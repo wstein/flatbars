@@ -86,8 +86,8 @@ helperDefs =
   , gen "dict" false AnyArity dictH
   , gen "apply" true (AtLeast 1) applyH
   , gen "partial" false (Between 2 3) partialH
+  , gen "inline" true (AtLeast 1) inlineH
   , valDef "eq" (binary eq')
-  , valDef "eq?" (binary eq')
   , valDef "not" (unary not')
   , valDef "and" (variadic (boolOf Array.all))
   , valDef "or" (variadic (boolOf Array.any))
@@ -124,6 +124,7 @@ preludeSchema =
     , Tuple "key" { block: false, arity: Exactly 0 }
     , Tuple "first" { block: false, arity: Exactly 0 }
     , Tuple "last" { block: false, arity: Exactly 0 }
+    , Tuple "partial-block" { block: false, arity: Exactly 0 }
     ]
 
 -- | Lift `Value.stringify` (pure, `Either Error`) into the engine monad.
@@ -358,15 +359,26 @@ applyH ctl args = case Array.uncons args of
 -- | a hash `dict` (surface `{{> name k=v}}`) whose keys are merged onto the
 -- | context, overriding it (Handlebars' `options.hash`). The name is a (possibly
 -- | computed) string; the body comes from the env's partial registry.
+-- |
+-- | When called as a *block* (`{{#partial name}}body{{/partial}}`) the body is
+-- | the fallback rendered if the partial is missing, and is also exposed inside
+-- | the partial as the scoped `partial-block` helper (surface `{{> @partial-block}}`).
 partialH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 partialH ctl args = case args of
   [ VString name, ctx ] -> renderPartial name ctx
   [ VString name, ctx, opts ] -> renderPartial name (mergeHash ctx opts)
   _ -> throwError (TypeError "partial: expected (name string, context, [options])")
   where
+  -- the caller's block body, rendered in the caller's context — exposed inside
+  -- the partial as `partial-block`. Only installed when there is a body.
+  blockFrame =
+    if Array.null ctl.children then Map.empty
+    else Map.singleton "partial-block" (\_ _ -> VSafe <$> ctl.render ctl.env ctl.children)
   renderPartial name ctx = case lookupPartial name ctl.env of
-    Just tmpl -> VSafe <$> ctl.render (pushFrame Map.empty ctx ctl.env) tmpl
-    Nothing -> throwError (HelperError ("unknown partial '" <> name <> "'"))
+    Just tmpl -> VSafe <$> ctl.render (pushFrame blockFrame ctx ctl.env) tmpl
+    Nothing
+      | Array.null ctl.children -> throwError (HelperError ("unknown partial '" <> name <> "'"))
+      | otherwise -> VSafe <$> ctl.render ctl.env ctl.children -- block body is the fallback
   -- hash keys override the context; with a non-object context the hash *is* the
   -- context (so `{{> nav title=…}}` works even at top level with no data).
   mergeHash ctx opts = case opts of
@@ -374,3 +386,10 @@ partialH ctl args = case args of
       VObject c -> VObject (Map.union o c)
       _ -> VObject o
     _ -> ctx
+
+-- | `inline` defines a partial (`{{#inline "name"}}body{{/inline}}`). The
+-- | definition is hoisted into the partial registry *before* rendering (see
+-- | `FlatBars.Surface.hoistInline`), so at render time the block itself emits
+-- | nothing.
+inlineH :: forall m. Applicative m => Helper m (RefEnv m)
+inlineH _ _ = pure (VSafe "")

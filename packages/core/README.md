@@ -53,7 +53,7 @@ both `Either Error` (`renderWith`/`compile`) and `ExceptT Error Aff`
 (`{{#if c}}…{{else}}…{{/if}}` — a name-agnostic `Sep` marker the engine splits
 at); prelude helpers `this`, `lookup`, `true`/`false`/`null`, `esc_html`,
 `safe`, `raw`, `if`, `unless`, `each`, `with`, `else`, `dict`, `apply`,
-`eq`/`eq?`, `not`, `and`, `or`, `log`;
+`eq`, `not`, `and`, `or`, `log`;
 and a JSON-schema-style `validate` over the skeleton.
 
 `FlatBars.Lower` is the reference *walker* (ADR-001): a `foldTemplate` that turns

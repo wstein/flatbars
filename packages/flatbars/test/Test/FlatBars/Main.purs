@@ -465,7 +465,6 @@ main = do
       , "safe"
       , "else"
       , "eq"
-      , "eq?"
       , "not"
       , "and"
       , "or"

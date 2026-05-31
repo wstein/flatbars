@@ -229,7 +229,7 @@ a helper library. They are part of the FlatBars prelude (xref:prelude.adoc[§6])
 |`raw` |raw-block helper returning its captured body verbatim
 |`dict` |build an object from `key value …` pairs (hash arguments)
 |`apply` |call a helper by name (`pass:[apply "helper" arg…]`)
-|`eq` / `eq?` |value equality ⇒ boolean (for `pass:[{{#if (eq a b)}}]`)
+|`eq` |value equality ⇒ boolean (for `pass:[{{#if (eq a b)}}]`)
 |`not` |logical negation of truthiness
 |`and` / `or` |variadic boolean fold over truthiness
 |`else` |the inert separator marker (renders to nothing on its own)

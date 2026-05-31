@@ -89,7 +89,7 @@ Within `pass:[{{{ … }}}]`, `pass:[{{# … }}]`, and the head of a raw block, t
 |An identifier. One or more characters from `A`–`Z`, `a`–`z`, `0`–`9`, `_`, `-`, `+`, `*`, `?`, `!`,
 `/`, `.`, `<`, `>`, `=` that does not parse as a `NUMBER`. Must not start with a digit, `-`+digit,
 `"`, `(`, `)`, or whitespace.
-|`each`  `esc_html`  `partial-block`  `>`  `eq?`
+|`each`  `esc_html`  `partial-block`  `>`  `eq`
 
 |`STRING`
 |`"` … `"` or `'` … `'` with escapes `\\` `\"` `\'` `\n` `\t` `\r`. May contain spaces and any
@@ -109,7 +109,7 @@ tag-like text; the lexer does not look inside strings.
 |
 |===
 
-The permissive `IDENT` set lets names like `>` (partial), `eq?`, `+`, and `partial-block` be
+The permissive `IDENT` set lets names like `>` (partial), `eq`, `+`, and `partial-block` be
 written. `.` is a legal `IDENT` character, so `a.b` lexes as a *single* identifier — the core never
 splits it. Dotted *paths* are a surface concept (xref:surface.adoc[]).
 
