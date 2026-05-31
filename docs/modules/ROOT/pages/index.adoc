@@ -63,7 +63,7 @@ C --> P : handed to
 ....
 
 The xref:concepts.adoc[core model] explains the decisions. The
-xref:appendix-handlebars.adoc[appendix] maps *every* {hb} concept onto BareBars with no gaps.
+xref:appendix-handlebars.adoc[appendix] maps *every* {hbs} concept onto BareBars with no gaps.
 
 [NOTE]
 ====
@@ -72,3 +72,14 @@ satisfy. The xref:prelude.adoc[reference engine] and xref:host-api.adoc[host API
 conforming implementation, in PureScript. Code fragments use `text`/`haskell` blocks and are
 normative only where marked _normative_.
 ====
+
+== The reference dialect: FullBars
+
+The engine and surface dialect that ship with BareBars are *FullBars* — a member of the
+Handlebars/Mustache family, familiar on sight, but a *dialect* with its own reasoned choices, not a
+clone: a helper-first core, escaping as an explicit helper, `pass:[{{else}}]` as a name-agnostic
+separator, a native short-circuit `pass:[{{elif}}]`, content-based safe-string truthiness, and
+explicit (`~`) whitespace. The differences from {hbs} are *features, not gaps* — see
+xref:fullbars-compat.adoc[the FullBars dialect — differences from Handlebars]. And because the core
+reserves no names, you can delete, replace, or rename any of it and grow a different dialect on the
+same substrate.
