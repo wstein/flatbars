@@ -55,6 +55,15 @@ prelude =
   ]
 
 -- | The reference engine's validation schema (`BareBars.Walk.validate`).
+-- |
+-- | NOTE: validation is *scope-blind* — like a lenient JSON schema, it checks
+-- | only that a name is known and its arity fits, not *where* it may appear. The
+-- | scoped helpers below (`root`, `parent`, `index`, `key`, `first`, `last`)
+-- | only exist inside the frames `each`/`with` push (and `root` from
+-- | `preludeEnv`), so a template using `{{{index}}}` at top level *validates*
+-- | but then fails to render with `UnknownHelper`. Declaring them keeps their
+-- | in-scope uses from being flagged; catching out-of-scope uses would require a
+-- | scope-aware pass, which the schema deliberately is not.
 preludeSchema :: Schema
 preludeSchema =
   { allowUnknown: false
