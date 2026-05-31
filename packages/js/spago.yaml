@@ -7,11 +7,18 @@ package:
       githubOwner: barebars
       githubRepo: barebars
   dependencies:
+    - prelude
     - either
     - functions
     - argonaut-core
+    - barebars
     - barebars-json
     - flatbars
+    - arrays
+    - integers
+    - maybe
+    - tuples
+    - foreign-object
   test:
     main: Test.FlatBars.JS.Main
     dependencies:

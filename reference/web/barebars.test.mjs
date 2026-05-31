@@ -55,7 +55,7 @@ test("a parse error is thrown as a located render error", async () => {
 test("engineInfo advertises an honest capability vector", async () => {
   const r = await createBareBarsRenderer();
   const info = r.engineInfo();
-  assert.match(info.version, /^barebars /);
+  assert.match(info.version, /\d+\.\d+/);
   assert.ok(Array.isArray(info.features));
   // MVP: no Stem-only / AST-backed features advertised, so those panels gate off.
   for (const absent of ["transformers", "static-ast", "partial-graph", "bytecode-wire", "context-inspect"]) {
@@ -71,4 +71,40 @@ test("the catalog entries have the cheat-sheet shape", async () => {
       assert.ok(f in e, `catalog entry missing ${f}`);
     }
   }
+});
+
+test("parseAst returns the {t:…} node shape", async () => {
+  const r = await createBareBarsRenderer();
+  const { ast } = r.parseAst("<h1>{{ name }}</h1>{{#each items}}{{ this }}{{/each}}");
+  assert.equal(ast.version, "barebars-ast/v1");
+  const kinds = ast.nodes.map((n) => n.t);
+  assert.deepEqual(kinds, ["text", "emit", "text", "each"]);
+  const emit = ast.nodes[1];
+  assert.equal(emit.expr.t, "path");
+  assert.deepEqual(emit.expr.segments, ["name"]);
+});
+
+test("parseAst surfaces a located parse error", async () => {
+  const r = await createBareBarsRenderer();
+  const res = r.parseAst("{{#each xs}}…"); // unclosed block
+  assert.ok(res.error, "expected an error result");
+  assert.equal(typeof res.error.message, "string");
+});
+
+test("requiredAssigns is exact (path roots only, no helpers/params)", async () => {
+  const r = await createBareBarsRenderer();
+  const prog = r.compile(
+    '{{ title }}{{#each rows as |row|}}{{ row.id }} {{ city.name }}{{/each}}{{#if (eq a b)}}{{ a }}{{/if}}',
+    {},
+  ).program;
+  // `rows`, `city`, `a`, `b` are data; `row` is a block param (a call, excluded);
+  // `eq`/`each`/`if` are helpers (excluded).
+  assert.deepEqual(r.requiredAssigns(prog), ["a", "b", "city", "rows", "title"]);
+});
+
+test("usedTransformers collects block + call helpers", async () => {
+  const r = await createBareBarsRenderer();
+  const prog = r.compile("{{#each xs}}{{#if (eq a b)}}{{ x }}{{/if}}{{/each}}", {}).program;
+  const used = r.usedTransformers(prog);
+  assert.ok(used.includes("each") && used.includes("if") && used.includes("eq"));
 });

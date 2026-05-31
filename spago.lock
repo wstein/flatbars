@@ -181,10 +181,17 @@
         "core": {
           "dependencies": [
             "argonaut-core",
+            "arrays",
+            "barebars",
             "barebars-json",
             "either",
             "flatbars",
-            "functions"
+            "foreign-object",
+            "functions",
+            "integers",
+            "maybe",
+            "prelude",
+            "tuples"
           ],
           "build_plan": [
             "aff",

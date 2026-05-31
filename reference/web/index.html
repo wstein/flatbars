@@ -1639,12 +1639,13 @@
         : await createRenderer(await (await fetch(WASM)).arrayBuffer());
       // Show the engine + its version (the Stem build bakes it into the wasm;
       // the Handlebars adapter reports the vendored library version).
-      byId("brand-ver").textContent =
-        (ENGINE === "handlebars" ? "Handlebars " : "") + "v" + renderer.version;
+      const ENGINE_LABEL =
+        ENGINE === "handlebars" ? "Handlebars" : ENGINE === "barebars" ? "BareBars" : "Stem";
+      byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
       // The on-disk extension for this engine's template/partial files
-      // (`.hbs` for Handlebars, `.stem` for Stem) — used wherever a file name
-      // is shown (explorer, tab strip, download).
-      const TEMPLATE_EXT = ENGINE === "handlebars" ? "hbs" : "stem";
+      // (`.hbs` for Handlebars/BareBars — surface is Handlebars-flavoured —
+      // `.stem` for Stem) — used wherever a file name is shown.
+      const TEMPLATE_EXT = ENGINE === "stem" ? "stem" : "hbs";
       // Engine reflection: canonical built-in list and capability metadata,
       // live from the loaded WASM binary. Used to drive the cheat-sheet section
       // in the Transformers dock tab and validate the risk-tier map below.

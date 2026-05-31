@@ -1,47 +1,168 @@
--- | A thin, JS/TS-friendly facade over the FlatBars engine (review P6).
+-- | A thin, JS/TS-friendly facade over the FlatBars engine (review P6), and the
+-- | engine seam the polyglot lab (Brace Lab) consumes.
 -- |
--- | The library is written in PureScript and renders against the core `Value`
--- | type, but a JavaScript or TypeScript host should not have to know that —
--- | curried calling conventions, `Either`, and `Data.Map`-based values are all
--- | internal. This module is the public boundary: *uncurried* functions that
--- | take a template string and *plain JS data* (any JSON-shaped value) and
--- | return a plain `{ ok, value, error }` object.
--- |
--- | ```js
--- | import { render, renderSurface } from "barebars-js";
--- | const r = renderSurface("<h1>{{ name }}</h1>", { name: "Ada" });
--- | if (r.ok) document.body.innerHTML = r.value; else console.error(r.error);
--- | ```
--- |
--- | `data` is taken as an Argonaut `Json`, which *is* an ordinary JS value, so a
--- | JS caller just passes an object/array/string/number/boolean/null directly;
--- | it is converted to `Value` via `BareBars.Json.fromJson`.
+-- | The library renders against the core `Value` type with curried,
+-- | `Either`-returning internals; this module is the public boundary: uncurried
+-- | functions over plain JS data. `render`/`renderSurface` return a plain
+-- | `{ ok, value, error }`; `astJson` returns the lowered AST as the lab's
+-- | `{t:…}` JSON node shape (or `{error}`), so a JS host's AST-outline and
+-- | data-access inspectors can walk it.
 module FlatBars.JS
   ( Result
   , render
   , renderSurface
+  , astJson
   ) where
 
-import BareBars.Json (fromJson)
-import Data.Argonaut.Core (Json)
-import Data.Either (Either, either)
-import Data.Function.Uncurried (Fn2, mkFn2)
-import FlatBars as FlatBars
+import Prelude
 
--- | A render outcome as a plain JS object: `ok` says which of `value`/`error`
--- | is meaningful (the other is `""`).
+import BareBars (Expr(..), parse, parseErrorAt)
+import BareBars.Json (fromJson)
+import BareBars.Value (Value(..))
+import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
+import Data.Array (elem, null, uncons) as Array
+import Data.Either (Either(..), either)
+import Data.Function.Uncurried (Fn2, mkFn2)
+import Data.Int (toNumber)
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
+import FlatBars (RNode(..), desugarSurface, lower)
+import FlatBars as FlatBars
+import Foreign.Object as FO
+
+-- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
 type Result = { ok :: Boolean, value :: String, error :: String }
 
 result :: Either String String -> Result
 result = either (\e -> { ok: false, value: "", error: e }) (\v -> { ok: true, value: v, error: "" })
 
--- | Render a *core-syntax* template against JS data. `render(template, data)`.
--- | Parse failures are reported as `line:column: message`.
+-- | Render a core-syntax template against JS data. `render(template, data)`.
 render :: Fn2 String Json Result
 render = mkFn2 \tpl json -> result (FlatBars.renderWithDiag tpl (fromJson json))
 
--- | Render a *surface-dialect* template (paths, `{{ }}` auto-escape, …) against
--- | JS data. `renderSurface(template, data)`. Parse failures are reported as
--- | `line:column: message`.
+-- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result
 renderSurface = mkFn2 \tpl json -> result (FlatBars.renderSurfaceDiag tpl (fromJson json))
+
+--------------------------------------------------------------------------------
+-- AST for the polyglot lab seam
+--------------------------------------------------------------------------------
+
+-- | Parse + lower a template to the lab's `{ ast: { version, nodes } }` JSON (or
+-- | `{ error: { message, start, end } }`). `dialect` is `"core"` or `"surface"`
+-- | (surface desugars first). The node shape matches the host's `mapNode`
+-- | contract: `text`/`emit`/`if`/`unless`/`each`/`with`/`raw`/`sep`/custom-block,
+-- | with expressions as `lit`/`identifier`/`path`/`context`/`call`/data vars.
+astJson :: Fn2 String String Json
+astJson = mkFn2 \dialect src -> case parse src of
+  Left pe ->
+    let
+      d = parseErrorAt src pe
+    in
+      obj
+        [ Tuple "error"
+            ( obj
+                [ Tuple "message" (str d.message)
+                , Tuple "start" (int d.offset)
+                , Tuple "end" (int d.offset)
+                ]
+            )
+        ]
+  Right tmpl ->
+    let
+      nodes = lower (if dialect == "core" then tmpl else desugarSurface tmpl)
+    in
+      obj
+        [ Tuple "ast"
+            (obj [ Tuple "version" (str "barebars-ast/v1"), Tuple "nodes" (arr (map rnode nodes)) ])
+        ]
+
+--------------------------------------------------------------------------------
+-- JSON builders
+--------------------------------------------------------------------------------
+
+obj :: Array (Tuple String Json) -> Json
+obj kvs = fromObject (FO.fromFoldable kvs)
+
+arr :: Array Json -> Json
+arr = fromArray
+
+str :: String -> Json
+str = fromString
+
+int :: Int -> Json
+int n = fromNumber (toNumber n)
+
+tt :: String -> Tuple String Json
+tt t = Tuple "t" (str t)
+
+ctx :: String -> Json
+ctx kind = obj [ tt "context", Tuple "kind" (str kind) ]
+
+--------------------------------------------------------------------------------
+-- Node / expression mapping
+--------------------------------------------------------------------------------
+
+rnode :: RNode -> Json
+rnode = case _ of
+  RText s -> obj [ tt "text", Tuple "text" (str s) ]
+  ROut escaped e -> obj
+    [ tt "emit", Tuple "expr" (rexpr e), Tuple "escape" (str (if escaped then "html" else "none")) ]
+  RIf c a b -> obj
+    [ tt "if", Tuple "cond" (rexpr c), Tuple "then" (children a), Tuple "else" (children b) ]
+  RUnless c a b -> obj
+    [ tt "unless", Tuple "cond" (rexpr c), Tuple "then" (children a), Tuple "else" (children b) ]
+  REach c a b -> obj
+    [ tt "each", Tuple "subject" (rexpr c), Tuple "body" (children a), Tuple "else" (children b) ]
+  RWith c a b -> obj
+    [ tt "with", Tuple "subject" (rexpr c), Tuple "body" (children a), Tuple "else" (children b) ]
+  RCall n args ch -> obj [ tt n, Tuple "args" (arr (map argOf args)), Tuple "body" (children ch) ]
+  RSep n args -> obj [ tt "sep", Tuple "name" (str n), Tuple "args" (arr (map argOf args)) ]
+  RRaw s -> obj [ tt "raw", Tuple "text" (str s) ]
+  where
+  children ns = arr (map rnode ns)
+
+argOf :: Expr -> Json
+argOf e = obj [ Tuple "value" (rexpr e) ]
+
+-- The scoped @data variables the host renders as their own `{t:name}` node.
+dataVars :: Array String
+dataVars =
+  [ "index", "key", "first", "last", "parent-index", "parent-key", "parent-first", "parent-last" ]
+
+rexpr :: Expr -> Json
+rexpr = case _ of
+  Lit v -> obj [ tt "lit", Tuple "value" (rlit v) ]
+  App "this" [] -> ctx "this"
+  App "root" [] -> ctx "root"
+  App "parent" [] -> ctx "parent"
+  App "lookup" args -> path args -- surface paths desugar to `lookup this seg…`
+  App name [] ->
+    if Array.elem name dataVars then obj [ tt name ]
+    else obj [ tt "identifier", Tuple "name" (str name) ]
+  App name args -> obj [ tt "call", Tuple "name" (str name), Tuple "args" (arr (map argOf args)) ]
+
+-- `lookup this "a" "b"` ⇒ a path; `lookup this` ⇒ this; anything else (e.g.
+-- `lookup (parent) …`) is kept as a plain call.
+path :: Array Expr -> Json
+path args = case Array.uncons args of
+  Just { head: App "this" [], tail } ->
+    if Array.null tail then ctx "this"
+    else obj [ tt "path", Tuple "segments" (arr (map segment tail)) ]
+  _ -> obj [ tt "call", Tuple "name" (str "lookup"), Tuple "args" (arr (map argOf args)) ]
+
+segment :: Expr -> Json
+segment = case _ of
+  Lit (VString s) -> str s
+  Lit (VNumber n) -> str (show n)
+  App n _ -> str n
+  _ -> str "?"
+
+rlit :: Value -> Json
+rlit = case _ of
+  VString s -> str s
+  VSafe s -> str s
+  VNumber n -> fromNumber n
+  VBool b -> fromBoolean b
+  VNull -> jsonNull
+  _ -> jsonNull

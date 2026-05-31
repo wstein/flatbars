@@ -22,15 +22,19 @@
 // then BareBars does not advertise those features, so those panels gate off
 // exactly as for any engine that lacks them.
 
-import { render as bbRender, renderSurface as bbRenderSurface } from "./vendor/barebars-engine.mjs";
+import { render as bbRender, renderSurface as bbRenderSurface, astJson } from "./vendor/barebars-engine.mjs";
 
-const BB_VERSION = "barebars 0.1.0";
+const BB_VERSION = "0.1.0";
 
-// engine-features/v1 capability vector. Deliberately thin for the MVP: BareBars
-// backs rendering and a static helper catalog, but the AST-backed analyses are
-// not advertised yet (Phase 2), so the gate hides those panels.
+// engine-features/v1 capability vector. BareBars backs rendering, a static helper
+// catalog (→ Transformers panel), and exact data-access (→ Data Access panel):
+// the surface dialect desugars every bare path to `lookup`, so the AST cleanly
+// separates data reads from helper calls — no `:approximate` suffix needed.
+// AST-only Stem features (partial-graph, standalone-whitespace, provenance, …)
+// stay absent, so the gate hides those panels.
 const BB_FEATURES = [
   "catalog",
+  "required-assigns",
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
 ];
@@ -85,19 +89,76 @@ export async function createBareBarsRenderer() {
     return renderResult(res, map);
   }
 
-  // parseAst / inspectors: Phase 2 (needs the FlatBars.Lab AST-JSON facade). The
-  // features above omit the AST capabilities, so the host gates these panels off;
-  // these are belt-and-braces typed `unsupported` guards.
-  function parseAst() {
-    return { ast: { version: "barebars-ast/v1", nodes: [] } };
+  // ── AST + static analyses ──────────────────────────────────────────────────
+  // parseAst returns the lowered AST in the host's {t:…} node shape (or {error}).
+  // The engine facade does the parse+lower+map in PureScript; the analyses below
+  // walk that shape, exactly like the Handlebars adapter walks its mapped nodes.
+
+  function parseAst(source) {
+    return astJson("surface", source);
   }
+
+  function walk(nodes, visit) {
+    for (const node of nodes || []) {
+      visit(node);
+      for (const key of ["then", "else", "body"]) {
+        if (Array.isArray(node[key])) walk(node[key], visit);
+      }
+    }
+  }
+  function walkExpr(expr, visit) {
+    if (!expr || typeof expr !== "object") return;
+    visit(expr);
+    if (expr.t === "call") for (const a of expr.args || []) walkExpr(a.value, visit);
+  }
+
+  // Every expression position in a node (the emitted value, a condition/subject,
+  // and any call arguments).
+  function eachExpr(node, fn) {
+    if (node.t === "emit") fn(node.expr);
+    if (node.cond) fn(node.cond);
+    if (node.subject) fn(node.subject);
+    if (Array.isArray(node.args)) for (const a of node.args) fn(a.value);
+  }
+
+  function nodesOf(program) {
+    const parsed = astJson(program.dialect, program.source);
+    return parsed.ast ? parsed.ast.nodes : [];
+  }
+
+  // required-assigns (EXACT for BareBars): the root of every `{t:"path"}` — i.e.
+  // every bare/dotted data path. Helpers are explicit calls and block params are
+  // `(param)` calls, so neither leaks in (unlike the Handlebars approximation).
+  function requiredAssigns(program) {
+    const out = new Set();
+    walk(nodesOf(program), (node) =>
+      eachExpr(node, (e) => walkExpr(e, (x) => {
+        if (x.t === "path" && x.segments && x.segments.length) out.add(x.segments[0]);
+      })),
+    );
+    return [...out].sort();
+  }
+
+  // used-transformers: block-helper node types (if/unless/each/with + any custom
+  // block) and every `{t:"call"}` head.
+  function usedTransformers(program) {
+    const names = new Set();
+    const STRUCTURAL = new Set(["text", "emit", "sep", "raw"]);
+    walk(nodesOf(program), (node) => {
+      if (["if", "unless", "each", "with"].includes(node.t)) names.add(node.t);
+      else if (node.t && !STRUCTURAL.has(node.t)) names.add(node.t); // custom block helper
+      eachExpr(node, (e) => walkExpr(e, (x) => { if (x.t === "call" && x.name) names.add(x.name); }));
+    });
+    return [...names].sort();
+  }
+
   function inspectAt() {
     const err = new Error("BareBars context inspector is not implemented yet");
     err.kind = "unsupported";
     throw err;
   }
-  function usedTransformers() { return []; }
-  function requiredAssigns() { return []; }
+  // partial-graph is not advertised yet (BareBars partials are `partial` calls,
+  // not distinct AST nodes — a Phase-3 mapping), so the Partials panel gates off.
   function partialGraph() { return { nodes: [], edges: [], cycles: [] }; }
   function allTransformers() { return BB_CATALOG.map((e) => e.name); }
   function catalog() { return BB_CATALOG; }
