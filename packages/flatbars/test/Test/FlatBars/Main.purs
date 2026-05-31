@@ -124,6 +124,18 @@ main = do
   expect "if-false-bare" "{{#if this}}yes{{/if}}" (VBool false) ""
   expect "unless" "{{#unless this}}none{{/unless}}" (VBool false) "none"
 
+  -- Truthiness matches Handlebars: 0 is falsy by default. `includeZero` (passed
+  -- as an options object via `dict`) makes 0 count as truthy.
+  expect "if-zero-falsy" "{{#if this}}y{{else}}n{{/if}}" (VNumber 0.0) "n"
+  expect "if-nonzero-truthy" "{{#if this}}y{{else}}n{{/if}}" (VNumber 1.0) "y"
+  expect "if-zero-includeZero" "{{#if this (dict \"includeZero\" true)}}y{{else}}n{{/if}}"
+    (VNumber 0.0)
+    "y"
+  expect "unless-zero" "{{#unless this}}n{{/unless}}" (VNumber 0.0) "n"
+  expect "unless-zero-includeZero" "{{#unless this (dict \"includeZero\" true)}}n{{/unless}}"
+    (VNumber 0.0)
+    ""
+
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at
   -- it. The word `else` never lands in the lexer or parser.

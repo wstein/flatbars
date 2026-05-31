@@ -32,7 +32,7 @@ import Data.Array as Array
 import Data.Either (Either)
 import Data.Int as Int
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -78,8 +78,8 @@ helperDefs =
   , valDef "esc_html" (unary escHtml)
   , valDef "safe" (unary safe)
   , gen "raw" true AnyArity rawH
-  , gen "if" true (Exactly 1) ifH
-  , gen "unless" true (Exactly 1) unlessH
+  , gen "if" true (Between 1 2) ifH
+  , gen "unless" true (Between 1 2) unlessH
   , gen "each" true (Exactly 1) eachH
   , gen "with" true (Exactly 1) withH
   , valDef "else" (nullary (pure (VSafe "")))
@@ -223,15 +223,41 @@ renderElse ctl = renderSafe ctl ctl.env (elseBody ctl)
 -- Conditionals
 --------------------------------------------------------------------------------
 
+-- | `if cond [opts]`. An optional second argument is an *options object*
+-- | (build it with `dict`); when it carries `includeZero: true`, the number `0`
+-- | counts as truthy — Handlebars' `includeZero`. Without it, `0` is falsy
+-- | (see `Value.truthy`).
 ifH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 ifH ctl args = case args of
-  [ c ] -> if truthy c then renderMain ctl else renderElse ctl
-  _ -> throwError (ArityError (wrongCount "if" 1 args))
+  [ c ] -> branchOn (truthy c) ctl
+  [ c, opts ] -> branchOn (truthyWith opts c) ctl
+  _ -> throwError (ArityError (wrong1or2 "if" args))
 
 unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 unlessH ctl args = case args of
-  [ c ] -> if truthy c then renderElse ctl else renderMain ctl
-  _ -> throwError (ArityError (wrongCount "unless" 1 args))
+  [ c ] -> branchOn (not (truthy c)) ctl
+  [ c, opts ] -> branchOn (not (truthyWith opts c)) ctl
+  _ -> throwError (ArityError (wrong1or2 "unless" args))
+
+-- | Render the main clause when the condition holds, else the `{{else}}` clause.
+branchOn :: forall m. MonadThrow Error m => Boolean -> Ctl m (RefEnv m) -> m Value
+branchOn cond ctl = if cond then renderMain ctl else renderElse ctl
+
+wrong1or2 :: String -> Array Value -> String
+wrong1or2 name args = name <> ": expected 1 or 2 arguments, got " <> show (Array.length args)
+
+-- | Truthiness honoring an options object's `includeZero` flag: when set, the
+-- | number `0` is truthy; otherwise this is plain `truthy`.
+truthyWith :: Value -> Value -> Boolean
+truthyWith opts v = case v of
+  VNumber n | n == 0.0 && optFlag "includeZero" opts -> true
+  _ -> truthy v
+
+-- | Read a boolean option from an options object (`VObject`); absent ⇒ false.
+optFlag :: String -> Value -> Boolean
+optFlag key = case _ of
+  VObject m -> maybe false truthy (Map.lookup key m)
+  _ -> false
 
 --------------------------------------------------------------------------------
 -- Iteration & context shift

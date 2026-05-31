@@ -20,8 +20,11 @@ import Data.String (Pattern(..), Replacement(..), replaceAll, stripSuffix)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 
--- | Truthiness, matching Handlebars: `false`, `null`, `""`, and the empty array
--- | are falsy; `0`, `{}`, and any non-empty value are truthy.
+-- | Truthiness, matching Handlebars: `false`, `null`, `0`, `""`, and the empty
+-- | array are falsy; `{}`, non-empty strings/arrays, and non-zero numbers are
+-- | truthy. (Handlebars' `includeZero` option — counting `0` as truthy — lives
+-- | in the `if`/`unless` helpers, not here.) A trusted empty string (`VSafe ""`)
+-- | is falsy too, since it is still an empty string.
 truthy :: Value -> Boolean
 truthy = case _ of
   VBool b -> b
@@ -29,6 +32,7 @@ truthy = case _ of
   VString "" -> false
   VSafe "" -> false
   VArray [] -> false
+  VNumber n -> n /= 0.0
   _ -> true
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
