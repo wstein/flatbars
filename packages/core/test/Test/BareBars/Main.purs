@@ -189,12 +189,12 @@ main = do
     (contentOf "a\n{{! x }}\nb" defaultParseOptions == [ "a\n", "b" ])
   -- option off: the surrounding newline is kept.
   assert' "trim: option off keeps lines"
-    (contentOf "a\n{{! x }}\nb" { trimStandalone: false } == [ "a\n", "\nb" ])
+    (contentOf "a\n{{! x }}\nb" (defaultParseOptions { trimStandalone = false }) == [ "a\n", "\nb" ])
   -- @trim:none overrides the on-default; @trim:standalone overrides off.
   assert' "trim: @trim:none overrides default-on"
     (contentOf "{{! @trim:none }}a\n{{! x }}\nb" defaultParseOptions == [ "a\n", "\nb" ])
   assert' "trim: @trim:standalone overrides option-off"
-    (contentOf "{{! @trim:standalone }}a\n{{! x }}\nb" { trimStandalone: false } == [ "a\n", "b" ])
+    (contentOf "{{! @trim:standalone }}a\n{{! x }}\nb" (defaultParseOptions { trimStandalone = false }) == [ "a\n", "b" ])
   -- an invalid @trim value is a BadDirective parse error.
   case parse "{{! @trim:loose }}x" of
     Left (BadDirective _ _) -> pure unit

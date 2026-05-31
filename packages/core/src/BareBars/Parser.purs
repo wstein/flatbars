@@ -10,13 +10,14 @@ module BareBars.Parser
   ( parse
   , parseWith
   , ParseOptions
+  , ExprParser
   , defaultParseOptions
   ) where
 
 import Prelude
 
 import BareBars.Error (ParseError(..))
-import BareBars.Expr (parseExpr)
+import BareBars.Expr as Expr
 import BareBars.Lexer (RawTok(..), tokenizeTemplate, trimStandalone)
 import BareBars.Span (Span)
 import BareBars.Syntax (Directive, Expr(..), Node(..), Template)
@@ -28,14 +29,21 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.String (trim)
 import Data.String.CodeUnits as SCU
 
+-- | A tag-interior expression parser: `offset -> interior -> Expr`. The core
+-- | grammar (`BareBars.Expr`) is the default; a *dialect* (e.g. MaxBars, with
+-- | infix operators and pipes) plugs in its own — the structural tree-builder
+-- | below is grammar-agnostic.
+type ExprParser = Int -> String -> Either ParseError Expr
+
 -- | Knobs the *front-end* (CLI/host) sets; per-file `@`-directives may override
 -- | them. `trimStandalone` toggles Handlebars-style standalone whitespace
--- | removal (default on); a `@trim: standalone | none` directive wins over it.
-type ParseOptions = { trimStandalone :: Boolean }
+-- | removal (default on; a `@trim: standalone | none` directive wins over it).
+-- | `parseExpr` is the interior expression grammar (dialect seam).
+type ParseOptions = { trimStandalone :: Boolean, parseExpr :: ExprParser }
 
--- | Standalone trimming on, matching Handlebars out of the box.
+-- | Standalone trimming on (Handlebars parity) + the core expression grammar.
 defaultParseOptions :: ParseOptions
-defaultParseOptions = { trimStandalone: true }
+defaultParseOptions = { trimStandalone: true, parseExpr: Expr.parseExpr }
 
 -- | Parse source text into the core template *plus* its header directives, with
 -- | the default options. The directives are a meaning-free list the engine
@@ -59,7 +67,7 @@ parseWith opts src = do
   -- comments carry no output; drop them before the tree builder, which then
   -- never has to know about `RComment` (the standalone pass needs them, so it
   -- runs first).
-  res <- parseSeq (Array.filter (not <<< isComment) toks') 0
+  res <- parseSeq opts.parseExpr (Array.filter (not <<< isComment) toks') 0
   case res.stop of
     StopEOF -> Right { directives, nodes: res.nodes }
     StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
@@ -174,17 +182,18 @@ isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
 
 -- | The single `Expr` filling an output tag. A blank interior is `EmptyOutput`
 -- | at the tag's offset (not the interior's), matching the diagnostics tests.
-outputExpr :: Span -> Int -> String -> Either ParseError Expr
-outputExpr span base s
+outputExpr :: ExprParser -> Span -> Int -> String -> Either ParseError Expr
+outputExpr pe span base s
   | trim s == "" = Left (EmptyOutput span.start)
-  | otherwise = parseExpr base s
+  | otherwise = pe base s
 
 -- | A *headed* tag (`{{# name args}}`, `{{name args}}`, `{{/name}}`, raw): its
 -- | interior is one application whose head names the helper/block/separator.
-headed :: Span -> Int -> String -> Either ParseError { name :: String, args :: Array Expr }
-headed span base s
+headed
+  :: ExprParser -> Span -> Int -> String -> Either ParseError { name :: String, args :: Array Expr }
+headed pe span base s
   | trim s == "" = Left (HeadNotIdent span.start)
-  | otherwise = case parseExpr base s of
+  | otherwise = case pe base s of
       Left e -> Left e
       Right (App name args) -> Right { name, args }
       Right _ -> Left (HeadNotIdent span.start)
@@ -202,8 +211,8 @@ type SeqResult = { nodes :: Template, stop :: Stop }
 -- | Parse a run of nodes starting at index `i`, stopping at end of input or at
 -- | a close `{{/name}}`. A block captures a single body; multi-branch control
 -- | flow is expressed as nested clause blocks the engine interprets.
-parseSeq :: Array RawTok -> Int -> Either ParseError SeqResult
-parseSeq toks = go Nil
+parseSeq :: ExprParser -> Array RawTok -> Int -> Either ParseError SeqResult
+parseSeq pe toks = go Nil
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
@@ -223,24 +232,24 @@ parseSeq toks = go Nil
     Just t -> case t of
       RContent s -> go (Content s : acc) (i + 1)
       RComment _ _ _ -> go acc (i + 1) -- filtered upstream; skip defensively
-      ROutput span base s -> case outputExpr span base s of
+      ROutput span base s -> case outputExpr pe span base s of
         Left e -> Left e
         Right e -> go (Output span e : acc) (i + 1)
-      RRaw span base s body -> case headed span base s of
+      RRaw span base s body -> case headed pe span base s of
         Left e -> Left e
         Right h -> go (RawBlock span h.name h.args body : acc) (i + 1)
-      RSep span base s -> case headed span base s of
+      RSep span base s -> case headed pe span base s of
         Left e -> Left e
         Right h -> go (Sep span h.name h.args : acc) (i + 1)
-      RClose _ base s -> case headed { start: base, end: base } base s of
+      RClose _ base s -> case headed pe { start: base, end: base } base s of
         Left e -> Left e
         Right h -> Right (done acc (StopClose h.name (i + 1)))
       ROpen span base s -> buildBlock acc span base s (i + 1)
 
   buildBlock :: List Node -> Span -> Int -> String -> Int -> Either ParseError SeqResult
-  buildBlock acc span base s i = case headed span base s of
+  buildBlock acc span base s i = case headed pe span base s of
     Left e -> Left e
-    Right h -> case parseSeq toks i of
+    Right h -> case parseSeq pe toks i of
       Left e -> Left e
       Right inner -> case inner.stop of
         -- point the diagnostic at the *opener* (its span start), not offset 0.

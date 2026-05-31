@@ -16,7 +16,7 @@ module Cli.Main where
 
 import Prelude
 
-import BareBars (ParseOptions, parseWith, renderParseErrorAt, validate)
+import BareBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt, validate)
 import BareBars.Compile.FullBars (compileCoreWith, compileSurfaceWith) as Compile
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
@@ -132,7 +132,9 @@ run opts = do
     Right tpl -> do
       -- precedence: --trim flag > barebars.json > built-in default (on).
       configTrim <- loadConfigTrim
-      let popts = { trimStandalone: fromMaybe true (firstJust opts.trim configTrim) }
+      let
+        popts = defaultParseOptions
+          { trimStandalone = fromMaybe true (firstJust opts.trim configTrim) }
       if opts.compileOnly then runCompile popts opts tpl
       else if opts.validateOnly then runValidate popts tpl
       else do
