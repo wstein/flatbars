@@ -1,7 +1,7 @@
 name: barebars
 title: BareBars
 version: ~          # unversioned component; cut a branch to version it
-display_version: 'spec'
+display_version: 'spec · ADR-001'
 start_page: ROOT:index.adoc
 nav:
   - modules/ROOT/nav.adoc

@@ -1,6 +1,7 @@
 .xref:index.adoc[BareBars]
 * xref:index.adoc[Introduction]
 * xref:concepts.adoc[The core model]
+* xref:adr-0001-structural-parser-and-walker.adoc[ADR-001: structural parser + walker]
 
 .Specification
 * xref:lexical.adoc[1. Lexical structure]

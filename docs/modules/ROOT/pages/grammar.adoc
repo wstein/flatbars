@@ -109,6 +109,17 @@ engine's `if` helper splits its body at the `else` separator (xref:evaluation.ad
 xref:prelude.adoc[]); a `switch` helper might split at `case`. The word never lands in the lexer or
 parser. A separator's head may not begin with the reserved sigils `# / ! {` (those open other tags).
 
+A few consequences the parser does *not* legislate, leaving them to the engine:
+
+* *Standalone separator.* A `Sep` with no enclosing block to interpret it is not a parse error; the
+  reference engine renders it as the application of its head, i.e. `pass:[{{x}}]` ≡ `pass:[{{{x}}}]`
+  when not consumed (xref:evaluation.adoc[] §3.5). A standalone `pass:[{{else}}]` thus just invokes
+  the (inert) `else` helper and yields nothing.
+* *Repeated separators.* A block may contain several `Sep` nodes (`pass:[{{case}}]` … `pass:[{{case}}]`
+  … `pass:[{{default}}]`). The parser keeps them all as siblings; how many a helper recognizes, and
+  in what order, is the helper's contract. `splitClause` splits at the *first* match; a multi-way
+  helper folds over the rest.
+
 == 2.5 What is *not* in the grammar
 
 To make "no sugar in core" auditable, here is what a {hbs} author will look for and not find — each

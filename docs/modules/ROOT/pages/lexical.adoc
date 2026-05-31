@@ -44,8 +44,17 @@ before a tag opener escapes it: the opener is emitted literally and the backslas
 [source,text]
 ----
 \{{{x}}}      emits the literal text {{{x}}}
+\{{x}}        emits the literal text {{x}}      (a bare {{ is a separator opener)
 \\{{{x}}}     emits a literal backslash, then evaluates {{{x}}}
 ----
+
+[IMPORTANT]
+====
+*`pass:[{{]` is significant.* Because the bare double-stash is a separator opener (§1.2), a literal
+`pass:[{{]` in content must be written `pass:[\{{]`. For blocks of text full of braces, a raw block
+(`pass:[{{{{#raw}}}}…{{{{/raw}}}}]`, §1.7) is cleaner. This is a deliberate change from earlier
+drafts, where `pass:[{{ }}]` was not part of the core at all (xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]).
+====
 
 == 1.4 Whitespace control: `~`
 

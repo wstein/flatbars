@@ -1,0 +1,66 @@
+= ADR-001: One structural parser, a desugaring walker
+:navtitle: ADR-001 Structural parser + walker
+
+*Status:* Accepted (supersedes the earlier three-layer "surface parser + desugar pass + interpreter"
+framing). *Date:* 2026-05-31.
+
+This record fixes the architecture so it stops being relitigated. Earlier iterations swung between a
+hardcoded `pass:[{{else}}]` token, name-agnostic separators, nested `pass:[{{#else}}]` clause blocks,
+and back. This is the decision; changes to it require a new ADR.
+
+== Context
+
+BareBars is a *substrate*, not an engine: the core must commit to no semantics, and an engine
+supplies meaning. We need a pipeline that makes that split structural rather than merely asserted,
+and that does not grow a second parser/AST for "surface" sugar.
+
+== Decision
+
+The pipeline is *two passes and one parser*:
+
+[source,text]
+----
+source ──Lexer/Parser──▶ structural AST ──the walker──▶ real AST ──▶ output
+         1st pass: STRUCTURAL ONLY        2nd pass: engine-supplied
+         tags, braces, blocks, args,      desugars (escaping, paths, {{else}}→clause)
+         nesting — zero meaning           AND builds the real AST, in one walk
+----
+
+. *One parser, structural only.* `parse :: String -> Either ParseError Template` produces the
+  *structural AST* (xref:evaluation.adoc[] §3.1): `Content`, `Output`, `Block`, `RawBlock`, and the
+  bare double-stash `Sep`. It records every syntactic shape — brace count, identifiers, args,
+  nesting — and assigns *none* of it meaning. There is **no separate surface parser and no surface
+  AST**.
+
+. *`pass:[{{ }}]` is structural.* The two-brace stache is a first-class, meaning-free node (`Sep`).
+  `pass:[{{else}}]` is just a `Sep` whose head identifier is `else`; the parser cannot tell it from
+  any other `pass:[{{ name }}]`. Consequence: `pass:[{{]` is significant in content and a literal one
+  is written `pass:[\{{]` (or inside a raw block). The brace *count* is structural data;
+  "two ⇒ escape" is a *walker* rule, not a parser fact (xref:lexical.adoc[] §1.2).
+
+. *The walker is the only thing that assigns meaning.* It desugars and builds the real AST in the
+  same pass. Escaping (`esc_html` ⇒ escaped), clause-splitting (`pass:[{{else}}]` consumed into typed
+  branches), and — for a surface dialect — paths (`name` ⇒ `lookup this "name"`) are all walker
+  decisions. The reference lowering is `BareBars.Lower.lower :: Template -> Array RNode`, a
+  `foldTemplate` (xref:appendix-handlebars.adoc#engine-api[A.13.2]).
+
+. *No canonical real AST.* `RNode` (`RIf`/`ROut`/…) is the *reference engine's* real AST, published
+  as a worked example for tool authors. Another engine may lower to any shape. The reference renderer
+  (`runTemplate`) interprets the structural tree directly; `lower` is the materializable real AST
+  that tooling inspects (the playground's "Real AST" view, `escapingWarnings`).
+
+. *Safe by default.* The reference engine never auto-escapes raw output (`pass:[{{{ }}}]`); the
+  `escapingWarnings` lint flags raw output of untrusted data (`lookup`/`this`/scoped accessors not
+  wrapped in `safe`). Escaping is a walker rule, so this lint is where "you forgot to escape" is
+  caught.
+
+== Consequences
+
+* *Pro:* the parser is genuinely meaning-free (the `else`/`user` indistinguishability proves it); one
+  recursion (`foldTemplate`) replaces "surface parser + desugar pass + interpret"; the real AST is
+  inspectable but never mandated.
+* *Con:* `pass:[{{]` is now significant in template text (a breaking change from "no double-stash in
+  the core"); escaping lives in the swappable layer, mitigated by safe-by-default in the reference
+  engine plus the lint.
+* *Removed:* the separate surface parser / surface AST (`BareBars.Surface` as a `parseSurface`); the
+  dialect is recast as the walker's desugaring rules over the structural AST (xref:surface.adoc[]).

@@ -2,10 +2,13 @@
 :navtitle: 5. The surface dialect
 
 The core is austere by design. *BareBars Surface* is an optional dialect that recovers {hbs}
-ergonomics. It is *not* a separate parser: the one structural parser (`parse`) is unchanged, and
-Surface is a *desugaring walk* over the structural AST — part of the second pass (xref:host-api.adoc[]
-§7.1), naturally a `foldTemplate` (xref:appendix-handlebars.adoc#engine-api[A.13.2]). It lowers the
-skeleton to the engine's real AST; you can run it, swap it, or write your own.
+ergonomics. It is *not* a separate parser (xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]):
+the one structural parser (`parse`) is unchanged, and Surface is a *desugaring walk* over the
+structural AST — part of the second pass (xref:host-api.adoc[] §7.1), naturally a `foldTemplate`
+(xref:appendix-handlebars.adoc#engine-api[A.13.2]). The reference walk `BareBars.Lower.lower`
+already performs the clause and escaping rewrites below; the path/`@data`/hash/partial rules are the
+planned extension. It lowers the skeleton to the engine's real AST; you can run it, swap it, or write
+your own.
 
 Surface adds nothing the core cannot already express. Every rule below is a *rewrite* of one
 structural node into core nodes. Where a rewrite names a helper (`esc_html`, `lookup`, `dict`,
