@@ -6,13 +6,17 @@ module Test.Main where
 
 import Prelude
 
-import BareBars (foldTemplate, parse, preludeSchema, renderWith, validate)
+import BareBars (Engine, foldTemplate, parse, preludeSchema, renderAff, renderWith, runTemplate, stringify, validate)
+import BareBars.Error (Error(..))
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
+import Data.String (toUpper)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
+import Effect.Aff (launchAff_)
+import Effect.Class (liftEffect)
 import Effect.Console (log)
 import Test.Assert (assert')
 
@@ -56,6 +60,23 @@ expectIssue name src = case parse src of
   Left e -> assert' (name <> ": expected a validation issue, but got parse error " <> show e) false
   Right t -> assert' (name <> ": expected a validation issue")
     (not (Array.null (validate preludeSchema t)))
+
+-- A *pluggable env*: an engine whose environment is a bare `Value` (not the
+-- reference `RefEnv`), with a fixed two-helper resolver. Proves the driver is
+-- polymorphic in `env`.
+customEngine :: Value -> Engine (Either Error) Value
+customEngine root =
+  { initial: root
+  , resolve: \_ name -> case name of
+      "this" -> Right \ctl _ -> Right ctl.env
+      "shout" -> Right shoutH
+      _ -> Left (UnknownHelper name)
+  , stringify
+  }
+  where
+  shoutH _ args = case args of
+    [ v ] -> VString <<< toUpper <$> stringify v
+    _ -> Left (ArityError "shout/1")
 
 main :: Effect Unit
 main = do
@@ -160,5 +181,16 @@ main = do
   case parse "a{{#each x}}b{{{this}}}{{/each}}c" of
     Left e -> assert' ("foldTemplate: parse error " <> show e) false
     Right t -> assert' "foldTemplate node count" (foldTemplate counter t == 5)
+
+  -- Pluggable env: the same driver runs a custom engine whose env is a Value.
+  case parse "{{{shout this}}}" of
+    Left e -> assert' ("custom-engine: parse error " <> show e) false
+    Right t -> assert' "custom-engine pluggable env"
+      (runTemplate (customEngine (VString "hi")) t == Right "HI")
+
+  -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
+  launchAff_ do
+    out <- renderAff "Hi {{{esc_html (lookup this \"name\")}}}" (obj [ Tuple "name" (str "Ada") ])
+    liftEffect $ assert' ("aff render: " <> show out) (out == Right "Hi Ada")
 
   log "all core tests passed"

@@ -1,14 +1,11 @@
--- | The reference prelude. See `docs/modules/ROOT/pages/prelude.adoc`.
+-- | The reference engine's helpers and schema. See
+-- | `docs/modules/ROOT/pages/prelude.adoc`.
 -- |
--- | *None of this is built into the core.* It is the meaning layer: a library
--- | of helpers, plus a schema, that together turn the skeleton AST into output.
--- | Delete `each` and `{{#each}}` stops working; the language is unaffected.
--- |
--- | Multi-branch control flow is expressed as *nested clause blocks*. `if`
--- | renders its body when truthy and an `{{#else}}…{{/else}}` clause otherwise;
--- | `each` renders its body per element and the `else` clause when empty. The
--- | clause name `else` is this prelude's choice, not the core's — a different
--- | engine could name it `otherwise`, add `elif`, or build a `switch`/`case`.
+-- | *None of this is built into the core.* Helpers are `Helper m (RefEnv m)`
+-- | over any `MonadThrow Error m`, so the very same prelude runs in a pure host
+-- | (`Either Error`) or an async one (`ExceptT Error Aff`). Multi-branch control
+-- | flow is nested clause blocks; `if` reads an `{{#else}}…{{/else}}` clause via
+-- | the control handle's `clause`.
 module BareBars.Prelude
   ( prelude
   , preludeSchema
@@ -16,10 +13,12 @@ module BareBars.Prelude
 
 import Prelude
 
-import BareBars.Env (Helper(..), HelperCtx, constHelper, lookupHelper, pushFrame, runHelper)
+import BareBars.Engine (Ctl, Helper)
+import BareBars.Env (RefEnv, constHelper, lookupHelper, pushFrame, refContext)
 import BareBars.Error (Error(..))
 import BareBars.Value (Value(..), escapeHtml, stringify, truthy)
-import BareBars.Walk (Arity(..), HelperSpec, Schema, splitClause)
+import BareBars.Walk (Arity(..), HelperSpec, Schema)
+import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Int as Int
@@ -29,7 +28,7 @@ import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 
-prelude :: Array (Tuple String Helper)
+prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
 prelude =
   [ Tuple "this" thisH
   , Tuple "lookup" lookupH
@@ -55,10 +54,7 @@ prelude =
   , Tuple "log" logH
   ]
 
--- | The reference engine's schema, for `BareBars.Walk.validate`. It declares
--- | every prelude helper plus the scoped helpers that block helpers install
--- | (`index`, `key`, `first`, `last`, `parent`, `root`), so a template using
--- | them validates cleanly. `allowUnknown` is `false`.
+-- | The reference engine's validation schema (`BareBars.Walk.validate`).
 preludeSchema :: Schema
 preludeSchema =
   { allowUnknown: false
@@ -97,17 +93,23 @@ preludeSchema =
   spec :: Boolean -> Arity -> HelperSpec
   spec block arity = { block, arity }
 
+-- | Lift `Value.stringify` (which yields `Either Error`) into `m`.
+stringifyM :: forall m. MonadThrow Error m => Value -> m String
+stringifyM v = case stringify v of
+  Left e -> throwError e
+  Right s -> pure s
+
 --------------------------------------------------------------------------------
 -- Context & access
 --------------------------------------------------------------------------------
 
-thisH :: Helper
-thisH = Helper \ctx _ -> Right ctx.env.context
+thisH :: forall m. Applicative m => Helper m (RefEnv m)
+thisH ctl _ = pure (refContext ctl.env)
 
-lookupH :: Helper
-lookupH = Helper \_ args -> case Array.uncons args of
-  Nothing -> Left (ArityError "lookup/≥1")
-  Just { head, tail } -> Right (Array.foldl step head tail)
+lookupH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+lookupH _ args = case Array.uncons args of
+  Nothing -> throwError (ArityError "lookup/≥1")
+  Just { head, tail } -> pure (Array.foldl step head tail)
   where
   step :: Value -> Value -> Value
   step VNull _ = VNull
@@ -126,78 +128,75 @@ indexValue _ _ = VNull
 -- Output & safety
 --------------------------------------------------------------------------------
 
-escHtmlH :: Helper
-escHtmlH = Helper \_ args -> case args of
-  [ VSafe s ] -> Right (VSafe s) -- idempotent on already-safe input
-  [ v ] -> (VSafe <<< escapeHtml) <$> stringify v
-  _ -> Left (ArityError "esc_html/1")
+escHtmlH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+escHtmlH _ args = case args of
+  [ VSafe s ] -> pure (VSafe s) -- idempotent on already-safe input
+  [ v ] -> (VSafe <<< escapeHtml) <$> stringifyM v
+  _ -> throwError (ArityError "esc_html/1")
 
-safeH :: Helper
-safeH = Helper \_ args -> case args of
-  [ v ] -> VSafe <$> stringify v
-  _ -> Left (ArityError "safe/1")
+safeH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+safeH _ args = case args of
+  [ v ] -> VSafe <$> stringifyM v
+  _ -> throwError (ArityError "safe/1")
 
 -- | A raw-block helper that returns its captured body verbatim.
-rawH :: Helper
-rawH = Helper \ctx _ -> VSafe <$> ctx.render ctx.env ctx.body
+rawH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+rawH ctl _ = VSafe <$> ctl.render ctl.env ctl.children
 
 -- | A clause helper (`then`, `else`): transparent — it renders its own body.
--- | Control-flow helpers reach in and render the relevant clause; this default
--- | governs only direct use.
-clauseH :: Helper
-clauseH = Helper \ctx _ -> VSafe <$> ctx.render ctx.env ctx.body
+clauseH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+clauseH ctl _ = VSafe <$> ctl.render ctl.env ctl.children
 
 --------------------------------------------------------------------------------
 -- Conditionals
 --------------------------------------------------------------------------------
 
-ifH :: Helper
-ifH = Helper \ctx args -> case args of
-  [ c ] ->
-    if truthy c then renderMain ctx
-    else renderElse ctx
-  _ -> Left (ArityError "if/1")
+ifH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+ifH ctl args = case args of
+  [ c ] -> if truthy c then renderMain ctl else renderElse ctl
+  _ -> throwError (ArityError "if/1")
 
-unlessH :: Helper
-unlessH = Helper \ctx args -> case args of
-  [ c ] ->
-    if truthy c then renderElse ctx
-    else renderMain ctx
-  _ -> Left (ArityError "unless/1")
+unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+unlessH ctl args = case args of
+  [ c ] -> if truthy c then renderElse ctl else renderMain ctl
+  _ -> throwError (ArityError "unless/1")
 
 -- | Render the body up to the first `{{#else}}` clause.
-renderMain :: HelperCtx -> Either Error Value
-renderMain ctx = VSafe <$> ctx.render ctx.env (splitClause "else" ctx.body).before
+renderMain :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
+renderMain ctl = VSafe <$> ctl.render ctl.env (ctl.clause "else").before
 
 -- | Render the `{{#else}}…{{/else}}` clause, if present; otherwise empty.
-renderElse :: HelperCtx -> Either Error Value
-renderElse ctx = case (splitClause "else" ctx.body).clause of
-  Just t -> VSafe <$> ctx.render ctx.env t
-  Nothing -> Right (VSafe "")
+renderElse :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
+renderElse ctl = VSafe <$> ctl.render ctl.env (fromMaybe [] (ctl.clause "else").body)
 
 --------------------------------------------------------------------------------
 -- Iteration & context shift
 --------------------------------------------------------------------------------
 
-eachH :: Helper
-eachH = Helper \ctx args -> case args of
+eachH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+eachH ctl args = case args of
   [ coll ] -> case coll of
     VArray xs ->
-      if Array.null xs then renderElse ctx
-      else iterate ctx (Array.mapWithIndex (\i x -> { key: show i, val: x }) xs)
+      if Array.null xs then renderElse ctl
+      else iterate ctl (Array.mapWithIndex (\i x -> { key: show i, val: x }) xs)
     VObject m ->
       let
         pairs = Map.toUnfoldable m :: Array (Tuple String Value)
       in
-        if Array.null pairs then renderElse ctx
-        else iterate ctx (map (\(Tuple k v) -> { key: k, val: v }) pairs)
-    _ -> renderElse ctx
-  _ -> Left (ArityError "each/1")
+        if Array.null pairs then renderElse ctl
+        else iterate ctl (map (\(Tuple k v) -> { key: k, val: v }) pairs)
+    _ -> renderElse ctl
+  _ -> throwError (ArityError "each/1")
 
-iterate :: HelperCtx -> Array { key :: String, val :: Value } -> Either Error Value
-iterate ctx items =
+iterate
+  :: forall m
+   . MonadThrow Error m
+  => Ctl m (RefEnv m)
+  -> Array { key :: String, val :: Value }
+  -> m Value
+iterate ctl items =
   let
-    main = (splitClause "else" ctx.body).before
+    main = (ctl.clause "else").before
     n = Array.length items
     renderItem i { key, val } =
       let
@@ -207,60 +206,60 @@ iterate ctx items =
           , Tuple "key" (constHelper (VString key))
           , Tuple "first" (constHelper (VBool (i == 0)))
           , Tuple "last" (constHelper (VBool (i == n - 1)))
-          , Tuple "parent" (constHelper ctx.env.context)
+          , Tuple "parent" (constHelper (refContext ctl.env))
           ]
       in
-        ctx.render (pushFrame frame val ctx.env) main
+        ctl.render (pushFrame frame val ctl.env) main
   in
     (VSafe <<< joinWith "") <$> traverse identity (Array.mapWithIndex renderItem items)
 
-withH :: Helper
-withH = Helper \ctx args -> case args of
+withH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+withH ctl args = case args of
   [ v ] ->
     if truthy v then
       let
-        frame = Map.singleton "parent" (constHelper ctx.env.context)
+        frame = Map.singleton "parent" (constHelper (refContext ctl.env))
       in
-        VSafe <$> ctx.render (pushFrame frame v ctx.env) (splitClause "else" ctx.body).before
-    else renderElse ctx
-  _ -> Left (ArityError "with/1")
+        VSafe <$> ctl.render (pushFrame frame v ctl.env) (ctl.clause "else").before
+    else renderElse ctl
+  _ -> throwError (ArityError "with/1")
 
 --------------------------------------------------------------------------------
 -- Composition / data
 --------------------------------------------------------------------------------
 
-dictH :: Helper
-dictH = Helper \_ args -> build args Map.empty
+dictH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+dictH _ args = build args Map.empty
   where
   build as acc = case Array.uncons as of
-    Nothing -> Right (VObject acc)
+    Nothing -> pure (VObject acc)
     Just { head: VString k, tail } -> case Array.uncons tail of
       Just { head: v, tail: rest } -> build rest (Map.insert k v acc)
-      Nothing -> Left (ArityError "dict: odd number of arguments")
-    Just _ -> Left (TypeError "dict: keys must be strings")
+      Nothing -> throwError (ArityError "dict: odd number of arguments")
+    Just _ -> throwError (TypeError "dict: keys must be strings")
 
-applyH :: Helper
-applyH = Helper \ctx args -> case Array.uncons args of
-  Just { head: VString name, tail } -> case lookupHelper name ctx.env of
-    Just h -> runHelper h ctx tail
-    Nothing -> Left (UnknownHelper name)
-  _ -> Left (TypeError "apply: first argument must be a helper-name string")
+applyH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+applyH ctl args = case Array.uncons args of
+  Just { head: VString name, tail } -> case lookupHelper name ctl.env of
+    Just h -> h ctl tail
+    Nothing -> throwError (UnknownHelper name)
+  _ -> throwError (TypeError "apply: first argument must be a helper-name string")
 
-eqH :: Helper
-eqH = Helper \_ args -> case args of
-  [ a, b ] -> Right (VBool (a == b))
-  _ -> Left (ArityError "eq/2")
+eqH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+eqH _ args = case args of
+  [ a, b ] -> pure (VBool (a == b))
+  _ -> throwError (ArityError "eq/2")
 
-notH :: Helper
-notH = Helper \_ args -> case args of
-  [ a ] -> Right (VBool (not (truthy a)))
-  _ -> Left (ArityError "not/1")
+notH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+notH _ args = case args of
+  [ a ] -> pure (VBool (not (truthy a)))
+  _ -> throwError (ArityError "not/1")
 
-andH :: Helper
-andH = Helper \_ args -> Right (VBool (Array.all truthy args))
+andH :: forall m. Applicative m => Helper m (RefEnv m)
+andH _ args = pure (VBool (Array.all truthy args))
 
-orH :: Helper
-orH = Helper \_ args -> Right (VBool (Array.any truthy args))
+orH :: forall m. Applicative m => Helper m (RefEnv m)
+orH _ args = pure (VBool (Array.any truthy args))
 
-logH :: Helper
-logH = Helper \_ _ -> Right VNull -- effect-free in the pure (Either) host
+logH :: forall m. Applicative m => Helper m (RefEnv m)
+logH _ _ = pure VNull -- effect-free in a pure host; an effectful engine can override

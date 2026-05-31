@@ -1,58 +1,61 @@
 -- | BareBars — the host API. See `docs/modules/ROOT/pages/host-api.adoc`.
 -- |
--- | This is the entry point a host imports. It re-exports the core types and
--- | wires `parse` + the reference `prelude` into convenience functions.
--- |
--- | ```purescript
--- | import BareBars as BB
--- |
--- | BB.renderWith "{{{ esc_html (lookup this \"name\") }}}" (BB.VObject ...)
--- | ```
+-- | Re-exports the core types and the polymorphic engine driver, and wires the
+-- | reference engine + prelude into convenience functions. The driver is
+-- | monad- and environment-polymorphic; this module provides two ready
+-- | instantiations: a pure host (`Either Error`) and an async one
+-- | (`ExceptT Error Aff`).
 module BareBars
   ( module BareBars.Syntax
   , module BareBars.Value
   , module BareBars.Error
+  , module BareBars.Engine
   , module BareBars.Env
   , module BareBars.Parser
-  , module BareBars.Eval
   , module BareBars.Prelude
   , module BareBars.Walk
   , preludeEnv
   , compile
   , renderWith
+  , renderAff
   ) where
 
 import Prelude
 
-import BareBars.Env (Env, Helper(..), emptyEnv, register, registerAll)
+import BareBars.Engine (Ctl, Engine, Helper, runString, runTemplate)
+import BareBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll)
 import BareBars.Error (Error, ParseError)
-import BareBars.Eval (render, runTemplate)
 import BareBars.Parser (parse)
 import BareBars.Prelude (prelude, preludeSchema)
 import BareBars.Syntax (Expr(..), Node(..), Template)
 import BareBars.Value (Value(..), stringify, truthy)
 import BareBars.Walk (Algebra, foldTemplate, helperRefs, splitClause, validate)
+import Control.Monad.Error.Class (class MonadThrow)
+import Control.Monad.Except.Trans (runExceptT)
 import Data.Either (Either(..))
+import Effect.Aff (Aff)
 
--- | Build an environment with the reference prelude, the given data as context,
--- | and a `root` helper that returns the top-level data.
-preludeEnv :: Value -> Env
+-- | Build a reference environment with the prelude, the given data as context,
+-- | and a `root` helper returning the top-level data. Polymorphic in `m`.
+preludeEnv :: forall m. MonadThrow Error m => Value -> RefEnv m
 preludeEnv dat =
-  registerAll prelude
-    (register "root" (Helper \_ _ -> Right dat) (emptyEnv dat))
+  registerAll prelude (register "root" (constHelper dat) (emptyEnv dat))
 
--- | Parse a *core* template and return a renderer closed over the reference
--- | prelude. (The surface front-end is a separate, not-yet-complete step; see
--- | `BareBars.Surface`.)
+-- | Parse a *core* template and return a pure renderer closed over the
+-- | reference engine.
 compile :: String -> Either ParseError (Value -> Either Error String)
 compile src = do
   tmpl <- parse src
-  pure \dat -> render tmpl (preludeEnv dat)
+  pure \dat -> runTemplate (refEngine (preludeEnv dat)) tmpl
 
--- | One-shot: parse core source and render against prelude + data.
+-- | One-shot pure render: parse core source and render against prelude + data.
 renderWith :: String -> Value -> Either String String
-renderWith src dat = case parse src of
-  Left pe -> Left (show pe)
-  Right tmpl -> case render tmpl (preludeEnv dat) of
-    Left e -> Left (show e)
-    Right out -> Right out
+renderWith src dat = case runString (refEngine (preludeEnv dat)) src of
+  Left e -> Left (show e)
+  Right out -> Right out
+
+-- | The async instantiation: the same engine and prelude, but in
+-- | `ExceptT Error Aff`, so effectful helpers and partials are possible. Proof
+-- | that the driver is monad-polymorphic.
+renderAff :: String -> Value -> Aff (Either Error String)
+renderAff src dat = runExceptT (runString (refEngine (preludeEnv dat)) src)

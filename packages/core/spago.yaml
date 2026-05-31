@@ -22,9 +22,15 @@ package:
     - argonaut-core
     - argonaut
     - foreign-object
+    - control
+    - transformers
+    - aff
+    - effect
+    - exceptions
   test:
     main: Test.Main
     dependencies:
       - effect
       - console
       - assert
+      - aff
