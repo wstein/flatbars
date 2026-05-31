@@ -15,10 +15,12 @@ does the FlatBars prelude actually register*, and where its semantics differ fro
 ====
 *Short answer.* FlatBars implements all *six* of {hb}' built-in **helpers** (`if`, `unless`, `each`,
 `with`, `lookup`, `log`). The wider built-in **feature set** is broadly covered: comments, raw blocks,
-whitespace control, subexpressions, `@data` variables, paths, hash arguments, basic partials, and
-block params (the last via the xref:surface.adoc[surface dialect]). Still missing: *decorators,
-inline / block partials, and `@partial-block`*. FlatBars also adds helpers {hb} has no built-in for
-(`eq`, `and`, `or`, `not`, `dict`, `apply`, `esc_html`, `safe`, …).
+whitespace control, subexpressions, `@data` variables, paths, hash arguments, partials (including
+block, inline, and `@partial-block`), and block params (the last few via the
+xref:surface.adoc[surface dialect]). Still missing: *decorators* and the Handlebars block-partial
+*sigils* `pass:[{{#> }}]` / `pass:[{{#*inline}}]` (use the `pass:[{{#partial}}]` / `pass:[{{#inline}}]`
+core spellings). FlatBars also adds helpers {hb} has no built-in for (`eq`, `and`, `or`, `not`,
+`dict`, `apply`, `esc_html`, `safe`, …).
 ====
 
 [horizontal]
@@ -159,19 +161,21 @@ xref:surface.adoc[surface dialect] (`renderSurface`) restores Handlebars' `pass:
 |surface ⇒ `pass:[{{{ partial "name" ctx [(dict …)] }}}]`
 |✅
 |`renderSurfaceWith` registers named partials; the `partial` engine helper renders one (unescaped)
-with the given context, hash `k=v` pairs merged onto it. Inline / block partials and
-`@partial-block` are not yet supported (the `pass:[{{#*inline}}]` / `pass:[{{#> }}]` block sigils need
-parser support).
+with the given context, hash `k=v` pairs merged onto it.
 
-|Partial blocks `pass:[{{#> }}]`, `pass:[{{> @partial-block}}]`
-|mapping in A.6
-|✗
-|Not implemented yet (`partial>` / `partial-block`).
+|Block partials `pass:[{{#partial name}}body{{/partial}}]`, `pass:[{{> @partial-block}}]`
+|block-aware `partial` + `partial-block`
+|✅
+|`{{#partial}}` renders the named partial with its body as the fallback (if missing) and the
+`pass:[{{> @partial-block}}]` yield. The Handlebars `pass:[{{#> name}}…{{/name}}]` *sigil* is not
+parsed (use `pass:[{{#partial}}]`).
 
-|Inline partials `pass:[{{#*inline "n"}}…{{/inline}}]`
-|mapping in A.6 / A.8
-|✗
-|Not implemented yet (`inline`).
+|Inline partials `pass:[{{#inline "n"}}…{{/inline}}]`
+|`inline` (hoisted into the registry)
+|✅
+|`renderSurface`/`renderSurfaceWith` hoist `{{#inline}}` definitions before rendering, so later
+`pass:[{{> n}}]` use them (definitions are global to the render). The Handlebars `pass:[{{#*inline}}]`
+*sigil* is not parsed (use `pass:[{{#inline}}]`).
 
 |Decorators `pass:[{{*d}}]`, `pass:[{{#*d}}]`
 |an ordinary block helper
@@ -261,8 +265,9 @@ etc. map to which `lookup`/render variant the host registers (xref:appendix-hand
 
 [NOTE]
 ====
-The remaining ✗ rows (decorators, inline / block partials, `@partial-block`) are *engine roadmap
-items*, not core limitations: the BareBars core already parses the syntax they need, and Appendix A
-gives each a concrete desugaring. They become available when the FlatBars prelude registers the
-corresponding helpers.
+The remaining ✗ rows (decorators, and the Handlebars block-partial sigils `pass:[{{#> }}]` /
+`pass:[{{#*inline}}]`) are *roadmap items*, not core limitations. The sigil forms specifically need
+the parser to reconcile the opener sigil with the close name — a deliberate concession the
+meaning-free core has not made; the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` core spellings cover
+the same capability today.
 ====

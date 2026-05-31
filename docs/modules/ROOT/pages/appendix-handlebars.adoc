@@ -258,11 +258,13 @@ than walk a stack: `pass:[{{#each teams as \|team\|}}…{{#each team.members}}{{
 
 [NOTE]
 ====
-*Status.* The basic `partial` helper *is* implemented: `pass:[{{> name}}]`,
-`pass:[{{> name ctx}}]`, and dynamic `pass:[{{> (expr)}}]` work via `renderSurfaceWith` (which
-registers named partials) — see xref:flatbars-compat.adoc[compatibility matrix] §3. Still pending:
-the `partial>` block-partial / `partial-block`, `inline` partials, and hash context
-(`pass:[{{> name k=v}}]`, which needs §5.4 hash arguments).
+*Status.* Partials are implemented via `renderSurfaceWith`: `pass:[{{> name}}]`,
+`pass:[{{> name ctx}}]`, dynamic `pass:[{{> (expr)}}]`, hash context `pass:[{{> name k=v}}]`, block
+partials `pass:[{{#partial name}}body{{/partial}}]` (body = fallback + `pass:[{{> @partial-block}}]`
+yield), and inline partials `pass:[{{#inline "name"}}body{{/inline}}]` (hoisted into the registry) —
+see xref:flatbars-compat.adoc[compatibility matrix] §3. The core spellings `pass:[{{#partial}}]` /
+`pass:[{{#inline}}]` are used in place of the Handlebars `pass:[{{#> }}]` / `pass:[{{#*inline}}]`
+sigils, which the meaning-free parser does not yet match.
 ====
 
 All partial forms become the engine helpers `partial`, `partial>`, `inline`, and the scoped

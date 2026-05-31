@@ -40,7 +40,7 @@ import Effect.Aff (Aff)
 import FlatBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll, registerPartials)
 import FlatBars.Lower (RNode(..), escapingWarnings, lower)
 import FlatBars.Prelude (prelude, preludeSchema)
-import FlatBars.Surface (desugar)
+import FlatBars.Surface (desugar, hoistInline)
 import FlatBars.Value (escapeHtml, stringify, truthy)
 
 -- | Build a FlatBars environment with the prelude, the given data as context,
@@ -75,19 +75,22 @@ surfaceClauses = [ "else" ]
 desugarSurface :: Template -> Template
 desugarSurface = desugar surfaceClauses
 
--- | Parse + desugar Surface source into a compiled renderer.
+-- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
+-- | definitions are hoisted into the partial registry before rendering.
 compileSurface :: String -> Either ParseError (Value -> Either Error String)
 compileSurface src = do
   tmpl <- parse src
-  let core = desugarSurface tmpl
-  pure \dat -> runTemplate (refEngine (preludeEnv dat)) core
+  let
+    { partials, template } = hoistInline (desugarSurface tmpl)
+  pure \dat -> runTemplate (refEngine (registerPartials partials (preludeEnv dat))) template
 
 -- | One-shot pure render of *Surface* source (paths, `{{ }}` auto-escape, …).
 renderSurface :: String -> Value -> Either String String
 renderSurface = renderSurfaceWith []
 
 -- | Render Surface source with a set of named partials (each given as Surface
--- | source). `{{> name}}` in the template renders the registered `name` partial.
+-- | source). `{{> name}}` renders a registered partial; `{{#inline "name"}}…`
+-- | definitions in the template are hoisted into the registry too.
 renderSurfaceWith :: Array (Tuple String String) -> String -> Value -> Either String String
 renderSurfaceWith partialSrcs src dat =
   case traverse compilePartial partialSrcs of
@@ -96,9 +99,10 @@ renderSurfaceWith partialSrcs src dat =
       Left e -> Left (show e)
       Right tmpl ->
         let
-          env = registerPartials (Map.fromFoldable pairs) (preludeEnv dat)
+          { partials: inlineP, template } = hoistInline (desugarSurface tmpl)
+          env = registerPartials (Map.union inlineP (Map.fromFoldable pairs)) (preludeEnv dat)
         in
-          case runTemplate (refEngine env) (desugarSurface tmpl) of
+          case runTemplate (refEngine env) template of
             Left e -> Left (show e)
             Right out -> Right out
   where

@@ -337,6 +337,24 @@ main = do
     Left _ -> pure unit
     Right out -> assert' ("partial-missing: expected error, got " <> show out) false
 
+  -- Block partials: {{#partial name}}body{{/partial}} renders the partial with
+  -- the body exposed as {{> @partial-block}}, or renders the body as fallback if
+  -- the partial is missing.
+  expectP "block-partial-yield" [ Tuple "layout" "<div>{{> @partial-block}}</div>" ]
+    "{{#partial \"layout\"}}<b>{{ name }}</b>{{/partial}}"
+    (obj [ Tuple "name" (str "Ada") ])
+    "<div><b>Ada</b></div>"
+  expectS "block-partial-fallback" "{{#partial \"missing\"}}<i>fb</i>{{/partial}}" VNull "<i>fb</i>"
+
+  -- Inline partials: {{#inline "name"}}body{{/inline}} defines a partial (hoisted
+  -- before render) usable by later {{> name}}; a bare name is literalized.
+  expectS "inline-partial" "{{#inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
+    (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
+    "[a][b]"
+  expectS "inline-partial-unquoted" "{{#inline greet}}hi {{ name }}{{/inline}}{{> greet}}"
+    (obj [ Tuple "name" (str "Bo") ])
+    "hi Bo"
+
   -- Hash arguments (§5.4): key=value pairs collect into a trailing `dict`, which
   -- the if/unless `includeZero` option consumes (the existing dict mechanism).
   expectS "surface-hash-includeZero" "{{#if n includeZero=true}}y{{else}}m{{/if}}"

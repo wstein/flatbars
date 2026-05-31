@@ -25,13 +25,18 @@
 -- |  * `{{> name [ctx] [k=v]}}` ⇒ `{{{ partial "name" ctx [(dict …)] }}}` (a bare
 -- |    name is a string literal, a parenthesized expression is a dynamic name;
 -- |    hash pairs merge onto the partial's context; §5.7).
+-- |  * block partial `{{#partial name}}body{{/partial}}` (body = fallback and the
+-- |    `{{> @partial-block}}` yield) and inline partial `{{#inline name}}body
+-- |    {{/inline}}` (a definition, hoisted by `hoistInline`); §5.7. A bare name is
+-- |    literalized. `{{> @partial-block}}` ⇒ a `(partial-block)` call.
 -- |
 -- | Not yet desugared: `@../` parent-data (the scoped helpers are frame-local),
--- | and the inline / block / `@partial-block` partial forms (§5.7) — those use a
--- | `{{#*inline}}` / `{{#> name}}…{{/name}}` block whose sigil/close-name the
--- | meaning-free core parser cannot match without partial-specific support.
+-- | and the Handlebars block sigils `{{#> name}}…{{/name}}` / `{{#*inline}}…
+-- | {{/inline}}` — the opener sigil/close-name mismatch needs parser support, so
+-- | use the `{{#partial}}` / `{{#inline}}` core spellings instead.
 module FlatBars.Surface
   ( desugar
+  , hoistInline
   ) where
 
 import Prelude
@@ -41,6 +46,8 @@ import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Foldable (foldl)
 import Data.Int as Int
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Number as Number
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
@@ -71,6 +78,12 @@ desugar clauseNames = go []
             Just rest -> Output sp (partialExpr scope rest args)
             -- everything else is `{{ E }}` ⇒ escaped output.
             Nothing -> Output sp (App "esc_html" [ rewriteHead scope name args ])
+      -- `{{#partial name …}}` / `{{#inline name}}` (§5.7): a bare first argument
+      -- is the partial *name* (a string), like `{{> name}}`.
+      Block sp "partial" args body ->
+        Block sp "partial" (partialArgs scope args) (go scope (expandElseIf body))
+      Block sp "inline" args body ->
+        Block sp "inline" (inlineArgs scope args) (go scope (expandElseIf body))
       -- block head stays a helper; `else if` chains expand to nested `if` (§5.6);
       -- a trailing `as |a b|` becomes positional binding-name strings (§5.5) and
       -- extends the scope for the body.
@@ -125,11 +138,34 @@ partialExpr scope rest args =
         Just { head, tail } -> { nameExpr: partialName scope head, valueArgs: tail }
         Nothing -> { nameExpr: Lit (VString ""), valueArgs: [] }
       _ -> { nameExpr: Lit (VString rest), valueArgs: args }
+  in
+    case nameExpr of
+      -- `{{> @partial-block}}` yields the enclosing block partial's body.
+      Lit (VString "@partial-block") -> App "partial-block" []
+      _ -> App "partial" (partialCall scope nameExpr valueArgs)
+
+-- | Build the `partial` helper's arguments from its name and the value arguments
+-- | (an optional positional context, default `this`, then `key=value` hash pairs
+-- | collected into a trailing options `dict`).
+partialCall :: Scope -> Expr -> Array Expr -> Array Expr
+partialCall scope nameExpr valueArgs =
+  let
     h = collectHash scope valueArgs
     ctx = maybe (App "this" []) (rewrite scope) (Array.head h.positional)
   in
-    if Array.null h.pairs then App "partial" [ nameExpr, ctx ]
-    else App "partial" [ nameExpr, ctx, dictExpr h.pairs ]
+    if Array.null h.pairs then [ nameExpr, ctx ] else [ nameExpr, ctx, dictExpr h.pairs ]
+
+-- | Arguments for a `{{#partial name …}}` block (name + context + hash).
+partialArgs :: Scope -> Array Expr -> Array Expr
+partialArgs scope args = case Array.uncons args of
+  Just { head, tail } -> partialCall scope (partialName scope head) tail
+  Nothing -> [ Lit (VString ""), App "this" [] ]
+
+-- | Arguments for a `{{#inline name}}` block — just the (literal) partial name.
+inlineArgs :: Scope -> Array Expr -> Array Expr
+inlineArgs scope args = case Array.uncons args of
+  Just { head } -> [ partialName scope head ]
+  Nothing -> [ Lit (VString "") ]
 
 -- | A bare partial name is a string literal; a (parenthesized) expression is a
 -- | dynamic name, rewritten as usual.
@@ -270,6 +306,34 @@ expandElseIf nodes = case Array.findIndex isElseIf nodes of
   isElseIf = case _ of
     Sep _ "else" [ App "if" [], _ ] -> true
     _ -> false
+
+-- | Hoist `{{#inline "name"}}body{{/inline}}` definitions out of a (desugared)
+-- | template into a partial registry, returning that registry and the template
+-- | with the `inline` blocks removed. Definitions are *global* to the render
+-- | (not lexically scoped) — a simplification of Handlebars' block scoping.
+hoistInline :: Template -> { partials :: Map String Template, template :: Template }
+hoistInline nodes = Array.foldl step { partials: Map.empty, template: [] } nodes
+  where
+  step acc = case _ of
+    Block _ "inline" args body
+      | Just name <- inlineName args ->
+          let
+            inner = hoistInline body
+          in
+            acc
+              { partials = Map.insert name inner.template (Map.union acc.partials inner.partials) }
+    Block sp name args body ->
+      let
+        inner = hoistInline body
+      in
+        acc
+          { partials = Map.union acc.partials inner.partials
+          , template = Array.snoc acc.template (Block sp name args inner.template)
+          }
+    other -> acc { template = Array.snoc acc.template other }
+  inlineName args = case Array.head args of
+    Just (Lit (VString n)) -> Just n
+    _ -> Nothing
 
 -- | Strip leading `../` runs, counting the parent depth.
 stripParents :: String -> Int -> { depth :: Int, rest :: String }
