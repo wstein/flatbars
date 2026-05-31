@@ -13,11 +13,6 @@ module FullBars
   , module FullBars.Lower
   , module FullBars.Surface
   , preludeEnv
-  , compile
-  , renderWith
-  , renderWithDiag
-  , renderValue
-  , renderAff
   , surfaceClauses
   , desugarSurface
   , compileSurface
@@ -26,8 +21,8 @@ module FullBars
   , renderSurfaceDiag
   , renderSurfaceDiagWith
   , renderSurfaceValue
-  , compileWith
   , formatError
+  , runResolved
   ) where
 
 import Prelude
@@ -39,12 +34,10 @@ import BareBars.Syntax (Directive, Ident, Template)
 import BareBars.ToValue (class ToValue, toValue)
 import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow)
-import Control.Monad.Except.Trans (runExceptT)
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Aff (Aff)
 import FullBars.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import FullBars.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import FullBars.Prelude (prelude, preludeSchema)
@@ -73,26 +66,6 @@ runResolved directives setup nodes dat = do
   fs <- liftEither (resolveTruthiness directives)
   runTemplate (refEngine (withFalsy fs (setup (preludeEnv dat)))) nodes
 
--- | Parse a core template and return a pure renderer closed over the engine.
--- | The `@truthiness` mode is resolved once and baked into the renderer.
-compile :: String -> Either ParseError (Value -> Either Error String)
-compile = compileWith defaultParseOptions
-
--- | `compile` with explicit parse options (the CLI/config path, e.g. standalone
--- | whitespace). A `@trim` directive still overrides the option per file.
-compileWith :: ParseOptions -> String -> Either ParseError (Value -> Either Error String)
-compileWith opts src = do
-  { directives, nodes } <- parseWith opts src
-  pure \dat -> runResolved directives identity nodes dat
-
--- | One-shot pure render: parse core source and render against prelude + data.
-renderWith :: String -> Value -> Either String String
-renderWith src dat = case parse src of
-  Left pe -> Left (show (ParseFailure pe))
-  Right { directives, nodes } -> case runResolved directives identity nodes dat of
-    Left e -> Left (show e)
-    Right out -> Right out
-
 -- | Format an engine `Error` against its source for a host boundary: a parse
 -- | failure becomes a located `line:column: message` (xref host-api §7); every
 -- | other error keeps its `show` form. This is what a JS/CLI facade should
@@ -101,27 +74,6 @@ formatError :: String -> Error -> String
 formatError src = case _ of
   ParseFailure pe -> renderParseErrorAt src pe
   e -> show e
-
--- | `renderWith` with located parse-error messages (`formatError`).
-renderWithDiag :: String -> Value -> Either String String
-renderWithDiag src dat = case parse src of
-  Left pe -> Left (renderParseErrorAt src pe)
-  Right { directives, nodes } -> case runResolved directives identity nodes dat of
-    Left e -> Left (formatError src e)
-    Right out -> Right out
-
--- | Render *core* source against native PureScript data — a record, `Array`,
--- | `Map`, etc. lowered via `ToValue` (host binding). `renderValue tmpl { name:
--- | "Ada" }`. Uses located error messages.
-renderValue :: forall a. ToValue a => String -> a -> Either String String
-renderValue src = renderWithDiag src <<< toValue
-
--- | The async instantiation: the same engine in `ExceptT Error Aff`, so
--- | effectful helpers/partials are possible. Proof the driver is monad-polymorphic.
-renderAff :: String -> Value -> Aff (Either Error String)
-renderAff src dat = case parse src of
-  Left pe -> pure (Left (ParseFailure pe))
-  Right { directives, nodes } -> runExceptT (runResolved directives identity nodes dat)
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).

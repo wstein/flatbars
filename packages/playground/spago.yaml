@@ -15,6 +15,7 @@ package:
     - barebars
     - barebars-json
     - fullbars
+    - corebars
   bundle:
     module: Playground.Main
     outfile: dist/app.js

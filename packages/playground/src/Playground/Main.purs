@@ -21,6 +21,7 @@ import BareBars (parse, validate)
 import BareBars.Json (parseValue)
 import BareBars.Syntax (Expr(..), Node(..), Template)
 import BareBars.Walk (Issue)
+import CoreBars (render) as CoreBars
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
@@ -31,7 +32,7 @@ import Data.String.Common (joinWith)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import FullBars (RNode(..), desugarSurface, escapingWarnings, lower, preludeSchema, renderSurface, renderWith)
+import FullBars (RNode(..), desugarSurface, escapingWarnings, lower, preludeSchema, renderSurface)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
@@ -117,7 +118,7 @@ renderResult :: State -> Either String String
 renderResult st = do
   value <- lmap (\e -> "Data JSON error: " <> e) (parseValue st.dataText)
   case st.mode of
-    Core -> renderWith st.template value
+    Core -> CoreBars.render st.template value
     Surface -> renderSurface st.template value
 
 -- | The structural template the validation / lowering views run against: the

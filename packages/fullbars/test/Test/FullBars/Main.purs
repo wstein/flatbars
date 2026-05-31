@@ -7,11 +7,12 @@ module Test.FullBars.Main where
 
 import Prelude
 
-import BareBars (Ctl, Engine, Helper, foldTemplate, parse, runTemplate, spanText, validate)
+import BareBars (Ctl, Engine, Helper, foldTemplate, parse, runString, runTemplate, spanText, validate)
 import BareBars.Error (Error(..))
 import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Value (Value(..))
 import BareBars.Walk (arityOk)
+import Control.Monad.Except.Trans (runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)
 import Data.Foldable (for_)
@@ -25,7 +26,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, resolveTruthiness, stringify, truthy)
+import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, resolveTruthiness, stringify, truthy)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value
@@ -49,17 +50,25 @@ arr = VArray
 str :: String -> Value
 str = VString
 
+-- Render core syntax straight through the engine (no dialect layer): this suite
+-- tests the FullBars *engine*, so it uses `runString` directly rather than the
+-- CoreBars dialect (which now owns the `render` convenience).
+renderCore :: String -> Value -> Either String String
+renderCore src dat = case runString (refEngine (preludeEnv dat)) src of
+  Left e -> Left (show e)
+  Right out -> Right out
+
 -- | Assert that `src` rendered against `dat` yields `expected`.
 expect :: String -> String -> Value -> String -> Effect Unit
 expect name src dat expected =
-  case renderWith src dat of
+  case renderCore src dat of
     Left err -> assert' (name <> ": unexpected error: " <> err) false
     Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
       (out == expected)
 
 -- | Assert that `src` fails to render (parse or eval error).
 expectError :: String -> String -> Value -> Effect Unit
-expectError name src dat = case renderWith src dat of
+expectError name src dat = case renderCore src dat of
   Left _ -> pure unit
   Right out -> assert' (name <> ": expected an error, got " <> show out) false
 
@@ -752,7 +761,9 @@ main = do
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do
-    out <- renderAff "Hi {{{esc_html (lookup this \"name\")}}}" (obj [ Tuple "name" (str "Ada") ])
+    let dat = obj [ Tuple "name" (str "Ada") ]
+    out <- runExceptT
+      (runString (refEngine (preludeEnv dat)) "Hi {{{esc_html (lookup this \"name\")}}}")
     liftEffect $ assert' ("aff render: " <> show out) (out == Right "Hi Ada")
 
   log "all core tests passed"

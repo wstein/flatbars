@@ -20,9 +20,10 @@ module FullBars.JS
 import Prelude
 
 import BareBars (Expr(..), parse, parseErrorAt)
-import BareBars.Compile.FullBars (compileCore, compileSurface) as Compile
+import BareBars.Compile.FullBars (compileSurface) as Compile
 import BareBars.Json (fromJson)
 import BareBars.Value (Value(..))
+import CoreBars as CoreBars
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
@@ -42,7 +43,7 @@ result = either (\e -> { ok: false, value: "", error: e }) (\v -> { ok: true, va
 
 -- | Render a core-syntax template against JS data. `render(template, data)`.
 render :: Fn2 String Json Result
-render = mkFn2 \tpl json -> result (FullBars.renderWithDiag tpl (fromJson json))
+render = mkFn2 \tpl json -> result (CoreBars.renderDiag tpl (fromJson json))
 
 -- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result
@@ -60,7 +61,7 @@ renderSurfaceWithPartials = mkFn3 \partials tpl json ->
 -- | emitted module's default export is `function (data, rt)`; pair it with
 -- | `runtime/barebars-runtime.mjs`. `value` is the JS source on success.
 compile :: Fn1 String Result
-compile = mkFn1 \tpl -> compileResult (Compile.compileCore tpl)
+compile = mkFn1 \tpl -> compileResult (CoreBars.compileJs tpl)
 
 -- | Compile a *surface* template to JS (desugars first). `compileSurface(template)`.
 compileSurface :: Fn1 String Result

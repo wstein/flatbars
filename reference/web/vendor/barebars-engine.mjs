@@ -3418,7 +3418,7 @@ var stateParserT = function(k) {
 var runParserT$prime = function(dictMonadRec) {
   var Monad0 = dictMonadRec.Monad0();
   var map18 = map(Monad0.Bind1().Apply0().Functor0());
-  var pure1 = pure(Monad0.Applicative0());
+  var pure12 = pure(Monad0.Applicative0());
   var tailRecM4 = tailRecM(dictMonadRec);
   return function(state1) {
     return function(v) {
@@ -3439,7 +3439,7 @@ var runParserT$prime = function(dictMonadRec) {
           ;
           if (v1 instanceof Stop) {
             $tco_done = true;
-            return pure1(new Done(new Tuple(v1.value1, v1.value0)));
+            return pure12(new Done(new Tuple(v1.value1, v1.value0)));
           }
           ;
           throw new Error("Failed pattern match at Parsing (line 152, column 13 - line 158, column 32): " + [v1.constructor.name]);
@@ -5129,18 +5129,20 @@ var StopClose = /* @__PURE__ */ function() {
   };
   return StopClose2;
 }();
-var outputExpr = function(span3) {
-  return function(base) {
-    return function(s) {
-      if (trim(s) === "") {
-        return new Left(new EmptyOutput(span3.start));
-      }
-      ;
-      if (otherwise) {
-        return parseExpr(base)(s);
-      }
-      ;
-      throw new Error("Failed pattern match at BareBars.Parser (line 177, column 1 - line 177, column 62): " + [span3.constructor.name, base.constructor.name, s.constructor.name]);
+var outputExpr = function(pe) {
+  return function(span3) {
+    return function(base) {
+      return function(s) {
+        if (trim(s) === "") {
+          return new Left(new EmptyOutput(span3.start));
+        }
+        ;
+        if (otherwise) {
+          return pe(base)(s);
+        }
+        ;
+        throw new Error("Failed pattern match at BareBars.Parser (line 185, column 1 - line 185, column 76): " + [pe.constructor.name, span3.constructor.name, base.constructor.name, s.constructor.name]);
+      };
     };
   };
 };
@@ -5187,7 +5189,7 @@ var parseDirectives = function(base) {
           return;
         }
         ;
-        throw new Error("Failed pattern match at BareBars.Parser (line 129, column 3 - line 132, column 35): " + [k.constructor.name]);
+        throw new Error("Failed pattern match at BareBars.Parser (line 137, column 3 - line 140, column 35): " + [k.constructor.name]);
       }
       ;
       while (!$tco_done) {
@@ -5200,8 +5202,8 @@ var parseDirectives = function(base) {
       var $tco_done1 = false;
       var $tco_result;
       function $tco_loop(k) {
-        var $33 = maybe(false)(isKeyChar)(at(k));
-        if ($33) {
+        var $34 = maybe(false)(isKeyChar)(at(k));
+        if ($34) {
           $copy_k = k + 1 | 0;
           return;
         }
@@ -5220,8 +5222,8 @@ var parseDirectives = function(base) {
       var $tco_done2 = false;
       var $tco_result;
       function $tco_loop(k) {
-        var $34 = maybe(false)(isSpace3)(at(k));
-        if ($34) {
+        var $35 = maybe(false)(isSpace3)(at(k));
+        if ($35) {
           $copy_k = k + 1 | 0;
           return;
         }
@@ -5287,7 +5289,7 @@ var parseDirectives = function(base) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at BareBars.Parser (line 134, column 3 - line 134, column 50): " + [j.constructor.name, acc.constructor.name]);
+          throw new Error("Failed pattern match at BareBars.Parser (line 142, column 3 - line 142, column 50): " + [j.constructor.name, acc.constructor.name]);
         }
         ;
         while (!$tco_done3) {
@@ -5300,200 +5302,204 @@ var parseDirectives = function(base) {
     return go(0)([]);
   };
 };
-var headed = function(span3) {
-  return function(base) {
-    return function(s) {
-      if (trim(s) === "") {
-        return new Left(new HeadNotIdent(span3.start));
-      }
-      ;
-      if (otherwise) {
-        var v = parseExpr(base)(s);
-        if (v instanceof Left) {
-          return new Left(v.value0);
-        }
-        ;
-        if (v instanceof Right && v.value0 instanceof App2) {
-          return new Right({
-            name: v.value0.value0,
-            args: v.value0.value1
-          });
-        }
-        ;
-        if (v instanceof Right) {
+var headed = function(pe) {
+  return function(span3) {
+    return function(base) {
+      return function(s) {
+        if (trim(s) === "") {
           return new Left(new HeadNotIdent(span3.start));
         }
         ;
-        throw new Error("Failed pattern match at BareBars.Parser (line 187, column 17 - line 190, column 48): " + [v.constructor.name]);
-      }
-      ;
-      throw new Error("Failed pattern match at BareBars.Parser (line 184, column 1 - line 184, column 92): " + [span3.constructor.name, base.constructor.name, s.constructor.name]);
-    };
-  };
-};
-var parseSeq = function(toks) {
-  var done = function(acc) {
-    return function(stop) {
-      return {
-        nodes: fromFoldable6(reverse2(acc)),
-        stop
+        if (otherwise) {
+          var v = pe(base)(s);
+          if (v instanceof Left) {
+            return new Left(v.value0);
+          }
+          ;
+          if (v instanceof Right && v.value0 instanceof App2) {
+            return new Right({
+              name: v.value0.value0,
+              args: v.value0.value1
+            });
+          }
+          ;
+          if (v instanceof Right) {
+            return new Left(new HeadNotIdent(span3.start));
+          }
+          ;
+          throw new Error("Failed pattern match at BareBars.Parser (line 196, column 17 - line 199, column 48): " + [v.constructor.name]);
+        }
+        ;
+        throw new Error("Failed pattern match at BareBars.Parser (line 192, column 1 - line 193, column 101): " + [pe.constructor.name, span3.constructor.name, base.constructor.name, s.constructor.name]);
       };
     };
   };
-  var go = function($copy_acc) {
-    return function($copy_i) {
-      var $tco_var_acc = $copy_acc;
-      var $tco_done = false;
-      var $tco_result;
-      function $tco_loop(acc, i) {
-        var v = index(toks)(i);
-        if (v instanceof Nothing) {
-          $tco_done = true;
-          return new Right(done(acc)(StopEOF.value));
-        }
-        ;
-        if (v instanceof Just) {
-          if (v.value0 instanceof RContent) {
-            $tco_var_acc = new Cons(new Content(v.value0.value0), acc);
-            $copy_i = i + 1 | 0;
-            return;
-          }
-          ;
-          if (v.value0 instanceof RComment) {
-            $tco_var_acc = acc;
-            $copy_i = i + 1 | 0;
-            return;
-          }
-          ;
-          if (v.value0 instanceof ROutput) {
-            var v1 = outputExpr(v.value0.value0)(v.value0.value1)(v.value0.value2);
-            if (v1 instanceof Left) {
-              $tco_done = true;
-              return new Left(v1.value0);
-            }
-            ;
-            if (v1 instanceof Right) {
-              $tco_var_acc = new Cons(new Output(v.value0.value0, v1.value0), acc);
-              $copy_i = i + 1 | 0;
-              return;
-            }
-            ;
-            throw new Error("Failed pattern match at BareBars.Parser (line 226, column 30 - line 228, column 52): " + [v1.constructor.name]);
-          }
-          ;
-          if (v.value0 instanceof RRaw) {
-            var v1 = headed(v.value0.value0)(v.value0.value1)(v.value0.value2);
-            if (v1 instanceof Left) {
-              $tco_done = true;
-              return new Left(v1.value0);
-            }
-            ;
-            if (v1 instanceof Right) {
-              $tco_var_acc = new Cons(new RawBlock(v.value0.value0, v1.value0.name, v1.value0.args, v.value0.value3), acc);
-              $copy_i = i + 1 | 0;
-              return;
-            }
-            ;
-            throw new Error("Failed pattern match at BareBars.Parser (line 229, column 32 - line 231, column 71): " + [v1.constructor.name]);
-          }
-          ;
-          if (v.value0 instanceof RSep) {
-            var v1 = headed(v.value0.value0)(v.value0.value1)(v.value0.value2);
-            if (v1 instanceof Left) {
-              $tco_done = true;
-              return new Left(v1.value0);
-            }
-            ;
-            if (v1 instanceof Right) {
-              $tco_var_acc = new Cons(new Sep(v.value0.value0, v1.value0.name, v1.value0.args), acc);
-              $copy_i = i + 1 | 0;
-              return;
-            }
-            ;
-            throw new Error("Failed pattern match at BareBars.Parser (line 232, column 27 - line 234, column 61): " + [v1.constructor.name]);
-          }
-          ;
-          if (v.value0 instanceof RClose) {
-            var v1 = headed({
-              start: v.value0.value1,
-              end: v.value0.value1
-            })(v.value0.value1)(v.value0.value2);
-            if (v1 instanceof Left) {
-              $tco_done = true;
-              return new Left(v1.value0);
-            }
-            ;
-            if (v1 instanceof Right) {
-              $tco_done = true;
-              return new Right(done(acc)(new StopClose(v1.value0.name, i + 1 | 0)));
-            }
-            ;
-            throw new Error("Failed pattern match at BareBars.Parser (line 235, column 26 - line 237, column 63): " + [v1.constructor.name]);
-          }
-          ;
-          if (v.value0 instanceof ROpen) {
-            $tco_done = true;
-            return buildBlock(acc)(v.value0.value0)(v.value0.value1)(v.value0.value2)(i + 1 | 0);
-          }
-          ;
-          throw new Error("Failed pattern match at BareBars.Parser (line 223, column 15 - line 238, column 62): " + [v.value0.constructor.name]);
-        }
-        ;
-        throw new Error("Failed pattern match at BareBars.Parser (line 221, column 14 - line 238, column 62): " + [v.constructor.name]);
-      }
-      ;
-      while (!$tco_done) {
-        $tco_result = $tco_loop($tco_var_acc, $copy_i);
-      }
-      ;
-      return $tco_result;
+};
+var parseSeq = function(pe) {
+  return function(toks) {
+    var done = function(acc) {
+      return function(stop) {
+        return {
+          nodes: fromFoldable6(reverse2(acc)),
+          stop
+        };
+      };
     };
-  };
-  var buildBlock = function(acc) {
-    return function(span3) {
-      return function(base) {
-        return function(s) {
-          return function(i) {
-            var v = headed(span3)(base)(s);
-            if (v instanceof Left) {
-              return new Left(v.value0);
+    var go = function($copy_acc) {
+      return function($copy_i) {
+        var $tco_var_acc = $copy_acc;
+        var $tco_done = false;
+        var $tco_result;
+        function $tco_loop(acc, i) {
+          var v = index(toks)(i);
+          if (v instanceof Nothing) {
+            $tco_done = true;
+            return new Right(done(acc)(StopEOF.value));
+          }
+          ;
+          if (v instanceof Just) {
+            if (v.value0 instanceof RContent) {
+              $tco_var_acc = new Cons(new Content(v.value0.value0), acc);
+              $copy_i = i + 1 | 0;
+              return;
             }
             ;
-            if (v instanceof Right) {
-              var v1 = parseSeq(toks)(i);
+            if (v.value0 instanceof RComment) {
+              $tco_var_acc = acc;
+              $copy_i = i + 1 | 0;
+              return;
+            }
+            ;
+            if (v.value0 instanceof ROutput) {
+              var v1 = outputExpr(pe)(v.value0.value0)(v.value0.value1)(v.value0.value2);
               if (v1 instanceof Left) {
+                $tco_done = true;
                 return new Left(v1.value0);
               }
               ;
               if (v1 instanceof Right) {
-                if (v1.value0.stop instanceof StopEOF) {
-                  return new Left(new MismatchedBlock(v.value0.name, "<eof>", span3.start));
-                }
-                ;
-                if (v1.value0.stop instanceof StopClose) {
-                  if (v1.value0.stop.value0 === v.value0.name) {
-                    return go(new Cons(new Block(span3, v.value0.name, v.value0.args, v1.value0.nodes), acc))(v1.value0.stop.value1);
-                  }
-                  ;
-                  if (otherwise) {
-                    return new Left(new MismatchedBlock(v.value0.name, v1.value0.stop.value0, span3.start));
-                  }
-                  ;
-                }
-                ;
-                throw new Error("Failed pattern match at BareBars.Parser (line 245, column 22 - line 250, column 73): " + [v1.value0.stop.constructor.name]);
+                $tco_var_acc = new Cons(new Output(v.value0.value0, v1.value0), acc);
+                $copy_i = i + 1 | 0;
+                return;
               }
               ;
-              throw new Error("Failed pattern match at BareBars.Parser (line 243, column 16 - line 250, column 73): " + [v1.constructor.name]);
+              throw new Error("Failed pattern match at BareBars.Parser (line 235, column 30 - line 237, column 52): " + [v1.constructor.name]);
             }
             ;
-            throw new Error("Failed pattern match at BareBars.Parser (line 241, column 34 - line 250, column 73): " + [v.constructor.name]);
+            if (v.value0 instanceof RRaw) {
+              var v1 = headed(pe)(v.value0.value0)(v.value0.value1)(v.value0.value2);
+              if (v1 instanceof Left) {
+                $tco_done = true;
+                return new Left(v1.value0);
+              }
+              ;
+              if (v1 instanceof Right) {
+                $tco_var_acc = new Cons(new RawBlock(v.value0.value0, v1.value0.name, v1.value0.args, v.value0.value3), acc);
+                $copy_i = i + 1 | 0;
+                return;
+              }
+              ;
+              throw new Error("Failed pattern match at BareBars.Parser (line 238, column 32 - line 240, column 71): " + [v1.constructor.name]);
+            }
+            ;
+            if (v.value0 instanceof RSep) {
+              var v1 = headed(pe)(v.value0.value0)(v.value0.value1)(v.value0.value2);
+              if (v1 instanceof Left) {
+                $tco_done = true;
+                return new Left(v1.value0);
+              }
+              ;
+              if (v1 instanceof Right) {
+                $tco_var_acc = new Cons(new Sep(v.value0.value0, v1.value0.name, v1.value0.args), acc);
+                $copy_i = i + 1 | 0;
+                return;
+              }
+              ;
+              throw new Error("Failed pattern match at BareBars.Parser (line 241, column 27 - line 243, column 61): " + [v1.constructor.name]);
+            }
+            ;
+            if (v.value0 instanceof RClose) {
+              var v1 = headed(pe)({
+                start: v.value0.value1,
+                end: v.value0.value1
+              })(v.value0.value1)(v.value0.value2);
+              if (v1 instanceof Left) {
+                $tco_done = true;
+                return new Left(v1.value0);
+              }
+              ;
+              if (v1 instanceof Right) {
+                $tco_done = true;
+                return new Right(done(acc)(new StopClose(v1.value0.name, i + 1 | 0)));
+              }
+              ;
+              throw new Error("Failed pattern match at BareBars.Parser (line 244, column 26 - line 246, column 63): " + [v1.constructor.name]);
+            }
+            ;
+            if (v.value0 instanceof ROpen) {
+              $tco_done = true;
+              return buildBlock(acc)(v.value0.value0)(v.value0.value1)(v.value0.value2)(i + 1 | 0);
+            }
+            ;
+            throw new Error("Failed pattern match at BareBars.Parser (line 232, column 15 - line 247, column 62): " + [v.value0.constructor.name]);
+          }
+          ;
+          throw new Error("Failed pattern match at BareBars.Parser (line 230, column 14 - line 247, column 62): " + [v.constructor.name]);
+        }
+        ;
+        while (!$tco_done) {
+          $tco_result = $tco_loop($tco_var_acc, $copy_i);
+        }
+        ;
+        return $tco_result;
+      };
+    };
+    var buildBlock = function(acc) {
+      return function(span3) {
+        return function(base) {
+          return function(s) {
+            return function(i) {
+              var v = headed(pe)(span3)(base)(s);
+              if (v instanceof Left) {
+                return new Left(v.value0);
+              }
+              ;
+              if (v instanceof Right) {
+                var v1 = parseSeq(pe)(toks)(i);
+                if (v1 instanceof Left) {
+                  return new Left(v1.value0);
+                }
+                ;
+                if (v1 instanceof Right) {
+                  if (v1.value0.stop instanceof StopEOF) {
+                    return new Left(new MismatchedBlock(v.value0.name, "<eof>", span3.start));
+                  }
+                  ;
+                  if (v1.value0.stop instanceof StopClose) {
+                    if (v1.value0.stop.value0 === v.value0.name) {
+                      return go(new Cons(new Block(span3, v.value0.name, v.value0.args, v1.value0.nodes), acc))(v1.value0.stop.value1);
+                    }
+                    ;
+                    if (otherwise) {
+                      return new Left(new MismatchedBlock(v.value0.name, v1.value0.stop.value0, span3.start));
+                    }
+                    ;
+                  }
+                  ;
+                  throw new Error("Failed pattern match at BareBars.Parser (line 254, column 22 - line 259, column 73): " + [v1.value0.stop.constructor.name]);
+                }
+                ;
+                throw new Error("Failed pattern match at BareBars.Parser (line 252, column 16 - line 259, column 73): " + [v1.constructor.name]);
+              }
+              ;
+              throw new Error("Failed pattern match at BareBars.Parser (line 250, column 34 - line 259, column 73): " + [v.constructor.name]);
+            };
           };
         };
       };
     };
+    return go(Nil.value);
   };
-  return go(Nil.value);
 };
 var effectiveTrim = function(opts) {
   return function(directives) {
@@ -5516,11 +5522,12 @@ var effectiveTrim = function(opts) {
       return new Left(new BadDirective("invalid @trim value '" + (v.value0.value + "'; expected 'standalone' or 'none'"), v.value0.span.start));
     }
     ;
-    throw new Error("Failed pattern match at BareBars.Parser (line 76, column 33 - line 84, column 8): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at BareBars.Parser (line 84, column 33 - line 92, column 8): " + [v.constructor.name]);
   };
 };
 var defaultParseOptions = {
-  trimStandalone: true
+  trimStandalone: true,
+  parseExpr
 };
 var collectDirectives = function(toks) {
   var go = function($copy_i) {
@@ -5559,7 +5566,7 @@ var collectDirectives = function(toks) {
               return;
             }
             ;
-            throw new Error("Failed pattern match at BareBars.Parser (line 107, column 14 - line 109, column 42): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at BareBars.Parser (line 115, column 14 - line 117, column 42): " + [v1.constructor.name]);
           }
           ;
           if (v instanceof Just && v.value0 instanceof RContent) {
@@ -5576,7 +5583,7 @@ var collectDirectives = function(toks) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at BareBars.Parser (line 100, column 25 - line 111, column 35): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at BareBars.Parser (line 108, column 25 - line 119, column 35): " + [v.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -5608,8 +5615,8 @@ var parseWith = function(opts) {
             ;
             return toks;
           }();
-          return bind4(parseSeq(filter(function($114) {
-            return !isComment($114);
+          return bind4(parseSeq(opts.parseExpr)(filter(function($116) {
+            return !isComment($116);
           })(toks$prime))(0))(function(res) {
             if (res.stop instanceof StopEOF) {
               return new Right({
@@ -5622,7 +5629,7 @@ var parseWith = function(opts) {
               return new Left(new MismatchedBlock("<none>", res.stop.value0, 0));
             }
             ;
-            throw new Error("Failed pattern match at BareBars.Parser (line 63, column 3 - line 65, column 63): " + [res.stop.constructor.name]);
+            throw new Error("Failed pattern match at BareBars.Parser (line 71, column 3 - line 73, column 63): " + [res.stop.constructor.name]);
           });
         });
       });
@@ -5839,7 +5846,7 @@ var runTemplate = function(dictMonad) {
   var Applicative0 = dictMonad.Applicative0();
   var traverse12 = traverse2(Applicative0);
   var pure5 = pure(Applicative0);
-  var bind6 = bind(Bind1);
+  var bind7 = bind(Bind1);
   return function(engine) {
     var renderTemplate = function(env) {
       return function(nodes) {
@@ -5853,7 +5860,7 @@ var runTemplate = function(dictMonad) {
         }
         ;
         if (v instanceof Output) {
-          return bind6(evalExpr(env)(v.value0)(v.value1))(engine.stringify);
+          return bind7(evalExpr(env)(v.value0)(v.value1))(engine.stringify);
         }
         ;
         if (v instanceof Block) {
@@ -5865,7 +5872,7 @@ var runTemplate = function(dictMonad) {
         }
         ;
         if (v instanceof Sep) {
-          return bind6(evalExpr(env)(v.value0)(new App2(v.value1, v.value2)))(engine.stringify);
+          return bind7(evalExpr(env)(v.value0)(new App2(v.value1, v.value2)))(engine.stringify);
         }
         ;
         throw new Error("Failed pattern match at BareBars.Engine (line 68, column 20 - line 76, column 81): " + [v.constructor.name]);
@@ -5879,8 +5886,8 @@ var runTemplate = function(dictMonad) {
           }
           ;
           if (v instanceof App2) {
-            return bind6(traverse12(evalExpr(env)(span3))(v.value1))(function(vals) {
-              return bind6(engine.resolve(env)(v.value0))(function(h) {
+            return bind7(traverse12(evalExpr(env)(span3))(v.value1))(function(vals) {
+              return bind7(engine.resolve(env)(v.value0))(function(h) {
                 return h(ctl(env)([])(span3))(vals);
               });
             });
@@ -5919,9 +5926,9 @@ var runTemplate = function(dictMonad) {
         return function(name2) {
           return function(args) {
             return function(body) {
-              return bind6(traverse12(evalExpr(env)(span3))(args))(function(vals) {
-                return bind6(engine.resolve(env)(name2))(function(h) {
-                  return bind6(h(ctl(env)(body)(span3))(vals))(engine.stringify);
+              return bind7(traverse12(evalExpr(env)(span3))(args))(function(vals) {
+                return bind7(engine.resolve(env)(name2))(function(h) {
+                  return bind7(h(ctl(env)(body)(span3))(vals))(engine.stringify);
                 });
               });
             };
@@ -5932,845 +5939,6 @@ var runTemplate = function(dictMonad) {
     return renderTemplate(engine.initial);
   };
 };
-
-// output/Effect.Aff/foreign.js
-var Aff = function() {
-  var EMPTY = {};
-  var PURE = "Pure";
-  var THROW = "Throw";
-  var CATCH = "Catch";
-  var SYNC = "Sync";
-  var ASYNC = "Async";
-  var BIND = "Bind";
-  var BRACKET = "Bracket";
-  var FORK = "Fork";
-  var SEQ = "Sequential";
-  var MAP = "Map";
-  var APPLY = "Apply";
-  var ALT = "Alt";
-  var CONS = "Cons";
-  var RESUME = "Resume";
-  var RELEASE = "Release";
-  var FINALIZER = "Finalizer";
-  var FINALIZED = "Finalized";
-  var FORKED = "Forked";
-  var FIBER = "Fiber";
-  var THUNK = "Thunk";
-  function Aff2(tag, _1, _2, _3) {
-    this.tag = tag;
-    this._1 = _1;
-    this._2 = _2;
-    this._3 = _3;
-  }
-  function AffCtr(tag) {
-    var fn = function(_1, _2, _3) {
-      return new Aff2(tag, _1, _2, _3);
-    };
-    fn.tag = tag;
-    return fn;
-  }
-  function nonCanceler(error2) {
-    return new Aff2(PURE, void 0);
-  }
-  function runEff(eff) {
-    try {
-      eff();
-    } catch (error2) {
-      setTimeout(function() {
-        throw error2;
-      }, 0);
-    }
-  }
-  function runSync(left, right, eff) {
-    try {
-      return right(eff());
-    } catch (error2) {
-      return left(error2);
-    }
-  }
-  function runAsync(left, eff, k) {
-    try {
-      return eff(k)();
-    } catch (error2) {
-      k(left(error2))();
-      return nonCanceler;
-    }
-  }
-  var Scheduler = function() {
-    var limit = 1024;
-    var size3 = 0;
-    var ix = 0;
-    var queue = new Array(limit);
-    var draining = false;
-    function drain() {
-      var thunk;
-      draining = true;
-      while (size3 !== 0) {
-        size3--;
-        thunk = queue[ix];
-        queue[ix] = void 0;
-        ix = (ix + 1) % limit;
-        thunk();
-      }
-      draining = false;
-    }
-    return {
-      isDraining: function() {
-        return draining;
-      },
-      enqueue: function(cb) {
-        var i, tmp;
-        if (size3 === limit) {
-          tmp = draining;
-          drain();
-          draining = tmp;
-        }
-        queue[(ix + size3) % limit] = cb;
-        size3++;
-        if (!draining) {
-          drain();
-        }
-      }
-    };
-  }();
-  function Supervisor(util) {
-    var fibers = {};
-    var fiberId = 0;
-    var count = 0;
-    return {
-      register: function(fiber) {
-        var fid = fiberId++;
-        fiber.onComplete({
-          rethrow: true,
-          handler: function(result2) {
-            return function() {
-              count--;
-              delete fibers[fid];
-            };
-          }
-        })();
-        fibers[fid] = fiber;
-        count++;
-      },
-      isEmpty: function() {
-        return count === 0;
-      },
-      killAll: function(killError, cb) {
-        return function() {
-          if (count === 0) {
-            return cb();
-          }
-          var killCount = 0;
-          var kills = {};
-          function kill(fid) {
-            kills[fid] = fibers[fid].kill(killError, function(result2) {
-              return function() {
-                delete kills[fid];
-                killCount--;
-                if (util.isLeft(result2) && util.fromLeft(result2)) {
-                  setTimeout(function() {
-                    throw util.fromLeft(result2);
-                  }, 0);
-                }
-                if (killCount === 0) {
-                  cb();
-                }
-              };
-            })();
-          }
-          for (var k in fibers) {
-            if (fibers.hasOwnProperty(k)) {
-              killCount++;
-              kill(k);
-            }
-          }
-          fibers = {};
-          fiberId = 0;
-          count = 0;
-          return function(error2) {
-            return new Aff2(SYNC, function() {
-              for (var k2 in kills) {
-                if (kills.hasOwnProperty(k2)) {
-                  kills[k2]();
-                }
-              }
-            });
-          };
-        };
-      }
-    };
-  }
-  var SUSPENDED = 0;
-  var CONTINUE = 1;
-  var STEP_BIND = 2;
-  var STEP_RESULT = 3;
-  var PENDING = 4;
-  var RETURN = 5;
-  var COMPLETED = 6;
-  function Fiber(util, supervisor, aff) {
-    var runTick = 0;
-    var status = SUSPENDED;
-    var step2 = aff;
-    var fail2 = null;
-    var interrupt = null;
-    var bhead = null;
-    var btail = null;
-    var attempts = null;
-    var bracketCount = 0;
-    var joinId = 0;
-    var joins = null;
-    var rethrow = true;
-    function run3(localRunTick) {
-      var tmp, result2, attempt;
-      while (true) {
-        tmp = null;
-        result2 = null;
-        attempt = null;
-        switch (status) {
-          case STEP_BIND:
-            status = CONTINUE;
-            try {
-              step2 = bhead(step2);
-              if (btail === null) {
-                bhead = null;
-              } else {
-                bhead = btail._1;
-                btail = btail._2;
-              }
-            } catch (e) {
-              status = RETURN;
-              fail2 = util.left(e);
-              step2 = null;
-            }
-            break;
-          case STEP_RESULT:
-            if (util.isLeft(step2)) {
-              status = RETURN;
-              fail2 = step2;
-              step2 = null;
-            } else if (bhead === null) {
-              status = RETURN;
-            } else {
-              status = STEP_BIND;
-              step2 = util.fromRight(step2);
-            }
-            break;
-          case CONTINUE:
-            switch (step2.tag) {
-              case BIND:
-                if (bhead) {
-                  btail = new Aff2(CONS, bhead, btail);
-                }
-                bhead = step2._2;
-                status = CONTINUE;
-                step2 = step2._1;
-                break;
-              case PURE:
-                if (bhead === null) {
-                  status = RETURN;
-                  step2 = util.right(step2._1);
-                } else {
-                  status = STEP_BIND;
-                  step2 = step2._1;
-                }
-                break;
-              case SYNC:
-                status = STEP_RESULT;
-                step2 = runSync(util.left, util.right, step2._1);
-                break;
-              case ASYNC:
-                status = PENDING;
-                step2 = runAsync(util.left, step2._1, function(result3) {
-                  return function() {
-                    if (runTick !== localRunTick) {
-                      return;
-                    }
-                    runTick++;
-                    Scheduler.enqueue(function() {
-                      if (runTick !== localRunTick + 1) {
-                        return;
-                      }
-                      status = STEP_RESULT;
-                      step2 = result3;
-                      run3(runTick);
-                    });
-                  };
-                });
-                return;
-              case THROW:
-                status = RETURN;
-                fail2 = util.left(step2._1);
-                step2 = null;
-                break;
-              // Enqueue the Catch so that we can call the error handler later on
-              // in case of an exception.
-              case CATCH:
-                if (bhead === null) {
-                  attempts = new Aff2(CONS, step2, attempts, interrupt);
-                } else {
-                  attempts = new Aff2(CONS, step2, new Aff2(CONS, new Aff2(RESUME, bhead, btail), attempts, interrupt), interrupt);
-                }
-                bhead = null;
-                btail = null;
-                status = CONTINUE;
-                step2 = step2._1;
-                break;
-              // Enqueue the Bracket so that we can call the appropriate handlers
-              // after resource acquisition.
-              case BRACKET:
-                bracketCount++;
-                if (bhead === null) {
-                  attempts = new Aff2(CONS, step2, attempts, interrupt);
-                } else {
-                  attempts = new Aff2(CONS, step2, new Aff2(CONS, new Aff2(RESUME, bhead, btail), attempts, interrupt), interrupt);
-                }
-                bhead = null;
-                btail = null;
-                status = CONTINUE;
-                step2 = step2._1;
-                break;
-              case FORK:
-                status = STEP_RESULT;
-                tmp = Fiber(util, supervisor, step2._2);
-                if (supervisor) {
-                  supervisor.register(tmp);
-                }
-                if (step2._1) {
-                  tmp.run();
-                }
-                step2 = util.right(tmp);
-                break;
-              case SEQ:
-                status = CONTINUE;
-                step2 = sequential2(util, supervisor, step2._1);
-                break;
-            }
-            break;
-          case RETURN:
-            bhead = null;
-            btail = null;
-            if (attempts === null) {
-              status = COMPLETED;
-              step2 = interrupt || fail2 || step2;
-            } else {
-              tmp = attempts._3;
-              attempt = attempts._1;
-              attempts = attempts._2;
-              switch (attempt.tag) {
-                // We cannot recover from an unmasked interrupt. Otherwise we should
-                // continue stepping, or run the exception handler if an exception
-                // was raised.
-                case CATCH:
-                  if (interrupt && interrupt !== tmp && bracketCount === 0) {
-                    status = RETURN;
-                  } else if (fail2) {
-                    status = CONTINUE;
-                    step2 = attempt._2(util.fromLeft(fail2));
-                    fail2 = null;
-                  }
-                  break;
-                // We cannot resume from an unmasked interrupt or exception.
-                case RESUME:
-                  if (interrupt && interrupt !== tmp && bracketCount === 0 || fail2) {
-                    status = RETURN;
-                  } else {
-                    bhead = attempt._1;
-                    btail = attempt._2;
-                    status = STEP_BIND;
-                    step2 = util.fromRight(step2);
-                  }
-                  break;
-                // If we have a bracket, we should enqueue the handlers,
-                // and continue with the success branch only if the fiber has
-                // not been interrupted. If the bracket acquisition failed, we
-                // should not run either.
-                case BRACKET:
-                  bracketCount--;
-                  if (fail2 === null) {
-                    result2 = util.fromRight(step2);
-                    attempts = new Aff2(CONS, new Aff2(RELEASE, attempt._2, result2), attempts, tmp);
-                    if (interrupt === tmp || bracketCount > 0) {
-                      status = CONTINUE;
-                      step2 = attempt._3(result2);
-                    }
-                  }
-                  break;
-                // Enqueue the appropriate handler. We increase the bracket count
-                // because it should not be cancelled.
-                case RELEASE:
-                  attempts = new Aff2(CONS, new Aff2(FINALIZED, step2, fail2), attempts, interrupt);
-                  status = CONTINUE;
-                  if (interrupt && interrupt !== tmp && bracketCount === 0) {
-                    step2 = attempt._1.killed(util.fromLeft(interrupt))(attempt._2);
-                  } else if (fail2) {
-                    step2 = attempt._1.failed(util.fromLeft(fail2))(attempt._2);
-                  } else {
-                    step2 = attempt._1.completed(util.fromRight(step2))(attempt._2);
-                  }
-                  fail2 = null;
-                  bracketCount++;
-                  break;
-                case FINALIZER:
-                  bracketCount++;
-                  attempts = new Aff2(CONS, new Aff2(FINALIZED, step2, fail2), attempts, interrupt);
-                  status = CONTINUE;
-                  step2 = attempt._1;
-                  break;
-                case FINALIZED:
-                  bracketCount--;
-                  status = RETURN;
-                  step2 = attempt._1;
-                  fail2 = attempt._2;
-                  break;
-              }
-            }
-            break;
-          case COMPLETED:
-            for (var k in joins) {
-              if (joins.hasOwnProperty(k)) {
-                rethrow = rethrow && joins[k].rethrow;
-                runEff(joins[k].handler(step2));
-              }
-            }
-            joins = null;
-            if (interrupt && fail2) {
-              setTimeout(function() {
-                throw util.fromLeft(fail2);
-              }, 0);
-            } else if (util.isLeft(step2) && rethrow) {
-              setTimeout(function() {
-                if (rethrow) {
-                  throw util.fromLeft(step2);
-                }
-              }, 0);
-            }
-            return;
-          case SUSPENDED:
-            status = CONTINUE;
-            break;
-          case PENDING:
-            return;
-        }
-      }
-    }
-    function onComplete(join3) {
-      return function() {
-        if (status === COMPLETED) {
-          rethrow = rethrow && join3.rethrow;
-          join3.handler(step2)();
-          return function() {
-          };
-        }
-        var jid = joinId++;
-        joins = joins || {};
-        joins[jid] = join3;
-        return function() {
-          if (joins !== null) {
-            delete joins[jid];
-          }
-        };
-      };
-    }
-    function kill(error2, cb) {
-      return function() {
-        if (status === COMPLETED) {
-          cb(util.right(void 0))();
-          return function() {
-          };
-        }
-        var canceler = onComplete({
-          rethrow: false,
-          handler: function() {
-            return cb(util.right(void 0));
-          }
-        })();
-        switch (status) {
-          case SUSPENDED:
-            interrupt = util.left(error2);
-            status = COMPLETED;
-            step2 = interrupt;
-            run3(runTick);
-            break;
-          case PENDING:
-            if (interrupt === null) {
-              interrupt = util.left(error2);
-            }
-            if (bracketCount === 0) {
-              if (status === PENDING) {
-                attempts = new Aff2(CONS, new Aff2(FINALIZER, step2(error2)), attempts, interrupt);
-              }
-              status = RETURN;
-              step2 = null;
-              fail2 = null;
-              run3(++runTick);
-            }
-            break;
-          default:
-            if (interrupt === null) {
-              interrupt = util.left(error2);
-            }
-            if (bracketCount === 0) {
-              status = RETURN;
-              step2 = null;
-              fail2 = null;
-            }
-        }
-        return canceler;
-      };
-    }
-    function join2(cb) {
-      return function() {
-        var canceler = onComplete({
-          rethrow: false,
-          handler: cb
-        })();
-        if (status === SUSPENDED) {
-          run3(runTick);
-        }
-        return canceler;
-      };
-    }
-    return {
-      kill,
-      join: join2,
-      onComplete,
-      isSuspended: function() {
-        return status === SUSPENDED;
-      },
-      run: function() {
-        if (status === SUSPENDED) {
-          if (!Scheduler.isDraining()) {
-            Scheduler.enqueue(function() {
-              run3(runTick);
-            });
-          } else {
-            run3(runTick);
-          }
-        }
-      }
-    };
-  }
-  function runPar(util, supervisor, par, cb) {
-    var fiberId = 0;
-    var fibers = {};
-    var killId = 0;
-    var kills = {};
-    var early = new Error("[ParAff] Early exit");
-    var interrupt = null;
-    var root = EMPTY;
-    function kill(error2, par2, cb2) {
-      var step2 = par2;
-      var head4 = null;
-      var tail2 = null;
-      var count = 0;
-      var kills2 = {};
-      var tmp, kid;
-      loop: while (true) {
-        tmp = null;
-        switch (step2.tag) {
-          case FORKED:
-            if (step2._3 === EMPTY) {
-              tmp = fibers[step2._1];
-              kills2[count++] = tmp.kill(error2, function(result2) {
-                return function() {
-                  count--;
-                  if (count === 0) {
-                    cb2(result2)();
-                  }
-                };
-              });
-            }
-            if (head4 === null) {
-              break loop;
-            }
-            step2 = head4._2;
-            if (tail2 === null) {
-              head4 = null;
-            } else {
-              head4 = tail2._1;
-              tail2 = tail2._2;
-            }
-            break;
-          case MAP:
-            step2 = step2._2;
-            break;
-          case APPLY:
-          case ALT:
-            if (head4) {
-              tail2 = new Aff2(CONS, head4, tail2);
-            }
-            head4 = step2;
-            step2 = step2._1;
-            break;
-        }
-      }
-      if (count === 0) {
-        cb2(util.right(void 0))();
-      } else {
-        kid = 0;
-        tmp = count;
-        for (; kid < tmp; kid++) {
-          kills2[kid] = kills2[kid]();
-        }
-      }
-      return kills2;
-    }
-    function join2(result2, head4, tail2) {
-      var fail2, step2, lhs, rhs, tmp, kid;
-      if (util.isLeft(result2)) {
-        fail2 = result2;
-        step2 = null;
-      } else {
-        step2 = result2;
-        fail2 = null;
-      }
-      loop: while (true) {
-        lhs = null;
-        rhs = null;
-        tmp = null;
-        kid = null;
-        if (interrupt !== null) {
-          return;
-        }
-        if (head4 === null) {
-          cb(fail2 || step2)();
-          return;
-        }
-        if (head4._3 !== EMPTY) {
-          return;
-        }
-        switch (head4.tag) {
-          case MAP:
-            if (fail2 === null) {
-              head4._3 = util.right(head4._1(util.fromRight(step2)));
-              step2 = head4._3;
-            } else {
-              head4._3 = fail2;
-            }
-            break;
-          case APPLY:
-            lhs = head4._1._3;
-            rhs = head4._2._3;
-            if (fail2) {
-              head4._3 = fail2;
-              tmp = true;
-              kid = killId++;
-              kills[kid] = kill(early, fail2 === lhs ? head4._2 : head4._1, function() {
-                return function() {
-                  delete kills[kid];
-                  if (tmp) {
-                    tmp = false;
-                  } else if (tail2 === null) {
-                    join2(fail2, null, null);
-                  } else {
-                    join2(fail2, tail2._1, tail2._2);
-                  }
-                };
-              });
-              if (tmp) {
-                tmp = false;
-                return;
-              }
-            } else if (lhs === EMPTY || rhs === EMPTY) {
-              return;
-            } else {
-              step2 = util.right(util.fromRight(lhs)(util.fromRight(rhs)));
-              head4._3 = step2;
-            }
-            break;
-          case ALT:
-            lhs = head4._1._3;
-            rhs = head4._2._3;
-            if (lhs === EMPTY && util.isLeft(rhs) || rhs === EMPTY && util.isLeft(lhs)) {
-              return;
-            }
-            if (lhs !== EMPTY && util.isLeft(lhs) && rhs !== EMPTY && util.isLeft(rhs)) {
-              fail2 = step2 === lhs ? rhs : lhs;
-              step2 = null;
-              head4._3 = fail2;
-            } else {
-              head4._3 = step2;
-              tmp = true;
-              kid = killId++;
-              kills[kid] = kill(early, step2 === lhs ? head4._2 : head4._1, function() {
-                return function() {
-                  delete kills[kid];
-                  if (tmp) {
-                    tmp = false;
-                  } else if (tail2 === null) {
-                    join2(step2, null, null);
-                  } else {
-                    join2(step2, tail2._1, tail2._2);
-                  }
-                };
-              });
-              if (tmp) {
-                tmp = false;
-                return;
-              }
-            }
-            break;
-        }
-        if (tail2 === null) {
-          head4 = null;
-        } else {
-          head4 = tail2._1;
-          tail2 = tail2._2;
-        }
-      }
-    }
-    function resolve(fiber) {
-      return function(result2) {
-        return function() {
-          delete fibers[fiber._1];
-          fiber._3 = result2;
-          join2(result2, fiber._2._1, fiber._2._2);
-        };
-      };
-    }
-    function run3() {
-      var status = CONTINUE;
-      var step2 = par;
-      var head4 = null;
-      var tail2 = null;
-      var tmp, fid;
-      loop: while (true) {
-        tmp = null;
-        fid = null;
-        switch (status) {
-          case CONTINUE:
-            switch (step2.tag) {
-              case MAP:
-                if (head4) {
-                  tail2 = new Aff2(CONS, head4, tail2);
-                }
-                head4 = new Aff2(MAP, step2._1, EMPTY, EMPTY);
-                step2 = step2._2;
-                break;
-              case APPLY:
-                if (head4) {
-                  tail2 = new Aff2(CONS, head4, tail2);
-                }
-                head4 = new Aff2(APPLY, EMPTY, step2._2, EMPTY);
-                step2 = step2._1;
-                break;
-              case ALT:
-                if (head4) {
-                  tail2 = new Aff2(CONS, head4, tail2);
-                }
-                head4 = new Aff2(ALT, EMPTY, step2._2, EMPTY);
-                step2 = step2._1;
-                break;
-              default:
-                fid = fiberId++;
-                status = RETURN;
-                tmp = step2;
-                step2 = new Aff2(FORKED, fid, new Aff2(CONS, head4, tail2), EMPTY);
-                tmp = Fiber(util, supervisor, tmp);
-                tmp.onComplete({
-                  rethrow: false,
-                  handler: resolve(step2)
-                })();
-                fibers[fid] = tmp;
-                if (supervisor) {
-                  supervisor.register(tmp);
-                }
-            }
-            break;
-          case RETURN:
-            if (head4 === null) {
-              break loop;
-            }
-            if (head4._1 === EMPTY) {
-              head4._1 = step2;
-              status = CONTINUE;
-              step2 = head4._2;
-              head4._2 = EMPTY;
-            } else {
-              head4._2 = step2;
-              step2 = head4;
-              if (tail2 === null) {
-                head4 = null;
-              } else {
-                head4 = tail2._1;
-                tail2 = tail2._2;
-              }
-            }
-        }
-      }
-      root = step2;
-      for (fid = 0; fid < fiberId; fid++) {
-        fibers[fid].run();
-      }
-    }
-    function cancel(error2, cb2) {
-      interrupt = util.left(error2);
-      var innerKills;
-      for (var kid in kills) {
-        if (kills.hasOwnProperty(kid)) {
-          innerKills = kills[kid];
-          for (kid in innerKills) {
-            if (innerKills.hasOwnProperty(kid)) {
-              innerKills[kid]();
-            }
-          }
-        }
-      }
-      kills = null;
-      var newKills = kill(error2, root, cb2);
-      return function(killError) {
-        return new Aff2(ASYNC, function(killCb) {
-          return function() {
-            for (var kid2 in newKills) {
-              if (newKills.hasOwnProperty(kid2)) {
-                newKills[kid2]();
-              }
-            }
-            return nonCanceler;
-          };
-        });
-      };
-    }
-    run3();
-    return function(killError) {
-      return new Aff2(ASYNC, function(killCb) {
-        return function() {
-          return cancel(killError, killCb);
-        };
-      });
-    };
-  }
-  function sequential2(util, supervisor, par) {
-    return new Aff2(ASYNC, function(cb) {
-      return function() {
-        return runPar(util, supervisor, par, cb);
-      };
-    });
-  }
-  Aff2.EMPTY = EMPTY;
-  Aff2.Pure = AffCtr(PURE);
-  Aff2.Throw = AffCtr(THROW);
-  Aff2.Catch = AffCtr(CATCH);
-  Aff2.Sync = AffCtr(SYNC);
-  Aff2.Async = AffCtr(ASYNC);
-  Aff2.Bind = AffCtr(BIND);
-  Aff2.Bracket = AffCtr(BRACKET);
-  Aff2.Fork = AffCtr(FORK);
-  Aff2.Seq = AffCtr(SEQ);
-  Aff2.ParMap = AffCtr(MAP);
-  Aff2.ParApply = AffCtr(APPLY);
-  Aff2.ParAlt = AffCtr(ALT);
-  Aff2.Fiber = Fiber;
-  Aff2.Supervisor = Supervisor;
-  Aff2.Scheduler = Scheduler;
-  Aff2.nonCanceler = nonCanceler;
-  return Aff2;
-}();
-var _pure = Aff.Pure;
-var _throwError = Aff.Throw;
-var _liftEffect = Aff.Sync;
-var makeAff = Aff.Async;
-var _sequential = Aff.Seq;
 
 // output/Data.Char/index.js
 var toCharCode2 = /* @__PURE__ */ fromEnum(boundedEnumChar);
@@ -7862,7 +7030,7 @@ var pickClause = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
   var pure5 = pure(Monad0.Applicative0());
   var renderSafe1 = renderSafe(dictMonadThrow);
-  var bind6 = bind(Monad0.Bind1());
+  var bind7 = bind(Monad0.Bind1());
   var throwError3 = throwError(dictMonadThrow);
   return function(ctl) {
     return function(clauses) {
@@ -7878,7 +7046,7 @@ var pickClause = function(dictMonadThrow) {
         ;
         if (v.value0.head.name === "elif") {
           if (v.value0.head.args.length === 1) {
-            return bind6(ctl["eval"](ctl.env)(v["value0"]["head"]["args"][0]))(function(cond) {
+            return bind7(ctl["eval"](ctl.env)(v["value0"]["head"]["args"][0]))(function(cond) {
               var $238 = truthy(refFalsy(ctl.env))(cond);
               if ($238) {
                 return renderSafe1(ctl)(ctl.env)(v.value0.head.body);
@@ -8337,7 +7505,7 @@ var checkIfClauses = function(dictMonadThrow) {
 var ifH = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
   var Bind1 = Monad0.Bind1();
-  var bind6 = bind(Bind1);
+  var bind7 = bind(Bind1);
   var pure5 = pure(Monad0.Applicative0());
   var throwError3 = throwError(dictMonadThrow);
   var discard1 = discard2(Bind1);
@@ -8346,7 +7514,7 @@ var ifH = function(dictMonadThrow) {
   var pickClause1 = pickClause(dictMonadThrow);
   return function(ctl) {
     return function(args) {
-      return bind6(function() {
+      return bind7(function() {
         if (args.length === 1) {
           return pure5(truthy(refFalsy(ctl.env))(args[0]));
         }
@@ -9208,7 +8376,6 @@ var desugar = function(clauseNames) {
 };
 
 // output/FullBars/index.js
-var identity9 = /* @__PURE__ */ identity(categoryFn);
 var show8 = /* @__PURE__ */ show(showError);
 var show1 = /* @__PURE__ */ show(showParseError);
 var traverse5 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
@@ -9242,7 +8409,7 @@ var runResolved = function(dictMonadThrow) {
     };
   };
 };
-var runResolved2 = /* @__PURE__ */ runResolved(monadThrowEither);
+var runResolved1 = /* @__PURE__ */ runResolved(monadThrowEither);
 var formatError = function(src) {
   return function(v) {
     if (v instanceof ParseFailure) {
@@ -9250,29 +8417,6 @@ var formatError = function(src) {
     }
     ;
     return show8(v);
-  };
-};
-var renderWithDiag = function(src) {
-  return function(dat) {
-    var v = parse(src);
-    if (v instanceof Left) {
-      return new Left(renderParseErrorAt(src)(v.value0));
-    }
-    ;
-    if (v instanceof Right) {
-      var v1 = runResolved2(v.value0.directives)(identity9)(v.value0.nodes)(dat);
-      if (v1 instanceof Left) {
-        return new Left(formatError(src)(v1.value0));
-      }
-      ;
-      if (v1 instanceof Right) {
-        return new Right(v1.value0);
-      }
-      ;
-      throw new Error("Failed pattern match at FullBars (line 109, column 34 - line 111, column 27): " + [v1.constructor.name]);
-    }
-    ;
-    throw new Error("Failed pattern match at FullBars (line 107, column 26 - line 111, column 27): " + [v.constructor.name]);
   };
 };
 var desugarSurface = /* @__PURE__ */ desugar(surfaceClauses);
@@ -9286,7 +8430,7 @@ var renderSurfaceDiagWith = function(opts) {
       ;
       if (v instanceof Right) {
         var v1 = hoistInline(desugarSurface(v.value0.nodes));
-        var v2 = runResolved2(v.value0.directives)(registerPartials(v1.partials))(v1.template)(dat);
+        var v2 = runResolved1(v.value0.directives)(registerPartials(v1.partials))(v1.template)(dat);
         if (v2 instanceof Left) {
           return new Left(formatError(src)(v2.value0));
         }
@@ -9295,10 +8439,10 @@ var renderSurfaceDiagWith = function(opts) {
           return new Right(v2.value0);
         }
         ;
-        throw new Error("Failed pattern match at FullBars (line 191, column 7 - line 193, column 31): " + [v2.constructor.name]);
+        throw new Error("Failed pattern match at FullBars (line 143, column 7 - line 145, column 31): " + [v2.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars (line 185, column 38 - line 193, column 31): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FullBars (line 137, column 38 - line 145, column 31): " + [v.constructor.name]);
     };
   };
 };
@@ -9326,10 +8470,10 @@ var renderSurfaceWith = function(partialSrcs) {
             });
           }
           ;
-          throw new Error("Failed pattern match at FullBars (line 174, column 36 - line 176, column 75): " + [v22.constructor.name]);
+          throw new Error("Failed pattern match at FullBars (line 126, column 36 - line 128, column 75): " + [v22.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars (line 172, column 35 - line 176, column 75): " + [v12.constructor.name]);
+        throw new Error("Failed pattern match at FullBars (line 124, column 35 - line 128, column 75): " + [v12.constructor.name]);
       };
       var v = traverse5(compilePartial)(partialSrcs);
       if (v instanceof Left) {
@@ -9351,13 +8495,13 @@ var renderSurfaceWith = function(partialSrcs) {
             return new Tuple(p.name, p.falsy);
           })(v.value0));
           var setup = function() {
-            var $124 = registerPartialsFalsy(externalF);
-            var $125 = registerPartials(union6(v2.partials)(externalT));
-            return function($126) {
-              return $124($125($126));
+            var $86 = registerPartialsFalsy(externalF);
+            var $87 = registerPartials(union6(v2.partials)(externalT));
+            return function($88) {
+              return $86($87($88));
             };
           }();
-          var v3 = runResolved2(v1.value0.directives)(setup)(v2.template)(dat);
+          var v3 = runResolved1(v1.value0.directives)(setup)(v2.template)(dat);
           if (v3 instanceof Left) {
             return new Left(show8(v3.value0));
           }
@@ -9366,13 +8510,13 @@ var renderSurfaceWith = function(partialSrcs) {
             return new Right(v3.value0);
           }
           ;
-          throw new Error("Failed pattern match at FullBars (line 166, column 11 - line 168, column 35): " + [v3.constructor.name]);
+          throw new Error("Failed pattern match at FullBars (line 118, column 11 - line 120, column 35): " + [v3.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars (line 155, column 17 - line 168, column 35): " + [v1.constructor.name]);
+        throw new Error("Failed pattern match at FullBars (line 107, column 17 - line 120, column 35): " + [v1.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars (line 153, column 3 - line 168, column 35): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FullBars (line 105, column 3 - line 120, column 35): " + [v.constructor.name]);
     };
   };
 };
@@ -9447,7 +8591,7 @@ var litJs = function(v) {
     return "null";
   }
   ;
-  throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 139, column 9 - line 146, column 22): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 141, column 9 - line 148, column 22): " + [v.constructor.name]);
 };
 var lambda = function(rec) {
   return function(ctx2) {
@@ -9468,7 +8612,7 @@ var head1 = function(rec) {
         return "null";
       }
       ;
-      throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 251, column 22 - line 253, column 20): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 253, column 22 - line 255, column 20): " + [v.constructor.name]);
     };
   };
 };
@@ -9499,7 +8643,7 @@ var falsyLiteral = function(fs) {
       return "o";
     }
     ;
-    throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 99, column 9 - line 105, column 21): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 101, column 9 - line 107, column 21): " + [v.constructor.name]);
   };
   var flag = function(sh) {
     var $39 = member4(sh)(fs);
@@ -9534,7 +8678,7 @@ var elseChain = function(rec) {
         return " else {\n" + (rec.nodes(ctx2)(v.value0.head.body) + "  }");
       }
       ;
-      throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 186, column 29 - line 194, column 58): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 188, column 29 - line 196, column 58): " + [v.constructor.name]);
     };
   };
 };
@@ -9583,7 +8727,7 @@ var frameBlock = function(rec) {
               return [];
             }
             ;
-            throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 208, column 18 - line 210, column 20): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 210, column 18 - line 212, column 20): " + [v.constructor.name]);
           }();
           var child = rec.child(ctx2);
           return "  out += rt." + (fn + ("(" + (subject + (", " + (ctx2.scope + (", " + (names + (", " + (lambda(rec)(child)(s.before) + (", " + (lambda(rec)(ctx2)(elseClause) + ");\n")))))))))));
@@ -9657,7 +8801,7 @@ var argAt = function(rec) {
           return "null";
         }
         ;
-        throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 134, column 24 - line 136, column 20): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 136, column 24 - line 138, column 20): " + [v.constructor.name]);
       };
     };
   };
@@ -9693,7 +8837,7 @@ var fbExpr = function(rec) {
         return "rt.call(" + (jsString(v.value0) + (", [" + (args$prime(rec)(ctx2)(v.value1) + ("], " + (ctx2.scope + ")")))));
       }
       ;
-      throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 116, column 18 - line 129, column 92): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at BareBars.Compile.FullBars (line 118, column 18 - line 131, column 92): " + [v.constructor.name]);
     };
   };
 };
@@ -9701,16 +8845,6 @@ var fullbarsEmit = {
   expr: fbExpr,
   block: fbBlock
 };
-var compileCoreWith = function(opts) {
-  return function(src) {
-    return bind5(parseWith(opts)(src))(function(v) {
-      return bind5(resolveForCompile(v.directives))(function(fs) {
-        return pure4(compile(metaFor(fs))(fullbarsEmit)([])(v.nodes));
-      });
-    });
-  };
-};
-var compileCore = /* @__PURE__ */ compileCoreWith(defaultParseOptions);
 var compileSurfaceWith = function(opts) {
   return function(src) {
     return bind5(parseWith(opts)(src))(function(v) {
@@ -9842,6 +8976,876 @@ var $lazy_fromJson = /* @__PURE__ */ $runtime_lazy6("fromJson", "BareBars.Json",
 });
 var fromJson = /* @__PURE__ */ $lazy_fromJson(19);
 
+// output/Effect.Aff/foreign.js
+var Aff = function() {
+  var EMPTY = {};
+  var PURE = "Pure";
+  var THROW = "Throw";
+  var CATCH = "Catch";
+  var SYNC = "Sync";
+  var ASYNC = "Async";
+  var BIND = "Bind";
+  var BRACKET = "Bracket";
+  var FORK = "Fork";
+  var SEQ = "Sequential";
+  var MAP = "Map";
+  var APPLY = "Apply";
+  var ALT = "Alt";
+  var CONS = "Cons";
+  var RESUME = "Resume";
+  var RELEASE = "Release";
+  var FINALIZER = "Finalizer";
+  var FINALIZED = "Finalized";
+  var FORKED = "Forked";
+  var FIBER = "Fiber";
+  var THUNK = "Thunk";
+  function Aff2(tag, _1, _2, _3) {
+    this.tag = tag;
+    this._1 = _1;
+    this._2 = _2;
+    this._3 = _3;
+  }
+  function AffCtr(tag) {
+    var fn = function(_1, _2, _3) {
+      return new Aff2(tag, _1, _2, _3);
+    };
+    fn.tag = tag;
+    return fn;
+  }
+  function nonCanceler(error2) {
+    return new Aff2(PURE, void 0);
+  }
+  function runEff(eff) {
+    try {
+      eff();
+    } catch (error2) {
+      setTimeout(function() {
+        throw error2;
+      }, 0);
+    }
+  }
+  function runSync(left, right, eff) {
+    try {
+      return right(eff());
+    } catch (error2) {
+      return left(error2);
+    }
+  }
+  function runAsync(left, eff, k) {
+    try {
+      return eff(k)();
+    } catch (error2) {
+      k(left(error2))();
+      return nonCanceler;
+    }
+  }
+  var Scheduler = function() {
+    var limit = 1024;
+    var size3 = 0;
+    var ix = 0;
+    var queue = new Array(limit);
+    var draining = false;
+    function drain() {
+      var thunk;
+      draining = true;
+      while (size3 !== 0) {
+        size3--;
+        thunk = queue[ix];
+        queue[ix] = void 0;
+        ix = (ix + 1) % limit;
+        thunk();
+      }
+      draining = false;
+    }
+    return {
+      isDraining: function() {
+        return draining;
+      },
+      enqueue: function(cb) {
+        var i, tmp;
+        if (size3 === limit) {
+          tmp = draining;
+          drain();
+          draining = tmp;
+        }
+        queue[(ix + size3) % limit] = cb;
+        size3++;
+        if (!draining) {
+          drain();
+        }
+      }
+    };
+  }();
+  function Supervisor(util) {
+    var fibers = {};
+    var fiberId = 0;
+    var count = 0;
+    return {
+      register: function(fiber) {
+        var fid = fiberId++;
+        fiber.onComplete({
+          rethrow: true,
+          handler: function(result2) {
+            return function() {
+              count--;
+              delete fibers[fid];
+            };
+          }
+        })();
+        fibers[fid] = fiber;
+        count++;
+      },
+      isEmpty: function() {
+        return count === 0;
+      },
+      killAll: function(killError, cb) {
+        return function() {
+          if (count === 0) {
+            return cb();
+          }
+          var killCount = 0;
+          var kills = {};
+          function kill(fid) {
+            kills[fid] = fibers[fid].kill(killError, function(result2) {
+              return function() {
+                delete kills[fid];
+                killCount--;
+                if (util.isLeft(result2) && util.fromLeft(result2)) {
+                  setTimeout(function() {
+                    throw util.fromLeft(result2);
+                  }, 0);
+                }
+                if (killCount === 0) {
+                  cb();
+                }
+              };
+            })();
+          }
+          for (var k in fibers) {
+            if (fibers.hasOwnProperty(k)) {
+              killCount++;
+              kill(k);
+            }
+          }
+          fibers = {};
+          fiberId = 0;
+          count = 0;
+          return function(error2) {
+            return new Aff2(SYNC, function() {
+              for (var k2 in kills) {
+                if (kills.hasOwnProperty(k2)) {
+                  kills[k2]();
+                }
+              }
+            });
+          };
+        };
+      }
+    };
+  }
+  var SUSPENDED = 0;
+  var CONTINUE = 1;
+  var STEP_BIND = 2;
+  var STEP_RESULT = 3;
+  var PENDING = 4;
+  var RETURN = 5;
+  var COMPLETED = 6;
+  function Fiber(util, supervisor, aff) {
+    var runTick = 0;
+    var status = SUSPENDED;
+    var step2 = aff;
+    var fail2 = null;
+    var interrupt = null;
+    var bhead = null;
+    var btail = null;
+    var attempts = null;
+    var bracketCount = 0;
+    var joinId = 0;
+    var joins = null;
+    var rethrow = true;
+    function run3(localRunTick) {
+      var tmp, result2, attempt;
+      while (true) {
+        tmp = null;
+        result2 = null;
+        attempt = null;
+        switch (status) {
+          case STEP_BIND:
+            status = CONTINUE;
+            try {
+              step2 = bhead(step2);
+              if (btail === null) {
+                bhead = null;
+              } else {
+                bhead = btail._1;
+                btail = btail._2;
+              }
+            } catch (e) {
+              status = RETURN;
+              fail2 = util.left(e);
+              step2 = null;
+            }
+            break;
+          case STEP_RESULT:
+            if (util.isLeft(step2)) {
+              status = RETURN;
+              fail2 = step2;
+              step2 = null;
+            } else if (bhead === null) {
+              status = RETURN;
+            } else {
+              status = STEP_BIND;
+              step2 = util.fromRight(step2);
+            }
+            break;
+          case CONTINUE:
+            switch (step2.tag) {
+              case BIND:
+                if (bhead) {
+                  btail = new Aff2(CONS, bhead, btail);
+                }
+                bhead = step2._2;
+                status = CONTINUE;
+                step2 = step2._1;
+                break;
+              case PURE:
+                if (bhead === null) {
+                  status = RETURN;
+                  step2 = util.right(step2._1);
+                } else {
+                  status = STEP_BIND;
+                  step2 = step2._1;
+                }
+                break;
+              case SYNC:
+                status = STEP_RESULT;
+                step2 = runSync(util.left, util.right, step2._1);
+                break;
+              case ASYNC:
+                status = PENDING;
+                step2 = runAsync(util.left, step2._1, function(result3) {
+                  return function() {
+                    if (runTick !== localRunTick) {
+                      return;
+                    }
+                    runTick++;
+                    Scheduler.enqueue(function() {
+                      if (runTick !== localRunTick + 1) {
+                        return;
+                      }
+                      status = STEP_RESULT;
+                      step2 = result3;
+                      run3(runTick);
+                    });
+                  };
+                });
+                return;
+              case THROW:
+                status = RETURN;
+                fail2 = util.left(step2._1);
+                step2 = null;
+                break;
+              // Enqueue the Catch so that we can call the error handler later on
+              // in case of an exception.
+              case CATCH:
+                if (bhead === null) {
+                  attempts = new Aff2(CONS, step2, attempts, interrupt);
+                } else {
+                  attempts = new Aff2(CONS, step2, new Aff2(CONS, new Aff2(RESUME, bhead, btail), attempts, interrupt), interrupt);
+                }
+                bhead = null;
+                btail = null;
+                status = CONTINUE;
+                step2 = step2._1;
+                break;
+              // Enqueue the Bracket so that we can call the appropriate handlers
+              // after resource acquisition.
+              case BRACKET:
+                bracketCount++;
+                if (bhead === null) {
+                  attempts = new Aff2(CONS, step2, attempts, interrupt);
+                } else {
+                  attempts = new Aff2(CONS, step2, new Aff2(CONS, new Aff2(RESUME, bhead, btail), attempts, interrupt), interrupt);
+                }
+                bhead = null;
+                btail = null;
+                status = CONTINUE;
+                step2 = step2._1;
+                break;
+              case FORK:
+                status = STEP_RESULT;
+                tmp = Fiber(util, supervisor, step2._2);
+                if (supervisor) {
+                  supervisor.register(tmp);
+                }
+                if (step2._1) {
+                  tmp.run();
+                }
+                step2 = util.right(tmp);
+                break;
+              case SEQ:
+                status = CONTINUE;
+                step2 = sequential2(util, supervisor, step2._1);
+                break;
+            }
+            break;
+          case RETURN:
+            bhead = null;
+            btail = null;
+            if (attempts === null) {
+              status = COMPLETED;
+              step2 = interrupt || fail2 || step2;
+            } else {
+              tmp = attempts._3;
+              attempt = attempts._1;
+              attempts = attempts._2;
+              switch (attempt.tag) {
+                // We cannot recover from an unmasked interrupt. Otherwise we should
+                // continue stepping, or run the exception handler if an exception
+                // was raised.
+                case CATCH:
+                  if (interrupt && interrupt !== tmp && bracketCount === 0) {
+                    status = RETURN;
+                  } else if (fail2) {
+                    status = CONTINUE;
+                    step2 = attempt._2(util.fromLeft(fail2));
+                    fail2 = null;
+                  }
+                  break;
+                // We cannot resume from an unmasked interrupt or exception.
+                case RESUME:
+                  if (interrupt && interrupt !== tmp && bracketCount === 0 || fail2) {
+                    status = RETURN;
+                  } else {
+                    bhead = attempt._1;
+                    btail = attempt._2;
+                    status = STEP_BIND;
+                    step2 = util.fromRight(step2);
+                  }
+                  break;
+                // If we have a bracket, we should enqueue the handlers,
+                // and continue with the success branch only if the fiber has
+                // not been interrupted. If the bracket acquisition failed, we
+                // should not run either.
+                case BRACKET:
+                  bracketCount--;
+                  if (fail2 === null) {
+                    result2 = util.fromRight(step2);
+                    attempts = new Aff2(CONS, new Aff2(RELEASE, attempt._2, result2), attempts, tmp);
+                    if (interrupt === tmp || bracketCount > 0) {
+                      status = CONTINUE;
+                      step2 = attempt._3(result2);
+                    }
+                  }
+                  break;
+                // Enqueue the appropriate handler. We increase the bracket count
+                // because it should not be cancelled.
+                case RELEASE:
+                  attempts = new Aff2(CONS, new Aff2(FINALIZED, step2, fail2), attempts, interrupt);
+                  status = CONTINUE;
+                  if (interrupt && interrupt !== tmp && bracketCount === 0) {
+                    step2 = attempt._1.killed(util.fromLeft(interrupt))(attempt._2);
+                  } else if (fail2) {
+                    step2 = attempt._1.failed(util.fromLeft(fail2))(attempt._2);
+                  } else {
+                    step2 = attempt._1.completed(util.fromRight(step2))(attempt._2);
+                  }
+                  fail2 = null;
+                  bracketCount++;
+                  break;
+                case FINALIZER:
+                  bracketCount++;
+                  attempts = new Aff2(CONS, new Aff2(FINALIZED, step2, fail2), attempts, interrupt);
+                  status = CONTINUE;
+                  step2 = attempt._1;
+                  break;
+                case FINALIZED:
+                  bracketCount--;
+                  status = RETURN;
+                  step2 = attempt._1;
+                  fail2 = attempt._2;
+                  break;
+              }
+            }
+            break;
+          case COMPLETED:
+            for (var k in joins) {
+              if (joins.hasOwnProperty(k)) {
+                rethrow = rethrow && joins[k].rethrow;
+                runEff(joins[k].handler(step2));
+              }
+            }
+            joins = null;
+            if (interrupt && fail2) {
+              setTimeout(function() {
+                throw util.fromLeft(fail2);
+              }, 0);
+            } else if (util.isLeft(step2) && rethrow) {
+              setTimeout(function() {
+                if (rethrow) {
+                  throw util.fromLeft(step2);
+                }
+              }, 0);
+            }
+            return;
+          case SUSPENDED:
+            status = CONTINUE;
+            break;
+          case PENDING:
+            return;
+        }
+      }
+    }
+    function onComplete(join3) {
+      return function() {
+        if (status === COMPLETED) {
+          rethrow = rethrow && join3.rethrow;
+          join3.handler(step2)();
+          return function() {
+          };
+        }
+        var jid = joinId++;
+        joins = joins || {};
+        joins[jid] = join3;
+        return function() {
+          if (joins !== null) {
+            delete joins[jid];
+          }
+        };
+      };
+    }
+    function kill(error2, cb) {
+      return function() {
+        if (status === COMPLETED) {
+          cb(util.right(void 0))();
+          return function() {
+          };
+        }
+        var canceler = onComplete({
+          rethrow: false,
+          handler: function() {
+            return cb(util.right(void 0));
+          }
+        })();
+        switch (status) {
+          case SUSPENDED:
+            interrupt = util.left(error2);
+            status = COMPLETED;
+            step2 = interrupt;
+            run3(runTick);
+            break;
+          case PENDING:
+            if (interrupt === null) {
+              interrupt = util.left(error2);
+            }
+            if (bracketCount === 0) {
+              if (status === PENDING) {
+                attempts = new Aff2(CONS, new Aff2(FINALIZER, step2(error2)), attempts, interrupt);
+              }
+              status = RETURN;
+              step2 = null;
+              fail2 = null;
+              run3(++runTick);
+            }
+            break;
+          default:
+            if (interrupt === null) {
+              interrupt = util.left(error2);
+            }
+            if (bracketCount === 0) {
+              status = RETURN;
+              step2 = null;
+              fail2 = null;
+            }
+        }
+        return canceler;
+      };
+    }
+    function join2(cb) {
+      return function() {
+        var canceler = onComplete({
+          rethrow: false,
+          handler: cb
+        })();
+        if (status === SUSPENDED) {
+          run3(runTick);
+        }
+        return canceler;
+      };
+    }
+    return {
+      kill,
+      join: join2,
+      onComplete,
+      isSuspended: function() {
+        return status === SUSPENDED;
+      },
+      run: function() {
+        if (status === SUSPENDED) {
+          if (!Scheduler.isDraining()) {
+            Scheduler.enqueue(function() {
+              run3(runTick);
+            });
+          } else {
+            run3(runTick);
+          }
+        }
+      }
+    };
+  }
+  function runPar(util, supervisor, par, cb) {
+    var fiberId = 0;
+    var fibers = {};
+    var killId = 0;
+    var kills = {};
+    var early = new Error("[ParAff] Early exit");
+    var interrupt = null;
+    var root = EMPTY;
+    function kill(error2, par2, cb2) {
+      var step2 = par2;
+      var head4 = null;
+      var tail2 = null;
+      var count = 0;
+      var kills2 = {};
+      var tmp, kid;
+      loop: while (true) {
+        tmp = null;
+        switch (step2.tag) {
+          case FORKED:
+            if (step2._3 === EMPTY) {
+              tmp = fibers[step2._1];
+              kills2[count++] = tmp.kill(error2, function(result2) {
+                return function() {
+                  count--;
+                  if (count === 0) {
+                    cb2(result2)();
+                  }
+                };
+              });
+            }
+            if (head4 === null) {
+              break loop;
+            }
+            step2 = head4._2;
+            if (tail2 === null) {
+              head4 = null;
+            } else {
+              head4 = tail2._1;
+              tail2 = tail2._2;
+            }
+            break;
+          case MAP:
+            step2 = step2._2;
+            break;
+          case APPLY:
+          case ALT:
+            if (head4) {
+              tail2 = new Aff2(CONS, head4, tail2);
+            }
+            head4 = step2;
+            step2 = step2._1;
+            break;
+        }
+      }
+      if (count === 0) {
+        cb2(util.right(void 0))();
+      } else {
+        kid = 0;
+        tmp = count;
+        for (; kid < tmp; kid++) {
+          kills2[kid] = kills2[kid]();
+        }
+      }
+      return kills2;
+    }
+    function join2(result2, head4, tail2) {
+      var fail2, step2, lhs, rhs, tmp, kid;
+      if (util.isLeft(result2)) {
+        fail2 = result2;
+        step2 = null;
+      } else {
+        step2 = result2;
+        fail2 = null;
+      }
+      loop: while (true) {
+        lhs = null;
+        rhs = null;
+        tmp = null;
+        kid = null;
+        if (interrupt !== null) {
+          return;
+        }
+        if (head4 === null) {
+          cb(fail2 || step2)();
+          return;
+        }
+        if (head4._3 !== EMPTY) {
+          return;
+        }
+        switch (head4.tag) {
+          case MAP:
+            if (fail2 === null) {
+              head4._3 = util.right(head4._1(util.fromRight(step2)));
+              step2 = head4._3;
+            } else {
+              head4._3 = fail2;
+            }
+            break;
+          case APPLY:
+            lhs = head4._1._3;
+            rhs = head4._2._3;
+            if (fail2) {
+              head4._3 = fail2;
+              tmp = true;
+              kid = killId++;
+              kills[kid] = kill(early, fail2 === lhs ? head4._2 : head4._1, function() {
+                return function() {
+                  delete kills[kid];
+                  if (tmp) {
+                    tmp = false;
+                  } else if (tail2 === null) {
+                    join2(fail2, null, null);
+                  } else {
+                    join2(fail2, tail2._1, tail2._2);
+                  }
+                };
+              });
+              if (tmp) {
+                tmp = false;
+                return;
+              }
+            } else if (lhs === EMPTY || rhs === EMPTY) {
+              return;
+            } else {
+              step2 = util.right(util.fromRight(lhs)(util.fromRight(rhs)));
+              head4._3 = step2;
+            }
+            break;
+          case ALT:
+            lhs = head4._1._3;
+            rhs = head4._2._3;
+            if (lhs === EMPTY && util.isLeft(rhs) || rhs === EMPTY && util.isLeft(lhs)) {
+              return;
+            }
+            if (lhs !== EMPTY && util.isLeft(lhs) && rhs !== EMPTY && util.isLeft(rhs)) {
+              fail2 = step2 === lhs ? rhs : lhs;
+              step2 = null;
+              head4._3 = fail2;
+            } else {
+              head4._3 = step2;
+              tmp = true;
+              kid = killId++;
+              kills[kid] = kill(early, step2 === lhs ? head4._2 : head4._1, function() {
+                return function() {
+                  delete kills[kid];
+                  if (tmp) {
+                    tmp = false;
+                  } else if (tail2 === null) {
+                    join2(step2, null, null);
+                  } else {
+                    join2(step2, tail2._1, tail2._2);
+                  }
+                };
+              });
+              if (tmp) {
+                tmp = false;
+                return;
+              }
+            }
+            break;
+        }
+        if (tail2 === null) {
+          head4 = null;
+        } else {
+          head4 = tail2._1;
+          tail2 = tail2._2;
+        }
+      }
+    }
+    function resolve(fiber) {
+      return function(result2) {
+        return function() {
+          delete fibers[fiber._1];
+          fiber._3 = result2;
+          join2(result2, fiber._2._1, fiber._2._2);
+        };
+      };
+    }
+    function run3() {
+      var status = CONTINUE;
+      var step2 = par;
+      var head4 = null;
+      var tail2 = null;
+      var tmp, fid;
+      loop: while (true) {
+        tmp = null;
+        fid = null;
+        switch (status) {
+          case CONTINUE:
+            switch (step2.tag) {
+              case MAP:
+                if (head4) {
+                  tail2 = new Aff2(CONS, head4, tail2);
+                }
+                head4 = new Aff2(MAP, step2._1, EMPTY, EMPTY);
+                step2 = step2._2;
+                break;
+              case APPLY:
+                if (head4) {
+                  tail2 = new Aff2(CONS, head4, tail2);
+                }
+                head4 = new Aff2(APPLY, EMPTY, step2._2, EMPTY);
+                step2 = step2._1;
+                break;
+              case ALT:
+                if (head4) {
+                  tail2 = new Aff2(CONS, head4, tail2);
+                }
+                head4 = new Aff2(ALT, EMPTY, step2._2, EMPTY);
+                step2 = step2._1;
+                break;
+              default:
+                fid = fiberId++;
+                status = RETURN;
+                tmp = step2;
+                step2 = new Aff2(FORKED, fid, new Aff2(CONS, head4, tail2), EMPTY);
+                tmp = Fiber(util, supervisor, tmp);
+                tmp.onComplete({
+                  rethrow: false,
+                  handler: resolve(step2)
+                })();
+                fibers[fid] = tmp;
+                if (supervisor) {
+                  supervisor.register(tmp);
+                }
+            }
+            break;
+          case RETURN:
+            if (head4 === null) {
+              break loop;
+            }
+            if (head4._1 === EMPTY) {
+              head4._1 = step2;
+              status = CONTINUE;
+              step2 = head4._2;
+              head4._2 = EMPTY;
+            } else {
+              head4._2 = step2;
+              step2 = head4;
+              if (tail2 === null) {
+                head4 = null;
+              } else {
+                head4 = tail2._1;
+                tail2 = tail2._2;
+              }
+            }
+        }
+      }
+      root = step2;
+      for (fid = 0; fid < fiberId; fid++) {
+        fibers[fid].run();
+      }
+    }
+    function cancel(error2, cb2) {
+      interrupt = util.left(error2);
+      var innerKills;
+      for (var kid in kills) {
+        if (kills.hasOwnProperty(kid)) {
+          innerKills = kills[kid];
+          for (kid in innerKills) {
+            if (innerKills.hasOwnProperty(kid)) {
+              innerKills[kid]();
+            }
+          }
+        }
+      }
+      kills = null;
+      var newKills = kill(error2, root, cb2);
+      return function(killError) {
+        return new Aff2(ASYNC, function(killCb) {
+          return function() {
+            for (var kid2 in newKills) {
+              if (newKills.hasOwnProperty(kid2)) {
+                newKills[kid2]();
+              }
+            }
+            return nonCanceler;
+          };
+        });
+      };
+    }
+    run3();
+    return function(killError) {
+      return new Aff2(ASYNC, function(killCb) {
+        return function() {
+          return cancel(killError, killCb);
+        };
+      });
+    };
+  }
+  function sequential2(util, supervisor, par) {
+    return new Aff2(ASYNC, function(cb) {
+      return function() {
+        return runPar(util, supervisor, par, cb);
+      };
+    });
+  }
+  Aff2.EMPTY = EMPTY;
+  Aff2.Pure = AffCtr(PURE);
+  Aff2.Throw = AffCtr(THROW);
+  Aff2.Catch = AffCtr(CATCH);
+  Aff2.Sync = AffCtr(SYNC);
+  Aff2.Async = AffCtr(ASYNC);
+  Aff2.Bind = AffCtr(BIND);
+  Aff2.Bracket = AffCtr(BRACKET);
+  Aff2.Fork = AffCtr(FORK);
+  Aff2.Seq = AffCtr(SEQ);
+  Aff2.ParMap = AffCtr(MAP);
+  Aff2.ParApply = AffCtr(APPLY);
+  Aff2.ParAlt = AffCtr(ALT);
+  Aff2.Fiber = Fiber;
+  Aff2.Supervisor = Supervisor;
+  Aff2.Scheduler = Scheduler;
+  Aff2.nonCanceler = nonCanceler;
+  return Aff2;
+}();
+var _pure = Aff.Pure;
+var _throwError = Aff.Throw;
+var _liftEffect = Aff.Sync;
+var makeAff = Aff.Async;
+var _sequential = Aff.Seq;
+
+// output/CoreBars/index.js
+var lmap2 = /* @__PURE__ */ lmap(bifunctorEither);
+var runResolved2 = /* @__PURE__ */ runResolved(monadThrowEither);
+var identity9 = /* @__PURE__ */ identity(categoryFn);
+var bind6 = /* @__PURE__ */ bind(bindEither);
+var pure1 = /* @__PURE__ */ pure(applicativeEither);
+var renderDiag = function(src) {
+  return function(dat) {
+    var v = parse(src);
+    if (v instanceof Left) {
+      return new Left(renderParseErrorAt(src)(v.value0));
+    }
+    ;
+    if (v instanceof Right) {
+      return lmap2(formatError(src))(runResolved2(v.value0.directives)(identity9)(v.value0.nodes)(dat));
+    }
+    ;
+    throw new Error("Failed pattern match at CoreBars (line 59, column 22 - line 61, column 100): " + [v.constructor.name]);
+  };
+};
+var compileJsWith = function(opts) {
+  return function(src) {
+    return bind6(parseWith(opts)(src))(function(v) {
+      return bind6(resolveForCompile(v.directives))(function(fs) {
+        return pure1(compile(metaFor(fs))(fullbarsEmit)([])(v.nodes));
+      });
+    });
+  };
+};
+var compileJs = /* @__PURE__ */ compileJsWith(defaultParseOptions);
+
 // output/FullBars.JS/index.js
 var $runtime_lazy7 = function(name2, moduleName, init3) {
   var state2 = 0;
@@ -9922,7 +9926,7 @@ var renderSurface = function(tpl, json) {
   return result(renderSurfaceDiag(tpl)(fromJson(json)));
 };
 var render = function(tpl, json) {
-  return result(renderWithDiag(tpl)(fromJson(json)));
+  return result(renderDiag(tpl)(fromJson(json)));
 };
 var obj = function(kvs) {
   return id(fromFoldable12(kvs));
@@ -9968,7 +9972,7 @@ var compileResult = function(dictShow) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 70, column 17 - line 72, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 71, column 17 - line 73, column 49): " + [v.constructor.name]);
   };
 };
 var compileResult1 = /* @__PURE__ */ compileResult(showParseError);
@@ -9976,7 +9980,7 @@ var compileSurface2 = function(tpl) {
   return compileResult1(compileSurface(tpl));
 };
 var compile2 = function(tpl) {
-  return compileResult1(compileCore(tpl));
+  return compileResult1(compileJs(tpl));
 };
 var arr = id;
 var rexpr = function(v) {
@@ -10013,7 +10017,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map17(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 188, column 9 - line 197, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 189, column 9 - line 198, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
@@ -10033,7 +10037,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map17($lazy_rnode(164))(ns));
+    return arr(map17($lazy_rnode(165))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -10056,7 +10060,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", functio
         }()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 138, column 21 - line 145, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 139, column 21 - line 146, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -10089,7 +10093,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 133, column 1 - line 133, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 134, column 1 - line 134, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
         var $94 = litName(v.value1);
@@ -10114,7 +10118,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(133);
+var rnode = /* @__PURE__ */ $lazy_rnode(134);
 var astJson = function(dialect, src) {
   var v = parse(src);
   if (v instanceof Left) {
@@ -10134,7 +10138,7 @@ var astJson = function(dialect, src) {
     return obj([new Tuple("ast", obj([new Tuple("version", str("barebars-ast/v1")), new Tuple("nodes", arr(map17(rnode)(nodes)))]))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 84, column 33 - line 105, column 10): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 85, column 33 - line 106, column 10): " + [v.constructor.name]);
 };
 export {
   astJson,

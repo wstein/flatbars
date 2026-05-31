@@ -1,5 +1,5 @@
 package:
-  name: fullbars
+  name: corebars
   publish:
     version: 0.1.0
     license: Apache-2.0
@@ -8,22 +8,19 @@ package:
       githubRepo: barebars
   dependencies:
     - prelude
-    - arrays
-    - lists
-    - strings
-    - maybe
     - either
-    - tuples
-    - foldable-traversable
-    - ordered-collections
-    - integers
-    - numbers
+    - bifunctors
     - transformers
+    - aff
     - barebars
+    - fullbars
+    - barebars-compile
   test:
-    main: Test.FullBars.Main
+    main: Test.CoreBars.Main
     dependencies:
       - effect
       - console
       - assert
-      - aff
+      - strings
+      - ordered-collections
+      - tuples

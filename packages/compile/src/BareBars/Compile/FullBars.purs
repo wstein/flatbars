@@ -14,6 +14,8 @@ module BareBars.Compile.FullBars
   , compileCoreWith
   , compileSurface
   , compileSurfaceWith
+  , resolveForCompile
+  , metaFor
   , runtimeVersion
   ) where
 

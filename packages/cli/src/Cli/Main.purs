@@ -17,9 +17,10 @@ module Cli.Main where
 import Prelude
 
 import BareBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt, validate)
-import BareBars.Compile.FullBars (compileCoreWith, compileSurfaceWith) as Compile
+import BareBars.Compile.FullBars (compileSurfaceWith) as Compile
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
+import CoreBars (compileJsWith, compileWith)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -27,7 +28,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
-import FullBars (compileWith, directiveLints, preludeSchema, renderSurfaceDiagWith)
+import FullBars (directiveLints, preludeSchema, renderSurfaceDiagWith)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 
@@ -154,7 +155,7 @@ run opts = do
 -- | Compile a template to a JS ES module and print it to stdout (surface or core).
 runCompile :: ParseOptions -> Options -> String -> Effect Unit
 runCompile popts opts tpl =
-  case (if opts.surface then Compile.compileSurfaceWith else Compile.compileCoreWith) popts tpl of
+  case (if opts.surface then Compile.compileSurfaceWith else compileJsWith) popts tpl of
     Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
     Right js -> writeStdout js
 
