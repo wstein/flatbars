@@ -27,6 +27,12 @@ type Template = Array Node
 
 -- | Tag-level nodes carry the source `Span` of their opening tag, for
 -- | diagnostics. `Content` does not (it is literal text, never a helper call).
+-- |
+-- | `Sep` is a *separator* — the bare double-stash `{{ name args }}`. The core
+-- | attaches it *no meaning*: it is a flat marker node sitting in a template,
+-- | exactly as the parser found it. Whether `{{else}}` splits an `if`, or
+-- | `{{case 1}}` a `switch`, is decided entirely by the second pass (the engine
+-- | walk) — the lexer and parser never interpret the name.
 data Node
   = Content String
   | Output Span Expr
@@ -34,6 +40,8 @@ data Node
   | Block Span Ident (Array Expr) Template
   -- span, head, args, verbatim body
   | RawBlock Span Ident (Array Expr) String
+  -- span, head, args (a name-agnostic separator marker)
+  | Sep Span Ident (Array Expr)
 
 data Expr
   = Lit Value
@@ -53,3 +61,4 @@ instance showNode :: Show Node where
     Output _ e -> "Output (" <> show e <> ")"
     Block _ n args body -> "Block " <> show n <> " " <> show args <> " " <> show body
     RawBlock _ n args raw -> "RawBlock " <> show n <> " " <> show args <> " " <> show raw
+    Sep _ n args -> "Sep " <> show n <> " " <> show args

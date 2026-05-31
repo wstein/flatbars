@@ -2,4 +2,4 @@
 <ul>
 {{#each (lookup this "items")}}  <li>{{{index}}}. {{{esc_html this}}}</li>
 {{/each}}</ul>
-{{#if (lookup this "done")}}<p>All done.</p>{{#else}}<p>Pending…</p>{{/else}}{{/if}}
+{{#if (lookup this "done")}}<p>All done.</p>{{else}}<p>Pending…</p>{{/if}}

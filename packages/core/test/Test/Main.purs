@@ -108,27 +108,22 @@ main = do
   expect "if-false-bare" "{{#if this}}yes{{/if}}" (VBool false) ""
   expect "unless" "{{#unless this}}none{{/unless}}" (VBool false) "none"
 
-  -- Multi-branch control flow is *nested clause blocks* the engine interprets;
-  -- `else` is the reference prelude's clause name, not a core keyword.
-  expect "if-else-true" "{{#if this}}yes{{#else}}no{{/else}}{{/if}}" (VBool true) "yes"
-  expect "if-else-false" "{{#if this}}yes{{#else}}no{{/else}}{{/if}}" (VBool false) "no"
-  expect "if-then-else"
-    "{{#if this}}{{#then}}A{{/then}}{{#else}}B{{/else}}{{/if}}"
-    (VBool true)
-    "A"
-  expect "if-then-else-false"
-    "{{#if this}}{{#then}}A{{/then}}{{#else}}B{{/else}}{{/if}}"
-    (VBool false)
-    "B"
+  -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
+  -- meaningless marker, and the engine's `if`/`each`/`with` split their body at
+  -- it. The word `else` never lands in the lexer or parser.
+  expect "if-else-true" "{{#if this}}yes{{else}}no{{/if}}" (VBool true) "yes"
+  expect "if-else-false" "{{#if this}}yes{{else}}no{{/if}}" (VBool false) "no"
+  expect "if-else-tilde" "{{#if this}}yes {{~else~}} no{{/if}}" (VBool false) "no"
 
-  -- A double-stash {{ … }} is NOT a core construct: it is literal content.
-  expect "double-stash-literal" "a{{b}}c" VNull "a{{b}}c"
+  -- A standalone separator renders to nothing (the `else` marker is inert);
+  -- only an enclosing block helper gives it meaning.
+  expect "standalone-else" "a{{else}}c" VNull "ac"
 
   expect "each-array" "{{#each (lookup this \"xs\")}}[{{{this}}}={{{index}}}]{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
     "[a=0][b=1]"
 
-  expect "each-empty" "{{#each (lookup this \"xs\")}}x{{#else}}empty{{/else}}{{/each}}"
+  expect "each-empty" "{{#each (lookup this \"xs\")}}x{{else}}empty{{/each}}"
     (obj [ Tuple "xs" (arr []) ])
     "empty"
 
@@ -166,7 +161,7 @@ main = do
 
   -- Skeleton-AST validation (the engine-supplied second pass).
   expectValid "validate-clean"
-    "{{#each (lookup this \"xs\")}}{{{esc_html this}}}{{#else}}none{{/else}}{{/each}}"
+    "{{#each (lookup this \"xs\")}}{{{esc_html this}}}{{else}}none{{/each}}"
   expectIssue "validate-unknown" "{{{frobnicate this}}}"
   expectIssue "validate-arity" "{{{esc_html}}}"
 
@@ -177,6 +172,7 @@ main = do
       { content: \_ -> 1
       , output: \_ -> 1
       , raw: \_ _ _ -> 1
+      , sep: \_ _ -> 1
       , block: \b -> 1 + b.recurse b.children
       , concat: Array.foldl (+) 0
       }

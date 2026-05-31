@@ -4,8 +4,8 @@
 -- | *None of this is built into the core.* Helpers are `Helper m (RefEnv m)`
 -- | over any `MonadThrow Error m`, so the very same prelude runs in a pure host
 -- | (`Either Error`) or an async one (`ExceptT Error Aff`). Multi-branch control
--- | flow is nested clause blocks; `if` reads an `{{#else}}…{{/else}}` clause via
--- | the control handle's `clause`.
+-- | flow uses `{{else}}` separators; `if`/`each`/`with` split their body at the
+-- | `{{else}}` marker via the control handle's `clause`.
 module BareBars.Prelude
   ( prelude
   , preludeSchema
@@ -42,8 +42,7 @@ prelude =
   , Tuple "unless" unlessH
   , Tuple "each" eachH
   , Tuple "with" withH
-  , Tuple "then" clauseH
-  , Tuple "else" clauseH
+  , Tuple "else" elseH
   , Tuple "dict" dictH
   , Tuple "apply" applyH
   , Tuple "eq" eqH
@@ -77,8 +76,7 @@ preludeSchema =
       , Tuple "unless" (spec true (Exactly 1))
       , Tuple "each" (spec true (AtLeast 1))
       , Tuple "with" (spec true (AtLeast 1))
-      , Tuple "then" (spec true AnyArity)
-      , Tuple "else" (spec true AnyArity)
+      , Tuple "else" (spec false AnyArity)
       , Tuple "dict" (spec false AnyArity)
       , Tuple "apply" (spec true (AtLeast 1))
       , Tuple "eq" (spec false (Exactly 2))
@@ -143,9 +141,11 @@ safeH _ args = case args of
 rawH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 rawH ctl _ = VSafe <$> ctl.render ctl.env ctl.children
 
--- | A clause helper (`then`, `else`): transparent — it renders its own body.
-clauseH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-clauseH ctl _ = VSafe <$> ctl.render ctl.env ctl.children
+-- | `else` is a *separator marker*: on its own it renders to nothing. A block
+-- | helper (`if`, `each`, `with`) gives it meaning by splitting its body at the
+-- | `{{else}}` separator — see `splitClause`.
+elseH :: forall m. Applicative m => Helper m (RefEnv m)
+elseH _ _ = pure (VSafe "")
 
 --------------------------------------------------------------------------------
 -- Conditionals
@@ -161,11 +161,11 @@ unlessH ctl args = case args of
   [ c ] -> if truthy c then renderElse ctl else renderMain ctl
   _ -> throwError (ArityError "unless/1")
 
--- | Render the body up to the first `{{#else}}` clause.
+-- | Render the body up to the first `{{else}}` separator.
 renderMain :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
 renderMain ctl = VSafe <$> ctl.render ctl.env (ctl.clause "else").before
 
--- | Render the `{{#else}}…{{/else}}` clause, if present; otherwise empty.
+-- | Render the clause after the `{{else}}` separator, if present; else empty.
 renderElse :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
 renderElse ctl = VSafe <$> ctl.render ctl.env (fromMaybe [] (ctl.clause "else").body)
 

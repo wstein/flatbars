@@ -54,6 +54,9 @@ parseSeq toks = go []
       RRaw span name argTks body -> do
         args <- parseArgTokens argTks
         go (Array.snoc acc (RawBlock span name args body)) (i + 1)
+      RSep span name argTks -> do
+        args <- parseArgTokens argTks
+        go (Array.snoc acc (Sep span name args)) (i + 1)
       RClose name -> Right { nodes: acc, stop: StopClose name (i + 1) }
       ROpen span name argTks -> buildBlock acc span name argTks (i + 1)
 

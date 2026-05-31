@@ -6,10 +6,11 @@
 -- | second pass, driven by a `Schema` the *engine* supplies — the BareBars
 -- | analogue of validating a document against a JSON schema.
 -- |
--- | `foldRefs` folds a monoid over every helper reference in a template
--- | (applications, blocks, raw blocks); `foldTemplate` is the full catamorphism
--- | an engine builds custom passes on (lowering, linting, pretty-printing).
--- | `validate` is the batteries-included schema pass built on `foldRefs`.
+-- | `foldRefs` folds a monoid over every name reference in a template
+-- | (applications, blocks, raw blocks, separators); `foldTemplate` is the full
+-- | catamorphism an engine builds custom passes on (lowering, linting,
+-- | pretty-printing). `splitClause` splits a block body at a `{{name}}`
+-- | separator. `validate` is the batteries-included schema pass.
 module BareBars.Walk
   ( RefKind(..)
   , HelperRef
@@ -17,9 +18,6 @@ module BareBars.Walk
   , Algebra
   , foldTemplate
   , helperRefs
-  , clause
-  , clauses
-  , withoutClause
   , splitClause
   , Arity(..)
   , HelperSpec
@@ -49,6 +47,7 @@ data RefKind
   = AppRef -- {{{ name … }}} or a nested application
   | BlockRef -- {{# name … }}
   | RawRef -- {{{{# name … }}}}
+  | SepRef -- {{ name … }} separator (not a helper invocation)
 
 derive instance eqRefKind :: Eq RefKind
 
@@ -57,6 +56,7 @@ instance showRefKind :: Show RefKind where
     AppRef -> "AppRef"
     BlockRef -> "BlockRef"
     RawRef -> "RawRef"
+    SepRef -> "SepRef"
 
 -- | A single occurrence of a name, with how it was used and how many arguments
 -- | it was given.
@@ -76,6 +76,8 @@ foldRefs f = foldMap (node f)
         <> foldRefs g body
     RawBlock _ name args _ ->
       g { name, kind: RawRef, argc: Array.length args } <> foldMap (expr g) args
+    Sep _ name args ->
+      g { name, kind: SepRef, argc: Array.length args } <> foldMap (expr g) args
 
   expr :: (HelperRef -> m) -> Expr -> m
   expr g = case _ of
@@ -96,6 +98,7 @@ type Algebra a =
   { content :: String -> a
   , output :: Expr -> a
   , raw :: Ident -> Array Expr -> String -> a
+  , sep :: Ident -> Array Expr -> a
   , block ::
       { span :: Span
       , name :: Ident
@@ -118,47 +121,27 @@ foldTemplate alg = go
     Content s -> alg.content s
     Output _ e -> alg.output e
     RawBlock _ name args raw' -> alg.raw name args raw'
+    Sep _ name args -> alg.sep name args
     Block span name args children -> alg.block { span, name, args, children, recurse: go }
 
 --------------------------------------------------------------------------------
--- Clause helpers (for nested-clause control flow)
+-- Clause splitting (for separator-driven control flow)
 --------------------------------------------------------------------------------
 
--- | The body of the first top-level `{{#name}}…{{/name}}` block in a template,
--- | if present. This is how a block helper finds a clause (e.g. `if` looking
--- | for an `else` clause in its body).
-clause :: Ident -> Template -> Maybe Template
-clause name = Array.findMap case _ of
-  Block _ n _ body | n == name -> Just body
-  _ -> Nothing
-
--- | The bodies of every top-level `{{#name}}` block in a template.
-clauses :: Ident -> Template -> Array Template
-clauses name = Array.mapMaybe case _ of
-  Block _ n _ body | n == name -> Just body
-  _ -> Nothing
-
--- | A template with every top-level `{{#name}}` block removed — the "main"
--- | content once a clause has been pulled out.
-withoutClause :: Ident -> Template -> Template
-withoutClause name = Array.filter case _ of
-  Block _ n _ _ -> n /= name
-  _ -> true
-
--- | Split a body at the first top-level `{{#name}}` clause: the nodes *before*
--- | it, and that clause's body (if any). The idiom a control-flow helper uses —
--- | e.g. `if` renders `before` when truthy and `clause` otherwise.
+-- | Split a block body at the first top-level `{{name}}` *separator*: the nodes
+-- | *before* it, and the nodes *after* it (the clause), if the separator is
+-- | present. This is the idiom a control-flow helper uses — e.g. `if` renders
+-- | `before` when truthy and `clause` otherwise. The split is shallow (it never
+-- | descends into nested blocks), so an inner block's own `{{else}}` is its own
+-- | business.
 splitClause :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
-splitClause name nodes = case Array.findIndex isClause nodes of
+splitClause name nodes = case Array.findIndex isSep nodes of
   Nothing -> { before: nodes, clause: Nothing }
-  Just i -> { before: Array.take i nodes, clause: bodyAt i }
+  Just i -> { before: Array.take i nodes, clause: Just (Array.drop (i + 1) nodes) }
   where
-  isClause = case _ of
-    Block _ n _ _ -> n == name
+  isSep = case _ of
+    Sep _ n _ -> n == name
     _ -> false
-  bodyAt i = case Array.index nodes i of
-    Just (Block _ _ _ body) -> Just body
-    _ -> Nothing
 
 --------------------------------------------------------------------------------
 -- Schema-driven validation
@@ -214,19 +197,24 @@ validate :: Schema -> Template -> Array Issue
 validate schema = Array.mapMaybe check <<< helperRefs
   where
   check :: HelperRef -> Maybe Issue
-  check ref = case Map.lookup ref.name schema.helpers of
-    Nothing ->
-      if schema.allowUnknown then Nothing
-      else Just
-        { severity: Err, name: ref.name, message: "unknown helper '" <> ref.name <> "'" }
-    Just spec ->
-      if not (arityOk spec.arity ref.argc) then Just
-        { severity: Err
-        , name: ref.name
-        , message: "'" <> ref.name <> "' expects " <> arityText spec.arity
-            <> " arguments, got "
-            <> show ref.argc
-        }
-      else if (ref.kind == BlockRef || ref.kind == RawRef) && not spec.block then Just
-        { severity: Warn, name: ref.name, message: "'" <> ref.name <> "' is not a block helper" }
-      else Nothing
+  check ref
+    | ref.kind == SepRef = Nothing -- separators are markers, not helper invocations
+    | otherwise = case Map.lookup ref.name schema.helpers of
+        Nothing ->
+          if schema.allowUnknown then Nothing
+          else Just
+            { severity: Err, name: ref.name, message: "unknown helper '" <> ref.name <> "'" }
+        Just spec ->
+          if not (arityOk spec.arity ref.argc) then Just
+            { severity: Err
+            , name: ref.name
+            , message: "'" <> ref.name <> "' expects " <> arityText spec.arity
+                <> " arguments, got "
+                <> show ref.argc
+            }
+          else if (ref.kind == BlockRef || ref.kind == RawRef) && not spec.block then Just
+            { severity: Warn
+            , name: ref.name
+            , message: "'" <> ref.name <> "' is not a block helper"
+            }
+          else Nothing

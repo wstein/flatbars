@@ -63,7 +63,7 @@ examples =
   , { id: "conditional"
     , label: "Conditional (clauses)"
     , template:
-        "{{#if (lookup this \"loggedIn\")}}<p>Welcome back, {{{esc_html (lookup this \"user\")}}}.</p>{{#else}}<p>Please sign in.</p>{{/else}}{{/if}}"
+        "{{#if (lookup this \"loggedIn\")}}<p>Welcome back, {{{esc_html (lookup this \"user\")}}}.</p>{{else}}<p>Please sign in.</p>{{/if}}"
     , dataText: "{ \"loggedIn\": true, \"user\": \"Ada\" }"
     }
   , { id: "object"

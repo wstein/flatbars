@@ -50,6 +50,7 @@ data RawTok
   | ROutput Span (Array Token) -- {{{ expr }}}
   | ROpen Span String (Array Token) -- {{# name args }}
   | RClose String -- {{/ name }}
+  | RSep Span String (Array Token) -- {{ name args }} — a name-agnostic separator
   | RRaw Span String (Array Token) String -- {{{{# name args }}}} body {{{{/ name }}}}
 
 derive instance eqRawTok :: Eq RawTok
@@ -60,6 +61,7 @@ instance showRawTok :: Show RawTok where
     ROutput _ t -> "ROutput " <> show t
     ROpen _ n t -> "ROpen " <> show n <> " " <> show t
     RClose n -> "RClose " <> show n
+    RSep _ n t -> "RSep " <> show n <> " " <> show t
     RRaw _ n t b -> "RRaw " <> show n <> " " <> show t <> " " <> show b
 
 --------------------------------------------------------------------------------
@@ -250,8 +252,8 @@ tokenizeTemplate src = go 0 [] [] false
 
   -- The brace-prefixed openers, longest first. The `~` whitespace-control
   -- variants (`{{~#`, `{{~/`, …) are recognized so a left-trim tilde may sit
-  -- between the braces and the sigil. The only block opener is `{{#` (and
-  -- `{{{{#` for raw): the core has no inverse `{{^}}` and no separators.
+  -- between the braces and the sigil. `{{#` is the only block *opener*; the bare
+  -- double-stash `{{ … }}` is a name-agnostic *separator* (handled separately).
   openerLiteralAt :: Int -> Maybe String
   openerLiteralAt i
     | matchAt cs i "{{{{#" = Just "{{{{#"
@@ -266,14 +268,24 @@ tokenizeTemplate src = go 0 [] [] false
     | matchAt cs i "{{/" = Just "{{/"
     | otherwise = Nothing
 
+  -- A separator is any `{{` that is not `{{{` and not one of the bracketed
+  -- openers above — a bare double-stash whose head is an identifier. The lexer
+  -- recognizes the *shape*, never the name.
+  isSeparatorAt :: Int -> Boolean
+  isSeparatorAt i = matchAt cs i "{{" && not (matchAt cs i "{{{") && case openerLiteralAt i of
+    Just _ -> false
+    Nothing -> true
+
   isOpenerAt :: Int -> Boolean
   isOpenerAt i = case openerLiteralAt i of
     Just _ -> true
-    Nothing -> false
+    Nothing -> isSeparatorAt i
 
   -- The literal text emitted for a backslash-escaped opener.
   escapedOpenerAt :: Int -> Maybe String
-  escapedOpenerAt = openerLiteralAt
+  escapedOpenerAt i = case openerLiteralAt i of
+    Just s -> Just s
+    Nothing -> if isSeparatorAt i then Just "{{" else Nothing
 
   readTag :: Int -> Either ParseError TagResult
   readTag i
@@ -287,6 +299,7 @@ tokenizeTemplate src = go 0 [] [] false
     | matchAt cs i "{{#" = readBlockOpen i "{{#"
     | matchAt cs i "{{~/" = readClose i "{{~/"
     | matchAt cs i "{{/" = readClose i "{{/"
+    | matchAt cs i "{{" = readSeparator i
     | otherwise = Left (LexError "internal: no opener" i)
 
   -- A left-trim tilde may sit immediately after the braces, before the sigil.
@@ -356,6 +369,27 @@ tokenizeTemplate src = go 0 [] [] false
           { name } <- splitHead i toks
           Right
             { mtok: Just (RClose name)
+            , next: q + 2
+            , trimL: leadTrimAt i || t.trimL
+            , trimR: t.trimR
+            }
+
+  -- A bare double-stash separator `{{ [~] name args [~] }}`. The leading `~`
+  -- (if any) sits before the interior; the head is an identifier the lexer does
+  -- not interpret.
+  readSeparator :: Int -> Either ParseError TagResult
+  readSeparator i =
+    let
+      start = if leadTrimAt i then i + 3 else i + 2
+    in
+      case findFrom cs start "}}" of
+        Nothing -> Left (UnterminatedTag i)
+        Just q -> do
+          let t = splitTrims (slice cs start q)
+          toks <- lexExpr start t.core
+          { name, rest } <- splitHead i toks
+          Right
+            { mtok: Just (RSep { start: i, end: q + 2 } name rest)
             , next: q + 2
             , trimL: leadTrimAt i || t.trimL
             , trimR: t.trimR

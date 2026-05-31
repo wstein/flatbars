@@ -70,6 +70,10 @@ runTemplate engine = renderTemplate engine.initial
     Output span e -> evalExpr env span e >>= engine.stringify
     Block span name args body -> applyBlock env span name args body
     RawBlock span name args raw -> applyBlock env span name args [ Content raw ]
+    -- A separator rendered on its own is just an application of its head; a
+    -- block helper that cares (e.g. `if` at `{{else}}`) intercepts it by
+    -- splitting its children before rendering, so it is never reached there.
+    Sep span name args -> evalExpr env span (App name args) >>= engine.stringify
 
   applyBlock :: env -> Span -> Ident -> Array Expr -> Template -> m String
   applyBlock env span name args body = do
