@@ -1,0 +1,14 @@
+package:
+  name: barebars-cli
+  dependencies:
+    - prelude
+    - effect
+    - arrays
+    - maybe
+    - either
+    - strings
+    - node-fs
+    - exceptions
+    - barebars
+  run:
+    main: Main
