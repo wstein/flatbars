@@ -22,12 +22,14 @@
 -- |    `{{{ esc_html (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
 -- |  * block params `{{#each xs as |item i|}}` ⇒ `{{#each xs "item" "i"}}`; a bare
 -- |    reference to an in-scope param becomes a helper call `(item)` (§5.5).
--- |  * `{{> name [ctx]}}` ⇒ `{{{ partial "name" ctx }}}` (a bare name is a string
--- |    literal, a parenthesized expression is a dynamic name; §5.7).
+-- |  * `{{> name [ctx] [k=v]}}` ⇒ `{{{ partial "name" ctx [(dict …)] }}}` (a bare
+-- |    name is a string literal, a parenthesized expression is a dynamic name;
+-- |    hash pairs merge onto the partial's context; §5.7).
 -- |
 -- | Not yet desugared: `@../` parent-data (the scoped helpers are frame-local),
--- | and the inline / block / `@partial-block` partial forms and partial hash
--- | context `{{> n k=v}}` (§5.7).
+-- | and the inline / block / `@partial-block` partial forms (§5.7) — those use a
+-- | `{{#*inline}}` / `{{#> name}}…{{/name}}` block whose sigil/close-name the
+-- | meaning-free core parser cannot match without partial-specific support.
 module FlatBars.Surface
   ( desugar
   ) where
@@ -110,17 +112,24 @@ rewriteHead scope name args
   | otherwise = App name (rewriteArgs scope args)
 
 -- | A partial reference (surface.adoc §5.7), emitted *unescaped*. `rest` is the
--- | text after the `>` sigil: empty for `{{> name [ctx]}}` (name is the first
+-- | text after the `>` sigil: empty for `{{> name …}}` (name is the first
 -- | argument — a bare name is a string literal, a parenthesized expression is a
--- | dynamic name), or the name itself for the no-space `{{>name [ctx]}}` form.
--- | An optional second argument is the context (default `this`).
+-- | dynamic name), or the name itself for the no-space `{{>name …}}` form. After
+-- | the name come an optional positional context (default `this`) and `key=value`
+-- | hash pairs, which collect into a trailing options `dict`.
 partialExpr :: Scope -> String -> Array Expr -> Expr
-partialExpr scope rest args
-  | rest == "" = case Array.uncons args of
-      Just { head: nameArg, tail } -> App "partial"
-        [ partialName scope nameArg, partialCtx scope tail ]
-      Nothing -> App "partial" [ Lit (VString ""), App "this" [] ]
-  | otherwise = App "partial" [ Lit (VString rest), partialCtx scope args ]
+partialExpr scope rest args =
+  let
+    { nameExpr, valueArgs } = case rest of
+      "" -> case Array.uncons args of
+        Just { head, tail } -> { nameExpr: partialName scope head, valueArgs: tail }
+        Nothing -> { nameExpr: Lit (VString ""), valueArgs: [] }
+      _ -> { nameExpr: Lit (VString rest), valueArgs: args }
+    h = collectHash scope valueArgs
+    ctx = maybe (App "this" []) (rewrite scope) (Array.head h.positional)
+  in
+    if Array.null h.pairs then App "partial" [ nameExpr, ctx ]
+    else App "partial" [ nameExpr, ctx, dictExpr h.pairs ]
 
 -- | A bare partial name is a string literal; a (parenthesized) expression is a
 -- | dynamic name, rewritten as usual.
@@ -128,10 +137,6 @@ partialName :: Scope -> Expr -> Expr
 partialName scope = case _ of
   App n [] -> Lit (VString n)
   e -> rewrite scope e
-
--- | The partial's context argument, defaulting to `this` when omitted.
-partialCtx :: Scope -> Array Expr -> Expr
-partialCtx scope cs = maybe (App "this" []) (rewrite scope) (Array.head cs)
 
 -- | Rewrite an expression: a bare identifier in value position becomes a path
 -- | (or a literal, or a block-param call); an application keeps its helper head.

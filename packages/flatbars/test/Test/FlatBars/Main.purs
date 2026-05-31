@@ -317,6 +317,17 @@ main = do
     (obj [ Tuple "items" (arr [ str "a", str "b" ]) ])
     "<li>a</li><li>b</li>"
   expectP "partial-nospace" [ Tuple "p" "X" ] "{{>p}}" VNull "X"
+  -- hash context (§5.7/§5.4): k=v pairs merge onto the partial's context.
+  expectP "partial-hash" [ Tuple "nav" "<h1>{{ title }}</h1>" ] "{{> nav title=\"Home\"}}" VNull
+    "<h1>Home</h1>"
+  expectP "partial-hash-override" [ Tuple "card" "{{ name }}:{{ role }}" ]
+    "{{> card role=\"Admin\"}}"
+    (obj [ Tuple "name" (str "Ada"), Tuple "role" (str "User") ])
+    "Ada:Admin"
+  expectP "partial-ctx-hash" [ Tuple "row" "{{ label }}={{ n }}" ]
+    "{{> row this n=42}}"
+    (obj [ Tuple "label" (str "x") ])
+    "x=42"
   expectP "partial-dynamic" [ Tuple "a" "A", Tuple "b" "B" ]
     "{{> (lookup this \"which\")}}"
     (obj [ Tuple "which" (str "b") ])

@@ -85,7 +85,7 @@ helperDefs =
   , valDef "else" (nullary (pure (VSafe "")))
   , gen "dict" false AnyArity dictH
   , gen "apply" true (AtLeast 1) applyH
-  , gen "partial" false (Exactly 2) partialH
+  , gen "partial" false (Between 2 3) partialH
   , valDef "eq" (binary eq')
   , valDef "eq?" (binary eq')
   , valDef "not" (unary not')
@@ -353,12 +353,24 @@ applyH ctl args = case Array.uncons args of
     Nothing -> throwError (UnknownHelper name)
   _ -> throwError (TypeError "apply: first argument must be a helper-name string")
 
--- | `partial name ctx`: render the named partial template with `ctx` as the new
--- | context. Partials emit *unescaped* markup. The name is a (possibly computed)
--- | string; the body comes from the env's partial registry.
+-- | `partial name ctx [opts]`: render the named partial template with `ctx` as
+-- | the new context, emitting *unescaped* markup. An optional third argument is
+-- | a hash `dict` (surface `{{> name k=v}}`) whose keys are merged onto the
+-- | context, overriding it (Handlebars' `options.hash`). The name is a (possibly
+-- | computed) string; the body comes from the env's partial registry.
 partialH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 partialH ctl args = case args of
-  [ VString name, ctx ] -> case lookupPartial name ctl.env of
+  [ VString name, ctx ] -> renderPartial name ctx
+  [ VString name, ctx, opts ] -> renderPartial name (mergeHash ctx opts)
+  _ -> throwError (TypeError "partial: expected (name string, context, [options])")
+  where
+  renderPartial name ctx = case lookupPartial name ctl.env of
     Just tmpl -> VSafe <$> ctl.render (pushFrame Map.empty ctx ctl.env) tmpl
     Nothing -> throwError (HelperError ("unknown partial '" <> name <> "'"))
-  _ -> throwError (TypeError "partial: expected (name string, context)")
+  -- hash keys override the context; with a non-object context the hash *is* the
+  -- context (so `{{> nav title=…}}` works even at top level with no data).
+  mergeHash ctx opts = case opts of
+    VObject o -> case ctx of
+      VObject c -> VObject (Map.union o c)
+      _ -> VObject o
+    _ -> ctx

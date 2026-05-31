@@ -155,11 +155,13 @@ xref:surface.adoc[surface dialect] (`renderSurface`) restores Handlebars' `pass:
 |✗
 |Deliberately dropped — no implicit whitespace removal (xref:appendix-handlebars.adoc#comments-raw-ws[A.7]).
 
-|Partials `pass:[{{> name}}]`, `pass:[{{> name ctx}}]`, dynamic `pass:[{{> (expr)}}]`
-|surface ⇒ `pass:[{{{ partial "name" ctx }}}]`
+|Partials `pass:[{{> name [ctx] [k=v]}}]`, dynamic `pass:[{{> (expr)}}]`
+|surface ⇒ `pass:[{{{ partial "name" ctx [(dict …)] }}}]`
 |✅
 |`renderSurfaceWith` registers named partials; the `partial` engine helper renders one (unescaped)
-with the given context. Hash context `pass:[{{> name k=v}}]` is not yet desugared (§5.4 hash args).
+with the given context, hash `k=v` pairs merged onto it. Inline / block partials and
+`@partial-block` are not yet supported (the `pass:[{{#*inline}}]` / `pass:[{{#> }}]` block sigils need
+parser support).
 
 |Partial blocks `pass:[{{#> }}]`, `pass:[{{> @partial-block}}]`
 |mapping in A.6
