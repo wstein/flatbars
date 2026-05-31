@@ -183,8 +183,11 @@ read a clause named `otherwise` or provide `case`/`default`; Surface simply targ
 engine defines. (Authoring `pass:[{{elif b}}]` directly in Surface also works — it is a clause
 separator like `pass:[{{else}}]`.)
 
-There is *no inverted-block sugar*. BareBars adopts Mustache's `pass:[{{^x}}]` in *no form* — for
-"render when falsy" you write the `unless` helper explicitly: `pass:[{{#unless c}}A{{/unless}}]`.
+FullBars supports Mustache's inverted section `pass:[{{^x}}…{{/x}}]` (and the triple variant
+`pass:[{{{^x}}}…{{{/x}}}]`), desugaring it to `pass:[{{#unless x}}…{{/unless}}]` — so "render when
+falsy" reads the way Handlebars authors expect. You may always write the `unless` helper explicitly
+instead. (The austere CoreBars and MaxBars dialects do *not* accept `pass:[{{^}}]` — there you write
+`unless`.) Unescaped output also has the `pass:[{{&x}}]` alias for `pass:[{{{x}}}]`.
 
 == 5.7 Partials become `partial` / `inline`
 

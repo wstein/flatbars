@@ -35,6 +35,7 @@ toc::[]
 
 |`pass:[{{x}}]` |`pass:[{{x}}]` |`pass:[{{{ esc_html (lookup this "x") }}}]` |SURFACE
 |`pass:[{{{x}}}]` |`pass:[{{{x}}}]` |`pass:[{{{ lookup this "x" }}}]` |SURFACE
+|`pass:[{{&x}}]` (HB unescaped alias) |`pass:[{{{x}}}]` (FullBars accepts `{{&}}`) |`pass:[{{{ lookup this "x" }}}]` |PROVIDED (FullBars; CoreBars/MaxBars reject)
 |`pass:[{{a.b.c}}]` |same |`pass:[{{{ esc_html (lookup this "a" "b" "c") }}}]` |SURFACE
 |`pass:[{{a.[1]}}]` / `pass:[{{a.1}}]` |same |`pass:[{{{ esc_html (lookup this "a" 1) }}}]` |SURFACE
 |`pass:[{{a.[home town]}}]` |same |`pass:[{{{ esc_html (lookup this "a" "home town") }}}]` |SURFACE
@@ -110,7 +111,7 @@ Core:        {{{ esc_html (field (lookup this "value")
 |`pass:[{{#h}}…{{/h}}]` |same |`pass:[{{#h}}…{{/h}}]` |CORE
 |`pass:[{{#h arg}}…{{/h}}]` |same |args desugar like any call |CORE
 |`pass:[{{else}}]` separator |`pass:[{{else}}]` |a `Sep "else"` marker the block helper splits at |CORE+ENGINE
-|`pass:[{{^h c}}…{{/h}}]` (HB inverted) |`pass:[{{#unless c}}…{{/unless}}]` |`pass:[{{#unless c}}…{{/unless}}]` |DROPPED→`unless`
+|`pass:[{{^h c}}…{{/h}}]` (HB inverted) |`pass:[{{#unless c}}…{{/unless}}]` (FullBars desugars `{{^}}`) |`pass:[{{#unless c}}…{{/unless}}]` |PROVIDED (FullBars; CoreBars/MaxBars reject)
 |`else if` (chained) |same |nested `pass:[{{#if c}}…{{/if}}]` inside an `else` clause |SURFACE→ENGINE
 |block params `pass:[{{#h x as \|a b\|}}]` |same |`pass:[{{#h x "a" "b"}}]` — binding-name args |SURFACE
 |`options.fn(ctx)` |— |`ctx.render` over the body's non-clause nodes |ENGINE
@@ -422,18 +423,19 @@ to `esc_html`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
 |Mustache feature |BareBars |Kind
 
 |sections `pass:[{{#section}}]` (truthy / list / lambda) |write the helper explicitly: `if`/`each` |DROPPED→`if`/`each`
-|inverted sections `pass:[{{^section}}]` |write `pass:[{{#unless …}}]` |DROPPED→`unless`
+|inverted sections `pass:[{{^section}}]` |FullBars desugars to `pass:[{{#unless …}}]` |PROVIDED (FullBars)
 |implicit iterator `pass:[{{.}}]` |`this` (A.1) |SURFACE
 |lambdas (functions in the data) |values are never functions; expose behaviour as a helper, or call via `apply` |DROPPED→helper
 |set delimiters `pass:[{{=<% %>=}}]` |*not supported* — delimiters are fixed; a host may pre-process the source |DROPPED
 |HTML-escaping by default |Surface `pass:[{{ }}]` ⇒ `esc_html`; core never escapes |SURFACE
 |===
 
-BareBars adopts *no* Mustache section syntax in any form. `pass:[{{#x}}]` *always* means "apply the
-block helper `x`" — never "this is a truthy/list section over `x`" — and the inverted opener
-`pass:[{{^]` is invalid: there is no such tag. Iterate with `pass:[{{#each x}}…{{/each}}]`, branch
-with `if`/`unless`. (Given `{"list":[1,2,3]}`, Mustache's `pass:[{{#list}}…{{/list}}]` is *not*
-BareBars; write `pass:[{{#each list}}…{{/each}}]`.)
+BareBars adopts *no* Mustache truthy/list *section* semantics: `pass:[{{#x}}]` *always* means "apply
+the block helper `x`" — never "this is a truthy/list section over `x`". Iterate with
+`pass:[{{#each x}}…{{/each}}]`, branch with `if`/`unless`. (Given `{"list":[1,2,3]}`, Mustache's
+`pass:[{{#list}}…{{/list}}]` is *not* BareBars; write `pass:[{{#each list}}…{{/each}}]`.) The
+*inverted* opener `pass:[{{^x}}]` *is* recognized by the core (a `Block` with the `Inverse` sigil);
+FullBars desugars it to `pass:[{{#unless x}}]`, while CoreBars/MaxBars reject it.
 
 [#coverage]
 == A.12 Coverage checklist
@@ -456,7 +458,7 @@ Every {hbs}/Mustache surface element, asserting a mapping exists. A missing ✓ 
 .Blocks & branches
 * [x] block helper `pass:[{{#h}}…{{/h}}]` — A.3
 * [x] `pass:[{{else}}]` → a separator — A.3, A.4
-* [x] `pass:[{{^h}}]` inverted → `unless` — A.3, A.11
+* [x] `pass:[{{^h}}]` inverted — PROVIDED (FullBars → `unless`; CoreBars/MaxBars reject) — A.3, A.11
 * [x] `else if` chaining — A.3
 * [x] block params `as \|a b\|` — A.3, A.5
 * [x] `options.fn` / `options.inverse` — A.3

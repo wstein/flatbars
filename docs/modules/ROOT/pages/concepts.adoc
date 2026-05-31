@@ -103,7 +103,10 @@ body at that separator (xref:evaluation.adoc[]). The name is the engine's choice
 `elif`, `otherwise`, `case`, `default`; the core never singles any of them out. A lone separator,
 with no enclosing block to interpret it, simply renders as an application of its head.
 
-There is no `pass:[{{^}}]` inverse opener; "render when falsy" is just the `unless` helper.
+The core *recognizes* the inverse opener `pass:[{{^x}}]` structurally — it records the opener sigil on
+the `Block` node (`Section` vs `Inverse`) but assigns it no meaning. FullBars desugars `pass:[{{^x}}]`
+to `pass:[{{#unless x}}]`; the austere CoreBars and MaxBars dialects reject it (write the `unless`
+helper). See xref:directives.adoc[].
 ====
 
 == 6. No sugar in the core

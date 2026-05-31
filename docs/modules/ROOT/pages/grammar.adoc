@@ -46,8 +46,9 @@ Ident, String, Number, RawText    (* from the lexer; see Chapter 1 *)
 
 A `Block` captures exactly one `Template`; it has no built-in inverse. Branching is written with
 `Separator` markers — the bare double-stash `pass:[{{ Ident Arg* }}]` — which the parser keeps as
-meaningless `Sep` nodes for the engine walk to interpret (§2.4, xref:concepts.adoc[] §5). There is no
-`pass:[{{^}}]` inverse opener.
+meaningless `Sep` nodes for the engine walk to interpret (§2.4, xref:concepts.adoc[] §5). A block's
+opener carries a *sigil* the core records but never interprets: `Section` (`pass:[{{#x}}]`) or
+`Inverse` (`pass:[{{^x}}]` / the triple `pass:[{{{^x}}}]`).
 
 == 2.2 Reading the grammar
 
@@ -131,7 +132,7 @@ has a home in the surface dialect or the engine:
 |Absent from the core |Where it lives
 
 |`pass:[{{ }}]` *as escaped output* |surface → `pass:[{{{ esc_html … }}}]`. (In the core a bare `pass:[{{ Ident … }}]` is a *separator* marker, §2.4 — not output.)
-|`pass:[{{^}}]` inverse opener |dropped — write the `unless` helper. (`pass:[{{else}}]` *is* in the core: a separator.)
+|`pass:[{{^}}]` inverse opener |recognized as a `Block` with the `Inverse` sigil (meaning-free); FullBars desugars it to `unless`, CoreBars/MaxBars reject it. (`pass:[{{else}}]` *is* in the core: a separator.)
 |dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent`
 |index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments
 |`@index`, `@key`, `@root`, … |surface → scoped engine helpers `index`, `key`, `root`, …

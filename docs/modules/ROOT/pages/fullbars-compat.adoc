@@ -127,9 +127,10 @@ A refusal, not a TODO — each with its replacement. These will not return.
 |===
 |Handlebars |Replacement |Why
 
-|Inverted section `pass:[{{^x}}]` / `pass:[{{else}}]`-as-inverse
-|`pass:[{{#unless x}}…{{/unless}}]`
-|One explicit negation helper instead of a second sigil and an overloaded `else`.
+|Mustache truthy/list *section* `pass:[{{#x}}]`
+|`pass:[{{#if x}}]` / `pass:[{{#each x}}]`
+|`pass:[{{#x}}]` always means "apply block helper `x`", never an implicit truthy/list section. (The
+*inverted* section `pass:[{{^x}}]` *is* supported — it desugars to `pass:[{{#unless x}}]`.)
 
 |Unescaped `pass:[{{&x}}]`
 |`pass:[{{{x}}}]`
