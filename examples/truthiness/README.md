@@ -1,7 +1,7 @@
-# Truthiness — FlatBars edges & Handlebars parity
+# Truthiness — FullBars edges & Handlebars parity
 
 A self-contained example that renders an HTML document exercising **every**
-value kind FlatBars can decide truthiness for, with the engine's verdict
+value kind FullBars can decide truthiness for, with the engine's verdict
 computed live (`{{#if v}}…{{else}}…{{/if}}`) next to what Handlebars.js would
 decide for the same value.
 
@@ -25,7 +25,7 @@ interactively.
 
 ## The rule
 
-FlatBars truthiness ([`FlatBars.Value.truthy`](../../packages/flatbars/src/FlatBars/Value.purs)) —
+FullBars truthiness ([`FullBars.Value.truthy`](../../packages/fullbars/src/FullBars/Value.purs)) —
 **falsy** is exactly (the same set as Handlebars):
 
 - `false`
@@ -50,7 +50,7 @@ it is supplied as an *options object* built with `dict`:
 
 ## Parity matrix
 
-| Value | FlatBars | Handlebars.js | Parity |
+| Value | FullBars | Handlebars.js | Parity |
 | --- | --- | --- | --- |
 | `false` | falsy | falsy | ✓ |
 | `true` | truthy | truthy | ✓ |
@@ -74,11 +74,11 @@ collections), while the empty **object** is truthy in both.
 
 ## Safe strings — a deliberate divergence
 
-FlatBars keeps one invariant Handlebars does not: **marking a string safe never
+FullBars keeps one invariant Handlebars does not: **marking a string safe never
 changes its truthiness — a safe string tests as its content**
 (`truthy (VSafe s) == truthy (VString s)`). So `safe ""` is **falsy**. Handlebars
 instead wraps safe output in a `SafeString` *object*, which is always truthy —
-empty or not. FlatBars' content-based rule is the more useful one (an empty
+empty or not. FullBars' content-based rule is the more useful one (an empty
 escaped section reads as empty), so it is kept on purpose.
 
 The sharp edge to know: `safe` and `esc_html` **stringify** their argument, so
@@ -91,5 +91,5 @@ they are *output*, not data. The engine's `escapingWarnings` lint flags it:
 {{#if x}}…{{/if}}          ✓ test the underlying data
 ```
 
-See also the [compatibility matrix](../../docs/modules/ROOT/pages/flatbars-compat.adoc)
+See also the [compatibility matrix](../../docs/modules/ROOT/pages/fullbars-compat.adoc)
 §5, which lists this alongside the other Handlebars semantic differences.

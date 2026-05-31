@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>FlatBars truthiness — edges &amp; Handlebars parity</title>
+<title>FullBars truthiness — edges &amp; Handlebars parity</title>
 <style>
   body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 60rem; color: #1a1a1a; }
   h1 { font-size: 1.4rem; }
@@ -18,15 +18,15 @@
 </style>
 </head>
 <body>
-<h1>FlatBars truthiness</h1>
-<p>The <b>FlatBars</b> column is computed live by the engine
+<h1>FullBars truthiness</h1>
+<p>The <b>FullBars</b> column is computed live by the engine
 (<code>{{#if v}}truthy{{else}}falsy{{/if}}</code>). The <b>Handlebars</b> column
 is what Handlebars.js would decide for the same value. Rows marked
 <span class="bad">✗</span> diverge.</p>
 
 <table>
 <thead>
-  <tr><th>Value</th><th>FlatBars</th><th>Handlebars</th><th>Parity</th></tr>
+  <tr><th>Value</th><th>FullBars</th><th>Handlebars</th><th>Parity</th></tr>
 </thead>
 <tbody>
   <tr>
@@ -129,7 +129,7 @@ is what Handlebars.js would decide for the same value. Rows marked
 </table>
 
 <p class="note">
-<b>Parity with one edge.</b> FlatBars matches Handlebars' truthiness: the falsy
+<b>Parity with one edge.</b> FullBars matches Handlebars' truthiness: the falsy
 set is <code>false</code>, <code>null</code>, <code>0</code>, <code>""</code>, and
 the empty array; everything else — including <code>{}</code> and non-zero numbers
 — is truthy. Like Handlebars, <code>0</code> is falsy by default and counts as
