@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "spago build",
-    "test": "spago test -p barebars && spago test -p flatbars && npm run check:catalog && npm --workspace packages/playground run test",
+    "test": "spago test -p barebars && spago test -p flatbars && spago test -p barebars-json && spago test -p barebars-js && npm run check:catalog && npm --workspace packages/playground run test",
     "cli": "spago run -p barebars-cli",
     "playground": "npm --workspace packages/playground run dev",
     "playground:build": "npm --workspace packages/playground run build",

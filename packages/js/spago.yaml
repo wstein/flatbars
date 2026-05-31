@@ -12,3 +12,13 @@ package:
     - argonaut-core
     - barebars-json
     - flatbars
+  test:
+    main: Test.FlatBars.JS.Main
+    dependencies:
+      - prelude
+      - effect
+      - console
+      - assert
+      - functions
+      - argonaut
+      - strings

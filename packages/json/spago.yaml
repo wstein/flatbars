@@ -19,3 +19,9 @@ package:
     - argonaut
     - foreign-object
     - barebars
+  test:
+    main: Test.BareBars.Json.Main
+    dependencies:
+      - effect
+      - console
+      - assert
