@@ -1,0 +1,238 @@
+= FlatBars ↔ Handlebars built-in compatibility
+:navtitle: FlatBars compatibility matrix
+:toc: macro
+:toclevels: 2
+
+*FlatBars* is the reference engine shipped with BareBars (xref:prelude.adoc[]). This page is the
+concrete, per-feature status of what FlatBars *implements today* against {hb}' built-ins.
+
+It is the engine-level companion to xref:appendix-handlebars.adoc[Appendix A]. The appendix is the
+gap-free *language* mapping — it shows that every {hb} concept *can* be expressed over the BareBars
+core, including engine features not yet built. This page is narrower and concrete: of those, *which
+does the FlatBars prelude actually register*, and where its semantics differ from {hb}.
+
+[TIP]
+====
+*Short answer.* FlatBars implements all *six* of {hb}' built-in **helpers** (`if`, `unless`, `each`,
+`with`, `lookup`, `log`). The wider built-in **feature set** is partially covered: comments, raw
+blocks, whitespace control, subexpressions, and the `@data` variables are in; *partials, inline
+partials, decorators, and block params are not implemented yet*. FlatBars also adds helpers {hb} has
+no built-in for (`eq`, `and`, `or`, `not`, `dict`, `apply`, `esc_html`, `safe`, …).
+====
+
+[horizontal]
+✅ Implemented:: shipped in the FlatBars prelude / BareBars core.
+◑ Partial:: implemented with a documented limitation or behavioural difference.
+✗ Not yet:: mapping is defined (see Appendix A) but no helper is registered.
+➕ Extension:: FlatBars helper with no {hb} built-in equivalent.
+
+toc::[]
+
+== 1. Built-in helpers
+
+{hb} documents exactly six built-in helpers. All six are FlatBars prelude helpers
+(xref:prelude.adoc[§6]); none is in the engine-agnostic core.
+
+[cols="2,2,1,4",options="header"]
+|===
+|Handlebars |FlatBars |Status |Notes / differences
+
+|`pass:[{{#if c}}…{{else}}…{{/if}}]`
+|`pass:[{{#if c}}…{{else}}…{{/if}}]`
+|✅
+|Takes an explicit *value*: `pass:[{{#if (lookup this "x")}}]`. `pass:[{{else}}]` is a name-agnostic
+separator the helper splits on. `includeZero` is not a hash option — and note `0` is *truthy* in
+FlatBars (see §5).
+
+|`pass:[{{#unless c}}…{{/unless}}]`
+|`pass:[{{#unless c}}…{{/unless}}]`
+|✅
+|Inverse of `if`; supports the same `pass:[{{else}}]` clause.
+
+|`pass:[{{#each xs}}…{{else}}…{{/each}}]`
+|`pass:[{{#each xs}}…{{else}}…{{/each}}]`
+|✅
+|Iterates arrays *and* objects. An empty collection renders the `pass:[{{else}}]` clause.
+`@index`/`@key`/`@first`/`@last` become the scoped helpers `index`/`key`/`first`/`last` (§2).
+
+|`pass:[{{#with o}}…{{/with}}]`
+|`pass:[{{#with o}}…{{/with}}]`
+|✅
+|Shifts context; a falsy context renders the `pass:[{{else}}]` clause (matches {hbs} 4.x).
+
+|`pass:[{{lookup o k}}]`
+|`pass:[{{{ lookup o k }}}]`
+|✅
+|More general than {hbs}': chains (`pass:[lookup o "a" "b"]`), and indexes objects by string and
+arrays by number (or numeric string).
+
+|`pass:[{{log x}}]`
+|`pass:[{{{ log x }}}]`
+|◑
+|Registered, but a *no-op* in a pure host (returns `VNull` ⇒ empty output). An effectful engine
+(`m = ExceptT Error Aff`, or a custom `log`) performs the actual logging.
+|===
+
+== 2. `@data` variables
+
+{hbs}' `@`-namespace does not exist; each becomes a *scoped nullary helper* installed by the block
+that introduces it (xref:appendix-handlebars.adoc#data[A.5]). Drop the `@`.
+
+[cols="2,2,1,3",options="header"]
+|===
+|Handlebars |FlatBars |Status |Installed by
+
+|`pass:[{{@index}}]` |`pass:[{{{ index }}}]` |✅ |`each`
+|`pass:[{{@key}}]` |`pass:[{{{ key }}}]` |✅ |`each`
+|`pass:[{{@first}}]` |`pass:[{{{ first }}}]` |✅ |`each`
+|`pass:[{{@last}}]` |`pass:[{{{ last }}}]` |✅ |`each`
+|`pass:[{{@root}}]` |`pass:[{{{ root }}}]` |✅ |the host (`preludeEnv` installs `root`)
+|`pass:[{{@../index}}]` |`pass:[{{{ index (parent) }}}]` |✅ |`each` + the `parent` helper
+|custom `pass:[{{@var}}]` |any scoped helper a block frames |◑ |only the prelude's set is built in
+|`pass:[{{@level}}]` (log level) |— |✗ |no logging-level data variable
+|===
+
+== 3. Other built-in features
+
+[cols="2,2,1,3",options="header"]
+|===
+|Handlebars |FlatBars |Status |Notes
+
+|Auto-escape `pass:[{{x}}]`
+|explicit `pass:[{{{ esc_html x }}}]`
+|◑
+|FlatBars does *not* auto-escape. `pass:[{{ }}]` is a structural separator, not escaped output;
+output is `pass:[{{{ }}}]` and is *raw*. Escape explicitly with `esc_html`; the `escapingWarnings`
+lint flags unescaped *data* (safe-by-default — see xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]).
+
+|Unescaped `pass:[{{{x}}}]`
+|`pass:[{{{ x }}}]` output node
+|✅
+|The core output form. (`pass:[{{&x}}]` is *not* supported — removed as redundant.)
+
+|Comment `pass:[{{! … }}]`
+|same
+|✅
+|Core; discarded.
+
+|Long comment `pass:[{{!-- … --}}]`
+|same
+|✅
+|Core; may contain `pass:[}}]` / `pass:[{{]` / `--`.
+
+|Raw block `pass:[{{{{raw}}}}…{{{{/raw}}}}]`
+|same (+ the `raw` helper)
+|✅
+|Core captures the verbatim body; the `raw` engine helper returns it.
+
+|Whitespace control `pass:[{{~ ~}}]`
+|same
+|✅
+|Core; resolved in the lexer.
+
+|Backslash escape `\pass:[{{x}}]`
+|same
+|✅
+|Core; emits the tag literally.
+
+|Subexpressions `pass:[(helper arg)]`
+|same
+|✅
+|First-class in the core grammar; nesting is the norm (`pass:[(lookup (parent) "k")]`).
+
+|Standalone-line trim
+|— (use `~`)
+|✗
+|Deliberately dropped — no implicit whitespace removal (xref:appendix-handlebars.adoc#comments-raw-ws[A.7]).
+
+|Partials `pass:[{{> name}}]` (+ context, hash, dynamic)
+|mapping in A.6
+|✗
+|*Not implemented.* The `partial` helper is specified (xref:appendix-handlebars.adoc#partials[A.6])
+but not registered in the prelude yet.
+
+|Partial blocks `pass:[{{#> }}]`, `pass:[{{> @partial-block}}]`
+|mapping in A.6
+|✗
+|Not implemented yet (`partial>` / `partial-block`).
+
+|Inline partials `pass:[{{#*inline "n"}}…{{/inline}}]`
+|mapping in A.6 / A.8
+|✗
+|Not implemented yet (`inline`).
+
+|Decorators `pass:[{{*d}}]`, `pass:[{{#*d}}]`
+|an ordinary block helper
+|✗
+|No decorator concept; none shipped. Block helpers already receive the body, so a decorator is just
+a helper (xref:appendix-handlebars.adoc#decorators[A.8]) — but none is in the prelude.
+
+|Block params `pass:[as \|a b\|]`
+|—
+|✗
+|Not implemented. Use `lookup`/`parent` to reach outer scopes; named-scope block params are a
+planned addition.
+
+|`helperMissing` / `blockHelperMissing`
+|—
+|✗
+|An unknown helper is an `UnknownHelper` error. A custom engine's `resolve` can add a fallback, but
+the reference engine has no missing-helper hook.
+
+|Mustache sections `pass:[{{#x}}…{{/x}}]` (truthy/list/lambda)
+|—
+|✗
+|Not supported — BareBars is not Mustache-compatible. Write the control flow explicitly with
+`if`/`each` (xref:appendix-handlebars.adoc#mustache[A.11]).
+
+|`{{else if c}}` chaining
+|nest `pass:[{{#if}}]` in the else clause
+|✗
+|`else` is a plain separator; it does not re-test a condition. Express elif by nesting an `if` inside
+the `pass:[{{else}}]` clause.
+|===
+
+== 4. FlatBars extensions (no Handlebars built-in)
+
+These have no {hb} built-in counterpart; in {hbs} you would register them yourself or pull them from
+a helper library. They are part of the FlatBars prelude (xref:prelude.adoc[§6]).
+
+[cols="2,4",options="header"]
+|===
+|FlatBars |Purpose
+
+|`this` |the current context value (`pass:[{{{this}}}]`)
+|`true` / `false` / `null` |literal value helpers
+|`esc_html` |HTML-escape a value to a safe string (the explicit auto-escape)
+|`safe` |mark a string trusted (no escaping) — `pass:[VSafe]`
+|`raw` |raw-block helper returning its captured body verbatim
+|`dict` |build an object from `key value …` pairs (hash arguments)
+|`apply` |call a helper by name (`pass:[apply "helper" arg…]`)
+|`eq` / `eq?` |value equality ⇒ boolean (for `pass:[{{#if (eq a b)}}]`)
+|`not` |logical negation of truthiness
+|`and` / `or` |variadic boolean fold over truthiness
+|`else` |the inert separator marker (renders to nothing on its own)
+|===
+
+== 5. Semantic differences to watch
+
+. *A bare identifier calls a helper.* `pass:[{{{city}}}]` invokes the helper `city`; it is *not* a
+path read. To read a field, use `pass:[{{{ lookup this "city" }}}]` (xref:index.adoc[]). This is the
+single biggest porting adjustment from {hbs}.
+. *Truthiness mostly matches {hbs}, with one exception.* Falsy: `false`, `null`, `""`, and the empty
+array. Truthy: everything else — including the empty object `pass:[{}]` *and* the number `0`. {hb}
+treats `0` as falsy unless `includeZero` is set; *FlatBars treats `0` as truthy*. Guard zero
+explicitly (e.g. `pass:[(eq n 0)]`) where it matters.
+. *No implicit HTML escaping.* Output is raw by default; escape with `esc_html` and rely on the
+`escapingWarnings` lint to catch unescaped data. The surface dialect (xref:surface.adoc[§5]) is where
+a `pass:[{{ }}]`-auto-escapes-to-`esc_html` rewrite would live.
+. *Config flags are assembly choices, not template syntax* — `noEscape`, `strict`, `assumeObjects`,
+etc. map to which `lookup`/render variant the host registers (xref:appendix-handlebars.adoc#options[A.9]).
+
+[NOTE]
+====
+The ✗ rows above (partials, inline partials, decorators, block params) are *engine roadmap items*,
+not core limitations: the BareBars core already parses the block syntax they need, and Appendix A
+gives each a concrete desugaring. They become available when the FlatBars prelude registers the
+corresponding helpers.
+====

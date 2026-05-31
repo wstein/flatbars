@@ -13,6 +13,7 @@
 * xref:surface.adoc[5. The surface dialect (sugar)]
 * xref:prelude.adoc[6. The reference engine]
 * xref:host-api.adoc[7. Host API]
+* xref:flatbars-compat.adoc[FlatBars ↔ Handlebars compatibility]
 
 .Appendix
 * xref:appendix-handlebars.adoc[A. Handlebars.js → BareBars, with no gaps]
