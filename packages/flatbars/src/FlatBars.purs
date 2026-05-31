@@ -15,18 +15,21 @@ module FlatBars
   , preludeEnv
   , compile
   , renderWith
+  , renderWithDiag
   , renderAff
   , surfaceClauses
   , desugarSurface
   , compileSurface
   , renderSurface
   , renderSurfaceWith
+  , renderSurfaceDiag
+  , formatError
   ) where
 
 import Prelude
 
 import BareBars.Engine (runString, runTemplate)
-import BareBars.Error (Error, ParseError)
+import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
 import BareBars.Parser (parse)
 import BareBars.Syntax (Ident, Template)
 import BareBars.Value (Value)
@@ -59,6 +62,21 @@ compile src = do
 renderWith :: String -> Value -> Either String String
 renderWith src dat = case runString (refEngine (preludeEnv dat)) src of
   Left e -> Left (show e)
+  Right out -> Right out
+
+-- | Format an engine `Error` against its source for a host boundary: a parse
+-- | failure becomes a located `line:column: message` (xref host-api §7); every
+-- | other error keeps its `show` form. This is what a JS/CLI facade should
+-- | print instead of a bare offset.
+formatError :: String -> Error -> String
+formatError src = case _ of
+  ParseFailure pe -> renderParseErrorAt src pe
+  e -> show e
+
+-- | `renderWith` with located parse-error messages (`formatError`).
+renderWithDiag :: String -> Value -> Either String String
+renderWithDiag src dat = case runString (refEngine (preludeEnv dat)) src of
+  Left e -> Left (formatError src e)
   Right out -> Right out
 
 -- | The async instantiation: the same engine in `ExceptT Error Aff`, so
@@ -109,3 +127,17 @@ renderSurfaceWith partialSrcs src dat =
   compilePartial (Tuple name s) = case parse s of
     Left e -> Left e
     Right t -> Right (Tuple name (desugarSurface t))
+
+-- | `renderSurface` with located parse-error messages (`formatError`): a parse
+-- | failure reports `line:column`, an eval failure keeps its `show` form.
+renderSurfaceDiag :: String -> Value -> Either String String
+renderSurfaceDiag src dat = case parse src of
+  Left pe -> Left (renderParseErrorAt src pe)
+  Right tmpl ->
+    let
+      { partials, template } = hoistInline (desugarSurface tmpl)
+      env = registerPartials partials (preludeEnv dat)
+    in
+      case runTemplate (refEngine env) template of
+        Left e -> Left (formatError src e)
+        Right out -> Right out
