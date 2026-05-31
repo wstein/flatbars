@@ -84,6 +84,13 @@ examples =
     , dataText:
         "{ \"report\": { \"rows\": [ { \"k\": \"CPU\", \"v\": \"42%\" }, { \"k\": \"RAM\", \"v\": \"7.1 GB\" } ] } }"
     }
+  , { id: "truthiness"
+    , label: "Truthiness (vs Handlebars)"
+    , template:
+        "<h3>Truthiness — FlatBars vs Handlebars</h3>\n<table border=\"1\" cellpadding=\"5\">\n<tr><th>value</th><th>FlatBars</th><th>Handlebars</th></tr>\n{{#each (lookup this \"cases\")}}<tr><td>{{{esc_html (lookup this \"label\")}}}</td><td>{{#if (lookup this \"v\")}}truthy{{else}}falsy{{/if}}</td><td>{{{esc_html (lookup this \"hb\")}}}</td></tr>\n{{/each}}</table>\n<p>Only <b>0</b> differs: truthy in FlatBars, falsy in Handlebars. Falsy in FlatBars = false, null, \"\", [], and a trusted empty string.</p>"
+    , dataText:
+        "{ \"cases\":\n  [ { \"label\": \"false\", \"v\": false, \"hb\": \"falsy\" }\n  , { \"label\": \"true\", \"v\": true, \"hb\": \"truthy\" }\n  , { \"label\": \"null\", \"v\": null, \"hb\": \"falsy\" }\n  , { \"label\": \"empty string\", \"v\": \"\", \"hb\": \"falsy\" }\n  , { \"label\": \"non-empty string\", \"v\": \"hi\", \"hb\": \"truthy\" }\n  , { \"label\": \"string 0\", \"v\": \"0\", \"hb\": \"truthy\" }\n  , { \"label\": \"number 0\", \"v\": 0, \"hb\": \"falsy\" }\n  , { \"label\": \"number 42\", \"v\": 42, \"hb\": \"truthy\" }\n  , { \"label\": \"empty array\", \"v\": [], \"hb\": \"falsy\" }\n  , { \"label\": \"array [1,2]\", \"v\": [ 1, 2 ], \"hb\": \"truthy\" }\n  , { \"label\": \"empty object\", \"v\": {}, \"hb\": \"truthy\" }\n  , { \"label\": \"object {k:1}\", \"v\": { \"k\": 1 }, \"hb\": \"truthy\" }\n  ] }"
+    }
   ]
 
 --------------------------------------------------------------------------------

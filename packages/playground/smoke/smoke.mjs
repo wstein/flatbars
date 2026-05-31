@@ -121,10 +121,18 @@ try {
   if (!/(^|\n)RIf\n {2}App "lookup"/.test(realAst) || !/\n {2}then:\n/.test(realAst) || !/\n {2}else:\n/.test(realAst))
     fail(`Real AST not expanded with RIf/then/else: ${JSON.stringify(realAst.slice(0, 160))}`);
 
+  // Truthiness example: the parity table must render number 0 as truthy in
+  // FlatBars and falsy in Handlebars (the one divergence), proving the engine
+  // computed the live verdict.
+  await page.select("select", "truthiness");
+  const truthHtml = await treeText("HTML");
+  if (!/number 0<\/td><td>truthy<\/td><td>falsy<\/td>/.test(truthHtml))
+    fail(`Truthiness example did not render 0 as truthy/falsy: ${JSON.stringify(truthHtml.slice(0, 200))}`);
+
   if (process.exitCode) {
     console.error("smoke: one or more checks failed.");
   } else {
-    console.log(`smoke: OK — mounted, 5 tabs, preview iframe, clean validation, expanded AST trees (${exe.split("/").pop()}).`);
+    console.log(`smoke: OK — mounted, 5 tabs, preview iframe, clean validation, expanded AST trees, truthiness parity (${exe.split("/").pop()}).`);
   }
 } finally {
   await browser.close();

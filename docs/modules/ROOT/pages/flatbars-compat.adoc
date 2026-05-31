@@ -219,10 +219,10 @@ a helper library. They are part of the FlatBars prelude (xref:prelude.adoc[§6])
 . *A bare identifier calls a helper.* `pass:[{{{city}}}]` invokes the helper `city`; it is *not* a
 path read. To read a field, use `pass:[{{{ lookup this "city" }}}]` (xref:index.adoc[]). This is the
 single biggest porting adjustment from {hbs}.
-. *Truthiness mostly matches {hbs}, with one exception.* Falsy: `false`, `null`, `""`, and the empty
-array. Truthy: everything else — including the empty object `pass:[{}]` *and* the number `0`. {hb}
-treats `0` as falsy unless `includeZero` is set; *FlatBars treats `0` as truthy*. Guard zero
-explicitly (e.g. `pass:[(eq n 0)]`) where it matters.
+. *Truthiness mostly matches {hbs}, with one exception.* Falsy: `false`, `null`, `""`, the empty
+array, and a trusted empty string (`safe ""` ⇒ `VSafe ""`). Truthy: everything else — including the
+empty object `pass:[{}]` *and* the number `0`. {hb} treats `0` as falsy unless `includeZero` is set;
+*FlatBars treats `0` as truthy*. Guard zero explicitly (e.g. `pass:[(eq n 0)]`) where it matters.
 . *No implicit HTML escaping.* Output is raw by default; escape with `esc_html` and rely on the
 `escapingWarnings` lint to catch unescaped data. The surface dialect (xref:surface.adoc[§5]) is where
 a `pass:[{{ }}]`-auto-escapes-to-`esc_html` rewrite would live.
