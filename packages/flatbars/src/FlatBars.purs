@@ -11,10 +11,15 @@ module FlatBars
   , module FlatBars.Env
   , module FlatBars.Prelude
   , module FlatBars.Lower
+  , module FlatBars.Surface
   , preludeEnv
   , compile
   , renderWith
   , renderAff
+  , surfaceClauses
+  , desugarSurface
+  , compileSurface
+  , renderSurface
   ) where
 
 import Prelude
@@ -22,6 +27,7 @@ import Prelude
 import BareBars.Engine (runString, runTemplate)
 import BareBars.Error (Error, ParseError)
 import BareBars.Parser (parse)
+import BareBars.Syntax (Ident, Template)
 import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except.Trans (runExceptT)
@@ -30,6 +36,7 @@ import Effect.Aff (Aff)
 import FlatBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll)
 import FlatBars.Lower (RNode(..), escapingWarnings, lower)
 import FlatBars.Prelude (prelude, preludeSchema)
+import FlatBars.Surface (desugar)
 import FlatBars.Value (escapeHtml, stringify, truthy)
 
 -- | Build a FlatBars environment with the prelude, the given data as context,
@@ -54,3 +61,27 @@ renderWith src dat = case runString (refEngine (preludeEnv dat)) src of
 -- | effectful helpers/partials are possible. Proof the driver is monad-polymorphic.
 renderAff :: String -> Value -> Aff (Either Error String)
 renderAff src dat = runExceptT (runString (refEngine (preludeEnv dat)) src)
+
+-- | The clause-separator names this engine recognizes (so the surface knows a
+-- | `{{else}}` is a clause marker, not escaped output).
+surfaceClauses :: Array Ident
+surfaceClauses = [ "else" ]
+
+-- | Desugar Surface syntax to core syntax for this engine (surface.adoc §5).
+desugarSurface :: Template -> Template
+desugarSurface = desugar surfaceClauses
+
+-- | Parse + desugar Surface source into a compiled renderer.
+compileSurface :: String -> Either ParseError (Value -> Either Error String)
+compileSurface src = do
+  tmpl <- parse src
+  let core = desugarSurface tmpl
+  pure \dat -> runTemplate (refEngine (preludeEnv dat)) core
+
+-- | One-shot pure render of *Surface* source (paths, `{{ }}` auto-escape, …).
+renderSurface :: String -> Value -> Either String String
+renderSurface src dat = case parse src of
+  Left e -> Left (show e)
+  Right tmpl -> case runTemplate (refEngine (preludeEnv dat)) (desugarSurface tmpl) of
+    Left e -> Left (show e)
+    Right out -> Right out

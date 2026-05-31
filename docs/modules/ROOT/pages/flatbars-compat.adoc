@@ -99,11 +99,18 @@ that introduces it (xref:appendix-handlebars.adoc#data[A.5]). Drop the `@`.
 |Handlebars |FlatBars |Status |Notes
 
 |Auto-escape `pass:[{{x}}]`
-|explicit `pass:[{{{ esc_html x }}}]`
-|◑
-|FlatBars does *not* auto-escape. `pass:[{{ }}]` is a structural separator, not escaped output;
-output is `pass:[{{{ }}}]` and is *raw*. Escape explicitly with `esc_html`; the `escapingWarnings`
-lint flags unescaped *data* (safe-by-default — see xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]).
+|`pass:[{{ x }}]` via the surface dialect; core `pass:[{{{ esc_html x }}}]`
+|✅
+|In *core* syntax `pass:[{{ }}]` is a structural separator and output is raw `pass:[{{{ }}}]` (escape
+explicitly with `esc_html`; the `escapingWarnings` lint flags unescaped *data*). The
+xref:surface.adoc[surface dialect] (`renderSurface`) restores Handlebars' `pass:[{{ x }}]` ⇒ escaped,
+`pass:[{{{ x }}}]` ⇒ raw, plus path rewriting.
+
+|Paths `pass:[{{a.b.c}}]`, `pass:[{{../a}}]`
+|surface dialect ⇒ `lookup` chains
+|✅
+|`renderSurface` rewrites bare/dotted/numeric/slash/`../`/`this` paths to `lookup` (§5.2). `@data`
+and `[bracket]` segments are not yet desugared (the lexer has no `@`/`[`).
 
 |Unescaped `pass:[{{{x}}}]`
 |`pass:[{{{ x }}}]` output node

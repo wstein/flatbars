@@ -23,7 +23,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FlatBars (RNode(..), RefEnv, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderWith, stringify, truthy)
+import FlatBars (RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderSurface, renderWith, stringify, truthy)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value
@@ -59,6 +59,13 @@ expectError :: String -> String -> Value -> Effect Unit
 expectError name src dat = case renderWith src dat of
   Left _ -> pure unit
   Right out -> assert' (name <> ": expected an error, got " <> show out) false
+
+-- | Assert that *Surface* source `src` rendered against `dat` yields `expected`.
+expectS :: String -> String -> Value -> String -> Effect Unit
+expectS name src dat expected = case renderSurface src dat of
+  Left err -> assert' (name <> ": unexpected error: " <> err) false
+  Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
+    (out == expected)
 
 -- | Assert that `src` parses and validates cleanly against the prelude schema.
 expectValid :: String -> String -> Effect Unit
@@ -214,6 +221,34 @@ main = do
   expectError "unknown-helper" "{{{nope}}}" VNull
   expectError "mismatched-block" "{{#if this}}x{{/each}}" (VBool true)
   expectError "empty-output" "{{{}}}" VNull
+
+  -- Surface dialect (surface.adoc §5.1–5.3): `{{ }}` auto-escapes, `{{{ }}}`
+  -- stays raw, and bare/dotted/numeric/parent paths become `lookup` chains.
+  expectS "surface-escape" "{{ name }}" (obj [ Tuple "name" (str "<b>") ]) "&lt;b&gt;"
+  expectS "surface-raw" "{{{ name }}}" (obj [ Tuple "name" (str "<b>") ]) "<b>"
+  expectS "surface-dotted" "{{ user.name }}"
+    (obj [ Tuple "user" (obj [ Tuple "name" (str "Ada") ]) ])
+    "Ada"
+  expectS "surface-index" "{{ xs.1 }}" (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ]) "b"
+  expectS "surface-this" "{{#each items}}[{{ . }}]{{/each}}"
+    (obj [ Tuple "items" (arr [ str "x", str "y" ]) ])
+    "[x][y]"
+  expectS "surface-parent" "{{#with user}}{{ ../title }}:{{ name }}{{/with}}"
+    (obj [ Tuple "title" (str "Dr"), Tuple "user" (obj [ Tuple "name" (str "Ada") ]) ])
+    "Dr:Ada"
+  expectS "surface-if-clause" "{{#if loggedIn}}hi{{else}}bye{{/if}}"
+    (obj [ Tuple "loggedIn" (VBool true) ])
+    "hi"
+  expectS "surface-literal" "{{ true }}" VNull "true"
+
+  -- desugarSurface produces the documented core expression.
+  case desugarSurface <$> parse "{{ user.name }}" of
+    Right [ Output _ e ] ->
+      assert' ("desugar path: " <> show e)
+        ( e == App "esc_html"
+            [ App "lookup" [ App "this" [], Lit (VString "user"), Lit (VString "name") ] ]
+        )
+    _ -> assert' "desugar: unexpected shape" false
 
   -- Skeleton-AST validation (the engine-supplied second pass).
   expectValid "validate-clean"
