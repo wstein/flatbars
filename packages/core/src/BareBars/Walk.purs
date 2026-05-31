@@ -6,19 +6,21 @@
 -- | second pass, driven by a `Schema` the *engine* supplies — the BareBars
 -- | analogue of validating a document against a JSON schema.
 -- |
--- | `foldRefs` is the generic visitor: it folds a monoid over every helper
--- | reference in a template (applications, blocks, raw blocks, and separators),
--- | so engines can build their own passes (free-variable analysis, helper
--- | usage reports, linters). `validate` is the batteries-included pass built on
--- | top of it.
+-- | `foldRefs` folds a monoid over every helper reference in a template
+-- | (applications, blocks, raw blocks); `foldTemplate` is the full catamorphism
+-- | an engine builds custom passes on (lowering, linting, pretty-printing).
+-- | `validate` is the batteries-included schema pass built on `foldRefs`.
 module BareBars.Walk
   ( RefKind(..)
   , HelperRef
   , foldRefs
+  , Algebra
+  , foldTemplate
   , helperRefs
   , clause
   , clauses
   , withoutClause
+  , splitClause
   , Arity(..)
   , HelperSpec
   , Schema
@@ -84,6 +86,33 @@ foldRefs f = foldMap (node f)
 helperRefs :: Template -> Array HelperRef
 helperRefs = foldRefs Array.singleton
 
+-- | A catamorphism over the skeleton: the engine supplies an algebra, BareBars
+-- | owns the recursion (inversion of control). The `block` case is handed the
+-- | raw `children` (so it can resolve clauses) *and* a BareBars-provided
+-- | `recurse` to fold any sub-range. Use it to lower the skeleton to your own
+-- | typed AST, collect diagnostics, or pretty-print — without writing a walk.
+type Algebra a =
+  { content :: String -> a
+  , output :: Expr -> a
+  , raw :: Ident -> Array Expr -> String -> a
+  , block ::
+      { name :: Ident, args :: Array Expr, children :: Template, recurse :: Template -> a } -> a
+  , concat :: Array a -> a
+  }
+
+foldTemplate :: forall a. Algebra a -> Template -> a
+foldTemplate alg = go
+  where
+  go :: Template -> a
+  go nodes = alg.concat (map node nodes)
+
+  node :: Node -> a
+  node = case _ of
+    Content s -> alg.content s
+    Output e -> alg.output e
+    RawBlock name args raw' -> alg.raw name args raw'
+    Block name args children -> alg.block { name, args, children, recurse: go }
+
 --------------------------------------------------------------------------------
 -- Clause helpers (for nested-clause control flow)
 --------------------------------------------------------------------------------
@@ -108,6 +137,21 @@ withoutClause :: Ident -> Template -> Template
 withoutClause name = Array.filter case _ of
   Block n _ _ -> n /= name
   _ -> true
+
+-- | Split a body at the first top-level `{{#name}}` clause: the nodes *before*
+-- | it, and that clause's body (if any). The idiom a control-flow helper uses —
+-- | e.g. `if` renders `before` when truthy and `clause` otherwise.
+splitClause :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
+splitClause name nodes = case Array.findIndex isClause nodes of
+  Nothing -> { before: nodes, clause: Nothing }
+  Just i -> { before: Array.take i nodes, clause: bodyAt i }
+  where
+  isClause = case _ of
+    Block n _ _ -> n == name
+    _ -> false
+  bodyAt i = case Array.index nodes i of
+    Just (Block _ _ body) -> Just body
+    _ -> Nothing
 
 --------------------------------------------------------------------------------
 -- Schema-driven validation

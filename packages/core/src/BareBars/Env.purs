@@ -11,6 +11,7 @@
 module BareBars.Env
   ( Helper(..)
   , HelperCtx
+  , Render
   , Env
   , runHelper
   , constHelper
@@ -33,16 +34,24 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 
+-- | BareBars drives the whole walk (inversion of control): it resolves and
+-- | invokes helpers, and hands each one a `HelperCtx` — a *control handle*
+-- | whose every field calls back into BareBars. A helper never walks the tree
+-- | itself; it asks BareBars to.
 newtype Helper = Helper (HelperCtx -> Array Value -> Either Error Value)
 
--- | What a helper is handed when invoked. `body` is the captured skeleton
--- | subtree (`[]` for an inline application); `renderTemplate` renders any
--- | template against any environment. A block helper interprets `body` however
--- | it likes — including reaching into *nested clause blocks* for control flow.
+-- | Render any template against any environment — the callback BareBars exposes
+-- | to helpers so they can render captured bodies and clauses on their terms.
+type Render = Env -> Template -> Either Error String
+
+-- | The control handle a helper receives. `env` is the current environment;
+-- | `body` is the captured skeleton subtree (`[]` for an inline application);
+-- | `render` is the inversion-of-control callback. A block helper interprets
+-- | `body` however it likes — including reaching into *nested clause blocks*.
 type HelperCtx =
   { env :: Env
   , body :: Template
-  , renderTemplate :: Template -> Env -> Either Error String
+  , render :: Render
   }
 
 type Env =

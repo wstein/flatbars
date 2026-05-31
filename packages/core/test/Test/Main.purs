@@ -6,7 +6,7 @@ module Test.Main where
 
 import Prelude
 
-import BareBars (parse, preludeSchema, renderWith, validate)
+import BareBars (foldTemplate, parse, preludeSchema, renderWith, validate)
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -146,5 +146,19 @@ main = do
     "{{#each (lookup this \"xs\")}}{{{esc_html this}}}{{#else}}none{{/else}}{{/each}}"
   expectIssue "validate-unknown" "{{{frobnicate this}}}"
   expectIssue "validate-arity" "{{{esc_html}}}"
+
+  -- foldTemplate: a catamorphism over the skeleton (the "prepare" half of the
+  -- engine API). Here we count nodes, recursing into block bodies.
+  let
+    counter =
+      { content: \_ -> 1
+      , output: \_ -> 1
+      , raw: \_ _ _ -> 1
+      , block: \b -> 1 + b.recurse b.children
+      , concat: Array.foldl (+) 0
+      }
+  case parse "a{{#each x}}b{{{this}}}{{/each}}c" of
+    Left e -> assert' ("foldTemplate: parse error " <> show e) false
+    Right t -> assert' "foldTemplate node count" (foldTemplate counter t == 5)
 
   log "all core tests passed"

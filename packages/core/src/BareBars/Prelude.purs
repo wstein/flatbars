@@ -19,7 +19,7 @@ import Prelude
 import BareBars.Env (Helper(..), HelperCtx, constHelper, lookupHelper, pushFrame, runHelper)
 import BareBars.Error (Error(..))
 import BareBars.Value (Value(..), escapeHtml, stringify, truthy)
-import BareBars.Walk (Arity(..), HelperSpec, Schema, clause, withoutClause)
+import BareBars.Walk (Arity(..), HelperSpec, Schema, splitClause)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Int as Int
@@ -139,13 +139,13 @@ safeH = Helper \_ args -> case args of
 
 -- | A raw-block helper that returns its captured body verbatim.
 rawH :: Helper
-rawH = Helper \ctx _ -> VSafe <$> ctx.renderTemplate ctx.body ctx.env
+rawH = Helper \ctx _ -> VSafe <$> ctx.render ctx.env ctx.body
 
 -- | A clause helper (`then`, `else`): transparent — it renders its own body.
 -- | Control-flow helpers reach in and render the relevant clause; this default
 -- | governs only direct use.
 clauseH :: Helper
-clauseH = Helper \ctx _ -> VSafe <$> ctx.renderTemplate ctx.body ctx.env
+clauseH = Helper \ctx _ -> VSafe <$> ctx.render ctx.env ctx.body
 
 --------------------------------------------------------------------------------
 -- Conditionals
@@ -165,14 +165,14 @@ unlessH = Helper \ctx args -> case args of
     else renderMain ctx
   _ -> Left (ArityError "unless/1")
 
--- | Render the body with any `else` clause stripped out.
+-- | Render the body up to the first `{{#else}}` clause.
 renderMain :: HelperCtx -> Either Error Value
-renderMain ctx = VSafe <$> ctx.renderTemplate (withoutClause "else" ctx.body) ctx.env
+renderMain ctx = VSafe <$> ctx.render ctx.env (splitClause "else" ctx.body).before
 
 -- | Render the `{{#else}}…{{/else}}` clause, if present; otherwise empty.
 renderElse :: HelperCtx -> Either Error Value
-renderElse ctx = case clause "else" ctx.body of
-  Just t -> VSafe <$> ctx.renderTemplate t ctx.env
+renderElse ctx = case (splitClause "else" ctx.body).clause of
+  Just t -> VSafe <$> ctx.render ctx.env t
   Nothing -> Right (VSafe "")
 
 --------------------------------------------------------------------------------
@@ -197,7 +197,7 @@ eachH = Helper \ctx args -> case args of
 iterate :: HelperCtx -> Array { key :: String, val :: Value } -> Either Error Value
 iterate ctx items =
   let
-    main = withoutClause "else" ctx.body
+    main = (splitClause "else" ctx.body).before
     n = Array.length items
     renderItem i { key, val } =
       let
@@ -210,7 +210,7 @@ iterate ctx items =
           , Tuple "parent" (constHelper ctx.env.context)
           ]
       in
-        ctx.renderTemplate main (pushFrame frame val ctx.env)
+        ctx.render (pushFrame frame val ctx.env) main
   in
     (VSafe <<< joinWith "") <$> traverse identity (Array.mapWithIndex renderItem items)
 
@@ -221,7 +221,7 @@ withH = Helper \ctx args -> case args of
       let
         frame = Map.singleton "parent" (constHelper ctx.env.context)
       in
-        VSafe <$> ctx.renderTemplate (withoutClause "else" ctx.body) (pushFrame frame v ctx.env)
+        VSafe <$> ctx.render (pushFrame frame v ctx.env) (splitClause "else" ctx.body).before
     else renderElse ctx
   _ -> Left (ArityError "with/1")
 

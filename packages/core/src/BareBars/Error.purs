@@ -48,6 +48,7 @@ data Error
   = UnknownHelper String
   | ArityError String
   | TypeError String
+  | ClauseError String
   | HelperError String
 
 derive instance eqError :: Eq Error
@@ -60,4 +61,5 @@ renderError = case _ of
   UnknownHelper n -> "UnknownHelper: no helper named '" <> n <> "' in any frame"
   ArityError n -> "ArityError: " <> n
   TypeError m -> "TypeError: " <> m
+  ClauseError m -> "ClauseError: " <> m
   HelperError m -> "HelperError: " <> m

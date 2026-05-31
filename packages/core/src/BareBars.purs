@@ -26,12 +26,12 @@ import Prelude
 
 import BareBars.Env (Env, Helper(..), emptyEnv, register, registerAll)
 import BareBars.Error (Error, ParseError)
-import BareBars.Eval (render)
+import BareBars.Eval (render, runTemplate)
 import BareBars.Parser (parse)
 import BareBars.Prelude (prelude, preludeSchema)
 import BareBars.Syntax (Expr(..), Node(..), Template)
 import BareBars.Value (Value(..), stringify, truthy)
-import BareBars.Walk (helperRefs, validate)
+import BareBars.Walk (Algebra, foldTemplate, helperRefs, splitClause, validate)
 import Data.Either (Either(..))
 
 -- | Build an environment with the reference prelude, the given data as context,

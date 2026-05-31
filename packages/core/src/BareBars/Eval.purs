@@ -12,6 +12,7 @@
 -- | nested clause blocks.
 module BareBars.Eval
   ( render
+  , runTemplate
   , evalExpr
   ) where
 
@@ -28,6 +29,12 @@ import Data.Traversable (traverse)
 
 render :: Template -> Env -> Either Error String
 render tmpl env = joinWith "" <$> traverse (renderNode env) tmpl
+
+-- | The inversion-of-control entry point: BareBars runs the template against an
+-- | environment, driving the walk and calling the registered helpers. (Argument
+-- | order mirrors the `Render` callback handed to helpers.)
+runTemplate :: Env -> Template -> Either Error String
+runTemplate env tmpl = render tmpl env
 
 renderNode :: Env -> Node -> Either Error String
 renderNode env = case _ of
@@ -53,10 +60,11 @@ evalExpr env = case _ of
     h <- resolve name env
     runHelper h (ctx env []) vals
 
--- | Build the context handed to a helper. `renderTemplate` is `render` itself,
--- | so helpers can render captured bodies and clauses against any environment.
+-- | Build the control handle handed to a helper. `render` is the BareBars walk
+-- | itself (inversion of control), so a helper renders captured bodies and
+-- | clauses by calling back in rather than traversing the tree.
 ctx :: Env -> Template -> HelperCtx
-ctx env body = { env, body, renderTemplate: render }
+ctx env body = { env, body, render: runTemplate }
 
 resolve :: String -> Env -> Either Error Helper
 resolve name env = case lookupHelper name env of
