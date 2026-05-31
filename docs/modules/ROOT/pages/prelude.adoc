@@ -1,14 +1,15 @@
-= 6. The reference prelude
-:navtitle: 6. The reference prelude
+= 6. The reference engine (prelude)
+:navtitle: 6. The reference engine
 
-The *prelude* is a set of helpers that, together with the xref:surface.adoc[surface dialect],
-reproduces {hb}. *None of it is built into the core.* It is a library you register into the helper
-environment. Delete `each` and `pass:[{{#each}}]` stops working; the language is unaffected. Rename
-`esc_html` and update your Surface accordingly. This is what "no built-in helpers" buys you.
+The *reference engine* is a Phase-2 walk (xref:evaluation.adoc[]) plus a set of helpers that,
+together with the xref:surface.adoc[surface dialect], reproduces {hb}. *None of it is in the core.*
+It is a library you register into the helper environment. Delete `each` and `pass:[{{#each}}]` stops
+validating; the core is unaffected. Rename `esc_html` and update your Surface. This is what "no
+built-in helpers, no keywords" buys you.
 
-Helper signatures below use the shapes from xref:evaluation.adoc[]: positional `Value` arguments,
-an optional trailing `dict` for hash options, and — for block helpers — the `body`/`inverse`
-thunks.
+Helper signatures use the shapes from xref:evaluation.adoc[]: an inline helper is
+`Array Value -> M Value`; a block helper also receives a `Body` (`{ children, render }`) and may
+inspect its `children` for nested clause blocks via `splitClause`.
 
 == 6.1 Context and access
 
@@ -34,22 +35,24 @@ returning `VNull` at the first miss. `(lookup obj)` is `obj`.
 |`esc_html` |1 |HTML-escapes the stringified argument (`&`, `<`, `>`, `"`, `'`) and returns a
 `VSafe`. Idempotent on `VSafe` input.
 |`safe` |1 |Marks the stringified argument as `VSafe` *without* escaping — the explicit "trust this
-markup" helper. The BareBars analogue of `new Handlebars.SafeString(…)`.
-|`raw` |block |A raw-block helper that returns its captured body verbatim.
+markup" helper. The analogue of `new Handlebars.SafeString(…)`.
+|`raw` |block |A raw-block helper returning its captured body verbatim.
 |===
 
-== 6.3 Conditionals
+== 6.3 Conditionals (clause-reading block helpers)
 
 [cols="1,1,3",options="header"]
 |===
 |Helper |Form |Behaviour
 
-|`if` |block |Calls `body` when its argument is truthy, else `inverse`.
+|`if` |block |`splitClause "else"` over its body: renders the nodes before the `else` child when the
+argument is truthy, else renders the `else` child's body.
 |`unless` |block |The inverse of `if`.
 |===
 
-*Truthiness* is defined by the prelude, matching {hbs}: `VBool false`, `VNull`, `""`, and the
-*empty array* are falsy; `0`, `{}` (empty object), and non-empty values are truthy.
+`if` and `unless` *define* the meaning of a nested `pass:[{{#else}}…{{/else}}]`; the core does not.
+*Truthiness* matches {hbs}: `VBool false`, `VNull`, `""`, and the *empty array* are falsy; `0`, `{}`,
+and non-empty values are truthy.
 
 == 6.4 Iteration and context shift
 
@@ -57,12 +60,12 @@ markup" helper. The BareBars analogue of `new Handlebars.SafeString(…)`.
 |===
 |Helper |Form |Behaviour
 
-|`each` |block |Iterates an array or object. For each element it pushes a frame, sets `context` to
-the element, and installs scoped helpers: `index` (0-based number; for objects, the key as
-`VString` is also available via `key`), `first`, `last`, and `key`. Optional binding-name arguments
-rename the element and index (`(each xs "item" "i")`). On an empty collection it calls `inverse`.
-|`with` |block |Pushes a frame, sets `context` to its argument, installs `parent`, and calls
-`body`. On a falsy/absent argument it calls `inverse`. An optional binding-name argument also
+|`each` |block |Iterates an array or object. Per element it pushes a frame, sets `context` to the
+element, and installs scoped helpers `index` (0-based), `key`, `first`, `last`, `parent`. Optional
+binding-name arguments rename the element and index. On an *empty* collection it renders the
+`else` clause (via `splitClause "else"`).
+|`with` |block |Pushes a frame, sets `context` to its argument, installs `parent`, renders the body.
+On a falsy/absent argument it renders the `else` clause. An optional binding-name argument also
 installs the shifted context under that name.
 |===
 
@@ -74,8 +77,7 @@ Scoped helpers installed by `each`:
 |`this` |the current element
 |`index` |0-based position (number)
 |`key` |property name (objects) or numeric index as string (arrays)
-|`first` |`VBool` — is this the first element?
-|`last` |`VBool` — is this the last element?
+|`first` / `last` |`VBool` — first / last element?
 |`parent` |the collection's enclosing context
 |===
 
@@ -85,10 +87,10 @@ Scoped helpers installed by `each`:
 |===
 |Helper |Arity |Behaviour
 
-|`dict` |even ≥0 |`(dict "k1" v1 "k2" v2 …)` builds a `VObject`. Target of the hash desugaring (5.4).
-|`apply` |≥1 |`(apply name args…)` — the escape hatch for higher-order use: `name` is a `VString`
-naming a helper, which is then applied to the remaining arguments. This is how a "helper held in
-data" is called, given that values are never functions.
+|`dict` |even ≥0 |`(dict "k1" v1 …)` builds a `VObject`. Target of the hash desugaring (5.4).
+|`apply` |≥1 |`(apply name args…)` — the higher-order escape hatch: `name` is a `VString` naming a
+helper, applied to the remaining arguments. How a "helper held in data" is called, since values are
+never functions.
 |`log` |≥1 |Emits its arguments to the host log (an effect in `M`) and returns `VNull`.
 |===
 
@@ -99,19 +101,19 @@ data" is called, given that values are never functions.
 |Helper |Form |Behaviour
 
 |`partial` |≥1 |`(partial name ctx hash?)` renders the registered partial `name` with `context = ctx`
-and the optional `hash` object merged into a scoped frame. Returns `VSafe`.
+and the optional `hash` merged into a scoped frame. Returns `VSafe`.
 |`inline` |block |`(inline "name") body` registers `body` as a partial named `name`, scoped to the
 current frame and below. Returns `""`.
-|`partial>` |block |`(partial> name hash?) body` renders partial `name`, exposing this block's `body`
-to it as the scoped helper `partial-block`. If `name` is not registered, renders `body` (the
-fallback). Returns `VSafe`.
+|`partial>` |block |`(partial> name hash?) body` renders partial `name`, exposing this block's body to
+it as the scoped helper `partial-block`. If `name` is unregistered, renders `body` (the fallback).
+Returns `VSafe`.
 |`partial-block` |0 |Scoped helper installed by `partial>`; returns the enclosing block body. Target
 of `pass:[{{> @partial-block}}]`.
 |===
 
-== 6.7 A minimal prelude is enough
+== 6.7 A minimal engine is enough
 
 You do not need all of the above. A static-site author might register only `this`, `lookup`,
-`esc_html`, `if`, and `each`. A configuration templater might register `lookup`, `eq`, and `or` and
-nothing else. The point of BareBars is that *the prelude is the product surface you design*, and the
-core never presumes which of these exist.
+`esc_html`, `if`, and `each`; a configuration templater only `lookup`, `eq`, and `or`. The engine —
+the helpers *and* the clause vocabulary they read — is the product surface you design. The core never
+presumes which of these exist.

@@ -3,77 +3,79 @@
 
 The reference implementation is PureScript and compiles to JavaScript, so a BareBars engine drops
 into the same places {hb} does. This chapter sketches the surface a host uses; it is informative,
-not normative, except for the helper contract carried over from xref:evaluation.adoc[].
+except for the AST and walk contract carried over from xref:evaluation.adoc[].
 
 == 7.1 Pipeline
 
 [source,text]
 ----
-String --lex--> [Token]  --parse--> Template(core)
+                 PHASE 1 (core)                         PHASE 2 (engine)
+String --lex--> [Token] --parse--> Template(skeleton) --render env--> String
                                         ^
-String --lex--> [Token] --parse--> Surface AST --desugar--> Template(core)
-                                                                  |
-                                            Template(core) + Env --render--> String
+String --lex--> [Token] --parse--> Surface --desugar--> Template(skeleton)
 ----
 
-Surface is a *front-end* that emits core `Template`; the renderer only ever sees core.
+Surface is a front-end that emits the core skeleton; the engine walk only ever sees the skeleton.
 
 == 7.2 Types and functions
 
 [source,haskell]
 ----
--- Parsing
-parse        :: String -> Either ParseError Template          -- core
+-- Phase 1: parsing (core)
+parse        :: String -> Either ParseError Template          -- skeleton AST
 parseSurface :: String -> Either ParseError SurfaceTemplate
 desugar      :: SurfaceTemplate -> Template
 
--- Building an environment
-emptyEnv     :: Value -> Env                                  -- context only, no helpers
+-- Phase 2: the engine (reference)
+type Render  = Env -> Template -> M String                    -- the IoC callback handed to helpers
+emptyEnv     :: Value -> Env
 register     :: Ident -> Helper -> Env -> Env
 registerAll  :: Array (Tuple Ident Helper) -> Env -> Env
-prelude      :: Array (Tuple Ident Helper)                    -- the reference prelude (Ch. 6)
+prelude      :: Array (Tuple Ident Helper)                    -- the reference engine (Ch. 6)
+render       :: Template -> Env -> M String                   -- BareBars drives the walk
+runTemplate  :: Env -> Template -> M String                   -- same, argument order of `Render`
 
--- Rendering
-render       :: Template -> Env -> Either Error String
+-- Validation (the JSON-Schema-style pass) and analysis
+validate     :: Schema -> Template -> Array Issue             -- schema = engine's contract
+preludeSchema :: Schema                                       -- the reference engine's schema
+foldTemplate :: Algebra a -> Template -> a                    -- catamorphism: prepare / analyze (A.13.2)
+splitClause  :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
 
--- Validating the skeleton AST against an engine schema (BareBars.Walk; see §4.3)
-validate     :: Schema -> Template -> Array Issue
-helperRefs   :: Template -> Array HelperRef                   -- every helper reference, for custom passes
-preludeSchema :: Schema                                       -- the reference engine's contract
-
--- Convenience: parse core, render against prelude + data
+-- Convenience: parse core, render against the prelude + data
 compile      :: String -> Either ParseError (Value -> Either Error String)
-renderWith   :: String -> Value -> Either String String       -- parse + render, errors as text
 ----
+
+`validate` is the JSON-Schema-style pass: walk the skeleton against an engine `Schema` and return
+every unknown-helper / arity / block-misuse `Issue`, *before* rendering. A host may skip it (errors
+surface lazily during `render`) or require it (strict). `preludeSchema` is the reference engine's
+contract; `foldTemplate` is the general traversal a custom pass is built on.
 
 == 7.3 Writing a helper
 
-A helper is `HelperCtx -> Array Value -> Either Error Value` (v1 fixes the result monad to
-`Either Error`). A plain helper ignores the `body`; a block helper renders it — and may reach into
-its *nested clause blocks*.
+A helper is `HelperCtx -> Array Value -> M Value`. An inline helper ignores the handle's `body`; a
+block helper uses it. *BareBars drives the walk and calls your helpers (inversion of control)* — the
+helper recurses only by calling `ctx.render`. See xref:appendix-handlebars.adoc#engine-api[A.13] for
+the full implementer API — the `HelperCtx` control handle, `runTemplate`, and `foldTemplate` for
+preparing your own AST.
 
 [source,haskell]
 ----
--- upcase: a 1-argument value helper
+-- upcase: a 1-argument inline helper (ignores the body)
 upcase :: Helper
 upcase _ args = case args of
   [v] -> VString <<< toUpper <$> stringify v
-  _   -> Left (ArityError "upcase/1")
+  _   -> throwError (ArityError "upcase/1")
 
--- if: a block helper. There is no "inverse" in the core — `else` is just a
--- nested clause block this helper chooses to interpret.
+-- if: a block helper that reads a nested `else` clause
 ifHelper :: Helper
 ifHelper ctx args = case args of
-  [cond] -> if truthy cond
-              then VSafe <$> ctx.renderTemplate (withoutClause "else" ctx.body) ctx.env
-              else case clause "else" ctx.body of
-                     Just t  -> VSafe <$> ctx.renderTemplate t ctx.env
-                     Nothing -> Right (VSafe "")
-  _      -> Left (ArityError "if/1")
+  [cond] ->
+    let { before, clause } = splitClause "else" ctx.body
+    in if truthy cond
+         then VSafe <$> ctx.render ctx.env before
+         else VSafe <$> ctx.render ctx.env (fromMaybe [] clause)
+  _ -> throwError (ArityError "if/1")
 ----
-
-A multi-way helper (`switch`/`case`, an `elif` chain) walks `ctx.body` for its clause blocks with
-the `clause` / `clauses` / `withoutClause` utilities from `BareBars.Walk`.
 
 == 7.4 {hbs} JavaScript API → BareBars host API
 
@@ -82,20 +84,20 @@ the `clause` / `clauses` / `withoutClause` utilities from `BareBars.Walk`.
 |{hb} |BareBars |Note
 
 |`Handlebars.compile(src)` |`compile src` |Surface in, `data -> String` out.
-|`Handlebars.precompile(src)` |`parseSurface` `>>>` `desugar` |Ship the core `Template`; render later.
+|`Handlebars.precompile(src)` |`parseSurface` `>>>` `desugar` |Ship the skeleton; render later.
 |`Handlebars.parse(src)` |`parse` / `parseSurface` |Returns the AST of xref:evaluation.adoc[].
 |`Handlebars.registerHelper(n,f)` |`register n f` |`f` follows the `Helper` contract.
 |`Handlebars.registerPartial(n,t)` |`register n (partialOf t)` |A partial *is* a helper.
 |`Handlebars.registerDecorator(n,f)` |`register n f` |Decorators are block helpers (xref:appendix-handlebars.adoc#decorators[A.8]).
+|`options.fn` / `options.inverse` |`ctx.render` over `ctx.body` / over a `splitClause` result |No inverse field; clauses are nested blocks.
+|`options.hash` |the trailing `dict` argument |xref:surface.adoc[] §5.4.
 |`Handlebars.SafeString(s)` |`VSafe s` / `safe` |A value, not a wrapper class.
-|`Handlebars.escapeExpression(s)` |`esc_html` |Prelude helper.
-|`Handlebars.Utils` |host module |`escape`, `isEmpty`, `createFrame` analogues.
-|`Visitor` / AST walk |fold over `Template` |Plain algebraic data; pattern-match.
+|`Handlebars.escapeExpression(s)` |`esc_html` |Engine helper.
+|`Visitor` / AST walk |the Phase-2 `render`/`validate` walk |Plain algebraic data; pattern-match.
 |===
 
 == 7.5 Effectful and async hosts
 
-Fix `M = Aff` to allow helpers and partials that perform I/O (fetching a partial, calling a
-service, awaiting a value). The evaluator's `MonadThrow Error m` constraint is satisfied by `Aff`;
-the only cost is that `render` returns `Aff String` instead of `Either Error String`. Pure hosts
-keep `M = Either Error` and pay nothing.
+Fix `M = Aff` for helpers/partials that perform I/O. The walk's `MonadThrow Error m` constraint is
+satisfied by `Aff`; `render` then returns `Aff String`. Pure hosts keep `M = Either Error` and pay
+nothing.

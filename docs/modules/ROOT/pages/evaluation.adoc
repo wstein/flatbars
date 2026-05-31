@@ -1,17 +1,20 @@
-= 3. Values & evaluation
-:navtitle: 3. Values & evaluation
+= 3. The skeleton AST & the walk
+:navtitle: 3. AST & the walk
 
-== 3.1 The abstract syntax
+Phase 1 (the core) produces the *skeleton AST* defined here. Phase 2 (an engine you supply) *walks*
+it to validate and render. This chapter gives the AST and the value type normatively, then specifies
+the *walk contract* the reference engine implements.
+
+== 3.1 The skeleton AST (normative)
 
 [source,haskell]
 ----
--- The parsed core. (PureScript-flavoured.)
 type Template = Array Node
 
 data Node
   = Content  String
   | Output   Expr
-  | Block    Ident (Array Expr) Template     -- head, args, captured body
+  | Block    Ident (Array Expr) Template     -- head, args, body (one sub-tree)
   | RawBlock Ident (Array Expr) String       -- head, args, verbatim body
 
 data Expr
@@ -19,18 +22,11 @@ data Expr
   | App Ident (Array Expr)
 ----
 
-This is the *skeleton* AST: purely syntactic, with no meaning ascribed to any name. There is no node
-for comments (the lexer drops them) and no `Group` constructor — parentheses only affect *parsing*;
-`(e)` and `e` produce the same `Expr`. A `Block` is just a named application with a captured body;
-the core has *no* separators, no `pass:[{{else}}]`, no "inverse". The only block opener is
-`pass:[{{#]` (and `pass:[{{{{#]` for raw).
-
-*Multi-branch control flow is expressed as nested clause blocks* the engine interprets — e.g.
-`pass:[{{#if c}}{{#then}}…{{/then}}{{#else}}…{{/else}}{{/if}}]`. The clause names (`then`, `else`,
-`elif`, `case`, …) are the engine's and the author's choice, never core keywords. Meaning is given
-by a separate, engine-supplied pass over this skeleton — a validating + interpreting visitor, exactly
-as a JSON schema validates a JSON document (xref:errors.adoc[] and the `BareBars.Walk` /
-`BareBars.Eval` host modules).
+There is no comment node (the lexer drops them), no inverse field on `Block` (branching is a nested
+`Block`; xref:grammar.adoc[]), and no `Group` constructor — parentheses affect *parsing* only, so
+`(e)` and `e` produce the same `Expr`. *This tree carries no meaning.* `App "if" […]` is just an
+identifier and some arguments; whether `if` exists, how many arguments it takes, and what it does are
+Phase-2 questions.
 
 == 3.2 The value type (normative)
 
@@ -48,95 +44,124 @@ data Value
 
 [IMPORTANT]
 ====
-`Value` has *no function case*. Helpers are not values; they live in the environment under names
-and can never be produced, stored, or passed by the language. This is the direct consequence of
-"the head of an application is always a name" (xref:concepts.adoc[]). It keeps values
-serializable and comparable, and it is why higher-order behaviour must go through a helper such as
-`apply` rather than through the syntax.
+`Value` has *no function case*. Helpers are not values; they live in the engine's environment under
+names and can never be produced, stored, or passed by the language — the direct consequence of "the
+head of an application is always a name" (xref:concepts.adoc[]). Values stay serializable and
+comparable; higher-order behaviour goes through a helper such as `apply`.
 ====
 
 `VSafe` is the only non-data case and exists solely at the output boundary; see 3.6.
 
-== 3.3 The environment
+== 3.3 The walk contract
+
+An *engine* is anything that turns a `Template` and some data into output. The contract is one
+function:
 
 [source,haskell]
 ----
-type Helper = HelperCtx -> Array Value -> M Value     -- HelperCtx defined in 3.5
+type Render = Env -> Template -> M String
+----
 
+`M` is the result monad: v1 fixes `M = Either Error` (pure); a host needing async/effects instantiates
+`M = Aff` under a `MonadThrow Error m` constraint. `Env` is the engine's business; the reference
+engine uses:
+
+[source,haskell]
+----
 type Env =
   { helpers :: List (Map Ident Helper)   -- a stack of frames; head is innermost
   , context :: Value                     -- what `this` returns
   }
 ----
 
-* `helpers` is a *stack of frames*. Name resolution searches from the innermost frame outward; the
-  first match wins. A block helper pushes a frame for its body and pops it afterward — this is the
-  whole of "scope" (xref:concepts.adoc[]).
-* `context` is the current data, reached only via the `this` helper. Block helpers such as `with`
-  and `each` push a frame *and* set a new `context` for the body.
-* A block helper receives a `HelperCtx` carrying its captured `body` (a `Template`) and a
-  `renderTemplate` function (3.5), so it can render sub-templates and interpret nested clauses. For
-  a non-block application `body` is empty.
-* `M` is the result monad. v1 fixes `M = Either Error` (pure). A host that needs asynchronous
-  partials or effectful helpers may instantiate `M = Aff`; the evaluator is written against a
-  `MonadThrow Error m` constraint so both work.
+* `helpers` is a *stack of frames*. Resolution searches innermost-outward; first match wins. A block
+  helper pushes a frame for its body and pops it — the whole of "scope" (xref:concepts.adoc[]).
+* `context` is the current data, reached only via `this`. `with`/`each` push a frame *and* set a new
+  `context`.
 
-== 3.4 Evaluating expressions
+== 3.4 Validation is part of the walk
 
-[source,text]
-----
-eval(Lit v)            = v
-eval(App name args)    = resolve(name) applied to [ eval(a) | a in args ]
-----
+Before (or as) it interprets a node, the walk *validates* it against the engine's rules — exactly
+like checking a JSON document against a JSON Schema:
 
-`resolve(name)` searches the helper frames inner-to-outer. If no frame defines `name`, evaluation
-fails with `UnknownHelper name` (xref:errors.adoc[]). A nullary application `App name []` is a
-normal call with an empty argument list — there is no separate "variable" path.
+* `App name` — is `name` a registered helper? (else `UnknownHelper`)
+* arity — did `name` get the argument count it requires? (`ArityError`)
+* argument shape — are the values the right kind? (`TypeError`)
+* block shape — are this block's nested clauses (`else`, `case`, …) ones this helper allows, in a
+  legal arrangement? (`ClauseError`)
 
-Arguments are evaluated *eagerly, left to right*, before the helper runs. (Block bodies are the
-exception: they are passed unevaluated as thunks — 3.5.) A helper that needs laziness over an
-argument must instead be written as a *block* helper.
+The *core does none of this*. A conforming engine MAY validate the whole tree up front (a static
+pass, like schema validation) or lazily as it renders; the reference engine validates lazily. See
+xref:errors.adoc[].
 
-== 3.5 Evaluating nodes
+== 3.5 The reference walk
 
 [source,text]
 ----
-render(Content s)              = s
-render(Output e)               = stringify(eval(e))
-render(Block name args body)   = stringify( resolve(name) evaluated-args { body } )
-render(RawBlock name args raw) = stringify( resolve(name) evaluated-args { body = [Content raw] } )
+render env (Content s)            = s
+render env (Output e)             = stringify (eval env e)
+render env (Block name args body) = stringify (apply (resolve env name)
+                                                      { env, body, render }
+                                                      [ eval env a | a <- args ])
+render env (RawBlock name args r) = stringify (apply (resolve env name)
+                                                      { env, body: [Content r], render }
+                                                      [ eval env a | a <- args ])
+
+eval env (Lit v)         = v
+eval env (App name args) = apply (resolve env name) { env, body: [], render }
+                                                    [ eval env a | a <- args ]
 ----
 
-A *block* helper receives, in addition to its evaluated arguments, a `HelperCtx`:
+Arguments are evaluated *eagerly, left to right*, before the helper runs. Block bodies are the
+exception: a helper receives its body *unevaluated* (as a `Template`) and decides what to do with it.
+
+== 3.6 Helpers and the control handle
+
+*BareBars drives the whole walk — inversion of control.* It resolves and applies each helper,
+handing it a `HelperCtx`: a *control handle* whose `render` field is a callback *into* BareBars. A
+helper never traverses the tree itself; it asks BareBars to render the sub-trees it chooses.
 
 [source,haskell]
 ----
-type HelperCtx =
-  { env            :: Env                              -- the current environment
-  , body           :: Template                         -- the captured body ([] for inline use)
-  , renderTemplate :: Template -> Env -> M String }    -- render any template in any env
+type Render    = Env -> Template -> M String   -- the inversion-of-control callback
+
+type HelperCtx = { env    :: Env               -- the current environment
+                 , body   :: Template          -- captured children ([] for inline calls)
+                 , render :: Render }           -- ask BareBars to render a sub-tree
+
+type Helper    = HelperCtx -> Array Value -> M Value
 ----
 
-The helper decides whether to render `body`, how many times, with what `context`, and which extra
-scoped helpers to install in a pushed frame — and, crucially, it may reach into `body` to find
-*nested clause blocks*. The reference `if` renders its body (minus any `else` clause) when truthy and
-renders the `pass:[{{#else}}…{{/else}}]` clause otherwise; `each` renders the body once per element
-with a per-element frame, or the `else` clause when empty; `with` renders the body with a shifted
-context. The helper utilities `clause`, `clauses`, and `withoutClause` (`BareBars.Walk`) extract and
-remove top-level clause blocks by name.
+An *inline* helper ignores `body`. A *block* helper uses it: it may render `body` zero or more times,
+under environments it constructs (pushing scoped helpers, shifting `context`), and it may *inspect*
+`body` to find nested clause blocks.
 
-For a *raw* block the body is the single verbatim `Content` node, so a raw block whose helper renders
-its body emits the captured text unchanged.
+[source,haskell]
+----
+-- if: render the body up to a child `else` block; render the else clause otherwise.
+ifHelper ctx [cond] =
+  let { before, clause } = splitClause "else" ctx.body
+  in if truthy cond
+       then VSafe <$> ctx.render ctx.env before
+       else VSafe <$> ctx.render ctx.env (fromMaybe [] clause)
 
-== 3.6 Stringification, escaping, and safety
+-- splitClause "else" finds the first  Block "else" _ t  in the body,
+-- returning the nodes before it and that block's body t.
+----
+
+`each` calls `ctx.render` once per element with a per-element frame (installing `index`, `first`,
+`this`, …) and uses the same `splitClause "else"` to render an empty-collection clause. `with`
+shifts `context`. None of this is in the core — it is the reference engine's reading of plain nested
+blocks.
+
+== 3.7 Stringification, escaping, and safety
 
 `stringify` converts a `Value` to output text:
 
 [cols="1,3",options="header"]
 |===
 |Value |Output
-|`VString s` |`s`
-|`VSafe s` |`s` (already safe; emitted as-is)
+|`VString s` / `VSafe s` |`s`
 |`VNumber n` |the shortest round-tripping decimal of `n`
 |`VBool b` |`"true"` / `"false"`
 |`VNull` |the empty string
@@ -145,16 +170,13 @@ its body emits the captured text unchanged.
 
 [IMPORTANT]
 ====
-*The core never escapes.* `stringify` writes strings literally. HTML escaping is the prelude helper
-`esc_html`, which returns a `VSafe`. The `VSafe` tag exists so that escaping is *idempotent at the
-boundary*: a helper that has already escaped its output (or deliberately produced trusted markup
-via `safe`) is not escaped again when it flows through another helper. This is the BareBars analogue
-of {hbs}' `SafeString`, but it is carried in the value rather than implied by which braces you typed.
-Outside the output boundary, `VSafe s` compares and behaves like `VString s`.
+*The core never escapes.* HTML escaping is the helper `esc_html`, which returns a `VSafe`. The
+`VSafe` tag makes escaping *idempotent at the boundary*: a value already escaped (or deliberately
+trusted via `safe`) is not escaped again as it flows through another helper. This is the BareBars
+analogue of {hbs}' `SafeString`, carried in the value rather than implied by which braces you typed.
 ====
 
-== 3.7 Determinism
+== 3.8 Determinism
 
-Given the same template, the same `context`, the same starting helper frame, and pure helpers,
-rendering is deterministic and side-effect-free. Side effects (e.g. a `log` helper) are confined to
-the `M` monad and are the host's responsibility.
+Given the same template, context, starting frame, and pure helpers, the walk is deterministic and
+side-effect-free. Side effects (e.g. `log`) are confined to `M`.

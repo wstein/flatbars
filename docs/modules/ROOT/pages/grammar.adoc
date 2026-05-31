@@ -1,9 +1,10 @@
 = 2. Syntactic grammar
 :navtitle: 2. Syntactic grammar
 
-This is the *complete* core grammar. It is small on purpose: there is one output form, one
-application shape, and two block forms. Everything else a {hbs} user expects is built on top in the
-xref:surface.adoc[surface dialect] or supplied by the xref:prelude.adoc[prelude].
+This is the *complete* core grammar. It produces a *skeleton AST* — structure with no meaning. There
+is one output form, one application shape, and one block form. Everything a {hbs} user expects
+beyond that is built in the xref:surface.adoc[surface dialect] or supplied by the
+xref:prelude.adoc[engine walk].
 
 == 2.1 Grammar (normative)
 
@@ -20,7 +21,7 @@ Node      ::= Content                                   (* literal text *)
 Output    ::= "{{{" Expr "}}}"
 
 Block     ::= "{{#"   Ident Arg* "}}"
-                  Template                    (* a single captured body *)
+                  Template
               "{{/" Ident "}}"
 
 RawBlock  ::= "{{{{#" Ident Arg* "}}}}"
@@ -40,10 +41,14 @@ Literal   ::= String | Number
 Ident, String, Number, RawText    (* from the lexer; see Chapter 1 *)
 ----
 
+There is *no inverse clause* in `Block`: a block captures exactly one `Template`. There is no
+`pass:[{{else}}]` and no `pass:[{{^}}]`. Branching is represented as ordinary nested `Block` nodes
+that the engine walk interprets (xref:concepts.adoc[] §5).
+
 == 2.2 Reading the grammar
 
-One structure runs through all of it: *an application is an operator followed by arguments*, and
-the operator sits *immediately after an opening bracket*. There are three brackets:
+One structure runs through all of it: *an application is an operator followed by arguments*, with the
+operator *immediately after an opening bracket*. There are three brackets:
 
 [cols="1,2,2",options="header"]
 |===
@@ -51,81 +56,70 @@ the operator sits *immediately after an opening bracket*. There are three bracke
 
 |grouping |`(` … `)` |a value
 |output |`pass:[{{{]` … `pass:[}}}]` |writes a value (takes exactly one `Expr`)
-|block |`pass:[{{#]` … `pass:[{{/n}}]` |writes a value, *and* hands the helper its captured body
+|block |`pass:[{{#]` … `pass:[{{/n}}]` |writes a value, *and* captures its body as a sub-tree
 |===
 
-Because the output bracket takes *exactly one* `Expr`, you cannot write a bare-head application
-inside it:
+Because the output bracket takes *exactly one* `Expr`, and `Expr ::= Ident Arg*` is itself a whole
+application, you write top-level applications *without* parentheses:
 
 [source,text]
 ----
-{{{lookup this "age"}}}     ok: the single Expr is an application
-{{{ lookup this "age" }}}   ok: grouping a whole expression is a harmless no-op
-{{{f a}}}                   ALSO ok — a single Expr "f a" (operator f, arg a)
+{{{lookup this "age"}}}     ok: one Expr, operator lookup with two args
 {{{f a b}}}                 ok: operator f, args a and b
+{{{(lookup this "age")}}}   redundant: the outer group wraps the whole Expr — a no-op
 ----
 
-Wait — re-read `Expr ::= Ident Arg*`. The output form's single `Expr` _may_ itself be a
-multi-argument application, because `Ident Arg*` is one `Expr`. So `pass:[{{{lookup this "age"}}}]`
-is legal without parens. Parentheses are needed only to nest one application *inside another* as an
-argument, as in `pass:[{{{upcase (lookup this "name")}}}]`. The head of an application is always an
-`Ident`; a group never appears in head position.
+Parentheses are needed only to nest one application *inside another* as an argument, as in
+`pass:[{{{upcase (lookup this "name")}}}]`. The head of an application is always an `Ident`; a group
+never appears in head position.
 
 == 2.3 Block heads must be identifiers
 
-The block opener is `pass:[{{# Ident Arg* }}]` — the operator is a bare `Ident`, exactly as in an
-inline application, and the arguments follow with the same rules. The closing tag `pass:[{{/Ident}}]`
-must repeat that identifier so the parser can match nesting.
+The block opener is `pass:[{{# Ident Arg* }}]` — the operator is a bare `Ident`, with the same
+argument rules as an inline application — and `pass:[{{/Ident}}]` must repeat that identifier so the
+parser can match nesting. *Computed block helpers are not expressible*: there is no
+`pass:[{{#(pick) …}}]`. This is the one place the "head is always a name" rule is enforced
+syntactically, and it is what makes `pass:[{{/each}}]` unambiguous.
 
-Consequently *computed block helpers are not expressible*: there is no `pass:[{{#(pick) …}}]`. This
-is the one place where the "head is always a name" rule is enforced syntactically rather than
-merely conventionally, and it is what makes `pass:[{{/each}}]` unambiguous.
+== 2.4 Branching is nesting, not a clause
 
-== 2.4 No separators, no inverse — clauses instead
-
-A `Block` captures *one* body. The core has *no* `pass:[{{else}}]` separator and *no* inverse-first
-`pass:[{{^}}]`. The only block opener is `pass:[{{#]` (and `pass:[{{{{#]` for raw).
-
-[IMPORTANT]
-====
-*Multi-branch control flow is expressed as nested clause blocks*, which are ordinary blocks the
-engine's pass interprets. A name like `else` *never lands in the lexer or parser* — it is the
-enclosing helper that decides what (if anything) `else`, `then`, `elif`, `case`, `default` mean.
-====
+A block helper that wants alternatives reads them from *its own body* as nested blocks. The parser
+treats them like any other child:
 
 [source,text]
 ----
-{{#if ready}}{{#then}}Go!{{/then}}{{#else}}Wait…{{/else}}{{/if}}
-{{#each xs}}<li>{{{this}}}</li>{{#else}}empty{{/else}}{{/each}}
+{{#if cond}}A{{#else}}B{{/else}}{{/if}}
+
+parses to:
+
+Block "if" [App "cond" []]
+  [ Content "A"
+  , Block "else" [] [ Content "B" ] ]
 ----
 
-The reference prelude's `if` renders its body (with any top-level `pass:[{{#else}}]` clause removed)
-when truthy, and the `else` clause otherwise; `each` renders the `else` clause for an empty
-collection. A `switch`/`case` helper, an `elif` chain, or any other shape is just a helper that
-walks its body's clause blocks — see xref:errors.adoc[] (the validation/interpretation pass) and
-xref:prelude.adoc[].
+The parser assigns `else` no special status; the engine's `if` helper decides what a child named
+`else` means (xref:evaluation.adoc[], xref:prelude.adoc[]).
 
 == 2.5 What is *not* in the grammar
 
-To make the "no sugar in core" rule auditable, here is what a {hbs} author will look for and not
-find. Each has a home in the surface dialect or the prelude:
+To make "no sugar in core" auditable, here is what a {hbs} author will look for and not find — each
+has a home in the surface dialect or the engine:
 
 [cols="1,2",options="header"]
 |===
 |Absent from the core |Where it lives
 
-|`pass:[{{ }}]` (escaped output) |surface → `pass:[{{{ esc_html … }}}]`. (In the *core*, a
-single-brace-pair `pass:[{{ … }}]` is *not a tag at all* — it is literal content.)
-|`pass:[{{else}}]`, `pass:[{{^}}]` (inverse) |nested clause blocks (§2.4) interpreted by the engine
+|`pass:[{{ }}]` (escaped output) |surface → `pass:[{{{ esc_html … }}}]`
 |`pass:[{{& }}]` (ampersand-unescaped) |surface → `pass:[{{{ … }}}]`
-|dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent` (xref:surface.adoc[])
-|array-index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments
-|`@index`, `@key`, `@root`, … |surface → scoped prelude helpers `index`, `key`, `root`, …
+|`pass:[{{else}}]`, `pass:[{{^}}]` |engine → nested clause blocks / the `unless` helper
+|dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent`
+|index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments
+|`@index`, `@key`, `@root`, … |surface → scoped engine helpers `index`, `key`, `root`, …
 |hash arguments `key=val` |surface → trailing `(dict "key" val)` argument
 |block params `as \|x i\|` |surface → binding-name arguments to the block helper
-|`true` / `false` / `null` / `undefined` literals |prelude helpers `(true)` `(false)` `(null)`
-|partials `pass:[{{> p}}]`, `pass:[{{#> p}}]`, `pass:[{{#*inline}}]` |surface → `partial` / `inline` prelude helpers
-|decorators `pass:[{{* …}}]`, `pass:[{{#* …}}]` |prelude block helpers
+|`true` / `false` / `null` / `undefined` |engine helpers `(true)` `(false)` `(null)`
+|partials `pass:[{{> p}}]`, `pass:[{{#> p}}]`, `pass:[{{#*inline}}]` |surface → `partial` / `inline` helpers
+|decorators `pass:[{{* …}}]`, `pass:[{{#* …}}]` |engine block helpers
 |===
 
 == 2.6 Worked parse
@@ -136,11 +130,10 @@ template:  <li>{{{esc_html (lookup this "name")}}} — {{{index}}}</li>
 
 Node[0] = Content "<li>"
 Node[1] = Output (App "esc_html"
-                       [ Group (App "lookup" [ App "this" []
-                                             , Str "name" ]) ])
+                       [ App "lookup" [ App "this" [], Str "name" ] ])   <1>
 Node[2] = Content " — "
 Node[3] = Output (App "index" [])
 Node[4] = Content "</li>"
 ----
-
-The abstract syntax this produces is specified in xref:evaluation.adoc[].
+<1> The group `(lookup this "name")` is parsed away — grouping affects parsing only and leaves no
+node. The abstract syntax is specified in xref:evaluation.adoc[].
