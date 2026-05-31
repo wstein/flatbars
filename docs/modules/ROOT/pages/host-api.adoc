@@ -51,6 +51,9 @@ splitClause  :: Ident -> Template -> { before :: Template, clause :: Maybe Templ
 type Span    = { start :: Int, end :: Int }
 spanText     :: String -> Span -> String                      -- the source text a span covers
 lineColumn   :: String -> Int -> { line :: Int, column :: Int } -- 1-based, for an offset
+-- Parse-error diagnostics (line/column, given the source)
+parseErrorAt      :: String -> ParseError -> { line :: Int, column :: Int, offset :: Int, message :: String }
+renderParseErrorAt :: String -> ParseError -> String          -- "line:column: message"
 
 -- Convenience instantiations of the reference engine (from FlatBars)
 compile      :: String -> Either ParseError (Value -> Either Error String)   -- pure (m = Either Error)

@@ -24,8 +24,10 @@ violates the engine's schema (an unknown helper, a bad arity, an illegal clause)
 Note what is *absent*: there is no `MultipleElse` or `ElseOutsideBlock`, because the core has no
 `else`. `pass:[{{else}}…]` is just a block; if it appears where the engine does not expect
 a clause, that is a *validation* error (4.2), not a parse error. Every structural error carries a
-source offset covering the offending tag; `Span.lineColumn src offset` maps it to a 1-based
-line/column.
+source offset (`parseErrorOffset`) pointing at the offending tag — an unclosed/mismatched block
+points at its *opener*. Given the source, `parseErrorAt src pe` returns the 1-based
+`{ line, column, offset, message }` (via `Span.lineColumn`), and `renderParseErrorAt src pe` formats
+it as `pass:[line:column: message]` for a host to print.
 
 == 4.2 Validation errors — raised by the engine walk
 

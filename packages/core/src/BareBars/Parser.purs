@@ -80,10 +80,11 @@ parseSeq toks = go Nil
     Right args -> case parseSeq toks i of
       Left e -> Left e
       Right inner -> case inner.stop of
-        StopEOF -> Left (MismatchedBlock name "<eof>" 0)
+        -- point the diagnostic at the *opener* (its span start), not offset 0.
+        StopEOF -> Left (MismatchedBlock name "<eof>" span.start)
         StopClose closed pos
           | closed == name -> go (Block span name args inner.nodes : acc) pos
-          | otherwise -> Left (MismatchedBlock name closed 0)
+          | otherwise -> Left (MismatchedBlock name closed span.start)
 
 --------------------------------------------------------------------------------
 -- Expression parsing over a token array

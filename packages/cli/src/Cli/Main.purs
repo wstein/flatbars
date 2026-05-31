@@ -13,7 +13,7 @@ module Cli.Main where
 
 import Prelude
 
-import BareBars (parse, validate)
+import BareBars (parse, renderParseErrorAt, validate)
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
 import Data.Array as Array
@@ -22,7 +22,7 @@ import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
-import FlatBars (preludeSchema, renderWith)
+import FlatBars (compile, preludeSchema)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 
@@ -96,14 +96,16 @@ run opts = do
         datE <- loadData opts.dataFile
         case datE of
           Left err -> die ("barebars: " <> err)
-          Right value -> case renderWith tpl value of
-            Left err -> die ("barebars: " <> err)
-            Right out -> writeStdout out
+          Right value -> case compile tpl of
+            Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
+            Right render -> case render value of
+              Left err -> die ("barebars: " <> show err)
+              Right out -> writeStdout out
 
 -- | Run the skeleton-AST validation pass and report issues.
 runValidate :: String -> Effect Unit
 runValidate tpl = case parse tpl of
-  Left err -> die ("barebars: parse error: " <> show err)
+  Left err -> die ("barebars: parse error at " <> renderParseErrorAt tpl err)
   Right template -> case validate preludeSchema template of
     [] -> writeStdout "ok: no issues\n"
     issues -> do

@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), foldExpr, foldTemplate, parse, spanText, splitClause, splitClauses, validate)
+import BareBars (Arity(..), Expr(..), Node(..), foldExpr, foldTemplate, parse, parseErrorAt, spanText, splitClause, splitClauses, validate)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -121,5 +121,17 @@ main = do
       assert' "span offsets + spanText"
         (sp.start == 2 && sp.end == 12 && spanText "  {{{this}}}" sp == "{{{this}}}")
     _ -> assert' "span: unexpected parse" false
+
+  -- Parse-error line/column (P8): `{{{}}}` (empty output) starts at line 2, col 7.
+  let
+    bad = "hello\nworld {{{}}}"
+  case parse bad of
+    Left e ->
+      let
+        d = parseErrorAt bad e
+      in
+        assert' ("parseErrorAt: " <> show d.line <> ":" <> show d.column <> " " <> d.message)
+          (d.line == 2 && d.column == 7)
+    Right _ -> assert' "parseErrorAt: expected a parse error" false
 
   log "all framework tests passed"

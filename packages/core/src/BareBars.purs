@@ -18,7 +18,7 @@ module BareBars
   ) where
 
 import BareBars.Engine (Ctl, Engine, Helper, runString, runTemplate)
-import BareBars.Error (Error(..), ParseError(..), renderError, renderParseError)
+import BareBars.Error (Error(..), ParseDiagnostic, ParseError(..), parseErrorAt, parseErrorOffset, renderError, renderParseError, renderParseErrorAt)
 import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
 import BareBars.Parser (parse, parseExprTokens)
 import BareBars.Span (Span, lineColumn, spanText)
