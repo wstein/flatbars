@@ -18,15 +18,18 @@ module FullBars.Lower
   ( RNode(..)
   , lower
   , escapingWarnings
+  , directiveLints
+  , crossBoundaryWarnings
   ) where
 
 import Prelude
 
-import BareBars.Syntax (Expr(..), Ident, Template)
+import BareBars.Syntax (Directive, Expr(..), Ident, Template)
 import BareBars.Walk (Clause, Issue, Severity(..), foldTemplate, splitClause, splitClauses)
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), uncurry)
+import FullBars.Value (FalsySet)
 
 -- | The reference real AST. Control flow is explicit (branches, not a flat
 -- | `Sep` marker) and escaping is a boolean, not a wrapper helper.
@@ -163,3 +166,39 @@ escapingWarnings = walk <<< lower
   -- Helpers that produce output text (a `VSafe`) rather than data.
   safeProducers :: Array Ident
   safeProducers = [ "esc_html", "safe", "raw" ]
+
+--------------------------------------------------------------------------------
+-- Directive lints (truthiness spec §6 / Phase 4)
+--------------------------------------------------------------------------------
+
+-- | Warn on unknown header-directive keys: they are carried for forward
+-- | compatibility (the core never rejects them) but mean nothing to this engine.
+-- | The understood keys are `truthiness` (engine) and `trim` (core whitespace).
+directiveLints :: Array Directive -> Array Issue
+directiveLints = Array.mapMaybe lintOne
+  where
+  known = [ "truthiness", "trim" ]
+  lintOne d
+    | Array.elem d.key known = Nothing
+    | otherwise = Just
+        { severity: Warn
+        , name: d.key
+        , message: "unknown directive '@" <> d.key
+            <> "' — carried but not understood by this engine"
+        }
+
+-- | Warn when an external partial's truthiness mode differs from the caller's:
+-- | one render then runs two truthiness rules. This is *by design* (each file
+-- | owns its mode), so it is informational, not an error. `caller` is the
+-- | calling file's resolved mode; each `(name, mode)` is an external partial's.
+crossBoundaryWarnings :: FalsySet -> Array (Tuple Ident FalsySet) -> Array Issue
+crossBoundaryWarnings caller = Array.mapMaybe (uncurry check)
+  where
+  check name mode
+    | mode == caller = Nothing
+    | otherwise = Just
+        { severity: Warn
+        , name
+        , message: "partial '" <> name
+            <> "' uses a different truthiness mode than its caller (two modes in one render)"
+        }

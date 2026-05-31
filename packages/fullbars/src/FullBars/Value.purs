@@ -32,7 +32,7 @@ import Data.Either (Either(..), note)
 import Data.Foldable (foldMap)
 import Data.Int (hexadecimal, toStringAs)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Monoid (power)
 import Data.Set (Set)
 import Data.Set as Set
@@ -134,17 +134,22 @@ aliasSet = case _ of
 resolveTruthiness :: Array Directive -> Either Error FalsySet
 resolveTruthiness directives = case Array.filter (\d -> d.key == "truthiness") directives of
   [] -> Right handlebars
-  [ d ] -> parseTruthiness d.value
-  _ -> Left (DirectiveError "duplicate @truthiness directive (at most one per file)")
+  [ d ] -> parseTruthiness d.span.start d.value
+  ds -> Left
+    ( DirectiveError "duplicate @truthiness directive (at most one per file)"
+        (maybe 0 (\d -> d.span.start) (Array.index ds 1))
+    )
 
 -- | Parse a `@truthiness` value: an alias name, or a non-empty list of falsy
--- | shape-literals. The empty value is illegal — use the `always` alias.
-parseTruthiness :: String -> Either Error FalsySet
-parseTruthiness value = case aliasSet value of
+-- | shape-literals. The empty value is illegal — use the `always` alias. `off`
+-- | is the directive's source offset, threaded into every error for location.
+parseTruthiness :: Int -> String -> Either Error FalsySet
+parseTruthiness off value = case aliasSet value of
   Just fs -> Right fs
   Nothing -> case tokens value of
-    [] -> Left (DirectiveError "empty @truthiness value; use the 'always' alias for nothing-falsy")
-    ts -> Set.fromFoldable <$> traverse shapeOf ts
+    [] -> Left
+      (DirectiveError "empty @truthiness value; use the 'always' alias for nothing-falsy" off)
+    ts -> Set.fromFoldable <$> traverse (shapeOf off) ts
   where
   -- whitespace-separated, layout-insensitive (newlines/tabs count as spaces).
   tokens v =
@@ -157,15 +162,15 @@ parseTruthiness value = case aliasSet value of
           )
       )
 
-shapeOf :: String -> Either Error FalsyShape
-shapeOf = case _ of
+shapeOf :: Int -> String -> Either Error FalsyShape
+shapeOf off = case _ of
   "false" -> Right FFalse
   "null" -> Right FNull
   "\"\"" -> Right FEmptyStr
   "0" -> Right FZero
   "[]" -> Right FEmptyArr
   "{}" -> Right FEmptyObj
-  other -> note (DirectiveError ("unknown @truthiness value '" <> other <> "'")) Nothing
+  other -> note (DirectiveError ("unknown @truthiness value '" <> other <> "'") off) Nothing
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
 -- | the `esc_html` helper); arrays join with `","` and objects are an error.

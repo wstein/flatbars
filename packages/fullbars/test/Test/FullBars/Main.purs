@@ -19,13 +19,13 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Number (nan)
 import Data.Set as Set
-import Data.String (toUpper)
+import Data.String (Pattern(..), contains, toUpper)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, handlebars, lower, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, stringify, truthy)
+import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, resolveTruthiness, stringify, truthy)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value
@@ -315,6 +315,29 @@ main = do
     "{{! @truthiness:minimal }}{{#inline \"row\"}}{{#if n}}y{{else}}m{{/if}}{{/inline}}{{> row this}}"
     n0
     "y"
+
+  -- Phase 4: directive diagnostics.
+  let
+    dirsOf s = case parse s of
+      Right { directives } -> directives
+      Left _ -> []
+  -- unknown directive key warns (carried for forward-compat); known keys silent.
+  assert' "lint:unknown-directive-warns"
+    (map _.name (directiveLints (dirsOf "{{! @foobar:1 }}{{! @trim:none }}x")) == [ "foobar" ])
+  assert' "lint:known-directives-silent"
+    (Array.null (directiveLints (dirsOf "{{! @truthiness:minimal }}{{! @trim:standalone }}x")))
+  -- a partial whose mode differs from the caller warns; a matching mode is silent.
+  assert' "lint:cross-boundary-mismatch"
+    ( map _.name
+        (crossBoundaryWarnings handlebars [ Tuple "card" minimal, Tuple "same" handlebars ])
+        == [ "card" ]
+    )
+  -- a rejected @truthiness carries the offending directive's source offset.
+  case resolveTruthiness (dirsOf "{{! @truthiness:bogus }}x") of
+    Left (DirectiveError msg off) ->
+      assert' ("lint:located-error " <> msg <> " @" <> show off)
+        (off == 4 && contains (Pattern "bogus") msg)
+    _ -> assert' "lint:located-error expected a located DirectiveError" false
 
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at

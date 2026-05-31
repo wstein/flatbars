@@ -110,7 +110,9 @@ data Error
   | TypeError String
   | ClauseError String
   | HelperError String
-  | DirectiveError String
+  -- a header directive the engine rejects (bad `@truthiness`); carries the
+  -- offending directive's source offset for a located diagnostic.
+  | DirectiveError String Int
   | ParseFailure ParseError
 
 derive instance eqError :: Eq Error
@@ -125,5 +127,5 @@ renderError = case _ of
   TypeError m -> "TypeError: " <> m
   ClauseError m -> "ClauseError: " <> m
   HelperError m -> "HelperError: " <> m
-  DirectiveError m -> "DirectiveError: " <> m
+  DirectiveError m o -> "DirectiveError: " <> m <> " (at " <> show o <> ")"
   ParseFailure pe -> "ParseFailure: " <> renderParseError pe

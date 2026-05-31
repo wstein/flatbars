@@ -27,7 +27,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
-import FullBars (compileWith, preludeSchema, renderSurfaceDiagWith)
+import FullBars (compileWith, directiveLints, preludeSchema, renderSurfaceDiagWith)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 
@@ -156,15 +156,16 @@ runCompile popts opts tpl =
     Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
     Right js -> writeStdout js
 
--- | Run the skeleton-AST validation pass and report issues.
+-- | Run the skeleton-AST validation pass + directive lints and report issues.
 runValidate :: ParseOptions -> String -> Effect Unit
 runValidate popts tpl = case parseWith popts tpl of
   Left err -> die ("barebars: parse error at " <> renderParseErrorAt tpl err)
-  Right { nodes: template } -> case validate preludeSchema template of
-    [] -> writeStdout "ok: no issues\n"
-    issues -> do
-      writeStderr (joinWith "\n" (map fmt issues) <> "\n")
-      setExitCode 1
+  Right { directives, nodes: template } ->
+    case directiveLints directives <> validate preludeSchema template of
+      [] -> writeStdout "ok: no issues\n"
+      issues -> do
+        writeStderr (joinWith "\n" (map fmt issues) <> "\n")
+        setExitCode 1
   where
   fmt issue = show issue.severity <> ": " <> issue.message
 

@@ -46,10 +46,10 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import FullBars.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
-import FullBars.Lower (RNode(..), escapingWarnings, lower)
+import FullBars.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import FullBars.Prelude (prelude, preludeSchema)
 import FullBars.Surface (desugar, hoistInline)
-import FullBars.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, isFalsy, resolveTruthiness, stringify, truthy)
+import FullBars.Value (FalsySet, FalsyShape(..), aliasSet, always, escapeHtml, handlebars, isFalsy, minimal, presence, resolveTruthiness, stringify, truthy)
 
 -- | Build a FullBars environment with the prelude, the given data as context,
 -- | and a `root` helper returning the top-level data. Polymorphic in `m`.
