@@ -88,6 +88,11 @@ helperDefs =
   , gen "partial" false (Between 2 3) partialH
   , gen "inline" true (AtLeast 1) inlineH
   , valDef "eq" (binary eq')
+  , valDef "ne" (binary ne')
+  , valDef "lt" (binary (cmp (_ == LT)))
+  , valDef "gt" (binary (cmp (_ == GT)))
+  , valDef "lte" (binary (cmp (_ /= GT)))
+  , valDef "gte" (binary (cmp (_ /= LT)))
   , valDef "not" (unary not')
   , valDef "and" (variadic (boolOf Array.all))
   , valDef "or" (variadic (boolOf Array.any))
@@ -147,6 +152,22 @@ safe v = VSafe <$> stringifyM v
 
 eq' :: forall m. Applicative m => Value -> Value -> m Value
 eq' a b = pure (VBool (a == b))
+
+ne' :: forall m. Applicative m => Value -> Value -> m Value
+ne' a b = pure (VBool (a /= b))
+
+-- | Order two values: numbers numerically, strings lexicographically; anything
+-- | else (mixed types, booleans, null, arrays, objects) is *incomparable*.
+compareValues :: Value -> Value -> Maybe Ordering
+compareValues a b = case a, b of
+  VNumber x, VNumber y -> Just (compare x y)
+  VString x, VString y -> Just (compare x y)
+  _, _ -> Nothing
+
+-- | A comparison helper (`lt`/`gt`/`lte`/`gte`): true when the ordering exists
+-- | and satisfies `ok`; an incomparable pair is false.
+cmp :: forall m. Applicative m => (Ordering -> Boolean) -> Value -> Value -> m Value
+cmp ok a b = pure (VBool (maybe false ok (compareValues a b)))
 
 not' :: forall m. Applicative m => Value -> m Value
 not' a = pure (VBool (not (truthy a)))

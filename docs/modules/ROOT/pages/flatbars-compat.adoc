@@ -19,7 +19,8 @@ whitespace control, subexpressions, `@data` variables, paths, hash arguments, pa
 block, inline, and `@partial-block`), and block params (the last few via the
 xref:surface.adoc[surface dialect]). Still missing: *decorators* and the Handlebars block-partial
 *sigils* `pass:[{{#> }}]` / `pass:[{{#*inline}}]` (use the `pass:[{{#partial}}]` / `pass:[{{#inline}}]`
-core spellings). FlatBars also adds helpers {hb} has no built-in for (`eq`, `and`, `or`, `not`,
+core spellings). FlatBars also adds helpers {hb} has no built-in for (`eq`/`ne`, `lt`/`gt`/`lte`/`gte`,
+`and`, `or`, `not`,
 `dict`, `apply`, `esc_html`, `safe`, …).
 ====
 
@@ -233,7 +234,8 @@ a helper library. They are part of the FlatBars prelude (xref:prelude.adoc[§6])
 |`raw` |raw-block helper returning its captured body verbatim
 |`dict` |build an object from `key value …` pairs (hash arguments)
 |`apply` |call a helper by name (`pass:[apply "helper" arg…]`)
-|`eq` |value equality ⇒ boolean (for `pass:[{{#if (eq a b)}}]`)
+|`eq` / `ne` |value (in)equality ⇒ boolean (for `pass:[{{#if (eq a b)}}]`)
+|`lt` / `gt` / `lte` / `gte` |order numbers/strings ⇒ boolean (mixed/other types are incomparable ⇒ false)
 |`not` |logical negation of truthiness
 |`and` / `or` |variadic boolean fold over truthiness
 |`else` |the inert separator marker (renders to nothing on its own)

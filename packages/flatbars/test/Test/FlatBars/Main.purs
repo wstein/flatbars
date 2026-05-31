@@ -216,6 +216,24 @@ main = do
     (obj [ Tuple "a" (str "x"), Tuple "b" (str "x") ])
     "same"
 
+  -- Comparison & boolean value helpers. `lt`/`gt`/`lte`/`gte` order numbers and
+  -- strings; mixed/other types are incomparable (false).
+  expect "eq-num" "{{{eq 1 1}}}" VNull "true"
+  expect "ne-num" "{{{ne 1 2}}}" VNull "true"
+  expect "ne-false" "{{{ne 1 1}}}" VNull "false"
+  expect "gt-true" "{{{gt 3 2}}}" VNull "true"
+  expect "gt-false" "{{{gt 2 3}}}" VNull "false"
+  expect "lt-true" "{{{lt 2 3}}}" VNull "true"
+  expect "gte-eq" "{{{gte 2 2}}}" VNull "true"
+  expect "gte-lt" "{{{gte 1 2}}}" VNull "false"
+  expect "lte-eq" "{{{lte 2 2}}}" VNull "true"
+  expect "gt-strings" "{{{gt \"b\" \"a\"}}}" VNull "true"
+  expect "gt-incomparable" "{{{gt 1 \"x\"}}}" VNull "false"
+  expect "and-true" "{{{and true true}}}" VNull "true"
+  expect "and-false" "{{{and true false}}}" VNull "false"
+  expect "or-true" "{{{or false true}}}" VNull "true"
+  expect "not-true" "{{{not false}}}" VNull "true"
+
   expect "dict-apply" "{{{lookup (dict \"k\" \"v\") \"k\"}}}" VNull "v"
 
   -- Number stringify: integral values render without a trailing ".0", including
