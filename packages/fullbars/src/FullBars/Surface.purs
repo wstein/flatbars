@@ -1,4 +1,4 @@
--- | The FlatBars *surface dialect* — a desugaring of Handlebars-flavoured
+-- | The FullBars *surface dialect* — a desugaring of Handlebars-flavoured
 -- | author syntax into core syntax. See `docs/modules/ROOT/pages/surface.adoc`.
 -- |
 -- | This is *not* a separate parser (ADR-001): `desugar` is a pure rewrite of
@@ -38,7 +38,7 @@
 -- | `{{#*inline}}…{{/inline}}` — the opener sigil/close-name mismatch needs
 -- | parser support, so use the `{{#partial}}` / `{{#inline}}` core spellings
 -- | instead.
-module FlatBars.Surface
+module FullBars.Surface
   ( desugar
   , hoistInline
   ) where
@@ -300,7 +300,7 @@ dataExpr raw =
       Nothing -> App "this" []
 
 -- | Expand `{{else if C}}` chains into nested `{{#if C}}…{{/if}}` in the else
--- | clause (surface.adoc §5.6) — the FlatBars convention (clause `else`, helper
+-- | clause (surface.adoc §5.6) — the FullBars convention (clause `else`, helper
 -- | `if`). The condition must be a single argument; parenthesize a helper call:
 -- | `{{else if (eq a b)}}`.
 expandElseIf :: Template -> Template

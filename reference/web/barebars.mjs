@@ -9,7 +9,7 @@
 //
 // BareBars is a PureScript engine compiled to JS — no WASM. The engine is the
 // `barebars-js` facade, bundled to `vendor/barebars-engine.mjs` (regenerate with
-//   spago bundle -p barebars-js --module FlatBars.JS \
+//   spago bundle -p barebars-js --module FullBars.JS \
 //     --bundle-type module --platform browser --outfile vendor/barebars-engine.mjs
 // ). It renders the **surface** dialect by default — the Handlebars-compatible
 // layer (paths, `{{ }}` auto-escape, `@data`, `else`/`elif`) — which is the
@@ -18,7 +18,7 @@
 //
 // MVP scope (Phase 1): render + honest capability advertisement. The AST-backed
 // inspectors (parseAst outline, required-assigns, partial-graph) are Phase 2,
-// pending a `FlatBars.Lab` facade that exposes the lowered AST as JSON; until
+// pending a `FullBars.Lab` facade that exposes the lowered AST as JSON; until
 // then BareBars does not advertise those features, so those panels gate off
 // exactly as for any engine that lacks them.
 

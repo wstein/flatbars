@@ -44,7 +44,7 @@ it as `pass:[line:column: message]` for a host to print.
 
 These are the engine's "schema" being enforced. A conforming engine MAY run this validation as a
 *separate up-front pass* over the whole `Template` (rejecting a template before any output, the way
-a schema validator rejects a document) or *lazily* during rendering. The reference engine, *FlatBars*, validates
+a schema validator rejects a document) or *lazily* during rendering. The reference engine, *FullBars*, validates
 lazily; a stricter engine can fold the same checks into a visitor that walks the AST once and
 reports every violation with its source span.
 

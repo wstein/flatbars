@@ -41,10 +41,10 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
 . *The walker is the only thing that assigns meaning.* It desugars and builds the real AST in the
   same pass. Escaping (`esc_html` ⇒ escaped), clause-splitting (`pass:[{{else}}]` consumed into typed
   branches), and — for a surface dialect — paths (`name` ⇒ `lookup this "name"`) are all walker
-  decisions. The reference lowering is `FlatBars.Lower.lower :: Template -> Array RNode`, a
+  decisions. The reference lowering is `FullBars.Lower.lower :: Template -> Array RNode`, a
   `foldTemplate` (xref:appendix-handlebars.adoc#engine-api[A.13.2]).
 
-. *No canonical real AST.* `RNode` (`RIf`/`ROut`/…) is the real AST of the reference engine, *FlatBars*, published
+. *No canonical real AST.* `RNode` (`RIf`/`ROut`/…) is the real AST of the reference engine, *FullBars*, published
   as a worked example for tool authors. Another engine may lower to any shape. The reference renderer
   (`runTemplate`) interprets the structural tree directly; `lower` is the materializable real AST
   that tooling inspects (the playground's "Real AST" view, `escapingWarnings`).

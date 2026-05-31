@@ -5,7 +5,7 @@
 -- | different engine could pick an entirely different `env` type — that is the
 -- | point of the pluggable driver. `RefEnv` is a newtype (not a synonym) so the
 -- | otherwise-cyclic reference `RefEnv → Helper → Ctl → RefEnv` is well-founded.
-module FlatBars.Env
+module FullBars.Env
   ( RefEnv(..)
   , refContext
   , constHelper
@@ -36,7 +36,7 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import FlatBars.Value (stringify)
+import FullBars.Value (stringify)
 
 -- | Lift a pure `Either Error` into the engine monad — the single place the
 -- | `Left e -> throwError e` plumbing lives, shared by `refEngine` and helpers.

@@ -1,7 +1,7 @@
 # Bars Lab — polyglot template playground (plan)
 
 Goal: **one** playground that serves **Handlebars**, **Stem**, *and*
-**BareBars/FlatBars** — porting the full `reference/web` ("Stem Playground —
+**BareBars/FullBars** — porting the full `reference/web` ("Stem Playground —
 IDE") feature set and adding BareBars as a first-class engine. Draft for
 approval; nothing built yet. (Working name "Bars Lab" — see naming options.)
 
@@ -45,11 +45,11 @@ decision. We keep the engine in PureScript and expose it to the lab as JS.
 ## The BareBars engine adapter (the core new work)
 
 Implement the seam in a `barebars.mjs` adapter backed by a compiled PureScript
-facade (`FlatBars.Lab` or an extension of `barebars-js`):
+facade (`FullBars.Lab` or an extension of `barebars-js`):
 
 | Seam member | BareBars implementation | Reuses |
 |---|---|---|
-| `render(tmpl, data, opts)` | `FlatBars.renderWithDiag` / `renderSurfaceDiag` (dialect = opt) | barebars-js, the **core/surface toggle** |
+| `render(tmpl, data, opts)` | `FullBars.renderWithDiag` / `renderSurfaceDiag` (dialect = opt) | barebars-js, the **core/surface toggle** |
 | `parseAst(tmpl)` | `parse` → `Template` (+ `lower` → `RNode`) serialized to JS | Parser, Lower |
 | `inspectAt(tmpl, offset)` | node/expr at a code-unit offset via spans | `Span` |
 | `requiredAssigns(tmpl)` | `foldExpr` over `lookup`/path roots → data fields | `foldExpr` |
@@ -95,7 +95,7 @@ This is the reason to be polyglot, not just multi-tab.
 - **Phase 1 ✓** — BareBars adapter (`reference/web/barebars.mjs`); `?engine=barebars`
   boots in headless Brave, render works (surface + core), 13 adapter tests.
 - **Phase 2 ✓** — real `parseAst` + exact `requiredAssigns` + `usedTransformers`
-  via `FlatBars.JS.astJson`; capability gating verified in-browser (Data Access /
+  via `FullBars.JS.astJson`; capability gating verified in-browser (Data Access /
   Transformers panels light up; partials/whitespace gate off).
 - **Phase 3 ◑** — cross-engine **compare view** shipped (`compare.html`, the
   headline; Handlebars≡BareBars confirmed, Stem divergence surfaced) + partial/

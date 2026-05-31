@@ -13,14 +13,14 @@ package:
     - argonaut-core
     - barebars
     - barebars-json
-    - flatbars
+    - fullbars
     - arrays
     - integers
     - maybe
     - tuples
     - foreign-object
   test:
-    main: Test.FlatBars.JS.Main
+    main: Test.FullBars.JS.Main
     dependencies:
       - prelude
       - effect

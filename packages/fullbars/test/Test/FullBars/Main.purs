@@ -1,9 +1,9 @@
--- | FlatBars engine test suite (`spago test -p flatbars`).
+-- | FullBars engine test suite (`spago test -p fullbars`).
 -- |
 -- | Exercises the reference engine end to end — rendering, the `lower` real AST,
 -- | the escaping lint, the Aff instantiation, and a pluggable-env engine — over
 -- | the BareBars framework (parse/foldTemplate/spans).
-module Test.FlatBars.Main where
+module Test.FullBars.Main where
 
 import Prelude
 
@@ -23,7 +23,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FlatBars (RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, stringify, truthy)
+import FullBars (RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, stringify, truthy)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value

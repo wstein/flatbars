@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // Generate (or --check) the helper-catalog AsciiDoc partial from the engine's
-// single source of truth, FlatBars.preludeSchema.
+// single source of truth, FullBars.preludeSchema.
 //
-// The PureScript module FlatBars.Catalog renders the whole fragment to a String
+// The PureScript module FullBars.Catalog renders the whole fragment to a String
 // (types are first-class there); this script only does file I/O and comparison,
 // so the Map/Arity values never have to be marshalled across the FFI boundary.
 //
 //   node scripts/generate-helper-catalog.mjs           # write the partial
 //   node scripts/generate-helper-catalog.mjs --check    # fail if out of date
 //
-// Requires `spago build` to have produced output/FlatBars.Catalog first.
+// Requires `spago build` to have produced output/FullBars.Catalog first.
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,7 @@ const target = resolve(
   root,
   "docs/modules/ROOT/partials/helper-catalog.adoc",
 );
-const compiled = resolve(root, "output/FlatBars.Catalog/index.js");
+const compiled = resolve(root, "output/FullBars.Catalog/index.js");
 
 if (!existsSync(compiled)) {
   console.error(
@@ -44,7 +44,7 @@ if (check) {
   console.error(
     "error: " +
       target +
-      " is out of date with FlatBars.preludeSchema.\n" +
+      " is out of date with FullBars.preludeSchema.\n" +
       "Run `npm run gen:catalog` and commit the result.",
   );
   process.exit(1);

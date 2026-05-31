@@ -22,7 +22,7 @@ import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
-import FlatBars (compile, preludeSchema)
+import FullBars (compile, preludeSchema)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 

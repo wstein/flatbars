@@ -14,7 +14,7 @@
 -- | tooling (the playground, a formatter, a linter) inspects, and the basis of
 -- | `escapingWarnings`. The real AST is *this* engine's; another engine may
 -- | lower to a different shape.
-module FlatBars.Lower
+module FullBars.Lower
   ( RNode(..)
   , lower
   , escapingWarnings

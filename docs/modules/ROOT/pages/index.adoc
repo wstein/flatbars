@@ -27,7 +27,7 @@ All meaning is added by the xref:evaluation.adoc[engine walk].
 
 |No built-in helpers, no keywords
 |`if`, `each`, `with`, `unless`, `lookup`, HTML escaping — and `else` — are *userland*. The core
-ships none of them and reserves no names. The xref:prelude.adoc[reference engine], *FlatBars*, reproduces
+ships none of them and reserves no names. The xref:prelude.adoc[reference engine], *FullBars*, reproduces
 {hbs}, but you can delete, replace, or rename any of it.
 
 |No sugar in the core

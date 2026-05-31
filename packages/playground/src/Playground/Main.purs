@@ -1,7 +1,7 @@
 -- | The BareBars web playground — a Halogen SPA.
 -- |
 -- | It lexes, parses, validates, and renders BareBars templates entirely in the
--- | browser (the `barebars` framework + `flatbars` engine compiled to
+-- | browser (the `barebars` framework + `fullbars` engine compiled to
 -- | JavaScript). A *dialect* toggle switches between the austere *core* syntax
 -- | and the Handlebars-flavoured *surface* dialect (which desugars to core
 -- | before validation/lowering/rendering). Nothing is sent anywhere: the bundle
@@ -10,7 +10,7 @@
 -- |
 -- | Panels: a template editor and a JSON data editor on the left; an output
 -- | pane on the right with five views — a sandboxed rendered preview, the HTML
--- | source, the structural Parse tree, the lowered Real AST (`FlatBars.Lower`;
+-- | source, the structural Parse tree, the lowered Real AST (`FullBars.Lower`;
 -- | in surface mode, of the desugared template), and the schema + escaping
 -- | validation report.
 module Playground.Main where
@@ -31,7 +31,7 @@ import Data.String.Common (joinWith)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import FlatBars (RNode(..), desugarSurface, escapingWarnings, lower, preludeSchema, renderSurface, renderWith)
+import FullBars (RNode(..), desugarSurface, escapingWarnings, lower, preludeSchema, renderSurface, renderWith)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
@@ -174,7 +174,7 @@ headArgs d label name args
 line :: Int -> String -> String
 line d s = power "  " d <> s
 
--- | The *real* AST — `FlatBars.Lower.lower` of the structural tree, expanded
+-- | The *real* AST — `FullBars.Lower.lower` of the structural tree, expanded
 -- | the same way. Clauses become labelled branches and escaping is explicit
 -- | (`escaped`/`raw`); condition/collection expressions are expanded inline.
 realText :: State -> String

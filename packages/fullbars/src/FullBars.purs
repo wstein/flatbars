@@ -1,4 +1,4 @@
--- | FlatBars — the reference template engine built on the BareBars framework.
+-- | FullBars — the reference template engine built on the BareBars framework.
 -- |
 -- | "Flat bars" to BareBars' "bare rods": one *possible* engine over the
 -- | substrate (ADR-001). It supplies the Handlebars-flavoured meaning the
@@ -6,12 +6,12 @@
 -- | `stringify`), an environment (`RefEnv`/`refEngine`), the prelude of helpers,
 -- | and the desugaring walk (`lower`) — and wires them into convenience
 -- | renderers. Swap any of it for a different engine without touching `barebars`.
-module FlatBars
-  ( module FlatBars.Value
-  , module FlatBars.Env
-  , module FlatBars.Prelude
-  , module FlatBars.Lower
-  , module FlatBars.Surface
+module FullBars
+  ( module FullBars.Value
+  , module FullBars.Env
+  , module FullBars.Prelude
+  , module FullBars.Lower
+  , module FullBars.Surface
   , preludeEnv
   , compile
   , renderWith
@@ -43,13 +43,13 @@ import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import FlatBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll, registerPartials)
-import FlatBars.Lower (RNode(..), escapingWarnings, lower)
-import FlatBars.Prelude (prelude, preludeSchema)
-import FlatBars.Surface (desugar, hoistInline)
-import FlatBars.Value (escapeHtml, stringify, truthy)
+import FullBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll, registerPartials)
+import FullBars.Lower (RNode(..), escapingWarnings, lower)
+import FullBars.Prelude (prelude, preludeSchema)
+import FullBars.Surface (desugar, hoistInline)
+import FullBars.Value (escapeHtml, stringify, truthy)
 
--- | Build a FlatBars environment with the prelude, the given data as context,
+-- | Build a FullBars environment with the prelude, the given data as context,
 -- | and a `root` helper returning the top-level data. Polymorphic in `m`.
 preludeEnv :: forall m. MonadThrow Error m => Value -> RefEnv m
 preludeEnv dat =

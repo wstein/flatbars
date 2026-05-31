@@ -1,10 +1,10 @@
--- | Value *policy* for the FlatBars engine — the meaning the framework
+-- | Value *policy* for the FullBars engine — the meaning the framework
 -- | deliberately leaves out (`BareBars.Value` is just the data type). See
 -- | `docs/modules/ROOT/pages/evaluation.adoc` §3.2, §3.6.
 -- |
 -- | A different engine could define truthiness, escaping, and stringification
 -- | differently; these are this engine's choices.
-module FlatBars.Value
+module FullBars.Value
   ( truthy
   , stringify
   , jsonStringify

@@ -2,7 +2,7 @@
 -- |
 -- | Structural only — parsing shapes, the foldTemplate catamorphism, clause
 -- | splitting, schema validation, and source spans. No rendering: that is the
--- | engine's job and is tested in `flatbars`.
+-- | engine's job and is tested in `fullbars`.
 module Test.BareBars.Main where
 
 import Prelude

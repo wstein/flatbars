@@ -1,4 +1,4 @@
--- | A thin, JS/TS-friendly facade over the FlatBars engine (review P6), and the
+-- | A thin, JS/TS-friendly facade over the FullBars engine (review P6), and the
 -- | engine seam the polyglot lab (Brace Lab) consumes.
 -- |
 -- | The library renders against the core `Value` type with curried,
@@ -7,7 +7,7 @@
 -- | `{ ok, value, error }`; `astJson` returns the lowered AST as the lab's
 -- | `{t:…}` JSON node shape (or `{error}`), so a JS host's AST-outline and
 -- | data-access inspectors can walk it.
-module FlatBars.JS
+module FullBars.JS
   ( Result
   , render
   , renderSurface
@@ -26,9 +26,9 @@ import Data.Function.Uncurried (Fn2, mkFn2)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import FlatBars (RNode(..), desugarSurface, lower)
-import FlatBars as FlatBars
 import Foreign.Object as FO
+import FullBars (RNode(..), desugarSurface, lower)
+import FullBars as FullBars
 
 -- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
 type Result = { ok :: Boolean, value :: String, error :: String }
@@ -38,11 +38,11 @@ result = either (\e -> { ok: false, value: "", error: e }) (\v -> { ok: true, va
 
 -- | Render a core-syntax template against JS data. `render(template, data)`.
 render :: Fn2 String Json Result
-render = mkFn2 \tpl json -> result (FlatBars.renderWithDiag tpl (fromJson json))
+render = mkFn2 \tpl json -> result (FullBars.renderWithDiag tpl (fromJson json))
 
 -- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result
-renderSurface = mkFn2 \tpl json -> result (FlatBars.renderSurfaceDiag tpl (fromJson json))
+renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJson json))
 
 --------------------------------------------------------------------------------
 -- AST for the polyglot lab seam

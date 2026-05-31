@@ -1,12 +1,12 @@
 -- | Generate the helper-catalog documentation from the single source of truth.
 -- |
--- | `FlatBars.Prelude.preludeSchema` already lists every helper the engine knows
+-- | `FullBars.Prelude.preludeSchema` already lists every helper the engine knows
 -- | (name, block-ness, arity), projected from `helperDefs`. Rather than maintain
 -- | a parallel table by hand in the docs — which is exactly how a phantom helper
 -- | like `partial>` slips in — this module renders that schema to an AsciiDoc
 -- | fragment. `scripts/generate-helper-catalog.mjs` writes it to a partial the
 -- | prelude page includes, and re-runs with `--check` in CI to fail on drift.
-module FlatBars.Catalog
+module FullBars.Catalog
   ( helperCatalogAdoc
   ) where
 
@@ -20,8 +20,8 @@ import Data.Foldable (foldMap)
 import Data.Map as Map
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
-import FlatBars.Env (RefEnv)
-import FlatBars.Prelude (prelude, preludeSchema)
+import FullBars.Env (RefEnv)
+import FullBars.Prelude (prelude, preludeSchema)
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
 -- | Everything else in the schema is a *scoped* variable a block helper installs.
@@ -54,7 +54,7 @@ helperCatalogAdoc =
     <> "|===\n"
   where
   header =
-    "// Generated from FlatBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit.\n"
+    "// Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit.\n"
       <> "// Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`.\n\n"
   rows =
     foldMap (\r -> renderRow r <> "\n")

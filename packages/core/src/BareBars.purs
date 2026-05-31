@@ -5,7 +5,7 @@
 -- | data type, the polymorphic inversion-of-control driver, and the
 -- | skeleton-AST traversal/validation toolkit. It contains *no* helper names,
 -- | truthiness, or escaping policy — those belong to an engine built on top
--- | (e.g. `FlatBars`, the reference engine). See ADR-001.
+-- | (e.g. `FullBars`, the reference engine). See ADR-001.
 module BareBars
   ( module BareBars.Syntax
   , module BareBars.Value

@@ -14,7 +14,7 @@ package:
     - halogen
     - barebars
     - barebars-json
-    - flatbars
+    - fullbars
   bundle:
     module: Playground.Main
     outfile: dist/app.js

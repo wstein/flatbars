@@ -13,7 +13,7 @@ offline** (open `dist/index.html` straight from disk).
   - **Rendered** — a sandboxed `<iframe>` preview of the HTML output.
   - **HTML** — the raw rendered source.
   - **Parse tree** — the parsed *skeleton* AST (`BareBars.parse`).
-  - **Real AST** — the lowered reference engine AST (`FlatBars.Lower.lower`).
+  - **Real AST** — the lowered reference engine AST (`FullBars.Lower.lower`).
   - **Validation** — the schema-validation report (`BareBars.validate` against
     `preludeSchema`), the engine's second pass.
 - **Examples** — greeting, list/`each`, clause-based conditionals, object
@@ -59,11 +59,11 @@ deploy, build and publish the `dist/` directory as static files — or just open
 
 - Templates use **core syntax**; control flow uses `{{else}}` separators
   (`{{#if c}}…{{else}}…{{/if}}`). The full surface dialect (`{{ x }}` auto-escape,
-  dotted paths) is a future extension of the desugaring walk (`FlatBars.Lower`);
+  dotted paths) is a future extension of the desugaring walk (`FullBars.Lower`);
   the **Real AST** tab already shows that walk's output for the supported core.
 - If you edit `examples/**`, rerun `npm run playground:build` (or just
   `npm run generate:examples`) so the bundled manifest stays in sync.
 - The pedantic dependency warnings reported by `npm run lint` are tracked as a
   separate cleanup pass and intentionally left unchanged in this change set.
 - The richer JS/WASM reference playground lives in [`reference/web/`](../../reference/web/);
-  this package is the PureScript equivalent built on the reference engine, FlatBars.
+  this package is the PureScript equivalent built on the reference engine, FullBars.

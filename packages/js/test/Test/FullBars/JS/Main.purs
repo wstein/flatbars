@@ -1,10 +1,10 @@
 -- | `barebars-js` facade test suite (`spago test -p barebars-js`).
 -- |
--- | Exercises the public JS boundary `FlatBars.JS.render` / `renderSurface`
+-- | Exercises the public JS boundary `FullBars.JS.render` / `renderSurface`
 -- | exactly as a JS host would call them (uncurried, over a `Json` value),
 -- | checking the `{ ok, value, error }` result shape, auto-escaping, and that
 -- | parse failures come back located rather than thrown.
-module Test.FlatBars.JS.Main where
+module Test.FullBars.JS.Main where
 
 import Prelude
 
@@ -15,7 +15,7 @@ import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FlatBars.JS (Result, render, renderSurface)
+import FullBars.JS (Result, render, renderSurface)
 import Test.Assert (assert')
 
 -- Parse a JSON literal for use as render data, failing the test on a bad fixture.
@@ -26,7 +26,7 @@ json label src k = case jsonParser src of
 
 main :: Effect Unit
 main = do
-  log "FlatBars.JS facade tests"
+  log "FullBars.JS facade tests"
 
   -- Surface dialect: paths resolve and {{ }} auto-escapes.
   json "surface-escape" "{\"name\": \"Ada & <b>\"}" \j -> do

@@ -5,9 +5,9 @@ The core is austere by design. *BareBars Surface* is an optional dialect that re
 ergonomics. It is *not* a separate parser (xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]):
 the one structural parser (`parse`) is unchanged, and Surface is a *desugaring walk* over the
 structural AST — part of the second pass (xref:host-api.adoc[] §7.1), naturally a `foldTemplate`
-(xref:appendix-handlebars.adoc#engine-api[A.13.2]). `FlatBars.Surface.desugar` performs the surface
+(xref:appendix-handlebars.adoc#engine-api[A.13.2]). `FullBars.Surface.desugar` performs the surface
 rewrites below (output and paths today; see the status note); it is distinct from
-`FlatBars.Lower.lower`, which lowers the *core* skeleton to the engine's typed real AST for tooling.
+`FullBars.Lower.lower`, which lowers the *core* skeleton to the engine's typed real AST for tooling.
 You can run the desugarer, swap it, or write your own.
 
 Surface adds nothing the core cannot already express. Every rule below is a *rewrite* of one
@@ -16,7 +16,7 @@ structural node into core nodes. Where a rewrite names a helper (`esc_html`, `lo
 
 [NOTE]
 ====
-*Implementation status.* `FlatBars.Surface.desugar` (and the convenience
+*Implementation status.* `FullBars.Surface.desugar` (and the convenience
 `renderSurface` / `compileSurface`) implement §5.1 *output* (`pass:[{{ }}]` ⇒
 escaped, `pass:[{{{ }}}]` ⇒ raw), §5.2 *paths* (bare, dotted, numeric index,
 legacy slash, `this`/`.`, `../`), §5.3 *literals* and head-vs-argument, §5.5
@@ -48,7 +48,7 @@ Still *specified but not desugared*: the Handlebars block-partial *sigils*
 `pass:[{{#> name}}…{{/name}}]` / `pass:[{{#*inline}}…{{/inline}}]` — the opener
 sigil and close name cannot be matched by the meaning-free core parser, so use
 the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` core spellings instead. See the
-xref:flatbars-compat.adoc[compatibility matrix] for per-feature status.
+xref:fullbars-compat.adoc[compatibility matrix] for per-feature status.
 ====
 
 [IMPORTANT]

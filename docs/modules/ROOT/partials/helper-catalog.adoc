@@ -1,4 +1,4 @@
-// Generated from FlatBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit.
+// Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit.
 // Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`.
 
 [cols="2,1,1,1",options="header"]

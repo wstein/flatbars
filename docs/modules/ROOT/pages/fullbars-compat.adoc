@@ -1,45 +1,45 @@
-= FlatBars ↔ Handlebars built-in compatibility
-:navtitle: FlatBars compatibility matrix
+= FullBars ↔ Handlebars built-in compatibility
+:navtitle: FullBars compatibility matrix
 :toc: macro
 :toclevels: 2
 
-*FlatBars* is the reference engine shipped with BareBars (xref:prelude.adoc[]). This page is the
-concrete, per-feature status of what FlatBars *implements today* against {hb}' built-ins.
+*FullBars* is the reference engine shipped with BareBars (xref:prelude.adoc[]). This page is the
+concrete, per-feature status of what FullBars *implements today* against {hb}' built-ins.
 
 It is the engine-level companion to xref:appendix-handlebars.adoc[Appendix A]. The appendix is the
 gap-free *language* mapping — it shows that every {hb} concept *can* be expressed over the BareBars
 core, including engine features not yet built. This page is narrower and concrete: of those, *which
-does the FlatBars prelude actually register*, and where its semantics differ from {hb}.
+does the FullBars prelude actually register*, and where its semantics differ from {hb}.
 
 [TIP]
 ====
-*Short answer.* FlatBars implements all *six* of {hb}' built-in **helpers** (`if`, `unless`, `each`,
+*Short answer.* FullBars implements all *six* of {hb}' built-in **helpers** (`if`, `unless`, `each`,
 `with`, `lookup`, `log`). The wider built-in **feature set** is broadly covered: comments, raw blocks,
 whitespace control, subexpressions, `@data` variables, paths, hash arguments, partials (including
 block, inline, and `@partial-block`), and block params (the last few via the
 xref:surface.adoc[surface dialect]). Still missing: *decorators* and the Handlebars block-partial
 *sigils* `pass:[{{#> }}]` / `pass:[{{#*inline}}]` (use the `pass:[{{#partial}}]` / `pass:[{{#inline}}]`
-core spellings). FlatBars also adds helpers {hb} has no built-in for (`eq`/`ne`, `lt`/`gt`/`lte`/`gte`,
+core spellings). FullBars also adds helpers {hb} has no built-in for (`eq`/`ne`, `lt`/`gt`/`lte`/`gte`,
 `and`, `or`, `not`,
 `dict`, `apply`, `esc_html`, `safe`, `json`/`esc_json`, …).
 ====
 
 [horizontal]
-✅ Implemented:: shipped in the FlatBars prelude / BareBars core.
+✅ Implemented:: shipped in the FullBars prelude / BareBars core.
 ◑ Partial:: implemented with a documented limitation or behavioural difference.
 ✗ Not yet:: mapping is defined (see Appendix A) but no helper is registered.
-➕ Extension:: FlatBars helper with no {hb} built-in equivalent.
+➕ Extension:: FullBars helper with no {hb} built-in equivalent.
 
 toc::[]
 
 == 1. Built-in helpers
 
-{hb} documents exactly six built-in helpers. All six are FlatBars prelude helpers
+{hb} documents exactly six built-in helpers. All six are FullBars prelude helpers
 (xref:prelude.adoc[§6]); none is in the engine-agnostic core.
 
 [cols="2,2,1,4",options="header"]
 |===
-|Handlebars |FlatBars |Status |Notes / differences
+|Handlebars |FullBars |Status |Notes / differences
 
 |`pass:[{{#if c}}…{{else}}…{{/if}}]`
 |`pass:[{{#if c}}…{{else}}…{{/if}}]`
@@ -86,7 +86,7 @@ directly (`renderSurface`): `pass:[{{@index}}]` ⇒ `(index)`; in core you call 
 
 [cols="2,2,1,3",options="header"]
 |===
-|Handlebars |FlatBars (surface ⇒ core) |Status |Installed by
+|Handlebars |FullBars (surface ⇒ core) |Status |Installed by
 
 |`pass:[{{@index}}]` |`pass:[{{@index}}]` ⇒ `(index)` |✅ |`each`
 |`pass:[{{@key}}]` |`pass:[{{@key}}]` ⇒ `(key)` |✅ |`each`
@@ -102,7 +102,7 @@ directly (`renderSurface`): `pass:[{{@index}}]` ⇒ `(index)`; in core you call 
 
 [cols="2,2,1,3",options="header"]
 |===
-|Handlebars |FlatBars |Status |Notes
+|Handlebars |FullBars |Status |Notes
 
 |Auto-escape `pass:[{{x}}]`
 |`pass:[{{ x }}]` via the surface dialect; core `pass:[{{{ esc_html x }}}]`
@@ -219,14 +219,14 @@ trick. The xref:surface.adoc[surface dialect] (`renderSurface`) lowers `pass:[{{
 (§5.6); parenthesize a helper condition: `pass:[{{else if (eq a b)}}]`.
 |===
 
-== 4. FlatBars extensions (no Handlebars built-in)
+== 4. FullBars extensions (no Handlebars built-in)
 
 These have no {hb} built-in counterpart; in {hbs} you would register them yourself or pull them from
-a helper library. They are part of the FlatBars prelude (xref:prelude.adoc[§6]).
+a helper library. They are part of the FullBars prelude (xref:prelude.adoc[§6]).
 
 [cols="2,4",options="header"]
 |===
-|FlatBars |Purpose
+|FullBars |Purpose
 
 |`this` |the current context value (`pass:[{{{this}}}]`)
 |`true` / `false` / `null` |literal value helpers
@@ -252,10 +252,10 @@ string (`safe ""` ⇒ `VSafe ""`). Truthy: everything else — including the emp
 non-zero numbers. As in {hbs}, `0` is falsy unless `includeZero` is set — the surface hash
 `pass:[{{#if n includeZero=true}}]` (core: the options object `pass:[(dict "includeZero" true)]`).
 +
-*Safe strings (a deliberate divergence).* FlatBars holds one invariant {hbs} does not: marking a
+*Safe strings (a deliberate divergence).* FullBars holds one invariant {hbs} does not: marking a
 string safe never changes its truthiness — a safe string tests as its *content* (`truthy (VSafe s) ==
 truthy (VString s)`), so `safe ""` is falsy. {hbs} instead wraps safe output in a `SafeString`
-*object*, which is always truthy — empty or not. FlatBars' content-based rule is the more useful one
+*object*, which is always truthy — empty or not. FullBars' content-based rule is the more useful one
 (an empty escaped section reads as empty), so it is kept on purpose. The sharp edge to know: `safe`
 and `esc_html` *stringify* their argument, so `pass:[(safe 0)]` is truthy (it is the non-empty string
 `"0"`) while `0` is falsy. Testing the truthiness of an escaped/safe value is therefore a category

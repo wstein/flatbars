@@ -1,7 +1,7 @@
-// TypeScript surface for the barebars-js facade (FlatBars.JS).
+// TypeScript surface for the barebars-js facade (FullBars.JS).
 //
 // These declarations describe the *uncurried* entry points compiled from
-// `FlatBars.JS`. `data` is any JSON-shaped value (object, array, string,
+// `FullBars.JS`. `data` is any JSON-shaped value (object, array, string,
 // number, boolean, or null) — it is read as Argonaut `Json`, which is an
 // ordinary JS value.
 

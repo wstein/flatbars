@@ -1,5 +1,5 @@
 package:
-  name: flatbars
+  name: fullbars
   publish:
     version: 0.1.0
     license: Apache-2.0
@@ -22,7 +22,7 @@ package:
     - aff
     - barebars
   test:
-    main: Test.FlatBars.Main
+    main: Test.FullBars.Main
     dependencies:
       - effect
       - console

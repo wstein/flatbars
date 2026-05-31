@@ -3,7 +3,7 @@
 
 Phase 1 (the core) produces the *skeleton AST* defined here. Phase 2 (an engine you supply) *walks*
 it to validate and render. This chapter gives the AST and the value type normatively, then specifies
-the *walk contract* the reference engine, *FlatBars*, implements.
+the *walk contract* the reference engine, *FullBars*, implements.
 
 == 3.1 The skeleton AST (normative)
 

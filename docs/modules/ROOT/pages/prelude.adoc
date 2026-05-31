@@ -1,7 +1,7 @@
 = 6. The reference engine (prelude)
 :navtitle: 6. The reference engine
 
-The *reference engine*, *FlatBars*, is a Phase-2 walk (xref:evaluation.adoc[]) plus a set of helpers that,
+The *reference engine*, *FullBars*, is a Phase-2 walk (xref:evaluation.adoc[]) plus a set of helpers that,
 together with the xref:surface.adoc[surface dialect], reproduces {hb}. *None of it is in the core.*
 It is a library you register into the helper environment. Delete `each` and `pass:[{{#each}}]` stops
 validating; the core is unaffected. Rename `esc_html` and update your Surface. This is what "no
@@ -125,7 +125,7 @@ the optional `hash` object merged onto it. *As a block* (`pass:[{{#partial name}
 the body is the fallback (rendered if `name` is unregistered) and is exposed inside the partial as the
 scoped `partial-block` helper. Returns `VSafe`.
 |`inline` |block |`pass:[{{#inline "name"}}body{{/inline}}]` defines a partial named `name`. Definitions
-are *hoisted* into the registry before rendering (`FlatBars.Surface.hoistInline`) and are global to
+are *hoisted* into the registry before rendering (`FullBars.Surface.hoistInline`) and are global to
 the render; the block itself emits `""`.
 |`partial-block` |0 |Scoped helper installed by a *block* `partial`; returns the enclosing block body.
 Target of `pass:[{{> @partial-block}}]`.
@@ -140,8 +140,8 @@ presumes which of these exist.
 
 == 6.8 Helper catalog (generated)
 
-The table below is *generated* from `FlatBars.preludeSchema` — the same single source the validator
-uses (`FlatBars.Catalog.helperCatalogAdoc`; regenerate with `npm run gen:catalog`, checked in CI by
+The table below is *generated* from `FullBars.preludeSchema` — the same single source the validator
+uses (`FullBars.Catalog.helperCatalogAdoc`; regenerate with `npm run gen:catalog`, checked in CI by
 `npm run check:catalog`). It is the authoritative list of names, arities, and block-ness; the prose
 sections above explain behaviour. *Source* is `registered` for helpers with a runtime in `prelude`
 and `scoped` for variables a block helper installs (`root`/`parent`/`index`/`key`/`first`/`last`/`partial-block`).

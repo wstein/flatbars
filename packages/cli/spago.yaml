@@ -12,6 +12,6 @@ package:
     - exceptions
     - barebars
     - barebars-json
-    - flatbars
+    - fullbars
   run:
     main: Cli.Main

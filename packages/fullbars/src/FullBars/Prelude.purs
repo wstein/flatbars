@@ -14,7 +14,7 @@
 -- | validated arity can never drift. Value helpers are built from the
 -- | `BareBars.Helper` combinators (arity enforced by construction); block and
 -- | bespoke helpers are written directly against `Helper`.
-module FlatBars.Prelude
+module FullBars.Prelude
   ( prelude
   , preludeSchema
   ) where
@@ -36,8 +36,8 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FlatBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext)
-import FlatBars.Value (escapeHtml, jsonStringify, jsonStringifyPretty, stringify, truthy)
+import FullBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext)
+import FullBars.Value (escapeHtml, jsonStringify, jsonStringifyPretty, stringify, truthy)
 
 --------------------------------------------------------------------------------
 -- The single source of truth
@@ -503,7 +503,7 @@ partialH ctl args = case args of
 
 -- | `inline` defines a partial (`{{#inline "name"}}body{{/inline}}`). The
 -- | definition is hoisted into the partial registry *before* rendering (see
--- | `FlatBars.Surface.hoistInline`), so at render time the block itself emits
+-- | `FullBars.Surface.hoistInline`), so at render time the block itself emits
 -- | nothing.
 inlineH :: forall m. Applicative m => Helper m (RefEnv m)
 inlineH _ _ = pure (VSafe "")
