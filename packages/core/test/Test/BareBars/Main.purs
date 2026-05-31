@@ -12,6 +12,7 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Monoid (power)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
@@ -90,6 +91,15 @@ main = do
   case parse "{{{nope}}}" of
     Right t -> assert' "validate flags unknown" (not (Array.null (validate schema t)))
     Left e -> assert' ("validate: " <> show e) false
+
+  -- Stack safety: a large flat template (long content run + many output tags)
+  -- must lex and parse without overflowing — the tokenizer and the sibling
+  -- scan are tail-recursive. (Regression: a ~6 KB template used to overflow.)
+  let
+    big = power "x{{{a}}}y " 20000 -- ~180 KB, ~40000 content/output nodes
+  case parse big of
+    Right t -> assert' "large template parses without overflow" (Array.length t > 40000)
+    Left e -> assert' ("large template overflowed/failed: " <> show e) false
 
   -- Source spans on tag-level nodes + spanText.
   case parse "  {{{this}}}" of

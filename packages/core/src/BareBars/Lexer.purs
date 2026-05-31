@@ -231,12 +231,18 @@ tokenizeTemplate src = go 0 [] [] false
               else case escapedOpenerAt (i + 1) of
                 Just lit -> go (i + 1 + SCU.length lit) (buf <> SCU.toCharArray lit) acc pend
                 Nothing -> go (i + 1) (Array.snoc buf '\\') acc pend
-          | isOpenerAt i -> do
-              res <- readTag i
-              let
-                acc1 = flush buf acc pend res.trimL
-                acc2 = maybe acc1 (Array.snoc acc1) res.mtok
-              go res.next [] acc2 res.trimR
+          -- NB: the recursive `go` must stay in *tail* position in every branch
+          -- — including this one — or PureScript abandons the tail-call loop for
+          -- the whole function and the per-character scan grows the stack (a
+          -- ~6 KB template would overflow). Hence an explicit `case`, not `do`.
+          | isOpenerAt i -> case readTag i of
+              Left e -> Left e
+              Right res ->
+                let
+                  acc1 = flush buf acc pend res.trimL
+                  acc2 = maybe acc1 (Array.snoc acc1) res.mtok
+                in
+                  go res.next [] acc2 res.trimR
           | otherwise -> go (i + 1) (Array.snoc buf c) acc pend
 
   -- Flush the content buffer, applying a pending leading trim and an optional

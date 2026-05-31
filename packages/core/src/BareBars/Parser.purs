@@ -43,32 +43,39 @@ type SeqResult = { nodes :: Template, stop :: Stop }
 parseSeq :: Array RawTok -> Int -> Either ParseError SeqResult
 parseSeq toks = go []
   where
+  -- The linear sibling scan. Every recursive `go` call is kept in *tail*
+  -- position (explicit `case`, never `do`) so PureScript loops it — otherwise a
+  -- bind-wrapped recursive call defeats the tail-call optimization for the whole
+  -- function and a long node sequence overflows the stack. (Block *nesting* still
+  -- recurses through `parseSeq`, but that depth is bounded by how deep blocks
+  -- nest, not by sequence length.)
   go :: Template -> Int -> Either ParseError SeqResult
   go acc i = case Array.index toks i of
     Nothing -> Right { nodes: acc, stop: StopEOF }
     Just t -> case t of
       RContent s -> go (Array.snoc acc (Content s)) (i + 1)
-      ROutput span tks -> do
-        e <- parseExprTokens tks
-        go (Array.snoc acc (Output span e)) (i + 1)
-      RRaw span name argTks body -> do
-        args <- parseArgTokens argTks
-        go (Array.snoc acc (RawBlock span name args body)) (i + 1)
-      RSep span name argTks -> do
-        args <- parseArgTokens argTks
-        go (Array.snoc acc (Sep span name args)) (i + 1)
+      ROutput span tks -> case parseExprTokens tks of
+        Left e -> Left e
+        Right e -> go (Array.snoc acc (Output span e)) (i + 1)
+      RRaw span name argTks body -> case parseArgTokens argTks of
+        Left e -> Left e
+        Right args -> go (Array.snoc acc (RawBlock span name args body)) (i + 1)
+      RSep span name argTks -> case parseArgTokens argTks of
+        Left e -> Left e
+        Right args -> go (Array.snoc acc (Sep span name args)) (i + 1)
       RClose name -> Right { nodes: acc, stop: StopClose name (i + 1) }
       ROpen span name argTks -> buildBlock acc span name argTks (i + 1)
 
   buildBlock :: Template -> Span -> String -> Array Token -> Int -> Either ParseError SeqResult
-  buildBlock acc span name argTks i = do
-    args <- parseArgTokens argTks
-    inner <- parseSeq toks i
-    case inner.stop of
-      StopEOF -> Left (MismatchedBlock name "<eof>" 0)
-      StopClose closed pos
-        | closed == name -> go (Array.snoc acc (Block span name args inner.nodes)) pos
-        | otherwise -> Left (MismatchedBlock name closed 0)
+  buildBlock acc span name argTks i = case parseArgTokens argTks of
+    Left e -> Left e
+    Right args -> case parseSeq toks i of
+      Left e -> Left e
+      Right inner -> case inner.stop of
+        StopEOF -> Left (MismatchedBlock name "<eof>" 0)
+        StopClose closed pos
+          | closed == name -> go (Array.snoc acc (Block span name args inner.nodes)) pos
+          | otherwise -> Left (MismatchedBlock name closed 0)
 
 --------------------------------------------------------------------------------
 -- Expression parsing over a token array
