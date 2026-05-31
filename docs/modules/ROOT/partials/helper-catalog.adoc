@@ -1,0 +1,42 @@
+// Generated from FlatBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit.
+// Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`.
+
+[cols="2,1,1,1",options="header"]
+|===
+|Helper |Form |Arity |Source
+
+|`and` |value |any |registered
+|`apply` |block |≥1 |registered
+|`dict` |value |any |registered
+|`each` |block |≥1 |registered
+|`else` |value |0 |registered
+|`eq` |value |2 |registered
+|`esc_html` |value |1 |registered
+|`false` |value |0 |registered
+|`first` |value |0 |scoped
+|`gt` |value |2 |registered
+|`gte` |value |2 |registered
+|`if` |block |1–2 |registered
+|`index` |value |0 |scoped
+|`inline` |block |≥1 |registered
+|`key` |value |0 |scoped
+|`last` |value |0 |scoped
+|`log` |value |≥1 |registered
+|`lookup` |value |≥1 |registered
+|`lt` |value |2 |registered
+|`lte` |value |2 |registered
+|`ne` |value |2 |registered
+|`not` |value |1 |registered
+|`null` |value |0 |registered
+|`or` |value |any |registered
+|`parent` |value |0–1 |scoped
+|`partial` |value |2–3 |registered
+|`partial-block` |value |0 |scoped
+|`raw` |block |any |registered
+|`root` |value |0 |scoped
+|`safe` |value |1 |registered
+|`this` |value |0 |registered
+|`true` |value |0 |registered
+|`unless` |block |1–2 |registered
+|`with` |block |≥1 |registered
+|===

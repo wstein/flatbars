@@ -119,3 +119,13 @@ You do not need all of the above. A static-site author might register only `this
 `esc_html`, `if`, and `each`; a configuration templater only `lookup`, `eq`, and `or`. The engine —
 the helpers *and* the clause vocabulary they read — is the product surface you design. The core never
 presumes which of these exist.
+
+== 6.8 Helper catalog (generated)
+
+The table below is *generated* from `FlatBars.preludeSchema` — the same single source the validator
+uses (`FlatBars.Catalog.helperCatalogAdoc`; regenerate with `npm run gen:catalog`, checked in CI by
+`npm run check:catalog`). It is the authoritative list of names, arities, and block-ness; the prose
+sections above explain behaviour. *Source* is `registered` for helpers with a runtime in `prelude`
+and `scoped` for variables a block helper installs (`root`/`parent`/`index`/`key`/`first`/`last`/`partial-block`).
+
+include::partial$helper-catalog.adoc[]
