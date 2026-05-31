@@ -23,7 +23,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FlatBars (RNode(..), RefEnv, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderWith, stringify)
+import FlatBars (RNode(..), RefEnv, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderWith, stringify, truthy)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value
@@ -135,6 +135,13 @@ main = do
   expect "unless-zero-includeZero" "{{#unless this (dict \"includeZero\" true)}}n{{/unless}}"
     (VNumber 0.0)
     ""
+
+  -- Invariant: marking a string safe never changes its truthiness — a safe
+  -- string tests as its content. (Handlebars instead tests a SafeString as an
+  -- object, so even an empty one is truthy; that divergence is intentional.)
+  for_ [ "", "0", "x" ] \s ->
+    assert' ("safe-truthiness invariant for " <> show s)
+      (truthy (VSafe s) == truthy (VString s))
 
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at
