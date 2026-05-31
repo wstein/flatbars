@@ -151,9 +151,26 @@ main = do
     "{\"a\":1,\"b\":2}"
   -- control characters use the readable escapes.
   expect "json-control" "{{{json (safe \"a\nb\tc\")}}}" VNull "\"a\\nb\\tc\""
+  -- json pretty=true: two-space indented JSON; empty containers stay inline.
+  expect "json-pretty" "{{{json (lookup this \"o\") (dict \"pretty\" true)}}}"
+    (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0), Tuple "xs" (arr [ str "x" ]) ]) ])
+    "{\n  \"a\": 1,\n  \"xs\": [\n    \"x\"\n  ]\n}"
+  expect "json-pretty-empty" "{{{json this (dict \"pretty\" true)}}}" (obj []) "{}"
+  -- pretty defaults off, and a non-object opts argument is treated as compact.
+  expect "json-pretty-default-off" "{{{json (lookup this \"o\")}}}"
+    (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0) ]) ])
+    "{\"a\":1}"
   -- esc_json: JSON + HTML-escape, marked safe (the JSON analogue of esc_html).
   expect "esc-json" "{{{esc_json (lookup this \"x\")}}}" (obj [ Tuple "x" (str "<b>") ])
     "&quot;&lt;b&gt;&quot;"
+  -- esc_json honours pretty=true too.
+  expect "esc-json-pretty" "{{{esc_json (lookup this \"xs\") (dict \"pretty\" true)}}}"
+    (obj [ Tuple "xs" (arr [ str "<b>" ]) ])
+    "[\n  &quot;&lt;b&gt;&quot;\n]"
+  -- surface hash: {{ json x pretty=true }} feeds the (dict "pretty" true) option.
+  expectS "surface-json-pretty" "{{{ json o pretty=true }}}"
+    (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0) ]) ])
+    "{\n  \"a\": 1\n}"
   -- esc_html is idempotent on esc_json's VSafe, so surface {{ }} does not double-escape.
   expectS "surface-esc-json" "{{ esc_json (lookup this \"x\") }}" (obj [ Tuple "x" (str "<b>") ])
     "&quot;&lt;b&gt;&quot;"

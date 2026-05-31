@@ -37,7 +37,7 @@ import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext)
-import FlatBars.Value (escapeHtml, jsonStringify, stringify, truthy)
+import FlatBars.Value (escapeHtml, jsonStringify, jsonStringifyPretty, stringify, truthy)
 
 --------------------------------------------------------------------------------
 -- The single source of truth
@@ -77,8 +77,8 @@ helperDefs =
   , valDef "null" (nullary (pure VNull))
   , valDef "esc_html" (unary escHtml)
   , valDef "safe" (unary safe)
-  , valDef "json" (unary json')
-  , valDef "esc_json" (unary escJson)
+  , gen "json" false (Between 1 2) jsonH
+  , gen "esc_json" false (Between 1 2) escJsonH
   , gen "raw" true AnyArity rawH
   , gen "if" true (Between 1 2) ifH
   , gen "unless" true (Between 1 2) unlessH
@@ -157,18 +157,28 @@ escHtml = case _ of
 safe :: forall m. MonadThrow Error m => Value -> m Value
 safe v = VSafe <$> stringifyM v
 
--- | `json`: serialize a value as compact JSON *text* (a plain `VString`, so
+-- | `json x [opts]`: serialize a value as JSON *text* (a plain `VString`, so
 -- | surface `pass:[{{ json x }}]` still HTML-escapes it and `pass:[{{{ json x }}}]`
--- | emits it raw — e.g. for `<script>` data).
-json' :: forall m. Applicative m => Value -> m Value
-json' v = pure (VString (jsonStringify v))
+-- | emits it raw — e.g. for `<script>` data). An optional options object selects
+-- | pretty-printing: `pass:[{{ json x pretty=true }}]` indents two spaces.
+jsonH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+jsonH _ args = VString <$> jsonText "json" args
 
--- | `esc_json`: the JSON analogue of `esc_html` — serialize to JSON *and*
--- | HTML-escape, returning `VSafe`, for embedding JSON safely in HTML (e.g. an
--- | attribute). `esc_html` is idempotent on the result, so surface escaping does
--- | not double up.
-escJson :: forall m. Applicative m => Value -> m Value
-escJson v = pure (VSafe (escapeHtml (jsonStringify v)))
+-- | `esc_json x [opts]`: the JSON analogue of `esc_html` — serialize to JSON
+-- | *and* HTML-escape, returning `VSafe`, for embedding JSON safely in HTML
+-- | (e.g. an attribute). `esc_html` is idempotent on the result, so surface
+-- | escaping does not double up. Accepts the same `pretty=true` option.
+escJsonH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+escJsonH _ args = (VSafe <<< escapeHtml) <$> jsonText "esc_json" args
+
+-- | Serialize the first argument as JSON, compact by default or pretty when an
+-- | optional second *options object* carries `pretty: true` (built by the
+-- | surface hash, `pass:[pretty=true]`). Shared by `json` and `esc_json`.
+jsonText :: forall m. MonadThrow Error m => String -> Array Value -> m String
+jsonText name args = case args of
+  [ v ] -> pure (jsonStringify v)
+  [ v, opts ] -> pure ((if optFlag "pretty" opts then jsonStringifyPretty else jsonStringify) v)
+  _ -> throwError (ArityError (wrong1or2 name args))
 
 eq' :: forall m. Applicative m => Value -> Value -> m Value
 eq' a b = pure (VBool (a == b))

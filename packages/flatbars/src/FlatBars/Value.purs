@@ -8,6 +8,7 @@ module FlatBars.Value
   ( truthy
   , stringify
   , jsonStringify
+  , jsonStringifyPretty
   , escapeHtml
   ) where
 
@@ -15,12 +16,14 @@ import Prelude
 
 import BareBars.Error (Error(..))
 import BareBars.Value (Value(..))
+import Data.Array as Array
 import Data.Char (toCharCode)
 import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Int (hexadecimal, toStringAs)
 import Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Monoid (power)
 import Data.String (Pattern(..), Replacement(..), length, replaceAll, stripSuffix)
 import Data.String.CodeUnits (singleton, toCharArray)
 import Data.String.Common (joinWith)
@@ -66,22 +69,50 @@ numberToString n =
   in
     fromMaybe s (stripSuffix (Pattern ".0") s)
 
--- | Serialize a value as compact JSON text (the `json` / `esc_json` helpers).
--- | Unlike `stringify`, this is total — *objects* and *arrays* are first-class
--- | JSON, and a `VSafe` is just a string. Numbers reuse `numberToString` (so an
--- | integral value is `1`, not `1.0`); object keys come out in `Map` order.
+-- | Serialize a value as compact JSON text (the default for the `json` /
+-- | `esc_json` helpers). Unlike `stringify`, this is total — *objects* and
+-- | *arrays* are first-class JSON, and a `VSafe` is just a string. Numbers reuse
+-- | `numberToString` (so an integral value is `1`, not `1.0`); object keys come
+-- | out in `Map` order.
 jsonStringify :: Value -> String
-jsonStringify = case _ of
+jsonStringify = renderJson Nothing 0
+
+-- | Serialize as *pretty* JSON: two-space indentation per level and a space
+-- | after each `:` (matching `JSON.stringify(x, null, 2)`). Opt in with the
+-- | helpers' `pretty=true` option. Empty objects/arrays stay on one line
+-- | (`{}` / `[]`).
+jsonStringifyPretty :: Value -> String
+jsonStringifyPretty = renderJson (Just "  ") 0
+
+-- | The shared JSON serializer. `mIndent` is the indent unit (`Nothing` ⇒
+-- | compact, `Just unit` ⇒ pretty), `depth` the current nesting level.
+renderJson :: Maybe String -> Int -> Value -> String
+renderJson mIndent depth = case _ of
   VNull -> "null"
   VBool b -> if b then "true" else "false"
   VNumber n -> numberToString n
   VString s -> jsonQuote s
   VSafe s -> jsonQuote s
-  VArray xs -> "[" <> joinWith "," (map jsonStringify xs) <> "]"
+  VArray xs -> container "[" "]" (map (renderJson mIndent (depth + 1)) xs)
   VObject m ->
-    "{" <> joinWith "," (map member (Map.toUnfoldable m :: Array (Tuple String Value))) <> "}"
-    where
-    member (Tuple k v) = jsonQuote k <> ":" <> jsonStringify v
+    container "{" "}"
+      (map member (Map.toUnfoldable m :: Array (Tuple String Value)))
+  where
+  member (Tuple k v) = jsonQuote k <> colon <> renderJson mIndent (depth + 1) v
+  colon = case mIndent of
+    Just _ -> ": "
+    Nothing -> ":"
+  -- lay `items` between `open`/`close`: inline for compact (or when empty),
+  -- otherwise one item per line indented to `depth + 1` with the close at `depth`.
+  container open close items = case mIndent of
+    _ | Array.null items -> open <> close
+    Nothing -> open <> joinWith "," items <> close
+    Just unit ->
+      open <> "\n"
+        <> joinWith ",\n" (map (\it -> power unit (depth + 1) <> it) items)
+        <> "\n"
+        <> power unit depth
+        <> close
 
 -- | Quote and escape a string as a JSON string literal: `"`, `\`, the readable
 -- | control escapes (`\n`/`\r`/`\t`), and any other control character below
