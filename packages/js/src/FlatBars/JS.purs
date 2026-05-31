@@ -20,7 +20,7 @@ import BareBars (Expr(..), parse, parseErrorAt)
 import BareBars.Json (fromJson)
 import BareBars.Value (Value(..))
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
-import Data.Array (elem, null, uncons) as Array
+import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
 import Data.Function.Uncurried (Fn2, mkFn2)
 import Data.Int (toNumber)
@@ -106,8 +106,16 @@ ctx kind = obj [ tt "context", Tuple "kind" (str kind) ]
 rnode :: RNode -> Json
 rnode = case _ of
   RText s -> obj [ tt "text", Tuple "text" (str s) ]
-  ROut escaped e -> obj
-    [ tt "emit", Tuple "expr" (rexpr e), Tuple "escape" (str (if escaped then "html" else "none")) ]
+  -- A `{{> name}}` partial reference desugars to an emitted `partial "name" …`
+  -- call; surface it as a `{t:"partial"}` node so the dependency graph finds it.
+  ROut escaped e -> case partialName e of
+    Just name -> obj [ tt "partial", Tuple "name" (str name) ]
+    Nothing ->
+      obj
+        [ tt "emit"
+        , Tuple "expr" (rexpr e)
+        , Tuple "escape" (str (if escaped then "html" else "none"))
+        ]
   RIf c a b -> obj
     [ tt "if", Tuple "cond" (rexpr c), Tuple "then" (children a), Tuple "else" (children b) ]
   RUnless c a b -> obj
@@ -116,11 +124,30 @@ rnode = case _ of
     [ tt "each", Tuple "subject" (rexpr c), Tuple "body" (children a), Tuple "else" (children b) ]
   RWith c a b -> obj
     [ tt "with", Tuple "subject" (rexpr c), Tuple "body" (children a), Tuple "else" (children b) ]
+  -- `{{#inline "name"}}…{{/inline}}` defines a partial; `{{#partial name}}…`
+  -- is a block partial use. Both name a partial via a leading string literal.
+  RCall "inline" args ch | Just name <- litName args ->
+    obj [ tt "inline", Tuple "name" (str name), Tuple "body" (children ch) ]
+  RCall "partial" args ch | Just name <- litName args ->
+    obj [ tt "partial", Tuple "name" (str name), Tuple "body" (children ch) ]
   RCall n args ch -> obj [ tt n, Tuple "args" (arr (map argOf args)), Tuple "body" (children ch) ]
   RSep n args -> obj [ tt "sep", Tuple "name" (str n), Tuple "args" (arr (map argOf args)) ]
   RRaw s -> obj [ tt "raw", Tuple "text" (str s) ]
   where
   children ns = arr (map rnode ns)
+
+-- The static partial name of a `{{> name}}` use (`partial "name" ctx …`), or
+-- Nothing for a dynamic partial (`{{> (expr)}}`).
+partialName :: Expr -> Maybe String
+partialName = case _ of
+  App "partial" args -> litName args
+  _ -> Nothing
+
+-- The leading string-literal argument, if any — a partial/inline name.
+litName :: Array Expr -> Maybe String
+litName args = case Array.head args of
+  Just (Lit (VString s)) -> Just s
+  _ -> Nothing
 
 argOf :: Expr -> Json
 argOf e = obj [ Tuple "value" (rexpr e) ]

@@ -8269,6 +8269,21 @@ var render = function(tpl, json) {
 var obj = function(kvs) {
   return id(fromFoldable9(kvs));
 };
+var litName = function(args) {
+  var v = head(args);
+  if (v instanceof Just && (v.value0 instanceof Lit && v.value0.value0 instanceof VString)) {
+    return new Just(v.value0.value0.value0);
+  }
+  ;
+  return Nothing.value;
+};
+var partialName2 = function(v) {
+  if (v instanceof App2 && v.value0 === "partial") {
+    return litName(v.value1);
+  }
+  ;
+  return Nothing.value;
+};
 var $$int = function(n) {
   return id(toNumber(n));
 };
@@ -8299,8 +8314,8 @@ var rexpr = function(v) {
   }
   ;
   if (v instanceof App2 && v.value1.length === 0) {
-    var $33 = elem4(v.value0)(dataVars);
-    if ($33) {
+    var $47 = elem4(v.value0)(dataVars);
+    if ($47) {
       return obj([tt2(v.value0)]);
     }
     ;
@@ -8311,13 +8326,13 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map14(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FlatBars.JS (line 134, column 9 - line 143, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FlatBars.JS (line 157, column 9 - line 166, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
   if (v instanceof Just && (v.value0.head instanceof App2 && (v.value0.head.value0 === "this" && v.value0.head.value1.length === 0))) {
-    var $39 = $$null(v.value0.tail);
-    if ($39) {
+    var $53 = $$null(v.value0.tail);
+    if ($53) {
       return ctx("this");
     }
     ;
@@ -8331,7 +8346,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FlatBars.JS", function() {
   var children = function(ns) {
-    return arr(map14($lazy_rnode(123))(ns));
+    return arr(map14($lazy_rnode(133))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -8339,13 +8354,22 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FlatBars.JS", functio
     }
     ;
     if (v instanceof ROut) {
-      return obj([tt2("emit"), new Tuple("expr", rexpr(v.value1)), new Tuple("escape", str(function() {
-        if (v.value0) {
-          return "html";
-        }
-        ;
-        return "none";
-      }()))]);
+      var v1 = partialName2(v.value1);
+      if (v1 instanceof Just) {
+        return obj([tt2("partial"), new Tuple("name", str(v1.value0))]);
+      }
+      ;
+      if (v1 instanceof Nothing) {
+        return obj([tt2("emit"), new Tuple("expr", rexpr(v.value1)), new Tuple("escape", str(function() {
+          if (v.value0) {
+            return "html";
+          }
+          ;
+          return "none";
+        }()))]);
+      }
+      ;
+      throw new Error("Failed pattern match at FlatBars.JS (line 111, column 21 - line 114, column 107): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -8364,19 +8388,43 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FlatBars.JS", functio
       return obj([tt2("with"), new Tuple("subject", rexpr(v.value0)), new Tuple("body", children(v.value1)), new Tuple("else", children(v.value2))]);
     }
     ;
-    if (v instanceof RCall) {
-      return obj([tt2(v.value0), new Tuple("args", arr(map14(argOf)(v.value1))), new Tuple("body", children(v.value2))]);
+    var v1 = function(v2) {
+      var v3 = function(v4) {
+        if (v instanceof RCall) {
+          return obj([tt2(v.value0), new Tuple("args", arr(map14(argOf)(v.value1))), new Tuple("body", children(v.value2))]);
+        }
+        ;
+        if (v instanceof RSep2) {
+          return obj([tt2("sep"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map14(argOf)(v.value1)))]);
+        }
+        ;
+        if (v instanceof RRaw2) {
+          return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
+        }
+        ;
+        throw new Error("Failed pattern match at FlatBars.JS (line 106, column 1 - line 106, column 23): " + [v.constructor.name]);
+      };
+      if (v instanceof RCall && v.value0 === "partial") {
+        var $86 = litName(v.value1);
+        if ($86 instanceof Just) {
+          return obj([tt2("partial"), new Tuple("name", str($86.value0)), new Tuple("body", children(v.value2))]);
+        }
+        ;
+        return v3(true);
+      }
+      ;
+      return v3(true);
+    };
+    if (v instanceof RCall && v.value0 === "inline") {
+      var $92 = litName(v.value1);
+      if ($92 instanceof Just) {
+        return obj([tt2("inline"), new Tuple("name", str($92.value0)), new Tuple("body", children(v.value2))]);
+      }
+      ;
+      return v1(true);
     }
     ;
-    if (v instanceof RSep2) {
-      return obj([tt2("sep"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map14(argOf)(v.value1)))]);
-    }
-    ;
-    if (v instanceof RRaw2) {
-      return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
-    }
-    ;
-    throw new Error("Failed pattern match at FlatBars.JS (line 107, column 9 - line 121, column 51): " + [v.constructor.name]);
+    return v1(true);
   };
 });
 var rnode = /* @__PURE__ */ $lazy_rnode(106);
@@ -8389,8 +8437,8 @@ var astJson = function(dialect, src) {
   ;
   if (v instanceof Right) {
     var nodes = lower(function() {
-      var $70 = dialect === "core";
-      if ($70) {
+      var $99 = dialect === "core";
+      if ($99) {
         return v.value0;
       }
       ;

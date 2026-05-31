@@ -102,6 +102,22 @@ test("requiredAssigns is exact (path roots only, no helpers/params)", async () =
   assert.deepEqual(r.requiredAssigns(prog), ["a", "b", "city", "rows", "title"]);
 });
 
+test("parseAst surfaces partial uses and inline defs as semantic nodes", async () => {
+  const r = await createBareBarsRenderer();
+  const { ast } = r.parseAst('{{#inline "row"}}<li>{{ this }}</li>{{/inline}}{{> row}}{{> missing}}');
+  const top = ast.nodes;
+  const inline = top.find((n) => n.t === "inline");
+  assert.equal(inline && inline.name, "row");
+  const partials = top.filter((n) => n.t === "partial").map((n) => n.name);
+  assert.deepEqual(partials, ["row", "missing"]);
+});
+
+test("inline-defined partials actually render", async () => {
+  const r = await createBareBarsRenderer();
+  const out = run(r, '{{#inline "row"}}[{{ this }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}', { xs: ["a", "b"] });
+  assert.equal(out, "[a][b]");
+});
+
 test("usedTransformers collects block + call helpers", async () => {
   const r = await createBareBarsRenderer();
   const prog = r.compile("{{#each xs}}{{#if (eq a b)}}{{ x }}{{/if}}{{/each}}", {}).program;
