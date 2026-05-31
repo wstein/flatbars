@@ -82,7 +82,7 @@ try {
 
   if (errors.length) fail(`page errors: ${errors.slice(0, 3).join(" | ")}`);
   if (!/playground/i.test(wm)) fail(`brand text unexpected: ${JSON.stringify(wm)}`);
-  const wantTabs = ["Rendered", "HTML", "AST", "Validation"];
+  const wantTabs = ["Rendered", "HTML", "Parse tree", "Real AST", "Validation"];
   if (!wantTabs.every((t) => tabs.includes(t))) fail(`tabs missing: got ${JSON.stringify(tabs)}`);
   if (!hasIframe) fail("rendered-preview iframe not found");
   if (!/valid against prelude schema/.test(status)) fail(`status not clean: ${JSON.stringify(status)}`);
@@ -107,7 +107,7 @@ try {
   if (process.exitCode) {
     console.error("smoke: one or more checks failed.");
   } else {
-    console.log(`smoke: OK — mounted, 4 tabs, preview iframe, clean validation (${exe.split("/").pop()}).`);
+    console.log(`smoke: OK — mounted, 5 tabs, preview iframe, clean validation (${exe.split("/").pop()}).`);
   }
 } finally {
   await browser.close();

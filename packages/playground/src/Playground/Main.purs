@@ -6,13 +6,14 @@
 -- | (open `dist/index.html` directly).
 -- |
 -- | Panels: a template editor and a JSON data editor on the left; an output
--- | pane on the right with four views — a sandboxed rendered preview, the HTML
--- | source, the parsed skeleton AST, and the schema-validation report.
+-- | pane on the right with five views — a sandboxed rendered preview, the HTML
+-- | source, the structural Parse tree, the lowered Real AST (`BareBars.Lower`),
+-- | and the schema + escaping validation report.
 module Playground.Main where
 
 import Prelude
 
-import BareBars (parse, preludeSchema, renderWith, validate)
+import BareBars (RNode(..), escapingWarnings, lower, parse, preludeSchema, renderWith, validate)
 import BareBars.Json (parseValue)
 import BareBars.Syntax (Node(..))
 import BareBars.Walk (Issue)
@@ -87,7 +88,7 @@ examples =
 -- Component
 --------------------------------------------------------------------------------
 
-data View = Rendered | Source | Ast | Validation
+data View = Rendered | Source | Parse | Real | Validation
 
 derive instance eqView :: Eq View
 
@@ -162,10 +163,39 @@ renderNode d = case _ of
 line :: Int -> String -> String
 line d s = power "  " d <> s
 
+-- | The *real* AST — `BareBars.Lower.lower` of the structural tree, indented.
+-- | Clauses are resolved into branches and escaping is explicit (`escaped`/`raw`).
+realText :: State -> String
+realText st = case parse st.template of
+  Left e -> "Parse error: " <> show e
+  Right t -> joinWith "\n" (Array.concatMap (renderReal 0) (lower t))
+
+renderReal :: Int -> RNode -> Array String
+renderReal d = case _ of
+  RText s -> [ line d ("RText " <> show s) ]
+  ROut esc e -> [ line d ("ROut " <> (if esc then "escaped" else "raw") <> " (" <> show e <> ")") ]
+  RIf c a b -> line d ("RIf (" <> show c <> ")") `Array.cons` (branch "then" a <> branch "else" b)
+  RUnless c a b -> line d ("RUnless (" <> show c <> ")") `Array.cons`
+    (branch "body" a <> branch "else" b)
+  REach c a b -> line d ("REach (" <> show c <> ")") `Array.cons`
+    (branch "body" a <> branch "empty" b)
+  RWith c a b -> line d ("RWith (" <> show c <> ")") `Array.cons`
+    (branch "body" a <> branch "else" b)
+  RCall n args ch ->
+    line d ("RCall " <> show n <> " " <> show args) `Array.cons` Array.concatMap
+      (renderReal (d + 1))
+      ch
+  RSep n args -> [ line d ("RSep " <> show n <> " " <> show args) ]
+  RRaw s -> [ line d ("RRaw " <> show s) ]
+  where
+  branch label nodes =
+    if Array.null nodes then []
+    else Array.cons (line (d + 1) (label <> ":")) (Array.concatMap (renderReal (d + 2)) nodes)
+
 validationIssues :: State -> Either String (Array Issue)
 validationIssues st = case parse st.template of
   Left e -> Left ("Parse error: " <> show e)
-  Right nodes -> Right (validate preludeSchema nodes)
+  Right nodes -> Right (validate preludeSchema nodes <> escapingWarnings nodes)
 
 --------------------------------------------------------------------------------
 -- View
@@ -218,7 +248,8 @@ outputPane st =
         , HH.div [ cls "tabs" ]
             [ tab "Rendered" Rendered
             , tab "HTML" Source
-            , tab "AST" Ast
+            , tab "Parse tree" Parse
+            , tab "Real AST" Real
             , tab "Validation" Validation
             ]
         ]
@@ -245,7 +276,8 @@ outputPane st =
     Source -> case renderResult st of
       Left err -> HH.div [ cls "banner" ] [ HH.text err ]
       Right out -> HH.pre [ cls "code" ] [ HH.text out ]
-    Ast -> HH.pre [ cls "code" ] [ HH.text (astText st) ]
+    Parse -> HH.pre [ cls "code" ] [ HH.text (astText st) ]
+    Real -> HH.pre [ cls "code" ] [ HH.text (realText st) ]
     Validation -> case validationIssues st of
       Left err -> HH.div [ cls "banner" ] [ HH.text err ]
       Right [] -> HH.ul [ cls "issues" ] [ HH.li [ cls "none" ] [ HH.text "✓ no issues" ] ]
