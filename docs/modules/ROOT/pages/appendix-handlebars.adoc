@@ -267,8 +267,10 @@ see xref:flatbars-compat.adoc[compatibility matrix] §3. The core spellings `pas
 sigils, which the meaning-free parser does not yet match.
 ====
 
-All partial forms become the engine helpers `partial`, `partial>`, `inline`, and the scoped
-`partial-block` (xref:prelude.adoc[] §6.6; xref:surface.adoc[] §5.7). Partials emit *unescaped*.
+All partial forms become the engine helpers `partial` (inline and block) and `inline`, plus the
+scoped `partial-block` (xref:prelude.adoc[] §6.6; xref:surface.adoc[] §5.7). The rows below show the
+mapping shape; the implemented core spellings are `pass:[{{#partial}}]` / `pass:[{{#inline}}]` (see
+the status note above). Partials emit *unescaped*.
 
 [cols="2,3,1",options="header"]
 |===
