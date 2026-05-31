@@ -697,7 +697,6 @@
             "ordered-collections",
             "prelude",
             "strings",
-            "transformers",
             "tuples"
           ],
           "build_plan": [
@@ -753,7 +752,8 @@
             "aff",
             "assert",
             "console",
-            "effect"
+            "effect",
+            "transformers"
           ],
           "build_plan": [
             "aff",
@@ -1005,7 +1005,6 @@
             "barebars-compile",
             "bifunctors",
             "either",
-            "fullbars",
             "kernel",
             "prelude",
             "transformers"

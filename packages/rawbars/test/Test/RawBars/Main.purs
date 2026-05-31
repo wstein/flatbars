@@ -5,13 +5,13 @@ module Test.RawBars.Main where
 import Prelude
 
 import BareBars.Value (Value(..))
-import RawBars (compileJs, render)
 import Data.Either (Either(..), isLeft)
 import Data.Map as Map
 import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import RawBars (compileJs, render)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value

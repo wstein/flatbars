@@ -17,7 +17,6 @@ package:
     - ordered-collections
     - integers
     - numbers
-    - transformers
     - barebars
     - kernel
   test:
@@ -27,3 +26,4 @@ package:
       - console
       - assert
       - aff
+      - transformers

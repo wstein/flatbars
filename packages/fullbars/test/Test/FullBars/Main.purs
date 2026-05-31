@@ -8,12 +8,9 @@ module Test.FullBars.Main where
 import Prelude
 
 import BareBars (parse, spanText)
-import Kernel.Engine (Ctl, Engine, Helper, runString, runTemplate)
-import Kernel.Walk (arityOk, foldTemplate, validate)
 import BareBars.Error (Error(..))
 import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Value (Value(..))
-
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)
@@ -29,6 +26,8 @@ import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
 import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, resolveTruthiness, stringify, truthy)
+import Kernel.Engine (Ctl, Engine, Helper, runString, runTemplate)
+import Kernel.Walk (arityOk, foldTemplate, validate)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value

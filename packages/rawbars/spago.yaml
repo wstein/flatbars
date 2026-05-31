@@ -14,7 +14,6 @@ package:
     - aff
     - barebars
     - kernel
-    - fullbars
     - barebars-compile
   test:
     main: Test.RawBars.Main

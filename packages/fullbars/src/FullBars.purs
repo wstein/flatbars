@@ -11,8 +11,8 @@ module FullBars
   , module Kernel.Env
   , module Kernel.Prelude
   , module Kernel.Lower
+  , module Kernel.Render
   , module FullBars.Surface
-  , preludeEnv
   , surfaceClauses
   , desugarSurface
   , compileSurface
@@ -21,59 +21,25 @@ module FullBars
   , renderSurfaceDiag
   , renderSurfaceDiagWith
   , renderSurfaceValue
-  , formatError
-  , runResolved
   ) where
 
 import Prelude
 
-import Kernel.Engine (runTemplate)
-import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
+import BareBars.Error (Error, ParseError, renderParseErrorAt)
 import BareBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
-import BareBars.Syntax (Directive, Ident, Template)
-import Kernel.ToValue (class ToValue, toValue)
+import BareBars.Syntax (Ident, Template)
 import BareBars.Value (Value)
-import Control.Monad.Error.Class (class MonadThrow)
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import FullBars.Surface (desugar, hoistInline)
 import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (prelude, preludeSchema)
-import FullBars.Surface (desugar, hoistInline)
+import Kernel.Render (formatError, preludeEnv, runResolved)
+import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (FalsySet, FalsyShape(..), aliasSet, always, escapeHtml, handlebars, isFalsy, minimal, presence, resolveTruthiness, stringify, truthy)
-
--- | Build a FullBars environment with the prelude, the given data as context,
--- | and a `root` helper returning the top-level data. Polymorphic in `m`.
-preludeEnv :: forall m. MonadThrow Error m => Value -> RefEnv m
-preludeEnv dat =
-  registerAll prelude (register "root" (constHelper dat) (emptyEnv dat))
-
--- | Render `nodes` against a prelude env seeded with the falsy-set resolved from
--- | the template's header `directives` — the engine's truthiness *application*
--- | point (truthiness spec §4.2). `setup` adds anything extra to the env (e.g.
--- | surface partials). A resolution failure is thrown into `m`.
-runResolved
-  :: forall m
-   . MonadThrow Error m
-  => Array Directive
-  -> (RefEnv m -> RefEnv m)
-  -> Template
-  -> Value
-  -> m String
-runResolved directives setup nodes dat = do
-  fs <- liftEither (resolveTruthiness directives)
-  runTemplate (refEngine (withFalsy fs (setup (preludeEnv dat)))) nodes
-
--- | Format an engine `Error` against its source for a host boundary: a parse
--- | failure becomes a located `line:column: message` (xref host-api §7); every
--- | other error keeps its `show` form. This is what a JS/CLI facade should
--- | print instead of a bare offset.
-formatError :: String -> Error -> String
-formatError src = case _ of
-  ParseFailure pe -> renderParseErrorAt src pe
-  e -> show e
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).

@@ -12,16 +12,16 @@ module FullBars.Catalog
 
 import Prelude
 
-import Kernel.Engine (Helper)
 import BareBars.Error (Error)
-import Kernel.Walk (Arity(..))
 import Data.Either (Either)
 import Data.Foldable (foldMap)
 import Data.Map as Map
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
+import Kernel.Engine (Helper)
 import Kernel.Env (RefEnv)
 import Kernel.Prelude (prelude, preludeSchema)
+import Kernel.Walk (Arity(..))
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
 -- | Everything else in the schema is a *scoped* variable a block helper installs.
