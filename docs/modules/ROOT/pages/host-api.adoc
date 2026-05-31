@@ -26,14 +26,16 @@ parse        :: String -> Either ParseError Template          -- skeleton AST
 parseSurface :: String -> Either ParseError SurfaceTemplate
 desugar      :: SurfaceTemplate -> Template
 
--- Phase 2: the engine (reference)
-type Render  = Env -> Template -> M String                    -- the IoC callback handed to helpers
-emptyEnv     :: Value -> Env
-register     :: Ident -> Helper -> Env -> Env
-registerAll  :: Array (Tuple Ident Helper) -> Env -> Env
-prelude      :: Array (Tuple Ident Helper)                    -- the reference engine (Ch. 6)
-render       :: Template -> Env -> M String                   -- BareBars drives the walk
-runTemplate  :: Env -> Template -> M String                   -- same, argument order of `Render`
+-- Phase 2: the polymorphic engine driver (BareBars owns the walk; A.13)
+runTemplate  :: forall m env. Monad m            => Engine m env -> Template -> m String
+runString    :: forall m env. MonadThrow Error m => Engine m env -> String   -> m String
+
+-- The reference engine (one choice of m/env; Ch. 6), parametric in the monad
+emptyEnv     :: forall m. Value -> RefEnv m
+register     :: forall m. Ident -> Helper m (RefEnv m) -> RefEnv m -> RefEnv m
+registerAll  :: forall m. Array (Tuple Ident (Helper m (RefEnv m))) -> RefEnv m -> RefEnv m
+refEngine    :: forall m. MonadThrow Error m => RefEnv m -> Engine m (RefEnv m)
+prelude      :: forall m. MonadThrow Error m => Array (Tuple Ident (Helper m (RefEnv m)))
 
 -- Validation (the JSON-Schema-style pass) and analysis
 validate     :: Schema -> Template -> Array Issue             -- schema = engine's contract
@@ -41,39 +43,46 @@ preludeSchema :: Schema                                       -- the reference e
 foldTemplate :: Algebra a -> Template -> a                    -- catamorphism: prepare / analyze (A.13.2)
 splitClause  :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
 
--- Convenience: parse core, render against the prelude + data
-compile      :: String -> Either ParseError (Value -> Either Error String)
+-- Convenience instantiations of the reference engine
+compile      :: String -> Either ParseError (Value -> Either Error String)   -- pure (m = Either Error)
+renderWith   :: String -> Value -> Either String String                      -- pure, errors as text
+renderAff    :: String -> Value -> Aff (Either Error String)                 -- async (m = ExceptT Error Aff)
 ----
+
+The driver is *polymorphic in the monad `m` and the environment `env`* — the heart of the
+inversion-of-control design (xref:appendix-handlebars.adoc#engine-api[A.13]). The reference engine
+fixes `env = RefEnv m` and is supplied for `m = Either Error` (pure) and `m = ExceptT Error Aff`
+(async); a different engine plugs in its own `env`/`resolve`/`stringify`.
 
 `validate` is the JSON-Schema-style pass: walk the skeleton against an engine `Schema` and return
 every unknown-helper / arity / block-misuse `Issue`, *before* rendering. A host may skip it (errors
-surface lazily during `render`) or require it (strict). `preludeSchema` is the reference engine's
-contract; `foldTemplate` is the general traversal a custom pass is built on.
+surface lazily during the walk) or require it (strict). `preludeSchema` is the reference engine's
+contract; `foldTemplate` is the catamorphism a custom analysis pass is built on.
 
 == 7.3 Writing a helper
 
-A helper is `HelperCtx -> Array Value -> M Value`. An inline helper ignores the handle's `body`; a
+A helper is `Ctl m env -> Array Value -> m Value`. An inline helper ignores the control handle; a
 block helper uses it. *BareBars drives the walk and calls your helpers (inversion of control)* — the
-helper recurses only by calling `ctx.render`. See xref:appendix-handlebars.adoc#engine-api[A.13] for
-the full implementer API — the `HelperCtx` control handle, `runTemplate`, and `foldTemplate` for
-preparing your own AST.
+helper recurses only by calling `ctl.render` / `ctl.clause`. Helpers are generic in `m`/`env`, so the
+same code runs pure or async. See xref:appendix-handlebars.adoc#engine-api[A.13] for the full handle
+(`runTemplate`, `runString`, `foldTemplate`).
 
 [source,haskell]
 ----
--- upcase: a 1-argument inline helper (ignores the body)
-upcase :: Helper
+-- upcase: a 1-argument inline helper (ignores the handle)
+upcase :: forall m env. MonadThrow Error m => Helper m env
 upcase _ args = case args of
   [v] -> VString <<< toUpper <$> stringify v
   _   -> throwError (ArityError "upcase/1")
 
--- if: a block helper that reads a nested `else` clause
-ifHelper :: Helper
-ifHelper ctx args = case args of
+-- if: a block helper that reads a nested `else` clause via the handle
+ifHelper :: forall m env. MonadThrow Error m => Helper m env
+ifHelper ctl args = case args of
   [cond] ->
-    let { before, clause } = splitClause "else" ctx.body
+    let { before, body } = ctl.clause "else"
     in if truthy cond
-         then VSafe <$> ctx.render ctx.env before
-         else VSafe <$> ctx.render ctx.env (fromMaybe [] clause)
+         then VSafe <$> ctl.render ctl.env before
+         else VSafe <$> ctl.render ctl.env (fromMaybe [] body)
   _ -> throwError (ArityError "if/1")
 ----
 
@@ -89,15 +98,16 @@ ifHelper ctx args = case args of
 |`Handlebars.registerHelper(n,f)` |`register n f` |`f` follows the `Helper` contract.
 |`Handlebars.registerPartial(n,t)` |`register n (partialOf t)` |A partial *is* a helper.
 |`Handlebars.registerDecorator(n,f)` |`register n f` |Decorators are block helpers (xref:appendix-handlebars.adoc#decorators[A.8]).
-|`options.fn` / `options.inverse` |`ctx.render` over `ctx.body` / over a `splitClause` result |No inverse field; clauses are nested blocks.
+|`options.fn` / `options.inverse` |`ctl.render` over `ctl.children` / over `ctl.clause "else"` |No inverse field; clauses are nested blocks.
 |`options.hash` |the trailing `dict` argument |xref:surface.adoc[] §5.4.
 |`Handlebars.SafeString(s)` |`VSafe s` / `safe` |A value, not a wrapper class.
 |`Handlebars.escapeExpression(s)` |`esc_html` |Engine helper.
-|`Visitor` / AST walk |the Phase-2 `render`/`validate` walk |Plain algebraic data; pattern-match.
+|`Visitor` / AST walk |`foldTemplate` (prepare) or the `runTemplate` walk (interpret) |Plain algebraic data; pattern-match.
 |===
 
 == 7.5 Effectful and async hosts
 
-Fix `M = Aff` for helpers/partials that perform I/O. The walk's `MonadThrow Error m` constraint is
-satisfied by `Aff`; `render` then returns `Aff String`. Pure hosts keep `M = Either Error` and pay
-nothing.
+Because the driver is polymorphic in `m`, an effectful host instantiates it at `m = ExceptT Error
+Aff` — helpers and partials may then perform I/O (`liftEffect`/`liftAff`), and the result is
+`Aff (Either Error String)`. `renderAff` is exactly this instantiation; the *same* prelude runs
+unchanged. Pure hosts keep `m = Either Error` (`renderWith`) and pay nothing.

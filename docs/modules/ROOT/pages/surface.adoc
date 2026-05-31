@@ -19,7 +19,7 @@ is the top-level operator (no wrapper), and `(lookup this "name")` is parenthesi
 argument.
 ====
 
-== 5.1 Output: `pass:[{{ }}]`, `pass:[{{{ }}}]`, `pass:[{{& }}]`
+== 5.1 Output: `pass:[{{ }}]` and `pass:[{{{ }}}]`
 
 [cols="2,3",options="header"]
 |===
@@ -27,8 +27,10 @@ argument.
 
 |`pass:[{{ E }}]` |`pass:[{{{ esc_html E' }}}]`
 |`pass:[{{{ E }}}]` |`pass:[{{{ E' }}}]`
-|`pass:[{{& E }}]` |`pass:[{{{ E' }}}]`
 |===
+
+There is no ampersand form: {hbs}' `pass:[{{& E }}]` (unescaped) is dropped — write the triple-stash
+`pass:[{{{ E }}}]`, which is exactly as short and already means "do not escape".
 
 `E'` is `E` after the *path rewrite* (5.2). If `E'` is itself a multi-token application it is wrapped
 in parentheses before being handed to `esc_html` (it is now an argument): `pass:[{{ upcase x }}]` →

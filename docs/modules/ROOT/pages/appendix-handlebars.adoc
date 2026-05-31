@@ -35,7 +35,6 @@ toc::[]
 
 |`pass:[{{x}}]` |`pass:[{{x}}]` |`pass:[{{{ esc_html (lookup this "x") }}}]` |SURFACE
 |`pass:[{{{x}}}]` |`pass:[{{{x}}}]` |`pass:[{{{ lookup this "x" }}}]` |SURFACE
-|`pass:[{{&x}}]` |`pass:[{{&x}}]` |`pass:[{{{ lookup this "x" }}}]` |SURFACE
 |`pass:[{{a.b.c}}]` |same |`pass:[{{{ esc_html (lookup this "a" "b" "c") }}}]` |SURFACE
 |`pass:[{{a.[1]}}]` / `pass:[{{a.1}}]` |same |`pass:[{{{ esc_html (lookup this "a" 1) }}}]` |SURFACE
 |`pass:[{{a.[home town]}}]` |same |`pass:[{{{ esc_html (lookup this "a" "home town") }}}]` |SURFACE
@@ -421,7 +420,6 @@ Every {hbs}/Mustache surface element, asserting a mapping exists. A missing ✓ 
 .Expressions & paths
 * [x] `pass:[{{x}}]` escaped — A.1
 * [x] `pass:[{{{x}}}]` triple-stash — A.1
-* [x] `pass:[{{&x}}]` ampersand — A.1
 * [x] dotted / index / segment-literal / slash paths — A.1
 * [x] `this` / `.` / `this.a` — A.1
 * [x] parent `../a`, `../../a` — A.1, A.5
@@ -514,14 +512,13 @@ Both invert control. Pick `runTemplate` to *execute*, `foldTemplate` to *prepare
 
 [NOTE]
 ====
-*What v1 ships, concretely.* The reference implementation fixes `m = Either Error` and a single
-`env` record, and exposes the control handle as `HelperCtx { env, body, render }` with
-`Helper = HelperCtx -> Array Value -> Either Error Value`, plus `runTemplate :: Env -> Template ->
-Either Error String`, the `foldTemplate` *algebra* of A.13.2, `splitClause`, and `validate :: Schema
--> Template -> Array Issue`. The polymorphic `Engine m env` / `Ctl m env` shown below is the
-*intended generalization* (pluggable monad — `m = Aff` for async — and pluggable
-`env`/`resolve`/`stringify`); read `Ctl`'s `children`/`clause` as `HelperCtx`'s `body`/`splitClause`
-for the v1 slice.
+*What v1 ships.* The polymorphic `Engine m env` / `Ctl m env` / `Helper m env` and the drivers
+`runTemplate` (`Monad m`) and `runString` (`MonadThrow Error m`) are implemented as shown. The
+reference engine is supplied at both `m = Either Error` (`renderWith`/`compile`) and
+`m = ExceptT Error Aff` (`renderAff`), proving the monad is pluggable; its environment is the newtype
+`RefEnv m` (a type *synonym* `Env = { … Helper … Env }` would be cyclic — use a newtype). Two small
+deltas from the sketch below: the handle carries no `span` field yet (planned, pending source spans
+on the AST), and `Ctl.clause`/`splitClause` return `{ before, body }`.
 ====
 
 [#engine-api-run]
@@ -569,7 +566,7 @@ there is no traversal anywhere in it:
 
 [source,haskell]
 ----
-type Env = { ctx :: Value, helpers :: Map Ident (Helper (Either Error) Env) }
+newtype Env = Env { ctx :: Value, helpers :: Map Ident (Helper (Either Error) Env) }  -- newtype: a synonym here would be cyclic
 
 engine :: Value -> Engine (Either Error) Env
 engine root =

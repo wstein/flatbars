@@ -59,18 +59,19 @@ function:
 
 [source,haskell]
 ----
-type Render = Env -> Template -> M String
+runTemplate :: forall m env. Monad m => Engine m env -> Template -> m String
 ----
 
-`M` is the result monad: v1 fixes `M = Either Error` (pure); a host needing async/effects instantiates
-`M = Aff` under a `MonadThrow Error m` constraint. `Env` is the engine's business; the reference
-engine uses:
+The driver is *polymorphic* in the result monad `m` (a pure host uses `Either Error`; an async one
+`ExceptT Error Aff`, under `MonadThrow Error m`) and in the environment type `env`. `env` is the
+engine's business; the reference engine uses a frame stack (as a newtype, `RefEnv m`, so the
+recursive `RefEnv → Helper → Ctl → RefEnv` is well-founded):
 
 [source,haskell]
 ----
-type Env =
-  { helpers :: List (Map Ident Helper)   -- a stack of frames; head is innermost
-  , context :: Value                     -- what `this` returns
+newtype RefEnv m = RefEnv
+  { helpers :: List (Map Ident (Helper m (RefEnv m)))   -- a stack of frames; head is innermost
+  , context :: Value                                    -- what `this` returns
   }
 ----
 
@@ -101,15 +102,16 @@ xref:errors.adoc[].
 render env (Content s)            = s
 render env (Output e)             = stringify (eval env e)
 render env (Block name args body) = stringify (apply (resolve env name)
-                                                      { env, body, render }
+                                                      (ctl env body)             -- Ctl handle
                                                       [ eval env a | a <- args ])
 render env (RawBlock name args r) = stringify (apply (resolve env name)
-                                                      { env, body: [Content r], render }
+                                                      (ctl env [Content r])
                                                       [ eval env a | a <- args ])
 
 eval env (Lit v)         = v
-eval env (App name args) = apply (resolve env name) { env, body: [], render }
-                                                    [ eval env a | a <- args ]
+eval env (App name args) = apply (resolve env name) (ctl env []) [ eval env a | a <- args ]
+
+-- ctl env children = { env, children, eval, render, clause: \n -> splitClause n children }
 ----
 
 Arguments are evaluated *eagerly, left to right*, before the helper runs. Block bodies are the
@@ -118,39 +120,40 @@ exception: a helper receives its body *unevaluated* (as a `Template`) and decide
 == 3.6 Helpers and the control handle
 
 *BareBars drives the whole walk — inversion of control.* It resolves and applies each helper,
-handing it a `HelperCtx`: a *control handle* whose `render` field is a callback *into* BareBars. A
-helper never traverses the tree itself; it asks BareBars to render the sub-trees it chooses.
+handing it a `Ctl`: a *control handle* whose fields are callbacks *into* BareBars. A helper never
+traverses the tree itself; it asks BareBars to render the sub-trees it chooses.
 
 [source,haskell]
 ----
-type Render    = Env -> Template -> M String   -- the inversion-of-control callback
+type Ctl m env =
+  { env      :: env                          -- the current environment (the engine's type)
+  , children :: Template                     -- this block's body ([] for inline calls)
+  , eval     :: env -> Expr     -> m Value   -- BareBars evaluates an expression for you
+  , render   :: env -> Template -> m String  -- BareBars renders a sub-tree for you
+  , clause   :: Ident -> { before :: Template, body :: Maybe Template } }  -- split a nested clause
 
-type HelperCtx = { env    :: Env               -- the current environment
-                 , body   :: Template          -- captured children ([] for inline calls)
-                 , render :: Render }           -- ask BareBars to render a sub-tree
-
-type Helper    = HelperCtx -> Array Value -> M Value
+type Helper m env = Ctl m env -> Array Value -> m Value
 ----
 
-An *inline* helper ignores `body`. A *block* helper uses it: it may render `body` zero or more times,
-under environments it constructs (pushing scoped helpers, shifting `context`), and it may *inspect*
-`body` to find nested clause blocks.
+An *inline* helper ignores the handle. A *block* helper uses it: it may `render` its `children` zero
+or more times, under environments it constructs (pushing scoped helpers, shifting `context`), and it
+may `clause` into `children` to find nested clause blocks.
 
 [source,haskell]
 ----
 -- if: render the body up to a child `else` block; render the else clause otherwise.
-ifHelper ctx [cond] =
-  let { before, clause } = splitClause "else" ctx.body
+ifHelper ctl [cond] =
+  let { before, body } = ctl.clause "else"
   in if truthy cond
-       then VSafe <$> ctx.render ctx.env before
-       else VSafe <$> ctx.render ctx.env (fromMaybe [] clause)
+       then VSafe <$> ctl.render ctl.env before
+       else VSafe <$> ctl.render ctl.env (fromMaybe [] body)
 
--- splitClause "else" finds the first  Block "else" _ t  in the body,
+-- ctl.clause "else" finds the first  Block "else" _ t  in the children,
 -- returning the nodes before it and that block's body t.
 ----
 
-`each` calls `ctx.render` once per element with a per-element frame (installing `index`, `first`,
-`this`, …) and uses the same `splitClause "else"` to render an empty-collection clause. `with`
+`each` calls `ctl.render` once per element with a per-element frame (installing `index`, `first`,
+`this`, …) and uses the same `ctl.clause "else"` to render an empty-collection clause. `with`
 shifts `context`. None of this is in the core — it is the reference engine's reading of plain nested
 blocks.
 

@@ -110,7 +110,6 @@ has a home in the surface dialect or the engine:
 |Absent from the core |Where it lives
 
 |`pass:[{{ }}]` (escaped output) |surface → `pass:[{{{ esc_html … }}}]`
-|`pass:[{{& }}]` (ampersand-unescaped) |surface → `pass:[{{{ … }}}]`
 |`pass:[{{else}}]`, `pass:[{{^}}]` |engine → nested clause blocks / the `unless` helper
 |dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent`
 |index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments
