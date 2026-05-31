@@ -11,7 +11,7 @@
          immediately in the system fallback, then the fonts swap in. -->
     <link rel="stylesheet" media="print" onload="this.media='all'"
           href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
-    <title>Stem Playground — IDE</title>
+    <title>FlatBars Lab — IDE</title>
     <style>
       /* ── Design tokens ───────────────────────────────────────────── */
       :root {
@@ -1320,7 +1320,7 @@
             <path class="stem-line" d="M24 29 C27 27 29 27 31 28" stroke="var(--stem-green)" stroke-width="2" stroke-linecap="round"/>
             <circle class="stem-dot" cx="24" cy="13" r="2" fill="var(--stem-green)"/>
           </svg>
-          <span class="brand-name"><b>Stem</b> Playground</span>
+          <span class="brand-name"><b>FlatBars</b> Lab</span>
         </div>
         <div class="divider"></div>
         <div class="topbar-group">
@@ -1334,8 +1334,8 @@
         <div class="topbar-group" id="dialect-group" hidden>
           <span class="field-label">Dialect</span>
           <select id="dialect-select" class="select" aria-label="BareBars dialect">
-            <option value="surface">Surface</option>
-            <option value="core">Core</option>
+            <option value="fullbars">FullBars</option>
+            <option value="corebars">CoreBars</option>
           </select>
         </div>
         <div class="divider"></div>
@@ -1679,8 +1679,8 @@
       if (dialectGroup && dialectSel) {
         if (ENGINE === "barebars") {
           dialectGroup.hidden = false;
-          dialectSel.value =
-            new URLSearchParams(location.search).get("dialect") === "core" ? "core" : "surface";
+          const dp = new URLSearchParams(location.search).get("dialect");
+          dialectSel.value = (dp === "core" || dp === "corebars") ? "corebars" : "fullbars";
           dialectSel.addEventListener("change", (e) => navWith("dialect", e.target.value));
         } else {
           dialectGroup.hidden = true;
@@ -1787,14 +1787,15 @@
 
       // Classify a matched tag by its leading marker (after the braces and an
       // optional `~` trim marker): comment, raw (`{{{ }}}` / `{{&}}`), partial,
-      // block, or plain expression.
+      // block (openers `{{#}}` / `{{^}}` (inverted section), closers `{{/}}`, and
+      // the clause separators `{{else}}` / `{{elif}}`), or plain expression.
       const hbMarkFor = (t) => {
         if (t.startsWith("{{!--") || t.startsWith("{{!")) return hbCommentMark;
         if (t.startsWith("{{{")) return hbRawMark;
         const inner = t.replace(/^\{\{+~?\s*/, "");
         if (inner.startsWith("&")) return hbRawMark;     // {{&html}} — unescaped, like {{{ }}}
         if (inner.startsWith(">")) return hbPartialMark;  // {{> part}}
-        if (inner.startsWith("#") || inner.startsWith("/") || /^else\b/.test(inner)) return hbBlockMark;
+        if (inner.startsWith("#") || inner.startsWith("/") || inner.startsWith("^") || /^(?:else|elif)\b/.test(inner)) return hbBlockMark;
         return hbExprMark;
       };
 

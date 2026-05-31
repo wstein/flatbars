@@ -1,9 +1,9 @@
-# Bars Lab — polyglot template playground (plan)
+# FlatBars Lab — polyglot template playground (plan)
 
 Goal: **one** playground that serves **Handlebars**, **Stem**, *and*
 **BareBars/FullBars** — porting the full `reference/web` ("Stem Playground —
 IDE") feature set and adding BareBars as a first-class engine. Draft for
-approval; nothing built yet. (Working name "Bars Lab" — see naming options.)
+approval; nothing built yet. (Working name "FlatBars Lab" — see naming options.)
 
 ## Decisive finding: the reference is already a multi-engine IDE
 
@@ -27,7 +27,7 @@ doesn't advertise a feature simply doesn't show that panel. It already runs Stem
 
 ## Strategy (the pivot — confirm)
 
-**Build Bars Lab on `reference/web`; add a BareBars engine adapter; rebrand.**
+**Build FlatBars Lab on `reference/web`; add a BareBars engine adapter; rebrand.**
 Do *not* rebuild the IDE in Halogen. Rationale:
 
 - The reference gives us *all* Stem features, the Handlebars engine, and every
@@ -36,7 +36,7 @@ Do *not* rebuild the IDE in Halogen. Rationale:
 - BareBars already compiles to JS, so it plugs into the vanilla-JS adapter seam
   via a compiled facade — no WASM needed (the `barebars-js` facade is the seed:
   `render`/`renderSurface` already exist; we extend it to the full seam).
-- The current Halogen `packages/playground` is **superseded** by Bars Lab. Keep
+- The current Halogen `packages/playground` is **superseded** by FlatBars Lab. Keep
   it only if we still want a tiny embeddable BareBars-only demo (decision below).
 
 Consequence: this reverses the earlier "stay on Halogen / reuse our engine"
@@ -110,10 +110,10 @@ This is the reason to be polyglot, not just multi-tab.
 
 1. **Strategy**: confirm building on `reference/web` + a BareBars adapter (vs a
    Halogen rebuild). Recommended: build on the reference.
-2. **Name** (see ratings in the chat): Bars Lab / Brace Lab / Polybars / …
+2. **Name** (see ratings in the chat): FlatBars Lab / FlatBars Lab / Polybars / …
 3. **Halogen `packages/playground`**: retire it, or keep a minimal embeddable
    BareBars-only demo?
 4. **Stem source**: is the prebuilt `wasm/stem_native` the canonical Stem, or do
    we track a Stem source/repo for rebuilds?
-5. **Repo placement**: does Bars Lab live in this repo (e.g. `packages/lab` or
+5. **Repo placement**: does FlatBars Lab live in this repo (e.g. `packages/lab` or
    promote `reference/web`), and is the Stem/Handlebars vendoring kept as-is?
