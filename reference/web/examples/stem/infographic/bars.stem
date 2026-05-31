@@ -1,0 +1,5 @@
+<div class="ig-bars">
+  {{~#each bars}}
+    {{partial "bar" @this}}
+  {{~/each}}
+</div>

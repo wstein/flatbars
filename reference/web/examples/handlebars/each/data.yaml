@@ -1,0 +1,11 @@
+people: [Ada, Grace, Alan]
+profile:
+  name: Ada Lovelace
+  role: Compiler
+  joined: "1843"
+archived: []
+teams:
+  - name: Frontend
+    members: [Mara, Devon]
+  - name: Backend
+    members: [Priya, Lin]

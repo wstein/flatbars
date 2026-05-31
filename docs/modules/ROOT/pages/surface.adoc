@@ -1,0 +1,148 @@
+= 5. The surface dialect (sugar)
+:navtitle: 5. The surface dialect
+
+The core is austere by design. *BareBars Surface* is an optional dialect that recovers {hbs}
+ergonomics by *compiling to the core*. It is a separate component — you can render core templates
+without it, swap it, or write your own — but the reference Surface is specified here because the
+xref:appendix-handlebars.adoc[Handlebars mapping] is defined in terms of it.
+
+Surface adds nothing the core cannot already express. Every rule below is a *pure syntactic
+rewrite* (a desugaring) from Surface to core. Where a rewrite mentions a helper (`esc_html`,
+`lookup`, `dict`, `partial`, …), that helper must exist in the xref:prelude.adoc[prelude].
+
+== 5.1 Output: `pass:[{{ }}]`, `pass:[{{{ }}}]`, `pass:[{{& }}]`
+
+[cols="2,3",options="header"]
+|===
+|Surface |Core
+
+|`pass:[{{ E }}]` |`pass:[{{{ esc_html E' }}}]`
+|`pass:[{{{ E }}}]` |`pass:[{{{ E' }}}]`
+|`pass:[{{& E }}]` |`pass:[{{{ E' }}}]`
+|===
+
+`E'` is `E` after the *path rewrite* (5.2). The double-stash is the only place escaping is
+introduced; the triple-stash and ampersand forms emit the value as-is.
+
+== 5.2 Paths become `lookup`
+
+A *path* is the {hbs} dotted/segmented reference. Surface rewrites every path against the current
+context obtained from `this`:
+
+[cols="2,3",options="header"]
+|===
+|Surface path |Core
+
+|`name` |`(lookup this "name")`
+|`a.b.c` |`(lookup this "a" "b" "c")`
+|`a.1` or `a.[1]` |`(lookup this "a" 1)`  (numeric segment)
+|`a.[home town]` |`(lookup this "a" "home town")`  (segment-literal)
+|`a/b` (legacy slash) |`(lookup this "a" "b")`
+|`this` or `.` |`this`
+|`this.a` or `./a` |`(lookup this "a")`
+|`../a` |`(lookup (parent) "a")`
+|`../../a` |`(lookup (parent (parent)) "a")`
+|`@x` |`(x)`  (a scoped data helper — see 5.5)
+|`@../x` |`(x (parent))`
+|===
+
+`lookup` is *variadic*: it walks the segments left to right, indexing objects by string key and
+arrays by number, returning `VNull` at the first miss. `parent` is a scoped helper that block
+helpers install to expose the enclosing context (5.5); it replaces {hbs}' implicit context stack
+with an explicit, named one.
+
+[NOTE]
+====
+A bare path `name` resolves to a *data field*, never to a helper, because Surface always wraps it in
+`lookup this`. This is the opposite of the core, where `pass:[{{{name}}}]` calls the helper `name`.
+The two layers read the same text differently *on purpose*: Surface is for template authors who
+think in data; the core is for the desugarer and the prelude.
+====
+
+== 5.3 Helper calls, literals, and subexpressions
+
+Inside a Surface tag, anything that is not a bare path is a helper call, exactly as in the core,
+with two literal conveniences:
+
+[cols="2,3",options="header"]
+|===
+|Surface |Core
+
+|`true` / `false` / `null` |`(true)` / `(false)` / `(null)`
+|`(helper a b)` |unchanged — grouping is already core
+|`helper a b` (tag head) |unchanged — application is already core
+|===
+
+How does Surface tell a *helper name* from a *path* in head position? It cannot, and it does not
+try: *in head position a bare identifier is always a helper*, and *in argument position a bare
+identifier that is not a registered literal is a path*. So `pass:[{{upcase name}}]` is
+`pass:[{{{ esc_html (upcase (lookup this "name")) }}}]`. This matches {hbs}, where the first token
+is helper-or-path-with-helper-priority and later bare tokens are paths.
+
+== 5.4 Hash arguments become a trailing `dict`
+
+[cols="2,3",options="header"]
+|===
+|Surface |Core
+
+|`pass:[{{helper a k1=v1 k2=v2}}]` |`pass:[{{{ esc_html (helper a (dict "k1" v1 "k2" v2)) }}}]`
+|`pass:[{{#helper a k=v}}…{{/helper}}]` |`pass:[{{#helper a (dict "k" v)}}…{{/helper}}]`
+|===
+
+All `key=value` pairs in a call collapse into a single `dict` value appended *after* the positional
+arguments. A helper that wants named options reads them out of that trailing object — the
+equivalent of {hbs}' `options.hash`.
+
+== 5.5 `@data` and block params become scoped helpers
+
+`each` and `with` install scoped helpers for the duration of their body. Surface `@`-variables are
+just calls to them, and block params rename them:
+
+[cols="2,3",options="header"]
+|===
+|Surface |Core / mechanism
+
+|`@index` `@key` `@first` `@last` |`(index)` `(key)` `(first)` `(last)` — installed by `each`
+|`@root` |`(root)` — installed by the host at the top frame
+|`@level` |`(level)` — depth counter, if the prelude provides it
+|`{{#each xs as \|item i\|}}` |`{{#each xs "item" "i"}}` — `each` installs `item` and `i` in addition to `this`/`index`
+|`{{#with o as \|x\|}}` |`{{#with o "x"}}` — `with` installs `x` alongside the shifted `this`
+|===
+
+Renaming via `as |…|` becomes positional *binding-name* arguments to the block helper. The helper
+chooses what each name binds (the prelude `each` binds the first to the element, the second to the
+index); see xref:prelude.adoc[].
+
+== 5.6 Partials become `partial` / `inline`
+
+[cols="2,3",options="header"]
+|===
+|Surface |Core
+
+|`pass:[{{> name}}]` |`pass:[{{{ partial "name" this }}}]`
+|`pass:[{{> name ctx}}]` |`pass:[{{{ partial "name" ctx }}}]`
+|`pass:[{{> name k=v}}]` |`pass:[{{{ partial "name" this (dict "k" v) }}}]`
+|`pass:[{{> name ctx k=v}}]` |`pass:[{{{ partial "name" ctx (dict "k" v) }}}]`
+|`pass:[{{> (expr)}}]` (dynamic) |`pass:[{{{ partial (expr) this }}}]`
+|`pass:[{{#> name k=v}}body{{/name}}]` |`pass:[{{#partial> "name" (dict "k" v)}}body{{/partial>}}]`
+|`pass:[{{> @partial-block}}]` |`pass:[{{{ partial-block }}}]`
+|`pass:[{{#*inline "name"}}body{{/inline}}]` |`pass:[{{#inline "name"}}body{{/inline}}]`
+|===
+
+Partials render *unescaped* (note the triple-stash on the right) — a partial produces markup, not a
+data value. The partial *name* desugars to a `STRING` literal; a dynamic partial keeps the computed
+expression. `partial`, `partial>`, `inline`, and the scoped `partial-block` are prelude helpers; see
+xref:appendix-handlebars.adoc#partials[A.6].
+
+== 5.7 What Surface does *not* change
+
+Comments, raw blocks, whitespace `~`, and brace-escaping are *core* features and pass through
+Surface untouched. The inverse separator `pass:[{{else}}]` and `pass:[{{^…}}]` are core. Surface
+adds `else if` as the single non-trivial *block* rewrite:
+
+[source,text]
+----
+{{#if a}}A{{else if b}}B{{else}}C{{/if}}
+desugars to
+{{#if a}}A{{else}}{{#if b}}B{{else}}C{{/if}}{{/if}}
+----

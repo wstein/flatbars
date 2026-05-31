@@ -1,0 +1,17 @@
+# {{project}} v{{version}}
+
+_Released {{date}} · {{total}} changes_
+
+| Section | Count |
+| --- | ---: |
+{{~#each sections}}
+| {{@this.title}} | {{@this.count}} |
+{{~/each}}
+
+{{~#each sections}}
+## {{@this.title}}
+
+{{#each @this.items}}- **{{@this.scope}}**: {{@this.desc}}
+{{/each}}
+
+{{~/each}}

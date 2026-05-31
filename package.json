@@ -1,0 +1,30 @@
+{
+  "name": "barebars-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BareBars — a template-engine construction kit. PureScript monorepo: core library, CLI, and web playground.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "workspaces": [
+    "packages/playground"
+  ],
+  "scripts": {
+    "build": "spago build",
+    "test": "spago test -p barebars",
+    "cli": "spago run -p barebars-cli",
+    "playground": "npm --workspace packages/playground run dev",
+    "playground:build": "npm --workspace packages/playground run build",
+    "docs": "antora docs/antora.yml",
+    "format": "purs-tidy format-in-place \"packages/*/src/**/*.purs\" \"packages/*/test/**/*.purs\"",
+    "format:check": "purs-tidy check \"packages/*/src/**/*.purs\" \"packages/*/test/**/*.purs\"",
+    "lint": "spago build --pedantic-packages",
+    "clean": "rimraf output .spago"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0",
+    "purescript": "^0.15.15",
+    "purs-tidy": "^0.11.1",
+    "rimraf": "^5.0.0",
+    "spago": "^0.93.0"
+  }
+}

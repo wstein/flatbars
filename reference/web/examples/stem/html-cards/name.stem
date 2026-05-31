@@ -1,0 +1,4 @@
+{{!-- e.g. "1. ADA LOVELACE ★ lead". `n` is the 1-based index the card passes
+      down: runtime partials are root-scoped, so iteration vars like @index1 must
+      be handed over as data rather than inherited (ADR-0014). --}}
+<div class="name">{{n}}. {{upcase @this.name}}{{#if @this.lead}} {{partial "lead_badge"}}{{/if}}</div>

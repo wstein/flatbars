@@ -1,0 +1,24 @@
+<h1>Conditionals</h1>
+
+{{#if author}}
+  <h2>{{author.firstName}} {{author.lastName}}</h2>
+{{else}}
+  <h2>Unknown Author</h2>
+{{/if}}
+
+{{! `unless` is the inverse of `if`. }}
+{{#unless license}}
+  <p class="warning">WARNING: this entry does not have a license.</p>
+{{/unless}}
+
+{{! `else if` chains conditions without nesting. }}
+{{#if active}}
+  <p>Status: active ✓</p>
+{{else if paused}}
+  <p>Status: paused ⏸</p>
+{{else}}
+  <p>Status: unknown</p>
+{{/if}}
+
+{{! Handlebars truthiness: empty arrays are falsy, but 0 and {} are truthy. }}
+<p>tasks is {{#if tasks}}truthy{{else}}falsy (empty array){{/if}}.</p>

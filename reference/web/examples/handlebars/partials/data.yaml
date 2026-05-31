@@ -1,0 +1,8 @@
+author:
+  name: Ada Lovelace
+person:
+  name: Grace Hopper
+team:
+  - name: Alan Turing
+  - name: Barbara Liskov
+layout: fancy

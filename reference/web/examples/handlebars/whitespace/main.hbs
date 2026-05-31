@@ -1,0 +1,25 @@
+<h1>Whitespace &amp; escaping</h1>
+
+{{! `~` trims whitespace on that side of the tag. }}
+<p>Default (keeps newlines/indent):</p>
+<ul>
+  {{#each items}}
+    <li>{{this}}</li>
+  {{/each}}
+</ul>
+
+<p>Trimmed with <code>~</code> (compact):</p>
+<ul>
+  {{~#each items~}}
+    <li>{{this}}</li>
+  {{~/each~}}
+</ul>
+
+{{! A backslash escapes a mustache so it renders literally. }}
+<p>Literal: \{{ this stays text }}.</p>
+
+{{!-- A raw block ({{{{ }}}}) emits its body verbatim — mustaches inside
+    are NOT evaluated. See the `raw` helper in helpers.js. --}}
+<pre>{{{{raw}}}}
+Hello {{name}} — this {{mustache}} is not evaluated.
+{{{{/raw}}}}</pre>

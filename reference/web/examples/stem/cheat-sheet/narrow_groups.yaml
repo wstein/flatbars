@@ -1,0 +1,36 @@
+- name: eval
+  pill: "dynamic · opt-in"
+  desc: "Dynamic, opt-in only — renders a string from data as a full Stem template against the assign context."
+  callout: "Never enable for untrusted templates OR untrusted data — eval renders an arbitrary Stem template drawn from a data value at render time (SSTI)."
+  warn: true
+  categories: [eval]
+  overrides:
+    eval:
+      example: "{{eval expr}}"
+      result: "WORLD"
+
+- name: escape
+  pill: "literal output"
+  desc: "Always available — literal output via the consume-1 backslash rule and raw blocks."
+  categories: []
+  entries:
+    - name: '\{{ }}'
+      desc: "One backslash before a tag prints it literally; the backslash is consumed."
+      example: '\{{name}}'
+      result: '{{name}}'
+    - name: '\\{{ }}'
+      desc: "Two backslashes emit one literal backslash, then the tag interpolates."
+      example: '\\{{name}}'
+      result: '\World'
+    - name: '\\\{{ }}'
+      desc: "Three backslashes emit two literal backslashes, then the tag interpolates."
+      example: '\\\{{name}}'
+      result: '\\World'
+    - name: '\\\\{{ }}'
+      desc: "In general, n backslashes emit n-1 literal backslashes, then the tag interpolates."
+      example: '\\\\{{name}}'
+      result: '\\\World'
+    - name: '{{{{#raw}}}}'
+      desc: "A raw block emits everything between the open and close tags literally."
+      example: '{{{{#raw}}}}{{name}}{{{{/raw}}}}'
+      result: '{{name}}'

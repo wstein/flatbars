@@ -1,0 +1,44 @@
+<style>
+body { font: 13px/1.6 system-ui, sans-serif; padding: 1.5rem 2rem; background: #f8f8fc; color: #111; }
+h2 { margin: 0 0 .25rem; font-size: 1rem; color: #333; }
+p  { margin: 0 0 1rem; font-size: 12px; color: #888; }
+table { border-collapse: collapse; width: 100%; background: #fff;
+        border: 1px solid #e2e2ee; border-radius: 6px; overflow: hidden; }
+th { padding: .45rem .8rem; text-align: left; background: #f0f0f8;
+     color: #555; font-weight: 600; font-size: 11px; letter-spacing: .05em;
+     text-transform: uppercase; border-bottom: 1px solid #e2e2ee; }
+td { padding: .4rem .8rem; border-bottom: 1px solid #f0f0f8;
+     font-family: monospace; font-size: 12px; }
+tr:last-child td { border-bottom: none; }
+.col-type    { color: #7c3aed; }
+.col-default { color: #059669; }
+.col-null    { color: #bbb; font-style: italic; }
+.sql-create  { margin-top: 1.5rem; background: #1e1e2e; color: #cdd6f4;
+               border-radius: 6px; padding: 1rem 1.25rem; font: 12px/1.7 monospace;
+               white-space: pre; overflow-x: auto; }
+.kw { color: #89b4fa; } .tbl { color: #a6e3a1; }
+.cn { color: #f5c2e7; } .ct { color: #fab387; } .cd { color: #a6e3a1; }
+</style>
+<h2>SQL DDL — <code>{{table}}</code></h2>
+<p>Each column's DEFAULT is resolved from the <strong>typeDefaults</strong> dictionary via <code>{{"{{"}}default (lookup typeDefaults @this.type) "NULL"{{"}}"}}</code>. Unknown types fall back to the <code>default</code> key automatically.</p>
+
+<table>
+  <tr><th>Column</th><th>Type</th><th>SQL DEFAULT</th></tr>
+  {{~#each columns}}
+  <tr>
+    <td>{{@this.name}}</td>
+    <td class="col-type">{{@this.type}}</td>
+    {{~#if (lookup typeDefaults @this.type)}}
+    <td class="col-default">{{lookup typeDefaults @this.type}}</td>
+    {{~else}}
+    <td class="col-null">NULL <em>(unmapped — uses default key)</em></td>
+    {{~/if}}
+  </tr>
+  {{~/each}}
+</table>
+
+<div class="sql-create"><span class="kw">CREATE TABLE</span> <span class="tbl">{{table}}</span> (
+{{~#each columns}}
+  <span class="cn">{{@this.name}}</span>  <span class="ct">{{@this.type}}</span>  <span class="kw">DEFAULT</span> <span class="cd">{{default (lookup typeDefaults @this.type) "NULL"}}</span>{{~#unless @last}},{{~/unless}}
+{{~/each}}
+);</div>

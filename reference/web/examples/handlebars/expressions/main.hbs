@@ -1,0 +1,15 @@
+<h1>Expressions</h1>
+
+<p>A simple expression looks up a value: Hello, {{firstname}} {{lastname}}!</p>
+
+<p>Nested paths walk into objects: {{person.name}} leads {{person.team}}.</p>
+
+<p>By default, values are HTML-escaped: {{html}}</p>
+<p>Triple-stash emits raw HTML: {{{html}}}</p>
+<p>…and so does the ampersand form: {{&html}}</p>
+
+<p>Segment-literal notation reads keys with spaces or symbols: {{person.[home town]}}.</p>
+
+<ul>
+  {{#each tags}}<li>this = {{this}}</li>{{/each}}
+</ul>

@@ -1,0 +1,95 @@
+= The core model
+:navtitle: The core model
+
+BareBars rests on five decisions. Every later rule is a consequence of these.
+
+== 1. Everything is a helper application
+
+A template is a sequence of *content* and *outputs*. An output evaluates one expression and
+writes its value. The only kind of compound expression is a *helper application*.
+
+[source,text]
+----
+{{{city}}}                 <1>
+{{{lookup this "city"}}}   <2>
+{{{upcase (lookup this "name")}}} <3>
+----
+<1> Calls the helper `city` with no arguments. It is *not* a variable and *not* `this.city`.
+<2> Reads the `city` field of the current context, by calling the helpers `lookup` and `this`.
+<3> `upcase` applied to one argument — the grouped sub-application `(lookup this "name")`.
+
+There are *no variables*. The name in `pass:[{{{city}}}]` is resolved in the *helper environment*
+and invoked. The only way to touch data is to call a helper that exposes it.
+
+== 2. Application is juxtaposition; parentheses are grouping
+
+Writing a helper next to its arguments applies it: `head arg1 arg2`. Parentheses do not mean
+"call"; they *group* a multi-token application so it can sit in a single argument slot.
+
+[source,text]
+----
+lookup this "age"             a 2-argument application; no parens needed
+upcase (lookup this "name")   upcase applied to ONE argument (the group)
+upcase lookup this "name"     WRONG: upcase applied to THREE arguments
+----
+
+This is exactly the {hbs} subexpression model (and ML/Haskell-style application), *not* Lisp
+prefix notation where every call is parenthesized.
+
+== 3. The head of an application is always a name
+
+The operator position holds an *identifier* — a helper name — never a computed value. Nothing
+in the language produces a callable value, so nothing can appear in head position except a name.
+
+[source,text]
+----
+{{{(lookup this "fn") x}}}    not valid: the head is a group, not a name
+{{{apply (lookup this "fn") x}}}   the higher-order case goes through a helper
+----
+
+This is what keeps a `Value` free of functions (see xref:evaluation.adoc[]). Helpers are names in
+a table; data values are pure.
+
+== 4. Scope is helpers, installed by blocks
+
+Because a bare name is a helper call, *scoped state is just scoped helpers*. A block helper such
+as `each` installs nullary helpers (`index`, `first`, the item context `this`, …) that live only
+for the duration of its body, then removes them.
+
+[source,text]
+----
+{{#each people}}
+  {{{lookup this "name"}}} is number {{{index}}}   <1>
+{{/each}}
+{{{index}}}                                        <2>
+----
+<1> Inside the block, `index` and `this` resolve — `each` installed them for its body.
+<2> Outside, `index` is undefined and resolving it is an error.
+
+This replaces {hbs}' `@index`/`@parent`/context-stack machinery with ordinary lexical
+scoping over the helper environment. There is no `@` namespace and no `../` operator in the core.
+
+== 5. No sugar, no reserved words, no built-ins
+
+The core defines *syntax and plumbing only*. It does not know what is truthy, what `if` does, how
+to index an object, or whether output should be HTML-escaped. Those are *helper implementations*.
+Consequences:
+
+* `true`, `false`, `null` are *not* literals and *not* keywords — they are prelude helpers
+  `(true)`, `(false)`, `(null)`.
+* HTML escaping is the prelude helper `esc_html`; the core never escapes anything.
+* `if`, `each`, `with`, `unless`, `lookup` are prelude helpers; delete them and the language still
+  parses and runs.
+
+[IMPORTANT]
+====
+*The non-negotiable rule.* No sugar in the core. If a construct can be explained as a rewrite to
+a smaller construct, it does not belong in the core; it belongs in the
+xref:surface.adoc[surface dialect]. `pass:[{{name}}]` (escaped), `a.b.c`, `@index`, `../x`,
+`as \|x\|`, `pass:[{{> p}}]` are *all* surface sugar.
+====
+
+== A note on naming
+
+The mark is a set of *bare rods*: the {hbs} braces stripped to their vertical strokes. The triple
+stash `pass:[{{{ }}}]` — the core's one and only inline output form — is the logo's source.

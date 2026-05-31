@@ -1,0 +1,34 @@
+# --- PureScript / Spago ---
+output/
+.spago/
+.spago-cache/
+.psc-package/
+.psci_modules/
+*.purs.bak
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Bundles / build output ---
+dist/
+build/
+.parcel-cache/
+
+# --- Reference playground build artifacts (kept as reference, not built here) ---
+reference/web/wasm/*.wasm
+reference/web/test/node_modules/
+reference/web/test/screenshots/
+
+# --- Editor / OS ---
+.DS_Store
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- Antora ---
+docs/build/
+public/

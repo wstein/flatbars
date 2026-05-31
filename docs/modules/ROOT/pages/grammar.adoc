@@ -1,0 +1,154 @@
+= 2. Syntactic grammar
+:navtitle: 2. Syntactic grammar
+
+This is the *complete* core grammar. It is small on purpose: there is one output form, one
+application shape, and two block forms. Everything else a {hbs} user expects is built on top in the
+xref:surface.adoc[surface dialect] or supplied by the xref:prelude.adoc[prelude].
+
+== 2.1 Grammar (normative)
+
+[source,text]
+----
+Template  ::= Node*
+
+Node      ::= Content                                   (* literal text *)
+            | Output
+            | Block
+            | RawBlock
+            (* Comments are removed by the lexer and never appear here. *)
+
+Output    ::= "{{{" Expr "}}}"
+
+Block     ::= "{{#"   Ident Arg* "}}"
+                  Template
+                  ( Separator Template )*     (* zero or more name-agnostic separators *)
+              "{{/" Ident "}}"
+
+Separator ::= "{{" Ident Arg* "}}"           (* a block-internal split; the name is userland *)
+
+RawBlock  ::= "{{{{#" Ident Arg* "}}}}"
+                  RawText
+              "{{{{/" Ident "}}}}"
+
+Expr      ::= Literal
+            | Ident Arg*            (* application; zero args = nullary call *)
+            | "(" Expr ")"          (* grouping; a no-op around a whole expression *)
+
+Arg       ::= Literal
+            | Ident                 (* a bare ident in argument position is a nullary call *)
+            | "(" Expr ")"          (* group a nested application into one argument *)
+
+Literal   ::= String | Number
+
+Ident, String, Number, RawText    (* from the lexer; see Chapter 1 *)
+----
+
+== 2.2 Reading the grammar
+
+One structure runs through all of it: *an application is an operator followed by arguments*, and
+the operator sits *immediately after an opening bracket*. There are three brackets:
+
+[cols="1,2,2",options="header"]
+|===
+|Bracket |Opens with |Yields
+
+|grouping |`(` … `)` |a value
+|output |`pass:[{{{]` … `pass:[}}}]` |writes a value (takes exactly one `Expr`)
+|block |`pass:[{{#]` … `pass:[{{/n}}]` |writes a value, *and* hands the helper its captured body
+|===
+
+Because the output bracket takes *exactly one* `Expr`, you cannot write a bare-head application
+inside it:
+
+[source,text]
+----
+{{{lookup this "age"}}}     ok: the single Expr is an application
+{{{(lookup this "age")}}}   ok: grouping a whole expression is a harmless no-op
+{{{f a}}}                   ALSO ok — a single Expr "f a" (operator f, arg a)
+{{{f a b}}}                 ok: operator f, args a and b
+----
+
+Wait — re-read `Expr ::= Ident Arg*`. The output form's single `Expr` _may_ itself be a
+multi-argument application, because `Ident Arg*` is one `Expr`. So `pass:[{{{lookup this "age"}}}]`
+is legal without parens. Parentheses are needed only to nest one application *inside another* as an
+argument, as in `pass:[{{{upcase (lookup this "name")}}}]`. The head of an application is always an
+`Ident`; a group never appears in head position.
+
+== 2.3 Block heads must be identifiers
+
+The block opener is `pass:[{{# Ident Arg* }}]` — the operator is a bare `Ident`, exactly as in an
+inline application, and the arguments follow with the same rules. The closing tag `pass:[{{/Ident}}]`
+must repeat that identifier so the parser can match nesting.
+
+Consequently *computed block helpers are not expressible*: there is no `pass:[{{#(pick) …}}]`. This
+is the one place where the "head is always a name" rule is enforced syntactically rather than
+merely conventionally, and it is what makes `pass:[{{/each}}]` unambiguous.
+
+== 2.4 Separators and `pass:[{{^}}]`
+
+A `Block` may contain any number of *separators*. A separator is the generic double-stash tag
+`pass:[{{ Ident Arg* }}]` — the *only* double-stash form the core recognizes — and it splits the
+captured template into segments: the *primary body* (before the first separator) and one *branch*
+per separator. The helper receives the body thunk and the branch list (xref:evaluation.adoc[]);
+whether, when, and which it renders is entirely up to the helper.
+
+[IMPORTANT]
+====
+*The core attaches no meaning to a separator's name.* `pass:[{{else}}]`, `pass:[{{elif c}}]`,
+`pass:[{{case 1}}]`, `pass:[{{otherwise}}]`, `pass:[{{default}}]` all parse identically — as a
+separator whose head identifier is `else` / `elif` / `case` / …. A name like `else` *never lands in
+the lexer or parser*; it is the enclosing helper that decides what (if anything) `else` means. A
+separator's head identifier may not begin with the reserved sigils `# ^ / ! {` (those open other
+tags); any other identifier is legal.
+====
+
+`pass:[{{^Ident Arg*}}]` … `pass:[{{/Ident}}]` is an *inverse-first* block: the primary body is
+empty and the captured template becomes the first branch (with an empty separator name). It exists
+so the common "render when falsy" shape has a spelling; the prelude `unless` helper is the usual
+operator.
+
+[source,text]
+----
+{{^each xs}}nothing here{{/each}}
+≡ {{#each xs}}{{else}}nothing here{{/each}}     (* "else" here is just the first branch *)
+----
+
+== 2.5 What is *not* in the grammar
+
+To make the "no sugar in core" rule auditable, here is what a {hbs} author will look for and not
+find. Each has a home in the surface dialect or the prelude:
+
+[cols="1,2",options="header"]
+|===
+|Absent from the core |Where it lives
+
+|`pass:[{{ }}]` (escaped output) |surface → `pass:[{{{ esc_html … }}}]`. (In the *core*, a
+double-stash `pass:[{{ Ident … }}]` is a block separator, §2.4 — only meaningful inside a block;
+elsewhere it is a parse error. The two layers read `pass:[{{ }}]` differently, by design.)
+|`pass:[{{& }}]` (ampersand-unescaped) |surface → `pass:[{{{ … }}}]`
+|dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent` (xref:surface.adoc[])
+|array-index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments
+|`@index`, `@key`, `@root`, … |surface → scoped prelude helpers `index`, `key`, `root`, …
+|hash arguments `key=val` |surface → trailing `(dict "key" val)` argument
+|block params `as \|x i\|` |surface → binding-name arguments to the block helper
+|`true` / `false` / `null` / `undefined` literals |prelude helpers `(true)` `(false)` `(null)`
+|partials `pass:[{{> p}}]`, `pass:[{{#> p}}]`, `pass:[{{#*inline}}]` |surface → `partial` / `inline` prelude helpers
+|decorators `pass:[{{* …}}]`, `pass:[{{#* …}}]` |prelude block helpers
+|===
+
+== 2.6 Worked parse
+
+[source,text]
+----
+template:  <li>{{{esc_html (lookup this "name")}}} — {{{index}}}</li>
+
+Node[0] = Content "<li>"
+Node[1] = Output (App "esc_html"
+                       [ Group (App "lookup" [ App "this" []
+                                             , Str "name" ]) ])
+Node[2] = Content " — "
+Node[3] = Output (App "index" [])
+Node[4] = Content "</li>"
+----
+
+The abstract syntax this produces is specified in xref:evaluation.adoc[].

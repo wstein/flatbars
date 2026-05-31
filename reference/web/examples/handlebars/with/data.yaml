@@ -1,0 +1,10 @@
+person:
+  firstname: Ada
+  lastname: Lovelace
+company:
+  name: Analytical Engines Ltd
+  city: London
+book:
+  title: Notes on the Analytical Engine
+  author: Ada Lovelace
+manager: null

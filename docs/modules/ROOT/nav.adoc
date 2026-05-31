@@ -1,0 +1,29 @@
+.xref:index.adoc[BareBars]
+* xref:index.adoc[Introduction]
+* xref:concepts.adoc[The core model]
+
+.Specification
+* xref:lexical.adoc[1. Lexical structure]
+* xref:grammar.adoc[2. Syntactic grammar]
+* xref:evaluation.adoc[3. Values & evaluation]
+* xref:errors.adoc[4. Errors & diagnostics]
+
+.Building an engine
+* xref:surface.adoc[5. The surface dialect (sugar)]
+* xref:prelude.adoc[6. The reference prelude]
+* xref:host-api.adoc[7. Host API]
+
+.Appendix
+* xref:appendix-handlebars.adoc[A. Handlebars.js → BareBars, with no gaps]
+** xref:appendix-handlebars.adoc#expressions[A.1 Expressions & paths]
+** xref:appendix-handlebars.adoc#helpers[A.2 Helpers, arguments, subexpressions]
+** xref:appendix-handlebars.adoc#blocks[A.3 Block helpers & inverse]
+** xref:appendix-handlebars.adoc#builtins[A.4 Built-in helpers]
+** xref:appendix-handlebars.adoc#data[A.5 @data variables]
+** xref:appendix-handlebars.adoc#partials[A.6 Partials]
+** xref:appendix-handlebars.adoc#comments-raw-ws[A.7 Comments, raw blocks, whitespace]
+** xref:appendix-handlebars.adoc#decorators[A.8 Decorators]
+** xref:appendix-handlebars.adoc#options[A.9 Compile & runtime options]
+** xref:appendix-handlebars.adoc#api[A.10 JavaScript API]
+** xref:appendix-handlebars.adoc#mustache[A.11 Mustache-only features]
+** xref:appendix-handlebars.adoc#coverage[A.12 Coverage checklist]

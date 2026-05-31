@@ -1,0 +1,5 @@
+{{partial "styles"}}
+{{partial "header"}}
+<div class="team">
+  {{#each members}}{{partial "card" @this (dict "n" @index1)}}{{/each}}
+</div>

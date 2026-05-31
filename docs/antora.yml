@@ -1,0 +1,23 @@
+name: barebars
+title: BareBars
+version: ~          # unversioned component; cut a branch to version it
+display_version: 'spec'
+start_page: ROOT:index.adoc
+nav:
+  - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    project-name: BareBars
+    tagline: 'bare rods — a template-engine construction kit'
+    # Core glyphs, defined once so prose stays consistent.
+    out: '{plus}{plus}{plus} … {plus}{plus}{plus}'   # not used directly; see attributes below
+    idprefix: ''
+    idseparator: '-'
+    source-language: text
+    table-caption: false
+    figure-caption: false
+    sectanchors: ''
+    sectlinks: ''
+    experimental: ''
+    hbs: 'Handlebars'
+    hb: 'Handlebars.js'

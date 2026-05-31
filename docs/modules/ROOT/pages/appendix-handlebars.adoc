@@ -1,0 +1,492 @@
+= Appendix A — Handlebars.js → BareBars, with no gaps
+:navtitle: A. Handlebars mapping
+:toc: macro
+:toclevels: 3
+
+This appendix is the *contract*: every {hb} concept must have a defined BareBars equivalent, with
+no gaps. Each entry gives the {hbs} form, the *BareBars Surface* spelling (what a template author
+writes), and the *core* it desugars to (what the engine actually runs). Surface rules are defined in
+xref:surface.adoc[]; helpers are defined in xref:prelude.adoc[].
+
+A concept maps in exactly one of these ways, marked throughout:
+
+[horizontal]
+[CORE]:: a first-class core construct.
+[SURFACE]:: a pure syntactic rewrite to the core.
+[PRELUDE]:: a helper you register; not built in.
+[HOST]:: an engine/assembly choice, not template syntax.
+[DROPPED]:: deliberately not provided — with the replacement stated.
+
+toc::[]
+
+[#expressions]
+== A.1 Expressions, escaping & paths
+
+[cols="2,2,3,1",options="header"]
+|===
+|Handlebars |BareBars Surface |Core |Kind
+
+|`pass:[{{foo}}]` |`pass:[{{foo}}]` |`pass:[{{{ esc_html (lookup this "foo") }}}]` |SURFACE
+|`pass:[{{{foo}}}]` |`pass:[{{{foo}}}]` |`pass:[{{{ lookup this "foo" }}}]` |SURFACE
+|`pass:[{{&foo}}]` |`pass:[{{&foo}}]` |`pass:[{{{ lookup this "foo" }}}]` |SURFACE
+|`pass:[{{foo.bar.baz}}]` |same |`pass:[{{{ esc_html (lookup this "foo" "bar" "baz") }}}]` |SURFACE
+|`pass:[{{foo.[1]}}]` / `pass:[{{foo.1}}]` |same |`pass:[{{{ esc_html (lookup this "foo" 1) }}}]` |SURFACE
+|`pass:[{{foo.[home town]}}]` |same |`pass:[{{{ esc_html (lookup this "foo" "home town") }}}]` |SURFACE
+|`pass:[{{foo/bar}}]` (legacy slash) |`pass:[{{foo.bar}}]` |`pass:[{{{ esc_html (lookup this "foo" "bar") }}}]` |SURFACE
+|`pass:[{{this}}]` / `pass:[{{.}}]` |`pass:[{{this}}]` |`pass:[{{{ esc_html this }}}]` |SURFACE
+|`pass:[{{this.foo}}]` / `pass:[{{./foo}}]` |`pass:[{{this.foo}}]` |`pass:[{{{ esc_html (lookup this "foo") }}}]` |SURFACE
+|`pass:[{{../foo}}]` |`pass:[{{../foo}}]` |`pass:[{{{ esc_html (lookup (parent) "foo") }}}]` |SURFACE
+|`pass:[{{../../foo}}]` |same |`pass:[{{{ esc_html (lookup (parent (parent)) "foo") }}}]` |SURFACE
+|a literal helper result, e.g. `pass:[{{price}}]` returning HTML |use `safe` in the helper |`pass:[{{{ price }}}]` |PRELUDE
+|===
+
+*Escaping model.* {hbs} escapes `pass:[{{ }}]` and trusts `pass:[{{{ }}}]`/`SafeString`. BareBars
+makes both explicit: `pass:[{{ }}]` is the *only* thing that introduces `esc_html`; `esc_html`
+returns `VSafe` so re-escaping is a no-op; `safe`/`VSafe` is the `SafeString` analogue. See
+xref:evaluation.adoc[] §3.6. The set `&`, `<`, `>`, `"`, `'` is escaped, matching {hb}.
+
+*Why bare names differ between layers.* In Surface, `foo` is a *field* (`lookup this "foo"`). In the
+core, `pass:[{{{foo}}}]` is a *helper call*. Authors write Surface and think in data; the desugarer
+and prelude work in the core. This is intentional and is the single most important thing to
+internalise from this appendix.
+
+[#helpers]
+== A.2 Helpers, arguments & subexpressions
+
+[cols="2,2,3,1",options="header"]
+|===
+|Handlebars |BareBars Surface |Core |Kind
+
+|`pass:[{{helper a b}}]` |same |`pass:[{{{ esc_html (helper a' b') }}}]` |SURFACE/CORE
+|positional arguments |same |evaluated left-to-right, eagerly |CORE
+|string literal `"x"` / `'x'` |same |`Str "x"` |CORE
+|number literal `3`, `-2.5` |same |`Num 3` |CORE
+|`true` / `false` |same |`(true)` / `(false)` |PRELUDE
+|`null` |same |`(null)` |PRELUDE
+|`undefined` |`null` |`(null)` |DROPPED→`null`
+|hash argument `key=value` |same |trailing `(dict "key" value')` |SURFACE
+|subexpression `pass:[(helper a)]` |same |`pass:[(helper a')]` — grouping is core |CORE
+|nested subexpr `pass:[(a (b c))]` |same |unchanged |CORE
+|`this` as an argument |same |`this` (a nullary helper) |CORE/PRELUDE
+|helper that returns a value vs. block |arity & `pass:[#]` decide |a value helper ignores `Blocks`; a block helper uses them |CORE
+|===
+
+Worked example (from `subexpressions/`):
+
+[source,text]
+----
+Handlebars:  {{upper (concat first last)}}
+Surface:     {{upper (concat first last)}}
+Core:        {{{ esc_html (upper (concat (lookup this "first")
+                                         (lookup this "last"))) }}}
+----
+
+[source,text]
+----
+Handlebars:  {{repeat "ab" (add 1 2)}}
+Core:        {{{ esc_html (repeat "ab" (add 1 2)) }}}     (literals pass straight through)
+----
+
+Hash example (from `partials/`, generalised to any helper):
+
+[source,text]
+----
+Handlebars:  {{field value required=true label="Name"}}
+Core:        {{{ esc_html (field (lookup this "value")
+                                 (dict "required" (true) "label" "Name")) }}}
+----
+
+[#blocks]
+== A.3 Block helpers & the inverse
+
+[cols="2,2,3,1",options="header"]
+|===
+|Handlebars |BareBars Surface |Core |Kind
+
+|`pass:[{{#h}}…{{/h}}]` |same |`pass:[{{#h}}…{{/h}}]` |CORE
+|`pass:[{{#h arg}}…{{/h}}]` |same |args desugar like any call |CORE
+|`pass:[{{else}}]` |same |the inverse separator |CORE
+|`pass:[{{^h}}…{{/h}}]` (inverted) |same |inverse-first block; usual operator is `unless` |CORE
+|`pass:[{{else if c}}]` (chained) |same |nested `pass:[{{#if c}}…{{/if}}]` in the inverse |SURFACE
+|block params `pass:[{{#h x as \|a b\|}}]` |same |`pass:[{{#h x "a" "b"}}]` — binding-name args |SURFACE
+|`options.fn(ctx)` |— |the `body` thunk, called with a context |CORE
+|`options.inverse(ctx)` |— |the `inverse` thunk |CORE
+|`options.hash` |`k=v` on the block |trailing `dict` argument |SURFACE
+|`options.data` / `createFrame` |— |the pushed helper frame the block installs |CORE
+|`return new SafeString(…)` |`safe`/return `VSafe` |a `VSafe` value |PRELUDE
+|===
+
+A block helper is the *only* mechanism that captures unevaluated sub-templates, so {hbs}' entire
+`options` object reduces to: the evaluated arguments, the trailing hash `dict`, and the two thunks.
+The {hbs} private-data frame (`Handlebars.createFrame`) is exactly the helper frame a block pushes
+(xref:evaluation.adoc[] §3.5).
+
+Worked example (custom block helper `times`, from `block-helpers/`):
+
+[source,text]
+----
+Handlebars:  {{#times 3}}{{@index1}}🔁{{/times}}
+Surface:     {{#times 3}}{{index1}}🔁{{/times}}      (no @-prefix needed)
+Core:        {{#times 3}}{{{ esc_html (index1) }}}🔁{{/times}}
+----
+
+`times` pushes a frame for each iteration and installs the scoped helper `index1`. The
+PRELUDE/HOST writes that helper; the core only supplies the frame plumbing.
+
+Worked example (`ifEquals`, from `block-helpers/`):
+
+[source,text]
+----
+Handlebars:  {{#ifEquals plan "pro"}}…{{else}}…{{/ifEquals}}
+Core:        {{#ifEquals (lookup this "plan") "pro"}}…{{else}}…{{/ifEquals}}
+----
+
+[#builtins]
+== A.4 Built-in helpers (all become PRELUDE)
+
+{hbs}' six built-ins are *not* in the BareBars core. They are reference-prelude helpers
+(xref:prelude.adoc[]); you may remove or replace any of them.
+
+[cols="1,2,3,1",options="header"]
+|===
+|Handlebars built-in |Surface |Core |Kind
+
+|`pass:[{{#if c}}…{{else}}…{{/if}}]` |same |`pass:[{{#if c'}}…{{else}}…{{/if}}]` |PRELUDE
+|`pass:[{{#unless c}}…{{/unless}}]` |same |`pass:[{{#unless c'}}…{{/unless}}]` |PRELUDE
+|`pass:[{{#each xs}}…{{else}}…{{/each}}]` |same |`pass:[{{#each xs'}}…{{else}}…{{/each}}]` |PRELUDE
+|`pass:[{{#with o}}…{{/with}}]` |same |`pass:[{{#with o'}}…{{/with}}]` |PRELUDE
+|`pass:[{{lookup o k}}]` |same |`pass:[{{{ esc_html (lookup o' k') }}}]` |PRELUDE
+|`pass:[{{log x}}]` |same |`pass:[{{{ log x' }}}]` (returns `VNull` ⇒ empty output) |PRELUDE
+|===
+
+*Truthiness* (used by `if`/`unless`/`each`/`with`) is defined by the prelude to match {hb}: empty
+array is falsy; `0` and `{}` are truthy; `false`/`null`/`""` are falsy (see
+xref:prelude.adoc[] §6.3). Worked example (`if-unless/`):
+
+[source,text]
+----
+Handlebars:  <p>tasks is {{#if tasks}}truthy{{else}}falsy (empty array){{/if}}.</p>
+Core:        <p>tasks is {{#if (lookup this "tasks")}}truthy{{else}}falsy …{{/if}}.</p>
+----
+
+`each` over an object, with `@key` (from `each/`):
+
+[source,text]
+----
+Handlebars:  {{#each profile}}<dt>{{@key}}</dt><dd>{{this}}</dd>{{/each}}
+Core:        {{#each (lookup this "profile")}}
+               <dt>{{{ esc_html (key) }}}</dt><dd>{{{ esc_html this }}}</dd>
+             {{/each}}
+----
+
+[#data]
+== A.5 `@data` variables (become scoped PRELUDE helpers)
+
+{hbs}' `@`-namespace does not exist in BareBars. Each `@x` is a *scoped nullary helper* installed by
+the block that introduces it; Surface drops the `@` (xref:surface.adoc[] §5.5).
+
+[cols="2,2,2,1",options="header"]
+|===
+|Handlebars |Surface |Core |Installed by
+
+|`pass:[{{@index}}]` |`pass:[{{index}}]` |`pass:[{{{ esc_html (index) }}}]` |`each`
+|`pass:[{{@key}}]` |`pass:[{{key}}]` |`pass:[{{{ esc_html (key) }}}]` |`each`
+|`pass:[{{@first}}]` |`pass:[{{first}}]` |`pass:[{{{ esc_html (first) }}}]` |`each`
+|`pass:[{{@last}}]` |`pass:[{{last}}]` |`pass:[{{{ esc_html (last) }}}]` |`each`
+|`pass:[{{@root}}]` |`pass:[{{root}}]` |`pass:[{{{ esc_html (root) }}}]` |host (top frame)
+|`pass:[{{@level}}]` |`pass:[{{level}}]` |`pass:[{{{ esc_html (level) }}}]` |host/prelude
+|`pass:[{{@../index}}]` |`pass:[{{@../index}}]` |`pass:[{{{ esc_html (index (parent)) }}}]` |`each` + `parent`
+|custom `pass:[{{@myVar}}]` via `createFrame` |`pass:[{{myVar}}]` |`pass:[{{{ esc_html (myVar) }}}]` |the block that frames it
+|===
+
+Worked example (`each/`, `@index`/`@first`/`@last`):
+
+[source,text]
+----
+Handlebars:  {{#each people}}
+               <li>{{@index}}: {{this}}{{#if @first}} — first{{/if}}{{#if @last}} — last{{/if}}</li>
+             {{/each}}
+Core:        {{#each (lookup this "people")}}
+               <li>{{{ esc_html (index) }}}: {{{ esc_html this }}}
+                 {{#if (first)}} — first{{/if}}{{#if (last)}} — last{{/if}}</li>
+             {{/each}}
+----
+
+*Parent access* (`../`, the context stack) becomes the explicit `parent` helper. From `with/` and
+`each/`/`lookup/`:
+
+[source,text]
+----
+Handlebars:  {{#with person}}{{firstname}} works at {{../company.name}}{{/with}}
+Core:        {{#with (lookup this "person")}}
+               {{{ esc_html (lookup this "firstname") }}} works at
+               {{{ esc_html (lookup (parent) "company" "name") }}}
+             {{/with}}
+
+Handlebars:  {{#each people}}<li>{{this}} lives in {{lookup ../cities @index}}</li>{{/each}}
+Core:        {{#each (lookup this "people")}}
+               <li>{{{ esc_html this }}} lives in
+                   {{{ esc_html (lookup (lookup (parent) "cities") (index)) }}}</li>
+             {{/each}}
+----
+
+[NOTE]
+====
+The *idiomatic* BareBars replacement for `../` is to *name the scope* with a block parameter rather
+than walk a stack: `pass:[{{#each teams as \|team\|}}…{{#each team.members}}{{team.name}}…]`. The
+`parent` helper above is the mechanical, gap-free mapping; block params are the recommended style.
+Both are specified.
+====
+
+[#partials]
+== A.6 Partials
+
+All partial forms become the prelude helpers `partial`, `partial>`, `inline`, and the scoped
+`partial-block` (xref:prelude.adoc[] §6.6; xref:surface.adoc[] §5.6). Partials emit *unescaped*.
+
+[cols="2,3,1",options="header"]
+|===
+|Handlebars |Core |Kind
+
+|`pass:[{{> name}}]` |`pass:[{{{ partial "name" this }}}]` |SURFACE→PRELUDE
+|`pass:[{{> name ctx}}]` |`pass:[{{{ partial "name" (lookup this "ctx") }}}]` |SURFACE→PRELUDE
+|`pass:[{{> name key=val}}]` |`pass:[{{{ partial "name" this (dict "key" val') }}}]` |SURFACE→PRELUDE
+|`pass:[{{> name ctx k=v}}]` |`pass:[{{{ partial "name" ctx' (dict "k" v') }}}]` |SURFACE→PRELUDE
+|dynamic `pass:[{{> (lookup . "layout")}}]` |`pass:[{{{ partial (lookup this "layout") this }}}]` |SURFACE→PRELUDE
+|partial block `pass:[{{#> layout title="T"}}body{{/layout}}]` |`pass:[{{#partial> "layout" (dict "title" "T")}}body{{/partial>}}]` |SURFACE→PRELUDE
+|`pass:[{{> @partial-block}}]` |`pass:[{{{ partial-block }}}]` |SURFACE→PRELUDE
+|inline `pass:[{{#*inline "person"}}…{{/inline}}]` |`pass:[{{#inline "person"}}…{{/inline}}]` |SURFACE→PRELUDE
+|partial-block *fallback* (missing partial renders body) |built into `partial>` (renders `body` if name unregistered) |PRELUDE
+|`explicitPartialContext` |always on — `partial` *requires* an explicit context argument; the implicit one is the SURFACE sugar `partial "name" this` |HOST/DROPPED
+|`preventIndent` |a `dict` option to `partial`, or a host flag |HOST
+|===
+
+Worked example (`partials/` dynamic partial + hash):
+
+[source,text]
+----
+Handlebars:  {{> (lookup . "layout") title="Chosen dynamically"}}
+Core:        {{{ partial (lookup this "layout") this (dict "title" "Chosen dynamically") }}}
+----
+
+Worked example (`inline-partials/` — inline partial + partial block + `@partial-block`):
+
+[source,text]
+----
+Handlebars (main):   {{#*inline "person"}}<li>{{name}} — <em>{{role}}</em></li>{{/inline}}
+                     {{#each people}}{{> person}}{{/each}}
+                     {{#> layout title="Team"}}<p>block content</p>{{/layout}}
+
+Core (main):         {{#inline "person"}}
+                       <li>{{{ esc_html (lookup this "name") }}} —
+                           <em>{{{ esc_html (lookup this "role") }}}</em></li>
+                     {{/inline}}
+                     {{#each (lookup this "people")}}{{{ partial "person" this }}}{{/each}}
+                     {{#partial> "layout" (dict "title" "Team")}}
+                       <p>block content</p>
+                     {{/partial>}}
+
+Handlebars (layout): <div class="body">{{> @partial-block}}</div>
+Core (layout):       <div class="body">{{{ partial-block }}}</div>
+----
+
+[#comments-raw-ws]
+== A.7 Comments, raw blocks & whitespace
+
+[cols="2,2,3,1",options="header"]
+|===
+|Handlebars |Surface |Core |Kind
+
+|`pass:[{{! … }}]` |same |CORE comment, discarded (no `pass:[}}]` inside) |CORE
+|`pass:[{{!-- … --}}]` |same |CORE long comment; may contain `pass:[}}]`/`pass:[{{]`/`--` |CORE
+|raw block `pass:[{{{{raw}}}}…{{{{/raw}}}}]` |same |CORE raw block; body captured verbatim |CORE
+|`~` whitespace control |same |CORE; resolved in the lexer |CORE
+|backslash escape `\pass:[{{x}}]` |same |CORE; emits the tag literally |CORE
+|standalone-line auto-trim |— |*not provided* — use explicit `~` |DROPPED
+|===
+
+Worked example (`whitespace/` + `comments/`):
+
+[source,text]
+----
+Handlebars:  {{~#each items~}}<li>{{this}}</li>{{~/each~}}
+Core:        {{~#each (lookup this "items")~}}<li>{{{ esc_html this }}}</li>{{~/each~}}
+
+Handlebars:  \{{ this stays text }}
+Core:        \{{ this stays text }}          (emitted literally; identical)
+
+Handlebars:  {{{{raw}}}}Hello {{name}}{{{{/raw}}}}
+Core:        {{{{raw}}}}Hello {{name}}{{{{/raw}}}}   (verbatim; `raw` prelude helper returns body)
+----
+
+[IMPORTANT]
+====
+*The one behavioural difference.* {hbs} silently removes the whitespace and newline around a tag
+that stands alone on its line ("standalone" tags). BareBars does *not*: whitespace is removed only
+where `~` appears. Templates that relied on standalone trimming will emit extra blank lines until
+the `~` is added. This is the deliberate cost of "no implicit sugar" (xref:lexical.adoc[] §1.4).
+A Surface-level *opt-in* standalone pass MAY be offered by a host as a pre-lexer transform, but it
+is not part of the core or the reference Surface.
+====
+
+[#decorators]
+== A.8 Decorators
+
+{hbs} decorators (`pass:[{{#*helper}}]`, `pass:[{{*helper}}]`) modify a block's behaviour or its
+`options`. BareBars has no separate decorator concept — *a decorator is just a block helper* that
+wraps the body thunk.
+
+[cols="2,3,1",options="header"]
+|===
+|Handlebars |BareBars |Kind
+
+|`pass:[{{#*inline "n"}}…{{/inline}}]` (built-in decorator) |`pass:[{{#inline "n"}}…{{/inline}}]` prelude block helper (A.6) |PRELUDE
+|custom block decorator `pass:[{{#*deco}}…{{/deco}}]` |an ordinary block helper that returns a transformed `body` |PRELUDE
+|inline decorator `pass:[{{*deco arg}}]` |a value helper whose effect is a frame mutation it performs in `M` |PRELUDE
+|`registerDecorator` |`register` (same table as helpers) |HOST
+|===
+
+Because BareBars block helpers already receive the body thunk and the frame, the decorator
+mechanism is subsumed; the `*` marker is unnecessary and is *not* part of the grammar.
+
+[#options]
+== A.9 Compile & runtime options
+
+{hbs} compile/runtime flags are not template syntax; in BareBars they are *assembly choices* —
+which prelude you register and how its helpers behave. None require a language feature.
+
+[cols="2,3,1",options="header"]
+|===
+|Handlebars option |BareBars |Kind
+
+|`noEscape: true` |render core directly (it never escapes), or use a Surface variant whose `pass:[{{ }}]` rule omits `esc_html` |HOST
+|`strict: true` |register a `lookup` that raises `TypeError` on a missing field instead of returning `VNull` |HOST/PRELUDE
+|`assumeObjects: true` |a `lookup` variant that skips nullish guards |HOST/PRELUDE
+|`preventIndent: true` |a `partial` option / host flag (A.6) |HOST
+|`explicitPartialContext: true` |the *default* — `partial` always takes an explicit context |HOST (default)
+|`knownHelpers` / `knownHelpersOnly` |inherent: only registered helpers exist; a tooling pass can reject unknown `Ident`s at compile time |HOST/TOOLING
+|`data: false` |omit the `@data`-style scoped helpers from the prelude |HOST
+|`compat: true` (recursive parent lookup) |register a `lookup`/`get` variant that walks `parent` frames on a miss |PRELUDE
+|custom `helpers` / `partials` / `decorators` arguments |the `Env` you pass to `render` |HOST
+|===
+
+[#api]
+== A.10 JavaScript API
+
+See xref:host-api.adoc[] §7.4 for the full table. Summary: `compile`/`precompile`/`parse` map to
+the BareBars pipeline; `registerHelper`/`registerPartial`/`registerDecorator` all map to `register`
+(partials and decorators are helpers); `SafeString` maps to the `VSafe` value and the `safe` helper;
+`escapeExpression` maps to `esc_html`; `Utils` maps to a host module; AST `Visitor` maps to folding
+over the plain `Template` data.
+
+[#mustache]
+== A.11 Mustache-only features
+
+The prompt names *Mustache/Handlebars*. {hbs} is a superset of Mustache, with two exceptions worth
+recording for completeness.
+
+[cols="2,3,1",options="header"]
+|===
+|Mustache feature |BareBars |Kind
+
+|sections `pass:[{{#section}}]` (truthy / list / lambda) |block helpers `if`/`each`; a "lambda section" is just a block helper |PRELUDE
+|inverted sections `pass:[{{^section}}]` |CORE inverse-first block; usual operator `unless` (A.3) |CORE/PRELUDE
+|implicit iterator `pass:[{{.}}]` |`this` (A.1) |SURFACE
+|lambdas (functions in the data) |values are never functions; expose behaviour as a helper and call it, or via `apply` |DROPPED→helper
+|set delimiters `pass:[{{=<% %>=}}]` |*not supported* — delimiters are fixed. If a host needs alternate delimiters, it pre-processes the source before lexing |DROPPED
+|HTML-escaping by default |Surface `pass:[{{ }}]` ⇒ `esc_html`; core never escapes |SURFACE
+|===
+
+[#coverage]
+== A.12 Coverage checklist
+
+A flat list of every {hbs}/Mustache surface element, asserting a mapping exists. If an item below
+has no ✓, this specification has a gap and must be amended.
+
+.Expressions & paths
+* [x] `pass:[{{x}}]` escaped — A.1
+* [x] `pass:[{{{x}}}]` triple-stash unescaped — A.1
+* [x] `pass:[{{&x}}]` ampersand unescaped — A.1
+* [x] dotted path `a.b.c` — A.1
+* [x] index path `a.1` / `a.[1]` — A.1
+* [x] segment-literal `a.[home town]` — A.1
+* [x] slash path `a/b` (legacy) — A.1
+* [x] `this` / `.` — A.1
+* [x] `this.a` / `./a` — A.1
+* [x] parent `../a`, `../../a` — A.1, A.5
+* [x] string / number / boolean / null / undefined literals — A.2
+
+.Helpers
+* [x] helper call with positional args — A.2
+* [x] hash arguments `k=v` — A.2
+* [x] subexpressions `(h a)` and nesting — A.2
+* [x] `helperMissing` — `UnknownHelper` (xref:errors.adoc[]); a host MAY register a helper literally named `helperMissing` only if it also overrides resolution — DROPPED/HOST
+* [x] `blockHelperMissing` — same as above; the core raises `UnknownHelper` — DROPPED/HOST
+
+.Blocks
+* [x] block helper `pass:[{{#h}}…{{/h}}]` — A.3
+* [x] `pass:[{{else}}]` inverse — A.3
+* [x] `pass:[{{^h}}]` inverted — A.3, A.11
+* [x] `else if` chaining — A.3
+* [x] block params `as \|a b\|` — A.3, A.5
+* [x] `options.fn` / `options.inverse` — A.3
+* [x] `options.hash` — A.2, A.3
+* [x] `options.data` / `createFrame` — A.3, A.5
+
+.Built-ins
+* [x] `if` — A.4
+* [x] `unless` — A.4
+* [x] `each` (array, object, `@index`/`@key`/`@first`/`@last`, `else`) — A.4, A.5
+* [x] `with` (context shift, `else`, block params) — A.4, A.5
+* [x] `lookup` — A.4
+* [x] `log` — A.4
+* [x] truthiness rules (empty array falsy; 0/{} truthy) — A.4
+
+.`@data`
+* [x] `@index`, `@key`, `@first`, `@last`, `@root`, `@level` — A.5
+* [x] `@../index` and parent data — A.5
+* [x] custom `@data` via frames — A.5
+
+.Partials
+* [x] `pass:[{{> p}}]` — A.6
+* [x] partial with context — A.6
+* [x] partial with hash params — A.6
+* [x] partial per-iteration — A.6 (it is just `partial` inside `each`)
+* [x] dynamic partial `pass:[{{> (expr)}}]` — A.6
+* [x] partial block `pass:[{{#> p}}…{{/p}}]` + fallback — A.6
+* [x] `pass:[{{> @partial-block}}]` — A.6
+* [x] inline partial `pass:[{{#*inline}}]` — A.6, A.8
+* [x] `explicitPartialContext`, `preventIndent` — A.6, A.9
+
+.Comments / raw / whitespace
+* [x] `pass:[{{! }}]` short comment — A.7
+* [x] `pass:[{{!-- --}}]` long comment — A.7
+* [x] raw block `pass:[{{{{ }}}}]` — A.7
+* [x] `~` whitespace control — A.7
+* [x] backslash escape `\pass:[{{]` — A.7
+* [x] standalone-line trim — DROPPED, replaced by explicit `~` — A.7
+
+.Decorators
+* [x] `pass:[{{#*inline}}]` built-in decorator — A.6, A.8
+* [x] custom decorators `pass:[{{#* }}]` / `pass:[{{* }}]` — A.8
+* [x] `registerDecorator` — A.8
+
+.Options & API
+* [x] `noEscape`, `strict`, `assumeObjects`, `preventIndent`, `explicitPartialContext`,
+  `knownHelpers(Only)`, `data`, `compat` — A.9
+* [x] `compile`, `precompile`, `parse`, `registerHelper/Partial/Decorator`, `SafeString`,
+  `escapeExpression`, `Utils`, `Visitor` — A.10, §7.4
+
+.Mustache-only
+* [x] sections / inverted sections / implicit iterator — A.11
+* [x] lambdas — DROPPED→helper/`apply` — A.11
+* [x] set delimiters — DROPPED (fixed delimiters; host pre-process) — A.11
+
+[TIP]
+====
+Two items are intentionally `DROPPED`: *standalone whitespace auto-trim* (replaced by explicit `~`)
+and *set delimiters* (delimiters are fixed). Two are reframed rather than reproduced: *lambdas*
+(values are never functions; use a helper or `apply`) and *`helperMissing`/`blockHelperMissing`*
+(the core raises `UnknownHelper`; a host may layer its own resolution). Everything else is a faithful
+mapping. No item is left unaddressed — which is the contract.
+====

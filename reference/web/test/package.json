@@ -1,0 +1,12 @@
+{
+  "name": "stem-playground-browser-smoke",
+  "private": true,
+  "type": "module",
+  "description": "Headless browser smoke test for the Stem playground dock panels. Uses puppeteer-core driving the locally-installed Brave Browser (Chromium) so no Chromium download is needed.",
+  "scripts": {
+    "test": "node browser_smoke.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.0.0"
+  }
+}

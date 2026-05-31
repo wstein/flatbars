@@ -1,0 +1,4 @@
+{{partial "header" @this (dict "heading" "Our team")}}
+<ul>
+  {{#each people}}{{partial "row" @this}}{{/each}}
+</ul>

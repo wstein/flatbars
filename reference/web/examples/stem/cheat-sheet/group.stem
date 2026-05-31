@@ -1,0 +1,11 @@
+<section id="{{@this.name}}" class="card" style="--a:var(--g-{{@this.name}})">
+  <div class="head">
+    <span class="dot"></span>
+    <h2>{{@this.name}}<a href="#{{@this.name}}" class="anchor" aria-label="Permalink">§</a></h2>
+    <span class="pill">{{@this.pill}}</span>
+    <span class="count">{{len @this.transformers}}</span>
+    <p class="desc">{{@this.desc}}</p>
+  </div>
+  <div class="rows">{{#each @this.transformers}}{{partial "row"}}{{/each}}</div>
+  {{#if @this.callout}}<div class="callout{{#if @this.warn}} warn{{/if}}"><span class="ico">{{#if @this.warn}}!{{else}}i{{/if}}</span><div>{{@this.callout}}</div></div>{{/if}}
+</section>

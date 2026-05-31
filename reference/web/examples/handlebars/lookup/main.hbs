@@ -1,0 +1,14 @@
+<h1>lookup</h1>
+
+{{! `lookup` reads a property by a dynamic key — handy for parallel arrays. }}
+<ul>
+{{#each people}}
+  <li>{{this}} lives in {{lookup ../cities @index}}</li>
+{{/each}}
+</ul>
+
+{{! Look a value up by a key held in another variable. }}
+<p>Selected: {{lookup translations selected}}</p>
+
+{{! Subexpression form: lookup feeding another helper / path. }}
+<p>Nested: {{lookup (lookup matrix row) col}}</p>

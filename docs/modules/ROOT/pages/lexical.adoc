@@ -1,0 +1,158 @@
+= 1. Lexical structure
+:navtitle: 1. Lexical structure
+
+This chapter defines how a template's bytes are split into *content* and *tags*, and how the
+pieces inside a tag are tokenized. The grammar in xref:grammar.adoc[] consumes these tokens.
+
+== 1.1 Source
+
+A template is a sequence of Unicode characters. BareBars never interprets bytes; the host decodes
+to text first. The lexer recognizes a small set of *tag openers* and treats everything else as
+literal *content*.
+
+== 1.2 Tag openers and the brace count
+
+[cols="1,2,3",options="header"]
+|===
+|Opener |Closer |Meaning
+
+|`pass:[{{{]`  |`pass:[}}}]`   |*Output* — evaluate one expression, write its value. The only inline output form.
+|`pass:[{{#]`  |`pass:[}}]` … `pass:[{{/name}}]` |*Block* — apply a helper to arguments and to the captured segments.
+|`pass:[{{^]`  |`pass:[}}]` … `pass:[{{/name}}]` |*Block, inverse-first* — reserved opener; see xref:grammar.adoc[].
+|`pass:[{{!]`  |`pass:[}}]`    |*Short comment* — discarded. May not contain `pass:[}}]`.
+|`pass:[{{!--]`|`pass:[--}}]`  |*Long comment* — discarded. May contain `pass:[}}]`, `pass:[{{]`, and `--`.
+|`pass:[{{{{#]`|`pass:[}}}}]` … `pass:[{{{{/name}}}}]` |*Raw block* — body is captured verbatim, never tokenized.
+|`pass:[{{]` _Ident_ `pass:[}}]`| |*Block separator* — the generic double-stash tag. Splits a block into segments; *the name is never interpreted by the lexer*. Only legal inside a block.
+|===
+
+[NOTE]
+====
+The brace count is meaningful and fixed. The single-brace-pair `pass:[{{ … }}]` form is a *block
+separator* in the core (the row above) — its head is a bare identifier and it is the lexer's *only*
+double-stash tag. The same delimiter is reused by the xref:surface.adoc[surface dialect] for escaped
+output (`pass:[{{ E }}]` → `pass:[{{{ esc_html E }}}]`); the two layers read it differently by
+design. In the core, `pass:[{{{ }}}]` is the one output delimiter and escaping is an ordinary
+helper.
+
+Crucially, the separator's identifier — `else`, `elif`, `case`, `otherwise`, … — is *opaque to the
+lexer and parser*. Whether `else` means "the inverse" is a decision made by the block helper, in
+userland. A separator's head may not begin with the reserved sigils `# ^ / ! {`.
+====
+
+The lexer must match the *longest opener*: `pass:[{{{{]` before `pass:[{{{]` before `pass:[{{]`,
+and `pass:[{{!--]` before `pass:[{{!]`. A bare `pass:[{{]` whose next significant character (after
+an optional `~`) is not one of `# ^ / ! {` is a *separator*.
+
+== 1.3 Content and brace escaping
+
+Any run of characters not beginning a tag is *content* and is emitted verbatim.
+
+A backslash immediately before a tag opener escapes it: the opener is emitted literally and the
+backslash is consumed.
+
+[source,text]
+----
+\{{{x}}}      emits the literal text {{{x}}}
+\\{{{x}}}     emits a literal backslash, then evaluates {{{x}}}
+----
+
+Formally, `\` escapes the opener that follows it; `\\` is a literal backslash that does not escape.
+
+== 1.4 Whitespace control: `~`
+
+A tilde immediately inside a tag opener or before a tag closer trims *all* contiguous whitespace
+on that side of the tag, including newlines.
+
+[source,text]
+----
+{{{~ x ~}}}      trims whitespace before and after this output
+{{~#each xs~}}…{{~/each~}}    trims around the block tags
+----
+
+`~` is resolved entirely in the lexer: it adjusts the adjacent *content* runs and then disappears.
+It never reaches the syntax tree, so it is not sugar — there is nothing to desugar.
+
+[IMPORTANT]
+====
+BareBars performs *no implicit "standalone" whitespace removal*. {hb} silently strips the line
+around a block/partial/comment that stands alone on its line; BareBars does not. Whitespace is
+removed only where you write `~`. This is predictable and explicit; the cost is that block tags on
+their own lines leave their surrounding newlines in the output unless trimmed. See
+xref:appendix-handlebars.adoc#comments-raw-ws[A.7].
+====
+
+== 1.5 Tokens inside a tag
+
+Within `pass:[{{{ … }}}]`, `pass:[{{# … }}]`, and the head of a raw block, the lexer produces:
+
+[cols="1,3,2",options="header"]
+|===
+|Token |Definition |Examples
+
+|`IDENT`
+|A helper name. One or more characters from `A`–`Z`, `a`–`z`, `0`–`9`, `_`, `-`, `+`, `*`, `?`,
+`!`, `/`, `.`, `<`, `>`, `=` that does not parse as a `NUMBER`. Must not start with a digit, `-`
+followed by a digit, `"`, `(`, `)`, or whitespace.
+|`each`  `esc_html`  `partial-block`  `>`  `eq?`
+
+|`STRING`
+|`"` … `"` or `'` … `'` with backslash escapes `\\` `\"` `\'` `\n` `\t` `\r`. May contain spaces
+and any tag-like text; the lexer does not look inside strings for openers.
+|`"home town"`  `'pro'`  `"a \"b\" c"`
+
+|`NUMBER`
+|Optional `-`, decimal digits, optional fractional part. No exponents in v1.
+|`3`  `-2.5`  `0`
+
+|`LPAREN` `RPAREN`
+|`(` and `)` — grouping.
+|`(` `)`
+
+|whitespace
+|Spaces, tabs, newlines between tokens. Insignificant *inside* a tag (significant only via `~`).
+|
+|===
+
+The permissive `IDENT` set is deliberate: helper names like `>` (partial), `eq?`, `+`, and
+`partial-block` must be expressible. Note that `.` is a legal `IDENT` character, so `a.b` lexes as
+a *single* identifier — the core never splits it. Dotted *paths* are a surface concept; see
+xref:surface.adoc[].
+
+== 1.6 Comments
+
+[source,text]
+----
+{{! stripped, no }} allowed inside }}
+{{!-- stripped; may contain }} and {{ and -- dashes --}}
+----
+
+Both forms are discarded during lexing and never appear in the syntax tree. The long form scans to
+the first `pass:[--}}]`.
+
+== 1.7 Raw blocks
+
+[source,text]
+----
+{{{{#raw}}}}
+Hello {{name}} — these braces are emitted verbatim.
+{{{{/raw}}}}
+----
+
+After the `pass:[}}}}]` that closes the raw-block head, the lexer captures everything up to the
+matching `pass:[{{{{/IDENT}}}}]` as a single uninterpreted string. The closing `IDENT` must equal
+the opening one. No nested raw blocks of the same name; the *first* matching close wins.
+
+== 1.8 Lexer summary (informative)
+
+[source,text]
+----
+the lexer is a small state machine:
+
+  CONTENT  --"\\" + opener-->  emit literal opener, stay in CONTENT
+  CONTENT  --opener-->         switch to the matching TAG/RAW/COMMENT state
+  TAG      --"~"-->            mark trim, continue
+  TAG      --tokens-->         IDENT | STRING | NUMBER | ( | )
+  TAG      --closer-->         back to CONTENT (apply pending trims)
+  RAW      --scan-->           capture verbatim until {{{{/name}}}}
+  COMMENT  --scan-->           discard until }} (short) or --}} (long)
+----

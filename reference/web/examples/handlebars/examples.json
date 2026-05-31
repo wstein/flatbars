@@ -1,0 +1,118 @@
+[
+  {
+    "id": "greeting",
+    "label": "Basics - Hello World",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "expressions",
+    "label": "Basics - Expressions & escaping",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "comments",
+    "label": "Basics - Comments",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "if-unless",
+    "label": "Built-ins - if / unless / else",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "each",
+    "label": "Built-ins - each (@index, @key, else)",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "with",
+    "label": "Built-ins - with & ../parent paths",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "lookup",
+    "label": "Built-ins - lookup (dynamic keys)",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "list",
+    "label": "Helpers - custom helpers (helpers.js)",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "transform": "helpers.js",
+    "data": "data.yaml"
+  },
+  {
+    "id": "block-helpers",
+    "label": "Helpers - block helpers",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "transform": "helpers.js",
+    "data": "data.yaml"
+  },
+  {
+    "id": "subexpressions",
+    "label": "Helpers - subexpressions",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "transform": "helpers.js",
+    "data": "data.yaml"
+  },
+  {
+    "id": "partials",
+    "label": "Partials - context, params, dynamic",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": ["greeting", "userBox", "fancy"],
+    "data": "data.yaml"
+  },
+  {
+    "id": "inline-partials",
+    "label": "Partials - inline & blocks (layout)",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": ["layout"],
+    "data": "data.yaml"
+  },
+  {
+    "id": "whitespace",
+    "label": "Advanced - whitespace & raw blocks",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": [],
+    "transform": "helpers.js",
+    "data": "data.yaml"
+  },
+  {
+    "id": "cards",
+    "label": "Real-world - profile cards",
+    "view": "rendered",
+    "main": "main.hbs",
+    "partials": ["styles", "card"],
+    "data": "data.yaml"
+  }
+]

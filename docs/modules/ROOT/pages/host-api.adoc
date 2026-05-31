@@ -1,0 +1,100 @@
+= 7. Host API
+:navtitle: 7. Host API
+
+The reference implementation is PureScript and compiles to JavaScript, so a BareBars engine drops
+into the same places {hb} does. This chapter sketches the surface a host uses; it is informative,
+not normative, except for the helper contract carried over from xref:evaluation.adoc[].
+
+== 7.1 Pipeline
+
+[source,text]
+----
+String --lex--> [Token]  --parse--> Template(core)
+                                        ^
+String --lex--> [Token] --parse--> Surface AST --desugar--> Template(core)
+                                                                  |
+                                            Template(core) + Env --render--> String
+----
+
+Surface is a *front-end* that emits core `Template`; the renderer only ever sees core.
+
+== 7.2 Types and functions
+
+[source,haskell]
+----
+-- Parsing
+parse        :: String -> Either ParseError Template          -- core
+parseSurface :: String -> Either ParseError SurfaceTemplate
+desugar      :: SurfaceTemplate -> Template
+
+-- Building an environment
+emptyEnv     :: Value -> Env                                  -- context only, no helpers
+register     :: Ident -> Helper -> Env -> Env
+registerAll  :: Array (Tuple Ident Helper) -> Env -> Env
+prelude      :: Array (Tuple Ident Helper)                    -- the reference prelude (Ch. 6)
+
+-- Rendering
+render       :: Template -> Env -> Either Error String
+
+-- Validating the skeleton AST against an engine schema (BareBars.Walk; see §4.3)
+validate     :: Schema -> Template -> Array Issue
+helperRefs   :: Template -> Array HelperRef                   -- every helper reference, for custom passes
+preludeSchema :: Schema                                       -- the reference engine's contract
+
+-- Convenience: parse core, render against prelude + data
+compile      :: String -> Either ParseError (Value -> Either Error String)
+renderWith   :: String -> Value -> Either String String       -- parse + render, errors as text
+----
+
+== 7.3 Writing a helper
+
+A helper is `Env -> Array Value -> Blocks -> Either Error Value` (v1 fixes the result monad to
+`Either Error`). A plain helper ignores `Blocks`; a block helper uses `body` and `branches`.
+
+[source,haskell]
+----
+-- upcase: a 1-argument value helper
+upcase :: Helper
+upcase _ args _ = case args of
+  [v] -> VString <<< toUpper <$> stringify v
+  _   -> Left (ArityError "upcase/1")
+
+-- if: a block helper. The "inverse" is just the first branch — the core never
+-- privileges the name `else`, so any separator (`{{otherwise}}`, …) works too.
+ifHelper :: Helper
+ifHelper env args blocks = case args of
+  [cond] -> if truthy cond
+              then VSafe <$> blocks.body env
+              else case Array.head blocks.branches of
+                     Just b  -> VSafe <$> b.render env
+                     Nothing -> Right VNull
+  _      -> Left (ArityError "if/1")
+----
+
+A multi-way helper (`switch`/`case`, an `if`/`elif`/`else` chain) inspects `blocks.branches`
+directly: each branch carries its separator `sep`, its evaluated `args`, and a `render` thunk.
+
+== 7.4 {hbs} JavaScript API → BareBars host API
+
+[cols="2,2,3",options="header"]
+|===
+|{hb} |BareBars |Note
+
+|`Handlebars.compile(src)` |`compile src` |Surface in, `data -> String` out.
+|`Handlebars.precompile(src)` |`parseSurface` `>>>` `desugar` |Ship the core `Template`; render later.
+|`Handlebars.parse(src)` |`parse` / `parseSurface` |Returns the AST of xref:evaluation.adoc[].
+|`Handlebars.registerHelper(n,f)` |`register n f` |`f` follows the `Helper` contract.
+|`Handlebars.registerPartial(n,t)` |`register n (partialOf t)` |A partial *is* a helper.
+|`Handlebars.registerDecorator(n,f)` |`register n f` |Decorators are block helpers (xref:appendix-handlebars.adoc#decorators[A.8]).
+|`Handlebars.SafeString(s)` |`VSafe s` / `safe` |A value, not a wrapper class.
+|`Handlebars.escapeExpression(s)` |`esc_html` |Prelude helper.
+|`Handlebars.Utils` |host module |`escape`, `isEmpty`, `createFrame` analogues.
+|`Visitor` / AST walk |fold over `Template` |Plain algebraic data; pattern-match.
+|===
+
+== 7.5 Effectful and async hosts
+
+Fix `M = Aff` to allow helpers and partials that perform I/O (fetching a partial, calling a
+service, awaiting a value). The evaluator's `MonadThrow Error m` constraint is satisfied by `Aff`;
+the only cost is that `render` returns `Aff String` instead of `Either Error String`. Pure hosts
+keep `M = Either Error` and pay nothing.

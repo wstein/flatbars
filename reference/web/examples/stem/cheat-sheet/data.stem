@@ -1,0 +1,20 @@
+<section id="data" class="card" style="--a:var(--g-data);margin-top:14px">
+  <div class="head">
+    <span class="dot"></span>
+    <h2>source data<a href="#data" class="anchor" aria-label="Permalink">§</a></h2>
+    <span class="pill">yaml · derived</span>
+    <p class="desc">
+      Context bound to every expression on this sheet. Rendered from
+      <code>@root</code> by iterating each key and inspecting its value —
+      group catalogs (<code>main_groups</code> / <code>narrow_groups</code>)
+      live in their own data overlay tabs and are skipped here for brevity.
+    </p>
+  </div>
+  <pre class="codeblock">
+    {{~#each @root}}
+      {{~#unless (contains (list "main_groups" "narrow_groups") @key)}}
+        <span class="k">{{@key}}</span>: <span class="f">{{json @this}}</span>
+      {{~/unless}}
+    {{~/each}}
+  </pre>
+</section>

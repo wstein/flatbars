@@ -1,0 +1,78 @@
+= 4. Errors & diagnostics
+:navtitle: 4. Errors & diagnostics
+
+BareBars distinguishes *parse errors* (the template is not well-formed) from *evaluation errors*
+(the template is well-formed but cannot be rendered against the given environment and data).
+
+== 4.1 Parse errors
+
+[cols="1,3",options="header"]
+|===
+|Error |Cause
+
+|`UnterminatedTag` |an opener with no matching closer before end of input
+|`UnterminatedComment` |`pass:[{{!--]` with no `pass:[--}}]`
+|`UnterminatedRaw` |`pass:[{{{{#name}}}}]` with no `pass:[{{{{/name}}}}]`
+|`MismatchedBlock` |`pass:[{{/a}}]` closing a `pass:[{{#b}}]`
+|`SeparatorOutsideBlock` |a `pass:[{{sep …}}]` separator with no enclosing block
+|`HeadNotIdent` |a group or literal where an application head must be an `Ident`
+|`EmptyOutput` |`pass:[{{{}}}]` with no expression
+|`BadEscape` |an invalid string escape inside a `STRING`
+|===
+
+Every parse error carries a source offset covering the offending tag. (Multiple separators in one
+block are *not* an error — a block may have any number of branches; xref:grammar.adoc[].)
+
+== 4.2 Evaluation errors
+
+[cols="1,3",options="header"]
+|===
+|Error |Cause
+
+|`UnknownHelper name` |`name` is not defined in any helper frame
+|`ArityError` |a helper received the wrong number of arguments (helper-raised)
+|`TypeError` |a helper received an argument of the wrong shape (helper-raised)
+|`HelperError` |any other failure a helper chooses to raise
+|===
+
+Only `UnknownHelper` is raised by the core itself. `ArityError`, `TypeError`, and `HelperError`
+are *raised by helpers*, because the core does not know any helper's contract. This keeps the core
+free of helper semantics (xref:concepts.adoc[]).
+
+[NOTE]
+====
+There is no "missing variable" error, because there are no variables. A `pass:[{{{city}}}]` whose
+helper is undefined is an `UnknownHelper`, not a missing value. Reading an absent *data field*
+(`pass:[{{{lookup this "nope"}}}]`) is *not* an error in the reference prelude — `lookup` returns
+`VNull`, which stringifies to the empty string, matching {hbs}' behaviour for missing paths. A host
+may install a strict `lookup` that raises instead (xref:appendix-handlebars.adoc#options[A.9]).
+====
+
+== 4.3 The validation pass (skeleton AST)
+
+`parse` produces a *skeleton* AST: it is purely syntactic and ascribes no meaning to any name. It
+does not know whether `each` exists, takes one argument, or is a block helper. Catching those
+mistakes is a *second pass*, driven by a schema the *engine* supplies — the BareBars analogue of
+validating a document against a JSON schema.
+
+The `BareBars.Walk` host module provides this. `foldRefs` is the generic visitor (it folds a monoid
+over every helper reference — applications, blocks, raw blocks, and separators), and `validate`
+checks a template against a `Schema`:
+
+[source,haskell]
+----
+type HelperSpec = { block :: Boolean, arity :: Arity }            -- Arity = Exactly | AtLeast | Between | AnyArity
+type Schema     = { helpers :: Map Ident HelperSpec, allowUnknown :: Boolean }
+validate        :: Schema -> Template -> Array Issue              -- Issue = { severity, name, message }
+----
+
+`validate` reports unknown helpers (when `allowUnknown` is false — the JSON-schema
+`additionalProperties: false` analogue), arity violations, and block/inline misuse. Separators are
+*not* helper invocations and are never flagged here. The reference engine's schema is
+`BareBars.Prelude.preludeSchema`. This keeps the core free of semantics (xref:concepts.adoc[]) while
+giving engines a place to define — and enforce — their contract.
+
+== 4.4 Diagnostics quality
+
+Implementations SHOULD attach source offsets to evaluation errors by tracking the originating
+`Output`/`Block` node, so a `UnknownHelper "uppcase"` points at the typo rather than at the document.

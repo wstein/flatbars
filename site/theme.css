@@ -1,0 +1,131 @@
+/* ============================================================================
+   BareBars — brand theme
+   Industrial / blueprint: graphite + warm paper + one safety-orange accent.
+   Drop this into the product site or feed the tokens to an Antora supplemental UI.
+   ========================================================================== */
+
+:root {
+  /* ---- core palette ---- */
+  --bb-ink:        #1A1813;   /* graphite, warm near-black            */
+  --bb-ink-2:      #2A2620;   /* raised graphite (cards on dark)      */
+  --bb-paper:      #F4F1EA;   /* warm off-white, primary surface      */
+  --bb-paper-2:    #ECE7DB;   /* sunken paper (code, wells)           */
+  --bb-rod:        #EDE7D9;   /* rod colour on dark                   */
+
+  --bb-accent:     #F2541B;   /* safety orange — the "value"          */
+  --bb-accent-deep:#C73E0F;   /* pressed / hover                      */
+  --bb-blue:       #2C6E8F;   /* blueprint steel-blue, links/info     */
+  --bb-steel:      #7A746A;   /* muted label / secondary text         */
+
+  --bb-line:       #D8D2C4;   /* hairline on paper                    */
+  --bb-line-2:     #C7C0AE;   /* stronger hairline                    */
+  --bb-line-dark:  #3C3833;   /* hairline on graphite                 */
+
+  --bb-ok:         #2E7D52;
+  --bb-warn:       #B8860B;
+
+  /* ---- type ---- */
+  --bb-font-display: 'Anton', 'Archivo', system-ui, sans-serif;
+  --bb-font-mono:    'Space Mono', 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --bb-font-body:    'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+
+  --bb-fs-hero:   clamp(3.5rem, 14vw, 11rem);
+  --bb-fs-h1:     clamp(2rem, 5vw, 3.25rem);
+  --bb-fs-h2:     clamp(1.4rem, 3vw, 2rem);
+  --bb-fs-h3:     1.2rem;
+  --bb-fs-body:   1.0625rem;
+  --bb-fs-small:  0.85rem;
+  --bb-fs-mono:   0.92rem;
+
+  /* ---- structure ---- */
+  --bb-radius:    13px;     /* matches the logo plate */
+  --bb-radius-sm: 7px;
+  --bb-gap:       clamp(1rem, 4vw, 3rem);
+  --bb-maxw:      1180px;
+  --bb-shadow:    0 1px 0 var(--bb-line-2), 0 18px 40px -28px rgba(26,24,19,.55);
+  --bb-grid:      24px;     /* blueprint grid pitch */
+}
+
+/* ---- base ---- */
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--bb-font-body);
+  font-size: var(--bb-fs-body);
+  line-height: 1.6;
+  color: var(--bb-ink);
+  background:
+    linear-gradient(var(--bb-paper), var(--bb-paper)),
+    /* faint blueprint dot grid */
+    radial-gradient(var(--bb-line) 1px, transparent 1px);
+  background-size: auto, var(--bb-grid) var(--bb-grid);
+  background-position: 0 0, 0 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--bb-font-body); font-weight: 700; line-height: 1.12; letter-spacing: -0.02em; }
+h1 { font-size: var(--bb-fs-h1); }
+h2 { font-size: var(--bb-fs-h2); }
+h3 { font-size: var(--bb-fs-h3); }
+
+a { color: var(--bb-blue); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { color: var(--bb-accent-deep); }
+
+code, kbd, samp, pre { font-family: var(--bb-font-mono); font-size: var(--bb-fs-mono); }
+
+/* ---- the technical "kicker" label, used everywhere ---- */
+.bb-kicker {
+  font-family: var(--bb-font-mono);
+  font-size: var(--bb-fs-small);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--bb-steel);
+  display: inline-flex; align-items: center; gap: .6em;
+}
+.bb-kicker::before {
+  content: ""; width: 22px; height: 2px; background: var(--bb-accent);
+}
+
+/* ---- buttons ---- */
+.bb-btn {
+  font-family: var(--bb-font-mono); font-weight: 700; font-size: .95rem;
+  letter-spacing: .02em;
+  display: inline-flex; align-items: center; gap: .6em;
+  padding: .72em 1.2em; border-radius: var(--bb-radius-sm);
+  border: 1.5px solid var(--bb-ink); background: var(--bb-ink); color: var(--bb-paper);
+  cursor: pointer; text-decoration: none; transition: transform .08s ease, background .15s ease;
+}
+.bb-btn:hover { background: var(--bb-accent-deep); border-color: var(--bb-accent-deep); color: #fff; transform: translateY(-1px); }
+.bb-btn--ghost { background: transparent; color: var(--bb-ink); }
+.bb-btn--ghost:hover { background: var(--bb-paper-2); color: var(--bb-ink); border-color: var(--bb-ink); transform: translateY(-1px); }
+
+/* ---- code surfaces ---- */
+.bb-code {
+  background: var(--bb-ink); color: var(--bb-rod);
+  border-radius: var(--bb-radius); padding: 1.1rem 1.25rem; overflow:auto;
+  border: 1px solid var(--bb-line-dark); line-height: 1.55;
+}
+.bb-code .t-key { color: #F2541B; }       /* {{{ }}} and helper heads */
+.bb-code .t-str { color: #9BD08B; }        /* strings */
+.bb-code .t-num { color: #E8C06A; }        /* numbers */
+.bb-code .t-mut { color: #8C857A; }        /* punctuation / comments */
+.bb-code .t-dim { color: #6B655B; }
+
+/* ---- callout ---- */
+.bb-note {
+  border-left: 3px solid var(--bb-accent);
+  background: var(--bb-paper-2);
+  padding: .9rem 1.1rem; border-radius: 0 var(--bb-radius-sm) var(--bb-radius-sm) 0;
+}
+
+/* ---- tables ---- */
+.bb-table { width:100%; border-collapse: collapse; font-size: .98rem; }
+.bb-table th { text-align:left; font-family: var(--bb-font-mono); font-size: var(--bb-fs-small);
+  letter-spacing:.06em; text-transform:uppercase; color: var(--bb-steel);
+  border-bottom: 2px solid var(--bb-ink); padding:.55rem .7rem; }
+.bb-table td { border-bottom: 1px solid var(--bb-line); padding:.6rem .7rem; vertical-align: top; }
+.bb-table tr:hover td { background: var(--bb-paper-2); }
+
+/* ---- hairline frame helper ---- */
+.bb-frame { border: 1px solid var(--bb-line-2); border-radius: var(--bb-radius); background: var(--bb-paper); }

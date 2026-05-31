@@ -1,0 +1,9 @@
+tree:
+  label: src
+  children:
+    - label: parser.ex
+    - label: bytecode
+      children:
+        - label: vm.ex
+        - label: compiler.ex
+    - label: README.md
