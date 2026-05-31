@@ -47,7 +47,7 @@ import FullBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registe
 import FullBars.Lower (RNode(..), escapingWarnings, lower)
 import FullBars.Prelude (prelude, preludeSchema)
 import FullBars.Surface (desugar, hoistInline)
-import FullBars.Value (escapeHtml, stringify, truthy)
+import FullBars.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, isFalsy, stringify, truthy)
 
 -- | Build a FullBars environment with the prelude, the given data as context,
 -- | and a `root` helper returning the top-level data. Polymorphic in `m`.

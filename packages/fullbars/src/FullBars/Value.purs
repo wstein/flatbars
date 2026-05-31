@@ -5,7 +5,11 @@
 -- | A different engine could define truthiness, escaping, and stringification
 -- | differently; these are this engine's choices.
 module FullBars.Value
-  ( truthy
+  ( FalsyShape(..)
+  , FalsySet
+  , handlebars
+  , isFalsy
+  , truthy
   , stringify
   , jsonStringify
   , jsonStringifyPretty
@@ -24,26 +28,62 @@ import Data.Int (hexadecimal, toStringAs)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (power)
+import Data.Set (Set)
+import Data.Set as Set
 import Data.String (Pattern(..), Replacement(..), length, replaceAll, stripSuffix)
 import Data.String.CodeUnits (singleton, toCharArray)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 
--- | Truthiness, matching Handlebars: `false`, `null`, `0`, `""`, and the empty
--- | array are falsy; `{}`, non-empty strings/arrays, and non-zero numbers are
--- | truthy. (Handlebars' `includeZero` option — counting `0` as truthy — lives
--- | in the `if`/`unless` helpers, not here.) A trusted empty string (`VSafe ""`)
--- | is falsy too, since it is still an empty string.
-truthy :: Value -> Boolean
-truthy = case _ of
-  VBool b -> b
-  VNull -> false
-  VString "" -> false
-  VSafe "" -> false
-  VArray [] -> false
-  VNumber n -> n /= 0.0
-  _ -> true
+-- | The closed vocabulary of *falsy shapes*: which value shapes a truthiness
+-- | mode treats as false. These denote shapes, not values — value-specific
+-- | logic (e.g. "is it the string `"no"`") is `eq`'s job, never truthiness.
+-- | See `docs/.../truthiness` §2.2.
+data FalsyShape
+  = FFalse -- `VBool false`
+  | FNull -- `VNull`
+  | FEmptyStr -- the empty string `VString ""`
+  | FZero -- numeric zero `VNumber 0.0`
+  | FEmptyArr -- the empty array `VArray []`
+  | FEmptyObj -- the empty object `VObject` (no keys)
+
+derive instance Eq FalsyShape
+derive instance Ord FalsyShape
+
+-- | A truthiness *mode*: the set of shapes that count as false. The set is the
+-- | only thing that varies between modes (`handlebars`/`ruby`/`presence`/…); the
+-- | `isFalsy`/`truthy` machinery is fixed.
+type FalsySet = Set FalsyShape
+
+-- | The default mode — Handlebars: `false`, `null`, `""`, `0`, and the empty
+-- | array are falsy; `{}` and every non-empty/non-zero value are truthy. This is
+-- | the behaviour of the engine when no `@truthiness` directive is present, so
+-- | existing templates are unaffected.
+handlebars :: FalsySet
+handlebars = Set.fromFoldable [ FFalse, FNull, FEmptyStr, FZero, FEmptyArr ]
+
+-- | Is a value falsy under the given mode? Each shape is false only if its
+-- | marker is in the set; everything else is truthy. A `VSafe` is judged by its
+-- | *content* (a safe empty string is as falsy as a plain empty string) — the
+-- | engine's long-standing content-based rule. `NaN` is truthy under every mode
+-- | (`NaN == 0.0` is false, so `FZero` never matches it).
+isFalsy :: FalsySet -> Value -> Boolean
+isFalsy fs = case _ of
+  VBool b -> not b && FFalse `Set.member` fs
+  VNull -> FNull `Set.member` fs
+  VString "" -> FEmptyStr `Set.member` fs
+  VString _ -> false
+  VNumber n -> n == 0.0 && FZero `Set.member` fs
+  VArray a -> Array.null a && FEmptyArr `Set.member` fs
+  VObject o -> Map.isEmpty o && FEmptyObj `Set.member` fs
+  VSafe s -> isFalsy fs (VString s)
+
+-- | Truthiness under a mode — the negation of `isFalsy`. (`includeZero` on
+-- | `if`/`unless` is a per-call exception layered on the mode; see
+-- | `FullBars.Prelude.truthyWith`.)
+truthy :: FalsySet -> Value -> Boolean
+truthy fs = not <<< isFalsy fs
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
 -- | the `esc_html` helper); arrays join with `","` and objects are an error.

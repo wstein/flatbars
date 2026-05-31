@@ -17,13 +17,15 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Number (nan)
+import Data.Set as Set
 import Data.String (toUpper)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FullBars (RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, stringify, truthy)
+import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, handlebars, lower, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, stringify, truthy)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value
@@ -201,7 +203,31 @@ main = do
   -- object, so even an empty one is truthy; that divergence is intentional.)
   for_ [ "", "0", "x" ] \s ->
     assert' ("safe-truthiness invariant for " <> show s)
-      (truthy (VSafe s) == truthy (VString s))
+      (truthy handlebars (VSafe s) == truthy handlebars (VString s))
+
+  -- §8 truthiness matrix — the engine's value policy across modes. This is the
+  -- semantics EVERY dialect shares (CoreBars/FullBars/future MaxBars all render
+  -- through one `truthy`, parameterised only by the falsy-set); locks §3.2/§8.
+  let
+    ruby = Set.fromFoldable [ FFalse, FNull ]
+    presence = Set.fromFoldable [ FFalse, FNull, FEmptyArr, FEmptyObj ]
+    always = Set.empty :: FalsySet
+    row label v hb' rb' pr' al' = do
+      assert' (label <> " @handlebars") (truthy handlebars v == hb')
+      assert' (label <> " @ruby") (truthy ruby v == rb')
+      assert' (label <> " @presence") (truthy presence v == pr')
+      assert' (label <> " @always") (truthy always v == al')
+  --      value                     hb     ruby   presence always
+  row "false" (VBool false) false false false true
+  row "null" VNull false false false true
+  row "0" (VNumber 0.0) false true true true
+  row "\"0\"" (VString "0") true true true true
+  row "empty-string" (VString "") false true true true
+  row "blank-string" (VString " ") true true true true
+  row "[]" (VArray []) false true false true
+  row "{}" (VObject Map.empty) true true false true
+  row "safe-empty" (VSafe "") false true true true
+  row "NaN" (VNumber nan) true true true true
 
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at

@@ -37,7 +37,7 @@ import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FullBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext)
-import FullBars.Value (escapeHtml, jsonStringify, jsonStringifyPretty, stringify, truthy)
+import FullBars.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
 
 --------------------------------------------------------------------------------
 -- The single source of truth
@@ -200,7 +200,7 @@ cmp :: forall m. Applicative m => (Ordering -> Boolean) -> Value -> Value -> m V
 cmp ok a b = pure (VBool (maybe false ok (compareValues a b)))
 
 not' :: forall m. Applicative m => Value -> m Value
-not' a = pure (VBool (not (truthy a)))
+not' a = pure (VBool (not (truthy handlebars a)))
 
 -- | `and`/`or`: fold truthiness across the arguments with the given quantifier.
 boolOf
@@ -209,7 +209,7 @@ boolOf
   => ((Value -> Boolean) -> Array Value -> Boolean)
   -> Array Value
   -> m Value
-boolOf quant args = pure (VBool (quant truthy args))
+boolOf quant args = pure (VBool (quant (truthy handlebars) args))
 
 --------------------------------------------------------------------------------
 -- Context & access
@@ -284,7 +284,7 @@ renderElse ctl = renderSafe ctl ctl.env (elseBody ctl)
 ifH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 ifH ctl args = do
   cond <- case args of
-    [ c ] -> pure (truthy c)
+    [ c ] -> pure (truthy handlebars c)
     [ c, opts ] -> pure (truthyWith opts c)
     _ -> throwError (ArityError (wrong1or2 "if" args))
   let
@@ -303,7 +303,7 @@ pickClause ctl clauses = case Array.uncons clauses of
     "elif" -> case cl.args of
       [ condE ] -> do
         cond <- ctl.eval ctl.env condE
-        if truthy cond then renderSafe ctl ctl.env cl.body
+        if truthy handlebars cond then renderSafe ctl ctl.env cl.body
         else pickClause ctl tail
       _ -> throwError (ClauseError "elif: expected exactly 1 argument")
     other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
@@ -326,7 +326,7 @@ checkIfClauses clauses = case Array.uncons clauses of
 
 unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 unlessH ctl args = case args of
-  [ c ] -> branchOn (not (truthy c)) ctl
+  [ c ] -> branchOn (not (truthy handlebars c)) ctl
   [ c, opts ] -> branchOn (not (truthyWith opts c)) ctl
   _ -> throwError (ArityError (wrong1or2 "unless" args))
 
@@ -342,12 +342,12 @@ wrong1or2 name args = name <> ": expected 1 or 2 arguments, got " <> show (Array
 truthyWith :: Value -> Value -> Boolean
 truthyWith opts v = case v of
   VNumber n | n == 0.0 && optFlag "includeZero" opts -> true
-  _ -> truthy v
+  _ -> truthy handlebars v
 
 -- | Read a boolean option from an options object (`VObject`); absent ⇒ false.
 optFlag :: String -> Value -> Boolean
 optFlag key = case _ of
-  VObject m -> maybe false truthy (Map.lookup key m)
+  VObject m -> maybe false (truthy handlebars) (Map.lookup key m)
   _ -> false
 
 --------------------------------------------------------------------------------
@@ -434,7 +434,7 @@ iterate ctl names items =
 withH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 withH ctl args = case Array.uncons args of
   Just { head: v, tail: rest } ->
-    if truthy v then
+    if truthy handlebars v then
       let
         binds = Array.zipWith (\nm val -> Tuple nm (constHelper val)) (bindingNames rest) [ v ]
         frame = Map.fromFoldable
