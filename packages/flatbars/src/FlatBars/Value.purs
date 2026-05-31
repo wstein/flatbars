@@ -7,6 +7,7 @@
 module FlatBars.Value
   ( truthy
   , stringify
+  , jsonStringify
   , escapeHtml
   ) where
 
@@ -14,11 +15,17 @@ import Prelude
 
 import BareBars.Error (Error(..))
 import BareBars.Value (Value(..))
+import Data.Char (toCharCode)
 import Data.Either (Either(..))
+import Data.Foldable (foldMap)
+import Data.Int (hexadecimal, toStringAs)
+import Data.Map as Map
 import Data.Maybe (fromMaybe)
-import Data.String (Pattern(..), Replacement(..), replaceAll, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), length, replaceAll, stripSuffix)
+import Data.String.CodeUnits (singleton, toCharArray)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 
 -- | Truthiness, matching Handlebars: `false`, `null`, `0`, `""`, and the empty
 -- | array are falsy; `{}`, non-empty strings/arrays, and non-zero numbers are
@@ -58,6 +65,43 @@ numberToString n =
     s = show n
   in
     fromMaybe s (stripSuffix (Pattern ".0") s)
+
+-- | Serialize a value as compact JSON text (the `json` / `esc_json` helpers).
+-- | Unlike `stringify`, this is total — *objects* and *arrays* are first-class
+-- | JSON, and a `VSafe` is just a string. Numbers reuse `numberToString` (so an
+-- | integral value is `1`, not `1.0`); object keys come out in `Map` order.
+jsonStringify :: Value -> String
+jsonStringify = case _ of
+  VNull -> "null"
+  VBool b -> if b then "true" else "false"
+  VNumber n -> numberToString n
+  VString s -> jsonQuote s
+  VSafe s -> jsonQuote s
+  VArray xs -> "[" <> joinWith "," (map jsonStringify xs) <> "]"
+  VObject m ->
+    "{" <> joinWith "," (map member (Map.toUnfoldable m :: Array (Tuple String Value))) <> "}"
+    where
+    member (Tuple k v) = jsonQuote k <> ":" <> jsonStringify v
+
+-- | Quote and escape a string as a JSON string literal: `"`, `\`, the readable
+-- | control escapes (`\n`/`\r`/`\t`), and any other control character below
+-- | U+0020 as `\u00XX`. Per-character so escape order can never double up.
+jsonQuote :: String -> String
+jsonQuote s = "\"" <> foldMap esc (toCharArray s) <> "\""
+  where
+  esc c = case c of
+    '"' -> "\\\""
+    '\\' -> "\\\\"
+    '\n' -> "\\n"
+    '\r' -> "\\r"
+    '\t' -> "\\t"
+    _ ->
+      let
+        code = toCharCode c
+      in
+        if code < 0x20 then "\\u00" <> pad2 (toStringAs hexadecimal code)
+        else singleton c
+  pad2 h = if length h == 1 then "0" <> h else h
 
 -- | HTML-escape the five significant characters. Used by the `esc_html` helper.
 escapeHtml :: String -> String

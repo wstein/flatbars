@@ -36,6 +36,13 @@ returning `VNull` at the first miss. `(lookup obj)` is `obj`.
 `VSafe`. Idempotent on `VSafe` input.
 |`safe` |1 |Marks the stringified argument as `VSafe` *without* escaping — the explicit "trust this
 markup" helper. The analogue of `new Handlebars.SafeString(…)`.
+|`json` |1 |Serializes the argument as *compact JSON text*, returned as a plain `VString` — so surface
+`pass:[{{ json x }}]` HTML-escapes it and `pass:[{{{ json x }}}]` emits it raw (e.g. inline `<script>`
+data). Objects/arrays are first-class; integral numbers print without a trailing `.0`; object keys
+come out in key order.
+|`esc_json` |1 |The JSON analogue of `esc_html`: serializes to JSON *and* HTML-escapes, returning
+`VSafe`. For embedding JSON safely in HTML (e.g. an attribute). `esc_html` is idempotent on the
+result, so surface escaping never doubles up.
 |`raw` |block |A raw-block helper returning its captured body verbatim.
 |===
 

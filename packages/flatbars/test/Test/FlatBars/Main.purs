@@ -135,6 +135,34 @@ main = do
     (obj [ Tuple "name" (str "A<B") ])
     "A&lt;B"
 
+  -- json: serialize a value as compact JSON text (plain VString).
+  expect "json-string" "{{{json (lookup this \"x\")}}}" (obj [ Tuple "x" (str "a\"b") ])
+    "\"a\\\"b\""
+  expect "json-number-int" "{{{json (lookup this \"n\")}}}" (obj [ Tuple "n" (VNumber 3.0) ]) "3"
+  expect "json-number-frac" "{{{json (lookup this \"n\")}}}" (obj [ Tuple "n" (VNumber 1.5) ]) "1.5"
+  expect "json-bool-null" "{{{json (lookup this \"b\")}}}{{{json (lookup this \"z\")}}}"
+    (obj [ Tuple "b" (VBool true), Tuple "z" VNull ])
+    "truenull"
+  expect "json-array" "{{{json (lookup this \"xs\")}}}"
+    (obj [ Tuple "xs" (arr [ str "x", VNumber 1.0 ]) ])
+    "[\"x\",1]"
+  expect "json-object-sorted" "{{{json this}}}"
+    (obj [ Tuple "b" (VNumber 2.0), Tuple "a" (VNumber 1.0) ])
+    "{\"a\":1,\"b\":2}"
+  -- control characters use the readable escapes.
+  expect "json-control" "{{{json (safe \"a\nb\tc\")}}}" VNull "\"a\\nb\\tc\""
+  -- esc_json: JSON + HTML-escape, marked safe (the JSON analogue of esc_html).
+  expect "esc-json" "{{{esc_json (lookup this \"x\")}}}" (obj [ Tuple "x" (str "<b>") ])
+    "&quot;&lt;b&gt;&quot;"
+  -- esc_html is idempotent on esc_json's VSafe, so surface {{ }} does not double-escape.
+  expectS "surface-esc-json" "{{ esc_json (lookup this \"x\") }}" (obj [ Tuple "x" (str "<b>") ])
+    "&quot;&lt;b&gt;&quot;"
+  -- surface {{ json x }} HTML-escapes the JSON; {{{ json x }}} leaves it raw.
+  expectS "surface-json-escaped" "{{ json (lookup this \"x\") }}" (obj [ Tuple "x" (str "<b>") ])
+    "&quot;&lt;b&gt;&quot;"
+  expectS "surface-json-raw" "{{{ json (lookup this \"x\") }}}" (obj [ Tuple "x" (str "<b>") ])
+    "\"<b>\""
+
   expect "if-true-bare" "{{#if this}}yes{{/if}}" (VBool true) "yes"
   expect "if-false-bare" "{{#if this}}yes{{/if}}" (VBool false) ""
   expect "unless" "{{#unless this}}none{{/unless}}" (VBool false) "none"
