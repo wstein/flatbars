@@ -330,7 +330,7 @@ Core (layout):       <div class="body">{{{ partial-block }}}</div>
 |raw block `pass:[{{{{raw}}}}…{{{{/raw}}}}]` |same |CORE raw block; body verbatim |CORE
 |`~` whitespace control |same |CORE; resolved in the lexer |CORE
 |backslash escape `\pass:[{{x}}]` |same |CORE; emits the tag literally |CORE
-|standalone-line auto-trim |— |*not provided* — use explicit `~` |DROPPED
+|standalone-line auto-trim |same |CORE; on by default (Handlebars parity), configurable via `@trim` / CLI / config |CORE
 |===
 
 Worked example (`whitespace/` + `comments/`):
@@ -347,13 +347,13 @@ Handlebars:  {{{{raw}}}}Hello {{name}}{{{{/raw}}}}
 Core:        {{{{raw}}}}Hello {{name}}{{{{/raw}}}}   (verbatim; `raw` engine helper returns body)
 ----
 
-[IMPORTANT]
+[NOTE]
 ====
-*The one behavioural difference.* {hbs} silently removes whitespace and the newline around a tag that
-stands alone on its line. BareBars does *not*: whitespace is removed only where `~` appears.
-Templates relying on standalone trimming emit extra blank lines until `~` is added — the deliberate
-cost of "no implicit sugar" (xref:lexical.adoc[] §1.4). A host MAY offer an opt-in standalone pass as
-a pre-lexer transform, but it is not in the core or the reference Surface.
+*Standalone whitespace.* Like {hbs}, BareBars removes a line that holds only a standalone block
+open/close or a comment, so a control tag leaves no blank line. This is **on by default** and runs as
+a post-tokenize pass in the core. Turn it off per file with `pass:[{{! @trim: none }}]`, or globally
+with the CLI `--trim none` / `barebars.json`; explicit `~` composes on top. Output tags and bare
+`pass:[{{else}}]` separators are never standalone-trimmed. See xref:directives.adoc[].
 ====
 
 [#decorators]
@@ -485,7 +485,7 @@ Every {hbs}/Mustache surface element, asserting a mapping exists. A missing ✓ 
 * [x] raw block `pass:[{{{{ }}}}]` — A.7
 * [x] `~` whitespace control — A.7
 * [x] backslash escape `\pass:[{{]` — A.7
-* [x] standalone-line trim — DROPPED, replaced by explicit `~` — A.7
+* [x] standalone-line trim — PROVIDED, on by default + configurable (`@trim`) — A.7
 
 .Decorators
 * [x] `pass:[{{#*inline}}]`, custom decorators, `registerDecorator` — A.8
@@ -503,8 +503,8 @@ Every {hbs}/Mustache surface element, asserting a mapping exists. A missing ✓ 
 
 [TIP]
 ====
-Intentionally `DROPPED`: *standalone whitespace auto-trim* (→ explicit `~`) and *set delimiters*
-(fixed delimiters). Reframed rather than reproduced: *lambdas* (values are never functions; use a
+Intentionally `DROPPED`: *set delimiters* (fixed delimiters). Reframed rather than reproduced:
+*lambdas* (values are never functions; use a
 helper or `apply`), *`helperMissing`/`blockHelperMissing`* (the engine raises `UnknownHelper`; a host
 may layer resolution), and — most importantly — *`{{else}}`*, which is not a core construct at all
 but a separator the engine interprets. Everything else is a faithful mapping. No item is

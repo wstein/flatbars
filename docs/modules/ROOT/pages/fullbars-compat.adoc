@@ -81,32 +81,38 @@ so it is kept on purpose. The sharp edge to know: `safe`/`esc_html` *stringify* 
 an escaped/safe value is a category error — they are *output*, not data — and `escapingWarnings`
 flags exactly that on `if`/`unless` conditions.
 
-(Everything else about truthiness *is* familiar: `false`, `null`, `0`, `""`, and the empty array are
+The *default* mode is familiar (Handlebars): `false`, `null`, `0`, `""`, and the empty array are
 falsy; `pass:[{}]` and non-zero numbers are truthy; `0` is falsy unless `includeZero` is set, written
-as the surface hash `pass:[{{#if n includeZero=true}}]`.)
+as the surface hash `pass:[{{#if n includeZero=true}}]`. The falsy set is **per-file configurable** via
+the `pass:[{{! @truthiness: … }}]` directive (`minimal`/`presence`/`always`/an explicit shape-list) —
+see xref:directives.adoc[]. With no directive, the behaviour above is exactly today's.
 
-=== 1.5 Whitespace is explicit — no standalone-line magic
+=== 1.5 Standalone whitespace is trimmed (on by default, configurable)
 
-{hbs}/Mustache silently strip a line that contains only a standalone block tag. FullBars does *not*:
-whitespace is removed only where you ask, with `~`. This is the difference most likely to surprise
-silently, so it is called out here rather than buried.
+Like {hbs}/Mustache, FullBars strips a line that contains only a standalone block open/close or a
+comment, so a control tag leaves no blank line. This is **on by default** (Handlebars parity).
 
 [cols="1,3a",options="header"]
 |===
 |Template |Output
 
 |`pass:[{{#each xs}}\n  <li>{{ this }}</li>\n{{/each}}]`
-|*Handlebars* strips the standalone `pass:[{{#each}}]`/`pass:[{{/each}}]` lines:
-`pass:[  <li>a</li>\n  <li>b</li>\n]`. *FullBars* keeps every newline verbatim:
-`pass:[\n  <li>a</li>\n\n  <li>b</li>\n]`.
+|*Default* — the standalone `pass:[{{#each}}]`/`pass:[{{/each}}]` lines are removed:
+`pass:[  <li>a</li>\n  <li>b</li>\n]` (matching Handlebars).
 
-|`pass:[{{~#each xs~}}\n  <li>{{ this }}</li>\n{{~/each~}}]`
-|With explicit `~`, *FullBars* trims the surrounding whitespace and matches the compact Handlebars
-result.
+|same template, with `pass:[{{! @trim: none }}]` in the header
+|Trimming off — every newline is kept verbatim:
+`pass:[\n  <li>a</li>\n\n  <li>b</li>\n]`.
 |===
 
-The trade is implicit-and-surprising for explicit-and-predictable: output whitespace is exactly what
-the template's literal text says, until a `~` says otherwise.
+Only block opens/closes and comments are standalone-eligible. Output tags (`pass:[{{ }}]` /
+`pass:[{{{ }}}]`) and bare separators like `pass:[{{else}}]` are **never** standalone-trimmed — at the
+structural level a `pass:[{{ x }}]` separator is indistinguishable from surface output, so trimming it
+could eat real content. Explicit `~` still works and composes on top.
+
+Control (highest precedence first): a `pass:[{{! @trim: standalone | none }}]` header directive (the
+one *syntactic* directive the core itself acts on), then the CLI `--trim`, then a `barebars.json`
+`pass:[{ "trim": … }]`, then the built-in default (on). See xref:directives.adoc[].
 
 === 1.6 The literals `true` / `false` / `null` are helpers
 

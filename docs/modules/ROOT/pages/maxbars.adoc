@@ -1,0 +1,65 @@
+= The MaxBars dialect (infix operators & pipes)
+:hbs: Handlebars
+
+MaxBars is the top of the dialect ladder — **CoreBars ⊂ FullBars ⊂ MaxBars**. It
+is FullBars plus a richer *surface*: infix operators and pipes. Everything below
+the surface is reused unchanged.
+
+== Reuse by dependency
+
+MaxBars desugars to the same core `Expr` that FullBars already understands, so it
+reuses FullBars *wholesale by dependency* — the engine, prelude, value policy,
+surface desugar, **and the compiler**. The only new piece is the interior
+expression grammar, plugged in through the `ParseOptions.parseExpr` seam
+(xref:grammar.adoc[]); the structural tree-builder stays grammar-agnostic.
+
+[source,purescript]
+----
+maxOptions  = defaultParseOptions { parseExpr = MaxBars.Expr.parseMaxExpr }
+renderMax   = renderSurfaceDiagWith maxOptions      -- FullBars engine, reused
+compileMaxJs = compileSurfaceWith   maxOptions      -- FullBars compiler, reused
+----
+
+A shared semantic *kernel* (truthiness/stringify/escape, frame mechanics) is
+extracted lazily — only for proven overlaps, never a vague `common` package.
+
+== Operators
+
+Operators desugar to plain core helper calls — the same `App` nodes a `(and a b)`
+subexpression produces — so the prelude, engine, and emit rules need no changes.
+
+[cols="1,1,2",options="header"]
+|===
+|Infix |Helper |Example → core
+
+|`&&` |`and` |`pass:[{{ a && b }}]` → `pass:[(and a b)]`
+|`\|\|` |`or` |`pass:[{{ a \|\| b }}]` → `pass:[(or a b)]`
+|`!` |`not` |`pass:[{{ !a }}]` → `pass:[(not a)]`
+|`==` `!=` |`eq` `ne` |`pass:[{{ x == 1 }}]` → `pass:[(eq x 1)]`
+|`<` `>` `<=` `>=` |`lt` `gt` `lte` `gte` |`pass:[{{ x >= 18 }}]` → `pass:[(gte x 18)]`
+|`\|` (pipe) |application |`pass:[{{ a \| f x }}]` → `pass:[(f a x)]` (piped value first)
+|===
+
+Precedence (loosest → tightest): pipe, `||`, `&&`, comparisons (non-associative),
+prefix `!`, then application/atom. Pipe chains are left-associative:
+`pass:[a | f | g]` ⇒ `pass:[(g (f a))]`. Paths, literals, and `(parenthesised)`
+subexpressions are exactly as in FullBars; the operator characters
+(`< > = | & !`) are excluded from the identifier set so they tokenise as
+operators.
+
+== v1 limitations
+
+* **Infix block conditions must be parenthesised** — `pass:[{{#if (a && b)}}]`,
+  not `pass:[{{#if a && b}}]`. Bare infix works in output (`pass:[{{ a && b }}]`,
+  `pass:[{{{ … }}}]`) and pipes; the shared tree-builder reads a block *head* as a
+  prefix application, so block-head-aware infix is a follow-up.
+* **Richer loop variables** (`index0`/`index1`/`rindex0`/`rindex1`/`length`, bare
+  names without `@`) are specified for MaxBars but not yet wired; FullBars'
+  `@index`/`@../` are available in the meantime.
+
+== Truthiness
+
+MaxBars shares FullBars' truthiness, including the per-file `@truthiness`
+directive (xref:directives.adoc[]). A reader can rely on `pass:[{{#if x}}]` and
+`pass:[{{ x && y }}]` always agreeing within one file, because both consult the
+file's falsy set.

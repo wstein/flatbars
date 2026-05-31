@@ -1,0 +1,88 @@
+= Header directives (`@truthiness`, `@trim`)
+:hbs: Handlebars
+
+A *directive* is a `@key`/`@key: value` marker carried in a short `pass:[{{! … }}]`
+comment at the **head** of a file. The core lifts directives meaning-free (the
+`Sep` precedent applied to comments — xref:grammar.adoc[]); the engine assigns
+meaning. Because carriage lives in the core parser, every dialect (CoreBars,
+FullBars, MaxBars) inherits directives uniformly.
+
+== The mechanism
+
+[source,handlebars]
+----
+{{! @truthiness: minimal
+    @trim: none }}
+Hello {{ name }}!
+----
+
+Rules (xref:lexical.adoc[]):
+
+* Directives live **only** in short `pass:[{{! … }}]` comments. A long
+  `pass:[{{!-- … --}}]` comment is inert prose — so JSDoc `@param`, e-mail
+  handles, etc. are safe by construction.
+* The parser keys on `@<key>` heads (`[A-Za-z][A-Za-z0-9_-]*`); a value runs to
+  the next head or the block end, trimmed. A bare `@key` (no colon) is a flag
+  (`= @key:true`). Layout is free; canonical style is one `@key:value` per line.
+* **Header-only.** Directives are recognised before the first non-comment tag.
+  Leading content/whitespace does not close the header — only a real tag does. A
+  directive after that point is a `DirectiveAfterHeader` parse error.
+* Unknown keys are **carried but lint-warned** (forward compatibility), not an
+  error.
+
+== `@truthiness` — the falsy set (engine)
+
+Chooses which value *shapes* `if`/`unless`/`and`/`or`/`not` (and MaxBars'
+`&&`/`||`/`!`) treat as false, per file. The value is **either** one alias **or**
+a non-empty space-separated list of shape-literals (`false null "" 0 [] {}`).
+Absent ⇒ the `handlebars` default, so existing templates are unaffected.
+
+[cols="1,2,3",options="header"]
+|===
+|Alias |Falsy set |Notes
+
+|`empty` / `handlebars` |`false null "" 0 []` |the default; `pass:[{}]` truthy, `"0"` truthy
+|`minimal` / `ruby` / `nil` / `lua` |`false null` |only `false`/`null` are false; `0`/`""`/`[]`/`pass:[{}]` truthy
+|`presence` |`false null [] {}` |present ⇒ truthy; `false` kept false on purpose
+|`always` |∅ |nothing is false — every value truthy
+|===
+
+Docs always print the expansion next to a name (a name says nothing the explicit
+set does not). Decisions the explicit form makes visible: `"0"` is truthy under
+every mode; `pass:[{}]` is falsy only under `presence`; `NaN` is always truthy;
+`safe ""` is falsy iff `""` is in the set (content-based — xref:fullbars-compat.adoc[] §1.4).
+
+`includeZero` on a single `if`/`unless` is a **per-call exception** layered on the
+mode: it removes `0` from the falsy set for that one test (a no-op under a mode
+that already omits `0`, e.g. `minimal`).
+
+**Scoping is file-based and lexical.** A condition branches by the set declared in
+the file where it is *written* — never render-global, never inherited across an
+*external* partial boundary. An external partial uses its own `@truthiness`
+(default `handlebars` if it declares none); an inline `pass:[{{#inline}}]` partial
+is lexically part of its file and uses the file's mode. (A linter surfaces a
+caller/partial mode mismatch as information.)
+
+Errors: a duplicate `@truthiness`, an empty value (use `always`), an unknown
+alias/literal, or an alias+list mix — each located at the directive.
+
+== `@trim` — standalone whitespace (core, syntactic)
+
+`@trim: standalone | none` toggles Handlebars-style standalone-line trimming: a
+line holding only a block open/close or a comment has its indentation and
+trailing newline removed. **On by default.** This is the one directive the *core*
+itself acts on, because whitespace is syntactic (the core already owns `~`).
+
+Output tags (`pass:[{{ }}]` / `pass:[{{{ }}}]`) and bare `pass:[{{else}}]`
+separators are never standalone-trimmed. Explicit `~` composes on top.
+
+Precedence (highest first): the `@trim` directive, the CLI `--trim standalone|none`,
+a `barebars.json` `pass:[{ "trim": "standalone" | "none" }]` in the working
+directory, then the built-in default (on).
+
+== Compilation
+
+Both interpreter and compiler honour directives identically. The compiler bakes
+the resolved falsy set into the emitted module (a `$falsy` constant the runtime
+reads), so a compiled template branches under the same mode as the interpreter —
+asserted byte-for-byte by the conformance harness.
