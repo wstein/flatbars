@@ -16,25 +16,37 @@
 // right basis for cross-engine comparison; the austere **core** dialect is an
 // option (the BareBars-specific control, surfaced in Phase 2).
 //
-// MVP scope (Phase 1): render + honest capability advertisement. The AST-backed
-// inspectors (parseAst outline, required-assigns, partial-graph) are Phase 2,
-// pending a `FullBars.Lab` facade that exposes the lowered AST as JSON; until
-// then BareBars does not advertise those features, so those panels gate off
-// exactly as for any engine that lacks them.
+// Supported: render (core + surface dialects, `?dialect=`), the lowered AST
+// (parseAst), data-access (required-assigns), the helper catalog, and the
+// partial graph (multi-document partials). The generic rt.block fallback for
+// exotic block helpers and `inspectAt` are not yet implemented, so those
+// features are not advertised and the matching panels gate off.
 
-import { render as bbRender, renderSurface as bbRenderSurface, astJson } from "./vendor/barebars-engine.mjs";
+import {
+  render as bbRender,
+  renderSurface as bbRenderSurface,
+  renderSurfaceWithPartials as bbRenderSurfaceWith,
+  astJson,
+} from "./vendor/barebars-engine.mjs";
 
 const BB_VERSION = "0.1.0";
 
+// The active dialect, from `?dialect=core|surface` (default surface — the
+// Handlebars-compatible layer). The header dialect toggle sets this param.
+const DIALECT =
+  (typeof location !== "undefined" && new URLSearchParams(location.search).get("dialect") === "core")
+    ? "core"
+    : "surface";
+
 // engine-features/v1 capability vector. BareBars backs rendering, a static helper
-// catalog (→ Transformers panel), and exact data-access (→ Data Access panel):
-// the surface dialect desugars every bare path to `lookup`, so the AST cleanly
-// separates data reads from helper calls — no `:approximate` suffix needed.
-// AST-only Stem features (partial-graph, standalone-whitespace, provenance, …)
-// stay absent, so the gate hides those panels.
+// catalog (→ Transformers panel), exact data-access (→ Data Access panel — the
+// surface dialect desugars every bare path to `lookup`), and a partial graph
+// (→ Partials panel; {{> name}}/{{#inline}} surface as partial nodes). AST-only
+// Stem features (standalone-whitespace, provenance, …) stay absent, gated off.
 const BB_FEATURES = [
   "catalog",
   "required-assigns",
+  "partial-graph",
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
 ];
@@ -70,12 +82,11 @@ export async function createBareBarsRenderer() {
     throw err;
   }
 
-  // `program` is opaque to the host: it carries the source and the chosen dialect.
-  function compile(source, partials = {}, { dialect = "surface" } = {}) {
-    // A compile-time parse check via a throwaway render against empty data would
-    // conflate parse and eval errors; instead defer to render (which reports
-    // located parse errors). The MVP has no separate compile step.
-    return { program: { source, dialect } };
+  // `program` is opaque to the host: it carries the source, the active dialect,
+  // and the named partial documents (the host's multi-document sources).
+  function compile(source, partials = {}, _opts = {}) {
+    // No separate compile step — render reports located parse errors directly.
+    return { program: { source, dialect: DIALECT, partials: partials || {} } };
   }
 
   function render(program, data, { map = false, policy } = {}) {
@@ -85,7 +96,12 @@ export async function createBareBarsRenderer() {
       throw err;
     }
     const d = data == null ? {} : data;
-    const res = program.dialect === "core" ? bbRender(program.source, d) : bbRenderSurface(program.source, d);
+    const hasPartials = program.partials && Object.keys(program.partials).length > 0;
+    const res = program.dialect === "core"
+      ? bbRender(program.source, d)
+      : hasPartials
+        ? bbRenderSurfaceWith(program.partials, program.source, d)
+        : bbRenderSurface(program.source, d);
     return renderResult(res, map);
   }
 
@@ -95,7 +111,7 @@ export async function createBareBarsRenderer() {
   // walk that shape, exactly like the Handlebars adapter walks its mapped nodes.
 
   function parseAst(source) {
-    return astJson("surface", source);
+    return astJson(DIALECT, source);
   }
 
   function walk(nodes, visit) {

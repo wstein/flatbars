@@ -8115,6 +8115,10 @@ var runString1 = /* @__PURE__ */ runString(monadThrowEither);
 var refEngine1 = /* @__PURE__ */ refEngine(monadThrowEither);
 var show8 = /* @__PURE__ */ show(showError);
 var runTemplate2 = /* @__PURE__ */ runTemplate(monadEither);
+var traverse5 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
+var show1 = /* @__PURE__ */ show(showParseError);
+var union6 = /* @__PURE__ */ union(ordString);
+var fromFoldable8 = /* @__PURE__ */ fromFoldable(ordString)(foldableArray);
 var surfaceClauses = ["else", "elif"];
 var preludeEnv = function(dictMonadThrow) {
   var prelude2 = prelude(dictMonadThrow);
@@ -8171,6 +8175,54 @@ var renderSurfaceDiag = function(src) {
     }
     ;
     throw new Error("Failed pattern match at FullBars (line 143, column 29 - line 152, column 31): " + [v.constructor.name]);
+  };
+};
+var renderSurfaceWith = function(partialSrcs) {
+  return function(src) {
+    return function(dat) {
+      var compilePartial = function(v4) {
+        var v12 = parse(v4.value1);
+        if (v12 instanceof Left) {
+          return new Left(v12.value0);
+        }
+        ;
+        if (v12 instanceof Right) {
+          return new Right(new Tuple(v4.value0, desugarSurface(v12.value0)));
+        }
+        ;
+        throw new Error("Failed pattern match at FullBars (line 136, column 35 - line 138, column 53): " + [v12.constructor.name]);
+      };
+      var v = traverse5(compilePartial)(partialSrcs);
+      if (v instanceof Left) {
+        return new Left(show1(v.value0));
+      }
+      ;
+      if (v instanceof Right) {
+        var v1 = parse(src);
+        if (v1 instanceof Left) {
+          return new Left(show1(v1.value0));
+        }
+        ;
+        if (v1 instanceof Right) {
+          var v2 = hoistInline(desugarSurface(v1.value0));
+          var env = registerPartials(union6(v2.partials)(fromFoldable8(v.value0)))(preludeEnv2(dat));
+          var v3 = runTemplate2(refEngine1(env))(v2.template);
+          if (v3 instanceof Left) {
+            return new Left(show8(v3.value0));
+          }
+          ;
+          if (v3 instanceof Right) {
+            return new Right(v3.value0);
+          }
+          ;
+          throw new Error("Failed pattern match at FullBars (line 132, column 11 - line 134, column 35): " + [v3.constructor.name]);
+        }
+        ;
+        throw new Error("Failed pattern match at FullBars (line 125, column 20 - line 134, column 35): " + [v1.constructor.name]);
+      }
+      ;
+      throw new Error("Failed pattern match at FullBars (line 123, column 3 - line 134, column 35): " + [v.constructor.name]);
+    };
   };
 };
 
@@ -8485,7 +8537,7 @@ var toUnfoldable5 = function(dictUnfoldable) {
     return $89($90($91));
   };
 };
-var fromFoldable8 = function(dictFoldable) {
+var fromFoldable9 = function(dictFoldable) {
   var fromFoldable12 = fromFoldable2(dictFoldable);
   return function(l) {
     return runST(function __do() {
@@ -8558,7 +8610,8 @@ var $runtime_lazy6 = function(name2, moduleName, init3) {
   };
 };
 var show10 = /* @__PURE__ */ show(showNumber);
-var fromFoldable9 = /* @__PURE__ */ fromFoldable8(foldableArray);
+var toUnfoldable6 = /* @__PURE__ */ toUnfoldable5(unfoldableArray);
+var fromFoldable10 = /* @__PURE__ */ fromFoldable9(foldableArray);
 var elem4 = /* @__PURE__ */ elem2(eqString);
 var map17 = /* @__PURE__ */ map(functorArray);
 var str = id;
@@ -8616,6 +8669,9 @@ var result = /* @__PURE__ */ either(function(e) {
     error: ""
   };
 });
+var renderSurfaceWithPartials = function(partials, tpl, json) {
+  return result(renderSurfaceWith(toUnfoldable6(partials))(tpl)(fromJson(json)));
+};
 var renderSurface = function(tpl, json) {
   return result(renderSurfaceDiag(tpl)(fromJson(json)));
 };
@@ -8623,7 +8679,7 @@ var render = function(tpl, json) {
   return result(renderWithDiag(tpl)(fromJson(json)));
 };
 var obj = function(kvs) {
-  return id(fromFoldable9(kvs));
+  return id(fromFoldable10(kvs));
 };
 var litName = function(args) {
   var v = head(args);
@@ -8648,13 +8704,13 @@ var ctx = function(kind) {
   return obj([tt2("context"), new Tuple("kind", str(kind))]);
 };
 var compileResult = function(dictShow) {
-  var show1 = show(dictShow);
+  var show12 = show(dictShow);
   return function(v) {
     if (v instanceof Left) {
       return {
         ok: false,
         value: "",
-        error: show1(v.value0)
+        error: show12(v.value0)
       };
     }
     ;
@@ -8666,7 +8722,7 @@ var compileResult = function(dictShow) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 61, column 17 - line 63, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 70, column 17 - line 72, column 49): " + [v.constructor.name]);
   };
 };
 var compileResult1 = /* @__PURE__ */ compileResult(showParseError);
@@ -8699,8 +8755,8 @@ var rexpr = function(v) {
   }
   ;
   if (v instanceof App2 && v.value1.length === 0) {
-    var $54 = elem4(v.value0)(dataVars);
-    if ($54) {
+    var $55 = elem4(v.value0)(dataVars);
+    if ($55) {
       return obj([tt2(v.value0)]);
     }
     ;
@@ -8711,13 +8767,13 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map17(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 179, column 9 - line 188, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 188, column 9 - line 197, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
   if (v instanceof Just && (v.value0.head instanceof App2 && (v.value0.head.value0 === "this" && v.value0.head.value1.length === 0))) {
-    var $60 = $$null2(v.value0.tail);
-    if ($60) {
+    var $61 = $$null2(v.value0.tail);
+    if ($61) {
       return ctx("this");
     }
     ;
@@ -8731,7 +8787,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map17($lazy_rnode(155))(ns));
+    return arr(map17($lazy_rnode(164))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -8754,7 +8810,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         }()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 129, column 21 - line 136, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 138, column 21 - line 145, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -8787,12 +8843,12 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 124, column 1 - line 124, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 133, column 1 - line 133, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
-        var $93 = litName(v.value1);
-        if ($93 instanceof Just) {
-          return obj([tt2("partial"), new Tuple("name", str($93.value0)), new Tuple("body", children(v.value2))]);
+        var $94 = litName(v.value1);
+        if ($94 instanceof Just) {
+          return obj([tt2("partial"), new Tuple("name", str($94.value0)), new Tuple("body", children(v.value2))]);
         }
         ;
         return v3(true);
@@ -8801,9 +8857,9 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
       return v3(true);
     };
     if (v instanceof RCall && v.value0 === "inline") {
-      var $99 = litName(v.value1);
-      if ($99 instanceof Just) {
-        return obj([tt2("inline"), new Tuple("name", str($99.value0)), new Tuple("body", children(v.value2))]);
+      var $100 = litName(v.value1);
+      if ($100 instanceof Just) {
+        return obj([tt2("inline"), new Tuple("name", str($100.value0)), new Tuple("body", children(v.value2))]);
       }
       ;
       return v1(true);
@@ -8812,7 +8868,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(124);
+var rnode = /* @__PURE__ */ $lazy_rnode(133);
 var astJson = function(dialect, src) {
   var v = parse(src);
   if (v instanceof Left) {
@@ -8822,8 +8878,8 @@ var astJson = function(dialect, src) {
   ;
   if (v instanceof Right) {
     var nodes = lower(function() {
-      var $106 = dialect === "core";
-      if ($106) {
+      var $107 = dialect === "core";
+      if ($107) {
         return v.value0;
       }
       ;
@@ -8832,12 +8888,13 @@ var astJson = function(dialect, src) {
     return obj([new Tuple("ast", obj([new Tuple("version", str("barebars-ast/v1")), new Tuple("nodes", arr(map17(rnode)(nodes)))]))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 75, column 33 - line 96, column 10): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 84, column 33 - line 105, column 10): " + [v.constructor.name]);
 };
 export {
   astJson,
   compile2 as compile,
   compileSurface2 as compileSurface,
   render,
-  renderSurface
+  renderSurface,
+  renderSurfaceWithPartials
 };

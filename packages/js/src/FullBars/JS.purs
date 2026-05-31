@@ -14,6 +14,7 @@ module FullBars.JS
   , astJson
   , compile
   , compileSurface
+  , renderSurfaceWithPartials
   ) where
 
 import Prelude
@@ -25,7 +26,7 @@ import BareBars.Value (Value(..))
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
-import Data.Function.Uncurried (Fn1, Fn2, mkFn1, mkFn2)
+import Data.Function.Uncurried (Fn1, Fn2, Fn3, mkFn1, mkFn2, mkFn3)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -46,6 +47,14 @@ render = mkFn2 \tpl json -> result (FullBars.renderWithDiag tpl (fromJson json))
 -- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result
 renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJson json))
+
+-- | Render a surface template with a set of named partials (each a surface
+-- | source). `renderSurfaceWithPartials(partials, template, data)`, where
+-- | `partials` is a plain `{ name: source }` object — the lab's multi-document
+-- | partials. `{{> name}}` renders the registered partial.
+renderSurfaceWithPartials :: Fn3 (FO.Object String) String Json Result
+renderSurfaceWithPartials = mkFn3 \partials tpl json ->
+  result (FullBars.renderSurfaceWith (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Compile a *core* template to JS ES-module source (`BareBars.Compile`). The
 -- | emitted module's default export is `function (data, rt)`; pair it with

@@ -57,8 +57,12 @@ test("engineInfo advertises an honest capability vector", async () => {
   const info = r.engineInfo();
   assert.match(info.version, /\d+\.\d+/);
   assert.ok(Array.isArray(info.features));
-  // MVP: no Stem-only / AST-backed features advertised, so those panels gate off.
-  for (const absent of ["transformers", "static-ast", "partial-graph", "bytecode-wire", "context-inspect"]) {
+  // backs: catalog, data-access, partial-graph; NOT Stem-only / unimplemented
+  // features, so those panels gate off.
+  for (const has of ["catalog", "required-assigns", "partial-graph"]) {
+    assert.ok(info.features.includes(has), `should advertise ${has}`);
+  }
+  for (const absent of ["transformers", "bytecode-wire", "context-inspect", "standalone"]) {
     assert.ok(!info.features.includes(absent), `should not advertise ${absent} yet`);
   }
   assert.ok(info.builtins.includes("each") && info.builtins.includes("json"));
@@ -110,6 +114,13 @@ test("parseAst surfaces partial uses and inline defs as semantic nodes", async (
   assert.equal(inline && inline.name, "row");
   const partials = top.filter((n) => n.t === "partial").map((n) => n.name);
   assert.deepEqual(partials, ["row", "missing"]);
+});
+
+test("named partial documents render (multi-document)", async () => {
+  const r = await createBareBarsRenderer();
+  // the host passes partial documents to compile; render registers them.
+  const prog = r.compile("<nav>{{> nav}}</nav>{{ title }}", { nav: "[home]" }).program;
+  assert.equal(r.render(prog, { title: "T" }), "<nav>[home]</nav>T");
 });
 
 test("inline-defined partials actually render", async () => {

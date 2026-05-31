@@ -97,11 +97,14 @@ This is the reason to be polyglot, not just multi-tab.
 - **Phase 2 ✓** — real `parseAst` + exact `requiredAssigns` + `usedTransformers`
   via `FullBars.JS.astJson`; capability gating verified in-browser (Data Access /
   Transformers panels light up; partials/whitespace gate off).
-- **Phase 3 ◑** — cross-engine **compare view** shipped (`compare.html`, the
-  headline; Handlebars≡BareBars confirmed, Stem divergence surfaced) + partial/
-  inline AST fidelity. *Remaining:* multi-document partials → `partial-graph`
-  panel (needs `renderSurfaceWith` + the sources panel), and the core/surface
-  **dialect toggle** as a UI control.
+- **Phase 3 ✓** — cross-engine **compare view** (`compare.html`; Handlebars≡BareBars
+  confirmed, Stem divergence surfaced); an in-header **engine dropdown** (Stem /
+  Handlebars / BareBars, `?engine=` reload) and a BareBars-only **dialect toggle**
+  (Core / Surface, `?dialect=` reload); **multi-document partials** → the Partials
+  panel (the adapter renders named partials via `renderSurfaceWith`, advertises
+  `partial-graph`, and parseAst surfaces `{{> }}`/`{{#inline}}` as partial nodes).
+  Verified headless. *Note:* in-template `{{#inline}}` defs are not graph nodes in
+  the file-based dependency view (a documented limitation).
 
 ## Open questions
 
