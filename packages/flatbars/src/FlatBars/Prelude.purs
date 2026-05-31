@@ -6,7 +6,7 @@
 -- | (`Either Error`) or an async one (`ExceptT Error Aff`). Multi-branch control
 -- | flow uses `{{else}}` separators; `if`/`each`/`with` split their body at the
 -- | `{{else}}` marker via the control handle's `clause`.
-module BareBars.Prelude
+module FlatBars.Prelude
   ( prelude
   , preludeSchema
   ) where
@@ -14,9 +14,8 @@ module BareBars.Prelude
 import Prelude
 
 import BareBars.Engine (Ctl, Helper)
-import BareBars.Env (RefEnv, constHelper, lookupHelper, pushFrame, refContext)
 import BareBars.Error (Error(..))
-import BareBars.Value (Value(..), escapeHtml, stringify, truthy)
+import BareBars.Value (Value(..))
 import BareBars.Walk (Arity(..), HelperSpec, Schema)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
@@ -27,6 +26,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import FlatBars.Env (RefEnv, constHelper, lookupHelper, pushFrame, refContext)
+import FlatBars.Value (escapeHtml, stringify, truthy)
 
 prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
 prelude =

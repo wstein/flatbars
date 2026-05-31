@@ -5,7 +5,7 @@
 -- | different engine could pick an entirely different `env` type — that is the
 -- | point of the pluggable driver. `RefEnv` is a newtype (not a synonym) so the
 -- | otherwise-cyclic reference `RefEnv → Helper → Ctl → RefEnv` is well-founded.
-module BareBars.Env
+module FlatBars.Env
   ( RefEnv(..)
   , refContext
   , constHelper
@@ -22,7 +22,7 @@ import Prelude
 
 import BareBars.Engine (Engine, Helper)
 import BareBars.Error (Error(..))
-import BareBars.Value (Value, stringify)
+import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
@@ -31,6 +31,7 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import FlatBars.Value (stringify)
 
 newtype RefEnv m = RefEnv
   { context :: Value

@@ -13,7 +13,7 @@ module Cli.Main where
 
 import Prelude
 
-import BareBars (parse, preludeSchema, renderWith, validate)
+import BareBars (parse, validate)
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
 import Data.Array as Array
@@ -22,6 +22,7 @@ import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
+import FlatBars (preludeSchema, renderWith)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 

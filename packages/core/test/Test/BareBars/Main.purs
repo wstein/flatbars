@@ -1,0 +1,91 @@
+-- | BareBars *framework* test suite (`spago test -p barebars`).
+-- |
+-- | Structural only — parsing shapes, the foldTemplate catamorphism, clause
+-- | splitting, schema validation, and source spans. No rendering: that is the
+-- | engine's job and is tested in `flatbars`.
+module Test.BareBars.Main where
+
+import Prelude
+
+import BareBars (Arity(..), Expr(..), Node(..), foldTemplate, parse, spanText, splitClause, validate)
+import Data.Array as Array
+import Data.Either (Either(..))
+import Data.Map as Map
+import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
+import Effect (Effect)
+import Effect.Console (log)
+import Test.Assert (assert')
+
+-- A tiny engine schema: `if` is a 1-arg block, `c`/`x` are nullary.
+schema
+  :: { allowUnknown :: Boolean, helpers :: Map.Map String { block :: Boolean, arity :: Arity } }
+schema =
+  { allowUnknown: false
+  , helpers: Map.fromFoldable
+      [ Tuple "if" { block: true, arity: Exactly 1 }
+      , Tuple "c" { block: false, arity: Exactly 0 }
+      , Tuple "x" { block: false, arity: Exactly 0 }
+      ]
+  }
+
+-- foldTemplate node counter (descends into block bodies).
+nodeCount :: String -> Int
+nodeCount src = case parse src of
+  Left _ -> -1
+  Right t -> foldTemplate
+    { content: \_ -> 1
+    , output: \_ -> 1
+    , raw: \_ _ _ -> 1
+    , sep: \_ _ -> 1
+    , block: \b -> 1 + b.recurse b.children
+    , concat: Array.foldl (+) 0
+    }
+    t
+
+main :: Effect Unit
+main = do
+  log "BareBars framework tests"
+
+  -- Well-formed parse, and the structural shapes the parser emits.
+  case parse "a{{{x}}}{{#if c}}t{{else}}e{{/if}}" of
+    Left e -> assert' ("parse: unexpected error " <> show e) false
+    Right t -> do
+      assert' "parse: content/output/block shapes"
+        ( t ==
+            [ Content "a"
+            , Output { start: 1, end: 8 } (App "x" [])
+            , Block { start: 8, end: 17 } "if" [ App "c" [] ]
+                [ Content "t", Sep { start: 18, end: 26 } "else" [], Content "e" ]
+            ]
+        )
+
+  -- foldTemplate counts every node, recursing into bodies.
+  assert' "foldTemplate node count" (nodeCount "a{{#each x}}b{{{this}}}{{/each}}c" == 5)
+
+  -- splitClause shallowly splits a body at the first {{else}} separator.
+  case parse "{{#if c}}A{{else}}B{{/if}}" of
+    Right [ Block _ _ _ body ] ->
+      let
+        s = splitClause "else" body
+      in
+        assert' "splitClause before/after"
+          (s.before == [ Content "A" ] && s.clause == Just [ Content "B" ])
+    _ -> assert' "splitClause: unexpected parse" false
+
+  -- Schema validation flags an unknown helper; a known-arity call is clean.
+  case parse "{{#if c}}{{{x}}}{{/if}}" of
+    Right t -> assert' "validate clean" (Array.null (validate schema t))
+    Left e -> assert' ("validate: " <> show e) false
+  case parse "{{{nope}}}" of
+    Right t -> assert' "validate flags unknown" (not (Array.null (validate schema t)))
+    Left e -> assert' ("validate: " <> show e) false
+
+  -- Source spans on tag-level nodes + spanText.
+  case parse "  {{{this}}}" of
+    Right [ _, Output sp _ ] ->
+      assert' "span offsets + spanText"
+        (sp.start == 2 && sp.end == 12 && spanText "  {{{this}}}" sp == "{{{this}}}")
+    _ -> assert' "span: unexpected parse" false
+
+  log "all framework tests passed"

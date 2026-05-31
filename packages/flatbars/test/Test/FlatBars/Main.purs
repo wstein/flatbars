@@ -1,12 +1,13 @@
--- | Core test suite. Run with `npm test` (or `spago test -p barebars`).
+-- | FlatBars engine test suite (`spago test -p flatbars`).
 -- |
--- | These exercise the lexer/parser/evaluator and a representative slice of the
--- | reference prelude using core syntax (`{{{ … }}}`, blocks, raw blocks).
-module Test.Main where
+-- | Exercises the reference engine end to end — rendering, the `lower` real AST,
+-- | the escaping lint, the Aff instantiation, and a pluggable-env engine — over
+-- | the BareBars framework (parse/foldTemplate/spans).
+module Test.FlatBars.Main where
 
 import Prelude
 
-import BareBars (Engine, RNode(..), escapingWarnings, foldTemplate, lower, parse, preludeSchema, renderAff, renderWith, runTemplate, spanText, stringify, validate)
+import BareBars (Engine, foldTemplate, parse, runTemplate, spanText, validate)
 import BareBars.Error (Error(..))
 import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Value (Value(..))
@@ -19,6 +20,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
+import FlatBars (RNode(..), escapingWarnings, lower, preludeSchema, renderAff, renderWith, stringify)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
