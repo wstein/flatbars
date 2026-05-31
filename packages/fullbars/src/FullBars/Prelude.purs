@@ -37,7 +37,7 @@ import Data.Set as Set
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FullBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext, refFalsy)
+import FullBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, lookupPartialFalsy, pushFrame, refContext, refFalsy, withFalsy)
 import FullBars.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
 
 --------------------------------------------------------------------------------
@@ -494,8 +494,18 @@ partialH ctl args = case args of
   blockFrame =
     if Array.null ctl.children then Map.empty
     else Map.singleton "partial-block" (\_ _ -> VSafe <$> ctl.render ctl.env ctl.children)
+  -- a partial renders under its own truthiness mode if it declared one (external
+  -- partial); otherwise it inherits the current file's mode (inline partial).
+  -- Scoping is lexical and never inherited across an external boundary (§5).
   renderPartial name ctx = case lookupPartial name ctl.env of
-    Just tmpl -> VSafe <$> ctl.render (pushFrame blockFrame ctx ctl.env) tmpl
+    Just tmpl ->
+      let
+        entered = pushFrame blockFrame ctx ctl.env
+        scoped = case lookupPartialFalsy name ctl.env of
+          Just fs -> withFalsy fs entered
+          Nothing -> entered
+      in
+        VSafe <$> ctl.render scoped tmpl
     Nothing
       | Array.null ctl.children -> throwError (HelperError ("unknown partial '" <> name <> "'"))
       | otherwise -> VSafe <$> ctl.render ctl.env ctl.children -- block body is the fallback

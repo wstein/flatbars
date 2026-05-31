@@ -295,6 +295,27 @@ main = do
     (obj [ Tuple "c" (VBool true) ])
     "a X b"
 
+  -- Phase 3: partial-boundary truthiness scoping. An external partial branches
+  -- by its OWN @truthiness, never the caller's (§5, file-based & lexical).
+  -- minimal-mode partial called from a default caller: 0 is truthy in the partial.
+  expectP "partial:external-uses-own-mode"
+    [ Tuple "card" "{{! @truthiness:minimal }}{{#if n}}has{{else}}none{{/if}}" ]
+    "{{> card this}}"
+    n0
+    "has"
+  -- a directive-less external partial uses handlebars even when the caller is
+  -- minimal — the caller's mode is NOT inherited across the boundary.
+  expectP "partial:no-inherit-from-caller"
+    [ Tuple "card" "{{#if n}}has{{else}}none{{/if}}" ]
+    "{{! @truthiness:minimal }}{{> card this}}"
+    n0
+    "none"
+  -- an inline (same-file) partial DOES inherit the file's mode (it's lexical).
+  expectS "partial:inline-inherits-file-mode"
+    "{{! @truthiness:minimal }}{{#inline \"row\"}}{{#if n}}y{{else}}m{{/if}}{{/inline}}{{> row this}}"
+    n0
+    "y"
+
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at
   -- it. The word `else` never lands in the lexer or parser.

@@ -19,7 +19,9 @@ module FullBars.Env
   , pushHelpers
   , registerPartial
   , registerPartials
+  , registerPartialsFalsy
   , lookupPartial
+  , lookupPartialFalsy
   , refEngine
   , liftEither
   ) where
@@ -50,6 +52,11 @@ newtype RefEnv m = RefEnv
   , helpers :: List (Map String (Helper m (RefEnv m)))
   , partials :: Map String Template -- named templates, for the `partial` helper
   , falsy :: FalsySet -- the active truthiness mode (per file/partial)
+  -- each *external* partial's own truthiness mode (resolved from its own
+  -- `@truthiness`); an entry here means "switch to this mode when entering that
+  -- partial". Inline (same-file) partials have no entry — they inherit the
+  -- file's mode lexically. See truthiness spec §5.
+  , partialFalsy :: Map String FalsySet
   }
 
 refContext :: forall m. RefEnv m -> Value
@@ -75,7 +82,12 @@ constHelper v = \_ _ -> pure v
 -- | An environment with the given context and a single empty helper frame.
 emptyEnv :: forall m. Value -> RefEnv m
 emptyEnv ctx = RefEnv
-  { context: ctx, helpers: Map.empty : Nil, partials: Map.empty, falsy: handlebars }
+  { context: ctx
+  , helpers: Map.empty : Nil
+  , partials: Map.empty
+  , falsy: handlebars
+  , partialFalsy: Map.empty
+  }
 
 -- | Register a helper into the innermost frame.
 register :: forall m. String -> Helper m (RefEnv m) -> RefEnv m -> RefEnv m
@@ -110,9 +122,19 @@ registerPartial name tmpl (RefEnv e) = RefEnv (e { partials = Map.insert name tm
 registerPartials :: forall m. Map String Template -> RefEnv m -> RefEnv m
 registerPartials ps (RefEnv e) = RefEnv (e { partials = Map.union ps e.partials })
 
+-- | Register the truthiness modes of *external* partials (each resolved from its
+-- | own `@truthiness`), so the `partial` helper switches into them. Partials
+-- | without an entry inherit the current (file) mode.
+registerPartialsFalsy :: forall m. Map String FalsySet -> RefEnv m -> RefEnv m
+registerPartialsFalsy fs (RefEnv e) = RefEnv (e { partialFalsy = Map.union fs e.partialFalsy })
+
 -- | Look up a registered partial by name.
 lookupPartial :: forall m. String -> RefEnv m -> Maybe Template
 lookupPartial name (RefEnv e) = Map.lookup name e.partials
+
+-- | A partial's own truthiness mode, if it declared one (external partials only).
+lookupPartialFalsy :: forall m. String -> RefEnv m -> Maybe FalsySet
+lookupPartialFalsy name (RefEnv e) = Map.lookup name e.partialFalsy
 
 -- | The reference `Engine`: resolve from the frame stack (throwing
 -- | `UnknownHelper`), stringify via `Value.stringify`.

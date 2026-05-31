@@ -45,7 +45,7 @@ import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import FullBars.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, withFalsy)
+import FullBars.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import FullBars.Lower (RNode(..), escapingWarnings, lower)
 import FullBars.Prelude (prelude, preludeSchema)
 import FullBars.Surface (desugar, hoistInline)
@@ -151,21 +151,29 @@ renderSurface = renderSurfaceWith []
 renderSurfaceWith :: Array (Tuple String String) -> String -> Value -> Either String String
 renderSurfaceWith partialSrcs src dat =
   case traverse compilePartial partialSrcs of
-    Left e -> Left (show e)
-    Right pairs -> case parse src of
+    Left e -> Left e
+    Right ps -> case parse src of
       Left e -> Left (show e)
       Right { directives, nodes } ->
         let
           { partials: inlineP, template } = hoistInline (desugarSurface nodes)
-          setup = registerPartials (Map.union inlineP (Map.fromFoldable pairs))
+          externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          externalF = Map.fromFoldable (map (\p -> Tuple p.name p.falsy) ps)
+          -- external partials carry their own resolved mode; inline partials
+          -- (in `inlineP`) get no entry and inherit the file's mode (§5).
+          setup = registerPartialsFalsy externalF <<< registerPartials (Map.union inlineP externalT)
         in
           case runResolved directives setup template dat of
             Left e -> Left (show e)
             Right out -> Right out
   where
+  -- a named *external* partial: parse + desugar its body and resolve its own
+  -- `@truthiness` (a different file ⇒ its own lexical mode).
   compilePartial (Tuple name s) = case parse s of
-    Left e -> Left e
-    Right { nodes } -> Right (Tuple name (desugarSurface nodes))
+    Left e -> Left (show e)
+    Right { directives, nodes } -> case resolveTruthiness directives of
+      Left e -> Left (show e)
+      Right falsy -> Right { name, template: desugarSurface nodes, falsy }
 
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
