@@ -42,14 +42,18 @@ renderParseError = case _ of
   BadEscape o -> "BadEscape: invalid string escape (at " <> show o <> ")"
   LexError msg o -> "LexError: " <> msg <> " (at " <> show o <> ")"
 
--- | Evaluation errors. `UnknownHelper` is the only one the core raises; the
--- | rest are conventions helpers use to report their own contract violations.
+-- | Evaluation errors. `UnknownHelper` is the only one the core raises during
+-- | rendering; the rest are conventions helpers use to report their own
+-- | contract violations. `ParseFailure` carries a structured `ParseError` so
+-- | callers that run source end-to-end (`runString`) can still tell a malformed
+-- | template apart from a render-time failure, rather than seeing a flat string.
 data Error
   = UnknownHelper String
   | ArityError String
   | TypeError String
   | ClauseError String
   | HelperError String
+  | ParseFailure ParseError
 
 derive instance eqError :: Eq Error
 
@@ -63,3 +67,4 @@ renderError = case _ of
   TypeError m -> "TypeError: " <> m
   ClauseError m -> "ClauseError: " <> m
   HelperError m -> "HelperError: " <> m
+  ParseFailure pe -> "ParseFailure: " <> renderParseError pe
