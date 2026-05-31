@@ -256,11 +256,13 @@ than walk a stack: `pass:[{{#each teams as \|team\|}}…{{#each team.members}}{{
 [#partials]
 == A.6 Partials
 
-[CAUTION]
+[NOTE]
 ====
-*Not yet implemented.* The `partial`, `partial>`, and `inline` helpers below are the *specified*
-mapping; the FlatBars prelude does not register them yet (xref:flatbars-compat.adoc[compatibility
-matrix] §3). The core already parses the block syntax they need — only the helpers are pending.
+*Status.* The basic `partial` helper *is* implemented: `pass:[{{> name}}]`,
+`pass:[{{> name ctx}}]`, and dynamic `pass:[{{> (expr)}}]` work via `renderSurfaceWith` (which
+registers named partials) — see xref:flatbars-compat.adoc[compatibility matrix] §3. Still pending:
+the `partial>` block-partial / `partial-block`, `inline` partials, and hash context
+(`pass:[{{> name k=v}}]`, which needs §5.4 hash arguments).
 ====
 
 All partial forms become the engine helpers `partial`, `partial>`, `inline`, and the scoped

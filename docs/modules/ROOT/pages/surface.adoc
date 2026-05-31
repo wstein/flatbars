@@ -24,12 +24,15 @@ legacy slash, `this`/`.`, `../`), §5.3 *literals* and head-vs-argument, §5.5
 reference renderer still runs *core* syntax by default (`renderWith`); call
 `renderSurface` to author in the dialect. §5.2 paths include `[bracket]`
 segments (`a.[home town]`, `a.[1]` — dots and spaces inside the brackets are
-literal).
+literal). Basic *partials* (§5.7) work via `renderSurfaceWith`: `pass:[{{> name}}]`,
+`pass:[{{> name ctx}}]`, and dynamic `pass:[{{> (expr)}}]` render a registered
+partial (unescaped), backed by the `partial` engine helper and the env's partial
+registry.
 
 Still *specified but not yet desugared*: `@../` parent-data (the scoped helpers
 are frame-local), hash arguments `k=v` (§5.4), block params `as \|x\|` (§5.5),
-and partials (§5.7). See the xref:flatbars-compat.adoc[compatibility matrix] for
-per-feature status.
+and the inline / block / `@partial-block` partial forms (§5.7). See the
+xref:flatbars-compat.adoc[compatibility matrix] for per-feature status.
 ====
 
 [IMPORTANT]

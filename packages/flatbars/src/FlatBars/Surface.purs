@@ -6,24 +6,24 @@
 -- | structural `Template` that uses only core forms. The reference renderer (or
 -- | `lower`) then runs the result unchanged.
 -- |
--- | What it rewrites (surface.adoc §5.1–5.3):
+-- | What it rewrites (surface.adoc §5):
 -- |
 -- |  * `{{ E }}` (a separator that is not a clause marker) ⇒ escaped output,
 -- |    `{{{ esc_html E' }}}`; `{{{ E }}}` stays raw output.
 -- |  * a bare/dotted *path* in value position ⇒ a `lookup` chain:
 -- |    `name` ⇒ `lookup this "name"`, `a.b` ⇒ `lookup this "a" "b"`,
--- |    `a.1` ⇒ `lookup this "a" 1`, `a/b` (legacy slash) likewise,
--- |    `this`/`.` ⇒ `this`, `../a` ⇒ `lookup (parent) "a"`,
--- |    `../../a` ⇒ `lookup (parent (parent)) "a"`.
+-- |    `a.1`/`a.[1]` ⇒ `lookup this "a" 1`, `a.[home town]` (bracket segment),
+-- |    `a/b` (legacy slash), `this`/`.` ⇒ `this`, `../a` ⇒ `lookup (parent) "a"`.
 -- |  * `@data` variables ⇒ scoped-helper calls: `@index` ⇒ `(index)`,
 -- |    `@root.x` ⇒ `(lookup (root) "x")` (§5.5).
 -- |  * `true`/`false`/`null` stay literal helper calls.
 -- |  * `else if` chains ⇒ nested `if` blocks in the else clause (§5.6).
+-- |  * `{{> name [ctx]}}` ⇒ `{{{ partial "name" ctx }}}` (a bare name is a string
+-- |    literal, a parenthesized expression is a dynamic name; §5.7).
 -- |
--- | Not yet desugared (need lexer support or a further pass): `[bracket]` path
--- | segments (`[` is not an identifier character), `@../` parent-data (the
--- | scoped helpers are frame-local), hash arguments `k=v`, block params
--- | `as |x|`, and partials (§5.4–5.7). Those remain author-unsupported.
+-- | Not yet desugared: `@../` parent-data (the scoped helpers are frame-local),
+-- | hash arguments `k=v` (§5.4), block params `as |x|` (§5.5), and the inline /
+-- | block / `@partial-block` partial forms (§5.7). Those remain unsupported.
 module FlatBars.Surface
   ( desugar
   ) where
@@ -35,7 +35,7 @@ import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Foldable (foldl)
 import Data.Int as Int
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.String (Pattern(..), stripPrefix)
 import Data.String.CodeUnits (singleton, toCharArray)
 
@@ -52,9 +52,13 @@ desugar clauseNames = map go
     Output sp e -> Output sp (rewrite e)
     Sep sp name args
       -- a clause marker (`{{else}}`, …) passes through untouched for the engine
-      -- to split on; everything else is `{{ E }}` ⇒ escaped output.
+      -- to split on.
       | Array.elem name clauseNames -> Sep sp name args
-      | otherwise -> Output sp (App "esc_html" [ rewriteHead name args ])
+      | otherwise -> case stripPrefix (Pattern ">") name of
+          -- a partial reference `{{> name [ctx]}}` ⇒ unescaped `partial` call.
+          Just rest -> Output sp (partialExpr rest args)
+          -- everything else is `{{ E }}` ⇒ escaped output.
+          Nothing -> Output sp (App "esc_html" [ rewriteHead name args ])
     -- block head stays a helper; `else if` chains in the body are expanded into
     -- nested `if` blocks (§5.6) before the body and arguments are rewritten.
     Block sp name args body ->
@@ -68,6 +72,29 @@ rewriteHead :: Ident -> Array Expr -> Expr
 rewriteHead name args
   | Array.null args = pathOrLit name
   | otherwise = App name (map rewrite args)
+
+-- | A partial reference (surface.adoc §5.7), emitted *unescaped*. `rest` is the
+-- | text after the `>` sigil: empty for `{{> name [ctx]}}` (name is the first
+-- | argument — a bare name is a string literal, a parenthesized expression is a
+-- | dynamic name), or the name itself for the no-space `{{>name [ctx]}}` form.
+-- | An optional second argument is the context (default `this`).
+partialExpr :: String -> Array Expr -> Expr
+partialExpr rest args
+  | rest == "" = case Array.uncons args of
+      Just { head: nameArg, tail } -> App "partial" [ partialName nameArg, partialCtx tail ]
+      Nothing -> App "partial" [ Lit (VString ""), App "this" [] ]
+  | otherwise = App "partial" [ Lit (VString rest), partialCtx args ]
+
+-- | A bare partial name is a string literal; a (parenthesized) expression is a
+-- | dynamic name, rewritten as usual.
+partialName :: Expr -> Expr
+partialName = case _ of
+  App n [] -> Lit (VString n)
+  e -> rewrite e
+
+-- | The partial's context argument, defaulting to `this` when omitted.
+partialCtx :: Array Expr -> Expr
+partialCtx cs = maybe (App "this" []) rewrite (Array.head cs)
 
 -- | Rewrite an expression: a bare identifier in value position becomes a path
 -- | (or a literal); an application keeps its helper head and rewrites its args.

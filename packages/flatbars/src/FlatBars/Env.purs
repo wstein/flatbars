@@ -15,6 +15,9 @@ module FlatBars.Env
   , lookupHelper
   , pushFrame
   , pushHelpers
+  , registerPartial
+  , registerPartials
+  , lookupPartial
   , refEngine
   , liftEither
   ) where
@@ -23,6 +26,7 @@ import Prelude
 
 import BareBars.Engine (Engine, Helper)
 import BareBars.Error (Error(..))
+import BareBars.Syntax (Template)
 import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Either (Either, either)
@@ -42,6 +46,7 @@ liftEither = either throwError pure
 newtype RefEnv m = RefEnv
   { context :: Value
   , helpers :: List (Map String (Helper m (RefEnv m)))
+  , partials :: Map String Template -- named templates, for the `partial` helper
   }
 
 refContext :: forall m. RefEnv m -> Value
@@ -54,7 +59,7 @@ constHelper v = \_ _ -> pure v
 
 -- | An environment with the given context and a single empty helper frame.
 emptyEnv :: forall m. Value -> RefEnv m
-emptyEnv ctx = RefEnv { context: ctx, helpers: Map.empty : Nil }
+emptyEnv ctx = RefEnv { context: ctx, helpers: Map.empty : Nil, partials: Map.empty }
 
 -- | Register a helper into the innermost frame.
 register :: forall m. String -> Helper m (RefEnv m) -> RefEnv m -> RefEnv m
@@ -81,6 +86,17 @@ pushFrame frame ctx (RefEnv e) = RefEnv (e { helpers = frame : e.helpers, contex
 -- | Push a new helper frame without changing the context.
 pushHelpers :: forall m. Map String (Helper m (RefEnv m)) -> RefEnv m -> RefEnv m
 pushHelpers frame (RefEnv e) = RefEnv (e { helpers = frame : e.helpers })
+
+-- | Register a named partial template (the body the `partial` helper renders).
+registerPartial :: forall m. String -> Template -> RefEnv m -> RefEnv m
+registerPartial name tmpl (RefEnv e) = RefEnv (e { partials = Map.insert name tmpl e.partials })
+
+registerPartials :: forall m. Map String Template -> RefEnv m -> RefEnv m
+registerPartials ps (RefEnv e) = RefEnv (e { partials = Map.union ps e.partials })
+
+-- | Look up a registered partial by name.
+lookupPartial :: forall m. String -> RefEnv m -> Maybe Template
+lookupPartial name (RefEnv e) = Map.lookup name e.partials
 
 -- | The reference `Engine`: resolve from the frame stack (throwing
 -- | `UnknownHelper`), stringify via `Value.stringify`.

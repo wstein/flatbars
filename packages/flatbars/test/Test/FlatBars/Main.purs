@@ -23,7 +23,7 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FlatBars (RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderSurface, renderWith, stringify, truthy)
+import FlatBars (RNode(..), RefEnv, desugarSurface, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderSurface, renderSurfaceWith, renderWith, stringify, truthy)
 import Test.Assert (assert')
 
 -- A minimal control handle for exercising helpers that ignore it (the value
@@ -63,6 +63,13 @@ expectError name src dat = case renderWith src dat of
 -- | Assert that *Surface* source `src` rendered against `dat` yields `expected`.
 expectS :: String -> String -> Value -> String -> Effect Unit
 expectS name src dat expected = case renderSurface src dat of
+  Left err -> assert' (name <> ": unexpected error: " <> err) false
+  Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
+    (out == expected)
+
+-- | Assert that Surface `src` with the given named partials yields `expected`.
+expectP :: String -> Array (Tuple String String) -> String -> Value -> String -> Effect Unit
+expectP name partials src dat expected = case renderSurfaceWith partials src dat of
   Left err -> assert' (name <> ": unexpected error: " <> err) false
   Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
     (out == expected)
@@ -279,6 +286,25 @@ main = do
   expectS "surface-elseif-chain" "{{#if a}}A{{else if b}}B{{else if c}}C{{else}}D{{/if}}"
     (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false), Tuple "c" (VBool true) ])
     "C"
+
+  -- Partials (§5.7): {{> name [ctx]}} renders a registered partial (unescaped
+  -- markup), with escaping applied to {{ }} inside the partial body.
+  expectP "partial-static" [ Tuple "greet" "Hi {{ name }}" ] "{{> greet}}"
+    (obj [ Tuple "name" (str "<Ada>") ])
+    "Hi &lt;Ada&gt;"
+  expectP "partial-ctx" [ Tuple "row" "<li>{{ . }}</li>" ]
+    "{{#each items}}{{> row this}}{{/each}}"
+    (obj [ Tuple "items" (arr [ str "a", str "b" ]) ])
+    "<li>a</li><li>b</li>"
+  expectP "partial-nospace" [ Tuple "p" "X" ] "{{>p}}" VNull "X"
+  expectP "partial-dynamic" [ Tuple "a" "A", Tuple "b" "B" ]
+    "{{> (lookup this \"which\")}}"
+    (obj [ Tuple "which" (str "b") ])
+    "B"
+  -- a missing partial is a render error.
+  case renderSurfaceWith [] "{{> nope}}" VNull of
+    Left _ -> pure unit
+    Right out -> assert' ("partial-missing: expected error, got " <> show out) false
 
   -- desugarSurface produces the documented core expression.
   case desugarSurface <$> parse "{{ user.name }}" of

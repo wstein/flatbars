@@ -36,7 +36,7 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FlatBars.Env (RefEnv, constHelper, liftEither, lookupHelper, pushFrame, refContext)
+import FlatBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext)
 import FlatBars.Value (escapeHtml, stringify, truthy)
 
 --------------------------------------------------------------------------------
@@ -85,6 +85,7 @@ helperDefs =
   , valDef "else" (nullary (pure (VSafe "")))
   , gen "dict" false AnyArity dictH
   , gen "apply" true (AtLeast 1) applyH
+  , gen "partial" false (Exactly 2) partialH
   , valDef "eq" (binary eq')
   , valDef "eq?" (binary eq')
   , valDef "not" (unary not')
@@ -334,3 +335,13 @@ applyH ctl args = case Array.uncons args of
     Just h -> h ctl tail
     Nothing -> throwError (UnknownHelper name)
   _ -> throwError (TypeError "apply: first argument must be a helper-name string")
+
+-- | `partial name ctx`: render the named partial template with `ctx` as the new
+-- | context. Partials emit *unescaped* markup. The name is a (possibly computed)
+-- | string; the body comes from the env's partial registry.
+partialH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+partialH ctl args = case args of
+  [ VString name, ctx ] -> case lookupPartial name ctl.env of
+    Just tmpl -> VSafe <$> ctl.render (pushFrame Map.empty ctx ctl.env) tmpl
+    Nothing -> throwError (HelperError ("unknown partial '" <> name <> "'"))
+  _ -> throwError (TypeError "partial: expected (name string, context)")

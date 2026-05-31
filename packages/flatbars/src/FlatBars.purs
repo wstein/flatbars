@@ -20,6 +20,7 @@ module FlatBars
   , desugarSurface
   , compileSurface
   , renderSurface
+  , renderSurfaceWith
   ) where
 
 import Prelude
@@ -32,8 +33,11 @@ import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Either (Either(..))
+import Data.Map as Map
+import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import FlatBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll)
+import FlatBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll, registerPartials)
 import FlatBars.Lower (RNode(..), escapingWarnings, lower)
 import FlatBars.Prelude (prelude, preludeSchema)
 import FlatBars.Surface (desugar)
@@ -80,8 +84,24 @@ compileSurface src = do
 
 -- | One-shot pure render of *Surface* source (paths, `{{ }}` auto-escape, …).
 renderSurface :: String -> Value -> Either String String
-renderSurface src dat = case parse src of
-  Left e -> Left (show e)
-  Right tmpl -> case runTemplate (refEngine (preludeEnv dat)) (desugarSurface tmpl) of
+renderSurface = renderSurfaceWith []
+
+-- | Render Surface source with a set of named partials (each given as Surface
+-- | source). `{{> name}}` in the template renders the registered `name` partial.
+renderSurfaceWith :: Array (Tuple String String) -> String -> Value -> Either String String
+renderSurfaceWith partialSrcs src dat =
+  case traverse compilePartial partialSrcs of
     Left e -> Left (show e)
-    Right out -> Right out
+    Right pairs -> case parse src of
+      Left e -> Left (show e)
+      Right tmpl ->
+        let
+          env = registerPartials (Map.fromFoldable pairs) (preludeEnv dat)
+        in
+          case runTemplate (refEngine env) (desugarSurface tmpl) of
+            Left e -> Left (show e)
+            Right out -> Right out
+  where
+  compilePartial (Tuple name s) = case parse s of
+    Left e -> Left e
+    Right t -> Right (Tuple name (desugarSurface t))
