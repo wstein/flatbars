@@ -9,7 +9,7 @@
     "assets": "cp index.html dist/index.html",
     "build": "npm run bundle && npm run assets",
     "dev": "npm run build && esbuild --servedir=dist --serve=8080",
-    "smoke": "npm run build && node test/smoke.mjs"
+    "smoke": "npm run build && node smoke/smoke.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^23.0.0"
