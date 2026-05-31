@@ -7,21 +7,35 @@ module Test.FlatBars.Main where
 
 import Prelude
 
-import BareBars (Engine, foldTemplate, parse, runTemplate, spanText, validate)
+import BareBars (Ctl, Engine, Helper, foldTemplate, parse, runTemplate, spanText, validate)
 import BareBars.Error (Error(..))
 import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Value (Value(..))
+import BareBars.Walk (arityOk)
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.String (toUpper)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FlatBars (RNode(..), escapingWarnings, lower, preludeSchema, renderAff, renderWith, stringify)
+import FlatBars (RNode(..), RefEnv, emptyEnv, escapingWarnings, lower, prelude, preludeSchema, renderAff, renderWith, stringify)
 import Test.Assert (assert')
+
+-- A minimal control handle for exercising helpers that ignore it (the value
+-- helpers under arity-conformance). Renders nothing; has an empty clause.
+dummyCtl :: Ctl (Either Error) (RefEnv (Either Error))
+dummyCtl =
+  { env: emptyEnv VNull
+  , children: []
+  , span: { start: 0, end: 0 }
+  , render: \_ _ -> Right ""
+  , clause: \_ -> { before: [], body: Nothing }
+  }
 
 obj :: Array (Tuple String Value) -> Value
 obj = VObject <<< Map.fromFoldable
@@ -225,6 +239,41 @@ main = do
   case parse "{{{esc_html (lookup this \"x\")}}}{{{safe (lookup this \"y\")}}}" of
     Right t -> assert' "escaping lint silent for esc_html/safe" (Array.null (escapingWarnings t))
     Left e -> assert' ("lint: parse error " <> show e) false
+
+  -- Schema/runtime conformance: prelude and preludeSchema are projections of one
+  -- HelperDef table, so for every combinator-built value helper the runtime
+  -- arity guard must agree exactly with the schema's declared arity. Drive each
+  -- with 0–3 args (the helper ignores the control handle) and assert that it
+  -- raises an ArityError precisely when the schema arity rejects that count.
+  let
+    runMap =
+      Map.fromFoldable prelude :: Map.Map String (Helper (Either Error) (RefEnv (Either Error)))
+    valueHelpers =
+      [ "true"
+      , "false"
+      , "null"
+      , "esc_html"
+      , "safe"
+      , "else"
+      , "eq"
+      , "eq?"
+      , "not"
+      , "and"
+      , "or"
+      , "log"
+      ]
+  for_ valueHelpers \name ->
+    case Map.lookup name preludeSchema.helpers, Map.lookup name runMap of
+      Just spec, Just run ->
+        for_ [ 0, 1, 2, 3 ] \k ->
+          let
+            threw = case run dummyCtl (Array.replicate k VNull) of
+              Left (ArityError _) -> true
+              _ -> false
+          in
+            assert' ("arity conformance: " <> name <> "/" <> show k)
+              (threw == not (arityOk spec.arity k))
+      _, _ -> assert' ("arity conformance: missing helper " <> name) false
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do

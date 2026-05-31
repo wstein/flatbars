@@ -6,6 +6,14 @@
 -- | (`Either Error`) or an async one (`ExceptT Error Aff`). Multi-branch control
 -- | flow uses `{{else}}` separators; `if`/`each`/`with` split their body at the
 -- | `{{else}}` marker via the control handle's `clause`.
+-- |
+-- | Helpers are declared *once* in `helperDefs` — each entry carries its name,
+-- | whether it is a block helper, and its arity alongside the runtime function.
+-- | `prelude` (the registry) and `preludeSchema` (the validator) are both
+-- | *projections* of that one table, so a helper's runtime arity and its
+-- | validated arity can never drift. Value helpers are built from the
+-- | `BareBars.Helper` combinators (arity enforced by construction); block and
+-- | bespoke helpers are written directly against `Helper`.
 module FlatBars.Prelude
   ( prelude
   , preludeSchema
@@ -15,97 +23,140 @@ import Prelude
 
 import BareBars.Engine (Ctl, Helper)
 import BareBars.Error (Error(..))
+import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
+import BareBars.Syntax (Template)
 import BareBars.Value (Value(..))
-import BareBars.Walk (Arity(..), HelperSpec, Schema)
+import BareBars.Walk (Arity(..), Schema)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FlatBars.Env (RefEnv, constHelper, lookupHelper, pushFrame, refContext)
+import FlatBars.Env (RefEnv, constHelper, liftEither, lookupHelper, pushFrame, refContext)
 import FlatBars.Value (escapeHtml, stringify, truthy)
 
-prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
-prelude =
-  [ Tuple "this" thisH
-  , Tuple "lookup" lookupH
-  , Tuple "true" (constHelper (VBool true))
-  , Tuple "false" (constHelper (VBool false))
-  , Tuple "null" (constHelper VNull)
-  , Tuple "esc_html" escHtmlH
-  , Tuple "safe" safeH
-  , Tuple "raw" rawH
-  , Tuple "if" ifH
-  , Tuple "unless" unlessH
-  , Tuple "each" eachH
-  , Tuple "with" withH
-  , Tuple "else" elseH
-  , Tuple "dict" dictH
-  , Tuple "apply" applyH
-  , Tuple "eq" eqH
-  , Tuple "eq?" eqH
-  , Tuple "not" notH
-  , Tuple "and" andH
-  , Tuple "or" orH
-  , Tuple "log" logH
+--------------------------------------------------------------------------------
+-- The single source of truth
+--------------------------------------------------------------------------------
+
+-- | One helper's full declaration: its name, whether it opens a block, its
+-- | arity, and the runtime function. `prelude` and `preludeSchema` below are
+-- | projections of `helperDefs`, so the two never disagree.
+type HelperDef m =
+  { name :: String
+  , block :: Boolean
+  , arity :: Arity
+  , run :: Helper m (RefEnv m)
+  }
+
+-- | A non-block value helper built from a `BareBars.Helper` combinator. The
+-- | combinator pins the arity, so the schema entry below is derived from the
+-- | very guard the runtime uses.
+valDef :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> HelperDef m
+valDef name mk =
+  let
+    s = mk name
+  in
+    { name, block: false, arity: s.arity, run: s.run }
+
+-- | A block or bespoke helper written directly against `Helper`, with its arity
+-- | declared explicitly (and enforced inside the helper body).
+gen :: forall m. String -> Boolean -> Arity -> Helper m (RefEnv m) -> HelperDef m
+gen name block arity run = { name, block, arity, run }
+
+helperDefs :: forall m. MonadThrow Error m => Array (HelperDef m)
+helperDefs =
+  [ gen "this" false (Exactly 0) thisH
+  , gen "lookup" false (AtLeast 1) lookupH
+  , valDef "true" (nullary (pure (VBool true)))
+  , valDef "false" (nullary (pure (VBool false)))
+  , valDef "null" (nullary (pure VNull))
+  , valDef "esc_html" (unary escHtml)
+  , valDef "safe" (unary safe)
+  , gen "raw" true AnyArity rawH
+  , gen "if" true (Exactly 1) ifH
+  , gen "unless" true (Exactly 1) unlessH
+  , gen "each" true (Exactly 1) eachH
+  , gen "with" true (Exactly 1) withH
+  , valDef "else" (nullary (pure (VSafe "")))
+  , gen "dict" false AnyArity dictH
+  , gen "apply" true (AtLeast 1) applyH
+  , valDef "eq" (binary eq')
+  , valDef "eq?" (binary eq')
+  , valDef "not" (unary not')
+  , valDef "and" (variadic (boolOf Array.all))
+  , valDef "or" (variadic (boolOf Array.any))
+  , valDef "log" (atLeast 1 (const (pure VNull)))
   ]
 
--- | The reference engine's validation schema (`BareBars.Walk.validate`).
+-- | The registry: name → runtime helper.
+prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
+prelude = map (\d -> Tuple d.name d.run) helperDefs
+
+-- | The reference engine's validation schema (`BareBars.Walk.validate`),
+-- | projected from `helperDefs` plus the scoped variables below.
 -- |
 -- | NOTE: validation is *scope-blind* — like a lenient JSON schema, it checks
 -- | only that a name is known and its arity fits, not *where* it may appear. The
--- | scoped helpers below (`root`, `parent`, `index`, `key`, `first`, `last`)
--- | only exist inside the frames `each`/`with` push (and `root` from
--- | `preludeEnv`), so a template using `{{{index}}}` at top level *validates*
--- | but then fails to render with `UnknownHelper`. Declaring them keeps their
--- | in-scope uses from being flagged; catching out-of-scope uses would require a
--- | scope-aware pass, which the schema deliberately is not.
+-- | scoped helpers (`root`, `parent`, `index`, `key`, `first`, `last`) only
+-- | exist inside the frames `each`/`with` push (and `root` from `preludeEnv`),
+-- | so a template using `{{{index}}}` at top level *validates* but then fails to
+-- | render with `UnknownHelper`. Declaring them keeps their in-scope uses from
+-- | being flagged; catching out-of-scope uses would require a scope-aware pass,
+-- | which the schema deliberately is not.
 preludeSchema :: Schema
 preludeSchema =
   { allowUnknown: false
   , helpers: Map.fromFoldable
-      [ Tuple "this" (spec false (Exactly 0))
-      , Tuple "root" (spec false (Exactly 0))
-      , Tuple "parent" (spec false (Between 0 1))
-      , Tuple "index" (spec false (Exactly 0))
-      , Tuple "key" (spec false (Exactly 0))
-      , Tuple "first" (spec false (Exactly 0))
-      , Tuple "last" (spec false (Exactly 0))
-      , Tuple "lookup" (spec false (AtLeast 1))
-      , Tuple "true" (spec false (Exactly 0))
-      , Tuple "false" (spec false (Exactly 0))
-      , Tuple "null" (spec false (Exactly 0))
-      , Tuple "esc_html" (spec false (Exactly 1))
-      , Tuple "safe" (spec false (Exactly 1))
-      , Tuple "raw" (spec true AnyArity)
-      , Tuple "if" (spec true (Exactly 1))
-      , Tuple "unless" (spec true (Exactly 1))
-      , Tuple "each" (spec true (AtLeast 1))
-      , Tuple "with" (spec true (AtLeast 1))
-      , Tuple "else" (spec false AnyArity)
-      , Tuple "dict" (spec false AnyArity)
-      , Tuple "apply" (spec true (AtLeast 1))
-      , Tuple "eq" (spec false (Exactly 2))
-      , Tuple "eq?" (spec false (Exactly 2))
-      , Tuple "not" (spec false (Exactly 1))
-      , Tuple "and" (spec false AnyArity)
-      , Tuple "or" (spec false AnyArity)
-      , Tuple "log" (spec false (AtLeast 1))
-      ]
+      (scoped <> map toSpec (helperDefs :: Array (HelperDef (Either Error))))
   }
   where
-  spec :: Boolean -> Arity -> HelperSpec
-  spec block arity = { block, arity }
+  toSpec d = Tuple d.name { block: d.block, arity: d.arity }
+  scoped =
+    [ Tuple "root" { block: false, arity: Exactly 0 }
+    , Tuple "parent" { block: false, arity: Between 0 1 }
+    , Tuple "index" { block: false, arity: Exactly 0 }
+    , Tuple "key" { block: false, arity: Exactly 0 }
+    , Tuple "first" { block: false, arity: Exactly 0 }
+    , Tuple "last" { block: false, arity: Exactly 0 }
+    ]
 
--- | Lift `Value.stringify` (which yields `Either Error`) into `m`.
+-- | Lift `Value.stringify` (pure, `Either Error`) into the engine monad.
 stringifyM :: forall m. MonadThrow Error m => Value -> m String
-stringifyM v = case stringify v of
-  Left e -> throwError e
-  Right s -> pure s
+stringifyM = liftEither <<< stringify
+
+--------------------------------------------------------------------------------
+-- Value helpers (arity enforced by the combinators above)
+--------------------------------------------------------------------------------
+
+-- | `esc_html`: HTML-escape a value; idempotent on already-safe input.
+escHtml :: forall m. MonadThrow Error m => Value -> m Value
+escHtml = case _ of
+  VSafe s -> pure (VSafe s)
+  v -> (VSafe <<< escapeHtml) <$> stringifyM v
+
+-- | `safe`: mark a stringified value as trusted (no escaping).
+safe :: forall m. MonadThrow Error m => Value -> m Value
+safe v = VSafe <$> stringifyM v
+
+eq' :: forall m. Applicative m => Value -> Value -> m Value
+eq' a b = pure (VBool (a == b))
+
+not' :: forall m. Applicative m => Value -> m Value
+not' a = pure (VBool (not (truthy a)))
+
+-- | `and`/`or`: fold truthiness across the arguments with the given quantifier.
+boolOf
+  :: forall m
+   . Applicative m
+  => ((Value -> Boolean) -> Array Value -> Boolean)
+  -> Array Value
+  -> m Value
+boolOf quant args = pure (VBool (quant truthy args))
 
 --------------------------------------------------------------------------------
 -- Context & access
@@ -116,7 +167,7 @@ thisH ctl _ = pure (refContext ctl.env)
 
 lookupH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 lookupH _ args = case Array.uncons args of
-  Nothing -> throwError (ArityError "lookup/≥1")
+  Nothing -> throwError (ArityError "lookup: expected at least 1 argument(s), got 0")
   Just { head, tail } -> pure (Array.foldl step head tail)
   where
   step :: Value -> Value -> Value
@@ -136,26 +187,37 @@ indexValue _ _ = VNull
 -- Output & safety
 --------------------------------------------------------------------------------
 
-escHtmlH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-escHtmlH _ args = case args of
-  [ VSafe s ] -> pure (VSafe s) -- idempotent on already-safe input
-  [ v ] -> (VSafe <<< escapeHtml) <$> stringifyM v
-  _ -> throwError (ArityError "esc_html/1")
-
-safeH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-safeH _ args = case args of
-  [ v ] -> VSafe <$> stringifyM v
-  _ -> throwError (ArityError "safe/1")
-
 -- | A raw-block helper that returns its captured body verbatim.
 rawH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 rawH ctl _ = VSafe <$> ctl.render ctl.env ctl.children
 
--- | `else` is a *separator marker*: on its own it renders to nothing. A block
--- | helper (`if`, `each`, `with`) gives it meaning by splitting its body at the
--- | `{{else}}` separator — see `splitClause`.
-elseH :: forall m. Applicative m => Helper m (RefEnv m)
-elseH _ _ = pure (VSafe "")
+--------------------------------------------------------------------------------
+-- Clauses (separator-driven control flow)
+--------------------------------------------------------------------------------
+
+-- | The body before the first `{{else}}` separator.
+mainBody :: forall m. Ctl m (RefEnv m) -> Template
+mainBody ctl = (ctl.clause "else").before
+
+-- | The body after the first `{{else}}` separator, or empty if absent.
+elseBody :: forall m. Ctl m (RefEnv m) -> Template
+elseBody ctl = fromMaybe [] (ctl.clause "else").body
+
+-- | Render a sub-tree in an environment, wrapped as already-escaped output.
+renderSafe :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> RefEnv m -> Template -> m Value
+renderSafe ctl env nodes = VSafe <$> ctl.render env nodes
+
+-- | The arity-error message for a block helper that wanted exactly `k` args.
+wrongCount :: String -> Int -> Array Value -> String
+wrongCount name k args =
+  name <> ": expected exactly " <> show k <> " argument(s), got " <> show (Array.length args)
+
+-- | Render the main clause / the else clause in the current environment.
+renderMain :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
+renderMain ctl = renderSafe ctl ctl.env (mainBody ctl)
+
+renderElse :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
+renderElse ctl = renderSafe ctl ctl.env (elseBody ctl)
 
 --------------------------------------------------------------------------------
 -- Conditionals
@@ -164,20 +226,12 @@ elseH _ _ = pure (VSafe "")
 ifH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 ifH ctl args = case args of
   [ c ] -> if truthy c then renderMain ctl else renderElse ctl
-  _ -> throwError (ArityError "if/1")
+  _ -> throwError (ArityError (wrongCount "if" 1 args))
 
 unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 unlessH ctl args = case args of
   [ c ] -> if truthy c then renderElse ctl else renderMain ctl
-  _ -> throwError (ArityError "unless/1")
-
--- | Render the body up to the first `{{else}}` separator.
-renderMain :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
-renderMain ctl = VSafe <$> ctl.render ctl.env (ctl.clause "else").before
-
--- | Render the clause after the `{{else}}` separator, if present; else empty.
-renderElse :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
-renderElse ctl = VSafe <$> ctl.render ctl.env (fromMaybe [] (ctl.clause "else").body)
+  _ -> throwError (ArityError (wrongCount "unless" 1 args))
 
 --------------------------------------------------------------------------------
 -- Iteration & context shift
@@ -196,7 +250,7 @@ eachH ctl args = case args of
         if Array.null pairs then renderElse ctl
         else iterate ctl (map (\(Tuple k v) -> { key: k, val: v }) pairs)
     _ -> renderElse ctl
-  _ -> throwError (ArityError "each/1")
+  _ -> throwError (ArityError (wrongCount "each" 1 args))
 
 iterate
   :: forall m
@@ -206,7 +260,7 @@ iterate
   -> m Value
 iterate ctl items =
   let
-    main = (ctl.clause "else").before
+    main = mainBody ctl
     n = Array.length items
     renderItem i { key, val } =
       let
@@ -230,9 +284,9 @@ withH ctl args = case args of
       let
         frame = Map.singleton "parent" (constHelper (refContext ctl.env))
       in
-        VSafe <$> ctl.render (pushFrame frame v ctl.env) (ctl.clause "else").before
+        renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)
     else renderElse ctl
-  _ -> throwError (ArityError "with/1")
+  _ -> throwError (ArityError (wrongCount "with" 1 args))
 
 --------------------------------------------------------------------------------
 -- Composition / data
@@ -254,22 +308,3 @@ applyH ctl args = case Array.uncons args of
     Just h -> h ctl tail
     Nothing -> throwError (UnknownHelper name)
   _ -> throwError (TypeError "apply: first argument must be a helper-name string")
-
-eqH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-eqH _ args = case args of
-  [ a, b ] -> pure (VBool (a == b))
-  _ -> throwError (ArityError "eq/2")
-
-notH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-notH _ args = case args of
-  [ a ] -> pure (VBool (not (truthy a)))
-  _ -> throwError (ArityError "not/1")
-
-andH :: forall m. Applicative m => Helper m (RefEnv m)
-andH _ args = pure (VBool (Array.all truthy args))
-
-orH :: forall m. Applicative m => Helper m (RefEnv m)
-orH _ args = pure (VBool (Array.any truthy args))
-
-logH :: forall m. Applicative m => Helper m (RefEnv m)
-logH _ _ = pure VNull -- effect-free in a pure host; an effectful engine can override

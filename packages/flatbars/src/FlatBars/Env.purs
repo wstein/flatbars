@@ -16,6 +16,7 @@ module FlatBars.Env
   , pushFrame
   , pushHelpers
   , refEngine
+  , liftEither
   ) where
 
 import Prelude
@@ -24,7 +25,7 @@ import BareBars.Engine (Engine, Helper)
 import BareBars.Error (Error(..))
 import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
-import Data.Either (Either(..))
+import Data.Either (Either, either)
 import Data.Foldable (foldl)
 import Data.List (List(..), (:))
 import Data.Map (Map)
@@ -32,6 +33,11 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import FlatBars.Value (stringify)
+
+-- | Lift a pure `Either Error` into the engine monad — the single place the
+-- | `Left e -> throwError e` plumbing lives, shared by `refEngine` and helpers.
+liftEither :: forall m a. MonadThrow Error m => Either Error a -> m a
+liftEither = either throwError pure
 
 newtype RefEnv m = RefEnv
   { context :: Value
@@ -84,7 +90,5 @@ refEngine initial =
   , resolve: \env name -> case lookupHelper name env of
       Just h -> pure h
       Nothing -> throwError (UnknownHelper name)
-  , stringify: \v -> case stringify v of
-      Left e -> throwError e
-      Right s -> pure s
+  , stringify: \v -> liftEither (stringify v)
   }
