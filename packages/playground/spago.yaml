@@ -13,6 +13,7 @@ package:
     - web-dom
     - halogen
     - barebars
+    - flatbars
   bundle:
     module: Playground.Main
     outfile: dist/app.js

@@ -1,21 +1,22 @@
 -- | The BareBars web playground — a Halogen SPA.
 -- |
 -- | It lexes, parses, validates, and renders BareBars *core* templates entirely
--- | in the browser (the `barebars` library compiled to JavaScript). Nothing is
+-- | in the browser (the `barebars` framework + `flatbars` engine compiled to
+-- | JavaScript). Nothing is
 -- | sent anywhere: the bundle is self-contained, so it works online and offline
 -- | (open `dist/index.html` directly).
 -- |
 -- | Panels: a template editor and a JSON data editor on the left; an output
 -- | pane on the right with five views — a sandboxed rendered preview, the HTML
--- | source, the structural Parse tree, the lowered Real AST (`BareBars.Lower`),
+-- | source, the structural Parse tree, the lowered Real AST (`FlatBars.Lower`),
 -- | and the schema + escaping validation report.
 module Playground.Main where
 
 import Prelude
 
-import BareBars (RNode(..), escapingWarnings, lower, parse, preludeSchema, renderWith, validate)
+import BareBars (parse, validate)
 import BareBars.Json (parseValue)
-import BareBars.Syntax (Node(..))
+import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Walk (Issue)
 import Data.Array as Array
 import Data.Bifunctor (lmap)
@@ -27,6 +28,7 @@ import Data.String.Common (joinWith)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
+import FlatBars (RNode(..), escapingWarnings, lower, preludeSchema, renderWith)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
@@ -139,10 +141,11 @@ renderResult st = do
   value <- lmap (\e -> "Data JSON error: " <> e) (parseValue st.dataText)
   renderWith st.template value
 
--- | A readable view of the *structural* AST. It hides nothing — every node
--- | kind, expression, and literal is shown exactly as `show` would — but the
--- | node tree is indented one line per node (the part that is unreadable as a
--- | single line). Expressions stay inline, since they are already compact.
+-- | A readable view of the *structural* AST. It hides nothing — every node,
+-- | expression, and literal is shown — but the whole tree is expanded one line
+-- | per node, with each level indented. Nested expressions (`App`/`Lit`) are
+-- | expanded the same way, so a deep `lookup`/`esc_html` call reads as a tree
+-- | instead of a single dense `show` line.
 astText :: State -> String
 astText st = case parse st.template of
   Left e -> "Parse error: " <> show e
@@ -151,20 +154,39 @@ astText st = case parse st.template of
 renderNode :: Int -> Node -> Array String
 renderNode d = case _ of
   Content s -> [ line d ("Content " <> show s) ]
-  Output _ e -> [ line d ("Output (" <> show e <> ")") ]
-  Sep _ name args -> [ line d ("Sep " <> show name <> " " <> show args) ]
+  Output _ e -> Array.cons (line d "Output") (renderExpr (d + 1) e)
+  Sep _ name args -> headArgs d "Sep" name args
   RawBlock _ name args raw ->
-    [ line d ("RawBlock " <> show name <> " " <> show args <> " " <> show raw) ]
+    headArgs d "RawBlock" name args `Array.snoc` line (d + 1) (show raw)
   Block _ name args body ->
-    -- block head (name + args) on its line; body nodes indented one level
-    Array.cons (line d ("Block " <> show name <> " " <> show args))
-      (Array.concatMap (renderNode (d + 1)) body)
+    -- block head + arg exprs and body nodes both indented one level beneath it
+    Array.cons (line d ("Block " <> show name))
+      (Array.concatMap (renderExpr (d + 1)) args <> Array.concatMap (renderNode (d + 1)) body)
+
+-- | Render an expression as an indented tree. A nullary `App`/a literal is a
+-- | single line; an applied `App` puts each argument on its own indented line.
+renderExpr :: Int -> Expr -> Array String
+renderExpr d = case _ of
+  Lit v -> [ line d ("Lit " <> show v) ]
+  App name args
+    | Array.null args -> [ line d ("App " <> show name <> " []") ]
+    | otherwise -> Array.cons (line d ("App " <> show name))
+        (Array.concatMap (renderExpr (d + 1)) args)
+
+-- | A `name + arg-exprs` header line, with the args expanded beneath it (or an
+-- | inline `[]` when there are none).
+headArgs :: Int -> String -> String -> Array Expr -> Array String
+headArgs d label name args
+  | Array.null args = [ line d (label <> " " <> show name <> " []") ]
+  | otherwise = Array.cons (line d (label <> " " <> show name))
+      (Array.concatMap (renderExpr (d + 1)) args)
 
 line :: Int -> String -> String
 line d s = power "  " d <> s
 
--- | The *real* AST — `BareBars.Lower.lower` of the structural tree, indented.
--- | Clauses are resolved into branches and escaping is explicit (`escaped`/`raw`).
+-- | The *real* AST — `FlatBars.Lower.lower` of the structural tree, expanded
+-- | the same way. Clauses become labelled branches and escaping is explicit
+-- | (`escaped`/`raw`); condition/collection expressions are expanded inline.
 realText :: State -> String
 realText st = case parse st.template of
   Left e -> "Parse error: " <> show e
@@ -173,21 +195,21 @@ realText st = case parse st.template of
 renderReal :: Int -> RNode -> Array String
 renderReal d = case _ of
   RText s -> [ line d ("RText " <> show s) ]
-  ROut esc e -> [ line d ("ROut " <> (if esc then "escaped" else "raw") <> " (" <> show e <> ")") ]
-  RIf c a b -> line d ("RIf (" <> show c <> ")") `Array.cons` (branch "then" a <> branch "else" b)
-  RUnless c a b -> line d ("RUnless (" <> show c <> ")") `Array.cons`
-    (branch "body" a <> branch "else" b)
-  REach c a b -> line d ("REach (" <> show c <> ")") `Array.cons`
-    (branch "body" a <> branch "empty" b)
-  RWith c a b -> line d ("RWith (" <> show c <> ")") `Array.cons`
-    (branch "body" a <> branch "else" b)
+  ROut esc e ->
+    Array.cons (line d ("ROut " <> if esc then "escaped" else "raw")) (renderExpr (d + 1) e)
+  RIf c a b -> ctl "RIf" c (branch "then" a <> branch "else" b)
+  RUnless c a b -> ctl "RUnless" c (branch "body" a <> branch "else" b)
+  REach c a b -> ctl "REach" c (branch "body" a <> branch "empty" b)
+  RWith c a b -> ctl "RWith" c (branch "body" a <> branch "else" b)
   RCall n args ch ->
-    line d ("RCall " <> show n <> " " <> show args) `Array.cons` Array.concatMap
-      (renderReal (d + 1))
-      ch
-  RSep n args -> [ line d ("RSep " <> show n <> " " <> show args) ]
+    Array.cons (line d ("RCall " <> show n))
+      (Array.concatMap (renderExpr (d + 1)) args <> Array.concatMap (renderReal (d + 1)) ch)
+  RSep n args -> headArgs d "RSep" n args
   RRaw s -> [ line d ("RRaw " <> show s) ]
   where
+  -- a control node: head, its condition/collection expr, then the branches
+  ctl label c rest = Array.cons (line d label) (renderExpr (d + 1) c <> rest)
+
   branch label nodes =
     if Array.null nodes then []
     else Array.cons (line (d + 1) (label <> ":")) (Array.concatMap (renderReal (d + 2)) nodes)

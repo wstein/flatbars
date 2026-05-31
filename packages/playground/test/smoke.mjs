@@ -104,10 +104,27 @@ try {
     fail("validation view did not show a clean result")
   );
 
+  // Tree views: load the conditional example and confirm the Parse tree and
+  // Real AST expand expressions into an indented tree (App/Lit on their own
+  // lines, RIf with labelled then/else branches), not a single dense line.
+  await page.select("select", "conditional");
+  const treeText = async (tabLabel) => {
+    const i = (await page.$$eval(".tabs button", (e) => e.map((b) => b.textContent))).indexOf(tabLabel);
+    await page.$$eval(".tabs button", (els, idx) => els[idx].click(), i);
+    await page.waitForSelector("pre.code", { timeout: 5000 });
+    return page.$eval("pre.code", (el) => el.textContent);
+  };
+  const parseTree = await treeText("Parse tree");
+  if (!/(^|\n) {2}App "lookup"\n {4}App "this" \[\]/.test(parseTree))
+    fail(`Parse tree not expanded as a tree: ${JSON.stringify(parseTree.slice(0, 160))}`);
+  const realAst = await treeText("Real AST");
+  if (!/(^|\n)RIf\n {2}App "lookup"/.test(realAst) || !/\n {2}then:\n/.test(realAst) || !/\n {2}else:\n/.test(realAst))
+    fail(`Real AST not expanded with RIf/then/else: ${JSON.stringify(realAst.slice(0, 160))}`);
+
   if (process.exitCode) {
     console.error("smoke: one or more checks failed.");
   } else {
-    console.log(`smoke: OK — mounted, 5 tabs, preview iframe, clean validation (${exe.split("/").pop()}).`);
+    console.log(`smoke: OK — mounted, 5 tabs, preview iframe, clean validation, expanded AST trees (${exe.split("/").pop()}).`);
   }
 } finally {
   await browser.close();
