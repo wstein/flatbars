@@ -43,6 +43,7 @@ type Ctl m env =
   , children :: Template -- this block's captured body ([] for inline calls)
   , span :: Span -- source location of the enclosing tag, for diagnostics
   , render :: env -> Template -> m String -- BareBars renders a sub-tree
+  , eval :: env -> Expr -> m Value -- BareBars evaluates a body expression to a Value
   , clause :: Ident -> { before :: Template, body :: Maybe Template } -- split a nested clause
   }
 
@@ -94,6 +95,10 @@ runTemplate engine = renderTemplate engine.initial
     , children: body
     , span
     , render: renderTemplate
+    -- evaluate an expression a helper reads from its body (e.g. an `elif`
+    -- condition) lazily — the dual of `render`. Arguments still arrive
+    -- pre-evaluated; this is for expressions the helper finds in `children`.
+    , eval: \env' e -> evalExpr env' span e
     , clause: \name ->
         let
           s = splitClause name body

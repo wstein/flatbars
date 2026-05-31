@@ -34,6 +34,7 @@ dummyCtl =
   , children: []
   , span: { start: 0, end: 0 }
   , render: \_ _ -> Right ""
+  , eval: \_ _ -> Right VNull
   , clause: \_ -> { before: [], body: Nothing }
   }
 
