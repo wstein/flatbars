@@ -306,7 +306,16 @@ main = do
     Left _ -> pure unit
     Right out -> assert' ("partial-missing: expected error, got " <> show out) false
 
-  -- desugarSurface produces the documented core expression.
+  -- Hash arguments (§5.4): key=value pairs collect into a trailing `dict`, which
+  -- the if/unless `includeZero` option consumes (the existing dict mechanism).
+  expectS "surface-hash-includeZero" "{{#if n includeZero=true}}y{{else}}m{{/if}}"
+    (obj [ Tuple "n" (VNumber 0.0) ])
+    "y"
+  expectS "surface-no-hash-zero" "{{#if n}}y{{else}}m{{/if}}"
+    (obj [ Tuple "n" (VNumber 0.0) ])
+    "m"
+
+  -- desugarSurface produces the documented core expressions.
   case desugarSurface <$> parse "{{ user.name }}" of
     Right [ Output _ e ] ->
       assert' ("desugar path: " <> show e)
@@ -314,6 +323,29 @@ main = do
             [ App "lookup" [ App "this" [], Lit (VString "user"), Lit (VString "name") ] ]
         )
     _ -> assert' "desugar: unexpected shape" false
+
+  -- positional + glued hash: {{ f a k=v }} ⇒ f (lookup this "a") (dict "k" …)
+  case desugarSurface <$> parse "{{ f a k=v }}" of
+    Right [ Output _ e ] ->
+      assert' ("desugar hash: " <> show e)
+        ( e == App "esc_html"
+            [ App "f"
+                [ App "lookup" [ App "this" [], Lit (VString "a") ]
+                , App "dict"
+                    [ Lit (VString "k"), App "lookup" [ App "this" [], Lit (VString "v") ] ]
+                ]
+            ]
+        )
+    _ -> assert' "desugar hash: unexpected shape" false
+
+  -- quoted hash value (the value is the next token): {{ f g="hi" }}
+  case desugarSurface <$> parse "{{ f g=\"hi\" }}" of
+    Right [ Output _ e ] ->
+      assert' ("desugar hash quoted: " <> show e)
+        ( e == App "esc_html"
+            [ App "f" [ App "dict" [ Lit (VString "g"), Lit (VString "hi") ] ] ]
+        )
+    _ -> assert' "desugar hash quoted: unexpected shape" false
 
   -- Skeleton-AST validation (the engine-supplied second pass).
   expectValid "validate-clean"

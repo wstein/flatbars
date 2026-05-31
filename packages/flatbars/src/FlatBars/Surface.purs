@@ -18,12 +18,14 @@
 -- |    `@root.x` ⇒ `(lookup (root) "x")` (§5.5).
 -- |  * `true`/`false`/`null` stay literal helper calls.
 -- |  * `else if` chains ⇒ nested `if` blocks in the else clause (§5.6).
+-- |  * hash arguments `k=v` ⇒ a trailing `dict`: `{{ f a k=v }}` ⇒
+-- |    `{{{ esc_html (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
 -- |  * `{{> name [ctx]}}` ⇒ `{{{ partial "name" ctx }}}` (a bare name is a string
 -- |    literal, a parenthesized expression is a dynamic name; §5.7).
 -- |
 -- | Not yet desugared: `@../` parent-data (the scoped helpers are frame-local),
--- | hash arguments `k=v` (§5.4), block params `as |x|` (§5.5), and the inline /
--- | block / `@partial-block` partial forms (§5.7). Those remain unsupported.
+-- | block params `as |x|` (§5.5), and the inline / block / `@partial-block`
+-- | partial forms and partial hash context `{{> n k=v}}` (§5.7).
 module FlatBars.Surface
   ( desugar
   ) where
@@ -36,8 +38,9 @@ import Data.Array as Array
 import Data.Foldable (foldl)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (Pattern(..), stripPrefix)
-import Data.String.CodeUnits (singleton, toCharArray)
+import Data.Number as Number
+import Data.String (Pattern(..), contains, stripPrefix)
+import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
 
 -- | Desugar a Surface template into core syntax. `clauseNames` are the
 -- | separator names the engine treats as clause markers (e.g. `["else"]`); a
@@ -62,7 +65,7 @@ desugar clauseNames = map go
     -- block head stays a helper; `else if` chains in the body are expanded into
     -- nested `if` blocks (§5.6) before the body and arguments are rewritten.
     Block sp name args body ->
-      Block sp name (map rewrite args) (desugar clauseNames (expandElseIf body))
+      Block sp name (rewriteArgs args) (desugar clauseNames (expandElseIf body))
     -- raw blocks are verbatim (surface.adoc §5.8).
     RawBlock sp name args raw -> RawBlock sp name args raw
 
@@ -71,7 +74,7 @@ desugar clauseNames = map go
 rewriteHead :: Ident -> Array Expr -> Expr
 rewriteHead name args
   | Array.null args = pathOrLit name
-  | otherwise = App name (map rewrite args)
+  | otherwise = App name (rewriteArgs args)
 
 -- | A partial reference (surface.adoc §5.7), emitted *unescaped*. `rest` is the
 -- | text after the `>` sigil: empty for `{{> name [ctx]}}` (name is the first
@@ -103,7 +106,66 @@ rewrite = case _ of
   Lit v -> Lit v
   App name args
     | Array.null args -> pathOrLit name
-    | otherwise -> App name (map rewrite args)
+    | otherwise -> App name (rewriteArgs args)
+
+-- | Rewrite a helper's argument list, collecting any trailing `key=value` hash
+-- | pairs into a single `dict` value appended after the positional arguments
+-- | (surface.adoc §5.4) — the equivalent of Handlebars' `options.hash`.
+rewriteArgs :: Array Expr -> Array Expr
+rewriteArgs args =
+  let
+    h = collectHash args
+  in
+    if Array.null h.pairs then map rewrite h.positional
+    else Array.snoc (map rewrite h.positional) (dictExpr h.pairs)
+
+dictExpr :: Array { key :: String, val :: Expr } -> Expr
+dictExpr pairs = App "dict" (Array.concatMap (\p -> [ Lit (VString p.key), p.val ]) pairs)
+
+-- | Partition arguments into positional ones and `key=value` hash pairs. A hash
+-- | argument is a bare ident containing `=`: either glued (`k=v`) or a trailing
+-- | `k=` whose value is the *next* argument (so `k="str"` / `k=(expr)` work).
+collectHash
+  :: Array Expr -> { positional :: Array Expr, pairs :: Array { key :: String, val :: Expr } }
+collectHash = go { positional: [], pairs: [] }
+  where
+  go acc args = case Array.uncons args of
+    Nothing -> acc
+    Just { head, tail } -> case asHashKey head of
+      Just { key, consumesNext: true } -> case Array.uncons tail of
+        Just { head: v, tail: rest } ->
+          go (acc { pairs = Array.snoc acc.pairs { key, val: rewrite v } }) rest
+        Nothing -> go (acc { pairs = Array.snoc acc.pairs { key, val: App "null" [] } }) []
+      Just { key, inlineVal } ->
+        go (acc { pairs = Array.snoc acc.pairs { key, val: inlineVal } }) tail
+      Nothing -> go (acc { positional = Array.snoc acc.positional head }) tail
+
+-- | Recognize a `key=value` hash argument. `consumesNext` means the value is
+-- | the following argument (the ident ended with `=`).
+asHashKey :: Expr -> Maybe { key :: String, consumesNext :: Boolean, inlineVal :: Expr }
+asHashKey = case _ of
+  App name []
+    | contains (Pattern "=") name ->
+        let
+          { key, rest } = splitFirstEq name
+        in
+          Just
+            if rest == "" then { key, consumesNext: true, inlineVal: App "null" [] }
+            else { key, consumesNext: false, inlineVal: hashValue rest }
+  _ -> Nothing
+
+splitFirstEq :: String -> { key :: String, rest :: String }
+splitFirstEq s = case indexOf (Pattern "=") s of
+  Just i -> { key: take i s, rest: drop (i + 1) s }
+  Nothing -> { key: s, rest: "" }
+
+-- | The value of a *glued* hash pair (`k=v`): a literal, a number, or a path.
+hashValue :: String -> Expr
+hashValue t
+  | t == "true" || t == "false" || t == "null" = App t []
+  | otherwise = case Number.fromString t of
+      Just n -> Lit (VNumber n)
+      Nothing -> pathExpr t
 
 -- | A bare identifier: a literal helper (`true`/`false`/`null`) stays as-is;
 -- | anything else is a data path.

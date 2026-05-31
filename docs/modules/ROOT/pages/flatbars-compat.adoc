@@ -41,8 +41,8 @@ toc::[]
 |`pass:[{{#if c}}…{{else}}…{{/if}}]`
 |✅
 |Takes an explicit *value*: `pass:[{{#if (lookup this "x")}}]`. `pass:[{{else}}]` is a name-agnostic
-separator the helper splits on. `0` is falsy by default (§5); `includeZero` is supported, supplied as
-an options object: `pass:[{{#if n (dict "includeZero" true)}}]`.
+separator the helper splits on. `0` is falsy by default (§5); `includeZero` is supported — write the
+surface hash `pass:[{{#if n includeZero=true}}]` (⇒ the options object `pass:[(dict "includeZero" true)]`).
 
 |`pass:[{{#unless c}}…{{/unless}}]`
 |`pass:[{{#unless c}}…{{/unless}}]`
@@ -176,6 +176,13 @@ with the given context. Hash context `pass:[{{> name k=v}}]` is not yet desugare
 |No decorator concept; none shipped. Block helpers already receive the body, so a decorator is just
 a helper (xref:appendix-handlebars.adoc#decorators[A.8]) — but none is in the prelude.
 
+|Hash arguments `pass:[{{helper a k=v}}]`
+|surface ⇒ trailing `dict`
+|✅
+|`renderSurface` collects `key=value` pairs into a trailing `pass:[(dict "k" v …)]` after the
+positional arguments (§5.4) — `options.hash`. Values may be glued (`k=path`/`k=42`) or the next token
+(`k="str"`, `k=(expr)`). This is how `pass:[{{#if n includeZero=true}}]` works.
+
 |Block params `pass:[as \|a b\|]`
 |—
 |✗
@@ -231,8 +238,8 @@ path read. To read a field, use `pass:[{{{ lookup this "city" }}}]` (xref:index.
 single biggest porting adjustment from {hbs}.
 . *Truthiness matches {hbs}.* Falsy: `false`, `null`, `0`, `""`, the empty array, and a trusted empty
 string (`safe ""` ⇒ `VSafe ""`). Truthy: everything else — including the empty object `pass:[{}]` and
-non-zero numbers. As in {hbs}, `0` is falsy unless `includeZero` is set; FlatBars takes it as an
-options object on `if`/`unless`: `pass:[{{#if n (dict "includeZero" true)}}]`.
+non-zero numbers. As in {hbs}, `0` is falsy unless `includeZero` is set — the surface hash
+`pass:[{{#if n includeZero=true}}]` (core: the options object `pass:[(dict "includeZero" true)]`).
 +
 *Safe strings (a deliberate divergence).* FlatBars holds one invariant {hbs} does not: marking a
 string safe never changes its truthiness — a safe string tests as its *content* (`truthy (VSafe s) ==

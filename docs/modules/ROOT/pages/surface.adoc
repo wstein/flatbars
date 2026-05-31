@@ -27,12 +27,14 @@ segments (`a.[home town]`, `a.[1]` — dots and spaces inside the brackets are
 literal). Basic *partials* (§5.7) work via `renderSurfaceWith`: `pass:[{{> name}}]`,
 `pass:[{{> name ctx}}]`, and dynamic `pass:[{{> (expr)}}]` render a registered
 partial (unescaped), backed by the `partial` engine helper and the env's partial
-registry.
+registry. *Hash arguments* (§5.4) collect into a trailing `dict`:
+`pass:[{{ f a k=v k2="s"}}]` ⇒ `pass:[{{{ esc_html (f (lookup this "a") (dict "k" … "k2" "s")) }}}]`
+— this is what feeds `if`/`unless`' `includeZero`, e.g. `pass:[{{#if n includeZero=true}}]`.
 
 Still *specified but not yet desugared*: `@../` parent-data (the scoped helpers
-are frame-local), hash arguments `k=v` (§5.4), block params `as \|x\|` (§5.5),
-and the inline / block / `@partial-block` partial forms (§5.7). See the
-xref:flatbars-compat.adoc[compatibility matrix] for per-feature status.
+are frame-local), block params `as \|x\|` (§5.5), and the inline / block /
+`@partial-block` partial forms and partial hash context `pass:[{{> n k=v}}]`
+(§5.7). See the xref:flatbars-compat.adoc[compatibility matrix] for per-feature status.
 ====
 
 [IMPORTANT]
