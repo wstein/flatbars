@@ -18,7 +18,8 @@ lives in [`packages/flatbars`](../flatbars/) and is built on top of these module
 | `BareBars.Parser` | §2 | `parse :: String -> Either ParseError Template` |
 | `BareBars.Span` | — | `Span` source ranges + `lineColumn`/`spanText` |
 | `BareBars.Engine` | §3.4–3.6, A.13 | polymorphic IoC driver: `Ctl m env`, `Helper m env`, `Engine m env`, `runTemplate`/`runString` |
-| `BareBars.Walk` | §4.3 | skeleton visitor (`foldRefs`/`foldTemplate`), `splitClause`, schema `validate` |
+| `BareBars.Walk` | §4.3 | skeleton visitor (`foldRefs`/`foldTemplate`/`foldExpr`), `splitClause`, schema `validate` |
+| `BareBars.Helper` | A.13 | arity-checked arg combinators (`nullary`/`unary`/`binary`/`variadic`/`atLeast`) for building helpers |
 | `BareBars.Json` | — | JSON ⇆ `Value` bridge for hosts |
 | `BareBars` | §7 | framework aggregator: `parse`, `runTemplate`, `validate`, `foldTemplate`, spans, the `Value` and `Engine` types |
 
