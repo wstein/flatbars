@@ -5,11 +5,13 @@
   "type": "module",
   "description": "BareBars web playground — a Halogen SPA that lexes, parses, validates, and renders BareBars core templates entirely in the browser.",
   "scripts": {
-    "bundle": "spago bundle -p barebars-playground",
+    "generate:examples": "node scripts/generate-examples.mjs",
+    "bundle": "npm run generate:examples && spago bundle -p barebars-playground",
     "assets": "cp index.html dist/index.html",
     "build": "npm run bundle && npm run assets",
     "dev": "npm run build && esbuild --servedir=dist --serve=8080",
-    "smoke": "npm run build && node smoke/smoke.mjs"
+    "smoke": "npm run build && node smoke/smoke.mjs",
+    "test": "node scripts/generate-examples.mjs --check"
   },
   "devDependencies": {
     "puppeteer-core": "^23.0.0"

@@ -1,0 +1,3 @@
+{{#with (lookup this "report")}}<table>
+{{#each (lookup this "rows")}}  <tr><td>{{{esc_html (lookup this "k")}}}</td><td>{{{esc_html (lookup this "v")}}}</td></tr>
+{{/each}}</table>{{/with}}
