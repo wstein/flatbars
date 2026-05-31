@@ -26,6 +26,7 @@ module BareBars.Walk
   , Issue
   , validate
   , arityOk
+  , arityText
   ) where
 
 import Prelude
