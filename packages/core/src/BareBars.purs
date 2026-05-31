@@ -9,6 +9,7 @@
 module BareBars
   ( module BareBars.Syntax
   , module BareBars.Value
+  , module BareBars.ToValue
   , module BareBars.Error
   , module BareBars.Span
   , module BareBars.Engine
@@ -23,6 +24,7 @@ import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
 import BareBars.Parser (parse, parseExprTokens)
 import BareBars.Span (Span, lineColumn, spanText)
 import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
+import BareBars.ToValue (class ToValue, class ToValueFields, toValue, toValueFields)
 import BareBars.Value (Value(..))
 import BareBars.Walk
   ( Algebra

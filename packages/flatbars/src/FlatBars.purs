@@ -16,6 +16,7 @@ module FlatBars
   , compile
   , renderWith
   , renderWithDiag
+  , renderValue
   , renderAff
   , surfaceClauses
   , desugarSurface
@@ -23,6 +24,7 @@ module FlatBars
   , renderSurface
   , renderSurfaceWith
   , renderSurfaceDiag
+  , renderSurfaceValue
   , formatError
   ) where
 
@@ -32,6 +34,7 @@ import BareBars.Engine (runString, runTemplate)
 import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
 import BareBars.Parser (parse)
 import BareBars.Syntax (Ident, Template)
+import BareBars.ToValue (class ToValue, toValue)
 import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except.Trans (runExceptT)
@@ -78,6 +81,12 @@ renderWithDiag :: String -> Value -> Either String String
 renderWithDiag src dat = case runString (refEngine (preludeEnv dat)) src of
   Left e -> Left (formatError src e)
   Right out -> Right out
+
+-- | Render *core* source against native PureScript data — a record, `Array`,
+-- | `Map`, etc. lowered via `ToValue` (host binding). `renderValue tmpl { name:
+-- | "Ada" }`. Uses located error messages.
+renderValue :: forall a. ToValue a => String -> a -> Either String String
+renderValue src = renderWithDiag src <<< toValue
 
 -- | The async instantiation: the same engine in `ExceptT Error Aff`, so
 -- | effectful helpers/partials are possible. Proof the driver is monad-polymorphic.
@@ -141,3 +150,9 @@ renderSurfaceDiag src dat = case parse src of
       case runTemplate (refEngine env) template of
         Left e -> Left (formatError src e)
         Right out -> Right out
+
+-- | Render *Surface* source against native PureScript data lowered via
+-- | `ToValue` (host binding). `renderSurfaceValue tmpl { name: "Ada" }`. Uses
+-- | located error messages.
+renderSurfaceValue :: forall a. ToValue a => String -> a -> Either String String
+renderSurfaceValue src = renderSurfaceDiag src <<< toValue

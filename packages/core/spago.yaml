@@ -16,6 +16,8 @@ package:
     - foldable-traversable
     - ordered-collections
     - numbers
+    - integers
+    - record
     - transformers
   test:
     main: Test.BareBars.Main

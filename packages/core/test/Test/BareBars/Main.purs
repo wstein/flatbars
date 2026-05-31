@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), foldExpr, foldTemplate, parse, parseErrorAt, spanText, splitClause, splitClauses, validate)
+import BareBars (Arity(..), Expr(..), Node(..), Value(..), foldExpr, foldTemplate, parse, parseErrorAt, spanText, splitClause, splitClauses, toValue, validate)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -133,5 +133,39 @@ main = do
         assert' ("parseErrorAt: " <> show d.line <> ":" <> show d.column <> " " <> d.message)
           (d.line == 2 && d.column == 7)
     Right _ -> assert' "parseErrorAt: expected a parse error" false
+
+  -- ToValue host binding: native PureScript data lowers to the core `Value`.
+  assert' "toValue String" (toValue "x" == VString "x")
+  assert' "toValue Boolean true" (toValue true == VBool true)
+  assert' "toValue Boolean false" (toValue false == VBool false)
+  assert' "toValue Int" (toValue (3 :: Int) == VNumber 3.0)
+  assert' "toValue Number" (toValue 2.5 == VNumber 2.5)
+  assert' "toValue Value is identity" (toValue (VSafe "<b>") == VSafe "<b>")
+  assert' "toValue Nothing -> VNull" (toValue (Nothing :: Maybe Int) == VNull)
+  assert' "toValue Just" (toValue (Just "a") == VString "a")
+  assert' "toValue Array" (toValue [ "a", "b" ] == VArray [ VString "a", VString "b" ])
+  assert' "toValue Map"
+    ( toValue (Map.fromFoldable [ Tuple "k" "v" ])
+        == VObject (Map.fromFoldable [ Tuple "k" (VString "v") ])
+    )
+  assert' "toValue record"
+    ( toValue { name: "Ada", admin: true, n: 3 }
+        == VObject
+          ( Map.fromFoldable
+              [ Tuple "name" (VString "Ada")
+              , Tuple "admin" (VBool true)
+              , Tuple "n" (VNumber 3.0)
+              ]
+          )
+    )
+  assert' "toValue nested record + array"
+    ( toValue { user: { name: "Ada" }, tags: [ "x", "y" ] }
+        == VObject
+          ( Map.fromFoldable
+              [ Tuple "user" (VObject (Map.singleton "name" (VString "Ada")))
+              , Tuple "tags" (VArray [ VString "x", VString "y" ])
+              ]
+          )
+    )
 
   log "all framework tests passed"
