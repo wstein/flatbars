@@ -546,13 +546,20 @@ BareBars hands every helper a *control handle* `Ctl`. Everything on it is a call
 type Ctl m env =
   { env      :: env                          -- the current environment (yours)
   , children :: Template                     -- this block's body ([] for inline calls)
-  , eval     :: env -> Expr     -> m Value   -- BareBars evaluates an expression for you
   , render   :: env -> Template -> m String  -- BareBars renders a sub-tree for you
   , clause   :: Ident -> { before :: Template, body :: Maybe Template }   -- split at a separator
   , span     :: Span }                        -- source location, for diagnostics
 
 type Helper m env = Ctl m env -> Array Value -> m Value
 ----
+
+[NOTE]
+====
+An earlier `Ctl` also carried `eval :: env -> Expr -> m Value` (evaluate a synthesized expression).
+No helper used it — arguments arrive already evaluated as `Array Value` — so it was removed to keep
+the control handle minimal. It can return without a breaking change if a future helper needs to
+evaluate an `Expr` it constructs itself (e.g. a `let`/macro-style helper).
+====
 
 (Chapter 3's `Body` — `{ children, render }` — is just the slice of `Ctl` that most helpers use.)
 What *you* supply is three functions; BareBars owns everything else:

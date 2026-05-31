@@ -42,7 +42,6 @@ type Ctl m env =
   { env :: env -- the current environment (the engine's own type)
   , children :: Template -- this block's captured body ([] for inline calls)
   , span :: Span -- source location of the enclosing tag, for diagnostics
-  , eval :: env -> Expr -> m Value -- BareBars evaluates an expression
   , render :: env -> Template -> m String -- BareBars renders a sub-tree
   , clause :: Ident -> { before :: Template, body :: Maybe Template } -- split a nested clause
   }
@@ -94,7 +93,6 @@ runTemplate engine = renderTemplate engine.initial
     { env
     , children: body
     , span
-    , eval: \e -> evalExpr e span
     , render: renderTemplate
     , clause: \name ->
         let
