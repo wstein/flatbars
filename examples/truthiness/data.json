@@ -1,0 +1,15 @@
+{
+  "vFalse": false,
+  "vTrue": true,
+  "vNull": null,
+  "sEmpty": "",
+  "sText": "hi",
+  "sZero": "0",
+  "sSpace": " ",
+  "nZero": 0,
+  "nNum": 42,
+  "arrEmpty": [],
+  "arrFull": [1, 2],
+  "objEmpty": {},
+  "objFull": { "k": 1 }
+}

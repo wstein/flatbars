@@ -20,9 +20,11 @@ specification and a JavaScript/WASM reference playground.
 │   └── modules/ROOT/      pages/*.adoc · nav.adoc · assets/images
 ├── site/                  Hand-written marketing landing page (index.html)
 ├── packages/
-│   ├── core/              `barebars` — the reference library (lexer · parser · eval · prelude)
+│   ├── core/              `barebars` — the engine-agnostic framework (lexer · parser · driver · walk)
+│   ├── flatbars/          `flatbars` — the reference engine (value policy · prelude · lowering)
 │   ├── cli/               `barebars-cli` — render templates from the command line
 │   └── playground/        Halogen web playground (works online and offline as a static bundle)
+├── examples/              Runnable templates (e.g. `truthiness/` — edges & Handlebars parity)
 └── reference/
     └── web/               Provided JS/WASM ("stem") reference playground — kept for comparison
 ```
