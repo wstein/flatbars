@@ -20,6 +20,9 @@ offline** (open `dist/index.html` straight from disk).
   iteration, a `with` table, and a truthiness parity matrix. The example
   catalog is generated from `examples/*/{meta.json,template.hbs,data.json}` at
   build time and bundled into the offline playground.
+- Future examples should follow the same pattern: add a new `examples/<name>/`
+  folder with `meta.json`, `template.hbs`, and `data.json`, then regenerate the
+  bundled manifest with `npm run generate:examples`.
 - A **status bar** showing parse state, data validity, and the live issue count.
 
 ## Develop
@@ -60,5 +63,7 @@ deploy, build and publish the `dist/` directory as static files — or just open
   the **Real AST** tab already shows that walk's output for the supported core.
 - If you edit `examples/**`, rerun `npm run playground:build` (or just
   `npm run generate:examples`) so the bundled manifest stays in sync.
+- The pedantic dependency warnings reported by `npm run lint` are tracked as a
+  separate cleanup pass and intentionally left unchanged in this change set.
 - The richer JS/WASM reference playground lives in [`reference/web/`](../../reference/web/);
   this package is the PureScript equivalent built on the reference engine, FlatBars.

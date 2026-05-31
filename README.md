@@ -33,6 +33,11 @@ The specification (`docs/`) is the contract. The PureScript packages target it;
 `docs/modules/ROOT/pages/host-api.adoc` defines the host API the `core` package
 exposes.
 
+To add a new playground example, create a new folder under `examples/` with
+`meta.json`, `template.hbs`, and `data.json`. The playground manifest is
+generated from those folders at build time, so no example data should be added
+inline to the Halogen source.
+
 ## Prerequisites
 
 The PureScript toolchain is provisioned per-project via npm — you do **not** need
