@@ -1,0 +1,13 @@
+{
+  "name": "barebars-playground",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BareBars web playground — a Halogen SPA that lexes, parses, validates, and renders BareBars core templates entirely in the browser.",
+  "scripts": {
+    "bundle": "spago bundle -p barebars-playground",
+    "assets": "cp index.html dist/index.html",
+    "build": "npm run bundle && npm run assets",
+    "dev": "npm run build && esbuild --servedir=dist --serve=8080"
+  }
+}

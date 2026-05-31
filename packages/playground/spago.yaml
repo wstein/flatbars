@@ -1,0 +1,18 @@
+package:
+  name: barebars-playground
+  dependencies:
+    - prelude
+    - effect
+    - arrays
+    - maybe
+    - either
+    - strings
+    - bifunctors
+    - foldable-traversable
+    - halogen
+    - barebars
+  bundle:
+    module: Main
+    outfile: dist/app.js
+    platform: browser
+    type: app

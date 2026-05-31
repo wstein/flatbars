@@ -1,0 +1,45 @@
+# `barebars-playground` — web playground
+
+A [Halogen](https://purescript-halogen.github.io/purescript-halogen/) single-page
+app that lexes, parses, validates, and renders BareBars **core** templates
+entirely in the browser. The `barebars` library is compiled to JavaScript and
+bundled in — nothing is sent to a server, so the playground works **online and
+offline** (open `dist/index.html` straight from disk).
+
+## Features
+
+- **Template editor** and **JSON data editor**, live.
+- **Output pane** with four views:
+  - **Rendered** — a sandboxed `<iframe>` preview of the HTML output.
+  - **HTML** — the raw rendered source.
+  - **AST** — the parsed *skeleton* AST (`BareBars.parse`).
+  - **Validation** — the schema-validation report (`BareBars.validate` against
+    `preludeSchema`), the engine's second pass.
+- **Examples** — greeting, list/`each`, clause-based conditionals, object
+  iteration, and a `with` table.
+- A **status bar** showing parse state, data validity, and the live issue count.
+
+## Develop
+
+```sh
+# from the repo root (installs the toolchain once)
+npm install
+
+# build + serve at http://localhost:8080
+npm run playground
+
+# just build the static bundle into packages/playground/dist/
+npm run playground:build
+```
+
+`dist/` (the bundle `app.js` + `index.html`) is generated and git-ignored. To
+deploy, build and publish the `dist/` directory as static files — or just open
+`dist/index.html` locally.
+
+## Notes
+
+- Templates use **core syntax**; control flow is nested clause blocks
+  (`{{#if c}}…{{#else}}…{{/else}}{{/if}}`). The surface dialect (`{{ x }}`,
+  dotted paths) is a future addition (see `BareBars.Surface`).
+- The richer JS/WASM reference playground lives in [`reference/web/`](../../reference/web/);
+  this package is the PureScript equivalent built on the reference engine.

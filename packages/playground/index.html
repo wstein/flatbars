@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BareBars Playground</title>
+<meta name="description" content="Lex, parse, validate, and render BareBars core templates live in the browser.">
+<style>
+  :root {
+    --bb-bg: #f4f1ea; --bb-panel: #fffdf8; --bb-ink: #1f1d1b; --bb-line: #e2ddd2;
+    --bb-accent: #d2552b; --bb-accent-deep: #a23c1c; --bb-muted: #7d7669;
+    --bb-ok: #2f7d4f; --bb-warn: #b8860b; --bb-err: #c0392b;
+    --bb-mono: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --bb-sans: "IBM Plex Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bb-bg); color: var(--bb-ink); font-family: var(--bb-sans); }
+  #app { height: 100vh; display: flex; flex-direction: column; }
+
+  header.bar {
+    display: flex; align-items: center; gap: 1rem; padding: 0 1.1rem; height: 56px;
+    background: var(--bb-panel); border-bottom: 1px solid var(--bb-line); flex: 0 0 auto;
+  }
+  .wm { font-family: var(--bb-mono); font-weight: 700; font-size: 1.18rem; letter-spacing: -.02em; }
+  .wm b { color: var(--bb-accent); }
+  .bar .spacer { margin-left: auto; }
+  .bar label { font-family: var(--bb-mono); font-size: .78rem; color: var(--bb-muted); margin-right: .4rem; }
+  select, button {
+    font-family: var(--bb-mono); font-size: .82rem; padding: .35rem .6rem;
+    border: 1px solid var(--bb-line); border-radius: 6px; background: #fff; color: var(--bb-ink); cursor: pointer;
+  }
+
+  main { flex: 1 1 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--bb-line); min-height: 0; }
+  .col { display: flex; flex-direction: column; min-height: 0; background: var(--bb-bg); }
+  .pane { display: flex; flex-direction: column; min-height: 0; flex: 1 1 0; border-bottom: 1px solid var(--bb-line); }
+  .pane:last-child { border-bottom: 0; }
+  .pane > .head {
+    display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; background: var(--bb-panel);
+    border-bottom: 1px solid var(--bb-line); font-family: var(--bb-mono); font-size: .74rem;
+    text-transform: uppercase; letter-spacing: .06em; color: var(--bb-muted);
+  }
+  textarea {
+    flex: 1 1 auto; width: 100%; resize: none; border: 0; padding: .8rem;
+    font-family: var(--bb-mono); font-size: 13px; line-height: 1.55; background: var(--bb-panel); color: var(--bb-ink);
+    tab-size: 2; outline: none;
+  }
+  .tabs { display: flex; gap: .25rem; margin-left: auto; }
+  .tabs button { padding: .15rem .5rem; font-size: .72rem; text-transform: none; border-radius: 5px; }
+  .tabs button.active { background: var(--bb-accent); color: #fff; border-color: var(--bb-accent); }
+
+  .out { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--bb-panel); }
+  iframe.preview { width: 100%; height: 100%; border: 0; background: #fff; }
+  pre.code { margin: 0; padding: .8rem; font-family: var(--bb-mono); font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .issues { margin: 0; padding: .6rem .8rem; list-style: none; font-family: var(--bb-mono); font-size: 12.5px; }
+  .issues li { padding: .3rem .5rem; border-left: 3px solid var(--bb-line); margin-bottom: .35rem; background: var(--bb-bg); }
+  .issues li.error { border-left-color: var(--bb-err); }
+  .issues li.warning { border-left-color: var(--bb-warn); }
+  .issues .none { color: var(--bb-ok); }
+  .banner { padding: .6rem .8rem; font-family: var(--bb-mono); font-size: 12.5px; color: var(--bb-err); background: #fcebe7; border-bottom: 1px solid var(--bb-line); white-space: pre-wrap; }
+
+  footer.status {
+    flex: 0 0 auto; display: flex; gap: 1.2rem; align-items: center; padding: .35rem 1.1rem;
+    background: var(--bb-panel); border-top: 1px solid var(--bb-line);
+    font-family: var(--bb-mono); font-size: .74rem; color: var(--bb-muted);
+  }
+  footer .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: .35rem; }
+  .dot.ok { background: var(--bb-ok); } .dot.bad { background: var(--bb-err); }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
