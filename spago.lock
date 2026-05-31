@@ -93,6 +93,7 @@
           "dependencies": [
             "arrays",
             "barebars",
+            "barebars-compile",
             "barebars-json",
             "effect",
             "either",
@@ -113,6 +114,7 @@
             "arraybuffer-types",
             "arrays",
             "barebars",
+            "barebars-compile",
             "barebars-json",
             "bifunctors",
             "const",

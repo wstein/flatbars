@@ -3,17 +3,19 @@
 -- | Usage:
 -- |
 -- | ```text
--- | barebars <template.bars> [--data <data.json>] [--validate] [--help]
+-- | barebars <template.bars> [--data <data.json>] [--validate | --compile] [--help]
 -- | ```
 -- |
 -- | Renders a *core-syntax* template against JSON data using the reference
--- | prelude, writing the result to stdout. With `--validate` it instead runs
--- | the skeleton-AST validation pass and reports any issues.
+-- | prelude, writing the result to stdout. With `--validate` it instead runs the
+-- | skeleton-AST validation pass; with `--compile` it emits a JS module
+-- | (`BareBars.Compile`) to stdout — pair it with `barebars-runtime.mjs`.
 module Cli.Main where
 
 import Prelude
 
 import BareBars (parse, renderParseErrorAt, validate)
+import BareBars.Compile.FullBars (compileCore)
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
 import Data.Array as Array
@@ -37,14 +39,17 @@ usage =
     [ "barebars — render a BareBars core template"
     , ""
     , "Usage:"
-    , "  barebars <template> [--data <data.json>] [--validate]"
+    , "  barebars <template> [--data <data.json>] [--validate | --compile]"
     , ""
     , "Options:"
     , "  -d, --data <file>   JSON data file (default: null context)"
     , "      --validate      validate the template against the prelude schema; do not render"
+    , "  -c, --compile       compile the template to a JS module (printed to stdout); do not render"
     , "  -h, --help          show this help"
     , ""
     , "Templates use core syntax: {{{ lookup this \"x\" }}}, {{#each …}}, …."
+    , "The compiled module's default export is `function (data, rt)`; pair it with"
+    , "the runtime at packages/compile/runtime/barebars-runtime.mjs."
     ]
 
 data Mode
@@ -56,6 +61,7 @@ type Options =
   { template :: String
   , dataFile :: Maybe String
   , validateOnly :: Boolean
+  , compileOnly :: Boolean
   }
 
 main :: Effect Unit
@@ -68,16 +74,22 @@ main = do
 
 -- | Parse argv into a mode. The first non-flag argument is the template path.
 parseArgs :: Array String -> Mode
-parseArgs = go { template: Nothing, dataFile: Nothing, validateOnly: false }
+parseArgs = go { template: Nothing, dataFile: Nothing, validateOnly: false, compileOnly: false }
   where
   go acc args = case Array.uncons args of
     Nothing -> case acc.template of
-      Just template -> Run { template, dataFile: acc.dataFile, validateOnly: acc.validateOnly }
+      Just template -> Run
+        { template
+        , dataFile: acc.dataFile
+        , validateOnly: acc.validateOnly
+        , compileOnly: acc.compileOnly
+        }
       Nothing -> Help
     Just { head, tail } -> case head of
       "-h" -> Help
       "--help" -> Help
       "--validate" -> go (acc { validateOnly = true }) tail
+      flag | flag == "-c" || flag == "--compile" -> go (acc { compileOnly = true }) tail
       flag | flag == "-d" || flag == "--data" -> case Array.uncons tail of
         Just { head: file, tail: rest } -> go (acc { dataFile = Just file }) rest
         Nothing -> Invalid (flag <> " requires a file argument")
@@ -91,7 +103,8 @@ run opts = do
   case tplE of
     Left err -> die ("barebars: cannot read template '" <> opts.template <> "': " <> err)
     Right tpl ->
-      if opts.validateOnly then runValidate tpl
+      if opts.compileOnly then runCompile opts tpl
+      else if opts.validateOnly then runValidate tpl
       else do
         datE <- loadData opts.dataFile
         case datE of
@@ -101,6 +114,12 @@ run opts = do
             Right render -> case render value of
               Left err -> die ("barebars: " <> show err)
               Right out -> writeStdout out
+
+-- | Compile a core template to a JS ES module and print it to stdout.
+runCompile :: Options -> String -> Effect Unit
+runCompile opts tpl = case compileCore tpl of
+  Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
+  Right js -> writeStdout js
 
 -- | Run the skeleton-AST validation pass and report issues.
 runValidate :: String -> Effect Unit
