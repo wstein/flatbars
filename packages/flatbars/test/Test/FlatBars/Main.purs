@@ -259,6 +259,19 @@ main = do
     Right t -> assert' "escaping lint silent for esc_html/safe" (Array.null (escapingWarnings t))
     Left e -> assert' ("lint: parse error " <> show e) false
 
+  -- Lint: testing the truthiness of an escaped/safe value is a smell (safe/
+  -- esc_html stringify, so e.g. `safe 0` is truthy while `0` is falsy).
+  case parse "{{#if (safe (lookup this \"x\"))}}y{{/if}}" of
+    Right t -> assert' "lint flags if-on-safe" (not (Array.null (escapingWarnings t)))
+    Left e -> assert' ("lint: parse error " <> show e) false
+  case parse "{{#unless (esc_html (lookup this \"x\"))}}y{{/unless}}" of
+    Right t -> assert' "lint flags unless-on-esc_html" (not (Array.null (escapingWarnings t)))
+    Left e -> assert' ("lint: parse error " <> show e) false
+  -- Testing the underlying data directly is clean.
+  case parse "{{#if (lookup this \"x\")}}y{{/if}}" of
+    Right t -> assert' "lint silent for if-on-data" (Array.null (escapingWarnings t))
+    Left e -> assert' ("lint: parse error " <> show e) false
+
   -- Schema/runtime conformance: prelude and preludeSchema are projections of one
   -- HelperDef table, so for every combinator-built value helper the runtime
   -- arity guard must agree exactly with the schema's declared arity. Drive each

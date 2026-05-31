@@ -88,10 +88,18 @@ lower = foldTemplate
           | name == "with" -> RWith c before elseBranch
         _ -> RCall name args (recurse children)
 
--- | Safe-by-default lint: warn when a *raw* output (`{{{ … }}}`, i.e. not
--- | `esc_html`) emits untrusted *data* — a `lookup`/`this`/scoped accessor not
--- | wrapped in `safe`. The reference renderer never auto-escapes raw output, so
--- | this is where "you forgot to escape" is caught.
+-- | Safe-by-default lint. Two warnings:
+-- |
+-- |  1. *Forgot to escape* — a *raw* output (`{{{ … }}}`, not `esc_html`) emits
+-- |     untrusted *data* (a `lookup`/`this`/scoped accessor not wrapped in
+-- |     `safe`). The reference renderer never auto-escapes raw output, so this
+-- |     is where "you forgot to escape" is caught.
+-- |
+-- |  2. *Testing rendered output* — an `if`/`unless` condition headed by
+-- |     `esc_html`/`safe`/`raw`. Those produce *output text*, not data, so
+-- |     testing their truthiness is a category error: `safe`/`esc_html`
+-- |     stringify first, so `safe 0` is truthy while `0` is falsy. Test the
+-- |     underlying data instead.
 escapingWarnings :: Template -> Array Issue
 escapingWarnings = walk <<< lower
   where
@@ -107,14 +115,32 @@ escapingWarnings = walk <<< lower
             , message: "raw output of data '" <> name <> "' — wrap in esc_html, or mark safe"
             }
           ]
-    RIf _ a b -> walk a <> walk b
-    RUnless _ a b -> walk a <> walk b
+    RIf c a b -> condWarn c <> walk a <> walk b
+    RUnless c a b -> condWarn c <> walk a <> walk b
     REach _ a b -> walk a <> walk b
     RWith _ a b -> walk a <> walk b
     RCall _ _ ch -> walk ch
+    _ -> []
+
+  -- An `if`/`unless` condition that tests the result of an output-producing
+  -- helper (escaped/safe/raw) rather than the underlying data.
+  condWarn :: Expr -> Array Issue
+  condWarn = case _ of
+    App name _
+      | Array.elem name safeProducers ->
+          [ { severity: Warn
+            , name
+            , message: "testing the truthiness of an escaped/safe value ('" <> name
+                <> "') — test the underlying data instead"
+            }
+          ]
     _ -> []
 
   -- Accessors that yield arbitrary (string) data — the real injection surface.
   -- Numeric scoped scalars (`index`, `first`, `last`) are intentionally excluded.
   dataAccessors :: Array Ident
   dataAccessors = [ "lookup", "this", "root", "parent", "key" ]
+
+  -- Helpers that produce output text (a `VSafe`) rather than data.
+  safeProducers :: Array Ident
+  safeProducers = [ "esc_html", "safe", "raw" ]

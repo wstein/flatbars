@@ -131,10 +131,23 @@ try {
   if (!/0 \+ includeZero<\/td><td>truthy<\/td>/.test(truthHtml))
     fail(`Truthiness: includeZero should make 0 truthy: ${JSON.stringify(truthHtml.slice(0, 200))}`);
 
+  // Lint wiring: typing an if-condition headed by `safe` surfaces the
+  // "testing an escaped/safe value" warning in the Validation tab.
+  await page.$eval("textarea", (el) => {
+    el.value = '{{#if (safe (lookup this "x"))}}y{{/if}}';
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const valIdx = (await page.$$eval(".tabs button", (e) => e.map((b) => b.textContent))).indexOf("Validation");
+  await page.$$eval(".tabs button", (els, i) => els[i].click(), valIdx);
+  await page.waitForSelector(".issues", { timeout: 5000 });
+  const issues = await page.$eval(".issues", (el) => el.textContent);
+  if (!/escaped\/safe value/.test(issues))
+    fail(`lint warning not surfaced in Validation tab: ${JSON.stringify(issues.slice(0, 200))}`);
+
   if (process.exitCode) {
     console.error("smoke: one or more checks failed.");
   } else {
-    console.log(`smoke: OK — mounted, 5 tabs, preview iframe, clean validation, expanded AST trees, truthiness parity (${exe.split("/").pop()}).`);
+    console.log(`smoke: OK — mounted, 5 tabs, preview iframe, expanded AST trees, truthiness parity, safe-value lint (${exe.split("/").pop()}).`);
   }
 } finally {
   await browser.close();
