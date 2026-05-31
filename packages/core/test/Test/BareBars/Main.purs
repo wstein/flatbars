@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), ParseError(..), Value(..), foldExpr, foldTemplate, parse, parseErrorAt, spanText, splitClause, splitClauses, toValue, validate)
+import BareBars (Arity(..), Expr(..), Node(..), ParseError(..), Value(..), defaultParseOptions, foldExpr, foldTemplate, parse, parseErrorAt, parseWith, spanText, splitClause, splitClauses, toValue, validate)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -174,6 +174,31 @@ main = do
   case parse "{{{this}}}{{! @foo:bar }}" of
     Left (DirectiveAfterHeader _) -> pure unit
     _ -> assert' "directive: after-header must error" false
+
+  -- Standalone trim (on by default) removes a lone block's line; parseWith can
+  -- turn it off, and a `@trim` directive overrides the option either way.
+  let
+    contentStr = case _ of
+      Content s -> Just s
+      _ -> Nothing
+    contentOf src opts = case parseWith opts src of
+      Right { nodes } -> Array.mapMaybe contentStr nodes
+      Left _ -> [ "<error>" ]
+  -- default on: the standalone comment's line vanishes ("\nb" loses its newline).
+  assert' "trim: standalone on by default"
+    (contentOf "a\n{{! x }}\nb" defaultParseOptions == [ "a\n", "b" ])
+  -- option off: the surrounding newline is kept.
+  assert' "trim: option off keeps lines"
+    (contentOf "a\n{{! x }}\nb" { trimStandalone: false } == [ "a\n", "\nb" ])
+  -- @trim:none overrides the on-default; @trim:standalone overrides off.
+  assert' "trim: @trim:none overrides default-on"
+    (contentOf "{{! @trim:none }}a\n{{! x }}\nb" defaultParseOptions == [ "a\n", "\nb" ])
+  assert' "trim: @trim:standalone overrides option-off"
+    (contentOf "{{! @trim:standalone }}a\n{{! x }}\nb" { trimStandalone: false } == [ "a\n", "b" ])
+  -- an invalid @trim value is a BadDirective parse error.
+  case parse "{{! @trim:loose }}x" of
+    Left (BadDirective _ _) -> pure unit
+    _ -> assert' "trim: invalid @trim value must error" false
 
   -- ToValue host binding: native PureScript data lowers to the core `Value`.
   assert' "toValue String" (toValue "x" == VString "x")

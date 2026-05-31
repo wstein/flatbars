@@ -24,7 +24,9 @@ module FullBars
   , renderSurface
   , renderSurfaceWith
   , renderSurfaceDiag
+  , renderSurfaceDiagWith
   , renderSurfaceValue
+  , compileWith
   , formatError
   ) where
 
@@ -32,7 +34,7 @@ import Prelude
 
 import BareBars.Engine (runTemplate)
 import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
-import BareBars.Parser (parse)
+import BareBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import BareBars.Syntax (Directive, Ident, Template)
 import BareBars.ToValue (class ToValue, toValue)
 import BareBars.Value (Value)
@@ -74,8 +76,13 @@ runResolved directives setup nodes dat = do
 -- | Parse a core template and return a pure renderer closed over the engine.
 -- | The `@truthiness` mode is resolved once and baked into the renderer.
 compile :: String -> Either ParseError (Value -> Either Error String)
-compile src = do
-  { directives, nodes } <- parse src
+compile = compileWith defaultParseOptions
+
+-- | `compile` with explicit parse options (the CLI/config path, e.g. standalone
+-- | whitespace). A `@trim` directive still overrides the option per file.
+compileWith :: ParseOptions -> String -> Either ParseError (Value -> Either Error String)
+compileWith opts src = do
+  { directives, nodes } <- parseWith opts src
   pure \dat -> runResolved directives identity nodes dat
 
 -- | One-shot pure render: parse core source and render against prelude + data.
@@ -163,7 +170,11 @@ renderSurfaceWith partialSrcs src dat =
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
 renderSurfaceDiag :: String -> Value -> Either String String
-renderSurfaceDiag src dat = case parse src of
+renderSurfaceDiag = renderSurfaceDiagWith defaultParseOptions
+
+-- | `renderSurfaceDiag` with explicit parse options (CLI/config path).
+renderSurfaceDiagWith :: ParseOptions -> String -> Value -> Either String String
+renderSurfaceDiagWith opts src dat = case parseWith opts src of
   Left pe -> Left (renderParseErrorAt src pe)
   Right { directives, nodes } ->
     let

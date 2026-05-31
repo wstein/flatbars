@@ -277,6 +277,24 @@ main = do
     (isLeft (renderSurface "{{! @truthiness:ruby }}{{! @truthiness:lua }}x" VNull))
   assert' "truth:unknown-alias errors" (isLeft (renderSurface "{{! @truthiness:bogus }}x" VNull))
 
+  -- Standalone whitespace removal (on by default): a block open/close or comment
+  -- alone on its line leaves no blank line.
+  expect "standalone:block"
+    "a\n{{#if (lookup this \"c\")}}\nX\n{{/if}}\nb"
+    (obj [ Tuple "c" (VBool true) ])
+    "a\nX\nb"
+  expect "standalone:comment" "a\n{{! note }}\nb" VNull "a\nb"
+  -- @trim:none keeps the lines (directive overrides the default).
+  expect "standalone:trim-none-directive"
+    "{{! @trim:none }}a\n{{#if (lookup this \"c\")}}\nX\n{{/if}}\nb"
+    (obj [ Tuple "c" (VBool true) ])
+    "a\n\nX\n\nb"
+  -- a non-standalone tag (content on its line) is untouched.
+  expect "standalone:inline-untouched"
+    "a {{#if (lookup this \"c\")}}X{{/if}} b"
+    (obj [ Tuple "c" (VBool true) ])
+    "a X b"
+
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at
   -- it. The word `else` never lands in the lexer or parser.

@@ -8,13 +8,16 @@
 -- | delimiting it.
 module BareBars.Parser
   ( parse
+  , parseWith
+  , ParseOptions
+  , defaultParseOptions
   ) where
 
 import Prelude
 
 import BareBars.Error (ParseError(..))
 import BareBars.Expr (parseExpr)
-import BareBars.Lexer (RawTok(..), tokenizeTemplate)
+import BareBars.Lexer (RawTok(..), tokenizeTemplate, trimStandalone)
 import BareBars.Span (Span)
 import BareBars.Syntax (Directive, Expr(..), Node(..), Template)
 import Data.Array as Array
@@ -25,17 +28,38 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.String (trim)
 import Data.String.CodeUnits as SCU
 
--- | Parse source text into the core template *plus* its header directives. The
--- | directives are a meaning-free list the engine interprets later (see
--- | `BareBars.Syntax.Directive`); the `Template` is the node tree (comments
--- | stripped). See `docs/.../grammar.adoc`.
+-- | Knobs the *front-end* (CLI/host) sets; per-file `@`-directives may override
+-- | them. `trimStandalone` toggles Handlebars-style standalone whitespace
+-- | removal (default on); a `@trim: standalone | none` directive wins over it.
+type ParseOptions = { trimStandalone :: Boolean }
+
+-- | Standalone trimming on, matching Handlebars out of the box.
+defaultParseOptions :: ParseOptions
+defaultParseOptions = { trimStandalone: true }
+
+-- | Parse source text into the core template *plus* its header directives, with
+-- | the default options. The directives are a meaning-free list the engine
+-- | interprets later (see `BareBars.Syntax.Directive`); the `Template` is the
+-- | node tree (comments stripped). See `docs/.../grammar.adoc`.
 parse :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
-parse src = do
+parse = parseWith defaultParseOptions
+
+-- | `parse` with explicit front-end options (the CLI/config path). Whitespace is
+-- | the one concern the core owns by `@`-directive: `@trim` overrides the
+-- | supplied `trimStandalone`.
+parseWith
+  :: ParseOptions
+  -> String
+  -> Either ParseError { directives :: Array Directive, nodes :: Template }
+parseWith opts src = do
   toks <- tokenizeTemplate src
   directives <- collectDirectives toks
+  standalone <- effectiveTrim opts directives
+  let toks' = if standalone then trimStandalone toks else toks
   -- comments carry no output; drop them before the tree builder, which then
-  -- never has to know about `RComment`.
-  res <- parseSeq (Array.filter (not <<< isComment) toks) 0
+  -- never has to know about `RComment` (the standalone pass needs them, so it
+  -- runs first).
+  res <- parseSeq (Array.filter (not <<< isComment) toks') 0
   case res.stop of
     StopEOF -> Right { directives, nodes: res.nodes }
     StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
@@ -43,6 +67,21 @@ parse src = do
   isComment = case _ of
     RComment _ _ _ -> true
     _ -> false
+
+-- | The effective standalone-trim setting: a `@trim` header directive overrides
+-- | the front-end option. `@trim: standalone` ⇒ on, `@trim: none` ⇒ off; any
+-- | other value is a parse error (it is a core-acted, *syntactic* directive,
+-- | unlike the engine's semantic `@truthiness`).
+effectiveTrim :: ParseOptions -> Array Directive -> Either ParseError Boolean
+effectiveTrim opts directives = case Array.find (\d -> d.key == "trim") directives of
+  Nothing -> Right opts.trimStandalone
+  Just d -> case d.value of
+    "standalone" -> Right true
+    "none" -> Right false
+    other -> Left
+      ( BadDirective ("invalid @trim value '" <> other <> "'; expected 'standalone' or 'none'")
+          d.span.start
+      )
 
 --------------------------------------------------------------------------------
 -- Header directives

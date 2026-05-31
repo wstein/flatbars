@@ -16,17 +16,18 @@ module Cli.Main where
 
 import Prelude
 
-import BareBars (parse, renderParseErrorAt, validate)
-import BareBars.Compile.FullBars (compileCore, compileSurface) as Compile
+import BareBars (ParseOptions, parseWith, renderParseErrorAt, validate)
+import BareBars.Compile.FullBars (compileCoreWith, compileSurfaceWith) as Compile
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Map as Map
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
-import FullBars (compile, preludeSchema, renderSurfaceDiag)
+import FullBars (compileWith, preludeSchema, renderSurfaceDiagWith)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 
@@ -49,8 +50,12 @@ usage =
     , "                      as |x|) instead of core syntax — applies to render and --compile"
     , "      --validate      validate the template against the prelude schema; do not render"
     , "  -c, --compile       compile the template to a JS module (printed to stdout); do not render"
+    , "      --trim <mode>   standalone whitespace: 'standalone' (default) strips a lone block/"
+    , "                      comment line; 'none' keeps it. Overrides barebars.json; a @trim"
+    , "                      directive in the template overrides both."
     , "  -h, --help          show this help"
     , ""
+    , "Config: a barebars.json in the working directory may set { \"trim\": \"standalone\" | \"none\" }."
     , "Core syntax: {{{ lookup this \"x\" }}}, {{#each …}}, …. Surface (--surface): {{ x }}, a.b.c, …."
     , "The compiled module's default export is `function (data, rt)`; pair it with"
     , "the runtime at packages/compile/runtime/barebars-runtime.mjs."
@@ -67,6 +72,7 @@ type Options =
   , validateOnly :: Boolean
   , compileOnly :: Boolean
   , surface :: Boolean
+  , trim :: Maybe Boolean -- --trim override; Nothing ⇒ config/default decides
   }
 
 main :: Effect Unit
@@ -86,6 +92,7 @@ parseArgs =
     , validateOnly: false
     , compileOnly: false
     , surface: false
+    , trim: Nothing
     }
   where
   go acc args = case Array.uncons args of
@@ -96,6 +103,7 @@ parseArgs =
         , validateOnly: acc.validateOnly
         , compileOnly: acc.compileOnly
         , surface: acc.surface
+        , trim: acc.trim
         }
       Nothing -> Help
     Just { head, tail } -> case head of
@@ -104,6 +112,11 @@ parseArgs =
       "--validate" -> go (acc { validateOnly = true }) tail
       flag | flag == "-c" || flag == "--compile" -> go (acc { compileOnly = true }) tail
       flag | flag == "-s" || flag == "--surface" -> go (acc { surface = true }) tail
+      "--trim" -> case Array.uncons tail of
+        Just { head: "standalone", tail: rest } -> go (acc { trim = Just true }) rest
+        Just { head: "none", tail: rest } -> go (acc { trim = Just false }) rest
+        Just _ -> Invalid "--trim expects 'standalone' or 'none'"
+        Nothing -> Invalid "--trim requires a value ('standalone' or 'none')"
       flag | flag == "-d" || flag == "--data" -> case Array.uncons tail of
         Just { head: file, tail: rest } -> go (acc { dataFile = Just file }) rest
         Nothing -> Invalid (flag <> " requires a file argument")
@@ -116,33 +129,36 @@ run opts = do
   tplE <- readFileSafe opts.template
   case tplE of
     Left err -> die ("barebars: cannot read template '" <> opts.template <> "': " <> err)
-    Right tpl ->
-      if opts.compileOnly then runCompile opts tpl
-      else if opts.validateOnly then runValidate tpl
+    Right tpl -> do
+      -- precedence: --trim flag > barebars.json > built-in default (on).
+      configTrim <- loadConfigTrim
+      let popts = { trimStandalone: fromMaybe true (firstJust opts.trim configTrim) }
+      if opts.compileOnly then runCompile popts opts tpl
+      else if opts.validateOnly then runValidate popts tpl
       else do
         datE <- loadData opts.dataFile
         case datE of
           Left err -> die ("barebars: " <> err)
           Right value
-            | opts.surface -> case renderSurfaceDiag tpl value of
+            | opts.surface -> case renderSurfaceDiagWith popts tpl value of
                 Left err -> die ("barebars: " <> opts.template <> ": " <> err)
                 Right out -> writeStdout out
-            | otherwise -> case compile tpl of
+            | otherwise -> case compileWith popts tpl of
                 Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
                 Right render -> case render value of
                   Left err -> die ("barebars: " <> show err)
                   Right out -> writeStdout out
 
 -- | Compile a template to a JS ES module and print it to stdout (surface or core).
-runCompile :: Options -> String -> Effect Unit
-runCompile opts tpl =
-  case (if opts.surface then Compile.compileSurface else Compile.compileCore) tpl of
+runCompile :: ParseOptions -> Options -> String -> Effect Unit
+runCompile popts opts tpl =
+  case (if opts.surface then Compile.compileSurfaceWith else Compile.compileCoreWith) popts tpl of
     Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
     Right js -> writeStdout js
 
 -- | Run the skeleton-AST validation pass and report issues.
-runValidate :: String -> Effect Unit
-runValidate tpl = case parse tpl of
+runValidate :: ParseOptions -> String -> Effect Unit
+runValidate popts tpl = case parseWith popts tpl of
   Left err -> die ("barebars: parse error at " <> renderParseErrorAt tpl err)
   Right { nodes: template } -> case validate preludeSchema template of
     [] -> writeStdout "ok: no issues\n"
@@ -163,6 +179,25 @@ loadData = case _ of
       Right content -> case parseValue content of
         Left err -> Left ("invalid JSON in '" <> file <> "': " <> err)
         Right value -> Right value
+
+-- | Read the standalone-trim setting from `barebars.json` in the working
+-- | directory, if present: `{ "trim": "standalone" | "none" }`. A missing/
+-- | unreadable/malformed file or absent key yields `Nothing` (use the default).
+loadConfigTrim :: Effect (Maybe Boolean)
+loadConfigTrim = do
+  e <- readFileSafe "barebars.json"
+  pure case e of
+    Left _ -> Nothing
+    Right content -> case parseValue content of
+      Right (VObject m) -> case Map.lookup "trim" m of
+        Just (VString "standalone") -> Just true
+        Just (VString "none") -> Just false
+        _ -> Nothing
+      _ -> Nothing
+
+firstJust :: forall a. Maybe a -> Maybe a -> Maybe a
+firstJust (Just a) _ = Just a
+firstJust Nothing b = b
 
 readFileSafe :: String -> Effect (Either String String)
 readFileSafe path = do

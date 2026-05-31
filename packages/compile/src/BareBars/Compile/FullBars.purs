@@ -11,7 +11,9 @@
 module BareBars.Compile.FullBars
   ( fullbarsEmit
   , compileCore
+  , compileCoreWith
   , compileSurface
+  , compileSurfaceWith
   , runtimeVersion
   ) where
 
@@ -19,7 +21,7 @@ import Prelude
 
 import BareBars.Compile (Ctx, Emit, Rec, compile, jsString)
 import BareBars.Error (ParseError)
-import BareBars.Parser (parse)
+import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import BareBars.Syntax (Expr(..), Ident, Template)
 import BareBars.Value (Value(..))
 import BareBars.Walk (Clause, splitClauses)
@@ -40,14 +42,23 @@ runtimeVersion = "0.1.0"
 -- | an `{{#inline}}` block is a no-op and a `{{> }}`/`partial` to an
 -- | unregistered name is a runtime error, exactly as in the interpreter.
 compileCore :: String -> Either ParseError String
-compileCore src = (\{ nodes } -> compile { runtimeVersion } fullbarsEmit [] nodes) <$> parse src
+compileCore = compileCoreWith defaultParseOptions
+
+-- | `compileCore` with explicit parse options (CLI/config: standalone trim).
+compileCoreWith :: ParseOptions -> String -> Either ParseError String
+compileCoreWith opts src =
+  (\{ nodes } -> compile { runtimeVersion } fullbarsEmit [] nodes) <$> parseWith opts src
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
 -- | `{{#inline}}` definitions into the partial registry (as `renderSurfaceWith`
 -- | does), then emit. The emit rules are dialect-pure — they only ever see core.
 compileSurface :: String -> Either ParseError String
-compileSurface src = (\{ nodes } -> emitSurface nodes) <$> parse src
+compileSurface = compileSurfaceWith defaultParseOptions
+
+-- | `compileSurface` with explicit parse options (CLI/config: standalone trim).
+compileSurfaceWith :: ParseOptions -> String -> Either ParseError String
+compileSurfaceWith opts src = (\{ nodes } -> emitSurface nodes) <$> parseWith opts src
   where
   emitSurface tmpl =
     let

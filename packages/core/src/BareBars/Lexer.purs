@@ -12,6 +12,7 @@
 module BareBars.Lexer
   ( RawTok(..)
   , tokenizeTemplate
+  , trimStandalone
   ) where
 
 import Prelude
@@ -88,6 +89,104 @@ trimStartWs s = SCU.fromCharArray (Array.dropWhile isSpace (SCU.toCharArray s))
 trimEndWs :: String -> String
 trimEndWs s =
   SCU.fromCharArray (Array.reverse (Array.dropWhile isSpace (Array.reverse (SCU.toCharArray s))))
+
+--------------------------------------------------------------------------------
+-- Standalone whitespace removal (Handlebars-style)
+--------------------------------------------------------------------------------
+
+-- | Strip the line a "standalone" tag sits on: when a block open/close or a
+-- | comment is alone on its line (only whitespace before it back to a newline or
+-- | the start, and only whitespace after it to a newline or the end), remove
+-- | that indentation and the trailing newline so the tag leaves no blank line.
+-- |
+-- | Only `{{#…}}` / `{{/…}}` / `{{! }}` are eligible. Output tags (`{{ }}` /
+-- | `{{{ }}}`) and bare separators (`RSep`) are *not* — at the structural level a
+-- | `{{ x }}` separator is indistinguishable from surface output, so trimming it
+-- | could eat real content. (`{{else}}`-standalone therefore needs dialect clause
+-- | knowledge and is deferred.) Composes with `~`: it runs on the already
+-- | tilde-trimmed content.
+trimStandalone :: Array RawTok -> Array RawTok
+trimStandalone toks = Array.mapWithIndex trimContent toks
+  where
+  n = Array.length toks
+
+  trimContent :: Int -> RawTok -> RawTok
+  trimContent j = case _ of
+    RContent s ->
+      let
+        -- the tag *before* this content is standalone ⇒ drop its trailing line.
+        s1 = if standaloneAt (j - 1) then dropLeadingLine s else s
+        -- the tag *after* this content is standalone ⇒ drop this line's indent.
+        s2 = if standaloneAt (j + 1) then dropTrailingIndent s1 else s1
+      in
+        RContent s2
+    other -> other
+
+  standaloneAt :: Int -> Boolean
+  standaloneAt i = case Array.index toks i of
+    Just t | blockLevel t -> leftBlank i && rightBlank i
+    _ -> false
+
+  -- everything from the previous newline (or start of input) to the tag is blank.
+  leftBlank :: Int -> Boolean
+  leftBlank i = case Array.index toks (i - 1) of
+    Nothing -> true
+    Just (RContent s) -> allWs (afterLastNL s)
+    Just _ -> false
+
+  -- everything from the tag to the next newline (or end of input) is blank.
+  rightBlank :: Int -> Boolean
+  rightBlank i = case Array.index toks (i + 1) of
+    Nothing -> true
+    Just (RContent s)
+      | hasNL s -> allWs (beforeFirstNL s)
+      | otherwise -> allWs s && i + 1 == n - 1
+    Just _ -> false
+
+blockLevel :: RawTok -> Boolean
+blockLevel = case _ of
+  ROpen _ _ _ -> true
+  RClose _ _ _ -> true
+  RComment _ _ _ -> true
+  _ -> false
+
+allWs :: String -> Boolean
+allWs = Array.all isSpace <<< SCU.toCharArray
+
+hasNL :: String -> Boolean
+hasNL s = nlIndex true s /= Nothing
+
+-- index of the first ('true') or last ('false') newline, in code units.
+nlIndex :: Boolean -> String -> Maybe Int
+nlIndex first s =
+  let
+    f = if first then Array.findIndex else Array.findLastIndex
+  in
+    f (_ == '\n') (SCU.toCharArray s)
+
+afterLastNL :: String -> String
+afterLastNL s = case nlIndex false s of
+  Just i -> SCU.drop (i + 1) s
+  Nothing -> s
+
+beforeFirstNL :: String -> String
+beforeFirstNL s = case nlIndex true s of
+  Just i -> SCU.take i s
+  Nothing -> s
+
+-- drop the leading blank run through the first newline (the standalone tag's
+-- line break); with no newline it is trailing EOF whitespace, dropped whole.
+dropLeadingLine :: String -> String
+dropLeadingLine s = case nlIndex true s of
+  Just i -> SCU.drop (i + 1) s
+  Nothing -> ""
+
+-- drop the trailing blank indentation after the last newline (keep the newline);
+-- with no newline the whole run is indentation on the first line, dropped whole.
+dropTrailingIndent :: String -> String
+dropTrailingIndent s = case nlIndex false s of
+  Just i -> SCU.take (i + 1) s
+  Nothing -> ""
 
 --------------------------------------------------------------------------------
 -- Template tokenizer

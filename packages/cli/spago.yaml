@@ -7,6 +7,7 @@ package:
     - maybe
     - either
     - strings
+    - ordered-collections
     - node-fs
     - node-buffer
     - exceptions

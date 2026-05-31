@@ -33,6 +33,8 @@ data ParseError
   | LexError String Int
   -- a `{{! @directive }}` after the header (the first non-comment tag)
   | DirectiveAfterHeader Int
+  -- a core-acted header directive (e.g. `@trim`) with an invalid value
+  | BadDirective String Int
 
 derive instance eqParseError :: Eq ParseError
 
@@ -56,6 +58,7 @@ parseErrorMessage = case _ of
   LexError msg _ -> "LexError: " <> msg
   DirectiveAfterHeader _ ->
     "DirectiveAfterHeader: a {{! @directive }} must precede the first tag"
+  BadDirective msg _ -> "BadDirective: " <> msg
 
 renderParseError :: ParseError -> String
 renderParseError pe = parseErrorMessage pe <> " (at " <> show (parseErrorOffset pe) <> ")"
@@ -72,6 +75,7 @@ parseErrorOffset = case _ of
   BadEscape o -> o
   LexError _ o -> o
   DirectiveAfterHeader o -> o
+  BadDirective _ o -> o
 
 -- | A parse error located in its source: 1-based `line`/`column` (via
 -- | `Span.lineColumn`), the raw `offset`, and the rendered `message`. Enough for
