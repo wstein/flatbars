@@ -1,7 +1,7 @@
 = 6. The reference engine (prelude)
 :navtitle: 6. The reference engine
 
-The *reference engine* is a Phase-2 walk (xref:evaluation.adoc[]) plus a set of helpers that,
+The *reference engine*, *FlatBars*, is a Phase-2 walk (xref:evaluation.adoc[]) plus a set of helpers that,
 together with the xref:surface.adoc[surface dialect], reproduces {hb}. *None of it is in the core.*
 It is a library you register into the helper environment. Delete `each` and `pass:[{{#each}}]` stops
 validating; the core is unaffected. Rename `esc_html` and update your Surface. This is what "no

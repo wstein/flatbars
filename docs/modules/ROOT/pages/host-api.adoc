@@ -32,7 +32,7 @@ desugar      :: Template -> Template                          -- structural AST 
 runTemplate  :: forall m env. Monad m            => Engine m env -> Template -> m String
 runString    :: forall m env. MonadThrow Error m => Engine m env -> String   -> m String
 
--- The reference engine (one choice of m/env; Ch. 6), parametric in the monad
+-- The reference engine, FlatBars (one choice of m/env; Ch. 6), parametric in the monad
 emptyEnv     :: forall m. Value -> RefEnv m
 register     :: forall m. Ident -> Helper m (RefEnv m) -> RefEnv m -> RefEnv m
 registerAll  :: forall m. Array (Tuple Ident (Helper m (RefEnv m))) -> RefEnv m -> RefEnv m
@@ -41,7 +41,7 @@ prelude      :: forall m. MonadThrow Error m => Array (Tuple Ident (Helper m (Re
 
 -- Validation (the JSON-Schema-style pass) and analysis
 validate     :: Schema -> Template -> Array Issue             -- schema = engine's contract
-preludeSchema :: Schema                                       -- the reference engine's schema
+preludeSchema :: Schema                                       -- FlatBars's schema (from FlatBars)
 foldTemplate :: Algebra a -> Template -> a                    -- catamorphism: prepare / analyze (A.13.2)
 splitClause  :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
 
@@ -50,7 +50,7 @@ type Span    = { start :: Int, end :: Int }
 spanText     :: String -> Span -> String                      -- the source text a span covers
 lineColumn   :: String -> Int -> { line :: Int, column :: Int } -- 1-based, for an offset
 
--- Convenience instantiations of the reference engine
+-- Convenience instantiations of the reference engine (from FlatBars)
 compile      :: String -> Either ParseError (Value -> Either Error String)   -- pure (m = Either Error)
 renderWith   :: String -> Value -> Either String String                      -- pure, errors as text
 renderAff    :: String -> Value -> Aff (Either Error String)                 -- async (m = ExceptT Error Aff)

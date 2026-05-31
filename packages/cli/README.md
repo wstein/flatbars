@@ -37,4 +37,4 @@ Templates use core syntax — `{{{ lookup this "x" }}}`, `{{#each …}}`, and
 name-agnostic *separator* — the parser keeps it as a structural marker and the
 prelude `if`/`each`/`with` split their body at it. The full surface dialect
 (`{{ x }}` auto-escape, dotted paths) is a future extension of the desugaring
-walk; see [`BareBars.Lower`](../core/src/BareBars/Lower.purs).
+walk; see [`FlatBars.Lower`](../flatbars/src/FlatBars/Lower.purs).

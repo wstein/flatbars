@@ -514,7 +514,8 @@ Both invert control. Pick `runTemplate` to *execute*, `foldTemplate` to *prepare
 ====
 *What v1 ships.* The polymorphic `Engine m env` / `Ctl m env` / `Helper m env` and the drivers
 `runTemplate` (`Monad m`) and `runString` (`MonadThrow Error m`) are implemented as shown. The
-reference engine is supplied at both `m = Either Error` (`renderWith`/`compile`) and
+reference engine, *FlatBars*, supplies these instantiations (`renderWith`/`compile`/`renderAff` from
+`FlatBars`) at both `m = Either Error` (`renderWith`/`compile`) and
 `m = ExceptT Error Aff` (`renderAff`), proving the monad is pluggable; its environment is the newtype
 `RefEnv m` (a type *synonym* `Env = { … Helper … Env }` would be cyclic — use a newtype). The handle
 carries a `span` (the opening tag's code-unit range; `Span.lineColumn` maps it to line/column), and

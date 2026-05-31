@@ -112,7 +112,7 @@ parser. A separator's head may not begin with the reserved sigils `# / ! {` (tho
 A few consequences the parser does *not* legislate, leaving them to the engine:
 
 * *Standalone separator.* A `Sep` with no enclosing block to interpret it is not a parse error; the
-  reference engine renders it as the application of its head, i.e. `pass:[{{x}}]` ≡ `pass:[{{{x}}}]`
+  reference engine (*FlatBars*) renders it as the application of its head, i.e. `pass:[{{x}}]` ≡ `pass:[{{{x}}}]`
   when not consumed (xref:evaluation.adoc[] §3.5). A standalone `pass:[{{else}}]` thus just invokes
   the (inert) `else` helper and yields nothing.
 * *Repeated separators.* A block may contain several `Sep` nodes (`pass:[{{case}}]` … `pass:[{{case}}]`

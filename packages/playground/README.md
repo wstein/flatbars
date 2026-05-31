@@ -53,7 +53,7 @@ deploy, build and publish the `dist/` directory as static files — or just open
 
 - Templates use **core syntax**; control flow uses `{{else}}` separators
   (`{{#if c}}…{{else}}…{{/if}}`). The full surface dialect (`{{ x }}` auto-escape,
-  dotted paths) is a future extension of the desugaring walk (`BareBars.Lower`);
+  dotted paths) is a future extension of the desugaring walk (`FlatBars.Lower`);
   the **Real AST** tab already shows that walk's output for the supported core.
 - The richer JS/WASM reference playground lives in [`reference/web/`](../../reference/web/);
-  this package is the PureScript equivalent built on the reference engine.
+  this package is the PureScript equivalent built on the reference engine, FlatBars.

@@ -15,7 +15,7 @@ validates the tree against the engine's rules and interprets it — precisely th
 between a JSON document and a JSON Schema. BareBars defines the tree and the walking contract; the
 engine defines the schema and the interpreter.
 
-Everything below describes the *reference engine's* interpretation. A different engine may choose
+Everything below describes the interpretation of the reference engine, *FlatBars*. A different engine may choose
 differently; the core does not care.
 
 == 1. Everything is a helper application
