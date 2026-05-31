@@ -245,7 +245,6 @@
         "core": {
           "dependencies": [
             "argonaut",
-            "argonaut-core",
             "barebars",
             "either",
             "foreign-object",

@@ -361,9 +361,11 @@ a pre-lexer transform, but it is not in the core or the reference Surface.
 
 [CAUTION]
 ====
-*Not yet implemented.* FlatBars ships no decorator helpers (including `inline`); the mapping below is
-the design (xref:flatbars-compat.adoc[compatibility matrix] §3). Because a decorator is just a block
-helper here, no grammar or core change is needed to add them.
+*Not yet implemented.* FlatBars ships no *decorator* helpers; the mapping below is the design
+(xref:flatbars-compat.adoc[compatibility matrix] §3). Because a decorator is just a block helper
+here, no grammar or core change is needed to add them. (Inline *partials* — Handlebars' decorator-like
+`pass:[{{#*inline}}]` — *are* implemented, but as the ordinary block helper `pass:[{{#inline}}]`,
+not via a decorator mechanism; see xref:prelude.adoc[] §6.6.)
 ====
 
 {hbs} decorators (`pass:[{{#*helper}}]`, `pass:[{{*helper}}]`) modify a block or its `options`. BareBars

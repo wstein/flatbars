@@ -8,6 +8,7 @@ module BareBars.Error
   ( ParseError(..)
   , Error(..)
   , renderParseError
+  , parseErrorMessage
   , renderError
   , parseErrorOffset
   , ParseDiagnostic
@@ -36,17 +37,24 @@ derive instance eqParseError :: Eq ParseError
 instance showParseError :: Show ParseError where
   show = renderParseError
 
+-- | The message for a parse error *without* a location. `renderParseError`
+-- | appends `(at offset)`; the located forms (`parseErrorAt` /
+-- | `renderParseErrorAt`) carry the position separately, so they use this and
+-- | do not repeat the offset.
+parseErrorMessage :: ParseError -> String
+parseErrorMessage = case _ of
+  UnterminatedTag _ -> "UnterminatedTag: opener with no closer"
+  UnterminatedComment _ -> "UnterminatedComment: {{! with no }}"
+  UnterminatedRaw _ -> "UnterminatedRaw: {{{{#name}}}} with no matching close"
+  MismatchedBlock open close _ ->
+    "MismatchedBlock: {{/" <> close <> "}} closing {{#" <> open <> "}}"
+  HeadNotIdent _ -> "HeadNotIdent: an application head must be an identifier"
+  EmptyOutput _ -> "EmptyOutput: {{{}}} with no expression"
+  BadEscape _ -> "BadEscape: invalid string escape"
+  LexError msg _ -> "LexError: " <> msg
+
 renderParseError :: ParseError -> String
-renderParseError = case _ of
-  UnterminatedTag o -> "UnterminatedTag: opener with no closer (at " <> show o <> ")"
-  UnterminatedComment o -> "UnterminatedComment: {{! with no }} (at " <> show o <> ")"
-  UnterminatedRaw o -> "UnterminatedRaw: {{{{#name}}}} with no matching close (at " <> show o <> ")"
-  MismatchedBlock open close o ->
-    "MismatchedBlock: {{/" <> close <> "}} closing {{#" <> open <> "}} (at " <> show o <> ")"
-  HeadNotIdent o -> "HeadNotIdent: an application head must be an identifier (at " <> show o <> ")"
-  EmptyOutput o -> "EmptyOutput: {{{}}} with no expression (at " <> show o <> ")"
-  BadEscape o -> "BadEscape: invalid string escape (at " <> show o <> ")"
-  LexError msg o -> "LexError: " <> msg <> " (at " <> show o <> ")"
+renderParseError pe = parseErrorMessage pe <> " (at " <> show (parseErrorOffset pe) <> ")"
 
 -- | The source code-unit offset a parse error points at.
 parseErrorOffset :: ParseError -> Int
@@ -72,7 +80,7 @@ parseErrorAt src pe =
     offset = parseErrorOffset pe
     { line, column } = lineColumn src offset
   in
-    { line, column, offset, message: renderParseError pe }
+    { line, column, offset, message: parseErrorMessage pe }
 
 -- | Render a parse error prefixed with `line:column:`, given its source.
 renderParseErrorAt :: String -> ParseError -> String

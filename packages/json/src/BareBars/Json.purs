@@ -10,8 +10,7 @@ module BareBars.Json
 import Prelude
 
 import BareBars.Value (Value(..))
-import Data.Argonaut.Core (Json, caseJson, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
-import Data.Argonaut.Parser (jsonParser)
+import Data.Argonaut (Json, caseJson, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull, jsonParser)
 import Data.Either (Either)
 import Data.Map as Map
 import Data.Tuple (Tuple(..))

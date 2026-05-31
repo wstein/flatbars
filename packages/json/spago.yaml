@@ -11,10 +11,11 @@ package:
     - either
     - tuples
     - ordered-collections
-    - argonaut-core
-    # `argonaut` umbrella: pulls in `argonaut-parser` (Data.Argonaut.Parser),
-    # which has no standalone package-set entry. --pedantic-packages flags this
-    # as "unused" (no `argonaut` module is imported directly) — keep it anyway.
+    # The `argonaut` umbrella re-exports Core + Parser through its own
+    # `Data.Argonaut` module, which is what `BareBars.Json` imports. Depending on
+    # the umbrella (rather than `argonaut-core` directly) means the declared dep
+    # is the one actually imported, so `--pedantic-packages` stays green —
+    # `argonaut-parser` (for `jsonParser`) has no standalone package-set entry.
     - argonaut
     - foreign-object
     - barebars
