@@ -1542,6 +1542,7 @@
       // file with a stale cached adapter module.
       import { createRenderer } from "./stem.mjs?v=1";
       import { createHandlebarsRenderer } from "./handlebars.mjs?v=2";
+      import { createBareBarsRenderer } from "./barebars.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
       import {
@@ -1627,14 +1628,15 @@
       // calls return the identical renderer shape, so everything downstream
       // stays engine-agnostic — the panel gate (below) hides whatever the chosen
       // engine doesn't back.
+      const ENGINE_PARAM = new URLSearchParams(location.search).get("engine");
       const ENGINE =
-        ["handlebars", "hbs"].includes(new URLSearchParams(location.search).get("engine"))
-          ? "handlebars"
-          : "stem";
+        ["handlebars", "hbs"].includes(ENGINE_PARAM) ? "handlebars"
+        : ["barebars", "bb"].includes(ENGINE_PARAM) ? "barebars"
+        : "stem";
       const renderer =
-        ENGINE === "handlebars"
-          ? await createHandlebarsRenderer()
-          : await createRenderer(await (await fetch(WASM)).arrayBuffer());
+        ENGINE === "handlebars" ? await createHandlebarsRenderer()
+        : ENGINE === "barebars" ? await createBareBarsRenderer()
+        : await createRenderer(await (await fetch(WASM)).arrayBuffer());
       // Show the engine + its version (the Stem build bakes it into the wasm;
       // the Handlebars adapter reports the vendored library version).
       byId("brand-ver").textContent =
