@@ -90,4 +90,19 @@ export const cases = [
   { name: "p:inline-ctx", dialect: "surface", t: "{{#inline \"greet\"}}Hi {{ name }}!{{/inline}}{{> greet user}}", d: { user: { name: "Ada" } } },
   { name: "p:inline-hash", dialect: "surface", t: "{{#inline \"tag\"}}<{{ kind }}>{{/inline}}{{> tag this kind=\"b\"}}", d: {} },
   { name: "p:inline-nested", dialect: "surface", t: "{{#inline \"a\"}}A{{> b}}{{/inline}}{{#inline \"b\"}}B{{/inline}}{{> a}}", d: {} },
+
+  // ── @truthiness modes (compiled per-mode codegen vs interpreter) ─────────────
+  { name: "t:default-zero-falsy", dialect: "surface", t: "{{#if n}}y{{else}}m{{/if}}", d: { n: 0 } },
+  { name: "t:minimal-zero-truthy", dialect: "surface", t: "{{! @truthiness:minimal }}{{#if n}}y{{else}}m{{/if}}", d: { n: 0 } },
+  { name: "t:minimal-empty-string", dialect: "surface", t: "{{! @truthiness:minimal }}{{#if s}}y{{else}}m{{/if}}", d: { s: "" } },
+  { name: "t:presence-empty-array", dialect: "surface", t: "{{! @truthiness:presence }}{{#if xs}}y{{else}}m{{/if}}", d: { xs: [] } },
+  { name: "t:presence-empty-object", dialect: "surface", t: "{{! @truthiness:presence }}{{#if o}}y{{else}}m{{/if}}", d: { o: {} } },
+  { name: "t:always-false-truthy", dialect: "surface", t: "{{! @truthiness:always }}{{#if b}}y{{else}}m{{/if}}", d: { b: false } },
+  { name: "t:explicit-list", dialect: "surface", t: "{{! @truthiness: false null }}{{#if n}}y{{else}}m{{/if}}", d: { n: 0 } },
+  { name: "t:and-retuned", dialect: "surface", t: "{{! @truthiness:minimal }}{{{ and 0 5 }}}", d: null },
+  { name: "t:not-retuned", dialect: "surface", t: "{{! @truthiness:minimal }}{{{ not 0 }}}", d: null },
+  { name: "t:includeZero-compose", dialect: "surface", t: "{{! @truthiness:empty }}{{#if n includeZero=true}}y{{else}}m{{/if}}", d: { n: 0 } },
+  { name: "t:with-empty-array-minimal", dialect: "surface", t: "{{! @truthiness:minimal }}{{#with xs}}has{{else}}none{{/with}}", d: { xs: [] } },
+  { name: "t:core-minimal", dialect: "core", t: "{{! @truthiness:minimal }}{{#if (lookup this \"n\")}}y{{else}}m{{/if}}", d: { n: 0 } },
+  { name: "t:each-body-inherits-mode", dialect: "surface", t: "{{! @truthiness:minimal }}{{#each xs}}{{#if this}}t{{else}}f{{/if}}{{/each}}", d: { xs: [0, 1] } },
 ];

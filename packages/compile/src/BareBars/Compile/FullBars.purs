@@ -20,17 +20,19 @@ module BareBars.Compile.FullBars
 import Prelude
 
 import BareBars.Compile (Ctx, Emit, Rec, compile, jsString)
-import BareBars.Error (ParseError)
+import BareBars.Error (Error(..), ParseError(..))
 import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
-import BareBars.Syntax (Expr(..), Ident, Template)
+import BareBars.Syntax (Directive, Expr(..), Ident, Template)
 import BareBars.Value (Value(..))
 import BareBars.Walk (Clause, splitClauses)
 import Data.Array as Array
+import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Set as Set
 import Data.String (joinWith)
-import FullBars (desugarSurface, hoistInline)
+import FullBars (FalsySet, FalsyShape(..), desugarSurface, hoistInline, resolveTruthiness)
 
 -- | The runtime contract version, recorded in the compiled header and checked by
 -- | `barebars-runtime.mjs`. Bump on any runtime-incompatible codegen change.
@@ -46,8 +48,10 @@ compileCore = compileCoreWith defaultParseOptions
 
 -- | `compileCore` with explicit parse options (CLI/config: standalone trim).
 compileCoreWith :: ParseOptions -> String -> Either ParseError String
-compileCoreWith opts src =
-  (\{ nodes } -> compile { runtimeVersion } fullbarsEmit [] nodes) <$> parseWith opts src
+compileCoreWith opts src = do
+  { directives, nodes } <- parseWith opts src
+  fs <- resolveForCompile directives
+  pure (compile (metaFor fs) fullbarsEmit [] nodes)
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
@@ -58,13 +62,47 @@ compileSurface = compileSurfaceWith defaultParseOptions
 
 -- | `compileSurface` with explicit parse options (CLI/config: standalone trim).
 compileSurfaceWith :: ParseOptions -> String -> Either ParseError String
-compileSurfaceWith opts src = (\{ nodes } -> emitSurface nodes) <$> parseWith opts src
+compileSurfaceWith opts src = do
+  { directives, nodes } <- parseWith opts src
+  fs <- resolveForCompile directives
+  let h = hoistInline (desugarSurface nodes)
+  pure (compile (metaFor fs) fullbarsEmit (Map.toUnfoldable h.partials) h.template)
+
+-- | The compile metadata: the runtime version, a module-level `$falsy` constant
+-- | (the file's resolved truthiness mode), and the root-frame seed that hands
+-- | `$falsy` to `rt.scope`. Inline partials reference the same module const, so
+-- | they inherit the file's mode (Phase 3 parity in the compiled path).
+metaFor :: FalsySet -> { runtimeVersion :: String, preamble :: String, seed :: String }
+metaFor fs =
+  { runtimeVersion
+  , preamble: "const $falsy = " <> falsyLiteral fs <> ";\n"
+  , seed: "rt.scope(data, $falsy)"
+  }
+
+-- | Resolve the file's `@truthiness` mode for codegen, mapping a resolution
+-- | error into the compiler's `ParseError` channel (a located `BadDirective`).
+resolveForCompile :: Array Directive -> Either ParseError FalsySet
+resolveForCompile = lmap toParseError <<< resolveTruthiness
   where
-  emitSurface tmpl =
-    let
-      h = hoistInline (desugarSurface tmpl)
-    in
-      compile { runtimeVersion } fullbarsEmit (Map.toUnfoldable h.partials) h.template
+  toParseError = case _ of
+    DirectiveError m o -> BadDirective m o
+    e -> BadDirective (show e) 0
+
+-- | The falsy-set as a JS object literal `{ b:1, n:1, … }` — one key per present
+-- | shape (false/null/""/0/[]/{}); the runtime reads `!!set.<k>`. Mirrors
+-- | `FullBars.Value.isFalsy` so the compiled path matches the interpreter.
+falsyLiteral :: FalsySet -> String
+falsyLiteral fs = "{ " <> joinWith ", " (Array.mapMaybe flag shapes) <> " }"
+  where
+  shapes = [ FFalse, FNull, FEmptyStr, FZero, FEmptyArr, FEmptyObj ]
+  flag sh = if Set.member sh fs then Just (key sh <> ": 1") else Nothing
+  key = case _ of
+    FFalse -> "b"
+    FNull -> "n"
+    FEmptyStr -> "s"
+    FZero -> "z"
+    FEmptyArr -> "a"
+    FEmptyObj -> "o"
 
 fullbarsEmit :: Emit
 fullbarsEmit = { expr: fbExpr, block: fbBlock }
@@ -128,8 +166,10 @@ fbBlock rec ctx name args body = case name of
 -- `rt.truthyWith`.
 truthyTest :: Rec -> Ctx -> Array Expr -> String
 truthyTest rec ctx args = case args of
-  [ c ] -> "rt.truthy(" <> rec.expr ctx c <> ")"
-  [ c, opts ] -> "rt.truthyWith(" <> rec.expr ctx c <> ", " <> rec.expr ctx opts <> ")"
+  [ c ] -> "rt.truthy(" <> ctx.scope <> ".falsy, " <> rec.expr ctx c <> ")"
+  [ c, opts ] ->
+    "rt.truthyWith(" <> ctx.scope <> ".falsy, " <> rec.expr ctx c <> ", " <> rec.expr ctx opts <>
+      ")"
   _ -> "false"
 
 -- `if`/`unless`: branches share the current frame (no context shift), so they
@@ -147,7 +187,7 @@ elseChain rec ctx clauses = case Array.uncons clauses of
   Nothing -> ""
   Just { head: cl, tail } -> case cl.name, cl.args of
     "elif", [ cond ] ->
-      " else if (rt.truthy(" <> rec.expr ctx cond <> ")) {\n"
+      " else if (rt.truthy(" <> ctx.scope <> ".falsy, " <> rec.expr ctx cond <> ")) {\n"
         <> rec.nodes ctx cl.body
         <> "  }"
         <> elseChain rec ctx tail

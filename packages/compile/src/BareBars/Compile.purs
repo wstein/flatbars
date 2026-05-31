@@ -67,13 +67,23 @@ type Emit =
 -- | `{}`, so a caller may invoke `fn(data, rt)`; the main function augments it
 -- | with its inline definitions, and each partial receives the registry too (so
 -- | nested partials resolve).
+-- |
+-- | `preamble` is opaque dialect JS injected at module top (e.g. FullBars' falsy
+-- | -set const), and `seed` is the JS expression building the root frame from
+-- | `data` (default `rt.scope(data)`; FullBars seeds it with the falsy-set). The
+-- | driver treats both as opaque strings — it stays meaning-free.
 compile
-  :: { runtimeVersion :: String } -> Emit -> Array (Tuple String Template) -> Template -> String
+  :: { runtimeVersion :: String, preamble :: String, seed :: String }
+  -> Emit
+  -> Array (Tuple String Template)
+  -> Template
+  -> String
 compile meta emit partials main =
   "// barebars-compiled — runtime " <> meta.runtimeVersion <> "\n"
     <> "export const runtimeVersion = "
     <> jsString meta.runtimeVersion
     <> ";\n"
+    <> meta.preamble -- dialect module-level declarations (e.g. the falsy-set const)
     <> "export default "
     <> fn true main
     <> "\n"
@@ -92,7 +102,9 @@ compile meta emit partials main =
   fn withRegistry t =
     "function (data, rt, partials) {\n  partials = partials || {};\n"
       <> (if withRegistry then registry else "")
-      <> "  let out = \"\";\n  const c0 = rt.scope(data);\n"
+      <> "  let out = \"\";\n  const c0 = "
+      <> meta.seed
+      <> ";\n"
       <> rec.nodes { scope: "c0", depth: 0 } t
       <> "  return out;\n}"
 

@@ -17,6 +17,7 @@ package:
     - fullbars
     - ordered-collections
     - tuples
+    - bifunctors
   test:
     main: Test.BareBars.Compile.Main
     dependencies:

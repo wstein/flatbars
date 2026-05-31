@@ -40,17 +40,26 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
 
-// ── truthiness (FullBars.Value.truthy) — content-based for Safe ──────────────
-function truthy(v) {
-  if (isSafe(v)) return truthy(v.s);              // a safe string tests as its content
-  if (v === null || v === undefined) return false;
+// ── truthiness (FullBars.Value) — parameterised by a falsy-set ───────────────
+// A *set* is `{ b,n,s,z,a,o }` of booleans for the six falsy shapes
+// (false / null / "" / 0 / [] / {}); an absent key ⇒ that shape is NOT falsy.
+// `HB` is the Handlebars default, used for runtime-internal/config truthiness
+// (e.g. the `pretty` option) that is not governed by a file's @truthiness.
+const HB = { b: 1, n: 1, s: 1, z: 1, a: 1 };
+
+function isFalsy(set, v) {
+  if (isSafe(v)) return isFalsy(set, v.s);        // a safe string tests as its content
+  if (v === null || v === undefined) return !!set.n;
   switch (typeof v) {
-    case "boolean": return v;
-    case "string": return v !== "";
-    case "number": return v !== 0;
+    case "boolean": return v === false && !!set.b;
+    case "string": return v === "" && !!set.s;
+    case "number": return v === 0 && !!set.z;     // NaN: NaN===0 is false ⇒ truthy
   }
-  if (Array.isArray(v)) return v.length > 0;
-  return true;                                    // {} and other objects are truthy
+  if (Array.isArray(v)) return v.length === 0 && !!set.a;
+  return Object.keys(v).length === 0 && !!set.o;  // {} falsy only under `presence`
+}
+function truthy(set, v) {
+  return !isFalsy(set, v);
 }
 
 // ── value equality / ordering (structural, like the prelude helpers) ─────────
@@ -92,11 +101,12 @@ function lookup(obj, ...segs) {
 }
 
 // ── frames ───────────────────────────────────────────────────────────────────
-function scope(data) {
+function scope(data, falsy) {
   return {
     ctx: data ?? null, index: null, key: null, first: null, last: null,
     parent: null, parentIndex: null, parentKey: null, parentFirst: null, parentLast: null,
     root: data ?? null,
+    falsy: falsy || HB,             // the active @truthiness mode (default Handlebars)
   };
 }
 // A child frame, exposing the *enclosing* frame's loop data under `parent-*`
@@ -107,6 +117,7 @@ function childFrame(parent, ctx, index, key, first, last) {
     parent: parent.ctx,
     parentIndex: parent.index, parentKey: parent.key, parentFirst: parent.first, parentLast: parent.last,
     root: parent.root,
+    falsy: parent.falsy,            // a loop/with body inherits the file's mode
   };
 }
 
@@ -148,7 +159,7 @@ function each(coll, parent, names, bodyFn, elseFn) {
 
 // ── context shift: `with` (FullBars withH) ───────────────────────────────────
 function withCtx(val, parent, names, bodyFn, elseFn) {
-  if (!truthy(val)) return elseFn(parent);
+  if (!truthy(parent.falsy, val)) return elseFn(parent);
   return bodyFn(bindNames(childFrame(parent, val, null, null, null, null), names, [val]));
 }
 
@@ -202,7 +213,7 @@ function renderJson(v, indent, depth) {
   const members = Object.keys(v).sort().map((k) => jsonQuote(k) + colon + renderJson(v[k], indent, depth + 1));
   return wrap("{", "}", members);
 }
-const jsonText = (v, opts) => renderJson(v, opts && typeof opts === "object" && truthy(opts.pretty) ? "  " : null, 0);
+const jsonText = (v, opts) => renderJson(v, opts && typeof opts === "object" && truthy(HB, opts.pretty) ? "  " : null, 0);
 
 // ── output / escaping helpers the codegen inlines ────────────────────────────
 const out = (v) => stringify(v);
@@ -234,9 +245,9 @@ const helpers = {
   gt: (a) => order((o) => o === 1, a[0], a[1]),
   lte: (a) => order((o) => o !== 1, a[0], a[1]),
   gte: (a) => order((o) => o !== -1, a[0], a[1]),
-  not: (a) => !truthy(a[0]),
-  and: (a) => a.every(truthy),
-  or: (a) => a.some(truthy),
+  not: (a, f) => !truthy(f.falsy, a[0]),
+  and: (a, f) => a.every((v) => truthy(f.falsy, v)),
+  or: (a, f) => a.some((v) => truthy(f.falsy, v)),
   log: () => null,
   json: (a) => jsonText(a[0], a[1]),
   esc_json: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))),
@@ -254,10 +265,12 @@ function call(name, args, frame) {
   return h(args, frame);
 }
 
-// truthiness honouring an options object's includeZero (FullBars truthyWith)
-function truthyWith(v, opts) {
-  if (typeof v === "number" && v === 0 && opts && typeof opts === "object" && truthy(opts.includeZero)) return true;
-  return truthy(v);
+// truthiness under a set, honouring an options object's includeZero as a
+// per-call exception (FullBars truthyWith): includeZero removes the zero shape
+// for this one test, composing with whatever the file's mode is.
+function truthyWith(set, v, opts) {
+  const inc = opts && typeof opts === "object" && truthy(HB, opts.includeZero);
+  return truthy(inc ? { ...set, z: 0 } : set, v);
 }
 
 // generic block fallback (unrecognised block helper) — not yet supported in the

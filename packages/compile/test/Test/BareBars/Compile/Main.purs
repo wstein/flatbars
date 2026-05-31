@@ -35,8 +35,13 @@ main :: Effect Unit
 main = do
   log "BareBars.Compile emitter tests"
 
-  expectJs "header + scope" "hi"
-    [ "runtime 0.1.0", "function (data, rt, partials)", "rt.scope(data)", "out += \"hi\"" ]
+  expectJs "header + scope + falsy-set preamble" "hi"
+    [ "runtime 0.1.0"
+    , "function (data, rt, partials)"
+    , "const $falsy = { b: 1, n: 1, s: 1, z: 1, a: 1 }" -- handlebars default
+    , "rt.scope(data, $falsy)"
+    , "out += \"hi\""
+    ]
 
   expectJsS "surface inline def becomes a partial registry; {{> }} calls rt.partial"
     "{{#inline \"row\"}}[{{ this }}]{{/inline}}{{#each items}}{{> row}}{{/each}}"
@@ -45,21 +50,29 @@ main = do
     , "rt.partial(\"row\", c1.ctx, null, partials, rt)"
     ]
 
+  expectJsS "@truthiness:minimal emits the minimal falsy-set + threads it"
+    "{{! @truthiness:minimal }}{{#if n}}y{{else}}m{{/if}}"
+    [ "const $falsy = { b: 1, n: 1 }", "rt.truthy(c0.falsy," ]
+
   expectJs "output + inlined esc_html/lookup/this"
     "{{{esc_html (lookup this \"name\")}}}"
     [ "rt.out(rt.esc(rt.lookup(c0.ctx, \"name\")))" ]
 
   expectJs "if/else compiles to native control flow"
     "{{#if (lookup this \"a\")}}X{{else}}Y{{/if}}"
-    [ "if (rt.truthy(rt.lookup(c0.ctx, \"a\"))) {", "} else {", "out += \"X\"", "out += \"Y\"" ]
+    [ "if (rt.truthy(c0.falsy, rt.lookup(c0.ctx, \"a\"))) {"
+    , "} else {"
+    , "out += \"X\""
+    , "out += \"Y\""
+    ]
 
   expectJs "elif chains to else-if"
     "{{#if (lookup this \"a\")}}A{{elif (lookup this \"b\")}}B{{else}}C{{/if}}"
-    [ "} else if (rt.truthy(rt.lookup(c0.ctx, \"b\"))) {" ]
+    [ "} else if (rt.truthy(c0.falsy, rt.lookup(c0.ctx, \"b\"))) {" ]
 
   expectJs "unless negates the test"
     "{{#unless (lookup this \"a\")}}N{{/unless}}"
-    [ "if (!(rt.truthy(rt.lookup(c0.ctx, \"a\")))) {" ]
+    [ "if (!(rt.truthy(c0.falsy, rt.lookup(c0.ctx, \"a\")))) {" ]
 
   expectJs "each compiles to a frame loop with a child scope"
     "{{#each (lookup this \"xs\")}}{{{this}}}{{/each}}"
