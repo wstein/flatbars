@@ -110,4 +110,4 @@ runTemplate engine = renderTemplate engine.initial
 runString :: forall m env. MonadThrow Error m => Engine m env -> String -> m String
 runString engine src = case parse src of
   Left pe -> throwError (ParseFailure pe)
-  Right tmpl -> runTemplate engine tmpl
+  Right { nodes } -> runTemplate engine nodes

@@ -37,6 +37,10 @@ data RawTok
   | RClose Span Int String -- {{/ <interior> }}
   | RSep Span Int String -- {{ <interior> }} — a name-agnostic separator
   | RRaw Span Int String String -- {{{{# <interior> }}}} <body> {{{{/ name }}}}
+  -- {{! <interior> }} — a *short* comment, kept for directive lifting (the parser
+  -- scans its interior for `@key` heads). Long `{{!-- … --}}` comments are never
+  -- emitted (inert prose).
+  | RComment Span Int String
 
 derive instance eqRawTok :: Eq RawTok
 
@@ -48,6 +52,7 @@ instance showRawTok :: Show RawTok where
     RClose _ _ s -> "RClose " <> show s
     RSep _ _ s -> "RSep " <> show s
     RRaw _ _ s b -> "RRaw " <> show s <> " " <> show b
+    RComment _ _ s -> "RComment " <> show s
 
 --------------------------------------------------------------------------------
 -- Character helpers
@@ -307,11 +312,28 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
               , trimR: t.trimR
               }
 
+  -- A short comment `{{! [~] … [~] }}` is *kept* as an `RComment` carrying its
+  -- interior (trailing `~` stripped) and offset, so the parser can lift any
+  -- `@key` directives from it. It still produces no output — the parser drops it
+  -- after directive extraction — and its `~` trims as before.
   readShortComment :: Int -> String -> Either ParseError TagResult
-  readShortComment i opener = case findFrom cs (i + SCU.length opener) "}}" of
-    Nothing -> Left (UnterminatedComment i)
-    Just q -> Right
-      { mtok: Nothing, next: q + 2, trimL: leadTrimAt i, trimR: matchAt cs (q - 1) "~" }
+  readShortComment i opener =
+    let
+      start = i + SCU.length opener
+    in
+      case findFrom cs start "}}" of
+        Nothing -> Left (UnterminatedComment i)
+        Just q ->
+          let
+            trimR = matchAt cs (q - 1) "~"
+            interior = slice cs start (if trimR then q - 1 else q)
+          in
+            Right
+              { mtok: Just (RComment { start: i, end: q + 2 } start interior)
+              , next: q + 2
+              , trimL: leadTrimAt i
+              , trimR
+              }
 
   readLongComment :: Int -> String -> Either ParseError TagResult
   readLongComment i opener = case findFrom cs (i + SCU.length opener) "--}}" of

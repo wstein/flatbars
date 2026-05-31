@@ -14,6 +14,7 @@ module BareBars.Syntax
   , Template
   , Node(..)
   , Expr(..)
+  , Directive
   ) where
 
 import Prelude
@@ -24,6 +25,14 @@ import BareBars.Value (Value)
 type Ident = String
 
 type Template = Array Node
+
+-- | A *header directive* lifted from a `{{! @key: value }}` comment — a
+-- | meaning-free marker the core carries but never interprets (the `Sep`
+-- | precedent applied to comments). The engine decides what `@truthiness`,
+-- | `@dialect`, … mean; the core only knows the *shape* `@key[: value]`. A flag
+-- | directive (`@key` with no colon) is normalised to `value = "true"`, so a
+-- | downstream reader sees one shape. `span` covers `@key` … end-of-value.
+type Directive = { key :: Ident, value :: String, span :: Span }
 
 -- | Tag-level nodes carry the source `Span` of their opening tag, for
 -- | diagnostics. `Content` does not (it is literal text, never a helper call).

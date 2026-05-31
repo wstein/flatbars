@@ -144,7 +144,7 @@ runCompile opts tpl =
 runValidate :: String -> Effect Unit
 runValidate tpl = case parse tpl of
   Left err -> die ("barebars: parse error at " <> renderParseErrorAt tpl err)
-  Right template -> case validate preludeSchema template of
+  Right { nodes: template } -> case validate preludeSchema template of
     [] -> writeStdout "ok: no issues\n"
     issues -> do
       writeStderr (joinWith "\n" (map fmt issues) <> "\n")

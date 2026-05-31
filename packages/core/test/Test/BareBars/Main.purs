@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), Value(..), foldExpr, foldTemplate, parse, parseErrorAt, spanText, splitClause, splitClauses, toValue, validate)
+import BareBars (Arity(..), Expr(..), Node(..), ParseError(..), Value(..), foldExpr, foldTemplate, parse, parseErrorAt, spanText, splitClause, splitClauses, toValue, validate)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -34,7 +34,7 @@ schema =
 nodeCount :: String -> Int
 nodeCount src = case parse src of
   Left _ -> -1
-  Right t -> foldTemplate
+  Right { nodes: t } -> foldTemplate
     { content: \_ -> 1
     , output: \_ -> 1
     , raw: \_ _ _ -> 1
@@ -51,7 +51,7 @@ main = do
   -- Well-formed parse, and the structural shapes the parser emits.
   case parse "a{{{x}}}{{#if c}}t{{else}}e{{/if}}" of
     Left e -> assert' ("parse: unexpected error " <> show e) false
-    Right t -> do
+    Right { nodes: t } -> do
       assert' "parse: content/output/block shapes"
         ( t ==
             [ Content "a"
@@ -67,7 +67,7 @@ main = do
   -- foldExpr: a catamorphism over an expression. Count App nodes in a nested
   -- subexpression, descending into application arguments.
   case parse "{{{lookup this \"x\"}}}" of
-    Right [ Output _ e ] ->
+    Right { nodes: [ Output _ e ] } ->
       let
         appCount = foldExpr { lit: \_ -> 0, app: \_ kids -> 1 + Array.foldl (+) 0 kids } e
       in
@@ -76,7 +76,7 @@ main = do
 
   -- splitClause shallowly splits a body at the first {{else}} separator.
   case parse "{{#if c}}A{{else}}B{{/if}}" of
-    Right [ Block _ _ _ body ] ->
+    Right { nodes: [ Block _ _ _ body ] } ->
       let
         s = splitClause "else" body
       in
@@ -88,7 +88,7 @@ main = do
   -- clause at the next separator (a second {{else}} opens its own clause and
   -- does not leak into the first).
   case parse "{{#if c}}A{{else}}B{{else}}C{{/if}}" of
-    Right [ Block _ _ _ body ] -> do
+    Right { nodes: [ Block _ _ _ body ] } -> do
       let
         cs = splitClauses body
       assert' "splitClauses before" (cs.before == [ Content "A" ])
@@ -100,10 +100,10 @@ main = do
 
   -- Schema validation flags an unknown helper; a known-arity call is clean.
   case parse "{{#if c}}{{{x}}}{{/if}}" of
-    Right t -> assert' "validate clean" (Array.null (validate schema t))
+    Right { nodes: t } -> assert' "validate clean" (Array.null (validate schema t))
     Left e -> assert' ("validate: " <> show e) false
   case parse "{{{nope}}}" of
-    Right t -> assert' "validate flags unknown" (not (Array.null (validate schema t)))
+    Right { nodes: t } -> assert' "validate flags unknown" (not (Array.null (validate schema t)))
     Left e -> assert' ("validate: " <> show e) false
 
   -- Stack safety: a large flat template (long content run + many output tags)
@@ -112,12 +112,12 @@ main = do
   let
     big = power "x{{{a}}}y " 20000 -- ~180 KB, ~40000 content/output nodes
   case parse big of
-    Right t -> assert' "large template parses without overflow" (Array.length t > 40000)
+    Right { nodes: t } -> assert' "large template parses without overflow" (Array.length t > 40000)
     Left e -> assert' ("large template overflowed/failed: " <> show e) false
 
   -- Source spans on tag-level nodes + spanText.
   case parse "  {{{this}}}" of
-    Right [ _, Output sp _ ] ->
+    Right { nodes: [ _, Output sp _ ] } ->
       assert' "span offsets + spanText"
         (sp.start == 2 && sp.end == 12 && spanText "  {{{this}}}" sp == "{{{this}}}")
     _ -> assert' "span: unexpected parse" false
@@ -133,6 +133,47 @@ main = do
         assert' ("parseErrorAt: " <> show d.line <> ":" <> show d.column <> " " <> d.message)
           (d.line == 2 && d.column == 7)
     Right _ -> assert' "parseErrorAt: expected a parse error" false
+
+  -- Header directives (truthiness-spec Phase 1): the core lifts `@key[: value]`
+  -- from short `{{! … }}` comments, meaning-free, and drops the comment.
+  let
+    dirsOf src = case parse src of
+      Right { directives } -> map (\d -> Tuple d.key d.value) directives
+      Left _ -> [ Tuple "<error>" "" ]
+    nodesOf src = case parse src of
+      Right { nodes } -> nodes
+      Left _ -> [ Content "<error>" ]
+  -- single directive lifted; the comment leaves no node behind.
+  assert' "directive: single key:value"
+    (dirsOf "{{! @truthiness:always }}Hi" == [ Tuple "truthiness" "always" ])
+  assert' "directive: comment produces no node"
+    (nodesOf "{{! @truthiness:always }}Hi" == [ Content "Hi" ])
+  -- multiline block, several heads, one per line and several on one line.
+  assert' "directive: multiline + multi-head"
+    ( dirsOf "{{! @truthiness: empty\n@foo: bar }}{{! @baz @qux:1 }}x"
+        == [ Tuple "truthiness" "empty", Tuple "foo" "bar", Tuple "baz" "true", Tuple "qux" "1" ]
+    )
+  -- lenient spacing around the colon; a hyphen key; the bare-flag form ⇒ "true".
+  assert' "directive: spaces around colon"
+    (dirsOf "{{! @truthiness  :   always }}x" == [ Tuple "truthiness" "always" ])
+  assert' "directive: hyphen key + flag form"
+    (dirsOf "{{! @opt-in }}x" == [ Tuple "opt-in" "true" ])
+  -- the explicit falsy-list value is carried verbatim (engine parses it later).
+  assert' "directive: explicit shape-list value"
+    ( dirsOf "{{! @truthiness: false null \"\" 0 [] }}x" ==
+        [ Tuple "truthiness" "false null \"\" 0 []" ]
+    )
+  -- a long {{!-- … --}} comment is inert: its @text is prose, never a directive.
+  assert' "directive: long comment is inert" (dirsOf "{{!-- @truthiness: ruby --}}x" == [])
+  -- a plain short comment (no @head) is dropped and lifts nothing.
+  assert' "directive: plain comment lifts nothing" (dirsOf "{{! just a note }}x" == [])
+  -- leading content does not close the header, so a later directive is still valid.
+  assert' "directive: content does not close the header"
+    (dirsOf "pre {{! @truthiness:ruby }}{{{this}}}" == [ Tuple "truthiness" "ruby" ])
+  -- a directive after the first real tag is a DirectiveAfterHeader error.
+  case parse "{{{this}}}{{! @foo:bar }}" of
+    Left (DirectiveAfterHeader _) -> pure unit
+    _ -> assert' "directive: after-header must error" false
 
   -- ToValue host binding: native PureScript data lowers to the core `Value`.
   assert' "toValue String" (toValue "x" == VString "x")

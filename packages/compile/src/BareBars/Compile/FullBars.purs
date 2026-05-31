@@ -40,14 +40,14 @@ runtimeVersion = "0.1.0"
 -- | an `{{#inline}}` block is a no-op and a `{{> }}`/`partial` to an
 -- | unregistered name is a runtime error, exactly as in the interpreter.
 compileCore :: String -> Either ParseError String
-compileCore src = compile { runtimeVersion } fullbarsEmit [] <$> parse src
+compileCore src = (\{ nodes } -> compile { runtimeVersion } fullbarsEmit [] nodes) <$> parse src
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
 -- | `{{#inline}}` definitions into the partial registry (as `renderSurfaceWith`
 -- | does), then emit. The emit rules are dialect-pure — they only ever see core.
 compileSurface :: String -> Either ParseError String
-compileSurface src = emitSurface <$> parse src
+compileSurface src = (\{ nodes } -> emitSurface nodes) <$> parse src
   where
   emitSurface tmpl =
     let

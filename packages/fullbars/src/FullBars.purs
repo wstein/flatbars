@@ -58,8 +58,8 @@ preludeEnv dat =
 -- | Parse a core template and return a pure renderer closed over the engine.
 compile :: String -> Either ParseError (Value -> Either Error String)
 compile src = do
-  tmpl <- parse src
-  pure \dat -> runTemplate (refEngine (preludeEnv dat)) tmpl
+  { nodes } <- parse src
+  pure \dat -> runTemplate (refEngine (preludeEnv dat)) nodes
 
 -- | One-shot pure render: parse core source and render against prelude + data.
 renderWith :: String -> Value -> Either String String
@@ -106,9 +106,9 @@ desugarSurface = desugar surfaceClauses
 -- | definitions are hoisted into the partial registry before rendering.
 compileSurface :: String -> Either ParseError (Value -> Either Error String)
 compileSurface src = do
-  tmpl <- parse src
+  { nodes } <- parse src
   let
-    { partials, template } = hoistInline (desugarSurface tmpl)
+    { partials, template } = hoistInline (desugarSurface nodes)
   pure \dat -> runTemplate (refEngine (registerPartials partials (preludeEnv dat))) template
 
 -- | One-shot pure render of *Surface* source (paths, `{{ }}` auto-escape, …).
@@ -124,9 +124,9 @@ renderSurfaceWith partialSrcs src dat =
     Left e -> Left (show e)
     Right pairs -> case parse src of
       Left e -> Left (show e)
-      Right tmpl ->
+      Right { nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarSurface tmpl)
+          { partials: inlineP, template } = hoistInline (desugarSurface nodes)
           env = registerPartials (Map.union inlineP (Map.fromFoldable pairs)) (preludeEnv dat)
         in
           case runTemplate (refEngine env) template of
@@ -135,16 +135,16 @@ renderSurfaceWith partialSrcs src dat =
   where
   compilePartial (Tuple name s) = case parse s of
     Left e -> Left e
-    Right t -> Right (Tuple name (desugarSurface t))
+    Right { nodes } -> Right (Tuple name (desugarSurface nodes))
 
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
 renderSurfaceDiag :: String -> Value -> Either String String
 renderSurfaceDiag src dat = case parse src of
   Left pe -> Left (renderParseErrorAt src pe)
-  Right tmpl ->
+  Right { nodes } ->
     let
-      { partials, template } = hoistInline (desugarSurface tmpl)
+      { partials, template } = hoistInline (desugarSurface nodes)
       env = registerPartials partials (preludeEnv dat)
     in
       case runTemplate (refEngine env) template of

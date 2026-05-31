@@ -95,7 +95,7 @@ astJson = mkFn2 \dialect src -> case parse src of
                 ]
             )
         ]
-  Right tmpl ->
+  Right { nodes: tmpl } ->
     let
       nodes = lower (if dialect == "core" then tmpl else desugarSurface tmpl)
     in

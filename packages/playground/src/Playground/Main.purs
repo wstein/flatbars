@@ -127,7 +127,7 @@ renderResult st = do
 loweredNodes :: State -> Either String Template
 loweredNodes st = case parse st.template of
   Left e -> Left ("Parse error: " <> show e)
-  Right t -> Right case st.mode of
+  Right { nodes: t } -> Right case st.mode of
     Core -> t
     Surface -> desugarSurface t
 
@@ -139,7 +139,7 @@ loweredNodes st = case parse st.template of
 astText :: State -> String
 astText st = case parse st.template of
   Left e -> "Parse error: " <> show e
-  Right nodes -> joinWith "\n" (Array.concatMap (renderNode 0) nodes)
+  Right { nodes } -> joinWith "\n" (Array.concatMap (renderNode 0) nodes)
 
 renderNode :: Int -> Node -> Array String
 renderNode d = case _ of
@@ -319,7 +319,7 @@ footer st =
     , HH.span_ [ HH.text issueSummary ]
     ]
   where
-  parsed = parse st.template
+  parsed = _.nodes <$> parse st.template
   dataParsed = parseValue st.dataText
 
   parseLabel = case _ of

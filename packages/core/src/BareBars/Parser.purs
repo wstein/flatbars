@@ -16,21 +16,118 @@ import BareBars.Error (ParseError(..))
 import BareBars.Expr (parseExpr)
 import BareBars.Lexer (RawTok(..), tokenizeTemplate)
 import BareBars.Span (Span)
-import BareBars.Syntax (Expr(..), Node(..), Template)
+import BareBars.Syntax (Directive, Expr(..), Node(..), Template)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.String (trim)
+import Data.String.CodeUnits as SCU
 
-parse :: String -> Either ParseError Template
+-- | Parse source text into the core template *plus* its header directives. The
+-- | directives are a meaning-free list the engine interprets later (see
+-- | `BareBars.Syntax.Directive`); the `Template` is the node tree (comments
+-- | stripped). See `docs/.../grammar.adoc`.
+parse :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
 parse src = do
   toks <- tokenizeTemplate src
-  res <- parseSeq toks 0
+  directives <- collectDirectives toks
+  -- comments carry no output; drop them before the tree builder, which then
+  -- never has to know about `RComment`.
+  res <- parseSeq (Array.filter (not <<< isComment) toks) 0
   case res.stop of
-    StopEOF -> Right res.nodes
+    StopEOF -> Right { directives, nodes: res.nodes }
     StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
+  where
+  isComment = case _ of
+    RComment _ _ _ -> true
+    _ -> false
+
+--------------------------------------------------------------------------------
+-- Header directives
+--------------------------------------------------------------------------------
+
+-- | Lift `@key[: value]` directives from short-comment interiors, enforcing
+-- | *header-only* placement: directives are valid only before the first
+-- | non-comment tag. Leading content/whitespace does not close the header — only
+-- | a real tag (output/block/close/separator/raw) does. A directive-bearing
+-- | comment after that point is a `DirectiveAfterHeader` error. Plain comments
+-- | (no `@key` head) are ignored wherever they sit.
+collectDirectives :: Array RawTok -> Either ParseError (Array Directive)
+collectDirectives toks = go 0 true []
+  where
+  go :: Int -> Boolean -> Array Directive -> Either ParseError (Array Directive)
+  go i headerOpen acc = case Array.index toks i of
+    Nothing -> Right acc
+    Just (RComment _ base interior) ->
+      let
+        dirs = parseDirectives base interior
+      in
+        if headerOpen then go (i + 1) true (acc <> dirs)
+        else case Array.head dirs of
+          Just d -> Left (DirectiveAfterHeader d.span.start)
+          Nothing -> go (i + 1) false acc
+    Just (RContent _) -> go (i + 1) headerOpen acc -- content does not close the header
+    Just _ -> go (i + 1) false acc -- a real tag closes the header
+
+-- | Parse the `@key[: value]` directives out of one comment interior. The parser
+-- | keys on `@<key>` heads (a letter-led identifier with hyphens allowed); a
+-- | value runs from the colon to the next head or the interior end, trimmed; a
+-- | bare `@key` (no colon) is a flag normalised to `value = "true"`. `base` is
+-- | the interior's source offset, so spans point into the original template.
+parseDirectives :: Int -> String -> Array Directive
+parseDirectives base interior = go 0 []
+  where
+  cs = SCU.toCharArray interior
+  len = Array.length cs
+  at k = Array.index cs k
+  slc a b = SCU.fromCharArray (Array.slice a b cs)
+
+  isHead k = at k == Just '@' && maybe false isLetter (at (k + 1))
+  readKey k = if maybe false isKeyChar (at k) then readKey (k + 1) else k
+  skipWs k = if maybe false isSpace (at k) then skipWs (k + 1) else k
+  valueEnd k
+    | k >= len = len
+    | isHead k = k
+    | otherwise = valueEnd (k + 1)
+
+  go :: Int -> Array Directive -> Array Directive
+  go j acc
+    | j >= len = acc
+    | isHead j =
+        let
+          keyEnd = readKey (j + 1)
+          key = slc (j + 1) keyEnd
+          afterKey = skipWs keyEnd
+        in
+          case at afterKey of
+            Just ':' ->
+              let
+                vStart = skipWs (afterKey + 1)
+                vEnd = valueEnd vStart
+                dir =
+                  { key
+                  , value: trim (slc vStart vEnd)
+                  , span: { start: base + j, end: base + vEnd }
+                  }
+              in
+                go vEnd (Array.snoc acc dir)
+            _ ->
+              let
+                dir = { key, value: "true", span: { start: base + j, end: base + keyEnd } }
+              in
+                go keyEnd (Array.snoc acc dir)
+    | otherwise = go (j + 1) acc
+
+isLetter :: Char -> Boolean
+isLetter c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+
+isKeyChar :: Char -> Boolean
+isKeyChar c = isLetter c || (c >= '0' && c <= '9') || c == '_' || c == '-'
+
+isSpace :: Char -> Boolean
+isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
 
 --------------------------------------------------------------------------------
 -- Tag-interior expression parsing
@@ -86,6 +183,7 @@ parseSeq toks = go Nil
     Nothing -> Right (done acc StopEOF)
     Just t -> case t of
       RContent s -> go (Content s : acc) (i + 1)
+      RComment _ _ _ -> go acc (i + 1) -- filtered upstream; skip defensively
       ROutput span base s -> case outputExpr span base s of
         Left e -> Left e
         Right e -> go (Output span e : acc) (i + 1)

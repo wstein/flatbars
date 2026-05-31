@@ -81,7 +81,7 @@ expectP name partials src dat expected = case renderSurfaceWith partials src dat
 expectValid :: String -> String -> Effect Unit
 expectValid name src = case parse src of
   Left e -> assert' (name <> ": parse error " <> show e) false
-  Right t ->
+  Right { nodes: t } ->
     let
       issues = validate preludeSchema t
     in
@@ -92,7 +92,7 @@ expectValid name src = case parse src of
 expectIssue :: String -> String -> Effect Unit
 expectIssue name src = case parse src of
   Left e -> assert' (name <> ": expected a validation issue, but got parse error " <> show e) false
-  Right t -> assert' (name <> ": expected a validation issue")
+  Right { nodes: t } -> assert' (name <> ": expected a validation issue")
     (not (Array.null (validate preludeSchema t)))
 
 -- A *pluggable env*: an engine whose environment is a bare `Value` (not the
@@ -501,7 +501,7 @@ main = do
     "m"
 
   -- desugarSurface produces the documented core expressions.
-  case desugarSurface <$> parse "{{ user.name }}" of
+  case (desugarSurface <<< _.nodes) <$> parse "{{ user.name }}" of
     Right [ Output _ e ] ->
       assert' ("desugar path: " <> show e)
         ( e == App "esc_html"
@@ -510,7 +510,7 @@ main = do
     _ -> assert' "desugar: unexpected shape" false
 
   -- positional + glued hash: {{ f a k=v }} ⇒ f (lookup this "a") (dict "k" …)
-  case desugarSurface <$> parse "{{ f a k=v }}" of
+  case (desugarSurface <<< _.nodes) <$> parse "{{ f a k=v }}" of
     Right [ Output _ e ] ->
       assert' ("desugar hash: " <> show e)
         ( e == App "esc_html"
@@ -524,7 +524,7 @@ main = do
     _ -> assert' "desugar hash: unexpected shape" false
 
   -- quoted hash value (the value is the next token): {{ f g="hi" }}
-  case desugarSurface <$> parse "{{ f g=\"hi\" }}" of
+  case (desugarSurface <<< _.nodes) <$> parse "{{ f g=\"hi\" }}" of
     Right [ Output _ e ] ->
       assert' ("desugar hash quoted: " <> show e)
         ( e == App "esc_html"
@@ -551,30 +551,30 @@ main = do
       }
   case parse "a{{#each x}}b{{{this}}}{{/each}}c" of
     Left e -> assert' ("foldTemplate: parse error " <> show e) false
-    Right t -> assert' "foldTemplate node count" (foldTemplate counter t == 5)
+    Right { nodes: t } -> assert' "foldTemplate node count" (foldTemplate counter t == 5)
 
   -- Pluggable env: the same driver runs a custom engine whose env is a Value.
   case parse "{{{shout this}}}" of
     Left e -> assert' ("custom-engine: parse error " <> show e) false
-    Right t -> assert' "custom-engine pluggable env"
+    Right { nodes: t } -> assert' "custom-engine pluggable env"
       (runTemplate (customEngine (VString "hi")) t == Right "HI")
 
   -- Source spans: tag-level nodes carry their span; helpers see it via Ctl.span.
   case parse "  {{{this}}}" of
-    Right [ _, Output sp _ ] -> do
+    Right { nodes: [ _, Output sp _ ] } -> do
       assert' "span offsets" (sp.start == 2 && sp.end == 12)
       assert' "spanText" (spanText "  {{{this}}}" sp == "{{{this}}}")
     _ -> assert' "span: unexpected parse shape" false
   case parse "{{{at}}}" of
     Left e -> assert' ("ctl.span: parse error " <> show e) false
-    Right t -> assert' "ctl.span visible to helper"
+    Right { nodes: t } -> assert' "ctl.span visible to helper"
       (runTemplate (customEngine VNull) t == Right "0")
 
   -- lower: the structural skeleton becomes the typed real AST — {{else}} is
   -- consumed into RIf's branches, and esc_html becomes the escaped flag.
   case parse "{{#if this}}A{{{esc_html (lookup this \"x\")}}}{{else}}B{{/if}}" of
     Left e -> assert' ("lower: parse error " <> show e) false
-    Right t -> assert' ("lower if/else+escape: " <> show (lower t))
+    Right { nodes: t } -> assert' ("lower if/else+escape: " <> show (lower t))
       ( lower t ==
           [ RIf (App "this" [])
               [ RText "A", ROut true (App "lookup" [ App "this" [], Lit (VString "x") ]) ]
@@ -584,23 +584,23 @@ main = do
 
   -- Safe-by-default lint: raw output of data warns; esc_html / safe do not.
   case parse "{{{lookup this \"x\"}}}" of
-    Right t -> assert' "escaping lint flags raw data" (not (Array.null (escapingWarnings t)))
+    Right { nodes: t } -> assert' "escaping lint flags raw data" (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
   case parse "{{{esc_html (lookup this \"x\")}}}{{{safe (lookup this \"y\")}}}" of
-    Right t -> assert' "escaping lint silent for esc_html/safe" (Array.null (escapingWarnings t))
+    Right { nodes: t } -> assert' "escaping lint silent for esc_html/safe" (Array.null (escapingWarnings t))
     Left e -> assert' ("lint: parse error " <> show e) false
 
   -- Lint: testing the truthiness of an escaped/safe value is a smell (safe/
   -- esc_html stringify, so e.g. `safe 0` is truthy while `0` is falsy).
   case parse "{{#if (safe (lookup this \"x\"))}}y{{/if}}" of
-    Right t -> assert' "lint flags if-on-safe" (not (Array.null (escapingWarnings t)))
+    Right { nodes: t } -> assert' "lint flags if-on-safe" (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
   case parse "{{#unless (esc_html (lookup this \"x\"))}}y{{/unless}}" of
-    Right t -> assert' "lint flags unless-on-esc_html" (not (Array.null (escapingWarnings t)))
+    Right { nodes: t } -> assert' "lint flags unless-on-esc_html" (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
   -- Testing the underlying data directly is clean.
   case parse "{{#if (lookup this \"x\")}}y{{/if}}" of
-    Right t -> assert' "lint silent for if-on-data" (Array.null (escapingWarnings t))
+    Right { nodes: t } -> assert' "lint silent for if-on-data" (Array.null (escapingWarnings t))
     Left e -> assert' ("lint: parse error " <> show e) false
 
   -- Schema/runtime conformance: prelude and preludeSchema are projections of one
