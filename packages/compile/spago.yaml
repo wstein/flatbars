@@ -1,0 +1,22 @@
+package:
+  name: barebars-compile
+  publish:
+    version: 0.1.0
+    license: Apache-2.0
+    location:
+      githubOwner: barebars
+      githubRepo: barebars
+  dependencies:
+    - prelude
+    - arrays
+    - strings
+    - maybe
+    - foldable-traversable
+    - either
+    - barebars
+  test:
+    main: Test.BareBars.Compile.Main
+    dependencies:
+      - effect
+      - console
+      - assert

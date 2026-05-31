@@ -20,7 +20,8 @@
     "format": "purs-tidy format-in-place \"packages/*/src/**/*.purs\" \"packages/*/test/**/*.purs\"",
     "format:check": "purs-tidy check \"packages/*/src/**/*.purs\" \"packages/*/test/**/*.purs\"",
     "lint": "spago build --pedantic-packages",
-    "clean": "rimraf output .spago"
+    "clean": "rimraf output .spago",
+    "test:compile": "node packages/compile/conformance.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.23.0",

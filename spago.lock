@@ -176,6 +176,79 @@
           "build_plan": []
         }
       },
+      "barebars-compile": {
+        "path": "packages/compile",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "barebars",
+            "either",
+            "foldable-traversable",
+            "maybe",
+            "prelude",
+            "strings"
+          ],
+          "build_plan": [
+            "arrays",
+            "barebars",
+            "bifunctors",
+            "const",
+            "contravariant",
+            "control",
+            "distributive",
+            "effect",
+            "either",
+            "enums",
+            "exceptions",
+            "exists",
+            "foldable-traversable",
+            "functions",
+            "functors",
+            "gen",
+            "identity",
+            "integers",
+            "invariant",
+            "lazy",
+            "lists",
+            "maybe",
+            "newtype",
+            "nonempty",
+            "nullable",
+            "numbers",
+            "ordered-collections",
+            "orders",
+            "parsing",
+            "partial",
+            "prelude",
+            "profunctor",
+            "record",
+            "refs",
+            "safe-coerce",
+            "st",
+            "strings",
+            "tailrec",
+            "transformers",
+            "tuples",
+            "type-equality",
+            "unfoldable",
+            "unicode",
+            "unsafe-coerce"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "assert",
+            "console",
+            "effect"
+          ],
+          "build_plan": [
+            "assert",
+            "console",
+            "effect",
+            "prelude"
+          ]
+        }
+      },
       "barebars-js": {
         "path": "packages/js",
         "core": {
@@ -183,6 +256,7 @@
             "argonaut-core",
             "arrays",
             "barebars",
+            "barebars-compile",
             "barebars-json",
             "either",
             "foreign-object",
@@ -201,6 +275,7 @@
             "argonaut-traversals",
             "arrays",
             "barebars",
+            "barebars-compile",
             "barebars-json",
             "bifunctors",
             "const",

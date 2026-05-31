@@ -12,17 +12,19 @@ module FullBars.JS
   , render
   , renderSurface
   , astJson
+  , compile
   ) where
 
 import Prelude
 
 import BareBars (Expr(..), parse, parseErrorAt)
+import BareBars.Compile.FullBars (compileCore)
 import BareBars.Json (fromJson)
 import BareBars.Value (Value(..))
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
-import Data.Function.Uncurried (Fn2, mkFn2)
+import Data.Function.Uncurried (Fn1, Fn2, mkFn1, mkFn2)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
@@ -43,6 +45,14 @@ render = mkFn2 \tpl json -> result (FullBars.renderWithDiag tpl (fromJson json))
 -- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result
 renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJson json))
+
+-- | Compile a *core* template to JS ES-module source (`BareBars.Compile`). The
+-- | emitted module's default export is `function (data, rt)`; pair it with
+-- | `runtime/barebars-runtime.mjs`. `value` is the JS source on success.
+compile :: Fn1 String Result
+compile = mkFn1 \tpl -> case compileCore tpl of
+  Left e -> { ok: false, value: "", error: show e }
+  Right js -> { ok: true, value: js, error: "" }
 
 --------------------------------------------------------------------------------
 -- AST for the polyglot lab seam
