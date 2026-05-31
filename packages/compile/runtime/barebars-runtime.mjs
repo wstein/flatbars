@@ -152,6 +152,21 @@ function withCtx(val, parent, names, bodyFn, elseFn) {
   return bodyFn(bindNames(childFrame(parent, val, null, null, null, null), names, [val]));
 }
 
+// ── partials: render a registered partial (FullBars partialH) ────────────────
+// `partials[name]` is a compiled `function (data, rt, partials)`. The hash (if
+// any) merges onto the context object (opts override); a non-object context
+// means the hash *is* the context. The result is unescaped (Safe), since a
+// partial produces markup, and the registry is threaded so nested `{{> }}`
+// resolve.
+function partial(name, ctx, hash, partials, rt) {
+  const fn = partials && partials[name];
+  if (typeof fn !== "function") throw new Error("HelperError: unknown partial '" + name + "'");
+  let data = ctx;
+  const obj = (v) => v != null && typeof v === "object" && !Array.isArray(v) && !isSafe(v);
+  if (obj(hash)) data = obj(ctx) ? Object.assign({}, ctx, hash) : hash;
+  return new Safe(fn(data, rt, partials));
+}
+
 // ── JSON serialization (FullBars.Value.jsonStringify): compact or pretty, with
 //    sorted object keys (ordered Map) and per-code-unit string escaping ────────
 function jsonQuote(s) {
@@ -253,6 +268,6 @@ function block(name) {
 function raw(_name, body) { return body; }
 
 export const rt = {
-  RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, block, raw, Safe,
+  RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, block, raw, Safe,
 };
 export default rt;

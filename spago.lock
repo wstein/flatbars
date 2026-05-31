@@ -188,8 +188,10 @@
             "foldable-traversable",
             "fullbars",
             "maybe",
+            "ordered-collections",
             "prelude",
-            "strings"
+            "strings",
+            "tuples"
           ],
           "build_plan": [
             "aff",

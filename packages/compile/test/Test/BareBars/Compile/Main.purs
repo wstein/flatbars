@@ -6,7 +6,8 @@ module Test.BareBars.Compile.Main where
 
 import Prelude
 
-import BareBars.Compile.FullBars (compileCore)
+import BareBars.Compile.FullBars (compileCore, compileSurface)
+import BareBars.Error (ParseError)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.String (Pattern(..), contains)
@@ -16,7 +17,15 @@ import Test.Assert (assert')
 
 -- assert `src` compiles and the JS contains every fragment in `needles`.
 expectJs :: String -> String -> Array String -> Effect Unit
-expectJs name src needles = case compileCore src of
+expectJs = expectWith compileCore
+
+-- surface variant (desugar + hoist + emit), for surface-only codegen (partials).
+expectJsS :: String -> String -> Array String -> Effect Unit
+expectJsS = expectWith compileSurface
+
+expectWith
+  :: (String -> Either ParseError String) -> String -> String -> Array String -> Effect Unit
+expectWith compileFn name src needles = case compileFn src of
   Left e -> assert' (name <> ": unexpected compile error: " <> show e) false
   Right js -> for_ needles \n ->
     assert' (name <> ": expected JS to contain " <> show n <> "\n--- JS ---\n" <> js)
@@ -27,7 +36,14 @@ main = do
   log "BareBars.Compile emitter tests"
 
   expectJs "header + scope" "hi"
-    [ "runtime 0.1.0", "function (data, rt)", "rt.scope(data)", "out += \"hi\"" ]
+    [ "runtime 0.1.0", "function (data, rt, partials)", "rt.scope(data)", "out += \"hi\"" ]
+
+  expectJsS "surface inline def becomes a partial registry; {{> }} calls rt.partial"
+    "{{#inline \"row\"}}[{{ this }}]{{/inline}}{{#each items}}{{> row}}{{/each}}"
+    [ "partials = Object.assign({}, partials, {"
+    , "\"row\": function (data, rt, partials)"
+    , "rt.partial(\"row\", c1.ctx, null, partials, rt)"
+    ]
 
   expectJs "output + inlined esc_html/lookup/this"
     "{{{esc_html (lookup this \"name\")}}}"

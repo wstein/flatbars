@@ -25,25 +25,35 @@ import BareBars.Value (Value(..))
 import BareBars.Walk (Clause, splitClauses)
 import Data.Array as Array
 import Data.Either (Either)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
-import FullBars (desugarSurface)
+import FullBars (desugarSurface, hoistInline)
 
 -- | The runtime contract version, recorded in the compiled header and checked by
 -- | `barebars-runtime.mjs`. Bump on any runtime-incompatible codegen change.
 runtimeVersion :: String
 runtimeVersion = "0.1.0"
 
--- | Compile *core* FullBars source to a JS ES module.
+-- | Compile *core* FullBars source to a JS ES module. Core does *not* hoist
+-- | `{{#inline}}` (matching the core interpreter `renderWith`, which doesn't):
+-- | an `{{#inline}}` block is a no-op and a `{{> }}`/`partial` to an
+-- | unregistered name is a runtime error, exactly as in the interpreter.
 compileCore :: String -> Either ParseError String
-compileCore src = compile { runtimeVersion } fullbarsEmit <$> parse src
+compileCore src = compile { runtimeVersion } fullbarsEmit [] <$> parse src
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
--- | `@data`, hash args, block params, `else if`) to the core skeleton, then emit
--- | with the same rules. The emit rules are dialect-pure — they only ever see
--- | core — so surface is just one `desugarSurface` upstream.
+-- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
+-- | `{{#inline}}` definitions into the partial registry (as `renderSurfaceWith`
+-- | does), then emit. The emit rules are dialect-pure — they only ever see core.
 compileSurface :: String -> Either ParseError String
-compileSurface src = (compile { runtimeVersion } fullbarsEmit <<< desugarSurface) <$> parse src
+compileSurface src = emitSurface <$> parse src
+  where
+  emitSurface tmpl =
+    let
+      h = hoistInline (desugarSurface tmpl)
+    in
+      compile { runtimeVersion } fullbarsEmit (Map.toUnfoldable h.partials) h.template
 
 fullbarsEmit :: Emit
 fullbarsEmit = { expr: fbExpr, block: fbBlock }
@@ -60,8 +70,21 @@ fbExpr rec ctx = case _ of
   App "lookup" args -> "rt.lookup(" <> args' rec ctx args <> ")"
   App "esc_html" [ a ] -> "rt.esc(" <> rec.expr ctx a <> ")"
   App "safe" [ a ] -> "rt.safe(" <> rec.expr ctx a <> ")"
+  -- `{{> name}}` ⇒ `partial name ctx [hash]` ⇒ a runtime partial call against
+  -- the in-scope registry (`partials`).
+  App "partial" args ->
+    "rt.partial(" <> argAt rec ctx args 0 <> ", " <> argAt rec ctx args 1 <> ", "
+      <> argAt rec ctx args 2
+      <> ", partials, rt)"
   App name args ->
     "rt.call(" <> jsString name <> ", [" <> args' rec ctx args <> "], " <> ctx.scope <> ")"
+
+-- The nth argument as a JS expression, or `null` if absent (partials take
+-- name, context, and an optional hash object).
+argAt :: Rec -> Ctx -> Array Expr -> Int -> String
+argAt rec ctx args i = case Array.index args i of
+  Just e -> rec.expr ctx e
+  Nothing -> "null"
 
 litJs :: Value -> String
 litJs = case _ of
@@ -86,6 +109,8 @@ fbBlock rec ctx name args body = case name of
   "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx args <> ")") body
   "each" -> frameBlock rec ctx "each" args body
   "with" -> frameBlock rec ctx "with" args body
+  -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
+  "inline" -> ""
   _ -> rtBlock rec ctx name args body
 
 -- The condition test: 1 arg ⇒ `rt.truthy`; an options object (includeZero) ⇒

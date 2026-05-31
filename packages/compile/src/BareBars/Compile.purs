@@ -28,9 +28,11 @@ module BareBars.Compile
 import Prelude
 
 import BareBars.Syntax (Expr, Ident, Node(..), Template)
+import Data.Array as Array
 import Data.Foldable (foldMap)
 import Data.String as String
 import Data.String.CodeUnits as SCU
+import Data.Tuple (Tuple(..))
 
 -- | The compile-time context threaded through emission: the JS variable holding
 -- | the current frame, and its nesting depth (so a block can mint a fresh,
@@ -54,20 +56,27 @@ type Emit =
   , block :: Rec -> Ctx -> Ident -> Array Expr -> Template -> String
   }
 
--- | Compile a `Template` to an ES-module JS source string. `runtimeVersion` is
+-- | Compile a template to an ES-module JS source string. `runtimeVersion` is
 -- | recorded in a header and checked by the runtime (a Handlebars-style
--- | `compilerInfo` handshake).
-compile :: { runtimeVersion :: String } -> Emit -> Template -> String
-compile meta emit tmpl =
+-- | `compilerInfo` handshake). `partials` are named sub-templates (e.g. hoisted
+-- | `{{#inline}}` definitions) compiled into a local registry the module passes
+-- | to `rt.partial`; the dialect's `Emit.expr` decides how a partial *call* is
+-- | emitted.
+-- |
+-- | Every module is `function (data, rt, partials)` — `partials` defaults to
+-- | `{}`, so a caller may invoke `fn(data, rt)`; the main function augments it
+-- | with its inline definitions, and each partial receives the registry too (so
+-- | nested partials resolve).
+compile
+  :: { runtimeVersion :: String } -> Emit -> Array (Tuple String Template) -> Template -> String
+compile meta emit partials main =
   "// barebars-compiled — runtime " <> meta.runtimeVersion <> "\n"
     <> "export const runtimeVersion = "
     <> jsString meta.runtimeVersion
     <> ";\n"
-    <> "export default function (data, rt) {\n"
-    <> "  let out = \"\";\n"
-    <> "  const c0 = rt.scope(data);\n"
-    <> rec.nodes { scope: "c0", depth: 0 } tmpl
-    <> "  return out;\n}\n"
+    <> "export default "
+    <> fn true main
+    <> "\n"
   where
   rec :: Rec
   rec =
@@ -75,6 +84,26 @@ compile meta emit tmpl =
     , nodes: \ctx ts -> foldMap (node ctx) ts
     , child: \ctx -> { scope: "c" <> show (ctx.depth + 1), depth: ctx.depth + 1 }
     }
+
+  -- A `function (data, rt, partials) { … }`. The main function (`withRegistry`)
+  -- merges the inline-partial registry into `partials`; partial functions just
+  -- use the registry they are handed.
+  fn :: Boolean -> Template -> String
+  fn withRegistry t =
+    "function (data, rt, partials) {\n  partials = partials || {};\n"
+      <> (if withRegistry then registry else "")
+      <> "  let out = \"\";\n  const c0 = rt.scope(data);\n"
+      <> rec.nodes { scope: "c0", depth: 0 } t
+      <> "  return out;\n}"
+
+  registry :: String
+  registry
+    | Array.null partials = ""
+    | otherwise =
+        "  partials = Object.assign({}, partials, {\n"
+          <> String.joinWith ",\n"
+            (map (\(Tuple n t) -> "    " <> jsString n <> ": " <> fn false t) partials)
+          <> "\n  });\n"
 
   -- The universal, meaning-free node cases; `Block`/`Expr` defer to the dialect.
   node :: Ctx -> Node -> String
