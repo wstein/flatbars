@@ -6,7 +6,8 @@ computed live (`{{#if v}}…{{else}}…{{/if}}`) next to what Handlebars.js woul
 decide for the same value.
 
 ## Files
-- [`truthiness.bars`](truthiness.bars) — the template (itself a full HTML document).
+- [`template.hbs`](template.hbs) — the template (itself a full HTML document).
+- [`meta.json`](meta.json) — the label and ordering used by the generated playground manifest.
 - [`data.json`](data.json) — one value of each kind.
 - [`expected.html`](expected.html) — the rendered output (regenerate with the command below).
 
@@ -14,11 +15,11 @@ decide for the same value.
 
 ```sh
 # from the repo root
-npx spago run -p barebars-cli -- examples/truthiness/truthiness.bars \
+npx spago run -p barebars-cli -- examples/truthiness/template.hbs \
   --data examples/truthiness/data.json > examples/truthiness/expected.html
 ```
 
-Open `expected.html` in a browser. You can also paste `truthiness.bars` and
+Open `expected.html` in a browser. You can also paste `template.hbs` and
 `data.json` into the [web playground](../../packages/playground/) to explore it
 interactively.
 

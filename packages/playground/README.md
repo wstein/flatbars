@@ -9,14 +9,17 @@ offline** (open `dist/index.html` straight from disk).
 ## Features
 
 - **Template editor** and **JSON data editor**, live.
-- **Output pane** with four views:
+- **Output pane** with five views:
   - **Rendered** — a sandboxed `<iframe>` preview of the HTML output.
   - **HTML** — the raw rendered source.
-  - **AST** — the parsed *skeleton* AST (`BareBars.parse`).
+  - **Parse tree** — the parsed *skeleton* AST (`BareBars.parse`).
+  - **Real AST** — the lowered reference engine AST (`FlatBars.Lower.lower`).
   - **Validation** — the schema-validation report (`BareBars.validate` against
     `preludeSchema`), the engine's second pass.
 - **Examples** — greeting, list/`each`, clause-based conditionals, object
-  iteration, and a `with` table.
+  iteration, a `with` table, and a truthiness parity matrix. The example
+  catalog is generated from `examples/*/{meta.json,template.hbs,data.json}` at
+  build time and bundled into the offline playground.
 - A **status bar** showing parse state, data validity, and the live issue count.
 
 ## Develop
@@ -36,7 +39,7 @@ npm run playground:build
 
 A headless end-to-end check builds the bundle, serves `dist/` over HTTP, and
 drives it with `puppeteer-core` against a locally installed **Brave**, asserting
-the Halogen app mounted (brand, the four output tabs, the preview iframe, and a
+  the Halogen app mounted (brand, the five output tabs, the preview iframe, and a
 clean validation view):
 
 ```sh
@@ -55,5 +58,7 @@ deploy, build and publish the `dist/` directory as static files — or just open
   (`{{#if c}}…{{else}}…{{/if}}`). The full surface dialect (`{{ x }}` auto-escape,
   dotted paths) is a future extension of the desugaring walk (`FlatBars.Lower`);
   the **Real AST** tab already shows that walk's output for the supported core.
+- If you edit `examples/**`, rerun `npm run playground:build` (or just
+  `npm run generate:examples`) so the bundled manifest stays in sync.
 - The richer JS/WASM reference playground lives in [`reference/web/`](../../reference/web/);
   this package is the PureScript equivalent built on the reference engine, FlatBars.

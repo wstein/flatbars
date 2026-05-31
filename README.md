@@ -24,7 +24,7 @@ specification and a JavaScript/WASM reference playground.
 │   ├── flatbars/          `flatbars` — the reference engine (value policy · prelude · lowering)
 │   ├── cli/               `barebars-cli` — render templates from the command line
 │   └── playground/        Halogen web playground (works online and offline as a static bundle)
-├── examples/              Runnable templates (e.g. `truthiness/` — edges & Handlebars parity)
+├── examples/              Runnable fixtures (foldered templates + data, bundled into the playground)
 └── reference/
     └── web/               Provided JS/WASM ("stem") reference playground — kept for comparison
 ```
