@@ -4,11 +4,11 @@
 -- | constructor — parentheses only affect parsing; `(e)` and `e` produce the
 -- | same `Expr`.
 -- | The *skeleton* AST. It is purely syntactic: a `Block` is just a named
--- | application with a captured body. The core attaches no meaning to any name,
--- | recognizes no separators, and has no notion of an "inverse" or "else". All
--- | of that — including multi-branch control flow expressed as *nested clause
--- | blocks* — is the job of the engine's second pass (see `BareBars.Walk` and
--- | `BareBars.Eval`).
+-- | application with a captured body. The core attaches no meaning to any name
+-- | and has no notion of an "inverse" or "else"; `{{else}}` is just a `Sep`
+-- | marker. All of that — including separator-driven control flow — is the job
+-- | of the engine's second pass (see `BareBars.Walk` for the traversal toolkit
+-- | and `BareBars.Engine` for the interpreting driver).
 module BareBars.Syntax
   ( Ident
   , Template
