@@ -1,4 +1,4 @@
--- | **MaxBars** — the top tier of the dialect ladder (CoreBars ⊂ FullBars ⊂
+-- | **MaxBars** — the top tier of the dialect ladder (RawBars ⊂ FullBars ⊂
 -- | MaxBars). It is FullBars plus a richer *surface*: infix operators and pipes
 -- | (`MaxBars.Expr`). Because that surface desugars to the same core `Expr` that
 -- | FullBars already understands, MaxBars reuses FullBars wholesale by

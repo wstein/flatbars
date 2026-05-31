@@ -8,7 +8,7 @@ import Prelude
 
 import BareBars.Compile.FullBars (compileSurface)
 import BareBars.Error (ParseError)
-import CoreBars (compileJs) as CoreBars
+import RawBars (compileJs) as RawBars
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.String (Pattern(..), contains)
@@ -18,9 +18,9 @@ import Test.Assert (assert')
 
 -- assert `src` compiles and the JS contains every fragment in `needles`.
 expectJs :: String -> String -> Array String -> Effect Unit
--- core-syntax emitter SHAPE tests use the CoreBars dialect's compile (no surface
+-- core-syntax emitter SHAPE tests use the RawBars dialect's compile (no surface
 -- desugar — so `{{{item}}}`/scoped vars stay scoped-helper calls, not lookups).
-expectJs = expectWith CoreBars.compileJs
+expectJs = expectWith RawBars.compileJs
 
 -- surface variant (desugar + hoist + emit), for surface-only codegen (partials).
 expectJsS :: String -> String -> Array String -> Effect Unit
@@ -96,7 +96,7 @@ main = do
     [ "rt.call(\"eq\", [rt.lookup(c0.ctx, \"a\"), rt.lookup(c0.ctx, \"b\")], c0)" ]
 
   -- a malformed template is a compile (parse) error, not a crash.
-  case CoreBars.compileJs "{{ oops" of
+  case RawBars.compileJs "{{ oops" of
     Left _ -> pure unit
     Right _ -> assert' "expected a parse error for an unterminated tag" false
 

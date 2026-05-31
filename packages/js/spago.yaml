@@ -14,7 +14,7 @@ package:
     - barebars
     - barebars-json
     - fullbars
-    - corebars
+    - rawbars
     - barebars-compile
     - arrays
     - integers

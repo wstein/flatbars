@@ -1,4 +1,4 @@
--- | **CoreBars** — the austere base of the dialect ladder (CoreBars ⊂ FullBars ⊂
+-- | **RawBars** — the austere base of the dialect ladder (RawBars ⊂ FullBars ⊂
 -- | MaxBars). It renders/compiles the *core* skeleton syntax directly — explicit
 -- | `pass:[{{{ lookup this "x" }}}]`, no surface sugar — against the FullBars
 -- | reference engine. (FullBars adds the surface desugar; MaxBars adds operators
@@ -8,7 +8,7 @@
 -- | resolve `@truthiness` → seed → engine) and the compiler's FullBars `Emit`,
 -- | swapping in *no* surface desugar. It exists so the three dialects are
 -- | symmetric packages over one engine.
-module CoreBars
+module RawBars
   ( render
   , renderDiag
   , renderValue
@@ -37,7 +37,7 @@ import FullBars (formatError, runResolved)
 -- Rendering (core syntax + the FullBars engine)
 --------------------------------------------------------------------------------
 
--- | CoreBars is the austere dialect: it rejects the Handlebars-only tag shapes
+-- | RawBars is the austere dialect: it rejects the Handlebars-only tag shapes
 -- | (`{{{{…}}}}` raw blocks, `{{^…}}` inverse, `{{&…}}` unescaped) — `extras`
 -- | off. Front-end knobs like standalone trimming still pass through.
 coreOptions :: ParseOptions
@@ -48,7 +48,7 @@ coreOptions = defaultParseOptions { extras = false }
 compile :: String -> Either ParseError (Value -> Either Error String)
 compile = compileWith coreOptions
 
--- | `compile` with explicit parse options; CoreBars always rejects extras.
+-- | `compile` with explicit parse options; RawBars always rejects extras.
 compileWith :: ParseOptions -> String -> Either ParseError (Value -> Either Error String)
 compileWith opts src = do
   { directives, nodes } <- parseWith (opts { extras = false }) src
@@ -86,7 +86,7 @@ renderAff src dat = case parseWith coreOptions src of
 compileJs :: String -> Either ParseError String
 compileJs = compileJsWith coreOptions
 
--- | `compileJs` with explicit parse options; CoreBars always rejects extras.
+-- | `compileJs` with explicit parse options; RawBars always rejects extras.
 compileJsWith :: ParseOptions -> String -> Either ParseError String
 compileJsWith opts src = do
   { directives, nodes } <- parseWith (opts { extras = false }) src

@@ -1,11 +1,11 @@
--- | CoreBars dialect tests (`spago test -p corebars`): rendering and compiling
+-- | RawBars dialect tests (`spago test -p rawbars`): rendering and compiling
 -- | the austere *core* syntax (explicit calls, no surface sugar).
-module Test.CoreBars.Main where
+module Test.RawBars.Main where
 
 import Prelude
 
 import BareBars.Value (Value(..))
-import CoreBars (compileJs, render)
+import RawBars (compileJs, render)
 import Data.Either (Either(..), isLeft)
 import Data.Map as Map
 import Data.String (Pattern(..), contains)
@@ -19,7 +19,7 @@ obj = VObject <<< Map.fromFoldable
 
 main :: Effect Unit
 main = do
-  log "CoreBars dialect tests"
+  log "RawBars dialect tests"
 
   -- core syntax renders against the shared engine (explicit lookup, raw output).
   assert' "render: lookup"
@@ -36,7 +36,7 @@ main = do
   -- a parse error surfaces as Left.
   assert' "render: parse error" (isLeft (render "{{ oops" (obj [])))
 
-  -- CoreBars is austere: the Handlebars-only shapes are rejected (DisallowedShape).
+  -- RawBars is austere: the Handlebars-only shapes are rejected (DisallowedShape).
   assert' "reject: inverse {{^}}" (isLeft (render "{{^a}}x{{/a}}" (obj [])))
   assert' "reject: triple inverse {{{^}}}" (isLeft (render "{{{^a}}}x{{{/a}}}" (obj [])))
   assert' "reject: unescaped {{&}}" (isLeft (render "{{&a}}" (obj [])))
@@ -50,4 +50,4 @@ main = do
     Right js -> assert' ("compileJs: expected a module\n" <> js)
       (contains (Pattern "rt.scope(data") js && contains (Pattern "rt.out(c0.ctx)") js)
 
-  log "all CoreBars tests passed"
+  log "all RawBars tests passed"

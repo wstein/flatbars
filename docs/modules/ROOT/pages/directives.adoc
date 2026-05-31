@@ -4,7 +4,7 @@
 A *directive* is a `@key`/`@key: value` marker carried in a short `pass:[{{! … }}]`
 comment at the **head** of a file. The core lifts directives meaning-free (the
 `Sep` precedent applied to comments — xref:grammar.adoc[]); the engine assigns
-meaning. Because carriage lives in the core parser, every dialect (CoreBars,
+meaning. Because carriage lives in the core parser, every dialect (RawBars,
 FullBars, MaxBars) inherits directives uniformly.
 
 == The mechanism

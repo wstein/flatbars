@@ -33,13 +33,13 @@ import {
 
 const BB_VERSION = "0.1.0";
 
-// The active dialect, from `?dialect=` — `corebars` (the austere core) or
+// The active dialect, from `?dialect=` — `rawbars` (the austere core) or
 // `fullbars` (default; the Handlebars-flavoured layer). The header dialect
 // toggle sets this param. (Internally these are the engine's "core"/"surface".)
 const DIALECT = (() => {
   if (typeof location === "undefined") return "surface";
   const d = new URLSearchParams(location.search).get("dialect");
-  return d === "core" || d === "corebars" ? "core" : "surface";
+  return d === "core" || d === "rawbars" ? "core" : "surface";
 })();
 
 // engine-features/v1 capability vector. BareBars backs rendering, a static helper

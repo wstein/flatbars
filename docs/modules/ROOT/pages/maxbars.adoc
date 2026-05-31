@@ -1,7 +1,7 @@
 = The MaxBars dialect (infix operators & pipes)
 :hbs: Handlebars
 
-MaxBars is the top of the dialect ladder — **CoreBars ⊂ FullBars ⊂ MaxBars**. It
+MaxBars is the top of the dialect ladder — **RawBars ⊂ FullBars ⊂ MaxBars**. It
 is FullBars plus a richer *surface*: infix operators and pipes. Everything below
 the surface is reused unchanged.
 

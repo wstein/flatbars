@@ -186,7 +186,7 @@ separator like `pass:[{{else}}]`.)
 FullBars supports Mustache's inverted section `pass:[{{^x}}…{{/x}}]` (and the triple variant
 `pass:[{{{^x}}}…{{{/x}}}]`), desugaring it to `pass:[{{#unless x}}…{{/unless}}]` — so "render when
 falsy" reads the way Handlebars authors expect. You may always write the `unless` helper explicitly
-instead. (The austere CoreBars and MaxBars dialects do *not* accept `pass:[{{^}}]` — there you write
+instead. (The austere RawBars and MaxBars dialects do *not* accept `pass:[{{^}}]` — there you write
 `unless`.) Unescaped output also has the `pass:[{{&x}}]` alias for `pass:[{{{x}}}]`.
 
 == 5.7 Partials become `partial` / `inline`

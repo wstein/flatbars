@@ -25,4 +25,4 @@ package:
       - effect
       - console
       - assert
-      - corebars
+      - rawbars

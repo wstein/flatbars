@@ -54,7 +54,7 @@ str = VString
 
 -- Render core syntax straight through the engine (no dialect layer): this suite
 -- tests the FullBars *engine*, so it uses `runString` directly rather than the
--- CoreBars dialect (which now owns the `render` convenience).
+-- RawBars dialect (which now owns the `render` convenience).
 renderCore :: String -> Value -> Either String String
 renderCore src dat = case runString (refEngine (preludeEnv dat)) src of
   Left e -> Left (show e)
@@ -217,7 +217,7 @@ main = do
       (truthy handlebars (VSafe s) == truthy handlebars (VString s))
 
   -- §8 truthiness matrix — the engine's value policy across modes. This is the
-  -- semantics EVERY dialect shares (CoreBars/FullBars/future MaxBars all render
+  -- semantics EVERY dialect shares (RawBars/FullBars/future MaxBars all render
   -- through one `truthy`, parameterised only by the falsy-set); locks §3.2/§8.
   let
     ruby = Set.fromFoldable [ FFalse, FNull ]

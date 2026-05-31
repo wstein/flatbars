@@ -41,12 +41,12 @@ type ExprParser = Int -> String -> Either ParseError Expr
 -- | `parseExpr` is the interior expression grammar (dialect seam). `extras`
 -- | allows the Handlebars-only tag shapes — raw blocks `{{{{…}}}}`, the inverse
 -- | block `{{^…}}`/`{{{^…}}}`, and unescaped `{{&…}}`. The core *lexer* always
--- | recognizes them (meaning-free); a dialect that doesn't accept them (CoreBars,
+-- | recognizes them (meaning-free); a dialect that doesn't accept them (RawBars,
 -- | MaxBars) sets `extras = false` and the parser rejects them.
 type ParseOptions = { trimStandalone :: Boolean, parseExpr :: ExprParser, extras :: Boolean }
 
 -- | Standalone trimming on (Handlebars parity), the core expression grammar, and
--- | Handlebars-extras allowed (the engine + FullBars use this; CoreBars/MaxBars
+-- | Handlebars-extras allowed (the engine + FullBars use this; RawBars/MaxBars
 -- | override `extras = false`).
 defaultParseOptions :: ParseOptions
 defaultParseOptions = { trimStandalone: true, parseExpr: Expr.parseExpr, extras: true }

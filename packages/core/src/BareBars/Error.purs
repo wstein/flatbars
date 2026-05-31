@@ -35,7 +35,7 @@ data ParseError
   | DirectiveAfterHeader Int
   -- a core-acted header directive (e.g. `@trim`) with an invalid value
   | BadDirective String Int
-  -- a tag shape the active dialect does not accept (e.g. `{{^}}` in CoreBars)
+  -- a tag shape the active dialect does not accept (e.g. `{{^}}` in RawBars)
   | DisallowedShape String Int
 
 derive instance eqParseError :: Eq ParseError

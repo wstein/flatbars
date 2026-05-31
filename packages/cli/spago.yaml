@@ -16,6 +16,6 @@ package:
     - barebars-json
     - barebars-compile
     - fullbars
-    - corebars
+    - rawbars
   run:
     main: Cli.Main

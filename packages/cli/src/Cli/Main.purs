@@ -21,7 +21,7 @@ import Kernel.Walk (validate)
 import BareBars.Compile.FullBars (compileSurfaceWith) as Compile
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
-import CoreBars (compileJsWith, compileWith)
+import RawBars (compileJsWith, compileWith)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map

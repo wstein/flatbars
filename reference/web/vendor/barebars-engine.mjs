@@ -10027,7 +10027,7 @@ var _liftEffect = Aff.Sync;
 var makeAff = Aff.Async;
 var _sequential = Aff.Seq;
 
-// output/CoreBars/index.js
+// output/RawBars/index.js
 var lmap2 = /* @__PURE__ */ lmap(bifunctorEither);
 var runResolved2 = /* @__PURE__ */ runResolved(monadThrowEither);
 var identity9 = /* @__PURE__ */ identity(categoryFn);
@@ -10051,7 +10051,7 @@ var renderDiag = function(src) {
       return lmap2(formatError(src))(runResolved2(v.value0.directives)(identity9)(v.value0.nodes)(dat));
     }
     ;
-    throw new Error("Failed pattern match at CoreBars (line 65, column 22 - line 67, column 100): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at RawBars (line 65, column 22 - line 67, column 100): " + [v.constructor.name]);
   };
 };
 var compileJsWith = function(opts) {

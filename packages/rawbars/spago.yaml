@@ -1,5 +1,5 @@
 package:
-  name: corebars
+  name: rawbars
   publish:
     version: 0.1.0
     license: Apache-2.0
@@ -17,7 +17,7 @@ package:
     - fullbars
     - barebars-compile
   test:
-    main: Test.CoreBars.Main
+    main: Test.RawBars.Main
     dependencies:
       - effect
       - console
