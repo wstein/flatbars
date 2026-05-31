@@ -21,9 +21,12 @@ import BareBars.Error (ParseError(..))
 import BareBars.Span (Span)
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.List (List(..), (:))
+import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
 import Data.Number as Number
 import Data.String.CodeUnits as SCU
+import Data.String.Common (joinWith)
 
 -- | Tokens that appear inside a tag.
 data Token
@@ -212,49 +215,79 @@ lexExpr base src = go 0 []
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
 
 tokenizeTemplate :: String -> Either ParseError (Array RawTok)
-tokenizeTemplate src = go 0 [] [] false
+tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
   where
   cs = SCU.toCharArray src
   len = Array.length cs
 
-  -- i: cursor; buf: pending content chars; acc: emitted tokens; pend: trim
-  -- leading whitespace of the next flushed content run.
-  go :: Int -> Array Char -> Array RawTok -> Boolean -> Either ParseError (Array RawTok)
-  go i buf acc pend
-    | i >= len = Right (flush buf acc pend false)
+  -- Tokens accumulate in a *reversed* `List` (O(1) prepend) and are reversed
+  -- into an `Array` once, for the same O(n²)-avoidance as the content scan.
+  finalize :: List RawTok -> Array RawTok
+  finalize = Array.fromFoldable <<< List.reverse
+
+  -- The content run is tracked as a *slice* `[segStart, i)` of the source plus
+  -- `frags`, the fragments split off by backslash escapes (which rewrite text,
+  -- so the run is not one contiguous slice). A normal character just advances
+  -- `i` — O(1), no per-char copy — so a long content run is linear, not the
+  -- O(n²) `Array.snoc`-per-char it used to be. `frags` is flushed by joining.
+  --
+  -- Every recursive `go` must stay in *tail* position (explicit `case`, never
+  -- `do`) or PureScript abandons the tail-call loop and the scan overflows the
+  -- stack on large input.
+  go
+    :: Int
+    -> Int
+    -> Array String
+    -> List RawTok
+    -> Boolean
+    -> Either ParseError (List RawTok)
+  go i segStart frags acc pend
+    | i >= len = Right (flush (contentTo segStart frags i) acc pend false)
     | otherwise = case Array.index cs i of
-        Nothing -> Right (flush buf acc pend false)
+        Nothing -> Right (flush (contentTo segStart frags i) acc pend false)
         Just c
-          -- backslash escaping of an opener
+          -- backslash escaping of an opener: emit the segment so far, then the
+          -- literal, and restart the segment after the escape.
           | c == '\\' ->
-              if matchAt cs (i + 1) "\\" then go (i + 2) (Array.snoc buf '\\') acc pend
+              if matchAt cs (i + 1) "\\" then
+                go (i + 2) (i + 2) (pushSeg segStart frags i "\\") acc pend
               else case escapedOpenerAt (i + 1) of
-                Just lit -> go (i + 1 + SCU.length lit) (buf <> SCU.toCharArray lit) acc pend
-                Nothing -> go (i + 1) (Array.snoc buf '\\') acc pend
-          -- NB: the recursive `go` must stay in *tail* position in every branch
-          -- — including this one — or PureScript abandons the tail-call loop for
-          -- the whole function and the per-character scan grows the stack (a
-          -- ~6 KB template would overflow). Hence an explicit `case`, not `do`.
-          | isOpenerAt i -> case readTag i of
+                Just lit ->
+                  let
+                    next = i + 1 + SCU.length lit
+                  in
+                    go next next (pushSeg segStart frags i lit) acc pend
+                Nothing -> go (i + 1) (i + 1) (pushSeg segStart frags i "\\") acc pend
+          -- openers all begin with `{`, so gate the (multi-probe) opener check
+          -- on that single character — non-brace content costs one comparison.
+          | c == '{' && isOpenerAt i -> case readTag i of
               Left e -> Left e
               Right res ->
                 let
-                  acc1 = flush buf acc pend res.trimL
-                  acc2 = maybe acc1 (Array.snoc acc1) res.mtok
+                  acc1 = flush (contentTo segStart frags i) acc pend res.trimL
+                  acc2 = maybe acc1 (\t -> t : acc1) res.mtok
                 in
-                  go res.next [] acc2 res.trimR
-          | otherwise -> go (i + 1) (Array.snoc buf c) acc pend
+                  go res.next res.next [] acc2 res.trimR
+          | otherwise -> go (i + 1) segStart frags acc pend
 
-  -- Flush the content buffer, applying a pending leading trim and an optional
-  -- trailing trim (from the tag that follows).
-  flush :: Array Char -> Array RawTok -> Boolean -> Boolean -> Array RawTok
-  flush buf acc pend trimR =
+  -- The content string for a run: prior escape fragments followed by the
+  -- still-uncopied slice `[segStart, end)`.
+  contentTo :: Int -> Array String -> Int -> String
+  contentTo segStart frags end = joinWith "" (Array.snoc frags (slice cs segStart end))
+
+  -- Close the current segment `[segStart, end)` and append a literal fragment.
+  pushSeg :: Int -> Array String -> Int -> String -> Array String
+  pushSeg segStart frags end lit = Array.snoc (Array.snoc frags (slice cs segStart end)) lit
+
+  -- Flush a content string (prepending to the reversed token list), applying a
+  -- pending leading trim and an optional trailing trim (from the following tag).
+  flush :: String -> List RawTok -> Boolean -> Boolean -> List RawTok
+  flush s0 acc pend trimR =
     let
-      s0 = SCU.fromCharArray buf
       s1 = if pend then trimStartWs s0 else s0
       s2 = if trimR then trimEndWs s1 else s1
     in
-      if s2 == "" then acc else Array.snoc acc (RContent s2)
+      if s2 == "" then acc else RContent s2 : acc
 
   -- The brace-prefixed openers, longest first. The `~` whitespace-control
   -- variants (`{{~#`, `{{~/`, …) are recognized so a left-trim tilde may sit

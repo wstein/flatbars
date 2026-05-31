@@ -17,6 +17,8 @@ import BareBars.Syntax (Expr(..), Node(..), Template)
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.List (List(..), (:))
+import Data.List as List
 import Data.Maybe (Maybe(..))
 
 parse :: String -> Either ParseError Template
@@ -41,32 +43,38 @@ type SeqResult = { nodes :: Template, stop :: Stop }
 -- | a close `{{/name}}`. A block captures a single body; multi-branch control
 -- | flow is expressed as nested clause blocks the engine interprets.
 parseSeq :: Array RawTok -> Int -> Either ParseError SeqResult
-parseSeq toks = go []
+parseSeq toks = go Nil
   where
+  -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
+  -- run is reversed into an `Array` once. Building the `Template` with
+  -- `Array.snoc` per node would be O(n²).
+  done :: List Node -> Stop -> SeqResult
+  done acc stop = { nodes: Array.fromFoldable (List.reverse acc), stop }
+
   -- The linear sibling scan. Every recursive `go` call is kept in *tail*
   -- position (explicit `case`, never `do`) so PureScript loops it — otherwise a
   -- bind-wrapped recursive call defeats the tail-call optimization for the whole
   -- function and a long node sequence overflows the stack. (Block *nesting* still
   -- recurses through `parseSeq`, but that depth is bounded by how deep blocks
   -- nest, not by sequence length.)
-  go :: Template -> Int -> Either ParseError SeqResult
+  go :: List Node -> Int -> Either ParseError SeqResult
   go acc i = case Array.index toks i of
-    Nothing -> Right { nodes: acc, stop: StopEOF }
+    Nothing -> Right (done acc StopEOF)
     Just t -> case t of
-      RContent s -> go (Array.snoc acc (Content s)) (i + 1)
+      RContent s -> go (Content s : acc) (i + 1)
       ROutput span tks -> case parseExprTokens tks of
         Left e -> Left e
-        Right e -> go (Array.snoc acc (Output span e)) (i + 1)
+        Right e -> go (Output span e : acc) (i + 1)
       RRaw span name argTks body -> case parseArgTokens argTks of
         Left e -> Left e
-        Right args -> go (Array.snoc acc (RawBlock span name args body)) (i + 1)
+        Right args -> go (RawBlock span name args body : acc) (i + 1)
       RSep span name argTks -> case parseArgTokens argTks of
         Left e -> Left e
-        Right args -> go (Array.snoc acc (Sep span name args)) (i + 1)
-      RClose name -> Right { nodes: acc, stop: StopClose name (i + 1) }
+        Right args -> go (Sep span name args : acc) (i + 1)
+      RClose name -> Right (done acc (StopClose name (i + 1)))
       ROpen span name argTks -> buildBlock acc span name argTks (i + 1)
 
-  buildBlock :: Template -> Span -> String -> Array Token -> Int -> Either ParseError SeqResult
+  buildBlock :: List Node -> Span -> String -> Array Token -> Int -> Either ParseError SeqResult
   buildBlock acc span name argTks i = case parseArgTokens argTks of
     Left e -> Left e
     Right args -> case parseSeq toks i of
@@ -74,7 +82,7 @@ parseSeq toks = go []
       Right inner -> case inner.stop of
         StopEOF -> Left (MismatchedBlock name "<eof>" 0)
         StopClose closed pos
-          | closed == name -> go (Array.snoc acc (Block span name args inner.nodes)) pos
+          | closed == name -> go (Block span name args inner.nodes : acc) pos
           | otherwise -> Left (MismatchedBlock name closed 0)
 
 --------------------------------------------------------------------------------
