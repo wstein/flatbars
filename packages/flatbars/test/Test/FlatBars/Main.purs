@@ -230,6 +230,19 @@ main = do
     (obj [ Tuple "user" (obj [ Tuple "name" (str "Ada") ]) ])
     "Ada"
   expectS "surface-index" "{{ xs.1 }}" (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ]) "b"
+  -- bracket segments: keys with spaces/dots, and a leading bracket.
+  expectS "surface-bracket-space" "{{ user.[full name] }}"
+    (obj [ Tuple "user" (obj [ Tuple "full name" (str "Ada L") ]) ])
+    "Ada L"
+  expectS "surface-bracket-lead" "{{ [home town] }}"
+    (obj [ Tuple "home town" (str "Lovelace") ])
+    "Lovelace"
+  expectS "surface-bracket-dots" "{{ m.[a.b] }}"
+    (obj [ Tuple "m" (obj [ Tuple "a.b" (str "v") ]) ])
+    "v"
+  expectS "surface-bracket-index" "{{ a.[1] }}"
+    (obj [ Tuple "a" (arr [ str "x", str "y" ]) ])
+    "y"
   expectS "surface-this" "{{#each items}}[{{ . }}]{{/each}}"
     (obj [ Tuple "items" (arr [ str "x", str "y" ]) ])
     "[x][y]"

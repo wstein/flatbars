@@ -33,9 +33,11 @@ import Prelude
 import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
 import BareBars.Value (Value(..))
 import Data.Array as Array
+import Data.Foldable (foldl)
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
-import Data.String (Pattern(..), Replacement(..), replaceAll, split, stripPrefix)
+import Data.String (Pattern(..), stripPrefix)
+import Data.String.CodeUnits (singleton, toCharArray)
 
 -- | Desugar a Surface template into core syntax. `clauseNames` are the
 -- | separator names the engine treats as clause markers (e.g. `["else"]`); a
@@ -143,17 +145,25 @@ parents n
   | n == 1 = App "parent" []
   | otherwise = App "parent" [ parents (n - 1) ]
 
--- | Split a (already `../`-stripped) path into segments, treating `/` as `.`,
--- | dropping empties and a leading `this`.
+-- | Split a (already `../`-stripped) path into segments. `.` and `/` separate
+-- | segments; a `[ … ]` run is one literal segment (dots/spaces inside are
+-- | kept). Empty segments and a leading `this` are dropped.
 segmentsOf :: String -> Array String
 segmentsOf s =
   let
-    parts = Array.filter (_ /= "")
-      (split (Pattern ".") (replaceAll (Pattern "/") (Replacement ".") s))
+    final = foldl step { segs: [], cur: "", inB: false } (toCharArray s)
+    parts = Array.filter (_ /= "") (flush final).segs
   in
     case Array.uncons parts of
       Just { head: "this", tail } -> tail
       _ -> parts
+  where
+  flush st = if st.cur == "" then st else st { segs = Array.snoc st.segs st.cur, cur = "" }
+  step st c
+    | st.inB = if c == ']' then st { inB = false } else st { cur = st.cur <> singleton c }
+    | c == '[' = (flush st) { inB = true }
+    | c == '.' || c == '/' = flush st
+    | otherwise = st { cur = st.cur <> singleton c }
 
 -- | A path segment becomes a numeric index when it parses as an integer,
 -- | otherwise a string key.

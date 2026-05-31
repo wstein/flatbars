@@ -148,7 +148,7 @@ lexExpr base src = go 0 []
       | c == '"' -> lexString '"' (i + 1) acc
       | c == '\'' -> lexString '\'' (i + 1) acc
       | isDigit c || (c == '-' && peekDigit (i + 1)) -> lexNumber i acc
-      | isIdentChar c -> lexIdent i acc
+      | isIdentChar c || c == '[' -> lexIdent i acc
       | otherwise -> Left (LexError ("unexpected character '" <> SCU.singleton c <> "'") (base + i))
 
   peekDigit :: Int -> Boolean
@@ -156,12 +156,21 @@ lexExpr base src = go 0 []
     Just d -> isDigit d
     Nothing -> false
 
+  -- An identifier/path token. A `[ … ]` run is consumed whole (so a bracketed
+  -- path segment may contain spaces and dots, e.g. `a.[home town]`); the surface
+  -- dialect interprets the brackets.
   lexIdent :: Int -> Array Token -> Either ParseError (Array Token)
-  lexIdent start acc =
-    let
-      end = scanWhile isIdentChar start
-    in
-      go end (Array.snoc acc (TIdent (slice cs start end)))
+  lexIdent start acc = case scanPath start of
+    Left e -> Left e
+    Right end -> go end (Array.snoc acc (TIdent (slice cs start end)))
+
+  scanPath :: Int -> Either ParseError Int
+  scanPath i = case Array.index cs i of
+    Just '[' -> case findFrom cs (i + 1) "]" of
+      Just j -> scanPath (j + 1)
+      Nothing -> Left (LexError "unterminated '[' in path segment" (base + i))
+    Just c | isIdentChar c -> scanPath (i + 1)
+    _ -> Right i
 
   lexNumber :: Int -> Array Token -> Either ParseError (Array Token)
   lexNumber start acc =

@@ -111,8 +111,8 @@ xref:surface.adoc[surface dialect] (`renderSurface`) restores Handlebars' `pass:
 |Paths `pass:[{{a.b.c}}]`, `pass:[{{../a}}]`
 |surface dialect ⇒ `lookup` chains
 |✅
-|`renderSurface` rewrites bare/dotted/numeric/slash/`../`/`this` paths to `lookup` (§5.2). `@data`
-and `[bracket]` segments are not yet desugared (the lexer has no `@`/`[`).
+|`renderSurface` rewrites bare/dotted/numeric/slash/`../`/`this`/`@data`/`[bracket]` paths to
+`lookup` chains and scoped helpers (§5.2/§5.5). `@../` parent-data is the one path form not desugared.
 
 |Unescaped `pass:[{{{x}}}]`
 |`pass:[{{{ x }}}]` output node

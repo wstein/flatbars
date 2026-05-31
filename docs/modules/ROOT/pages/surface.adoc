@@ -22,12 +22,13 @@ escaped, `pass:[{{{ }}}]` ⇒ raw), §5.2 *paths* (bare, dotted, numeric index,
 legacy slash, `this`/`.`, `../`), §5.3 *literals* and head-vs-argument, §5.5
 *`@data`* variables (`@index`, `@root.x`, …), and the §5.6 *`else if`* chain. The
 reference renderer still runs *core* syntax by default (`renderWith`); call
-`renderSurface` to author in the dialect.
+`renderSurface` to author in the dialect. §5.2 paths include `[bracket]`
+segments (`a.[home town]`, `a.[1]` — dots and spaces inside the brackets are
+literal).
 
-Still *specified but not yet desugared*: `[bracket]` path segments (§5.2 — `[` is
-not an identifier character), `@../` parent-data (the scoped helpers are
-frame-local), hash arguments `k=v` (§5.4), block params `as \|x\|` (§5.5), and
-partials (§5.7). See the xref:flatbars-compat.adoc[compatibility matrix] for
+Still *specified but not yet desugared*: `@../` parent-data (the scoped helpers
+are frame-local), hash arguments `k=v` (§5.4), block params `as \|x\|` (§5.5),
+and partials (§5.7). See the xref:flatbars-compat.adoc[compatibility matrix] for
 per-feature status.
 ====
 
