@@ -1,0 +1,20 @@
+package:
+  name: barebars-json
+  publish:
+    version: 0.1.0
+    license: Apache-2.0
+    location:
+      githubOwner: barebars
+      githubRepo: barebars
+  dependencies:
+    - prelude
+    - either
+    - tuples
+    - ordered-collections
+    - argonaut-core
+    # `argonaut` umbrella: pulls in `argonaut-parser` (Data.Argonaut.Parser),
+    # which has no standalone package-set entry. --pedantic-packages flags this
+    # as "unused" (no `argonaut` module is imported directly) — keep it anyway.
+    - argonaut
+    - foreign-object
+    - barebars

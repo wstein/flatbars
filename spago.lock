@@ -5,25 +5,18 @@
         "path": "packages/core",
         "core": {
           "dependencies": [
-            "argonaut",
-            "argonaut-core",
             "arrays",
             "either",
             "foldable-traversable",
-            "foreign-object",
+            "lists",
             "maybe",
             "numbers",
             "ordered-collections",
             "prelude",
             "strings",
-            "transformers",
-            "tuples"
+            "transformers"
           ],
           "build_plan": [
-            "argonaut",
-            "argonaut-codecs",
-            "argonaut-core",
-            "argonaut-traversals",
             "arrays",
             "bifunctors",
             "const",
@@ -36,7 +29,6 @@
             "exceptions",
             "exists",
             "foldable-traversable",
-            "foreign-object",
             "functions",
             "functors",
             "gen",
@@ -54,8 +46,6 @@
             "partial",
             "prelude",
             "profunctor",
-            "profunctor-lenses",
-            "record",
             "refs",
             "safe-coerce",
             "st",
@@ -64,7 +54,6 @@
             "transformers",
             "tuples",
             "type-equality",
-            "typelevel-prelude",
             "unfoldable",
             "unsafe-coerce"
           ]
@@ -73,13 +62,20 @@
           "dependencies": [
             "assert",
             "console",
-            "effect"
+            "effect",
+            "tuples"
           ],
           "build_plan": [
             "assert",
             "console",
+            "control",
             "effect",
-            "prelude"
+            "invariant",
+            "newtype",
+            "prelude",
+            "safe-coerce",
+            "tuples",
+            "unsafe-coerce"
           ]
         }
       },
@@ -89,6 +85,7 @@
           "dependencies": [
             "arrays",
             "barebars",
+            "barebars-json",
             "effect",
             "either",
             "exceptions",
@@ -108,6 +105,7 @@
             "arraybuffer-types",
             "arrays",
             "barebars",
+            "barebars-json",
             "bifunctors",
             "const",
             "contravariant",
@@ -168,12 +166,82 @@
           "build_plan": []
         }
       },
+      "barebars-json": {
+        "path": "packages/json",
+        "core": {
+          "dependencies": [
+            "argonaut",
+            "argonaut-core",
+            "barebars",
+            "either",
+            "foreign-object",
+            "ordered-collections",
+            "prelude",
+            "tuples"
+          ],
+          "build_plan": [
+            "argonaut",
+            "argonaut-codecs",
+            "argonaut-core",
+            "argonaut-traversals",
+            "arrays",
+            "barebars",
+            "bifunctors",
+            "const",
+            "contravariant",
+            "control",
+            "distributive",
+            "effect",
+            "either",
+            "enums",
+            "exceptions",
+            "exists",
+            "foldable-traversable",
+            "foreign-object",
+            "functions",
+            "functors",
+            "gen",
+            "identity",
+            "integers",
+            "invariant",
+            "lazy",
+            "lists",
+            "maybe",
+            "newtype",
+            "nonempty",
+            "numbers",
+            "ordered-collections",
+            "orders",
+            "partial",
+            "prelude",
+            "profunctor",
+            "profunctor-lenses",
+            "record",
+            "refs",
+            "safe-coerce",
+            "st",
+            "strings",
+            "tailrec",
+            "transformers",
+            "tuples",
+            "type-equality",
+            "typelevel-prelude",
+            "unfoldable",
+            "unsafe-coerce"
+          ]
+        },
+        "test": {
+          "dependencies": [],
+          "build_plan": []
+        }
+      },
       "barebars-playground": {
         "path": "packages/playground",
         "core": {
           "dependencies": [
             "arrays",
             "barebars",
+            "barebars-json",
             "bifunctors",
             "effect",
             "either",
@@ -194,6 +262,7 @@
             "argonaut-traversals",
             "arrays",
             "barebars",
+            "barebars-json",
             "bifunctors",
             "catenable-lists",
             "console",
@@ -282,6 +351,7 @@
             "integers",
             "lists",
             "maybe",
+            "numbers",
             "ordered-collections",
             "prelude",
             "strings",
@@ -290,10 +360,6 @@
           ],
           "build_plan": [
             "aff",
-            "argonaut",
-            "argonaut-codecs",
-            "argonaut-core",
-            "argonaut-traversals",
             "arrays",
             "barebars",
             "bifunctors",
@@ -308,7 +374,6 @@
             "exceptions",
             "exists",
             "foldable-traversable",
-            "foreign-object",
             "functions",
             "functors",
             "gen",
@@ -327,8 +392,6 @@
             "partial",
             "prelude",
             "profunctor",
-            "profunctor-lenses",
-            "record",
             "refs",
             "safe-coerce",
             "st",
@@ -337,7 +400,6 @@
             "transformers",
             "tuples",
             "type-equality",
-            "typelevel-prelude",
             "unfoldable",
             "unsafe-coerce"
           ]

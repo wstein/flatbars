@@ -22,6 +22,7 @@ specification and a JavaScript/WASM reference playground.
 ├── packages/
 │   ├── core/              `barebars` — the engine-agnostic framework (lexer · parser · driver · walk)
 │   ├── flatbars/          `flatbars` — the reference engine (value policy · prelude · lowering)
+│   ├── json/              `barebars-json` — JSON ⇆ `Value` adapter (kept out of the framework)
 │   ├── cli/               `barebars-cli` — render templates from the command line
 │   └── playground/        Halogen web playground (works online and offline as a static bundle)
 ├── examples/              Runnable fixtures (foldered templates + data, bundled into the playground)

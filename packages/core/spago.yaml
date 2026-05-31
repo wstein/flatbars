@@ -9,19 +9,13 @@ package:
   dependencies:
     - prelude
     - arrays
+    - lists
     - strings
     - maybe
     - either
-    - tuples
     - foldable-traversable
     - ordered-collections
     - numbers
-    - argonaut-core
-    # `argonaut` umbrella: pulls in `argonaut-parser` (Data.Argonaut.Parser),
-    # which has no standalone package-set entry. --pedantic-packages flags this
-    # as "unused" (no `argonaut` module is imported directly) — keep it anyway.
-    - argonaut
-    - foreign-object
     - transformers
   test:
     main: Test.BareBars.Main
@@ -29,3 +23,4 @@ package:
       - effect
       - console
       - assert
+      - tuples

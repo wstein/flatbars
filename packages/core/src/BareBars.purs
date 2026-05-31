@@ -15,13 +15,11 @@ module BareBars
   , module BareBars.Helper
   , module BareBars.Parser
   , module BareBars.Walk
-  , module BareBars.Json
   ) where
 
 import BareBars.Engine (Ctl, Engine, Helper, runString, runTemplate)
 import BareBars.Error (Error(..), ParseError(..), renderError, renderParseError)
 import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
-import BareBars.Json (fromJson, parseValue, toJson)
 import BareBars.Parser (parse, parseExprTokens)
 import BareBars.Span (Span, lineColumn, spanText)
 import BareBars.Syntax (Expr(..), Ident, Node(..), Template)

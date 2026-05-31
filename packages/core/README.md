@@ -20,8 +20,11 @@ lives in [`packages/flatbars`](../flatbars/) and is built on top of these module
 | `BareBars.Engine` | §3.4–3.6, A.13 | polymorphic IoC driver: `Ctl m env`, `Helper m env`, `Engine m env`, `runTemplate`/`runString` |
 | `BareBars.Walk` | §4.3 | skeleton visitor (`foldRefs`/`foldTemplate`/`foldExpr`), `splitClause`, schema `validate` |
 | `BareBars.Helper` | A.13 | arity-checked arg combinators (`nullary`/`unary`/`binary`/`variadic`/`atLeast`) for building helpers |
-| `BareBars.Json` | — | JSON ⇆ `Value` bridge for hosts |
 | `BareBars` | §7 | framework aggregator: `parse`, `runTemplate`, `validate`, `foldTemplate`, spans, the `Value` and `Engine` types |
+
+The JSON ⇆ `Value` bridge (`BareBars.Json`: `parseValue`/`fromJson`/`toJson`) lives in a
+separate adapter, [`packages/json`](../json/) (`barebars-json`), so the framework
+carries no JSON dependency — JSON-ness is a host concern.
 
 The reference engine **FlatBars** is in [`packages/flatbars`](../flatbars/), with
 modules `FlatBars.Value` (value policy: `truthy`, `stringify`, `escapeHtml`),

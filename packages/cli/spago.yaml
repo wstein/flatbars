@@ -11,6 +11,7 @@ package:
     - node-buffer
     - exceptions
     - barebars
+    - barebars-json
     - flatbars
   run:
     main: Cli.Main
