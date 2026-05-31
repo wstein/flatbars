@@ -9,6 +9,8 @@ package:
     - strings
     - bifunctors
     - foldable-traversable
+    - exceptions
+    - web-dom
     - halogen
     - barebars
   bundle:

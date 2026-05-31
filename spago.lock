@@ -224,11 +224,13 @@
             "bifunctors",
             "effect",
             "either",
+            "exceptions",
             "foldable-traversable",
             "halogen",
             "maybe",
             "prelude",
-            "strings"
+            "strings",
+            "web-dom"
           ],
           "build_plan": [
             "aff",

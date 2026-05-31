@@ -22,6 +22,8 @@ import Data.Foldable (find)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.Common (joinWith)
 import Effect (Effect)
+import Effect.Class (liftEffect)
+import Effect.Exception (throw)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
@@ -29,11 +31,15 @@ import Halogen.HTML.Core (AttrName(..), ClassName(..), ElemName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Web.DOM.ParentNode (QuerySelector(..))
 
 main :: Effect Unit
 main = HA.runHalogenAff do
-  body <- HA.awaitBody
-  runUI component unit body
+  HA.awaitLoad
+  mEl <- HA.selectElement (QuerySelector "#app")
+  case mEl of
+    Just el -> void (runUI component unit el)
+    Nothing -> liftEffect (throw "BareBars playground: #app mount point not found")
 
 --------------------------------------------------------------------------------
 -- Examples

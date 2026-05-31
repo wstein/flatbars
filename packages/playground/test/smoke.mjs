@@ -87,6 +87,16 @@ try {
   if (!hasIframe) fail("rendered-preview iframe not found");
   if (!/valid against prelude schema/.test(status)) fail(`status not clean: ${JSON.stringify(status)}`);
 
+  // Geometry: header at the top, footer below the editors — catches a broken
+  // (e.g. inverted) layout that "mounted" but is positioned wrong.
+  const box = (sel) => page.$eval(sel, (el) => el.getBoundingClientRect().top);
+  const vh = await page.evaluate(() => window.innerHeight);
+  const headerTop = await box("header.bar");
+  const footerTop = await box("footer.status");
+  if (headerTop > 80) fail(`header not at top (top=${headerTop})`);
+  if (footerTop < vh / 2) fail(`footer not in lower half (top=${footerTop}, vh=${vh})`);
+  if (headerTop >= footerTop) fail(`header/footer order wrong (header=${headerTop}, footer=${footerTop})`);
+
   // Switch to the Validation tab and confirm the default example validates.
   const vIdx = tabs.indexOf("Validation");
   await page.$$eval(".tabs button", (els, i) => els[i].click(), vIdx);
