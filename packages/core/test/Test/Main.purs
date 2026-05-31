@@ -6,8 +6,9 @@ module Test.Main where
 
 import Prelude
 
-import BareBars (Engine, foldTemplate, parse, preludeSchema, renderAff, renderWith, runTemplate, stringify, validate)
+import BareBars (Engine, foldTemplate, parse, preludeSchema, renderAff, renderWith, runTemplate, spanText, stringify, validate)
 import BareBars.Error (Error(..))
+import BareBars.Syntax (Node(..))
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -70,6 +71,7 @@ customEngine root =
   , resolve: \_ name -> case name of
       "this" -> Right \ctl _ -> Right ctl.env
       "shout" -> Right shoutH
+      "at" -> Right \ctl _ -> Right (VString (show ctl.span.start)) -- reads Ctl.span
       _ -> Left (UnknownHelper name)
   , stringify
   }
@@ -187,6 +189,17 @@ main = do
     Left e -> assert' ("custom-engine: parse error " <> show e) false
     Right t -> assert' "custom-engine pluggable env"
       (runTemplate (customEngine (VString "hi")) t == Right "HI")
+
+  -- Source spans: tag-level nodes carry their span; helpers see it via Ctl.span.
+  case parse "  {{{this}}}" of
+    Right [ _, Output sp _ ] -> do
+      assert' "span offsets" (sp.start == 2 && sp.end == 12)
+      assert' "spanText" (spanText "  {{{this}}}" sp == "{{{this}}}")
+    _ -> assert' "span: unexpected parse shape" false
+  case parse "{{{at}}}" of
+    Left e -> assert' ("ctl.span: parse error " <> show e) false
+    Right t -> assert' "ctl.span visible to helper"
+      (runTemplate (customEngine VNull) t == Right "0")
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do

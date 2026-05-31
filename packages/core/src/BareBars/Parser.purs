@@ -12,6 +12,7 @@ import Prelude
 
 import BareBars.Error (ParseError(..))
 import BareBars.Lexer (RawTok(..), Token(..), tokenizeTemplate)
+import BareBars.Span (Span)
 import BareBars.Syntax (Expr(..), Node(..), Template)
 import BareBars.Value (Value(..))
 import Data.Array as Array
@@ -47,23 +48,23 @@ parseSeq toks = go []
     Nothing -> Right { nodes: acc, stop: StopEOF }
     Just t -> case t of
       RContent s -> go (Array.snoc acc (Content s)) (i + 1)
-      ROutput tks -> do
+      ROutput span tks -> do
         e <- parseExprTokens tks
-        go (Array.snoc acc (Output e)) (i + 1)
-      RRaw name argTks body -> do
+        go (Array.snoc acc (Output span e)) (i + 1)
+      RRaw span name argTks body -> do
         args <- parseArgTokens argTks
-        go (Array.snoc acc (RawBlock name args body)) (i + 1)
+        go (Array.snoc acc (RawBlock span name args body)) (i + 1)
       RClose name -> Right { nodes: acc, stop: StopClose name (i + 1) }
-      ROpen name argTks -> buildBlock acc name argTks (i + 1)
+      ROpen span name argTks -> buildBlock acc span name argTks (i + 1)
 
-  buildBlock :: Template -> String -> Array Token -> Int -> Either ParseError SeqResult
-  buildBlock acc name argTks i = do
+  buildBlock :: Template -> Span -> String -> Array Token -> Int -> Either ParseError SeqResult
+  buildBlock acc span name argTks i = do
     args <- parseArgTokens argTks
     inner <- parseSeq toks i
     case inner.stop of
       StopEOF -> Left (MismatchedBlock name "<eof>" 0)
       StopClose closed pos
-        | closed == name -> go (Array.snoc acc (Block name args inner.nodes)) pos
+        | closed == name -> go (Array.snoc acc (Block span name args inner.nodes)) pos
         | otherwise -> Left (MismatchedBlock name closed 0)
 
 --------------------------------------------------------------------------------

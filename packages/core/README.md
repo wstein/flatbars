@@ -13,13 +13,14 @@ JavaScript, so a BareBars engine drops into the same places Handlebars does.
 | `BareBars.Syntax` | §3.1 | core AST: `Template`, `Node`, `Expr` |
 | `BareBars.Lexer` | §1 | template tokenizer + expression tokenizer (`~`, escapes, comments, raw blocks) |
 | `BareBars.Parser` | §2 | `parse :: String -> Either ParseError Template` |
-| `BareBars.Env` | §3.3 | `Env`, `Helper`, `Blocks`, frame stack |
-| `BareBars.Eval` | §3.4–3.5 | `render :: Template -> Env -> Either Error String` |
-| `BareBars.Prelude` | §6 | the reference prelude (a working subset) + `preludeSchema` |
-| `BareBars.Walk` | §4.3 | skeleton-AST visitor (`foldRefs`) + schema validation (`validate`) |
+| `BareBars.Span` | — | `Span` source ranges + `lineColumn`/`spanText` |
+| `BareBars.Engine` | §3.4–3.6, A.13 | polymorphic IoC driver: `Ctl m env`, `Helper m env`, `Engine m env`, `runTemplate`/`runString` |
+| `BareBars.Env` | §3.3 | the reference engine: pluggable `RefEnv m`, registry ops, `refEngine` |
+| `BareBars.Prelude` | §6 | the reference prelude (`Helper m (RefEnv m)`) + `preludeSchema` |
+| `BareBars.Walk` | §4.3 | skeleton visitor (`foldRefs`/`foldTemplate`), clause utilities, schema `validate` |
 | `BareBars.Surface` | §5 | surface dialect — **scaffold/TODO** |
 | `BareBars.Json` | — | JSON ⇆ `Value` bridge for hosts |
-| `BareBars` | §7 | host API: `parse`, `render`, `validate`, `compile`, `renderWith`, `prelude` |
+| `BareBars` | §7 | host API: `parse`, `runTemplate`, `validate`, `compile`, `renderWith`, `renderAff`, `prelude` |
 
 ## What works today
 
@@ -33,21 +34,23 @@ renderWith "{{#each (lookup this \"xs\")}}<li>{{{this}}}</li>{{/each}}"
 -- Right "<li>a</li><li>b</li>"
 ```
 
-Implemented: content, `{{{ output }}}`, `{{#block}}…{{sep …}}…{{/block}}` with
-name-agnostic separators (`{{else}}`, `{{elif}}`, `{{otherwise}}`, … — the core
-privileges no name), inverse-first `{{^block}}`, raw blocks
-`{{{{#raw}}}}…{{{{/raw}}}}`, comments, backslash escaping, `~` whitespace
-control; prelude helpers `this`, `lookup`, `true`/`false`/`null`, `esc_html`,
-`safe`, `raw`, `if`, `unless`, `each`, `with`, `dict`, `apply`, `eq`/`eq?`,
-`not`, `and`, `or`, `log`; and a JSON-schema-style validation pass
-(`validate preludeSchema`) over the skeleton AST.
+Implemented: the **skeleton AST** (`{{{ output }}}`, `{{#block}}…{{/block}}`,
+raw blocks `{{{{#raw}}}}…{{{{/raw}}}}`, comments, backslash escaping, `~`
+whitespace control) with source spans on every tag; a **fully polymorphic
+inversion-of-control engine** (`runTemplate`/`runString` over any
+`MonadThrow Error m` and any `env`), with the reference engine supplied for
+both `Either Error` (`renderWith`/`compile`) and `ExceptT Error Aff`
+(`renderAff`); multi-branch control flow as **nested clause blocks**
+(`{{#if c}}…{{#else}}…{{/else}}{{/if}}`); prelude helpers `this`, `lookup`,
+`true`/`false`/`null`, `esc_html`, `safe`, `raw`, `if`, `unless`, `each`,
+`with`, `then`/`else`, `dict`, `apply`, `eq`/`eq?`, `not`, `and`, `or`, `log`;
+and a JSON-schema-style `validate` over the skeleton.
 
 ## Next milestones
 
 - `BareBars.Surface` — the `{{ }}` / dotted-path / `@data` / hash-arg / partial
   desugarer (§5). Until then, author in core syntax.
 - Partials & decorators in the prelude (§6.6).
-- Source spans on evaluation errors (§4.3); `M = Aff` host for async helpers (§7.5).
 
 ## Test
 

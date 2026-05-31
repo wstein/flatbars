@@ -516,9 +516,9 @@ Both invert control. Pick `runTemplate` to *execute*, `foldTemplate` to *prepare
 `runTemplate` (`Monad m`) and `runString` (`MonadThrow Error m`) are implemented as shown. The
 reference engine is supplied at both `m = Either Error` (`renderWith`/`compile`) and
 `m = ExceptT Error Aff` (`renderAff`), proving the monad is pluggable; its environment is the newtype
-`RefEnv m` (a type *synonym* `Env = { … Helper … Env }` would be cyclic — use a newtype). Two small
-deltas from the sketch below: the handle carries no `span` field yet (planned, pending source spans
-on the AST), and `Ctl.clause`/`splitClause` return `{ before, body }`.
+`RefEnv m` (a type *synonym* `Env = { … Helper … Env }` would be cyclic — use a newtype). The handle
+carries a `span` (the opening tag's code-unit range; `Span.lineColumn` maps it to line/column), and
+`Ctl.clause`/`splitClause` return `{ before, body }`.
 ====
 
 [#engine-api-run]

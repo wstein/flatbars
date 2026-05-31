@@ -24,7 +24,8 @@ violates the engine's schema (an unknown helper, a bad arity, an illegal clause)
 Note what is *absent*: there is no `MultipleElse` or `ElseOutsideBlock`, because the core has no
 `else`. `pass:[{{#else}}…{{/else}}]` is just a block; if it appears where the engine does not expect
 a clause, that is a *validation* error (4.2), not a parse error. Every structural error carries a
-source offset covering the offending tag (a full line/column span is a planned refinement).
+source offset covering the offending tag; `Span.lineColumn src offset` maps it to a 1-based
+line/column.
 
 == 4.2 Validation errors — raised by the engine walk
 
@@ -56,6 +57,9 @@ There is no "missing variable" error, because there are no variables. Reading an
 == 4.3 Diagnostics quality
 
 Because validation is a walk over the AST, an engine SHOULD attach the originating node's source span
-to every validation error, so `UnknownHelper "uppcase"` points at the typo rather than at the
-document. Implementing Phase 2 as an explicit visitor (rather than inlined into rendering) makes this
-— and whole-template linting — straightforward.
+to every diagnostic, so `UnknownHelper "uppcase"` points at the typo rather than at the document. The
+spans are available: every tag-level node carries one, and during rendering the control handle
+exposes it as `ctl.span` (xref:evaluation.adoc[] §3.6) — so a helper that raises `HelperError` can
+quote `spanText`/`lineColumn` of the very tag it was called from. Implementing Phase 2 as an explicit
+visitor (rather than inlined into rendering) makes this — and whole-template linting —
+straightforward.

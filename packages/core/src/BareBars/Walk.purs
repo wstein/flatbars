@@ -32,6 +32,7 @@ module BareBars.Walk
 
 import Prelude
 
+import BareBars.Span (Span)
 import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
 import Data.Array as Array
 import Data.Foldable (foldMap)
@@ -68,12 +69,12 @@ foldRefs f = foldMap (node f)
   node :: (HelperRef -> m) -> Node -> m
   node g = case _ of
     Content _ -> mempty
-    Output e -> expr g e
-    Block name args body ->
+    Output _ e -> expr g e
+    Block _ name args body ->
       g { name, kind: BlockRef, argc: Array.length args }
         <> foldMap (expr g) args
         <> foldRefs g body
-    RawBlock name args _ ->
+    RawBlock _ name args _ ->
       g { name, kind: RawRef, argc: Array.length args } <> foldMap (expr g) args
 
   expr :: (HelperRef -> m) -> Expr -> m
@@ -96,7 +97,13 @@ type Algebra a =
   , output :: Expr -> a
   , raw :: Ident -> Array Expr -> String -> a
   , block ::
-      { name :: Ident, args :: Array Expr, children :: Template, recurse :: Template -> a } -> a
+      { span :: Span
+      , name :: Ident
+      , args :: Array Expr
+      , children :: Template
+      , recurse :: Template -> a
+      }
+      -> a
   , concat :: Array a -> a
   }
 
@@ -109,9 +116,9 @@ foldTemplate alg = go
   node :: Node -> a
   node = case _ of
     Content s -> alg.content s
-    Output e -> alg.output e
-    RawBlock name args raw' -> alg.raw name args raw'
-    Block name args children -> alg.block { name, args, children, recurse: go }
+    Output _ e -> alg.output e
+    RawBlock _ name args raw' -> alg.raw name args raw'
+    Block span name args children -> alg.block { span, name, args, children, recurse: go }
 
 --------------------------------------------------------------------------------
 -- Clause helpers (for nested-clause control flow)
@@ -122,20 +129,20 @@ foldTemplate alg = go
 -- | for an `else` clause in its body).
 clause :: Ident -> Template -> Maybe Template
 clause name = Array.findMap case _ of
-  Block n _ body | n == name -> Just body
+  Block _ n _ body | n == name -> Just body
   _ -> Nothing
 
 -- | The bodies of every top-level `{{#name}}` block in a template.
 clauses :: Ident -> Template -> Array Template
 clauses name = Array.mapMaybe case _ of
-  Block n _ body | n == name -> Just body
+  Block _ n _ body | n == name -> Just body
   _ -> Nothing
 
 -- | A template with every top-level `{{#name}}` block removed — the "main"
 -- | content once a clause has been pulled out.
 withoutClause :: Ident -> Template -> Template
 withoutClause name = Array.filter case _ of
-  Block n _ _ -> n /= name
+  Block _ n _ _ -> n /= name
   _ -> true
 
 -- | Split a body at the first top-level `{{#name}}` clause: the nodes *before*
@@ -147,10 +154,10 @@ splitClause name nodes = case Array.findIndex isClause nodes of
   Just i -> { before: Array.take i nodes, clause: bodyAt i }
   where
   isClause = case _ of
-    Block n _ _ -> n == name
+    Block _ n _ _ -> n == name
     _ -> false
   bodyAt i = case Array.index nodes i of
-    Just (Block _ _ body) -> Just body
+    Just (Block _ _ _ body) -> Just body
     _ -> Nothing
 
 --------------------------------------------------------------------------------

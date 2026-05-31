@@ -43,6 +43,11 @@ preludeSchema :: Schema                                       -- the reference e
 foldTemplate :: Algebra a -> Template -> a                    -- catamorphism: prepare / analyze (A.13.2)
 splitClause  :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
 
+-- Source spans (diagnostics): tag-level nodes and `Ctl` carry a `Span`
+type Span    = { start :: Int, end :: Int }
+spanText     :: String -> Span -> String                      -- the source text a span covers
+lineColumn   :: String -> Int -> { line :: Int, column :: Int } -- 1-based, for an offset
+
 -- Convenience instantiations of the reference engine
 compile      :: String -> Either ParseError (Value -> Either Error String)   -- pure (m = Either Error)
 renderWith   :: String -> Value -> Either String String                      -- pure, errors as text

@@ -18,19 +18,22 @@ module BareBars.Syntax
 
 import Prelude
 
+import BareBars.Span (Span)
 import BareBars.Value (Value)
 
 type Ident = String
 
 type Template = Array Node
 
+-- | Tag-level nodes carry the source `Span` of their opening tag, for
+-- | diagnostics. `Content` does not (it is literal text, never a helper call).
 data Node
   = Content String
-  | Output Expr
-  -- head, args, captured body
-  | Block Ident (Array Expr) Template
-  -- head, args, verbatim body
-  | RawBlock Ident (Array Expr) String
+  | Output Span Expr
+  -- span, head, args, captured body
+  | Block Span Ident (Array Expr) Template
+  -- span, head, args, verbatim body
+  | RawBlock Span Ident (Array Expr) String
 
 data Expr
   = Lit Value
@@ -47,6 +50,6 @@ instance showExpr :: Show Expr where
 instance showNode :: Show Node where
   show = case _ of
     Content s -> "Content " <> show s
-    Output e -> "Output (" <> show e <> ")"
-    Block n args body -> "Block " <> show n <> " " <> show args <> " " <> show body
-    RawBlock n args raw -> "RawBlock " <> show n <> " " <> show args <> " " <> show raw
+    Output _ e -> "Output (" <> show e <> ")"
+    Block _ n args body -> "Block " <> show n <> " " <> show args <> " " <> show body
+    RawBlock _ n args raw -> "RawBlock " <> show n <> " " <> show args <> " " <> show raw

@@ -18,6 +18,7 @@ module BareBars.Lexer
 import Prelude
 
 import BareBars.Error (ParseError(..))
+import BareBars.Span (Span)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
@@ -46,20 +47,20 @@ instance showToken :: Show Token where
 -- | whitespace control has already been applied to the `Content` runs.
 data RawTok
   = RContent String
-  | ROutput (Array Token) -- {{{ expr }}}
-  | ROpen String (Array Token) -- {{# name args }}
+  | ROutput Span (Array Token) -- {{{ expr }}}
+  | ROpen Span String (Array Token) -- {{# name args }}
   | RClose String -- {{/ name }}
-  | RRaw String (Array Token) String -- {{{{# name args }}}} body {{{{/ name }}}}
+  | RRaw Span String (Array Token) String -- {{{{# name args }}}} body {{{{/ name }}}}
 
 derive instance eqRawTok :: Eq RawTok
 
 instance showRawTok :: Show RawTok where
   show = case _ of
     RContent s -> "RContent " <> show s
-    ROutput t -> "ROutput " <> show t
-    ROpen n t -> "ROpen " <> show n <> " " <> show t
+    ROutput _ t -> "ROutput " <> show t
+    ROpen _ n t -> "ROpen " <> show n <> " " <> show t
     RClose n -> "RClose " <> show n
-    RRaw n t b -> "RRaw " <> show n <> " " <> show t <> " " <> show b
+    RRaw _ n t b -> "RRaw " <> show n <> " " <> show t <> " " <> show b
 
 --------------------------------------------------------------------------------
 -- Character helpers
@@ -317,7 +318,12 @@ tokenizeTemplate src = go 0 [] [] false
             do
               toks <- lexExpr start t.core
               if Array.null toks then Left (EmptyOutput i)
-              else Right { mtok: Just (ROutput toks), next: q + 3, trimL: t.trimL, trimR: t.trimR }
+              else Right
+                { mtok: Just (ROutput { start: i, end: q + 3 } toks)
+                , next: q + 3
+                , trimL: t.trimL
+                , trimR: t.trimR
+                }
 
   readBlockOpen :: Int -> String -> Either ParseError TagResult
   readBlockOpen i opener =
@@ -331,7 +337,7 @@ tokenizeTemplate src = go 0 [] [] false
           toks <- lexExpr start t.core
           { name, rest } <- splitHead i toks
           Right
-            { mtok: Just (ROpen name rest)
+            { mtok: Just (ROpen { start: i, end: q + 2 } name rest)
             , next: q + 2
             , trimL: leadTrimAt i || t.trimL
             , trimR: t.trimR
@@ -383,12 +389,15 @@ tokenizeTemplate src = go 0 [] [] false
           case findFrom cs bodyStart closePat of
             Nothing -> Left (UnterminatedRaw i)
             Just qc ->
-              Right
-                { mtok: Just (RRaw name rest (slice cs bodyStart qc))
-                , next: qc + SCU.length closePat
-                , trimL: false
-                , trimR: false
-                }
+              let
+                end = qc + SCU.length closePat
+              in
+                Right
+                  { mtok: Just (RRaw { start: i, end } name rest (slice cs bodyStart qc))
+                  , next: end
+                  , trimL: false
+                  , trimR: false
+                  }
 
   splitHead :: Int -> Array Token -> Either ParseError { name :: String, rest :: Array Token }
   splitHead i toks = case Array.uncons toks of

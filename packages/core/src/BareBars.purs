@@ -13,6 +13,7 @@ module BareBars
   , module BareBars.Env
   , module BareBars.Parser
   , module BareBars.Prelude
+  , module BareBars.Span
   , module BareBars.Walk
   , preludeEnv
   , compile
@@ -27,6 +28,7 @@ import BareBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registe
 import BareBars.Error (Error, ParseError)
 import BareBars.Parser (parse)
 import BareBars.Prelude (prelude, preludeSchema)
+import BareBars.Span (Span, lineColumn, spanText)
 import BareBars.Syntax (Expr(..), Node(..), Template)
 import BareBars.Value (Value(..), stringify, truthy)
 import BareBars.Walk (Algebra, foldTemplate, helperRefs, splitClause, validate)

@@ -10,17 +10,21 @@ the *walk contract* the reference engine implements.
 [source,haskell]
 ----
 type Template = Array Node
+type Span     = { start :: Int, end :: Int }   -- code-unit offsets of the opening tag
 
 data Node
   = Content  String
-  | Output   Expr
-  | Block    Ident (Array Expr) Template     -- head, args, body (one sub-tree)
-  | RawBlock Ident (Array Expr) String       -- head, args, verbatim body
+  | Output   Span Expr                       -- span, expression
+  | Block    Span Ident (Array Expr) Template -- span, head, args, body (one sub-tree)
+  | RawBlock Span Ident (Array Expr) String   -- span, head, args, verbatim body
 
 data Expr
   = Lit Value          -- only Str / Num arrive from the parser
   | App Ident (Array Expr)
 ----
+
+Every tag-level node carries the source `Span` of its opening tag, for diagnostics; `Content` does
+not (it is literal text). `Span.lineColumn` turns an offset into a 1-based line/column.
 
 There is no comment node (the lexer drops them), no inverse field on `Block` (branching is a nested
 `Block`; xref:grammar.adoc[]), and no `Group` constructor — parentheses affect *parsing* only, so
@@ -128,6 +132,7 @@ traverses the tree itself; it asks BareBars to render the sub-trees it chooses.
 type Ctl m env =
   { env      :: env                          -- the current environment (the engine's type)
   , children :: Template                     -- this block's body ([] for inline calls)
+  , span     :: Span                         -- source location of the enclosing tag
   , eval     :: env -> Expr     -> m Value   -- BareBars evaluates an expression for you
   , render   :: env -> Template -> m String  -- BareBars renders a sub-tree for you
   , clause   :: Ident -> { before :: Template, body :: Maybe Template } }  -- split a nested clause

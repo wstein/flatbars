@@ -26,6 +26,7 @@ import Prelude
 
 import BareBars.Error (Error(..))
 import BareBars.Parser (parse)
+import BareBars.Span (Span)
 import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
 import BareBars.Value (Value)
 import BareBars.Walk (splitClause)
@@ -40,6 +41,7 @@ import Data.Traversable (traverse)
 type Ctl m env =
   { env :: env -- the current environment (the engine's own type)
   , children :: Template -- this block's captured body ([] for inline calls)
+  , span :: Span -- source location of the enclosing tag, for diagnostics
   , eval :: env -> Expr -> m Value -- BareBars evaluates an expression
   , render :: env -> Template -> m String -- BareBars renders a sub-tree
   , clause :: Ident -> { before :: Template, body :: Maybe Template } -- split a nested clause
@@ -65,29 +67,30 @@ runTemplate engine = renderTemplate engine.initial
   renderNode :: env -> Node -> m String
   renderNode env = case _ of
     Content s -> pure s
-    Output e -> evalExpr env e >>= engine.stringify
-    Block name args body -> applyBlock env name args body
-    RawBlock name args raw -> applyBlock env name args [ Content raw ]
+    Output span e -> evalExpr env span e >>= engine.stringify
+    Block span name args body -> applyBlock env span name args body
+    RawBlock span name args raw -> applyBlock env span name args [ Content raw ]
 
-  applyBlock :: env -> Ident -> Array Expr -> Template -> m String
-  applyBlock env name args body = do
-    vals <- traverse (evalExpr env) args
+  applyBlock :: env -> Span -> Ident -> Array Expr -> Template -> m String
+  applyBlock env span name args body = do
+    vals <- traverse (evalExpr env span) args
     h <- engine.resolve env name
-    h (ctl env body) vals >>= engine.stringify
+    h (ctl env body span) vals >>= engine.stringify
 
-  evalExpr :: env -> Expr -> m Value
-  evalExpr env = case _ of
+  evalExpr :: env -> Span -> Expr -> m Value
+  evalExpr env span = case _ of
     Lit v -> pure v
     App name args -> do
-      vals <- traverse (evalExpr env) args
+      vals <- traverse (evalExpr env span) args
       h <- engine.resolve env name
-      h (ctl env []) vals
+      h (ctl env [] span) vals
 
-  ctl :: env -> Template -> Ctl m env
-  ctl env body =
+  ctl :: env -> Template -> Span -> Ctl m env
+  ctl env body span =
     { env
     , children: body
-    , eval: evalExpr
+    , span
+    , eval: \e -> evalExpr e span
     , render: renderTemplate
     , clause: \name ->
         let
