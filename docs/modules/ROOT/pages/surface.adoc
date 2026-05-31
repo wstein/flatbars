@@ -188,15 +188,22 @@ There is *no inverted-block sugar*. BareBars adopts Mustache's `pass:[{{^x}}]` i
 |`pass:[{{> name k=v}}]` |`pass:[{{{ partial "name" this (dict "k" v) }}}]`
 |`pass:[{{> name ctx k=v}}]` |`pass:[{{{ partial "name" ctx' (dict "k" v) }}}]`
 |`pass:[{{> (expr)}}]` (dynamic) |`pass:[{{{ partial (expr) this }}}]`
-|`pass:[{{#> name k=v}}body{{/name}}]` |`pass:[{{#partial> "name" (dict "k" v)}}body{{/partial>}}]`
+|`pass:[{{#partial name k=v}}body{{/partial}}]` |`pass:[{{#partial "name" this (dict "k" v)}}body{{/partial}}]`
 |`pass:[{{> @partial-block}}]` |`pass:[{{{ partial-block }}}]`
-|`pass:[{{#*inline "name"}}body{{/inline}}]` |`pass:[{{#inline "name"}}body{{/inline}}]`
+|`pass:[{{#inline name}}body{{/inline}}]` |`pass:[{{#inline "name"}}body{{/inline}}]`
 |===
+
+Block and inline partials are written with the *core spellings* `pass:[{{#partial}}]` /
+`pass:[{{#inline}}]` (a bare name is literalized like `pass:[{{> name}}]`). A block `partial`
+renders the named partial with its `body` as both the fallback (when the partial is missing) and the
+`pass:[{{> @partial-block}}]` yield point; `inline` definitions are hoisted into the registry before
+rendering. The Handlebars `pass:[{{#> name}}…{{/name}}]` / `pass:[{{#*inline}}…{{/inline}}]` *sigils*
+are not parsed (the opener sigil / close-name mismatch needs partial-specific parser support).
 
 Partials render *unescaped* — a partial produces markup, not a data value, so the desugaring is the
 plain triple-stash with no `esc_html`. The partial *name* desugars to a `STRING` literal; a dynamic
-partial keeps the computed expression. `partial`, `partial>`, `inline`, and the scoped
-`partial-block` are engine helpers; see xref:appendix-handlebars.adoc#partials[A.6].
+partial keeps the computed expression. `partial`, `inline`, and the scoped `partial-block` are engine
+helpers; see xref:appendix-handlebars.adoc#partials[A.6].
 
 == 5.8 What Surface does *not* change
 
