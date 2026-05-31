@@ -93,10 +93,21 @@ function lookup(obj, ...segs) {
 
 // ── frames ───────────────────────────────────────────────────────────────────
 function scope(data) {
-  return { ctx: data ?? null, index: null, key: null, first: null, last: null, parent: null, root: data ?? null };
+  return {
+    ctx: data ?? null, index: null, key: null, first: null, last: null,
+    parent: null, parentIndex: null, parentKey: null, parentFirst: null, parentLast: null,
+    root: data ?? null,
+  };
 }
+// A child frame, exposing the *enclosing* frame's loop data under `parent-*`
+// (FullBars `parentData`: each/with rebind the parent's index/key/first/last).
 function childFrame(parent, ctx, index, key, first, last) {
-  return { ctx, index, key, first, last, parent: parent.ctx, root: parent.root };
+  return {
+    ctx, index, key, first, last,
+    parent: parent.ctx,
+    parentIndex: parent.index, parentKey: parent.key, parentFirst: parent.first, parentLast: parent.last,
+    root: parent.root,
+  };
 }
 
 // ── iteration: `each` over array or object (FullBars eachH) ──────────────────
@@ -105,7 +116,8 @@ function each(coll, parent, bodyFn, elseFn) {
   if (Array.isArray(coll)) {
     items = coll.map((val, i) => ({ val, key: String(i) }));
   } else if (coll && typeof coll === "object" && !isSafe(coll)) {
-    items = Object.keys(coll).map((k) => ({ val: coll[k], key: k }));
+    // FullBars VObject is an ordered Map — iteration is by *sorted* key.
+    items = Object.keys(coll).sort().map((k) => ({ val: coll[k], key: k }));
   } else {
     items = [];
   }
@@ -124,6 +136,43 @@ function withCtx(val, parent, bodyFn, elseFn) {
   return bodyFn(childFrame(parent, val, null, null, null, null));
 }
 
+// ── JSON serialization (FullBars.Value.jsonStringify): compact or pretty, with
+//    sorted object keys (ordered Map) and per-code-unit string escaping ────────
+function jsonQuote(s) {
+  let r = '"';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i], code = s.charCodeAt(i);
+    if (c === '"') r += '\\"';
+    else if (c === "\\") r += "\\\\";
+    else if (c === "\n") r += "\\n";
+    else if (c === "\r") r += "\\r";
+    else if (c === "\t") r += "\\t";
+    else if (code < 0x20) r += "\\u00" + code.toString(16).padStart(2, "0");
+    else r += c;
+  }
+  return r + '"';
+}
+function renderJson(v, indent, depth) {
+  if (isSafe(v)) v = v.s;
+  if (v === null || v === undefined) return "null";
+  switch (typeof v) {
+    case "boolean": return v ? "true" : "false";
+    case "number": return String(v);
+    case "string": return jsonQuote(v);
+  }
+  const colon = indent ? ": " : ":";
+  const wrap = (open, close, items) => {
+    if (items.length === 0) return open + close;
+    if (!indent) return open + items.join(",") + close;
+    const pad = indent.repeat(depth + 1);
+    return open + "\n" + items.map((it) => pad + it).join(",\n") + "\n" + indent.repeat(depth) + close;
+  };
+  if (Array.isArray(v)) return wrap("[", "]", v.map((x) => renderJson(x, indent, depth + 1)));
+  const members = Object.keys(v).sort().map((k) => jsonQuote(k) + colon + renderJson(v[k], indent, depth + 1));
+  return wrap("{", "}", members);
+}
+const jsonText = (v, opts) => renderJson(v, opts && typeof opts === "object" && truthy(opts.pretty) ? "  " : null, 0);
+
 // ── output / escaping helpers the codegen inlines ────────────────────────────
 const out = (v) => stringify(v);
 const esc = (v) => isSafe(v) ? v : new Safe(escapeHtml(stringify(v)));
@@ -138,6 +187,10 @@ const helpers = {
   last: (a, f) => f.last,
   root: (a, f) => f.root,
   parent: (a, f) => f.parent,
+  "parent-index": (a, f) => f.parentIndex,
+  "parent-key": (a, f) => f.parentKey,
+  "parent-first": (a, f) => f.parentFirst,
+  "parent-last": (a, f) => f.parentLast,
   true: () => true,
   false: () => false,
   null: () => null,
@@ -154,6 +207,8 @@ const helpers = {
   and: (a) => a.every(truthy),
   or: (a) => a.some(truthy),
   log: () => null,
+  json: (a) => jsonText(a[0], a[1]),
+  esc_json: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))),
   else: () => new Safe(""),
   elif: () => new Safe(""),
   dict: (a) => { const o = {}; for (let i = 0; i + 1 < a.length; i += 2) o[stringify(a[i])] = a[i + 1]; return o; },

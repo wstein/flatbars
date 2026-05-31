@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "spago build",
-    "test": "spago test -p barebars && spago test -p fullbars && spago test -p barebars-json && spago test -p barebars-js && npm run check:catalog && npm --workspace packages/playground run test",
+    "test": "spago test -p barebars && spago test -p fullbars && spago test -p barebars-json && spago test -p barebars-js && spago test -p barebars-compile && npm run check:catalog && npm run test:compile && npm --workspace packages/playground run test",
     "cli": "spago run -p barebars-cli",
     "playground": "npm --workspace packages/playground run dev",
     "playground:build": "npm --workspace packages/playground run build",
@@ -21,7 +21,7 @@
     "format:check": "purs-tidy check \"packages/*/src/**/*.purs\" \"packages/*/test/**/*.purs\"",
     "lint": "spago build --pedantic-packages",
     "clean": "rimraf output .spago",
-    "test:compile": "node packages/compile/conformance.mjs"
+    "test:compile": "spago build && node packages/compile/conformance.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.23.0",
