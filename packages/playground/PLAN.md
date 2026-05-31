@@ -1,118 +1,103 @@
-# Expert-level Playground — phased plan
+# Bars Lab — polyglot template playground (plan)
 
-Goal: bring `packages/playground` to the bar set by `reference/web` (the **"Stem
-Playground — IDE"**), a reference-quality, IDE-like template playground. This
-document maps each reference capability to a BareBars task and sequences them
-into shippable phases. **Nothing here is built yet — this is for approval.**
+Goal: **one** playground that serves **Handlebars**, **Stem**, *and*
+**BareBars/FlatBars** — porting the full `reference/web` ("Stem Playground —
+IDE") feature set and adding BareBars as a first-class engine. Draft for
+approval; nothing built yet. (Working name "Bars Lab" — see naming options.)
 
-## Reference inventory (`reference/web`)
+## Decisive finding: the reference is already a multi-engine IDE
 
-What the reference ships (from `index.html`, `playground_utils.mjs`,
-`validate.mjs`, `panels/`, `wasm/`, `vendor/`):
+`reference/web` is **adapter-based and polyglot by design**. Each engine provides
+the same seam (the "Stem seam"):
 
-- **IDE shell**: docked tab strips — `tmpl-tabs`/`sources` (multi-document
-  editing), `view-tabs` (output modes), `inspect-tabs`/`dock-tabs` (inspector
-  panels), `output-preview`. Panes switch between `output` and `sources`.
-- **Editor intelligence**: `byteToChar`/`charToByte`/`byteRangeToCharRange`/
-  `charToLineColumn` (position mapping), `partialNameAt` (cursor-aware),
-  `debounce`.
-- **Static analyses**: `astOutline`, `analyseDataAccess`, `analyseCalls`,
-  `analyseWhitespace`, `analyseEscapeRuns`, `analyseCoverage`,
-  `buildDependencyGraph`, `disassemble`.
-- **Parity & reference**: `stemTruthy` vs `handlebarsTruthy`, `handlebars_golden`
-  (golden comparison), `buildCheatSheetData`, vendored `handlebars`, `jsonata`,
-  `js-yaml`.
-- **Data**: `mergeDataOverlays` + overlay-name validation (compose data sources).
-- **Panels**: `partials`, `transformers`.
-- **Engine**: `wasm/stem_native` (Stem compiled to WASM) + `validate.mjs` golden
-  expectations; `test/browser_smoke.mjs` with screenshots.
+```text
+{ render, compile, parseAst, inspectAt,
+  requiredAssigns,          // data-access analysis
+  partialGraph,             // partial dependency graph
+  usedTransformers, allTransformers,   // Stem-only; absent ⇒ panel hides
+  catalog,                  // helper/feature catalog
+  engineInfo, features, version }       // capability advertisement
+```
 
-## Current state (`packages/playground`)
+Inspector panels are **feature-gated** (`hasFeature`/`featureFidelity`/
+`tabVisibleUnder`): `problems`, `data-access`, `trim`, `partials`,
+`capabilities`, `perf`, `coverage`, `dep-arrow`, `transformers`. An engine that
+doesn't advertise a feature simply doesn't show that panel. It already runs Stem
++ vendored Handlebars side by side.
 
-Halogen SPA (~340 lines): template editor + JSON data editor, example picker,
-**core/surface dialect toggle**, 5 output views (Rendered / HTML / Parse tree /
-Real AST / Validation), status footer. Renders entirely in-browser via the
-`barebars` + `flatbars` engine compiled to JS.
+## Strategy (the pivot — confirm)
 
-## Architectural decisions (to confirm)
+**Build Bars Lab on `reference/web`; add a BareBars engine adapter; rebrand.**
+Do *not* rebuild the IDE in Halogen. Rationale:
 
-1. **Stay on Halogen/PureScript, do not port the reference's vanilla JS.** Our
-   engine already compiles to JS; we reuse it directly (`parse`, `lower`,
-   `validate`, `escapingWarnings`, `Span.lineColumn`, `preludeSchema`, the
-   `FlatBars` renderers). No WASM is needed — BareBars *is* the JS engine. The
-   reference's JS is a behavioural reference, not code to copy.
-2. **Analyses are AST passes, not string scans.** Each reference analysis maps to
-   a `foldTemplate`/`foldExpr`/`lower` pass over our typed AST — more faithful
-   than the reference's text heuristics and reusing existing tooling.
-3. **Offsets: code units, not bytes.** The reference maps UTF-8 byte ranges; we
-   use code-unit offsets (`Span`, `lineColumn`) end to end, so we skip the
-   byte/char conversion layer (simpler, already correct for our `Span`s).
-4. **"Transformers" has no BareBars analogue.** That is a Stem concept; we either
-   omit that panel or repurpose it as a **helpers** panel (the prelude + custom
-   registrations). Flagged for decision in Phase 3.
+- The reference gives us *all* Stem features, the Handlebars engine, and every
+  inspector panel **for free** — "migrate all Stem features" becomes "keep them
+  and add one adapter," not "reimplement dozens of analyses."
+- BareBars already compiles to JS, so it plugs into the vanilla-JS adapter seam
+  via a compiled facade — no WASM needed (the `barebars-js` facade is the seed:
+  `render`/`renderSurface` already exist; we extend it to the full seam).
+- The current Halogen `packages/playground` is **superseded** by Bars Lab. Keep
+  it only if we still want a tiny embeddable BareBars-only demo (decision below).
 
-## Mapping: reference feature → BareBars implementation
+Consequence: this reverses the earlier "stay on Halogen / reuse our engine"
+decision. We keep the engine in PureScript and expose it to the lab as JS.
 
-| Reference | BareBars implementation | Reuses |
+## The BareBars engine adapter (the core new work)
+
+Implement the seam in a `barebars.mjs` adapter backed by a compiled PureScript
+facade (`FlatBars.Lab` or an extension of `barebars-js`):
+
+| Seam member | BareBars implementation | Reuses |
 |---|---|---|
-| `charToLineColumn`, position mapping | `Span.lineColumn`, `parseErrorAt` | P8 (done) |
-| inline error markers | render `validate`/`escapingWarnings` issues + `ParseError` at line:col | P8, `escapingWarnings` |
-| `astOutline` | `foldTemplate` → collapsible node tree | `foldTemplate` |
-| `analyseDataAccess` | `foldExpr` collecting `lookup`/path roots → data-field map | `foldExpr` |
-| `analyseCalls` | `foldExpr` collecting `App` heads → used helpers vs `preludeSchema` | `preludeSchema` |
-| `analyseEscapeRuns` | the escaping lint (raw output of data) | `escapingWarnings` (done) |
-| `analyseWhitespace` | detect `~`/trim effects from the structural parse | `Lexer` trims |
-| `analyseCoverage` | branch/path hit-set from an instrumented `render` over data | engine walk |
-| `disassemble` | the **Real AST** (`lower`) view, expanded | `lower` (done) |
-| `buildDependencyGraph` | scan `{{> name}}`/`partial` calls across documents | Surface/`hoistInline` |
-| `stemTruthy` vs `handlebarsTruthy` | `FlatBars.truthy` vs vendored Handlebars; parity table | `truthy`, vendor HB |
-| `buildCheatSheetData` | generate from `preludeSchema` / the helper catalog | docs-from-helperDefs (done) |
-| `mergeDataOverlays` | merge N JSON data docs into the render context | `BareBars.Json` |
-| `partials` panel | named-partial documents | `renderSurfaceWith`, `{{#inline}}` |
-| `handlebars_golden` | side-by-side BareBars vs vendored Handlebars output | vendor HB |
+| `render(tmpl, data, opts)` | `FlatBars.renderWithDiag` / `renderSurfaceDiag` (dialect = opt) | barebars-js, the **core/surface toggle** |
+| `parseAst(tmpl)` | `parse` → `Template` (+ `lower` → `RNode`) serialized to JS | Parser, Lower |
+| `inspectAt(tmpl, offset)` | node/expr at a code-unit offset via spans | `Span` |
+| `requiredAssigns(tmpl)` | `foldExpr` over `lookup`/path roots → data fields | `foldExpr` |
+| `partialGraph(tmpl, partials)` | scan `{{> }}`/`partial` + `{{#inline}}` defs | Surface, `hoistInline` |
+| `catalog()` | helpers from `preludeSchema` / `helper-catalog` | docs-from-helperDefs |
+| `features` | advertise: paths, `@data`, partials, inline, `else`/`elif`, `~`, raw, **no transformers** | preludeSchema |
+| `engineInfo`/`version` | package metadata | — |
+| `problems` (diagnostics) | `validate` + `escapingWarnings` + `ParseError`, located via `lineColumn` | P8, lint |
+| `coverage` | branch/path hit-set from an instrumented render | engine walk |
+
+`transformers` and any Stem-only feature are simply not advertised → those panels
+hide for the BareBars engine, exactly as for Handlebars.
+
+## Polyglot headline feature
+
+Cross-engine **side-by-side**: one template + data, rendered by Handlebars vs
+Stem vs BareBars at once, with per-engine diagnostics and a diff. The reference
+already does Stem-vs-Handlebars golden comparison; we extend it to three engines.
+This is the reason to be polyglot, not just multi-tab.
 
 ## Phased roadmap
 
-Each phase is independently shippable, keeps the suite + smoke test green, and
-ends with a polish/UX pass.
+- **Phase 0 — Adopt & build.** Bring `reference/web` into the monorepo build as
+  the lab (entry point, `build.sh` → our tooling), Stem (WASM) + Handlebars
+  intact, green smoke test. Decide the fate of Halogen `packages/playground`.
+- **Phase 1 — BareBars adapter (MVP).** `render` + `parseAst` + `features` +
+  `engineInfo`; BareBars selectable in the engine catalog; Rendered/HTML/AST
+  views work. Dialect (core/surface) as an engine option.
+- **Phase 2 — BareBars inspectors.** Wire `problems` (diagnostics), `data-access`
+  (`requiredAssigns`), `trim`, `capabilities`/`catalog`, `disassemble` (`lower`).
+  Feature-gate the rest.
+- **Phase 3 — Partials & multi-document.** `partialGraph`, the partials panel,
+  `{{#inline}}` defs across documents.
+- **Phase 4 — Cross-engine parity.** 3-way side-by-side + diff; truthiness
+  cheat-sheet across engines; golden harness extended to BareBars.
+- **Phase 5 — Rebrand & polish.** Name/logo/landing; data overlays; shareable
+  URL state; `coverage`/`perf` panels for BareBars.
+- **Phase 6 — Tests & CI.** Browser-smoke + screenshots per engine (extend
+  `reference/web/test`); golden diffs in CI.
 
-- **Phase 0 — IDE shell.** Restructure the layout into the docked multi-pane shell
-  (sources dock, editor, `view-tabs`, inspector dock) without losing current
-  features. Establishes the component structure the later panels slot into.
-- **Phase 1 — Editor diagnostics (recommended first).** Line:column readout;
-  inline error/issue markers + a gutter, mapping `ParseError` and `validate`/
-  `escapingWarnings` issues to positions via `Span.lineColumn`. Highest
-  polish-per-effort; builds on P8.
-- **Phase 2 — Analysis inspectors.** AST outline, data-access map, call graph
-  (used helpers vs schema, unknown/over-arity flags), whitespace + escape-run
-  views, coverage-over-data. Each a new inspector pane over the AST.
-- **Phase 3 — Multi-document.** Partials panel (named partials via
-  `renderSurfaceWith`, `{{#inline}}` hoisting), partial-dependency graph. Decide
-  the "transformers" → "helpers" panel question here.
-- **Phase 4 — Handlebars parity.** Side-by-side BareBars vs vendored Handlebars
-  output, the truthiness parity cheat sheet, and a golden-comparison harness
-  (mirroring `handlebars_golden.mjs`).
-- **Phase 5 — Reference/cheat sheet.** A helper cheat-sheet panel generated from
-  `preludeSchema` / `helper-catalog.adoc` (single source — ties to the
-  docs-from-helperDefs work).
-- **Phase 6 — UX polish.** Data overlays (compose data docs), shareable state
-  (encode editor state in the URL), search, and a `browser_smoke` + screenshot
-  harness matching the reference test rig.
+## Open questions
 
-## Cross-cutting
-
-- **Testing**: extend `reference/web/test`-style browser smoke (Brave/puppeteer,
-  already used for the current smoke) per phase; keep `playground_utils`-style
-  pure helpers unit-tested.
-- **Examples**: the reference's `examples/` set; align our generated examples.
-- **Fidelity**: per feature, cross-check behaviour against `reference/web` during
-  implementation rather than guessing from this map.
-
-## Open questions for the user
-
-1. Confirm **Halogen/PureScript** (decision 1) vs porting the reference stack.
-2. **Transformers** panel: omit, or repurpose as a **helpers** panel?
-3. Phase order — start at **Phase 1** (editor diagnostics) or **Phase 0** (shell
-   first)?
-4. Scope of **Handlebars parity** — is matching `{hb}` output a hard goal for the
-   playground, or informational?
+1. **Strategy**: confirm building on `reference/web` + a BareBars adapter (vs a
+   Halogen rebuild). Recommended: build on the reference.
+2. **Name** (see ratings in the chat): Bars Lab / Brace Lab / Polybars / …
+3. **Halogen `packages/playground`**: retire it, or keep a minimal embeddable
+   BareBars-only demo?
+4. **Stem source**: is the prebuilt `wasm/stem_native` the canonical Stem, or do
+   we track a Stem source/repo for rebuilds?
+5. **Repo placement**: does Bars Lab live in this repo (e.g. `packages/lab` or
+   promote `reference/web`), and is the Stem/Handlebars vendoring kept as-is?
