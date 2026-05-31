@@ -90,6 +90,19 @@ This is the reason to be polyglot, not just multi-tab.
 - **Phase 6 — Tests & CI.** Browser-smoke + screenshots per engine (extend
   `reference/web/test`); golden diffs in CI.
 
+## Status (2026-05-31)
+
+- **Phase 1 ✓** — BareBars adapter (`reference/web/barebars.mjs`); `?engine=barebars`
+  boots in headless Brave, render works (surface + core), 13 adapter tests.
+- **Phase 2 ✓** — real `parseAst` + exact `requiredAssigns` + `usedTransformers`
+  via `FlatBars.JS.astJson`; capability gating verified in-browser (Data Access /
+  Transformers panels light up; partials/whitespace gate off).
+- **Phase 3 ◑** — cross-engine **compare view** shipped (`compare.html`, the
+  headline; Handlebars≡BareBars confirmed, Stem divergence surfaced) + partial/
+  inline AST fidelity. *Remaining:* multi-document partials → `partial-graph`
+  panel (needs `renderSurfaceWith` + the sources panel), and the core/surface
+  **dialect toggle** as a UI control.
+
 ## Open questions
 
 1. **Strategy**: confirm building on `reference/web` + a BareBars adapter (vs a
