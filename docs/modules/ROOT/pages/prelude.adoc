@@ -81,6 +81,9 @@ Scoped helpers installed by `each`:
 |`key` |property name (objects) or numeric index as string (arrays)
 |`first` / `last` |`VBool` — first / last element?
 |`parent` |the collection's enclosing context
+|`parent-index` / `parent-key` / `parent-first` / `parent-last` |the *enclosing* loop's
+`index`/`key`/`first`/`last` — the target of surface `pass:[{{@../index}}]` etc. (one `../` level).
+Installed by `each`/`with` only when an enclosing loop provided them.
 |===
 
 == 6.5 Composition / data helpers

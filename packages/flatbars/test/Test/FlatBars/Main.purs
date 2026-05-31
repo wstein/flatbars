@@ -293,6 +293,19 @@ main = do
   expectS "surface-at-root" "{{#each xs}}{{@root.title}};{{/each}}"
     (obj [ Tuple "title" (str "T"), Tuple "xs" (arr [ str "a" ]) ])
     "T;"
+  -- @../ parent-data: a nested loop reads the enclosing loop's index/key/etc.
+  expectS "surface-at-parent-index"
+    "{{#each rows}}{{#each this}}[{{@../index}}-{{@index}}:{{ . }}]{{/each}}{{/each}}"
+    (obj [ Tuple "rows" (arr [ arr [ str "a", str "b" ], arr [ str "c" ] ]) ])
+    "[0-0:a][0-1:b][1-0:c]"
+  expectS "surface-at-parent-key"
+    "{{#each outer}}{{#each this}}{{@../key}}.{{@key}};{{/each}}{{/each}}"
+    (obj [ Tuple "outer" (obj [ Tuple "g" (obj [ Tuple "a" (str "1"), Tuple "b" (str "2") ]) ]) ])
+    "g.a;g.b;"
+  expectS "surface-at-parent-first-last"
+    "{{#each rows}}{{#each this}}{{#if @../first}}F{{/if}}{{#if @../last}}L{{/if}};{{/each}}{{/each}}"
+    (obj [ Tuple "rows" (arr [ arr [ str "a" ], arr [ str "b" ] ]) ])
+    "F;L;"
 
   -- else if (§5.6): lowers to nested if blocks in the else clause.
   expectS "surface-elseif-mid" "{{#if a}}A{{else if b}}B{{else}}C{{/if}}"

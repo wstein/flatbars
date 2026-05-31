@@ -30,10 +30,13 @@
 -- |    {{/inline}}` (a definition, hoisted by `hoistInline`); §5.7. A bare name is
 -- |    literalized. `{{> @partial-block}}` ⇒ a `(partial-block)` call.
 -- |
--- | Not yet desugared: `@../` parent-data (the scoped helpers are frame-local),
--- | and the Handlebars block sigils `{{#> name}}…{{/name}}` / `{{#*inline}}…
--- | {{/inline}}` — the opener sigil/close-name mismatch needs parser support, so
--- | use the `{{#partial}}` / `{{#inline}}` core spellings instead.
+-- |    `@../index` (and `key`/`first`/`last`) reads the enclosing loop's datum
+-- |    via the `parent-*` helpers (one `../` level).
+-- |
+-- | Not yet desugared: the Handlebars block sigils `{{#> name}}…{{/name}}` /
+-- | `{{#*inline}}…{{/inline}}` — the opener sigil/close-name mismatch needs
+-- | parser support, so use the `{{#partial}}` / `{{#inline}}` core spellings
+-- | instead.
 module FlatBars.Surface
   ( desugar
   , hoistInline
@@ -278,14 +281,21 @@ pathExpr scope raw
 
 -- | A `@data` path: the first segment is a scoped helper, any remaining
 -- | segments are looked up on its value. `@index` ⇒ `(index)`; `@root.x` ⇒
--- | `(lookup (root) "x")`. A leading `../` is not faithfully supported (the
--- | scoped helpers are frame-local), so it collapses to the current frame.
+-- | `(lookup (root) "x")`. A leading `../` reads the *enclosing* loop's datum:
+-- | `@../index` ⇒ `(parent-index)` (and `key`/`first`/`last`), which `each`/
+-- | `with` install (see `parentData`). Only one `../` level is supported — a
+-- | deeper run still resolves to the immediate parent.
 dataExpr :: String -> Expr
-dataExpr s = case Array.uncons (segmentsOf s) of
-  Just { head, tail }
-    | Array.null tail -> App head []
-    | otherwise -> App "lookup" (Array.cons (App head []) (map segKey tail))
-  Nothing -> App "this" []
+dataExpr raw =
+  let
+    { depth, rest } = stripParents raw 0
+    prefix = if depth == 0 then "" else "parent-"
+  in
+    case Array.uncons (segmentsOf rest) of
+      Just { head, tail }
+        | Array.null tail -> App (prefix <> head) []
+        | otherwise -> App "lookup" (Array.cons (App (prefix <> head) []) (map segKey tail))
+      Nothing -> App "this" []
 
 -- | Expand `{{else if C}}` chains into nested `{{#if C}}…{{/if}}` in the else
 -- | clause (surface.adoc §5.6) — the FlatBars convention (clause `else`, helper

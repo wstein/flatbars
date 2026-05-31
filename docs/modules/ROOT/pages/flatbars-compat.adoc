@@ -93,7 +93,7 @@ directly (`renderSurface`): `pass:[{{@index}}]` ⇒ `(index)`; in core you call 
 |`pass:[{{@first}}]` |`pass:[{{@first}}]` ⇒ `(first)` |✅ |`each`
 |`pass:[{{@last}}]` |`pass:[{{@last}}]` ⇒ `(last)` |✅ |`each`
 |`pass:[{{@root}}]` |`pass:[{{@root}}]` ⇒ `(root)` |✅ |the host (`preludeEnv` installs `root`)
-|`pass:[{{@../index}}]` |— |✗ |parent-data: scoped helpers are frame-local, so `../` cannot reach them; surface drops it
+|`pass:[{{@../index}}]` |`pass:[{{@../index}}]` ⇒ `(parent-index)` |◑ |`each`/`with` expose the enclosing loop's datum (also `@../key`/`@../first`/`@../last`); one `../` level only
 |custom `pass:[{{@var}}]` |any scoped helper a block frames |◑ |only the prelude's set is built in
 |`pass:[{{@level}}]` (log level) |— |✗ |no logging-level data variable
 |===
@@ -116,7 +116,7 @@ xref:surface.adoc[surface dialect] (`renderSurface`) restores Handlebars' `pass:
 |surface dialect ⇒ `lookup` chains
 |✅
 |`renderSurface` rewrites bare/dotted/numeric/slash/`../`/`this`/`@data`/`[bracket]` paths to
-`lookup` chains and scoped helpers (§5.2/§5.5). `@../` parent-data is the one path form not desugared.
+`lookup` chains and scoped helpers (§5.2/§5.5), including `@../` parent-data for one `../` level.
 
 |Unescaped `pass:[{{{x}}}]`
 |`pass:[{{{ x }}}]` output node

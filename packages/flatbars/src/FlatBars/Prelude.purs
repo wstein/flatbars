@@ -129,6 +129,10 @@ preludeSchema =
     , Tuple "key" { block: false, arity: Exactly 0 }
     , Tuple "first" { block: false, arity: Exactly 0 }
     , Tuple "last" { block: false, arity: Exactly 0 }
+    , Tuple "parent-index" { block: false, arity: Exactly 0 }
+    , Tuple "parent-key" { block: false, arity: Exactly 0 }
+    , Tuple "parent-first" { block: false, arity: Exactly 0 }
+    , Tuple "parent-last" { block: false, arity: Exactly 0 }
     , Tuple "partial-block" { block: false, arity: Exactly 0 }
     ]
 
@@ -310,6 +314,23 @@ bindingNames = Array.mapMaybe case _ of
   VString s -> Just s
   _ -> Nothing
 
+-- | Expose the *enclosing* frame's loop data under `parent-*` names, so a body
+-- | one level in can read it — this is what surface `@../index`, `@../key`,
+-- | `@../first`, `@../last` desugar to (one `../` level; just as `parent`
+-- | exposes the enclosing *context*). Each name rebinds the enclosing helper
+-- | directly (a snapshot `constHelper`), and is omitted when the enclosing frame
+-- | has none (e.g. `each` not nested in another `each`).
+parentData :: forall m. Ctl m (RefEnv m) -> Array (Tuple String (Helper m (RefEnv m)))
+parentData ctl =
+  Array.mapMaybe rebind
+    [ Tuple "parent-index" "index"
+    , Tuple "parent-key" "key"
+    , Tuple "parent-first" "first"
+    , Tuple "parent-last" "last"
+    ]
+  where
+  rebind (Tuple newName srcName) = Tuple newName <$> lookupHelper srcName ctl.env
+
 iterate
   :: forall m
    . MonadThrow Error m
@@ -332,7 +353,7 @@ iterate ctl names items =
             , Tuple "first" (constHelper (VBool (i == 0)))
             , Tuple "last" (constHelper (VBool (i == n - 1)))
             , Tuple "parent" (constHelper (refContext ctl.env))
-            ] <> binds val idx
+            ] <> parentData ctl <> binds val idx
           )
       in
         ctl.render (pushFrame frame val ctl.env) main
@@ -348,7 +369,10 @@ withH ctl args = case Array.uncons args of
       let
         binds = Array.zipWith (\nm val -> Tuple nm (constHelper val)) (bindingNames rest) [ v ]
         frame = Map.fromFoldable
-          (Tuple "parent" (constHelper (refContext ctl.env)) `Array.cons` binds)
+          ( [ Tuple "parent" (constHelper (refContext ctl.env)) ]
+              <> parentData ctl
+              <> binds
+          )
       in
         renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)
     else renderElse ctl
