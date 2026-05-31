@@ -8,7 +8,7 @@ reference prelude.
 npm run cli -- packages/cli/examples/greeting.bars --data packages/cli/examples/greeting.json
 
 # or directly
-spago run -p barebars-cli -- <template> [--data <data.json>] [--validate]
+spago run -p barebars-cli -- <template> [--data <data.json>] [--validate | --compile]
 ```
 
 ## Options
@@ -17,6 +17,7 @@ spago run -p barebars-cli -- <template> [--data <data.json>] [--validate]
 | --- | --- |
 | `-d`, `--data <file>` | JSON data file (default: `null` context) |
 | `--validate` | Run the skeleton-AST validation pass against the prelude schema and report issues; do not render. Exits non-zero if any issue is found. |
+| `-c`, `--compile` | Compile the template to a JS module (`BareBars.Compile`), printed to stdout; do not render. The default export is `function (data, rt)` — pair it with [`barebars-runtime.mjs`](../compile/runtime/barebars-runtime.mjs). |
 | `-h`, `--help` | Show usage |
 
 ## Example
