@@ -30,10 +30,10 @@ module FullBars
 
 import Prelude
 
-import BareBars.Engine (runString, runTemplate)
+import BareBars.Engine (runTemplate)
 import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
 import BareBars.Parser (parse)
-import BareBars.Syntax (Ident, Template)
+import BareBars.Syntax (Directive, Ident, Template)
 import BareBars.ToValue (class ToValue, toValue)
 import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow)
@@ -43,11 +43,11 @@ import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
-import FullBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll, registerPartials)
+import FullBars.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, withFalsy)
 import FullBars.Lower (RNode(..), escapingWarnings, lower)
 import FullBars.Prelude (prelude, preludeSchema)
 import FullBars.Surface (desugar, hoistInline)
-import FullBars.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, isFalsy, stringify, truthy)
+import FullBars.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, isFalsy, resolveTruthiness, stringify, truthy)
 
 -- | Build a FullBars environment with the prelude, the given data as context,
 -- | and a `root` helper returning the top-level data. Polymorphic in `m`.
@@ -55,17 +55,36 @@ preludeEnv :: forall m. MonadThrow Error m => Value -> RefEnv m
 preludeEnv dat =
   registerAll prelude (register "root" (constHelper dat) (emptyEnv dat))
 
+-- | Render `nodes` against a prelude env seeded with the falsy-set resolved from
+-- | the template's header `directives` — the engine's truthiness *application*
+-- | point (truthiness spec §4.2). `setup` adds anything extra to the env (e.g.
+-- | surface partials). A resolution failure is thrown into `m`.
+runResolved
+  :: forall m
+   . MonadThrow Error m
+  => Array Directive
+  -> (RefEnv m -> RefEnv m)
+  -> Template
+  -> Value
+  -> m String
+runResolved directives setup nodes dat = do
+  fs <- liftEither (resolveTruthiness directives)
+  runTemplate (refEngine (withFalsy fs (setup (preludeEnv dat)))) nodes
+
 -- | Parse a core template and return a pure renderer closed over the engine.
+-- | The `@truthiness` mode is resolved once and baked into the renderer.
 compile :: String -> Either ParseError (Value -> Either Error String)
 compile src = do
-  { nodes } <- parse src
-  pure \dat -> runTemplate (refEngine (preludeEnv dat)) nodes
+  { directives, nodes } <- parse src
+  pure \dat -> runResolved directives identity nodes dat
 
 -- | One-shot pure render: parse core source and render against prelude + data.
 renderWith :: String -> Value -> Either String String
-renderWith src dat = case runString (refEngine (preludeEnv dat)) src of
-  Left e -> Left (show e)
-  Right out -> Right out
+renderWith src dat = case parse src of
+  Left pe -> Left (show (ParseFailure pe))
+  Right { directives, nodes } -> case runResolved directives identity nodes dat of
+    Left e -> Left (show e)
+    Right out -> Right out
 
 -- | Format an engine `Error` against its source for a host boundary: a parse
 -- | failure becomes a located `line:column: message` (xref host-api §7); every
@@ -78,9 +97,11 @@ formatError src = case _ of
 
 -- | `renderWith` with located parse-error messages (`formatError`).
 renderWithDiag :: String -> Value -> Either String String
-renderWithDiag src dat = case runString (refEngine (preludeEnv dat)) src of
-  Left e -> Left (formatError src e)
-  Right out -> Right out
+renderWithDiag src dat = case parse src of
+  Left pe -> Left (renderParseErrorAt src pe)
+  Right { directives, nodes } -> case runResolved directives identity nodes dat of
+    Left e -> Left (formatError src e)
+    Right out -> Right out
 
 -- | Render *core* source against native PureScript data — a record, `Array`,
 -- | `Map`, etc. lowered via `ToValue` (host binding). `renderValue tmpl { name:
@@ -91,7 +112,9 @@ renderValue src = renderWithDiag src <<< toValue
 -- | The async instantiation: the same engine in `ExceptT Error Aff`, so
 -- | effectful helpers/partials are possible. Proof the driver is monad-polymorphic.
 renderAff :: String -> Value -> Aff (Either Error String)
-renderAff src dat = runExceptT (runString (refEngine (preludeEnv dat)) src)
+renderAff src dat = case parse src of
+  Left pe -> pure (Left (ParseFailure pe))
+  Right { directives, nodes } -> runExceptT (runResolved directives identity nodes dat)
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).
@@ -106,10 +129,10 @@ desugarSurface = desugar surfaceClauses
 -- | definitions are hoisted into the partial registry before rendering.
 compileSurface :: String -> Either ParseError (Value -> Either Error String)
 compileSurface src = do
-  { nodes } <- parse src
+  { directives, nodes } <- parse src
   let
     { partials, template } = hoistInline (desugarSurface nodes)
-  pure \dat -> runTemplate (refEngine (registerPartials partials (preludeEnv dat))) template
+  pure \dat -> runResolved directives (registerPartials partials) template dat
 
 -- | One-shot pure render of *Surface* source (paths, `{{ }}` auto-escape, …).
 renderSurface :: String -> Value -> Either String String
@@ -124,12 +147,12 @@ renderSurfaceWith partialSrcs src dat =
     Left e -> Left (show e)
     Right pairs -> case parse src of
       Left e -> Left (show e)
-      Right { nodes } ->
+      Right { directives, nodes } ->
         let
           { partials: inlineP, template } = hoistInline (desugarSurface nodes)
-          env = registerPartials (Map.union inlineP (Map.fromFoldable pairs)) (preludeEnv dat)
+          setup = registerPartials (Map.union inlineP (Map.fromFoldable pairs))
         in
-          case runTemplate (refEngine env) template of
+          case runResolved directives setup template dat of
             Left e -> Left (show e)
             Right out -> Right out
   where
@@ -142,12 +165,11 @@ renderSurfaceWith partialSrcs src dat =
 renderSurfaceDiag :: String -> Value -> Either String String
 renderSurfaceDiag src dat = case parse src of
   Left pe -> Left (renderParseErrorAt src pe)
-  Right { nodes } ->
+  Right { directives, nodes } ->
     let
       { partials, template } = hoistInline (desugarSurface nodes)
-      env = registerPartials partials (preludeEnv dat)
     in
-      case runTemplate (refEngine env) template of
+      case runResolved directives (registerPartials partials) template dat of
         Left e -> Left (formatError src e)
         Right out -> Right out
 

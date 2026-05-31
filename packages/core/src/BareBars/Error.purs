@@ -106,6 +106,7 @@ data Error
   | TypeError String
   | ClauseError String
   | HelperError String
+  | DirectiveError String
   | ParseFailure ParseError
 
 derive instance eqError :: Eq Error
@@ -120,4 +121,5 @@ renderError = case _ of
   TypeError m -> "TypeError: " <> m
   ClauseError m -> "ClauseError: " <> m
   HelperError m -> "HelperError: " <> m
+  DirectiveError m -> "DirectiveError: " <> m
   ParseFailure pe -> "ParseFailure: " <> renderParseError pe

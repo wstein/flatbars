@@ -8,6 +8,11 @@ module FullBars.Value
   ( FalsyShape(..)
   , FalsySet
   , handlebars
+  , minimal
+  , presence
+  , always
+  , aliasSet
+  , resolveTruthiness
   , isFalsy
   , truthy
   , stringify
@@ -19,10 +24,11 @@ module FullBars.Value
 import Prelude
 
 import BareBars.Error (Error(..))
+import BareBars.Syntax (Directive)
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Char (toCharCode)
-import Data.Either (Either(..))
+import Data.Either (Either(..), note)
 import Data.Foldable (foldMap)
 import Data.Int (hexadecimal, toStringAs)
 import Data.Map as Map
@@ -30,7 +36,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (power)
 import Data.Set (Set)
 import Data.Set as Set
-import Data.String (Pattern(..), Replacement(..), length, replaceAll, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), length, replaceAll, split, stripSuffix)
 import Data.String.CodeUnits (singleton, toCharArray)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
@@ -84,6 +90,82 @@ isFalsy fs = case _ of
 -- | `FullBars.Prelude.truthyWith`.)
 truthy :: FalsySet -> Value -> Boolean
 truthy fs = not <<< isFalsy fs
+
+--------------------------------------------------------------------------------
+-- Named modes & the @truthiness resolver (truthiness spec §2.3, §4.2)
+--------------------------------------------------------------------------------
+
+-- | `minimal` (≡ `ruby`/`nil`/`lua`): only `false`/`null` are falsy — `0`, `""`,
+-- | `[]`, `{}` are all truthy.
+minimal :: FalsySet
+minimal = Set.fromFoldable [ FFalse, FNull ]
+
+-- | `presence`: present ⇒ truthy. `false`/`null` and the *empty* collections are
+-- | falsy, but scalars (`0`, `""`) are truthy. `false` is kept falsy on purpose.
+presence :: FalsySet
+presence = Set.fromFoldable [ FFalse, FNull, FEmptyArr, FEmptyObj ]
+
+-- | `always`: nothing is falsy — every value is truthy (the empty set). The
+-- | named replacement for the illegal empty directive form.
+always :: FalsySet
+always = Set.empty
+
+-- | The alias table — 8 accepted names → 4 sets. Canonical display names are
+-- | `empty` (the default), `minimal`, `presence`, `always`; `handlebars`,
+-- | `ruby`/`nil`/`lua` are accepted synonyms (a name says nothing the explicit
+-- | set does not — docs always print the expansion).
+aliasSet :: String -> Maybe FalsySet
+aliasSet = case _ of
+  "empty" -> Just handlebars
+  "handlebars" -> Just handlebars
+  "minimal" -> Just minimal
+  "ruby" -> Just minimal
+  "nil" -> Just minimal
+  "lua" -> Just minimal
+  "presence" -> Just presence
+  "always" -> Just always
+  _ -> Nothing
+
+-- | Resolve the active falsy-set from a template's header directives. Finds the
+-- | (≤1) `@truthiness`; parses an alias *or* an explicit space-separated list of
+-- | shape-literals (`false null "" 0 [] {}`). Absent ⇒ the `handlebars` default.
+-- | Errors: a duplicate `@truthiness`, an empty value, or an unknown
+-- | alias/literal (which also rejects an alias+list mix and the bare-flag form).
+resolveTruthiness :: Array Directive -> Either Error FalsySet
+resolveTruthiness directives = case Array.filter (\d -> d.key == "truthiness") directives of
+  [] -> Right handlebars
+  [ d ] -> parseTruthiness d.value
+  _ -> Left (DirectiveError "duplicate @truthiness directive (at most one per file)")
+
+-- | Parse a `@truthiness` value: an alias name, or a non-empty list of falsy
+-- | shape-literals. The empty value is illegal — use the `always` alias.
+parseTruthiness :: String -> Either Error FalsySet
+parseTruthiness value = case aliasSet value of
+  Just fs -> Right fs
+  Nothing -> case tokens value of
+    [] -> Left (DirectiveError "empty @truthiness value; use the 'always' alias for nothing-falsy")
+    ts -> Set.fromFoldable <$> traverse shapeOf ts
+  where
+  -- whitespace-separated, layout-insensitive (newlines/tabs count as spaces).
+  tokens v =
+    Array.filter (_ /= "")
+      ( split (Pattern " ")
+          ( replaceAll (Pattern "\t") (Replacement " ")
+              ( replaceAll (Pattern "\n") (Replacement " ")
+                  (replaceAll (Pattern "\r") (Replacement " ") v)
+              )
+          )
+      )
+
+shapeOf :: String -> Either Error FalsyShape
+shapeOf = case _ of
+  "false" -> Right FFalse
+  "null" -> Right FNull
+  "\"\"" -> Right FEmptyStr
+  "0" -> Right FZero
+  "[]" -> Right FEmptyArr
+  "{}" -> Right FEmptyObj
+  other -> note (DirectiveError ("unknown @truthiness value '" <> other <> "'")) Nothing
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
 -- | the `esc_html` helper); arrays join with `","` and objects are an error.

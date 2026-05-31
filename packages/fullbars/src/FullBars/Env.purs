@@ -8,6 +8,8 @@
 module FullBars.Env
   ( RefEnv(..)
   , refContext
+  , refFalsy
+  , withFalsy
   , constHelper
   , emptyEnv
   , register
@@ -36,7 +38,7 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import FullBars.Value (stringify)
+import FullBars.Value (FalsySet, handlebars, stringify)
 
 -- | Lift a pure `Either Error` into the engine monad — the single place the
 -- | `Left e -> throwError e` plumbing lives, shared by `refEngine` and helpers.
@@ -47,10 +49,23 @@ newtype RefEnv m = RefEnv
   { context :: Value
   , helpers :: List (Map String (Helper m (RefEnv m)))
   , partials :: Map String Template -- named templates, for the `partial` helper
+  , falsy :: FalsySet -- the active truthiness mode (per file/partial)
   }
 
 refContext :: forall m. RefEnv m -> Value
 refContext (RefEnv e) = e.context
+
+-- | The active falsy-set governing `if`/`unless`/`and`/`or`/`not` in this
+-- | environment. Lexically scoped: a partial renders under its own env (and so
+-- | its own mode); see the truthiness spec §4.2/§5.
+refFalsy :: forall m. RefEnv m -> FalsySet
+refFalsy (RefEnv e) = e.falsy
+
+-- | Seed the active truthiness mode (the engine resolves it from the file's
+-- | `@truthiness` directive; absent ⇒ the `handlebars` default already set by
+-- | `emptyEnv`). Partials get their own via `registerPartials` + a re-seed.
+withFalsy :: forall m. FalsySet -> RefEnv m -> RefEnv m
+withFalsy fs (RefEnv e) = RefEnv (e { falsy = fs })
 
 -- | A nullary helper that always returns a fixed value (scoped helpers like
 -- | `index`, `first`, `this`).
@@ -59,7 +74,8 @@ constHelper v = \_ _ -> pure v
 
 -- | An environment with the given context and a single empty helper frame.
 emptyEnv :: forall m. Value -> RefEnv m
-emptyEnv ctx = RefEnv { context: ctx, helpers: Map.empty : Nil, partials: Map.empty }
+emptyEnv ctx = RefEnv
+  { context: ctx, helpers: Map.empty : Nil, partials: Map.empty, falsy: handlebars }
 
 -- | Register a helper into the innermost frame.
 register :: forall m. String -> Helper m (RefEnv m) -> RefEnv m -> RefEnv m

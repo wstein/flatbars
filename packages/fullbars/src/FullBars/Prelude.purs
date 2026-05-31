@@ -23,7 +23,7 @@ import Prelude
 
 import BareBars.Engine (Ctl, Helper)
 import BareBars.Error (Error(..))
-import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
+import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary)
 import BareBars.Syntax (Template)
 import BareBars.Value (Value(..))
 import BareBars.Walk (Arity(..), Clause, Schema, splitClauses)
@@ -33,11 +33,12 @@ import Data.Either (Either)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Set as Set
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FullBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext)
-import FullBars.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
+import FullBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, pushFrame, refContext, refFalsy)
+import FullBars.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
 
 --------------------------------------------------------------------------------
 -- The single source of truth
@@ -96,9 +97,9 @@ helperDefs =
   , valDef "gt" (binary (cmp (_ == GT)))
   , valDef "lte" (binary (cmp (_ /= GT)))
   , valDef "gte" (binary (cmp (_ /= LT)))
-  , valDef "not" (unary not')
-  , valDef "and" (variadic (boolOf Array.all))
-  , valDef "or" (variadic (boolOf Array.any))
+  , gen "not" false (Exactly 1) notH
+  , gen "and" false AnyArity (boolH Array.all)
+  , gen "or" false AnyArity (boolH Array.any)
   , valDef "log" (atLeast 1 (const (pure VNull)))
   ]
 
@@ -199,17 +200,21 @@ compareValues a b = case a, b of
 cmp :: forall m. Applicative m => (Ordering -> Boolean) -> Value -> Value -> m Value
 cmp ok a b = pure (VBool (maybe false ok (compareValues a b)))
 
-not' :: forall m. Applicative m => Value -> m Value
-not' a = pure (VBool (not (truthy handlebars a)))
+-- | `not`: logical negation under the *active* truthiness mode (`ctl.env`).
+notH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+notH ctl args = case args of
+  [ a ] -> pure (VBool (not (truthy (refFalsy ctl.env) a)))
+  _ -> throwError (ArityError "not: expected exactly 1 argument")
 
--- | `and`/`or`: fold truthiness across the arguments with the given quantifier.
-boolOf
+-- | `and`/`or`: fold truthiness across the arguments with the given quantifier,
+-- | consulting the active mode — so the file's `@truthiness` retunes them too
+-- | (and `{{#if x}}`/`{{x && y}}` always agree). See truthiness spec §6.1.
+boolH
   :: forall m
    . Applicative m
   => ((Value -> Boolean) -> Array Value -> Boolean)
-  -> Array Value
-  -> m Value
-boolOf quant args = pure (VBool (quant (truthy handlebars) args))
+  -> Helper m (RefEnv m)
+boolH quant ctl args = pure (VBool (quant (truthy (refFalsy ctl.env)) args))
 
 --------------------------------------------------------------------------------
 -- Context & access
@@ -284,8 +289,8 @@ renderElse ctl = renderSafe ctl ctl.env (elseBody ctl)
 ifH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 ifH ctl args = do
   cond <- case args of
-    [ c ] -> pure (truthy handlebars c)
-    [ c, opts ] -> pure (truthyWith opts c)
+    [ c ] -> pure (truthy (refFalsy ctl.env) c)
+    [ c, opts ] -> pure (truthyWith (refFalsy ctl.env) opts c)
     _ -> throwError (ArityError (wrong1or2 "if" args))
   let
     { before, clauses } = splitClauses ctl.children
@@ -303,7 +308,7 @@ pickClause ctl clauses = case Array.uncons clauses of
     "elif" -> case cl.args of
       [ condE ] -> do
         cond <- ctl.eval ctl.env condE
-        if truthy handlebars cond then renderSafe ctl ctl.env cl.body
+        if truthy (refFalsy ctl.env) cond then renderSafe ctl ctl.env cl.body
         else pickClause ctl tail
       _ -> throwError (ClauseError "elif: expected exactly 1 argument")
     other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
@@ -326,8 +331,8 @@ checkIfClauses clauses = case Array.uncons clauses of
 
 unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 unlessH ctl args = case args of
-  [ c ] -> branchOn (not (truthy handlebars c)) ctl
-  [ c, opts ] -> branchOn (not (truthyWith opts c)) ctl
+  [ c ] -> branchOn (not (truthy (refFalsy ctl.env) c)) ctl
+  [ c, opts ] -> branchOn (not (truthyWith (refFalsy ctl.env) opts c)) ctl
   _ -> throwError (ArityError (wrong1or2 "unless" args))
 
 -- | Render the main clause when the condition holds, else the `{{else}}` clause.
@@ -337,12 +342,13 @@ branchOn cond ctl = if cond then renderMain ctl else renderElse ctl
 wrong1or2 :: String -> Array Value -> String
 wrong1or2 name args = name <> ": expected 1 or 2 arguments, got " <> show (Array.length args)
 
--- | Truthiness honoring an options object's `includeZero` flag: when set, the
--- | number `0` is truthy; otherwise this is plain `truthy`.
-truthyWith :: Value -> Value -> Boolean
-truthyWith opts v = case v of
-  VNumber n | n == 0.0 && optFlag "includeZero" opts -> true
-  _ -> truthy handlebars v
+-- | Truthiness under the active mode, honoring an options object's `includeZero`
+-- | flag as a *per-call exception*: when set, `FZero` is removed from the mode
+-- | for this one test (so `0` counts as truthy), composing with whatever the
+-- | file's `@truthiness` is (a no-op when the mode already omits `0`). See spec
+-- | §3.3.
+truthyWith :: FalsySet -> Value -> Value -> Boolean
+truthyWith fs opts v = truthy (if optFlag "includeZero" opts then Set.delete FZero fs else fs) v
 
 -- | Read a boolean option from an options object (`VObject`); absent ⇒ false.
 optFlag :: String -> Value -> Boolean
@@ -434,7 +440,7 @@ iterate ctl names items =
 withH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 withH ctl args = case Array.uncons args of
   Just { head: v, tail: rest } ->
-    if truthy handlebars v then
+    if truthy (refFalsy ctl.env) v then
       let
         binds = Array.zipWith (\nm val -> Tuple nm (constHelper val)) (bindingNames rest) [ v ]
         frame = Map.fromFoldable

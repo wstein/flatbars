@@ -13,7 +13,7 @@ import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Value (Value(..))
 import BareBars.Walk (arityOk)
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), isLeft)
 import Data.Foldable (for_)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
@@ -228,6 +228,54 @@ main = do
   row "{}" (VObject Map.empty) true true false true
   row "safe-empty" (VSafe "") false true true true
   row "NaN" (VNumber nan) true true true true
+
+  -- Phase 2: the @truthiness directive retunes the *active* mode per file, and
+  -- the conditionals/operators read it. Rendering matrix (surface) + resolver.
+  let
+    n0 = obj [ Tuple "n" (VNumber 0.0) ]
+  -- default (no directive) ⇒ handlebars: 0 is falsy.
+  expectS "truth:default-zero-falsy" "{{#if n}}y{{else}}m{{/if}}" n0 "m"
+  -- @truthiness:minimal ⇒ 0/""/[]/{} truthy; only false/null falsy.
+  expectS "truth:minimal-zero-truthy" "{{! @truthiness:minimal }}{{#if n}}y{{else}}m{{/if}}" n0 "y"
+  expectS "truth:minimal-empty-string-truthy"
+    "{{! @truthiness:minimal }}{{#if s}}y{{else}}m{{/if}}"
+    (obj [ Tuple "s" (str "") ])
+    "y"
+  -- the three language synonyms expand to the same set as `minimal`.
+  for_ [ "ruby", "nil", "lua" ] \alias ->
+    expectS ("truth:synonym-" <> alias)
+      ("{{! @truthiness:" <> alias <> " }}{{#if n}}y{{else}}m{{/if}}")
+      n0
+      "y"
+  -- the explicit shape-list form (false null ≡ minimal).
+  expectS "truth:explicit-list" "{{! @truthiness: false null }}{{#if n}}y{{else}}m{{/if}}" n0 "y"
+  -- presence: empty array/object are falsy (where handlebars calls {} truthy).
+  expectS "truth:presence-empty-array-falsy"
+    "{{! @truthiness:presence }}{{#if xs}}y{{else}}m{{/if}}"
+    (obj [ Tuple "xs" (arr []) ])
+    "m"
+  expectS "truth:presence-empty-object-falsy"
+    "{{! @truthiness:presence }}{{#if o}}y{{else}}m{{/if}}"
+    (obj [ Tuple "o" (obj []) ])
+    "m"
+  -- always: nothing is falsy, so even false takes the then-branch.
+  expectS "truth:always-false-truthy"
+    "{{! @truthiness:always }}{{#if b}}y{{else}}m{{/if}}"
+    (obj [ Tuple "b" (VBool false) ])
+    "y"
+  -- the operators read the active mode too (and 0 5 ⇒ true under minimal).
+  expectS "truth:and-retuned" "{{! @truthiness:minimal }}{{{ and 0 5 }}}" VNull "true"
+  expectS "truth:and-default" "{{{ and 0 5 }}}" VNull "false"
+  -- includeZero is a per-call exception layered on the mode (here: handlebars).
+  expectS "truth:includeZero-compose"
+    "{{! @truthiness:empty }}{{#if n includeZero=true}}y{{else}}m{{/if}}"
+    n0
+    "y"
+  -- resolver errors: empty value, duplicate, unknown alias/literal.
+  assert' "truth:empty-value errors" (isLeft (renderSurface "{{! @truthiness: }}x" VNull))
+  assert' "truth:duplicate errors"
+    (isLeft (renderSurface "{{! @truthiness:ruby }}{{! @truthiness:lua }}x" VNull))
+  assert' "truth:unknown-alias errors" (isLeft (renderSurface "{{! @truthiness:bogus }}x" VNull))
 
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at
@@ -584,10 +632,12 @@ main = do
 
   -- Safe-by-default lint: raw output of data warns; esc_html / safe do not.
   case parse "{{{lookup this \"x\"}}}" of
-    Right { nodes: t } -> assert' "escaping lint flags raw data" (not (Array.null (escapingWarnings t)))
+    Right { nodes: t } -> assert' "escaping lint flags raw data"
+      (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
   case parse "{{{esc_html (lookup this \"x\")}}}{{{safe (lookup this \"y\")}}}" of
-    Right { nodes: t } -> assert' "escaping lint silent for esc_html/safe" (Array.null (escapingWarnings t))
+    Right { nodes: t } -> assert' "escaping lint silent for esc_html/safe"
+      (Array.null (escapingWarnings t))
     Left e -> assert' ("lint: parse error " <> show e) false
 
   -- Lint: testing the truthiness of an escaped/safe value is a smell (safe/
@@ -596,7 +646,8 @@ main = do
     Right { nodes: t } -> assert' "lint flags if-on-safe" (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
   case parse "{{#unless (esc_html (lookup this \"x\"))}}y{{/unless}}" of
-    Right { nodes: t } -> assert' "lint flags unless-on-esc_html" (not (Array.null (escapingWarnings t)))
+    Right { nodes: t } -> assert' "lint flags unless-on-esc_html"
+      (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
   -- Testing the underlying data directly is clean.
   case parse "{{#if (lookup this \"x\")}}y{{/if}}" of
