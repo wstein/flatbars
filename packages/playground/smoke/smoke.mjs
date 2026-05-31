@@ -121,14 +121,14 @@ try {
   if (!/(^|\n)RIf\n {2}App "lookup"/.test(realAst) || !/\n {2}then:\n/.test(realAst) || !/\n {2}else:\n/.test(realAst))
     fail(`Real AST not expanded with RIf/then/else: ${JSON.stringify(realAst.slice(0, 160))}`);
 
-  // Truthiness example: 0 is falsy in both engines (parity), and the
-  // includeZero row flips it to truthy — proving the engine computed both the
-  // default verdict and the includeZero option live.
+  // Truthiness example: the engine computes each verdict live — the "number
+  // zero" row is falsy, and the includeZero row flips 0 to truthy. (Matched on
+  // semantic text + verdict class, not styling, so a restyle won't break it.)
   await page.select("select", "truthiness");
   const truthHtml = await treeText("HTML");
-  if (!/number 0<\/td><td>falsy<\/td><td>falsy<\/td>/.test(truthHtml))
-    fail(`Truthiness: 0 should be falsy in both: ${JSON.stringify(truthHtml.slice(0, 200))}`);
-  if (!/0 \+ includeZero<\/td><td>truthy<\/td>/.test(truthHtml))
+  if (!/number zero[\s\S]{0,200}?class="falsy">falsy/.test(truthHtml))
+    fail(`Truthiness: number 0 should be falsy: ${JSON.stringify(truthHtml.slice(0, 200))}`);
+  if (!/includeZero<\/code>[\s\S]{0,200}?class="truthy">truthy/.test(truthHtml))
     fail(`Truthiness: includeZero should make 0 truthy: ${JSON.stringify(truthHtml.slice(0, 200))}`);
 
   // Lint wiring: typing an if-condition headed by `safe` surfaces the
