@@ -1,14 +1,14 @@
 -- | The reference prelude. See `docs/modules/ROOT/pages/prelude.adoc`.
 -- |
--- | *None of this is built into the core.* It is a library of helpers you
--- | register into the environment. Delete `each` and `{{#each}}` stops working;
--- | the language is unaffected.
+-- | *None of this is built into the core.* It is the meaning layer: a library
+-- | of helpers, plus a schema, that together turn the skeleton AST into output.
+-- | Delete `each` and `{{#each}}` stops working; the language is unaffected.
 -- |
--- | This module ships a working subset: context/access (`this`, `lookup`,
--- | `true`/`false`/`null`), output/safety (`esc_html`, `safe`), conditionals
--- | (`if`, `unless`), iteration/context-shift (`each`, `with`), composition
--- | (`dict`, `apply`, `eq`, `not`, `and`, `or`, `log`). Partials and decorators
--- | are left for a later iteration (see prelude.adoc §6.6).
+-- | Multi-branch control flow is expressed as *nested clause blocks*. `if`
+-- | renders its body when truthy and an `{{#else}}…{{/else}}` clause otherwise;
+-- | `each` renders its body per element and the `else` clause when empty. The
+-- | clause name `else` is this prelude's choice, not the core's — a different
+-- | engine could name it `otherwise`, add `elif`, or build a `switch`/`case`.
 module BareBars.Prelude
   ( prelude
   , preludeSchema
@@ -16,10 +16,10 @@ module BareBars.Prelude
 
 import Prelude
 
-import BareBars.Env (Blocks, Env, Helper(..), constHelper, lookupHelper, pushFrame, runHelper)
+import BareBars.Env (Helper(..), HelperCtx, constHelper, lookupHelper, pushFrame, runHelper)
 import BareBars.Error (Error(..))
 import BareBars.Value (Value(..), escapeHtml, stringify, truthy)
-import BareBars.Walk (Arity(..), HelperSpec, Schema)
+import BareBars.Walk (Arity(..), HelperSpec, Schema, clause, withoutClause)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Int as Int
@@ -43,6 +43,8 @@ prelude =
   , Tuple "unless" unlessH
   , Tuple "each" eachH
   , Tuple "with" withH
+  , Tuple "then" clauseH
+  , Tuple "else" clauseH
   , Tuple "dict" dictH
   , Tuple "apply" applyH
   , Tuple "eq" eqH
@@ -56,8 +58,7 @@ prelude =
 -- | The reference engine's schema, for `BareBars.Walk.validate`. It declares
 -- | every prelude helper plus the scoped helpers that block helpers install
 -- | (`index`, `key`, `first`, `last`, `parent`, `root`), so a template using
--- | them validates cleanly. `allowUnknown` is `false`: a name outside this set
--- | is reported as an unknown helper.
+-- | them validates cleanly. `allowUnknown` is `false`.
 preludeSchema :: Schema
 preludeSchema =
   { allowUnknown: false
@@ -80,6 +81,8 @@ preludeSchema =
       , Tuple "unless" (spec true (Exactly 1))
       , Tuple "each" (spec true (AtLeast 1))
       , Tuple "with" (spec true (AtLeast 1))
+      , Tuple "then" (spec true AnyArity)
+      , Tuple "else" (spec true AnyArity)
       , Tuple "dict" (spec false AnyArity)
       , Tuple "apply" (spec true (AtLeast 1))
       , Tuple "eq" (spec false (Exactly 2))
@@ -99,10 +102,10 @@ preludeSchema =
 --------------------------------------------------------------------------------
 
 thisH :: Helper
-thisH = Helper \env _ _ -> Right env.context
+thisH = Helper \ctx _ -> Right ctx.env.context
 
 lookupH :: Helper
-lookupH = Helper \_ args _ -> case Array.uncons args of
+lookupH = Helper \_ args -> case Array.uncons args of
   Nothing -> Left (ArityError "lookup/≥1")
   Just { head, tail } -> Right (Array.foldl step head tail)
   where
@@ -124,71 +127,77 @@ indexValue _ _ = VNull
 --------------------------------------------------------------------------------
 
 escHtmlH :: Helper
-escHtmlH = Helper \_ args _ -> case args of
+escHtmlH = Helper \_ args -> case args of
   [ VSafe s ] -> Right (VSafe s) -- idempotent on already-safe input
   [ v ] -> (VSafe <<< escapeHtml) <$> stringify v
   _ -> Left (ArityError "esc_html/1")
 
 safeH :: Helper
-safeH = Helper \_ args _ -> case args of
+safeH = Helper \_ args -> case args of
   [ v ] -> VSafe <$> stringify v
   _ -> Left (ArityError "safe/1")
 
--- | A raw-block helper that returns its captured body verbatim. For a raw
--- | block the body thunk ignores its environment and yields the literal text.
+-- | A raw-block helper that returns its captured body verbatim.
 rawH :: Helper
-rawH = Helper \env _ blocks -> VSafe <$> blocks.body env
+rawH = Helper \ctx _ -> VSafe <$> ctx.renderTemplate ctx.body ctx.env
+
+-- | A clause helper (`then`, `else`): transparent — it renders its own body.
+-- | Control-flow helpers reach in and render the relevant clause; this default
+-- | governs only direct use.
+clauseH :: Helper
+clauseH = Helper \ctx _ -> VSafe <$> ctx.renderTemplate ctx.body ctx.env
 
 --------------------------------------------------------------------------------
 -- Conditionals
 --------------------------------------------------------------------------------
 
 ifH :: Helper
-ifH = Helper \env args blocks -> case args of
+ifH = Helper \ctx args -> case args of
   [ c ] ->
-    if truthy c then VSafe <$> blocks.body env
-    else runInverse env blocks
+    if truthy c then renderMain ctx
+    else renderElse ctx
   _ -> Left (ArityError "if/1")
 
 unlessH :: Helper
-unlessH = Helper \env args blocks -> case args of
+unlessH = Helper \ctx args -> case args of
   [ c ] ->
-    if truthy c then runInverse env blocks
-    else VSafe <$> blocks.body env
+    if truthy c then renderElse ctx
+    else renderMain ctx
   _ -> Left (ArityError "unless/1")
 
--- | The "inverse" of a block, in prelude terms, is simply its first branch
--- | (whatever the author named the separator — `else`, `otherwise`, …). The
--- | core never privileges a name; this prelude treats branch 0 as the inverse,
--- | matching Handlebars' single `{{else}}`. Richer, multi-branch helpers can
--- | inspect `blocks.branches` (names + args) themselves.
-runInverse :: Env -> Blocks -> Either Error Value
-runInverse env blocks = case Array.head blocks.branches of
-  Just b -> VSafe <$> b.render env
-  Nothing -> Right VNull
+-- | Render the body with any `else` clause stripped out.
+renderMain :: HelperCtx -> Either Error Value
+renderMain ctx = VSafe <$> ctx.renderTemplate (withoutClause "else" ctx.body) ctx.env
+
+-- | Render the `{{#else}}…{{/else}}` clause, if present; otherwise empty.
+renderElse :: HelperCtx -> Either Error Value
+renderElse ctx = case clause "else" ctx.body of
+  Just t -> VSafe <$> ctx.renderTemplate t ctx.env
+  Nothing -> Right (VSafe "")
 
 --------------------------------------------------------------------------------
 -- Iteration & context shift
 --------------------------------------------------------------------------------
 
 eachH :: Helper
-eachH = Helper \env args blocks -> case args of
+eachH = Helper \ctx args -> case args of
   [ coll ] -> case coll of
     VArray xs ->
-      if Array.null xs then runInverse env blocks
-      else iterate env blocks (Array.mapWithIndex (\i x -> { key: show i, val: x }) xs)
+      if Array.null xs then renderElse ctx
+      else iterate ctx (Array.mapWithIndex (\i x -> { key: show i, val: x }) xs)
     VObject m ->
       let
         pairs = Map.toUnfoldable m :: Array (Tuple String Value)
       in
-        if Array.null pairs then runInverse env blocks
-        else iterate env blocks (map (\(Tuple k v) -> { key: k, val: v }) pairs)
-    _ -> runInverse env blocks
+        if Array.null pairs then renderElse ctx
+        else iterate ctx (map (\(Tuple k v) -> { key: k, val: v }) pairs)
+    _ -> renderElse ctx
   _ -> Left (ArityError "each/1")
 
-iterate :: Env -> Blocks -> Array { key :: String, val :: Value } -> Either Error Value
-iterate env blocks items =
+iterate :: HelperCtx -> Array { key :: String, val :: Value } -> Either Error Value
+iterate ctx items =
   let
+    main = withoutClause "else" ctx.body
     n = Array.length items
     renderItem i { key, val } =
       let
@@ -198,22 +207,22 @@ iterate env blocks items =
           , Tuple "key" (constHelper (VString key))
           , Tuple "first" (constHelper (VBool (i == 0)))
           , Tuple "last" (constHelper (VBool (i == n - 1)))
-          , Tuple "parent" (constHelper env.context)
+          , Tuple "parent" (constHelper ctx.env.context)
           ]
       in
-        blocks.body (pushFrame frame val env)
+        ctx.renderTemplate main (pushFrame frame val ctx.env)
   in
     (VSafe <<< joinWith "") <$> traverse identity (Array.mapWithIndex renderItem items)
 
 withH :: Helper
-withH = Helper \env args blocks -> case args of
+withH = Helper \ctx args -> case args of
   [ v ] ->
     if truthy v then
       let
-        frame = Map.singleton "parent" (constHelper env.context)
+        frame = Map.singleton "parent" (constHelper ctx.env.context)
       in
-        VSafe <$> blocks.body (pushFrame frame v env)
-    else runInverse env blocks
+        VSafe <$> ctx.renderTemplate (withoutClause "else" ctx.body) (pushFrame frame v ctx.env)
+    else renderElse ctx
   _ -> Left (ArityError "with/1")
 
 --------------------------------------------------------------------------------
@@ -221,7 +230,7 @@ withH = Helper \env args blocks -> case args of
 --------------------------------------------------------------------------------
 
 dictH :: Helper
-dictH = Helper \_ args _ -> build args Map.empty
+dictH = Helper \_ args -> build args Map.empty
   where
   build as acc = case Array.uncons as of
     Nothing -> Right (VObject acc)
@@ -231,27 +240,27 @@ dictH = Helper \_ args _ -> build args Map.empty
     Just _ -> Left (TypeError "dict: keys must be strings")
 
 applyH :: Helper
-applyH = Helper \env args blocks -> case Array.uncons args of
-  Just { head: VString name, tail } -> case lookupHelper name env of
-    Just h -> runHelper h env tail blocks
+applyH = Helper \ctx args -> case Array.uncons args of
+  Just { head: VString name, tail } -> case lookupHelper name ctx.env of
+    Just h -> runHelper h ctx tail
     Nothing -> Left (UnknownHelper name)
   _ -> Left (TypeError "apply: first argument must be a helper-name string")
 
 eqH :: Helper
-eqH = Helper \_ args _ -> case args of
+eqH = Helper \_ args -> case args of
   [ a, b ] -> Right (VBool (a == b))
   _ -> Left (ArityError "eq/2")
 
 notH :: Helper
-notH = Helper \_ args _ -> case args of
+notH = Helper \_ args -> case args of
   [ a ] -> Right (VBool (not (truthy a)))
   _ -> Left (ArityError "not/1")
 
 andH :: Helper
-andH = Helper \_ args _ -> Right (VBool (Array.all truthy args))
+andH = Helper \_ args -> Right (VBool (Array.all truthy args))
 
 orH :: Helper
-orH = Helper \_ args _ -> Right (VBool (Array.any truthy args))
+orH = Helper \_ args -> Right (VBool (Array.any truthy args))
 
 logH :: Helper
-logH = Helper \_ _ _ -> Right VNull -- effect-free in the pure (Either) host
+logH = Helper \_ _ -> Right VNull -- effect-free in the pure (Either) host

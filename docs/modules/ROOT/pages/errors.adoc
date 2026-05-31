@@ -13,15 +13,15 @@ BareBars distinguishes *parse errors* (the template is not well-formed) from *ev
 |`UnterminatedTag` |an opener with no matching closer before end of input
 |`UnterminatedComment` |`pass:[{{!--]` with no `pass:[--}}]`
 |`UnterminatedRaw` |`pass:[{{{{#name}}}}]` with no `pass:[{{{{/name}}}}]`
-|`MismatchedBlock` |`pass:[{{/a}}]` closing a `pass:[{{#b}}]`
-|`SeparatorOutsideBlock` |a `pass:[{{sep …}}]` separator with no enclosing block
+|`MismatchedBlock` |`pass:[{{/a}}]` closing a `pass:[{{#b}}]` (or a block left unclosed)
 |`HeadNotIdent` |a group or literal where an application head must be an `Ident`
 |`EmptyOutput` |`pass:[{{{}}}]` with no expression
 |`BadEscape` |an invalid string escape inside a `STRING`
 |===
 
-Every parse error carries a source offset covering the offending tag. (Multiple separators in one
-block are *not* an error — a block may have any number of branches; xref:grammar.adoc[].)
+Every parse error carries a source offset covering the offending tag. Note there is no
+"separator outside block" error: the core has no separators — `pass:[{{else}}]` is just literal
+content unless an engine layer (the surface dialect) gives it meaning.
 
 == 4.2 Evaluation errors
 
@@ -67,10 +67,10 @@ validate        :: Schema -> Template -> Array Issue              -- Issue = { s
 ----
 
 `validate` reports unknown helpers (when `allowUnknown` is false — the JSON-schema
-`additionalProperties: false` analogue), arity violations, and block/inline misuse. Separators are
-*not* helper invocations and are never flagged here. The reference engine's schema is
-`BareBars.Prelude.preludeSchema`. This keeps the core free of semantics (xref:concepts.adoc[]) while
-giving engines a place to define — and enforce — their contract.
+`additionalProperties: false` analogue), arity violations, and block/inline misuse. The reference
+engine's schema is `BareBars.Prelude.preludeSchema`, which also declares the clause names (`then`,
+`else`) so clause blocks validate cleanly. This keeps the core free of semantics
+(xref:concepts.adoc[]) while giving engines a place to define — and enforce — their contract.
 
 == 4.4 Diagnostics quality
 

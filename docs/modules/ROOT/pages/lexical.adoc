@@ -17,31 +17,27 @@ literal *content*.
 |Opener |Closer |Meaning
 
 |`pass:[{{{]`  |`pass:[}}}]`   |*Output* — evaluate one expression, write its value. The only inline output form.
-|`pass:[{{#]`  |`pass:[}}]` … `pass:[{{/name}}]` |*Block* — apply a helper to arguments and to the captured segments.
-|`pass:[{{^]`  |`pass:[}}]` … `pass:[{{/name}}]` |*Block, inverse-first* — reserved opener; see xref:grammar.adoc[].
+|`pass:[{{#]`  |`pass:[}}]` … `pass:[{{/name}}]` |*Block* — apply a helper to arguments and to the captured body. The only block opener.
 |`pass:[{{!]`  |`pass:[}}]`    |*Short comment* — discarded. May not contain `pass:[}}]`.
 |`pass:[{{!--]`|`pass:[--}}]`  |*Long comment* — discarded. May contain `pass:[}}]`, `pass:[{{]`, and `--`.
 |`pass:[{{{{#]`|`pass:[}}}}]` … `pass:[{{{{/name}}}}]` |*Raw block* — body is captured verbatim, never tokenized.
-|`pass:[{{]` _Ident_ `pass:[}}]`| |*Block separator* — the generic double-stash tag. Splits a block into segments; *the name is never interpreted by the lexer*. Only legal inside a block.
 |===
 
 [NOTE]
 ====
-The brace count is meaningful and fixed. The single-brace-pair `pass:[{{ … }}]` form is a *block
-separator* in the core (the row above) — its head is a bare identifier and it is the lexer's *only*
-double-stash tag. The same delimiter is reused by the xref:surface.adoc[surface dialect] for escaped
-output (`pass:[{{ E }}]` → `pass:[{{{ esc_html E }}}]`); the two layers read it differently by
-design. In the core, `pass:[{{{ }}}]` is the one output delimiter and escaping is an ordinary
-helper.
+The brace count is meaningful and fixed. There is *no* double-stash `pass:[{{ }}]` tag in the core
+and *no* inverse `pass:[{{^}}]`: a single brace pair is simply literal content. The
+`pass:[{{ }}]` delimiter is given a meaning (escaped output) only by the
+xref:surface.adoc[surface dialect]. In the core, `pass:[{{{ }}}]` is the one output delimiter,
+`pass:[{{#]` the one block opener, and escaping is an ordinary helper.
 
-Crucially, the separator's identifier — `else`, `elif`, `case`, `otherwise`, … — is *opaque to the
-lexer and parser*. Whether `else` means "the inverse" is a decision made by the block helper, in
-userland. A separator's head may not begin with the reserved sigils `# ^ / ! {`.
+The names `else`, `elif`, `case`, `then`, … are therefore *opaque to the lexer and parser* — there
+is nothing for them to be a keyword *of*. They are just block names a helper may interpret as
+clauses (xref:grammar.adoc[]).
 ====
 
-The lexer must match the *longest opener*: `pass:[{{{{]` before `pass:[{{{]` before `pass:[{{]`,
-and `pass:[{{!--]` before `pass:[{{!]`. A bare `pass:[{{]` whose next significant character (after
-an optional `~`) is not one of `# ^ / ! {` is a *separator*.
+The lexer must match the *longest opener*: `pass:[{{{{]` before `pass:[{{{]` before `pass:[{{#]`,
+and `pass:[{{!--]` before `pass:[{{!]`.
 
 == 1.3 Content and brace escaping
 

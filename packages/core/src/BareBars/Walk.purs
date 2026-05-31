@@ -16,6 +16,9 @@ module BareBars.Walk
   , HelperRef
   , foldRefs
   , helperRefs
+  , clause
+  , clauses
+  , withoutClause
   , Arity(..)
   , HelperSpec
   , Schema
@@ -27,7 +30,7 @@ module BareBars.Walk
 
 import Prelude
 
-import BareBars.Syntax (Branch, Expr(..), Ident, Node(..), Template)
+import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
 import Data.Array as Array
 import Data.Foldable (foldMap)
 import Data.Map (Map)
@@ -43,7 +46,6 @@ data RefKind
   = AppRef -- {{{ name … }}} or a nested application
   | BlockRef -- {{# name … }}
   | RawRef -- {{{{# name … }}}}
-  | SepRef -- {{ sep … }} block separator
 
 derive instance eqRefKind :: Eq RefKind
 
@@ -52,7 +54,6 @@ instance showRefKind :: Show RefKind where
     AppRef -> "AppRef"
     BlockRef -> "BlockRef"
     RawRef -> "RawRef"
-    SepRef -> "SepRef"
 
 -- | A single occurrence of a name, with how it was used and how many arguments
 -- | it was given.
@@ -66,19 +67,12 @@ foldRefs f = foldMap (node f)
   node g = case _ of
     Content _ -> mempty
     Output e -> expr g e
-    Block name args body branches ->
+    Block name args body ->
       g { name, kind: BlockRef, argc: Array.length args }
         <> foldMap (expr g) args
         <> foldRefs g body
-        <> foldMap (branch g) branches
     RawBlock name args _ ->
       g { name, kind: RawRef, argc: Array.length args } <> foldMap (expr g) args
-
-  branch :: (HelperRef -> m) -> Branch -> m
-  branch g b =
-    g { name: b.sep, kind: SepRef, argc: Array.length b.args }
-      <> foldMap (expr g) b.args
-      <> foldRefs g b.body
 
   expr :: (HelperRef -> m) -> Expr -> m
   expr g = case _ of
@@ -89,6 +83,31 @@ foldRefs f = foldMap (node f)
 -- | Every helper reference in a template, in depth-first order.
 helperRefs :: Template -> Array HelperRef
 helperRefs = foldRefs Array.singleton
+
+--------------------------------------------------------------------------------
+-- Clause helpers (for nested-clause control flow)
+--------------------------------------------------------------------------------
+
+-- | The body of the first top-level `{{#name}}…{{/name}}` block in a template,
+-- | if present. This is how a block helper finds a clause (e.g. `if` looking
+-- | for an `else` clause in its body).
+clause :: Ident -> Template -> Maybe Template
+clause name = Array.findMap case _ of
+  Block n _ body | n == name -> Just body
+  _ -> Nothing
+
+-- | The bodies of every top-level `{{#name}}` block in a template.
+clauses :: Ident -> Template -> Array Template
+clauses name = Array.mapMaybe case _ of
+  Block n _ body | n == name -> Just body
+  _ -> Nothing
+
+-- | A template with every top-level `{{#name}}` block removed — the "main"
+-- | content once a clause has been pulled out.
+withoutClause :: Ident -> Template -> Template
+withoutClause name = Array.filter case _ of
+  Block n _ _ -> n /= name
+  _ -> true
 
 --------------------------------------------------------------------------------
 -- Schema-driven validation
@@ -138,28 +157,25 @@ arityText = case _ of
   Between lo hi -> show lo <> "–" <> show hi
   AnyArity -> "any number of"
 
--- | Validate a skeleton template against an engine schema. Separators are not
--- | helper invocations (they are block-internal markers whose meaning is the
--- | enclosing helper's), so they are not checked here.
+-- | Validate a skeleton template against an engine schema: unknown helpers
+-- | (when `allowUnknown` is false), arity violations, and block/inline misuse.
 validate :: Schema -> Template -> Array Issue
 validate schema = Array.mapMaybe check <<< helperRefs
   where
   check :: HelperRef -> Maybe Issue
-  check ref = case ref.kind of
-    SepRef -> Nothing
-    _ -> case Map.lookup ref.name schema.helpers of
-      Nothing ->
-        if schema.allowUnknown then Nothing
-        else Just
-          { severity: Err, name: ref.name, message: "unknown helper '" <> ref.name <> "'" }
-      Just spec ->
-        if not (arityOk spec.arity ref.argc) then Just
-          { severity: Err
-          , name: ref.name
-          , message: "'" <> ref.name <> "' expects " <> arityText spec.arity
-              <> " arguments, got "
-              <> show ref.argc
-          }
-        else if (ref.kind == BlockRef || ref.kind == RawRef) && not spec.block then Just
-          { severity: Warn, name: ref.name, message: "'" <> ref.name <> "' is not a block helper" }
-        else Nothing
+  check ref = case Map.lookup ref.name schema.helpers of
+    Nothing ->
+      if schema.allowUnknown then Nothing
+      else Just
+        { severity: Err, name: ref.name, message: "unknown helper '" <> ref.name <> "'" }
+    Just spec ->
+      if not (arityOk spec.arity ref.argc) then Just
+        { severity: Err
+        , name: ref.name
+        , message: "'" <> ref.name <> "' expects " <> arityText spec.arity
+            <> " arguments, got "
+            <> show ref.argc
+        }
+      else if (ref.kind == BlockRef || ref.kind == RawRef) && not spec.block then Just
+        { severity: Warn, name: ref.name, message: "'" <> ref.name <> "' is not a block helper" }
+      else Nothing

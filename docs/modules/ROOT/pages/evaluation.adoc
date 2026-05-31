@@ -11,25 +11,26 @@ type Template = Array Node
 data Node
   = Content  String
   | Output   Expr
-  | Block    Ident (Array Expr) Template (Array Branch)     -- head, args, primary body, branches
-  | RawBlock Ident (Array Expr) String                      -- head, args, verbatim body
-
-type Branch = { sep :: Ident, args :: Array Expr, body :: Template }   -- a {{sep …}} alternative
+  | Block    Ident (Array Expr) Template     -- head, args, captured body
+  | RawBlock Ident (Array Expr) String       -- head, args, verbatim body
 
 data Expr
   = Lit Value          -- only Str / Num arrive from the parser
   | App Ident (Array Expr)
 ----
 
-Note there is no node for comments (the lexer drops them) and no `Group` constructor —
-parentheses only affect *parsing*; `(e)` and `e` produce the same `Expr`.
+This is the *skeleton* AST: purely syntactic, with no meaning ascribed to any name. There is no node
+for comments (the lexer drops them) and no `Group` constructor — parentheses only affect *parsing*;
+`(e)` and `e` produce the same `Expr`. A `Block` is just a named application with a captured body;
+the core has *no* separators, no `pass:[{{else}}]`, no "inverse". The only block opener is
+`pass:[{{#]` (and `pass:[{{{{#]` for raw).
 
-A `Block` carries a *primary body* and a list of *branches*. A branch is introduced by an inline
-separator `pass:[{{sep …}}]` (xref:grammar.adoc[]). *The core attaches no meaning to a separator's
-name.* `else`, `elif`, `case`, `otherwise` are all just identifiers; which one (if any) a block
-helper acts on is entirely the helper's business. The lexer and parser never single out a name —
-this is "everything is userland" applied to control flow. The skeleton tree produced here is
-validated by a separate, engine-supplied pass (the `BareBars.Walk` host module).
+*Multi-branch control flow is expressed as nested clause blocks* the engine interprets — e.g.
+`pass:[{{#if c}}{{#then}}…{{/then}}{{#else}}…{{/else}}{{/if}}]`. The clause names (`then`, `else`,
+`elif`, `case`, …) are the engine's and the author's choice, never core keywords. Meaning is given
+by a separate, engine-supplied pass over this skeleton — a validating + interpreting visitor, exactly
+as a JSON schema validates a JSON document (xref:errors.adoc[] and the `BareBars.Walk` /
+`BareBars.Eval` host modules).
 
 == 3.2 The value type (normative)
 
@@ -60,7 +61,7 @@ serializable and comparable, and it is why higher-order behaviour must go throug
 
 [source,haskell]
 ----
-type Helper = Eval -> Array Value -> Blocks -> M Value
+type Helper = HelperCtx -> Array Value -> M Value     -- HelperCtx defined in 3.5
 
 type Env =
   { helpers :: List (Map Ident Helper)   -- a stack of frames; head is innermost
@@ -73,8 +74,9 @@ type Env =
   whole of "scope" (xref:concepts.adoc[]).
 * `context` is the current data, reached only via the `this` helper. Block helpers such as `with`
   and `each` push a frame *and* set a new `context` for the body.
-* `Blocks` carries the captured `body` thunk and the `branches` to block helpers (3.5). For
-  non-block applications it is empty.
+* A block helper receives a `HelperCtx` carrying its captured `body` (a `Template`) and a
+  `renderTemplate` function (3.5), so it can render sub-templates and interpret nested clauses. For
+  a non-block application `body` is empty.
 * `M` is the result monad. v1 fixes `M = Either Error` (pure). A host that needs asynchronous
   partials or effectful helpers may instantiate `M = Aff`; the evaluator is written against a
   `MonadThrow Error m` constraint so both work.
@@ -99,42 +101,32 @@ argument must instead be written as a *block* helper.
 
 [source,text]
 ----
-render(Content s)                       = s
-render(Output e)                        = stringify(eval(e))
-render(Block name args body branches)   = stringify( resolve(name)
-                                                        evaluated-args
-                                                        { body, branches } )
-render(RawBlock name args raw)          = stringify( resolve(name)
-                                                        evaluated-args
-                                                        { body = const raw, branches = [] } )
+render(Content s)              = s
+render(Output e)               = stringify(eval(e))
+render(Block name args body)   = stringify( resolve(name) evaluated-args { body } )
+render(RawBlock name args raw) = stringify( resolve(name) evaluated-args { body = [Content raw] } )
 ----
 
-A *block* helper receives, in addition to its evaluated arguments, a `body` thunk and the block's
-`branches`:
+A *block* helper receives, in addition to its evaluated arguments, a `HelperCtx`:
 
 [source,haskell]
 ----
-type Blocks =
-  { body     :: Env -> M String                       -- render the primary segment
-  , branches :: Array { sep    :: Ident               -- the separator's name (verbatim)
-                       , args   :: Array Value         -- its evaluated arguments
-                       , render :: Env -> M String } } -- render the segment after it
+type HelperCtx =
+  { env            :: Env                              -- the current environment
+  , body           :: Template                         -- the captured body ([] for inline use)
+  , renderTemplate :: Template -> Env -> M String }    -- render any template in any env
 ----
 
-The helper decides whether to call `body`, how many times, with what `context`, and which extra
-scoped helpers to install in the pushed frame, and it interprets `branches` however it likes. The
-reference `if` renders `body` when truthy and the first branch otherwise; `each` renders `body` once
-per element with a per-element frame, or the first branch when the collection is empty; `with`
-renders `body` with a shifted context.
+The helper decides whether to render `body`, how many times, with what `context`, and which extra
+scoped helpers to install in a pushed frame — and, crucially, it may reach into `body` to find
+*nested clause blocks*. The reference `if` renders its body (minus any `else` clause) when truthy and
+renders the `pass:[{{#else}}…{{/else}}]` clause otherwise; `each` renders the body once per element
+with a per-element frame, or the `else` clause when empty; `with` renders the body with a shifted
+context. The helper utilities `clause`, `clauses`, and `withoutClause` (`BareBars.Walk`) extract and
+remove top-level clause blocks by name.
 
-When rendering a block, the evaluator additionally installs *each separator name as a scoped helper*
-that renders that branch (returning `VSafe`). This is the whole of "`else` is a scoped helper": the
-core hardcodes no name, it just exposes whatever separators the author wrote. Consequently
-`pass:[{{else}}]` ≡ `pass:[{{{esc_html else}}}]` ≡ `pass:[{{{else}}}]` — the `else` value is already
-safe, so escaping it is a no-op.
-
-For a *raw* block the body thunk ignores its environment and returns the captured text verbatim, so
-a raw block whose helper is the identity emits its contents unchanged.
+For a *raw* block the body is the single verbatim `Content` node, so a raw block whose helper renders
+its body emits the captured text unchanged.
 
 == 3.6 Stringification, escaping, and safety
 

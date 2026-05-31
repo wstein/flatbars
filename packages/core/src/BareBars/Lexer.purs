@@ -48,9 +48,7 @@ data RawTok
   = RContent String
   | ROutput (Array Token) -- {{{ expr }}}
   | ROpen String (Array Token) -- {{# name args }}
-  | ROpenInv String (Array Token) -- {{^ name args }}
   | RClose String -- {{/ name }}
-  | RSep String (Array Token) -- {{ sep args }} — a name-agnostic block separator
   | RRaw String (Array Token) String -- {{{{# name args }}}} body {{{{/ name }}}}
 
 derive instance eqRawTok :: Eq RawTok
@@ -60,9 +58,7 @@ instance showRawTok :: Show RawTok where
     RContent s -> "RContent " <> show s
     ROutput t -> "ROutput " <> show t
     ROpen n t -> "ROpen " <> show n <> " " <> show t
-    ROpenInv n t -> "ROpenInv " <> show n <> " " <> show t
     RClose n -> "RClose " <> show n
-    RSep n t -> "RSep " <> show n <> " " <> show t
     RRaw n t b -> "RRaw " <> show n <> " " <> show t <> " " <> show b
 
 --------------------------------------------------------------------------------
@@ -253,7 +249,8 @@ tokenizeTemplate src = go 0 [] [] false
 
   -- The brace-prefixed openers, longest first. The `~` whitespace-control
   -- variants (`{{~#`, `{{~/`, …) are recognized so a left-trim tilde may sit
-  -- between the braces and the sigil.
+  -- between the braces and the sigil. The only block opener is `{{#` (and
+  -- `{{{{#` for raw): the core has no inverse `{{^}}` and no separators.
   openerLiteralAt :: Int -> Maybe String
   openerLiteralAt i
     | matchAt cs i "{{{{#" = Just "{{{{#"
@@ -264,44 +261,18 @@ tokenizeTemplate src = go 0 [] [] false
     | matchAt cs i "{{!" = Just "{{!"
     | matchAt cs i "{{~#" = Just "{{~#"
     | matchAt cs i "{{#" = Just "{{#"
-    | matchAt cs i "{{~^" = Just "{{~^"
-    | matchAt cs i "{{^" = Just "{{^"
     | matchAt cs i "{{~/" = Just "{{~/"
     | matchAt cs i "{{/" = Just "{{/"
     | otherwise = Nothing
 
-  -- | A block separator is the generic double-stash tag `{{ ident args }}`
-  -- | (with an optional leading `~`). It is the *only* double-stash form the
-  -- | core recognizes, and it is name-agnostic: `else`, `elif`, `case`,
-  -- | `otherwise` are all just identifiers a helper may choose to interpret —
-  -- | the lexer and parser never single any of them out. A separator is any
-  -- | `{{` that is not `{{{` and whose sigil (after an optional `~`) is not one
-  -- | of the reserved `# ^ / !` or another `{`.
-  isSeparatorAt :: Int -> Boolean
-  isSeparatorAt i =
-    matchAt cs i "{{"
-      && not (matchAt cs i "{{{")
-      && reservedSigil
-    where
-    p = if matchAt cs (i + 2) "~" then i + 3 else i + 2
-    reservedSigil =
-      not (matchAt cs p "#")
-        && not (matchAt cs p "^")
-        && not (matchAt cs p "/")
-        && not (matchAt cs p "!")
-        && not (matchAt cs p "{")
-
   isOpenerAt :: Int -> Boolean
   isOpenerAt i = case openerLiteralAt i of
     Just _ -> true
-    Nothing -> isSeparatorAt i
+    Nothing -> false
 
-  -- The literal text emitted for a backslash-escaped opener. For a separator we
-  -- only need to emit `{{`; the remainder falls through as ordinary content.
+  -- The literal text emitted for a backslash-escaped opener.
   escapedOpenerAt :: Int -> Maybe String
-  escapedOpenerAt i = case openerLiteralAt i of
-    Just s -> Just s
-    Nothing -> if isSeparatorAt i then Just "{{" else Nothing
+  escapedOpenerAt = openerLiteralAt
 
   readTag :: Int -> Either ParseError TagResult
   readTag i
@@ -311,13 +282,10 @@ tokenizeTemplate src = go 0 [] [] false
     | matchAt cs i "{{{" = readOutput i
     | matchAt cs i "{{~!" = readShortComment i "{{~!"
     | matchAt cs i "{{!" = readShortComment i "{{!"
-    | matchAt cs i "{{~#" = readBlockOpen i "{{~#" false
-    | matchAt cs i "{{#" = readBlockOpen i "{{#" false
-    | matchAt cs i "{{~^" = readBlockOpen i "{{~^" true
-    | matchAt cs i "{{^" = readBlockOpen i "{{^" true
+    | matchAt cs i "{{~#" = readBlockOpen i "{{~#"
+    | matchAt cs i "{{#" = readBlockOpen i "{{#"
     | matchAt cs i "{{~/" = readClose i "{{~/"
     | matchAt cs i "{{/" = readClose i "{{/"
-    | isSeparatorAt i = readSeparator i
     | otherwise = Left (LexError "internal: no opener" i)
 
   -- A left-trim tilde may sit immediately after the braces, before the sigil.
@@ -351,8 +319,8 @@ tokenizeTemplate src = go 0 [] [] false
               if Array.null toks then Left (EmptyOutput i)
               else Right { mtok: Just (ROutput toks), next: q + 3, trimL: t.trimL, trimR: t.trimR }
 
-  readBlockOpen :: Int -> String -> Boolean -> Either ParseError TagResult
-  readBlockOpen i opener inv =
+  readBlockOpen :: Int -> String -> Either ParseError TagResult
+  readBlockOpen i opener =
     let
       start = i + SCU.length opener
     in
@@ -362,8 +330,12 @@ tokenizeTemplate src = go 0 [] [] false
           let t = splitTrims (slice cs start q)
           toks <- lexExpr start t.core
           { name, rest } <- splitHead i toks
-          let tok = if inv then ROpenInv name rest else ROpen name rest
-          Right { mtok: Just tok, next: q + 2, trimL: leadTrimAt i || t.trimL, trimR: t.trimR }
+          Right
+            { mtok: Just (ROpen name rest)
+            , next: q + 2
+            , trimL: leadTrimAt i || t.trimL
+            , trimR: t.trimR
+            }
 
   readClose :: Int -> String -> Either ParseError TagResult
   readClose i opener =
@@ -378,28 +350,6 @@ tokenizeTemplate src = go 0 [] [] false
           { name } <- splitHead i toks
           Right
             { mtok: Just (RClose name)
-            , next: q + 2
-            , trimL: leadTrimAt i || t.trimL
-            , trimR: t.trimR
-            }
-
-  -- A generic block separator `{{ [~] ident args [~] }}`. The leading `~` (if
-  -- any) is consumed before the interior; the trailing `~` is handled by
-  -- `splitTrims`. The head identifier names the separator — its meaning is the
-  -- helper's business, never the lexer's.
-  readSeparator :: Int -> Either ParseError TagResult
-  readSeparator i =
-    let
-      start = if leadTrimAt i then i + 3 else i + 2
-    in
-      case findFrom cs start "}}" of
-        Nothing -> Left (UnterminatedTag i)
-        Just q -> do
-          let t = splitTrims (slice cs start q)
-          toks <- lexExpr start t.core
-          { name, rest } <- splitHead i toks
-          Right
-            { mtok: Just (RSep name rest)
             , next: q + 2
             , trimL: leadTrimAt i || t.trimL
             , trimR: t.trimR

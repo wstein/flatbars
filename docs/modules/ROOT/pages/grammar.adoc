@@ -20,11 +20,8 @@ Node      ::= Content                                   (* literal text *)
 Output    ::= "{{{" Expr "}}}"
 
 Block     ::= "{{#"   Ident Arg* "}}"
-                  Template
-                  ( Separator Template )*     (* zero or more name-agnostic separators *)
+                  Template                    (* a single captured body *)
               "{{/" Ident "}}"
-
-Separator ::= "{{" Ident Arg* "}}"           (* a block-internal split; the name is userland *)
 
 RawBlock  ::= "{{{{#" Ident Arg* "}}}}"
                   RawText
@@ -63,7 +60,7 @@ inside it:
 [source,text]
 ----
 {{{lookup this "age"}}}     ok: the single Expr is an application
-{{{(lookup this "age")}}}   ok: grouping a whole expression is a harmless no-op
+{{{ lookup this "age" }}}   ok: grouping a whole expression is a harmless no-op
 {{{f a}}}                   ALSO ok — a single Expr "f a" (operator f, arg a)
 {{{f a b}}}                 ok: operator f, args a and b
 ----
@@ -84,34 +81,29 @@ Consequently *computed block helpers are not expressible*: there is no `pass:[{{
 is the one place where the "head is always a name" rule is enforced syntactically rather than
 merely conventionally, and it is what makes `pass:[{{/each}}]` unambiguous.
 
-== 2.4 Separators and `pass:[{{^}}]`
+== 2.4 No separators, no inverse — clauses instead
 
-A `Block` may contain any number of *separators*. A separator is the generic double-stash tag
-`pass:[{{ Ident Arg* }}]` — the *only* double-stash form the core recognizes — and it splits the
-captured template into segments: the *primary body* (before the first separator) and one *branch*
-per separator. The helper receives the body thunk and the branch list (xref:evaluation.adoc[]);
-whether, when, and which it renders is entirely up to the helper.
+A `Block` captures *one* body. The core has *no* `pass:[{{else}}]` separator and *no* inverse-first
+`pass:[{{^}}]`. The only block opener is `pass:[{{#]` (and `pass:[{{{{#]` for raw).
 
 [IMPORTANT]
 ====
-*The core attaches no meaning to a separator's name.* `pass:[{{else}}]`, `pass:[{{elif c}}]`,
-`pass:[{{case 1}}]`, `pass:[{{otherwise}}]`, `pass:[{{default}}]` all parse identically — as a
-separator whose head identifier is `else` / `elif` / `case` / …. A name like `else` *never lands in
-the lexer or parser*; it is the enclosing helper that decides what (if anything) `else` means. A
-separator's head identifier may not begin with the reserved sigils `# ^ / ! {` (those open other
-tags); any other identifier is legal.
+*Multi-branch control flow is expressed as nested clause blocks*, which are ordinary blocks the
+engine's pass interprets. A name like `else` *never lands in the lexer or parser* — it is the
+enclosing helper that decides what (if anything) `else`, `then`, `elif`, `case`, `default` mean.
 ====
-
-`pass:[{{^Ident Arg*}}]` … `pass:[{{/Ident}}]` is an *inverse-first* block: the primary body is
-empty and the captured template becomes the first branch (with an empty separator name). It exists
-so the common "render when falsy" shape has a spelling; the prelude `unless` helper is the usual
-operator.
 
 [source,text]
 ----
-{{^each xs}}nothing here{{/each}}
-≡ {{#each xs}}{{else}}nothing here{{/each}}     (* "else" here is just the first branch *)
+{{#if ready}}{{#then}}Go!{{/then}}{{#else}}Wait…{{/else}}{{/if}}
+{{#each xs}}<li>{{{this}}}</li>{{#else}}empty{{/else}}{{/each}}
 ----
+
+The reference prelude's `if` renders its body (with any top-level `pass:[{{#else}}]` clause removed)
+when truthy, and the `else` clause otherwise; `each` renders the `else` clause for an empty
+collection. A `switch`/`case` helper, an `elif` chain, or any other shape is just a helper that
+walks its body's clause blocks — see xref:errors.adoc[] (the validation/interpretation pass) and
+xref:prelude.adoc[].
 
 == 2.5 What is *not* in the grammar
 
@@ -123,8 +115,8 @@ find. Each has a home in the surface dialect or the prelude:
 |Absent from the core |Where it lives
 
 |`pass:[{{ }}]` (escaped output) |surface → `pass:[{{{ esc_html … }}}]`. (In the *core*, a
-double-stash `pass:[{{ Ident … }}]` is a block separator, §2.4 — only meaningful inside a block;
-elsewhere it is a parse error. The two layers read `pass:[{{ }}]` differently, by design.)
+single-brace-pair `pass:[{{ … }}]` is *not a tag at all* — it is literal content.)
+|`pass:[{{else}}]`, `pass:[{{^}}]` (inverse) |nested clause blocks (§2.4) interpreted by the engine
 |`pass:[{{& }}]` (ampersand-unescaped) |surface → `pass:[{{{ … }}}]`
 |dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent` (xref:surface.adoc[])
 |array-index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments

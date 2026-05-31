@@ -48,31 +48,32 @@ renderWith   :: String -> Value -> Either String String       -- parse + render,
 
 == 7.3 Writing a helper
 
-A helper is `Env -> Array Value -> Blocks -> Either Error Value` (v1 fixes the result monad to
-`Either Error`). A plain helper ignores `Blocks`; a block helper uses `body` and `branches`.
+A helper is `HelperCtx -> Array Value -> Either Error Value` (v1 fixes the result monad to
+`Either Error`). A plain helper ignores the `body`; a block helper renders it — and may reach into
+its *nested clause blocks*.
 
 [source,haskell]
 ----
 -- upcase: a 1-argument value helper
 upcase :: Helper
-upcase _ args _ = case args of
+upcase _ args = case args of
   [v] -> VString <<< toUpper <$> stringify v
   _   -> Left (ArityError "upcase/1")
 
--- if: a block helper. The "inverse" is just the first branch — the core never
--- privileges the name `else`, so any separator (`{{otherwise}}`, …) works too.
+-- if: a block helper. There is no "inverse" in the core — `else` is just a
+-- nested clause block this helper chooses to interpret.
 ifHelper :: Helper
-ifHelper env args blocks = case args of
+ifHelper ctx args = case args of
   [cond] -> if truthy cond
-              then VSafe <$> blocks.body env
-              else case Array.head blocks.branches of
-                     Just b  -> VSafe <$> b.render env
-                     Nothing -> Right VNull
+              then VSafe <$> ctx.renderTemplate (withoutClause "else" ctx.body) ctx.env
+              else case clause "else" ctx.body of
+                     Just t  -> VSafe <$> ctx.renderTemplate t ctx.env
+                     Nothing -> Right (VSafe "")
   _      -> Left (ArityError "if/1")
 ----
 
-A multi-way helper (`switch`/`case`, an `if`/`elif`/`else` chain) inspects `blocks.branches`
-directly: each branch carries its separator `sep`, its evaluated `args`, and a `render` thunk.
+A multi-way helper (`switch`/`case`, an `elif` chain) walks `ctx.body` for its clause blocks with
+the `clause` / `clauses` / `withoutClause` utilities from `BareBars.Walk`.
 
 == 7.4 {hbs} JavaScript API → BareBars host API
 

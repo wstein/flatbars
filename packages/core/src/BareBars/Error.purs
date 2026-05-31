@@ -20,7 +20,6 @@ data ParseError
   | UnterminatedComment Int
   | UnterminatedRaw Int
   | MismatchedBlock String String Int -- opened with, closed with
-  | SeparatorOutsideBlock String Int -- a {{sep}} separator with no enclosing block
   | HeadNotIdent Int
   | EmptyOutput Int
   | BadEscape Int
@@ -38,8 +37,6 @@ renderParseError = case _ of
   UnterminatedRaw o -> "UnterminatedRaw: {{{{#name}}}} with no matching close (at " <> show o <> ")"
   MismatchedBlock open close o ->
     "MismatchedBlock: {{/" <> close <> "}} closing {{#" <> open <> "}} (at " <> show o <> ")"
-  SeparatorOutsideBlock sep o ->
-    "SeparatorOutsideBlock: {{" <> sep <> "}} separator is not inside a block (at " <> show o <> ")"
   HeadNotIdent o -> "HeadNotIdent: an application head must be an identifier (at " <> show o <> ")"
   EmptyOutput o -> "EmptyOutput: {{{}}} with no expression (at " <> show o <> ")"
   BadEscape o -> "BadEscape: invalid string escape (at " <> show o <> ")"

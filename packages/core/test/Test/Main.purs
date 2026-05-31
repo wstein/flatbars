@@ -81,28 +81,31 @@ main = do
     (obj [ Tuple "name" (str "A<B") ])
     "A&lt;B"
 
-  expect "if-true" "{{#if this}}yes{{else}}no{{/if}}" (VBool true) "yes"
-  expect "if-false" "{{#if this}}yes{{else}}no{{/if}}" (VBool false) "no"
+  expect "if-true-bare" "{{#if this}}yes{{/if}}" (VBool true) "yes"
+  expect "if-false-bare" "{{#if this}}yes{{/if}}" (VBool false) ""
   expect "unless" "{{#unless this}}none{{/unless}}" (VBool false) "none"
 
-  -- A separator name is just an identifier: it becomes a scoped helper that
-  -- renders its branch, so {{{else}}} inside a body renders the inverse and
-  -- {{else}} ≡ {{{esc_html else}}} ≡ {{{else}}}.
-  expect "else-as-helper" "{{#if this}}A {{{else}}} C{{else}}B{{/if}}" (VBool true) "A B C"
-  expect "else-separator-false" "{{#if this}}A {{{else}}} C{{else}}B{{/if}}" (VBool false) "B"
-  expect "tilde-else" "{{#if this}}x  {{~else~}}  y{{/if}}" (VBool true) "x"
-  expect "inverse-first" "{{^if this}}neg{{/if}}" (VBool false) "neg"
+  -- Multi-branch control flow is *nested clause blocks* the engine interprets;
+  -- `else` is the reference prelude's clause name, not a core keyword.
+  expect "if-else-true" "{{#if this}}yes{{#else}}no{{/else}}{{/if}}" (VBool true) "yes"
+  expect "if-else-false" "{{#if this}}yes{{#else}}no{{/else}}{{/if}}" (VBool false) "no"
+  expect "if-then-else"
+    "{{#if this}}{{#then}}A{{/then}}{{#else}}B{{/else}}{{/if}}"
+    (VBool true)
+    "A"
+  expect "if-then-else-false"
+    "{{#if this}}{{#then}}A{{/then}}{{#else}}B{{/else}}{{/if}}"
+    (VBool false)
+    "B"
 
-  -- The core privileges no separator name: `otherwise` works exactly like
-  -- `else` because the prelude `if` treats branch 0 as the inverse.
-  expect "custom-separator" "{{#if this}}yes{{otherwise}}no{{/if}}" (VBool false) "no"
-  expect "custom-separator-scoped" "{{#if this}}A {{{nope}}} C{{nope}}B{{/if}}" (VBool true) "A B C"
+  -- A double-stash {{ … }} is NOT a core construct: it is literal content.
+  expect "double-stash-literal" "a{{b}}c" VNull "a{{b}}c"
 
   expect "each-array" "{{#each (lookup this \"xs\")}}[{{{this}}}={{{index}}}]{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
     "[a=0][b=1]"
 
-  expect "each-empty" "{{#each (lookup this \"xs\")}}x{{else}}empty{{/each}}"
+  expect "each-empty" "{{#each (lookup this \"xs\")}}x{{#else}}empty{{/else}}{{/each}}"
     (obj [ Tuple "xs" (arr []) ])
     "empty"
 
@@ -140,7 +143,7 @@ main = do
 
   -- Skeleton-AST validation (the engine-supplied second pass).
   expectValid "validate-clean"
-    "{{#each (lookup this \"xs\")}}{{{esc_html this}}}{{else}}none{{/each}}"
+    "{{#each (lookup this \"xs\")}}{{{esc_html this}}}{{#else}}none{{/else}}{{/each}}"
   expectIssue "validate-unknown" "{{{frobnicate this}}}"
   expectIssue "validate-arity" "{{{esc_html}}}"
 

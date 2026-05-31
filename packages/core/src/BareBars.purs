@@ -39,7 +39,7 @@ import Data.Either (Either(..))
 preludeEnv :: Value -> Env
 preludeEnv dat =
   registerAll prelude
-    (register "root" (Helper \_ _ _ -> Right dat) (emptyEnv dat))
+    (register "root" (Helper \_ _ -> Right dat) (emptyEnv dat))
 
 -- | Parse a *core* template and return a renderer closed over the reference
 -- | prelude. (The surface front-end is a separate, not-yet-complete step; see

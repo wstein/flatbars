@@ -7,15 +7,13 @@
 -- |
 -- | v1 fixes the result monad to `Either Error` (pure). `Helper` is a newtype so
 -- | that the otherwise-cyclic synonyms (`Env` mentions `Helper`, `Helper`
--- | mentions `Env`/`Blocks`) are well-founded.
+-- | mentions `Env`/`HelperCtx`) are well-founded.
 module BareBars.Env
   ( Helper(..)
-  , Blocks
-  , BlockBranch
+  , HelperCtx
   , Env
   , runHelper
   , constHelper
-  , emptyBlocks
   , emptyEnv
   , register
   , registerAll
@@ -25,6 +23,7 @@ module BareBars.Env
   ) where
 
 import BareBars.Error (Error)
+import BareBars.Syntax (Template)
 import BareBars.Value (Value)
 import Data.Either (Either(..))
 import Data.Foldable (foldl)
@@ -34,24 +33,16 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 
-newtype Helper = Helper (Env -> Array Value -> Blocks -> Either Error Value)
+newtype Helper = Helper (HelperCtx -> Array Value -> Either Error Value)
 
--- | The captured sub-templates handed to a block helper. `body` is the primary
--- | segment; `branches` are the alternatives introduced by inline separators
--- | (`{{else}}`, `{{elif c}}`, …). The core attaches no meaning to a branch's
--- | `sep` name — a helper decides what (if anything) each name means. For a
--- | non-block application `Blocks` is `emptyBlocks`.
-type Blocks =
-  { body :: Env -> Either Error String
-  , branches :: Array BlockBranch
-  }
-
--- | One block alternative: the separator name, its evaluated arguments, and a
--- | thunk that renders the segment that followed it.
-type BlockBranch =
-  { sep :: String
-  , args :: Array Value
-  , render :: Env -> Either Error String
+-- | What a helper is handed when invoked. `body` is the captured skeleton
+-- | subtree (`[]` for an inline application); `renderTemplate` renders any
+-- | template against any environment. A block helper interprets `body` however
+-- | it likes — including reaching into *nested clause blocks* for control flow.
+type HelperCtx =
+  { env :: Env
+  , body :: Template
+  , renderTemplate :: Template -> Env -> Either Error String
   }
 
 type Env =
@@ -59,16 +50,13 @@ type Env =
   , context :: Value
   }
 
-runHelper :: Helper -> Env -> Array Value -> Blocks -> Either Error Value
+runHelper :: Helper -> HelperCtx -> Array Value -> Either Error Value
 runHelper (Helper f) = f
 
 -- | A nullary helper that always returns a fixed value (the common case for
 -- | scoped helpers like `index`, `first`, `this`).
 constHelper :: Value -> Helper
-constHelper v = Helper \_ _ _ -> Right v
-
-emptyBlocks :: Blocks
-emptyBlocks = { body: \_ -> Right "", branches: [] }
+constHelper v = Helper \_ _ -> Right v
 
 -- | An environment with the given context and a single empty helper frame.
 emptyEnv :: Value -> Env
