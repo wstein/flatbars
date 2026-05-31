@@ -12,7 +12,7 @@ package:
     - halogen
     - barebars
   bundle:
-    module: Main
+    module: Playground.Main
     outfile: dist/app.js
     platform: browser
     type: app

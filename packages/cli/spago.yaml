@@ -11,4 +11,4 @@ package:
     - exceptions
     - barebars
   run:
-    main: Main
+    main: Cli.Main

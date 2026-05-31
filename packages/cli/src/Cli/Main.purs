@@ -9,7 +9,7 @@
 -- | Renders a *core-syntax* template against JSON data using the reference
 -- | prelude, writing the result to stdout. With `--validate` it instead runs
 -- | the skeleton-AST validation pass and reports any issues.
-module Main where
+module Cli.Main where
 
 import Prelude
 

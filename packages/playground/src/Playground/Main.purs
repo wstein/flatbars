@@ -8,7 +8,7 @@
 -- | Panels: a template editor and a JSON data editor on the left; an output
 -- | pane on the right with four views — a sandboxed rendered preview, the HTML
 -- | source, the parsed skeleton AST, and the schema-validation report.
-module Main where
+module Playground.Main where
 
 import Prelude
 
