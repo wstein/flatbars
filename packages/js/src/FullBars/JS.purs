@@ -13,12 +13,13 @@ module FullBars.JS
   , renderSurface
   , astJson
   , compile
+  , compileSurface
   ) where
 
 import Prelude
 
 import BareBars (Expr(..), parse, parseErrorAt)
-import BareBars.Compile.FullBars (compileCore)
+import BareBars.Compile.FullBars (compileCore, compileSurface) as Compile
 import BareBars.Json (fromJson)
 import BareBars.Value (Value(..))
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
@@ -50,7 +51,14 @@ renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJ
 -- | emitted module's default export is `function (data, rt)`; pair it with
 -- | `runtime/barebars-runtime.mjs`. `value` is the JS source on success.
 compile :: Fn1 String Result
-compile = mkFn1 \tpl -> case compileCore tpl of
+compile = mkFn1 \tpl -> compileResult (Compile.compileCore tpl)
+
+-- | Compile a *surface* template to JS (desugars first). `compileSurface(template)`.
+compileSurface :: Fn1 String Result
+compileSurface = mkFn1 \tpl -> compileResult (Compile.compileSurface tpl)
+
+compileResult :: forall e. Show e => Either e String -> Result
+compileResult = case _ of
   Left e -> { ok: false, value: "", error: show e }
   Right js -> { ok: true, value: js, error: "" }
 

@@ -25,15 +25,15 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, render } = await import(enginePath);
+const { compile, compileSurface, render, renderSurface } = await import(enginePath);
 
-// Render with the interpreter (the spec). `render` is FullBars.renderWith over
-// core syntax: render(template, data) -> { ok, value, error }.
-const interpret = (t, d) => render(t, d == null ? null : d);
+// Render with the interpreter (the spec), in the case's dialect.
+const interpret = (t, d, dialect) =>
+  (dialect === "surface" ? renderSurface : render)(t, d == null ? null : d);
 
 // Compile then execute against the runtime: -> { ok, value, error }.
-async function runCompiled(t, d) {
-  const c = compile(t);
+async function runCompiled(t, d, dialect) {
+  const c = (dialect === "surface" ? compileSurface : compile)(t);
   if (!c.ok) return { ok: false, value: "", error: "compile: " + c.error };
   try {
     const mod = await import("data:text/javascript," + encodeURIComponent(c.value));
@@ -58,9 +58,9 @@ const allCases = [...corpus, ...exampleCases()];
 
 let pass = 0, fail = 0;
 const fails = [];
-for (const { name, t, d } of allCases) {
-  const spec = interpret(t, d);
-  const got = await runCompiled(t, d);
+for (const { name, t, d, dialect } of allCases) {
+  const spec = interpret(t, d, dialect);
+  const got = await runCompiled(t, d, dialect);
   if (!spec.ok) {
     // The interpreter itself errored — not a compiler conformance case.
     console.log(`  ?    ${name} — interpreter errored: ${spec.error}`);

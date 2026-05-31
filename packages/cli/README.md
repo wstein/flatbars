@@ -16,6 +16,7 @@ spago run -p barebars-cli -- <template> [--data <data.json>] [--validate | --com
 | Flag | Meaning |
 | --- | --- |
 | `-d`, `--data <file>` | JSON data file (default: `null` context) |
+| `-s`, `--surface` | Read the template in the surface dialect (`{{ name }}`, paths, `@data`, `as \|x\|`) instead of core syntax. Applies to both render and `--compile`. |
 | `--validate` | Run the skeleton-AST validation pass against the prelude schema and report issues; do not render. Exits non-zero if any issue is found. |
 | `-c`, `--compile` | Compile the template to a JS module (`BareBars.Compile`), printed to stdout; do not render. The default export is `function (data, rt)` — pair it with [`barebars-runtime.mjs`](../compile/runtime/barebars-runtime.mjs). |
 | `-h`, `--help` | Show usage |

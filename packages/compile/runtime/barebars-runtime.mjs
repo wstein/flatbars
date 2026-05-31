@@ -110,30 +110,46 @@ function childFrame(parent, ctx, index, key, first, last) {
   };
 }
 
+// Bind block-param names in a frame: `names` ⇒ [element, idx] for `each`, [ctx]
+// for `with` (FullBars binds the element/value first, then the index/key).
+function bindNames(frame, names, values) {
+  if (names && names.length) {
+    frame.binds = {};
+    for (let i = 0; i < names.length; i++) if (values[i] !== undefined) frame.binds[names[i]] = values[i];
+  }
+  return frame;
+}
+
 // ── iteration: `each` over array or object (FullBars eachH) ──────────────────
-function each(coll, parent, bodyFn, elseFn) {
+// `names` are block-param names (`as |item i|`): item = element, i = index
+// (array) or key (object), matching the interpreter.
+function each(coll, parent, names, bodyFn, elseFn) {
   let items;
   if (Array.isArray(coll)) {
-    items = coll.map((val, i) => ({ val, key: String(i) }));
+    items = coll.map((val, i) => ({ val, key: String(i), idx: i }));
   } else if (coll && typeof coll === "object" && !isSafe(coll)) {
     // FullBars VObject is an ordered Map — iteration is by *sorted* key.
-    items = Object.keys(coll).sort().map((k) => ({ val: coll[k], key: k }));
+    items = Object.keys(coll).sort().map((k) => ({ val: coll[k], key: k, idx: k }));
   } else {
     items = [];
   }
   if (items.length === 0) return elseFn(parent);
   let out = "";
   for (let i = 0; i < items.length; i++) {
-    const fr = childFrame(parent, items[i].val, i, items[i].key, i === 0, i === items.length - 1);
+    const it = items[i];
+    const fr = bindNames(
+      childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1),
+      names, [it.val, it.idx],
+    );
     out += bodyFn(fr);
   }
   return out;
 }
 
 // ── context shift: `with` (FullBars withH) ───────────────────────────────────
-function withCtx(val, parent, bodyFn, elseFn) {
+function withCtx(val, parent, names, bodyFn, elseFn) {
   if (!truthy(val)) return elseFn(parent);
-  return bodyFn(childFrame(parent, val, null, null, null, null));
+  return bodyFn(bindNames(childFrame(parent, val, null, null, null, null), names, [val]));
 }
 
 // ── JSON serialization (FullBars.Value.jsonStringify): compact or pretty, with
@@ -215,6 +231,9 @@ const helpers = {
   apply: (a, f) => call(stringify(a[0]), a.slice(1), f),
 };
 function call(name, args, frame) {
+  // block-param bindings (as |item i|) shadow the helper registry, like the
+  // interpreter's scoped frame helpers.
+  if (frame && frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name)) return frame.binds[name];
   const h = helpers[name];
   if (!h) throw new Error("UnknownHelper: no helper named '" + name + "' in any frame");
   return h(args, frame);

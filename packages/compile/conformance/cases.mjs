@@ -64,4 +64,24 @@ export const cases = [
   // ── nesting & escaping interplay ────────────────────────────────────────────
   { name: "nested-if-each", t: "<ul>{{#each (lookup this \"xs\")}}{{#if this}}<li>{{{esc_html this}}}</li>{{/if}}{{/each}}</ul>", d: { xs: ["a", "", "b"] } },
   { name: "auto-escape-each", t: "{{#each (lookup this \"xs\")}}{{{esc_html this}}} {{/each}}", d: { xs: ["<x>", "a&b"] } },
+
+  // ── SURFACE dialect (desugars to core, then compiles) ───────────────────────
+  { name: "s:bare-path", dialect: "surface", t: "Hello {{ name }}!", d: { name: "Ada" } },
+  { name: "s:auto-escape", dialect: "surface", t: "{{ html }}", d: { html: "<b>&\"" } },
+  { name: "s:raw", dialect: "surface", t: "{{{ html }}}", d: { html: "<b>" } },
+  { name: "s:dotted-path", dialect: "surface", t: "{{ user.name }}", d: { user: { name: "Ada" } } },
+  { name: "s:bracket-path", dialect: "surface", t: "{{ a.[home town] }}", d: { a: { "home town": "Lübeck" } } },
+  { name: "s:if-else", dialect: "surface", t: "{{#if admin}}A{{else}}U{{/if}}", d: { admin: false } },
+  { name: "s:else-if", dialect: "surface", t: "{{#if a}}A{{else if b}}B{{else}}C{{/if}}", d: { a: false, b: true } },
+  { name: "s:each-this", dialect: "surface", t: "{{#each items}}[{{ this }}]{{/each}}", d: { items: ["x", "y"] } },
+  { name: "s:each-blockparams", dialect: "surface", t: "{{#each items as |item i|}}{{ i }}:{{ item }};{{/each}}", d: { items: ["a", "b"] } },
+  { name: "s:each-object-blockparams", dialect: "surface", t: "{{#each o as |v k|}}{{ k }}={{ v }};{{/each}}", d: { o: { b: 2, a: 1 } } },
+  { name: "s:with-blockparam", dialect: "surface", t: "{{#with user as |u|}}{{ u.name }}{{/with}}", d: { user: { name: "Ada" } } },
+  { name: "s:at-index", dialect: "surface", t: "{{#each xs}}{{@index}}:{{ this }};{{/each}}", d: { xs: ["a", "b"] } },
+  { name: "s:at-first-last", dialect: "surface", t: "{{#each xs}}{{#if @first}}<{{/if}}{{ this }}{{#if @last}}>{{/if}}{{/each}}", d: { xs: ["x", "y"] } },
+  { name: "s:at-parent-index", dialect: "surface", t: "{{#each rows}}{{#each this}}[{{@../index}}-{{@index}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "s:at-root", dialect: "surface", t: "{{#each xs}}{{@root.title}};{{/each}}", d: { title: "T", xs: ["a"] } },
+  { name: "s:hash-includeZero", dialect: "surface", t: "{{#if n includeZero=true}}y{{else}}n{{/if}}", d: { n: 0 } },
+  { name: "s:helper-call", dialect: "surface", t: "{{#if (eq a b)}}eq{{else}}ne{{/if}}", d: { a: 1, b: 1 } },
+  { name: "s:parent-path", dialect: "surface", t: "{{#each xs}}{{ ../title }}:{{ this }};{{/each}}", d: { title: "T", xs: ["a", "b"] } },
 ];

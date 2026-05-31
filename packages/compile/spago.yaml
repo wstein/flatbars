@@ -14,6 +14,7 @@ package:
     - foldable-traversable
     - either
     - barebars
+    - fullbars
   test:
     main: Test.BareBars.Compile.Main
     dependencies:

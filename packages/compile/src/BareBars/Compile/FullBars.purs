@@ -11,6 +11,7 @@
 module BareBars.Compile.FullBars
   ( fullbarsEmit
   , compileCore
+  , compileSurface
   , runtimeVersion
   ) where
 
@@ -26,17 +27,23 @@ import Data.Array as Array
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
+import FullBars (desugarSurface)
 
 -- | The runtime contract version, recorded in the compiled header and checked by
 -- | `barebars-runtime.mjs`. Bump on any runtime-incompatible codegen change.
 runtimeVersion :: String
 runtimeVersion = "0.1.0"
 
--- | Compile *core* FullBars source to a JS ES module. (Surface support — a
--- | `desugarSurface` first — is a follow-up that adds the `fullbars` dependency;
--- | the emit rules below are dialect-pure and need only the core AST.)
+-- | Compile *core* FullBars source to a JS ES module.
 compileCore :: String -> Either ParseError String
 compileCore src = compile { runtimeVersion } fullbarsEmit <$> parse src
+
+-- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
+-- | `@data`, hash args, block params, `else if`) to the core skeleton, then emit
+-- | with the same rules. The emit rules are dialect-pure — they only ever see
+-- | core — so surface is just one `desugarSurface` upstream.
+compileSurface :: String -> Either ParseError String
+compileSurface src = (compile { runtimeVersion } fullbarsEmit <<< desugarSurface) <$> parse src
 
 fullbarsEmit :: Emit
 fullbarsEmit = { expr: fbExpr, block: fbBlock }
@@ -77,8 +84,8 @@ fbBlock :: Rec -> Ctx -> Ident -> Array Expr -> Template -> String
 fbBlock rec ctx name args body = case name of
   "if" -> ifBlock rec ctx (truthyTest rec ctx args) body
   "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx args <> ")") body
-  "each" -> frameBlock rec ctx "each" (head1 rec ctx args) body
-  "with" -> frameBlock rec ctx "with" (head1 rec ctx args) body
+  "each" -> frameBlock rec ctx "each" args body
+  "with" -> frameBlock rec ctx "with" args body
   _ -> rtBlock rec ctx name args body
 
 -- The condition test: 1 arg ⇒ `rt.truthy`; an options object (includeZero) ⇒
@@ -111,21 +118,32 @@ elseChain rec ctx clauses = case Array.uncons clauses of
     _, _ -> " else {\n" <> rec.nodes ctx cl.body <> "  }" -- else (terminal)
 
 -- `each`/`with`: shift the frame, so the body runs in a fresh scope variable and
--- its own buffer; the empty/falsy `else` clause renders in the parent frame.
-frameBlock :: Rec -> Ctx -> String -> String -> Template -> String
-frameBlock rec ctx fn subject body =
+-- its own buffer; the empty/falsy `else` clause renders in the parent frame. The
+-- subject is the first argument; any trailing *string-literal* arguments are
+-- block-param binding names (surface `as |item i|` desugars to them), passed to
+-- the runtime to bind in the child frame.
+frameBlock :: Rec -> Ctx -> String -> Array Expr -> Template -> String
+frameBlock rec ctx fn args body =
   let
     s = splitClauses body
     child = rec.child ctx
+    subject = head1 rec ctx args
+    names = "[" <> joinWith ", " (map jsString (bindingNames (Array.drop 1 args))) <> "]"
     elseClause = case Array.head s.clauses of
       Just cl -> cl.body
       Nothing -> []
   in
-    "  out += rt." <> fn <> "(" <> subject <> ", " <> ctx.scope <> ", "
+    "  out += rt." <> fn <> "(" <> subject <> ", " <> ctx.scope <> ", " <> names <> ", "
       <> lambda rec child s.before
       <> ", "
       <> lambda rec ctx elseClause
       <> ");\n"
+
+-- The trailing string-literal arguments — block-param binding names.
+bindingNames :: Array Expr -> Array String
+bindingNames = Array.mapMaybe case _ of
+  Lit (VString s) -> Just s
+  _ -> Nothing
 
 -- A `function (frame) { let out=""; …; return out; }` for a sub-body.
 lambda :: Rec -> Ctx -> Template -> String
