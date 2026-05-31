@@ -1,0 +1,30 @@
+package:
+  name: barebars
+  publish:
+    version: 0.1.0
+    license: Apache-2.0
+    location:
+      githubOwner: barebars
+      githubRepo: barebars
+  dependencies:
+    - prelude
+    - arrays
+    - lists
+    - strings
+    - maybe
+    - either
+    - tuples
+    - foldable-traversable
+    - ordered-collections
+    - integers
+    - numbers
+    - partial
+    - argonaut-core
+    - argonaut
+    - foreign-object
+  test:
+    main: Test.Main
+    dependencies:
+      - effect
+      - console
+      - assert
