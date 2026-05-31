@@ -287,6 +287,26 @@ main = do
     (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false), Tuple "c" (VBool true) ])
     "C"
 
+  -- Block params (§5.5): `as |a b|` binds the element/index (each) or context
+  -- (with) to named helpers; a bare reference becomes a `(name)` call.
+  expectS "surface-blockparam-1" "{{#each xs as |item|}}[{{ item }}]{{/each}}"
+    (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
+    "[a][b]"
+  expectS "surface-blockparam-2" "{{#each xs as |item idx|}}{{ idx }}:{{ item }};{{/each}}"
+    (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
+    "0:a;1:b;"
+  expectS "surface-blockparam-obj" "{{#each o as |v k|}}{{ k }}={{ v }};{{/each}}"
+    (obj [ Tuple "o" (obj [ Tuple "x" (str "1") ]) ])
+    "x=1;"
+  expectS "surface-blockparam-with" "{{#with user as |u|}}{{ u.name }}{{/with}}"
+    (obj [ Tuple "user" (obj [ Tuple "name" (str "Ada") ]) ])
+    "Ada"
+  -- nested: the outer block param stays in scope inside an inner block.
+  expectS "surface-blockparam-nested"
+    "{{#each rows as |row|}}{{#each row.cells as |c|}}{{ c }}@{{ row.id }} {{/each}}{{/each}}"
+    (obj [ Tuple "rows" (arr [ obj [ Tuple "id" (str "r1"), Tuple "cells" (arr [ str "a" ]) ] ]) ])
+    "a@r1 "
+
   -- Partials (§5.7): {{> name [ctx]}} renders a registered partial (unescaped
   -- markup), with escaping applied to {{ }} inside the partial body.
   expectP "partial-static" [ Tuple "greet" "Hi {{ name }}" ] "{{> greet}}"

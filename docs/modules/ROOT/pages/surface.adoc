@@ -30,11 +30,14 @@ partial (unescaped), backed by the `partial` engine helper and the env's partial
 registry. *Hash arguments* (§5.4) collect into a trailing `dict`:
 `pass:[{{ f a k=v k2="s"}}]` ⇒ `pass:[{{{ esc_html (f (lookup this "a") (dict "k" … "k2" "s")) }}}]`
 — this is what feeds `if`/`unless`' `includeZero`, e.g. `pass:[{{#if n includeZero=true}}]`.
+*Block params* (§5.5) work too: `pass:[{{#each xs as \|item i\|}}]` binds `item`/`i` as scoped
+helpers (the index/key), and `pass:[{{#with o as \|x\|}}]` binds the context — a bare reference to an
+in-scope param desugars to a `pass:[(param)]` call (lexically scoped, visible in nested blocks).
 
 Still *specified but not yet desugared*: `@../` parent-data (the scoped helpers
-are frame-local), block params `as \|x\|` (§5.5), and the inline / block /
-`@partial-block` partial forms and partial hash context `pass:[{{> n k=v}}]`
-(§5.7). See the xref:flatbars-compat.adoc[compatibility matrix] for per-feature status.
+are frame-local), and the inline / block / `@partial-block` partial forms and
+partial hash context `pass:[{{> n k=v}}]` (§5.7). See the
+xref:flatbars-compat.adoc[compatibility matrix] for per-feature status.
 ====
 
 [IMPORTANT]

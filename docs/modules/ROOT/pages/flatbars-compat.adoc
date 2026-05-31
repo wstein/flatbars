@@ -14,10 +14,11 @@ does the FlatBars prelude actually register*, and where its semantics differ fro
 [TIP]
 ====
 *Short answer.* FlatBars implements all *six* of {hb}' built-in **helpers** (`if`, `unless`, `each`,
-`with`, `lookup`, `log`). The wider built-in **feature set** is partially covered: comments, raw
-blocks, whitespace control, subexpressions, and the `@data` variables are in; *partials, inline
-partials, decorators, and block params are not implemented yet*. FlatBars also adds helpers {hb} has
-no built-in for (`eq`, `and`, `or`, `not`, `dict`, `apply`, `esc_html`, `safe`, …).
+`with`, `lookup`, `log`). The wider built-in **feature set** is broadly covered: comments, raw blocks,
+whitespace control, subexpressions, `@data` variables, paths, hash arguments, basic partials, and
+block params (the last via the xref:surface.adoc[surface dialect]). Still missing: *decorators,
+inline / block partials, and `@partial-block`*. FlatBars also adds helpers {hb} has no built-in for
+(`eq`, `and`, `or`, `not`, `dict`, `apply`, `esc_html`, `safe`, …).
 ====
 
 [horizontal]
@@ -184,10 +185,11 @@ positional arguments (§5.4) — `options.hash`. Values may be glued (`k=path`/`
 (`k="str"`, `k=(expr)`). This is how `pass:[{{#if n includeZero=true}}]` works.
 
 |Block params `pass:[as \|a b\|]`
-|—
-|✗
-|Not implemented. Use `lookup`/`parent` to reach outer scopes; named-scope block params are a
-planned addition.
+|surface ⇒ positional name strings
+|✅
+|`renderSurface` desugars `pass:[{{#each xs as \|item i\|}}]` to `pass:[{{#each xs "item" "i"}}]`;
+`each` binds `item`=element, `i`=index/key, and `with` binds the context. A bare reference to an
+in-scope param becomes a `pass:[(param)]` call (lexically scoped, including nested blocks).
 
 |`helperMissing` / `blockHelperMissing`
 |—
@@ -257,8 +259,8 @@ etc. map to which `lookup`/render variant the host registers (xref:appendix-hand
 
 [NOTE]
 ====
-The ✗ rows above (partials, inline partials, decorators, block params) are *engine roadmap items*,
-not core limitations: the BareBars core already parses the block syntax they need, and Appendix A
+The remaining ✗ rows (decorators, inline / block partials, `@partial-block`) are *engine roadmap
+items*, not core limitations: the BareBars core already parses the syntax they need, and Appendix A
 gives each a concrete desugaring. They become available when the FlatBars prelude registers the
 corresponding helpers.
 ====

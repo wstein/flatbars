@@ -20,12 +20,14 @@
 -- |  * `else if` chains ⇒ nested `if` blocks in the else clause (§5.6).
 -- |  * hash arguments `k=v` ⇒ a trailing `dict`: `{{ f a k=v }}` ⇒
 -- |    `{{{ esc_html (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
+-- |  * block params `{{#each xs as |item i|}}` ⇒ `{{#each xs "item" "i"}}`; a bare
+-- |    reference to an in-scope param becomes a helper call `(item)` (§5.5).
 -- |  * `{{> name [ctx]}}` ⇒ `{{{ partial "name" ctx }}}` (a bare name is a string
 -- |    literal, a parenthesized expression is a dynamic name; §5.7).
 -- |
 -- | Not yet desugared: `@../` parent-data (the scoped helpers are frame-local),
--- | block params `as |x|` (§5.5), and the inline / block / `@partial-block`
--- | partial forms and partial hash context `{{> n k=v}}` (§5.7).
+-- | and the inline / block / `@partial-block` partial forms and partial hash
+-- | context `{{> n k=v}}` (§5.7).
 module FlatBars.Surface
   ( desugar
   ) where
@@ -39,85 +41,117 @@ import Data.Foldable (foldl)
 import Data.Int as Int
 import Data.Maybe (Maybe(..), maybe)
 import Data.Number as Number
-import Data.String (Pattern(..), contains, stripPrefix)
+import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
 import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
 
 -- | Desugar a Surface template into core syntax. `clauseNames` are the
 -- | separator names the engine treats as clause markers (e.g. `["else"]`); a
 -- | `{{ … }}` separator with any other name is escaped output.
+-- | `scope` is the set of in-scope block-param names (surface `as |…|`); a bare
+-- | reference to one becomes a helper *call* `(name)`, not a `this` path lookup.
+type Scope = Array Ident
+
 desugar :: Array Ident -> Template -> Template
-desugar clauseNames = map go
+desugar clauseNames = go []
   where
-  go :: Node -> Node
-  go = case _ of
-    Content s -> Content s
-    -- `{{{ E }}}` — raw output; path-rewrite the expression, no escaping.
-    Output sp e -> Output sp (rewrite e)
-    Sep sp name args
-      -- a clause marker (`{{else}}`, …) passes through untouched for the engine
-      -- to split on.
-      | Array.elem name clauseNames -> Sep sp name args
-      | otherwise -> case stripPrefix (Pattern ">") name of
-          -- a partial reference `{{> name [ctx]}}` ⇒ unescaped `partial` call.
-          Just rest -> Output sp (partialExpr rest args)
-          -- everything else is `{{ E }}` ⇒ escaped output.
-          Nothing -> Output sp (App "esc_html" [ rewriteHead name args ])
-    -- block head stays a helper; `else if` chains in the body are expanded into
-    -- nested `if` blocks (§5.6) before the body and arguments are rewritten.
-    Block sp name args body ->
-      Block sp name (rewriteArgs args) (desugar clauseNames (expandElseIf body))
-    -- raw blocks are verbatim (surface.adoc §5.8).
-    RawBlock sp name args raw -> RawBlock sp name args raw
+  go :: Scope -> Template -> Template
+  go scope = map node
+    where
+    node = case _ of
+      Content s -> Content s
+      -- `{{{ E }}}` — raw output; path-rewrite the expression, no escaping.
+      Output sp e -> Output sp (rewrite scope e)
+      Sep sp name args
+        -- a clause marker (`{{else}}`, …) passes through untouched for the engine.
+        | Array.elem name clauseNames -> Sep sp name args
+        | otherwise -> case stripPrefix (Pattern ">") name of
+            -- a partial reference `{{> name [ctx]}}` ⇒ unescaped `partial` call.
+            Just rest -> Output sp (partialExpr scope rest args)
+            -- everything else is `{{ E }}` ⇒ escaped output.
+            Nothing -> Output sp (App "esc_html" [ rewriteHead scope name args ])
+      -- block head stays a helper; `else if` chains expand to nested `if` (§5.6);
+      -- a trailing `as |a b|` becomes positional binding-name strings (§5.5) and
+      -- extends the scope for the body.
+      Block sp name args body ->
+        let
+          { mainArgs, params } = extractBlockParams args
+        in
+          Block sp name (rewriteArgs scope mainArgs <> map (Lit <<< VString) params)
+            (go (scope <> params) (expandElseIf body))
+      -- raw blocks are verbatim (surface.adoc §5.8).
+      RawBlock sp name args raw -> RawBlock sp name args raw
+
+-- | Split a block helper's arguments at a trailing `as |a b|` clause (§5.5),
+-- | returning the arguments before `as` and the binding names (with the `|`
+-- | bars stripped). When there is no such clause, all args are `mainArgs`.
+extractBlockParams :: Array Expr -> { mainArgs :: Array Expr, params :: Array String }
+extractBlockParams args = case Array.findIndex isAs args of
+  Just i | looksLikeParams (Array.drop (i + 1) args) ->
+    { mainArgs: Array.take i args, params: paramNames (Array.drop (i + 1) args) }
+  _ -> { mainArgs: args, params: [] }
+  where
+  isAs = case _ of
+    App "as" [] -> true
+    _ -> false
+  looksLikeParams a = case Array.head a of
+    Just (App n []) -> stripPrefix (Pattern "|") n /= Nothing
+    _ -> false
+  paramNames = Array.mapMaybe case _ of
+    App n [] -> case replaceAll (Pattern "|") (Replacement "") n of
+      "" -> Nothing
+      s -> Just s
+    _ -> Nothing
 
 -- | The head of a `{{ head args }}` separator read as output: a bare head (no
 -- | arguments) is a path; a head with arguments is a helper call.
-rewriteHead :: Ident -> Array Expr -> Expr
-rewriteHead name args
-  | Array.null args = pathOrLit name
-  | otherwise = App name (rewriteArgs args)
+rewriteHead :: Scope -> Ident -> Array Expr -> Expr
+rewriteHead scope name args
+  | Array.null args = pathOrLit scope name
+  | otherwise = App name (rewriteArgs scope args)
 
 -- | A partial reference (surface.adoc §5.7), emitted *unescaped*. `rest` is the
 -- | text after the `>` sigil: empty for `{{> name [ctx]}}` (name is the first
 -- | argument — a bare name is a string literal, a parenthesized expression is a
 -- | dynamic name), or the name itself for the no-space `{{>name [ctx]}}` form.
 -- | An optional second argument is the context (default `this`).
-partialExpr :: String -> Array Expr -> Expr
-partialExpr rest args
+partialExpr :: Scope -> String -> Array Expr -> Expr
+partialExpr scope rest args
   | rest == "" = case Array.uncons args of
-      Just { head: nameArg, tail } -> App "partial" [ partialName nameArg, partialCtx tail ]
+      Just { head: nameArg, tail } -> App "partial"
+        [ partialName scope nameArg, partialCtx scope tail ]
       Nothing -> App "partial" [ Lit (VString ""), App "this" [] ]
-  | otherwise = App "partial" [ Lit (VString rest), partialCtx args ]
+  | otherwise = App "partial" [ Lit (VString rest), partialCtx scope args ]
 
 -- | A bare partial name is a string literal; a (parenthesized) expression is a
 -- | dynamic name, rewritten as usual.
-partialName :: Expr -> Expr
-partialName = case _ of
+partialName :: Scope -> Expr -> Expr
+partialName scope = case _ of
   App n [] -> Lit (VString n)
-  e -> rewrite e
+  e -> rewrite scope e
 
 -- | The partial's context argument, defaulting to `this` when omitted.
-partialCtx :: Array Expr -> Expr
-partialCtx cs = maybe (App "this" []) rewrite (Array.head cs)
+partialCtx :: Scope -> Array Expr -> Expr
+partialCtx scope cs = maybe (App "this" []) (rewrite scope) (Array.head cs)
 
 -- | Rewrite an expression: a bare identifier in value position becomes a path
--- | (or a literal); an application keeps its helper head and rewrites its args.
-rewrite :: Expr -> Expr
-rewrite = case _ of
+-- | (or a literal, or a block-param call); an application keeps its helper head.
+rewrite :: Scope -> Expr -> Expr
+rewrite scope = case _ of
   Lit v -> Lit v
   App name args
-    | Array.null args -> pathOrLit name
-    | otherwise -> App name (rewriteArgs args)
+    | Array.null args -> pathOrLit scope name
+    | otherwise -> App name (rewriteArgs scope args)
 
 -- | Rewrite a helper's argument list, collecting any trailing `key=value` hash
 -- | pairs into a single `dict` value appended after the positional arguments
 -- | (surface.adoc §5.4) — the equivalent of Handlebars' `options.hash`.
-rewriteArgs :: Array Expr -> Array Expr
-rewriteArgs args =
+rewriteArgs :: Scope -> Array Expr -> Array Expr
+rewriteArgs scope args =
   let
-    h = collectHash args
+    h = collectHash scope args
   in
-    if Array.null h.pairs then map rewrite h.positional
-    else Array.snoc (map rewrite h.positional) (dictExpr h.pairs)
+    if Array.null h.pairs then map (rewrite scope) h.positional
+    else Array.snoc (map (rewrite scope) h.positional) (dictExpr h.pairs)
 
 dictExpr :: Array { key :: String, val :: Expr } -> Expr
 dictExpr pairs = App "dict" (Array.concatMap (\p -> [ Lit (VString p.key), p.val ]) pairs)
@@ -126,15 +160,17 @@ dictExpr pairs = App "dict" (Array.concatMap (\p -> [ Lit (VString p.key), p.val
 -- | argument is a bare ident containing `=`: either glued (`k=v`) or a trailing
 -- | `k=` whose value is the *next* argument (so `k="str"` / `k=(expr)` work).
 collectHash
-  :: Array Expr -> { positional :: Array Expr, pairs :: Array { key :: String, val :: Expr } }
-collectHash = go { positional: [], pairs: [] }
+  :: Scope
+  -> Array Expr
+  -> { positional :: Array Expr, pairs :: Array { key :: String, val :: Expr } }
+collectHash scope = go { positional: [], pairs: [] }
   where
   go acc args = case Array.uncons args of
     Nothing -> acc
-    Just { head, tail } -> case asHashKey head of
+    Just { head, tail } -> case asHashKey scope head of
       Just { key, consumesNext: true } -> case Array.uncons tail of
         Just { head: v, tail: rest } ->
-          go (acc { pairs = Array.snoc acc.pairs { key, val: rewrite v } }) rest
+          go (acc { pairs = Array.snoc acc.pairs { key, val: rewrite scope v } }) rest
         Nothing -> go (acc { pairs = Array.snoc acc.pairs { key, val: App "null" [] } }) []
       Just { key, inlineVal } ->
         go (acc { pairs = Array.snoc acc.pairs { key, val: inlineVal } }) tail
@@ -142,8 +178,8 @@ collectHash = go { positional: [], pairs: [] }
 
 -- | Recognize a `key=value` hash argument. `consumesNext` means the value is
 -- | the following argument (the ident ended with `=`).
-asHashKey :: Expr -> Maybe { key :: String, consumesNext :: Boolean, inlineVal :: Expr }
-asHashKey = case _ of
+asHashKey :: Scope -> Expr -> Maybe { key :: String, consumesNext :: Boolean, inlineVal :: Expr }
+asHashKey scope = case _ of
   App name []
     | contains (Pattern "=") name ->
         let
@@ -151,7 +187,7 @@ asHashKey = case _ of
         in
           Just
             if rest == "" then { key, consumesNext: true, inlineVal: App "null" [] }
-            else { key, consumesNext: false, inlineVal: hashValue rest }
+            else { key, consumesNext: false, inlineVal: hashValue scope rest }
   _ -> Nothing
 
 splitFirstEq :: String -> { key :: String, rest :: String }
@@ -160,34 +196,44 @@ splitFirstEq s = case indexOf (Pattern "=") s of
   Nothing -> { key: s, rest: "" }
 
 -- | The value of a *glued* hash pair (`k=v`): a literal, a number, or a path.
-hashValue :: String -> Expr
-hashValue t
+hashValue :: Scope -> String -> Expr
+hashValue scope t
   | t == "true" || t == "false" || t == "null" = App t []
   | otherwise = case Number.fromString t of
       Just n -> Lit (VNumber n)
-      Nothing -> pathExpr t
+      Nothing -> pathExpr scope t
 
 -- | A bare identifier: a literal helper (`true`/`false`/`null`) stays as-is;
--- | anything else is a data path.
-pathOrLit :: Ident -> Expr
-pathOrLit name
+-- | anything else is a data path (or a block-param call).
+pathOrLit :: Scope -> Ident -> Expr
+pathOrLit scope name
   | name == "true" || name == "false" || name == "null" = App name []
-  | otherwise = pathExpr name
+  | otherwise = pathExpr scope name
 
--- | Expand a path string into a `lookup` chain (or `this`/`parent`/`@data`).
-pathExpr :: Ident -> Expr
-pathExpr raw
+-- | Expand a path string into a `lookup` chain (or `this`/`parent`/`@data`/a
+-- | block-param call). A path whose first segment is an in-scope block param is
+-- | rooted at the param's value `(param)` rather than `this`.
+pathExpr :: Scope -> Ident -> Expr
+pathExpr scope raw
   | raw == "this" || raw == "." = App "this" []
   | otherwise = case stripPrefix (Pattern "@") raw of
       Just dataPath -> dataExpr dataPath
       Nothing ->
         let
           { depth, rest } = stripParents raw 0
-          base = parents depth
           segs = segmentsOf rest
         in
-          if Array.null segs then base
-          else App "lookup" (Array.cons base (map segKey segs))
+          case Array.uncons segs of
+            Just { head: first, tail }
+              | depth == 0 && Array.elem first scope ->
+                  if Array.null tail then App first []
+                  else App "lookup" (Array.cons (App first []) (map segKey tail))
+            _ ->
+              let
+                base = parents depth
+              in
+                if Array.null segs then base
+                else App "lookup" (Array.cons base (map segKey segs))
 
 -- | A `@data` path: the first segment is a scoped helper, any remaining
 -- | segments are looked up on its value. `@index` ⇒ `(index)`; `@root.x` ⇒

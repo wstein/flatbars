@@ -80,8 +80,8 @@ helperDefs =
   , gen "raw" true AnyArity rawH
   , gen "if" true (Between 1 2) ifH
   , gen "unless" true (Between 1 2) unlessH
-  , gen "each" true (Exactly 1) eachH
-  , gen "with" true (Exactly 1) withH
+  , gen "each" true (AtLeast 1) eachH
+  , gen "with" true (AtLeast 1) withH
   , valDef "else" (nullary (pure (VSafe "")))
   , gen "dict" false AnyArity dictH
   , gen "apply" true (AtLeast 1) applyH
@@ -208,11 +208,6 @@ elseBody ctl = fromMaybe [] (ctl.clause "else").body
 renderSafe :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> RefEnv m -> Template -> m Value
 renderSafe ctl env nodes = VSafe <$> ctl.render env nodes
 
--- | The arity-error message for a block helper that wanted exactly `k` args.
-wrongCount :: String -> Int -> Array Value -> String
-wrongCount name k args =
-  name <> ": expected exactly " <> show k <> " argument(s), got " <> show (Array.length args)
-
 -- | Render the main clause / the else clause in the current environment.
 renderMain :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
 renderMain ctl = renderSafe ctl ctl.env (mainBody ctl)
@@ -264,56 +259,78 @@ optFlag key = case _ of
 -- Iteration & context shift
 --------------------------------------------------------------------------------
 
+-- | `each coll [name1 name2]`: the optional trailing string arguments are block
+-- | params (surface `as |name1 name2|`) — `name1` binds the element, `name2` the
+-- | index (array) or key (object).
 eachH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-eachH ctl args = case args of
-  [ coll ] -> case coll of
-    VArray xs ->
-      if Array.null xs then renderElse ctl
-      else iterate ctl (Array.mapWithIndex (\i x -> { key: show i, val: x }) xs)
-    VObject m ->
-      let
-        pairs = Map.toUnfoldable m :: Array (Tuple String Value)
-      in
-        if Array.null pairs then renderElse ctl
-        else iterate ctl (map (\(Tuple k v) -> { key: k, val: v }) pairs)
-    _ -> renderElse ctl
-  _ -> throwError (ArityError (wrongCount "each" 1 args))
+eachH ctl args = case Array.uncons args of
+  Just { head: coll, tail: rest } ->
+    let
+      names = bindingNames rest
+    in
+      case coll of
+        VArray xs ->
+          if Array.null xs then renderElse ctl
+          else iterate ctl names
+            (Array.mapWithIndex (\i x -> { val: x, key: show i, idx: VNumber (Int.toNumber i) }) xs)
+        VObject m ->
+          let
+            pairs = Map.toUnfoldable m :: Array (Tuple String Value)
+          in
+            if Array.null pairs then renderElse ctl
+            else iterate ctl names (map (\(Tuple k v) -> { val: v, key: k, idx: VString k }) pairs)
+        _ -> renderElse ctl
+  Nothing -> throwError (ArityError "each: expected at least 1 argument(s), got 0")
+
+-- | The string arguments among `vs`, used as block-param binding names.
+bindingNames :: Array Value -> Array String
+bindingNames = Array.mapMaybe case _ of
+  VString s -> Just s
+  _ -> Nothing
 
 iterate
   :: forall m
    . MonadThrow Error m
   => Ctl m (RefEnv m)
-  -> Array { key :: String, val :: Value }
+  -> Array String
+  -> Array { val :: Value, key :: String, idx :: Value }
   -> m Value
-iterate ctl items =
+iterate ctl names items =
   let
     main = mainBody ctl
     n = Array.length items
-    renderItem i { key, val } =
+    -- block params bind, in order, the element value and its index/key.
+    binds val idx = Array.zipWith (\nm v -> Tuple nm (constHelper v)) names [ val, idx ]
+    renderItem i { val, key, idx } =
       let
         frame = Map.fromFoldable
-          [ Tuple "this" (constHelper val)
-          , Tuple "index" (constHelper (VNumber (Int.toNumber i)))
-          , Tuple "key" (constHelper (VString key))
-          , Tuple "first" (constHelper (VBool (i == 0)))
-          , Tuple "last" (constHelper (VBool (i == n - 1)))
-          , Tuple "parent" (constHelper (refContext ctl.env))
-          ]
+          ( [ Tuple "this" (constHelper val)
+            , Tuple "index" (constHelper (VNumber (Int.toNumber i)))
+            , Tuple "key" (constHelper (VString key))
+            , Tuple "first" (constHelper (VBool (i == 0)))
+            , Tuple "last" (constHelper (VBool (i == n - 1)))
+            , Tuple "parent" (constHelper (refContext ctl.env))
+            ] <> binds val idx
+          )
       in
         ctl.render (pushFrame frame val ctl.env) main
   in
     (VSafe <<< joinWith "") <$> traverse identity (Array.mapWithIndex renderItem items)
 
+-- | `with ctx [name]`: an optional trailing string argument is a block param
+-- | (surface `as |name|`) bound to the shifted context.
 withH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-withH ctl args = case args of
-  [ v ] ->
+withH ctl args = case Array.uncons args of
+  Just { head: v, tail: rest } ->
     if truthy v then
       let
-        frame = Map.singleton "parent" (constHelper (refContext ctl.env))
+        binds = Array.zipWith (\nm val -> Tuple nm (constHelper val)) (bindingNames rest) [ v ]
+        frame = Map.fromFoldable
+          (Tuple "parent" (constHelper (refContext ctl.env)) `Array.cons` binds)
       in
         renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)
     else renderElse ctl
-  _ -> throwError (ArityError (wrongCount "with" 1 args))
+  Nothing -> throwError (ArityError "with: expected at least 1 argument(s), got 0")
 
 --------------------------------------------------------------------------------
 -- Composition / data
