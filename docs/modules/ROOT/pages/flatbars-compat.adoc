@@ -222,9 +222,16 @@ single biggest porting adjustment from {hbs}.
 . *Truthiness matches {hbs}.* Falsy: `false`, `null`, `0`, `""`, the empty array, and a trusted empty
 string (`safe ""` ⇒ `VSafe ""`). Truthy: everything else — including the empty object `pass:[{}]` and
 non-zero numbers. As in {hbs}, `0` is falsy unless `includeZero` is set; FlatBars takes it as an
-options object on `if`/`unless`: `pass:[{{#if n (dict "includeZero" true)}}]`. The *one* remaining
-difference: a {hb} `SafeString` is a truthy object, whereas FlatBars' `safe ""` is falsy (it is still
-an empty string).
+options object on `if`/`unless`: `pass:[{{#if n (dict "includeZero" true)}}]`.
++
+*Safe strings (a deliberate divergence).* FlatBars holds one invariant {hbs} does not: marking a
+string safe never changes its truthiness — a safe string tests as its *content* (`truthy (VSafe s) ==
+truthy (VString s)`), so `safe ""` is falsy. {hbs} instead wraps safe output in a `SafeString`
+*object*, which is always truthy — empty or not. FlatBars' content-based rule is the more useful one
+(an empty escaped section reads as empty), so it is kept on purpose. The sharp edge to know: `safe`
+and `esc_html` *stringify* their argument, so `pass:[(safe 0)]` is truthy (it is the non-empty string
+`"0"`) while `0` is falsy. Testing the truthiness of an escaped/safe value is therefore a category
+error — they are *output*, not data — and `escapingWarnings` flags it on `if`/`unless` conditions.
 . *No implicit HTML escaping.* Output is raw by default; escape with `esc_html` and rely on the
 `escapingWarnings` lint to catch unescaped data. The surface dialect (xref:surface.adoc[§5]) is where
 a `pass:[{{ }}]`-auto-escapes-to-`esc_html` rewrite would live.

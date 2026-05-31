@@ -71,12 +71,24 @@ it is supplied as an *options object* built with `dict`:
 Note that the empty **array** is falsy in both (Handlebars special-cases empty
 collections), while the empty **object** is truthy in both.
 
-## The one remaining divergence
+## Safe strings — a deliberate divergence
 
-**A trusted empty string (`safe ""`) is falsy in FlatBars,** because it is still
-an empty string. In Handlebars a `SafeString` is a wrapper *object*, so even an
-empty one is truthy. Most templates never test a safe string for truthiness, but
-the edge is real.
+FlatBars keeps one invariant Handlebars does not: **marking a string safe never
+changes its truthiness — a safe string tests as its content**
+(`truthy (VSafe s) == truthy (VString s)`). So `safe ""` is **falsy**. Handlebars
+instead wraps safe output in a `SafeString` *object*, which is always truthy —
+empty or not. FlatBars' content-based rule is the more useful one (an empty
+escaped section reads as empty), so it is kept on purpose.
+
+The sharp edge to know: `safe` and `esc_html` **stringify** their argument, so
+`(safe 0)` is truthy (it is the non-empty string `"0"`) while `0` is falsy.
+Testing the truthiness of an escaped/safe value is therefore a category error —
+they are *output*, not data. The engine's `escapingWarnings` lint flags it:
+
+```handlebars
+{{#if (safe x)}}…{{/if}}   ⚠ testing an escaped/safe value — test the data
+{{#if x}}…{{/if}}          ✓ test the underlying data
+```
 
 See also the [compatibility matrix](../../docs/modules/ROOT/pages/flatbars-compat.adoc)
-§5, which lists these alongside the other Handlebars semantic differences.
+§5, which lists this alongside the other Handlebars semantic differences.

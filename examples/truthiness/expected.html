@@ -135,9 +135,12 @@ the empty array; everything else — including <code>{}</code> and non-zero numb
 — is truthy. Like Handlebars, <code>0</code> is falsy by default and counts as
 truthy only with <code>includeZero</code> (passed as an options object:
 <code>{{#if n (dict "includeZero" true)}}…{{/if}}</code>). The one remaining
-difference: a trusted empty string (<code>safe ""</code>) is <b>falsy</b> in
-FlatBars because it is still an empty string, whereas a Handlebars
-<code>SafeString</code> is a truthy object.
+difference is deliberate: marking a string safe never changes its truthiness —
+a safe string tests as its <em>content</em>, so <code>safe ""</code> is
+<b>falsy</b>, whereas a Handlebars <code>SafeString</code> is a truthy object.
+Because <code>safe</code>/<code>esc_html</code> stringify first, <code>(safe
+0)</code> is truthy while <code>0</code> is falsy — so testing an escaped/safe
+value is a category error, and the validator warns about it.
 </p>
 </body>
 </html>
