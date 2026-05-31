@@ -123,12 +123,15 @@ is what Handlebars.js would decide for the same value. Rows marked
 </table>
 
 <p class="note">
-<b>The one number difference.</b> FlatBars treats <code>0</code> as <b>truthy</b>.
-The full falsy set is <code>false</code>, <code>null</code>, <code>""</code>, the
-empty array, and a trusted empty string (<code>safe ""</code>); everything else,
-including <code>0</code> and <code>{}</code>, is truthy. Handlebars treats
-<code>0</code> as <b>falsy</b> unless <code>includeZero</code> is set. Guard zero
-explicitly where it matters, e.g. <code>\{{#if (not (eq n 0))}}…\{{/if}}</code>.
+<b>Two differences from Handlebars</b> (the <span class="bad">✗</span> rows above).
+<b>1.</b> FlatBars treats <code>0</code> as <b>truthy</b>; Handlebars treats it as
+falsy unless <code>includeZero</code> is set — guard zero explicitly, e.g.
+<code>\{{#if (not (eq n 0))}}…\{{/if}}</code>. <b>2.</b> A trusted empty string
+(<code>safe ""</code>) is <b>falsy</b> in FlatBars because it is still an empty
+string, whereas a Handlebars <code>SafeString</code> is a truthy object. The full
+FlatBars falsy set is <code>false</code>, <code>null</code>, <code>""</code>, the
+empty array, and a trusted empty string; everything else — including
+<code>0</code> and <code>{}</code> — is truthy.
 </p>
 </body>
 </html>
