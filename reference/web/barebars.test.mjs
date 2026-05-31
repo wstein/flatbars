@@ -68,6 +68,16 @@ test("engineInfo advertises an honest capability vector", async () => {
   assert.ok(info.builtins.includes("each") && info.builtins.includes("json"));
 });
 
+test("compileToJs emits a JS module (the compile-js feature)", async () => {
+  const r = await createBareBarsRenderer();
+  assert.equal(typeof r.compileToJs, "function");
+  assert.ok(r.engineInfo().features.includes("compile-js"));
+  const c = r.compileToJs("Hello {{ name }}!");
+  assert.ok(c.ok, c.error);
+  assert.match(c.value, /barebars-compiled/);
+  assert.match(c.value, /export default function/);
+});
+
 test("the catalog entries have the cheat-sheet shape", async () => {
   const r = await createBareBarsRenderer();
   for (const e of r.catalog()) {

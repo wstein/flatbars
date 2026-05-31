@@ -27,6 +27,8 @@ import {
   renderSurface as bbRenderSurface,
   renderSurfaceWithPartials as bbRenderSurfaceWith,
   astJson,
+  compile as bbCompile,
+  compileSurface as bbCompileSurface,
 } from "./vendor/barebars-engine.mjs";
 
 const BB_VERSION = "0.1.0";
@@ -49,6 +51,7 @@ const BB_FEATURES = [
   "catalog",
   "required-assigns",
   "partial-graph",
+  "compile-js", // BareBars-only: compile the template to a JS module (Compiled JS view)
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
 ];
@@ -114,6 +117,13 @@ export async function createBareBarsRenderer() {
 
   function parseAst(source) {
     return astJson(DIALECT, source);
+  }
+
+  // BareBars-specific (the `compile-js` feature): compile the template to a JS
+  // ES module via BareBars.Compile, honouring the active dialect. Returns
+  // `{ ok, value, error }` — `value` is the JS source. Drives the Compiled JS view.
+  function compileToJs(source) {
+    return (DIALECT === "core" ? bbCompile : bbCompileSurface)(source);
   }
 
   function walk(nodes, visit) {
@@ -194,6 +204,7 @@ export async function createBareBarsRenderer() {
     partialGraph,
     allTransformers,
     catalog,
+    compileToJs,
     engineInfo,
     version: BB_VERSION,
   };

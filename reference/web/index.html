@@ -2961,6 +2961,7 @@
       function outputHasContent(view) {
         if (view === "data") return lastData != null;
         if (view === "bytecode") return lastProgram != null;
+        if (view === "compiled") return true; // depends only on the template source
         return !!lastOutput;
       }
 
@@ -3141,6 +3142,17 @@
           }
           lastSegViews = [];
           setOutputDoc(text, Decoration.none);
+        } else if (outputView === "compiled") {
+          // The template compiled to a JS module (the `compile-js` engine
+          // extension). Errors come back as a `// …` comment so the pane stays
+          // valid-looking JS.
+          lastSegViews = [];
+          let text = "// this engine has no compiler";
+          if (typeof renderer.compileToJs === "function") {
+            const r = renderer.compileToJs(templateSourceFor("main"));
+            text = r.ok ? r.value : "// compile error: " + r.error;
+          }
+          setOutputDoc(text, Decoration.none);
         } else {
           const { segViews, deco } = buildProvenance(lastOutput, lastSegments);
           lastSegViews = segViews;
@@ -3205,6 +3217,10 @@
           // `separator`), quoted option values, and `<! transpile-error: ... !>`
           // comments emitted for ❌ rows.
           outputEditor.dispatch({ effects: outLangComp.reconfigure([st4SourceLang]) });
+          return;
+        }
+        if (outputView === "compiled") {
+          outputEditor.dispatch({ effects: outLangComp.reconfigure([jsLang]) });
           return;
         }
         if (outputView !== "source") return;
@@ -3610,6 +3626,8 @@
         { view: "st4", label: "ST4 Preview", requires: ["st4-modes"] },
         { view: "data", label: "Render Data" },
         { view: "bytecode", label: "Bytecode", requires: ["bytecode-wire"] },
+        // BareBars-only: the template compiled to a JS module (BareBars.Compile).
+        { view: "compiled", label: "Compiled JS", requires: ["compile-js"] },
       ];
 
       // Views the loaded engine actually exposes (ADR-0020 gate applied).
@@ -3715,7 +3733,8 @@
         // wire disassembly), and "st4" (ST4 bytecode disassembly fixture) all
         // use the text pane; "rendered" and "markdown" use the iframe.
         const isText =
-          view === "source" || view === "data" || view === "bytecode" || view === "st4";
+          view === "source" || view === "data" || view === "bytecode" || view === "st4" ||
+          view === "compiled";
         byId("output-text").hidden = !isText;
         byId("output-preview").hidden = isText;
         hideSegTip(); clearLink();
