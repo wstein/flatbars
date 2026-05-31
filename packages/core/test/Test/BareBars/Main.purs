@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), foldTemplate, parse, spanText, splitClause, validate)
+import BareBars (Arity(..), Expr(..), Node(..), foldExpr, foldTemplate, parse, spanText, splitClause, validate)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -62,6 +62,16 @@ main = do
 
   -- foldTemplate counts every node, recursing into bodies.
   assert' "foldTemplate node count" (nodeCount "a{{#each x}}b{{{this}}}{{/each}}c" == 5)
+
+  -- foldExpr: a catamorphism over an expression. Count App nodes in a nested
+  -- subexpression, descending into application arguments.
+  case parse "{{{lookup this \"x\"}}}" of
+    Right [ Output _ e ] ->
+      let
+        appCount = foldExpr { lit: \_ -> 0, app: \_ kids -> 1 + Array.foldl (+) 0 kids } e
+      in
+        assert' "foldExpr counts App nodes" (appCount == 2) -- (lookup …) and (this)
+    _ -> assert' "foldExpr: unexpected parse" false
 
   -- splitClause shallowly splits a body at the first {{else}} separator.
   case parse "{{#if c}}A{{else}}B{{/if}}" of

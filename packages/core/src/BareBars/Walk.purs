@@ -15,6 +15,8 @@ module BareBars.Walk
   ( RefKind(..)
   , HelperRef
   , foldRefs
+  , ExprAlgebra
+  , foldExpr
   , Algebra
   , foldTemplate
   , helperRefs
@@ -33,8 +35,9 @@ import Prelude
 
 import BareBars.Span (Span)
 import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
+import BareBars.Value (Value)
 import Data.Array as Array
-import Data.Foldable (foldMap)
+import Data.Foldable (fold, foldMap)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
@@ -63,6 +66,23 @@ instance showRefKind :: Show RefKind where
 -- | it was given.
 type HelperRef = { name :: Ident, kind :: RefKind, argc :: Int }
 
+-- | A catamorphism over an `Expr`: `app` receives the *already-folded* results
+-- | of its arguments (bottom-up). It is the single expression-recursion
+-- | primitive — passes that walk into expressions (ref collection, the surface
+-- | desugarer rewriting `lookup`/`@data` chains) build on it instead of
+-- | re-implementing the `App`/`Lit` descent.
+type ExprAlgebra a =
+  { lit :: Value -> a
+  , app :: Ident -> Array a -> a
+  }
+
+foldExpr :: forall a. ExprAlgebra a -> Expr -> a
+foldExpr alg = go
+  where
+  go = case _ of
+    Lit v -> alg.lit v
+    App name args -> alg.app name (map go args)
+
 -- | Fold a monoid over every helper reference in a template, depth-first.
 foldRefs :: forall m. Monoid m => (HelperRef -> m) -> Template -> m
 foldRefs f = foldMap (node f)
@@ -80,11 +100,13 @@ foldRefs f = foldMap (node f)
     Sep _ name args ->
       g { name, kind: SepRef, argc: Array.length args } <> foldMap (expr g) args
 
+  -- Expression refs via the shared `foldExpr`: each application emits its own
+  -- ref and combines the refs collected from its arguments.
   expr :: (HelperRef -> m) -> Expr -> m
-  expr g = case _ of
-    Lit _ -> mempty
-    App name args ->
-      g { name, kind: AppRef, argc: Array.length args } <> foldMap (expr g) args
+  expr g = foldExpr
+    { lit: \_ -> mempty
+    , app: \name children -> g { name, kind: AppRef, argc: Array.length children } <> fold children
+    }
 
 -- | Every helper reference in a template, in depth-first order.
 helperRefs :: Template -> Array HelperRef

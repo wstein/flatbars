@@ -29,12 +29,14 @@ import BareBars.Value (Value(..))
 import BareBars.Walk
   ( Algebra
   , Arity(..)
+  , ExprAlgebra
   , HelperRef
   , HelperSpec
   , Issue
   , RefKind(..)
   , Schema
   , Severity(..)
+  , foldExpr
   , foldRefs
   , foldTemplate
   , helperRefs
