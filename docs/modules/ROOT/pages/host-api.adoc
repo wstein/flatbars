@@ -63,6 +63,13 @@ renderAff    :: String -> Value -> Aff (Either Error String)                 -- 
 desugarSurface :: Template -> Template                                       -- surface ⇒ core rewrite
 renderSurface  :: String -> Value -> Either String String                    -- parse + desugar + render
 renderSurfaceWith :: Array (Tuple String String) -> String -> Value -> Either String String -- + named partials
+-- Located parse errors at the host boundary (parse failures ⇒ "line:column: …")
+renderWithDiag     :: String -> Value -> Either String String
+renderSurfaceDiag  :: String -> Value -> Either String String
+-- Host binding: render against native PureScript data (records, Array, Map, …)
+toValue            :: forall a. ToValue a => a -> Value                       -- BareBars.ToValue
+renderValue        :: forall a. ToValue a => String -> a -> Either String String
+renderSurfaceValue :: forall a. ToValue a => String -> a -> Either String String
 ----
 
 The driver is *polymorphic in the monad `m` and the environment `env`* — the heart of the
@@ -127,3 +134,23 @@ Because the driver is polymorphic in `m`, an effectful host instantiates it at `
 Aff` — helpers and partials may then perform I/O (`liftEffect`/`liftAff`), and the result is
 `Aff (Either Error String)`. `renderAff` is exactly this instantiation; the *same* prelude runs
 unchanged. Pure hosts keep `m = Either Error` (`renderWith`) and pay nothing.
+
+== 7.6 Host data binding
+
+A host renders against a `Value`. Three ways to get one:
+
+* *JSON wire data* — `BareBars.Json.fromJson` (package `barebars-json`) bridges an Argonaut `Json`.
+This is an external adapter, kept out of the core (it pulls the JSON dependency).
+* *Native PureScript data* — `BareBars.ToValue.toValue` lowers records, `Array`, `Maybe`
+(`Nothing ⇒ VNull`), string-keyed `Map`, and primitives into a `Value`; the record instance is
+`RowToList`-driven, so each field is lifted by label into a `VObject`. It constructs only the core
+`Value` and carries no engine meaning, so it lives in the core. The conveniences `renderValue` /
+`renderSurfaceValue` are `renderWith` / `renderSurface` composed with `toValue` — e.g.
+`renderSurfaceValue "<h1>{{ name }}</h1>" { name: "Ada" }`.
+* *JavaScript hosts* — the `barebars-js` facade (`FlatBars.JS`, §A) exposes uncurried
+`render(template, data)` / `renderSurface(template, data)` over plain JS values, returning a
+`{ ok, value, error }` object; parse failures come back located (`line:column`).
+
+The located-error renderers `renderWithDiag` / `renderSurfaceDiag` (and `formatError`) report a parse
+failure as `line:column: message` (§7.2's `renderParseErrorAt`); the plain `renderWith` /
+`renderSurface` keep the bare `show` form.
