@@ -14,6 +14,15 @@ Surface adds nothing the core cannot already express. Every rule below is a *rew
 structural node into core nodes. Where a rewrite names a helper (`esc_html`, `lookup`, `dict`,
 `partial`, …), that helper must exist in the xref:prelude.adoc[engine].
 
+[NOTE]
+====
+*Implementation status.* Of this chapter, only the *clause* and *escaping* rewrites are implemented
+today, in `FlatBars.Lower.lower`. There is *no standalone Surface module yet*: the path / `@data` /
+hash-argument / partial rules below are the *specified* design of the desugaring walk, not shipping
+code. Templates are authored in core syntax until the walk is extended. See the
+xref:flatbars-compat.adoc[compatibility matrix] for the exact per-feature status.
+====
+
 [IMPORTANT]
 ====
 *Parenthesis convention.* A top-level expression inside `pass:[{{{ }}}]` needs no grouping — it is

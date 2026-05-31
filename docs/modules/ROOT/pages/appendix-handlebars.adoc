@@ -255,6 +255,13 @@ than walk a stack: `pass:[{{#each teams as \|team\|}}…{{#each team.members}}{{
 [#partials]
 == A.6 Partials
 
+[CAUTION]
+====
+*Not yet implemented.* The `partial`, `partial>`, and `inline` helpers below are the *specified*
+mapping; the FlatBars prelude does not register them yet (xref:flatbars-compat.adoc[compatibility
+matrix] §3). The core already parses the block syntax they need — only the helpers are pending.
+====
+
 All partial forms become the engine helpers `partial`, `partial>`, `inline`, and the scoped
 `partial-block` (xref:prelude.adoc[] §6.6; xref:surface.adoc[] §5.7). Partials emit *unescaped*.
 
@@ -344,6 +351,13 @@ a pre-lexer transform, but it is not in the core or the reference Surface.
 
 [#decorators]
 == A.8 Decorators
+
+[CAUTION]
+====
+*Not yet implemented.* FlatBars ships no decorator helpers (including `inline`); the mapping below is
+the design (xref:flatbars-compat.adoc[compatibility matrix] §3). Because a decorator is just a block
+helper here, no grammar or core change is needed to add them.
+====
 
 {hbs} decorators (`pass:[{{#*helper}}]`, `pass:[{{*helper}}]`) modify a block or its `options`. BareBars
 has no separate decorator concept — *a decorator is just a block helper* that wraps the body.
