@@ -20,7 +20,7 @@ import BareBars.Error (ParseError(..))
 import BareBars.Expr as Expr
 import BareBars.Lexer (RawTok(..), tokenizeTemplate, trimStandalone)
 import BareBars.Span (Span)
-import BareBars.Syntax (Directive, Expr(..), Node(..), Template)
+import BareBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
@@ -38,12 +38,18 @@ type ExprParser = Int -> String -> Either ParseError Expr
 -- | Knobs the *front-end* (CLI/host) sets; per-file `@`-directives may override
 -- | them. `trimStandalone` toggles Handlebars-style standalone whitespace
 -- | removal (default on; a `@trim: standalone | none` directive wins over it).
--- | `parseExpr` is the interior expression grammar (dialect seam).
-type ParseOptions = { trimStandalone :: Boolean, parseExpr :: ExprParser }
+-- | `parseExpr` is the interior expression grammar (dialect seam). `extras`
+-- | allows the Handlebars-only tag shapes — raw blocks `{{{{…}}}}`, the inverse
+-- | block `{{^…}}`/`{{{^…}}}`, and unescaped `{{&…}}`. The core *lexer* always
+-- | recognizes them (meaning-free); a dialect that doesn't accept them (CoreBars,
+-- | MaxBars) sets `extras = false` and the parser rejects them.
+type ParseOptions = { trimStandalone :: Boolean, parseExpr :: ExprParser, extras :: Boolean }
 
--- | Standalone trimming on (Handlebars parity) + the core expression grammar.
+-- | Standalone trimming on (Handlebars parity), the core expression grammar, and
+-- | Handlebars-extras allowed (the engine + FullBars use this; CoreBars/MaxBars
+-- | override `extras = false`).
 defaultParseOptions :: ParseOptions
-defaultParseOptions = { trimStandalone: true, parseExpr: Expr.parseExpr }
+defaultParseOptions = { trimStandalone: true, parseExpr: Expr.parseExpr, extras: true }
 
 -- | Parse source text into the core template *plus* its header directives, with
 -- | the default options. The directives are a meaning-free list the engine
@@ -67,7 +73,7 @@ parseWith opts src = do
   -- comments carry no output; drop them before the tree builder, which then
   -- never has to know about `RComment` (the standalone pass needs them, so it
   -- runs first).
-  res <- parseSeq opts.parseExpr (Array.filter (not <<< isComment) toks') 0
+  res <- parseSeq opts.parseExpr opts.extras (Array.filter (not <<< isComment) toks') 0
   case res.stop of
     StopEOF -> Right { directives, nodes: res.nodes }
     StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
@@ -211,8 +217,8 @@ type SeqResult = { nodes :: Template, stop :: Stop }
 -- | Parse a run of nodes starting at index `i`, stopping at end of input or at
 -- | a close `{{/name}}`. A block captures a single body; multi-branch control
 -- | flow is expressed as nested clause blocks the engine interprets.
-parseSeq :: ExprParser -> Array RawTok -> Int -> Either ParseError SeqResult
-parseSeq pe toks = go Nil
+parseSeq :: ExprParser -> Boolean -> Array RawTok -> Int -> Either ParseError SeqResult
+parseSeq pe extras toks = go Nil
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
@@ -235,25 +241,37 @@ parseSeq pe toks = go Nil
       ROutput span base s -> case outputExpr pe span base s of
         Left e -> Left e
         Right e -> go (Output span e : acc) (i + 1)
-      RRaw span base s body -> case headed pe span base s of
-        Left e -> Left e
-        Right h -> go (RawBlock span h.name h.args body : acc) (i + 1)
+      -- `{{&x}}` is unescaped output (= `{{{x}}}`); a Handlebars-extra, gated.
+      RAmp span base s
+        | not extras -> Left (DisallowedShape "{{& }} (unescaped output)" span.start)
+        | otherwise -> case outputExpr pe span base s of
+            Left e -> Left e
+            Right e -> go (Output span e : acc) (i + 1)
+      RRaw span base s body
+        | not extras -> Left (DisallowedShape "{{{{ }}}} (raw block)" span.start)
+        | otherwise -> case headed pe span base s of
+            Left e -> Left e
+            Right h -> go (RawBlock span h.name h.args body : acc) (i + 1)
       RSep span base s -> case headed pe span base s of
         Left e -> Left e
         Right h -> go (Sep span h.name h.args : acc) (i + 1)
       RClose _ base s -> case headed pe { start: base, end: base } base s of
         Left e -> Left e
         Right h -> Right (done acc (StopClose h.name (i + 1)))
-      ROpen span base s -> buildBlock acc span base s (i + 1)
+      -- `{{^x}}` (Inverse) is a Handlebars-extra, gated; `{{#x}}` (Section) is core.
+      ROpen span sigil base s
+        | sigil == Inverse && not extras -> Left
+            (DisallowedShape "{{^ }} (inverse block)" span.start)
+        | otherwise -> buildBlock acc span sigil base s (i + 1)
 
-  buildBlock :: List Node -> Span -> Int -> String -> Int -> Either ParseError SeqResult
-  buildBlock acc span base s i = case headed pe span base s of
+  buildBlock :: List Node -> Span -> Sigil -> Int -> String -> Int -> Either ParseError SeqResult
+  buildBlock acc span sigil base s i = case headed pe span base s of
     Left e -> Left e
-    Right h -> case parseSeq pe toks i of
+    Right h -> case parseSeq pe extras toks i of
       Left e -> Left e
       Right inner -> case inner.stop of
         -- point the diagnostic at the *opener* (its span start), not offset 0.
         StopEOF -> Left (MismatchedBlock h.name "<eof>" span.start)
         StopClose closed pos
-          | closed == h.name -> go (Block span h.name h.args inner.nodes : acc) pos
+          | closed == h.name -> go (Block span sigil h.name h.args inner.nodes : acc) pos
           | otherwise -> Left (MismatchedBlock h.name closed span.start)

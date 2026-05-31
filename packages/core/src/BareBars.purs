@@ -23,7 +23,7 @@ import BareBars.Error (Error(..), ParseDiagnostic, ParseError(..), parseErrorAt,
 import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
 import BareBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import BareBars.Span (Span, lineColumn, spanText)
-import BareBars.Syntax (Directive, Expr(..), Ident, Node(..), Template)
+import BareBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil(..), Template)
 import BareBars.ToValue (class ToValue, class ToValueFields, toValue, toValueFields)
 import BareBars.Value (Value(..))
 import BareBars.Walk

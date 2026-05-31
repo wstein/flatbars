@@ -122,7 +122,9 @@ compile meta emit partials main =
   node ctx = case _ of
     Content s -> stmtOut (jsString s)
     Output _ e -> stmtOut ("rt.out(" <> rec.expr ctx e <> ")")
-    Block _ name args body -> emit.block rec ctx name args body
+    -- the sigil is `Section` here: FullBars desugars `Inverse` (`{{^}}`) to
+    -- `unless` upstream, and CoreBars rejects it — so the compiler never sees it.
+    Block _ _ name args body -> emit.block rec ctx name args body
     -- a separator rendered on its own is just its helper applied (the engine's
     -- rule); `else` standing alone yields "" — the runtime decides.
     Sep _ name args -> stmtOut

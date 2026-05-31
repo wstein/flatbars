@@ -428,6 +428,19 @@ main = do
     "T"
 
   expect "raw-block" "{{{{#raw}}}}{{name}} stays{{{{/raw}}}}" VNull "{{name}} stays"
+  -- the Handlebars raw-block form (no `#`) lexes identically.
+  expect "raw-block-no-hash" "{{{{raw}}}}{{name}} stays{{{{/raw}}}}" VNull "{{name}} stays"
+
+  -- Handlebars-extra shapes (FullBars accepts). The inverted section {{^x}}
+  -- desugars to {{#unless x}}; the triple variant {{{^x}}} is the same.
+  expectS "inverse-section" "{{^admin}}guest{{/admin}}" (obj [ Tuple "admin" (VBool false) ])
+    "guest"
+  expectS "inverse-true" "{{^admin}}guest{{/admin}}" (obj [ Tuple "admin" (VBool true) ]) ""
+  expectS "inverse-triple" "{{{^admin}}}guest{{{/admin}}}" (obj [ Tuple "admin" (VBool false) ])
+    "guest"
+  -- {{&x}} is unescaped output (= {{{x}}}), distinct from escaped {{x}}.
+  expectS "ampersand-unescaped" "{{& html }}" (obj [ Tuple "html" (str "<b>") ]) "<b>"
+  expectS "double-escapes" "{{ html }}" (obj [ Tuple "html" (str "<b>") ]) "&lt;b&gt;"
 
   expect "comment" "a{{! ignored }}b" VNull "ab"
   expect "long-comment" "a{{!-- ig}}nored --}}b" VNull "ab"

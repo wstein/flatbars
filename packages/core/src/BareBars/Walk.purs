@@ -93,7 +93,7 @@ foldRefs f = foldMap (node f)
   node g = case _ of
     Content _ -> mempty
     Output _ e -> expr g e
-    Block _ name args body ->
+    Block _ _ name args body ->
       g { name, kind: BlockRef, argc: Array.length args }
         <> foldMap (expr g) args
         <> foldRefs g body
@@ -147,7 +147,7 @@ foldTemplate alg = go
     Output _ e -> alg.output e
     RawBlock _ name args raw' -> alg.raw name args raw'
     Sep _ name args -> alg.sep name args
-    Block span name args children -> alg.block { span, name, args, children, recurse: go }
+    Block span _ name args children -> alg.block { span, name, args, children, recurse: go }
 
 --------------------------------------------------------------------------------
 -- Clause splitting (for separator-driven control flow)

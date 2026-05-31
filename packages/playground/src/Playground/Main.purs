@@ -149,9 +149,9 @@ renderNode d = case _ of
   Sep _ name args -> headArgs d "Sep" name args
   RawBlock _ name args raw ->
     headArgs d "RawBlock" name args `Array.snoc` line (d + 1) (show raw)
-  Block _ name args body ->
+  Block _ sig name args body ->
     -- block head + arg exprs and body nodes both indented one level beneath it
-    Array.cons (line d ("Block " <> show name))
+    Array.cons (line d ("Block " <> show sig <> " " <> show name))
       (Array.concatMap (renderExpr (d + 1)) args <> Array.concatMap (renderNode (d + 1)) body)
 
 -- | Render an expression as an indented tree. A nullary `App`/a literal is a

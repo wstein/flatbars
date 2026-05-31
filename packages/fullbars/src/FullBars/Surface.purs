@@ -45,7 +45,7 @@ module FullBars.Surface
 
 import Prelude
 
-import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
+import BareBars.Syntax (Expr(..), Ident, Node(..), Sigil(..), Template)
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Foldable (foldl)
@@ -85,18 +85,22 @@ desugar clauseNames = go []
             Nothing -> Output sp (App "esc_html" [ rewriteHead scope name args ])
       -- `{{#partial name …}}` / `{{#inline name}}` (§5.7): a bare first argument
       -- is the partial *name* (a string), like `{{> name}}`.
-      Block sp "partial" args body ->
-        Block sp "partial" (partialArgs scope args) (go scope (expandElseIf body))
-      Block sp "inline" args body ->
-        Block sp "inline" (inlineArgs scope args) (go scope (expandElseIf body))
+      Block sp Section "partial" args body ->
+        Block sp Section "partial" (partialArgs scope args) (go scope (expandElseIf body))
+      Block sp Section "inline" args body ->
+        Block sp Section "inline" (inlineArgs scope args) (go scope (expandElseIf body))
+      -- the inverted section `{{^x}}…{{/x}}` desugars to `{{#unless x}}…{{/unless}}`
+      -- (the FullBars way to "render when falsy"); the head becomes the condition.
+      Block sp Inverse name args body ->
+        Block sp Section "unless" [ rewriteHead scope name args ] (go scope (expandElseIf body))
       -- block head stays a helper; `else if` chains expand to flat `elif` (§5.6);
       -- a trailing `as |a b|` becomes positional binding-name strings (§5.5) and
       -- extends the scope for the body.
-      Block sp name args body ->
+      Block sp Section name args body ->
         let
           { mainArgs, params } = extractBlockParams args
         in
-          Block sp name (rewriteArgs scope mainArgs <> map (Lit <<< VString) params)
+          Block sp Section name (rewriteArgs scope mainArgs <> map (Lit <<< VString) params)
             (go (scope <> params) (expandElseIf body))
       -- raw blocks are verbatim (surface.adoc §5.8).
       RawBlock sp name args raw -> RawBlock sp name args raw
@@ -322,20 +326,20 @@ hoistInline :: Template -> { partials :: Map String Template, template :: Templa
 hoistInline nodes = Array.foldl step { partials: Map.empty, template: [] } nodes
   where
   step acc = case _ of
-    Block _ "inline" args body
+    Block _ _ "inline" args body
       | Just name <- inlineName args ->
           let
             inner = hoistInline body
           in
             acc
               { partials = Map.insert name inner.template (Map.union acc.partials inner.partials) }
-    Block sp name args body ->
+    Block sp sig name args body ->
       let
         inner = hoistInline body
       in
         acc
           { partials = Map.union acc.partials inner.partials
-          , template = Array.snoc acc.template (Block sp name args inner.template)
+          , template = Array.snoc acc.template (Block sp sig name args inner.template)
           }
     other -> acc { template = Array.snoc acc.template other }
   inlineName args = case Array.head args of

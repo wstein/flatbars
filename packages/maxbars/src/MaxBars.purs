@@ -22,9 +22,11 @@ import MaxBars.Expr (parseMaxExpr)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
--- | `MaxBars.Expr` (infix operators + pipes).
+-- | `MaxBars.Expr` (infix operators + pipes), and the Handlebars-only tag shapes
+-- | (`{{{{…}}}}`, `{{^…}}`, `{{&…}}`) rejected (`extras` off) — MaxBars is not the
+-- | Handlebars-compatibility dialect.
 maxOptions :: ParseOptions
-maxOptions = defaultParseOptions { parseExpr = parseMaxExpr }
+maxOptions = defaultParseOptions { parseExpr = parseMaxExpr, extras = false }
 
 -- | Render MaxBars surface source against data, reusing FullBars' surface
 -- | pipeline (desugar → hoist → @truthiness → engine) with located errors.

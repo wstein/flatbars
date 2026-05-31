@@ -35,6 +35,8 @@ data ParseError
   | DirectiveAfterHeader Int
   -- a core-acted header directive (e.g. `@trim`) with an invalid value
   | BadDirective String Int
+  -- a tag shape the active dialect does not accept (e.g. `{{^}}` in CoreBars)
+  | DisallowedShape String Int
 
 derive instance eqParseError :: Eq ParseError
 
@@ -59,6 +61,7 @@ parseErrorMessage = case _ of
   DirectiveAfterHeader _ ->
     "DirectiveAfterHeader: a {{! @directive }} must precede the first tag"
   BadDirective msg _ -> "BadDirective: " <> msg
+  DisallowedShape shape _ -> "DisallowedShape: " <> shape <> " is not allowed in this dialect"
 
 renderParseError :: ParseError -> String
 renderParseError pe = parseErrorMessage pe <> " (at " <> show (parseErrorOffset pe) <> ")"
@@ -76,6 +79,7 @@ parseErrorOffset = case _ of
   LexError _ o -> o
   DirectiveAfterHeader o -> o
   BadDirective _ o -> o
+  DisallowedShape _ o -> o
 
 -- | A parse error located in its source: 1-based `line`/`column` (via
 -- | `Span.lineColumn`), the raw `offset`, and the rendered `message`. Enough for

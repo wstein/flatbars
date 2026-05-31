@@ -13,6 +13,7 @@ module BareBars.Syntax
   ( Ident
   , Template
   , Node(..)
+  , Sigil(..)
   , Expr(..)
   , Directive
   ) where
@@ -45,12 +46,24 @@ type Directive = { key :: Ident, value :: String, span :: Span }
 data Node
   = Content String
   | Output Span Expr
-  -- span, head, args, captured body
-  | Block Span Ident (Array Expr) Template
+  -- span, opener sigil, head, args, captured body
+  | Block Span Sigil Ident (Array Expr) Template
   -- span, head, args, verbatim body
   | RawBlock Span Ident (Array Expr) String
   -- span, head, args (a name-agnostic separator marker)
   | Sep Span Ident (Array Expr)
+
+-- | A block's opener *sigil* — a structural marker the core records but assigns
+-- | no meaning. `Section` is `{{#name}}`; `Inverse` is `{{^name}}` (and the
+-- | triple variant `{{{^name}}}`). The engine/dialect decides what `Inverse`
+-- | means (FullBars desugars it to `unless`); the core only knows the shape.
+data Sigil = Section | Inverse
+
+derive instance eqSigil :: Eq Sigil
+
+instance showSigil :: Show Sigil where
+  show Section = "Section"
+  show Inverse = "Inverse"
 
 data Expr
   = Lit Value
@@ -68,6 +81,7 @@ instance showNode :: Show Node where
   show = case _ of
     Content s -> "Content " <> show s
     Output _ e -> "Output (" <> show e <> ")"
-    Block _ n args body -> "Block " <> show n <> " " <> show args <> " " <> show body
+    Block _ sig n args body ->
+      "Block " <> show sig <> " " <> show n <> " " <> show args <> " " <> show body
     RawBlock _ n args raw -> "RawBlock " <> show n <> " " <> show args <> " " <> show raw
     Sep _ n args -> "Sep " <> show n <> " " <> show args

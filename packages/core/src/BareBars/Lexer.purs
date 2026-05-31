@@ -19,6 +19,7 @@ import Prelude
 
 import BareBars.Error (ParseError(..))
 import BareBars.Span (Span)
+import BareBars.Syntax (Sigil(..))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
@@ -34,7 +35,8 @@ import Data.String.Common (joinWith)
 data RawTok
   = RContent String
   | ROutput Span Int String -- {{{ <interior> }}}
-  | ROpen Span Int String -- {{# <interior> }}
+  | RAmp Span Int String -- {{& <interior> }} — unescaped output (Handlebars `&`)
+  | ROpen Span Sigil Int String -- {{# / {{^ <interior> }} — sigil = Section/Inverse
   | RClose Span Int String -- {{/ <interior> }}
   | RSep Span Int String -- {{ <interior> }} — a name-agnostic separator
   | RRaw Span Int String String -- {{{{# <interior> }}}} <body> {{{{/ name }}}}
@@ -49,7 +51,8 @@ instance showRawTok :: Show RawTok where
   show = case _ of
     RContent s -> "RContent " <> show s
     ROutput _ _ s -> "ROutput " <> show s
-    ROpen _ _ s -> "ROpen " <> show s
+    RAmp _ _ s -> "RAmp " <> show s
+    ROpen _ sig _ s -> "ROpen " <> show sig <> " " <> show s
     RClose _ _ s -> "RClose " <> show s
     RSep _ _ s -> "RSep " <> show s
     RRaw _ _ s b -> "RRaw " <> show s <> " " <> show b
@@ -145,7 +148,7 @@ trimStandalone toks = Array.mapWithIndex trimContent toks
 
 blockLevel :: RawTok -> Boolean
 blockLevel = case _ of
-  ROpen _ _ _ -> true
+  ROpen _ _ _ _ -> true
   RClose _ _ _ -> true
   RComment _ _ _ -> true
   _ -> false
@@ -276,15 +279,22 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
   openerLiteralAt :: Int -> Maybe String
   openerLiteralAt i
     | matchAt cs i "{{{{#" = Just "{{{{#"
+    | matchAt cs i "{{{{" = Just "{{{{" -- raw block, Handlebars form (no `#`)
     | matchAt cs i "{{~!--" = Just "{{~!--"
     | matchAt cs i "{{!--" = Just "{{!--"
+    | matchAt cs i "{{{^" = Just "{{{^" -- inverse block, triple-brace variant
+    | matchAt cs i "{{{/" = Just "{{{/" -- close, triple-brace variant
     | matchAt cs i "{{{" = Just "{{{"
     | matchAt cs i "{{~!" = Just "{{~!"
     | matchAt cs i "{{!" = Just "{{!"
     | matchAt cs i "{{~#" = Just "{{~#"
     | matchAt cs i "{{#" = Just "{{#"
+    | matchAt cs i "{{~^" = Just "{{~^"
+    | matchAt cs i "{{^" = Just "{{^" -- inverse block (Handlebars inverted section)
     | matchAt cs i "{{~/" = Just "{{~/"
     | matchAt cs i "{{/" = Just "{{/"
+    | matchAt cs i "{{~&" = Just "{{~&"
+    | matchAt cs i "{{&" = Just "{{&" -- unescaped output (Handlebars `&`)
     | otherwise = Nothing
 
   -- A separator is any `{{` that is not `{{{` and not one of the bracketed
@@ -308,16 +318,23 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
 
   readTag :: Int -> Either ParseError TagResult
   readTag i
-    | matchAt cs i "{{{{#" = readRaw i
+    | matchAt cs i "{{{{#" = readRaw i 5 -- `{{{{#name}}}}` (BareBars/back-compat)
+    | matchAt cs i "{{{{" = readRaw i 4 -- `{{{{name}}}}` (Handlebars raw block)
     | matchAt cs i "{{~!--" = readLongComment i "{{~!--"
     | matchAt cs i "{{!--" = readLongComment i "{{!--"
+    | matchAt cs i "{{{^" = readBlockOpen i "{{{^" Inverse "}}}"
+    | matchAt cs i "{{{/" = readClose i "{{{/" "}}}"
     | matchAt cs i "{{{" = readOutput i
     | matchAt cs i "{{~!" = readShortComment i "{{~!"
     | matchAt cs i "{{!" = readShortComment i "{{!"
-    | matchAt cs i "{{~#" = readBlockOpen i "{{~#"
-    | matchAt cs i "{{#" = readBlockOpen i "{{#"
-    | matchAt cs i "{{~/" = readClose i "{{~/"
-    | matchAt cs i "{{/" = readClose i "{{/"
+    | matchAt cs i "{{~#" = readBlockOpen i "{{~#" Section "}}"
+    | matchAt cs i "{{#" = readBlockOpen i "{{#" Section "}}"
+    | matchAt cs i "{{~^" = readBlockOpen i "{{~^" Inverse "}}"
+    | matchAt cs i "{{^" = readBlockOpen i "{{^" Inverse "}}"
+    | matchAt cs i "{{~/" = readClose i "{{~/" "}}"
+    | matchAt cs i "{{/" = readClose i "{{/" "}}"
+    | matchAt cs i "{{~&" = readAmp i "{{~&"
+    | matchAt cs i "{{&" = readAmp i "{{&"
     | matchAt cs i "{{" = readSeparator i
     | otherwise = Left (LexError "internal: no opener" i)
 
@@ -354,26 +371,52 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
               , trimR: t.trimR
               }
 
-  readBlockOpen :: Int -> String -> Either ParseError TagResult
-  readBlockOpen i opener =
+  -- A block opener `{{# / {{^ [~] name args [~] close`, carrying its `sigil`
+  -- (Section/Inverse). `close` is `}}` for double-brace openers, `}}}` for the
+  -- triple-brace inverse variant `{{{^…}}}`.
+  readBlockOpen :: Int -> String -> Sigil -> String -> Either ParseError TagResult
+  readBlockOpen i opener sigil close =
     let
       start = i + SCU.length opener
+      cl = SCU.length close
     in
-      case findFrom cs start "}}" of
+      case findFrom cs start close of
         Nothing -> Left (UnterminatedTag i)
         Just q ->
           let
             t = splitTrims (slice cs start q)
           in
             Right
-              { mtok: Just (ROpen { start: i, end: q + 2 } start t.core)
-              , next: q + 2
+              { mtok: Just (ROpen { start: i, end: q + cl } sigil start t.core)
+              , next: q + cl
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
               }
 
-  readClose :: Int -> String -> Either ParseError TagResult
-  readClose i opener =
+  -- A close `{{/ [~] name [~] close`; `close` is `}}` or `}}}` (the triple-brace
+  -- `{{{/…}}}` that pairs with the triple-brace inverse open).
+  readClose :: Int -> String -> String -> Either ParseError TagResult
+  readClose i opener close =
+    let
+      start = i + SCU.length opener
+      cl = SCU.length close
+    in
+      case findFrom cs start close of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (RClose { start: i, end: q + cl } start t.core)
+              , next: q + cl
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
+
+  -- Unescaped output `{{& [~] expr [~] }}` (Handlebars' `&` alias for `{{{…}}}`).
+  readAmp :: Int -> String -> Either ParseError TagResult
+  readAmp i opener =
     let
       start = i + SCU.length opener
     in
@@ -384,7 +427,7 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
             t = splitTrims (slice cs start q)
           in
             Right
-              { mtok: Just (RClose { start: i, end: q + 2 } start t.core)
+              { mtok: Just (RAmp { start: i, end: q + 2 } start t.core)
               , next: q + 2
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -440,10 +483,12 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
     Just q -> Right
       { mtok: Nothing, next: q + 4, trimL: leadTrimAt i, trimR: matchAt cs (q - 1) "~" }
 
-  readRaw :: Int -> Either ParseError TagResult
-  readRaw i =
+  -- `sigil` is the opener length: 5 for `{{{{#`, 4 for the bare `{{{{`. Both
+  -- close with the name-matched `{{{{/name}}}}`; the head is read from `start`.
+  readRaw :: Int -> Int -> Either ParseError TagResult
+  readRaw i sigil =
     let
-      start = i + 5
+      start = i + sigil
     in
       case findFrom cs start "}}}}" of
         Nothing -> Left (UnterminatedRaw i)

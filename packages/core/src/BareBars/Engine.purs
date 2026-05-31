@@ -68,7 +68,10 @@ runTemplate engine = renderTemplate engine.initial
   renderNode env = case _ of
     Content s -> pure s
     Output span e -> evalExpr env span e >>= engine.stringify
-    Block span name args body -> applyBlock env span name args body
+    -- the engine applies the head as a block helper; the opener sigil (`#`/`^`)
+    -- is a dialect concern (FullBars desugars `Inverse` to `unless`), so the
+    -- meaning-free driver ignores it.
+    Block span _ name args body -> applyBlock env span name args body
     RawBlock span name args raw -> applyBlock env span name args [ Content raw ]
     -- A separator rendered on its own is just an application of its head; a
     -- block helper that cares (e.g. `if` at `{{else}}`) intercepts it by

@@ -11,7 +11,7 @@ module Test.MaxBars.Main where
 import Prelude
 
 import BareBars.Value (Value(..))
-import Data.Either (Either(..))
+import Data.Either (Either(..), isLeft)
 import Data.Map as Map
 import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
@@ -74,6 +74,12 @@ main = do
   -- a plain path still works (FullBars surface reused unchanged).
   expectM "path" "{{ user.name }}" (obj [ Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
     "Ada"
+
+  -- MaxBars also rejects the Handlebars-only shapes (not the Handlebars-compat
+  -- dialect): inverse {{^}}, unescaped {{&}}, and raw blocks {{{{}}}}.
+  assert' "reject: inverse {{^}}" (isLeft (renderMax "{{^a}}x{{/a}}" (obj [])))
+  assert' "reject: unescaped {{&}}" (isLeft (renderMax "{{&a}}" (obj [])))
+  assert' "reject: raw block {{{{}}}}" (isLeft (renderMax "{{{{r}}}}body{{{{/r}}}}" (obj [])))
 
   -- compilation reuses the FullBars compiler: && desugars to the `and` helper.
   case compileMaxJs "{{ a && b }}" of

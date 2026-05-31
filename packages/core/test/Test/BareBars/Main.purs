@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), ParseError(..), Value(..), defaultParseOptions, foldExpr, foldTemplate, parse, parseErrorAt, parseWith, spanText, splitClause, splitClauses, toValue, validate)
+import BareBars (Arity(..), Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, foldExpr, foldTemplate, parse, parseErrorAt, parseWith, spanText, splitClause, splitClauses, toValue, validate)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -56,7 +56,7 @@ main = do
         ( t ==
             [ Content "a"
             , Output { start: 1, end: 8 } (App "x" [])
-            , Block { start: 8, end: 17 } "if" [ App "c" [] ]
+            , Block { start: 8, end: 17 } Section "if" [ App "c" [] ]
                 [ Content "t", Sep { start: 18, end: 26 } "else" [], Content "e" ]
             ]
         )
@@ -76,7 +76,7 @@ main = do
 
   -- splitClause shallowly splits a body at the first {{else}} separator.
   case parse "{{#if c}}A{{else}}B{{/if}}" of
-    Right { nodes: [ Block _ _ _ body ] } ->
+    Right { nodes: [ Block _ _ _ _ body ] } ->
       let
         s = splitClause "else" body
       in
@@ -88,7 +88,7 @@ main = do
   -- clause at the next separator (a second {{else}} opens its own clause and
   -- does not leak into the first).
   case parse "{{#if c}}A{{else}}B{{else}}C{{/if}}" of
-    Right { nodes: [ Block _ _ _ body ] } -> do
+    Right { nodes: [ Block _ _ _ _ body ] } -> do
       let
         cs = splitClauses body
       assert' "splitClauses before" (cs.before == [ Content "A" ])
@@ -189,12 +189,16 @@ main = do
     (contentOf "a\n{{! x }}\nb" defaultParseOptions == [ "a\n", "b" ])
   -- option off: the surrounding newline is kept.
   assert' "trim: option off keeps lines"
-    (contentOf "a\n{{! x }}\nb" (defaultParseOptions { trimStandalone = false }) == [ "a\n", "\nb" ])
+    ( contentOf "a\n{{! x }}\nb" (defaultParseOptions { trimStandalone = false }) ==
+        [ "a\n", "\nb" ]
+    )
   -- @trim:none overrides the on-default; @trim:standalone overrides off.
   assert' "trim: @trim:none overrides default-on"
     (contentOf "{{! @trim:none }}a\n{{! x }}\nb" defaultParseOptions == [ "a\n", "\nb" ])
   assert' "trim: @trim:standalone overrides option-off"
-    (contentOf "{{! @trim:standalone }}a\n{{! x }}\nb" (defaultParseOptions { trimStandalone = false }) == [ "a\n", "b" ])
+    ( contentOf "{{! @trim:standalone }}a\n{{! x }}\nb"
+        (defaultParseOptions { trimStandalone = false }) == [ "a\n", "b" ]
+    )
   -- an invalid @trim value is a BadDirective parse error.
   case parse "{{! @trim:loose }}x" of
     Left (BadDirective _ _) -> pure unit

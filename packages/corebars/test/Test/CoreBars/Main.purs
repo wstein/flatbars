@@ -36,6 +36,14 @@ main = do
   -- a parse error surfaces as Left.
   assert' "render: parse error" (isLeft (render "{{ oops" (obj [])))
 
+  -- CoreBars is austere: the Handlebars-only shapes are rejected (DisallowedShape).
+  assert' "reject: inverse {{^}}" (isLeft (render "{{^a}}x{{/a}}" (obj [])))
+  assert' "reject: triple inverse {{{^}}}" (isLeft (render "{{{^a}}}x{{{/a}}}" (obj [])))
+  assert' "reject: unescaped {{&}}" (isLeft (render "{{&a}}" (obj [])))
+  assert' "reject: raw block {{{{}}}}" (isLeft (render "{{{{r}}}}body{{{{/r}}}}" (obj [])))
+  -- the same rejection in the compiled path.
+  assert' "reject (compile): inverse" (isLeft (compileJs "{{^a}}x{{/a}}"))
+
   -- compile core syntax to a JS module.
   case compileJs "{{{this}}}" of
     Left e -> assert' ("compileJs: unexpected error " <> show e) false
