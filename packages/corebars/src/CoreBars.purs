@@ -25,7 +25,7 @@ import BareBars.Compile (compile) as Driver
 import BareBars.Compile.FullBars (fullbarsEmit, metaFor, resolveForCompile)
 import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
 import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
-import BareBars.ToValue (class ToValue, toValue)
+import Kernel.ToValue (class ToValue, toValue)
 import BareBars.Value (Value)
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Bifunctor (lmap)

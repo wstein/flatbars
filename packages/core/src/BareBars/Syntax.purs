@@ -7,8 +7,8 @@
 -- | application with a captured body. The core attaches no meaning to any name
 -- | and has no notion of an "inverse" or "else"; `{{else}}` is just a `Sep`
 -- | marker. All of that — including separator-driven control flow — is the job
--- | of the engine's second pass (see `BareBars.Walk` for the traversal toolkit
--- | and `BareBars.Engine` for the interpreting driver).
+-- | of the engine's second pass (see `Kernel.Walk` for the traversal toolkit
+-- | and `Kernel.Engine` for the interpreting driver).
 module BareBars.Syntax
   ( Ident
   , Template

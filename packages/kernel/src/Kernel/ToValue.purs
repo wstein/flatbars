@@ -18,7 +18,7 @@
 -- |        , "tags" /\ VArray [ VString "x", VString "y" ]
 -- |        , "admin" /\ VBool true ])
 -- | ```
-module BareBars.ToValue
+module Kernel.ToValue
   ( class ToValue
   , toValue
   , class ToValueFields

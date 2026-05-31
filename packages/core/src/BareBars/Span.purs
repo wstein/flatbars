@@ -3,7 +3,7 @@
 -- | A `Span` is a half-open range of code-unit offsets into the original
 -- | template source. It is attached to the tag-level AST nodes (`Output`,
 -- | `Block`, `RawBlock`) by the parser and surfaced to helpers on the control
--- | handle (`BareBars.Engine.Ctl`), so an engine can point a diagnostic at the
+-- | handle (`Kernel.Engine.Ctl`), so an engine can point a diagnostic at the
 -- | offending tag. `lineColumn` turns an offset into a 1-based line/column.
 module BareBars.Span
   ( Span

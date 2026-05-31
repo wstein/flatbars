@@ -7,11 +7,13 @@ module Test.FullBars.Main where
 
 import Prelude
 
-import BareBars (Ctl, Engine, Helper, foldTemplate, parse, runString, runTemplate, spanText, validate)
+import BareBars (parse, spanText)
+import Kernel.Engine (Ctl, Engine, Helper, runString, runTemplate)
+import Kernel.Walk (arityOk, foldTemplate, validate)
 import BareBars.Error (Error(..))
 import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Value (Value(..))
-import BareBars.Walk (arityOk)
+
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)

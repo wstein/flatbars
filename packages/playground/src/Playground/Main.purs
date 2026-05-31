@@ -10,17 +10,18 @@
 -- |
 -- | Panels: a template editor and a JSON data editor on the left; an output
 -- | pane on the right with five views — a sandboxed rendered preview, the HTML
--- | source, the structural Parse tree, the lowered Real AST (`FullBars.Lower`;
+-- | source, the structural Parse tree, the lowered Real AST (`Kernel.Lower`;
 -- | in surface mode, of the desugared template), and the schema + escaping
 -- | validation report.
 module Playground.Main where
 
 import Prelude
 
-import BareBars (parse, validate)
+import BareBars (parse)
+import Kernel.Walk (Issue, validate)
 import BareBars.Json (parseValue)
 import BareBars.Syntax (Expr(..), Node(..), Template)
-import BareBars.Walk (Issue)
+
 import CoreBars (render) as CoreBars
 import Data.Array as Array
 import Data.Bifunctor (lmap)
@@ -175,7 +176,7 @@ headArgs d label name args
 line :: Int -> String -> String
 line d s = power "  " d <> s
 
--- | The *real* AST — `FullBars.Lower.lower` of the structural tree, expanded
+-- | The *real* AST — `Kernel.Lower.lower` of the structural tree, expanded
 -- | the same way. Clauses become labelled branches and escaping is explicit
 -- | (`escaped`/`raw`); condition/collection expressions are expanded inline.
 realText :: State -> String

@@ -1,6 +1,6 @@
 -- | Generate the helper-catalog documentation from the single source of truth.
 -- |
--- | `FullBars.Prelude.preludeSchema` already lists every helper the engine knows
+-- | `Kernel.Prelude.preludeSchema` already lists every helper the engine knows
 -- | (name, block-ness, arity), projected from `helperDefs`. Rather than maintain
 -- | a parallel table by hand in the docs — which is exactly how a phantom helper
 -- | like `partial>` slips in — this module renders that schema to an AsciiDoc
@@ -12,16 +12,16 @@ module FullBars.Catalog
 
 import Prelude
 
-import BareBars.Engine (Helper)
+import Kernel.Engine (Helper)
 import BareBars.Error (Error)
-import BareBars.Walk (Arity(..))
+import Kernel.Walk (Arity(..))
 import Data.Either (Either)
 import Data.Foldable (foldMap)
 import Data.Map as Map
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
-import FullBars.Env (RefEnv)
-import FullBars.Prelude (prelude, preludeSchema)
+import Kernel.Env (RefEnv)
+import Kernel.Prelude (prelude, preludeSchema)
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
 -- | Everything else in the schema is a *scoped* variable a block helper installs.

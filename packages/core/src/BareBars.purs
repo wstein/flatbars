@@ -1,47 +1,21 @@
--- | BareBars — the framework (substrate) host API. See
--- | `docs/modules/ROOT/pages/host-api.adoc`.
+-- | BareBars — the *structural* core. See `docs/modules/ROOT/pages/host-api.adoc`.
 -- |
--- | This package is *engine-agnostic*: a structural lexer/parser, the value
--- | data type, the polymorphic inversion-of-control driver, and the
--- | skeleton-AST traversal/validation toolkit. It contains *no* helper names,
--- | truthiness, or escaping policy — those belong to an engine built on top
--- | (e.g. `FullBars`, the reference engine). See ADR-001.
+-- | This package is purely structural and meaning-free: the lexer/parser, the
+-- | skeleton AST (`Syntax`), the literal `Value` data type, source spans, and
+-- | parse errors. It assigns *no* meaning — no evaluation driver, no helper
+-- | combinators, no clause/`else` handling, no validation. Those are the shared
+-- | engine (the `kernel` package); dialects (corebars/fullbars/maxbars) build on
+-- | the kernel. See ADR-001 and the kernel-migration notes.
 module BareBars
   ( module BareBars.Syntax
   , module BareBars.Value
-  , module BareBars.ToValue
   , module BareBars.Error
   , module BareBars.Span
-  , module BareBars.Engine
-  , module BareBars.Helper
   , module BareBars.Parser
-  , module BareBars.Walk
   ) where
 
-import BareBars.Engine (Ctl, Engine, Helper, runString, runTemplate)
 import BareBars.Error (Error(..), ParseDiagnostic, ParseError(..), parseErrorAt, parseErrorOffset, renderError, renderParseError, renderParseErrorAt)
-import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
-import BareBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
+import BareBars.Parser (ExprParser, ParseOptions, defaultParseOptions, parse, parseWith)
 import BareBars.Span (Span, lineColumn, spanText)
 import BareBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil(..), Template)
-import BareBars.ToValue (class ToValue, class ToValueFields, toValue, toValueFields)
 import BareBars.Value (Value(..))
-import BareBars.Walk
-  ( Algebra
-  , Arity(..)
-  , Clause
-  , ExprAlgebra
-  , HelperRef
-  , HelperSpec
-  , Issue
-  , RefKind(..)
-  , Schema
-  , Severity(..)
-  , foldExpr
-  , foldRefs
-  , foldTemplate
-  , helperRefs
-  , splitClause
-  , splitClauses
-  , validate
-  )

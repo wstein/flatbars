@@ -7,10 +7,10 @@
 -- | and the desugaring walk (`lower`) — and wires them into convenience
 -- | renderers. Swap any of it for a different engine without touching `barebars`.
 module FullBars
-  ( module FullBars.Value
-  , module FullBars.Env
-  , module FullBars.Prelude
-  , module FullBars.Lower
+  ( module Kernel.Value
+  , module Kernel.Env
+  , module Kernel.Prelude
+  , module Kernel.Lower
   , module FullBars.Surface
   , preludeEnv
   , surfaceClauses
@@ -27,22 +27,22 @@ module FullBars
 
 import Prelude
 
-import BareBars.Engine (runTemplate)
+import Kernel.Engine (runTemplate)
 import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
 import BareBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import BareBars.Syntax (Directive, Ident, Template)
-import BareBars.ToValue (class ToValue, toValue)
+import Kernel.ToValue (class ToValue, toValue)
 import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow)
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FullBars.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
-import FullBars.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
-import FullBars.Prelude (prelude, preludeSchema)
+import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
+import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
+import Kernel.Prelude (prelude, preludeSchema)
 import FullBars.Surface (desugar, hoistInline)
-import FullBars.Value (FalsySet, FalsyShape(..), aliasSet, always, escapeHtml, handlebars, isFalsy, minimal, presence, resolveTruthiness, stringify, truthy)
+import Kernel.Value (FalsySet, FalsyShape(..), aliasSet, always, escapeHtml, handlebars, isFalsy, minimal, presence, resolveTruthiness, stringify, truthy)
 
 -- | Build a FullBars environment with the prelude, the given data as context,
 -- | and a `root` helper returning the top-level data. Polymorphic in `m`.

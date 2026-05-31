@@ -26,7 +26,7 @@ import BareBars.Error (Error(..), ParseError(..))
 import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import BareBars.Syntax (Directive, Expr(..), Ident, Template)
 import BareBars.Value (Value(..))
-import BareBars.Walk (Clause, splitClauses)
+import Kernel.Walk (Clause, splitClauses)
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
@@ -92,7 +92,7 @@ resolveForCompile = lmap toParseError <<< resolveTruthiness
 
 -- | The falsy-set as a JS object literal `{ b:1, n:1, … }` — one key per present
 -- | shape (false/null/""/0/[]/{}); the runtime reads `!!set.<k>`. Mirrors
--- | `FullBars.Value.isFalsy` so the compiled path matches the interpreter.
+-- | `Kernel.Value.isFalsy` so the compiled path matches the interpreter.
 falsyLiteral :: FalsySet -> String
 falsyLiteral fs = "{ " <> joinWith ", " (Array.mapMaybe flag shapes) <> " }"
   where

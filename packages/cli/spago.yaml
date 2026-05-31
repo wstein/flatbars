@@ -12,6 +12,7 @@ package:
     - node-buffer
     - exceptions
     - barebars
+    - kernel
     - barebars-json
     - barebars-compile
     - fullbars

@@ -13,6 +13,7 @@ package:
     - transformers
     - aff
     - barebars
+    - kernel
     - fullbars
     - barebars-compile
   test:

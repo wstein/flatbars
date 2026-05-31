@@ -9,7 +9,6 @@ package:
   dependencies:
     - prelude
     - arrays
-    - lists
     - strings
     - maybe
     - either
@@ -20,6 +19,7 @@ package:
     - numbers
     - transformers
     - barebars
+    - kernel
   test:
     main: Test.FullBars.Main
     dependencies:

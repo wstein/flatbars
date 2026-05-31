@@ -14,7 +14,7 @@
 -- |
 -- | See `docs/modules/ROOT/pages/appendix-handlebars.adoc` §A.13 and
 -- | `evaluation.adoc` §3.5–3.6.
-module BareBars.Engine
+module Kernel.Engine
   ( Ctl
   , Helper
   , Engine
@@ -29,12 +29,12 @@ import BareBars.Parser (parse)
 import BareBars.Span (Span)
 import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
 import BareBars.Value (Value)
-import BareBars.Walk (splitClause)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
+import Kernel.Walk (splitClause)
 
 -- | The *control handle* BareBars hands every helper. Every field is a callback
 -- | *into* BareBars — a helper never walks the tree itself.

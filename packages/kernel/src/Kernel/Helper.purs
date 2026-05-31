@@ -10,12 +10,12 @@
 -- | `ArgSpec`. Because the arity lives in one place, an engine can project *both*
 -- | the runtime helper and a validation `Schema` entry from the same value — the
 -- | runtime guard and the static check can never drift. Ranged arities reuse
--- | `BareBars.Walk.arityOk`, the very predicate `validate` uses.
+-- | `Kernel.Walk.arityOk`, the very predicate `validate` uses.
 -- |
 -- | Helpers that need the control handle (block helpers, `this`) or bespoke
 -- | argument handling (`lookup`, `dict`) are written directly against `Helper`;
 -- | these combinators are for the common value-helper shapes.
-module BareBars.Helper
+module Kernel.Helper
   ( ArgSpec
   , nullary
   , unary
@@ -26,12 +26,12 @@ module BareBars.Helper
 
 import Prelude
 
-import BareBars.Engine (Helper)
 import BareBars.Error (Error(..))
 import BareBars.Value (Value)
-import BareBars.Walk (Arity(..), arityOk, arityText)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
+import Kernel.Engine (Helper)
+import Kernel.Walk (Arity(..), arityOk, arityText)
 
 -- | A runtime helper paired with the arity it enforces. An engine reads `.run`
 -- | for execution and `.arity` for its validation schema — one source of truth.

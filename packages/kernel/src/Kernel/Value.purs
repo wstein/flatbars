@@ -4,7 +4,7 @@
 -- |
 -- | A different engine could define truthiness, escaping, and stringification
 -- | differently; these are this engine's choices.
-module FullBars.Value
+module Kernel.Value
   ( FalsyShape(..)
   , FalsySet
   , handlebars
@@ -87,7 +87,7 @@ isFalsy fs = case _ of
 
 -- | Truthiness under a mode — the negation of `isFalsy`. (`includeZero` on
 -- | `if`/`unless` is a per-call exception layered on the mode; see
--- | `FullBars.Prelude.truthyWith`.)
+-- | `Kernel.Prelude.truthyWith`.)
 truthy :: FalsySet -> Value -> Boolean
 truthy fs = not <<< isFalsy fs
 

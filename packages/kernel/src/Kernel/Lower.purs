@@ -14,7 +14,7 @@
 -- | tooling (the playground, a formatter, a linter) inspects, and the basis of
 -- | `escapingWarnings`. The real AST is *this* engine's; another engine may
 -- | lower to a different shape.
-module FullBars.Lower
+module Kernel.Lower
   ( RNode(..)
   , lower
   , escapingWarnings
@@ -25,11 +25,11 @@ module FullBars.Lower
 import Prelude
 
 import BareBars.Syntax (Directive, Expr(..), Ident, Template)
-import BareBars.Walk (Clause, Issue, Severity(..), foldTemplate, splitClause, splitClauses)
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), uncurry)
-import FullBars.Value (FalsySet)
+import Kernel.Value (FalsySet)
+import Kernel.Walk (Clause, Issue, Severity(..), foldTemplate, splitClause, splitClauses)
 
 -- | The reference real AST. Control flow is explicit (branches, not a flat
 -- | `Sep` marker) and escaping is a boolean, not a wrapper helper.

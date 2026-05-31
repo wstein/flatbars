@@ -1,11 +1,11 @@
 -- | The *reference* engine's environment and `Engine` instance.
 -- |
--- | The driver (`BareBars.Engine`) is environment-agnostic; this module is one
+-- | The driver (`Kernel.Engine`) is environment-agnostic; this module is one
 -- | concrete choice: a stack of helper frames plus the current context. A
 -- | different engine could pick an entirely different `env` type — that is the
 -- | point of the pluggable driver. `RefEnv` is a newtype (not a synonym) so the
 -- | otherwise-cyclic reference `RefEnv → Helper → Ctl → RefEnv` is well-founded.
-module FullBars.Env
+module Kernel.Env
   ( RefEnv(..)
   , refContext
   , refFalsy
@@ -28,7 +28,6 @@ module FullBars.Env
 
 import Prelude
 
-import BareBars.Engine (Engine, Helper)
 import BareBars.Error (Error(..))
 import BareBars.Syntax (Template)
 import BareBars.Value (Value)
@@ -40,7 +39,8 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import FullBars.Value (FalsySet, handlebars, stringify)
+import Kernel.Engine (Engine, Helper)
+import Kernel.Value (FalsySet, handlebars, stringify)
 
 -- | Lift a pure `Either Error` into the engine monad — the single place the
 -- | `Left e -> throwError e` plumbing lives, shared by `refEngine` and helpers.

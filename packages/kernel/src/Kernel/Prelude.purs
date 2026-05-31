@@ -12,21 +12,18 @@
 -- | `prelude` (the registry) and `preludeSchema` (the validator) are both
 -- | *projections* of that one table, so a helper's runtime arity and its
 -- | validated arity can never drift. Value helpers are built from the
--- | `BareBars.Helper` combinators (arity enforced by construction); block and
+-- | `Kernel.Helper` combinators (arity enforced by construction); block and
 -- | bespoke helpers are written directly against `Helper`.
-module FullBars.Prelude
+module Kernel.Prelude
   ( prelude
   , preludeSchema
   ) where
 
 import Prelude
 
-import BareBars.Engine (Ctl, Helper)
 import BareBars.Error (Error(..))
-import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary)
 import BareBars.Syntax (Template)
 import BareBars.Value (Value(..))
-import BareBars.Walk (Arity(..), Clause, Schema, splitClauses)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
 import Data.Either (Either)
@@ -37,8 +34,11 @@ import Data.Set as Set
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FullBars.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, lookupPartialFalsy, pushFrame, refContext, refFalsy, withFalsy)
-import FullBars.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
+import Kernel.Engine (Ctl, Helper)
+import Kernel.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, lookupPartialFalsy, pushFrame, refContext, refFalsy, withFalsy)
+import Kernel.Helper (ArgSpec, atLeast, binary, nullary, unary)
+import Kernel.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
+import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
 
 --------------------------------------------------------------------------------
 -- The single source of truth
@@ -54,7 +54,7 @@ type HelperDef m =
   , run :: Helper m (RefEnv m)
   }
 
--- | A non-block value helper built from a `BareBars.Helper` combinator. The
+-- | A non-block value helper built from a `Kernel.Helper` combinator. The
 -- | combinator pins the arity, so the schema entry below is derived from the
 -- | very guard the runtime uses.
 valDef :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> HelperDef m
@@ -107,7 +107,7 @@ helperDefs =
 prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
 prelude = map (\d -> Tuple d.name d.run) helperDefs
 
--- | The reference engine's validation schema (`BareBars.Walk.validate`),
+-- | The reference engine's validation schema (`Kernel.Walk.validate`),
 -- | projected from `helperDefs` plus the scoped variables below.
 -- |
 -- | NOTE: validation is *scope-blind* — like a lenient JSON schema, it checks

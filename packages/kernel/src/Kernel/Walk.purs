@@ -11,7 +11,7 @@
 -- | catamorphism an engine builds custom passes on (lowering, linting,
 -- | pretty-printing). `splitClause` splits a block body at a `{{name}}`
 -- | separator. `validate` is the batteries-included schema pass.
-module BareBars.Walk
+module Kernel.Walk
   ( RefKind(..)
   , HelperRef
   , foldRefs

@@ -1,5 +1,5 @@
 package:
-  name: barebars
+  name: kernel
   publish:
     version: 0.1.0
     license: Apache-2.0
@@ -13,16 +13,16 @@ package:
     - strings
     - maybe
     - either
+    - tuples
     - foldable-traversable
     - ordered-collections
-    - numbers
-    - parsing
-    - control
+    - integers
+    - transformers
+    - record
+    - barebars
   test:
-    main: Test.BareBars.Main
+    main: Test.Kernel.Main
     dependencies:
       - effect
       - console
       - assert
-      - tuples
-      - kernel

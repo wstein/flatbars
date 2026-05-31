@@ -16,7 +16,8 @@ module Cli.Main where
 
 import Prelude
 
-import BareBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt, validate)
+import BareBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt)
+import Kernel.Walk (validate)
 import BareBars.Compile.FullBars (compileSurfaceWith) as Compile
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))

@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, foldExpr, foldTemplate, parse, parseErrorAt, parseWith, spanText, splitClause, splitClauses, toValue, validate)
+import BareBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseWith, spanText)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -16,6 +16,8 @@ import Data.Monoid (power)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import Kernel.ToValue (toValue)
+import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
 
 -- A tiny engine schema: `if` is a 1-arg block, `c`/`x` are nullary.
