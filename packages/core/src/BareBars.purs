@@ -11,6 +11,7 @@ module BareBars
   , module BareBars.Error
   , module BareBars.Engine
   , module BareBars.Env
+  , module BareBars.Lower
   , module BareBars.Parser
   , module BareBars.Prelude
   , module BareBars.Span
@@ -26,6 +27,7 @@ import Prelude
 import BareBars.Engine (Ctl, Engine, Helper, runString, runTemplate)
 import BareBars.Env (RefEnv, constHelper, emptyEnv, refEngine, register, registerAll)
 import BareBars.Error (Error, ParseError)
+import BareBars.Lower (RNode(..), escapingWarnings, lower)
 import BareBars.Parser (parse)
 import BareBars.Prelude (prelude, preludeSchema)
 import BareBars.Span (Span, lineColumn, spanText)

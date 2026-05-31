@@ -6,9 +6,9 @@ module Test.Main where
 
 import Prelude
 
-import BareBars (Engine, foldTemplate, parse, preludeSchema, renderAff, renderWith, runTemplate, spanText, stringify, validate)
+import BareBars (Engine, RNode(..), escapingWarnings, foldTemplate, lower, parse, preludeSchema, renderAff, renderWith, runTemplate, spanText, stringify, validate)
 import BareBars.Error (Error(..))
-import BareBars.Syntax (Node(..))
+import BareBars.Syntax (Expr(..), Node(..))
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -196,6 +196,26 @@ main = do
     Left e -> assert' ("ctl.span: parse error " <> show e) false
     Right t -> assert' "ctl.span visible to helper"
       (runTemplate (customEngine VNull) t == Right "0")
+
+  -- lower: the structural skeleton becomes the typed real AST — {{else}} is
+  -- consumed into RIf's branches, and esc_html becomes the escaped flag.
+  case parse "{{#if this}}A{{{esc_html (lookup this \"x\")}}}{{else}}B{{/if}}" of
+    Left e -> assert' ("lower: parse error " <> show e) false
+    Right t -> assert' ("lower if/else+escape: " <> show (lower t))
+      ( lower t ==
+          [ RIf (App "this" [])
+              [ RText "A", ROut true (App "lookup" [ App "this" [], Lit (VString "x") ]) ]
+              [ RText "B" ]
+          ]
+      )
+
+  -- Safe-by-default lint: raw output of data warns; esc_html / safe do not.
+  case parse "{{{lookup this \"x\"}}}" of
+    Right t -> assert' "escaping lint flags raw data" (not (Array.null (escapingWarnings t)))
+    Left e -> assert' ("lint: parse error " <> show e) false
+  case parse "{{{esc_html (lookup this \"x\")}}}{{{safe (lookup this \"y\")}}}" of
+    Right t -> assert' "escaping lint silent for esc_html/safe" (Array.null (escapingWarnings t))
+    Left e -> assert' ("lint: parse error " <> show e) false
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do

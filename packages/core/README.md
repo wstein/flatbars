@@ -17,8 +17,8 @@ JavaScript, so a BareBars engine drops into the same places Handlebars does.
 | `BareBars.Engine` | §3.4–3.6, A.13 | polymorphic IoC driver: `Ctl m env`, `Helper m env`, `Engine m env`, `runTemplate`/`runString` |
 | `BareBars.Env` | §3.3 | the reference engine: pluggable `RefEnv m`, registry ops, `refEngine` |
 | `BareBars.Prelude` | §6 | the reference prelude (`Helper m (RefEnv m)`) + `preludeSchema` |
-| `BareBars.Walk` | §4.3 | skeleton visitor (`foldRefs`/`foldTemplate`), clause utilities, schema `validate` |
-| `BareBars.Surface` | §5 | surface dialect — **scaffold/TODO** |
+| `BareBars.Walk` | §4.3 | skeleton visitor (`foldRefs`/`foldTemplate`), `splitClause`, schema `validate` |
+| `BareBars.Lower` | §5, A.13.2 | the desugaring walk: `lower :: Template -> Array RNode` (real AST) + `escapingWarnings` |
 | `BareBars.Json` | — | JSON ⇆ `Value` bridge for hosts |
 | `BareBars` | §7 | host API: `parse`, `runTemplate`, `validate`, `compile`, `renderWith`, `renderAff`, `prelude` |
 
@@ -47,10 +47,16 @@ at); prelude helpers `this`, `lookup`, `true`/`false`/`null`, `esc_html`,
 `eq`/`eq?`, `not`, `and`, `or`, `log`;
 and a JSON-schema-style `validate` over the skeleton.
 
+`BareBars.Lower` is the reference *walker* (ADR-001): a `foldTemplate` that turns
+the structural AST into the typed real AST (`RIf`/`ROut`/…), resolving clauses
+(`{{else}}` → branches) and escaping (`esc_html` → the escaped flag). It backs the
+playground's "Real AST" view and the `escapingWarnings` safety lint.
+
 ## Next milestones
 
-- `BareBars.Surface` — the `{{ }}` / dotted-path / `@data` / hash-arg / partial
-  desugarer (§5). Until then, author in core syntax.
+- Extend `BareBars.Lower` with the rest of the surface dialect — `{{ }}`
+  auto-escape, dotted-path → `lookup`, `@data`, hash args, partials (§5). Until
+  then, author in core syntax.
 - Partials & decorators in the prelude (§6.6).
 
 ## Test
