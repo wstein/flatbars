@@ -15,8 +15,8 @@ import Prelude
 import BareBars.Error (Error(..))
 import BareBars.Value (Value(..))
 import Data.Either (Either(..))
-import Data.Int as Int
-import Data.String (Pattern(..), Replacement(..), replaceAll)
+import Data.Maybe (fromMaybe)
+import Data.String (Pattern(..), Replacement(..), replaceAll, stripSuffix)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 
@@ -43,13 +43,17 @@ stringify = case _ of
   VArray xs -> joinWith "," <$> traverse stringify xs
   VObject _ -> Left (TypeError "cannot stringify an object")
 
--- | Shortest round-tripping-ish decimal: integral numbers without a trailing ".0".
+-- | Render a number as plain decimal: integral values without a trailing ".0",
+-- | everything else via `show`. `show :: Number -> String` appends ".0" only to
+-- | finite integral values, so stripping that suffix yields the integer — and it
+-- | works for integers beyond `Int`'s 32-bit range (a round-trip through `Int`
+-- | would overflow and mis-render e.g. `1000000000000`).
 numberToString :: Number -> String
 numberToString n =
   let
-    i = Int.round n
+    s = show n
   in
-    if Int.toNumber i == n then show i else show n
+    fromMaybe s (stripSuffix (Pattern ".0") s)
 
 -- | HTML-escape the five significant characters. Used by the `esc_html` helper.
 escapeHtml :: String -> String

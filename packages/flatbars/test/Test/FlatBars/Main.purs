@@ -157,6 +157,13 @@ main = do
 
   expect "dict-apply" "{{{lookup (dict \"k\" \"v\") \"k\"}}}" VNull "v"
 
+  -- Number stringify: integral values render without a trailing ".0", including
+  -- integers beyond Int's 32-bit range; fractionals are preserved.
+  expect "num-int" "{{{this}}}" (VNumber 42.0) "42"
+  expect "num-zero" "{{{this}}}" (VNumber 0.0) "0"
+  expect "num-large-int" "{{{this}}}" (VNumber 1000000000000.0) "1000000000000"
+  expect "num-frac" "{{{this}}}" (VNumber 3.5) "3.5"
+
   expectError "unknown-helper" "{{{nope}}}" VNull
   expectError "mismatched-block" "{{#if this}}x{{/each}}" (VBool true)
   expectError "empty-output" "{{{}}}" VNull
