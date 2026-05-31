@@ -51,8 +51,10 @@ argument is truthy, else renders the `else` child's body.
 |===
 
 `if` and `unless` *define* the meaning of a nested `pass:[{{else}}…]`; the core does not.
-*Truthiness* matches {hbs}: `VBool false`, `VNull`, `""`, and the *empty array* are falsy; `0`, `{}`,
-and non-empty values are truthy.
+*Truthiness* matches {hbs}: `VBool false`, `VNull`, `0`, `""`, and the *empty array* are falsy; `{}`,
+non-zero numbers, and other non-empty values are truthy. As in {hbs}, `0` is falsy unless the
+`includeZero` option is set — `if`/`unless` accept it as an options object,
+`pass:[{{#if n (dict "includeZero" true)}}]`.
 
 == 6.4 Iteration and context shift
 

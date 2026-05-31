@@ -163,8 +163,9 @@ helper; the core only supplies the frame plumbing.
 |`pass:[{{log x}}]` |same |`pass:[{{{ log x' }}}]` (returns `VNull` ⇒ empty output) |ENGINE
 |===
 
-*Truthiness* (used by `if`/`unless`/`each`/`with`) matches {hb}: empty array is falsy; `0` and `{}`
-are truthy; `false`/`null`/`""` are falsy (xref:prelude.adoc[] §6.3).
+*Truthiness* (used by `if`/`unless`/`each`/`with`) matches {hb}: `false`, `null`, `0`, `""`, and the
+empty array are falsy; `{}` and non-zero numbers are truthy. As in {hb}, `0` is falsy unless
+`includeZero` is set — passed to `if`/`unless` as an options object (xref:prelude.adoc[] §6.3).
 
 Worked example (`if-unless/` — `if` with an else and {hbs} truthiness):
 

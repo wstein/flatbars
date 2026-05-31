@@ -25,16 +25,27 @@ interactively.
 ## The rule
 
 FlatBars truthiness ([`FlatBars.Value.truthy`](../../packages/flatbars/src/FlatBars/Value.purs)) —
-**falsy** is exactly:
+**falsy** is exactly (the same set as Handlebars):
 
 - `false`
 - `null`
+- `0`
 - `""` (the empty string)
 - `[]` (the empty array)
 - a trusted empty string (`safe ""` / `esc_html ""` ⇒ `VSafe ""`)
 
-**Everything else is truthy** — including `0`, the empty object `{}`, and any
-non-empty string/array/number.
+**Everything else is truthy** — including the empty object `{}`, non-zero
+numbers, and any non-empty string/array.
+
+## `includeZero`
+
+Like Handlebars, `0` is falsy by default. To count `0` as truthy, pass
+Handlebars' `includeZero` option. BareBars has no hash-argument surface yet, so
+it is supplied as an *options object* built with `dict`:
+
+```handlebars
+{{#if n (dict "includeZero" true)}} n is present (even if 0) {{/if}}
+```
 
 ## Parity matrix
 
@@ -47,7 +58,8 @@ non-empty string/array/number.
 | `"hi"` | truthy | truthy | ✓ |
 | `"0"` | truthy | truthy | ✓ |
 | `" "` | truthy | truthy | ✓ |
-| `0` | **truthy** | **falsy** | ✗ |
+| `0` | falsy | falsy | ✓ |
+| `0` + `includeZero` | truthy | truthy | ✓ |
 | `42` | truthy | truthy | ✓ |
 | `[]` | falsy | falsy | ✓ |
 | `[1, 2]` | truthy | truthy | ✓ |
@@ -59,15 +71,12 @@ non-empty string/array/number.
 Note that the empty **array** is falsy in both (Handlebars special-cases empty
 collections), while the empty **object** is truthy in both.
 
-## The two divergences
+## The one remaining divergence
 
-1. **`0` is truthy in FlatBars.** Handlebars treats `0` as falsy unless its
-   `includeZero` option is set. Guard zero explicitly where it matters:
-   `{{#if (not (eq n 0))}}…{{/if}}`. (This also covers `-0`.)
-2. **A trusted empty string (`safe ""`) is falsy in FlatBars,** because it is
-   still an empty string. In Handlebars a `SafeString` is a wrapper *object*, so
-   even an empty one is truthy. Most templates never test a safe string for
-   truthiness, but the edge is real.
+**A trusted empty string (`safe ""`) is falsy in FlatBars,** because it is still
+an empty string. In Handlebars a `SafeString` is a wrapper *object*, so even an
+empty one is truthy. Most templates never test a safe string for truthiness, but
+the edge is real.
 
 See also the [compatibility matrix](../../docs/modules/ROOT/pages/flatbars-compat.adoc)
 §5, which lists these alongside the other Handlebars semantic differences.

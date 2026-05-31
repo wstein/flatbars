@@ -41,8 +41,8 @@ toc::[]
 |`pass:[{{#if c}}…{{else}}…{{/if}}]`
 |✅
 |Takes an explicit *value*: `pass:[{{#if (lookup this "x")}}]`. `pass:[{{else}}]` is a name-agnostic
-separator the helper splits on. `includeZero` is not a hash option — and note `0` is *truthy* in
-FlatBars (see §5).
+separator the helper splits on. `0` is falsy by default (§5); `includeZero` is supported, supplied as
+an options object: `pass:[{{#if n (dict "includeZero" true)}}]`.
 
 |`pass:[{{#unless c}}…{{/unless}}]`
 |`pass:[{{#unless c}}…{{/unless}}]`
@@ -219,11 +219,12 @@ a helper library. They are part of the FlatBars prelude (xref:prelude.adoc[§6])
 . *A bare identifier calls a helper.* `pass:[{{{city}}}]` invokes the helper `city`; it is *not* a
 path read. To read a field, use `pass:[{{{ lookup this "city" }}}]` (xref:index.adoc[]). This is the
 single biggest porting adjustment from {hbs}.
-. *Truthiness mostly matches {hbs}, with two edges that differ.* Falsy: `false`, `null`, `""`, the
-empty array, and a trusted empty string (`safe ""` ⇒ `VSafe ""`). Truthy: everything else — including
-the empty object `pass:[{}]` *and* the number `0`. The two differences: {hb} treats `0` as falsy
-unless `includeZero` is set (FlatBars: truthy — guard with `pass:[(eq n 0)]`); and a {hb}
-`SafeString` is a truthy object, whereas FlatBars' `safe ""` is falsy.
+. *Truthiness matches {hbs}.* Falsy: `false`, `null`, `0`, `""`, the empty array, and a trusted empty
+string (`safe ""` ⇒ `VSafe ""`). Truthy: everything else — including the empty object `pass:[{}]` and
+non-zero numbers. As in {hbs}, `0` is falsy unless `includeZero` is set; FlatBars takes it as an
+options object on `if`/`unless`: `pass:[{{#if n (dict "includeZero" true)}}]`. The *one* remaining
+difference: a {hb} `SafeString` is a truthy object, whereas FlatBars' `safe ""` is falsy (it is still
+an empty string).
 . *No implicit HTML escaping.* Output is raw by default; escape with `esc_html` and rely on the
 `escapingWarnings` lint to catch unescaped data. The surface dialect (xref:surface.adoc[§5]) is where
 a `pass:[{{ }}]`-auto-escapes-to-`esc_html` rewrite would live.

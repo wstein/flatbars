@@ -73,9 +73,15 @@ is what Handlebars.js would decide for the same value. Rows marked
   </tr>
   <tr>
     <td><code>0</code> (number zero)</td>
-    <td><span class="t">truthy</span></td>
     <td><span class="f">falsy</span></td>
-    <td><span class="bad">✗ differs</span></td>
+    <td><span class="f">falsy</span></td>
+    <td><span class="ok">✓</span></td>
+  </tr>
+  <tr>
+    <td><code>0</code> with <code>includeZero</code></td>
+    <td><span class="t">truthy</span></td>
+    <td><span class="t">truthy</span> (<code>includeZero=true</code>)</td>
+    <td><span class="ok">✓</span></td>
   </tr>
   <tr>
     <td><code>42</code> (non-zero number)</td>
@@ -123,15 +129,15 @@ is what Handlebars.js would decide for the same value. Rows marked
 </table>
 
 <p class="note">
-<b>Two differences from Handlebars</b> (the <span class="bad">✗</span> rows above).
-<b>1.</b> FlatBars treats <code>0</code> as <b>truthy</b>; Handlebars treats it as
-falsy unless <code>includeZero</code> is set — guard zero explicitly, e.g.
-<code>{{#if (not (eq n 0))}}…{{/if}}</code>. <b>2.</b> A trusted empty string
-(<code>safe ""</code>) is <b>falsy</b> in FlatBars because it is still an empty
-string, whereas a Handlebars <code>SafeString</code> is a truthy object. The full
-FlatBars falsy set is <code>false</code>, <code>null</code>, <code>""</code>, the
-empty array, and a trusted empty string; everything else — including
-<code>0</code> and <code>{}</code> — is truthy.
+<b>Parity with one edge.</b> FlatBars matches Handlebars' truthiness: the falsy
+set is <code>false</code>, <code>null</code>, <code>0</code>, <code>""</code>, and
+the empty array; everything else — including <code>{}</code> and non-zero numbers
+— is truthy. Like Handlebars, <code>0</code> is falsy by default and counts as
+truthy only with <code>includeZero</code> (passed as an options object:
+<code>{{#if n (dict "includeZero" true)}}…{{/if}}</code>). The one remaining
+difference: a trusted empty string (<code>safe ""</code>) is <b>falsy</b> in
+FlatBars because it is still an empty string, whereas a Handlebars
+<code>SafeString</code> is a truthy object.
 </p>
 </body>
 </html>
