@@ -1,22 +1,25 @@
 -- | The BareBars web playground — a Halogen SPA.
 -- |
--- | It lexes, parses, validates, and renders BareBars *core* templates entirely
--- | in the browser (the `barebars` framework + `flatbars` engine compiled to
--- | JavaScript). Nothing is
--- | sent anywhere: the bundle is self-contained, so it works online and offline
--- | (open `dist/index.html` directly).
+-- | It lexes, parses, validates, and renders BareBars templates entirely in the
+-- | browser (the `barebars` framework + `flatbars` engine compiled to
+-- | JavaScript). A *dialect* toggle switches between the austere *core* syntax
+-- | and the Handlebars-flavoured *surface* dialect (which desugars to core
+-- | before validation/lowering/rendering). Nothing is sent anywhere: the bundle
+-- | is self-contained, so it works online and offline (open `dist/index.html`
+-- | directly).
 -- |
 -- | Panels: a template editor and a JSON data editor on the left; an output
 -- | pane on the right with five views — a sandboxed rendered preview, the HTML
--- | source, the structural Parse tree, the lowered Real AST (`FlatBars.Lower`),
--- | and the schema + escaping validation report.
+-- | source, the structural Parse tree, the lowered Real AST (`FlatBars.Lower`;
+-- | in surface mode, of the desugared template), and the schema + escaping
+-- | validation report.
 module Playground.Main where
 
 import Prelude
 
 import BareBars (parse, validate)
 import BareBars.Json (parseValue)
-import BareBars.Syntax (Expr(..), Node(..))
+import BareBars.Syntax (Expr(..), Node(..), Template)
 import BareBars.Walk (Issue)
 import Data.Array as Array
 import Data.Bifunctor (lmap)
@@ -28,7 +31,7 @@ import Data.String.Common (joinWith)
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Exception (throw)
-import FlatBars (RNode(..), escapingWarnings, lower, preludeSchema, renderWith)
+import FlatBars (RNode(..), desugarSurface, escapingWarnings, lower, preludeSchema, renderSurface, renderWith)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
@@ -55,16 +58,26 @@ data View = Rendered | Source | Parse | Real | Validation
 
 derive instance eqView :: Eq View
 
+-- | Which dialect the template is read as: the austere *core* syntax (explicit
+-- | `lookup`/`esc_html`, `{{{ }}}` output) or the Handlebars-flavoured *surface*
+-- | dialect (paths, `{{ }}` auto-escape, `@data`, `else if`), which desugars to
+-- | core before validation/lowering/rendering.
+data Mode = Core | Surface
+
+derive instance eqMode :: Eq Mode
+
 type State =
   { template :: String
   , dataText :: String
   , view :: View
+  , mode :: Mode
   }
 
 data Action
   = SetTemplate String
   | SetData String
   | SetView View
+  | SetMode Mode
   | LoadExample String
 
 component :: forall q i o m. H.Component q i o m
@@ -79,7 +92,7 @@ component =
     let
       ex = fromMaybe seed (Array.head examples)
     in
-      { template: ex.template, dataText: ex.dataText, view: Rendered }
+      { template: ex.template, dataText: ex.dataText, view: Rendered, mode: Core }
 
   seed = { id: "", label: "", template: "", dataText: "null" }
 
@@ -88,6 +101,7 @@ handleAction = case _ of
   SetTemplate t -> H.modify_ _ { template = t }
   SetData d -> H.modify_ _ { dataText = d }
   SetView v -> H.modify_ _ { view = v }
+  SetMode m -> H.modify_ _ { mode = m }
   LoadExample eid -> case find (\e -> e.id == eid) examples of
     Just e -> H.modify_ _ { template = e.template, dataText = e.dataText }
     Nothing -> pure unit
@@ -96,11 +110,26 @@ handleAction = case _ of
 -- Derived results (pure)
 --------------------------------------------------------------------------------
 
--- | Render the template against the JSON data, or an explanatory error.
+-- | Render the template against the JSON data, or an explanatory error. The
+-- | dialect follows `st.mode`: core syntax (`renderWith`) or the surface dialect
+-- | (`renderSurface`, which desugars and hoists inline partials first).
 renderResult :: State -> Either String String
 renderResult st = do
   value <- lmap (\e -> "Data JSON error: " <> e) (parseValue st.dataText)
-  renderWith st.template value
+  case st.mode of
+    Core -> renderWith st.template value
+    Surface -> renderSurface st.template value
+
+-- | The structural template the validation / lowering views run against: the
+-- | raw parse in core mode, or its surface desugaring in surface mode (so that
+-- | `{{ name }}` is seen as `esc_html (lookup this "name")`, not an unknown
+-- | helper `name`).
+loweredNodes :: State -> Either String Template
+loweredNodes st = case parse st.template of
+  Left e -> Left ("Parse error: " <> show e)
+  Right t -> Right case st.mode of
+    Core -> t
+    Surface -> desugarSurface t
 
 -- | A readable view of the *structural* AST. It hides nothing — every node,
 -- | expression, and literal is shown — but the whole tree is expanded one line
@@ -149,8 +178,8 @@ line d s = power "  " d <> s
 -- | the same way. Clauses become labelled branches and escaping is explicit
 -- | (`escaped`/`raw`); condition/collection expressions are expanded inline.
 realText :: State -> String
-realText st = case parse st.template of
-  Left e -> "Parse error: " <> show e
+realText st = case loweredNodes st of
+  Left e -> e
   Right t -> joinWith "\n" (Array.concatMap (renderReal 0) (lower t))
 
 renderReal :: Int -> RNode -> Array String
@@ -176,9 +205,9 @@ renderReal d = case _ of
     else Array.cons (line (d + 1) (label <> ":")) (Array.concatMap (renderReal (d + 2)) nodes)
 
 validationIssues :: State -> Either String (Array Issue)
-validationIssues st = case parse st.template of
-  Left e -> Left ("Parse error: " <> show e)
-  Right nodes -> Right (validate preludeSchema nodes <> escapingWarnings nodes)
+validationIssues st = do
+  nodes <- loweredNodes st
+  pure (validate preludeSchema nodes <> escapingWarnings nodes)
 
 --------------------------------------------------------------------------------
 -- View
@@ -190,7 +219,7 @@ cls = HP.class_ <<< ClassName
 render :: forall m. State -> H.ComponentHTML Action () m
 render st =
   HH.div [ HP.id "app-root" ]
-    [ header
+    [ header st
     , HH.main_
         [ HH.div [ cls "col" ]
             [ editorPane "Template" st.template SetTemplate
@@ -201,15 +230,27 @@ render st =
     , footer st
     ]
 
-header :: forall m. H.ComponentHTML Action () m
-header =
+header :: forall m. State -> H.ComponentHTML Action () m
+header st =
   HH.header [ cls "bar" ]
     [ HH.span [ cls "wm" ] [ HH.text "bare", HH.b_ [ HH.text "bars" ], HH.text " playground" ]
     , HH.span [ cls "spacer" ] []
+    , HH.label_ [ HH.text "dialect" ]
+    , HH.div [ cls "tabs" ]
+        [ modeBtn "Core" Core
+        , modeBtn "Surface" Surface
+        ]
     , HH.label_ [ HH.text "example" ]
     , HH.select [ HE.onValueChange LoadExample ]
         (map (\e -> HH.option [ HP.value e.id ] [ HH.text e.label ]) examples)
     ]
+  where
+  modeBtn label m =
+    HH.button
+      [ cls (if st.mode == m then "active" else "")
+      , HE.onClick \_ -> SetMode m
+      ]
+      [ HH.text label ]
 
 editorPane
   :: forall m. String -> String -> (String -> Action) -> H.ComponentHTML Action () m
