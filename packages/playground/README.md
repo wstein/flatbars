@@ -32,6 +32,19 @@ npm run playground
 npm run playground:build
 ```
 
+## Smoke test
+
+A headless end-to-end check builds the bundle, serves `dist/` over HTTP, and
+drives it with `puppeteer-core` against a locally installed **Brave**, asserting
+the Halogen app mounted (brand, the four output tabs, the preview iframe, and a
+clean validation view):
+
+```sh
+npm --workspace packages/playground run smoke
+# or point at another Chromium-family browser:
+BRAVE_PATH=/path/to/browser npm --workspace packages/playground run smoke
+```
+
 `dist/` (the bundle `app.js` + `index.html`) is generated and git-ignored. To
 deploy, build and publish the `dist/` directory as static files — or just open
 `dist/index.html` locally.
