@@ -7,7 +7,7 @@ module Test.BareBars.Main where
 
 import Prelude
 
-import BareBars (Arity(..), Expr(..), Node(..), foldExpr, foldTemplate, parse, spanText, splitClause, validate)
+import BareBars (Arity(..), Expr(..), Node(..), foldExpr, foldTemplate, parse, spanText, splitClause, splitClauses, validate)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -83,6 +83,20 @@ main = do
         assert' "splitClause before/after"
           (s.before == [ Content "A" ] && s.clause == Just [ Content "B" ])
     _ -> assert' "splitClause: unexpected parse" false
+
+  -- splitClauses returns every separator-delimited section; splitClause bounds a
+  -- clause at the next separator (a second {{else}} opens its own clause and
+  -- does not leak into the first).
+  case parse "{{#if c}}A{{else}}B{{else}}C{{/if}}" of
+    Right [ Block _ _ _ body ] -> do
+      let
+        cs = splitClauses body
+      assert' "splitClauses before" (cs.before == [ Content "A" ])
+      assert' "splitClauses yields both clauses"
+        (map _.body cs.clauses == [ [ Content "B" ], [ Content "C" ] ])
+      assert' "splitClause bounds at next separator"
+        ((splitClause "else" body).clause == Just [ Content "B" ])
+    _ -> assert' "splitClauses: unexpected parse" false
 
   -- Schema validation flags an unknown helper; a known-arity call is clean.
   case parse "{{#if c}}{{{x}}}{{/if}}" of

@@ -118,7 +118,7 @@ render env (Sep name args)        = render env (Output (App name args))   -- a l
 eval env (Lit v)         = v
 eval env (App name args) = apply (resolve env name) (ctl env []) [ eval env a | a <- args ]
 
--- ctl env children = { env, children, eval, render, clause: \n -> splitClause n children }
+-- ctl env children = { env, children, render, span, clause: \n -> splitClause n children }
 ----
 
 Arguments are evaluated *eagerly, left to right*, before the helper runs. Block bodies are the

@@ -117,8 +117,9 @@ A few consequences the parser does *not* legislate, leaving them to the engine:
   the (inert) `else` helper and yields nothing.
 * *Repeated separators.* A block may contain several `Sep` nodes (`pass:[{{case}}]` … `pass:[{{case}}]`
   … `pass:[{{default}}]`). The parser keeps them all as siblings; how many a helper recognizes, and
-  in what order, is the helper's contract. `splitClause` splits at the *first* match; a multi-way
-  helper folds over the rest.
+  in what order, is the helper's contract. `splitClauses` returns *every* separator-delimited section
+  (`{ before, clauses }`, each clause bounded by the next separator) — the primitive a multi-way
+  helper folds over; `splitClause name` is the convenience that picks the first clause of one name.
 
 == 2.5 What is *not* in the grammar
 

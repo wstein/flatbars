@@ -20,6 +20,8 @@ module BareBars.Walk
   , Algebra
   , foldTemplate
   , helperRefs
+  , Clause
+  , splitClauses
   , splitClause
   , Arity(..)
   , HelperSpec
@@ -40,7 +42,7 @@ import Data.Array as Array
 import Data.Foldable (fold, foldMap)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 
 --------------------------------------------------------------------------------
 -- Generic traversal
@@ -151,20 +153,49 @@ foldTemplate alg = go
 -- Clause splitting (for separator-driven control flow)
 --------------------------------------------------------------------------------
 
--- | Split a block body at the first top-level `{{name}}` *separator*: the nodes
--- | *before* it, and the nodes *after* it (the clause), if the separator is
--- | present. This is the idiom a control-flow helper uses — e.g. `if` renders
--- | `before` when truthy and `clause` otherwise. The split is shallow (it never
--- | descends into nested blocks), so an inner block's own `{{else}}` is its own
--- | business.
-splitClause :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
-splitClause name nodes = case Array.findIndex isSep nodes of
-  Nothing -> { before: nodes, clause: Nothing }
-  Just i -> { before: Array.take i nodes, clause: Just (Array.drop (i + 1) nodes) }
+-- | A separator-delimited clause: the section a `{{name args}}` separator opens,
+-- | running up to the next top-level separator (or the end of the block body).
+type Clause = { name :: Ident, args :: Array Expr, body :: Template }
+
+-- | Split a block body at *every* top-level separator. `before` is the section
+-- | up to the first separator; `clauses` are the sections that follow, each
+-- | tagged with the separator that opened it. The split is shallow — nested
+-- | blocks keep their own separators. This is the general primitive a
+-- | control-flow helper uses to read `{{else}}`, `{{case}}`, … (a helper has the
+-- | block body as `Ctl.children`); the framework never interprets the names.
+splitClauses :: Template -> { before :: Template, clauses :: Array Clause }
+splitClauses nodes = case Array.findIndex isSep nodes of
+  Nothing -> { before: nodes, clauses: [] }
+  Just i -> { before: Array.take i nodes, clauses: clausesFrom (Array.drop i nodes) }
   where
   isSep = case _ of
-    Sep _ n _ -> n == name
+    Sep _ _ _ -> true
     _ -> false
+
+  -- `rest` begins with a separator: emit its clause (bounded by the next
+  -- separator) and recurse on what follows.
+  clausesFrom :: Template -> Array Clause
+  clausesFrom rest = case Array.uncons rest of
+    Just { head: Sep _ name args, tail } ->
+      let
+        bodyEnd = fromMaybe (Array.length tail) (Array.findIndex isSep tail)
+      in
+        Array.cons { name, args, body: Array.take bodyEnd tail }
+          (clausesFrom (Array.drop bodyEnd tail))
+    _ -> []
+
+-- | Split a block body around the *first* clause named `name`: the nodes before
+-- | the first separator, and that clause's body (bounded by the next separator),
+-- | if present. The idiom a control-flow helper uses — `if` renders `before`
+-- | when truthy and the `else` `clause` otherwise. Defined via `splitClauses`,
+-- | so a second `{{else}}` opens its own clause rather than leaking into this
+-- | one.
+splitClause :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
+splitClause name nodes =
+  let
+    s = splitClauses nodes
+  in
+    { before: s.before, clause: map _.body (Array.find (\c -> c.name == name) s.clauses) }
 
 --------------------------------------------------------------------------------
 -- Schema-driven validation

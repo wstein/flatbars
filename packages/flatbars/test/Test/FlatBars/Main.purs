@@ -154,6 +154,20 @@ main = do
   -- only an enclosing block helper gives it meaning.
   expect "standalone-else" "a{{else}}c" VNull "ac"
 
+  -- A second {{else}} opens its own clause (splitClauses); `if` renders only the
+  -- first else clause, so the trailing section does not leak in.
+  expect "if-double-else" "{{#if this}}A{{else}}B{{else}}C{{/if}}" (VBool false) "B"
+
+  -- else-if is expressed by nesting; it lowers/renders as a chain.
+  expect "else-if-chain"
+    "{{#if (lookup this \"a\")}}A{{else}}{{#if (lookup this \"b\")}}B{{else}}C{{/if}}{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool true) ])
+    "B"
+  expect "else-if-chain-fall"
+    "{{#if (lookup this \"a\")}}A{{else}}{{#if (lookup this \"b\")}}B{{else}}C{{/if}}{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false) ])
+    "C"
+
   expect "each-array" "{{#each (lookup this \"xs\")}}[{{{this}}}={{{index}}}]{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
     "[a=0][b=1]"

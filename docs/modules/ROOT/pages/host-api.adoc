@@ -43,7 +43,9 @@ prelude      :: forall m. MonadThrow Error m => Array (Tuple Ident (Helper m (Re
 validate     :: Schema -> Template -> Array Issue             -- schema = engine's contract
 preludeSchema :: Schema                                       -- FlatBars's schema (from FlatBars)
 foldTemplate :: Algebra a -> Template -> a                    -- catamorphism: prepare / analyze (A.13.2)
-splitClause  :: Ident -> Template -> { before :: Template, clause :: Maybe Template }
+foldExpr     :: ExprAlgebra a -> Expr -> a                    -- catamorphism over an expression
+splitClauses :: Template -> { before :: Template, clauses :: Array Clause }  -- all separator sections
+splitClause  :: Ident -> Template -> { before :: Template, clause :: Maybe Template }  -- first of one name
 
 -- Source spans (diagnostics): tag-level nodes and `Ctl` carry a `Span`
 type Span    = { start :: Int, end :: Int }

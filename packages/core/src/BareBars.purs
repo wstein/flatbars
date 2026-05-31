@@ -29,6 +29,7 @@ import BareBars.Value (Value(..))
 import BareBars.Walk
   ( Algebra
   , Arity(..)
+  , Clause
   , ExprAlgebra
   , HelperRef
   , HelperSpec
@@ -41,5 +42,6 @@ import BareBars.Walk
   , foldTemplate
   , helperRefs
   , splitClause
+  , splitClauses
   , validate
   )
