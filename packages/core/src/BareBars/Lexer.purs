@@ -1,17 +1,16 @@
 -- | Lexical structure. See `docs/modules/ROOT/pages/lexical.adoc`.
 -- |
--- | Two jobs live here:
--- |
--- |  * `tokenizeTemplate` scans the raw source into a flat stream of `RawTok`
--- |    (content runs and tag tokens), handling comment stripping, raw-block
--- |    capture, backslash escaping, and `~` whitespace control.
--- |  * `lexExpr` tokenizes the interior of a tag into expression `Token`s.
--- |
--- | The grammar in `Parser` consumes both.
+-- | `tokenizeTemplate` scans the raw source into a flat stream of `RawTok` —
+-- | content runs and tag tokens — handling comment stripping, raw-block capture,
+-- | backslash escaping, and `~` whitespace control. It is a deliberately
+-- | hand-written, index-slicing scan (linear, tail-recursive, stack-safe for
+-- | very large templates); the parser (`BareBars.Parser`) then parses each tag's
+-- | *interior* text into an `Expr` with `BareBars.Expr` (a `purescript-parsing`
+-- | grammar). The scanner is structural only — it never interprets a tag's
+-- | contents, just delimits them — so each tag token carries its interior text
+-- | and that interior's source offset, for the expression parser.
 module BareBars.Lexer
-  ( Token(..)
-  , RawTok(..)
-  , lexExpr
+  ( RawTok(..)
   , tokenizeTemplate
   ) where
 
@@ -24,48 +23,31 @@ import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
-import Data.Number as Number
 import Data.String.CodeUnits as SCU
 import Data.String.Common (joinWith)
 
--- | Tokens that appear inside a tag.
-data Token
-  = TIdent String
-  | TString String
-  | TNumber Number
-  | TLParen
-  | TRParen
-
-derive instance eqToken :: Eq Token
-
-instance showToken :: Show Token where
-  show = case _ of
-    TIdent s -> "TIdent " <> show s
-    TString s -> "TString " <> show s
-    TNumber n -> "TNumber " <> show n
-    TLParen -> "TLParen"
-    TRParen -> "TRParen"
-
--- | A flat template token. Comments never appear (they are dropped). `~`
--- | whitespace control has already been applied to the `Content` runs.
+-- | A flat template token. Comments never appear (they are dropped); `~`
+-- | whitespace control has already been applied to the `Content` runs. Each tag
+-- | carries its `Span`, the source offset of its interior (`Int`), and the
+-- | interior text — the parser turns that text into `Expr`s.
 data RawTok
   = RContent String
-  | ROutput Span (Array Token) -- {{{ expr }}}
-  | ROpen Span String (Array Token) -- {{# name args }}
-  | RClose String -- {{/ name }}
-  | RSep Span String (Array Token) -- {{ name args }} — a name-agnostic separator
-  | RRaw Span String (Array Token) String -- {{{{# name args }}}} body {{{{/ name }}}}
+  | ROutput Span Int String -- {{{ <interior> }}}
+  | ROpen Span Int String -- {{# <interior> }}
+  | RClose Span Int String -- {{/ <interior> }}
+  | RSep Span Int String -- {{ <interior> }} — a name-agnostic separator
+  | RRaw Span Int String String -- {{{{# <interior> }}}} <body> {{{{/ name }}}}
 
 derive instance eqRawTok :: Eq RawTok
 
 instance showRawTok :: Show RawTok where
   show = case _ of
     RContent s -> "RContent " <> show s
-    ROutput _ t -> "ROutput " <> show t
-    ROpen _ n t -> "ROpen " <> show n <> " " <> show t
-    RClose n -> "RClose " <> show n
-    RSep _ n t -> "RSep " <> show n <> " " <> show t
-    RRaw _ n t b -> "RRaw " <> show n <> " " <> show t <> " " <> show b
+    ROutput _ _ s -> "ROutput " <> show s
+    ROpen _ _ s -> "ROpen " <> show s
+    RClose _ _ s -> "RClose " <> show s
+    RSep _ _ s -> "RSep " <> show s
+    RRaw _ _ s b -> "RRaw " <> show s <> " " <> show b
 
 --------------------------------------------------------------------------------
 -- Character helpers
@@ -73,31 +55,6 @@ instance showRawTok :: Show RawTok where
 
 isSpace :: Char -> Boolean
 isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
-
-isDigit :: Char -> Boolean
-isDigit c = c >= '0' && c <= '9'
-
-isAlpha :: Char -> Boolean
-isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-
--- | The permissive IDENT character set (lexical.adoc §1.5). Note `.` is a legal
--- | ident character: `a.b` lexes as a single identifier in the core.
-isIdentChar :: Char -> Boolean
-isIdentChar c =
-  isAlpha c || isDigit c
-    || c == '_'
-    || c == '-'
-    || c == '+'
-    || c == '*'
-    || c == '?'
-    || c == '!'
-    || c == '/'
-    || c == '.'
-    || c == '<'
-    || c == '>'
-    || c == '='
-    || c == '@' -- so the surface dialect can read @data paths (@index, @root, …)
-    || c == '|' -- so the surface dialect can read block params (as |item i|)
 
 -- | Does `cs` contain the literal `pat` starting at index `i`?
 matchAt :: Array Char -> Int -> String -> Boolean
@@ -128,101 +85,9 @@ trimEndWs s =
   SCU.fromCharArray (Array.reverse (Array.dropWhile isSpace (Array.reverse (SCU.toCharArray s))))
 
 --------------------------------------------------------------------------------
--- Expression tokenizer (tag interior)
---------------------------------------------------------------------------------
-
--- | Tokenize the interior of a tag. `base` is the source offset of the interior
--- | start, used only for error reporting.
-lexExpr :: Int -> String -> Either ParseError (Array Token)
-lexExpr base src = go 0 []
-  where
-  cs = SCU.toCharArray src
-  len = Array.length cs
-
-  go :: Int -> Array Token -> Either ParseError (Array Token)
-  go i acc = case Array.index cs i of
-    Nothing -> Right acc
-    Just c
-      | isSpace c -> go (i + 1) acc
-      | c == '(' -> go (i + 1) (Array.snoc acc TLParen)
-      | c == ')' -> go (i + 1) (Array.snoc acc TRParen)
-      | c == '"' -> lexString '"' (i + 1) acc
-      | c == '\'' -> lexString '\'' (i + 1) acc
-      | isDigit c || (c == '-' && peekDigit (i + 1)) -> lexNumber i acc
-      | isIdentChar c || c == '[' -> lexIdent i acc
-      | otherwise -> Left (LexError ("unexpected character '" <> SCU.singleton c <> "'") (base + i))
-
-  peekDigit :: Int -> Boolean
-  peekDigit i = case Array.index cs i of
-    Just d -> isDigit d
-    Nothing -> false
-
-  -- An identifier/path token. A `[ … ]` run is consumed whole (so a bracketed
-  -- path segment may contain spaces and dots, e.g. `a.[home town]`); the surface
-  -- dialect interprets the brackets.
-  lexIdent :: Int -> Array Token -> Either ParseError (Array Token)
-  lexIdent start acc = case scanPath start of
-    Left e -> Left e
-    Right end -> go end (Array.snoc acc (TIdent (slice cs start end)))
-
-  scanPath :: Int -> Either ParseError Int
-  scanPath i = case Array.index cs i of
-    Just '[' -> case findFrom cs (i + 1) "]" of
-      Just j -> scanPath (j + 1)
-      Nothing -> Left (LexError "unterminated '[' in path segment" (base + i))
-    Just c | isIdentChar c -> scanPath (i + 1)
-    _ -> Right i
-
-  lexNumber :: Int -> Array Token -> Either ParseError (Array Token)
-  lexNumber start acc =
-    let
-      end = scanWhile isNumChar (start + 1) -- consume sign/first digit then rest
-      raw = slice cs start end
-    in
-      case Number.fromString raw of
-        Just n -> go end (Array.snoc acc (TNumber n))
-        Nothing -> Left (LexError ("malformed number '" <> raw <> "'") (base + start))
-
-  isNumChar :: Char -> Boolean
-  isNumChar c = isDigit c || c == '.'
-
-  lexString :: Char -> Int -> Array Token -> Either ParseError (Array Token)
-  lexString quote start acc = collect start []
-    where
-    collect :: Int -> Array Char -> Either ParseError (Array Token)
-    collect i buf = case Array.index cs i of
-      Nothing -> Left (UnterminatedTag (base + start))
-      Just c
-        | c == quote -> go (i + 1) (Array.snoc acc (TString (SCU.fromCharArray buf)))
-        | c == '\\' -> case Array.index cs (i + 1) of
-            Just e -> case unescape e of
-              Just ch -> collect (i + 2) (Array.snoc buf ch)
-              Nothing -> Left (BadEscape (base + i))
-            Nothing -> Left (BadEscape (base + i))
-        | otherwise -> collect (i + 1) (Array.snoc buf c)
-
-  unescape :: Char -> Maybe Char
-  unescape = case _ of
-    '\\' -> Just '\\'
-    '"' -> Just '"'
-    '\'' -> Just '\''
-    'n' -> Just '\n'
-    't' -> Just '\t'
-    'r' -> Just '\r'
-    _ -> Nothing
-
-  scanWhile :: (Char -> Boolean) -> Int -> Int
-  scanWhile p i
-    | i >= len = len
-    | otherwise = case Array.index cs i of
-        Just c | p c -> scanWhile p (i + 1)
-        _ -> i
-
---------------------------------------------------------------------------------
 -- Template tokenizer
 --------------------------------------------------------------------------------
 
--- | The openers we recognize, longest first (lexical.adoc §1.2).
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
 
 tokenizeTemplate :: String -> Either ParseError (Array RawTok)
@@ -378,15 +243,12 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
           let
             t = splitTrims (slice cs start q)
           in
-            do
-              toks <- lexExpr start t.core
-              if Array.null toks then Left (EmptyOutput i)
-              else Right
-                { mtok: Just (ROutput { start: i, end: q + 3 } toks)
-                , next: q + 3
-                , trimL: t.trimL
-                , trimR: t.trimR
-                }
+            Right
+              { mtok: Just (ROutput { start: i, end: q + 3 } start t.core)
+              , next: q + 3
+              , trimL: t.trimL
+              , trimR: t.trimR
+              }
 
   readBlockOpen :: Int -> String -> Either ParseError TagResult
   readBlockOpen i opener =
@@ -395,16 +257,16 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
     in
       case findFrom cs start "}}" of
         Nothing -> Left (UnterminatedTag i)
-        Just q -> do
-          let t = splitTrims (slice cs start q)
-          toks <- lexExpr start t.core
-          { name, rest } <- splitHead i toks
-          Right
-            { mtok: Just (ROpen { start: i, end: q + 2 } name rest)
-            , next: q + 2
-            , trimL: leadTrimAt i || t.trimL
-            , trimR: t.trimR
-            }
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (ROpen { start: i, end: q + 2 } start t.core)
+              , next: q + 2
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
 
   readClose :: Int -> String -> Either ParseError TagResult
   readClose i opener =
@@ -413,16 +275,16 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
     in
       case findFrom cs start "}}" of
         Nothing -> Left (UnterminatedTag i)
-        Just q -> do
-          let t = splitTrims (slice cs start q)
-          toks <- lexExpr start t.core
-          { name } <- splitHead i toks
-          Right
-            { mtok: Just (RClose name)
-            , next: q + 2
-            , trimL: leadTrimAt i || t.trimL
-            , trimR: t.trimR
-            }
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (RClose { start: i, end: q + 2 } start t.core)
+              , next: q + 2
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
 
   -- A bare double-stash separator `{{ [~] name args [~] }}`. The leading `~`
   -- (if any) sits before the interior; the head is an identifier the lexer does
@@ -434,16 +296,16 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
     in
       case findFrom cs start "}}" of
         Nothing -> Left (UnterminatedTag i)
-        Just q -> do
-          let t = splitTrims (slice cs start q)
-          toks <- lexExpr start t.core
-          { name, rest } <- splitHead i toks
-          Right
-            { mtok: Just (RSep { start: i, end: q + 2 } name rest)
-            , next: q + 2
-            , trimL: leadTrimAt i || t.trimL
-            , trimR: t.trimR
-            }
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+          in
+            Right
+              { mtok: Just (RSep { start: i, end: q + 2 } start t.core)
+              , next: q + 2
+              , trimL: leadTrimAt i || t.trimL
+              , trimR: t.trimR
+              }
 
   readShortComment :: Int -> String -> Either ParseError TagResult
   readShortComment i opener = case findFrom cs (i + SCU.length opener) "}}" of
@@ -464,26 +326,31 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
     in
       case findFrom cs start "}}}}" of
         Nothing -> Left (UnterminatedRaw i)
-        Just qh -> do
-          toks <- lexExpr start (slice cs start qh)
-          { name, rest } <- splitHead i toks
+        Just qh ->
           let
+            head = slice cs start qh
             bodyStart = qh + 4
-            closePat = "{{{{/" <> name <> "}}}}"
-          case findFrom cs bodyStart closePat of
-            Nothing -> Left (UnterminatedRaw i)
-            Just qc ->
-              let
-                end = qc + SCU.length closePat
-              in
-                Right
-                  { mtok: Just (RRaw { start: i, end } name rest (slice cs bodyStart qc))
-                  , next: end
-                  , trimL: false
-                  , trimR: false
-                  }
+            -- the close is name-matched (`{{{{/name}}}}`); the name is the
+            -- leading whitespace-delimited token of the head, which is exactly
+            -- the head identifier the parser will read from `head`.
+            closePat = "{{{{/" <> rawName head <> "}}}}"
+          in
+            case findFrom cs bodyStart closePat of
+              Nothing -> Left (UnterminatedRaw i)
+              Just qc ->
+                let
+                  end = qc + SCU.length closePat
+                in
+                  Right
+                    { mtok: Just (RRaw { start: i, end } start head (slice cs bodyStart qc))
+                    , next: end
+                    , trimL: false
+                    , trimR: false
+                    }
 
-  splitHead :: Int -> Array Token -> Either ParseError { name :: String, rest :: Array Token }
-  splitHead i toks = case Array.uncons toks of
-    Just { head: TIdent name, tail } -> Right { name, rest: tail }
-    _ -> Left (HeadNotIdent i)
+  -- The leading whitespace-delimited token of a raw-block head, used to build
+  -- the name-matched close delimiter.
+  rawName :: String -> String
+  rawName s =
+    SCU.fromCharArray
+      (Array.takeWhile (not <<< isSpace) (Array.dropWhile isSpace (SCU.toCharArray s)))

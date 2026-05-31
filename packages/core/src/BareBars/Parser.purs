@@ -1,25 +1,28 @@
 -- | The syntactic grammar. See `docs/modules/ROOT/pages/grammar.adoc`.
 -- |
 -- | `parse` turns source text into a core `Template`. It runs the template
--- | tokenizer (`Lexer.tokenizeTemplate`), then builds the tree from the flat
--- | token stream, parsing each tag's expression tokens into `Expr`s.
+-- | scanner (`Lexer.tokenizeTemplate`), then builds the tree from the flat token
+-- | stream, parsing each tag's *interior* text into `Expr`s with `BareBars.Expr`
+-- | (a `purescript-parsing` grammar). There is no separate expression token
+-- | stream: a tag carries its interior text and the scanner's job ends at
+-- | delimiting it.
 module BareBars.Parser
   ( parse
-  , parseExprTokens
   ) where
 
 import Prelude
 
 import BareBars.Error (ParseError(..))
-import BareBars.Lexer (RawTok(..), Token(..), tokenizeTemplate)
+import BareBars.Expr (parseExpr)
+import BareBars.Lexer (RawTok(..), tokenizeTemplate)
 import BareBars.Span (Span)
 import BareBars.Syntax (Expr(..), Node(..), Template)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..))
+import Data.String (trim)
 
 parse :: String -> Either ParseError Template
 parse src = do
@@ -28,6 +31,27 @@ parse src = do
   case res.stop of
     StopEOF -> Right res.nodes
     StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
+
+--------------------------------------------------------------------------------
+-- Tag-interior expression parsing
+--------------------------------------------------------------------------------
+
+-- | The single `Expr` filling an output tag. A blank interior is `EmptyOutput`
+-- | at the tag's offset (not the interior's), matching the diagnostics tests.
+outputExpr :: Span -> Int -> String -> Either ParseError Expr
+outputExpr span base s
+  | trim s == "" = Left (EmptyOutput span.start)
+  | otherwise = parseExpr base s
+
+-- | A *headed* tag (`{{# name args}}`, `{{name args}}`, `{{/name}}`, raw): its
+-- | interior is one application whose head names the helper/block/separator.
+headed :: Span -> Int -> String -> Either ParseError { name :: String, args :: Array Expr }
+headed span base s
+  | trim s == "" = Left (HeadNotIdent span.start)
+  | otherwise = case parseExpr base s of
+      Left e -> Left e
+      Right (App name args) -> Right { name, args }
+      Right _ -> Left (HeadNotIdent span.start)
 
 --------------------------------------------------------------------------------
 -- Tree building over the flat RawTok stream
@@ -62,76 +86,28 @@ parseSeq toks = go Nil
     Nothing -> Right (done acc StopEOF)
     Just t -> case t of
       RContent s -> go (Content s : acc) (i + 1)
-      ROutput span tks -> case parseExprTokens tks of
+      ROutput span base s -> case outputExpr span base s of
         Left e -> Left e
         Right e -> go (Output span e : acc) (i + 1)
-      RRaw span name argTks body -> case parseArgTokens argTks of
+      RRaw span base s body -> case headed span base s of
         Left e -> Left e
-        Right args -> go (RawBlock span name args body : acc) (i + 1)
-      RSep span name argTks -> case parseArgTokens argTks of
+        Right h -> go (RawBlock span h.name h.args body : acc) (i + 1)
+      RSep span base s -> case headed span base s of
         Left e -> Left e
-        Right args -> go (Sep span name args : acc) (i + 1)
-      RClose name -> Right (done acc (StopClose name (i + 1)))
-      ROpen span name argTks -> buildBlock acc span name argTks (i + 1)
+        Right h -> go (Sep span h.name h.args : acc) (i + 1)
+      RClose _ base s -> case headed { start: base, end: base } base s of
+        Left e -> Left e
+        Right h -> Right (done acc (StopClose h.name (i + 1)))
+      ROpen span base s -> buildBlock acc span base s (i + 1)
 
-  buildBlock :: List Node -> Span -> String -> Array Token -> Int -> Either ParseError SeqResult
-  buildBlock acc span name argTks i = case parseArgTokens argTks of
+  buildBlock :: List Node -> Span -> Int -> String -> Int -> Either ParseError SeqResult
+  buildBlock acc span base s i = case headed span base s of
     Left e -> Left e
-    Right args -> case parseSeq toks i of
+    Right h -> case parseSeq toks i of
       Left e -> Left e
       Right inner -> case inner.stop of
         -- point the diagnostic at the *opener* (its span start), not offset 0.
-        StopEOF -> Left (MismatchedBlock name "<eof>" span.start)
+        StopEOF -> Left (MismatchedBlock h.name "<eof>" span.start)
         StopClose closed pos
-          | closed == name -> go (Block span name args inner.nodes : acc) pos
-          | otherwise -> Left (MismatchedBlock name closed span.start)
-
---------------------------------------------------------------------------------
--- Expression parsing over a token array
---------------------------------------------------------------------------------
-
-type ExprResult = { expr :: Expr, pos :: Int }
-
--- | Parse the single `Expr` that fills an output tag. The whole interior may be
--- | a multi-argument application (`Ident Arg*` is one `Expr`).
-parseExprTokens :: Array Token -> Either ParseError Expr
-parseExprTokens tks = do
-  res <- pExpr tks 0
-  if res.pos == Array.length tks then Right res.expr
-  else Left (HeadNotIdent 0)
-
--- | Parse the argument list that follows a block/raw head identifier; the whole
--- | token array must be consumed.
-parseArgTokens :: Array Token -> Either ParseError (Array Expr)
-parseArgTokens tks = do
-  res <- pArgs tks 0 []
-  if res.pos == Array.length tks then Right res.args
-  else Left (HeadNotIdent 0)
-
-type ArgsResult = { args :: Array Expr, pos :: Int }
-
-pExpr :: Array Token -> Int -> Either ParseError ExprResult
-pExpr tks pos = case Array.index tks pos of
-  Just (TIdent name) -> do
-    res <- pArgs tks (pos + 1) []
-    Right { expr: App name res.args, pos: res.pos }
-  Just (TString s) -> Right { expr: Lit (VString s), pos: pos + 1 }
-  Just (TNumber n) -> Right { expr: Lit (VNumber n), pos: pos + 1 }
-  Just TLParen -> do
-    inner <- pExpr tks (pos + 1)
-    case Array.index tks inner.pos of
-      Just TRParen -> Right { expr: inner.expr, pos: inner.pos + 1 }
-      _ -> Left (HeadNotIdent pos)
-  Just TRParen -> Left (HeadNotIdent pos)
-  Nothing -> Left (EmptyOutput pos)
-
-pArgs :: Array Token -> Int -> Array Expr -> Either ParseError ArgsResult
-pArgs tks pos acc = case Array.index tks pos of
-  Nothing -> Right { args: acc, pos }
-  Just TRParen -> Right { args: acc, pos } -- caller (a group) consumes the ')'
-  Just (TString s) -> pArgs tks (pos + 1) (Array.snoc acc (Lit (VString s)))
-  Just (TNumber n) -> pArgs tks (pos + 1) (Array.snoc acc (Lit (VNumber n)))
-  Just (TIdent name) -> pArgs tks (pos + 1) (Array.snoc acc (App name [])) -- bare ident = nullary
-  Just TLParen -> do
-    grouped <- pExpr tks pos -- pExpr consumes the matching ')'
-    pArgs tks grouped.pos (Array.snoc acc grouped.expr)
+          | closed == h.name -> go (Block span h.name h.args inner.nodes : acc) pos
+          | otherwise -> Left (MismatchedBlock h.name closed span.start)
