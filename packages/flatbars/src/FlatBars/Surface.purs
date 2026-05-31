@@ -15,12 +15,15 @@
 -- |    `a.1` ⇒ `lookup this "a" 1`, `a/b` (legacy slash) likewise,
 -- |    `this`/`.` ⇒ `this`, `../a` ⇒ `lookup (parent) "a"`,
 -- |    `../../a` ⇒ `lookup (parent (parent)) "a"`.
+-- |  * `@data` variables ⇒ scoped-helper calls: `@index` ⇒ `(index)`,
+-- |    `@root.x` ⇒ `(lookup (root) "x")` (§5.5).
 -- |  * `true`/`false`/`null` stay literal helper calls.
+-- |  * `else if` chains ⇒ nested `if` blocks in the else clause (§5.6).
 -- |
--- | Not yet desugared (need lexer support or a further pass): `@data` variables
--- | (`@` is not an identifier character), `[bracket]` path segments, hash
--- | arguments `k=v`, block params `as |x|`, `else if` chains, and partials.
--- | Those are listed in surface.adoc §5.4–5.7 and remain author-unsupported.
+-- | Not yet desugared (need lexer support or a further pass): `[bracket]` path
+-- | segments (`[` is not an identifier character), `@../` parent-data (the
+-- | scoped helpers are frame-local), hash arguments `k=v`, block params
+-- | `as |x|`, and partials (§5.4–5.7). Those remain author-unsupported.
 module FlatBars.Surface
   ( desugar
   ) where
@@ -50,8 +53,10 @@ desugar clauseNames = map go
       -- to split on; everything else is `{{ E }}` ⇒ escaped output.
       | Array.elem name clauseNames -> Sep sp name args
       | otherwise -> Output sp (App "esc_html" [ rewriteHead name args ])
-    -- block head stays a helper; its arguments and body are rewritten.
-    Block sp name args body -> Block sp name (map rewrite args) (desugar clauseNames body)
+    -- block head stays a helper; `else if` chains in the body are expanded into
+    -- nested `if` blocks (§5.6) before the body and arguments are rewritten.
+    Block sp name args body ->
+      Block sp name (map rewrite args) (desugar clauseNames (expandElseIf body))
     -- raw blocks are verbatim (surface.adoc §5.8).
     RawBlock sp name args raw -> RawBlock sp name args raw
 
@@ -78,18 +83,51 @@ pathOrLit name
   | name == "true" || name == "false" || name == "null" = App name []
   | otherwise = pathExpr name
 
--- | Expand a path string into a `lookup` chain (or `this`/`parent`).
+-- | Expand a path string into a `lookup` chain (or `this`/`parent`/`@data`).
 pathExpr :: Ident -> Expr
 pathExpr raw
   | raw == "this" || raw == "." = App "this" []
-  | otherwise =
-      let
-        { depth, rest } = stripParents raw 0
-        base = parents depth
-        segs = segmentsOf rest
-      in
-        if Array.null segs then base
-        else App "lookup" (Array.cons base (map segKey segs))
+  | otherwise = case stripPrefix (Pattern "@") raw of
+      Just dataPath -> dataExpr dataPath
+      Nothing ->
+        let
+          { depth, rest } = stripParents raw 0
+          base = parents depth
+          segs = segmentsOf rest
+        in
+          if Array.null segs then base
+          else App "lookup" (Array.cons base (map segKey segs))
+
+-- | A `@data` path: the first segment is a scoped helper, any remaining
+-- | segments are looked up on its value. `@index` ⇒ `(index)`; `@root.x` ⇒
+-- | `(lookup (root) "x")`. A leading `../` is not faithfully supported (the
+-- | scoped helpers are frame-local), so it collapses to the current frame.
+dataExpr :: String -> Expr
+dataExpr s = case Array.uncons (segmentsOf s) of
+  Just { head, tail }
+    | Array.null tail -> App head []
+    | otherwise -> App "lookup" (Array.cons (App head []) (map segKey tail))
+  Nothing -> App "this" []
+
+-- | Expand `{{else if C}}` chains into nested `{{#if C}}…{{/if}}` in the else
+-- | clause (surface.adoc §5.6) — the FlatBars convention (clause `else`, helper
+-- | `if`). The condition must be a single argument; parenthesize a helper call:
+-- | `{{else if (eq a b)}}`.
+expandElseIf :: Template -> Template
+expandElseIf nodes = case Array.findIndex isElseIf nodes of
+  Nothing -> nodes
+  Just i -> case Array.index nodes i of
+    Just (Sep sp _ [ _, cond ]) ->
+      Array.take i nodes
+        <>
+          [ Sep sp "else" []
+          , Block sp "if" [ cond ] (expandElseIf (Array.drop (i + 1) nodes))
+          ]
+    _ -> nodes
+  where
+  isElseIf = case _ of
+    Sep _ "else" [ App "if" [], _ ] -> true
+    _ -> false
 
 -- | Strip leading `../` runs, counting the parent depth.
 stripParents :: String -> Int -> { depth :: Int, rest :: String }

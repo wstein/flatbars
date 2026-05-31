@@ -96,6 +96,7 @@ isIdentChar c =
     || c == '<'
     || c == '>'
     || c == '='
+    || c == '@' -- so the surface dialect can read @data paths (@index, @root, …)
 
 -- | Does `cs` contain the literal `pat` starting at index `i`?
 matchAt :: Array Char -> Int -> String -> Boolean

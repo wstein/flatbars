@@ -75,19 +75,21 @@ arrays by number (or numeric string).
 
 == 2. `@data` variables
 
-{hbs}' `@`-namespace does not exist; each becomes a *scoped nullary helper* installed by the block
-that introduces it (xref:appendix-handlebars.adoc#data[A.5]). Drop the `@`.
+{hbs}' `@`-namespace becomes *scoped nullary helpers* installed by the block that introduces them
+(xref:appendix-handlebars.adoc#data[A.5]). The xref:surface.adoc[surface dialect] reads the `@`-form
+directly (`renderSurface`): `pass:[{{@index}}]` ⇒ `(index)`; in core you call the helper, dropping the
+`@`.
 
 [cols="2,2,1,3",options="header"]
 |===
-|Handlebars |FlatBars |Status |Installed by
+|Handlebars |FlatBars (surface ⇒ core) |Status |Installed by
 
-|`pass:[{{@index}}]` |`pass:[{{{ index }}}]` |✅ |`each`
-|`pass:[{{@key}}]` |`pass:[{{{ key }}}]` |✅ |`each`
-|`pass:[{{@first}}]` |`pass:[{{{ first }}}]` |✅ |`each`
-|`pass:[{{@last}}]` |`pass:[{{{ last }}}]` |✅ |`each`
-|`pass:[{{@root}}]` |`pass:[{{{ root }}}]` |✅ |the host (`preludeEnv` installs `root`)
-|`pass:[{{@../index}}]` |`pass:[{{{ index (parent) }}}]` |✅ |`each` + the `parent` helper
+|`pass:[{{@index}}]` |`pass:[{{@index}}]` ⇒ `(index)` |✅ |`each`
+|`pass:[{{@key}}]` |`pass:[{{@key}}]` ⇒ `(key)` |✅ |`each`
+|`pass:[{{@first}}]` |`pass:[{{@first}}]` ⇒ `(first)` |✅ |`each`
+|`pass:[{{@last}}]` |`pass:[{{@last}}]` ⇒ `(last)` |✅ |`each`
+|`pass:[{{@root}}]` |`pass:[{{@root}}]` ⇒ `(root)` |✅ |the host (`preludeEnv` installs `root`)
+|`pass:[{{@../index}}]` |— |✗ |parent-data: scoped helpers are frame-local, so `../` cannot reach them; surface drops it
 |custom `pass:[{{@var}}]` |any scoped helper a block frames |◑ |only the prelude's set is built in
 |`pass:[{{@level}}]` (log level) |— |✗ |no logging-level data variable
 |===
@@ -193,10 +195,11 @@ the reference engine has no missing-helper hook.
 `if`/`each` (xref:appendix-handlebars.adoc#mustache[A.11]).
 
 |`{{else if c}}` chaining
-|nest `pass:[{{#if}}]` in the else clause
-|✗
-|`else` is a plain separator; it does not re-test a condition. Express elif by nesting an `if` inside
-the `pass:[{{else}}]` clause.
+|surface dialect ⇒ nested `pass:[{{#if}}]`
+|✅
+|In core, `else` is a plain separator that does not re-test a condition. The
+xref:surface.adoc[surface dialect] (`renderSurface`) expands an `pass:[{{else if c}}]` chain into
+nested `if` blocks in the else clause (§5.6); parenthesize a helper condition: `pass:[{{else if (eq a b)}}]`.
 |===
 
 == 4. FlatBars extensions (no Handlebars built-in)

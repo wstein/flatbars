@@ -19,15 +19,16 @@ structural node into core nodes. Where a rewrite names a helper (`esc_html`, `lo
 *Implementation status.* `FlatBars.Surface.desugar` (and the convenience
 `renderSurface` / `compileSurface`) implement §5.1 *output* (`pass:[{{ }}]` ⇒
 escaped, `pass:[{{{ }}}]` ⇒ raw), §5.2 *paths* (bare, dotted, numeric index,
-legacy slash, `this`/`.`, `../`), and §5.3 *literals* and head-vs-argument. The
+legacy slash, `this`/`.`, `../`), §5.3 *literals* and head-vs-argument, §5.5
+*`@data`* variables (`@index`, `@root.x`, …), and the §5.6 *`else if`* chain. The
 reference renderer still runs *core* syntax by default (`renderWith`); call
 `renderSurface` to author in the dialect.
 
-Still *specified but not yet desugared* (most need lexer support — `@` and `[`
-are not identifier characters): `@data` variables and `[bracket]` path segments
-(§5.2/§5.5), hash arguments `k=v` (§5.4), block params `as \|x\|` (§5.5), the
-`else if` chain (§5.6), and partials (§5.7). See the
-xref:flatbars-compat.adoc[compatibility matrix] for per-feature status.
+Still *specified but not yet desugared*: `[bracket]` path segments (§5.2 — `[` is
+not an identifier character), `@../` parent-data (the scoped helpers are
+frame-local), hash arguments `k=v` (§5.4), block params `as \|x\|` (§5.5), and
+partials (§5.7). See the xref:flatbars-compat.adoc[compatibility matrix] for
+per-feature status.
 ====
 
 [IMPORTANT]

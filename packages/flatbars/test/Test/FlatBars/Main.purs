@@ -241,6 +241,32 @@ main = do
     "hi"
   expectS "surface-literal" "{{ true }}" VNull "true"
 
+  -- @data variables (§5.5): scoped-helper calls installed by each / the host.
+  expectS "surface-at-index" "{{#each xs}}{{@index}}:{{ . }};{{/each}}"
+    (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
+    "0:a;1:b;"
+  expectS "surface-at-key" "{{#each o}}{{@key}}={{ . }};{{/each}}"
+    (obj [ Tuple "o" (obj [ Tuple "a" (str "1") ]) ])
+    "a=1;"
+  expectS "surface-at-firstlast"
+    "{{#each xs}}{{#if @first}}<{{/if}}{{ . }}{{#if @last}}>{{/if}}{{/each}}"
+    (obj [ Tuple "xs" (arr [ str "x", str "y" ]) ])
+    "<xy>"
+  expectS "surface-at-root" "{{#each xs}}{{@root.title}};{{/each}}"
+    (obj [ Tuple "title" (str "T"), Tuple "xs" (arr [ str "a" ]) ])
+    "T;"
+
+  -- else if (§5.6): lowers to nested if blocks in the else clause.
+  expectS "surface-elseif-mid" "{{#if a}}A{{else if b}}B{{else}}C{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool true) ])
+    "B"
+  expectS "surface-elseif-else" "{{#if a}}A{{else if b}}B{{else}}C{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false) ])
+    "C"
+  expectS "surface-elseif-chain" "{{#if a}}A{{else if b}}B{{else if c}}C{{else}}D{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false), Tuple "c" (VBool true) ])
+    "C"
+
   -- desugarSurface produces the documented core expression.
   case desugarSurface <$> parse "{{ user.name }}" of
     Right [ Output _ e ] ->
