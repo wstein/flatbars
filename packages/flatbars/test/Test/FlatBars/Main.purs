@@ -169,9 +169,9 @@ main = do
   -- only an enclosing block helper gives it meaning.
   expect "standalone-else" "a{{else}}c" VNull "ac"
 
-  -- A second {{else}} opens its own clause (splitClauses); `if` renders only the
-  -- first else clause, so the trailing section does not leak in.
-  expect "if-double-else" "{{#if this}}A{{else}}B{{else}}C{{/if}}" (VBool false) "B"
+  -- A second {{else}} is rejected as unreachable (the dead-code guard that also
+  -- protects an elif-after-else), rather than silently dropped.
+  expectError "if-double-else" "{{#if this}}A{{else}}B{{else}}C{{/if}}" (VBool false)
 
   -- else-if is expressed by nesting; it lowers/renders as a chain.
   expect "else-if-chain"
@@ -182,6 +182,39 @@ main = do
     "{{#if (lookup this \"a\")}}A{{else}}{{#if (lookup this \"b\")}}B{{else}}C{{/if}}{{/if}}"
     (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false) ])
     "C"
+
+  -- Native {{elif}} chain (flat, no nesting): the engine's `if` reads the clauses.
+  let
+    elifChain =
+      "{{#if (lookup this \"a\")}}A{{elif (lookup this \"b\")}}B{{elif (lookup this \"c\")}}C{{else}}D{{/if}}"
+  expect "elif-first" elifChain
+    (obj [ Tuple "a" (VBool true), Tuple "b" (VBool false), Tuple "c" (VBool false) ])
+    "A"
+  expect "elif-mid" elifChain
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool true), Tuple "c" (VBool false) ])
+    "B"
+  expect "elif-late" elifChain
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false), Tuple "c" (VBool true) ])
+    "C"
+  expect "elif-else" elifChain
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false), Tuple "c" (VBool false) ])
+    "D"
+  -- No else: an all-falsy chain renders nothing.
+  expect "elif-no-else" "{{#if (lookup this \"a\")}}A{{elif (lookup this \"b\")}}B{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false) ])
+    ""
+  -- Short-circuit: a later elif condition is never evaluated once a branch is
+  -- taken, so the unknown helper `nope` in it does not raise.
+  expect "elif-short-circuit" "{{#if (lookup this \"a\")}}A{{elif nope}}B{{/if}}"
+    (obj [ Tuple "a" (VBool true) ])
+    "A"
+  -- But it *does* raise when that branch is reached.
+  expectError "elif-reached-error" "{{#if (lookup this \"a\")}}A{{elif nope}}B{{/if}}"
+    (obj [ Tuple "a" (VBool false) ])
+  -- An {{else}} that is not the final clause is rejected up front (dead code).
+  expectError "elif-else-not-terminal"
+    "{{#if (lookup this \"a\")}}A{{else}}B{{elif (lookup this \"c\")}}C{{/if}}"
+    (obj [ Tuple "a" (VBool true) ])
 
   expect "each-array" "{{#each (lookup this \"xs\")}}[{{{this}}}={{{index}}}]{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])

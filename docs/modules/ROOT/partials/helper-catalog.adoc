@@ -9,6 +9,7 @@
 |`apply` |block |≥1 |registered
 |`dict` |value |any |registered
 |`each` |block |≥1 |registered
+|`elif` |value |1 |registered
 |`else` |value |0 |registered
 |`eq` |value |2 |registered
 |`esc_html` |value |1 |registered

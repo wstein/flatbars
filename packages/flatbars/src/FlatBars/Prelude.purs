@@ -26,7 +26,7 @@ import BareBars.Error (Error(..))
 import BareBars.Helper (ArgSpec, atLeast, binary, nullary, unary, variadic)
 import BareBars.Syntax (Template)
 import BareBars.Value (Value(..))
-import BareBars.Walk (Arity(..), Schema)
+import BareBars.Walk (Arity(..), Clause, Schema, splitClauses)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
 import Data.Either (Either)
@@ -83,6 +83,7 @@ helperDefs =
   , gen "each" true (AtLeast 1) eachH
   , gen "with" true (AtLeast 1) withH
   , valDef "else" (nullary (pure (VSafe "")))
+  , valDef "elif" (unary (\_ -> pure (VSafe "")))
   , gen "dict" false AnyArity dictH
   , gen "apply" true (AtLeast 1) applyH
   , gen "partial" false (Between 2 3) partialH
@@ -245,15 +246,58 @@ renderElse ctl = renderSafe ctl ctl.env (elseBody ctl)
 -- Conditionals
 --------------------------------------------------------------------------------
 
--- | `if cond [opts]`. An optional second argument is an *options object*
--- | (build it with `dict`); when it carries `includeZero: true`, the number `0`
--- | counts as truthy — Handlebars' `includeZero`. Without it, `0` is falsy
--- | (see `Value.truthy`).
+-- | `if cond [opts]` with optional `{{elif cond}}` / `{{else}}` clauses. An
+-- | optional second argument to the *head* `if` is an *options object* (build it
+-- | with `dict`); `includeZero: true` makes the number `0` truthy — Handlebars'
+-- | `includeZero`. Without it, `0` is falsy (see `Value.truthy`).
+-- |
+-- | The body is read as a clause chain (`splitClauses`): the section before the
+-- | first separator is the `then` branch; each `{{elif e}}` is tested in order
+-- | and `{{else}}` is the terminal fallback. Conditions short-circuit — once a
+-- | branch is taken, no later `elif` is evaluated (which matters for effects in
+-- | `m`, and for a later `elif` that would error).
 ifH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-ifH ctl args = case args of
-  [ c ] -> branchOn (truthy c) ctl
-  [ c, opts ] -> branchOn (truthyWith opts c) ctl
-  _ -> throwError (ArityError (wrong1or2 "if" args))
+ifH ctl args = do
+  cond <- case args of
+    [ c ] -> pure (truthy c)
+    [ c, opts ] -> pure (truthyWith opts c)
+    _ -> throwError (ArityError (wrong1or2 "if" args))
+  let
+    { before, clauses } = splitClauses ctl.children
+  checkIfClauses clauses
+  if cond then renderSafe ctl ctl.env before
+  else pickClause ctl clauses
+
+-- | Walk the `elif`/`else` clauses after a falsy `if`, evaluating each `elif`
+-- | condition only until one holds. No matching clause ⇒ empty output.
+pickClause :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> Array Clause -> m Value
+pickClause ctl clauses = case Array.uncons clauses of
+  Nothing -> pure (VSafe "")
+  Just { head: cl, tail } -> case cl.name of
+    "else" -> renderSafe ctl ctl.env cl.body
+    "elif" -> case cl.args of
+      [ condE ] -> do
+        cond <- ctl.eval ctl.env condE
+        if truthy cond then renderSafe ctl ctl.env cl.body
+        else pickClause ctl tail
+      _ -> throwError (ClauseError "elif: expected exactly 1 argument")
+    other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
+
+-- | Reject a malformed clause chain *before* branching, so the error does not
+-- | depend on which branch the data happens to take: every clause must be
+-- | `elif` or `else`, an `elif` is unary, and `else` must be the last clause
+-- | (anything after it is unreachable).
+checkIfClauses :: forall m. MonadThrow Error m => Array Clause -> m Unit
+checkIfClauses clauses = case Array.uncons clauses of
+  Nothing -> pure unit
+  Just { head: cl, tail } -> case cl.name of
+    "else"
+      | Array.null tail -> pure unit
+      | otherwise -> throwError (ClauseError "if: {{else}} must be the final clause")
+    "elif" -> case cl.args of
+      [ _ ] -> checkIfClauses tail
+      _ -> throwError (ClauseError "elif: expected exactly 1 argument")
+    other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
 
 unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 unlessH ctl args = case args of

@@ -45,12 +45,19 @@ markup" helper. The analogue of `new Handlebars.SafeString(…)`.
 |===
 |Helper |Form |Behaviour
 
-|`if` |block |`splitClause "else"` over its body: renders the nodes before the `else` child when the
-argument is truthy, else renders the `else` child's body.
-|`unless` |block |The inverse of `if`.
+|`if` |block |`splitClauses` over its body: renders the nodes before the first separator when the
+argument is truthy; otherwise walks the `pass:[{{elif cond}}]` clauses in order, rendering the first
+whose `cond` is truthy (evaluated lazily via `Ctl.eval`, so later conditions short-circuit), and
+falls back to a terminal `pass:[{{else}}]`.
+|`elif` |1 |A *separator* the enclosing `if` interprets — `pass:[{{#if a}}…{{elif b}}…{{/if}}]`.
+Rendered standalone it is inert (returns `""`), exactly like `else`.
+|`unless` |block |The inverse of `if` (a single `pass:[{{else}}]`, no `elif`).
 |===
 
-`if` and `unless` *define* the meaning of a nested `pass:[{{else}}…]`; the core does not.
+`if`, `elif`, and `unless` *define* the meaning of nested `pass:[{{else}}…]` / `pass:[{{elif}}…]`;
+the core does not — they are ordinary separators. `if` rejects a malformed chain up front (a clause
+other than `elif`/`else`, or anything after `else`) as a `ClauseError`, so the error never depends on
+which branch the data takes.
 *Truthiness* matches {hbs}: `VBool false`, `VNull`, `0`, `""`, and the *empty array* are falsy; `{}`,
 non-zero numbers, and other non-empty values are truthy. As in {hbs}, `0` is falsy unless the
 `includeZero` option is set — `if`/`unless` accept it as an options object,

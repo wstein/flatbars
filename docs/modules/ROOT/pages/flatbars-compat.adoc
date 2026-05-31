@@ -211,11 +211,12 @@ the reference engine has no missing-helper hook.
 `if`/`each` (xref:appendix-handlebars.adoc#mustache[A.11]).
 
 |`{{else if c}}` chaining
-|surface dialect ⇒ nested `pass:[{{#if}}]`
+|`elif` separator (core); surface `pass:[{{else if c}}]` ⇒ `pass:[{{elif c}}]`
 |✅
-|In core, `else` is a plain separator that does not re-test a condition. The
-xref:surface.adoc[surface dialect] (`renderSurface`) expands an `pass:[{{else if c}}]` chain into
-nested `if` blocks in the else clause (§5.6); parenthesize a helper condition: `pass:[{{else if (eq a b)}}]`.
+|The engine's `if` reads a flat `pass:[{{elif cond}}]` clause chain, evaluating each condition lazily
+(short-circuit) via `Ctl.eval` — so `else` re-testing is a real, native clause, not a desugaring
+trick. The xref:surface.adoc[surface dialect] (`renderSurface`) lowers `pass:[{{else if c}}]` to it
+(§5.6); parenthesize a helper condition: `pass:[{{else if (eq a b)}}]`.
 |===
 
 == 4. FlatBars extensions (no Handlebars built-in)

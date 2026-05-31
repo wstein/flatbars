@@ -166,8 +166,8 @@ Renaming via `as |…|` becomes positional *binding-name* arguments to the block
 == 5.6 Branches
 
 `pass:[{{else}}]` is already core — a separator (xref:grammar.adoc[] §2.4) — so Surface passes it
-through unchanged. Surface's only job here is the `else if` chain, which it lowers to nested `if`
-blocks:
+through unchanged. Surface's only job here is the `else if` chain, which it lowers to the engine's
+flat `pass:[{{elif cond}}]` separator (the condition is still path-rewritten):
 
 [cols="2,3",options="header"]
 |===
@@ -175,11 +175,13 @@ blocks:
 
 |`pass:[{{#if c}}A{{else}}B{{/if}}]` |`pass:[{{#if c}}A{{else}}B{{/if}}]`
 |`pass:[{{#each xs}}A{{else}}B{{/each}}]` |`pass:[{{#each xs}}A{{else}}B{{/each}}]`
-|`pass:[{{#if a}}A{{else if b}}B{{else}}C{{/if}}]` |`pass:[{{#if a}}A{{else}}{{#if b}}B{{else}}C{{/if}}{{/if}}]`
+|`pass:[{{#if a}}A{{else if b}}B{{else}}C{{/if}}]` |`pass:[{{#if a}}A{{elif (lookup this "b")}}B{{else}}C{{/if}}]`
 |===
 
-`else` and `unless` are *engine* names. A different engine could read a clause named `otherwise` or
-provide `elif`/`case`/`default`; Surface simply targets whatever the engine defines.
+`else`, `elif`, and `unless` are *engine* names (xref:prelude.adoc[] §6.3). A different engine could
+read a clause named `otherwise` or provide `case`/`default`; Surface simply targets whatever the
+engine defines. (Authoring `pass:[{{elif b}}]` directly in Surface also works — it is a clause
+separator like `pass:[{{else}}]`.)
 
 There is *no inverted-block sugar*. BareBars adopts Mustache's `pass:[{{^x}}]` in *no form* — for
 "render when falsy" you write the `unless` helper explicitly: `pass:[{{#unless c}}A{{/unless}}]`.

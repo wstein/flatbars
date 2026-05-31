@@ -23,7 +23,7 @@ module FlatBars.Lower
 import Prelude
 
 import BareBars.Syntax (Expr(..), Ident, Template)
-import BareBars.Walk (Issue, Severity(..), foldTemplate, splitClause)
+import BareBars.Walk (Clause, Issue, Severity(..), foldTemplate, splitClause, splitClauses)
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), uncurry)
@@ -81,12 +81,31 @@ lower = foldTemplate
       elseBranch = recurse (fromMaybe [] s.clause)
     in
       case Array.head args of
+        -- `if` reads a full `elif`/`else` chain; fold it so the typed AST shows
+        -- nested `RIf` branches (what the playground / lint inspect), matching
+        -- the engine's short-circuit walk.
+        Just c | name == "if" -> lowerIf c children recurse
         Just c
-          | name == "if" -> RIf c before elseBranch
           | name == "unless" -> RUnless c before elseBranch
           | name == "each" -> REach c before elseBranch
           | name == "with" -> RWith c before elseBranch
         _ -> RCall name args (recurse children)
+
+  -- An `{{#if c}}…{{elif d}}…{{else}}…{{/if}}` chain becomes nested `RIf`: each
+  -- `elif` is the else-branch's `RIf`, and `else` is the innermost else-branch.
+  lowerIf :: Expr -> Template -> (Template -> Array RNode) -> RNode
+  lowerIf cond children recurse =
+    let
+      { before, clauses } = splitClauses children
+    in
+      RIf cond (recurse before) (foldClauses clauses)
+    where
+    foldClauses :: Array Clause -> Array RNode
+    foldClauses cs = case Array.uncons cs of
+      Nothing -> []
+      Just { head: cl, tail } -> case cl.name, cl.args of
+        "elif", [ c ] -> [ RIf c (recurse cl.body) (foldClauses tail) ]
+        _, _ -> recurse cl.body -- `else` (terminal); malformed clauses best-effort
 
 -- | Safe-by-default lint. Two warnings:
 -- |

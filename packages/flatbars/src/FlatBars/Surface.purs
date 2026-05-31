@@ -17,7 +17,8 @@
 -- |  * `@data` variables ⇒ scoped-helper calls: `@index` ⇒ `(index)`,
 -- |    `@root.x` ⇒ `(lookup (root) "x")` (§5.5).
 -- |  * `true`/`false`/`null` stay literal helper calls.
--- |  * `else if` chains ⇒ nested `if` blocks in the else clause (§5.6).
+-- |  * `else if` chains ⇒ flat `{{elif cond}}` clauses the engine's `if` reads
+-- |    (§5.6).
 -- |  * hash arguments `k=v` ⇒ a trailing `dict`: `{{ f a k=v }}` ⇒
 -- |    `{{{ esc_html (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
 -- |  * block params `{{#each xs as |item i|}}` ⇒ `{{#each xs "item" "i"}}`; a bare
@@ -74,8 +75,9 @@ desugar clauseNames = go []
       -- `{{{ E }}}` — raw output; path-rewrite the expression, no escaping.
       Output sp e -> Output sp (rewrite scope e)
       Sep sp name args
-        -- a clause marker (`{{else}}`, …) passes through untouched for the engine.
-        | Array.elem name clauseNames -> Sep sp name args
+        -- a clause marker (`{{else}}`, `{{elif cond}}`, …) stays a separator for
+        -- the engine; its arguments (an `elif` condition) are still path-rewritten.
+        | Array.elem name clauseNames -> Sep sp name (rewriteArgs scope args)
         | otherwise -> case stripPrefix (Pattern ">") name of
             -- a partial reference `{{> name [ctx]}}` ⇒ unescaped `partial` call.
             Just rest -> Output sp (partialExpr scope rest args)
@@ -87,7 +89,7 @@ desugar clauseNames = go []
         Block sp "partial" (partialArgs scope args) (go scope (expandElseIf body))
       Block sp "inline" args body ->
         Block sp "inline" (inlineArgs scope args) (go scope (expandElseIf body))
-      -- block head stays a helper; `else if` chains expand to nested `if` (§5.6);
+      -- block head stays a helper; `else if` chains expand to flat `elif` (§5.6);
       -- a trailing `as |a b|` becomes positional binding-name strings (§5.5) and
       -- extends the scope for the body.
       Block sp name args body ->
@@ -302,20 +304,15 @@ dataExpr raw =
 -- | `if`). The condition must be a single argument; parenthesize a helper call:
 -- | `{{else if (eq a b)}}`.
 expandElseIf :: Template -> Template
-expandElseIf nodes = case Array.findIndex isElseIf nodes of
-  Nothing -> nodes
-  Just i -> case Array.index nodes i of
-    Just (Sep sp _ [ _, cond ]) ->
-      Array.take i nodes
-        <>
-          [ Sep sp "else" []
-          , Block sp "if" [ cond ] (expandElseIf (Array.drop (i + 1) nodes))
-          ]
-    _ -> nodes
+expandElseIf = map rewrite
   where
-  isElseIf = case _ of
-    Sep _ "else" [ App "if" [], _ ] -> true
-    _ -> false
+  rewrite = case _ of
+    -- `{{else if cond}}` parses as a separator named `else` whose first argument
+    -- is the bare helper `if`; rewrite it to the flat `{{elif cond}}` separator
+    -- the engine's `if` reads as a clause. (The condition is path-rewritten later
+    -- by `go`'s clause-separator case.)
+    Sep sp "else" [ App "if" [], cond ] -> Sep sp "elif" [ cond ]
+    other -> other
 
 -- | Hoist `{{#inline "name"}}body{{/inline}}` definitions out of a (desugared)
 -- | template into a partial registry, returning that registry and the template

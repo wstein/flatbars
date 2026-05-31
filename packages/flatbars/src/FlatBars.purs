@@ -96,7 +96,7 @@ renderAff src dat = runExceptT (runString (refEngine (preludeEnv dat)) src)
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).
 surfaceClauses :: Array Ident
-surfaceClauses = [ "else" ]
+surfaceClauses = [ "else", "elif" ]
 
 -- | Desugar Surface syntax to core syntax for this engine (surface.adoc §5).
 desugarSurface :: Template -> Template
