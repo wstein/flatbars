@@ -33,7 +33,8 @@ spago run -p barebars-cli -- <template> [--data <data.json>] [--validate]
 ```
 
 Templates use core syntax — `{{{ lookup this "x" }}}`, `{{#each …}}`, and
-clause blocks for control flow: `{{#if …}}…{{#else}}…{{/else}}{{/if}}` (the core
-has no `{{else}}` separator; `else` is a nested clause block the prelude `if`
-interprets). The surface dialect (`{{ x }}`, dotted paths) is not yet wired up;
+`{{else}}` for control flow: `{{#if …}}…{{else}}…{{/if}}`. `{{else}}` is a
+name-agnostic *separator* — the parser keeps it as a structural marker and the
+prelude `if`/`each`/`with` split their body at it. The surface dialect (`{{ x }}`,
+dotted paths) — a desugaring walk over the structural AST — is not yet wired up;
 see [`BareBars.Surface`](../core/src/BareBars/Surface.purs).

@@ -1,32 +1,25 @@
 -- | The surface dialect (sugar). See `docs/modules/ROOT/pages/surface.adoc`.
 -- |
--- | Surface is a *front-end* that emits core `Template`: `{{ }}` escaped output,
--- | dotted paths, `@data` variables, hash arguments, block params, partials.
--- | Every rule is a pure syntactic rewrite to the core.
+-- | Desugaring is *not* a separate front-end: the one (structural) parser is
+-- | `BareBars.parse`, and the surface dialect is a *walk* over the structural
+-- | AST that lowers it to the engine's real AST — `{{ }}` escaped output,
+-- | dotted paths → `lookup`, `@data` variables, hash arguments → `dict`, block
+-- | params, partials, `else if` chains. It is naturally a `BareBars.Walk`
+-- | catamorphism (`foldTemplate`).
 -- |
--- | NOTE: this is a scaffold. The working core (`Parser`/`Eval`/`Prelude`) is
--- | complete; the surface desugarer is the next milestone. Until it lands,
--- | author templates in core syntax (`{{{ lookup this "x" }}}`, etc.) and call
--- | `BareBars.parse` directly.
+-- | NOTE: this is a scaffold. The structural core (`Lexer`/`Parser`) and the
+-- | interpreting walk (`Engine`/`Prelude`) are complete; this desugaring walk is
+-- | the next milestone. Until it lands, author templates in core syntax
+-- | (`{{{ lookup this "x" }}}`, `{{#if c}}…{{else}}…{{/if}}`) and render directly.
 module BareBars.Surface
-  ( SurfaceTemplate
-  , parseSurface
-  , desugar
+  ( desugar
   ) where
 
-import BareBars.Error (ParseError)
 import BareBars.Syntax (Template)
-import Data.Either (Either)
 import Partial.Unsafe (unsafeCrashWith)
 
--- | Placeholder: the real surface AST (with paths, hash args, block params)
--- | will replace this alias.
-type SurfaceTemplate = Template
-
-parseSurface :: String -> Either ParseError SurfaceTemplate
-parseSurface _ = unsafeCrashWith
-  "BareBars.Surface.parseSurface: not yet implemented — see docs/modules/ROOT/pages/surface.adoc"
-
-desugar :: SurfaceTemplate -> Template
+-- | Desugar a structural AST into the engine's real AST (a walk over the
+-- | skeleton). Placeholder until the dialect lands.
+desugar :: Template -> Template
 desugar _ = unsafeCrashWith
   "BareBars.Surface.desugar: not yet implemented — see docs/modules/ROOT/pages/surface.adoc"

@@ -2,13 +2,14 @@
 :navtitle: 5. The surface dialect
 
 The core is austere by design. *BareBars Surface* is an optional dialect that recovers {hbs}
-ergonomics by *compiling to the core skeleton*. It is a separate front-end — you can render core
-templates without it, swap it, or write your own — but the reference Surface is specified here
-because the xref:appendix-handlebars.adoc[Handlebars mapping] is defined in terms of it.
+ergonomics. It is *not* a separate parser: the one structural parser (`parse`) is unchanged, and
+Surface is a *desugaring walk* over the structural AST — part of the second pass (xref:host-api.adoc[]
+§7.1), naturally a `foldTemplate` (xref:appendix-handlebars.adoc#engine-api[A.13.2]). It lowers the
+skeleton to the engine's real AST; you can run it, swap it, or write your own.
 
-Surface adds nothing the core cannot already express. Every rule below is a *pure syntactic rewrite*
-to the core. Where a rewrite names a helper (`esc_html`, `lookup`, `dict`, `partial`, …), that
-helper must exist in the xref:prelude.adoc[engine].
+Surface adds nothing the core cannot already express. Every rule below is a *rewrite* of one
+structural node into core nodes. Where a rewrite names a helper (`esc_html`, `lookup`, `dict`,
+`partial`, …), that helper must exist in the xref:prelude.adoc[engine].
 
 [IMPORTANT]
 ====
@@ -120,18 +121,19 @@ calls to them, and block params rename them:
 
 Renaming via `as |…|` becomes positional *binding-name* arguments to the block helper.
 
-== 5.6 Branches become nested clause blocks
+== 5.6 Branches
 
-Surface has no `pass:[{{else}}]` either: it rewrites the familiar separator into the nested clause
-block the engine reads (xref:concepts.adoc[] §5).
+`pass:[{{else}}]` is already core — a separator (xref:grammar.adoc[] §2.4) — so Surface passes it
+through unchanged. Surface's only job here is the `else if` chain, which it lowers to nested `if`
+blocks:
 
 [cols="2,3",options="header"]
 |===
 |Surface |Core
 
-|`pass:[{{#if c}}A{{else}}B{{/if}}]` |`pass:[{{#if c}}A{{#else}}B{{/else}}{{/if}}]`
-|`pass:[{{#each xs}}A{{else}}B{{/each}}]` |`pass:[{{#each xs}}A{{#else}}B{{/else}}{{/each}}]`
-|`pass:[{{#if a}}A{{else if b}}B{{else}}C{{/if}}]` |`pass:[{{#if a}}A{{#else}}{{#if b}}B{{#else}}C{{/else}}{{/if}}{{/else}}{{/if}}]`
+|`pass:[{{#if c}}A{{else}}B{{/if}}]` |`pass:[{{#if c}}A{{else}}B{{/if}}]`
+|`pass:[{{#each xs}}A{{else}}B{{/each}}]` |`pass:[{{#each xs}}A{{else}}B{{/each}}]`
+|`pass:[{{#if a}}A{{else if b}}B{{else}}C{{/if}}]` |`pass:[{{#if a}}A{{else}}{{#if b}}B{{else}}C{{/if}}{{/if}}]`
 |===
 
 `else` and `unless` are *engine* names. A different engine could read a clause named `otherwise` or

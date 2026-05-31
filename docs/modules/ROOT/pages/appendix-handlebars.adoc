@@ -109,7 +109,7 @@ Core:        {{{ esc_html (field (lookup this "value")
 
 |`pass:[{{#h}}…{{/h}}]` |same |`pass:[{{#h}}…{{/h}}]` |CORE
 |`pass:[{{#h arg}}…{{/h}}]` |same |args desugar like any call |CORE
-|`pass:[{{else}}]` separator |`pass:[{{else}}]` |a nested `pass:[{{#else}}…{{/else}}]` clause block |ENGINE
+|`pass:[{{else}}]` separator |`pass:[{{else}}]` |a `Sep "else"` marker the block helper splits at |CORE+ENGINE
 |`pass:[{{^h c}}…{{/h}}]` (HB inverted) |`pass:[{{#unless c}}…{{/unless}}]` |`pass:[{{#unless c}}…{{/unless}}]` |DROPPED→`unless`
 |`else if` (chained) |same |nested `pass:[{{#if c}}…{{/if}}]` inside an `else` clause |SURFACE→ENGINE
 |block params `pass:[{{#h x as \|a b\|}}]` |same |`pass:[{{#h x "a" "b"}}]` — binding-name args |SURFACE
@@ -120,17 +120,17 @@ Core:        {{{ esc_html (field (lookup this "value")
 |`return new SafeString(…)` |`safe`/return `VSafe` |a `VSafe` value |ENGINE
 |===
 
-`else` is *not* a core concept: the parser sees `pass:[{{#else}}…{{/else}}]` as an ordinary `Block`
-nested inside its parent, and the parent helper (`if`, `each`, `with`, …) decides what a child named
-`else` means. The name is the engine's choice — `el`, `elif`, `case`, `default` are equally valid
-(xref:concepts.adoc[] §5).
+`else` has *no* meaning in the core: the parser emits a flat `Sep "else"` marker in the block's body,
+and the parent helper (`if`, `each`, `with`, …) decides what a separator named `else` means by
+splitting at it. The name is the engine's choice — `el`, `elif`, `case`, `default` are equally valid
+(xref:concepts.adoc[] §5, xref:grammar.adoc[] §2.4).
 
 Worked example (`block-helpers/` — `ifEquals` with an else):
 
 [source,text]
 ----
 Handlebars:  {{#ifEquals plan "pro"}}Pro{{else}}Upgrade{{/ifEquals}}
-Core:        {{#ifEquals (lookup this "plan") "pro"}}Pro{{#else}}Upgrade{{/else}}{{/ifEquals}}
+Core:        {{#ifEquals (lookup this "plan") "pro"}}Pro{{else}}Upgrade{{/ifEquals}}
 ----
 
 Worked example (`block-helpers/` — custom `times`, exposing a scoped helper):
@@ -155,9 +155,9 @@ helper; the core only supplies the frame plumbing.
 |===
 |Handlebars built-in |Surface |Core |Kind
 
-|`pass:[{{#if c}}…{{else}}…{{/if}}]` |same |`pass:[{{#if c'}}…{{#else}}…{{/else}}{{/if}}]` |ENGINE
+|`pass:[{{#if c}}…{{else}}…{{/if}}]` |same |`pass:[{{#if c'}}…{{else}}…{{/if}}]` |ENGINE
 |`pass:[{{#unless c}}…{{/unless}}]` |same |`pass:[{{#unless c'}}…{{/unless}}]` |ENGINE
-|`pass:[{{#each xs}}…{{else}}…{{/each}}]` |same |`pass:[{{#each xs'}}…{{#else}}…{{/else}}{{/each}}]` |ENGINE
+|`pass:[{{#each xs}}…{{else}}…{{/each}}]` |same |`pass:[{{#each xs'}}…{{else}}…{{/each}}]` |ENGINE
 |`pass:[{{#with o}}…{{/with}}]` |same |`pass:[{{#with o'}}…{{/with}}]` |ENGINE
 |`pass:[{{lookup o k}}]` |same |`pass:[{{{ esc_html (lookup o' k') }}}]` |ENGINE
 |`pass:[{{log x}}]` |same |`pass:[{{{ log x' }}}]` (returns `VNull` ⇒ empty output) |ENGINE
@@ -171,7 +171,7 @@ Worked example (`if-unless/` — `if` with an else and {hbs} truthiness):
 [source,text]
 ----
 Handlebars:  <p>tasks is {{#if tasks}}truthy{{else}}falsy (empty array){{/if}}.</p>
-Core:        <p>tasks is {{#if (lookup this "tasks")}}truthy{{#else}}falsy (empty array){{/else}}{{/if}}.</p>
+Core:        <p>tasks is {{#if (lookup this "tasks")}}truthy{{else}}falsy (empty array){{/if}}.</p>
 ----
 
 Worked example (`each/` — over an object, with `@key`):
@@ -191,7 +191,7 @@ Worked example (`each/` — empty collection renders the `else` clause):
 Handlebars:  {{#each archived}}<li>{{title}}</li>{{else}}<li>Nothing archived.</li>{{/each}}
 Core:        {{#each (lookup this "archived")}}
                <li>{{{ esc_html (lookup this "title") }}}</li>
-               {{#else}}<li>Nothing archived.</li>{{/else}}
+               {{else}}<li>Nothing archived.</li>
              {{/each}}
 ----
 
@@ -432,7 +432,7 @@ Every {hbs}/Mustache surface element, asserting a mapping exists. A missing ✓ 
 
 .Blocks & branches
 * [x] block helper `pass:[{{#h}}…{{/h}}]` — A.3
-* [x] `pass:[{{else}}]` → nested clause block — A.3, A.4
+* [x] `pass:[{{else}}]` → a separator — A.3, A.4
 * [x] `pass:[{{^h}}]` inverted → `unless` — A.3, A.11
 * [x] `else if` chaining — A.3
 * [x] block params `as \|a b\|` — A.3, A.5
@@ -484,7 +484,7 @@ Intentionally `DROPPED`: *standalone whitespace auto-trim* (→ explicit `~`) an
 (fixed delimiters). Reframed rather than reproduced: *lambdas* (values are never functions; use a
 helper or `apply`), *`helperMissing`/`blockHelperMissing`* (the engine raises `UnknownHelper`; a host
 may layer resolution), and — most importantly — *`{{else}}`*, which is not a core construct at all
-but a nested clause block the engine interprets. Everything else is a faithful mapping. No item is
+but a separator the engine interprets. Everything else is a faithful mapping. No item is
 left unaddressed — which is the contract.
 ====
 
@@ -533,7 +533,7 @@ type Ctl m env =
   , children :: Template                     -- this block's body ([] for inline calls)
   , eval     :: env -> Expr     -> m Value   -- BareBars evaluates an expression for you
   , render   :: env -> Template -> m String  -- BareBars renders a sub-tree for you
-  , clause   :: Ident -> { before :: Template, body :: Maybe Template }   -- split a nested clause
+  , clause   :: Ident -> { before :: Template, body :: Maybe Template }   -- split at a separator
   , span     :: Span }                        -- source location, for diagnostics
 
 type Helper m env = Ctl m env -> Array Value -> m Value

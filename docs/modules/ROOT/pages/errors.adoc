@@ -22,7 +22,7 @@ violates the engine's schema (an unknown helper, a bad arity, an illegal clause)
 |===
 
 Note what is *absent*: there is no `MultipleElse` or `ElseOutsideBlock`, because the core has no
-`else`. `pass:[{{#else}}…{{/else}}]` is just a block; if it appears where the engine does not expect
+`else`. `pass:[{{else}}…]` is just a block; if it appears where the engine does not expect
 a clause, that is a *validation* error (4.2), not a parse error. Every structural error carries a
 source offset covering the offending tag; `Span.lineColumn src offset` maps it to a 1-based
 line/column.
@@ -36,7 +36,7 @@ line/column.
 |`UnknownHelper name` |`name` is not defined in any helper frame
 |`ArityError` |a helper received the wrong number of arguments
 |`TypeError` |a helper received an argument of the wrong shape
-|`ClauseError` |a block contains a nested clause the helper does not accept, or in an illegal order
+|`ClauseError` |a block contains a separator the helper does not accept, or in an illegal order
 |`HelperError` |any other failure a helper chooses to raise
 |===
 

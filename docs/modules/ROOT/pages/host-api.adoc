@@ -9,22 +9,24 @@ except for the AST and walk contract carried over from xref:evaluation.adoc[].
 
 [source,text]
 ----
-                 PHASE 1 (core)                         PHASE 2 (engine)
-String --lex--> [Token] --parse--> Template(skeleton) --render env--> String
-                                        ^
-String --lex--> [Token] --parse--> Surface --desugar--> Template(skeleton)
+        PASS 1 — BareBars core (structural only)      PASS 2 — the engine walk
+String --lex--> [Token] --parse--> structural AST --walk: desugar + interpret--> output
 ----
 
-Surface is a front-end that emits the core skeleton; the engine walk only ever sees the skeleton.
+Pass 1 is *purely structural*: the lexer and parser turn the source into a structural AST (the
+skeleton) and stop. Pass 2 is the engine's *walk* over that tree — it is responsible for
+*desugaring* (lowering the structural AST to the engine's real AST) *and* interpretation/validation.
+Desugaring is therefore not a pre-parse front-end; it is a walker (`foldTemplate`) over the skeleton.
 
 == 7.2 Types and functions
 
 [source,haskell]
 ----
--- Phase 1: parsing (core)
-parse        :: String -> Either ParseError Template          -- skeleton AST
-parseSurface :: String -> Either ParseError SurfaceTemplate
-desugar      :: SurfaceTemplate -> Template
+-- Pass 1: the structural parser (core)
+parse        :: String -> Either ParseError Template          -- the structural (skeleton) AST
+
+-- Pass 2: desugaring is a walk over the structural AST (a foldTemplate; see §A.13.2)
+desugar      :: Template -> Template                          -- structural AST -> real AST
 
 -- Phase 2: the polymorphic engine driver (BareBars owns the walk; A.13)
 runTemplate  :: forall m env. Monad m            => Engine m env -> Template -> m String
@@ -98,12 +100,12 @@ ifHelper ctl args = case args of
 |{hb} |BareBars |Note
 
 |`Handlebars.compile(src)` |`compile src` |Surface in, `data -> String` out.
-|`Handlebars.precompile(src)` |`parseSurface` `>>>` `desugar` |Ship the skeleton; render later.
-|`Handlebars.parse(src)` |`parse` / `parseSurface` |Returns the AST of xref:evaluation.adoc[].
+|`Handlebars.precompile(src)` |`parse` `>>>` `desugar` |Ship the desugared real AST; render later.
+|`Handlebars.parse(src)` |`parse` |Returns the structural AST of xref:evaluation.adoc[].
 |`Handlebars.registerHelper(n,f)` |`register n f` |`f` follows the `Helper` contract.
 |`Handlebars.registerPartial(n,t)` |`register n (partialOf t)` |A partial *is* a helper.
 |`Handlebars.registerDecorator(n,f)` |`register n f` |Decorators are block helpers (xref:appendix-handlebars.adoc#decorators[A.8]).
-|`options.fn` / `options.inverse` |`ctl.render` over `ctl.children` / over `ctl.clause "else"` |No inverse field; clauses are nested blocks.
+|`options.fn` / `options.inverse` |`ctl.render` over `ctl.children` / over `ctl.clause "else"` |No inverse field; clauses are separator-delimited.
 |`options.hash` |the trailing `dict` argument |xref:surface.adoc[] §5.4.
 |`Handlebars.SafeString(s)` |`VSafe s` / `safe` |A value, not a wrapper class.
 |`Handlebars.escapeExpression(s)` |`esc_html` |Engine helper.

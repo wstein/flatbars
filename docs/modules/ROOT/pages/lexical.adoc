@@ -21,18 +21,20 @@ recognizes a small set of *tag openers* and treats everything else as literal *c
 |`pass:[{{!]`  |`pass:[}}]`    |*Short comment* — discarded. May not contain `pass:[}}]`.
 |`pass:[{{!--]`|`pass:[--}}]`  |*Long comment* — discarded. May contain `pass:[}}]`, `pass:[{{]`, and `--`.
 |`pass:[{{{{#]`|`pass:[}}}}]` … `pass:[{{{{/name}}}}]` |*Raw block* — body captured verbatim, never tokenized.
+|`pass:[{{]` _Ident_ `pass:[}}]`| |*Separator* — the bare double-stash `pass:[{{ name args }}]`. A flat marker; the lexer reads the *shape*, never the name.
 |===
 
-That is the *entire* opener set. There is deliberately no:
+That is the entire opener set. `pass:[{{#]` is the only block *opener*; the bare double-stash
+`pass:[{{ … }}]` is a *separator*, recognized by shape. There is deliberately no:
 
-* `pass:[{{ }}]` double-stash — escaping is a helper, not a brace count; the double-stash exists only
-  in the xref:surface.adoc[surface dialect], where it desugars to `pass:[{{{ esc_html … }}}]`.
-* `pass:[{{else}}]` separator — branching is a nested clause block the engine interprets
-  (xref:concepts.adoc[] §5), so the lexer never sees `else`.
 * `pass:[{{^}}]` inverse opener — "render when falsy" is the `unless` helper, not a syntax.
+* escaped-output `pass:[{{ }}]` *in the core* — the double-stash is a separator here; escaping is the
+  helper `esc_html`. The xref:surface.adoc[surface dialect] reuses `pass:[{{ E }}]` for escaped
+  output, desugaring it to `pass:[{{{ esc_html … }}}]`; the two layers read it differently.
 
-The lexer matches the *longest opener*: `pass:[{{{{]` before `pass:[{{{]` before `pass:[{{]`, and
-`pass:[{{!--]` before `pass:[{{!]`.
+The separator's identifier — `else`, `elif`, `case`, `default` — is *opaque to the lexer and parser*
+(xref:grammar.adoc[] §2.4). The lexer matches the *longest opener*: `pass:[{{{{]` before
+`pass:[{{{]` before `pass:[{{#]` before a bare `pass:[{{]`, and `pass:[{{!--]` before `pass:[{{!]`.
 
 == 1.3 Content and brace escaping
 

@@ -16,6 +16,7 @@ Node      ::= Content                                   (* literal text *)
             | Output
             | Block
             | RawBlock
+            | Separator
             (* Comments are removed by the lexer and never appear here. *)
 
 Output    ::= "{{{" Expr "}}}"
@@ -27,6 +28,8 @@ Block     ::= "{{#"   Ident Arg* "}}"
 RawBlock  ::= "{{{{#" Ident Arg* "}}}}"
                   RawText
               "{{{{/" Ident "}}}}"
+
+Separator ::= "{{" Ident Arg* "}}"      (* a bare double-stash marker; the name carries no meaning *)
 
 Expr      ::= Literal
             | Ident Arg*            (* application; zero args = nullary call *)
@@ -41,9 +44,10 @@ Literal   ::= String | Number
 Ident, String, Number, RawText    (* from the lexer; see Chapter 1 *)
 ----
 
-There is *no inverse clause* in `Block`: a block captures exactly one `Template`. There is no
-`pass:[{{else}}]` and no `pass:[{{^}}]`. Branching is represented as ordinary nested `Block` nodes
-that the engine walk interprets (xref:concepts.adoc[] §5).
+A `Block` captures exactly one `Template`; it has no built-in inverse. Branching is written with
+`Separator` markers — the bare double-stash `pass:[{{ Ident Arg* }}]` — which the parser keeps as
+meaningless `Sep` nodes for the engine walk to interpret (§2.4, xref:concepts.adoc[] §5). There is no
+`pass:[{{^}}]` inverse opener.
 
 == 2.2 Reading the grammar
 
@@ -81,24 +85,29 @@ parser can match nesting. *Computed block helpers are not expressible*: there is
 `pass:[{{#(pick) …}}]`. This is the one place the "head is always a name" rule is enforced
 syntactically, and it is what makes `pass:[{{/each}}]` unambiguous.
 
-== 2.4 Branching is nesting, not a clause
+== 2.4 Separators
 
-A block helper that wants alternatives reads them from *its own body* as nested blocks. The parser
-treats them like any other child:
+A block helper that wants alternatives reads them from *its own body*, split at `Separator` markers.
+A separator is the bare double-stash `pass:[{{ Ident Arg* }}]` — the *only* double-stash form the
+core recognizes. The parser keeps it as a flat `Sep` node; it never interprets the name:
 
 [source,text]
 ----
-{{#if cond}}A{{#else}}B{{/else}}{{/if}}
+{{#if cond}}A{{else}}B{{/if}}
 
 parses to:
 
 Block "if" [App "cond" []]
   [ Content "A"
-  , Block "else" [] [ Content "B" ] ]
+  , Sep "else" []
+  , Content "B" ]
 ----
 
-The parser assigns `else` no special status; the engine's `if` helper decides what a child named
-`else` means (xref:evaluation.adoc[], xref:prelude.adoc[]).
+The parser assigns `else` no special status — `pass:[{{else}}]`, `pass:[{{elif x}}]`,
+`pass:[{{case 1}}]`, `pass:[{{default}}]` all parse to a `Sep` whose head is that identifier. The
+engine's `if` helper splits its body at the `else` separator (xref:evaluation.adoc[],
+xref:prelude.adoc[]); a `switch` helper might split at `case`. The word never lands in the lexer or
+parser. A separator's head may not begin with the reserved sigils `# / ! {` (those open other tags).
 
 == 2.5 What is *not* in the grammar
 
@@ -109,8 +118,8 @@ has a home in the surface dialect or the engine:
 |===
 |Absent from the core |Where it lives
 
-|`pass:[{{ }}]` (escaped output) |surface → `pass:[{{{ esc_html … }}}]`
-|`pass:[{{else}}]`, `pass:[{{^}}]` |engine → nested clause blocks / the `unless` helper
+|`pass:[{{ }}]` *as escaped output* |surface → `pass:[{{{ esc_html … }}}]`. (In the core a bare `pass:[{{ Ident … }}]` is a *separator* marker, §2.4 — not output.)
+|`pass:[{{^}}]` inverse opener |dropped — write the `unless` helper. (`pass:[{{else}}]` *is* in the core: a separator.)
 |dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent`
 |index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments
 |`@index`, `@key`, `@root`, … |surface → scoped engine helpers `index`, `key`, `root`, …

@@ -7,9 +7,9 @@ It is a library you register into the helper environment. Delete `each` and `pas
 validating; the core is unaffected. Rename `esc_html` and update your Surface. This is what "no
 built-in helpers, no keywords" buys you.
 
-Helper signatures use the shapes from xref:evaluation.adoc[]: an inline helper is
-`Array Value -> M Value`; a block helper also receives a `Body` (`{ children, render }`) and may
-inspect its `children` for nested clause blocks via `splitClause`.
+Helper signatures use the shapes from xref:evaluation.adoc[]: a helper is `Ctl m env -> Array Value
+-> m Value`; a block helper uses the control handle's `children`/`clause`/`render` and may split its
+`children` at a `{{name}}` separator via `splitClause`.
 
 == 6.1 Context and access
 
@@ -50,7 +50,7 @@ argument is truthy, else renders the `else` child's body.
 |`unless` |block |The inverse of `if`.
 |===
 
-`if` and `unless` *define* the meaning of a nested `pass:[{{#else}}…{{/else}}]`; the core does not.
+`if` and `unless` *define* the meaning of a nested `pass:[{{else}}…]`; the core does not.
 *Truthiness* matches {hbs}: `VBool false`, `VNull`, `""`, and the *empty array* are falsy; `0`, `{}`,
 and non-empty values are truthy.
 

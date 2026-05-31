@@ -17,6 +17,7 @@ data Node
   | Output   Span Expr                       -- span, expression
   | Block    Span Ident (Array Expr) Template -- span, head, args, body (one sub-tree)
   | RawBlock Span Ident (Array Expr) String   -- span, head, args, verbatim body
+  | Sep      Span Ident (Array Expr)          -- span, head, args (a separator marker)
 
 data Expr
   = Lit Value          -- only Str / Num arrive from the parser
@@ -26,11 +27,11 @@ data Expr
 Every tag-level node carries the source `Span` of its opening tag, for diagnostics; `Content` does
 not (it is literal text). `Span.lineColumn` turns an offset into a 1-based line/column.
 
-There is no comment node (the lexer drops them), no inverse field on `Block` (branching is a nested
-`Block`; xref:grammar.adoc[]), and no `Group` constructor — parentheses affect *parsing* only, so
-`(e)` and `e` produce the same `Expr`. *This tree carries no meaning.* `App "if" […]` is just an
-identifier and some arguments; whether `if` exists, how many arguments it takes, and what it does are
-Phase-2 questions.
+There is no comment node (the lexer drops them), no inverse field on `Block` (branching uses `Sep`
+markers; xref:grammar.adoc[]), and no `Group` constructor — parentheses affect *parsing* only, so
+`(e)` and `e` produce the same `Expr`. *This tree carries no meaning.* `App "if" […]` and
+`Sep "else" []` are just identifiers and arguments; whether `if` exists, what it does, and whether
+`else` splits it are all Phase-2 questions.
 
 == 3.2 The value type (normative)
 
@@ -92,7 +93,7 @@ like checking a JSON document against a JSON Schema:
 * `App name` — is `name` a registered helper? (else `UnknownHelper`)
 * arity — did `name` get the argument count it requires? (`ArityError`)
 * argument shape — are the values the right kind? (`TypeError`)
-* block shape — are this block's nested clauses (`else`, `case`, …) ones this helper allows, in a
+* block shape — are this block's separators (`else`, `case`, …) ones this helper allows, in a
   legal arrangement? (`ClauseError`)
 
 The *core does none of this*. A conforming engine MAY validate the whole tree up front (a static
@@ -111,6 +112,8 @@ render env (Block name args body) = stringify (apply (resolve env name)
 render env (RawBlock name args r) = stringify (apply (resolve env name)
                                                       (ctl env [Content r])
                                                       [ eval env a | a <- args ])
+render env (Sep name args)        = render env (Output (App name args))   -- a lone separator
+                                                                          -- is just an application
 
 eval env (Lit v)         = v
 eval env (App name args) = apply (resolve env name) (ctl env []) [ eval env a | a <- args ]
@@ -135,32 +138,32 @@ type Ctl m env =
   , span     :: Span                         -- source location of the enclosing tag
   , eval     :: env -> Expr     -> m Value   -- BareBars evaluates an expression for you
   , render   :: env -> Template -> m String  -- BareBars renders a sub-tree for you
-  , clause   :: Ident -> { before :: Template, body :: Maybe Template } }  -- split a nested clause
+  , clause   :: Ident -> { before :: Template, body :: Maybe Template } }  -- split at a separator
 
 type Helper m env = Ctl m env -> Array Value -> m Value
 ----
 
 An *inline* helper ignores the handle. A *block* helper uses it: it may `render` its `children` zero
 or more times, under environments it constructs (pushing scoped helpers, shifting `context`), and it
-may `clause` into `children` to find nested clause blocks.
+may `clause` to split `children` at a `{{name}}` separator.
 
 [source,haskell]
 ----
--- if: render the body up to a child `else` block; render the else clause otherwise.
+-- if: render the body up to the {{else}} separator; render the else clause otherwise.
 ifHelper ctl [cond] =
   let { before, body } = ctl.clause "else"
   in if truthy cond
        then VSafe <$> ctl.render ctl.env before
        else VSafe <$> ctl.render ctl.env (fromMaybe [] body)
 
--- ctl.clause "else" finds the first  Block "else" _ t  in the children,
--- returning the nodes before it and that block's body t.
+-- ctl.clause "else" finds the first  Sep "else" _  in the children, returning
+-- the nodes before it and the nodes after it.
 ----
 
 `each` calls `ctl.render` once per element with a per-element frame (installing `index`, `first`,
-`this`, …) and uses the same `ctl.clause "else"` to render an empty-collection clause. `with`
-shifts `context`. None of this is in the core — it is the reference engine's reading of plain nested
-blocks.
+`this`, …) and uses the same `ctl.clause "else"` for an empty-collection clause. `with` shifts
+`context`. None of this is in the core — it is the reference engine's reading of the `{{else}}`
+separator.
 
 == 3.7 Stringification, escaping, and safety
 

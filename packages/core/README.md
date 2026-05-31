@@ -40,10 +40,11 @@ whitespace control) with source spans on every tag; a **fully polymorphic
 inversion-of-control engine** (`runTemplate`/`runString` over any
 `MonadThrow Error m` and any `env`), with the reference engine supplied for
 both `Either Error` (`renderWith`/`compile`) and `ExceptT Error Aff`
-(`renderAff`); multi-branch control flow as **nested clause blocks**
-(`{{#if c}}…{{#else}}…{{/else}}{{/if}}`); prelude helpers `this`, `lookup`,
-`true`/`false`/`null`, `esc_html`, `safe`, `raw`, `if`, `unless`, `each`,
-`with`, `then`/`else`, `dict`, `apply`, `eq`/`eq?`, `not`, `and`, `or`, `log`;
+(`renderAff`); multi-branch control flow via **`{{else}}` separators**
+(`{{#if c}}…{{else}}…{{/if}}` — a name-agnostic `Sep` marker the engine splits
+at); prelude helpers `this`, `lookup`, `true`/`false`/`null`, `esc_html`,
+`safe`, `raw`, `if`, `unless`, `each`, `with`, `else`, `dict`, `apply`,
+`eq`/`eq?`, `not`, `and`, `or`, `log`;
 and a JSON-schema-style `validate` over the skeleton.
 
 ## Next milestones

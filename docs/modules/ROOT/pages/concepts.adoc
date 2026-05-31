@@ -86,26 +86,24 @@ escapes. And *`else` is not special*:
 
 [IMPORTANT]
 ====
-`else` never reaches the lexer or the parser. A multi-branch construct is expressed as a *nested
-clause block* that the engine's walk interprets:
+The *word* `else` never reaches the lexer or the parser. Branching is written with a *separator* —
+the bare double-stash `pass:[{{ name args }}]` — which the core keeps as a meaningless marker:
 
 [source,text]
 ----
 {{#if cond}}
   yes
-  {{#else}}no{{/else}}     <1>
+  {{else}}     <1>
+  no
 {{/if}}
 ----
-<1> `else` here is an ordinary `Block` node nested in `if`'s body. The reference `if` helper splits
-its body at the first child block named `else`. The name is the engine's choice — call it `else`,
-`el`, `elif`, `otherwise`, `case`, `default`, whatever your schema defines. The core sees only a
-block named `else` inside a block named `if`, and assigns it no meaning.
+<1> The lexer recognizes the double-stash *shape* and the parser emits `Sep "else" []` — a flat
+marker sitting in `if`'s body. It assigns `else` no meaning. The reference `if` helper splits its
+body at that separator (xref:evaluation.adoc[]). The name is the engine's choice — `else`, `el`,
+`elif`, `otherwise`, `case`, `default`; the core never singles any of them out. A lone separator,
+with no enclosing block to interpret it, simply renders as an application of its head.
 
-Treating `pass:[{{else}}]` as output would desugar it to `pass:[{{{ esc_html else }}}]` — but a
-branch is not a value and never yields a string, so that reading is incoherent. The honest
-conclusion is that branching is *structure for the engine to interpret*, not syntax for the core to
-privilege. There is likewise no `pass:[{{^}}]` inverse opener; "render when falsy" is just the
-`unless` helper.
+There is no `pass:[{{^}}]` inverse opener; "render when falsy" is just the `unless` helper.
 ====
 
 == 6. No sugar in the core
