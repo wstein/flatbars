@@ -7,17 +7,14 @@ package:
       githubOwner: barebars
       githubRepo: barebars
   dependencies:
-    - prelude
     - arrays
-    - lists
-    - strings
-    - maybe
     - either
-    - foldable-traversable
-    - ordered-collections
+    - lists
+    - maybe
     - numbers
-    - parsing
-    - control
+    - ordered-collections
+    - prelude
+    - strings
   test:
     main: Test.BareBars.Main
     dependencies:

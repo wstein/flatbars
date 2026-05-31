@@ -17,11 +17,9 @@ module Cli.Main where
 import Prelude
 
 import BareBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt)
-import Kernel.Walk (validate)
 import BareBars.Compile.FullBars (compileSurfaceWith) as Compile
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
-import RawBars (compileJsWith, compileWith)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -30,8 +28,10 @@ import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
 import FullBars (directiveLints, preludeSchema, renderSurfaceDiagWith)
+import Kernel.Walk (validate)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
+import RawBars (compileJsWith, compileWith)
 
 foreign import argv :: Effect (Array String)
 foreign import writeStdout :: String -> Effect Unit

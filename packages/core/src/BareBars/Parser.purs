@@ -1,11 +1,12 @@
 -- | The syntactic grammar. See `docs/modules/ROOT/pages/grammar.adoc`.
 -- |
 -- | `parse` turns source text into a core `Template`. It runs the template
--- | scanner (`Lexer.tokenizeTemplate`), then builds the tree from the flat token
--- | stream, parsing each tag's *interior* text into `Expr`s with `BareBars.Expr`
--- | (a `purescript-parsing` grammar). There is no separate expression token
--- | stream: a tag carries its interior text and the scanner's job ends at
--- | delimiting it.
+-- | scanner (`Lexer.tokenizeTemplate`) to delimit tags, builds the tree from the
+-- | flat token stream, and parses each tag's *interior* by first lexing it into
+-- | an interior token stream (`BareBars.Token.tokenizeInterior`) and then handing
+-- | those tokens to the dialect grammar (`ParseOptions.parseExpr`; the default is
+-- | the prefix grammar `BareBars.Expr`). Tokenizing is meaning-free and shared;
+-- | the grammar (prefix vs. MaxBars infix) is the dialect seam.
 module BareBars.Parser
   ( parse
   , parseWith
@@ -21,6 +22,7 @@ import BareBars.Expr as Expr
 import BareBars.Lexer (RawTok(..), tokenizeTemplate, trimStandalone)
 import BareBars.Span (Span)
 import BareBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
+import BareBars.Token (PosToken, Token(..), tokenizeInterior)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
@@ -29,11 +31,12 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.String (trim)
 import Data.String.CodeUnits as SCU
 
--- | A tag-interior expression parser: `offset -> interior -> Expr`. The core
--- | grammar (`BareBars.Expr`) is the default; a *dialect* (e.g. MaxBars, with
--- | infix operators and pipes) plugs in its own — the structural tree-builder
--- | below is grammar-agnostic.
-type ExprParser = Int -> String -> Either ParseError Expr
+-- | A tag-interior expression parser: it consumes the interior **token stream**
+-- | (the core tokenizes interiors via `BareBars.Token.tokenizeInterior`; this
+-- | parses those tokens into an `Expr`). The core grammar (`BareBars.Expr`) is
+-- | the default; a *dialect* (e.g. MaxBars, with infix operators and pipes)
+-- | plugs in its own — the structural tree-builder below is grammar-agnostic.
+type ExprParser = Array PosToken -> Either ParseError Expr
 
 -- | Knobs the *front-end* (CLI/host) sets; per-file `@`-directives may override
 -- | them. `trimStandalone` toggles Handlebars-style standalone whitespace
@@ -191,7 +194,7 @@ isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
 outputExpr :: ExprParser -> Span -> Int -> String -> Either ParseError Expr
 outputExpr pe span base s
   | trim s == "" = Left (EmptyOutput span.start)
-  | otherwise = pe base s
+  | otherwise = tokenizeInterior base s >>= pe
 
 -- | A *headed* tag (`{{# name args}}`, `{{name args}}`, `{{/name}}`, raw): its
 -- | interior is one application whose head names the helper/block/separator.
@@ -199,10 +202,21 @@ headed
   :: ExprParser -> Span -> Int -> String -> Either ParseError { name :: String, args :: Array Expr }
 headed pe span base s
   | trim s == "" = Left (HeadNotIdent span.start)
-  | otherwise = case pe base s of
+  | otherwise = case partialHead <$> tokenizeInterior base s >>= pe of
       Left e -> Left e
       Right (App name args) -> Right { name, args }
       Right _ -> Left (HeadNotIdent span.start)
+
+-- | A *leading* `>` is the Handlebars partial tag sigil, not the `gt` operator,
+-- | so remap it to a `>` head identifier — `{{> name …}}` then reads as an
+-- | application headed by `>` (the rest are its flat arguments, so the
+-- | name/context/hash split survives). Meaning-free: the core attaches nothing
+-- | to a `>`-named head; FullBars' surface desugar is what reads it as a partial
+-- | (other dialects simply see an undefined helper named `>`).
+partialHead :: Array PosToken -> Array PosToken
+partialHead toks = case Array.uncons toks of
+  Just { head: pt, tail } | pt.tok == TOp ">" -> Array.cons (pt { tok = TIdent ">" }) tail
+  _ -> toks
 
 --------------------------------------------------------------------------------
 -- Tree building over the flat RawTok stream

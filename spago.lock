@@ -6,14 +6,11 @@
         "core": {
           "dependencies": [
             "arrays",
-            "control",
             "either",
-            "foldable-traversable",
             "lists",
             "maybe",
             "numbers",
             "ordered-collections",
-            "parsing",
             "prelude",
             "strings"
           ],
@@ -27,7 +24,6 @@
             "effect",
             "either",
             "enums",
-            "exceptions",
             "exists",
             "foldable-traversable",
             "functions",
@@ -41,11 +37,9 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -54,11 +48,9 @@
             "st",
             "strings",
             "tailrec",
-            "transformers",
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -98,11 +90,9 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -116,7 +106,6 @@
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         }
@@ -191,7 +180,6 @@
             "ordered-collections",
             "orders",
             "parallel",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -208,7 +196,6 @@
             "type-equality",
             "typelevel-prelude",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -261,11 +248,9 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -279,7 +264,6 @@
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -322,12 +306,10 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
             "parallel",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -342,7 +324,6 @@
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         }
@@ -402,12 +383,10 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
             "parallel",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -424,7 +403,6 @@
             "type-equality",
             "typelevel-prelude",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -533,11 +511,9 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -553,7 +529,6 @@
             "type-equality",
             "typelevel-prelude",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -646,7 +621,6 @@
             "ordered-collections",
             "orders",
             "parallel",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -663,7 +637,6 @@
             "type-equality",
             "typelevel-prelude",
             "unfoldable",
-            "unicode",
             "unsafe-coerce",
             "unsafe-reference",
             "web-clipboard",
@@ -725,11 +698,9 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -743,7 +714,6 @@
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -845,11 +815,9 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -863,7 +831,6 @@
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -888,16 +855,10 @@
             "arrays",
             "barebars",
             "barebars-compile",
-            "control",
             "either",
-            "foldable-traversable",
             "fullbars",
-            "identity",
             "maybe",
-            "numbers",
-            "parsing",
-            "prelude",
-            "strings"
+            "prelude"
           ],
           "build_plan": [
             "arrays",
@@ -927,11 +888,9 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -945,7 +904,6 @@
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -955,6 +913,7 @@
             "console",
             "effect",
             "ordered-collections",
+            "strings",
             "tuples"
           ],
           "build_plan": [
@@ -968,18 +927,21 @@
             "distributive",
             "effect",
             "either",
+            "enums",
             "exists",
             "foldable-traversable",
             "functions",
             "functors",
             "gen",
             "identity",
+            "integers",
             "invariant",
             "lazy",
             "lists",
             "maybe",
             "newtype",
             "nonempty",
+            "numbers",
             "ordered-collections",
             "orders",
             "partial",
@@ -988,6 +950,7 @@
             "refs",
             "safe-coerce",
             "st",
+            "strings",
             "tailrec",
             "tuples",
             "type-equality",
@@ -1039,12 +1002,10 @@
             "maybe",
             "newtype",
             "nonempty",
-            "nullable",
             "numbers",
             "ordered-collections",
             "orders",
             "parallel",
-            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -1058,7 +1019,6 @@
             "tuples",
             "type-equality",
             "unfoldable",
-            "unicode",
             "unsafe-coerce"
           ]
         },
@@ -2446,38 +2406,6 @@
         "transformers"
       ]
     },
-    "parsing": {
-      "type": "registry",
-      "version": "10.2.0",
-      "integrity": "sha256-cwEGJ8HgyhRPdVwLLD4rsqdZMDjGwAdnT7b13xqkKEQ=",
-      "dependencies": [
-        "arrays",
-        "control",
-        "effect",
-        "either",
-        "enums",
-        "foldable-traversable",
-        "functions",
-        "identity",
-        "integers",
-        "lazy",
-        "lists",
-        "maybe",
-        "newtype",
-        "nullable",
-        "numbers",
-        "partial",
-        "prelude",
-        "st",
-        "strings",
-        "tailrec",
-        "transformers",
-        "tuples",
-        "unfoldable",
-        "unicode",
-        "unsafe-coerce"
-      ]
-    },
     "partial": {
       "type": "registry",
       "version": "4.0.0",
@@ -2667,21 +2595,6 @@
         "partial",
         "prelude",
         "tuples"
-      ]
-    },
-    "unicode": {
-      "type": "registry",
-      "version": "6.0.0",
-      "integrity": "sha256-5KugCNyYxscmZpnMbssOQA96XimuBN/bjHpdrtd5qaY=",
-      "dependencies": [
-        "arrays",
-        "enums",
-        "integers",
-        "maybe",
-        "partial",
-        "prelude",
-        "strings",
-        "unsafe-coerce"
       ]
     },
     "unsafe-coerce": {

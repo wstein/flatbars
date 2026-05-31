@@ -1,189 +1,117 @@
--- | The **MaxBars** interior-expression grammar: the FullBars/core term language
--- | plus *infix operators* and *pipes*, desugared to plain core `Expr` (`App`
--- | calls) so everything below — the FullBars surface desugar, prelude, engine,
--- | and compiler — is reused unchanged. This is the dialect's defining feature
--- | and the reason MaxBars needs its own grammar (the core IDENT set has no `&`
--- | and treats `|` as an ident char). Plugged into the parser via the
--- | `ParseOptions.parseExpr` seam.
+-- | The **MaxBars** interior grammar: the prefix term language plus *infix
+-- | operators* and *pipes*, parsed from the core interior **token stream**
+-- | (`BareBars.Token`) into plain core `Expr` (`App` calls) — so the engine,
+-- | prelude, and compiler below are reused unchanged.
 -- |
--- | Operators desugar per the spec's operator → helper table:
--- | `&&`→`and`, `||`→`or`, `!`→`not`, `==`→`eq`, `!=`→`ne`, `<`/`>`/`<=`/`>=`→
--- | `lt`/`gt`/`lte`/`gte`, and `a | f x`→`(f a x)` (piped value first). Precedence
--- | (loosest→tightest): pipe, `||`, `&&`, comparisons (non-assoc), prefix `!`,
--- | application/atom.
+-- | Operators desugar to helper calls: `&&`→`and`, `||`→`or`, `!`→`not`,
+-- | `==`/`!=`/`<`/`>`/`<=`/`>=`→`eq`/`ne`/`lt`/`gt`/`lte`/`gte`, and `a | f x`→
+-- | `(f a x)` (piped value first). Precedence loosest→tightest: pipe, `||`, `&&`,
+-- | comparisons (non-associative), prefix `!`, application/atom.
 module MaxBars.Expr
   ( parseMaxExpr
   ) where
 
-import Prelude hiding (between)
+import Prelude
 
 import BareBars.Error (ParseError(..))
 import BareBars.Syntax (Expr(..))
+import BareBars.Token (PosToken, Token(..))
 import BareBars.Value (Value(..))
-import Control.Alt ((<|>))
-import Control.Lazy (defer)
-import Data.Array (cons)
+import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Foldable (fold)
-import Data.Identity (Identity)
 import Data.Maybe (Maybe(..))
-import Data.Number as Number
-import Data.String.CodeUnits (fromCharArray, singleton)
-import Parsing (Parser, Position(..), fail, parseErrorMessage, parseErrorPosition, runParser)
-import Parsing.Combinators (between, choice, lookAhead, notFollowedBy, try)
-import Parsing.Combinators.Array (many, many1)
-import Parsing.Expr (Assoc(..), Operator(..), OperatorTable, buildExprParser)
-import Parsing.String (anyChar, char, eof, satisfy, string)
 
--- | Parse a MaxBars tag interior into a core `Expr`. `base` offsets the failure
--- | position into the original source (as `BareBars.Expr.parseExpr` does).
-parseMaxExpr :: Int -> String -> Either ParseError Expr
-parseMaxExpr base s = case runParser s (ws *> expr <* eof) of
-  Right e -> Right e
-  Left err -> Left (LexError (parseErrorMessage err) (base + idx err))
+type Step a = { val :: a, pos :: Int }
+
+-- | Parse a tag interior's tokens into one `Expr`, consuming all of them.
+parseMaxExpr :: Array PosToken -> Either ParseError Expr
+parseMaxExpr toks = case pPipe 0 of
+  Left e -> Left e
+  Right { val, pos }
+    | pos >= len -> Right val
+    | otherwise -> Left (LexError "unexpected token" (posAt pos))
   where
-  idx err = case parseErrorPosition err of Position p -> p.index
+  len = Array.length toks
+  tk i = _.tok <$> Array.index toks i
+  posAt i = case Array.index toks i of
+    Just pt -> pt.at
+    Nothing -> case Array.last toks of
+      Just pt -> pt.at
+      Nothing -> 0
 
---------------------------------------------------------------------------------
--- The operator-precedence expression
---------------------------------------------------------------------------------
+  -- left-associative binary level: parse `sub`, then fold any matching operators.
+  binL
+    :: (Token -> Maybe (Expr -> Expr -> Expr))
+    -> (Int -> Either ParseError (Step Expr))
+    -> Int
+    -> Either ParseError (Step Expr)
+  binL match sub i = sub i >>= \first -> loop first.val first.pos
+    where
+    loop lhs pos = case tk pos >>= match of
+      Just combine -> sub (pos + 1) >>= \r -> loop (combine lhs r.val) r.pos
+      Nothing -> Right { val: lhs, pos }
 
-expr :: Parser String Expr
-expr = defer \_ -> buildExprParser table term
+  -- precedence ladder (loosest first)
+  pPipe :: Int -> Either ParseError (Step Expr)
+  pPipe i = binL pipeOp pOr i
 
--- Highest precedence first (buildExprParser convention): prefix `!`, then
--- comparisons, `&&`, `||`, and pipe (loosest).
-table :: OperatorTable Identity String Expr
-table =
-  [ [ Prefix (opNot $> \a -> App "not" [ a ]) ]
-  , [ Infix (compOp <#> \name -> \a b -> App name [ a, b ]) AssocNone ]
-  , [ Infix (opSym "&&" $> \a b -> App "and" [ a, b ]) AssocLeft ]
-  , [ Infix (opSym "||" $> \a b -> App "or" [ a, b ]) AssocLeft ]
-  , [ Infix (opPipe $> pipe) AssocLeft ]
-  ]
-  where
-  -- `a | f x` ⇒ the piped value is f's *first* argument: `(f a x)`.
-  pipe l r = case r of
-    App name args -> App name (cons l args)
-    _ -> r
+  pOr :: Int -> Either ParseError (Step Expr)
+  pOr i = binL (binOp "||" "or") pAnd i
 
--- prefix `!`, but not the `!=` comparison.
-opNot :: Parser String Unit
-opNot = lexeme (try (void (string "!") <* notFollowedBy (char '=')))
+  pAnd :: Int -> Either ParseError (Step Expr)
+  pAnd i = binL (binOp "&&" "and") pCmp i
 
--- a fixed two-char operator (`&&` / `||`).
-opSym :: String -> Parser String Unit
-opSym s = lexeme (void (string s))
+  -- comparisons are non-associative (at most one).
+  pCmp :: Int -> Either ParseError (Step Expr)
+  pCmp i = pUnary i >>= \lhs -> case tk lhs.pos >>= cmpOp of
+    Just combine -> pUnary (lhs.pos + 1) >>= \r -> Right { val: combine lhs.val r.val, pos: r.pos }
+    Nothing -> Right { val: lhs.val, pos: lhs.pos }
 
--- the pipe `|`, but not `||` (the or-operator).
-opPipe :: Parser String Unit
-opPipe = lexeme (try (void (string "|") <* notFollowedBy (char '|')))
+  pUnary :: Int -> Either ParseError (Step Expr)
+  pUnary i = case tk i of
+    Just (TOp "!") -> pUnary (i + 1) >>= \r -> Right { val: App "not" [ r.val ], pos: r.pos }
+    _ -> pTerm i
 
--- a comparison operator → its helper name (longest match first).
-compOp :: Parser String String
-compOp = lexeme
-  ( choice
-      [ try (string "==") $> "eq"
-      , try (string "!=") $> "ne"
-      , try (string "<=") $> "lte"
-      , try (string ">=") $> "gte"
-      , string "<" $> "lt"
-      , string ">" $> "gt"
-      ]
-  )
+  -- a term: a group, a literal, or an application (ident + atom args).
+  pTerm :: Int -> Either ParseError (Step Expr)
+  pTerm i = case tk i of
+    Just TLParen -> pPipe (i + 1) >>= \r -> case tk r.pos of
+      Just TRParen -> Right { val: r.val, pos: r.pos + 1 }
+      _ -> Left (LexError "expected )" (posAt r.pos))
+    Just (TStr s) -> Right { val: Lit (VString s), pos: i + 1 }
+    Just (TNum n) -> Right { val: Lit (VNumber n), pos: i + 1 }
+    Just (TIdent name) -> pArgs (i + 1) [] >>= \r -> Right { val: App name r.val, pos: r.pos }
+    _ -> Left (LexError "expected an expression" (posAt i))
 
---------------------------------------------------------------------------------
--- Terms: literals, parens, and prefix applications / paths (core/FullBars)
---------------------------------------------------------------------------------
+  pArgs :: Int -> Array Expr -> Either ParseError (Step (Array Expr))
+  pArgs i acc = case tk i of
+    Just TLParen -> pTerm i >>= \r -> pArgs r.pos (Array.snoc acc r.val)
+    Just (TStr s) -> pArgs (i + 1) (Array.snoc acc (Lit (VString s)))
+    Just (TNum n) -> pArgs (i + 1) (Array.snoc acc (Lit (VNumber n)))
+    Just (TIdent name) -> pArgs (i + 1) (Array.snoc acc (App name []))
+    _ -> Right { val: acc, pos: i }
 
-term :: Parser String Expr
-term = defer \_ -> lexeme (pParen <|> pLit <|> pApp)
+  binOp :: String -> String -> Token -> Maybe (Expr -> Expr -> Expr)
+  binOp sym helper = case _ of
+    TOp s | s == sym -> Just (\a b -> App helper [ a, b ])
+    _ -> Nothing
 
-pApp :: Parser String Expr
-pApp = defer \_ -> App <$> lexeme pIdent <*> many pArg
+  -- `a | f x` ⇒ the piped value is f's first argument: `(f a x)`.
+  pipeOp :: Token -> Maybe (Expr -> Expr -> Expr)
+  pipeOp = case _ of
+    TOp "|" -> Just \l r -> case r of
+      App name as -> App name (Array.cons l as)
+      _ -> r
+    _ -> Nothing
 
-pArg :: Parser String Expr
-pArg = defer \_ -> pParen <|> lexeme pLit <|> (flip App [] <$> lexeme pIdent)
-
-pParen :: Parser String Expr
-pParen = defer \_ -> between (lexeme (char '(')) (lexeme (char ')')) expr
-
-pLit :: Parser String Expr
-pLit = pString <|> pNumber
-
--- | A MaxBars identifier/path: alnum, `_`, `-`, `.`, `@`, and whole `[bracket]`
--- | segments. Operator characters (`< > = | & !`) are deliberately *excluded* so
--- | they tokenize as operators, not as part of a path.
-pIdent :: Parser String String
-pIdent = fold <$> many1 identPiece
-  where
-  identPiece = (singleton <$> satisfy isPathChar) <|> bracketGroup
-  bracketGroup = do
-    _ <- char '['
-    inner <- many (satisfy (_ /= ']'))
-    _ <- char ']'
-    pure ("[" <> fromCharArray inner <> "]")
-
-pString :: Parser String Expr
-pString = do
-  q <- char '"' <|> char '\''
-  cs <- many (strChar q)
-  _ <- char q
-  pure (Lit (VString (fromCharArray cs)))
-  where
-  strChar q = (char '\\' *> escChar) <|> satisfy (\c -> c /= q && c /= '\\')
-  escChar = do
-    e <- anyChar
-    case unescape e of
-      Just ch -> pure ch
-      Nothing -> fail "invalid string escape"
-
-pNumber :: Parser String Expr
-pNumber = do
-  raw <- try numLexeme
-  case Number.fromString raw of
-    Just n -> pure (Lit (VNumber n))
-    Nothing -> fail ("malformed number '" <> raw <> "'")
-  where
-  -- a digit, or a `-` immediately before a digit (negative literal); `try` lets
-  -- a bare `-`/kebab fall back to an identifier.
-  numLexeme = do
-    first <- satisfy isDigit <|> (char '-' <* lookAhead (satisfy isDigit))
-    rest <- many (satisfy isNumChar)
-    pure (singleton first <> fromCharArray rest)
-
-unescape :: Char -> Maybe Char
-unescape = case _ of
-  '\\' -> Just '\\'
-  '"' -> Just '"'
-  '\'' -> Just '\''
-  'n' -> Just '\n'
-  't' -> Just '\t'
-  'r' -> Just '\r'
-  _ -> Nothing
-
---------------------------------------------------------------------------------
--- Lexical helpers
---------------------------------------------------------------------------------
-
-ws :: Parser String Unit
-ws = void (many (satisfy isSpace))
-
-lexeme :: forall a. Parser String a -> Parser String a
-lexeme p = p <* ws
-
-isSpace :: Char -> Boolean
-isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
-
-isDigit :: Char -> Boolean
-isDigit c = c >= '0' && c <= '9'
-
-isNumChar :: Char -> Boolean
-isNumChar c = isDigit c || c == '.'
-
-isAlpha :: Char -> Boolean
-isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-
-isPathChar :: Char -> Boolean
-isPathChar c =
-  isAlpha c || isDigit c || c == '_' || c == '-' || c == '.' || c == '@'
+  cmpOp :: Token -> Maybe (Expr -> Expr -> Expr)
+  cmpOp = case _ of
+    TOp "==" -> bin "eq"
+    TOp "!=" -> bin "ne"
+    TOp "<=" -> bin "lte"
+    TOp ">=" -> bin "gte"
+    TOp "<" -> bin "lt"
+    TOp ">" -> bin "gt"
+    _ -> Nothing
+    where
+    bin h = Just (\a b -> App h [ a, b ])

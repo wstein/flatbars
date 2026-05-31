@@ -8,12 +8,12 @@ import Prelude
 
 import BareBars.Compile.FullBars (compileSurface)
 import BareBars.Error (ParseError)
-import RawBars (compileJs) as RawBars
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.String (Pattern(..), contains)
 import Effect (Effect)
 import Effect.Console (log)
+import RawBars (compileJs) as RawBars
 import Test.Assert (assert')
 
 -- assert `src` compiles and the JS contains every fragment in `needles`.

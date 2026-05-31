@@ -7,24 +7,19 @@ package:
       githubOwner: barebars
       githubRepo: barebars
   dependencies:
-    - prelude
     - arrays
-    - strings
-    - maybe
-    - either
-    - numbers
-    - control
-    - foldable-traversable
-    - identity
-    - parsing
     - barebars
-    - fullbars
     - barebars-compile
+    - either
+    - fullbars
+    - maybe
+    - prelude
   test:
     main: Test.MaxBars.Main
     dependencies:
-      - effect
-      - console
       - assert
+      - console
+      - effect
       - ordered-collections
+      - strings
       - tuples

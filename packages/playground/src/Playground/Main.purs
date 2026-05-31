@@ -18,11 +18,8 @@ module Playground.Main where
 import Prelude
 
 import BareBars (parse)
-import Kernel.Walk (Issue, validate)
 import BareBars.Json (parseValue)
 import BareBars.Syntax (Expr(..), Node(..), Template)
-
-import RawBars (render) as RawBars
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
@@ -41,7 +38,9 @@ import Halogen.HTML.Core (AttrName(..), ClassName(..), ElemName(..))
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
+import Kernel.Walk (Issue, validate)
 import Playground.Examples (examples)
+import RawBars (render) as RawBars
 import Web.DOM.ParentNode (QuerySelector(..))
 
 main :: Effect Unit

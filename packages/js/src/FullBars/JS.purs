@@ -23,7 +23,6 @@ import BareBars (Expr(..), parse, parseErrorAt)
 import BareBars.Compile.FullBars (compileSurface) as Compile
 import BareBars.Json (fromJson)
 import BareBars.Value (Value(..))
-import RawBars as RawBars
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
@@ -34,6 +33,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, lower)
 import FullBars as FullBars
+import RawBars as RawBars
 
 -- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
 type Result = { ok :: Boolean, value :: String, error :: String }
