@@ -863,6 +863,7 @@
             "either",
             "foldable-traversable",
             "fullbars",
+            "kernel",
             "maxbars",
             "maybe",
             "ordered-collections",

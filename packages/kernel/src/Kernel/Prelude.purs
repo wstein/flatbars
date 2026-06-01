@@ -17,6 +17,7 @@
 module Kernel.Prelude
   ( prelude
   , preludeSchema
+  , preludeAliases
   , coreHelperDefs
   , primitiveHelperDefs
   , coreSchema
@@ -60,6 +61,14 @@ type HelperDef m =
   , block :: Boolean
   , arity :: Arity
   , run :: Helper m (RefEnv m)
+  -- | `Just canonical` marks this name as a *linter-lowered alias* of `canonical`
+  -- | (e.g. `plus` → `add`). The alias renders identically (it is a real
+  -- | registered helper, never removed), but it is second-class: the catalog marks
+  -- | it, the on-demand alias lint warns on its use, and the lift/migrate assist
+  -- | rewrites it to the canonical form. The single source of truth for which
+  -- | names are aliases — `preludeAliases` projects it. (Open decision 2,
+  -- | resolved: permanent + warn-on-demand, never auto-rewritten on save.)
+  , alias :: Maybe String
   }
 
 -- | A non-block value helper built from a `Kernel.Helper` combinator. The
@@ -70,12 +79,16 @@ valDef name mk =
   let
     s = mk name
   in
-    { name, block: false, arity: s.arity, run: s.run }
+    { name, block: false, arity: s.arity, run: s.run, alias: Nothing }
 
 -- | A block or bespoke helper written directly against `Helper`, with its arity
 -- | declared explicitly (and enforced inside the helper body).
 gen :: forall m. String -> Boolean -> Arity -> Helper m (RefEnv m) -> HelperDef m
-gen name block arity run = { name, block, arity, run }
+gen name block arity run = { name, block, arity, run, alias: Nothing }
+
+-- | Mark a helper definition as an alias of `canonical` (see `HelperDef.alias`).
+withAlias :: forall m. String -> HelperDef m -> HelperDef m
+withAlias canonical d = d { alias = Just canonical }
 
 -- | The complete reference roster: the core helpers (control flow, access,
 -- | arithmetic, …) followed by the *separable* value-primitive pack. Splitting
@@ -129,11 +142,11 @@ coreHelperDefs =
   , valDef "divide" (binary (arith (/)))
   , valDef "modulo" (binary (arith jsMod))
   -- handlebars-helpers aliases: render identically to the canonical helpers
-  -- (`add`/`subtract`/`multiply`); the linter normalises them to the canonical
-  -- name / the `+ - *` operators in committed form.
-  , valDef "plus" (binary (arith (+)))
-  , valDef "minus" (binary (arith (-)))
-  , valDef "times" (binary (arith (*)))
+  -- (`add`/`subtract`/`multiply`); marked as aliases so the catalog flags them,
+  -- the alias lint warns, and the lift normalises them to the `+ - *` operators.
+  , withAlias "add" (valDef "plus" (binary (arith (+))))
+  , withAlias "subtract" (valDef "minus" (binary (arith (-))))
+  , withAlias "multiply" (valDef "times" (binary (arith (*))))
   -- null-coalescing: the desugar target of `??`. Returns the first non-`VNull`
   -- argument (else `VNull`). Distinct from truthiness — `0`/`""`/`[]` pass.
   , gen "coalesce" false (AtLeast 1) coalesceH
@@ -171,8 +184,8 @@ primitiveHelperDefs =
   , valDef "prepend" (binary prependH)
   -- case aliases (handlebars-helpers parity): render identically to the
   -- canonical case helpers, reusing the very same `strUnary` transform.
-  , valDef "downcase" (unary (strUnary toLower))
-  , valDef "upcase" (unary (strUnary toUpper))
+  , withAlias "lowercase" (valDef "downcase" (unary (strUnary toLower)))
+  , withAlias "uppercase" (valDef "upcase" (unary (strUnary toUpper)))
   -- number pack
   , valDef "abs" (unary (numUnary Number.abs))
   , valDef "floor" (unary (numUnary Number.floor))
@@ -198,6 +211,16 @@ primitiveHelperDefs =
 -- | The registry: name → runtime helper.
 prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
 prelude = map (\d -> Tuple d.name d.run) helperDefs
+
+-- | The alias table — each linter-lowered alias name → its canonical name —
+-- | projected from `helperDefs.alias` (the single source of truth). The catalog
+-- | marks these, and the on-demand alias lint warns on their use (open decision
+-- | 2: permanent + warn-on-demand). E.g. `plus → add`, `downcase → lowercase`.
+preludeAliases :: Array (Tuple String String)
+preludeAliases =
+  Array.mapMaybe aliasOf (helperDefs :: Array (HelperDef (Either Error)))
+  where
+  aliasOf d = Tuple d.name <$> d.alias
 
 -- | The reference engine's validation schema (`Kernel.Walk.validate`),
 -- | projected from `helperDefs` plus the scoped variables below.

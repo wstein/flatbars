@@ -14,13 +14,14 @@ import Prelude
 
 import BareBars.Error (Error)
 import Data.Either (Either)
-import Data.Foldable (foldMap)
+import Data.Foldable (foldMap, lookup)
 import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
 import Kernel.Engine (Helper)
 import Kernel.Env (RefEnv)
-import Kernel.Prelude (prelude, preludeSchema)
+import Kernel.Prelude (prelude, preludeAliases, preludeSchema)
 import Kernel.Walk (Arity(..))
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
@@ -42,7 +43,9 @@ renderRow (Tuple name spec) =
   "|`" <> name <> "` |" <> form <> " |" <> renderArity spec.arity <> " |" <> source
   where
   form = if spec.block then "block" else "value"
-  source = if Set.member name registeredNames then "registered" else "scoped"
+  source = case lookup name preludeAliases of
+    Just canonical -> "alias of `" <> canonical <> "`"
+    Nothing -> if Set.member name registeredNames then "registered" else "scoped"
 
 -- | The full AsciiDoc partial: a generated, do-not-edit table of every helper in
 -- | `preludeSchema`, sorted by name (the `Map` is already key-ordered).

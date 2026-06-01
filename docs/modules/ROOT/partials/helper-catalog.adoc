@@ -17,7 +17,7 @@
 |`count` |value |1 |registered
 |`dict` |value |any |registered
 |`divide` |value |2 |registered
-|`downcase` |value |1 |registered
+|`downcase` |value |1 |alias of `lowercase`
 |`each` |block |≥1 |registered
 |`elif` |value |1 |registered
 |`else` |value |0 |registered
@@ -47,7 +47,7 @@
 |`lowercase` |value |1 |registered
 |`lt` |value |2 |registered
 |`lte` |value |2 |registered
-|`minus` |value |2 |registered
+|`minus` |value |2 |alias of `subtract`
 |`modulo` |value |2 |registered
 |`multiply` |value |2 |registered
 |`ne` |value |2 |registered
@@ -62,7 +62,7 @@
 |`partial` |value |2–3 |registered
 |`partial-block` |value |0 |scoped
 |`pluck` |value |2 |registered
-|`plus` |value |2 |registered
+|`plus` |value |2 |alias of `add`
 |`prepend` |value |2 |registered
 |`raw` |block |any |registered
 |`replace` |value |3 |registered
@@ -81,7 +81,7 @@
 |`take` |value |2 |registered
 |`takeRight` |value |2 |registered
 |`this` |value |0 |registered
-|`times` |value |2 |registered
+|`times` |value |2 |alias of `multiply`
 |`toFixed` |value |2 |registered
 |`toFloat` |value |1 |registered
 |`toInt` |value |1 |registered
@@ -92,7 +92,7 @@
 |`truncate` |value |2–3 |registered
 |`unique` |value |1 |registered
 |`unless` |block |1–2 |registered
-|`upcase` |value |1 |registered
+|`upcase` |value |1 |alias of `uppercase`
 |`uppercase` |value |1 |registered
 |`with` |block |≥1 |registered
 |===

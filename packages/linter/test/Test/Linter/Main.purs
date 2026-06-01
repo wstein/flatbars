@@ -28,6 +28,7 @@ import Linter.Lower (lowerReport, lowerToRawBars)
 import MaxBars (maxLoopVars, maxOptions, renderMax)
 import RawBars as RawBars
 import Test.Assert (assert')
+import Test.Linter.Aliases as Aliases
 import Test.Linter.Lift as Lift
 import Test.Linter.Migrate as Migrate
 
@@ -179,3 +180,6 @@ main = do
 
   -- X3 — heuristic lift RawBars → MaxBars.
   Lift.main
+
+  -- alias warnings (open decision 2: permanent + warn-on-demand).
+  Aliases.main
