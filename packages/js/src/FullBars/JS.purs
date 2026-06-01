@@ -11,9 +11,11 @@ module FullBars.JS
   ( Result
   , render
   , renderSurface
+  , renderMaxbars
   , astJson
   , compile
   , compileSurface
+  , compileMaxbars
   , renderSurfaceWithPartials
   ) where
 
@@ -33,6 +35,7 @@ import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, lower)
 import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
+import MaxBars as MaxBars
 import RawBars as RawBars
 
 -- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
@@ -48,6 +51,11 @@ render = mkFn2 \tpl json -> result (RawBars.renderDiag tpl (fromJson json))
 -- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result
 renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJson json))
+
+-- | Render a *MaxBars* template (FullBars surface + infix/pipes + bare loop
+-- | variables) against JS data. `renderMaxbars(template, data)`.
+renderMaxbars :: Fn2 String Json Result
+renderMaxbars = mkFn2 \tpl json -> result (MaxBars.renderMax tpl (fromJson json))
 
 -- | Render a surface template with a set of named partials (each a surface
 -- | source). `renderSurfaceWithPartials(partials, template, data)`, where
@@ -66,6 +74,11 @@ compile = mkFn1 \tpl -> compileResult (RawBars.compileJs tpl)
 -- | Compile a *surface* template to JS (desugars first). `compileSurface(template)`.
 compileSurface :: Fn1 String Result
 compileSurface = mkFn1 \tpl -> compileResult (Compile.compileSurface tpl)
+
+-- | Compile a *MaxBars* template to JS (infix/pipes/loop vars desugar first).
+-- | `compileMaxbars(template)`.
+compileMaxbars :: Fn1 String Result
+compileMaxbars = mkFn1 \tpl -> compileResult (MaxBars.compileMaxJs tpl)
 
 compileResult :: forall e. Show e => Either e String -> Result
 compileResult = case _ of

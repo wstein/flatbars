@@ -25,15 +25,22 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, compileSurface, render, renderSurface } = await import(enginePath);
+const { compile, compileSurface, compileMaxbars, render, renderSurface, renderMaxbars } =
+  await import(enginePath);
+
+// Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
+// "maxbars" (FullBars + infix/pipes/loop vars), or core (default).
+const interpreterFor = (dialect) =>
+  dialect === "surface" ? renderSurface : dialect === "maxbars" ? renderMaxbars : render;
+const compilerFor = (dialect) =>
+  dialect === "surface" ? compileSurface : dialect === "maxbars" ? compileMaxbars : compile;
 
 // Render with the interpreter (the spec), in the case's dialect.
-const interpret = (t, d, dialect) =>
-  (dialect === "surface" ? renderSurface : render)(t, d == null ? null : d);
+const interpret = (t, d, dialect) => interpreterFor(dialect)(t, d == null ? null : d);
 
 // Compile then execute against the runtime: -> { ok, value, error }.
 async function runCompiled(t, d, dialect) {
-  const c = (dialect === "surface" ? compileSurface : compile)(t);
+  const c = compilerFor(dialect)(t);
   if (!c.ok) return { ok: false, value: "", error: "compile: " + c.error };
   try {
     const mod = await import("data:text/javascript," + encodeURIComponent(c.value));

@@ -15,10 +15,14 @@ expression grammar, plugged in through the `ParseOptions.parseExpr` seam
 
 [source,purescript]
 ----
-maxOptions  = defaultParseOptions { parseExpr = MaxBars.Expr.parseMaxExpr }
-renderMax   = renderSurfaceDiagWith maxOptions      -- FullBars engine, reused
-compileMaxJs = compileSurfaceWith   maxOptions      -- FullBars compiler, reused
+maxOptions   = defaultParseOptions { parseExpr = MaxBars.Expr.parseMaxExpr }
+renderMax    = renderSurfaceDiagWith maxLoopVars maxOptions  -- FullBars engine, reused
+compileMaxJs = compileSurfaceWith   maxLoopVars maxOptions  -- FullBars compiler, reused
 ----
+
+The second seam, `maxLoopVars`, is a `LoopVars` resolver the surface desugar
+consults for *bare loop variables* (below); FullBars passes `noLoopVars`, so its
+bare names stay data paths.
 
 A shared semantic *kernel* (truthiness/stringify/escape, frame mechanics) is
 extracted lazily — only for proven overlaps, never a vague `common` package.
@@ -47,15 +51,47 @@ subexpressions are exactly as in FullBars; the operator characters
 (`< > = | & !`) are excluded from the identifier set so they tokenise as
 operators.
 
+== Loop variables
+
+Inside `pass:[{{#each}}]`, MaxBars exposes the loop metadata as **bare** scoped
+variables (no `@` sigil — that is the FullBars/Handlebars spelling). They desugar
+to scoped-helper calls; the underlying frame is the shared engine's, so the
+interpreter and compiler agree by construction.
+
+[cols="1,2",options="header"]
+|===
+|Variable |Value (0-based, `n` = collection length)
+
+|`index0` |the current index (`0…n-1`)
+|`index1` |`index0 + 1` (1-based)
+|`rindex0` |`n - 1 - index0` (remaining, 0-based)
+|`rindex1` |`n - index0` (remaining, 1-based)
+|`length` |`n`
+|`first` `last` |`true` on the first / last element
+|`key` |the array index (as a string) or object key
+|===
+
+Aliases: `index` → `index0`, `rindex` → `rindex0`, `size` → `length`. A block
+parameter of the same name (`pass:[as |index0|]`) shadows the loop variable. A
+bare name that is *not* a loop variable is a data path, exactly as in FullBars —
+so `pass:[{{ length }}]` is the loop size inside `each`, while a data field named
+`length` must be read with an explicit path (e.g. `pass:[{{ this.length }}]`).
+
+[source,handlebars]
+----
+{{#each items}}{{index1}}/{{length}}: {{ this.name }}{{#unless last}}, {{/unless}}{{/each}}
+----
+
 == v1 limitations
 
 * **Infix block conditions must be parenthesised** — `pass:[{{#if (a && b)}}]`,
   not `pass:[{{#if a && b}}]`. Bare infix works in output (`pass:[{{ a && b }}]`,
   `pass:[{{{ … }}}]`) and pipes; the shared tree-builder reads a block *head* as a
   prefix application, so block-head-aware infix is a follow-up.
-* **Richer loop variables** (`index0`/`index1`/`rindex0`/`rindex1`/`length`, bare
-  names without `@`) are specified for MaxBars but not yet wired; FullBars'
-  `@index`/`@../` are available in the meantime.
+* **Block parameters `pass:[as |x|]` are not yet available in MaxBars** — the `|`
+  bars collide with the pipe operator in the MaxBars grammar. Use the bare loop
+  variables above for index/key access; outer-loop block params are a follow-up
+  (tracked with the block-head grammar work).
 
 == Truthiness
 

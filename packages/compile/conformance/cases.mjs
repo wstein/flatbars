@@ -105,4 +105,25 @@ export const cases = [
   { name: "t:with-empty-array-minimal", dialect: "surface", t: "{{! @truthiness:minimal }}{{#with xs}}has{{else}}none{{/with}}", d: { xs: [] } },
   { name: "t:core-minimal", dialect: "core", t: "{{! @truthiness:minimal }}{{#if (lookup this \"n\")}}y{{else}}m{{/if}}", d: { n: 0 } },
   { name: "t:each-body-inherits-mode", dialect: "surface", t: "{{! @truthiness:minimal }}{{#each xs}}{{#if this}}t{{else}}f{{/if}}{{/each}}", d: { xs: [0, 1] } },
+
+  // ── MaxBars: infix operators, pipes, bare loop variables ─────────────────────
+  { name: "mx:and", dialect: "maxbars", t: "{{ a && b }}", d: { a: true, b: false } },
+  { name: "mx:or", dialect: "maxbars", t: "{{ a || b }}", d: { a: false, b: true } },
+  { name: "mx:not", dialect: "maxbars", t: "{{ !a }}", d: { a: false } },
+  { name: "mx:cmp-gt", dialect: "maxbars", t: "{{ x > 3 }}", d: { x: 5 } },
+  { name: "mx:cmp-gte", dialect: "maxbars", t: "{{ x >= 18 }}", d: { x: 18 } },
+  { name: "mx:cmp-eq", dialect: "maxbars", t: "{{ x == 1 }}", d: { x: 1 } },
+  { name: "mx:cmp-ne", dialect: "maxbars", t: "{{ x != 1 }}", d: { x: 2 } },
+  { name: "mx:precedence", dialect: "maxbars", t: "{{ x > 0 && x < 10 }}", d: { x: 5 } },
+  { name: "mx:pipe", dialect: "maxbars", t: "{{{ o | json }}}", d: { o: { a: 1 } } },
+  { name: "mx:pipe-arg", dialect: "maxbars", t: "{{{ xs | lookup 0 }}}", d: { xs: ["a", "b"] } },
+  { name: "mx:pipe-chain", dialect: "maxbars", t: "{{{ n | not | not }}}", d: { n: 0 } },
+  { name: "mx:if-paren-infix", dialect: "maxbars", t: "{{#if (a && b)}}Y{{else}}N{{/if}}", d: { a: true, b: false } },
+  // bare loop variables (the canonical set + aliases).
+  { name: "mx:loopvars", dialect: "maxbars", t: "{{#each xs}}[{{index0}}/{{index1}}/{{rindex0}}/{{rindex1}}/{{length}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:loopvar-aliases", dialect: "maxbars", t: "{{#each xs}}{{index}}{{rindex}}{{size}}{{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:loopvar-first-last", dialect: "maxbars", t: "{{#each xs}}{{#if first}}<{{/if}}{{this}}{{#if last}}>{{/if}}{{/each}}", d: { xs: ["a", "b"] } },
+  { name: "mx:loopvar-key", dialect: "maxbars", t: "{{#each o}}{{key}}={{this}};{{/each}}", d: { o: { x: 1, y: 2 } } },
+  // a dotted path is still a path (not a loop var) in MaxBars.
+  { name: "mx:path-still-works", dialect: "maxbars", t: "{{ user.name }}", d: { user: { name: "Ada" } } },
 ];
