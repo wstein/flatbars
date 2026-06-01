@@ -1,11 +1,11 @@
 # MaxBars Loop Variables & Cross-Dialect Linter — Specification & Implementation Plan
 
-Status: **Part A shipped; Part B in implementation.** Companion to truthiness (specified in the truthiness ADR / `Kernel.Value`, not here).
+Status: **Part A shipped; Part B shipped.** Companion to truthiness (specified in the truthiness ADR / `Kernel.Value`, not here).
 
 Implementation status (what `main` does today):
 
 - **Part A — Loop variables — SHIPPED.** The `index0`/`index1`/`rindex0`/`rindex1`/`first`/`last`/`length`/`key` set as scoped helpers in `each` (`Kernel.Prelude.iterate`); the `index`/`rindex`/`size` aliases resolved at desugar (`MaxBars.maxLoopVars`); `key` is **`null` for arrays** (engine, per the §A.1 fix); bare-name vs `this.NAME` resolution (`FullBars.Surface.pathExpr`); the **warn-always shadow lint** (`MaxBars.loopVarWarnings`, on-demand). The recursion budget is shipped (ADR-012, default 64); the `depth` accessor and labeled loops are **not** built — A.5/A.6's boundaries stand.
-- **Part B — Cross-dialect linter / translator — being built.** The transpiler over the tier ladder: its four jobs (lower / lift / migrate / materialize-truthiness), what is lossless vs heuristic, and the per-construct rules.
+- **Part B — Cross-dialect linter / translator — SHIPPED.** The `linter` package implements all four jobs over the tier ladder: **lower** (X0, `Linter.Lower` — MaxBars→RawBars, lossless, round-trip-tested), **materialize truthiness** (X1, carries the `@truthiness` directive forward so non-default modes render exact), **migrate** (X2, `Linter.Migrate` — Handlebars→MaxBars minimal-diff rewrite + residual report), and **lift** (X3, `Linter.Lift` — RawBars→MaxBars heuristic re-sugar, assist-only with ambiguity flags). Each is render-equivalence-tested; see the X0–X3 phase entries below.
 
 ---
 
