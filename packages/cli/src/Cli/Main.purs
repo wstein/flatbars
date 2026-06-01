@@ -21,17 +21,20 @@ import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (joinWith)
+import Data.String (Pattern(..), joinWith, stripSuffix)
+import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (message, try)
 import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
-import MinBars (renderMinDiag) as MinBars
+import MinBars (renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
-import Node.FS.Sync (readTextFile)
+import Node.FS.Sync (readTextFile, readdir)
 import RawBars (compileJsWith, compileWith)
 
 foreign import argv :: Effect (Array String)
@@ -84,10 +87,13 @@ type Options =
 main :: Effect Unit
 main = do
   args <- Array.drop 2 <$> argv
-  case parseArgs args of
-    Help -> writeStdout (usage <> "\n")
-    Invalid msg -> die ("barebars: " <> msg <> "\n\n" <> usage)
-    Run opts -> run opts
+  case Array.uncons args of
+    -- `barebars examples …` — the vendored example/conformance corpus subcommand.
+    Just { head: "examples", tail } -> runExamples tail
+    _ -> case parseArgs args of
+      Help -> writeStdout (usage <> "\n")
+      Invalid msg -> die ("barebars: " <> msg <> "\n\n" <> usage)
+      Run opts -> run opts
 
 -- | Parse argv into a mode. The first non-flag argument is the template path.
 parseArgs :: Array String -> Mode
@@ -228,3 +234,155 @@ die :: String -> Effect Unit
 die msg = do
   writeStderr (msg <> "\n")
   setExitCode 1
+
+--------------------------------------------------------------------------------
+-- `barebars examples` — the vendored example/conformance corpus
+--
+-- See `example-loader-spec.md`. v1 implements the headless `verify` gate for the
+-- `mustache` provider: re-render each vendored fixture through MinBars and assert
+-- `actual == expected` (a divergence is a conformance failure). The corpus is
+-- vendored offline by `scripts/vendor-mustache.mjs`; this command never fetches.
+--------------------------------------------------------------------------------
+
+examplesUsage :: String
+examplesUsage =
+  joinWith "\n"
+    [ "barebars examples — vendored example/conformance corpus"
+    , ""
+    , "Usage:"
+    , "  barebars examples verify [--provider mustache]   re-render each fixture; assert"
+    , ""
+    , "verify (mustache): render template+data+partials via MinBars and assert"
+    , "  actual == expected — a divergence is a conformance failure. Exit ≠ 0 on any miss."
+    , "Vendor/refresh the corpus with: node scripts/vendor-mustache.mjs"
+    ]
+
+runExamples :: Array String -> Effect Unit
+runExamples args = case Array.uncons args of
+  Just { head: "verify", tail } -> verifyProvider (providerOf tail)
+  Just { head: "-h" } -> writeStdout (examplesUsage <> "\n")
+  Just { head: "--help" } -> writeStdout (examplesUsage <> "\n")
+  Nothing -> writeStdout (examplesUsage <> "\n")
+  Just { head: sub } -> die
+    ("barebars examples: unknown subcommand '" <> sub <> "'\n\n" <> examplesUsage)
+
+-- | Read `--provider <id>` from the flags; default `mustache`.
+providerOf :: Array String -> String
+providerOf args = case Array.elemIndex "--provider" args of
+  Just i -> fromMaybe "mustache" (Array.index args (i + 1))
+  Nothing -> "mustache"
+
+-- | The `verify` gate for one provider. v1 supports `mustache` (authoritative
+-- | `expected`, rendered through MinBars).
+verifyProvider :: String -> Effect Unit
+verifyProvider provider
+  | provider /= "mustache" =
+      die ("barebars examples: unsupported provider '" <> provider <> "' (only 'mustache' in v1)")
+  | otherwise = do
+      let base = "examples/vendored/" <> provider
+      files <- listFixtures base
+      case files of
+        [] -> die
+          ( "barebars examples: no fixtures under " <> base
+              <> " — run: node scripts/vendor-mustache.mjs"
+          )
+        _ -> do
+          results <- traverse verifyOne files
+          let
+            fails = Array.filter (\r -> not r.ok) results
+            n = Array.length results
+            passed = n - Array.length fails
+          writeStderr (joinWith "" (map _.detail fails))
+          writeStdout (show passed <> "/" <> show n <> " " <> provider <> " fixtures conform\n")
+          when (not (Array.null fails)) (setExitCode 1)
+
+-- | Collect every `*.json` fixture two levels down (`<base>/<category>/<name>.json`).
+listFixtures :: String -> Effect (Array String)
+listFixtures base = do
+  catsE <- try (readdir base)
+  case catsE of
+    Left _ -> pure []
+    Right cats -> do
+      nested <- traverse (\cat -> jsonIn (base <> "/" <> cat)) cats
+      pure (Array.concat nested)
+  where
+  jsonIn dir = do
+    filesE <- try (readdir dir)
+    pure case filesE of
+      Left _ -> [] -- not a directory (or unreadable) — skip
+      Right files ->
+        map (\f -> dir <> "/" <> f)
+          (Array.filter (\f -> stripSuffix (Pattern ".json") f /= Nothing) files)
+
+type FxResult = { id :: String, ok :: Boolean, detail :: String }
+
+-- | Verify one fixture file: read it, decode the shared fixture shape, render via
+-- | MinBars, and compare against the authoritative `expected`.
+verifyOne :: String -> Effect FxResult
+verifyOne path = do
+  txtE <- readFileSafe path
+  pure case txtE of
+    Left e -> fxFail path ("read error: " <> e)
+    Right txt -> case parseValue txt of
+      Left e -> fxFail path ("fixture JSON: " <> e)
+      Right v -> case decodeFixture v of
+        Nothing -> fxFail path "fixture missing template/expected"
+        Just fx -> case MinBars.renderMinWith fx.partials fx.template fx.dat of
+          Left err ->
+            { id: fx.id
+            , ok: false
+            , detail: "  FAIL " <> fx.id <> "\n    render error: " <> err <> "\n"
+            }
+          Right out
+            | out == fx.expected -> { id: fx.id, ok: true, detail: "" }
+            | otherwise ->
+                { id: fx.id
+                , ok: false
+                , detail: "  FAIL " <> fx.id <> "\n    expected " <> show fx.expected
+                    <> "\n    actual   "
+                    <> show out
+                    <> "\n"
+                }
+
+fxFail :: String -> String -> FxResult
+fxFail path msg = { id: path, ok: false, detail: "  FAIL " <> path <> "\n    " <> msg <> "\n" }
+
+-- | Decode the fields `verify` needs from a vendored fixture `Value`.
+decodeFixture
+  :: Value
+  -> Maybe
+       { id :: String
+       , template :: String
+       , dat :: Value
+       , partials :: Array (Tuple String String)
+       , expected :: String
+       }
+decodeFixture v = do
+  obj <- asObject v
+  ident <- asString =<< Map.lookup "id" obj
+  template <- asString =<< Map.lookup "template" obj
+  expected <- asString =<< Map.lookup "expected" obj
+  let
+    dat = fromMaybe VNull (Map.lookup "data" obj)
+    partials = case Map.lookup "partials" obj of
+      Just (VObject pm) -> stringPairs pm
+      _ -> []
+  pure { id: ident, template, dat, partials, expected }
+
+asObject :: Value -> Maybe (Map String Value)
+asObject = case _ of
+  VObject m -> Just m
+  _ -> Nothing
+
+asString :: Value -> Maybe String
+asString = case _ of
+  VString s -> Just s
+  _ -> Nothing
+
+-- | The string-valued entries of a `Value` object, as (name, source) pairs.
+stringPairs :: Map String Value -> Array (Tuple String String)
+stringPairs m = Array.mapMaybe pair (Map.toUnfoldable m :: Array (Tuple String Value))
+  where
+  pair (Tuple k val) = case val of
+    VString s -> Just (Tuple k s)
+    _ -> Nothing

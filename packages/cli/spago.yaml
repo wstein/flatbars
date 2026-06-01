@@ -8,6 +8,8 @@ package:
     - either
     - strings
     - ordered-collections
+    - foldable-traversable
+    - tuples
     - node-fs
     - node-buffer
     - exceptions
