@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "spago build",
-    "test": "spago test -p barebars && spago test -p fullbars && spago test -p barebars-json && spago test -p barebars-js && spago test -p barebars-compile && npm run check:catalog && npm run check:isolation && npm run test:compile && npm run examples:verify",
+    "test": "spago test -p barebars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p barebars-json && spago test -p barebars-js && spago test -p barebars-compile && spago test -p linter && npm run check:catalog && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify",
     "check:isolation": "node scripts/check-package-isolation.mjs",
     "examples:verify": "spago build -p barebars-cli && spago run -p barebars-cli -- examples verify",
     "cli": "spago run -p barebars-cli",
