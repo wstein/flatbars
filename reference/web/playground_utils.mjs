@@ -1466,25 +1466,3 @@ export function vendoredVerdict(fx, actual) {
   const match = actual === (fx.expected ?? "");
   return { match, severity: match ? "ok" : (fx.divergenceMeaning || "conformance-failure") };
 }
-
-// Browse-menu entries for the vendored corpus, from its `manifest.json`
-// (example-loader-spec.md §8). Each carries the deep-link target so the picker
-// just navigates. `label` drops the redundant provider prefix from the id.
-export function vendoredMenuItems(manifest) {
-  const fixtures = (manifest && Array.isArray(manifest.fixtures)) ? manifest.fixtures : [];
-  return fixtures.map((f) => ({
-    id: f.id,
-    dialect: f.dialect,
-    label: `${f.category}/${f.name}`,
-  }));
-}
-
-// The deep-link URL for a vendored fixture: it runs under its dialect engine, so
-// set both `?engine=` and `?vendored=` on the current location (other params and
-// the path are preserved). Returns a string; the caller assigns `location.href`.
-export function vendoredHref(id, dialect, currentHref) {
-  const u = new URL(currentHref);
-  if (dialect) u.searchParams.set("engine", dialect);
-  u.searchParams.set("vendored", id);
-  return u.toString();
-}

@@ -1347,6 +1347,11 @@
             </button>
             <ul id="example-menu" class="dropdown-menu" role="listbox" hidden></ul>
           </div>
+          <!-- Provenance for a vendored fixture loaded via ?vendored= : a link
+               back to the upstream source the example was copied from. Hidden
+               for hand-edited / catalog examples. -->
+          <a id="vendored-source" class="field-label" target="_blank" rel="noopener noreferrer"
+             style="margin-left:8px;text-decoration:underline" hidden></a>
         </div>
         <div class="divider"></div>
         <!-- Search · Appearance · Diagnostics · Share — one divider-separated
@@ -1581,14 +1586,12 @@
         tabVisibleUnder,
         transpileSt4,
         validateOverlayName,
-        vendoredHref,
-        vendoredMenuItems,
         vendoredVerdict,
         vendoredWorkspace,
       // Cache-bust query: bump on any playground_utils.mjs change so a freshly
       // loaded index.html never pairs with a stale cached module (which silently
-      // ran the old, uncompressed encodeState). Bumped for the vendored-fixture picker (E2).
-      } from "./playground_utils.mjs?v=15";
+      // ran the old, uncompressed encodeState). Bumped for the vendored source link (E2).
+      } from "./playground_utils.mjs?v=16";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -1719,7 +1722,6 @@
       let tabs        = [{ name: "main", source: "" }];
       let activeTabIdx = 0;
       let loadedExampleIdx = -1;      // which example is loaded (-1 = custom/edited)
-      let VENDORED = [];              // vendored conformance fixtures (manifest.json) for the example-menu picker
       let exampleModified  = false;  // true when a loaded example has been edited
       let activeView   = "tmpl";      // "tmpl" | "data"
       let outputView   = "rendered";  // "rendered" | "source"
@@ -4073,14 +4075,8 @@
       // `#example-menu` <ul>; the trigger toggles the menu's `hidden`. Re-rendered
       // on open so the loaded example shows as active.
       function renderExampleMenu() {
-        const sectionStyle =
-          "opacity:.55;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:6px 12px 2px;cursor:default";
         render(
-          html`
-            ${examples.map((ex, i) => html`<li class=${"dropdown-item" + (i === loadedExampleIdx ? " active" : "")} role="option" onClick=${() => { closeExampleMenu(); loadExample(i); }}>${ex.label}</li>`)}
-            ${VENDORED.length ? html`<li style=${sectionStyle} aria-disabled="true">mustache/spec conformance</li>` : null}
-            ${VENDORED.map((v) => html`<li class="dropdown-item" role="option" title=${v.id} onClick=${() => { closeExampleMenu(); location.href = vendoredHref(v.id, v.dialect, location.href); }}>${v.label}</li>`)}
-          `,
+          html`${examples.map((ex, i) => html`<li class=${"dropdown-item" + (i === loadedExampleIdx ? " active" : "")} role="option" onClick=${() => { closeExampleMenu(); loadExample(i); }}>${ex.label}</li>`)}`,
           byId("example-menu")
         );
       }
@@ -4192,6 +4188,7 @@
         syncStandaloneUI();
         updateRenderStatus();
         setExampleLabel(ex.label);
+        { const s = byId("vendored-source"); if (s) s.hidden = true; } // catalog example: no vendored source
         loadedExampleIdx = idx;
         exampleModified = false;
         tabs.forEach(t => { t.dirty = false; });
@@ -4265,6 +4262,14 @@
         run(); // synchronous render — populates lastOutput
         const verdict = vendoredVerdict(fx, lastOutput);
         setExampleLabel(`vendored ${fx.id} — ` + (verdict.match ? "✓ conforms" : "✗ " + verdict.severity));
+        // Show the link back to the upstream source the fixture was copied from.
+        const srcEl = byId("vendored-source");
+        const url = fx.source && fx.source.url;
+        if (srcEl && url) {
+          srcEl.href = url; srcEl.textContent = "source ↗"; srcEl.title = url; srcEl.hidden = false;
+        } else if (srcEl) {
+          srcEl.hidden = true;
+        }
       }
 
       // Once the user edits anything, the state no longer matches a shipped
@@ -6233,13 +6238,6 @@
 
       // Default load is keyed by id, not array position, so reordering the
       // examples.json catalog (e.g. simple -> advanced) never breaks it.
-      // Load the vendored-corpus manifest for the example-menu picker
-      // (best-effort: a missing corpus just leaves the picker section empty).
-      try {
-        const mres = await fetch("./examples/vendored/mustache/manifest.json");
-        if (mres.ok) VENDORED = vendoredMenuItems(await mres.json());
-      } catch { /* no vendored corpus served — picker stays empty */ }
-
       // A `?vendored=<id>` deep-link takes precedence over both the shared-state
       // hash and the default example.
       const vendoredParam = new URLSearchParams(location.search).get("vendored");

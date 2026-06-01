@@ -28,8 +28,6 @@ import {
   validateOverlayName,
   vendoredWorkspace,
   vendoredVerdict,
-  vendoredMenuItems,
-  vendoredHref,
 } from "./playground_utils.mjs";
 
 // ── ADR-0020 capability gating ─────────────────────────────────────────────
@@ -962,26 +960,5 @@ test("vendoredVerdict classifies match and divergence by meaning", () => {
   assert.deepEqual(vendoredVerdict(mus, "no"), { match: false, severity: "conformance-failure" });
   const hbs = { expected: "ok", divergenceMeaning: "expected-difference" };
   assert.deepEqual(vendoredVerdict(hbs, "no"), { match: false, severity: "expected-difference" });
-});
-
-test("vendoredMenuItems maps a manifest to picker entries", () => {
-  const manifest = { commit: "abc", fixtures: [
-    { id: "mustache/sections/truthy", dialect: "minbars", category: "sections", name: "truthy" },
-    { id: "mustache/partials/context", dialect: "minbars", category: "partials", name: "context" },
-  ]};
-  assert.deepEqual(vendoredMenuItems(manifest), [
-    { id: "mustache/sections/truthy", dialect: "minbars", label: "sections/truthy" },
-    { id: "mustache/partials/context", dialect: "minbars", label: "partials/context" },
-  ]);
-  assert.deepEqual(vendoredMenuItems(null), []);
-  assert.deepEqual(vendoredMenuItems({}), []);
-});
-
-test("vendoredHref sets engine + vendored, preserving the rest", () => {
-  const href = vendoredHref("mustache/sections/truthy", "minbars", "http://x/app?engine=stem&foo=1");
-  const u = new URL(href);
-  assert.equal(u.searchParams.get("engine"), "minbars");
-  assert.equal(u.searchParams.get("vendored"), "mustache/sections/truthy");
-  assert.equal(u.searchParams.get("foo"), "1"); // unrelated params preserved
 });
 
