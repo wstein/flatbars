@@ -64,6 +64,45 @@ main = do
   -- pipe chain is left-assoc: not(not(0)) = false.
   expectM "pipe-chain" "{{{ n | not | not }}}" (obj [ Tuple "n" (num 0.0) ]) "false"
 
+  -- arithmetic operators (desugar to add/subtract/multiply/divide/modulo).
+  expectM "arith-add" "{{ a + b }}" (obj [ Tuple "a" (num 2.0), Tuple "b" (num 3.0) ]) "5"
+  expectM "arith-sub" "{{ a - b }}" (obj [ Tuple "a" (num 7.0), Tuple "b" (num 4.0) ]) "3"
+  expectM "arith-mul" "{{ a * b }}" (obj [ Tuple "a" (num 6.0), Tuple "b" (num 7.0) ]) "42"
+  expectM "arith-div" "{{ a / b }}" (obj [ Tuple "a" (num 9.0), Tuple "b" (num 2.0) ]) "4.5"
+  expectM "arith-mod" "{{ a % b }}" (obj [ Tuple "a" (num 17.0), Tuple "b" (num 5.0) ]) "2"
+  -- precedence: `*` binds tighter than `+`; comparison looser than both.
+  expectM "arith-precedence" "{{ a + b * c }}"
+    (obj [ Tuple "a" (num 2.0), Tuple "b" (num 3.0), Tuple "c" (num 4.0) ])
+    "14"
+  expectM "arith-parens" "{{ (a + b) * c }}"
+    (obj [ Tuple "a" (num 2.0), Tuple "b" (num 3.0), Tuple "c" (num 4.0) ])
+    "20"
+  expectM "arith-in-cmp" "{{#if n + 1 > 5}}big{{else}}small{{/if}}" (obj [ Tuple "n" (num 5.0) ])
+    "big"
+  -- a dotted path operand stays a path; `*` is unambiguously multiply.
+  expectM "arith-path" "{{ price.net * qty }}"
+    (obj [ Tuple "price" (obj [ Tuple "net" (num 10.0) ]), Tuple "qty" (num 3.0) ])
+    "30"
+
+  -- null-coalescing `??` (desugars to coalesce): first non-null, NOT truthiness.
+  expectM "coalesce-null" "{{ a ?? b }}" (obj [ Tuple "a" VNull, Tuple "b" (VString "fb") ]) "fb"
+  expectM "coalesce-zero" "{{ a ?? b }}" (obj [ Tuple "a" (num 0.0), Tuple "b" (VString "fb") ]) "0"
+  expectM "coalesce-chain" "{{ a ?? b ?? \"x\" }}" (obj [ Tuple "a" VNull, Tuple "b" VNull ]) "x"
+  expectM "coalesce-path" "{{ user.nick ?? user.name }}"
+    (obj [ Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
+    "Ada"
+
+  -- compiled path: `+` desugars to the `add` helper call.
+  case compileMaxJs "{{ a + b }}" of
+    Left e -> assert' ("compile arith: unexpected error " <> show e) false
+    Right js -> assert' ("compile arith: expected rt.call(\"add\" in\n" <> js)
+      (contains (Pattern "rt.call(\"add\"") js)
+  -- compiled path: `??` desugars to the `coalesce` helper call.
+  case compileMaxJs "{{ a ?? b }}" of
+    Left e -> assert' ("compile coalesce: unexpected error " <> show e) false
+    Right js -> assert' ("compile coalesce: expected rt.call(\"coalesce\" in\n" <> js)
+      (contains (Pattern "rt.call(\"coalesce\"") js)
+
   -- parenthesised infix in a block condition.
   expectM "if-paren-infix" "{{#if (a && b)}}Y{{else}}N{{/if}}"
     (obj [ Tuple "a" (VBool true), Tuple "b" (VBool false) ])

@@ -93,8 +93,11 @@ type LiftResult =
 unaryFilters :: Array String
 unaryFilters = [ "esc_html", "safe", "json", "esc_json" ]
 
--- | The infix operator table (B.7), helper → infix symbol, for the binary
--- | operators. `not` (prefix `!`) is handled separately.
+-- | The infix operator table, helper → infix symbol, for the binary operators
+-- | MaxBars re-sugars to. `not` (prefix `!`) is handled separately. Arithmetic
+-- | and `coalesce` (`??`) lift exactly like the comparison/boolean operators;
+-- | conservative parenthesisation (any infix operand is wrapped) keeps the
+-- | re-sugar render-equivalent without modelling the full precedence ladder.
 binaryOps :: Array (Tuple String String)
 binaryOps =
   [ Tuple "and" "&&"
@@ -105,6 +108,12 @@ binaryOps =
   , Tuple "gt" ">"
   , Tuple "lte" "<="
   , Tuple "gte" ">="
+  , Tuple "add" "+"
+  , Tuple "subtract" "-"
+  , Tuple "multiply" "*"
+  , Tuple "divide" "/"
+  , Tuple "modulo" "%"
+  , Tuple "coalesce" "??"
   ]
 
 -- | Lift RawBars (core) source up to MaxBars source, collecting advisory flags.

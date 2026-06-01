@@ -99,6 +99,11 @@ corpus =
   , Tuple "if elif else"
       "{{#if (gt (lookup this \"b\") 25)}}big{{elif (gt (lookup this \"b\") 15)}}mid{{else}}small{{/if}}"
   , Tuple "nested path output" "{{{ esc_html (lookup this \"user\" \"name\") }}}"
+  -- arithmetic + coalesce re-sugar (the new operator table rows).
+  , Tuple "add" "{{{ add (lookup this \"b\") 1 }}}"
+  , Tuple "nested arith" "{{{ add (multiply (lookup this \"b\") 2) 1 }}}"
+  , Tuple "modulo" "{{{ modulo (lookup this \"b\") 7 }}}"
+  , Tuple "coalesce" "{{{ coalesce (lookup this \"a\") \"fb\" }}}"
   ]
 
 -- | Assert render-equivalence across the matrix for one RawBars template.
@@ -141,6 +146,10 @@ maxCorpus =
   , Tuple "each" "{{#each xs}}[{{index1}}/{{this}}]{{/each}}"
   , Tuple "each cond" "{{#each xs}}{{#if index0 > 0}}, {{/if}}{{this}}{{/each}}"
   , Tuple "mixed" "Hi {{ user.name | esc_html }}!{{#each xs}} {{index1}}={{this}}{{/each}}"
+  -- arithmetic + `??` round-trip (lower desugars to helpers, lift re-sugars back).
+  , Tuple "arith" "{{ b + 1 }}"
+  , Tuple "arith precedence" "{{ b * 2 + 1 }}"
+  , Tuple "coalesce" "{{ a ?? b }}"
   ]
 
 -- | Assert `renderMax src == renderMax (lift (lower src))` across the matrix.
@@ -225,6 +234,15 @@ main = do
   liftsWithFlag "unrecognised filter flag" "{{{ frobnicate (lookup this \"a\") }}}"
     "(frobnicate"
     "unrecognised-filter"
+
+  -- arithmetic + coalesce re-sugar shapes.
+  liftsContaining "add → +" "{{{ add (lookup this \"b\") 1 }}}" "b + 1"
+  liftsContaining "multiply → *" "{{{ multiply (lookup this \"b\") 2 }}}" "b * 2"
+  liftsContaining "modulo → %" "{{{ modulo (lookup this \"b\") 7 }}}" "b % 7"
+  liftsContaining "coalesce → ??" "{{{ coalesce (lookup this \"a\") \"fb\" }}}" "a ?? \"fb\""
+  -- nested arithmetic parenthesises the infix operand.
+  liftsContaining "nested arith parens" "{{{ add (multiply (lookup this \"b\") 2) 1 }}}"
+    "(b * 2) + 1"
 
   -- `(and a (gt b 21))` lifts to source containing `a && (b > 21)` (inner gt
   -- parenthesised) — the headline acceptance example.

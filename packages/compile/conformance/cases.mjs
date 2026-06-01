@@ -154,4 +154,19 @@ export const cases = [
   { name: "coalesce-first", dialect: "surface", t: "{{ coalesce a b }}", d: { a: null, b: "fallback" } },
   { name: "coalesce-zero", dialect: "surface", t: "{{ coalesce a b }}", d: { a: 0, b: "x" } },
   { name: "coalesce-chain", dialect: "surface", t: "{{ coalesce a b c }}", d: { a: null, b: null, c: "third" } },
+
+  // MaxBars infix arithmetic + `??` operators (desugar to the prelude helpers;
+  // the compiled path and the interpreter must agree).
+  { name: "mx:add", dialect: "maxbars", t: "{{ a + b }}", d: { a: 2, b: 3 } },
+  { name: "mx:subtract", dialect: "maxbars", t: "{{ a - b }}", d: { a: 7, b: 4 } },
+  { name: "mx:multiply", dialect: "maxbars", t: "{{ a * b }}", d: { a: 6, b: 7 } },
+  { name: "mx:divide", dialect: "maxbars", t: "{{ a / b }}", d: { a: 9, b: 2 } },
+  { name: "mx:modulo", dialect: "maxbars", t: "{{ a % b }}", d: { a: 17, b: 5 } },
+  { name: "mx:arith-precedence", dialect: "maxbars", t: "{{ a + b * c }}", d: { a: 2, b: 3, c: 4 } },
+  { name: "mx:arith-parens", dialect: "maxbars", t: "{{ (a + b) * c }}", d: { a: 2, b: 3, c: 4 } },
+  { name: "mx:arith-cmp", dialect: "maxbars", t: "{{#if n + 1 > 5}}big{{else}}small{{/if}}", d: { n: 5 } },
+  { name: "mx:arith-path", dialect: "maxbars", t: "{{ price.net * qty }}", d: { price: { net: 10 }, qty: 3 } },
+  { name: "mx:coalesce-null", dialect: "maxbars", t: "{{ a ?? b }}", d: { a: null, b: "fb" } },
+  { name: "mx:coalesce-zero", dialect: "maxbars", t: "{{ a ?? b }}", d: { a: 0, b: "fb" } },
+  { name: "mx:coalesce-chain", dialect: "maxbars", t: '{{ a ?? b ?? "x" }}', d: { a: null, b: null } },
 ];
