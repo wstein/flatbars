@@ -1,7 +1,8 @@
 = ADR-015: Mustache set delimiters via a gated lexer mode
 :navtitle: ADR-015 Set delimiters
 
-*Status:* Proposed. *Date:* 2026-06-01. Lifts the set-delimiters deferral recorded in
+*Status:* Accepted (implemented across all four phases; MinBars 14/14 on the mustache/spec `delimiters`
+module, RawBars/MaxBars opt-in shipped). *Date:* 2026-06-01. Lifts the set-delimiters deferral recorded in
 xref:adr-0007-minbars.adoc[ADR-007]; constrained by xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]
 (one structural lexer) and xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014] (no forked
 grammar). Implementation plan: `set-delimiters-spec.md` (to be written before coding).

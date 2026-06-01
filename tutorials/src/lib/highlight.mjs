@@ -26,16 +26,23 @@ export function esc(s) {
 // NOT understand MaxBars operators/pipes (that needs the dialect-scoped lexer).
 //
 // Order matters: alternatives are tried left-to-right at each position, so the
-// most specific opener (long comment, then 4-brace, then 3-brace) must precede
-// the bare `{{ … }}` — otherwise `{{[^{}]*?}}` closes a `{{!--` at its inner
-// `}}` (Exhibit A). A long comment with no `--}}` runs to EOF, matching how the
-// engine's `RComment` swallows to the close-or-end (Exhibit B).
-const TAG_RE = /\{\{~?!--[\s\S]*?(?:--~?\}\}|$)|\{\{\{\{[\s\S]*?\}\}\}\}|\{\{\{[\s\S]*?\}\}\}|\{\{[^{}]*?\}\}/g;
+// most specific opener (long comment, then 4-brace, then 3-brace, then the
+// set-delimiter `{{=…=}}`) must precede the bare `{{ … }}` — otherwise
+// `{{[^{}]*?}}` closes a `{{!--` at its inner `}}` (Exhibit A). A long comment
+// with no `--}}` runs to EOF, matching how the engine's `RComment` swallows to
+// the close-or-end (Exhibit B).
+//
+// Set-delimiter caveat: only the DEFAULT-delimiter form `{{=A B=}}` is marked.
+// Once a template switches to custom delimiters, the regex cannot track the new
+// pair, so custom-delimited tags read as plain text — the dialect-aware engine
+// tokenizer (ADR-014 Tier 1) is what closes that gap.
+const TAG_RE = /\{\{~?!--[\s\S]*?(?:--~?\}\}|$)|\{\{\{\{[\s\S]*?\}\}\}\}|\{\{\{[\s\S]*?\}\}\}|\{\{=[^{}]*?=\}\}|\{\{[^{}]*?\}\}/g;
 
 export function highlightTemplate(src) {
   return esc(src).replace(TAG_RE, (m) => {
     let cls;
-    if (/^\{\{~?!--/.test(m)) cls = "stem-comment"; // long comment {{!-- … --}}
+    if (/^\{\{=[^{}]*=\}\}$/.test(m)) cls = "stem-comment"; // set-delimiter {{=<% %>=}} (meta)
+    else if (/^\{\{~?!--/.test(m)) cls = "stem-comment"; // long comment {{!-- … --}}
     else if (m.startsWith("{{{{")) cls = "stem-raw"; // raw-block delimiter {{{{ … }}}}
     else if (m.startsWith("{{{")) cls = "stem-raw"; // triple-brace unescaped {{{ … }}}
     else {

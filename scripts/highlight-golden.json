@@ -108,6 +108,13 @@
       "html": "<span class=\"stem-raw\">{{{{raw}}}}</span><span class=\"stem-expr\">{{x}}</span><span class=\"stem-raw\">{{{{/raw}}}}</span>"
     },
     {
+      "id": "set-delimiter",
+      "lang": "template",
+      "note": "default-form {{=A B=}} → stem-comment (meta); custom-delim tags after it are a known stopgap gap (ADR-014)",
+      "src": "{{=<% %>=}}{{x}}",
+      "html": "<span class=\"stem-comment\">{{=&lt;% %&gt;=}}</span><span class=\"stem-expr\">{{x}}</span>"
+    },
+    {
       "id": "yaml-scalars",
       "lang": "yaml",
       "note": "key + string/number/bool/null colouring",

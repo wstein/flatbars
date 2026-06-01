@@ -17,7 +17,7 @@
 * xref:adr-0012-recursion-budget.adoc[ADR-012: recursion budget]
 * xref:adr-0013-labelled-loops.adoc[ADR-013: labelled loops (proposed)]
 * xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014: highlighting from the lexer]
-* xref:adr-0015-set-delimiters.adoc[ADR-015: set delimiters (proposed)]
+* xref:adr-0015-set-delimiters.adoc[ADR-015: set delimiters]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification

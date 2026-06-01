@@ -57,6 +57,7 @@ const CORPUS = [
   { id: "short-comment", lang: "template", note: "{{! … }} (single bang, no --) → stem-comment", src: "Total{{! dropped }}: {{total}}" },
   { id: "tilde-long-comment", lang: "template", note: "{{~!-- … --}} whitespace-control long comment", src: "a {{~!-- note --}} b" },
   { id: "raw-block", lang: "template", note: "{{{{raw}}}} … {{{{/raw}}}} delimiters → stem-raw, body literal", src: "{{{{raw}}}}{{x}}{{{{/raw}}}}" },
+  { id: "set-delimiter", lang: "template", note: "default-form {{=A B=}} → stem-comment (meta); custom-delim tags after it are a known stopgap gap (ADR-014)", src: "{{=<% %>=}}{{x}}" },
 
   // ── YAML data ───────────────────────────────────────────────────────────
   { id: "yaml-scalars", lang: "yaml", note: "key + string/number/bool/null colouring", src: "name: Ada\nid: 42\nactive: true\nnada: null" },

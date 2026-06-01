@@ -1,6 +1,6 @@
 # Mustache Set Delimiters — Specification & Implementation Plan
 
-Status: draft for review · Companions: ADR-015 (set delimiters), ADR-007 (MinBars), ADR-001 (one structural lexer), ADR-014 (highlighting from the lexer) · Scope: **MinBars** (on by default) + **opt-in** for **RawBars / MaxBars** (FullBars excluded — Handlebars has no set delimiters)
+Status: **implemented** (all four phases shipped; MinBars 14/14 on the mustache/spec `delimiters` module) · Companions: ADR-015 (set delimiters), ADR-007 (MinBars), ADR-001 (one structural lexer), ADR-014 (highlighting from the lexer) · Scope: **MinBars** (on by default) + **opt-in** for **RawBars / MaxBars** (FullBars excluded — Handlebars has no set delimiters)
 
 ---
 

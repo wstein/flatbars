@@ -17,8 +17,9 @@ unchanged" claims to be false. They are recorded here because they reshape the p
 . *Scope = the full Mustache spec in one pass* — interpolation, sections, inverted, comments, partials,
   dotted names, implicit iterator, standalone whitespace — *plus* inheritance
   (`pass:[{{<p}}]`/`pass:[{{$b}}]`/`pass:[{{<*}}]`/`pass:[{{/*}}]`) and dynamic-name partials
-  (`pass:[{{>* }}]`). Lambdas are dropped (`Value` has no function arm). Set-delimiters are deferred
-  (no customer corpus to audit).
+  (`pass:[{{>* }}]`). Lambdas are dropped (`Value` has no function arm). Set delimiters
+  (`pass:[{{=<% %>=}}]`) were initially deferred but are now *implemented* (ADR-015; MinBars passes
+  the full `delimiters` module, 14/14).
 
 . *Truthiness `mustache` default = a shared parameter.* Add `mustache = false null []` to the alias
   table *and* thread a per-engine default `FalsySet` through `resolveTruthiness` + `runResolved`
