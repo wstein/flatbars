@@ -85,9 +85,15 @@ const BB_CATALOG = [
   { name: "partial", category: "composition", arity: "inline", summary: "Render a registered partial; block form gives a fallback + {{> @partial-block}}.", example: "{{> nav user}}" },
 ];
 
-export async function createBareBarsRenderer() {
+export async function createBareBarsRenderer(dialectArg) {
   // No async init — the engine is synchronous JS. The async signature mirrors the
-  // Stem/Handlebars adapters so the host's `await create…()` site stays uniform.
+  // Stem adapter so the host's `await create…()` site stays uniform.
+  //
+  // The active dialect is fixed by the engine choice: the lab now exposes the
+  // three BareBars dialects as first-class engines (RawBars→"core",
+  // FullBars→"surface", MaxBars→"maxbars"), so the host passes the dialect in.
+  // Falls back to the `?dialect=` URL default for back-compat / per-call use.
+  const activeDialect = normalizeDialect(dialectArg) ?? DIALECT;
 
   // Map the engine's `{ ok, value, error }` result to the seam's render contract:
   // the string on success, a thrown `{ kind: "render" }` error otherwise.
@@ -105,7 +111,7 @@ export async function createBareBarsRenderer() {
     // An explicit `opts.dialect` overrides the URL-driven default (used by tests
     // and any host that selects per-call); `rawbars`/`fullbars` are the engine's
     // "core"/"surface".
-    const dialect = normalizeDialect(opts.dialect) ?? DIALECT;
+    const dialect = normalizeDialect(opts.dialect) ?? activeDialect;
     return { program: { source, dialect, partials: partials || {} } };
   }
 
@@ -138,14 +144,14 @@ export async function createBareBarsRenderer() {
   // walk that shape, exactly like the Handlebars adapter walks its mapped nodes.
 
   function parseAst(source, opts = {}) {
-    return astJson(normalizeDialect(opts.dialect) ?? DIALECT, source);
+    return astJson(normalizeDialect(opts.dialect) ?? activeDialect, source);
   }
 
   // BareBars-specific (the `compile-js` feature): compile the template to a JS
   // ES module via BareBars.Compile, honouring the active dialect. Returns
   // `{ ok, value, error }` — `value` is the JS source. Drives the Compiled JS view.
   function compileToJs(source) {
-    const c = DIALECT === "core" ? bbCompile : DIALECT === "maxbars" ? bbCompileMaxbars : bbCompileSurface;
+    const c = activeDialect === "core" ? bbCompile : activeDialect === "maxbars" ? bbCompileMaxbars : bbCompileSurface;
     return c(source);
   }
 

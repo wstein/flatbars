@@ -1327,17 +1327,10 @@
           <span class="field-label">Engine</span>
           <select id="engine-select" class="select" aria-label="Engine">
             <option value="stem">Stem</option>
-            <option value="handlebars">Handlebars</option>
-            <option value="barebars">BareBars</option>
-            <option value="minbars">MinBars (Mustache)</option>
-          </select>
-        </div>
-        <div class="topbar-group" id="dialect-group" hidden>
-          <span class="field-label">Dialect</span>
-          <select id="dialect-select" class="select" aria-label="BareBars dialect">
-            <option value="rawbars">RawBars</option>
-            <option value="fullbars">FullBars</option>
-            <option value="maxbars">MaxBars</option>
+            <option value="rawbars">RawBars — no sugar</option>
+            <option value="minbars">MinBars — Mustache</option>
+            <option value="fullbars">FullBars — Handlebars</option>
+            <option value="maxbars">MaxBars — operators &amp; pipes</option>
           </select>
         </div>
         <div class="divider"></div>
@@ -1560,8 +1553,7 @@
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
       import { createRenderer } from "./stem.mjs?v=1";
-      import { createHandlebarsRenderer } from "./handlebars.mjs?v=2";
-      import { createBareBarsRenderer } from "./barebars.mjs?v=1";
+      import { createBareBarsRenderer } from "./barebars.mjs?v=2";
       import { createMinBarsRenderer } from "./minbars.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -1642,57 +1634,56 @@
       const byId = (id) => document.getElementById(id);
       const qs   = (sel) => document.querySelector(sel);
 
-      // ADR-0020 Phase 3: pick the engine adapter. `?engine=handlebars` (or the
-      // `hbs` shortcut) loads the Handlebars adapter (same seam, honest thinner
-      // capability vector); the default is the Stem WASM engine. Both `create…()`
-      // calls return the identical renderer shape, so everything downstream
-      // stays engine-agnostic — the panel gate (below) hides whatever the chosen
-      // engine doesn't back.
-      const ENGINE_PARAM = new URLSearchParams(location.search).get("engine");
+      // Pick the engine adapter. The lab exposes the three BareBars dialects as
+      // first-class engines — RawBars (no sugar) / FullBars (Handlebars-like) /
+      // MaxBars (operators & pipes) — alongside Stem and MinBars (Mustache-like).
+      // The former "BareBars + Dialect" two-selector model is flattened into one
+      // engine choice, and native Handlebars is dropped (FullBars fills the
+      // Handlebars-like role). Every `create…()` returns the identical renderer
+      // shape, so everything downstream stays engine-agnostic — the panel gate
+      // (below) hides whatever the chosen engine doesn't back.
+      const ENGINE_PARAM = (new URLSearchParams(location.search).get("engine") || "").toLowerCase();
+      const DIALECT_PARAM = (new URLSearchParams(location.search).get("dialect") || "").toLowerCase();
       const ENGINE =
-        ["handlebars", "hbs"].includes(ENGINE_PARAM) ? "handlebars"
-        : ["barebars", "bb"].includes(ENGINE_PARAM) ? "barebars"
+        ["rawbars", "raw", "core"].includes(ENGINE_PARAM) ? "rawbars"
         : ["minbars", "mustache"].includes(ENGINE_PARAM) ? "minbars"
+        : ["fullbars", "full", "surface"].includes(ENGINE_PARAM) ? "fullbars"
+        : ["maxbars", "max"].includes(ENGINE_PARAM) ? "maxbars"
+        // back-compat: old `?engine=barebars[&dialect=…]` links → dialect engine.
+        : ["barebars", "bb"].includes(ENGINE_PARAM)
+            ? (["core", "rawbars"].includes(DIALECT_PARAM) ? "rawbars"
+               : DIALECT_PARAM === "maxbars" ? "maxbars" : "fullbars")
         : "stem";
+      // The three BareBars dialect engines share one adapter; the engine name
+      // fixes the dialect it renders.
+      const BB_DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
       const renderer =
-        ENGINE === "handlebars" ? await createHandlebarsRenderer()
-        : ENGINE === "barebars" ? await createBareBarsRenderer()
+        BB_DIALECT[ENGINE] ? await createBareBarsRenderer(BB_DIALECT[ENGINE])
         : ENGINE === "minbars" ? await createMinBarsRenderer()
         : await createRenderer(await (await fetch(WASM)).arrayBuffer());
-      // Show the engine + its version (the Stem build bakes it into the wasm;
-      // the Handlebars adapter reports the vendored library version).
+      // Show the engine + its version (the Stem build bakes it into the wasm; the
+      // BareBars/MinBars adapters report the bundled engine version).
       const ENGINE_LABEL =
-        ENGINE === "handlebars" ? "Handlebars"
-        : ENGINE === "barebars" ? "BareBars"
+        ENGINE === "rawbars" ? "RawBars"
+        : ENGINE === "fullbars" ? "FullBars"
+        : ENGINE === "maxbars" ? "MaxBars"
         : ENGINE === "minbars" ? "MinBars"
         : "Stem";
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
 
-      // Engine + dialect selectors. Switching either is a fundamental mode change
-      // (one renderer is instantiated at boot), so it navigates with the new
-      // query param and reloads — preserving the rest of the URL. The Dialect
-      // selector is BareBars-only (Core vs the Handlebars-flavoured Surface).
-      const navWith = (key, value) => {
-        const u = new URL(location.href);
-        u.searchParams.set(key, value);
-        location.href = u.toString();
-      };
+      // The engine selector. Switching is a fundamental mode change (one renderer
+      // is instantiated at boot), so it navigates with the new `?engine=` param
+      // and reloads — preserving the rest of the URL, but dropping the now-defunct
+      // `?dialect=` param (the dialect is implied by the engine).
       const engineSel = byId("engine-select");
       if (engineSel) {
         engineSel.value = ENGINE;
-        engineSel.addEventListener("change", (e) => navWith("engine", e.target.value));
-      }
-      const dialectGroup = byId("dialect-group");
-      const dialectSel = byId("dialect-select");
-      if (dialectGroup && dialectSel) {
-        if (ENGINE === "barebars") {
-          dialectGroup.hidden = false;
-          const dp = new URLSearchParams(location.search).get("dialect");
-          dialectSel.value = dp === "maxbars" ? "maxbars" : (dp === "core" || dp === "rawbars") ? "rawbars" : "fullbars";
-          dialectSel.addEventListener("change", (e) => navWith("dialect", e.target.value));
-        } else {
-          dialectGroup.hidden = true;
-        }
+        engineSel.addEventListener("change", (e) => {
+          const u = new URL(location.href);
+          u.searchParams.set("engine", e.target.value);
+          u.searchParams.delete("dialect");
+          location.href = u.toString();
+        });
       }
       // The on-disk extension for this engine's template/partial files
       // (`.hbs` for Handlebars/BareBars — surface is Handlebars-flavoured —
