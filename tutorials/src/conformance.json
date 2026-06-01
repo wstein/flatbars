@@ -1,0 +1,53 @@
+{
+  "_generated": "by scripts/gen-conformance.mjs — DO NOT EDIT; run `npm run gen:conformance`",
+  "source": "mustache/spec (vendored: packages/minbars/test/spec)",
+  "engine": "MinBars (lab/minbars.mjs — the same bundle the page's live examples run)",
+  "modules": [
+    {
+      "id": "interpolation",
+      "label": "Interpolation",
+      "pass": 42,
+      "total": 42
+    },
+    {
+      "id": "sections",
+      "label": "Sections",
+      "pass": 34,
+      "total": 34
+    },
+    {
+      "id": "inverted",
+      "label": "Inverted sections",
+      "pass": 22,
+      "total": 22
+    },
+    {
+      "id": "comments",
+      "label": "Comments",
+      "pass": 12,
+      "total": 12
+    },
+    {
+      "id": "partials",
+      "label": "Partials",
+      "pass": 12,
+      "total": 12
+    },
+    {
+      "id": "inheritance",
+      "label": "Template inheritance",
+      "pass": 27,
+      "total": 27
+    },
+    {
+      "id": "dynamic-names",
+      "label": "Dynamic names",
+      "pass": 21,
+      "total": 21
+    }
+  ],
+  "total": {
+    "pass": 170,
+    "total": 170
+  }
+}

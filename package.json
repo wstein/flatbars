@@ -7,10 +7,12 @@
   "type": "module",
   "scripts": {
     "build": "spago build",
-    "test": "spago test -p barebars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p barebars-json && spago test -p barebars-js && spago test -p barebars-compile && spago test -p linter && npm run check:catalog && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:bundle && npm run test:lab",
+    "test": "spago test -p barebars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p barebars-json && spago test -p barebars-js && spago test -p barebars-compile && spago test -p linter && npm run check:catalog && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:conformance && npm run check:bundle && npm run test:lab",
     "check:isolation": "node scripts/check-package-isolation.mjs",
     "examples:verify": "spago build -p barebars-cli && spago run -p barebars-cli -- examples verify",
     "check:tutorial-links": "node scripts/check-tutorial-links.mjs",
+    "gen:conformance": "node scripts/gen-conformance.mjs",
+    "check:conformance": "node scripts/gen-conformance.mjs --check",
     "check:bundle": "spago build -p barebars-js && node scripts/check-bundle.mjs",
     "test:lab": "node lab/playground_utils.test.mjs && node lab/barebars.test.mjs && node lab/open-in-lab.test.mjs",
     "cli": "spago run -p barebars-cli",
