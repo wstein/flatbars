@@ -44,11 +44,12 @@ in-scope param desugars to a `pass:[(param)]` call (lexically scoped, visible in
 of `parent` for context). A deeper run (`@../../index`) still resolves to the
 immediate parent.
 
-Still *specified but not desugared*: the Handlebars block-partial *sigils*
-`pass:[{{#> name}}…{{/name}}]` / `pass:[{{#*inline}}…{{/inline}}]` — the opener
-sigil and close name cannot be matched by the meaning-free core parser, so use
-the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` core spellings instead. See the
-xref:fullbars-compat.adoc[compatibility matrix] for per-feature status.
+The Handlebars block-partial *sigils* `pass:[{{#> name}}…{{/name}}]` /
+`pass:[{{#*inline}}…{{/inline}}]` are also accepted and desugar to the same core
+forms as the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` spellings (the lexer
+strips the sigil so the interior is the clean head, and the close matches by
+name). See the xref:fullbars-compat.adoc[compatibility matrix] for per-feature
+status.
 ====
 
 [IMPORTANT]
@@ -206,11 +207,12 @@ instead. (The austere RawBars and MaxBars dialects do *not* accept `pass:[{{^}}]
 |===
 
 Block and inline partials are written with the *core spellings* `pass:[{{#partial}}]` /
-`pass:[{{#inline}}]` (a bare name is literalized like `pass:[{{> name}}]`). A block `partial`
+`pass:[{{#inline}}]` (a bare name is literalized like `pass:[{{> name}}]`) *or* the equivalent
+Handlebars *sigils* `pass:[{{#> name}}…{{/name}}]` / `pass:[{{#*inline "name"}}…{{/inline}}]`, which
+desugar to the same forms. A block `partial`
 renders the named partial with its `body` as both the fallback (when the partial is missing) and the
 `pass:[{{> @partial-block}}]` yield point; `inline` definitions are hoisted into the registry before
-rendering. The Handlebars `pass:[{{#> name}}…{{/name}}]` / `pass:[{{#*inline}}…{{/inline}}]` *sigils*
-are not parsed (the opener sigil / close-name mismatch needs partial-specific parser support).
+rendering.
 
 Partials render *unescaped* — a partial produces markup, not a data value, so the desugaring is the
 plain triple-stash with no `esc_html`. The partial *name* desugars to a `STRING` literal; a dynamic
