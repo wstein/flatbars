@@ -16,6 +16,7 @@ package:
     - fullbars
     - rawbars
     - maxbars
+    - minbars
     - fullbars-compile
     - arrays
     - integers

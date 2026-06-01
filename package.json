@@ -21,7 +21,8 @@
     "format:check": "purs-tidy check \"packages/*/src/**/*.purs\" \"packages/*/test/**/*.purs\"",
     "lint": "spago build --pedantic-packages",
     "clean": "rimraf output .spago",
-    "test:compile": "spago build && node packages/compile/conformance.mjs"
+    "test:compile": "spago build && node packages/compile/conformance.mjs",
+    "test:minbars-spec": "spago build && node packages/minbars/test/spec-conformance.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.23.0",

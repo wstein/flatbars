@@ -342,6 +342,7 @@
             "integers",
             "maxbars",
             "maybe",
+            "minbars",
             "prelude",
             "rawbars",
             "tuples"
@@ -382,6 +383,7 @@
             "lists",
             "maxbars",
             "maybe",
+            "minbars",
             "newtype",
             "nonempty",
             "numbers",

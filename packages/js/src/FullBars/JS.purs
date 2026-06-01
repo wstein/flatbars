@@ -17,6 +17,7 @@ module FullBars.JS
   , compileSurface
   , compileMaxbars
   , renderSurfaceWithPartials
+  , renderMustache
   ) where
 
 import Prelude
@@ -37,6 +38,7 @@ import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
 import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
+import MinBars as MinBars
 import RawBars as RawBars
 
 -- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
@@ -65,6 +67,14 @@ renderMaxbars = mkFn2 \tpl json -> result (MaxBars.renderMax tpl (fromJson json)
 renderSurfaceWithPartials :: Fn3 (FO.Object String) String Json Result
 renderSurfaceWithPartials = mkFn3 \partials tpl json ->
   result (FullBars.renderSurfaceWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Render a *MinBars* template (the mustache-conformant core dialect) with a
+-- | set of named partials, against JS data. `renderMustache(partials, template,
+-- | data)`, where `partials` is a plain `{ name: source }` object. Drives the
+-- | mustache/spec conformance harness.
+renderMustache :: Fn3 (FO.Object String) String Json Result
+renderMustache = mkFn3 \partials tpl json ->
+  result (MinBars.renderMinWith (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Compile a *core* template to JS ES-module source (`BareBars.Compile`). The
 -- | emitted module's default export is `function (data, rt)`; pair it with
