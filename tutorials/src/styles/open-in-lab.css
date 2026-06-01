@@ -20,8 +20,6 @@
   color: var(--fg-faint);
   margin: 0 0 0.3rem;
 }
-.oil-note { text-transform: none; letter-spacing: 0; font-weight: 400; }
-
 .oil-pane pre {
   background: var(--bg-1);
   border: 1px solid var(--border);
@@ -33,16 +31,17 @@
 }
 .oil-pane pre code { font-size: 0.85em; white-space: pre-wrap; }
 
-/* Output — a dark-gray pane, the same in light and dark mode, so the rendered
-   result is unmistakable against the input panes. */
+/* Output — a dark-grey "old screen": neutral dark-grey background, light text,
+   the same in light and dark mode, so the result is unmistakable against the
+   input panes. */
 .oil-output { margin-top: 1rem; }
 .oil-output pre {
-  background: #23242b;
-  border-color: #3a3b45;
-  color: #e9e9f0;
+  background: #2b2b2b;
+  border-color: #444444;
+  color: #e6e6e6;
 }
 .oil-output pre code { color: inherit; }
-.oil-output em { color: #b9b9c6; }
+.oil-output em { color: #b8b8b8; }
 .oil-err { color: #ff9d9d; }
 
 .oil-btn {

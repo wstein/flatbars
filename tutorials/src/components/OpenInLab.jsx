@@ -66,7 +66,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
         ))}
       </div>
       <figure class="oil-pane oil-output">
-        <figcaption>output <span class="oil-note">— {engine}, rendered HTML as plain text</span></figcaption>
+        <figcaption>output</figcaption>
         {preview == null
           ? <pre><em>rendering…</em></pre>
           : <pre class={preview.ok ? "" : "oil-err"}><code>{preview.out}</code></pre>}
