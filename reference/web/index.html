@@ -1712,10 +1712,14 @@
       // uses this to gate behaviour that assumes the stem-bc wire — e.g. the
       // per-emit escape rewrite — rather than just hiding a panel.)
       const engineHas = (name) => hasFeature(engineFeatures, name);
-      // The example catalog (examples/stem/): templates the lab's engines can
-      // all parse. (The BareBars surface dialect is Handlebars-flavoured, so the
-      // shared set renders across Stem and the BareBars/MinBars engines.)
-      const EXAMPLES_BASE = `./examples/stem/`;
+      // The example catalog is engine-appropriate: Stem ships Stem-syntax
+      // templates (transformers, `{{partial}}`, `dict`); the BareBars dialects are
+      // Handlebars-flavoured, so they use the `examples/handlebars/` catalog (which
+      // FullBars/MaxBars render natively, and MinBars/RawBars render the compatible
+      // subset). Loading Stem examples under a BareBars engine — or vice-versa —
+      // produces templates the active engine can't parse, so the base must follow
+      // the engine.
+      const EXAMPLES_BASE = `./examples/${ENGINE === "stem" ? "stem" : "handlebars"}/`;
       const examples = await (await fetch(EXAMPLES_BASE + "examples.json")).json();
 
       // ── State ─────────────────────────────────────────────────────────

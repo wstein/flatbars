@@ -56,38 +56,15 @@
     "data": "data.yaml"
   },
   {
-    "id": "list",
-    "label": "Helpers - custom helpers (helpers.js)",
-    "view": "rendered",
-    "main": "main.hbs",
-    "partials": [],
-    "transform": "helpers.js",
-    "data": "data.yaml"
-  },
-  {
-    "id": "block-helpers",
-    "label": "Helpers - block helpers",
-    "view": "rendered",
-    "main": "main.hbs",
-    "partials": [],
-    "transform": "helpers.js",
-    "data": "data.yaml"
-  },
-  {
-    "id": "subexpressions",
-    "label": "Helpers - subexpressions",
-    "view": "rendered",
-    "main": "main.hbs",
-    "partials": [],
-    "transform": "helpers.js",
-    "data": "data.yaml"
-  },
-  {
     "id": "partials",
     "label": "Partials - context, params, dynamic",
     "view": "rendered",
     "main": "main.hbs",
-    "partials": ["greeting", "userBox", "fancy"],
+    "partials": [
+      "greeting",
+      "userBox",
+      "fancy"
+    ],
     "data": "data.yaml"
   },
   {
@@ -95,16 +72,9 @@
     "label": "Partials - inline & blocks (layout)",
     "view": "rendered",
     "main": "main.hbs",
-    "partials": ["layout"],
-    "data": "data.yaml"
-  },
-  {
-    "id": "whitespace",
-    "label": "Advanced - whitespace & raw blocks",
-    "view": "rendered",
-    "main": "main.hbs",
-    "partials": [],
-    "transform": "helpers.js",
+    "partials": [
+      "layout"
+    ],
     "data": "data.yaml"
   },
   {
@@ -112,7 +82,10 @@
     "label": "Real-world - profile cards",
     "view": "rendered",
     "main": "main.hbs",
-    "partials": ["styles", "card"],
+    "partials": [
+      "styles",
+      "card"
+    ],
     "data": "data.yaml"
   }
 ]

@@ -1,9 +1,0 @@
-<h2>{{title}}</h2>
-<ul class="tasks">
-{{#each tasks}}
-  <li>{{statusIcon done}} {{label}}{{#if note}} <em>({{note}})</em>{{/if}}</li>
-{{else}}
-  <li>No tasks yet.</li>
-{{/each}}
-</ul>
-<p>{{pluralize summary.done "task"}} done of {{summary.total}}.</p>
