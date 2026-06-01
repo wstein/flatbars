@@ -33,7 +33,7 @@ The bulk of `handlebars-helpers` fails criterion 1 against current `main`. These
 | chaining / composition helpers | clumsy subexpressions | MaxBars **pipes** `{{ x \| f \| g }}` | replaced by a language feature |
 | data access (`get` `lookup` `with` `withHash`) | — | prelude `lookup`/`get`, `with`, scope | solved |
 | iteration meta (`@index` `@first` `forEach` `withFirst`) | — | **loop variables** `index0/index1/rindex0/rindex1/first/last/length/key` (loopvars spec) | solved |
-| escaping / `json` / `raw` | — | `esc_html` (returns `VSafe`), `esc_json`, `safe`, `raw`, `json` | solved |
+| escaping / `json` / `raw` | — | `escapeHtml` (returns `VSafe`; alias `esc_html`), `escapeJson` (alias `esc_json`), `safe`, `raw`, `json` | solved |
 | layout (`extend` `block` `content` `partial`) | — | `partial` / `inline` / `apply` + inheritance | solved |
 | `fs` `path` `code`/`gist` `markdown` `i18n` `logging` `date` `random` `sanitize` `regex` | impure / unsafe | — | excluded (§7) |
 | `map` `filter` `some` `iterate` (callback) | — | inexpressible: `Value` has no function constructor | rejected (§6) |
@@ -149,20 +149,20 @@ This is the honest cost of the no-function-values rule, stated up front.
 
 The references are **lodash** and the **ES string/array standard** — `handlebars-helpers` is too self-inconsistent (`downcase`+`lowercase`, `plus`+`add`, `isnt` with no `ne`) to be the authority.
 
-- **Casing:** single-word names lowercase (`trim`, `join`, `round`); multi-word camelCase (`truncate` is one word; `startsWith`, `trimStart`). **snake_case is banned** (the one offender is handled in §8).
+- **Casing:** single-word names lowercase (`trim`, `join`, `round`); multi-word camelCase (`truncate` is one word; `startsWith`, `trimStart`). **snake_case is banned** — the two offenders (`esc_html`/`esc_json`) were renamed to `escapeHtml`/`escapeJson` with silent back-compat aliases (§8).
 - **Canonical + alias:** where the source ships duplicates, one is canonical and the other a linter-lowered alias: `lowercase` (not `downcase`), `uppercase` (not `upcase`); the arithmetic helpers carry `plus`/`minus`/`times` aliases. Aliases render correctly and normalise to canonical in committed form.
 - **Universal over idiosyncratic:** `trimStart`/`trimEnd` (not `trimLeft`/`trimRight`), `includes` (not `inArray`), `at` (not `itemAt`), `count`/`size` (not a fourth spelling).
 - **Keep what BareBars has right:** `and or not eq ne gt gte lt lte lookup if unless each with trim round raw json` — no churn; keep `ne` (do **not** adopt `is`/`isnt`). (`first`/`last`/`length`/`key` exist as the **loop variables** — §4 reserved-names note — not collection helpers.)
 
 ---
 
-## 8. `esc_html` → `escapeHtml` (orthogonal rename — separate decision)
+## 8. `esc_html` → `escapeHtml`, `esc_json` → `escapeJson` *(SHIPPED)*
 
-This is independent of the migration question; it is the one snake_case name in the prelude and the default escaper (woven through the FullBars desugar output, `Kernel.Lower`, the compiler `Emit`, the JS runtime, the conformance corpus, **and the shipped linter's pretty-printers**, ~60 occurrences). Proposal, pending sign-off:
+Removes the last snake_case names. `esc_html` was not just a name — it is a structural marker woven through the FullBars desugar output, `Kernel.Lower` (escaped-output detection + the safe-producer lint), the compiler `Emit` (inlined to `rt.esc`), the JS runtime, and the linter's lift/print. The rename threads through every one of those, each now recognising the canonical name **and** the old one.
 
-- `escapeHtml` becomes canonical (HTML-escapes `& < > "` plus `'`; returns `VSafe`; idempotent).
-- **`esc_html` is retained as a permanent, non-warned alias.** Renaming a security primitive's name baked into the desugar and the compiler is a breaking change whose only danger is *removal*; a permanent alias makes the blast radius zero while giving new code the consistent name. (This corrects the earlier "deprecated/warned" framing — do not schedule removal.)
-- `escape` stays distinct (URL-escape, deferred with the `url` set); `json` gains alias `stringify`.
+- `escapeHtml`/`escapeJson` are canonical (camelCase); the desugar emits `escapeHtml` and the structural matchers key on it.
+- **`esc_html`/`esc_json` are retained as permanent, *silent* aliases** — never removed, never warned. Renaming a security primitive's name baked into the desugar/compiler is a breaking change whose only danger is *removal*; a permanent alias makes the blast radius zero. `HelperDef.alias` carries a `warn` flag (`withSilentAlias` for these), so `preludeAliasWarnings` excludes them while the catalog still marks them "alias of …".
+- `escape` stays distinct (URL-escape, deferred with the `url` set); `json` gains alias `stringify` *(not yet wired)*.
 
 ---
 
