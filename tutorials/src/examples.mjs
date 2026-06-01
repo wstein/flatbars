@@ -12,11 +12,11 @@ export const lessons = {
     title: "RawBars — the austere core",
     blurb:
       "No surface sugar: every value is an explicit helper application. " +
-      "{{{ … }}} is raw output; escape with esc_html; read fields with lookup.",
+      "{{{ … }}} is raw output; escape with escapeHtml; read fields with lookup.",
     spec: "concepts", // docs/modules/ROOT/pages/concepts.adoc
     template:
-      '<h1>{{{ esc_html (lookup this "name") }}}</h1>\n' +
-      '<ul>{{#each (lookup this "items")}}<li>{{{ esc_html this }}}</li>{{/each}}</ul>',
+      '<h1>{{{ escapeHtml (lookup this "name") }}}</h1>\n' +
+      '<ul>{{#each (lookup this "items")}}<li>{{{ escapeHtml this }}}</li>{{/each}}</ul>',
     data: { name: "Ada <core>", items: ["alpha", "beta"] },
   },
 
