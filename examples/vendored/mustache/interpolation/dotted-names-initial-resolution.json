@@ -1,0 +1,47 @@
+{
+  "id": "mustache/interpolation/dotted-names-initial-resolution",
+  "provider": "mustache",
+  "dialect": "minbars",
+  "divergenceMeaning": "conformance-failure",
+  "desc": "The first part of a dotted name should resolve as any other name.",
+  "template": "\"{{#a}}{{b.c.d.e.name}}{{/a}}\" == \"Phil\"",
+  "data": {
+    "a": {
+      "b": {
+        "c": {
+          "d": {
+            "e": {
+              "name": "Phil"
+            }
+          }
+        }
+      }
+    },
+    "b": {
+      "c": {
+        "d": {
+          "e": {
+            "name": "Wrong"
+          }
+        }
+      }
+    }
+  },
+  "partials": {},
+  "expected": "\"Phil\" == \"Phil\"",
+  "features": [
+    "interpolation"
+  ],
+  "support": "ok",
+  "unsupported": [],
+  "source": {
+    "url": "https://github.com/mustache/spec/blob/e8ec001db7f594521e773c34866aca2b5d6b0037/specs/interpolation.json",
+    "repo": "github.com/mustache/spec",
+    "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037"
+  },
+  "license": {
+    "spdx": "MIT",
+    "holder": "mustache/spec contributors",
+    "notice": "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim."
+  }
+}

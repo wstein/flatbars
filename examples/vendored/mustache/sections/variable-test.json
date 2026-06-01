@@ -1,0 +1,28 @@
+{
+  "id": "mustache/sections/variable-test",
+  "provider": "mustache",
+  "dialect": "minbars",
+  "divergenceMeaning": "conformance-failure",
+  "desc": "Non-false sections have their value at the top of context,\naccessible as {{.}} or through the parent context. This gives\na simple way to display content conditionally if a variable exists.\n",
+  "template": "\"{{#foo}}{{.}} is {{foo}}{{/foo}}\"",
+  "data": {
+    "foo": "bar"
+  },
+  "partials": {},
+  "expected": "\"bar is bar\"",
+  "features": [
+    "sections"
+  ],
+  "support": "ok",
+  "unsupported": [],
+  "source": {
+    "url": "https://github.com/mustache/spec/blob/e8ec001db7f594521e773c34866aca2b5d6b0037/specs/sections.json",
+    "repo": "github.com/mustache/spec",
+    "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037"
+  },
+  "license": {
+    "spdx": "MIT",
+    "holder": "mustache/spec contributors",
+    "notice": "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim."
+  }
+}

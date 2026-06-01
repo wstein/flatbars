@@ -1,0 +1,31 @@
+{
+  "id": "mustache/interpolation/dotted-names-no-masking",
+  "provider": "mustache",
+  "dialect": "minbars",
+  "divergenceMeaning": "conformance-failure",
+  "desc": "Dotted Names in a given context are unvavailable due to dot splitting",
+  "template": "{{a.b}}",
+  "data": {
+    "a.b": "c",
+    "a": {
+      "b": "d"
+    }
+  },
+  "partials": {},
+  "expected": "d",
+  "features": [
+    "interpolation"
+  ],
+  "support": "ok",
+  "unsupported": [],
+  "source": {
+    "url": "https://github.com/mustache/spec/blob/e8ec001db7f594521e773c34866aca2b5d6b0037/specs/interpolation.json",
+    "repo": "github.com/mustache/spec",
+    "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037"
+  },
+  "license": {
+    "spdx": "MIT",
+    "holder": "mustache/spec contributors",
+    "notice": "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim."
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "mustache/comments/variable-name-collision",
+  "provider": "mustache",
+  "dialect": "minbars",
+  "divergenceMeaning": "conformance-failure",
+  "desc": "Comments must never render, even if variable with same name exists.",
+  "template": "comments never show: >{{! comment }}<",
+  "data": {
+    "! comment": 1,
+    "! comment ": 2,
+    "!comment": 3,
+    "comment": 4
+  },
+  "partials": {},
+  "expected": "comments never show: ><",
+  "features": [
+    "comments"
+  ],
+  "support": "ok",
+  "unsupported": [],
+  "source": {
+    "url": "https://github.com/mustache/spec/blob/e8ec001db7f594521e773c34866aca2b5d6b0037/specs/comments.json",
+    "repo": "github.com/mustache/spec",
+    "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037"
+  },
+  "license": {
+    "spdx": "MIT",
+    "holder": "mustache/spec contributors",
+    "notice": "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim."
+  }
+}

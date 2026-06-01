@@ -1,0 +1,39 @@
+{
+  "id": "mustache/sections/implicit-iterator-array",
+  "provider": "mustache",
+  "dialect": "minbars",
+  "divergenceMeaning": "conformance-failure",
+  "desc": "Implicit iterators should allow iterating over nested arrays.",
+  "template": "\"{{#list}}({{#.}}{{.}}{{/.}}){{/list}}\"",
+  "data": {
+    "list": [
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        "a",
+        "b",
+        "c"
+      ]
+    ]
+  },
+  "partials": {},
+  "expected": "\"(123)(abc)\"",
+  "features": [
+    "sections"
+  ],
+  "support": "ok",
+  "unsupported": [],
+  "source": {
+    "url": "https://github.com/mustache/spec/blob/e8ec001db7f594521e773c34866aca2b5d6b0037/specs/sections.json",
+    "repo": "github.com/mustache/spec",
+    "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037"
+  },
+  "license": {
+    "spdx": "MIT",
+    "holder": "mustache/spec contributors",
+    "notice": "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim."
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "mustache/interpolation/implicit-iterators-html-escaping",
+  "provider": "mustache",
+  "dialect": "minbars",
+  "divergenceMeaning": "conformance-failure",
+  "desc": "Basic interpolation should be HTML escaped.",
+  "template": "These characters should be HTML escaped: {{.}}\n",
+  "data": "& \" < >",
+  "partials": {},
+  "expected": "These characters should be HTML escaped: &amp; &quot; &lt; &gt;\n",
+  "features": [
+    "interpolation"
+  ],
+  "support": "ok",
+  "unsupported": [],
+  "source": {
+    "url": "https://github.com/mustache/spec/blob/e8ec001db7f594521e773c34866aca2b5d6b0037/specs/interpolation.json",
+    "repo": "github.com/mustache/spec",
+    "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037"
+  },
+  "license": {
+    "spdx": "MIT",
+    "holder": "mustache/spec contributors",
+    "notice": "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim."
+  }
+}
