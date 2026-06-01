@@ -28,6 +28,7 @@ import Linter.Lower (lowerReport, lowerToRawBars)
 import MaxBars (maxLoopVars, maxOptions, renderMax)
 import RawBars as RawBars
 import Test.Assert (assert')
+import Test.Linter.Migrate as Migrate
 
 -- | The desugared MaxBars source as the reference real AST.
 maxAst :: String -> Either String (Array RNode)
@@ -171,3 +172,6 @@ main = do
     "{{#unless (lookup this \"done\")}}x{{/unless}}"
 
   log "Linter tests passed"
+
+  -- X2 — Handlebars → MaxBars migrator.
+  Migrate.main

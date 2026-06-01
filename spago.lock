@@ -226,7 +226,8 @@
             "maybe",
             "ordered-collections",
             "prelude",
-            "strings"
+            "strings",
+            "tuples"
           ]
         },
         "test": {

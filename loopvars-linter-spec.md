@@ -211,9 +211,9 @@ Loop-variable phases (`L`) and linter phases (`X`) are independent tracks; order
 - On any downward cross of a non-`handlebars`-mode file, **carry the `@truthiness` directive forward** into the lowered RawBars source (`Linter.Print.printDirectives`), so it resolves the same `FalsySet` (`Kernel.Value.resolveTruthinessWith`) and renders identically. `lowerReport` exposes a `materialized` flag for host reporting/refusal. The per-condition `(truthy <set> …)` guard form is the deferred alternative (§B.5). A `handlebars`/directive-less file lowers cleanly.
 - **Acceptance (shipped):** `minimal`/`nil`/`mustache`/`presence`-mode templates — at values whose branch differs from the handlebars default — render identically through the MaxBars interpreter and through the lowered RawBars source (`renderMax src == RawBars.render (lower src)`); the test fails if the directive is dropped.
 
-### X2 — Migrate Handlebars → MaxBars
-- Apply B.4; emit a per-file residual report for the flagged rows (`@../`, Mustache sections, set delimiters).
-- **Acceptance:** a representative Handlebars template ports with ≤ the documented residual; every residual item carries a span and a suggested fix.
+### X2 — Migrate Handlebars → MaxBars *(shipped)*
+- `Linter.Migrate.migrateToMaxBars` applies B.4 as a **minimal-diff token-stream rewrite** (untouched tags are rebuilt from their original source slice, so formatting/`~` is preserved): `{{^x}}`→`{{#unless x}}` (close paired via a stack), `@index`/`@first`/`@last`/`@key`→bare loop vars, `{{&x}}`→`{{{x}}}`, `{{else if c}}`→`{{elif c}}`. Emits a per-file residual report for the flagged rows (`parent-data` `@../`/`@root`, `ambiguous-section` bare Mustache `{{#name}}`, `set-delimiters` `{{=…=}}`).
+- **Acceptance (shipped):** render-equivalence oracle — residual-free mechanical templates render identically through `FullBars.renderSurface` (Handlebars) and `renderMax` of the migrated source across a data matrix; every residual carries a span (`end > start`), a message, and a suggested fix.
 
 ### X3 — Heuristic lift *(assist only)*
 - RawBars/FullBars → MaxBars with ambiguity flags (B.3); never an automated commit.

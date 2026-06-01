@@ -17,6 +17,7 @@ package:
     - ordered-collections
     - prelude
     - strings
+    - tuples
   test:
     main: Test.Linter.Main
     dependencies:
