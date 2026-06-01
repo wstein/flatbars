@@ -54,14 +54,14 @@ inversion-of-control engine** (`runTemplate`/`runString` over any
 both `Either Error` (`renderWith`/`compile`) and `ExceptT Error Aff`
 (`renderAff`) by the FullBars engine; multi-branch control flow via **`{{else}}` separators**
 (`{{#if c}}…{{else}}…{{/if}}` — a name-agnostic `Sep` marker the engine splits
-at); prelude helpers `this`, `lookup`, `true`/`false`/`null`, `esc_html`,
+at); prelude helpers `this`, `lookup`, `true`/`false`/`null`, `escapeHtml`,
 `safe`, `raw`, `if`, `unless`, `each`, `with`, `else`, `dict`, `apply`,
 `partial`, `inline`, `eq`, `ne`, `lt`, `gt`, `lte`, `gte`, `not`, `and`, `or`, `log`;
 and a JSON-schema-style `validate` over the skeleton.
 
 `FullBars.Lower` is the reference *walker* (ADR-001): a `foldTemplate` that turns
 the structural AST into the typed real AST (`RIf`/`ROut`/…), resolving clauses
-(`{{else}}` → branches) and escaping (`esc_html` → the escaped flag). It backs the
+(`{{else}}` → branches) and escaping (`escapeHtml` → the escaped flag). It backs the
 playground's "Real AST" view and the `escapingWarnings` safety lint.
 
 ## Next milestones

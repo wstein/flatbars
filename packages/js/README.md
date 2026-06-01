@@ -18,7 +18,7 @@ r.ok;     // true
 r.value;  // "<h1>Ada &amp; &lt;b&gt;</h1>"
 
 // Core syntax: explicit helpers, {{{ }}} is output.
-render("{{{ esc_html (lookup this \"x\") }}}", { x: "<i>" }).value; // "&lt;i&gt;"
+render("{{{ escapeHtml (lookup this \"x\") }}}", { x: "<i>" }).value; // "&lt;i&gt;"
 
 // Errors come back located (line:column), never thrown.
 renderSurface("line1\nline2 {{ oops", {}).error; // "2:7: UnterminatedTag: …"

@@ -14,7 +14,7 @@ Handlebars precompiles.
   dialect's `Emit` rules. Reserves no names.
 - [`BareBars.Compile.FullBars`](src/BareBars/Compile/FullBars.purs) — the
   **FullBars** `Emit` binding: native JS control flow for `if`/`unless`/`each`/
-  `with` (the optimiser), hot helpers (`this`/`lookup`/`esc_html`/`safe`)
+  `with` (the optimiser), hot helpers (`this`/`lookup`/`escapeHtml`/`safe`)
   inlined, everything else through `rt.call`/`rt.block` (the baseline). A Core or
   Max dialect would add its own binding to the same seam.
 - [`runtime/barebars-runtime.mjs`](runtime/barebars-runtime.mjs) — the JS runtime
