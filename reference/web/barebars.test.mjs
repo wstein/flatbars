@@ -43,6 +43,41 @@ test("supports the elif clause chain", async () => {
   assert.equal(run(r, "{{#if a}}A{{elif b}}B{{else}}C{{/if}}", { a: false, b: true }), "B");
 });
 
+test("renders the maxbars dialect: infix, bare-infix block conditions, loop vars", async () => {
+  const r = await createBareBarsRenderer();
+  const mx = (src, data) => run(r, src, data, { dialect: "maxbars" });
+  // infix operators in output
+  assert.equal(mx("{{ x > 0 && x < 10 }}", { x: 5 }), "true");
+  // bare (un-parenthesised) infix block condition
+  assert.equal(mx("{{#if a && b}}Y{{else}}N{{/if}}", { a: true, b: false }), "N");
+  // bare loop variables (canonical + alias)
+  assert.equal(mx("{{#each xs}}[{{index1}}/{{length}}]{{/each}}", { xs: ["a", "b"] }), "[1/2][2/2]");
+  // a pipe
+  assert.equal(mx("{{{ o | json }}}", { o: { a: 1 } }), '{"a":1}');
+});
+
+test("parseAst handles maxbars infix (the AST/analysis panels)", async () => {
+  const r = await createBareBarsRenderer();
+  // a bare-infix block condition must parse as an `if` whose condition is the
+  // desugared `(and …)` — not a parse error (which a stale engine would give).
+  const ast = r.parseAst("{{#if a && b}}x{{/if}}", { dialect: "maxbars" });
+  assert.ok(ast.ast, `expected an AST, got ${JSON.stringify(ast)}`);
+  assert.equal(ast.ast.nodes[0].t, "if");
+});
+
+test("compiles the maxbars dialect to a JS module", async () => {
+  const r = await createBareBarsRenderer();
+  // compileToJs is URL-dialect driven; assert the seam member exists and that
+  // the maxbars render path (above) works — compile parity is covered by the
+  // PureScript conformance harness (dialect "maxbars").
+  assert.equal(typeof r.compileToJs, "function");
+});
+
+test("advertises the maxbars-dialect capability", async () => {
+  const r = await createBareBarsRenderer();
+  assert.ok(r.engineInfo().features.includes("maxbars-dialect"));
+});
+
 test("a parse error is thrown as a located render error", async () => {
   const r = await createBareBarsRenderer();
   assert.throws(() => run(r, "{{ oops", {}), (e) => {

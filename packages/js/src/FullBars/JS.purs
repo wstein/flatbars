@@ -21,7 +21,7 @@ module FullBars.JS
 
 import Prelude
 
-import BareBars (Expr(..), parse, parseErrorAt)
+import BareBars (Expr(..), parse, parseErrorAt, parseWith)
 import BareBars.Json (fromJson)
 import BareBars.Value (Value(..))
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
@@ -32,9 +32,10 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object as FO
-import FullBars (RNode(..), desugarSurface, lower)
+import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
 import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
+import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
 import RawBars as RawBars
 
@@ -95,28 +96,37 @@ compileResult = case _ of
 -- | contract: `text`/`emit`/`if`/`unless`/`each`/`with`/`raw`/`sep`/custom-block,
 -- | with expressions as `lit`/`identifier`/`path`/`context`/`call`/data vars.
 astJson :: Fn2 String String Json
-astJson = mkFn2 \dialect src -> case parse src of
-  Left pe ->
-    let
-      d = parseErrorAt src pe
-    in
-      obj
-        [ Tuple "error"
-            ( obj
-                [ Tuple "message" (str d.message)
-                , Tuple "start" (int d.offset)
-                , Tuple "end" (int d.offset)
-                ]
-            )
-        ]
-  Right { nodes: tmpl } ->
-    let
-      nodes = lower (if dialect == "core" then tmpl else desugarSurface tmpl)
-    in
-      obj
-        [ Tuple "ast"
-            (obj [ Tuple "version" (str "barebars-ast/v1"), Tuple "nodes" (arr (map rnode nodes)) ])
-        ]
+astJson = mkFn2 \dialect src ->
+  case (if dialect == "maxbars" then parseWith maxOptions else parse) src of
+    Left pe ->
+      let
+        d = parseErrorAt src pe
+      in
+        obj
+          [ Tuple "error"
+              ( obj
+                  [ Tuple "message" (str d.message)
+                  , Tuple "start" (int d.offset)
+                  , Tuple "end" (int d.offset)
+                  ]
+              )
+          ]
+    Right { nodes: tmpl } ->
+      let
+        -- `core` is the austere syntax (no desugar); `surface` and `maxbars` both
+        -- desugar (MaxBars adds bare loop variables via `maxLoopVars`).
+        desugared = case dialect of
+          "core" -> tmpl
+          "maxbars" -> desugarSurfaceWith maxLoopVars tmpl
+          _ -> desugarSurface tmpl
+        nodes = lower desugared
+      in
+        obj
+          [ Tuple "ast"
+              ( obj
+                  [ Tuple "version" (str "barebars-ast/v1"), Tuple "nodes" (arr (map rnode nodes)) ]
+              )
+          ]
 
 --------------------------------------------------------------------------------
 -- JSON builders

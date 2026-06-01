@@ -26,20 +26,30 @@ import {
   render as bbRender,
   renderSurface as bbRenderSurface,
   renderSurfaceWithPartials as bbRenderSurfaceWith,
+  renderMaxbars as bbRenderMaxbars,
   astJson,
   compile as bbCompile,
   compileSurface as bbCompileSurface,
+  compileMaxbars as bbCompileMaxbars,
 } from "./vendor/barebars-engine.mjs";
 
 const BB_VERSION = "0.1.0";
 
-// The active dialect, from `?dialect=` — `rawbars` (the austere core) or
-// `fullbars` (default; the Handlebars-flavoured layer). The header dialect
-// toggle sets this param. (Internally these are the engine's "core"/"surface".)
+// Map a UI/param dialect name to the engine's internal dialect, or `null` for an
+// unrecognised value. `rawbars`→"core", `fullbars`→"surface", `maxbars` is its
+// own engine entrypoint (FullBars + infix operators, pipes, bare loop variables).
+function normalizeDialect(d) {
+  if (d === "maxbars" || d === "core" || d === "surface") return d;
+  if (d === "rawbars") return "core";
+  if (d === "fullbars") return "surface";
+  return null;
+}
+
+// The active dialect, from `?dialect=` (the header dialect toggle sets this
+// param); defaults to the Handlebars-flavoured surface.
 const DIALECT = (() => {
   if (typeof location === "undefined") return "surface";
-  const d = new URLSearchParams(location.search).get("dialect");
-  return d === "core" || d === "rawbars" ? "core" : "surface";
+  return normalizeDialect(new URLSearchParams(location.search).get("dialect")) ?? "surface";
 })();
 
 // engine-features/v1 capability vector. BareBars backs rendering, a static helper
@@ -54,6 +64,7 @@ const BB_FEATURES = [
   "compile-js", // BareBars-only: compile the template to a JS module (Compiled JS view)
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
+  "maxbars-dialect", // FullBars + infix operators, pipes, bare loop variables
 ];
 
 // The prelude helpers, with the metadata the cheat-sheet panel renders (mirrors
@@ -62,7 +73,7 @@ const BB_FEATURES = [
 const BB_CATALOG = [
   { name: "if", category: "logic", arity: "block", summary: "Render the block when the argument is truthy; supports {{elif}} / {{else}} clauses.", example: "{{#if active}}on{{elif other}}alt{{else}}off{{/if}}" },
   { name: "unless", category: "logic", arity: "block", summary: "The inverse of if.", example: "{{#unless done}}todo{{/unless}}" },
-  { name: "each", category: "collections", arity: "block", summary: "Iterate an array or object; @index/@key/@first/@last (and @../index) in scope.", example: "{{#each items}}{{ this }}{{/each}}" },
+  { name: "each", category: "collections", arity: "block", summary: "Iterate an array or object; @index/@key/@first/@last (and @../index) in scope. MaxBars adds bare loop vars: index0/index1/rindex0/rindex1/length (aliases index/rindex/size).", example: "{{#each items}}{{ this }}{{/each}}" },
   { name: "with", category: "access", arity: "block", summary: "Shift context into the argument for the block.", example: "{{#with user}}{{ name }}{{/with}}" },
   { name: "lookup", category: "access", arity: "inline", summary: "Variadic path lookup; the target of surface path desugaring.", example: "{{{ lookup this \"a\" \"b\" }}}" },
   { name: "eq", category: "logic", arity: "inline", summary: "Value equality ⇒ boolean. Also ne/lt/gt/lte/gte, and/or/not.", example: "{{#if (eq a b)}}…{{/if}}" },
@@ -89,9 +100,13 @@ export async function createBareBarsRenderer() {
 
   // `program` is opaque to the host: it carries the source, the active dialect,
   // and the named partial documents (the host's multi-document sources).
-  function compile(source, partials = {}, _opts = {}) {
+  function compile(source, partials = {}, opts = {}) {
     // No separate compile step — render reports located parse errors directly.
-    return { program: { source, dialect: DIALECT, partials: partials || {} } };
+    // An explicit `opts.dialect` overrides the URL-driven default (used by tests
+    // and any host that selects per-call); `rawbars`/`fullbars` are the engine's
+    // "core"/"surface".
+    const dialect = normalizeDialect(opts.dialect) ?? DIALECT;
+    return { program: { source, dialect, partials: partials || {} } };
   }
 
   function render(program, data, { map = false, policy } = {}) {
@@ -102,11 +117,18 @@ export async function createBareBarsRenderer() {
     }
     const d = data == null ? {} : data;
     const hasPartials = program.partials && Object.keys(program.partials).length > 0;
-    const res = program.dialect === "core"
-      ? bbRender(program.source, d)
-      : hasPartials
+    let res;
+    if (program.dialect === "core") {
+      res = bbRender(program.source, d);
+    } else if (program.dialect === "maxbars") {
+      // MaxBars reuses the FullBars surface pipeline; named external partials are
+      // not threaded through its entrypoint, so inline `{{#inline}}` only here.
+      res = bbRenderMaxbars(program.source, d);
+    } else {
+      res = hasPartials
         ? bbRenderSurfaceWith(program.partials, program.source, d)
         : bbRenderSurface(program.source, d);
+    }
     return renderResult(res, map);
   }
 
@@ -115,15 +137,16 @@ export async function createBareBarsRenderer() {
   // The engine facade does the parse+lower+map in PureScript; the analyses below
   // walk that shape, exactly like the Handlebars adapter walks its mapped nodes.
 
-  function parseAst(source) {
-    return astJson(DIALECT, source);
+  function parseAst(source, opts = {}) {
+    return astJson(normalizeDialect(opts.dialect) ?? DIALECT, source);
   }
 
   // BareBars-specific (the `compile-js` feature): compile the template to a JS
   // ES module via BareBars.Compile, honouring the active dialect. Returns
   // `{ ok, value, error }` — `value` is the JS source. Drives the Compiled JS view.
   function compileToJs(source) {
-    return (DIALECT === "core" ? bbCompile : bbCompileSurface)(source);
+    const c = DIALECT === "core" ? bbCompile : DIALECT === "maxbars" ? bbCompileMaxbars : bbCompileSurface;
+    return c(source);
   }
 
   function walk(nodes, visit) {

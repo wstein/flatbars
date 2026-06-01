@@ -1334,8 +1334,9 @@
         <div class="topbar-group" id="dialect-group" hidden>
           <span class="field-label">Dialect</span>
           <select id="dialect-select" class="select" aria-label="BareBars dialect">
-            <option value="fullbars">FullBars</option>
             <option value="rawbars">RawBars</option>
+            <option value="fullbars">FullBars</option>
+            <option value="maxbars">MaxBars</option>
           </select>
         </div>
         <div class="divider"></div>
@@ -1680,7 +1681,7 @@
         if (ENGINE === "barebars") {
           dialectGroup.hidden = false;
           const dp = new URLSearchParams(location.search).get("dialect");
-          dialectSel.value = (dp === "core" || dp === "rawbars") ? "rawbars" : "fullbars";
+          dialectSel.value = dp === "maxbars" ? "maxbars" : (dp === "core" || dp === "rawbars") ? "rawbars" : "fullbars";
           dialectSel.addEventListener("change", (e) => navWith("dialect", e.target.value));
         } else {
           dialectGroup.hidden = true;
