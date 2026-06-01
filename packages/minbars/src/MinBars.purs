@@ -15,23 +15,29 @@ module MinBars
   , renderMin
   , renderMinWith
   , renderMinDiag
+  , compileMinJs
   ) where
 
 import Prelude
 
+import Data.Array as Array
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FlatBars.Error (ParseError, renderParseErrorAt)
+import FlatBars.Compile (compile)
+import FlatBars.Compile.Emit (falsyLiteral, runtimeVersion)
+import FlatBars.Error (Error(..), ParseError(..), renderParseErrorAt)
 import FlatBars.Lexer (LexConfig, defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
-import FlatBars.Syntax (Directive, Template)
+import FlatBars.Syntax (Directive, Expr(..), Node(..), Template)
 import FlatBars.Value (Value)
 import Kernel.Engine (runTemplate)
 import Kernel.Render (formatError)
-import Kernel.Value (mustache, resolveTruthinessWith)
+import Kernel.Value (FalsySet, mustache, resolveTruthinessWith)
+import MinBars.Compile (minEmit)
 import MinBars.Context (seedEnv)
 import MinBars.Prelude (minEngine)
 import MinBars.Standalone (mustacheStandalone)
@@ -106,3 +112,42 @@ renderCore partials src dat = case parseMin src of
         case runTemplate (minEngine seeded) (desugar nodes) of
           Left e -> Left (formatError src e)
           Right out -> Right out
+
+-- | Compile MinBars (Mustache) source to a JS ES module (ADR-016), reusing the
+-- | dialect-agnostic `FlatBars.Compile` driver with MinBars' own `Emit`
+-- | (`MinBars.Compile.minEmit`) over the `m*` runtime ops. The emitted function
+-- | runs against `runtime/flatbars-runtime.mjs`, and `compile_conformance.mjs`
+-- | asserts it is byte-identical to `renderMin`.
+-- |
+-- | Slice 1 covers interpolation, sections, and inverted sections; a template
+-- | that uses partials or inheritance is rejected with a `DisallowedShape` until
+-- | the later slices land (a loud failure, never a silent miscompile).
+compileMinJs :: String -> Either ParseError String
+compileMinJs src = do
+  { directives, nodes } <- parseMin src
+  falsy <- lmap toParseError (resolveTruthinessWith mustache directives)
+  let desugared = desugar nodes
+  if hasUnsupported desugared then
+    Left (DisallowedShape "partials / inheritance (MinBars compile is ADR-016 slice 1)" 0)
+  else Right (compile (minMeta falsy) minEmit [] desugared)
+  where
+  toParseError = case _ of
+    DirectiveError m o -> BadDirective m o
+    e -> BadDirective (show e) 0
+
+-- | The MinBars compile metadata: the runtime version, the `$falsy` const (the
+-- | file's resolved mode, `mustache` by default), and the root-stack seed.
+minMeta :: FalsySet -> { runtimeVersion :: String, preamble :: String, seed :: String }
+minMeta falsy =
+  { runtimeVersion
+  , preamble: "const $falsy = " <> falsyLiteral falsy <> ";\n"
+  , seed: "rt.mseed(data, $falsy)"
+  }
+
+-- | Does the desugared template use a construct outside slice 1? Partials
+-- | (`(partial …)`), parent templates (`parent`), or block overrides (`block`).
+hasUnsupported :: Template -> Boolean
+hasUnsupported = Array.any case _ of
+  Output _ (App "partial" _) -> true
+  Block _ _ name _ body -> name == "parent" || name == "block" || hasUnsupported body
+  _ -> false

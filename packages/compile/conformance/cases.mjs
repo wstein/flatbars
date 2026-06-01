@@ -279,4 +279,29 @@ export const cases = [
   // canonical escapers escapeHtml/escapeJson (compiled ≡ interpreter).
   { name: "escapeHtml-canonical", t: "{{{escapeHtml (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
   { name: "escapeJson-canonical", t: "{{{escapeJson (lookup this \"o\")}}}", d: { o: { a: 1 } } },
+
+  // ── MinBars (Mustache) — ADR-016 compile slice 1 ────────────────────────────
+  // Interpolation: escaped `{{x}}`, raw `{{{x}}}` / `{{&x}}`, dotted names,
+  // implicit iterator `{{.}}`, missing → "". The compiled `rt.mlookup`/`rt.esc`
+  // must match the interpreter's context-stack resolve + escape byte for byte.
+  { name: "mn:interp-escaped", dialect: "minbars", t: "Hi {{html}}!", d: { html: "<b>&\"'" } },
+  { name: "mn:interp-raw-triple", dialect: "minbars", t: "{{{html}}}", d: { html: "<b>&\"'" } },
+  { name: "mn:interp-raw-amp", dialect: "minbars", t: "{{&html}}", d: { html: "<b>&" } },
+  { name: "mn:dotted", dialect: "minbars", t: "{{name.first}} {{name.last}}", d: { name: { first: "Ada", last: "L" } } },
+  { name: "mn:implicit", dialect: "minbars", t: "{{#tags}}[{{.}}]{{/tags}}", d: { tags: ["a", "b", "c"] } },
+  { name: "mn:missing", dialect: "minbars", t: "[{{nope}}]", d: { name: "Ada" } },
+  { name: "mn:parent-fallback", dialect: "minbars", t: "{{#user}}{{org}}:{{name}}{{/user}}", d: { org: "X", user: { name: "Ada" } } },
+  // Sections: array iterate (each element pushed), truthy non-list once, falsy
+  // skipped, object opens a scope.
+  { name: "mn:section-array", dialect: "minbars", t: "<ul>{{#items}}<li>{{name}}({{qty}})</li>{{/items}}</ul>", d: { items: [{ name: "pen", qty: 3 }, { name: "ink", qty: 1 }] } },
+  { name: "mn:section-bool-true", dialect: "minbars", t: "{{#active}}on{{/active}}", d: { active: true } },
+  { name: "mn:section-bool-false", dialect: "minbars", t: "{{#active}}on{{/active}}", d: { active: false } },
+  { name: "mn:section-object", dialect: "minbars", t: "{{#user}}{{name}} <{{email}}>{{/user}}", d: { user: { name: "Ada", email: "a@x" } } },
+  // Inverted sections: render iff falsy under the mustache mode.
+  { name: "mn:inverted-empty", dialect: "minbars", t: "{{#items}}<li>{{.}}</li>{{/items}}{{^items}}none{{/items}}", d: { items: [] } },
+  { name: "mn:inverted-truthy", dialect: "minbars", t: "{{^items}}none{{/items}}", d: { items: ["x"] } },
+  // The truthiness gotcha: in Mustache 0 and "" are TRUTHY (only false/null/[]
+  // are falsy), so the section renders — the compiled `$falsy` is the mustache set.
+  { name: "mn:truthy-zero", dialect: "minbars", t: "{{#count}}in stock: {{count}}{{/count}}{{^count}}sold out{{/count}}", d: { count: 0 } },
+  { name: "mn:truthy-empty-string", dialect: "minbars", t: "{{#note}}has{{/note}}{{^note}}none{{/note}}", d: { note: "" } },
 ];

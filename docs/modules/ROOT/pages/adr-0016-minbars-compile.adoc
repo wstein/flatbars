@@ -1,0 +1,68 @@
+= ADR-016: MinBars compile-to-JS
+:navtitle: ADR-016 MinBars compile
+
+*Status:* Accepted (phased; slice 1 — interpolation, sections, inverted — shipped). *Date:* 2026-06-01.
+Revisits the interpret-only decision in xref:adr-0007-minbars.adoc[ADR-007]; an instance of the
+compile IoC pattern (xref:adr-0011-compile-to-js.adoc[ADR-011]).
+
+== Context
+
+The dialect-agnostic compiler (`FlatBars.Compile` = emit driver + an `Emit` record + the
+`flatbars-runtime.mjs` runtime) already serves the whole *ladder*: RawBars (`compileJs`), FullBars
+(`compileSurface`), and MaxBars (`compileMaxJs`, which literally reuses the FullBars surface compiler).
+They share one compiler because they are *one engine* (RefEnv + the reference prelude) differing only in
+surface syntax, so they desugar to one core AST and run on one runtime.
+
+The lone holdout is *MinBars*, deferred to interpret-only by ADR-007. MinBars is a *peer* engine: its
+own `MinEnv` context stack (Mustache walks a stack of frames with parent fallback), polymorphic
+sections (`pass:[{{#x}}]` = iterate-array / render-once-truthy / skip-falsy), the mustache falsy-set,
+context-inheriting partials, and inheritance — none of which match the RefEnv model the shared runtime
+assumes.
+
+The lever: `MinBars.Surface.desugar` is already a `Template → Template` rewrite into *core helper
+applications* (`mlookup` / `escape` / `section` / `inverted` / `partial` / `parent` / `block`). So
+MinBars already produces the exact core `Template` the emit driver walks — what was missing is a
+*runtime target* for those helpers, not a new AST.
+
+== Decision
+
+Give MinBars a compile path the same way it has an interpret path: plug its *own* `Emit` rules + runtime
+ops into the *reused* emit driver (the IoC move, mirroring its own `Engine m MinEnv`).
+
+* *Emit* (`MinBars.Compile`): the baseline tier (no FullBars `if`/`each` optimiser — MinBars's heads are
+  `section`/`inverted`/…). `escape e` → `rt.esc`, raw output → `rt.out` (both reused: the runtime's
+  `escapeHtml`/`stringify` already match the kernel's, gated by the existing compile conformance);
+  `(mlookup "name")` → `rt.mlookup(env, name)`; `section` → `rt.msection(value, env, fn)` pushing a
+  frame per item; `inverted` → an inline `if (rt.mfalsy(env, value)) { … }`.
+* *Runtime* (`flatbars-runtime.mjs`, `m*` ops): the MinBars "scope" is `{ stack, falsy }`; `mseed`
+  builds the root stack, `mlookup` is `MinBars.Context.mresolve` (implicit-iterator `.`, dotted-name
+  descent, parent-fallback stack walk), `msection` is the polymorphic coercion + push, `mfalsy` is the
+  mode test. The falsy-set is the already-threaded `$falsy` const (mustache by default), so truthiness
+  is correct for free.
+* *Seam*: `FullBars.JS` exposes `compileMinbars`/`renderMinbars`; the compile-conformance harness
+  (`packages/compile/conformance.mjs`) dispatches the `minbars` dialect and asserts *compiled ≡
+  interpreter* byte-for-byte — the contract that forces the runtime to replicate `MinEnv` exactly.
+
+*Packaging (slice 1):* the `m*` ops live in the shared `flatbars-runtime.mjs` (namespaced) rather than a
+separate `minbars-runtime.mjs`; `MinBars.Compile` lives in the `minbars` package (a new `flatbars-compile`
+dependency, allowed by the isolation invariants — only `rawbars` edges are forbidden). A dedicated
+`minbars-compile` package is the cleaner long-term home and can be split out later.
+
+== Phasing
+
+. *Slice 1 (this ADR):* interpolation (escaped/raw/dotted/implicit/missing), polymorphic sections,
+  inverted sections. `compileMinJs` *rejects* templates using partials or inheritance with a clear
+  parse error (loud, not a silent miscompile) until later slices.
+. *Slice 2:* context-inheriting partials + standalone indentation (`rt.mpartial`).
+. *Slice 3:* inheritance — `parent`/`block` with the block-override stack and the §4.6.2 reindentation.
+
+Each slice is gated by compile conformance before it lands.
+
+== Consequences
+
+* The Lab's "Compiled JS" panel can light up for MinBars (it already gates on `compileToJs` existing) —
+  a follow-up once the bundle re-exports `compileMinJs`.
+* A Mustache template can ship as a standalone JS module (no engine bundle at runtime) — the one real
+  payoff, since Mustache is logic-less (no helpers to inline, unlike Handlebars `if`/`each`).
+* The compile-conformance gate now spans all four engines; a MinBars semantics change that isn't
+  mirrored in the runtime fails the build.

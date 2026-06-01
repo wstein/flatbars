@@ -423,7 +423,53 @@ function block(name, args, frame, bodyFn, clauses) {
 }
 function raw(_name, body) { return body; }
 
+// ── MinBars (Mustache) compiled-path ops (ADR-016) ───────────────────────────
+// MinBars is a peer engine: its "scope" is a context STACK with parent fallback,
+// not the RefEnv frame. These mirror MinBars.Context/MinBars.Prelude exactly
+// (the compile-conformance gate enforces it). Output/escape reuse out/esc/stringify
+// above — the runtime's escapeHtml/stringify already match the kernel's.
+const MUSTACHE = { b: 1, n: 1, a: 1 }; // false/null/[] falsy (fallback; $falsy is generated)
+
+// The root MinBars scope: the datum as the sole stack frame (MinBars.Context.seedEnv).
+function mseed(data, falsy) { return { stack: [data ?? null], falsy: falsy || MUSTACHE }; }
+// Push a frame (sections render their body under a push; MinBars.Context.push).
+function mpush(env, v) { return { stack: [v, ...env.stack], falsy: env.falsy }; }
+// A plain (non-array, non-Safe) object frame that owns `key` (the walk predicate).
+const mhas = (v, key) =>
+  v !== null && typeof v === "object" && !Array.isArray(v) && !isSafe(v) &&
+  Object.prototype.hasOwnProperty.call(v, key);
+
+// Resolve a Mustache name against the stack (MinBars.Context.mresolve): `.` is the
+// stack top; otherwise the head key walks the stack top→bottom for the first object
+// frame holding it (parent fallback), and each dotted-tail segment descends into
+// THAT result only (no further walk). Any miss ⇒ null.
+function mlookup(env, name) {
+  const stack = env.stack;
+  if (name === ".") return stack.length ? stack[0] : null;
+  const segs = name.split(".");
+  let cur = null;
+  for (const frame of stack) { if (mhas(frame, segs[0])) { cur = frame[segs[0]]; break; } }
+  for (let i = 1; i < segs.length; i++) cur = mhas(cur, segs[i]) ? cur[segs[i]] : null;
+  return cur;
+}
+
+// The polymorphic Mustache section (MinBars.Prelude.sectionH): an array renders the
+// body once per element (each pushed); a truthy non-list renders once (pushed); a
+// falsy value renders zero times. Bodies are joined raw (already escaped by their
+// own interpolations).
+function msection(v, env, bodyFn) {
+  const items = Array.isArray(v) ? v : (isFalsy(env.falsy, v) ? [] : [v]);
+  let out = "";
+  for (const it of items) out += bodyFn(mpush(env, it));
+  return out;
+}
+
+// Inverted-section test (MinBars.Prelude.invertedH renders iff the value is falsy
+// under the active mode; the body runs in the unchanged context).
+const mfalsy = (env, v) => isFalsy(env.falsy, v);
+
 export const rt = {
   RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, block, raw, Safe,
+  mseed, mlookup, msection, mfalsy,
 };
 export default rt;

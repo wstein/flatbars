@@ -10349,7 +10349,7 @@ var litJs = function(v) {
     return "null";
   }
   ;
-  throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 106, column 9 - line 113, column 22): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 107, column 9 - line 114, column 22): " + [v.constructor.name]);
 };
 var lambda = function(rec) {
   return function(ctx2) {
@@ -10370,7 +10370,7 @@ var head1 = function(rec) {
         return "null";
       }
       ;
-      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 221, column 22 - line 223, column 20): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 222, column 22 - line 224, column 20): " + [v.constructor.name]);
     };
   };
 };
@@ -10401,7 +10401,7 @@ var falsyLiteral = function(fs) {
       return "o";
     }
     ;
-    throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 66, column 9 - line 72, column 21): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 67, column 9 - line 73, column 21): " + [v.constructor.name]);
   };
   var flag = function(sh) {
     var $34 = member4(sh)(fs);
@@ -10436,7 +10436,7 @@ var elseChain = function(rec) {
         return " else {\n" + (rec.nodes(ctx2)(v.value0.head.body) + "  }");
       }
       ;
-      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 153, column 29 - line 164, column 55): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 154, column 29 - line 165, column 55): " + [v.constructor.name]);
     };
   };
 };
@@ -10485,7 +10485,7 @@ var frameBlock = function(rec) {
               return [];
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 178, column 18 - line 180, column 20): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 179, column 18 - line 181, column 20): " + [v.constructor.name]);
           }();
           var child = rec.child(ctx2);
           return "  out += rt." + (fn + ("(" + (subject + (", " + (ctx2.scope + (", " + (names + (", " + (lambda(rec)(child)(s.before) + (", " + (lambda(rec)(ctx2)(elseClause) + ");\n")))))))))));
@@ -10559,7 +10559,7 @@ var argAt = function(rec) {
           return "null";
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 101, column 24 - line 103, column 20): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 102, column 24 - line 104, column 20): " + [v.constructor.name]);
       };
     };
   };
@@ -10595,7 +10595,7 @@ var fbExpr = function(rec) {
         return "rt.call(" + (jsString(v.value0) + (", [" + (args$prime(rec)(ctx2)(v.value1) + ("], " + (ctx2.scope + ")")))));
       }
       ;
-      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 83, column 18 - line 96, column 92): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 84, column 18 - line 97, column 92): " + [v.constructor.name]);
     };
   };
 };
@@ -11085,6 +11085,88 @@ var maxLoopVars = function(v) {
 };
 var renderMax = /* @__PURE__ */ renderSurfaceDiagWith(maxLoopVars)(maxOptions);
 var compileMaxJs = /* @__PURE__ */ compileSurfaceWith(maxLoopVars)(maxOptions);
+
+// output/MinBars.Compile/index.js
+var show11 = /* @__PURE__ */ show(showNumber);
+var mBlock = function(rec) {
+  return function(ctx2) {
+    return function(name2) {
+      return function(args) {
+        return function(body) {
+          var child = rec.child(ctx2);
+          var arg0 = function() {
+            var v = head(args);
+            if (v instanceof Just) {
+              return rec.expr(ctx2)(v.value0);
+            }
+            ;
+            if (v instanceof Nothing) {
+              return "null";
+            }
+            ;
+            throw new Error("Failed pattern match at MinBars.Compile (line 61, column 10 - line 63, column 22): " + [v.constructor.name]);
+          }();
+          if (name2 === "section") {
+            return "  out += rt.msection(" + (arg0 + (", " + (ctx2.scope + (", function (" + (child.scope + (') { let out = "";\n' + (rec.nodes(child)(body) + "  return out; });\n")))))));
+          }
+          ;
+          if (name2 === "inverted") {
+            return "  if (rt.mfalsy(" + (ctx2.scope + (", " + (arg0 + (")) {\n" + (rec.nodes(ctx2)(body) + "  }\n")))));
+          }
+          ;
+          return `  throw new Error("MinBars compile: unsupported block '` + (name2 + `'");
+`);
+        };
+      };
+    };
+  };
+};
+var litJs2 = function(v) {
+  if (v instanceof VString) {
+    return jsString(v.value0);
+  }
+  ;
+  if (v instanceof VBool) {
+    if (v.value0) {
+      return "true";
+    }
+    ;
+    return "false";
+  }
+  ;
+  if (v instanceof VNull) {
+    return "null";
+  }
+  ;
+  if (v instanceof VNumber) {
+    return show11(v.value0);
+  }
+  ;
+  return "null";
+};
+var mExpr = function(rec) {
+  return function(ctx2) {
+    return function(v) {
+      if (v instanceof App2 && (v.value0 === "mlookup" && (v.value1.length === 1 && (v["value1"][0] instanceof Lit && v["value1"][0].value0 instanceof VString)))) {
+        return "rt.mlookup(" + (ctx2.scope + (", " + (jsString(v["value1"][0].value0.value0) + ")")));
+      }
+      ;
+      if (v instanceof App2 && (v.value0 === "escape" && v.value1.length === 1)) {
+        return "rt.esc(" + (rec.expr(ctx2)(v["value1"][0]) + ")");
+      }
+      ;
+      if (v instanceof Lit) {
+        return litJs2(v.value0);
+      }
+      ;
+      return '(function () { throw new Error("MinBars compile: unsupported expression"); })()';
+    };
+  };
+};
+var minEmit = {
+  expr: mExpr,
+  block: mBlock
+};
 
 // output/MinBars.Context/index.js
 var lookup4 = /* @__PURE__ */ lookup(ordString);
@@ -12130,12 +12212,26 @@ var $lazy_desugar = /* @__PURE__ */ $runtime_lazy5("desugar", "MinBars.Surface",
 var desugar2 = /* @__PURE__ */ $lazy_desugar(40);
 
 // output/MinBars/index.js
+var $runtime_lazy6 = function(name2, moduleName, init) {
+  var state2 = 0;
+  var val;
+  return function(lineNumber) {
+    if (state2 === 2) return val;
+    if (state2 === 1) throw new ReferenceError(name2 + " was needed before it finished initializing (module " + moduleName + ", line " + lineNumber + ")", moduleName, lineNumber);
+    state2 = 1;
+    val = init();
+    state2 = 2;
+    return val;
+  };
+};
 var bind7 = /* @__PURE__ */ bind(bindEither);
 var pure3 = /* @__PURE__ */ pure(applicativeEither);
 var runTemplate2 = /* @__PURE__ */ runTemplate(monadEither);
 var minEngine2 = /* @__PURE__ */ minEngine(monadThrowEither);
 var traverse7 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
 var fromFoldable10 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
+var show13 = /* @__PURE__ */ show(showError);
+var lmap2 = /* @__PURE__ */ lmap(bifunctorEither);
 var minOptions = /* @__PURE__ */ function() {
   return {
     parseExpr: defaultParseOptions.parseExpr,
@@ -12148,6 +12244,13 @@ var minOptions = /* @__PURE__ */ function() {
     trimStandalone: false
   };
 }();
+var minMeta = function(falsy) {
+  return {
+    runtimeVersion,
+    preamble: "const $falsy = " + (falsyLiteral(falsy) + ";\n"),
+    seed: "rt.mseed(data, $falsy)"
+  };
+};
 var minLexConfig = /* @__PURE__ */ function() {
   return {
     open: defaultLexConfig.open,
@@ -12192,13 +12295,13 @@ var renderCore = function(partials) {
             return new Right(v2.value0);
           }
           ;
-          throw new Error("Failed pattern match at MinBars (line 106, column 9 - line 108, column 33): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at MinBars (line 112, column 9 - line 114, column 33): " + [v2.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at MinBars (line 100, column 34 - line 108, column 33): " + [v1.constructor.name]);
+        throw new Error("Failed pattern match at MinBars (line 106, column 34 - line 114, column 33): " + [v1.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at MinBars (line 98, column 31 - line 108, column 33): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at MinBars (line 104, column 31 - line 114, column 33): " + [v.constructor.name]);
     };
   };
 };
@@ -12215,7 +12318,7 @@ var renderMinWith = function(partialSrcs) {
           return new Right(new Tuple(v2.value0, desugar2(v1.value0.nodes)));
         }
         ;
-        throw new Error("Failed pattern match at MinBars (line 84, column 35 - line 86, column 58): " + [v1.constructor.name]);
+        throw new Error("Failed pattern match at MinBars (line 90, column 35 - line 92, column 58): " + [v1.constructor.name]);
       };
       var v = traverse7(compilePartial)(partialSrcs);
       if (v instanceof Left) {
@@ -12226,9 +12329,45 @@ var renderMinWith = function(partialSrcs) {
         return renderCore(fromFoldable10(v.value0))(src)(dat);
       }
       ;
-      throw new Error("Failed pattern match at MinBars (line 80, column 3 - line 82, column 57): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at MinBars (line 86, column 3 - line 88, column 57): " + [v.constructor.name]);
     };
   };
+};
+var renderMin = /* @__PURE__ */ renderMinWith([]);
+var renderMinDiag = renderMin;
+var $lazy_hasUnsupported = /* @__PURE__ */ $runtime_lazy6("hasUnsupported", "MinBars", function() {
+  return any2(function(v) {
+    if (v instanceof Output && (v.value1 instanceof App2 && v.value1.value0 === "partial")) {
+      return true;
+    }
+    ;
+    if (v instanceof Block) {
+      return v.value2 === "parent" || (v.value2 === "block" || $lazy_hasUnsupported(152)(v.value4));
+    }
+    ;
+    return false;
+  });
+});
+var hasUnsupported = /* @__PURE__ */ $lazy_hasUnsupported(149);
+var compileMinJs = function(src) {
+  var toParseError = function(v) {
+    if (v instanceof DirectiveError) {
+      return new BadDirective(v.value0, v.value1);
+    }
+    ;
+    return new BadDirective(show13(v), 0);
+  };
+  return bind7(parseMin(src))(function(v) {
+    return bind7(lmap2(toParseError)(resolveTruthinessWith(mustache)(v.directives)))(function(falsy) {
+      var desugared = desugar2(v.nodes);
+      var $59 = hasUnsupported(desugared);
+      if ($59) {
+        return new Left(new DisallowedShape("partials / inheritance (MinBars compile is ADR-016 slice 1)", 0));
+      }
+      ;
+      return new Right(compile(minMeta(falsy))(minEmit)([])(desugared));
+    });
+  });
 };
 
 // output/Effect.Aff/foreign.js
@@ -13057,7 +13196,7 @@ var makeAff = Aff.Async;
 var _sequential = Aff.Seq;
 
 // output/RawBars/index.js
-var lmap2 = /* @__PURE__ */ lmap(bifunctorEither);
+var lmap3 = /* @__PURE__ */ lmap(bifunctorEither);
 var runResolved3 = /* @__PURE__ */ runResolved(monadThrowEither);
 var identity7 = /* @__PURE__ */ identity(categoryFn);
 var bind8 = /* @__PURE__ */ bind(bindEither);
@@ -13086,7 +13225,7 @@ var renderDiag = function(src) {
     }
     ;
     if (v instanceof Right) {
-      return lmap2(formatError(src))(runResolved3(v.value0.directives)(identity7)(v.value0.nodes)(dat));
+      return lmap3(formatError(src))(runResolved3(v.value0.directives)(identity7)(v.value0.nodes)(dat));
     }
     ;
     throw new Error("Failed pattern match at RawBars (line 75, column 22 - line 77, column 100): " + [v.constructor.name]);
@@ -13113,7 +13252,7 @@ var compileJsWith = function(opts) {
 var compileJs = /* @__PURE__ */ compileJsWith(coreOptions);
 
 // output/FullBars.JS/index.js
-var $runtime_lazy6 = function(name2, moduleName, init) {
+var $runtime_lazy7 = function(name2, moduleName, init) {
   var state2 = 0;
   var val;
   return function(lineNumber) {
@@ -13125,7 +13264,7 @@ var $runtime_lazy6 = function(name2, moduleName, init) {
     return val;
   };
 };
-var show11 = /* @__PURE__ */ show(showNumber);
+var show14 = /* @__PURE__ */ show(showNumber);
 var toUnfoldable8 = /* @__PURE__ */ toUnfoldable2(unfoldableArray);
 var fromFoldable11 = /* @__PURE__ */ fromFoldable2(foldableArray);
 var elem6 = /* @__PURE__ */ elem2(eqString);
@@ -13140,7 +13279,7 @@ var segment = function(v) {
   }
   ;
   if (v instanceof Lit && v.value0 instanceof VNumber) {
-    return str(show11(v.value0.value0));
+    return str(show14(v.value0.value0));
   }
   ;
   if (v instanceof App2) {
@@ -13194,6 +13333,9 @@ var renderSurface = function(tpl, json) {
 var renderMustache = function(partials, tpl, json) {
   return result(renderMinWith(toUnfoldable8(partials))(tpl)(fromJson(json)));
 };
+var renderMinbars = function(tpl, json) {
+  return result(renderMinDiag(tpl)(fromJson(json)));
+};
 var renderMaxbars = function(tpl, json) {
   return result(renderMax(tpl)(fromJson(json)));
 };
@@ -13226,13 +13368,13 @@ var ctx = function(kind) {
   return obj([tt2("context"), new Tuple("kind", str(kind))]);
 };
 var compileResult = function(dictShow) {
-  var show13 = show(dictShow);
+  var show15 = show(dictShow);
   return function(v) {
     if (v instanceof Left) {
       return {
         ok: false,
         value: "",
-        error: show13(v.value0)
+        error: show15(v.value0)
       };
     }
     ;
@@ -13244,12 +13386,15 @@ var compileResult = function(dictShow) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 95, column 17 - line 97, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 105, column 17 - line 107, column 49): " + [v.constructor.name]);
   };
 };
 var compileResult1 = /* @__PURE__ */ compileResult(showParseError);
 var compileSurface2 = function(tpl) {
   return compileResult1(compileSurface(tpl));
+};
+var compileMinbars = function(tpl) {
+  return compileResult1(compileMinJs(tpl));
 };
 var compileMaxbars = function(tpl) {
   return compileResult1(compileMaxJs(tpl));
@@ -13292,7 +13437,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map21(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 222, column 9 - line 231, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 232, column 9 - line 241, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
@@ -13310,9 +13455,9 @@ var path = function(args) {
 var argOf = function(e) {
   return obj([new Tuple("value", rexpr(e))]);
 };
-var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
+var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map21($lazy_rnode(198))(ns));
+    return arr(map21($lazy_rnode(208))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -13335,7 +13480,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         }()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 172, column 21 - line 179, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 182, column 21 - line 189, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -13368,7 +13513,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 167, column 1 - line 167, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 177, column 1 - line 177, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
         var $94 = litName(v.value1);
@@ -13393,7 +13538,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(167);
+var rnode = /* @__PURE__ */ $lazy_rnode(177);
 var astJson = function(dialect, src) {
   var v = function() {
     var $105 = dialect === "maxbars";
@@ -13424,15 +13569,17 @@ var astJson = function(dialect, src) {
     return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map21(rnode)(nodes)))]))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 110, column 3 - line 139, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 120, column 3 - line 149, column 12): " + [v.constructor.name]);
 };
 export {
   astJson,
   compile2 as compile,
   compileMaxbars,
+  compileMinbars,
   compileSurface2 as compileSurface,
   render,
   renderMaxbars,
+  renderMinbars,
   renderMustache,
   renderSurface,
   renderSurfaceWithPartials

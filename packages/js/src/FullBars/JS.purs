@@ -12,10 +12,12 @@ module FullBars.JS
   , render
   , renderSurface
   , renderMaxbars
+  , renderMinbars
   , astJson
   , compile
   , compileSurface
   , compileMaxbars
+  , compileMinbars
   , renderSurfaceWithPartials
   , renderMustache
   ) where
@@ -60,6 +62,10 @@ renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJ
 renderMaxbars :: Fn2 String Json Result
 renderMaxbars = mkFn2 \tpl json -> result (MaxBars.renderMax tpl (fromJson json))
 
+-- | Render a MinBars (Mustache) template against JS data. `renderMinbars(template, data)`.
+renderMinbars :: Fn2 String Json Result
+renderMinbars = mkFn2 \tpl json -> result (MinBars.renderMinDiag tpl (fromJson json))
+
 -- | Render a surface template with a set of named partials (each a surface
 -- | source). `renderSurfaceWithPartials(partials, template, data)`, where
 -- | `partials` is a plain `{ name: source }` object — the lab's multi-document
@@ -90,6 +96,10 @@ compileSurface = mkFn1 \tpl -> compileResult (Compile.compileSurface tpl)
 -- | `compileMaxbars(template)`.
 compileMaxbars :: Fn1 String Result
 compileMaxbars = mkFn1 \tpl -> compileResult (MaxBars.compileMaxJs tpl)
+
+-- | Compile a MinBars (Mustache) template to JS (ADR-016). `compileMinbars(template)`.
+compileMinbars :: Fn1 String Result
+compileMinbars = mkFn1 \tpl -> compileResult (MinBars.compileMinJs tpl)
 
 compileResult :: forall e. Show e => Either e String -> Result
 compileResult = case _ of

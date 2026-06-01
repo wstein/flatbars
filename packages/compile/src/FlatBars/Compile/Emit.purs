@@ -10,6 +10,7 @@
 -- | runs against `runtime/flatbars-runtime.mjs`.
 module FlatBars.Compile.Emit
   ( fullbarsEmit
+  , falsyLiteral
   , metaFor
   , resolveForCompile
   , runtimeVersion

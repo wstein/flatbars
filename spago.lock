@@ -1101,8 +1101,10 @@
         "core": {
           "dependencies": [
             "arrays",
+            "bifunctors",
             "either",
             "flatbars",
+            "flatbars-compile",
             "foldable-traversable",
             "kernel",
             "lists",
@@ -1126,6 +1128,7 @@
             "exceptions",
             "exists",
             "flatbars",
+            "flatbars-compile",
             "foldable-traversable",
             "functions",
             "functors",
