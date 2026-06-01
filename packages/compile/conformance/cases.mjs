@@ -159,6 +159,42 @@ export const cases = [
   { name: "minus-alias", dialect: "surface", t: "{{ minus a b }}", d: { a: 7, b: 4 } },
   { name: "times-alias", dialect: "surface", t: "{{ times a b }}", d: { a: 4, b: 5 } },
 
+  // value primitives — string pack (helper-packs-spec §4). Subject-first; the
+  // interpreter and the JS runtime must produce byte-identical output (the
+  // `slice` negative-index / `truncate` boundary semantics are pinned by this).
+  { name: "str-lowercase", dialect: "surface", t: "{{ lowercase s }}", d: { s: "HeLLo" } },
+  { name: "str-uppercase", dialect: "surface", t: "{{ uppercase s }}", d: { s: "HeLLo" } },
+  { name: "str-uppercase-number", dialect: "surface", t: "{{ uppercase n }}", d: { n: 42 } },
+  { name: "str-capitalize", dialect: "surface", t: "{{ capitalize s }}", d: { s: "hello world" } },
+  { name: "str-capitalize-empty", dialect: "surface", t: "[{{ capitalize s }}]", d: { s: "" } },
+  { name: "str-trim", dialect: "surface", t: "[{{ trim s }}]", d: { s: "  hi \t\n " } },
+  { name: "str-trimStart", dialect: "surface", t: "[{{ trimStart s }}]", d: { s: "  hi  " } },
+  { name: "str-trimEnd", dialect: "surface", t: "[{{ trimEnd s }}]", d: { s: "  hi  " } },
+  { name: "str-trim-allspace", dialect: "surface", t: "[{{ trimStart s }}][{{ trimEnd s }}]", d: { s: "   " } },
+  { name: "str-split", dialect: "surface", t: "{{#each (split s sep)}}<{{ this }}>{{/each}}", d: { s: "a,b,c", sep: "," } },
+  { name: "str-split-empty-sep", dialect: "surface", t: "{{#each (split s sep)}}<{{ this }}>{{/each}}", d: { s: "abc", sep: "" } },
+  { name: "str-replace", dialect: "surface", t: "{{ replace s find rep }}", d: { s: "a-b-c", find: "-", rep: "+" } },
+  { name: "str-replace-all", dialect: "surface", t: "{{ replace s find rep }}", d: { s: "foo foo foo", find: "foo", rep: "bar" } },
+  { name: "str-slice", dialect: "surface", t: "{{ slice s a b }}", d: { s: "hello", a: 1, b: 4 } },
+  { name: "str-slice-open", dialect: "surface", t: "{{ slice s a }}", d: { s: "hello", a: 2 } },
+  { name: "str-slice-neg-start", dialect: "surface", t: "{{ slice s a }}", d: { s: "hello", a: -3 } },
+  { name: "str-slice-neg-end", dialect: "surface", t: "{{ slice s a b }}", d: { s: "hello", a: 0, b: -2 } },
+  { name: "str-slice-neg-both", dialect: "surface", t: "{{ slice s a b }}", d: { s: "hello", a: -4, b: -1 } },
+  { name: "str-slice-overshoot", dialect: "surface", t: "[{{ slice s a b }}]", d: { s: "hi", a: 5, b: 10 } },
+  { name: "str-slice-inverted", dialect: "surface", t: "[{{ slice s a b }}]", d: { s: "hello", a: 4, b: 1 } },
+  { name: "str-includes-true", dialect: "surface", t: "{{ includes s sub }}", d: { s: "hello", sub: "ell" } },
+  { name: "str-includes-false", dialect: "surface", t: "{{ includes s sub }}", d: { s: "hello", sub: "xyz" } },
+  { name: "str-startsWith", dialect: "surface", t: "{{ startsWith s x }}", d: { s: "hello", x: "he" } },
+  { name: "str-endsWith", dialect: "surface", t: "{{ endsWith s x }}", d: { s: "hello", x: "lo" } },
+  { name: "str-truncate-long", dialect: "surface", t: "{{ truncate s n }}", d: { s: "hello world", n: 5 } },
+  { name: "str-truncate-short", dialect: "surface", t: "{{ truncate s n }}", d: { s: "hi", n: 5 } },
+  { name: "str-truncate-boundary", dialect: "surface", t: "{{ truncate s n }}", d: { s: "hello", n: 5 } },
+  { name: "str-truncate-suffix", dialect: "surface", t: "{{ truncate s n suf }}", d: { s: "hello world", n: 5, suf: "..." } },
+  { name: "str-append", dialect: "surface", t: "{{ append s x }}", d: { s: "foo", x: "bar" } },
+  { name: "str-prepend", dialect: "surface", t: "{{ prepend s x }}", d: { s: "foo", x: "bar" } },
+  { name: "str-append-number", dialect: "surface", t: "{{ append s x }}", d: { s: "v", x: 2 } },
+  { name: "str-unicode-upper", dialect: "surface", t: "{{ uppercase s }}", d: { s: "café" } },
+
   // MaxBars infix arithmetic + `??` operators (desugar to the prelude helpers;
   // the compiled path and the interpreter must agree).
   { name: "mx:add", dialect: "maxbars", t: "{{ a + b }}", d: { a: 2, b: 3 } },

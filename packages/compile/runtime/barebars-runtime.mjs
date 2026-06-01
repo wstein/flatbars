@@ -239,6 +239,11 @@ function num(v) {
   if (typeof v !== "number") throw new Error("arithmetic expects a number");
   return v;
 }
+// A numeric primitive argument (slice/truncate index): same strict number guard
+// as the interpreter's asNum, truncated toward zero like its `trunc`/Int.round.
+function int(v) {
+  return Math.trunc(num(v));
+}
 
 const helpers = {
   this: (a, f) => f.ctx,
@@ -287,6 +292,28 @@ const helpers = {
   // null-coalescing — the first non-null argument (the `??` desugar target).
   coalesce: (a) => { for (const v of a) if (v !== null) return v; return null; },
   log: () => null,
+  // ── value primitives — string pack (helper-packs-spec §4) ──────────────────
+  // Subject-first transforms. The subject and any string-valued argument are
+  // coerced with `stringify` (so `uppercase` works on a number, matching the
+  // interpreter's `strUnary`/`stringifyM`); numeric args (slice/truncate) read
+  // via `int` (Math.trunc, matching `asInt`). Results are plain strings (split:
+  // an array of strings). All indexing is over UTF-16 code units, the same unit
+  // PureScript's Data.String.CodeUnits uses, so the two targets agree.
+  lowercase: (a) => stringify(a[0]).toLowerCase(),
+  uppercase: (a) => stringify(a[0]).toUpperCase(),
+  capitalize: (a) => { const s = stringify(a[0]); return s === "" ? s : s.charAt(0).toUpperCase() + s.slice(1); },
+  trim: (a) => stringify(a[0]).trim(),
+  trimStart: (a) => stringify(a[0]).trimStart(),
+  trimEnd: (a) => stringify(a[0]).trimEnd(),
+  split: (a) => stringify(a[0]).split(stringify(a[1])),
+  replace: (a) => stringify(a[0]).split(stringify(a[1])).join(stringify(a[2])), // literal, all occurrences (= PureScript replaceAll); empty find is not a tested case
+  slice: (a) => a.length >= 3 ? stringify(a[0]).slice(int(a[1]), int(a[2])) : stringify(a[0]).slice(int(a[1])),
+  includes: (a) => stringify(a[0]).includes(stringify(a[1])),
+  startsWith: (a) => stringify(a[0]).startsWith(stringify(a[1])),
+  endsWith: (a) => stringify(a[0]).endsWith(stringify(a[1])),
+  truncate: (a) => { const s = stringify(a[0]), n = int(a[1]), suf = a.length >= 3 ? stringify(a[2]) : "…"; return s.length > n ? s.slice(0, n) + suf : s; },
+  append: (a) => stringify(a[0]) + stringify(a[1]),
+  prepend: (a) => stringify(a[1]) + stringify(a[0]),
   json: (a) => jsonText(a[0], a[1]),
   esc_json: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))),
   else: () => new Safe(""),

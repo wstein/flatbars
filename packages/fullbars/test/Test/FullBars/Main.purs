@@ -27,6 +27,7 @@ import Effect.Class (liftEffect)
 import Effect.Console (log)
 import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, resolveTruthiness, stringify, truthy)
 import Kernel.Engine (Ctl, Engine, Helper, runString, runTemplate)
+import Kernel.Prelude (coreSchema, preludeSchema) as KP
 import Kernel.Walk (arityOk, foldTemplate, validate)
 import Test.Assert (assert')
 
@@ -159,6 +160,44 @@ main = do
   expect "coalesce-zero" "{{{coalesce (lookup this \"a\") (lookup this \"b\")}}}"
     (obj [ Tuple "a" (VNumber 0.0), Tuple "b" (str "fb") ])
     "0"
+
+  -- value primitives — string pack (helper-packs-spec §4). Pin the actual
+  -- outputs; conformance only proves compiled ≡ interpreter, not correctness.
+  let s1 v = obj [ Tuple "s" (str v) ]
+  expectS "p-lowercase" "{{{ lowercase s }}}" (s1 "HeLLo") "hello"
+  expectS "p-uppercase" "{{{ uppercase s }}}" (s1 "HeLLo") "HELLO"
+  -- subject coercion: a number is stringified before transforming.
+  expectS "p-uppercase-number" "{{{ uppercase n }}}" (obj [ Tuple "n" (VNumber 42.0) ]) "42"
+  expectS "p-capitalize" "{{{ capitalize s }}}" (s1 "hello world") "Hello world"
+  expectS "p-capitalize-empty" "[{{{ capitalize s }}}]" (s1 "") "[]"
+  expectS "p-trim" "[{{{ trim s }}}]" (s1 "  hi \t\n ") "[hi]"
+  expectS "p-trimStart" "[{{{ trimStart s }}}]" (s1 "  hi  ") "[hi  ]"
+  expectS "p-trimEnd" "[{{{ trimEnd s }}}]" (s1 "  hi  ") "[  hi]"
+  expectS "p-trim-allspace" "[{{{ trimStart s }}}][{{{ trimEnd s }}}]" (s1 "   ") "[][]"
+  -- split → VArray VString (stringify joins with ",").
+  expectS "p-split" "{{{ split s \",\" }}}" (s1 "a,b,c") "a,b,c"
+  expectS "p-split-each" "{{#each (split s \",\")}}<{{ this }}>{{/each}}" (s1 "a,b,c") "<a><b><c>"
+  expectS "p-replace" "{{{ replace s \"-\" \"+\" }}}" (s1 "a-b-c") "a+b+c"
+  expectS "p-replace-all" "{{{ replace s \"foo\" \"bar\" }}}" (s1 "foo foo foo") "bar bar bar"
+  -- slice: JS String.prototype.slice semantics, negative indices allowed.
+  expectS "p-slice" "{{{ slice s 1 4 }}}" (s1 "hello") "ell"
+  expectS "p-slice-open" "{{{ slice s 2 }}}" (s1 "hello") "llo"
+  expectS "p-slice-neg-start" "{{{ slice s (subtract 0 3) }}}" (s1 "hello") "llo"
+  expectS "p-slice-neg-end" "{{{ slice s 0 (subtract 0 2) }}}" (s1 "hello") "hel"
+  expectS "p-slice-neg-both" "{{{ slice s (subtract 0 4) (subtract 0 1) }}}" (s1 "hello") "ell"
+  expectS "p-slice-overshoot" "[{{{ slice s 5 10 }}}]" (s1 "hi") "[]"
+  expectS "p-slice-inverted" "[{{{ slice s 4 1 }}}]" (s1 "hello") "[]"
+  expectS "p-includes-true" "{{{ includes s \"ell\" }}}" (s1 "hello") "true"
+  expectS "p-includes-false" "{{{ includes s \"xyz\" }}}" (s1 "hello") "false"
+  expectS "p-startsWith" "{{{ startsWith s \"he\" }}}" (s1 "hello") "true"
+  expectS "p-endsWith" "{{{ endsWith s \"lo\" }}}" (s1 "hello") "true"
+  -- truncate: longer-than-n ⇒ first n chars + suffix (default ellipsis U+2026).
+  expectS "p-truncate-long" "{{{ truncate s 5 }}}" (s1 "hello world") "hello\x2026"
+  expectS "p-truncate-short" "{{{ truncate s 5 }}}" (s1 "hi") "hi"
+  expectS "p-truncate-boundary" "{{{ truncate s 5 }}}" (s1 "hello") "hello"
+  expectS "p-truncate-suffix" "{{{ truncate s 5 \"...\" }}}" (s1 "hello world") "hello..."
+  expectS "p-append" "{{{ append s \"bar\" }}}" (s1 "foo") "foobar"
+  expectS "p-prepend" "{{{ prepend s \"bar\" }}}" (s1 "foo") "barfoo"
 
   expect "esc-html" "{{{esc_html (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
@@ -858,6 +897,47 @@ main = do
             assert' ("arity conformance: " <> name <> "/" <> show k)
               (threw == not (arityOk spec.arity k))
       _, _ -> assert' ("arity conformance: missing helper " <> name) false
+
+  -- Separability of the value-primitive pack (helper-packs-spec §4, P0 intent):
+  -- the primitives are a genuinely detachable set, not fused into core. A schema
+  -- built from `coreHelperDefs` alone does NOT know `uppercase` (a primitive),
+  -- while the full `preludeSchema` does. The core helpers must still be present
+  -- in both (the split only moves the primitives out).
+  assert' "separability: coreSchema omits the primitive 'uppercase'"
+    (not (Map.member "uppercase" KP.coreSchema.helpers))
+  assert' "separability: preludeSchema includes the primitive 'uppercase'"
+    (Map.member "uppercase" KP.preludeSchema.helpers)
+  assert' "separability: every primitive (e.g. slice/truncate) is absent from coreSchema"
+    ( not
+        ( Array.any (\n -> Map.member n KP.coreSchema.helpers)
+            [ "lowercase", "capitalize", "split", "slice", "truncate", "append", "prepend" ]
+        )
+    )
+  assert' "separability: every primitive is present in preludeSchema"
+    ( Array.all (\n -> Map.member n KP.preludeSchema.helpers)
+        [ "lowercase"
+        , "uppercase"
+        , "capitalize"
+        , "trim"
+        , "trimStart"
+        , "trimEnd"
+        , "split"
+        , "replace"
+        , "slice"
+        , "includes"
+        , "startsWith"
+        , "endsWith"
+        , "truncate"
+        , "append"
+        , "prepend"
+        ]
+    )
+  assert' "separability: a core helper (e.g. 'if') survives the split in coreSchema"
+    (Map.member "if" KP.coreSchema.helpers)
+  -- `coreHelperDefs` is the non-primitive base; the full roster adds exactly the
+  -- 15-strong primitive pack on top.
+  assert' "separability: helperDefs = coreHelperDefs <> primitiveHelperDefs (15 primitives)"
+    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 15)
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do

@@ -17,6 +17,9 @@
 module Kernel.Prelude
   ( prelude
   , preludeSchema
+  , coreHelperDefs
+  , primitiveHelperDefs
+  , coreSchema
   ) where
 
 import Prelude
@@ -32,7 +35,10 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Number (trunc)
 import Data.Set as Set
-import Data.String.Common (joinWith)
+import Data.String (Pattern(..), Replacement(..))
+import Data.String as String
+import Data.String.CodeUnits as CodeUnits
+import Data.String.Common (joinWith, toLower, toUpper)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Kernel.Engine (Ctl, Helper)
@@ -70,8 +76,18 @@ valDef name mk =
 gen :: forall m. String -> Boolean -> Arity -> Helper m (RefEnv m) -> HelperDef m
 gen name block arity run = { name, block, arity, run }
 
+-- | The complete reference roster: the core helpers (control flow, access,
+-- | arithmetic, …) followed by the *separable* value-primitive pack. Splitting
+-- | the table — `helperDefs = coreHelperDefs <> primitiveHelperDefs` — keeps the
+-- | primitives a genuinely detachable set (a registry/schema built from
+-- | `coreHelperDefs` alone does not know `uppercase`), without introducing a
+-- | pack-assembly abstraction.
 helperDefs :: forall m. MonadThrow Error m => Array (HelperDef m)
-helperDefs =
+helperDefs = coreHelperDefs <> primitiveHelperDefs
+
+-- | The core helpers — everything that is not a value primitive.
+coreHelperDefs :: forall m. MonadThrow Error m => Array (HelperDef m)
+coreHelperDefs =
   [ gen "this" false (Exactly 0) thisH
   , gen "lookup" false (AtLeast 1) lookupH
   , valDef "true" (nullary (pure (VBool true)))
@@ -123,6 +139,37 @@ helperDefs =
   , valDef "log" (atLeast 1 (const (pure VNull)))
   ]
 
+-- | The value-primitive pack (helper-packs-spec §4) — the *separable* batch.
+-- | These are pure transforms: subject-first (the value being transformed is
+-- | argument 0), string-coercing their subject/string args via the engine's
+-- | `stringify` (so `pass:[{{ uppercase n }}]` works on a number) and reading
+-- | numeric args (`slice`/`truncate`) as numbers, and they return a plain
+-- | `VString` (not `VSafe`) — escaping stays the output layer's job. Operations
+-- | are on **code units** so the interpreter and the compiled JS runtime agree
+-- | on indices and length bit-for-bit (gated by `test:compile`).
+primitiveHelperDefs :: forall m. MonadThrow Error m => Array (HelperDef m)
+primitiveHelperDefs =
+  -- case
+  [ valDef "lowercase" (unary (strUnary toLower))
+  , valDef "uppercase" (unary (strUnary toUpper))
+  , valDef "capitalize" (unary (strUnary capitalizeStr))
+  -- whitespace
+  , valDef "trim" (unary (strUnary String.trim))
+  , valDef "trimStart" (unary (strUnary trimStartStr))
+  , valDef "trimEnd" (unary (strUnary trimEndStr))
+  -- substring & membership
+  , valDef "split" (binary splitH)
+  , gen "replace" false (Exactly 3) replaceH
+  , gen "slice" false (Between 2 3) sliceH
+  , valDef "includes" (binary includesH)
+  , valDef "startsWith" (binary startsWithH)
+  , valDef "endsWith" (binary endsWithH)
+  , gen "truncate" false (Between 2 3) truncateH
+  -- concatenation
+  , valDef "append" (binary appendH)
+  , valDef "prepend" (binary prependH)
+  ]
+
 -- | The registry: name → runtime helper.
 prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
 prelude = map (\d -> Tuple d.name d.run) helperDefs
@@ -142,28 +189,41 @@ preludeSchema :: Schema
 preludeSchema =
   { allowUnknown: false
   , helpers: Map.fromFoldable
-      (scoped <> map toSpec (helperDefs :: Array (HelperDef (Either Error))))
+      (scopedSpecs <> map helperSpec (helperDefs :: Array (HelperDef (Either Error))))
   }
-  where
-  toSpec d = Tuple d.name { block: d.block, arity: d.arity }
-  scoped =
-    [ Tuple "root" { block: false, arity: Exactly 0 }
-    , Tuple "parent" { block: false, arity: Between 0 1 }
-    , Tuple "index" { block: false, arity: Exactly 0 }
-    , Tuple "key" { block: false, arity: Exactly 0 }
-    , Tuple "first" { block: false, arity: Exactly 0 }
-    , Tuple "last" { block: false, arity: Exactly 0 }
-    , Tuple "index0" { block: false, arity: Exactly 0 }
-    , Tuple "index1" { block: false, arity: Exactly 0 }
-    , Tuple "rindex0" { block: false, arity: Exactly 0 }
-    , Tuple "rindex1" { block: false, arity: Exactly 0 }
-    , Tuple "length" { block: false, arity: Exactly 0 }
-    , Tuple "parent-index" { block: false, arity: Exactly 0 }
-    , Tuple "parent-key" { block: false, arity: Exactly 0 }
-    , Tuple "parent-first" { block: false, arity: Exactly 0 }
-    , Tuple "parent-last" { block: false, arity: Exactly 0 }
-    , Tuple "partial-block" { block: false, arity: Exactly 0 }
-    ]
+
+-- | The schema for the *core* helpers alone (no value primitives) — used to
+-- | demonstrate the primitives' separability: `coreSchema` does not know
+-- | `uppercase`, whereas `preludeSchema` does.
+coreSchema :: Schema
+coreSchema =
+  { allowUnknown: false
+  , helpers: Map.fromFoldable
+      (scopedSpecs <> map helperSpec (coreHelperDefs :: Array (HelperDef (Either Error))))
+  }
+
+helperSpec :: forall m. HelperDef m -> Tuple String { block :: Boolean, arity :: Arity }
+helperSpec d = Tuple d.name { block: d.block, arity: d.arity }
+
+scopedSpecs :: Array (Tuple String { block :: Boolean, arity :: Arity })
+scopedSpecs =
+  [ Tuple "root" { block: false, arity: Exactly 0 }
+  , Tuple "parent" { block: false, arity: Between 0 1 }
+  , Tuple "index" { block: false, arity: Exactly 0 }
+  , Tuple "key" { block: false, arity: Exactly 0 }
+  , Tuple "first" { block: false, arity: Exactly 0 }
+  , Tuple "last" { block: false, arity: Exactly 0 }
+  , Tuple "index0" { block: false, arity: Exactly 0 }
+  , Tuple "index1" { block: false, arity: Exactly 0 }
+  , Tuple "rindex0" { block: false, arity: Exactly 0 }
+  , Tuple "rindex1" { block: false, arity: Exactly 0 }
+  , Tuple "length" { block: false, arity: Exactly 0 }
+  , Tuple "parent-index" { block: false, arity: Exactly 0 }
+  , Tuple "parent-key" { block: false, arity: Exactly 0 }
+  , Tuple "parent-first" { block: false, arity: Exactly 0 }
+  , Tuple "parent-last" { block: false, arity: Exactly 0 }
+  , Tuple "partial-block" { block: false, arity: Exactly 0 }
+  ]
 
 -- | Lift `Value.stringify` (pure, `Either Error`) into the engine monad.
 stringifyM :: forall m. MonadThrow Error m => Value -> m String
@@ -270,6 +330,172 @@ boolH
   => ((Value -> Boolean) -> Array Value -> Boolean)
   -> Helper m (RefEnv m)
 boolH quant ctl args = pure (VBool (quant (truthy (refFalsy ctl.env)) args))
+
+--------------------------------------------------------------------------------
+-- Value primitives — string pack (helper-packs-spec §4)
+--------------------------------------------------------------------------------
+--
+-- Coercion policy (applied identically in `barebars-runtime.mjs`):
+--   * the subject and any *string-valued* argument (sep/find/rep/sub/x/suffix)
+--     are coerced with the engine's `stringify` — so `{{ uppercase n }}` works
+--     on a number, exactly as the runtime's `stringify` does;
+--   * numeric arguments (`slice`/`truncate`'s indices) read via `asNum` and are
+--     truncated to an `Int` with `Int.round`, matching the runtime;
+--   * results are plain `VString` (`split` ⇒ `VArray VString`); escaping is the
+--     output layer's job, never these transforms'.
+-- All indexing/length is over **code units** (`Data.String.CodeUnits`), the
+-- same unit JS strings use, so the two targets agree bit-for-bit.
+
+-- | A one-argument string transform: coerce the subject to text, apply `f`,
+-- | return a `VString`.
+strUnary :: forall m. MonadThrow Error m => (String -> String) -> Value -> m Value
+strUnary f v = (VString <<< f) <$> stringifyM v
+
+-- | `capitalize`: uppercase the first code unit; the rest is unchanged.
+capitalizeStr :: String -> String
+capitalizeStr s = case CodeUnits.uncons s of
+  Nothing -> s
+  Just { head, tail } -> toUpper (CodeUnits.singleton head) <> tail
+
+-- | `trimStart`/`trimEnd`: defined in terms of `String.trim` (the very same
+-- | `String.prototype.trim` FFI the JS runtime uses) so the trimmed whitespace
+-- | set is identical on both targets without re-encoding it. `trim s` is the
+-- | body with both ends stripped; its first occurrence in `s` begins exactly
+-- | where the leading whitespace ends (the body's first char is non-whitespace,
+-- | so no earlier match is possible), and likewise for the trailing end.
+trimStartStr :: String -> String
+trimStartStr s = case bodyStart s of
+  Nothing -> ""
+  Just i -> CodeUnits.drop i s
+
+trimEndStr :: String -> String
+trimEndStr s = case bodyStart s of
+  Nothing -> ""
+  Just i -> CodeUnits.take (i + CodeUnits.length (String.trim s)) s
+
+-- | The code-unit index in `s` where `trim s` begins, or `Nothing` when `s` is
+-- | all whitespace (`trim s == ""`).
+bodyStart :: String -> Maybe Int
+bodyStart s =
+  let
+    body = String.trim s
+  in
+    if body == "" then Nothing
+    else CodeUnits.indexOf (Pattern body) s
+
+-- | `split s sep` → `VArray` of `VString` pieces (literal separator).
+splitH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+splitH sv sepv = do
+  s <- stringifyM sv
+  sep <- stringifyM sepv
+  pure (VArray (map VString (String.split (Pattern sep) s)))
+
+-- | `replace s find rep`: replace **all** literal occurrences of `find`.
+replaceH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+replaceH _ args = case args of
+  [ sv, findv, repv ] -> do
+    s <- stringifyM sv
+    find <- stringifyM findv
+    rep <- stringifyM repv
+    pure (VString (String.replaceAll (Pattern find) (Replacement rep) s))
+  _ -> throwError
+    (ArityError ("replace: expected exactly 3 argument(s), got " <> show (Array.length args)))
+
+-- | `slice s start [end]`: a code-unit substring, matching JS
+-- | `String.prototype.slice` exactly — negative indices count from the end,
+-- | out-of-range indices clamp, and `start >= end` yields `""`. `end` defaults
+-- | to the string length.
+sliceH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+sliceH _ args = case args of
+  [ sv, startv ] -> slice1 sv startv Nothing
+  [ sv, startv, endv ] -> slice1 sv startv (Just endv)
+  _ -> throwError
+    (ArityError ("slice: expected 2 or 3 arguments, got " <> show (Array.length args)))
+  where
+  slice1 sv startv mEndv = do
+    s <- stringifyM sv
+    start <- asInt startv
+    let
+      len = CodeUnits.length s
+    end <- case mEndv of
+      Nothing -> pure len
+      Just endv -> asInt endv
+    let
+      lo = clampIndex len start
+      hi = clampIndex len end
+    pure (VString (if lo >= hi then "" else CodeUnits.take (hi - lo) (CodeUnits.drop lo s)))
+
+-- | Normalise a (possibly negative) JS slice index against a length: negatives
+-- | count from the end (floored at 0), positives clamp to the length.
+clampIndex :: Int -> Int -> Int
+clampIndex len i
+  | i < 0 = max (len + i) 0
+  | otherwise = min i len
+
+-- | `includes s sub` → `VBool`: literal substring membership.
+includesH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+includesH sv subv = do
+  s <- stringifyM sv
+  sub <- stringifyM subv
+  pure (VBool (String.contains (Pattern sub) s))
+
+-- | `startsWith s x` / `endsWith s x` → `VBool`.
+startsWithH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+startsWithH sv xv = do
+  s <- stringifyM sv
+  x <- stringifyM xv
+  pure (VBool (isJustPrefix x s))
+  where
+  isJustPrefix p str = case CodeUnits.stripPrefix (Pattern p) str of
+    Just _ -> true
+    Nothing -> false
+
+endsWithH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+endsWithH sv xv = do
+  s <- stringifyM sv
+  x <- stringifyM xv
+  pure (VBool (isJustSuffix x s))
+  where
+  isJustSuffix sfx str = case CodeUnits.stripSuffix (Pattern sfx) str of
+    Just _ -> true
+    Nothing -> false
+
+-- | `truncate s n [suffix]`: if `s` is longer than `n` code units, keep the
+-- | first `n` and append `suffix` (default the ellipsis U+2026); otherwise
+-- | return `s` unchanged. `n` is read as a number and truncated to an `Int`.
+truncateH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+truncateH _ args = case args of
+  [ sv, nv ] -> truncate1 sv nv ellipsis
+  [ sv, nv, sufv ] -> do
+    suf <- stringifyM sufv
+    truncate1 sv nv suf
+  _ -> throwError
+    (ArityError ("truncate: expected 2 or 3 arguments, got " <> show (Array.length args)))
+  where
+  ellipsis = "\x2026"
+  truncate1 sv nv suf = do
+    s <- stringifyM sv
+    n <- asInt nv
+    pure (VString (if CodeUnits.length s > n then CodeUnits.take n s <> suf else s))
+
+-- | `append s x` = `s` then `x`; `prepend s x` = `x` then `s`. Both coerce both
+-- | operands to text.
+appendH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+appendH sv xv = do
+  s <- stringifyM sv
+  x <- stringifyM xv
+  pure (VString (s <> x))
+
+prependH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+prependH sv xv = do
+  s <- stringifyM sv
+  x <- stringifyM xv
+  pure (VString (x <> s))
+
+-- | Read a numeric argument as an `Int`, truncating toward zero (`trunc`) to
+-- | match the runtime's `Math.trunc`, and reusing `asNum`'s strict number guard.
+asInt :: forall m. MonadThrow Error m => Value -> m Int
+asInt v = (Int.round <<< trunc) <$> asNum v
 
 --------------------------------------------------------------------------------
 -- Context & access
