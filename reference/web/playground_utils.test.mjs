@@ -26,6 +26,8 @@ import {
   tabVisibleUnder,
   transpileSt4,
   validateOverlayName,
+  vendoredWorkspace,
+  vendoredVerdict,
 } from "./playground_utils.mjs";
 
 // ── ADR-0020 capability gating ─────────────────────────────────────────────
@@ -922,5 +924,41 @@ test("transpileSt4 wraps partials into a .stg group file", () => {
   assert.match(out, /<row\(\)>/);
   assert.match(out, /row\(\) ::= <</);
   assert.match(out, /- item/);
+});
+
+test("vendoredWorkspace maps a fixture to a Lab workspace payload", () => {
+  const fx = {
+    id: "mustache/partials/context",
+    dialect: "minbars",
+    template: "{{>p}}",
+    data: { name: "Ada" },
+    partials: { p: "Hi {{name}}" },
+    expected: "Hi Ada",
+    divergenceMeaning: "conformance-failure",
+  };
+  const ws = vendoredWorkspace(fx);
+  assert.equal(ws.engine, "minbars");
+  assert.equal(ws.template, "{{>p}}");
+  assert.equal(ws.expected, "Hi Ada");
+  assert.equal(ws.divergenceMeaning, "conformance-failure");
+  // data → editor text (JSON is valid YAML); partials object → {name, source} pairs.
+  assert.equal(JSON.parse(ws.dataText).name, "Ada");
+  assert.deepEqual(ws.partials, [{ name: "p", source: "Hi {{name}}" }]);
+});
+
+test("vendoredWorkspace tolerates absent data/partials", () => {
+  const ws = vendoredWorkspace({ dialect: "minbars", template: "x", expected: "x" });
+  assert.equal(ws.dataText, "null");
+  assert.deepEqual(ws.partials, []);
+  assert.equal(ws.divergenceMeaning, "conformance-failure");
+});
+
+test("vendoredVerdict classifies match and divergence by meaning", () => {
+  const mus = { expected: "ok", divergenceMeaning: "conformance-failure" };
+  assert.deepEqual(vendoredVerdict(mus, "ok"), { match: true, severity: "ok" });
+  // a Mustache miss is a defect; a Handlebars miss is a by-design divergence.
+  assert.deepEqual(vendoredVerdict(mus, "no"), { match: false, severity: "conformance-failure" });
+  const hbs = { expected: "ok", divergenceMeaning: "expected-difference" };
+  assert.deepEqual(vendoredVerdict(hbs, "no"), { match: false, severity: "expected-difference" });
 });
 

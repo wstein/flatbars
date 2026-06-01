@@ -1438,3 +1438,31 @@ function wrapAtPath(segments, value) {
   for (let i = segments.length - 1; i >= 0; i--) acc = { [segments[i]]: acc };
   return acc;
 }
+
+// ── Vendored example/conformance corpus (example-loader-spec.md) ──────────────
+// The corpus under reference/web/examples/vendored/<provider>/ is the same one
+// the headless `barebars examples verify` gate renders; these pure helpers let
+// the Lab load a fixture and frame its expected-vs-actual diff.
+
+// Map a vendored fixture (example-loader-spec.md §4) to a Lab workspace payload:
+// the engine it must run under (its dialect), the main template, the data as
+// editor text (JSON is valid YAML, which the data editor parses), the partials
+// as {name, source} pairs, and the authoritative expected output to diff against.
+export function vendoredWorkspace(fx) {
+  return {
+    engine: fx.dialect,
+    template: fx.template ?? "",
+    dataText: JSON.stringify(fx.data ?? null, null, 2),
+    partials: Object.entries(fx.partials || {}).map(([name, source]) => ({ name, source })),
+    expected: fx.expected ?? "",
+    divergenceMeaning: fx.divergenceMeaning || "conformance-failure",
+  };
+}
+
+// Classify an `actual` render against a fixture's authoritative `expected`.
+// A miss under `conformance-failure` (Mustache) is a defect; a miss under
+// `expected-difference` (Handlebars) is a neutral, by-design divergence.
+export function vendoredVerdict(fx, actual) {
+  const match = actual === (fx.expected ?? "");
+  return { match, severity: match ? "ok" : (fx.divergenceMeaning || "conformance-failure") };
+}

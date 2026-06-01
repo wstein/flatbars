@@ -1,0 +1,1225 @@
+{
+  "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037",
+  "fixtures": [
+    {
+      "id": "mustache/comments/inline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "inline",
+      "desc": "Comment blocks should be removed from the template.",
+      "path": "examples/vendored/mustache/comments/inline.json"
+    },
+    {
+      "id": "mustache/comments/multiline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "multiline",
+      "desc": "Multiline comments should be permitted.",
+      "path": "examples/vendored/mustache/comments/multiline.json"
+    },
+    {
+      "id": "mustache/comments/standalone",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "standalone",
+      "desc": "All standalone comment lines should be removed.",
+      "path": "examples/vendored/mustache/comments/standalone.json"
+    },
+    {
+      "id": "mustache/comments/indented-standalone",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "indented-standalone",
+      "desc": "All standalone comment lines should be removed.",
+      "path": "examples/vendored/mustache/comments/indented-standalone.json"
+    },
+    {
+      "id": "mustache/comments/standalone-line-endings",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "standalone-line-endings",
+      "desc": "\"\\r\\n\" should be considered a newline for standalone tags.",
+      "path": "examples/vendored/mustache/comments/standalone-line-endings.json"
+    },
+    {
+      "id": "mustache/comments/standalone-without-previous-line",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "standalone-without-previous-line",
+      "desc": "Standalone tags should not require a newline to precede them.",
+      "path": "examples/vendored/mustache/comments/standalone-without-previous-line.json"
+    },
+    {
+      "id": "mustache/comments/standalone-without-newline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "standalone-without-newline",
+      "desc": "Standalone tags should not require a newline to follow them.",
+      "path": "examples/vendored/mustache/comments/standalone-without-newline.json"
+    },
+    {
+      "id": "mustache/comments/multiline-standalone",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "multiline-standalone",
+      "desc": "All standalone comment lines should be removed.",
+      "path": "examples/vendored/mustache/comments/multiline-standalone.json"
+    },
+    {
+      "id": "mustache/comments/indented-multiline-standalone",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "indented-multiline-standalone",
+      "desc": "All standalone comment lines should be removed.",
+      "path": "examples/vendored/mustache/comments/indented-multiline-standalone.json"
+    },
+    {
+      "id": "mustache/comments/indented-inline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "indented-inline",
+      "desc": "Inline comments should not strip whitespace",
+      "path": "examples/vendored/mustache/comments/indented-inline.json"
+    },
+    {
+      "id": "mustache/comments/surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "surrounding-whitespace",
+      "desc": "Comment removal should preserve surrounding whitespace.",
+      "path": "examples/vendored/mustache/comments/surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/comments/variable-name-collision",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "comments",
+      "name": "variable-name-collision",
+      "desc": "Comments must never render, even if variable with same name exists.",
+      "path": "examples/vendored/mustache/comments/variable-name-collision.json"
+    },
+    {
+      "id": "mustache/interpolation/no-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "no-interpolation",
+      "desc": "Mustache-free templates should render as-is.",
+      "path": "examples/vendored/mustache/interpolation/no-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/basic-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "basic-interpolation",
+      "desc": "Unadorned tags should interpolate content into the template.",
+      "path": "examples/vendored/mustache/interpolation/basic-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/no-re-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "no-re-interpolation",
+      "desc": "Interpolated tag output should not be re-interpolated.",
+      "path": "examples/vendored/mustache/interpolation/no-re-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/html-escaping",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "html-escaping",
+      "desc": "Basic interpolation should be HTML escaped.",
+      "path": "examples/vendored/mustache/interpolation/html-escaping.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache",
+      "desc": "Triple mustaches should interpolate without HTML escaping.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand",
+      "desc": "Ampersand should interpolate without HTML escaping.",
+      "path": "examples/vendored/mustache/interpolation/ampersand.json"
+    },
+    {
+      "id": "mustache/interpolation/basic-integer-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "basic-integer-interpolation",
+      "desc": "Integers should interpolate seamlessly.",
+      "path": "examples/vendored/mustache/interpolation/basic-integer-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache-integer-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache-integer-interpolation",
+      "desc": "Integers should interpolate seamlessly.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache-integer-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand-integer-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand-integer-interpolation",
+      "desc": "Integers should interpolate seamlessly.",
+      "path": "examples/vendored/mustache/interpolation/ampersand-integer-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/basic-decimal-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "basic-decimal-interpolation",
+      "desc": "Decimals should interpolate seamlessly with proper significance.",
+      "path": "examples/vendored/mustache/interpolation/basic-decimal-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache-decimal-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache-decimal-interpolation",
+      "desc": "Decimals should interpolate seamlessly with proper significance.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache-decimal-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand-decimal-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand-decimal-interpolation",
+      "desc": "Decimals should interpolate seamlessly with proper significance.",
+      "path": "examples/vendored/mustache/interpolation/ampersand-decimal-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/basic-null-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "basic-null-interpolation",
+      "desc": "Nulls should interpolate as the empty string.",
+      "path": "examples/vendored/mustache/interpolation/basic-null-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache-null-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache-null-interpolation",
+      "desc": "Nulls should interpolate as the empty string.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache-null-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand-null-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand-null-interpolation",
+      "desc": "Nulls should interpolate as the empty string.",
+      "path": "examples/vendored/mustache/interpolation/ampersand-null-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/basic-context-miss-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "basic-context-miss-interpolation",
+      "desc": "Failed context lookups should default to empty strings.",
+      "path": "examples/vendored/mustache/interpolation/basic-context-miss-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache-context-miss-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache-context-miss-interpolation",
+      "desc": "Failed context lookups should default to empty strings.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache-context-miss-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand-context-miss-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand-context-miss-interpolation",
+      "desc": "Failed context lookups should default to empty strings.",
+      "path": "examples/vendored/mustache/interpolation/ampersand-context-miss-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-basic-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-basic-interpolation",
+      "desc": "Dotted names should be considered a form of shorthand for sections.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-basic-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-triple-mustache-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-triple-mustache-interpolation",
+      "desc": "Dotted names should be considered a form of shorthand for sections.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-triple-mustache-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-ampersand-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-ampersand-interpolation",
+      "desc": "Dotted names should be considered a form of shorthand for sections.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-ampersand-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-arbitrary-depth",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-arbitrary-depth",
+      "desc": "Dotted names should be functional to any level of nesting.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-arbitrary-depth.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-broken-chains",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-broken-chains",
+      "desc": "Any falsey value prior to the last part of the name should yield ''.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-broken-chains.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-broken-chain-resolution",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-broken-chain-resolution",
+      "desc": "Each part of a dotted name should resolve only against its parent.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-broken-chain-resolution.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-initial-resolution",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-initial-resolution",
+      "desc": "The first part of a dotted name should resolve as any other name.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-initial-resolution.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-context-precedence",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-context-precedence",
+      "desc": "Dotted names should be resolved against former resolutions.",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-context-precedence.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-are-never-single-keys",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-are-never-single-keys",
+      "desc": "Dotted names shall not be parsed as single, atomic keys",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-are-never-single-keys.json"
+    },
+    {
+      "id": "mustache/interpolation/dotted-names-no-masking",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "dotted-names-no-masking",
+      "desc": "Dotted Names in a given context are unvavailable due to dot splitting",
+      "path": "examples/vendored/mustache/interpolation/dotted-names-no-masking.json"
+    },
+    {
+      "id": "mustache/interpolation/implicit-iterators-basic-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "implicit-iterators-basic-interpolation",
+      "desc": "Unadorned tags should interpolate content into the template.",
+      "path": "examples/vendored/mustache/interpolation/implicit-iterators-basic-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/implicit-iterators-html-escaping",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "implicit-iterators-html-escaping",
+      "desc": "Basic interpolation should be HTML escaped.",
+      "path": "examples/vendored/mustache/interpolation/implicit-iterators-html-escaping.json"
+    },
+    {
+      "id": "mustache/interpolation/implicit-iterators-triple-mustache",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "implicit-iterators-triple-mustache",
+      "desc": "Triple mustaches should interpolate without HTML escaping.",
+      "path": "examples/vendored/mustache/interpolation/implicit-iterators-triple-mustache.json"
+    },
+    {
+      "id": "mustache/interpolation/implicit-iterators-ampersand",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "implicit-iterators-ampersand",
+      "desc": "Ampersand should interpolate without HTML escaping.",
+      "path": "examples/vendored/mustache/interpolation/implicit-iterators-ampersand.json"
+    },
+    {
+      "id": "mustache/interpolation/implicit-iterators-basic-integer-interpolation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "implicit-iterators-basic-integer-interpolation",
+      "desc": "Integers should interpolate seamlessly.",
+      "path": "examples/vendored/mustache/interpolation/implicit-iterators-basic-integer-interpolation.json"
+    },
+    {
+      "id": "mustache/interpolation/interpolation-surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "interpolation-surrounding-whitespace",
+      "desc": "Interpolation should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/interpolation/interpolation-surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache-surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache-surrounding-whitespace",
+      "desc": "Interpolation should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache-surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand-surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand-surrounding-whitespace",
+      "desc": "Interpolation should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/interpolation/ampersand-surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/interpolation/interpolation-standalone",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "interpolation-standalone",
+      "desc": "Standalone interpolation should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/interpolation/interpolation-standalone.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache-standalone",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache-standalone",
+      "desc": "Standalone interpolation should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache-standalone.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand-standalone",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand-standalone",
+      "desc": "Standalone interpolation should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/interpolation/ampersand-standalone.json"
+    },
+    {
+      "id": "mustache/interpolation/interpolation-with-padding",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "interpolation-with-padding",
+      "desc": "Superfluous in-tag whitespace should be ignored.",
+      "path": "examples/vendored/mustache/interpolation/interpolation-with-padding.json"
+    },
+    {
+      "id": "mustache/interpolation/triple-mustache-with-padding",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "triple-mustache-with-padding",
+      "desc": "Superfluous in-tag whitespace should be ignored.",
+      "path": "examples/vendored/mustache/interpolation/triple-mustache-with-padding.json"
+    },
+    {
+      "id": "mustache/interpolation/ampersand-with-padding",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "interpolation",
+      "name": "ampersand-with-padding",
+      "desc": "Superfluous in-tag whitespace should be ignored.",
+      "path": "examples/vendored/mustache/interpolation/ampersand-with-padding.json"
+    },
+    {
+      "id": "mustache/sections/truthy",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "truthy",
+      "desc": "Truthy sections should have their contents rendered.",
+      "path": "examples/vendored/mustache/sections/truthy.json"
+    },
+    {
+      "id": "mustache/sections/falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "falsey",
+      "desc": "Falsey sections should have their contents omitted.",
+      "path": "examples/vendored/mustache/sections/falsey.json"
+    },
+    {
+      "id": "mustache/sections/null-is-falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "null-is-falsey",
+      "desc": "Null is falsey.",
+      "path": "examples/vendored/mustache/sections/null-is-falsey.json"
+    },
+    {
+      "id": "mustache/sections/context",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "context",
+      "desc": "Objects and hashes should be pushed onto the context stack.",
+      "path": "examples/vendored/mustache/sections/context.json"
+    },
+    {
+      "id": "mustache/sections/parent-contexts",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "parent-contexts",
+      "desc": "Names missing in the current context are looked up in the stack.",
+      "path": "examples/vendored/mustache/sections/parent-contexts.json"
+    },
+    {
+      "id": "mustache/sections/variable-test",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "variable-test",
+      "desc": "Non-false sections have their value at the top of context,\naccessible as {{.}} or through the parent context. This gives\na simple way to display content conditionally if a variable exists.\n",
+      "path": "examples/vendored/mustache/sections/variable-test.json"
+    },
+    {
+      "id": "mustache/sections/list-contexts",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "list-contexts",
+      "desc": "All elements on the context stack should be accessible within lists.",
+      "path": "examples/vendored/mustache/sections/list-contexts.json"
+    },
+    {
+      "id": "mustache/sections/deeply-nested-contexts",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "deeply-nested-contexts",
+      "desc": "All elements on the context stack should be accessible.",
+      "path": "examples/vendored/mustache/sections/deeply-nested-contexts.json"
+    },
+    {
+      "id": "mustache/sections/list",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "list",
+      "desc": "Lists should be iterated; list items should visit the context stack.",
+      "path": "examples/vendored/mustache/sections/list.json"
+    },
+    {
+      "id": "mustache/sections/empty-list",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "empty-list",
+      "desc": "Empty lists should behave like falsey values.",
+      "path": "examples/vendored/mustache/sections/empty-list.json"
+    },
+    {
+      "id": "mustache/sections/doubled",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "doubled",
+      "desc": "Multiple sections per template should be permitted.",
+      "path": "examples/vendored/mustache/sections/doubled.json"
+    },
+    {
+      "id": "mustache/sections/nested-truthy",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "nested-truthy",
+      "desc": "Nested truthy sections should have their contents rendered.",
+      "path": "examples/vendored/mustache/sections/nested-truthy.json"
+    },
+    {
+      "id": "mustache/sections/nested-falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "nested-falsey",
+      "desc": "Nested falsey sections should be omitted.",
+      "path": "examples/vendored/mustache/sections/nested-falsey.json"
+    },
+    {
+      "id": "mustache/sections/context-misses",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "context-misses",
+      "desc": "Failed context lookups should be considered falsey.",
+      "path": "examples/vendored/mustache/sections/context-misses.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-string",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-string",
+      "desc": "Implicit iterators should directly interpolate strings.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-string.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-integer",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-integer",
+      "desc": "Implicit iterators should cast integers to strings and interpolate.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-integer.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-decimal",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-decimal",
+      "desc": "Implicit iterators should cast decimals to strings and interpolate.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-decimal.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-array",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-array",
+      "desc": "Implicit iterators should allow iterating over nested arrays.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-array.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-html-escaping",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-html-escaping",
+      "desc": "Implicit iterators with basic interpolation should be HTML escaped.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-html-escaping.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-triple-mustache",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-triple-mustache",
+      "desc": "Implicit iterators in triple mustache should interpolate without HTML escaping.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-triple-mustache.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-ampersand",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-ampersand",
+      "desc": "Implicit iterators in an Ampersand tag should interpolate without HTML escaping.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-ampersand.json"
+    },
+    {
+      "id": "mustache/sections/implicit-iterator-root-level",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "implicit-iterator-root-level",
+      "desc": "Implicit iterators should work on root-level lists.",
+      "path": "examples/vendored/mustache/sections/implicit-iterator-root-level.json"
+    },
+    {
+      "id": "mustache/sections/dotted-names-truthy",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "dotted-names-truthy",
+      "desc": "Dotted names should be valid for Section tags.",
+      "path": "examples/vendored/mustache/sections/dotted-names-truthy.json"
+    },
+    {
+      "id": "mustache/sections/dotted-names-falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "dotted-names-falsey",
+      "desc": "Dotted names should be valid for Section tags.",
+      "path": "examples/vendored/mustache/sections/dotted-names-falsey.json"
+    },
+    {
+      "id": "mustache/sections/dotted-names-broken-chains",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "dotted-names-broken-chains",
+      "desc": "Dotted names that cannot be resolved should be considered falsey.",
+      "path": "examples/vendored/mustache/sections/dotted-names-broken-chains.json"
+    },
+    {
+      "id": "mustache/sections/surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "surrounding-whitespace",
+      "desc": "Sections should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/sections/surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/sections/internal-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "internal-whitespace",
+      "desc": "Sections should not alter internal whitespace.",
+      "path": "examples/vendored/mustache/sections/internal-whitespace.json"
+    },
+    {
+      "id": "mustache/sections/indented-inline-sections",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "indented-inline-sections",
+      "desc": "Single-line sections should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/sections/indented-inline-sections.json"
+    },
+    {
+      "id": "mustache/sections/standalone-lines",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "standalone-lines",
+      "desc": "Standalone lines should be removed from the template.",
+      "path": "examples/vendored/mustache/sections/standalone-lines.json"
+    },
+    {
+      "id": "mustache/sections/indented-standalone-lines",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "indented-standalone-lines",
+      "desc": "Indented standalone lines should be removed from the template.",
+      "path": "examples/vendored/mustache/sections/indented-standalone-lines.json"
+    },
+    {
+      "id": "mustache/sections/standalone-line-endings",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "standalone-line-endings",
+      "desc": "\"\\r\\n\" should be considered a newline for standalone tags.",
+      "path": "examples/vendored/mustache/sections/standalone-line-endings.json"
+    },
+    {
+      "id": "mustache/sections/standalone-without-previous-line",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "standalone-without-previous-line",
+      "desc": "Standalone tags should not require a newline to precede them.",
+      "path": "examples/vendored/mustache/sections/standalone-without-previous-line.json"
+    },
+    {
+      "id": "mustache/sections/standalone-without-newline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "standalone-without-newline",
+      "desc": "Standalone tags should not require a newline to follow them.",
+      "path": "examples/vendored/mustache/sections/standalone-without-newline.json"
+    },
+    {
+      "id": "mustache/sections/padding",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "sections",
+      "name": "padding",
+      "desc": "Superfluous in-tag whitespace should be ignored.",
+      "path": "examples/vendored/mustache/sections/padding.json"
+    },
+    {
+      "id": "mustache/inverted/falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "falsey",
+      "desc": "Falsey sections should have their contents rendered.",
+      "path": "examples/vendored/mustache/inverted/falsey.json"
+    },
+    {
+      "id": "mustache/inverted/truthy",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "truthy",
+      "desc": "Truthy sections should have their contents omitted.",
+      "path": "examples/vendored/mustache/inverted/truthy.json"
+    },
+    {
+      "id": "mustache/inverted/null-is-falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "null-is-falsey",
+      "desc": "Null is falsey.",
+      "path": "examples/vendored/mustache/inverted/null-is-falsey.json"
+    },
+    {
+      "id": "mustache/inverted/context",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "context",
+      "desc": "Objects and hashes should behave like truthy values.",
+      "path": "examples/vendored/mustache/inverted/context.json"
+    },
+    {
+      "id": "mustache/inverted/list",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "list",
+      "desc": "Lists should behave like truthy values.",
+      "path": "examples/vendored/mustache/inverted/list.json"
+    },
+    {
+      "id": "mustache/inverted/empty-list",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "empty-list",
+      "desc": "Empty lists should behave like falsey values.",
+      "path": "examples/vendored/mustache/inverted/empty-list.json"
+    },
+    {
+      "id": "mustache/inverted/doubled",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "doubled",
+      "desc": "Multiple inverted sections per template should be permitted.",
+      "path": "examples/vendored/mustache/inverted/doubled.json"
+    },
+    {
+      "id": "mustache/inverted/nested-falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "nested-falsey",
+      "desc": "Nested falsey sections should have their contents rendered.",
+      "path": "examples/vendored/mustache/inverted/nested-falsey.json"
+    },
+    {
+      "id": "mustache/inverted/nested-truthy",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "nested-truthy",
+      "desc": "Nested truthy sections should be omitted.",
+      "path": "examples/vendored/mustache/inverted/nested-truthy.json"
+    },
+    {
+      "id": "mustache/inverted/context-misses",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "context-misses",
+      "desc": "Failed context lookups should be considered falsey.",
+      "path": "examples/vendored/mustache/inverted/context-misses.json"
+    },
+    {
+      "id": "mustache/inverted/dotted-names-truthy",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "dotted-names-truthy",
+      "desc": "Dotted names should be valid for Inverted Section tags.",
+      "path": "examples/vendored/mustache/inverted/dotted-names-truthy.json"
+    },
+    {
+      "id": "mustache/inverted/dotted-names-falsey",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "dotted-names-falsey",
+      "desc": "Dotted names should be valid for Inverted Section tags.",
+      "path": "examples/vendored/mustache/inverted/dotted-names-falsey.json"
+    },
+    {
+      "id": "mustache/inverted/dotted-names-broken-chains",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "dotted-names-broken-chains",
+      "desc": "Dotted names that cannot be resolved should be considered falsey.",
+      "path": "examples/vendored/mustache/inverted/dotted-names-broken-chains.json"
+    },
+    {
+      "id": "mustache/inverted/surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "surrounding-whitespace",
+      "desc": "Inverted sections should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/inverted/surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/inverted/internal-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "internal-whitespace",
+      "desc": "Inverted should not alter internal whitespace.",
+      "path": "examples/vendored/mustache/inverted/internal-whitespace.json"
+    },
+    {
+      "id": "mustache/inverted/indented-inline-sections",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "indented-inline-sections",
+      "desc": "Single-line sections should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/inverted/indented-inline-sections.json"
+    },
+    {
+      "id": "mustache/inverted/standalone-lines",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "standalone-lines",
+      "desc": "Standalone lines should be removed from the template.",
+      "path": "examples/vendored/mustache/inverted/standalone-lines.json"
+    },
+    {
+      "id": "mustache/inverted/standalone-indented-lines",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "standalone-indented-lines",
+      "desc": "Standalone indented lines should be removed from the template.",
+      "path": "examples/vendored/mustache/inverted/standalone-indented-lines.json"
+    },
+    {
+      "id": "mustache/inverted/standalone-line-endings",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "standalone-line-endings",
+      "desc": "\"\\r\\n\" should be considered a newline for standalone tags.",
+      "path": "examples/vendored/mustache/inverted/standalone-line-endings.json"
+    },
+    {
+      "id": "mustache/inverted/standalone-without-previous-line",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "standalone-without-previous-line",
+      "desc": "Standalone tags should not require a newline to precede them.",
+      "path": "examples/vendored/mustache/inverted/standalone-without-previous-line.json"
+    },
+    {
+      "id": "mustache/inverted/standalone-without-newline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "standalone-without-newline",
+      "desc": "Standalone tags should not require a newline to follow them.",
+      "path": "examples/vendored/mustache/inverted/standalone-without-newline.json"
+    },
+    {
+      "id": "mustache/inverted/padding",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "inverted",
+      "name": "padding",
+      "desc": "Superfluous in-tag whitespace should be ignored.",
+      "path": "examples/vendored/mustache/inverted/padding.json"
+    },
+    {
+      "id": "mustache/partials/basic-behavior",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "basic-behavior",
+      "desc": "The greater-than operator should expand to the named partial.",
+      "path": "examples/vendored/mustache/partials/basic-behavior.json"
+    },
+    {
+      "id": "mustache/partials/failed-lookup",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "failed-lookup",
+      "desc": "The empty string should be used when the named partial is not found.",
+      "path": "examples/vendored/mustache/partials/failed-lookup.json"
+    },
+    {
+      "id": "mustache/partials/context",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "context",
+      "desc": "The greater-than operator should operate within the current context.",
+      "path": "examples/vendored/mustache/partials/context.json"
+    },
+    {
+      "id": "mustache/partials/recursion",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "recursion",
+      "desc": "The greater-than operator should properly recurse.",
+      "path": "examples/vendored/mustache/partials/recursion.json"
+    },
+    {
+      "id": "mustache/partials/nested",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "nested",
+      "desc": "The greater-than operator should work from within partials.",
+      "path": "examples/vendored/mustache/partials/nested.json"
+    },
+    {
+      "id": "mustache/partials/surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "surrounding-whitespace",
+      "desc": "The greater-than operator should not alter surrounding whitespace.",
+      "path": "examples/vendored/mustache/partials/surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/partials/inline-indentation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "inline-indentation",
+      "desc": "Whitespace should be left untouched.",
+      "path": "examples/vendored/mustache/partials/inline-indentation.json"
+    },
+    {
+      "id": "mustache/partials/standalone-line-endings",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "standalone-line-endings",
+      "desc": "\"\\r\\n\" should be considered a newline for standalone tags.",
+      "path": "examples/vendored/mustache/partials/standalone-line-endings.json"
+    },
+    {
+      "id": "mustache/partials/standalone-without-previous-line",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "standalone-without-previous-line",
+      "desc": "Standalone tags should not require a newline to precede them.",
+      "path": "examples/vendored/mustache/partials/standalone-without-previous-line.json"
+    },
+    {
+      "id": "mustache/partials/standalone-without-newline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "standalone-without-newline",
+      "desc": "Standalone tags should not require a newline to follow them.",
+      "path": "examples/vendored/mustache/partials/standalone-without-newline.json"
+    },
+    {
+      "id": "mustache/partials/standalone-indentation",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "standalone-indentation",
+      "desc": "Each line of the partial should be indented before rendering.",
+      "path": "examples/vendored/mustache/partials/standalone-indentation.json"
+    },
+    {
+      "id": "mustache/partials/padding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "partials",
+      "name": "padding-whitespace",
+      "desc": "Superfluous in-tag whitespace should be ignored.",
+      "path": "examples/vendored/mustache/partials/padding-whitespace.json"
+    }
+  ]
+}

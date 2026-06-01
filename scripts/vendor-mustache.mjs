@@ -77,6 +77,7 @@ async function fetchModule(module) {
 
 if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true });
 let total = 0;
+const manifest = [];
 for (const module of MODULES) {
   const spec = await fetchModule(module);
   const dir = resolve(OUT, module);
@@ -90,8 +91,24 @@ for (const module of MODULES) {
     const fx = fixture(module, test);
     fx.id = `mustache/${module}/${s}`;
     writeFileSync(resolve(dir, `${s}.json`), JSON.stringify(fx, null, 2) + "\n");
+    // `path` is relative to reference/web/ (the Lab's fetch root).
+    manifest.push({
+      id: fx.id,
+      provider: fx.provider,
+      dialect: fx.dialect,
+      divergenceMeaning: fx.divergenceMeaning,
+      category: module,
+      name: s,
+      desc: fx.desc,
+      path: `examples/vendored/mustache/${module}/${s}.json`,
+    });
     total++;
   }
   console.log(`  ${module}: ${spec.tests.length} fixtures`);
 }
+// The browse manifest the FlatBars Lab reads to list fixtures (example-loader-spec.md §8).
+writeFileSync(
+  resolve(OUT, "manifest.json"),
+  JSON.stringify({ commit: SHA, fixtures: manifest }, null, 2) + "\n",
+);
 console.log(`vendored ${total} mustache fixtures at ${SHA.slice(0, 7)} → reference/web/examples/vendored/mustache/`);
