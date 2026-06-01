@@ -233,6 +233,13 @@ const esc = (v) => isSafe(v) ? v : new Safe(escapeHtml(stringify(v)));
 const safe = (v) => new Safe(stringify(v));
 
 // ── the helper registry (`rt.call` for everything not inlined) ───────────────
+// arithmetic operands must be numbers (matches the interpreter's asNum), so the
+// two paths agree on results and on rejecting non-numeric input.
+function num(v) {
+  if (typeof v !== "number") throw new Error("arithmetic expects a number");
+  return v;
+}
+
 const helpers = {
   this: (a, f) => f.ctx,
   index: (a, f) => f.index,
@@ -265,6 +272,16 @@ const helpers = {
   not: (a, f) => !truthy(f.falsy, a[0]),
   and: (a, f) => a.every((v) => truthy(f.falsy, v)),
   or: (a, f) => a.some((v) => truthy(f.falsy, v)),
+  // arithmetic — strictly numeric (matches the interpreter's asNum): a non-number
+  // operand throws. JS `+ - * /` are the same ops the PureScript interpreter
+  // compiles to; modulo uses the trunc form, identical to `Kernel.Prelude.jsMod`.
+  add: (a) => num(a[0]) + num(a[1]),
+  subtract: (a) => num(a[0]) - num(a[1]),
+  multiply: (a) => num(a[0]) * num(a[1]),
+  divide: (a) => num(a[0]) / num(a[1]),
+  modulo: (a) => { const x = num(a[0]), y = num(a[1]); return x - y * Math.trunc(x / y); },
+  // null-coalescing — the first non-null argument (the `??` desugar target).
+  coalesce: (a) => { for (const v of a) if (v !== null) return v; return null; },
   log: () => null,
   json: (a) => jsonText(a[0], a[1]),
   esc_json: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))),

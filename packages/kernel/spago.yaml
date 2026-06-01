@@ -17,6 +17,7 @@ package:
     - foldable-traversable
     - ordered-collections
     - integers
+    - numbers
     - transformers
     - record
     - barebars

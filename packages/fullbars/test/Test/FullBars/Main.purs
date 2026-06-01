@@ -139,6 +139,27 @@ main = do
     (obj [ Tuple "user" (obj [ Tuple "city" (str "Lübeck") ]) ])
     "Lübeck"
 
+  -- arithmetic + coalesce prelude helpers (pin the actual values; conformance
+  -- only proves compiled ≡ interpreter, not that either is correct).
+  let ab a b = obj [ Tuple "a" (VNumber a), Tuple "b" (VNumber b) ]
+  expect "add" "{{{add (lookup this \"a\") (lookup this \"b\")}}}" (ab 2.0 3.0) "5"
+  expect "subtract" "{{{subtract (lookup this \"a\") (lookup this \"b\")}}}" (ab 7.0 4.0) "3"
+  expect "multiply" "{{{multiply (lookup this \"a\") (lookup this \"b\")}}}" (ab 6.0 7.0) "42"
+  expect "divide" "{{{divide (lookup this \"a\") (lookup this \"b\")}}}" (ab 9.0 2.0) "4.5"
+  expect "modulo" "{{{modulo (lookup this \"a\") (lookup this \"b\")}}}" (ab 17.0 5.0) "2"
+  expect "modulo-neg" "{{{modulo (lookup this \"a\") (lookup this \"b\")}}}" (ab (-17.0) 5.0) "-2"
+  expect "arith-nested"
+    "{{{add (multiply (lookup this \"a\") (lookup this \"b\")) (lookup this \"a\")}}}"
+    (ab 3.0 4.0)
+    "15"
+  expect "coalesce-null" "{{{coalesce (lookup this \"a\") (lookup this \"b\")}}}"
+    (obj [ Tuple "a" VNull, Tuple "b" (str "fb") ])
+    "fb"
+  -- null-coalescing is NOT truthiness: a present 0 wins over the fallback.
+  expect "coalesce-zero" "{{{coalesce (lookup this \"a\") (lookup this \"b\")}}}"
+    (obj [ Tuple "a" (VNumber 0.0), Tuple "b" (str "fb") ])
+    "0"
+
   expect "esc-html" "{{{esc_html (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
     "&lt;b&gt;&amp;&quot;&#x27;"

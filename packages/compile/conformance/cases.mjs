@@ -140,4 +140,18 @@ export const cases = [
   { name: "mx:loopvar-key", dialect: "maxbars", t: "{{#each o}}{{key}}={{this}};{{/each}}", d: { o: { x: 1, y: 2 } } },
   // a dotted path is still a path (not a loop var) in MaxBars.
   { name: "mx:path-still-works", dialect: "maxbars", t: "{{ user.name }}", d: { user: { name: "Ada" } } },
+
+  // arithmetic + coalesce prelude helpers (explicit call form — the desugar
+  // targets). Strictly numeric; the interpreter and the runtime must agree.
+  { name: "add", dialect: "surface", t: "{{ add a b }}", d: { a: 2, b: 3 } },
+  { name: "subtract", dialect: "surface", t: "{{ subtract a b }}", d: { a: 7, b: 4 } },
+  { name: "multiply", dialect: "surface", t: "{{ multiply a b }}", d: { a: 6, b: 7 } },
+  { name: "divide", dialect: "surface", t: "{{ divide a b }}", d: { a: 9, b: 2 } },
+  { name: "modulo", dialect: "surface", t: "{{ modulo a b }}", d: { a: 17, b: 5 } },
+  { name: "modulo-neg", dialect: "surface", t: "{{ modulo a b }}", d: { a: -17, b: 5 } },
+  { name: "divide-zero", dialect: "surface", t: "{{ divide a b }}", d: { a: 1, b: 0 } },
+  { name: "arith-nested", dialect: "surface", t: "{{ add (multiply a b) c }}", d: { a: 3, b: 4, c: 5 } },
+  { name: "coalesce-first", dialect: "surface", t: "{{ coalesce a b }}", d: { a: null, b: "fallback" } },
+  { name: "coalesce-zero", dialect: "surface", t: "{{ coalesce a b }}", d: { a: 0, b: "x" } },
+  { name: "coalesce-chain", dialect: "surface", t: "{{ coalesce a b c }}", d: { a: null, b: null, c: "third" } },
 ];

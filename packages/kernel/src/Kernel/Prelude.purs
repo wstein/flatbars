@@ -30,6 +30,7 @@ import Data.Either (Either)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Number (trunc)
 import Data.Set as Set
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
@@ -100,6 +101,19 @@ helperDefs =
   , gen "not" false (Exactly 1) notH
   , gen "and" false AnyArity (boolH Array.all)
   , gen "or" false AnyArity (boolH Array.any)
+  -- arithmetic: the desugar targets of the MaxBars `+ - * / %` operators, also
+  -- callable explicitly in RawBars/FullBars (`(add a b)`). Strictly numeric:
+  -- both operands must be `VNumber` (no string coercion — determinism), so the
+  -- interpreter (which is itself JS) and the compiled runtime share JS's `+ - * /`
+  -- bit-for-bit; `modulo` uses the `trunc` form, which equals JS `%`.
+  , valDef "add" (binary (arith (+)))
+  , valDef "subtract" (binary (arith (-)))
+  , valDef "multiply" (binary (arith (*)))
+  , valDef "divide" (binary (arith (/)))
+  , valDef "modulo" (binary (arith jsMod))
+  -- null-coalescing: the desugar target of `??`. Returns the first non-`VNull`
+  -- argument (else `VNull`). Distinct from truthiness — `0`/`""`/`[]` pass.
+  , gen "coalesce" false (AtLeast 1) coalesceH
   , valDef "log" (atLeast 1 (const (pure VNull)))
   ]
 
@@ -204,6 +218,36 @@ compareValues a b = case a, b of
 -- | and satisfies `ok`; an incomparable pair is false.
 cmp :: forall m. Applicative m => (Ordering -> Boolean) -> Value -> Value -> m Value
 cmp ok a b = pure (VBool (maybe false ok (compareValues a b)))
+
+-- | A binary arithmetic helper. Both operands must be numbers (`VNumber`); a
+-- | non-number is a `TypeError` (no string coercion — keeps results deterministic
+-- | and identical on both targets). The compiled runtime applies the same JS
+-- | operator to the same `num`-guarded operands, so the two paths never drift.
+arith :: forall m. MonadThrow Error m => (Number -> Number -> Number) -> Value -> Value -> m Value
+arith op a b = do
+  x <- asNum a
+  y <- asNum b
+  pure (VNumber (op x y))
+
+asNum :: forall m. MonadThrow Error m => Value -> m Number
+asNum = case _ of
+  VNumber n -> pure n
+  _ -> throwError (TypeError "arithmetic expects a number")
+
+-- | JS-`%` modulo via the truncated-division identity (`a - b * trunc(a/b)`),
+-- | so it matches the runtime's `Math.trunc`-based modulo bit-for-bit.
+jsMod :: Number -> Number -> Number
+jsMod a b = a - b * trunc (a / b)
+
+-- | `coalesce a b …`: the first non-`VNull` argument, else `VNull`. The desugar
+-- | target of the MaxBars `??` operator (null-coalescing, *not* truthiness — so
+-- | a falsy-but-present `0`/`""`/`[]` is returned, keeping `??` decoupled from the
+-- | active `@truthiness` set).
+coalesceH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+coalesceH _ args = pure (fromMaybe VNull (Array.find notNull args))
+  where
+  notNull VNull = false
+  notNull _ = true
 
 -- | `not`: logical negation under the *active* truthiness mode (`ctl.env`).
 notH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
