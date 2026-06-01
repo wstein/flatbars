@@ -1,0 +1,256 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The RawBars reference — a focused, honest-substrate page (design debate
+// consensus). RawBars is the meaning-free core: no surface sugar, every value an
+// explicit helper application. Prose illustrates; runnable examples come from the
+// single gate-validated source ../rawbars.mjs. One flagship example shows the
+// live compiled-JS pane (RawBars compiles; MinBars doesn't). The deep-dive links
+// the spec/ADR rather than forking them, grounded in the page's own live
+// artifacts (the diptych = desugar; the compile pane = compile).
+import Reference from "../layouts/Reference.astro";
+import OpenInLab from "../components/OpenInLab.jsx";
+import { examples as ex } from "../rawbars.mjs";
+
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
+
+const groups = [
+  {
+    label: "RawBars",
+    items: [
+      { href: "#intro", label: "What RawBars is" },
+      { href: "#output", label: "Output & escaping" },
+      { href: "#application", label: "Application & parens" },
+      { href: "#lookup", label: "Reading data" },
+      { href: "#blocks", label: "Blocks & scope" },
+      { href: "#compile", label: "Compiles to JS" },
+      { href: "#conditionals", label: "Conditionals" },
+      { href: "#comments", label: "Comments" },
+      { href: "#architecture", label: "Under the hood" },
+      { href: "#helpers", label: "Helpers" },
+    ],
+  },
+  {
+    label: "Other surfaces",
+    items: [
+      { href: "/mustache", label: "MinBars — Mustache" },
+      { href: "/fullbars", label: "FullBars — Handlebars" },
+      { href: "/maxbars", label: "MaxBars — operators" },
+    ],
+  },
+  {
+    label: "Play",
+    items: [{ href: "/lab/index.html?engine=rawbars", label: "FlatBars Lab ↗" }],
+  },
+];
+
+// Inline tag references — kept in a helper so Astro never parses the {{ }}.
+const t = (s) => s;
+---
+
+<Reference
+  title="RawBars — the meaning-free core"
+  subtitle="RawBars is the structural core of FlatBars with no surface sugar: every value is an explicit helper application. You rarely hand-write it — it's the framework you build sugar-rich engines (Mustache, Handlebars) on top of. This reference shows the bare core running live, and compiling to JS."
+  groups={groups}
+  spec="concepts"
+>
+  <!-- ─────────────────────────── Intro ─────────────────────────── -->
+  <section id="intro">
+    <h2>What RawBars is</h2>
+    <p>
+      RawBars renders the <b>core skeleton syntax</b> directly — no dotted paths,
+      no auto-escaping, no <code>{t("{{ }}")}</code> interpolation. There is one
+      rule: <b>everything is a helper application</b>. <code>{t("{{{ city }}}")}</code>
+      doesn't read a variable named <code>city</code> — it <em>calls</em> the
+      helper <code>city</code>. To read a field you call <code>lookup</code>; to
+      escape you call <code>escapeHtml</code>. Nothing is implicit.
+    </p>
+    <p>
+      That makes RawBars <b>verbose on purpose</b>. The verbosity is the feature:
+      nothing is hidden, so it's the honest substrate to target when you build a
+      friendlier surface. The dialect ladder is <b>RawBars ⊂ FullBars ⊂ MaxBars</b>;
+      end users reach for <a href="/fullbars">FullBars</a> or
+      <a href="/maxbars">MaxBars</a>, which buy back the brevity. They all share
+      one engine, prelude, and compiler — they differ only in surface syntax.
+    </p>
+  </section>
+
+  <!-- ────────────────────── Output & escaping ───────────────────── -->
+  <section id="output">
+    <h2>Output &amp; escaping — sugar → core</h2>
+    <p>
+      RawBars has one inline output form, the triple-stash <code>{t("{{{ … }}}")}</code>,
+      and it is <b>never auto-escaped</b>. Here is what FullBars's friendly
+      <code>{t("{{ name }}")}</code> actually <em>is</em> — the same render, written
+      out explicitly:
+    </p>
+    <p class="diptych-cap"><b>FullBars</b> (sugar):</p>
+    <OpenInLab client:visible engine={ex.sugar.engine} template={ex.sugar.template} data={ex.sugar.data} />
+    <p class="diptych-cap"><b>RawBars</b> (the same thing, explicit):</p>
+    <OpenInLab client:visible engine="rawbars" template={ex.core.template} data={ex.core.data} />
+    <p class="tip">
+      Same output, <code>Ada &amp;lt;core&amp;gt;</code>. FullBars' <code>{t("{{ x }}")}</code>
+      desugars to exactly <code>{t("{{{ escapeHtml (lookup this \"x\") }}}")}</code>.
+      The sugar is convenience; the core is the contract.
+    </p>
+  </section>
+
+  <!-- ────────────────────── Application & parens ─────────────────── -->
+  <section id="application">
+    <h2>Application is juxtaposition; parens group</h2>
+    <p>
+      <code>head arg1 arg2</code> applies <code>head</code> to its arguments by
+      juxtaposition. Parentheses do <b>not</b> mean "call" — they <em>group</em> a
+      multi-token application so it fits one argument slot.
+    </p>
+    <OpenInLab client:visible engine="rawbars" template={ex.application.template} data={ex.application.data} />
+    <p class="tip">
+      <code>{t("uppercase (lookup this \"name\")")}</code> applies <code>uppercase</code>
+      to <b>one</b> argument — the parenthesised group. Drop the parens —
+      <code>{t("uppercase lookup this \"name\"")}</code> — and you'd be applying
+      <code>uppercase</code> to <em>three</em> arguments. That's the one parse rule
+      to internalise.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── lookup ─────────────────────────── -->
+  <section id="lookup">
+    <h2>Reading data — explicitly</h2>
+    <p>
+      RawBars has no dot paths. You index data with <code>lookup</code>:
+      <code>{t("(lookup this \"k\")")}</code> reads a field of the current context;
+      add more keys to descend. <code>this</code> is itself a (nullary) helper —
+      the current context.
+    </p>
+    <OpenInLab client:visible engine="rawbars" template={ex.lookup.template} data={ex.lookup.data} />
+  </section>
+
+  <!-- ─────────────────────── Blocks & scope ─────────────────────── -->
+  <section id="blocks">
+    <h2>Blocks install scope</h2>
+    <p>
+      A block <code>{t("{{# helper args }} … {{/ helper }}")}</code> hands its body
+      to a block helper. <code>each</code> iterates and, inside the body, installs
+      scoped helpers — <code>this</code> (the element), <code>index</code>,
+      <code>key</code>, <code>first</code>, <code>last</code> — that the block
+      removes again on exit.
+    </p>
+    <OpenInLab client:visible engine="rawbars" template={ex.each.template} data={ex.each.data} compile />
+
+    <!-- ───── Compiles to JS (flagship, lives on the each card above) ───── -->
+    <h3 id="compile">…and it compiles to JS</h3>
+    <p>
+      The <b>compiled JS</b> pane above is live: the very template the interpreter
+      runs also compiles to a standalone ES module (it runs against
+      <code>flatbars-runtime.mjs</code>). This is RawBars' edge over MinBars, which
+      is render-only. The compiler is held to <b>byte-identical output with the
+      interpreter</b> — the repo asserts it on every build (<code>npm run
+      test:compile</code>), so the pane is the same bytes you see under
+      <code>output</code>, just produced ahead of time.
+    </p>
+  </section>
+
+  <!-- ───────────────────────── Conditionals ─────────────────────── -->
+  <section id="conditionals">
+    <h2>Conditionals — and no keywords</h2>
+    <p>
+      <code>if</code> is a block helper, not syntax. And <code>else</code> is not a
+      keyword: it's a bare <b>separator</b> <code>{t("{{else}}")}</code> that the
+      core keeps as a meaningless marker and the <code>if</code> helper splits its
+      body on. <code>else</code>, <code>elif</code>, <code>case</code> are all the
+      same shape to the parser.
+    </p>
+    <OpenInLab client:visible engine="rawbars" template={ex.cond.template} data={ex.cond.data} />
+  </section>
+
+  <!-- ───────────────────────── Comments ─────────────────────────── -->
+  <section id="comments">
+    <h2>Comments</h2>
+    <p>
+      <code>{t("{{! … }}")}</code> is dropped by the lexer and never reaches the
+      output. (A comment can also carry a header directive, e.g.
+      <code>{t("{{! @truthiness: … }}")}</code> — but that's a separate topic.)
+    </p>
+    <OpenInLab client:visible engine="rawbars" template={ex.comment.template} data={ex.comment.data} />
+  </section>
+
+  <!-- ─────────────────────── Under the hood ─────────────────────── -->
+  <section id="architecture">
+    <h2>Under the hood — one core, four pluggable rules</h2>
+    <p>
+      RawBars is the bare expression of the design the whole project rests on
+      (<a href={`${SPEC_BASE}adr-0001-structural-parser-and-walker.html`}>ADR-0001</a>,
+      <a href={`${SPEC_BASE}concepts.html`}>concepts</a>): a <b>meaning-free
+      parser</b> builds a structural tree, and a pluggable rule supplies the
+      meaning — <i>"don't call us, we call you."</i> The same idea appears four
+      times, and you've just seen two of them run:
+    </p>
+    <table class="cmp">
+      <thead><tr><th>IoC instance</th><th>What plugs in</th><th>On this page</th></tr></thead>
+      <tbody>
+        <tr><td>interpret</td><td>the engine (helper meanings)</td><td>every example's <code>output</code></td></tr>
+        <tr><td>desugar</td><td>a surface's rewrite rules</td><td>the sugar → core diptych above</td></tr>
+        <tr><td>compile</td><td>a per-dialect emitter</td><td>the <code>compiled JS</code> pane</td></tr>
+        <tr><td>validate</td><td>a schema</td><td>the linter (off-page)</td></tr>
+      </tbody>
+    </table>
+    <p>
+      A dialect is just a different <b>surface</b> swapped in at one seam: the
+      parser tokenises a tag's interior with a shared tokeniser and hands it to a
+      dialect grammar (<code>parseExpr</code> / <code>parseHead</code>). RawBars
+      uses the plain core grammar; MaxBars plugs in infix operators and pipes.
+      Which tag <em>shapes</em> are legal is also dialect-gated — RawBars sets
+      <code>extras = false</code>, so it rejects the Handlebars-only shapes
+      (<code>{t("{{^ }}")}</code> inverse, <code>{t("{{& }}")}</code> unescaped,
+      <code>{t("{{{{ }}}}")}</code> raw blocks). That seam is how
+      <a href="/mustache">MinBars</a> and <a href="/fullbars">FullBars</a> are
+      built on the same core.
+    </p>
+  </section>
+
+  <!-- ───────────────────────── Helpers ──────────────────────────── -->
+  <section id="helpers">
+    <h2>Helpers</h2>
+    <p>
+      RawBars exposes the whole reference prelude (~60 helpers). The handful these
+      examples use:
+    </p>
+    <table class="cmp">
+      <thead><tr><th>Helper</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>this</code></td><td>the current context (nullary)</td></tr>
+        <tr><td><code>lookup</code></td><td><code>{t("(lookup obj k1 k2 …)")}</code> — index by key/position</td></tr>
+        <tr><td><code>escapeHtml</code></td><td>HTML-escape a value</td></tr>
+        <tr><td><code>uppercase</code></td><td>upper-case a string</td></tr>
+        <tr><td><code>each</code></td><td>block: iterate an array/object, installing scope</td></tr>
+        <tr><td><code>if</code> / <code>unless</code></td><td>block: conditional; split on the <code>{t("{{else}}")}</code> separator</td></tr>
+        <tr><td><code>index</code></td><td>scoped: 0-based position inside <code>each</code></td></tr>
+      </tbody>
+    </table>
+    <p>
+      The full list — comparisons, arithmetic, string/array helpers, the scoped
+      loop variables — is the generated
+      <a href={`${SPEC_BASE}helper-catalog.html`}>helper catalog</a>. Every one is
+      available identically in FullBars and MaxBars.
+    </p>
+  </section>
+
+  <style is:global>
+    #main section { scroll-margin-top: 60px; }
+    .content .tip {
+      font-size: 0.92rem;
+      color: var(--fg-muted);
+      border-left: 3px solid var(--border-strong);
+      padding-left: 0.8rem;
+    }
+    .content .diptych-cap { margin: 1rem 0 0.3rem; font-size: 0.95rem; }
+    table.cmp { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+    table.cmp th, table.cmp td { text-align: left; padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    table.cmp thead th {
+      font: 600 11px/1 var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--fg-faint);
+    }
+  </style>
+</Reference>

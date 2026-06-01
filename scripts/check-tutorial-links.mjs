@@ -13,6 +13,7 @@
 import { readFileSync } from "node:fs";
 import { lessons } from "../tutorials/src/examples.mjs";
 import { examples as mustacheExamples } from "../tutorials/src/mustache.mjs";
+import { examples as rawbarsExamples } from "../tutorials/src/rawbars.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../lab/minbars.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
@@ -77,4 +78,40 @@ for (const [key, ex] of Object.entries(mustacheExamples)) {
 console.log(
   fail ? `\n${fail} example(s) broken overall` : `\nall mustache reference examples render + link`,
 );
+// RawBars reference examples (tutorials/src/rawbars.mjs) — each runs under its
+// own engine (the diptych's `sugar` is FullBars); a `compiles` example must also
+// emit JS via compileToJs. Orphan guard against examples never shown on the page.
+console.log("\nRawBars reference examples:");
+const rawPageSrc = readFileSync(new URL("../tutorials/src/pages/rawbars.astro", import.meta.url), "utf8");
+for (const [key, rex] of Object.entries(rawbarsExamples)) {
+  const eng = rex.engine || "rawbars";
+  if (!rawPageSrc.includes(`ex.${key}.`)) {
+    console.error(`  ✗ ${key}: defined in rawbars.mjs but never referenced by rawbars.astro (orphan)`);
+    fail++;
+  }
+  try {
+    await labHref(eng, rex, { labUrl: "/lab/index.html" });
+  } catch (e) {
+    console.error(`  ✗ ${key}: Open-in-Lab link failed to build — ${e.message}`);
+    fail++;
+    continue;
+  }
+  const r = await createFlatBarsRenderer(DIALECT[eng]);
+  try {
+    const out = r.render(r.compile(rex.template, rex.partials || {}).program, rex.data ?? {});
+    if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
+    let note = "";
+    if (rex.compiles) {
+      const c = r.compileToJs(rex.template);
+      if (!c || !c.ok) throw new Error("compileToJs failed: " + ((c && c.error) || "unknown"));
+      note = ` [compiles ✓ ${c.value.length}b]`;
+    }
+    console.log(`  ✓ ${key} (${eng}) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}${note}`);
+  } catch (e) {
+    console.error(`  ✗ ${key} (${eng}): ${e && e.message ? e.message : e}`);
+    fail++;
+  }
+}
+
+console.log(fail ? `\n${fail} example(s) broken overall` : `\nall tutorial + reference examples render + link`);
 process.exit(fail ? 1 : 0);

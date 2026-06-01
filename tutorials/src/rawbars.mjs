@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// The RawBars reference's runnable examples — ONE source, imported by both the
+// reference page (live preview + Open-in-Lab + the compiled-JS pane) and the CI
+// gate (scripts/check-tutorial-links.mjs), which renders every one through the
+// real engine bundle and asserts it produces output. RawBars is the meaning-free
+// core: no surface sugar, so every value is an explicit helper application.
+//
+// `engine` defaults to "rawbars"; the `sugar` example is FullBars on purpose —
+// it's the left half of the "sugar → core" diptych (what `{{ name }}` desugars
+// to). `compiles: true` marks the flagship the page shows compiled to JS (and
+// the gate asserts compileToJs succeeds for it).
+
+export const examples = {
+  // ── Output & escaping: the sugar → core diptych ──────────────────────────
+  // FullBars writes {{ name }}; that is exactly this RawBars application.
+  sugar: {
+    engine: "fullbars",
+    template: "{{ name }}",
+    data: { name: "Ada <core>" },
+  },
+  core: {
+    template: '{{{ escapeHtml (lookup this "name") }}}',
+    data: { name: "Ada <core>" },
+  },
+
+  // ── Application is juxtaposition; parens group ────────────────────────────
+  // `uppercase (lookup this "name")` applies uppercase to ONE argument — the
+  // parenthesised group. Without the parens it would be three arguments.
+  application: {
+    template: '{{{ uppercase (lookup this "name") }}}',
+    data: { name: "ada" },
+  },
+
+  // ── Reading data: lookup, explicitly, with no dot paths ───────────────────
+  lookup: {
+    template: '{{{ escapeHtml (lookup this "user" "email") }}}',
+    data: { user: { email: "ada@example.com" } },
+  },
+
+  // ── Blocks install scope; `this` and `index` are nullary helpers ──────────
+  // Also the compile flagship: the page shows this template emitted as JS.
+  each: {
+    template: '{{#each (lookup this "items")}}{{{ index }}}: {{{ escapeHtml this }}}\n{{/each}}',
+    data: { items: ["alpha", "beta"] },
+    compiles: true,
+  },
+
+  // ── No keywords: {{else}} is a separator the `if` helper splits on ────────
+  cond: {
+    template: '{{#if (lookup this "admin")}}admin{{else}}guest{{/if}}',
+    data: { admin: false },
+  },
+
+  // ── Comments are dropped by the lexer ─────────────────────────────────────
+  comment: {
+    template: "A{{! dropped }}B",
+    data: {},
+  },
+};

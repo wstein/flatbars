@@ -1,28 +1,34 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 // One page per surface, on the shared reference chrome (left nav + lab theme),
-// so clicking through from the Mustache reference never hits a visual seam.
-// `minbars` is intentionally excluded — the comprehensive /mustache reference
-// supersedes a one-example MinBars lesson.
+// so clicking through from a reference never hits a visual seam. `minbars` and
+// `rawbars` are excluded — they have comprehensive dedicated references
+// (/mustache, /rawbars) that supersede a one-example lesson.
 import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { lessons, surfaces } from "../examples.mjs";
 
 export function getStaticPaths() {
+  // Inlined (not the const below): getStaticPaths is hoisted above it, so
+  // referencing the const here would hit the temporal dead zone at build time.
+  const hasReference = { minbars: true, rawbars: true };
   return surfaces
-    .filter((s) => s !== "minbars")
+    .filter((s) => !hasReference[s])
     .map((s) => ({ params: { surface: s }, props: { lesson: lessons[s], surface: s } }));
 }
+
+// Surfaces with a comprehensive dedicated reference (used for nav links below).
+const HAS_REFERENCE = { minbars: "/mustache", rawbars: "/rawbars" };
 
 const { lesson, surface } = Astro.props;
 const shortName = (s) => lessons[s].title.split(" — ")[0];
 
 const groups = [
-  { label: "Reference", items: [{ href: "/mustache", label: "Mustache reference" }] },
+  { label: "Reference", items: [{ href: "/mustache", label: "Mustache reference" }, { href: "/rawbars", label: "RawBars reference" }] },
   {
     label: "The four surfaces",
     items: surfaces.map((s) => ({
-      href: s === "minbars" ? "/mustache" : `/${s}`,
+      href: HAS_REFERENCE[s] ?? `/${s}`,
       label: s === "minbars" ? "MinBars (Mustache)" : shortName(s),
       active: s === surface,
     })),
