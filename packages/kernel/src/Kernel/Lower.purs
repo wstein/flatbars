@@ -3,7 +3,7 @@
 -- | `docs/modules/ROOT/pages/surface.adoc`.
 -- |
 -- | This is the second pass made inspectable: `lower` is a pure `foldTemplate`
--- | over the structural skeleton that (1) resolves *escaping* — `esc_html e`
+-- | over the structural skeleton that (1) resolves *escaping* — `escapeHtml e`
 -- | becomes `ROut true e`, everything else `ROut false e` — and (2) resolves
 -- | *clauses* — a block's `{{else}}` separator is consumed and the body split
 -- | into the typed branches of `RIf`/`RUnless`/`REach`/`RWith`. The structural
@@ -69,10 +69,12 @@ lower = foldTemplate
   , concat: join
   }
   where
-  -- `esc_html e` ⇒ escaped output of `e`; anything else is raw output as-is
-  -- (so `safe x` stays visible as `ROut false (safe x)` — intentional trust).
+  -- `escapeHtml e` (canonical) / `esc_html e` (silent alias) ⇒ escaped output of
+  -- `e`; anything else is raw output as-is (so `safe x` stays visible as
+  -- `ROut false (safe x)` — intentional trust).
   escaping :: Expr -> Tuple Boolean Expr
   escaping = case _ of
+    App "escapeHtml" [ inner ] -> Tuple true inner
     App "esc_html" [ inner ] -> Tuple true inner
     e -> Tuple false e
 
@@ -134,7 +136,7 @@ escapingWarnings = walk <<< lower
       | Array.elem name dataAccessors ->
           [ { severity: Warn
             , name
-            , message: "raw output of data '" <> name <> "' — wrap in esc_html, or mark safe"
+            , message: "raw output of data '" <> name <> "' — wrap in escapeHtml, or mark safe"
             }
           ]
     RIf c a b -> condWarn c <> walk a <> walk b
@@ -163,9 +165,11 @@ escapingWarnings = walk <<< lower
   dataAccessors :: Array Ident
   dataAccessors = [ "lookup", "this", "root", "parent", "key" ]
 
-  -- Helpers that produce output text (a `VSafe`) rather than data.
+  -- Helpers that produce output text (a `VSafe`) rather than data. The canonical
+  -- `escapeHtml` and its silent alias `esc_html` both count (matching the prior
+  -- set exactly, modulo the rename — `esc_json` was not listed and stays out).
   safeProducers :: Array Ident
-  safeProducers = [ "esc_html", "safe", "raw" ]
+  safeProducers = [ "escapeHtml", "esc_html", "safe", "raw" ]
 
 --------------------------------------------------------------------------------
 -- Directive lints (truthiness spec §6 / Phase 4)

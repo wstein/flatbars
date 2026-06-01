@@ -84,7 +84,8 @@ fbExpr rec ctx = case _ of
   Lit v -> litJs v
   App "this" [] -> ctx.scope <> ".ctx"
   App "lookup" args -> "rt.lookup(" <> args' rec ctx args <> ")"
-  App "esc_html" [ a ] -> "rt.esc(" <> rec.expr ctx a <> ")"
+  App "escapeHtml" [ a ] -> "rt.esc(" <> rec.expr ctx a <> ")"
+  App "esc_html" [ a ] -> "rt.esc(" <> rec.expr ctx a <> ")" -- silent alias (§8)
   App "safe" [ a ] -> "rt.safe(" <> rec.expr ctx a <> ")"
   -- `{{> name}}` ⇒ `partial name ctx [hash]` ⇒ a runtime partial call against
   -- the in-scope registry (`partials`).

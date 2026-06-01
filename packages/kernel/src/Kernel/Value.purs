@@ -192,7 +192,7 @@ shapeOf off = case _ of
   other -> note (DirectiveError ("unknown @truthiness value '" <> other <> "'") off) Nothing
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
--- | the `esc_html` helper); arrays join with `","` and objects are an error.
+-- | the `escapeHtml` helper); arrays join with `","` and objects are an error.
 stringify :: Value -> Either Error String
 stringify = case _ of
   VString s -> Right s
@@ -280,7 +280,7 @@ jsonQuote s = "\"" <> foldMap esc (toCharArray s) <> "\""
         else singleton c
   pad2 h = if length h == 1 then "0" <> h else h
 
--- | HTML-escape the five significant characters. Used by the `esc_html` helper.
+-- | HTML-escape the five significant characters. Used by the `escapeHtml` helper.
 escapeHtml :: String -> String
 escapeHtml =
   replaceAll (Pattern "&") (Replacement "&amp;")

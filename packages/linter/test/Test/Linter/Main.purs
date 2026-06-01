@@ -165,9 +165,9 @@ main = do
 
   -- Direct shape assertions on the printer.
   lowersContaining "and shape" "{{ a && b }}"
-    "{{{ esc_html (and (lookup this \"a\") (lookup this \"b\")) }}}"
+    "{{{ escapeHtml (and (lookup this \"a\") (lookup this \"b\")) }}}"
   lowersContaining "gt shape" "{{ a > b }}"
-    "{{{ esc_html (gt (lookup this \"a\") (lookup this \"b\")) }}}"
+    "{{{ escapeHtml (gt (lookup this \"a\") (lookup this \"b\")) }}}"
   lowersContaining "pipe shape" "{{{ o | json }}}"
     "{{{ json (lookup this \"o\") }}}"
   lowersContaining "section shape" "{{#unless done}}x{{/unless}}"

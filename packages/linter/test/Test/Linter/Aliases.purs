@@ -41,6 +41,12 @@ main = do
   expectWarns "lowercase does not warn" "{{{lowercase s}}}" []
   expectWarns "plain path does not warn" "{{{lookup this \"x\"}}}" []
 
+  -- the silent escaper aliases are NOT warned (§8): they are permanent and
+  -- structural, while the canonical names are escapeHtml / escapeJson.
+  expectWarns "esc_html does not warn" "{{{esc_html (lookup this \"x\")}}}" []
+  expectWarns "esc_json does not warn" "{{{esc_json (lookup this \"x\")}}}" []
+  expectWarns "escapeHtml (canonical) does not warn" "{{{escapeHtml (lookup this \"x\")}}}" []
+
   -- the message names the canonical target.
   case aliasWarningsOf "{{{plus a b}}}" of
     Right [ issue ] -> assert' ("plus → add message, got: " <> issue.message)

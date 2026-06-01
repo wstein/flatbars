@@ -9,7 +9,7 @@
 -- | What it rewrites (surface.adoc §5):
 -- |
 -- |  * `{{ E }}` (a separator that is not a clause marker) ⇒ escaped output,
--- |    `{{{ esc_html E' }}}`; `{{{ E }}}` stays raw output.
+-- |    `{{{ escapeHtml E' }}}`; `{{{ E }}}` stays raw output.
 -- |  * a bare/dotted *path* in value position ⇒ a `lookup` chain:
 -- |    `name` ⇒ `lookup this "name"`, `a.b` ⇒ `lookup this "a" "b"`,
 -- |    `a.1`/`a.[1]` ⇒ `lookup this "a" 1`, `a.[home town]` (bracket segment),
@@ -20,7 +20,7 @@
 -- |  * `else if` chains ⇒ flat `{{elif cond}}` clauses the engine's `if` reads
 -- |    (§5.6).
 -- |  * hash arguments `k=v` ⇒ a trailing `dict`: `{{ f a k=v }}` ⇒
--- |    `{{{ esc_html (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
+-- |    `{{{ escapeHtml (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
 -- |  * block params `{{#each xs as |item i|}}` ⇒ `{{#each xs "item" "i"}}`; a bare
 -- |    reference to an in-scope param becomes a helper call `(item)` (§5.5).
 -- |  * `{{> name [ctx] [k=v]}}` ⇒ `{{{ partial "name" ctx [(dict …)] }}}` (a bare
@@ -108,8 +108,8 @@ desugarWith lv clauseNames = go []
         | otherwise -> case stripPrefix (Pattern ">") name of
             -- a partial reference `{{> name [ctx]}}` ⇒ unescaped `partial` call.
             Just rest -> Output sp (partialExpr lv scope rest args)
-            -- everything else is `{{ E }}` ⇒ escaped output.
-            Nothing -> Output sp (App "esc_html" [ rewriteHead lv scope name args ])
+            -- everything else is `{{ E }}` ⇒ escaped output (canonical escaper).
+            Nothing -> Output sp (App "escapeHtml" [ rewriteHead lv scope name args ])
       -- `{{#partial name …}}` / `{{#inline name}}` (§5.7): a bare first argument
       -- is the partial *name* (a string), like `{{> name}}`.
       Block sp Section "partial" args body ->

@@ -23,8 +23,10 @@
 |`else` |value |0 |registered
 |`endsWith` |value |2 |registered
 |`eq` |value |2 |registered
-|`esc_html` |value |1 |registered
-|`esc_json` |value |1–2 |registered
+|`esc_html` |value |1 |alias of `escapeHtml`
+|`esc_json` |value |1–2 |alias of `escapeJson`
+|`escapeHtml` |value |1 |registered
+|`escapeJson` |value |1–2 |registered
 |`false` |value |0 |registered
 |`first` |value |0 |scoped
 |`floor` |value |1 |registered

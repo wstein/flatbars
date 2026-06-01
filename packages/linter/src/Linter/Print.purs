@@ -2,7 +2,7 @@
 -- | to **RawBars (core) source** text. This is the rendering half of the
 -- | linter's *lower* job (loopvars-linter-spec.md §B.2): a MaxBars template,
 -- | once desugared to the meaning-free core `Template`, is printed here in the
--- | austere RawBars surface — explicit `{{{ esc_html (lookup this "x") }}}`,
+-- | austere RawBars surface — explicit `{{{ escapeHtml (lookup this "x") }}}`,
 -- | `{{#name …}}`, no infix, no pipes, no dotted-path sugar.
 -- |
 -- | The printer is *mechanical and lossless* for the desugared corpus: every

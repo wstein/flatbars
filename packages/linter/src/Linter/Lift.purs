@@ -20,7 +20,7 @@
 -- |    as a call (`multi-arg-call`).
 -- |
 -- | Everything else round-trips faithfully: the operator table (B.7) inverts
--- | exactly, `Output (App "esc_html" [e])` becomes escaped `{{ e }}` and any other
+-- | exactly, `Output (App "escapeHtml" [e])` becomes escaped `{{ e }}` and any other
 -- | `Output e` becomes raw `{{{ e }}}`, and blocks/separators re-emit as
 -- | `{{#name …}}…{{/name}}` / `{{name …}}`. The re-sugar is render-preserving —
 -- | the acceptance oracle asserts `RawBars.render input == renderMax (lift input)`
@@ -78,7 +78,7 @@ type LiftResult =
 -- | The recognised **unary "filter-shaped" helpers** — the arity-1 calls that
 -- | have a canonical pipe form `a | f` (§B.3). **Derived from the prelude**
 -- | (`Kernel.Prelude.preludeUnaryHelpers`: every non-block value helper whose
--- | arity admits a single argument — `esc_html`/`safe`/`json`/`esc_json` and all
+-- | arity admits a single argument — `escapeHtml`/`safe`/`json`/`escapeJson` and all
 -- | the §4 value primitives `uppercase`/`trim`/`abs`/`count`/`reverse`/…), so a
 -- | new primitive becomes pipe-liftable with no change here.
 -- |
@@ -156,14 +156,11 @@ printNode :: Node -> Out
 printNode = case _ of
   Content s -> emptyOut { text = s }
 
-  -- `Output _ (App "esc_html" [e])` is FullBars's auto-escaped `{{ e }}`; any
-  -- other `Output _ e` is the raw `{{{ e }}}`.
+  -- `Output _ (App "escapeHtml" [e])` (canonical) / `esc_html` (silent alias) is
+  -- the auto-escaped `{{ e }}`; any other `Output _ e` is the raw `{{{ e }}}`.
   Output span e -> case e of
-    App "esc_html" [ inner ] ->
-      let
-        ex = exprTop span inner
-      in
-        ex { text = "{{ " <> ex.text <> " }}" }
+    App "escapeHtml" [ inner ] -> escaped span inner
+    App "esc_html" [ inner ] -> escaped span inner
     _ ->
       let
         ex = exprTop span e
@@ -186,6 +183,14 @@ printNode = case _ of
       h = headOut span name args
     in
       h { text = "{{{{" <> h.text <> "}}}}" <> raw <> "{{{{/" <> name <> "}}}}" }
+
+-- | Escaped output `{{ e }}` — the re-sugar of `(escapeHtml e)` / `(esc_html e)`.
+escaped :: Span -> Expr -> Out
+escaped span inner =
+  let
+    ex = exprTop span inner
+  in
+    ex { text = "{{ " <> ex.text <> " }}" }
 
 -- | A `{{#name …}}body{{/name}}` section (every desugared sigil prints in the
 -- | section shape; `Inverse`/`Parent`/`BlockDef` are unreachable for RawBars

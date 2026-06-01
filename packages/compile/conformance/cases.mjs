@@ -275,4 +275,11 @@ export const cases = [
   // behaves identically to the `{{elif …}}` form above (both targets).
   { name: "s:else-if-includeZero", dialect: "surface", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
+
+  // canonical escapers `escapeHtml`/`escapeJson` and their silent snake_case
+  // aliases `esc_html`/`esc_json` (§8) compile identically (compiled ≡ interpreter).
+  { name: "escapeHtml-canonical", t: "{{{escapeHtml (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
+  { name: "esc_html-alias", t: "{{{esc_html (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
+  { name: "escapeJson-canonical", t: "{{{escapeJson (lookup this \"o\")}}}", d: { o: { a: 1 } } },
+  { name: "esc_json-alias", t: "{{{esc_json (lookup this \"o\")}}}", d: { o: { a: 1 } } },
 ];

@@ -296,6 +296,14 @@ main = do
   expect "esc-html" "{{{esc_html (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
     "&lt;b&gt;&amp;&quot;&#x27;"
+  -- the canonical `escapeHtml` renders identically to its `esc_html` alias.
+  expect "escapeHtml-canonical" "{{{escapeHtml (lookup this \"x\")}}}"
+    (obj [ Tuple "x" (str "<b>&\"'") ])
+    "&lt;b&gt;&amp;&quot;&#x27;"
+  -- `escapeJson` is the canonical name for `esc_json`.
+  expect "escapeJson-canonical" "{{{escapeJson (lookup this \"o\")}}}"
+    (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0) ]) ])
+    "{&quot;a&quot;:1}"
 
   expect "subexpr" "{{{esc_html (lookup this \"name\")}}}"
     (obj [ Tuple "name" (str "A<B") ])
@@ -856,7 +864,7 @@ main = do
   case (desugarSurface <<< _.nodes) <$> parse "{{ user.name }}" of
     Right [ Output _ e ] ->
       assert' ("desugar path: " <> show e)
-        ( e == App "esc_html"
+        ( e == App "escapeHtml"
             [ App "lookup" [ App "this" [], Lit (VString "user"), Lit (VString "name") ] ]
         )
     _ -> assert' "desugar: unexpected shape" false
@@ -865,7 +873,7 @@ main = do
   case (desugarSurface <<< _.nodes) <$> parse "{{ f a k=v }}" of
     Right [ Output _ e ] ->
       assert' ("desugar hash: " <> show e)
-        ( e == App "esc_html"
+        ( e == App "escapeHtml"
             [ App "f"
                 [ App "lookup" [ App "this" [], Lit (VString "a") ]
                 , App "dict"
@@ -879,7 +887,7 @@ main = do
   case (desugarSurface <<< _.nodes) <$> parse "{{ f g=\"hi\" }}" of
     Right [ Output _ e ] ->
       assert' ("desugar hash quoted: " <> show e)
-        ( e == App "esc_html"
+        ( e == App "escapeHtml"
             [ App "f" [ App "dict" [ Lit (VString "g"), Lit (VString "hi") ] ] ]
         )
     _ -> assert' "desugar hash quoted: unexpected shape" false
