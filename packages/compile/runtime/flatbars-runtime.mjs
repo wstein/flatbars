@@ -468,8 +468,21 @@ function msection(v, env, bodyFn) {
 // under the active mode; the body runs in the unchanged context).
 const mfalsy = (env, v) => isFalsy(env.falsy, v);
 
+// Block-override reindentation (ADR-016 slice 3 / MinBars.Prelude.indentOverride):
+// add a standalone `{{$block}}`'s expansion indent to each non-empty line of the
+// override's RENDERED output (the definition-site dedent already happened at
+// compile time), and guarantee exactly one trailing newline (the slot's line
+// terminator). An empty body, or empty indent, is the identity bar that newline.
+function mindentOverride(indent, body) {
+  if (body === "") return body;
+  const ls = body.split("\n");
+  const lastI = ls.length - 1;
+  const out = ls.map((l, i) => ((i === lastI && l === "") || l === "") ? l : indent + l).join("\n");
+  return out.endsWith("\n") ? out : out + "\n";
+}
+
 export const rt = {
   RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, block, raw, Safe,
-  mseed, mlookup, msection, mfalsy,
+  mseed, mlookup, msection, mfalsy, mindentOverride,
 };
 export default rt;

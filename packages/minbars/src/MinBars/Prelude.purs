@@ -19,6 +19,8 @@ module MinBars.Prelude
   , parentH
   , blockH
   , indentTemplate
+  , harvestBlocks
+  , leadingIndent
   ) where
 
 import Prelude

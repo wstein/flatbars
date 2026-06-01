@@ -36,14 +36,15 @@ import FlatBars.Compile.Emit (falsyLiteral, runtimeVersion)
 import FlatBars.Error (Error(..), ParseError(..), renderParseErrorAt)
 import FlatBars.Lexer (LexConfig, defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
-import FlatBars.Syntax (Directive, Expr(..), Node(..), Template)
+import FlatBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (runTemplate)
+import Kernel.Env (recursionBudget)
 import Kernel.Render (formatError)
 import Kernel.Value (FalsySet, mustache, resolveTruthinessWith)
 import MinBars.Compile (minEmit)
 import MinBars.Context (seedEnv)
-import MinBars.Prelude (indentTemplate, minEngine)
+import MinBars.Prelude (harvestBlocks, indentTemplate, leadingIndent, minEngine)
 import MinBars.Standalone (mustacheStandalone)
 import MinBars.Surface (desugar)
 
@@ -129,26 +130,18 @@ compileMinJs = compileMinJsWith []
 -- | runs against `runtime/flatbars-runtime.mjs`; `compile_conformance.mjs` asserts
 -- | it is byte-identical to `renderMin`/`renderMinWith`.
 -- |
--- | Slice 2 (partials): `{{> p}}` is *inlined* — the partial's desugared template
--- | is spliced at the call site with `indentTemplate` applied (the standalone
--- | indent is a compile-time literal), in the caller's scope, so context
--- | inheritance and standalone-indent re-application match the interpreter exactly
--- | (which renders the same `indentTemplate indent tmpl` under the caller's env).
--- | A missing partial inlines to nothing (`""`).
--- |
--- | Out of scope, rejected with a `DisallowedShape` (loud, never a miscompile):
--- | *recursive* partials (a cycle cannot be inlined — the interpreter bounds them
--- | at run time), *dynamic-name* partials `{{>* name}}` (the name is unknown until
--- | run time), and *inheritance* (`{{<p}}` / `{{$b}}`, ADR-016 slice 3).
+-- | The pipeline is parse → resolve `@truthiness` → desugar → `inline` (resolve
+-- | partials + inheritance into a partial-free, inheritance-free template; see
+-- | its doc) → `compile`. The only constructs `inline` cannot express are
+-- | rejected with a `DisallowedShape` (loud, never a miscompile): a *recursive*
+-- | partial and a *dynamic-name* partial/parent (`{{>* }}` / `{{<* }}`).
 compileMinJsWith :: Array (Tuple String String) -> String -> Either ParseError String
 compileMinJsWith partialSrcs src = do
   { directives, nodes } <- parseMin src
   falsy <- lmap toParseError (resolveTruthinessWith mustache directives)
   partials <- Map.fromFoldable <$> traverse parsePartial partialSrcs
-  inlined <- inlinePartials partials Nil (desugar nodes)
-  if hasUnsupported inlined then
-    Left (DisallowedShape "inheritance — {{<p}} / {{$b}} (MinBars compile is ADR-016 slice 3)" 0)
-  else Right (compile (minMeta falsy) minEmit [] inlined)
+  inlined <- inline partials Map.empty Nil 0 (desugar nodes)
+  Right (compile (minMeta falsy) minEmit [] inlined)
   where
   parsePartial (Tuple name s) = parseMin s <#> \r -> Tuple name (desugar r.nodes)
   toParseError = case _ of
@@ -164,31 +157,87 @@ minMeta falsy =
   , seed: "rt.mseed(data, $falsy)"
   }
 
--- | Inline every static `{{> p}}` into the (desugared) template, carrying the
--- | call-site standalone indent and tracking the inlining chain to reject cycles.
--- | The result is partial-free, ready for the slice-1 `minEmit`.
-inlinePartials :: Map String Template -> List String -> Template -> Either ParseError Template
-inlinePartials partials chain tmpl = Array.concat <$> traverse expand tmpl
+-- | Resolve partials and inheritance into a partial-free, inheritance-free
+-- | template the slice-1 `minEmit` can compile. Everything here is static — block
+-- | resolution never consults data — so the whole expansion happens at compile
+-- | time, mirroring the interpreter (`MinBars.Prelude`).
+-- |
+-- |  * `partials` — registered partial templates (desugared); `overrides` — the
+-- |    active `{{$b}}` block overrides (outer-wins via left-biased `Map.union`);
+-- |    `chain` — the partial-inlining chain (cycle guard); `depth` — the parent
+-- |    nesting (bounded by the recursion budget, like the interpreter).
+-- |  * `{{> p}}` static partial: spliced with `indentTemplate`; a *recursive*
+-- |    partial (data-driven, cannot be inlined) or a *dynamic-name* `{{>* }}` is
+-- |    rejected (loud).
+-- |  * `{{<p}}` parent: harvest the body's `{{$b}}` overrides, layer them under
+-- |    any inherited ones (inherited = more-derived = wins), and inline the parent
+-- |    template (`indentTemplate` for a standalone parent). Bounded by the budget;
+-- |    a true cycle errors (the interpreter does too, at run time).
+-- |  * `{{$b}}` block site: emit the override if one is active (reindented at the
+-- |    expansion site when standalone — §4.6.2), else the default body.
+inline
+  :: Map String Template
+  -> Map String Template
+  -> List String
+  -> Int
+  -> Template
+  -> Either ParseError Template
+inline partials overrides chain depth tmpl = Array.concat <$> traverse one tmpl
   where
-  expand = case _ of
-    -- a static partial reference `(partial "name" "indent")` — splice it in.
+  recurse = inline partials overrides chain depth
+  one = case _ of
     Output _ (App "partial" [ Lit (VString name), Lit (VString indent) ])
       | elem name chain -> Left
           (DisallowedShape ("recursive partial '" <> name <> "' (MinBars compile)") 0)
       | otherwise -> case Map.lookup name partials of
-          Nothing -> Right [] -- missing partial ⇒ "" (Mustache: never an error)
-          Just body -> inlinePartials partials (name : chain) (indentTemplate indent body)
-    -- a dynamic-name partial `{{>* name}}` resolves at run time ⇒ cannot inline.
+          Nothing -> Right []
+          Just body -> inline partials overrides (name : chain) depth (indentTemplate indent body)
     Output _ (App "partial" _) ->
       Left (DisallowedShape "dynamic-name partial {{>* …}} (MinBars compile)" 0)
-    Block sp sig name args body -> (\b -> [ Block sp sig name args b ]) <$> inlinePartials partials
-      chain
-      body
+    -- `{{<p}}` — expand the parent template under the merged overrides.
+    Block _ Section "parent" [ Lit (VString p), Lit (VString pindent) ] body
+      | depth >= recursionBudget -> Left
+          (DisallowedShape "inheritance recursion exceeded the budget (MinBars compile)" 0)
+      | otherwise -> case Map.lookup p partials of
+          Nothing -> Right []
+          Just ptmpl ->
+            inline partials (Map.union overrides (harvestBlocks body)) chain (depth + 1)
+              (indentTemplate pindent ptmpl)
+    Block _ Section "parent" _ _ ->
+      Left (DisallowedShape "dynamic-name parent {{<* …}} (MinBars compile)" 0)
+    -- `{{$b}}` — the override (reindented when standalone) or the default body.
+    Block sp Section "block" args body -> case Array.head args of
+      Just (Lit (VString name)) -> case Map.lookup name overrides of
+        Nothing -> recurse body -- no override ⇒ the default body, never reindented
+        Just override -> do
+          inlinedOverride <- recurse override
+          if Array.length args >= 2 then do
+            expand <- expansionIndent (blockIndent args) body
+            Right [ Block sp Section "@reindent" [ Lit (VString expand) ] inlinedOverride ]
+          else Right inlinedOverride
+      _ -> Left (DisallowedShape "malformed block override (MinBars compile)" 0)
+    -- ordinary section / inverted: recurse into the body (overrides carry through;
+    -- the data push is a runtime concern and does not touch the override stack).
+    Block sp sig name args body -> (\b -> [ Block sp sig name args b ]) <$> recurse body
     other -> Right [ other ]
 
--- | Does the (already partial-inlined) template still use an unsupported
--- | construct? Only inheritance remains — parent templates / block overrides.
-hasUnsupported :: Template -> Boolean
-hasUnsupported = Array.any case _ of
-  Block _ _ name _ body -> name == "parent" || name == "block" || hasUnsupported body
-  _ -> false
+-- | A standalone block's captured indent (its arity-2 trailing literal).
+blockIndent :: Array Expr -> String
+blockIndent args = case Array.index args 1 of
+  Just (Lit (VString s)) -> s
+  _ -> ""
+
+-- | The expansion indent for a standalone override (§4.6.2): the tag's own indent
+-- | when non-empty, else the default body's *intrinsic* indentation — the leading
+-- | whitespace of its first (already standalone-stripped) content line. A default
+-- | that does not begin with static content has no statically-known intrinsic
+-- | indent, so it is rejected (loud) rather than miscompiled.
+expansionIndent :: String -> Template -> Either ParseError String
+expansionIndent indent body
+  | indent /= "" = Right indent
+  | otherwise = case Array.head body of
+      Just (Content s) -> Right (leadingIndent s)
+      _ -> Left
+        ( DisallowedShape "intrinsic block indentation with a non-static default (MinBars compile)"
+            0
+        )

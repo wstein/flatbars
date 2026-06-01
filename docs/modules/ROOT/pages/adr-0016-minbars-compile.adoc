@@ -1,7 +1,7 @@
 = ADR-016: MinBars compile-to-JS
 :navtitle: ADR-016 MinBars compile
 
-*Status:* Accepted (phased; slices 1–2 — interpolation, sections, inverted, partials — shipped).
+*Status:* Accepted (complete — slices 1–3: interpolation, sections, inverted, partials, inheritance).
 *Date:* 2026-06-01. Revisits the interpret-only decision in xref:adr-0007-minbars.adoc[ADR-007]; an
 instance of the compile IoC pattern (xref:adr-0011-compile-to-js.adoc[ADR-011]).
 
@@ -63,7 +63,18 @@ dependency, allowed by the isolation invariants — only `rawbars` edges are for
   time with the recursion budget); a *dynamic-name* partial `{{>* name}}` is rejected too (the name is
   unknown until run time). Both are loud failures, never a silent miscompile. No runtime/driver change
   was needed — the slice-1 `m*` ops suffice.
-. *Slice 3:* inheritance — `parent`/`block` with the block-override stack and the §4.6.2 reindentation.
+. *Slice 3 (shipped):* inheritance — also by inlining, since block resolution never consults data, so
+  the whole override structure is static. The inliner threads an *override map* (outer-wins via a
+  left-biased union: the more-derived/inherited override wins) and a *parent depth* (bounded by the
+  recursion budget). `{{<p}}` harvests its body's `{{$b}}` overrides, layers them, and inlines the
+  parent template (`indentTemplate` for a standalone parent — template-level). `{{$b}}` emits the
+  active override (or the default body). §4.6.2 reindentation: a standalone override is dedented at its
+  definition (compile-time, `harvestBlocks`) and re-indented at the expansion site (runtime
+  `rt.mindentOverride` — output-level, so it indents value newlines too, unlike partial indentation);
+  the expansion indent is the tag's own indent, or the default's intrinsic indent computed at compile
+  time from its leading static content. Inheritance "recursion" that terminates via an override (the
+  spec's *Recursion* case) inlines fine; a true cycle is bounded by the budget. A *dynamic-name* parent
+  `{{<* …}}` is rejected (loud).
 
 Each slice is gated by compile conformance before it lands.
 

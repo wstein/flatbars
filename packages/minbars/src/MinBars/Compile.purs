@@ -55,6 +55,15 @@ mBlock rec ctx name args body = case name of
   -- Inverted section: render the body once, in the unchanged context, iff falsy.
   "inverted" ->
     "  if (rt.mfalsy(" <> ctx.scope <> ", " <> arg0 <> ")) {\n" <> rec.nodes ctx body <> "  }\n"
+  -- A standalone `{{$block}}` whose override was inlined (ADR-016 slice 3): render
+  -- the override into a buffer (in the current data scope, hence a closing-over
+  -- IIFE) and reindent each line by the expansion indent (a compile-time literal
+  -- carried as the sole arg). Non-standalone blocks and defaults are spliced
+  -- directly by the inliner and never reach here.
+  "@reindent" ->
+    "  out += rt.mindentOverride(" <> arg0 <> ", (function () { let out = \"\";\n"
+      <> rec.nodes ctx body
+      <> "  return out; })());\n"
   _ -> "  throw new Error(\"MinBars compile: unsupported block '" <> name <> "'\");\n"
   where
   child = rec.child ctx

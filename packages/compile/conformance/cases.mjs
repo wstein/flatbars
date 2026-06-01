@@ -319,4 +319,24 @@ export const cases = [
   // interpolated value — the byte-exactness proof that the compiled path applies
   // `indentTemplate` at the template level, not to the rendered string.
   { name: "mn:partial-standalone-indent", dialect: "minbars", t: "\\\n {{>part}}\n/\n", d: { content: "<\n->" }, partials: { part: "|\n{{{content}}}\n|\n" } },
+
+  // ── MinBars inheritance — ADR-016 compile slice 3 (inlined {{<p}} / {{$b}}) ──
+  // All from the mustache/spec ~inheritance module; the compiler resolves the
+  // (static) block-override stack at compile time, matching the interpreter.
+  { name: "inh:default", dialect: "minbars", t: "{{$title}}Default title{{/title}}\n", d: {} },
+  { name: "inh:overridden-content", dialect: "minbars", t: "{{<super}}{{$title}}sub template title{{/title}}{{/super}}", d: {}, partials: { super: "...{{$title}}Default title{{/title}}..." } },
+  // a data key of the same name never overrides a block.
+  { name: "inh:data-does-not-override", dialect: "minbars", t: "{{<include}}{{$var}}var in template{{/var}}{{/include}}", d: { var: "var in data" }, partials: { include: "{{$var}}var in include{{/var}}" } },
+  // multi-level chain (sub → parent → older → grandParent), outer-wins.
+  { name: "inh:multi-level", dialect: "minbars", t: "{{<parent}}{{$a}}c{{/a}}{{/parent}}", d: {}, partials: { parent: "{{<older}}{{$a}}p{{/a}}{{/older}}", older: "{{<grandParent}}{{$a}}o{{/a}}{{/grandParent}}", grandParent: "{{$a}}g{{/a}}" } },
+  // override-broken recursion (parent → parent2 → parent, terminates).
+  { name: "inh:recursion", dialect: "minbars", t: "{{<parent}}{{$foo}}override{{/foo}}{{/parent}}", d: {}, partials: { parent: "{{$foo}}default content{{/foo}} {{$bar}}{{<parent2}}{{/parent2}}{{/bar}}", parent2: "{{$foo}}parent2 default content{{/foo}} {{<parent}}{{$bar}}don't recurse{{/bar}}{{/parent}}" } },
+  // §4.6.2 reindentation: standalone parent / standalone block / explicit block
+  // reindent / intrinsic (column-0 block uses the default's intrinsic indent) /
+  // nested block reindentation.
+  { name: "inh:standalone-parent", dialect: "minbars", t: "Hi,\n  {{<parent}}{{/parent}}\n", d: {}, partials: { parent: "one\ntwo\n" } },
+  { name: "inh:standalone-block", dialect: "minbars", t: "{{<parent}}{{$block}}\none\ntwo{{/block}}\n{{/parent}}\n", d: {}, partials: { parent: "Hi,\n  {{$block}}{{/block}}\n" } },
+  { name: "inh:block-reindentation", dialect: "minbars", t: "{{<parent}}{{$block}}\n    one\n    two\n{{/block}}{{/parent}}\n", d: {}, partials: { parent: "Hi,\n  {{$block}}\n  {{/block}}\n" } },
+  { name: "inh:intrinsic-indentation", dialect: "minbars", t: "{{<parent}}{{$block}}\none\ntwo\n{{/block}}{{/parent}}\n", d: {}, partials: { parent: "Hi,\n{{$block}}\n  default\n{{/block}}\n" } },
+  { name: "inh:nested-block-reindentation", dialect: "minbars", t: "{{<parent}}{{$nested}}\nthree\n{{/nested}}{{/parent}}\n", d: {}, partials: { parent: "{{<grandparent}}{{$block}}\n  one\n  {{$nested}}\n    two\n  {{/nested}}\n{{/block}}{{/grandparent}}\n", grandparent: "{{$block}}default{{/block}}" } },
 ];
