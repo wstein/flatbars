@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,12 +17,20 @@ const renderField = (name, value) =>
     ? `    , ${name}:\n        ${encode(value)}`
     : `    , ${name}: ${encode(value)}`;
 
-const entries = (await readdir(examplesRoot, { withFileTypes: true }))
+// A demo example is a directory holding a `meta.json`. Other directories under
+// `examples/` — notably the vendored conformance corpus (`examples/vendored/`,
+// see example-loader-spec.md §8) — are a separate catalogue and are skipped here.
+const hasMeta = async (dir) =>
+  access(join(examplesRoot, dir, "meta.json")).then(() => true, () => false);
+
+const dirs = (await readdir(examplesRoot, { withFileTypes: true }))
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
+const entries = (await Promise.all(dirs.map(async (d) => ((await hasMeta(d)) ? d : null))))
+  .filter((d) => d !== null);
 
 if (!entries.length) {
-  throw new Error(`generate-examples: no example folders found under ${examplesRoot}`);
+  throw new Error(`generate-examples: no demo example folders (with meta.json) under ${examplesRoot}`);
 }
 
 const examples = [];
