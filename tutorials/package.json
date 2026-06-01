@@ -1,0 +1,17 @@
+{
+  "name": "barebars-tutorials",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FlatBars Lab tutorials — one lesson per surface, each with an Open-in-Lab button.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^4.16.0",
+    "@astrojs/preact": "^3.5.0",
+    "preact": "^10.24.0"
+  }
+}

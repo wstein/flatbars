@@ -1,0 +1,36 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+import { lessons, surfaces } from "../examples.mjs";
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BareBars tutorials — the four surfaces</title>
+    <style>
+      :root { color-scheme: light dark; --fg:#1a1a1a; --muted:#666; --line:#ddd; --accent:#5b4cff; }
+      @media (prefers-color-scheme: dark) { :root { --fg:#e6e6e6; --muted:#9a9a9a; --line:#333; --accent:#9a8cff; } }
+      body { font:16px/1.6 system-ui, sans-serif; color:var(--fg); max-width:48rem; margin:2rem auto; padding:0 1rem; }
+      ul { list-style:none; padding:0; display:grid; gap:.75rem; }
+      a.card { display:block; border:1px solid var(--line); border-radius:8px; padding:1rem; text-decoration:none; color:inherit; }
+      a.card:hover { border-color:var(--accent); }
+      a.card b { color:var(--accent); }
+      a.card span { color:var(--muted); display:block; margin-top:.25rem; font-size:.9rem; }
+    </style>
+  </head>
+  <body>
+    <h1>BareBars — learn the four surfaces</h1>
+    <p>Each lesson renders a live example and opens it in the FlatBars Lab with one click.</p>
+    <ul>
+      {surfaces.map((s) => (
+        <li>
+          <a class="card" href={`/${s}`}>
+            <b>{lessons[s].title}</b>
+            <span>{lessons[s].blurb}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </body>
+</html>

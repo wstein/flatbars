@@ -1,0 +1,22 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+// One page per surface, generated from the single example source.
+import Lesson from "../layouts/Lesson.astro";
+import OpenInLab from "../components/OpenInLab.jsx";
+import { lessons, surfaces } from "../examples.mjs";
+
+export function getStaticPaths() {
+  return surfaces.map((s) => ({ params: { surface: s }, props: { lesson: lessons[s] } }));
+}
+
+const { lesson } = Astro.props;
+---
+<Lesson title={lesson.title} surface={lesson.engine} spec={lesson.spec} blurb={lesson.blurb}>
+  <OpenInLab
+    client:load
+    engine={lesson.engine}
+    template={lesson.template}
+    data={lesson.data}
+    partials={lesson.partials ?? {}}
+  />
+</Lesson>
