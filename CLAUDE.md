@@ -156,11 +156,13 @@ The web playground is **`lab`** (the FlatBars Lab — plain HTML/JS/WASM,
 not a PureScript package). The old Halogen `packages/playground` was removed.
 
 The **`tutorials`** site (Astro + Preact, also not a PureScript package) is the
-learner-facing front end: a comprehensive runnable **Mustache reference**
-(`/mustache`) leads, with one lesson per surface behind it. Its runnable
-examples are gate-validated (`check:tutorial-links`) and its conformance table is
-generated from the vendored spec suite (`gen:conformance`); see
-`tutorials/README.md`.
+learner-facing front end: a comprehensive runnable **Mustache/MinBars reference**
+(`/mustache`) leads, a focused **RawBars core-model reference** (`/rawbars`,
+including a live compiled-JS pane) sits alongside it, and the remaining surfaces
+get a one-example lesson. Runnable examples are gate-validated
+(`check:tutorial-links`, which also asserts the compile flagship emits JS) and the
+Mustache conformance table is generated from the vendored spec suite
+(`gen:conformance`); see `tutorials/README.md`.
 
 ### Conventions worth knowing
 

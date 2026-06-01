@@ -16,9 +16,10 @@ npm run dev            # http://localhost:4321  ← the tutorials
 npm run build          # static site → dist/
 ```
 
-Pages: `/` (landing, Mustache hero) · `/mustache` (the comprehensive reference) ·
-`/rawbars`, `/fullbars`, `/maxbars` (one lesson per surface). MinBars has no
-separate lesson page — the `/mustache` reference supersedes it.
+Pages: `/` (landing, Mustache hero) · `/mustache` (the comprehensive MinBars /
+Mustache reference) · `/rawbars` (the meaning-free core reference) ·
+`/fullbars`, `/maxbars` (one lesson per surface). MinBars and RawBars have no
+per-surface lesson — their dedicated references supersede it.
 
 **`npm run dev` serves the Lab too.** The dev server mounts the repo's `lab/` at
 `/lab/` (same handler as `npm run lab`), so the tutorials and the Lab share one
@@ -33,11 +34,17 @@ spec is published (default `/flatbars/`).
 ## How it works
 
 - **One source per example, gate-validated:** the Mustache reference's runnable
-  examples live in `src/mustache.mjs`; the per-surface lessons in
-  `src/examples.mjs`. `scripts/check-tutorial-links.mjs` (in `npm test`) renders
-  every one through the real engine bundle, builds its Open-in-Lab link, and
-  fails if any example is broken or is defined but never shown on the page
-  (orphan guard). A preview can never drift from what's tested.
+  examples live in `src/mustache.mjs`, the RawBars reference's in `src/rawbars.mjs`,
+  the per-surface lessons in `src/examples.mjs`. `scripts/check-tutorial-links.mjs`
+  (in `npm test`) renders every one through the real engine bundle, builds its
+  Open-in-Lab link, asserts any `compiles`-flagged example emits JS, and fails if
+  an example is broken or is defined but never shown on its page (orphan guard).
+  A preview can never drift from what's tested.
+- **Compiled-JS pane (opt-in):** an example can pass `compile` to show its
+  template compiled to a JS module. It's guarded on the engine exposing
+  `compileToJs` — the FlatBars dialects (RawBars/FullBars/MaxBars) do, MinBars
+  doesn't — so the pane never appears where it can't run. The RawBars reference
+  uses it on one flagship.
 - **Prose illustrates; the spec is the contract.** Page copy annotates verified,
   runnable examples and links to the Antora spec — it never forks the normative
   text.
