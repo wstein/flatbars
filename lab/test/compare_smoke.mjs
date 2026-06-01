@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Cross-engine compare smoke test (Brace Lab). Loads compare.html in headless
-// Brave, lets all three adapters (Handlebars, Stem, BareBars) render the default
+// Brave, lets all three adapters (Handlebars, Stem, FlatBars) render the default
 // shared template, and asserts: every engine loads and renders without a page
-// error, and BareBars' surface output matches Handlebars (its compatibility
+// error, and FlatBars' surface output matches Handlebars (its compatibility
 // target). Stem may differ (its iteration semantics) — that divergence is the
 // point of the view, so it is reported, not asserted.
 //
@@ -53,15 +53,15 @@ try {
     const ver = (id) => document.getElementById("ver-" + id).textContent;
     return {
       agree: document.getElementById("agree").textContent,
-      engines: ["handlebars", "stem", "barebars"].map((id) => ({ id, out: out(id), ok: st(id), ver: ver(id) })),
+      engines: ["handlebars", "stem", "flatbars"].map((id) => ({ id, out: out(id), ok: st(id), ver: ver(id) })),
     };
   });
 
   check("no page errors", errs.length === 0, errs.slice(0, 3).join(" | "));
   for (const e of res.engines) check(`${e.id} renders${e.ver}`, e.ok, JSON.stringify(e.out).slice(0, 60));
   const hbs = res.engines.find((e) => e.id === "handlebars");
-  const bb = res.engines.find((e) => e.id === "barebars");
-  check("BareBars surface output matches Handlebars", hbs.out === bb.out);
+  const bb = res.engines.find((e) => e.id === "flatbars");
+  check("FlatBars surface output matches Handlebars", hbs.out === bb.out);
   console.log(`  info: agreement = ${JSON.stringify(res.agree)} (Stem may differ by design)`);
 
   await mkdir(resolve(HERE, "screenshots"), { recursive: true });

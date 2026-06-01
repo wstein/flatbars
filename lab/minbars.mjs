@@ -14,11 +14,11 @@
 // `catalog` — and the Phase-1 panel gate hides everything else (Compiled JS,
 // Context Inspector, Bytecode, the approximate static analyses).
 
-import { renderMustache as bbRenderMustache } from "./vendor/barebars-engine.mjs";
+import { renderMustache as bbRenderMustache } from "./vendor/flatbars-engine.mjs";
 
 const MIN_VERSION = "0.1.0";
 
-// engine-features/v1 capability vector for MinBars. Compared with the BareBars
+// engine-features/v1 capability vector for MinBars. Compared with the FlatBars
 // adapter's set, everything compile/AST-analysis specific is absent: MinBars has
 // no JS compile, no lowered AST seam here, and no Handlebars-style helper
 // catalog — just rendering and (Mustache) partials.

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!--
   FlatBars Lab — cross-engine compare. One template + data, rendered by Handlebars,
-  Stem, and BareBars at once, side by side, with an agreement indicator. Reuses
+  Stem, and FlatBars at once, side by side, with an agreement indicator. Reuses
   the same engine adapters as the IDE (the shared seam); this is the "one
   playground serves them all" breadth view that complements the deep IDE
   (index.html). No CodeMirror/CDN — plain editors so it loads offline.
@@ -60,7 +60,7 @@
 
   <script type="module">
     import { createRenderer } from "./stem.mjs";
-    import { createBareBarsRenderer } from "./barebars.mjs";
+    import { createFlatBarsRenderer } from "./flatbars.mjs";
 
     const byId = (id) => document.getElementById(id);
     const escapeHtml = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -72,9 +72,9 @@
     async function init() {
       const defs = [
         { id: "stem", label: "Stem", make: async () => createRenderer(await (await fetch(WASM)).arrayBuffer()) },
-        { id: "rawbars", label: "RawBars", make: () => createBareBarsRenderer("core") },
-        { id: "fullbars", label: "FullBars", make: () => createBareBarsRenderer("surface") },
-        { id: "maxbars", label: "MaxBars", make: () => createBareBarsRenderer("maxbars") },
+        { id: "rawbars", label: "RawBars", make: () => createFlatBarsRenderer("core") },
+        { id: "fullbars", label: "FullBars", make: () => createFlatBarsRenderer("surface") },
+        { id: "maxbars", label: "MaxBars", make: () => createFlatBarsRenderer("maxbars") },
       ];
       const out = byId("outputs");
       for (const d of defs) {

@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// BareBars adapter — backs the lab's three BareBars dialect engines (RawBars /
+// FlatBars adapter — backs the lab's three FlatBars dialect engines (RawBars /
 // FullBars / MaxBars), selected by the dialect argument to
-// `createBareBarsRenderer()`. Like stem.mjs and minbars.mjs it returns the SAME
+// `createFlatBarsRenderer()`. Like stem.mjs and minbars.mjs it returns the SAME
 // seam shape (render, compile, parseAst, inspectAt, usedTransformers,
 // requiredAssigns, partialGraph, allTransformers, catalog, engineInfo, version),
 // so the host wires it through the identical contract and the capability gate
-// hides whatever BareBars doesn't (yet) back.
+// hides whatever FlatBars doesn't (yet) back.
 //
-// BareBars is a PureScript engine compiled to JS — no WASM. The engine is the
-// `barebars-js` facade, bundled to `vendor/barebars-engine.mjs` (regenerate with
-//   spago bundle -p barebars-js --module FullBars.JS \
-//     --bundle-type module --platform browser --outfile vendor/barebars-engine.mjs
+// FlatBars is a PureScript engine compiled to JS — no WASM. The engine is the
+// `flatbars-js` facade, bundled to `vendor/flatbars-engine.mjs` (regenerate with
+//   spago bundle -p flatbars-js --module FullBars.JS \
+//     --bundle-type module --platform browser --outfile vendor/flatbars-engine.mjs
 // ). It renders the **surface** dialect by default — the Handlebars-compatible
 // layer (paths, `{{ }}` auto-escape, `@data`, `else`/`elif`) — which is the
 // right basis for cross-engine comparison; the austere **core** dialect is an
-// option (the BareBars-specific control, surfaced in Phase 2).
+// option (the FlatBars-specific control, surfaced in Phase 2).
 //
 // Supported: render (core + surface dialects, `?dialect=`), the lowered AST
 // (parseAst), data-access (required-assigns), the helper catalog, and the
@@ -32,7 +32,7 @@ import {
   compile as bbCompile,
   compileSurface as bbCompileSurface,
   compileMaxbars as bbCompileMaxbars,
-} from "./vendor/barebars-engine.mjs";
+} from "./vendor/flatbars-engine.mjs";
 
 const BB_VERSION = "0.1.0";
 
@@ -53,7 +53,7 @@ const DIALECT = (() => {
   return normalizeDialect(new URLSearchParams(location.search).get("dialect")) ?? "surface";
 })();
 
-// engine-features/v1 capability vector. BareBars backs rendering, a static helper
+// engine-features/v1 capability vector. FlatBars backs rendering, a static helper
 // catalog (→ Transformers panel), exact data-access (→ Data Access panel — the
 // surface dialect desugars every bare path to `lookup`), and a partial graph
 // (→ Partials panel; {{> name}}/{{#inline}} surface as partial nodes). AST-only
@@ -62,7 +62,7 @@ const BB_FEATURES = [
   "catalog",
   "required-assigns",
   "partial-graph",
-  "compile-js", // BareBars-only: compile the template to a JS module (Compiled JS view)
+  "compile-js", // FlatBars-only: compile the template to a JS module (Compiled JS view)
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
   "maxbars-dialect", // FullBars + infix operators, pipes, bare loop variables
@@ -86,12 +86,12 @@ const BB_CATALOG = [
   { name: "partial", category: "composition", arity: "inline", summary: "Render a registered partial; block form gives a fallback + {{> @partial-block}}.", example: "{{> nav user}}" },
 ];
 
-export async function createBareBarsRenderer(dialectArg) {
+export async function createFlatBarsRenderer(dialectArg) {
   // No async init — the engine is synchronous JS. The async signature mirrors the
   // Stem adapter so the host's `await create…()` site stays uniform.
   //
   // The active dialect is fixed by the engine choice: the lab now exposes the
-  // three BareBars dialects as first-class engines (RawBars→"core",
+  // three FlatBars dialects as first-class engines (RawBars→"core",
   // FullBars→"surface", MaxBars→"maxbars"), so the host passes the dialect in.
   // Falls back to the `?dialect=` URL default for back-compat / per-call use.
   const activeDialect = normalizeDialect(dialectArg) ?? DIALECT;
@@ -118,7 +118,7 @@ export async function createBareBarsRenderer(dialectArg) {
 
   function render(program, data, { map = false, policy } = {}) {
     if (policy != null) {
-      const err = new Error("BareBars has no render-time { allow, eval } policy");
+      const err = new Error("FlatBars has no render-time { allow, eval } policy");
       err.kind = "unsupported-policy";
       throw err;
     }
@@ -148,8 +148,8 @@ export async function createBareBarsRenderer(dialectArg) {
     return astJson(normalizeDialect(opts.dialect) ?? activeDialect, source);
   }
 
-  // BareBars-specific (the `compile-js` feature): compile the template to a JS
-  // ES module via BareBars.Compile, honouring the active dialect. Returns
+  // FlatBars-specific (the `compile-js` feature): compile the template to a JS
+  // ES module via FlatBars.Compile, honouring the active dialect. Returns
   // `{ ok, value, error }` — `value` is the JS source. Drives the Compiled JS view.
   function compileToJs(source) {
     const c = activeDialect === "core" ? bbCompile : activeDialect === "maxbars" ? bbCompileMaxbars : bbCompileSurface;
@@ -184,7 +184,7 @@ export async function createBareBarsRenderer(dialectArg) {
     return parsed.ast ? parsed.ast.nodes : [];
   }
 
-  // required-assigns (EXACT for BareBars): the root of every `{t:"path"}` — i.e.
+  // required-assigns (EXACT for FlatBars): the root of every `{t:"path"}` — i.e.
   // every bare/dotted data path. Helpers are explicit calls and block params are
   // `(param)` calls, so neither leaks in (unlike the Handlebars approximation).
   function requiredAssigns(program) {
@@ -211,11 +211,11 @@ export async function createBareBarsRenderer(dialectArg) {
   }
 
   function inspectAt() {
-    const err = new Error("BareBars context inspector is not implemented yet");
+    const err = new Error("FlatBars context inspector is not implemented yet");
     err.kind = "unsupported";
     throw err;
   }
-  // partial-graph is not advertised yet (BareBars partials are `partial` calls,
+  // partial-graph is not advertised yet (FlatBars partials are `partial` calls,
   // not distinct AST nodes — a Phase-3 mapping), so the Partials panel gates off.
   function partialGraph() { return { nodes: [], edges: [], cycles: [] }; }
   function allTransformers() { return BB_CATALOG.map((e) => e.name); }

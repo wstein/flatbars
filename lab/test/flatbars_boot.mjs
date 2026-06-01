@@ -1,5 +1,5 @@
-// Boot check: load the lab with ?engine=barebars in headless Brave, assert it
-// mounts with BareBars as the active engine and reports no page errors.
+// Boot check: load the lab with ?engine=flatbars in headless Brave, assert it
+// mounts with FlatBars as the active engine and reports no page errors.
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
@@ -18,7 +18,7 @@ const { server, port } = await new Promise((res) => {
   });
   s.listen(0, "127.0.0.1", () => res({ server: s, port: s.address().port }));
 });
-const url = `http://127.0.0.1:${port}/?engine=barebars`;
+const url = `http://127.0.0.1:${port}/?engine=flatbars`;
 console.log("boot: " + url);
 const browser = await puppeteer.launch({ executablePath: BROWSER, headless: true, defaultViewport: { width: 1440, height: 900 }, args: ["--no-sandbox","--disable-extensions"] });
 let code = 0;
@@ -32,10 +32,10 @@ try {
   const brand = await page.$eval("#brand-ver", (e) => e.textContent);
   console.log("brand-ver:", JSON.stringify(brand));
   await mkdir(resolve(HERE, "screenshots"), { recursive: true });
-  await page.screenshot({ path: resolve(HERE, "screenshots", "barebars-boot.png") });
-  const ok = /BareBars/.test(brand) && errs.length === 0;
+  await page.screenshot({ path: resolve(HERE, "screenshots", "flatbars-boot.png") });
+  const ok = /FlatBars/.test(brand) && errs.length === 0;
   if (errs.length) { console.log("PAGE ERRORS:"); for (const e of errs.slice(0, 8)) console.log("  " + e); }
-  console.log(ok ? "\n✓ booted with BareBars engine, no page errors" : "\n✗ boot check failed");
+  console.log(ok ? "\n✓ booted with FlatBars engine, no page errors" : "\n✗ boot check failed");
   code = ok ? 0 : 1;
 } catch (e) { console.log("✗ boot threw: " + e.message); code = 2; }
 finally { await browser.close(); server.close(); }

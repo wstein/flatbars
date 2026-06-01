@@ -14,7 +14,7 @@
 
 import { encodeState } from "./playground_utils.mjs";
 
-// The engines the Lab accepts on `?engine=` (the four BareBars surfaces + Stem).
+// The engines the Lab accepts on `?engine=` (the four FlatBars surfaces + Stem).
 export const LAB_ENGINES = ["rawbars", "minbars", "fullbars", "maxbars", "stem"];
 
 // Normalize an example's data to the Lab's data-editor text. The editor parses

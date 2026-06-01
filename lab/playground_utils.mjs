@@ -1441,7 +1441,7 @@ function wrapAtPath(segments, value) {
 
 // ── Vendored example/conformance corpus (example-loader-spec.md) ──────────────
 // The corpus under lab/examples/vendored/<provider>/ is the same one
-// the headless `barebars examples verify` gate renders; these pure helpers let
+// the headless `flatbars examples verify` gate renders; these pure helpers let
 // the Lab load a fixture and frame its expected-vs-actual diff.
 
 // Map a vendored fixture (example-loader-spec.md §4) to a Lab workspace payload:
