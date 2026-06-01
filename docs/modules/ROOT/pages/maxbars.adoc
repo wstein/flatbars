@@ -82,16 +82,30 @@ so `pass:[{{ length }}]` is the loop size inside `each`, while a data field name
 {{#each items}}{{index1}}/{{length}}: {{ this.name }}{{#unless last}}, {{/unless}}{{/each}}
 ----
 
+== Block conditions
+
+A block *open* parses its head as the helper name followed by arguments, each a
+full infix expression — so a condition needs no parentheses:
+
+[source,handlebars]
+----
+{{#if x > 0 && x < 10}}in range{{/if}}      {{!-- = {{#if (and (gt x 0) (lt x 10))}} --}}
+{{#unless a || b}}neither{{/unless}}
+----
+
+This is the core `parseHead` seam: only block opens use it. A *clause* separator
+still takes a parenthesised condition — `pass:[{{elif (a && b)}}]`,
+`pass:[{{else if (a && b)}}]` — because separators share their tag shape with
+output expressions.
+
 == v1 limitations
 
-* **Infix block conditions must be parenthesised** — `pass:[{{#if (a && b)}}]`,
-  not `pass:[{{#if a && b}}]`. Bare infix works in output (`pass:[{{ a && b }}]`,
-  `pass:[{{{ … }}}]`) and pipes; the shared tree-builder reads a block *head* as a
-  prefix application, so block-head-aware infix is a follow-up.
+* **Clause separators need parenthesised conditions** — `pass:[{{elif (a && b)}}]`
+  / `pass:[{{else if (a && b)}}]`, since `pass:[{{ … }}]` separators and output
+  share a tag shape. Block opens (`pass:[{{#if a && b}}]`) do not.
 * **Block parameters `pass:[as |x|]` are not yet available in MaxBars** — the `|`
   bars collide with the pipe operator in the MaxBars grammar. Use the bare loop
-  variables above for index/key access; outer-loop block params are a follow-up
-  (tracked with the block-head grammar work).
+  variables above for index/key access; outer-loop block params are a follow-up.
 
 == Truthiness
 

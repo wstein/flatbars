@@ -2,10 +2,10 @@
 -- | surface desugaring to FullBars/core, rendered through the reused engine, and
 -- | a compile-shape check.
 -- |
--- | v1 note: bare infix works in output expressions (`{{ a && b }}` /
--- | `{{{ … }}}`) and pipes; an infix *block condition* must be parenthesised
--- | (`{{#if (a && b)}}`), since the shared tree-builder reads a block head as a
--- | prefix application. Block-head-aware infix is a follow-up.
+-- | Infix works in output expressions (`{{ a && b }}` / `{{{ … }}}`), pipes, and
+-- | — via the core `parseHead` seam — bare block conditions (`{{#if a && b}}`).
+-- | Clause separators (`{{elif …}}` / `{{else if …}}`) still take a parenthesised
+-- | condition, and `as |x|` block params await block-head grammar work.
 module Test.MaxBars.Main where
 
 import Prelude
@@ -63,13 +63,30 @@ main = do
   -- pipe chain is left-assoc: not(not(0)) = false.
   expectM "pipe-chain" "{{{ n | not | not }}}" (obj [ Tuple "n" (num 0.0) ]) "false"
 
-  -- parenthesised infix in a block condition (the v1 block form).
+  -- parenthesised infix in a block condition.
   expectM "if-paren-infix" "{{#if (a && b)}}Y{{else}}N{{/if}}"
     (obj [ Tuple "a" (VBool true), Tuple "b" (VBool false) ])
     "N"
   expectM "if-paren-comparison" "{{#if (x >= 18)}}adult{{else}}minor{{/if}}"
     (obj [ Tuple "x" (num 21.0) ])
     "adult"
+  -- bare (un-parenthesised) infix block conditions, via the `parseHead` seam.
+  expectM "if-bare-infix" "{{#if a && b}}Y{{else}}N{{/if}}"
+    (obj [ Tuple "a" (VBool true), Tuple "b" (VBool false) ])
+    "N"
+  expectM "if-bare-comparison" "{{#if x >= 18}}adult{{else}}minor{{/if}}"
+    (obj [ Tuple "x" (num 21.0) ])
+    "adult"
+  expectM "unless-bare-infix" "{{#unless a || b}}none{{/unless}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false) ])
+    "none"
+  expectM "if-bare-precedence" "{{#if x > 0 && x < 10}}in{{else}}out{{/if}}"
+    (obj [ Tuple "x" (num 5.0) ])
+    "in"
+  -- a block head with a single subject still works (each over a bare path).
+  expectM "each-bare-subject" "{{#each xs}}{{this}}{{/each}}"
+    (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
+    "ab"
 
   -- a plain path still works (FullBars surface reused unchanged).
   expectM "path" "{{ user.name }}" (obj [ Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])

@@ -46,13 +46,22 @@ type ExprParser = Array PosToken -> Either ParseError Expr
 -- | block `{{^…}}`/`{{{^…}}}`, and unescaped `{{&…}}`. The core *lexer* always
 -- | recognizes them (meaning-free); a dialect that doesn't accept them (RawBars,
 -- | MaxBars) sets `extras = false` and the parser rejects them.
-type ParseOptions = { trimStandalone :: Boolean, parseExpr :: ExprParser, extras :: Boolean }
+-- | `parseHead` parses a *block-open* tag's head (`{{# … }}`); it defaults to
+-- | `parseExpr` (so the head reads exactly like any other interior), but a
+-- | dialect may override it to parse the head specially — MaxBars uses this to
+-- | read `{{#if a && b}}` as `if (a && b)` (the helper name then a single infix
+-- | condition), which the uniform expression grammar cannot, since application
+-- | binds tighter than the operators. Only block opens consult it; output,
+-- | separators, closes, and raw blocks keep `parseExpr`.
+type ParseOptions =
+  { trimStandalone :: Boolean, parseExpr :: ExprParser, parseHead :: ExprParser, extras :: Boolean }
 
 -- | Standalone trimming on (Handlebars parity), the core expression grammar, and
 -- | Handlebars-extras allowed (the engine + FullBars use this; RawBars/MaxBars
 -- | override `extras = false`).
 defaultParseOptions :: ParseOptions
-defaultParseOptions = { trimStandalone: true, parseExpr: Expr.parseExpr, extras: true }
+defaultParseOptions =
+  { trimStandalone: true, parseExpr: Expr.parseExpr, parseHead: Expr.parseExpr, extras: true }
 
 -- | Parse source text into the core template *plus* its header directives, with
 -- | the default options. The directives are a meaning-free list the engine
@@ -76,7 +85,8 @@ parseWith opts src = do
   -- comments carry no output; drop them before the tree builder, which then
   -- never has to know about `RComment` (the standalone pass needs them, so it
   -- runs first).
-  res <- parseSeq opts.parseExpr opts.extras (Array.filter (not <<< isComment) toks') 0
+  res <- parseSeq opts.parseExpr opts.parseHead opts.extras (Array.filter (not <<< isComment) toks')
+    0
   case res.stop of
     StopEOF -> Right { directives, nodes: res.nodes }
     StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
@@ -231,8 +241,9 @@ type SeqResult = { nodes :: Template, stop :: Stop }
 -- | Parse a run of nodes starting at index `i`, stopping at end of input or at
 -- | a close `{{/name}}`. A block captures a single body; multi-branch control
 -- | flow is expressed as nested clause blocks the engine interprets.
-parseSeq :: ExprParser -> Boolean -> Array RawTok -> Int -> Either ParseError SeqResult
-parseSeq pe extras toks = go Nil
+parseSeq
+  :: ExprParser -> ExprParser -> Boolean -> Array RawTok -> Int -> Either ParseError SeqResult
+parseSeq pe ph extras toks = go Nil
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
@@ -279,9 +290,9 @@ parseSeq pe extras toks = go Nil
         | otherwise -> buildBlock acc span sigil base s (i + 1)
 
   buildBlock :: List Node -> Span -> Sigil -> Int -> String -> Int -> Either ParseError SeqResult
-  buildBlock acc span sigil base s i = case headed pe span base s of
+  buildBlock acc span sigil base s i = case headed ph span base s of
     Left e -> Left e
-    Right h -> case parseSeq pe extras toks i of
+    Right h -> case parseSeq pe ph extras toks i of
       Left e -> Left e
       Right inner -> case inner.stop of
         -- point the diagnostic at the *opener* (its span start), not offset 0.

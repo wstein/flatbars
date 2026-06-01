@@ -7,8 +7,19 @@
 -- | `==`/`!=`/`<`/`>`/`<=`/`>=`→`eq`/`ne`/`lt`/`gt`/`lte`/`gte`, and `a | f x`→
 -- | `(f a x)` (piped value first). Precedence loosest→tightest: pipe, `||`, `&&`,
 -- | comparisons (non-associative), prefix `!`, application/atom.
+-- |
+-- | Two entry points share the precedence ladder, differing only in the *primary*
+-- | the operators bind over:
+-- |
+-- |  * `parseMaxExpr` (output expressions) — the primary is an **application**
+-- |    (`f a b`), so `{{ f a && b }}` is `(and (f a) b)`.
+-- |  * `parseMaxHead` (block heads, the `parseHead` seam) — the head is `name`
+-- |    followed by *arguments*, each a full infix expression whose primary is a
+-- |    single **atom**. So `{{#if a && b}}` reads as `if (and a b)` (one condition)
+-- |    and `{{#each xs}}` / `{{#if cond k=v}}` keep their positional/hash args.
 module MaxBars.Expr
   ( parseMaxExpr
+  , parseMaxHead
   ) where
 
 import Prelude
@@ -23,13 +34,49 @@ import Data.Maybe (Maybe(..))
 
 type Step a = { val :: a, pos :: Int }
 
--- | Parse a tag interior's tokens into one `Expr`, consuming all of them.
+-- | Parse a tag interior's tokens into one `Expr` (output position), consuming
+-- | all of them.
 parseMaxExpr :: Array PosToken -> Either ParseError Expr
-parseMaxExpr toks = case pPipe 0 of
+parseMaxExpr toks = case exprLadder 0 of
   Left e -> Left e
   Right { val, pos }
     | pos >= len -> Right val
     | otherwise -> Left (LexError "unexpected token" (posAt pos))
+  where
+  comb = combinators toks
+  exprLadder = comb.exprLadder
+  len = comb.len
+  posAt = comb.posAt
+
+-- | Parse a *block head*: `name arg*`, where each argument is a full infix
+-- | expression over atoms (so `{{#if a && b}}` is `if (and a b)`). Returns the
+-- | head as an `App`, which the core tree-builder splits into `{ name, args }`.
+parseMaxHead :: Array PosToken -> Either ParseError Expr
+parseMaxHead toks = case comb.tk 0 of
+  Just (TIdent name) -> App name <$> collect 1 []
+  _ -> Left (LexError "expected a block helper name" (comb.posAt 0))
+  where
+  comb = combinators toks
+  collect i acc
+    | i >= comb.len = Right acc
+    | otherwise = case comb.headLadder i of
+        Left e -> Left e
+        Right r
+          | r.pos == i -> Left (LexError "unexpected token" (comb.posAt i))
+          | otherwise -> collect r.pos (Array.snoc acc r.val)
+
+-- | The shared parser combinators over a token array: the precedence ladder
+-- | (parameterised by its primary), the atom/application primaries, and helpers.
+combinators
+  :: Array PosToken
+  -> { exprLadder :: Int -> Either ParseError (Step Expr)
+     , headLadder :: Int -> Either ParseError (Step Expr)
+     , tk :: Int -> Maybe Token
+     , posAt :: Int -> Int
+     , len :: Int
+     }
+combinators toks =
+  { exprLadder, headLadder, tk, posAt, len }
   where
   len = Array.length toks
   tk i = _.tok <$> Array.index toks i
@@ -51,41 +98,46 @@ parseMaxExpr toks = case pPipe 0 of
       Just combine -> sub (pos + 1) >>= \r -> loop (combine lhs r.val) r.pos
       Nothing -> Right { val: lhs, pos }
 
-  -- precedence ladder (loosest first)
-  pPipe :: Int -> Either ParseError (Step Expr)
-  pPipe i = binL pipeOp pOr i
+  -- the precedence ladder over a given `term` (the primary at the bottom).
+  ladder :: (Int -> Either ParseError (Step Expr)) -> Int -> Either ParseError (Step Expr)
+  ladder term = pPipe
+    where
+    pPipe i = binL pipeOp pOr i
+    pOr i = binL (binOp "||" "or") pAnd i
+    pAnd i = binL (binOp "&&" "and") pCmp i
+    pCmp i = pUnary i >>= \lhs -> case tk lhs.pos >>= cmpOp of
+      Just c -> pUnary (lhs.pos + 1) >>= \r -> Right { val: c lhs.val r.val, pos: r.pos }
+      Nothing -> Right { val: lhs.val, pos: lhs.pos }
+    pUnary i = case tk i of
+      Just (TOp "!") -> pUnary (i + 1) >>= \r -> Right { val: App "not" [ r.val ], pos: r.pos }
+      _ -> term i
 
-  pOr :: Int -> Either ParseError (Step Expr)
-  pOr i = binL (binOp "||" "or") pAnd i
+  -- output expressions: the primary is an application (`f a b`).
+  exprLadder i = ladder pApp i
+  -- block-head arguments: the primary is a single atom (so `name a b` is two args).
+  headLadder i = ladder pAtom i
 
-  pAnd :: Int -> Either ParseError (Step Expr)
-  pAnd i = binL (binOp "&&" "and") pCmp i
+  -- an application: an identifier head applied to atom arguments, or an atom.
+  pApp :: Int -> Either ParseError (Step Expr)
+  pApp i = case tk i of
+    Just (TIdent name) -> pArgs (i + 1) [] >>= \r -> Right { val: App name r.val, pos: r.pos }
+    _ -> pAtom i
 
-  -- comparisons are non-associative (at most one).
-  pCmp :: Int -> Either ParseError (Step Expr)
-  pCmp i = pUnary i >>= \lhs -> case tk lhs.pos >>= cmpOp of
-    Just combine -> pUnary (lhs.pos + 1) >>= \r -> Right { val: combine lhs.val r.val, pos: r.pos }
-    Nothing -> Right { val: lhs.val, pos: lhs.pos }
-
-  pUnary :: Int -> Either ParseError (Step Expr)
-  pUnary i = case tk i of
-    Just (TOp "!") -> pUnary (i + 1) >>= \r -> Right { val: App "not" [ r.val ], pos: r.pos }
-    _ -> pTerm i
-
-  -- a term: a group, a literal, or an application (ident + atom args).
-  pTerm :: Int -> Either ParseError (Step Expr)
-  pTerm i = case tk i of
-    Just TLParen -> pPipe (i + 1) >>= \r -> case tk r.pos of
+  -- an atom: a parenthesised full expression, a literal, or a nullary identifier.
+  pAtom :: Int -> Either ParseError (Step Expr)
+  pAtom i = case tk i of
+    Just TLParen -> exprLadder (i + 1) >>= \r -> case tk r.pos of
       Just TRParen -> Right { val: r.val, pos: r.pos + 1 }
       _ -> Left (LexError "expected )" (posAt r.pos))
     Just (TStr s) -> Right { val: Lit (VString s), pos: i + 1 }
     Just (TNum n) -> Right { val: Lit (VNumber n), pos: i + 1 }
-    Just (TIdent name) -> pArgs (i + 1) [] >>= \r -> Right { val: App name r.val, pos: r.pos }
+    Just (TIdent name) -> Right { val: App name [], pos: i + 1 }
     _ -> Left (LexError "expected an expression" (posAt i))
 
+  -- application arguments: a run of atoms (paren / literal / nullary ident).
   pArgs :: Int -> Array Expr -> Either ParseError (Step (Array Expr))
   pArgs i acc = case tk i of
-    Just TLParen -> pTerm i >>= \r -> pArgs r.pos (Array.snoc acc r.val)
+    Just TLParen -> pAtom i >>= \r -> pArgs r.pos (Array.snoc acc r.val)
     Just (TStr s) -> pArgs (i + 1) (Array.snoc acc (Lit (VString s)))
     Just (TNum n) -> pArgs (i + 1) (Array.snoc acc (Lit (VNumber n)))
     Just (TIdent name) -> pArgs (i + 1) (Array.snoc acc (App name []))

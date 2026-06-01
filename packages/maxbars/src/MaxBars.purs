@@ -20,7 +20,7 @@ import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import FullBars (LoopVars, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith)
-import MaxBars.Expr (parseMaxExpr)
+import MaxBars.Expr (parseMaxExpr, parseMaxHead)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -28,7 +28,8 @@ import MaxBars.Expr (parseMaxExpr)
 -- | (`{{{{…}}}}`, `{{^…}}`, `{{&…}}`) rejected (`extras` off) — MaxBars is not the
 -- | Handlebars-compatibility dialect.
 maxOptions :: ParseOptions
-maxOptions = defaultParseOptions { parseExpr = parseMaxExpr, extras = false }
+maxOptions =
+  defaultParseOptions { parseExpr = parseMaxExpr, parseHead = parseMaxHead, extras = false }
 
 -- | MaxBars' loop variables: bare (no-`@`) scoped names usable inside `each`.
 -- | The canonical set `index0/index1/rindex0/rindex1/first/last/length/key` maps

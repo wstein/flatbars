@@ -119,6 +119,10 @@ export const cases = [
   { name: "mx:pipe-arg", dialect: "maxbars", t: "{{{ xs | lookup 0 }}}", d: { xs: ["a", "b"] } },
   { name: "mx:pipe-chain", dialect: "maxbars", t: "{{{ n | not | not }}}", d: { n: 0 } },
   { name: "mx:if-paren-infix", dialect: "maxbars", t: "{{#if (a && b)}}Y{{else}}N{{/if}}", d: { a: true, b: false } },
+  { name: "mx:if-bare-infix", dialect: "maxbars", t: "{{#if a && b}}Y{{else}}N{{/if}}", d: { a: true, b: false } },
+  { name: "mx:if-bare-cmp", dialect: "maxbars", t: "{{#if x >= 18}}adult{{else}}minor{{/if}}", d: { x: 21 } },
+  { name: "mx:unless-bare-infix", dialect: "maxbars", t: "{{#unless a || b}}none{{/unless}}", d: { a: false, b: false } },
+  { name: "mx:if-bare-precedence", dialect: "maxbars", t: "{{#if x > 0 && x < 10}}in{{else}}out{{/if}}", d: { x: 5 } },
   // bare loop variables (the canonical set + aliases).
   { name: "mx:loopvars", dialect: "maxbars", t: "{{#each xs}}[{{index0}}/{{index1}}/{{rindex0}}/{{rindex1}}/{{length}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
   { name: "mx:loopvar-aliases", dialect: "maxbars", t: "{{#each xs}}{{index}}{{rindex}}{{size}}{{/each}}", d: { xs: ["a", "b", "c"] } },
