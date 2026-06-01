@@ -27,7 +27,7 @@ module FullBars
 import Prelude
 
 import BareBars.Error (Error, ParseError, renderParseErrorAt)
-import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import BareBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import BareBars.Syntax (Ident, Template)
 import BareBars.Value (Value)
 import Data.Either (Either(..))
@@ -47,14 +47,6 @@ import Kernel.Value (FalsySet, FalsyShape(..), aliasSet, always, escapeHtml, han
 surfaceClauses :: Array Ident
 surfaceClauses = [ "else", "elif" ]
 
--- | FullBars' parse options: the core defaults, with the Handlebars block-partial
--- | sigils opted in (`blockPartials = true`) so `{{#>name}}…{{/name}}` and
--- | `{{#*inline "name"}}…{{/inline}}` parse here (the surface desugars them to the
--- | `partial`/`inline` core spellings). Only FullBars sets this; the default keeps
--- | it `false`, so RawBars/MaxBars/MinBars still reject the shapes.
-surfaceParseOptions :: ParseOptions
-surfaceParseOptions = defaultParseOptions { blockPartials = true }
-
 -- | Desugar Surface syntax to core syntax for this engine (surface.adoc §5).
 desugarSurface :: Template -> Template
 desugarSurface = desugar surfaceClauses
@@ -68,7 +60,7 @@ desugarSurfaceWith lv = desugarWith lv surfaceClauses
 -- | definitions are hoisted into the partial registry before rendering.
 compileSurface :: String -> Either ParseError (Value -> Either Error String)
 compileSurface src = do
-  { directives, nodes } <- parseWith surfaceParseOptions src
+  { directives, nodes } <- parse src
   let
     { partials, template } = hoistInline (desugarSurface nodes)
   pure \dat -> runResolved directives (registerPartials partials) template dat
@@ -84,7 +76,7 @@ renderSurfaceWith :: Array (Tuple String String) -> String -> Value -> Either St
 renderSurfaceWith partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseWith surfaceParseOptions src of
+    Right ps -> case parse src of
       Left e -> Left (show e)
       Right { directives, nodes } ->
         let
@@ -101,7 +93,7 @@ renderSurfaceWith partialSrcs src dat =
   where
   -- a named *external* partial: parse + desugar its body and resolve its own
   -- `@truthiness` (a different file ⇒ its own lexical mode).
-  compilePartial (Tuple name s) = case parseWith surfaceParseOptions s of
+  compilePartial (Tuple name s) = case parse s of
     Left e -> Left (show e)
     Right { directives, nodes } -> case resolveTruthiness directives of
       Left e -> Left (show e)
@@ -110,7 +102,7 @@ renderSurfaceWith partialSrcs src dat =
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
 renderSurfaceDiag :: String -> Value -> Either String String
-renderSurfaceDiag = renderSurfaceDiagWith noLoopVars surfaceParseOptions
+renderSurfaceDiag = renderSurfaceDiagWith noLoopVars defaultParseOptions
 
 -- | `renderSurfaceDiag` with explicit parse options and a dialect `LoopVars`
 -- | resolver (the CLI/config + dialect path; FullBars passes `noLoopVars`,

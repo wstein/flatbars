@@ -168,9 +168,11 @@ semantic objection.
 helper (xref:appendix-handlebars.adoc#decorators[A.8]) — none is in the prelude yet.
 
 |Block-partial sigils `pass:[{{#> name}}]` / `pass:[{{#*inline}}]`
-|☑ Now accepted — the lexer strips the sigil so the interior is the clean head (close matches by
-name), and they desugar to the same forms as the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` core
-spellings (xref:surface.adoc[] §5.7). Gated to FullBars; the other dialects reject them.
+|☑ Accepted in FullBars — they parse as plain `pass:[{{#}}]`-section blocks headed by the sigil, with
+the `pass:[{{/…}}]` close resolved by `Parser.blockCloseName` (the partial name / `inline`), and
+desugar to the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` core spellings (xref:surface.adoc[] §5.7).
+No new sigil or parse gate; the core parses them but only FullBars' surface gives them meaning (other
+dialects fail at render, not parse).
 |===
 
 == 4. Familiar — works as a Handlebars author expects

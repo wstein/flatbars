@@ -678,9 +678,15 @@ main = do
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
     "[a][b]"
 
-  -- the block-partial sigils are GATED to FullBars: the core/other-dialect parser
-  -- (blockPartials = false) rejects them with DisallowedShape (a Left render).
-  assert' "block-partial-gated-off"
+  -- a {{#> name}} whose partial is missing renders its body as the fallback
+  -- (the {{#partial}} block-body fallback, reached through the sigil).
+  expectS "block-partial-sigil-fallback" "{{#> missing}}<i>fb</i>{{/missing}}" VNull "<i>fb</i>"
+
+  -- the {{#>}} sigil is meaningful only in FullBars: the core parses it (the
+  -- `>`-headed block closes on the partial name via `blockCloseName`) but RawBars
+  -- has no surface to map `>` onto `partial`, so it fails at render (unknown
+  -- helper `>`) — a Left, just at render rather than parse.
+  assert' "block-partial-core-has-no-meaning"
     (isLeft (renderCore "{{#> x}}body{{/x}}" VNull))
 
   -- Hash arguments (§5.4): key=value pairs collect into a trailing `dict`, which

@@ -46,10 +46,12 @@ immediate parent.
 
 The Handlebars block-partial *sigils* `pass:[{{#> name}}…{{/name}}]` /
 `pass:[{{#*inline}}…{{/inline}}]` are also accepted and desugar to the same core
-forms as the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` spellings (the lexer
-strips the sigil so the interior is the clean head, and the close matches by
-name). See the xref:fullbars-compat.adoc[compatibility matrix] for per-feature
-status.
+forms as the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` spellings. They parse
+as ordinary `pass:[{{#}}]`-section blocks headed by the sigil (`>` / `*inline`);
+the matching `pass:[{{/…}}]` close is resolved by `Parser.blockCloseName` (the
+partial name for `pass:[{{#>}}]`, `inline` for `pass:[{{#*inline}}]`) — no new
+sigil or gate. See the xref:fullbars-compat.adoc[compatibility matrix] for
+per-feature status.
 ====
 
 [IMPORTANT]

@@ -30,7 +30,7 @@ import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (trim)
+import Data.String (Pattern(..), stripPrefix, trim)
 import Data.String.CodeUnits as SCU
 
 -- | A tag-interior expression parser: it consumes the interior **token stream**
@@ -61,9 +61,6 @@ type ExprParser = Array PosToken -> Either ParseError Expr
 -- | The core *lexer* always recognizes them (meaning-free shapes); a dialect that
 -- | doesn't accept them sets `inheritance = false` (the default) and the parser
 -- | rejects them with `DisallowedShape`, exactly as `extras` gates `{{^}}`/`{{&}}`.
--- | `blockPartials` likewise gates the Handlebars block-partial sigil
--- | `{{#>name}}…{{/name}}` (`PartialBlock`) and the inline-partial decorator
--- | `{{#*inline "name"}}…{{/inline}}` (`InlineDecorator`); only FullBars opts in.
 -- | `standaloneSeps` are the separator head-names whose *standalone* lines the
 -- | whitespace pass strips (the engine's clause markers `["else", "elif"]`) — so
 -- | a lone `{{else}}`/`{{elif …}}` leaves no blank line, while an arbitrary
@@ -74,7 +71,6 @@ type ParseOptions =
   , parseHead :: ExprParser
   , extras :: Boolean
   , inheritance :: Boolean
-  , blockPartials :: Boolean
   , standaloneSeps :: Array String
   }
 
@@ -88,7 +84,6 @@ defaultParseOptions =
   , parseHead: Expr.parseExpr
   , extras: true
   , inheritance: false
-  , blockPartials: false
   , standaloneSeps: [ "else", "elif" ]
   }
 
@@ -114,7 +109,7 @@ parseWith opts src = do
   -- comments carry no output; drop them before the tree builder, which then
   -- never has to know about `RComment` (the standalone pass needs them, so it
   -- runs first).
-  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance opts.blockPartials
+  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance
     (Array.filter (not <<< isComment) toks')
     0
   case res.stop of
@@ -131,7 +126,7 @@ parseWith opts src = do
 -- | core's own `parseWith` path is unchanged, so other engines are unaffected.
 buildFromTokens :: ParseOptions -> Array RawTok -> Either ParseError Template
 buildFromTokens opts toks = do
-  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance opts.blockPartials
+  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance
     (Array.filter (not <<< isComment) toks)
     0
   case res.stop of
@@ -276,6 +271,34 @@ partialHead toks = case Array.uncons toks of
   Just { head: pt, tail } | pt.tok == TOp ">" -> Array.cons (pt { tok = TIdent ">" }) tail
   _ -> toks
 
+-- | The name a block's `{{/…}}` close must repeat. Normally the block's head
+-- | name — but the Handlebars block-partial / inline-decorator sigils head on
+-- | the sigil, not the name Handlebars closes on:
+-- |
+-- |  * `{{#> card}}…{{/card}}` heads on `>` (see `partialHead`) and closes on the
+-- |    partial *name* — so a `>`-headed block's close is its first argument's
+-- |    bare identifier.
+-- |  * `{{#*inline "row"}}…{{/inline}}` heads on `*inline` and closes on `inline`
+-- |    — so a `*`-prefixed head's close is the head with the `*` dropped.
+-- |
+-- | Meaning-free: the core uses this only for structural close-matching; a
+-- | dialect decides what a `>`- or `*inline`-headed block *means* (FullBars
+-- | desugars them to the `partial`/`inline` core spellings; other dialects see an
+-- | undefined helper and fail at render). Sigil-aware: only a `Section` block
+-- | (`{{#…}}`) gets this treatment — the `Parent`/`BlockDef` inheritance sigils
+-- | have their own dynamic `*`-headed spelling whose close repeats the `*`-name
+-- | verbatim (`{{<*p}}…{{/*p}}`), so they must NOT be `*`-stripped here.
+blockCloseName :: Sigil -> String -> Array Expr -> String
+blockCloseName sigil name args = case sigil of
+  Section
+    | name == ">" -> case Array.head args of
+        Just (App n _) -> n
+        _ -> name
+    | otherwise -> case stripPrefix (Pattern "*") name of
+        Just rest -> rest -- `{{#*inline}}` heads on `*inline`, closes on `inline`
+        Nothing -> name
+  _ -> name
+
 --------------------------------------------------------------------------------
 -- Tree building over the flat RawTok stream
 --------------------------------------------------------------------------------
@@ -294,11 +317,10 @@ parseSeq
   -> ExprParser
   -> Boolean
   -> Boolean
-  -> Boolean
   -> Array RawTok
   -> Int
   -> Either ParseError SeqResult
-parseSeq pe ph extras inheritance blockPartials toks = go Nil
+parseSeq pe ph extras inheritance toks = go Nil
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
@@ -349,23 +371,24 @@ parseSeq pe ph extras inheritance blockPartials toks = go Nil
             (DisallowedShape "{{< }} (parent block)" span.start)
         | sigil == BlockDef && not inheritance -> Left
             (DisallowedShape "{{$ }} (override block)" span.start)
-        -- `{{#>x}}` (PartialBlock) / `{{#*inline "x"}}` (InlineDecorator) are the
-        -- Handlebars block-partial sigils, gated by `blockPartials` (FullBars only);
-        -- the sigil records the kind, the interior head matches the close as usual.
-        | sigil == PartialBlock && not blockPartials -> Left
-            (DisallowedShape "{{#> }} (block partial)" span.start)
-        | sigil == InlineDecorator && not blockPartials -> Left
-            (DisallowedShape "{{#* }} (inline-partial decorator)" span.start)
         | otherwise -> buildBlock acc span sigil base s (i + 1)
 
   buildBlock :: List Node -> Span -> Sigil -> Int -> String -> Int -> Either ParseError SeqResult
   buildBlock acc span sigil base s i = case headed ph span base s of
     Left e -> Left e
-    Right h -> case parseSeq pe ph extras inheritance blockPartials toks i of
-      Left e -> Left e
-      Right inner -> case inner.stop of
-        -- point the diagnostic at the *opener* (its span start), not offset 0.
-        StopEOF -> Left (MismatchedBlock h.name "<eof>" span.start)
-        StopClose closed pos
-          | closed == h.name -> go (Block span sigil h.name h.args inner.nodes : acc) pos
-          | otherwise -> Left (MismatchedBlock h.name closed span.start)
+    Right h ->
+      let
+        -- the name the `{{/…}}` close must repeat (`blockCloseName`): normally the
+        -- head, but a Handlebars block-partial `{{#>name}}` heads on `>` and closes
+        -- on the partial name, and `{{#*inline …}}` heads on `*inline` and closes on
+        -- `inline`. Meaning-free — the dialect surface decides what those heads mean.
+        expected = blockCloseName sigil h.name h.args
+      in
+        case parseSeq pe ph extras inheritance toks i of
+          Left e -> Left e
+          Right inner -> case inner.stop of
+            -- point the diagnostic at the *opener* (its span start), not offset 0.
+            StopEOF -> Left (MismatchedBlock expected "<eof>" span.start)
+            StopClose closed pos
+              | closed == expected -> go (Block span sigil h.name h.args inner.nodes : acc) pos
+              | otherwise -> Left (MismatchedBlock expected closed span.start)
