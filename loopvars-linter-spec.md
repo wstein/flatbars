@@ -1,11 +1,11 @@
 # MaxBars Loop Variables & Cross-Dialect Linter — Specification & Implementation Plan
 
-Status: draft for review · Companion to `truthiness-spec.md` (truthiness is specified there, not here).
+Status: **Part A shipped; Part B in implementation.** Companion to truthiness (specified in the truthiness ADR / `Kernel.Value`, not here).
 
-This document settles the two items left open in the loop-variable / linter feedback:
+Implementation status (what `main` does today):
 
-- **Part A — Loop variables.** The explicit `index0`/`index1`/… set as scoped helpers, the `length`/`size` and `index`/`rindex` aliases, the shadowing cost of dropping `@`, the **innermost rule + how an inner loop reaches an outer loop's index** (the open question), and the status of `depth`.
-- **Part B — Cross-dialect linter / translator.** The transpiler over the tier ladder — its four jobs, what is lossless vs heuristic, and the per-construct rules.
+- **Part A — Loop variables — SHIPPED.** The `index0`/`index1`/`rindex0`/`rindex1`/`first`/`last`/`length`/`key` set as scoped helpers in `each` (`Kernel.Prelude.iterate`); the `index`/`rindex`/`size` aliases resolved at desugar (`MaxBars.maxLoopVars`); `key` is **`null` for arrays** (engine, per the §A.1 fix); bare-name vs `this.NAME` resolution (`FullBars.Surface.pathExpr`); the **warn-always shadow lint** (`MaxBars.loopVarWarnings`, on-demand). The recursion budget is shipped (ADR-012, default 64); the `depth` accessor and labeled loops are **not** built — A.5/A.6's boundaries stand.
+- **Part B — Cross-dialect linter / translator — being built.** The transpiler over the tier ladder: its four jobs (lower / lift / migrate / materialize-truthiness), what is lossless vs heuristic, and the per-construct rules.
 
 ---
 
@@ -52,14 +52,17 @@ The resolution rule is the existing FullBars `scope` mechanism with the loop nam
 
 So inside a loop, bare `first` ⇒ `(first)`; `this.first` ⇒ `lookup this "first"` reads a data field named `first`. Outside a loop, `first` is not in scope, so bare `first` ⇒ `lookup this "first"` (a plain field). No core change — this is desugar-level scoping.
 
+> **Normative (the `this.NAME` escape hatch).** A loop variable is resolved only for a **whole bare name**, never for a path. `pathExpr` matches the loop-var resolver against the *original* identifier, not the segmented head — so `this.first` and `../first` reduce to a `lookup` and are **never** loop-var-resolved. A regression once stripped the leading `this.`, leaving the segment `first` to match the resolver and silently turn `{{this.first}}` into the loop variable; the fix (match the whole name) is load-bearing and pinned by a render test (`{{#each xs}}{{this.first}}{{/each}}` reads the element's `first` field).
+
 ## A.4 Shadowing — the cost of dropping `@`, and the lint that contains it
 
 `@` previously namespaced loop metadata away from data. Without it, a data object carrying a `length`, `size`, `first`, `last`, `index`, or `key` field — all common — is **shadowed** inside any loop and must be read as `this.length`. Worse, a reader can't tell whether bare `length` is data or loop-meta without knowing they're inside a loop.
 
-This is an accepted trade (punctuation reduction is the goal), contained by tooling rather than buried:
+This is an accepted trade (punctuation reduction is the goal, and the bare name is the whole reason MaxBars sits above FullBars, which keeps `@index`), contained by tooling rather than buried:
 
-- **Shadowing lint (schema-aware).** When a schema is available (the `validate` / `ToValue` typed binding), the linter **errors/warns** on a bare loop-variable name that collides with a field present on the loop's element type, and points at the `this.<name>` fix. Without a schema it can only warn heuristically (it cannot know the data shape), so the lint is strongest when a schema is declared.
-- The `index`/`size` → `index0`/`length` auto-lowering reduces the collision surface for the two most common offenders.
+- **Shadowing lint — warn-always, on-demand (SHIPPED).** `MaxBars.loopVarWarnings :: String -> Either ParseError (Array Issue)` walks the desugared template and emits a `Warn` for every bare use of a *data-like* loop variable — `first`, `last`, `length`, `key` — pointing at the `this.<name>` fix. It needs **no schema**: it cannot know whether a field exists, so it warns on the ambiguous names whenever they appear bare. It is a **lint pass the host/CI invokes**, not a render-time nag (render never calls it) — so it is informational, never blocks rendering. The unambiguous spellings (`index0`/`index1`/`rindex0`/`rindex1`) are never data-like, so they are not flagged.
+- A **schema-aware *error* tier** (escalate to an error when a declared field actually collides) is **future** — it needs a data-field schema the kernel `Schema` (helper-only) does not yet carry. Until then the warn-always tier is the whole lint.
+- The `index`/`size` → `index0`/`length` auto-resolution at desugar removes those two from the bare-collision surface entirely (`{{index}}`/`{{size}}` are already the canonical loop vars, not data).
 
 ## A.5 Innermost rule + reaching an outer loop (the open question, resolved)
 
@@ -83,9 +86,7 @@ This resolves parent access **without** reintroducing `@../` or a `loop.parent` 
 
 Decision: **`depth` is reserved in the vocabulary but its semantics ship with the recursion construct, not now.** Until then:
 
-- The recursion construct is a **partial that (transitively) invokes itself** (partials already exist); `depth` counts that re-entry, `1` at the top-level invocation, `+1` per recursive call.
-- Outside any recursion, `depth` is `1`.
-- Implementation is a later phase (A-phase L3).
+- The recursion construct is a **partial that (transitively) invokes itself** (partials already exist). The cross-dialect **recursion budget is SHIPPED** (ADR-012, default **64**): `partialH` increments a depth counter on entry and raises a located `RecursionLimit` past the budget, so a cyclic partial errors instead of overflowing the stack. The `depth` *accessor* (`depth` = `1` at the top-level invocation, `+1` per recursive call, `1` outside recursion) is **not yet built** — it rides on the same counter when added (A-phase L3).
 
 Note the distinction from *static nested-loop depth* (how many `each` blocks you sit inside) — that is free to compute but is **not** what `depth` means here, and conflating them is a footgun. If static nesting is ever wanted it would be a separate, differently named helper; we are not adding one unprompted.
 
@@ -97,14 +98,14 @@ All of the above is desugar/engine-level: `each` installs the scoped helpers; th
 
 # Part B — Cross-dialect linter / translator
 
-A transpiler over the tier ladder **CoreBars ⊂ FullBars ⊂ MaxBars**, plus Handlebars as a migration source. It has **four jobs**, and the direction decides whether a job is mechanical or heuristic.
+A transpiler over the tier ladder **RawBars ⊂ FullBars ⊂ MaxBars**, plus Handlebars as a migration source. It has **four jobs**, and the direction decides whether a job is mechanical or heuristic.
 
 ## B.1 The four jobs
 
 | job | direction | nature | lossless? |
 |---|---|---|---|
-| **lower** | MaxBars → FullBars → CoreBars | desugar / lower | **yes**, mechanical |
-| **lift** | CoreBars → FullBars → MaxBars | resugar | **no**, best-effort + ambiguity flags |
+| **lower** | MaxBars → FullBars → RawBars | desugar / lower | **yes**, mechanical |
+| **lift** | RawBars → FullBars → MaxBars | resugar | **no**, best-effort + ambiguity flags |
 | **migrate** | Handlebars → MaxBars | source-language port | mostly; a flagged reinterpreted-token residual |
 | **materialize truthiness** | any downward cross of a tier that can't carry the `@truthiness` directive | semantic guard insertion | required for correctness (see B.5) |
 
@@ -112,7 +113,7 @@ A transpiler over the tier ladder **CoreBars ⊂ FullBars ⊂ MaxBars**, plus Ha
 
 Each MaxBars/FullBars sugar has a defined lowering; the linter applies it and pretty-prints at the target tier:
 
-| MaxBars | → FullBars | → CoreBars |
+| MaxBars | → FullBars | → RawBars |
 |---|---|---|
 | `{{ a \| f }}` | `{{ f a }}` | `{{{ esc_html (f (lookup this "a")) }}}` |
 | `{{ a \| f x }}` | `{{ f a x }}` | piped value is the **first** argument |
@@ -152,14 +153,16 @@ Truthiness needs **no** materialization for this direction: Handlebars truthines
 
 ## B.5 Materialize truthiness (the correctness trap)
 
-A non-default-mode file does **not** survive a downward translation. Lowering a `nil`-mode MaxBars file to FullBars/CoreBars (neither of which carries the `@truthiness` directive) would silently switch it to `handlebars` truthiness and change which branch runs. The linter must therefore **materialize** the set: every `if`/`unless`/`&&`/`||`/`!` condition is wrapped at the target tier in an explicit guard derived from the file's `FalsySet` — e.g. `cond` becomes `(truthy-nil cond)` (or `(truthy <set> cond)`), per `truthiness-spec.md` §6.3.
+A non-default-mode file does **not** survive a downward *source* translation. Lowering a `mustache`/`minimal`-mode MaxBars file to FullBars/RawBars **source** (neither dialect's source carries the `@truthiness` directive forward through this transpiler) would silently switch it to the `handlebars` default and change which branch runs. The linter must therefore **materialize** the set: every `if`/`unless`/`&&`/`||`/`!` condition is wrapped at the target tier in an explicit guard derived from the file's `FalsySet` — `cond` becomes `(truthy <set> cond)` (`<set>` spelled as the explicit shape list, e.g. `(truthy (false null) cond)`).
 
-So down-translation of any file whose `@truthiness` ≠ `handlebars` is **not purely syntactic**; the linter either emits the guards or refuses and warns. (A `handlebars`-mode or directive-less file lowers cleanly, since the target's fixed default already matches.)
+So down-translation of any file whose `@truthiness` ≠ `handlebars` is **not purely syntactic**; the linter either emits the guards or **refuses and warns** (the safe default). A `handlebars`-mode or directive-less file lowers cleanly, since the target's fixed default already matches.
+
+> **Note — the *compile* path is already safe.** This obligation is specific to **source-to-source** lowering. The JS compiler (`compileSurface`/`compileMaxJs`) does *not* have this problem: it resolves the file's `@truthiness` at compile time and bakes the `FalsySet` into the emitted module's `$falsy` preamble (`rt.truthy(c0.falsy, …)`), so a compiled `mustache`-mode template already carries its own truthiness. Materialization closes the gap that only the source-transpile direction opens.
 
 ## B.6 Lints the translator owns
 
-- **Shadowing** (A.4): schema-aware collision of a bare loop-var with a data field.
-- **Partial-mode mismatch** (`truthiness-spec.md`): a partial whose `@truthiness` differs from its caller's — one render then runs two truthiness rules.
+- **Shadowing** (A.4): warn-always on a bare data-like loop-var (`first`/`last`/`length`/`key`); the schema-aware *error* tier is future.
+- **Partial-mode mismatch** (truthiness ADR / `Kernel.Value`): a partial whose `@truthiness` differs from its caller's — one render then runs two truthiness rules.
 - **Alias normalisation:** `index`→`index0`, `rindex`→`rindex0`, `size`→`length`, and directive good-style (`@key:value`, one per line).
 - **Migration residual:** the flagged Handlebars rows in B.4.
 
@@ -184,9 +187,9 @@ Loop-variable phases (`L`) and linter phases (`X`) are independent tracks; order
 - `each` installs `index0 index1 rindex0 rindex1 first last length key` as scoped helpers; bodies get them in scope; `this.<name>` forces the data path; `index`/`rindex`/`size` lower to `index0`/`rindex0`/`length` at desugar.
 - **Acceptance:** golden tests pin the arithmetic (`index1 = index0+1`, `rindex0 = length-1-index0`, `first`/`last` at the ends), object `key` (property name) vs array `key` (**`null`**), and `this.length` reading a shadowed field; the aliases render and lower.
 
-### L1 — Shadowing lint
-- Schema-aware: error/warn on a bare loop-var colliding with a present field on the element type; suggest `this.<name>`.
-- **Acceptance:** with a declared schema, a `length` field inside `{{#each}}` warns; without a schema, only a heuristic warning.
+### L1 — Shadowing lint *(shipped: warn-always)*
+- Warn-always, on-demand: `MaxBars.loopVarWarnings` emits a `Warn` for every bare `first`/`last`/`length`/`key`, suggesting `this.<name>`. No schema needed; not wired into render. The schema-aware *error* tier (escalate on a real declared-field collision) is future, pending a data-field schema.
+- **Acceptance (shipped):** bare `{{first}}`/`{{length}}`/`{{key}}` warn; `{{index0}}` and `{{this.first}}` do not; the lint fires with no schema/loop.
 
 ### L2 — Parent-loop access
 - Confirm block-param bindings nest lexically (`as |user uidx|` visible in inner loops); document the innermost rule and the v1 limitation (only element/index/key reachable outward).
@@ -197,28 +200,26 @@ Loop-variable phases (`L`) and linter phases (`X`) are independent tracks; order
 - **Acceptance:** a self-including partial reports increasing `depth`; non-recursive use reads `1`.
 
 ### X0 — Lossless lower
-- Run the front-end backwards: MaxBars→FullBars→CoreBars pretty-printing, using B.2/B.7.
-- **Acceptance:** round-trip property — `lower` then re-parse yields the same real AST as parsing the MaxBars source directly, on the full example corpus.
+- Run the front-end backwards: MaxBars→FullBars→RawBars pretty-printing, using B.2/B.7.
+- **Acceptance:** round-trip property — `lower` then re-parse yields the same real AST as parsing the MaxBars source directly, on **truthiness-default (`handlebars`/directive-less) files** of the example corpus. (Non-default-mode files are *out of scope for the pure round-trip*: X1's materialization deliberately inserts `(truthy <set> …)` guards, so the lowered AST differs by construction — those files are covered by X1's render-equivalence acceptance instead.)
 
 ### X1 — Truthiness materialization
-- On any downward cross, wrap conditions in explicit `(truthy <set> …)` guards when the file's mode ≠ `handlebars`; otherwise lower cleanly. (Depends on `truthiness-spec.md` Phase 2.)
-- **Acceptance:** a `nil`-mode template lowered to CoreBars renders identically to the MaxBars interpreter across the truthiness conformance matrix.
+- On any downward cross, wrap conditions in explicit `(truthy <set> …)` guards when the file's mode ≠ `handlebars`; otherwise lower cleanly. (Uses the shipped `Kernel.Value` falsy-sets + `resolveTruthinessWith`.)
+- **Acceptance:** a `nil`-mode template lowered to RawBars renders identically to the MaxBars interpreter across the truthiness conformance matrix.
 
 ### X2 — Migrate Handlebars → MaxBars
 - Apply B.4; emit a per-file residual report for the flagged rows (`@../`, Mustache sections, set delimiters).
 - **Acceptance:** a representative Handlebars template ports with ≤ the documented residual; every residual item carries a span and a suggested fix.
 
 ### X3 — Heuristic lift *(assist only)*
-- CoreBars/FullBars → MaxBars with ambiguity flags (B.3); never an automated commit.
+- RawBars/FullBars → MaxBars with ambiguity flags (B.3); never an automated commit.
 - **Acceptance:** `(and a (gt b 21))` lifts to `a && (b > 21)`; `(lookup this "x")` lifts to `x` **with** a confirmation flag; multi-arg helpers are left as calls.
 
 ---
 
-# Resolved / superseded
+# Status notes
 
-The first three items below were left open in this spec and are now **resolved in `rawbars-maxbars-spec.md`**, which introduces the shared env frame-stack primitive. This spec defers to it.
-
-1. **`depth` + recursion construct** — *resolved.* Recursion is self-including partials, guarded by the cross-dialect recursion budget (default **64**, `rawbars-maxbars-spec.md` §7). `depth` ships as a MaxBars-only accessor (Handlebars/FullBars have no `@depth`). Supersedes A.6's deferral.
-2. **Outer-loop `first`/`last`/`length`/`rindex`** from a nested loop — *resolved.* MaxBars **labeled loops** (`label u` → `u.first`/`u.length`/`u.rindex0`) reach the full outer set; the block-param workaround in A.5 (outer element/index/key only) is now just the minimal subset. Supersedes A.5's v1 limitation.
-3. **`key` for arrays** — *resolved: `null`* (not `index0`), in every engine. Matches Handlebars (`@key` set only on object iteration); `index0` already carries the array position; conflating them masks array/object confusion. Folded into the variable table above.
-4. Truthiness naming (`nil` vs `minimal`) is settled in `truthiness-spec.md` (alias `nil`/`ruby`); no action here.
+- **`key` for arrays — `null`** (not the index). Matches Handlebars (`@key` is object-only); `index0` already carries the array position. Implemented in the engine (`Kernel.Prelude.iterate` + the JS runtime); see §A.1.
+- **`depth` + recursion** — the recursion *budget* is shipped (ADR-012, default 64); the `depth` *accessor* is not yet built (§A.6). The earlier draft claimed both were "resolved in `rawbars-maxbars-spec.md`" — that companion does not exist; the budget lives in ADR-012 and the accessor remains future work.
+- **Outer-loop `first`/`last`/`length`/`rindex`** from a nested loop — **not built.** A.5's v1 limitation stands (block params reach the outer element/index/key only). *Labeled loops* (`label u` → `u.first`/`u.length`) would generalise this but are a separate, unbuilt proposal — not a resolution to cite here.
+- **Truthiness naming** (`mustache`/`handlebars`/`minimal`/`presence`/`always` + the `nil`/`ruby` synonyms) is settled in the truthiness ADR / `Kernel.Value`; no action here.
