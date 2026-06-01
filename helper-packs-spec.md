@@ -14,7 +14,7 @@ The answer is small: roughly **two dozen irreducible value primitives** in the s
 
 A capability is worth migrating **only if all four hold**:
 
-1. **Irreducible** — it cannot be composed from what MaxBars already has (pipes `{{ x | f }}`, infix `&& || ! == != < > <= >=`, the prelude `lookup/if/unless/each/with/and/or/...`, the loop variables, `esc_html`/`json`/`safe`/`raw`). If a pipe chain expresses it, it is **sugar, not capability** — do not migrate it.
+1. **Irreducible** — it cannot be composed from what MaxBars already has (pipes `{{ x | f }}`, infix `&& || ! == != < > <= >=`, the prelude `lookup/if/unless/each/with/and/or/...`, the loop variables, `escapeHtml`/`json`/`safe`/`raw`). If a pipe chain expresses it, it is **sugar, not capability** — do not migrate it.
 2. **High-frequency** — it is something templates actually reach for across ecosystems (Liquid/Jinja/Twig/Handlebars), not a library idiosyncrasy. `handlebars-helpers` is used here as a *frequency signal*, never as a source to mirror.
 3. **Pure & deterministic** — a pure function of its arguments: no filesystem, network, clock, RNG, or ambient locale. Non-determinism is a *correctness* failure (it breaks referential transparency and golden tests).
 4. **Determinism-stable across both targets** — it produces the **same `Value`** in the PureScript interpreter *and* the emitted JS runtime. Every helper is implemented twice and gated byte-identical by the `test:compile` conformance harness, so a capability that can't be made identical on both targets (see `toFixed`, §4) is not adoptable until it can.
