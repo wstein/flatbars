@@ -34,10 +34,11 @@
 -- |    `@../index` (and `key`/`first`/`last`) reads the enclosing loop's datum
 -- |    via the `parent-*` helpers (one `../` level).
 -- |
--- | Not yet desugared: the Handlebars block sigils `{{#> name}}…{{/name}}` /
--- | `{{#*inline}}…{{/inline}}` — the opener sigil/close-name mismatch needs
--- | parser support, so use the `{{#partial}}` / `{{#inline}}` core spellings
--- | instead.
+-- |  * the Handlebars block sigils `{{#>name}}…{{/name}}` (PartialBlock) and
+-- |    `{{#*inline "name"}}…{{/inline}}` (InlineDecorator) desugar to the same
+-- |    core forms as the `{{#partial name}}` / `{{#inline "name"}}` spellings —
+-- |    the lexer strips the sigil so the tag interior is the clean head, and the
+-- |    `blockPartials` gate (FullBars only) admits the shapes.
 module FullBars.Surface
   ( desugar
   , desugarWith
@@ -113,6 +114,18 @@ desugarWith lv clauseNames = go []
       Block sp Section "partial" args body ->
         Block sp Section "partial" (partialArgs lv scope args) (go scope (expandElseIf body))
       Block sp Section "inline" args body ->
+        Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
+      -- the Handlebars block-partial sigil `{{#>name …}}…{{/name}}` (PartialBlock):
+      -- the partial *name* is the headed name (`name`), which the lexer kept as the
+      -- clean head. Treat it exactly as `{{#partial name …}}` — prepend the name as
+      -- the first argument so `partialArgs` (name + context + hash) applies.
+      Block sp PartialBlock name args body ->
+        Block sp Section "partial" (partialArgs lv scope (Array.cons (App name []) args))
+          (go scope (expandElseIf body))
+      -- the inline-partial decorator `{{#*inline "name"}}…{{/inline}}`
+      -- (InlineDecorator): the lexer kept `inline` as the head and `"name"` as the
+      -- sole argument, exactly the `{{#inline "name"}}` shape — reuse `inlineArgs`.
+      Block sp InlineDecorator _ args body ->
         Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
       -- the inverted section `{{^x}}…{{/x}}` desugars to `{{#unless x}}…{{/unless}}`
       -- (the FullBars way to "render when falsy"); the head becomes the condition.

@@ -651,6 +651,38 @@ main = do
     (obj [ Tuple "name" (str "Bo") ])
     "hi Bo"
 
+  -- Handlebars block-partial sigil {{#> name}}…{{/name}} (FullBars only): desugars
+  -- to the SAME core form as the {{#partial name}}…{{/partial}} spelling, so the
+  -- two render identically (a registered `greeting` partial yields the body via
+  -- {{> @partial-block}}; the close is matched by the headed name `greeting`).
+  expectP "block-partial-sigil" [ Tuple "greeting" "<div>{{> @partial-block}}</div>" ]
+    "{{#> greeting}}<b>{{ name }}</b>{{/greeting}}"
+    (obj [ Tuple "name" (str "Ada") ])
+    "<div><b>Ada</b></div>"
+  expectP "block-partial-sigil-matches-partial-spelling"
+    [ Tuple "greeting" "<div>{{> @partial-block}}</div>" ]
+    "{{#partial \"greeting\"}}<b>{{ name }}</b>{{/partial}}"
+    (obj [ Tuple "name" (str "Ada") ])
+    "<div><b>Ada</b></div>"
+
+  -- inline-partial decorator {{#*inline "name"}}…{{/inline}} (FullBars only):
+  -- desugars to the SAME core form as {{#inline "name"}}…{{/inline}}; the lexer
+  -- keeps `inline` as the head and `"row"` as its sole argument, so the close
+  -- {{/inline}} matches by the headed name.
+  expectS "inline-decorator-sigil"
+    "{{#*inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
+    (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
+    "[a][b]"
+  expectS "inline-decorator-matches-inline-spelling"
+    "{{#inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
+    (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
+    "[a][b]"
+
+  -- the block-partial sigils are GATED to FullBars: the core/other-dialect parser
+  -- (blockPartials = false) rejects them with DisallowedShape (a Left render).
+  assert' "block-partial-gated-off"
+    (isLeft (renderCore "{{#> x}}body{{/x}}" VNull))
+
   -- Hash arguments (§5.4): key=value pairs collect into a trailing `dict`, which
   -- the if/unless `includeZero` option consumes (the existing dict mechanism).
   expectS "surface-hash-includeZero" "{{#if n includeZero=true}}y{{else}}m{{/if}}"

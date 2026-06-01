@@ -57,12 +57,19 @@ data Node
 -- | no meaning. `Section` is `{{#name}}`; `Inverse` is `{{^name}}` (and the
 -- | triple variant `{{{^name}}}`). `Parent` is the Mustache-inheritance parent
 -- | tag `{{<name}}` and `BlockDef` the override-block tag `{{$name}}` (each with
--- | a dynamic-name spelling whose head begins with `*`, e.g. `{{<*name}}`). The
--- | engine/dialect decides what these mean (FullBars desugars `Inverse` to
--- | `unless`; inheritance is wired in a later phase); the core only knows the
--- | shape, and a dialect must opt in (`ParseOptions.inheritance`) to accept the
--- | `Parent`/`BlockDef` shapes at all.
-data Sigil = Section | Inverse | Parent | BlockDef
+-- | a dynamic-name spelling whose head begins with `*`, e.g. `{{<*name}}`).
+-- | `PartialBlock` is the Handlebars block-partial sigil `{{#>name}}` and
+-- | `InlineDecorator` the inline-partial decorator `{{#*inline "name"}}`; for
+-- | both the *sigil* only records which kind of block it is — the tag interior
+-- | (and thus the headed name used for close-matching) is the clean head after
+-- | the sigil (`name` for `{{#>name}}`, `inline "name"` for `{{#*inline …}}`).
+-- | The engine/dialect decides what these mean (FullBars desugars `Inverse` to
+-- | `unless` and `PartialBlock`/`InlineDecorator` to the `partial`/`inline`
+-- | core spellings; inheritance is wired in a later phase); the core only knows
+-- | the shape, and a dialect must opt in (`ParseOptions.inheritance` for
+-- | `Parent`/`BlockDef`, `ParseOptions.blockPartials` for
+-- | `PartialBlock`/`InlineDecorator`) to accept those shapes at all.
+data Sigil = Section | Inverse | Parent | BlockDef | PartialBlock | InlineDecorator
 
 derive instance eqSigil :: Eq Sigil
 
@@ -71,6 +78,8 @@ instance showSigil :: Show Sigil where
   show Inverse = "Inverse"
   show Parent = "Parent"
   show BlockDef = "BlockDef"
+  show PartialBlock = "PartialBlock"
+  show InlineDecorator = "InlineDecorator"
 
 data Expr
   = Lit Value
