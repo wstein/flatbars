@@ -49,9 +49,12 @@ spec is published (default `/barebars/`).
 - **Open in Lab** uses the shared `lab/open-in-lab.mjs` (`labHref`), which encodes
   the workspace with the Lab's own share-state codec into the URL — self-
   contained, no vendoring, no fetch.
-- **Live previews dogfood the real engine:** the `OpenInLab` island imports the
-  same engine the Lab ships, so a lesson runs the engine it teaches. CI's
-  `check:bundle` keeps that bundle from going stale.
+- **Live previews dogfood the real engine:** the `OpenInLab` island shows the
+  example's template, data, and any partials, then renders the output (as plain
+  text, in a dark pane) through the same engine the Lab ships — so a lesson runs
+  the engine it teaches. Its **Open in Lab** button targets one named tab, so
+  repeated clicks reuse a single Lab window. CI's `check:bundle` keeps that
+  bundle from going stale.
 - **Conformance badges are generated, not asserted.** `npm run gen:conformance`
   runs the vendored `mustache/spec` suite through the shipped MinBars bundle and
   writes `src/conformance.json`; the reference renders its support table from

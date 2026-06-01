@@ -26,6 +26,14 @@ async function renderExample(engine, { template, data, partials }) {
 // running `npm run lab` server, e.g. PUBLIC_LAB_URL=http://localhost:8000/lab/index.html.
 const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
 
+// The data the example feeds the engine, as the Lab's editor shows it (JSON is
+// valid YAML, so an object round-trips; a string is taken verbatim).
+function dataText(data) {
+  if (data == null) return "{}";
+  if (typeof data === "string") return data;
+  return JSON.stringify(data, null, 2);
+}
+
 export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL }) {
   const [href, setHref] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -37,21 +45,34 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     return () => { live = false; };
   }, []);
 
+  const partialEntries = Object.entries(partials || {});
+
   return (
     <div class="oil">
-      <div class="oil-grid">
+      <div class="oil-inputs">
         <figure class="oil-pane">
           <figcaption>template</figcaption>
           <pre><code>{template}</code></pre>
         </figure>
         <figure class="oil-pane">
-          <figcaption>rendered ({engine})</figcaption>
-          {preview == null
-            ? <pre><em>rendering…</em></pre>
-            : <pre class={preview.ok ? "" : "oil-err"}><code>{preview.out}</code></pre>}
+          <figcaption>data</figcaption>
+          <pre><code>{dataText(data)}</code></pre>
         </figure>
+        {partialEntries.map(([name, src]) => (
+          <figure class="oil-pane">
+            <figcaption>partial · {name}</figcaption>
+            <pre><code>{src}</code></pre>
+          </figure>
+        ))}
       </div>
-      <a class="oil-btn" href={href ?? "#"} target="_blank" rel="noopener noreferrer"
+      <figure class="oil-pane oil-output">
+        <figcaption>output <span class="oil-note">— {engine}, rendered HTML as plain text</span></figcaption>
+        {preview == null
+          ? <pre><em>rendering…</em></pre>
+          : <pre class={preview.ok ? "" : "oil-err"}><code>{preview.out}</code></pre>}
+      </figure>
+      {/* A named target reuses one Lab tab across every "Open in Lab" click. */}
+      <a class="oil-btn" href={href ?? "#"} target="flatbars-lab" rel="noopener"
          aria-disabled={href == null}>Open in Lab ↗</a>
     </div>
   );
