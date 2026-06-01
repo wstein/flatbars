@@ -14,6 +14,7 @@
     "check:bundle": "spago build -p barebars-js && node scripts/check-bundle.mjs",
     "test:lab": "node lab/playground_utils.test.mjs && node lab/barebars.test.mjs && node lab/open-in-lab.test.mjs",
     "cli": "spago run -p barebars-cli",
+    "lab": "node scripts/serve-lab.mjs",
     "docs": "antora docs/antora.yml",
     "gen:catalog": "spago build && node scripts/generate-helper-catalog.mjs",
     "check:catalog": "spago build && node scripts/generate-helper-catalog.mjs --check",
