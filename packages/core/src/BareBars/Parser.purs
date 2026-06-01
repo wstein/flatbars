@@ -13,6 +13,8 @@ module BareBars.Parser
   , ParseOptions
   , ExprParser
   , defaultParseOptions
+  , buildFromTokens
+  , collectDirectives
   ) where
 
 import Prelude
@@ -107,10 +109,28 @@ parseWith opts src = do
   case res.stop of
     StopEOF -> Right { directives, nodes: res.nodes }
     StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
-  where
-  isComment = case _ of
-    RComment _ _ _ -> true
-    _ -> false
+
+-- | Build the node tree from an *already tokenized* (and, where a dialect wants
+-- | it, already whitespace-trimmed) `RawTok` stream. This is the same tree
+-- | builder `parseWith` uses internally, exposed so a dialect can interpose its
+-- | own token-stream pass — e.g. MinBars' Mustache standalone-whitespace +
+-- | partial-indentation pass — between tokenizing and building, without the core
+-- | committing to that pass. Comments are dropped here (they carry no output);
+-- | any standalone pass that needs them must therefore run *before* this. The
+-- | core's own `parseWith` path is unchanged, so other engines are unaffected.
+buildFromTokens :: ParseOptions -> Array RawTok -> Either ParseError Template
+buildFromTokens opts toks = do
+  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance
+    (Array.filter (not <<< isComment) toks)
+    0
+  case res.stop of
+    StopEOF -> Right res.nodes
+    StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
+
+isComment :: RawTok -> Boolean
+isComment = case _ of
+  RComment _ _ _ -> true
+  _ -> false
 
 -- | The effective standalone-trim setting: a `@trim` header directive overrides
 -- | the front-end option. `@trim: standalone` ⇒ on, `@trim: none` ⇒ off; any

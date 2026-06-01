@@ -17,9 +17,12 @@ module MinBars
   , renderMinDiag
   ) where
 
-import BareBars.Error (renderParseErrorAt)
-import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
-import BareBars.Syntax (Template)
+import Prelude
+
+import BareBars.Error (ParseError, renderParseErrorAt)
+import BareBars.Lexer (tokenizeTemplate)
+import BareBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
+import BareBars.Syntax (Directive, Template)
 import BareBars.Value (Value)
 import Data.Either (Either(..))
 import Data.Map (Map)
@@ -31,17 +34,32 @@ import Kernel.Render (formatError)
 import Kernel.Value (mustache, resolveTruthinessWith)
 import MinBars.Context (seedEnv)
 import MinBars.Prelude (minEngine)
+import MinBars.Standalone (mustacheStandalone)
 import MinBars.Surface (desugar)
 
 -- | Parse options for the MinBars surface: `extras = true` so the Handlebars-extra
 -- | shapes Mustache also uses — `{{^…}}` (inverted) and `{{&…}}` (unescaped) — are
 -- | accepted; `inheritance = true` so the Mustache-inheritance shapes `{{<p}}`
--- | (parent) and `{{$b}}` (block) parse; `trimStandalone = false` because
--- | standalone-whitespace handling is a later phase (leave the surrounding
--- | whitespace raw for now).
+-- | (parent) and `{{$b}}` (block) parse; `trimStandalone = false` because MinBars
+-- | does **not** use the core's Handlebars-flavored standalone pass — it runs its
+-- | own Mustache pass (`MinBars.Standalone`) over the token stream instead (the
+-- | eligible-tag set and the partial-indentation capture differ; §4.8).
 minOptions :: ParseOptions
 minOptions = defaultParseOptions
   { extras = true, inheritance = true, trimStandalone = false }
+
+-- | Parse MinBars source into directives + nodes, applying the Mustache
+-- | standalone-whitespace pass (`MinBars.Standalone`) between tokenizing and
+-- | building the tree. This is MinBars' replacement for the core `parseWith`
+-- | pipeline: it interposes the dialect-specific standalone pass on the raw token
+-- | stream (which still carries comments, needed for comment-standalone) before
+-- | the core tree builder drops comments and parses interiors.
+parseMin :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
+parseMin src = do
+  toks <- tokenizeTemplate src
+  directives <- collectDirectives toks
+  nodes <- buildFromTokens minOptions (mustacheStandalone toks)
+  pure { directives, nodes }
 
 -- | One-shot pure render of MinBars (Mustache) source against root data.
 renderMin :: String -> Value -> Either String String
@@ -56,7 +74,7 @@ renderMinWith partialSrcs src dat =
     Left e -> Left e
     Right ps -> renderCore (Map.fromFoldable ps) src dat
   where
-  compilePartial (Tuple name s) = case parseWith minOptions s of
+  compilePartial (Tuple name s) = case parseMin s of
     Left pe -> Left (renderParseErrorAt s pe)
     Right { nodes } -> Right (Tuple name (desugar nodes))
 
@@ -70,7 +88,7 @@ renderMinDiag = renderMin
 -- | → desugar → seed the env (stack = `[data]`, partials, falsy, depth 0) →
 -- | run. Every error is rendered to a `String` for the host boundary.
 renderCore :: Map String Template -> String -> Value -> Either String String
-renderCore partials src dat = case parseWith minOptions src of
+renderCore partials src dat = case parseMin src of
   Left pe -> Left (renderParseErrorAt src pe)
   Right { directives, nodes } -> case resolveTruthinessWith mustache directives of
     Left e -> Left (formatError src e)

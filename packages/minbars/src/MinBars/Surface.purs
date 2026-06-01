@@ -49,7 +49,7 @@ desugar = map node
     -- `Sep` whose head is `>` (via the parser's `partialHead` remap) with the
     -- name as its first argument. Anything else is an escaped interpolation.
     Sep sp name args -> case name of
-      ">" -> Output sp (partialExpr (partialName args))
+      ">" -> Output sp (partialExpr (partialName args) (partialIndent args))
       _ -> Output sp (escape (mlookup name))
     -- `{{#x}}` (Section) ⇒ the `section` helper; `{{^x}}` (Inverse) ⇒ `inverted`.
     -- The head name becomes the resolved subject `(mlookup "x")`; the body
@@ -62,12 +62,17 @@ desugar = map node
     -- A static name is a `Lit (VString "p")`; a `*`-headed name resolves from
     -- the context stack via `(mlookup "name")`. The body keeps its `{{$…}}`
     -- children (they desugar to `block` apps `parent` harvests).
-    Block sp Parent name _ body ->
-      Block sp Section "parent" [ parentName name ] (desugar body)
+    Block sp Parent name args body ->
+      Block sp Section "parent" [ parentName name, Lit (VString (indentArg args)) ]
+        (desugar body)
     -- `{{$b}}` (BlockDef) ⇒ the `block` helper over the literal block name; the
-    -- captured body is the default rendering.
-    Block sp BlockDef name _ body ->
-      Block sp Section "block" [ Lit (VString name) ] (desugar body)
+    -- captured body is the default rendering. A *standalone* block also carries
+    -- its captured indent as a second arg (a `Lit (VString …)` injected by
+    -- `MinBars.Standalone`), which signals the override is to be reindented; a
+    -- non-standalone block emits only the name, so `block` never reindents it.
+    Block sp BlockDef name args body ->
+      Block sp Section "block" (Array.cons (Lit (VString name)) (indentArgs args))
+        (desugar body)
     -- raw blocks are not part of the Mustache surface; carry them verbatim.
     RawBlock sp name args raw -> RawBlock sp name args raw
 
@@ -88,10 +93,21 @@ exprName = case _ of
 -- |    a `Dynamic "name"`.
 -- |
 -- | A `*`-marked name is *dynamic*: it is resolved from the context stack.
+-- | A standalone partial also carries a trailing string-literal *indent*
+-- | argument injected by `MinBars.Standalone`; `partialIndent` recovers it.
 data PartialName = Static String | Dynamic String
 
+-- | The leading-whitespace indent injected by the standalone pass as the *last*
+-- | argument, when it is a string literal (`Lit (VString …)`). A non-standalone
+-- | partial has no such argument ⇒ `""`. A lone `*` dynamic head consumes args 0
+-- | and 1 for the name; the indent is then arg 2.
+partialIndent :: Array Expr -> String
+partialIndent args = case Array.last args of
+  Just (Lit (VString ind)) -> ind
+  _ -> ""
+
 partialName :: Array Expr -> PartialName
-partialName args = case argName <$> Array.head args of
+partialName args0 = case argName <$> Array.head args of
   Just n -> case stripPrefix (Pattern "*") n of
     -- `{{>* name}}` — a lone `*` head; the name is the second argument.
     Just "" -> Dynamic (maybe "" argName (Array.index args 1))
@@ -100,6 +116,11 @@ partialName args = case argName <$> Array.head args of
     -- `{{> p}}` — a static literal name.
     Nothing -> Static n
   Nothing -> Static ""
+  where
+  -- drop the trailing injected indent literal (if any) before reading the name.
+  args = case Array.last args0 of
+    Just (Lit (VString _)) -> Array.dropEnd 1 args0
+    _ -> args0
 
 -- | The bare name an argument expression denotes (`App n []` or a string lit).
 argName :: Expr -> String
@@ -107,6 +128,22 @@ argName = case _ of
   App n _ -> n
   Lit (VString s) -> s
   _ -> ""
+
+-- | The standalone indent injected by `MinBars.Standalone` as a `Parent` open's
+-- | trailing string-literal argument (`""` when the parent was not standalone).
+indentArg :: Array Expr -> String
+indentArg args = case Array.last args of
+  Just (Lit (VString ind)) -> ind
+  _ -> ""
+
+-- | The standalone-indent argument(s) for a `BlockDef`: a single-element
+-- | `[Lit (VString indent)]` when the block was standalone (an indent literal was
+-- | injected), else `[]` — so the emitted `block` app signals standalone-ness by
+-- | *arity*, and a non-standalone block is never reindented.
+indentArgs :: Array Expr -> Array Expr
+indentArgs args = case Array.last args of
+  Just (Lit (VString ind)) -> [ Lit (VString ind) ]
+  _ -> []
 
 -- | A parent template name (`{{<p}}` / `{{<*name}}`): a `*`-headed name is
 -- | dynamic (`(mlookup "name")`), else a static `VString` literal. The `*` lexes
@@ -125,8 +162,12 @@ mlookup name = App "mlookup" [ Lit (VString name) ]
 escape :: Expr -> Expr
 escape e = App "escape" [ e ]
 
--- | `(partial e)` over a static literal name or a dynamic `(mlookup …)`.
-partialExpr :: PartialName -> Expr
-partialExpr = case _ of
-  Static name -> App "partial" [ Lit (VString name) ]
-  Dynamic name -> App "partial" [ mlookup name ]
+-- | `(partial e indent)` over a static literal name or a dynamic `(mlookup …)`,
+-- | carrying the standalone indent as a trailing string-literal argument the
+-- | `partial` helper re-applies to every line of the partial's output.
+partialExpr :: PartialName -> String -> Expr
+partialExpr pn indent = App "partial" [ nameExpr, Lit (VString indent) ]
+  where
+  nameExpr = case pn of
+    Static name -> Lit (VString name)
+    Dynamic name -> mlookup name
