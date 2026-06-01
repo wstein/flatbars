@@ -1,0 +1,24 @@
+package:
+  name: linter
+  publish:
+    version: 0.1.0
+    license: Apache-2.0
+    location:
+      githubOwner: barebars
+      githubRepo: barebars
+  dependencies:
+    - arrays
+    - barebars
+    - either
+    - fullbars
+    - maxbars
+    - maybe
+    - prelude
+    - strings
+  test:
+    main: Test.Linter.Main
+    dependencies:
+      - assert
+      - console
+      - effect
+      - kernel
