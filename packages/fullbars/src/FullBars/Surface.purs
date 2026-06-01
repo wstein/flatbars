@@ -366,17 +366,21 @@ dataExpr raw =
 
 -- | Expand `{{else if C}}` chains into nested `{{#if C}}…{{/if}}` in the else
 -- | clause (surface.adoc §5.6) — the FullBars convention (clause `else`, helper
--- | `if`). The condition must be a single argument; parenthesize a helper call:
--- | `{{else if (eq a b)}}`.
+-- | `if`). The condition is one argument; parenthesize a helper call
+-- | (`{{else if (eq a b)}}`). A trailing `key=value` hash is carried through, so
+-- | `{{else if n includeZero=true}}` behaves exactly like `{{elif n includeZero=true}}`.
 expandElseIf :: Template -> Template
 expandElseIf = map toElif
   where
   toElif = case _ of
-    -- `{{else if cond}}` parses as a separator named `else` whose first argument
-    -- is the bare helper `if`; rewrite it to the flat `{{elif cond}}` separator
-    -- the engine's `if` reads as a clause. (The condition is path-rewritten later
-    -- by `go`'s clause-separator case.)
-    Sep sp "else" [ App "if" [], cond ] -> Sep sp "elif" [ cond ]
+    -- `{{else if cond [hash]}}` parses as a separator named `else` whose first
+    -- argument is the bare helper `if`; rewrite it to the flat `{{elif cond [hash]}}`
+    -- separator the engine's `if` reads as a clause, carrying any trailing options
+    -- hash (e.g. `includeZero=true`) through. (The args are path-rewritten and the
+    -- hash collected into a `dict` later, by `go`'s clause-separator case.)
+    Sep sp "else" args
+      | Just { head: App "if" [], tail } <- Array.uncons args
+      , not (Array.null tail) -> Sep sp "elif" tail
     other -> other
 
 -- | Hoist `{{#inline "name"}}body{{/inline}}` definitions out of a (desugared)

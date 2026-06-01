@@ -162,6 +162,15 @@ main = do
     "0"
 
   -- value primitives — string pack (helper-packs-spec §4). Pin the actual
+  -- `{{else if …}}` carries a trailing options hash through to `elif`, so
+  -- `includeZero=true` works on it exactly like on `{{elif …}}`.
+  expectS "else-if-includeZero" "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "n" (VNumber 0.0) ])
+    "Z"
+  expectS "else-if-plain" "{{#if a}}A{{else if b}}B{{else}}E{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool true) ])
+    "B"
+
   -- outputs; conformance only proves compiled ≡ interpreter, not correctness.
   let s1 v = obj [ Tuple "s" (str v) ]
   expectS "p-lowercase" "{{{ lowercase s }}}" (s1 "HeLLo") "hello"

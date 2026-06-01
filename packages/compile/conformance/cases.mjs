@@ -271,4 +271,8 @@ export const cases = [
   { name: "mx:elif-includeZero-else", dialect: "maxbars", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   // surface (FullBars) elif + includeZero hash.
   { name: "s:elif-includeZero", dialect: "surface", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
+  // the `{{else if …}}` spelling carries a trailing hash through to `elif`, so it
+  // behaves identically to the `{{elif …}}` form above (both targets).
+  { name: "s:else-if-includeZero", dialect: "surface", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
+  { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
 ];
