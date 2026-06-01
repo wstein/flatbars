@@ -15,8 +15,15 @@
 -- |  * `{{> p}}` (a `Sep` whose head is `>`, arg `p`) ⇒ `(partial "p")`
 -- |  * `{{! … }}` — already dropped by the parser (a comment).
 -- |
--- | Out of scope for this phase: inheritance (`{{<p}}`/`{{$b}}`), dynamic names
--- | (`{{>* name}}`), standalone-whitespace stripping, set-delimiters.
+-- | This phase also wires Mustache *inheritance* and *dynamic-name* partials:
+-- |
+-- |  * `{{<p}} B {{/p}}` (Parent) ⇒ `Block Section "parent" [ "p" ] (desugar B)`
+-- |  * `{{<*name}} B {{/*name}}` (dynamic parent) ⇒ the name resolves from
+-- |    context, so the `parent` arg is `(mlookup "name")` instead of a literal.
+-- |  * `{{$b}} D {{/b}}` (BlockDef) ⇒ `Block Section "block" [ "b" ] (desugar D)`
+-- |  * `{{>* name}}` (dynamic partial) ⇒ `(partial (mlookup "name"))`.
+-- |
+-- | Out of scope for this phase: standalone-whitespace stripping, set-delimiters.
 module MinBars.Surface
   ( desugar
   ) where
@@ -26,7 +33,8 @@ import Prelude
 import BareBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
 import BareBars.Value (Value(..))
 import Data.Array as Array
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
+import Data.String (Pattern(..), stripPrefix)
 
 -- | Desugar a MinBars surface template into core syntax.
 desugar :: Template -> Template
@@ -41,7 +49,7 @@ desugar = map node
     -- `Sep` whose head is `>` (via the parser's `partialHead` remap) with the
     -- name as its first argument. Anything else is an escaped interpolation.
     Sep sp name args -> case name of
-      ">" -> Output sp (partial (firstName args))
+      ">" -> Output sp (partialExpr (partialName args))
       _ -> Output sp (escape (mlookup name))
     -- `{{#x}}` (Section) ⇒ the `section` helper; `{{^x}}` (Inverse) ⇒ `inverted`.
     -- The head name becomes the resolved subject `(mlookup "x")`; the body
@@ -50,13 +58,16 @@ desugar = map node
       Block sp Section "section" [ mlookup name ] (desugar body)
     Block sp Inverse name _ body ->
       Block sp Section "inverted" [ mlookup name ] (desugar body)
-    -- the Mustache-inheritance shapes `{{<name}}` (Parent) / `{{$name}}`
-    -- (BlockDef) are gated off (`inheritance = false`) so the parser never
-    -- produces them here; a later phase wires inheritance in. Until then keep
-    -- the match total — treat any other block like a section over its head — so
-    -- the desugar stays exhaustive without crashing.
-    Block sp _ name _ body ->
-      Block sp Section "section" [ mlookup name ] (desugar body)
+    -- `{{<p}}` (Parent) ⇒ the `parent` helper over the (possibly dynamic) name.
+    -- A static name is a `Lit (VString "p")`; a `*`-headed name resolves from
+    -- the context stack via `(mlookup "name")`. The body keeps its `{{$…}}`
+    -- children (they desugar to `block` apps `parent` harvests).
+    Block sp Parent name _ body ->
+      Block sp Section "parent" [ parentName name ] (desugar body)
+    -- `{{$b}}` (BlockDef) ⇒ the `block` helper over the literal block name; the
+    -- captured body is the default rendering.
+    Block sp BlockDef name _ body ->
+      Block sp Section "block" [ Lit (VString name) ] (desugar body)
     -- raw blocks are not part of the Mustache surface; carry them verbatim.
     RawBlock sp name args raw -> RawBlock sp name args raw
 
@@ -68,13 +79,43 @@ exprName = case _ of
   Lit (VString s) -> s
   Lit _ -> "."
 
--- | The partial name from a `{{> p}}` separator's arguments: the first argument
--- | is the bare name `App "p" []`.
-firstName :: Array Expr -> String
-firstName args = case Array.head args of
-  Just (App n _) -> n
-  Just (Lit (VString s)) -> s
+-- | The argument names of a `{{> p}}` / `{{>* name}}` separator.
+-- |
+-- |  * `{{> p}}` ⇒ `[App "p" []]` ⇒ a static `Static "p"`.
+-- |  * `{{>*name}}` ⇒ `[App "*name" []]` (the `*` is an ident char, so it lexes
+-- |    glued to the name) ⇒ a `Dynamic "name"`.
+-- |  * `{{>* name}}` ⇒ `[App "*" [], App "name" []]` (the space splits them) ⇒
+-- |    a `Dynamic "name"`.
+-- |
+-- | A `*`-marked name is *dynamic*: it is resolved from the context stack.
+data PartialName = Static String | Dynamic String
+
+partialName :: Array Expr -> PartialName
+partialName args = case argName <$> Array.head args of
+  Just n -> case stripPrefix (Pattern "*") n of
+    -- `{{>* name}}` — a lone `*` head; the name is the second argument.
+    Just "" -> Dynamic (maybe "" argName (Array.index args 1))
+    -- `{{>*name}}` — `*` glued to the name.
+    Just rest -> Dynamic rest
+    -- `{{> p}}` — a static literal name.
+    Nothing -> Static n
+  Nothing -> Static ""
+
+-- | The bare name an argument expression denotes (`App n []` or a string lit).
+argName :: Expr -> String
+argName = case _ of
+  App n _ -> n
+  Lit (VString s) -> s
   _ -> ""
+
+-- | A parent template name (`{{<p}}` / `{{<*name}}`): a `*`-headed name is
+-- | dynamic (`(mlookup "name")`), else a static `VString` literal. The `*` lexes
+-- | glued to the name (it is an ident char), so `{{<*name}}` arrives as the
+-- | single head identifier `*name`.
+parentName :: String -> Expr
+parentName name = case stripPrefix (Pattern "*") name of
+  Just rest -> mlookup rest
+  Nothing -> Lit (VString name)
 
 -- | `(mlookup "name")`.
 mlookup :: String -> Expr
@@ -84,6 +125,8 @@ mlookup name = App "mlookup" [ Lit (VString name) ]
 escape :: Expr -> Expr
 escape e = App "escape" [ e ]
 
--- | `(partial "name")`.
-partial :: String -> Expr
-partial name = App "partial" [ Lit (VString name) ]
+-- | `(partial e)` over a static literal name or a dynamic `(mlookup …)`.
+partialExpr :: PartialName -> Expr
+partialExpr = case _ of
+  Static name -> App "partial" [ Lit (VString name) ]
+  Dynamic name -> App "partial" [ mlookup name ]

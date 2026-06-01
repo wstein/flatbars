@@ -35,10 +35,13 @@ import MinBars.Surface (desugar)
 
 -- | Parse options for the MinBars surface: `extras = true` so the Handlebars-extra
 -- | shapes Mustache also uses — `{{^…}}` (inverted) and `{{&…}}` (unescaped) — are
--- | accepted; `trimStandalone = false` because standalone-whitespace handling is a
--- | later phase (leave the surrounding whitespace raw for now).
+-- | accepted; `inheritance = true` so the Mustache-inheritance shapes `{{<p}}`
+-- | (parent) and `{{$b}}` (block) parse; `trimStandalone = false` because
+-- | standalone-whitespace handling is a later phase (leave the surrounding
+-- | whitespace raw for now).
 minOptions :: ParseOptions
-minOptions = defaultParseOptions { extras = true, trimStandalone = false }
+minOptions = defaultParseOptions
+  { extras = true, inheritance = true, trimStandalone = false }
 
 -- | One-shot pure render of MinBars (Mustache) source against root data.
 renderMin :: String -> Value -> Either String String

@@ -16,21 +16,27 @@ module MinBars.Prelude
   , sectionH
   , invertedH
   , partialH
+  , parentH
+  , blockH
   ) where
 
 import Prelude
 
 import BareBars.Error (Error(..))
+import BareBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
 import BareBars.Value (Value(..))
 import Control.Monad.Error.Class (class MonadThrow, throwError)
+import Data.Array as Array
+import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Kernel.Engine (Engine, Helper)
 import Kernel.Env (liftEither, recursionBudget)
 import Kernel.Value (escapeHtml, isFalsy, stringify)
-import MinBars.Context (MinEnv, enterPartial, minDepth, minFalsy, minPartials, mresolve, push)
+import MinBars.Context (MinEnv, blookup, enterPartial, layerBlocks, minBlocks, minDepth, minFalsy, minPartials, mresolve, push)
 
 -- | The MinBars engine over any `MonadThrow Error m`. `resolve` is closed: the
 -- | five fixed helper names map to their helpers; an unknown name (which the
@@ -45,6 +51,8 @@ minEngine initial =
       "section" -> pure sectionH
       "inverted" -> pure invertedH
       "partial" -> pure partialH
+      "parent" -> pure parentH
+      "block" -> pure blockH
       other -> throwError (HelperError ("unknown MinBars helper '" <> other <> "'"))
   , stringify: \v -> liftEither (stringify v)
   }
@@ -112,3 +120,49 @@ partialH ctl args = case args of
       | otherwise -> VSafe <$> ctl.render (enterPartial ctl.env) tmpl
     Nothing -> pure (VSafe "")
   _ -> pure (VSafe "")
+
+-- | `parent name` — the Mustache-inheritance parent (§4.6.2). The body
+-- | (`ctl.children`) supplies block *overrides*: each immediate
+-- | `Block Section "block" [Lit (VString b)] body` child contributes `b -> body`
+-- | and **all other content is ignored** (the "text inside parent" rule). That
+-- | map is layered onto `env.blocks` (`layerBlocks`), then the named parent
+-- | template is rendered under the **current data stack** with the overlay. The
+-- | name arrives as a `VString` (static `{{<p}}`) or resolved (`{{<*name}}`).
+-- | Missing / non-string / unregistered name ⇒ `""`. Guarded against the
+-- | recursion budget like `partial`.
+parentH :: forall m. MonadThrow Error m => Helper m MinEnv
+parentH ctl args = case args of
+  [ VString name ] -> case Map.lookup name (minPartials ctl.env) of
+    Just tmpl
+      | minDepth ctl.env >= recursionBudget -> throwError (RecursionLimit recursionBudget)
+      | otherwise ->
+          let
+            overrides = harvestBlocks ctl.children
+            env' = layerBlocks overrides (enterPartial ctl.env)
+          in
+            VSafe <$> ctl.render env' tmpl
+    Nothing -> pure (VSafe "")
+  _ -> pure (VSafe "")
+
+-- | Collect the `{{$name}}` block overrides from a parent body: each immediate
+-- | `Block Section "block" [Lit (VString b)] body` child maps `b -> body`. Any
+-- | other node (text, interpolation, sections) is ignored.
+harvestBlocks :: Template -> Map String Template
+harvestBlocks = Map.fromFoldable <<< Array.mapMaybe blockChild
+  where
+  blockChild = case _ of
+    Block _ Section "block" [ Lit (VString b) ] body -> Just (Tuple b body)
+    _ -> Nothing
+
+-- | `block name` — render the override for `name` from the layered block stack
+-- | (`env.blocks`) under the outer-wins rule (`blookup`), else the **default**
+-- | body (`ctl.children`). Block resolution consults `env.blocks` **only**: a
+-- | data key of the same name never overrides a block. An override renders in
+-- | the current data context (where the `block` site sits, i.e. the including
+-- | template's context), so both branches render against the current env.
+blockH :: forall m. MonadThrow Error m => Helper m MinEnv
+blockH ctl args = case args of
+  [ VString name ] -> case blookup name (minBlocks ctl.env) of
+    Just override -> VSafe <$> ctl.render ctl.env override
+    Nothing -> VSafe <$> ctl.render ctl.env ctl.children
+  _ -> throwError (HelperError "block: expected exactly one string name")
