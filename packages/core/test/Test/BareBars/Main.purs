@@ -66,6 +66,47 @@ main = do
   -- foldTemplate counts every node, recursing into bodies.
   assert' "foldTemplate node count" (nodeCount "a{{#each x}}b{{{this}}}{{/each}}c" == 5)
 
+  -- Mustache-inheritance shapes (meaning-free skeletons): the parent tag
+  -- `{{<name}}…{{/name}}` (Parent) and the override-block tag `{{$name}}…{{/name}}`
+  -- (BlockDef), including the dynamic `*`-headed spelling. They are gated by
+  -- `inheritance`; an opting-in dialect builds plain `Block` nodes, dialects that
+  -- don't opt in (the default) reject them with `DisallowedShape`.
+  let
+    inh = defaultParseOptions { inheritance = true }
+  -- `{{<p}}B{{/p}}` ⇒ a Parent block headed `p`, close matched on `p`.
+  case parseWith inh "{{<p}}B{{/p}}" of
+    Right { nodes: t } ->
+      assert' "inheritance: parent block shape"
+        (t == [ Block { start: 0, end: 6 } Parent "p" [] [ Content "B" ] ])
+    Left e -> assert' ("inheritance: parent parse error " <> show e) false
+  -- `{{$b}}D{{/b}}` ⇒ a BlockDef block headed `b`.
+  case parseWith inh "{{$b}}D{{/b}}" of
+    Right { nodes: t } ->
+      assert' "inheritance: block-def shape"
+        (t == [ Block { start: 0, end: 6 } BlockDef "b" [] [ Content "D" ] ])
+    Left e -> assert' ("inheritance: block-def parse error " <> show e) false
+  -- dynamic spelling: `*` is an ident char, so `{{<*dyn}}…{{/*dyn}}` heads on
+  -- `*dyn` and the close matches that headed name.
+  case parseWith inh "{{<*dyn}}B{{/*dyn}}" of
+    Right { nodes: t } ->
+      assert' "inheritance: dynamic parent shape"
+        (t == [ Block { start: 0, end: 9 } Parent "*dyn" [] [ Content "B" ] ])
+    Left e -> assert' ("inheritance: dynamic parent parse error " <> show e) false
+  -- with the default options (`inheritance = false`) the shapes are rejected.
+  case parse "{{<p}}B{{/p}}" of
+    Left (DisallowedShape _ _) -> pure unit
+    _ -> assert' "inheritance: parent rejected when not opted in" false
+  case parse "{{$b}}D{{/b}}" of
+    Left (DisallowedShape _ _) -> pure unit
+    _ -> assert' "inheritance: block-def rejected when not opted in" false
+  -- a normal section / inverse still parse unchanged (sigil regression).
+  case parse "{{#x}}A{{/x}}" of
+    Right { nodes: [ Block _ Section "x" [] [ Content "A" ] ] } -> pure unit
+    other -> assert' ("inheritance: section regressed " <> show other) false
+  case parse "{{^x}}A{{/x}}" of
+    Right { nodes: [ Block _ Inverse "x" [] [ Content "A" ] ] } -> pure unit
+    other -> assert' ("inheritance: inverse regressed " <> show other) false
+
   -- foldExpr: a catamorphism over an expression. Count App nodes in a nested
   -- subexpression, descending into application arguments.
   case parse "{{{lookup this \"x\"}}}" of

@@ -127,6 +127,16 @@ desugarWith lv clauseNames = go []
         in
           Block sp Section name (rewriteArgs lv scope mainArgs <> map (Lit <<< VString) params)
             (go (scope <> params) (expandElseIf body))
+      -- the Mustache-inheritance shapes `{{<name}}` (Parent) / `{{$name}}`
+      -- (BlockDef) are gated off for FullBars (`inheritance = false`), so the
+      -- parser never produces them here; handle them totally — like a plain
+      -- section over the head — so this stays exhaustive without crashing.
+      Block sp sig name args body ->
+        let
+          { mainArgs, params } = extractBlockParams args
+        in
+          Block sp sig name (rewriteArgs lv scope mainArgs <> map (Lit <<< VString) params)
+            (go (scope <> params) (expandElseIf body))
       -- raw blocks are verbatim (surface.adoc §5.8).
       RawBlock sp name args raw -> RawBlock sp name args raw
 

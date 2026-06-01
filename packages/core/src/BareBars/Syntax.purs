@@ -55,15 +55,22 @@ data Node
 
 -- | A block's opener *sigil* — a structural marker the core records but assigns
 -- | no meaning. `Section` is `{{#name}}`; `Inverse` is `{{^name}}` (and the
--- | triple variant `{{{^name}}}`). The engine/dialect decides what `Inverse`
--- | means (FullBars desugars it to `unless`); the core only knows the shape.
-data Sigil = Section | Inverse
+-- | triple variant `{{{^name}}}`). `Parent` is the Mustache-inheritance parent
+-- | tag `{{<name}}` and `BlockDef` the override-block tag `{{$name}}` (each with
+-- | a dynamic-name spelling whose head begins with `*`, e.g. `{{<*name}}`). The
+-- | engine/dialect decides what these mean (FullBars desugars `Inverse` to
+-- | `unless`; inheritance is wired in a later phase); the core only knows the
+-- | shape, and a dialect must opt in (`ParseOptions.inheritance`) to accept the
+-- | `Parent`/`BlockDef` shapes at all.
+data Sigil = Section | Inverse | Parent | BlockDef
 
 derive instance eqSigil :: Eq Sigil
 
 instance showSigil :: Show Sigil where
   show Section = "Section"
   show Inverse = "Inverse"
+  show Parent = "Parent"
+  show BlockDef = "BlockDef"
 
 data Expr
   = Lit Value

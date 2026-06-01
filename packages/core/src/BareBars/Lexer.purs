@@ -36,7 +36,7 @@ data RawTok
   = RContent String
   | ROutput Span Int String -- {{{ <interior> }}}
   | RAmp Span Int String -- {{& <interior> }} — unescaped output (Handlebars `&`)
-  | ROpen Span Sigil Int String -- {{# / {{^ <interior> }} — sigil = Section/Inverse
+  | ROpen Span Sigil Int String -- {{# / {{^ / {{< / {{$ <interior> }} — sigil distinguishes them
   | RClose Span Int String -- {{/ <interior> }}
   | RSep Span Int String -- {{ <interior> }} — a name-agnostic separator
   | RRaw Span Int String String -- {{{{# <interior> }}}} <body> {{{{/ name }}}}
@@ -291,6 +291,10 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
     | matchAt cs i "{{#" = Just "{{#"
     | matchAt cs i "{{~^" = Just "{{~^"
     | matchAt cs i "{{^" = Just "{{^" -- inverse block (Handlebars inverted section)
+    | matchAt cs i "{{~<" = Just "{{~<"
+    | matchAt cs i "{{<" = Just "{{<" -- parent block (Mustache inheritance `{{<name}}`)
+    | matchAt cs i "{{~$" = Just "{{~$"
+    | matchAt cs i "{{$" = Just "{{$" -- override block (Mustache inheritance `{{$name}}`)
     | matchAt cs i "{{~/" = Just "{{~/"
     | matchAt cs i "{{/" = Just "{{/"
     | matchAt cs i "{{~&" = Just "{{~&"
@@ -331,6 +335,10 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
     | matchAt cs i "{{#" = readBlockOpen i "{{#" Section "}}"
     | matchAt cs i "{{~^" = readBlockOpen i "{{~^" Inverse "}}"
     | matchAt cs i "{{^" = readBlockOpen i "{{^" Inverse "}}"
+    | matchAt cs i "{{~<" = readBlockOpen i "{{~<" Parent "}}"
+    | matchAt cs i "{{<" = readBlockOpen i "{{<" Parent "}}"
+    | matchAt cs i "{{~$" = readBlockOpen i "{{~$" BlockDef "}}"
+    | matchAt cs i "{{$" = readBlockOpen i "{{$" BlockDef "}}"
     | matchAt cs i "{{~/" = readClose i "{{~/" "}}"
     | matchAt cs i "{{/" = readClose i "{{/" "}}"
     | matchAt cs i "{{~&" = readAmp i "{{~&"

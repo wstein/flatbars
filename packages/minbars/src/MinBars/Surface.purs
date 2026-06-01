@@ -50,6 +50,13 @@ desugar = map node
       Block sp Section "section" [ mlookup name ] (desugar body)
     Block sp Inverse name _ body ->
       Block sp Section "inverted" [ mlookup name ] (desugar body)
+    -- the Mustache-inheritance shapes `{{<name}}` (Parent) / `{{$name}}`
+    -- (BlockDef) are gated off (`inheritance = false`) so the parser never
+    -- produces them here; a later phase wires inheritance in. Until then keep
+    -- the match total — treat any other block like a section over its head — so
+    -- the desugar stays exhaustive without crashing.
+    Block sp _ name _ body ->
+      Block sp Section "section" [ mlookup name ] (desugar body)
     -- raw blocks are not part of the Mustache surface; carry them verbatim.
     RawBlock sp name args raw -> RawBlock sp name args raw
 

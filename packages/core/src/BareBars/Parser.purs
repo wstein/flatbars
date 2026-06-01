@@ -53,15 +53,31 @@ type ExprParser = Array PosToken -> Either ParseError Expr
 -- | condition), which the uniform expression grammar cannot, since application
 -- | binds tighter than the operators. Only block opens consult it; output,
 -- | separators, closes, and raw blocks keep `parseExpr`.
+-- | `inheritance` gates the Mustache-inheritance block shapes — the parent tag
+-- | `{{<name}}…{{/name}}` (`Parent`) and the override-block tag
+-- | `{{$name}}…{{/name}}` (`BlockDef`), each with a dynamic `*`-headed spelling.
+-- | The core *lexer* always recognizes them (meaning-free shapes); a dialect that
+-- | doesn't accept them sets `inheritance = false` (the default) and the parser
+-- | rejects them with `DisallowedShape`, exactly as `extras` gates `{{^}}`/`{{&}}`.
 type ParseOptions =
-  { trimStandalone :: Boolean, parseExpr :: ExprParser, parseHead :: ExprParser, extras :: Boolean }
+  { trimStandalone :: Boolean
+  , parseExpr :: ExprParser
+  , parseHead :: ExprParser
+  , extras :: Boolean
+  , inheritance :: Boolean
+  }
 
 -- | Standalone trimming on (Handlebars parity), the core expression grammar, and
 -- | Handlebars-extras allowed (the engine + FullBars use this; RawBars/MaxBars
 -- | override `extras = false`).
 defaultParseOptions :: ParseOptions
 defaultParseOptions =
-  { trimStandalone: true, parseExpr: Expr.parseExpr, parseHead: Expr.parseExpr, extras: true }
+  { trimStandalone: true
+  , parseExpr: Expr.parseExpr
+  , parseHead: Expr.parseExpr
+  , extras: true
+  , inheritance: false
+  }
 
 -- | Parse source text into the core template *plus* its header directives, with
 -- | the default options. The directives are a meaning-free list the engine
@@ -85,7 +101,8 @@ parseWith opts src = do
   -- comments carry no output; drop them before the tree builder, which then
   -- never has to know about `RComment` (the standalone pass needs them, so it
   -- runs first).
-  res <- parseSeq opts.parseExpr opts.parseHead opts.extras (Array.filter (not <<< isComment) toks')
+  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance
+    (Array.filter (not <<< isComment) toks')
     0
   case res.stop of
     StopEOF -> Right { directives, nodes: res.nodes }
@@ -242,8 +259,14 @@ type SeqResult = { nodes :: Template, stop :: Stop }
 -- | a close `{{/name}}`. A block captures a single body; multi-branch control
 -- | flow is expressed as nested clause blocks the engine interprets.
 parseSeq
-  :: ExprParser -> ExprParser -> Boolean -> Array RawTok -> Int -> Either ParseError SeqResult
-parseSeq pe ph extras toks = go Nil
+  :: ExprParser
+  -> ExprParser
+  -> Boolean
+  -> Boolean
+  -> Array RawTok
+  -> Int
+  -> Either ParseError SeqResult
+parseSeq pe ph extras inheritance toks = go Nil
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
@@ -284,15 +307,22 @@ parseSeq pe ph extras toks = go Nil
         Left e -> Left e
         Right h -> Right (done acc (StopClose h.name (i + 1)))
       -- `{{^x}}` (Inverse) is a Handlebars-extra, gated; `{{#x}}` (Section) is core.
+      -- `{{<x}}` (Parent) / `{{$x}}` (BlockDef) are the Mustache-inheritance shapes,
+      -- gated by `inheritance`; the dynamic `*`-headed spelling lexes as the same
+      -- sigil with a `*`-led head, so it is matched here too.
       ROpen span sigil base s
         | sigil == Inverse && not extras -> Left
             (DisallowedShape "{{^ }} (inverse block)" span.start)
+        | sigil == Parent && not inheritance -> Left
+            (DisallowedShape "{{< }} (parent block)" span.start)
+        | sigil == BlockDef && not inheritance -> Left
+            (DisallowedShape "{{$ }} (override block)" span.start)
         | otherwise -> buildBlock acc span sigil base s (i + 1)
 
   buildBlock :: List Node -> Span -> Sigil -> Int -> String -> Int -> Either ParseError SeqResult
   buildBlock acc span sigil base s i = case headed ph span base s of
     Left e -> Left e
-    Right h -> case parseSeq pe ph extras toks i of
+    Right h -> case parseSeq pe ph extras inheritance toks i of
       Left e -> Left e
       Right inner -> case inner.stop of
         -- point the diagnostic at the *opener* (its span start), not offset 0.
