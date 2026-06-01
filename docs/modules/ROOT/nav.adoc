@@ -1,4 +1,4 @@
-.xref:index.adoc[BareBars]
+.xref:index.adoc[FlatBars]
 * xref:index.adoc[Introduction]
 * xref:concepts.adoc[The core model]
 
@@ -33,7 +33,7 @@
 * xref:maxbars.adoc[The MaxBars dialect (operators & pipes)]
 
 .Appendix
-* xref:appendix-handlebars.adoc[A. Handlebars.js → BareBars, with no gaps]
+* xref:appendix-handlebars.adoc[A. Handlebars.js → FlatBars, with no gaps]
 ** xref:appendix-handlebars.adoc#expressions[A.1 Expressions & paths]
 ** xref:appendix-handlebars.adoc#helpers[A.2 Helpers, arguments, subexpressions]
 ** xref:appendix-handlebars.adoc#blocks[A.3 Block helpers & branches]

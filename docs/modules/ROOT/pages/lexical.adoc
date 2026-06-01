@@ -72,8 +72,8 @@ reaches the AST, so it is not sugar — there is nothing to desugar.
 
 [IMPORTANT]
 ====
-BareBars performs *no implicit "standalone" whitespace removal*. {hb} silently strips the line
-around a block/partial/comment that stands alone; BareBars does not. Whitespace is removed only where
+FlatBars performs *no implicit "standalone" whitespace removal*. {hb} silently strips the line
+around a block/partial/comment that stands alone; FlatBars does not. Whitespace is removed only where
 you write `~`. Predictable and explicit; see xref:appendix-handlebars.adoc#comments-raw-ws[A.7].
 ====
 

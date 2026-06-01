@@ -4,14 +4,14 @@ package:
     version: 0.1.0
     license: Apache-2.0
     location:
-      githubOwner: barebars
-      githubRepo: barebars
+      githubOwner: flatbars
+      githubRepo: flatbars
   dependencies:
     - prelude
     - either
     - ordered-collections
-    - barebars
-    - barebars-compile
+    - flatbars
+    - flatbars-compile
     - fullbars
   test:
     main: Test.FullBars.Compile.Main

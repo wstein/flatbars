@@ -6,12 +6,12 @@ module Test.MinBars.Main where
 
 import Prelude
 
-import BareBars.Value (Value(..))
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Value (Value(..))
 import MinBars (renderMin, renderMinWith)
 import Test.Assert (assert')
 

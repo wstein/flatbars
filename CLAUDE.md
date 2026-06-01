@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-BareBars is a template-engine **construction kit**, not a template engine. The
+FlatBars is a template-engine **construction kit**, not a template engine. The
 core is a meaning-free parser; everything you expect from Handlebars/Mustache
 (helpers, escaping, control flow, path semantics) is supplied by an *engine*
 built on top. This is a PureScript monorepo holding the reference
@@ -24,7 +24,7 @@ do **not** assume a global install.
 npm install            # installs purescript + spago + esbuild
 npm run build          # spago build — compile every package
 npm test               # full suite: per-package spago tests + catalog + isolation + compile & mustache conformance + Lab unit tests
-npm run cli -- --help  # run the CLI (spago run -p barebars-cli)
+npm run cli -- --help  # run the CLI (spago run -p flatbars-cli)
 npm run lint           # spago build --pedantic-packages (catches unused/missing deps)
 npm run format         # purs-tidy format-in-place; format:check to verify only
 ```
@@ -32,7 +32,7 @@ npm run format         # purs-tidy format-in-place; format:check to verify only
 Run one package's PureScript tests directly (faster than `npm test`):
 
 ```sh
-spago test -p maxbars        # or barebars / fullbars / kernel / rawbars / barebars-json / fullbars-compile / barebars-js
+spago test -p maxbars        # or flatbars / fullbars / kernel / rawbars / flatbars-json / fullbars-compile / flatbars-js
 ```
 
 There is no finer-grained-than-package test runner; each package's tests run
@@ -71,7 +71,7 @@ npm run gen:conformance       # regenerate tutorials/src/conformance.json from t
 npm run check:conformance     # fail if that file is stale (so the reference can't over-claim conformance)
 ```
 
-`examples:verify` is the `barebars examples verify` CLI subcommand (see
+`examples:verify` is the `flatbars examples verify` CLI subcommand (see
 `example-loader-spec.md`). The FlatBars Lab loads the same corpus via the
 `?vendored=<id>` deep-link (`lab/index.html`), framing each fixture's
 expected-vs-actual verdict. Note the overlap with `test:minbars-spec`: both render
@@ -85,7 +85,7 @@ measurement harness).
 ### The IoC pattern (read this first)
 
 The whole system is one idea applied four times: **the core walks the
-structural tree and calls into pluggable rules; "don't call BareBars, BareBars
+structural tree and calls into pluggable rules; "don't call FlatBars, FlatBars
 calls you."** The four instances:
 
 | Operation | Driver (meaning-free) | Plug-in (the meaning) |
@@ -93,7 +93,7 @@ calls you."** The four instances:
 | **interpret** | `Kernel.Engine` traversal | `Engine` (helper meanings) |
 | **desugar** | a `foldTemplate` | rewrite rules (`Kernel.Lower`) |
 | **validate** | `Kernel.Walk` | a `Schema` |
-| **compile** | `BareBars.Compile` emit driver | an `Emit` record (per dialect) |
+| **compile** | `FlatBars.Compile` emit driver | an `Emit` record (per dialect) |
 
 The interpret driver is polymorphic in the result monad `m`
 (`MonadThrow Error m` — `Either Error` for pure, `ExceptT Error Aff` for async)
@@ -102,7 +102,7 @@ of helper frames + current context).
 
 ### Two phases
 
-1. **Parse → skeleton AST.** `core` (`barebars`) is purely structural: lexer,
+1. **Parse → skeleton AST.** `core` (`flatbars`) is purely structural: lexer,
    expression tokenizer, parser, the skeleton `Syntax` AST (`Content`/`Output`/
    `Block` nodes), the literal `Value` type, source spans, parse errors. It
    attaches **no meaning** — it doesn't know what `each` is, doesn't know
@@ -118,7 +118,7 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 
 ### Package layers (dependencies point downward)
 
-- **`core` (`barebars`)** — the framework: lexer, parser, skeleton AST, `Value`,
+- **`core` (`flatbars`)** — the framework: lexer, parser, skeleton AST, `Value`,
   spans, errors. No engine, no helpers, no validation.
 - **`kernel`** — the shared engine machinery, dialect-agnostic: `Engine` (IoC
   interpret driver), `Env`/`RefEnv`, `Helper` (arity combinators), `Lower`
@@ -135,19 +135,19 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   - **`fullbars`** — adds the Handlebars-style surface desugar.
   - **`maxbars`** — FullBars plus infix operators and pipes (`MaxBars.Expr`),
     desugaring to the same core `Expr`.
-- **`compile`** (`barebars-compile`) — the dialect-agnostic emit driver →
+- **`compile`** (`flatbars-compile`) — the dialect-agnostic emit driver →
   `export default function (data, rt)`. **`fullbars-compile`** layers the
   surface compiler on top. Emitted JS runs against
-  `packages/compile/runtime/barebars-runtime.mjs`.
-- **`json`** (`barebars-json`) — JSON ⇆ `Value` adapter, deliberately kept out
+  `packages/compile/runtime/flatbars-runtime.mjs`.
+- **`json`** (`flatbars-json`) — JSON ⇆ `Value` adapter, deliberately kept out
   of `core` (JSON-ness is a host concern, not a framework dependency).
-- **`js`** (`barebars-js`) — JS/FFI surface bundling the dialects for JS hosts
-  (bundled to `lab/vendor/barebars-engine.mjs` for the FlatBars Lab).
+- **`js`** (`flatbars-js`) — JS/FFI surface bundling the dialects for JS hosts
+  (bundled to `lab/vendor/flatbars-engine.mjs` for the FlatBars Lab).
   That bundle is a **committed artifact**: regenerate it after any engine change,
-  or the Lab runs stale — `spago bundle -p barebars-js --module FullBars.JS
+  or the Lab runs stale — `spago bundle -p flatbars-js --module FullBars.JS
   --bundle-type module --platform browser --outfile
-  lab/vendor/barebars-engine.mjs` (needs `esbuild` on PATH).
-- **`cli`** (`barebars-cli`) — render templates, and the `examples verify`
+  lab/vendor/flatbars-engine.mjs` (needs `esbuild` on PATH).
+- **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source), incl.
   truthiness materialization via directive-carry.

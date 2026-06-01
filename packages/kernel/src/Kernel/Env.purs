@@ -31,9 +31,6 @@ module Kernel.Env
 
 import Prelude
 
-import BareBars.Error (Error(..))
-import BareBars.Syntax (Template)
-import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Either (Either, either)
 import Data.Foldable (foldl)
@@ -42,6 +39,9 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import FlatBars.Error (Error(..))
+import FlatBars.Syntax (Template)
+import FlatBars.Value (Value)
 import Kernel.Engine (Engine, Helper)
 import Kernel.Value (FalsySet, handlebars, stringify)
 

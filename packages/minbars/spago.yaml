@@ -4,8 +4,8 @@ package:
     version: 0.1.0
     license: Apache-2.0
     location:
-      githubOwner: barebars
-      githubRepo: barebars
+      githubOwner: flatbars
+      githubRepo: flatbars
   dependencies:
     - prelude
     - arrays
@@ -17,7 +17,7 @@ package:
     - foldable-traversable
     - transformers
     - tuples
-    - barebars
+    - flatbars
     - kernel
   test:
     main: Test.MinBars.Main

@@ -1,24 +1,21 @@
--- | `barebars` — a command-line renderer for BareBars core templates.
+-- | `flatbars` — a command-line renderer for FlatBars core templates.
 -- |
 -- | Usage:
 -- |
 -- | ```text
--- | barebars <template.bars> [--data <data.json>] [--validate | --compile] [--help]
+-- | flatbars <template.bars> [--data <data.json>] [--validate | --compile] [--help]
 -- | ```
 -- |
 -- | Renders a template against JSON data using the reference prelude, writing
 -- | the result to stdout. Core syntax by default; `--surface` reads the
 -- | Handlebars-flavoured surface dialect. With `--validate` it runs the
 -- | skeleton-AST validation pass instead; with `--compile` it emits a JS module
--- | (`BareBars.Compile`, honouring `--surface`) to stdout — pair it with
--- | `barebars-runtime.mjs`.
+-- | (`FlatBars.Compile`, honouring `--surface`) to stdout — pair it with
+-- | `flatbars-runtime.mjs`.
 module Cli.Main where
 
 import Prelude
 
-import BareBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt)
-import BareBars.Json (parseValue)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map (Map)
@@ -29,6 +26,9 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (message, try)
+import FlatBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt)
+import FlatBars.Json (parseValue)
+import FlatBars.Value (Value(..))
 import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
@@ -45,10 +45,10 @@ foreign import setExitCode :: Int -> Effect Unit
 usage :: String
 usage =
   joinWith "\n"
-    [ "barebars — render a BareBars core template"
+    [ "flatbars — render a FlatBars core template"
     , ""
     , "Usage:"
-    , "  barebars <template> [--data <data.json>] [--validate | --compile]"
+    , "  flatbars <template> [--data <data.json>] [--validate | --compile]"
     , ""
     , "Options:"
     , "  -d, --data <file>   JSON data file (default: null context)"
@@ -59,14 +59,14 @@ usage =
     , "      --validate      validate the template against the prelude schema; do not render"
     , "  -c, --compile       compile the template to a JS module (printed to stdout); do not render"
     , "      --trim <mode>   standalone whitespace: 'standalone' (default) strips a lone block/"
-    , "                      comment line; 'none' keeps it. Overrides barebars.json; a @trim"
+    , "                      comment line; 'none' keeps it. Overrides flatbars.json; a @trim"
     , "                      directive in the template overrides both."
     , "  -h, --help          show this help"
     , ""
-    , "Config: a barebars.json in the working directory may set { \"trim\": \"standalone\" | \"none\" }."
+    , "Config: a flatbars.json in the working directory may set { \"trim\": \"standalone\" | \"none\" }."
     , "Core syntax: {{{ lookup this \"x\" }}}, {{#each …}}, …. Surface (--surface): {{ x }}, a.b.c, …."
     , "The compiled module's default export is `function (data, rt)`; pair it with"
-    , "the runtime at packages/compile/runtime/barebars-runtime.mjs."
+    , "the runtime at packages/compile/runtime/flatbars-runtime.mjs."
     ]
 
 data Mode
@@ -88,11 +88,11 @@ main :: Effect Unit
 main = do
   args <- Array.drop 2 <$> argv
   case Array.uncons args of
-    -- `barebars examples …` — the vendored example/conformance corpus subcommand.
+    -- `flatbars examples …` — the vendored example/conformance corpus subcommand.
     Just { head: "examples", tail } -> runExamples tail
     _ -> case parseArgs args of
       Help -> writeStdout (usage <> "\n")
-      Invalid msg -> die ("barebars: " <> msg <> "\n\n" <> usage)
+      Invalid msg -> die ("flatbars: " <> msg <> "\n\n" <> usage)
       Run opts -> run opts
 
 -- | Parse argv into a mode. The first non-flag argument is the template path.
@@ -143,46 +143,46 @@ run :: Options -> Effect Unit
 run opts = do
   tplE <- readFileSafe opts.template
   case tplE of
-    Left err -> die ("barebars: cannot read template '" <> opts.template <> "': " <> err)
+    Left err -> die ("flatbars: cannot read template '" <> opts.template <> "': " <> err)
     Right tpl -> do
-      -- precedence: --trim flag > barebars.json > built-in default (on).
+      -- precedence: --trim flag > flatbars.json > built-in default (on).
       configTrim <- loadConfigTrim
       let
         popts = defaultParseOptions
           { trimStandalone = fromMaybe true (firstJust opts.trim configTrim) }
       if opts.mustache && (opts.compileOnly || opts.validateOnly || opts.surface) then
         die
-          "barebars: --mustache renders the Mustache (MinBars) engine; it cannot combine with --surface, --compile, or --validate"
+          "flatbars: --mustache renders the Mustache (MinBars) engine; it cannot combine with --surface, --compile, or --validate"
       else if opts.compileOnly then runCompile popts opts tpl
       else if opts.validateOnly then runValidate popts tpl
       else do
         datE <- loadData opts.dataFile
         case datE of
-          Left err -> die ("barebars: " <> err)
+          Left err -> die ("flatbars: " <> err)
           Right value
             | opts.mustache -> case MinBars.renderMinDiag tpl value of
-                Left err -> die ("barebars: " <> opts.template <> ": " <> err)
+                Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                 Right out -> writeStdout out
             | opts.surface -> case renderSurfaceDiagWith noLoopVars popts tpl value of
-                Left err -> die ("barebars: " <> opts.template <> ": " <> err)
+                Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                 Right out -> writeStdout out
             | otherwise -> case compileWith popts tpl of
-                Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
+                Left pe -> die ("flatbars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
                 Right render -> case render value of
-                  Left err -> die ("barebars: " <> show err)
+                  Left err -> die ("flatbars: " <> show err)
                   Right out -> writeStdout out
 
 -- | Compile a template to a JS ES module and print it to stdout (surface or core).
 runCompile :: ParseOptions -> Options -> String -> Effect Unit
 runCompile popts opts tpl =
   case (if opts.surface then Compile.compileSurfaceWith noLoopVars else compileJsWith) popts tpl of
-    Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
+    Left pe -> die ("flatbars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
     Right js -> writeStdout js
 
 -- | Run the skeleton-AST validation pass + directive lints and report issues.
 runValidate :: ParseOptions -> String -> Effect Unit
 runValidate popts tpl = case parseWith popts tpl of
-  Left err -> die ("barebars: parse error at " <> renderParseErrorAt tpl err)
+  Left err -> die ("flatbars: parse error at " <> renderParseErrorAt tpl err)
   Right { directives, nodes: template } ->
     case directiveLints directives <> validate preludeSchema template of
       [] -> writeStdout "ok: no issues\n"
@@ -204,12 +204,12 @@ loadData = case _ of
         Left err -> Left ("invalid JSON in '" <> file <> "': " <> err)
         Right value -> Right value
 
--- | Read the standalone-trim setting from `barebars.json` in the working
+-- | Read the standalone-trim setting from `flatbars.json` in the working
 -- | directory, if present: `{ "trim": "standalone" | "none" }`. A missing/
 -- | unreadable/malformed file or absent key yields `Nothing` (use the default).
 loadConfigTrim :: Effect (Maybe Boolean)
 loadConfigTrim = do
-  e <- readFileSafe "barebars.json"
+  e <- readFileSafe "flatbars.json"
   pure case e of
     Left _ -> Nothing
     Right content -> case parseValue content of
@@ -236,7 +236,7 @@ die msg = do
   setExitCode 1
 
 --------------------------------------------------------------------------------
--- `barebars examples` — the vendored example/conformance corpus
+-- `flatbars examples` — the vendored example/conformance corpus
 --
 -- See `example-loader-spec.md`. v1 implements the headless `verify` gate for the
 -- `mustache` provider: re-render each vendored fixture through MinBars and assert
@@ -247,10 +247,10 @@ die msg = do
 examplesUsage :: String
 examplesUsage =
   joinWith "\n"
-    [ "barebars examples — vendored example/conformance corpus"
+    [ "flatbars examples — vendored example/conformance corpus"
     , ""
     , "Usage:"
-    , "  barebars examples verify [--provider mustache]   re-render each fixture; assert"
+    , "  flatbars examples verify [--provider mustache]   re-render each fixture; assert"
     , ""
     , "verify (mustache): render template+data+partials via MinBars and assert"
     , "  actual == expected — a divergence is a conformance failure. Exit ≠ 0 on any miss."
@@ -264,7 +264,7 @@ runExamples args = case Array.uncons args of
   Just { head: "--help" } -> writeStdout (examplesUsage <> "\n")
   Nothing -> writeStdout (examplesUsage <> "\n")
   Just { head: sub } -> die
-    ("barebars examples: unknown subcommand '" <> sub <> "'\n\n" <> examplesUsage)
+    ("flatbars examples: unknown subcommand '" <> sub <> "'\n\n" <> examplesUsage)
 
 -- | Read `--provider <id>` from the flags; default `mustache`.
 providerOf :: Array String -> String
@@ -277,13 +277,13 @@ providerOf args = case Array.elemIndex "--provider" args of
 verifyProvider :: String -> Effect Unit
 verifyProvider provider
   | provider /= "mustache" =
-      die ("barebars examples: unsupported provider '" <> provider <> "' (only 'mustache' in v1)")
+      die ("flatbars examples: unsupported provider '" <> provider <> "' (only 'mustache' in v1)")
   | otherwise = do
       let base = "lab/examples/vendored/" <> provider
       files <- listFixtures base
       case files of
         [] -> die
-          ( "barebars examples: no fixtures under " <> base
+          ( "flatbars examples: no fixtures under " <> base
               <> " — run: node scripts/vendor-mustache.mjs"
           )
         _ -> do

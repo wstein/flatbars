@@ -27,7 +27,7 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
 
 . *Reuse by dependency, with a FullBars-free closure.* RawBars renders through the shared reference
   engine via `Kernel.Render.runResolved` and compiles through the shared driver + `fullbarsEmit` from
-  `BareBars.Compile.Emit`. It imports `kernel` and `barebars-compile` — **not** the `fullbars`
+  `FlatBars.Compile.Emit`. It imports `kernel` and `flatbars-compile` — **not** the `fullbars`
   package. Its dependency closure is therefore provably free of FullBars (this is the closure the
   xref:adr-final-review.adoc[final review] asks to lock with a test).
 
@@ -42,4 +42,4 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
 * *Con:* authoring is verbose (every `lookup` is explicit) — RawBars is a substrate/test dialect, not
   the one most authors should reach for. The module docstring still says "the FullBars reference
   engine"/"the compiler's FullBars `Emit`," which is cosmetic drift: that engine and that `Emit` now
-  live in `kernel`/`barebars-compile`, which is *why* the closure is FullBars-free.
+  live in `kernel`/`flatbars-compile`, which is *why* the closure is FullBars-free.

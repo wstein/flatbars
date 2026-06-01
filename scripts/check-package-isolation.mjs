@@ -5,7 +5,7 @@
 // particular RawBars — the austere substrate — must NOT pull in FullBars, even
 // transitively. This guards the boundary the `fullbars-compile` split (driver +
 // emit vs. surface compile) was made to keep: RawBars compiles through
-// `barebars-compile`, which carries no `fullbars` dependency.
+// `flatbars-compile`, which carries no `fullbars` dependency.
 //
 // It reads each packages/*/spago.yaml, takes the package's *library*
 // dependencies (the first `dependencies:` block — test deps are exempt),

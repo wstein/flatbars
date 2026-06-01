@@ -2,7 +2,7 @@
 -- | X2): a **Handlebars → MaxBars source migrator** with a per-file residual
 -- | report. Unlike `Linter.Lower` (which parse-and-reprints), this is a
 -- | *minimal-diff source rewrite over the token stream*: it lexes the Handlebars
--- | source with the Handlebars-compatible lexer (`BareBars.Lexer.tokenizeTemplate`,
+-- | source with the Handlebars-compatible lexer (`FlatBars.Lexer.tokenizeTemplate`,
 -- | which the FullBars `defaultParseOptions` parser uses), rewrites only the
 -- | tokens that change, and rebuilds the rest from the *original source slice* —
 -- | so the author's formatting, spacing, and `~` whitespace-control are preserved
@@ -42,10 +42,6 @@ module Linter.Migrate
 
 import Prelude
 
-import BareBars.Error (ParseError)
-import BareBars.Lexer (RawTok(..), tokenizeTemplate)
-import BareBars.Span (Span)
-import BareBars.Syntax (Sigil(..))
 import Data.Array as Array
 import Data.Either (Either)
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
@@ -53,6 +49,10 @@ import Data.String (Pattern(..))
 import Data.String as String
 import Data.String.CodeUnits as SCU
 import Data.Tuple (Tuple(..))
+import FlatBars.Error (ParseError)
+import FlatBars.Lexer (RawTok(..), tokenizeTemplate)
+import FlatBars.Span (Span)
+import FlatBars.Syntax (Sigil(..))
 
 -- | One flagged construct the migrator could not (or should not) rewrite
 -- | mechanically. `kind` is a stable tag (`"parent-data"`, `"ambiguous-section"`,

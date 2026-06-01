@@ -1,7 +1,7 @@
 = 5. The surface dialect (sugar)
 :navtitle: 5. The surface dialect
 
-The core is austere by design. *BareBars Surface* is an optional dialect that recovers {hbs}
+The core is austere by design. *FlatBars Surface* is an optional dialect that recovers {hbs}
 ergonomics. It is *not* a separate parser (xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]):
 the one structural parser (`parse`) is unchanged, and Surface is a *desugaring walk* over the
 structural AST — part of the second pass (xref:host-api.adoc[] §7.1), naturally a `foldTemplate`

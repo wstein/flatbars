@@ -1,26 +1,26 @@
 package:
-  name: barebars-json
+  name: flatbars-json
   publish:
     version: 0.1.0
     license: Apache-2.0
     location:
-      githubOwner: barebars
-      githubRepo: barebars
+      githubOwner: flatbars
+      githubRepo: flatbars
   dependencies:
     - prelude
     - either
     - tuples
     - ordered-collections
     # The `argonaut` umbrella re-exports Core + Parser through its own
-    # `Data.Argonaut` module, which is what `BareBars.Json` imports. Depending on
+    # `Data.Argonaut` module, which is what `FlatBars.Json` imports. Depending on
     # the umbrella (rather than `argonaut-core` directly) means the declared dep
     # is the one actually imported, so `--pedantic-packages` stays green —
     # `argonaut-parser` (for `jsonParser`) has no standalone package-set entry.
     - argonaut
     - foreign-object
-    - barebars
+    - flatbars
   test:
-    main: Test.BareBars.Json.Main
+    main: Test.FlatBars.Json.Main
     dependencies:
       - effect
       - console

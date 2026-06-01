@@ -22,9 +22,9 @@ module MaxBars.Lint
 
 import Prelude
 
-import BareBars.Syntax (Template)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
+import FlatBars.Syntax (Template)
 import Kernel.Walk (Issue, RefKind(..), Severity(..), helperRefs)
 
 -- | The loop-variable names that plausibly collide with data fields (ADR-006

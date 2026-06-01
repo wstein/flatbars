@@ -10,7 +10,6 @@ module Test.MaxBars.Main where
 
 import Prelude
 
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)
 import Data.Map as Map
@@ -18,6 +17,7 @@ import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Value (Value(..))
 import MaxBars (compileMaxJs, loopVarWarnings, renderMax)
 import Test.Assert (assert')
 

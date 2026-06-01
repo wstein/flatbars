@@ -22,9 +22,6 @@ module MinBars.Prelude
 
 import Prelude
 
-import BareBars.Error (Error(..))
-import BareBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
-import BareBars.Value (Value(..))
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
 import Data.Map (Map)
@@ -35,6 +32,9 @@ import Data.String.CodeUnits as SCU
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import FlatBars.Error (Error(..))
+import FlatBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
+import FlatBars.Value (Value(..))
 import Kernel.Engine (Engine, Helper)
 import Kernel.Env (liftEither, recursionBudget)
 import Kernel.Value (escapeHtml, isFalsy, stringify)

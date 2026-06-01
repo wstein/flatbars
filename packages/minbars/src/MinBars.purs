@@ -19,16 +19,16 @@ module MinBars
 
 import Prelude
 
-import BareBars.Error (ParseError, renderParseErrorAt)
-import BareBars.Lexer (tokenizeTemplate)
-import BareBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
-import BareBars.Syntax (Directive, Template)
-import BareBars.Value (Value)
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import FlatBars.Error (ParseError, renderParseErrorAt)
+import FlatBars.Lexer (tokenizeTemplate)
+import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
+import FlatBars.Syntax (Directive, Template)
+import FlatBars.Value (Value)
 import Kernel.Engine (runTemplate)
 import Kernel.Render (formatError)
 import Kernel.Value (mustache, resolveTruthinessWith)

@@ -1,10 +1,10 @@
 -- | The interpreting walk — fully polymorphic and inversion-of-control.
 -- |
--- | This is *not* part of the BareBars core (which is parser → skeleton AST). It
--- | is the generic *second-stage driver*: BareBars owns lexing, parsing,
+-- | This is *not* part of the FlatBars core (which is parser → skeleton AST). It
+-- | is the generic *second-stage driver*: FlatBars owns lexing, parsing,
 -- | recursion into children, argument evaluation, and output assembly; an engine
--- | plugs in three small functions and BareBars calls them. **Don't call
--- | BareBars; BareBars calls you.**
+-- | plugs in three small functions and FlatBars calls them. **Don't call
+-- | FlatBars; FlatBars calls you.**
 -- |
 -- | The driver is polymorphic in:
 -- |
@@ -24,40 +24,40 @@ module Kernel.Engine
 
 import Prelude
 
-import BareBars.Error (Error(..))
-import BareBars.Parser (parse)
-import BareBars.Span (Span)
-import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
-import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
+import FlatBars.Error (Error(..))
+import FlatBars.Parser (parse)
+import FlatBars.Span (Span)
+import FlatBars.Syntax (Expr(..), Ident, Node(..), Template)
+import FlatBars.Value (Value)
 import Kernel.Walk (splitClause)
 
--- | The *control handle* BareBars hands every helper. Every field is a callback
--- | *into* BareBars — a helper never walks the tree itself.
+-- | The *control handle* FlatBars hands every helper. Every field is a callback
+-- | *into* FlatBars — a helper never walks the tree itself.
 type Ctl m env =
   { env :: env -- the current environment (the engine's own type)
   , children :: Template -- this block's captured body ([] for inline calls)
   , span :: Span -- source location of the enclosing tag, for diagnostics
-  , render :: env -> Template -> m String -- BareBars renders a sub-tree
-  , eval :: env -> Expr -> m Value -- BareBars evaluates a body expression to a Value
+  , render :: env -> Template -> m String -- FlatBars renders a sub-tree
+  , eval :: env -> Expr -> m Value -- FlatBars evaluates a body expression to a Value
   , clause :: Ident -> { before :: Template, body :: Maybe Template } -- split a nested clause
   }
 
 -- | A helper: given its control handle and evaluated arguments, produce a value.
 type Helper m env = Ctl m env -> Array Value -> m Value
 
--- | What an engine supplies; BareBars owns everything else.
+-- | What an engine supplies; FlatBars owns everything else.
 type Engine m env =
   { initial :: env -- starting environment + root context
   , resolve :: env -> Ident -> m (Helper m env) -- find a helper (throw UnknownHelper if absent)
   , stringify :: Value -> m String -- how a Value becomes output text
   }
 
--- | Run a parsed template against an engine. BareBars drives the entire walk.
+-- | Run a parsed template against an engine. FlatBars drives the entire walk.
 runTemplate :: forall m env. Monad m => Engine m env -> Template -> m String
 runTemplate engine = renderTemplate engine.initial
   where

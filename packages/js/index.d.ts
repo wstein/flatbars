@@ -1,4 +1,4 @@
-// TypeScript surface for the barebars-js facade (FullBars.JS).
+// TypeScript surface for the flatbars-js facade (FullBars.JS).
 //
 // These declarations describe the *uncurried* entry points compiled from
 // `FullBars.JS`. `data` is any JSON-shaped value (object, array, string,

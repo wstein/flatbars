@@ -1,6 +1,6 @@
-# `barebars-cli` — command-line renderer
+# `flatbars-cli` — command-line renderer
 
-Renders a BareBars **core-syntax** template against JSON data using the
+Renders a FlatBars **core-syntax** template against JSON data using the
 reference prelude.
 
 ```sh
@@ -8,7 +8,7 @@ reference prelude.
 npm run cli -- packages/cli/examples/greeting.bars --data packages/cli/examples/greeting.json
 
 # or directly
-spago run -p barebars-cli -- <template> [--data <data.json>] [--validate | --compile]
+spago run -p flatbars-cli -- <template> [--data <data.json>] [--validate | --compile]
 ```
 
 ## Options
@@ -19,13 +19,13 @@ spago run -p barebars-cli -- <template> [--data <data.json>] [--validate | --com
 | `-s`, `--surface` | Read the template in the surface dialect (`{{ name }}`, paths, `@data`, `as \|x\|`) instead of core syntax. Applies to both render and `--compile`. |
 | `-m`, `--mustache` | Render with the Mustache (MinBars) engine. Render-only — cannot combine with `--surface`/`--compile`/`--validate`. |
 | `--validate` | Run the skeleton-AST validation pass against the prelude schema and report issues; do not render. Exits non-zero if any issue is found. |
-| `-c`, `--compile` | Compile the template to a JS module (`BareBars.Compile`), printed to stdout; do not render. The default export is `function (data, rt)` — pair it with [`barebars-runtime.mjs`](../compile/runtime/barebars-runtime.mjs). |
+| `-c`, `--compile` | Compile the template to a JS module (`FlatBars.Compile`), printed to stdout; do not render. The default export is `function (data, rt)` — pair it with [`flatbars-runtime.mjs`](../compile/runtime/flatbars-runtime.mjs). |
 | `-h`, `--help` | Show usage |
 
-## `barebars examples` — the vendored conformance corpus
+## `flatbars examples` — the vendored conformance corpus
 
 ```sh
-spago run -p barebars-cli -- examples verify [--provider mustache]
+spago run -p flatbars-cli -- examples verify [--provider mustache]
 ```
 
 `verify` is the headless MinBars conformance gate (see
@@ -41,7 +41,7 @@ on any miss. The corpus is vendored offline (`node scripts/vendor-mustache.mjs`)
 `examples/greeting.bars` rendered against `examples/greeting.json`:
 
 ```html
-<h1>BareBars &lt;demo&gt;</h1>
+<h1>FlatBars &lt;demo&gt;</h1>
 <ul>
   <li>0. alpha</li>
   <li>1. beta</li>

@@ -3,7 +3,7 @@
 // The compiler conformance harness — the gate that keeps the two execution
 // paths from drifting. For every case it renders with the INTERPRETER
 // (FullBars.renderWith, the executable spec) and with the COMPILED function
-// (BareBars.Compile → JS, run against the runtime) and asserts byte-identical
+// (FlatBars.Compile → JS, run against the runtime) and asserts byte-identical
 // output. Sources: the inline corpus (conformance/cases.mjs) + the golden
 // examples/ (core templates).
 //
@@ -16,7 +16,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { cases as corpus } from "./conformance/cases.mjs";
-import rt from "./runtime/barebars-runtime.mjs";
+import rt from "./runtime/flatbars-runtime.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");

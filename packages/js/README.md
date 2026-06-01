@@ -1,4 +1,4 @@
-# barebars-js
+# flatbars-js
 
 A thin, JS/TS-friendly facade over the [FullBars](../fullbars) reference engine
 (design review item **P6**).
@@ -10,7 +10,7 @@ functions that take a template string and **plain JS data** and return a plain
 `Data.Map`-shaped values leak across it.
 
 ```js
-import { render, renderSurface } from "barebars-js"; // FullBars.JS
+import { render, renderSurface } from "flatbars-js"; // FullBars.JS
 
 // Surface dialect: paths, {{ }} auto-escapes.
 const r = renderSurface("<h1>{{ name }}</h1>", { name: "Ada & <b>" });

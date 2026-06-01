@@ -43,17 +43,17 @@ module Linter.Lift
 
 import Prelude
 
-import BareBars.Error (ParseError)
-import BareBars.Parser (defaultParseOptions, parseWith)
-import BareBars.Span (Span)
-import BareBars.Syntax (Expr(..), Ident, Node(..), Sigil, Template)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.String as String
 import Data.Tuple (Tuple(..), fst, snd)
+import FlatBars.Error (ParseError)
+import FlatBars.Parser (defaultParseOptions, parseWith)
+import FlatBars.Span (Span)
+import FlatBars.Syntax (Expr(..), Ident, Node(..), Sigil, Template)
+import FlatBars.Value (Value(..))
 import Kernel.Prelude (preludeUnaryHelpers)
 
 -- | One advisory ambiguity flag raised during a lift. `kind` is a stable tag

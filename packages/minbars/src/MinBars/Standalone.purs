@@ -1,6 +1,6 @@
 -- | The MinBars-only **Mustache standalone-whitespace** pass over the core
 -- | `RawTok` stream (spec §4.8). It is a *peer* of the core's Handlebars-flavored
--- | `BareBars.Lexer.trimStandalone`, but differs in two ways the spec demands and
+-- | `FlatBars.Lexer.trimStandalone`, but differs in two ways the spec demands and
 -- | which is why MinBars owns it rather than sharing the core pass:
 -- |
 -- |  1. **Eligible-tag set.** A line is *standalone* when it holds only a
@@ -24,11 +24,11 @@ module MinBars.Standalone
 
 import Prelude
 
-import BareBars.Lexer (RawTok(..))
-import BareBars.Syntax (Sigil(..))
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as SCU
+import FlatBars.Lexer (RawTok(..))
+import FlatBars.Syntax (Sigil(..))
 
 isSpaceCU :: Char -> Boolean
 isSpaceCU c = c == ' ' || c == '\t' || c == '\r' || c == '\n'

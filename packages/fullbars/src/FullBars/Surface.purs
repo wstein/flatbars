@@ -50,8 +50,6 @@ module FullBars.Surface
 
 import Prelude
 
-import BareBars.Syntax (Expr(..), Ident, Node(..), Sigil(..), Template)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Foldable (foldl)
 import Data.Int as Int
@@ -61,6 +59,8 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Number as Number
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
 import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
+import FlatBars.Syntax (Expr(..), Ident, Node(..), Sigil(..), Template)
+import FlatBars.Value (Value(..))
 
 -- | Desugar a Surface template into core syntax. `clauseNames` are the
 -- | separator names the engine treats as clause markers (e.g. `["else"]`); a

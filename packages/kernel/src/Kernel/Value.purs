@@ -1,5 +1,5 @@
 -- | Value *policy* for the FullBars engine — the meaning the framework
--- | deliberately leaves out (`BareBars.Value` is just the data type). See
+-- | deliberately leaves out (`FlatBars.Value` is just the data type). See
 -- | `docs/modules/ROOT/pages/evaluation.adoc` §3.2, §3.6.
 -- |
 -- | A different engine could define truthiness, escaping, and stringification
@@ -25,9 +25,6 @@ module Kernel.Value
 
 import Prelude
 
-import BareBars.Error (Error(..))
-import BareBars.Syntax (Directive)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Char (toCharCode)
 import Data.Either (Either(..), note)
@@ -43,6 +40,9 @@ import Data.String.CodeUnits (singleton, toCharArray)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import FlatBars.Error (Error(..))
+import FlatBars.Syntax (Directive)
+import FlatBars.Value (Value(..))
 
 -- | The closed vocabulary of *falsy shapes*: which value shapes a truthiness
 -- | mode treats as false. These denote shapes, not values — value-specific

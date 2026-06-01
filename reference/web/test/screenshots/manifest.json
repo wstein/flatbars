@@ -1,0 +1,49 @@
+{
+  "capturedAt": "2026-05-30T05:21:49.449Z",
+  "panels": [
+    {
+      "id": "problems",
+      "label": "Problems",
+      "file": "screenshots/dock-problems.png"
+    },
+    {
+      "id": "transformers",
+      "label": "Transformers",
+      "file": "screenshots/dock-transformers.png"
+    },
+    {
+      "id": "data-access",
+      "label": "Data Access",
+      "file": "screenshots/dock-data-access.png"
+    },
+    {
+      "id": "trim",
+      "label": "Whitespace",
+      "file": "screenshots/dock-trim.png"
+    },
+    {
+      "id": "partials",
+      "label": "Partials",
+      "file": "screenshots/dock-partials.png"
+    },
+    {
+      "id": "capabilities",
+      "label": "Capabilities",
+      "file": "screenshots/dock-capabilities.png"
+    },
+    {
+      "id": "perf",
+      "label": "Performance",
+      "file": "screenshots/dock-perf.png"
+    },
+    {
+      "id": "coverage",
+      "label": "Coverage",
+      "file": "screenshots/dock-coverage.png"
+    }
+  ],
+  "overview": "screenshots/playground-overview.png",
+  "outputViews": {
+    "st4": "screenshots/playground-st4-preview.png"
+  }
+}

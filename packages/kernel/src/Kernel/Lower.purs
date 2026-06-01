@@ -24,10 +24,10 @@ module Kernel.Lower
 
 import Prelude
 
-import BareBars.Syntax (Directive, Expr(..), Ident, Template)
 import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), uncurry)
+import FlatBars.Syntax (Directive, Expr(..), Ident, Template)
 import Kernel.Value (FalsySet)
 import Kernel.Walk (Clause, Issue, Severity(..), foldTemplate, splitClause, splitClauses)
 

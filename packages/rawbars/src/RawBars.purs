@@ -6,8 +6,8 @@
 -- |
 -- | This is a thin dialect layer: it reuses the reference engine's `runResolved`
 -- | (`Kernel.Render`: parse → resolve `@truthiness` → seed → engine) and the
--- | shared compiler's `Emit` (`BareBars.Compile.Emit.fullbarsEmit`), swapping in
--- | *no* surface desugar. Note it depends on `kernel` + `barebars-compile`, *not*
+-- | shared compiler's `Emit` (`FlatBars.Compile.Emit.fullbarsEmit`), swapping in
+-- | *no* surface desugar. Note it depends on `kernel` + `flatbars-compile`, *not*
 -- | the `fullbars` package — its dependency closure is FullBars-free (see ADR-008).
 -- | It exists so the three dialects are symmetric packages over one engine.
 module RawBars
@@ -23,15 +23,15 @@ module RawBars
 
 import Prelude
 
-import BareBars.Compile (compile) as Driver
-import BareBars.Compile.Emit (fullbarsEmit, metaFor, resolveForCompile)
-import BareBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
-import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
-import BareBars.Value (Value)
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Effect.Aff (Aff)
+import FlatBars.Compile (compile) as Driver
+import FlatBars.Compile.Emit (fullbarsEmit, metaFor, resolveForCompile)
+import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
+import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Value (Value)
 import Kernel.Render (formatError, runResolved)
 import Kernel.ToValue (class ToValue, toValue)
 

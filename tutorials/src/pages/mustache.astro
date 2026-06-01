@@ -85,7 +85,7 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
       Mustache is also <b>a specification, not an engine</b> — like how JavaScript
       is a spec that Chrome and Firefox implement. Dozens of engines across
       languages implement it. On this page the engine is <b>MinBars</b>, the
-      Mustache-conformant member of the BareBars family; it is tested against the
+      Mustache-conformant member of the FlatBars family; it is tested against the
       official <code>mustache/spec</code> fixtures.
     </p>
     <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
@@ -254,7 +254,7 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
     <div class="callout info">
       <p>
         <b>MinBars does not implement set delimiters</b> (deferred in
-        <a href="/barebars/adr-0007-minbars.html">ADR-0007</a>: no customer corpus
+        <a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>: no customer corpus
         to audit yet). There's no live button here because a preview that can't run
         would mislead. The example is shown for spec completeness.
       </p>
@@ -274,7 +274,7 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
       <p>
         <b>MinBars has no function value type</b>, so lambdas are not supported
         (and may arrive in a later phase). Reach for a real engine binding —
-        mustache.js, or BareBars <a href="/fullbars">FullBars</a> helpers — when
+        mustache.js, or FlatBars <a href="/fullbars">FullBars</a> helpers — when
         you need computed output.
       </p>
     </div>
@@ -311,13 +311,13 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
     </table>
     <p class="tip">
       Set delimiters and lambdas carry no spec fixtures here and aren't
-      implemented (<a href="/barebars/adr-0007-minbars.html">ADR-0007</a>) — so
+      implemented (<a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>) — so
       the table claims nothing for them rather than a hollow ✓.
     </p>
     <h3>Where to go next</h3>
     <p>
       Mustache is the on-ramp. When you want real conditionals, helpers, and
-      computed values, the BareBars ladder continues:
+      computed values, the FlatBars ladder continues:
       <a href="/fullbars">FullBars</a> adds Handlebars-style blocks and helpers,
       and <a href="/maxbars">MaxBars</a> adds infix operators and pipes — all on
       the same core. Or jump straight into the

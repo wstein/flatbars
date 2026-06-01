@@ -8,7 +8,7 @@
 import "../styles/lab-tokens.css";
 import "../styles/open-in-lab.css";
 
-const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/barebars/";
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
 const { title, subtitle, groups = [], spec } = Astro.props;
 ---
 
@@ -17,7 +17,7 @@ const { title, subtitle, groups = [], spec } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} · BareBars</title>
+    <title>{title} · FlatBars</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

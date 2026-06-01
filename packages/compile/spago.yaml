@@ -1,11 +1,11 @@
 package:
-  name: barebars-compile
+  name: flatbars-compile
   publish:
     version: 0.1.0
     license: Apache-2.0
     location:
-      githubOwner: barebars
-      githubRepo: barebars
+      githubOwner: flatbars
+      githubRepo: flatbars
   dependencies:
     - prelude
     - arrays
@@ -13,13 +13,13 @@ package:
     - maybe
     - foldable-traversable
     - either
-    - barebars
+    - flatbars
     - kernel
     - ordered-collections
     - tuples
     - bifunctors
   test:
-    main: Test.BareBars.Compile.Main
+    main: Test.FlatBars.Compile.Main
     dependencies:
       - effect
       - console

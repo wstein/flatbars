@@ -1,8 +1,8 @@
-= BareBars
+= FlatBars
 :description: A template-engine construction kit: a parser that yields a skeleton AST, plus a contract for the validating, interpreting pass an engine layers on top.
 
 [.lead]
-*BareBars* — _bare rods_ — is not a template engine. It is the *substrate you build one on*.
+*FlatBars* — _bare rods_ — is not a template engine. It is the *substrate you build one on*.
 
 It is two things, and only two things:
 
@@ -13,7 +13,7 @@ It is two things, and only two things:
 
 The split is the whole idea. Think *JSON and JSON Schema*: JSON fixes a uniform structural syntax
 and knows nothing about what any document _means_; a schema is a separate pass that decides which
-shapes are legal and what they stand for. BareBars is the JSON; the engine you build is the schema
+shapes are legal and what they stand for. FlatBars is the JSON; the engine you build is the schema
 plus the interpreter.
 
 == What makes it different
@@ -55,7 +55,7 @@ serializable; helpers live in a separate, scoped environment.
 skinparam shadowing false
 skinparam rectangle { BorderColor #1f1d1b FontName monospace }
 rectangle "Surface dialect (optional sugar)\n{{name}}  a.b.c  @index  ../x  as |x|  {{> p}}" as S #fdf0e6
-rectangle "PHASE 1 — BareBars core\nlex + parse -> skeleton AST\n{{{ }}}   {{# }}   {{{{# }}}}   comments   ~\nstructure only; no meaning, no else, no keywords" as C #f5f3f0
+rectangle "PHASE 1 — FlatBars core\nlex + parse -> skeleton AST\n{{{ }}}   {{# }}   {{{{# }}}}   comments   ~\nstructure only; no meaning, no else, no keywords" as C #f5f3f0
 rectangle "PHASE 2 — the engine walk (you supply)\nvalidate + interpret the AST, like a JSON Schema\nhelpers, arity, truthiness, escaping, clauses (else/case/...)" as P #e9f5ee
 S --> C : desugars to
 C --> P : handed to
@@ -63,7 +63,7 @@ C --> P : handed to
 ....
 
 The xref:concepts.adoc[core model] explains the decisions. The
-xref:appendix-handlebars.adoc[appendix] maps *every* {hbs} concept onto BareBars with no gaps.
+xref:appendix-handlebars.adoc[appendix] maps *every* {hbs} concept onto FlatBars with no gaps.
 
 [NOTE]
 ====
@@ -75,7 +75,7 @@ normative only where marked _normative_.
 
 == The reference dialect: FullBars
 
-The engine and surface dialect that ship with BareBars are *FullBars* — a member of the
+The engine and surface dialect that ship with FlatBars are *FullBars* — a member of the
 Handlebars/Mustache family, familiar on sight, but a *dialect* with its own reasoned choices, not a
 clone: a helper-first core, escaping as an explicit helper, `pass:[{{else}}]` as a name-agnostic
 separator, a native short-circuit `pass:[{{elif}}]`, content-based safe-string truthiness, and

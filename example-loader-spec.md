@@ -2,7 +2,7 @@
 
 Status: draft for review · Companions: `minbars-spec.md`, `rawbars-maxbars-spec.md`, `helper-packs-spec.md`, `loopvars-linter-spec.md`
 
-Lets Playground Lab load **official examples** — Handlebars from handlebarsjs.com, Mustache from the `mustache/spec` suite — render them in the right BareBars dialect, and show **expected-vs-actual** side by side. Examples are **vendored** (copied into the repo at a pinned upstream commit), never fetched at runtime. A **TUI** drives the download/update of that vendored corpus.
+Lets Playground Lab load **official examples** — Handlebars from handlebarsjs.com, Mustache from the `mustache/spec` suite — render them in the right FlatBars dialect, and show **expected-vs-actual** side by side. Examples are **vendored** (copied into the repo at a pinned upstream commit), never fetched at runtime. A **TUI** drives the download/update of that vendored corpus.
 
 Two facts from the source review shape the whole design:
 
@@ -101,12 +101,12 @@ The pipeline is **deterministic**: the same upstream commit **and** the same pin
 
 ## 6. The TUI download/update tool
 
-A full-screen terminal app (invoked `barebars examples`) — not a prompt script. UX is the point: browse, multi-select, see status and diffs, vendor, verify.
+A full-screen terminal app (invoked `flatbars examples`) — not a prompt script. UX is the point: browse, multi-select, see status and diffs, vendor, verify.
 
 ### 6.1 Layout
 
 ```
-┌ BareBars Examples ───────────────────────────── handlebars @ a1b2c3d (pinned) ┐
+┌ FlatBars Examples ───────────────────────────── handlebars @ a1b2c3d (pinned) ┐
 │ Provider: ● handlebars   ○ mustache              upstream: a1b2c3d (in sync)   │
 ├───────────────────────────────┬───────────────────────────────────────────────┤
 │ ▸ /partials                   │  partials/inline                  [FullBars]    │
@@ -155,10 +155,10 @@ Shows the selected example's template, data, partials, expected, and — when th
 A TUI without a scriptable path is useless in CI, so every action has a flag form:
 
 ```
-barebars examples sync   --provider mustache --commit <sha>   # vendor a pinned set
-barebars examples check  --all                                # exit≠0 if upstream drifted
-barebars examples verify --all                                # re-render; assert per provider
-barebars examples vendor --select "partials/*" --provider handlebars
+flatbars examples sync   --provider mustache --commit <sha>   # vendor a pinned set
+flatbars examples check  --all                                # exit≠0 if upstream drifted
+flatbars examples verify --all                                # re-render; assert per provider
+flatbars examples vendor --select "partials/*" --provider handlebars
 ```
 
 `verify` is the conformance gate: for `mustache`, assert `actual == expected` (a failure is a MinBars bug or unimplemented module); for `handlebars`, assert the diff set equals the **recorded divergence catalogue** (a *new* divergence is the alarm, an expected one is fine). CI runs `check` (drift) + `verify` (correctness).
@@ -169,7 +169,7 @@ barebars examples vendor --select "partials/*" --provider handlebars
 
 ### 6.6 Tech
 
-Recommended: **Ink** (React-for-CLI) in the `cli` package, importing the compiled BareBars engine for live preview/diff and the provider modules for discover/parse/bake. Ink gives flexbox panes, lists, spinners, and incremental filter cheaply. The tool is an effectful Node dev-utility, so it lives outside the pure core — acceptable. (Alternative: neo-blessed; decision in §10.)
+Recommended: **Ink** (React-for-CLI) in the `cli` package, importing the compiled FlatBars engine for live preview/diff and the provider modules for discover/parse/bake. Ink gives flexbox panes, lists, spinners, and incremental filter cheaply. The tool is an effectful Node dev-utility, so it lives outside the pure core — acceptable. (Alternative: neo-blessed; decision in §10.)
 
 ---
 
@@ -208,7 +208,7 @@ The vendored corpus (`lab/examples/vendored/`) is the *conformance/coverage* set
 
 ### Pipeline & corpus
 - **E0 — Provider interface + fixture format.** The fixture format (§4) is **landed**: `lab/examples/vendored/mustache/<module>/<name>.json`. The typed `Provider` record (§3) is not yet extracted — the `mustache` path is implemented directly (vendor script + a CLI verifier), and the typed interface arrives with the second (`handlebars`) provider.
-- **E1 — Vendor pipeline + `mustache` corpus.** **Landed.** `scripts/vendor-mustache.mjs` vendors the core modules (comments, interpolation, sections, inverted, partials — 122 fixtures) at a pinned commit; `barebars examples verify` is the headless strict gate (`npm run examples:verify`, wired into `npm test`) — renders each fixture through MinBars and asserts `actual == expected` (122/122 conform). *Reconcile:* `packages/minbars/test/spec-conformance.mjs` (`npm run test:minbars-spec`) is a parallel **lenient measurement** over a **second** vendored corpus (`packages/minbars/test/spec/`); per §6.5 this `verify` gate is meant to supersede it — consolidating to one corpus is the open follow-up.
+- **E1 — Vendor pipeline + `mustache` corpus.** **Landed.** `scripts/vendor-mustache.mjs` vendors the core modules (comments, interpolation, sections, inverted, partials — 122 fixtures) at a pinned commit; `flatbars examples verify` is the headless strict gate (`npm run examples:verify`, wired into `npm test`) — renders each fixture through MinBars and asserts `actual == expected` (122/122 conform). *Reconcile:* `packages/minbars/test/spec-conformance.mjs` (`npm run test:minbars-spec`) is a parallel **lenient measurement** over a **second** vendored corpus (`packages/minbars/test/spec/`); per §6.5 this `verify` gate is meant to supersede it — consolidating to one corpus is the open follow-up.
 - **E2 — Playground load + diff.** *Shipped (deep-link + source link); a richer diff panel + a browser UX pass remain.* The use case is **load an example you found on the web into the Lab in one action, with a link back to where it came from** — *not* a browsable dump of the corpus (the vendored fixtures are conformance vectors, not curated demos, so they are deliberately **kept out of the example menu**). The corpus is single-sourced under the Lab's served root (`lab/examples/vendored/`); the vendor script also emits a `manifest.json` index (for docs-side / future discovery, not surfaced in the menu). `lab/playground_utils.mjs` carries the tested helpers `vendoredWorkspace` (fixture → `{ engine, template, dataText, partials, expected, divergenceMeaning }`) and `vendoredVerdict` (actual-vs-expected, severity by `divergenceMeaning`). `index.html` implements the `?vendored=<id>` deep-link (`loadVendored`/`loadVendoredById`): it auto-selects the dialect engine (re-navigating with `?engine=` if needed), loads the workspace, renders, frames the verdict in the example label (`✓ conforms` / `✗ <divergence>`), and shows a **`source ↗` link** to the upstream URL the fixture was copied from (the connection to the original source). Gated on the param (no regression to the existing Lab). Verified at the logic level (the MinBars adapter render path conforms 122/122 fed by `vendoredWorkspace`; the module parses; the helpers are unit-tested in `npm test` via `test:lab`). *Remaining (enhancements):* docs-side "Open in Lab" links (source → Lab, generated from `manifest.json`); an import-by-paste path for non-vendored examples; a side-by-side expected/actual diff panel; a browser smoke-test of the render/UX.
 
 ### Handlebars provider

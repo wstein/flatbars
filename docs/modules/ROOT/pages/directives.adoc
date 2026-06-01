@@ -78,7 +78,7 @@ Output tags (`pass:[{{ }}]` / `pass:[{{{ }}}]`) and bare `pass:[{{else}}]`
 separators are never standalone-trimmed. Explicit `~` composes on top.
 
 Precedence (highest first): the `@trim` directive, the CLI `--trim standalone|none`,
-a `barebars.json` `pass:[{ "trim": "standalone" | "none" }]` in the working
+a `flatbars.json` `pass:[{ "trim": "standalone" | "none" }]` in the working
 directory, then the built-in default (on).
 
 == Compilation

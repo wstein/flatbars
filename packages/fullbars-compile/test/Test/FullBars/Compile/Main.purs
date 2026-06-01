@@ -2,7 +2,7 @@
 -- | (`FullBars.Compile.compileSurface`): desugar + `{{#inline}}` hoist + emit.
 -- | These cover codegen that only exists after surface desugaring (inline
 -- | partials, `@truthiness` falsy-set threading); the dialect-free driver/emit
--- | shape tests live in the `barebars-compile` package, and byte-for-byte
+-- | shape tests live in the `flatbars-compile` package, and byte-for-byte
 -- | execution conformance is the Node harness `packages/compile/conformance.mjs`.
 module Test.FullBars.Compile.Main where
 

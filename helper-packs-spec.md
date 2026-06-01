@@ -1,4 +1,4 @@
-# BareBars Value Primitives & MaxBars Operators — Specification
+# FlatBars Value Primitives & MaxBars Operators — Specification
 
 Status: draft for review · Companion: `loopvars-linter-spec.md`. Truthiness is specified in the truthiness ADR / `Kernel.Value` (not a separate file); the dialect ladder and MinBars live in their respective packages and `CLAUDE.md`, not in standalone `*-spec.md` files.
 
@@ -27,7 +27,7 @@ This criterion is the whole design. It is deliberately strict because each primi
 
 The bulk of `handlebars-helpers` fails criterion 1 against current `main`. These are not candidates:
 
-| `handlebars-helpers` category | why it is large there | BareBars equivalent | verdict |
+| `handlebars-helpers` category | why it is large there | FlatBars equivalent | verdict |
 |---|---|---|---|
 | comparison (`eq` `ifEq` `unlessGt` `compare` `and` `or` …) | Handlebars has no inline booleans | MaxBars **infix** `{{#if a == b && c}}` + prelude `and/or/not/eq/ne/lt/gt/lte/gte` | replaced by a language feature |
 | chaining / composition helpers | clumsy subexpressions | MaxBars **pipes** `{{ x \| f \| g }}` | replaced by a language feature |
@@ -152,7 +152,7 @@ The references are **lodash** and the **ES string/array standard** — `handleba
 - **Casing:** single-word names lowercase (`trim`, `join`, `round`); multi-word camelCase (`truncate` is one word; `startsWith`, `trimStart`). **snake_case is banned** — the two offenders (`esc_html`/`esc_json`) were renamed to `escapeHtml`/`escapeJson` and the old names deleted (§8). The prelude is now fully camelCase/lowercase.
 - **Canonical + alias:** where the source ships duplicates, one is canonical and the other a linter-lowered alias: `lowercase` (not `downcase`), `uppercase` (not `upcase`); the arithmetic helpers carry `plus`/`minus`/`times` aliases. Aliases render correctly and normalise to canonical in committed form.
 - **Universal over idiosyncratic:** `trimStart`/`trimEnd` (not `trimLeft`/`trimRight`), `includes` (not `inArray`), `at` (not `itemAt`), `count`/`size` (not a fourth spelling).
-- **Keep what BareBars has right:** `and or not eq ne gt gte lt lte lookup if unless each with trim round raw json` — no churn; keep `ne` (do **not** adopt `is`/`isnt`). (`first`/`last`/`length`/`key` exist as the **loop variables** — §4 reserved-names note — not collection helpers.)
+- **Keep what FlatBars has right:** `and or not eq ne gt gte lt lte lookup if unless each with trim round raw json` — no churn; keep `ne` (do **not** adopt `is`/`isnt`). (`first`/`last`/`length`/`key` exist as the **loop variables** — §4 reserved-names note — not collection helpers.)
 
 ---
 

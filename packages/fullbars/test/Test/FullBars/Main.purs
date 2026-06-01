@@ -2,15 +2,11 @@
 -- |
 -- | Exercises the reference engine end to end — rendering, the `lower` real AST,
 -- | the escaping lint, the Aff instantiation, and a pluggable-env engine — over
--- | the BareBars framework (parse/foldTemplate/spans).
+-- | the FlatBars framework (parse/foldTemplate/spans).
 module Test.FullBars.Main where
 
 import Prelude
 
-import BareBars (parse, spanText)
-import BareBars.Error (Error(..))
-import BareBars.Syntax (Expr(..), Node(..))
-import BareBars.Value (Value(..))
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)
@@ -25,6 +21,10 @@ import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
+import FlatBars (parse, spanText)
+import FlatBars.Error (Error(..))
+import FlatBars.Syntax (Expr(..), Node(..))
+import FlatBars.Value (Value(..))
 import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, resolveTruthiness, stringify, truthy)
 import Kernel.Engine (Ctl, Engine, Helper, runString, runTemplate)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
@@ -126,7 +126,7 @@ customEngine root =
 
 main :: Effect Unit
 main = do
-  log "BareBars core tests"
+  log "FlatBars core tests"
 
   expect "content" "hello world" VNull "hello world"
 

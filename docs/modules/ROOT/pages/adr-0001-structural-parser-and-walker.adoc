@@ -11,7 +11,7 @@ and back. This is the decision; changes to it require a new ADR.
 
 == Context
 
-BareBars is a *substrate*, not an engine: the core must commit to no semantics, and an engine
+FlatBars is a *substrate*, not an engine: the core must commit to no semantics, and an engine
 supplies meaning. We need a pipeline that makes that split structural rather than merely asserted,
 and that does not grow a second parser/AST for "surface" sugar.
 
@@ -40,10 +40,10 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
   bare double-stash `Sep`. It records every syntactic shape — brace count, identifiers, args,
   nesting — and assigns *no name* any meaning. There is **no separate surface parser and no surface
   AST**. The interior of a tag is tokenized by a shared, meaning-free tokenizer
-  (`BareBars.Token.tokenizeInterior`: `TIdent`/`TStr`/`TNum`/`TLParen`/`TRParen`/`TOp`) and handed to
+  (`FlatBars.Token.tokenizeInterior`: `TIdent`/`TStr`/`TNum`/`TLParen`/`TRParen`/`TOp`) and handed to
   a *dialect grammar* through two seams on `ParseOptions`: `parseExpr` (output/argument interiors)
   and `parseHead` (block-open heads). The default grammar is the shared prefix grammar
-  (`BareBars.Expr`); MaxBars swaps in a precedence-climbing grammar through the same seams.
+  (`FlatBars.Expr`); MaxBars swaps in a precedence-climbing grammar through the same seams.
 
 . *`pass:[{{ }}]` is structural.* The two-brace stache is a first-class, meaning-free node (`Sep`).
   `pass:[{{else}}]` is just a `Sep` whose head identifier is `else`; the parser cannot tell it from
@@ -88,7 +88,7 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
   plus the lint; the core carries a *fixed* sigil vocabulary, so a new dialect's sigils (MinBars'
   `pass:[{{<]`/`pass:[{{$]`/…) must be added to the shared lexer and gated, not bolted on in the
   dialect package.
-* *Removed:* the separate surface parser / surface AST (`BareBars.Surface` as a `parseSurface`); the
+* *Removed:* the separate surface parser / surface AST (`FlatBars.Surface` as a `parseSurface`); the
   dialect is recast as the walker's desugaring rules over the structural AST (xref:surface.adoc[]).
 
 [#review]
@@ -121,7 +121,7 @@ ignored. A substrate that can't mandate escaping is defensible; a substrate that
 ignorable warning as the safety mechanism is not."
 
 *Petra (spec / docs).* "Half the ADR's identifiers are stale. It says `FullBars.Lower.lower` and
-`BareBars.Surface`; the code says `Kernel.Lower.lower` (`Lower.purs:62`) and `FullBars.Surface`. And
+`FlatBars.Surface`; the code says `Kernel.Lower.lower` (`Lower.purs:62`) and `FullBars.Surface`. And
 '`RNode` is the real AST of the reference engine, published as an example — another engine may lower
 to any shape' reads very differently now that `RNode` sits in the *shared kernel* and *all three*
 dialects lower through it (`FullBars.purs:39`). De facto, it is canonical for the ladder."

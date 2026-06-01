@@ -22,9 +22,6 @@ module FullBars.JS
 
 import Prelude
 
-import BareBars (Expr(..), parse, parseErrorAt, parseWith)
-import BareBars.Json (fromJson)
-import BareBars.Value (Value(..))
 import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
@@ -32,6 +29,9 @@ import Data.Function.Uncurried (Fn1, Fn2, Fn3, mkFn1, mkFn2, mkFn3)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import FlatBars (Expr(..), parse, parseErrorAt, parseWith)
+import FlatBars.Json (fromJson)
+import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
 import FullBars as FullBars
@@ -76,9 +76,9 @@ renderMustache :: Fn3 (FO.Object String) String Json Result
 renderMustache = mkFn3 \partials tpl json ->
   result (MinBars.renderMinWith (FO.toUnfoldable partials) tpl (fromJson json))
 
--- | Compile a *core* template to JS ES-module source (`BareBars.Compile`). The
+-- | Compile a *core* template to JS ES-module source (`FlatBars.Compile`). The
 -- | emitted module's default export is `function (data, rt)`; pair it with
--- | `runtime/barebars-runtime.mjs`. `value` is the JS source on success.
+-- | `runtime/flatbars-runtime.mjs`. `value` is the JS source on success.
 compile :: Fn1 String Result
 compile = mkFn1 \tpl -> compileResult (RawBars.compileJs tpl)
 
@@ -134,7 +134,7 @@ astJson = mkFn2 \dialect src ->
         obj
           [ Tuple "ast"
               ( obj
-                  [ Tuple "version" (str "barebars-ast/v1"), Tuple "nodes" (arr (map rnode nodes)) ]
+                  [ Tuple "version" (str "flatbars-ast/v1"), Tuple "nodes" (arr (map rnode nodes)) ]
               )
           ]
 

@@ -126,9 +126,9 @@ exception: a helper receives its body *unevaluated* (as a `Template`) and decide
 
 == 3.6 Helpers and the control handle
 
-*BareBars drives the whole walk — inversion of control.* It resolves and applies each helper,
-handing it a `Ctl`: a *control handle* whose fields are callbacks *into* BareBars. A helper never
-traverses the tree itself; it asks BareBars to render the sub-trees it chooses.
+*FlatBars drives the whole walk — inversion of control.* It resolves and applies each helper,
+handing it a `Ctl`: a *control handle* whose fields are callbacks *into* FlatBars. A helper never
+traverses the tree itself; it asks FlatBars to render the sub-trees it chooses.
 
 [source,haskell]
 ----
@@ -136,8 +136,8 @@ type Ctl m env =
   { env      :: env                          -- the current environment (the engine's type)
   , children :: Template                     -- this block's body ([] for inline calls)
   , span     :: Span                         -- source location of the enclosing tag
-  , eval     :: env -> Expr     -> m Value   -- BareBars evaluates an expression for you
-  , render   :: env -> Template -> m String  -- BareBars renders a sub-tree for you
+  , eval     :: env -> Expr     -> m Value   -- FlatBars evaluates an expression for you
+  , render   :: env -> Template -> m String  -- FlatBars renders a sub-tree for you
   , clause   :: Ident -> { before :: Template, body :: Maybe Template } }  -- split at a separator
 
 type Helper m env = Ctl m env -> Array Value -> m Value
@@ -183,7 +183,7 @@ separator.
 ====
 *The core never escapes.* HTML escaping is the helper `esc_html`, which returns a `VSafe`. The
 `VSafe` tag makes escaping *idempotent at the boundary*: a value already escaped (or deliberately
-trusted via `safe`) is not escaped again as it flows through another helper. This is the BareBars
+trusted via `safe`) is not escaped again as it flows through another helper. This is the FlatBars
 analogue of {hbs}' `SafeString`, carried in the value rather than implied by which braces you typed.
 ====
 

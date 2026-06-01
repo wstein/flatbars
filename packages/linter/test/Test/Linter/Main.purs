@@ -14,14 +14,14 @@ module Test.Linter.Main where
 
 import Prelude
 
-import BareBars.Parser (parse, parseWith)
-import BareBars.Value (Value(..))
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Parser (parse, parseWith)
+import FlatBars.Value (Value(..))
 import FullBars (desugarSurfaceWith)
 import Kernel.Lower (RNode, lower)
 import Linter.Lower (lowerReport, lowerToRawBars)

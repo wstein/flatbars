@@ -26,9 +26,6 @@ module Kernel.Prelude
 
 import Prelude
 
-import BareBars.Error (Error(..))
-import BareBars.Syntax (Template)
-import BareBars.Value (Value(..))
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
 import Data.Either (Either)
@@ -44,6 +41,9 @@ import Data.String.CodeUnits as CodeUnits
 import Data.String.Common (joinWith, toLower, toUpper)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import FlatBars.Error (Error(..))
+import FlatBars.Syntax (Template)
+import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Helper)
 import Kernel.Env (RefEnv, constHelper, enterPartial, liftEither, lookupHelper, lookupPartial, lookupPartialFalsy, pushFrame, recursionBudget, refContext, refDepth, refFalsy, withFalsy)
 import Kernel.Helper (ArgSpec, atLeast, binary, nullary, unary)
@@ -404,7 +404,7 @@ boolH quant ctl args = pure (VBool (quant (truthy (refFalsy ctl.env)) args))
 -- Value primitives — string pack (helper-packs-spec §4)
 --------------------------------------------------------------------------------
 --
--- Coercion policy (applied identically in `barebars-runtime.mjs`):
+-- Coercion policy (applied identically in `flatbars-runtime.mjs`):
 --   * the subject and any *string-valued* argument (sep/find/rep/sub/x/suffix)
 --     are coerced with the engine's `stringify` — so `{{ uppercase n }}` works
 --     on a number, exactly as the runtime's `stringify` does;

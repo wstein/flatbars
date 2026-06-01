@@ -1,5 +1,5 @@
-name: barebars
-title: BareBars
+name: flatbars
+title: FlatBars
 version: ~          # unversioned component; cut a branch to version it
 display_version: 'spec · ADR-001'
 start_page: ROOT:index.adoc
@@ -7,7 +7,7 @@ nav:
   - modules/ROOT/nav.adoc
 asciidoc:
   attributes:
-    project-name: BareBars
+    project-name: FlatBars
     tagline: 'bare rods — a template-engine construction kit'
     # Core glyphs, defined once so prose stays consistent.
     out: '{plus}{plus}{plus} … {plus}{plus}{plus}'   # not used directly; see attributes below

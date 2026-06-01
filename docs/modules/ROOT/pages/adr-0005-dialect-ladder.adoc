@@ -26,7 +26,7 @@ The family needs several Handlebars-lineage dialects that share one engine witho
   `parseExpr`/`parseHead` seams. A shared semantic kernel is extracted *lazily*, only on a proven
   second consumer (ADR-003), never speculatively.
 
-. *Shared compile driver + per-dialect `Emit`.* `BareBars.Compile` is the dialect-agnostic emit driver
+. *Shared compile driver + per-dialect `Emit`.* `FlatBars.Compile` is the dialect-agnostic emit driver
   — the *fourth* instance of the inversion-of-control pattern (interpret / desugar / validate /
   *compile*). `type Emit = { expr, block }` (`Compile.purs:54`); FullBars' `fullbarsEmit`
   (`Emit.purs:74`) emits native control flow for `if`/`each`/…. The conformance harness asserts the

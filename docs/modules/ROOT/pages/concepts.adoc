@@ -1,7 +1,7 @@
 = The core model
 :navtitle: The core model
 
-BareBars rests on a few decisions. Every later rule is a consequence of them.
+FlatBars rests on a few decisions. Every later rule is a consequence of them.
 
 == 0. Two phases: a skeleton, then a walk
 
@@ -12,7 +12,7 @@ and performs no checks beyond "is this well-formed structure."
 
 Meaning is a *second pass*: a *walk* over the skeleton, supplied by the engine you build. The walk
 validates the tree against the engine's rules and interprets it — precisely the relationship
-between a JSON document and a JSON Schema. BareBars defines the tree and the walking contract; the
+between a JSON document and a JSON Schema. FlatBars defines the tree and the walking contract; the
 engine defines the schema and the interpreter.
 
 Everything below describes the interpretation of the reference engine, *FullBars*. A different engine may choose

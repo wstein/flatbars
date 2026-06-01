@@ -6,7 +6,7 @@
 
 == Context
 
-The original `barebars` package carried *both* the structural core and the engine. The standing
+The original `flatbars` package carried *both* the structural core and the engine. The standing
 directive was *strict separation of concerns* — "separating later makes it harder, so do it right":
 each dialect package contains only its own dialect code, the core is structural only, and the shared
 engine is factored into its own package. ADR-001 made the parser/walker split *conceptual*; this ADR
@@ -16,7 +16,7 @@ makes it a *package* split.
 
 Three tiers plus adapters, dependencies pointing strictly downward.
 
-. *core (`barebars`)* — `Lexer`, `Token`, `Parser`, `Syntax`, `Span`, `Error`, `Value`. Meaning-free:
+. *core (`flatbars`)* — `Lexer`, `Token`, `Parser`, `Syntax`, `Span`, `Error`, `Value`. Meaning-free:
   no engine, no helpers, no validation. `Value` must live at or below core because `Syntax.Expr`
   embeds `Lit Value`; pushing it up would cycle `kernel → core`.
 
@@ -35,7 +35,7 @@ RawBars *has* import isolation (a FullBars-free closure, xref:adr-0008-rawbars.a
 *trades* it for reuse because it genuinely is a FullBars superset. The two properties must not be
 conflated — there is exactly *one* sanctioned import crossing.
 
-. *compile* — `barebars-compile` is the dialect-agnostic emit driver + `Emit` rules, kept FullBars-free
+. *compile* — `flatbars-compile` is the dialect-agnostic emit driver + `Emit` rules, kept FullBars-free
   (`Compile.Emit` reads `Kernel.Value`); `fullbars-compile` layers the surface compiler on top, so
   RawBars' dependency closure is fully FullBars-free.
 
@@ -46,7 +46,7 @@ conflated — there is exactly *one* sanctioned import crossing.
 
 * *Pro:* the substrate claim is *structural* (enforced by the package graph), not asserted; RawBars'
   closure is provably FullBars-free; a new engine plugs onto `kernel` without touching dialects.
-* *Con:* module renames (`BareBars.Engine → Kernel.Engine`, etc.) rippled to every importer; the
+* *Con:* module renames (`FlatBars.Engine → Kernel.Engine`, etc.) rippled to every importer; the
   workspace is now 11 packages; `spago.lock` must be regenerated when a package is added (else test
   deps don't resolve). The "no dialect imports another" rule carries one sanctioned exception.
 

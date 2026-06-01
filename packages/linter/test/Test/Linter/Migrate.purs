@@ -9,7 +9,6 @@ module Test.Linter.Migrate (main) where
 
 import Prelude
 
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -18,6 +17,7 @@ import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Value (Value(..))
 import FullBars (renderSurface)
 import Linter.Migrate (Residual, migrateToMaxBars)
 import MaxBars (renderMax)

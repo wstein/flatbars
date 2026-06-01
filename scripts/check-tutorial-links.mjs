@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { lessons } from "../tutorials/src/examples.mjs";
 import { examples as mustacheExamples } from "../tutorials/src/mustache.mjs";
-import { createBareBarsRenderer } from "../lab/barebars.mjs";
+import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../lab/minbars.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
 
@@ -29,7 +29,7 @@ for (const [key, ex] of Object.entries(lessons)) {
     continue;
   }
   const renderer =
-    ex.engine === "minbars" ? await createMinBarsRenderer() : await createBareBarsRenderer(DIALECT[ex.engine]);
+    ex.engine === "minbars" ? await createMinBarsRenderer() : await createFlatBarsRenderer(DIALECT[ex.engine]);
   try {
     const out = renderer.render(renderer.compile(ex.template, ex.partials || {}).program, ex.data ?? {});
     if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");

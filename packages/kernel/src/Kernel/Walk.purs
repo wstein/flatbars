@@ -3,7 +3,7 @@
 -- | `Parser.parse` produces a *skeleton* AST: it is purely syntactic and
 -- | attaches no meaning to any name. Whether `each` exists, takes one argument,
 -- | and is a block helper is not the parser's concern. Validation is a separate
--- | second pass, driven by a `Schema` the *engine* supplies — the BareBars
+-- | second pass, driven by a `Schema` the *engine* supplies — the FlatBars
 -- | analogue of validating a document against a JSON schema.
 -- |
 -- | `foldRefs` folds a monoid over every name reference in a template
@@ -35,14 +35,14 @@ module Kernel.Walk
 
 import Prelude
 
-import BareBars.Span (Span)
-import BareBars.Syntax (Expr(..), Ident, Node(..), Template)
-import BareBars.Value (Value)
 import Data.Array as Array
 import Data.Foldable (fold, foldMap)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
+import FlatBars.Span (Span)
+import FlatBars.Syntax (Expr(..), Ident, Node(..), Template)
+import FlatBars.Value (Value)
 
 --------------------------------------------------------------------------------
 -- Generic traversal
@@ -114,9 +114,9 @@ foldRefs f = foldMap (node f)
 helperRefs :: Template -> Array HelperRef
 helperRefs = foldRefs Array.singleton
 
--- | A catamorphism over the skeleton: the engine supplies an algebra, BareBars
+-- | A catamorphism over the skeleton: the engine supplies an algebra, FlatBars
 -- | owns the recursion (inversion of control). The `block` case is handed the
--- | raw `children` (so it can resolve clauses) *and* a BareBars-provided
+-- | raw `children` (so it can resolve clauses) *and* a FlatBars-provided
 -- | `recurse` to fold any sub-range. Use it to lower the skeleton to your own
 -- | typed AST, collect diagnostics, or pretty-print — without writing a walk.
 type Algebra a =

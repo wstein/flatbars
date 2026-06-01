@@ -3,7 +3,7 @@
 :toc: macro
 :toclevels: 2
 
-*FullBars* is the reference engine + xref:surface.adoc[surface dialect] shipped with BareBars
+*FullBars* is the reference engine + xref:surface.adoc[surface dialect] shipped with FlatBars
 (xref:prelude.adoc[]). It is a member of the Handlebars/Mustache family: an author who knows {hbs} is
 immediately at home. But it is its own *dialect*, not a clone — and the interesting parts are exactly
 where it chooses differently, on purpose.
@@ -13,7 +13,7 @@ This page is written the other way round from a compatibility matrix. The *diale
 the choices that give FullBars its identity, each with the reasoning — then states what it
 **deliberately drops** (and the replacement), what is genuinely **not built yet**, and finally the
 large surface that is simply **familiar**. For the gap-free *language* mapping (every {hbs} concept
-expressed over the BareBars core), see xref:appendix-handlebars.adoc[Appendix A].
+expressed over the FlatBars core), see xref:appendix-handlebars.adoc[Appendix A].
 
 [horizontal]
 ✓ Familiar:: works as a {hbs} author expects — quiet background.
@@ -111,7 +111,7 @@ structural level a `pass:[{{ x }}]` separator is indistinguishable from surface 
 could eat real content. Explicit `~` still works and composes on top.
 
 Control (highest precedence first): a `pass:[{{! @trim: standalone | none }}]` header directive (the
-one *syntactic* directive the core itself acts on), then the CLI `--trim`, then a `barebars.json`
+one *syntactic* directive the core itself acts on), then the CLI `--trim`, then a `flatbars.json`
 `pass:[{ "trim": … }]`, then the built-in default (on). See xref:directives.adoc[].
 
 === 1.6 The literals `true` / `false` / `null` are helpers
@@ -138,7 +138,7 @@ A refusal, not a TODO — each with its replacement. These will not return.
 
 |Mustache sections `pass:[{{#x}}…{{/x}}]` (truthy/list/lambda)
 |`pass:[{{#if x}}]` / `pass:[{{#each x}}]`
-|BareBars is not Mustache-compatible; control flow is written explicitly
+|FlatBars is not Mustache-compatible; control flow is written explicitly
 (xref:appendix-handlebars.adoc#mustache[A.11]).
 
 |Set-delimiters `pass:[{{=<% %>=}}]`

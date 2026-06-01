@@ -13,9 +13,9 @@ plugs in its expression grammar.
 
 == Decision
 
-. *Keep the structural scanner; add an interior tokenizer.* `BareBars.Lexer` (perf-tuned) still
+. *Keep the structural scanner; add an interior tokenizer.* `FlatBars.Lexer` (perf-tuned) still
   delimits tags into raw interior strings. A *new*, meaning-free interior tokenizer
-  `BareBars.Token.tokenizeInterior :: Int -> String -> Either ParseError (Array PosToken)` lexes that
+  `FlatBars.Token.tokenizeInterior :: Int -> String -> Either ParseError (Array PosToken)` lexes that
   interior into `TIdent`/`TStr`/`TNum`/`TLParen`/`TRParen`/`TOp`.
 
 . *Operators are lexed, not interpreted.* `pass:[& | ! < > == != <= >=]` are matched longest-first and
@@ -25,7 +25,7 @@ plugs in its expression grammar.
 
 . *Two seams on `ParseOptions`.* `parseExpr :: ExprParser` parses output/argument interiors;
   `parseHead :: ExprParser` parses block-open heads (added in Phase D for bare-infix block conditions
-  like `pass:[{{#if a == b}}]`). The default grammar is the shared prefix grammar (`BareBars.Expr`);
+  like `pass:[{{#if a == b}}]`). The default grammar is the shared prefix grammar (`FlatBars.Expr`);
   MaxBars swaps a precedence-climbing grammar through the *same* seams (`Parser.purs:57`).
 
 . *Two surface affordances that (ab)use operator chars, handled meaning-free in core.* (a) The partial

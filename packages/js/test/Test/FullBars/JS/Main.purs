@@ -1,4 +1,4 @@
--- | `barebars-js` facade test suite (`spago test -p barebars-js`).
+-- | `flatbars-js` facade test suite (`spago test -p flatbars-js`).
 -- |
 -- | Exercises the public JS boundary `FullBars.JS.render` / `renderSurface`
 -- | exactly as a JS host would call them (uncurried, over a `Json` value),

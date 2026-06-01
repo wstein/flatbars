@@ -1,9 +1,9 @@
-# BareBars tutorials (FlatBars Lab)
+# FlatBars tutorials (FlatBars Lab)
 
 A runnable, lab-themed documentation site. **Mustache is the front door**: a
 comprehensive `/mustache` reference walks every tag in the logic-less language,
 each illustrated by a live example that renders through the real MinBars engine
-and opens in the FlatBars Lab (`lab/`) with one click. The four BareBars
+and opens in the FlatBars Lab (`lab/`) with one click. The four FlatBars
 surfaces — **RawBars · MinBars · FullBars · MaxBars** — follow as the ladder
 beyond it.
 
@@ -28,7 +28,7 @@ the buttons at a Lab hosted elsewhere.)
 
 In production, serve `lab/` and this site under one origin so the default
 `/lab/index.html` deep-links resolve; set `PUBLIC_SPEC_BASE` to where the Antora
-spec is published (default `/barebars/`).
+spec is published (default `/flatbars/`).
 
 ## How it works
 

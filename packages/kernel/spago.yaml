@@ -4,8 +4,8 @@ package:
     version: 0.1.0
     license: Apache-2.0
     location:
-      githubOwner: barebars
-      githubRepo: barebars
+      githubOwner: flatbars
+      githubRepo: flatbars
   dependencies:
     - prelude
     - arrays
@@ -20,7 +20,7 @@ package:
     - numbers
     - transformers
     - record
-    - barebars
+    - flatbars
   test:
     main: Test.Kernel.Main
     dependencies:

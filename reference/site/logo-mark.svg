@@ -1,5 +1,5 @@
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="BareBars">
-  <title>BareBars</title>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FlatBars">
+  <title>FlatBars</title>
   <!-- graphite plate -->
   <rect x="3" y="3" width="58" height="58" rx="13" fill="#1A1813"/>
   <rect x="3.75" y="3.75" width="56.5" height="56.5" rx="12.25" fill="none" stroke="#3C3833" stroke-width="1.5"/>

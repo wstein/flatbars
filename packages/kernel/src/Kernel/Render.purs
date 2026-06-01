@@ -10,10 +10,10 @@ module Kernel.Render
 
 import Prelude
 
-import BareBars.Error (Error(ParseFailure), renderParseErrorAt)
-import BareBars.Syntax (Directive, Template)
-import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow)
+import FlatBars.Error (Error(ParseFailure), renderParseErrorAt)
+import FlatBars.Syntax (Directive, Template)
+import FlatBars.Value (Value)
 import Kernel.Engine (runTemplate)
 import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, withFalsy)
 import Kernel.Prelude (prelude)

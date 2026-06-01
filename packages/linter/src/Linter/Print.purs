@@ -22,13 +22,13 @@ module Linter.Print
 
 import Prelude
 
-import BareBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil(..), Template)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Foldable (foldMap)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.String as String
+import FlatBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil(..), Template)
+import FlatBars.Value (Value(..))
 
 -- | Pretty-print a desugared core `Template` as RawBars source text.
 printRawBars :: Template -> String

@@ -17,7 +17,6 @@ module Test.Linter.Lift (main) where
 
 import Prelude
 
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -27,6 +26,7 @@ import Data.String as String
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Value (Value(..))
 import Linter.Lift (liftToMaxBars)
 import Linter.Lower (lowerToRawBars)
 import MaxBars (renderMax)

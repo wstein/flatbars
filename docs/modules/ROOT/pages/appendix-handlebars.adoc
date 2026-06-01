@@ -1,10 +1,10 @@
-= Appendix A — Handlebars.js → BareBars, with no gaps
+= Appendix A — Handlebars.js → FlatBars, with no gaps
 :navtitle: A. Handlebars mapping
 :toc: macro
 :toclevels: 3
 
-This appendix is the *contract*: every {hb} concept must have a defined BareBars equivalent, with no
-gaps. Each entry gives the {hbs} form, the *BareBars Surface* spelling (what a template author
+This appendix is the *contract*: every {hb} concept must have a defined FlatBars equivalent, with no
+gaps. Each entry gives the {hbs} form, the *FlatBars Surface* spelling (what a template author
 writes), and the *core* skeleton it desugars to (what the parser produces and the engine walks).
 Surface rules are in xref:surface.adoc[]; engine helpers in xref:prelude.adoc[].
 
@@ -31,7 +31,7 @@ toc::[]
 
 [cols="2,2,3,1",options="header"]
 |===
-|Handlebars |BareBars Surface |Core |Kind
+|Handlebars |FlatBars Surface |Core |Kind
 
 |`pass:[{{x}}]` |`pass:[{{x}}]` |`pass:[{{{ esc_html (lookup this "x") }}}]` |SURFACE
 |`pass:[{{{x}}}]` |`pass:[{{{x}}}]` |`pass:[{{{ lookup this "x" }}}]` |SURFACE
@@ -47,7 +47,7 @@ toc::[]
 |a helper returning HTML, e.g. `pass:[{{price}}]` |use `safe` in the helper |`pass:[{{{ price }}}]` |ENGINE
 |===
 
-*Escaping model.* {hbs} escapes `pass:[{{ }}]` and trusts `pass:[{{{ }}}]`/`SafeString`. BareBars makes
+*Escaping model.* {hbs} escapes `pass:[{{ }}]` and trusts `pass:[{{{ }}}]`/`SafeString`. FlatBars makes
 both explicit: `pass:[{{ }}]` is the *only* thing that introduces `esc_html`; `esc_html` returns
 `VSafe` so re-escaping is a no-op; `safe`/`VSafe` is the `SafeString` analogue. See
 xref:evaluation.adoc[] §3.7. The escaped set is `&`, `<`, `>`, `"`, `'`, matching {hb}.
@@ -61,7 +61,7 @@ and engine work in the core. This is the single most important thing to internal
 
 [cols="2,2,3,1",options="header"]
 |===
-|Handlebars |BareBars Surface |Core |Kind
+|Handlebars |FlatBars Surface |Core |Kind
 
 |`pass:[{{helper a b}}]` |same |`pass:[{{{ esc_html (helper a' b') }}}]` |SURFACE/CORE
 |positional arguments |same |evaluated left-to-right, eagerly |CORE
@@ -106,7 +106,7 @@ Core:        {{{ esc_html (field (lookup this "value")
 
 [cols="2,2,3,1",options="header"]
 |===
-|Handlebars |BareBars Surface |Core |Kind
+|Handlebars |FlatBars Surface |Core |Kind
 
 |`pass:[{{#h}}…{{/h}}]` |same |`pass:[{{#h}}…{{/h}}]` |CORE
 |`pass:[{{#h arg}}…{{/h}}]` |same |args desugar like any call |CORE
@@ -149,7 +149,7 @@ helper; the core only supplies the frame plumbing.
 [#builtins]
 == A.4 Built-in helpers (all become ENGINE)
 
-{hbs}' six built-ins are *not* in the BareBars core. They are reference-engine helpers
+{hbs}' six built-ins are *not* in the FlatBars core. They are reference-engine helpers
 (xref:prelude.adoc[]); remove or replace any of them.
 
 [cols="1,2,3,1",options="header"]
@@ -249,7 +249,7 @@ Core:        {{#each (lookup this "people")}}
 
 [NOTE]
 ====
-The *idiomatic* BareBars replacement for `../` is to *name the scope* with a block parameter rather
+The *idiomatic* FlatBars replacement for `../` is to *name the scope* with a block parameter rather
 than walk a stack: `pass:[{{#each teams as \|team\|}}…{{#each team.members}}{{team.name}}…]`. The
 `parent` helper above is the mechanical, gap-free mapping; block params are the recommended style.
 ====
@@ -350,10 +350,10 @@ Core:        {{{{raw}}}}Hello {{name}}{{{{/raw}}}}   (verbatim; `raw` engine hel
 
 [NOTE]
 ====
-*Standalone whitespace.* Like {hbs}, BareBars removes a line that holds only a standalone block
+*Standalone whitespace.* Like {hbs}, FlatBars removes a line that holds only a standalone block
 open/close or a comment, so a control tag leaves no blank line. This is **on by default** and runs as
 a post-tokenize pass in the core. Turn it off per file with `pass:[{{! @trim: none }}]`, or globally
-with the CLI `--trim none` / `barebars.json`; explicit `~` composes on top. Output tags and bare
+with the CLI `--trim none` / `flatbars.json`; explicit `~` composes on top. Output tags and bare
 `pass:[{{else}}]` separators are never standalone-trimmed. See xref:directives.adoc[].
 ====
 
@@ -369,12 +369,12 @@ here, no grammar or core change is needed to add them. (Inline *partials* — Ha
 not via a decorator mechanism; see xref:prelude.adoc[] §6.6.)
 ====
 
-{hbs} decorators (`pass:[{{#*helper}}]`, `pass:[{{*helper}}]`) modify a block or its `options`. BareBars
+{hbs} decorators (`pass:[{{#*helper}}]`, `pass:[{{*helper}}]`) modify a block or its `options`. FlatBars
 has no separate decorator concept — *a decorator is just a block helper* that wraps the body.
 
 [cols="2,3,1",options="header"]
 |===
-|Handlebars |BareBars |Kind
+|Handlebars |FlatBars |Kind
 
 |`pass:[{{#*inline "n"}}…{{/inline}}]` (built-in) |`pass:[{{#inline "n"}}…{{/inline}}]` engine block helper (A.6) |ENGINE
 |custom block decorator `pass:[{{#*deco}}…{{/deco}}]` |an ordinary block helper returning a transformed body |ENGINE
@@ -382,18 +382,18 @@ has no separate decorator concept — *a decorator is just a block helper* that 
 |`registerDecorator` |`register` (same table as helpers) |HOST
 |===
 
-Because BareBars block helpers already receive the body and the frame, the decorator mechanism is
+Because FlatBars block helpers already receive the body and the frame, the decorator mechanism is
 subsumed; the `*` marker is not part of the grammar.
 
 [#options]
 == A.9 Compile & runtime options
 
-{hbs} compile/runtime flags are not template syntax; in BareBars they are *assembly choices* — which
+{hbs} compile/runtime flags are not template syntax; in FlatBars they are *assembly choices* — which
 engine you register and how its helpers/validation behave.
 
 [cols="2,3,1",options="header"]
 |===
-|Handlebars option |BareBars |Kind
+|Handlebars option |FlatBars |Kind
 
 |`noEscape: true` |render core directly (it never escapes), or a Surface variant whose `pass:[{{ }}]` omits `esc_html` |HOST
 |`strict: true` |register a `lookup` that raises `TypeError` on a missing field instead of `VNull` |HOST/ENGINE
@@ -410,7 +410,7 @@ engine you register and how its helpers/validation behave.
 == A.10 JavaScript API
 
 See xref:host-api.adoc[] §7.4 for the full table. Summary: `compile`/`precompile`/`parse` map to the
-BareBars pipeline; `registerHelper`/`registerPartial`/`registerDecorator` all map to `register`
+FlatBars pipeline; `registerHelper`/`registerPartial`/`registerDecorator` all map to `register`
 (partials and decorators are helpers); `options.fn`/`options.inverse` map to `ctx.render` over the
 body's nodes / over the `else` clause; `SafeString` maps to `VSafe`/`safe`; `escapeExpression` maps
 to `esc_html`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
@@ -420,7 +420,7 @@ to `esc_html`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
 
 [cols="2,3,1",options="header"]
 |===
-|Mustache feature |BareBars |Kind
+|Mustache feature |FlatBars |Kind
 
 |sections `pass:[{{#section}}]` (truthy / list / lambda) |write the helper explicitly: `if`/`each` |DROPPED→`if`/`each`
 |inverted sections `pass:[{{^section}}]` |FullBars desugars to `pass:[{{#unless …}}]` |PROVIDED (FullBars)
@@ -430,10 +430,10 @@ to `esc_html`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
 |HTML-escaping by default |Surface `pass:[{{ }}]` ⇒ `esc_html`; core never escapes |SURFACE
 |===
 
-BareBars adopts *no* Mustache truthy/list *section* semantics: `pass:[{{#x}}]` *always* means "apply
+FlatBars adopts *no* Mustache truthy/list *section* semantics: `pass:[{{#x}}]` *always* means "apply
 the block helper `x`" — never "this is a truthy/list section over `x`". Iterate with
 `pass:[{{#each x}}…{{/each}}]`, branch with `if`/`unless`. (Given `{"list":[1,2,3]}`, Mustache's
-`pass:[{{#list}}…{{/list}}]` is *not* BareBars; write `pass:[{{#each list}}…{{/each}}]`.) The
+`pass:[{{#list}}…{{/list}}]` is *not* FlatBars; write `pass:[{{#each list}}…{{/each}}]`.) The
 *inverted* opener `pass:[{{^x}}]` *is* recognized by the core (a `Block` with the `Inverse` sigil);
 FullBars desugars it to `pass:[{{#unless x}}]`, while RawBars/MaxBars reject it.
 
@@ -517,21 +517,21 @@ left unaddressed — which is the contract.
 == A.13 Implementing the second stage: the engine API
 
 The tables above say *what* a concrete engine must mean. This section says *how* you build one — and
-the defining property is that *you never write the traversal*. BareBars owns lexing, parsing,
+the defining property is that *you never write the traversal*. FlatBars owns lexing, parsing,
 delimiter matching, recursion into children, argument evaluation, output assembly, and error/span
-propagation. Your engine plugs in a few small functions; *BareBars calls them*. This is *inversion of
-control* — the Hollywood principle: **don't call BareBars; BareBars calls you.** An engine is
+propagation. Your engine plugs in a few small functions; *FlatBars calls them*. This is *inversion of
+control* — the Hollywood principle: **don't call FlatBars; FlatBars calls you.** An engine is
 therefore tiny, and two engines differ only in the functions they plug in, never in traversal code.
 
 There are two entry points, for the two things a second stage does:
 
 [horizontal]
 *interpret* (with scope):: `runTemplate` — render directly. Helpers receive a *control handle* and
-ask BareBars to evaluate arguments and render children under environments the helper builds. Top-down;
-BareBars owns dispatch, arg-evaluation, and assembly.
+ask FlatBars to evaluate arguments and render children under environments the helper builds. Top-down;
+FlatBars owns dispatch, arg-evaluation, and assembly.
 *prepare* (analyze / lower):: `foldTemplate` — a catamorphism over the skeleton. The engine supplies
-an *algebra* and BareBars owns the recursion. Use it to lower the skeleton to your own typed AST, to
-collect diagnostics, or to pretty-print. Bottom-up; BareBars owns the recursion.
+an *algebra* and FlatBars owns the recursion. Use it to lower the skeleton to your own typed AST, to
+collect diagnostics, or to pretty-print. Bottom-up; FlatBars owns the recursion.
 
 Both invert control. Pick `runTemplate` to *execute*, `foldTemplate` to *prepare*.
 
@@ -550,15 +550,15 @@ carries a `span` (the opening tag's code-unit range; `Span.lineColumn` maps it t
 [#engine-api-run]
 === A.13.1 Interpreting: `runTemplate`
 
-BareBars hands every helper a *control handle* `Ctl`. Everything on it is a callback *into* BareBars:
+FlatBars hands every helper a *control handle* `Ctl`. Everything on it is a callback *into* FlatBars:
 
 [source,haskell]
 ----
 type Ctl m env =
   { env      :: env                          -- the current environment (yours)
   , children :: Template                     -- this block's body ([] for inline calls)
-  , render   :: env -> Template -> m String  -- BareBars renders a sub-tree for you
-  , eval     :: env -> Expr -> m Value        -- BareBars evaluates a body expression for you
+  , render   :: env -> Template -> m String  -- FlatBars renders a sub-tree for you
+  , eval     :: env -> Expr -> m Value        -- FlatBars evaluates a body expression for you
   , clause   :: Ident -> { before :: Template, body :: Maybe Template }   -- split at a separator
   , span     :: Span }                        -- source location, for diagnostics
 
@@ -577,7 +577,7 @@ predicted.
 ====
 
 (Chapter 3's `Body` — `{ children, render }` — is just the slice of `Ctl` that most helpers use.)
-What *you* supply is three functions; BareBars owns everything else:
+What *you* supply is three functions; FlatBars owns everything else:
 
 [source,haskell]
 ----
@@ -586,17 +586,17 @@ type Engine m env =
   , resolve   :: env -> Ident -> m (Helper m env)   -- find a helper (throw UnknownHelper if absent)
   , stringify :: Value -> m String }                -- how a Value becomes output text
 
--- BareBars provides:
+-- FlatBars provides:
 runTemplate :: forall m env. MonadThrow Error m => Engine m env -> Template -> m String
 runString   :: forall m env. MonadThrow Error m => Engine m env -> String   -> m String  -- parse + run
 ----
 
-The loop, which lives *inside* BareBars (informative): for each node it dispatches on the node kind;
+The loop, which lives *inside* FlatBars (informative): for each node it dispatches on the node kind;
 for `Output e` it calls `eval`; for `App n args` it calls `resolve`, evaluates each argument (which
 may recurse), builds a `Ctl`, and applies the helper; for `Block n args body` it does the same but
 puts `body` on the handle as `children` and closes a `render` over the walk. When a block helper
 wants to emit its body it calls `ctl.render` under an environment *it* constructs — and that call
-re-enters BareBars, which recurses. *That re-entry is the inversion.*
+re-enters FlatBars, which recurses. *That re-entry is the inversion.*
 
 A complete engine for `this`, `lookup`, `esc_html`, `if` (with an `else` clause) and `each` — note
 there is no traversal anywhere in it:
@@ -638,7 +638,7 @@ run :: String -> Value -> Either Error String
 run src data_ = runString (engine data_) src        -- parse Surface upstream if desired
 ----
 
-BareBars matched every `pass:[{{/each}}]`, evaluated `(lookup this "x")` left-to-right, split the
+FlatBars matched every `pass:[{{/each}}]`, evaluated `(lookup this "x")` left-to-right, split the
 `else` clause, recursed per element, and concatenated the output. The engine only stated *what each
 name means* and *when to render its children*.
 
@@ -646,8 +646,8 @@ name means* and *when to render its children*.
 === A.13.2 Preparing the AST: `foldTemplate`
 
 To *prepare* rather than execute — lower the skeleton into your own typed AST, validate it, or
-print it — supply an *algebra*. BareBars drives the recursion; the block case is handed the raw
-`children` (so it can resolve clauses) *and* a BareBars-provided `recurse` to fold any sub-range:
+print it — supply an *algebra*. FlatBars drives the recursion; the block case is handed the raw
+`children` (so it can resolve clauses) *and* a FlatBars-provided `recurse` to fold any sub-range:
 
 [source,haskell]
 ----
@@ -656,10 +656,10 @@ type Algebra a =
   , output  :: Expr   -> a
   , raw     :: Ident -> Array Expr -> String -> a
   , block   :: { name :: Ident, args :: Array Expr
-               , children :: Template, recurse :: Template -> a } -> a   -- recurse is BareBars'
+               , children :: Template, recurse :: Template -> a } -> a   -- recurse is FlatBars'
   , concat  :: Array a -> a }                                            -- combine siblings
 
-foldTemplate :: forall a. Algebra a -> Template -> a       -- BareBars owns the traversal
+foldTemplate :: forall a. Algebra a -> Template -> a       -- FlatBars owns the traversal
 ----
 
 *Lowering* a skeleton into a typed engine AST that resolves `if`/`else` into one node — the
@@ -703,11 +703,11 @@ validate' = foldTemplate (checker preludeNames)
 ----
 
 [#engine-api-summary]
-=== A.13.3 What BareBars does, and what you do
+=== A.13.3 What FlatBars does, and what you do
 
 [cols="1,1",options="header"]
 |===
-|BareBars owns (you never write it) |You supply (small, declarative)
+|FlatBars owns (you never write it) |You supply (small, declarative)
 
 |lex, parse, match `pass:[{{/name}}]`, drop comments, apply `~`
 |`initial` env / root context
@@ -727,5 +727,5 @@ validate' = foldTemplate (checker preludeNames)
 
 The xref:prelude.adoc[reference engine] (Chapter 6) is *exactly one* `Engine`: the `base` map above
 grown to the full helper set, with `else`/clauses read the same way. Swap the map and you have a
-different engine; the traversal — BareBars — is unchanged. That is the whole point of a construction
+different engine; the traversal — FlatBars — is unchanged. That is the whole point of a construction
 kit.

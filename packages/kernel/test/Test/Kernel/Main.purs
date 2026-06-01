@@ -6,13 +6,13 @@ module Test.Kernel.Main where
 
 import Prelude
 
-import BareBars (Node(..), Value(..), parse)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars (Node(..), Value(..), parse)
 import Kernel.ToValue (toValue)
 import Kernel.Value (handlebars, isFalsy, minimal, mustache, resolveTruthiness, resolveTruthinessWith, truthy)
 import Kernel.Walk (Arity(..), foldTemplate, splitClauses, validate)

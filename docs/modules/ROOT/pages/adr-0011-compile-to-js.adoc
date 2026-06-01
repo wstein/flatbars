@@ -6,7 +6,7 @@ xref:adr-0005-dialect-ladder.adoc[] §3, recorded in full here.
 
 == Context
 
-BareBars must drop into the same places Handlebars does — including ahead-of-time *compiled*
+FlatBars must drop into the same places Handlebars does — including ahead-of-time *compiled*
 templates, not only interpretation. A compiler that silently diverges from the interpreter is worse
 than no compiler. The decision is therefore not "add a compiler" but "keep *two* execution paths and
 *gate* them against each other."
@@ -14,11 +14,11 @@ than no compiler. The decision is therefore not "add a compiler" but "keep *two*
 == Decision
 
 . *The compiler is the fourth inversion-of-control instance* (interpret / desugar / validate /
-  *compile*): a dialect-agnostic *emit driver* (`BareBars.Compile`) walks the structural `Template`
+  *compile*): a dialect-agnostic *emit driver* (`FlatBars.Compile`) walks the structural `Template`
   and assembles JS source; a per-dialect `Emit` record (`type Emit = { expr, block }`) decides how an
   expression and a block become JavaScript. Output is one ES module —
   `export default function (data, rt)` — run against a small runtime
-  (`packages/compile/runtime/barebars-runtime.mjs`).
+  (`packages/compile/runtime/flatbars-runtime.mjs`).
 
 . *Two `Emit` tiers.* The faithful baseline routes everything through `rt.call`/`rt.block` (the
   reference behaviour). The FullBars optimiser (`fullbarsEmit`) additionally emits *native* JS control

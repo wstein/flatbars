@@ -6,7 +6,7 @@
 // fetch the spec's `.json` modules at a PINNED commit and split each into one
 // fixture file per test, in the shared vendored-fixture format (§4). The corpus
 // is then plain, diffable, offline files — no runtime fetch. The headless
-// `barebars examples verify` gate (§6.5) renders each fixture through MinBars and
+// `flatbars examples verify` gate (§6.5) renders each fixture through MinBars and
 // asserts `actual == expected` (a divergence is a conformance failure).
 //
 // `.json` (not `.yml`) is deliberate: mustache/spec ships both, so `JSON.parse`
@@ -22,7 +22,7 @@ import { dirname, resolve } from "node:path";
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 // The corpus lives under the FlatBars Lab's served root so both the headless
-// `barebars examples verify` gate (run from the repo root) and the Lab (served
+// `flatbars examples verify` gate (run from the repo root) and the Lab (served
 // from lab/) read one canonical copy — no duplication.
 const OUT = resolve(root, "lab/examples/vendored/mustache");
 

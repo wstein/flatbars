@@ -15,7 +15,7 @@ decide for the same value.
 
 ```sh
 # from the repo root
-npx spago run -p barebars-cli -- examples/truthiness/template.hbs \
+npx spago run -p flatbars-cli -- examples/truthiness/template.hbs \
   --data examples/truthiness/data.json > examples/truthiness/expected.html
 ```
 
@@ -41,7 +41,7 @@ numbers, and any non-empty string/array.
 ## `includeZero`
 
 Like Handlebars, `0` is falsy by default. To count `0` as truthy, pass
-Handlebars' `includeZero` option. BareBars has no hash-argument surface yet, so
+Handlebars' `includeZero` option. FlatBars has no hash-argument surface yet, so
 it is supplied as an *options object* built with `dict`:
 
 ```handlebars

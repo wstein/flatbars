@@ -21,14 +21,14 @@ module Linter.Lower
 
 import Prelude
 
-import BareBars.Error (ParseError(..))
-import BareBars.Parser (parseWith)
-import BareBars.Syntax (Directive, Node(..), Sigil(..), Template)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Set as Set
 import Data.String as String
+import FlatBars.Error (ParseError(..))
+import FlatBars.Parser (parseWith)
+import FlatBars.Syntax (Directive, Node(..), Sigil(..), Template)
 import FullBars (desugarSurfaceWith)
 import Linter.Print (printDirectives, printRawBars)
 import MaxBars (maxLoopVars, maxOptions)

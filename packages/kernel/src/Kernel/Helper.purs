@@ -26,10 +26,10 @@ module Kernel.Helper
 
 import Prelude
 
-import BareBars.Error (Error(..))
-import BareBars.Value (Value)
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
+import FlatBars.Error (Error(..))
+import FlatBars.Value (Value)
 import Kernel.Engine (Helper)
 import Kernel.Walk (Arity(..), arityOk, arityText)
 

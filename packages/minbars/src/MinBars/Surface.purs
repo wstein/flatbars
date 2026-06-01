@@ -30,11 +30,11 @@ module MinBars.Surface
 
 import Prelude
 
-import BareBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Maybe (Maybe(..), maybe)
 import Data.String (Pattern(..), stripPrefix)
+import FlatBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
+import FlatBars.Value (Value(..))
 
 -- | Desugar a MinBars surface template into core syntax.
 desugar :: Template -> Template

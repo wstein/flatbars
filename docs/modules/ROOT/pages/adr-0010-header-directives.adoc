@@ -38,7 +38,7 @@ carriage mechanism that does not breach the meaning-free core (ADR-001).
 . *`@trim` selects standalone-whitespace handling* — `standalone` (default; strips the line a lone
   block/comment tag sits on) or `none`. It is acted *in the core lexer* (`trimStandalone`), default-on
   (`defaultParseOptions.trimStandalone = true`). Precedence: a `@trim` directive overrides the CLI
-  `--trim` flag, which overrides `barebars.json`'s `{ "trim": … }`, which overrides the default.
+  `--trim` flag, which overrides `flatbars.json`'s `{ "trim": … }`, which overrides the default.
 
 == Consequences
 

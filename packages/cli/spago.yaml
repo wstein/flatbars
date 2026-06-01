@@ -1,5 +1,5 @@
 package:
-  name: barebars-cli
+  name: flatbars-cli
   dependencies:
     - prelude
     - effect
@@ -13,9 +13,9 @@ package:
     - node-fs
     - node-buffer
     - exceptions
-    - barebars
+    - flatbars
     - kernel
-    - barebars-json
+    - flatbars-json
     - fullbars-compile
     - fullbars
     - rawbars

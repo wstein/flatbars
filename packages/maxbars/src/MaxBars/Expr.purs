@@ -1,6 +1,6 @@
 -- | The **MaxBars** interior grammar: the prefix term language plus *infix
 -- | operators* and *pipes*, parsed from the core interior **token stream**
--- | (`BareBars.Token`) into plain core `Expr` (`App` calls) — so the engine,
+-- | (`FlatBars.Token`) into plain core `Expr` (`App` calls) — so the engine,
 -- | prelude, and compiler below are reused unchanged.
 -- |
 -- | Operators desugar to helper calls: `&&`→`and`, `||`→`or`, `!`→`not`,
@@ -28,13 +28,13 @@ module MaxBars.Expr
 
 import Prelude
 
-import BareBars.Error (ParseError(..))
-import BareBars.Syntax (Expr(..))
-import BareBars.Token (PosToken, Token(..))
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import FlatBars.Error (ParseError(..))
+import FlatBars.Syntax (Expr(..))
+import FlatBars.Token (PosToken, Token(..))
+import FlatBars.Value (Value(..))
 
 type Step a = { val :: a, pos :: Int }
 

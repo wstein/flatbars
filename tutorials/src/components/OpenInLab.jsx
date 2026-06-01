@@ -5,7 +5,7 @@
 // and offers an "Open in Lab" link built from the shared contract (item 1).
 import { useEffect, useState } from "preact/hooks";
 import { labHref } from "../../../lab/open-in-lab.mjs";
-import { createBareBarsRenderer } from "../../../lab/barebars.mjs";
+import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
@@ -13,7 +13,7 @@ const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
 async function renderExample(engine, { template, data, partials }) {
   const r = engine === "minbars"
     ? await createMinBarsRenderer()
-    : await createBareBarsRenderer(DIALECT[engine]);
+    : await createFlatBarsRenderer(DIALECT[engine]);
   try {
     return { ok: true, out: r.render(r.compile(template, partials || {}).program, data ?? {}) };
   } catch (e) {

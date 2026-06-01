@@ -19,13 +19,13 @@ module Linter.Aliases
 
 import Prelude
 
-import BareBars.Error (ParseError)
-import BareBars.Parser (parse)
-import BareBars.Syntax (Template)
 import Data.Array as Array
 import Data.Either (Either)
 import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..))
+import FlatBars.Error (ParseError)
+import FlatBars.Parser (parse)
+import FlatBars.Syntax (Template)
 import Kernel.Prelude (preludeAliases)
 import Kernel.Walk (Issue, Severity(..), helperRefs)
 

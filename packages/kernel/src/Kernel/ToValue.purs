@@ -6,7 +6,7 @@
 -- | obvious `Value`, and a `RowToList`-driven instance turns any *record* into a
 -- | `VObject` by lifting each field.
 -- |
--- | This is the typed, dependency-light dual of `BareBars.Json.fromJson` (which
+-- | This is the typed, dependency-light dual of `FlatBars.Json.fromJson` (which
 -- | bridges an external JSON wire value). It introduces *no* engine semantics —
 -- | it only constructs the core `Value` the substrate already owns — so it stays
 -- | in the core proper, unlike the JSON adapter.
@@ -27,12 +27,12 @@ module Kernel.ToValue
 
 import Prelude
 
-import BareBars.Value (Value(..))
 import Data.Int (toNumber)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe, maybe)
 import Data.Symbol (class IsSymbol, reflectSymbol)
+import FlatBars.Value (Value(..))
 import Prim.Row as Row
 import Prim.RowList (class RowToList, Cons, Nil, RowList)
 import Record (get)

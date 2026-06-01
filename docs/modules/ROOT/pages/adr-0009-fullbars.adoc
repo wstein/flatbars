@@ -2,7 +2,7 @@
 :navtitle: ADR-009 FullBars
 
 *Status:* Accepted. *Date:* 2026-06-01. The middle rung of the ladder
-(xref:adr-0005-dialect-ladder.adoc[]); "flat bars" to BareBars' "bare rods."
+(xref:adr-0005-dialect-ladder.adoc[]); "flat bars" to FlatBars' "bare rods."
 
 == Context
 

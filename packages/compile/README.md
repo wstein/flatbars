@@ -1,6 +1,6 @@
-# barebars-compile
+# flatbars-compile
 
-A **dialect-agnostic** template→JavaScript compiler for BareBars — the fourth
+A **dialect-agnostic** template→JavaScript compiler for FlatBars — the fourth
 instance of the inversion-of-control pattern (interpret / desugar / validate /
 **compile**). It turns a template into a small JS ES module that runs against a
 hand-written runtime over **plain JS values** (not the `Value` ADT), the way
@@ -8,16 +8,16 @@ Handlebars precompiles.
 
 ## Layout
 
-- [`BareBars.Compile`](src/BareBars/Compile.purs) — the meaning-free **emit
+- [`FlatBars.Compile`](src/FlatBars/Compile.purs) — the meaning-free **emit
   driver**: walks the structural `Template` and assembles a JS function source.
   `Content`/`Output`/`Sep`/`RawBlock` are universal; `Block`/`Expr` defer to a
   dialect's `Emit` rules. Reserves no names.
-- [`BareBars.Compile.FullBars`](src/BareBars/Compile/FullBars.purs) — the
+- [`FlatBars.Compile.FullBars`](src/FlatBars/Compile/FullBars.purs) — the
   **FullBars** `Emit` binding: native JS control flow for `if`/`unless`/`each`/
   `with` (the optimiser), hot helpers (`this`/`lookup`/`escapeHtml`/`safe`)
   inlined, everything else through `rt.call`/`rt.block` (the baseline). A Core or
   Max dialect would add its own binding to the same seam.
-- [`runtime/barebars-runtime.mjs`](runtime/barebars-runtime.mjs) — the JS runtime
+- [`runtime/flatbars-runtime.mjs`](runtime/flatbars-runtime.mjs) — the JS runtime
   the compiled code calls. It re-implements the FullBars value semantics —
   including the deliberate divergences (content-based `VSafe` truthiness, explicit
   escaping, sorted object iteration, `@../` parent-data).
@@ -30,7 +30,7 @@ paths and asserts byte-identical output:
 
 - *spec* = the interpreter (`FullBars.renderWith`, imported from `output/` so it
   is always current source);
-- *compiled* = `BareBars.Compile` → JS, executed against the runtime.
+- *compiled* = `FlatBars.Compile` → JS, executed against the runtime.
 
 Cases come from the inline corpus ([`conformance/cases.mjs`](conformance/cases.mjs)
 — constructs + divergence edge cases) plus every `examples/*/` golden template.

@@ -16,11 +16,11 @@ module MaxBars
 
 import Prelude
 
-import BareBars.Error (ParseError)
-import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
-import BareBars.Value (Value)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
+import FlatBars.Error (ParseError)
+import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Value (Value)
 import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith)
 import Kernel.Walk (Issue)
@@ -70,7 +70,7 @@ renderMax :: String -> Value -> Either String String
 renderMax = renderSurfaceDiagWith maxLoopVars maxOptions
 
 -- | Compile MaxBars surface source to a JS ES module, reusing the FullBars
--- | compiler (`BareBars.Compile`) — infix/pipe and loop vars desugar to the same
+-- | compiler (`FlatBars.Compile`) — infix/pipe and loop vars desugar to the same
 -- | core helpers the emit rules already handle.
 compileMaxJs :: String -> Either ParseError String
 compileMaxJs = compileSurfaceWith maxLoopVars maxOptions

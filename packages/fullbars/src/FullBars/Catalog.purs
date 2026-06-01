@@ -12,13 +12,13 @@ module FullBars.Catalog
 
 import Prelude
 
-import BareBars.Error (Error)
 import Data.Either (Either)
 import Data.Foldable (foldMap, lookup)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
+import FlatBars.Error (Error)
 import Kernel.Engine (Helper)
 import Kernel.Env (RefEnv)
 import Kernel.Prelude (prelude, preludeAliases, preludeSchema)

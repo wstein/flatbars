@@ -1,8 +1,8 @@
-# BareBars
+# FlatBars
 
 > **bare rods** — a template-engine *construction kit*.
 
-BareBars is not a template engine. It is the **substrate you build one on**: the
+FlatBars is not a template engine. It is the **substrate you build one on**: the
 Handlebars/Mustache surface you already know (`{{{ }}}`, blocks, raw blocks,
 comments, whitespace control) sitting on top of a **deliberately tiny core**
 where almost nothing is built in. No built-in helpers, no escaping policy, no
@@ -20,12 +20,12 @@ implementation and a CLI, alongside the normative specification and the
 │   └── modules/ROOT/      pages/*.adoc · nav.adoc · assets/images
 ├── site/                  Hand-written marketing landing page (index.html)
 ├── packages/
-│   ├── core/              `barebars` — the engine-agnostic framework (lexer · parser · driver · walk)
+│   ├── core/              `flatbars` — the engine-agnostic framework (lexer · parser · driver · walk)
 │   ├── fullbars/          `fullbars` — the reference engine (value policy · prelude · lowering)
-│   ├── json/              `barebars-json` — JSON ⇆ `Value` adapter (kept out of the framework)
-│   └── cli/               `barebars-cli` — render templates + run the example/conformance corpus
+│   ├── json/              `flatbars-json` — JSON ⇆ `Value` adapter (kept out of the framework)
+│   └── cli/               `flatbars-cli` — render templates + run the example/conformance corpus
 ├── examples/              Foldered core-template fixtures (golden cases for the compiler conformance harness)
-│   └── vendored/          Vendored upstream corpus (mustache/spec) for `barebars examples verify`
+│   └── vendored/          Vendored upstream corpus (mustache/spec) for `flatbars examples verify`
 └── reference/
     └── web/               FlatBars Lab — the JS/WASM polyglot playground (Stem · RawBars · MinBars · FullBars · MaxBars)
 ```
@@ -36,7 +36,7 @@ exposes.
 
 The `examples/*/` folders (each `meta.json` + `template.hbs` + `data.json`) are
 golden cases for the compiler conformance harness (`npm run test:compile`); the
-vendored upstream corpus under `lab/examples/vendored/` drives `barebars examples
+vendored upstream corpus under `lab/examples/vendored/` drives `flatbars examples
 verify`. The FlatBars Lab's own demo templates live under `lab/examples/`.
 
 ## Prerequisites
@@ -45,7 +45,7 @@ The PureScript toolchain is provisioned per-project via npm — you do **not** n
 a global `purs`/`spago`:
 
 ```sh
-npm install            # installs purescript + spago (+ esbuild for the barebars-js bundle)
+npm install            # installs purescript + spago (+ esbuild for the flatbars-js bundle)
 ```
 
 ## Common tasks

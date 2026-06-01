@@ -1,11 +1,11 @@
--- | FullBars — the reference template engine built on the BareBars framework.
+-- | FullBars — the reference template engine built on the FlatBars framework.
 -- |
--- | "Flat bars" to BareBars' "bare rods": one *possible* engine over the
+-- | "Flat bars" to FlatBars' "bare rods": one *possible* engine over the
 -- | substrate (ADR-001). It supplies the Handlebars-flavoured meaning the
 -- | framework deliberately omits — value policy (`truthy`/`escapeHtml`/
 -- | `stringify`), an environment (`RefEnv`/`refEngine`), the prelude of helpers,
 -- | and the desugaring walk (`lower`) — and wires them into convenience
--- | renderers. Swap any of it for a different engine without touching `barebars`.
+-- | renderers. Swap any of it for a different engine without touching `flatbars`.
 module FullBars
   ( module Kernel.Value
   , module Kernel.Env
@@ -26,14 +26,14 @@ module FullBars
 
 import Prelude
 
-import BareBars.Error (Error, ParseError, renderParseErrorAt)
-import BareBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
-import BareBars.Syntax (Ident, Template)
-import BareBars.Value (Value)
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import FlatBars.Error (Error, ParseError, renderParseErrorAt)
+import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
+import FlatBars.Syntax (Ident, Template)
+import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, desugar, desugarWith, hoistInline, noLoopVars)
 import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)

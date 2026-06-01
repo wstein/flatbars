@@ -23,8 +23,6 @@ module MinBars.Context
 
 import Prelude
 
-import BareBars.Syntax (Template)
-import BareBars.Value (Value(..))
 import Data.Array as Array
 import Data.List (List(..), (:))
 import Data.List as List
@@ -32,6 +30,8 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split)
+import FlatBars.Syntax (Template)
+import FlatBars.Value (Value(..))
 import Kernel.Value (FalsySet)
 
 -- | The MinBars environment: a Mustache *context stack* plus the partial
