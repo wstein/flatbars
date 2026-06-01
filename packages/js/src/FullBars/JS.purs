@@ -18,6 +18,7 @@ module FullBars.JS
   , compileSurface
   , compileMaxbars
   , compileMinbars
+  , compileMinbarsWithPartials
   , renderSurfaceWithPartials
   , renderMustache
   ) where
@@ -100,6 +101,13 @@ compileMaxbars = mkFn1 \tpl -> compileResult (MaxBars.compileMaxJs tpl)
 -- | Compile a MinBars (Mustache) template to JS (ADR-016). `compileMinbars(template)`.
 compileMinbars :: Fn1 String Result
 compileMinbars = mkFn1 \tpl -> compileResult (MinBars.compileMinJs tpl)
+
+-- | Compile a MinBars template to JS with a set of named partials (each a
+-- | Mustache source); `{{> name}}` is inlined. `compileMinbarsWithPartials(partials, template)`,
+-- | where `partials` is a plain `{ name: source }` object.
+compileMinbarsWithPartials :: Fn2 (FO.Object String) String Result
+compileMinbarsWithPartials = mkFn2 \partials tpl ->
+  compileResult (MinBars.compileMinJsWith (FO.toUnfoldable partials) tpl)
 
 compileResult :: forall e. Show e => Either e String -> Result
 compileResult = case _ of

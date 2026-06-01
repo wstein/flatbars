@@ -16,6 +16,7 @@ module MinBars
   , renderMinWith
   , renderMinDiag
   , compileMinJs
+  , compileMinJsWith
   ) where
 
 import Prelude
@@ -23,8 +24,11 @@ import Prelude
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
+import Data.Foldable (elem)
+import Data.List (List(..), (:))
 import Data.Map (Map)
 import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Compile (compile)
@@ -33,13 +37,13 @@ import FlatBars.Error (Error(..), ParseError(..), renderParseErrorAt)
 import FlatBars.Lexer (LexConfig, defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
 import FlatBars.Syntax (Directive, Expr(..), Node(..), Template)
-import FlatBars.Value (Value)
+import FlatBars.Value (Value(..))
 import Kernel.Engine (runTemplate)
 import Kernel.Render (formatError)
 import Kernel.Value (FalsySet, mustache, resolveTruthinessWith)
 import MinBars.Compile (minEmit)
 import MinBars.Context (seedEnv)
-import MinBars.Prelude (minEngine)
+import MinBars.Prelude (indentTemplate, minEngine)
 import MinBars.Standalone (mustacheStandalone)
 import MinBars.Surface (desugar)
 
@@ -113,24 +117,40 @@ renderCore partials src dat = case parseMin src of
           Left e -> Left (formatError src e)
           Right out -> Right out
 
--- | Compile MinBars (Mustache) source to a JS ES module (ADR-016), reusing the
+-- | Compile MinBars (Mustache) source to a JS ES module (ADR-016) with no
+-- | partials registered (`{{> p}}` then renders `""`, as the interpreter does for
+-- | a missing partial). See `compileMinJsWith` for the partial-aware entry.
+compileMinJs :: String -> Either ParseError String
+compileMinJs = compileMinJsWith []
+
+-- | Compile MinBars (Mustache) source to a JS ES module, reusing the
 -- | dialect-agnostic `FlatBars.Compile` driver with MinBars' own `Emit`
 -- | (`MinBars.Compile.minEmit`) over the `m*` runtime ops. The emitted function
--- | runs against `runtime/flatbars-runtime.mjs`, and `compile_conformance.mjs`
--- | asserts it is byte-identical to `renderMin`.
+-- | runs against `runtime/flatbars-runtime.mjs`; `compile_conformance.mjs` asserts
+-- | it is byte-identical to `renderMin`/`renderMinWith`.
 -- |
--- | Slice 1 covers interpolation, sections, and inverted sections; a template
--- | that uses partials or inheritance is rejected with a `DisallowedShape` until
--- | the later slices land (a loud failure, never a silent miscompile).
-compileMinJs :: String -> Either ParseError String
-compileMinJs src = do
+-- | Slice 2 (partials): `{{> p}}` is *inlined* — the partial's desugared template
+-- | is spliced at the call site with `indentTemplate` applied (the standalone
+-- | indent is a compile-time literal), in the caller's scope, so context
+-- | inheritance and standalone-indent re-application match the interpreter exactly
+-- | (which renders the same `indentTemplate indent tmpl` under the caller's env).
+-- | A missing partial inlines to nothing (`""`).
+-- |
+-- | Out of scope, rejected with a `DisallowedShape` (loud, never a miscompile):
+-- | *recursive* partials (a cycle cannot be inlined — the interpreter bounds them
+-- | at run time), *dynamic-name* partials `{{>* name}}` (the name is unknown until
+-- | run time), and *inheritance* (`{{<p}}` / `{{$b}}`, ADR-016 slice 3).
+compileMinJsWith :: Array (Tuple String String) -> String -> Either ParseError String
+compileMinJsWith partialSrcs src = do
   { directives, nodes } <- parseMin src
   falsy <- lmap toParseError (resolveTruthinessWith mustache directives)
-  let desugared = desugar nodes
-  if hasUnsupported desugared then
-    Left (DisallowedShape "partials / inheritance (MinBars compile is ADR-016 slice 1)" 0)
-  else Right (compile (minMeta falsy) minEmit [] desugared)
+  partials <- Map.fromFoldable <$> traverse parsePartial partialSrcs
+  inlined <- inlinePartials partials Nil (desugar nodes)
+  if hasUnsupported inlined then
+    Left (DisallowedShape "inheritance — {{<p}} / {{$b}} (MinBars compile is ADR-016 slice 3)" 0)
+  else Right (compile (minMeta falsy) minEmit [] inlined)
   where
+  parsePartial (Tuple name s) = parseMin s <#> \r -> Tuple name (desugar r.nodes)
   toParseError = case _ of
     DirectiveError m o -> BadDirective m o
     e -> BadDirective (show e) 0
@@ -144,10 +164,31 @@ minMeta falsy =
   , seed: "rt.mseed(data, $falsy)"
   }
 
--- | Does the desugared template use a construct outside slice 1? Partials
--- | (`(partial …)`), parent templates (`parent`), or block overrides (`block`).
+-- | Inline every static `{{> p}}` into the (desugared) template, carrying the
+-- | call-site standalone indent and tracking the inlining chain to reject cycles.
+-- | The result is partial-free, ready for the slice-1 `minEmit`.
+inlinePartials :: Map String Template -> List String -> Template -> Either ParseError Template
+inlinePartials partials chain tmpl = Array.concat <$> traverse expand tmpl
+  where
+  expand = case _ of
+    -- a static partial reference `(partial "name" "indent")` — splice it in.
+    Output _ (App "partial" [ Lit (VString name), Lit (VString indent) ])
+      | elem name chain -> Left
+          (DisallowedShape ("recursive partial '" <> name <> "' (MinBars compile)") 0)
+      | otherwise -> case Map.lookup name partials of
+          Nothing -> Right [] -- missing partial ⇒ "" (Mustache: never an error)
+          Just body -> inlinePartials partials (name : chain) (indentTemplate indent body)
+    -- a dynamic-name partial `{{>* name}}` resolves at run time ⇒ cannot inline.
+    Output _ (App "partial" _) ->
+      Left (DisallowedShape "dynamic-name partial {{>* …}} (MinBars compile)" 0)
+    Block sp sig name args body -> (\b -> [ Block sp sig name args b ]) <$> inlinePartials partials
+      chain
+      body
+    other -> Right [ other ]
+
+-- | Does the (already partial-inlined) template still use an unsupported
+-- | construct? Only inheritance remains — parent templates / block overrides.
 hasUnsupported :: Template -> Boolean
 hasUnsupported = Array.any case _ of
-  Output _ (App "partial" _) -> true
   Block _ _ name _ body -> name == "parent" || name == "block" || hasUnsupported body
   _ -> false

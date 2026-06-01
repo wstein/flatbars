@@ -25,7 +25,7 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, compileSurface, compileMaxbars, compileMinbars, render, renderSurface, renderMaxbars, renderMinbars } =
+const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMustache } =
   await import(enginePath);
 
 // Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
@@ -41,12 +41,15 @@ const compilerFor = (dialect) =>
     : dialect === "minbars" ? compileMinbars
     : compile;
 
-// Render with the interpreter (the spec), in the case's dialect.
-const interpret = (t, d, dialect) => interpreterFor(dialect)(t, d == null ? null : d);
+// Render with the interpreter (the spec), in the case's dialect. A `minbars`
+// case with `partials` uses the MinBars + partials interpreter (renderMustache).
+const interpret = (t, d, dialect, partials) =>
+  (dialect === "minbars" && partials) ? renderMustache(partials, t, d == null ? null : d)
+    : interpreterFor(dialect)(t, d == null ? null : d);
 
 // Compile then execute against the runtime: -> { ok, value, error }.
-async function runCompiled(t, d, dialect) {
-  const c = compilerFor(dialect)(t);
+async function runCompiled(t, d, dialect, partials) {
+  const c = (dialect === "minbars" && partials) ? compileMinbarsWithPartials(partials, t) : compilerFor(dialect)(t);
   if (!c.ok) return { ok: false, value: "", error: "compile: " + c.error };
   try {
     const mod = await import("data:text/javascript," + encodeURIComponent(c.value));
@@ -71,9 +74,9 @@ const allCases = [...corpus, ...exampleCases()];
 
 let pass = 0, fail = 0;
 const fails = [];
-for (const { name, t, d, dialect } of allCases) {
-  const spec = interpret(t, d, dialect);
-  const got = await runCompiled(t, d, dialect);
+for (const { name, t, d, dialect, partials } of allCases) {
+  const spec = interpret(t, d, dialect, partials);
+  const got = await runCompiled(t, d, dialect, partials);
   if (!spec.ok) {
     // The interpreter itself errored — not a compiler conformance case.
     console.log(`  ?    ${name} — interpreter errored: ${spec.error}`);

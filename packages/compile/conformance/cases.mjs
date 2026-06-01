@@ -304,4 +304,19 @@ export const cases = [
   // are falsy), so the section renders — the compiled `$falsy` is the mustache set.
   { name: "mn:truthy-zero", dialect: "minbars", t: "{{#count}}in stock: {{count}}{{/count}}{{^count}}sold out{{/count}}", d: { count: 0 } },
   { name: "mn:truthy-empty-string", dialect: "minbars", t: "{{#note}}has{{/note}}{{^note}}none{{/note}}", d: { note: "" } },
+
+  // ── MinBars partials — ADR-016 compile slice 2 (inlined `{{> p}}`) ───────────
+  // A partial inherits the caller's context (the partial body resolves against
+  // the same stack), and is reused per row of a section.
+  { name: "mn:partial-basic", dialect: "minbars", t: "{{> greeting}} & {{> greeting}}", d: { name: "Ada" }, partials: { greeting: "Hi {{name}}!" } },
+  { name: "mn:partial-row", dialect: "minbars", t: "{{#people}}{{> row}}\n{{/people}}", d: { people: [{ name: "Ada", role: "author" }, { name: "Lin", role: "guest" }] }, partials: { row: "- {{name}} ({{role}})" } },
+  // a missing partial renders "" (never an error), like the interpreter.
+  { name: "mn:partial-missing", dialect: "minbars", t: "[{{> nope}}]", d: {}, partials: {} },
+  // nested partials (a partial that includes another) inline transitively.
+  { name: "mn:partial-nested", dialect: "minbars", t: "{{> outer}}", d: { name: "Ada" }, partials: { outer: "<{{> inner}}>", inner: "{{name}}" } },
+  // standalone-indentation (mustache/spec): a lone `{{>p}}` on an indented line
+  // re-indents the partial's STATIC lines, but NOT a newline produced by an
+  // interpolated value — the byte-exactness proof that the compiled path applies
+  // `indentTemplate` at the template level, not to the rendered string.
+  { name: "mn:partial-standalone-indent", dialect: "minbars", t: "\\\n {{>part}}\n/\n", d: { content: "<\n->" }, partials: { part: "|\n{{{content}}}\n|\n" } },
 ];

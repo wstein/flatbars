@@ -1,9 +1,9 @@
 = ADR-016: MinBars compile-to-JS
 :navtitle: ADR-016 MinBars compile
 
-*Status:* Accepted (phased; slice 1 — interpolation, sections, inverted — shipped). *Date:* 2026-06-01.
-Revisits the interpret-only decision in xref:adr-0007-minbars.adoc[ADR-007]; an instance of the
-compile IoC pattern (xref:adr-0011-compile-to-js.adoc[ADR-011]).
+*Status:* Accepted (phased; slices 1–2 — interpolation, sections, inverted, partials — shipped).
+*Date:* 2026-06-01. Revisits the interpret-only decision in xref:adr-0007-minbars.adoc[ADR-007]; an
+instance of the compile IoC pattern (xref:adr-0011-compile-to-js.adoc[ADR-011]).
 
 == Context
 
@@ -50,10 +50,19 @@ dependency, allowed by the isolation invariants — only `rawbars` edges are for
 
 == Phasing
 
-. *Slice 1 (this ADR):* interpolation (escaped/raw/dotted/implicit/missing), polymorphic sections,
-  inverted sections. `compileMinJs` *rejects* templates using partials or inheritance with a clear
-  parse error (loud, not a silent miscompile) until later slices.
-. *Slice 2:* context-inheriting partials + standalone indentation (`rt.mpartial`).
+. *Slice 1:* interpolation (escaped/raw/dotted/implicit/missing), polymorphic sections, inverted
+  sections.
+. *Slice 2 (shipped):* partials, by *inlining* — `compileMinJsWith` splices each static `{{> p}}`
+  into the call site, with `indentTemplate indent` applied to the partial's desugared template (the
+  standalone indent is a compile-time literal). Because the splice lands in the caller's scope, context
+  inheritance is automatic, and because `indentTemplate` runs on the *template* (not the rendered
+  string), a newline produced by an interpolated value is not indented — byte-identical to the
+  interpreter, which renders the same `indentTemplate indent tmpl` under the caller's env (proven by
+  the mustache standalone-indentation case in the corpus). Inlining cannot express a *cycle*, so a
+  *recursive* partial is rejected with a `DisallowedShape` (the interpreter bounds recursion at run
+  time with the recursion budget); a *dynamic-name* partial `{{>* name}}` is rejected too (the name is
+  unknown until run time). Both are loud failures, never a silent miscompile. No runtime/driver change
+  was needed — the slice-1 `m*` ops suffice.
 . *Slice 3:* inheritance — `parent`/`block` with the block-override stack and the §4.6.2 reindentation.
 
 Each slice is gated by compile conformance before it lands.
