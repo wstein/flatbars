@@ -1,0 +1,28 @@
+package:
+  name: minbars
+  publish:
+    version: 0.1.0
+    license: Apache-2.0
+    location:
+      githubOwner: barebars
+      githubRepo: barebars
+  dependencies:
+    - prelude
+    - arrays
+    - lists
+    - ordered-collections
+    - maybe
+    - either
+    - strings
+    - foldable-traversable
+    - transformers
+    - tuples
+    - barebars
+    - kernel
+  test:
+    main: Test.MinBars.Main
+    dependencies:
+      - effect
+      - console
+      - assert
+      - tuples
