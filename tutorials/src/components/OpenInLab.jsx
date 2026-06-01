@@ -21,7 +21,12 @@ async function renderExample(engine, { template, data, partials }) {
   }
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = "/lab/index.html" }) {
+// Where the Lab is served. Same-origin `/lab/` in production (one host serves
+// both); in local dev the tutorials run on their own port, so point this at the
+// running `npm run lab` server, e.g. PUBLIC_LAB_URL=http://localhost:8000/lab/index.html.
+const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
+
+export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL }) {
   const [href, setHref] = useState(null);
   const [preview, setPreview] = useState(null);
 

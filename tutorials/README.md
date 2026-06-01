@@ -9,13 +9,24 @@ Lab (`lab/`) on the right engine, no copy-pasting.
 ```sh
 cd tutorials
 npm install            # Astro + @astrojs/preact + preact
-npm run dev            # http://localhost:4321
+npm run dev            # http://localhost:4321  ← the tutorials
 npm run build          # static site → dist/
 ```
 
-Serve the Lab (`lab/`) and this site under the same origin so the
-`/lab/index.html` deep-links resolve; set `PUBLIC_SPEC_BASE` to where the
-Antora spec is published (default `/barebars/`).
+`http://localhost:4321/` is the tutorials landing page; each surface is at
+`/rawbars`, `/minbars`, `/fullbars`, `/maxbars`.
+
+**Local dev with working "Open in Lab"** (two servers). The tutorials and the Lab
+run on different ports locally, so point the buttons at the running Lab:
+
+```sh
+npm run lab                                                   # terminal 1 (repo root) → :8000
+cd tutorials && PUBLIC_LAB_URL=http://localhost:8000/lab/index.html npm run dev   # terminal 2 → :4321
+```
+
+In production, serve the Lab (`lab/`) and this site under one origin so the default
+`/lab/index.html` deep-links resolve; set `PUBLIC_SPEC_BASE` to where the Antora
+spec is published (default `/barebars/`).
 
 ## How it works
 
