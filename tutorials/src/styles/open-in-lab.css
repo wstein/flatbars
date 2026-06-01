@@ -179,6 +179,11 @@
 .oil .oil-out-pre.err { color: #ff9c9c; }
 .oil .oil-out-pre em { color: #9a9a9a; font-style: normal; }
 
+/* Compiled-JS pane (opt-in, RawBars flagship): the same dark screen, scrollable
+   so a long emitted module doesn't dominate the card. */
+.oil .oil-js .oil-out-pre { max-height: 22rem; }
+.oil .oil-js-note { font: 400 11px/1.4 var(--font-mono); color: var(--fg-faint); text-transform: none; letter-spacing: 0; }
+
 /* ── Lab affordance: DOCK (header toolbar) — quiet, labelled, always visible ── */
 .oil .oil-lab {
   text-decoration: none;

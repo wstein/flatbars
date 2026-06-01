@@ -64,7 +64,7 @@ function CodeEditor({ lang, value, onInput }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL, compile = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
@@ -72,7 +72,11 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   const [edited, setEdited] = useState(false);
   const [renderer, setRenderer] = useState(null);
   const [out, setOut] = useState({ ok: true, text: null }); // text === null ⇒ "rendering…"
+  const [js, setJs] = useState(null); // compiled-JS pane (opt-in via `compile`)
   const [href, setHref] = useState(null);
+  // Only the compiling dialects (RawBars/FullBars/MaxBars) expose compileToJs;
+  // MinBars doesn't, so the pane is gated on the method actually existing.
+  const canCompile = compile && !!renderer && typeof renderer.compileToJs === "function";
 
   // Load the real engine bundle once (client-side only).
   useEffect(() => {
@@ -101,6 +105,13 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       setOut({ ok: false, text: String((e && e.message) || e) });
     }
   }, [renderer, tpl, dataStr, parts]);
+
+  // Optional: compile the template to a JS module (RawBars/FullBars/MaxBars only).
+  useEffect(() => {
+    if (!canCompile) return;
+    const r = renderer.compileToJs(tpl);
+    setJs(r && r.ok ? { ok: true, text: r.value } : { ok: false, text: (r && r.error) || "compile failed" });
+  }, [canCompile, renderer, tpl]);
 
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace.
   useEffect(() => {
@@ -165,6 +176,18 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
           ? <pre class="oil-out-pre"><em>rendering…</em></pre>
           : <pre class={"oil-out-pre" + (out.ok ? "" : " err")}><code>{out.text}</code></pre>}
       </div>
+
+      {canCompile && (
+        <div class="oil-out oil-js">
+          <div class="oil-cell-head oil-out-head">
+            <span class="oil-cap">compiled JS</span>
+            <span class="oil-js-note">— byte-identical output to the interpreter</span>
+          </div>
+          {js == null
+            ? <pre class="oil-out-pre"><em>compiling…</em></pre>
+            : <pre class={"oil-out-pre" + (js.ok ? "" : " err")}><code>{js.text}</code></pre>}
+        </div>
+      )}
     </figure>
   );
 }
