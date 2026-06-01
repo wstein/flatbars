@@ -436,9 +436,8 @@
       /* Sources = edit pane on top, inspector pane below (vertical stack). */
       .pane-sources { flex-direction: column; }
       .src-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-      .src-inspect { flex: 0 0 38%; }
+      .src-inspect { flex: 0 0 38%; } /* the bottom (data / overlay) editor pane */
       .src-edit { flex: 1 1 0; }
-      .src-inspect .data-inspect { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--bg-pane); }
       .src-esplitter { flex: 0 0 6px; width: 100%; height: 6px; cursor: row-resize; }
       /* Empty edit pane (all tabs closed). */
       .edit-empty {
@@ -496,9 +495,6 @@
         padding: 4px 12px; border-bottom: 1px solid var(--border); background: var(--bg-pane);
       }
       .view-controls[hidden] { display: none; }
-      /* Read-only inspector panels shown in place of the data editor. */
-      .data-inspect { flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--bg-pane); }
-      .data-inspect[hidden] { display: none; }
       .yaml-ver {
         margin-left: auto; color: var(--fg-faint);
         font-size: 10px; font-weight: bold; letter-spacing: .02em; opacity: .7;
@@ -1399,10 +1395,12 @@
              title="Drag to resize · double-click to reset"></div>
 
         <div class="editor-region">
-        <!-- Sources: the single edit pane on top, a read-only Inspector pane
-             (Context Inspector / Syntax Tree) stacked below it. -->
+        <!-- Sources: a vertical split — the template editor on top, the data /
+             overlay editor below it. (The read-only inspectors — Context
+             Inspector / Syntax Tree / Render Data — now live in the Diagnostics
+             dock.) -->
         <section class="pane pane-sources" aria-label="Sources">
-          <!-- TOP: the single edit pane (all editable files). -->
+          <!-- TOP: the template editor (template files + transform). -->
           <div class="src-col src-edit">
             <div class="tabs-wrap">
               <div class="tabs" id="tmpl-tabs"></div>
@@ -1414,7 +1412,6 @@
             </div>
             <div class="editors edit-stack">
               <div class="editor-pane" id="template-editor-container"></div>
-              <div class="editor-pane" id="data-editor-container" hidden></div>
               <!-- Shown when every editor tab is closed; pick a file in the Explorer. -->
               <div class="edit-empty" id="edit-empty" hidden>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2.5 3.5h4l1.5 2h5.5v7h-11z"/></svg>
@@ -1424,12 +1421,15 @@
             </div>
           </div>
           <div class="esplitter src-esplitter" id="inspect-splitter" title="Drag to resize · double-click to reset"></div>
-          <!-- BOTTOM: read-only inspector views (no editing). -->
+          <!-- BOTTOM: the data / overlay editor (data.yaml, overlays, config —
+               they share the YAML editor `dataView`). -->
           <div class="src-col src-inspect">
             <div class="tabs-wrap">
-              <div class="tabs" id="inspect-tabs"></div>
+              <div class="tabs" id="data-tabs"></div>
             </div>
-            <div class="data-inspect" id="data-inspect"></div>
+            <div class="editors">
+              <div class="editor-pane" id="data-editor-container"></div>
+            </div>
           </div>
         </section>
 
@@ -2513,21 +2513,29 @@
       }
 
       // ── Tabs ──────────────────────────────────────────────────────────
+      // A close-button (×) for an open-editor tab.
+      function tabCloseBtn(onClose) {
+        const x = document.createElement("span");
+        x.className = "close"; x.title = "Close editor — the file stays in the explorer";
+        x.textContent = "×";
+        x.addEventListener("click", (e) => { e.stopPropagation(); onClose(); });
+        return x;
+      }
+
+      // Repaint both editor tab strips (top = template + transform; bottom =
+      // data + overlays + config) and the explorer. The two panes are visible at
+      // once, each editing its own active file.
       function renderTabs() {
+        renderTmplStrip();
+        renderDataStrip();
+        renderExplorer();
+      }
+
+      // TOP strip (#tmpl-tabs): the template files (main + partials) and the
+      // `transform` controller — everything edited in `templateView`.
+      function renderTmplStrip() {
         const bar = byId("tmpl-tabs");
         bar.innerHTML = "";
-
-        const closeBtn = (onClose) => {
-          const x = document.createElement("span");
-          x.className = "close"; x.title = "Close editor — the file stays in the explorer";
-          x.textContent = "×";
-          x.addEventListener("click", (e) => { e.stopPropagation(); onClose(); });
-          return x;
-        };
-
-        // VS Code-style open editors: render the files in `openEditors`, in open
-        // order. `main` + `data` are pinned roots (no ×); everything else closes
-        // (which never deletes — create/delete/rename live in the explorer).
         for (const key of openEditors) {
           if (key === "transform") {
             const isTfm = activeView === "tmpl" && templateMode === "transform";
@@ -2536,35 +2544,11 @@
             tfm.title = "data → view-model transform (JSONata)";
             tfm.append(document.createTextNode("transform.jsonata"));
             tfm.addEventListener("click", selectTransformTab);
-            tfm.append(closeBtn(() => closeEditor("transform")));
+            tfm.append(tabCloseBtn(() => closeEditor("transform")));
             bar.append(tfm);
             continue;
           }
-          if (key === "config") {
-            const isActive = activeView === "config";
-            const t = document.createElement("div");
-            t.className = "tab tab-transform" + (isActive ? " active" : "");
-            t.title = "render config — escape · trim · ST4 · allow-list";
-            t.append(document.createTextNode("stem.config.yaml"));
-            t.addEventListener("click", () => selectConfigTab());
-            t.append(closeBtn(() => closeEditor("config")));
-            bar.append(t);
-            continue;
-          }
-          if (key === "data" || overlayByName(key)) {
-            // data.yaml (pinned) or an overlay editor.
-            const isOv = key !== "data";
-            const ov = isOv ? overlayByName(key) : null;
-            const isActive = activeView === "data" && dataTab === "edit" && dataFile === key;
-            const t = document.createElement("div");
-            t.className = "tab" + (isActive ? " active" : "");
-            t.title = isOv ? `overlay · mounts at ${key.replace(/\//g, ".")}` : "root data context · @root";
-            t.addEventListener("click", () => selectDataTab(key));
-            t.append(document.createTextNode(isOv ? key + ".yaml" : "data.yaml"));
-            t.append(closeBtn(() => closeEditor(key)));
-            bar.append(t);
-            continue;
-          }
+          if (key === "config" || key === "data" || overlayByName(key)) continue; // bottom strip
           const i = key === "main" ? 0 : tabs.findIndex((t) => t.name === key);
           if (i < 0) continue; // a partial that no longer exists
           const tab = tabs[i];
@@ -2573,50 +2557,49 @@
           t.className = "tab" + (isActive ? " active" : "") + (i === 0 ? " is-main" : "");
           t.title = i === 0 ? "entry template" : `partial · {{partial "${tab.name}"}}`;
           t.addEventListener("click", () => selectTemplateTab(i));
-
-          // All tabs (including the active partial) render as plain text — the
-          // editor strip is for navigation only. Rename for partials lives in
-          // the Explorer: select the file in the PARTIALS group and press the
-          // rename key (F2 on Windows/Linux, Enter on macOS).
+          // Tabs render as plain text — the strip is navigation only; rename lives
+          // in the Explorer (PARTIALS group + the rename key).
           t.append(document.createTextNode(
             (i === 0 ? "main" : (tab.name || "(unnamed)")) + "." + TEMPLATE_EXT));
-          t.append(closeBtn(() => closeEditor(i === 0 ? "main" : tab.name)));
+          t.append(tabCloseBtn(() => closeEditor(i === 0 ? "main" : tab.name)));
           bar.append(t);
         }
-
-        renderExplorer();
       }
 
-      // The read-only Inspector pane (left of the edit pane). Its own tab strip
-      // (Context Inspector · Syntax Tree) + panel; never hosts edits. `inspectView`
-      // is independent of the edit pane's active file.
-      let inspectView = "context";
-      function renderInspectTabs() {
-        const bar = byId("inspect-tabs");
+      // BOTTOM strip (#data-tabs): data.yaml, overlays, and stem.config.yaml —
+      // everything edited in the YAML editor `dataView`.
+      function renderDataStrip() {
+        const bar = byId("data-tabs");
         if (!bar) return;
         bar.innerHTML = "";
-        const mk = (mode, label) => {
+        for (const key of openEditors) {
+          if (key === "config") {
+            const isActive = activeView === "config";
+            const t = document.createElement("div");
+            t.className = "tab tab-transform" + (isActive ? " active" : "");
+            t.title = "render config — escape · trim · ST4 · allow-list";
+            t.append(document.createTextNode("stem.config.yaml"));
+            t.addEventListener("click", () => selectConfigTab());
+            t.append(tabCloseBtn(() => closeEditor("config")));
+            bar.append(t);
+            continue;
+          }
+          if (key !== "data" && !overlayByName(key)) continue; // top strip
+          const isOv = key !== "data";
+          const isActive = activeView === "data" && dataTab === "edit" && dataFile === key;
           const t = document.createElement("div");
-          t.className = "tab" + (inspectView === mode ? " active" : "");
-          t.append(document.createTextNode(label));
-          t.addEventListener("click", () => selectInspect(mode));
+          t.className = "tab" + (isActive ? " active" : "");
+          t.title = isOv ? `overlay · mounts at ${key.replace(/\//g, ".")}` : "root data context · @root";
+          t.addEventListener("click", () => selectDataTab(key));
+          t.append(document.createTextNode(isOv ? key + ".yaml" : "data.yaml"));
+          t.append(tabCloseBtn(() => closeEditor(key)));
           bar.append(t);
-        };
-        mk("context", "Context Inspector");
-        mk("ast", "Syntax Tree");
+        }
       }
-      function selectInspect(mode) {
-        inspectView = mode === "ast" ? "ast" : "context";
-        renderInspectTabs();
-        renderInspectPane();
-      }
-      function renderInspectPane() {
-        const panel = byId("data-inspect");
-        if (!panel) return;
-        panel.textContent = "";
-        if (inspectView === "context") renderContext(panel);
-        else renderAst(panel);
-      }
+
+      // The Context Inspector / Syntax Tree inspectors now live in the
+      // Diagnostics dock (see `dockTabs`); `renderDataInspect` re-renders the
+      // dock so the active inspector follows the file / latest render.
 
       // ── Template open-editor helpers (VS Code-style tabs) ───────────────
       const tmplKeyForIndex = (i) => (i === 0 ? "main" : tabs[i].name);
@@ -2663,9 +2646,9 @@
         updateStatusMeta();
       }
       function showConfigTab() {
-        byId("template-editor-container").hidden = true;
+        // config edits in the bottom (data) pane's `dataView`; the template pane
+        // stays visible above it.
         byId("data-editor-container").hidden = false;
-        byId("edit-empty").hidden = true;
         // (Re)generate the YAML from the current render state on every open so the
         // buffer always reflects the live config.
         setEditorText(dataView, buildConfigYaml());
@@ -2707,8 +2690,8 @@
       // No editors open: hide both edit surfaces, show a placeholder prompting
       // the user to pick a file from the Explorer.
       function showEmptyEdit() {
+        // empties the TOP (template) pane only; the data pane stays visible.
         byId("template-editor-container").hidden = true;
-        byId("data-editor-container").hidden = true;
         byId("edit-empty").hidden = false;
         activeView = null;
         renderTabs();
@@ -2721,7 +2704,10 @@
       // name). "transform" routes to the template pane (kept for older callers).
       function selectDataTab(name = "data") {
         if (name === "transform") { selectTransformTab(); return; }
-        if (name === "context" || name === "ast") { selectInspect(name); return; }
+        if (name === "context" || name === "ast") { // inspectors are dock tabs now
+          dockActiveTab = name; if (byId("dock").hidden) setDockVisible(true); else renderDock();
+          return;
+        }
         activeView = "data";
         dataFile = (name === "data" || overlayByName(name)) ? name : "data";
         dataTab = "edit";
@@ -2762,11 +2748,10 @@
 
       // Show the active editable file in the single edit pane: the template
       // editor (templates/transform) or the YAML editor (data/overlays). The
-      // read-only inspectors live in their own pane (renderInspectPane).
+      // read-only inspectors live in the Diagnostics dock (renderDataInspect → dock).
       function showDataTab() {
-        byId("template-editor-container").hidden = true;
+        // the bottom (data) pane is always visible alongside the template pane.
         byId("data-editor-container").hidden = false;
-        byId("edit-empty").hidden = true;
         const overlay = overlayByName(dataFile);
         setEditorText(dataView, overlay ? overlay.source : yamlSrc);
         dataView.dispatch({
@@ -2776,7 +2761,9 @@
       }
 
       // Kept for callers (run(), tab switches) — the inspector is its own pane now.
-      function renderDataInspect() { renderInspectPane(); }
+      // Re-render the dock so its active inspector (Context Inspector / Syntax
+      // Tree) follows the active file and latest render. Named for its callers.
+      function renderDataInspect() { renderDock(); }
       function addPartial() {
         let n = 1, name;
         do { name = "partial" + n++; } while (tabs.some((t) => t.name === name));
@@ -2821,9 +2808,8 @@
       // shown does not change the compiled program, so this never recompiles or
       // rebuilds the output — only callers that change the sources call run().
       function showActiveTab() {
-        // Single edit pane: show the template surface, hide data.
+        // Top pane shows the template surface; the data pane stays visible below.
         byId("template-editor-container").hidden = false;
-        byId("data-editor-container").hidden = true;
         byId("edit-empty").hidden = true;
         if (templateMode === "transform") {
           // The controller tab lives in the template pane's strip but shows
@@ -2845,7 +2831,7 @@
         updateStatusMeta();
         caretLinkKey = null; syncOutputToCaret();
         refreshCoverageGutter(); // dead-branch decoration follows the active tab
-        renderInspectPane(); // inspectors follow the active file (Syntax Tree, etc.)
+        renderDataInspect(); // dock inspectors follow the active file (Syntax Tree, etc.)
       }
 
       // Activate the transform tab in the template pane. Symmetric with
@@ -5097,6 +5083,13 @@
             return dead ? "warn" : "success";
           },
           render: renderCoverage },
+        // The read-only inspectors (moved here from the Sources pane). They are
+        // not analyses with a count — `noBadge` suppresses the badge — and follow
+        // the active file / last render (re-rendered by renderDock after each run).
+        { id: "context", label: "Context Inspector", noBadge: true,
+          count: () => 0, badge: () => "", render: renderContext },
+        { id: "ast", label: "Syntax Tree", noBadge: true,
+          count: () => 0, badge: () => "", render: renderAst },
       ];
 
       function dockTabById(id) { return dockTabs.find((t) => t.id === id); }
@@ -5116,10 +5109,9 @@
           const btn = makeEl("button", {
             class: "dock-tab" + (dockActiveTab === tab.id ? " active" : ""),
             "data-tab": tab.id,
-          }, [
-            tab.label, " ",
-            makeEl("span", { class: "badge " + tab.badge() }, String(tab.count())),
-          ]);
+          }, tab.noBadge
+            ? [ tab.label ]
+            : [ tab.label, " ", makeEl("span", { class: "badge " + tab.badge() }, String(tab.count())) ]);
           btn.addEventListener("click", () => {
             dockActiveTab = tab.id;
             panelState.dock.activeTab = tab.id;
@@ -6257,9 +6249,8 @@
       applyTweaks();
       applyNarrow(); // L-1 · reflect current viewport width on boot
       setOutputView(outputView);
-      renderDataTabs(); // paint the data-pane tabs before the async example load
-      renderInspectTabs(); // Inspector pane (Context Inspector / Syntax Tree)
-      renderInspectPane();
+      renderDataTabs(); // paint both editor tab strips before the async example load
+      showDataTab(); // populate the bottom (data) pane so it isn't blank on boot
 
       // The highlighter is a sticky preference. Capture it before the startup
       // load (which loads an example and resets the choice to "Auto"), then
