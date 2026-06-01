@@ -72,8 +72,8 @@ const lambdaHtml = highlightTemplate(lambdaCode);
 ---
 
 <Reference
-  title="Mustache"
-  subtitle="The logic-less template language — a guided, runnable reference. Every supported tag below renders live through MinBars, our Mustache-conformant engine, and opens in the Lab with one click."
+  title="MinBars — Mustache-compatible"
+  subtitle="MinBars is FlatBars's Mustache-compatible engine. This runnable reference walks the logic-less Mustache language as MinBars implements it — every supported tag renders live and opens in the Lab. The two spec features MinBars does not implement (set delimiters, lambdas) are marked below."
   groups={groups}
   spec="adr-0007-minbars"
 >
@@ -90,9 +90,11 @@ const lambdaHtml = highlightTemplate(lambdaCode);
     <p>
       Mustache is also <b>a specification, not an engine</b> — like how JavaScript
       is a spec that Chrome and Firefox implement. Dozens of engines across
-      languages implement it. On this page the engine is <b>MinBars</b>, the
-      Mustache-conformant member of the FlatBars family; it is tested against the
-      official <code>mustache/spec</code> fixtures.
+      languages implement it. The engine here is <b>MinBars</b>, the
+      Mustache-compatible member of the FlatBars family: it passes the vendored
+      <code>mustache/spec</code> suite for every feature on this page (set
+      delimiters and lambdas excepted — see <a href="#conformance">what MinBars
+      supports</a>).
     </p>
     <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
     <p class="tip">
@@ -215,7 +217,12 @@ const lambdaHtml = highlightTemplate(lambdaCode);
     </p>
     <OpenInLab client:visible engine="minbars" template={ex.partial.template} data={ex.partial.data} partials={ex.partial.partials} />
     <h3>A partial per row</h3>
-    <p>Combine a section with a partial to template each element of a list.</p>
+    <p>
+      Combine a section with a partial to template each element of a list. Note
+      where the line break lives: a standalone <code>{t("{{> row}}")}</code> line
+      has its own newline <b>trimmed</b>, so the partial body owns its trailing
+      newline — otherwise every row would run together on one line.
+    </p>
     <OpenInLab client:visible engine="minbars" template={ex.partialList.template} data={ex.partialList.data} partials={ex.partialList.partials} />
     <p class="tip">
       Partials also carry <b>standalone indentation</b>: if a <code>{t("{{> p}}")}</code>
