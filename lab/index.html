@@ -1754,7 +1754,7 @@
       let loadedExampleIdx = -1;      // which example is loaded (-1 = custom/edited)
       let exampleModified  = false;  // true when a loaded example has been edited
       let activeView   = "tmpl";      // "tmpl" | "data"
-      let outputView   = "rendered";  // "rendered" | "source"
+      let outputView   = "source";  // "source" (Plain Text) is the default landing view
       let allowScripts = true;       // HTML/Markdown preview always runs <script> in an isolated (null-origin) sandbox
       let escapeMode   = "";
       // Compiler & runtime options (ADR-0016).
@@ -6268,6 +6268,9 @@
         // Both catalogs ship a "greeting" entry as the default landing example.
         const def = examples.findIndex((e) => e.id === "greeting");
         await loadExample(def < 0 ? 0 : def);
+        // On a fresh open (no share link), default the output to Plain Text rather
+        // than the example's own view. A shared link keeps its saved view.
+        setOutputView(validView("source"));
       }
       if (savedOutLang && savedOutLang !== "Auto") {
         outLangChoice = savedOutLang;
