@@ -61,12 +61,17 @@ type ExprParser = Array PosToken -> Either ParseError Expr
 -- | The core *lexer* always recognizes them (meaning-free shapes); a dialect that
 -- | doesn't accept them sets `inheritance = false` (the default) and the parser
 -- | rejects them with `DisallowedShape`, exactly as `extras` gates `{{^}}`/`{{&}}`.
+-- | `standaloneSeps` are the separator head-names whose *standalone* lines the
+-- | whitespace pass strips (the engine's clause markers `["else", "elif"]`) — so
+-- | a lone `{{else}}`/`{{elif …}}` leaves no blank line, while an arbitrary
+-- | `{{ x }}` separator (indistinguishable from output) is left alone.
 type ParseOptions =
   { trimStandalone :: Boolean
   , parseExpr :: ExprParser
   , parseHead :: ExprParser
   , extras :: Boolean
   , inheritance :: Boolean
+  , standaloneSeps :: Array String
   }
 
 -- | Standalone trimming on (Handlebars parity), the core expression grammar, and
@@ -79,6 +84,7 @@ defaultParseOptions =
   , parseHead: Expr.parseExpr
   , extras: true
   , inheritance: false
+  , standaloneSeps: [ "else", "elif" ]
   }
 
 -- | Parse source text into the core template *plus* its header directives, with
@@ -99,7 +105,7 @@ parseWith opts src = do
   toks <- tokenizeTemplate src
   directives <- collectDirectives toks
   standalone <- effectiveTrim opts directives
-  let toks' = if standalone then trimStandalone toks else toks
+  let toks' = if standalone then trimStandalone opts.standaloneSeps toks else toks
   -- comments carry no output; drop them before the tree builder, which then
   -- never has to know about `RComment` (the standalone pass needs them, so it
   -- runs first).

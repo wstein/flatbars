@@ -102,7 +102,6 @@ mustacheStandalone :: Array RawTok -> Array RawTok
 mustacheStandalone toks0 = Array.mapWithIndex inject trimmed
   where
   trimmed = Array.mapWithIndex trimContent toks0
-  n = Array.length toks0
 
   trimContent :: Int -> RawTok -> RawTok
   trimContent j = case _ of

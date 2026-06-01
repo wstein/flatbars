@@ -191,6 +191,14 @@ main = do
     "&quot;&lt;b&gt;&quot;"
   expectS "surface-json-raw" "{{{ json (lookup this \"x\") }}}" (obj [ Tuple "x" (str "<b>") ])
     "\"<b>\""
+  -- a standalone `{{else}}` line is stripped (like the block open/close), so an
+  -- if/else over its own lines leaves no blank line — Handlebars whitespace parity.
+  expectS "standalone-else-false" "{{#if x}}\nA\n{{else}}\nB\n{{/if}}\n"
+    (obj [ Tuple "x" (VBool false) ])
+    "B\n"
+  expectS "standalone-else-true" "{{#if x}}\nA\n{{else}}\nB\n{{/if}}\n"
+    (obj [ Tuple "x" (VBool true) ])
+    "A\n"
 
   expect "if-true-bare" "{{#if this}}yes{{/if}}" (VBool true) "yes"
   expect "if-false-bare" "{{#if this}}yes{{/if}}" (VBool false) ""

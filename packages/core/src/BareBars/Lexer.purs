@@ -102,16 +102,25 @@ trimEndWs s =
 -- | the start, and only whitespace after it to a newline or the end), remove
 -- | that indentation and the trailing newline so the tag leaves no blank line.
 -- |
--- | Only `{{#…}}` / `{{/…}}` / `{{! }}` are eligible. Output tags (`{{ }}` /
--- | `{{{ }}}`) and bare separators (`RSep`) are *not* — at the structural level a
--- | `{{ x }}` separator is indistinguishable from surface output, so trimming it
--- | could eat real content. (`{{else}}`-standalone therefore needs dialect clause
--- | knowledge and is deferred.) Composes with `~`: it runs on the already
--- | tilde-trimmed content.
-trimStandalone :: Array RawTok -> Array RawTok
-trimStandalone toks = Array.mapWithIndex trimContent toks
+-- | Block opens/closes (`{{#…}}` / `{{/…}}`) and comments (`{{! }}`) are always
+-- | eligible. Output tags (`{{ }}` / `{{{ }}}`) never are. A bare separator
+-- | (`RSep`) is eligible only when its head name is in `seps` — the caller's
+-- | clause-separator names (`["else", "elif"]`): at the structural level a
+-- | `{{ x }}` separator is indistinguishable from surface output, so only the
+-- | known clause markers are trimmed (a `{{else}}` / `{{elif …}}` alone on its
+-- | line leaves no blank line), never an arbitrary `{{ x }}`. Composes with `~`:
+-- | it runs on the already tilde-trimmed content.
+trimStandalone :: Array String -> Array RawTok -> Array RawTok
+trimStandalone seps toks = Array.mapWithIndex trimContent toks
   where
   n = Array.length toks
+
+  -- standalone-eligible: a block open/close/comment, or a separator whose head
+  -- name is a known clause marker (so `{{else}}`/`{{elif}}` strip, output does not).
+  eligible :: RawTok -> Boolean
+  eligible t = blockLevel t || case t of
+    RSep _ _ s -> Array.elem (sepHead s) seps
+    _ -> false
 
   trimContent :: Int -> RawTok -> RawTok
   trimContent j = case _ of
@@ -127,7 +136,7 @@ trimStandalone toks = Array.mapWithIndex trimContent toks
 
   standaloneAt :: Int -> Boolean
   standaloneAt i = case Array.index toks i of
-    Just t | blockLevel t -> leftBlank i && rightBlank i
+    Just t | eligible t -> leftBlank i && rightBlank i
     _ -> false
 
   -- everything from the previous newline (or start of input) to the tag is blank.
@@ -152,6 +161,16 @@ blockLevel = case _ of
   RClose _ _ _ -> true
   RComment _ _ _ -> true
   _ -> false
+
+-- | The head name of a separator interior — its first whitespace-delimited word
+-- | (leading whitespace skipped): `"else"` from `{{else}}`, `"elif"` from
+-- | `{{elif (gt x 0)}}`. Used only to decide standalone-whitespace eligibility.
+sepHead :: String -> String
+sepHead s =
+  let
+    cs = Array.dropWhile isSpace (SCU.toCharArray s)
+  in
+    SCU.fromCharArray (Array.takeWhile (not <<< isSpace) cs)
 
 allWs :: String -> Boolean
 allWs = Array.all isSpace <<< SCU.toCharArray
