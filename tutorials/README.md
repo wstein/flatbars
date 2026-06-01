@@ -78,8 +78,8 @@ Measured on this site (`/mustache` reference + landing + 3 surface lessons):
 | metric | value |
 |---|---|
 | `npm install` | ~17 s, 365 packages, **151 MB** `node_modules` (gitignored) |
-| `npm run build` | ~1 s → **296 KB** static `dist/` (5 HTML pages) |
-| island JS (incl. engine) | 173 KB / **41 KB gzip**, one shared chunk, hydrated `client:visible` |
+| `npm run build` | ~1 s → **312 KB** static `dist/` (5 HTML pages) |
+| island JS (incl. engine + js-yaml) | 195 KB / **49 KB gzip**, one shared chunk, hydrated `client:visible` |
 | authoring an example | one entry in `src/mustache.mjs` (template + data) |
 
 Astro gives component authoring and ships static HTML (the build is dev-time

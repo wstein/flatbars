@@ -13,17 +13,19 @@
 // surface (example-loader-spec.md non-goals): the example travels inside the URL.
 
 import { encodeState } from "./playground_utils.mjs";
+import { dump as dumpYaml } from "./vendor/js-yaml.mjs";
 
 // The engines the Lab accepts on `?engine=` (the four FlatBars surfaces + Stem).
 export const LAB_ENGINES = ["rawbars", "minbars", "fullbars", "maxbars", "stem"];
 
-// Normalize an example's data to the Lab's data-editor text. The editor parses
-// YAML, and JSON is valid YAML, so an object/array round-trips via JSON; a string
-// is taken verbatim (already YAML/JSON the author wrote).
-function dataText(data) {
+// Render an example's data as the Lab's data-editor text. The Lab's native data
+// format is YAML (data.yaml), so an object/array is dumped to YAML; a string is
+// taken verbatim (already YAML the author wrote); nullish → an empty editor.
+// Exported so the tutorial preview shows exactly what the Lab will load.
+export function dataText(data) {
   if (data == null) return "";
   if (typeof data === "string") return data;
-  return JSON.stringify(data, null, 2);
+  return dumpYaml(data);
 }
 
 // The Lab workspace snapshot for a one-off example. `x: -1` marks a custom edit

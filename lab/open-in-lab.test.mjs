@@ -16,7 +16,7 @@ test("labHref puts the surface on ?engine= and the workspace in the fragment", a
   const state = await decodeFragment(href);
   assert.equal(state.x, -1); // custom edit → restored verbatim
   assert.equal(state.tabs[0].s, "{{ name }}");
-  assert.equal(state.d, '{\n  "name": "Ada"\n}'); // object → JSON (valid YAML)
+  assert.equal(state.d, "name: Ada\n"); // object → YAML (the Lab's native data format)
   assert.equal(state.av, "tmpl");
 });
 

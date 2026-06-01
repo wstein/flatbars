@@ -4,7 +4,7 @@
 // through the real engine bundle the Lab ships (dogfooding — consensus item 3),
 // and offers an "Open in Lab" link built from the shared contract (item 1).
 import { useEffect, useState } from "preact/hooks";
-import { labHref } from "../../../lab/open-in-lab.mjs";
+import { labHref, dataText } from "../../../lab/open-in-lab.mjs";
 import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 
@@ -25,14 +25,6 @@ async function renderExample(engine, { template, data, partials }) {
 // both); in local dev the tutorials run on their own port, so point this at the
 // running `npm run lab` server, e.g. PUBLIC_LAB_URL=http://localhost:8000/lab/index.html.
 const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
-
-// The data the example feeds the engine, as the Lab's editor shows it (JSON is
-// valid YAML, so an object round-trips; a string is taken verbatim).
-function dataText(data) {
-  if (data == null) return "{}";
-  if (typeof data === "string") return data;
-  return JSON.stringify(data, null, 2);
-}
 
 export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL }) {
   const [href, setHref] = useState(null);
