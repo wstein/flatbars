@@ -222,9 +222,16 @@ A helper lives in **two** synced places, not a runtime-assembled triple: a PureS
 
 ## 12. Open decisions
 
-1. **`reverse` polymorphism** — one helper over string+array (fewer names) only if a golden test proves identical `Value` semantics on both targets; otherwise split. *(`length` overloading is no longer open — `length` is the loop var, `count` the collection reducer.)*
-2. **Alias retention policy** — how long lowered aliases (`downcase`, `plus`, …) live, and whether the linter auto-rewrites on save or only warns. (`esc_html` is settled: permanent, non-warned — §8.)
+Still open:
 
-Resolved and removed from this list: pipe argument position (subject-as-argument-0, shipped); `default` semantics (→ the shipped `??` operator, null-coalescing only); block-vs-key duplication (block forms dropped, §6); arithmetic operand policy (shipped strict-numeric — non-number is a `TypeError`, no coercion; §5.2).
+1. **`reverse` polymorphism** — *(now shipped polymorphic; string + array, type-dispatched on the subject — §P2.)* Nothing genuinely open here anymore; kept only as a note that `length` overloading is closed (`length` is the loop var, `count` the collection reducer).
 
-> **Shipped (§5).** The `??` and `+ - * / %` operators and their six prelude desugar targets are implemented and tested (conformance 133/133; the X3 lift re-sugars them). The remaining value-primitives (§4 string/array/number) are still unbuilt — this spec's §1–4/§6–10 govern them.
+Resolved:
+
+- **Alias retention/lint policy** — **permanent + warn-on-demand**, the uniform alias story: the legacy aliases (`downcase`/`upcase`/`plus`/`minus`/`times`) are permanent working helpers (never removed), marked in `HelperDef.alias` (single source of truth → `preludeAliases`), flagged in the catalog ("alias of `canonical`"), and warned by the on-demand `Linter.Aliases.aliasWarnings` (host/CI, never render-time/blocking); the user-invoked lift/migrate assist rewrites them, but **nothing auto-rewrites on save**. `esc_html` stays the non-warned exception (security-structural — §8).
+- **Pipe argument position** — subject-as-argument-0 (shipped).
+- **`default` semantics** — the shipped `??` operator, null-coalescing only (§5.1).
+- **Block-vs-key duplication** — block forms dropped; key-based `sortBy`/`pluck`/`groupBy` only (§6).
+- **Arithmetic operand policy** — strict-numeric; a non-number is a `TypeError`, no coercion (§5.2).
+
+> **Status.** §5 operators and the full §4 value-primitives module (35 primitives: string/number/array) are **shipped** — conformance 210/210 (compiled ≡ interpreter), catalog generated, X3 lift re-sugars the operators. Deferred: the §9 sets (`url`/object/locale/`date`/`regex`/`JSONparse`) and a runtime core-only build toggle.
