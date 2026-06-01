@@ -7,10 +7,10 @@
 // debate: the runnable example is the source of truth; the page's prose only
 // annotates it, and the normative description stays in docs/ (we never fork it).
 //
-// Every entry runs under MinBars (Mustache semantics). Features the Mustache
-// spec defines but MinBars does NOT implement (set-delimiters, lambdas) are NOT
-// here — they appear on the page as static `spec-only` callouts with no live
-// button, because a preview that can't run would lie (debate consensus item 4).
+// Every entry runs under MinBars (Mustache semantics). Set delimiters are now
+// implemented, so they have a live example here. Lambdas remain unimplemented —
+// they appear on the page as a static `spec-only` callout with no live button,
+// because a preview that can't run would lie (debate consensus item 4).
 
 export const examples = {
   // ── Interpolation ──────────────────────────────────────────────────────

@@ -89,9 +89,8 @@ const lambdaHtml = highlightTemplate(lambdaCode);
       is a spec that Chrome and Firefox implement. Dozens of engines across
       languages implement it. The engine here is <b>MinBars</b>, the
       Mustache-compatible member of the FlatBars family: it passes the vendored
-      <code>mustache/spec</code> suite for every feature on this page (set
-      delimiters and lambdas excepted — see <a href="#conformance">what MinBars
-      supports</a>).
+      <code>mustache/spec</code> suite for every feature on this page (lambdas
+      excepted — see <a href="#conformance">what MinBars supports</a>).
     </p>
     <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
     <p class="tip">
