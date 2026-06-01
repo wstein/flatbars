@@ -103,9 +103,9 @@ That is the entire stdlib: ~24 irreducible primitives. There is no `string`/`mat
 
 ---
 
-## 5. MaxBars operators — the capabilities that belong in the *language*, not a helper
+## 5. MaxBars operators — the capabilities that belong in the *language*, not a helper *(SHIPPED)*
 
-Two high-frequency needs read far better as operators, and follow the exact pattern MaxBars already uses for `&&`→`and`: a surface operator desugaring to a shared prelude helper. The helper is the irreducible primitive (callable explicitly in RawBars); the operator is the MaxBars ergonomics.
+Two high-frequency needs read far better as operators, and follow the exact pattern MaxBars already uses for `&&`→`and`: a surface operator desugaring to a shared prelude helper. The helper is the irreducible primitive (callable explicitly in RawBars); the operator is the MaxBars ergonomics. **Both shipped** — the prelude helpers (`add subtract multiply divide modulo coalesce`), the MaxBars lexer/precedence, the compiler runtime, and the linter lift table; conformance proves compiled ≡ interpreter and the lift re-sugars them back.
 
 ### 5.1 `??` — null-coalescing (replaces a `default` helper)
 `default v fallback` is the single most-reached-for transformer in every ecosystem. It belongs as an **operator**, not a helper:
@@ -125,9 +125,9 @@ MaxBars shipped comparison infix but **not** arithmetic, so `{{ multiply price q
 {{ price * qty }}        {{ subtotal + tax }}        {{ (n + 1) % cols }}
 ```
 
-- Desugar to the shared prelude helpers `add subtract multiply divide modulo` (the irreducible primitives), the same way `>` desugars to `gt`. Standard precedence (`* / %` above `+ -`, both above comparison, all above `&&`/`||`).
-- The helpers live in the shared prelude so RawBars/FullBars keep the explicit `(add a b)` form (aliases `plus`/`minus`/`times` lowered by the linter).
-- Division by zero and non-numeric operands follow the engine's existing numeric-coercion/error policy — no new semantics, just surface.
+- Desugar to the shared prelude helpers `add subtract multiply divide modulo` (the irreducible primitives), the same way `>` desugars to `gt`. Shipped precedence (loosest→tightest): pipe, `??`, `||`, `&&`, comparison (non-associative), additive `+ -`, multiplicative `* / %`, prefix `!`, application/atom — so `n + 1 > 5` is `(gt (add n 1) 5)`.
+- The helpers live in the shared prelude so RawBars/FullBars keep the explicit `(add a b)` form. (The `plus`/`minus`/`times` linter aliases are **deferred** — not yet wired.)
+- **Strictly numeric** (shipped): operands must be numbers; a non-number is a `TypeError` (no string coercion — determinism). The interpreter is itself JS, so `+ - * /` match the compiled runtime bit-for-bit; `modulo` uses the `trunc` identity (= JS `%`); division by zero is IEEE `Infinity`. A dotted path stays a path (`.` is still an ident char), so `price.net * qty` is unambiguous.
 
 These two operator groups are the **highest-value items in this spec**: together they retire the entire comparison-helper and math-helper surface of `handlebars-helpers` with two small, composable language features.
 
@@ -233,6 +233,7 @@ The §4 string roster and `abs`/`round`/`floor`/`ceil`/`toInt`/`toFloat`/`toFixe
 
 1. **`reverse` polymorphism** — one helper over string+array (fewer names) only if a golden test proves identical `Value` semantics on both targets; otherwise split. *(`length` overloading is no longer open — `length` is the loop var, `count` the collection reducer.)*
 2. **Alias retention policy** — how long lowered aliases (`downcase`, `plus`, …) live, and whether the linter auto-rewrites on save or only warns. (`esc_html` is settled: permanent, non-warned — §8.)
-3. **Arithmetic operand policy** — confirm division-by-zero / non-numeric behaviour reuses the engine's existing numeric policy unchanged (no new error kinds).
 
-Resolved and removed from this list: pipe argument position (subject-as-argument-0, shipped); `default` semantics (→ the `??` operator, null-coalescing only); block-vs-key duplication (block forms dropped, §6).
+Resolved and removed from this list: pipe argument position (subject-as-argument-0, shipped); `default` semantics (→ the shipped `??` operator, null-coalescing only); block-vs-key duplication (block forms dropped, §6); arithmetic operand policy (shipped strict-numeric — non-number is a `TypeError`, no coercion; §5.2).
+
+> **Shipped (§5).** The `??` and `+ - * / %` operators and their six prelude desugar targets are implemented and tested (conformance 133/133; the X3 lift re-sugars them). The remaining value-primitives (§4 string/array/number) are still unbuilt — this spec's §1–4/§6–10 govern them.
