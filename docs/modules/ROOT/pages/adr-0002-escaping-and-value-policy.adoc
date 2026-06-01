@@ -8,7 +8,7 @@
 The core assigns no value policy. The reference engine supplies `truthy`/`escapeHtml`/`stringify`
 (`Kernel.Value`), exposes `stringify` through the engine `Ctl` (`Engine.purs:57`), and never
 auto-escapes raw output (`pass:[{{{ }}}]`); the surface dialect's `pass:[{{ }}]` escapes by lowering
-to `esc_html`. The ADR-001 debate flagged the tension: framing `escapingWarnings` (an *ignorable
+to `escapeHtml`. The ADR-001 debate flagged the tension: framing `escapingWarnings` (an *ignorable
 lint*, `Lower.purs:125`) as the safety mechanism is "opt-in XSS." But the substrate *cannot* mandate
 escaping without choosing a value policy — and a chosen value policy is exactly what makes something
 an *engine*, not a substrate.
@@ -24,7 +24,7 @@ an *engine*, not a substrate.
   in the xref:host-api.adoc[] engine checklist.
 
 . *The reference engine is safe-by-default for the surface.* `pass:[{{ }}]` escapes (lowers to
-  `esc_html`); `pass:[{{{ }}}]` does not; `escapingWarnings` flags raw output of untrusted accessors
+  `escapeHtml`); `pass:[{{{ }}}]` does not; `escapingWarnings` flags raw output of untrusted accessors
   (`lookup`/`this`/scoped) not wrapped in `safe`.
 
 . *The lint is on by default in tooling.* The playground already runs it (`Main.purs:211`); the CLI

@@ -33,22 +33,22 @@ toc::[]
 |===
 |Handlebars |FlatBars Surface |Core |Kind
 
-|`pass:[{{x}}]` |`pass:[{{x}}]` |`pass:[{{{ esc_html (lookup this "x") }}}]` |SURFACE
+|`pass:[{{x}}]` |`pass:[{{x}}]` |`pass:[{{{ escapeHtml (lookup this "x") }}}]` |SURFACE
 |`pass:[{{{x}}}]` |`pass:[{{{x}}}]` |`pass:[{{{ lookup this "x" }}}]` |SURFACE
 |`pass:[{{&x}}]` (HB unescaped alias) |`pass:[{{{x}}}]` (FullBars accepts `{{&}}`) |`pass:[{{{ lookup this "x" }}}]` |PROVIDED (FullBars; RawBars/MaxBars reject)
-|`pass:[{{a.b.c}}]` |same |`pass:[{{{ esc_html (lookup this "a" "b" "c") }}}]` |SURFACE
-|`pass:[{{a.[1]}}]` / `pass:[{{a.1}}]` |same |`pass:[{{{ esc_html (lookup this "a" 1) }}}]` |SURFACE
-|`pass:[{{a.[home town]}}]` |same |`pass:[{{{ esc_html (lookup this "a" "home town") }}}]` |SURFACE
-|`pass:[{{a/b}}]` (legacy slash) |`pass:[{{a.b}}]` |`pass:[{{{ esc_html (lookup this "a" "b") }}}]` |SURFACE
-|`pass:[{{this}}]` / `pass:[{{.}}]` |`pass:[{{this}}]` |`pass:[{{{ esc_html this }}}]` |SURFACE
-|`pass:[{{this.a}}]` / `pass:[{{./a}}]` |`pass:[{{this.a}}]` |`pass:[{{{ esc_html (lookup this "a") }}}]` |SURFACE
-|`pass:[{{../a}}]` |`pass:[{{../a}}]` |`pass:[{{{ esc_html (lookup (parent) "a") }}}]` |SURFACE
-|`pass:[{{../../a}}]` |same |`pass:[{{{ esc_html (lookup (parent (parent)) "a") }}}]` |SURFACE
+|`pass:[{{a.b.c}}]` |same |`pass:[{{{ escapeHtml (lookup this "a" "b" "c") }}}]` |SURFACE
+|`pass:[{{a.[1]}}]` / `pass:[{{a.1}}]` |same |`pass:[{{{ escapeHtml (lookup this "a" 1) }}}]` |SURFACE
+|`pass:[{{a.[home town]}}]` |same |`pass:[{{{ escapeHtml (lookup this "a" "home town") }}}]` |SURFACE
+|`pass:[{{a/b}}]` (legacy slash) |`pass:[{{a.b}}]` |`pass:[{{{ escapeHtml (lookup this "a" "b") }}}]` |SURFACE
+|`pass:[{{this}}]` / `pass:[{{.}}]` |`pass:[{{this}}]` |`pass:[{{{ escapeHtml this }}}]` |SURFACE
+|`pass:[{{this.a}}]` / `pass:[{{./a}}]` |`pass:[{{this.a}}]` |`pass:[{{{ escapeHtml (lookup this "a") }}}]` |SURFACE
+|`pass:[{{../a}}]` |`pass:[{{../a}}]` |`pass:[{{{ escapeHtml (lookup (parent) "a") }}}]` |SURFACE
+|`pass:[{{../../a}}]` |same |`pass:[{{{ escapeHtml (lookup (parent (parent)) "a") }}}]` |SURFACE
 |a helper returning HTML, e.g. `pass:[{{price}}]` |use `safe` in the helper |`pass:[{{{ price }}}]` |ENGINE
 |===
 
 *Escaping model.* {hbs} escapes `pass:[{{ }}]` and trusts `pass:[{{{ }}}]`/`SafeString`. FlatBars makes
-both explicit: `pass:[{{ }}]` is the *only* thing that introduces `esc_html`; `esc_html` returns
+both explicit: `pass:[{{ }}]` is the *only* thing that introduces `escapeHtml`; `escapeHtml` returns
 `VSafe` so re-escaping is a no-op; `safe`/`VSafe` is the `SafeString` analogue. See
 xref:evaluation.adoc[] §3.7. The escaped set is `&`, `<`, `>`, `"`, `'`, matching {hb}.
 
@@ -63,7 +63,7 @@ and engine work in the core. This is the single most important thing to internal
 |===
 |Handlebars |FlatBars Surface |Core |Kind
 
-|`pass:[{{helper a b}}]` |same |`pass:[{{{ esc_html (helper a' b') }}}]` |SURFACE/CORE
+|`pass:[{{helper a b}}]` |same |`pass:[{{{ escapeHtml (helper a' b') }}}]` |SURFACE/CORE
 |positional arguments |same |evaluated left-to-right, eagerly |CORE
 |string literal `"x"` / `'x'` |same |`Str "x"` |CORE
 |number literal `3`, `-2.5` |same |`Num 3` |CORE
@@ -82,14 +82,14 @@ Worked example (from `subexpressions/`):
 [source,text]
 ----
 Handlebars:  {{upper (concat first last)}}
-Core:        {{{ esc_html (upper (concat (lookup this "first")
+Core:        {{{ escapeHtml (upper (concat (lookup this "first")
                                          (lookup this "last"))) }}}
 ----
 
 [source,text]
 ----
 Handlebars:  {{repeat "ab" (add 1 2)}}
-Core:        {{{ esc_html (repeat "ab" (add 1 2)) }}}     (literals pass straight through)
+Core:        {{{ escapeHtml (repeat "ab" (add 1 2)) }}}     (literals pass straight through)
 ----
 
 Hash example:
@@ -97,7 +97,7 @@ Hash example:
 [source,text]
 ----
 Handlebars:  {{field value required=true label="Name"}}
-Core:        {{{ esc_html (field (lookup this "value")
+Core:        {{{ escapeHtml (field (lookup this "value")
                                  (dict "required" (true) "label" "Name")) }}}
 ----
 
@@ -140,7 +140,7 @@ Worked example (`block-helpers/` — custom `times`, exposing a scoped helper):
 ----
 Handlebars:  {{#times 3}}{{@index1}}🔁{{/times}}
 Surface:     {{#times 3}}{{index1}}🔁{{/times}}
-Core:        {{#times 3}}{{{ esc_html (index1) }}}🔁{{/times}}
+Core:        {{#times 3}}{{{ escapeHtml (index1) }}}🔁{{/times}}
 ----
 
 `times` pushes a frame per iteration and installs the scoped helper `index1`. The ENGINE writes that
@@ -160,7 +160,7 @@ helper; the core only supplies the frame plumbing.
 |`pass:[{{#unless c}}…{{/unless}}]` |same |`pass:[{{#unless c'}}…{{/unless}}]` |ENGINE
 |`pass:[{{#each xs}}…{{else}}…{{/each}}]` |same |`pass:[{{#each xs'}}…{{else}}…{{/each}}]` |ENGINE
 |`pass:[{{#with o}}…{{/with}}]` |same |`pass:[{{#with o'}}…{{/with}}]` |ENGINE
-|`pass:[{{lookup o k}}]` |same |`pass:[{{{ esc_html (lookup o' k') }}}]` |ENGINE
+|`pass:[{{lookup o k}}]` |same |`pass:[{{{ escapeHtml (lookup o' k') }}}]` |ENGINE
 |`pass:[{{log x}}]` |same |`pass:[{{{ log x' }}}]` (returns `VNull` ⇒ empty output) |ENGINE
 |===
 
@@ -182,7 +182,7 @@ Worked example (`each/` — over an object, with `@key`):
 ----
 Handlebars:  {{#each profile}}<dt>{{@key}}</dt><dd>{{this}}</dd>{{/each}}
 Core:        {{#each (lookup this "profile")}}
-               <dt>{{{ esc_html (key) }}}</dt><dd>{{{ esc_html this }}}</dd>
+               <dt>{{{ escapeHtml (key) }}}</dt><dd>{{{ escapeHtml this }}}</dd>
              {{/each}}
 ----
 
@@ -192,7 +192,7 @@ Worked example (`each/` — empty collection renders the `else` clause):
 ----
 Handlebars:  {{#each archived}}<li>{{title}}</li>{{else}}<li>Nothing archived.</li>{{/each}}
 Core:        {{#each (lookup this "archived")}}
-               <li>{{{ esc_html (lookup this "title") }}}</li>
+               <li>{{{ escapeHtml (lookup this "title") }}}</li>
                {{else}}<li>Nothing archived.</li>
              {{/each}}
 ----
@@ -207,13 +207,13 @@ that introduces it; Surface drops the `@` (xref:surface.adoc[] §5.5).
 |===
 |Handlebars |Surface |Core |Installed by
 
-|`pass:[{{@index}}]` |`pass:[{{index}}]` |`pass:[{{{ esc_html (index) }}}]` |`each`
-|`pass:[{{@key}}]` |`pass:[{{key}}]` |`pass:[{{{ esc_html (key) }}}]` |`each`
-|`pass:[{{@first}}]` |`pass:[{{first}}]` |`pass:[{{{ esc_html (first) }}}]` |`each`
-|`pass:[{{@last}}]` |`pass:[{{last}}]` |`pass:[{{{ esc_html (last) }}}]` |`each`
-|`pass:[{{@root}}]` |`pass:[{{root}}]` |`pass:[{{{ esc_html (root) }}}]` |host (top frame)
-|`pass:[{{@../index}}]` |`pass:[{{@../index}}]` |`pass:[{{{ esc_html (index (parent)) }}}]` |`each` + `parent`
-|custom `pass:[{{@myVar}}]` |`pass:[{{myVar}}]` |`pass:[{{{ esc_html (myVar) }}}]` |the block that frames it
+|`pass:[{{@index}}]` |`pass:[{{index}}]` |`pass:[{{{ escapeHtml (index) }}}]` |`each`
+|`pass:[{{@key}}]` |`pass:[{{key}}]` |`pass:[{{{ escapeHtml (key) }}}]` |`each`
+|`pass:[{{@first}}]` |`pass:[{{first}}]` |`pass:[{{{ escapeHtml (first) }}}]` |`each`
+|`pass:[{{@last}}]` |`pass:[{{last}}]` |`pass:[{{{ escapeHtml (last) }}}]` |`each`
+|`pass:[{{@root}}]` |`pass:[{{root}}]` |`pass:[{{{ escapeHtml (root) }}}]` |host (top frame)
+|`pass:[{{@../index}}]` |`pass:[{{@../index}}]` |`pass:[{{{ escapeHtml (index (parent)) }}}]` |`each` + `parent`
+|custom `pass:[{{@myVar}}]` |`pass:[{{myVar}}]` |`pass:[{{{ escapeHtml (myVar) }}}]` |the block that frames it
 |===
 
 Worked example (`each/` — `@index`/`@first`/`@last`):
@@ -224,7 +224,7 @@ Handlebars:  {{#each people}}
                <li>{{@index}}: {{this}}{{#if @first}} — first{{/if}}{{#if @last}} — last{{/if}}</li>
              {{/each}}
 Core:        {{#each (lookup this "people")}}
-               <li>{{{ esc_html (index) }}}: {{{ esc_html this }}}
+               <li>{{{ escapeHtml (index) }}}: {{{ escapeHtml this }}}
                  {{#if (first)}} — first{{/if}}{{#if (last)}} — last{{/if}}</li>
              {{/each}}
 ----
@@ -236,14 +236,14 @@ Core:        {{#each (lookup this "people")}}
 ----
 Handlebars:  {{#with person}}{{firstname}} works at {{../company.name}}{{/with}}
 Core:        {{#with (lookup this "person")}}
-               {{{ esc_html (lookup this "firstname") }}} works at
-               {{{ esc_html (lookup (parent) "company" "name") }}}
+               {{{ escapeHtml (lookup this "firstname") }}} works at
+               {{{ escapeHtml (lookup (parent) "company" "name") }}}
              {{/with}}
 
 Handlebars:  {{#each people}}<li>{{this}} lives in {{lookup ../cities @index}}</li>{{/each}}
 Core:        {{#each (lookup this "people")}}
-               <li>{{{ esc_html this }}} lives in
-                   {{{ esc_html (lookup (lookup (parent) "cities") (index)) }}}</li>
+               <li>{{{ escapeHtml this }}} lives in
+                   {{{ escapeHtml (lookup (lookup (parent) "cities") (index)) }}}</li>
              {{/each}}
 ----
 
@@ -307,8 +307,8 @@ Handlebars (main):   {{#*inline "person"}}<li>{{name}} — <em>{{role}}</em></li
                      {{#> layout title="Team"}}<p>block content</p>{{/layout}}
 
 Core (main):         {{#inline "person"}}
-                       <li>{{{ esc_html (lookup this "name") }}} —
-                           <em>{{{ esc_html (lookup this "role") }}}</em></li>
+                       <li>{{{ escapeHtml (lookup this "name") }}} —
+                           <em>{{{ escapeHtml (lookup this "role") }}}</em></li>
                      {{/inline}}
                      {{#each (lookup this "people")}}{{{ partial "person" this }}}{{/each}}
                      {{#partial> "layout" (dict "title" "Team")}}
@@ -339,7 +339,7 @@ Worked example (`whitespace/` + `comments/`):
 [source,text]
 ----
 Handlebars:  {{~#each items~}}<li>{{this}}</li>{{~/each~}}
-Core:        {{~#each (lookup this "items")~}}<li>{{{ esc_html this }}}</li>{{~/each~}}
+Core:        {{~#each (lookup this "items")~}}<li>{{{ escapeHtml this }}}</li>{{~/each~}}
 
 Handlebars:  \{{ this stays text }}
 Core:        \{{ this stays text }}          (emitted literally; identical)
@@ -395,7 +395,7 @@ engine you register and how its helpers/validation behave.
 |===
 |Handlebars option |FlatBars |Kind
 
-|`noEscape: true` |render core directly (it never escapes), or a Surface variant whose `pass:[{{ }}]` omits `esc_html` |HOST
+|`noEscape: true` |render core directly (it never escapes), or a Surface variant whose `pass:[{{ }}]` omits `escapeHtml` |HOST
 |`strict: true` |register a `lookup` that raises `TypeError` on a missing field instead of `VNull` |HOST/ENGINE
 |`assumeObjects: true` |a `lookup` variant that skips nullish guards |HOST/ENGINE
 |`preventIndent: true` |a `partial` option / host flag |HOST
@@ -413,7 +413,7 @@ See xref:host-api.adoc[] §7.4 for the full table. Summary: `compile`/`precompil
 FlatBars pipeline; `registerHelper`/`registerPartial`/`registerDecorator` all map to `register`
 (partials and decorators are helpers); `options.fn`/`options.inverse` map to `ctx.render` over the
 body's nodes / over the `else` clause; `SafeString` maps to `VSafe`/`safe`; `escapeExpression` maps
-to `esc_html`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
+to `escapeHtml`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
 
 [#mustache]
 == A.11 Mustache-only features
@@ -427,7 +427,7 @@ to `esc_html`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
 |implicit iterator `pass:[{{.}}]` |`this` (A.1) |SURFACE
 |lambdas (functions in the data) |values are never functions; expose behaviour as a helper, or call via `apply` |DROPPED→helper
 |set delimiters `pass:[{{=<% %>=}}]` |*not supported* — delimiters are fixed; a host may pre-process the source |DROPPED
-|HTML-escaping by default |Surface `pass:[{{ }}]` ⇒ `esc_html`; core never escapes |SURFACE
+|HTML-escaping by default |Surface `pass:[{{ }}]` ⇒ `escapeHtml`; core never escapes |SURFACE
 |===
 
 FlatBars adopts *no* Mustache truthy/list *section* semantics: `pass:[{{#x}}]` *always* means "apply
@@ -598,7 +598,7 @@ puts `body` on the handle as `children` and closes a `render` over the walk. Whe
 wants to emit its body it calls `ctl.render` under an environment *it* constructs — and that call
 re-enters FlatBars, which recurses. *That re-entry is the inversion.*
 
-A complete engine for `this`, `lookup`, `esc_html`, `if` (with an `else` clause) and `each` — note
+A complete engine for `this`, `lookup`, `escapeHtml`, `if` (with an `else` clause) and `each` — note
 there is no traversal anywhere in it:
 
 [source,haskell]
@@ -614,7 +614,7 @@ engine root =
   base = Map.fromFoldable
     [ "this"     /\ \c _        -> pure c.env.ctx
     , "lookup"   /\ \_ (o : ks) -> pure (foldl index o ks)               -- index by each segment
-    , "esc_html" /\ \_ [v]      -> pure (VSafe (escape (stringifyValue v)))
+    , "escapeHtml" /\ \_ [v]      -> pure (VSafe (escape (stringifyValue v)))
     , "if"       /\ ifH
     , "each"     /\ eachH ]
 

@@ -131,7 +131,7 @@ has a home in the surface dialect or the engine:
 |===
 |Absent from the core |Where it lives
 
-|`pass:[{{ }}]` *as escaped output* |surface → `pass:[{{{ esc_html … }}}]`. (In the core a bare `pass:[{{ Ident … }}]` is a *separator* marker, §2.4 — not output.)
+|`pass:[{{ }}]` *as escaped output* |surface → `pass:[{{{ escapeHtml … }}}]`. (In the core a bare `pass:[{{ Ident … }}]` is a *separator* marker, §2.4 — not output.)
 |`pass:[{{^}}]` inverse opener |recognized as a `Block` with the `Inverse` sigil (meaning-free); FullBars desugars it to `unless`, RawBars/MaxBars reject it. (`pass:[{{else}}]` *is* in the core: a separator.)
 |dotted/parent paths `a.b`, `../a`, `this.a` |surface → `lookup` / `parent`
 |index & segment-literal paths `a.1`, `a.[k v]` |surface → `lookup` with number / string segments
@@ -147,10 +147,10 @@ has a home in the surface dialect or the engine:
 
 [source,text]
 ----
-template:  <li>{{{esc_html (lookup this "name")}}} — {{{index}}}</li>
+template:  <li>{{{escapeHtml (lookup this "name")}}} — {{{index}}}</li>
 
 Node[0] = Content "<li>"
-Node[1] = Output (App "esc_html"
+Node[1] = Output (App "escapeHtml"
                        [ App "lookup" [ App "this" [], Str "name" ] ])   <1>
 Node[2] = Content " — "
 Node[3] = Output (App "index" [])

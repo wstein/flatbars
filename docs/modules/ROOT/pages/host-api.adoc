@@ -124,7 +124,7 @@ ifHelper ctl args = case args of
 |`options.fn` / `options.inverse` |`ctl.render` over `ctl.children` / over `ctl.clause "else"` |No inverse field; clauses are separator-delimited.
 |`options.hash` |the trailing `dict` argument |xref:surface.adoc[] §5.4.
 |`Handlebars.SafeString(s)` |`VSafe s` / `safe` |A value, not a wrapper class.
-|`Handlebars.escapeExpression(s)` |`esc_html` |Engine helper.
+|`Handlebars.escapeExpression(s)` |`escapeHtml` |Engine helper.
 |`Visitor` / AST walk |`foldTemplate` (prepare) or the `runTemplate` walk (interpret) |Plain algebraic data; pattern-match.
 |===
 

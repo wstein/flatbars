@@ -59,7 +59,7 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
   structural gate (which shapes exist), never a semantic one (what a name means).
 
 . *The walker is the only thing that assigns name-meaning.* It desugars and builds the real AST in the
-  same pass. Escaping (`esc_html` ⇒ escaped), clause-splitting (`pass:[{{else}}]` consumed into typed
+  same pass. Escaping (`escapeHtml` ⇒ escaped), clause-splitting (`pass:[{{else}}]` consumed into typed
   branches), and — for a surface dialect — paths (`name` ⇒ `lookup this "name"`) are all walker
   decisions. The reference lowering is `Kernel.Lower.lower :: Template -> Array RNode`, a
   `foldTemplate` (xref:appendix-handlebars.adoc#engine-api[A.13.2]). The surface desugar is

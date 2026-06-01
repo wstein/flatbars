@@ -24,7 +24,7 @@ privileged one; the architecture must keep it swappable even as it serves as the
 
 . *The surface is a desugar, not a parser* (ADR-001). `FullBars.Surface.desugar` is a pure
   `Template → Template` rewrite into core forms, then the reference renderer (or `lower`) runs the
-  result unchanged. It rewrites: `pass:[{{ E }}]` ⇒ escaped `pass:[{{{ esc_html E }}}]`; bare/dotted
+  result unchanged. It rewrites: `pass:[{{ E }}]` ⇒ escaped `pass:[{{{ escapeHtml E }}}]`; bare/dotted
   *paths* ⇒ `lookup` chains (`name` ⇒ `lookup this "name"`, `a.b`, `a.[1]`, `../a` ⇒
   `lookup (parent) …`); `@data` ⇒ scoped calls (`@index` ⇒ `(index)`, `@root.x`); `else if` chains ⇒
   flat `pass:[{{elif}}]`; hash args `k=v` ⇒ a trailing `dict`; block params `as |item i|` ⇒ string

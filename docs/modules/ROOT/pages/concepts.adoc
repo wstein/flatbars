@@ -81,7 +81,7 @@ environment. There is no `@` namespace and no `../` operator in the core.
 == 5. No keywords — not even `else`
 
 The core reserves *nothing*. `true`, `false`, `null` are not literals; they are reference-engine
-helpers `(true)`, `(false)`, `(null)`. HTML escaping is the helper `esc_html`; the core never
+helpers `(true)`, `(false)`, `(null)`. HTML escaping is the helper `escapeHtml`; the core never
 escapes. And *`else` is not special*:
 
 [IMPORTANT]

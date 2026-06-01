@@ -181,7 +181,7 @@ separator.
 
 [IMPORTANT]
 ====
-*The core never escapes.* HTML escaping is the helper `esc_html`, which returns a `VSafe`. The
+*The core never escapes.* HTML escaping is the helper `escapeHtml`, which returns a `VSafe`. The
 `VSafe` tag makes escaping *idempotent at the boundary*: a value already escaped (or deliberately
 trusted via `safe`) is not escaped again as it flows through another helper. This is the FlatBars
 analogue of {hbs}' `SafeString`, carried in the value rather than implied by which braces you typed.

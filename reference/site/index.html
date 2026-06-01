@@ -169,8 +169,8 @@
 <span class="lbl">desugars to ↓</span>
 
 <span class="t-mut">// core (what runs — everything is a helper)</span>
-&lt;li&gt;<span class="t-key">{{{</span> <span class="t-mut">(</span>esc_html <span class="t-mut">(</span>lookup this <span class="t-str">"name"</span><span class="t-mut">))</span> <span class="t-key">}}}</span> —
-    <span class="t-key">{{{</span> <span class="t-mut">(</span>esc_html <span class="t-mut">(</span>upcase <span class="t-mut">(</span>lookup this <span class="t-str">"role"</span><span class="t-mut">)))</span> <span class="t-key">}}}</span>&lt;/li&gt;</pre>
+&lt;li&gt;<span class="t-key">{{{</span> <span class="t-mut">(</span>escapeHtml <span class="t-mut">(</span>lookup this <span class="t-str">"name"</span><span class="t-mut">))</span> <span class="t-key">}}}</span> —
+    <span class="t-key">{{{</span> <span class="t-mut">(</span>escapeHtml <span class="t-mut">(</span>upcase <span class="t-mut">(</span>lookup this <span class="t-str">"role"</span><span class="t-mut">)))</span> <span class="t-key">}}}</span>&lt;/li&gt;</pre>
     </div>
   </div>
 </section>
@@ -223,7 +223,7 @@
         <p style="color:#bdb6a8"><code style="background:#2a2620;color:var(--bb-rod)">if</code>
           <code style="background:#2a2620;color:var(--bb-rod)">each</code>
           <code style="background:#2a2620;color:var(--bb-rod)">with</code>
-          <code style="background:#2a2620;color:var(--bb-rod)">esc_html</code> — all userland. Delete
+          <code style="background:#2a2620;color:var(--bb-rod)">escapeHtml</code> — all userland. Delete
           them and the language still parses and runs. The prelude <em>is</em> the product you design.</p>
       </div>
     </div>
@@ -253,7 +253,7 @@
 
 <span class="t-mut">core</span>
 <span class="t-key">{{#each</span> <span class="t-mut">(</span>lookup this <span class="t-str">"people"</span><span class="t-mut">)</span><span class="t-key">}}</span>
-  <span class="t-key">{{{</span><span class="t-mut">(</span>esc_html <span class="t-mut">(</span>index<span class="t-mut">))</span><span class="t-key">}}}</span>: <span class="t-key">{{{</span><span class="t-mut">(</span>esc_html this<span class="t-mut">)</span><span class="t-key">}}}</span>
+  <span class="t-key">{{{</span><span class="t-mut">(</span>escapeHtml <span class="t-mut">(</span>index<span class="t-mut">))</span><span class="t-key">}}}</span>: <span class="t-key">{{{</span><span class="t-mut">(</span>escapeHtml this<span class="t-mut">)</span><span class="t-key">}}}</span>
   <span class="t-key">{{#if</span> <span class="t-mut">(</span>first<span class="t-mut">)</span><span class="t-key">}}</span> ★<span class="t-key">{{/if}}</span>
 <span class="t-key">{{/each}}</span></pre></div>
 
@@ -265,8 +265,8 @@
 
 <span class="t-mut">core</span>
 <span class="t-key">{{#with</span> <span class="t-mut">(</span>lookup this <span class="t-str">"person"</span><span class="t-mut">)</span><span class="t-key">}}</span>
-  <span class="t-key">{{{</span><span class="t-mut">(</span>esc_html <span class="t-mut">(</span>lookup this <span class="t-str">"firstname"</span><span class="t-mut">))</span><span class="t-key">}}}</span> @
-  <span class="t-key">{{{</span><span class="t-mut">(</span>esc_html <span class="t-mut">(</span>lookup <span class="t-mut">(</span>parent<span class="t-mut">)</span> <span class="t-str">"company" "name"</span><span class="t-mut">))</span><span class="t-key">}}}</span>
+  <span class="t-key">{{{</span><span class="t-mut">(</span>escapeHtml <span class="t-mut">(</span>lookup this <span class="t-str">"firstname"</span><span class="t-mut">))</span><span class="t-key">}}}</span> @
+  <span class="t-key">{{{</span><span class="t-mut">(</span>escapeHtml <span class="t-mut">(</span>lookup <span class="t-mut">(</span>parent<span class="t-mut">)</span> <span class="t-str">"company" "name"</span><span class="t-mut">))</span><span class="t-key">}}}</span>
 <span class="t-key">{{/with}}</span></pre></div>
 
       <div class="panel"><div class="head"><span class="dot on"></span>&nbsp;hash args → trailing dict</div>
@@ -282,7 +282,7 @@
 <span class="t-key">{{</span>upper <span class="t-mut">(</span>concat first last<span class="t-mut">)</span><span class="t-key">}}</span>
 
 <span class="t-mut">core</span>
-<span class="t-key">{{{</span> <span class="t-mut">(</span>esc_html <span class="t-mut">(</span>upper
+<span class="t-key">{{{</span> <span class="t-mut">(</span>escapeHtml <span class="t-mut">(</span>upper
     <span class="t-mut">(</span>concat <span class="t-mut">(</span>lookup this <span class="t-str">"first"</span><span class="t-mut">)</span>
             <span class="t-mut">(</span>lookup this <span class="t-str">"last"</span><span class="t-mut">)))) }}}</span></pre></div>
     </div>
@@ -335,7 +335,7 @@
       <div class="row"><span class="tag">Anton · display</span><span style="font-family:var(--bb-font-display); font-size:2.6rem; text-transform:lowercase; line-height:1">flatbars</span></div>
       <div class="row"><span class="tag">IBM Plex Sans · h2</span><span style="font-family:var(--bb-font-body); font-weight:700; font-size:1.7rem">Five decisions, and everything follows</span></div>
       <div class="row"><span class="tag">IBM Plex Sans · body</span><span style="font-family:var(--bb-font-body); font-size:1.0625rem">The substrate you build a template engine on.</span></div>
-      <div class="row"><span class="tag">Space Mono · code/label</span><span style="font-family:var(--bb-font-mono); font-size:1rem">{{{ esc_html (lookup this "name") }}}</span></div>
+      <div class="row"><span class="tag">Space Mono · code/label</span><span style="font-family:var(--bb-font-mono); font-size:1rem">{{{ escapeHtml (lookup this "name") }}}</span></div>
     </div>
 
     <h3 style="font-family:var(--bb-font-mono); font-size:.82rem; letter-spacing:.1em; color:var(--bb-steel); text-transform:uppercase">Logo</h3>
@@ -365,7 +365,7 @@
           the one thing on a page that must not be missed.</div>
         <table class="bb-table">
           <tr><th>Surface</th><th>Core</th></tr>
-          <tr><td><code>{{x}}</code></td><td><code>{{{ esc_html (lookup this "x") }}}</code></td></tr>
+          <tr><td><code>{{x}}</code></td><td><code>{{{ escapeHtml (lookup this "x") }}}</code></td></tr>
           <tr><td><code>@index</code></td><td><code>(index)</code></td></tr>
           <tr><td><code>../x</code></td><td><code>(lookup (parent) "x")</code></td></tr>
         </table>
@@ -374,7 +374,7 @@
 <span class="t-mut"># a minimal prelude is enough</span>
 register <span class="t-str">"this"</span>    thisHelper
 register <span class="t-str">"lookup"</span>  lookupHelper
-register <span class="t-str">"esc_html"</span> escHtmlHelper
+register <span class="t-str">"escapeHtml"</span> escHtmlHelper
 register <span class="t-str">"if"</span>      ifHelper
 register <span class="t-str">"each"</span>    eachHelper
 

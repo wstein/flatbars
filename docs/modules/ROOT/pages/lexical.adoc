@@ -29,8 +29,8 @@ That is the entire opener set. `pass:[{{#]` is the only block *opener*; the bare
 
 * `pass:[{{^}}]` inverse opener — "render when falsy" is the `unless` helper, not a syntax.
 * escaped-output `pass:[{{ }}]` *in the core* — the double-stash is a separator here; escaping is the
-  helper `esc_html`. The xref:surface.adoc[surface dialect] reuses `pass:[{{ E }}]` for escaped
-  output, desugaring it to `pass:[{{{ esc_html … }}}]`; the two layers read it differently.
+  helper `escapeHtml`. The xref:surface.adoc[surface dialect] reuses `pass:[{{ E }}]` for escaped
+  output, desugaring it to `pass:[{{{ escapeHtml … }}}]`; the two layers read it differently.
 
 The separator's identifier — `else`, `elif`, `case`, `default` — is *opaque to the lexer and parser*
 (xref:grammar.adoc[] §2.4). The lexer matches the *longest opener*: `pass:[{{{{]` before
@@ -89,7 +89,7 @@ Within `pass:[{{{ … }}}]`, `pass:[{{# … }}]`, and the head of a raw block, t
 |An identifier. One or more characters from `A`–`Z`, `a`–`z`, `0`–`9`, `_`, `-`, `+`, `*`, `?`, `!`,
 `/`, `.`, `<`, `>`, `=` that does not parse as a `NUMBER`. Must not start with a digit, `-`+digit,
 `"`, `(`, `)`, or whitespace.
-|`each`  `esc_html`  `partial-block`  `>`  `eq`
+|`each`  `escapeHtml`  `partial-block`  `>`  `eq`
 
 |`STRING`
 |`"` … `"` or `'` … `'` with escapes `\\` `\"` `\'` `\n` `\t` `\r`. May contain spaces and any

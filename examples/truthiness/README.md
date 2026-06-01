@@ -33,7 +33,7 @@ FullBars truthiness ([`FullBars.Value.truthy`](../../packages/fullbars/src/FullB
 - `0`
 - `""` (the empty string)
 - `[]` (the empty array)
-- a trusted empty string (`safe ""` / `esc_html ""` ⇒ `VSafe ""`)
+- a trusted empty string (`safe ""` / `escapeHtml ""` ⇒ `VSafe ""`)
 
 **Everything else is truthy** — including the empty object `{}`, non-zero
 numbers, and any non-empty string/array.
@@ -81,7 +81,7 @@ instead wraps safe output in a `SafeString` *object*, which is always truthy —
 empty or not. FullBars' content-based rule is the more useful one (an empty
 escaped section reads as empty), so it is kept on purpose.
 
-The sharp edge to know: `safe` and `esc_html` **stringify** their argument, so
+The sharp edge to know: `safe` and `escapeHtml` **stringify** their argument, so
 `(safe 0)` is truthy (it is the non-empty string `"0"`) while `0` is falsy.
 Testing the truthiness of an escaped/safe value is therefore a category error —
 they are *output*, not data. The engine's `escapingWarnings` lint flags it:
