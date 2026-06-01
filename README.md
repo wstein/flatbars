@@ -36,7 +36,7 @@ exposes.
 
 The `examples/*/` folders (each `meta.json` + `template.hbs` + `data.json`) are
 golden cases for the compiler conformance harness (`npm run test:compile`); the
-vendored upstream corpus under `examples/vendored/` drives `barebars examples
+vendored upstream corpus under `reference/web/examples/vendored/` drives `barebars examples
 verify`. The FlatBars Lab's own demo templates live under `reference/web/examples/`.
 
 ## Prerequisites

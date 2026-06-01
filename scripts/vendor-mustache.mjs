@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Vendor the mustache/spec conformance corpus into examples/vendored/mustache/.
+// Vendor the mustache/spec conformance corpus into reference/web/examples/vendored/mustache/.
 // This is the "sync" step of the example-loader spec (example-loader-spec.md §5):
 // fetch the spec's `.json` modules at a PINNED commit and split each into one
 // fixture file per test, in the shared vendored-fixture format (§4). The corpus
@@ -21,7 +21,10 @@ import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const OUT = resolve(root, "examples/vendored/mustache");
+// The corpus lives under the FlatBars Lab's served root so both the headless
+// `barebars examples verify` gate (run from the repo root) and the Lab (served
+// from reference/web/) read one canonical copy — no duplication.
+const OUT = resolve(root, "reference/web/examples/vendored/mustache");
 
 // Pinned mustache/spec commit (refs/heads/master at vendor time). Bump
 // deliberately; re-running at the same SHA is byte-identical.
@@ -91,4 +94,4 @@ for (const module of MODULES) {
   }
   console.log(`  ${module}: ${spec.tests.length} fixtures`);
 }
-console.log(`vendored ${total} mustache fixtures at ${SHA.slice(0, 7)} → examples/vendored/mustache/`);
+console.log(`vendored ${total} mustache fixtures at ${SHA.slice(0, 7)} → reference/web/examples/vendored/mustache/`);

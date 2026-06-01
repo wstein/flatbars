@@ -60,7 +60,7 @@ type Provider =
 
 ## 4. Vendored fixture format
 
-One file per example, committed under `examples/vendored/<provider>/<category>/<name>.json`:
+One file per example, committed under `reference/web/examples/vendored/<provider>/<category>/<name>.json` (under the FlatBars Lab's served root, so the cli gate and the Lab read one copy):
 
 ```jsonc
 {
@@ -188,7 +188,7 @@ The corpus thus becomes a live feature-coverage report for FullBars, not just a 
 
 Loading a fixture: auto-select its `dialect`, populate template/data/partials, render, and show expected-vs-actual. A "see in other dialects" control runs the migrate linter (`loopvars-linter-spec.md`) to show the same input across FullBars/MinBars/MaxBars. The diff's framing follows `divergenceMeaning` — neutral "divergence (by design)" for Handlebars, red "conformance failure" for Mustache. Unsupported-feature examples load read-only with the gap explained, never a silent wrong render.
 
-The vendored corpus (`examples/vendored/`) is the *conformance/coverage* set and **coexists** with the curated demo examples the lab already ships (`reference/web/examples/stem/examples.json`); they are separate catalogues — vendored fixtures are not auto-merged into the demo dropdown. (If the two are ever unified, that is its own migration, not part of this loader.)
+The vendored corpus (`reference/web/examples/vendored/`) is the *conformance/coverage* set and **coexists** with the curated demo examples the lab already ships (`reference/web/examples/stem/examples.json`); they are separate catalogues — vendored fixtures are not auto-merged into the demo dropdown. (If the two are ever unified, that is its own migration, not part of this loader.)
 
 ---
 
@@ -207,7 +207,7 @@ The vendored corpus (`examples/vendored/`) is the *conformance/coverage* set and
 > **Sequencing.** E0–E2 plus the headless `verify`/`check` flags (§6.5) deliver the MinBars conformance value with **no** Handlebars dependency and **no** TUI. E3 (Handlebars provider) is gated on Open #3 (source repo); E4 (TUI) on Open #2 (library). Neither blocks the MinBars path — ship MinBars-first.
 
 ### Pipeline & corpus
-- **E0 — Provider interface + fixture format.** The fixture format (§4) is **landed**: `examples/vendored/mustache/<module>/<name>.json`. The typed `Provider` record (§3) is not yet extracted — the `mustache` path is implemented directly (vendor script + a CLI verifier), and the typed interface arrives with the second (`handlebars`) provider.
+- **E0 — Provider interface + fixture format.** The fixture format (§4) is **landed**: `reference/web/examples/vendored/mustache/<module>/<name>.json`. The typed `Provider` record (§3) is not yet extracted — the `mustache` path is implemented directly (vendor script + a CLI verifier), and the typed interface arrives with the second (`handlebars`) provider.
 - **E1 — Vendor pipeline + `mustache` corpus.** **Landed.** `scripts/vendor-mustache.mjs` vendors the core modules (comments, interpolation, sections, inverted, partials — 122 fixtures) at a pinned commit; `barebars examples verify` is the headless strict gate (`npm run examples:verify`, wired into `npm test`) — renders each fixture through MinBars and asserts `actual == expected` (122/122 conform). *Reconcile:* `packages/minbars/test/spec-conformance.mjs` (`npm run test:minbars-spec`) is a parallel **lenient measurement** over a **second** vendored corpus (`packages/minbars/test/spec/`); per §6.5 this `verify` gate is meant to supersede it — consolidating to one corpus is the open follow-up.
 - **E2 — Playground load + diff.** Wire the engine; expected-vs-actual with `divergenceMeaning` framing; auto-dialect-select.
 

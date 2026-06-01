@@ -56,14 +56,14 @@ Mustache conformance for MinBars (both run from real `mustache/spec` fixtures):
 ```sh
 npm run examples:verify       # STRICT gate (in `npm test`): render each vendored fixture via
                               # MinBars and assert actual == expected; exit ≠ 0 on any miss
-node scripts/vendor-mustache.mjs   # re-vendor examples/vendored/mustache/ at the pinned commit
+node scripts/vendor-mustache.mjs   # re-vendor reference/web/examples/vendored/mustache/ at the pinned commit
 npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; always exits 0
 ```
 
 `examples:verify` is the `barebars examples verify` CLI subcommand (see
 `example-loader-spec.md`). Note the overlap with `test:minbars-spec`: both render
 `mustache/spec` through MinBars but from **two separate vendored corpora**
-(`examples/vendored/mustache/` vs `packages/minbars/test/spec/`). Consolidating to
+(`reference/web/examples/vendored/mustache/` vs `packages/minbars/test/spec/`). Consolidating to
 one corpus is a tracked follow-up (the spec's `verify` is intended to supersede the
 measurement harness).
 
@@ -150,7 +150,7 @@ not a PureScript package). The old Halogen `packages/playground` was removed.
   kind of care this needs).
 - **`examples/*/` are conformance golden cases, foldered.** Each is `meta.json`
   + `template.hbs` + `data.json`; `test:compile` renders every one through the
-  interpreter and the compiled JS and asserts they match. `examples/vendored/`
+  interpreter and the compiled JS and asserts they match. `reference/web/examples/vendored/`
   is the separate upstream corpus for `examples verify` (see below).
 - **Mustache conformance.** `npm run examples:verify` (in `npm test`) renders the
   vendored `mustache/spec` fixtures through MinBars and asserts `== expected`;
