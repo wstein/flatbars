@@ -1661,7 +1661,7 @@
             ? (["core", "rawbars"].includes(DIALECT_PARAM) ? "rawbars"
                : DIALECT_PARAM === "maxbars" ? "maxbars" : "fullbars")
         // Default to FullBars — a no-wasm BareBars engine. Stem renders from a
-        // wasm binary built by reference/web/build.sh, so it must not be the
+        // wasm binary built by lab/build.sh, so it must not be the
         // zero-config default (a missing wasm would kill the Lab at boot).
         : "fullbars";
       // The three BareBars dialect engines share one adapter; the engine name
@@ -1684,7 +1684,7 @@
       if (ENGINE === "stem") {
         stemBytes = await loadStemWasm();
         if (!stemBytes) {
-          console.warn(`Stem wasm not found at ${WASM}; using FullBars instead — build it with reference/web/build.sh.`);
+          console.warn(`Stem wasm not found at ${WASM}; using FullBars instead — build it with lab/build.sh.`);
           if (typeof toast === "function") toast("Stem engine needs its wasm (build.sh) — using FullBars");
           ENGINE = "fullbars";
         }
@@ -4233,7 +4233,7 @@
 
       // ── Vendored conformance fixtures (example-loader-spec.md §8, E2) ──────
       // `?vendored=<id>` deep-links a fixture from the vendored corpus
-      // (reference/web/examples/vendored/<id>.json). The fixture must run under
+      // (lab/examples/vendored/<id>.json). The fixture must run under
       // its own dialect engine, so if the boot engine differs we re-navigate with
       // the right `?engine=`. The whole path is gated on the param — it never runs
       // for a normal Lab session.

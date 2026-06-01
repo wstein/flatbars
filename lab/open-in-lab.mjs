@@ -2,7 +2,7 @@
 //
 // openInLab — the shared "load this example into the FlatBars Lab" contract.
 //
-// Both the Lab (reference/web/index.html) and the tutorial pages import this, so
+// Both the Lab (lab/index.html) and the tutorial pages import this, so
 // the deep-link format lives in ONE place. An example is `{ template, data,
 // partials }` plus the engine (surface) it runs under. We encode the workspace
 // with the Lab's own share-state codec (`encodeState`) into the URL *fragment*

@@ -9,7 +9,7 @@ core is a meaning-free parser; everything you expect from Handlebars/Mustache
 (helpers, escaping, control flow, path semantics) is supplied by an *engine*
 built on top. This is a PureScript monorepo holding the reference
 implementation and a CLI, plus the normative spec in `docs/` and the FlatBars Lab
-(a JS/WASM polyglot playground in `reference/web`, served as static files).
+(a JS/WASM polyglot playground in `lab`, served as static files).
 
 The spec in `docs/` is the contract; the PureScript packages target it.
 `docs/modules/ROOT/pages/concepts.adoc` is the fastest way to understand the
@@ -56,17 +56,17 @@ Mustache conformance for MinBars (both run from real `mustache/spec` fixtures):
 ```sh
 npm run examples:verify       # STRICT gate (in `npm test`): render each vendored fixture via
                               # MinBars and assert actual == expected; exit ≠ 0 on any miss
-node scripts/vendor-mustache.mjs   # re-vendor reference/web/examples/vendored/mustache/ at the pinned commit
+node scripts/vendor-mustache.mjs   # re-vendor lab/examples/vendored/mustache/ at the pinned commit
 npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; always exits 0
 npm run test:lab              # FlatBars Lab pure-Node unit tests (playground_utils, adapter)
 ```
 
 `examples:verify` is the `barebars examples verify` CLI subcommand (see
 `example-loader-spec.md`). The FlatBars Lab loads the same corpus via the
-`?vendored=<id>` deep-link (`reference/web/index.html`), framing each fixture's
+`?vendored=<id>` deep-link (`lab/index.html`), framing each fixture's
 expected-vs-actual verdict. Note the overlap with `test:minbars-spec`: both render
 `mustache/spec` through MinBars but from **two separate vendored corpora**
-(`reference/web/examples/vendored/mustache/` vs `packages/minbars/test/spec/`). Consolidating to
+(`lab/examples/vendored/mustache/` vs `packages/minbars/test/spec/`). Consolidating to
 one corpus is a tracked follow-up (the spec's `verify` is intended to supersede the
 measurement harness).
 
@@ -132,17 +132,17 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 - **`json`** (`barebars-json`) — JSON ⇆ `Value` adapter, deliberately kept out
   of `core` (JSON-ness is a host concern, not a framework dependency).
 - **`js`** (`barebars-js`) — JS/FFI surface bundling the dialects for JS hosts
-  (bundled to `reference/web/vendor/barebars-engine.mjs` for the FlatBars Lab).
+  (bundled to `lab/vendor/barebars-engine.mjs` for the FlatBars Lab).
   That bundle is a **committed artifact**: regenerate it after any engine change,
   or the Lab runs stale — `spago bundle -p barebars-js --module FullBars.JS
   --bundle-type module --platform browser --outfile
-  reference/web/vendor/barebars-engine.mjs` (needs `esbuild` on PATH).
+  lab/vendor/barebars-engine.mjs` (needs `esbuild` on PATH).
 - **`cli`** (`barebars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source), incl.
   truthiness materialization via directive-carry.
 
-The web playground is **`reference/web`** (the FlatBars Lab — plain HTML/JS/WASM,
+The web playground is **`lab`** (the FlatBars Lab — plain HTML/JS/WASM,
 not a PureScript package). The old Halogen `packages/playground` was removed.
 
 ### Conventions worth knowing
@@ -157,7 +157,7 @@ not a PureScript package). The old Halogen `packages/playground` was removed.
   kind of care this needs).
 - **`examples/*/` are conformance golden cases, foldered.** Each is `meta.json`
   + `template.hbs` + `data.json`; `test:compile` renders every one through the
-  interpreter and the compiled JS and asserts they match. `reference/web/examples/vendored/`
+  interpreter and the compiled JS and asserts they match. `lab/examples/vendored/`
   is the separate upstream corpus for `examples verify` (see below).
 - **Mustache conformance.** `npm run examples:verify` (in `npm test`) renders the
   vendored `mustache/spec` fixtures through MinBars and asserts `== expected`;

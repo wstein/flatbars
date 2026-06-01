@@ -4,9 +4,9 @@
 // through the real engine bundle the Lab ships (dogfooding — consensus item 3),
 // and offers an "Open in Lab" link built from the shared contract (item 1).
 import { useEffect, useState } from "preact/hooks";
-import { labHref } from "../../../reference/web/open-in-lab.mjs";
-import { createBareBarsRenderer } from "../../../reference/web/barebars.mjs";
-import { createMinBarsRenderer } from "../../../reference/web/minbars.mjs";
+import { labHref } from "../../../lab/open-in-lab.mjs";
+import { createBareBarsRenderer } from "../../../lab/barebars.mjs";
+import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
 
@@ -21,7 +21,7 @@ async function renderExample(engine, { template, data, partials }) {
   }
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = "/reference/web/index.html" }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = "/lab/index.html" }) {
   const [href, setHref] = useState(null);
   const [preview, setPreview] = useState(null);
 

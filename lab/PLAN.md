@@ -1,13 +1,13 @@
 # FlatBars Lab — polyglot template playground (plan)
 
 Goal: **one** playground that serves **Handlebars**, **Stem**, *and*
-**BareBars/FullBars** — porting the full `reference/web` ("Stem Playground —
+**BareBars/FullBars** — porting the full `lab` ("Stem Playground —
 IDE") feature set and adding BareBars as a first-class engine. Draft for
 approval; nothing built yet. (Working name "FlatBars Lab" — see naming options.)
 
 ## Decisive finding: the reference is already a multi-engine IDE
 
-`reference/web` is **adapter-based and polyglot by design**. Each engine provides
+`lab` is **adapter-based and polyglot by design**. Each engine provides
 the same seam (the "Stem seam"):
 
 ```text
@@ -27,7 +27,7 @@ doesn't advertise a feature simply doesn't show that panel. It already runs Stem
 
 ## Strategy (the pivot — confirm)
 
-**Build FlatBars Lab on `reference/web`; add a BareBars engine adapter; rebrand.**
+**Build FlatBars Lab on `lab`; add a BareBars engine adapter; rebrand.**
 Do *not* rebuild the IDE in Halogen. Rationale:
 
 - The reference gives us *all* Stem features, the Handlebars engine, and every
@@ -72,7 +72,7 @@ This is the reason to be polyglot, not just multi-tab.
 
 ## Phased roadmap
 
-- **Phase 0 — Adopt & build.** Bring `reference/web` into the monorepo build as
+- **Phase 0 — Adopt & build.** Bring `lab` into the monorepo build as
   the lab (entry point, `build.sh` → our tooling), Stem (WASM) + Handlebars
   intact, green smoke test. Decide the fate of Halogen `packages/playground`.
 - **Phase 1 — BareBars adapter (MVP).** `render` + `parseAst` + `features` +
@@ -88,11 +88,11 @@ This is the reason to be polyglot, not just multi-tab.
 - **Phase 5 — Rebrand & polish.** Name/logo/landing; data overlays; shareable
   URL state; `coverage`/`perf` panels for BareBars.
 - **Phase 6 — Tests & CI.** Browser-smoke + screenshots per engine (extend
-  `reference/web/test`); golden diffs in CI.
+  `lab/test`); golden diffs in CI.
 
 ## Status (2026-05-31)
 
-- **Phase 1 ✓** — BareBars adapter (`reference/web/barebars.mjs`); `?engine=barebars`
+- **Phase 1 ✓** — BareBars adapter (`lab/barebars.mjs`); `?engine=barebars`
   boots in headless Brave, render works (surface + core), 13 adapter tests.
 - **Phase 2 ✓** — real `parseAst` + exact `requiredAssigns` + `usedTransformers`
   via `FullBars.JS.astJson`; capability gating verified in-browser (Data Access /
@@ -108,7 +108,7 @@ This is the reason to be polyglot, not just multi-tab.
 
 ## Open questions
 
-1. **Strategy**: confirm building on `reference/web` + a BareBars adapter (vs a
+1. **Strategy**: confirm building on `lab` + a BareBars adapter (vs a
    Halogen rebuild). Recommended: build on the reference.
 2. **Name** (see ratings in the chat): FlatBars Lab / FlatBars Lab / Polybars / …
 3. **Halogen `packages/playground`**: retire it, or keep a minimal embeddable
@@ -116,4 +116,4 @@ This is the reason to be polyglot, not just multi-tab.
 4. **Stem source**: is the prebuilt `wasm/stem_native` the canonical Stem, or do
    we track a Stem source/repo for rebuilds?
 5. **Repo placement**: does FlatBars Lab live in this repo (e.g. `packages/lab` or
-   promote `reference/web`), and is the Stem/Handlebars vendoring kept as-is?
+   promote `lab`), and is the Stem/Handlebars vendoring kept as-is?

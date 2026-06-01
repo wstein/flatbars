@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Bundle-staleness guard (consensus item 3). The FlatBars Lab and the tutorial
-// previews run the COMMITTED engine bundle reference/web/vendor/barebars-engine.mjs,
+// previews run the COMMITTED engine bundle lab/vendor/barebars-engine.mjs,
 // so it must track the PureScript source. This regenerates the bundle from the
 // compiled output with a PINNED esbuild and byte-diffs it against the committed
 // file: a difference means someone changed the engine without re-bundling, and CI
@@ -19,11 +19,11 @@ import { dirname, resolve, join } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ENTRY = resolve(root, "output/FullBars.JS/index.js");
-const COMMITTED = resolve(root, "reference/web/vendor/barebars-engine.mjs");
+const COMMITTED = resolve(root, "lab/vendor/barebars-engine.mjs");
 // Pinned so the regen is byte-reproducible regardless of the local toolchain;
 // the committed bundle is produced by this exact command.
 const ESBUILD = "esbuild@0.23.0";
-const REGEN_CMD = `npx --yes ${ESBUILD} output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=reference/web/vendor/barebars-engine.mjs`;
+const REGEN_CMD = `npx --yes ${ESBUILD} output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/barebars-engine.mjs`;
 
 if (!existsSync(ENTRY)) {
   console.error("check:bundle: output/FullBars.JS not found — run `spago build` first.");
@@ -43,7 +43,7 @@ try {
 }
 
 if (Buffer.compare(readFileSync(out), readFileSync(COMMITTED)) === 0) {
-  console.log("check:bundle: reference/web/vendor/barebars-engine.mjs is current ✓");
+  console.log("check:bundle: lab/vendor/barebars-engine.mjs is current ✓");
   process.exit(0);
 }
 console.error(

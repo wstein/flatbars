@@ -18,9 +18,9 @@ build/
 .parcel-cache/
 
 # --- Reference playground build artifacts (kept as reference, not built here) ---
-reference/web/wasm/*.wasm
-reference/web/test/node_modules/
-reference/web/test/screenshots/
+lab/wasm/*.wasm
+lab/test/node_modules/
+lab/test/screenshots/
 
 # --- Editor / OS ---
 .DS_Store

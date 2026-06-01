@@ -1440,7 +1440,7 @@ function wrapAtPath(segments, value) {
 }
 
 // ── Vendored example/conformance corpus (example-loader-spec.md) ──────────────
-// The corpus under reference/web/examples/vendored/<provider>/ is the same one
+// The corpus under lab/examples/vendored/<provider>/ is the same one
 // the headless `barebars examples verify` gate renders; these pure helpers let
 // the Lab load a fixture and frame its expected-vs-actual diff.
 

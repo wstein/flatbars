@@ -11,16 +11,16 @@
 //   node scripts/check-tutorial-links.mjs
 //
 import { lessons } from "../tutorials/src/examples.mjs";
-import { createBareBarsRenderer } from "../reference/web/barebars.mjs";
-import { createMinBarsRenderer } from "../reference/web/minbars.mjs";
-import { labHref } from "../reference/web/open-in-lab.mjs";
+import { createBareBarsRenderer } from "../lab/barebars.mjs";
+import { createMinBarsRenderer } from "../lab/minbars.mjs";
+import { labHref } from "../lab/open-in-lab.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
 
 let fail = 0;
 for (const [key, ex] of Object.entries(lessons)) {
   try {
-    await labHref(ex.engine, ex, { labUrl: "/reference/web/index.html" });
+    await labHref(ex.engine, ex, { labUrl: "/lab/index.html" });
   } catch (e) {
     console.error(`  ✗ ${key}: Open-in-Lab link failed to build — ${e.message}`);
     fail++;

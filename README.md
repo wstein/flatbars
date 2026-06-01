@@ -10,7 +10,7 @@ control flow, no path semantics — every one of those is a *helper you supply*.
 
 This repository is a **PureScript** monorepo hosting the reference
 implementation and a CLI, alongside the normative specification and the
-**FlatBars Lab** — a JavaScript/WASM polyglot playground (`reference/web`).
+**FlatBars Lab** — a JavaScript/WASM polyglot playground (`lab`).
 
 ## Layout
 
@@ -36,8 +36,8 @@ exposes.
 
 The `examples/*/` folders (each `meta.json` + `template.hbs` + `data.json`) are
 golden cases for the compiler conformance harness (`npm run test:compile`); the
-vendored upstream corpus under `reference/web/examples/vendored/` drives `barebars examples
-verify`. The FlatBars Lab's own demo templates live under `reference/web/examples/`.
+vendored upstream corpus under `lab/examples/vendored/` drives `barebars examples
+verify`. The FlatBars Lab's own demo templates live under `lab/examples/`.
 
 ## Prerequisites
 
@@ -55,9 +55,9 @@ npm run build          # compile every package in the workspace
 npm test               # run the full suite (per-package tests + conformance gates)
 npm run cli -- --help  # run the CLI
 npm run docs           # build the Antora documentation site (requires antora)
-# FlatBars Lab: serve reference/web/ over HTTP and open index.html
+# FlatBars Lab: serve lab/ over HTTP and open index.html
 #   (defaults to the FullBars engine — no build needed; the Stem engine also
-#    needs its wasm: run reference/web/build.sh, requires the Rust wasm toolchain)
+#    needs its wasm: run lab/build.sh, requires the Rust wasm toolchain)
 ```
 
 See each package's own `README` for details.

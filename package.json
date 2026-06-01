@@ -12,7 +12,7 @@
     "examples:verify": "spago build -p barebars-cli && spago run -p barebars-cli -- examples verify",
     "check:tutorial-links": "node scripts/check-tutorial-links.mjs",
     "check:bundle": "spago build -p barebars-js && node scripts/check-bundle.mjs",
-    "test:lab": "node reference/web/playground_utils.test.mjs && node reference/web/barebars.test.mjs && node reference/web/open-in-lab.test.mjs",
+    "test:lab": "node lab/playground_utils.test.mjs && node lab/barebars.test.mjs && node lab/open-in-lab.test.mjs",
     "cli": "spago run -p barebars-cli",
     "docs": "antora docs/antora.yml",
     "gen:catalog": "spago build && node scripts/generate-helper-catalog.mjs",

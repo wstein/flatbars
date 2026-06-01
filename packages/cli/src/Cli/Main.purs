@@ -279,7 +279,7 @@ verifyProvider provider
   | provider /= "mustache" =
       die ("barebars examples: unsupported provider '" <> provider <> "' (only 'mustache' in v1)")
   | otherwise = do
-      let base = "reference/web/examples/vendored/" <> provider
+      let base = "lab/examples/vendored/" <> provider
       files <- listFixtures base
       case files of
         [] -> die

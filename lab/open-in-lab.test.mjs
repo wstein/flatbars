@@ -50,8 +50,8 @@ test("workspaceState defaults are Lab-restorable", () => {
 });
 
 test("openInLab returns the URL when there is no window (SSR/build)", async () => {
-  const href = await openInLab("rawbars", { template: "{{{ this }}}" }, { labUrl: "/reference/web/index.html" });
-  assert.match(href, /^\/reference\/web\/index\.html\?engine=rawbars#/);
+  const href = await openInLab("rawbars", { template: "{{{ this }}}" }, { labUrl: "/lab/index.html" });
+  assert.match(href, /^\/lab\/index\.html\?engine=rawbars#/);
 });
 
 test("LAB_ENGINES are exactly the four surfaces plus Stem", () => {

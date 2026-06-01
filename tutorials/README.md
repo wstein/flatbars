@@ -2,7 +2,7 @@
 
 One lesson per surface — **RawBars · MinBars · FullBars · MaxBars** — each showing a
 live example and an **Open in Lab** button that opens the example in the FlatBars
-Lab (`reference/web/`) on the right engine, no copy-pasting.
+Lab (`lab/`) on the right engine, no copy-pasting.
 
 ## Run
 
@@ -13,8 +13,8 @@ npm run dev            # http://localhost:4321
 npm run build          # static site → dist/
 ```
 
-Serve the Lab (`reference/web/`) and this site under the same origin so the
-`/reference/web/index.html` deep-links resolve; set `PUBLIC_SPEC_BASE` to where the
+Serve the Lab (`lab/`) and this site under the same origin so the
+`/lab/index.html` deep-links resolve; set `PUBLIC_SPEC_BASE` to where the
 Antora spec is published (default `/barebars/`).
 
 ## How it works
@@ -22,11 +22,11 @@ Antora spec is published (default `/barebars/`).
 - **One source per example:** `src/examples.mjs` holds the four lessons. The pages
   render them and the CI gate (`scripts/check-tutorial-links.mjs`) renders the same
   objects — a preview can never drift from what's tested.
-- **Open in Lab** uses the shared `reference/web/open-in-lab.mjs` (`labHref`), which
+- **Open in Lab** uses the shared `lab/open-in-lab.mjs` (`labHref`), which
   encodes the workspace with the Lab's own share-state codec into the URL — self-
   contained, no vendoring, no fetch.
 - **Live previews dogfood the real engine:** the `OpenInLab` island imports the same
-  `reference/web/vendor/barebars-engine.mjs` the Lab ships, so a lesson runs the
+  `lab/vendor/barebars-engine.mjs` the Lab ships, so a lesson runs the
   engine it teaches. CI's `check:bundle` keeps that bundle from going stale.
 - **The spec is the contract:** each lesson links to its Antora page and never forks
   the normative text.
