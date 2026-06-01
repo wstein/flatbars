@@ -133,6 +133,10 @@ coreHelperDefs =
   , valDef "gt" (binary (cmp (_ == GT)))
   , valDef "lte" (binary (cmp (_ /= GT)))
   , valDef "gte" (binary (cmp (_ /= LT)))
+  -- comparison alias: `isnt` reads as "is not" — a warned alias of `ne`,
+  -- rendering identically and normalised to `ne` by the lift (like the
+  -- arithmetic aliases below).
+  , withAlias "ne" (valDef "isnt" (binary ne'))
   , gen "not" false (Exactly 1) notH
   , gen "and" false AnyArity (boolH Array.all)
   , gen "or" false AnyArity (boolH Array.any)

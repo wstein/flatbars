@@ -210,6 +210,9 @@ main = do
   -- case aliases: downcase/upcase render exactly like lowercase/uppercase.
   expectS "p-downcase-alias" "{{{ downcase s }}}" (s1 "HeLLo") "hello"
   expectS "p-upcase-alias" "{{{ upcase s }}}" (s1 "HeLLo") "HELLO"
+  -- comparison alias: `isnt` renders exactly like `ne`.
+  expectS "p-isnt-alias" "{{{ isnt a b }}}" (obj [ Tuple "a" (VNumber 1.0), Tuple "b" (VNumber 2.0) ]) "true"
+  expectS "p-isnt-eq" "{{{ isnt a a }}}" (obj [ Tuple "a" (VNumber 1.0) ]) "false"
 
   -- value primitives — number pack (helper-packs-spec §4). Pin the actual
   -- outputs; abs/floor/ceil/round are Math.*, toFixed is n.toFixed(d), toInt/

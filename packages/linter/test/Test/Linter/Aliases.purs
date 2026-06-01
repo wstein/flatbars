@@ -5,7 +5,6 @@ module Test.Linter.Aliases (main) where
 
 import Prelude
 
-import Data.Array as Array
 import Data.Either (Either(..))
 import Data.String (Pattern(..), contains)
 import Effect (Effect)
@@ -35,6 +34,7 @@ main = do
   expectWarns "downcase warns" "{{{downcase s}}}" [ "downcase" ]
   expectWarns "upcase warns" "{{{upcase s}}}" [ "upcase" ]
   expectWarns "minus+times warn" "{{{minus a b}}}{{{times a b}}}" [ "minus", "times" ]
+  expectWarns "isnt warns" "{{{isnt a b}}}" [ "isnt" ]
 
   -- the canonical helpers (and ordinary names) do NOT warn.
   expectWarns "add does not warn" "{{{add a b}}}" []
