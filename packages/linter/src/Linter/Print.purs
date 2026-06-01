@@ -17,13 +17,15 @@
 -- | `Left` rather than silently re-spelling them.
 module Linter.Print
   ( printRawBars
+  , printDirectives
   ) where
 
 import Prelude
 
-import BareBars.Syntax (Expr(..), Ident, Node(..), Sigil(..), Template)
+import BareBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil(..), Template)
 import BareBars.Value (Value(..))
 import Data.Array as Array
+import Data.Foldable (foldMap)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.String as String
@@ -31,6 +33,18 @@ import Data.String as String
 -- | Pretty-print a desugared core `Template` as RawBars source text.
 printRawBars :: Template -> String
 printRawBars nodes = joinWith "" (map printNode nodes)
+
+-- | Re-emit a template's header `@`-directives as leading short-comment source,
+-- | one comment per directive (`{{! @key: value }}`). This is how the lower
+-- | *materializes truthiness* (loopvars-linter-spec.md §B.5 / X1): a
+-- | non-`handlebars`-mode file carries its own `@truthiness` directive into the
+-- | lowered RawBars source, which the core parser collects exactly as it did in
+-- | the original — so the lowered file renders under the same falsy-set, with no
+-- | per-condition guard helper required. Directives are header-only, so these
+-- | comments must precede every tag; `printRawBars` output follows them. `@trim`
+-- | and any other header directive are carried verbatim for faithfulness.
+printDirectives :: Array Directive -> String
+printDirectives = foldMap (\d -> "{{! @" <> d.key <> ": " <> d.value <> " }}")
 
 printNode :: Node -> String
 printNode = case _ of

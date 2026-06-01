@@ -15,14 +15,18 @@ module Test.Linter.Main where
 import Prelude
 
 import BareBars.Parser (parse, parseWith)
+import BareBars.Value (Value(..))
 import Data.Either (Either(..))
+import Data.Map as Map
 import Data.String (Pattern(..), contains)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FullBars (desugarSurfaceWith)
 import Kernel.Lower (RNode, lower)
-import Linter.Lower (lowerToRawBars)
-import MaxBars (maxLoopVars, maxOptions)
+import Linter.Lower (lowerReport, lowerToRawBars)
+import MaxBars (maxLoopVars, maxOptions, renderMax)
+import RawBars as RawBars
 import Test.Assert (assert')
 
 -- | The desugared MaxBars source as the reference real AST.
@@ -55,6 +59,47 @@ lowersContaining name src needle = case lowerToRawBars src of
   Right out -> assert' (name <> ": expected " <> show out <> " to contain " <> show needle)
     (contains (Pattern needle) out)
 
+-- | The shared truthiness matrix data: one value per falsy *shape* plus a
+-- | non-empty witness, so a body can probe how a mode treats each shape.
+matrixData :: Value
+matrixData = VObject $ Map.fromFoldable
+  [ Tuple "zero" (VNumber 0.0)
+  , Tuple "empty" (VString "")
+  , Tuple "arr" (VArray [])
+  , Tuple "ob" (VObject Map.empty)
+  , Tuple "yes" (VString "x")
+  ]
+
+-- | X1 acceptance: a `@truthiness: <dir>`-mode template renders identically
+-- | through the MaxBars interpreter and through its lowered RawBars source
+-- | (`renderMax src == RawBars.render (lower src)`), against `matrixData`.
+rendersSame :: String -> String -> String -> Effect Unit
+rendersSame name dir body =
+  let
+    src = "{{! @truthiness: " <> dir <> " }}" <> body
+  in
+    case lowerToRawBars src of
+      Left e -> assert' (name <> ": lower failed: " <> show e) false
+      Right lowered ->
+        let
+          want = renderMax src matrixData
+          got = RawBars.render lowered matrixData
+        in
+          assert'
+            ( name <> ": MaxBars " <> show want <> " ≠ lowered RawBars " <> show got
+                <> "\n  lowered = "
+                <> lowered
+            )
+            (want == got)
+
+-- | Assert `lowerReport`'s `materialized` flag for `src`.
+assertMaterialized :: String -> String -> Boolean -> Effect Unit
+assertMaterialized name src expected = case lowerReport src of
+  Left e -> assert' (name <> ": lower failed: " <> show e) false
+  Right r -> assert'
+    (name <> ": materialized = " <> show r.materialized <> ", want " <> show expected)
+    (r.materialized == expected)
+
 main :: Effect Unit
 main = do
   log "Linter lower round-trip tests"
@@ -83,6 +128,37 @@ main = do
   roundTrips "each with infix cond" "{{#each xs}}{{#if index0 > 0}}, {{/if}}{{this}}{{/each}}"
   roundTrips "nested each" "{{#each users}}{{#each this.posts}}{{this}}{{/each}}{{/each}}"
   roundTrips "mixed" "Hi {{ user.name | upper }}!{{#each xs}} {{index1}}={{this}}{{/each}}"
+
+  -- X1 — truthiness materialization. A non-`handlebars`-mode file is lowered by
+  -- carrying its `@truthiness` directive forward; the lowered RawBars source must
+  -- then render *identically* to the MaxBars interpreter. Each case below picks a
+  -- mode + value whose branch DIFFERS from the handlebars default, so the test
+  -- fails if the directive is ever dropped (the lowered file would default to
+  -- handlebars and diverge).
+  --   `minimal` (nil/ruby): 0, "", [], {} are all truthy (only false/null falsy).
+  --   `mustache`:            [] is falsy but 0 and "" are truthy.
+  rendersSame "minimal: 0 truthy" "minimal" "{{#if zero}}T{{else}}F{{/if}}"
+  rendersSame "minimal: \"\" truthy" "minimal" "{{#if empty}}T{{else}}F{{/if}}"
+  rendersSame "minimal: [] truthy" "minimal" "{{#if arr}}T{{else}}F{{/if}}"
+  rendersSame "minimal: unless 0" "minimal" "{{#unless zero}}U{{else}}-{{/unless}}"
+  rendersSame "minimal: && over 0" "minimal" "{{ zero && yes }}"
+  rendersSame "nil alias: 0 truthy" "nil" "{{#if zero}}T{{else}}F{{/if}}"
+  rendersSame "mustache: \"\" truthy" "mustache" "{{#if empty}}T{{else}}F{{/if}}"
+  rendersSame "mustache: [] falsy" "mustache" "{{#if arr}}T{{else}}F{{/if}}"
+  rendersSame "presence: 0 truthy, {} falsy" "presence"
+    "{{#if zero}}{{#if ob}}A{{else}}B{{/if}}{{/if}}"
+  rendersSame "explicit list (minimal shapes)" "false null"
+    "{{#if zero}}T{{else}}F{{/if}}"
+
+  -- the materialization is visible: the lowered source carries the directive.
+  lowersContaining "carries @truthiness" "{{! @truthiness: minimal }}{{ a }}"
+    "{{! @truthiness: minimal }}"
+
+  -- the `materialized` report flag: set for non-default modes, clear otherwise.
+  assertMaterialized "minimal is materialized" "{{! @truthiness: minimal }}{{ a }}" true
+  assertMaterialized "mustache is materialized" "{{! @truthiness: mustache }}{{ a }}" true
+  assertMaterialized "handlebars alias is not" "{{! @truthiness: handlebars }}{{ a }}" false
+  assertMaterialized "absent directive is not" "{{ a }}" false
 
   -- Direct shape assertions on the printer.
   lowersContaining "and shape" "{{ a && b }}"

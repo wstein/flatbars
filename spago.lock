@@ -246,9 +246,11 @@
             "arrays",
             "barebars",
             "either",
+            "foldable-traversable",
             "fullbars",
             "maxbars",
             "maybe",
+            "ordered-collections",
             "prelude",
             "strings"
           ]
@@ -258,7 +260,10 @@
             "assert",
             "console",
             "effect",
-            "kernel"
+            "kernel",
+            "ordered-collections",
+            "rawbars",
+            "tuples"
           ]
         }
       },
