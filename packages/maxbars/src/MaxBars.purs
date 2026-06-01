@@ -11,16 +11,21 @@ module MaxBars
   , maxLoopVars
   , renderMax
   , compileMaxJs
+  , loopVarWarnings
   ) where
 
+import Prelude
+
 import BareBars.Error (ParseError)
-import BareBars.Parser (ParseOptions, defaultParseOptions)
+import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import BareBars.Value (Value)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
-import FullBars (LoopVars, renderSurfaceDiagWith)
+import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith)
+import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
+import MaxBars.Lint (loopVarShadowWarnings)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -64,3 +69,13 @@ renderMax = renderSurfaceDiagWith maxLoopVars maxOptions
 -- | core helpers the emit rules already handle.
 compileMaxJs :: String -> Either ParseError String
 compileMaxJs = compileSurfaceWith maxLoopVars maxOptions
+
+-- | The loop-variable shadow lint (ADR-006, schema-less *warn-always* tier): a
+-- | bare loop variable whose name reads like a data field (`first`/`last`/
+-- | `length`/`key`) is flagged with a `Warn` `Issue`, since dropping `@` lets it
+-- | silently shadow a field. Parses MaxBars `src`, desugars with the loop-var
+-- | resolver, then lints (see `MaxBars.Lint`). A parse error short-circuits.
+loopVarWarnings :: String -> Either ParseError (Array Issue)
+loopVarWarnings src = do
+  { nodes } <- parseWith maxOptions src
+  pure (loopVarShadowWarnings (desugarSurfaceWith maxLoopVars nodes))

@@ -332,10 +332,13 @@ pathExpr lv scope raw
               | depth == 0 && Array.elem first scope ->
                   if Array.null tail then App first []
                   else App "lookup" (Array.cons (App first []) (map segKey tail))
-              -- then a dialect loop variable: a bare single-segment name the
-              -- resolver claims becomes a scoped-helper call (MaxBars only).
+              -- then a dialect loop variable: a *whole* bare name the resolver
+              -- claims becomes a scoped-helper call (MaxBars only). Match on the
+              -- original `raw`, not the segmented head, so an explicit path like
+              -- `this.first` / `../first` (which reduces to the segment `first`)
+              -- is NOT hijacked — it stays a data lookup, the escape hatch.
               | depth == 0 && Array.null tail
-              , Just canonical <- lv first -> App canonical []
+              , Just canonical <- lv raw -> App canonical []
             _ ->
               let
                 base = parents depth

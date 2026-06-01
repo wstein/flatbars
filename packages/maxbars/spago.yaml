@@ -12,6 +12,7 @@ package:
     - either
     - fullbars
     - fullbars-compile
+    - kernel
     - maybe
     - prelude
   test:

@@ -11,13 +11,14 @@ module Test.MaxBars.Main where
 import Prelude
 
 import BareBars.Value (Value(..))
+import Data.Array as Array
 import Data.Either (Either(..), isLeft)
 import Data.Map as Map
 import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
-import MaxBars (compileMaxJs, renderMax)
+import MaxBars (compileMaxJs, loopVarWarnings, renderMax)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -107,6 +108,11 @@ main = do
   expectM "loopvars-key" "{{#each o}}{{key}}{{/each}}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "xy"
+  -- the escape hatch: `{{this.first}}` reads the *data field* `first`, not the
+  -- loop variable (a path is never loop-var-resolved — only a whole bare name).
+  expectM "loopvar-escape-this-dot" "{{#each xs}}{{this.first}}{{/each}}"
+    (obj [ Tuple "xs" (VArray [ obj [ Tuple "first" (VString "D") ] ]) ])
+    "D"
   -- NOTE: block-param shadowing of a loop variable (`as |index0|`) is wired in
   -- the surface (`pathExpr` checks scope before loop vars), but MaxBars' `as |…|`
   -- bars still collide with the pipe operator — fixed with block-head grammar
@@ -129,5 +135,23 @@ main = do
     Left e -> assert' ("compile: unexpected error " <> show e) false
     Right js -> assert' ("compile: expected rt.call(\"and\" in\n" <> js)
       (contains (Pattern "rt.call(\"and\"") js)
+
+  -- loop-var shadow lint (ADR-006 warn-always tier): a bare shadow-prone loop
+  -- variable warns; an unambiguous one and an explicit `this.` path do not.
+  let
+    warnNames src = case loopVarWarnings src of
+      Left _ -> [ "<parse error>" ]
+      Right is -> map _.name is
+  assert' "shadow-warn: bare {{first}} warns"
+    (warnNames "{{#each xs}}{{first}}{{/each}}" == [ "first" ])
+  assert' "shadow-warn: {{length}}+{{key}} both warn"
+    (warnNames "{{#each xs}}{{length}}{{key}}{{/each}}" == [ "length", "key" ])
+  assert' "shadow-warn: {{index0}} (unambiguous) does not warn"
+    (Array.null (warnNames "{{#each xs}}{{index0}}{{/each}}"))
+  assert' "shadow-warn: {{this.first}} (explicit data path) does not warn"
+    (Array.null (warnNames "{{#each xs}}{{this.first}}{{/each}}"))
+  -- warn-always: it fires with no schema and even outside a loop (the name is a
+  -- loop variable wherever it appears bare).
+  assert' "shadow-warn: fires with no loop/schema" (warnNames "{{first}}" == [ "first" ])
 
   log "all MaxBars tests passed"
