@@ -1,8 +1,8 @@
 # Spago workspace root.
 #
 # This file declares the *workspace* only. Each package (packages/core,
-# packages/cli, packages/playground) carries its own spago.yaml with a
-# `package:` stanza; Spago discovers them automatically.
+# packages/cli, …) carries its own spago.yaml with a `package:` stanza; Spago
+# discovers them automatically.
 #
 # To list/upgrade the registry package set: `spago registry package-sets`.
 workspace:

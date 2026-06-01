@@ -8,8 +8,8 @@ BareBars is a template-engine **construction kit**, not a template engine. The
 core is a meaning-free parser; everything you expect from Handlebars/Mustache
 (helpers, escaping, control flow, path semantics) is supplied by an *engine*
 built on top. This is a PureScript monorepo holding the reference
-implementation, a CLI, and a Halogen web playground, plus the normative spec in
-`docs/`.
+implementation and a CLI, plus the normative spec in `docs/` and the FlatBars Lab
+(a JS/WASM polyglot playground in `reference/web`, served as static files).
 
 The spec in `docs/` is the contract; the PureScript packages target it.
 `docs/modules/ROOT/pages/concepts.adoc` is the fastest way to understand the
@@ -23,9 +23,8 @@ do **not** assume a global install.
 ```sh
 npm install            # installs purescript + spago + esbuild
 npm run build          # spago build — compile every package
-npm test               # full suite: per-package spago tests + catalog + conformance + playground
+npm test               # full suite: per-package spago tests + catalog + isolation + compile & mustache conformance
 npm run cli -- --help  # run the CLI (spago run -p barebars-cli)
-npm run playground     # build + serve the playground at http://localhost:8080
 npm run lint           # spago build --pedantic-packages (catches unused/missing deps)
 npm run format         # purs-tidy format-in-place; format:check to verify only
 ```
@@ -129,9 +128,15 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `packages/compile/runtime/barebars-runtime.mjs`.
 - **`json`** (`barebars-json`) — JSON ⇆ `Value` adapter, deliberately kept out
   of `core` (JSON-ness is a host concern, not a framework dependency).
-- **`js`** (`barebars-js`) — JS/FFI surface bundling the dialects for JS hosts.
-- **`cli`** (`barebars-cli`), **`playground`** (Halogen, builds to a static
-  offline bundle).
+- **`js`** (`barebars-js`) — JS/FFI surface bundling the dialects for JS hosts
+  (bundled to `reference/web/vendor/barebars-engine.mjs` for the FlatBars Lab).
+- **`cli`** (`barebars-cli`) — render templates, and the `examples verify`
+  conformance gate.
+- **`linter`** — cross-dialect lowering (MaxBars → RawBars source), incl.
+  truthiness materialization via directive-carry.
+
+The web playground is **`reference/web`** (the FlatBars Lab — plain HTML/JS/WASM,
+not a PureScript package). The old Halogen `packages/playground` was removed.
 
 ### Conventions worth knowing
 
@@ -143,10 +148,13 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 - **`--pedantic-packages`** is enforced via `npm run lint`; declared deps must
   match imports (see the `json` package's `argonaut` umbrella comment for the
   kind of care this needs).
-- **Playground examples are foldered, never inline.** Add a folder under
-  `examples/` with `meta.json`, `template.hbs`, `data.json` (+ optional
-  `expected.html`); the playground manifest is generated from those at build
-  time.
+- **`examples/*/` are conformance golden cases, foldered.** Each is `meta.json`
+  + `template.hbs` + `data.json`; `test:compile` renders every one through the
+  interpreter and the compiled JS and asserts they match. `examples/vendored/`
+  is the separate upstream corpus for `examples verify` (see below).
+- **Mustache conformance.** `npm run examples:verify` (in `npm test`) renders the
+  vendored `mustache/spec` fixtures through MinBars and asserts `== expected`;
+  re-vendor with `node scripts/vendor-mustache.mjs`.
 - ADR-001 (`docs/modules/ROOT/pages/adr-0001-structural-parser-and-walker.adoc`)
   records the structural-parser-plus-walker decision that the whole design rests
   on.
