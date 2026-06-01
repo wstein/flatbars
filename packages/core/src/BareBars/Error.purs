@@ -114,6 +114,10 @@ data Error
   | TypeError String
   | ClauseError String
   | HelperError String
+  -- a partial (or chain of partials) recursed past the engine's depth budget;
+  -- carries the budget that was exceeded. Guards against a cyclic partial that
+  -- would otherwise overflow the stack.
+  | RecursionLimit Int
   -- a header directive the engine rejects (bad `@truthiness`); carries the
   -- offending directive's source offset for a located diagnostic.
   | DirectiveError String Int
@@ -131,5 +135,6 @@ renderError = case _ of
   TypeError m -> "TypeError: " <> m
   ClauseError m -> "ClauseError: " <> m
   HelperError m -> "HelperError: " <> m
+  RecursionLimit n -> "RecursionLimit: partial recursion exceeded budget of " <> show n
   DirectiveError m o -> "DirectiveError: " <> m <> " (at " <> show o <> ")"
   ParseFailure pe -> "ParseFailure: " <> renderParseError pe

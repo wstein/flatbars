@@ -35,7 +35,7 @@ import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Kernel.Engine (Ctl, Helper)
-import Kernel.Env (RefEnv, constHelper, liftEither, lookupHelper, lookupPartial, lookupPartialFalsy, pushFrame, refContext, refFalsy, withFalsy)
+import Kernel.Env (RefEnv, constHelper, enterPartial, liftEither, lookupHelper, lookupPartial, lookupPartialFalsy, pushFrame, recursionBudget, refContext, refDepth, refFalsy, withFalsy)
 import Kernel.Helper (ArgSpec, atLeast, binary, nullary, unary)
 import Kernel.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
@@ -513,14 +513,18 @@ partialH ctl args = case args of
   -- partial); otherwise it inherits the current file's mode (inline partial).
   -- Scoping is lexical and never inherited across an external boundary (§5).
   renderPartial name ctx = case lookupPartial name ctl.env of
-    Just tmpl ->
-      let
-        entered = pushFrame blockFrame ctx ctl.env
-        scoped = case lookupPartialFalsy name ctl.env of
-          Just fs -> withFalsy fs entered
-          Nothing -> entered
-      in
-        VSafe <$> ctl.render scoped tmpl
+    Just tmpl
+      | refDepth ctl.env >= recursionBudget -> throwError (RecursionLimit recursionBudget)
+      | otherwise ->
+          let
+            -- increment the partial depth so a cyclic partial chain hits the
+            -- budget instead of overflowing the stack (threaded like pushFrame).
+            entered = enterPartial (pushFrame blockFrame ctx ctl.env)
+            scoped = case lookupPartialFalsy name ctl.env of
+              Just fs -> withFalsy fs entered
+              Nothing -> entered
+          in
+            VSafe <$> ctl.render scoped tmpl
     Nothing
       | Array.null ctl.children -> throwError (HelperError ("unknown partial '" <> name <> "'"))
       | otherwise -> VSafe <$> ctl.render ctl.env ctl.children -- block body is the fallback

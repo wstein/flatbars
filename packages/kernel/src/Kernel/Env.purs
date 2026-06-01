@@ -22,6 +22,9 @@ module Kernel.Env
   , registerPartialsFalsy
   , lookupPartial
   , lookupPartialFalsy
+  , refDepth
+  , enterPartial
+  , recursionBudget
   , refEngine
   , liftEither
   ) where
@@ -57,6 +60,10 @@ newtype RefEnv m = RefEnv
   -- partial". Inline (same-file) partials have no entry — they inherit the
   -- file's mode lexically. See truthiness spec §5.
   , partialFalsy :: Map String FalsySet
+  -- how many partials deep this environment is. `partialH` bumps it on entry and
+  -- refuses to recurse past `recursionBudget`, so a cyclic partial raises a
+  -- located `RecursionLimit` rather than overflowing the stack.
+  , depth :: Int
   }
 
 refContext :: forall m. RefEnv m -> Value
@@ -87,7 +94,23 @@ emptyEnv ctx = RefEnv
   , partials: Map.empty
   , falsy: handlebars
   , partialFalsy: Map.empty
+  , depth: 0
   }
+
+-- | The maximum number of nested partials the engine renders before raising
+-- | `RecursionLimit`. A cyclic partial (e.g. one that includes itself) would
+-- | otherwise recurse forever and overflow the stack; this caps it.
+recursionBudget :: Int
+recursionBudget = 64
+
+-- | The current partial nesting depth.
+refDepth :: forall m. RefEnv m -> Int
+refDepth (RefEnv e) = e.depth
+
+-- | Enter one partial deeper: increment the depth counter. Threaded into the
+-- | env a partial body renders under, so nested partials accumulate.
+enterPartial :: forall m. RefEnv m -> RefEnv m
+enterPartial (RefEnv e) = RefEnv (e { depth = e.depth + 1 })
 
 -- | Register a helper into the innermost frame.
 register :: forall m. String -> Helper m (RefEnv m) -> RefEnv m -> RefEnv m

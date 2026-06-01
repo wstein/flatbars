@@ -613,6 +613,18 @@ main = do
     Left _ -> pure unit
     Right out -> assert' ("partial-missing: expected error, got " <> show out) false
 
+  -- A self-including partial recurses forever; the shared kernel depth guard
+  -- caps it with a located error rather than overflowing the stack (no hang).
+  case renderSurfaceWith [ Tuple "self" "{{> self}}" ] "{{> self}}" VNull of
+    Left _ -> pure unit
+    Right out -> assert' ("partial-recursion: expected error, got " <> show out) false
+  -- Bounded nesting (well under the budget) still renders normally.
+  expectP "partial-bounded-nesting"
+    [ Tuple "a" "[{{> b}}]", Tuple "b" "{{ name }}" ]
+    "{{> a}}"
+    (obj [ Tuple "name" (str "ok") ])
+    "[ok]"
+
   -- Block partials: {{#partial name}}body{{/partial}} renders the partial with
   -- the body exposed as {{> @partial-block}}, or renders the body as fallback if
   -- the partial is missing.
