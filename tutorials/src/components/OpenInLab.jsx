@@ -122,6 +122,14 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     return () => { live = false; };
   }, [tpl, dataStr, parts]);
 
+  // A full-width template row only pays off when the template is actually wide
+  // (multi-line or long); a short one-liner like `{{> card}}` would just leave a
+  // near-empty band, so it shares the row with data + partials instead.
+  const partialNames = Object.keys(parts);
+  const wideTemplate = tpl.includes("\n") || tpl.length > 30;
+  const gridClass =
+    "oil-grid" + (partialNames.length ? " has-partials" : "") + (partialNames.length && wideTemplate ? " wide-tpl" : "");
+
   const onTpl = (v) => { setTpl(v); setEdited(true); };
   const onData = (v) => { setDataStr(v); setEdited(true); };
   const onPart = (name, v) => { setParts((p) => ({ ...p, [name]: v })); setEdited(true); };
@@ -153,7 +161,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
         </div>
       </header>
 
-      <div class={"oil-grid" + (Object.keys(parts).length ? " has-partials" : "")}>
+      <div class={gridClass}>
         <div class="oil-cell">
           <div class="oil-cell-head"><span class="oil-cap">template</span></div>
           <CodeEditor lang="template" value={tpl} onInput={onTpl} />

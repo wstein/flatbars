@@ -112,8 +112,11 @@
   display: flex;
   flex-wrap: wrap;
 }
-.oil .oil-grid.has-partials .oil-cell { flex: 1 1 13rem; min-width: 0; }
-.oil .oil-grid.has-partials .oil-cell:first-child { flex-basis: 100%; }
+.oil .oil-grid.has-partials .oil-cell { flex: 1 1 12rem; min-width: 0; }
+/* Only a WIDE template (multi-line/long, set by the component) gets its own
+   full-width row; a short one-liner shares the row with data + partials so it
+   doesn't leave a near-empty band. */
+.oil .oil-grid.has-partials.wide-tpl .oil-cell:first-child { flex-basis: 100%; }
 @media (max-width: 40rem) {
   .oil .oil-grid { grid-template-columns: 1fr; }
   .oil .oil-grid.has-partials .oil-cell { flex-basis: 100%; }
