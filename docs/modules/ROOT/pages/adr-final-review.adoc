@@ -1,0 +1,177 @@
+= Final ADR review (2026-06-01)
+:navtitle: Final ADR review
+
+A cross-cutting review of the whole ADR set (xref:adr-0001-structural-parser-and-walker.adoc[001]–xref:adr-0013-labelled-loops.adoc[013])
+once they were drafted together. The goal was not to re-approve each record but to find the *seams
+between* them — the places where two ADRs are individually true and jointly misleading. Same cast as
+the ADR-001 review. Suggestions rated 1–5 (5 = adopt now).
+
+[NOTE]
+====
+*Post-review status (2026-06-01).* Several rating-5 items below were actioned in the same pass:
+the two extension axes are now named in xref:adr-0004-token-lexer-and-grammar-seams.adoc[];
+superset-vs-isolation is sharpened in xref:adr-0003-strict-layering.adoc[]/xref:adr-0005-dialect-ladder.adoc[];
+the engine-conformance checklist landed in xref:host-api.adoc[] §7.7; the "FullBars" term is split in
+xref:adr-0008-rawbars.adoc[]/xref:adr-0009-fullbars.adoc[] and the RawBars docstring fixed; the
+directives decision is recorded in xref:adr-0010-header-directives.adoc[] and the `mustache` alias added
+to xref:directives.adoc[]. *Still open (code, not docs):* the recursion guard
+(xref:adr-0012-recursion-budget.adoc[]), the two regression tests, and the loop-variable warn-always
+change.
+====
+
+== The tensions found
+
+=== 1. Two different "extension points" wear one word
+
+*Devi:* "ADR-004 warns that a third *grammar seam* would be a smell, then ADR-007 cheerfully adds new
+*sigils*. A reader will think MinBars is the forbidden third seam. It isn't — there are *two
+orthogonal axes* and we never named them. Axis A is the **grammar seam**: `parseExpr`/`parseHead`,
+how a dialect parses a tag *interior* (`Parser.purs:57`). Axis B is the **shape gate**: `extras` and
+the MinBars sigils, which *tag shapes* a dialect admits (`Parser.purs:271`). Adding sigils grows axis
+B and is fine; adding a third grammar seam grows axis A and is the smell."
+
+*Mara:* "Agreed, and this is the deeper point behind ADR-001's reword. The parser is *name*-agnostic
+(axis-free), *shape-aware* and *shape-gated* (axis B), and *grammar-pluggable* (axis A). Three
+sentences, three mechanisms. Right now ADR-004 blurs A and B in one 'Watch' note."
+
+*Consensus:* name the two axes explicitly in ADR-004 and cross-link ADR-007's sigils to axis B.
+*Rating 5.*
+
+=== 2. "RawBars ⊂ FullBars ⊂ MaxBars" vs. "no dialect imports another"
+
+*Petra:* "ADR-003 says dialects never import each other; ADR-005 says `maxbars → fullbars` is fine.
+Both are in the record, a click apart. That looks like the dogma cracked."
+
+*Kai:* "It didn't crack — it was never about imports. `⊂` is a *surface-superset* claim: every MaxBars
+template that avoids operators is a FullBars template. Package isolation is a *different* property,
+and RawBars *does* have it (FullBars-free closure, ADR-003). MaxBars deliberately trades isolation for
+reuse because it genuinely *is* a superset. The fix is wording: say 'no dialect imports another
+*except along the ladder's superset edge*,' and state plainly that `⊂` ≠ isolation."
+
+*Soren:* "Then make it falsifiable: a test asserting RawBars' closure excludes `fullbars`, so the one
+allowed exception can't quietly become two."
+
+*Consensus:* reword both ADRs to separate *superset* from *isolation*; add the closure test.
+*Rating 5.*
+
+=== 3. The conformance checklist is promised in three ADRs and exists in none
+
+*Soren:* "ADR-001 promised an engine-conformance checklist. ADR-002 leans on it for safety. ADR-007
+needs it to even define what 'MinBars conforms' means. It is load-bearing in three records and
+written in zero files. We are accumulating an IOU."
+
+*Devi:* "It's small, though — escape fn, stringify, truthiness default, raw-output stance, sigil set,
+real-AST-shape-or-none. That's a table in `host-api.adoc`, not a research project."
+
+*Mara:* "Build it now, precisely because three ADRs depend on it. An undefined contract is worse than
+no contract — it lets every engine claim conformance."
+
+*Consensus:* write the checklist into xref:host-api.adoc[] before MinBars starts. *Rating 5.*
+
+=== 4. Does MinBars retro-justify or violate ADR-003's "extract lazily"?
+
+*Mara:* "ADR-007 forces *new* kernel features — a per-engine truthiness default, a recursion guard.
+ADR-003 said extract lazily. Is MinBars making us extract *eagerly* for a thing that isn't built?"
+
+*Kai:* "The opposite. 'Extract lazily' means *on a proven second consumer*. The truthiness default
+already has two consumers the moment MinBars needs `mustache` while the others need `handlebars` —
+that *is* the second consumer. Same for the recursion guard: it hardens the reference `partialH`
+*today* (`Prelude.purs:501` is unbounded) and serves MinBars tomorrow. These are textbook lazy
+extractions, not speculation."
+
+*Devi:* "One caveat — do them as *P0 shared prereqs* (ADR-007's own phase plan) and keep them green
+under the existing suites, or we destabilise three shipped dialects for one unshipped one."
+
+*Consensus:* ADR-007's P0 ordering is correct; note in ADR-003 that MinBars is the worked example of
+its lazy-extraction rule. *Rating 4.*
+
+=== 5. The loop-variable lint only fires with a schema
+
+*Soren:* "ADR-006 catches `length`/`first`/`key` shadowing *only when a schema is present*. Most
+templates have no schema. That's the majority case going unguarded for a footgun we *introduced* by
+dropping `@`."
+
+*Kai:* "Without a schema we can't know `first` is a data field rather than the loop var — there's no
+oracle. Erroring blindly would break legitimate templates."
+
+*Soren:* "Not an error — a *warning*. 'bare `first` resolves to the loop variable here; wrap the field
+as `(lookup this \"first\")` if you meant the datum.' Warn always, error only with a schema."
+
+*Mara:* "That's the right severity split and it matches how `escapingWarnings` already behaves —
+warn-by-default, never silently wrong."
+
+*Consensus:* ADR-006 gains a schema-less *warning* tier under the schema-present *error*. *Rating 4.*
+
+=== 6. Granularity: are 003/004/005 over-split?
+
+*Devi:* "Three ADRs for one migration quarter. Merge?"
+
+*Petra:* "No — they have *different reversal costs*. Re-layering packages (003) is a quarter of work;
+swapping a grammar seam (004) is a function type; rearranging the ladder (005) is a dependency edge.
+A future change touches one, not all three. Separate records, heavily cross-linked, is correct."
+
+*Consensus:* keep them separate. *Rating 4* (for the cross-linking, which was thin in the first
+drafts).
+
+=== 7. "FullBars" names two different things (ADR-008/009)
+
+*Kai:* "ADR-008 says RawBars' closure is *FullBars-free*, then RawBars' own docstring says it renders
+'against the FullBars reference engine.' Both ship. A reader cannot tell whether RawBars uses FullBars
+or not."
+
+*Devi:* "Because 'FullBars' is overloaded. There's *FullBars the engine* — value policy + prelude +
+`lower`, which moved to `kernel` (ADR-003) — and *FullBars the package/dialect*, which is now only the
+surface desugar + renderers + catalog. RawBars uses the former (via `kernel`) and not the latter. The
+prose conflates them, and ADR-008's own *Con* admits the docstring is stale."
+
+*Mara:* "This is the same disease as tension #1 and #2 — one word, two referents. Decide the
+vocabulary: 'the *reference engine*' = the `kernel` machinery; 'the *FullBars dialect*' = the package.
+Then RawBars' sentence becomes true: 'renders against the reference engine, with no surface desugar.'"
+
+*Petra:* "And fix the RawBars docstring in the same change, or we've documented the bug instead of
+the decision."
+
+*Consensus:* split the term — *reference engine* (kernel) vs *FullBars dialect* (package) — in ADR-008/009
+and the RawBars docstring. *Rating 4.*
+
+== Consensus summary
+
+. *Name the two extension axes* — grammar seam (`parseExpr`/`parseHead`) vs. shape gate
+  (`extras`/sigils) — in ADR-004; stop letting one word cover both.
+. *Separate "superset" from "isolation"* in ADR-003/005; the ladder's `⊂` is about surface, the
+  isolation rule is about imports, and they have exactly one sanctioned crossing (`maxbars → fullbars`).
+. *Write the engine-conformance checklist now* — it is load-bearing in ADR-001/002/007 and exists
+  nowhere.
+. *MinBars is the worked example of lazy extraction*, not a violation of it; its P0 prereqs
+  (truthiness default, recursion guard) land first and stay green.
+. *The loop-variable shadow check warns always, errors with a schema.*
+. *003/004/005 stay separate* — different reversal costs — but cross-linked.
+. *Disambiguate "FullBars"* — the *reference engine* (the `kernel` machinery) vs the *FullBars
+  dialect* (the package: surface desugar + renderers + catalog). RawBars uses the former, not the
+  latter; the prose must say so.
+
+== Potential future developments
+
+* *xref:adr-0012-recursion-budget.adoc[ADR-012] (recursion & resource budget)* — now drafted
+  (Proposed); the depth/budget model (default 64, directive override, overflow behaviour) still needs
+  *implementation*, and it touches MinBars, labelled loops, and self-including partials.
+* *xref:adr-0013-labelled-loops.adoc[ADR-013] (labelled loops)* — now drafted (Proposed); lifts the
+  ADR-006 §5 v1 outer-loop limit once a naming/scoping design is settled.
+* *Set-delimiters* (deferred in ADR-007) will reopen the shape-gate axis if a corpus ever justifies it.
+* *A third grammar seam*, if one is ever proposed, triggers a review of axis A rather than a quiet
+  addition (ADR-004 Watch).
+
+== Concrete suggestions for improvement
+
+. *Land the four rating-5 doc fixes* (axes naming, superset≠isolation wording, the checklist, the
+  cross-links) — they are corrections, and the set is quotably ambiguous without them.
+. *Add the engine-conformance checklist to xref:host-api.adoc[]*: escape fn · stringify · truthiness
+  default · raw-output safety stance · admitted sigil set · real-AST shape (or "none").
+. *Add two regression tests*: (a) `parse` yields the same `Sep` shape for `else` and `user` (ADR-001's
+  crown jewel); (b) RawBars' dependency closure excludes `fullbars` (ADR-003/005's isolation claim).
+. *Implement the recursion guard as ADR-007 P0* and immediately point the reference `partialH` at it,
+  closing the unbounded-recursion gap that exists *today* regardless of MinBars.
+. *Promote the loop-variable shadow check to warn-always* with the schema-present error retained.
+. *Add an ADR index page* (this nav group) so the set is navigable and new ADRs have an obvious home.
+. *Fix the RawBars module docstring* to say "the reference engine" rather than "the FullBars reference
+  engine," matching ADR-008/009's split term and ADR-008's own *Con*.

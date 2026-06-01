@@ -1,0 +1,69 @@
+= ADR-007: MinBars — a Mustache-compatible peer engine
+:navtitle: ADR-007 MinBars
+
+*Status:* Proposed (scope locked; not yet implemented). *Date:* 2026-06-01.
+
+== Context
+
+A Mustache-compatible engine completes the family. The key decision is its *position*: MinBars is a
+*peer* of FullBars, not a desugar over it. The lattice becomes RawBars ⊂ MinBars (Mustache) and
+RawBars ⊂ FullBars ⊂ MaxBars, with MinBars and FullBars as siblings over the shared kernel.
+
+The draft spec was reviewed against the real code; that review found several "core is reused
+unchanged" claims to be false. They are recorded here because they reshape the plan.
+
+== Decision (locked)
+
+. *Scope = the full Mustache spec in one pass* — interpolation, sections, inverted, comments, partials,
+  dotted names, implicit iterator, standalone whitespace — *plus* inheritance
+  (`pass:[{{<p}}]`/`pass:[{{$b}}]`/`pass:[{{<*}}]`/`pass:[{{/*}}]`) and dynamic-name partials
+  (`pass:[{{>* }}]`). Lambdas are dropped (`Value` has no function arm). Set-delimiters are deferred
+  (no customer corpus to audit).
+
+. *Truthiness `mustache` default = a shared parameter.* Add `mustache = false null []` to the alias
+  table *and* thread a per-engine default `FalsySet` through `resolveTruthiness` + `runResolved`
+  (today `handlebars` is hardwired, `Value.purs:69`); update the RawBars/FullBars/MaxBars call sites to
+  pass `handlebars` explicitly. Recursion budget default = 64.
+
+. *Conformance harness = a Node-side runner* (`.mjs`, mirroring `packages/compile/conformance.mjs`)
+  against built `output/`, using the mustache/spec *`.json`* fixtures — built-in `JSON.parse`, *no*
+  YAML dependency.
+
+. *Build the shared recursion guard now* — a kernel depth/budget (error past 64) that also hardens the
+  reference engine's currently-unbounded `partialH` (`Prelude.purs:501`).
+
+== Substrate corrections the review found
+
+These were wrong in the draft spec; verified in the code:
+
+* The IoC driver *is* env-polymorphic (`Engine m env`) — but `refEngine` is hardwired to `RefEnv`, so
+  MinBars writes its *own* `Engine m MinEnv`. `MinEnv` must be a *newtype* (the `env → Helper → Ctl`
+  reference is cyclic). Use a closed `resolve` mapping the desugar's fixed helper names to the MinBars
+  prelude — no helper-registry frame needed.
+* `Ctl.render :: env -> Template -> m **String**` (not `m Value`) — section/inverted helpers must
+  ``VSafe <$> ctl.render …`` then `joinWith ""`, like `eachH`; the spec's helper snippets were
+  type-wrong as written.
+* The core lexer recognises a *fixed* sigil set with *no* per-engine seam. Plain-Mustache sigils
+  already exist, but `pass:[{{<]`/`pass:[{{$]`/`pass:[{{>*]`/`pass:[{{<*]`/`pass:[{{/*]` are *new* and
+  must be added to the *shared* core lexer/parser, gated like `extras` (xref:adr-0004-token-lexer-and-grammar-seams.adoc[]).
+  "Core reused unchanged" is false.
+* Standalone whitespace is already shared and default-on (`trimStandalone`); the genuinely new work is
+  *partial/inheritance indentation re-application*, not the standalone pass.
+* `escapeHtml` already escapes `pass:[& < > " ']` and not backtick/`=` — already Mustache-conformant,
+  reuse it (xref:adr-0002-escaping-and-value-policy.adoc[]).
+* MinBars supplies its *own* prelude: the reference `partialH` *throws* on a missing partial (Mustache
+  wants `""`) and Mustache *inherits* the context stack.
+
+== Consequences
+
+* *Pro:* completes the family and forces three genuinely reusable kernel upgrades — the per-engine
+  truthiness default, the recursion guard, and the gated-sigil mechanism. MinBars is the *proven
+  second consumer* that justifies these extractions under ADR-003's "extract lazily" rule.
+* *Con:* the "core is reused unchanged" folklore dies; every new gated sigil enlarges the shared
+  lexer's fixed vocabulary — the ADR-004 *Con* realised for the first time.
+
+== Phase plan
+
+P0 shared prereqs (truthiness default param + `mustache` set; recursion guard; gated core-lexer
+Mustache shapes) → P1 `minbars` package + own `Engine`/`MinEnv` + prelude + desugar → P2 core
+semantics → P3 inheritance + dynamic-names → P4 standalone + indentation → P5 Node conformance harness.

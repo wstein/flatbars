@@ -154,3 +154,51 @@ This is an external adapter, kept out of the core (it pulls the JSON dependency)
 The located-error renderers `renderWithDiag` / `renderSurfaceDiag` (and `formatError`) report a parse
 failure as `line:column: message` (§7.2's `renderParseErrorAt`); the plain `renderWith` /
 `renderSurface` keep the bare `show` form.
+
+== 7.7 Engine conformance checklist
+
+BareBars is a substrate: "another engine may differ" recurs throughout
+xref:adr-0001-structural-parser-and-walker.adoc[ADR-001],
+xref:adr-0002-escaping-and-value-policy.adoc[ADR-002], and
+xref:adr-0007-minbars.adoc[ADR-007]. For that to be testable rather than a slogan, a *conforming
+engine* must declare each of the following. The reference engine (FullBars) is shown as the worked
+example.
+
+[cols="2,3,2",options="header"]
+|===
+| Must declare | Meaning | Reference (FullBars)
+
+| *HTML-escape function*
+| how text is made safe for HTML output
+| `escapeHtml` — escapes `pass:[& < > " ']`, not backtick/`=` (shared; xref:adr-0002-escaping-and-value-policy.adoc[])
+
+| *`stringify`*
+| how a `Value` becomes output text (`Ctl.stringify :: Value -> m String`)
+| `Kernel.Value.stringify`
+
+| *Truthiness default*
+| the `FalsySet` used when no `@truthiness` directive is present
+| `handlebars` (`empty`) — passed to `resolveTruthinessWith` (xref:adr-0010-header-directives.adoc[])
+
+| *Raw-output safety stance*
+| does `pass:[{{{ }}}]` escape? is there a "you forgot to escape" lint?
+| no auto-escape on `pass:[{{{ }}}]`; `escapingWarnings` lint, on-by-default in tooling
+
+| *Admitted sigil/shape set*
+| which tag shapes parse vs. raise `DisallowedShape` (the `extras` gate + any gated sigils)
+| `extras = true` (raw blocks, `pass:[{{^}}]`, `pass:[{{&}}]`); no extra sigils
+
+| *Grammar*
+| the interior expression grammar plugged into `parseExpr`/`parseHead` (xref:adr-0004-token-lexer-and-grammar-seams.adoc[])
+| the shared prefix grammar (`BareBars.Expr`)
+
+| *Real-AST shape, or "none"*
+| the typed AST the engine lowers to, if it materializes one
+| `RNode` via `Kernel.Lower.lower` — a *shared reference* lowering, mandated for no engine
+
+| *Recursion stance*
+| the render-recursion limit and its overflow behaviour
+| _currently unbounded_ — see xref:adr-0012-recursion-budget.adoc[] (proposed)
+|===
+
+The last row is deliberately a known gap, not a checkmark.

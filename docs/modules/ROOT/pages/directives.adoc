@@ -45,6 +45,7 @@ Absent ⇒ the `handlebars` default, so existing templates are unaffected.
 |`minimal` / `ruby` / `nil` / `lua` |`false null` |only `false`/`null` are false; `0`/`""`/`[]`/`pass:[{}]` truthy
 |`presence` |`false null [] {}` |present ⇒ truthy; `false` kept false on purpose
 |`always` |∅ |nothing is false — every value truthy
+|`mustache` |`false null []` |the Mustache rule; `0`/`""`/`pass:[{}]` truthy. MinBars' engine default
 |===
 
 Docs always print the expansion next to a name (a name says nothing the explicit

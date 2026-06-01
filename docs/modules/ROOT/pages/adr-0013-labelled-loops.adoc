@@ -1,0 +1,36 @@
+= ADR-013: Labelled loops (lifting the outer-loop limit)
+:navtitle: ADR-013 Labelled loops
+
+*Status:* Proposed. *Date:* 2026-06-01. Lifts the v1 limit documented in
+xref:adr-0006-maxbars-loop-variables.adoc[] §5.
+
+== Context
+
+MaxBars v1 reaches only the *outer element/index/key*, via block params `as |user uidx|`. The outer
+loop's `first`/`last`/`length`/`rindex` are unreachable, and the companion spec's "compute from a
+named outer length" idea was shown wrong: block params bind only the item plus index/key, so the
+outer length cannot be named. Reaching full outer-loop state needs a *naming/scoping* construct, not
+another block param.
+
+== Decision (proposed, sketch)
+
+. *A loop label names the frame, not just the datum* — an inner body can address
+  `outer.length`/`outer.rindex0`/… of a labelled enclosing loop.
+. *Scoping reuses ADR-001 §4* ("scope is scoped helpers"): a label installs a *namespaced accessor
+  frame* for the duration of its body, then removes it — no `../` walk, no `@parent` stack.
+. *The interaction with the bare loop-variable shadowing rule* (xref:adr-0006-maxbars-loop-variables.adoc[]
+  §4) must be defined — a label namespace must not silently re-open the shadowing footgun.
+
+== Consequences
+
+* *Pro:* removes the documented v1 limit; composes with the existing normative loop-variable arithmetic
+  rather than replacing it.
+* *Con:* a new surface form and new scoping rules; risk of re-importing the Handlebars `../`/`@parent`
+  complexity the core *deliberately* dropped (ADR-001 §4) — the design must stay inside the
+  scoped-helper model.
+
+== Open questions
+
+* *Label syntax* (and whether labels are MaxBars-only, like the bare loop variables they extend).
+* *Depth interaction* with the recursion budget (xref:adr-0012-recursion-budget.adoc[]) once nested
+  labelled loops can address arbitrarily many enclosing frames.

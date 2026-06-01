@@ -1,0 +1,38 @@
+= ADR-012: Recursion and resource budget
+:navtitle: ADR-012 Recursion budget
+
+*Status:* Proposed. *Date:* 2026-06-01. Required by xref:adr-0007-minbars.adoc[] §4 and the
+xref:adr-final-review.adoc[final review].
+
+== Context
+
+The reference engine's partial helper (`partialH`, `Prelude.purs:501`) is currently *unbounded*: a
+self-including or mutually-including partial recurses until the stack overflows. This is a live gap
+*today*, independent of any unshipped engine. MinBars (inheritance, dynamic-name partials) makes it
+acute, and any future recursion construct (self-including partials, labelled loops —
+xref:adr-0013-labelled-loops.adoc[]) needs a defined limit.
+
+== Decision (proposed)
+
+. *A shared kernel depth/budget*, default **64**, that — when exceeded — raises a *located*
+  `RecursionLimit` error rather than crashing the host.
+. *It hardens the reference `partialH` immediately*, so the unbounded-recursion gap closes regardless
+  of MinBars.
+. *Overridable per file* via a header directive (mechanism per xref:adr-0010-header-directives.adoc[];
+  spelling — e.g. `@budget` — TBD).
+. *Counts render-time re-entry* (partial/block expansion depth), not expression nesting, which is
+  already bounded structurally by the parser.
+
+== Consequences
+
+* *Pro:* no unbounded recursion; a single guard serves MinBars, the reference engine, and future
+  recursion constructs — a textbook ADR-003 lazy extraction with three consumers.
+* *Con:* a global default may be too low for legitimate deep partial trees (hence the override); the
+  guard adds a counter to the hot path.
+
+== Open questions
+
+* *Depth-only vs. a work/node budget.* A depth cap is simple but lets a shallow-but-explosive template
+  through; a node budget is fairer but harder to explain.
+* *The default value* (64 is borrowed from the MinBars decision; no corpus has validated it).
+* *The directive spelling* and whether it is engine-wide or per-call.

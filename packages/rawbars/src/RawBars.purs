@@ -1,13 +1,15 @@
 -- | **RawBars** — the austere base of the dialect ladder (RawBars ⊂ FullBars ⊂
 -- | MaxBars). It renders/compiles the *core* skeleton syntax directly — explicit
--- | `pass:[{{{ lookup this "x" }}}]`, no surface sugar — against the FullBars
--- | reference engine. (FullBars adds the surface desugar; MaxBars adds operators
+-- | `pass:[{{{ lookup this "x" }}}]`, no surface sugar — against the shared
+-- | *reference engine*. (FullBars adds the surface desugar; MaxBars adds operators
 -- | and pipes. The engine, value policy, prelude, and compiler are all shared.)
 -- |
--- | This is a thin dialect layer: it reuses FullBars' `runResolved` (parse →
--- | resolve `@truthiness` → seed → engine) and the compiler's FullBars `Emit`,
--- | swapping in *no* surface desugar. It exists so the three dialects are
--- | symmetric packages over one engine.
+-- | This is a thin dialect layer: it reuses the reference engine's `runResolved`
+-- | (`Kernel.Render`: parse → resolve `@truthiness` → seed → engine) and the
+-- | shared compiler's `Emit` (`BareBars.Compile.Emit.fullbarsEmit`), swapping in
+-- | *no* surface desugar. Note it depends on `kernel` + `barebars-compile`, *not*
+-- | the `fullbars` package — its dependency closure is FullBars-free (see ADR-008).
+-- | It exists so the three dialects are symmetric packages over one engine.
 module RawBars
   ( render
   , renderDiag

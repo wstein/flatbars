@@ -1,0 +1,50 @@
+= ADR-009: FullBars — the reference engine and surface dialect
+:navtitle: ADR-009 FullBars
+
+*Status:* Accepted. *Date:* 2026-06-01. The middle rung of the ladder
+(xref:adr-0005-dialect-ladder.adoc[]); "flat bars" to BareBars' "bare rods."
+
+== Context
+
+The substrate needs *one* worked, Handlebars-faithful engine — to validate the host API (ADR-001
+§A.13), to be the family's reference and Handlebars migration target, and to be the surface the other
+dialects are defined against. FullBars is "one *possible* engine over the substrate" (ADR-001), not a
+privileged one; the architecture must keep it swappable even as it serves as the default.
+
+== Decision
+
+. *FullBars = value policy + environment + prelude + lowering + surface desugar*, wired into
+  convenience renderers. After the kernel extraction (ADR-003) the value policy
+  (`truthy`/`escapeHtml`/`stringify`), `RefEnv`, prelude, and `lower` live in `kernel`; the `fullbars`
+  package owns the *surface desugar* (`FullBars.Surface`), the convenience renderers, and the helper
+  *catalog* (the single source of truth for `gen:catalog`).
+
+. *`extras = true`.* FullBars admits the Handlebars-only shapes (raw blocks, inverse, unescaped) that
+  RawBars (xref:adr-0008-rawbars.adoc[]) and MaxBars reject.
+
+. *The surface is a desugar, not a parser* (ADR-001). `FullBars.Surface.desugar` is a pure
+  `Template → Template` rewrite into core forms, then the reference renderer (or `lower`) runs the
+  result unchanged. It rewrites: `pass:[{{ E }}]` ⇒ escaped `pass:[{{{ esc_html E }}}]`; bare/dotted
+  *paths* ⇒ `lookup` chains (`name` ⇒ `lookup this "name"`, `a.b`, `a.[1]`, `../a` ⇒
+  `lookup (parent) …`); `@data` ⇒ scoped calls (`@index` ⇒ `(index)`, `@root.x`); `else if` chains ⇒
+  flat `pass:[{{elif}}]`; hash args `k=v` ⇒ a trailing `dict`; block params `as |item i|` ⇒ string
+  args (and a bare in-scope reference ⇒ a call `(item)`); partials `pass:[{{> name ctx k=v}}]`;
+  `pass:[{{#partial}}]`/`pass:[{{#inline}}]`.
+
+. *`noLoopVars` — every bare name is a data path* (the Handlebars rule); scoped loop state is reached
+  only through `@`. This is the deliberate contrast with MaxBars
+  (xref:adr-0006-maxbars-loop-variables.adoc[]), which maps bare names to loop variables through the
+  *same* `LoopVars` hook.
+
+. *Safe-by-default* (xref:adr-0002-escaping-and-value-policy.adoc[]): `pass:[{{ }}]` escapes,
+  `pass:[{{{ }}}]` is raw, and `escapingWarnings` flags raw output of untrusted accessors.
+
+== Consequences
+
+* *Pro:* one engine doubles as the Handlebars migration target *and* the catalog's source of truth;
+  the surface-as-rewrite is the concrete proof of ADR-001's "no surface parser, no surface AST."
+* *Con:* a handful of Handlebars block sigils stay undesugared — `pass:[{{#> name}}]` and
+  `pass:[{{#*inline}}]` need parser support for the opener-sigil/close-name mismatch, so authors use
+  the `pass:[{{#partial}}]`/`pass:[{{#inline}}]` core spellings. And because every other dialect is
+  defined *relative to* FullBars, it carries gravitational weight despite being "just one engine" —
+  the same tension ADR-001 logged as the shared-reference-lowering point.

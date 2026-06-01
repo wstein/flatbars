@@ -1,0 +1,45 @@
+= ADR-008: RawBars — the austere base dialect
+:navtitle: ADR-008 RawBars
+
+*Status:* Accepted. *Date:* 2026-06-01. The base rung of the ladder fixed by
+xref:adr-0005-dialect-ladder.adoc[].
+
+== Context
+
+The dialect ladder (ADR-005) needs a *base*: a dialect that exercises the substrate with **zero**
+surface sugar. It is two things at once — the runnable proof that the engine works on raw core syntax
+(ADR-001's "core syntax renders end-to-end" as an actual package, not an aspiration), and the package
+whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim made testable).
+
+== Decision
+
+. *No surface — authors write core syntax directly.* Explicit `pass:[{{{ lookup this "x" }}}]`,
+  `pass:[{{#each …}}]`, `pass:[{{else}}]`. No path desugar, no `@data`, no `pass:[{{ }}]`
+  auto-escape, no hash args, no block-param sugar. The seam that distinguishes RawBars from FullBars
+  is precisely the `identity` desugar: `runResolved directives identity nodes dat`
+  (`RawBars.purs:55`) — *same engine, no rewrite*.
+
+. *`extras = false`.* RawBars rejects the Handlebars-only tag shapes — raw blocks
+  `pass:[{{{{…}}}}]`, inverse `pass:[{{^}}]`, unescaped `pass:[{{&}}]` — with `DisallowedShape`
+  (`coreOptions`, `RawBars.purs:44`). The gate is re-forced inside `compileWith`/`compileJsWith`
+  (`opts { extras = false }`) so a caller-supplied `ParseOptions` cannot smuggle them back in. Other
+  front-end knobs (standalone trimming) still pass through.
+
+. *Reuse by dependency, with a FullBars-free closure.* RawBars renders through the shared reference
+  engine via `Kernel.Render.runResolved` and compiles through the shared driver + `fullbarsEmit` from
+  `BareBars.Compile.Emit`. It imports `kernel` and `barebars-compile` — **not** the `fullbars`
+  package. Its dependency closure is therefore provably free of FullBars (this is the closure the
+  xref:adr-final-review.adoc[final review] asks to lock with a test).
+
+. *Full instantiation set.* The same dialect is offered pure (`render`/`renderDiag`/`renderValue`),
+  async (`renderAff`, in `ExceptT Error Aff`), and as a JS-compiling target
+  (`compileJs`/`compileJsWith`) — so RawBars covers every host shape the engine supports.
+
+== Consequences
+
+* *Pro:* the substrate's central promise is a *running dialect*, not prose; the FullBars-free closure
+  turns ADR-003's layering into something a CI test can assert.
+* *Con:* authoring is verbose (every `lookup` is explicit) — RawBars is a substrate/test dialect, not
+  the one most authors should reach for. The module docstring still says "the FullBars reference
+  engine"/"the compiler's FullBars `Emit`," which is cosmetic drift: that engine and that `Emit` now
+  live in `kernel`/`barebars-compile`, which is *why* the closure is FullBars-free.

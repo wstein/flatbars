@@ -1,0 +1,51 @@
+= ADR-005: The dialect ladder and reuse-by-dependency
+:navtitle: ADR-005 Dialect ladder
+
+*Status:* Accepted. *Date:* 2026-06-01.
+
+== Context
+
+The family needs several Handlebars-lineage dialects that share one engine without copy-paste, and
+*without* a premature shared-abstraction package. ADR-003 fixed *where* code lives; ADR-004 fixed
+*how* a dialect plugs in its grammar. This ADR fixes the *relationship* between the dialects.
+
+== Decision
+
+. *The ladder: RawBars ⊂ FullBars ⊂ MaxBars.*
++
+[cols="1,4",options="header"]
+|===
+| Dialect | Surface
+| *RawBars* | the core prefix grammar directly — explicit `pass:[{{{ lookup this "x" }}}]`, no sugar; `extras = false`.
+| *FullBars* | adds the surface desugar — paths, `@data`, `as |x|`, `pass:[{{ }}]` auto-escape; `extras = true`.
+| *MaxBars* | FullBars + infix operators and pipes (`MaxBars.Expr`), desugaring to the same core `Expr`; `extras = false`.
+|===
+
+. *Reuse by dependency, not copy.* MaxBars depends on `fullbars` and reuses its engine, prelude, value
+  policy, surface desugar, and compiler — swapping *only* the interior grammar through the
+  `parseExpr`/`parseHead` seams. A shared semantic kernel is extracted *lazily*, only on a proven
+  second consumer (ADR-003), never speculatively.
+
+. *Shared compile driver + per-dialect `Emit`.* `BareBars.Compile` is the dialect-agnostic emit driver
+  — the *fourth* instance of the inversion-of-control pattern (interpret / desugar / validate /
+  *compile*). `type Emit = { expr, block }` (`Compile.purs:54`); FullBars' `fullbarsEmit`
+  (`Emit.purs:74`) emits native control flow for `if`/`each`/…. The conformance harness asserts the
+  interpreter and the compiled JS produce byte-identical output.
+
+. *Operators and pipes lower to existing prelude helpers.* Pipe `pass:[{{ a | f }}]` → `(f a)` (piped
+  value first); infix `pass:[&& || ! == != < > <= >=]` → `and`/`or`/`not`/`eq`/… per the surface §B.7
+  table. No new engine semantics — only new *surface*.
+
+== Consequences
+
+* *Pro:* one engine, four IoC instances, N dialects as symmetric packages; a new tier is a grammar
+  swap, not a fork.
+* *Con:* `maxbars → fullbars` is a *real* cross-dialect dependency — the single sanctioned violation
+  of ADR-003's "no dialect imports another." The "⊂" is a claim about *surface supersetting*, not
+  about package isolation; the two must not be conflated (see the final review).
+
+== Alternatives considered
+
+* *Copy FullBars into MaxBars.* Rejected: guarantees drift between the dialects' shared semantics.
+* *A `common` engine package up front.* Rejected for the same reason as in ADR-003 — extract on a
+  proven overlap, not on speculation.

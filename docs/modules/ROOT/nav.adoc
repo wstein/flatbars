@@ -1,7 +1,22 @@
 .xref:index.adoc[BareBars]
 * xref:index.adoc[Introduction]
 * xref:concepts.adoc[The core model]
+
+.Architecture decisions
 * xref:adr-0001-structural-parser-and-walker.adoc[ADR-001: structural parser + walker]
+* xref:adr-0002-escaping-and-value-policy.adoc[ADR-002: escaping & value policy]
+* xref:adr-0003-strict-layering.adoc[ADR-003: strict layering]
+* xref:adr-0004-token-lexer-and-grammar-seams.adoc[ADR-004: token lexer & seams]
+* xref:adr-0005-dialect-ladder.adoc[ADR-005: dialect ladder]
+* xref:adr-0006-maxbars-loop-variables.adoc[ADR-006: MaxBars loop variables]
+* xref:adr-0007-minbars.adoc[ADR-007: MinBars peer engine]
+* xref:adr-0008-rawbars.adoc[ADR-008: RawBars base dialect]
+* xref:adr-0009-fullbars.adoc[ADR-009: FullBars reference engine]
+* xref:adr-0010-header-directives.adoc[ADR-010: header directives]
+* xref:adr-0011-compile-to-js.adoc[ADR-011: compile to JS]
+* xref:adr-0012-recursion-budget.adoc[ADR-012: recursion budget (proposed)]
+* xref:adr-0013-labelled-loops.adoc[ADR-013: labelled loops (proposed)]
+* xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification
 * xref:lexical.adoc[1. Lexical structure]
