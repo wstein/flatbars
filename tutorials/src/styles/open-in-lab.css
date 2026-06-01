@@ -105,14 +105,18 @@
 }
 /* With partials there are 3+ inputs; a 50/50-ish split leaves an empty cell and
    a cramped template. Instead the template takes a full-width row, and the data
-   and partial(s) sit side by side below it (auto-fit, min 13rem each). */
+   and partial(s) sit side by side below it. Flex (not grid auto-fit) so the row
+   is filled exactly by however many inputs there are — grid auto-fit + a
+   full-width span pins the track count and leaves a phantom empty track. */
 .oil .oil-grid.has-partials {
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
 }
-.oil .oil-grid.has-partials .oil-cell:first-child { grid-column: 1 / -1; }
+.oil .oil-grid.has-partials .oil-cell { flex: 1 1 13rem; min-width: 0; }
+.oil .oil-grid.has-partials .oil-cell:first-child { flex-basis: 100%; }
 @media (max-width: 40rem) {
-  .oil .oil-grid,
-  .oil .oil-grid.has-partials { grid-template-columns: 1fr; }
+  .oil .oil-grid { grid-template-columns: 1fr; }
+  .oil .oil-grid.has-partials .oil-cell { flex-basis: 100%; }
 }
 .oil .oil-cell { background: var(--bg); min-width: 0; padding: 0.55rem 0.7rem 0.7rem; }
 .oil .oil-cell-head { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.4rem; }
