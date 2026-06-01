@@ -133,6 +133,11 @@ preludeSchema =
     , Tuple "key" { block: false, arity: Exactly 0 }
     , Tuple "first" { block: false, arity: Exactly 0 }
     , Tuple "last" { block: false, arity: Exactly 0 }
+    , Tuple "index0" { block: false, arity: Exactly 0 }
+    , Tuple "index1" { block: false, arity: Exactly 0 }
+    , Tuple "rindex0" { block: false, arity: Exactly 0 }
+    , Tuple "rindex1" { block: false, arity: Exactly 0 }
+    , Tuple "length" { block: false, arity: Exactly 0 }
     , Tuple "parent-index" { block: false, arity: Exactly 0 }
     , Tuple "parent-key" { block: false, arity: Exactly 0 }
     , Tuple "parent-first" { block: false, arity: Exactly 0 }
@@ -428,6 +433,16 @@ iterate ctl names items =
             , Tuple "first" (constHelper (VBool (i == 0)))
             , Tuple "last" (constHelper (VBool (i == n - 1)))
             , Tuple "parent" (constHelper (refContext ctl.env))
+            -- The richer loop metadata (MaxBars' bare loop variables). These are
+            -- exposed for every dialect's `each`, but only MaxBars' surface names
+            -- them: FullBars reaches scoped vars solely through the `@` sigil and
+            -- never emits these, so its behaviour is unchanged. `index0` mirrors
+            -- `index`; arithmetic is normative so interpreter and compiler agree.
+            , Tuple "index0" (constHelper (VNumber (Int.toNumber i)))
+            , Tuple "index1" (constHelper (VNumber (Int.toNumber (i + 1))))
+            , Tuple "rindex0" (constHelper (VNumber (Int.toNumber (n - 1 - i))))
+            , Tuple "rindex1" (constHelper (VNumber (Int.toNumber (n - i))))
+            , Tuple "length" (constHelper (VNumber (Int.toNumber n)))
             ] <> parentData ctl <> binds val idx
           )
       in

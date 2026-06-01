@@ -104,6 +104,7 @@ function lookup(obj, ...segs) {
 function scope(data, falsy) {
   return {
     ctx: data ?? null, index: null, key: null, first: null, last: null,
+    index0: null, index1: null, rindex0: null, rindex1: null, length: null,
     parent: null, parentIndex: null, parentKey: null, parentFirst: null, parentLast: null,
     root: data ?? null,
     falsy: falsy || HB,             // the active @truthiness mode (default Handlebars)
@@ -111,9 +112,18 @@ function scope(data, falsy) {
 }
 // A child frame, exposing the *enclosing* frame's loop data under `parent-*`
 // (FullBars `parentData`: each/with rebind the parent's index/key/first/last).
-function childFrame(parent, ctx, index, key, first, last) {
+// `len` is the collection length (each only); the richer MaxBars loop variables
+// (index0/index1/rindex0/rindex1/length) derive from it, null outside a loop.
+// Arithmetic mirrors the interpreter's `iterate` so the two paths never drift.
+function childFrame(parent, ctx, index, key, first, last, len) {
+  const inLoop = index !== null && index !== undefined;
   return {
     ctx, index, key, first, last,
+    index0: inLoop ? index : null,
+    index1: inLoop ? index + 1 : null,
+    rindex0: inLoop ? len - 1 - index : null,
+    rindex1: inLoop ? len - index : null,
+    length: inLoop ? len : null,
     parent: parent.ctx,
     parentIndex: parent.index, parentKey: parent.key, parentFirst: parent.first, parentLast: parent.last,
     root: parent.root,
@@ -149,7 +159,7 @@ function each(coll, parent, names, bodyFn, elseFn) {
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
     const fr = bindNames(
-      childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1),
+      childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1, items.length),
       names, [it.val, it.idx],
     );
     out += bodyFn(fr);
@@ -227,6 +237,11 @@ const helpers = {
   key: (a, f) => f.key,
   first: (a, f) => f.first,
   last: (a, f) => f.last,
+  index0: (a, f) => f.index0,
+  index1: (a, f) => f.index1,
+  rindex0: (a, f) => f.rindex0,
+  rindex1: (a, f) => f.rindex1,
+  length: (a, f) => f.length,
   root: (a, f) => f.root,
   parent: (a, f) => f.parent,
   "parent-index": (a, f) => f.parentIndex,
