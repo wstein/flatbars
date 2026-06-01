@@ -1,0 +1,20 @@
+mustache/spec `delimiters` module, vendored verbatim from
+https://github.com/mustache/spec/tree/e8ec001db7f594521e773c34866aca2b5d6b0037/specs
+(the SAME pinned commit as packages/minbars/test/spec, see scripts/vendor-mustache.mjs).
+
+STAGED, NOT YET GATED. Set delimiters is not implemented (ADR-015, Proposed).
+This module lives here — not in ../spec/ — on purpose: both gen-conformance.mjs
+(check:conformance) and `flatbars examples verify` (examples:verify) glob the
+gated corpora and are STRICT gates in `npm test`; adding delimiters there now
+would turn the suite red (baseline 0/14).
+
+Baseline (shipped engine, lab/vendor/flatbars-engine.mjs): MinBars 0/14.
+
+On implementation (ADR-015 / set-delimiters-spec.md): move delimiters.json to
+../spec/, split into lab/examples/vendored/mustache/ via scripts/vendor-mustache.mjs
+(add "delimiters" to MODULES), and wire both gates. 14 tests:
+  Pair Behavior · Special Characters · Sections · Inverted Sections ·
+  Partial Inheritence · Post-Partial Behavior · Surrounding Whitespace ·
+  Outlying Whitespace (Inline) · Standalone Tag · Indented Standalone Tag ·
+  Standalone Line Endings · Standalone Without Previous Line ·
+  Standalone Without Newline · Pair with Padding
