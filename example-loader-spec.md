@@ -74,8 +74,8 @@ One file per example, committed under `examples/vendored/<provider>/<category>/<
   "expected": "<h1>…</h1>\n",
   "bakedWith": "handlebars@4.7.8",              // handlebars only: the oracle version that *defines* `expected` (§5, §9)
   "features": ["partial-block", "inline-partial"],
-  "support": "uses-unsupported-feature",      // ok | uses-unsupported-feature | parse-error
-  "unsupported": ["inline-partial"],            // only {{#*inline}} now — {{#> }} / {{> @partial-block}} are supported (§7)
+  "support": "ok",                              // ok | uses-unsupported-feature | parse-error
+  "unsupported": [],                            // both {{#> }} and {{#*inline}} are supported now (§7); [] for an example with a gap, list the features
   "source": { "url": "https://handlebarsjs.com/examples/partials/inline.html",
               "repo": "…", "commit": "a1b2c3d" },
   "license": { "spdx": "MIT", "holder": "Yehuda Katz", "notice": "…" }
@@ -127,6 +127,8 @@ A full-screen terminal app (invoked `barebars examples`) — not a prompt script
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+> The `⚠`/`inline` rows above are **illustrative of the glyph**, not current truth: `partials/inline` now renders under FullBars (§7), so it would show `✓`. The `⚠` state applies to whatever example genuinely hits a dialect gap.
+
 ### 6.2 Status glyphs (left tree)
 
 | glyph | meaning |
@@ -176,7 +178,7 @@ Recommended: **Ink** (React-for-CLI) in the `cli` package, importing the compile
 `features` tags each example; the pipeline flags any feature outside the target dialect's supported set.
 
 - **MinBars vs `mustache/spec`:** modules map directly — `~lambdas` excluded; `~dynamic-names` and `~inheritance` are supported (per `minbars-spec.md`), so only un-implemented phases show `⚠`/`✗`.
-- **FullBars vs Handlebars `/examples/`:** the completeness patch (`rawbars-maxbars-spec.md` §5) covered `@../`, `@root`, recursive partials; the partial-*block* gap has since closed (commit `a5be67d`): `{{#> name}}…{{/name}}` now parses (the close matches the partial *name* via `Parser.blockCloseName`) and `{{> @partial-block}}` desugars — see the FullBars test `block-partial-gt-yield` and `fullbars-compat.adoc` ("✓ Parsed and desugared"). The **only** remaining gap is the inline-*definition* sigil `{{#*inline}}` (the core spelling `{{#inline}}` already works). So the cited `partials/inline` example — `{{#> layout}}` (now supported) **plus** `{{#*inline "body"}}` (not yet) — tags `uses-unsupported-feature` for the *inline* sigil alone, exactly as §4's fixture already records (`unsupported: ["inline-partial"]`). Narrowed to a one-line follow-on (§11.1).
+- **FullBars vs Handlebars `/examples/`:** the completeness patch (`rawbars-maxbars-spec.md` §5) covered `@../`, `@root`, recursive partials; the partial gap has since closed **entirely** (commit `a5be67d`): `{{#> name}}…{{/name}}`, `{{> @partial-block}}`, **and** the inline-definition decorator `{{#*inline "name"}}…{{/inline}}` all parse and desugar. `Parser.blockCloseName` resolves the `{{/…}}` close-name mismatch (the partial name for `{{#>}}`, `inline` for `{{#*inline}}`) onto the `{{#partial}}`/`{{#inline}}` core spellings — see the FullBars tests `block-partial-gt-yield` and `inline-decorator-sigil`, and `fullbars-compat.adoc`. So the cited `partials/inline` example now renders fully (`support: "ok"`). The `support`/`unsupported` machinery (§4) stays — it is the live coverage report for *whatever* feature a future example hits — but there is **no FullBars partial gap today**. Open #1 is resolved (§11.1).
 
 The corpus thus becomes a live feature-coverage report for FullBars, not just a demo.
 
@@ -220,7 +222,7 @@ The vendored corpus (`examples/vendored/`) is the *conformance/coverage* set and
 
 ## 11. Open decisions
 
-1. **FullBars `{{#*inline}}` sigil** (§7) — **Narrowed.** Partial-blocks (`{{#> }}`) and `{{> @partial-block}}` already work (commit `a5be67d`); the only remaining gap is the inline-*definition* sigil. This is no longer a design fork but a one-line surface map `{{#*inline "x"}}…{{/inline}}` → the existing `{{#inline "x"}}` core spelling (reusing `Parser.blockCloseName` for the `#*`/close-name mismatch and the existing `hoistInline`). Recommendation: fill it — cheap, and it flips `partials/inline` from `uses-unsupported-feature` to `ok`.
+1. **FullBars partial sigils** (§7) — **Resolved (commit `a5be67d`).** `{{#> }}`, `{{> @partial-block}}`, **and** `{{#*inline}}` all parse and desugar; `Parser.blockCloseName` resolves the close-name mismatch and the surface maps the sigils onto the `{{#partial}}`/`{{#inline}}` core spellings (tests `block-partial-gt-yield`, `inline-decorator-sigil`). No FullBars partial gap remains; `partials/inline` loads as `ok`.
 2. **TUI library** (§6.6) — Ink (recommended) vs neo-blessed vs a minimal ANSI renderer.
 3. **handlebarsjs.com source repo** (§2) — locate and pin the exact markdown repo/path.
 4. **Handlebars expected-baking dependency** — pin which real-Handlebars version computes expected output (it defines "expected"); bump policy.
