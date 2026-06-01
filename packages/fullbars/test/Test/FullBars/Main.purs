@@ -493,6 +493,13 @@ main = do
     (obj [ Tuple "user" (obj [ Tuple "name" (str "Ada") ]) ])
     "Ada"
   expectS "surface-index" "{{ xs.1 }}" (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ]) "b"
+  -- the MaxBars-only loop-variable guarantee: in FullBars a bare loop-variable
+  -- *name* is a plain data path, NOT the loop datum. `{{index0}}` reads the field
+  -- "index0" (the loop index is `{{@index}}` here); MaxBars is the dialect that
+  -- makes bare `{{index0}}` the scoped variable.
+  expectS "surface-loopvar-name-is-data" "{{#each xs}}{{index0}}{{/each}}"
+    (obj [ Tuple "xs" (arr [ obj [ Tuple "index0" (str "DATA") ], obj [] ]) ])
+    "DATA"
   -- bracket segments: keys with spaces/dots, and a leading bracket.
   expectS "surface-bracket-space" "{{ user.[full name] }}"
     (obj [ Tuple "user" (obj [ Tuple "full name" (str "Ada L") ]) ])

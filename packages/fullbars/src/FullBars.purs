@@ -15,6 +15,7 @@ module FullBars
   , module FullBars.Surface
   , surfaceClauses
   , desugarSurface
+  , desugarSurfaceWith
   , compileSurface
   , renderSurface
   , renderSurfaceWith
@@ -33,7 +34,7 @@ import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FullBars.Surface (desugar, hoistInline)
+import FullBars.Surface (LoopVars, desugar, desugarWith, hoistInline, noLoopVars)
 import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (prelude, preludeSchema)
@@ -49,6 +50,11 @@ surfaceClauses = [ "else", "elif" ]
 -- | Desugar Surface syntax to core syntax for this engine (surface.adoc §5).
 desugarSurface :: Template -> Template
 desugarSurface = desugar surfaceClauses
+
+-- | Desugar with a dialect `LoopVars` resolver (MaxBars passes its loop-variable
+-- | map; `desugarSurface` is `desugarSurfaceWith noLoopVars`).
+desugarSurfaceWith :: LoopVars -> Template -> Template
+desugarSurfaceWith lv = desugarWith lv surfaceClauses
 
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.
@@ -96,15 +102,17 @@ renderSurfaceWith partialSrcs src dat =
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
 renderSurfaceDiag :: String -> Value -> Either String String
-renderSurfaceDiag = renderSurfaceDiagWith defaultParseOptions
+renderSurfaceDiag = renderSurfaceDiagWith noLoopVars defaultParseOptions
 
--- | `renderSurfaceDiag` with explicit parse options (CLI/config path).
-renderSurfaceDiagWith :: ParseOptions -> String -> Value -> Either String String
-renderSurfaceDiagWith opts src dat = case parseWith opts src of
+-- | `renderSurfaceDiag` with explicit parse options and a dialect `LoopVars`
+-- | resolver (the CLI/config + dialect path; FullBars passes `noLoopVars`,
+-- | MaxBars its loop-variable map).
+renderSurfaceDiagWith :: LoopVars -> ParseOptions -> String -> Value -> Either String String
+renderSurfaceDiagWith lv opts src dat = case parseWith opts src of
   Left pe -> Left (renderParseErrorAt src pe)
   Right { directives, nodes } ->
     let
-      { partials, template } = hoistInline (desugarSurface nodes)
+      { partials, template } = hoistInline (desugarSurfaceWith lv nodes)
     in
       case runResolved directives (registerPartials partials) template dat of
         Left e -> Left (formatError src e)

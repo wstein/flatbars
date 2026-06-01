@@ -18,19 +18,20 @@ import BareBars.Error (ParseError)
 import BareBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import Data.Either (Either)
 import Data.Map as Map
-import FullBars (desugarSurface, hoistInline)
+import FullBars (LoopVars, desugarSurfaceWith, hoistInline, noLoopVars)
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
 -- | `{{#inline}}` definitions into the partial registry (as `renderSurfaceWith`
 -- | does), then emit. The emit rules are dialect-pure — they only ever see core.
 compileSurface :: String -> Either ParseError String
-compileSurface = compileSurfaceWith defaultParseOptions
+compileSurface = compileSurfaceWith noLoopVars defaultParseOptions
 
--- | `compileSurface` with explicit parse options (CLI/config: standalone trim).
-compileSurfaceWith :: ParseOptions -> String -> Either ParseError String
-compileSurfaceWith opts src = do
+-- | `compileSurface` with explicit parse options and a dialect `LoopVars`
+-- | resolver (CLI/config + dialect path: standalone trim, MaxBars loop vars).
+compileSurfaceWith :: LoopVars -> ParseOptions -> String -> Either ParseError String
+compileSurfaceWith lv opts src = do
   { directives, nodes } <- parseWith opts src
   fs <- resolveForCompile directives
-  let h = hoistInline (desugarSurface nodes)
+  let h = hoistInline (desugarSurfaceWith lv nodes)
   pure (compile (metaFor fs) fullbarsEmit (Map.toUnfoldable h.partials) h.template)

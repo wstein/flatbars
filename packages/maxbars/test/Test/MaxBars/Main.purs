@@ -75,6 +75,32 @@ main = do
   expectM "path" "{{ user.name }}" (obj [ Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
     "Ada"
 
+  -- bare loop variables (MaxBars-only): index0/index1/rindex0/rindex1/length.
+  let xs3 = obj [ Tuple "xs" (VArray [ VString "a", VString "b", VString "c" ]) ]
+  expectM "loopvars-all"
+    "{{#each xs}}[{{index0}}/{{index1}}/{{rindex0}}/{{rindex1}}/{{length}}]{{/each}}"
+    xs3
+    "[0/1/2/3/3][1/2/1/2/3][2/3/0/1/3]"
+  -- aliases: index⇒index0, rindex⇒rindex0, size⇒length.
+  expectM "loopvars-aliases" "{{#each xs}}{{index}}{{rindex}}{{size}}{{/each}}" xs3 "023113203"
+  -- first/last as bare names.
+  expectM "loopvars-first" "{{#each xs}}{{#if first}}F{{else}}-{{/if}}{{/each}}" xs3 "F--"
+  expectM "loopvars-last" "{{#each xs}}{{#if last}}L{{else}}-{{/if}}{{/each}}" xs3 "--L"
+  -- object iteration exposes the bare `key`.
+  expectM "loopvars-key" "{{#each o}}{{key}}{{/each}}"
+    (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
+    "xy"
+  -- NOTE: block-param shadowing of a loop variable (`as |index0|`) is wired in
+  -- the surface (`pathExpr` checks scope before loop vars), but MaxBars' `as |…|`
+  -- bars still collide with the pipe operator — fixed with block-head grammar
+  -- work (see the v1 limitations / Phase D).
+
+  -- compiled path names the loop variable as a scoped helper call.
+  case compileMaxJs "{{#each xs}}{{index1}}{{/each}}" of
+    Left e -> assert' ("compile loopvar: unexpected error " <> show e) false
+    Right js -> assert' ("compile loopvar: expected rt.call(\"index1\" in\n" <> js)
+      (contains (Pattern "rt.call(\"index1\"") js)
+
   -- MaxBars also rejects the Handlebars-only shapes (not the Handlebars-compat
   -- dialect): inverse {{^}}, unescaped {{&}}, and raw blocks {{{{}}}}.
   assert' "reject: inverse {{^}}" (isLeft (renderMax "{{^a}}x{{/a}}" (obj [])))

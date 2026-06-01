@@ -26,7 +26,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
-import FullBars (directiveLints, preludeSchema, renderSurfaceDiagWith)
+import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
 import Node.Encoding (Encoding(..))
@@ -144,7 +144,7 @@ run opts = do
         case datE of
           Left err -> die ("barebars: " <> err)
           Right value
-            | opts.surface -> case renderSurfaceDiagWith popts tpl value of
+            | opts.surface -> case renderSurfaceDiagWith noLoopVars popts tpl value of
                 Left err -> die ("barebars: " <> opts.template <> ": " <> err)
                 Right out -> writeStdout out
             | otherwise -> case compileWith popts tpl of
@@ -156,7 +156,7 @@ run opts = do
 -- | Compile a template to a JS ES module and print it to stdout (surface or core).
 runCompile :: ParseOptions -> Options -> String -> Effect Unit
 runCompile popts opts tpl =
-  case (if opts.surface then Compile.compileSurfaceWith else compileJsWith) popts tpl of
+  case (if opts.surface then Compile.compileSurfaceWith noLoopVars else compileJsWith) popts tpl of
     Left pe -> die ("barebars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
     Right js -> writeStdout js
 
