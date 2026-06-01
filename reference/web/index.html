@@ -1581,10 +1581,12 @@
         tabVisibleUnder,
         transpileSt4,
         validateOverlayName,
+        vendoredVerdict,
+        vendoredWorkspace,
       // Cache-bust query: bump on any playground_utils.mjs change so a freshly
       // loaded index.html never pairs with a stale cached module (which silently
-      // ran the old, uncompressed encodeState). Bumped for ADR-0020 capability gating.
-      } from "./playground_utils.mjs?v=13";
+      // ran the old, uncompressed encodeState). Bumped for the vendored-fixture loader (E2).
+      } from "./playground_utils.mjs?v=14";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -4193,6 +4195,69 @@
         showActiveTab(); run();
       }
 
+      // ── Vendored conformance fixtures (example-loader-spec.md §8, E2) ──────
+      // `?vendored=<id>` deep-links a fixture from the vendored corpus
+      // (reference/web/examples/vendored/<id>.json). The fixture must run under
+      // its own dialect engine, so if the boot engine differs we re-navigate with
+      // the right `?engine=`. The whole path is gated on the param — it never runs
+      // for a normal Lab session.
+      async function loadVendoredById(id) {
+        let fx;
+        try {
+          const res = await fetch(`./examples/vendored/${id}.json`);
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          fx = await res.json();
+        } catch (e) {
+          // Fall back to the default example so the Lab still boots usefully.
+          const def = examples.findIndex((e2) => e2.id === "greeting");
+          await loadExample(def < 0 ? 0 : def);
+          setExampleLabel(`vendored ${id} — not found`);
+          return;
+        }
+        if (fx.dialect && fx.dialect !== ENGINE) {
+          const u = new URL(location.href);
+          u.searchParams.set("engine", fx.dialect);
+          location.href = u.toString(); // reload under the fixture's dialect engine
+          return;
+        }
+        loadVendored(fx);
+      }
+
+      // Load a vendored fixture into the workspace and render it, then frame the
+      // result as expected-vs-actual: a `conformance-failure` miss (Mustache) is a
+      // defect, an `expected-difference` miss (Handlebars) is a by-design divergence.
+      // Mirrors loadExample's state setup, but from the fixture (no per-file fetch).
+      function loadVendored(fx) {
+        const ws = vendoredWorkspace(fx);
+        tabs = [{ name: "main", source: ws.template, dirty: false }];
+        ws.partials.forEach((p) => tabs.push({ name: p.name, source: p.source, dirty: false }));
+        activeTabIdx = 0; activeView = "tmpl";
+        yamlSrc = ws.dataText;
+        transformSrc = "";
+        dataOverlays = [];
+        dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform"];
+        templateMode = "tmpl";
+        showDataTab();
+        escapeMode = "";
+        byId("escape-select").value = "";
+        standalone = true;
+        st4Mode = false;
+        allowList = null;
+        syncStandaloneUI();
+        updateRenderStatus();
+        loadedExampleIdx = -1;
+        exampleModified = false;
+        yamlDirty = false; transformDirty = false;
+        outLangChoice = "Auto";
+        persistOutLang();
+        updateLangPlaceholder();
+        setOutputView(validView("rendered"));
+        showActiveTab();
+        run(); // synchronous render — populates lastOutput
+        const verdict = vendoredVerdict(fx, lastOutput);
+        setExampleLabel(`vendored ${fx.id} — ` + (verdict.match ? "✓ conforms" : "✗ " + verdict.severity));
+      }
+
       // Once the user edits anything, the state no longer matches a shipped
       // example: flag it custom so the URL state reflects that. The dropdown
       // keeps showing the example name but appends ● to signal modification.
@@ -6159,7 +6224,12 @@
 
       // Default load is keyed by id, not array position, so reordering the
       // examples.json catalog (e.g. simple -> advanced) never breaks it.
-      if (!(await restoreHash())) {
+      // A `?vendored=<id>` deep-link takes precedence over both the shared-state
+      // hash and the default example.
+      const vendoredParam = new URLSearchParams(location.search).get("vendored");
+      if (vendoredParam) {
+        await loadVendoredById(vendoredParam);
+      } else if (!(await restoreHash())) {
         // Both catalogs ship a "greeting" entry as the default landing example.
         const def = examples.findIndex((e) => e.id === "greeting");
         await loadExample(def < 0 ? 0 : def);
