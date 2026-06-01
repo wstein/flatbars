@@ -1,22 +1,46 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
-// One page per surface, generated from the single example source.
-import Lesson from "../layouts/Lesson.astro";
+// One page per surface, on the shared reference chrome (left nav + lab theme),
+// so clicking through from the Mustache reference never hits a visual seam.
+// `minbars` is intentionally excluded — the comprehensive /mustache reference
+// supersedes a one-example MinBars lesson.
+import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { lessons, surfaces } from "../examples.mjs";
 
 export function getStaticPaths() {
-  return surfaces.map((s) => ({ params: { surface: s }, props: { lesson: lessons[s] } }));
+  return surfaces
+    .filter((s) => s !== "minbars")
+    .map((s) => ({ params: { surface: s }, props: { lesson: lessons[s], surface: s } }));
 }
 
-const { lesson } = Astro.props;
+const { lesson, surface } = Astro.props;
+const shortName = (s) => lessons[s].title.split(" — ")[0];
+
+const groups = [
+  { label: "Reference", items: [{ href: "/mustache", label: "Mustache reference" }] },
+  {
+    label: "The four surfaces",
+    items: surfaces.map((s) => ({
+      href: s === "minbars" ? "/mustache" : `/${s}`,
+      label: s === "minbars" ? "MinBars (Mustache)" : shortName(s),
+      active: s === surface,
+    })),
+  },
+  { label: "Play", items: [{ href: `/lab/index.html?engine=${lesson.engine}`, label: "FlatBars Lab ↗" }] },
+];
 ---
-<Lesson title={lesson.title} surface={lesson.engine} spec={lesson.spec} blurb={lesson.blurb}>
-  <OpenInLab
-    client:load
-    engine={lesson.engine}
-    template={lesson.template}
-    data={lesson.data}
-    partials={lesson.partials ?? {}}
-  />
-</Lesson>
+
+<Reference title={lesson.title} subtitle={lesson.blurb} groups={groups} spec={lesson.spec}>
+  <section>
+    <h2>Live example</h2>
+    <p>Rendered through the real <code>{lesson.engine}</code> engine — edit it in the Lab to explore further.</p>
+    <OpenInLab
+      client:visible
+      engine={lesson.engine}
+      template={lesson.template}
+      data={lesson.data}
+      partials={lesson.partials ?? {}}
+    />
+  </section>
+</Reference>

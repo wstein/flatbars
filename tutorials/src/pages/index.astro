@@ -1,33 +1,101 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
+import "../styles/lab-tokens.css";
 import { lessons, surfaces } from "../examples.mjs";
+
+// Mustache leads (debate consensus item 8): it's the universally-known on-ramp
+// and the comprehensive reference, so it gets the hero. The per-surface lessons
+// follow as the ladder beyond it. The minbars card points at the full reference.
+const surfaceCards = surfaces.map((s) => ({
+  href: s === "minbars" ? "/mustache" : `/${s}`,
+  title: lessons[s].title,
+  blurb: lessons[s].blurb,
+}));
 ---
+
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BareBars tutorials — the four surfaces</title>
+    <title>BareBars — learn the surfaces</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
     <style>
-      :root { color-scheme: light dark; --fg:#1a1a1a; --muted:#666; --line:#ddd; --accent:#5b4cff; }
-      @media (prefers-color-scheme: dark) { :root { --fg:#e6e6e6; --muted:#9a9a9a; --line:#333; --accent:#9a8cff; } }
-      body { font:16px/1.6 system-ui, sans-serif; color:var(--fg); max-width:48rem; margin:2rem auto; padding:0 1rem; }
-      ul { list-style:none; padding:0; display:grid; gap:.75rem; }
-      a.card { display:block; border:1px solid var(--line); border-radius:8px; padding:1rem; text-decoration:none; color:inherit; }
-      a.card:hover { border-color:var(--accent); }
-      a.card b { color:var(--accent); }
-      a.card span { color:var(--muted); display:block; margin-top:.25rem; font-size:.9rem; }
+      body {
+        font: 16px/1.65 var(--font-ui);
+        color: var(--fg);
+        background: var(--bg);
+        max-width: 52rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 4rem;
+      }
+      h1 { font-size: 2rem; margin: 0 0 0.3rem; }
+      h1 b { color: var(--accent); }
+      .lede { color: var(--fg-muted); font-size: 1.1rem; margin-top: 0; }
+      .hero {
+        display: block;
+        margin: 1.75rem 0;
+        padding: 1.5rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent-softer), var(--bg-1));
+        text-decoration: none;
+        color: inherit;
+      }
+      .hero:hover { border-color: var(--accent); }
+      .hero .kicker {
+        font: 600 11px/1 var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent-2);
+      }
+      .hero h2 { font-size: 1.5rem; margin: 0.4rem 0 0.3rem; }
+      .hero p { margin: 0; color: var(--fg-muted); }
+      .hero .go { color: var(--accent-2); font-weight: 600; }
+      .grid-label {
+        font: 600 11px/1 var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--fg-faint);
+        margin: 2rem 0 0.5rem;
+      }
+      ul { list-style: none; padding: 0; display: grid; gap: 0.7rem; }
+      a.card {
+        display: block;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem;
+        text-decoration: none;
+        color: inherit;
+        background: var(--bg-1);
+      }
+      a.card:hover { border-color: var(--accent); }
+      a.card b { color: var(--accent-2); }
+      a.card span { color: var(--fg-muted); display: block; margin-top: 0.25rem; font-size: 0.9rem; }
     </style>
   </head>
   <body>
-    <h1>BareBars — learn the four surfaces</h1>
-    <p>Each lesson renders a live example and opens it in the FlatBars Lab with one click.</p>
+    <h1><b>Bare</b>Bars — learn the surfaces</h1>
+    <p class="lede">Logic-less templates, live. Start with Mustache, then climb the ladder.</p>
+
+    <a class="hero" href="/mustache">
+      <span class="kicker">Start here · reference</span>
+      <h2>Mustache, the runnable reference</h2>
+      <p>Every tag in the logic-less language — interpolation, sections, partials, inheritance — explained with examples that render live and open in the Lab. <span class="go">Open the reference →</span></p>
+    </a>
+
+    <p class="grid-label">The four surfaces</p>
     <ul>
-      {surfaces.map((s) => (
+      {surfaceCards.map((c) => (
         <li>
-          <a class="card" href={`/${s}`}>
-            <b>{lessons[s].title}</b>
-            <span>{lessons[s].blurb}</span>
+          <a class="card" href={c.href}>
+            <b>{c.title}</b>
+            <span>{c.blurb}</span>
           </a>
         </li>
       ))}
