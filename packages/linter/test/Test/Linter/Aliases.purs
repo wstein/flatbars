@@ -34,10 +34,10 @@ main = do
   expectWarns "downcase warns" "{{{downcase s}}}" [ "downcase" ]
   expectWarns "upcase warns" "{{{upcase s}}}" [ "upcase" ]
   expectWarns "minus+times warn" "{{{minus a b}}}{{{times a b}}}" [ "minus", "times" ]
-  expectWarns "isnt warns" "{{{isnt a b}}}" [ "isnt" ]
 
   -- the canonical helpers (and ordinary names) do NOT warn.
   expectWarns "add does not warn" "{{{add a b}}}" []
+  expectWarns "isnt (canonical synonym) does not warn" "{{{isnt a b}}}" []
   expectWarns "lowercase does not warn" "{{{lowercase s}}}" []
   expectWarns "plain path does not warn" "{{{lookup this \"x\"}}}" []
 

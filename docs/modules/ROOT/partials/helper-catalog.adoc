@@ -37,7 +37,7 @@
 |`index0` |value |0 |scoped
 |`index1` |value |0 |scoped
 |`inline` |block |≥1 |registered
-|`isnt` |value |2 |alias of `ne`
+|`isnt` |value |2 |registered
 |`join` |value |2 |registered
 |`json` |value |1–2 |registered
 |`key` |value |0 |scoped
