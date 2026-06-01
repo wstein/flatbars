@@ -84,15 +84,18 @@ export const examples = {
   // ── Partials ───────────────────────────────────────────────────────────────
   partial: {
     // {{> name}} includes another template; it inherits the caller's context.
-    template: "{{> greeting}}\n{{> greeting}}",
-    partials: { greeting: "Hi {{name}}!" },
-    data: { name: "Ada" },
+    // A partial is a reusable multi-line chunk — here, a small card.
+    template: "{{> card}}",
+    partials: { card: "{{name}} — {{role}}\nsince {{joined}}" },
+    data: { name: "Ada", role: "author", joined: 1842 },
   },
 
   partialList: {
-    // A partial reused per row — the classic header/row/footer composition.
-    template: "{{#people}}{{> row}}\n{{/people}}",
-    partials: { row: "- {{name}} ({{role}})" },
+    // A partial reused per row. The row's line break lives INSIDE the partial
+    // body: a standalone `{{> row}}` line has its own newline trimmed, so a
+    // partial owns its trailing newline — otherwise the rows run together.
+    template: "{{#people}}{{> row}}{{/people}}",
+    partials: { row: "- {{name}} ({{role}})\n" },
     data: {
       people: [
         { name: "Ada", role: "author" },
