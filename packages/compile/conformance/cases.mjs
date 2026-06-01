@@ -46,6 +46,7 @@ export const cases = [
   { name: "each-array", t: "{{#each (lookup this \"xs\")}}[{{{this}}}={{{index}}}]{{/each}}", d: { xs: ["a", "b"] } },
   { name: "each-first-last", t: "{{#each (lookup this \"xs\")}}{{#if first}}<{{/if}}{{{this}}}{{#if last}}>{{/if}}{{/each}}", d: { xs: ["x", "y"] } },
   { name: "each-empty-else", t: "{{#each (lookup this \"xs\")}}x{{else}}empty{{/each}}", d: { xs: [] } },
+  { name: "each-array-key-null", t: "{{#each (lookup this \"xs\")}}[{{{key}}}]{{/each}}", d: { xs: ["a", "b"] } },
   { name: "each-object-sorted", t: "{{#each (lookup this \"o\")}}{{{key}}}={{{this}}};{{/each}}", d: { o: { b: 2, a: 1, c: 3 } } },
   { name: "each-object-index", t: "{{#each (lookup this \"o\")}}{{{index}}}:{{{key}}};{{/each}}", d: { o: { z: 1, a: 2 } } },
   { name: "each-parent-index", t: "{{#each (lookup this \"rows\")}}{{#each this}}[{{{parent-index}}}-{{{index}}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },

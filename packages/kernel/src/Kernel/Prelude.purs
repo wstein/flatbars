@@ -378,13 +378,17 @@ eachH ctl args = case Array.uncons args of
         VArray xs ->
           if Array.null xs then renderElse ctl
           else iterate ctl names
-            (Array.mapWithIndex (\i x -> { val: x, key: show i, idx: VNumber (Int.toNumber i) }) xs)
+            ( Array.mapWithIndex
+                (\i x -> { val: x, key: VNull, idx: VNumber (Int.toNumber i) })
+                xs
+            )
         VObject m ->
           let
             pairs = Map.toUnfoldable m :: Array (Tuple String Value)
           in
             if Array.null pairs then renderElse ctl
-            else iterate ctl names (map (\(Tuple k v) -> { val: v, key: k, idx: VString k }) pairs)
+            else iterate ctl names
+              (map (\(Tuple k v) -> { val: v, key: VString k, idx: VString k }) pairs)
         _ -> renderElse ctl
   Nothing -> throwError (ArityError "each: expected at least 1 argument(s), got 0")
 
@@ -416,7 +420,7 @@ iterate
    . MonadThrow Error m
   => Ctl m (RefEnv m)
   -> Array String
-  -> Array { val :: Value, key :: String, idx :: Value }
+  -> Array { val :: Value, key :: Value, idx :: Value }
   -> m Value
 iterate ctl names items =
   let
@@ -429,7 +433,10 @@ iterate ctl names items =
         frame = Map.fromFoldable
           ( [ Tuple "this" (constHelper val)
             , Tuple "index" (constHelper (VNumber (Int.toNumber i)))
-            , Tuple "key" (constHelper (VString key))
+            -- `key` is the object property name when iterating an object, and
+            -- `null` for an array (Handlebars parity: `@key` is object-only; use
+            -- `index0` for the array position). See loopvars-linter-spec §A.1.
+            , Tuple "key" (constHelper key)
             , Tuple "first" (constHelper (VBool (i == 0)))
             , Tuple "last" (constHelper (VBool (i == n - 1)))
             , Tuple "parent" (constHelper (refContext ctl.env))

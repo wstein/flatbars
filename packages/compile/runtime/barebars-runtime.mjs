@@ -147,7 +147,9 @@ function bindNames(frame, names, values) {
 function each(coll, parent, names, bodyFn, elseFn) {
   let items;
   if (Array.isArray(coll)) {
-    items = coll.map((val, i) => ({ val, key: String(i), idx: i }));
+    // `key` is null for arrays (Handlebars parity — @key is object-only; use the
+    // index for the array position); the block-param `idx` still binds the index.
+    items = coll.map((val, i) => ({ val, key: null, idx: i }));
   } else if (coll && typeof coll === "object" && !isSafe(coll)) {
     // FullBars VObject is an ordered Map — iteration is by *sorted* key.
     items = Object.keys(coll).sort().map((k) => ({ val: coll[k], key: k, idx: k }));

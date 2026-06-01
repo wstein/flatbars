@@ -104,10 +104,12 @@ main = do
   -- first/last as bare names.
   expectM "loopvars-first" "{{#each xs}}{{#if first}}F{{else}}-{{/if}}{{/each}}" xs3 "F--"
   expectM "loopvars-last" "{{#each xs}}{{#if last}}L{{else}}-{{/if}}{{/each}}" xs3 "--L"
-  -- object iteration exposes the bare `key`.
+  -- object iteration exposes the bare `key`; array iteration's `key` is null
+  -- (Handlebars parity — use index0 for the array position).
   expectM "loopvars-key" "{{#each o}}{{key}}{{/each}}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "xy"
+  expectM "loopvars-key-array-null" "{{#each xs}}[{{key}}]{{/each}}" xs3 "[][][]"
   -- the escape hatch: `{{this.first}}` reads the *data field* `first`, not the
   -- loop variable (a path is never loop-var-resolved — only a whole bare name).
   expectM "loopvar-escape-this-dot" "{{#each xs}}{{this.first}}{{/each}}"
