@@ -1003,7 +1003,6 @@
       .cv-where { color: var(--fg-faint); font-family: var(--font-mono); text-align: right; }
 
       .ast-pane { padding: 6px 0; font: 12px/1.6 var(--font-mono); }
-      .inspect-data { margin: 0; padding: 6px 12px; font: 12px/1.6 var(--font-mono); color: var(--fg-secondary); white-space: pre; }
       .ast-row { display: flex; align-items: baseline; padding: 1px 14px 1px 0; color: var(--fg-secondary); }
       .ast-row.linked { cursor: pointer; color: var(--fg); }
       .ast-row.linked:hover { background: var(--accent-softer); }
@@ -1401,7 +1400,7 @@
 
         <div class="editor-region">
         <!-- Sources: the single edit pane on top, a read-only Inspector pane
-             (Context Inspector / Syntax Tree / Render Data) stacked below it. -->
+             (Context Inspector / Syntax Tree) stacked below it. -->
         <section class="pane pane-sources" aria-label="Sources">
           <!-- TOP: the single edit pane (all editable files). -->
           <div class="src-col src-edit">
@@ -2589,8 +2588,8 @@
       }
 
       // The read-only Inspector pane (left of the edit pane). Its own tab strip
-      // (Context Inspector · Syntax Tree · Render Data) + panel; never hosts
-      // edits. `inspectView` is independent of the edit pane's active file.
+      // (Context Inspector · Syntax Tree) + panel; never hosts edits. `inspectView`
+      // is independent of the edit pane's active file.
       let inspectView = "context";
       function renderInspectTabs() {
         const bar = byId("inspect-tabs");
@@ -2605,10 +2604,9 @@
         };
         mk("context", "Context Inspector");
         mk("ast", "Syntax Tree");
-        mk("data", "Render Data");
       }
       function selectInspect(mode) {
-        inspectView = (mode === "ast" || mode === "data") ? mode : "context";
+        inspectView = mode === "ast" ? "ast" : "context";
         renderInspectTabs();
         renderInspectPane();
       }
@@ -2617,23 +2615,7 @@
         if (!panel) return;
         panel.textContent = "";
         if (inspectView === "context") renderContext(panel);
-        else if (inspectView === "ast") renderAst(panel);
-        else renderRenderData(panel);
-      }
-      // Render Data inspector view: the post-transform view-model the template
-      // rendered (`lastData`), dumped as YAML. Re-rendered after every run via
-      // setOutput → renderDataInspect, so it tracks the live data. (Moved here
-      // from the output-view tab strip — it is an inspection of the input data,
-      // not an output rendering.)
-      function renderRenderData(body) {
-        if (lastData == null) {
-          body.append(makeEl("div", { class: "problem-empty" }, "no render data yet — run the template"));
-          return;
-        }
-        let text;
-        try { text = dumpYaml(lastData, { indent: 2, lineWidth: -1, noRefs: true }); }
-        catch { text = String(lastData); }
-        body.append(makeEl("pre", { class: "inspect-data" }, text));
+        else renderAst(panel);
       }
 
       // ── Template open-editor helpers (VS Code-style tabs) ───────────────
@@ -3644,9 +3626,7 @@
         // export-only ST interop effort — until the transpiler ships, the
         // pane shows a placeholder describing what it will render.
         { view: "st4", label: "ST4 Preview", requires: ["st4-modes"] },
-        // "Render Data" moved to the Inspector pane (renderRenderData) — it is an
-        // inspection of the input view-model, not an output rendering. The
-        // defensive `outputView === "data"` branches below remain unreachable.
+        { view: "data", label: "Render Data" },
         { view: "bytecode", label: "Bytecode", requires: ["bytecode-wire"] },
         // BareBars-only: the template compiled to a JS module (BareBars.Compile).
         { view: "compiled", label: "Compiled JS", requires: ["compile-js"] },
