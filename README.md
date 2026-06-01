@@ -56,6 +56,8 @@ npm test               # run the full suite (per-package tests + conformance gat
 npm run cli -- --help  # run the CLI
 npm run docs           # build the Antora documentation site (requires antora)
 # FlatBars Lab: serve reference/web/ over HTTP and open index.html
+#   (defaults to the FullBars engine — no build needed; the Stem engine also
+#    needs its wasm: run reference/web/build.sh, requires the Rust wasm toolchain)
 ```
 
 See each package's own `README` for details.

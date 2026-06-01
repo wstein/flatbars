@@ -1650,23 +1650,49 @@
       // (below) hides whatever the chosen engine doesn't back.
       const ENGINE_PARAM = (new URLSearchParams(location.search).get("engine") || "").toLowerCase();
       const DIALECT_PARAM = (new URLSearchParams(location.search).get("dialect") || "").toLowerCase();
-      const ENGINE =
+      let ENGINE =
         ["rawbars", "raw", "core"].includes(ENGINE_PARAM) ? "rawbars"
         : ["minbars", "mustache"].includes(ENGINE_PARAM) ? "minbars"
         : ["fullbars", "full", "surface"].includes(ENGINE_PARAM) ? "fullbars"
         : ["maxbars", "max"].includes(ENGINE_PARAM) ? "maxbars"
+        : ENGINE_PARAM === "stem" ? "stem"
         // back-compat: old `?engine=barebars[&dialect=…]` links → dialect engine.
         : ["barebars", "bb"].includes(ENGINE_PARAM)
             ? (["core", "rawbars"].includes(DIALECT_PARAM) ? "rawbars"
                : DIALECT_PARAM === "maxbars" ? "maxbars" : "fullbars")
-        : "stem";
+        // Default to FullBars — a no-wasm BareBars engine. Stem renders from a
+        // wasm binary built by reference/web/build.sh, so it must not be the
+        // zero-config default (a missing wasm would kill the Lab at boot).
+        : "fullbars";
       // The three BareBars dialect engines share one adapter; the engine name
       // fixes the dialect it renders.
       const BB_DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
+      // Stem needs its wasm binary. If it is absent the dev server returns a 404
+      // HTML page (not wasm) and WebAssembly.instantiate throws — so probe the
+      // bytes (check the `\0asm` magic word) and fall back to FullBars rather than
+      // letting the whole Lab die.
+      async function loadStemWasm() {
+        try {
+          const res = await fetch(WASM);
+          if (!res.ok) return null;
+          const buf = await res.arrayBuffer();
+          const m = new Uint8Array(buf, 0, 4);
+          return (m[0] === 0x00 && m[1] === 0x61 && m[2] === 0x73 && m[3] === 0x6d) ? buf : null;
+        } catch { return null; }
+      }
+      let stemBytes = null;
+      if (ENGINE === "stem") {
+        stemBytes = await loadStemWasm();
+        if (!stemBytes) {
+          console.warn(`Stem wasm not found at ${WASM}; using FullBars instead — build it with reference/web/build.sh.`);
+          if (typeof toast === "function") toast("Stem engine needs its wasm (build.sh) — using FullBars");
+          ENGINE = "fullbars";
+        }
+      }
       const renderer =
         BB_DIALECT[ENGINE] ? await createBareBarsRenderer(BB_DIALECT[ENGINE])
         : ENGINE === "minbars" ? await createMinBarsRenderer()
-        : await createRenderer(await (await fetch(WASM)).arrayBuffer());
+        : await createRenderer(stemBytes);
       // Show the engine + its version (the Stem build bakes it into the wasm; the
       // BareBars/MinBars adapters report the bundled engine version).
       const ENGINE_LABEL =
