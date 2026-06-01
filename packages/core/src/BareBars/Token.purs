@@ -12,6 +12,8 @@
 module BareBars.Token
   ( Token(..)
   , PosToken
+  , LexOptions
+  , defaultLexOptions
   , tokenizeInterior
   ) where
 
@@ -53,13 +55,31 @@ type PosToken = { tok :: Token, at :: Int }
 -- | Tokenize a tag interior. `base` is its offset in the source, added to every
 -- | token's position so a downstream parse error points into the original
 -- | template. A blank interior yields `[]`.
-tokenizeInterior :: Int -> String -> Either ParseError (Array PosToken)
-tokenizeInterior base src = go 0 []
+-- | Lexer configuration (a dialect seam). `infixArith` turns `+ - * / % ` and
+-- | `??` into operator tokens (MaxBars); when off (RawBars/FullBars default)
+-- | those characters stay *identifier* characters, so path/name syntax such as
+-- | `../x`, `a/b`, and `partial-block` lexes as a single `TIdent` exactly as
+-- | before. `.` `@` `_` `=` remain identifier characters in **both** modes, so
+-- | dotted paths, `@data`, and `key=value` hashes are untouched by the switch.
+type LexOptions = { infixArith :: Boolean }
+
+-- | The default lexer config: no arithmetic operators (RawBars/FullBars).
+defaultLexOptions :: LexOptions
+defaultLexOptions = { infixArith: false }
+
+tokenizeInterior :: LexOptions -> Int -> String -> Either ParseError (Array PosToken)
+tokenizeInterior cfg base src = go 0 []
   where
   cs = SCU.toCharArray src
   len = Array.length cs
   at i = Array.index cs i
   slc a b = SCU.fromCharArray (Array.slice a b cs)
+
+  -- `+ - * / ?` are operator characters only under `infixArith`; otherwise they
+  -- are identifier characters (path/name punctuation). `%` is never an identifier
+  -- character, so it is an operator under `infixArith` and invalid otherwise.
+  arithChar c = c == '+' || c == '-' || c == '*' || c == '/' || c == '?'
+  identChar c = isIdentChar c && not (cfg.infixArith && arithChar c)
 
   go :: Int -> Array PosToken -> Either ParseError (Array PosToken)
   go i acc
@@ -80,9 +100,15 @@ tokenizeInterior base src = go 0 []
           -- `==` is the only token-boundary use of `=`; a lone `=` here is invalid
           -- (`key=value` keeps `=` inside the ident run, below).
           | c == '=' -> if at (i + 1) == Just '=' then op2 "==" i acc else bad i
+          -- a leading `-` glued to a digit is a negative literal in both modes.
           | c == '-' && maybe false isDigit (at (i + 1)) -> readNumber i acc
+          -- MaxBars arithmetic / coalesce operators (only under `infixArith`).
+          | cfg.infixArith && c == '?' ->
+              if at (i + 1) == Just '?' then op2 "??" i acc else bad i
+          | cfg.infixArith && arithChar c -> op1 (SCU.singleton c) i acc
+          | cfg.infixArith && c == '%' -> op1 "%" i acc
           | isDigit c -> readNumber i acc
-          | isIdentChar c || c == '[' -> readIdent i acc
+          | identChar c || c == '[' -> readIdent i acc
           | otherwise -> bad i
 
   push acc t i = Array.snoc acc { tok: t, at: base + i }
@@ -98,7 +124,7 @@ tokenizeInterior base src = go 0 []
       Just '[' -> case bracketEnd (j + 1) of
         Just k -> scan (k + 1)
         Nothing -> Left (LexError "unterminated [ segment" (base + j))
-      Just c | isIdentChar c -> scan (j + 1)
+      Just c | identChar c -> scan (j + 1)
       _ -> go j (push acc (TIdent (slc start j)) start)
     bracketEnd k
       | k > len = Nothing

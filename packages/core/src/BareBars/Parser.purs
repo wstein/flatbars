@@ -24,7 +24,7 @@ import BareBars.Expr as Expr
 import BareBars.Lexer (RawTok(..), tokenizeTemplate, trimStandalone)
 import BareBars.Span (Span)
 import BareBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
-import BareBars.Token (PosToken, Token(..), tokenizeInterior)
+import BareBars.Token (LexOptions, PosToken, Token(..), defaultLexOptions, tokenizeInterior)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
@@ -72,6 +72,7 @@ type ParseOptions =
   , extras :: Boolean
   , inheritance :: Boolean
   , standaloneSeps :: Array String
+  , lexOptions :: LexOptions
   }
 
 -- | Standalone trimming on (Handlebars parity), the core expression grammar, and
@@ -85,6 +86,7 @@ defaultParseOptions =
   , extras: true
   , inheritance: false
   , standaloneSeps: [ "else", "elif" ]
+  , lexOptions: defaultLexOptions
   }
 
 -- | Parse source text into the core template *plus* its header directives, with
@@ -109,7 +111,7 @@ parseWith opts src = do
   -- comments carry no output; drop them before the tree builder, which then
   -- never has to know about `RComment` (the standalone pass needs them, so it
   -- runs first).
-  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance
+  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance opts.lexOptions
     (Array.filter (not <<< isComment) toks')
     0
   case res.stop of
@@ -126,7 +128,7 @@ parseWith opts src = do
 -- | core's own `parseWith` path is unchanged, so other engines are unaffected.
 buildFromTokens :: ParseOptions -> Array RawTok -> Either ParseError Template
 buildFromTokens opts toks = do
-  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance
+  res <- parseSeq opts.parseExpr opts.parseHead opts.extras opts.inheritance opts.lexOptions
     (Array.filter (not <<< isComment) toks)
     0
   case res.stop of
@@ -244,18 +246,23 @@ isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
 
 -- | The single `Expr` filling an output tag. A blank interior is `EmptyOutput`
 -- | at the tag's offset (not the interior's), matching the diagnostics tests.
-outputExpr :: ExprParser -> Span -> Int -> String -> Either ParseError Expr
-outputExpr pe span base s
+outputExpr :: LexOptions -> ExprParser -> Span -> Int -> String -> Either ParseError Expr
+outputExpr lx pe span base s
   | trim s == "" = Left (EmptyOutput span.start)
-  | otherwise = tokenizeInterior base s >>= pe
+  | otherwise = tokenizeInterior lx base s >>= pe
 
 -- | A *headed* tag (`{{# name args}}`, `{{name args}}`, `{{/name}}`, raw): its
 -- | interior is one application whose head names the helper/block/separator.
 headed
-  :: ExprParser -> Span -> Int -> String -> Either ParseError { name :: String, args :: Array Expr }
-headed pe span base s
+  :: LexOptions
+  -> ExprParser
+  -> Span
+  -> Int
+  -> String
+  -> Either ParseError { name :: String, args :: Array Expr }
+headed lx pe span base s
   | trim s == "" = Left (HeadNotIdent span.start)
-  | otherwise = case partialHead <$> tokenizeInterior base s >>= pe of
+  | otherwise = case partialHead <$> tokenizeInterior lx base s >>= pe of
       Left e -> Left e
       Right (App name args) -> Right { name, args }
       Right _ -> Left (HeadNotIdent span.start)
@@ -317,10 +324,11 @@ parseSeq
   -> ExprParser
   -> Boolean
   -> Boolean
+  -> LexOptions
   -> Array RawTok
   -> Int
   -> Either ParseError SeqResult
-parseSeq pe ph extras inheritance toks = go Nil
+parseSeq pe ph extras inheritance lx toks = go Nil
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
@@ -340,24 +348,24 @@ parseSeq pe ph extras inheritance toks = go Nil
     Just t -> case t of
       RContent s -> go (Content s : acc) (i + 1)
       RComment _ _ _ -> go acc (i + 1) -- filtered upstream; skip defensively
-      ROutput span base s -> case outputExpr pe span base s of
+      ROutput span base s -> case outputExpr lx pe span base s of
         Left e -> Left e
         Right e -> go (Output span e : acc) (i + 1)
       -- `{{&x}}` is unescaped output (= `{{{x}}}`); a Handlebars-extra, gated.
       RAmp span base s
         | not extras -> Left (DisallowedShape "{{& }} (unescaped output)" span.start)
-        | otherwise -> case outputExpr pe span base s of
+        | otherwise -> case outputExpr lx pe span base s of
             Left e -> Left e
             Right e -> go (Output span e : acc) (i + 1)
       RRaw span base s body
         | not extras -> Left (DisallowedShape "{{{{ }}}} (raw block)" span.start)
-        | otherwise -> case headed pe span base s of
+        | otherwise -> case headed lx pe span base s of
             Left e -> Left e
             Right h -> go (RawBlock span h.name h.args body : acc) (i + 1)
-      RSep span base s -> case headed pe span base s of
+      RSep span base s -> case headed lx pe span base s of
         Left e -> Left e
         Right h -> go (Sep span h.name h.args : acc) (i + 1)
-      RClose _ base s -> case headed pe { start: base, end: base } base s of
+      RClose _ base s -> case headed lx pe { start: base, end: base } base s of
         Left e -> Left e
         Right h -> Right (done acc (StopClose h.name (i + 1)))
       -- `{{^x}}` (Inverse) is a Handlebars-extra, gated; `{{#x}}` (Section) is core.
@@ -374,7 +382,7 @@ parseSeq pe ph extras inheritance toks = go Nil
         | otherwise -> buildBlock acc span sigil base s (i + 1)
 
   buildBlock :: List Node -> Span -> Sigil -> Int -> String -> Int -> Either ParseError SeqResult
-  buildBlock acc span sigil base s i = case headed ph span base s of
+  buildBlock acc span sigil base s i = case headed lx ph span base s of
     Left e -> Left e
     Right h ->
       let
@@ -384,7 +392,7 @@ parseSeq pe ph extras inheritance toks = go Nil
         -- `inline`. Meaning-free — the dialect surface decides what those heads mean.
         expected = blockCloseName sigil h.name h.args
       in
-        case parseSeq pe ph extras inheritance toks i of
+        case parseSeq pe ph extras inheritance lx toks i of
           Left e -> Left e
           Right inner -> case inner.stop of
             -- point the diagnostic at the *opener* (its span start), not offset 0.

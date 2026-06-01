@@ -4,9 +4,13 @@
 -- | prelude, and compiler below are reused unchanged.
 -- |
 -- | Operators desugar to helper calls: `&&`→`and`, `||`→`or`, `!`→`not`,
--- | `==`/`!=`/`<`/`>`/`<=`/`>=`→`eq`/`ne`/`lt`/`gt`/`lte`/`gte`, and `a | f x`→
--- | `(f a x)` (piped value first). Precedence loosest→tightest: pipe, `||`, `&&`,
--- | comparisons (non-associative), prefix `!`, application/atom.
+-- | `==`/`!=`/`<`/`>`/`<=`/`>=`→`eq`/`ne`/`lt`/`gt`/`lte`/`gte`, the
+-- | null-coalescing `??`→`coalesce`, arithmetic `+`/`-`/`*`/`/`/`%`→
+-- | `add`/`subtract`/`multiply`/`divide`/`modulo`, and `a | f x`→`(f a x)` (piped
+-- | value first). Precedence loosest→tightest: pipe, `??`, `||`, `&&`, comparisons
+-- | (non-associative), additive (`+` `-`), multiplicative (`*` `/` `%`), prefix
+-- | `!`, application/atom. (A dotted path like `a.b` stays a single identifier —
+-- | the lexer keeps `.` an ident char — so `/` is unambiguously division here.)
 -- |
 -- | Two entry points share the precedence ladder, differing only in the *primary*
 -- | the operators bind over:
@@ -102,12 +106,17 @@ combinators toks =
   ladder :: (Int -> Either ParseError (Step Expr)) -> Int -> Either ParseError (Step Expr)
   ladder term = pPipe
     where
-    pPipe i = binL pipeOp pOr i
+    pPipe i = binL pipeOp pCoalesce i
+    pCoalesce i = binL (binOp "??" "coalesce") pOr i
     pOr i = binL (binOp "||" "or") pAnd i
     pAnd i = binL (binOp "&&" "and") pCmp i
-    pCmp i = pUnary i >>= \lhs -> case tk lhs.pos >>= cmpOp of
-      Just c -> pUnary (lhs.pos + 1) >>= \r -> Right { val: c lhs.val r.val, pos: r.pos }
+    -- comparison is non-associative and its operands are full additive
+    -- expressions, so `n + 1 > 5` reads as `(gt (add n 1) 5)`.
+    pCmp i = pAdd i >>= \lhs -> case tk lhs.pos >>= cmpOp of
+      Just c -> pAdd (lhs.pos + 1) >>= \r -> Right { val: c lhs.val r.val, pos: r.pos }
       Nothing -> Right { val: lhs.val, pos: lhs.pos }
+    pAdd i = binL addOp pMul i
+    pMul i = binL mulOp pUnary i
     pUnary i = case tk i of
       Just (TOp "!") -> pUnary (i + 1) >>= \r -> Right { val: App "not" [ r.val ], pos: r.pos }
       _ -> term i
@@ -164,6 +173,24 @@ combinators toks =
     TOp ">=" -> bin "gte"
     TOp "<" -> bin "lt"
     TOp ">" -> bin "gt"
+    _ -> Nothing
+    where
+    bin h = Just (\a b -> App h [ a, b ])
+
+  -- additive / multiplicative arithmetic (desugar to the shared prelude helpers).
+  addOp :: Token -> Maybe (Expr -> Expr -> Expr)
+  addOp = case _ of
+    TOp "+" -> bin "add"
+    TOp "-" -> bin "subtract"
+    _ -> Nothing
+    where
+    bin h = Just (\a b -> App h [ a, b ])
+
+  mulOp :: Token -> Maybe (Expr -> Expr -> Expr)
+  mulOp = case _ of
+    TOp "*" -> bin "multiply"
+    TOp "/" -> bin "divide"
+    TOp "%" -> bin "modulo"
     _ -> Nothing
     where
     bin h = Just (\a b -> App h [ a, b ])

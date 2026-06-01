@@ -34,7 +34,12 @@ import MaxBars.Lint (loopVarShadowWarnings)
 -- | Handlebars-compatibility dialect.
 maxOptions :: ParseOptions
 maxOptions =
-  defaultParseOptions { parseExpr = parseMaxExpr, parseHead = parseMaxHead, extras = false }
+  defaultParseOptions
+    { parseExpr = parseMaxExpr
+    , parseHead = parseMaxHead
+    , extras = false
+    , lexOptions = { infixArith: true }
+    }
 
 -- | MaxBars' loop variables: bare (no-`@`) scoped names usable inside `each`.
 -- | The canonical set `index0/index1/rindex0/rindex1/first/last/length/key` maps
