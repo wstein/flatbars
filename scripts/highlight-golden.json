@@ -119,21 +119,21 @@
       "lang": "yaml",
       "note": "key + string/number/bool/null colouring",
       "src": "name: Ada\nid: 42\nactive: true\nnada: null",
-      "html": "<span class=\"y-key\">name</span>: Ada\n<span class=\"y-key\">id</span>: <span class=\"y-num\">42</span>\n<span class=\"y-key\">active</span>: <span class=\"y-kw\">true</span>\n<span class=\"y-key\">nada</span>: <span class=\"y-kw\">null</span>"
+      "html": "<span class=\"y-key\">name</span>: <span class=\"y-str\">Ada</span>\n<span class=\"y-key\">id</span>: <span class=\"y-num\">42</span>\n<span class=\"y-key\">active</span>: <span class=\"y-kw\">true</span>\n<span class=\"y-key\">nada</span>: <span class=\"y-kw\">null</span>"
     },
     {
       "id": "yaml-list",
       "lang": "yaml",
       "note": "list markers + nested keys",
       "src": "items:\n  - name: pen\n    qty: 3\ntags:\n  - math",
-      "html": "<span class=\"y-key\">items</span>:\n  - <span class=\"y-key\">name</span>: pen\n    <span class=\"y-key\">qty</span>: <span class=\"y-num\">3</span>\n<span class=\"y-key\">tags</span>:\n  - math"
+      "html": "<span class=\"y-key\">items</span>:\n  - <span class=\"y-key\">name</span>: <span class=\"y-str\">pen</span>\n    <span class=\"y-key\">qty</span>: <span class=\"y-num\">3</span>\n<span class=\"y-key\">tags</span>:\n  - <span class=\"y-str\">math</span>"
     },
     {
       "id": "yaml-comment",
       "lang": "yaml",
       "note": "trailing # comment",
       "src": "name: Ada  # the author",
-      "html": "<span class=\"y-key\">name</span>: Ada  <span class=\"y-comment\"># the author</span>"
+      "html": "<span class=\"y-key\">name</span>: <span class=\"y-str\">Ada  </span><span class=\"y-comment\"># the author</span>"
     }
   ]
 }

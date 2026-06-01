@@ -96,13 +96,19 @@ function highlightYamlLine(raw) {
 }
 
 function hlYamlValue(v) {
-  // Quotes were turned into entities by esc(), so match their escaped forms.
-  return v.replace(
-    /(&quot;.*?&quot;|&#39;.*?&#39;)|\b(true|false|null|yes|no)\b|(-?\d+(?:\.\d+)?)/g,
-    (m, str, kw, num) => {
-      if (str !== undefined) return '<span class="y-str">' + str + "</span>";
-      if (kw !== undefined) return '<span class="y-kw">' + kw + "</span>";
-      return '<span class="y-num">' + num + "</span>";
-    },
-  );
+  // Classify the value as a WHOLE scalar, not by matching substrings — otherwise
+  // a digit run inside a plain scalar (`default111`) is mis-coloured as a number,
+  // and quotes inside esc() output are matched mid-word. Split off any leading
+  // whitespace, then colour the trimmed scalar by what it is. A YAML plain scalar
+  // is a string, so it gets the string colour (numbers/bools/null only when the
+  // ENTIRE value is one); flow collections (`{}`, `[]`) are left uncoloured.
+  const lead = v.match(/^\s*/)[0];
+  const val = v.slice(lead.length);
+  if (val === "") return v;
+  let cls = "y-str"; // plain scalar ⇒ string
+  if (/^(&quot;[\s\S]*&quot;|&#39;[\s\S]*&#39;)$/.test(val)) cls = "y-str"; // quoted string
+  else if (/^(true|false|null|yes|no)$/.test(val)) cls = "y-kw"; // bool/null keyword
+  else if (/^-?\d+(?:\.\d+)?$/.test(val)) cls = "y-num"; // number
+  else if (/^[[{]/.test(val)) return v; // flow {} / [] — leave plain
+  return lead + '<span class="' + cls + '">' + val + "</span>";
 }
