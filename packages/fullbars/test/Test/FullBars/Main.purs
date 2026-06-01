@@ -211,7 +211,9 @@ main = do
   expectS "p-downcase-alias" "{{{ downcase s }}}" (s1 "HeLLo") "hello"
   expectS "p-upcase-alias" "{{{ upcase s }}}" (s1 "HeLLo") "HELLO"
   -- comparison alias: `isnt` renders exactly like `ne`.
-  expectS "p-isnt-alias" "{{{ isnt a b }}}" (obj [ Tuple "a" (VNumber 1.0), Tuple "b" (VNumber 2.0) ]) "true"
+  expectS "p-isnt-alias" "{{{ isnt a b }}}"
+    (obj [ Tuple "a" (VNumber 1.0), Tuple "b" (VNumber 2.0) ])
+    "true"
   expectS "p-isnt-eq" "{{{ isnt a a }}}" (obj [ Tuple "a" (VNumber 1.0) ]) "false"
 
   -- value primitives — number pack (helper-packs-spec §4). Pin the actual
@@ -1063,6 +1065,14 @@ main = do
   -- 35-strong primitive pack on top (string + number + array, incl. aliases).
   assert' "separability: helperDefs = coreHelperDefs <> primitiveHelperDefs (35 primitives)"
     (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 35)
+
+  -- Set delimiters are EXCLUDED from FullBars (ADR-015): it is the Handlebars-
+  -- faithful dialect, and Handlebars has no set delimiters. The `@delimiters`
+  -- directive is an inert comment here, so `<%name%>` after it stays literal text,
+  -- never interpolated. (RawBars/MaxBars opt in; FullBars does not.)
+  expect "set-delim excluded from FullBars" "{{! @delimiters: <% %> }}<%name%>"
+    (obj [ Tuple "name" (str "Ada") ])
+    "<%name%>"
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do

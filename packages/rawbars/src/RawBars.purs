@@ -30,6 +30,7 @@ import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (fullbarsEmit, metaFor, resolveForCompile)
 import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
+import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Render (formatError, runResolved)
@@ -42,8 +43,15 @@ import Kernel.ToValue (class ToValue, toValue)
 -- | RawBars is the austere dialect: it rejects the Handlebars-only tag shapes
 -- | (`{{{{…}}}}` raw blocks, `{{^…}}` inverse, `{{&…}}` unescaped) — `extras`
 -- | off. Front-end knobs like standalone trimming still pass through.
+-- |
+-- | Set delimiters are enabled (`mustacheDelims`): RawBars and MaxBars are
+-- | non-Handlebars dialects, so inline `{{=<% %>=}}` and the
+-- | `{{! @delimiters: <% %> }}` directive both work (ADR-015). FullBars — the
+-- | Handlebars-faithful dialect — leaves them off (Handlebars has no set
+-- | delimiters).
 coreOptions :: ParseOptions
-coreOptions = defaultParseOptions { extras = false }
+coreOptions = defaultParseOptions
+  { extras = false, lexConfig = defaultLexConfig { mustacheDelims = true } }
 
 -- | Parse core source and return a pure renderer; the `@truthiness` mode is
 -- | resolved once and baked in.

@@ -19,6 +19,7 @@ import Prelude
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import FlatBars.Error (ParseError)
+import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith)
@@ -39,6 +40,9 @@ maxOptions =
     , parseHead = parseMaxHead
     , extras = false
     , lexOptions = { infixArith: true }
+    -- Set delimiters enabled (ADR-015): inline `{{=<% %>=}}` + the
+    -- `{{! @delimiters: <% %> }}` directive. FullBars stays Handlebars-faithful.
+    , lexConfig = defaultLexConfig { mustacheDelims = true }
     }
 
 -- | MaxBars' loop variables: bare (no-`@`) scoped names usable inside `each`.

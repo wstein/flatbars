@@ -44,6 +44,25 @@ main = do
   -- the same rejection in the compiled path.
   assert' "reject (compile): inverse" (isLeft (compileJs "{{^a}}x{{/a}}"))
 
+  -- ── Set delimiters (ADR-015): RawBars enables `mustacheDelims` ─────────────
+  -- inline `{{=<% %>=}}` switches the active delimiters; the block then uses `<% %>`.
+  assert' "set-delim: inline switch"
+    ( render "{{=<% %>=}}<%#if (lookup this \"a\")%>Y<%else%>N<%/if%>"
+        (obj [ Tuple "a" (VBool true) ]) == Right "Y"
+    )
+  -- the `{{! @delimiters: <% %> }}` directive switches the same way (positional).
+  assert' "set-delim: @delimiters directive"
+    ( render "{{! @delimiters: <% %> }}<%#if (lookup this \"a\")%>Y<%/if%>"
+        (obj [ Tuple "a" (VBool true) ]) == Right "Y"
+    )
+  -- `<%={{ }}=%>` switches back to the default braces.
+  assert' "set-delim: switch back to default"
+    ( render "{{=<% %>=}}<%={{ }}=%>{{{lookup this \"x\"}}}"
+        (obj [ Tuple "x" (VString "hi") ]) == Right "hi"
+    )
+  -- a malformed set-delimiter (not exactly two delimiters) is a parse error.
+  assert' "set-delim: malformed rejected" (isLeft (render "{{=onlyone=}}" (obj [])))
+
   -- compile core syntax to a JS module.
   case compileJs "{{{this}}}" of
     Left e -> assert' ("compileJs: unexpected error " <> show e) false

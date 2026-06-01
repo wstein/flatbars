@@ -20,14 +20,15 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (Pattern(..), joinWith, stripSuffix)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.String (Pattern(..), contains, joinWith, split, stripSuffix)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (message, try)
 import FlatBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt)
 import FlatBars.Json (parseValue)
+import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
 import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
@@ -61,9 +62,14 @@ usage =
     , "      --trim <mode>   standalone whitespace: 'standalone' (default) strips a lone block/"
     , "                      comment line; 'none' keeps it. Overrides flatbars.json; a @trim"
     , "                      directive in the template overrides both."
+    , "      --delimiters <pair>"
+    , "                      set the initial tag delimiters (Mustache set delimiters, ADR-015),"
+    , "                      e.g. --delimiters '<% %>'. Enables {{=<% %>=}} switching and the"
+    , "                      {{! @delimiters }} directive. Core syntax only — not with --surface."
     , "  -h, --help          show this help"
     , ""
-    , "Config: a flatbars.json in the working directory may set { \"trim\": \"standalone\" | \"none\" }."
+    , "Config: a flatbars.json in the working directory may set { \"trim\": \"standalone\" | \"none\","
+    , "        \"delimiters\": [\"<%\", \"%>\"] } (--trim/--delimiters override it)."
     , "Core syntax: {{{ lookup this \"x\" }}}, {{#each …}}, …. Surface (--surface): {{ x }}, a.b.c, …."
     , "The compiled module's default export is `function (data, rt)`; pair it with"
     , "the runtime at packages/compile/runtime/flatbars-runtime.mjs."
@@ -82,6 +88,7 @@ type Options =
   , surface :: Boolean
   , mustache :: Boolean -- --mustache: render via the MinBars (Mustache) engine
   , trim :: Maybe Boolean -- --trim override; Nothing ⇒ config/default decides
+  , delimiters :: Maybe { open :: String, close :: String } -- --delimiters override
   }
 
 main :: Effect Unit
@@ -106,6 +113,7 @@ parseArgs =
     , surface: false
     , mustache: false
     , trim: Nothing
+    , delimiters: Nothing
     }
   where
   go acc args = case Array.uncons args of
@@ -118,6 +126,7 @@ parseArgs =
         , surface: acc.surface
         , mustache: acc.mustache
         , trim: acc.trim
+        , delimiters: acc.delimiters
         }
       Nothing -> Help
     Just { head, tail } -> case head of
@@ -132,6 +141,11 @@ parseArgs =
         Just { head: "none", tail: rest } -> go (acc { trim = Just false }) rest
         Just _ -> Invalid "--trim expects 'standalone' or 'none'"
         Nothing -> Invalid "--trim requires a value ('standalone' or 'none')"
+      "--delimiters" -> case Array.uncons tail of
+        Just { head: v, tail: rest } -> case parseDelimArg v of
+          Right d -> go (acc { delimiters = Just d }) rest
+          Left e -> Invalid e
+        Nothing -> Invalid "--delimiters requires a value, e.g. --delimiters '<% %>'"
       flag | flag == "-d" || flag == "--data" -> case Array.uncons tail of
         Just { head: file, tail: rest } -> go (acc { dataFile = Just file }) rest
         Nothing -> Invalid (flag <> " requires a file argument")
@@ -145,12 +159,24 @@ run opts = do
   case tplE of
     Left err -> die ("flatbars: cannot read template '" <> opts.template <> "': " <> err)
     Right tpl -> do
-      -- precedence: --trim flag > flatbars.json > built-in default (on).
+      -- precedence (both keys): flag > flatbars.json > built-in default.
       configTrim <- loadConfigTrim
+      configDelims <- loadConfigDelimiters
       let
+        delims = firstJust opts.delimiters configDelims
         popts = defaultParseOptions
-          { trimStandalone = fromMaybe true (firstJust opts.trim configTrim) }
-      if opts.mustache && (opts.compileOnly || opts.validateOnly || opts.surface) then
+          { trimStandalone = fromMaybe true (firstJust opts.trim configTrim)
+          , lexConfig = maybe defaultLexConfig
+              (\d -> defaultLexConfig { open = d.open, close = d.close, mustacheDelims = true })
+              delims
+          }
+      if isJust delims && opts.surface then
+        die
+          "flatbars: --delimiters/config delimiters apply to core syntax only, not --surface (FullBars, the Handlebars-faithful dialect, has no set delimiters)"
+      else if isJust delims && opts.mustache then
+        die
+          "flatbars: --mustache already renders with Mustache delimiters; --delimiters does not apply"
+      else if opts.mustache && (opts.compileOnly || opts.validateOnly || opts.surface) then
         die
           "flatbars: --mustache renders the Mustache (MinBars) engine; it cannot combine with --surface, --compile, or --validate"
       else if opts.compileOnly then runCompile popts opts tpl
@@ -218,6 +244,31 @@ loadConfigTrim = do
         Just (VString "none") -> Just false
         _ -> Nothing
       _ -> Nothing
+
+-- | Read the initial delimiter pair from `flatbars.json`: `{ "delimiters":
+-- | ["<%", "%>"] }`. A missing/unreadable/malformed file, absent key, wrong
+-- | shape, or a delimiter containing `=` yields `Nothing` (use the default pair).
+loadConfigDelimiters :: Effect (Maybe { open :: String, close :: String })
+loadConfigDelimiters = do
+  e <- readFileSafe "flatbars.json"
+  pure case e of
+    Left _ -> Nothing
+    Right content -> case parseValue content of
+      Right (VObject m) -> case Map.lookup "delimiters" m of
+        Just (VArray [ VString o, VString c ]) | validDelim o && validDelim c ->
+          Just { open: o, close: c }
+        _ -> Nothing
+      _ -> Nothing
+
+-- | Parse a `--delimiters` value: two space-separated, non-empty, `=`-free
+-- | delimiters (per the Mustache manual), e.g. `<% %>`.
+parseDelimArg :: String -> Either String { open :: String, close :: String }
+parseDelimArg s = case Array.filter (_ /= "") (split (Pattern " ") s) of
+  [ o, c ] | validDelim o && validDelim c -> Right { open: o, close: c }
+  _ -> Left "--delimiters expects two space-separated delimiters with no '=', e.g. '<% %>'"
+
+validDelim :: String -> Boolean
+validDelim d = d /= "" && not (contains (Pattern "=") d)
 
 firstJust :: forall a. Maybe a -> Maybe a -> Maybe a
 firstJust (Just a) _ = Just a

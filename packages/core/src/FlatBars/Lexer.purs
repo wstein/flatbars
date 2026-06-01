@@ -24,6 +24,7 @@ import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
+import Data.String (Pattern(..))
 import Data.String.CodeUnits as SCU
 import Data.String.Common (joinWith)
 import FlatBars.Error (ParseError(..))
@@ -311,10 +312,12 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
               Left e -> Left e
               Right res ->
                 let
-                  acc1 = flush (contentTo segStart frags i) acc pend res.trimL
-                  acc2 = maybe acc1 (\t -> t : acc1) res.mtok
+                  acc2 = consTok res.mtok (flush (contentTo segStart frags i) acc pend res.trimL)
                 in
-                  go res.next open close res.next [] acc2 res.trimR
+                  case delimSwitch res.mtok of
+                    Left e -> Left e
+                    Right Nothing -> go res.next open close res.next [] acc2 res.trimR
+                    Right (Just d) -> go res.next d.open d.close res.next [] acc2 res.trimR
           | open == "{{" && close == "}}" -> go (i + 1) open close segStart frags acc pend
           -- Custom delimiters: the reduced Mustache grammar (no triple/raw/long
           -- comment/`~` — those forms do not rebase, ADR-015).
@@ -322,11 +325,49 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
               Left e -> Left e
               Right res ->
                 let
-                  acc1 = flush (contentTo segStart frags i) acc pend res.trimL
-                  acc2 = maybe acc1 (\t -> t : acc1) res.mtok
+                  acc2 = consTok res.mtok (flush (contentTo segStart frags i) acc pend res.trimL)
                 in
-                  go res.next open close res.next [] acc2 res.trimR
+                  case delimSwitch res.mtok of
+                    Left e -> Left e
+                    Right Nothing -> go res.next open close res.next [] acc2 res.trimR
+                    Right (Just d) -> go res.next d.open d.close res.next [] acc2 res.trimR
           | otherwise -> go (i + 1) open close segStart frags acc pend
+
+  -- Push an optional tag token onto the (reversed) accumulator.
+  consTok :: Maybe RawTok -> List RawTok -> List RawTok
+  consTok mtok acc1 = maybe acc1 (\t -> t : acc1) mtok
+
+  -- Decide whether a just-read token switches the delimiters. A
+  -- `{{! @delimiters: A B }}` short comment is *positional* (like an inline
+  -- `{{=A B=}}`): when `mustacheDelims` is on it switches the active pair from
+  -- here on (the comment is still emitted, so it is carried as a directive the
+  -- engine ignores — lexer-acted, like `@trim`). Gated on `mustacheDelims`, so
+  -- the Handlebars family (FullBars, default) never treats `@delimiters`
+  -- specially. `Right Nothing` ⇒ no switch; this is a pure decision, never
+  -- recursing — `go` must call itself directly to keep its tail-call loop.
+  delimSwitch :: Maybe RawTok -> Either ParseError (Maybe { open :: String, close :: String })
+  delimSwitch = case _ of
+    Just (RComment _ _ interior) | cfg.mustacheDelims -> case parseDelimDirective interior of
+      Nothing -> Right Nothing
+      Just (Left e) -> Left e
+      Just (Right d) -> Right (Just d)
+    _ -> Right Nothing
+
+  -- A `@delimiters: A B` directive comment ⇒ `Just (Right {open,close})`; a
+  -- malformed one ⇒ `Just (Left err)`; any other comment ⇒ `Nothing`.
+  parseDelimDirective :: String -> Maybe (Either ParseError { open :: String, close :: String })
+  parseDelimDirective interior =
+    let
+      t = trimStartWs interior
+    in
+      case
+        SCU.stripPrefix (Pattern "@delimiters") t >>=
+          (trimStartWs >>> SCU.stripPrefix (Pattern ":"))
+        of
+        Nothing -> Nothing
+        Just val -> Just case delimWords val of
+          Just d | validDelim d.open && validDelim d.close -> Right d
+          _ -> Left (LexError "@delimiters expects two whitespace-separated delimiters (no '=')" 0)
 
   -- The content string for a run: prior escape fragments followed by the
   -- still-uncopied slice `[segStart, end)`.

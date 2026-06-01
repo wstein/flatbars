@@ -214,4 +214,15 @@ main = do
   -- loop variable wherever it appears bare).
   assert' "shadow-warn: fires with no loop/schema" (warnNames "{{first}}" == [ "first" ])
 
+  -- ── Set delimiters (ADR-015): MaxBars enables `mustacheDelims` ─────────────
+  expectM "set-delim: inline switch" "{{=<% %>=}}<%name%>"
+    (obj [ Tuple "name" (VString "Ada") ])
+    "Ada"
+  expectM "set-delim: @delimiters directive" "{{! @delimiters: <% %> }}<%name%>"
+    (obj [ Tuple "name" (VString "Ada") ])
+    "Ada"
+  expectM "set-delim: switch back to default" "{{=<% %>=}}<%={{ }}=%>{{name}}"
+    (obj [ Tuple "name" (VString "Ada") ])
+    "Ada"
+
   log "all MaxBars tests passed"
