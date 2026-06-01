@@ -16,15 +16,13 @@ npm run build          # static site → dist/
 `http://localhost:4321/` is the tutorials landing page; each surface is at
 `/rawbars`, `/minbars`, `/fullbars`, `/maxbars`.
 
-**Local dev with working "Open in Lab"** (two servers). The tutorials and the Lab
-run on different ports locally, so point the buttons at the running Lab:
+**`npm run dev` serves the Lab too.** The dev server mounts the repo's `lab/` at
+`/lab/` (same handler as `npm run lab`), so the tutorials and the Lab share one
+origin and the **Open in Lab** buttons (`/lab/index.html#…`) work out of the box —
+no second server. (`PUBLIC_LAB_URL` overrides the target only if you want to point
+the buttons at a Lab hosted elsewhere.)
 
-```sh
-npm run lab                                                   # terminal 1 (repo root) → :8000
-cd tutorials && PUBLIC_LAB_URL=http://localhost:8000/lab/index.html npm run dev   # terminal 2 → :4321
-```
-
-In production, serve the Lab (`lab/`) and this site under one origin so the default
+In production, serve `lab/` and this site under one origin so the default
 `/lab/index.html` deep-links resolve; set `PUBLIC_SPEC_BASE` to where the Antora
 spec is published (default `/barebars/`).
 
