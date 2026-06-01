@@ -215,9 +215,9 @@ Loop-variable phases (`L`) and linter phases (`X`) are independent tracks; order
 - `Linter.Migrate.migrateToMaxBars` applies B.4 as a **minimal-diff token-stream rewrite** (untouched tags are rebuilt from their original source slice, so formatting/`~` is preserved): `{{^x}}`→`{{#unless x}}` (close paired via a stack), `@index`/`@first`/`@last`/`@key`→bare loop vars, `{{&x}}`→`{{{x}}}`, `{{else if c}}`→`{{elif c}}`. Emits a per-file residual report for the flagged rows (`parent-data` `@../`/`@root`, `ambiguous-section` bare Mustache `{{#name}}`, `set-delimiters` `{{=…=}}`).
 - **Acceptance (shipped):** render-equivalence oracle — residual-free mechanical templates render identically through `FullBars.renderSurface` (Handlebars) and `renderMax` of the migrated source across a data matrix; every residual carries a span (`end > start`), a message, and a suggested fix.
 
-### X3 — Heuristic lift *(assist only)*
-- RawBars/FullBars → MaxBars with ambiguity flags (B.3); never an automated commit.
-- **Acceptance:** `(and a (gt b 21))` lifts to `a && (b > 21)`; `(lookup this "x")` lifts to `x` **with** a confirmation flag; multi-arg helpers are left as calls.
+### X3 — Heuristic lift *(shipped: assist only)*
+- `Linter.Lift.liftToMaxBars` re-sugars RawBars (core) source up to MaxBars with ambiguity flags (B.3); never an automated commit (flags are advisory, they do not change the emitted source). It is the inverse of X0's lower: the operator table inverts exactly (`and`→`&&`, `gt`→`>`, `not`→`!`, …), `Output (esc_html e)`→escaped `{{ e }}`, recognised unary filters (`esc_html`/`safe`/`json`/`esc_json`) re-sugar `(f a)`→`a | f`, and infix operands that are themselves infix are parenthesised. Flags: `lookup-path` (`(lookup this "x")`→`x`, could be `this.x`), `unrecognised-filter` (arity-1 non-filter call left as a call), `multi-arg-call`.
+- **Acceptance (shipped):** `(and a (gt b 21))` lifts to `a && (b > 21)`; `(lookup this "x")` lifts to `x` **with** a `lookup-path` flag; multi-arg helpers are left as calls + flagged. Two render oracles: `RawBars.render input == renderMax (lift input)` on a corpus, and the lower∘lift round-trip `renderMax src == renderMax (lift (lower src))`.
 
 ---
 

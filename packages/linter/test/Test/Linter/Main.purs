@@ -28,6 +28,7 @@ import Linter.Lower (lowerReport, lowerToRawBars)
 import MaxBars (maxLoopVars, maxOptions, renderMax)
 import RawBars as RawBars
 import Test.Assert (assert')
+import Test.Linter.Lift as Lift
 import Test.Linter.Migrate as Migrate
 
 -- | The desugared MaxBars source as the reference real AST.
@@ -175,3 +176,6 @@ main = do
 
   -- X2 — Handlebars → MaxBars migrator.
   Migrate.main
+
+  -- X3 — heuristic lift RawBars → MaxBars.
+  Lift.main
