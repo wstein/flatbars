@@ -1,0 +1,132 @@
+{
+  "_generated": "by scripts/gen-highlight.mjs — DO NOT EDIT; run `npm run gen:highlight`",
+  "source": "tutorials/src/lib/highlight.mjs (STOPGAP regex highlighter — see ADR-014 / highlighting-spec.md)",
+  "cases": [
+    {
+      "id": "exhibit-a-long-comment",
+      "lang": "template",
+      "note": "the whole {{!-- … --}} is ONE comment; the trailing `!` is OUTSIDE it",
+      "src": "Hello, {{!-- name --}}!",
+      "html": "Hello, <span class=\"stem-comment\">{{!-- name --}}</span>!"
+    },
+    {
+      "id": "exhibit-b-unterminated-comment",
+      "lang": "template",
+      "note": "a {{!-- with no own --}} swallows to the next --}} (or EOF), as the engine's RComment does",
+      "src": "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}",
+      "html": "escaped: <span class=\"stem-expr\">{{html}}</span>\nraw:     <span class=\"stem-comment\">{{!-- html}}\namp:     {{&amp;html--}}</span>"
+    },
+    {
+      "id": "expr",
+      "lang": "template",
+      "note": "{{name}} → stem-expr",
+      "src": "Hello, {{name}}!",
+      "html": "Hello, <span class=\"stem-expr\">{{name}}</span>!"
+    },
+    {
+      "id": "triple-raw",
+      "lang": "template",
+      "note": "{{{x}}} → stem-raw (unescaped)",
+      "src": "raw: {{{html}}}",
+      "html": "raw: <span class=\"stem-raw\">{{{html}}}</span>"
+    },
+    {
+      "id": "amp-raw",
+      "lang": "template",
+      "note": "{{&x}} → stem-raw; `&` arrives as &amp; after escaping",
+      "src": "amp: {{&html}}",
+      "html": "amp: <span class=\"stem-raw\">{{&amp;html}}</span>"
+    },
+    {
+      "id": "dotted",
+      "lang": "template",
+      "note": "dotted path stays one expr",
+      "src": "{{name.first}} {{name.last}}",
+      "html": "<span class=\"stem-expr\">{{name.first}}</span> <span class=\"stem-expr\">{{name.last}}</span>"
+    },
+    {
+      "id": "implicit",
+      "lang": "template",
+      "note": "implicit iterator {{.}}",
+      "src": "{{#tags}}[{{.}}]{{/tags}}",
+      "html": "<span class=\"stem-block\">{{#tags}}</span>[<span class=\"stem-expr\">{{.}}</span>]<span class=\"stem-block\">{{/tags}}</span>"
+    },
+    {
+      "id": "section",
+      "lang": "template",
+      "note": "{{#}} and {{/}} → stem-block",
+      "src": "{{#items}}{{name}}{{/items}}",
+      "html": "<span class=\"stem-block\">{{#items}}</span><span class=\"stem-expr\">{{name}}</span><span class=\"stem-block\">{{/items}}</span>"
+    },
+    {
+      "id": "inverted",
+      "lang": "template",
+      "note": "{{^}} → stem-block",
+      "src": "{{^items}}none{{/items}}",
+      "html": "<span class=\"stem-block\">{{^items}}</span>none<span class=\"stem-block\">{{/items}}</span>"
+    },
+    {
+      "id": "partial",
+      "lang": "template",
+      "note": "{{> name}} → stem-partial; `>` arrives as &gt; (regression: was mis-coloured raw)",
+      "src": "{{> row}}",
+      "html": "<span class=\"stem-partial\">{{&gt; row}}</span>"
+    },
+    {
+      "id": "dynamic-partial",
+      "lang": "template",
+      "note": "{{>* name}} → stem-partial",
+      "src": "{{>* which}}",
+      "html": "<span class=\"stem-partial\">{{&gt;* which}}</span>"
+    },
+    {
+      "id": "inheritance",
+      "lang": "template",
+      "note": "{{<parent}} and {{$block}} → stem-partial; close → stem-block",
+      "src": "{{<layout}}{{$title}}Welcome{{/title}}{{/layout}}",
+      "html": "<span class=\"stem-partial\">{{&lt;layout}}</span><span class=\"stem-partial\">{{$title}}</span>Welcome<span class=\"stem-block\">{{/title}}</span><span class=\"stem-block\">{{/layout}}</span>"
+    },
+    {
+      "id": "short-comment",
+      "lang": "template",
+      "note": "{{! … }} (single bang, no --) → stem-comment",
+      "src": "Total{{! dropped }}: {{total}}",
+      "html": "Total<span class=\"stem-comment\">{{! dropped }}</span>: <span class=\"stem-expr\">{{total}}</span>"
+    },
+    {
+      "id": "tilde-long-comment",
+      "lang": "template",
+      "note": "{{~!-- … --}} whitespace-control long comment",
+      "src": "a {{~!-- note --}} b",
+      "html": "a <span class=\"stem-comment\">{{~!-- note --}}</span> b"
+    },
+    {
+      "id": "raw-block",
+      "lang": "template",
+      "note": "{{{{raw}}}} … {{{{/raw}}}} delimiters → stem-raw, body literal",
+      "src": "{{{{raw}}}}{{x}}{{{{/raw}}}}",
+      "html": "<span class=\"stem-raw\">{{{{raw}}}}</span><span class=\"stem-expr\">{{x}}</span><span class=\"stem-raw\">{{{{/raw}}}}</span>"
+    },
+    {
+      "id": "yaml-scalars",
+      "lang": "yaml",
+      "note": "key + string/number/bool/null colouring",
+      "src": "name: Ada\nid: 42\nactive: true\nnada: null",
+      "html": "<span class=\"y-key\">name</span>: Ada\n<span class=\"y-key\">id</span>: <span class=\"y-num\">42</span>\n<span class=\"y-key\">active</span>: <span class=\"y-kw\">true</span>\n<span class=\"y-key\">nada</span>: <span class=\"y-kw\">null</span>"
+    },
+    {
+      "id": "yaml-list",
+      "lang": "yaml",
+      "note": "list markers + nested keys",
+      "src": "items:\n  - name: pen\n    qty: 3\ntags:\n  - math",
+      "html": "<span class=\"y-key\">items</span>:\n  - <span class=\"y-key\">name</span>: pen\n    <span class=\"y-key\">qty</span>: <span class=\"y-num\">3</span>\n<span class=\"y-key\">tags</span>:\n  - math"
+    },
+    {
+      "id": "yaml-comment",
+      "lang": "yaml",
+      "note": "trailing # comment",
+      "src": "name: Ada  # the author",
+      "html": "<span class=\"y-key\">name</span>: Ada  <span class=\"y-comment\"># the author</span>"
+    }
+  ]
+}

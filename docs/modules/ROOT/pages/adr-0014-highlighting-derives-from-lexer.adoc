@@ -1,0 +1,68 @@
+= ADR-014: Syntax highlighting derives from the engine lexer
+:navtitle: ADR-014 Highlighting from the lexer
+
+*Status:* Accepted. *Date:* 2026-06-01. Companion to xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]
+(one structural parser) — this record extends the same "one grammar, derived downstream" principle to
+syntax highlighting. Implementation plan: `highlighting-spec.md`.
+
+== Context
+
+FlatBars renders template syntax in (at least) two front-ends — the FlatBars Lab editor (CodeMirror 6,
+a hand-written `StreamLanguage`) and the tutorials site (a regex overlay behind the runnable-example
+card). Each grew its own tokenizer. Together with the engine's own lexer that makes *three* definitions
+of FlatBars surface syntax:
+
+. the authoritative one — `FlatBars.Lexer` + `FlatBars.Token` (`tokenizeInterior`), the meaning-free
+  structural tokenizer ADR-001 rests on, dialect-scoped through `LexOptions` / the `parseExpr` seam;
+. the Lab's CodeMirror `StreamLanguage`;
+. the tutorials' regex highlighter.
+
+(2) and (3) are *approximations* of (1), and approximations drift. Two bugs shipped from this:
+
+* *Exhibit A* — `pass:[Hello, {{!-- name --}}!]` highlighted the comment as closing at the inner
+  `pass:[}}]`, leaving `pass:[--}}!]` as plain text. The regex did not know the `pass:[{{!-- … --}}]`
+  long-comment form, which the engine's `RComment` / `openerLiteralAt` handles.
+* *Exhibit B* — the regex painted an unterminated `pass:[{{!--]` as a closed comment plus a separate
+  raw tag, while the engine swallowed everything to the next `pass:[--}}]`. *The highlighter and the
+  engine disagreed about where a tag begins and ends* — i.e. the highlighter lied about what the engine
+  would parse.
+
+This is precisely the class of drift ADR-001 and the project's "one source of truth, derived
+downstream" gates (`check:catalog`, `test:compile`, `examples:verify`) exist to prevent. Highlighting
+had no such gate, so the drift was silent.
+
+== Decision
+
+. *Highlighting is a structural concern and MUST derive from the engine lexer.* Tokenizing template
+  source for display is the same job the meaning-free lexer already does. Front-ends MUST NOT fork the
+  grammar. The engine exposes a tokenization API (`tokenizeTemplate(source, { dialect })` →
+  positioned spans; see `highlighting-spec.md`), shipped in the same `flatbars-js` bundle the Lab and
+  tutorials already load. A single `kind → CSS-class` map is shared; presenters differ (a CodeMirror
+  `ViewPlugin` for the Lab, a highlight-layer overlay for the tutorials) but the *grammar is one*.
+
+. *Per-dialect by construction.* Because the source is the dialect-scoped lexer (`LexOptions`,
+  `parseExpr`), MaxBars operators/pipes, RawBars bare syntax, and MinBars/FullBars forms are coloured
+  correctly without per-dialect highlighter code. A regex cannot even *tokenize* MaxBars (operator
+  chars vs path chars), which is decisive against the regex as a permanent solution.
+
+. *A drift gate is mandatory* (`check:highlight`, mirroring `check:catalog`), wired into `npm test`.
+  Highlighting joins "measured, not asserted": a lexer change not reflected in highlighting fails the
+  build.
+
+. *Stopgap, explicitly time-boxed.* Until the engine API lands, the tutorials keep a regex highlighter
+  (`tutorials/src/lib/highlight.mjs`) that recognises the opener literals `openerLiteralAt` enumerates
+  (`pass:[{{!-- … --}}]`, `pass:[{{~!--]`, `pass:[{{{ … }}}]`, `pass:[{{{{ … }}}}]`). It is labelled a
+  stopgap in-source, does *not* claim MaxBars support, and is pinned by `check:highlight` (Exhibits A &
+  B are regression cases). This is a bridge, not the destination.
+
+== Consequences
+
+* The Lab's hand-written `StreamLanguage` and the tutorials' regex are both slated for retirement once
+  `tokenizeTemplate` is exposed; the `check:highlight` corpus is the acceptance set that the
+  engine-driven highlighter must keep green, so the migration is verifiable rather than a leap.
+* `flatbars-js` gains a public, stable tokenization surface — also useful for future editor features
+  (semantic colouring of known vs unknown helpers via the schema/catalog, error squiggles from the
+  lexer's `ParseError` spans).
+* The golden gate (`scripts/gen-highlight.mjs`) is, until Tier 1, a *regression* gate over the regex
+  output, not yet an engine-equivalence oracle; its corpus cases are authored to read correctly so they
+  carry forward unchanged. This caveat is recorded here so the gate is not over-trusted in the interim.
