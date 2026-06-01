@@ -1,6 +1,6 @@
 # BareBars Helper Packs — Specification
 
-Status: draft for review · Companions: `rawbars-maxbars-spec.md`, `truthiness-spec.md`, `loopvars-linter-spec.md`, `minbars-spec.md`
+Status: draft for review · Companion: `loopvars-linter-spec.md`. Truthiness is specified in the truthiness ADR / `Kernel.Value` (not a separate file); the dialect ladder and MinBars live in their respective packages and `CLAUDE.md`, not in standalone `*-spec.md` files.
 
 This spec defines how BareBars ships a standard library of transformer helpers, and pins the curated, normative name registry. It is **not** a port of `helpers/handlebars-helpers`: that library is a 188-helper kitchen sink, roughly a third of which is impure (`fs`, `code`/`embed`/`gist`, `markdown`, `i18n`, `logging`, `date`/moment), self-inconsistent in naming (`downcase`+`lowercase`, `plus`+`add`, `eq`+`is`, `isnt` with no `ne`), or inexpressible in BareBars's `Value` model (no function constructor ⇒ no callback helpers). We adopt the **pure, deterministic, safe subset** under **lodash/ES-standard names**, organised as separable packs.
 
@@ -17,24 +17,31 @@ This spec defines how BareBars ships a standard library of transformer helpers, 
 
 ## 2. The pack protocol
 
-A pack is a PureScript module exporting a manifest and a helper map:
+A pack is a PureScript module exporting a manifest and a map of helper **entries**. A helper is not a bare function: the engine runs on the registry `prelude` **and** a parallel validator `preludeSchema` (`{ block, arity }`, `Kernel.Prelude`), and the `test:compile` gate (110/110 byte-identical) requires every helper to also exist as a **JS-runtime** implementation the compiler can emit. A `Pack` must therefore carry all three or it cannot wire the validator or keep the compiler ≡ interpreter:
 
 ```purescript
-type Pack =
-  { name    :: String              -- "string", "array", …
-  , version :: String              -- semver
-  , helpers :: Map Name Helper     -- canonical names → helpers
-  , aliases :: Map Name Name       -- alias → canonical (linter-lowered, §4)
+type PackEntry m =
+  { helper :: Helper m                       -- the interpreter implementation
+  , schema :: { block :: Boolean, arity :: Arity }  -- feeds preludeSchema
+  , emit   :: EmitBinding                     -- the compiler/runtime binding (test:compile)
   }
 
-mkPrelude :: Array Pack -> Either PackConflict Prelude
+type Pack m =
+  { name    :: String                 -- "string", "array", …
+  , version :: String                 -- semver
+  , entries :: Map Name (PackEntry m)  -- canonical name → entry (helper + schema + emit)
+  , aliases :: Map Name Name           -- alias → canonical (linter-lowered, §4)
+  }
+
+-- assembles ALL three engine structures at once, so they can never drift:
+mkPrelude :: Array (Pack m) -> Either PackConflict { prelude :: Prelude m, schema :: Schema, runtime :: RuntimeBindings }
 ```
 
-- **Merge** unions the helper maps. A name defined by two packs is a `PackConflict` (hard error by default; an explicit `override` list is required to shadow). Aliases that collide with a canonical name are also conflicts.
-- **Default bundle** = core prelude + `{ string, array, comparison, math, number, object, url }`. A minimal build can pass only the packs it wants.
+- **Merge** unions the entry maps. A name defined by two packs is a `PackConflict` (hard error by default; an explicit `override` list is required to shadow). Aliases that collide with a canonical name — or with a **reserved loop name** (§6) — are also conflicts.
+- **Default bundle** = core prelude + `{ string, array, comparison, math, number, object, url }`. A minimal build passes only the packs it wants; **H0 must ship a test that the core prelude + zero packs renders**, so the à-la-carte separation is enforced, not merely asserted.
 - **Versioning.** Packs are semver'd independently of the engine; the manifest lets the linter check that every helper a template set uses is present in the assembled prelude (the "pack availability" check).
 
-The same `Map Name Helper` is consumed unchanged by every dialect — the engine only swaps the surface parser/desugarer.
+Because `mkPrelude` emits the registry, the schema, and the runtime bindings from one source, the helper-catalog gate (`check:catalog`) and `test:compile` stay consistent by construction — a pack cannot add an interpreter helper the compiler can't emit.
 
 ---
 
@@ -62,7 +69,7 @@ Block helpers use the body as their "callback": `withSort arr "name"` renders `c
 - **Casing:** single-word names are lowercase (`trim`, `join`, `round`); multi-word names are camelCase (`truncateWords`, `startsWith`, `escapeHtml`). **snake_case is banned.**
 - **Canonical + alias:** where the source library ships duplicates, exactly one is canonical and the other is a documented alias the linter lowers. `lowercase` (not `downcase`), `uppercase` (not `upcase`), `add` (not `plus`), `subtract` (not `minus`), `multiply` (not `times`); aliases render correctly and normalise to canonical in committed form.
 - **Prefer the universal name** over the library's idiosyncrasy: `trimStart`/`trimEnd` (ES standard, replaced `trimLeft`/`trimRight`), `includes` (not `inArray`), `at` (not `itemAt`), `camelCase`/`kebabCase`/`snakeCase`/`startCase` (lodash; `kebabCase` not `dashcase`).
-- **Keep what BareBars already has right:** `and or not eq ne gt gte lt lte lookup if unless each with trim first last round raw json` are already common — no churn. In particular **keep `ne`** (more common in the wild than `handlebars-helpers`'s `isnt`); do **not** adopt `is`/`isnt`.
+- **Keep what BareBars already has right:** `and or not eq ne gt gte lt lte lookup if unless each with trim round raw json` are already common — no churn. In particular **keep `ne`** (more common in the wild than `handlebars-helpers`'s `isnt`); do **not** adopt `is`/`isnt`. (`first`/`last`/`length`/`key` also already exist, but as the **loop variables** — see the reserved-names note in §6; they are not collection helpers.)
 
 ---
 
@@ -81,6 +88,8 @@ The core prelude keeps its current members: control `if unless each with`, truth
 ## 6. Normative pack registry
 
 Subject is argument 0 throughout. "←x" marks a rename away from the source library; "alias:" lists lowered aliases; "block" marks body-using helpers.
+
+> **Reserved loop names (normative).** `length`, `first`, `last`, and `key` are **already registered nullary scoped helpers** — the loop variables installed by `each` (loopvars-linter-spec §A.1; `Kernel.Prelude.preludeSchema`, `arity: Exactly 0`). A pack **must not** redefine them with a different arity (it would collide inside any loop, where the scoped helper wins). So the collection-length reducer is **`count`** (alias `size`), not `length`; the head/tail slices are **`take`/`takeRight`**, not `first`/`last`. This also resolves the prior contradiction with loopvars §A.2, which reserved `length`/`size` for the loop var — `count` is the collection name, in the array pack's namespace, distinct from the loop variable.
 
 ### string
 | name | signature | notes |
@@ -105,8 +114,8 @@ Subject is argument 0 throughout. "←x" marks a rename away from the source lib
 | name | signature | notes |
 |---|---|---|
 | `join` | `(arr sep)` | |
-| `length` | `(arr)` | |
-| `first` `last` | `(arr [n])` | pre-existing names |
+| `count` | `(arr)` | collection length; alias `size`. **←not `length`** — see the reserved-names note below |
+| `take` `takeRight` | `(arr n)` | ←lodash; first/last `n` elements. **Not `first`/`last`** (those are loop vars); single element is `at arr 0` / `at arr -1` |
 | `reverse` | `(arr)` | |
 | `includes` | `(arr v)` → `VBool` | ←`inArray` |
 | `at` | `(arr i)` | ←`itemAt`; negative index allowed |
@@ -207,7 +216,8 @@ This is the honest cost of the no-function-values rule, and it is stated up fron
 ## 10. Implementation plan
 
 ### H0 — Pack protocol
-`Pack` type, `mkPrelude` with conflict detection, the default-bundle assembly, the linter pack-availability check. No helpers yet beyond a smoke pack.
+The `Pack`/`PackEntry` **triple** (helper + schema + emit, §2), `mkPrelude` emitting registry + schema + runtime bindings together with conflict detection (incl. reserved-loop-name collisions), the default-bundle assembly, the linter pack-availability check. No helpers yet beyond a smoke pack.
+- **Acceptance:** a name defined twice (or colliding with a reserved loop name) is a `PackConflict`; the assembled prelude/schema/runtime agree (`check:catalog` + `test:compile` green); **core prelude + zero packs renders a template** (separability is tested, not asserted).
 
 ### H1 — `escapeHtml` rename + alias
 Add `escapeHtml`; retain `esc_html` as a lowered, warned alias; migrate the ≈13 call sites; `json`→alias `stringify`.
@@ -235,5 +245,5 @@ If demand: a `regex` pack behind a backtrack/step limit; safe `JSONparse`; a `da
 1. **Pipe arg position** (§3) — confirm subject-as-argument-0 (Liquid/Jinja) rather than last-arg; this fixes every transformer's signature.
 2. **`default` semantics** (§6) — null-coalesce (proposed) vs truthiness-aware (returns fallback when the subject is falsy under the file's truthiness set). Truthiness-aware is more powerful but couples `default` to the active set.
 3. **Alias retention policy** — how long deprecated aliases (`esc_html`, `downcase`, `plus`, …) live, and whether the linter auto-rewrites on save or only warns.
-4. **`reverse`/`length` overloading** — single polymorphic helper over string+array, or separate per pack. Polymorphic is fewer names; separate is clearer types.
+4. **`reverse` overloading** — single polymorphic helper over string+array, or separate per pack. Polymorphic is fewer names; separate is clearer types. (Adopt the shared name only if a golden test proves identical `Value` semantics on both targets, else split.) *`length` is no longer part of this question — it is reserved for the loop var; the collection reducer is `count` (§6).*
 5. **Block vs key duplication** — both `sortBy` (inline, returns array) and `withSort` (block) exist; confirm we want both rather than one.

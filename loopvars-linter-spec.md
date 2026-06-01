@@ -40,7 +40,7 @@ Three names are tolerated aliases that the linter rewrites to the explicit form 
 |---|---|---|
 | `index` | `index0` | the Handlebars 0-based rule, but ambiguous on the page; explicit wins |
 | `rindex` | `rindex0` | same |
-| `size` | `length` | `length` is canonical (Twig/Liquid/Jinja/JS); `size` is the Liquid/Ruby outlier. Do **not** also add `count` |
+| `size` | `length` | `length` is canonical (Twig/Liquid/Jinja/JS); `size` is the Liquid/Ruby outlier. Do **not** add `count` *as a loop alias* |
 
 The aliases render correctly *and* the linter lowers them, so source stays readable but the committed form is unambiguous — consistent with the "no one should guess" principle behind having both `index0` and `index1` in the first place.
 
