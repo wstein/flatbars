@@ -153,7 +153,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
         </div>
       </header>
 
-      <div class="oil-grid">
+      <div class={"oil-grid" + (Object.keys(parts).length ? " has-partials" : "")}>
         <div class="oil-cell">
           <div class="oil-cell-head"><span class="oil-cap">template</span></div>
           <CodeEditor lang="template" value={tpl} onInput={onTpl} />

@@ -103,7 +103,17 @@
   gap: 1px;
   background: var(--border);
 }
-@media (max-width: 40rem) { .oil .oil-grid { grid-template-columns: 1fr; } }
+/* With partials there are 3+ inputs; a 50/50-ish split leaves an empty cell and
+   a cramped template. Instead the template takes a full-width row, and the data
+   and partial(s) sit side by side below it (auto-fit, min 13rem each). */
+.oil .oil-grid.has-partials {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+.oil .oil-grid.has-partials .oil-cell:first-child { grid-column: 1 / -1; }
+@media (max-width: 40rem) {
+  .oil .oil-grid,
+  .oil .oil-grid.has-partials { grid-template-columns: 1fr; }
+}
 .oil .oil-cell { background: var(--bg); min-width: 0; padding: 0.55rem 0.7rem 0.7rem; }
 .oil .oil-cell-head { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.4rem; }
 .oil .oil-cap {
