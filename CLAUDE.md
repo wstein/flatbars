@@ -133,6 +133,10 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   of `core` (JSON-ness is a host concern, not a framework dependency).
 - **`js`** (`barebars-js`) — JS/FFI surface bundling the dialects for JS hosts
   (bundled to `reference/web/vendor/barebars-engine.mjs` for the FlatBars Lab).
+  That bundle is a **committed artifact**: regenerate it after any engine change,
+  or the Lab runs stale — `spago bundle -p barebars-js --module FullBars.JS
+  --bundle-type module --platform browser --outfile
+  reference/web/vendor/barebars-engine.mjs` (needs `esbuild` on PATH).
 - **`cli`** (`barebars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source), incl.
