@@ -17,7 +17,7 @@ A capability is worth migrating **only if all four hold**:
 1. **Irreducible** — it cannot be composed from what MaxBars already has (pipes `{{ x | f }}`, infix `&& || ! == != < > <= >=`, the prelude `lookup/if/unless/each/with/and/or/...`, the loop variables, `esc_html`/`json`/`safe`/`raw`). If a pipe chain expresses it, it is **sugar, not capability** — do not migrate it.
 2. **High-frequency** — it is something templates actually reach for across ecosystems (Liquid/Jinja/Twig/Handlebars), not a library idiosyncrasy. `handlebars-helpers` is used here as a *frequency signal*, never as a source to mirror.
 3. **Pure & deterministic** — a pure function of its arguments: no filesystem, network, clock, RNG, or ambient locale. Non-determinism is a *correctness* failure (it breaks referential transparency and golden tests).
-4. **Determinism-stable across both targets** — it produces the **same `Value`** in the PureScript interpreter *and* the emitted JS runtime. Every helper is implemented twice and gated byte-identical by `test:compile` (110/110), so a capability that can't be made identical on both targets (see `toFixed`, §4) is not adoptable until it can.
+4. **Determinism-stable across both targets** — it produces the **same `Value`** in the PureScript interpreter *and* the emitted JS runtime. Every helper is implemented twice and gated byte-identical by the `test:compile` conformance harness, so a capability that can't be made identical on both targets (see `toFixed`, §4) is not adoptable until it can.
 
 This criterion is the whole design. It is deliberately strict because each primitive costs two implementations + a golden test, and because every new prelude name adds namespace pressure against the scoped loop helpers (we already saw `length`/`count`/`size` collide).
 
@@ -198,23 +198,14 @@ This is independent of the migration question; it is the one snake_case name in 
 
 ## 11. Implementation plan
 
-### P0 — the helper triple + the criterion gate
-A migrated helper is not a bare function: the engine runs on the registry `prelude` **and** the parallel validator `preludeSchema` (`{ block, arity }`), **and** `test:compile` requires a JS-runtime implementation the compiler can emit. So each entry is a triple:
-
-```purescript
-type PrimEntry m =
-  { helper :: Helper m                               -- interpreter implementation
-  , schema :: { block :: Boolean, arity :: Arity }   -- feeds preludeSchema
-  , emit   :: EmitBinding                            -- compiler/runtime binding (test:compile)
-  }
-```
-
-`mkPrelude :: { primitives :: Boolean } -> Either Conflict { prelude, schema, runtime }` assembles registry + schema + runtime **together** (so `check:catalog` and `test:compile` can't drift), with conflict detection that also rejects collisions against the **reserved loop names** (§4).
-- **Acceptance:** a duplicate or reserved-name collision is a `Conflict`; **core prelude with `primitives:false` renders a template** (the primitives are genuinely optional, tested not asserted); `check:catalog` + `test:compile` green.
+### P0 — separability + the criterion gate *(shipped, simplified)*
+A helper lives in **two** synced places, not a runtime-assembled triple: a PureScript `HelperDef` (`{ name, block, arity, run }`) that **projects** to both the registry `prelude` and the validator `preludeSchema`, and a hand-written **JS-runtime** entry. The compiler emits a generic `rt.call("name", …)`, so there is no per-helper `emit` binding to assemble — `test:compile` (compiled ≡ interpreter) is the gate that keeps the two places identical, and `check:catalog` keeps the docs in sync with `preludeSchema`. (The originally-specced `PrimEntry { helper, schema, emit }` + `mkPrelude` assembly is therefore *not* built — the monolithic runtime can't honour an emit-per-helper protocol, and the existing gates already prevent drift.)
+- **Separability** is realised as a split: `helperDefs = coreHelperDefs <> primitiveHelperDefs` (both exported), with a `coreSchema` projection. **Shipped** with a test that `coreSchema` omits the primitives while `preludeSchema` includes them — the primitives are a genuinely detachable set. A runtime *toggle* (build core-only) is deferred; the split is the foundation it would use.
+- **The criterion** (§1) and the **reserved-loop-name** check (§4) are enforced at review, not by a `mkPrelude` conflict pass.
 
 ### P1 — string + number primitives
-The §4 string roster and `abs`/`round`/`floor`/`ceil`/`toInt`/`toFloat`/`toFixed`, subject-first; alias lowering (`downcase`/…).
-- **Acceptance:** golden tests per primitive across all three surfaces (RawBars call, FullBars curly, MaxBars pipe); `toFixed`/`toFloat` rounding pinned and identical on interpreter and JS.
+- **String (shipped):** the §4 string roster — `lowercase uppercase capitalize trim trimStart trimEnd split replace slice includes startsWith endsWith truncate append prepend` — subject-first, in `Kernel.Prelude.primitiveHelperDefs` + the JS runtime. Conformance 136→168 (compiled ≡ interpreter); value-pinning interpreter tests; catalog regenerated. Coercion: subject/string-args via `stringify`, numeric args via the strict `asNum`/`trunc`; code-unit indexing; `slice` matches JS exactly.
+- **Number (pending):** `abs`/`round`/`floor`/`ceil`/`toInt`/`toFloat`/`toFixed`. `toFixed`/`toFloat` must pin their rounding/format mode identically on interpreter and JS (criterion 4). `downcase`/`upcase` alias lowering is part of this batch.
 
 ### P2 — array primitives (incl. the §6 key-based design)
 `join`/`count`/`at`/`take`/`takeRight`/`reverse`/`unique`/`includes`; key-based `sortBy`/`pluck`/`groupBy`. No callback or block forms.
