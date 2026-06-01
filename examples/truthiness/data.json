@@ -1,15 +1,18 @@
 {
-  "vFalse": false,
-  "vTrue": true,
-  "vNull": null,
-  "sEmpty": "",
-  "sText": "hi",
-  "sZero": "0",
-  "sSpace": " ",
-  "nZero": 0,
-  "nNum": 42,
-  "arrEmpty": [],
-  "arrFull": [1, 2],
-  "objEmpty": {},
-  "objFull": { "k": 1 }
+  "cases": [
+    { "token": "false", "v": false, "hbTruthy": false },
+    { "token": "true", "v": true, "hbTruthy": true },
+    { "token": "null", "v": null, "hbTruthy": false },
+    { "token": "\"\"", "desc": "empty string", "v": "", "hbTruthy": false },
+    { "token": "\"hi\"", "v": "hi", "hbTruthy": true },
+    { "token": "\"0\"", "desc": "string zero", "v": "0", "hbTruthy": true },
+    { "token": "\" \"", "desc": "single space", "v": " ", "hbTruthy": true },
+    { "token": "0", "desc": "number zero", "v": 0, "hbTruthy": false },
+    { "token": "42", "v": 42, "hbTruthy": true },
+    { "token": "[]", "desc": "empty array", "v": [], "hbTruthy": false },
+    { "token": "[1, 2]", "v": [1, 2], "hbTruthy": true },
+    { "token": "{}", "desc": "empty object", "v": {}, "hbTruthy": true },
+    { "token": "{ \"k\": 1 }", "v": { "k": 1 }, "hbTruthy": true },
+    { "token": "0", "cont": "with", "token2": "includeZero", "v": 0, "hbTruthy": false, "includeZero": true }
+  ]
 }
