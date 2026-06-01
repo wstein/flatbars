@@ -1,7 +1,7 @@
 = ADR-007: MinBars — a Mustache-compatible peer engine
 :navtitle: ADR-007 MinBars
 
-*Status:* Proposed (scope locked; not yet implemented). *Date:* 2026-06-01.
+*Status:* Accepted (implemented; MinBars ships at 170/170 on the vendored mustache/spec suite). *Date:* 2026-06-01.
 
 == Context
 
