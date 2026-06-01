@@ -59,9 +59,9 @@ type Helper = Ctl M Env -> Array Value -> M Value
 
 ---
 
-## 4. The value-primitives module
+## 4. The value-primitives module *(SHIPPED)*
 
-A **single** module (not seven packs), assembled into the prelude alongside core. Subject is argument 0 throughout. "←x" marks a rename to the universal name; "alias:" lists linter-lowered aliases. The roster is everything that passes §1 — irreducible, high-frequency, pure, target-stable.
+The full roster below is implemented in `Kernel.Prelude.primitiveHelperDefs` + the JS runtime (35 primitives: string, number, array), gated byte-identical by `test:compile` (conformance 210/210). A **single** module (not seven packs), assembled into the prelude alongside core. Subject is argument 0 throughout. "←x" marks a rename to the universal name; "alias:" lists linter-lowered aliases. The roster is everything that passes §1 — irreducible, high-frequency, pure, target-stable.
 
 > **Reserved loop names (normative).** `length`, `first`, `last`, `key` are already registered **nullary** scoped loop helpers (`Kernel.Prelude.preludeSchema`, `arity: Exactly 0`; loopvars spec §A.1). A primitive **must not** redefine them with a different arity — inside a loop the scoped helper wins. So the collection-length reducer is **`count`** (alias `size`), the head/tail slices are **`take`/`takeRight`**, never `length`/`first`/`last`.
 
@@ -205,11 +205,11 @@ A helper lives in **two** synced places, not a runtime-assembled triple: a PureS
 
 ### P1 — string + number primitives
 - **String (shipped):** the §4 string roster — `lowercase uppercase capitalize trim trimStart trimEnd split replace slice includes startsWith endsWith truncate append prepend` — subject-first, in `Kernel.Prelude.primitiveHelperDefs` + the JS runtime. Conformance 136→168 (compiled ≡ interpreter); value-pinning interpreter tests; catalog regenerated. Coercion: subject/string-args via `stringify`, numeric args via the strict `asNum`/`trunc`; code-unit indexing; `slice` matches JS exactly.
-- **Number (pending):** `abs`/`round`/`floor`/`ceil`/`toInt`/`toFloat`/`toFixed`. `toFixed`/`toFloat` must pin their rounding/format mode identically on interpreter and JS (criterion 4). `downcase`/`upcase` alias lowering is part of this batch.
+- **Number (shipped):** `abs`/`round`/`floor`/`ceil` (`Data.Number` FFI = `Math.*`), `toFixed` (`toStringWith (fixed d)` = JS `n.toFixed(d)`), `toInt`/`toFloat` (`Data.Number.fromString` = `parseFloat` gated by `isFinite`; runtime mirrors it; `VNull` on failure, `trunc` for `toInt`). `downcase`/`upcase` aliases land here. toInt/toFloat conformance uses only unambiguous inputs; the parseFloat/`Number()` edge cases are documented-excluded.
 
-### P2 — array primitives (incl. the §6 key-based design)
-`join`/`count`/`at`/`take`/`takeRight`/`reverse`/`unique`/`includes`; key-based `sortBy`/`pluck`/`groupBy`. No callback or block forms.
-- **Acceptance:** key-path sorting/plucking/grouping; stable sort identical on both targets; no callback API exists; `reverse` polymorphism decided by golden test (else split string/array).
+### P2 — array primitives (incl. the §6 key-based design) *(shipped)*
+`join`/`count` (alias `size`)/`at`/`take`/`takeRight`/`reverse`/`unique`/`includes`; key-based `sortBy`/`pluck`/`groupBy` (dotted key string, no callbacks). No block forms.
+- **Shipped:** key-path sorting/plucking/grouping; `sortBy` is a stable sort keyed by `compareValues` (incomparable ⇒ EQ), with a matching -1/0/1 runtime comparator over V8's stable sort. `includes` and `reverse` are **polymorphic** (string + array), type-dispatched on the subject. Conformance 168→210 (compiled ≡ interpreter for every primitive); no callback API.
 
 ### P3 — MaxBars operators
 `??` ⇒ `(coalesce …)`; arithmetic `+ - * / %` ⇒ `(add/subtract/multiply/divide/modulo …)` with standard precedence. Surface-only desugar (`MaxBars.Expr`), the same seam as the comparison operators; the lift/lower linter learns the new operator↔helper rows.
