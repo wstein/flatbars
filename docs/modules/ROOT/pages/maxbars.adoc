@@ -41,15 +41,26 @@ subexpression produces — so the prelude, engine, and emit rules need no change
 |`!` |`not` |`pass:[{{ !a }}]` → `pass:[(not a)]`
 |`==` `!=` |`eq` `ne` |`pass:[{{ x == 1 }}]` → `pass:[(eq x 1)]`
 |`<` `>` `<=` `>=` |`lt` `gt` `lte` `gte` |`pass:[{{ x >= 18 }}]` → `pass:[(gte x 18)]`
+|`+` `-` `*` `/` `%` |`add` `subtract` `multiply` `divide` `modulo` |`pass:[{{ price * qty }}]` → `pass:[(multiply price qty)]`
+|`??` |`coalesce` |`pass:[{{ a ?? b }}]` → `pass:[(coalesce a b)]` (first non-null)
 |`\|` (pipe) |application |`pass:[{{ a \| f x }}]` → `pass:[(f a x)]` (piped value first)
 |===
 
-Precedence (loosest → tightest): pipe, `||`, `&&`, comparisons (non-associative),
-prefix `!`, then application/atom. Pipe chains are left-associative:
-`pass:[a | f | g]` ⇒ `pass:[(g (f a))]`. Paths, literals, and `(parenthesised)`
-subexpressions are exactly as in FullBars; the operator characters
-(`< > = | & !`) are excluded from the identifier set so they tokenise as
-operators.
+Precedence (loosest → tightest): pipe, `??`, `||`, `&&`, comparisons
+(non-associative), additive (`+` `-`), multiplicative (`*` `/` `%`), prefix `!`,
+then application/atom — so `pass:[{{ n + 1 > 5 }}]` is `pass:[(gt (add n 1) 5)]`.
+Pipe chains are left-associative: `pass:[a | f | g]` ⇒ `pass:[(g (f a))]`. Paths,
+literals, and `(parenthesised)` subexpressions are exactly as in FullBars.
+
+The operator characters are excluded from the identifier set so they tokenise as
+operators — but this is a *MaxBars-only* lexer mode (`ParseOptions.lexOptions`
+`infixArith`): RawBars/FullBars keep `+ - * / ?` as path/name characters, so
+`../x`, `a/b`, and `partial-block` are unaffected. `.` and `@` stay identifier
+characters in **every** dialect, so a dotted path like `price.net` is still one
+path even in MaxBars (and `/` is therefore unambiguously division). Arithmetic is
+strictly numeric — a non-number operand is a `TypeError` (no coercion) — and `??`
+is *null*-coalescing (a present `0`/`""`/`[]` wins), independent of the file's
+`@truthiness` mode.
 
 == Loop variables
 
