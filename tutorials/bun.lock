@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "barebars-tutorials",
+      "name": "flatbars-tutorials",
       "dependencies": {
         "@astrojs/preact": "^3.5.0",
         "astro": "^4.16.0",
