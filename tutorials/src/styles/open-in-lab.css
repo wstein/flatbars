@@ -2,58 +2,80 @@
  *
  * Styling for the OpenInLab island. The island renders its OWN DOM (Preact), so
  * Astro's scoped styles can't reach it — this sheet is imported globally by the
- * Reference layout, the one place every page that hosts an island shares. Tokens
- * come from lab-tokens.css.
+ * Reference layout. Every selector is scoped under `.oil` so it outranks the
+ * layout's generic `.content pre` / `.content a` rules (which otherwise win on
+ * source order at equal specificity). Tokens come from lab-tokens.css.
  *
  * Inputs (template, data, partials) sit in a light grid; the output is a single
- * dark "terminal" pane so input and result read as visibly different things. */
-.oil { margin: 1rem 0 1.5rem; }
+ * dark "old-screen" pane so input and result read as visibly different things. */
+.oil { margin: 1.25rem 0 1.75rem; }
 
-.oil-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 40rem) { .oil-inputs { grid-template-columns: 1fr; } }
+.oil .oil-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+@media (max-width: 40rem) { .oil .oil-inputs { grid-template-columns: 1fr; } }
 
-.oil-pane { margin: 0; }
-.oil-pane figcaption {
+.oil .oil-pane { margin: 0; min-width: 0; }
+.oil .oil-pane figcaption {
   font: 600 11px/1.4 var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--fg-faint);
-  margin: 0 0 0.3rem;
+  margin: 0 0 0.35rem;
 }
-.oil-pane pre {
+.oil .oil-pane pre {
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.7rem 0.85rem;
   overflow: auto;
   margin: 0;
-  min-height: 3rem;
+  min-height: 2.75rem;
 }
-.oil-pane pre code { font-size: 0.85em; white-space: pre-wrap; }
-
-/* Output — a dark-grey "old screen": neutral dark-grey background, light text,
-   the same in light and dark mode, so the result is unmistakable against the
-   input panes. */
-.oil-output { margin-top: 1rem; }
-.oil-output pre {
-  background: #2b2b2b;
-  border-color: #444444;
-  color: #e6e6e6;
+.oil .oil-pane pre code {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
-.oil-output pre code { color: inherit; }
-.oil-output em { color: #b8b8b8; }
-.oil-err { color: #ff9d9d; }
 
-.oil-btn {
-  display: inline-block;
-  margin-top: 0.9rem;
+/* Output — a dark "old-screen" pane: neutral dark-grey background, light text,
+   the same in light and dark mode, so the result is unmistakable. */
+.oil .oil-output { margin-top: 0.9rem; }
+.oil .oil-output pre {
+  background: #1e1e1e;
+  border: 1px solid #000;
+  color: #eaeaea;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.oil .oil-output pre code { color: inherit; }
+.oil .oil-output em { color: #9a9a9a; font-style: normal; }
+.oil .oil-output .oil-err { color: #ff8a8a; }
+
+/* Open in Lab — a solid accent button with white text (must beat `.content a`),
+   subtle depth, and a hover lift. */
+.oil a.oil-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding: 0.55rem 1.1rem;
   background: var(--accent);
-  color: #fff;
+  color: #ffffff;
   text-decoration: none;
-  font-weight: 600;
-  font-size: 0.9rem;
-  padding: 0.5rem 0.95rem;
+  font: 600 0.9rem/1 var(--font-ui);
+  border: none;
   border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.18);
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
-.oil-btn:hover { background: var(--accent-2); }
-.oil-btn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+.oil a.oil-btn:hover {
+  background: var(--accent-2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.oil a.oil-btn:active { transform: translateY(0); }
+.oil a.oil-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.oil a.oil-btn[aria-disabled="true"] { opacity: 0.45; pointer-events: none; box-shadow: none; }
