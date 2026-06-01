@@ -25,7 +25,7 @@ import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (ParseError, renderParseErrorAt)
-import FlatBars.Lexer (defaultLexConfig, tokenizeTemplate)
+import FlatBars.Lexer (LexConfig, defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
@@ -48,6 +48,13 @@ minOptions :: ParseOptions
 minOptions = defaultParseOptions
   { extras = true, inheritance = true, trimStandalone = false }
 
+-- | MinBars lexes with Mustache set-delimiters enabled (`{{=<% %>=}}`). Each
+-- | template — including every partial, which is parsed by its own `parseMin` —
+-- | starts at the default `{{`/`}}` pair, so delimiter changes are template-scoped
+-- | (they never leak across a partial boundary), per the Mustache spec.
+minLexConfig :: LexConfig
+minLexConfig = defaultLexConfig { mustacheDelims = true }
+
 -- | Parse MinBars source into directives + nodes, applying the Mustache
 -- | standalone-whitespace pass (`MinBars.Standalone`) between tokenizing and
 -- | building the tree. This is MinBars' replacement for the core `parseWith`
@@ -56,7 +63,7 @@ minOptions = defaultParseOptions
 -- | the core tree builder drops comments and parses interiors.
 parseMin :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
 parseMin src = do
-  toks <- tokenizeTemplate defaultLexConfig src
+  toks <- tokenizeTemplate minLexConfig src
   directives <- collectDirectives toks
   nodes <- buildFromTokens minOptions (mustacheStandalone toks)
   pure { directives, nodes }

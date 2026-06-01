@@ -84,6 +84,7 @@ eligible = case _ of
   ROpen _ _ _ _ -> true
   RClose _ _ _ -> true
   RComment _ _ _ -> true
+  RSetDelim _ -> true -- a lone `{{=<% %>=}}` line is standalone (spec §delimiters)
   RSep _ _ s -> isPartialInterior s
   _ -> false
 

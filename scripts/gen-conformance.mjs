@@ -34,6 +34,7 @@ const META = [
   ["partials", "Partials"],
   ["inheritance", "Template inheritance"],
   ["dynamic-names", "Dynamic names"],
+  ["delimiters", "Set delimiters"],
 ];
 const labelFor = (id) => META.find(([k]) => k === id)?.[1] ?? id;
 const orderOf = (id) => {

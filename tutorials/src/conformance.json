@@ -44,10 +44,16 @@
       "label": "Dynamic names",
       "pass": 21,
       "total": 21
+    },
+    {
+      "id": "delimiters",
+      "label": "Set delimiters",
+      "pass": 14,
+      "total": 14
     }
   ],
   "total": {
-    "pass": 170,
-    "total": 170
+    "pass": 184,
+    "total": 184
   }
 }

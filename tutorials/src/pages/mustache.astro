@@ -3,14 +3,14 @@
 //
 // The comprehensive Mustache reference — the front door (debate consensus item
 // 8). Prose is illustrative only; every runnable example comes from the single
-// gate-validated source `../mustache.mjs`, and features MinBars cannot execute
-// (set-delimiters, lambdas) are static `spec-only` callouts with no live button.
+// gate-validated source `../mustache.mjs`; the one feature MinBars cannot execute
+// (lambdas) is a static `spec-only` callout with no live button.
 import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../mustache.mjs";
-// The two spec-only blocks (set-delimiters, lambdas) can't run, so they're
-// static — but still syntax-highlighted at build time through the same
-// highlighter the live editors use, so they read consistently.
+// The one spec-only block (lambdas) can't run, so it's static — but still
+// syntax-highlighted at build time through the same highlighter the live editors
+// use, so it reads consistently.
 import { highlightTemplate } from "../lib/highlight.mjs";
 // Conformance numbers are GENERATED from the vendored mustache/spec suite
 // (scripts/gen-conformance.mjs, gated by `npm run check:conformance`), so the
@@ -56,10 +56,8 @@ const groups = [
 // Inline tag references and spec-only code — kept in strings so Astro never
 // tries to parse the `{{ }}` as expressions.
 const t = (s) => s; // readability helper for inline tag literals
-const setDelimCode = `{{=<% %>=}}
-Now tags look like <% name %>.
-<%={{ }}=%>
-...and {{name}} again.`;
+// Lambdas are the one Mustache feature MinBars does not implement (no function
+// arm in `Value`), so this stays a static, syntax-highlighted spec-only block.
 const lambdaCode = `// mustache.js — a section whose value is a function (a "lambda")
 const data = {
   year: 2026,
@@ -67,13 +65,12 @@ const data = {
 };
 Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
 // → "<b>(c) 2026</b>"`;
-const setDelimHtml = highlightTemplate(setDelimCode);
 const lambdaHtml = highlightTemplate(lambdaCode);
 ---
 
 <Reference
   title="MinBars — Mustache-compatible"
-  subtitle="MinBars is FlatBars's Mustache-compatible engine. This runnable reference walks the logic-less Mustache language as MinBars implements it — every supported tag renders live and opens in the Lab. The two spec features MinBars does not implement (set delimiters, lambdas) are marked below."
+  subtitle="MinBars is FlatBars's Mustache-compatible engine. This runnable reference walks the logic-less Mustache language as MinBars implements it — every supported tag renders live and opens in the Lab. The one spec feature MinBars does not implement (lambdas) is marked below."
   groups={groups}
   spec="adr-0007-minbars"
 >
@@ -257,21 +254,17 @@ const lambdaHtml = highlightTemplate(lambdaCode);
 
   <!-- ─────────────────────── Set delimiters ────────────────────── -->
   <section id="set-delimiters">
-    <h2>Set delimiters <span class="badge spec-only">spec · not in MinBars</span></h2>
+    <h2>Set delimiters</h2>
     <p>
-      The Mustache spec lets a template <em>change its own delimiters</em> mid-stream
-      with <code>{t("{{=<% %>=}}")}</code> — useful when <code>{t("{{ }}")}</code>
-      collides with another syntax (e.g. server-side languages).
+      A template can <em>change its own delimiters</em> mid-stream with
+      <code>{t("{{=<% %>=}}")}</code> — useful when <code>{t("{{ }}")}</code>
+      collides with another syntax (e.g. server-side languages). Everything after
+      the tag uses the new pair until <code>{t("<%={{ }}=%>")}</code> restores the
+      default. The delimiters may be any non-whitespace strings (no <code>=</code>),
+      and a set-delimiter tag alone on its line is <b>standalone</b> — it leaves no
+      blank line. Edit the example: the middle item switches to ERB-style tags.
     </p>
-    <pre class="oil-static"><code set:html={setDelimHtml} /></pre>
-    <div class="callout info">
-      <p>
-        <b>MinBars does not implement set delimiters</b> (deferred in
-        <a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>: no customer corpus
-        to audit yet). There's no live button here because a preview that can't run
-        would mislead. The example is shown for spec completeness.
-      </p>
-    </div>
+    <OpenInLab client:visible engine="minbars" template={ex.setDelimiters.template} data={ex.setDelimiters.data} />
   </section>
 
   <!-- ───────────────────────── Lambdas ─────────────────────────── -->
@@ -318,14 +311,13 @@ const lambdaHtml = highlightTemplate(lambdaCode);
             </td>
           </tr>
         ))}
-        <tr><td>Set delimiters</td><td class="no">✗ not in suite · not implemented</td></tr>
         <tr><td>Lambdas</td><td class="no">✗ not in suite · not implemented</td></tr>
       </tbody>
     </table>
     <p class="tip">
-      Set delimiters and lambdas carry no spec fixtures here and aren't
-      implemented (<a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>) — so
-      the table claims nothing for them rather than a hollow ✓.
+      Lambdas are the one Mustache feature MinBars does not implement (no function
+      value type, <a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>) — so the
+      table claims nothing for them rather than a hollow ✓.
     </p>
     <h3>Where to go next</h3>
     <p>

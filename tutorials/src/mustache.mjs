@@ -125,4 +125,13 @@ export const examples = {
     partials: { en: "Hello, {{name}}!", de: "Hallo, {{name}}!" },
     data: { which: "de", name: "Ada" },
   },
+
+  // ── Set delimiters ───────────────────────────────────────────────────────
+  setDelimiters: {
+    // {{=<% %>=}} changes the active delimiters mid-stream; <%={{ }}=%> restores
+    // them. The set-delimiter lines are standalone, so they leave no blank line.
+    template:
+      "* {{before}}\n{{=<% %>=}}\n* <% during %>\n<%={{ }}=%>\n* {{after}}\n",
+    data: { before: "default", during: "erb-style", after: "default again" },
+  },
 };

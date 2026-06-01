@@ -1220,6 +1220,146 @@
       "name": "padding-whitespace",
       "desc": "Superfluous in-tag whitespace should be ignored.",
       "path": "examples/vendored/mustache/partials/padding-whitespace.json"
+    },
+    {
+      "id": "mustache/delimiters/pair-behavior",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "pair-behavior",
+      "desc": "The equals sign (used on both sides) should permit delimiter changes.",
+      "path": "examples/vendored/mustache/delimiters/pair-behavior.json"
+    },
+    {
+      "id": "mustache/delimiters/special-characters",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "special-characters",
+      "desc": "Characters with special meaning regexen should be valid delimiters.",
+      "path": "examples/vendored/mustache/delimiters/special-characters.json"
+    },
+    {
+      "id": "mustache/delimiters/sections",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "sections",
+      "desc": "Delimiters set outside sections should persist.",
+      "path": "examples/vendored/mustache/delimiters/sections.json"
+    },
+    {
+      "id": "mustache/delimiters/inverted-sections",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "inverted-sections",
+      "desc": "Delimiters set outside inverted sections should persist.",
+      "path": "examples/vendored/mustache/delimiters/inverted-sections.json"
+    },
+    {
+      "id": "mustache/delimiters/partial-inheritence",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "partial-inheritence",
+      "desc": "Delimiters set in a parent template should not affect a partial.",
+      "path": "examples/vendored/mustache/delimiters/partial-inheritence.json"
+    },
+    {
+      "id": "mustache/delimiters/post-partial-behavior",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "post-partial-behavior",
+      "desc": "Delimiters set in a partial should not affect the parent template.",
+      "path": "examples/vendored/mustache/delimiters/post-partial-behavior.json"
+    },
+    {
+      "id": "mustache/delimiters/surrounding-whitespace",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "surrounding-whitespace",
+      "desc": "Surrounding whitespace should be left untouched.",
+      "path": "examples/vendored/mustache/delimiters/surrounding-whitespace.json"
+    },
+    {
+      "id": "mustache/delimiters/outlying-whitespace-inline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "outlying-whitespace-inline",
+      "desc": "Whitespace should be left untouched.",
+      "path": "examples/vendored/mustache/delimiters/outlying-whitespace-inline.json"
+    },
+    {
+      "id": "mustache/delimiters/standalone-tag",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "standalone-tag",
+      "desc": "Standalone lines should be removed from the template.",
+      "path": "examples/vendored/mustache/delimiters/standalone-tag.json"
+    },
+    {
+      "id": "mustache/delimiters/indented-standalone-tag",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "indented-standalone-tag",
+      "desc": "Indented standalone lines should be removed from the template.",
+      "path": "examples/vendored/mustache/delimiters/indented-standalone-tag.json"
+    },
+    {
+      "id": "mustache/delimiters/standalone-line-endings",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "standalone-line-endings",
+      "desc": "\"\\r\\n\" should be considered a newline for standalone tags.",
+      "path": "examples/vendored/mustache/delimiters/standalone-line-endings.json"
+    },
+    {
+      "id": "mustache/delimiters/standalone-without-previous-line",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "standalone-without-previous-line",
+      "desc": "Standalone tags should not require a newline to precede them.",
+      "path": "examples/vendored/mustache/delimiters/standalone-without-previous-line.json"
+    },
+    {
+      "id": "mustache/delimiters/standalone-without-newline",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "standalone-without-newline",
+      "desc": "Standalone tags should not require a newline to follow them.",
+      "path": "examples/vendored/mustache/delimiters/standalone-without-newline.json"
+    },
+    {
+      "id": "mustache/delimiters/pair-with-padding",
+      "provider": "mustache",
+      "dialect": "minbars",
+      "divergenceMeaning": "conformance-failure",
+      "category": "delimiters",
+      "name": "pair-with-padding",
+      "desc": "Superfluous in-tag whitespace should be ignored.",
+      "path": "examples/vendored/mustache/delimiters/pair-with-padding.json"
     }
   ]
 }

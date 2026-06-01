@@ -1,0 +1,29 @@
+{
+  "id": "mustache/delimiters/inverted-sections",
+  "provider": "mustache",
+  "dialect": "minbars",
+  "divergenceMeaning": "conformance-failure",
+  "desc": "Delimiters set outside inverted sections should persist.",
+  "template": "[\n{{^section}}\n  {{data}}\n  |data|\n{{/section}}\n\n{{= | | =}}\n|^section|\n  {{data}}\n  |data|\n|/section|\n]\n",
+  "data": {
+    "section": false,
+    "data": "I got interpolated."
+  },
+  "partials": {},
+  "expected": "[\n  I got interpolated.\n  |data|\n\n  {{data}}\n  I got interpolated.\n]\n",
+  "features": [
+    "delimiters"
+  ],
+  "support": "ok",
+  "unsupported": [],
+  "source": {
+    "url": "https://github.com/mustache/spec/blob/e8ec001db7f594521e773c34866aca2b5d6b0037/specs/delimiters.json",
+    "repo": "github.com/mustache/spec",
+    "commit": "e8ec001db7f594521e773c34866aca2b5d6b0037"
+  },
+  "license": {
+    "spdx": "MIT",
+    "holder": "mustache/spec contributors",
+    "notice": "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim."
+  }
+}

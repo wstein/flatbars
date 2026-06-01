@@ -34,9 +34,9 @@ const SHA = process.argv[2] || PINNED;
 // In-scope modules = the Mustache core that MinBars implements (MinBars.purs):
 // escaped/raw interpolation, dotted names, the implicit iterator, sections,
 // inverted sections, comments, and context-inheriting partials. Excluded:
-// `delimiters` (set-delimiters deferred), `~lambdas` (no function arm in Value),
-// `~dynamic-names`/`~inheritance` (optional modules — add when MinBars lands them).
-const MODULES = ["comments", "interpolation", "sections", "inverted", "partials"];
+// `~lambdas` (no function arm in Value), `~dynamic-names`/`~inheritance` (optional
+// modules — add when MinBars lands them). `delimiters` is included (ADR-015).
+const MODULES = ["comments", "interpolation", "sections", "inverted", "partials", "delimiters"];
 
 const NOTICE =
   "Mustache spec (github.com/mustache/spec), MIT. Test fixtures vendored verbatim.";
