@@ -21,6 +21,27 @@ import { labHref } from "../lab/open-in-lab.mjs";
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
 
 let fail = 0;
+const warnings = [];
+
+// Heuristic (non-fatal): a list example that renders its items on one line with
+// no separator reads as "broken" to newcomers — the standalone-trim footgun the
+// partial examples hit. Flag a block-iterating example whose data holds a 2+
+// element array and whose output has neither a newline nor an HTML tag (HTML
+// one-liners read as structure), unless it is deliberately inline.
+function hasMultiArray(v) {
+  if (Array.isArray(v)) return v.length >= 2 || v.some(hasMultiArray);
+  if (v && typeof v === "object") return Object.values(v).some(hasMultiArray);
+  return false;
+}
+function collapseWarn(label, ex, out) {
+  if (ex.inline || !/\{\{#/.test(ex.template) || !hasMultiArray(ex.data)) return;
+  if (out.includes("\n") || out.includes("<")) return;
+  warnings.push(
+    `  ⚠ ${label}: iterates a list but renders on one line with no separator — ` +
+      "newcomers may read it as broken. Put the line break in the row, or set `inline: true` if intended.",
+  );
+}
+
 for (const [key, ex] of Object.entries(lessons)) {
   try {
     await labHref(ex.engine, ex, { labUrl: "/lab/index.html" });
@@ -35,6 +56,7 @@ for (const [key, ex] of Object.entries(lessons)) {
     const out = renderer.render(renderer.compile(ex.template, ex.partials || {}).program, ex.data ?? {});
     if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
     console.log(`  ✓ ${key} (${ex.engine}) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}`);
+    collapseWarn(`${key} (${ex.engine})`, ex, out);
   } catch (e) {
     console.error(`  ✗ ${key} (${ex.engine}): ${e && e.message ? e.message : e}`);
     fail++;
@@ -70,6 +92,7 @@ for (const [key, ex] of Object.entries(mustacheExamples)) {
     const out = minbars.render(minbars.compile(ex.template, ex.partials || {}).program, ex.data ?? {});
     if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
     console.log(`  ✓ ${key} → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}`);
+    collapseWarn(key, ex, out);
   } catch (e) {
     console.error(`  ✗ ${key}: ${e && e.message ? e.message : e}`);
     fail++;
@@ -107,11 +130,16 @@ for (const [key, rex] of Object.entries(rawbarsExamples)) {
       note = ` [compiles ✓ ${c.value.length}b]`;
     }
     console.log(`  ✓ ${key} (${eng}) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}${note}`);
+    collapseWarn(`${key} (${eng})`, rex, out);
   } catch (e) {
     console.error(`  ✗ ${key} (${eng}): ${e && e.message ? e.message : e}`);
     fail++;
   }
 }
 
+if (warnings.length) {
+  console.log(`\n${warnings.length} possible single-line list collapse(s) — non-fatal, review:`);
+  for (const w of warnings) console.log(w);
+}
 console.log(fail ? `\n${fail} example(s) broken overall` : `\nall tutorial + reference examples render + link`);
 process.exit(fail ? 1 : 0);

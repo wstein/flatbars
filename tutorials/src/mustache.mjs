@@ -32,6 +32,9 @@ export const examples = {
 
   implicit: {
     // {{.}} is the current item — useful when iterating a list of scalars.
+    // Intentionally inline (bracketed, single line), so opt out of the
+    // single-line-collapse heuristic in the gate.
+    inline: true,
     template: "{{#tags}}[{{.}}] {{/tags}}",
     data: { tags: ["math", "logic", "engines"] },
   },
