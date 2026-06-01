@@ -40,15 +40,23 @@ export const examples = {
 
   // ── Blocks install scope; `this` and `index` are nullary helpers ──────────
   // Also the compile flagship: the page shows this template emitted as JS.
+  // Block tags sit on their own lines; standalone-line trimming drops those
+  // lines, so the output is one clean row per item.
   each: {
-    template: '{{#each (lookup this "items")}}{{{ index }}}: {{{ escapeHtml this }}}\n{{/each}}',
+    template: `{{#each (lookup this "items")}}
+{{{ index }}}: {{{ escapeHtml this }}}
+{{/each}}`,
     data: { items: ["alpha", "beta"] },
     compiles: true,
   },
 
   // ── No keywords: {{else}} is a separator the `if` helper splits on ────────
   cond: {
-    template: '{{#if (lookup this "admin")}}admin{{else}}guest{{/if}}',
+    template: `{{#if (lookup this "admin")}}
+admin
+{{else}}
+guest
+{{/if}}`,
     data: { admin: false },
   },
 

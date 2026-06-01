@@ -47,20 +47,33 @@ export const examples = {
 
   // ── Sections ───────────────────────────────────────────────────────────
   sectionArray: {
-    // An array section iterates; each element is pushed as the context.
-    template: "<ul>{{#items}}<li>{{name}} ({{qty}})</li>{{/items}}</ul>",
+    // An array section iterates; each element is pushed as the context. The
+    // section tags sit on their own lines, so standalone trimming yields tidy,
+    // indented HTML.
+    template: `<ul>
+{{#items}}
+  <li>{{name}} ({{qty}})</li>
+{{/items}}
+</ul>`,
     data: { items: [{ name: "pen", qty: 3 }, { name: "ink", qty: 1 }] },
   },
 
   sectionBool: {
     // A boolean (or any truthy scalar) renders the body once, falsy omits it.
-    template: "{{#active}}● online{{/active}}{{^active}}○ offline{{/active}}",
+    template: `{{#active}}
+● online
+{{/active}}
+{{^active}}
+○ offline
+{{/active}}`,
     data: { active: true },
   },
 
   sectionObject: {
     // An object section pushes that object as the context for its body.
-    template: "{{#user}}{{name}} <{{email}}>{{/user}}",
+    template: `{{#user}}
+{{name}} <{{email}}>
+{{/user}}`,
     data: { user: { name: "Ada", email: "ada@example.com" } },
   },
 
@@ -68,13 +81,28 @@ export const examples = {
   truthyZero: {
     // In MUSTACHE, 0 and "" are TRUTHY (only false, null, [] are falsy). A
     // Handlebars refugee expects {{#count}} to hide on 0 — here it renders.
-    template: '{{#count}}in stock: {{count}}{{/count}}{{^count}}sold out{{/count}}\n{{#note}}note: "{{note}}"{{/note}}',
+    template: `{{#count}}
+in stock: {{count}}
+{{/count}}
+{{^count}}
+sold out
+{{/count}}
+{{#note}}
+note: "{{note}}"
+{{/note}}`,
     data: { count: 0, note: "" },
   },
 
   // ── Inverted sections ────────────────────────────────────────────────────
   inverted: {
-    template: "<ul>{{#items}}<li>{{.}}</li>{{/items}}{{^items}}<li><em>nothing here</em></li>{{/items}}</ul>",
+    template: `<ul>
+{{#items}}
+  <li>{{.}}</li>
+{{/items}}
+{{^items}}
+  <li><em>nothing here</em></li>
+{{/items}}
+</ul>`,
     data: { items: [] },
   },
 
@@ -97,7 +125,9 @@ export const examples = {
     // A partial reused per row. The row's line break lives INSIDE the partial
     // body: a standalone `{{> row}}` line has its own newline trimmed, so a
     // partial owns its trailing newline — otherwise the rows run together.
-    template: "{{#people}}{{> row}}{{/people}}",
+    template: `{{#people}}
+{{> row}}
+{{/people}}`,
     partials: { row: "- {{name}} ({{role}})\n" },
     data: {
       people: [
