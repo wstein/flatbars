@@ -23,7 +23,7 @@ do **not** assume a global install.
 ```sh
 npm install            # installs purescript + spago + esbuild
 npm run build          # spago build — compile every package
-npm test               # full suite: per-package spago tests + catalog + isolation + compile & mustache conformance
+npm test               # full suite: per-package spago tests + catalog + isolation + compile & mustache conformance + Lab unit tests
 npm run cli -- --help  # run the CLI (spago run -p barebars-cli)
 npm run lint           # spago build --pedantic-packages (catches unused/missing deps)
 npm run format         # purs-tidy format-in-place; format:check to verify only
@@ -58,10 +58,13 @@ npm run examples:verify       # STRICT gate (in `npm test`): render each vendore
                               # MinBars and assert actual == expected; exit ≠ 0 on any miss
 node scripts/vendor-mustache.mjs   # re-vendor reference/web/examples/vendored/mustache/ at the pinned commit
 npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; always exits 0
+npm run test:lab              # FlatBars Lab pure-Node unit tests (playground_utils, adapter)
 ```
 
 `examples:verify` is the `barebars examples verify` CLI subcommand (see
-`example-loader-spec.md`). Note the overlap with `test:minbars-spec`: both render
+`example-loader-spec.md`). The FlatBars Lab loads the same corpus via the
+`?vendored=<id>` deep-link (`reference/web/index.html`), framing each fixture's
+expected-vs-actual verdict. Note the overlap with `test:minbars-spec`: both render
 `mustache/spec` through MinBars but from **two separate vendored corpora**
 (`reference/web/examples/vendored/mustache/` vs `packages/minbars/test/spec/`). Consolidating to
 one corpus is a tracked follow-up (the spec's `verify` is intended to supersede the
