@@ -207,8 +207,8 @@ The vendored corpus (`examples/vendored/`) is the *conformance/coverage* set and
 > **Sequencing.** E0–E2 plus the headless `verify`/`check` flags (§6.5) deliver the MinBars conformance value with **no** Handlebars dependency and **no** TUI. E3 (Handlebars provider) is gated on Open #3 (source repo); E4 (TUI) on Open #2 (library). Neither blocks the MinBars path — ship MinBars-first.
 
 ### Pipeline & corpus
-- **E0 — Provider interface + fixture format.** The types in §3–4; the `mustache` provider first (authoritative expected, no baking).
-- **E1 — Vendor pipeline + `mustache` corpus.** `discover/parse/expected/features`; vendor the spec `.json` modules at a pinned commit; `check`/`verify` headless.
+- **E0 — Provider interface + fixture format.** The fixture format (§4) is **landed**: `examples/vendored/mustache/<module>/<name>.json`. The typed `Provider` record (§3) is not yet extracted — the `mustache` path is implemented directly (vendor script + a CLI verifier), and the typed interface arrives with the second (`handlebars`) provider.
+- **E1 — Vendor pipeline + `mustache` corpus.** **Landed.** `scripts/vendor-mustache.mjs` vendors the core modules (comments, interpolation, sections, inverted, partials — 122 fixtures) at a pinned commit; `barebars examples verify` is the headless strict gate (`npm run examples:verify`, wired into `npm test`) — renders each fixture through MinBars and asserts `actual == expected` (122/122 conform). *Reconcile:* `packages/minbars/test/spec-conformance.mjs` (`npm run test:minbars-spec`) is a parallel **lenient measurement** over a **second** vendored corpus (`packages/minbars/test/spec/`); per §6.5 this `verify` gate is meant to supersede it — consolidating to one corpus is the open follow-up.
 - **E2 — Playground load + diff.** Wire the engine; expected-vs-actual with `divergenceMeaning` framing; auto-dialect-select.
 
 ### Handlebars provider

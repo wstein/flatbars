@@ -49,8 +49,24 @@ npm run check:catalog  # fails if docs' helper-catalog partial is stale vs FullB
 npm run gen:catalog    # regenerate that partial after changing the prelude
 ```
 
-Both Node scripts import from `output/` (the spago build product), so they
+These Node scripts import from `output/` (the spago build product), so they
 always test current source — rebuild before running them.
+
+Mustache conformance for MinBars (both run from real `mustache/spec` fixtures):
+
+```sh
+npm run examples:verify       # STRICT gate (in `npm test`): render each vendored fixture via
+                              # MinBars and assert actual == expected; exit ≠ 0 on any miss
+node scripts/vendor-mustache.mjs   # re-vendor examples/vendored/mustache/ at the pinned commit
+npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; always exits 0
+```
+
+`examples:verify` is the `barebars examples verify` CLI subcommand (see
+`example-loader-spec.md`). Note the overlap with `test:minbars-spec`: both render
+`mustache/spec` through MinBars but from **two separate vendored corpora**
+(`examples/vendored/mustache/` vs `packages/minbars/test/spec/`). Consolidating to
+one corpus is a tracked follow-up (the spec's `verify` is intended to supersede the
+measurement harness).
 
 ## Architecture
 
