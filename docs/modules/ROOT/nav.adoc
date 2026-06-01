@@ -14,7 +14,7 @@
 * xref:adr-0009-fullbars.adoc[ADR-009: FullBars reference engine]
 * xref:adr-0010-header-directives.adoc[ADR-010: header directives]
 * xref:adr-0011-compile-to-js.adoc[ADR-011: compile to JS]
-* xref:adr-0012-recursion-budget.adoc[ADR-012: recursion budget (proposed)]
+* xref:adr-0012-recursion-budget.adoc[ADR-012: recursion budget]
 * xref:adr-0013-labelled-loops.adoc[ADR-013: labelled loops (proposed)]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 

@@ -1,18 +1,18 @@
 = ADR-012: Recursion and resource budget
 :navtitle: ADR-012 Recursion budget
 
-*Status:* Proposed. *Date:* 2026-06-01. Required by xref:adr-0007-minbars.adoc[] §4 and the
-xref:adr-final-review.adoc[final review].
+*Status:* Accepted — implemented (commit `fdc0b33`). *Date:* 2026-06-01. Required by
+xref:adr-0007-minbars.adoc[] §4 and the xref:adr-final-review.adoc[final review].
 
 == Context
 
-The reference engine's partial helper (`partialH`, `Prelude.purs:501`) is currently *unbounded*: a
-self-including or mutually-including partial recurses until the stack overflows. This is a live gap
-*today*, independent of any unshipped engine. MinBars (inheritance, dynamic-name partials) makes it
-acute, and any future recursion construct (self-including partials, labelled loops —
-xref:adr-0013-labelled-loops.adoc[]) needs a defined limit.
+The reference engine's partial helper (`partialH`, `Prelude.purs`) *was* unbounded: a self-including
+or mutually-including partial recursed until the stack overflowed. This was a live gap, independent of
+any unshipped engine. MinBars (inheritance, dynamic-name partials) made it acute, and any future
+recursion construct (self-including partials, labelled loops — xref:adr-0013-labelled-loops.adoc[])
+needs a defined limit.
 
-== Decision (proposed)
+== Decision
 
 . *A shared kernel depth/budget*, default **64**, that — when exceeded — raises a *located*
   `RecursionLimit` error rather than crashing the host.
@@ -22,6 +22,14 @@ xref:adr-0013-labelled-loops.adoc[]) needs a defined limit.
   spelling — e.g. `@budget` — TBD).
 . *Counts render-time re-entry* (partial/block expansion depth), not expression nesting, which is
   already bounded structurally by the parser.
+
+== Implementation
+
+Shipped in commit `fdc0b33`: `RefEnv` carries a `depth` field (0 in `emptyEnv`); `recursionBudget`
+is a kernel constant (**64**); `partialH` increments via `enterPartial` on entering a registered
+partial and raises `RecursionLimit recursionBudget` once `depth >= budget` — so the reference engine
+is bounded (decision items 1, 2, 4). MinBars' `parent`/`partial` reuse the same guard (`f4e98a0`).
+The per-file `@budget` *override* (item 3) is not yet implemented — it remains the open question below.
 
 == Consequences
 
