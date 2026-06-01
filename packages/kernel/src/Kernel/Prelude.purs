@@ -18,7 +18,6 @@ module Kernel.Prelude
   ( prelude
   , preludeSchema
   , preludeAliases
-  , preludeAliasWarnings
   , preludeUnaryHelpers
   , coreHelperDefs
   , primitiveHelperDefs
@@ -63,17 +62,13 @@ type HelperDef m =
   , block :: Boolean
   , arity :: Arity
   , run :: Helper m (RefEnv m)
-  -- | `Just { canonical, warn }` marks this name as an *alias* of `canonical`
+  -- | `Just canonical` marks this name as a *linter-lowered alias* of `canonical`
   -- | (e.g. `plus` → `add`). The alias renders identically (it is a real
   -- | registered helper, never removed) but is second-class: the catalog marks
-  -- | it and the lift/migrate assist rewrites it to `canonical`. `warn` controls
-  -- | the on-demand alias lint — `true` for the handlebars-legacy convenience
-  -- | names (`plus`/`downcase`/…), `false` for the security-*structural* escaper
-  -- | aliases (`esc_html`/`esc_json`), whose old names are baked into the desugar
-  -- | and compiler and so are kept silently forever (§8). `preludeAliases` /
-  -- | `preludeAliasWarnings` project this. (Open decision 2: permanent +
-  -- | warn-on-demand, never auto-rewritten on save.)
-  , alias :: Maybe { canonical :: String, warn :: Boolean }
+  -- | it, the on-demand alias lint warns on its use, and the lift/migrate assist
+  -- | rewrites it to `canonical`. `preludeAliases` projects this. (Open decision
+  -- | 2: permanent + warn-on-demand, never auto-rewritten on save.)
+  , alias :: Maybe String
   }
 
 -- | A non-block value helper built from a `Kernel.Helper` combinator. The
@@ -91,16 +86,9 @@ valDef name mk =
 gen :: forall m. String -> Boolean -> Arity -> Helper m (RefEnv m) -> HelperDef m
 gen name block arity run = { name, block, arity, run, alias: Nothing }
 
--- | Mark a helper as a *warned* alias of `canonical` (the handlebars-legacy
--- | convenience names — the lint nudges toward the canonical form).
+-- | Mark a helper definition as a (warned) alias of `canonical`.
 withAlias :: forall m. String -> HelperDef m -> HelperDef m
-withAlias canonical d = d { alias = Just { canonical, warn: true } }
-
--- | Mark a helper as a *silent* alias of `canonical` — kept forever, never
--- | warned: the security-structural escaper aliases (`esc_html`/`esc_json`),
--- | whose old names the desugar/compiler emit and so must keep accepting (§8).
-withSilentAlias :: forall m. String -> HelperDef m -> HelperDef m
-withSilentAlias canonical d = d { alias = Just { canonical, warn: false } }
+withAlias canonical d = d { alias = Just canonical }
 
 -- | The complete reference roster: the core helpers (control flow, access,
 -- | arithmetic, …) followed by the *separable* value-primitive pack. Splitting
@@ -119,16 +107,11 @@ coreHelperDefs =
   , valDef "true" (nullary (pure (VBool true)))
   , valDef "false" (nullary (pure (VBool false)))
   , valDef "null" (nullary (pure VNull))
-  -- escaping. `escapeHtml`/`escapeJson` are canonical (camelCase); the old
-  -- snake_case `esc_html`/`esc_json` are permanent **silent** aliases — the
-  -- desugar/compiler recognise the canonical name but keep accepting the old one
-  -- (§8: a security primitive's name is never removed, and not nagged about).
+  -- escaping (camelCase canonical names; no snake_case aliases).
   , valDef "escapeHtml" (unary escHtml)
-  , withSilentAlias "escapeHtml" (valDef "esc_html" (unary escHtml))
   , valDef "safe" (unary safe)
   , gen "json" false (Between 1 2) jsonH
   , gen "escapeJson" false (Between 1 2) escJsonH
-  , withSilentAlias "escapeJson" (gen "esc_json" false (Between 1 2) escJsonH)
   , gen "raw" true AnyArity rawH
   , gen "if" true (Between 1 2) ifH
   , gen "unless" true (Between 1 2) unlessH
@@ -234,25 +217,14 @@ primitiveHelperDefs =
 prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
 prelude = map (\d -> Tuple d.name d.run) helperDefs
 
--- | The full alias table — every alias name → its canonical name — projected
--- | from `helperDefs.alias` (the single source of truth). Used by the catalog
--- | (marks each "alias of …") and the lift/migrate assist. E.g. `plus → add`,
--- | `downcase → lowercase`, `esc_html → escapeHtml`.
+-- | The alias table — each alias name → its canonical name — projected from
+-- | `helperDefs.alias` (the single source of truth). The catalog marks these
+-- | ("alias of …"), the on-demand alias lint warns on their use, and the
+-- | lift/migrate assist rewrites them. E.g. `plus → add`, `downcase → lowercase`.
 preludeAliases :: Array (Tuple String String)
 preludeAliases =
-  Array.mapMaybe (\d -> (\a -> Tuple d.name a.canonical) <$> d.alias)
+  Array.mapMaybe (\d -> Tuple d.name <$> d.alias)
     (helperDefs :: Array (HelperDef (Either Error)))
-
--- | The *warned* subset of `preludeAliases` — aliases the on-demand lint flags
--- | (the handlebars-legacy convenience names). Excludes the silent escaper
--- | aliases (`esc_html`/`esc_json`), which are kept forever without nagging (§8).
-preludeAliasWarnings :: Array (Tuple String String)
-preludeAliasWarnings =
-  Array.mapMaybe warnedAlias (helperDefs :: Array (HelperDef (Either Error)))
-  where
-  warnedAlias d = case d.alias of
-    Just a | a.warn -> Just (Tuple d.name a.canonical)
-    _ -> Nothing
 
 -- | The names of *value* (non-block) helpers whose arity admits a **single
 -- | argument** — `Exactly 1` or `Between 1 n`. This is the candidate set for the
@@ -330,7 +302,7 @@ stringifyM = liftEither <<< stringify
 -- Value helpers (arity enforced by the combinators above)
 --------------------------------------------------------------------------------
 
--- | `esc_html`: HTML-escape a value; idempotent on already-safe input.
+-- | `escapeHtml`: HTML-escape a value; idempotent on already-safe input.
 escHtml :: forall m. MonadThrow Error m => Value -> m Value
 escHtml = case _ of
   VSafe s -> pure (VSafe s)
@@ -347,16 +319,16 @@ safe v = VSafe <$> stringifyM v
 jsonH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
 jsonH _ args = VString <$> jsonText "json" args
 
--- | `esc_json x [opts]`: the JSON analogue of `esc_html` — serialize to JSON
+-- | `escapeJson x [opts]`: the JSON analogue of `escapeHtml` — serialize to JSON
 -- | *and* HTML-escape, returning `VSafe`, for embedding JSON safely in HTML
--- | (e.g. an attribute). `esc_html` is idempotent on the result, so surface
+-- | (e.g. an attribute). `escapeHtml` is idempotent on the result, so surface
 -- | escaping does not double up. Accepts the same `pretty=true` option.
 escJsonH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
-escJsonH _ args = (VSafe <<< escapeHtml) <$> jsonText "esc_json" args
+escJsonH _ args = (VSafe <<< escapeHtml) <$> jsonText "escapeJson" args
 
 -- | Serialize the first argument as JSON, compact by default or pretty when an
 -- | optional second *options object* carries `pretty: true` (built by the
--- | surface hash, `pass:[pretty=true]`). Shared by `json` and `esc_json`.
+-- | surface hash, `pass:[pretty=true]`). Shared by `json` and `escapeJson`.
 jsonText :: forall m. MonadThrow Error m => String -> Array Value -> m String
 jsonText name args = case args of
   [ v ] -> pure (jsonStringify v)

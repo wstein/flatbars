@@ -293,19 +293,19 @@ main = do
     )
     "x=[13];y=[2];"
 
-  expect "esc-html" "{{{esc_html (lookup this \"x\")}}}"
+  expect "esc-html" "{{{escapeHtml (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
     "&lt;b&gt;&amp;&quot;&#x27;"
-  -- the canonical `escapeHtml` renders identically to its `esc_html` alias.
+  -- the canonical `escapeHtml` renders identically to its `escapeHtml` alias.
   expect "escapeHtml-canonical" "{{{escapeHtml (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
     "&lt;b&gt;&amp;&quot;&#x27;"
-  -- `escapeJson` is the canonical name for `esc_json`.
+  -- `escapeJson` is the canonical name for `escapeJson`.
   expect "escapeJson-canonical" "{{{escapeJson (lookup this \"o\")}}}"
     (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0) ]) ])
     "{&quot;a&quot;:1}"
 
-  expect "subexpr" "{{{esc_html (lookup this \"name\")}}}"
+  expect "subexpr" "{{{escapeHtml (lookup this \"name\")}}}"
     (obj [ Tuple "name" (str "A<B") ])
     "A&lt;B"
 
@@ -334,19 +334,19 @@ main = do
   expect "json-pretty-default-off" "{{{json (lookup this \"o\")}}}"
     (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0) ]) ])
     "{\"a\":1}"
-  -- esc_json: JSON + HTML-escape, marked safe (the JSON analogue of esc_html).
-  expect "esc-json" "{{{esc_json (lookup this \"x\")}}}" (obj [ Tuple "x" (str "<b>") ])
+  -- escapeJson: JSON + HTML-escape, marked safe (the JSON analogue of escapeHtml).
+  expect "esc-json" "{{{escapeJson (lookup this \"x\")}}}" (obj [ Tuple "x" (str "<b>") ])
     "&quot;&lt;b&gt;&quot;"
-  -- esc_json honours pretty=true too.
-  expect "esc-json-pretty" "{{{esc_json (lookup this \"xs\") (dict \"pretty\" true)}}}"
+  -- escapeJson honours pretty=true too.
+  expect "esc-json-pretty" "{{{escapeJson (lookup this \"xs\") (dict \"pretty\" true)}}}"
     (obj [ Tuple "xs" (arr [ str "<b>" ]) ])
     "[\n  &quot;&lt;b&gt;&quot;\n]"
   -- surface hash: {{ json x pretty=true }} feeds the (dict "pretty" true) option.
   expectS "surface-json-pretty" "{{{ json o pretty=true }}}"
     (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0) ]) ])
     "{\n  \"a\": 1\n}"
-  -- esc_html is idempotent on esc_json's VSafe, so surface {{ }} does not double-escape.
-  expectS "surface-esc-json" "{{ esc_json (lookup this \"x\") }}" (obj [ Tuple "x" (str "<b>") ])
+  -- escapeHtml is idempotent on escapeJson's VSafe, so surface {{ }} does not double-escape.
+  expectS "surface-esc-json" "{{ escapeJson (lookup this \"x\") }}" (obj [ Tuple "x" (str "<b>") ])
     "&quot;&lt;b&gt;&quot;"
   -- surface {{ json x }} HTML-escapes the JSON; {{{ json x }}} leaves it raw.
   expectS "surface-json-escaped" "{{ json (lookup this \"x\") }}" (obj [ Tuple "x" (str "<b>") ])
@@ -894,9 +894,9 @@ main = do
 
   -- Skeleton-AST validation (the engine-supplied second pass).
   expectValid "validate-clean"
-    "{{#each (lookup this \"xs\")}}{{{esc_html this}}}{{else}}none{{/each}}"
+    "{{#each (lookup this \"xs\")}}{{{escapeHtml this}}}{{else}}none{{/each}}"
   expectIssue "validate-unknown" "{{{frobnicate this}}}"
-  expectIssue "validate-arity" "{{{esc_html}}}"
+  expectIssue "validate-arity" "{{{escapeHtml}}}"
 
   -- foldTemplate: a catamorphism over the skeleton (the "prepare" half of the
   -- engine API). Here we count nodes, recursing into block bodies.
@@ -931,8 +931,8 @@ main = do
       (runTemplate (customEngine VNull) t == Right "0")
 
   -- lower: the structural skeleton becomes the typed real AST — {{else}} is
-  -- consumed into RIf's branches, and esc_html becomes the escaped flag.
-  case parse "{{#if this}}A{{{esc_html (lookup this \"x\")}}}{{else}}B{{/if}}" of
+  -- consumed into RIf's branches, and escapeHtml becomes the escaped flag.
+  case parse "{{#if this}}A{{{escapeHtml (lookup this \"x\")}}}{{else}}B{{/if}}" of
     Left e -> assert' ("lower: parse error " <> show e) false
     Right { nodes: t } -> assert' ("lower if/else+escape: " <> show (lower t))
       ( lower t ==
@@ -942,23 +942,23 @@ main = do
           ]
       )
 
-  -- Safe-by-default lint: raw output of data warns; esc_html / safe do not.
+  -- Safe-by-default lint: raw output of data warns; escapeHtml / safe do not.
   case parse "{{{lookup this \"x\"}}}" of
     Right { nodes: t } -> assert' "escaping lint flags raw data"
       (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
-  case parse "{{{esc_html (lookup this \"x\")}}}{{{safe (lookup this \"y\")}}}" of
-    Right { nodes: t } -> assert' "escaping lint silent for esc_html/safe"
+  case parse "{{{escapeHtml (lookup this \"x\")}}}{{{safe (lookup this \"y\")}}}" of
+    Right { nodes: t } -> assert' "escaping lint silent for escapeHtml/safe"
       (Array.null (escapingWarnings t))
     Left e -> assert' ("lint: parse error " <> show e) false
 
   -- Lint: testing the truthiness of an escaped/safe value is a smell (safe/
-  -- esc_html stringify, so e.g. `safe 0` is truthy while `0` is falsy).
+  -- escapeHtml stringify, so e.g. `safe 0` is truthy while `0` is falsy).
   case parse "{{#if (safe (lookup this \"x\"))}}y{{/if}}" of
     Right { nodes: t } -> assert' "lint flags if-on-safe" (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
-  case parse "{{#unless (esc_html (lookup this \"x\"))}}y{{/unless}}" of
-    Right { nodes: t } -> assert' "lint flags unless-on-esc_html"
+  case parse "{{#unless (escapeHtml (lookup this \"x\"))}}y{{/unless}}" of
+    Right { nodes: t } -> assert' "lint flags unless-on-escapeHtml"
       (not (Array.null (escapingWarnings t)))
     Left e -> assert' ("lint: parse error " <> show e) false
   -- Testing the underlying data directly is clean.
@@ -978,7 +978,7 @@ main = do
       [ "true"
       , "false"
       , "null"
-      , "esc_html"
+      , "escapeHtml"
       , "safe"
       , "else"
       , "eq"
@@ -1065,7 +1065,7 @@ main = do
   launchAff_ do
     let dat = obj [ Tuple "name" (str "Ada") ]
     out <- runExceptT
-      (runString (refEngine (preludeEnv dat)) "Hi {{{esc_html (lookup this \"name\")}}}")
+      (runString (refEngine (preludeEnv dat)) "Hi {{{escapeHtml (lookup this \"name\")}}}")
     liftEffect $ assert' ("aff render: " <> show out) (out == Right "Hi Ada")
 
   log "all core tests passed"

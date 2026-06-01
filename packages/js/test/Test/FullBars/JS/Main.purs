@@ -37,7 +37,7 @@ main = do
 
   -- Core syntax: explicit helpers, {{{ }}} is output.
   json "core" "{\"x\": \"<i>\"}" \j -> do
-    let r = runFn2 render "{{{ esc_html (lookup this \"x\") }}}" j
+    let r = runFn2 render "{{{ escapeHtml (lookup this \"x\") }}}" j
     assert' "core ok flag" r.ok
     assert' ("core value: " <> r.value) (r.value == "&lt;i&gt;")
 

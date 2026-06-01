@@ -156,11 +156,10 @@ printNode :: Node -> Out
 printNode = case _ of
   Content s -> emptyOut { text = s }
 
-  -- `Output _ (App "escapeHtml" [e])` (canonical) / `esc_html` (silent alias) is
-  -- the auto-escaped `{{ e }}`; any other `Output _ e` is the raw `{{{ e }}}`.
+  -- `Output _ (App "escapeHtml" [e])` is the auto-escaped `{{ e }}`; any other
+  -- `Output _ e` is the raw `{{{ e }}}`.
   Output span e -> case e of
     App "escapeHtml" [ inner ] -> escaped span inner
-    App "esc_html" [ inner ] -> escaped span inner
     _ ->
       let
         ex = exprTop span e
@@ -184,7 +183,7 @@ printNode = case _ of
     in
       h { text = "{{{{" <> h.text <> "}}}}" <> raw <> "{{{{/" <> name <> "}}}}" }
 
--- | Escaped output `{{ e }}` — the re-sugar of `(escapeHtml e)` / `(esc_html e)`.
+-- | Escaped output `{{ e }}` — the re-sugar of `(escapeHtml e)`.
 escaped :: Span -> Expr -> Out
 escaped span inner =
   let

@@ -26,19 +26,17 @@ import Data.Array as Array
 import Data.Either (Either)
 import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..))
-import Kernel.Prelude (preludeAliasWarnings)
+import Kernel.Prelude (preludeAliases)
 import Kernel.Walk (Issue, Severity(..), helperRefs)
 
--- | Warn on every use of a *warned* alias helper in a (parsed) template, pointing
--- | at its canonical name. Dialect-agnostic: the caller parses with whatever
--- | dialect it wants and passes the `Template` (mirrors
--- | `MaxBars.loopVarShadowWarnings`). One `Warn` per occurrence. The silent
--- | escaper aliases (`esc_html`/`esc_json`, §8) are excluded — `preludeAliasWarnings`
--- | already drops them — so they are never nagged about.
+-- | Warn on every use of an alias helper in a (parsed) template, pointing at its
+-- | canonical name. Dialect-agnostic: the caller parses with whatever dialect it
+-- | wants and passes the `Template` (mirrors `MaxBars.loopVarShadowWarnings`).
+-- | One `Warn` per occurrence.
 aliasWarnings :: Template -> Array Issue
 aliasWarnings = Array.mapMaybe warnOf <<< helperRefs
   where
-  warnOf ref = case lookup ref.name preludeAliasWarnings of
+  warnOf ref = case lookup ref.name preludeAliases of
     Just canonical -> Just
       { severity: Warn
       , name: ref.name

@@ -12,9 +12,9 @@ export const cases = [
   // ── text & output ──────────────────────────────────────────────────────────
   { name: "text-only", t: "hello world", d: null },
   { name: "raw-output", t: "{{{lookup this \"x\"}}}", d: { x: "<b>&\"'" } },
-  { name: "esc_html", t: "{{{esc_html (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
+  { name: "escapeHtml", t: "{{{escapeHtml (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
   { name: "safe-passthrough", t: "{{{safe (lookup this \"x\")}}}", d: { x: "<i>" } },
-  { name: "esc-idempotent-on-safe", t: "{{{esc_html (safe (lookup this \"x\"))}}}", d: { x: "<i>" } },
+  { name: "esc-idempotent-on-safe", t: "{{{escapeHtml (safe (lookup this \"x\"))}}}", d: { x: "<i>" } },
 
   // ── literals & stringify ────────────────────────────────────────────────────
   { name: "number-int", t: "{{{lookup this \"n\"}}}", d: { n: 3 } },
@@ -22,7 +22,7 @@ export const cases = [
   { name: "bool-true", t: "{{{lookup this \"b\"}}}", d: { b: true } },
   { name: "null-empty", t: "[{{{lookup this \"z\"}}}]", d: { z: null } },
   { name: "array-join", t: "{{{lookup this \"xs\"}}}", d: { xs: ["a", "b", "c"] } },
-  { name: "string-literal-arg", t: "{{{esc_html \"a<b\"}}}", d: null },
+  { name: "string-literal-arg", t: "{{{escapeHtml \"a<b\"}}}", d: null },
 
   // ── lookup ──────────────────────────────────────────────────────────────────
   { name: "lookup-nested", t: "{{{lookup this \"u\" \"city\"}}}", d: { u: { city: "Lübeck" } } },
@@ -58,7 +58,7 @@ export const cases = [
   { name: "apply-if-false", t: "{{#apply \"if\" (lookup this \"c\")}}Y{{else}}N{{/apply}}", d: { c: false } },
   { name: "apply-unless", t: "{{#apply \"unless\" (lookup this \"c\")}}N{{/apply}}", d: { c: false } },
   { name: "apply-with", t: "{{#apply \"with\" (lookup this \"o\")}}{{{lookup this \"k\"}}}{{/apply}}", d: { o: { k: "v" } } },
-  { name: "apply-inline-helper", t: "{{#apply \"esc_html\" (lookup this \"x\")}}ignored{{/apply}}", d: { x: "<b>" } },
+  { name: "apply-inline-helper", t: "{{#apply \"escapeHtml\" (lookup this \"x\")}}ignored{{/apply}}", d: { x: "<b>" } },
 
   // ── with ────────────────────────────────────────────────────────────────────
   { name: "with", t: "{{#with (lookup this \"u\")}}{{{lookup this \"name\"}}}{{/with}}", d: { u: { name: "Ada" } } },
@@ -72,8 +72,8 @@ export const cases = [
   { name: "json-pretty", t: "{{{json (lookup this \"o\") (dict \"pretty\" true)}}}", d: { o: { a: 1 } } },
 
   // ── nesting & escaping interplay ────────────────────────────────────────────
-  { name: "nested-if-each", t: "<ul>{{#each (lookup this \"xs\")}}{{#if this}}<li>{{{esc_html this}}}</li>{{/if}}{{/each}}</ul>", d: { xs: ["a", "", "b"] } },
-  { name: "auto-escape-each", t: "{{#each (lookup this \"xs\")}}{{{esc_html this}}} {{/each}}", d: { xs: ["<x>", "a&b"] } },
+  { name: "nested-if-each", t: "<ul>{{#each (lookup this \"xs\")}}{{#if this}}<li>{{{escapeHtml this}}}</li>{{/if}}{{/each}}</ul>", d: { xs: ["a", "", "b"] } },
+  { name: "auto-escape-each", t: "{{#each (lookup this \"xs\")}}{{{escapeHtml this}}} {{/each}}", d: { xs: ["<x>", "a&b"] } },
 
   // ── SURFACE dialect (desugars to core, then compiles) ───────────────────────
   { name: "s:bare-path", dialect: "surface", t: "Hello {{ name }}!", d: { name: "Ada" } },
@@ -276,10 +276,7 @@ export const cases = [
   { name: "s:else-if-includeZero", dialect: "surface", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
 
-  // canonical escapers `escapeHtml`/`escapeJson` and their silent snake_case
-  // aliases `esc_html`/`esc_json` (§8) compile identically (compiled ≡ interpreter).
+  // canonical escapers escapeHtml/escapeJson (compiled ≡ interpreter).
   { name: "escapeHtml-canonical", t: "{{{escapeHtml (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
-  { name: "esc_html-alias", t: "{{{esc_html (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
   { name: "escapeJson-canonical", t: "{{{escapeJson (lookup this \"o\")}}}", d: { o: { a: 1 } } },
-  { name: "esc_json-alias", t: "{{{esc_json (lookup this \"o\")}}}", d: { o: { a: 1 } } },
 ];

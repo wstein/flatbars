@@ -216,7 +216,7 @@ numberToString n =
     fromMaybe s (stripSuffix (Pattern ".0") s)
 
 -- | Serialize a value as compact JSON text (the default for the `json` /
--- | `esc_json` helpers). Unlike `stringify`, this is total — *objects* and
+-- | `escapeJson` helpers). Unlike `stringify`, this is total — *objects* and
 -- | *arrays* are first-class JSON, and a `VSafe` is just a string. Numbers reuse
 -- | `numberToString` (so an integral value is `1`, not `1.0`); object keys come
 -- | out in `Map` order.

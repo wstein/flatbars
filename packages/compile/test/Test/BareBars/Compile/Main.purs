@@ -43,8 +43,8 @@ main = do
     , "out += \"hi\""
     ]
 
-  expectJs "output + inlined esc_html/lookup/this"
-    "{{{esc_html (lookup this \"name\")}}}"
+  expectJs "output + inlined escapeHtml/lookup/this"
+    "{{{escapeHtml (lookup this \"name\")}}}"
     [ "rt.out(rt.esc(rt.lookup(c0.ctx, \"name\")))" ]
 
   expectJs "if/else compiles to native control flow"

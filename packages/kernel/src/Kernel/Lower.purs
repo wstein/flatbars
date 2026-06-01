@@ -69,13 +69,11 @@ lower = foldTemplate
   , concat: join
   }
   where
-  -- `escapeHtml e` (canonical) / `esc_html e` (silent alias) ⇒ escaped output of
-  -- `e`; anything else is raw output as-is (so `safe x` stays visible as
-  -- `ROut false (safe x)` — intentional trust).
+  -- `escapeHtml e` ⇒ escaped output of `e`; anything else is raw output as-is
+  -- (so `safe x` stays visible as `ROut false (safe x)` — intentional trust).
   escaping :: Expr -> Tuple Boolean Expr
   escaping = case _ of
     App "escapeHtml" [ inner ] -> Tuple true inner
-    App "esc_html" [ inner ] -> Tuple true inner
     e -> Tuple false e
 
   lowerBlock :: Ident -> Array Expr -> Template -> (Template -> Array RNode) -> RNode
@@ -114,14 +112,14 @@ lower = foldTemplate
 
 -- | Safe-by-default lint. Two warnings:
 -- |
--- |  1. *Forgot to escape* — a *raw* output (`{{{ … }}}`, not `esc_html`) emits
+-- |  1. *Forgot to escape* — a *raw* output (`{{{ … }}}`, not `escapeHtml`) emits
 -- |     untrusted *data* (a `lookup`/`this`/scoped accessor not wrapped in
 -- |     `safe`). The reference renderer never auto-escapes raw output, so this
 -- |     is where "you forgot to escape" is caught.
 -- |
 -- |  2. *Testing rendered output* — an `if`/`unless` condition headed by
--- |     `esc_html`/`safe`/`raw`. Those produce *output text*, not data, so
--- |     testing their truthiness is a category error: `safe`/`esc_html`
+-- |     `escapeHtml`/`safe`/`raw`. Those produce *output text*, not data, so
+-- |     testing their truthiness is a category error: `safe`/`escapeHtml`
 -- |     stringify first, so `safe 0` is truthy while `0` is falsy. Test the
 -- |     underlying data instead.
 escapingWarnings :: Template -> Array Issue
@@ -165,11 +163,9 @@ escapingWarnings = walk <<< lower
   dataAccessors :: Array Ident
   dataAccessors = [ "lookup", "this", "root", "parent", "key" ]
 
-  -- Helpers that produce output text (a `VSafe`) rather than data. The canonical
-  -- `escapeHtml` and its silent alias `esc_html` both count (matching the prior
-  -- set exactly, modulo the rename — `esc_json` was not listed and stays out).
+  -- Helpers that produce output text (a `VSafe`) rather than data.
   safeProducers :: Array Ident
-  safeProducers = [ "escapeHtml", "esc_html", "safe", "raw" ]
+  safeProducers = [ "escapeHtml", "safe", "raw" ]
 
 --------------------------------------------------------------------------------
 -- Directive lints (truthiness spec §6 / Phase 4)

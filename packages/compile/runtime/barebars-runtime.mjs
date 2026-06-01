@@ -283,7 +283,6 @@ const helpers = {
   null: () => null,
   lookup: (a) => lookup(...a),
   escapeHtml: (a) => esc(a[0]),
-  esc_html: (a) => esc(a[0]), // silent alias of escapeHtml (§8)
   safe: (a) => safe(a[0]),
   eq: (a) => deepEq(a[0], a[1]),
   ne: (a) => !deepEq(a[0], a[1]),
@@ -370,7 +369,6 @@ const helpers = {
   groupBy: (a) => { if (!Array.isArray(a[0])) return {}; const key = stringify(a[1]), o = {}; for (const el of a[0]) { const k = stringify(pathOf(el, key)); (o[k] = o[k] || []).push(el); } return o; },
   json: (a) => jsonText(a[0], a[1]),
   escapeJson: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))),
-  esc_json: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))), // silent alias of escapeJson (§8)
   else: () => new Safe(""),
   elif: () => new Safe(""),
   dict: (a) => { const o = {}; for (let i = 0; i + 1 < a.length; i += 2) o[stringify(a[i])] = a[i + 1]; return o; },
