@@ -1329,6 +1329,7 @@
             <option value="stem">Stem</option>
             <option value="handlebars">Handlebars</option>
             <option value="barebars">BareBars</option>
+            <option value="minbars">MinBars (Mustache)</option>
           </select>
         </div>
         <div class="topbar-group" id="dialect-group" hidden>
@@ -1561,6 +1562,7 @@
       import { createRenderer } from "./stem.mjs?v=1";
       import { createHandlebarsRenderer } from "./handlebars.mjs?v=2";
       import { createBareBarsRenderer } from "./barebars.mjs?v=1";
+      import { createMinBarsRenderer } from "./minbars.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
       import {
@@ -1650,15 +1652,20 @@
       const ENGINE =
         ["handlebars", "hbs"].includes(ENGINE_PARAM) ? "handlebars"
         : ["barebars", "bb"].includes(ENGINE_PARAM) ? "barebars"
+        : ["minbars", "mustache"].includes(ENGINE_PARAM) ? "minbars"
         : "stem";
       const renderer =
         ENGINE === "handlebars" ? await createHandlebarsRenderer()
         : ENGINE === "barebars" ? await createBareBarsRenderer()
+        : ENGINE === "minbars" ? await createMinBarsRenderer()
         : await createRenderer(await (await fetch(WASM)).arrayBuffer());
       // Show the engine + its version (the Stem build bakes it into the wasm;
       // the Handlebars adapter reports the vendored library version).
       const ENGINE_LABEL =
-        ENGINE === "handlebars" ? "Handlebars" : ENGINE === "barebars" ? "BareBars" : "Stem";
+        ENGINE === "handlebars" ? "Handlebars"
+        : ENGINE === "barebars" ? "BareBars"
+        : ENGINE === "minbars" ? "MinBars"
+        : "Stem";
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
 
       // Engine + dialect selectors. Switching either is a fundamental mode change
