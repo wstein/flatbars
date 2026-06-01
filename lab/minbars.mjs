@@ -2,27 +2,30 @@
 //
 // MinBars adapter — the engine-neutral playground's Mustache engine.
 // `createMinBarsRenderer()` returns the same object shape as the other engine
-// adapters (render, compile, parseAst, inspectAt, usedTransformers,
+// adapters (render, compile, compileToJs, parseAst, inspectAt, usedTransformers,
 // requiredAssigns, partialGraph, allTransformers, catalog, engineInfo,
 // version), so the host wires it through the identical seam.
 //
 // MinBars is a *peer engine* to FullBars (Mustache semantics — a context stack
 // with parent fallback, polymorphic sections, `false null []` truthiness),
-// rendering 170/170 of the in-scope mustache/spec suite. It is interpret-only:
-// there is no compile-to-JS path, no helper registry, no output->source map. So
-// the capability vector is deliberately small — `render` + `partials` +
-// `catalog` — and the Phase-1 panel gate hides everything else (Compiled JS,
-// Context Inspector, Bytecode, the approximate static analyses).
+// rendering the in-scope mustache/spec suite. It now also compiles to JS
+// (`compileToJs`, ADR-016), so the Compiled JS view lights up; it still has no
+// helper registry or lowered-AST seam, so the catalog stays small and the
+// AST-analysis panels (Context Inspector, partial graph) gate off.
 
-import { renderMustache as bbRenderMustache } from "./vendor/flatbars-engine.mjs";
+import {
+  renderMustache as bbRenderMustache,
+  compileMinbars as bbCompileMinbars,
+  compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
+} from "./vendor/flatbars-engine.mjs";
 
 const MIN_VERSION = "0.1.0";
 
-// engine-features/v1 capability vector for MinBars. Compared with the FlatBars
-// adapter's set, everything compile/AST-analysis specific is absent: MinBars has
-// no JS compile, no lowered AST seam here, and no Handlebars-style helper
-// catalog — just rendering and (Mustache) partials.
-const MIN_FEATURES = ["partials", "catalog"];
+// engine-features/v1 capability vector for MinBars. It renders + has (Mustache)
+// partials + a catalog + a JS compiler (ADR-016). Compared with the FlatBars
+// adapter's set, the AST-analysis features (lowered-AST seam, required-assigns,
+// partial-graph) are absent — there is no lowered AST here.
+const MIN_FEATURES = ["partials", "catalog", "compile-js"];
 
 // The Mustache constructs, with the metadata the Transformers/cheat-sheet panel
 // renders (mirrors the shape of the other adapters' catalogs). Mustache has no
@@ -62,6 +65,18 @@ export async function createMinBarsRenderer() {
     throw err;
   }
 
+  // Compile the MinBars template to a JS ES module (the `compile-js` feature;
+  // ADR-016). Returns `{ ok, value, error }` — `value` is the JS source — driving
+  // the Compiled JS view. `{{> p}}` is inlined, so when partials are supplied they
+  // are compiled in; without them a partial inlines to "" (as a missing partial
+  // renders). Recursive/dynamic partials and dynamic-name parents compile-reject
+  // with a clear error (slice limitation), matching the engine.
+  function compileToJs(source, partials) {
+    return partials && Object.keys(partials).length
+      ? bbCompileMinbarsWithPartials(partials, source)
+      : bbCompileMinbars(source);
+  }
+
   // MinBars exposes no lowered-AST seam to the host yet, so the AST-derived
   // panels (outline, data-access, partial-graph) gate off via the absent
   // features. The host may still call these analyses defensively during a
@@ -94,6 +109,7 @@ export async function createMinBarsRenderer() {
   return {
     render,
     compile,
+    compileToJs,
     parseAst,
     inspectAt,
     usedTransformers: noUses,
