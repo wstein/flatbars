@@ -1,0 +1,271 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// Reference-doc chrome: a sticky left navigation (antlr-ng's persistent-tree
+// FEEL, without its many-pages cause — see the design debate), lab-themed via
+// the shared token sheet, with scroll-spy that highlights the current section.
+// `groups` is [{ label, items: [{ href, label }] }]; the page body is the slot.
+import "../styles/lab-tokens.css";
+import "../styles/open-in-lab.css";
+
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/barebars/";
+const { title, subtitle, groups = [], spec } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · BareBars</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <button id="navToggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+      <a class="brand" href="/"><b>Bare</b>Bars <span>docs</span></a>
+      <a class="lab-link" href="/lab/index.html?engine=minbars" target="_blank" rel="noopener">Open the Lab ↗</a>
+    </header>
+
+    <div class="shell">
+      <nav id="sidebar" class="sidebar" aria-label="Reference navigation">
+        {groups.map((g) => (
+          <div class="nav-group">
+            <p class="nav-label">{g.label}</p>
+            <ul>
+              {g.items.map((it) => (
+                <li>
+                  <a
+                    class:list={["nav-link", { active: it.active }]}
+                    href={it.href}
+                    data-spy={it.href.startsWith("#") ? it.href.slice(1) : null}
+                    aria-current={it.active ? "page" : null}
+                  >
+                    {it.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      <main id="main" class="content">
+        <h1>{title}</h1>
+        {subtitle && <p class="lede">{subtitle}</p>}
+        <slot />
+        {spec && (
+          <p class="spec-foot">
+            Normative reference: <a href={`${SPEC_BASE}${spec}.html`}>{spec}.adoc ↗</a> —
+            the spec is the contract; this page only illustrates it.
+          </p>
+        )}
+      </main>
+    </div>
+
+    <script is:inline>
+      // Mobile nav toggle.
+      const tgl = document.getElementById("navToggle");
+      const sb = document.getElementById("sidebar");
+      tgl?.addEventListener("click", () => {
+        const open = sb.classList.toggle("open");
+        tgl.setAttribute("aria-expanded", String(open));
+      });
+      // Close the drawer after picking a link on narrow screens.
+      sb?.addEventListener("click", (e) => {
+        if (e.target.closest("a") && window.matchMedia("(max-width: 52rem)").matches) {
+          sb.classList.remove("open");
+          tgl?.setAttribute("aria-expanded", "false");
+        }
+      });
+      // Scroll-spy: highlight the nav link for the section in view.
+      const spies = [...document.querySelectorAll(".nav-link[data-spy]")];
+      const byId = new Map(spies.map((a) => [a.dataset.spy, a]));
+      const targets = spies.map((a) => document.getElementById(a.dataset.spy)).filter(Boolean);
+      if ("IntersectionObserver" in window && targets.length) {
+        const seen = new Set();
+        const io = new IntersectionObserver(
+          (ents) => {
+            for (const en of ents) {
+              if (en.isIntersecting) seen.add(en.target.id);
+              else seen.delete(en.target.id);
+            }
+            // The topmost currently-visible section wins.
+            const active = targets.find((t) => seen.has(t.id));
+            spies.forEach((a) => a.classList.remove("active"));
+            if (active) byId.get(active.id)?.classList.add("active");
+          },
+          { rootMargin: "-72px 0px -65% 0px", threshold: 0 },
+        );
+        targets.forEach((t) => io.observe(t));
+      }
+    </script>
+
+    <style is:global>
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; scroll-padding-top: 60px; }
+      body {
+        margin: 0;
+        font: 16px/1.65 var(--font-ui);
+        color: var(--fg);
+        background: var(--bg);
+      }
+      .skip {
+        position: absolute;
+        left: -999px;
+      }
+      .skip:focus {
+        left: 8px;
+        top: 8px;
+        z-index: 20;
+        background: var(--accent);
+        color: #fff;
+        padding: 0.4rem 0.7rem;
+        border-radius: var(--radius);
+      }
+
+      /* Top bar */
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        height: 48px;
+        padding: 0 1rem;
+        background: color-mix(in srgb, var(--bg) 85%, transparent);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid var(--border);
+      }
+      .brand { color: var(--fg); text-decoration: none; font-weight: 600; }
+      .brand b { color: var(--accent); }
+      .brand span {
+        font: 600 11px/1 var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--fg-faint);
+        margin-left: 0.25rem;
+      }
+      .lab-link {
+        margin-left: auto;
+        color: var(--accent-2);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .lab-link:hover { color: var(--accent); }
+      .nav-toggle {
+        display: none;
+        background: none;
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius);
+        color: var(--fg);
+        font-size: 1rem;
+        padding: 0.1rem 0.5rem;
+        cursor: pointer;
+      }
+
+      /* Layout */
+      .shell {
+        display: grid;
+        grid-template-columns: 16rem minmax(0, 1fr);
+        max-width: 78rem;
+        margin: 0 auto;
+      }
+      .sidebar {
+        position: sticky;
+        top: 48px;
+        align-self: start;
+        height: calc(100vh - 48px);
+        overflow-y: auto;
+        padding: 1.25rem 0.75rem 2rem;
+        border-right: 1px solid var(--border);
+        background: var(--bg-1);
+      }
+      .nav-group { margin-bottom: 1.25rem; }
+      .nav-label {
+        font: 600 11px/1 var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--fg-faint);
+        margin: 0 0 0.4rem 0.6rem;
+      }
+      .sidebar ul { list-style: none; margin: 0; padding: 0; }
+      .nav-link {
+        display: block;
+        padding: 0.3rem 0.6rem;
+        border-radius: var(--radius);
+        color: var(--fg-secondary);
+        text-decoration: none;
+        font-size: 0.92rem;
+        border-left: 2px solid transparent;
+      }
+      .nav-link:hover { background: var(--bg-2); }
+      .nav-link.active {
+        background: var(--accent-soft);
+        color: var(--accent-2);
+        font-weight: 600;
+        border-left-color: var(--accent);
+      }
+
+      /* Content */
+      .content {
+        padding: 2rem clamp(1rem, 4vw, 3rem) 5rem;
+        max-width: 52rem;
+      }
+      .content h1 { font-size: 2rem; margin: 0.2rem 0 0.5rem; }
+      .lede { font-size: 1.1rem; color: var(--fg-muted); margin-top: 0; }
+      .content h2 {
+        font-size: 1.4rem;
+        margin: 2.75rem 0 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px solid var(--border);
+      }
+      .content h3 { font-size: 1.08rem; margin: 1.5rem 0 0.4rem; }
+      .content p { margin: 0.6rem 0; }
+      .content a { color: var(--accent-2); }
+      .content code {
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+        background: var(--bg-2);
+        padding: 0.1em 0.35em;
+        border-radius: 4px;
+      }
+      .content pre {
+        background: var(--bg-1);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 0.75rem 0.9rem;
+        overflow: auto;
+      }
+      .content pre code { background: none; padding: 0; font-size: 0.85em; }
+      .spec-foot { margin-top: 3rem; color: var(--fg-muted); font-size: 0.92rem; }
+
+      @media (max-width: 52rem) {
+        .nav-toggle { display: inline-block; }
+        .shell { grid-template-columns: minmax(0, 1fr); }
+        .sidebar {
+          position: fixed;
+          top: 48px;
+          left: 0;
+          width: 16rem;
+          transform: translateX(-110%);
+          transition: transform 0.2s ease;
+          z-index: 9;
+          box-shadow: var(--shadow-pop);
+        }
+        .sidebar.open { transform: none; }
+      }
+    </style>
+  </body>
+</html>

@@ -1,0 +1,394 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The comprehensive Mustache reference — the front door (debate consensus item
+// 8). Prose is illustrative only; every runnable example comes from the single
+// gate-validated source `../mustache.mjs`, and features MinBars cannot execute
+// (set-delimiters, lambdas) are static `spec-only` callouts with no live button.
+import Reference from "../layouts/Reference.astro";
+import OpenInLab from "../components/OpenInLab.jsx";
+import { examples as ex } from "../mustache.mjs";
+// Conformance numbers are GENERATED from the vendored mustache/spec suite
+// (scripts/gen-conformance.mjs, gated by `npm run check:conformance`), so the
+// table below can never claim more than the suite proves on the shipped engine.
+import conformance from "../conformance.json";
+
+const conformanceGreen = conformance.modules.every((m) => m.pass === m.total);
+
+// Sticky left-nav model (consensus item 1): Mustache concepts, then the sibling
+// surfaces this reference is the hub for, then the Lab.
+const groups = [
+  {
+    label: "Mustache",
+    items: [
+      { href: "#intro", label: "What Mustache is" },
+      { href: "#interpolation", label: "Interpolation" },
+      { href: "#sections", label: "Sections" },
+      { href: "#truthiness", label: "Truthiness (gotcha)" },
+      { href: "#inverted", label: "Inverted sections" },
+      { href: "#comments", label: "Comments" },
+      { href: "#partials", label: "Partials" },
+      { href: "#inheritance", label: "Template inheritance" },
+      { href: "#dynamic-names", label: "Dynamic names" },
+      { href: "#set-delimiters", label: "Set delimiters" },
+      { href: "#lambdas", label: "Lambdas" },
+      { href: "#conformance", label: "What MinBars supports" },
+    ],
+  },
+  {
+    label: "Other surfaces",
+    items: [
+      { href: "/rawbars", label: "RawBars — the core" },
+      { href: "/fullbars", label: "FullBars — Handlebars" },
+      { href: "/maxbars", label: "MaxBars — operators" },
+    ],
+  },
+  {
+    label: "Play",
+    items: [{ href: "/lab/index.html?engine=minbars", label: "FlatBars Lab ↗" }],
+  },
+];
+
+// Inline tag references and spec-only code — kept in strings so Astro never
+// tries to parse the `{{ }}` as expressions.
+const t = (s) => s; // readability helper for inline tag literals
+const setDelimCode = `{{=<% %>=}}
+Now tags look like <% name %>.
+<%={{ }}=%>
+...and {{name}} again.`;
+const lambdaCode = `// mustache.js — a section whose value is a function (a "lambda")
+const data = {
+  year: 2026,
+  bold: () => (text, render) => "<b>" + render(text) + "</b>",
+};
+Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
+// → "<b>(c) 2026</b>"`;
+---
+
+<Reference
+  title="Mustache"
+  subtitle="The logic-less template language — a guided, runnable reference. Every supported tag below renders live through MinBars, our Mustache-conformant engine, and opens in the Lab with one click."
+  groups={groups}
+  spec="adr-0007-minbars"
+>
+  <!-- ─────────────────────────── Intro ─────────────────────────── -->
+  <section id="intro">
+    <h2>What Mustache is</h2>
+    <p>
+      Mustache is <b>logic-less</b>: there are no <code>if</code> statements, no
+      <code>else</code> clauses, no loops. A template is plain text with
+      <code>{t("{{ }}")}</code> tags; rendering expands each tag against the data
+      you hand it. All control flow is expressed by the <em>shape of the data</em>
+      (is this key truthy? is it a list?), never by code in the template.
+    </p>
+    <p>
+      Mustache is also <b>a specification, not an engine</b> — like how JavaScript
+      is a spec that Chrome and Firefox implement. Dozens of engines across
+      languages implement it. On this page the engine is <b>MinBars</b>, the
+      Mustache-conformant member of the BareBars family; it is tested against the
+      official <code>mustache/spec</code> fixtures.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
+    <p class="tip">
+      The left pane is the template, the right is the live output, and
+      <b>Open in Lab</b> loads the same example into the full editor. Edit, and
+      watch it re-render.
+    </p>
+  </section>
+
+  <!-- ─────────────────────── Interpolation ─────────────────────── -->
+  <section id="interpolation">
+    <h2>Interpolation</h2>
+    <p>
+      The workhorse tag. <code>{t("{{name}}")}</code> looks <code>name</code> up
+      in the data and inserts it, <b>HTML-escaped</b> by default (so user data
+      can't inject markup). To emit raw, unescaped output use the triple-mustache
+      <code>{t("{{{name}}}")}</code> or the ampersand form <code>{t("{{&name}}")}</code>.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.escaping.template} data={ex.escaping.data} />
+
+    <h3>Dotted names</h3>
+    <p>Reach into nested objects with dots: <code>{t("{{name.first}}")}</code>.</p>
+    <OpenInLab client:visible engine="minbars" template={ex.dotted.template} data={ex.dotted.data} />
+
+    <h3>The implicit iterator</h3>
+    <p>
+      Inside a section over a list of scalars, <code>{t("{{.}}")}</code> is the
+      current item itself.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.implicit.template} data={ex.implicit.data} />
+
+    <h3>Missing keys</h3>
+    <p>
+      A name that resolves to nothing — missing or <code>null</code> — renders as
+      the empty string. Mustache never errors on a missing key.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.missing.template} data={ex.missing.data} />
+  </section>
+
+  <!-- ───────────────────────── Sections ────────────────────────── -->
+  <section id="sections">
+    <h2>Sections</h2>
+    <p>
+      A section <code>{t("{{#key}} … {{/key}}")}</code> renders its body a number
+      of times that depends on the <em>shape</em> of <code>key</code>:
+    </p>
+    <ul>
+      <li><b>List</b> → the body repeats once per element, each element pushed as the context.</li>
+      <li><b>Truthy non-list</b> (object, <code>true</code>, a number, a string) → the body renders once.</li>
+      <li><b>Falsy</b> (<code>false</code>, <code>null</code>, <code>[]</code>) → the body is skipped.</li>
+    </ul>
+
+    <h3>Iterating a list</h3>
+    <OpenInLab client:visible engine="minbars" template={ex.sectionArray.template} data={ex.sectionArray.data} />
+
+    <h3>As a conditional</h3>
+    <p>A boolean turns a section into a plain on/off switch.</p>
+    <OpenInLab client:visible engine="minbars" template={ex.sectionBool.template} data={ex.sectionBool.data} />
+
+    <h3>An object opens a scope</h3>
+    <p>When the value is an object, that object becomes the context for the body.</p>
+    <OpenInLab client:visible engine="minbars" template={ex.sectionObject.template} data={ex.sectionObject.data} />
+  </section>
+
+  <!-- ──────────────────────── Truthiness ───────────────────────── -->
+  <section id="truthiness">
+    <h2>Truthiness — the one that bites</h2>
+    <div class="callout warn">
+      <p>
+        <b>In Mustache, only <code>false</code>, <code>null</code>, and the empty
+        list <code>[]</code> are falsy.</b> The number <code>0</code> and the
+        empty string <code>""</code> are <b>truthy</b> — so a section over them
+        <em>renders</em>. This is the single most common surprise for anyone
+        arriving from Handlebars or JavaScript, where <code>0</code> and
+        <code>""</code> are falsy.
+      </p>
+    </div>
+    <table class="cmp">
+      <thead><tr><th>value</th><th>Mustache / MinBars</th><th>JS / Handlebars</th></tr></thead>
+      <tbody>
+        <tr><td><code>false</code></td><td>falsy</td><td>falsy</td></tr>
+        <tr><td><code>null</code></td><td>falsy</td><td>falsy</td></tr>
+        <tr><td><code>[]</code></td><td>falsy</td><td>falsy / truthy*</td></tr>
+        <tr><td><code>0</code></td><td><b>truthy</b></td><td>falsy</td></tr>
+        <tr><td><code>""</code></td><td><b>truthy</b></td><td>falsy</td></tr>
+      </tbody>
+    </table>
+    <p>See it for yourself — <code>count</code> is <code>0</code> yet the section renders:</p>
+    <OpenInLab client:visible engine="minbars" template={ex.truthyZero.template} data={ex.truthyZero.data} />
+  </section>
+
+  <!-- ──────────────────── Inverted sections ────────────────────── -->
+  <section id="inverted">
+    <h2>Inverted sections</h2>
+    <p>
+      Open with a caret — <code>{t("{{^key}} … {{/key}}")}</code> — to render the
+      body <em>only</em> when the key is falsy. The idiomatic "list, or an
+      empty-state message" pairs a section with its inverse.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.inverted.template} data={ex.inverted.data} />
+  </section>
+
+  <!-- ───────────────────────── Comments ────────────────────────── -->
+  <section id="comments">
+    <h2>Comments</h2>
+    <p>
+      <code>{t("{{! … }}")}</code> is dropped entirely from the output — handy for
+      notes that should never reach the rendered page.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.comment.template} data={ex.comment.data} />
+  </section>
+
+  <!-- ───────────────────────── Partials ────────────────────────── -->
+  <section id="partials">
+    <h2>Partials</h2>
+    <p>
+      <code>{t("{{> name}}")}</code> includes another template by name. A partial
+      <b>inherits the caller's context</b> — it sees the same data — which makes
+      partials the natural unit for reuse: a row, a card, a header/footer.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.partial.template} data={ex.partial.data} partials={ex.partial.partials} />
+    <h3>A partial per row</h3>
+    <p>Combine a section with a partial to template each element of a list.</p>
+    <OpenInLab client:visible engine="minbars" template={ex.partialList.template} data={ex.partialList.data} partials={ex.partialList.partials} />
+    <p class="tip">
+      Partials also carry <b>standalone indentation</b>: if a <code>{t("{{> p}}")}</code>
+      sits alone on an indented line, that indent is re-applied to every line the
+      partial emits — so included blocks stay aligned.
+    </p>
+  </section>
+
+  <!-- ─────────────────── Template inheritance ──────────────────── -->
+  <section id="inheritance">
+    <h2>Template inheritance</h2>
+    <p>
+      Partials include; <b>parents</b> let a child fill named holes in a layout.
+      A parent is invoked with <code>{t("{{<layout}} … {{/layout}}")}</code>;
+      inside it, the child supplies <code>{t("{{$block}} … {{/block}}")}</code>
+      overrides. The layout itself declares the same <code>{t("{{$block}}")}</code>
+      names with default content, used when the child omits an override.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.inheritance.template} data={ex.inheritance.data} partials={ex.inheritance.partials} />
+  </section>
+
+  <!-- ─────────────────────── Dynamic names ─────────────────────── -->
+  <section id="dynamic-names">
+    <h2>Dynamic names</h2>
+    <p>
+      Choose the partial (or parent) <em>at render time</em> by prefixing a star
+      and reading the name from the data: <code>{t("{{>* key}}")}</code> includes
+      whichever partial <code>key</code> resolves to.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.dynamicPartial.template} data={ex.dynamicPartial.data} partials={ex.dynamicPartial.partials} />
+  </section>
+
+  <!-- ─────────────────────── Set delimiters ────────────────────── -->
+  <section id="set-delimiters">
+    <h2>Set delimiters <span class="badge spec-only">spec · not in MinBars</span></h2>
+    <p>
+      The Mustache spec lets a template <em>change its own delimiters</em> mid-stream
+      with <code>{t("{{=<% %>=}}")}</code> — useful when <code>{t("{{ }}")}</code>
+      collides with another syntax (e.g. server-side languages).
+    </p>
+    <pre><code>{setDelimCode}</code></pre>
+    <div class="callout info">
+      <p>
+        <b>MinBars does not implement set delimiters</b> (deferred in
+        <a href="/barebars/adr-0007-minbars.html">ADR-0007</a>: no customer corpus
+        to audit yet). There's no live button here because a preview that can't run
+        would mislead. The example is shown for spec completeness.
+      </p>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── Lambdas ─────────────────────────── -->
+  <section id="lambdas">
+    <h2>Lambdas <span class="badge spec-only">spec · not in MinBars</span></h2>
+    <p>
+      The spec allows a key to be a <em>function</em>. A lambda used as a section
+      receives the raw, unrendered body text and a <code>render</code> callback,
+      so it can transform or wrap content programmatically.
+    </p>
+    <pre><code>{lambdaCode}</code></pre>
+    <div class="callout info">
+      <p>
+        <b>MinBars has no function value type</b>, so lambdas are not supported
+        (and may arrive in a later phase). Reach for a real engine binding —
+        mustache.js, or BareBars <a href="/fullbars">FullBars</a> helpers — when
+        you need computed output.
+      </p>
+    </div>
+  </section>
+
+  <!-- ──────────────────────── Conformance ──────────────────────── -->
+  <section id="conformance">
+    <h2>What MinBars supports</h2>
+    <p>
+      Every row below is <b>measured, not asserted</b>: the counts come from
+      running the vendored <code>mustache/spec</code> suite through the exact
+      engine these live examples use, regenerated on every build. The page can't
+      claim a pass its own previews would contradict.
+    </p>
+    <p class="score">
+      {conformanceGreen ? "✓ " : ""}MinBars passes
+      <b>{conformance.total.pass}/{conformance.total.total}</b>
+      of the vendored mustache/spec suite.
+    </p>
+    <table class="cmp">
+      <thead><tr><th>Module</th><th>Spec cases passed</th></tr></thead>
+      <tbody>
+        {conformance.modules.map((m) => (
+          <tr>
+            <td>{m.label}</td>
+            <td class={m.pass === m.total && m.total > 0 ? "ok" : "no"}>
+              {m.pass === m.total && m.total > 0 ? "✓ " : ""}{m.pass}/{m.total}
+            </td>
+          </tr>
+        ))}
+        <tr><td>Set delimiters</td><td class="no">✗ not in suite · not implemented</td></tr>
+        <tr><td>Lambdas</td><td class="no">✗ not in suite · not implemented</td></tr>
+      </tbody>
+    </table>
+    <p class="tip">
+      Set delimiters and lambdas carry no spec fixtures here and aren't
+      implemented (<a href="/barebars/adr-0007-minbars.html">ADR-0007</a>) — so
+      the table claims nothing for them rather than a hollow ✓.
+    </p>
+    <h3>Where to go next</h3>
+    <p>
+      Mustache is the on-ramp. When you want real conditionals, helpers, and
+      computed values, the BareBars ladder continues:
+      <a href="/fullbars">FullBars</a> adds Handlebars-style blocks and helpers,
+      and <a href="/maxbars">MaxBars</a> adds infix operators and pipes — all on
+      the same core. Or jump straight into the
+      <a href="/lab/index.html?engine=minbars">Lab</a> and start typing.
+    </p>
+  </section>
+
+  <style is:global>
+    /* Section spacing — a section's own h2 owns the top rule. */
+    #main section { scroll-margin-top: 60px; }
+    .content .tip {
+      font-size: 0.92rem;
+      color: var(--fg-muted);
+      border-left: 3px solid var(--border-strong);
+      padding-left: 0.8rem;
+    }
+    .content .score {
+      font-size: 1.05rem;
+      background: var(--success-faint);
+      border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+      border-radius: var(--radius);
+      padding: 0.6rem 0.9rem;
+    }
+    .content .score b { color: var(--success); }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      vertical-align: middle;
+      font: 600 11px/1.4 var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 3px 7px;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+    }
+    .badge.spec-only {
+      color: var(--warn);
+      background: var(--warn-faint);
+      border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+    }
+
+    /* Callouts */
+    .callout {
+      border-radius: var(--radius);
+      padding: 0.1rem 1rem;
+      margin: 1rem 0;
+      border: 1px solid var(--border);
+    }
+    .callout.warn { background: var(--warn-faint); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+    .callout.info { background: var(--accent-softer); border-color: var(--border-strong); }
+
+    /* Comparison tables */
+    table.cmp {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    table.cmp th, table.cmp td {
+      text-align: left;
+      padding: 0.45rem 0.7rem;
+      border-bottom: 1px solid var(--border);
+    }
+    table.cmp thead th {
+      font: 600 11px/1 var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--fg-faint);
+    }
+    table.cmp td.ok { color: var(--success); font-weight: 600; }
+    table.cmp td.no { color: var(--danger); font-weight: 600; }
+  </style>
+</Reference>
