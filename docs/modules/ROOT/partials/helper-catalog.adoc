@@ -19,7 +19,7 @@
 |`divide` |value |2 |registered
 |`downcase` |value |1 |alias of `lowercase`
 |`each` |block |≥1 |registered
-|`elif` |value |1 |registered
+|`elif` |value |1–2 |registered
 |`else` |value |0 |registered
 |`endsWith` |value |2 |registered
 |`eq` |value |2 |registered

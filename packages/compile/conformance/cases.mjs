@@ -262,4 +262,13 @@ export const cases = [
   { name: "mx:coalesce-null", dialect: "maxbars", t: "{{ a ?? b }}", d: { a: null, b: "fb" } },
   { name: "mx:coalesce-zero", dialect: "maxbars", t: "{{ a ?? b }}", d: { a: 0, b: "fb" } },
   { name: "mx:coalesce-chain", dialect: "maxbars", t: '{{ a ?? b ?? "x" }}', d: { a: null, b: null } },
+
+  // `elif` honours an `includeZero=true` options hash (like the head `if`): a
+  // bare 0 in the elif is truthy only with the flag. Compiled ≡ interpreter.
+  { name: "mx:elif-includeZero-pass", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif 0 includeZero=true}}F{{/if}}", d: { score: 150 } },
+  { name: "mx:elif-includeZero-fire", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif 0 includeZero=true}}F{{/if}}", d: { score: 50 } },
+  { name: "mx:elif-no-includeZero", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif n}}Z{{else}}E{{/if}}", d: { score: 50, n: 0 } },
+  { name: "mx:elif-includeZero-else", dialect: "maxbars", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
+  // surface (FullBars) elif + includeZero hash.
+  { name: "s:elif-includeZero", dialect: "surface", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
 ];

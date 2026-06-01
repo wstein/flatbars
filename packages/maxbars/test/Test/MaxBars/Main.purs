@@ -103,6 +103,25 @@ main = do
     Right js -> assert' ("compile coalesce: expected rt.call(\"coalesce\" in\n" <> js)
       (contains (Pattern "rt.call(\"coalesce\"") js)
 
+  -- `elif` honours an `includeZero=true` options hash, like the head `if`: a
+  -- bare 0 is falsy normally, truthy with the flag (so the elif fires).
+  expectM "elif-includeZero-pass"
+    "{{#if score >= 100}}<b>pass</b>{{elif 0 includeZero=true}}<b>fail</b>{{/if}}"
+    (obj [ Tuple "score" (num 150.0) ])
+    "<b>pass</b>"
+  expectM "elif-includeZero-fire"
+    "{{#if score >= 100}}<b>pass</b>{{elif 0 includeZero=true}}<b>fail</b>{{/if}}"
+    (obj [ Tuple "score" (num 50.0) ])
+    "<b>fail</b>"
+  -- without the flag, the bare-0 elif is falsy → falls through (empty here).
+  expectM "elif-no-includeZero" "{{#if score >= 100}}P{{elif 0}}Z{{/if}}"
+    (obj [ Tuple "score" (num 50.0) ])
+    ""
+  -- the hash works on a data-driven elif condition + an else fallback too.
+  expectM "elif-includeZero-data" "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}"
+    (obj [ Tuple "a" (VBool false), Tuple "n" (num 0.0) ])
+    "Z"
+
   -- parenthesised infix in a block condition.
   expectM "if-paren-infix" "{{#if (a && b)}}Y{{else}}N{{/if}}"
     (obj [ Tuple "a" (VBool true), Tuple "b" (VBool false) ])

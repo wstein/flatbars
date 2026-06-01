@@ -118,7 +118,11 @@ coreHelperDefs =
   , gen "each" true (AtLeast 1) eachH
   , gen "with" true (AtLeast 1) withH
   , valDef "else" (nullary (pure (VSafe "")))
-  , valDef "elif" (unary (\_ -> pure (VSafe "")))
+  -- `elif cond [opts]`: a clause marker (its body/condition are handled by the
+  -- enclosing `if` via splitClauses). The optional 2nd arg is an options object
+  -- (surface hash `includeZero=true`), exactly like `if`'s — so the schema admits
+  -- 1 or 2 args; the marker itself renders nothing.
+  , gen "elif" false (Between 1 2) (\_ _ -> pure (VSafe ""))
   , gen "dict" false AnyArity dictH
   , gen "apply" true (AtLeast 1) applyH
   , gen "partial" false (Between 2 3) partialH
@@ -830,12 +834,21 @@ pickClause ctl clauses = case Array.uncons clauses of
   Nothing -> pure (VSafe "")
   Just { head: cl, tail } -> case cl.name of
     "else" -> renderSafe ctl ctl.env cl.body
+    -- `{{elif cond}}` / `{{elif cond includeZero=true}}`: the optional 2nd arg is
+    -- a surface-hash options object, honoured with `truthyWith` exactly as the
+    -- head `if`'s 2nd arg. Conditions short-circuit (only tested until one holds).
     "elif" -> case cl.args of
-      [ condE ] -> do
+      [ condE ] -> elifBranch condE Nothing
+      [ condE, optsE ] -> elifBranch condE (Just optsE)
+      _ -> throwError (ClauseError "elif: expected 1 or 2 arguments")
+      where
+      elifBranch condE mOpts = do
         cond <- ctl.eval ctl.env condE
-        if truthy (refFalsy ctl.env) cond then renderSafe ctl ctl.env cl.body
-        else pickClause ctl tail
-      _ -> throwError (ClauseError "elif: expected exactly 1 argument")
+        hit <- case mOpts of
+          Nothing -> pure (truthy (refFalsy ctl.env) cond)
+          Just optsE -> (\opts -> truthyWith (refFalsy ctl.env) opts cond) <$> ctl.eval ctl.env
+            optsE
+        if hit then renderSafe ctl ctl.env cl.body else pickClause ctl tail
     other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
 
 -- | Reject a malformed clause chain *before* branching, so the error does not
@@ -851,7 +864,8 @@ checkIfClauses clauses = case Array.uncons clauses of
       | otherwise -> throwError (ClauseError "if: {{else}} must be the final clause")
     "elif" -> case cl.args of
       [ _ ] -> checkIfClauses tail
-      _ -> throwError (ClauseError "elif: expected exactly 1 argument")
+      [ _, _ ] -> checkIfClauses tail
+      _ -> throwError (ClauseError "elif: expected 1 or 2 arguments")
     other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
 
 unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)

@@ -152,13 +152,16 @@ ifBlock rec ctx test body =
 elseChain :: Rec -> Ctx -> Array Clause -> String
 elseChain rec ctx clauses = case Array.uncons clauses of
   Nothing -> ""
-  Just { head: cl, tail } -> case cl.name, cl.args of
-    "elif", [ cond ] ->
-      " else if (rt.truthy(" <> ctx.scope <> ".falsy, " <> rec.expr ctx cond <> ")) {\n"
+  Just { head: cl, tail } -> case cl.name of
+    -- `elif cond [opts]` reuses `truthyTest`, so a 2-arg `{{elif c includeZero=true}}`
+    -- emits `rt.truthyWith` like the head `if` (and isn't mistaken for a terminal
+    -- `else`, as the old `"elif", [cond]`-only match did).
+    "elif" ->
+      " else if (" <> truthyTest rec ctx cl.args <> ") {\n"
         <> rec.nodes ctx cl.body
         <> "  }"
         <> elseChain rec ctx tail
-    _, _ -> " else {\n" <> rec.nodes ctx cl.body <> "  }" -- else (terminal)
+    _ -> " else {\n" <> rec.nodes ctx cl.body <> "  }" -- else (terminal)
 
 -- `each`/`with`: shift the frame, so the body runs in a fresh scope variable and
 -- its own buffer; the empty/falsy `else` clause renders in the parent frame. The
