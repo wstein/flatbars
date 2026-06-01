@@ -288,10 +288,35 @@ function truthyWith(set, v, opts) {
   return truthy(inc ? { ...set, z: 0 } : set, v);
 }
 
-// generic block fallback (unrecognised block helper) — not yet supported in the
-// compiled path; the interpreter remains the path for exotic block helpers.
-function block(name) {
-  throw new Error("rt.block: compiled path does not yet support block helper '" + name + "'");
+// Block helpers not lowered to native control flow (the emitter routes them
+// here with the same shape it gives `each`/`with`: the args, the frame, the
+// before-clause body lambda, and a `{ clause: fn }` object — e.g. `{ else }`).
+// The compiled body lambda is frame-relative (it reads whatever frame it is
+// handed), so we can dispatch `apply` to the right block semantics at runtime:
+// the parent frame for if/unless (no shift), child frames for each/with.
+//   {{#apply "each" coll}}…{{/apply}}  ⇒  apply renders `coll` with each.
+// `apply`'s first arg is a helper-name string; the rest are that helper's args.
+// Mirrors the interpreter's `applyH` (Kernel.Prelude). A non-block target is
+// invoked as an inline helper (its body ignored, as the interpreter does) and
+// its value stringified; an unknown name throws, like `rt.call`.
+function block(name, args, frame, bodyFn, clauses) {
+  if (name !== "apply") {
+    throw new Error("rt.block: compiled path does not support block helper '" + name + "'");
+  }
+  const target = args[0];
+  if (typeof target !== "string") {
+    throw new Error("apply: first argument must be a helper-name string");
+  }
+  const rest = args.slice(1);
+  const elseFn = (clauses && clauses.else) || (() => "");
+  switch (target) {
+    case "if": return truthy(frame.falsy, rest[0]) ? bodyFn(frame) : elseFn(frame);
+    case "unless": return truthy(frame.falsy, rest[0]) ? elseFn(frame) : bodyFn(frame);
+    case "each": return each(rest[0], frame, [], bodyFn, elseFn);
+    case "with": return withCtx(rest[0], frame, [], bodyFn, elseFn);
+    // an inline helper target: call it (body ignored) and stringify the result.
+    default: return stringify(call(target, rest, frame));
+  }
 }
 function raw(_name, body) { return body; }
 

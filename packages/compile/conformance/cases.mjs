@@ -50,6 +50,15 @@ export const cases = [
   { name: "each-object-index", t: "{{#each (lookup this \"o\")}}{{{index}}}:{{{key}}};{{/each}}", d: { o: { z: 1, a: 2 } } },
   { name: "each-parent-index", t: "{{#each (lookup this \"rows\")}}{{#each this}}[{{{parent-index}}}-{{{index}}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
 
+  // ── apply (dynamic block dispatch; compiled via rt.block) ────────────────────
+  { name: "apply-each", t: "{{#apply \"each\" (lookup this \"xs\")}}[{{{this}}}]{{/apply}}", d: { xs: ["a", "b"] } },
+  { name: "apply-each-else", t: "{{#apply \"each\" (lookup this \"xs\")}}x{{else}}none{{/apply}}", d: { xs: [] } },
+  { name: "apply-if-true", t: "{{#apply \"if\" (lookup this \"c\")}}Y{{else}}N{{/apply}}", d: { c: true } },
+  { name: "apply-if-false", t: "{{#apply \"if\" (lookup this \"c\")}}Y{{else}}N{{/apply}}", d: { c: false } },
+  { name: "apply-unless", t: "{{#apply \"unless\" (lookup this \"c\")}}N{{/apply}}", d: { c: false } },
+  { name: "apply-with", t: "{{#apply \"with\" (lookup this \"o\")}}{{{lookup this \"k\"}}}{{/apply}}", d: { o: { k: "v" } } },
+  { name: "apply-inline-helper", t: "{{#apply \"esc_html\" (lookup this \"x\")}}ignored{{/apply}}", d: { x: "<b>" } },
+
   // ── with ────────────────────────────────────────────────────────────────────
   { name: "with", t: "{{#with (lookup this \"u\")}}{{{lookup this \"name\"}}}{{/with}}", d: { u: { name: "Ada" } } },
   { name: "with-falsy-else", t: "{{#with (lookup this \"u\")}}x{{else}}none{{/with}}", d: { u: null } },
