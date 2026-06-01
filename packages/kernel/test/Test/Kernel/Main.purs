@@ -14,7 +14,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import Kernel.ToValue (toValue)
-import Kernel.Value (handlebars, minimal, truthy)
+import Kernel.Value (handlebars, isFalsy, minimal, mustache, resolveTruthiness, resolveTruthinessWith, truthy)
 import Kernel.Walk (Arity(..), foldTemplate, splitClauses, validate)
 import Test.Assert (assert')
 
@@ -41,6 +41,16 @@ main = do
   assert' "truthy: 0 is falsy (handlebars)" (truthy handlebars (VNumber 0.0) == false)
   assert' "truthy: 0 is truthy (minimal)" (truthy minimal (VNumber 0.0) == true)
   assert' "truthy: non-empty string truthy" (truthy handlebars (VString "x") == true)
+  -- mustache set: false/null/[] falsy; 0/""/{}  truthy (the Mustache rule)
+  assert' "mustache: 0 is truthy" (truthy mustache (VNumber 0.0) == true)
+  assert' "mustache: empty string truthy" (truthy mustache (VString "") == true)
+  assert' "mustache: empty object truthy" (truthy mustache (VObject Map.empty) == true)
+  assert' "mustache: empty array falsy" (isFalsy mustache (VArray []) == true)
+  assert' "mustache: false falsy" (isFalsy mustache (VBool false) == true)
+  -- per-engine default: absent directive ⇒ the supplied default; back-compat ⇒ handlebars
+  assert' "resolveTruthinessWith mustache (absent) ⇒ mustache"
+    (resolveTruthinessWith mustache [] == Right mustache)
+  assert' "resolveTruthiness (absent) ⇒ handlebars" (resolveTruthiness [] == Right handlebars)
 
   -- walk: foldTemplate descends into block bodies.
   assert' "foldTemplate node count" (nodeCount "a{{#each x}}b{{{this}}}{{/each}}c" == 5)

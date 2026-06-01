@@ -11,8 +11,10 @@ module Kernel.Value
   , minimal
   , presence
   , always
+  , mustache
   , aliasSet
   , resolveTruthiness
+  , resolveTruthinessWith
   , isFalsy
   , truthy
   , stringify
@@ -110,6 +112,14 @@ presence = Set.fromFoldable [ FFalse, FNull, FEmptyArr, FEmptyObj ]
 always :: FalsySet
 always = Set.empty
 
+-- | `mustache` (`false null []`): the Mustache rule — `false`, `null`, and the
+-- | empty *array* are falsy, but `0`, `""`, and `{}` are **truthy**. Distinct
+-- | from `presence` (which also makes `{}` falsy) and from `handlebars` (which
+-- | also makes `""`/`0` falsy). This is MinBars' engine default; the spec suite
+-- | would fail if `0`/`""` were treated as falsy.
+mustache :: FalsySet
+mustache = Set.fromFoldable [ FFalse, FNull, FEmptyArr ]
+
 -- | The alias table — 8 accepted names → 4 sets. Canonical display names are
 -- | `empty` (the default), `minimal`, `presence`, `always`; `handlebars`,
 -- | `ruby`/`nil`/`lua` are accepted synonyms (a name says nothing the explicit
@@ -124,21 +134,30 @@ aliasSet = case _ of
   "lua" -> Just minimal
   "presence" -> Just presence
   "always" -> Just always
+  "mustache" -> Just mustache
   _ -> Nothing
 
--- | Resolve the active falsy-set from a template's header directives. Finds the
+-- | Resolve the active falsy-set from a template's header directives, against a
+-- | caller-supplied *engine default* for the absent-directive case. Finds the
 -- | (≤1) `@truthiness`; parses an alias *or* an explicit space-separated list of
--- | shape-literals (`false null "" 0 [] {}`). Absent ⇒ the `handlebars` default.
+-- | shape-literals (`false null "" 0 [] {}`). Absent ⇒ `def`. The per-engine
+-- | default lives here (one kernel place): FullBars/RawBars/MaxBars pass
+-- | `handlebars`; MinBars passes `mustache`.
 -- | Errors: a duplicate `@truthiness`, an empty value, or an unknown
 -- | alias/literal (which also rejects an alias+list mix and the bare-flag form).
-resolveTruthiness :: Array Directive -> Either Error FalsySet
-resolveTruthiness directives = case Array.filter (\d -> d.key == "truthiness") directives of
-  [] -> Right handlebars
+resolveTruthinessWith :: FalsySet -> Array Directive -> Either Error FalsySet
+resolveTruthinessWith def directives = case Array.filter (\d -> d.key == "truthiness") directives of
+  [] -> Right def
   [ d ] -> parseTruthiness d.span.start d.value
   ds -> Left
     ( DirectiveError "duplicate @truthiness directive (at most one per file)"
         (maybe 0 (\d -> d.span.start) (Array.index ds 1))
     )
+
+-- | `resolveTruthinessWith handlebars` — the absent-directive default for the
+-- | Handlebars-family engines (RawBars/FullBars/MaxBars).
+resolveTruthiness :: Array Directive -> Either Error FalsySet
+resolveTruthiness = resolveTruthinessWith handlebars
 
 -- | Parse a `@truthiness` value: an alias name, or a non-empty list of falsy
 -- | shape-literals. The empty value is illegal — use the `always` alias. `off`
