@@ -11,6 +11,8 @@
 -- | and that interior's source offset, for the expression parser.
 module FlatBars.Lexer
   ( RawTok(..)
+  , LexConfig
+  , defaultLexConfig
   , tokenizeTemplate
   , trimStandalone
   ) where
@@ -44,6 +46,11 @@ data RawTok
   -- scans its interior for `@key` heads). Long `{{!-- … --}}` comments are never
   -- emitted (inert prose).
   | RComment Span Int String
+  -- {{=<% %>=}} — a Mustache set-delimiter tag (only recognized when
+  -- `LexConfig.mustacheDelims` is on). It changes the active delimiter pair for
+  -- all following content and renders nothing; the parser drops it (like a
+  -- comment) after the standalone-whitespace pass, where it is eligible.
+  | RSetDelim Span
 
 derive instance eqRawTok :: Eq RawTok
 
@@ -57,6 +64,7 @@ instance showRawTok :: Show RawTok where
     RSep _ _ s -> "RSep " <> show s
     RRaw _ _ s b -> "RRaw " <> show s <> " " <> show b
     RComment _ _ s -> "RComment " <> show s
+    RSetDelim _ -> "RSetDelim"
 
 --------------------------------------------------------------------------------
 -- Character helpers
@@ -160,6 +168,7 @@ blockLevel = case _ of
   ROpen _ _ _ _ -> true
   RClose _ _ _ -> true
   RComment _ _ _ -> true
+  RSetDelim _ -> true -- standalone-eligible (a lone `{{=<% %>=}}` line is stripped)
   _ -> false
 
 -- | The head name of a separator interior — its first whitespace-delimited word
@@ -214,10 +223,34 @@ dropTrailingIndent s = case nlIndex false s of
 -- Template tokenizer
 --------------------------------------------------------------------------------
 
+-- | Lexer configuration for the *template* scanner (distinct from
+-- | `FlatBars.Token.LexOptions`, which configures the *interior* expression
+-- | tokenizer). `open`/`close` are the initial delimiter pair; `mustacheDelims`
+-- | enables the Mustache `{{=<% %>=}}` set-delimiter tag — when on, the scanner
+-- | swaps the active pair mid-stream (ADR-015). When `mustacheDelims` is off
+-- | (the ladder's default) and the pair is the default `{{`/`}}`, the scan is
+-- | byte-identical to the fixed-delimiter lexer.
+type LexConfig = { open :: String, close :: String, mustacheDelims :: Boolean }
+
+-- | Default template-lexer config: `{{`/`}}`, no set-delimiter switching.
+defaultLexConfig :: LexConfig
+defaultLexConfig = { open: "{{", close: "}}", mustacheDelims: false }
+
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
 
-tokenizeTemplate :: String -> Either ParseError (Array RawTok)
-tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
+-- | Result of reading a set-delimiter tag: the token, the next index, and the
+-- | new active delimiter pair the scan continues with.
+type SetDelimResult =
+  { tok :: RawTok
+  , next :: Int
+  , open :: String
+  , close :: String
+  , trimL :: Boolean
+  , trimR :: Boolean
+  }
+
+tokenizeTemplate :: LexConfig -> String -> Either ParseError (Array RawTok)
+tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
   where
   cs = SCU.toCharArray src
   len = Array.length cs
@@ -238,39 +271,62 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
   -- stack on large input.
   go
     :: Int
+    -> String
+    -> String
     -> Int
     -> Array String
     -> List RawTok
     -> Boolean
     -> Either ParseError (List RawTok)
-  go i segStart frags acc pend
+  go i open close segStart frags acc pend
     | i >= len = Right (flush (contentTo segStart frags i) acc pend false)
     | otherwise = case Array.index cs i of
         Nothing -> Right (flush (contentTo segStart frags i) acc pend false)
         Just c
-          -- backslash escaping of an opener: emit the segment so far, then the
-          -- literal, and restart the segment after the escape.
-          | c == '\\' ->
+          -- A set-delimiter tag `<open>=A B=<close>` (Mustache; gated). Checked
+          -- before the opener probe so `{{=…=}}` is not read as a bare separator.
+          -- It swaps the active pair for everything that follows.
+          | cfg.mustacheDelims && matchAt cs i (open <> "=") -> case readSetDelim i open close of
+              Left e -> Left e
+              Right sd ->
+                let
+                  acc1 = flush (contentTo segStart frags i) acc pend sd.trimL
+                in
+                  go sd.next sd.open sd.close sd.next [] (sd.tok : acc1) sd.trimR
+          -- Default delimiters `{{`/`}}`: the full Handlebars-flavored grammar,
+          -- byte-identical to the fixed-delimiter lexer (backslash escapes, triple,
+          -- raw blocks, long comments, `~`). The opener probe is gated on `{`, so
+          -- non-brace content costs one comparison.
+          | open == "{{" && close == "}}" && c == '\\' ->
               if matchAt cs (i + 1) "\\" then
-                go (i + 2) (i + 2) (pushSeg segStart frags i "\\") acc pend
+                go (i + 2) open close (i + 2) (pushSeg segStart frags i "\\") acc pend
               else case escapedOpenerAt (i + 1) of
                 Just lit ->
                   let
                     next = i + 1 + SCU.length lit
                   in
-                    go next next (pushSeg segStart frags i lit) acc pend
-                Nothing -> go (i + 1) (i + 1) (pushSeg segStart frags i "\\") acc pend
-          -- openers all begin with `{`, so gate the (multi-probe) opener check
-          -- on that single character — non-brace content costs one comparison.
-          | c == '{' && isOpenerAt i -> case readTag i of
+                    go next open close next (pushSeg segStart frags i lit) acc pend
+                Nothing -> go (i + 1) open close (i + 1) (pushSeg segStart frags i "\\") acc pend
+          | open == "{{" && close == "}}" && c == '{' && isOpenerAt i -> case readTag i of
               Left e -> Left e
               Right res ->
                 let
                   acc1 = flush (contentTo segStart frags i) acc pend res.trimL
                   acc2 = maybe acc1 (\t -> t : acc1) res.mtok
                 in
-                  go res.next res.next [] acc2 res.trimR
-          | otherwise -> go (i + 1) segStart frags acc pend
+                  go res.next open close res.next [] acc2 res.trimR
+          | open == "{{" && close == "}}" -> go (i + 1) open close segStart frags acc pend
+          -- Custom delimiters: the reduced Mustache grammar (no triple/raw/long
+          -- comment/`~` — those forms do not rebase, ADR-015).
+          | matchAt cs i open -> case readCustomTag i open close of
+              Left e -> Left e
+              Right res ->
+                let
+                  acc1 = flush (contentTo segStart frags i) acc pend res.trimL
+                  acc2 = maybe acc1 (\t -> t : acc1) res.mtok
+                in
+                  go res.next open close res.next [] acc2 res.trimR
+          | otherwise -> go (i + 1) open close segStart frags acc pend
 
   -- The content string for a run: prior escape fragments followed by the
   -- still-uncopied slice `[segStart, end)`.
@@ -547,3 +603,78 @@ tokenizeTemplate src = map finalize (go 0 0 [] Nil false)
   rawName s =
     SCU.fromCharArray
       (Array.takeWhile (not <<< isSpace) (Array.dropWhile isSpace (SCU.toCharArray s)))
+
+  -- A set-delimiter tag `<open>=NEW-OPEN NEW-CLOSE=<close>`. Reads the two
+  -- whitespace-separated delimiters, validates them (per the Mustache manual:
+  -- non-empty, no whitespace — guaranteed by the split — and no `=`), and returns
+  -- the new active pair for the continuing scan. Renders nothing (`RSetDelim`).
+  readSetDelim :: Int -> String -> String -> Either ParseError SetDelimResult
+  readSetDelim i open close =
+    let
+      start = i + SCU.length open + 1 -- after `<open>=`
+      closePat = "=" <> close
+    in
+      case findFrom cs start closePat of
+        Nothing -> Left
+          (LexError ("unterminated set-delimiter tag (expected '=" <> close <> "')") i)
+        Just q -> case delimWords (slice cs start q) of
+          Nothing -> Left (LexError "set-delimiter expects two whitespace-separated delimiters" i)
+          Just d
+            | validDelim d.open && validDelim d.close -> Right
+                { tok: RSetDelim { start: i, end: q + SCU.length closePat }
+                , next: q + SCU.length closePat
+                , open: d.open
+                , close: d.close
+                , trimL: false
+                , trimR: false
+                }
+            | otherwise -> Left (LexError "set-delimiter values may not contain '='" i)
+
+  -- The two whitespace-separated delimiter words of a set-delimiter interior
+  -- (exactly two; nothing may follow the second).
+  delimWords :: String -> Maybe { open :: String, close :: String }
+  delimWords s =
+    let
+      a0 = Array.dropWhile isSpace (SCU.toCharArray s)
+      w1 = Array.takeWhile (not <<< isSpace) a0
+      a1 = Array.dropWhile isSpace (Array.dropWhile (not <<< isSpace) a0)
+      w2 = Array.takeWhile (not <<< isSpace) a1
+      rest = Array.dropWhile isSpace (Array.dropWhile (not <<< isSpace) a1)
+    in
+      if Array.null w1 || Array.null w2 || not (Array.null rest) then Nothing
+      else Just { open: SCU.fromCharArray w1, close: SCU.fromCharArray w2 }
+
+  -- A custom delimiter is non-empty (ensured by `delimWords`) and contains no `=`.
+  validDelim :: String -> Boolean
+  validDelim d = not (Array.elem '=' (SCU.toCharArray d))
+
+  -- A tag under *custom* delimiters: `<open> [sigil] interior <close>`. The reduced
+  -- Mustache grammar — the sigil (if any) is the single character immediately
+  -- after `open` (mirroring how the default openers require `{{#` with no gap);
+  -- `>` partials and bare interpolation fall through to `RSep` (keeping the full
+  -- interior, exactly as `{{> x}}` / `{{ x }}` do under default delimiters).
+  readCustomTag :: Int -> String -> String -> Either ParseError TagResult
+  readCustomTag i open close =
+    let
+      start = i + SCU.length open
+      cl = SCU.length close
+    in
+      case findFrom cs start close of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            span = { start: i, end: q + cl }
+            next = q + cl
+            afterSig = slice cs (start + 1) q
+            interior = slice cs start q
+            mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
+          in
+            case Array.index cs start of
+              Just '#' -> mk (ROpen span Section (start + 1) afterSig)
+              Just '^' -> mk (ROpen span Inverse (start + 1) afterSig)
+              Just '<' -> mk (ROpen span Parent (start + 1) afterSig)
+              Just '$' -> mk (ROpen span BlockDef (start + 1) afterSig)
+              Just '/' -> mk (RClose span (start + 1) afterSig)
+              Just '&' -> mk (RAmp span (start + 1) afterSig)
+              Just '!' -> mk (RComment span (start + 1) afterSig)
+              _ -> mk (RSep span start interior)

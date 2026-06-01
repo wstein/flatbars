@@ -28,7 +28,7 @@ import Data.String (Pattern(..), stripPrefix, trim)
 import Data.String.CodeUnits as SCU
 import FlatBars.Error (ParseError(..))
 import FlatBars.Expr as Expr
-import FlatBars.Lexer (RawTok(..), tokenizeTemplate, trimStandalone)
+import FlatBars.Lexer (LexConfig, RawTok(..), defaultLexConfig, tokenizeTemplate, trimStandalone)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
 import FlatBars.Token (LexOptions, PosToken, Token(..), defaultLexOptions, tokenizeInterior)
@@ -73,6 +73,7 @@ type ParseOptions =
   , inheritance :: Boolean
   , standaloneSeps :: Array String
   , lexOptions :: LexOptions
+  , lexConfig :: LexConfig
   }
 
 -- | Standalone trimming on (Handlebars parity), the core expression grammar, and
@@ -87,6 +88,7 @@ defaultParseOptions =
   , inheritance: false
   , standaloneSeps: [ "else", "elif" ]
   , lexOptions: defaultLexOptions
+  , lexConfig: defaultLexConfig
   }
 
 -- | Parse source text into the core template *plus* its header directives, with
@@ -104,7 +106,7 @@ parseWith
   -> String
   -> Either ParseError { directives :: Array Directive, nodes :: Template }
 parseWith opts src = do
-  toks <- tokenizeTemplate src
+  toks <- tokenizeTemplate opts.lexConfig src
   directives <- collectDirectives toks
   standalone <- effectiveTrim opts directives
   let toks' = if standalone then trimStandalone opts.standaloneSeps toks else toks
@@ -348,6 +350,7 @@ parseSeq pe ph extras inheritance lx toks = go Nil
     Just t -> case t of
       RContent s -> go (Content s : acc) (i + 1)
       RComment _ _ _ -> go acc (i + 1) -- filtered upstream; skip defensively
+      RSetDelim _ -> go acc (i + 1) -- renders nothing; the delimiter swap already happened in the lexer
       ROutput span base s -> case outputExpr lx pe span base s of
         Left e -> Left e
         Right e -> go (Output span e : acc) (i + 1)

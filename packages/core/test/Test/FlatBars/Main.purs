@@ -107,6 +107,42 @@ main = do
     Right { nodes: [ Block _ Inverse "x" [] [ Content "A" ] ] } -> pure unit
     other -> assert' ("inheritance: inverse regressed " <> show other) false
 
+  -- ── Set delimiters (ADR-015): the lexer's gated `mustacheDelims` mode ────────
+  let
+    md = defaultParseOptions { lexConfig = { open: "{{", close: "}}", mustacheDelims: true } }
+  -- `{{=<% %>=}}` swaps the active delimiters; it renders nothing, and a following
+  -- `<%x%>` is a separator in the new pair (span confirms the tag was consumed).
+  case parseWith md "{{=<% %>=}}<%x%>" of
+    Right { nodes: [ Sep { start: 11, end: 16 } "x" [] ] } -> pure unit
+    other -> assert' ("set-delim: switch + custom tag " <> show other) false
+  -- `<%={{ }}=%>` switches back, re-enabling the default `{{ }}` pair.
+  case parseWith md "{{=<% %>=}}<%x%><%={{ }}=%>{{y}}" of
+    Right { nodes: [ Sep _ "x" [], Sep _ "y" [] ] } -> pure unit
+    other -> assert' ("set-delim: switch back to default " <> show other) false
+  -- content is preserved, and `{{y}}` is literal text once delimiters are custom.
+  case parseWith md "{{=<% %>=}}* <%x%> {{y}}" of
+    Right { nodes: [ Content "* ", Sep _ "x" [], Content " {{y}}" ] } -> pure unit
+    other -> assert' ("set-delim: content + literal default braces after switch " <> show other)
+      false
+  -- sigils rebase under custom delimiters: `<%#a%>…<%/a%>` is a section.
+  case parseWith md "{{=<% %>=}}<%#a%>b<%/a%>" of
+    Right { nodes: [ Block _ Section "a" [] [ Content "b" ] ] } -> pure unit
+    other -> assert' ("set-delim: custom-delimited section " <> show other) false
+  -- exactly two delimiters are required; a malformed set-delimiter is a parse error.
+  case parseWith md "{{=onlyone=}}" of
+    Left _ -> pure unit
+    other -> assert' ("set-delim: malformed tag should be rejected " <> show other) false
+  -- the mode is OFF by default: `{{=…=}}` is not special, so the switch never
+  -- happens and `<%x%>` stays literal content (never a tag).
+  let
+    isSepX = case _ of
+      Sep _ "x" _ -> true
+      _ -> false
+  case parse "{{=<% %>=}}plain<%x%>" of
+    Right { nodes } -> assert' "set-delim: must stay inert when mustacheDelims is off"
+      (not (Array.any isSepX nodes))
+    Left _ -> pure unit -- a parse error is also fine: the point is `<%x%>` is not a tag
+
   -- ADR-001 crown jewel: the core parser does NOT special-case `{{else}}`. It is
   -- a plain `Sep` node, structurally identical to any user separator — the name
   -- is the only difference; clause *meaning* is the engine's job, not the parser's.

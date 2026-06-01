@@ -25,7 +25,7 @@ import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (ParseError, renderParseErrorAt)
-import FlatBars.Lexer (tokenizeTemplate)
+import FlatBars.Lexer (defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
@@ -56,7 +56,7 @@ minOptions = defaultParseOptions
 -- | the core tree builder drops comments and parses interiors.
 parseMin :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
 parseMin src = do
-  toks <- tokenizeTemplate src
+  toks <- tokenizeTemplate defaultLexConfig src
   directives <- collectDirectives toks
   nodes <- buildFromTokens minOptions (mustacheStandalone toks)
   pure { directives, nodes }

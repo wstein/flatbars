@@ -50,7 +50,7 @@ import Data.String as String
 import Data.String.CodeUnits as SCU
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (ParseError)
-import FlatBars.Lexer (RawTok(..), tokenizeTemplate)
+import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
 
@@ -87,7 +87,7 @@ knownBlockHelpers =
 -- | A lex failure is propagated as `Left`.
 migrateToMaxBars :: String -> Either ParseError MigrateResult
 migrateToMaxBars src = do
-  toks <- tokenizeTemplate src
+  toks <- tokenizeTemplate defaultLexConfig src
   let
     delimResiduals = scanSetDelimiters src
     walk = rewrite src toks
@@ -172,6 +172,10 @@ step src acc = case _ of
   RComment span _ _ -> emit acc (sliceSpan src span)
 
   RRaw span _ _ _ -> emit acc (sliceSpan src span)
+
+  -- Migrate runs under default delimiters, so a set-delimiter tag never appears;
+  -- pass it through verbatim if one ever does (minimal-diff rewrite).
+  RSetDelim span -> emit acc (sliceSpan src span)
 
 emit :: Acc -> String -> Acc
 emit acc s = acc { chunks = Array.cons s acc.chunks }
