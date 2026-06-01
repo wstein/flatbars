@@ -1,81 +1,231 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
- * Styling for the OpenInLab island. The island renders its OWN DOM (Preact), so
- * Astro's scoped styles can't reach it — this sheet is imported globally by the
- * Reference layout. Every selector is scoped under `.oil` so it outranks the
- * layout's generic `.content pre` / `.content a` rules (which otherwise win on
- * source order at equal specificity). Tokens come from lab-tokens.css.
+ * Styling for the OpenInLab runnable-example card (ported from the FlatBars-
+ * design mockup's styles.css, scoped to this codebase). The island renders its
+ * OWN DOM (Preact), so Astro's scoped styles can't reach it — this sheet is
+ * imported globally by the Reference layout. Structural rules are scoped under
+ * `.oil` so they outrank the layout's generic `.content pre` / `.content a`
+ * rules; the syntax-colour classes (.stem-*, .y-*) are global because the
+ * spec-only static blocks on the page use them too. Tokens come from
+ * lab-tokens.css.
  *
- * Inputs (template, data, partials) sit in a light grid; the output is a single
- * dark "old-screen" pane so input and result read as visibly different things. */
-.oil { margin: 1.25rem 0 1.75rem; }
+ * The card is one cohesive runnable unit: header toolbar · editable
+ * template/data/partials · dark output. "Open in Lab" is the DOCK affordance —
+ * a quiet labelled control in the header toolbar (the design's four affordances
+ * were collapsed to this one). */
 
-.oil .oil-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
-@media (max-width: 40rem) { .oil .oil-inputs { grid-template-columns: 1fr; } }
+/* ── The card ── */
+.oil {
+  margin: 1.4rem 0 2rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
 
-.oil .oil-pane { margin: 0; min-width: 0; }
-.oil .oil-pane figcaption {
-  font: 600 11px/1.4 var(--font-mono);
+/* Header toolbar */
+.oil .oil-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem 0.5rem 0.85rem;
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border);
+}
+.oil .oil-bar-l { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.oil .oil-kicker {
+  font: 600 11px/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--fg-faint);
+}
+.oil .oil-engine {
+  font: 600 11px/1 var(--font-mono);
+  color: var(--accent-2);
+  background: var(--accent-soft);
+  padding: 3px 7px;
+  border-radius: 999px;
+}
+.oil .oil-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: 500 11px/1 var(--font-mono);
+  color: var(--success);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--fg-faint);
-  margin: 0 0 0.35rem;
 }
-.oil .oil-pane pre {
-  background: var(--bg-1);
+.oil .oil-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 60%, transparent);
+  animation: oil-pulse 2s infinite;
+}
+@keyframes oil-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent); }
+  70% { box-shadow: 0 0 0 5px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oil .oil-dot { animation: none; }
+}
+
+.oil .oil-actions { margin-left: auto; display: flex; align-items: center; gap: 0.4rem; }
+.oil .oil-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font: 500 0.8rem/1 var(--font-ui);
+  color: var(--fg-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 0.32rem 0.55rem;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.oil .oil-reset .oil-ic { font-size: 0.95rem; }
+.oil.is-edited .oil-reset { opacity: 1; pointer-events: auto; }
+.oil .oil-reset:hover { background: var(--bg-2); color: var(--fg); }
+
+/* Inputs grid */
+.oil .oil-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+}
+@media (max-width: 40rem) { .oil .oil-grid { grid-template-columns: 1fr; } }
+.oil .oil-cell { background: var(--bg); min-width: 0; padding: 0.55rem 0.7rem 0.7rem; }
+.oil .oil-cell-head { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.4rem; }
+.oil .oil-cap {
+  font: 600 10.5px/1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--fg-faint);
+}
+
+/* The editor: highlight layer + transparent textarea */
+.oil .oil-ed { position: relative; }
+.oil .oil-ed-hl,
+.oil .oil-ed-input {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  padding: 0.55rem 0.65rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  tab-size: 2;
   border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.oil .oil-ed-hl {
+  position: relative;
+  z-index: 0;
+  background: var(--bg-1);
+  color: var(--fg);
+  overflow: hidden;
+  min-height: 2.6rem;
+  pointer-events: none;
+}
+.oil .oil-ed-hl code { font: inherit; background: none; padding: 0; }
+.oil .oil-ed-input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--accent);
+  resize: none;
+  overflow: hidden;
+  border-color: transparent;
+}
+.oil .oil-ed-input::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.oil .oil-ed:focus-within .oil-ed-hl { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-softer); }
+.oil .oil-ed-input:focus { outline: none; }
+
+/* Output — the dark "screen" pane */
+.oil .oil-out { padding: 0.55rem 0.7rem 0.7rem; border-top: 1px solid var(--border); position: relative; }
+.oil .oil-out-head { justify-content: flex-start; }
+.oil .oil-out-pre {
+  margin: 0;
+  background: var(--out-bg);
+  color: var(--out-fg);
+  border: 1px solid #000;
   border-radius: var(--radius);
   padding: 0.7rem 0.85rem;
   overflow: auto;
-  margin: 0;
-  min-height: 2.75rem;
-}
-.oil .oil-pane pre code {
-  font-family: var(--font-mono);
-  font-size: 0.84em;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* Output — a dark "old-screen" pane: neutral dark-grey background, light text,
-   the same in light and dark mode, so the result is unmistakable. */
-.oil .oil-output { margin-top: 0.9rem; }
-.oil .oil-output pre {
-  background: #1e1e1e;
-  border: 1px solid #000;
-  color: #eaeaea;
+  min-height: 2.6rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-.oil .oil-output pre code { color: inherit; }
-.oil .oil-output em { color: #9a9a9a; font-style: normal; }
-.oil .oil-output .oil-err { color: #ff8a8a; }
+.oil .oil-out-pre code {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+.oil .oil-out-pre.err { color: #ff9c9c; }
+.oil .oil-out-pre em { color: #9a9a9a; font-style: normal; }
 
-/* Open in Lab — a solid accent button with white text (must beat `.content a`),
-   subtle depth, and a hover lift. */
-.oil a.oil-btn {
+/* ── Lab affordance: DOCK (header toolbar) — quiet, labelled, always visible ── */
+.oil .oil-lab {
+  text-decoration: none;
+  cursor: pointer;
+  font: 600 0.8rem/1 var(--font-ui);
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 1rem;
-  padding: 0.55rem 1.1rem;
-  background: var(--accent);
-  color: #ffffff;
-  text-decoration: none;
-  font: 600 0.9rem/1 var(--font-ui);
-  border: none;
+  gap: 0.3rem;
+  color: var(--accent-2);
+  padding: 0.34rem 0.6rem;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(24, 24, 27, 0.18);
-  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  background: var(--bg);
 }
-.oil a.oil-btn:hover {
-  background: var(--accent-2);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px -2px color-mix(in srgb, var(--accent) 55%, transparent);
+.oil .oil-lab .oil-lab-ic { transition: transform 0.15s ease; }
+.oil .oil-lab:hover { border-color: var(--accent); background: var(--accent-softer); color: var(--accent); }
+.oil .oil-lab:hover .oil-lab-ic { transform: translate(1px, -1px); }
+.oil .oil-lab[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+
+/* ── Syntax colours (GLOBAL — used by the card editors AND the static spec-only
+   blocks, which live outside `.oil`). Map to the Lab's stem palette. ── */
+.stem-expr { color: var(--stem-expr-fg); font-weight: 600; }
+.stem-block { color: var(--stem-block-fg); font-weight: 600; }
+.stem-partial { color: var(--stem-partial-fg); font-weight: 600; }
+.stem-raw { color: var(--stem-raw-fg); font-weight: 600; }
+.stem-comment { color: var(--stem-comment-fg); font-style: italic; }
+.y-key { color: var(--yaml-key); }
+.y-str { color: var(--yaml-str); }
+.y-num { color: var(--yaml-num); }
+.y-kw { color: var(--yaml-kw); font-weight: 600; }
+.y-comment { color: var(--stem-comment-fg); font-style: italic; }
+
+/* Static (spec-only) code blocks — set-delimiters & lambdas: shown for spec
+   completeness, syntax-highlighted, but with no live preview (they can't run). */
+.content pre.oil-static {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  margin: 1rem 0;
 }
-.oil a.oil-btn:active { transform: translateY(0); }
-.oil a.oil-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.content pre.oil-static code {
+  background: none;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  line-height: 1.55;
 }
-.oil a.oil-btn[aria-disabled="true"] { opacity: 0.45; pointer-events: none; box-shadow: none; }

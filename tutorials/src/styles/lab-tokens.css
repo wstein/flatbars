@@ -28,11 +28,12 @@
   --border: #ddd6f8;
   --border-strong: #c8bff2;
 
-  /* Accent (Elixir Purple) + soft tints */
-  --accent: #7c4dff;
-  --accent-2: #5a2ea6;
-  --accent-soft: #e7defc;
-  --accent-softer: #f0ebfe;
+  /* Accent (Tweaks "Brand" → deep violet) + soft tints. The soft/softer tints
+     are color-mixed against --bg so they track both the accent and the mode. */
+  --accent: #6d28d9;
+  --accent-2: #4c1d95;
+  --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
+  --accent-softer: color-mix(in srgb, var(--accent) 9%, var(--bg));
 
   /* Status */
   --danger: #b91c1c;
@@ -47,9 +48,22 @@
   --stem-expr-fg: #16a34a;
   --stem-partial-fg: #2563eb;
   --stem-raw-fg: #ea580c;
+  --stem-comment-fg: #9b8fc0;
+
+  /* YAML data syntax colours (data editor + spec-only blocks) */
+  --yaml-key: #2563eb;
+  --yaml-str: #16a34a;
+  --yaml-num: #ea580c;
+  --yaml-kw: #c026d3;
 
   --radius: 6px;
+  --radius-lg: 10px;
   --shadow-pop: 0 12px 32px -8px rgba(24, 24, 27, 0.18), 0 0 0 1px rgba(24, 24, 27, 0.06);
+  --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 6px 20px -12px rgba(60, 27, 107, 0.22);
+
+  /* The output "screen" — a dark pane, same in light and dark mode. */
+  --out-bg: #1b1923;
+  --out-fg: #ece9f5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -67,10 +81,10 @@
     --border: #2c2940;
     --border-strong: #423c5c;
 
+    /* In dark mode the accent lifts for contrast; --accent-soft/softer are NOT
+       overridden — the :root color-mix re-resolves against the dark accent+bg. */
     --accent: #9b7dff;
     --accent-2: #bca6ff;
-    --accent-soft: #2e2747;
-    --accent-softer: #221d36;
 
     --danger: #f87171;
     --danger-faint: #3a1414;
@@ -83,7 +97,14 @@
     --stem-expr-fg: #86efac;
     --stem-partial-fg: #93c5fd;
     --stem-raw-fg: #fdba74;
+    --stem-comment-fg: #8a83a6;
+
+    --yaml-key: #93c5fd;
+    --yaml-str: #86efac;
+    --yaml-num: #fdba74;
+    --yaml-kw: #f0abfc;
 
     --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
   }
 }

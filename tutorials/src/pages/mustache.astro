@@ -8,6 +8,10 @@
 import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../mustache.mjs";
+// The two spec-only blocks (set-delimiters, lambdas) can't run, so they're
+// static — but still syntax-highlighted at build time through the same
+// highlighter the live editors use, so they read consistently.
+import { highlightTemplate } from "../lib/highlight.mjs";
 // Conformance numbers are GENERATED from the vendored mustache/spec suite
 // (scripts/gen-conformance.mjs, gated by `npm run check:conformance`), so the
 // table below can never claim more than the suite proves on the shipped engine.
@@ -63,6 +67,8 @@ const data = {
 };
 Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
 // → "<b>(c) 2026</b>"`;
+const setDelimHtml = highlightTemplate(setDelimCode);
+const lambdaHtml = highlightTemplate(lambdaCode);
 ---
 
 <Reference
@@ -90,9 +96,9 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
     </p>
     <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
     <p class="tip">
-      The left pane is the template, the right is the live output, and
-      <b>Open in Lab</b> loads the same example into the full editor. Edit, and
-      watch it re-render.
+      The panes are live: edit the <b>template</b> or the <b>data</b> and the
+      output re-renders as you type. When you want the full editor,
+      <b>Open in Lab</b> carries the same example over.
     </p>
   </section>
 
@@ -250,7 +256,7 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
       with <code>{t("{{=<% %>=}}")}</code> — useful when <code>{t("{{ }}")}</code>
       collides with another syntax (e.g. server-side languages).
     </p>
-    <pre><code>{setDelimCode}</code></pre>
+    <pre class="oil-static"><code set:html={setDelimHtml} /></pre>
     <div class="callout info">
       <p>
         <b>MinBars does not implement set delimiters</b> (deferred in
@@ -269,7 +275,7 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
       receives the raw, unrendered body text and a <code>render</code> callback,
       so it can transform or wrap content programmatically.
     </p>
-    <pre><code>{lambdaCode}</code></pre>
+    <pre class="oil-static"><code set:html={lambdaHtml} /></pre>
     <div class="callout info">
       <p>
         <b>MinBars has no function value type</b>, so lambdas are not supported

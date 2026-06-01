@@ -1,71 +1,170 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The interactive lesson island: shows the template, renders a LIVE preview
-// through the real engine bundle the Lab ships (dogfooding — consensus item 3),
-// and offers an "Open in Lab" link built from the shared contract (item 1).
-import { useEffect, useState } from "preact/hooks";
+// The runnable example card — the redesigned "Open in Lab" lesson island.
+// One cohesive unit: header toolbar · editable template/data/partials · dark
+// output. The template AND data are editable INLINE and re-render LIVE through
+// the real engine bundle the Lab ships (dogfooding — a preview and the Lab can
+// never diverge); data is YAML, the Lab's native format. The fat dangling CTA is
+// gone: "Open in Lab" is demoted to a quiet, labelled control DOCKED in the
+// header toolbar (the affordance chosen from the design's four; the others —
+// inline/corner/foot — were collapsed). Accent + chrome come from lab-tokens.css.
+import { useEffect, useRef, useState } from "preact/hooks";
 import { labHref, dataText } from "../../../lab/open-in-lab.mjs";
+import { load as loadYaml } from "../../../lab/vendor/js-yaml.mjs";
 import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
+import { highlightTemplate, highlightYaml } from "../lib/highlight.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
-
-async function renderExample(engine, { template, data, partials }) {
-  const r = engine === "minbars"
-    ? await createMinBarsRenderer()
-    : await createFlatBarsRenderer(DIALECT[engine]);
-  try {
-    return { ok: true, out: r.render(r.compile(template, partials || {}).program, data ?? {}) };
-  } catch (e) {
-    return { ok: false, out: String((e && e.message) || e) };
-  }
-}
 
 // Where the Lab is served. Same-origin `/lab/` in production (one host serves
 // both); in local dev the tutorials run on their own port, so point this at the
 // running `npm run lab` server, e.g. PUBLIC_LAB_URL=http://localhost:8000/lab/index.html.
 const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL }) {
-  const [href, setHref] = useState(null);
-  const [preview, setPreview] = useState(null);
+// One code editor: a syntax-highlight layer with a transparent textarea atop, so
+// the reader edits real text while seeing colour. Heights are synced after every
+// render (the textarea auto-grows; the highlight <pre> follows it).
+function CodeEditor({ lang, value, onInput }) {
+  const taRef = useRef(null);
+  const preRef = useRef(null);
+  const html = (lang === "yaml" ? highlightYaml(value) : highlightTemplate(value)) + "\n";
 
   useEffect(() => {
+    const ta = taRef.current, pre = preRef.current;
+    if (!ta || !pre) return;
+    ta.style.height = "auto";
+    const h = ta.scrollHeight;
+    ta.style.height = h + "px";
+    pre.style.height = h + "px";
+  });
+
+  return (
+    <div class="oil-ed" data-lang={lang}>
+      <pre class="oil-ed-hl" aria-hidden="true" ref={preRef}>
+        <code dangerouslySetInnerHTML={{ __html: html }} />
+      </pre>
+      <textarea
+        ref={taRef}
+        class="oil-ed-input"
+        spellcheck={false}
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        value={value}
+        onInput={(e) => onInput(e.currentTarget.value)}
+        onScroll={(e) => {
+          const pre = preRef.current;
+          if (!pre) return;
+          pre.scrollTop = e.currentTarget.scrollTop;
+          pre.scrollLeft = e.currentTarget.scrollLeft;
+        }}
+      />
+    </div>
+  );
+}
+
+export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL }) {
+  const initialData = dataText(data); // object → YAML; string → verbatim
+  const [tpl, setTpl] = useState(template);
+  const [dataStr, setDataStr] = useState(initialData);
+  const [parts, setParts] = useState(partials || {});
+  const [edited, setEdited] = useState(false);
+  const [renderer, setRenderer] = useState(null);
+  const [out, setOut] = useState({ ok: true, text: null }); // text === null ⇒ "rendering…"
+  const [href, setHref] = useState(null);
+
+  // Load the real engine bundle once (client-side only).
+  useEffect(() => {
     let live = true;
-    labHref(engine, { template, data, partials }, { labUrl }).then((h) => live && setHref(h));
-    renderExample(engine, { template, data, partials }).then((p) => live && setPreview(p));
+    const p = engine === "minbars"
+      ? createMinBarsRenderer()
+      : createFlatBarsRenderer(DIALECT[engine]);
+    p.then((r) => { if (live) setRenderer(r); });
     return () => { live = false; };
   }, []);
 
-  const partialEntries = Object.entries(partials || {});
+  // Live render: parse the YAML data, then run the template through the engine.
+  useEffect(() => {
+    if (!renderer) return;
+    let data;
+    try {
+      data = dataStr.trim() === "" ? {} : loadYaml(dataStr);
+    } catch (e) {
+      setOut({ ok: false, text: "⚠ data isn’t valid YAML — " + ((e && e.message) || e) });
+      return;
+    }
+    try {
+      const text = renderer.render(renderer.compile(tpl, parts || {}).program, data ?? {});
+      setOut({ ok: true, text });
+    } catch (e) {
+      setOut({ ok: false, text: String((e && e.message) || e) });
+    }
+  }, [renderer, tpl, dataStr, parts]);
+
+  // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace.
+  useEffect(() => {
+    let live = true;
+    labHref(engine, { template: tpl, data: dataStr, partials: parts }, { labUrl })
+      .then((h) => { if (live) setHref(h); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [tpl, dataStr, parts]);
+
+  const onTpl = (v) => { setTpl(v); setEdited(true); };
+  const onData = (v) => { setDataStr(v); setEdited(true); };
+  const onPart = (name, v) => { setParts((p) => ({ ...p, [name]: v })); setEdited(true); };
+  const reset = () => {
+    setTpl(template);
+    setDataStr(initialData);
+    setParts(partials || {});
+    setEdited(false);
+  };
 
   return (
-    <div class="oil">
-      <div class="oil-inputs">
-        <figure class="oil-pane">
-          <figcaption>template</figcaption>
-          <pre><code>{template}</code></pre>
-        </figure>
-        <figure class="oil-pane">
-          <figcaption>data</figcaption>
-          <pre><code>{dataText(data)}</code></pre>
-        </figure>
-        {partialEntries.map(([name, src]) => (
-          <figure class="oil-pane">
-            <figcaption>partial · {name}</figcaption>
-            <pre><code>{src}</code></pre>
-          </figure>
+    <figure class={"oil" + (edited ? " is-edited" : "")} data-affordance="dock">
+      <header class="oil-bar">
+        <div class="oil-bar-l">
+          <span class="oil-kicker">Runnable</span>
+          <span class="oil-engine">{engine}</span>
+          <span class="oil-live"><span class="oil-dot" />live</span>
+        </div>
+        <div class="oil-actions">
+          <button type="button" class="oil-reset" title="Restore the original example" onClick={reset}>
+            <span class="oil-ic">↺</span> Reset
+          </button>
+          {/* A named target reuses one Lab tab across every "Open in Lab" click. */}
+          <a class="oil-lab oil-lab-dock" href={href ?? "#"} target="flatbars-lab" rel="noopener"
+             aria-disabled={href == null} title="Open this example in the full Lab editor">
+            <span class="oil-lab-txt">Open in Lab</span>
+            <span class="oil-lab-ic" aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </header>
+
+      <div class="oil-grid">
+        <div class="oil-cell">
+          <div class="oil-cell-head"><span class="oil-cap">template</span></div>
+          <CodeEditor lang="template" value={tpl} onInput={onTpl} />
+        </div>
+        <div class="oil-cell">
+          <div class="oil-cell-head"><span class="oil-cap">data</span></div>
+          <CodeEditor lang="yaml" value={dataStr} onInput={onData} />
+        </div>
+        {Object.keys(parts).map((name) => (
+          <div class="oil-cell" key={name}>
+            <div class="oil-cell-head"><span class="oil-cap">partial · {name}</span></div>
+            <CodeEditor lang="template" value={parts[name]} onInput={(v) => onPart(name, v)} />
+          </div>
         ))}
       </div>
-      <figure class="oil-pane oil-output">
-        <figcaption>output</figcaption>
-        {preview == null
-          ? <pre><em>rendering…</em></pre>
-          : <pre class={preview.ok ? "" : "oil-err"}><code>{preview.out}</code></pre>}
-      </figure>
-      {/* A named target reuses one Lab tab across every "Open in Lab" click. */}
-      <a class="oil-btn" href={href ?? "#"} target="flatbars-lab" rel="noopener"
-         aria-disabled={href == null}>Open in Lab ↗</a>
-    </div>
+
+      <div class="oil-out">
+        <div class="oil-cell-head oil-out-head"><span class="oil-cap">output</span></div>
+        {out.text == null
+          ? <pre class="oil-out-pre"><em>rendering…</em></pre>
+          : <pre class={"oil-out-pre" + (out.ok ? "" : " err")}><code>{out.text}</code></pre>}
+      </div>
+    </figure>
   );
 }
