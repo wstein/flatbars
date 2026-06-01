@@ -59,7 +59,6 @@
   </main>
 
   <script type="module">
-    import { createHandlebarsRenderer } from "./handlebars.mjs";
     import { createRenderer } from "./stem.mjs";
     import { createBareBarsRenderer } from "./barebars.mjs";
 
@@ -72,9 +71,10 @@
     const engines = [];
     async function init() {
       const defs = [
-        { id: "handlebars", label: "Handlebars", make: () => createHandlebarsRenderer() },
         { id: "stem", label: "Stem", make: async () => createRenderer(await (await fetch(WASM)).arrayBuffer()) },
-        { id: "barebars", label: "BareBars", make: () => createBareBarsRenderer() },
+        { id: "rawbars", label: "RawBars", make: () => createBareBarsRenderer("core") },
+        { id: "fullbars", label: "FullBars", make: () => createBareBarsRenderer("surface") },
+        { id: "maxbars", label: "MaxBars", make: () => createBareBarsRenderer("maxbars") },
       ];
       const out = byId("outputs");
       for (const d of defs) {

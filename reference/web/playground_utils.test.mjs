@@ -18,7 +18,6 @@ import {
   disassemble,
   encodeState,
   featureFidelity,
-  handlebarsTruthy,
   hasFeature,
   mergeDataOverlays,
   stemTruthy,
@@ -88,21 +87,13 @@ test("tabVisibleUnder gates panels per the engine vector", () => {
   assert.equal(tabVisibleUnder(HBS_VECTOR, ["partial-graph"]), true);
 });
 
-test("stem vs handlebars truthiness diverge only on {} (ADR-0020 Phase 4)", () => {
-  // Agree on falsy: null/false/""/0/[] (matches real Handlebars `#if`, which is
-  // `!c || isEmpty(c)` — 0 is falsy via `!c`, empty array via isEmpty).
-  for (const v of [null, undefined, false, "", 0, []]) {
+test("stemTruthy: falsy on null/false/\"\"/0/[]/{}; truthy on non-empty", () => {
+  for (const v of [null, undefined, false, "", 0, [], {}]) {
     assert.equal(stemTruthy(v), false, `stem ${JSON.stringify(v)}`);
-    assert.equal(handlebarsTruthy(v), false, `hbs ${JSON.stringify(v)}`);
   }
-  // Agree on truthy: non-empty values.
   for (const v of ["x", [1], { a: 1 }, 1, true]) {
     assert.equal(stemTruthy(v), true, `stem ${JSON.stringify(v)}`);
-    assert.equal(handlebarsTruthy(v), true, `hbs ${JSON.stringify(v)}`);
   }
-  // The one divergence: empty object is falsy in Stem, truthy in Handlebars.
-  assert.equal(stemTruthy({}), false);
-  assert.equal(handlebarsTruthy({}), true);
 });
 
 test("byteToChar maps UTF-8 byte offsets to JS character indices", () => {

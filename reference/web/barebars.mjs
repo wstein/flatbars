@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// BareBars adapter — the polyglot lab's THIRD engine (Brace Lab). Like stem.mjs
-// and handlebars.mjs, `createBareBarsRenderer()` returns the SAME seam shape
-// (render, compile, parseAst, inspectAt, usedTransformers, requiredAssigns,
-// partialGraph, allTransformers, catalog, engineInfo, version), so the host
-// wires it through the identical contract and the capability gate hides whatever
-// BareBars doesn't (yet) back.
+// BareBars adapter — backs the lab's three BareBars dialect engines (RawBars /
+// FullBars / MaxBars), selected by the dialect argument to
+// `createBareBarsRenderer()`. Like stem.mjs and minbars.mjs it returns the SAME
+// seam shape (render, compile, parseAst, inspectAt, usedTransformers,
+// requiredAssigns, partialGraph, allTransformers, catalog, engineInfo, version),
+// so the host wires it through the identical contract and the capability gate
+// hides whatever BareBars doesn't (yet) back.
 //
 // BareBars is a PureScript engine compiled to JS — no WASM. The engine is the
 // `barebars-js` facade, bundled to `vendor/barebars-engine.mjs` (regenerate with

@@ -1146,15 +1146,9 @@ export function stemTruthy(v) {
   if (typeof v === "object") return Object.keys(v).length > 0;
   return true;
 }
-export function handlebarsTruthy(v) {
-  if (!v) return false; // 0, "", null, false, undefined, NaN
-  if (Array.isArray(v)) return v.length > 0; // empty array is falsy
-  return true; // {} (empty object) is truthy — the only divergence from Stem
-}
-
-// `truthy` is the engine's truthiness predicate (defaults to Stem's). The host
-// injects `handlebarsTruthy` when the Handlebars adapter is active so the dead-
-// branch classification matches what that engine actually renders.
+// `truthy` is the engine's truthiness predicate (defaults to Stem's). A host
+// may inject a different predicate so the dead-branch classification matches
+// what the active engine actually renders.
 export function analyseCoverage(astsByFile, data, { truthy = stemTruthy } = {}) {
   const out = [];
   const exprValue = (expr, scoped) => {

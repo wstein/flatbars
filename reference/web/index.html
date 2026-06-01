@@ -1574,7 +1574,6 @@
         disassemble,
         encodeState,
         featureFidelity,
-        handlebarsTruthy,
         hasFeature,
         mergeDataOverlays,
         partialNameAt,
@@ -1585,7 +1584,7 @@
       // Cache-bust query: bump on any playground_utils.mjs change so a freshly
       // loaded index.html never pairs with a stale cached module (which silently
       // ran the old, uncompressed encodeState). Bumped for ADR-0020 capability gating.
-      } from "./playground_utils.mjs?v=12";
+      } from "./playground_utils.mjs?v=13";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -1706,12 +1705,10 @@
       // uses this to gate behaviour that assumes the stem-bc wire — e.g. the
       // per-emit escape rewrite — rather than just hiding a panel.)
       const engineHas = (name) => hasFeature(engineFeatures, name);
-      // Per-engine example catalog, each in its own folder
-      // (examples/stem/ · examples/handlebars/): the dropdown lists templates
-      // written in the active engine's syntax (Stem `{{partial "x"}}`/`dict` vs
-      // Handlebars `{{> x}}`/helpers), so switching engines never offers
-      // templates that won't parse.
-      const EXAMPLES_BASE = `./examples/${ENGINE === "handlebars" ? "handlebars" : "stem"}/`;
+      // The example catalog (examples/stem/): templates the lab's engines can
+      // all parse. (The BareBars surface dialect is Handlebars-flavoured, so the
+      // shared set renders across Stem and the BareBars/MinBars engines.)
+      const EXAMPLES_BASE = `./examples/stem/`;
       const examples = await (await fetch(EXAMPLES_BASE + "examples.json")).json();
 
       // ── State ─────────────────────────────────────────────────────────
@@ -2298,9 +2295,7 @@
               const i = idx + 1;
               return { icon: "stem", name: (t.name || "(unnamed)") + "." + TEMPLATE_EXT,
                 active: tmplActive && activeTabIdx === i, dirty: !!t.dirty,
-                title: ENGINE === "handlebars"
-                  ? `partial · {{> ${t.name}}}`
-                  : `partial · {{partial "${t.name}"}}`,
+                title: `partial · {{partial "${t.name}"}}`,
                 on: () => selectTemplateTab(i),
                 renameValue: t.name, onDelete: () => removeTab(i),
                 onRename: (v) => {
@@ -2330,13 +2325,11 @@
                   ov.name = v; ov.dirty = true; markCustom(); scheduleRun(); return true;
                 } }
             ))},
-          { key: "transform", label: ENGINE === "handlebars" ? "HELPERS" : "TRANSFORM", files: [
+          { key: "transform", label: "TRANSFORM", files: [
             { icon: "fn",
-              name: ENGINE === "handlebars" ? "helpers.js" : "transform.jsonata",
+              name: "transform.jsonata",
               active: xfActive, dirty: transformDirty,
-              title: ENGINE === "handlebars"
-                ? "helpers — register custom Handlebars helpers (+ transform data)"
-                : "data → view-model transform (JSONata)",
+              title: "data → view-model transform (JSONata)",
               on: () => selectTransformTab() },
           ]},
           { key: "config", label: "CONFIG", files: [
@@ -2503,10 +2496,8 @@
             const isTfm = activeView === "tmpl" && templateMode === "transform";
             const tfm = document.createElement("div");
             tfm.className = "tab tab-transform" + (isTfm ? " active" : "");
-            tfm.title = ENGINE === "handlebars"
-              ? "helpers — register custom Handlebars helpers (+ transform data)"
-              : "data → view-model transform (JSONata)";
-            tfm.append(document.createTextNode(ENGINE === "handlebars" ? "helpers.js" : "transform.jsonata"));
+            tfm.title = "data → view-model transform (JSONata)";
+            tfm.append(document.createTextNode("transform.jsonata"));
             tfm.addEventListener("click", selectTransformTab);
             tfm.append(closeBtn(() => closeEditor("transform")));
             bar.append(tfm);
@@ -2802,13 +2793,8 @@
           // transformSrc in the same editor. Stem: a JSONata data→view-model
           // transform. Handlebars: a JS controller that registers custom helpers.
           setEditorText(templateView, transformSrc);
-          if (ENGINE === "handlebars") {
-            templateView.dispatch({ effects: templateLangComp.reconfigure([jsLang]) });
-            byId("sources-sub").textContent = "helpers · JavaScript (Handlebars.registerHelper)";
-          } else {
-            templateView.dispatch({ effects: templateLangComp.reconfigure([jsonataLang]) });
-            byId("sources-sub").textContent = "transform · JSONata";
-          }
+          templateView.dispatch({ effects: templateLangComp.reconfigure([jsonataLang]) });
+          byId("sources-sub").textContent = "transform · JSONata";
         } else {
           setEditorText(templateView, activeTab().source); // programmatic → no auto-run
           templateView.dispatch({
@@ -2816,9 +2802,7 @@
           });
           byId("sources-sub").textContent = activeTabIdx === 0
             ? ""
-            : ENGINE === "handlebars"
-              ? `partial · referenced as {{> ${activeTab().name}}}`
-              : `partial · referenced as {{partial "${activeTab().name}"}}`;
+            : `partial · referenced as {{partial "${activeTab().name}"}}`;
         }
         renderTabs();
         updateStatusMeta();
@@ -3023,8 +3007,8 @@
         }
         out.push("## Data", "", mdFence(yamlSrc, "yaml"), "");
         if (transformSrc.trim()) out.push(
-          ENGINE === "handlebars" ? "## Helpers (JS)" : "## Transform (JSONata)", "",
-          mdFence(transformSrc, ENGINE === "handlebars" ? "js" : "jsonata"), "");
+          "## Transform (JSONata)", "",
+          mdFence(transformSrc, "jsonata"), "");
         out.push("## Output", "", mdFence(lastOutput, ""), "");
         return out.join("\n");
       }
@@ -3038,7 +3022,7 @@
         }));
         files.push({ name: "data.yaml", content: yamlSrc });
         if (transformSrc.trim()) files.push({
-          name: ENGINE === "handlebars" ? "helpers.js" : "transform.jsonata",
+          name: "transform.jsonata",
           content: transformSrc,
         });
         files.push({ name: "output.txt", content: lastOutput });
@@ -3423,22 +3407,8 @@
           });
         }
 
-        // Controller step. For Stem this is a sandboxed JSONata transform
-        // (data → view-model). For Handlebars it is a JS controller that
-        // registers the template's custom helpers (and may transform data) —
-        // run every time so helpers from a prior run are cleared even when the
-        // editor is empty.
-        if (ENGINE === "handlebars") {
-          const res = renderer.applyController(transformSrc, data);
-          if (res.error) {
-            lastData = null;
-            const message = "helpers · " + res.error.message;
-            setError("helpers error: " + res.error.message);
-            dockProblems = [{ severity: "error", file: "transform", line: 1, col: 1, message }];
-            setOutput(""); saveHash(); return;
-          }
-          data = res.data;
-        } else if (transformSrc.trim()) {
+        // Controller step: a sandboxed JSONata transform (data → view-model).
+        if (transformSrc.trim()) {
           try {
             data = jsonata(transformSrc).evaluate(data);
           } catch (err) {
@@ -3461,13 +3431,9 @@
         }
 
         // Data-aware analyses, now that the view-model is finalized. Coverage
-        // uses the engine's own truthiness (ADR-0020 Phase 4): Handlebars treats
-        // 0 and {} as truthy, Stem as falsy, so the dead-branch classification
-        // must match the active engine.
+        // uses the engine's default truthiness for dead-branch classification.
         lastDataAccess = analyseDataAccess(astsByFile, data);
-        lastCoverage = analyseCoverage(astsByFile, data, {
-          truthy: ENGINE === "handlebars" ? handlebarsTruthy : undefined,
-        });
+        lastCoverage = analyseCoverage(astsByFile, data);
         refreshCoverageGutter();
         // Engine-reported assigns that aren't present at the data root — a
         // tight, false-positive-free "missing assigns" signal (Data Access).
