@@ -17,7 +17,6 @@ module Cli.Main where
 import Prelude
 
 import BareBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt)
-import BareBars.Compile.FullBars (compileSurfaceWith) as Compile
 import BareBars.Json (parseValue)
 import BareBars.Value (Value(..))
 import Data.Array as Array
@@ -28,6 +27,7 @@ import Data.String (joinWith)
 import Effect (Effect)
 import Effect.Exception (message, try)
 import FullBars (directiveLints, preludeSchema, renderSurfaceDiagWith)
+import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)

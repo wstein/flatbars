@@ -3,7 +3,9 @@
 -- | emit rules (`BareBars.Compile.Emit`) through the driver. This module is the
 -- | only compile piece that depends on the FullBars dialect (for the desugar);
 -- | the emit rules themselves are dialect-free, so RawBars compiles without it.
-module BareBars.Compile.FullBars
+-- | It lives in its own package (`fullbars-compile`) so the dialect-free
+-- | `barebars-compile` (driver + emit) carries no FullBars dependency.
+module FullBars.Compile
   ( compileSurface
   , compileSurfaceWith
   ) where

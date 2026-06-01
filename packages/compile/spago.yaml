@@ -15,7 +15,6 @@ package:
     - either
     - barebars
     - kernel
-    - fullbars
     - ordered-collections
     - tuples
     - bifunctors

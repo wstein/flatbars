@@ -1,12 +1,15 @@
--- | Emitter unit tests for `BareBars.Compile` + the FullBars rules. These check
--- | the *shape* of the generated JS (native control flow, inlined hot helpers,
--- | the runtime header); byte-for-byte execution conformance against the
--- | interpreter is the Node harness `packages/compile/conformance.mjs`.
+-- | Emitter unit tests for the dialect-free `BareBars.Compile` driver + the
+-- | `BareBars.Compile.Emit` rules, exercised through the RawBars dialect's
+-- | `compileJs` (no surface desugar — so `{{{item}}}`/scoped vars stay
+-- | scoped-helper calls, not lookups). They check the *shape* of the generated
+-- | JS (native control flow, inlined hot helpers, the runtime header);
+-- | byte-for-byte execution conformance against the interpreter is the Node
+-- | harness `packages/compile/conformance.mjs`. Surface-only codegen
+-- | (`compileSurface`) is tested in the `fullbars-compile` package.
 module Test.BareBars.Compile.Main where
 
 import Prelude
 
-import BareBars.Compile.FullBars (compileSurface)
 import BareBars.Error (ParseError)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -18,13 +21,7 @@ import Test.Assert (assert')
 
 -- assert `src` compiles and the JS contains every fragment in `needles`.
 expectJs :: String -> String -> Array String -> Effect Unit
--- core-syntax emitter SHAPE tests use the RawBars dialect's compile (no surface
--- desugar — so `{{{item}}}`/scoped vars stay scoped-helper calls, not lookups).
 expectJs = expectWith RawBars.compileJs
-
--- surface variant (desugar + hoist + emit), for surface-only codegen (partials).
-expectJsS :: String -> String -> Array String -> Effect Unit
-expectJsS = expectWith compileSurface
 
 expectWith
   :: (String -> Either ParseError String) -> String -> String -> Array String -> Effect Unit
@@ -45,17 +42,6 @@ main = do
     , "rt.scope(data, $falsy)"
     , "out += \"hi\""
     ]
-
-  expectJsS "surface inline def becomes a partial registry; {{> }} calls rt.partial"
-    "{{#inline \"row\"}}[{{ this }}]{{/inline}}{{#each items}}{{> row}}{{/each}}"
-    [ "partials = Object.assign({}, partials, {"
-    , "\"row\": function (data, rt, partials)"
-    , "rt.partial(\"row\", c1.ctx, null, partials, rt)"
-    ]
-
-  expectJsS "@truthiness:minimal emits the minimal falsy-set + threads it"
-    "{{! @truthiness:minimal }}{{#if n}}y{{else}}m{{/if}}"
-    [ "const $falsy = { b: 1, n: 1 }", "rt.truthy(c0.falsy," ]
 
   expectJs "output + inlined esc_html/lookup/this"
     "{{{esc_html (lookup this \"name\")}}}"

@@ -14,7 +14,7 @@ package:
     - barebars
     - kernel
     - barebars-json
-    - barebars-compile
+    - fullbars-compile
     - fullbars
     - rawbars
   run:

@@ -1,5 +1,5 @@
 package:
-  name: maxbars
+  name: fullbars-compile
   publish:
     version: 0.1.0
     license: Apache-2.0
@@ -7,19 +7,18 @@ package:
       githubOwner: barebars
       githubRepo: barebars
   dependencies:
-    - arrays
-    - barebars
-    - either
-    - fullbars
-    - fullbars-compile
-    - maybe
     - prelude
+    - either
+    - ordered-collections
+    - barebars
+    - barebars-compile
+    - fullbars
   test:
-    main: Test.MaxBars.Main
+    main: Test.FullBars.Compile.Main
     dependencies:
-      - assert
-      - console
       - effect
-      - ordered-collections
+      - console
+      - assert
       - strings
-      - tuples
+      - either
+      - foldable-traversable

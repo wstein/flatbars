@@ -12,12 +12,12 @@ module MaxBars
   , compileMaxJs
   ) where
 
-import BareBars.Compile.FullBars (compileSurfaceWith)
 import BareBars.Error (ParseError)
 import BareBars.Parser (ParseOptions, defaultParseOptions)
 import BareBars.Value (Value)
 import Data.Either (Either)
 import FullBars (renderSurfaceDiagWith)
+import FullBars.Compile (compileSurfaceWith)
 import MaxBars.Expr (parseMaxExpr)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
