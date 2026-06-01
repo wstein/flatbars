@@ -2,7 +2,8 @@
 :navtitle: ADR-001 Structural parser + walker
 
 *Status:* Accepted (supersedes the earlier three-layer "surface parser + desugar pass + interpreter"
-framing). *Date:* 2026-05-31.
+framing). *Date:* 2026-05-31. *Revised:* 2026-06-01 — reconciled with the kernel extraction and the
+token-stream lexer; see <<review>>.
 
 This record fixes the architecture so it stops being relitigated. Earlier iterations swung between a
 hardcoded `pass:[{{else}}]` token, name-agnostic separators, nested `pass:[{{#else}}]` clause blocks,
@@ -14,23 +15,35 @@ BareBars is a *substrate*, not an engine: the core must commit to no semantics, 
 supplies meaning. We need a pipeline that makes that split structural rather than merely asserted,
 and that does not grow a second parser/AST for "surface" sugar.
 
+Since the original decision the repository has gained a shared `kernel` package, a token-stream
+interior lexer, and a *dialect ladder* (RawBars ⊂ FullBars ⊂ MaxBars, with MinBars planned). The
+normative claims below are unchanged in spirit; the <<review>> section records where the words had
+to be sharpened to stay true to the code.
+
 == Decision
 
 The pipeline is *two passes and one parser*:
 
 [source,text]
 ----
-source ──Lexer/Parser──▶ structural AST ──the walker──▶ real AST ──▶ output
-         1st pass: STRUCTURAL ONLY        2nd pass: engine-supplied
-         tags, braces, blocks, args,      desugars (escaping, paths, {{else}}→clause)
-         nesting — zero meaning           AND builds the real AST, in one walk
+source ──Lexer/Parser──▶ structural AST ──the walker──▶ real AST ──▶ tooling/lints
+         1st pass: STRUCTURAL ONLY        2nd pass: engine-supplied   (NOT the render path)
+         tags, braces, blocks, args,      desugars (escaping, paths,
+         nesting — zero name meaning      {{else}}→clause), builds real AST
+
+         structural AST ──runTemplate──▶ output                       (the render path)
+                          interprets the structural tree directly
 ----
 
 . *One parser, structural only.* `parse :: String -> Either ParseError Template` produces the
   *structural AST* (xref:evaluation.adoc[] §3.1): `Content`, `Output`, `Block`, `RawBlock`, and the
   bare double-stash `Sep`. It records every syntactic shape — brace count, identifiers, args,
-  nesting — and assigns *none* of it meaning. There is **no separate surface parser and no surface
-  AST**.
+  nesting — and assigns *no name* any meaning. There is **no separate surface parser and no surface
+  AST**. The interior of a tag is tokenized by a shared, meaning-free tokenizer
+  (`BareBars.Token.tokenizeInterior`: `TIdent`/`TStr`/`TNum`/`TLParen`/`TRParen`/`TOp`) and handed to
+  a *dialect grammar* through two seams on `ParseOptions`: `parseExpr` (output/argument interiors)
+  and `parseHead` (block-open heads). The default grammar is the shared prefix grammar
+  (`BareBars.Expr`); MaxBars swaps in a precedence-climbing grammar through the same seams.
 
 . *`pass:[{{ }}]` is structural.* The two-brace stache is a first-class, meaning-free node (`Sep`).
   `pass:[{{else}}]` is just a `Sep` whose head identifier is `else`; the parser cannot tell it from
@@ -38,16 +51,26 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
   is written `pass:[\{{]` (or inside a raw block). The brace *count* is structural data;
   "two ⇒ escape" is a *walker* rule, not a parser fact (xref:lexical.adoc[] §1.2).
 
-. *The walker is the only thing that assigns meaning.* It desugars and builds the real AST in the
+. *Shape recognition is fixed; shape admission is dialect-gated.* The parser recognizes a *fixed* set
+  of sigils and tag shapes and knows nothing of what any *name* does — but which shapes are *legal*
+  is a per-dialect flag. `ParseOptions.extras` gates the Handlebars-only shapes (raw blocks
+  `pass:[{{{{…}}}}]`, the inverse block `pass:[{{^}}]`, unescaped `pass:[{{& }}]`); RawBars and
+  MaxBars set `extras = false` and the parser rejects them with `DisallowedShape`. This is a
+  structural gate (which shapes exist), never a semantic one (what a name means).
+
+. *The walker is the only thing that assigns name-meaning.* It desugars and builds the real AST in the
   same pass. Escaping (`esc_html` ⇒ escaped), clause-splitting (`pass:[{{else}}]` consumed into typed
   branches), and — for a surface dialect — paths (`name` ⇒ `lookup this "name"`) are all walker
-  decisions. The reference lowering is `FullBars.Lower.lower :: Template -> Array RNode`, a
-  `foldTemplate` (xref:appendix-handlebars.adoc#engine-api[A.13.2]).
+  decisions. The reference lowering is `Kernel.Lower.lower :: Template -> Array RNode`, a
+  `foldTemplate` (xref:appendix-handlebars.adoc#engine-api[A.13.2]). The surface desugar is
+  `FullBars.Surface.desugar`.
 
-. *No canonical real AST.* `RNode` (`RIf`/`ROut`/…) is the real AST of the reference engine, *FullBars*, published
-  as a worked example for tool authors. Another engine may lower to any shape. The reference renderer
-  (`runTemplate`) interprets the structural tree directly; `lower` is the materializable real AST
-  that tooling inspects (the playground's "Real AST" view, `escapingWarnings`).
+. *No mandated real AST; one shared reference lowering.* `RNode` (`RIf`/`ROut`/…) is the real AST of
+  the reference lowering, now living in the shared `kernel` package and used by the whole ladder
+  (RawBars/FullBars/MaxBars) as a worked example for tool authors. Another engine (e.g. MinBars) may
+  lower to any shape. Crucially, `lower` is **not on the render path**: the reference renderer
+  (`runTemplate`, `Kernel.Engine`) interprets the structural tree *directly*; `lower` materializes
+  the real AST only for tooling (the playground's "Real AST" view) and lints (`escapingWarnings`).
 
 . *Safe by default.* The reference engine never auto-escapes raw output (`pass:[{{{ }}}]`); the
   `escapingWarnings` lint flags raw output of untrusted data (`lookup`/`this`/scoped accessors not
@@ -56,11 +79,171 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
 
 == Consequences
 
-* *Pro:* the parser is genuinely meaning-free (the `else`/`user` indistinguishability proves it); one
-  recursion (`foldTemplate`) replaces "surface parser + desugar pass + interpret"; the real AST is
-  inspectable but never mandated.
-* *Con:* `pass:[{{]` is now significant in template text (a breaking change from "no double-stash in
-  the core"); escaping lives in the swappable layer, mitigated by safe-by-default in the reference
-  engine plus the lint.
+* *Pro:* the parser is genuinely name-meaning-free (the `else`/`user` indistinguishability proves
+  it); one recursion (`foldTemplate`) replaces "surface parser + desugar pass + interpret"; the real
+  AST is inspectable but never mandated; the `parseExpr`/`parseHead` seams let three dialects share
+  one parser, kernel, prelude, and compiler.
+* *Con:* `pass:[{{]` is significant in template text (a breaking change from "no double-stash in the
+  core"); escaping lives in the swappable layer, mitigated by safe-by-default in the reference engine
+  plus the lint; the core carries a *fixed* sigil vocabulary, so a new dialect's sigils (MinBars'
+  `pass:[{{<]`/`pass:[{{$]`/…) must be added to the shared lexer and gated, not bolted on in the
+  dialect package.
 * *Removed:* the separate surface parser / surface AST (`BareBars.Surface` as a `parseSurface`); the
   dialect is recast as the walker's desugaring rules over the structural AST (xref:surface.adoc[]).
+
+[#review]
+== Review debate (2026-06-01)
+
+The kernel extraction, the token-stream lexer, and the arrival of a dialect ladder put pressure on
+three of the original claims. The team relitigated them — against the code, not the prose. Positions
+and counter-positions are recorded so the consensus below is not mistaken for unanimity-by-default.
+Suggestions are rated 1–5 (5 = adopt now).
+
+=== Participants and opening positions
+
+*Mara (substrate / language design).* "The crown jewel is that `parse` cannot distinguish
+`pass:[{{else}}]` from `pass:[{{user}}]` — `Sep _ "else" _` vs. `Sep _ "user" _` are the same shape
+(`Syntax.purs:54`). That property is intact and we must not lose it. But I'll concede the original
+word 'meaning-free' was sloppy. The parser is *name*-agnostic, not *shape*-agnostic: it knows
+`pass:[{{{{ }}}}]` is a raw block and `pass:[{{^]` is an inverse. That was always true; the ADR just
+didn't say it."
+
+*Devi (engine / compiler).* "My objection is concrete and falsifiable: the headline diagram is
+*wrong about how rendering works*. It draws `structural AST → walker → real AST → output`. But
+`runTemplate` (`Engine.purs:61-62`) renders by interpreting the `Template` directly —
+`render :: env -> Template -> m String` (`Engine.purs:45`). `lower`/`RNode` never appears on that
+path. We now have *four* IoC instances — interpret, desugar, validate, compile — and only one of them
+(desugar) produces the real AST. Selling `lower` as 'the second pass' overstates a tooling artifact."
+
+*Soren (security / correctness).* "‘Escaping lives in the swappable layer, mitigated by a lint’ is a
+polite way of saying XSS is opt-in. `escapingWarnings` (`Lower.purs:125`) is a *lint*, and lints get
+ignored. A substrate that can't mandate escaping is defensible; a substrate that *frames* an
+ignorable warning as the safety mechanism is not."
+
+*Petra (spec / docs).* "Half the ADR's identifiers are stale. It says `FullBars.Lower.lower` and
+`BareBars.Surface`; the code says `Kernel.Lower.lower` (`Lower.purs:62`) and `FullBars.Surface`. And
+'`RNode` is the real AST of the reference engine, published as an example — another engine may lower
+to any shape' reads very differently now that `RNode` sits in the *shared kernel* and *all three*
+dialects lower through it (`FullBars.purs:39`). De facto, it is canonical for the ladder."
+
+*Kai (dialects / MinBars).* "The ADR predates dialects entirely, yet the dialect seams are the most
+important thing the architecture earned. `ParseOptions.parseExpr` *and* `parseHead`
+(`Parser.purs:57`) are how RawBars/FullBars/MaxBars share one parser. And the MinBars review found a
+load-bearing falsehood in the folklore: 'the core is reused unchanged.' It is not — MinBars'
+`pass:[{{<]`/`pass:[{{$]`/`pass:[{{>*]` sigils have to be added to the *shared* lexer and gated like
+`extras`. The core's sigil set is a fixed, growing vocabulary, not an open extension point."
+
+=== Exchange
+
+*On "meaning-free" (Mara ↔ Kai ↔ Petra).* Kai pushed Mara: "`extras` proves your concession is
+bigger than you think. `Parser.purs:271/276/288` reject `pass:[{{&}}]`, `pass:[{{{{}}}}]`,
+`pass:[{{^}}]` with `DisallowedShape` when `extras = false`. The *same source text* parses under
+FullBars and fails under RawBars. That is the parser making a per-dialect decision." Mara held the
+line but moved: "Agreed, but note *what* it decides — whether a *shape* is admitted, never what a
+*name* evaluates to. `else` and `user` are still indistinguishable. The honest phrasing is
+*name-agnostic, shape-aware, shape-gated*." Petra: "Then say exactly that in the Decision, because
+'assigns none of it meaning' is what a reader quotes back at you."
+
+*On the diagram (Devi ↔ Mara).* Mara defended the two-pass framing as *conceptual*: "The model is
+parse-then-walk; the renderer happening to fuse them is an optimization." Devi: "It's not an
+optimization we wrote — `runTemplate` was *always* structural-direct; `lower` was *added later* for
+the playground. A reader who believes the diagram will look for a real-AST interpreter that doesn't
+exist. Conceptual honesty cuts the other way: show the render path as single-pass and the real-AST
+path as a parallel tooling branch." Mara conceded the diagram, not the principle.
+
+*On escaping (Soren ↔ Devi ↔ Mara).* Devi resisted Soren's maximalism: "The substrate *can't*
+mandate escaping without choosing a value policy — `truthy`/`escapeHtml`/`stringify` are FullBars',
+and MinBars deliberately picks its own. Bake escaping into core and you've smuggled an engine into
+the substrate, which is the exact thing this ADR exists to prevent." Soren narrowed the claim: "Fine
+— I'm not asking core to escape. I'm asking that (a) every engine be *required by contract* to
+declare an escaping policy, and (b) the lint be *on by default* in the CLI and playground, not an
+opt-in. The playground already runs it (`Main.purs:211`); the CLI doesn't." Mara: "That I can sign —
+it's a conformance requirement on engines, not a semantics in core."
+
+*On the real AST (Petra ↔ Devi).* Petra: "If three dialects share `RNode`, calling it 'just an
+example' is misleading even if technically true." Devi: "But it *is* only the lowering shape, not the
+render shape, so it isn't load-bearing the way a canonical AST would be — MinBars can ignore it
+entirely and nothing breaks." Consensus wording: 'one *shared reference* lowering, used by the
+ladder, mandated for no one.'
+
+=== Rated suggestions
+
+[cols="4,1,3",options="header"]
+|===
+| Suggestion | Rating | Sponsor / dissent
+
+| Reword the core principle to *name-agnostic, shape-aware, shape-gated* and document the `extras`
+  gate as structural-not-semantic.
+| 5 | Mara, Kai; Petra: "non-negotiable, it's the most-quoted line."
+
+| Redraw the pipeline diagram: render path is single-pass (`runTemplate` over the structural tree);
+  the `lower`→`RNode` real-AST path is a parallel *tooling/lint* branch, not the render path.
+| 5 | Devi; Mara concedes.
+
+| Fix stale identifiers (`Kernel.Lower.lower`, `FullBars.Surface`) and add the `parseExpr`/`parseHead`
+  seams + the dialect ladder to the Decision.
+| 5 | Petra, Kai.
+
+| Soften "no canonical real AST" → "no *mandated* real AST; one *shared reference* lowering
+  (`kernel`), used by the ladder."
+| 4 | Petra; Devi: "accurate, low risk."
+
+| Require (by engine-conformance contract) that each engine declare an escaping policy; make
+  `escapingWarnings` on-by-default in the CLI (it already is in the playground).
+| 4 | Soren; Devi: "+1 for the contract, the CLI default needs a flag to suppress."
+
+| Spin escaping/value-policy out into its own *ADR-002* rather than overloading this record.
+| 3 | Soren; Mara: "yes, but after we land the wording here."
+
+| Pre-register the MinBars sigils (`pass:[{{<]`/`pass:[{{$]`/`pass:[{{>*]`/`pass:[{{<*]`/`pass:[{{/*]`)
+  as *gated* shapes in the shared lexer, mirroring `extras`, before MinBars lands.
+| 3 | Kai; Petra: "ADR should *note the obligation*, the gating itself is MinBars' ADR."
+
+| Make `lower`/`RNode` the actual render path (kill structural-direct interpretation) to make the
+  two-pass diagram literally true.
+| 1 | nobody — Devi: "that's a rewrite of the engine to satisfy a diagram. Fix the diagram instead."
+|===
+
+== Consensus
+
+. *The principle is reworded, not reversed.* The parser is *name-agnostic* (no name has meaning —
+  `else` ≡ `user`), *shape-aware* (it recognizes a fixed sigil/shape vocabulary), and *shape-gated*
+  (`extras` and, later, MinBars sigils decide which shapes a *dialect* admits). "Meaning-free" was
+  retired as imprecise. (Decision §1, §3.)
+. *The render path is single-pass.* `runTemplate` interprets the structural tree directly; the
+  `lower`→`RNode` real AST is a *parallel* branch feeding tooling and lints, not rendering. The
+  diagram and Decision §5 now say so.
+. *One shared reference lowering, mandated for none.* `RNode` lives in `kernel` and the ladder shares
+  it, but the contract requires no engine to use it.
+. *Escaping stays swappable; safety becomes a contract.* Core will not mandate escaping (that would
+  smuggle in a value policy). Instead, engine conformance requires a declared escaping policy, and
+  the lint moves toward on-by-default everywhere.
+. *Stale identifiers and the dialect seams are now in the record.* The ADR no longer lies about
+  module names, and the `parseExpr`/`parseHead` seams + the ladder are first-class in the Decision.
+
+== Future developments
+
+* *ADR-002 — escaping & value-policy contract.* Lift Soren/Devi's compromise into its own record: the
+  conformance requirement that every engine declare `truthy`/`escapeHtml`/`stringify` and a
+  raw-output safety stance.
+* *MinBars sigils.* `pass:[{{<]`/`pass:[{{$]`/`pass:[{{>*]`/`pass:[{{<*]`/`pass:[{{/*]` join the
+  shared lexer as gated shapes (a new `extras`-like flag), with MinBars' own ADR owning the gate.
+  This is where "the core's sigil vocabulary grows per-dialect" gets tested for real.
+* *Recursion guard.* A shared kernel depth/budget (default 64) hardens the currently-unbounded
+  partial expansion — a prerequisite both MinBars and labeled loops want.
+* *Seam generalization.* `parseHead` was added late (bare-infix block conditions). Watch whether a
+  third seam appears; if it does, the "two seams" framing needs revisiting rather than accreting.
+
+== Concrete suggestions for improvement
+
+. **Land the four rating-5 doc fixes now** (principle wording, diagram, identifiers + seams, ladder)
+  — they are corrections, not design changes, and the ADR is currently quotably wrong.
+. **Add an engine-conformance checklist** to xref:host-api.adoc[] enumerating what an engine must
+  declare (escaping policy, truthiness default, sigil set, real-AST shape-or-none). This is where
+  "another engine may differ" stops being a slogan and becomes testable.
+. **Make `escapingWarnings` on-by-default in the CLI** with an explicit `--no-escape-lint` opt-out,
+  matching the playground (`Main.purs:211`).
+. **Pre-register MinBars' gated sigils** in the shared lexer behind a flag before MinBars code lands,
+  so the "core reused unchanged" folklore is killed at the source and not just in prose.
+. **Add a regression test asserting the `else`/`user` indistinguishability** (`parse` yields the same
+  `Sep` shape for both) so the crown-jewel property can't silently regress under a future seam.
