@@ -1,8 +1,11 @@
 # BareBars tutorials (FlatBars Lab)
 
-One lesson per surface — **RawBars · MinBars · FullBars · MaxBars** — each showing a
-live example and an **Open in Lab** button that opens the example in the FlatBars
-Lab (`lab/`) on the right engine, no copy-pasting.
+A runnable, lab-themed documentation site. **Mustache is the front door**: a
+comprehensive `/mustache` reference walks every tag in the logic-less language,
+each illustrated by a live example that renders through the real MinBars engine
+and opens in the FlatBars Lab (`lab/`) with one click. The four BareBars
+surfaces — **RawBars · MinBars · FullBars · MaxBars** — follow as the ladder
+beyond it.
 
 ## Run
 
@@ -13,8 +16,9 @@ npm run dev            # http://localhost:4321  ← the tutorials
 npm run build          # static site → dist/
 ```
 
-`http://localhost:4321/` is the tutorials landing page; each surface is at
-`/rawbars`, `/minbars`, `/fullbars`, `/maxbars`.
+Pages: `/` (landing, Mustache hero) · `/mustache` (the comprehensive reference) ·
+`/rawbars`, `/fullbars`, `/maxbars` (one lesson per surface). MinBars has no
+separate lesson page — the `/mustache` reference supersedes it.
 
 **`npm run dev` serves the Lab too.** The dev server mounts the repo's `lab/` at
 `/lab/` (same handler as `npm run lab`), so the tutorials and the Lab share one
@@ -28,31 +32,53 @@ spec is published (default `/barebars/`).
 
 ## How it works
 
-- **One source per example:** `src/examples.mjs` holds the four lessons. The pages
-  render them and the CI gate (`scripts/check-tutorial-links.mjs`) renders the same
-  objects — a preview can never drift from what's tested.
-- **Open in Lab** uses the shared `lab/open-in-lab.mjs` (`labHref`), which
-  encodes the workspace with the Lab's own share-state codec into the URL — self-
+- **One source per example, gate-validated:** the Mustache reference's runnable
+  examples live in `src/mustache.mjs`; the per-surface lessons in
+  `src/examples.mjs`. `scripts/check-tutorial-links.mjs` (in `npm test`) renders
+  every one through the real engine bundle, builds its Open-in-Lab link, and
+  fails if any example is broken or is defined but never shown on the page
+  (orphan guard). A preview can never drift from what's tested.
+- **Prose illustrates; the spec is the contract.** Page copy annotates verified,
+  runnable examples and links to the Antora spec — it never forks the normative
+  text.
+- **Shared chrome:** `src/layouts/Reference.astro` gives every page a sticky
+  left navigation (scroll-spy on the reference, active-page on the surfaces) and
+  the Lab's look via the token-only stylesheets `src/styles/lab-tokens.css`
+  (violet palette + IBM Plex) and `src/styles/open-in-lab.css`. Tokens are
+  copied, not the Lab's component CSS, so the two can't drift.
+- **Open in Lab** uses the shared `lab/open-in-lab.mjs` (`labHref`), which encodes
+  the workspace with the Lab's own share-state codec into the URL — self-
   contained, no vendoring, no fetch.
-- **Live previews dogfood the real engine:** the `OpenInLab` island imports the same
-  `lab/vendor/barebars-engine.mjs` the Lab ships, so a lesson runs the
-  engine it teaches. CI's `check:bundle` keeps that bundle from going stale.
-- **The spec is the contract:** each lesson links to its Antora page and never forks
-  the normative text.
+- **Live previews dogfood the real engine:** the `OpenInLab` island imports the
+  same engine the Lab ships, so a lesson runs the engine it teaches. CI's
+  `check:bundle` keeps that bundle from going stale.
+- **Conformance badges are generated, not asserted.** `npm run gen:conformance`
+  runs the vendored `mustache/spec` suite through the shipped MinBars bundle and
+  writes `src/conformance.json`; the reference renders its support table from
+  that data. `npm run check:conformance` (in `npm test`) fails if the committed
+  file is stale, so the page can never claim more than the suite proves.
+  Features the spec defines but MinBars doesn't implement (set delimiters,
+  lambdas) appear as static `spec-only` callouts with no live button — a preview
+  that can't run would mislead.
+
+### Add or change a Mustache example
+
+1. Add an entry to `src/mustache.mjs` (`{ template, data, partials? }`).
+2. Reference it on the page: `<OpenInLab client:visible engine="minbars" … />`
+   in `src/pages/mustache.astro` (the orphan guard enforces this).
+3. `npm run check:tutorial-links` to confirm it renders and links.
 
 ## Spike cost (Astro vs plain static — the decision evidence)
 
-Measured on this scaffold (4 lessons + landing):
+Measured on this site (`/mustache` reference + landing + 3 surface lessons):
 
 | metric | value |
 |---|---|
 | `npm install` | ~17 s, 365 packages, **151 MB** `node_modules` (gitignored) |
-| `npm run build` | ~2 s → **224 KB** static `dist/` (5 HTML pages) |
-| island JS (incl. engine) | 160 KB / **38 KB gzip**, one shared chunk |
-| authoring a lesson | one entry in `src/examples.mjs` (template + data) |
+| `npm run build` | ~1 s → **296 KB** static `dist/` (5 HTML pages) |
+| island JS (incl. engine) | 173 KB / **41 KB gzip**, one shared chunk, hydrated `client:visible` |
+| authoring an example | one entry in `src/mustache.mjs` (template + data) |
 
-Astro gives Markdown/component authoring and ships static HTML (the build is
-dev-time only; the deployed artifact is plain files, like the Lab). The cost is the
-toolchain (`node_modules`, a Node build) — acceptable at lesson volume. Below ~8–10
-pages, the plain-static path (hand-written HTML reusing the Lab's htm/preact idiom,
-no build) is the cheaper alternative the team flagged.
+Astro gives component authoring and ships static HTML (the build is dev-time
+only; the deployed artifact is plain files, like the Lab). The cost is the
+toolchain (`node_modules`, a Node build) — acceptable at this volume.

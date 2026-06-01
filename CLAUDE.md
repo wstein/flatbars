@@ -61,6 +61,16 @@ npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; alw
 npm run test:lab              # FlatBars Lab pure-Node unit tests (playground_utils, adapter)
 ```
 
+The `tutorials` site has its own two gates (both in `npm test`, no `spago build`
+needed — they import the committed lab bundle):
+
+```sh
+npm run check:tutorial-links  # render every tutorial example through the real engine + build its
+                              # Open-in-Lab link; also fails on an orphaned (defined-but-unshown) example
+npm run gen:conformance       # regenerate tutorials/src/conformance.json from the vendored mustache/spec suite
+npm run check:conformance     # fail if that file is stale (so the reference can't over-claim conformance)
+```
+
 `examples:verify` is the `barebars examples verify` CLI subcommand (see
 `example-loader-spec.md`). The FlatBars Lab loads the same corpus via the
 `?vendored=<id>` deep-link (`lab/index.html`), framing each fixture's
@@ -145,6 +155,13 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 The web playground is **`lab`** (the FlatBars Lab — plain HTML/JS/WASM,
 not a PureScript package). The old Halogen `packages/playground` was removed.
 
+The **`tutorials`** site (Astro + Preact, also not a PureScript package) is the
+learner-facing front end: a comprehensive runnable **Mustache reference**
+(`/mustache`) leads, with one lesson per surface behind it. Its runnable
+examples are gate-validated (`check:tutorial-links`) and its conformance table is
+generated from the vendored spec suite (`gen:conformance`); see
+`tutorials/README.md`.
+
 ### Conventions worth knowing
 
 - **One source of truth for the prelude.** `FullBars.Catalog` renders the
@@ -161,7 +178,10 @@ not a PureScript package). The old Halogen `packages/playground` was removed.
   is the separate upstream corpus for `examples verify` (see below).
 - **Mustache conformance.** `npm run examples:verify` (in `npm test`) renders the
   vendored `mustache/spec` fixtures through MinBars and asserts `== expected`;
-  re-vendor with `node scripts/vendor-mustache.mjs`.
+  re-vendor with `node scripts/vendor-mustache.mjs`. The same fixtures feed
+  `gen:conformance`, which measures them through the shipped lab bundle to
+  generate the tutorial's conformance table (`check:bundle` keeps the two in
+  step). Change the prelude/engine and re-run `npm run gen:conformance`.
 - ADR-001 (`docs/modules/ROOT/pages/adr-0001-structural-parser-and-walker.adoc`)
   records the structural-parser-plus-walker decision that the whole design rests
   on.
