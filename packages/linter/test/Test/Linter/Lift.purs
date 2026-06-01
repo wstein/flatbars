@@ -256,6 +256,9 @@ main = do
   liftsContaining "not op" "{{{ not (lookup this \"a\") }}}" "!a"
   liftsContaining "escaped output" "{{{ esc_html (lookup this \"x\") }}}" "{{ x }}"
   liftsContaining "pipe filter" "{{{ json (lookup this \"o\") }}}" "o | json"
+  -- handlebars-helpers aliases normalise to the canonical operator on lift.
+  liftsContaining "plus alias → +" "{{{ plus (lookup this \"a\") 1 }}}" "a + 1"
+  liftsContaining "times alias → *" "{{{ times (lookup this \"a\") 2 }}}" "a * 2"
 
   -- Every flag is well-formed (non-empty message, sane span).
   allFlagsWellFormed "well-formed flags"

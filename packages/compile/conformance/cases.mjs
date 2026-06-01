@@ -154,6 +154,10 @@ export const cases = [
   { name: "coalesce-first", dialect: "surface", t: "{{ coalesce a b }}", d: { a: null, b: "fallback" } },
   { name: "coalesce-zero", dialect: "surface", t: "{{ coalesce a b }}", d: { a: 0, b: "x" } },
   { name: "coalesce-chain", dialect: "surface", t: "{{ coalesce a b c }}", d: { a: null, b: null, c: "third" } },
+  // handlebars-helpers arithmetic aliases (render identically to add/sub/mul).
+  { name: "plus-alias", dialect: "surface", t: "{{ plus a b }}", d: { a: 2, b: 3 } },
+  { name: "minus-alias", dialect: "surface", t: "{{ minus a b }}", d: { a: 7, b: 4 } },
+  { name: "times-alias", dialect: "surface", t: "{{ times a b }}", d: { a: 4, b: 5 } },
 
   // MaxBars infix arithmetic + `??` operators (desugar to the prelude helpers;
   // the compiled path and the interpreter must agree).

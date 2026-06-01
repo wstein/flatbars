@@ -111,6 +111,12 @@ helperDefs =
   , valDef "multiply" (binary (arith (*)))
   , valDef "divide" (binary (arith (/)))
   , valDef "modulo" (binary (arith jsMod))
+  -- handlebars-helpers aliases: render identically to the canonical helpers
+  -- (`add`/`subtract`/`multiply`); the linter normalises them to the canonical
+  -- name / the `+ - *` operators in committed form.
+  , valDef "plus" (binary (arith (+)))
+  , valDef "minus" (binary (arith (-)))
+  , valDef "times" (binary (arith (*)))
   -- null-coalescing: the desugar target of `??`. Returns the first non-`VNull`
   -- argument (else `VNull`). Distinct from truthiness — `0`/`""`/`[]` pass.
   , gen "coalesce" false (AtLeast 1) coalesceH

@@ -280,6 +280,10 @@ const helpers = {
   multiply: (a) => num(a[0]) * num(a[1]),
   divide: (a) => num(a[0]) / num(a[1]),
   modulo: (a) => { const x = num(a[0]), y = num(a[1]); return x - y * Math.trunc(x / y); },
+  // handlebars-helpers aliases of add/subtract/multiply (render identically).
+  plus: (a) => num(a[0]) + num(a[1]),
+  minus: (a) => num(a[0]) - num(a[1]),
+  times: (a) => num(a[0]) * num(a[1]),
   // null-coalescing — the first non-null argument (the `??` desugar target).
   coalesce: (a) => { for (const v of a) if (v !== null) return v; return null; },
   log: () => null,

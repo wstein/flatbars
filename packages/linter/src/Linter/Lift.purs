@@ -114,6 +114,10 @@ binaryOps =
   , Tuple "divide" "/"
   , Tuple "modulo" "%"
   , Tuple "coalesce" "??"
+  -- handlebars-helpers aliases normalise to the canonical operator on lift.
+  , Tuple "plus" "+"
+  , Tuple "minus" "-"
+  , Tuple "times" "*"
   ]
 
 -- | Lift RawBars (core) source up to MaxBars source, collecting advisory flags.
