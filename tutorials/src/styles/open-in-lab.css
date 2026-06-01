@@ -93,10 +93,13 @@
 .oil.is-edited .oil-reset { opacity: 1; pointer-events: auto; }
 .oil .oil-reset:hover { background: var(--bg-2); color: var(--fg); }
 
-/* Inputs grid */
+/* Inputs grid. Templates are usually wider than their data, so the template
+   column gets the larger share — keeps verbose RawBars applications on one line
+   instead of wrapping while the data column sits half-empty. minmax(0,…) lets a
+   long token wrap rather than blow the column out. */
 .oil .oil-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
   gap: 1px;
   background: var(--border);
 }
