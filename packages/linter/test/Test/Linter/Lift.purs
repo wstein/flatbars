@@ -104,6 +104,10 @@ corpus =
   , Tuple "nested arith" "{{{ add (multiply (lookup this \"b\") 2) 1 }}}"
   , Tuple "modulo" "{{{ modulo (lookup this \"b\") 7 }}}"
   , Tuple "coalesce" "{{{ coalesce (lookup this \"a\") \"fb\" }}}"
+  -- value-primitive unary filters re-sugar to pipes (derived from the prelude).
+  , Tuple "uppercase filter" "{{{ uppercase (lookup this \"a\") }}}"
+  , Tuple "abs filter" "{{{ abs (lookup this \"b\") }}}"
+  , Tuple "filter chain" "{{{ uppercase (trim (lookup this \"a\")) }}}"
   ]
 
 -- | Assert render-equivalence across the matrix for one RawBars template.
@@ -259,6 +263,16 @@ main = do
   -- handlebars-helpers aliases normalise to the canonical operator on lift.
   liftsContaining "plus alias → +" "{{{ plus (lookup this \"a\") 1 }}}" "a + 1"
   liftsContaining "times alias → *" "{{{ times (lookup this \"a\") 2 }}}" "a * 2"
+  -- value-primitive unary helpers re-sugar to pipes (derived from the prelude).
+  liftsContaining "uppercase → pipe" "{{{ uppercase (lookup this \"a\") }}}" "a | uppercase"
+  liftsContaining "abs → pipe" "{{{ abs (lookup this \"b\") }}}" "b | abs"
+  liftsContaining "unique → pipe" "{{{ unique (lookup this \"xs\") }}}" "xs | unique"
+  liftsContaining "filter chain → pipes" "{{{ uppercase (trim (lookup this \"a\")) }}}"
+    "(a | trim) | uppercase"
+  -- an unknown arity-1 helper is still left as a call + flagged.
+  liftsWithFlag "unknown still flagged" "{{{ frobnicate (lookup this \"a\") }}}"
+    "(frobnicate"
+    "unrecognised-filter"
 
   -- Every flag is well-formed (non-empty message, sane span).
   allFlagsWellFormed "well-formed flags"

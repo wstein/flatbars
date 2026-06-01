@@ -18,6 +18,7 @@ module Kernel.Prelude
   ( prelude
   , preludeSchema
   , preludeAliases
+  , preludeUnaryHelpers
   , coreHelperDefs
   , primitiveHelperDefs
   , coreSchema
@@ -221,6 +222,23 @@ preludeAliases =
   Array.mapMaybe aliasOf (helperDefs :: Array (HelperDef (Either Error)))
   where
   aliasOf d = Tuple d.name <$> d.alias
+
+-- | The names of *value* (non-block) helpers whose arity admits a **single
+-- | argument** — `Exactly 1` or `Between 1 n`. This is the candidate set for the
+-- | linter's pipe re-sugaring (`(f a)` → `a | f`): every unary value transform
+-- | (`uppercase`, `trim`, `abs`, `count`, `json`, …) qualifies automatically, so
+-- | a new primitive becomes pipe-liftable with no change to the linter. The lift
+-- | further removes names that own a dedicated surface (the `!`/operator helpers).
+preludeUnaryHelpers :: Array String
+preludeUnaryHelpers =
+  Array.mapMaybe unaryName (helperDefs :: Array (HelperDef (Either Error)))
+  where
+  unaryName d
+    | d.block = Nothing
+    | otherwise = case d.arity of
+        Exactly 1 -> Just d.name
+        Between 1 _ -> Just d.name
+        _ -> Nothing
 
 -- | The reference engine's validation schema (`Kernel.Walk.validate`),
 -- | projected from `helperDefs` plus the scoped variables below.

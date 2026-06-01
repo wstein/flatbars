@@ -54,6 +54,7 @@ import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.String as String
 import Data.Tuple (Tuple(..), fst, snd)
+import Kernel.Prelude (preludeUnaryHelpers)
 
 -- | One advisory ambiguity flag raised during a lift. `kind` is a stable tag
 -- | (`"lookup-path"`, `"unrecognised-filter"`, `"multi-arg-call"`); `span` locates
@@ -74,24 +75,22 @@ type LiftResult =
   , flags :: Array LiftFlag
   }
 
--- | The recognised **unary "filter-shaped" helpers** — the only arity-1 calls
--- | that have a canonical pipe form `a | f` (§B.3). Derived from
--- | `Kernel.Prelude.helperDefs`: the *value* helpers (non-block) whose arity
--- | admits a single argument and whose shape is a value→value transform, with the
--- | helpers that own a dedicated *operator* surface excluded (so they re-sugar via
--- | the operator table, never a pipe):
+-- | The recognised **unary "filter-shaped" helpers** — the arity-1 calls that
+-- | have a canonical pipe form `a | f` (§B.3). **Derived from the prelude**
+-- | (`Kernel.Prelude.preludeUnaryHelpers`: every non-block value helper whose
+-- | arity admits a single argument — `esc_html`/`safe`/`json`/`esc_json` and all
+-- | the §4 value primitives `uppercase`/`trim`/`abs`/`count`/`reverse`/…), so a
+-- | new primitive becomes pipe-liftable with no change here.
 -- |
--- |  * `esc_html`, `safe` — `unary` value helpers.
--- |  * `json`, `esc_json` — `Between 1 2`; the 1-arg form is a transform.
--- |
--- | Excluded by design: `not` (arity 1, but its surface is the prefix `!`);
--- | `eq`/`ne`/`lt`/`gt`/`lte`/`gte` (binary operators); `and`/`or` (operators);
--- | `lookup`/`this`/`dict`/`log`/`apply`/`partial` (not value transforms, or
--- | variable-arity with no subject); the nullary literals `true`/`false`/`null`.
--- | `upper` etc. are NOT in the reference prelude, so they are *not* recognised —
--- | a `(upper a)` lifts to a flagged call, not a pipe (the conservative default).
+-- | Removed: the names that own a *dedicated* surface and so re-sugar another way
+-- | — `not` (prefix `!`), and the operator helpers in `binaryOps`. (`elif` is a
+-- | clause marker and never reaches an output-position application, so it cannot
+-- | be lifted as a filter even though its arity is 1.) An unrecognised arity-1
+-- | call (`(frobnicate a)`) is left as a call and flagged.
 unaryFilters :: Array String
-unaryFilters = [ "esc_html", "safe", "json", "esc_json" ]
+unaryFilters = Array.filter (not <<< dedicatedSurface) preludeUnaryHelpers
+  where
+  dedicatedSurface name = name == "not" || Array.elem name (map fst binaryOps)
 
 -- | The infix operator table, helper → infix symbol, for the binary operators
 -- | MaxBars re-sugars to. `not` (prefix `!`) is handled separately. Arithmetic
