@@ -112,7 +112,7 @@
   display: flex;
   flex-wrap: wrap;
 }
-.oil .oil-grid.has-partials .oil-cell { flex: 1 1 12rem; min-width: 0; }
+.oil .oil-grid.has-partials .oil-cell { flex: 1 1 11rem; min-width: 0; }
 /* Only a WIDE template (multi-line/long, set by the component) gets its own
    full-width row; a short one-liner shares the row with data + partials so it
    doesn't leave a near-empty band. */
