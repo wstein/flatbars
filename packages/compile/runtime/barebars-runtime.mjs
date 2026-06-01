@@ -80,6 +80,16 @@ function order(ok, a, b) {
   if (!comparable) return false;
   return ok(x < y ? -1 : x > y ? 1 : 0);
 }
+// A -1/0/1 comparator mirroring the interpreter's `compareValues`: numbers
+// numerically, strings lexicographically, anything else / mixed ⇒ 0 (so a
+// stable sort keeps the input order). Used by `sortBy`.
+function cmpVals(a, b) {
+  const x = isSafe(a) ? a.s : a, y = isSafe(b) ? b.s : b;
+  const comparable = (typeof x === "number" && typeof y === "number") ||
+    (typeof x === "string" && typeof y === "string");
+  if (!comparable) return 0;
+  return x < y ? -1 : x > y ? 1 : 0;
+}
 
 // ── lookup (FullBars.Prelude.lookup): walk segments, null at first miss ──────
 function lookup(obj, ...segs) {
@@ -98,6 +108,12 @@ function lookup(obj, ...segs) {
     if (cur === undefined) cur = null;
   }
   return cur;
+}
+// Extract a dotted key path from a value (the §6 key-string form for
+// sortBy/pluck/groupBy): split on `.` and walk via `lookup`, mirroring the
+// interpreter's `extractPath` (a missing/blocked segment ⇒ null).
+function pathOf(v, key) {
+  return lookup(v, ...key.split("."));
 }
 
 // ── frames ───────────────────────────────────────────────────────────────────
@@ -308,12 +324,49 @@ const helpers = {
   split: (a) => stringify(a[0]).split(stringify(a[1])),
   replace: (a) => stringify(a[0]).split(stringify(a[1])).join(stringify(a[2])), // literal, all occurrences (= PureScript replaceAll); empty find is not a tested case
   slice: (a) => a.length >= 3 ? stringify(a[0]).slice(int(a[1]), int(a[2])) : stringify(a[0]).slice(int(a[1])),
-  includes: (a) => stringify(a[0]).includes(stringify(a[1])),
+  // `includes` is polymorphic (matches the interpreter's type-dispatched
+  // includesH): array subject ⇒ element membership by deepEq; string subject ⇒
+  // substring; anything else ⇒ false.
+  includes: (a) => Array.isArray(a[0]) ? a[0].some((el) => deepEq(el, a[1])) : (typeof (isSafe(a[0]) ? a[0].s : a[0]) === "string" ? stringify(a[0]).includes(stringify(a[1])) : false),
   startsWith: (a) => stringify(a[0]).startsWith(stringify(a[1])),
   endsWith: (a) => stringify(a[0]).endsWith(stringify(a[1])),
   truncate: (a) => { const s = stringify(a[0]), n = int(a[1]), suf = a.length >= 3 ? stringify(a[2]) : "…"; return s.length > n ? s.slice(0, n) + suf : s; },
   append: (a) => stringify(a[0]) + stringify(a[1]),
   prepend: (a) => stringify(a[1]) + stringify(a[0]),
+  // case aliases (handlebars-helpers parity): identical to lowercase/uppercase.
+  downcase: (a) => stringify(a[0]).toLowerCase(),
+  upcase: (a) => stringify(a[0]).toUpperCase(),
+  // ── value primitives — number pack (helper-packs-spec §4) ───────────────────
+  // abs/floor/ceil/round are Math.* (the interpreter's Data.Number FFI is the
+  // same), so byte-identical. toFixed's `n.toFixed(d)` IS the interpreter's
+  // `toStringWith (fixed d) n`. toInt/toFloat parse via `parseFloat` gated by
+  // `Number.isFinite` — exactly Data.Number.fromString — so the two agree;
+  // null on parse failure, trunc toward zero for toInt. Operands via num/int.
+  abs: (a) => Math.abs(num(a[0])),
+  floor: (a) => Math.floor(num(a[0])),
+  ceil: (a) => Math.ceil(num(a[0])),
+  round: (a) => Math.round(num(a[0])),
+  toFixed: (a) => num(a[0]).toFixed(int(a[1])),
+  toInt: (a) => { const n = parseFloat(stringify(a[0])); return Number.isFinite(n) ? Math.trunc(n) : null; },
+  toFloat: (a) => { const n = parseFloat(stringify(a[0])); return Number.isFinite(n) ? n : null; },
+  // ── value primitives — array pack (helper-packs-spec §4, §6) ────────────────
+  // Key-based forms take a dotted key string (no callbacks): `pathOf` splits on
+  // `.` and walks via `lookup`, the same access the interpreter's extractPath
+  // uses. `sortBy` is stable (V8 ES2019) with the `cmpVals` comparator
+  // (incomparable ⇒ 0 = keep order), mirroring the interpreter's Array.sortBy.
+  join: (a) => Array.isArray(a[0]) ? a[0].map(stringify).join(stringify(a[1])) : stringify(a[0]),
+  count: (a) => Array.isArray(a[0]) ? a[0].length : (a[0] !== null && typeof a[0] === "object" && !isSafe(a[0]) ? Object.keys(a[0]).length : 0),
+  size: (a) => Array.isArray(a[0]) ? a[0].length : (a[0] !== null && typeof a[0] === "object" && !isSafe(a[0]) ? Object.keys(a[0]).length : 0),
+  at: (a) => { if (!Array.isArray(a[0])) return null; const r = a[0].at(int(a[1])); return r === undefined ? null : r; },
+  take: (a) => Array.isArray(a[0]) ? a[0].slice(0, Math.max(0, int(a[1]))) : [],
+  takeRight: (a) => { if (!Array.isArray(a[0])) return []; const n = Math.max(0, int(a[1])); return n === 0 ? [] : a[0].slice(a[0].length - Math.min(n, a[0].length)); },
+  // `reverse` is polymorphic (matches the interpreter's reverseH): array ⇒
+  // reversed elements; otherwise the stringified subject reversed by code unit.
+  reverse: (a) => Array.isArray(a[0]) ? a[0].slice().reverse() : stringify(a[0]).split("").reverse().join(""),
+  unique: (a) => { if (!Array.isArray(a[0])) return []; const out = []; for (const v of a[0]) if (!out.some((u) => deepEq(u, v))) out.push(v); return out; },
+  sortBy: (a) => { if (!Array.isArray(a[0])) return []; const key = stringify(a[1]); return a[0].slice().sort((x, y) => cmpVals(pathOf(x, key), pathOf(y, key))); },
+  pluck: (a) => Array.isArray(a[0]) ? a[0].map((el) => pathOf(el, stringify(a[1]))) : [],
+  groupBy: (a) => { if (!Array.isArray(a[0])) return {}; const key = stringify(a[1]), o = {}; for (const el of a[0]) { const k = stringify(pathOf(el, key)); (o[k] = o[k] || []).push(el); } return o; },
   json: (a) => jsonText(a[0], a[1]),
   esc_json: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))),
   else: () => new Safe(""),

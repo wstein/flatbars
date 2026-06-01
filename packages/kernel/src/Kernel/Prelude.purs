@@ -33,7 +33,8 @@ import Data.Either (Either)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
-import Data.Number (trunc)
+import Data.Number (abs, ceil, floor, fromString, round, trunc) as Number
+import Data.Number.Format (fixed, toStringWith) as Number
 import Data.Set as Set
 import Data.String (Pattern(..), Replacement(..))
 import Data.String as String
@@ -168,6 +169,30 @@ primitiveHelperDefs =
   -- concatenation
   , valDef "append" (binary appendH)
   , valDef "prepend" (binary prependH)
+  -- case aliases (handlebars-helpers parity): render identically to the
+  -- canonical case helpers, reusing the very same `strUnary` transform.
+  , valDef "downcase" (unary (strUnary toLower))
+  , valDef "upcase" (unary (strUnary toUpper))
+  -- number pack
+  , valDef "abs" (unary (numUnary Number.abs))
+  , valDef "floor" (unary (numUnary Number.floor))
+  , valDef "ceil" (unary (numUnary Number.ceil))
+  , valDef "round" (unary (numUnary Number.round))
+  , valDef "toFixed" (binary toFixedH)
+  , valDef "toInt" (unary toIntH)
+  , valDef "toFloat" (unary toFloatH)
+  -- array pack
+  , valDef "join" (binary joinH)
+  , valDef "count" (unary countH)
+  , valDef "size" (unary countH)
+  , valDef "at" (binary atH)
+  , valDef "take" (binary takeH)
+  , valDef "takeRight" (binary takeRightH)
+  , valDef "reverse" (unary reverseH)
+  , valDef "unique" (unary uniqueH)
+  , valDef "sortBy" (binary sortByH)
+  , valDef "pluck" (binary pluckH)
+  , valDef "groupBy" (binary groupByH)
   ]
 
 -- | The registry: name → runtime helper.
@@ -303,7 +328,7 @@ asNum = case _ of
 -- | JS-`%` modulo via the truncated-division identity (`a - b * trunc(a/b)`),
 -- | so it matches the runtime's `Math.trunc`-based modulo bit-for-bit.
 jsMod :: Number -> Number -> Number
-jsMod a b = a - b * trunc (a / b)
+jsMod a b = a - b * Number.trunc (a / b)
 
 -- | `coalesce a b …`: the first non-`VNull` argument, else `VNull`. The desugar
 -- | target of the MaxBars `??` operator (null-coalescing, *not* truthiness — so
@@ -432,12 +457,19 @@ clampIndex len i
   | i < 0 = max (len + i) 0
   | otherwise = min i len
 
--- | `includes s sub` → `VBool`: literal substring membership.
+-- | `includes subject x` → `VBool`, polymorphic in the subject:
+-- |   * a `VString` subject ⇒ literal substring membership (`(s sub)`);
+-- |   * a `VArray` subject ⇒ element membership by `Value` equality (`(arr v)`);
+-- |   * any other subject ⇒ `false`.
+-- | The runtime entry type-dispatches identically (`Array.isArray` ⇒ element
+-- | membership, string ⇒ `String.includes`, else `false`).
 includesH :: forall m. MonadThrow Error m => Value -> Value -> m Value
-includesH sv subv = do
-  s <- stringifyM sv
-  sub <- stringifyM subv
-  pure (VBool (String.contains (Pattern sub) s))
+includesH sv xv = case sv of
+  VArray xs -> pure (VBool (Array.elem xv xs))
+  VString s -> do
+    sub <- stringifyM xv
+    pure (VBool (String.contains (Pattern sub) s))
+  _ -> pure (VBool false)
 
 -- | `startsWith s x` / `endsWith s x` → `VBool`.
 startsWithH :: forall m. MonadThrow Error m => Value -> Value -> m Value
@@ -495,7 +527,178 @@ prependH sv xv = do
 -- | Read a numeric argument as an `Int`, truncating toward zero (`trunc`) to
 -- | match the runtime's `Math.trunc`, and reusing `asNum`'s strict number guard.
 asInt :: forall m. MonadThrow Error m => Value -> m Int
-asInt v = (Int.round <<< trunc) <$> asNum v
+asInt v = (Int.round <<< Number.trunc) <$> asNum v
+
+--------------------------------------------------------------------------------
+-- Value primitives — number pack (helper-packs-spec §4)
+--------------------------------------------------------------------------------
+--
+-- Determinism: `abs`/`floor`/`ceil`/`round` are `Data.Number` FFI to `Math.*`,
+-- so they are byte-identical to the runtime's `Math.abs/floor/ceil/round`.
+-- `toFixed`'s `toStringWith (fixed d)` FFI *is* JS `n.toFixed(d)`. `toInt`/
+-- `toFloat` parse via `Data.Number.fromString` (= JS `parseFloat` gated by
+-- `isFinite`); the runtime mirrors that exactly (`parseFloat` + `Number.isFinite`)
+-- so the two paths never diverge — `VNull` on parse failure, `trunc` toward zero
+-- for `toInt`. Operands read via the strict `asNum`/`asInt` guards.
+
+-- | A one-argument numeric transform: read the (strictly numeric) subject, apply
+-- | the `Math.*`-backed `f`, return a `VNumber`.
+numUnary :: forall m. MonadThrow Error m => (Number -> Number) -> Value -> m Value
+numUnary f v = (VNumber <<< f) <$> asNum v
+
+-- | `toFixed n d`: format `n` with `d` fixed decimal places. The PureScript FFI
+-- | (`toStringWith (fixed d) n`) is JS `n.toFixed(d)`, so both targets round
+-- | identically. `d` is read via the strict `asInt` guard.
+toFixedH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+toFixedH nv dv = do
+  n <- asNum nv
+  d <- asInt dv
+  pure (VString (Number.toStringWith (Number.fixed d) n))
+
+-- | `toInt s`: parse the stringified subject as a number then truncate toward
+-- | zero; `VNull` when the subject does not parse to a finite number.
+toIntH :: forall m. MonadThrow Error m => Value -> m Value
+toIntH v = do
+  s <- stringifyM v
+  pure (maybe VNull (VNumber <<< Number.trunc) (Number.fromString s))
+
+-- | `toFloat s`: parse the stringified subject as a number; `VNull` on failure.
+toFloatH :: forall m. MonadThrow Error m => Value -> m Value
+toFloatH v = do
+  s <- stringifyM v
+  pure (maybe VNull VNumber (Number.fromString s))
+
+--------------------------------------------------------------------------------
+-- Value primitives — array pack (helper-packs-spec §4, §6)
+--------------------------------------------------------------------------------
+--
+-- The key-based forms (`sortBy`/`pluck`/`groupBy`) take a **dotted key string**
+-- (§6, no callbacks): `extractPath` splits on `.` and walks each element with
+-- the same `indexValue` access `lookup` uses. `sortBy` is a **stable** sort
+-- (`Array.sortBy` is stable; V8's is too) keyed by `compareValues` with an
+-- incomparable pair compared `EQ` (so stable order is preserved); the runtime
+-- supplies a -1/0/1 comparator mirroring `compareValues`. All of this is gated
+-- byte-identical against the runtime by `test:compile`.
+
+-- | Extract a dotted-path value from a value (`"user.age"` walks `user` then
+-- | `age`); a missing/blocked segment yields `VNull`, matching `lookup`.
+extractPath :: String -> Value -> Value
+extractPath path v =
+  Array.foldl (\acc seg -> indexValue acc (VString seg)) v (String.split (Pattern ".") path)
+
+-- | `join arr sep` → `VString`: stringify each element and the separator, then
+-- | join. A non-array subject stringifies whole (its `stringify` already joins
+-- | with `,`), matching the runtime's `Array.isArray` branch.
+joinH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+joinH av sepv = do
+  sep <- stringifyM sepv
+  case av of
+    VArray xs -> do
+      parts <- traverse stringifyM xs
+      pure (VString (joinWith sep parts))
+    _ -> (VString) <$> stringifyM av
+
+-- | `count` (alias `size`): the number of elements in a `VArray`, or the number
+-- | of keys in a `VObject`; any other subject ⇒ `0`.
+countH :: forall m. Applicative m => Value -> m Value
+countH = case _ of
+  VArray xs -> pure (VNumber (Int.toNumber (Array.length xs)))
+  VObject m -> pure (VNumber (Int.toNumber (Map.size m)))
+  _ -> pure (VNumber 0.0)
+
+-- | `at arr i` → element: JS `Array.prototype.at` — a negative index counts from
+-- | the end; out of range ⇒ `VNull`. A non-array subject ⇒ `VNull`.
+atH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+atH av iv = do
+  i <- asInt iv
+  case av of
+    VArray xs ->
+      let
+        idx = if i < 0 then Array.length xs + i else i
+      in
+        pure (fromMaybe VNull (Array.index xs idx))
+    _ -> pure VNull
+
+-- | `take arr n` / `takeRight arr n` → `VArray`: the first / last `n` elements
+-- | (clamped to `[0, length]`). `n` reads via the strict `asInt` guard. A
+-- | non-array subject ⇒ empty array.
+takeH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+takeH = takeWith Array.take
+
+takeRightH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+takeRightH = takeWith Array.takeEnd
+
+takeWith
+  :: forall m
+   . MonadThrow Error m
+  => (Int -> Array Value -> Array Value)
+  -> Value
+  -> Value
+  -> m Value
+takeWith f av nv = do
+  n <- asInt nv
+  case av of
+    VArray xs -> pure (VArray (f (max 0 n) xs))
+    _ -> pure (VArray [])
+
+-- | `reverse`, polymorphic: a `VArray` reverses its elements; a `VString`
+-- | reverses its **code units** (matching a JS code-unit reverse, not code
+-- | points); any other subject is stringified then code-unit reversed.
+reverseH :: forall m. MonadThrow Error m => Value -> m Value
+reverseH = case _ of
+  VArray xs -> pure (VArray (Array.reverse xs))
+  VString s -> pure (VString (reverseCodeUnits s))
+  v -> (VString <<< reverseCodeUnits) <$> stringifyM v
+
+-- | Reverse a string by code units (UTF-16), the same unit JS uses.
+reverseCodeUnits :: String -> String
+reverseCodeUnits = CodeUnits.fromCharArray <<< Array.reverse <<< CodeUnits.toCharArray
+
+-- | `unique arr` → `VArray`: dedupe by `Value` equality, preserving first
+-- | occurrence order. A non-array subject ⇒ empty array.
+uniqueH :: forall m. Applicative m => Value -> m Value
+uniqueH = case _ of
+  VArray xs -> pure (VArray (Array.nubByEq eq xs))
+  _ -> pure (VArray [])
+
+-- | `sortBy arr key` → `VArray`: stable sort by the dotted-`key` value of each
+-- | element, using `compareValues`; an incomparable pair compares `EQ` (keeping
+-- | their input order). A non-array subject ⇒ empty array.
+sortByH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+sortByH av keyv = do
+  key <- stringifyM keyv
+  case av of
+    VArray xs ->
+      pure (VArray (Array.sortBy (\a b -> keyOrdering key a b) xs))
+    _ -> pure (VArray [])
+  where
+  keyOrdering key a b =
+    fromMaybe EQ (compareValues (extractPath key a) (extractPath key b))
+
+-- | `pluck arr key` → `VArray`: the dotted-`key` value of every element. A
+-- | non-array subject ⇒ empty array.
+pluckH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+pluckH av keyv = do
+  key <- stringifyM keyv
+  case av of
+    VArray xs -> pure (VArray (map (extractPath key) xs))
+    _ -> pure (VArray [])
+
+-- | `groupBy arr key` → `VObject`: group elements by the *stringified* dotted-
+-- | `key` value, each bucket a `VArray` in input order. A non-array subject ⇒
+-- | empty object.
+groupByH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+groupByH av keyv = do
+  key <- stringifyM keyv
+  case av of
+    VArray xs -> do
+      grouped <- Array.foldM (insertGroup key) Map.empty xs
+      pure (VObject (map (VArray <<< Array.reverse) grouped))
+    _ -> pure (VObject Map.empty)
+  where
+  insertGroup key acc el = do
+    k <- stringifyM (extractPath key el)
+    pure (Map.alter (\mv -> Just (Array.cons el (fromMaybe [] mv))) k acc)
 
 --------------------------------------------------------------------------------
 -- Context & access

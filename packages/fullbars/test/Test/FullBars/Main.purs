@@ -198,6 +198,91 @@ main = do
   expectS "p-truncate-suffix" "{{{ truncate s 5 \"...\" }}}" (s1 "hello world") "hello..."
   expectS "p-append" "{{{ append s \"bar\" }}}" (s1 "foo") "foobar"
   expectS "p-prepend" "{{{ prepend s \"bar\" }}}" (s1 "foo") "barfoo"
+  -- case aliases: downcase/upcase render exactly like lowercase/uppercase.
+  expectS "p-downcase-alias" "{{{ downcase s }}}" (s1 "HeLLo") "hello"
+  expectS "p-upcase-alias" "{{{ upcase s }}}" (s1 "HeLLo") "HELLO"
+
+  -- value primitives — number pack (helper-packs-spec §4). Pin the actual
+  -- outputs; abs/floor/ceil/round are Math.*, toFixed is n.toFixed(d), toInt/
+  -- toFloat parse via Data.Number.fromString (parseFloat gated by isFinite).
+  let n1 v = obj [ Tuple "n" (VNumber v) ]
+  expectS "p-abs" "{{{ abs n }}}" (n1 (-7.0)) "7"
+  expectS "p-abs-frac" "{{{ abs n }}}" (n1 (-4.5)) "4.5"
+  expectS "p-floor" "{{{ floor n }}}" (n1 3.9) "3"
+  expectS "p-floor-neg" "{{{ floor n }}}" (n1 (-3.1)) "-4"
+  expectS "p-ceil" "{{{ ceil n }}}" (n1 3.1) "4"
+  expectS "p-round-half" "{{{ round n }}}" (n1 2.5) "3"
+  expectS "p-round-down" "{{{ round n }}}" (n1 2.4) "2"
+  expectS "p-toFixed" "{{{ toFixed n 2 }}}" (n1 3.14159) "3.14"
+  expectS "p-toFixed-pad" "{{{ toFixed n 3 }}}" (n1 1.0) "1.000"
+  -- toInt: parse then truncate toward zero; non-parsing input ⇒ null (empty).
+  expectS "p-toInt" "{{{ toInt s }}}" (s1 "42") "42"
+  expectS "p-toInt-trunc" "{{{ toInt s }}}" (s1 "3.9") "3"
+  expectS "p-toInt-fail" "[{{{ toInt s }}}]" (s1 "abc") "[]"
+  expectS "p-toFloat" "{{{ toFloat s }}}" (s1 "3.5") "3.5"
+  expectS "p-toFloat-neg" "{{{ toFloat s }}}" (s1 "-1.5") "-1.5"
+  expectS "p-toFloat-fail" "[{{{ toFloat s }}}]" (s1 "nope") "[]"
+
+  -- value primitives — array pack (helper-packs-spec §4, §6). The key-based
+  -- forms take a dotted key string; sortBy is a stable sort by compareValues.
+  let
+    xsObj vs = obj [ Tuple "xs" (arr vs) ]
+    person nm age = obj [ Tuple "name" (str nm), Tuple "age" (VNumber age) ]
+  expectS "p-join" "{{{ join xs \"-\" }}}" (xsObj [ str "a", str "b", str "c" ]) "a-b-c"
+  expectS "p-join-numbers" "{{{ join xs \", \" }}}" (xsObj [ VNumber 1.0, VNumber 2.0 ]) "1, 2"
+  expectS "p-count" "{{{ count xs }}}" (xsObj [ str "a", str "b", str "c" ]) "3"
+  expectS "p-count-object" "{{{ count o }}}"
+    (obj [ Tuple "o" (obj [ Tuple "a" (VNumber 1.0), Tuple "b" (VNumber 2.0) ]) ])
+    "2"
+  expectS "p-size-alias" "{{{ size xs }}}" (xsObj [ str "a", str "b" ]) "2"
+  expectS "p-at" "{{{ at xs 1 }}}" (xsObj [ str "a", str "b", str "c" ]) "b"
+  expectS "p-at-neg" "{{{ at xs (subtract 0 1) }}}" (xsObj [ str "a", str "b", str "c" ]) "c"
+  expectS "p-at-oob" "[{{{ at xs 5 }}}]" (xsObj [ str "a" ]) "[]"
+  expectS "p-take" "{{{ join (take xs 2) \",\" }}}" (xsObj [ str "a", str "b", str "c", str "d" ])
+    "a,b"
+  expectS "p-take-clamp" "{{{ join (take xs 9) \",\" }}}" (xsObj [ str "a", str "b" ]) "a,b"
+  expectS "p-takeRight" "{{{ join (takeRight xs 2) \",\" }}}"
+    (xsObj [ str "a", str "b", str "c", str "d" ])
+    "c,d"
+  expectS "p-take-zero" "[{{{ join (take xs 0) \",\" }}}]" (xsObj [ str "a", str "b" ]) "[]"
+  expectS "p-reverse-array" "{{{ join (reverse xs) \",\" }}}" (xsObj [ str "a", str "b", str "c" ])
+    "c,b,a"
+  expectS "p-reverse-string" "{{{ reverse s }}}" (s1 "abc") "cba"
+  expectS "p-unique" "{{{ join (unique xs) \",\" }}}"
+    (xsObj [ str "a", str "b", str "a", str "c", str "b" ])
+    "a,b,c"
+  -- includes is polymorphic: an array subject ⇒ element membership.
+  expectS "p-includes-array-true" "{{{ includes xs \"b\" }}}" (xsObj [ str "a", str "b", str "c" ])
+    "true"
+  expectS "p-includes-array-false" "{{{ includes xs \"z\" }}}" (xsObj [ str "a", str "b" ]) "false"
+  -- sortBy: stable, by the dotted key's value (compareValues).
+  expectS "p-sortBy" "{{#each (sortBy xs \"age\")}}{{ name }}:{{ age }};{{/each}}"
+    (xsObj [ person "c" 3.0, person "a" 1.0, person "b" 2.0 ])
+    "a:1;b:2;c:3;"
+  expectS "p-sortBy-dotted" "{{#each (sortBy xs \"u.age\")}}{{ u.age }};{{/each}}"
+    ( xsObj
+        [ obj [ Tuple "u" (obj [ Tuple "age" (VNumber 30.0) ]) ]
+        , obj [ Tuple "u" (obj [ Tuple "age" (VNumber 10.0) ]) ]
+        ]
+    )
+    "10;30;"
+  expectS "p-pluck" "{{{ join (pluck xs \"id\") \",\" }}}"
+    ( xsObj
+        [ obj [ Tuple "id" (VNumber 1.0) ]
+        , obj [ Tuple "id" (VNumber 2.0) ]
+        , obj [ Tuple "id" (VNumber 3.0) ]
+        ]
+    )
+    "1,2,3"
+  expectS "p-groupBy"
+    "{{#each (groupBy xs \"type\")}}{{ @key }}=[{{#each this}}{{ id }}{{/each}}];{{/each}}"
+    ( xsObj
+        [ obj [ Tuple "type" (str "x"), Tuple "id" (str "1") ]
+        , obj [ Tuple "type" (str "y"), Tuple "id" (str "2") ]
+        , obj [ Tuple "type" (str "x"), Tuple "id" (str "3") ]
+        ]
+    )
+    "x=[13];y=[2];"
 
   expect "esc-html" "{{{esc_html (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
@@ -930,14 +1015,34 @@ main = do
         , "truncate"
         , "append"
         , "prepend"
+        , "downcase"
+        , "upcase"
+        , "abs"
+        , "floor"
+        , "ceil"
+        , "round"
+        , "toFixed"
+        , "toInt"
+        , "toFloat"
+        , "join"
+        , "count"
+        , "size"
+        , "at"
+        , "take"
+        , "takeRight"
+        , "reverse"
+        , "unique"
+        , "sortBy"
+        , "pluck"
+        , "groupBy"
         ]
     )
   assert' "separability: a core helper (e.g. 'if') survives the split in coreSchema"
     (Map.member "if" KP.coreSchema.helpers)
   -- `coreHelperDefs` is the non-primitive base; the full roster adds exactly the
-  -- 15-strong primitive pack on top.
-  assert' "separability: helperDefs = coreHelperDefs <> primitiveHelperDefs (15 primitives)"
-    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 15)
+  -- 35-strong primitive pack on top (string + number + array, incl. aliases).
+  assert' "separability: helperDefs = coreHelperDefs <> primitiveHelperDefs (35 primitives)"
+    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 35)
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do

@@ -194,6 +194,59 @@ export const cases = [
   { name: "str-prepend", dialect: "surface", t: "{{ prepend s x }}", d: { s: "foo", x: "bar" } },
   { name: "str-append-number", dialect: "surface", t: "{{ append s x }}", d: { s: "v", x: 2 } },
   { name: "str-unicode-upper", dialect: "surface", t: "{{ uppercase s }}", d: { s: "café" } },
+  // case aliases (downcase/upcase) render identically to lowercase/uppercase.
+  { name: "str-downcase-alias", dialect: "surface", t: "{{ downcase s }}", d: { s: "HeLLo" } },
+  { name: "str-upcase-alias", dialect: "surface", t: "{{ upcase s }}", d: { s: "HeLLo" } },
+
+  // value primitives — number pack (helper-packs-spec §4). abs/floor/ceil/round
+  // are Math.* on both targets; toFixed is `n.toFixed(d)`; toInt/toFloat parse
+  // (parseFloat gated by isFinite = Data.Number.fromString). Only unambiguous
+  // parse inputs are tested (edge cases like "", "abc", " 3 ", "0x10" excluded —
+  // see report). Negatives via subtract to avoid lexer minus.
+  { name: "num-abs", dialect: "surface", t: "{{ abs n }}", d: { n: -7 } },
+  { name: "num-abs-neg-expr", dialect: "surface", t: "{{ abs (subtract 0 4.5) }}", d: {} },
+  { name: "num-floor", dialect: "surface", t: "{{ floor n }}", d: { n: 3.9 } },
+  { name: "num-floor-neg", dialect: "surface", t: "{{ floor (subtract 0 3.1) }}", d: {} },
+  { name: "num-ceil", dialect: "surface", t: "{{ ceil n }}", d: { n: 3.1 } },
+  { name: "num-round-half", dialect: "surface", t: "{{ round n }}", d: { n: 2.5 } },
+  { name: "num-round-down", dialect: "surface", t: "{{ round n }}", d: { n: 2.4 } },
+  { name: "num-toFixed", dialect: "surface", t: "{{ toFixed n d }}", d: { n: 3.14159, d: 2 } },
+  { name: "num-toFixed-round", dialect: "surface", t: "{{ toFixed n d }}", d: { n: 2.5, d: 0 } },
+  { name: "num-toFixed-pad", dialect: "surface", t: "{{ toFixed n d }}", d: { n: 1, d: 3 } },
+  { name: "num-toInt", dialect: "surface", t: "{{ toInt s }}", d: { s: "42" } },
+  { name: "num-toInt-trunc", dialect: "surface", t: "{{ toInt s }}", d: { s: "3.9" } },
+  { name: "num-toFloat", dialect: "surface", t: "{{ toFloat s }}", d: { s: "3.5" } },
+  { name: "num-toFloat-neg", dialect: "surface", t: "{{ toFloat s }}", d: { s: "-1.5" } },
+
+  // value primitives — array pack (helper-packs-spec §4, §6). The interpreter
+  // and the JS runtime must produce byte-identical output. Key-based forms use a
+  // dotted key string over object arrays; sortBy uses homogeneous keys.
+  { name: "arr-join", dialect: "surface", t: "{{ join xs sep }}", d: { xs: ["a", "b", "c"], sep: "-" } },
+  { name: "arr-join-numbers", dialect: "surface", t: "{{ join xs sep }}", d: { xs: [1, 2, 3], sep: ", " } },
+  { name: "arr-count", dialect: "surface", t: "{{ count xs }}", d: { xs: ["a", "b", "c"] } },
+  { name: "arr-count-object", dialect: "surface", t: "{{ count o }}", d: { o: { a: 1, b: 2 } } },
+  { name: "arr-size-alias", dialect: "surface", t: "{{ size xs }}", d: { xs: ["a", "b"] } },
+  { name: "arr-at", dialect: "surface", t: "{{ at xs i }}", d: { xs: ["a", "b", "c"], i: 1 } },
+  { name: "arr-at-neg", dialect: "surface", t: "{{ at xs i }}", d: { xs: ["a", "b", "c"], i: -1 } },
+  { name: "arr-at-oob", dialect: "surface", t: "[{{ at xs i }}]", d: { xs: ["a"], i: 5 } },
+  { name: "arr-take", dialect: "surface", t: "{{ join (take xs n) sep }}", d: { xs: ["a", "b", "c", "d"], n: 2, sep: "," } },
+  { name: "arr-take-clamp", dialect: "surface", t: "{{ join (take xs n) sep }}", d: { xs: ["a", "b"], n: 9, sep: "," } },
+  { name: "arr-takeRight", dialect: "surface", t: "{{ join (takeRight xs n) sep }}", d: { xs: ["a", "b", "c", "d"], n: 2, sep: "," } },
+  { name: "arr-takeRight-clamp", dialect: "surface", t: "{{ join (takeRight xs n) sep }}", d: { xs: ["a", "b"], n: 9, sep: "," } },
+  { name: "arr-take-zero", dialect: "surface", t: "[{{ join (take xs n) sep }}]", d: { xs: ["a", "b"], n: 0, sep: "," } },
+  { name: "arr-reverse", dialect: "surface", t: "{{ join (reverse xs) sep }}", d: { xs: ["a", "b", "c"], sep: "," } },
+  { name: "arr-reverse-string", dialect: "surface", t: "{{ reverse s }}", d: { s: "abc" } },
+  { name: "arr-unique", dialect: "surface", t: "{{ join (unique xs) sep }}", d: { xs: ["a", "b", "a", "c", "b"], sep: "," } },
+  { name: "arr-includes-true", dialect: "surface", t: "{{ includes xs v }}", d: { xs: ["a", "b", "c"], v: "b" } },
+  { name: "arr-includes-false", dialect: "surface", t: "{{ includes xs v }}", d: { xs: ["a", "b"], v: "z" } },
+  { name: "arr-includes-number", dialect: "surface", t: "{{ includes xs v }}", d: { xs: [1, 2, 3], v: 2 } },
+  { name: "arr-sortBy-num", dialect: "surface", t: "{{#each (sortBy xs \"age\")}}{{ name }}:{{ age }};{{/each}}", d: { xs: [{ name: "c", age: 3 }, { name: "a", age: 1 }, { name: "b", age: 2 }] } },
+  { name: "arr-sortBy-str", dialect: "surface", t: "{{#each (sortBy xs \"name\")}}{{ name }};{{/each}}", d: { xs: [{ name: "charlie" }, { name: "alice" }, { name: "bob" }] } },
+  { name: "arr-sortBy-dotted", dialect: "surface", t: "{{#each (sortBy xs \"u.age\")}}{{ u.age }};{{/each}}", d: { xs: [{ u: { age: 30 } }, { u: { age: 10 } }, { u: { age: 20 } }] } },
+  { name: "arr-sortBy-stable", dialect: "surface", t: "{{#each (sortBy xs \"k\")}}{{ id }};{{/each}}", d: { xs: [{ k: 1, id: "a" }, { k: 1, id: "b" }, { k: 1, id: "c" }] } },
+  { name: "arr-pluck", dialect: "surface", t: "{{ join (pluck xs \"id\") sep }}", d: { xs: [{ id: 1 }, { id: 2 }, { id: 3 }], sep: "," } },
+  { name: "arr-pluck-dotted", dialect: "surface", t: "{{ join (pluck xs \"u.name\") sep }}", d: { xs: [{ u: { name: "a" } }, { u: { name: "b" } }], sep: "," } },
+  { name: "arr-groupBy", dialect: "surface", t: "{{#each (groupBy xs \"type\")}}{{ @key }}=[{{#each this}}{{ id }}{{/each}}];{{/each}}", d: { xs: [{ type: "x", id: "1" }, { type: "y", id: "2" }, { type: "x", id: "3" }] } },
 
   // MaxBars infix arithmetic + `??` operators (desugar to the prelude helpers;
   // the compiled path and the interpreter must agree).
