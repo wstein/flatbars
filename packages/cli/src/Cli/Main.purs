@@ -29,6 +29,7 @@ import Effect.Exception (message, try)
 import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
+import MinBars (renderMinDiag) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile)
 import RawBars (compileJsWith, compileWith)
@@ -50,6 +51,8 @@ usage =
     , "  -d, --data <file>   JSON data file (default: null context)"
     , "  -s, --surface       read the template in the surface dialect ({{ name }}, paths, @data,"
     , "                      as |x|) instead of core syntax — applies to render and --compile"
+    , "  -m, --mustache      render with the Mustache (MinBars) engine — sections, inverted,"
+    , "                      partials, inheritance; render-only (no --compile/--validate/--surface)"
     , "      --validate      validate the template against the prelude schema; do not render"
     , "  -c, --compile       compile the template to a JS module (printed to stdout); do not render"
     , "      --trim <mode>   standalone whitespace: 'standalone' (default) strips a lone block/"
@@ -74,6 +77,7 @@ type Options =
   , validateOnly :: Boolean
   , compileOnly :: Boolean
   , surface :: Boolean
+  , mustache :: Boolean -- --mustache: render via the MinBars (Mustache) engine
   , trim :: Maybe Boolean -- --trim override; Nothing ⇒ config/default decides
   }
 
@@ -94,6 +98,7 @@ parseArgs =
     , validateOnly: false
     , compileOnly: false
     , surface: false
+    , mustache: false
     , trim: Nothing
     }
   where
@@ -105,6 +110,7 @@ parseArgs =
         , validateOnly: acc.validateOnly
         , compileOnly: acc.compileOnly
         , surface: acc.surface
+        , mustache: acc.mustache
         , trim: acc.trim
         }
       Nothing -> Help
@@ -114,6 +120,7 @@ parseArgs =
       "--validate" -> go (acc { validateOnly = true }) tail
       flag | flag == "-c" || flag == "--compile" -> go (acc { compileOnly = true }) tail
       flag | flag == "-s" || flag == "--surface" -> go (acc { surface = true }) tail
+      flag | flag == "-m" || flag == "--mustache" -> go (acc { mustache = true }) tail
       "--trim" -> case Array.uncons tail of
         Just { head: "standalone", tail: rest } -> go (acc { trim = Just true }) rest
         Just { head: "none", tail: rest } -> go (acc { trim = Just false }) rest
@@ -137,13 +144,19 @@ run opts = do
       let
         popts = defaultParseOptions
           { trimStandalone = fromMaybe true (firstJust opts.trim configTrim) }
-      if opts.compileOnly then runCompile popts opts tpl
+      if opts.mustache && (opts.compileOnly || opts.validateOnly || opts.surface) then
+        die
+          "barebars: --mustache renders the Mustache (MinBars) engine; it cannot combine with --surface, --compile, or --validate"
+      else if opts.compileOnly then runCompile popts opts tpl
       else if opts.validateOnly then runValidate popts tpl
       else do
         datE <- loadData opts.dataFile
         case datE of
           Left err -> die ("barebars: " <> err)
           Right value
+            | opts.mustache -> case MinBars.renderMinDiag tpl value of
+                Left err -> die ("barebars: " <> opts.template <> ": " <> err)
+                Right out -> writeStdout out
             | opts.surface -> case renderSurfaceDiagWith noLoopVars popts tpl value of
                 Left err -> die ("barebars: " <> opts.template <> ": " <> err)
                 Right out -> writeStdout out
