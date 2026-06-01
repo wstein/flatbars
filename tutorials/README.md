@@ -1,7 +1,7 @@
 # FlatBars tutorials (FlatBars Lab)
 
-A runnable, lab-themed documentation site. **Mustache is the front door**: a
-comprehensive `/mustache` reference walks every tag in the logic-less language,
+A runnable, lab-themed documentation site. **MinBars is the front door**: a
+comprehensive `/minbars` reference walks every tag in the logic-less Mustache language,
 each illustrated by a live example that renders through the real MinBars engine
 and opens in the FlatBars Lab (`lab/`) with one click. The four FlatBars
 surfaces — **RawBars · MinBars · FullBars · MaxBars** — follow as the ladder
@@ -16,7 +16,7 @@ npm run dev            # http://localhost:4321  ← the tutorials
 npm run build          # static site → dist/
 ```
 
-Pages: `/` (landing, Mustache hero) · `/mustache` (the comprehensive MinBars /
+Pages: `/` (landing, MinBars hero) · `/minbars` (the comprehensive MinBars /
 Mustache reference) · `/rawbars` (the meaning-free core reference) ·
 `/fullbars`, `/maxbars` (one lesson per surface). MinBars and RawBars have no
 per-surface lesson — their dedicated references supersede it.
@@ -75,12 +75,12 @@ spec is published (default `/flatbars/`).
 
 1. Add an entry to `src/mustache.mjs` (`{ template, data, partials? }`).
 2. Reference it on the page: `<OpenInLab client:visible engine="minbars" … />`
-   in `src/pages/mustache.astro` (the orphan guard enforces this).
+   in `src/pages/minbars.astro` (the orphan guard enforces this).
 3. `npm run check:tutorial-links` to confirm it renders and links.
 
 ## Spike cost (Astro vs plain static — the decision evidence)
 
-Measured on this site (`/mustache` reference + landing + 3 surface lessons):
+Measured on this site (`/minbars` reference + landing + 3 surface lessons):
 
 | metric | value |
 |---|---|

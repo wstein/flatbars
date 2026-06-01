@@ -74,7 +74,7 @@ console.log(
 console.log("\nMustache reference examples (minbars):");
 // Orphan guard: every example must be wired into the reference page, so an
 // unused example can't accumulate as dead code.
-const pageSrc = readFileSync(new URL("../tutorials/src/pages/mustache.astro", import.meta.url), "utf8");
+const pageSrc = readFileSync(new URL("../tutorials/src/pages/minbars.astro", import.meta.url), "utf8");
 const minbars = await createMinBarsRenderer();
 for (const [key, ex] of Object.entries(mustacheExamples)) {
   if (!pageSrc.includes(`ex.${key}.`)) {

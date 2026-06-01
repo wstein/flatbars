@@ -157,7 +157,7 @@ not a PureScript package). The old Halogen `packages/playground` was removed.
 
 The **`tutorials`** site (Astro + Preact, also not a PureScript package) is the
 learner-facing front end: a comprehensive runnable **Mustache/MinBars reference**
-(`/mustache`) leads, a focused **RawBars core-model reference** (`/rawbars`,
+(`/minbars`) leads, a focused **RawBars core-model reference** (`/rawbars`,
 including a live compiled-JS pane) sits alongside it, and the remaining surfaces
 get a one-example lesson. Runnable examples are gate-validated
 (`check:tutorial-links`, which also asserts the compile flagship emits JS) and the

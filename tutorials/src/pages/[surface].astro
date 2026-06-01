@@ -3,7 +3,7 @@
 // One page per surface, on the shared reference chrome (left nav + lab theme),
 // so clicking through from a reference never hits a visual seam. `minbars` and
 // `rawbars` are excluded — they have comprehensive dedicated references
-// (/mustache, /rawbars) that supersede a one-example lesson.
+// (/minbars, /rawbars) that supersede a one-example lesson.
 import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { lessons, surfaces } from "../examples.mjs";
@@ -18,13 +18,13 @@ export function getStaticPaths() {
 }
 
 // Surfaces with a comprehensive dedicated reference (used for nav links below).
-const HAS_REFERENCE = { minbars: "/mustache", rawbars: "/rawbars" };
+const HAS_REFERENCE = { minbars: "/minbars", rawbars: "/rawbars" };
 
 const { lesson, surface } = Astro.props;
 const shortName = (s) => lessons[s].title.split(" — ")[0];
 
 const groups = [
-  { label: "Reference", items: [{ href: "/mustache", label: "Mustache reference" }, { href: "/rawbars", label: "RawBars reference" }] },
+  { label: "Reference", items: [{ href: "/minbars", label: "MinBars reference" }, { href: "/rawbars", label: "RawBars reference" }] },
   {
     label: "The four surfaces",
     items: surfaces.map((s) => ({

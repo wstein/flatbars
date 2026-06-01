@@ -7,7 +7,7 @@ import { lessons, surfaces } from "../examples.mjs";
 // and the comprehensive reference, so it gets the hero. The per-surface lessons
 // follow as the ladder beyond it. The minbars card points at the full reference.
 const surfaceCards = surfaces.map((s) => ({
-  href: s === "minbars" ? "/mustache" : `/${s}`,
+  href: s === "minbars" ? "/minbars" : `/${s}`,
   title: lessons[s].title,
   blurb: lessons[s].blurb,
 }));
@@ -83,7 +83,7 @@ const surfaceCards = surfaces.map((s) => ({
     <h1><b>Flat</b>Bars — learn the surfaces</h1>
     <p class="lede">Logic-less templates, live. Start with Mustache, then climb the ladder.</p>
 
-    <a class="hero" href="/mustache">
+    <a class="hero" href="/minbars">
       <span class="kicker">Start here · reference</span>
       <h2>MinBars — Mustache-compatible</h2>
       <p>Every tag in the logic-less Mustache language — interpolation, sections, partials, inheritance — explained with examples that render live through MinBars and open in the Lab. <span class="go">Open the reference →</span></p>
