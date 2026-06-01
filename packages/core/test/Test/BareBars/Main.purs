@@ -107,6 +107,19 @@ main = do
     Right { nodes: [ Block _ Inverse "x" [] [ Content "A" ] ] } -> pure unit
     other -> assert' ("inheritance: inverse regressed " <> show other) false
 
+  -- ADR-001 crown jewel: the core parser does NOT special-case `{{else}}`. It is
+  -- a plain `Sep` node, structurally identical to any user separator — the name
+  -- is the only difference; clause *meaning* is the engine's job, not the parser's.
+  let
+    sepShape src = case parse src of
+      Right { nodes: [ Content "a", Sep _ name args, Content "b" ] } -> Just
+        (Tuple name (Array.length args))
+      _ -> Nothing
+  assert' "ADR-001: {{else}} is a plain Sep, identical in shape to a user separator"
+    ( sepShape "a{{else}}b" == Just (Tuple "else" 0) && sepShape "a{{custom}}b" == Just
+        (Tuple "custom" 0)
+    )
+
   -- foldExpr: a catamorphism over an expression. Count App nodes in a nested
   -- subexpression, descending into application arguments.
   case parse "{{{lookup this \"x\"}}}" of
