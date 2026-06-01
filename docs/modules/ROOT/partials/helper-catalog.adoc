@@ -37,7 +37,7 @@
 |`index0` |value |0 |scoped
 |`index1` |value |0 |scoped
 |`inline` |block |≥1 |registered
-|`isnt` |value |2 |registered
+|`isnt` |value |2 |synonym of `ne`
 |`join` |value |2 |registered
 |`json` |value |1–2 |registered
 |`key` |value |0 |scoped
@@ -73,7 +73,7 @@
 |`root` |value |0 |scoped
 |`round` |value |1 |registered
 |`safe` |value |1 |registered
-|`size` |value |1 |registered
+|`size` |value |1 |synonym of `count`
 |`slice` |value |2–3 |registered
 |`sortBy` |value |2 |registered
 |`split` |value |2 |registered

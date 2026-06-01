@@ -18,6 +18,7 @@ module Kernel.Prelude
   ( prelude
   , preludeSchema
   , preludeAliases
+  , preludeSynonyms
   , preludeUnaryHelpers
   , coreHelperDefs
   , primitiveHelperDefs
@@ -62,13 +63,26 @@ type HelperDef m =
   , block :: Boolean
   , arity :: Arity
   , run :: Helper m (RefEnv m)
-  -- | `Just canonical` marks this name as a *linter-lowered alias* of `canonical`
-  -- | (e.g. `plus` → `add`). The alias renders identically (it is a real
-  -- | registered helper, never removed) but is second-class: the catalog marks
-  -- | it, the on-demand alias lint warns on its use, and the lift/migrate assist
-  -- | rewrites it to `canonical`. `preludeAliases` projects this. (Open decision
-  -- | 2: permanent + warn-on-demand, never auto-rewritten on save.)
+  -- | A helper can be a *second name* for another helper, in one of two ways
+  -- | (at most one is set):
+  -- |
+  -- | * `alias = Just canonical` — a **deprecation alias**: a foreign/legacy
+  -- |   spelling (e.g. handlebars-helpers `plus` → `add`) accepted for
+  -- |   compatibility but meant to be migrated off. It renders identically (a
+  -- |   real, never-removed helper) but is second-class: the catalog marks it,
+  -- |   the on-demand alias lint WARNS on its use, and the lift rewrites it to
+  -- |   `canonical`. `preludeAliases` projects this.
   , alias :: Maybe String
+  -- | * `synonymOf = Just canonical` — a **canonical synonym**: a name we endorse
+  -- |   as a permanent, equal alternative (e.g. `isnt` ≡ `ne`, `size` ≡ `count`).
+  -- |   It is NOT deprecated: the lint does not warn and the lift does not rewrite
+  -- |   it. The catalog only labels it "synonym of `canonical`" so two identical
+  -- |   helpers aren't shown as different capabilities. `preludeSynonyms` projects
+  -- |   this. Add synonyms sparingly — each must materially improve readability
+  -- |   for a common case, not merely respell an existing name.
+  , synonymOf :: Maybe String
+  -- | (Open decision 2: aliases are permanent + warn-on-demand, never
+  -- | auto-rewritten on save.)
   }
 
 -- | A non-block value helper built from a `Kernel.Helper` combinator. The
@@ -79,16 +93,21 @@ valDef name mk =
   let
     s = mk name
   in
-    { name, block: false, arity: s.arity, run: s.run, alias: Nothing }
+    { name, block: false, arity: s.arity, run: s.run, alias: Nothing, synonymOf: Nothing }
 
 -- | A block or bespoke helper written directly against `Helper`, with its arity
 -- | declared explicitly (and enforced inside the helper body).
 gen :: forall m. String -> Boolean -> Arity -> Helper m (RefEnv m) -> HelperDef m
-gen name block arity run = { name, block, arity, run, alias: Nothing }
+gen name block arity run = { name, block, arity, run, alias: Nothing, synonymOf: Nothing }
 
--- | Mark a helper definition as a (warned) alias of `canonical`.
+-- | Mark a helper definition as a (warned, lifted) deprecation alias of `canonical`.
 withAlias :: forall m. String -> HelperDef m -> HelperDef m
 withAlias canonical d = d { alias = Just canonical }
+
+-- | Mark a helper as a canonical synonym of `canonical` — an endorsed, equal
+-- | alternative, labelled in the catalog but never warned or rewritten.
+withSynonym :: forall m. String -> HelperDef m -> HelperDef m
+withSynonym canonical d = d { synonymOf = Just canonical }
 
 -- | The complete reference roster: the core helpers (control flow, access,
 -- | arithmetic, …) followed by the *separable* value-primitive pack. Splitting
@@ -133,11 +152,9 @@ coreHelperDefs =
   , valDef "gt" (binary (cmp (_ == GT)))
   , valDef "lte" (binary (cmp (_ /= GT)))
   , valDef "gte" (binary (cmp (_ /= LT)))
-  -- `isnt` reads as "is not" — a first-class (canonical) synonym for `ne`, NOT a
-  -- warned alias: it's a name we endorse, not a foreign/legacy spelling to migrate
-  -- off (contrast the handlebars-helpers aliases below). See the alias policy at
-  -- `withAlias`.
-  , valDef "isnt" (binary ne')
+  -- `isnt` reads as "is not" — a canonical synonym of `ne` (endorsed and equal),
+  -- NOT a warned alias. See the two-bucket policy on `HelperDef`.
+  , withSynonym "ne" (valDef "isnt" (binary ne'))
   , gen "not" false (Exactly 1) notH
   , gen "and" false AnyArity (boolH Array.all)
   , gen "or" false AnyArity (boolH Array.any)
@@ -207,7 +224,9 @@ primitiveHelperDefs =
   -- array pack
   , valDef "join" (binary joinH)
   , valDef "count" (unary countH)
-  , valDef "size" (unary countH)
+  -- `size` ≡ `count`: a canonical synonym (not a deprecation alias) — labelled
+  -- in the catalog, never warned.
+  , withSynonym "count" (valDef "size" (unary countH))
   , valDef "at" (binary atH)
   , valDef "take" (binary takeH)
   , valDef "takeRight" (binary takeRightH)
@@ -229,6 +248,15 @@ prelude = map (\d -> Tuple d.name d.run) helperDefs
 preludeAliases :: Array (Tuple String String)
 preludeAliases =
   Array.mapMaybe (\d -> Tuple d.name <$> d.alias)
+    (helperDefs :: Array (HelperDef (Either Error)))
+
+-- | The synonym table — each canonical synonym → its primary name — projected
+-- | from `helperDefs.synonymOf`. Unlike aliases these are NOT deprecated: the
+-- | catalog labels them ("synonym of …"), but the lint never warns and the lift
+-- | never rewrites them. E.g. `isnt → ne`, `size → count`.
+preludeSynonyms :: Array (Tuple String String)
+preludeSynonyms =
+  Array.mapMaybe (\d -> Tuple d.name <$> d.synonymOf)
     (helperDefs :: Array (HelperDef (Either Error)))
 
 -- | The names of *value* (non-block) helpers whose arity admits a **single
@@ -287,6 +315,10 @@ scopedSpecs =
   , Tuple "key" { block: false, arity: Exactly 0 }
   , Tuple "first" { block: false, arity: Exactly 0 }
   , Tuple "last" { block: false, arity: Exactly 0 }
+  -- `index0` ≡ `index` (both 0-based). It's a canonical synonym, but scoped
+  -- vars carry no synonym marker yet, so the catalog still lists it as "scoped"
+  -- rather than "synonym of `index`" — tracked follow-up (extend synonymOf to
+  -- scopedSpecs). `index1` is 1-based — a distinct helper, not a synonym.
   , Tuple "index0" { block: false, arity: Exactly 0 }
   , Tuple "index1" { block: false, arity: Exactly 0 }
   , Tuple "rindex0" { block: false, arity: Exactly 0 }

@@ -8438,6 +8438,18 @@ var wrong1or2 = function(name2) {
     return name2 + (": expected 1 or 2 arguments, got " + show6(length(args)));
   };
 };
+var withSynonym = function(canonical) {
+  return function(d) {
+    return {
+      name: d.name,
+      block: d.block,
+      arity: d.arity,
+      run: d.run,
+      alias: d.alias,
+      synonymOf: new Just(canonical)
+    };
+  };
+};
 var withAlias = function(canonical) {
   return function(d) {
     return {
@@ -8445,6 +8457,7 @@ var withAlias = function(canonical) {
       block: d.block,
       arity: d.arity,
       run: d.run,
+      synonymOf: d.synonymOf,
       alias: new Just(canonical)
     };
   };
@@ -8458,7 +8471,8 @@ var valDef = function(dictMonadThrow) {
         block: false,
         arity: s.arity,
         run: s.run,
-        alias: Nothing.value
+        alias: Nothing.value,
+        synonymOf: Nothing.value
       };
     };
   };
@@ -8482,9 +8496,9 @@ var thisH = function(dictApplicative) {
   };
 };
 var stringifyM = function(dictMonadThrow) {
-  var $693 = liftEither(dictMonadThrow);
-  return function($694) {
-    return $693(stringify2($694));
+  var $694 = liftEither(dictMonadThrow);
+  return function($695) {
+    return $694(stringify2($695));
   };
 };
 var toFloatH = function(dictMonadThrow) {
@@ -8505,8 +8519,8 @@ var toIntH = function(dictMonadThrow) {
   var pure4 = pure(Monad0.Applicative0());
   return function(v) {
     return bind9(stringifyM1(v))(function(s) {
-      return pure4(maybe(VNull.value)(function($695) {
-        return VNumber.create(trunc($695));
+      return pure4(maybe(VNull.value)(function($696) {
+        return VNumber.create(trunc($696));
       })(fromString(s)));
     });
   };
@@ -8516,8 +8530,8 @@ var strUnary = function(dictMonadThrow) {
   var stringifyM1 = stringifyM(dictMonadThrow);
   return function(f) {
     return function(v) {
-      return map32(function($696) {
-        return VString.create(f($696));
+      return map32(function($697) {
+        return VString.create(f($697));
       })(stringifyM1(v));
     };
   };
@@ -8540,7 +8554,7 @@ var startsWithH = function(dictMonadThrow) {
             return false;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 530, column 24 - line 532, column 21): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 562, column 24 - line 564, column 21): " + [v.constructor.name]);
         };
       };
       return bind9(stringifyM1(sv))(function(s) {
@@ -8573,8 +8587,8 @@ var safe = function(dictMonadThrow) {
     return map32(VSafe.create)(stringifyM1(v));
   };
 };
-var reverseCodeUnits = function($697) {
-  return fromCharArray(reverse(toCharArray($697)));
+var reverseCodeUnits = function($698) {
+  return fromCharArray(reverse(toCharArray($698)));
 };
 var reverseH = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
@@ -8590,8 +8604,8 @@ var reverseH = function(dictMonadThrow) {
       return pure4(new VString(reverseCodeUnits(v.value0)));
     }
     ;
-    return map32(function($698) {
-      return VString.create(reverseCodeUnits($698));
+    return map32(function($699) {
+      return VString.create(reverseCodeUnits($699));
     })(stringifyM1(v));
   };
 };
@@ -8669,8 +8683,8 @@ var partialH = function(dictMonadThrow) {
         };
       };
       var blockFrame = function() {
-        var $510 = $$null(ctl.children);
-        if ($510) {
+        var $511 = $$null(ctl.children);
+        if ($511) {
           return empty3;
         }
         ;
@@ -8700,7 +8714,7 @@ var partialH = function(dictMonadThrow) {
                   return entered;
                 }
                 ;
-                throw new Error("Failed pattern match at Kernel.Prelude (line 1068, column 22 - line 1070, column 33): " + [v1.constructor.name]);
+                throw new Error("Failed pattern match at Kernel.Prelude (line 1100, column 22 - line 1102, column 33): " + [v1.constructor.name]);
               }();
               return map32(VSafe.create)(ctl.render(scoped)(v.value0));
             }
@@ -8718,7 +8732,7 @@ var partialH = function(dictMonadThrow) {
             ;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 1060, column 28 - line 1075, column 63): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 1092, column 28 - line 1107, column 63): " + [v.constructor.name]);
         };
       };
       if (args.length === 2 && args[0] instanceof VString) {
@@ -8752,8 +8766,8 @@ var truthyWith = function(fs) {
   return function(opts) {
     return function(v) {
       return truthy(function() {
-        var $528 = optFlag("includeZero")(opts);
-        if ($528) {
+        var $529 = optFlag("includeZero")(opts);
+        if ($529) {
           return $$delete3(FZero.value)(fs);
         }
         ;
@@ -8797,7 +8811,7 @@ var pickClause = function(dictMonadThrow) {
                     })(ctl["eval"](ctl.env)(mOpts.value0));
                   }
                   ;
-                  throw new Error("Failed pattern match at Kernel.Prelude (line 851, column 16 - line 854, column 18): " + [mOpts.constructor.name]);
+                  throw new Error("Failed pattern match at Kernel.Prelude (line 883, column 16 - line 886, column 18): " + [mOpts.constructor.name]);
                 }())(function(hit) {
                   if (hit) {
                     return renderSafe1(ctl)(ctl.env)(v.value0.head.body);
@@ -8822,7 +8836,7 @@ var pickClause = function(dictMonadThrow) {
         return throwError2(new ClauseError("if: unexpected clause '" + (v.value0.head.name + "'")));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 837, column 26 - line 856, column 82): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 869, column 26 - line 888, column 82): " + [v.constructor.name]);
     };
   };
 };
@@ -8867,8 +8881,8 @@ var jsonText = function(dictMonadThrow) {
       ;
       if (args.length === 2) {
         return pure4(function() {
-          var $545 = optFlag("pretty")(args[1]);
-          if ($545) {
+          var $546 = optFlag("pretty")(args[1]);
+          if ($546) {
             return jsonStringifyPretty;
           }
           ;
@@ -8944,9 +8958,9 @@ var iterate2 = function(dictMonadThrow) {
           };
         };
         return map32(function() {
-          var $699 = joinWith("");
-          return function($700) {
-            return VSafe.create($699($700));
+          var $700 = joinWith("");
+          return function($701) {
+            return VSafe.create($700($701));
           };
         }())(traverse12(identity6)(mapWithIndex2(renderItem)(items)));
       };
@@ -8985,7 +8999,7 @@ var indexValue = function(v) {
         return VNull.value;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 772, column 38 - line 774, column 19): " + [v2.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 804, column 38 - line 806, column 19): " + [v2.constructor.name]);
     }
     ;
     return VNull.value;
@@ -9014,7 +9028,7 @@ var lookupH = function(dictMonadThrow) {
         return pure4(foldl2(step)(v1.value0.head)(v1.value0.tail));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 760, column 18 - line 762, column 59): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 792, column 18 - line 794, column 59): " + [v1.constructor.name]);
     };
   };
 };
@@ -9048,7 +9062,8 @@ var gen = function(name2) {
           block,
           arity,
           run: run3,
-          alias: Nothing.value
+          alias: Nothing.value,
+          synonymOf: Nothing.value
         };
       };
     };
@@ -9085,8 +9100,8 @@ var groupByH = function(dictMonadThrow) {
       return bind9(stringifyM1(keyv))(function(key) {
         if (av instanceof VArray) {
           return bind9(foldM2(insertGroup(key))(empty3)(av.value0))(function(grouped) {
-            return pure4(new VObject(map23(function($701) {
-              return VArray.create(reverse($701));
+            return pure4(new VObject(map23(function($702) {
+              return VArray.create(reverse($702));
             })(grouped)));
           });
         }
@@ -9118,8 +9133,8 @@ var escJsonH = function(dictMonadThrow) {
   var jsonText1 = jsonText(dictMonadThrow);
   return function(v) {
     return function(args) {
-      return map32(function($702) {
-        return VSafe.create(escapeHtml($702));
+      return map32(function($703) {
+        return VSafe.create(escapeHtml($703));
       })(jsonText1("escapeJson")(args));
     };
   };
@@ -9134,8 +9149,8 @@ var escHtml = function(dictMonadThrow) {
       return pure4(new VSafe(v.value0));
     }
     ;
-    return map32(function($703) {
-      return VSafe.create(escapeHtml($703));
+    return map32(function($704) {
+      return VSafe.create(escapeHtml($704));
     })(stringifyM1(v));
   };
 };
@@ -9165,7 +9180,7 @@ var endsWithH = function(dictMonadThrow) {
             return false;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 540, column 26 - line 542, column 21): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 572, column 26 - line 574, column 21): " + [v.constructor.name]);
         };
       };
       return bind9(stringifyM1(sv))(function(s) {
@@ -9215,7 +9230,7 @@ var dictH = function(dictMonadThrow) {
                 return throwError2(new ArityError("dict: odd number of arguments"));
               }
               ;
-              throw new Error("Failed pattern match at Kernel.Prelude (line 1025, column 39 - line 1027, column 73): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at Kernel.Prelude (line 1057, column 39 - line 1059, column 73): " + [v2.constructor.name]);
             }
             ;
             if (v1 instanceof Just) {
@@ -9223,7 +9238,7 @@ var dictH = function(dictMonadThrow) {
               return throwError2(new $$TypeError("dict: keys must be strings"));
             }
             ;
-            throw new Error("Failed pattern match at Kernel.Prelude (line 1023, column 18 - line 1028, column 66): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at Kernel.Prelude (line 1055, column 18 - line 1060, column 66): " + [v1.constructor.name]);
           }
           ;
           while (!$tco_done) {
@@ -9327,7 +9342,7 @@ var clampIndex = function(len) {
       return min3(i)(len);
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Prelude (line 504, column 1 - line 504, column 32): " + [len.constructor.name, i.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Prelude (line 536, column 1 - line 536, column 32): " + [len.constructor.name, i.constructor.name]);
   };
 };
 var checkIfClauses = function(dictMonadThrow) {
@@ -9366,7 +9381,7 @@ var checkIfClauses = function(dictMonadThrow) {
       return throwError2(new ClauseError("if: unexpected clause '" + (v.value0.head.name + "'")));
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Prelude (line 863, column 26 - line 873, column 82): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Prelude (line 895, column 26 - line 905, column 82): " + [v.constructor.name]);
   };
 };
 var ifH = function(dictMonadThrow) {
@@ -9414,7 +9429,7 @@ var capitalizeStr = function(s) {
     return toUpper(singleton4(v.value0.head)) + v.value0.tail;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Prelude (line 430, column 19 - line 432, column 68): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Prelude (line 462, column 19 - line 464, column 68): " + [v.constructor.name]);
 };
 var branchOn = function(dictMonadThrow) {
   var renderMain1 = renderMain(dictMonadThrow);
@@ -9458,8 +9473,8 @@ var boolH = function(dictApplicative) {
 };
 var bodyStart = function(s) {
   var body = trim(s);
-  var $634 = body === "";
-  if ($634) {
+  var $635 = body === "";
+  if ($635) {
     return Nothing.value;
   }
   ;
@@ -9475,7 +9490,7 @@ var trimEndStr = function(s) {
     return take2(v.value0 + length2(trim(s)) | 0)(s);
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Prelude (line 446, column 16 - line 448, column 68): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Prelude (line 478, column 16 - line 480, column 68): " + [v.constructor.name]);
 };
 var trimStartStr = function(s) {
   var v = bodyStart(s);
@@ -9487,7 +9502,7 @@ var trimStartStr = function(s) {
     return drop2(v.value0)(s);
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Prelude (line 441, column 18 - line 443, column 31): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Prelude (line 473, column 18 - line 475, column 31): " + [v.constructor.name]);
 };
 var bindingNames = /* @__PURE__ */ mapMaybe(function(v) {
   if (v instanceof VString) {
@@ -9506,8 +9521,8 @@ var eachH = function(dictMonadThrow) {
       if (v instanceof Just) {
         var names = bindingNames(v.value0.tail);
         if (v.value0.head instanceof VArray) {
-          var $643 = $$null(v.value0.head.value0);
-          if ($643) {
+          var $644 = $$null(v.value0.head.value0);
+          if ($644) {
             return renderElse1(ctl);
           }
           ;
@@ -9524,8 +9539,8 @@ var eachH = function(dictMonadThrow) {
         ;
         if (v.value0.head instanceof VObject) {
           var pairs = toUnfoldable6(v.value0.head.value0);
-          var $645 = $$null(pairs);
-          if ($645) {
+          var $646 = $$null(pairs);
+          if ($646) {
             return renderElse1(ctl);
           }
           ;
@@ -9545,7 +9560,7 @@ var eachH = function(dictMonadThrow) {
         return throwError2(new ArityError("each: expected at least 1 argument(s), got 0"));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 910, column 18 - line 931, column 84): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 942, column 18 - line 963, column 84): " + [v.constructor.name]);
     };
   };
 };
@@ -9558,8 +9573,8 @@ var withH = function(dictMonadThrow) {
     return function(args) {
       var v = uncons(args);
       if (v instanceof Just) {
-        var $654 = truthy(refFalsy(ctl.env))(v.value0.head);
-        if ($654) {
+        var $655 = truthy(refFalsy(ctl.env))(v.value0.head);
+        if ($655) {
           var binds = zipWith(function(nm) {
             return function(val) {
               return new Tuple(nm, constHelper2(val));
@@ -9576,7 +9591,7 @@ var withH = function(dictMonadThrow) {
         return throwError2(new ArityError("with: expected at least 1 argument(s), got 0"));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 1001, column 18 - line 1014, column 84): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 1033, column 18 - line 1046, column 84): " + [v.constructor.name]);
     };
   };
 };
@@ -9596,8 +9611,8 @@ var numUnary = function(dictMonadThrow) {
   var asNum1 = asNum(dictMonadThrow);
   return function(f) {
     return function(v) {
-      return map32(function($704) {
-        return VNumber.create(f($704));
+      return map32(function($705) {
+        return VNumber.create(f($705));
       })(asNum1(v));
     };
   };
@@ -9606,8 +9621,8 @@ var asInt = function(dictMonadThrow) {
   var map32 = map(dictMonadThrow.Monad0().Bind1().Apply0().Functor0());
   var asNum1 = asNum(dictMonadThrow);
   return function(v) {
-    return map32(function($705) {
-      return round2(trunc($705));
+    return map32(function($706) {
+      return round2(trunc($706));
     })(asNum1(v));
   };
 };
@@ -9621,8 +9636,8 @@ var atH = function(dictMonadThrow) {
       return bind9(asInt1(iv))(function(i) {
         if (av instanceof VArray) {
           var idx = function() {
-            var $661 = i < 0;
-            if ($661) {
+            var $662 = i < 0;
+            if ($662) {
               return length(av.value0) + i | 0;
             }
             ;
@@ -9660,13 +9675,13 @@ var sliceH = function(dictMonadThrow) {
                     return asInt1(mEndv.value0);
                   }
                   ;
-                  throw new Error("Failed pattern match at Kernel.Prelude (line 494, column 12 - line 496, column 30): " + [mEndv.constructor.name]);
+                  throw new Error("Failed pattern match at Kernel.Prelude (line 526, column 12 - line 528, column 30): " + [mEndv.constructor.name]);
                 }())(function(end) {
                   var lo = clampIndex(len)(start);
                   var hi = clampIndex(len)(end);
                   return pure4(new VString(function() {
-                    var $665 = lo >= hi;
-                    if ($665) {
+                    var $666 = lo >= hi;
+                    if ($666) {
                       return "";
                     }
                     ;
@@ -9746,8 +9761,8 @@ var truncateH = function(dictMonadThrow) {
             return bind9(stringifyM1(sv))(function(s) {
               return bind9(asInt1(nv))(function(n) {
                 return pure4(new VString(function() {
-                  var $674 = length2(s) > n;
-                  if ($674) {
+                  var $675 = length2(s) > n;
+                  if ($675) {
                     return take2(n)(s) + suf;
                   }
                   ;
@@ -9804,7 +9819,7 @@ var applyH = function(dictMonadThrow) {
           return throwError2(new UnknownHelper(v.value0.head.value0));
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Prelude (line 1032, column 40 - line 1034, column 47): " + [v1.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Prelude (line 1064, column 40 - line 1066, column 47): " + [v1.constructor.name]);
       }
       ;
       return throwError2(new $$TypeError("apply: first argument must be a helper-name string"));
@@ -9834,7 +9849,7 @@ var coreHelperDefs = function(dictMonadThrow) {
     return notEq12(v)(GT.value);
   }))), valDef1("gte")(binary2(cmp1(function(v) {
     return notEq12(v)(LT.value);
-  }))), valDef1("isnt")(binary2(ne$prime1)), gen("not")(false)(new Exactly(1))(notH(dictMonadThrow)), gen("and")(false)(AnyArity.value)(boolH1(all2)), gen("or")(false)(AnyArity.value)(boolH1(any2)), valDef1("add")(binary2(arith1(add1))), valDef1("subtract")(binary2(arith1(sub2))), valDef1("multiply")(binary2(arith1(mul2))), valDef1("divide")(binary2(arith1(div3))), valDef1("modulo")(binary2(arith1(jsMod))), withAlias("add")(valDef1("plus")(binary2(arith1(add1)))), withAlias("subtract")(valDef1("minus")(binary2(arith1(sub2)))), withAlias("multiply")(valDef1("times")(binary2(arith1(mul2)))), gen("coalesce")(false)(new AtLeast(1))(coalesceH(dictMonadThrow)), valDef1("log")(atLeast(dictMonadThrow)(1)($$const(pure4(VNull.value))))];
+  }))), withSynonym("ne")(valDef1("isnt")(binary2(ne$prime1))), gen("not")(false)(new Exactly(1))(notH(dictMonadThrow)), gen("and")(false)(AnyArity.value)(boolH1(all2)), gen("or")(false)(AnyArity.value)(boolH1(any2)), valDef1("add")(binary2(arith1(add1))), valDef1("subtract")(binary2(arith1(sub2))), valDef1("multiply")(binary2(arith1(mul2))), valDef1("divide")(binary2(arith1(div3))), valDef1("modulo")(binary2(arith1(jsMod))), withAlias("add")(valDef1("plus")(binary2(arith1(add1)))), withAlias("subtract")(valDef1("minus")(binary2(arith1(sub2)))), withAlias("multiply")(valDef1("times")(binary2(arith1(mul2)))), gen("coalesce")(false)(new AtLeast(1))(coalesceH(dictMonadThrow)), valDef1("log")(atLeast(dictMonadThrow)(1)($$const(pure4(VNull.value))))];
 };
 var appendH = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
@@ -9859,7 +9874,7 @@ var primitiveHelperDefs = function(dictMonadThrow) {
   var numUnary1 = numUnary(dictMonadThrow);
   var Applicative0 = dictMonadThrow.Monad0().Applicative0();
   var countH1 = countH(Applicative0);
-  return [valDef1("lowercase")(unary2(strUnary1(toLower))), valDef1("uppercase")(unary2(strUnary1(toUpper))), valDef1("capitalize")(unary2(strUnary1(capitalizeStr))), valDef1("trim")(unary2(strUnary1(trim))), valDef1("trimStart")(unary2(strUnary1(trimStartStr))), valDef1("trimEnd")(unary2(strUnary1(trimEndStr))), valDef1("split")(binary2(splitH(dictMonadThrow))), gen("replace")(false)(new Exactly(3))(replaceH(dictMonadThrow)), gen("slice")(false)(new Between(2, 3))(sliceH(dictMonadThrow)), valDef1("includes")(binary2(includesH(dictMonadThrow))), valDef1("startsWith")(binary2(startsWithH(dictMonadThrow))), valDef1("endsWith")(binary2(endsWithH(dictMonadThrow))), gen("truncate")(false)(new Between(2, 3))(truncateH(dictMonadThrow)), valDef1("append")(binary2(appendH(dictMonadThrow))), valDef1("prepend")(binary2(prependH(dictMonadThrow))), withAlias("lowercase")(valDef1("downcase")(unary2(strUnary1(toLower)))), withAlias("uppercase")(valDef1("upcase")(unary2(strUnary1(toUpper)))), valDef1("abs")(unary2(numUnary1(abs))), valDef1("floor")(unary2(numUnary1(floor))), valDef1("ceil")(unary2(numUnary1(ceil))), valDef1("round")(unary2(numUnary1(round))), valDef1("toFixed")(binary2(toFixedH(dictMonadThrow))), valDef1("toInt")(unary2(toIntH(dictMonadThrow))), valDef1("toFloat")(unary2(toFloatH(dictMonadThrow))), valDef1("join")(binary2(joinH(dictMonadThrow))), valDef1("count")(unary2(countH1)), valDef1("size")(unary2(countH1)), valDef1("at")(binary2(atH(dictMonadThrow))), valDef1("take")(binary2(takeH(dictMonadThrow))), valDef1("takeRight")(binary2(takeRightH(dictMonadThrow))), valDef1("reverse")(unary2(reverseH(dictMonadThrow))), valDef1("unique")(unary2(uniqueH(Applicative0))), valDef1("sortBy")(binary2(sortByH(dictMonadThrow))), valDef1("pluck")(binary2(pluckH(dictMonadThrow))), valDef1("groupBy")(binary2(groupByH(dictMonadThrow)))];
+  return [valDef1("lowercase")(unary2(strUnary1(toLower))), valDef1("uppercase")(unary2(strUnary1(toUpper))), valDef1("capitalize")(unary2(strUnary1(capitalizeStr))), valDef1("trim")(unary2(strUnary1(trim))), valDef1("trimStart")(unary2(strUnary1(trimStartStr))), valDef1("trimEnd")(unary2(strUnary1(trimEndStr))), valDef1("split")(binary2(splitH(dictMonadThrow))), gen("replace")(false)(new Exactly(3))(replaceH(dictMonadThrow)), gen("slice")(false)(new Between(2, 3))(sliceH(dictMonadThrow)), valDef1("includes")(binary2(includesH(dictMonadThrow))), valDef1("startsWith")(binary2(startsWithH(dictMonadThrow))), valDef1("endsWith")(binary2(endsWithH(dictMonadThrow))), gen("truncate")(false)(new Between(2, 3))(truncateH(dictMonadThrow)), valDef1("append")(binary2(appendH(dictMonadThrow))), valDef1("prepend")(binary2(prependH(dictMonadThrow))), withAlias("lowercase")(valDef1("downcase")(unary2(strUnary1(toLower)))), withAlias("uppercase")(valDef1("upcase")(unary2(strUnary1(toUpper)))), valDef1("abs")(unary2(numUnary1(abs))), valDef1("floor")(unary2(numUnary1(floor))), valDef1("ceil")(unary2(numUnary1(ceil))), valDef1("round")(unary2(numUnary1(round))), valDef1("toFixed")(binary2(toFixedH(dictMonadThrow))), valDef1("toInt")(unary2(toIntH(dictMonadThrow))), valDef1("toFloat")(unary2(toFloatH(dictMonadThrow))), valDef1("join")(binary2(joinH(dictMonadThrow))), valDef1("count")(unary2(countH1)), withSynonym("count")(valDef1("size")(unary2(countH1))), valDef1("at")(binary2(atH(dictMonadThrow))), valDef1("take")(binary2(takeH(dictMonadThrow))), valDef1("takeRight")(binary2(takeRightH(dictMonadThrow))), valDef1("reverse")(unary2(reverseH(dictMonadThrow))), valDef1("unique")(unary2(uniqueH(Applicative0))), valDef1("sortBy")(binary2(sortByH(dictMonadThrow))), valDef1("pluck")(binary2(pluckH(dictMonadThrow))), valDef1("groupBy")(binary2(groupByH(dictMonadThrow)))];
 };
 var helperDefs = function(dictMonadThrow) {
   return append13(coreHelperDefs(dictMonadThrow))(primitiveHelperDefs(dictMonadThrow));
