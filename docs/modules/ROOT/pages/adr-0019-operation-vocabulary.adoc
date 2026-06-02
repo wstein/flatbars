@@ -1,7 +1,8 @@
 = ADR-019: The operation model — "operation" / "definition" natively, "helper" at the host boundary
 :navtitle: ADR-019 Operation vocabulary
 
-*Status:* Proposed. *Date:* 2026-06-02. Builds on
+*Status:* Accepted (with the conditions in Consequences: a frozen boundary word, a single gated rename
+commit, and an owned kind taxonomy). *Date:* 2026-06-02. Builds on
 xref:concepts.adoc[the core model] §1–4 (everything is an application; there are *no variables*; the head
 is always a name; scope is install/remove of names) and
 xref:adr-0001-structural-parser-and-walker.adoc[ADR-001] (the meaning plug-in). Constrains, but does not
@@ -47,10 +48,13 @@ spends the adoption capital ADR-018 was paid to build.
    *and the internal code identifiers*. The primary noun is *operation* (the thing a name invokes at a
    call site); the thing *installed in the environment* is a *definition*. A name *resolves* to a
    definition in the current *scope*; applying it is an *operation*.
-** *Boundary / compatibility register* — the JS host facade. `registerHelper` / `renderWith` /
-   `compileWith` (ADR-018) and the §7.4 migration table *keep the word "helper,"* documented as: a
-   *helper is how a host registers an operation*. The migrator never loses the term; the newcomer never
-   inherits the lie.
+** *Boundary / compatibility register* — the JS host facade. `renderWith` and the source-level
+   `registerHelper` affordance (ADR-018) and the §7.4 migration table *keep the word "helper,"*
+   documented as: a *helper is how a host registers an operation*. The migrator never loses the term;
+   the newcomer never inherits the lie. *This boundary word is frozen* — `helper` is the permanent
+   migration anchor ADR-018 paid for, and is never renamed even as the internals become `Operation`;
+   that frozen boundary is what makes the rename below safe. (There is no `compileWith`: compilation is
+   helper-agnostic — it emits `rt.call`, bound at run time — see ADR-018.)
 
 . *Operations have two kinds, the contract already forces them.* The type
   `Ctl m env -> Array Value -> m Value` (xref:host-api.adoc[host-api] §7.3) distinguishes *inline*
@@ -63,7 +67,10 @@ spends the adoption capital ADR-018 was paid to build.
   exception* — they stay, by Decision 1.
 
 . *MaxBars gets a surface gloss, not a new model.* The infix symbols `+ >= |` are *operators* (surface
-  sugar); prefix heads and pipe stages are *operations*. There is *no "function"* —
+  sugar); prefix heads and pipe stages are *operations*. We keep the entrenched word "operator" rather
+  than coin a replacement — but because *operator* and *operation* differ by one letter, every use must
+  carry the contrast: an **operator is surface sugar that desugars to an operation** (never standalone).
+  The glossary pairs them on one line for exactly this reason. There is *no "function"* —
   xref:concepts.adoc[concepts] §3 forbids callable values, so "function" would promise first-class
   functions the language does not have. Both desugar to the same core `App`
   (xref:concepts.adoc[concepts] §8), so the two surface words sit over one core, exactly as "one parser,
@@ -81,14 +88,31 @@ spends the adoption capital ADR-018 was paid to build.
   truth. It is ratified here so a contributor meeting `registerHelper : … -> Operation` reads it as intent,
   not drift.
 * *A new normative glossary* (xref:concepts.adoc[concepts] or a `glossary.adoc`) becomes the single
-  teachable artifact for the two registers; the §7.4 table gains a one-line carry-over note.
+  teachable artifact for the two registers — and it is *gated*, not prose-on-trust: a `check:` (mirroring
+  `check:catalog`) asserts that every native term carries its host-API synonym and that the
+  xref:host-api.adoc[host-api] §7.4 migration table and the glossary agree on the
+  operation↔helper / definition / scope / inline / block / operator mapping. A drift in either fails the
+  build, so the two registers cannot silently diverge. The gate checks *terms*, not prose, to avoid a
+  maintenance tax.
+* *This ADR owns the kind taxonomy.* The single, shared set of operation kinds is *value* (a nullary
+  inline operation), *inline* (n-ary), *block*, and *operator* (the MaxBars surface form). ADR-018's
+  declared arities and xref:adr-0017-editor-support-lsp.adoc[ADR-017]'s catalog-driven completion both
+  *reference* this taxonomy rather than coining their own labels. (Note: the kind is *inline*, not
+  "transform" — "transform" is the Lab's JSONata data-preprocess and must not be overloaded as a kind.)
 * *The `Helper` → `Operation` rename is wide and mechanical* across kernel / fullbars / compile and the
-  schema language. It lands in its own commit with `npm run build`, `npm test`, and `npm run check:catalog`
-  green (the catalog prose shifts with the prelude vocabulary). No semantics change — `test:compile` byte
-  equality is untouched.
-* *Editor/LSP tie-in* (xref:adr-0017-editor-support-lsp.adoc[ADR-017]): catalog-driven completion can label
-  entries by kind — *value* (nullary), *transform* (inline n-ary), *block*, *operator* (MaxBars) — turning
-  the vocabulary into tooling. This ties to ADR-018's open question on declared arities.
+  schema language, and lands in *one* commit gated by a hard checklist, all green:
++
+--
+  . `npm run build` — every package compiles under the new type name;
+  . `npm test` — full suite, including `npm run check:catalog` (the catalog prose shifts with the prelude
+    vocabulary, so `npm run gen:catalog` is regenerated in the same commit);
+  . `npm run test:compile` — *byte-identical* compiled-vs-interpreted output, proving the rename is purely
+    nominal (no semantics change);
+  . `npm run check:bundle` — the editor bundle tracks the renamed source.
+--
++
+The boundary word `helper` (Decision 1) does *not* move in this commit — only the internal `Operation`
+type, the prelude/schema kind language, and `concepts`/dialect prose.
 
 == Alternatives rejected
 
@@ -109,9 +133,9 @@ spends the adoption capital ADR-018 was paid to build.
 
 == Open questions
 
-* *Schema kind labels.* Do we expose `value` / `transform` / `block` as the catalog's kind taxonomy
-  (feeding ADR-017 completion), or keep the internal `inline` / `block` pair and derive `value` from
-  arity 0? v1 can derive.
+* *Schema kind labels* — *resolved* (see Consequences): the taxonomy is *value* / *inline* / *block* /
+  *operator*, with `value` derived from `inline` + arity 0 internally and surfaced as its own label to
+  the catalog/LSP. "transform" is explicitly *not* a kind (it is the Lab's data-preprocess).
 * *Naming `definition` vs `binding` for the environment entry.* "Definition" reads well in prose;
   "binding" is more precise about the name↔meaning pairing. This ADR picks *definition*; revisit if the
   glossary proves it ambiguous against block-installed scope.

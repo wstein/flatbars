@@ -61,10 +61,17 @@ block helpers are therefore out of scope — a stated boundary, not an MVP cut.
   (known name, inline kind, `AnyArity` unless declared), so they neither trip "unknown helper" nor lose
   the arity diagnostics the prelude gets.
 
-. *Explicit primitives; a familiar shim.* The primitives are `renderWith(helpers, template, data)` and
-  `compileWith(helpers, template)` — a helpers *bag* passed per call, *no* global mutable registry
-  (clean for tests and for a shared Lab). A thin, stateful `registerHelper(name, fn)` is provided for
-  Handlebars-copy-paste familiarity, documented as sugar that accumulates into a bag.
+. *An explicit per-call bag; no global registry.* The one facade primitive is
+  `renderWith(helpers, partials, template, data)` (plus `safe`) — a helpers *bag* `{ name: fn }` passed
+  per call, with *no* global mutable registry (clean for tests and for a shared Lab). There is
+  deliberately *no* `compileWith`: compilation emits `rt.call(name, …)` for any non-built-in head
+  regardless of helpers, and the host binds them at run time via `rt.register` — so the bag is a
+  *render-time* concern, not a compile-time one. The familiar `Handlebars.registerHelper(name, fn[,
+  arity])` spelling is a *source-level* affordance, not a stateful facade global: the Lab and tutorials
+  inject a `registerHelper` function into the user's helper source (`lab/helpers.mjs` `buildHelpers`),
+  which accumulates the bag they then pass to `renderWith`. This keeps the migrator's spelling while
+  honouring "no global mutable registry" — the global shim an earlier draft proposed is exactly the
+  hidden state that line rejects.
 
 . *The Lab runs helpers in a Worker.* Custom helper JS is evaluated and executed in a *Worker*
   (`lab/helpers-worker.mjs`), never on the main thread — a Worker has no DOM and no `window`, so a
@@ -81,9 +88,10 @@ block helpers are therefore out of scope — a stated boundary, not an MVP cut.
 
 == Consequences
 
-* `flatbars-js` gains a public helper API (`renderWith`/`compileWith`/`registerHelper`, `safe`), and the
-  compiled runtime gains `rt.register`/`rt.safe` and a host-registry fallback in `rt.call`. The existing
-  `check:bundle` gate keeps the editor engine in step.
+* `flatbars-js` gains a public helper API — `renderWith(helpers, partials, template, data)` and `safe` —
+  and the compiled runtime gains `rt.register`/`rt.safe` and a host-registry fallback in `rt.call`. (The
+  Handlebars-style `registerHelper` is a source-level affordance the Lab/tutorials inject, per Decision 5,
+  not a facade export.) The existing `check:bundle` gate keeps the editor engine in step.
 * The interpreter gains a small, contained FFI surface (a marshaller calling a JS function over JSON);
   the canonical PureScript `prelude`/`render` are unchanged — the FFI lives at the facade boundary.
 * `test:compile` is extended with custom-helper cases; the equivalence invariant now also covers
@@ -95,21 +103,22 @@ block helpers are therefore out of scope — a stated boundary, not an MVP cut.
 == Alternatives rejected
 
 * *Global mutable `registerHelper` as the primitive* (Handlebars-style). Hidden state poisons a shared
-  Lab and test isolation; the bag-per-call primitive with a shim wrapper gives the familiar API without
-  the global.
+  Lab and test isolation; the bag-per-call primitive, with `registerHelper` injected at the *source*
+  level (not a facade global), gives the familiar spelling without the global.
 * *Compile-only or interpret-only helpers.* Either breaks `test:compile` or breaks the Lab's live
   render. Dual-mode through one registration is the only option that preserves both.
 * *Custom block helpers in v1.* No compiled equivalent (`rt.block`), so they cannot be made
   mode-equivalent; deferred until/unless the emitter gains generic block emission.
-* *Running Lab helpers on the main thread.* Shared-link code execution in the victim's origin; the
-  Worker + consent model is the floor.
+* *Running Lab helpers on the main thread.* Shared-link code execution in the victim's origin; Worker
+  isolation (no DOM/page access) is the floor, and supersedes the earlier confirm-prompt.
 
 == Open questions
 
 * *Declared helper arities* — *done.* `registerHelper(name, fn, arity)` accepts an optional arity (a
   number ⇒ exactly N, `[min, max]` ⇒ a range / at-least when `max` is `null`/`Infinity`, omitted ⇒
   any). A mismatch reports the *same* `ArityError` text the prelude's arity-checked helpers produce, in
-  both the interpreter and the compiled runtime. Editor completion from a declared kind/arity (ADR-017)
-  remains future work.
+  both the interpreter and the compiled runtime. A declared *kind* (value / inline / block / operator)
+  follows xref:adr-0019-operation-vocabulary.adoc[ADR-019]'s owned taxonomy; editor completion from a
+  declared kind/arity (ADR-017) remains future work.
 * *Capability scoping in the Lab.* The Worker removes DOM/ambient authority but not all of a Worker's
   own globals; a tighter capability jail is future work if abuse appears.
