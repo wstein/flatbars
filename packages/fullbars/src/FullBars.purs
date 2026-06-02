@@ -19,6 +19,7 @@ module FullBars
   , compileSurface
   , renderSurface
   , renderSurfaceWith
+  , renderSurfaceWithHelpers
   , renderSurfaceDiag
   , renderSurfaceDiagWith
   , renderSurfaceValue
@@ -35,6 +36,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, desugar, desugarWith, hoistInline, noLoopVars)
+import Kernel.Engine (Helper)
 import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (prelude, preludeSchema)
@@ -95,6 +97,44 @@ renderSurfaceWith partialSrcs src dat =
   -- `@truthiness` (a different file ⇒ its own lexical mode).
   compilePartial (Tuple name s) = case parse s of
     Left e -> Left (show e)
+    Right { directives, nodes } -> case resolveTruthiness directives of
+      Left e -> Left (show e)
+      Right falsy -> Right { name, template: desugarSurface nodes, falsy }
+
+-- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
+-- | `(name, helper)` is registered into the env alongside the prelude and the
+-- | partials, so a `{{loud x}}` resolves to the supplied helper. The JS facade
+-- | marshals user functions into these `Helper`s; the interpreter and the
+-- | compiled path (which routes the same names through `rt.call` →
+-- | `rt.register`) therefore agree. Parse errors are located (`line:column`).
+renderSurfaceWithHelpers
+  :: Array (Tuple String (Helper (Either Error) (RefEnv (Either Error))))
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String String
+renderSurfaceWithHelpers helpers partialSrcs src dat =
+  case traverse compilePartial partialSrcs of
+    Left e -> Left e
+    Right ps -> case parse src of
+      Left pe -> Left (renderParseErrorAt src pe)
+      Right { directives, nodes } ->
+        let
+          { partials: inlineP, template } = hoistInline (desugarSurface nodes)
+          externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          externalF = Map.fromFoldable (map (\p -> Tuple p.name p.falsy) ps)
+          setup =
+            registerAll helpers
+              <<< registerPartialsFalsy externalF
+              <<< registerPartials (Map.union inlineP externalT)
+        in
+          case runResolved directives setup template dat of
+            Left e -> Left (formatError src e)
+            Right out -> Right out
+  where
+  -- mirrors `renderSurfaceWith.compilePartial`, but locates the error.
+  compilePartial (Tuple name s) = case parse s of
+    Left e -> Left (renderParseErrorAt s e)
     Right { directives, nodes } -> case resolveTruthiness directives of
       Left e -> Left (show e)
       Right falsy -> Right { name, template: desugarSurface nodes, falsy }

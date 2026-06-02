@@ -10,6 +10,7 @@ package:
     - prelude
     - either
     - functions
+    - transformers
     - argonaut-core
     - flatbars
     - flatbars-json

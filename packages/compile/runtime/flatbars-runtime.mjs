@@ -374,13 +374,34 @@ const helpers = {
   dict: (a) => { const o = {}; for (let i = 0; i + 1 < a.length; i += 2) o[stringify(a[i])] = a[i + 1]; return o; },
   apply: (a, f) => call(stringify(a[0]), a.slice(1), f),
 };
+// Host-registered helpers (ADR-018): inline JS functions a host adds with
+// `rt.register`. They use the Handlebars-style positional convention
+// `(...args) => value` (not the prelude's `(args, frame)`), and may return
+// `safe(str)` — a `{ __fbSafe }` sentinel, the same one the engine facade's
+// `safe` produces — to emit raw markup; it is normalised to the internal `Safe`
+// here so the output site treats it like any safe value. Used by both the
+// compiled module (this registry) and the interpreter (the facade marshals the
+// same functions into engine helpers), so the two paths agree.
+const userHelpers = Object.create(null);
+function register(name, fn) {
+  if (typeof fn !== "function") throw new Error("rt.register: helper '" + name + "' is not a function");
+  userHelpers[name] = fn;
+  return rt;
+}
+function callUser(fn, args) {
+  const r = fn(...args);
+  return (r && typeof r === "object" && typeof r.__fbSafe === "string") ? new Safe(r.__fbSafe) : r;
+}
+
 function call(name, args, frame) {
   // block-param bindings (as |item i|) shadow the helper registry, like the
   // interpreter's scoped frame helpers.
   if (frame && frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name)) return frame.binds[name];
   const h = helpers[name];
-  if (!h) throw new Error("UnknownHelper: no helper named '" + name + "' in any frame");
-  return h(args, frame);
+  if (h) return h(args, frame);
+  const u = userHelpers[name];
+  if (u) return callUser(u, args);
+  throw new Error("UnknownHelper: no helper named '" + name + "' in any frame");
 }
 
 // truthiness under a set, honouring an options object's includeZero as a
@@ -483,6 +504,7 @@ function mindentOverride(indent, body) {
 
 export const rt = {
   RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, block, raw, Safe,
+  register, // ADR-018: host-registered inline helpers
   mseed, mlookup, msection, mfalsy, mindentOverride,
 };
 export default rt;

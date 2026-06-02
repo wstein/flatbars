@@ -25,7 +25,7 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMustache } =
+const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMustache, renderWith, safe } =
   await import(enginePath);
 
 // Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
@@ -43,13 +43,18 @@ const compilerFor = (dialect) =>
 
 // Render with the interpreter (the spec), in the case's dialect. A `minbars`
 // case with `partials` uses the MinBars + partials interpreter (renderMustache).
-const interpret = (t, d, dialect, partials) =>
-  (dialect === "minbars" && partials) ? renderMustache(partials, t, d == null ? null : d)
+const interpret = (t, d, dialect, partials, helpers) =>
+  helpers ? renderWith(helpers, partials || {}, t, d == null ? null : d)
+    : (dialect === "minbars" && partials) ? renderMustache(partials, t, d == null ? null : d)
     : interpreterFor(dialect)(t, d == null ? null : d);
 
-// Compile then execute against the runtime: -> { ok, value, error }.
-async function runCompiled(t, d, dialect, partials) {
-  const c = (dialect === "minbars" && partials) ? compileMinbarsWithPartials(partials, t) : compilerFor(dialect)(t);
+// Compile then execute against the runtime: -> { ok, value, error }. Custom-helper
+// cases (ADR-018) register their helpers on the runtime first, then compile as
+// surface — the same names route through `rt.call` → the registry.
+async function runCompiled(t, d, dialect, partials, helpers) {
+  if (helpers) for (const [n, f] of Object.entries(helpers)) rt.register(n, f);
+  const c = helpers ? compileSurface(t)
+    : (dialect === "minbars" && partials) ? compileMinbarsWithPartials(partials, t) : compilerFor(dialect)(t);
   if (!c.ok) return { ok: false, value: "", error: "compile: " + c.error };
   try {
     const mod = await import("data:text/javascript," + encodeURIComponent(c.value));
@@ -70,23 +75,39 @@ function exampleCases() {
       d: JSON.parse(readFileSync(resolve(dir, n, "data.json"), "utf8")),
     }));
 }
-const allCases = [...corpus, ...exampleCases()];
+// User-defined helper cases (ADR-018): exercise the interpreter (renderWith) and
+// the compiled path (rt.register + rt.call) for the same helper, asserting they
+// agree. `expect` pins the actual value too, so the gate catches a bug that the
+// two paths might share. Covers escaping, raw triple, `safe`, numbers,
+// subexpressions, and hash args.
+const up = (s) => String(s).toUpperCase();
+const helperCases = [
+  { name: "helper:escaped", dialect: "surface", helpers: { loud: up }, t: "{{loud x}}", d: { x: "<b>ada" }, expect: "&lt;B&gt;ADA" },
+  { name: "helper:raw-triple", dialect: "surface", helpers: { loud: up }, t: "{{{loud x}}}", d: { x: "<b>" }, expect: "<B>" },
+  { name: "helper:safe", dialect: "surface", helpers: { wrap: (s) => safe("<i>" + s + "</i>") }, t: "{{wrap x}}", d: { x: "hi" }, expect: "<i>hi</i>" },
+  { name: "helper:number", dialect: "surface", helpers: { inc: (n) => n + 1 }, t: "{{inc n}}", d: { n: 41 }, expect: "42" },
+  { name: "helper:subexpr", dialect: "surface", helpers: { loud: up }, t: "{{#if (loud x)}}Y{{else}}N{{/if}}", d: { x: "a" }, expect: "Y" },
+  { name: "helper:hash", dialect: "surface", helpers: { tag: (n, o) => "<" + n + (o && o.cls ? " class=" + o.cls : "") + ">" }, t: "{{{tag x cls=\"hi\"}}}", d: { x: "div" }, expect: "<div class=hi>" },
+];
+const allCases = [...corpus, ...exampleCases(), ...helperCases];
 
 let pass = 0, fail = 0;
 const fails = [];
-for (const { name, t, d, dialect, partials } of allCases) {
-  const spec = interpret(t, d, dialect, partials);
-  const got = await runCompiled(t, d, dialect, partials);
+for (const { name, t, d, dialect, partials, helpers, expect } of allCases) {
+  const spec = interpret(t, d, dialect, partials, helpers);
+  const got = await runCompiled(t, d, dialect, partials, helpers);
   if (!spec.ok) {
     // The interpreter itself errored — not a compiler conformance case.
     console.log(`  ?    ${name} — interpreter errored: ${spec.error}`);
     continue;
   }
-  if (got.ok && got.value === spec.value) {
+  // `expect` (when present) pins correctness; the equality check pins equivalence.
+  const correct = expect === undefined || spec.value === expect;
+  if (correct && got.ok && got.value === spec.value) {
     pass++;
   } else {
     fail++;
-    fails.push({ name, spec: spec.value, got: got.ok ? got.value : got.error, ok: got.ok });
+    fails.push({ name, spec: correct ? spec.value : `${spec.value} (expected ${expect})`, got: got.ok ? got.value : got.error, ok: got.ok && correct });
   }
 }
 

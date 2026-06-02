@@ -22,21 +22,26 @@ module FullBars.JS
   , compileFor
   , renderSurfaceWithPartials
   , renderMustache
+  , JsHelperFn
+  , renderWith
+  , safe
   , highlightSpans
   ) where
 
 import Prelude
 
-import Data.Argonaut.Core (Json, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
+import Control.Monad.Error.Class (throwError)
+import Data.Argonaut.Core (Json, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
-import Data.Function.Uncurried (Fn1, Fn2, Fn3, mkFn1, mkFn2, mkFn3)
+import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
+import FlatBars.Error (Error(HelperError))
 import FlatBars.Highlight (HSpan, HighlightConfig, highlightSpans) as Highlight
-import FlatBars.Json (fromJson)
+import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
@@ -87,6 +92,44 @@ renderSurfaceWithPartials = mkFn3 \partials tpl json ->
 renderMustache :: Fn3 (FO.Object String) String Json Result
 renderMustache = mkFn3 \partials tpl json ->
   result (MinBars.renderMinWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+--------------------------------------------------------------------------------
+-- User-defined helpers (ADR-018)
+--------------------------------------------------------------------------------
+
+-- | An opaque host JS helper: `(...args) => value`. Marshalled by `renderWith`.
+foreign import data JsHelperFn :: Type
+
+-- | Invoke a host helper over JSON-marshalled args, tagging the outcome:
+-- | `"ok"` (payload is the value), `"safe"` (payload is raw markup, ⇒ `VSafe`),
+-- | or `"error"` (payload is the thrown message). Never throws into PureScript.
+foreign import callJsHelperImpl
+  :: JsHelperFn -> Array Json -> { tag :: String, payload :: Json }
+
+-- | The `SafeString` equivalent a helper returns for raw markup. `safe(string)`.
+foreign import safe :: String -> Json
+
+-- | Render a *surface* (FullBars) template with host-registered inline helpers
+-- | and partials. `renderWith(helpers, partials, template, data)`, where
+-- | `helpers` is a plain `{ name: (…args) => value }` object and `partials` a
+-- | `{ name: source }` object. A helper returns a value (a string is
+-- | HTML-escaped in `pass:[{{ }}]`, raw in `pass:[{{{ }}}]`) or `safe(string)`
+-- | for raw markup; a thrown helper surfaces as a render error. Mirrors the
+-- | compiled path, which routes the same names through `rt.call`/`rt.register`.
+renderWith :: Fn4 (FO.Object JsHelperFn) (FO.Object String) String Json Result
+renderWith = mkFn4 \helpers partials tpl json ->
+  let
+    -- A host fn becomes a (polymorphic) engine helper; the `Ctl` handle is
+    -- ignored (inline helpers only — ADR-018). Args marshal Value→JSON, the
+    -- result JSON→Value, with the `safe` sentinel mapped to `VSafe`.
+    mk fn = \_ args -> case callJsHelperImpl fn (map toJson args) of
+      r
+        | r.tag == "safe" -> pure (VSafe (caseJsonString "" identity r.payload))
+        | r.tag == "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
+        | otherwise -> pure (fromJson r.payload)
+    hs = map (\(Tuple n fn) -> Tuple n (mk fn)) (FO.toUnfoldable helpers)
+  in
+    result (FullBars.renderSurfaceWithHelpers hs (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Compile a *core* template to JS ES-module source (`FlatBars.Compile`). The
 -- | emitted module's default export is `function (data, rt)`; pair it with
