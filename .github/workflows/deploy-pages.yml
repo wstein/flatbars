@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Deploy the Astro tutorials site + the static FlatBars Lab to GitHub Pages, under
+# one origin (the Lab at /lab/), as a project page: https://wstein.github.io/flatbars/.
+#
+# The site is built under the /flatbars sub-path (PUBLIC_BASE_PATH); astro.config
+# normalises the hand-written root-absolute links to that base, and PUBLIC_LAB_URL
+# bakes the based Lab URL into the runnable-example island. The Lab is plain static
+# files (relative paths), copied into dist/lab/ so it serves at /flatbars/lab/.
+#
+# One-time setup: repo Settings → Pages → Build and deployment → Source = GitHub Actions.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+# Least-privilege token for the Pages deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; don't cancel an in-flight publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # Full repo: the Astro build imports the committed engine bundle and the
+        # Lab from ../lab (vite fs.allow), and astro.config from ../scripts.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tutorials/package-lock.json
+
+      - name: Install tutorials dependencies
+        working-directory: tutorials
+        run: npm ci
+
+      - name: Build the site under the Pages sub-path, then bundle the Lab
+        working-directory: tutorials
+        env:
+          PUBLIC_BASE_PATH: /flatbars
+          PUBLIC_SITE: https://wstein.github.io
+          PUBLIC_LAB_URL: /flatbars/lab/index.html
+        run: |
+          npm run build
+          cp -R ../lab dist/lab
+          touch dist/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: tutorials/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

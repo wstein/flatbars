@@ -33,6 +33,35 @@ In production, serve `lab/` and this site under one origin so the default
 `/lab/index.html` deep-links resolve; set `PUBLIC_SPEC_BASE` to where the Antora
 spec is published (default `/flatbars/`).
 
+## Deploy (GitHub Pages)
+
+`.github/workflows/deploy-pages.yml` builds this site and the Lab and publishes
+them to the repo's GitHub **project page**,
+`https://wstein.github.io/flatbars/`, on push to `develop` (or via
+*workflow_dispatch*). **One-time setup:** repo *Settings → Pages → Build and
+deployment → Source = **GitHub Actions***.
+
+Because a project page serves under a `/<repo>/` sub-path, the build is
+parameterised by three env vars (set in the workflow; unset locally ⇒ root, so
+`npm run dev` and the gates are unaffected):
+
+| var | value | effect |
+|---|---|---|
+| `PUBLIC_BASE_PATH` | `/flatbars` | Astro `base`; `astro.config` then normalises the hand-written root-absolute links (`/minbars`, prose cross-links) to that base in the built HTML |
+| `PUBLIC_LAB_URL` | `/flatbars/lab/index.html` | bakes the based Lab URL into the runnable-example island (client JS the build-time rewrite can't reach) |
+| `PUBLIC_SITE` | `https://wstein.github.io` | Astro `site` |
+
+The Lab is plain static files with **relative** asset paths, so the workflow just
+copies `lab/` into `dist/lab/` (served at `/flatbars/lab/`); its "Docs" backlink
+(`../<engine>`) resolves to `/flatbars/<engine>`. To deploy at a **root** origin
+instead (custom domain or a user/org page), drop `PUBLIC_BASE_PATH` (and add a
+`CNAME`); the links then stay root-absolute as authored.
+
+> The Antora **spec** (`PUBLIC_SPEC_BASE`, default `/flatbars/`) is a *separate*
+> build and is not published by this workflow, so the footer "normative
+> reference" links 404 until you point `PUBLIC_SPEC_BASE` at where the spec is
+> actually hosted (or publish it alongside).
+
 ## How it works
 
 - **One source per example, gate-validated:** the Mustache reference's runnable
