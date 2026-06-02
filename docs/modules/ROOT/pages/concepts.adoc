@@ -200,10 +200,11 @@ with that synonym.
 | —
 |===
 
-The lambda-vs-helper split of Mustache does *not* survive here. Mustache binds a *lambda* in the data (at
-a leaf) and registers a *helper* on the side — a binding-site distinction. FlatBars has one binding site,
-the environment: a lambda bound to a data leaf is a *nullary operation installed in scope*, and a "helper
-applied to a section" is a *block operation*. One axis, not two.
+The lambda-vs-helper split of the {hbs}/Mustache family does *not* survive here. Mustache (logic-less, no
+helpers) binds a *lambda* in the data, at a leaf; {hbs} registers a *helper* on the side — a binding-site
+distinction across two languages. FlatBars has one binding site, the environment: a lambda bound to a data
+leaf is a *nullary operation installed in scope*, and a "helper applied to a block" is a *block operation*.
+One axis, not two.
 
 == A note on naming
 

@@ -10,10 +10,12 @@ revert, xref:adr-0018-user-defined-helpers.adoc[ADR-018] (`registerHelper`). Thi
 
 == Context
 
-FlatBars inherited the word *helper* from Handlebars/Mustache. In those languages the word is honest:
-they have real variables (a `pass:[{{name}}]` is a path lookup), and a *helper* is the bolt-on for when a
-path is not enough — the controlled escape hatch from "logic-less" purity, the auxiliary that *helps* the
-real content. That is the sense the team objects to: helper as *subordinate*.
+FlatBars inherited the word *helper* from *Handlebars* — not Mustache. Mustache has no helpers: it is
+"logic-less," and its only extension point is an in-data *lambda*. *Helper* is a Handlebars coinage —
+`Handlebars.registerHelper`, and the built-ins `if` / `each` / `with` / `unless` / `lookup` that
+Handlebars itself calls helpers. In Handlebars the word is honest: it has real variables (a
+`pass:[{{name}}]` is a path lookup), and a *helper* is the bolt-on for when a path is not enough — the
+auxiliary that *helps* the real content. That is the sense the team objects to: helper as *subordinate*.
 
 In FlatBars that sense is a falsehood. xref:concepts.adoc[concepts] §1 is explicit: there are *no
 variables*; `pass:[{{{city}}}]` *calls* the operation `city`. The thing the `{{ }}` family treats as an
@@ -21,15 +23,16 @@ afterthought is, here, the entire language. Keeping "helper" as the native noun 
 (logic-less-template-plus-escape-hatch) that §5 ("no keywords — not even `else`") already rejects, and it
 *hides the one genuinely new thing the model says*.
 
-That new thing is a dissolution. Mustache offers two mechanisms:
+That new thing is a dissolution. The `pass:[{{ }}]` family splits its extension story across *two*
+languages and *two* mechanisms:
 
-* a *lambda*, a function placed *in the data*, invoked when its name resolves at a leaf;
-* a *helper*, a function registered *on the side*, applied to a section or an interpolation.
+* a *lambda* (Mustache), a function placed *in the data*, invoked when its name resolves at a leaf;
+* a *helper* (Handlebars), a function registered *on the side*, applied to a block or an interpolation.
 
-This is a *binding-site* distinction: in-data vs registered. FlatBars has *one* binding site — the helper
-environment (§4). A Mustache lambda-at-a-leaf is just a *nullary operation installed in scope* (by a block
-or the host); a Mustache section-helper is just a *block operation*. One axis, not two. "Helper" buried
-this; a truer noun should advertise it.
+This is a *binding-site* distinction: in-data vs registered. FlatBars has *one* binding site — the
+operation environment (§4). A Mustache lambda-at-a-leaf is just a *nullary operation installed in scope*
+(by a block or the host); a Handlebars block helper is just a *block operation*. One axis, not two.
+"Helper" buried this; a truer noun should advertise it.
 
 The countervailing force is migration. xref:host-api.adoc[host-api] §7.4 is a deliberate
 Handlebars→FlatBars dictionary, and ADR-018 *just* shipped `registerHelper` because "Handlebars-faithful
