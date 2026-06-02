@@ -33,7 +33,7 @@ import FlatBars.Value (Value(..))
 import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
-import MinBars (renderMinDiag, renderMinWith) as MinBars
+import MinBars (renderMinDiag, renderMinDelimsDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
 import RawBars (compileJsWith, compileWith)
@@ -65,7 +65,8 @@ usage =
     , "      --delimiters <pair>"
     , "                      set the initial tag delimiters (Mustache set delimiters, ADR-015),"
     , "                      e.g. --delimiters '<% %>'. Enables {{=<% %>=}} switching and the"
-    , "                      {{! @delimiters }} directive. Core syntax only — not with --surface."
+    , "                      {{! @delimiters }} directive. Applies to core syntax or --mustache"
+    , "                      (the initial pair); not with --surface."
     , "  -h, --help          show this help"
     , ""
     , "Config: a flatbars.json in the working directory may set { \"trim\": \"standalone\" | \"none\","
@@ -173,9 +174,6 @@ run opts = do
       if isJust delims && opts.surface then
         die
           "flatbars: --delimiters/config delimiters apply to core syntax only, not --surface (FullBars, the Handlebars-faithful dialect, has no set delimiters)"
-      else if isJust delims && opts.mustache then
-        die
-          "flatbars: --mustache already renders with Mustache delimiters; --delimiters does not apply"
       else if opts.mustache && (opts.compileOnly || opts.validateOnly || opts.surface) then
         die
           "flatbars: --mustache renders the Mustache (MinBars) engine; it cannot combine with --surface, --compile, or --validate"
@@ -186,9 +184,12 @@ run opts = do
         case datE of
           Left err -> die ("flatbars: " <> err)
           Right value
-            | opts.mustache -> case MinBars.renderMinDiag tpl value of
-                Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
-                Right out -> writeStdout out
+            | opts.mustache ->
+                -- --delimiters sets MinBars' INITIAL pair (Mustache {{=…=}}
+                -- switching still applies, relative to it); else the default {{ }}.
+                case maybe (MinBars.renderMinDiag tpl value) (\d -> MinBars.renderMinDelimsDiag d tpl value) delims of
+                  Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
+                  Right out -> writeStdout out
             | opts.surface -> case renderSurfaceDiagWith noLoopVars popts tpl value of
                 Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                 Right out -> writeStdout out

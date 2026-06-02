@@ -15,6 +15,7 @@ module MinBars
   , renderMin
   , renderMinWith
   , renderMinDiag
+  , renderMinDelimsDiag
   , compileMinJs
   , compileMinJsWith
   ) where
@@ -73,8 +74,15 @@ minLexConfig = defaultLexConfig { mustacheDelims = true }
 -- | stream (which still carries comments, needed for comment-standalone) before
 -- | the core tree builder drops comments and parses interiors.
 parseMin :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
-parseMin src = do
-  toks <- tokenizeTemplate minLexConfig src
+parseMin = parseMinWith minLexConfig
+
+-- | `parseMin` with the lexer config explicit, so the main template can start at
+-- | a custom initial delimiter pair (`--mustache --delimiters '<% %>'`). Partials
+-- | still parse with `minLexConfig` (the default pair), per Mustache's
+-- | template-scoped delimiters.
+parseMinWith :: LexConfig -> String -> Either ParseError { directives :: Array Directive, nodes :: Template }
+parseMinWith cfg src = do
+  toks <- tokenizeTemplate cfg src
   directives <- collectDirectives toks
   nodes <- buildFromTokens minOptions (mustacheStandalone toks)
   pure { directives, nodes }
@@ -106,7 +114,12 @@ renderMinDiag = renderMin
 -- | → desugar → seed the env (stack = `[data]`, partials, falsy, depth 0) →
 -- | run. Every error is rendered to a `String` for the host boundary.
 renderCore :: Map String Template -> String -> Value -> Either String String
-renderCore partials src dat = case parseMin src of
+renderCore = renderCoreWith minLexConfig
+
+-- | `renderCore` with the main template's lexer config explicit (so it can start
+-- | at a custom initial delimiter pair).
+renderCoreWith :: LexConfig -> Map String Template -> String -> Value -> Either String String
+renderCoreWith cfg partials src dat = case parseMinWith cfg src of
   Left pe -> Left (renderParseErrorAt src pe)
   Right { directives, nodes } -> case resolveTruthinessWith mustache directives of
     Left e -> Left (formatError src e)
@@ -117,6 +130,13 @@ renderCore partials src dat = case parseMin src of
         case runTemplate (minEngine seeded) (desugar nodes) of
           Left e -> Left (formatError src e)
           Right out -> Right out
+
+-- | Render MinBars (Mustache) source whose *initial* delimiters are `d` rather
+-- | than the default `{{`/`}}` — the `flatbars --mustache --delimiters '<% %>'`
+-- | path. Mustache `{{=A B=}}`-style switching still applies, relative to the
+-- | initial pair. No partials (the CLI render-only path).
+renderMinDelimsDiag :: { open :: String, close :: String } -> String -> Value -> Either String String
+renderMinDelimsDiag d = renderCoreWith (minLexConfig { open = d.open, close = d.close }) Map.empty
 
 -- | Compile MinBars (Mustache) source to a JS ES module (ADR-016) with no
 -- | partials registered (`{{> p}}` then renders `""`, as the interpreter does for

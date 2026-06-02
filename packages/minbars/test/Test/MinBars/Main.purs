@@ -12,7 +12,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import MinBars (renderMin, renderMinWith)
+import MinBars (renderMin, renderMinWith, renderMinDelimsDiag)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -37,6 +37,13 @@ expectM name src dat expected = case renderMin src dat of
 -- | Assert with named partials.
 expectP :: String -> Array (Tuple String String) -> String -> Value -> String -> Effect Unit
 expectP name partials src dat expected = case renderMinWith partials src dat of
+  Left err -> assert' (name <> ": unexpected error: " <> err) false
+  Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
+    (out == expected)
+
+-- | Assert with a custom INITIAL delimiter pair (the `--mustache --delimiters` path).
+expectD :: String -> { open :: String, close :: String } -> String -> Value -> String -> Effect Unit
+expectD name d src dat expected = case renderMinDelimsDiag d src dat of
   Left err -> assert' (name <> ": unexpected error: " <> err) false
   Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
     (out == expected)
@@ -233,5 +240,14 @@ main = do
     "[{{<*which}}{{$title}}x{{/title}}{{/*which}}]"
     (obj [ Tuple "which" VNull ])
     "[]"
+
+  -- custom INITIAL delimiters (--mustache --delimiters '<% %>'): the main
+  -- template starts at the given pair; default {{ }} is then literal text; and
+  -- a {{=…=}}-style switch (relative to the initial pair) still works.
+  let erb = { open: "<%", close: "%>" }
+  expectD "delims-initial" erb "<% name %>" (obj [ Tuple "name" (str "Ada") ]) "Ada"
+  expectD "delims-default-literal" erb "{{name}}" (obj [ Tuple "name" (str "Ada") ]) "{{name}}"
+  expectD "delims-switch-back" erb "<%x%><%={{ }}=%>{{y}}"
+    (obj [ Tuple "x" (str "A"), Tuple "y" (str "B") ]) "AB"
 
   log "all MinBars tests passed"
