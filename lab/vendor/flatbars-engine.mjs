@@ -6334,8 +6334,8 @@ var parseDirectives = function(base) {
       var $tco_done1 = false;
       var $tco_result;
       function $tco_loop(k) {
-        var $47 = maybe(false)(isKeyChar)(at(k));
-        if ($47) {
+        var $49 = maybe(false)(isKeyChar)(at(k));
+        if ($49) {
           $copy_k = k + 1 | 0;
           return;
         }
@@ -6354,8 +6354,8 @@ var parseDirectives = function(base) {
       var $tco_done2 = false;
       var $tco_result;
       function $tco_loop(k) {
-        var $48 = maybe(false)(isSpace3)(at(k));
-        if ($48) {
+        var $50 = maybe(false)(isSpace3)(at(k));
+        if ($50) {
           $copy_k = k + 1 | 0;
           return;
         }
@@ -6726,18 +6726,34 @@ var parseSeq = function(pe) {
                     ;
                     if (v.value0 instanceof RSep) {
                       var v1 = headed(lx)(pe)(v.value0.value0)(v.value0.value1)(v.value0.value2);
-                      if (v1 instanceof Left) {
-                        $tco_done = true;
-                        return new Left(v1.value0);
-                      }
-                      ;
                       if (v1 instanceof Right) {
                         $tco_var_acc = new Cons(new Sep(v.value0.value0, v1.value0.name, v1.value0.args), acc);
                         $copy_i = i + 1 | 0;
                         return;
                       }
                       ;
-                      throw new Error("Failed pattern match at FlatBars.Parser (line 369, column 27 - line 371, column 61): " + [v1.constructor.name]);
+                      if (v1 instanceof Left && (v1.value0 instanceof HeadNotIdent && trim(v.value0.value2) !== "")) {
+                        var v2 = outputExpr(lx)(pe)(v.value0.value0)(v.value0.value1)(v.value0.value2);
+                        if (v2 instanceof Left) {
+                          $tco_done = true;
+                          return new Left(v2.value0);
+                        }
+                        ;
+                        if (v2 instanceof Right) {
+                          $tco_var_acc = new Cons(new Output(v.value0.value0, v2.value0), acc);
+                          $copy_i = i + 1 | 0;
+                          return;
+                        }
+                        ;
+                        throw new Error("Failed pattern match at FlatBars.Parser (line 377, column 29 - line 379, column 58): " + [v2.constructor.name]);
+                      }
+                      ;
+                      if (v1 instanceof Left) {
+                        $tco_done = true;
+                        return new Left(v1.value0);
+                      }
+                      ;
+                      throw new Error("Failed pattern match at FlatBars.Parser (line 369, column 27 - line 380, column 25): " + [v1.constructor.name]);
                     }
                     ;
                     if (v.value0 instanceof RClose) {
@@ -6755,7 +6771,7 @@ var parseSeq = function(pe) {
                         return new Right(done(acc)(new StopClose(v1.value0.name, i + 1 | 0)));
                       }
                       ;
-                      throw new Error("Failed pattern match at FlatBars.Parser (line 372, column 26 - line 374, column 63): " + [v1.constructor.name]);
+                      throw new Error("Failed pattern match at FlatBars.Parser (line 381, column 26 - line 383, column 63): " + [v1.constructor.name]);
                     }
                     ;
                     if (v.value0 instanceof ROpen) {
@@ -6781,10 +6797,10 @@ var parseSeq = function(pe) {
                       ;
                     }
                     ;
-                    throw new Error("Failed pattern match at FlatBars.Parser (line 350, column 15 - line 386, column 64): " + [v.value0.constructor.name]);
+                    throw new Error("Failed pattern match at FlatBars.Parser (line 350, column 15 - line 395, column 64): " + [v.value0.constructor.name]);
                   }
                   ;
-                  throw new Error("Failed pattern match at FlatBars.Parser (line 348, column 14 - line 386, column 64): " + [v.constructor.name]);
+                  throw new Error("Failed pattern match at FlatBars.Parser (line 348, column 14 - line 395, column 64): " + [v.constructor.name]);
                 }
                 ;
                 while (!$tco_done) {
@@ -6828,13 +6844,13 @@ var parseSeq = function(pe) {
                               ;
                             }
                             ;
-                            throw new Error("Failed pattern match at FlatBars.Parser (line 401, column 26 - line 406, column 79): " + [v1.value0.stop.constructor.name]);
+                            throw new Error("Failed pattern match at FlatBars.Parser (line 410, column 26 - line 415, column 79): " + [v1.value0.stop.constructor.name]);
                           }
                           ;
-                          throw new Error("Failed pattern match at FlatBars.Parser (line 399, column 9 - line 406, column 79): " + [v1.constructor.name]);
+                          throw new Error("Failed pattern match at FlatBars.Parser (line 408, column 9 - line 415, column 79): " + [v1.constructor.name]);
                         }
                         ;
-                        throw new Error("Failed pattern match at FlatBars.Parser (line 389, column 40 - line 406, column 79): " + [v.constructor.name]);
+                        throw new Error("Failed pattern match at FlatBars.Parser (line 398, column 40 - line 415, column 79): " + [v.constructor.name]);
                       };
                     };
                   };
@@ -6850,8 +6866,8 @@ var parseSeq = function(pe) {
 };
 var buildFromTokens = function(opts) {
   return function(toks) {
-    return bind4(parseSeq(opts.parseExpr)(opts.parseHead)(opts.extras)(opts.inheritance)(opts.lexOptions)(filter(function($149) {
-      return !isComment($149);
+    return bind4(parseSeq(opts.parseExpr)(opts.parseHead)(opts.extras)(opts.inheritance)(opts.lexOptions)(filter(function($156) {
+      return !isComment($156);
     })(toks))(0))(function(res) {
       if (res.stop instanceof StopEOF) {
         return new Right(res.nodes);
@@ -6877,8 +6893,8 @@ var parseWith = function(opts) {
             ;
             return toks;
           }();
-          return bind4(parseSeq(opts.parseExpr)(opts.parseHead)(opts.extras)(opts.inheritance)(opts.lexOptions)(filter(function($150) {
-            return !isComment($150);
+          return bind4(parseSeq(opts.parseExpr)(opts.parseHead)(opts.extras)(opts.inheritance)(opts.lexOptions)(filter(function($157) {
+            return !isComment($157);
           })(toks$prime))(0))(function(res) {
             if (res.stop instanceof StopEOF) {
               return new Right({

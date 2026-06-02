@@ -133,6 +133,12 @@ main = do
 
   expect "content" "hello world" VNull "hello world"
 
+  -- A bare literal in `{{ }}` is emitted like the triple-stash form (a literal is
+  -- a value, not a helper head): `{{42}}` ≡ `{{{42}}}`, `{{"x"}}` ≡ `{{{"x"}}}`.
+  expect "literal-number" "{{42}}" VNull "42"
+  expect "literal-string" "{{\"hi\"}}" VNull "hi"
+  expect "literal-number-triple" "{{{42}}}" VNull "42"
+
   expect "this-string" "{{{this}}}" (str "hi") "hi"
 
   expect "lookup" "{{{lookup this \"name\"}}}"

@@ -8,7 +8,7 @@ module Test.FlatBars.Main where
 import Prelude
 
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), isLeft)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Monoid (power)
@@ -101,6 +101,21 @@ main = do
                 [ Content "t", Sep { start: 18, end: 26 } "else" [], Content "e" ]
             ]
         )
+
+  -- A bare literal in an output tag (`{{42}}`, `{{"x"}}`) is not an application
+  -- head but it is a value — emit it as output, the same node the triple-stash
+  -- (`{{{42}}}`) produces. Blocks/closes still require an identifier head, and an
+  -- empty `{{}}` still errors.
+  case parse "{{42}}{{\"x\"}}" of
+    Left e -> assert' ("parse: literal output unexpected error " <> show e) false
+    Right { nodes: t } -> assert' "parse: a bare literal is output, not a head"
+      ( t ==
+          [ Output { start: 0, end: 6 } (Lit (VNumber 42.0))
+          , Output { start: 6, end: 13 } (Lit (VString "x"))
+          ]
+      )
+  assert' "parse: an empty {{}} is still an error" (isLeft (parse "{{}}"))
+  assert' "parse: a literal block head {{#42}} is still an error" (isLeft (parse "{{#42}}t{{/42}}"))
 
   -- foldTemplate counts every node, recursing into bodies.
   assert' "foldTemplate node count" (nodeCount "a{{#each x}}b{{{this}}}{{/each}}c" == 5)

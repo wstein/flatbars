@@ -20,6 +20,7 @@ Node      ::= Content                                   (* literal text *)
             (* Comments are removed by the lexer and never appear here. *)
 
 Output    ::= "{{{" Expr "}}}"
+            | "{{"  Literal "}}"        (* a bare literal — the same value as the triple form *)
 
 Block     ::= "{{#"   Ident Arg* "}}"
                   Template
@@ -89,8 +90,9 @@ syntactically, and it is what makes `pass:[{{/each}}]` unambiguous.
 == 2.4 Separators
 
 A block helper that wants alternatives reads them from *its own body*, split at `Separator` markers.
-A separator is the bare double-stash `pass:[{{ Ident Arg* }}]` — the *only* double-stash form the
-core recognizes. The parser keeps it as a flat `Sep` node; it never interprets the name:
+A separator is the double-stash whose head is an identifier, `pass:[{{ Ident Arg* }}]` (a bare-literal
+double-stash `pass:[{{ Literal }}]` is `Output` instead — §2.1). The parser keeps a separator as a
+flat `Sep` node; it never interprets the name:
 
 [source,text]
 ----

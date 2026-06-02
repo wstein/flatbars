@@ -16,7 +16,7 @@ violates the engine's schema (an unknown helper, a bad arity, an illegal clause)
 |`UnterminatedComment` |`pass:[{{!--]` with no `pass:[--}}]`
 |`UnterminatedRaw` |`pass:[{{{{#name}}}}]` with no `pass:[{{{{/name}}}}]`
 |`MismatchedBlock` |`pass:[{{/a}}]` closing a `pass:[{{#b}}]`
-|`HeadNotIdent` |a group or literal where an application head must be an `Ident`
+|`HeadNotIdent` |a group or literal in *head* position — a block/close/separator head must be an `Ident` (e.g. `pass:[{{#42}}]`). A bare literal in *output* position, `pass:[{{42}}]`, is allowed (it emits like `pass:[{{{42}}}]`).
 |`EmptyOutput` |`pass:[{{{}}}]` with no expression
 |`BadEscape` |an invalid string escape inside a `STRING`
 |===

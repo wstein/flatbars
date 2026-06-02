@@ -367,8 +367,17 @@ parseSeq pe ph extras inheritance lx toks = go Nil
             Left e -> Left e
             Right h -> go (RawBlock span h.name h.args body : acc) (i + 1)
       RSep span base s -> case headed lx pe span base s of
-        Left e -> Left e
         Right h -> go (Sep span h.name h.args : acc) (i + 1)
+        -- A non-empty interior that is a bare literal (`{{42}}`, `{{"x"}}`) is not
+        -- an application head, but it is still a valid value — emit it as output,
+        -- the same node the triple-stash (`{{{42}}}`) produces. Blocks and closes
+        -- still go through `headed`, so `{{#42}}` / `{{/42}}` stay errors. An empty
+        -- `{{}}` keeps its HeadNotIdent error (the guard excludes it).
+        Left (HeadNotIdent _)
+          | trim s /= "" -> case outputExpr lx pe span base s of
+              Left e -> Left e
+              Right e -> go (Output span e : acc) (i + 1)
+        Left e -> Left e
       RClose _ base s -> case headed lx pe { start: base, end: base } base s of
         Left e -> Left e
         Right h -> Right (done acc (StopClose h.name (i + 1)))
