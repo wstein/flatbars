@@ -25,7 +25,7 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMustache, renderWith, safe } =
+const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMustache, renderWith, renderRawWith, renderMaxWith, safe } =
   await import(enginePath);
 
 // Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
@@ -43,8 +43,14 @@ const compilerFor = (dialect) =>
 
 // Render with the interpreter (the spec), in the case's dialect. A `minbars`
 // case with `partials` uses the MinBars + partials interpreter (renderMustache).
+// Helper/operation cases route by dialect: FullBars `renderWith` (helper),
+// RawBars `renderRawWith` / MaxBars `renderMaxWith` (operation — ADR-019 addendum).
+const renderWithFor = (dialect) =>
+  dialect === "rawbars" ? renderRawWith
+    : dialect === "maxbars" ? renderMaxWith
+    : renderWith;
 const interpret = (t, d, dialect, partials, helpers) =>
-  helpers ? renderWith(helpers, partials || {}, t, d == null ? null : d)
+  helpers ? renderWithFor(dialect)(helpers, partials || {}, t, d == null ? null : d)
     : (dialect === "minbars" && partials) ? renderMustache(partials, t, d == null ? null : d)
     : interpreterFor(dialect)(t, d == null ? null : d);
 
@@ -58,7 +64,7 @@ async function runCompiled(t, d, dialect, partials, helpers) {
       rt.register(n, fn, typeof f === "function" ? undefined : f.arity);
     }
   }
-  const c = helpers ? compileSurface(t)
+  const c = helpers ? compilerFor(dialect)(t)
     : (dialect === "minbars" && partials) ? compileMinbarsWithPartials(partials, t) : compilerFor(dialect)(t);
   if (!c.ok) return { ok: false, value: "", error: "compile: " + c.error };
   try {
@@ -120,6 +126,24 @@ const helperCases = [
   { name: "block:hash", dialect: "surface", helpers: { link: (text, o) => safe('<a class="' + o.hash.cls + '">' + text + "</a>") }, t: '{{#link "Home" cls="nav"}}body{{/link}}', d: {}, expect: '<a class="nav">Home</a>' },
   { name: "block:params", dialect: "surface", helpers: { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) }, t: "{{#list xs as |item idx|}}[{{idx}}:{{item}}]{{/list}}", d: { xs: ["a", "b"] }, expect: "[0:a][1:b]" },
   { name: "block:hash-params-data", dialect: "surface", helpers: { rows: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x], data: { index: i } })).join(o.hash.sep)) }, t: '{{#rows xs sep=", " as |row|}}{{@index}}={{row}}{{/rows}}', d: { xs: ["a", "b"] }, expect: "0=a, 1=b" },
+  // ── ADR-019 addendum — host-registered block OPERATIONS for RawBars/MaxBars ──
+  // The operation marshaller (jsOperation) and the runtime are shared, so the same
+  // interpreter/compiled equivalence must hold over the RawBars (strict, core
+  // syntax) and MaxBars (lenient, infix/pipe surface) dialects too.
+  // RawBars: core syntax (explicit `lookup this`), fn/inverse + options.fn(ctx,{data});
+  // no hash / block params (there is no surface to write them).
+  { name: "op:raw-simple", dialect: "rawbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{{#wrap}}{{{lookup this \"x\"}}}{{/wrap}}", d: { x: "hi" }, expect: "[hi]" },
+  { name: "op:raw-context-shift", dialect: "rawbars", helpers: { list: (items, o) => safe(items.map((i) => o.fn(i)).join("")) }, t: "{{#list (lookup this \"items\")}}{{{lookup this \"name\"}}}{{/list}}", d: { items: [{ name: "a" }, { name: "b" }] }, expect: "ab" },
+  { name: "op:raw-inverse", dialect: "rawbars", helpers: { ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()) }, t: "{{#ifAny (lookup this \"xs\")}}y{{else}}n{{/ifAny}}", d: { xs: [] }, expect: "n" },
+  // a block operation SUPPLIES scoped data; in core a scoped var is just an operation name.
+  { name: "op:raw-data", dialect: "rawbars", helpers: { rows: (items, o) => safe(items.map((x, i) => o.fn(x, { data: { index: i } })).join("")) }, t: "{{#rows (lookup this \"items\")}}{{{index}}}:{{{lookup this \"label\"}}} {{/rows}}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0:a 1:b " },
+  // MaxBars: full surface MINUS block params — fn/inverse + options.hash + options.fn(ctx,{data}).
+  { name: "op:max-hash", dialect: "maxbars", helpers: { box: (xs, o) => safe('<ul class="' + o.hash.cls + '">' + xs.map((p) => o.fn(p)).join("") + "</ul>") }, t: '{{#box xs cls="r"}}<li>{{this}}</li>{{/box}}', d: { xs: ["a", "b"] }, expect: '<ul class="r"><li>a</li><li>b</li></ul>' },
+  { name: "op:max-data", dialect: "maxbars", helpers: { idx: (items, o) => items.map((x, i) => o.fn(x, { data: { index: i, first: i === 0 } })).join("") }, t: "{{#idx items}}{{@index}}{{#if @first}}*{{/if}}:{{label}} {{/idx}}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0*:a 1:b " },
+  { name: "op:max-inverse", dialect: "maxbars", helpers: { ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()) }, t: "{{#ifAny xs}}y{{else}}n{{/ifAny}}", d: { xs: [] }, expect: "n" },
+  // a MaxBars-distinctive infix expression inside a block-operation body — proves the
+  // MaxBars surface (not FullBars) is what compiles/interprets.
+  { name: "op:max-infix", dialect: "maxbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{{#wrap}}{{1 + 2}}{{/wrap}}", d: {}, expect: "[3]" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 

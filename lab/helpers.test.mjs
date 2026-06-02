@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 
 import { buildHelpers } from "./helpers.mjs";
 import { runHelperRequest } from "./helpers-worker.mjs";
-import { renderWith, safe } from "./vendor/flatbars-engine.mjs";
+import { renderWith, renderRawWith, renderMaxWith, safe } from "./vendor/flatbars-engine.mjs";
 
 test("buildHelpers collects registerHelper calls into a bag", () => {
   const r = buildHelpers("registerHelper('loud', (s) => String(s).toUpperCase())", safe);
@@ -157,4 +157,60 @@ test("an unsupported options.* still throws (ADR-020)", () => {
   const r = renderWith(helpers, {}, "{{#h}}b{{/h}}", {});
   assert.equal(r.ok, false);
   assert.match(r.error, /options\.lookupProperty is not supported/);
+});
+
+// ── ADR-019 addendum: host-registered block OPERATIONS for RawBars/MaxBars ─────
+// The marshaller is shared with FullBars (registerHelper), but the boundary word
+// and the entry point differ per dialect: renderRawWith / renderMaxWith.
+
+test("RawBars renderRawWith runs a block operation over core syntax (ADR-019)", () => {
+  const ops = { wrap: (o) => safe("[" + o.fn() + "]") };
+  // core syntax: explicit `lookup this`, no path sugar
+  assert.equal(
+    renderRawWith(ops, {}, '{{#wrap}}{{{lookup this "x"}}}{{/wrap}}', { x: "hi" }).value,
+    "[hi]",
+  );
+});
+
+test("RawBars block operation gets fn/inverse (context shift + {{else}}) (ADR-019)", () => {
+  const ops = {
+    list: (items, o) => safe(items.map((i) => o.fn(i)).join("")),
+    ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()),
+  };
+  assert.equal(
+    renderRawWith(ops, {}, '{{#list (lookup this "items")}}{{{lookup this "name"}}}{{/list}}',
+      { items: [{ name: "a" }, { name: "b" }] }).value,
+    "ab",
+  );
+  assert.equal(
+    renderRawWith(ops, {}, '{{#ifAny (lookup this "xs")}}y{{else}}n{{/ifAny}}', { xs: [] }).value,
+    "n",
+  );
+});
+
+test("RawBars stays STRICT: an unknown head is an error, not blockHelperMissing (ADR-019)", () => {
+  const r = renderRawWith({}, {}, "{{#nope}}b{{/nope}}", {});
+  assert.equal(r.ok, false);
+  assert.match(r.error, /nope/);
+});
+
+test("MaxBars renderMaxWith runs a block operation with options.hash (ADR-019)", () => {
+  const ops = { box: (xs, o) => safe('<ul class="' + o.hash.cls + '">' + xs.map((p) => o.fn(p)).join("") + "</ul>") };
+  assert.equal(
+    renderMaxWith(ops, {}, '{{#box xs cls="r"}}<li>{{this}}</li>{{/box}}', { xs: ["a", "b"] }).value,
+    '<ul class="r"><li>a</li><li>b</li></ul>',
+  );
+});
+
+test("MaxBars block operation body uses the MaxBars surface (infix arithmetic) (ADR-019)", () => {
+  const ops = { wrap: (o) => safe("[" + o.fn() + "]") };
+  assert.equal(renderMaxWith(ops, {}, "{{#wrap}}{{1 + 2}}{{/wrap}}", {}).value, "[3]");
+});
+
+test("MaxBars block params (as |x|) do NOT parse — the bar is the pipe operator (ADR-019)", () => {
+  // a pre-existing MaxBars surface limitation, orthogonal to operations: even a
+  // plain `each` rejects `as |x|`. Pinned here so the addendum's claim stays honest.
+  const r = renderMaxWith({ list: (xs, o) => safe(xs.map((x) => o.fn(x)).join("")) }, {},
+    "{{#list xs as |item|}}{{item}}{{/list}}", { xs: ["a"] });
+  assert.equal(r.ok, false);
 });
