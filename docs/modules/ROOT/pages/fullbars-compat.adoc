@@ -175,9 +175,10 @@ helper (xref:appendix-handlebars.adoc#decorators[A.8]) — none is in the prelud
 |User-defined *block* helpers (`registerHelper` + `options.fn`/`options.inverse`)
 |☑ Implemented (xref:adr-0020-user-block-helpers.adoc[ADR-020]), FullBars. One `registerHelper`; *usage
 decides* block vs inline — a block call passes a Handlebars-style `options` whose `fn(ctx)` renders the
-body and `inverse(ctx)` the `pass:[{{else}}]`. The `options` surface is `fn`/`inverse`/`data`
-(`options.fn(ctx, {data})` supplies scoped `@vars`); `options.hash` and block params throw, deferred on a
-surface design step. `registerHelper` is FullBars-only — RawBars/MaxBars use
+body and `inverse(ctx)` the `pass:[{{else}}]`. The full `options` surface is `fn`/`inverse`/`hash` plus
+`options.fn(ctx, { data, blockParams })` — so hash (`k=v`), scoped `@vars`, and `as |…|` block params all
+work (Phase 3, via the `@hash`/`@param` channel); only `ids`/`loc`/`lookupProperty` throw.
+`registerHelper` is FullBars-only — RawBars/MaxBars use
 the *operation*/*definition* vocabulary (xref:adr-0019-operation-vocabulary.adoc[ADR-019]), not
 `registerHelper`. This flipped the one buildable
 conformance miss (`pass:[{{#bold}}]`): FullBars is now 49/50 (98%) vs Handlebars.
@@ -223,7 +224,7 @@ This is the actual compatibility table.
 |Mustache-style section `pass:[{{#x}}…{{/x}}]` over data |`blockHelperMissing`: array ⇒ `each`, truthy ⇒ `with`, falsy/empty ⇒ `{{else}}` |✓ |An unregistered block head is looked up as data and dispatched exactly as {hbs} does (`Kernel.Prelude.blockHelperMissing` / `rt.block`). The inverted form `pass:[{{^x}}]` desugars to `pass:[{{#unless x}}]`.
 |`helperMissing` (inline `pass:[{{foo bar}}]`, unknown `foo`) |hard `UnknownHelper` |✓ |Matches {hbs}, which throws "Missing helper" for an unknown helper *called with arguments*; a bare `pass:[{{foo}}]` is a data read either way.
 |`registerHelper` *inline* helper |same | ✓ |Escaped in `pass:[{{ }}]`, raw via `safe(…)` (xref:adr-0018-user-defined-helpers.adoc[ADR-018]).
-|`registerHelper` *block* helper (`options.fn`/`inverse`/`data`) |same |✓ |One registration, usage decides; `options.fn(ctx, {data})` supplies scoped `@vars` (xref:adr-0020-user-block-helpers.adoc[ADR-020]). `options.hash`/block-params ⇒ deferred (throw).
+|`registerHelper` *block* helper (`fn`/`inverse`/`hash` + `options.fn(ctx, {data, blockParams})`) |same |✓ |One registration, usage decides; hash, scoped `@vars`, and `as |…|` block params all work (xref:adr-0020-user-block-helpers.adoc[ADR-020]); only `ids`/`loc`/`lookupProperty` throw.
 |===
 
 [NOTE]
