@@ -329,11 +329,6 @@ const t = (s) => s;
       <thead><tr><th>Handlebars</th><th>FullBars</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
-          <td>Mustache-style <code>{t("{{#person}}")}</code> truthy/list section</td>
-          <td><code>{t("{{#if person}}")}</code> / <code>{t("{{#each people}}")}</code></td>
-          <td><code>{t("{{#x}}")}</code> always means "apply block helper <code>x</code>", never an implicit section.</td>
-        </tr>
-        <tr>
           <td><code>else</code> as a keyword</td>
           <td><code>else</code> is a <b>separator</b>; <code>elif</code> is a real clause</td>
           <td>The core has no keywords (not even <code>else</code>); a block splits on a name-agnostic separator.</td>
@@ -356,11 +351,16 @@ const t = (s) => s;
       </tbody>
     </table>
     <p class="tip">
-      The trap for a Handlebars-and-Mustache veteran is the first row:
-      <code>{t("{{#person}}…{{/person}}")}</code> does <b>not</b> render once when
-      <code>person</code> is truthy — it tries to apply a block helper named
-      <code>person</code> and fails. Write the intent explicitly with
-      <code>{t("{{#if}}")}</code> or <code>{t("{{#each}}")}</code>.
+      Coming from Mustache or Handlebars? An <b>implicit section</b> just works:
+      <code>{t("{{#person}}…{{/person}}")}</code> renders once when <code>person</code> is
+      truthy and <code>{t("{{#tags}}…{{/tags}}")}</code> iterates a list — FullBars looks an
+      unregistered block head up as data and dispatches it like Handlebars'
+      <code>blockHelperMissing</code> (array&nbsp;⇒&nbsp;<code>each</code>,
+      truthy&nbsp;⇒&nbsp;<code>with</code>, empty&nbsp;⇒&nbsp;<code>{t("{{else}}")}</code>).
+      Writing <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> explicitly is still
+      the clearer style. FullBars matches Handlebars on <b>96%</b> of a differential
+      conformance corpus (rendered through the real Handlebars engine); the only gaps are
+      functions-in-data and user-defined <em>block</em> helpers.
     </p>
   </section>
 

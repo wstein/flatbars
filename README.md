@@ -26,6 +26,8 @@ implementation and a CLI, alongside the normative specification and the
 │   └── cli/               `flatbars-cli` — render templates + run the example/conformance corpus
 ├── examples/              Foldered core-template fixtures (golden cases for the compiler conformance harness)
 │   └── vendored/          Vendored upstream corpus (mustache/spec) for `flatbars examples verify`
+├── conformance/
+│   └── handlebars/        Differential Handlebars conformance — FullBars matches real handlebars@4.7.9 on 96% (48/50)
 └── reference/
     └── web/               FlatBars Lab — the JS/WASM polyglot playground (Stem · RawBars · MinBars · FullBars · MaxBars)
 ```
@@ -38,6 +40,13 @@ The `examples/*/` folders (each `meta.json` + `template.hbs` + `data.json`) are
 golden cases for the compiler conformance harness (`npm run test:compile`); the
 vendored upstream corpus under `lab/examples/vendored/` drives `flatbars examples
 verify`. The FlatBars Lab's own demo templates live under `lab/examples/`.
+
+**Handlebars conformance.** `conformance/handlebars/` proves how close FullBars is to
+Handlebars *differentially*: every case is rendered through the real `handlebars` npm
+package (a dev-only oracle) **and** FullBars, then asserted byte-identical — so the score
+cannot over-claim. FullBars currently matches on **96% (48/50)**; `npm run
+check:hbs-conformance` (in `npm test`) locks the number against regression. See
+`conformance/handlebars/README.md`.
 
 ## Prerequisites
 

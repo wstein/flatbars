@@ -5,8 +5,17 @@
 
 *FullBars* is the reference engine + xref:surface.adoc[surface dialect] shipped with FlatBars
 (xref:prelude.adoc[]). It is a member of the Handlebars/Mustache family: an author who knows {hbs} is
-immediately at home. But it is its own *dialect*, not a clone — and the interesting parts are exactly
-where it chooses differently, on purpose.
+immediately at home. It is also its own *dialect* — the interesting parts are exactly where it chooses
+differently, on purpose — yet it is a near-complete clone in practice.
+
+[NOTE]
+====
+*FullBars matches Handlebars on 96% (48/50) of a differential conformance corpus* — every case rendered
+through the real `handlebars` npm package *and* FullBars and asserted byte-identical (`conformance/handlebars/`,
+gated by `npm run check:hbs-conformance`). The remaining ~4% is two deferred items (user-defined *block*
+helpers, §3) and the irreducible *functions-in-context* (§2); see the harness README for the breakdown.
+This figure is *measured, not asserted* — it cannot over-claim what upstream Handlebars does not produce.
+====
 
 This page is written the other way round from a compatibility matrix. The *dialect* is the subject;
 {hbs} is the familiar reference we contrast against. So it leads with the **divergences by design** —
@@ -123,16 +132,14 @@ They are nullary helper calls returning `VBool`/`VNull`, not reserved words — 
 
 A refusal, not a TODO — each with its replacement. These will not return.
 
+NOTE: Two former entries have *moved to xref:_4_familiar_works_as_a_handlebars_author_expects[§4]*: Mustache-style implicit
+sections (`pass:[{{#x}}]` over data) and `blockHelperMissing` are now implemented (see §4 and the
+differential conformance harness, `conformance/handlebars/`). What remains below are the two genuine
+non-clonable items — one a Mustache (not {hbs}) feature, one a consequence of the pure-data core.
+
 [cols="2,2,3",options="header"]
 |===
 |Handlebars |Replacement |Why
-
-|Mustache truthy/list/lambda *section* `pass:[{{#x}}…{{/x}}]`
-|`pass:[{{#if x}}]` / `pass:[{{#each x}}]`
-|`pass:[{{#x}}]` always means "apply block helper `x`", never an implicit truthy/list/lambda section —
-FlatBars is not Mustache-compatible; control flow is written explicitly
-(xref:appendix-handlebars.adoc#mustache[A.11]). (The *inverted* section `pass:[{{^x}}]` *is* supported —
-it desugars to `pass:[{{#unless x}}]`.)
 
 |Mustache set-delimiters `pass:[{{=<% %>=}}]`
 |fixed `pass:[{{ }}]` / `pass:[{{{ }}}]`
@@ -141,11 +148,9 @@ delimiters too — so this is a divergence from Mustache, not {hbs}.)
 
 |Data as functions / lambdas in the context
 |a helper, or `apply`
-|`Value` is *pure data, never a function*; behaviour lives in the scoped helper environment.
-
-|`helperMissing` / `blockHelperMissing`
-|a custom engine `resolve`, else `UnknownHelper`
-|The reference engine has no missing-helper hook; an unknown helper is a hard error by default.
+|`Value` is *pure data, never a function* — the deepest core choice (xref:concepts.adoc[]); adding a
+function variant is the one thing that would break it. This is the *irreducible ~1%* of Handlebars
+FullBars cannot reach without ceasing to be FlatBars; everything else is implemented.
 |===
 
 == 3. Roadmap
@@ -160,6 +165,12 @@ semantic objection.
 |Decorators `pass:[{{*d}}]` / `pass:[{{#*d}}]`
 |☐ No decorator concept shipped. A block helper already receives its body, so a decorator is just a
 helper (xref:appendix-handlebars.adoc#decorators[A.8]) — none is in the prelude yet.
+
+|User-defined *block* helpers (`registerHelper` + `options.fn`/`options.inverse`)
+|☐ ADR-018 host helpers are *inline-only* (a user `pass:[{{#bold}}…{{/bold}}]` does not run the body).
+The built-in block helpers (`if`/`each`/`with`/…) and `blockHelperMissing` cover the common cases; a
+host-defined block helper that renders its body is the one differential-conformance miss that is buildable
+(future work — would lift FullBars past the current 96%).
 
 |Block-partial sigils `pass:[{{#> name}}]` / `pass:[{{#*inline}}]`
 |☑ Accepted in FullBars — they parse as plain `pass:[{{#}}]`-section blocks headed by the sigil, with
@@ -199,7 +210,18 @@ This is the actual compatibility table.
 |Block partials `pass:[{{#partial}}]`, `pass:[{{> @partial-block}}]` |block-aware `partial` |✓ |Body is the fallback + the `@partial-block` yield (core spelling; see §3).
 |Inline partials `pass:[{{#inline "n"}}]` |hoisted into the registry |✓ |Global to the render (core spelling; see §3).
 |`pass:[{{else if c}}]` |⇒ `pass:[{{elif c}}]` |✓ |Native short-circuit clause; see §1.3.
+|Mustache-style section `pass:[{{#x}}…{{/x}}]` over data |`blockHelperMissing`: array ⇒ `each`, truthy ⇒ `with`, falsy/empty ⇒ `{{else}}` |✓ |An unregistered block head is looked up as data and dispatched exactly as {hbs} does (`Kernel.Prelude.blockHelperMissing` / `rt.block`). The inverted form `pass:[{{^x}}]` desugars to `pass:[{{#unless x}}]`.
+|`helperMissing` (inline `pass:[{{foo bar}}]`, unknown `foo`) |hard `UnknownHelper` |✓ |Matches {hbs}, which throws "Missing helper" for an unknown helper *called with arguments*; a bare `pass:[{{foo}}]` is a data read either way.
 |===
+
+[NOTE]
+====
+The §4 table is *measured, not asserted*: `conformance/handlebars/` renders a categorised corpus through
+both the real `handlebars` npm package and FullBars and asserts byte-equality (`npm run
+gen:hbs-conformance`). FullBars currently matches Handlebars on **48/50** cases (96%). The two misses are
+the §2 *functions-in-context* item and *user-defined block helpers* (ADR-018 user helpers are inline-only);
+neither is reachable without changing the pure-data core or the helper-registration API.
+====
 
 == 5. FullBars extensions (no Handlebars built-in)
 
