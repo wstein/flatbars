@@ -7,73 +7,81 @@
 //   node scripts/gen-highlight.mjs            # regenerate the golden file
 //   node scripts/gen-highlight.mjs --check    # CI: fail if highlighting drifted
 //
-// WHY THIS EXISTS (design-debate consensus, Tier 2 + Priya's "10/10,
-// non-negotiable"): rendering has three drift gates (examples:verify,
-// test:compile, check:catalog); highlighting had NONE, which is why the
-// Exhibit-A/B mis-highlighting shipped silently. This gate pins the highlighter
-// output over a curated corpus — including Exhibits A & B — so a change to
-// highlighting is a deliberate, reviewable diff (rerun gen:highlight), never an
-// accident.
+// WHY THIS EXISTS (design-debate consensus): rendering has three drift gates
+// (examples:verify, test:compile, check:catalog); highlighting had NONE, which is
+// why the Exhibit-A/B mis-highlighting shipped silently. This gate pins the
+// highlighter output over a curated corpus so a change is a deliberate, reviewable
+// diff (rerun gen:highlight), never an accident.
 //
-// STOPGAP NOTE (ADR-014, highlighting-spec.md): today the golden is produced by
-// the regex highlighter (tutorials/src/lib/highlight.mjs), so this is a
-// REGRESSION gate, not yet an engine-equivalence oracle. Under Tier 1 the corpus
-// stays, the golden source flips to `tokenizeTemplate(src,{dialect})` from the
-// engine bundle, and this gate becomes the true "highlighting == what the engine
-// parses" check. The corpus cases below are authored to read CORRECTLY today, so
-// they double as the acceptance set Tier 1 must keep green.
+// ENGINE-DERIVED (ADR-014, Tier 1): the golden source is the engine itself —
+// `highlightSpans(src, dialect)` from the committed `flatbars-js` bundle, the
+// same function both front-ends paint from. This is now the true
+// "highlighting == what the engine lexes" oracle, not a snapshot of a regex. The
+// corpus carries the Exhibit A/B regressions plus the cases a regex cannot do:
+// set-delimiter statefulness, per-dialect tag boundaries, and the clause keywords.
+//
+// NOTE: long comments `{{!-- … --}}` are inert prose the lexer drops, so they
+// produce no span (they are not mis-bounded either — that was Exhibit A/B). Host
+// *data* highlighting (YAML) is a separate concern (real `lang-yaml` + a data-side
+// decorator), out of this FlatBars-syntax gate's scope.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { highlightTemplate, highlightYaml } from "../tutorials/src/lib/highlight.mjs";
+import { highlightSpans } from "../lab/vendor/flatbars-engine.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outFile = resolve(here, "highlight-golden.json");
 
-// The corpus. `lang: "template"` runs through highlightTemplate; "yaml" through
-// highlightYaml. `note` documents the invariant each case protects.
+// The corpus. Each case runs through `highlightSpans(src, dialect)`. `note`
+// documents the invariant the case protects.
 const CORPUS = [
   // ── Regression exhibits from the design debate ──────────────────────────
-  { id: "exhibit-a-long-comment", lang: "template", note: "the whole {{!-- … --}} is ONE comment; the trailing `!` is OUTSIDE it", src: "Hello, {{!-- name --}}!" },
-  { id: "exhibit-b-unterminated-comment", lang: "template", note: "a {{!-- with no own --}} swallows to the next --}} (or EOF), as the engine's RComment does", src: "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}" },
+  { id: "exhibit-a-long-comment", dialect: "fullbars", note: "long {{!-- … --}} is inert (lexer drops it) → no span; crucially NOT mis-bounded, so the trailing `!` stays plain text (Exhibit A fixed)", src: "Hello, {{!-- name --}}!" },
+  { id: "exhibit-b-unterminated-comment", dialect: "fullbars", note: "an unterminated {{!-- swallows to the next --}} exactly as the lexer does — no stray raw tag (Exhibit B fixed)", src: "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}" },
 
   // ── Interpolation ───────────────────────────────────────────────────────
-  { id: "expr", lang: "template", note: "{{name}} → stem-expr", src: "Hello, {{name}}!" },
-  { id: "triple-raw", lang: "template", note: "{{{x}}} → stem-raw (unescaped)", src: "raw: {{{html}}}" },
-  { id: "amp-raw", lang: "template", note: "{{&x}} → stem-raw; `&` arrives as &amp; after escaping", src: "amp: {{&html}}" },
-  { id: "dotted", lang: "template", note: "dotted path stays one expr", src: "{{name.first}} {{name.last}}" },
-  { id: "implicit", lang: "template", note: "implicit iterator {{.}}", src: "{{#tags}}[{{.}}]{{/tags}}" },
+  { id: "expr", dialect: "fullbars", note: "{{name}} → expr", src: "Hello, {{name}}!" },
+  { id: "triple-raw", dialect: "fullbars", note: "{{{x}}} → raw (unescaped)", src: "raw: {{{html}}}" },
+  { id: "amp-raw", dialect: "fullbars", note: "{{&x}} → raw", src: "amp: {{&html}}" },
+  { id: "dotted", dialect: "fullbars", note: "dotted path stays one expr tag", src: "{{name.first}} {{name.last}}" },
+  { id: "implicit", dialect: "fullbars", note: "implicit iterator {{.}} inside a section", src: "{{#tags}}[{{.}}]{{/tags}}" },
 
   // ── Sections / inverted ─────────────────────────────────────────────────
-  { id: "section", lang: "template", note: "{{#}} and {{/}} → stem-block", src: "{{#items}}{{name}}{{/items}}" },
-  { id: "inverted", lang: "template", note: "{{^}} → stem-block", src: "{{^items}}none{{/items}}" },
+  { id: "section", dialect: "fullbars", note: "{{#}}/{{/}} → block-open/block-close", src: "{{#items}}{{name}}{{/items}}" },
+  { id: "inverted", dialect: "fullbars", note: "{{^}} → block-inverse", src: "{{^items}}none{{/items}}" },
+
+  // ── Clause keywords (dialect-dependent, via IoC) ─────────────────────────
+  { id: "clause-else", dialect: "fullbars", note: "{{else}} between block open/close → keyword (statement-like)", src: "{{#if a}}x{{else}}y{{/if}}" },
+  { id: "clause-elif", dialect: "maxbars", note: "{{elif …}} → keyword", src: "{{#if a}}x{{elif b}}y{{/if}}" },
+  { id: "minbars-else-is-expr", dialect: "minbars", note: "MinBars (Mustache) has no clause words: {{else}} is a plain interpolation, NOT a keyword (IoC: classification follows the dialect)", src: "{{else}}" },
 
   // ── Composition / inheritance ───────────────────────────────────────────
-  { id: "partial", lang: "template", note: "{{> name}} → stem-partial; `>` arrives as &gt; (regression: was mis-coloured raw)", src: "{{> row}}" },
-  { id: "dynamic-partial", lang: "template", note: "{{>* name}} → stem-partial", src: "{{>* which}}" },
-  { id: "inheritance", lang: "template", note: "{{<parent}} and {{$block}} → stem-partial; close → stem-block", src: "{{<layout}}{{$title}}Welcome{{/title}}{{/layout}}" },
+  { id: "partial", dialect: "fullbars", note: "{{> name}} → partial", src: "{{> row}}" },
+  { id: "dynamic-partial", dialect: "fullbars", note: "{{>* name}} → partial", src: "{{>* which}}" },
+  { id: "inheritance", dialect: "fullbars", note: "{{<parent}} → block-parent, {{$block}} → block-decl (regression: the regex mis-coloured these as plain expressions)", src: "{{<layout}}{{$title}}Welcome{{/title}}{{/layout}}" },
 
   // ── Comments / raw blocks ───────────────────────────────────────────────
-  { id: "short-comment", lang: "template", note: "{{! … }} (single bang, no --) → stem-comment", src: "Total{{! dropped }}: {{total}}" },
-  { id: "tilde-long-comment", lang: "template", note: "{{~!-- … --}} whitespace-control long comment", src: "a {{~!-- note --}} b" },
-  { id: "raw-block", lang: "template", note: "{{{{raw}}}} … {{{{/raw}}}} delimiters → stem-raw, body literal", src: "{{{{raw}}}}{{x}}{{{{/raw}}}}" },
-  { id: "set-delimiter", lang: "template", note: "default-form {{=A B=}} → stem-comment (meta); custom-delim tags after it are a known stopgap gap (ADR-014)", src: "{{=<% %>=}}{{x}}" },
+  { id: "short-comment", dialect: "fullbars", note: "{{! … }} (single bang) → comment", src: "Total{{! dropped }}: {{total}}" },
+  { id: "raw-block", dialect: "fullbars", note: "{{{{raw}}}} … {{{{/raw}}}} → one raw-block span", src: "{{{{raw}}}}{{x}}{{{{/raw}}}}" },
 
-  // ── YAML data ───────────────────────────────────────────────────────────
-  { id: "yaml-scalars", lang: "yaml", note: "key + string/number/bool/null colouring", src: "name: Ada\nid: 42\nactive: true\nnada: null" },
-  { id: "yaml-list", lang: "yaml", note: "list markers + nested keys", src: "items:\n  - name: pen\n    qty: 3\ntags:\n  - math" },
-  { id: "yaml-comment", lang: "yaml", note: "trailing # comment", src: "name: Ada  # the author" },
+  // ── Set delimiters (the case every regex fails — stateful) ───────────────
+  { id: "set-delimiter-switch", dialect: "minbars", note: "{{=A B=}} → set-delimiter, and the FOLLOWING <%x%> is lexed in the new pair (a regex cannot track this)", src: "{{=<% %>=}}<%x%>" },
+  { id: "set-delimiter-switchback", dialect: "minbars", note: "switch to <% %>, then switch back to the default {{ }} pair mid-stream", src: "{{=<% %>=}}<%x%><%={{ }}=%>{{y}}" },
+
+  // ── MaxBars surface (tag boundaries; interior token kinds deferred) ──────
+  { id: "maxbars-operators", dialect: "maxbars", note: "an infix-operator tag is delimited as one expr tag (interior operator colouring is a tracked follow-up)", src: "{{ a + b * c }}" },
+  { id: "maxbars-pipe", dialect: "maxbars", note: "a pipe tag is one expr tag", src: "{{ items | sort | first }}" },
 ];
 
 const data = {
   _generated: "by scripts/gen-highlight.mjs — DO NOT EDIT; run `npm run gen:highlight`",
-  source: "tutorials/src/lib/highlight.mjs (STOPGAP regex highlighter — see ADR-014 / highlighting-spec.md)",
-  cases: CORPUS.map(({ id, lang, note, src }) => ({
+  source: "lab/vendor/flatbars-engine.mjs — highlightSpans(src, dialect) (ENGINE-DERIVED; ADR-014)",
+  cases: CORPUS.map(({ id, dialect, note, src }) => ({
     id,
-    lang,
+    dialect,
     note,
     src,
-    html: lang === "yaml" ? highlightYaml(src) : highlightTemplate(src),
+    spans: highlightSpans(src, dialect),
   })),
 };
 const text = JSON.stringify(data, null, 2) + "\n";
@@ -87,14 +95,15 @@ if (process.argv.includes("--check")) {
   }
   if (current !== text) {
     console.error(
-      "✗ scripts/highlight-golden.json is stale vs tutorials/src/lib/highlight.mjs.\n" +
-        "  Highlighting changed. If intended, run `npm run gen:highlight` and commit;\n" +
-        "  review the diff to confirm no construct (esp. Exhibits A & B) regressed.",
+      "✗ scripts/highlight-golden.json is stale vs the engine bundle.\n" +
+        "  Highlighting (the lexer's spans) changed. If intended, run `npm run gen:highlight`\n" +
+        "  and commit; review the diff to confirm no construct (esp. Exhibits A & B, set\n" +
+        "  delimiters, clause keywords) regressed. If the engine changed, also rebundle.",
     );
     process.exit(1);
   }
-  console.log(`✓ highlight-golden.json current — ${data.cases.length} highlighter cases pinned`);
+  console.log(`✓ highlight-golden.json current — ${data.cases.length} engine-derived highlighter cases pinned`);
 } else {
   writeFileSync(outFile, text);
-  console.log(`wrote ${outFile}\n  ${data.cases.length} highlighter cases pinned (incl. Exhibits A & B)`);
+  console.log(`wrote ${outFile}\n  ${data.cases.length} engine-derived highlighter cases pinned (incl. Exhibits A & B, set delimiters, clause keywords)`);
 }

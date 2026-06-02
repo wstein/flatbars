@@ -134,9 +134,9 @@ A lexer change not reflected in highlighting then fails the build — highlighti
 2. **`lab/cm-flatbars.mjs`** — the shared extension + kind→class map (reusing the Lab's existing `--stem-*` palette classes, injected CM via DI); unit-tested against the real bundle. **[done]**
 3. **Lab rewire** — swapped in `flatbarsHighlight`; deleted `HB_TAG_RE`/`hbMarkFor`/`handlebarsHighlighting`. `yamlDecorator` kept (data-side, §6). Visible win: set delimiters + inheritance sigils highlight correctly. **[done]**
 4. **Tutorials CM6 adoption** — `CodeEditor` → CM6; template = shared extension, data = `lang-yaml`; delete `highlight.mjs`.
-5. **Flip `check:highlight`** to engine-derived; add the set-delimiters + per-dialect corpus.
+5. **Flipped `check:highlight`** to engine-derived: the golden is now `highlightSpans(src, dialect)` from the bundle (21 cases incl. Exhibits A/B, set-delimiter switch + switch-back, clause keywords, per-dialect tag boundaries). The stopgap `highlight.mjs` dependency and YAML cases are gone. **[done]**
 
-Steps 1–2 are pure additions; 3 and 4 are independent surface swaps; 5 locks it. The regexes stay until their surface is swapped, so nothing regresses mid-flight.
+Steps 1–3 + 5 are done; step 4 (tutorials CM6) remains. The tutorials' regex stays until its surface is swapped, so nothing regresses mid-flight.
 
 ## 9. Non-goals
 

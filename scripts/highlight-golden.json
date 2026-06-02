@@ -1,139 +1,363 @@
 {
   "_generated": "by scripts/gen-highlight.mjs — DO NOT EDIT; run `npm run gen:highlight`",
-  "source": "tutorials/src/lib/highlight.mjs (STOPGAP regex highlighter — see ADR-014 / highlighting-spec.md)",
+  "source": "lab/vendor/flatbars-engine.mjs — highlightSpans(src, dialect) (ENGINE-DERIVED; ADR-014)",
   "cases": [
     {
       "id": "exhibit-a-long-comment",
-      "lang": "template",
-      "note": "the whole {{!-- … --}} is ONE comment; the trailing `!` is OUTSIDE it",
+      "dialect": "fullbars",
+      "note": "long {{!-- … --}} is inert (lexer drops it) → no span; crucially NOT mis-bounded, so the trailing `!` stays plain text (Exhibit A fixed)",
       "src": "Hello, {{!-- name --}}!",
-      "html": "Hello, <span class=\"stem-comment\">{{!-- name --}}</span>!"
+      "spans": []
     },
     {
       "id": "exhibit-b-unterminated-comment",
-      "lang": "template",
-      "note": "a {{!-- with no own --}} swallows to the next --}} (or EOF), as the engine's RComment does",
+      "dialect": "fullbars",
+      "note": "an unterminated {{!-- swallows to the next --}} exactly as the lexer does — no stray raw tag (Exhibit B fixed)",
       "src": "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}",
-      "html": "escaped: <span class=\"stem-expr\">{{html}}</span>\nraw:     <span class=\"stem-comment\">{{!-- html}}\namp:     {{&amp;html--}}</span>"
+      "spans": [
+        {
+          "from": 9,
+          "to": 17,
+          "kind": "expr"
+        }
+      ]
     },
     {
       "id": "expr",
-      "lang": "template",
-      "note": "{{name}} → stem-expr",
+      "dialect": "fullbars",
+      "note": "{{name}} → expr",
       "src": "Hello, {{name}}!",
-      "html": "Hello, <span class=\"stem-expr\">{{name}}</span>!"
+      "spans": [
+        {
+          "from": 7,
+          "to": 15,
+          "kind": "expr"
+        }
+      ]
     },
     {
       "id": "triple-raw",
-      "lang": "template",
-      "note": "{{{x}}} → stem-raw (unescaped)",
+      "dialect": "fullbars",
+      "note": "{{{x}}} → raw (unescaped)",
       "src": "raw: {{{html}}}",
-      "html": "raw: <span class=\"stem-raw\">{{{html}}}</span>"
+      "spans": [
+        {
+          "from": 5,
+          "to": 15,
+          "kind": "raw"
+        }
+      ]
     },
     {
       "id": "amp-raw",
-      "lang": "template",
-      "note": "{{&x}} → stem-raw; `&` arrives as &amp; after escaping",
+      "dialect": "fullbars",
+      "note": "{{&x}} → raw",
       "src": "amp: {{&html}}",
-      "html": "amp: <span class=\"stem-raw\">{{&amp;html}}</span>"
+      "spans": [
+        {
+          "from": 5,
+          "to": 14,
+          "kind": "raw"
+        }
+      ]
     },
     {
       "id": "dotted",
-      "lang": "template",
-      "note": "dotted path stays one expr",
+      "dialect": "fullbars",
+      "note": "dotted path stays one expr tag",
       "src": "{{name.first}} {{name.last}}",
-      "html": "<span class=\"stem-expr\">{{name.first}}</span> <span class=\"stem-expr\">{{name.last}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 14,
+          "kind": "expr"
+        },
+        {
+          "from": 15,
+          "to": 28,
+          "kind": "expr"
+        }
+      ]
     },
     {
       "id": "implicit",
-      "lang": "template",
-      "note": "implicit iterator {{.}}",
+      "dialect": "fullbars",
+      "note": "implicit iterator {{.}} inside a section",
       "src": "{{#tags}}[{{.}}]{{/tags}}",
-      "html": "<span class=\"stem-block\">{{#tags}}</span>[<span class=\"stem-expr\">{{.}}</span>]<span class=\"stem-block\">{{/tags}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 9,
+          "kind": "block-open"
+        },
+        {
+          "from": 10,
+          "to": 15,
+          "kind": "expr"
+        },
+        {
+          "from": 16,
+          "to": 25,
+          "kind": "block-close"
+        }
+      ]
     },
     {
       "id": "section",
-      "lang": "template",
-      "note": "{{#}} and {{/}} → stem-block",
+      "dialect": "fullbars",
+      "note": "{{#}}/{{/}} → block-open/block-close",
       "src": "{{#items}}{{name}}{{/items}}",
-      "html": "<span class=\"stem-block\">{{#items}}</span><span class=\"stem-expr\">{{name}}</span><span class=\"stem-block\">{{/items}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 10,
+          "kind": "block-open"
+        },
+        {
+          "from": 10,
+          "to": 18,
+          "kind": "expr"
+        },
+        {
+          "from": 18,
+          "to": 28,
+          "kind": "block-close"
+        }
+      ]
     },
     {
       "id": "inverted",
-      "lang": "template",
-      "note": "{{^}} → stem-block",
+      "dialect": "fullbars",
+      "note": "{{^}} → block-inverse",
       "src": "{{^items}}none{{/items}}",
-      "html": "<span class=\"stem-block\">{{^items}}</span>none<span class=\"stem-block\">{{/items}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 10,
+          "kind": "block-inverse"
+        },
+        {
+          "from": 14,
+          "to": 24,
+          "kind": "block-close"
+        }
+      ]
+    },
+    {
+      "id": "clause-else",
+      "dialect": "fullbars",
+      "note": "{{else}} between block open/close → keyword (statement-like)",
+      "src": "{{#if a}}x{{else}}y{{/if}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 9,
+          "kind": "block-open"
+        },
+        {
+          "from": 10,
+          "to": 18,
+          "kind": "keyword"
+        },
+        {
+          "from": 19,
+          "to": 26,
+          "kind": "block-close"
+        }
+      ]
+    },
+    {
+      "id": "clause-elif",
+      "dialect": "maxbars",
+      "note": "{{elif …}} → keyword",
+      "src": "{{#if a}}x{{elif b}}y{{/if}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 9,
+          "kind": "block-open"
+        },
+        {
+          "from": 10,
+          "to": 20,
+          "kind": "keyword"
+        },
+        {
+          "from": 21,
+          "to": 28,
+          "kind": "block-close"
+        }
+      ]
+    },
+    {
+      "id": "minbars-else-is-expr",
+      "dialect": "minbars",
+      "note": "MinBars (Mustache) has no clause words: {{else}} is a plain interpolation, NOT a keyword (IoC: classification follows the dialect)",
+      "src": "{{else}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 8,
+          "kind": "expr"
+        }
+      ]
     },
     {
       "id": "partial",
-      "lang": "template",
-      "note": "{{> name}} → stem-partial; `>` arrives as &gt; (regression: was mis-coloured raw)",
+      "dialect": "fullbars",
+      "note": "{{> name}} → partial",
       "src": "{{> row}}",
-      "html": "<span class=\"stem-partial\">{{&gt; row}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 9,
+          "kind": "partial"
+        }
+      ]
     },
     {
       "id": "dynamic-partial",
-      "lang": "template",
-      "note": "{{>* name}} → stem-partial",
+      "dialect": "fullbars",
+      "note": "{{>* name}} → partial",
       "src": "{{>* which}}",
-      "html": "<span class=\"stem-partial\">{{&gt;* which}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 12,
+          "kind": "partial"
+        }
+      ]
     },
     {
       "id": "inheritance",
-      "lang": "template",
-      "note": "{{<parent}} and {{$block}} → stem-partial; close → stem-block",
+      "dialect": "fullbars",
+      "note": "{{<parent}} → block-parent, {{$block}} → block-decl (regression: the regex mis-coloured these as plain expressions)",
       "src": "{{<layout}}{{$title}}Welcome{{/title}}{{/layout}}",
-      "html": "<span class=\"stem-partial\">{{&lt;layout}}</span><span class=\"stem-partial\">{{$title}}</span>Welcome<span class=\"stem-block\">{{/title}}</span><span class=\"stem-block\">{{/layout}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 11,
+          "kind": "block-parent"
+        },
+        {
+          "from": 11,
+          "to": 21,
+          "kind": "block-decl"
+        },
+        {
+          "from": 28,
+          "to": 38,
+          "kind": "block-close"
+        },
+        {
+          "from": 38,
+          "to": 49,
+          "kind": "block-close"
+        }
+      ]
     },
     {
       "id": "short-comment",
-      "lang": "template",
-      "note": "{{! … }} (single bang, no --) → stem-comment",
+      "dialect": "fullbars",
+      "note": "{{! … }} (single bang) → comment",
       "src": "Total{{! dropped }}: {{total}}",
-      "html": "Total<span class=\"stem-comment\">{{! dropped }}</span>: <span class=\"stem-expr\">{{total}}</span>"
-    },
-    {
-      "id": "tilde-long-comment",
-      "lang": "template",
-      "note": "{{~!-- … --}} whitespace-control long comment",
-      "src": "a {{~!-- note --}} b",
-      "html": "a <span class=\"stem-comment\">{{~!-- note --}}</span> b"
+      "spans": [
+        {
+          "from": 5,
+          "to": 19,
+          "kind": "comment"
+        },
+        {
+          "from": 21,
+          "to": 30,
+          "kind": "expr"
+        }
+      ]
     },
     {
       "id": "raw-block",
-      "lang": "template",
-      "note": "{{{{raw}}}} … {{{{/raw}}}} delimiters → stem-raw, body literal",
+      "dialect": "fullbars",
+      "note": "{{{{raw}}}} … {{{{/raw}}}} → one raw-block span",
       "src": "{{{{raw}}}}{{x}}{{{{/raw}}}}",
-      "html": "<span class=\"stem-raw\">{{{{raw}}}}</span><span class=\"stem-expr\">{{x}}</span><span class=\"stem-raw\">{{{{/raw}}}}</span>"
+      "spans": [
+        {
+          "from": 0,
+          "to": 28,
+          "kind": "raw-block"
+        }
+      ]
     },
     {
-      "id": "set-delimiter",
-      "lang": "template",
-      "note": "default-form {{=A B=}} → stem-comment (meta); custom-delim tags after it are a known stopgap gap (ADR-014)",
-      "src": "{{=<% %>=}}{{x}}",
-      "html": "<span class=\"stem-comment\">{{=&lt;% %&gt;=}}</span><span class=\"stem-expr\">{{x}}</span>"
+      "id": "set-delimiter-switch",
+      "dialect": "minbars",
+      "note": "{{=A B=}} → set-delimiter, and the FOLLOWING <%x%> is lexed in the new pair (a regex cannot track this)",
+      "src": "{{=<% %>=}}<%x%>",
+      "spans": [
+        {
+          "from": 0,
+          "to": 11,
+          "kind": "set-delimiter"
+        },
+        {
+          "from": 11,
+          "to": 16,
+          "kind": "expr"
+        }
+      ]
     },
     {
-      "id": "yaml-scalars",
-      "lang": "yaml",
-      "note": "key + string/number/bool/null colouring",
-      "src": "name: Ada\nid: 42\nactive: true\nnada: null",
-      "html": "<span class=\"y-key\">name</span>: <span class=\"y-str\">Ada</span>\n<span class=\"y-key\">id</span>: <span class=\"y-num\">42</span>\n<span class=\"y-key\">active</span>: <span class=\"y-kw\">true</span>\n<span class=\"y-key\">nada</span>: <span class=\"y-kw\">null</span>"
+      "id": "set-delimiter-switchback",
+      "dialect": "minbars",
+      "note": "switch to <% %>, then switch back to the default {{ }} pair mid-stream",
+      "src": "{{=<% %>=}}<%x%><%={{ }}=%>{{y}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 11,
+          "kind": "set-delimiter"
+        },
+        {
+          "from": 11,
+          "to": 16,
+          "kind": "expr"
+        },
+        {
+          "from": 16,
+          "to": 27,
+          "kind": "set-delimiter"
+        },
+        {
+          "from": 27,
+          "to": 32,
+          "kind": "expr"
+        }
+      ]
     },
     {
-      "id": "yaml-list",
-      "lang": "yaml",
-      "note": "list markers + nested keys",
-      "src": "items:\n  - name: pen\n    qty: 3\ntags:\n  - math",
-      "html": "<span class=\"y-key\">items</span>:\n  - <span class=\"y-key\">name</span>: <span class=\"y-str\">pen</span>\n    <span class=\"y-key\">qty</span>: <span class=\"y-num\">3</span>\n<span class=\"y-key\">tags</span>:\n  - <span class=\"y-str\">math</span>"
+      "id": "maxbars-operators",
+      "dialect": "maxbars",
+      "note": "an infix-operator tag is delimited as one expr tag (interior operator colouring is a tracked follow-up)",
+      "src": "{{ a + b * c }}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 15,
+          "kind": "expr"
+        }
+      ]
     },
     {
-      "id": "yaml-comment",
-      "lang": "yaml",
-      "note": "trailing # comment",
-      "src": "name: Ada  # the author",
-      "html": "<span class=\"y-key\">name</span>: <span class=\"y-str\">Ada  </span><span class=\"y-comment\"># the author</span>"
+      "id": "maxbars-pipe",
+      "dialect": "maxbars",
+      "note": "a pipe tag is one expr tag",
+      "src": "{{ items | sort | first }}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 26,
+          "kind": "expr"
+        }
+      ]
     }
   ]
 }
