@@ -32,6 +32,7 @@ import {
   compile as bbCompile,
   compileSurface as bbCompileSurface,
   compileMaxbars as bbCompileMaxbars,
+  renderWith as bbRenderWith,
 } from "./vendor/flatbars-engine.mjs?v=5";
 
 const BB_VERSION = "0.1.0";
@@ -111,9 +112,10 @@ export async function createFlatBarsRenderer(dialectArg) {
     // No separate compile step — render reports located parse errors directly.
     // An explicit `opts.dialect` overrides the URL-driven default (used by tests
     // and any host that selects per-call); `rawbars`/`fullbars` are the engine's
-    // "core"/"surface".
+    // "core"/"surface". `opts.helpers` is a built `{ name: fn }` bag of
+    // user-defined helpers (ADR-018) — surface/FullBars only.
     const dialect = normalizeDialect(opts.dialect) ?? activeDialect;
-    return { program: { source, dialect, partials: partials || {} } };
+    return { program: { source, dialect, partials: partials || {}, helpers: opts.helpers || null } };
   }
 
   function render(program, data, { map = false, policy } = {}) {
@@ -124,6 +126,7 @@ export async function createFlatBarsRenderer(dialectArg) {
     }
     const d = data == null ? {} : data;
     const hasPartials = program.partials && Object.keys(program.partials).length > 0;
+    const hasHelpers = program.helpers && Object.keys(program.helpers).length > 0;
     let res;
     if (program.dialect === "core") {
       res = bbRender(program.source, d);
@@ -131,6 +134,10 @@ export async function createFlatBarsRenderer(dialectArg) {
       // MaxBars reuses the FullBars surface pipeline; named external partials are
       // not threaded through its entrypoint, so inline `{{#inline}}` only here.
       res = bbRenderMaxbars(program.source, d);
+    } else if (hasHelpers) {
+      // Custom helpers (ADR-018) render through the facade's renderWith, which
+      // also threads partials — the surface/FullBars path.
+      res = bbRenderWith(program.helpers, program.partials || {}, program.source, d);
     } else {
       res = hasPartials
         ? bbRenderSurfaceWith(program.partials, program.source, d)

@@ -1575,7 +1575,8 @@
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=5";
+      import { highlightSpans, safe as fbSafe } from "./vendor/flatbars-engine.mjs?v=5";
+      import { buildHelpers } from "./helpers.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
       import {
@@ -1790,7 +1791,27 @@
       let yamlSrc      = "";
       // Optional transform applied to the parsed data before rendering
       // (the data->view-model "Controller"). Empty string = pass data through.
+      // For Stem it is a JSONata transform; on the FullBars surface it is
+      // registerHelper(...) source (ADR-018), built into a helper bag below.
       let transformSrc = "";
+      // Consent to run Controller helper JS that arrived via a shared link
+      // (ADR-018): true for the user's own typed code, false until they accept a
+      // shared workspace's helpers. The user editing the Controller takes ownership.
+      let helperShareConsent = true;
+
+      // The custom-helper bag for a render, or null. FullBars surface only; shared
+      // helper code prompts for consent before its first run.
+      function helperBag() {
+        const src = (transformSrc || "").trim();
+        if (ENGINE !== "fullbars" || !src) return null;
+        if (!helperShareConsent) {
+          helperShareConsent = window.confirm(
+            "This shared workspace defines custom JavaScript helpers (the Controller tab). Run them?");
+          if (!helperShareConsent) return null;
+        }
+        const built = buildHelpers(src, fbSafe);
+        return built.ok ? built.helpers : null;
+      }
       // Active data tab — either a built-in id ("data" / "transform" /
       // "context" / "ast") or an overlay name (e.g. "users/active") that
       // resolves to an entry in `dataOverlays`.
@@ -2081,6 +2102,7 @@
                 if (templateMode === "transform") {
                   transformSrc = text;
                   transformDirty = true;
+                  helperShareConsent = true; // the user owns code they edit themselves
                 } else {
                   activeTab().source = text;
                   tabs[activeTabIdx].dirty = true;
@@ -3302,7 +3324,7 @@
         const tCompileStart = performance.now();
         // Compile with span provenance so the rendered output can be mapped back
         // to its source files/tags in the Source view.
-        const compiled = renderer.compile(mainSource, partialsMap(), { map: true, standalone });
+        const compiled = renderer.compile(mainSource, partialsMap(), { map: true, standalone, helpers: helperBag() });
         const tCompileEnd = performance.now();
 
         if (compiled.errors) {
@@ -3404,8 +3426,10 @@
           });
         }
 
-        // Controller step: a sandboxed JSONata transform (data → view-model).
-        if (transformSrc.trim()) {
+        // Controller step: a JSONata transform (data → view-model). On the
+        // FullBars surface the Controller holds registerHelper source instead
+        // (applied via helperBag → renderer.compile), so JSONata is skipped there.
+        if (ENGINE !== "fullbars" && transformSrc.trim()) {
           try {
             data = jsonata(transformSrc).evaluate(data);
           } catch (err) {
@@ -4329,6 +4353,10 @@
           activeView = s.av === "data" ? "data" : "tmpl";
           yamlSrc = s.d ?? "";
           transformSrc = s.t ?? "";
+          // A shared workspace's Controller code is not run until the user
+          // consents (ADR-018); their own edits re-grant it. (Only FullBars
+          // helper JS is gated; Stem JSONata is unaffected — see helperBag.)
+          helperShareConsent = !(transformSrc.trim());
           // Data overlays — accept only entries whose name passes the same
           // validator the UI enforces, dedupe by name (last write wins so
           // the shared snapshot's order is preserved as far as possible).

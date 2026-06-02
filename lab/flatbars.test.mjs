@@ -30,6 +30,13 @@ test("renders the surface dialect (paths + auto-escape) by default", async () =>
   );
 });
 
+test("renders user-defined helpers via opts.helpers (ADR-018)", async () => {
+  const r = await createFlatBarsRenderer("fullbars");
+  const helpers = { loud: (s) => String(s).toUpperCase() };
+  // escaped in {{ }}, and threaded alongside any partials
+  assert.equal(run(r, "{{loud x}}", { x: "<b>ada" }, { helpers }), "&lt;B&gt;ADA");
+});
+
 test("renders the core dialect when selected", async () => {
   const r = await createFlatBarsRenderer();
   assert.equal(

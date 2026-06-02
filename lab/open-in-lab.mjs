@@ -37,9 +37,11 @@ export function workspaceState({ template = "", data, partials, helpers } = {}) 
   const p = partials || {};
   for (const name of Object.keys(p)) tabs.push({ n: name, s: p[name] });
   const st = { x: -1, tabs, d: dataText(data), av: "tmpl", ai: 0 };
-  // Custom-helper JS (ADR-018), carried as `h`. The Lab applies it only with
-  // explicit consent (a shared link must not auto-run someone else's code).
-  if (helpers && helpers.trim()) st.h = helpers;
+  // Custom-helper JS (ADR-018) rides in the Lab's existing Controller field `t`
+  // (the engine reads it as registerHelper source on the FullBars surface). The
+  // Lab applies shared helper code only with explicit consent — a shared link
+  // must not silently run someone else's JavaScript.
+  if (helpers && helpers.trim()) st.t = helpers;
   return st;
 }
 
