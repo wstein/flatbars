@@ -1,0 +1,90 @@
+{
+  "_generated": "by scripts/hbs-conformance.mjs — DO NOT EDIT; run `npm run gen:hbs-conformance`",
+  "oracle": "handlebars@4.7.9 (dev-only differential oracle)",
+  "engine": "FullBars (lab/vendor/flatbars-engine.mjs — the shipped Lab bundle)",
+  "method": "render each corpus case through real Handlebars AND FullBars; pass = byte-identical",
+  "total": {
+    "pass": 48,
+    "total": 50,
+    "pct": 96
+  },
+  "gap": {
+    "pass": 7,
+    "total": 7,
+    "label": "blockHelperMissing / Mustache-style sections"
+  },
+  "modules": [
+    {
+      "id": "expressions",
+      "label": "Expressions & escaping",
+      "pass": 8,
+      "total": 8
+    },
+    {
+      "id": "paths",
+      "label": "Paths",
+      "pass": 5,
+      "total": 5
+    },
+    {
+      "id": "if",
+      "label": "if / unless",
+      "pass": 6,
+      "total": 6
+    },
+    {
+      "id": "each",
+      "label": "each",
+      "pass": 6,
+      "total": 6
+    },
+    {
+      "id": "with",
+      "label": "with",
+      "pass": 2,
+      "total": 2
+    },
+    {
+      "id": "helpers",
+      "label": "Custom helpers",
+      "pass": 3,
+      "total": 4
+    },
+    {
+      "id": "subexpr",
+      "label": "Subexpressions & builtins",
+      "pass": 2,
+      "total": 2
+    },
+    {
+      "id": "blockparams",
+      "label": "Block params",
+      "pass": 2,
+      "total": 2
+    },
+    {
+      "id": "partials",
+      "label": "Partials",
+      "pass": 3,
+      "total": 3
+    },
+    {
+      "id": "comments",
+      "label": "Comments & raw",
+      "pass": 2,
+      "total": 3
+    },
+    {
+      "id": "whitespace",
+      "label": "Whitespace control",
+      "pass": 2,
+      "total": 2
+    },
+    {
+      "id": "mustache-sections",
+      "label": "Mustache-style sections (blockHelperMissing)",
+      "pass": 7,
+      "total": 7
+    }
+  ]
+}

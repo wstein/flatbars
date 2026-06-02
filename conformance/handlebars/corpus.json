@@ -1,0 +1,127 @@
+{
+  "_doc": "Handlebars conformance corpus for FullBars. DIFFERENTIAL: the `expected` output is NOT stored here — scripts/hbs-conformance.mjs renders each case through the real `handlebars` npm package (the oracle) AND through FullBars, then compares. So a case can never over-claim: the expectation IS whatever upstream Handlebars actually produces. `helpers` lists helper names the runner registers identically in BOTH engines (definitions live in scripts/hbs-conformance.mjs). Categories mirror the Handlebars guide. Cases tagged `gap` are the documented FullBars divergences we are closing (blockHelperMissing).",
+  "categories": [
+    {
+      "id": "expressions",
+      "label": "Expressions & escaping",
+      "tests": [
+        { "name": "interpolate", "template": "Hello {{name}}!", "data": { "name": "Ada" } },
+        { "name": "auto-escape", "template": "{{html}}", "data": { "html": "<b>x & y</b>" } },
+        { "name": "triple-stash-raw", "template": "{{{html}}}", "data": { "html": "<b>x & y</b>" } },
+        { "name": "ampersand-raw", "template": "{{&html}}", "data": { "html": "<b>x & y</b>" } },
+        { "name": "missing-is-empty", "template": "[{{nope}}]", "data": { "name": "Ada" } },
+        { "name": "backslash-escape", "template": "\\{{name}} is {{name}}", "data": { "name": "Ada" } },
+        { "name": "numbers", "template": "n={{n}} f={{f}}", "data": { "n": 42, "f": 3.5 } },
+        { "name": "booleans", "template": "b={{b}}", "data": { "b": true } }
+      ]
+    },
+    {
+      "id": "paths",
+      "label": "Paths",
+      "tests": [
+        { "name": "dotted", "template": "{{user.name}} @ {{user.org.name}}", "data": { "user": { "name": "Ada", "org": { "name": "Acme" } } } },
+        { "name": "this", "template": "{{#each xs}}{{this}} {{/each}}", "data": { "xs": ["a", "b"] } },
+        { "name": "parent", "template": "{{#each xs}}{{../title}}:{{this}} {{/each}}", "data": { "title": "T", "xs": ["a", "b"] } },
+        { "name": "bracket-index", "template": "{{xs.[1]}}", "data": { "xs": ["a", "b", "c"] } },
+        { "name": "bracket-key", "template": "{{m.[odd key]}}", "data": { "m": { "odd key": "v" } } }
+      ]
+    },
+    {
+      "id": "if",
+      "label": "if / unless",
+      "tests": [
+        { "name": "if-true", "template": "{{#if ok}}yes{{/if}}", "data": { "ok": true } },
+        { "name": "if-false", "template": "{{#if ok}}yes{{/if}}", "data": { "ok": false } },
+        { "name": "if-else", "template": "{{#if ok}}yes{{else}}no{{/if}}", "data": { "ok": false } },
+        { "name": "if-empty-array-falsy", "template": "{{#if xs}}some{{else}}none{{/if}}", "data": { "xs": [] } },
+        { "name": "unless", "template": "{{#unless ok}}off{{/unless}}", "data": { "ok": false } },
+        { "name": "else-if", "template": "{{#if a}}A{{else if b}}B{{else}}C{{/if}}", "data": { "a": false, "b": true } }
+      ]
+    },
+    {
+      "id": "each",
+      "label": "each",
+      "tests": [
+        { "name": "each-array", "template": "{{#each xs}}{{this}},{{/each}}", "data": { "xs": ["a", "b", "c"] } },
+        { "name": "each-index", "template": "{{#each xs}}{{@index}}:{{this}} {{/each}}", "data": { "xs": ["a", "b"] } },
+        { "name": "each-first-last", "template": "{{#each xs}}{{#if @first}}[{{/if}}{{this}}{{#if @last}}]{{/if}}{{/each}}", "data": { "xs": ["a", "b", "c"] } },
+        { "name": "each-object", "template": "{{#each o}}{{@key}}={{this}} {{/each}}", "data": { "o": { "a": 1, "b": 2 } } },
+        { "name": "each-else", "template": "{{#each xs}}{{this}}{{else}}empty{{/each}}", "data": { "xs": [] } },
+        { "name": "each-nested-parent-index", "template": "{{#each rows}}{{#each this}}{{@../index}}.{{@index}} {{/each}}{{/each}}", "data": { "rows": [["a", "b"], ["c"]] } }
+      ]
+    },
+    {
+      "id": "with",
+      "label": "with",
+      "tests": [
+        { "name": "with", "template": "{{#with o}}{{a}}/{{b}}{{/with}}", "data": { "o": { "a": 1, "b": 2 } } },
+        { "name": "with-else", "template": "{{#with o}}{{a}}{{else}}none{{/with}}", "data": { "o": null } }
+      ]
+    },
+    {
+      "id": "helpers",
+      "label": "Custom helpers",
+      "tests": [
+        { "name": "inline-helper", "template": "{{loud name}}", "data": { "name": "ada" }, "helpers": ["loud"] },
+        { "name": "helper-subexpr", "template": "{{loud (trim name)}}", "data": { "name": "  ada  " }, "helpers": ["loud", "trim"] },
+        { "name": "block-helper", "template": "{{#bold}}hi{{/bold}}", "data": {}, "helpers": ["bold"] },
+        { "name": "helper-hash", "template": "{{link \"Home\" href=\"/\"}}", "data": {}, "helpers": ["link"] }
+      ]
+    },
+    {
+      "id": "subexpr",
+      "label": "Subexpressions & builtins",
+      "tests": [
+        { "name": "lookup", "template": "{{lookup xs 1}}", "data": { "xs": ["a", "b", "c"] } },
+        { "name": "lookup-dynamic", "template": "{{#each ks}}{{lookup ../m this}} {{/each}}", "data": { "ks": ["a", "b"], "m": { "a": 1, "b": 2 } } }
+      ]
+    },
+    {
+      "id": "blockparams",
+      "label": "Block params",
+      "tests": [
+        { "name": "each-as", "template": "{{#each xs as |x i|}}{{i}}:{{x}} {{/each}}", "data": { "xs": ["a", "b"] } },
+        { "name": "with-as", "template": "{{#with o as |v|}}{{v.a}}{{/with}}", "data": { "o": { "a": 9 } } }
+      ]
+    },
+    {
+      "id": "partials",
+      "label": "Partials",
+      "tests": [
+        { "name": "partial-basic", "template": "{{> card}}", "data": { "name": "Ada" }, "partials": { "card": "[{{name}}]" } },
+        { "name": "partial-context", "template": "{{> card user}}", "data": { "user": { "name": "Ada" } }, "partials": { "card": "[{{name}}]" } },
+        { "name": "partial-hash", "template": "{{> card title=\"Hi\"}}", "data": { "name": "Ada" }, "partials": { "card": "{{title}} {{name}}" } }
+      ]
+    },
+    {
+      "id": "comments",
+      "label": "Comments & raw",
+      "tests": [
+        { "name": "comment", "template": "a{{! hidden }}b", "data": {} },
+        { "name": "comment-long", "template": "a{{!-- hidden --}}b", "data": {} },
+        { "name": "raw-block", "template": "{{{{raw}}}}{{escaped}}{{{{/raw}}}}", "data": { "escaped": "x" } }
+      ]
+    },
+    {
+      "id": "whitespace",
+      "label": "Whitespace control",
+      "tests": [
+        { "name": "tilde-trim", "template": "{{#each xs ~}} {{this}} {{~/each}}", "data": { "xs": ["a", "b"] } },
+        { "name": "standalone-block", "template": "<ul>\n{{#each xs}}\n  <li>{{this}}</li>\n{{/each}}\n</ul>", "data": { "xs": ["a", "b"] } }
+      ]
+    },
+    {
+      "id": "mustache-sections",
+      "label": "Mustache-style sections (blockHelperMissing)",
+      "tests": [
+        { "name": "section-array-iterates", "tag": "gap", "template": "{{#tags}}[{{.}}] {{/tags}}", "data": { "tags": ["math", "logic", "engines"] } },
+        { "name": "section-truthy-once", "tag": "gap", "template": "{{#person}}{{name}}{{/person}}", "data": { "person": { "name": "Ada" } } },
+        { "name": "section-falsy-empty", "tag": "gap", "template": "[{{#person}}{{name}}{{/person}}]", "data": { "person": false } },
+        { "name": "section-empty-array", "tag": "gap", "template": "[{{#tags}}x{{/tags}}]", "data": { "tags": [] } },
+        { "name": "inverted-section", "tag": "gap", "template": "{{^tags}}none{{/tags}}", "data": { "tags": [] } },
+        { "name": "inverted-truthy", "tag": "gap", "template": "{{^person}}none{{/person}}", "data": { "person": { "name": "Ada" } } },
+        { "name": "section-else", "tag": "gap", "template": "{{#tags}}{{.}}{{else}}none{{/tags}}", "data": { "tags": [] } }
+      ]
+    }
+  ]
+}
