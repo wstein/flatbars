@@ -1,7 +1,7 @@
 -- | The reference engine's helpers and schema. See
 -- | `docs/modules/ROOT/pages/prelude.adoc`.
 -- |
--- | *None of this is built into the core.* Helpers are `Helper m (RefEnv m)`
+-- | *None of this is built into the core.* Helpers are `Operation m (RefEnv m)`
 -- | over any `MonadThrow Error m`, so the very same prelude runs in a pure host
 -- | (`Either Error`) or an async one (`ExceptT Error Aff`). Multi-branch control
 -- | flow uses `{{else}}` separators; `if`/`each`/`with` split their body at the
@@ -12,8 +12,8 @@
 -- | `prelude` (the registry) and `preludeSchema` (the validator) are both
 -- | *projections* of that one table, so a helper's runtime arity and its
 -- | validated arity can never drift. Value helpers are built from the
--- | `Kernel.Helper` combinators (arity enforced by construction); block and
--- | bespoke helpers are written directly against `Helper`.
+-- | `Kernel.Operation` combinators (arity enforced by construction); block and
+-- | bespoke helpers are written directly against `Operation`.
 module Kernel.Prelude
   ( prelude
   , preludeSchema
@@ -45,9 +45,9 @@ import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Template)
 import FlatBars.Value (Value(..))
-import Kernel.Engine (Ctl, Helper)
-import Kernel.Env (RefEnv, constHelper, enterPartial, liftEither, lookupHelper, lookupPartial, lookupPartialFalsy, pushFrame, recursionBudget, refContext, refDepth, refFalsy, withFalsy)
-import Kernel.Helper (ArgSpec, atLeast, binary, nullary, unary)
+import Kernel.Engine (Ctl, Operation)
+import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, lookupPartialFalsy, pushFrame, recursionBudget, refContext, refDepth, refFalsy, withFalsy)
+import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
 import Kernel.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
 
@@ -62,7 +62,7 @@ type HelperDef m =
   { name :: String
   , block :: Boolean
   , arity :: Arity
-  , run :: Helper m (RefEnv m)
+  , run :: Operation m (RefEnv m)
   -- | A helper can be a *second name* for another helper, in one of two ways
   -- | (at most one is set):
   -- |
@@ -85,7 +85,7 @@ type HelperDef m =
   -- | auto-rewritten on save.)
   }
 
--- | A non-block value helper built from a `Kernel.Helper` combinator. The
+-- | A non-block value helper built from a `Kernel.Operation` combinator. The
 -- | combinator pins the arity, so the schema entry below is derived from the
 -- | very guard the runtime uses.
 valDef :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> HelperDef m
@@ -95,9 +95,9 @@ valDef name mk =
   in
     { name, block: false, arity: s.arity, run: s.run, alias: Nothing, synonymOf: Nothing }
 
--- | A block or bespoke helper written directly against `Helper`, with its arity
+-- | A block or bespoke helper written directly against `Operation`, with its arity
 -- | declared explicitly (and enforced inside the helper body).
-gen :: forall m. String -> Boolean -> Arity -> Helper m (RefEnv m) -> HelperDef m
+gen :: forall m. String -> Boolean -> Arity -> Operation m (RefEnv m) -> HelperDef m
 gen name block arity run = { name, block, arity, run, alias: Nothing, synonymOf: Nothing }
 
 -- | Mark a helper definition as a (warned, lifted) deprecation alias of `canonical`.
@@ -238,7 +238,7 @@ primitiveHelperDefs =
   ]
 
 -- | The registry: name → runtime helper.
-prelude :: forall m. MonadThrow Error m => Array (Tuple String (Helper m (RefEnv m)))
+prelude :: forall m. MonadThrow Error m => Array (Tuple String (Operation m (RefEnv m)))
 prelude = map (\d -> Tuple d.name d.run) helperDefs
 
 -- | The alias table — each alias name → its canonical name — projected from
@@ -353,14 +353,14 @@ safe v = VSafe <$> stringifyM v
 -- | surface `pass:[{{ json x }}]` still HTML-escapes it and `pass:[{{{ json x }}}]`
 -- | emits it raw — e.g. for `<script>` data). An optional options object selects
 -- | pretty-printing: `pass:[{{ json x pretty=true }}]` indents two spaces.
-jsonH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+jsonH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 jsonH _ args = VString <$> jsonText "json" args
 
 -- | `escapeJson x [opts]`: the JSON analogue of `escapeHtml` — serialize to JSON
 -- | *and* HTML-escape, returning `VSafe`, for embedding JSON safely in HTML
 -- | (e.g. an attribute). `escapeHtml` is idempotent on the result, so surface
 -- | escaping does not double up. Accepts the same `pretty=true` option.
-escJsonH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+escJsonH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 escJsonH _ args = (VSafe <<< escapeHtml) <$> jsonText "escapeJson" args
 
 -- | Serialize the first argument as JSON, compact by default or pretty when an
@@ -415,14 +415,14 @@ jsMod a b = a - b * Number.trunc (a / b)
 -- | target of the MaxBars `??` operator (null-coalescing, *not* truthiness — so
 -- | a falsy-but-present `0`/`""`/`[]` is returned, keeping `??` decoupled from the
 -- | active `@truthiness` set).
-coalesceH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+coalesceH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 coalesceH _ args = pure (fromMaybe VNull (Array.find notNull args))
   where
   notNull VNull = false
   notNull _ = true
 
 -- | `not`: logical negation under the *active* truthiness mode (`ctl.env`).
-notH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+notH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 notH ctl args = case args of
   [ a ] -> pure (VBool (not (truthy (refFalsy ctl.env) a)))
   _ -> throwError (ArityError "not: expected exactly 1 argument")
@@ -434,7 +434,7 @@ boolH
   :: forall m
    . Applicative m
   => ((Value -> Boolean) -> Array Value -> Boolean)
-  -> Helper m (RefEnv m)
+  -> Operation m (RefEnv m)
 boolH quant ctl args = pure (VBool (quant (truthy (refFalsy ctl.env)) args))
 
 --------------------------------------------------------------------------------
@@ -497,7 +497,7 @@ splitH sv sepv = do
   pure (VArray (map VString (String.split (Pattern sep) s)))
 
 -- | `replace s find rep`: replace **all** literal occurrences of `find`.
-replaceH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+replaceH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 replaceH _ args = case args of
   [ sv, findv, repv ] -> do
     s <- stringifyM sv
@@ -511,7 +511,7 @@ replaceH _ args = case args of
 -- | `String.prototype.slice` exactly — negative indices count from the end,
 -- | out-of-range indices clamp, and `start >= end` yields `""`. `end` defaults
 -- | to the string length.
-sliceH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+sliceH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 sliceH _ args = case args of
   [ sv, startv ] -> slice1 sv startv Nothing
   [ sv, startv, endv ] -> slice1 sv startv (Just endv)
@@ -576,7 +576,7 @@ endsWithH sv xv = do
 -- | `truncate s n [suffix]`: if `s` is longer than `n` code units, keep the
 -- | first `n` and append `suffix` (default the ellipsis U+2026); otherwise
 -- | return `s` unchanged. `n` is read as a number and truncated to an `Int`.
-truncateH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+truncateH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 truncateH _ args = case args of
   [ sv, nv ] -> truncate1 sv nv ellipsis
   [ sv, nv, sufv ] -> do
@@ -785,10 +785,10 @@ groupByH av keyv = do
 -- Context & access
 --------------------------------------------------------------------------------
 
-thisH :: forall m. Applicative m => Helper m (RefEnv m)
+thisH :: forall m. Applicative m => Operation m (RefEnv m)
 thisH ctl _ = pure (refContext ctl.env)
 
-lookupH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+lookupH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 lookupH _ args = case Array.uncons args of
   Nothing -> throwError (ArityError "lookup: expected at least 1 argument(s), got 0")
   Just { head, tail } -> pure (Array.foldl step head tail)
@@ -811,7 +811,7 @@ indexValue _ _ = VNull
 --------------------------------------------------------------------------------
 
 -- | A raw-block helper that returns its captured body verbatim.
-rawH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+rawH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 rawH ctl _ = VSafe <$> ctl.render ctl.env ctl.children
 
 --------------------------------------------------------------------------------
@@ -851,7 +851,7 @@ renderElse ctl = renderSafe ctl ctl.env (elseBody ctl)
 -- | and `{{else}}` is the terminal fallback. Conditions short-circuit — once a
 -- | branch is taken, no later `elif` is evaluated (which matters for effects in
 -- | `m`, and for a later `elif` that would error).
-ifH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+ifH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 ifH ctl args = do
   cond <- case args of
     [ c ] -> pure (truthy (refFalsy ctl.env) c)
@@ -904,7 +904,7 @@ checkIfClauses clauses = case Array.uncons clauses of
       _ -> throwError (ClauseError "elif: expected 1 or 2 arguments")
     other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
 
-unlessH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+unlessH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 unlessH ctl args = case args of
   [ c ] -> branchOn (not (truthy (refFalsy ctl.env) c)) ctl
   [ c, opts ] -> branchOn (not (truthyWith (refFalsy ctl.env) opts c)) ctl
@@ -938,7 +938,7 @@ optFlag key = case _ of
 -- | `each coll [name1 name2]`: the optional trailing string arguments are block
 -- | params (surface `as |name1 name2|`) — `name1` binds the element, `name2` the
 -- | index (array) or key (object).
-eachH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+eachH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 eachH ctl args = case Array.uncons args of
   Just { head: coll, tail: rest } ->
     let
@@ -972,9 +972,9 @@ bindingNames = Array.mapMaybe case _ of
 -- | one level in can read it — this is what surface `@../index`, `@../key`,
 -- | `@../first`, `@../last` desugar to (one `../` level; just as `parent`
 -- | exposes the enclosing *context*). Each name rebinds the enclosing helper
--- | directly (a snapshot `constHelper`), and is omitted when the enclosing frame
+-- | directly (a snapshot `constOperation`), and is omitted when the enclosing frame
 -- | has none (e.g. `each` not nested in another `each`).
-parentData :: forall m. Ctl m (RefEnv m) -> Array (Tuple String (Helper m (RefEnv m)))
+parentData :: forall m. Ctl m (RefEnv m) -> Array (Tuple String (Operation m (RefEnv m)))
 parentData ctl =
   Array.mapMaybe rebind
     [ Tuple "parent-index" "index"
@@ -983,7 +983,7 @@ parentData ctl =
     , Tuple "parent-last" "last"
     ]
   where
-  rebind (Tuple newName srcName) = Tuple newName <$> lookupHelper srcName ctl.env
+  rebind (Tuple newName srcName) = Tuple newName <$> lookupOperation srcName ctl.env
 
 iterate
   :: forall m
@@ -997,29 +997,29 @@ iterate ctl names items =
     main = mainBody ctl
     n = Array.length items
     -- block params bind, in order, the element value and its index/key.
-    binds val idx = Array.zipWith (\nm v -> Tuple nm (constHelper v)) names [ val, idx ]
+    binds val idx = Array.zipWith (\nm v -> Tuple nm (constOperation v)) names [ val, idx ]
     renderItem i { val, key, idx } =
       let
         frame = Map.fromFoldable
-          ( [ Tuple "this" (constHelper val)
-            , Tuple "index" (constHelper (VNumber (Int.toNumber i)))
+          ( [ Tuple "this" (constOperation val)
+            , Tuple "index" (constOperation (VNumber (Int.toNumber i)))
             -- `key` is the object property name when iterating an object, and
             -- `null` for an array (Handlebars parity: `@key` is object-only; use
             -- `index0` for the array position). See loopvars-linter-spec §A.1.
-            , Tuple "key" (constHelper key)
-            , Tuple "first" (constHelper (VBool (i == 0)))
-            , Tuple "last" (constHelper (VBool (i == n - 1)))
-            , Tuple "parent" (constHelper (refContext ctl.env))
+            , Tuple "key" (constOperation key)
+            , Tuple "first" (constOperation (VBool (i == 0)))
+            , Tuple "last" (constOperation (VBool (i == n - 1)))
+            , Tuple "parent" (constOperation (refContext ctl.env))
             -- The richer loop metadata (MaxBars' bare loop variables). These are
             -- exposed for every dialect's `each`, but only MaxBars' surface names
             -- them: FullBars reaches scoped vars solely through the `@` sigil and
             -- never emits these, so its behaviour is unchanged. `index0` mirrors
             -- `index`; arithmetic is normative so interpreter and compiler agree.
-            , Tuple "index0" (constHelper (VNumber (Int.toNumber i)))
-            , Tuple "index1" (constHelper (VNumber (Int.toNumber (i + 1))))
-            , Tuple "rindex0" (constHelper (VNumber (Int.toNumber (n - 1 - i))))
-            , Tuple "rindex1" (constHelper (VNumber (Int.toNumber (n - i))))
-            , Tuple "length" (constHelper (VNumber (Int.toNumber n)))
+            , Tuple "index0" (constOperation (VNumber (Int.toNumber i)))
+            , Tuple "index1" (constOperation (VNumber (Int.toNumber (i + 1))))
+            , Tuple "rindex0" (constOperation (VNumber (Int.toNumber (n - 1 - i))))
+            , Tuple "rindex1" (constOperation (VNumber (Int.toNumber (n - i))))
+            , Tuple "length" (constOperation (VNumber (Int.toNumber n)))
             ] <> parentData ctl <> binds val idx
           )
       in
@@ -1029,14 +1029,14 @@ iterate ctl names items =
 
 -- | `with ctx [name]`: an optional trailing string argument is a block param
 -- | (surface `as |name|`) bound to the shifted context.
-withH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+withH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 withH ctl args = case Array.uncons args of
   Just { head: v, tail: rest } ->
     if truthy (refFalsy ctl.env) v then
       let
-        binds = Array.zipWith (\nm val -> Tuple nm (constHelper val)) (bindingNames rest) [ v ]
+        binds = Array.zipWith (\nm val -> Tuple nm (constOperation val)) (bindingNames rest) [ v ]
         frame = Map.fromFoldable
-          ( [ Tuple "parent" (constHelper (refContext ctl.env)) ]
+          ( [ Tuple "parent" (constOperation (refContext ctl.env)) ]
               <> parentData ctl
               <> binds
           )
@@ -1049,7 +1049,7 @@ withH ctl args = case Array.uncons args of
 -- Composition / data
 --------------------------------------------------------------------------------
 
-dictH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+dictH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 dictH _ args = build args Map.empty
   where
   build as acc = case Array.uncons as of
@@ -1059,9 +1059,9 @@ dictH _ args = build args Map.empty
       Nothing -> throwError (ArityError "dict: odd number of arguments")
     Just _ -> throwError (TypeError "dict: keys must be strings")
 
-applyH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+applyH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 applyH ctl args = case Array.uncons args of
-  Just { head: VString name, tail } -> case lookupHelper name ctl.env of
+  Just { head: VString name, tail } -> case lookupOperation name ctl.env of
     Just h -> h ctl tail
     Nothing -> throwError (UnknownHelper name)
   _ -> throwError (TypeError "apply: first argument must be a helper-name string")
@@ -1075,7 +1075,7 @@ applyH ctl args = case Array.uncons args of
 -- | When called as a *block* (`{{#partial name}}body{{/partial}}`) the body is
 -- | the fallback rendered if the partial is missing, and is also exposed inside
 -- | the partial as the scoped `partial-block` helper (surface `{{> @partial-block}}`).
-partialH :: forall m. MonadThrow Error m => Helper m (RefEnv m)
+partialH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 partialH ctl args = case args of
   [ VString name, ctx ] -> renderPartial name ctx
   [ VString name, ctx, opts ] -> renderPartial name (mergeHash ctx opts)
@@ -1117,5 +1117,5 @@ partialH ctl args = case args of
 -- | definition is hoisted into the partial registry *before* rendering (see
 -- | `FullBars.Surface.hoistInline`), so at render time the block itself emits
 -- | nothing.
-inlineH :: forall m. Applicative m => Helper m (RefEnv m)
+inlineH :: forall m. Applicative m => Operation m (RefEnv m)
 inlineH _ _ = pure (VSafe "")

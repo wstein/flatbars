@@ -36,8 +36,8 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, desugar, desugarWith, hoistInline, noLoopVars)
-import Kernel.Engine (Helper)
-import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
+import Kernel.Engine (Operation)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolved)
@@ -104,11 +104,11 @@ renderSurfaceWith partialSrcs src dat =
 -- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
 -- | `(name, helper)` is registered into the env alongside the prelude and the
 -- | partials, so a `{{loud x}}` resolves to the supplied helper. The JS facade
--- | marshals user functions into these `Helper`s; the interpreter and the
+-- | marshals user functions into these `Operation`s; the interpreter and the
 -- | compiled path (which routes the same names through `rt.call` →
 -- | `rt.register`) therefore agree. Parse errors are located (`line:column`).
 renderSurfaceWithHelpers
-  :: Array (Tuple String (Helper (Either Error) (RefEnv (Either Error))))
+  :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
   -> Array (Tuple String String)
   -> String
   -> Value

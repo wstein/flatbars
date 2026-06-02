@@ -19,9 +19,9 @@ import Data.Maybe (Maybe(..))
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
 import FlatBars.Error (Error)
-import Kernel.Engine (Helper)
+import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
-import Kernel.Prelude (prelude, preludeAliases, preludeSynonyms, preludeSchema)
+import Kernel.Prelude (prelude, preludeAliases, preludeSchema, preludeSynonyms)
 import Kernel.Walk (Arity(..))
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
@@ -29,7 +29,7 @@ import Kernel.Walk (Arity(..))
 registeredNames :: Set.Set String
 registeredNames =
   Set.fromFoldable
-    (map fst (prelude :: Array (Tuple String (Helper (Either Error) (RefEnv (Either Error))))))
+    (map fst (prelude :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))))
 
 renderArity :: Arity -> String
 renderArity = case _ of
@@ -54,7 +54,7 @@ renderRow (Tuple name spec) =
 helperCatalogAdoc :: String
 helperCatalogAdoc =
   header
-    <> "[cols=\"2,1,1,1\",options=\"header\"]\n|===\n|Helper |Form |Arity |Source\n\n"
+    <> "[cols=\"2,1,1,1\",options=\"header\"]\n|===\n|Operation |Form |Arity |Source\n\n"
     <> rows
     <> "|===\n"
   where

@@ -3,7 +3,7 @@
 
 [cols="2,1,1,1",options="header"]
 |===
-|Helper |Form |Arity |Source
+|Operation |Form |Arity |Source
 
 |`abs` |value |1 |registered
 |`add` |value |2 |registered

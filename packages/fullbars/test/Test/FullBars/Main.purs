@@ -26,7 +26,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
 import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, resolveTruthiness, stringify, truthy)
-import Kernel.Engine (Ctl, Engine, Helper, runString, runTemplate)
+import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
 import Kernel.Walk (arityOk, foldTemplate, validate)
 import Test.Assert (assert')
@@ -978,7 +978,7 @@ main = do
   -- raises an ArityError precisely when the schema arity rejects that count.
   let
     runMap =
-      Map.fromFoldable prelude :: Map.Map String (Helper (Either Error) (RefEnv (Either Error)))
+      Map.fromFoldable prelude :: Map.Map String (Operation (Either Error) (RefEnv (Either Error)))
     valueHelpers =
       [ "true"
       , "false"

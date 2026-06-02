@@ -28,7 +28,7 @@ import Data.Set as Set
 import Data.String as String
 import FlatBars.Error (ParseError(..))
 import FlatBars.Parser (parseWith)
-import FlatBars.Syntax (Directive, Node(..), Sigil(..), Template)
+import FlatBars.Syntax (Node(..), Sigil(..), Template)
 import FullBars (desugarSurfaceWith)
 import Linter.Print (printDirectives, printRawBars)
 import MaxBars (maxLoopVars, maxOptions)

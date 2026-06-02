@@ -349,6 +349,7 @@
             "minbars",
             "prelude",
             "rawbars",
+            "transformers",
             "tuples"
           ],
           "build_plan": [

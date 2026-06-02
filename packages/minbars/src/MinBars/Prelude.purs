@@ -38,7 +38,7 @@ import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
 import FlatBars.Value (Value(..))
-import Kernel.Engine (Engine, Helper)
+import Kernel.Engine (Engine, Operation)
 import Kernel.Env (liftEither, recursionBudget)
 import Kernel.Value (escapeHtml, isFalsy, stringify)
 import MinBars.Context (MinEnv, blookup, enterPartial, layerBlocks, minBlocks, minDepth, minFalsy, minPartials, mresolve, push)
@@ -65,7 +65,7 @@ minEngine initial =
 -- | `mlookup name` — resolve a (possibly dotted) name against the context stack
 -- | (parent fallback), per `MinBars.Context.mresolve`. The name is baked in by
 -- | the desugar as a single `VString` argument; the value comes from `ctl.env`.
-mlookupH :: forall m. MonadThrow Error m => Helper m MinEnv
+mlookupH :: forall m. MonadThrow Error m => Operation m MinEnv
 mlookupH ctl args = case args of
   [ VString name ] -> pure (mresolve name ctl.env)
   _ -> throwError (HelperError "mlookup: expected exactly one string name")
@@ -73,7 +73,7 @@ mlookupH ctl args = case args of
 -- | `escape v` — stringify then HTML-escape, marking the result safe (`VSafe`).
 -- | `VNull` stringifies to `""`. Re-escaping a `VSafe` is idempotent (the kernel
 -- | `escapeHtml` is only applied to freshly-stringified text here).
-escapeH :: forall m. MonadThrow Error m => Helper m MinEnv
+escapeH :: forall m. MonadThrow Error m => Operation m MinEnv
 escapeH _ args = case args of
   [ v ] -> (VSafe <<< escapeHtml) <$> stringifyOrEmpty v
   _ -> throwError (HelperError "escape: expected exactly one argument")
@@ -91,7 +91,7 @@ stringifyOrEmpty = liftEither <<< stringify
 -- |    pushed (a hash becomes the new top frame; a scalar pushes too, so `{{.}}`
 -- |    yields it and named lookups fall through to a parent);
 -- |  * a falsy value (`false`/`null`/`[]`) — render zero times.
-sectionH :: forall m. MonadThrow Error m => Helper m MinEnv
+sectionH :: forall m. MonadThrow Error m => Operation m MinEnv
 sectionH ctl args = case args of
   [ v ] ->
     let
@@ -105,7 +105,7 @@ sectionH ctl args = case args of
 
 -- | `inverted v` — render the body once (context unchanged) iff `v` is falsy
 -- | under the env's mode (`false`/`null`/`[]`), else `""`.
-invertedH :: forall m. MonadThrow Error m => Helper m MinEnv
+invertedH :: forall m. MonadThrow Error m => Operation m MinEnv
 invertedH ctl args = case args of
   [ v ] ->
     if isFalsy (minFalsy ctl.env) v then VSafe <$> ctl.render ctl.env ctl.children
@@ -120,7 +120,7 @@ invertedH ctl args = case args of
 -- | error). When `indent` is non-empty it is re-applied to **every line** of the
 -- | partial's rendered output (§4.6). Partial entry is guarded against
 -- | `recursionBudget`, raising `RecursionLimit`.
-partialH :: forall m. MonadThrow Error m => Helper m MinEnv
+partialH :: forall m. MonadThrow Error m => Operation m MinEnv
 partialH ctl args = case args of
   [ VString name, VString indent ] -> case Map.lookup name (minPartials ctl.env) of
     Just tmpl
@@ -138,7 +138,7 @@ partialH ctl args = case args of
 -- | name arrives as a `VString` (static `{{<p}}`) or resolved (`{{<*name}}`).
 -- | Missing / non-string / unregistered name ⇒ `""`. Guarded against the
 -- | recursion budget like `partial`.
-parentH :: forall m. MonadThrow Error m => Helper m MinEnv
+parentH :: forall m. MonadThrow Error m => Operation m MinEnv
 parentH ctl args = case args of
   [ VString name, VString indent ] -> case Map.lookup name (minPartials ctl.env) of
     Just tmpl
@@ -225,7 +225,7 @@ dedentTemplate = \tmpl ->
 -- | leading whitespace (`indent`), or — when the tag sits at column 0 — the
 -- | default body's intrinsic indentation ("Intrinsic indentation"). The default
 -- | body is never reindented.
-blockH :: forall m. MonadThrow Error m => Helper m MinEnv
+blockH :: forall m. MonadThrow Error m => Operation m MinEnv
 blockH ctl args = case args of
   [ VString name, VString indent ] -> case blookup name (minBlocks ctl.env) of
     Just override -> do

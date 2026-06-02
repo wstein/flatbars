@@ -16,7 +16,7 @@
 -- | `evaluation.adoc` §3.5–3.6.
 module Kernel.Engine
   ( Ctl
-  , Helper
+  , Operation
   , Engine
   , runTemplate
   , runString
@@ -48,12 +48,12 @@ type Ctl m env =
   }
 
 -- | A helper: given its control handle and evaluated arguments, produce a value.
-type Helper m env = Ctl m env -> Array Value -> m Value
+type Operation m env = Ctl m env -> Array Value -> m Value
 
 -- | What an engine supplies; FlatBars owns everything else.
 type Engine m env =
   { initial :: env -- starting environment + root context
-  , resolve :: env -> Ident -> m (Helper m env) -- find a helper (throw UnknownHelper if absent)
+  , resolve :: env -> Ident -> m (Operation m env) -- find a helper (throw UnknownHelper if absent)
   , stringify :: Value -> m String -- how a Value becomes output text
   }
 

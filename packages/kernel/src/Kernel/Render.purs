@@ -15,7 +15,7 @@ import FlatBars.Error (Error(ParseFailure), renderParseErrorAt)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
 import Kernel.Engine (runTemplate)
-import Kernel.Env (RefEnv, constHelper, emptyEnv, liftEither, refEngine, register, registerAll, withFalsy)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, withFalsy)
 import Kernel.Prelude (prelude)
 import Kernel.Value (resolveTruthiness)
 
@@ -23,7 +23,7 @@ import Kernel.Value (resolveTruthiness)
 -- | `root` helper returning the top-level data. Polymorphic in `m`.
 preludeEnv :: forall m. MonadThrow Error m => Value -> RefEnv m
 preludeEnv dat =
-  registerAll prelude (register "root" (constHelper dat) (emptyEnv dat))
+  registerAll prelude (register "root" (constOperation dat) (emptyEnv dat))
 
 -- | Render `nodes` against a prelude env seeded with the falsy-set resolved from
 -- | the template's header `directives` — the truthiness *application* point

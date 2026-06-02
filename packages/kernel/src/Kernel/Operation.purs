@@ -6,16 +6,16 @@
 -- | otherwise repeat: destructure `Array Value`, and on the wrong count throw a
 -- | consistent `ArityError`.
 -- |
--- | Each combinator pairs a runtime `Helper` with the `Arity` it enforces, as an
+-- | Each combinator pairs a runtime `Operation` with the `Arity` it enforces, as an
 -- | `ArgSpec`. Because the arity lives in one place, an engine can project *both*
 -- | the runtime helper and a validation `Schema` entry from the same value — the
 -- | runtime guard and the static check can never drift. Ranged arities reuse
 -- | `Kernel.Walk.arityOk`, the very predicate `validate` uses.
 -- |
 -- | Helpers that need the control handle (block helpers, `this`) or bespoke
--- | argument handling (`lookup`, `dict`) are written directly against `Helper`;
+-- | argument handling (`lookup`, `dict`) are written directly against `Operation`;
 -- | these combinators are for the common value-helper shapes.
-module Kernel.Helper
+module Kernel.Operation
   ( ArgSpec
   , nullary
   , unary
@@ -30,12 +30,12 @@ import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
 import FlatBars.Error (Error(..))
 import FlatBars.Value (Value)
-import Kernel.Engine (Helper)
+import Kernel.Engine (Operation)
 import Kernel.Walk (Arity(..), arityOk, arityText)
 
 -- | A runtime helper paired with the arity it enforces. An engine reads `.run`
 -- | for execution and `.arity` for its validation schema — one source of truth.
-type ArgSpec m env = { arity :: Arity, run :: Helper m env }
+type ArgSpec m env = { arity :: Arity, run :: Operation m env }
 
 -- | Throw the standard arity error for `name`, given the expected arity and the
 -- | arguments actually received.

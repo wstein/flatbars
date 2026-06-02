@@ -4,7 +4,7 @@
 -- | fallback), not a single `this` — a divergence from the Handlebars-family
 -- | engines, quarantined to MinBars. `MinEnv` is a `newtype` (not a record
 -- | synonym) for the same reason `Kernel.Env.RefEnv` is: the reference
--- | `env -> Helper -> Ctl -> env` is cyclic and a synonym would not be
+-- | `env -> Operation -> Ctl -> env` is cyclic and a synonym would not be
 -- | well-founded.
 module MinBars.Context
   ( MinEnv(..)
@@ -36,7 +36,7 @@ import Kernel.Value (FalsySet)
 
 -- | The MinBars environment: a Mustache *context stack* plus the partial
 -- | registry, the active truthiness mode, and the partial-recursion depth.
--- | A `newtype` so `MinEnv -> Helper m MinEnv -> Ctl m MinEnv -> MinEnv`
+-- | A `newtype` so `MinEnv -> Operation m MinEnv -> Ctl m MinEnv -> MinEnv`
 -- | is well-founded (see `Kernel.Env.RefEnv`).
 newtype MinEnv = MinEnv
   { stack :: List Value -- the context stack, top = head

@@ -8172,7 +8172,7 @@ var lookupPartial = function(name2) {
     return lookup2(name2)(v.partials);
   };
 };
-var lookupHelper = function(name2) {
+var lookupOperation = function(name2) {
   return function(v) {
     var go = function($copy_v1) {
       var $tco_done = false;
@@ -8222,7 +8222,7 @@ var refEngine = function(dictMonadThrow) {
       initial,
       resolve: function(env) {
         return function(name2) {
-          var v = lookupHelper(name2)(env);
+          var v = lookupOperation(name2)(env);
           if (v instanceof Just) {
             return pure5(v.value0);
           }
@@ -8260,7 +8260,7 @@ var emptyEnv = function(ctx2) {
     depth: 0
   };
 };
-var constHelper = function(dictApplicative) {
+var constOperation = function(dictApplicative) {
   var pure5 = pure(dictApplicative);
   return function(v) {
     return function(v1) {
@@ -8725,7 +8725,7 @@ var fixed = /* @__PURE__ */ function() {
   };
 }();
 
-// output/Kernel.Helper/index.js
+// output/Kernel.Operation/index.js
 var show5 = /* @__PURE__ */ show(showInt);
 var wrongArity = function(dictMonadThrow) {
   var throwError3 = throwError(dictMonadThrow);
@@ -9162,7 +9162,7 @@ var partialH = function(dictMonadThrow) {
 };
 var parentData = function(ctl) {
   var rebind = function(v) {
-    return map15(Tuple.create(v.value0))(lookupHelper(v.value1)(ctl.env));
+    return map15(Tuple.create(v.value0))(lookupOperation(v.value1)(ctl.env));
   };
   return mapMaybe(rebind)([new Tuple("parent-index", "index"), new Tuple("parent-key", "key"), new Tuple("parent-first", "first"), new Tuple("parent-last", "last")]);
 };
@@ -9347,7 +9347,7 @@ var joinH = function(dictMonadThrow) {
 var iterate2 = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
   var Applicative0 = Monad0.Applicative0();
-  var constHelper2 = constHelper(Applicative0);
+  var constOperation2 = constOperation(Applicative0);
   var map32 = map(Monad0.Bind1().Apply0().Functor0());
   var traverse12 = traverse3(Applicative0);
   return function(ctl) {
@@ -9359,14 +9359,14 @@ var iterate2 = function(dictMonadThrow) {
           return function(idx) {
             return zipWith(function(nm) {
               return function(v) {
-                return new Tuple(nm, constHelper2(v));
+                return new Tuple(nm, constOperation2(v));
               };
             })(names)([val, idx]);
           };
         };
         var renderItem = function(i) {
           return function(v) {
-            var frame = fromFoldable9(append13([new Tuple("this", constHelper2(v.val)), new Tuple("index", constHelper2(new VNumber(toNumber(i)))), new Tuple("key", constHelper2(v.key)), new Tuple("first", constHelper2(new VBool(i === 0))), new Tuple("last", constHelper2(new VBool(i === (n - 1 | 0)))), new Tuple("parent", constHelper2(refContext(ctl.env))), new Tuple("index0", constHelper2(new VNumber(toNumber(i)))), new Tuple("index1", constHelper2(new VNumber(toNumber(i + 1 | 0)))), new Tuple("rindex0", constHelper2(new VNumber(toNumber((n - 1 | 0) - i | 0)))), new Tuple("rindex1", constHelper2(new VNumber(toNumber(n - i | 0)))), new Tuple("length", constHelper2(new VNumber(toNumber(n))))])(append13(parentData(ctl))(binds(v.val)(v.idx))));
+            var frame = fromFoldable9(append13([new Tuple("this", constOperation2(v.val)), new Tuple("index", constOperation2(new VNumber(toNumber(i)))), new Tuple("key", constOperation2(v.key)), new Tuple("first", constOperation2(new VBool(i === 0))), new Tuple("last", constOperation2(new VBool(i === (n - 1 | 0)))), new Tuple("parent", constOperation2(refContext(ctl.env))), new Tuple("index0", constOperation2(new VNumber(toNumber(i)))), new Tuple("index1", constOperation2(new VNumber(toNumber(i + 1 | 0)))), new Tuple("rindex0", constOperation2(new VNumber(toNumber((n - 1 | 0) - i | 0)))), new Tuple("rindex1", constOperation2(new VNumber(toNumber(n - i | 0)))), new Tuple("length", constOperation2(new VNumber(toNumber(n))))])(append13(parentData(ctl))(binds(v.val)(v.idx))));
             return ctl.render(pushFrame(frame)(v.val)(ctl.env))(main);
           };
         };
@@ -9978,7 +9978,7 @@ var eachH = function(dictMonadThrow) {
   };
 };
 var withH = function(dictMonadThrow) {
-  var constHelper2 = constHelper(dictMonadThrow.Monad0().Applicative0());
+  var constOperation2 = constOperation(dictMonadThrow.Monad0().Applicative0());
   var renderSafe1 = renderSafe(dictMonadThrow);
   var renderElse1 = renderElse(dictMonadThrow);
   var throwError3 = throwError(dictMonadThrow);
@@ -9990,10 +9990,10 @@ var withH = function(dictMonadThrow) {
         if ($655) {
           var binds = zipWith(function(nm) {
             return function(val) {
-              return new Tuple(nm, constHelper2(val));
+              return new Tuple(nm, constOperation2(val));
             };
           })(bindingNames(v.value0.tail))([v.value0.head]);
-          var frame = fromFoldable9(append13([new Tuple("parent", constHelper2(refContext(ctl.env)))])(append13(parentData(ctl))(binds)));
+          var frame = fromFoldable9(append13([new Tuple("parent", constOperation2(refContext(ctl.env)))])(append13(parentData(ctl))(binds)));
           return renderSafe1(ctl)(pushFrame(frame)(v.value0.head)(ctl.env))(mainBody(ctl));
         }
         ;
@@ -10223,7 +10223,7 @@ var applyH = function(dictMonadThrow) {
     return function(args) {
       var v = uncons(args);
       if (v instanceof Just && v.value0.head instanceof VString) {
-        var v1 = lookupHelper(v.value0.head.value0)(ctl.env);
+        var v1 = lookupOperation(v.value0.head.value0)(ctl.env);
         if (v1 instanceof Just) {
           return v1.value0(ctl)(v.value0.tail);
         }
@@ -10404,9 +10404,9 @@ var runTemplate = function(dictMonad) {
 var show7 = /* @__PURE__ */ show(showError);
 var preludeEnv = function(dictMonadThrow) {
   var prelude2 = prelude(dictMonadThrow);
-  var constHelper2 = constHelper(dictMonadThrow.Monad0().Applicative0());
+  var constOperation2 = constOperation(dictMonadThrow.Monad0().Applicative0());
   return function(dat) {
-    return registerAll(prelude2)(register("root")(constHelper2(dat))(emptyEnv(dat)));
+    return registerAll(prelude2)(register("root")(constOperation2(dat))(emptyEnv(dat)));
   };
 };
 var runResolved = function(dictMonadThrow) {
