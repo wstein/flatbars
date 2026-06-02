@@ -252,4 +252,16 @@ grade: fail
 </p>`,
     data: { name: "Ada" },
   },
+
+  // ── Lambdas → precalculated values (the "after" render) ──────────────────────
+  precompute: {
+    // A Handlebars value-lambda (a function on the context returning a string) is
+    // replaced by precalculated PLAIN DATA — fullName/initials are fields, not a
+    // function. The JSONata that computes them is shown beside this on the page;
+    // the renderer only sees data, so {{fullName}} runs identically interpreted
+    // and compiled. (Render-time, body-aware behaviour would be a helper instead.)
+    engine: "fullbars",
+    template: "{{fullName}} ({{initials}})",
+    data: { first: "Ada", last: "Lovelace", fullName: "Ada Lovelace", initials: "AL" },
+  },
 };

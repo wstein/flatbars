@@ -66,6 +66,21 @@ const data = {
 Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
 // → "<b>(c) 2026</b>"`;
 const lambdaHtml = highlightTemplate(lambdaCode, "minbars");
+
+// Worked example (P5): a *value* lambda → a precalculated plain-data field. What
+// you'd write as a lambda, the JSONata that precomputes it, and the plain data
+// the renderer actually sees (ex.precompute, gated by check-tutorial-links).
+const valueLambdaCode = `// Mustache / Handlebars.js — a value lambda (a function on the data)
+const data = {
+  first: "Ada", last: "Lovelace",
+  fullName() { return this.first + " " + this.last; },
+};
+// template:  {{fullName}}   →   "Ada Lovelace"`;
+const jsonataCode = `/* JSONata transform — compute the value, emit plain data */
+$ ~> | $ | {
+  "fullName": first & " " & last,
+  "initials": $uppercase($substring(first, 0, 1) & $substring(last, 0, 1))
+} |`;
 ---
 
 <Reference
@@ -288,6 +303,23 @@ const lambdaHtml = highlightTemplate(lambdaCode, "minbars");
         rendered value stays JSON-serialisable.</em>
       </p>
     </div>
+
+    <h3>Worked example: precompute the value</h3>
+    <p>
+      Say you want a <code>fullName</code> from <code>first</code> + <code>last</code>. In Mustache
+      you'd put a <em>function</em> on the data:
+    </p>
+    <pre class="oil-static"><code>{valueLambdaCode}</code></pre>
+    <p>
+      In FlatBars you compute it <b>before</b> rendering — here with the Lab's JSONata transform
+      (its first-class functions and closures do the work) — and emit plain data:
+    </p>
+    <pre class="oil-static"><code>{jsonataCode}</code></pre>
+    <p>
+      The renderer then sees ordinary fields, so <code>{"{{fullName}}"}</code> is a plain
+      interpolation — identical interpreted and compiled, with no function in the context:
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.precompute.template} data={ex.precompute.data} />
   </section>
 
   <!-- ──────────────────────── Conformance ──────────────────────── -->

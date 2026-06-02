@@ -164,4 +164,14 @@ note: "{{note}}"
       "* {{before}}\n{{=<% %>=}}\n* <% during %>\n<%={{ }}=%>\n* {{after}}\n",
     data: { before: "default", during: "erb-style", after: "default again" },
   },
+
+  // ── Lambdas → precalculated values (the "after" render) ───────────────────
+  precompute: {
+    // A value-producing lambda (fullName, initials) replaced by precalculated
+    // PLAIN DATA: no function in the context, just fields. The JSONata that
+    // computes them is shown beside this on the page; the renderer only ever sees
+    // data, so the same {{fullName}} works in every engine and the compiled JS.
+    template: "{{fullName}} ({{initials}})",
+    data: { first: "Ada", last: "Lovelace", fullName: "Ada Lovelace", initials: "AL" },
+  },
 };

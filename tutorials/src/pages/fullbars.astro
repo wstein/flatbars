@@ -30,6 +30,7 @@ const groups = [
       { href: "#lookup", label: "lookup & log" },
       { href: "#subexpressions", label: "Subexpressions" },
       { href: "#helpers", label: "Custom helpers" },
+      { href: "#precompute", label: "Lambdas → values" },
       { href: "#partials", label: "Partials" },
       { href: "#comments", label: "Comments" },
       { href: "#conventions", label: "Style & conventions" },
@@ -54,6 +55,20 @@ const groups = [
 
 // Inline tag references — kept in a helper so Astro never parses the {{ }}.
 const t = (s) => s;
+
+// Worked example (P5): a Handlebars *value* lambda → a precalculated plain-data
+// field. The function-on-the-context you'd write, the JSONata that precomputes
+// it, and the plain data the renderer sees (ex.precompute, gated by the link/render checks).
+const valueLambdaCode = `// Handlebars.js — a function on the context, called as {{fullName}}
+const data = {
+  first: "Ada", last: "Lovelace",
+  fullName() { return this.first + " " + this.last; },
+};`;
+const jsonataCode = `/* JSONata transform — compute the value, emit plain data */
+$ ~> | $ | {
+  "fullName": first & " " & last,
+  "initials": $uppercase($substring(first, 0, 1) & $substring(last, 0, 1))
+} |`;
 ---
 
 <Reference
@@ -223,6 +238,32 @@ const t = (s) => s;
         full sandbox — adequate for a playground.
       </p>
     </div>
+  </section>
+
+  <!-- ─────────────────── Lambdas → precalculated values ─────────────────── -->
+  <section id="precompute">
+    <h2>Lambdas → precalculated values</h2>
+    <p>
+      A helper is <em>render-time</em> behaviour. But for a computed <em>value</em>, there's a
+      simpler path that needs no helper: precompute it. Handlebars lets you put a function on the
+      context, called automatically as <code>{t("{{fullName}}")}</code>:
+    </p>
+    <pre><code>{valueLambdaCode}</code></pre>
+    <p>
+      FlatBars keeps a value <b>pure data, never a function</b>, so compute it <b>before</b> rendering
+      — in the Lab, with the JSONata transform — and pass plain data:
+    </p>
+    <pre><code>{jsonataCode}</code></pre>
+    <p>
+      Now <code>{t("{{fullName}}")}</code> is a plain interpolation — identical interpreted and
+      compiled, with no function in the context:
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.precompute.template} data={ex.precompute.data} />
+    <p class="tip">
+      Rule of thumb: a computed <em>value</em> → <b>precompute</b> it (a preprocess step);
+      render-time, body-aware behaviour → a <a href="#helpers">helper</a>. Either way, no function
+      rides inside the data.
+    </p>
   </section>
 
   <!-- ─────────────────────────── Partials ───────────────────────────── -->
