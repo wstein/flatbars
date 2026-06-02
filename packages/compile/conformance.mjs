@@ -115,6 +115,11 @@ const helperCases = [
   // ADR-020 Phase 2: a helper SUPPLIES scoped @vars via options.fn(ctx, { data }) —
   // both standard (@index/@first) and would-be custom keys layer over the scope.
   { name: "block:supplies-data", dialect: "surface", helpers: { idx: (items, options) => items.map((x, i) => options.fn(x, { data: { index: i, first: i === 0 } })).join("") }, t: "{{#idx items}}{{@index}}{{#if @first}}*{{/if}}:{{label}} {{/idx}}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0*:a 1:b " },
+  // ADR-020 Phase 3: options.hash (surface k=v), block params (as |…|), and both
+  // together with data — routed through the @hash/@param channel, identical both paths.
+  { name: "block:hash", dialect: "surface", helpers: { link: (text, o) => safe('<a class="' + o.hash.cls + '">' + text + "</a>") }, t: '{{#link "Home" cls="nav"}}body{{/link}}', d: {}, expect: '<a class="nav">Home</a>' },
+  { name: "block:params", dialect: "surface", helpers: { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) }, t: "{{#list xs as |item idx|}}[{{idx}}:{{item}}]{{/list}}", d: { xs: ["a", "b"] }, expect: "[0:a][1:b]" },
+  { name: "block:hash-params-data", dialect: "surface", helpers: { rows: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x], data: { index: i } })).join(o.hash.sep)) }, t: '{{#rows xs sep=", " as |row|}}{{@index}}={{row}}{{/rows}}', d: { xs: ["a", "b"] }, expect: "0=a, 1=b" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 

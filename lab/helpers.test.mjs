@@ -130,9 +130,31 @@ test("a block helper supplies scoped @vars via options.fn(ctx, { data }) (ADR-02
   );
 });
 
-test("block options surface is fn/inverse/data — hash etc. throw (ADR-020)", () => {
-  const { helpers } = buildHelpers("registerHelper('h', (options) => options.hash.x)", safe);
+test("a block helper reads options.hash (surface k=v) (ADR-020 Phase 3)", () => {
+  const { helpers } = buildHelpers(
+    "registerHelper('link', (text, o) => safe('<a class=\"' + o.hash.cls + '\">' + text + '</a>'))",
+    safe,
+  );
+  assert.equal(
+    renderWith(helpers, {}, '{{#link "Home" cls="nav"}}body{{/link}}', {}).value,
+    '<a class="nav">Home</a>',
+  );
+});
+
+test("a block helper binds block params via options.fn(ctx, { blockParams }) (ADR-020 Phase 3)", () => {
+  const { helpers } = buildHelpers(
+    "registerHelper('list', (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join('')))",
+    safe,
+  );
+  assert.equal(
+    renderWith(helpers, {}, "{{#list xs as |item idx|}}[{{idx}}:{{item}}]{{/list}}", { xs: ["a", "b"] }).value,
+    "[0:a][1:b]",
+  );
+});
+
+test("an unsupported options.* still throws (ADR-020)", () => {
+  const { helpers } = buildHelpers("registerHelper('h', (o) => o.lookupProperty)", safe);
   const r = renderWith(helpers, {}, "{{#h}}b{{/h}}", {});
   assert.equal(r.ok, false);
-  assert.match(r.error, /options\.hash is not supported/);
+  assert.match(r.error, /options\.lookupProperty is not supported/);
 });
