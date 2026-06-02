@@ -149,8 +149,9 @@ registerHelper("list", (items, options) =>
   `registerHelper`): `RawBars.renderWithOperations` (strict, core syntax) and
   `MaxBars.renderWithOperations` (lenient, infix/pipe surface), with `renderRawWith` / `renderMaxWith`
   JS facades. The kernel `rt.block` branch and the marshaller generalised exactly as anticipated here;
-  the surface differences (RawBars has no hash/block-params; MaxBars has no `pass:[as |x|]`, the bar
-  being its pipe operator) are recorded there. Gated by the `op:raw-*` / `op:max-*` conformance cases.
+  the surface differences (RawBars has no hash/block-params; MaxBars has the full surface once its head
+  grammar drops the top-level pipe rung, so `pass:[as |x|]` parses and a head pipe is parenthesised) are
+  recorded there. Gated by the `op:raw-*` / `op:max-*` conformance cases.
 * *Lab surfacing:* a user block helper in the Lab's `helpers.js` editor runs in the same Worker (ADR-018);
   no new capability, but the helpers pane copy should show a block example.
 

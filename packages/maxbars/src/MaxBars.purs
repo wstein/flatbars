@@ -79,12 +79,11 @@ renderMax = renderSurfaceDiagWith maxLoopVars maxOptions
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own
--- | surface (`maxLoopVars` / `maxOptions`). A block operation gets `options.hash`,
--- | `options.fn(ctx, { data })`, and `options.inverse`. Block params (`as |a b|`)
--- | are *not* available: the bar `|` is MaxBars' pipe operator, so `as |…|` does not
--- | parse in MaxBars at all (a pre-existing surface limitation, orthogonal to
--- | operations — even `renderMax` rejects it). A helper wanting per-iteration names
--- | supplies them through `options.fn(ctx, { data })` scoped `@vars`.
+-- | surface (`maxLoopVars` / `maxOptions`). A block operation gets the full surface:
+-- | `options.hash`, `options.fn(ctx, { data, blockParams })`, and `options.inverse`.
+-- | Block params (`as |a b|`) parse because the MaxBars head grammar omits the pipe
+-- | rung (a bar in head position is the block-param delimiter); pipe a block
+-- | argument by parenthesising it (`{{#each (xs | f) as |x|}}`).
 -- | "operation" is the native boundary word; FullBars' twin is `renderWith` (helper).
 renderWithOperations
   :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))

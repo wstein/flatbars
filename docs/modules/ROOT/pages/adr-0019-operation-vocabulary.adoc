@@ -181,12 +181,12 @@ register and is exactly the two-register model applied at the boundary, not just
   them). Resolution stays *strict* — an unknown operation is `UnknownHelper`, never `blockHelperMissing`
   (RawBars has no implicit-section policy; ADR-020's lenient resolve is FullBars/MaxBars only).
 * *MaxBars* — `renderWithOperations(...)` over the MaxBars surface (infix/pipes/loop vars). It desugars the
-  same `@hash` marker, so a MaxBars block operation gets `fn`/`inverse`/`hash` + `options.fn(ctx, { data })`,
-  and the lenient `blockHelperMissing` resolve it inherits. *Block params (`as |a b|`) are the one
-  exception:* the bar `|` is MaxBars' *pipe operator*, so `pass:[{{#x … as |a b|}}]` does not parse in
-  MaxBars *at all* (a pre-existing surface limitation, independent of operations — even `renderMax` rejects
-  it). MaxBars block operations therefore expose `options.hash` but not block params; a helper wanting
-  per-iteration names supplies them as `options.fn(ctx, { data })` scoped `@vars` instead.
+  same `@hash`/`@param` markers, so a MaxBars block operation gets the *full* surface: `fn`/`inverse`/`hash`
+  + `options.fn(ctx, { data, blockParams })`, and the lenient `blockHelperMissing` resolve it inherits.
+  Block params (`as |a b|`) parse because the MaxBars head grammar omits its top-level *pipe* rung, leaving
+  a bar in head position to serve as the block-parameter delimiter — exactly as FullBars and the core
+  parser already treat it. The only head-position consequence: to *pipe* a block argument, parenthesise it
+  (`pass:[{{#each (xs | f) as |x|}}]`), which re-enters the full expression grammar.
 
 === Mechanism — reuse, do not rebuild
 
@@ -201,14 +201,17 @@ machinery:
   same path `renderMax` already uses. Each gets a `…WithOperations` entry in its package, surfaced on the
   `flatbars-js` facade.
 * `Ctl.hash`/`blockParams` are populated by the shared `blockArgs` seam regardless of dialect; RawBars sees
-  `Nothing`/`[]` (no markers), MaxBars sees them — so the *same* marshaller yields the per-dialect surface
-  above with no per-dialect branching.
+  `Nothing`/`[]` (no markers), MaxBars sees both — so the *same* marshaller yields the per-dialect surface
+  above with no per-dialect branching. (MaxBars producing `@param` markers required one dialect-local parser
+  change — the head ladder dropping its pipe rung so `as |…|` survives as structure; see
+  xref:maxbars.adoc[the MaxBars page]. No core or desugar change: `as` stays single-sourced in the surface
+  desugar's `extractBlockParams`.)
 
 === Gating
 
 * `test:compile` gains RawBars and MaxBars block-operation cases (interpreter ≡ compiled), mirroring the
-  FullBars `block:*` cases — RawBars covering `fn`/`inverse`/`data`, MaxBars also `hash` (block params are
-  out, per the pipe-`|` collision above; FullBars retains the block-param cases).
+  FullBars `block:*` cases — RawBars covering `fn`/`inverse`/`data`, MaxBars also `hash` and block params
+  (`op:max-params`, plus `op:max-paren-pipe-params` pinning the parenthesise-to-pipe rule).
 * `check:glossary` extends to record the second boundary spelling: *operation* is the RawBars/MaxBars host
   registrar's word, *helper* the FullBars one — both naming the same `Operation`. The gate keeps the
   glossary and the facade in step (a registrar named against the wrong register fails the build).
