@@ -18,6 +18,7 @@ import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseWith, spanText)
 import FlatBars.Highlight (HighlightConfig, highlightSpans)
 import FlatBars.Lexer (defaultLexConfig)
+import FlatBars.Token (defaultLexOptions)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -52,11 +53,26 @@ nodeCount src = case parse src of
 -- clause separators) and a Mustache config (set delimiters on, no clause words).
 hlKernel :: HighlightConfig
 hlKernel =
-  { lexConfig: defaultLexConfig { keepLongComments = true }, clauseSeps: [ "else", "elif" ] }
+  { lexConfig: defaultLexConfig { keepLongComments = true }
+  , lexOptions: defaultLexOptions
+  , clauseSeps: [ "else", "elif" ]
+  }
 
 hlMustache :: HighlightConfig
 hlMustache =
-  { lexConfig: defaultLexConfig { mustacheDelims = true, keepLongComments = true }, clauseSeps: [] }
+  { lexConfig: defaultLexConfig { mustacheDelims = true, keepLongComments = true }
+  , lexOptions: defaultLexOptions
+  , clauseSeps: []
+  }
+
+-- MaxBars-like: infix operators tokenize, so interior `+ - * / % ?? | …` punch
+-- through as `operator` spans.
+hlMax :: HighlightConfig
+hlMax =
+  { lexConfig: defaultLexConfig { keepLongComments = true }
+  , lexOptions: { infixArith: true }
+  , clauseSeps: [ "else", "elif" ]
+  }
 
 kinds :: HighlightConfig -> String -> Array String
 kinds cfg src = map _.kind (highlightSpans cfg src)
@@ -387,5 +403,21 @@ main = do
     )
   assert' "highlight: a lex error degrades to no spans (plain text)"
     (highlightSpans hlKernel "{{oops" == [])
+
+  -- Interior tokens (ADR-017 PosToken end offsets): operators/strings/numbers
+  -- punch through the tag's colour; identifiers/whitespace/delimiters stay it.
+  assert' "highlight: a MaxBars operator punches through an expr tag"
+    ( highlightSpans hlMax "{{ a + b }}" ==
+        [ { from: 0, to: 5, kind: "expr" }
+        , { from: 5, to: 6, kind: "operator" }
+        , { from: 6, to: 11, kind: "expr" }
+        ]
+    )
+  assert' "highlight: strings and numbers punch through too"
+    (kinds hlMax "{{ x ?? \"y\" }}" == [ "expr", "operator", "expr", "string", "expr" ])
+  assert' "highlight: a simple {{name}} is still one chunk (no interior punches)"
+    (kinds hlKernel "{{name}}" == [ "expr" ])
+  assert' "highlight: a numeric literal in a block arg punches as a number"
+    (Array.elem "number" (kinds hlKernel "{{#if (gt x 5)}}{{/if}}"))
 
   log "all framework tests passed"

@@ -56,9 +56,10 @@ had no such gate, so the drift was silent.
   (`["else","elif"]` for the kernel dialects, *empty* for MinBars, where `else` is just a variable) —
   IoC, the same seam `trimStandalone` consults, never a hardcoded keyword list. A regex cannot even
   *tokenize* MaxBars (operator chars vs path chars) nor know a dialect's separator set, which is
-  decisive against the regex as a permanent solution. (Colouring *interior* tokens — operators vs paths
-  *within* a MaxBars tag — is a tracked enhancement; it needs token end offsets the interior lexer does
-  not yet record. Whole-tag colouring is correct in the interim.)
+  decisive against the regex as a permanent solution. *Interior* tokens are coloured too — `operator` /
+  `string` / `number` punch through the tag's head colour (so MaxBars `a + b`, `a ?? b` read with
+  operators distinct from paths) — once `FlatBars.Token.PosToken` gained an `end` offset
+  (xref:adr-0017-editor-support-lsp.adoc[ADR-017]).
 
 . *A drift gate is mandatory* (`check:highlight`, mirroring `check:catalog`), wired into `npm test`.
   Highlighting joins "measured, not asserted": a lexer change not reflected in highlighting fails the
@@ -70,12 +71,12 @@ had no such gate, so the drift was silent.
   tutorials via `highlightTemplate(src, dialect)` rewritten over `highlightSpans`. The template regexes
   (the Lab's `HB_TAG_RE`/`hbMarkFor`, the tutorials' `TAG_RE`/`highlightTemplate` body) are *gone*.
   `check:highlight` is now engine-derived (golden = `highlightSpans`), so a lexer change unreflected in
-  highlighting fails the build. Two follow-ups remain, both *enhancements, not the bug class this ADR
-  closes*: (a) interior token kinds (operators vs paths within a MaxBars tag), which need a token end
-  offset the interior lexer does not yet record; (b) full CodeMirror 6 adoption in the tutorials (real
-  `lang-yaml`, a single presenter with the Lab), deferred for bundle weight. Host-*data* (YAML)
-  highlighting — the Lab's `yamlDecorator`, the tutorials' `highlightYaml` — is a separate concern and
-  is unchanged. See `highlighting-spec.md`.
+  highlighting fails the build. Interior token kinds also landed: `FlatBars.Token.PosToken` gained an
+  `end` offset (ADR-017), so operators/strings/numbers inside a tag get their own span. One follow-up
+  remains, an *enhancement, not the bug class this ADR closes*: full CodeMirror 6 adoption in the
+  tutorials (real `lang-yaml`, a single presenter with the Lab), deferred for bundle weight. Host-*data*
+  (YAML) highlighting — the Lab's `yamlDecorator`, the tutorials' `highlightYaml` — is a separate concern
+  and is unchanged. See `highlighting-spec.md`.
 
 == Consequences
 

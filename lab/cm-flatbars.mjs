@@ -39,6 +39,10 @@ export const FLATBARS_KIND_CLASS = {
   comment: "cm-hb-comment",
   "set-delimiter": "cm-hb-comment",
   error: "cm-hb-error",
+  // interior-role kinds (ADR-017): operators/strings/numbers inside a tag
+  operator: "cm-hb-op",
+  string: "cm-hb-str",
+  number: "cm-hb-num",
 };
 
 // Map a span kind to its CSS class; an unknown kind falls back to `expr` so a

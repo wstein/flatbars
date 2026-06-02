@@ -49,8 +49,13 @@ instance showToken :: Show Token where
     TRParen -> "TRParen"
     TOp s -> "TOp " <> show s
 
--- | A token with its source offset (for located parse errors).
-type PosToken = { tok :: Token, at :: Int }
+-- | A token with its source span: `at` is the start offset (used for located
+-- | parse errors), `end` the offset just past the token. Both are absolute
+-- | source offsets (the interior `base` is already added). The span lets tooling
+-- | — the syntax highlighter (ADR-014), and the editor token vocabulary of
+-- | ADR-017 — colour interior tokens (operators, strings, numbers) precisely;
+-- | the parsers read only `tok`/`at`.
+type PosToken = { tok :: Token, at :: Int, end :: Int }
 
 -- | Tokenize a tag interior. `base` is its offset in the source, added to every
 -- | token's position so a downstream parse error points into the original
@@ -88,8 +93,8 @@ tokenizeInterior cfg base src = go 0 []
         Nothing -> Right acc
         Just c
           | isWs c -> go (i + 1) acc
-          | c == '(' -> go (i + 1) (push acc TLParen i)
-          | c == ')' -> go (i + 1) (push acc TRParen i)
+          | c == '(' -> go (i + 1) (push acc TLParen i (i + 1))
+          | c == ')' -> go (i + 1) (push acc TRParen i (i + 1))
           | c == '"' || c == '\'' -> readString i c acc
           -- operators (longest-match); `&` only as `&&`.
           | c == '&' -> if at (i + 1) == Just '&' then op2 "&&" i acc else bad i
@@ -111,9 +116,9 @@ tokenizeInterior cfg base src = go 0 []
           | identChar c || c == '[' -> readIdent i acc
           | otherwise -> bad i
 
-  push acc t i = Array.snoc acc { tok: t, at: base + i }
-  op1 s i acc = go (i + 1) (push acc (TOp s) i)
-  op2 s i acc = go (i + 2) (push acc (TOp s) i)
+  push acc t i j = Array.snoc acc { tok: t, at: base + i, end: base + j }
+  op1 s i acc = go (i + 1) (push acc (TOp s) i (i + 1))
+  op2 s i acc = go (i + 2) (push acc (TOp s) i (i + 2))
   bad i = Left (LexError "unexpected character" (base + i))
 
   -- an identifier/path: a run of ident chars and whole `[bracket]` segments.
@@ -125,7 +130,7 @@ tokenizeInterior cfg base src = go 0 []
         Just k -> scan (k + 1)
         Nothing -> Left (LexError "unterminated [ segment" (base + j))
       Just c | identChar c -> scan (j + 1)
-      _ -> go j (push acc (TIdent (slc start j)) start)
+      _ -> go j (push acc (TIdent (slc start j)) start j)
     bracketEnd k
       | k > len = Nothing
       | at k == Just ']' = Just k
@@ -138,7 +143,7 @@ tokenizeInterior cfg base src = go 0 []
       raw = slc start end
     in
       case Number.fromString raw of
-        Just n -> go end (push acc (TNum n) start)
+        Just n -> go end (push acc (TNum n) start end)
         Nothing -> Left (LexError ("malformed number '" <> raw <> "'") (base + start))
     where
     numEnd j = case at j of
@@ -151,7 +156,8 @@ tokenizeInterior cfg base src = go 0 []
     collect j chars = case at j of
       Nothing -> Left (LexError "unterminated string" (base + start))
       Just c
-        | c == q -> go (j + 1) (push acc (TStr (SCU.fromCharArray (Array.reverse chars))) start)
+        | c == q -> go (j + 1)
+            (push acc (TStr (SCU.fromCharArray (Array.reverse chars))) start (j + 1))
         | c == '\\' -> case at (j + 1) of
             Just e -> case unescape e of
               Just ch -> collect (j + 2) (Array.cons ch chars)

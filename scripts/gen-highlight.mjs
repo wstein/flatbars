@@ -69,9 +69,10 @@ const CORPUS = [
   { id: "set-delimiter-switch", dialect: "minbars", note: "{{=A B=}} → set-delimiter, and the FOLLOWING <%x%> is lexed in the new pair (a regex cannot track this)", src: "{{=<% %>=}}<%x%>" },
   { id: "set-delimiter-switchback", dialect: "minbars", note: "switch to <% %>, then switch back to the default {{ }} pair mid-stream", src: "{{=<% %>=}}<%x%><%={{ }}=%>{{y}}" },
 
-  // ── MaxBars surface (tag boundaries; interior token kinds deferred) ──────
-  { id: "maxbars-operators", dialect: "maxbars", note: "an infix-operator tag is delimited as one expr tag (interior operator colouring is a tracked follow-up)", src: "{{ a + b * c }}" },
-  { id: "maxbars-pipe", dialect: "maxbars", note: "a pipe tag is one expr tag", src: "{{ items | sort | first }}" },
+  // ── MaxBars surface — interior tokens punch through (ADR-017 end offsets) ──
+  { id: "maxbars-operators", dialect: "maxbars", note: "infix operators get their own `operator` span; identifiers/whitespace stay `expr` (the tag's colour)", src: "{{ a + b * c }}" },
+  { id: "maxbars-pipe", dialect: "maxbars", note: "pipes `|` are operators too", src: "{{ items | sort | first }}" },
+  { id: "maxbars-literals", dialect: "maxbars", note: "string and number literals punch through as `string` / `number`", src: "{{ label ?? \"n/a\" }} {{ qty * 2 }}" },
 ];
 
 const data = {

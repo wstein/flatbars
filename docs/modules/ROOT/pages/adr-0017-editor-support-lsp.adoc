@@ -110,7 +110,9 @@ stateful regions. The grammar is the floor; the engine is the ceiling.
 
 * *Token vocabulary.* Define the stable kind set (tag-role × interior-role) that the `tokenize` API, the
   LSP semantic-token legend, and the TextMate scopes all map to — the single contract the three
-  consumers share.
+  consumers share. The enabling step is done: `FlatBars.Token.PosToken` now carries an `end` offset, so
+  `highlightSpans` already emits the interior-role kinds (`operator` / `string` / `number`) alongside the
+  tag-role kinds — that span set is the draft vocabulary the LSP legend and TextMate scopes will map to.
 * *Incremental semantic tokens.* Whole-document retokenization is fine at current sizes; add range
   requests / deltas only if a profile shows it (ties to the deferred incremental-parse trigger noted in
   the parser review).

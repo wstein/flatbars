@@ -18,6 +18,10 @@ const tags = [
   { code: "{{<layout}} {{$title}}", dialect: "fullbars", label: "Inheritance", note: "parent layout · overridable block" },
   { code: "{{! note }} {{!-- long --}}", dialect: "fullbars", label: "Comment", note: "dropped from output" },
   { code: "{{=<% %>=}}", dialect: "minbars", label: "Set delimiters", note: "switches the {{ }} pair" },
+  // Interior tokens (ADR-017): punch through a tag's colour.
+  { code: "{{ a + b }}", dialect: "maxbars", label: "Operator", note: "infix / pipe (MaxBars)" },
+  { code: "{{ \"text\" }}", dialect: "maxbars", label: "String", note: "a string literal" },
+  { code: "{{ qty * 2 }}", dialect: "maxbars", label: "Number", note: "a numeric literal" },
 ];
 
 const data = [
@@ -38,7 +42,7 @@ const data = [
 
   <div class="hl-cols">
     <div class="hl-group">
-      <h3>Template tags</h3>
+      <h3>Template syntax</h3>
       <dl class="hl-list">
         {tags.map((r) => (
           <div class="hl-row">

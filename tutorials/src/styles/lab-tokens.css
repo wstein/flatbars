@@ -53,6 +53,10 @@
   --stem-raw-fg: #ea580c;
   --stem-raw-bg: rgba(234, 88, 12, 0.1);
   --stem-comment-fg: #9b8fc0;
+  /* Interior tokens (operators / strings / numbers inside a tag) */
+  --stem-op-fg: #0891b2;
+  --stem-str-fg: #e11d48;
+  --stem-num-fg: #b45309;
 
   /* YAML data syntax colours (data editor + spec-only blocks) */
   --yaml-key: #2563eb;
@@ -106,6 +110,9 @@
     --stem-raw-fg: #fdba74;
     --stem-raw-bg: rgba(253, 186, 116, 0.18);
     --stem-comment-fg: #8a83a6;
+    --stem-op-fg: #67e8f9;
+    --stem-str-fg: #fda4af;
+    --stem-num-fg: #fbbf24;
 
     --yaml-key: #93c5fd;
     --yaml-str: #86efac;
@@ -128,6 +135,11 @@
 .stem-partial { color: var(--stem-partial-fg); background: var(--stem-partial-bg); font-weight: 700; border-radius: 3px; }
 .stem-raw { color: var(--stem-raw-fg); background: var(--stem-raw-bg); font-weight: 700; border-radius: 3px; }
 .stem-comment { color: var(--stem-comment-fg); font-style: italic; }
+/* Interior tokens (ADR-017): bold ink, no chip background — they read on top of
+   the tag's faint tint. */
+.stem-op { color: var(--stem-op-fg); font-weight: 700; }
+.stem-str { color: var(--stem-str-fg); font-weight: 700; }
+.stem-num { color: var(--stem-num-fg); font-weight: 700; }
 .y-key { color: var(--yaml-key); }
 .y-str { color: var(--yaml-str); }
 .y-num { color: var(--yaml-num); }

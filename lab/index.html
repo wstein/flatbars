@@ -71,6 +71,9 @@
         --stem-partial-bg:  rgba(37, 99, 235, 0.10);
         --stem-raw-fg:      #ea580c;  /* orange-600 — unescaped emit */
         --stem-raw-bg:      rgba(234, 88, 12, 0.10);
+        --stem-op-fg:       #0891b2;  /* cyan-600 — interior operators (a + b, a | f) */
+        --stem-str-fg:      #e11d48;  /* rose-600 — interior string literals */
+        --stem-num-fg:      #b45309;  /* amber-700 — interior number literals */
 
         --font-ui: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
         --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -558,6 +561,11 @@
       .cm-hb-partial { color: var(--stem-partial-fg); background: var(--stem-partial-bg); font-weight: 700; border-radius: 3px; }
       .cm-hb-raw     { color: var(--stem-raw-fg);     background: var(--stem-raw-bg);     font-weight: 700; border-radius: 3px; }
       .cm-hb-expr    { color: var(--stem-expr-fg);    background: var(--stem-expr-bg);    font-weight: 600; border-radius: 3px; }
+      /* Interior tokens (ADR-017): operators/strings/numbers inside a tag — bold
+         ink, no chip background, so they read on top of the tag's faint tint. */
+      .cm-hb-op      { color: var(--stem-op-fg);  font-weight: 700; }
+      .cm-hb-str     { color: var(--stem-str-fg); font-weight: 700; }
+      .cm-hb-num     { color: var(--stem-num-fg); font-weight: 700; }
       /* A lexer error span (ADR-014): today `highlightSpans` degrades to no
          spans, so this is the defensive style for the `error` kind. */
       .cm-hb-error   { text-decoration: underline wavy #ef4444; text-decoration-skip-ink: none; }
@@ -1121,6 +1129,7 @@
           --stem-expr-fg:    #86efac; --stem-expr-bg:    rgba(134, 239, 172, 0.16);
           --stem-partial-fg: #93c5fd; --stem-partial-bg: rgba(147, 197, 253, 0.16);
           --stem-raw-fg:     #fdba74; --stem-raw-bg:     rgba(253, 186, 116, 0.18);
+          --stem-op-fg:      #67e8f9; --stem-str-fg:     #fda4af; --stem-num-fg: #fbbf24;
           --success: #4ade80;
           --danger: #f87171; --danger-faint: #3a1414; --warn: #fbbf24; --warn-faint: #3a2e10; --success-faint: #14321f;
           --shadow-pop: 0 12px 32px -8px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.4);

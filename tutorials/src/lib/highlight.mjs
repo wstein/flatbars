@@ -37,6 +37,10 @@ const KIND_CLASS = {
   comment: "stem-comment",
   "set-delimiter": "stem-comment",
   error: "stem-comment",
+  // interior-role kinds (ADR-017): operators/strings/numbers inside a tag
+  operator: "stem-op",
+  string: "stem-str",
+  number: "stem-num",
 };
 
 // Highlight a template by the engine's own spans. `dialect` selects the lexer

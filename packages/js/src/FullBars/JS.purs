@@ -37,6 +37,7 @@ import FlatBars (Expr(..), parse, parseErrorAt, parseWith)
 import FlatBars.Highlight (HSpan, HighlightConfig, highlightSpans) as Highlight
 import FlatBars.Json (fromJson)
 import FlatBars.Lexer (defaultLexConfig)
+import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
@@ -140,11 +141,17 @@ highlightConfig :: String -> Highlight.HighlightConfig
 highlightConfig = case _ of
   "maxbars" ->
     { lexConfig: maxOptions.lexConfig { keepLongComments = true }
+    , lexOptions: maxOptions.lexOptions
     , clauseSeps: maxOptions.standaloneSeps
     }
-  "rawbars" -> { lexConfig: withSetDelims, clauseSeps: kernelClauses }
-  "minbars" -> { lexConfig: withSetDelims, clauseSeps: [] }
-  _ -> { lexConfig: defaultLexConfig { keepLongComments = true }, clauseSeps: kernelClauses }
+  "rawbars" ->
+    { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: kernelClauses }
+  "minbars" -> { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: [] }
+  _ ->
+    { lexConfig: defaultLexConfig { keepLongComments = true }
+    , lexOptions: defaultLexOptions
+    , clauseSeps: kernelClauses
+    }
   where
   -- Highlighting wants the long comments rendering drops, so it can colour them.
   withSetDelims = defaultLexConfig { mustacheDelims = true, keepLongComments = true }

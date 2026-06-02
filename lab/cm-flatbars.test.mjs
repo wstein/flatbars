@@ -73,6 +73,16 @@ test("inheritance sigils and raw/comment get their own palette slots", () => {
   );
 });
 
+test("MaxBars interior tokens punch through with their own classes", () => {
+  // `+` is an operator span between expr (head-coloured) spans; a simple tag
+  // stays one expr chunk.
+  assert.deepEqual(
+    decorate("{{ a + b }}", "maxbars").map((d) => d.class),
+    ["cm-hb-expr", "cm-hb-op", "cm-hb-expr"],
+  );
+  assert.deepEqual(decorate("{{name}}", "maxbars").map((d) => d.class), ["cm-hb-expr"]);
+});
+
 test("a lex error degrades to no decorations", () => {
   assert.deepEqual(decorate("{{oops", "fullbars"), []);
 });

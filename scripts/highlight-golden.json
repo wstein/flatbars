@@ -347,11 +347,31 @@
     {
       "id": "maxbars-operators",
       "dialect": "maxbars",
-      "note": "an infix-operator tag is delimited as one expr tag (interior operator colouring is a tracked follow-up)",
+      "note": "infix operators get their own `operator` span; identifiers/whitespace stay `expr` (the tag's colour)",
       "src": "{{ a + b * c }}",
       "spans": [
         {
           "from": 0,
+          "to": 5,
+          "kind": "expr"
+        },
+        {
+          "from": 5,
+          "to": 6,
+          "kind": "operator"
+        },
+        {
+          "from": 6,
+          "to": 9,
+          "kind": "expr"
+        },
+        {
+          "from": 9,
+          "to": 10,
+          "kind": "operator"
+        },
+        {
+          "from": 10,
           "to": 15,
           "kind": "expr"
         }
@@ -360,12 +380,90 @@
     {
       "id": "maxbars-pipe",
       "dialect": "maxbars",
-      "note": "a pipe tag is one expr tag",
+      "note": "pipes `|` are operators too",
       "src": "{{ items | sort | first }}",
       "spans": [
         {
           "from": 0,
+          "to": 9,
+          "kind": "expr"
+        },
+        {
+          "from": 9,
+          "to": 10,
+          "kind": "operator"
+        },
+        {
+          "from": 10,
+          "to": 16,
+          "kind": "expr"
+        },
+        {
+          "from": 16,
+          "to": 17,
+          "kind": "operator"
+        },
+        {
+          "from": 17,
           "to": 26,
+          "kind": "expr"
+        }
+      ]
+    },
+    {
+      "id": "maxbars-literals",
+      "dialect": "maxbars",
+      "note": "string and number literals punch through as `string` / `number`",
+      "src": "{{ label ?? \"n/a\" }} {{ qty * 2 }}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 9,
+          "kind": "expr"
+        },
+        {
+          "from": 9,
+          "to": 11,
+          "kind": "operator"
+        },
+        {
+          "from": 11,
+          "to": 12,
+          "kind": "expr"
+        },
+        {
+          "from": 12,
+          "to": 17,
+          "kind": "string"
+        },
+        {
+          "from": 17,
+          "to": 20,
+          "kind": "expr"
+        },
+        {
+          "from": 21,
+          "to": 28,
+          "kind": "expr"
+        },
+        {
+          "from": 28,
+          "to": 29,
+          "kind": "operator"
+        },
+        {
+          "from": 29,
+          "to": 30,
+          "kind": "expr"
+        },
+        {
+          "from": 30,
+          "to": 31,
+          "kind": "number"
+        },
+        {
+          "from": 31,
+          "to": 34,
           "kind": "expr"
         }
       ]
