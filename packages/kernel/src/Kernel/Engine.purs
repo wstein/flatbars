@@ -26,7 +26,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import FlatBars.Error (Error(..))
@@ -45,6 +45,13 @@ type Ctl m env =
   , render :: env -> Template -> m String -- FlatBars renders a sub-tree
   , eval :: env -> Expr -> m Value -- FlatBars evaluates a body expression to a Value
   , clause :: Ident -> { before :: Template, body :: Maybe Template } -- split a nested clause
+  -- A block head's surface hash (`k=v`) and declared `as |a b|` names, split out
+  -- by the engine's `blockArgs` seam (ADR-020 Phase 3). Built-ins ignore these
+  -- (they read the equivalent values positionally); the user-helper marshaller
+  -- reads them to populate `options.hash` and bind block params. `Nothing` / `[]`
+  -- for dialects/heads with no such surface (e.g. RawBars).
+  , hash :: Maybe Value
+  , blockParams :: Array String
   }
 
 -- | A helper: given its control handle and evaluated arguments, produce a value.
@@ -55,6 +62,13 @@ type Engine m env =
   { initial :: env -- starting environment + root context
   , resolve :: env -> Ident -> m (Operation m env) -- find a helper (throw UnknownHelper if absent)
   , stringify :: Value -> m String -- how a Value becomes output text
+  -- Split a block head's argument expressions into the positional args (handed to
+  -- the operation, *unchanged* for built-ins), the surface hash (`@hash` marker),
+  -- and the `as |a b|` names (`@param` markers). The default identity split
+  -- (`{ positional: args, hash: Nothing, params: [] }`) is what RawBars uses;
+  -- FullBars supplies a marker-aware split. See ADR-020 Phase 3.
+  , blockArgs ::
+      Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }
   }
 
 -- | Run a parsed template against an engine. FlatBars drives the entire walk.
@@ -80,9 +94,11 @@ runTemplate engine = renderTemplate engine.initial
 
   applyBlock :: env -> Span -> Ident -> Array Expr -> Template -> m String
   applyBlock env span name args body = do
-    vals <- traverse (evalExpr env span) args
+    let split = engine.blockArgs args
+    vals <- traverse (evalExpr env span) split.positional
+    hashV <- traverse (evalExpr env span) split.hash
     h <- engine.resolve env name
-    h (ctl env body span) vals >>= engine.stringify
+    h (ctl env body span hashV split.params) vals >>= engine.stringify
 
   evalExpr :: env -> Span -> Expr -> m Value
   evalExpr env span = case _ of
@@ -90,10 +106,10 @@ runTemplate engine = renderTemplate engine.initial
     App name args -> do
       vals <- traverse (evalExpr env span) args
       h <- engine.resolve env name
-      h (ctl env [] span) vals
+      h (ctl env [] span Nothing []) vals
 
-  ctl :: env -> Template -> Span -> Ctl m env
-  ctl env body span =
+  ctl :: env -> Template -> Span -> Maybe Value -> Array String -> Ctl m env
+  ctl env body span hashV params =
     { env
     , children: body
     , span
@@ -107,6 +123,8 @@ runTemplate engine = renderTemplate engine.initial
           s = splitClause name body
         in
           { before: s.before, body: s.clause }
+    , hash: hashV
+    , blockParams: params
     }
 
 -- | Parse source and run it. Parse failures are thrown into `m`.

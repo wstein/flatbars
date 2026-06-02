@@ -183,4 +183,8 @@ refEngineWith onMissing initial =
       Just h -> pure h
       Nothing -> onMissing env name
   , stringify: \v -> liftEither (stringify v)
+  -- Default identity split: every argument is positional, no hash, no block
+  -- params (RawBars/MaxBars surface emits no `@hash`/`@param` markers). FullBars
+  -- overrides this via `refEngineBlockArgs` (ADR-020 Phase 3).
+  , blockArgs: \args -> { positional: args, hash: Nothing, params: [] }
   }
