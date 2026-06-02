@@ -26,6 +26,7 @@ module Kernel.Env
   , enterPartial
   , recursionBudget
   , refEngine
+  , refEngineWith
   , liftEither
   ) where
 
@@ -40,7 +41,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
-import FlatBars.Syntax (Template)
+import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import Kernel.Engine (Engine, Operation)
 import Kernel.Value (FalsySet, handlebars, stringify)
@@ -162,10 +163,24 @@ lookupPartialFalsy name (RefEnv e) = Map.lookup name e.partialFalsy
 -- | The reference `Engine`: resolve from the frame stack (throwing
 -- | `UnknownHelper`), stringify via `Value.stringify`.
 refEngine :: forall m. MonadThrow Error m => RefEnv m -> Engine m (RefEnv m)
-refEngine initial =
+refEngine = refEngineWith (\_ name -> throwError (UnknownHelper name))
+
+-- | Like `refEngine`, but with a pluggable *missing-helper* policy: `onMissing`
+-- | is consulted when no frame defines `name`. The strict default (`refEngine`)
+-- | throws `UnknownHelper`; FullBars supplies a `blockHelperMissing` fallback
+-- | (Handlebars-style implicit sections) so a bare `{{#x}}` over data iterates /
+-- | renders rather than erroring. RawBars keeps the strict default — the
+-- | divergence stays a per-dialect choice, not a core change.
+refEngineWith
+  :: forall m
+   . MonadThrow Error m
+  => (RefEnv m -> Ident -> m (Operation m (RefEnv m)))
+  -> RefEnv m
+  -> Engine m (RefEnv m)
+refEngineWith onMissing initial =
   { initial
   , resolve: \env name -> case lookupOperation name env of
       Just h -> pure h
-      Nothing -> throwError (UnknownHelper name)
+      Nothing -> onMissing env name
   , stringify: \v -> liftEither (stringify v)
   }

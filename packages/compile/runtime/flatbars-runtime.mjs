@@ -444,23 +444,37 @@ function truthyWith(set, v, opts) {
 // invoked as an inline helper (its body ignored, as the interpreter does) and
 // its value stringified; an unknown name throws, like `rt.call`.
 function block(name, args, frame, bodyFn, clauses) {
-  if (name !== "apply") {
-    throw new Error("rt.block: compiled path does not support block helper '" + name + "'");
+  if (name === "apply") {
+    const target = args[0];
+    if (typeof target !== "string") {
+      throw new Error("apply: first argument must be a helper-name string");
+    }
+    const rest = args.slice(1);
+    const elseFn = (clauses && clauses.else) || (() => "");
+    switch (target) {
+      case "if": return truthy(frame.falsy, rest[0]) ? bodyFn(frame) : elseFn(frame);
+      case "unless": return truthy(frame.falsy, rest[0]) ? elseFn(frame) : bodyFn(frame);
+      case "each": return each(rest[0], frame, [], bodyFn, elseFn);
+      case "with": return withCtx(rest[0], frame, [], bodyFn, elseFn);
+      // an inline helper target: call it (body ignored) and stringify the result.
+      default: return stringify(call(target, rest, frame));
+    }
   }
-  const target = args[0];
-  if (typeof target !== "string") {
-    throw new Error("apply: first argument must be a helper-name string");
+  // A registered helper used in block position: invoke it inline (body ignored),
+  // exactly as the interpreter does when `resolve` finds it.
+  if (helpers[name] || userHelpers[name] || (frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name))) {
+    return stringify(call(name, args, frame));
   }
-  const rest = args.slice(1);
+  // Otherwise Handlebars' `blockHelperMissing` (FullBars policy, mirrors
+  // Kernel.Prelude.sectionOp): the head names *data*, not a helper. Look it up in
+  // the current context and dispatch — an array iterates (`each`), anything else
+  // shifts context and renders once when truthy (`with`), falsy ⇒ the `{{else}}`
+  // inverse. This is the compiled twin of the interpreter's lenient `resolve`.
+  const ctx = frame.ctx;
+  const v = (ctx && typeof ctx === "object" && !isSafe(ctx) &&
+    Object.prototype.hasOwnProperty.call(ctx, name)) ? ctx[name] : null;
   const elseFn = (clauses && clauses.else) || (() => "");
-  switch (target) {
-    case "if": return truthy(frame.falsy, rest[0]) ? bodyFn(frame) : elseFn(frame);
-    case "unless": return truthy(frame.falsy, rest[0]) ? elseFn(frame) : bodyFn(frame);
-    case "each": return each(rest[0], frame, [], bodyFn, elseFn);
-    case "with": return withCtx(rest[0], frame, [], bodyFn, elseFn);
-    // an inline helper target: call it (body ignored) and stringify the result.
-    default: return stringify(call(target, rest, frame));
-  }
+  return Array.isArray(v) ? each(v, frame, [], bodyFn, elseFn) : withCtx(v, frame, [], bodyFn, elseFn);
 }
 function raw(_name, body) { return body; }
 

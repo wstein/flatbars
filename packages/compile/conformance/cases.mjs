@@ -339,4 +339,15 @@ export const cases = [
   { name: "inh:block-reindentation", dialect: "minbars", t: "{{<parent}}{{$block}}\n    one\n    two\n{{/block}}{{/parent}}\n", d: {}, partials: { parent: "Hi,\n  {{$block}}\n  {{/block}}\n" } },
   { name: "inh:intrinsic-indentation", dialect: "minbars", t: "{{<parent}}{{$block}}\none\ntwo\n{{/block}}{{/parent}}\n", d: {}, partials: { parent: "Hi,\n{{$block}}\n  default\n{{/block}}\n" } },
   { name: "inh:nested-block-reindentation", dialect: "minbars", t: "{{<parent}}{{$nested}}\nthree\n{{/nested}}{{/parent}}\n", d: {}, partials: { parent: "{{<grandparent}}{{$block}}\n  one\n  {{$nested}}\n    two\n  {{/nested}}\n{{/block}}{{/grandparent}}\n", grandparent: "{{$block}}default{{/block}}" } },
+
+  // ── blockHelperMissing — FullBars' Handlebars-style implicit sections ─────────
+  // A `{{#x}}` whose head names no helper is treated as data (array ⇒ each,
+  // truthy ⇒ with-once, falsy/empty ⇒ {{else}}), matching Handlebars. The gate
+  // pins that the interpreter (lenient `resolve`) and the compiled `rt.block`
+  // fallback render this identically. (See fullbars-compat.adoc §4.)
+  { name: "bhm:array-iterates", dialect: "surface", t: "{{#tags}}[{{.}}] {{/tags}}", d: { tags: ["math", "logic", "engines"] } },
+  { name: "bhm:truthy-once", dialect: "surface", t: "{{#person}}{{name}}{{/person}}", d: { person: { name: "Ada" } } },
+  { name: "bhm:falsy-empty", dialect: "surface", t: "[{{#person}}{{name}}{{/person}}]", d: { person: false } },
+  { name: "bhm:empty-array-else", dialect: "surface", t: "{{#tags}}{{.}}{{else}}none{{/tags}}", d: { tags: [] } },
+  { name: "bhm:nested-section", dialect: "surface", t: "{{#user}}{{name}}: {{#roles}}{{.}} {{/roles}}{{/user}}", d: { user: { name: "Ada", roles: ["admin", "dev"] } } },
 ];

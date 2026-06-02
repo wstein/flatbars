@@ -5,6 +5,7 @@
 module Kernel.Render
   ( preludeEnv
   , runResolved
+  , runResolvedLenient
   , formatError
   ) where
 
@@ -14,9 +15,9 @@ import Control.Monad.Error.Class (class MonadThrow)
 import FlatBars.Error (Error(ParseFailure), renderParseErrorAt)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
-import Kernel.Engine (runTemplate)
-import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, withFalsy)
-import Kernel.Prelude (prelude)
+import Kernel.Engine (Engine, runTemplate)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, withFalsy)
+import Kernel.Prelude (blockHelperMissing, prelude)
 import Kernel.Value (resolveTruthiness)
 
 -- | An environment with the reference prelude, the given data as context, and a
@@ -37,9 +38,36 @@ runResolved
   -> Template
   -> Value
   -> m String
-runResolved directives setup nodes dat = do
+runResolved = runResolvedUsing refEngine
+
+-- | Like `runResolved`, but with FullBars' Handlebars-style *missing-helper*
+-- | policy: an unregistered `{{#x}}` block over data iterates / renders rather
+-- | than erroring (`Kernel.Prelude.blockHelperMissing`). FullBars (and MaxBars,
+-- | its superset) render through this; RawBars keeps the strict `runResolved`.
+runResolvedLenient
+  :: forall m
+   . MonadThrow Error m
+  => Array Directive
+  -> (RefEnv m -> RefEnv m)
+  -> Template
+  -> Value
+  -> m String
+runResolvedLenient = runResolvedUsing (refEngineWith blockHelperMissing)
+
+-- | Shared body of `runResolved` / `runResolvedLenient`, parameterised by how the
+-- | seeded environment becomes an `Engine` (strict vs lenient resolve).
+runResolvedUsing
+  :: forall m
+   . MonadThrow Error m
+  => (RefEnv m -> Engine m (RefEnv m))
+  -> Array Directive
+  -> (RefEnv m -> RefEnv m)
+  -> Template
+  -> Value
+  -> m String
+runResolvedUsing toEngine directives setup nodes dat = do
   fs <- liftEither (resolveTruthiness directives)
-  runTemplate (refEngine (withFalsy fs (setup (preludeEnv dat)))) nodes
+  runTemplate (toEngine (withFalsy fs (setup (preludeEnv dat)))) nodes
 
 -- | Format an engine `Error` against its source for a host boundary: a parse
 -- | failure becomes a located `line:column: message`; everything else keeps its

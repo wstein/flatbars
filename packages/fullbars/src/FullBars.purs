@@ -40,7 +40,7 @@ import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (prelude, preludeSchema)
-import Kernel.Render (formatError, preludeEnv, runResolved)
+import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (FalsySet, FalsyShape(..), aliasSet, always, escapeHtml, handlebars, isFalsy, minimal, presence, resolveTruthiness, stringify, truthy)
 
@@ -65,7 +65,7 @@ compileSurface src = do
   { directives, nodes } <- parse src
   let
     { partials, template } = hoistInline (desugarSurface nodes)
-  pure \dat -> runResolved directives (registerPartials partials) template dat
+  pure \dat -> runResolvedLenient directives (registerPartials partials) template dat
 
 -- | One-shot pure render of *Surface* source (paths, `{{ }}` auto-escape, …).
 renderSurface :: String -> Value -> Either String String
@@ -89,7 +89,7 @@ renderSurfaceWith partialSrcs src dat =
           -- (in `inlineP`) get no entry and inherit the file's mode (§5).
           setup = registerPartialsFalsy externalF <<< registerPartials (Map.union inlineP externalT)
         in
-          case runResolved directives setup template dat of
+          case runResolvedLenient directives setup template dat of
             Left e -> Left (show e)
             Right out -> Right out
   where
@@ -128,7 +128,7 @@ renderSurfaceWithHelpers helpers partialSrcs src dat =
               <<< registerPartialsFalsy externalF
               <<< registerPartials (Map.union inlineP externalT)
         in
-          case runResolved directives setup template dat of
+          case runResolvedLenient directives setup template dat of
             Left e -> Left (formatError src e)
             Right out -> Right out
   where
@@ -154,7 +154,7 @@ renderSurfaceDiagWith lv opts src dat = case parseWith opts src of
     let
       { partials, template } = hoistInline (desugarSurfaceWith lv nodes)
     in
-      case runResolved directives (registerPartials partials) template dat of
+      case runResolvedLenient directives (registerPartials partials) template dat of
         Left e -> Left (formatError src e)
         Right out -> Right out
 

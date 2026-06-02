@@ -23,6 +23,7 @@ module Kernel.Prelude
   , coreOperationDefs
   , primitiveOperationDefs
   , coreSchema
+  , blockHelperMissing
   ) where
 
 import Prelude
@@ -43,7 +44,7 @@ import Data.String.Common (joinWith, toLower, toUpper)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
-import FlatBars.Syntax (Template)
+import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
 import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, lookupPartialFalsy, pushFrame, recursionBudget, refContext, refDepth, refFalsy, withFalsy)
@@ -88,7 +89,8 @@ type OperationDef m =
 -- | A non-block value helper built from a `Kernel.Operation` combinator. The
 -- | combinator pins the arity, so the schema entry below is derived from the
 -- | very guard the runtime uses.
-valDef :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> OperationDef m
+valDef
+  :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> OperationDef m
 valDef name mk =
   let
     s = mk name
@@ -1044,6 +1046,26 @@ withH ctl args = case Array.uncons args of
         renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)
     else renderElse ctl
   Nothing -> throwError (ArityError "with: expected at least 1 argument(s), got 0")
+
+-- | Handlebars' `blockHelperMissing` — the FullBars *missing-helper* policy
+-- | (`Kernel.Env.refEngineWith`). When `{{#x}}…{{/x}}` names no registered
+-- | helper, Handlebars treats `x` as data: an array iterates (`each`), a truthy
+-- | non-array shifts context and renders once (`with`), a falsy value (or empty
+-- | array) renders the `{{else}}` inverse. We get all three for free by looking
+-- | `x` up in the current context and delegating to `each`/`with`, which already
+-- | encode exactly those rules. An *inline* unknown application with arguments
+-- | (`{{foo bar}}`, no block body) is still a hard `UnknownHelper`, matching
+-- | Handlebars' "Missing helper" throw — only the block form is rescued.
+blockHelperMissing
+  :: forall m. MonadThrow Error m => RefEnv m -> Ident -> m (Operation m (RefEnv m))
+blockHelperMissing _ name = pure (sectionOp name)
+
+sectionOp :: forall m. MonadThrow Error m => Ident -> Operation m (RefEnv m)
+sectionOp name ctl args
+  | Array.null ctl.children && not (Array.null args) = throwError (UnknownHelper name)
+  | otherwise = case indexValue (refContext ctl.env) (VString name) of
+      v@(VArray _) -> eachH ctl [ v ]
+      v -> withH ctl [ v ]
 
 --------------------------------------------------------------------------------
 -- Composition / data
