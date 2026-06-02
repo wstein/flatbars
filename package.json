@@ -16,7 +16,7 @@
     "gen:highlight": "node scripts/gen-highlight.mjs",
     "check:highlight": "node scripts/gen-highlight.mjs --check",
     "check:bundle": "spago build -p flatbars-js && node scripts/check-bundle.mjs",
-    "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/open-in-lab.test.mjs",
+    "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs",
     "cli": "spago run -p flatbars-cli",
     "lab": "node scripts/serve-lab.mjs",
     "docs": "antora docs/antora.yml",
