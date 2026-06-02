@@ -16,12 +16,15 @@ module FlatBars.Syntax
   , Sigil(..)
   , Expr(..)
   , Directive
+  , splitBlockArgs
   ) where
 
 import Prelude
 
+import Data.Array (findMap, mapMaybe) as Array
+import Data.Maybe (Maybe(..))
 import FlatBars.Span (Span)
-import FlatBars.Value (Value)
+import FlatBars.Value (Value(..))
 
 type Ident = String
 
@@ -98,3 +101,29 @@ instance showNode :: Show Node where
       "Block " <> show sig <> " " <> show n <> " " <> show args <> " " <> show body
     RawBlock _ n args raw -> "RawBlock " <> show n <> " " <> show args <> " " <> show raw
     Sep _ n args -> "Sep " <> show n <> " " <> show args
+
+-- | Split a block head's arguments into the positional args, the surface hash,
+-- | and the `as |…|` block-param names — recognising the reserved `@hash` /
+-- | `@param` markers a dialect surface emits for a *block* head (ADR-020 Phase 3).
+-- | Pure and structural: it assigns no meaning, only reshapes `Expr`s — `@hash`
+-- | demarkers to a `dict` application (the value built-ins already expect),
+-- | `@param` to its bare name literal. A no-op when no markers are present (e.g.
+-- | RawBars/MaxBars/MinBars, or inline calls), so it is safe as the default split.
+splitBlockArgs
+  :: Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }
+splitBlockArgs args =
+  { positional: map demarker args
+  , hash: Array.findMap asHash args
+  , params: Array.mapMaybe asParam args
+  }
+  where
+  demarker = case _ of
+    App "@hash" pairs -> App "dict" pairs
+    App "@param" [ Lit (VString n) ] -> Lit (VString n)
+    e -> e
+  asHash = case _ of
+    App "@hash" pairs -> Just (App "dict" pairs)
+    _ -> Nothing
+  asParam = case _ of
+    App "@param" [ Lit (VString n) ] -> Just n
+    _ -> Nothing

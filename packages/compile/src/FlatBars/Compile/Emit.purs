@@ -26,7 +26,7 @@ import Data.Set as Set
 import Data.String (joinWith)
 import FlatBars.Compile (Ctx, Emit, Rec, jsString)
 import FlatBars.Error (Error(..), ParseError(..))
-import FlatBars.Syntax (Directive, Expr(..), Ident, Template)
+import FlatBars.Syntax (Directive, Expr(..), Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
 import Kernel.Value (FalsySet, FalsyShape(..), resolveTruthiness)
 import Kernel.Walk (Clause, splitClauses)
@@ -121,14 +121,21 @@ args' rec ctx = joinWith ", " <<< map (rec.expr ctx)
 --------------------------------------------------------------------------------
 
 fbBlock :: Rec -> Ctx -> Ident -> Array Expr -> Template -> String
-fbBlock rec ctx name args body = case name of
-  "if" -> ifBlock rec ctx (truthyTest rec ctx args) body
-  "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx args <> ")") body
-  "each" -> frameBlock rec ctx "each" args body
-  "with" -> frameBlock rec ctx "with" args body
-  -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
-  "inline" -> ""
-  _ -> rtBlock rec ctx name args body
+fbBlock rec ctx name args body =
+  -- Demarker `@hash`/`@param` once, centrally (ADR-020 Phase 3): every lowering
+  -- then sees the plain positional args it saw before (the interpreter does the
+  -- same in its `blockArgs` seam). `rtBlock` also reads the hash/param channel.
+  let
+    pos = (splitBlockArgs args).positional
+  in
+    case name of
+      "if" -> ifBlock rec ctx (truthyTest rec ctx pos) body
+      "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx pos <> ")") body
+      "each" -> frameBlock rec ctx "each" pos body
+      "with" -> frameBlock rec ctx "with" pos body
+      -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
+      "inline" -> ""
+      _ -> rtBlock rec ctx name pos body
 
 -- The condition test: 1 arg ⇒ `rt.truthy`; an options object (includeZero) ⇒
 -- `rt.truthyWith`.

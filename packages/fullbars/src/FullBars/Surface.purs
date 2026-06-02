@@ -138,7 +138,7 @@ desugarWith lv clauseNames = go []
         let
           { mainArgs, params } = extractBlockParams args
         in
-          Block sp Section name (rewriteArgs lv scope mainArgs <> map (Lit <<< VString) params)
+          Block sp Section name (blockHeadArgs lv scope mainArgs params)
             (go (scope <> params) (expandElseIf body))
       -- the Mustache-inheritance shapes `{{<name}}` (Parent) / `{{$name}}`
       -- (BlockDef) are gated off for FullBars (`inheritance = false`), so the
@@ -148,7 +148,7 @@ desugarWith lv clauseNames = go []
         let
           { mainArgs, params } = extractBlockParams args
         in
-          Block sp sig name (rewriteArgs lv scope mainArgs <> map (Lit <<< VString) params)
+          Block sp sig name (blockHeadArgs lv scope mainArgs params)
             (go (scope <> params) (expandElseIf body))
       -- raw blocks are verbatim (surface.adoc §5.8).
       RawBlock sp name args raw -> RawBlock sp name args raw
@@ -253,6 +253,23 @@ rewriteArgs lv scope args =
 
 dictExpr :: Array { key :: String, val :: Expr } -> Expr
 dictExpr pairs = App "dict" (Array.concatMap (\p -> [ Lit (VString p.key), p.val ]) pairs)
+
+-- | A *block* head's arguments, like `rewriteArgs` but emitting the reserved
+-- | `@hash` / `@param` markers (ADR-020 Phase 3) so the engine's `blockArgs` seam
+-- | can route the hash and `as |a b|` names to a user block helper's `options`.
+-- | The markers demarker back to `dict` / bare name literals (`splitBlockArgs`),
+-- | so built-ins (and inline calls, which keep `dict`) are unchanged.
+blockHeadArgs :: LoopVars -> Scope -> Array Expr -> Array String -> Array Expr
+blockHeadArgs lv scope mainArgs params =
+  let
+    h = collectHash lv scope mainArgs
+    pos = map (rewrite lv scope) h.positional
+    withHash = if Array.null h.pairs then pos else Array.snoc pos (hashMarker h.pairs)
+  in
+    withHash <> map paramMarker params
+  where
+  hashMarker pairs = App "@hash" (Array.concatMap (\p -> [ Lit (VString p.key), p.val ]) pairs)
+  paramMarker p = App "@param" [ Lit (VString p) ]
 
 -- | Partition arguments into positional ones and `key=value` hash pairs. A hash
 -- | argument is a bare ident containing `=`: either glued (`k=v`) or a trailing

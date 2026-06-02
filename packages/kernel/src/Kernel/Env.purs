@@ -41,7 +41,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
-import FlatBars.Syntax (Ident, Template)
+import FlatBars.Syntax (Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value)
 import Kernel.Engine (Engine, Operation)
 import Kernel.Value (FalsySet, handlebars, stringify)
@@ -183,8 +183,9 @@ refEngineWith onMissing initial =
       Just h -> pure h
       Nothing -> onMissing env name
   , stringify: \v -> liftEither (stringify v)
-  -- Default identity split: every argument is positional, no hash, no block
-  -- params (RawBars/MaxBars surface emits no `@hash`/`@param` markers). FullBars
-  -- overrides this via `refEngineBlockArgs` (ADR-020 Phase 3).
-  , blockArgs: \args -> { positional: args, hash: Nothing, params: [] }
+  -- The marker-aware split (ADR-020 Phase 3). Recognises FullBars' `@hash`/`@param`
+  -- block markers; a no-op for RawBars/MaxBars, which emit none — so this is safe
+  -- as the shared default. `splitBlockArgs` demarkers the positional list, so
+  -- built-in helpers receive exactly the values they did before.
+  , blockArgs: splitBlockArgs
   }

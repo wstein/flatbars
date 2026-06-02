@@ -14,7 +14,7 @@
 // bottom is guarded so importing the module in Node is side-effect-free.
 
 import { buildHelpers } from "./helpers.mjs";
-import { renderWith, safe } from "./vendor/flatbars-engine.mjs?v=11";
+import { renderWith, safe } from "./vendor/flatbars-engine.mjs?v=12";
 
 const DEPS = { buildHelpers, renderWith, safe };
 
