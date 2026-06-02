@@ -117,7 +117,20 @@ test("options.fn(ctx) shifts context; options.inverse renders {{else}} (ADR-020)
   assert.equal(renderWith(helpers, {}, "{{#ifAny xs}}some{{else}}none{{/ifAny}}", { xs: [] }).value, "none");
 });
 
-test("v1 block options surface is fn/inverse — the rest throw (ADR-020)", () => {
+test("a block helper supplies scoped @vars via options.fn(ctx, { data }) (ADR-020 Phase 2)", () => {
+  const { helpers } = buildHelpers(
+    "registerHelper('idx', (items, o) =>\n" +
+      "  items.map((x, i) => o.fn(x, { data: { index: i, first: i === 0 } })).join(''))",
+    safe,
+  );
+  assert.equal(
+    renderWith(helpers, {}, "{{#idx items}}{{@index}}{{#if @first}}*{{/if}}:{{label}} {{/idx}}",
+      { items: [{ label: "a" }, { label: "b" }] }).value,
+    "0*:a 1:b ",
+  );
+});
+
+test("block options surface is fn/inverse/data — hash etc. throw (ADR-020)", () => {
   const { helpers } = buildHelpers("registerHelper('h', (options) => options.hash.x)", safe);
   const r = renderWith(helpers, {}, "{{#h}}b{{/h}}", {});
   assert.equal(r.ok, false);
