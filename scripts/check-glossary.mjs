@@ -18,6 +18,8 @@ import { dirname, resolve } from "node:path";
 const pages = resolve(dirname(fileURLToPath(import.meta.url)), "../docs/modules/ROOT/pages");
 const concepts = readFileSync(resolve(pages, "concepts.adoc"), "utf8");
 const hostApi = readFileSync(resolve(pages, "host-api.adoc"), "utf8");
+const rawbars = readFileSync(resolve(pages, "adr-0008-rawbars.adoc"), "utf8");
+const maxbars = readFileSync(resolve(pages, "maxbars.adoc"), "utf8");
 
 const fail = [];
 const need = (cond, msg) => { if (!cond) fail.push(msg); };
@@ -56,10 +58,19 @@ need(/registerHelper/.test(hostApi), "host-api.adoc: must keep `registerHelper` 
 need(/\bhelper\b/i.test(hostApi), "host-api.adoc: must keep the word \"helper\" (the migrator's term)");
 need(/`Operation`|Operation m /.test(hostApi), "host-api.adoc §7.3/§7.4: the helper fn must follow the `Operation` contract (renamed type)");
 
+// The SECOND boundary spelling (ADR-019 addendum): the native dialects expose
+// host-registered operations as `renderWithOperations`, NOT `renderWith`/
+// `registerHelper` — the FullBars-frozen word. Both dialect pages must document
+// the native spelling so the two registers cannot drift back together.
+need(/renderWithOperations/.test(rawbars), "adr-0008-rawbars.adoc: must document `renderWithOperations` (native operation boundary, ADR-019 addendum)");
+need(/\boperation/i.test(rawbars), "adr-0008-rawbars.adoc: must use the native word \"operation\" (not \"helper\") for RawBars");
+need(/renderWithOperations/.test(maxbars), "maxbars.adoc: must document `renderWithOperations` (native operation boundary, ADR-019 addendum)");
+need(/\boperation/i.test(maxbars), "maxbars.adoc: must use the native word \"operation\" (not \"helper\") for MaxBars");
+
 if (fail.length) {
   console.error("✗ operation-vocabulary check failed (ADR-019):");
   for (const m of fail) console.error("  - " + m);
   console.error("  Fix the glossary (concepts.adoc) or host-api.adoc so the two registers agree.");
   process.exit(1);
 }
-console.log(`✓ operation vocabulary coherent — ${terms.length} native terms paired with their host-API synonyms`);
+console.log(`✓ operation vocabulary coherent — ${terms.length} native terms paired with their host-API synonyms; renderWithOperations documented for RawBars + MaxBars`);

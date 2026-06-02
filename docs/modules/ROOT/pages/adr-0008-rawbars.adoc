@@ -35,6 +35,14 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
   async (`renderAff`, in `ExceptT Error Aff`), and as a JS-compiling target
   (`compileJs`/`compileJsWith`) — so RawBars covers every host shape the engine supports.
 
+. *Host-registered operations.* `renderWithOperations` (ADR-019 addendum) renders against a bag of
+  host-supplied *operations* — the native boundary word for what FullBars calls a *helper*
+  (`renderWith`). RawBars stays *strict*: an unknown head is an `UnknownHelper`, never the lenient
+  `blockHelperMissing`. A *block* operation gets `options.fn(ctx)` / `options.inverse(ctx)` and may
+  supply scoped data through `options.fn(ctx, { data })` (read back as a core operation name, since
+  RawBars has no `@var` surface). It has *no* `options.hash` and *no* block params — core syntax has
+  no `k=v` or `pass:[as |x|]` to write. From JS, `renderRawWith` marshals plain functions in.
+
 == Consequences
 
 * *Pro:* the substrate's central promise is a *running dialect*, not prose; the FullBars-free closure

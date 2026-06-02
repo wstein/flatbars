@@ -109,6 +109,32 @@ still takes a parenthesised condition — `pass:[{{elif (a && b)}}]`,
 `pass:[{{else if (a && b)}}]` — because separators share their tag shape with
 output expressions.
 
+== Host-registered operations
+
+`renderWithOperations` renders MaxBars source against a bag of host-supplied
+*operations* (ADR-019 addendum) — the native boundary word for what FullBars
+calls a *helper* (`renderWith` / `registerHelper`). It is the same marshaller and
+runtime; only the dialect surface and the vocabulary differ.
+
+[source,purescript]
+----
+renderWithOperations
+  :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
+  -> Array (Tuple String String)   -- partials (MaxBars source)
+  -> String -> Value -> Either String String
+----
+
+A *block* operation receives a Handlebars-style `options`: `options.fn(ctx)`
+renders the body (shifting context), `options.inverse(ctx)` the `pass:[{{else}}]`
+clause, `options.hash` the surface `k=v` arguments, and `options.fn(ctx, { data })`
+supplies scoped `@vars`. MaxBars is *lenient* (it inherits the
+`blockHelperMissing` resolve), so an unknown head falls through rather than
+erroring. Block parameters (`pass:[as |x|]`) are the one piece of the surface
+*not* reachable — see the limitation below.
+
+From a JS host, `renderMaxWith(operations, partials, template, data)` marshals
+plain functions into these operations (the FlatBars Lab and `flatbars-js`).
+
 == v1 limitations
 
 * **Clause separators need parenthesised conditions** — `pass:[{{elif (a && b)}}]`
