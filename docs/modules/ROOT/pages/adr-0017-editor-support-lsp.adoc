@@ -1,0 +1,118 @@
+= ADR-017: Editor support via an engine-backed LSP, with a mandatory TextMate fallback
+:navtitle: ADR-017 Editor support (LSP + TextMate)
+
+*Status:* Proposed. *Date:* 2026-06-02. Builds on
+xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014] (highlighting derives from the lexer) and
+xref:adr-0001-structural-parser-and-walker.adoc[ADR-001] (one structural parser); the stateful driver is
+xref:adr-0015-set-delimiters.adoc[ADR-015] (set delimiters). This record extends "one grammar, derived
+downstream" from our own front-ends (the Lab, the tutorials) to *third-party editors* — VS Code and
+JetBrains — for production use.
+
+== Context
+
+Production use needs VS Code and JetBrains plugins with first-class DX. ADR-014 already decided that
+highlighting must derive from the engine lexer rather than a forked grammar, but it spoke to our
+in-process JS front-ends (the Lab's CodeMirror plugin, the tutorials' overlay). Real editors need a
+*delivery mechanism*, and that forces a sharper question than "which grammar format."
+
+The decisive constraint is that highlighting FlatBars is *stateful and content-dependent*:
+
+* *Set delimiters* (ADR-015): after `pass:[{{=<% %>=}}]` every later tag uses the new pair until
+  `pass:[<%={{ }}=%>]`. A correct highlighter must carry the *active delimiter pair* as state across the
+  document.
+* *Per-dialect grammar*: the `parseExpr` / `parseHead` seam and `LexOptions` make tag interiors and the
+  legal shape set differ across RawBars / FullBars / MaxBars / MinBars; the separator set that paints as
+  a statement is the parser's own `standaloneSeps` (empty for MinBars), never a fixed keyword list.
+* Raw blocks `pass:[{{{{ … }}}}]`, long comments `pass:[{{!-- … --}}]`, the inheritance sigils
+  `pass:[{{<}}]` / `pass:[{{$}}]`.
+
+Stateless mechanisms cannot express this. A *TextMate* grammar has a scope stack (begin/end) but no data
+state — it cannot capture "the delimiters are now `<% %>`" and use it later. A *tree-sitter* grammar is
+context-free for the same reason; its only escape hatch is a hand-written C *external scanner*, i.e. a
+second copy of the delimiter logic. So a grammar-format highlighter is *structurally incapable* of being
+correct for FlatBars, and — per ADR-014's Exhibits A & B and the tutorials' YAML `111` bug — any second
+definition of the grammar drifts from the engine.
+
+The engine lexer already implements the state (it threads `mustacheDelims`), is dialect-scoped, and is
+*already JavaScript* (the `flatbars-js` bundle the Lab and tutorials load). The way to highlight
+correctly in any editor is therefore to *run the engine lexer*, not to approximate it.
+
+== Decision
+
+. *Editor support derives from the engine; the authoritative highlighter is the engine lexer delivered
+  as LSP semantic tokens.* A single language server (`flatbars-lsp`, Node, embedding the `flatbars-js`
+  bundle and the ADR-014 `tokenize(source, { dialect })` API) computes positioned token kinds for the
+  document — stateful by construction, so set delimiters, dialects, raw blocks and separators are all
+  correct because there is no second grammar to be wrong. Both VS Code (semantic-tokens LSP client) and
+  JetBrains (LSP API, 2023.2+) consume *the same server*; one implementation, all editors. The server is
+  also the substrate for the rest of DX — diagnostics from a *tolerant* parse (errors + spans; the
+  canonical `parse` stays fail-fast/total per ADR-001, only tooling consumes the recovering variant),
+  helper hover/completion from `preludeSchema` and the catalog, and go-to-partial. Highlighting is the
+  first feature on this substrate, not a separate subsystem.
+
+. *A shared `flatbars.tmLanguage.json` is a mandatory, committed fallback — not optional.* Every plugin
+  ships it. The LSP is not always present or instant, and some contexts have *no* language server at
+  all, where the TextMate grammar is the only highlighting the user ever sees:
++
+--
+* first paint, before the server activates / attaches;
+* environments with no LSP: code review on GitHub/Gitea, diffs, `bat`/`less`/`cat` previews, marketplace
+  screenshots, documentation code blocks;
+* JetBrains' TextMate-bundle path for files before (or without) the plugin;
+* a degraded/crashed or still-starting server — DX must never fall to *no* colour.
+--
++
+Because those contexts are real and unavoidable, shipping the grammar is non-negotiable. It is, however,
+explicitly *best-effort and non-authoritative*: being stateless it colours the *default-delimiter* forms
+(`pass:[{{ }}]`, `pass:[{{{ }}}]`, `pass:[{{# }}]`, `pass:[{{! }}]`, `pass:[{{> }}]`, `pass:[{{< }}]`,
+`pass:[{{$ }}]`) and gives up *gracefully* on set-delimiter regions and MaxBars operators (it leaves them
+plain rather than mis-colouring). When the LSP is attached, semantic tokens override it and correct the
+stateful regions. The grammar is the floor; the engine is the ceiling.
+
+. *The fallback is a derived artifact and MUST be drift-bounded, like every other.* Because it is a
+  second representation of the grammar, it gets the same discipline ADR-014 mandates: it is generated
+  from / pinned against the engine for the default-delimiter corpus by a gate (extend `check:highlight`,
+  or a `gen:tmgrammar` mirroring `gen:highlight`), wired into `npm test`, and labelled in-source
+  "approximate fallback — the LSP is authoritative." ADR-014's stopgap was *time-boxed*; this fallback is
+  *permanent* (it serves the no-LSP contexts forever), so its gate is permanent too. The token vocabulary
+  is defined once and shared by three consumers — the `tokenize` API, the semantic-token legend, and the
+  TextMate scopes — so they cannot name kinds differently.
+
+. *Reject tree-sitter as the FlatBars parser/highlighter.* A tree-sitter grammar is a second source of
+  truth (the drift ADR-001 and ADR-014 exist to prevent); it cannot track the dialect seam without N
+  grammars; its statefulness requires a hand-written C external scanner duplicating set-delimiter logic;
+  and it is not JetBrains' highlighting path, so it would not unify editors. If Zed / Neovim / GitHub
+  tree-sitter highlighting later becomes a goal, a tree-sitter grammar may be added as *another
+  non-authoritative fallback* under the same drift gate — never as the engine's parser.
+
+. *Reject native per-editor lexers* (a JFlex/Kotlin lexer for JetBrains plus a separate VS Code
+  tokenizer). That is two more grammar copies, maximal drift, and double maintenance — the opposite of
+  one source of truth, for no benefit the LSP does not already give.
+
+== Consequences
+
+* One server, two (and more) plugins. The `flatbars-js` bundle runs inside `flatbars-lsp`; the existing
+  `check:bundle` gate keeps the editor's engine from going stale against the PureScript source.
+* The highlighting *layering* — TextMate first-paint, then semantic tokens as authority — is the standard
+  industry pattern (TypeScript, rust-analyzer). At template sizes the semantic round-trip is
+  imperceptible.
+* *Two highlighting representations exist by design* (the engine and the TextMate fallback). Unlike the
+  drift ADR-014 fought, the authority is unambiguous (the engine always wins where it runs), and the
+  fallback is gated, scoped to default delimiters, and labelled — *bounded* drift, not silent drift.
+* The Lab's hand-written `StreamLanguage` and the tutorials' regex (ADR-014) still retire in favour of
+  the engine `tokenize` API; the TextMate grammar is for *external / no-LSP* contexts, not for our own
+  in-process front-ends.
+* Set-delimiter and MaxBars-operator regions are *knowingly* approximate without a server — documented,
+  and corrected the instant one attaches. That is the honest limit of any stateless fallback, and the
+  reason the fallback is a floor rather than the design.
+
+== Open questions
+
+* *Token vocabulary.* Define the stable kind set (tag-role × interior-role) that the `tokenize` API, the
+  LSP semantic-token legend, and the TextMate scopes all map to — the single contract the three
+  consumers share.
+* *Incremental semantic tokens.* Whole-document retokenization is fine at current sizes; add range
+  requests / deltas only if a profile shows it (ties to the deferred incremental-parse trigger noted in
+  the parser review).
+* *Grammar provenance.* Whether the `flatbars.tmLanguage.json` is hand-authored with a conformance gate or
+  generated from the engine's default-delimiter token boundaries; generation is preferred where feasible.
