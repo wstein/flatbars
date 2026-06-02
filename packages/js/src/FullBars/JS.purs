@@ -21,6 +21,7 @@ module FullBars.JS
   , compileMinbarsWithPartials
   , renderSurfaceWithPartials
   , renderMustache
+  , highlightSpans
   ) where
 
 import Prelude
@@ -33,7 +34,9 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), parse, parseErrorAt, parseWith)
+import FlatBars.Highlight (HSpan, HighlightConfig, highlightSpans) as Highlight
 import FlatBars.Json (fromJson)
+import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
@@ -113,6 +116,35 @@ compileResult :: forall e. Show e => Either e String -> Result
 compileResult = case _ of
   Left e -> { ok: false, value: "", error: show e }
   Right js -> { ok: true, value: js, error: "" }
+
+--------------------------------------------------------------------------------
+-- Syntax-highlighting spans (ADR-014)
+--------------------------------------------------------------------------------
+
+-- | Tokenize template source into highlight spans for the given dialect
+-- | (`"rawbars"` | `"fullbars"` | `"maxbars"` | `"minbars"`; anything else is
+-- | treated as `"fullbars"`). `highlightSpans(template, dialect)` returns a plain
+-- | JS array of `{ from, to, kind }` (UTF-16 offsets + a kind tag). Highlighting
+-- | derives from the engine lexer, so it is correct on set delimiters and on each
+-- | dialect's tag boundaries and clause keywords (`{{else}}`/`{{elif}}`). See
+-- | `FlatBars.Highlight`.
+highlightSpans :: Fn2 String String (Array Highlight.HSpan)
+highlightSpans = mkFn2 \tpl dialect -> Highlight.highlightSpans (highlightConfig dialect) tpl
+
+-- | Map a dialect name to its highlight seams, mirroring each dialect's own parse
+-- | settings (the single source of truth — drift is caught by `check:highlight`):
+-- | RawBars/MaxBars/MinBars enable the `{{=A B=}}` set-delimiter tag
+-- | (`mustacheDelims`), FullBars does not; the kernel dialects treat
+-- | `else`/`elif` as clause separators, MinBars (Mustache) treats none.
+highlightConfig :: String -> Highlight.HighlightConfig
+highlightConfig = case _ of
+  "maxbars" -> { lexConfig: maxOptions.lexConfig, clauseSeps: maxOptions.standaloneSeps }
+  "rawbars" -> { lexConfig: withSetDelims, clauseSeps: kernelClauses }
+  "minbars" -> { lexConfig: withSetDelims, clauseSeps: [] }
+  _ -> { lexConfig: defaultLexConfig, clauseSeps: kernelClauses }
+  where
+  withSetDelims = defaultLexConfig { mustacheDelims = true }
+  kernelClauses = [ "else", "elif" ]
 
 --------------------------------------------------------------------------------
 -- AST for the polyglot lab seam

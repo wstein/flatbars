@@ -16,6 +16,8 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseWith, spanText)
+import FlatBars.Highlight (HighlightConfig, highlightSpans)
+import FlatBars.Lexer (defaultLexConfig)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -45,6 +47,17 @@ nodeCount src = case parse src of
     , concat: Array.foldl (+) 0
     }
     t
+
+-- Highlight configs: a kernel-dialect config (FullBars-like — `else`/`elif` are
+-- clause separators) and a Mustache config (set delimiters on, no clause words).
+hlKernel :: HighlightConfig
+hlKernel = { lexConfig: defaultLexConfig, clauseSeps: [ "else", "elif" ] }
+
+hlMustache :: HighlightConfig
+hlMustache = { lexConfig: defaultLexConfig { mustacheDelims = true }, clauseSeps: [] }
+
+kinds :: HighlightConfig -> String -> Array String
+kinds cfg src = map _.kind (highlightSpans cfg src)
 
 main :: Effect Unit
 main = do
@@ -329,5 +342,41 @@ main = do
               ]
           )
     )
+
+  -- Highlight spans (ADR-014): derived from the lexer, so exact and per-dialect.
+  assert' "highlight: bare interpolation is one expr span"
+    (highlightSpans hlKernel "{{name}}" == [ { from: 0, to: 8, kind: "expr" } ])
+  assert' "highlight: {{else}} is a clause keyword between block open/close"
+    ( highlightSpans hlKernel "{{#if c}}t{{else}}e{{/if}}" ==
+        [ { from: 0, to: 9, kind: "block-open" }
+        , { from: 10, to: 18, kind: "keyword" }
+        , { from: 19, to: 26, kind: "block-close" }
+        ]
+    )
+  assert' "highlight: {{elif …}} is also a clause keyword"
+    (kinds hlKernel "{{#if c}}{{elif d}}{{/if}}" == [ "block-open", "keyword", "block-close" ])
+  -- Dialect-dependent (IoC): with no clause separators (MinBars), `{{else}}` is
+  -- an ordinary interpolation, never a keyword.
+  assert' "highlight: {{else}} is expr when the dialect has no clause words"
+    (kinds hlMustache "{{else}}" == [ "expr" ])
+  assert' "highlight: {{> p}} is a partial"
+    (highlightSpans hlKernel "{{> p}}" == [ { from: 0, to: 7, kind: "partial" } ])
+  -- The inheritance sigils the old regex mis-painted as plain expressions.
+  assert' "highlight: inheritance {{<…}}/{{$…}} sigils are block kinds"
+    ( kinds hlKernel "{{<base}}{{$title}}d{{/title}}{{/base}}" ==
+        [ "block-parent", "block-decl", "block-close", "block-close" ]
+    )
+  assert' "highlight: triple-stash is raw, comment is comment"
+    (kinds hlKernel "{{{x}}}{{! hi }}" == [ "raw", "comment" ])
+  -- Set delimiters are stateful — only the lexer (which carries the live pair)
+  -- gets this right: after `{{=<% %>=}}` the following `<%y%>` is the active tag.
+  assert' "highlight: set-delimiter switch is stateful"
+    ( highlightSpans hlMustache "{{=<% %>=}}x<%y%>" ==
+        [ { from: 0, to: 11, kind: "set-delimiter" }
+        , { from: 12, to: 17, kind: "expr" }
+        ]
+    )
+  assert' "highlight: a lex error degrades to no spans (plain text)"
+    (highlightSpans hlKernel "{{oops" == [])
 
   log "all framework tests passed"

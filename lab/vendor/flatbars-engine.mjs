@@ -2583,6 +2583,77 @@ var foldableList = {
   }
 };
 
+// output/Data.List/index.js
+var reverse2 = /* @__PURE__ */ function() {
+  var go = function($copy_v) {
+    return function($copy_v1) {
+      var $tco_var_v = $copy_v;
+      var $tco_done = false;
+      var $tco_result;
+      function $tco_loop(v, v1) {
+        if (v1 instanceof Nil) {
+          $tco_done = true;
+          return v;
+        }
+        ;
+        if (v1 instanceof Cons) {
+          $tco_var_v = new Cons(v1.value0, v);
+          $copy_v1 = v1.value1;
+          return;
+        }
+        ;
+        throw new Error("Failed pattern match at Data.List (line 368, column 3 - line 368, column 19): " + [v.constructor.name, v1.constructor.name]);
+      }
+      ;
+      while (!$tco_done) {
+        $tco_result = $tco_loop($tco_var_v, $copy_v1);
+      }
+      ;
+      return $tco_result;
+    };
+  };
+  return go(Nil.value);
+}();
+var head2 = function(v) {
+  if (v instanceof Nil) {
+    return Nothing.value;
+  }
+  ;
+  if (v instanceof Cons) {
+    return new Just(v.value0);
+  }
+  ;
+  throw new Error("Failed pattern match at Data.List (line 230, column 1 - line 230, column 22): " + [v.constructor.name]);
+};
+
+// output/Data.String.Common/foreign.js
+var replaceAll = function(s1) {
+  return function(s2) {
+    return function(s3) {
+      return s3.replace(new RegExp(s1.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "g"), s2);
+    };
+  };
+};
+var split = function(sep) {
+  return function(s) {
+    return s.split(sep);
+  };
+};
+var toLower = function(s) {
+  return s.toLowerCase();
+};
+var toUpper = function(s) {
+  return s.toUpperCase();
+};
+var trim = function(s) {
+  return s.trim();
+};
+var joinWith = function(s) {
+  return function(xs) {
+    return xs.join(s);
+  };
+};
+
 // output/Data.Map.Internal/index.js
 var $runtime_lazy2 = function(name2, moduleName, init) {
   var state2 = 0;
@@ -3097,7 +3168,7 @@ var stepAsc = /* @__PURE__ */ function() {
   })($$const(IterDone.value));
 }();
 var eqMapIter = function(dictEq) {
-  var eq14 = eq(dictEq);
+  var eq15 = eq(dictEq);
   return function(dictEq1) {
     var eq22 = eq(dictEq1);
     return {
@@ -3111,7 +3182,7 @@ var eqMapIter = function(dictEq) {
               var v = stepAsc(a);
               if (v instanceof IterNext) {
                 var v2 = stepAsc(b);
-                if (v2 instanceof IterNext && (eq14(v.value0)(v2.value0) && eq22(v.value1)(v2.value1))) {
+                if (v2 instanceof IterNext && (eq15(v.value0)(v2.value0) && eq22(v.value1)(v2.value1))) {
                   $tco_var_a = v.value2;
                   $copy_b = v2.value2;
                   return;
@@ -3213,7 +3284,7 @@ var functorMap = {
 var eqMap = function(dictEq) {
   var eqMapIter1 = eqMapIter(dictEq);
   return function(dictEq1) {
-    var eq14 = eq(eqMapIter1(dictEq1));
+    var eq15 = eq(eqMapIter1(dictEq1));
     return {
       eq: function(xs) {
         return function(ys) {
@@ -3227,7 +3298,7 @@ var eqMap = function(dictEq) {
           ;
           if (xs instanceof Node) {
             if (ys instanceof Node && xs.value1 === ys.value1) {
-              return eq14(toMapIter(xs))(toMapIter(ys));
+              return eq15(toMapIter(xs))(toMapIter(ys));
             }
             ;
             return false;
@@ -3408,106 +3479,6 @@ var eqValue = {
   }
 };
 
-// output/FlatBars.Json/index.js
-var $runtime_lazy3 = function(name2, moduleName, init) {
-  var state2 = 0;
-  var val;
-  return function(lineNumber) {
-    if (state2 === 2) return val;
-    if (state2 === 1) throw new ReferenceError(name2 + " was needed before it finished initializing (module " + moduleName + ", line " + lineNumber + ")", moduleName, lineNumber);
-    state2 = 1;
-    val = init();
-    state2 = 2;
-    return val;
-  };
-};
-var map5 = /* @__PURE__ */ map(functorArray);
-var fromFoldable1 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
-var toUnfoldable1 = /* @__PURE__ */ toUnfoldable2(unfoldableArray);
-var $lazy_fromJson = /* @__PURE__ */ $runtime_lazy3("fromJson", "FlatBars.Json", function() {
-  return caseJson(function(v) {
-    return VNull.value;
-  })(VBool.create)(VNumber.create)(VString.create)(function(arr2) {
-    return new VArray(map5($lazy_fromJson(25))(arr2));
-  })(function(obj2) {
-    return new VObject(fromFoldable1(map5(function(v) {
-      return new Tuple(v.value0, $lazy_fromJson(28)(v.value1));
-    })(toUnfoldable1(obj2))));
-  });
-});
-var fromJson = /* @__PURE__ */ $lazy_fromJson(19);
-
-// output/Data.List/index.js
-var reverse2 = /* @__PURE__ */ function() {
-  var go = function($copy_v) {
-    return function($copy_v1) {
-      var $tco_var_v = $copy_v;
-      var $tco_done = false;
-      var $tco_result;
-      function $tco_loop(v, v1) {
-        if (v1 instanceof Nil) {
-          $tco_done = true;
-          return v;
-        }
-        ;
-        if (v1 instanceof Cons) {
-          $tco_var_v = new Cons(v1.value0, v);
-          $copy_v1 = v1.value1;
-          return;
-        }
-        ;
-        throw new Error("Failed pattern match at Data.List (line 368, column 3 - line 368, column 19): " + [v.constructor.name, v1.constructor.name]);
-      }
-      ;
-      while (!$tco_done) {
-        $tco_result = $tco_loop($tco_var_v, $copy_v1);
-      }
-      ;
-      return $tco_result;
-    };
-  };
-  return go(Nil.value);
-}();
-var head2 = function(v) {
-  if (v instanceof Nil) {
-    return Nothing.value;
-  }
-  ;
-  if (v instanceof Cons) {
-    return new Just(v.value0);
-  }
-  ;
-  throw new Error("Failed pattern match at Data.List (line 230, column 1 - line 230, column 22): " + [v.constructor.name]);
-};
-
-// output/Data.String.Common/foreign.js
-var replaceAll = function(s1) {
-  return function(s2) {
-    return function(s3) {
-      return s3.replace(new RegExp(s1.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "g"), s2);
-    };
-  };
-};
-var split = function(sep) {
-  return function(s) {
-    return s.split(sep);
-  };
-};
-var toLower = function(s) {
-  return s.toLowerCase();
-};
-var toUpper = function(s) {
-  return s.toUpperCase();
-};
-var trim = function(s) {
-  return s.trim();
-};
-var joinWith = function(s) {
-  return function(xs) {
-    return xs.join(s);
-  };
-};
-
 // output/FlatBars.Syntax/index.js
 var Section = /* @__PURE__ */ function() {
   function Section2() {
@@ -3664,655 +3635,13 @@ var eqSigil = {
   }
 };
 
-// output/FlatBars.Token/index.js
-var eq12 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
-var TIdent = /* @__PURE__ */ function() {
-  function TIdent2(value0) {
-    this.value0 = value0;
-  }
-  ;
-  TIdent2.create = function(value0) {
-    return new TIdent2(value0);
-  };
-  return TIdent2;
-}();
-var TStr = /* @__PURE__ */ function() {
-  function TStr2(value0) {
-    this.value0 = value0;
-  }
-  ;
-  TStr2.create = function(value0) {
-    return new TStr2(value0);
-  };
-  return TStr2;
-}();
-var TNum = /* @__PURE__ */ function() {
-  function TNum2(value0) {
-    this.value0 = value0;
-  }
-  ;
-  TNum2.create = function(value0) {
-    return new TNum2(value0);
-  };
-  return TNum2;
-}();
-var TLParen = /* @__PURE__ */ function() {
-  function TLParen2() {
-  }
-  ;
-  TLParen2.value = new TLParen2();
-  return TLParen2;
-}();
-var TRParen = /* @__PURE__ */ function() {
-  function TRParen2() {
-  }
-  ;
-  TRParen2.value = new TRParen2();
-  return TRParen2;
-}();
-var TOp = /* @__PURE__ */ function() {
-  function TOp2(value0) {
-    this.value0 = value0;
-  }
-  ;
-  TOp2.create = function(value0) {
-    return new TOp2(value0);
-  };
-  return TOp2;
-}();
-var $$unescape = function(v) {
-  if (v === "\\") {
-    return new Just("\\");
-  }
-  ;
-  if (v === '"') {
-    return new Just('"');
-  }
-  ;
-  if (v === "'") {
-    return new Just("'");
-  }
-  ;
-  if (v === "n") {
-    return new Just("\n");
-  }
-  ;
-  if (v === "t") {
-    return new Just("	");
-  }
-  ;
-  if (v === "r") {
-    return new Just("\r");
-  }
-  ;
-  return Nothing.value;
-};
-var isWs = function(c) {
-  return c === " " || (c === "	" || (c === "\n" || c === "\r"));
-};
-var isDigit = function(c) {
-  return c >= "0" && c <= "9";
-};
-var isNumChar = function(c) {
-  return isDigit(c) || c === ".";
-};
-var isAlpha = function(c) {
-  return c >= "a" && c <= "z" || c >= "A" && c <= "Z";
-};
-var isIdentChar = function(c) {
-  return isAlpha(c) || (isDigit(c) || (c === "_" || (c === "-" || (c === "." || (c === "@" || (c === "/" || (c === "+" || (c === "*" || (c === "?" || c === "=")))))))));
-};
-var tokenizeInterior = function(cfg) {
-  return function(base) {
-    return function(src) {
-      var push3 = function(acc) {
-        return function(t) {
-          return function(i) {
-            return snoc(acc)({
-              tok: t,
-              at: base + i | 0
-            });
-          };
-        };
-      };
-      var cs = toCharArray(src);
-      var len = length(cs);
-      var slc = function(a) {
-        return function(b) {
-          return fromCharArray(slice(a)(b)(cs));
-        };
-      };
-      var bad = function(i) {
-        return new Left(new LexError("unexpected character", base + i | 0));
-      };
-      var at = function(i) {
-        return index(cs)(i);
-      };
-      var arithChar = function(c) {
-        return c === "+" || (c === "-" || (c === "*" || (c === "/" || c === "?")));
-      };
-      var identChar = function(c) {
-        return isIdentChar(c) && !(cfg.infixArith && arithChar(c));
-      };
-      var readString = function(start) {
-        return function(q) {
-          return function(acc) {
-            var collect2 = function($copy_j) {
-              return function($copy_chars) {
-                var $tco_var_j = $copy_j;
-                var $tco_done = false;
-                var $tco_result;
-                function $tco_loop(j, chars) {
-                  var v = at(j);
-                  if (v instanceof Nothing) {
-                    $tco_done = true;
-                    return new Left(new LexError("unterminated string", base + start | 0));
-                  }
-                  ;
-                  if (v instanceof Just) {
-                    if (v.value0 === q) {
-                      $tco_done = true;
-                      return go(j + 1 | 0)(push3(acc)(new TStr(fromCharArray(reverse(chars))))(start));
-                    }
-                    ;
-                    if (v.value0 === "\\") {
-                      var v1 = at(j + 1 | 0);
-                      if (v1 instanceof Just) {
-                        var v2 = $$unescape(v1.value0);
-                        if (v2 instanceof Just) {
-                          $tco_var_j = j + 2 | 0;
-                          $copy_chars = cons(v2.value0)(chars);
-                          return;
-                        }
-                        ;
-                        if (v2 instanceof Nothing) {
-                          $tco_done = true;
-                          return new Left(new LexError("invalid string escape", base + j | 0));
-                        }
-                        ;
-                        throw new Error("Failed pattern match at FlatBars.Token (line 156, column 23 - line 158, column 76): " + [v2.constructor.name]);
-                      }
-                      ;
-                      if (v1 instanceof Nothing) {
-                        $tco_done = true;
-                        return new Left(new LexError("unterminated string", base + start | 0));
-                      }
-                      ;
-                      throw new Error("Failed pattern match at FlatBars.Token (line 155, column 24 - line 159, column 76): " + [v1.constructor.name]);
-                    }
-                    ;
-                    if (otherwise) {
-                      $tco_var_j = j + 1 | 0;
-                      $copy_chars = cons(v.value0)(chars);
-                      return;
-                    }
-                    ;
-                  }
-                  ;
-                  throw new Error("Failed pattern match at FlatBars.Token (line 151, column 23 - line 160, column 60): " + [v.constructor.name]);
-                }
-                ;
-                while (!$tco_done) {
-                  $tco_result = $tco_loop($tco_var_j, $copy_chars);
-                }
-                ;
-                return $tco_result;
-              };
-            };
-            return collect2(start + 1 | 0)([]);
-          };
-        };
-      };
-      var readNumber = function(start) {
-        return function(acc) {
-          var numEnd = function($copy_j) {
-            var $tco_done1 = false;
-            var $tco_result;
-            function $tco_loop(j) {
-              var v2 = at(j);
-              if (v2 instanceof Just && isNumChar(v2.value0)) {
-                $copy_j = j + 1 | 0;
-                return;
-              }
-              ;
-              $tco_done1 = true;
-              return j;
-            }
-            ;
-            while (!$tco_done1) {
-              $tco_result = $tco_loop($copy_j);
-            }
-            ;
-            return $tco_result;
-          };
-          var end = numEnd(start + 1 | 0);
-          var raw = slc(start)(end);
-          var v = fromString(raw);
-          if (v instanceof Just) {
-            return go(end)(push3(acc)(new TNum(v.value0))(start));
-          }
-          ;
-          if (v instanceof Nothing) {
-            return new Left(new LexError("malformed number '" + (raw + "'"), base + start | 0));
-          }
-          ;
-          throw new Error("Failed pattern match at FlatBars.Token (line 140, column 7 - line 142, column 87): " + [v.constructor.name]);
-        };
-      };
-      var readIdent = function(start) {
-        return function(acc) {
-          var bracketEnd = function($copy_k) {
-            var $tco_done2 = false;
-            var $tco_result;
-            function $tco_loop(k) {
-              if (k > len) {
-                $tco_done2 = true;
-                return Nothing.value;
-              }
-              ;
-              if (eq12(at(k))(new Just("]"))) {
-                $tco_done2 = true;
-                return new Just(k);
-              }
-              ;
-              if (otherwise) {
-                $copy_k = k + 1 | 0;
-                return;
-              }
-              ;
-              throw new Error("Failed pattern match at FlatBars.Token (line 129, column 5 - line 132, column 39): " + [k.constructor.name]);
-            }
-            ;
-            while (!$tco_done2) {
-              $tco_result = $tco_loop($copy_k);
-            }
-            ;
-            return $tco_result;
-          };
-          var scan = function($copy_j) {
-            var $tco_done3 = false;
-            var $tco_result;
-            function $tco_loop(j) {
-              var v = at(j);
-              if (v instanceof Just && v.value0 === "[") {
-                var v1 = bracketEnd(j + 1 | 0);
-                if (v1 instanceof Just) {
-                  $copy_j = v1.value0 + 1 | 0;
-                  return;
-                }
-                ;
-                if (v1 instanceof Nothing) {
-                  $tco_done3 = true;
-                  return new Left(new LexError("unterminated [ segment", base + j | 0));
-                }
-                ;
-                throw new Error("Failed pattern match at FlatBars.Token (line 124, column 19 - line 126, column 71): " + [v1.constructor.name]);
-              }
-              ;
-              if (v instanceof Just && identChar(v.value0)) {
-                $copy_j = j + 1 | 0;
-                return;
-              }
-              ;
-              $tco_done3 = true;
-              return go(j)(push3(acc)(new TIdent(slc(start)(j)))(start));
-            }
-            ;
-            while (!$tco_done3) {
-              $tco_result = $tco_loop($copy_j);
-            }
-            ;
-            return $tco_result;
-          };
-          return scan(start);
-        };
-      };
-      var op2 = function(s) {
-        return function(i) {
-          return function(acc) {
-            return go(i + 2 | 0)(push3(acc)(new TOp(s))(i));
-          };
-        };
-      };
-      var op1 = function(s) {
-        return function(i) {
-          return function(acc) {
-            return go(i + 1 | 0)(push3(acc)(new TOp(s))(i));
-          };
-        };
-      };
-      var go = function($copy_i) {
-        return function($copy_acc) {
-          var $tco_var_i = $copy_i;
-          var $tco_done4 = false;
-          var $tco_result;
-          function $tco_loop(i, acc) {
-            if (i >= len) {
-              $tco_done4 = true;
-              return new Right(acc);
-            }
-            ;
-            if (otherwise) {
-              var v = at(i);
-              if (v instanceof Nothing) {
-                $tco_done4 = true;
-                return new Right(acc);
-              }
-              ;
-              if (v instanceof Just) {
-                if (isWs(v.value0)) {
-                  $tco_var_i = i + 1 | 0;
-                  $copy_acc = acc;
-                  return;
-                }
-                ;
-                if (v.value0 === "(") {
-                  $tco_var_i = i + 1 | 0;
-                  $copy_acc = push3(acc)(TLParen.value)(i);
-                  return;
-                }
-                ;
-                if (v.value0 === ")") {
-                  $tco_var_i = i + 1 | 0;
-                  $copy_acc = push3(acc)(TRParen.value)(i);
-                  return;
-                }
-                ;
-                if (v.value0 === '"' || v.value0 === "'") {
-                  $tco_done4 = true;
-                  return readString(i)(v.value0)(acc);
-                }
-                ;
-                if (v.value0 === "&") {
-                  var $61 = eq12(at(i + 1 | 0))(new Just("&"));
-                  if ($61) {
-                    $tco_done4 = true;
-                    return op2("&&")(i)(acc);
-                  }
-                  ;
-                  $tco_done4 = true;
-                  return bad(i);
-                }
-                ;
-                if (v.value0 === "|") {
-                  var $62 = eq12(at(i + 1 | 0))(new Just("|"));
-                  if ($62) {
-                    $tco_done4 = true;
-                    return op2("||")(i)(acc);
-                  }
-                  ;
-                  $tco_done4 = true;
-                  return op1("|")(i)(acc);
-                }
-                ;
-                if (v.value0 === "!") {
-                  var $63 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($63) {
-                    $tco_done4 = true;
-                    return op2("!=")(i)(acc);
-                  }
-                  ;
-                  $tco_done4 = true;
-                  return op1("!")(i)(acc);
-                }
-                ;
-                if (v.value0 === "<") {
-                  var $64 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($64) {
-                    $tco_done4 = true;
-                    return op2("<=")(i)(acc);
-                  }
-                  ;
-                  $tco_done4 = true;
-                  return op1("<")(i)(acc);
-                }
-                ;
-                if (v.value0 === ">") {
-                  var $65 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($65) {
-                    $tco_done4 = true;
-                    return op2(">=")(i)(acc);
-                  }
-                  ;
-                  $tco_done4 = true;
-                  return op1(">")(i)(acc);
-                }
-                ;
-                if (v.value0 === "=") {
-                  var $66 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($66) {
-                    $tco_done4 = true;
-                    return op2("==")(i)(acc);
-                  }
-                  ;
-                  $tco_done4 = true;
-                  return bad(i);
-                }
-                ;
-                if (v.value0 === "-" && maybe(false)(isDigit)(at(i + 1 | 0))) {
-                  $tco_done4 = true;
-                  return readNumber(i)(acc);
-                }
-                ;
-                if (cfg.infixArith && v.value0 === "?") {
-                  var $67 = eq12(at(i + 1 | 0))(new Just("?"));
-                  if ($67) {
-                    $tco_done4 = true;
-                    return op2("??")(i)(acc);
-                  }
-                  ;
-                  $tco_done4 = true;
-                  return bad(i);
-                }
-                ;
-                if (cfg.infixArith && arithChar(v.value0)) {
-                  $tco_done4 = true;
-                  return op1(singleton4(v.value0))(i)(acc);
-                }
-                ;
-                if (cfg.infixArith && v.value0 === "%") {
-                  $tco_done4 = true;
-                  return op1("%")(i)(acc);
-                }
-                ;
-                if (isDigit(v.value0)) {
-                  $tco_done4 = true;
-                  return readNumber(i)(acc);
-                }
-                ;
-                if (identChar(v.value0) || v.value0 === "[") {
-                  $tco_done4 = true;
-                  return readIdent(i)(acc);
-                }
-                ;
-                if (otherwise) {
-                  $tco_done4 = true;
-                  return bad(i);
-                }
-                ;
-              }
-              ;
-              throw new Error("Failed pattern match at FlatBars.Token (line 87, column 19 - line 112, column 31): " + [v.constructor.name]);
-            }
-            ;
-            throw new Error("Failed pattern match at FlatBars.Token (line 84, column 3 - line 84, column 68): " + [i.constructor.name, acc.constructor.name]);
-          }
-          ;
-          while (!$tco_done4) {
-            $tco_result = $tco_loop($tco_var_i, $copy_acc);
-          }
-          ;
-          return $tco_result;
-        };
-      };
-      return go(0)([]);
-    };
-  };
-};
-var eqToken = {
-  eq: function(x) {
-    return function(y) {
-      if (x instanceof TIdent && y instanceof TIdent) {
-        return x.value0 === y.value0;
-      }
-      ;
-      if (x instanceof TStr && y instanceof TStr) {
-        return x.value0 === y.value0;
-      }
-      ;
-      if (x instanceof TNum && y instanceof TNum) {
-        return x.value0 === y.value0;
-      }
-      ;
-      if (x instanceof TLParen && y instanceof TLParen) {
-        return true;
-      }
-      ;
-      if (x instanceof TRParen && y instanceof TRParen) {
-        return true;
-      }
-      ;
-      if (x instanceof TOp && y instanceof TOp) {
-        return x.value0 === y.value0;
-      }
-      ;
-      return false;
-    };
-  }
-};
-var defaultLexOptions = {
-  infixArith: false
-};
-
-// output/FlatBars.Expr/index.js
-var map6 = /* @__PURE__ */ map(functorMaybe);
-var bind2 = /* @__PURE__ */ bind(bindEither);
-var parseExpr = function(toks) {
-  var tk = function(i) {
-    return map6(function(v2) {
-      return v2.tok;
-    })(index(toks)(i));
-  };
-  var posAt = function(i) {
-    var v2 = index(toks)(i);
-    if (v2 instanceof Just) {
-      return v2.value0.at;
-    }
-    ;
-    if (v2 instanceof Nothing) {
-      var v1 = last(toks);
-      if (v1 instanceof Just) {
-        return v1.value0.at;
-      }
-      ;
-      if (v1 instanceof Nothing) {
-        return 0;
-      }
-      ;
-      throw new Error("Failed pattern match at FlatBars.Expr (line 36, column 16 - line 38, column 19): " + [v1.constructor.name]);
-    }
-    ;
-    throw new Error("Failed pattern match at FlatBars.Expr (line 34, column 13 - line 38, column 19): " + [v2.constructor.name]);
-  };
-  var pExpr = function(i) {
-    var v2 = tk(i);
-    if (v2 instanceof Just && v2.value0 instanceof TLParen) {
-      return bind2(pExpr(i + 1 | 0))(function(v1) {
-        var v22 = tk(v1.pos);
-        if (v22 instanceof Just && v22.value0 instanceof TRParen) {
-          return new Right({
-            val: v1.val,
-            pos: v1.pos + 1 | 0
-          });
-        }
-        ;
-        return new Left(new LexError("expected )", posAt(v1.pos)));
-      });
-    }
-    ;
-    if (v2 instanceof Just && v2.value0 instanceof TStr) {
-      return new Right({
-        val: new Lit(new VString(v2.value0.value0)),
-        pos: i + 1 | 0
-      });
-    }
-    ;
-    if (v2 instanceof Just && v2.value0 instanceof TNum) {
-      return new Right({
-        val: new Lit(new VNumber(v2.value0.value0)),
-        pos: i + 1 | 0
-      });
-    }
-    ;
-    if (v2 instanceof Just && v2.value0 instanceof TIdent) {
-      return bind2(pArgs(i + 1 | 0)([]))(function(v1) {
-        return new Right({
-          val: new App2(v2.value0.value0, v1.val),
-          pos: v1.pos
-        });
-      });
-    }
-    ;
-    return new Left(new LexError("expected an expression", posAt(i)));
-  };
-  var pArgs = function(i) {
-    return function(acc) {
-      var v2 = tk(i);
-      if (v2 instanceof Just && v2.value0 instanceof TLParen) {
-        return bind2(pExpr(i))(function(v1) {
-          return pArgs(v1.pos)(snoc(acc)(v1.val));
-        });
-      }
-      ;
-      if (v2 instanceof Just && v2.value0 instanceof TStr) {
-        return pArgs(i + 1 | 0)(snoc(acc)(new Lit(new VString(v2.value0.value0))));
-      }
-      ;
-      if (v2 instanceof Just && v2.value0 instanceof TNum) {
-        return pArgs(i + 1 | 0)(snoc(acc)(new Lit(new VNumber(v2.value0.value0))));
-      }
-      ;
-      if (v2 instanceof Just && v2.value0 instanceof TIdent) {
-        return pArgs(i + 1 | 0)(snoc(acc)(new App2(v2.value0.value0, [])));
-      }
-      ;
-      if (v2 instanceof Just && (v2.value0 instanceof TOp && v2.value0.value0 === "|")) {
-        return pArgs(i + 1 | 0)(snoc(acc)(new App2("|", [])));
-      }
-      ;
-      return new Right({
-        val: acc,
-        pos: i
-      });
-    };
-  };
-  var len = length(toks);
-  var v = pExpr(0);
-  if (v instanceof Left) {
-    return new Left(v.value0);
-  }
-  ;
-  if (v instanceof Right) {
-    if (v.value0.pos >= len) {
-      return new Right(v.value0.val);
-    }
-    ;
-    if (otherwise) {
-      return new Left(new LexError("unexpected token", posAt(v.value0.pos)));
-    }
-    ;
-  }
-  ;
-  throw new Error("Failed pattern match at FlatBars.Expr (line 26, column 18 - line 30, column 66): " + [v.constructor.name]);
-};
-
 // output/FlatBars.Lexer/index.js
-var eq13 = /* @__PURE__ */ eq(/* @__PURE__ */ eqArray(eqChar));
+var eq12 = /* @__PURE__ */ eq(/* @__PURE__ */ eqArray(eqChar));
 var notEq2 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
 var elem3 = /* @__PURE__ */ elem2(eqChar);
 var fromFoldable4 = /* @__PURE__ */ fromFoldable(foldableList);
-var bind3 = /* @__PURE__ */ bind(bindMaybe);
-var map7 = /* @__PURE__ */ map(functorEither);
+var bind2 = /* @__PURE__ */ bind(bindMaybe);
+var map5 = /* @__PURE__ */ map(functorEither);
 var elem1 = /* @__PURE__ */ elem2(eqString);
 var RContent = /* @__PURE__ */ function() {
   function RContent2(value0) {
@@ -4477,7 +3806,7 @@ var matchAt = function(cs) {
   return function(i) {
     return function(pat) {
       var pcs = toCharArray(pat);
-      return eq13(slice(i)(i + length(pcs) | 0)(cs))(pcs);
+      return eq12(slice(i)(i + length(pcs) | 0)(cs))(pcs);
     };
   };
 };
@@ -4625,7 +3954,7 @@ var tokenizeTemplate = function(cfg) {
     };
     var parseDelimDirective = function(interior) {
       var t = trimStartWs(interior);
-      var v = bind3(stripPrefix("@delimiters")(t))(function() {
+      var v = bind2(stripPrefix("@delimiters")(t))(function() {
         var $334 = stripPrefix(":");
         return function($335) {
           return $334(trimStartWs($335));
@@ -5467,7 +4796,7 @@ var tokenizeTemplate = function(cfg) {
         };
       };
     };
-    return map7(finalize)(go(0)(cfg.open)(cfg.close)(0)([])(Nil.value)(false));
+    return map5(finalize)(go(0)(cfg.open)(cfg.close)(0)([])(Nil.value)(false));
   };
 };
 var dropTrailingIndent = function(s) {
@@ -5636,6 +4965,794 @@ var trimStandalone = function(seps) {
   };
 };
 
+// output/FlatBars.Highlight/index.js
+var eq13 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
+var elem4 = /* @__PURE__ */ elem2(eqString);
+var sigilKind = function(v) {
+  if (v instanceof Section) {
+    return "block-open";
+  }
+  ;
+  if (v instanceof Inverse) {
+    return "block-inverse";
+  }
+  ;
+  if (v instanceof Parent) {
+    return "block-parent";
+  }
+  ;
+  if (v instanceof BlockDef) {
+    return "block-decl";
+  }
+  ;
+  throw new Error("Failed pattern match at FlatBars.Highlight (line 89, column 13 - line 93, column 27): " + [v.constructor.name]);
+};
+var isSpace2 = function(c) {
+  return c === " " || (c === "	" || (c === "\n" || c === "\r"));
+};
+var trimmedChars = /* @__PURE__ */ function() {
+  var $41 = dropWhile(isSpace2);
+  return function($42) {
+    return $41(toCharArray($42));
+  };
+}();
+var isPartialHead = function(s) {
+  return eq13(head(trimmedChars(s)))(new Just(">"));
+};
+var headWord = function(s) {
+  return fromCharArray(takeWhile(function($43) {
+    return !isSpace2($43);
+  })(trimmedChars(s)));
+};
+var highlightSpans = function(cfg) {
+  return function(src) {
+    var sepKind = function(interior) {
+      if (isPartialHead(interior)) {
+        return "partial";
+      }
+      ;
+      if (elem4(headWord(interior))(cfg.clauseSeps)) {
+        return "keyword";
+      }
+      ;
+      if (otherwise) {
+        return "expr";
+      }
+      ;
+      throw new Error("Failed pattern match at FlatBars.Highlight (line 82, column 3 - line 82, column 30): " + [interior.constructor.name]);
+    };
+    var at = function(sp) {
+      return function(kind) {
+        return new Just({
+          from: sp.start,
+          to: sp.end,
+          kind
+        });
+      };
+    };
+    var spanOf = function(v2) {
+      if (v2 instanceof RContent) {
+        return Nothing.value;
+      }
+      ;
+      if (v2 instanceof ROutput) {
+        return at(v2.value0)("raw");
+      }
+      ;
+      if (v2 instanceof RAmp) {
+        return at(v2.value0)("raw");
+      }
+      ;
+      if (v2 instanceof ROpen) {
+        return at(v2.value0)(sigilKind(v2.value1));
+      }
+      ;
+      if (v2 instanceof RClose) {
+        return at(v2.value0)("block-close");
+      }
+      ;
+      if (v2 instanceof RSep) {
+        return at(v2.value0)(sepKind(v2.value2));
+      }
+      ;
+      if (v2 instanceof RRaw) {
+        return at(v2.value0)("raw-block");
+      }
+      ;
+      if (v2 instanceof RComment) {
+        return at(v2.value0)("comment");
+      }
+      ;
+      if (v2 instanceof RSetDelim) {
+        return at(v2.value0)("set-delimiter");
+      }
+      ;
+      throw new Error("Failed pattern match at FlatBars.Highlight (line 64, column 12 - line 73, column 42): " + [v2.constructor.name]);
+    };
+    var v = tokenizeTemplate(cfg.lexConfig)(src);
+    if (v instanceof Left) {
+      return [];
+    }
+    ;
+    if (v instanceof Right) {
+      return mapMaybe(spanOf)(v.value0);
+    }
+    ;
+    throw new Error("Failed pattern match at FlatBars.Highlight (line 59, column 26 - line 61, column 43): " + [v.constructor.name]);
+  };
+};
+
+// output/FlatBars.Json/index.js
+var $runtime_lazy3 = function(name2, moduleName, init) {
+  var state2 = 0;
+  var val;
+  return function(lineNumber) {
+    if (state2 === 2) return val;
+    if (state2 === 1) throw new ReferenceError(name2 + " was needed before it finished initializing (module " + moduleName + ", line " + lineNumber + ")", moduleName, lineNumber);
+    state2 = 1;
+    val = init();
+    state2 = 2;
+    return val;
+  };
+};
+var map6 = /* @__PURE__ */ map(functorArray);
+var fromFoldable1 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
+var toUnfoldable1 = /* @__PURE__ */ toUnfoldable2(unfoldableArray);
+var $lazy_fromJson = /* @__PURE__ */ $runtime_lazy3("fromJson", "FlatBars.Json", function() {
+  return caseJson(function(v) {
+    return VNull.value;
+  })(VBool.create)(VNumber.create)(VString.create)(function(arr2) {
+    return new VArray(map6($lazy_fromJson(25))(arr2));
+  })(function(obj2) {
+    return new VObject(fromFoldable1(map6(function(v) {
+      return new Tuple(v.value0, $lazy_fromJson(28)(v.value1));
+    })(toUnfoldable1(obj2))));
+  });
+});
+var fromJson = /* @__PURE__ */ $lazy_fromJson(19);
+
+// output/FlatBars.Token/index.js
+var eq14 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
+var TIdent = /* @__PURE__ */ function() {
+  function TIdent2(value0) {
+    this.value0 = value0;
+  }
+  ;
+  TIdent2.create = function(value0) {
+    return new TIdent2(value0);
+  };
+  return TIdent2;
+}();
+var TStr = /* @__PURE__ */ function() {
+  function TStr2(value0) {
+    this.value0 = value0;
+  }
+  ;
+  TStr2.create = function(value0) {
+    return new TStr2(value0);
+  };
+  return TStr2;
+}();
+var TNum = /* @__PURE__ */ function() {
+  function TNum2(value0) {
+    this.value0 = value0;
+  }
+  ;
+  TNum2.create = function(value0) {
+    return new TNum2(value0);
+  };
+  return TNum2;
+}();
+var TLParen = /* @__PURE__ */ function() {
+  function TLParen2() {
+  }
+  ;
+  TLParen2.value = new TLParen2();
+  return TLParen2;
+}();
+var TRParen = /* @__PURE__ */ function() {
+  function TRParen2() {
+  }
+  ;
+  TRParen2.value = new TRParen2();
+  return TRParen2;
+}();
+var TOp = /* @__PURE__ */ function() {
+  function TOp2(value0) {
+    this.value0 = value0;
+  }
+  ;
+  TOp2.create = function(value0) {
+    return new TOp2(value0);
+  };
+  return TOp2;
+}();
+var $$unescape = function(v) {
+  if (v === "\\") {
+    return new Just("\\");
+  }
+  ;
+  if (v === '"') {
+    return new Just('"');
+  }
+  ;
+  if (v === "'") {
+    return new Just("'");
+  }
+  ;
+  if (v === "n") {
+    return new Just("\n");
+  }
+  ;
+  if (v === "t") {
+    return new Just("	");
+  }
+  ;
+  if (v === "r") {
+    return new Just("\r");
+  }
+  ;
+  return Nothing.value;
+};
+var isWs = function(c) {
+  return c === " " || (c === "	" || (c === "\n" || c === "\r"));
+};
+var isDigit = function(c) {
+  return c >= "0" && c <= "9";
+};
+var isNumChar = function(c) {
+  return isDigit(c) || c === ".";
+};
+var isAlpha = function(c) {
+  return c >= "a" && c <= "z" || c >= "A" && c <= "Z";
+};
+var isIdentChar = function(c) {
+  return isAlpha(c) || (isDigit(c) || (c === "_" || (c === "-" || (c === "." || (c === "@" || (c === "/" || (c === "+" || (c === "*" || (c === "?" || c === "=")))))))));
+};
+var tokenizeInterior = function(cfg) {
+  return function(base) {
+    return function(src) {
+      var push3 = function(acc) {
+        return function(t) {
+          return function(i) {
+            return snoc(acc)({
+              tok: t,
+              at: base + i | 0
+            });
+          };
+        };
+      };
+      var cs = toCharArray(src);
+      var len = length(cs);
+      var slc = function(a) {
+        return function(b) {
+          return fromCharArray(slice(a)(b)(cs));
+        };
+      };
+      var bad = function(i) {
+        return new Left(new LexError("unexpected character", base + i | 0));
+      };
+      var at = function(i) {
+        return index(cs)(i);
+      };
+      var arithChar = function(c) {
+        return c === "+" || (c === "-" || (c === "*" || (c === "/" || c === "?")));
+      };
+      var identChar = function(c) {
+        return isIdentChar(c) && !(cfg.infixArith && arithChar(c));
+      };
+      var readString = function(start) {
+        return function(q) {
+          return function(acc) {
+            var collect2 = function($copy_j) {
+              return function($copy_chars) {
+                var $tco_var_j = $copy_j;
+                var $tco_done = false;
+                var $tco_result;
+                function $tco_loop(j, chars) {
+                  var v = at(j);
+                  if (v instanceof Nothing) {
+                    $tco_done = true;
+                    return new Left(new LexError("unterminated string", base + start | 0));
+                  }
+                  ;
+                  if (v instanceof Just) {
+                    if (v.value0 === q) {
+                      $tco_done = true;
+                      return go(j + 1 | 0)(push3(acc)(new TStr(fromCharArray(reverse(chars))))(start));
+                    }
+                    ;
+                    if (v.value0 === "\\") {
+                      var v1 = at(j + 1 | 0);
+                      if (v1 instanceof Just) {
+                        var v2 = $$unescape(v1.value0);
+                        if (v2 instanceof Just) {
+                          $tco_var_j = j + 2 | 0;
+                          $copy_chars = cons(v2.value0)(chars);
+                          return;
+                        }
+                        ;
+                        if (v2 instanceof Nothing) {
+                          $tco_done = true;
+                          return new Left(new LexError("invalid string escape", base + j | 0));
+                        }
+                        ;
+                        throw new Error("Failed pattern match at FlatBars.Token (line 156, column 23 - line 158, column 76): " + [v2.constructor.name]);
+                      }
+                      ;
+                      if (v1 instanceof Nothing) {
+                        $tco_done = true;
+                        return new Left(new LexError("unterminated string", base + start | 0));
+                      }
+                      ;
+                      throw new Error("Failed pattern match at FlatBars.Token (line 155, column 24 - line 159, column 76): " + [v1.constructor.name]);
+                    }
+                    ;
+                    if (otherwise) {
+                      $tco_var_j = j + 1 | 0;
+                      $copy_chars = cons(v.value0)(chars);
+                      return;
+                    }
+                    ;
+                  }
+                  ;
+                  throw new Error("Failed pattern match at FlatBars.Token (line 151, column 23 - line 160, column 60): " + [v.constructor.name]);
+                }
+                ;
+                while (!$tco_done) {
+                  $tco_result = $tco_loop($tco_var_j, $copy_chars);
+                }
+                ;
+                return $tco_result;
+              };
+            };
+            return collect2(start + 1 | 0)([]);
+          };
+        };
+      };
+      var readNumber = function(start) {
+        return function(acc) {
+          var numEnd = function($copy_j) {
+            var $tco_done1 = false;
+            var $tco_result;
+            function $tco_loop(j) {
+              var v2 = at(j);
+              if (v2 instanceof Just && isNumChar(v2.value0)) {
+                $copy_j = j + 1 | 0;
+                return;
+              }
+              ;
+              $tco_done1 = true;
+              return j;
+            }
+            ;
+            while (!$tco_done1) {
+              $tco_result = $tco_loop($copy_j);
+            }
+            ;
+            return $tco_result;
+          };
+          var end = numEnd(start + 1 | 0);
+          var raw = slc(start)(end);
+          var v = fromString(raw);
+          if (v instanceof Just) {
+            return go(end)(push3(acc)(new TNum(v.value0))(start));
+          }
+          ;
+          if (v instanceof Nothing) {
+            return new Left(new LexError("malformed number '" + (raw + "'"), base + start | 0));
+          }
+          ;
+          throw new Error("Failed pattern match at FlatBars.Token (line 140, column 7 - line 142, column 87): " + [v.constructor.name]);
+        };
+      };
+      var readIdent = function(start) {
+        return function(acc) {
+          var bracketEnd = function($copy_k) {
+            var $tco_done2 = false;
+            var $tco_result;
+            function $tco_loop(k) {
+              if (k > len) {
+                $tco_done2 = true;
+                return Nothing.value;
+              }
+              ;
+              if (eq14(at(k))(new Just("]"))) {
+                $tco_done2 = true;
+                return new Just(k);
+              }
+              ;
+              if (otherwise) {
+                $copy_k = k + 1 | 0;
+                return;
+              }
+              ;
+              throw new Error("Failed pattern match at FlatBars.Token (line 129, column 5 - line 132, column 39): " + [k.constructor.name]);
+            }
+            ;
+            while (!$tco_done2) {
+              $tco_result = $tco_loop($copy_k);
+            }
+            ;
+            return $tco_result;
+          };
+          var scan = function($copy_j) {
+            var $tco_done3 = false;
+            var $tco_result;
+            function $tco_loop(j) {
+              var v = at(j);
+              if (v instanceof Just && v.value0 === "[") {
+                var v1 = bracketEnd(j + 1 | 0);
+                if (v1 instanceof Just) {
+                  $copy_j = v1.value0 + 1 | 0;
+                  return;
+                }
+                ;
+                if (v1 instanceof Nothing) {
+                  $tco_done3 = true;
+                  return new Left(new LexError("unterminated [ segment", base + j | 0));
+                }
+                ;
+                throw new Error("Failed pattern match at FlatBars.Token (line 124, column 19 - line 126, column 71): " + [v1.constructor.name]);
+              }
+              ;
+              if (v instanceof Just && identChar(v.value0)) {
+                $copy_j = j + 1 | 0;
+                return;
+              }
+              ;
+              $tco_done3 = true;
+              return go(j)(push3(acc)(new TIdent(slc(start)(j)))(start));
+            }
+            ;
+            while (!$tco_done3) {
+              $tco_result = $tco_loop($copy_j);
+            }
+            ;
+            return $tco_result;
+          };
+          return scan(start);
+        };
+      };
+      var op2 = function(s) {
+        return function(i) {
+          return function(acc) {
+            return go(i + 2 | 0)(push3(acc)(new TOp(s))(i));
+          };
+        };
+      };
+      var op1 = function(s) {
+        return function(i) {
+          return function(acc) {
+            return go(i + 1 | 0)(push3(acc)(new TOp(s))(i));
+          };
+        };
+      };
+      var go = function($copy_i) {
+        return function($copy_acc) {
+          var $tco_var_i = $copy_i;
+          var $tco_done4 = false;
+          var $tco_result;
+          function $tco_loop(i, acc) {
+            if (i >= len) {
+              $tco_done4 = true;
+              return new Right(acc);
+            }
+            ;
+            if (otherwise) {
+              var v = at(i);
+              if (v instanceof Nothing) {
+                $tco_done4 = true;
+                return new Right(acc);
+              }
+              ;
+              if (v instanceof Just) {
+                if (isWs(v.value0)) {
+                  $tco_var_i = i + 1 | 0;
+                  $copy_acc = acc;
+                  return;
+                }
+                ;
+                if (v.value0 === "(") {
+                  $tco_var_i = i + 1 | 0;
+                  $copy_acc = push3(acc)(TLParen.value)(i);
+                  return;
+                }
+                ;
+                if (v.value0 === ")") {
+                  $tco_var_i = i + 1 | 0;
+                  $copy_acc = push3(acc)(TRParen.value)(i);
+                  return;
+                }
+                ;
+                if (v.value0 === '"' || v.value0 === "'") {
+                  $tco_done4 = true;
+                  return readString(i)(v.value0)(acc);
+                }
+                ;
+                if (v.value0 === "&") {
+                  var $61 = eq14(at(i + 1 | 0))(new Just("&"));
+                  if ($61) {
+                    $tco_done4 = true;
+                    return op2("&&")(i)(acc);
+                  }
+                  ;
+                  $tco_done4 = true;
+                  return bad(i);
+                }
+                ;
+                if (v.value0 === "|") {
+                  var $62 = eq14(at(i + 1 | 0))(new Just("|"));
+                  if ($62) {
+                    $tco_done4 = true;
+                    return op2("||")(i)(acc);
+                  }
+                  ;
+                  $tco_done4 = true;
+                  return op1("|")(i)(acc);
+                }
+                ;
+                if (v.value0 === "!") {
+                  var $63 = eq14(at(i + 1 | 0))(new Just("="));
+                  if ($63) {
+                    $tco_done4 = true;
+                    return op2("!=")(i)(acc);
+                  }
+                  ;
+                  $tco_done4 = true;
+                  return op1("!")(i)(acc);
+                }
+                ;
+                if (v.value0 === "<") {
+                  var $64 = eq14(at(i + 1 | 0))(new Just("="));
+                  if ($64) {
+                    $tco_done4 = true;
+                    return op2("<=")(i)(acc);
+                  }
+                  ;
+                  $tco_done4 = true;
+                  return op1("<")(i)(acc);
+                }
+                ;
+                if (v.value0 === ">") {
+                  var $65 = eq14(at(i + 1 | 0))(new Just("="));
+                  if ($65) {
+                    $tco_done4 = true;
+                    return op2(">=")(i)(acc);
+                  }
+                  ;
+                  $tco_done4 = true;
+                  return op1(">")(i)(acc);
+                }
+                ;
+                if (v.value0 === "=") {
+                  var $66 = eq14(at(i + 1 | 0))(new Just("="));
+                  if ($66) {
+                    $tco_done4 = true;
+                    return op2("==")(i)(acc);
+                  }
+                  ;
+                  $tco_done4 = true;
+                  return bad(i);
+                }
+                ;
+                if (v.value0 === "-" && maybe(false)(isDigit)(at(i + 1 | 0))) {
+                  $tco_done4 = true;
+                  return readNumber(i)(acc);
+                }
+                ;
+                if (cfg.infixArith && v.value0 === "?") {
+                  var $67 = eq14(at(i + 1 | 0))(new Just("?"));
+                  if ($67) {
+                    $tco_done4 = true;
+                    return op2("??")(i)(acc);
+                  }
+                  ;
+                  $tco_done4 = true;
+                  return bad(i);
+                }
+                ;
+                if (cfg.infixArith && arithChar(v.value0)) {
+                  $tco_done4 = true;
+                  return op1(singleton4(v.value0))(i)(acc);
+                }
+                ;
+                if (cfg.infixArith && v.value0 === "%") {
+                  $tco_done4 = true;
+                  return op1("%")(i)(acc);
+                }
+                ;
+                if (isDigit(v.value0)) {
+                  $tco_done4 = true;
+                  return readNumber(i)(acc);
+                }
+                ;
+                if (identChar(v.value0) || v.value0 === "[") {
+                  $tco_done4 = true;
+                  return readIdent(i)(acc);
+                }
+                ;
+                if (otherwise) {
+                  $tco_done4 = true;
+                  return bad(i);
+                }
+                ;
+              }
+              ;
+              throw new Error("Failed pattern match at FlatBars.Token (line 87, column 19 - line 112, column 31): " + [v.constructor.name]);
+            }
+            ;
+            throw new Error("Failed pattern match at FlatBars.Token (line 84, column 3 - line 84, column 68): " + [i.constructor.name, acc.constructor.name]);
+          }
+          ;
+          while (!$tco_done4) {
+            $tco_result = $tco_loop($tco_var_i, $copy_acc);
+          }
+          ;
+          return $tco_result;
+        };
+      };
+      return go(0)([]);
+    };
+  };
+};
+var eqToken = {
+  eq: function(x) {
+    return function(y) {
+      if (x instanceof TIdent && y instanceof TIdent) {
+        return x.value0 === y.value0;
+      }
+      ;
+      if (x instanceof TStr && y instanceof TStr) {
+        return x.value0 === y.value0;
+      }
+      ;
+      if (x instanceof TNum && y instanceof TNum) {
+        return x.value0 === y.value0;
+      }
+      ;
+      if (x instanceof TLParen && y instanceof TLParen) {
+        return true;
+      }
+      ;
+      if (x instanceof TRParen && y instanceof TRParen) {
+        return true;
+      }
+      ;
+      if (x instanceof TOp && y instanceof TOp) {
+        return x.value0 === y.value0;
+      }
+      ;
+      return false;
+    };
+  }
+};
+var defaultLexOptions = {
+  infixArith: false
+};
+
+// output/FlatBars.Expr/index.js
+var map7 = /* @__PURE__ */ map(functorMaybe);
+var bind3 = /* @__PURE__ */ bind(bindEither);
+var parseExpr = function(toks) {
+  var tk = function(i) {
+    return map7(function(v2) {
+      return v2.tok;
+    })(index(toks)(i));
+  };
+  var posAt = function(i) {
+    var v2 = index(toks)(i);
+    if (v2 instanceof Just) {
+      return v2.value0.at;
+    }
+    ;
+    if (v2 instanceof Nothing) {
+      var v1 = last(toks);
+      if (v1 instanceof Just) {
+        return v1.value0.at;
+      }
+      ;
+      if (v1 instanceof Nothing) {
+        return 0;
+      }
+      ;
+      throw new Error("Failed pattern match at FlatBars.Expr (line 36, column 16 - line 38, column 19): " + [v1.constructor.name]);
+    }
+    ;
+    throw new Error("Failed pattern match at FlatBars.Expr (line 34, column 13 - line 38, column 19): " + [v2.constructor.name]);
+  };
+  var pExpr = function(i) {
+    var v2 = tk(i);
+    if (v2 instanceof Just && v2.value0 instanceof TLParen) {
+      return bind3(pExpr(i + 1 | 0))(function(v1) {
+        var v22 = tk(v1.pos);
+        if (v22 instanceof Just && v22.value0 instanceof TRParen) {
+          return new Right({
+            val: v1.val,
+            pos: v1.pos + 1 | 0
+          });
+        }
+        ;
+        return new Left(new LexError("expected )", posAt(v1.pos)));
+      });
+    }
+    ;
+    if (v2 instanceof Just && v2.value0 instanceof TStr) {
+      return new Right({
+        val: new Lit(new VString(v2.value0.value0)),
+        pos: i + 1 | 0
+      });
+    }
+    ;
+    if (v2 instanceof Just && v2.value0 instanceof TNum) {
+      return new Right({
+        val: new Lit(new VNumber(v2.value0.value0)),
+        pos: i + 1 | 0
+      });
+    }
+    ;
+    if (v2 instanceof Just && v2.value0 instanceof TIdent) {
+      return bind3(pArgs(i + 1 | 0)([]))(function(v1) {
+        return new Right({
+          val: new App2(v2.value0.value0, v1.val),
+          pos: v1.pos
+        });
+      });
+    }
+    ;
+    return new Left(new LexError("expected an expression", posAt(i)));
+  };
+  var pArgs = function(i) {
+    return function(acc) {
+      var v2 = tk(i);
+      if (v2 instanceof Just && v2.value0 instanceof TLParen) {
+        return bind3(pExpr(i))(function(v1) {
+          return pArgs(v1.pos)(snoc(acc)(v1.val));
+        });
+      }
+      ;
+      if (v2 instanceof Just && v2.value0 instanceof TStr) {
+        return pArgs(i + 1 | 0)(snoc(acc)(new Lit(new VString(v2.value0.value0))));
+      }
+      ;
+      if (v2 instanceof Just && v2.value0 instanceof TNum) {
+        return pArgs(i + 1 | 0)(snoc(acc)(new Lit(new VNumber(v2.value0.value0))));
+      }
+      ;
+      if (v2 instanceof Just && v2.value0 instanceof TIdent) {
+        return pArgs(i + 1 | 0)(snoc(acc)(new App2(v2.value0.value0, [])));
+      }
+      ;
+      if (v2 instanceof Just && (v2.value0 instanceof TOp && v2.value0.value0 === "|")) {
+        return pArgs(i + 1 | 0)(snoc(acc)(new App2("|", [])));
+      }
+      ;
+      return new Right({
+        val: acc,
+        pos: i
+      });
+    };
+  };
+  var len = length(toks);
+  var v = pExpr(0);
+  if (v instanceof Left) {
+    return new Left(v.value0);
+  }
+  ;
+  if (v instanceof Right) {
+    if (v.value0.pos >= len) {
+      return new Right(v.value0.val);
+    }
+    ;
+    if (otherwise) {
+      return new Left(new LexError("unexpected token", posAt(v.value0.pos)));
+    }
+    ;
+  }
+  ;
+  throw new Error("Failed pattern match at FlatBars.Expr (line 26, column 18 - line 30, column 66): " + [v.constructor.name]);
+};
+
 // output/FlatBars.Parser/index.js
 var eq3 = /* @__PURE__ */ eq(eqToken);
 var bind4 = /* @__PURE__ */ bind(bindEither);
@@ -5694,7 +5811,7 @@ var outputExpr = function(lx) {
     };
   };
 };
-var isSpace2 = function(c) {
+var isSpace3 = function(c) {
   return c === " " || (c === "	" || (c === "\n" || c === "\r"));
 };
 var isLetter = function(c) {
@@ -5770,7 +5887,7 @@ var parseDirectives = function(base) {
       var $tco_done2 = false;
       var $tco_result;
       function $tco_loop(k) {
-        var $48 = maybe(false)(isSpace2)(at(k));
+        var $48 = maybe(false)(isSpace3)(at(k));
         if ($48) {
           $copy_k = k + 1 | 0;
           return;
@@ -6329,7 +6446,7 @@ var union2 = /* @__PURE__ */ union(ordString);
 var insert2 = /* @__PURE__ */ insert(ordString);
 var notEq1 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqString));
 var map9 = /* @__PURE__ */ map(functorArray);
-var elem4 = /* @__PURE__ */ elem2(eqString);
+var elem5 = /* @__PURE__ */ elem2(eqString);
 var append12 = /* @__PURE__ */ append(semigroupArray);
 var stripParents = function($copy_s) {
   return function($copy_depth) {
@@ -6641,7 +6758,7 @@ var pathExpr = function(lv) {
           var v1 = stripParents(raw)(0);
           var segs = segmentsOf(v1.rest);
           var v2 = uncons(segs);
-          if (v2 instanceof Just && (v1.depth === 0 && elem4(v2.value0.head)(scope))) {
+          if (v2 instanceof Just && (v1.depth === 0 && elem5(v2.value0.head)(scope))) {
             var $146 = $$null(v2.value0.tail);
             if ($146) {
               return new App2(v2.value0.head, []);
@@ -6996,7 +7113,7 @@ var desugarWith = function(lv) {
         }
         ;
         if (v instanceof Sep) {
-          if (elem4(v.value1)(clauseNames)) {
+          if (elem5(v.value1)(clauseNames)) {
             return new Sep(v.value0, v.value1, rewriteArgs(lv)(scope)(v.value2));
           }
           ;
@@ -8533,7 +8650,7 @@ var traverse3 = /* @__PURE__ */ traverse(traversableArray);
 var fromFoldable8 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
 var append13 = /* @__PURE__ */ append(semigroupArray);
 var identity6 = /* @__PURE__ */ identity(categoryFn);
-var elem5 = /* @__PURE__ */ elem2(eqValue);
+var elem6 = /* @__PURE__ */ elem2(eqValue);
 var alter2 = /* @__PURE__ */ alter(ordString);
 var map23 = /* @__PURE__ */ map(functorMap);
 var insert5 = /* @__PURE__ */ insert(ordString);
@@ -9153,7 +9270,7 @@ var includesH = function(dictMonadThrow) {
   return function(sv) {
     return function(xv) {
       if (sv instanceof VArray) {
-        return pure4(new VBool(elem5(xv)(sv.value0)));
+        return pure4(new VBool(elem6(xv)(sv.value0)));
       }
       ;
       if (sv instanceof VString) {
@@ -12335,7 +12452,7 @@ var runTemplate2 = /* @__PURE__ */ runTemplate(monadEither);
 var minEngine2 = /* @__PURE__ */ minEngine(monadThrowEither);
 var traverse7 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
 var fromFoldable10 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
-var elem6 = /* @__PURE__ */ elem(foldableList)(eqString);
+var elem7 = /* @__PURE__ */ elem(foldableList)(eqString);
 var lookup6 = /* @__PURE__ */ lookup(ordString);
 var union6 = /* @__PURE__ */ union(ordString);
 var map21 = /* @__PURE__ */ map(functorEither);
@@ -12479,7 +12596,7 @@ var inline = function(partials) {
           var recurse = inline(partials)(overrides)(chain)(depth);
           var one2 = function(v) {
             if (v instanceof Output && (v.value1 instanceof App2 && (v.value1.value0 === "partial" && (v.value1.value1.length === 2 && (v["value1"]["value1"][0] instanceof Lit && (v["value1"]["value1"][0].value0 instanceof VString && (v["value1"]["value1"][1] instanceof Lit && v["value1"]["value1"][1].value0 instanceof VString))))))) {
-              if (elem6(v["value1"]["value1"][0].value0.value0)(chain)) {
+              if (elem7(v["value1"]["value1"][0].value0.value0)(chain)) {
                 return new Left(new DisallowedShape("recursive partial '" + (v["value1"]["value1"][0].value0.value0 + "' (MinBars compile)"), 0));
               }
               ;
@@ -13491,7 +13608,7 @@ var $runtime_lazy6 = function(name2, moduleName, init) {
 var show14 = /* @__PURE__ */ show(showNumber);
 var toUnfoldable8 = /* @__PURE__ */ toUnfoldable2(unfoldableArray);
 var fromFoldable11 = /* @__PURE__ */ fromFoldable2(foldableArray);
-var elem7 = /* @__PURE__ */ elem2(eqString);
+var elem8 = /* @__PURE__ */ elem2(eqString);
 var map24 = /* @__PURE__ */ map(functorArray);
 var str = id;
 var tt2 = function(t) {
@@ -13587,6 +13704,44 @@ var partialName3 = function(v) {
 var $$int = function(n) {
   return id(toNumber(n));
 };
+var highlightConfig = /* @__PURE__ */ function() {
+  var withSetDelims = {
+    close: defaultLexConfig.close,
+    open: defaultLexConfig.open,
+    mustacheDelims: true
+  };
+  var kernelClauses = ["else", "elif"];
+  return function(v) {
+    if (v === "maxbars") {
+      return {
+        lexConfig: maxOptions.lexConfig,
+        clauseSeps: maxOptions.standaloneSeps
+      };
+    }
+    ;
+    if (v === "rawbars") {
+      return {
+        lexConfig: withSetDelims,
+        clauseSeps: kernelClauses
+      };
+    }
+    ;
+    if (v === "minbars") {
+      return {
+        lexConfig: withSetDelims,
+        clauseSeps: []
+      };
+    }
+    ;
+    return {
+      lexConfig: defaultLexConfig,
+      clauseSeps: kernelClauses
+    };
+  };
+}();
+var highlightSpans2 = function(tpl, dialect) {
+  return highlightSpans(highlightConfig(dialect))(tpl);
+};
 var dataVars = ["index", "key", "first", "last", "parent-index", "parent-key", "parent-first", "parent-last"];
 var ctx = function(kind) {
   return obj([tt2("context"), new Tuple("kind", str(kind))]);
@@ -13610,7 +13765,7 @@ var compileResult = function(dictShow) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 113, column 17 - line 115, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 116, column 17 - line 118, column 49): " + [v.constructor.name]);
   };
 };
 var compileResult1 = /* @__PURE__ */ compileResult(showParseError);
@@ -13652,8 +13807,8 @@ var rexpr = function(v) {
   }
   ;
   if (v instanceof App2 && v.value1.length === 0) {
-    var $55 = elem7(v.value0)(dataVars);
-    if ($55) {
+    var $58 = elem8(v.value0)(dataVars);
+    if ($58) {
       return obj([tt2(v.value0)]);
     }
     ;
@@ -13664,13 +13819,13 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map24(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 240, column 9 - line 249, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 272, column 9 - line 281, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
   if (v instanceof Just && (v.value0.head instanceof App2 && (v.value0.head.value0 === "this" && v.value0.head.value1.length === 0))) {
-    var $61 = $$null(v.value0.tail);
-    if ($61) {
+    var $64 = $$null(v.value0.tail);
+    if ($64) {
       return ctx("this");
     }
     ;
@@ -13684,7 +13839,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map24($lazy_rnode(216))(ns));
+    return arr(map24($lazy_rnode(248))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -13707,7 +13862,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         }()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 190, column 21 - line 197, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 222, column 21 - line 229, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -13740,12 +13895,12 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 185, column 1 - line 185, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 217, column 1 - line 217, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
-        var $94 = litName(v.value1);
-        if ($94 instanceof Just) {
-          return obj([tt2("partial"), new Tuple("name", str($94.value0)), new Tuple("body", children(v.value2))]);
+        var $97 = litName(v.value1);
+        if ($97 instanceof Just) {
+          return obj([tt2("partial"), new Tuple("name", str($97.value0)), new Tuple("body", children(v.value2))]);
         }
         ;
         return v3(true);
@@ -13754,9 +13909,9 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
       return v3(true);
     };
     if (v instanceof RCall && v.value0 === "inline") {
-      var $100 = litName(v.value1);
-      if ($100 instanceof Just) {
-        return obj([tt2("inline"), new Tuple("name", str($100.value0)), new Tuple("body", children(v.value2))]);
+      var $103 = litName(v.value1);
+      if ($103 instanceof Just) {
+        return obj([tt2("inline"), new Tuple("name", str($103.value0)), new Tuple("body", children(v.value2))]);
       }
       ;
       return v1(true);
@@ -13765,11 +13920,11 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(185);
+var rnode = /* @__PURE__ */ $lazy_rnode(217);
 var astJson = function(dialect, src) {
   var v = function() {
-    var $105 = dialect === "maxbars";
-    if ($105) {
+    var $108 = dialect === "maxbars";
+    if ($108) {
       return parseWith(maxOptions);
     }
     ;
@@ -13796,7 +13951,7 @@ var astJson = function(dialect, src) {
     return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map24(rnode)(nodes)))]))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 128, column 3 - line 157, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 160, column 3 - line 189, column 12): " + [v.constructor.name]);
 };
 export {
   astJson,
@@ -13805,6 +13960,7 @@ export {
   compileMinbars,
   compileMinbarsWithPartials,
   compileSurface2 as compileSurface,
+  highlightSpans2 as highlightSpans,
   render,
   renderMaxbars,
   renderMinbars,
