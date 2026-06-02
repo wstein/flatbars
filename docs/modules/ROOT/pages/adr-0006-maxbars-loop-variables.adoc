@@ -1,8 +1,12 @@
 = ADR-006: MaxBars bare loop variables
 :navtitle: ADR-006 MaxBars loop variables
 
-*Status:* Accepted. *Date:* 2026-06-01. Records MaxBars Phases A/B/F (commits `26a1f65`, `5caca26`,
-`8cf6c15`).
+*Status:* Accepted; the *Decision §1–2 bare loop-variable vocabulary* and the *§5 v1 outer-loop limit are
+superseded by* xref:adr-0021-maxbars-variable-model.adoc[ADR-021] — bare `pass:[{{index0}}]`/`pass:[{{first}}]`
+are replaced by the namespaced `loop.*` object, and `@root`/`pass:[../]` by `root`/`parent`. The
+normative arithmetic this ADR fixes (§3) carries over unchanged as the `loop`-object field values, and the
+§4 schema-less shadow lint is retired. *Date:* 2026-06-01. Records MaxBars Phases A/B/F (commits
+`26a1f65`, `5caca26`, `8cf6c15`).
 
 == Context
 

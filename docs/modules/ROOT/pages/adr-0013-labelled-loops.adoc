@@ -2,7 +2,10 @@
 :navtitle: ADR-013 Labelled loops
 
 *Status:* Accepted and *implemented*. *Date:* 2026-06-03 (implemented; accepted 2026-06-02; proposed
-2026-06-01). Lifts the v1 limit documented in xref:adr-0006-maxbars-loop-variables.adoc[] §5.
+2026-06-01). Lifts the v1 limit documented in xref:adr-0006-maxbars-loop-variables.adoc[] §5. *Extended by*
+xref:adr-0021-maxbars-variable-model.adoc[ADR-021], which generalises the labelled-loop frame-object into
+the full `this`/`loop`/`root`/`parent`/`outer` model (`outer` = a `label NAME`) and makes the frame chain
+(`loop.parent`, `parent.parent`).
 
 == Context
 

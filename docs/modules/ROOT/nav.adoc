@@ -23,6 +23,7 @@
 * xref:adr-0018-user-defined-helpers.adoc[ADR-018: user-defined helpers (registerHelper)]
 * xref:adr-0019-operation-vocabulary.adoc[ADR-019: operation vocabulary (proposed)]
 * xref:adr-0020-user-block-helpers.adoc[ADR-020: user block helpers (proposed)]
+* xref:adr-0021-maxbars-variable-model.adoc[ADR-021: MaxBars/RawBars variable model (proposed)]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification
