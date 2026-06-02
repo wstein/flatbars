@@ -33,7 +33,7 @@ import FlatBars.Value (Value(..))
 import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
-import MinBars (renderMinDiag, renderMinDelimsDiag, renderMinWith) as MinBars
+import MinBars (renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
 import RawBars (compileJsWith, compileWith)
@@ -187,7 +187,11 @@ run opts = do
             | opts.mustache ->
                 -- --delimiters sets MinBars' INITIAL pair (Mustache {{=…=}}
                 -- switching still applies, relative to it); else the default {{ }}.
-                case maybe (MinBars.renderMinDiag tpl value) (\d -> MinBars.renderMinDelimsDiag d tpl value) delims of
+                case
+                  maybe (MinBars.renderMinDiag tpl value)
+                    (\d -> MinBars.renderMinDelimsDiag d tpl value)
+                    delims
+                  of
                   Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                   Right out -> writeStdout out
             | opts.surface -> case renderSurfaceDiagWith noLoopVars popts tpl value of

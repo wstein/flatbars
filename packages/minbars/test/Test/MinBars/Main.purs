@@ -12,7 +12,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import MinBars (renderMin, renderMinWith, renderMinDelimsDiag)
+import MinBars (renderMin, renderMinDelimsDiag, renderMinWith)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -248,6 +248,7 @@ main = do
   expectD "delims-initial" erb "<% name %>" (obj [ Tuple "name" (str "Ada") ]) "Ada"
   expectD "delims-default-literal" erb "{{name}}" (obj [ Tuple "name" (str "Ada") ]) "{{name}}"
   expectD "delims-switch-back" erb "<%x%><%={{ }}=%>{{y}}"
-    (obj [ Tuple "x" (str "A"), Tuple "y" (str "B") ]) "AB"
+    (obj [ Tuple "x" (str "A"), Tuple "y" (str "B") ])
+    "AB"
 
   log "all MinBars tests passed"

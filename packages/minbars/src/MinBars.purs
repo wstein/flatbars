@@ -80,7 +80,8 @@ parseMin = parseMinWith minLexConfig
 -- | a custom initial delimiter pair (`--mustache --delimiters '<% %>'`). Partials
 -- | still parse with `minLexConfig` (the default pair), per Mustache's
 -- | template-scoped delimiters.
-parseMinWith :: LexConfig -> String -> Either ParseError { directives :: Array Directive, nodes :: Template }
+parseMinWith
+  :: LexConfig -> String -> Either ParseError { directives :: Array Directive, nodes :: Template }
 parseMinWith cfg src = do
   toks <- tokenizeTemplate cfg src
   directives <- collectDirectives toks
@@ -135,7 +136,8 @@ renderCoreWith cfg partials src dat = case parseMinWith cfg src of
 -- | than the default `{{`/`}}` — the `flatbars --mustache --delimiters '<% %>'`
 -- | path. Mustache `{{=A B=}}`-style switching still applies, relative to the
 -- | initial pair. No partials (the CLI render-only path).
-renderMinDelimsDiag :: { open :: String, close :: String } -> String -> Value -> Either String String
+renderMinDelimsDiag
+  :: { open :: String, close :: String } -> String -> Value -> Either String String
 renderMinDelimsDiag d = renderCoreWith (minLexConfig { open = d.open, close = d.close }) Map.empty
 
 -- | Compile MinBars (Mustache) source to a JS ES module (ADR-016) with no

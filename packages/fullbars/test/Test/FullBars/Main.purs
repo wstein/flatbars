@@ -1063,7 +1063,8 @@ main = do
     (Map.member "if" KP.coreSchema.helpers)
   -- `coreOperationDefs` is the non-primitive base; the full roster adds exactly the
   -- 35-strong primitive pack on top (string + number + array, incl. aliases).
-  assert' "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (35 primitives)"
+  assert'
+    "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (35 primitives)"
     (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 35)
 
   -- Set delimiters are EXCLUDED from FullBars (ADR-015): it is the Handlebars-
