@@ -1,0 +1,19 @@
+Mustache spec conformance fixtures — vendored verbatim.
+
+Source:  https://github.com/mustache/spec  (MIT license)
+Path:    specs/*.json
+Commit:  e8ec001db7f594521e773c34866aca2b5d6b0037  (pinned)
+
+The FULL official suite — every module, including the optional ones marked `~`
+(~dynamic-names, ~inheritance, ~lambdas). This is deliberate: the conformance
+score MUST be measured against the whole spec so it cannot over-claim. Modules
+MinBars does not (yet) implement show up as honest misses in the report.
+
+Re-vendor (bump the SHA to match scripts/vendor-mustache.mjs):
+
+  SHA=<sha>
+  for m in comments delimiters interpolation inverted partials sections \
+           '~dynamic-names' '~inheritance' '~lambdas'; do
+    curl -s "https://raw.githubusercontent.com/mustache/spec/$SHA/specs/$m.json" \
+      -o "conformance/mustache/spec/$m.json"
+  done
