@@ -478,16 +478,23 @@ function block(name, args, frame, bodyFn, clauses) {
   const ub = userHelpers[name];
   if (ub) {
     const elseFn = (clauses && clauses.else) || (() => "");
-    // options.fn(ctx) shifts the context but INHERITS the enclosing scope (loop
-    // vars, parent, root, falsy, block params) — mirroring the interpreter's
+    // options.fn(ctx, { data }) shifts the context but INHERITS the enclosing scope
+    // (loop vars, parent, root, falsy, block params) — mirroring the interpreter's
     // `pushFrame Map.empty ctx` (keep the frame stack, change only `ctx`). Using
     // `childFrame` here would null @index/@key/etc. and diverge from the interpreter.
-    const shift = (ctx) => ({ ...frame, ctx });
-    const options = {
-      fn: function (ctx) { return bodyFn(arguments.length === 0 ? frame : shift(ctx)); },
-      inverse: function (ctx) { return elseFn(arguments.length === 0 ? frame : shift(ctx)); },
+    // `data` keys layer into `binds` (rt.call checks binds first, so they win as
+    // scoped @vars over the fixed frame fields) — the interpreter's pushed frame.
+    const dataOf = (opts) => (opts && typeof opts === "object" && opts.data && typeof opts.data === "object" ? opts.data : null);
+    const shift = (ctx, opts) => {
+      const data = dataOf(opts);
+      const fr = { ...frame, ctx };
+      return data ? { ...fr, binds: { ...fr.binds, ...data } } : fr;
     };
-    for (const k of ["hash", "data", "blockParams", "ids", "loc", "lookupProperty"]) {
+    const options = {
+      fn: function (ctx, opts) { return bodyFn(arguments.length === 0 ? frame : shift(ctx, opts)); },
+      inverse: function (ctx, opts) { return elseFn(arguments.length === 0 ? frame : shift(ctx, opts)); },
+    };
+    for (const k of ["hash", "blockParams", "ids", "loc", "lookupProperty"]) {
       Object.defineProperty(options, k, {
         get() { throw new Error("options." + k + " is not supported in a FlatBars block helper (v1)"); },
       });

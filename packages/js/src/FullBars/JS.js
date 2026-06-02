@@ -66,12 +66,16 @@ export const callJsBlockHelperImpl =
       if (!r.ok) throw new Error(r.error);
       return r.value;
     };
+    // options.fn(ctx, { data }) — `data` keys become scoped vars (@key) in the body,
+    // layered over the inherited scope (Handlebars' runtime-options `data` frame);
+    // a non-object/absent `data` ⇒ null (no extra vars). `render*` take (ctx, data).
+    const dataOf = (opts) => (opts && typeof opts === "object" && opts.data && typeof opts.data === "object" ? opts.data : null);
     const options = {
-      fn: function (ctx) { return unwrap(renderBody(arguments.length === 0 ? currentCtx : ctx)); },
-      inverse: function (ctx) { return unwrap(renderInverse(arguments.length === 0 ? currentCtx : ctx)); },
+      fn: function (ctx, opts) { return unwrap(renderBody(arguments.length === 0 ? currentCtx : ctx)(dataOf(opts))); },
+      inverse: function (ctx, opts) { return unwrap(renderInverse(arguments.length === 0 ? currentCtx : ctx)(dataOf(opts))); },
     };
     // v1: an unsupported options.* is a loud error, never a silent `undefined`.
-    for (const k of ["hash", "data", "blockParams", "ids", "loc", "lookupProperty"]) {
+    for (const k of ["hash", "blockParams", "ids", "loc", "lookupProperty"]) {
       Object.defineProperty(options, k, {
         get() { throw new Error("options." + k + " is not supported in a FlatBars block helper (v1)"); },
       });

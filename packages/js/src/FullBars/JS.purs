@@ -31,12 +31,12 @@ module FullBars.JS
 import Prelude
 
 import Control.Monad.Error.Class (throwError)
-import Data.Argonaut.Core (Json, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
+import Data.Argonaut.Core (Json, caseJsonObject, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
 import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
-import Data.Map (empty) as Map
+import Data.Map (empty, fromFoldable) as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
@@ -50,7 +50,7 @@ import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
 import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
-import Kernel.Env (pushFrame, refContext)
+import Kernel.Env (constOperation, pushFrame, refContext)
 import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
 import MinBars as MinBars
@@ -113,16 +113,17 @@ foreign import callJsHelperImpl
 -- | Invoke a host helper used as a *block* (ADR-020): Handlebars-style, with a
 -- | trailing `options` object whose `fn`/`inverse` render the body / `{{else}}`
 -- | clause. `currentCtx` is the context for a no-arg `options.fn()`; `renderBody`
--- | / `renderInverse` are pure thunks (run `ctl.render`) returning
--- | `{ ok, value, error }`, which the FFI unwraps + throws in JS on `!ok`.
+-- | / `renderInverse` are pure thunks `(ctx, data) -> { ok, value, error }` (run
+-- | `ctl.render`), which the FFI unwraps + throws in JS on `!ok`. `data` is the
+-- | `options.fn(ctx, { data })` frame (its keys become scoped `@vars`), or null.
 -- | Tags: `"safe"` (raw block output ⇒ `VSafe`), `"arity"`, `"error"`.
 foreign import callJsBlockHelperImpl
   :: String
   -> JsHelperFn
   -> Array Json
   -> Json
-  -> (Json -> { ok :: Boolean, value :: String, error :: String })
-  -> (Json -> { ok :: Boolean, value :: String, error :: String })
+  -> (Json -> Json -> { ok :: Boolean, value :: String, error :: String })
+  -> (Json -> Json -> { ok :: Boolean, value :: String, error :: String })
   -> { tag :: String, payload :: Json }
 
 -- | The `SafeString` equivalent a helper returns for raw markup. `safe(string)`.
@@ -154,8 +155,17 @@ renderWith = mkFn4 \helpers partials tpl json ->
       else
         let
           clause = ctl.clause "else"
-          renderClause nodes ctxJson =
-            case ctl.render (pushFrame Map.empty (fromJson ctxJson) ctl.env) nodes of
+          -- An `options.fn(ctx, { data })` frame: its keys become scoped `@vars`
+          -- (constant helpers), layered over the inherited scope by `pushFrame`.
+          dataFrame dataJson = caseJsonObject Map.empty
+            ( \obj -> Map.fromFoldable
+                ( map (\(Tuple k v) -> Tuple k (constOperation (fromJson v)))
+                    (FO.toUnfoldable obj :: Array (Tuple String Json))
+                )
+            )
+            dataJson
+          renderClause nodes ctxJson dataJson =
+            case ctl.render (pushFrame (dataFrame dataJson) (fromJson ctxJson) ctl.env) nodes of
               Right s -> { ok: true, value: s, error: "" }
               Left e -> { ok: false, value: "", error: show e }
           r = callJsBlockHelperImpl name fn (map toJson args) (toJson (refContext ctl.env))

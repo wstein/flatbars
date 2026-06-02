@@ -37,15 +37,16 @@ var callJsBlockHelperImpl = (name2) => (descriptor) => (args) => (currentCtx) =>
     if (!r.ok) throw new Error(r.error);
     return r.value;
   };
+  const dataOf = (opts) => opts && typeof opts === "object" && opts.data && typeof opts.data === "object" ? opts.data : null;
   const options = {
-    fn: function(ctx2) {
-      return unwrap2(renderBody(arguments.length === 0 ? currentCtx : ctx2));
+    fn: function(ctx2, opts) {
+      return unwrap2(renderBody(arguments.length === 0 ? currentCtx : ctx2)(dataOf(opts)));
     },
-    inverse: function(ctx2) {
-      return unwrap2(renderInverse(arguments.length === 0 ? currentCtx : ctx2));
+    inverse: function(ctx2, opts) {
+      return unwrap2(renderInverse(arguments.length === 0 ? currentCtx : ctx2)(dataOf(opts)));
     }
   };
-  for (const k of ["hash", "data", "blockParams", "ids", "loc", "lookupProperty"]) {
+  for (const k of ["hash", "blockParams", "ids", "loc", "lookupProperty"]) {
     Object.defineProperty(options, k, {
       get() {
         throw new Error("options." + k + " is not supported in a FlatBars block helper (v1)");
@@ -1935,11 +1936,11 @@ var toUnfoldable2 = function(dictUnfoldable) {
   };
 };
 var fromFoldable2 = function(dictFoldable) {
-  var fromFoldable13 = fromFoldable(dictFoldable);
+  var fromFoldable14 = fromFoldable(dictFoldable);
   return function(l) {
     return runST(function __do() {
       var s = newImpl();
-      foreach(fromFoldable13(l))(function(v) {
+      foreach(fromFoldable14(l))(function(v) {
         return $$void3(poke2(v.value0)(v.value1)(s));
       })();
       return s;
@@ -1952,6 +1953,13 @@ var caseJsonString = function(d) {
   return function(f) {
     return function(j) {
       return _caseJson($$const(d), $$const(d), $$const(d), f, $$const(d), $$const(d), j);
+    };
+  };
+};
+var caseJsonObject = function(d) {
+  return function(f) {
+    return function(j) {
+      return _caseJson($$const(d), $$const(d), $$const(d), $$const(d), $$const(d), f, j);
     };
   };
 };
@@ -9439,7 +9447,7 @@ var joinH = function(dictMonadThrow) {
 var iterate2 = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
   var Applicative0 = Monad0.Applicative0();
-  var constOperation2 = constOperation(Applicative0);
+  var constOperation3 = constOperation(Applicative0);
   var map32 = map(Monad0.Bind1().Apply0().Functor0());
   var traverse12 = traverse3(Applicative0);
   return function(ctl) {
@@ -9451,14 +9459,14 @@ var iterate2 = function(dictMonadThrow) {
           return function(idx) {
             return zipWith(function(nm) {
               return function(v) {
-                return new Tuple(nm, constOperation2(v));
+                return new Tuple(nm, constOperation3(v));
               };
             })(names)([val, idx]);
           };
         };
         var renderItem = function(i) {
           return function(v) {
-            var frame = fromFoldable9(append13([new Tuple("this", constOperation2(v.val)), new Tuple("index", constOperation2(new VNumber(toNumber(i)))), new Tuple("key", constOperation2(v.key)), new Tuple("first", constOperation2(new VBool(i === 0))), new Tuple("last", constOperation2(new VBool(i === (n - 1 | 0)))), new Tuple("parent", constOperation2(refContext(ctl.env))), new Tuple("index0", constOperation2(new VNumber(toNumber(i)))), new Tuple("index1", constOperation2(new VNumber(toNumber(i + 1 | 0)))), new Tuple("rindex0", constOperation2(new VNumber(toNumber((n - 1 | 0) - i | 0)))), new Tuple("rindex1", constOperation2(new VNumber(toNumber(n - i | 0)))), new Tuple("length", constOperation2(new VNumber(toNumber(n))))])(append13(parentData(ctl))(binds(v.val)(v.idx))));
+            var frame = fromFoldable9(append13([new Tuple("this", constOperation3(v.val)), new Tuple("index", constOperation3(new VNumber(toNumber(i)))), new Tuple("key", constOperation3(v.key)), new Tuple("first", constOperation3(new VBool(i === 0))), new Tuple("last", constOperation3(new VBool(i === (n - 1 | 0)))), new Tuple("parent", constOperation3(refContext(ctl.env))), new Tuple("index0", constOperation3(new VNumber(toNumber(i)))), new Tuple("index1", constOperation3(new VNumber(toNumber(i + 1 | 0)))), new Tuple("rindex0", constOperation3(new VNumber(toNumber((n - 1 | 0) - i | 0)))), new Tuple("rindex1", constOperation3(new VNumber(toNumber(n - i | 0)))), new Tuple("length", constOperation3(new VNumber(toNumber(n))))])(append13(parentData(ctl))(binds(v.val)(v.idx))));
             return ctl.render(pushFrame(frame)(v.val)(ctl.env))(main);
           };
         };
@@ -10070,7 +10078,7 @@ var eachH = function(dictMonadThrow) {
   };
 };
 var withH = function(dictMonadThrow) {
-  var constOperation2 = constOperation(dictMonadThrow.Monad0().Applicative0());
+  var constOperation3 = constOperation(dictMonadThrow.Monad0().Applicative0());
   var renderSafe1 = renderSafe(dictMonadThrow);
   var renderElse1 = renderElse(dictMonadThrow);
   var throwError3 = throwError(dictMonadThrow);
@@ -10082,10 +10090,10 @@ var withH = function(dictMonadThrow) {
         if ($667) {
           var binds = zipWith(function(nm) {
             return function(val) {
-              return new Tuple(nm, constOperation2(val));
+              return new Tuple(nm, constOperation3(val));
             };
           })(bindingNames(v.value0.tail))([v.value0.head]);
-          var frame = fromFoldable9(append13([new Tuple("parent", constOperation2(refContext(ctl.env)))])(append13(parentData(ctl))(binds)));
+          var frame = fromFoldable9(append13([new Tuple("parent", constOperation3(refContext(ctl.env)))])(append13(parentData(ctl))(binds)));
           return renderSafe1(ctl)(pushFrame(frame)(v.value0.head)(ctl.env))(mainBody(ctl));
         }
         ;
@@ -10530,9 +10538,9 @@ var runTemplate = function(dictMonad) {
 var show7 = /* @__PURE__ */ show(showError);
 var preludeEnv = function(dictMonadThrow) {
   var prelude2 = prelude(dictMonadThrow);
-  var constOperation2 = constOperation(dictMonadThrow.Monad0().Applicative0());
+  var constOperation3 = constOperation(dictMonadThrow.Monad0().Applicative0());
   return function(dat) {
-    return registerAll(prelude2)(register("root")(constOperation2(dat))(emptyEnv(dat)));
+    return registerAll(prelude2)(register("root")(constOperation3(dat))(emptyEnv(dat)));
   };
 };
 var runResolvedUsing = function(dictMonadThrow) {
@@ -14011,9 +14019,11 @@ var map24 = /* @__PURE__ */ map(functorArray);
 var pure4 = /* @__PURE__ */ pure(applicativeEither);
 var identity8 = /* @__PURE__ */ identity(categoryFn);
 var throwError2 = /* @__PURE__ */ throwError(monadThrowEither);
-var show15 = /* @__PURE__ */ show(showError);
+var fromFoldable12 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
+var constOperation2 = /* @__PURE__ */ constOperation(applicativeEither);
 var toUnfoldable9 = /* @__PURE__ */ toUnfoldable2(unfoldableArray);
-var fromFoldable12 = /* @__PURE__ */ fromFoldable2(foldableArray);
+var show15 = /* @__PURE__ */ show(showError);
+var fromFoldable13 = /* @__PURE__ */ fromFoldable2(foldableArray);
 var elem8 = /* @__PURE__ */ elem2(eqString);
 var str = id;
 var tt2 = function(t) {
@@ -14075,8 +14085,8 @@ var renderWith = function(helpers, partials, tpl, json) {
     return function(fn) {
       return function(ctl) {
         return function(args) {
-          var $43 = $$null(ctl.children);
-          if ($43) {
+          var $47 = $$null(ctl.children);
+          if ($47) {
             var v = callJsHelperImpl(name2)(fn)(map24(toJson)(args));
             if (v.tag === "safe") {
               return pure4(new VSafe(caseJsonString("")(identity8)(v.payload)));
@@ -14094,29 +14104,38 @@ var renderWith = function(helpers, partials, tpl, json) {
               return pure4(fromJson(v.payload));
             }
             ;
-            throw new Error("Failed pattern match at FullBars.JS (line 148, column 39 - line 153, column 51): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FullBars.JS (line 149, column 39 - line 154, column 51): " + [v.constructor.name]);
           }
           ;
+          var dataFrame = function(dataJson) {
+            return caseJsonObject(empty3)(function(obj1) {
+              return fromFoldable12(map24(function(v2) {
+                return new Tuple(v2.value0, constOperation2(fromJson(v2.value1)));
+              })(toUnfoldable9(obj1)));
+            })(dataJson);
+          };
           var renderClause = function(nodes) {
             return function(ctxJson) {
-              var v2 = ctl.render(pushFrame(empty3)(fromJson(ctxJson))(ctl.env))(nodes);
-              if (v2 instanceof Right) {
-                return {
-                  ok: true,
-                  value: v2.value0,
-                  error: ""
-                };
-              }
-              ;
-              if (v2 instanceof Left) {
-                return {
-                  ok: false,
-                  value: "",
-                  error: show15(v2.value0)
-                };
-              }
-              ;
-              throw new Error("Failed pattern match at FullBars.JS (line 158, column 13 - line 160, column 64): " + [v2.constructor.name]);
+              return function(dataJson) {
+                var v2 = ctl.render(pushFrame(dataFrame(dataJson))(fromJson(ctxJson))(ctl.env))(nodes);
+                if (v2 instanceof Right) {
+                  return {
+                    ok: true,
+                    value: v2.value0,
+                    error: ""
+                  };
+                }
+                ;
+                if (v2 instanceof Left) {
+                  return {
+                    ok: false,
+                    value: "",
+                    error: show15(v2.value0)
+                  };
+                }
+                ;
+                throw new Error("Failed pattern match at FullBars.JS (line 168, column 13 - line 170, column 64): " + [v2.constructor.name]);
+              };
             };
           };
           var clause = ctl.clause("else");
@@ -14158,7 +14177,7 @@ var render = function(tpl, json) {
   return result(renderDiag(tpl)(fromJson(json)));
 };
 var obj = function(kvs) {
-  return id(fromFoldable12(kvs));
+  return id(fromFoldable13(kvs));
 };
 var litName = function(args) {
   var v = head(args);
@@ -14253,7 +14272,7 @@ var compileResultAt = function(src) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 219, column 23 - line 221, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 229, column 23 - line 231, column 49): " + [v.constructor.name]);
   };
 };
 var compileSurface2 = function(tpl) {
@@ -14311,8 +14330,8 @@ var rexpr = function(v) {
   }
   ;
   if (v instanceof App2 && v.value1.length === 0) {
-    var $74 = elem8(v.value0)(dataVars);
-    if ($74) {
+    var $81 = elem8(v.value0)(dataVars);
+    if ($81) {
       return obj([tt2(v.value0)]);
     }
     ;
@@ -14323,13 +14342,13 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map24(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 385, column 9 - line 394, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 395, column 9 - line 404, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
   if (v instanceof Just && (v.value0.head instanceof App2 && (v.value0.head.value0 === "this" && v.value0.head.value1.length === 0))) {
-    var $80 = $$null(v.value0.tail);
-    if ($80) {
+    var $87 = $$null(v.value0.tail);
+    if ($87) {
       return ctx("this");
     }
     ;
@@ -14343,7 +14362,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map24($lazy_rnode(361))(ns));
+    return arr(map24($lazy_rnode(371))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -14366,7 +14385,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         }()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 335, column 21 - line 342, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 345, column 21 - line 352, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -14399,12 +14418,12 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 330, column 1 - line 330, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 340, column 1 - line 340, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
-        var $113 = litName(v.value1);
-        if ($113 instanceof Just) {
-          return obj([tt2("partial"), new Tuple("name", str($113.value0)), new Tuple("body", children(v.value2))]);
+        var $120 = litName(v.value1);
+        if ($120 instanceof Just) {
+          return obj([tt2("partial"), new Tuple("name", str($120.value0)), new Tuple("body", children(v.value2))]);
         }
         ;
         return v3(true);
@@ -14413,9 +14432,9 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
       return v3(true);
     };
     if (v instanceof RCall && v.value0 === "inline") {
-      var $119 = litName(v.value1);
-      if ($119 instanceof Just) {
-        return obj([tt2("inline"), new Tuple("name", str($119.value0)), new Tuple("body", children(v.value2))]);
+      var $126 = litName(v.value1);
+      if ($126 instanceof Just) {
+        return obj([tt2("inline"), new Tuple("name", str($126.value0)), new Tuple("body", children(v.value2))]);
       }
       ;
       return v1(true);
@@ -14424,11 +14443,11 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(330);
+var rnode = /* @__PURE__ */ $lazy_rnode(340);
 var astJson = function(dialect, src) {
   var v = function() {
-    var $124 = dialect === "maxbars";
-    if ($124) {
+    var $131 = dialect === "maxbars";
+    if ($131) {
       return parseWith(maxOptions);
     }
     ;
@@ -14455,7 +14474,7 @@ var astJson = function(dialect, src) {
     return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map24(rnode)(nodes)))]))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 273, column 3 - line 302, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 283, column 3 - line 312, column 12): " + [v.constructor.name]);
 };
 export {
   astJson,
