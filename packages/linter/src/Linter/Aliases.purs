@@ -10,7 +10,7 @@
 -- | actually rewrites them; nothing here (and no on-save tooling) edits source.
 -- |
 -- | The alias set is read from `Kernel.Prelude.preludeAliases` (the single source
--- | of truth, projected from `HelperDef.alias`), so adding an alias to the
+-- | of truth, projected from `OperationDef.alias`), so adding an alias to the
 -- | prelude automatically teaches this lint about it.
 module Linter.Aliases
   ( aliasWarnings
@@ -27,14 +27,14 @@ import FlatBars.Error (ParseError)
 import FlatBars.Parser (parse)
 import FlatBars.Syntax (Template)
 import Kernel.Prelude (preludeAliases)
-import Kernel.Walk (Issue, Severity(..), helperRefs)
+import Kernel.Walk (Issue, Severity(..), operationRefs)
 
 -- | Warn on every use of an alias helper in a (parsed) template, pointing at its
 -- | canonical name. Dialect-agnostic: the caller parses with whatever dialect it
 -- | wants and passes the `Template` (mirrors `MaxBars.loopVarShadowWarnings`).
 -- | One `Warn` per occurrence.
 aliasWarnings :: Template -> Array Issue
-aliasWarnings = Array.mapMaybe warnOf <<< helperRefs
+aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
   where
   warnOf ref = case lookup ref.name preludeAliases of
     Just canonical -> Just

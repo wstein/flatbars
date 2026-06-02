@@ -1,7 +1,7 @@
 -- | Generate the helper-catalog documentation from the single source of truth.
 -- |
 -- | `Kernel.Prelude.preludeSchema` already lists every helper the engine knows
--- | (name, block-ness, arity), projected from `helperDefs`. Rather than maintain
+-- | (name, block-ness, arity), projected from `operationDefs`. Rather than maintain
 -- | a parallel table by hand in the docs — which is exactly how a phantom helper
 -- | like `partial>` slips in — this module renders that schema to an AsciiDoc
 -- | fragment. `scripts/generate-helper-catalog.mjs` writes it to a partial the

@@ -25,7 +25,7 @@ import Prelude
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import FlatBars.Syntax (Template)
-import Kernel.Walk (Issue, RefKind(..), Severity(..), helperRefs)
+import Kernel.Walk (Issue, RefKind(..), Severity(..), operationRefs)
 
 -- | The loop-variable names that plausibly collide with data fields (ADR-006
 -- | calls out `first`/`key`/`length`; `last` rounds out the set). The aliases
@@ -38,7 +38,7 @@ shadowProneNames = [ "first", "last", "length", "key" ]
 -- | Warn on every bare loop-variable use whose name is shadow-prone, over a
 -- | *desugared* MaxBars template. One `Warn` issue per occurrence.
 loopVarShadowWarnings :: Template -> Array Issue
-loopVarShadowWarnings = Array.mapMaybe warnOf <<< helperRefs
+loopVarShadowWarnings = Array.mapMaybe warnOf <<< operationRefs
   where
   warnOf ref
     | ref.kind == AppRef && ref.argc == 0 && Array.elem ref.name shadowProneNames =

@@ -95,14 +95,27 @@ const helperCases = [
   { name: "helper:hash", dialect: "surface", helpers: { tag: (n, o) => "<" + n + (o && o.cls ? " class=" + o.cls : "") + ">" }, t: "{{{tag x cls=\"hi\"}}}", d: { x: "div" }, expect: "<div class=hi>" },
   // a declared-arity helper, called correctly, renders the same both ways
   { name: "helper:arity-ok", dialect: "surface", helpers: { loud: { fn: up, arity: 1 } }, t: "{{loud x}}", d: { x: "<b>" }, expect: "&lt;B&gt;" },
+  // ARITY-MISMATCH equivalence: both paths must REJECT, with the same arity text.
+  // This is the one place the interpreter "errors" on purpose, so it is gated via
+  // `expectError` (a substring), not the value-equality path — and it is what
+  // pins the two render-path arity-text copies (JS.js + the runtime) together.
+  { name: "helper:arity-mismatch", dialect: "surface", helpers: { loud: { fn: up, arity: 1 } }, t: "{{loud x y}}", d: { x: "a", y: "b" }, expectError: "expected exactly 1 argument(s), got 2" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 
 let pass = 0, fail = 0;
 const fails = [];
-for (const { name, t, d, dialect, partials, helpers, expect } of allCases) {
+for (const { name, t, d, dialect, partials, helpers, expect, expectError } of allCases) {
   const spec = interpret(t, d, dialect, partials, helpers);
   const got = await runCompiled(t, d, dialect, partials, helpers);
+  // `expectError`: both paths must fail, each reporting the same diagnostic text
+  // (e.g. the arity message) — gates the interpreter/compiled error agreement.
+  if (expectError !== undefined) {
+    const bothReject = !spec.ok && !got.ok && spec.error.includes(expectError) && got.error.includes(expectError);
+    if (bothReject) pass++;
+    else { fail++; fails.push({ name, spec: spec.ok ? `OK ${spec.value}` : spec.error, got: got.ok ? `OK ${got.value}` : got.error, ok: false }); }
+    continue;
+  }
   if (!spec.ok) {
     // The interpreter itself errored — not a compiler conformance case.
     console.log(`  ?    ${name} — interpreter errored: ${spec.error}`);

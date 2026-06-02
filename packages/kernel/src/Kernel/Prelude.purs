@@ -7,7 +7,7 @@
 -- | flow uses `{{else}}` separators; `if`/`each`/`with` split their body at the
 -- | `{{else}}` marker via the control handle's `clause`.
 -- |
--- | Helpers are declared *once* in `helperDefs` — each entry carries its name,
+-- | Helpers are declared *once* in `operationDefs` — each entry carries its name,
 -- | whether it is a block helper, and its arity alongside the runtime function.
 -- | `prelude` (the registry) and `preludeSchema` (the validator) are both
 -- | *projections* of that one table, so a helper's runtime arity and its
@@ -20,8 +20,8 @@ module Kernel.Prelude
   , preludeAliases
   , preludeSynonyms
   , preludeUnaryHelpers
-  , coreHelperDefs
-  , primitiveHelperDefs
+  , coreOperationDefs
+  , primitiveOperationDefs
   , coreSchema
   ) where
 
@@ -57,8 +57,8 @@ import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
 
 -- | One helper's full declaration: its name, whether it opens a block, its
 -- | arity, and the runtime function. `prelude` and `preludeSchema` below are
--- | projections of `helperDefs`, so the two never disagree.
-type HelperDef m =
+-- | projections of `operationDefs`, so the two never disagree.
+type OperationDef m =
   { name :: String
   , block :: Boolean
   , arity :: Arity
@@ -88,7 +88,7 @@ type HelperDef m =
 -- | A non-block value helper built from a `Kernel.Operation` combinator. The
 -- | combinator pins the arity, so the schema entry below is derived from the
 -- | very guard the runtime uses.
-valDef :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> HelperDef m
+valDef :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> OperationDef m
 valDef name mk =
   let
     s = mk name
@@ -97,30 +97,30 @@ valDef name mk =
 
 -- | A block or bespoke helper written directly against `Operation`, with its arity
 -- | declared explicitly (and enforced inside the helper body).
-gen :: forall m. String -> Boolean -> Arity -> Operation m (RefEnv m) -> HelperDef m
+gen :: forall m. String -> Boolean -> Arity -> Operation m (RefEnv m) -> OperationDef m
 gen name block arity run = { name, block, arity, run, alias: Nothing, synonymOf: Nothing }
 
 -- | Mark a helper definition as a (warned, lifted) deprecation alias of `canonical`.
-withAlias :: forall m. String -> HelperDef m -> HelperDef m
+withAlias :: forall m. String -> OperationDef m -> OperationDef m
 withAlias canonical d = d { alias = Just canonical }
 
 -- | Mark a helper as a canonical synonym of `canonical` — an endorsed, equal
 -- | alternative, labelled in the catalog but never warned or rewritten.
-withSynonym :: forall m. String -> HelperDef m -> HelperDef m
+withSynonym :: forall m. String -> OperationDef m -> OperationDef m
 withSynonym canonical d = d { synonymOf = Just canonical }
 
 -- | The complete reference roster: the core helpers (control flow, access,
 -- | arithmetic, …) followed by the *separable* value-primitive pack. Splitting
--- | the table — `helperDefs = coreHelperDefs <> primitiveHelperDefs` — keeps the
+-- | the table — `operationDefs = coreOperationDefs <> primitiveOperationDefs` — keeps the
 -- | primitives a genuinely detachable set (a registry/schema built from
--- | `coreHelperDefs` alone does not know `uppercase`), without introducing a
+-- | `coreOperationDefs` alone does not know `uppercase`), without introducing a
 -- | pack-assembly abstraction.
-helperDefs :: forall m. MonadThrow Error m => Array (HelperDef m)
-helperDefs = coreHelperDefs <> primitiveHelperDefs
+operationDefs :: forall m. MonadThrow Error m => Array (OperationDef m)
+operationDefs = coreOperationDefs <> primitiveOperationDefs
 
 -- | The core helpers — everything that is not a value primitive.
-coreHelperDefs :: forall m. MonadThrow Error m => Array (HelperDef m)
-coreHelperDefs =
+coreOperationDefs :: forall m. MonadThrow Error m => Array (OperationDef m)
+coreOperationDefs =
   [ gen "this" false (Exactly 0) thisH
   , gen "lookup" false (AtLeast 1) lookupH
   , valDef "true" (nullary (pure (VBool true)))
@@ -153,7 +153,7 @@ coreHelperDefs =
   , valDef "lte" (binary (cmp (_ /= GT)))
   , valDef "gte" (binary (cmp (_ /= LT)))
   -- `isnt` reads as "is not" — a canonical synonym of `ne` (endorsed and equal),
-  -- NOT a warned alias. See the two-bucket policy on `HelperDef`.
+  -- NOT a warned alias. See the two-bucket policy on `OperationDef`.
   , withSynonym "ne" (valDef "isnt" (binary ne'))
   , gen "not" false (Exactly 1) notH
   , gen "and" false AnyArity (boolH Array.all)
@@ -188,8 +188,8 @@ coreHelperDefs =
 -- | `VString` (not `VSafe`) — escaping stays the output layer's job. Operations
 -- | are on **code units** so the interpreter and the compiled JS runtime agree
 -- | on indices and length bit-for-bit (gated by `test:compile`).
-primitiveHelperDefs :: forall m. MonadThrow Error m => Array (HelperDef m)
-primitiveHelperDefs =
+primitiveOperationDefs :: forall m. MonadThrow Error m => Array (OperationDef m)
+primitiveOperationDefs =
   -- case
   [ valDef "lowercase" (unary (strUnary toLower))
   , valDef "uppercase" (unary (strUnary toUpper))
@@ -239,25 +239,25 @@ primitiveHelperDefs =
 
 -- | The registry: name → runtime helper.
 prelude :: forall m. MonadThrow Error m => Array (Tuple String (Operation m (RefEnv m)))
-prelude = map (\d -> Tuple d.name d.run) helperDefs
+prelude = map (\d -> Tuple d.name d.run) operationDefs
 
 -- | The alias table — each alias name → its canonical name — projected from
--- | `helperDefs.alias` (the single source of truth). The catalog marks these
+-- | `operationDefs.alias` (the single source of truth). The catalog marks these
 -- | ("alias of …"), the on-demand alias lint warns on their use, and the
 -- | lift/migrate assist rewrites them. E.g. `plus → add`, `downcase → lowercase`.
 preludeAliases :: Array (Tuple String String)
 preludeAliases =
   Array.mapMaybe (\d -> Tuple d.name <$> d.alias)
-    (helperDefs :: Array (HelperDef (Either Error)))
+    (operationDefs :: Array (OperationDef (Either Error)))
 
 -- | The synonym table — each canonical synonym → its primary name — projected
--- | from `helperDefs.synonymOf`. Unlike aliases these are NOT deprecated: the
+-- | from `operationDefs.synonymOf`. Unlike aliases these are NOT deprecated: the
 -- | catalog labels them ("synonym of …"), but the lint never warns and the lift
 -- | never rewrites them. E.g. `isnt → ne`, `size → count`.
 preludeSynonyms :: Array (Tuple String String)
 preludeSynonyms =
   Array.mapMaybe (\d -> Tuple d.name <$> d.synonymOf)
-    (helperDefs :: Array (HelperDef (Either Error)))
+    (operationDefs :: Array (OperationDef (Either Error)))
 
 -- | The names of *value* (non-block) helpers whose arity admits a **single
 -- | argument** — `Exactly 1` or `Between 1 n`. This is the candidate set for the
@@ -267,7 +267,7 @@ preludeSynonyms =
 -- | further removes names that own a dedicated surface (the `!`/operator helpers).
 preludeUnaryHelpers :: Array String
 preludeUnaryHelpers =
-  Array.mapMaybe unaryName (helperDefs :: Array (HelperDef (Either Error)))
+  Array.mapMaybe unaryName (operationDefs :: Array (OperationDef (Either Error)))
   where
   unaryName d
     | d.block = Nothing
@@ -277,7 +277,7 @@ preludeUnaryHelpers =
         _ -> Nothing
 
 -- | The reference engine's validation schema (`Kernel.Walk.validate`),
--- | projected from `helperDefs` plus the scoped variables below.
+-- | projected from `operationDefs` plus the scoped variables below.
 -- |
 -- | NOTE: validation is *scope-blind* — like a lenient JSON schema, it checks
 -- | only that a name is known and its arity fits, not *where* it may appear. The
@@ -291,7 +291,7 @@ preludeSchema :: Schema
 preludeSchema =
   { allowUnknown: false
   , helpers: Map.fromFoldable
-      (scopedSpecs <> map helperSpec (helperDefs :: Array (HelperDef (Either Error))))
+      (scopedSpecs <> map operationSpec (operationDefs :: Array (OperationDef (Either Error))))
   }
 
 -- | The schema for the *core* helpers alone (no value primitives) — used to
@@ -301,11 +301,11 @@ coreSchema :: Schema
 coreSchema =
   { allowUnknown: false
   , helpers: Map.fromFoldable
-      (scopedSpecs <> map helperSpec (coreHelperDefs :: Array (HelperDef (Either Error))))
+      (scopedSpecs <> map operationSpec (coreOperationDefs :: Array (OperationDef (Either Error))))
   }
 
-helperSpec :: forall m. HelperDef m -> Tuple String { block :: Boolean, arity :: Arity }
-helperSpec d = Tuple d.name { block: d.block, arity: d.arity }
+operationSpec :: forall m. OperationDef m -> Tuple String { block :: Boolean, arity :: Arity }
+operationSpec d = Tuple d.name { block: d.block, arity: d.arity }
 
 scopedSpecs :: Array (Tuple String { block :: Boolean, arity :: Arity })
 scopedSpecs =

@@ -10239,7 +10239,7 @@ var applyH = function(dictMonadThrow) {
     };
   };
 };
-var coreHelperDefs = function(dictMonadThrow) {
+var coreOperationDefs = function(dictMonadThrow) {
   var Applicative0 = dictMonadThrow.Monad0().Applicative0();
   var valDef1 = valDef(dictMonadThrow);
   var nullary2 = nullary(dictMonadThrow);
@@ -10279,7 +10279,7 @@ var appendH = function(dictMonadThrow) {
     };
   };
 };
-var primitiveHelperDefs = function(dictMonadThrow) {
+var primitiveOperationDefs = function(dictMonadThrow) {
   var valDef1 = valDef(dictMonadThrow);
   var unary2 = unary(dictMonadThrow);
   var strUnary1 = strUnary(dictMonadThrow);
@@ -10289,13 +10289,13 @@ var primitiveHelperDefs = function(dictMonadThrow) {
   var countH1 = countH(Applicative0);
   return [valDef1("lowercase")(unary2(strUnary1(toLower))), valDef1("uppercase")(unary2(strUnary1(toUpper))), valDef1("capitalize")(unary2(strUnary1(capitalizeStr))), valDef1("trim")(unary2(strUnary1(trim))), valDef1("trimStart")(unary2(strUnary1(trimStartStr))), valDef1("trimEnd")(unary2(strUnary1(trimEndStr))), valDef1("split")(binary2(splitH(dictMonadThrow))), gen("replace")(false)(new Exactly(3))(replaceH(dictMonadThrow)), gen("slice")(false)(new Between(2, 3))(sliceH(dictMonadThrow)), valDef1("includes")(binary2(includesH(dictMonadThrow))), valDef1("startsWith")(binary2(startsWithH(dictMonadThrow))), valDef1("endsWith")(binary2(endsWithH(dictMonadThrow))), gen("truncate")(false)(new Between(2, 3))(truncateH(dictMonadThrow)), valDef1("append")(binary2(appendH(dictMonadThrow))), valDef1("prepend")(binary2(prependH(dictMonadThrow))), withAlias("lowercase")(valDef1("downcase")(unary2(strUnary1(toLower)))), withAlias("uppercase")(valDef1("upcase")(unary2(strUnary1(toUpper)))), valDef1("abs")(unary2(numUnary1(abs))), valDef1("floor")(unary2(numUnary1(floor))), valDef1("ceil")(unary2(numUnary1(ceil))), valDef1("round")(unary2(numUnary1(round))), valDef1("toFixed")(binary2(toFixedH(dictMonadThrow))), valDef1("toInt")(unary2(toIntH(dictMonadThrow))), valDef1("toFloat")(unary2(toFloatH(dictMonadThrow))), valDef1("join")(binary2(joinH(dictMonadThrow))), valDef1("count")(unary2(countH1)), withSynonym("count")(valDef1("size")(unary2(countH1))), valDef1("at")(binary2(atH(dictMonadThrow))), valDef1("take")(binary2(takeH(dictMonadThrow))), valDef1("takeRight")(binary2(takeRightH(dictMonadThrow))), valDef1("reverse")(unary2(reverseH(dictMonadThrow))), valDef1("unique")(unary2(uniqueH(Applicative0))), valDef1("sortBy")(binary2(sortByH(dictMonadThrow))), valDef1("pluck")(binary2(pluckH(dictMonadThrow))), valDef1("groupBy")(binary2(groupByH(dictMonadThrow)))];
 };
-var helperDefs = function(dictMonadThrow) {
-  return append13(coreHelperDefs(dictMonadThrow))(primitiveHelperDefs(dictMonadThrow));
+var operationDefs = function(dictMonadThrow) {
+  return append13(coreOperationDefs(dictMonadThrow))(primitiveOperationDefs(dictMonadThrow));
 };
 var prelude = function(dictMonadThrow) {
   return map14(function(d) {
     return new Tuple(d.name, d.run);
-  })(helperDefs(dictMonadThrow));
+  })(operationDefs(dictMonadThrow));
 };
 
 // output/Kernel.Engine/index.js

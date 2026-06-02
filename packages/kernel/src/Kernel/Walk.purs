@@ -13,18 +13,18 @@
 -- | separator. `validate` is the batteries-included schema pass.
 module Kernel.Walk
   ( RefKind(..)
-  , HelperRef
+  , OperationRef
   , foldRefs
   , ExprAlgebra
   , foldExpr
   , Algebra
   , foldTemplate
-  , helperRefs
+  , operationRefs
   , Clause
   , splitClauses
   , splitClause
   , Arity(..)
-  , HelperSpec
+  , OperationSpec
   , Schema
   , Severity(..)
   , Issue
@@ -66,7 +66,7 @@ instance showRefKind :: Show RefKind where
 
 -- | A single occurrence of a name, with how it was used and how many arguments
 -- | it was given.
-type HelperRef = { name :: Ident, kind :: RefKind, argc :: Int }
+type OperationRef = { name :: Ident, kind :: RefKind, argc :: Int }
 
 -- | A catamorphism over an `Expr`: `app` receives the *already-folded* results
 -- | of its arguments (bottom-up). It is the single expression-recursion
@@ -86,10 +86,10 @@ foldExpr alg = go
     App name args -> alg.app name (map go args)
 
 -- | Fold a monoid over every helper reference in a template, depth-first.
-foldRefs :: forall m. Monoid m => (HelperRef -> m) -> Template -> m
+foldRefs :: forall m. Monoid m => (OperationRef -> m) -> Template -> m
 foldRefs f = foldMap (node f)
   where
-  node :: (HelperRef -> m) -> Node -> m
+  node :: (OperationRef -> m) -> Node -> m
   node g = case _ of
     Content _ -> mempty
     Output _ e -> expr g e
@@ -104,15 +104,15 @@ foldRefs f = foldMap (node f)
 
   -- Expression refs via the shared `foldExpr`: each application emits its own
   -- ref and combines the refs collected from its arguments.
-  expr :: (HelperRef -> m) -> Expr -> m
+  expr :: (OperationRef -> m) -> Expr -> m
   expr g = foldExpr
     { lit: \_ -> mempty
     , app: \name children -> g { name, kind: AppRef, argc: Array.length children } <> fold children
     }
 
 -- | Every helper reference in a template, in depth-first order.
-helperRefs :: Template -> Array HelperRef
-helperRefs = foldRefs Array.singleton
+operationRefs :: Template -> Array OperationRef
+operationRefs = foldRefs Array.singleton
 
 -- | A catamorphism over the skeleton: the engine supplies an algebra, FlatBars
 -- | owns the recursion (inversion of control). The `block` case is handed the
@@ -210,13 +210,13 @@ data Arity
 derive instance eqArity :: Eq Arity
 
 -- | What an engine declares about a helper name.
-type HelperSpec = { block :: Boolean, arity :: Arity }
+type OperationSpec = { block :: Boolean, arity :: Arity }
 
 -- | The engine's contract for a template. `allowUnknown` mirrors a JSON
 -- | schema's `additionalProperties`: when false, any name not in `helpers` is
 -- | an error.
 type Schema =
-  { helpers :: Map Ident HelperSpec
+  { helpers :: Map Ident OperationSpec
   , allowUnknown :: Boolean
   }
 
@@ -248,9 +248,9 @@ arityText = case _ of
 -- | Validate a skeleton template against an engine schema: unknown helpers
 -- | (when `allowUnknown` is false), arity violations, and block/inline misuse.
 validate :: Schema -> Template -> Array Issue
-validate schema = Array.mapMaybe check <<< helperRefs
+validate schema = Array.mapMaybe check <<< operationRefs
   where
-  check :: HelperRef -> Maybe Issue
+  check :: OperationRef -> Maybe Issue
   check ref
     | ref.kind == SepRef = Nothing -- separators are markers, not helper invocations
     | otherwise = case Map.lookup ref.name schema.helpers of

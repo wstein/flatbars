@@ -972,7 +972,7 @@ main = do
     Left e -> assert' ("lint: parse error " <> show e) false
 
   -- Schema/runtime conformance: prelude and preludeSchema are projections of one
-  -- HelperDef table, so for every combinator-built value helper the runtime
+  -- OperationDef table, so for every combinator-built value helper the runtime
   -- arity guard must agree exactly with the schema's declared arity. Drive each
   -- with 0–3 args (the helper ignores the control handle) and assert that it
   -- raises an ArityError precisely when the schema arity rejects that count.
@@ -1007,7 +1007,7 @@ main = do
 
   -- Separability of the value-primitive pack (helper-packs-spec §4, P0 intent):
   -- the primitives are a genuinely detachable set, not fused into core. A schema
-  -- built from `coreHelperDefs` alone does NOT know `uppercase` (a primitive),
+  -- built from `coreOperationDefs` alone does NOT know `uppercase` (a primitive),
   -- while the full `preludeSchema` does. The core helpers must still be present
   -- in both (the split only moves the primitives out).
   assert' "separability: coreSchema omits the primitive 'uppercase'"
@@ -1061,9 +1061,9 @@ main = do
     )
   assert' "separability: a core helper (e.g. 'if') survives the split in coreSchema"
     (Map.member "if" KP.coreSchema.helpers)
-  -- `coreHelperDefs` is the non-primitive base; the full roster adds exactly the
+  -- `coreOperationDefs` is the non-primitive base; the full roster adds exactly the
   -- 35-strong primitive pack on top (string + number + array, incl. aliases).
-  assert' "separability: helperDefs = coreHelperDefs <> primitiveHelperDefs (35 primitives)"
+  assert' "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (35 primitives)"
     (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 35)
 
   -- Set delimiters are EXCLUDED from FullBars (ADR-015): it is the Handlebars-
