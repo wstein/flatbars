@@ -12771,13 +12771,13 @@ var renderCoreWith = function(cfg) {
               return new Right(v2.value0);
             }
             ;
-            throw new Error("Failed pattern match at MinBars (line 131, column 9 - line 133, column 33): " + [v2.constructor.name]);
+            throw new Error("Failed pattern match at MinBars (line 130, column 9 - line 132, column 33): " + [v2.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at MinBars (line 125, column 34 - line 133, column 33): " + [v1.constructor.name]);
+          throw new Error("Failed pattern match at MinBars (line 124, column 34 - line 132, column 33): " + [v1.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at MinBars (line 123, column 39 - line 133, column 33): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MinBars (line 122, column 39 - line 132, column 33): " + [v.constructor.name]);
       };
     };
   };
@@ -12812,7 +12812,7 @@ var renderMinWith = function(partialSrcs) {
           return new Right(new Tuple(v2.value0, desugar2(v1.value0.nodes)));
         }
         ;
-        throw new Error("Failed pattern match at MinBars (line 104, column 35 - line 106, column 58): " + [v1.constructor.name]);
+        throw new Error("Failed pattern match at MinBars (line 103, column 35 - line 105, column 58): " + [v1.constructor.name]);
       };
       var v = traverse7(compilePartial)(partialSrcs);
       if (v instanceof Left) {
@@ -12823,7 +12823,7 @@ var renderMinWith = function(partialSrcs) {
         return renderCore(fromFoldable11(v.value0))(src)(dat);
       }
       ;
-      throw new Error("Failed pattern match at MinBars (line 100, column 3 - line 102, column 57): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at MinBars (line 99, column 3 - line 101, column 57): " + [v.constructor.name]);
     };
   };
 };
@@ -12844,7 +12844,7 @@ var expansionIndent = function(indent) {
       return new Left(new DisallowedShape("intrinsic block indentation with a non-static default (MinBars compile)", 0));
     }
     ;
-    throw new Error("Failed pattern match at MinBars (line 257, column 1 - line 257, column 66): " + [indent.constructor.name, body.constructor.name]);
+    throw new Error("Failed pattern match at MinBars (line 255, column 1 - line 255, column 66): " + [indent.constructor.name, body.constructor.name]);
   };
 };
 var blockIndent = function(args) {
@@ -12877,7 +12877,7 @@ var inline = function(partials) {
                   return inline(partials)(overrides)(new Cons(v["value1"]["value1"][0].value0.value0, chain))(depth)(indentTemplate(v["value1"]["value1"][1].value0.value0)(v1.value0));
                 }
                 ;
-                throw new Error("Failed pattern match at MinBars (line 214, column 22 - line 216, column 99): " + [v1.constructor.name]);
+                throw new Error("Failed pattern match at MinBars (line 212, column 22 - line 214, column 99): " + [v1.constructor.name]);
               }
               ;
             }
@@ -12901,7 +12901,7 @@ var inline = function(partials) {
                   return inline(partials)(union6(overrides)(harvestBlocks(v.value4)))(chain)(depth + 1 | 0)(indentTemplate(v["value3"][1].value0.value0)(v1.value0));
                 }
                 ;
-                throw new Error("Failed pattern match at MinBars (line 223, column 22 - line 227, column 45): " + [v1.constructor.name]);
+                throw new Error("Failed pattern match at MinBars (line 221, column 22 - line 225, column 45): " + [v1.constructor.name]);
               }
               ;
             }
@@ -12931,7 +12931,7 @@ var inline = function(partials) {
                   });
                 }
                 ;
-                throw new Error("Failed pattern match at MinBars (line 232, column 36 - line 239, column 37): " + [v2.constructor.name]);
+                throw new Error("Failed pattern match at MinBars (line 230, column 36 - line 237, column 37): " + [v2.constructor.name]);
               }
               ;
               return new Left(new DisallowedShape("malformed block override (MinBars compile)", 0));

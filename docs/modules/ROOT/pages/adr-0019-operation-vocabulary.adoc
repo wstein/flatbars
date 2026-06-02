@@ -1,8 +1,11 @@
 = ADR-019: The operation model — "operation" / "definition" natively, "helper" at the host boundary
 :navtitle: ADR-019 Operation vocabulary
 
-*Status:* Accepted (with the conditions in Consequences: a frozen boundary word, a single gated rename
-commit, and an owned kind taxonomy). *Date:* 2026-06-02. Builds on
+*Status:* Accepted — *implemented*. The `Helper` → `Operation` rename landed in one gated commit
+(build + `test:compile` byte-identical + `check:catalog` + `check:bundle`); the `concepts` §1 reframe and
+`#glossary` are in place; the host API keeps the frozen `helper` word; and `check:glossary` gates the two
+registers' agreement. The conditions below (frozen boundary, single gated rename, owned kind taxonomy)
+are met. *Date:* 2026-06-02. Builds on
 xref:concepts.adoc[the core model] §1–4 (everything is an application; there are *no variables*; the head
 is always a name; scope is install/remove of names) and
 xref:adr-0001-structural-parser-and-walker.adoc[ADR-001] (the meaning plug-in). Constrains, but does not

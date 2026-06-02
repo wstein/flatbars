@@ -34,10 +34,10 @@ runString    :: forall m env. MonadThrow Error m => Engine m env -> String   -> 
 
 -- The reference engine, FullBars (one choice of m/env; Ch. 6), parametric in the monad
 emptyEnv     :: forall m. Value -> RefEnv m
-register     :: forall m. Ident -> Helper m (RefEnv m) -> RefEnv m -> RefEnv m
-registerAll  :: forall m. Array (Tuple Ident (Helper m (RefEnv m))) -> RefEnv m -> RefEnv m
+register     :: forall m. Ident -> Operation m (RefEnv m) -> RefEnv m -> RefEnv m
+registerAll  :: forall m. Array (Tuple Ident (Operation m (RefEnv m))) -> RefEnv m -> RefEnv m
 refEngine    :: forall m. MonadThrow Error m => RefEnv m -> Engine m (RefEnv m)
-prelude      :: forall m. MonadThrow Error m => Array (Tuple Ident (Helper m (RefEnv m)))
+prelude      :: forall m. MonadThrow Error m => Array (Tuple Ident (Operation m (RefEnv m)))
 
 -- Validation (the JSON-Schema-style pass) and analysis
 validate     :: Schema -> Template -> Array Issue             -- schema = engine's contract
@@ -93,13 +93,13 @@ same code runs pure or async. See xref:appendix-handlebars.adoc#engine-api[A.13]
 [source,haskell]
 ----
 -- upcase: a 1-argument inline helper (ignores the handle)
-upcase :: forall m env. MonadThrow Error m => Helper m env
+upcase :: forall m env. MonadThrow Error m => Operation m env
 upcase _ args = case args of
   [v] -> VString <<< toUpper <$> stringify v
   _   -> throwError (ArityError "upcase/1")
 
 -- if: a block helper that reads a nested `else` clause via the handle
-ifHelper :: forall m env. MonadThrow Error m => Helper m env
+ifHelper :: forall m env. MonadThrow Error m => Operation m env
 ifHelper ctl args = case args of
   [cond] ->
     let { before, body } = ctl.clause "else"
@@ -118,7 +118,7 @@ ifHelper ctl args = case args of
 |`Handlebars.compile(src)` |`compile src` |Surface in, `data -> String` out.
 |`Handlebars.precompile(src)` |`parse` `>>>` `desugar` |Ship the desugared real AST; render later.
 |`Handlebars.parse(src)` |`parse` |Returns the structural AST of xref:evaluation.adoc[].
-|`Handlebars.registerHelper(n,f)` |`register n f` |`f` follows the `Helper` contract.
+|`Handlebars.registerHelper(n,f)` |`register n f` |`f` follows the `Operation` contract (the type formerly `Helper`; the host word stays *helper* — xref:concepts.adoc#glossary[glossary], xref:adr-0019-operation-vocabulary.adoc[ADR-019]).
 |`Handlebars.registerPartial(n,t)` |`register n (partialOf t)` |A partial *is* a helper.
 |`Handlebars.registerDecorator(n,f)` |`register n f` |Decorators are block helpers (xref:appendix-handlebars.adoc#decorators[A.8]).
 |`options.fn` / `options.inverse` |`ctl.render` over `ctl.children` / over `ctl.clause "else"` |No inverse field; clauses are separator-delimited.
