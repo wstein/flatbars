@@ -20,10 +20,11 @@
 // corpus carries the Exhibit A/B regressions plus the cases a regex cannot do:
 // set-delimiter statefulness, per-dialect tag boundaries, and the clause keywords.
 //
-// NOTE: long comments `{{!-- … --}}` are inert prose the lexer drops, so they
-// produce no span (they are not mis-bounded either — that was Exhibit A/B). Host
-// *data* highlighting (YAML) is a separate concern (real `lang-yaml` + a data-side
-// decorator), out of this FlatBars-syntax gate's scope.
+// NOTE: long comments `{{!-- … --}}` are coloured (the lexer emits them as a
+// span-only token under `keepLongComments`, which only the highlighter sets — the
+// render/compile token stream is unchanged). Host *data* highlighting (YAML) is a
+// separate concern (real `lang-yaml` + a data-side decorator), out of this
+// FlatBars-syntax gate's scope.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -36,8 +37,8 @@ const outFile = resolve(here, "highlight-golden.json");
 // documents the invariant the case protects.
 const CORPUS = [
   // ── Regression exhibits from the design debate ──────────────────────────
-  { id: "exhibit-a-long-comment", dialect: "fullbars", note: "long {{!-- … --}} is inert (lexer drops it) → no span; crucially NOT mis-bounded, so the trailing `!` stays plain text (Exhibit A fixed)", src: "Hello, {{!-- name --}}!" },
-  { id: "exhibit-b-unterminated-comment", dialect: "fullbars", note: "an unterminated {{!-- swallows to the next --}} exactly as the lexer does — no stray raw tag (Exhibit B fixed)", src: "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}" },
+  { id: "exhibit-a-long-comment", dialect: "fullbars", note: "the whole {{!-- name --}} is ONE comment span and the trailing `!` is OUTSIDE it — the regex closed the comment at the inner }} (Exhibit A fixed)", src: "Hello, {{!-- name --}}!" },
+  { id: "exhibit-b-unterminated-comment", dialect: "fullbars", note: "an unterminated {{!-- swallows to the next --}} (one comment span) exactly as the lexer does — no stray raw tag (Exhibit B fixed)", src: "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}" },
 
   // ── Interpolation ───────────────────────────────────────────────────────
   { id: "expr", dialect: "fullbars", note: "{{name}} → expr", src: "Hello, {{name}}!" },

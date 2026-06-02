@@ -87,5 +87,7 @@ had no such gate, so the drift was silent.
   squiggles from the lexer's `ParseError` spans).
 * The golden gate (`scripts/gen-highlight.mjs`) is now an *engine-equivalence* oracle: its golden is
   `highlightSpans(src, dialect)` from the committed bundle, covering the set-delimiter, per-dialect, and
-  clause-keyword cases a regex cannot. Long `pass:[{{!-- … --}}]` comments produce no span (the lexer
-  drops them as inert prose); the engine still *bounds* them correctly, which was the Exhibit A/B bug.
+  clause-keyword cases a regex cannot. Long `pass:[{{!-- … --}}]` comments are coloured as one span: the
+  lexer emits them as a span-only `RLongComment` under `keepLongComments` (a flag only the highlighter
+  sets, so the render/compile token stream is unchanged), bounded exactly as the engine parses them —
+  which is what the regex got wrong in Exhibits A/B.

@@ -51,10 +51,12 @@ nodeCount src = case parse src of
 -- Highlight configs: a kernel-dialect config (FullBars-like — `else`/`elif` are
 -- clause separators) and a Mustache config (set delimiters on, no clause words).
 hlKernel :: HighlightConfig
-hlKernel = { lexConfig: defaultLexConfig, clauseSeps: [ "else", "elif" ] }
+hlKernel =
+  { lexConfig: defaultLexConfig { keepLongComments = true }, clauseSeps: [ "else", "elif" ] }
 
 hlMustache :: HighlightConfig
-hlMustache = { lexConfig: defaultLexConfig { mustacheDelims = true }, clauseSeps: [] }
+hlMustache =
+  { lexConfig: defaultLexConfig { mustacheDelims = true, keepLongComments = true }, clauseSeps: [] }
 
 kinds :: HighlightConfig -> String -> Array String
 kinds cfg src = map _.kind (highlightSpans cfg src)
@@ -122,7 +124,8 @@ main = do
 
   -- ── Set delimiters (ADR-015): the lexer's gated `mustacheDelims` mode ────────
   let
-    md = defaultParseOptions { lexConfig = { open: "{{", close: "}}", mustacheDelims: true } }
+    md = defaultParseOptions
+      { lexConfig = { open: "{{", close: "}}", mustacheDelims: true, keepLongComments: false } }
   -- `{{=<% %>=}}` swaps the active delimiters; it renders nothing, and a following
   -- `<%x%>` is a separator in the new pair (span confirms the tag was consumed).
   case parseWith md "{{=<% %>=}}<%x%>" of
@@ -368,6 +371,12 @@ main = do
     )
   assert' "highlight: triple-stash is raw, comment is comment"
     (kinds hlKernel "{{{x}}}{{! hi }}" == [ "raw", "comment" ])
+  -- Long comments are coloured too (keepLongComments): {{!-- … --}} → one comment
+  -- span, even with inner mustaches/dashes; the inner tags are NOT highlighted.
+  assert' "highlight: long {{!-- … --}} comment is one comment span"
+    ( highlightSpans hlKernel "a {{!-- has {{foo}} and -- dashes --}} b" ==
+        [ { from: 2, to: 38, kind: "comment" } ]
+    )
   -- Set delimiters are stateful — only the lexer (which carries the live pair)
   -- gets this right: after `{{=<% %>=}}` the following `<%y%>` is the active tag.
   assert' "highlight: set-delimiter switch is stateful"

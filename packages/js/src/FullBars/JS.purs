@@ -138,12 +138,16 @@ highlightSpans = mkFn2 \tpl dialect -> Highlight.highlightSpans (highlightConfig
 -- | `else`/`elif` as clause separators, MinBars (Mustache) treats none.
 highlightConfig :: String -> Highlight.HighlightConfig
 highlightConfig = case _ of
-  "maxbars" -> { lexConfig: maxOptions.lexConfig, clauseSeps: maxOptions.standaloneSeps }
+  "maxbars" ->
+    { lexConfig: maxOptions.lexConfig { keepLongComments = true }
+    , clauseSeps: maxOptions.standaloneSeps
+    }
   "rawbars" -> { lexConfig: withSetDelims, clauseSeps: kernelClauses }
   "minbars" -> { lexConfig: withSetDelims, clauseSeps: [] }
-  _ -> { lexConfig: defaultLexConfig, clauseSeps: kernelClauses }
+  _ -> { lexConfig: defaultLexConfig { keepLongComments = true }, clauseSeps: kernelClauses }
   where
-  withSetDelims = defaultLexConfig { mustacheDelims = true }
+  -- Highlighting wants the long comments rendering drops, so it can colour them.
+  withSetDelims = defaultLexConfig { mustacheDelims = true, keepLongComments = true }
   kernelClauses = [ "else", "elif" ]
 
 --------------------------------------------------------------------------------

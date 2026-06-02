@@ -350,6 +350,7 @@ parseSeq pe ph extras inheritance lx toks = go Nil
     Just t -> case t of
       RContent s -> go (Content s : acc) (i + 1)
       RComment _ _ _ -> go acc (i + 1) -- filtered upstream; skip defensively
+      RLongComment _ -> go acc (i + 1) -- highlight-only token (keepLongComments); never reaches the parser
       RSetDelim _ -> go acc (i + 1) -- renders nothing; the delimiter swap already happened in the lexer
       ROutput span base s -> case outputExpr lx pe span base s of
         Left e -> Left e

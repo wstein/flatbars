@@ -70,6 +70,7 @@ highlightSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
     RSep sp _ interior -> at sp (sepKind interior)
     RRaw sp _ _ _ -> at sp "raw-block"
     RComment sp _ _ -> at sp "comment"
+    RLongComment sp -> at sp "comment"
     RSetDelim sp -> at sp "set-delimiter"
 
   at :: Span -> String -> Maybe HSpan

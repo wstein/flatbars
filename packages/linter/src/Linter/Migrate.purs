@@ -177,6 +177,10 @@ step src acc = case _ of
   -- pass it through verbatim if one ever does (minimal-diff rewrite).
   RSetDelim span -> emit acc (sliceSpan src span)
 
+  -- Migrate leaves `keepLongComments` off, so a long-comment token never appears;
+  -- emit it verbatim if one ever does (minimal-diff rewrite).
+  RLongComment span -> emit acc (sliceSpan src span)
+
 emit :: Acc -> String -> Acc
 emit acc s = acc { chunks = Array.cons s acc.chunks }
 

@@ -5,20 +5,31 @@
     {
       "id": "exhibit-a-long-comment",
       "dialect": "fullbars",
-      "note": "long {{!-- … --}} is inert (lexer drops it) → no span; crucially NOT mis-bounded, so the trailing `!` stays plain text (Exhibit A fixed)",
+      "note": "the whole {{!-- name --}} is ONE comment span and the trailing `!` is OUTSIDE it — the regex closed the comment at the inner }} (Exhibit A fixed)",
       "src": "Hello, {{!-- name --}}!",
-      "spans": []
+      "spans": [
+        {
+          "from": 7,
+          "to": 22,
+          "kind": "comment"
+        }
+      ]
     },
     {
       "id": "exhibit-b-unterminated-comment",
       "dialect": "fullbars",
-      "note": "an unterminated {{!-- swallows to the next --}} exactly as the lexer does — no stray raw tag (Exhibit B fixed)",
+      "note": "an unterminated {{!-- swallows to the next --}} (one comment span) exactly as the lexer does — no stray raw tag (Exhibit B fixed)",
       "src": "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}",
       "spans": [
         {
           "from": 9,
           "to": 17,
           "kind": "expr"
+        },
+        {
+          "from": 27,
+          "to": 60,
+          "kind": "comment"
         }
       ]
     },

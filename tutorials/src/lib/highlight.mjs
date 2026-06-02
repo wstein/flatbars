@@ -40,9 +40,9 @@ const KIND_CLASS = {
 };
 
 // Highlight a template by the engine's own spans. `dialect` selects the lexer
-// configuration (set delimiters, clause keywords) exactly as the renderer would;
-// it defaults to FullBars. Text outside any span (and long `{{!-- … --}}`
-// comments, which the lexer drops as inert prose) stays the default colour.
+// configuration (set delimiters, clause keywords, and long-comment spans) exactly
+// as the renderer would; it defaults to FullBars. Text outside any span stays the
+// default colour.
 export function highlightTemplate(src, dialect = "fullbars") {
   const spans = highlightSpans(String(src), dialect) || [];
   let out = "";

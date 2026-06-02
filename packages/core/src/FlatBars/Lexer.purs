@@ -52,6 +52,13 @@ data RawTok
   -- all following content and renders nothing; the parser drops it (like a
   -- comment) after the standalone-whitespace pass, where it is eligible.
   | RSetDelim Span
+  -- {{!-- … --}} (and {{~!--) — a *long* comment, inert prose. It is normally
+  -- dropped (it carries no directives and produces no output), but is emitted as
+  -- this span-only token when `LexConfig.keepLongComments` is on, so the
+  -- highlighter can colour it (the parser/compiler never set that flag, so they
+  -- still never see it). Standalone-whitespace and `~` trimming are unchanged —
+  -- handled by the surrounding flush regardless of whether the token is emitted.
+  | RLongComment Span
 
 derive instance eqRawTok :: Eq RawTok
 
@@ -66,6 +73,7 @@ instance showRawTok :: Show RawTok where
     RRaw _ _ s b -> "RRaw " <> show s <> " " <> show b
     RComment _ _ s -> "RComment " <> show s
     RSetDelim _ -> "RSetDelim"
+    RLongComment _ -> "RLongComment"
 
 --------------------------------------------------------------------------------
 -- Character helpers
@@ -231,11 +239,17 @@ dropTrailingIndent s = case nlIndex false s of
 -- | swaps the active pair mid-stream (ADR-015). When `mustacheDelims` is off
 -- | (the ladder's default) and the pair is the default `{{`/`}}`, the scan is
 -- | byte-identical to the fixed-delimiter lexer.
-type LexConfig = { open :: String, close :: String, mustacheDelims :: Boolean }
+-- | `keepLongComments` makes the scanner emit `{{!-- … --}}` long comments as
+-- | span-only `RLongComment` tokens instead of dropping them; only the syntax
+-- | highlighter sets it (rendering/compilation leave it off, so their token
+-- | stream — and output — is unchanged).
+type LexConfig =
+  { open :: String, close :: String, mustacheDelims :: Boolean, keepLongComments :: Boolean }
 
--- | Default template-lexer config: `{{`/`}}`, no set-delimiter switching.
+-- | Default template-lexer config: `{{`/`}}`, no set-delimiter switching, long
+-- | comments dropped (the render/compile default).
 defaultLexConfig :: LexConfig
-defaultLexConfig = { open: "{{", close: "}}", mustacheDelims: false }
+defaultLexConfig = { open: "{{", close: "}}", mustacheDelims: false, keepLongComments: false }
 
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
 
@@ -601,11 +615,19 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
               , trimR
               }
 
+  -- A long comment `{{!-- … --}}` renders nothing and carries no directive, so
+  -- it is dropped (`mtok: Nothing`) — except under `keepLongComments`, where it
+  -- is emitted as a span-only `RLongComment` for the highlighter. Either way the
+  -- `~`/standalone trims are the same, so render output never depends on this.
   readLongComment :: Int -> String -> Either ParseError TagResult
   readLongComment i opener = case findFrom cs (i + SCU.length opener) "--}}" of
     Nothing -> Left (UnterminatedComment i)
     Just q -> Right
-      { mtok: Nothing, next: q + 4, trimL: leadTrimAt i, trimR: matchAt cs (q - 1) "~" }
+      { mtok: if cfg.keepLongComments then Just (RLongComment { start: i, end: q + 4 }) else Nothing
+      , next: q + 4
+      , trimL: leadTrimAt i
+      , trimR: matchAt cs (q - 1) "~"
+      }
 
   -- `sigil` is the opener length: 5 for `{{{{#`, 4 for the bare `{{{{`. Both
   -- close with the name-matched `{{{{/name}}}}`; the head is read from `start`.

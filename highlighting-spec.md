@@ -45,7 +45,7 @@ type Dialect = "rawbars" | "fullbars" | "maxbars" | "minbars"
 type Span    = { from: number, to: number, kind: Kind }          // UTF-16 offsets into `template`
 ```
 
-- **Total / never-throws.** On a lex error, return spans for everything classified plus a trailing `{ kind: "error" }` span — highlighting degrades, never blanks. (The lexer's `ParseError` already carries a span.)
+- **Total / never-throws.** The outer lexer is all-or-nothing (`Either`), so on a lex error `highlightSpans` returns `[]` — highlighting degrades to plain text rather than guessing where the engine would have stopped (it never disagrees with the lexer). The `error` kind is reserved for a future error-tolerant path; presenters may keep the last good span set to avoid flicker while typing.
 - **Pure & fast.** No async, no per-token FFI. The bundle is resident and the lexer already runs every render; one extra lex of a small string is negligible.
 - **Offsets, not markup.** Non-overlapping, ordered; gaps are literal text. Each host renders in its own idiom (here: CM decorations).
 
@@ -64,7 +64,7 @@ Each tag produces exactly **one whole-tag span** tagged by its structural role (
 | `block-parent` | `ROpen Parent` (`<`) | `{{<layout}}` |
 | `block-decl` | `ROpen BlockDef` (`$`) | `{{$title}}` |
 | `block-close` | `RClose` (`/`) | `{{/a}}` |
-| `comment` | `RComment` (`{{! }}`, `{{!-- --}}`, `{{~!--`) | `{{!-- … --}}` |
+| `comment` | `RComment` (`{{! }}`) and `RLongComment` (`{{!-- --}}`, `{{~!--`) | `{{!-- … --}}` |
 | `set-delimiter` | `RSetDelim` (ADR-015) | `{{=<% %>=}}` |
 | `raw-block` | `RRaw` (whole block) | `{{{{raw}}}} … {{{{/raw}}}}` |
 | `error` | lex error | unterminated tag (degrades to `[]`, see §3) |
