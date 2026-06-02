@@ -25,10 +25,10 @@ const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
 // One code editor: a syntax-highlight layer with a transparent textarea atop, so
 // the reader edits real text while seeing colour. Heights are synced after every
 // render (the textarea auto-grows; the highlight <pre> follows it).
-function CodeEditor({ lang, value, onInput }) {
+function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
   const taRef = useRef(null);
   const preRef = useRef(null);
-  const html = (lang === "yaml" ? highlightYaml(value) : highlightTemplate(value)) + "\n";
+  const html = (lang === "yaml" ? highlightYaml(value) : highlightTemplate(value, dialect)) + "\n";
 
   useEffect(() => {
     const ta = taRef.current, pre = preRef.current;
@@ -164,7 +164,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       <div class={gridClass}>
         <div class="oil-cell">
           <div class="oil-cell-head"><span class="oil-cap">template</span></div>
-          <CodeEditor lang="template" value={tpl} onInput={onTpl} />
+          <CodeEditor lang="template" value={tpl} onInput={onTpl} dialect={engine} />
         </div>
         <div class="oil-cell">
           <div class="oil-cell-head"><span class="oil-cap">data</span></div>
@@ -173,7 +173,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
         {Object.keys(parts).map((name) => (
           <div class="oil-cell" key={name}>
             <div class="oil-cell-head"><span class="oil-cap">partial · {name}</span></div>
-            <CodeEditor lang="template" value={parts[name]} onInput={(v) => onPart(name, v)} />
+            <CodeEditor lang="template" value={parts[name]} onInput={(v) => onPart(name, v)} dialect={engine} />
           </div>
         ))}
       </div>

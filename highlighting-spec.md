@@ -101,16 +101,13 @@ comment|set-delimiter→stem-comment  error→stem-error
 
 Because both hosts use this one extension, "the kind→class map" and "the presenter" are a single artifact — there is nothing to keep in sync between Lab and tutorials.
 
-## 5. Tutorials — adopt CodeMirror 6
+## 5. Tutorials — engine-derived overlay (CM6 adoption deferred)
 
-The tutorials' `OpenInLab.jsx` `CodeEditor` is a `<textarea>` + a highlight-`<pre>` overlay driven by the regex highlighters. Replace it with a **CodeMirror 6 `EditorView`** per editor (mounted in a Preact `useEffect`, `client:visible` as today):
+The tutorials' `OpenInLab.jsx` `CodeEditor` is a `<textarea>` + a highlight-`<pre>` overlay. The **template regex is replaced by the engine**: `highlightTemplate(src, dialect)` (in `tutorials/src/lib/highlight.mjs`) now wraps the bundle's `highlightSpans` and emits one `<span class="stem-…">` per span (kind→`stem-*` map mirroring `cm-flatbars.mjs`). The card threads its `engine` prop as the dialect, so the preview is correct on set delimiters, every dialect's tag boundaries, and the clause keywords — and the static lambda block in `minbars.astro` is highlighted the same way (`dialect: "minbars"`). **[done]**
 
-- **template / partial editors** → `[flatbarsHighlight("minbars"), flatbarsHighlightTheme, …editing]` (the shared engine extension).
-- **data editor** → `[yaml(), …editing]` (real `@codemirror/lang-yaml` — fixes the multi-line YAML bug, deletes `highlightYaml`).
-- The existing wiring is preserved: an `updateListener` feeds edits back to state (live re-render through the bundled engine, the dock "Open in Lab" link). The output pane stays a plain dark `<pre>` (rendered text, no editor).
-- **Deletes** `tutorials/src/lib/highlight.mjs` entirely (both `highlightTemplate` and `highlightYaml`); the static spec-only block (lambdas) is highlighted by a read-only CM instance with the FlatBars extension, or kept as a static engine-tokenized render at build time.
+**Why the overlay, not full CM6 (this iteration).** A CM6 `EditorView` mounts *client-side*; neither `astro build` nor `check:tutorial-links` exercises the browser, so a CM6 island can't be verified here, and it carries a real ~150–250 KB gz dependency. The engine-derived overlay achieves ADR-014's actual goal — template syntax derives from the lexer, the regex is gone, the gate is engine-derived — while staying buildable and verified. It is **not** debt: no FlatBars-syntax regex remains.
 
-**Dependencies / weight.** Add `@codemirror/{state,view,language,lang-yaml,lang-html,commands}` to the tutorials (Vite bundles them; ~150–250 KB gz). Tradeoff: the tutorials already ship the 369 KB engine bundle and host live editors, so CM6 is proportionate, and it is the only way to get a *real* YAML grammar there. *Fallback if the weight is rejected:* keep the textarea+overlay but feed it engine `tokenizeTemplate` spans for the template (delete `highlightTemplate`) and accept best-effort YAML — but this keeps a second presenter and a weak YAML story, so CM6 adoption is recommended.
+**`highlightYaml` is kept** (host-*data* line highlighter, unchanged): it is not FlatBars syntax. Adopting a real `lang-yaml` there is the remaining CM6 work — see §10.
 
 ## 6. Lab — rewire to the shared extension
 
@@ -133,7 +130,7 @@ A lexer change not reflected in highlighting then fails the build — highlighti
 1. **Expose `highlightSpans`** on `FullBars.JS` — a `FlatBars.Highlight` core module mapping `RawTok`s to whole-tag spans + a per-dialect clause-keyword classification (+ a `flatbars` unit test against golden spans); regenerate the bundle (`spago bundle …`, `check:bundle`). **[done]**
 2. **`lab/cm-flatbars.mjs`** — the shared extension + kind→class map (reusing the Lab's existing `--stem-*` palette classes, injected CM via DI); unit-tested against the real bundle. **[done]**
 3. **Lab rewire** — swapped in `flatbarsHighlight`; deleted `HB_TAG_RE`/`hbMarkFor`/`handlebarsHighlighting`. `yamlDecorator` kept (data-side, §6). Visible win: set delimiters + inheritance sigils highlight correctly. **[done]**
-4. **Tutorials CM6 adoption** — `CodeEditor` → CM6; template = shared extension, data = `lang-yaml`; delete `highlight.mjs`.
+4. **Tutorials template highlighting** — `highlightTemplate` rewritten over `highlightSpans` (dialect from the card's `engine`); the template regex is gone. Full CM6 adoption (real `lang-yaml`, single presenter) deferred — see §5 and §10. **[done]**
 5. **Flipped `check:highlight`** to engine-derived: the golden is now `highlightSpans(src, dialect)` from the bundle (21 cases incl. Exhibits A/B, set-delimiter switch + switch-back, clause keywords, per-dialect tag boundaries). The stopgap `highlight.mjs` dependency and YAML cases are gone. **[done]**
 
 Steps 1–3 + 5 are done; step 4 (tutorials CM6) remains. The tutorials' regex stays until its surface is swapped, so nothing regresses mid-flight.
@@ -147,6 +144,7 @@ Steps 1–3 + 5 are done; step 4 (tutorials CM6) remains. The tutorials' regex s
 ## 10. Future developments
 
 - **Interior token kinds:** colour `path`/`string`/`number`/`operator`/`pipe` *inside* a tag (so MaxBars `a | f`, `a ?? b`, `n + 1` read with operators distinct from paths). The engine already *tokenizes* them correctly (`tokenizeInterior maxOptions` lexes `+ - * / % ??` as `TOp`, `|` as a pipe); the blocker is that `FlatBars.Token.PosToken` records only a token *start* and stores parsed values (not source text) for numbers/strings, so an exact end offset isn't recoverable. Add an end offset to `PosToken` (touches `FlatBars.Token` and every parser consumer), then layer interior spans under each whole-tag span. Enhancement, not a correctness gap.
+- **Tutorials CM6 adoption:** swap the `OpenInLab` textarea+overlay for a CodeMirror 6 `EditorView` per editor — template = the shared `flatbarsHighlight` extension (one presenter with the Lab), data = real `@codemirror/lang-yaml` (retiring `highlightYaml`). Deferred this iteration for the ~150–250 KB gz dependency and because a client-mounted island isn't verifiable in the current gates; the engine-derived overlay already removes the FlatBars-syntax regex.
 - **Semantic layer:** with engine spans in hand, distinguish *known* vs *unknown* helper heads via `preludeSchema` (the linter's `Linter.Aliases` already computes this) and surface lexer `ParseError` spans as editor squiggles (the Lab already imports `lintGutter`/`linter`).
 - **WASM lexer:** compile a slice of `FlatBars.Lexer` to WASM to back a tree-sitter external scanner — making even the external/portable grammar set-delimiter-correct, still from one source.
 

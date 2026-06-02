@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Tiny syntax highlighters that emit HTML strings, shared by the runnable
-// example card (behind its live editors) and the static spec-only code blocks.
-// Ported from the FlatBars-design mockup's `highlight.js`; the JSON highlighter
-// is replaced by a YAML one because the Lab's — and these cards' — native data
-// format is YAML (see lab/open-in-lab.mjs `dataText`). Colours map to the Lab's
-// "stem" palette via CSS classes (open-in-lab.css), so a template reads the same
-// here as in the full Lab editor.
+// HTML-string highlighters for the runnable example card (behind its live
+// editors) and the static spec-only code blocks. The template highlighter
+// derives from the ENGINE lexer (ADR-014): `highlightTemplate` wraps the engine
+// bundle's `highlightSpans(src, dialect)`, so the colour can never disagree with
+// what the engine parses (the bug class in Exhibits A & B), is correct on set
+// delimiters and every dialect's tag boundaries, and paints `{{else}}`/`{{elif}}`
+// as statements where the dialect treats them as clause separators. The YAML
+// highlighter (host *data*, not FlatBars syntax) is a separate, line-oriented
+// pass — see the note above `highlightYaml`. Colours map to the Lab's "stem"
+// palette via CSS classes (open-in-lab.css), so a template reads the same here
+// as in the full Lab editor.
+import { highlightSpans } from "../../../lab/vendor/flatbars-engine.mjs";
 
 const ENT = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -14,54 +19,42 @@ export function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ENT[c]);
 }
 
-// ⚠ STOPGAP — a regex approximation, NOT the real grammar. The authoritative,
-// dialect-aware tokenizer is the engine lexer (packages/core/src/FlatBars/
-// Lexer.purs + Token.purs). Per ADR-014 and highlighting-spec.md (Tier 1), this
-// regex is to be REPLACED by `tokenizeTemplate(source, { dialect })` exposed
-// from the engine bundle, so the highlighter can never disagree with what the
-// engine actually parses (the bug class in Exhibits A & B). Until then, this
-// recognises the opener literals the engine's `openerLiteralAt` enumerates —
-// long comments `{{!-- … --}}` / `{{~!--`, raw blocks `{{{{ … }}}}`, triples
-// `{{{ … }}}` — so the common Mustache/FullBars forms stop misfiring. It does
-// NOT understand MaxBars operators/pipes (that needs the dialect-scoped lexer).
-//
-// Order matters: alternatives are tried left-to-right at each position, so the
-// most specific opener (long comment, then 4-brace, then 3-brace, then the
-// set-delimiter `{{=…=}}`) must precede the bare `{{ … }}` — otherwise
-// `{{[^{}]*?}}` closes a `{{!--` at its inner `}}` (Exhibit A). A long comment
-// with no `--}}` runs to EOF, matching how the engine's `RComment` swallows to
-// the close-or-end (Exhibit B).
-//
-// Set-delimiter caveat: only the DEFAULT-delimiter form `{{=A B=}}` is marked.
-// Once a template switches to custom delimiters, the regex cannot track the new
-// pair, so custom-delimited tags read as plain text — the dialect-aware engine
-// tokenizer (ADR-014 Tier 1) is what closes that gap.
-const TAG_RE = /\{\{~?!--[\s\S]*?(?:--~?\}\}|$)|\{\{\{\{[\s\S]*?\}\}\}\}|\{\{\{[\s\S]*?\}\}\}|\{\{=[^{}]*?=\}\}|\{\{[^{}]*?\}\}/g;
+// Engine span kind → the card's "stem" palette class. Several kinds share a slot
+// so `{{else}}` reads as control flow alongside `{{#…}}`, and set-delimiter tags
+// read as inert meta (like comments). Mirrors lab/cm-flatbars.mjs's grouping; the
+// classes differ only because the card's CSS predates the Lab's `cm-hb-*` names.
+const KIND_CLASS = {
+  expr: "stem-expr",
+  keyword: "stem-block",
+  "block-open": "stem-block",
+  "block-inverse": "stem-block",
+  "block-close": "stem-block",
+  "block-parent": "stem-partial",
+  "block-decl": "stem-partial",
+  partial: "stem-partial",
+  raw: "stem-raw",
+  "raw-block": "stem-raw",
+  comment: "stem-comment",
+  "set-delimiter": "stem-comment",
+  error: "stem-comment",
+};
 
-export function highlightTemplate(src) {
-  return esc(src).replace(TAG_RE, (m) => {
-    let cls;
-    if (/^\{\{=[^{}]*=\}\}$/.test(m)) cls = "stem-comment"; // set-delimiter {{=<% %>=}} (meta)
-    else if (/^\{\{~?!--/.test(m)) cls = "stem-comment"; // long comment {{!-- … --}}
-    else if (m.startsWith("{{{{")) cls = "stem-raw"; // raw-block delimiter {{{{ … }}}}
-    else if (m.startsWith("{{{")) cls = "stem-raw"; // triple-brace unescaped {{{ … }}}
-    else {
-      // Bare {{ … }} — classify by the interior sigil. The sigil is read AFTER
-      // escaping, so `<` (inheritance parent) and `&` (raw) arrive as entities;
-      // decode just those two leading forms to classify them correctly.
-      const t = m.slice(2, -2).trim();
-      let c = t[0];
-      if (t.startsWith("&lt;")) c = "<"; // inheritance parent {{<layout}}
-      else if (t.startsWith("&gt;")) c = ">"; // partial {{> name}} / {{>* name}}
-      else if (t.startsWith("&amp;")) c = "&"; // raw {{&name}}
-      cls = "stem-expr";
-      if (c === "&") cls = "stem-raw";
-      else if (c === "#" || c === "/" || c === "^") cls = "stem-block";
-      else if (c === ">" || c === "<" || c === "$") cls = "stem-partial";
-      else if (c === "!") cls = "stem-comment"; // short comment {{! … }}
-    }
-    return '<span class="' + cls + '">' + m + "</span>";
-  });
+// Highlight a template by the engine's own spans. `dialect` selects the lexer
+// configuration (set delimiters, clause keywords) exactly as the renderer would;
+// it defaults to FullBars. Text outside any span (and long `{{!-- … --}}`
+// comments, which the lexer drops as inert prose) stays the default colour.
+export function highlightTemplate(src, dialect = "fullbars") {
+  const spans = highlightSpans(String(src), dialect) || [];
+  let out = "";
+  let pos = 0;
+  for (const s of spans) {
+    if (!s || s.to <= s.from || s.from < pos) continue; // defensive: skip overlaps
+    out += esc(src.slice(pos, s.from));
+    const cls = KIND_CLASS[s.kind] || "stem-expr";
+    out += '<span class="' + cls + '">' + esc(src.slice(s.from, s.to)) + "</span>";
+    pos = s.to;
+  }
+  return out + esc(src.slice(pos));
 }
 
 // Highlight YAML data line-by-line (YAML is line-oriented, which sidesteps the

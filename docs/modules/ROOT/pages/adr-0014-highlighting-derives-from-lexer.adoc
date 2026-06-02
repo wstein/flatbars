@@ -64,20 +64,28 @@ had no such gate, so the drift was silent.
   Highlighting joins "measured, not asserted": a lexer change not reflected in highlighting fails the
   build.
 
-. *Stopgap, explicitly time-boxed.* Until the engine API lands, the tutorials keep a regex highlighter
-  (`tutorials/src/lib/highlight.mjs`) that recognises the opener literals `openerLiteralAt` enumerates
-  (`pass:[{{!-- … --}}]`, `pass:[{{~!--]`, `pass:[{{{ … }}}]`, `pass:[{{{{ … }}}}]`). It is labelled a
-  stopgap in-source, does *not* claim MaxBars support, and is pinned by `check:highlight` (Exhibits A &
-  B are regression cases). This is a bridge, not the destination.
+. *Implemented (the stopgap is retired for template syntax).* The engine API landed as
+  `highlightSpans` (`FlatBars.Highlight`, on the `flatbars-js` facade). Both front-ends now paint
+  template syntax from it — the Lab via the shared `lab/cm-flatbars.mjs` CodeMirror plugin, the
+  tutorials via `highlightTemplate(src, dialect)` rewritten over `highlightSpans`. The template regexes
+  (the Lab's `HB_TAG_RE`/`hbMarkFor`, the tutorials' `TAG_RE`/`highlightTemplate` body) are *gone*.
+  `check:highlight` is now engine-derived (golden = `highlightSpans`), so a lexer change unreflected in
+  highlighting fails the build. Two follow-ups remain, both *enhancements, not the bug class this ADR
+  closes*: (a) interior token kinds (operators vs paths within a MaxBars tag), which need a token end
+  offset the interior lexer does not yet record; (b) full CodeMirror 6 adoption in the tutorials (real
+  `lang-yaml`, a single presenter with the Lab), deferred for bundle weight. Host-*data* (YAML)
+  highlighting — the Lab's `yamlDecorator`, the tutorials' `highlightYaml` — is a separate concern and
+  is unchanged. See `highlighting-spec.md`.
 
 == Consequences
 
-* The Lab's hand-written `StreamLanguage` and the tutorials' regex are both slated for retirement once
-  `tokenizeTemplate` is exposed; the `check:highlight` corpus is the acceptance set that the
-  engine-driven highlighter must keep green, so the migration is verifiable rather than a leap.
-* `flatbars-js` gains a public, stable tokenization surface — also useful for future editor features
-  (semantic colouring of known vs unknown helpers via the schema/catalog, error squiggles from the
-  lexer's `ParseError` spans).
-* The golden gate (`scripts/gen-highlight.mjs`) is, until Tier 1, a *regression* gate over the regex
-  output, not yet an engine-equivalence oracle; its corpus cases are authored to read correctly so they
-  carry forward unchanged. This caveat is recorded here so the gate is not over-trusted in the interim.
+* The Lab's and the tutorials' template regexes are retired: both now paint from the shared
+  `highlightSpans`. The `check:highlight` corpus was the acceptance set that the engine-driven
+  highlighter kept green, so the migration was verifiable rather than a leap.
+* `flatbars-js` gained a public, stable tokenization surface (`highlightSpans`) — also useful for future
+  editor features (semantic colouring of known vs unknown helpers via the schema/catalog, error
+  squiggles from the lexer's `ParseError` spans).
+* The golden gate (`scripts/gen-highlight.mjs`) is now an *engine-equivalence* oracle: its golden is
+  `highlightSpans(src, dialect)` from the committed bundle, covering the set-delimiter, per-dialect, and
+  clause-keyword cases a regex cannot. Long `pass:[{{!-- … --}}]` comments produce no span (the lexer
+  drops them as inert prose); the engine still *bounds* them correctly, which was the Exhibit A/B bug.

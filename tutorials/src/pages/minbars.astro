@@ -65,7 +65,7 @@ const data = {
 };
 Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
 // → "<b>(c) 2026</b>"`;
-const lambdaHtml = highlightTemplate(lambdaCode);
+const lambdaHtml = highlightTemplate(lambdaCode, "minbars");
 ---
 
 <Reference
