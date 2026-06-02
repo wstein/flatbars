@@ -48,10 +48,10 @@ export const lessons = {
 
   maxbars: {
     engine: "maxbars",
-    title: "MaxBars — operators & pipes",
+    title: "MaxBars — the full FlatBars language",
     blurb:
-      "FullBars plus infix operators and pipes: write conditions like " +
-      "score >= 50 and transform with value | helper.",
+      "The complete, native FlatBars surface — FullBars plus infix operators and " +
+      "pipes: write conditions like score >= 50 and transform with value | helper.",
     spec: "maxbars", // docs/modules/ROOT/pages/maxbars.adoc
     template:
       "<p>{{ greeting }}, {{ name }}!</p>\n" +

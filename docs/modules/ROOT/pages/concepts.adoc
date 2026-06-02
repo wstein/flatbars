@@ -115,6 +115,25 @@ If a construct can be explained as a rewrite to a smaller one, it does not belon
 belongs in the xref:surface.adoc[surface dialect]. `pass:[{{name}}]` (escaped), `a.b.c`, `@index`,
 `../x`, `as \|x\|`, and `pass:[{{> p}}]` are *all* surface sugar.
 
+== 7. One parser, four languages
+
+Because the parser attaches no meaning, the *same* lexer and structural tree serve languages with
+incompatible semantics — the dialect supplies the meaning through the `parseExpr` / `parseHead` seam
+and the shape gates, never a fork of the grammar:
+
+* *RawBars* — the meaning-free core itself, written out (`pass:[{{{ lookup this "x" }}}]`).
+* *MinBars* — a Mustache-compatible *peer* engine, with its own context-stack scope and Mustache
+  truthiness (`0` and `pass:[""]` are truthy); it passes the vendored `mustache/spec` suite.
+* *FullBars* — the Handlebars-faithful reference engine (`pass:[{{ name }}]`, dotted paths,
+  `pass:[{{#each}}]`).
+* *MaxBars* — the full FlatBars surface language: FullBars plus infix operators and pipes.
+
+That MinBars (Mustache) and FullBars (Handlebars) — two *mutually incompatible* template languages,
+differing in scope rules and truthiness — both render through one structural core is the demonstration
+that the parser is universal across the `pass:[{{ }}]` family. RawBars is that core exposed; MaxBars is
+FlatBars's own maximal language on top. The normative contract for all four is this spec, not any one
+dialect.
+
 == A note on naming
 
 The mark is a set of *bare rods*: the {hbs} braces stripped to their vertical strokes. The triple
