@@ -6,11 +6,16 @@
 // the shared token sheet, with scroll-spy that highlights the current section.
 // `groups` is [{ label, items: [{ href, label }] }]; the page body is the slot.
 import BaseHead from "../components/BaseHead.astro";
+import LegendPopover from "../components/LegendPopover.astro";
 import "../styles/open-in-lab.css";
 import "../styles/reference-content.css";
+import "../styles/docs-chrome.css";
 
 const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
-const { title, subtitle, groups = [], spec } = Astro.props;
+// `dialect` drives the topbar "Open the Lab" target and the runtime inline-code
+// highlighter (so a prose `{{name}}` lights up in the page's own dialect).
+const { title, subtitle, groups = [], spec, dialect = "fullbars" } = Astro.props;
+const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
 ---
 
 <!doctype html>
@@ -18,13 +23,31 @@ const { title, subtitle, groups = [], spec } = Astro.props;
   <head>
     <BaseHead title={`${title} · FlatBars`} />
   </head>
-  <body>
+  <body data-chipstyle="tint" data-dialect={dialect}>
     <a class="skip" href="#main">Skip to content</a>
 
     <header class="topbar">
       <button id="navToggle" class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
       <a class="brand" href="/"><b>Flat</b>Bars <span>docs</span></a>
-      <a class="lab-link" href="/lab/index.html?engine=minbars" target="_blank" rel="noopener">Open the Lab ↗</a>
+      <div class="topbar-tools">
+        <div class="hdr-ctrl">
+          <span class="lbl">Chips</span>
+          <div class="seg" data-set="chipstyle" role="group" aria-label="Chip style">
+            <button type="button" data-val="tint">Tint</button>
+            <button type="button" data-val="outline">Outline</button>
+            <button type="button" data-val="solid">Solid</button>
+          </div>
+        </div>
+        <div class="hdr-ctrl">
+          <span class="lbl">Theme</span>
+          <div class="seg" data-set="theme" role="group" aria-label="Theme">
+            <button type="button" data-val="light">Light</button>
+            <button type="button" data-val="dark">Dark</button>
+          </div>
+        </div>
+        <LegendPopover />
+        <a class="lab-link" href={`${LAB_URL}?engine=${dialect}`} target="_blank" rel="noopener">Open the Lab ↗</a>
+      </div>
     </header>
 
     <div class="shell">
@@ -101,9 +124,93 @@ const { title, subtitle, groups = [], spec } = Astro.props;
       }
     </script>
 
+    <script>
+      // Topbar controls (Chips style on <body>, Theme on <html>) + the Legend
+      // popover + inline-code highlighting. Ported from the design mockup's
+      // legend.js (its legend RENDER is server-side now — see LegendPopover.astro;
+      // only the open/close handlers remain client-side). Persistence shares the
+      // same localStorage key the anti-flash <head> script reads.
+      import { highlightTemplate } from "../lib/highlight.mjs";
+
+      const STORE = "flatbars-docs-opts";
+      const TARGET = { theme: document.documentElement, chipstyle: document.body };
+      const curVal = (key) => TARGET[key].dataset[key];
+
+      function syncButtons() {
+        document.querySelectorAll(".seg").forEach((seg) => {
+          const key = seg.dataset.set;
+          const cur = curVal(key);
+          seg.querySelectorAll("button").forEach((b) => {
+            b.setAttribute("aria-pressed", String(b.dataset.val === cur));
+          });
+        });
+      }
+      function persist() {
+        try {
+          localStorage.setItem(
+            STORE,
+            JSON.stringify({ theme: curVal("theme"), chipstyle: curVal("chipstyle") }),
+          );
+        } catch (e) {}
+      }
+      // Restore the saved Chips style (Theme is already set by the anti-flash
+      // <head> script; re-applying it here is harmless and keeps the two in step).
+      try {
+        const s = JSON.parse(localStorage.getItem(STORE) || "{}");
+        if (s.theme) document.documentElement.dataset.theme = s.theme;
+        if (s.chipstyle) document.body.dataset.chipstyle = s.chipstyle;
+      } catch (e) {}
+
+      document.querySelectorAll(".seg").forEach((seg) => {
+        seg.addEventListener("click", (e) => {
+          const btn = e.target.closest("button");
+          if (!btn) return;
+          TARGET[seg.dataset.set].dataset[seg.dataset.set] = btn.dataset.val;
+          syncButtons();
+          persist();
+        });
+      });
+      syncButtons();
+
+      // Legend popover: open/close + outside-click + Esc (the content is
+      // server-rendered).
+      const legendBtn = document.getElementById("legendBtn");
+      const legendPop = document.getElementById("legendPop");
+      function onOutside(e) {
+        if (!legendPop.contains(e.target) && !legendBtn.contains(e.target)) closePop();
+      }
+      function onEsc(e) {
+        if (e.key === "Escape") { closePop(); legendBtn.focus(); }
+      }
+      function openPop() {
+        legendPop.hidden = false;
+        legendBtn.setAttribute("aria-expanded", "true");
+        document.addEventListener("mousedown", onOutside, true);
+        document.addEventListener("keydown", onEsc, true);
+      }
+      function closePop() {
+        legendPop.hidden = true;
+        legendBtn.setAttribute("aria-expanded", "false");
+        document.removeEventListener("mousedown", onOutside, true);
+        document.removeEventListener("keydown", onEsc, true);
+      }
+      legendBtn?.addEventListener("click", () => {
+        if (legendPop.hidden) openPop();
+        else closePop();
+      });
+
+      // Inline prose tags get the SAME highlighter as the live examples, in the
+      // page's own dialect — so a `{{name}}` in a sentence reads identically to one
+      // in a card (and drops its grey code plate via docs-chrome.css's :has rule).
+      const dialect = document.body.dataset.dialect || "fullbars";
+      document.querySelectorAll(".content :not(pre) > code").forEach((c) => {
+        if (c.textContent.includes("{{")) c.innerHTML = highlightTemplate(c.textContent, dialect);
+      });
+    </script>
+
     <style is:global>
       * { box-sizing: border-box; }
-      html { scroll-behavior: smooth; scroll-padding-top: 60px; }
+      html { scroll-behavior: smooth; scroll-padding-top: 64px; }
       body {
         margin: 0;
         font: 16px/1.65 var(--font-ui);
@@ -132,8 +239,8 @@ const { title, subtitle, groups = [], spec } = Astro.props;
         display: flex;
         align-items: center;
         gap: 1rem;
-        height: 48px;
-        padding: 0 1rem;
+        height: 52px;
+        padding: 0 1.25rem;
         background: color-mix(in srgb, var(--bg) 85%, transparent);
         backdrop-filter: blur(8px);
         border-bottom: 1px solid var(--border);
@@ -175,9 +282,9 @@ const { title, subtitle, groups = [], spec } = Astro.props;
       }
       .sidebar {
         position: sticky;
-        top: 48px;
+        top: 52px;
         align-self: start;
-        height: calc(100vh - 48px);
+        height: calc(100vh - 52px);
         overflow-y: auto;
         padding: 1.25rem 0.75rem 2rem;
         border-right: 1px solid var(--border);
@@ -247,7 +354,7 @@ const { title, subtitle, groups = [], spec } = Astro.props;
         .shell { grid-template-columns: minmax(0, 1fr); }
         .sidebar {
           position: fixed;
-          top: 48px;
+          top: 52px;
           left: 0;
           width: 16rem;
           transform: translateX(-110%);

@@ -55,13 +55,29 @@ spec is published (default `/flatbars/`).
   text.
 - **Shared chrome:** `src/layouts/Reference.astro` gives every reference and
   surface page a sticky left navigation (scroll-spy on the reference, active-page
-  on the surfaces). The Lab's look comes from the token-only stylesheets
+  on the surfaces) plus a topbar with three controls — **Theme** (light/dark),
+  **Chips** (the tag-chip style: tint/outline/solid), and a **Legend** popover.
+  Theme is an explicit `[data-theme]` on `<html>` set before first paint by the
+  anti-flash script in `BaseHead.astro` (seeded from the OS preference on a first
+  visit); Chips is `[data-chipstyle]` on `<body>`. Both persist to `localStorage`
+  (`flatbars-docs-opts`). The Lab's look comes from the token-only stylesheets
   `src/styles/lab-tokens.css` (violet palette + IBM Plex) and
-  `src/styles/open-in-lab.css` — tokens are copied, not the Lab's component CSS,
-  so the two can't drift. A single `src/components/BaseHead.astro` owns the
-  `<head>` (meta, the one canonical font link, the token sheet) for **both** the
-  landing and `Reference.astro`, so the two heads can't drift on fonts again;
-  `check:tutorial-links` fails if either page hand-rolls its own font link.
+  `src/styles/open-in-lab.css`, with `src/styles/docs-chrome.css` for the topbar
+  controls and the legend — tokens are copied, not the Lab's component CSS, so the
+  two can't drift. A single `src/components/BaseHead.astro` owns the `<head>`
+  (meta, the one canonical font link, the token sheet, the anti-flash script) for
+  **both** the landing and `Reference.astro`, so the two heads can't drift on
+  fonts again; `check:tutorial-links` fails if either page hand-rolls its own font
+  link.
+- **One honest syntax palette:** `lab-tokens.css` defines a single seven-family
+  `--c-*` palette (escaped · raw · section · partial · inheritance ·
+  set-delimiter · comment) that drives the runnable-example highlighter
+  (`src/lib/highlight.mjs`, ADR-014, engine-derived), the inline prose tags
+  (highlighted client-side in the page's own dialect), AND the colour legend
+  (`src/components/LegendPopover.astro`, server-rendered from the same data) — so
+  the legend can never lie about the examples. Each tag's `{{ }}` delimiters are
+  dimmed; the Chips control restyles every chip (editor, inline, legend) together.
+  Palette values are tuned to clear **WCAG AA** on their own tint.
 - **Open in Lab** uses the shared `lab/open-in-lab.mjs` (`labHref`), which encodes
   the workspace with the Lab's own share-state codec into the URL — self-
   contained, no vendoring, no fetch.

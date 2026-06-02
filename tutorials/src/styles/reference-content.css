@@ -8,7 +8,7 @@
  * from lab-tokens.css. */
 
 /* A section owns its own top rule via its h2; this just fixes anchor scrolling. */
-#main section { scroll-margin-top: 60px; }
+#main section { scroll-margin-top: 64px; }
 
 .content .tip {
   font-size: 0.92rem;

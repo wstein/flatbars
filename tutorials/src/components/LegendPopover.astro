@@ -1,0 +1,94 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The topbar "Legend" button + its colour-legend popover. Server-rendered from
+// the FAMILIES/TAGS data (ported from the design mockup's legend.js) — no client
+// render; the only client work is open/close + outside-click + Esc, wired in the
+// Reference layout. The chips reuse the SAME unified --c-* palette and Chips
+// control as the live-example highlighter (see lab-tokens.css / docs-chrome.css),
+// so the legend is an honest key for every tag on the page.
+
+const FAMILIES = [
+  { id: "Interpolation", sub: "outputs a value" },
+  { id: "Sections", sub: "control flow" },
+  { id: "Composition", sub: "pulls in templates" },
+  { id: "Directives", sub: "template-only · no output" },
+];
+
+// chips: { t } a tag literal, { br } a wrap break, { sep } a separator glyph.
+const TAGS = [
+  { family: "Interpolation", name: "Escaped", desc: "inserts a value, HTML-escaped",
+    chips: [{ t: "{{name}}", c: "expr" }] },
+  { family: "Interpolation", name: "Raw", desc: "the same value, left unescaped",
+    chips: [{ t: "{{{html}}}", c: "raw" }] },
+
+  { family: "Sections", name: "Section", desc: "opens & closes a region",
+    chips: [{ t: "{{#each xs}}", c: "block" }, { br: true }, { t: "{{/each}}", c: "block" }] },
+  { family: "Sections", name: "Clause", desc: "a branch inside a block",
+    chips: [{ t: "{{else}}", c: "block" }] },
+
+  { family: "Composition", name: "Partial", desc: "includes another template",
+    chips: [{ t: "{{>card}}", c: "partial" }] },
+  { family: "Composition", name: "Inheritance", desc: "extends a parent layout",
+    chips: [{ t: "{{<layout}}", c: "inherit" }] },
+  { family: "Composition", name: "Block", desc: "an overridable region",
+    chips: [{ t: "{{$title}}", c: "inherit" }] },
+
+  { family: "Directives", name: "Comment", desc: "dropped from output",
+    chips: [{ t: "{{! note }}", c: "comment", directive: true }] },
+  { family: "Directives", name: "Set delimiters", qual: "directive", desc: "changes the <code>{{ }}</code> pair",
+    chips: [{ t: "{{=<% %>=}}", c: "delim" }] },
+];
+
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function splitTag(t) {
+  if (t.slice(0, 3) === "{{{" && t.slice(-3) === "}}}") return ["{{{", t.slice(3, -3), "}}}"];
+  if (t.slice(0, 2) === "{{" && t.slice(-2) === "}}") return ["{{", t.slice(2, -2), "}}"];
+  return ["", t, ""];
+}
+function chipHTML(ch) {
+  if (ch.br) return '<span class="chip-br"></span>';
+  if (ch.sep) return '<span class="sep">' + esc(ch.sep) + "</span>";
+  const dir = ch.directive ? " is-directive" : "";
+  const p = splitTag(ch.t);
+  return '<code class="chip c-' + ch.c + dir + '">' +
+    '<span class="pn">' + esc(p[0]) + "</span>" + esc(p[1]) +
+    '<span class="pn">' + esc(p[2]) + "</span></code>";
+}
+function itemHTML(it) {
+  const chips = it.chips.map(chipHTML).join("");
+  const qual = it.qual ? ' <span class="qual">· ' + it.qual + "</span>" : "";
+  return (
+    '<div class="item"><div class="chips">' + chips + "</div>" +
+    '<div class="meta"><span class="name">' + it.name + qual + "</span>" +
+    '<span class="desc">' + it.desc + "</span></div></div>"
+  );
+}
+const bodyHTML = FAMILIES.map((fam) => {
+  const items = TAGS.filter((t) => t.family === fam.id);
+  return (
+    '<section class="fam"><h3 class="fam-label">' + fam.id +
+    ' <span class="sub">— ' + fam.sub + "</span></h3>" +
+    items.map(itemHTML).join("") + "</section>"
+  );
+}).join("");
+---
+
+<div class="hdr-ctrl legend-anchor">
+  <button class="hdr-btn" id="legendBtn" aria-haspopup="dialog" aria-expanded="false" title="Show the colour legend">
+    <span class="lg-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Legend
+  </button>
+  <div class="legend-pop" id="legendPop" role="dialog" aria-label="Colour legend" hidden>
+    <div class="legend-pop-head">
+      <span class="lph-title">Colour legend</span>
+      <span class="lph-sub">how every tag is tinted across this page</span>
+    </div>
+    <div class="legend-grid" set:html={bodyHTML} />
+    <p class="legend-foot">
+      <b>Reading the system:</b> green = interpolation, blue = composition, violet =
+      inheritance, orange = sections, rose = the set-delimiters directive, grey =
+      comment. A <em>deeper</em> green marks <em>raw</em> output — the one
+      interpolation to handle with care.
+    </p>
+  </div>
+</div>

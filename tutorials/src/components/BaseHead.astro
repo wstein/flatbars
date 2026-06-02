@@ -14,6 +14,21 @@ const { title } = Astro.props;
 
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+{/* Anti-flash: set the explicit [data-theme] on <html> before first paint, from
+    the saved preference (the topbar Theme control persists here) or, on first
+    visit, the OS preference. Tokens key dark mode off [data-theme="dark"], so this
+    must run before the stylesheet paints. */}
+<script is:inline>
+  (function () {
+    try {
+      var s = JSON.parse(localStorage.getItem("flatbars-docs-opts") || "{}");
+      var t = s.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.dataset.theme = t;
+    } catch (e) {
+      document.documentElement.dataset.theme = "light";
+    }
+  })();
+</script>
 <title>{title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
