@@ -114,8 +114,8 @@ The tutorials' `OpenInLab.jsx` `CodeEditor` is a `<textarea>` + a highlight-`<pr
 
 ## 6. Lab — rewire to the shared extension
 
-- Replace `handlebarsHighlighting` / `HB_TAG_RE` / `hbMarkFor` (~L1815–1864) with `flatbarsHighlight(activeDialect)` from `cm-flatbars.mjs`. The dialect comes from the active engine selector — so the Lab finally highlights MaxBars operators and set delimiters correctly, and stops mis-tagging `{{<}}`/`{{$}}`.
-- Drop `yamlDecorator` (~L1866): real `lang-yaml` already colours structure; if the bool/null/number value tint is still wanted, fold it into a tiny lang-yaml extension rather than a bespoke regex. (Lab keeps `lang-yaml`/`lang-html`/`lang-markdown` as-is.)
+- **[done]** Replaced `handlebarsHighlighting` / `HB_TAG_RE` / `hbMarkFor` with `flatbarsHighlight({ ViewPlugin, Decoration }, highlightSpans, ENGINE)` from `cm-flatbars.mjs` (the `ENGINE` global is the active dialect, fixed per page load since switching reloads). The Lab now highlights set delimiters and the inheritance sigils `{{<}}`/`{{$}}` correctly. The `error` kind gained a defensive `.cm-hb-error` style (the palette is inline in `index.html`, not a separate stylesheet).
+- **`yamlDecorator` is kept** (data-side scalar tint for `true`/`false`/`null`/numbers): it is host-*data* colouring over a real `lang-yaml` grammar, not a fork of FlatBars *syntax*, so it is outside ADR-014's grammar-unification scope. Consolidating data-format highlighting is a separate concern.
 - The four DSL `StreamLanguage`s (`jsonataLang`/`jsLang`/`bytecodeLang`/`st4SourceLang`) are untouched (§9).
 
 ## 7. Conformance gate (mandatory)
@@ -131,8 +131,8 @@ A lexer change not reflected in highlighting then fails the build — highlighti
 ## 8. Phasing (each step shippable + gated)
 
 1. **Expose `highlightSpans`** on `FullBars.JS` — a `FlatBars.Highlight` core module mapping `RawTok`s to whole-tag spans + a per-dialect clause-keyword classification (+ a `flatbars` unit test against golden spans); regenerate the bundle (`spago bundle …`, `check:bundle`). **[done]**
-2. **`lab/cm-flatbars.mjs`** — the shared extension + theme + kind→class map; new `--stem-*` palette tokens in `lab-tokens.css`.
-3. **Lab rewire** — swap in `flatbarsHighlight`; delete `HB_TAG_RE`/`hbMarkFor`/`yamlDecorator`. (Visible win: MaxBars + set delimiters highlight in the Lab.)
+2. **`lab/cm-flatbars.mjs`** — the shared extension + kind→class map (reusing the Lab's existing `--stem-*` palette classes, injected CM via DI); unit-tested against the real bundle. **[done]**
+3. **Lab rewire** — swapped in `flatbarsHighlight`; deleted `HB_TAG_RE`/`hbMarkFor`/`handlebarsHighlighting`. `yamlDecorator` kept (data-side, §6). Visible win: set delimiters + inheritance sigils highlight correctly. **[done]**
 4. **Tutorials CM6 adoption** — `CodeEditor` → CM6; template = shared extension, data = `lang-yaml`; delete `highlight.mjs`.
 5. **Flip `check:highlight`** to engine-derived; add the set-delimiters + per-dialect corpus.
 

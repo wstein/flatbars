@@ -558,6 +558,9 @@
       .cm-hb-partial { color: var(--stem-partial-fg); background: var(--stem-partial-bg); font-weight: 700; border-radius: 3px; }
       .cm-hb-raw     { color: var(--stem-raw-fg);     background: var(--stem-raw-bg);     font-weight: 700; border-radius: 3px; }
       .cm-hb-expr    { color: var(--stem-expr-fg);    background: var(--stem-expr-bg);    font-weight: 600; border-radius: 3px; }
+      /* A lexer error span (ADR-014): today `highlightSpans` degrades to no
+         spans, so this is the defensive style for the `error` kind. */
+      .cm-hb-error   { text-decoration: underline wavy #ef4444; text-decoration-skip-ink: none; }
       /* YAML scalar keywords (true/false/null/…) and numbers — the YAML grammar
          leaves these as plain content, so they are highlighted via a decorator. */
       .cm-yaml-kw    { color: var(--tok-tag); font-weight: 600; }
@@ -1560,6 +1563,10 @@
       import { createRenderer } from "./stem.mjs?v=1";
       import { createFlatBarsRenderer } from "./flatbars.mjs?v=2";
       import { createMinBarsRenderer } from "./minbars.mjs?v=1";
+      // Engine-derived template highlighting (ADR-014): the shared presenter +
+      // the lexer's own tokenizer, in place of a hand-written tag regex.
+      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
       import {
@@ -1812,56 +1819,14 @@
       }
 
       // ── CodeMirror ────────────────────────────────────────────────────
-      const hbExprMark    = Decoration.mark({ class: "cm-hb-expr" });
-      const hbCommentMark = Decoration.mark({ class: "cm-hb-comment" });
-      const hbBlockMark   = Decoration.mark({ class: "cm-hb-block" });
-      const hbPartialMark = Decoration.mark({ class: "cm-hb-partial" });
-      const hbRawMark     = Decoration.mark({ class: "cm-hb-raw" });
-
-      // Classify a matched tag by its leading marker (after the braces and an
-      // optional `~` trim marker): comment, raw (`{{{ }}}` / `{{&}}`), partial,
-      // block (openers `{{#}}` / `{{^}}` (inverted section), closers `{{/}}`, and
-      // the clause separators `{{else}}` / `{{elif}}`), or plain expression.
-      const hbMarkFor = (t) => {
-        if (t.startsWith("{{!--") || t.startsWith("{{!")) return hbCommentMark;
-        if (t.startsWith("{{{")) return hbRawMark;
-        const inner = t.replace(/^\{\{+~?\s*/, "");
-        if (inner.startsWith("&")) return hbRawMark;     // {{&html}} — unescaped, like {{{ }}}
-        if (inner.startsWith(">")) return hbPartialMark;  // {{> part}}
-        if (inner.startsWith("#") || inner.startsWith("/") || inner.startsWith("^") || /^(?:else|elif)\b/.test(inner)) return hbBlockMark;
-        return hbExprMark;
-      };
-
-      // Tag matcher, longest-delimiter first so a longer form wins at each
-      // position: block comment, short comment, the 4-brace raw block
-      // `{{{{raw}}}}`, triple-stash `{{{ }}}`, then plain `{{ }}`.
-      const HB_TAG_RE = /\{\{!--[\s\S]*?--\}\}|\{\{![\s\S]*?\}\}|\{\{\{\{[\s\S]*?\}\}\}\}|\{\{\{[\s\S]*?\}\}\}|\{\{[\s\S]*?\}\}/g;
-
-      // Scan the whole document (playground templates are small) rather than
-      // per visible line: a `{{!-- … --}}` comment can span lines, and a line-by-
-      // line matcher (MatchDecorator) would match `{{!-- {{#each}}` as a short
-      // comment on the first line and re-tag the comment's interior. A full-doc
-      // scan decorates the whole comment as one greyed span.
-      function buildHbDecorations(view) {
-        const text = view.state.doc.toString();
-        const ranges = [];
-        HB_TAG_RE.lastIndex = 0;
-        let m;
-        while ((m = HB_TAG_RE.exec(text))) {
-          ranges.push(hbMarkFor(m[0]).range(m.index, m.index + m[0].length));
-        }
-        return Decoration.set(ranges, true);
-      }
-
-      const handlebarsHighlighting = ViewPlugin.fromClass(
-        class {
-          constructor(view) { this.decorations = buildHbDecorations(view); }
-          update(update) {
-            if (update.docChanged) this.decorations = buildHbDecorations(update.view);
-          }
-        },
-        { decorations: (v) => v.decorations }
-      );
+      // Template highlighting derives from the engine lexer (ADR-014): one
+      // shared ViewPlugin over `highlightSpans`, replacing the old hand-written
+      // tag regex. It is correct on set delimiters (the lexer carries the live
+      // delimiter pair), on every dialect's tag boundaries, and on the clause
+      // keywords ({{else}}/{{elif}}) the dialect treats as separators — none of
+      // which the regex got right. `ENGINE` is the active dialect; switching
+      // engines reloads the page, so it is fixed for this editor's lifetime.
+      const flatbarsHighlighting = flatbarsHighlight({ ViewPlugin, Decoration }, highlightSpans, ENGINE);
 
         // YAML scalar-value highlighting. The YAML grammar tags bare scalars as
         // plain content, so booleans/null keywords and numbers get no color. This
@@ -2096,7 +2061,7 @@
           doc: "",
           extensions: [
             ...sharedExts,
-            templateLangComp.of([htmlLang(), handlebarsHighlighting]),
+            templateLangComp.of([htmlLang(), flatbarsHighlighting]),
             linkHighlightField,
             coverageField,
             lintGutter(),
@@ -2821,7 +2786,7 @@
         } else {
           setEditorText(templateView, activeTab().source); // programmatic → no auto-run
           templateView.dispatch({
-            effects: templateLangComp.reconfigure([htmlLang(), handlebarsHighlighting]),
+            effects: templateLangComp.reconfigure([htmlLang(), flatbarsHighlighting]),
           });
           byId("sources-sub").textContent = activeTabIdx === 0
             ? ""
