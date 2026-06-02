@@ -3,9 +3,10 @@
 -- | a compile-shape check.
 -- |
 -- | Infix works in output expressions (`{{ a && b }}` / `{{{ … }}}`), pipes, and
--- | — via the core `parseHead` seam — bare block conditions (`{{#if a && b}}`).
--- | Clause separators (`{{elif …}}` / `{{else if …}}`) still take a parenthesised
--- | condition, and `as |x|` block params await block-head grammar work.
+-- | — via the core `parseHead` seam — bare block conditions (`{{#if a && b}}`) and
+-- | `as |x|` block params (the head ladder omits the pipe rung, so a bar there is
+-- | structural). Clause separators (`{{elif …}}` / `{{else if …}}`) still take a
+-- | parenthesised condition; a pipe in a block head must also be parenthesised.
 module Test.MaxBars.Main where
 
 import Prelude
@@ -173,10 +174,35 @@ main = do
   expectM "loopvar-escape-this-dot" "{{#each xs}}{{this.first}}{{/each}}"
     (obj [ Tuple "xs" (VArray [ obj [ Tuple "first" (VString "D") ] ]) ])
     "D"
-  -- NOTE: block-param shadowing of a loop variable (`as |index0|`) is wired in
-  -- the surface (`pathExpr` checks scope before loop vars), but MaxBars' `as |…|`
-  -- bars still collide with the pipe operator — fixed with block-head grammar
-  -- work (see the v1 limitations / Phase D).
+  -- block params (`as |a b|`): the head ladder omits the pipe rung, so the bars
+  -- are structure the surface desugar strips. `each` binds element + index.
+  expectM "blockparams-each" "{{#each xs as |item i|}}[{{i}}:{{item}}]{{/each}}" xs3
+    "[0:a][1:b][2:c]"
+  -- `with` binds the shifted context to a name.
+  expectM "blockparams-with" "{{#with o as |c|}}{{c.n}}{{/with}}"
+    (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
+    "Z"
+  -- a block param shadows a loop variable: `as |index0|` binds the *element*, not
+  -- the loop index (the surface `pathExpr` checks scope before loop vars).
+  expectM "blockparams-shadow-loopvar" "{{#each xs as |index0|}}{{index0}}{{/each}}" xs3 "abc"
+  -- outer block param stays in scope inside a nested block.
+  expectM "blockparams-nested"
+    "{{#each rows as |row|}}{{#each row.cells}}{{row.id}}{{this}} {{/each}}{{/each}}"
+    ( obj
+        [ Tuple "rows"
+            ( VArray
+                [ obj
+                    [ Tuple "id" (VString "A")
+                    , Tuple "cells" (VArray [ VString "1", VString "2" ])
+                    ]
+                ]
+            )
+        ]
+    )
+    "A1 A2 "
+  -- a pipe in a block head must be parenthesised; `(xs | f)` re-enters the full
+  -- ladder, and a trailing `as |x|` still binds. Here `(xs | reverse)` pipes.
+  expectM "blockparams-paren-pipe" "{{#each (xs | reverse) as |x|}}{{x}}{{/each}}" xs3 "cba"
 
   -- compiled path names the loop variable as a scoped helper call.
   case compileMaxJs "{{#each xs}}{{index1}}{{/each}}" of

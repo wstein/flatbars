@@ -275,6 +275,12 @@ export const cases = [
   // behaves identically to the `{{elif …}}` form above (both targets).
   { name: "s:else-if-includeZero", dialect: "surface", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
+  // block params parse in MaxBars (head ladder omits the pipe rung) — built-ins
+  // bind them exactly as FullBars does, compiled ≡ interpreted.
+  { name: "mx:blockparams-each", dialect: "maxbars", t: "{{#each xs as |item i|}}[{{i}}:{{item}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:blockparams-with", dialect: "maxbars", t: "{{#with o as |c|}}{{c.n}}{{/with}}", d: { o: { n: "Z" } } },
+  // a parenthesised pipe coexists with a trailing block-param clause.
+  { name: "mx:blockparams-paren-pipe", dialect: "maxbars", t: "{{#each (xs | reverse) as |x|}}{{x}}{{/each}}", d: { xs: ["a", "b", "c"] } },
 
   // canonical escapers escapeHtml/escapeJson (compiled ≡ interpreter).
   { name: "escapeHtml-canonical", t: "{{{escapeHtml (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },

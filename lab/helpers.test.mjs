@@ -207,10 +207,20 @@ test("MaxBars block operation body uses the MaxBars surface (infix arithmetic) (
   assert.equal(renderMaxWith(ops, {}, "{{#wrap}}{{1 + 2}}{{/wrap}}", {}).value, "[3]");
 });
 
-test("MaxBars block params (as |x|) do NOT parse — the bar is the pipe operator (ADR-019)", () => {
-  // a pre-existing MaxBars surface limitation, orthogonal to operations: even a
-  // plain `each` rejects `as |x|`. Pinned here so the addendum's claim stays honest.
-  const r = renderMaxWith({ list: (xs, o) => safe(xs.map((x) => o.fn(x)).join("")) }, {},
-    "{{#list xs as |item|}}{{item}}{{/list}}", { xs: ["a"] });
-  assert.equal(r.ok, false);
+test("MaxBars block operation binds block params via options.fn(ctx, { blockParams }) (ADR-019)", () => {
+  // the head ladder omits the pipe rung, so `as |item idx|` parses; a block
+  // operation receives them through options.fn's blockParams channel.
+  const ops = { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) };
+  assert.equal(
+    renderMaxWith(ops, {}, "{{#list xs as |item idx|}}[{{idx}}:{{item}}]{{/list}}", { xs: ["a", "b"] }).value,
+    "[0:a][1:b]",
+  );
+});
+
+test("MaxBars requires parens to pipe in a block head; a trailing as |x| still binds (ADR-019)", () => {
+  const ops = { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) };
+  assert.equal(
+    renderMaxWith(ops, {}, "{{#box (xs | reverse) as |x|}}<i>{{x}}</i>{{/box}}", { xs: ["a", "b", "c"] }).value,
+    "<i>c</i><i>b</i><i>a</i>",
+  );
 });
