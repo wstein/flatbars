@@ -191,6 +191,14 @@ const t = (s) => s;
     <h3>Over an object</h3>
     <p>Iterating an object, <code>{t("key")}</code> is the property name and <code>{t("{{this}}")}</code> the value.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.loopObject.template} data={ex.loopObject.data} />
+    <h3>Block parameters</h3>
+    <p>
+      A trailing <code>{t("as |name …|")}</code> binds scoped names over the block body — exactly as
+      <a href="/fullbars">FullBars</a>. They stay in scope inside nested blocks, so an inner loop can
+      still reach an outer element. The bars are the block-parameter delimiter, not the pipe operator;
+      to <em>pipe</em> a head argument, parenthesise it — <code>{t("{{#each (rows | reverse) as |r|}}")}</code>.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.blockParams.template} data={ex.blockParams.data} />
   </section>
 
   <!-- ─────────────────────── Inherited from FullBars ─────────────────── -->
@@ -226,9 +234,9 @@ const t = (s) => s;
       <thead><tr><th>FullBars</th><th>MaxBars</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
-          <td>Block params <code>{t("{{#each xs as |x|}}")}</code></td>
-          <td><b>not available</b> — a lex error</td>
-          <td>The <code>|</code> bars collide with the pipe operator.</td>
+          <td>Pipe in a block head <code>{t("{{#each xs | f}}")}</code></td>
+          <td>must be <b>parenthesised</b></td>
+          <td>The head grammar drops the top-level pipe rung so a bar can delimit <code>{t("as |x|")}</code>; write <code>{t("{{#each (xs | f) as |x|}}")}</code>. An unparenthesised head bar is treated as structure (like FullBars), not a pipe.</td>
         </tr>
         <tr>
           <td>Partials <code>{t("{{> card}}")}</code>, inline <code>{t("{{#*inline}}")}</code></td>

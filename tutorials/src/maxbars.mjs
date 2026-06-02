@@ -123,6 +123,20 @@ export const examples = {
     data: { prefs: { theme: "dark", lang: "en" } },
   },
 
+  blockParams: {
+    // Block params `as |row i|` bind scoped names over the block body — the
+    // element and its index. Their point is that they STAY in scope inside nested
+    // blocks, so the inner loop still reaches the outer `row`. (A bar in a block
+    // head is the `as |…|` delimiter, not the pipe operator — to pipe a head
+    // argument, parenthesise it: `{{#each (rows | reverse) as |row i|}}`.)
+    engine: "maxbars",
+    compiles: true,
+    template: `{{#each rows as |row i|}}
+{{i}}: {{#each row.tags}}{{row.label}}#{{this}} {{/each}}
+{{/each}}`,
+    data: { rows: [{ label: "A", tags: ["x", "y"] }, { label: "B", tags: ["z"] }] },
+  },
+
   // ── Inherited from FullBars (operators shown inside) ──────────────────────
   inheritedEach: {
     // Everything FullBars does still works — here {{#each}}, {{#if}}, dotted
