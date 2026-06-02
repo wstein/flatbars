@@ -19,6 +19,7 @@ module FullBars.JS
   , compileMaxbars
   , compileMinbars
   , compileMinbarsWithPartials
+  , compileFor
   , renderSurfaceWithPartials
   , renderMustache
   , highlightSpans
@@ -112,6 +113,21 @@ compileMinbars = mkFn1 \tpl -> compileResult (MinBars.compileMinJs tpl)
 compileMinbarsWithPartials :: Fn2 (FO.Object String) String Result
 compileMinbarsWithPartials = mkFn2 \partials tpl ->
   compileResult (MinBars.compileMinJsWith (FO.toUnfoldable partials) tpl)
+
+-- | Compile a template to JS for a named dialect — one entry over the four
+-- | per-dialect compilers. `compileFor(dialect, template)`, where `dialect` is
+-- | `"rawbars"` | `"fullbars"` | `"maxbars"` | `"minbars"` (anything else is
+-- | treated as `"fullbars"`). RawBars/FullBars/MaxBars share one emit driver
+-- | (the surfaces desugar to the same core; xref ADR-011); MinBars compiles via
+-- | its own inliner (ADR-016). For MinBars *with partials*, use
+-- | `compileMinbarsWithPartials`. Equivalent to picking the matching
+-- | `compile*` function by hand — provided so a host has a single call site.
+compileFor :: Fn2 String String Result
+compileFor = mkFn2 \dialect tpl -> compileResult case dialect of
+  "rawbars" -> RawBars.compileJs tpl
+  "maxbars" -> MaxBars.compileMaxJs tpl
+  "minbars" -> MinBars.compileMinJs tpl
+  _ -> Compile.compileSurface tpl
 
 compileResult :: forall e. Show e => Either e String -> Result
 compileResult = case _ of

@@ -15,7 +15,7 @@ import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FullBars.JS (Result, render, renderSurface)
+import FullBars.JS (Result, compileFor, render, renderSurface)
 import Test.Assert (assert')
 
 -- Parse a JSON literal for use as render data, failing the test on a bad fixture.
@@ -53,6 +53,27 @@ main = do
     let r = runFn2 render "{{{ nope }}}" j
     assert' "eval error not ok" (not r.ok)
     assert' ("eval error message: " <> r.error) (contains (Pattern "nope") r.error)
+
+  -- compileFor dispatches to each dialect's compiler; every one emits a JS
+  -- module (default export), so a host has a single call site.
+  let
+    compiles label dialect src =
+      let
+        r = runFn2 compileFor dialect src
+      in
+        do
+          assert' (label <> " compiles ok: " <> r.error) r.ok
+          assert' (label <> " emits a module") (contains (Pattern "export default") r.value)
+  compiles "rawbars" "rawbars" "{{{ escapeHtml (lookup this \"x\") }}}"
+  compiles "fullbars" "fullbars" "<h1>{{ name }}</h1>"
+  compiles "maxbars" "maxbars" "{{ score >= 50 }}" -- infix desugars to core, then shared driver
+  compiles "minbars" "minbars" "{{name}}"
+  compiles "unknown→fullbars" "wat" "{{ name }}" -- unknown dialect falls back to surface
+  -- parse failures come back as a (positioned) error result, not thrown.
+  let bad = runFn2 compileFor "fullbars" "line1\nline2 {{ oops"
+  assert' "compileFor parse error not ok" (not bad.ok)
+  assert' ("compileFor parse error reported: " <> bad.error)
+    (contains (Pattern "Unterminated") bad.error)
 
   -- The Result type really is a plain { ok, value, error } record.
   let probe = { ok: true, value: "v", error: "" } :: Result
