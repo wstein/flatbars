@@ -153,3 +153,82 @@ registerHelper("list", (items, options) =>
   terminology* are ADR-019's to define; this ADR does not pre-empt them.
 * *Lab surfacing:* a user block helper in the Lab's `helpers.js` editor runs in the same Worker (ADR-018);
   no new capability, but the helpers pane copy should show a block example.
+
+== Phase 3 addendum: the hash + block-param channel (design)
+
+*Status:* Proposed (this addendum). Resolves the deferred `options.hash` and block-param surface for user
+block helpers. The goal is to route a block application's hash and `as |a b|` names to `options.hash` and
+body bindings *without* (a) changing the meaning-free core AST, (b) rewriting the built-in block helpers,
+or (c) a tagged-`Value` hack.
+
+=== The constraint, restated
+
+The surface folds a block head's hash into a trailing `pass:[(dict …)]` argument and `as |a b|` into
+trailing `pass:[Lit (VString "a")]` arguments (xref:surface.adoc[] §5.4–5.5), then the engine evaluates
+the head's args to `Array Value` before the `Operation` runs. At that boundary the hash dict and the
+name strings are indistinguishable from ordinary positional `Value`s. The built-ins cope because they
+*know* the convention (`eachH` reads trailing string args as block-param names; `partialH` reads the
+trailing dict as its hash). A *user* (Handlebars-style) helper does not — it expects `options.hash` and
+body-bound block params.
+
+=== Design: reserved markers + an explicit `Ctl` channel, built-ins unchanged
+
+The key move keeps built-ins untouched: the surface emits the hash and each block-param name as *reserved
+marker operations* that *evaluate to exactly the value the built-ins already expect*, while the engine
+*additionally* extracts them — recognised structurally, from the head application's arg expressions — into
+two new `Ctl` fields that only the user-helper marshaller reads.
+
+. *Surface markers (FullBars desugar).* Collected hash pairs desugar to a trailing `pass:[(@hash k v …)]`
+  instead of `pass:[(dict …)]`; each `as |name|` to `pass:[(@param "name")]` instead of a bare
+  `pass:[Lit (VString "name")]`. The `@`-prefix makes them *unspellable by users* (surface `@x` strips the
+  `@` to the scoped helper `x`), so they cannot collide with a real helper or data field — but they are
+  *not* registered prelude operations (that would list them in the generated helper catalog, which has no
+  hide mechanism — `dict`/`elif` already show there). They are recognised *structurally*, below.
+
+. *Engine seam + `Ctl` channel.* The `Engine` record gains a small pluggable `blockArgs` splitter
+  `Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }`; the kernel
+  driver stays generic (it calls the seam, evaluates the returned `positional` for the `Operation`, and
+  evaluates `hash` once to seed `Ctl`). FullBars supplies the marker-aware splitter; RawBars/MaxBars (no
+  such markers) supply the identity split — so neither the catalog nor the meaning-free core changes. `Ctl`
+  gains `hash :: Maybe Value` and `blockParams :: Array String`. *Built-ins keep working* because the
+  splitter, by default, still appends the hash dict + name strings to `positional` exactly as today — the
+  channel is *additive* (the new `Ctl` fields), and only the user-helper marshaller reads them and forwards
+  a trimmed positional list.
+
+. *The user-helper marshaller (interpreter).* For a block call it now: passes `options.hash = ctl.hash`
+  (the dict); binds each `ctl.blockParams[i]` to the matching value the helper supplies via
+  `options.fn(ctx, { blockParams: [v0, v1] })` (a sibling of the Phase-2 `data` frame — same pushed-frame
+  mechanism); and *strips* the trailing marker values from the positional `args` it forwards to the JS
+  function, so positional alignment matches Handlebars (`(items, options)`, not `(items, hashDict,
+  "name", options)`).
+
+. *The compiler.* The emitter already lowers native `each`/`with` with block-param names as a separate
+  argument, so they are unaffected. For a *user* block (`rt.block`), the emitter — which sees the markers
+  in the AST — emits the hash and block-param names through a new trailing options argument to `rt.block`;
+  `rt.block` then builds `options.hash` and binds block params exactly as the interpreter does. The
+  positional `args` it forwards exclude the markers. Gated by `test:compile`, so the two paths stay equal.
+
+=== Why this is the right shape
+
+* *No core-AST change.* `@hash`/`@param` are ordinary `App` nodes; the meaning-free `Block` is untouched.
+* *No built-in rewrite.* The markers evaluate to the built-ins' existing inputs, so `each`/`with`/`partial`
+  and every existing conformance case are unchanged.
+* *No tagged `Value`.* The hash stays a plain `VObject`; the split is structural (marker expressions),
+  resolved before the `Operation` boundary, not by inspecting a runtime value.
+* *Symmetry with Phase 2.* Block-param binding reuses the `options.fn(ctx, { … })` second-argument frame
+  (`{ data }` ⇒ scoped `@vars`; `{ blockParams }` ⇒ named bindings) — one mechanism, two key shapes.
+
+=== Risks / review notes
+
+* *Desugar-output churn.* Emitting `@hash`/`@param` changes the desugared AST (and therefore the compiled
+  JS) for every hash / block-param template; AST-shape and highlight goldens, and `test:compile`, must be
+  regenerated and stay green. This is mechanical but wide.
+* *Catalog stays clean.* Because the markers are recognised by the `Engine` seam — not registered as
+  prelude operations — they never reach `preludeSchema`, so the generated helper catalog (and
+  `check:catalog`) is untouched. The `@`-prefix also keeps them unspellable by users, so a data field
+  named `hash`/`param` can't collide.
+* *Implementation order.* Land as gated steps: (1) prelude `@hash`/`@param` + surface emit (behaviour
+  unchanged, all gates green); (2) `Ctl` fields + driver population (still a no-op for consumers);
+  (3) interpreter marshaller reads the channel (`options.hash`, block params) + conformance cases;
+  (4) compiler `rt.block` channel + `test:compile` parity; (5) docs + Lab example. Each step is independently
+  green, mirroring how Phases 1–2 landed.
