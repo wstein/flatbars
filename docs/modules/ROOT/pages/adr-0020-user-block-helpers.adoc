@@ -65,18 +65,25 @@ registerHelper("list", (items, options) =>
 // {{#list people}}{{name}}{{/list}}
 ----
 +
-  * `options.fn(ctx)` renders the block body with `ctx` as the new context (called with no argument ⇒
-    the current context, matching Handlebars `options.fn(this)`). The shift changes only the context: the
-    body *inherits* the enclosing scope's data — `pass:[{{@index}}]`/`pass:[{{@key}}]`/`../`/block params
-    resolve as they would just outside the block (both render paths build the shifted frame the same way:
-    the interpreter's `pushFrame Map.empty ctx` and the compiled `{ …frame, ctx }`, gated by a conformance
-    case). A helper *supplying its own* `@data` (Handlebars' `options.fn(ctx, { data })`) is Phase 2.
-  * `options.inverse(ctx)` renders the `{{else}}` clause (empty string if there is none).
-  * Every other Handlebars `options.*` — `hash`, `data`/`@`-vars, `blockParams`, `ids`, `loc`,
-    `lookupProperty` — *throws* a located error ("`options.hash` is not supported in a FlatBars block
-    helper (v1)") rather than returning `undefined`. A loud partial cannot become a silent conformance
-    lie. `hash`, `data`, and block params are *Phase 2* (hash splitting is ambiguous at our boundary and
-    none of the v1 acceptance cases need it).
+  * `options.fn(ctx[, { data }])` renders the block body with `ctx` as the new context (called with no
+    argument ⇒ the current context, matching Handlebars `options.fn(this)`). The shift changes only the
+    context: the body *inherits* the enclosing scope — `pass:[{{@index}}]`/`pass:[{{@key}}]`/`../`
+    resolve as they would just outside the block (both paths build the shifted frame the same way: the
+    interpreter's `pushFrame Map.empty ctx` and the compiled `{ …frame, ctx }`). The optional second
+    argument's `data` object (Handlebars' runtime-options `data` frame) *adds scoped `@vars`* layered over
+    the inherited scope — `options.fn(x, { data: { index: i, first: i === 0 } })` makes
+    `pass:[{{@index}}]`/`pass:[{{@first}}]` available in the body. Keys map uniformly (interpreter: a
+    pushed frame of constant helpers; compiled: layered `binds`, which `rt.call` checks first), so standard
+    and custom keys behave identically — gated by conformance cases (Phase 2, *done*).
+  * `options.inverse(ctx[, { data }])` renders the `{{else}}` clause (empty string if there is none).
+  * The remaining Handlebars `options.*` — `hash`, `blockParams`, `ids`, `loc`, `lookupProperty` —
+    *throw* a located error ("`options.hash` is not supported in a FlatBars block helper") rather than
+    returning `undefined`. A loud partial cannot become a silent conformance lie. **`hash` and block
+    params stay Phase 3** for a real reason (see Open questions): the surface *folds* a block's hash into a
+    trailing `pass:[(dict …)]` argument and `as |a b|` into trailing name strings
+    (xref:surface.adoc[] §5.4–5.5), so at the `Operation` boundary they are indistinguishable from
+    ordinary positional arguments — routing them to `options.hash` / block-param binding needs the surface
+    or `Ctl` to carry them in a dedicated channel, a design step, not a quick edit.
 
 . *Return escaping branches on usage* (one `fn`, two wrappings). Used *inline* (`pass:[{{name …}}]`), the
   return is an *escaped* `VString` unless `safe(…)` (ADR-018, unchanged). Used as a *block*
@@ -131,9 +138,15 @@ registerHelper("list", (items, options) =>
 
 == Open questions
 
-* *Phase 2 `options`:* `options.hash` (resolve the trailing-dict ambiguity), `options.data`
-  (`@index`/`@root` inside a user block), and block params (`pass:[{{#list xs as |x|}}]`) once the
-  minimal `fn`/`inverse` surface is proven and gated.
+* *`options.data` — done (Phase 2).* `options.fn(ctx, { data })` supplies scoped `@vars` to the body,
+  uniformly across interpreter and compiled paths (gated by `block:supplies-data`).
+* *`options.hash` + block params — deferred (Phase 3), blocked on a design decision.* The surface folds a
+  block's hash into a trailing `pass:[(dict …)]` and `as |a b|` into trailing name strings, so the
+  `Operation` sees them as ordinary positional `Value`s — there is no marker to split on. Routing them to
+  `options.hash` / block-param binding for a *user* helper needs a dedicated channel (e.g. the `Ctl`
+  carrying the head application's hash and block-param names, populated by the surface). That is an
+  AST/`Ctl` change with its own ADR addendum, deliberately not rushed here (rushing it would reintroduce
+  exactly the positional ambiguity, or a tagged-`Value` hack, that this ADR avoids).
 * *RawBars / MaxBars block operations* — a *native* registration under
   xref:adr-0019-operation-vocabulary.adoc[ADR-019]'s vocabulary (*operation* / *definition*, not
   `registerHelper`). The kernel `rt.block` branch and the marshalling generalise, but the *surface and

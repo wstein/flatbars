@@ -238,8 +238,9 @@ $ ~> | $ | {
     <OpenInLab client:visible engine="fullbars" template={ex.blockHelper.template} data={ex.blockHelper.data} helpers={ex.blockHelper.helpers} />
     <div class="callout info">
       <p>
-        Honest limits: the v1 block <code>options</code> surface is <code>fn</code>/<code>inverse</code>
-        only — <code>options.hash</code>/<code>data</code>/block-params <b>throw</b> (Phase 2,
+        The block <code>options</code> surface is <code>fn</code>/<code>inverse</code>/<code>data</code> —
+        <code>options.fn(ctx, &#123; data &#125;)</code> adds scoped <code>@vars</code> to the body;
+        <code>options.hash</code> and block params still <b>throw</b> (deferred,
         <a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>). <code>registerHelper</code>
         is <b>FullBars-only</b>: RawBars and MaxBars use a different concept and terminology
         (operations / definitions, <a href={`${SPEC_BASE}adr-0019-operation-vocabulary.html`}>ADR-019</a>).
