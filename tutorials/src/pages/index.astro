@@ -1,31 +1,30 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
-import "../styles/lab-tokens.css";
+import BaseHead from "../components/BaseHead.astro";
 import { lessons, surfaces } from "../examples.mjs";
 import HighlightLegend from "../components/HighlightLegend.astro";
 
-// Mustache leads (debate consensus item 8): it's the universally-known on-ramp
-// and the comprehensive reference, so it gets the hero. The per-surface lessons
-// follow as the ladder beyond it. The minbars card points at the full reference.
+// The page leads with the THESIS (what/why), not a surface name — FlatBars is the
+// parser, the four surfaces are languages built on it. Mustache still gets the
+// honest on-ramp (it's what readers already know) but it's labelled "recommended
+// start", and the word "reference" lives in the card body where MinBars genuinely
+// is the comprehensive one.
+//
+// The grid below shows ALL FOUR surfaces for completeness (the "four languages"
+// framing). MinBars is also the on-ramp above, so its card is marked as featured
+// rather than read as a duplicate.
 const surfaceCards = surfaces.map((s) => ({
   href: s === "minbars" ? "/minbars" : `/${s}`,
   title: lessons[s].title,
   blurb: lessons[s].blurb,
+  featured: s === "minbars",
 }));
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FlatBars — learn the surfaces</title>
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
+    <BaseHead title="FlatBars — one parser, four languages" />
     <style>
       body {
         font: 16px/1.65 var(--font-ui);
@@ -35,9 +34,29 @@ const surfaceCards = surfaces.map((s) => ({
         margin: 0 auto;
         padding: 2.5rem 1.25rem 4rem;
       }
-      h1 { font-size: 2rem; margin: 0 0 0.3rem; }
+      h1 { font-size: 2rem; margin: 0 0 0.5rem; }
       h1 b { color: var(--accent); }
-      .lede { color: var(--fg-muted); font-size: 1.1rem; margin-top: 0; }
+      /* The thesis: promoted out of grey sub-text into the page's lede voice. */
+      .thesis { color: var(--fg); font-size: 1.2rem; line-height: 1.5; margin: 0 0 0.9rem; }
+      .thesis b { color: var(--accent-2); font-weight: 600; }
+      /* One-line core → surfaces visual reinforcing the thesis. */
+      .ladder {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        margin: 0 0 0.5rem;
+        font: 600 12px/1 var(--font-mono);
+      }
+      .ladder .core { color: var(--accent-2); }
+      .ladder .arrow { color: var(--fg-faint); }
+      .ladder .pill {
+        padding: 0.2rem 0.5rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        background: var(--bg-1);
+        color: var(--fg-secondary);
+      }
       .hero {
         display: block;
         margin: 1.75rem 0;
@@ -78,23 +97,40 @@ const surfaceCards = surfaces.map((s) => ({
       a.card:hover { border-color: var(--accent); }
       a.card b { color: var(--accent-2); }
       a.card span { color: var(--fg-muted); display: block; margin-top: 0.25rem; font-size: 0.9rem; }
+      a.card.featured { border-color: var(--border-strong); background: var(--accent-softer); }
+      a.card .pin {
+        display: inline-block;
+        margin-bottom: 0.3rem;
+        font: 600 10px/1 var(--font-mono);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent-2);
+      }
     </style>
   </head>
   <body>
-    <h1><b>Flat</b>Bars — learn the surfaces</h1>
-    <p class="lede">One meaning-free parser; many languages. Mustache and Handlebars both run on it — the proof it's universal across the <code>{"{{ }}"}</code> family — and MaxBars is FlatBars's own full language.</p>
+    <h1><b>Flat</b>Bars</h1>
+    <p class="thesis">FlatBars isn't a template engine — it's a <b>meaning-free parser you build them on</b>. Mustache and Handlebars run on it unchanged; MaxBars is the language we built on top.</p>
+    <p class="ladder">
+      <span class="core">flatbars core</span><span class="arrow">→</span>
+      <span class="pill">RawBars</span>
+      <span class="pill">MinBars</span>
+      <span class="pill">FullBars</span>
+      <span class="pill">MaxBars</span>
+    </p>
 
     <a class="hero" href="/minbars">
-      <span class="kicker">Start here · reference</span>
+      <span class="kicker">Recommended start</span>
       <h2>MinBars — Mustache-compatible</h2>
-      <p>Every tag in the logic-less Mustache language — interpolation, sections, partials, inheritance — explained with examples that render live through MinBars and open in the Lab. <span class="go">Open the reference →</span></p>
+      <p>New to templates? Start with Mustache — you already know it. The complete logic-less language, and FlatBars's comprehensive reference: every tag explained with examples that render live and open in the Lab. <span class="go">Open the reference →</span></p>
     </a>
 
-    <p class="grid-label">The four surfaces</p>
+    <p class="grid-label">All four surfaces</p>
     <ul>
       {surfaceCards.map((c) => (
         <li>
-          <a class="card" href={c.href}>
+          <a class:list={["card", { featured: c.featured }]} href={c.href}>
+            {c.featured && <span class="pin">↑ Recommended start</span>}
             <b>{c.title}</b>
             <span>{c.blurb}</span>
           </a>

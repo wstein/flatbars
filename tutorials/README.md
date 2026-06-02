@@ -1,11 +1,11 @@
 # FlatBars tutorials (FlatBars Lab)
 
-A runnable, lab-themed documentation site. **MinBars is the front door**: a
-comprehensive `/minbars` reference walks every tag in the logic-less Mustache language,
-each illustrated by a live example that renders through the real MinBars engine
-and opens in the FlatBars Lab (`lab/`) with one click. The four FlatBars
-surfaces — **RawBars · MinBars · FullBars · MaxBars** — follow as the ladder
-beyond it.
+A runnable, lab-themed documentation site. The landing leads with the **thesis** —
+FlatBars is a meaning-free parser, and the four surfaces — **RawBars · MinBars ·
+FullBars · MaxBars** — are languages built on it. **MinBars is the recommended
+start**: a comprehensive `/minbars` reference walks every tag in the logic-less
+Mustache language, each illustrated by a live example that renders through the
+real MinBars engine and opens in the FlatBars Lab (`lab/`) with one click.
 
 ## Run
 
@@ -16,8 +16,8 @@ npm run dev            # http://localhost:4321  ← the tutorials
 npm run build          # static site → dist/
 ```
 
-Pages: `/` (landing, MinBars hero) · `/minbars` (the comprehensive MinBars /
-Mustache reference) · `/rawbars` (the meaning-free core reference) ·
+Pages: `/` (landing — thesis first, MinBars the recommended start) · `/minbars`
+(the comprehensive MinBars / Mustache reference) · `/rawbars` (the meaning-free core reference) ·
 `/fullbars`, `/maxbars` (one lesson per surface). MinBars and RawBars have no
 per-surface lesson — their dedicated references supersede it.
 
