@@ -20,6 +20,7 @@ module FullBars
   , renderSurface
   , renderSurfaceWith
   , renderSurfaceWithHelpers
+  , renderSurfaceWithHelpersWith
   , renderSurfaceDiag
   , renderSurfaceDiagWith
   , renderSurfaceValue
@@ -113,14 +114,28 @@ renderSurfaceWithHelpers
   -> String
   -> Value
   -> Either String String
-renderSurfaceWithHelpers helpers partialSrcs src dat =
+renderSurfaceWithHelpers = renderSurfaceWithHelpersWith noLoopVars defaultParseOptions
+
+-- | `renderSurfaceWithHelpers` parameterised by the dialect's `LoopVars` and
+-- | `ParseOptions`, so MaxBars (`renderWithOperations`, ADR-019 addendum) registers
+-- | host operations over *its* surface (infix/pipes/loop vars). FullBars is the
+-- | `noLoopVars` / `defaultParseOptions` specialisation above.
+renderSurfaceWithHelpersWith
+  :: LoopVars
+  -> ParseOptions
+  -> Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String String
+renderSurfaceWithHelpersWith lv opts helpers partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parse src of
+    Right ps -> case parseWith opts src of
       Left pe -> Left (renderParseErrorAt src pe)
       Right { directives, nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarSurface nodes)
+          { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           externalF = Map.fromFoldable (map (\p -> Tuple p.name p.falsy) ps)
           setup =
@@ -132,12 +147,13 @@ renderSurfaceWithHelpers helpers partialSrcs src dat =
             Left e -> Left (formatError src e)
             Right out -> Right out
   where
-  -- mirrors `renderSurfaceWith.compilePartial`, but locates the error.
-  compilePartial (Tuple name s) = case parse s of
+  -- mirrors `renderSurfaceWith.compilePartial`, but locates the error and uses the
+  -- dialect's parse options + loop-var desugar.
+  compilePartial (Tuple name s) = case parseWith opts s of
     Left e -> Left (renderParseErrorAt s e)
     Right { directives, nodes } -> case resolveTruthiness directives of
       Left e -> Left (show e)
-      Right falsy -> Right { name, template: desugarSurface nodes, falsy }
+      Right falsy -> Right { name, template: desugarSurfaceWith lv nodes, falsy }
 
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.

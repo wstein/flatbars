@@ -7,14 +7,17 @@ package:
       githubOwner: flatbars
       githubRepo: flatbars
   dependencies:
-    - prelude
-    - either
-    - bifunctors
-    - transformers
     - aff
+    - bifunctors
+    - either
     - flatbars
-    - kernel
     - flatbars-compile
+    - foldable-traversable
+    - kernel
+    - ordered-collections
+    - prelude
+    - transformers
+    - tuples
   test:
     main: Test.RawBars.Main
     dependencies:

@@ -24,6 +24,8 @@ module FullBars.JS
   , renderMustache
   , JsHelperFn
   , renderWith
+  , renderRawWith
+  , renderMaxWith
   , safe
   , highlightSpans
   ) where
@@ -50,7 +52,8 @@ import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
 import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
-import Kernel.Env (constOperation, pushFrame, refContext)
+import Kernel.Engine (Operation)
+import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
 import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
 import MinBars as MinBars
@@ -139,64 +142,94 @@ foreign import safe :: String -> Json
 -- | HTML-escaped in `pass:[{{ }}]`, raw in `pass:[{{{ }}}]`) or `safe(string)`
 -- | for raw markup; a thrown helper surfaces as a render error. Mirrors the
 -- | compiled path, which routes the same names through `rt.call`/`rt.register`.
+-- | Marshal one host JS function into an engine `Operation`, shared by every
+-- | registrar facade (`renderWith` for FullBars; `renderRawWith`/`renderMaxWith`
+-- | for RawBars/MaxBars, ADR-019 addendum). Usage decides inline vs block: a
+-- | non-empty `ctl.children` means `pass:[{{#name}}…{{/name}}]`. Inline (ADR-018):
+-- | args marshal Value→JSON, the result JSON→Value (escaped `VString`, or
+-- | `safe`→`VSafe`). Block (ADR-020): the fn is called Handlebars-style with an
+-- | `options` whose `hash`/`fn`/`inverse` come from the `Ctl` channel; `options.fn`'s
+-- | `{ data, blockParams }` layers scoped `@vars` and binds the declared names; the
+-- | result is raw (`VSafe`).
+jsOperation :: String -> JsHelperFn -> Operation (Either Error) (RefEnv (Either Error))
+jsOperation name fn = \ctl args ->
+  if Array.null ctl.children then case callJsHelperImpl name fn (map toJson args) of
+    r
+      | r.tag == "safe" -> pure (VSafe (caseJsonString "" identity r.payload))
+      | r.tag == "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
+      | r.tag == "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
+      | otherwise -> pure (fromJson r.payload)
+  else
+    let
+      clause = ctl.clause "else"
+      -- The engine split the head's hash + block-param values into the trailing
+      -- positional slots (hash, then the `as |…|` values); drop them so the JS fn
+      -- sees Handlebars-style positional args.
+      nDrop = Array.length ctl.blockParams + (if isJust ctl.hash then 1 else 0)
+      forwardArgs = Array.take (Array.length args - nDrop) args
+      -- The body frame from `options.fn(ctx, { data, blockParams })`: `data` keys
+      -- become scoped `@vars`, and the declared `as |…|` names bind to the
+      -- `blockParams` values — both layered over the inherited scope by `pushFrame`.
+      optsFrame optsJson =
+        let
+          o = caseJsonObject FO.empty identity optsJson
+          dataObj = caseJsonObject FO.empty identity (fromMaybe jsonNull (FO.lookup "data" o))
+          bpVals = caseJsonArray [] identity (fromMaybe jsonNull (FO.lookup "blockParams" o))
+          dataMap = Map.fromFoldable
+            ( map (\(Tuple k v) -> Tuple k (constOperation (fromJson v)))
+                (FO.toUnfoldable dataObj :: Array (Tuple String Json))
+            )
+          bpMap = Map.fromFoldable
+            (Array.zipWith (\n v -> Tuple n (constOperation (fromJson v))) ctl.blockParams bpVals)
+        in
+          Map.union bpMap dataMap
+      renderClause nodes ctxJson optsJson =
+        case ctl.render (pushFrame (optsFrame optsJson) (fromJson ctxJson) ctl.env) nodes of
+          Right s -> { ok: true, value: s, error: "" }
+          Left e -> { ok: false, value: "", error: show e }
+      r = callJsBlockHelperImpl name fn (map toJson forwardArgs) (toJson (refContext ctl.env))
+        (maybe jsonNull toJson ctl.hash)
+        (renderClause clause.before)
+        (renderClause (fromMaybe [] clause.body))
+    in
+      case r.tag of
+        "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
+        "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
+        _ -> pure (VSafe (caseJsonString "" identity r.payload))
+
+-- | Marshal a whole host operations/helpers bag into the engine's operation list.
+marshalOps
+  :: FO.Object JsHelperFn -> Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
+marshalOps = map (\(Tuple n fn) -> Tuple n (jsOperation n fn)) <<< FO.toUnfoldable
+
 renderWith :: Fn4 (FO.Object JsHelperFn) (FO.Object String) String Json Result
 renderWith = mkFn4 \helpers partials tpl json ->
-  let
-    -- A host fn becomes an engine operation. Usage decides inline vs block
-    -- (ADR-020): a non-empty `ctl.children` means it was called as
-    -- `pass:[{{#name}}…{{/name}}]`. Inline (ADR-018): args marshal Value→JSON,
-    -- the result JSON→Value (escaped `VString`, or `safe`→`VSafe`). Block:
-    -- the fn is called Handlebars-style with `options.fn`/`inverse` rendering the
-    -- body/`else` via `ctl.render`, and the result is raw (`VSafe`).
-    mk name fn = \ctl args ->
-      if Array.null ctl.children then case callJsHelperImpl name fn (map toJson args) of
-        r
-          | r.tag == "safe" -> pure (VSafe (caseJsonString "" identity r.payload))
-          | r.tag == "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
-          | r.tag == "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
-          | otherwise -> pure (fromJson r.payload)
-      else
-        let
-          clause = ctl.clause "else"
-          -- The engine split the head's hash + block-param values into the trailing
-          -- positional slots (hash, then the `as |…|` values); drop them so the JS
-          -- fn sees Handlebars-style positional args.
-          nDrop = Array.length ctl.blockParams + (if isJust ctl.hash then 1 else 0)
-          forwardArgs = Array.take (Array.length args - nDrop) args
-          -- The body frame from `options.fn(ctx, { data, blockParams })`: `data` keys
-          -- become scoped `@vars`, and the declared `as |…|` names bind to the
-          -- `blockParams` values — both layered over the inherited scope by `pushFrame`.
-          optsFrame optsJson =
-            let
-              o = caseJsonObject FO.empty identity optsJson
-              dataObj = caseJsonObject FO.empty identity (fromMaybe jsonNull (FO.lookup "data" o))
-              bpVals = caseJsonArray [] identity (fromMaybe jsonNull (FO.lookup "blockParams" o))
-              dataMap = Map.fromFoldable
-                ( map (\(Tuple k v) -> Tuple k (constOperation (fromJson v)))
-                    (FO.toUnfoldable dataObj :: Array (Tuple String Json))
-                )
-              bpMap = Map.fromFoldable
-                ( Array.zipWith (\n v -> Tuple n (constOperation (fromJson v))) ctl.blockParams
-                    bpVals
-                )
-            in
-              Map.union bpMap dataMap
-          renderClause nodes ctxJson optsJson =
-            case ctl.render (pushFrame (optsFrame optsJson) (fromJson ctxJson) ctl.env) nodes of
-              Right s -> { ok: true, value: s, error: "" }
-              Left e -> { ok: false, value: "", error: show e }
-          r = callJsBlockHelperImpl name fn (map toJson forwardArgs) (toJson (refContext ctl.env))
-            (maybe jsonNull toJson ctl.hash)
-            (renderClause clause.before)
-            (renderClause (fromMaybe [] clause.body))
-        in
-          case r.tag of
-            "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
-            "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
-            _ -> pure (VSafe (caseJsonString "" identity r.payload))
-    hs = map (\(Tuple n fn) -> Tuple n (mk n fn)) (FO.toUnfoldable helpers)
-  in
-    result (FullBars.renderSurfaceWithHelpers hs (FO.toUnfoldable partials) tpl (fromJson json))
+  result
+    ( FullBars.renderSurfaceWithHelpers (marshalOps helpers) (FO.toUnfoldable partials) tpl
+        (fromJson json)
+    )
+
+-- | Render *RawBars* (core) source with host-registered *operations* (ADR-019
+-- | addendum). `renderRawWith(operations, partials, template, data)`. Strict
+-- | resolve; a block operation gets `options.fn`/`inverse` (+ `{ data }`) but no
+-- | hash / block params (RawBars has no surface to write them). The boundary word
+-- | is *operation* — FullBars' `renderWith` is the helper-named twin.
+renderRawWith :: Fn4 (FO.Object JsHelperFn) (FO.Object String) String Json Result
+renderRawWith = mkFn4 \operations partials tpl json ->
+  result
+    ( RawBars.renderWithOperations (marshalOps operations) (FO.toUnfoldable partials) tpl
+        (fromJson json)
+    )
+
+-- | Render *MaxBars* source with host-registered *operations* (ADR-019 addendum).
+-- | `renderMaxWith(operations, partials, template, data)`. The full block surface
+-- | (hash + block params), over MaxBars' infix/pipe surface.
+renderMaxWith :: Fn4 (FO.Object JsHelperFn) (FO.Object String) String Json Result
+renderMaxWith = mkFn4 \operations partials tpl json ->
+  result
+    ( MaxBars.renderWithOperations (marshalOps operations) (FO.toUnfoldable partials) tpl
+        (fromJson json)
+    )
 
 -- | Compile a *core* template to JS ES-module source (`FlatBars.Compile`). The
 -- | emitted module's default export is `function (data, rt)`; pair it with
@@ -281,11 +314,19 @@ highlightConfig = case _ of
     , inheritance: false
     }
   "rawbars" ->
-    { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: kernelClauses
-    , extras: false, inheritance: false }
+    { lexConfig: withSetDelims
+    , lexOptions: defaultLexOptions
+    , clauseSeps: kernelClauses
+    , extras: false
+    , inheritance: false
+    }
   "minbars" ->
-    { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: []
-    , extras: true, inheritance: true }
+    { lexConfig: withSetDelims
+    , lexOptions: defaultLexOptions
+    , clauseSeps: []
+    , extras: true
+    , inheritance: true
+    }
   _ ->
     { lexConfig: defaultLexConfig { keepLongComments = true }
     , lexOptions: defaultLexOptions

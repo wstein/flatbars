@@ -997,7 +997,8 @@
             "fullbars-compile",
             "kernel",
             "maybe",
-            "prelude"
+            "prelude",
+            "tuples"
           ],
           "build_plan": [
             "arrays",
@@ -1194,9 +1195,12 @@
             "either",
             "flatbars",
             "flatbars-compile",
+            "foldable-traversable",
             "kernel",
+            "ordered-collections",
             "prelude",
-            "transformers"
+            "transformers",
+            "tuples"
           ],
           "build_plan": [
             "aff",

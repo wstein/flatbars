@@ -180,10 +180,13 @@ register and is exactly the two-register model applied at the boundary, not just
   for scoped vars) but *no* `options.hash` and no `as |…|` block params (there is no surface to write
   them). Resolution stays *strict* — an unknown operation is `UnknownHelper`, never `blockHelperMissing`
   (RawBars has no implicit-section policy; ADR-020's lenient resolve is FullBars/MaxBars only).
-* *MaxBars* — `renderWithOperations(...)` over the MaxBars surface (infix/pipes/loop vars). Because MaxBars
-  *is* FullBars' surface plus operators, it desugars the same `@hash`/`@param` markers, so a MaxBars block
-  operation gets the *full* surface: `fn`/`inverse`/`hash` + `options.fn(ctx, { data, blockParams })`, and
-  the lenient `blockHelperMissing` resolve it already inherits.
+* *MaxBars* — `renderWithOperations(...)` over the MaxBars surface (infix/pipes/loop vars). It desugars the
+  same `@hash` marker, so a MaxBars block operation gets `fn`/`inverse`/`hash` + `options.fn(ctx, { data })`,
+  and the lenient `blockHelperMissing` resolve it inherits. *Block params (`as |a b|`) are the one
+  exception:* the bar `|` is MaxBars' *pipe operator*, so `pass:[{{#x … as |a b|}}]` does not parse in
+  MaxBars *at all* (a pre-existing surface limitation, independent of operations — even `renderMax` rejects
+  it). MaxBars block operations therefore expose `options.hash` but not block params; a helper wanting
+  per-iteration names supplies them as `options.fn(ctx, { data })` scoped `@vars` instead.
 
 === Mechanism — reuse, do not rebuild
 
@@ -204,7 +207,8 @@ machinery:
 === Gating
 
 * `test:compile` gains RawBars and MaxBars block-operation cases (interpreter ≡ compiled), mirroring the
-  FullBars `block:*` cases — RawBars covering `fn`/`inverse`/`data`, MaxBars also `hash` + block params.
+  FullBars `block:*` cases — RawBars covering `fn`/`inverse`/`data`, MaxBars also `hash` (block params are
+  out, per the pipe-`|` collision above; FullBars retains the block-param cases).
 * `check:glossary` extends to record the second boundary spelling: *operation* is the RawBars/MaxBars host
   registrar's word, *helper* the FullBars one — both naming the same `Operation`. The gate keeps the
   glossary and the facade in step (a registrar named against the wrong register fails the build).

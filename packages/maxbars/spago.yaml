@@ -8,13 +8,14 @@ package:
       githubRepo: flatbars
   dependencies:
     - arrays
-    - flatbars
     - either
+    - flatbars
     - fullbars
     - fullbars-compile
     - kernel
     - maybe
     - prelude
+    - tuples
   test:
     main: Test.MaxBars.Main
     dependencies:

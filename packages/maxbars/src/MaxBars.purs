@@ -10,6 +10,7 @@ module MaxBars
   ( maxOptions
   , maxLoopVars
   , renderMax
+  , renderWithOperations
   , compileMaxJs
   , loopVarWarnings
   ) where
@@ -18,12 +19,15 @@ import Prelude
 
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
-import FlatBars.Error (ParseError)
+import Data.Tuple (Tuple)
+import FlatBars.Error (Error, ParseError)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
-import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith)
+import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
 import FullBars.Compile (compileSurfaceWith)
+import Kernel.Engine (Operation)
+import Kernel.Env (RefEnv)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
 import MaxBars.Lint (loopVarShadowWarnings)
@@ -72,6 +76,23 @@ maxLoopVars = case _ of
 -- | MaxBars' bare loop variables.
 renderMax :: String -> Value -> Either String String
 renderMax = renderSurfaceDiagWith maxLoopVars maxOptions
+
+-- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
+-- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own
+-- | surface (`maxLoopVars` / `maxOptions`). A block operation gets `options.hash`,
+-- | `options.fn(ctx, { data })`, and `options.inverse`. Block params (`as |a b|`)
+-- | are *not* available: the bar `|` is MaxBars' pipe operator, so `as |…|` does not
+-- | parse in MaxBars at all (a pre-existing surface limitation, orthogonal to
+-- | operations — even `renderMax` rejects it). A helper wanting per-iteration names
+-- | supplies them through `options.fn(ctx, { data })` scoped `@vars`.
+-- | "operation" is the native boundary word; FullBars' twin is `renderWith` (helper).
+renderWithOperations
+  :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String String
+renderWithOperations = renderSurfaceWithHelpersWith maxLoopVars maxOptions
 
 -- | Compile MaxBars surface source to a JS ES module, reusing the FullBars
 -- | compiler (`FlatBars.Compile`) — infix/pipe and loop vars desugar to the same
