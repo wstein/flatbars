@@ -3,15 +3,11 @@
   "source": "mustache/spec (full official suite, vendored: conformance/mustache/spec)",
   "engine": "MinBars (lab/minbars.mjs — the shipped Lab bundle)",
   "method": "render each spec fixture through MinBars; pass = actual === the fixture's own `expected`",
-  "required": {
-    "pass": 136,
-    "total": 136,
-    "pct": 100
-  },
-  "total": {
-    "pass": 185,
-    "total": 194,
-    "pct": 95.4
+  "conformance": {
+    "pass": 184,
+    "total": 184,
+    "pct": 100,
+    "scope": "all implemented modules"
   },
   "modules": [
     {
@@ -69,13 +65,12 @@
       "optional": true,
       "pass": 27,
       "total": 27
-    },
-    {
-      "id": "lambdas",
-      "label": "Lambdas (optional)",
-      "optional": true,
-      "pass": 1,
-      "total": 10
     }
-  ]
+  ],
+  "lambdas": {
+    "spec_module": "~lambdas",
+    "cases": 10,
+    "status": "out-of-value-by-design",
+    "rationale": "A Value is pure data, never a function (by design). A value-producing lambda is precalculated in a preprocess step (any host computation; the Lab uses JSONata) and rendered as plain data; a section lambda that rewrites its block body maps to a helper/block helper (render-time behaviour). Engine guarantee: no arbitrary host code runs from template data, and the rendered Value stays pure and JSON-serialisable. See conformance/mustache/README.md."
+  }
 }

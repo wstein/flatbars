@@ -12,9 +12,11 @@ differently, on purpose — yet it is a near-complete clone in practice.
 ====
 *FullBars matches Handlebars on 96% (48/50) of a differential conformance corpus* — every case rendered
 through the real `handlebars` npm package *and* FullBars and asserted byte-identical (`conformance/handlebars/`,
-gated by `npm run check:hbs-conformance`). The remaining ~4% is two deferred items (user-defined *block*
-helpers, §3) and the irreducible *functions-in-context* (§2); see the harness README for the breakdown.
-This figure is *measured, not asserted* — it cannot over-claim what upstream Handlebars does not produce.
+gated by `npm run check:hbs-conformance`). The corpus misses are user-defined *block* helpers (§3) and a
+raw-block corner. In-data *functions/lambdas* are not a corpus target — a `Value` is pure data; a
+value-producing lambda is precalculated before rendering and a section lambda is a helper (§2). This
+figure is *measured, not asserted* — it cannot
+over-claim what upstream Handlebars does not produce.
 ====
 
 This page is written the other way round from a compatibility matrix. The *dialect* is the subject;
@@ -147,10 +149,13 @@ non-clonable items — one a Mustache (not {hbs}) feature, one a consequence of 
 delimiters too — so this is a divergence from Mustache, not {hbs}.)
 
 |Data as functions / lambdas in the context
-|a helper, or `apply`
-|`Value` is *pure data, never a function* — the deepest core choice (xref:concepts.adoc[]); adding a
-function variant is the one thing that would break it. This is the *irreducible ~1%* of Handlebars
-FullBars cannot reach without ceasing to be FlatBars; everything else is implemented.
+|precalculate the value (preprocess), or a helper for body-aware sections
+|`Value` is *pure data, never a function* — the deepest core choice (xref:concepts.adoc[]). The two jobs
+a {hbs}.js/Mustache lambda does live outside the value: a *value-producing* lambda is *precalculated before
+rendering* (any host-side computation; the Lab uses JSONata) and passed as plain data; a *section* lambda
+that rewrites its block body is a *helper* (render-time behaviour — a preprocess step never sees the
+unrendered body). Engine guarantee: *no arbitrary host code runs from template data, and the rendered
+`Value` stays pure and JSON-serialisable*. A deliberate substitution, not a shortfall.
 |===
 
 == 3. Roadmap
@@ -218,9 +223,10 @@ This is the actual compatibility table.
 ====
 The §4 table is *measured, not asserted*: `conformance/handlebars/` renders a categorised corpus through
 both the real `handlebars` npm package and FullBars and asserts byte-equality (`npm run
-gen:hbs-conformance`). FullBars currently matches Handlebars on **48/50** cases (96%). The two misses are
-the §2 *functions-in-context* item and *user-defined block helpers* (ADR-018 user helpers are inline-only);
-neither is reachable without changing the pure-data core or the helper-registration API.
+gen:hbs-conformance`). FullBars currently matches Handlebars on **48/50** cases (96%). The two corpus
+misses are *user-defined block helpers* (ADR-018 user helpers are inline-only; §3) and a raw-block corner.
+In-data *functions/lambdas* are not a corpus target: a `Value` is pure data, so a value-producing lambda
+is precalculated before rendering and a section lambda is a helper (§2) — the pure-data core stays intact.
 ====
 
 == 5. FullBars extensions (no Handlebars built-in)

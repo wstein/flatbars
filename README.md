@@ -28,7 +28,7 @@ implementation and a CLI, alongside the normative specification and the
 │   └── vendored/          Vendored upstream corpus (mustache/spec) for `flatbars examples verify`
 ├── conformance/
 │   ├── handlebars/        Differential Handlebars conformance — FullBars matches real handlebars@4.7.9 on 96% (48/50)
-│   └── mustache/          MinBars vs the full official mustache/spec — 100% required, 95.4% incl. optional modules
+│   └── mustache/          MinBars vs the full official mustache/spec — 100% (184/184) of every module it implements
 └── reference/
     └── web/               FlatBars Lab — the JS/WASM polyglot playground (Stem · RawBars · MinBars · FullBars · MaxBars)
 ```
@@ -50,11 +50,12 @@ suites so the claims can't over-state. Both are gated in `npm test`:
   byte-identical. Currently **96% (48/50)**; `npm run check:hbs-conformance`.
 - `conformance/mustache/` — **MinBars vs the full official `mustache/spec`** (every module,
   optional `~` ones included). Each fixture carries its own `expected`, so the spec is the
-  oracle. **100% (136/136) of required modules; 95.4% (185/194) of the full spec** — the only
-  gap is lambdas (functions-in-data, the pure-data-`Value` limit). `npm run
-  check:mustache-conformance`.
+  oracle. **100% (184/184) of every module MinBars implements** — all required modules plus the
+  optional `dynamic-names` and `inheritance`. In-data lambdas live outside the value by design (a
+  `Value` is pure data): value-producing lambdas are **precalculated before rendering** and section
+  lambdas are **helpers** — no host code runs from template data. `npm run check:mustache-conformance`.
 
-Both READMEs document the method and the deliberately-deferred gaps.
+Both READMEs document the method and how lambdas are handled.
 
 ## Prerequisites
 

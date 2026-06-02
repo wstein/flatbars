@@ -345,8 +345,8 @@ const t = (s) => s;
         </tr>
         <tr>
           <td>Data/lambdas as functions in the context</td>
-          <td>a <a href="#helpers">helper</a>, or <code>apply</code></td>
-          <td>A value is pure data, never a function; behaviour lives in the helper environment.</td>
+          <td>precalculate the value (preprocess), or a <a href="#helpers">helper</a> for body-aware sections</td>
+          <td>A value is pure data, never a function. A value-producing lambda is precalculated before rendering (any host computation; the Lab uses JSONata); a section lambda that rewrites its body is a helper. No host code runs from template data.</td>
         </tr>
       </tbody>
     </table>
@@ -359,8 +359,10 @@ const t = (s) => s;
       truthy&nbsp;⇒&nbsp;<code>with</code>, empty&nbsp;⇒&nbsp;<code>{t("{{else}}")}</code>).
       Writing <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> explicitly is still
       the clearer style. FullBars matches Handlebars on <b>96%</b> of a differential
-      conformance corpus (rendered through the real Handlebars engine); the only gaps are
-      functions-in-data and user-defined <em>block</em> helpers.
+      conformance corpus (rendered through the real Handlebars engine); the corpus misses are
+      user-defined <em>block</em> helpers and a raw-block corner. In-data lambdas aren't a gap:
+      a value is pure data, so value-producing lambdas are precalculated before rendering and
+      section lambdas are helpers.
     </p>
   </section>
 

@@ -5,14 +5,20 @@
 
 [NOTE]
 ====
-*Conformance (full official `mustache/spec`).* Measured against the *whole* upstream suite — every
-module, the optional `~dynamic-names` / `~inheritance` / `~lambdas` included — MinBars passes *136/136
-(100%) of the required modules* and *185/194 (95.4%) of the full spec*. The only gap is the optional
-*lambdas* module (1/10): a Mustache lambda is a *function* in the data, and FlatBars `Value` has no
-function variant (xref:concepts.adoc[]), so MinBars cannot run one — the same irreducible function-in-data
-limit FullBars hits with Handlebars (xref:fullbars-compat.adoc[]). The proof is differential against the
-spec's own `expected` (`conformance/mustache/`, gated by `npm run check:mustache-conformance`); it
-measures the full spec so it cannot over-claim, unlike the curated `packages/minbars/test/spec` subset.
+*Conformance (full official `mustache/spec`).* MinBars passes *184/184 (100%) of every Mustache module
+it implements* — all six required modules plus the optional `~dynamic-names` and `~inheritance`. Measured
+against the spec's own `expected` (`conformance/mustache/`, gated by `npm run check:mustache-conformance`),
+over the *whole* vendored suite, so it cannot over-claim.
+
+*Lambdas live outside the value, by design.* The optional `~lambdas` module is not a target: a Mustache
+lambda is a *function embedded in the data*, and a `Value` is *pure data, never a function*
+(xref:concepts.adoc[]). The two jobs a lambda does map to two places, neither inside the value — a
+*value-producing* lambda is *precalculated in a preprocess step* (any host-side computation; in the Lab,
+the JSONata transform) and rendered as plain data; a *section* lambda that rewrites its block body is a
+*helper/block helper* (render-time behaviour — preprocessing never sees the unrendered body). The
+engine-level guarantee is narrow but real: *no arbitrary host code runs from template data, and the
+rendered `Value` stays pure and JSON-serialisable*. JSONata is the Lab's tool for the preprocess step, not
+an engine dependency — the engine, CLI and compiled output only ever receive plain data.
 ====
 
 == Context

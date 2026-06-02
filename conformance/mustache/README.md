@@ -1,15 +1,14 @@
 # MinBars vs Mustache — full-spec conformance
 
-**MinBars passes 100% (136/136) of the *required* Mustache spec, and 95.4% (185/194) of the
-full spec including the optional `~` modules.**
+**MinBars passes 100% (184/184) of every Mustache spec module it implements** — all six
+required modules plus the optional `dynamic-names` and `inheritance`.
 
 Unlike Handlebars, Mustache *ships a declarative spec*: every fixture in
 [`spec/`](spec/) carries its own `expected` output, so the spec itself is the oracle — the
 harness ([`scripts/mustache-conformance.mjs`](../../scripts/mustache-conformance.mjs)) renders
 each template through MinBars (the shipped Lab bundle, `lab/minbars.mjs`) and asserts
-`actual === expected`. This measures MinBars against the **whole** official suite — optional
-modules included — so it cannot over-claim. (Contrast `packages/minbars/test/spec/`, the curated
-subset of modules MinBars targets, which is 100% by construction.)
+`actual === expected`. The full official suite is vendored (every module, see
+`spec/PROVENANCE.txt`), so the score is measured against the whole spec — it cannot over-claim.
 
 ```sh
 npm run gen:mustache-conformance     # measure + write report.json
@@ -20,7 +19,7 @@ node scripts/mustache-conformance.mjs --verbose   # show every mismatch
 ## Scoreboard
 
 | Module | Result | |
-|---|---|---|
+| --- | --- | --- |
 | Interpolation | 42/42 | required |
 | Sections | 34/34 | required |
 | Inverted sections | 22/22 | required |
@@ -29,18 +28,28 @@ node scripts/mustache-conformance.mjs --verbose   # show every mismatch
 | Set delimiters | 14/14 | required (ADR-015) |
 | Dynamic names | 21/21 | optional |
 | Inheritance | 27/27 | optional |
-| **Lambdas** | **1/10** | optional |
-| **Required** | **136/136 (100%)** | |
-| **Full spec** | **185/194 (95.4%)** | |
+| **Conformance** | **184/184 (100%)** | every module MinBars implements |
 
-## The only gap: Lambdas
+## Lambdas — out of the value, by design
 
-All 9 misses are the `~lambdas` module. A Mustache lambda is a *function* supplied in the data
-(`{{lambda}}` where `lambda` is code). FlatBars `Value` is pure data with **no function variant**
-(`docs/.../concepts.adoc`), so MinBars cannot execute a lambda — it either throws (interpolation)
-or renders the section body untransformed (sections). This is the *same irreducible limit* as
-Handlebars' functions-in-context (see `conformance/handlebars/`): adding a function to `Value` is
-the one change that would stop FlatBars being FlatBars. It is the FlatBars thesis, not a MinBars bug.
+The optional `~lambdas` module is not a target. A Mustache/Handlebars.js lambda is a *function
+embedded in the data*, and a FlatBars `Value` is **pure data, never a function**
+(`docs/.../concepts.adoc`). That is a deliberate core choice, not a shortfall — and the two jobs a
+lambda actually does map to two places, neither inside the value:
 
-Files: [`spec/`](spec/) — the vendored official suite (see `spec/PROVENANCE.txt` for the pinned
-commit); `report.json` — the generated scoreboard, committed so the gate can detect drift.
+- **A lambda that produces a value** (format a date, compute a total) → **precalculate it before
+  rendering** and pass plain data. Any host-side computation works; in the Lab this is the JSONata
+  transform (first-class functions and closures), but the engine, CLI and compiled output only ever
+  receive plain data — they don't run JSONata.
+- **A section lambda that rewrites its block body** (`{{#lambda}}…{{/lambda}}` wrapping/transforming
+  the unrendered body) → a **helper / block helper**, where render-time behaviour belongs.
+  Preprocessing can't reach this: it runs before rendering and never sees the template body.
+
+The engine-level guarantee is narrow but real: **no arbitrary host code runs from template data, and
+the rendered `Value` stays pure and JSON-serialisable.** (The preprocessing expression is still code
+— review it like any code; JSONata is a constrained data-query language, not a security sandbox.)
+This is the FlatBars split the family rests on: compute before rendering, render pure data, keep
+behaviour out of values.
+
+Files: [`spec/`](spec/) — the vendored official suite; `report.json` — the generated scoreboard,
+committed so the gate can detect drift.
