@@ -33,7 +33,7 @@ import {
   compileSurface as bbCompileSurface,
   compileMaxbars as bbCompileMaxbars,
   renderWith as bbRenderWith,
-} from "./vendor/flatbars-engine.mjs?v=15";
+} from "./vendor/flatbars-engine.mjs?v=16";
 
 const BB_VERSION = "0.1.0";
 

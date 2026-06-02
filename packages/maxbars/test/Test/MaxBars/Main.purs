@@ -19,7 +19,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import MaxBars (compileMaxJs, loopVarWarnings, renderMax)
+import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -225,7 +225,7 @@ main = do
   -- loop-var shadow lint (ADR-006 warn-always tier): a bare shadow-prone loop
   -- variable warns; an unambiguous one and an explicit `this.` path do not.
   let
-    warnNames src = case loopVarWarnings src of
+    warnNames src = case maxbarsWarnings src of
       Left _ -> [ "<parse error>" ]
       Right is -> map _.name is
   assert' "shadow-warn: bare {{first}} warns"
@@ -239,6 +239,17 @@ main = do
   -- warn-always: it fires with no schema and even outside a loop (the name is a
   -- loop variable wherever it appears bare).
   assert' "shadow-warn: fires with no loop/schema" (warnNames "{{first}}" == [ "first" ])
+
+  -- stray-head-bar lint (ADR-019): an unparenthesised pipe in a block head is
+  -- parsed as structure, so it warns with the bar `|` as the issue name.
+  assert' "headbar-warn: {{#each xs | reverse}} warns"
+    (warnNames "{{#each xs | reverse}}{{this}}{{/each}}" == [ "|" ])
+  -- the parenthesised pipe is a real pipe — no stray bar, no warning.
+  assert' "headbar-warn: {{#each (xs | reverse)}} does not warn"
+    (Array.null (warnNames "{{#each (xs | reverse)}}{{this}}{{/each}}"))
+  -- a legitimate `as |x|` clause is stripped by the desugar — not a stray bar.
+  assert' "headbar-warn: {{#each xs as |x|}} does not warn"
+    (Array.null (warnNames "{{#each xs as |x|}}{{x}}{{/each}}"))
 
   -- ── Set delimiters (ADR-015): MaxBars enables `mustacheDelims` ─────────────
   expectM "set-delim: inline switch" "{{=<% %>=}}<%name%>"

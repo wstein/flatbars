@@ -18,14 +18,16 @@
 module MaxBars.Lint
   ( shadowProneNames
   , loopVarShadowWarnings
+  , strayHeadBarWarnings
   ) where
 
 import Prelude
 
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
-import FlatBars.Syntax (Template)
-import Kernel.Walk (Issue, RefKind(..), Severity(..), operationRefs)
+import FlatBars.Syntax (Expr(..), Template)
+import FullBars.Surface (extractBlockParams)
+import Kernel.Walk (Issue, RefKind(..), Severity(..), foldTemplate, operationRefs)
 
 -- | The loop-variable names that plausibly collide with data fields (ADR-006
 -- | calls out `first`/`key`/`length`; `last` rounds out the set). The aliases
@@ -54,3 +56,38 @@ loopVarShadowWarnings = Array.mapMaybe warnOf <<< operationRefs
                 <> "'"
           }
     | otherwise = Nothing
+
+-- | Warn on a *stray* bar in a block head, over a *parsed* (pre-desugar) MaxBars
+-- | template. The MaxBars head grammar omits the top-level pipe rung so a bar can
+-- | delimit an `as |…|` block-parameter clause; an unparenthesised top-level bar
+-- | in a head is therefore parsed as structure (a nullary `(|)` application,
+-- | matching FullBars and the core parser), not the pipe operator. The legitimate
+-- | `as |…|` bars are stripped by `extractBlockParams` — the single source of
+-- | `as`-truth, reused here so the lint never re-encodes the keyword — leaving any
+-- | bar that survives in `mainArgs` as one the author most likely meant as a pipe
+-- | (`{{#each xs | f}}` instead of `{{#each (xs | f)}}`). One `Warn` per stray bar.
+-- |
+-- | Run this on the *parsed* nodes, not the desugared ones: the surface desugar
+-- | rewrites a bare `(|)` into a `lookup` of a field named "|", erasing the signal.
+strayHeadBarWarnings :: Template -> Array Issue
+strayHeadBarWarnings = foldTemplate
+  { content: const []
+  , output: const []
+  , raw: \_ _ _ -> []
+  , sep: \_ _ -> []
+  , block: \b -> headBars b.args <> b.recurse b.children
+  , concat: Array.concat
+  }
+  where
+  -- a bar left in the head args after the `as |…|` clause is stripped
+  headBars args = map (const warn) (Array.filter isBar (extractBlockParams args).mainArgs)
+  isBar = case _ of
+    App "|" [] -> true
+    _ -> false
+  warn =
+    { severity: Warn
+    , name: "|"
+    , message:
+        "a bar in a block head is the block-parameter delimiter, not the pipe "
+          <> "operator; to pipe a block argument, parenthesise it — e.g. (x | f)"
+    }

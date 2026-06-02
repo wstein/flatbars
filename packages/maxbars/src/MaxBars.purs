@@ -12,7 +12,7 @@ module MaxBars
   , renderMax
   , renderWithOperations
   , compileMaxJs
-  , loopVarWarnings
+  , maxbarsWarnings
   ) where
 
 import Prelude
@@ -30,7 +30,7 @@ import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
-import MaxBars.Lint (loopVarShadowWarnings)
+import MaxBars.Lint (loopVarShadowWarnings, strayHeadBarWarnings)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -99,12 +99,20 @@ renderWithOperations = renderSurfaceWithHelpersWith maxLoopVars maxOptions
 compileMaxJs :: String -> Either ParseError String
 compileMaxJs = compileSurfaceWith maxLoopVars maxOptions
 
--- | The loop-variable shadow lint (ADR-006, schema-less *warn-always* tier): a
--- | bare loop variable whose name reads like a data field (`first`/`last`/
--- | `length`/`key`) is flagged with a `Warn` `Issue`, since dropping `@` lets it
--- | silently shadow a field. Parses MaxBars `src`, desugars with the loop-var
--- | resolver, then lints (see `MaxBars.Lint`). A parse error short-circuits.
-loopVarWarnings :: String -> Either ParseError (Array Issue)
-loopVarWarnings src = do
+-- | The MaxBars source warnings (schema-less *warn-always* tier). Parses `src`,
+-- | desugars with the loop-var resolver, then runs the dialect lints (see
+-- | `MaxBars.Lint`); a parse error short-circuits. Two warnings today:
+-- |
+-- |  * *loop-variable shadow* (ADR-006): a bare loop variable whose name reads
+-- |    like a data field (`first`/`last`/`length`/`key`), since dropping the `@`
+-- |    sigil lets it silently shadow a field — the fix is `{{ this.NAME }}`.
+-- |  * *stray head bar* (ADR-019): an unparenthesised top-level `|` in a block
+-- |    head, parsed as structure rather than the pipe operator — the fix is to
+-- |    parenthesise the pipe, `{{#x (a | f)}}`.
+maxbarsWarnings :: String -> Either ParseError (Array Issue)
+maxbarsWarnings src = do
   { nodes } <- parseWith maxOptions src
-  pure (loopVarShadowWarnings (desugarSurfaceWith maxLoopVars nodes))
+  -- loop-var shadows read the *desugared* tree (a bare loop var is a nullary
+  -- application there); the stray-bar lint reads the *parsed* tree (the desugar
+  -- rewrites a bare bar into a `lookup`, erasing the signal).
+  pure (loopVarShadowWarnings (desugarSurfaceWith maxLoopVars nodes) <> strayHeadBarWarnings nodes)

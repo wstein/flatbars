@@ -43,6 +43,7 @@
 module FullBars.Surface
   ( desugar
   , desugarWith
+  , extractBlockParams
   , LoopVars
   , noLoopVars
   , hoistInline
