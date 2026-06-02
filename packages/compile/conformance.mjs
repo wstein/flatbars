@@ -52,7 +52,12 @@ const interpret = (t, d, dialect, partials, helpers) =>
 // cases (ADR-018) register their helpers on the runtime first, then compile as
 // surface — the same names route through `rt.call` → the registry.
 async function runCompiled(t, d, dialect, partials, helpers) {
-  if (helpers) for (const [n, f] of Object.entries(helpers)) rt.register(n, f);
+  if (helpers) {
+    for (const [n, f] of Object.entries(helpers)) {
+      const fn = typeof f === "function" ? f : f.fn; // a bag value is fn or { fn, arity }
+      rt.register(n, fn, typeof f === "function" ? undefined : f.arity);
+    }
+  }
   const c = helpers ? compileSurface(t)
     : (dialect === "minbars" && partials) ? compileMinbarsWithPartials(partials, t) : compilerFor(dialect)(t);
   if (!c.ok) return { ok: false, value: "", error: "compile: " + c.error };
@@ -88,6 +93,8 @@ const helperCases = [
   { name: "helper:number", dialect: "surface", helpers: { inc: (n) => n + 1 }, t: "{{inc n}}", d: { n: 41 }, expect: "42" },
   { name: "helper:subexpr", dialect: "surface", helpers: { loud: up }, t: "{{#if (loud x)}}Y{{else}}N{{/if}}", d: { x: "a" }, expect: "Y" },
   { name: "helper:hash", dialect: "surface", helpers: { tag: (n, o) => "<" + n + (o && o.cls ? " class=" + o.cls : "") + ">" }, t: "{{{tag x cls=\"hi\"}}}", d: { x: "div" }, expect: "<div class=hi>" },
+  // a declared-arity helper, called correctly, renders the same both ways
+  { name: "helper:arity-ok", dialect: "surface", helpers: { loud: { fn: up, arity: 1 } }, t: "{{loud x}}", d: { x: "<b>" }, expect: "&lt;B&gt;" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 

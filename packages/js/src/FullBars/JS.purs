@@ -39,7 +39,7 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
-import FlatBars.Error (Error(HelperError))
+import FlatBars.Error (Error(ArityError, HelperError))
 import FlatBars.Highlight (HSpan, HighlightConfig, highlightSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
@@ -100,11 +100,13 @@ renderMustache = mkFn3 \partials tpl json ->
 -- | An opaque host JS helper: `(...args) => value`. Marshalled by `renderWith`.
 foreign import data JsHelperFn :: Type
 
--- | Invoke a host helper over JSON-marshalled args, tagging the outcome:
--- | `"ok"` (payload is the value), `"safe"` (payload is raw markup, ⇒ `VSafe`),
--- | or `"error"` (payload is the thrown message). Never throws into PureScript.
+-- | Invoke a host helper (by `name`, for diagnostics) over JSON-marshalled args,
+-- | tagging the outcome: `"ok"` (payload is the value), `"safe"` (payload is raw
+-- | markup, ⇒ `VSafe`), `"arity"` (a declared-arity mismatch, ⇒ `ArityError`,
+-- | matching the prelude), or `"error"` (the thrown message, ⇒ `HelperError`).
+-- | Never throws into PureScript.
 foreign import callJsHelperImpl
-  :: JsHelperFn -> Array Json -> { tag :: String, payload :: Json }
+  :: String -> JsHelperFn -> Array Json -> { tag :: String, payload :: Json }
 
 -- | The `SafeString` equivalent a helper returns for raw markup. `safe(string)`.
 foreign import safe :: String -> Json
@@ -121,13 +123,15 @@ renderWith = mkFn4 \helpers partials tpl json ->
   let
     -- A host fn becomes a (polymorphic) engine helper; the `Ctl` handle is
     -- ignored (inline helpers only — ADR-018). Args marshal Value→JSON, the
-    -- result JSON→Value, with the `safe` sentinel mapped to `VSafe`.
-    mk fn = \_ args -> case callJsHelperImpl fn (map toJson args) of
+    -- result JSON→Value, with the `safe` sentinel → `VSafe`, a declared-arity
+    -- mismatch → `ArityError` (as the prelude reports), a throw → `HelperError`.
+    mk name fn = \_ args -> case callJsHelperImpl name fn (map toJson args) of
       r
         | r.tag == "safe" -> pure (VSafe (caseJsonString "" identity r.payload))
+        | r.tag == "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
         | r.tag == "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
         | otherwise -> pure (fromJson r.payload)
-    hs = map (\(Tuple n fn) -> Tuple n (mk fn)) (FO.toUnfoldable helpers)
+    hs = map (\(Tuple n fn) -> Tuple n (mk n fn)) (FO.toUnfoldable helpers)
   in
     result (FullBars.renderSurfaceWithHelpers hs (FO.toUnfoldable partials) tpl (fromJson json))
 

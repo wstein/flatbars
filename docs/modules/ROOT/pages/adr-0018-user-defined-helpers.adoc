@@ -99,8 +99,10 @@ block helpers are therefore out of scope — a stated boundary, not an MVP cut.
 
 == Open questions
 
-* *Declared helper arities.* `registerHelper` could accept an arity/kind so registered helpers get the
-  same arity diagnostics and editor completion as the prelude (ties to ADR-017's catalog-driven
-  completion). v1 admits `AnyArity`.
+* *Declared helper arities* — *done.* `registerHelper(name, fn, arity)` accepts an optional arity (a
+  number ⇒ exactly N, `[min, max]` ⇒ a range / at-least when `max` is `null`/`Infinity`, omitted ⇒
+  any). A mismatch reports the *same* `ArityError` text the prelude's arity-checked helpers produce, in
+  both the interpreter and the compiled runtime. Editor completion from a declared kind/arity (ADR-017)
+  remains future work.
 * *Capability scoping in the Lab.* The Worker removes DOM/ambient authority but not all of a Worker's
   own globals; a tighter capability jail is future work if abuse appears.

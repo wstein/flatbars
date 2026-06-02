@@ -47,8 +47,9 @@ export const lessons = {
       "<ul>{{#each items}}<li>{{ this }}</li>{{/each}}</ul>",
     data: { name: "Ada", items: ["alpha", "beta"] },
     // A user-defined helper, exactly as in Handlebars (ADR-018). It is escaped
-    // by default in {{ }}; return safe(html) for raw markup.
-    helpers: "registerHelper('loud', (s) => String(s).toUpperCase())",
+    // by default in {{ }}; return safe(html) for raw markup. The optional 3rd
+    // arg declares an arity, so {{loud}} or {{loud a b}} report like a built-in.
+    helpers: "registerHelper('loud', (s) => String(s).toUpperCase(), 1)",
   },
 
   maxbars: {

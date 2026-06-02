@@ -21,10 +21,14 @@
 export function buildHelpers(source, safe) {
   if (!source || !source.trim()) return { ok: true, helpers: {}, error: "" };
   const helpers = Object.create(null);
-  const register = (name, fn) => {
+  // `registerHelper(name, fn)` or `registerHelper(name, fn, arity)` (ADR-018),
+  // where `arity` is a number (exactly N), `[min, max]` (max null/Infinity ⇒
+  // at-least), or omitted (any). A declared arity gives the helper the same
+  // arity diagnostics as a built-in.
+  const register = (name, fn, arity) => {
     if (typeof name !== "string" || !name) throw new Error("registerHelper(name, fn): name must be a non-empty string");
     if (typeof fn !== "function") throw new Error("registerHelper('" + name + "', fn): fn must be a function");
-    helpers[name] = fn;
+    helpers[name] = arity === undefined ? fn : { fn, arity };
   };
   try {
     // `registerHelper` + `safe` are the only names injected; the source runs

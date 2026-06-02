@@ -383,13 +383,33 @@ const helpers = {
 // compiled module (this registry) and the interpreter (the facade marshals the
 // same functions into engine helpers), so the two paths agree.
 const userHelpers = Object.create(null);
-function register(name, fn) {
+// Arity descriptor → text / check, matching the prelude (Kernel.Walk) and the
+// engine facade's FFI so a custom helper's arity diagnostics read like a
+// built-in's. `arity` is a number (exactly N), `[min, max]` (max null/Infinity ⇒
+// at-least), or undefined (any).
+function uArityText(arity) {
+  if (arity === undefined || arity === null) return "any number of";
+  if (typeof arity === "number") return "exactly " + arity;
+  const [lo, hi] = arity;
+  return hi == null || hi === Infinity ? "at least " + lo : lo + "–" + hi;
+}
+function uArityOk(arity, n) {
+  if (arity === undefined || arity === null) return true;
+  if (typeof arity === "number") return n === arity;
+  const [lo, hi] = arity;
+  return n >= lo && (hi == null || hi === Infinity || n <= hi);
+}
+// `register(name, fn)` or `register(name, fn, arity)` (ADR-018).
+function register(name, fn, arity) {
   if (typeof fn !== "function") throw new Error("rt.register: helper '" + name + "' is not a function");
-  userHelpers[name] = fn;
+  userHelpers[name] = { fn, arity };
   return rt;
 }
-function callUser(fn, args) {
-  const r = fn(...args);
+function callUser(name, entry, args) {
+  if (!uArityOk(entry.arity, args.length)) {
+    throw new Error("ArityError: " + name + ": expected " + uArityText(entry.arity) + " argument(s), got " + args.length);
+  }
+  const r = entry.fn(...args);
   return (r && typeof r === "object" && typeof r.__fbSafe === "string") ? new Safe(r.__fbSafe) : r;
 }
 
@@ -400,7 +420,7 @@ function call(name, args, frame) {
   const h = helpers[name];
   if (h) return h(args, frame);
   const u = userHelpers[name];
-  if (u) return callUser(u, args);
+  if (u) return callUser(name, u, args);
   throw new Error("UnknownHelper: no helper named '" + name + "' in any frame");
 }
 

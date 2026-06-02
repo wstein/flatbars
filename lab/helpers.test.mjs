@@ -33,6 +33,32 @@ test("registerHelper validates its arguments", () => {
   assert.equal(buildHelpers("registerHelper(123, () => 1)", safe).ok, false);
 });
 
+test("a declared arity is captured and enforced like the prelude (ADR-018)", () => {
+  const { helpers } = buildHelpers("registerHelper('loud', (s) => String(s).toUpperCase(), 1)", safe);
+  assert.deepEqual(Object.keys(helpers), ["loud"]);
+  assert.equal(typeof helpers.loud, "object"); // { fn, arity } descriptor
+  assert.equal(helpers.loud.arity, 1);
+  // correct arity renders; wrong arity is an ArityError matching the prelude's text
+  assert.equal(renderWith(helpers, {}, "{{loud x}}", { x: "a" }).value, "A");
+  const bad = renderWith(helpers, {}, "{{loud x y}}", { x: "a", y: "b" });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.error, "ArityError: loud: expected exactly 1 argument(s), got 2");
+});
+
+test("range arities: [min, max] is enforced when over the max", () => {
+  // A bare {{between}} with no args would be a data path (helpers need args), so
+  // arity is exercised with too-MANY args (an unambiguous helper call).
+  const { helpers } = buildHelpers(
+    "registerHelper('between', (a, b) => (a || '') + (b || ''), [1, 2])",
+    safe,
+  );
+  assert.equal(renderWith(helpers, {}, "{{between a}}", { a: "x" }).value, "x");
+  assert.equal(renderWith(helpers, {}, "{{between a b}}", { a: "x", b: "y" }).value, "xy");
+  const over = renderWith(helpers, {}, "{{between a b c}}", { a: "x", b: "y", c: "z" });
+  assert.equal(over.ok, false);
+  assert.match(over.error, /^ArityError: between: expected 1.2 argument\(s\), got 3$/); // 1–2 (en-dash)
+});
+
 test("the bag drives renderWith end-to-end (escaped + safe)", () => {
   const { helpers } = buildHelpers(
     "registerHelper('loud', (s) => String(s).toUpperCase());\n" +

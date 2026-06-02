@@ -1,5 +1,22 @@
 // output/FullBars.JS/foreign.js
-var callJsHelperImpl = (fn) => (args) => {
+function arityText(arity) {
+  if (arity === void 0 || arity === null) return "any number of";
+  if (typeof arity === "number") return "exactly " + arity;
+  const [lo, hi] = arity;
+  return hi == null || hi === Infinity ? "at least " + lo : lo + "\u2013" + hi;
+}
+function arityOk(arity, n) {
+  if (arity === void 0 || arity === null) return true;
+  if (typeof arity === "number") return n === arity;
+  const [lo, hi] = arity;
+  return n >= lo && (hi == null || hi === Infinity || n <= hi);
+}
+var callJsHelperImpl = (name2) => (descriptor) => (args) => {
+  const fn = typeof descriptor === "function" ? descriptor : descriptor.fn;
+  const arity = typeof descriptor === "function" ? void 0 : descriptor.arity;
+  if (!arityOk(arity, args.length)) {
+    return { tag: "arity", payload: name2 + ": expected " + arityText(arity) + " argument(s), got " + args.length };
+  }
   try {
     const r = fn.apply(null, args);
     if (r && typeof r === "object" && typeof r.__fbSafe === "string") {
@@ -8384,7 +8401,7 @@ var foldTemplate = function(alg) {
   };
   return go;
 };
-var arityText = function(v) {
+var arityText2 = function(v) {
   if (v instanceof Exactly) {
     return "exactly " + show4(v.value0);
   }
@@ -8403,7 +8420,7 @@ var arityText = function(v) {
   ;
   throw new Error("Failed pattern match at Kernel.Walk (line 242, column 13 - line 246, column 30): " + [v.constructor.name]);
 };
-var arityOk = function(a) {
+var arityOk2 = function(a) {
   return function(n) {
     if (a instanceof Exactly) {
       return n === a.value0;
@@ -8715,7 +8732,7 @@ var wrongArity = function(dictMonadThrow) {
   return function(name2) {
     return function(arity) {
       return function(args) {
-        return throwError3(new ArityError(name2 + (": expected " + (arityText(arity) + (" argument(s), got " + show5(length(args)))))));
+        return throwError3(new ArityError(name2 + (": expected " + (arityText2(arity) + (" argument(s), got " + show5(length(args)))))));
       };
     };
   };
@@ -8786,7 +8803,7 @@ var atLeast = function(dictMonadThrow) {
           arity: new AtLeast(k),
           run: function(v) {
             return function(args) {
-              var $24 = arityOk(new AtLeast(k))(length(args));
+              var $24 = arityOk2(new AtLeast(k))(length(args));
               if ($24) {
                 return f(args);
               }
@@ -13920,28 +13937,34 @@ var result = /* @__PURE__ */ either(function(e) {
   };
 });
 var renderWith = function(helpers, partials, tpl, json) {
-  var mk = function(fn) {
-    return function(v) {
-      return function(args) {
-        var v1 = callJsHelperImpl(fn)(map24(toJson)(args));
-        if (v1.tag === "safe") {
-          return pure4(new VSafe(caseJsonString("")(identity8)(v1.payload)));
-        }
-        ;
-        if (v1.tag === "error") {
-          return throwError2(new HelperError(caseJsonString("")(identity8)(v1.payload)));
-        }
-        ;
-        if (otherwise) {
-          return pure4(fromJson(v1.payload));
-        }
-        ;
-        throw new Error("Failed pattern match at FullBars.JS (line 125, column 24 - line 129, column 49): " + [v1.constructor.name]);
+  var mk = function(name2) {
+    return function(fn) {
+      return function(v) {
+        return function(args) {
+          var v1 = callJsHelperImpl(name2)(fn)(map24(toJson)(args));
+          if (v1.tag === "safe") {
+            return pure4(new VSafe(caseJsonString("")(identity8)(v1.payload)));
+          }
+          ;
+          if (v1.tag === "arity") {
+            return throwError2(new ArityError(caseJsonString("")(identity8)(v1.payload)));
+          }
+          ;
+          if (v1.tag === "error") {
+            return throwError2(new HelperError(caseJsonString("")(identity8)(v1.payload)));
+          }
+          ;
+          if (otherwise) {
+            return pure4(fromJson(v1.payload));
+          }
+          ;
+          throw new Error("Failed pattern match at FullBars.JS (line 128, column 29 - line 133, column 49): " + [v1.constructor.name]);
+        };
       };
     };
   };
   var hs = map24(function(v) {
-    return new Tuple(v.value0, mk(v.value1));
+    return new Tuple(v.value0, mk(v.value0)(v.value1));
   })(toUnfoldable9(helpers));
   return result(renderSurfaceWithHelpers(hs)(toUnfoldable9(partials))(tpl)(fromJson(json)));
 };
@@ -14059,7 +14082,7 @@ var compileResultAt = function(src) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 180, column 23 - line 182, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 184, column 23 - line 186, column 49): " + [v.constructor.name]);
   };
 };
 var compileSurface2 = function(tpl) {
@@ -14129,7 +14152,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map24(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 346, column 9 - line 355, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 350, column 9 - line 359, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
@@ -14149,7 +14172,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map24($lazy_rnode(322))(ns));
+    return arr(map24($lazy_rnode(326))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -14172,7 +14195,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         }()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 296, column 21 - line 303, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 300, column 21 - line 307, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -14205,7 +14228,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 291, column 1 - line 291, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 295, column 1 - line 295, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
         var $107 = litName(v.value1);
@@ -14230,7 +14253,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(291);
+var rnode = /* @__PURE__ */ $lazy_rnode(295);
 var astJson = function(dialect, src) {
   var v = function() {
     var $118 = dialect === "maxbars";
@@ -14261,7 +14284,7 @@ var astJson = function(dialect, src) {
     return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map24(rnode)(nodes)))]))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 234, column 3 - line 263, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 238, column 3 - line 267, column 12): " + [v.constructor.name]);
 };
 export {
   astJson,
