@@ -160,13 +160,17 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   of `core` (JSON-ness is a host concern, not a framework dependency).
 - **`js`** (`flatbars-js`) — JS/FFI surface bundling the dialects for JS hosts
   (bundled to `lab/vendor/flatbars-engine.mjs` for the FlatBars Lab).
-  That bundle is a **committed artifact**: regenerate it after any engine change,
-  or the Lab runs stale — `spago bundle -p flatbars-js --module FullBars.JS
-  --bundle-type module --platform browser --outfile
-  lab/vendor/flatbars-engine.mjs` (needs `esbuild` on PATH). The bundle URL is
-  imported with a `?v=N` cache-buster (in `lab/index.html`, `lab/flatbars.mjs`,
-  `lab/minbars.mjs`) — **bump that `N` whenever you regenerate the bundle**, or
-  browsers serve a cached old copy (the cause of "the Lab runs an old engine"
+  That bundle is a **committed artifact**: regenerate it after any engine change
+  (or the Lab runs stale) with **`npm run gen:bundle`** — it rebuilds `output/`
+  then esbuilds it to `lab/vendor/flatbars-engine.mjs`, the exact product
+  `check:bundle` verifies. (Always go through `gen:bundle`, not a bare `esbuild`:
+  the formatter reshapes the compiled output, so a bundle made before `npm run
+  format` is stale — `gen:bundle` rebuilds first, removing that footgun. Note a
+  bare `spago bundle --outfile …` resolves the path *relative to the package dir*,
+  writing to `packages/js/…`, not here.) The bundle URL is imported with a `?v=N`
+  cache-buster (in `lab/index.html`, `lab/flatbars.mjs`, `lab/minbars.mjs`,
+  `lab/helpers-worker.mjs`) — **bump that `N` whenever you regenerate the bundle**,
+  or browsers serve a cached old copy (the cause of "the Lab runs an old engine"
   even though `check:bundle` is green).
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.

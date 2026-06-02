@@ -21,6 +21,7 @@
     "check:mustache-conformance": "node scripts/mustache-conformance.mjs --check",
     "gen:highlight": "node scripts/gen-highlight.mjs",
     "check:highlight": "node scripts/gen-highlight.mjs --check",
+    "gen:bundle": "spago build -p flatbars-js && npx --yes esbuild@0.23.0 output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs",
     "check:bundle": "spago build -p flatbars-js && node scripts/check-bundle.mjs",
     "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs && node lab/helpers.test.mjs",
     "cli": "spago run -p flatbars-cli",
