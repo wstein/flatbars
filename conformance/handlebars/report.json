@@ -4,9 +4,9 @@
   "engine": "FullBars (lab/vendor/flatbars-engine.mjs — the shipped Lab bundle)",
   "method": "render each corpus case through real Handlebars AND FullBars; pass = byte-identical",
   "total": {
-    "pass": 48,
+    "pass": 49,
     "total": 50,
-    "pct": 96
+    "pct": 98
   },
   "gap": {
     "pass": 7,
@@ -47,7 +47,7 @@
     {
       "id": "helpers",
       "label": "Custom helpers",
-      "pass": 3,
+      "pass": 4,
       "total": 4
     },
     {

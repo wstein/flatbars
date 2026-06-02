@@ -412,6 +412,18 @@ function callUser(name, entry, args) {
   const r = entry.fn(...args);
   return (r && typeof r === "object" && typeof r.__fbSafe === "string") ? new Safe(r.__fbSafe) : r;
 }
+// A host helper used as a *block* (ADR-020): called Handlebars-style with the
+// positional args + a trailing `options`, `this` = current context. The return
+// is RAW block output (already-safe markup), appended verbatim — so it is a
+// plain string here, matching the interpreter's `VSafe` block result.
+function callUserBlock(name, entry, args, options, thisCtx) {
+  if (!uArityOk(entry.arity, args.length)) {
+    throw new Error("ArityError: " + name + ": expected " + uArityText(entry.arity) + " argument(s), got " + args.length);
+  }
+  const r = entry.fn.apply(thisCtx, args.concat([options]));
+  if (r && typeof r === "object" && typeof r.__fbSafe === "string") return r.__fbSafe;
+  return r == null ? "" : String(r);
+}
 
 function call(name, args, frame) {
   // block-param bindings (as |item i|) shadow the helper registry, like the
@@ -460,9 +472,27 @@ function block(name, args, frame, bodyFn, clauses) {
       default: return stringify(call(target, rest, frame));
     }
   }
-  // A registered helper used in block position: invoke it inline (body ignored),
-  // exactly as the interpreter does when `resolve` finds it.
-  if (helpers[name] || userHelpers[name] || (frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name))) {
+  // A host helper used as a block (ADR-020): call it Handlebars-style with an
+  // `options` whose fn/inverse render the body / {{else}} clause. Mirrors the
+  // interpreter's `callJsBlockHelperImpl`. v1 surface = fn/inverse; the rest throw.
+  const ub = userHelpers[name];
+  if (ub) {
+    const elseFn = (clauses && clauses.else) || (() => "");
+    const shift = (ctx) => childFrame(frame, ctx, null, null, null, null, null);
+    const options = {
+      fn: function (ctx) { return bodyFn(arguments.length === 0 ? frame : shift(ctx)); },
+      inverse: function (ctx) { return elseFn(arguments.length === 0 ? frame : shift(ctx)); },
+    };
+    for (const k of ["hash", "data", "blockParams", "ids", "loc", "lookupProperty"]) {
+      Object.defineProperty(options, k, {
+        get() { throw new Error("options." + k + " is not supported in a FlatBars block helper (v1)"); },
+      });
+    }
+    return callUserBlock(name, ub, args, options, frame.ctx);
+  }
+  // A built-in inline helper (or a block-param binding) used in block position:
+  // invoke it inline (body ignored), exactly as the interpreter's `resolve` does.
+  if (helpers[name] || (frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name))) {
     return stringify(call(name, args, frame));
   }
   // Otherwise Handlebars' `blockHelperMissing` (FullBars policy, mirrors

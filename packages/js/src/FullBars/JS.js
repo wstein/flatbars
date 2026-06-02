@@ -44,6 +44,47 @@ export const callJsHelperImpl = (name) => (descriptor) => (args) => {
   }
 };
 
+// Block (section) helper — ADR-020. Like `callJsHelperImpl`, but the helper is
+// called Handlebars-style with a trailing `options` object: `options.fn(ctx)`
+// renders the block body (with `ctx` as the new context; no arg ⇒ the current
+// context), `options.inverse(ctx)` the `{{else}}` clause. Those callbacks
+// re-enter the *pure* interpreter via PureScript thunks returning
+// `{ ok, value, error }`; we unwrap and throw IN JS (caught here), so the engine
+// never throws across the FFI. A block helper's return is RAW (the VSafe
+// analogue) — Handlebars treats block output as already-safe markup. v1 surface
+// is `fn`/`inverse` only; every other `options.*` throws rather than silently
+// reading `undefined` (ADR-020). `this` is the current context, so
+// `options.fn(this)` works.
+export const callJsBlockHelperImpl =
+  (name) => (descriptor) => (args) => (currentCtx) => (renderBody) => (renderInverse) => {
+    const fn = typeof descriptor === "function" ? descriptor : descriptor.fn;
+    const arity = typeof descriptor === "function" ? undefined : descriptor.arity;
+    if (!arityOk(arity, args.length)) {
+      return { tag: "arity", payload: name + ": expected " + arityText(arity) + " argument(s), got " + args.length };
+    }
+    const unwrap = (r) => {
+      if (!r.ok) throw new Error(r.error);
+      return r.value;
+    };
+    const options = {
+      fn: function (ctx) { return unwrap(renderBody(arguments.length === 0 ? currentCtx : ctx)); },
+      inverse: function (ctx) { return unwrap(renderInverse(arguments.length === 0 ? currentCtx : ctx)); },
+    };
+    // v1: an unsupported options.* is a loud error, never a silent `undefined`.
+    for (const k of ["hash", "data", "blockParams", "ids", "loc", "lookupProperty"]) {
+      Object.defineProperty(options, k, {
+        get() { throw new Error("options." + k + " is not supported in a FlatBars block helper (v1)"); },
+      });
+    }
+    try {
+      const r = fn.apply(currentCtx, args.concat([options]));
+      if (r && typeof r === "object" && typeof r.__fbSafe === "string") return { tag: "safe", payload: r.__fbSafe };
+      return { tag: "safe", payload: r === undefined || r === null ? "" : String(r) };
+    } catch (e) {
+      return { tag: "error", payload: String((e && e.message) || e) };
+    }
+  };
+
 // The SafeString equivalent a helper returns to emit raw (un-escaped) markup in
 // `{{ … }}` (ADR-018). A plain sentinel object so it travels across the engine
 // bundle and the separate compiled runtime without an instanceof dependency.

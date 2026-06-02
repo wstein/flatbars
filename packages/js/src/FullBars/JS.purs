@@ -36,7 +36,8 @@ import Data.Array (elem, head, null, uncons) as Array
 import Data.Either (Either(..), either)
 import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..))
+import Data.Map (empty) as Map
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
 import FlatBars.Error (Error(ArityError, HelperError))
@@ -49,6 +50,7 @@ import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
 import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
+import Kernel.Env (pushFrame, refContext)
 import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
 import MinBars as MinBars
@@ -108,6 +110,21 @@ foreign import data JsHelperFn :: Type
 foreign import callJsHelperImpl
   :: String -> JsHelperFn -> Array Json -> { tag :: String, payload :: Json }
 
+-- | Invoke a host helper used as a *block* (ADR-020): Handlebars-style, with a
+-- | trailing `options` object whose `fn`/`inverse` render the body / `{{else}}`
+-- | clause. `currentCtx` is the context for a no-arg `options.fn()`; `renderBody`
+-- | / `renderInverse` are pure thunks (run `ctl.render`) returning
+-- | `{ ok, value, error }`, which the FFI unwraps + throws in JS on `!ok`.
+-- | Tags: `"safe"` (raw block output ⇒ `VSafe`), `"arity"`, `"error"`.
+foreign import callJsBlockHelperImpl
+  :: String
+  -> JsHelperFn
+  -> Array Json
+  -> Json
+  -> (Json -> { ok :: Boolean, value :: String, error :: String })
+  -> (Json -> { ok :: Boolean, value :: String, error :: String })
+  -> { tag :: String, payload :: Json }
+
 -- | The `SafeString` equivalent a helper returns for raw markup. `safe(string)`.
 foreign import safe :: String -> Json
 
@@ -121,16 +138,34 @@ foreign import safe :: String -> Json
 renderWith :: Fn4 (FO.Object JsHelperFn) (FO.Object String) String Json Result
 renderWith = mkFn4 \helpers partials tpl json ->
   let
-    -- A host fn becomes a (polymorphic) engine helper; the `Ctl` handle is
-    -- ignored (inline helpers only — ADR-018). Args marshal Value→JSON, the
-    -- result JSON→Value, with the `safe` sentinel → `VSafe`, a declared-arity
-    -- mismatch → `ArityError` (as the prelude reports), a throw → `HelperError`.
-    mk name fn = \_ args -> case callJsHelperImpl name fn (map toJson args) of
-      r
-        | r.tag == "safe" -> pure (VSafe (caseJsonString "" identity r.payload))
-        | r.tag == "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
-        | r.tag == "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
-        | otherwise -> pure (fromJson r.payload)
+    -- A host fn becomes an engine operation. Usage decides inline vs block
+    -- (ADR-020): a non-empty `ctl.children` means it was called as
+    -- `pass:[{{#name}}…{{/name}}]`. Inline (ADR-018): args marshal Value→JSON,
+    -- the result JSON→Value (escaped `VString`, or `safe`→`VSafe`). Block:
+    -- the fn is called Handlebars-style with `options.fn`/`inverse` rendering the
+    -- body/`else` via `ctl.render`, and the result is raw (`VSafe`).
+    mk name fn = \ctl args ->
+      if Array.null ctl.children then case callJsHelperImpl name fn (map toJson args) of
+        r
+          | r.tag == "safe" -> pure (VSafe (caseJsonString "" identity r.payload))
+          | r.tag == "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
+          | r.tag == "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
+          | otherwise -> pure (fromJson r.payload)
+      else
+        let
+          clause = ctl.clause "else"
+          renderClause nodes ctxJson =
+            case ctl.render (pushFrame Map.empty (fromJson ctxJson) ctl.env) nodes of
+              Right s -> { ok: true, value: s, error: "" }
+              Left e -> { ok: false, value: "", error: show e }
+          r = callJsBlockHelperImpl name fn (map toJson args) (toJson (refContext ctl.env))
+            (renderClause clause.before)
+            (renderClause (fromMaybe [] clause.body))
+        in
+          case r.tag of
+            "arity" -> throwError (ArityError (caseJsonString "" identity r.payload))
+            "error" -> throwError (HelperError (caseJsonString "" identity r.payload))
+            _ -> pure (VSafe (caseJsonString "" identity r.payload))
     hs = map (\(Tuple n fn) -> Tuple n (mk n fn)) (FO.toUnfoldable helpers)
   in
     result (FullBars.renderSurfaceWithHelpers hs (FO.toUnfoldable partials) tpl (fromJson json))

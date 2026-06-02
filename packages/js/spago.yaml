@@ -15,6 +15,7 @@ package:
     - flatbars
     - flatbars-json
     - fullbars
+    - kernel
     - rawbars
     - maxbars
     - minbars
@@ -24,6 +25,7 @@ package:
     - maybe
     - tuples
     - foreign-object
+    - ordered-collections
   test:
     main: Test.FullBars.JS.Main
     dependencies:

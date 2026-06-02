@@ -49,11 +49,14 @@ const HELPERS = {
     },
     fb: (text, hash) => safe('<a href="' + (hash && hash.href) + '">' + text + "</a>"),
   },
-  // A user-defined BLOCK helper. Handlebars supports it; FullBars's user-helper
-  // API (ADR-018) is inline-only, so there is no `fb` — this is a known gap.
+  // A user-defined BLOCK helper (ADR-020): registered identically in both — the
+  // helper receives a trailing `options` whose `options.fn(this)` renders the body.
   bold: {
     hb: function (options) {
       return new Handlebars.SafeString("<b>" + options.fn(this) + "</b>");
+    },
+    fb: function (options) {
+      return safe("<b>" + options.fn(this) + "</b>");
     },
   },
 };
