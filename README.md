@@ -27,7 +27,8 @@ implementation and a CLI, alongside the normative specification and the
 ├── examples/              Foldered core-template fixtures (golden cases for the compiler conformance harness)
 │   └── vendored/          Vendored upstream corpus (mustache/spec) for `flatbars examples verify`
 ├── conformance/
-│   └── handlebars/        Differential Handlebars conformance — FullBars matches real handlebars@4.7.9 on 96% (48/50)
+│   ├── handlebars/        Differential Handlebars conformance — FullBars matches real handlebars@4.7.9 on 96% (48/50)
+│   └── mustache/          MinBars vs the full official mustache/spec — 100% required, 95.4% incl. optional modules
 └── reference/
     └── web/               FlatBars Lab — the JS/WASM polyglot playground (Stem · RawBars · MinBars · FullBars · MaxBars)
 ```
@@ -41,12 +42,19 @@ golden cases for the compiler conformance harness (`npm run test:compile`); the
 vendored upstream corpus under `lab/examples/vendored/` drives `flatbars examples
 verify`. The FlatBars Lab's own demo templates live under `lab/examples/`.
 
-**Handlebars conformance.** `conformance/handlebars/` proves how close FullBars is to
-Handlebars *differentially*: every case is rendered through the real `handlebars` npm
-package (a dev-only oracle) **and** FullBars, then asserted byte-identical — so the score
-cannot over-claim. FullBars currently matches on **96% (48/50)**; `npm run
-check:hbs-conformance` (in `npm test`) locks the number against regression. See
-`conformance/handlebars/README.md`.
+**Conformance proofs.** `conformance/` measures the surface engines against the upstream
+suites so the claims can't over-state. Both are gated in `npm test`:
+
+- `conformance/handlebars/` — **FullBars vs Handlebars**, *differential*: every case rendered
+  through the real `handlebars` npm package (a dev-only oracle) **and** FullBars, asserted
+  byte-identical. Currently **96% (48/50)**; `npm run check:hbs-conformance`.
+- `conformance/mustache/` — **MinBars vs the full official `mustache/spec`** (every module,
+  optional `~` ones included). Each fixture carries its own `expected`, so the spec is the
+  oracle. **100% (136/136) of required modules; 95.4% (185/194) of the full spec** — the only
+  gap is lambdas (functions-in-data, the pure-data-`Value` limit). `npm run
+  check:mustache-conformance`.
+
+Both READMEs document the method and the deliberately-deferred gaps.
 
 ## Prerequisites
 
