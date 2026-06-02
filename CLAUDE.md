@@ -146,7 +146,11 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   That bundle is a **committed artifact**: regenerate it after any engine change,
   or the Lab runs stale — `spago bundle -p flatbars-js --module FullBars.JS
   --bundle-type module --platform browser --outfile
-  lab/vendor/flatbars-engine.mjs` (needs `esbuild` on PATH).
+  lab/vendor/flatbars-engine.mjs` (needs `esbuild` on PATH). The bundle URL is
+  imported with a `?v=N` cache-buster (in `lab/index.html`, `lab/flatbars.mjs`,
+  `lab/minbars.mjs`) — **bump that `N` whenever you regenerate the bundle**, or
+  browsers serve a cached old copy (the cause of "the Lab runs an old engine"
+  even though `check:bundle` is green).
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source), incl.
