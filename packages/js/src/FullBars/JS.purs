@@ -34,7 +34,7 @@ import Data.Function.Uncurried (Fn1, Fn2, Fn3, mkFn1, mkFn2, mkFn3)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import FlatBars (Expr(..), parse, parseErrorAt, parseWith)
+import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
 import FlatBars.Highlight (HSpan, HighlightConfig, highlightSpans) as Highlight
 import FlatBars.Json (fromJson)
 import FlatBars.Lexer (defaultLexConfig)
@@ -92,27 +92,27 @@ renderMustache = mkFn3 \partials tpl json ->
 -- | emitted module's default export is `function (data, rt)`; pair it with
 -- | `runtime/flatbars-runtime.mjs`. `value` is the JS source on success.
 compile :: Fn1 String Result
-compile = mkFn1 \tpl -> compileResult (RawBars.compileJs tpl)
+compile = mkFn1 \tpl -> compileResultAt tpl (RawBars.compileJs tpl)
 
 -- | Compile a *surface* template to JS (desugars first). `compileSurface(template)`.
 compileSurface :: Fn1 String Result
-compileSurface = mkFn1 \tpl -> compileResult (Compile.compileSurface tpl)
+compileSurface = mkFn1 \tpl -> compileResultAt tpl (Compile.compileSurface tpl)
 
 -- | Compile a *MaxBars* template to JS (infix/pipes/loop vars desugar first).
 -- | `compileMaxbars(template)`.
 compileMaxbars :: Fn1 String Result
-compileMaxbars = mkFn1 \tpl -> compileResult (MaxBars.compileMaxJs tpl)
+compileMaxbars = mkFn1 \tpl -> compileResultAt tpl (MaxBars.compileMaxJs tpl)
 
 -- | Compile a MinBars (Mustache) template to JS (ADR-016). `compileMinbars(template)`.
 compileMinbars :: Fn1 String Result
-compileMinbars = mkFn1 \tpl -> compileResult (MinBars.compileMinJs tpl)
+compileMinbars = mkFn1 \tpl -> compileResultAt tpl (MinBars.compileMinJs tpl)
 
 -- | Compile a MinBars template to JS with a set of named partials (each a
 -- | Mustache source); `{{> name}}` is inlined. `compileMinbarsWithPartials(partials, template)`,
 -- | where `partials` is a plain `{ name: source }` object.
 compileMinbarsWithPartials :: Fn2 (FO.Object String) String Result
 compileMinbarsWithPartials = mkFn2 \partials tpl ->
-  compileResult (MinBars.compileMinJsWith (FO.toUnfoldable partials) tpl)
+  compileResultAt tpl (MinBars.compileMinJsWith (FO.toUnfoldable partials) tpl)
 
 -- | Compile a template to JS for a named dialect — one entry over the four
 -- | per-dialect compilers. `compileFor(dialect, template)`, where `dialect` is
@@ -123,15 +123,19 @@ compileMinbarsWithPartials = mkFn2 \partials tpl ->
 -- | `compileMinbarsWithPartials`. Equivalent to picking the matching
 -- | `compile*` function by hand — provided so a host has a single call site.
 compileFor :: Fn2 String String Result
-compileFor = mkFn2 \dialect tpl -> compileResult case dialect of
+compileFor = mkFn2 \dialect tpl -> compileResultAt tpl case dialect of
   "rawbars" -> RawBars.compileJs tpl
   "maxbars" -> MaxBars.compileMaxJs tpl
   "minbars" -> MinBars.compileMinJs tpl
   _ -> Compile.compileSurface tpl
 
-compileResult :: forall e. Show e => Either e String -> Result
-compileResult = case _ of
-  Left e -> { ok: false, value: "", error: show e }
+-- | A compile outcome, with parse failures *located* as `line:column: message`
+-- | (the same form `render`/`renderSurface` report) rather than the bare
+-- | offset `show` form — so a host points an editor at the offending tag. Takes
+-- | the source to resolve the `ParseError` offset to a line/column.
+compileResultAt :: String -> Either ParseError String -> Result
+compileResultAt src = case _ of
+  Left pe -> { ok: false, value: "", error: renderParseErrorAt src pe }
   Right js -> { ok: true, value: js, error: "" }
 
 --------------------------------------------------------------------------------

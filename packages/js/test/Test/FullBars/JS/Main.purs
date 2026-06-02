@@ -69,11 +69,10 @@ main = do
   compiles "maxbars" "maxbars" "{{ score >= 50 }}" -- infix desugars to core, then shared driver
   compiles "minbars" "minbars" "{{name}}"
   compiles "unknown→fullbars" "wat" "{{ name }}" -- unknown dialect falls back to surface
-  -- parse failures come back as a (positioned) error result, not thrown.
+  -- parse failures come back located as `line:column:` (like render), not thrown.
   let bad = runFn2 compileFor "fullbars" "line1\nline2 {{ oops"
   assert' "compileFor parse error not ok" (not bad.ok)
-  assert' ("compileFor parse error reported: " <> bad.error)
-    (contains (Pattern "Unterminated") bad.error)
+  assert' ("compileFor parse error located: " <> bad.error) (contains (Pattern "2:7:") bad.error)
 
   -- The Result type really is a plain { ok, value, error } record.
   let probe = { ok: true, value: "v", error: "" } :: Result
