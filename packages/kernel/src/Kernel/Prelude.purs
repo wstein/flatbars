@@ -1000,6 +1000,26 @@ iterate ctl names items =
     n = Array.length items
     -- block params bind, in order, the element value and its index/key.
     binds val idx = Array.zipWith (\nm v -> Tuple nm (constOperation v)) names [ val, idx ]
+    -- a loop `label NAME` (ADR-013) binds the *frame reified as an object* — the
+    -- bare loop variables `this`/`index0`/…/`length`/`key` as fields — so an inner
+    -- body reads `label.length`/`label.first` of this enclosing loop. It is an
+    -- immutable per-iteration snapshot; the compiler builds the same object.
+    frameObject i val key = VObject
+      ( Map.fromFoldable
+          [ Tuple "this" val
+          , Tuple "index0" (VNumber (Int.toNumber i))
+          , Tuple "index1" (VNumber (Int.toNumber (i + 1)))
+          , Tuple "rindex0" (VNumber (Int.toNumber (n - 1 - i)))
+          , Tuple "rindex1" (VNumber (Int.toNumber (n - i)))
+          , Tuple "first" (VBool (i == 0))
+          , Tuple "last" (VBool (i == n - 1))
+          , Tuple "length" (VNumber (Int.toNumber n))
+          , Tuple "key" key
+          ]
+      )
+    labelBind i val key = case ctl.loopLabel of
+      Just lbl -> [ Tuple lbl (constOperation (frameObject i val key)) ]
+      Nothing -> []
     renderItem i { val, key, idx } =
       let
         frame = Map.fromFoldable
@@ -1022,7 +1042,7 @@ iterate ctl names items =
             , Tuple "rindex0" (constOperation (VNumber (Int.toNumber (n - 1 - i))))
             , Tuple "rindex1" (constOperation (VNumber (Int.toNumber (n - i))))
             , Tuple "length" (constOperation (VNumber (Int.toNumber n)))
-            ] <> parentData ctl <> binds val idx
+            ] <> parentData ctl <> binds val idx <> labelBind i val key
           )
       in
         ctl.render (pushFrame frame val ctl.env) main

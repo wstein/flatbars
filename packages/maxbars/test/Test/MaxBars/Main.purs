@@ -204,6 +204,22 @@ main = do
   -- ladder, and a trailing `as |x|` still binds. Here `(xs | reverse)` pipes.
   expectM "blockparams-paren-pipe" "{{#each (xs | reverse) as |x|}}{{x}}{{/each}}" xs3 "cba"
 
+  -- labelled loops (ADR-013): `label NAME` binds the loop frame as an object, so
+  -- an inner body reads `NAME.index1`/`NAME.length`/`NAME.first`/… of THIS loop.
+  expectM "label-fields"
+    "{{#each xs label l}}{{l.index1}}/{{l.length}}{{#if l.first}}<{{/if}}{{#if l.last}}>{{/if}} {{/each}}"
+    xs3
+    "1/3< 2/3 3/3> "
+  -- the point: an inner loop reaches the *outer* loop's metadata through the label.
+  expectM "label-outer-from-inner"
+    "{{#each rows as |row| label outer}}{{#each row}}{{outer.index0}}:{{this}} {{/each}}{{/each}}"
+    (obj [ Tuple "rows" (VArray [ VArray [ VString "a", VString "b" ], VArray [ VString "c" ] ]) ])
+    "0:a 0:b 1:c "
+  -- the label's `this` is the element; `key` is the object key when iterating one.
+  expectM "label-this-key" "{{#each o label l}}{{l.key}}={{l.this}} {{/each}}"
+    (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0), Tuple "b" (num 2.0) ]) ])
+    "a=1 b=2 "
+
   -- compiled path names the loop variable as a scoped helper call.
   case compileMaxJs "{{#each xs}}{{index1}}{{/each}}" of
     Left e -> assert' ("compile loopvar: unexpected error " <> show e) false

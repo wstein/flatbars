@@ -137,10 +137,12 @@ desugarWith lv clauseNames = go []
       -- extends the scope for the body.
       Block sp Section name args body ->
         let
-          { mainArgs, params } = extractBlockParams args
+          { args: args', label } = extractLabel name args
+          { mainArgs, params } = extractBlockParams args'
+          bodyScope = scope <> params <> maybe [] pure label
         in
-          Block sp Section name (blockHeadArgs lv scope mainArgs params)
-            (go (scope <> params) (expandElseIf body))
+          Block sp Section name (blockHeadArgs lv scope mainArgs params label)
+            (go bodyScope (expandElseIf body))
       -- the Mustache-inheritance shapes `{{<name}}` (Parent) / `{{$name}}`
       -- (BlockDef) are gated off for FullBars (`inheritance = false`), so the
       -- parser never produces them here; handle them totally — like a plain
@@ -149,7 +151,7 @@ desugarWith lv clauseNames = go []
         let
           { mainArgs, params } = extractBlockParams args
         in
-          Block sp sig name (blockHeadArgs lv scope mainArgs params)
+          Block sp sig name (blockHeadArgs lv scope mainArgs params Nothing)
             (go (scope <> params) (expandElseIf body))
       -- raw blocks are verbatim (surface.adoc §5.8).
       RawBlock sp name args raw -> RawBlock sp name args raw
@@ -260,17 +262,34 @@ dictExpr pairs = App "dict" (Array.concatMap (\p -> [ Lit (VString p.key), p.val
 -- | can route the hash and `as |a b|` names to a user block helper's `options`.
 -- | The markers demarker back to `dict` / bare name literals (`splitBlockArgs`),
 -- | so built-ins (and inline calls, which keep `dict`) are unchanged.
-blockHeadArgs :: LoopVars -> Scope -> Array Expr -> Array String -> Array Expr
-blockHeadArgs lv scope mainArgs params =
+blockHeadArgs :: LoopVars -> Scope -> Array Expr -> Array String -> Maybe String -> Array Expr
+blockHeadArgs lv scope mainArgs params label =
   let
     h = collectHash lv scope mainArgs
     pos = map (rewrite lv scope) h.positional
     withHash = if Array.null h.pairs then pos else Array.snoc pos (hashMarker h.pairs)
   in
-    withHash <> map paramMarker params
+    withHash <> map paramMarker params <> labelMarker label
   where
   hashMarker pairs = App "@hash" (Array.concatMap (\p -> [ Lit (VString p.key), p.val ]) pairs)
   paramMarker p = App "@param" [ Lit (VString p) ]
+  -- a loop `label NAME` (ADR-013) emits a reserved `@label` marker the engine's
+  -- `blockArgs` seam lifts into `Ctl.loopLabel`; `splitBlockArgs` drops it from the
+  -- positional list, so built-ins never see it as an argument.
+  labelMarker = maybe [] (\n -> [ App "@label" [ Lit (VString n) ] ])
+
+-- | Split a trailing loop `label NAME` clause (ADR-013) off an `each` head's
+-- | arguments, returning the remaining arguments and the label name. Recognised
+-- | only on `each` (the loop case), and only as a bare `label` keyword followed by
+-- | a single identifier name (never a bar — that is an `as |…|` delimiter).
+extractLabel :: Ident -> Array Expr -> { args :: Array Expr, label :: Maybe String }
+extractLabel name args
+  | name == "each" = case Array.unsnoc args of
+      Just { init: init1, last: App nm [] } | nm /= "|" -> case Array.unsnoc init1 of
+        Just { init: init2, last: App "label" [] } -> { args: init2, label: Just nm }
+        _ -> { args, label: Nothing }
+      _ -> { args, label: Nothing }
+  | otherwise = { args, label: Nothing }
 
 -- | Partition arguments into positional ones and `key=value` hash pairs. A hash
 -- | argument is a bare ident containing `=`: either glued (`k=v`) or a trailing

@@ -43,6 +43,7 @@ dummyCtl =
   , clause: \_ -> { before: [], body: Nothing }
   , hash: Nothing
   , blockParams: []
+  , loopLabel: Nothing
   }
 
 obj :: Array (Tuple String Value) -> Value
@@ -120,7 +121,7 @@ customEngine root =
       "at" -> Right \ctl _ -> Right (VString (show ctl.span.start)) -- reads Ctl.span
       _ -> Left (UnknownHelper name)
   , stringify
-  , blockArgs: \args -> { positional: args, hash: Nothing, params: [] }
+  , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
   }
   where
   shoutH _ args = case args of

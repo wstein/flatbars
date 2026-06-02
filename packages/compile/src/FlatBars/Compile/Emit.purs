@@ -131,8 +131,8 @@ fbBlock rec ctx name args body =
     case name of
       "if" -> ifBlock rec ctx (truthyTest rec ctx split.positional) body
       "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx split.positional <> ")") body
-      "each" -> frameBlock rec ctx "each" split.positional body
-      "with" -> frameBlock rec ctx "with" split.positional body
+      "each" -> frameBlock rec ctx "each" split.positional split.label body
+      "with" -> frameBlock rec ctx "with" split.positional split.label body
       -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
       "inline" -> ""
       _ -> rtBlock rec ctx name split body
@@ -176,18 +176,23 @@ elseChain rec ctx clauses = case Array.uncons clauses of
 -- subject is the first argument; any trailing *string-literal* arguments are
 -- block-param binding names (surface `as |item i|` desugars to them), passed to
 -- the runtime to bind in the child frame.
-frameBlock :: Rec -> Ctx -> String -> Array Expr -> Template -> String
-frameBlock rec ctx fn args body =
+frameBlock :: Rec -> Ctx -> String -> Array Expr -> Maybe String -> Template -> String
+frameBlock rec ctx fn args label body =
   let
     s = splitClauses body
     child = rec.child ctx
     subject = head1 rec ctx args
     names = "[" <> joinWith ", " (map jsString (bindingNames (Array.drop 1 args))) <> "]"
+    -- a loop `label NAME` (ADR-013) binds the frame reified as an object; the
+    -- runtime builds the same field set the interpreter's `iterate` does.
+    labelJs = maybe "null" jsString label
     elseClause = case Array.head s.clauses of
       Just cl -> cl.body
       Nothing -> []
   in
     "  out += rt." <> fn <> "(" <> subject <> ", " <> ctx.scope <> ", " <> names <> ", "
+      <> labelJs
+      <> ", "
       <> lambda rec child s.before
       <> ", "
       <> lambda rec ctx elseClause
@@ -210,7 +215,7 @@ rtBlock
   :: Rec
   -> Ctx
   -> Ident
-  -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }
+  -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String, label :: Maybe String }
   -> Template
   -> String
 rtBlock rec ctx name split body =

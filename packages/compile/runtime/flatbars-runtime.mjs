@@ -123,6 +123,9 @@ function scope(data, falsy) {
     index0: null, index1: null, rindex0: null, rindex1: null, length: null,
     parent: null, parentIndex: null, parentKey: null, parentFirst: null, parentLast: null,
     root: data ?? null,
+    // scoped bindings (block params + loop labels). A null-proto object so the
+    // `in` test never finds Object.prototype members; child frames chain onto it.
+    binds: Object.create(null),
     falsy: falsy || HB,             // the active @truthiness mode (default Handlebars)
   };
 }
@@ -143,6 +146,10 @@ function childFrame(parent, ctx, index, key, first, last, len) {
     parent: parent.ctx,
     parentIndex: parent.index, parentKey: parent.key, parentFirst: parent.first, parentLast: parent.last,
     root: parent.root,
+    // inherit the enclosing frame's scoped bindings (outer block params + loop
+    // labels stay visible inward), with this frame's own binds shadowing them —
+    // matching the interpreter's pushed-frame stack.
+    binds: Object.create(parent.binds),
     falsy: parent.falsy,            // a loop/with body inherits the file's mode
   };
 }
@@ -151,16 +158,31 @@ function childFrame(parent, ctx, index, key, first, last, len) {
 // for `with` (FullBars binds the element/value first, then the index/key).
 function bindNames(frame, names, values) {
   if (names && names.length) {
-    frame.binds = {};
+    // set OWN properties on the (inherited) binds chain, so they shadow outer
+    // bindings of the same name without mutating the parent's binds object.
     for (let i = 0; i < names.length; i++) if (values[i] !== undefined) frame.binds[names[i]] = values[i];
   }
+  return frame;
+}
+
+// A loop `label NAME` (ADR-013) binds the frame reified as an object — the bare
+// loop variables (this/index0/…/length/key) as fields — so an inner body reads
+// `label.length`/`label.first`. The field set + arithmetic mirror the
+// interpreter's `iterate.frameObject`, so the two paths produce the same object.
+function labelFrame(frame, label) {
+  if (!label) return frame;
+  frame.binds[label] = {
+    this: frame.ctx, index0: frame.index0, index1: frame.index1,
+    rindex0: frame.rindex0, rindex1: frame.rindex1,
+    first: frame.first, last: frame.last, length: frame.length, key: frame.key,
+  };
   return frame;
 }
 
 // ── iteration: `each` over array or object (FullBars eachH) ──────────────────
 // `names` are block-param names (`as |item i|`): item = element, i = index
 // (array) or key (object), matching the interpreter.
-function each(coll, parent, names, bodyFn, elseFn) {
+function each(coll, parent, names, label, bodyFn, elseFn) {
   let items;
   if (Array.isArray(coll)) {
     // `key` is null for arrays (Handlebars parity — @key is object-only; use the
@@ -176,9 +198,12 @@ function each(coll, parent, names, bodyFn, elseFn) {
   let out = "";
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
-    const fr = bindNames(
-      childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1, items.length),
-      names, [it.val, it.idx],
+    const fr = labelFrame(
+      bindNames(
+        childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1, items.length),
+        names, [it.val, it.idx],
+      ),
+      label,
     );
     out += bodyFn(fr);
   }
@@ -186,9 +211,11 @@ function each(coll, parent, names, bodyFn, elseFn) {
 }
 
 // ── context shift: `with` (FullBars withH) ───────────────────────────────────
-function withCtx(val, parent, names, bodyFn, elseFn) {
+// `label` is accepted for signature symmetry with `each`; the surface only emits
+// a loop label on `each`, so it is null here in practice.
+function withCtx(val, parent, names, label, bodyFn, elseFn) {
   if (!truthy(parent.falsy, val)) return elseFn(parent);
-  return bodyFn(bindNames(childFrame(parent, val, null, null, null, null), names, [val]));
+  return bodyFn(labelFrame(bindNames(childFrame(parent, val, null, null, null, null), names, [val]), label));
 }
 
 // ── partials: render a registered partial (FullBars partialH) ────────────────
@@ -426,9 +453,10 @@ function callUserBlock(name, entry, args, options, thisCtx) {
 }
 
 function call(name, args, frame) {
-  // block-param bindings (as |item i|) shadow the helper registry, like the
-  // interpreter's scoped frame helpers.
-  if (frame && frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name)) return frame.binds[name];
+  // block-param bindings (as |item i|) and loop labels shadow the helper
+  // registry, like the interpreter's scoped frame helpers. `in` walks the binds
+  // prototype chain so an outer binding stays visible in a nested block.
+  if (frame && frame.binds && name in frame.binds) return frame.binds[name];
   const h = helpers[name];
   if (h) return h(args, frame);
   const u = userHelpers[name];
@@ -466,8 +494,8 @@ function block(name, args, frame, bodyFn, clauses, channel) {
     switch (target) {
       case "if": return truthy(frame.falsy, rest[0]) ? bodyFn(frame) : elseFn(frame);
       case "unless": return truthy(frame.falsy, rest[0]) ? elseFn(frame) : bodyFn(frame);
-      case "each": return each(rest[0], frame, [], bodyFn, elseFn);
-      case "with": return withCtx(rest[0], frame, [], bodyFn, elseFn);
+      case "each": return each(rest[0], frame, [], null, bodyFn, elseFn);
+      case "with": return withCtx(rest[0], frame, [], null, bodyFn, elseFn);
       // an inline helper target: call it (body ignored) and stringify the result.
       default: return stringify(call(target, rest, frame));
     }
@@ -523,7 +551,7 @@ function block(name, args, frame, bodyFn, clauses, channel) {
   const v = (ctx && typeof ctx === "object" && !isSafe(ctx) &&
     Object.prototype.hasOwnProperty.call(ctx, name)) ? ctx[name] : null;
   const elseFn = (clauses && clauses.else) || (() => "");
-  return Array.isArray(v) ? each(v, frame, [], bodyFn, elseFn) : withCtx(v, frame, [], bodyFn, elseFn);
+  return Array.isArray(v) ? each(v, frame, [], null, bodyFn, elseFn) : withCtx(v, frame, [], null, bodyFn, elseFn);
 }
 function raw(_name, body) { return body; }
 

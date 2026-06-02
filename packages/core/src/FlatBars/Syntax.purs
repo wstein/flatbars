@@ -103,27 +103,35 @@ instance showNode :: Show Node where
     Sep _ n args -> "Sep " <> show n <> " " <> show args
 
 -- | Split a block head's arguments into the positional args, the surface hash,
--- | and the `as |…|` block-param names — recognising the reserved `@hash` /
--- | `@param` markers a dialect surface emits for a *block* head (ADR-020 Phase 3).
--- | Pure and structural: it assigns no meaning, only reshapes `Expr`s — `@hash`
--- | demarkers to a `dict` application (the value built-ins already expect),
--- | `@param` to its bare name literal. A no-op when no markers are present (e.g.
--- | RawBars/MaxBars/MinBars, or inline calls), so it is safe as the default split.
+-- | the `as |…|` block-param names, and a loop `label NAME` (ADR-013) — recognising
+-- | the reserved `@hash` / `@param` / `@label` markers a dialect surface emits for a
+-- | *block* head (ADR-020 Phase 3 / ADR-013). Pure and structural: it assigns no
+-- | meaning, only reshapes `Expr`s — `@hash` demarkers to a `dict` application (the
+-- | value built-ins already expect), `@param` to its bare name literal, and `@label`
+-- | is lifted out entirely (it names a frame binding, never a positional argument).
+-- | A no-op when no markers are present (e.g. RawBars/MinBars, or inline calls), so
+-- | it is safe as the default split.
 splitBlockArgs
-  :: Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }
+  :: Array Expr
+  -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String, label :: Maybe String }
 splitBlockArgs args =
-  { positional: map demarker args
+  { positional: Array.mapMaybe demarker args
   , hash: Array.findMap asHash args
   , params: Array.mapMaybe asParam args
+  , label: Array.findMap asLabel args
   }
   where
   demarker = case _ of
-    App "@hash" pairs -> App "dict" pairs
-    App "@param" [ Lit (VString n) ] -> Lit (VString n)
-    e -> e
+    App "@label" _ -> Nothing -- routed via `label`, never a positional argument
+    App "@hash" pairs -> Just (App "dict" pairs)
+    App "@param" [ Lit (VString n) ] -> Just (Lit (VString n))
+    e -> Just e
   asHash = case _ of
     App "@hash" pairs -> Just (App "dict" pairs)
     _ -> Nothing
   asParam = case _ of
     App "@param" [ Lit (VString n) ] -> Just n
+    _ -> Nothing
+  asLabel = case _ of
+    App "@label" [ Lit (VString n) ] -> Just n
     _ -> Nothing

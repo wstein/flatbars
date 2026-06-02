@@ -52,6 +52,10 @@ type Ctl m env =
   -- for dialects/heads with no such surface (e.g. RawBars).
   , hash :: Maybe Value
   , blockParams :: Array String
+  -- A loop `label NAME` (ADR-013): the name a frame-shifting block (`each`/`with`)
+  -- binds to its frame reified as an object, so an inner body reads
+  -- `label.length`/`label.index0`/… `Nothing` when the head has no label clause.
+  , loopLabel :: Maybe String
   }
 
 -- | A helper: given its control handle and evaluated arguments, produce a value.
@@ -68,7 +72,12 @@ type Engine m env =
   -- (`{ positional: args, hash: Nothing, params: [] }`) is what RawBars uses;
   -- FullBars supplies a marker-aware split. See ADR-020 Phase 3.
   , blockArgs ::
-      Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }
+      Array Expr
+      -> { positional :: Array Expr
+         , hash :: Maybe Expr
+         , params :: Array String
+         , label :: Maybe String
+         }
   }
 
 -- | Run a parsed template against an engine. FlatBars drives the entire walk.
@@ -98,7 +107,7 @@ runTemplate engine = renderTemplate engine.initial
     vals <- traverse (evalExpr env span) split.positional
     hashV <- traverse (evalExpr env span) split.hash
     h <- engine.resolve env name
-    h (ctl env body span hashV split.params) vals >>= engine.stringify
+    h (ctl env body span hashV split.params split.label) vals >>= engine.stringify
 
   evalExpr :: env -> Span -> Expr -> m Value
   evalExpr env span = case _ of
@@ -106,10 +115,10 @@ runTemplate engine = renderTemplate engine.initial
     App name args -> do
       vals <- traverse (evalExpr env span) args
       h <- engine.resolve env name
-      h (ctl env [] span Nothing []) vals
+      h (ctl env [] span Nothing [] Nothing) vals
 
-  ctl :: env -> Template -> Span -> Maybe Value -> Array String -> Ctl m env
-  ctl env body span hashV params =
+  ctl :: env -> Template -> Span -> Maybe Value -> Array String -> Maybe String -> Ctl m env
+  ctl env body span hashV params label =
     { env
     , children: body
     , span
@@ -125,6 +134,7 @@ runTemplate engine = renderTemplate engine.initial
           { before: s.before, body: s.clause }
     , hash: hashV
     , blockParams: params
+    , loopLabel: label
     }
 
 -- | Parse source and run it. Parse failures are thrown into `m`.

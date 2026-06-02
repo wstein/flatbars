@@ -60,8 +60,8 @@ minEngine initial =
       "block" -> pure blockH
       other -> throwError (HelperError ("unknown MinBars helper '" <> other <> "'"))
   , stringify: \v -> liftEither (stringify v)
-  -- Mustache has no hash / block-param surface, so the identity split (ADR-020 Phase 3).
-  , blockArgs: \args -> { positional: args, hash: Nothing, params: [] }
+  -- Mustache has no hash / block-param / label surface, so the identity split (ADR-020 Phase 3).
+  , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
   }
 
 -- | `mlookup name` — resolve a (possibly dotted) name against the context stack
