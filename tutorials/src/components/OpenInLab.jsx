@@ -13,7 +13,9 @@ import { labHref, dataText } from "../../../lab/open-in-lab.mjs";
 import { load as loadYaml } from "../../../lab/vendor/js-yaml.mjs";
 import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
-import { highlightTemplate, highlightYaml } from "../lib/highlight.mjs";
+import { renderWith, safe } from "../../../lab/vendor/flatbars-engine.mjs";
+import { buildHelpers } from "../../../lab/helpers.mjs";
+import { highlightTemplate, highlightYaml, esc } from "../lib/highlight.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
 
@@ -28,7 +30,10 @@ const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
 function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
   const taRef = useRef(null);
   const preRef = useRef(null);
-  const html = (lang === "yaml" ? highlightYaml(value) : highlightTemplate(value, dialect)) + "\n";
+  // template → engine highlighter; yaml → data highlighter; js (custom helpers)
+  // → plain escaped text (no JS grammar — the source has no FlatBars tags).
+  const html =
+    (lang === "yaml" ? highlightYaml(value) : lang === "js" ? esc(value) : highlightTemplate(value, dialect)) + "\n";
 
   useEffect(() => {
     const ta = taRef.current, pre = preRef.current;
@@ -64,11 +69,14 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, labUrl = LAB_URL, compile = false }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", labUrl = LAB_URL, compile = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
   const [parts, setParts] = useState(partials || {});
+  // Custom-helper JS source (ADR-018). Only the FullBars/Handlebars surface has
+  // user helpers; the cell shows when an example supplies them.
+  const [helpersStr, setHelpersStr] = useState(helpers || "");
   const [edited, setEdited] = useState(false);
   const [renderer, setRenderer] = useState(null);
   const [out, setOut] = useState({ ok: true, text: null }); // text === null ⇒ "rendering…"
@@ -98,13 +106,24 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       setOut({ ok: false, text: "⚠ data isn’t valid YAML — " + ((e && e.message) || e) });
       return;
     }
+    // With custom helpers, render through the engine facade's `renderWith`
+    // (which marshals the JS helpers into the interpreter); otherwise the
+    // adapter's plain render. `safe(html)` is available to the helper source.
+    const hsrc = (helpersStr || "").trim();
+    if (hsrc) {
+      const built = buildHelpers(hsrc, safe);
+      if (!built.ok) { setOut({ ok: false, text: "⚠ helper error — " + built.error }); return; }
+      const r = renderWith(built.helpers, parts || {}, tpl, data ?? {});
+      setOut(r.ok ? { ok: true, text: r.value } : { ok: false, text: r.error });
+      return;
+    }
     try {
       const text = renderer.render(renderer.compile(tpl, parts || {}).program, data ?? {});
       setOut({ ok: true, text });
     } catch (e) {
       setOut({ ok: false, text: String((e && e.message) || e) });
     }
-  }, [renderer, tpl, dataStr, parts]);
+  }, [renderer, tpl, dataStr, parts, helpersStr]);
 
   // Optional: compile the template to a JS module (RawBars/FullBars/MaxBars only).
   useEffect(() => {
@@ -116,11 +135,11 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace.
   useEffect(() => {
     let live = true;
-    labHref(engine, { template: tpl, data: dataStr, partials: parts }, { labUrl })
+    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr }, { labUrl })
       .then((h) => { if (live) setHref(h); })
       .catch(() => {});
     return () => { live = false; };
-  }, [tpl, dataStr, parts]);
+  }, [tpl, dataStr, parts, helpersStr]);
 
   // A full-width template row only pays off when the template is actually wide
   // (multi-line or long); a short one-liner like `{{> card}}` would just leave a
@@ -133,12 +152,15 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   const onTpl = (v) => { setTpl(v); setEdited(true); };
   const onData = (v) => { setDataStr(v); setEdited(true); };
   const onPart = (name, v) => { setParts((p) => ({ ...p, [name]: v })); setEdited(true); };
+  const onHelpers = (v) => { setHelpersStr(v); setEdited(true); };
   const reset = () => {
     setTpl(template);
     setDataStr(initialData);
     setParts(partials || {});
+    setHelpersStr(helpers || "");
     setEdited(false);
   };
+  const hasHelpers = (helpersStr || "").trim().length > 0;
 
   return (
     <figure class={"oil" + (edited ? " is-edited" : "")} data-affordance="dock">
@@ -176,6 +198,12 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
             <CodeEditor lang="template" value={parts[name]} onInput={(v) => onPart(name, v)} dialect={engine} />
           </div>
         ))}
+        {hasHelpers && (
+          <div class="oil-cell">
+            <div class="oil-cell-head"><span class="oil-cap">helpers · JS</span><span class="oil-js-note">— registerHelper</span></div>
+            <CodeEditor lang="js" value={helpersStr} onInput={onHelpers} />
+          </div>
+        )}
       </div>
 
       <div class="oil-out">

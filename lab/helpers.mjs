@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Build a custom-helper bag from user JS source, shared by the Lab's helpers
+// panel and the tutorials' runnable cards (ADR-018). The source uses the
+// Handlebars-style `registerHelper(name, fn)` API and may call `safe(str)` to
+// emit raw markup; `buildHelpers` runs it and returns `{ ok, helpers, error }`,
+// where `helpers` is the `{ name: fn }` bag the engine facade's `renderWith`
+// (interpreter) and `rt.register` (compiled) both consume.
+//
+// `safe` is injected (the engine bundle's `safe`) so this module carries no
+// dependency on the bundle and can be unit-tested in isolation.
+//
+// SECURITY (ADR-018): this evaluates the user's own JS via `new Function` — the
+// playground model (CodePen/JSFiddle). It is NOT a sandbox against hostile code;
+// the threat that matters is a *shared* link auto-running someone else's
+// helpers, which the Lab guards separately (helper source is not auto-applied
+// from a shared workspace without explicit consent — see index.html).
+
+// Evaluate `source` into a helper bag. Returns `{ ok, helpers, error }`.
+// `safe` is the engine's SafeString constructor, exposed to the user's code.
+export function buildHelpers(source, safe) {
+  if (!source || !source.trim()) return { ok: true, helpers: {}, error: "" };
+  const helpers = Object.create(null);
+  const register = (name, fn) => {
+    if (typeof name !== "string" || !name) throw new Error("registerHelper(name, fn): name must be a non-empty string");
+    if (typeof fn !== "function") throw new Error("registerHelper('" + name + "', fn): fn must be a function");
+    helpers[name] = fn;
+  };
+  try {
+    // `registerHelper` + `safe` are the only names injected; the source runs
+    // for its side effects (registering helpers).
+    // eslint-disable-next-line no-new-func
+    const run = new Function("registerHelper", "safe", source);
+    run(register, safe);
+    return { ok: true, helpers, error: "" };
+  } catch (e) {
+    return { ok: false, helpers: {}, error: String((e && e.message) || e) };
+  }
+}

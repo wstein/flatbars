@@ -16,6 +16,8 @@ import { examples as mustacheExamples } from "../tutorials/src/mustache.mjs";
 import { examples as rawbarsExamples } from "../tutorials/src/rawbars.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../lab/minbars.mjs";
+import { renderWith, safe } from "../lab/vendor/flatbars-engine.mjs";
+import { buildHelpers } from "../lab/helpers.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
@@ -72,7 +74,18 @@ for (const [key, ex] of Object.entries(lessons)) {
   const renderer =
     ex.engine === "minbars" ? await createMinBarsRenderer() : await createFlatBarsRenderer(DIALECT[ex.engine]);
   try {
-    const out = renderer.render(renderer.compile(ex.template, ex.partials || {}).program, ex.data ?? {});
+    // A lesson with custom helpers (ADR-018) renders through `renderWith`, the
+    // same path the card uses; otherwise the adapter's plain render.
+    let out;
+    if (ex.helpers && ex.helpers.trim()) {
+      const built = buildHelpers(ex.helpers, safe);
+      if (!built.ok) throw new Error("helper source error: " + built.error);
+      const r = renderWith(built.helpers, ex.partials || {}, ex.template, ex.data ?? {});
+      if (!r.ok) throw new Error(r.error);
+      out = r.value;
+    } else {
+      out = renderer.render(renderer.compile(ex.template, ex.partials || {}).program, ex.data ?? {});
+    }
     if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
     console.log(`  ✓ ${key} (${ex.engine}) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}`);
     collapseWarn(`${key} (${ex.engine})`, ex, out);

@@ -32,11 +32,15 @@ export function dataText(data) {
 // (restoreHash restores it verbatim rather than reloading a catalog example);
 // tab 0 is the main template, the rest are named partials. Mirrors the field
 // shape `restoreHash` reads (`tabs:[{n,s}]`, `d`, `av`, `ai`).
-export function workspaceState({ template = "", data, partials } = {}) {
+export function workspaceState({ template = "", data, partials, helpers } = {}) {
   const tabs = [{ s: template }];
   const p = partials || {};
   for (const name of Object.keys(p)) tabs.push({ n: name, s: p[name] });
-  return { x: -1, tabs, d: dataText(data), av: "tmpl", ai: 0 };
+  const st = { x: -1, tabs, d: dataText(data), av: "tmpl", ai: 0 };
+  // Custom-helper JS (ADR-018), carried as `h`. The Lab applies it only with
+  // explicit consent (a shared link must not auto-run someone else's code).
+  if (helpers && helpers.trim()) st.h = helpers;
+  return st;
 }
 
 // Build the Lab URL for an example. `labUrl` is the Lab's index.html, relative

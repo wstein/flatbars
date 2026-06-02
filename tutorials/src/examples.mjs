@@ -39,12 +39,16 @@ export const lessons = {
     title: "FullBars — Handlebars-faithful",
     blurb:
       "Proof the core spans Handlebars — the reference engine: {{ name }} " +
-      "auto-escapes, dotted paths read data, {{#each}} / {{#if}} are block helpers.",
+      "auto-escapes, dotted paths read data, {{#each}} / {{#if}} are block helpers, " +
+      "and you register your own with registerHelper (ADR-018).",
     spec: "surface", // docs/modules/ROOT/pages/surface.adoc
     template:
-      "<h1>Hello, {{ name }}!</h1>\n" +
+      "<h1>Hello, {{loud name}}!</h1>\n" +
       "<ul>{{#each items}}<li>{{ this }}</li>{{/each}}</ul>",
     data: { name: "Ada", items: ["alpha", "beta"] },
+    // A user-defined helper, exactly as in Handlebars (ADR-018). It is escaped
+    // by default in {{ }}; return safe(html) for raw markup.
+    helpers: "registerHelper('loud', (s) => String(s).toUpperCase())",
   },
 
   maxbars: {
