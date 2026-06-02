@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { lessons } from "../tutorials/src/examples.mjs";
 import { examples as mustacheExamples } from "../tutorials/src/mustache.mjs";
 import { examples as rawbarsExamples } from "../tutorials/src/rawbars.mjs";
+import { examples as fullbarsExamples } from "../tutorials/src/fullbars.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../lab/minbars.mjs";
 import { renderWith, safe } from "../lab/vendor/flatbars-engine.mjs";
@@ -165,6 +166,51 @@ for (const [key, rex] of Object.entries(rawbarsExamples)) {
     collapseWarn(`${key} (${eng})`, rex, out);
   } catch (e) {
     console.error(`  ✗ ${key} (${eng}): ${e && e.message ? e.message : e}`);
+    fail++;
+  }
+}
+
+// FullBars reference examples (tutorials/src/fullbars.mjs) — every one runs under
+// the `surface` engine; a custom-helper example (ADR-018) renders through
+// `renderWith` (the same path the card uses), and a `compiles` example must also
+// emit JS. Orphan guard against examples never shown on fullbars.astro.
+console.log("\nFullBars reference examples (fullbars):");
+const fullPageSrc = readFileSync(new URL("../tutorials/src/pages/fullbars.astro", import.meta.url), "utf8");
+const fbr = await createFlatBarsRenderer("surface");
+for (const [key, fex] of Object.entries(fullbarsExamples)) {
+  if (!fullPageSrc.includes(`ex.${key}.`)) {
+    console.error(`  ✗ ${key}: defined in fullbars.mjs but never referenced by fullbars.astro (orphan)`);
+    fail++;
+  }
+  try {
+    await labHref("fullbars", fex, { labUrl: "/lab/index.html" });
+  } catch (e) {
+    console.error(`  ✗ ${key}: Open-in-Lab link failed to build — ${e.message}`);
+    fail++;
+    continue;
+  }
+  try {
+    let out;
+    if (fex.helpers && fex.helpers.trim()) {
+      const built = buildHelpers(fex.helpers, safe);
+      if (!built.ok) throw new Error("helper source error: " + built.error);
+      const res = renderWith(built.helpers, fex.partials || {}, fex.template, fex.data ?? {});
+      if (!res.ok) throw new Error(res.error);
+      out = res.value;
+    } else {
+      out = fbr.render(fbr.compile(fex.template, fex.partials || {}).program, fex.data ?? {});
+    }
+    if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
+    let note = "";
+    if (fex.compiles) {
+      const c = fbr.compileToJs(fex.template);
+      if (!c || !c.ok) throw new Error("compileToJs failed: " + ((c && c.error) || "unknown"));
+      note = ` [compiles ✓ ${c.value.length}b]`;
+    }
+    console.log(`  ✓ ${key} (fullbars) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}${note}`);
+    collapseWarn(`${key} (fullbars)`, fex, out);
+  } catch (e) {
+    console.error(`  ✗ ${key} (fullbars): ${e && e.message ? e.message : e}`);
     fail++;
   }
 }

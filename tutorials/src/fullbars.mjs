@@ -211,7 +211,9 @@ grade: fail
 
   inlinePartial: {
     // {{#*inline "name"}}…{{/inline}} defines a partial inline, scoped to the rest
-    // of the template — a reusable row without a separate file.
+    // of the template — a reusable row without a separate file. Deliberately inline
+    // (bracketed, single line), so opt out of the single-line-collapse heuristic.
+    inline: true,
     engine: "fullbars",
     template: `{{#*inline "tag"}}[{{ this }}]{{/inline}}{{#each tags}}{{> tag }}{{/each}}`,
     data: { tags: ["math", "logic"] },
