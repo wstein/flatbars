@@ -60,7 +60,7 @@ const t = (s) => s;
     <p>
       RawBars renders the <b>core skeleton syntax</b> directly — no dotted paths,
       no auto-escaping, no <code>{t("{{ }}")}</code> interpolation. There is one
-      rule: <b>everything is a helper application</b>. <code>{t("{{{ city }}}")}</code>
+      rule: <b>everything is a helper application</b>. <code>{t("{{{city}}}")}</code>
       doesn't read a variable named <code>city</code> — it <em>calls</em> the
       helper <code>city</code>. To read a field you call <code>lookup</code>; to
       escape you call <code>escapeHtml</code>. Nothing is implicit.
@@ -81,7 +81,7 @@ const t = (s) => s;
     <p>
       RawBars has one inline output form, the triple-stash <code>{t("{{{ … }}}")}</code>,
       and it is <b>never auto-escaped</b>. Here is what FullBars's friendly
-      <code>{t("{{ name }}")}</code> actually <em>is</em> — the same render, written
+      <code>{t("{{name}}")}</code> actually <em>is</em> — the same render, written
       out explicitly:
     </p>
     <p class="diptych-cap"><b>FullBars</b> (sugar):</p>
@@ -89,8 +89,8 @@ const t = (s) => s;
     <p class="diptych-cap"><b>RawBars</b> (the same thing, explicit):</p>
     <OpenInLab client:visible engine="rawbars" template={ex.core.template} data={ex.core.data} />
     <p class="tip">
-      Same output, <code>Ada &amp;lt;core&amp;gt;</code>. FullBars' <code>{t("{{ x }}")}</code>
-      desugars to exactly <code>{t("{{{ escapeHtml (lookup this \"x\") }}}")}</code>.
+      Same output, <code>Ada &amp;lt;core&amp;gt;</code>. FullBars' <code>{t("{{x}}")}</code>
+      desugars to exactly <code>{t("{{{escapeHtml (lookup this \"x\")}}}")}</code>.
       The sugar is convenience; the core is the contract.
     </p>
   </section>
@@ -129,7 +129,7 @@ const t = (s) => s;
   <section id="blocks">
     <h2>Blocks install scope</h2>
     <p>
-      A block <code>{t("{{# helper args }} … {{/ helper }}")}</code> hands its body
+      A block <code>{t("{{#helper args}} … {{/helper}}")}</code> hands its body
       to a block helper. <code>each</code> iterates and, inside the body, installs
       scoped helpers — <code>this</code> (the element), <code>index</code>,
       <code>key</code>, <code>first</code>, <code>last</code> — that the block

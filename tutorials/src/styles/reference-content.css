@@ -19,6 +19,11 @@
 
 .content .diptych-cap { margin: 1rem 0 0.3rem; font-size: 0.95rem; }
 
+/* Convention checklist (FullBars "Style & conventions") */
+.content ul.conv { margin: 1rem 0; padding-left: 1.2rem; display: grid; gap: 0.6rem; }
+.content ul.conv li { line-height: 1.5; }
+.content ul.conv b { color: var(--fg); }
+
 .content .score {
   font-size: 1.05rem;
   background: var(--success-faint);

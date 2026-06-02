@@ -32,6 +32,7 @@ const groups = [
       { href: "#helpers", label: "Custom helpers" },
       { href: "#partials", label: "Partials" },
       { href: "#comments", label: "Comments" },
+      { href: "#conventions", label: "Style & conventions" },
       { href: "#compile", label: "Compiles to JS" },
       { href: "#divergences", label: "Where it diverges" },
       { href: "#next", label: "Compatibility & next" },
@@ -66,7 +67,7 @@ const t = (s) => s;
     <h2>What FullBars is</h2>
     <p>
       <b>FullBars is the Handlebars-faithful member of the FlatBars family.</b> If
-      you know Handlebars, you already know most of this page: <code>{t("{{ name }}")}</code>
+      you know Handlebars, you already know most of this page: <code>{t("{{name}}")}</code>
       auto-escapes, dotted paths read nested data, <code>{t("{{#each}}")}</code> /
       <code>{t("{{#if}}")}</code> are block helpers, and partials, subexpressions, and
       <code>{t("{{#*inline}}")}</code> all work as you'd expect.
@@ -76,7 +77,7 @@ const t = (s) => s;
       FullBars isn't a separate engine — it's a <b>surface syntax</b> over the same
       meaning-free core that runs <a href="/minbars">MinBars (Mustache)</a> and
       <a href="/rawbars">RawBars</a>. One parser, four languages. In the core there
-      are <b>no variables</b>: <code>{t("{{ name }}")}</code> doesn't read a variable,
+      are <b>no variables</b>: <code>{t("{{name}}")}</code> doesn't read a variable,
       it <em>applies</em> the helper <code>name</code> (see <a href="/rawbars">RawBars</a>).
       That model holds the line in a few places where Handlebars is looser — gathered
       under <a href="#divergences">Where FullBars diverges</a>.
@@ -93,11 +94,11 @@ const t = (s) => s;
   <section id="expressions">
     <h2>Expressions &amp; escaping</h2>
     <p>
-      The workhorse tag. <code>{t("{{ name }}")}</code> applies <code>name</code> and
+      The workhorse tag. <code>{t("{{name}}")}</code> applies <code>name</code> and
       inserts the result, <b>HTML-escaped by default</b> so data can't inject markup.
-      To emit raw markup use the triple-stash <code>{t("{{{ name }}}")}</code>. (Unlike
-      Mustache there is <b>no <code>{t("{{&name}}")}</code></b> — the triple-stash is the
-      one unescaped form.)
+      To emit raw markup use the triple-stash <code>{t("{{{name}}}")}</code>. (Handlebars's
+      <code>{t("{{&name}}")}</code> is accepted as an alias, but the triple-stash is the
+      canonical FullBars spelling.)
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.escaping.template} data={ex.escaping.data} />
   </section>
@@ -106,14 +107,14 @@ const t = (s) => s;
   <section id="paths">
     <h2>Paths</h2>
     <p>
-      Reach into nested objects with dots — <code>{t("{{ user.address.city }}")}</code> —
-      and <code>{t("{{ this }}")}</code> is the current context.
+      Reach into nested objects with dots — <code>{t("{{user.address.city}}")}</code> —
+      and <code>{t("{{this}}")}</code> is the current context.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.dotted.template} data={ex.dotted.data} />
     <h3>Climbing out: <code>../</code> and <code>@root</code></h3>
     <p>
-      Inside a block, <code>{t("{{ ../x }}")}</code> climbs to the enclosing context and
-      <code>{t("{{ @root.x }}")}</code> jumps to the top-level data — no matter how deep
+      Inside a block, <code>{t("{{../x}}")}</code> climbs to the enclosing context and
+      <code>{t("{{@root.x}}")}</code> jumps to the top-level data — no matter how deep
       the nesting.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.paths.template} data={ex.paths.data} />
@@ -146,7 +147,7 @@ const t = (s) => s;
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.eachList.template} data={ex.eachList.data} />
     <h3>Over an object</h3>
-    <p>Iterating an object, <code>{t("@key")}</code> is the property name and <code>{t("{{ this }}")}</code> the value.</p>
+    <p>Iterating an object, <code>{t("@key")}</code> is the property name and <code>{t("{{this}}")}</code> the value.</p>
     <OpenInLab client:visible engine="fullbars" template={ex.eachObject.template} data={ex.eachObject.data} />
     <h3>The empty case</h3>
     <p><code>{t("{{#each}}")}</code> has its own <code>{t("{{else}}")}</code> for an empty list — no separate inverted section.</p>
@@ -171,12 +172,12 @@ const t = (s) => s;
   <section id="lookup">
     <h2><code>lookup</code> &amp; <code>log</code></h2>
     <p>
-      <code>{t("{{ lookup obj key }}")}</code> reads a field whose name isn't known until
+      <code>{t("{{lookup obj key}}")}</code> reads a field whose name isn't known until
       render — an array index, or a key chosen by the data.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.lookup.template} data={ex.lookup.data} />
     <p>
-      <code>{t("{{ log x }}")}</code> writes to the console and emits nothing — a debugging
+      <code>{t("{{log x}}")}</code> writes to the console and emits nothing — a debugging
       aid that renders to the empty string.
     </p>
   </section>
@@ -257,6 +258,52 @@ const t = (s) => s;
     <OpenInLab client:visible engine="fullbars" template={ex.comment.template} data={ex.comment.data} />
   </section>
 
+  <!-- ───────────────────── Style & conventions ─────────────────────── -->
+  <section id="conventions">
+    <h2>Style &amp; conventions</h2>
+    <p>
+      None of this changes what a template <em>means</em> — it changes how readable it
+      is six months later. The examples on this page follow these conventions; so does
+      the FlatBars Lab.
+    </p>
+    <ul class="conv">
+      <li>
+        <b>Tight delimiters.</b> Write <code>{t("{{name}}")}</code>, not
+        <code>{t("{{ name }}")}</code> — no padding inside the stash. (The parser
+        requires it for block tags anyway: <code>{t("{{ #each }}")}</code> is a lex
+        error, so tight is the only form that's uniform across every tag.)
+      </li>
+      <li>
+        <b>Indent with the HTML.</b> A tag's indentation should match the markup around
+        it — pick 2 or 4 spaces and keep it. Block bodies indent one level past their
+        opening tag.
+      </li>
+      <li>
+        <b>Block helpers get their own line.</b> Put <code>{t("{{#each}}")}</code>,
+        <code>{t("{{#if}}")}</code>, and friends on a line by themselves rather than
+        inlining them mid-markup. As a bonus, a block tag alone on its line is
+        <em>standalone</em>: the engine trims that whole line, so the output stays tidy.
+      </li>
+      <li>
+        <b>Close tags align with their opener.</b> Every <code>{t("{{/if}}")}</code> /
+        <code>{t("{{/each}}")}</code> sits on its own line, indented to match the
+        <code>{t("{{#…}}")}</code> it closes — the body is what's indented between them.
+      </li>
+      <li>
+        <b>Comment with <code>{t("{{! … }}")}</code>, not <code>&lt;!-- … --&gt;</code>.</b>
+        A Handlebars comment is dropped before render, so template notes never leak into
+        the output; an HTML comment ships to the browser.
+      </li>
+      <li>
+        <b>Reach for <code>~</code> sparingly.</b> A tilde (<code>{t("{{~name~}}")}</code>)
+        trims the whitespace next to a tag — useful when readable indentation would
+        otherwise show up in the output, but easy to overuse into line-noise. Format for
+        humans first; add tildes only where the output genuinely needs them.
+      </li>
+    </ul>
+    <OpenInLab client:visible engine="fullbars" template={ex.whitespace.template} data={ex.whitespace.data} />
+  </section>
+
   <!-- ────────────────────────── Compiles to JS ──────────────────────── -->
   <section id="compile">
     <h2>Compiles to JS</h2>
@@ -287,11 +334,6 @@ const t = (s) => s;
           <td><code>{t("{{#x}}")}</code> always means "apply block helper <code>x</code>", never an implicit section.</td>
         </tr>
         <tr>
-          <td>Unescaped <code>{t("{{&x}}")}</code></td>
-          <td><code>{t("{{{x}}}")}</code></td>
-          <td>One spelling for "don't escape" — the triple-stash.</td>
-        </tr>
-        <tr>
           <td><code>else</code> as a keyword</td>
           <td><code>else</code> is a <b>separator</b>; <code>elif</code> is a real clause</td>
           <td>The core has no keywords (not even <code>else</code>); a block splits on a name-agnostic separator.</td>
@@ -299,12 +341,12 @@ const t = (s) => s;
         <tr>
           <td><code>true</code> / <code>false</code> / <code>null</code> literals</td>
           <td>the same spellings — but they're <b>helpers</b></td>
-          <td>There are no variables and no literals-as-values; everything is an application.</td>
+          <td>The core's only literals are strings and numbers; <code>true</code>/<code>false</code>/<code>null</code> aren't keywords but nullary helpers.</td>
         </tr>
         <tr>
-          <td>Set delimiters <code>{t("{{=<% %>=}}")}</code></td>
+          <td>Mustache set delimiters <code>{t("{{=<% %>=}}")}</code></td>
           <td>fixed <code>{t("{{ }}")}</code> / <code>{t("{{{ }}}")}</code></td>
-          <td>A fixed grammar keeps the parser meaning-free and the tooling simple.</td>
+          <td>A fixed grammar keeps the parser meaning-free and the tooling simple. (A Mustache feature; Handlebars fixes the delimiters too.)</td>
         </tr>
         <tr>
           <td>Data/lambdas as functions in the context</td>

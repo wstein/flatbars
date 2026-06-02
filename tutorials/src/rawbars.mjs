@@ -7,20 +7,20 @@
 // core: no surface sugar, so every value is an explicit helper application.
 //
 // `engine` defaults to "rawbars"; the `sugar` example is FullBars on purpose —
-// it's the left half of the "sugar → core" diptych (what `{{ name }}` desugars
+// it's the left half of the "sugar → core" diptych (what `{{name}}` desugars
 // to). `compiles: true` marks the flagship the page shows compiled to JS (and
 // the gate asserts compileToJs succeeds for it).
 
 export const examples = {
   // ── Output & escaping: the sugar → core diptych ──────────────────────────
-  // FullBars writes {{ name }}; that is exactly this RawBars application.
+  // FullBars writes {{name}}; that is exactly this RawBars application.
   sugar: {
     engine: "fullbars",
-    template: "{{ name }}",
+    template: "{{name}}",
     data: { name: "Ada <core>" },
   },
   core: {
-    template: '{{{ escapeHtml (lookup this "name") }}}',
+    template: '{{{escapeHtml (lookup this "name")}}}',
     data: { name: "Ada <core>" },
   },
 
@@ -28,13 +28,13 @@ export const examples = {
   // `uppercase (lookup this "name")` applies uppercase to ONE argument — the
   // parenthesised group. Without the parens it would be three arguments.
   application: {
-    template: '{{{ uppercase (lookup this "name") }}}',
+    template: '{{{uppercase (lookup this "name")}}}',
     data: { name: "ada" },
   },
 
   // ── Reading data: lookup, explicitly, with no dot paths ───────────────────
   lookup: {
-    template: '{{{ escapeHtml (lookup this "user" "email") }}}',
+    template: '{{{escapeHtml (lookup this "user" "email")}}}',
     data: { user: { email: "ada@example.com" } },
   },
 
@@ -44,7 +44,7 @@ export const examples = {
   // lines, so the output is one clean row per item.
   each: {
     template: `{{#each (lookup this "items")}}
-{{{ index }}}: {{{ escapeHtml this }}}
+{{{index}}}: {{{escapeHtml this}}}
 {{/each}}`,
     data: { items: ["alpha", "beta"] },
     compiles: true,

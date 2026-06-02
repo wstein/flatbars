@@ -73,8 +73,9 @@ argument.
 |`pass:[{{{ E }}}]` |`pass:[{{{ E' }}}]`
 |===
 
-There is no ampersand form: {hbs}' `pass:[{{& E }}]` (unescaped) is dropped — write the triple-stash
-`pass:[{{{ E }}}]`, which is exactly as short and already means "do not escape".
+{hbs}' ampersand form `pass:[{{& E }}]` (unescaped) is accepted as an alias of the triple-stash
+`pass:[{{{ E }}}]` (see §5.6) — both mean "do not escape". The triple-stash is the canonical FullBars
+spelling; the austere RawBars and MaxBars dialects accept only it and reject `pass:[{{&}}]`.
 
 `E'` is `E` after the *path rewrite* (5.2). If `E'` is itself a multi-token application it is wrapped
 in parentheses before being handed to `escapeHtml` (it is now an argument): `pass:[{{ upcase x }}]` →

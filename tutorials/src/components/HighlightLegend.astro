@@ -19,9 +19,9 @@ const tags = [
   { code: "{{! note }} {{!-- long --}}", dialect: "fullbars", label: "Comment", note: "dropped from output" },
   { code: "{{=<% %>=}}", dialect: "minbars", label: "Set delimiters", note: "switches the {{ }} pair" },
   // Interior tokens (ADR-017): punch through a tag's colour.
-  { code: "{{ a + b }}", dialect: "maxbars", label: "Operator", note: "infix / pipe (MaxBars)" },
-  { code: "{{ \"text\" }}", dialect: "maxbars", label: "String", note: "a string literal" },
-  { code: "{{ qty * 2 }}", dialect: "maxbars", label: "Number", note: "a numeric literal" },
+  { code: "{{a + b}}", dialect: "maxbars", label: "Operator", note: "infix / pipe (MaxBars)" },
+  { code: "{{\"text\"}}", dialect: "maxbars", label: "String", note: "a string literal" },
+  { code: "{{qty * 2}}", dialect: "maxbars", label: "Number", note: "a numeric literal" },
 ];
 
 const data = [

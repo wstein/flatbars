@@ -14,6 +14,9 @@
 //     subexpression `(gte score 50)`. Conditions and transforms compose helpers.
 //   • No Mustache sections. `{{#person}}` is *not* an implicit truthy/list
 //     section here — control flow is explicit `{{#if}}` / `{{#each}}`.
+// Spacing is tight throughout — `{{name}}`, never `{{ name }}` — matching the
+// Mustache reference and the official Handlebars guide (the engine also forbids a
+// space after `{{` in a block tag, so block sigils have to stay tight regardless).
 // Custom-helper entries carry a `helpers` field (ADR-018 `registerHelper` source);
 // the page and the gate render those through the engine facade's `renderWith`.
 
@@ -21,15 +24,15 @@ export const examples = {
   // ── Expressions & escaping ───────────────────────────────────────────────
   hello: {
     engine: "fullbars",
-    template: "Hello, {{ name }}!",
+    template: "Hello, {{name}}!",
     data: { name: "Ada" },
   },
 
   escaping: {
-    // {{ x }} HTML-escapes (the safe default); {{{ x }}} emits raw markup. Unlike
-    // Mustache there is no {{&x}} — the triple-stash is the one unescaped form.
+    // {{x}} HTML-escapes (the safe default); {{{x}}} emits raw markup. Handlebars's
+    // {{&x}} is accepted as an alias; the triple-stash is the canonical spelling.
     engine: "fullbars",
-    template: "escaped: {{ html }}\nraw:     {{{ html }}}",
+    template: "escaped: {{html}}\nraw:     {{{html}}}",
     data: { html: "<b>bold & bright</b>" },
   },
 
@@ -37,7 +40,7 @@ export const examples = {
   dotted: {
     // Dotted paths reach into nested objects; `this` is the current context.
     engine: "fullbars",
-    template: "{{ user.name }} — {{ user.address.city }}",
+    template: "{{user.name}} — {{user.address.city}}",
     data: { user: { name: "Ada", address: { city: "London" } } },
   },
 
@@ -46,9 +49,9 @@ export const examples = {
     // the top-level data — both regardless of how deep the nesting goes.
     engine: "fullbars",
     template: `{{#each teams}}
-{{ name }}:
+{{name}}:
 {{#each members}}
-  - {{ this }} ({{ ../name }} @ {{ @root.org }})
+  - {{this}} ({{../name}} @ {{@root.org}})
 {{/each}}
 {{/each}}`,
     data: {
@@ -93,7 +96,7 @@ grade: fail
     compiles: true,
     template: `<ol>
 {{#each items}}
-  <li>{{ @index }}: {{ name }} (×{{ qty }})</li>
+  <li>{{@index}}: {{name}} (×{{qty}})</li>
 {{/each}}
 </ol>`,
     data: { items: [{ name: "pen", qty: 3 }, { name: "ink", qty: 1 }] },
@@ -103,7 +106,7 @@ grade: fail
     // Over an object, @key is the property name and `this` the value.
     engine: "fullbars",
     template: `{{#each prefs}}
-{{ @key }} = {{ this }}
+{{@key}} = {{this}}
 {{/each}}`,
     data: { prefs: { theme: "dark", lang: "en" } },
   },
@@ -113,7 +116,7 @@ grade: fail
     engine: "fullbars",
     template: `<ul>
 {{#each items}}
-  <li>{{ this }}</li>
+  <li>{{this}}</li>
 {{else}}
   <li><em>nothing here</em></li>
 {{/each}}
@@ -126,17 +129,17 @@ grade: fail
     // {{#with obj}} makes obj the context for its body — handy for a deep path.
     engine: "fullbars",
     template: `{{#with user.address}}
-{{ street }}, {{ city }}
+{{street}}, {{city}}
 {{/with}}`,
     data: { user: { address: { street: "12 Newport", city: "London" } } },
   },
 
   // ── lookup: dynamic keys ───────────────────────────────────────────────────
   lookup: {
-    // {{ lookup obj key }} reads a field whose name isn't known until render —
+    // {{lookup obj key}} reads a field whose name isn't known until render —
     // an index into an array, or a property chosen by the data.
     engine: "fullbars",
-    template: "{{ lookup colours selected }}",
+    template: "{{lookup colours selected}}",
     data: { selected: 1, colours: ["red", "green", "blue"] },
   },
 
@@ -146,7 +149,7 @@ grade: fail
     // FullBars replaces "write a JS helper for everything": compose the ~80 that
     // ship. Here: uppercase the looked-up name.
     engine: "fullbars",
-    template: "{{ uppercase (lookup user \"name\") }}",
+    template: "{{uppercase (lookup user \"name\")}}",
     data: { user: { name: "ada" } },
   },
 
@@ -159,7 +162,7 @@ grade: fail
     helpers:
       "registerHelper('loud', (s) => String(s).toUpperCase(), 1);\n" +
       "registerHelper('shout', (s) => safe('<strong>' + String(s).toUpperCase() + '!</strong>'), 1);",
-    template: "{{ loud name }}\n{{{ shout name }}}",
+    template: "{{loud name}}\n{{{shout name}}}",
     data: { name: "ada" },
   },
 
@@ -170,7 +173,7 @@ grade: fail
     helpers:
       "registerHelper('link', (text, opts) =>\n" +
       "  safe('<a href=\"' + (opts.url || '#') + '\">' + text + '</a>'));",
-    template: "{{{ link \"Home\" url=\"/home\" }}}",
+    template: "{{{link \"Home\" url=\"/home\"}}}",
     data: {},
   },
 
@@ -178,8 +181,8 @@ grade: fail
   partial: {
     // {{> name}} includes another template; it inherits the caller's context.
     engine: "fullbars",
-    template: "{{> card }}",
-    partials: { card: "{{ name }} — {{ role }}" },
+    template: "{{> card}}",
+    partials: { card: "{{name}} — {{role}}" },
     data: { name: "Ada", role: "author" },
   },
 
@@ -189,9 +192,9 @@ grade: fail
     // row — the partial body is just the row, no trailing newline of its own.
     engine: "fullbars",
     template: `{{#each people}}
-{{> row }}
+{{> row}}
 {{/each}}`,
-    partials: { row: "- {{ name }} ({{ role }})" },
+    partials: { row: "- {{name}} ({{role}})" },
     data: {
       people: [
         { name: "Ada", role: "author" },
@@ -204,8 +207,8 @@ grade: fail
     // The partial name is itself an expression, resolved at render time — here a
     // language chosen from the data via lookup.
     engine: "fullbars",
-    template: "{{> (lookup this \"lang\") }}",
-    partials: { en: "Hello, {{ name }}!", de: "Hallo, {{ name }}!" },
+    template: "{{> (lookup this \"lang\")}}",
+    partials: { en: "Hello, {{name}}!", de: "Hallo, {{name}}!" },
     data: { lang: "de", name: "Ada" },
   },
 
@@ -215,7 +218,7 @@ grade: fail
     // (bracketed, single line), so opt out of the single-line-collapse heuristic.
     inline: true,
     engine: "fullbars",
-    template: `{{#*inline "tag"}}[{{ this }}]{{/inline}}{{#each tags}}{{> tag }}{{/each}}`,
+    template: `{{#*inline "tag"}}[{{this}}]{{/inline}}{{#each tags}}{{> tag}}{{/each}}`,
     data: { tags: ["math", "logic"] },
   },
 
@@ -224,7 +227,7 @@ grade: fail
     // drops it in with {{> @partial-block}} — Handlebars-style layout reuse.
     engine: "fullbars",
     template: `{{#> frame}}Glad you came.{{/frame}}`,
-    partials: { frame: "== Welcome ==\n{{> @partial-block }}" },
+    partials: { frame: "== Welcome ==\n{{> @partial-block}}" },
     data: {},
   },
 
@@ -233,7 +236,20 @@ grade: fail
     // {{! … }} (and the {{!-- … --}} form, which may contain }}) is dropped from
     // the output entirely.
     engine: "fullbars",
-    template: "Total{{! dropped }}: {{ total }}{{!-- not shown: }} --}}",
+    template: "Total{{! dropped }}: {{total}}{{!-- not shown: }} --}}",
     data: { total: 99 },
+  },
+
+  // ── Whitespace control (~) ──────────────────────────────────────────────────
+  whitespace: {
+    // A tilde on either side of a tag trims the run of whitespace next to it —
+    // here the newline + indent before and after `name` — so a readably-formatted
+    // template can still emit tight output. Reach for it sparingly; overuse makes
+    // the template hard to read.
+    engine: "fullbars",
+    template: `<p>
+  {{~name~}}
+</p>`,
+    data: { name: "Ada" },
   },
 };

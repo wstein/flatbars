@@ -127,23 +127,17 @@ A refusal, not a TODO — each with its replacement. These will not return.
 |===
 |Handlebars |Replacement |Why
 
-|Mustache truthy/list *section* `pass:[{{#x}}]`
+|Mustache truthy/list/lambda *section* `pass:[{{#x}}…{{/x}}]`
 |`pass:[{{#if x}}]` / `pass:[{{#each x}}]`
-|`pass:[{{#x}}]` always means "apply block helper `x`", never an implicit truthy/list section. (The
-*inverted* section `pass:[{{^x}}]` *is* supported — it desugars to `pass:[{{#unless x}}]`.)
+|`pass:[{{#x}}]` always means "apply block helper `x`", never an implicit truthy/list/lambda section —
+FlatBars is not Mustache-compatible; control flow is written explicitly
+(xref:appendix-handlebars.adoc#mustache[A.11]). (The *inverted* section `pass:[{{^x}}]` *is* supported —
+it desugars to `pass:[{{#unless x}}]`.)
 
-|Unescaped `pass:[{{&x}}]`
-|`pass:[{{{x}}}]`
-|Two spellings for "don't escape" is one too many; the triple-stash is the form.
-
-|Mustache sections `pass:[{{#x}}…{{/x}}]` (truthy/list/lambda)
-|`pass:[{{#if x}}]` / `pass:[{{#each x}}]`
-|FlatBars is not Mustache-compatible; control flow is written explicitly
-(xref:appendix-handlebars.adoc#mustache[A.11]).
-
-|Set-delimiters `pass:[{{=<% %>=}}]`
+|Mustache set-delimiters `pass:[{{=<% %>=}}]`
 |fixed `pass:[{{ }}]` / `pass:[{{{ }}}]`
-|A fixed grammar keeps the parser meaning-free and tooling simple.
+|A fixed grammar keeps the parser meaning-free and tooling simple. (A Mustache feature; {hbs} fixes the
+delimiters too — so this is a divergence from Mustache, not {hbs}.)
 
 |Data as functions / lambdas in the context
 |a helper, or `apply`
@@ -193,6 +187,7 @@ This is the actual compatibility table.
 |`pass:[{{@../index}}]` |⇒ `(parent-index)` |✓ |Enclosing loop's datum (also `key`/`first`/`last`); one `../` level.
 |Paths `pass:[{{a.b.c}}]`, `pass:[{{../a}}]`, `pass:[{{a.[1]}}]` |surface ⇒ `lookup` chains |✓ |Bare/dotted/numeric/slash/`../`/`this`/`[bracket]` (xref:surface.adoc[] §5.2).
 |Auto-escape `pass:[{{x}}]` / raw `pass:[{{{x}}}]` |surface ⇒ `escapeHtml` / raw |✓ |See §1.2.
+|Unescaped alias `pass:[{{&x}}]` |⇒ `pass:[{{{x}}}]` |✓ |{hbs}' ampersand form, accepted as an alias of the triple-stash (the canonical spelling). RawBars/MaxBars reject `pass:[{{&}}]`.
 |Comments `pass:[{{! }}]`, `pass:[{{!-- --}}]` |same |✓ |Core; discarded.
 |Raw block `pass:[{{{{raw}}}}…]` |same (+ `raw` helper) |✓ |Verbatim body.
 |Whitespace control `pass:[{{~ ~}}]` |same |✓ |Resolved in the lexer; see §1.5.

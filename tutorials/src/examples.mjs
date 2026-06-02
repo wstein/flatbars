@@ -15,8 +15,8 @@ export const lessons = {
       "application. {{{ … }}} is raw output; escape with escapeHtml; read fields with lookup.",
     spec: "concepts", // docs/modules/ROOT/pages/concepts.adoc
     template:
-      '<h1>{{{ escapeHtml (lookup this "name") }}}</h1>\n' +
-      '<ul>{{#each (lookup this "items")}}<li>{{{ escapeHtml this }}}</li>{{/each}}</ul>',
+      '<h1>{{{escapeHtml (lookup this "name")}}}</h1>\n' +
+      '<ul>{{#each (lookup this "items")}}<li>{{{escapeHtml this}}}</li>{{/each}}</ul>',
     data: { name: "Ada <core>", items: ["alpha", "beta"] },
   },
 
@@ -38,13 +38,13 @@ export const lessons = {
     engine: "fullbars",
     title: "FullBars — Handlebars-faithful",
     blurb:
-      "Proof the core spans Handlebars — the reference engine: {{ name }} " +
+      "Proof the core spans Handlebars — the reference engine: {{name}} " +
       "auto-escapes, dotted paths read data, {{#each}} / {{#if}} are block helpers, " +
       "and you register your own with registerHelper (ADR-018).",
     spec: "surface", // docs/modules/ROOT/pages/surface.adoc
     template:
       "<h1>Hello, {{loud name}}!</h1>\n" +
-      "<ul>{{#each items}}<li>{{ this }}</li>{{/each}}</ul>",
+      "<ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>",
     data: { name: "Ada", items: ["alpha", "beta"] },
     // A user-defined helper, exactly as in Handlebars (ADR-018). It is escaped
     // by default in {{ }}; return safe(html) for raw markup. The optional 3rd
@@ -60,7 +60,7 @@ export const lessons = {
       "pipes: write conditions like score >= 50 and transform with value | helper.",
     spec: "maxbars", // docs/modules/ROOT/pages/maxbars.adoc
     template:
-      "<p>{{ greeting }}, {{ name }}!</p>\n" +
+      "<p>{{greeting}}, {{name}}!</p>\n" +
       "{{#if score >= 50}}<b>pass</b>{{else}}<b>fail</b>{{/if}}",
     data: { greeting: "Hi", name: "Ada", score: 72 },
   },
