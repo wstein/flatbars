@@ -19,29 +19,51 @@ export function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ENT[c]);
 }
 
-// Engine span kind → the card's "stem" palette class. Several kinds share a slot
-// so `{{else}}` reads as control flow alongside `{{#…}}`, and set-delimiter tags
-// read as inert meta (like comments). Mirrors lab/cm-flatbars.mjs's grouping; the
-// classes differ only because the card's CSS predates the Lab's `cm-hb-*` names.
+// Engine span kind → the unified "stem" palette class (the single source shared
+// with the legend). Several kinds share a slot so `{{else}}` reads as control
+// flow alongside `{{#…}}`. The mapping honours the redesign's seven families:
+// inheritance tags (`{{<layout}}`, `{{$block}}`) get their own violet `inherit`
+// slot, and set-delimiter tags their own rose `delim` slot — distinct from
+// partials and comments. Mirrors lab/cm-flatbars.mjs's grouping.
 const KIND_CLASS = {
   expr: "stem-expr",
   keyword: "stem-block",
   "block-open": "stem-block",
   "block-inverse": "stem-block",
   "block-close": "stem-block",
-  "block-parent": "stem-partial",
-  "block-decl": "stem-partial",
+  "block-parent": "stem-inherit",
+  "block-decl": "stem-inherit",
   partial: "stem-partial",
   raw: "stem-raw",
   "raw-block": "stem-raw",
   comment: "stem-comment",
-  "set-delimiter": "stem-comment",
+  "set-delimiter": "stem-delim",
   error: "stem-comment",
   // interior-role kinds (ADR-017): operators/strings/numbers inside a tag
   operator: "stem-op",
   string: "stem-str",
   number: "stem-num",
 };
+
+// The set of kinds whose span text is a whole tag (begins/ends with `{{`/`}}`)
+// rather than an interior token — only these get their delimiters dimmed.
+const TAG_KINDS = new Set([
+  "expr", "keyword", "block-open", "block-inverse", "block-close",
+  "block-parent", "block-decl", "partial", "raw", "raw-block",
+  "comment", "set-delimiter", "error",
+]);
+
+// Wrap leading `{{`/`{{{` and trailing `}}`/`}}}` in a dimmed `.pn` span, keeping
+// the sigil + name as the loud part — the same "highlight theme" the legend uses.
+// Braces survive HTML-escaping (esc() doesn't touch `{`/`}`), so this is safe on
+// the already-escaped slice. Anchored to the span ends, and `{{{`/`}}}` are tried
+// before `{{`/`}}`, so a MaxBars half-tag span like `{{a ` dims only its `{{` and
+// ` b}}` only its `}}`.
+function dimDelims(escaped) {
+  return escaped
+    .replace(/^(\{\{\{?)/, '<span class="pn">$1</span>')
+    .replace(/(\}\}\}?)$/, '<span class="pn">$1</span>');
+}
 
 // Highlight a template by the engine's own spans. `dialect` selects the lexer
 // configuration (set delimiters, clause keywords, and long-comment spans) exactly
@@ -55,7 +77,9 @@ export function highlightTemplate(src, dialect = "fullbars") {
     if (!s || s.to <= s.from || s.from < pos) continue; // defensive: skip overlaps
     out += esc(src.slice(pos, s.from));
     const cls = KIND_CLASS[s.kind] || "stem-expr";
-    out += '<span class="' + cls + '">' + esc(src.slice(s.from, s.to)) + "</span>";
+    let body = esc(src.slice(s.from, s.to));
+    if (TAG_KINDS.has(s.kind)) body = dimDelims(body);
+    out += '<span class="' + cls + '">' + body + "</span>";
     pos = s.to;
   }
   return out + esc(src.slice(pos));

@@ -4,10 +4,20 @@
  * lifted as CSS custom properties only (NOT the Lab's component CSS). The debate
  * consensus (item 6): visual continuity to the Lab when a reader clicks
  * "Open in Lab", with a single place to retune and no risk of the Lab's large
- * committed stylesheet drifting against a copy. Values mirror lab/index.html.
- */
+ * committed stylesheet drifting against a copy.
+ *
+ * Theme is an EXPLICIT [data-theme] on <html> (set by the anti-flash script in
+ * BaseHead before first paint, toggled by the topbar Theme control) — not
+ * prefers-color-scheme — so the toggle can override the OS preference. The
+ * anti-flash seed still falls back to the OS preference on first visit.
+ *
+ * The syntax palette below (--c-*) is the SINGLE SOURCE for three surfaces: the
+ * live-example highlighter (.stem-*), inline prose tags, AND the Syntax-colours
+ * legend (.chip.c-*). One palette, so the legend can never lie about the
+ * examples. The Chips control (body[data-chipstyle]) tints/outlines/fills every
+ * one of them together. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   --font-ui: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
@@ -28,8 +38,9 @@
   --border: #ddd6f8;
   --border-strong: #c8bff2;
 
-  /* Accent (Tweaks "Brand" → deep violet) + soft tints. The soft/softer tints
-     are color-mixed against --bg so they track both the accent and the mode. */
+  /* Accent — kept at the Lab's deep violet (visual continuity to the Lab), NOT
+     the mockup's lighter #7c4dff. The soft/softer tints are color-mixed against
+     --bg so they track both the accent and the mode. */
   --accent: #6d28d9;
   --accent-2: #4c1d95;
   --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
@@ -43,17 +54,26 @@
   --warn: #b45309;
   --warn-faint: #fef3c7;
 
-  /* Template-tag syntax colours (match the Lab's stem palette — fg + bg tint) */
-  --stem-block-fg: #c026d3;
-  --stem-block-bg: rgba(192, 38, 211, 0.1);
-  --stem-expr-fg: #16a34a;
-  --stem-expr-bg: rgba(22, 163, 74, 0.1);
-  --stem-partial-fg: #2563eb;
-  --stem-partial-bg: rgba(37, 99, 235, 0.1);
-  --stem-raw-fg: #ea580c;
-  --stem-raw-bg: rgba(234, 88, 12, 0.1);
-  --stem-comment-fg: #9b8fc0;
-  /* Interior tokens (operators / strings / numbers inside a tag) */
+  /* ── Unified syntax palette — shared by the live-example highlighter (.stem-*),
+     inline prose tags, AND the Syntax-colours legend (.chip.c-*). The Chips
+     control (body[data-chipstyle]) tints/outlines/fills every one together. ── */
+  /* Foregrounds darkened from the mockup's vibrant hues to clear WCAG AA (4.5:1)
+     as normal text over their own 12% tint background — hue family preserved.
+     Mockup originals: expr #16a34a, block #e06a16, partial #2563eb, delim
+     #e11d48, comment #6b7280 (raw/inherit already passed). */
+  --c-expr:    #107937;  /* interpolation · escaped — green */
+  --c-raw:     #14532d;  /* interpolation · raw — deepest green (handle with care) */
+  --c-block:   #a95011;  /* sections / clauses — warm orange */
+  --c-partial: #2460e3;  /* composition · partial — blue */
+  --c-inherit: #6d28d9;  /* composition · inheritance / block — violet */
+  --c-delim:   #c91a40;  /* directive · set delimiters — rose warning */
+  --c-comment: #646b78;  /* directive · comment — neutral grey */
+
+  --tint-mix: 12%;
+  --directive-bg: #eceaf1;
+
+  /* Interior-role tokens (ADR-017): operators / strings / numbers inside a
+     MaxBars tag — bold ink that punches through the tag's tint, no chip plate. */
   --stem-op-fg: #0891b2;
   --stem-str-fg: #e11d48;
   --stem-num-fg: #b45309;
@@ -74,74 +94,118 @@
   --out-fg: #ece9f5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16141d;
-    --bg-1: #1b1925;
-    --bg-2: #232030;
-    --bg-3: #2c2940;
+[data-theme="dark"] {
+  color-scheme: dark;
 
-    --fg: #ece9f5;
-    --fg-secondary: #c5bedd;
-    --fg-muted: #968fb0;
-    --fg-faint: #8a83a6;
+  --bg: #16141d;
+  --bg-1: #1b1925;
+  --bg-2: #232030;
+  --bg-3: #2c2940;
 
-    --border: #2c2940;
-    --border-strong: #423c5c;
+  --fg: #ece9f5;
+  --fg-secondary: #c5bedd;
+  --fg-muted: #968fb0;
+  --fg-faint: #8a83a6;
 
-    /* In dark mode the accent lifts for contrast; --accent-soft/softer are NOT
-       overridden — the :root color-mix re-resolves against the dark accent+bg. */
-    --accent: #9b7dff;
-    --accent-2: #bca6ff;
+  --border: #2c2940;
+  --border-strong: #423c5c;
 
-    --danger: #f87171;
-    --danger-faint: #3a1414;
-    --success: #4ade80;
-    --success-faint: #14321f;
-    --warn: #fbbf24;
-    --warn-faint: #3a2e10;
+  /* In dark mode the accent lifts for contrast; --accent-soft/softer are NOT
+     overridden — the :root color-mix re-resolves against the dark accent+bg. */
+  --accent: #9b7dff;
+  --accent-2: #bca6ff;
 
-    --stem-block-fg: #f0abfc;
-    --stem-block-bg: rgba(240, 171, 252, 0.16);
-    --stem-expr-fg: #86efac;
-    --stem-expr-bg: rgba(134, 239, 172, 0.16);
-    --stem-partial-fg: #93c5fd;
-    --stem-partial-bg: rgba(147, 197, 253, 0.16);
-    --stem-raw-fg: #fdba74;
-    --stem-raw-bg: rgba(253, 186, 116, 0.18);
-    --stem-comment-fg: #8a83a6;
-    --stem-op-fg: #67e8f9;
-    --stem-str-fg: #fda4af;
-    --stem-num-fg: #fbbf24;
+  --danger: #f87171;
+  --danger-faint: #3a1414;
+  --success: #4ade80;
+  --success-faint: #14321f;
+  --warn: #fbbf24;
+  --warn-faint: #3a2e10;
 
-    --yaml-key: #93c5fd;
-    --yaml-str: #86efac;
-    --yaml-num: #fdba74;
-    --yaml-kw: #f0abfc;
+  /* raw + delim lightened to clear AA over the 20% dark tint (mockup originals
+     #15803d / #f43f5e sat at 3.0 / 4.0); the rest already passed. */
+  --c-expr: #86efac;
+  --c-raw: #5ba677;
+  --c-block: #f9a35c;
+  --c-partial: #93c5fd;
+  --c-inherit: #a78bfa;
+  --c-delim: #f6647d;
+  --c-comment: #9ca3af;
 
-    --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
-  }
+  --tint-mix: 20%;
+  --directive-bg: #363150;
+
+  --stem-op-fg: #67e8f9;
+  --stem-str-fg: #fda4af;
+  --stem-num-fg: #fbbf24;
+
+  --yaml-key: #93c5fd;
+  --yaml-str: #86efac;
+  --yaml-num: #fdba74;
+  --yaml-kw: #f0abfc;
+
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
 }
 
 /* ── Syntax-colour classes (GLOBAL) ───────────────────────────────────────────
-   Used by the card editors, the static spec-only blocks, and the highlight
-   legend. These mirror the FlatBars Lab's `.cm-hb-*` rules exactly — a tinted,
-   rounded chunk per tag — so a template reads identically here and in the Lab.
-   (The editor font is monospace, so the heavier weight does not shift the
-   highlight overlay out of alignment with the textarea beneath it.) */
-.stem-expr { color: var(--stem-expr-fg); background: var(--stem-expr-bg); font-weight: 600; border-radius: 3px; }
-.stem-block { color: var(--stem-block-fg); background: var(--stem-block-bg); font-weight: 700; border-radius: 3px; }
-.stem-partial { color: var(--stem-partial-fg); background: var(--stem-partial-bg); font-weight: 700; border-radius: 3px; }
-.stem-raw { color: var(--stem-raw-fg); background: var(--stem-raw-bg); font-weight: 700; border-radius: 3px; }
-.stem-comment { color: var(--stem-comment-fg); font-style: italic; }
+   Used by the card editors, the static spec-only blocks, the inline prose tags,
+   and the highlight legend. Each tag class sets --c from the shared palette; the
+   Chips control (body[data-chipstyle]) below tints/outlines/fills --c so the
+   examples and the legend chips always read the same way. The default (no
+   data-chipstyle attribute, e.g. the landing page) is TINT.
+
+   box-shadow (not border) + zero horizontal padding keep the highlight overlay
+   pixel-aligned with the transparent <textarea> beneath it in the editors. */
+.stem-expr    { --c: var(--c-expr); }
+.stem-raw     { --c: var(--c-raw); }
+.stem-block   { --c: var(--c-block); }
+.stem-partial { --c: var(--c-partial); }
+.stem-inherit { --c: var(--c-inherit); }
+.stem-delim   { --c: var(--c-delim); }
+.stem-comment { --c: var(--c-comment); font-style: italic; }
+.stem-expr, .stem-raw, .stem-block, .stem-partial,
+.stem-inherit, .stem-delim { color: var(--c); font-weight: 600; }
+.stem-comment { color: var(--c); }
+
+/* Chip treatment on the tag tokens (NOT the interior op/str/num tokens). */
+:is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
+  border-radius: 4px;
+}
+/* TINT — the default (also used when no data-chipstyle attribute is present). */
+:is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment),
+body[data-chipstyle="tint"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
+  background: color-mix(in srgb, var(--c) var(--tint-mix), var(--bg));
+}
+/* OUTLINE — box-shadow, never border, so the editor overlay stays aligned. */
+body[data-chipstyle="outline"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 42%, var(--bg));
+}
+/* SOLID */
+body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
+  background: var(--c);
+  color: #fff;
+}
+[data-theme="dark"] body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
+  color: #0e0c16;
+}
+
+/* Dimmed {{ }} delimiters — keep the sigil + name as the loud part, the same
+   "highlight theme" the legend chips use. */
+:is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) .pn {
+  opacity: 0.42;
+  font-style: normal;
+}
+
 /* Interior tokens (ADR-017): bold ink, no chip background — they read on top of
    the tag's faint tint. */
-.stem-op { color: var(--stem-op-fg); font-weight: 700; }
+.stem-op  { color: var(--stem-op-fg); font-weight: 700; }
 .stem-str { color: var(--stem-str-fg); font-weight: 700; }
 .stem-num { color: var(--stem-num-fg); font-weight: 700; }
+
 .y-key { color: var(--yaml-key); }
 .y-str { color: var(--yaml-str); }
 .y-num { color: var(--yaml-num); }
 .y-kw { color: var(--yaml-kw); font-weight: 600; }
-.y-comment { color: var(--stem-comment-fg); font-style: italic; }
+.y-comment { color: var(--c-comment); font-style: italic; }
