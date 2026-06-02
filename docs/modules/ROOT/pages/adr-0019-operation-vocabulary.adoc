@@ -1,0 +1,114 @@
+= ADR-019: The operation model — "operation" / "definition" natively, "helper" at the host boundary
+:navtitle: ADR-019 Operation vocabulary
+
+*Status:* Proposed. *Date:* 2026-06-02. Builds on
+xref:concepts.adoc[the core model] §1–4 (everything is an application; there are *no variables*; the head
+is always a name; scope is install/remove of names) and
+xref:adr-0001-structural-parser-and-walker.adoc[ADR-001] (the meaning plug-in). Constrains, but does not
+revert, xref:adr-0018-user-defined-helpers.adoc[ADR-018] (`registerHelper`). This record is about
+*naming*, not mechanism: the mechanism is fixed; what we *call* it in the native dialects has been wrong.
+
+== Context
+
+FlatBars inherited the word *helper* from Handlebars/Mustache. In those languages the word is honest:
+they have real variables (a `pass:[{{name}}]` is a path lookup), and a *helper* is the bolt-on for when a
+path is not enough — the controlled escape hatch from "logic-less" purity, the auxiliary that *helps* the
+real content. That is the sense the team objects to: helper as *subordinate*.
+
+In FlatBars that sense is a falsehood. xref:concepts.adoc[concepts] §1 is explicit: there are *no
+variables*; `pass:[{{{city}}}]` *calls* the operation `city`. The thing the `{{ }}` family treats as an
+afterthought is, here, the entire language. Keeping "helper" as the native noun imports an ideology
+(logic-less-template-plus-escape-hatch) that §5 ("no keywords — not even `else`") already rejects, and it
+*hides the one genuinely new thing the model says*.
+
+That new thing is a dissolution. Mustache offers two mechanisms:
+
+* a *lambda*, a function placed *in the data*, invoked when its name resolves at a leaf;
+* a *helper*, a function registered *on the side*, applied to a section or an interpolation.
+
+This is a *binding-site* distinction: in-data vs registered. FlatBars has *one* binding site — the helper
+environment (§4). A Mustache lambda-at-a-leaf is just a *nullary operation installed in scope* (by a block
+or the host); a Mustache section-helper is just a *block operation*. One axis, not two. "Helper" buried
+this; a truer noun should advertise it.
+
+The countervailing force is migration. xref:host-api.adoc[host-api] §7.4 is a deliberate
+Handlebars→FlatBars dictionary, and ADR-018 *just* shipped `registerHelper` because "Handlebars-faithful
+without it is faithful to the grammar and unfaithful to the workflow." Renaming the word a migrator types
+spends the adoption capital ADR-018 was paid to build.
+
+== Decision
+
+. *Two registers, split by audience.*
++
+** *Native conceptual register* — xref:concepts.adoc[concepts] and the RawBars / MaxBars dialect docs,
+   *and the internal code identifiers*. The primary noun is *operation* (the thing a name invokes at a
+   call site); the thing *installed in the environment* is a *definition*. A name *resolves* to a
+   definition in the current *scope*; applying it is an *operation*.
+** *Boundary / compatibility register* — the JS host facade. `registerHelper` / `renderWith` /
+   `compileWith` (ADR-018) and the §7.4 migration table *keep the word "helper,"* documented as: a
+   *helper is how a host registers an operation*. The migrator never loses the term; the newcomer never
+   inherits the lie.
+
+. *Operations have two kinds, the contract already forces them.* The type
+  `Ctl m env -> Array Value -> m Value` (xref:host-api.adoc[host-api] §7.3) distinguishes *inline*
+  operations (ignore the control handle) from *block* operations (use it). *Values* are not a third kind:
+  a value is a *nullary inline operation* — there being no variables, that is the only way a value appears.
+
+. *Rename the internal type `Helper` → `Operation`.* The kernel/fullbars/compile `Helper` type, the
+  prelude table, and the schema's kind language (`inline` / `block`, arity) read as operations and
+  definitions. The JS-facing `registerHelper` and the rest of the `flatbars-js` facade are the *explicit
+  exception* — they stay, by Decision 1.
+
+. *MaxBars gets a surface gloss, not a new model.* The infix symbols `+ >= |` are *operators* (surface
+  sugar); prefix heads and pipe stages are *operations*. There is *no "function"* —
+  xref:concepts.adoc[concepts] §3 forbids callable values, so "function" would promise first-class
+  functions the language does not have. Both desugar to the same core `App`
+  (xref:concepts.adoc[concepts] §8), so the two surface words sit over one core, exactly as "one parser,
+  four languages / one compiler" already claims.
+
+. *Say the dissolution out loud.* xref:concepts.adoc[concepts] §1 gains one sentence: FlatBars has no
+  logic-less core for an operation to be an *escape hatch from* — application *is* the language, so an
+  operation is not a "helper" in the subordinate sense; and a glossary records
+  *operation / definition / scope / inline / block / operator* each with its host-API synonym.
+
+== Consequences
+
+* *A deliberate, documented asymmetry*: the internal type is `Operation`, the host registrar is
+  `registerHelper`. This is the cost of keeping ADR-018's migration value while telling the native model's
+  truth. It is ratified here so a contributor meeting `registerHelper : … -> Operation` reads it as intent,
+  not drift.
+* *A new normative glossary* (xref:concepts.adoc[concepts] or a `glossary.adoc`) becomes the single
+  teachable artifact for the two registers; the §7.4 table gains a one-line carry-over note.
+* *The `Helper` → `Operation` rename is wide and mechanical* across kernel / fullbars / compile and the
+  schema language. It lands in its own commit with `npm run build`, `npm test`, and `npm run check:catalog`
+  green (the catalog prose shifts with the prelude vocabulary). No semantics change — `test:compile` byte
+  equality is untouched.
+* *Editor/LSP tie-in* (xref:adr-0017-editor-support-lsp.adoc[ADR-017]): catalog-driven completion can label
+  entries by kind — *value* (nullary), *transform* (inline n-ary), *block*, *operator* (MaxBars) — turning
+  the vocabulary into tooling. This ties to ADR-018's open question on declared arities.
+
+== Alternatives rejected
+
+* *Keep "helper" everywhere.* Maximizes familiarity, but cements the falsehood in the native model and
+  leaves the lambda/helper dissolution unsaid — the very insight that distinguishes FlatBars from the
+  family it parses.
+* *Rename to "function."* Vetoed by xref:concepts.adoc[concepts] §3: nothing produces a callable value and
+  `Value` is free of functions. "Function" would set an expectation the language exists to deny.
+* *"Word" / Forth dictionary framing.* Most honest to the model (scope *is* a dictionary, §4), but opaque
+  to the `{{ }}`-family audience the dialects are for. Retained as *explanatory* framing in prose, not as
+  the surface noun.
+* *Docs-only reframe (leave code as `Helper`).* Considered and rejected by the team: a `concepts`/dialect
+  vocabulary that the type names contradict trains contributors back into "helper." The rename is the
+  cost of coherence.
+* *Open custom block operations to make the model fully uniform.* Out of scope and orthogonal —
+  ADR-018 defers custom *block* helpers for a compile-equivalence reason; this ADR only renames what
+  exists.
+
+== Open questions
+
+* *Schema kind labels.* Do we expose `value` / `transform` / `block` as the catalog's kind taxonomy
+  (feeding ADR-017 completion), or keep the internal `inline` / `block` pair and derive `value` from
+  arity 0? v1 can derive.
+* *Naming `definition` vs `binding` for the environment entry.* "Definition" reads well in prose;
+  "binding" is more precise about the name↔meaning pairing. This ADR picks *definition*; revisit if the
+  glossary proves it ambiguous against block-installed scope.

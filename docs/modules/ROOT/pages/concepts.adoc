@@ -18,10 +18,12 @@ engine defines the schema and the interpreter.
 Everything below describes the interpretation of the reference engine, *FullBars*. A different engine may choose
 differently; the core does not care.
 
-== 1. Everything is a helper application
+== 1. Everything is an operation
 
 A template is a sequence of *content* and *outputs*. An output evaluates one expression and writes
-its value. The only compound expression is a *helper application*.
+its value. The only compound expression is an *operation* — an *application* of a name. (At the host
+API this same thing is called a *helper*, the term {hbs} uses; the xref:concepts.adoc#glossary[glossary]
+pairs the native words with that synonym, and xref:host-api.adoc[] keeps it.)
 
 [source,text]
 ----
@@ -29,12 +31,14 @@ its value. The only compound expression is a *helper application*.
 {{{lookup this "city"}}}            <2>
 {{{upcase (lookup this "name")}}}   <3>
 ----
-<1> Calls the helper `city` with no arguments. Not a variable, not `this.city`.
-<2> Reads the `city` field of the current context, by calling the helpers `lookup` and `this`.
+<1> Calls the operation `city` with no arguments. Not a variable, not `this.city`.
+<2> Reads the `city` field of the current context, by calling the operations `lookup` and `this`.
 <3> `upcase` applied to one argument — the grouped sub-application `(lookup this "name")`.
 
 There are *no variables*. The parser sees `city` as an identifier at the head of an application; the
-engine resolves it in the *helper environment* and invokes it.
+engine resolves it in the *environment* and invokes it. And there is no logic-less core for an operation
+to be an *escape hatch from* — application *is* the language — so an operation is not a "helper" in the
+subordinate, auxiliary sense the word carries elsewhere; it is the primary thing.
 
 == 2. Application is juxtaposition; parentheses are grouping
 
@@ -156,6 +160,50 @@ MinBars is the one engine *not* on this driver: as a Mustache *peer* (its own co
 truthiness, no kernel lowering) it compiles through a separate inlining model
 (xref:adr-0016-minbars-compile.adoc[ADR-016]). That is a deliberate factoring — folding Mustache
 semantics into the kernel `Emit` would add code and drift, not remove it — not a gap.
+
+[#glossary]
+== Glossary
+
+The native-dialect names for the model above. The host API (xref:host-api.adoc[]) keeps {hbs}' own word
+*helper* for the same machinery, so a migrator's vocabulary still works; the table pairs each native term
+with that synonym.
+
+[cols="1,3,1",options="header"]
+|===
+| Native term | Meaning | Host-API synonym
+
+| *operation*
+| What a name invokes at a call site — the only compound expression (§1). Either *inline* or *block*.
+| helper
+
+| *definition*
+| What a name resolves to in the environment; what a block or the host *installs*. A *nullary* definition
+  is how a *value* appears — there are no variables, so a value is just an operation that takes no arguments.
+| (registered) helper / partial
+
+| *scope*
+| The set of definitions in force at a point. A block installs definitions for its body and removes them
+  after (§4) — scope is ordinary lexical scoping over the environment, not a context stack.
+| context / data frame
+
+| *inline operation*
+| An operation that ignores the control handle and returns a `Value` (`upcase`, `lookup`).
+| inline helper
+
+| *block operation*
+| An operation that uses the control handle to render its body and separator-delimited clauses (`if`, `each`).
+| block helper
+
+| *operator*
+| MaxBars only: an infix symbol (`+`, `>=`, `pass:[|]`) — surface sugar that desugars to an operation
+  application (§8). Not a separate mechanism, and not a "function": nothing produces a callable value (§3).
+| —
+|===
+
+The lambda-vs-helper split of Mustache does *not* survive here. Mustache binds a *lambda* in the data (at
+a leaf) and registers a *helper* on the side — a binding-site distinction. FlatBars has one binding site,
+the environment: a lambda bound to a data leaf is a *nullary operation installed in scope*, and a "helper
+applied to a section" is a *block operation*. One axis, not two.
 
 == A note on naming
 
