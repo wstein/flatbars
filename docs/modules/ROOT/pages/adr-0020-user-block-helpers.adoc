@@ -227,8 +227,19 @@ two new `Ctl` fields that only the user-helper marshaller reads.
   prelude operations — they never reach `preludeSchema`, so the generated helper catalog (and
   `check:catalog`) is untouched. The `@`-prefix also keeps them unspellable by users, so a data field
   named `hash`/`param` can't collide.
-* *Implementation order.* Land as gated steps: (1) prelude `@hash`/`@param` + surface emit (behaviour
-  unchanged, all gates green); (2) `Ctl` fields + driver population (still a no-op for consumers);
-  (3) interpreter marshaller reads the channel (`options.hash`, block params) + conformance cases;
-  (4) compiler `rt.block` channel + `test:compile` parity; (5) docs + Lab example. Each step is independently
-  green, mirroring how Phases 1–2 landed.
+* *Implementation order (revised during step 1).* Land as gated steps: *(1) — done* — the `Engine.blockArgs`
+  seam + `Ctl.hash`/`blockParams`, default identity, threaded by the driver (behaviour-preserving, no
+  consumer); (2) the shared marker splitter + surface emit + compiler demarker (still behaviour-preserving
+  for existing cases, channel populated); (3) the interpreter marshaller + compiler `rt.block` channel
+  *consume* the channel (`options.hash`, block-param binding) + conformance cases; (4) docs + Lab example.
+  Each step independently green.
+* *Two refinements found while implementing.*
+  ** *The split utility lives in `core`.* Both the kernel driver (interpreter seam) and the `compile`
+     emitter need it, and their only common dependency is `core`; it is a pure structural `Expr` transform
+     (recognise reserved `@hash`/`@param` markers, demarker the positional), giving no *meaning*, so it sits
+     in `core` without violating the meaning-free boundary. The default seam can then be the marker-aware
+     split for *every* dialect — a no-op when no markers are present (RawBars/MaxBars/MinBars).
+  ** *`@hash` marks **block** hash only; inline hash keeps `dict`.* The seam runs only on the *block* path
+     (`applyBlock`); the inline application path (`evalExpr (App …)`) has no seam, so an `@hash` there would
+     reach `resolve` and throw. So the surface emits `@hash` only when desugaring a *block* head's hash;
+     `{{ f x k=v }}` (inline) still desugars to a trailing `dict` (ADR-018 inline hash, unchanged).
