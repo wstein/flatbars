@@ -1,0 +1,106 @@
+= ADR-018: User-defined helpers (JS `registerHelper`), inline-only and dual-mode
+:navtitle: ADR-018 User-defined helpers
+
+*Status:* Accepted. *Date:* 2026-06-02. Builds on
+xref:adr-0001-structural-parser-and-walker.adoc[ADR-001] (helpers are the meaning plug-in) and
+xref:adr-0011-compile-to-js.adoc[ADR-011] (compile ≡ interpret). Extends the FullBars
+Handlebars-faithfulness claim (xref:fullbars-compat.adoc[]) from syntax/semantics to the one piece of the
+Handlebars *workflow* that was missing: `Handlebars.registerHelper(name, fn)`.
+
+== Context
+
+A JS host can render and compile FullBars, but cannot supply its own helper:
+`Handlebars.registerHelper('loud', s => s.toUpperCase())` has no equivalent. Helpers are the IoC
+plug-in (ADR-001) — but the plug-in language has been PureScript (`Kernel.Prelude`), and the JS facade
+ships only that curated prelude. For real Handlebars users, registering a helper is the *single most
+common* extension, so "Handlebars-faithful" without it is faithful to the grammar and unfaithful to the
+workflow. The feature is genuinely *cross-cutting* — four seams move together:
+
+. *Two execution modes.* FlatBars runs templates two ways and gates that they agree byte-for-byte
+  (`test:compile`, ADR-011). A user helper must work in *both* the interpreter and the compiled module,
+  or be explicitly mode-limited. The compiled runtime already has a closed helper registry
+  (`flatbars-runtime.mjs`: `const helpers = {…}` + `rt.call` → `UnknownHelper`); the interpreter
+  (PureScript) has an extensible env (`Kernel.Env.registerAll`) but *no* FFI to adopt a JS function as a
+  `Helper` over the `Value` type.
+. *Escaping.* The reference engine never auto-escapes raw output and escapes `Value` strings in
+  `pass:[{{ }}]`. A JS helper returns a string; that must land as an *escaped* `VString` in
+  `pass:[{{ }}]` (raw in `pass:[{{{ }}}]`), with a `SafeString`-equivalent escape hatch.
+. *Validation.* Unknown helpers are a schema error (`Kernel.Walk`, `allowUnknown`) and a runtime
+  `UnknownHelper`. A registered helper must extend the schema or it is rejected before it runs.
+. *Security.* In a *library* host, a helper is the host's own JS — no new risk. In the *Lab*, the user
+  types both template and helper into one page, and workspaces are shareable by URL: helper *source*
+  riding along in a link would let a shared link execute attacker JS in the victim's origin. FlatBars's
+  deliberate "no template `eval` / no render `policy`" stance is about *template* eval; host-registered
+  helpers are a different axis — but the Lab blurs host and template.
+
+A block helper (`pass:[{{#my}}…{{/my}}]`) is a fifth seam we deliberately do *not* open: the compiled
+runtime's `rt.block` *refuses* every block helper except the internal `apply`, so a custom block helper
+could never satisfy compile ≡ interpret without generic block emission the emitter does not have. Custom
+block helpers are therefore out of scope — a stated boundary, not an MVP cut.
+
+== Decision
+
+. *User-defined helpers are inline-only, dual-mode, and escaped-by-default.* A host registers
+  `name → (args…) → value` functions; they are usable in both the interpreter and the compiled module,
+  and produce escaped output in `pass:[{{ }}]` unless the value is marked safe.
+
+. *One registration feeds both modes.* The facade marshals each JS helper into (a) a PureScript
+  `Helper` over `Value` (via an FFI call site) registered into the render env, and (b) the compiled
+  runtime registry (`rt.register`). Both paths therefore execute *the same* JS function with *the same*
+  marshalling, so `test:compile` stays byte-identical — and the equivalence is gated with custom-helper
+  cases.
+
+. *The marshalling contract.* Arguments marshal `Value → JS` (string/number/boolean/null/array/object);
+  surface hash args (`key=value`) arrive as a trailing plain-object argument (the engine already
+  desugars them to a dict). The return marshals `JS → Value`: a string ⇒ `VString` (escaped in
+  `pass:[{{ }}]`); `safe(string)` — a sentinel from the bundle's exported `safe` — ⇒ `VSafe` (raw),
+  the `SafeString` equivalent. A thrown JS error becomes a located render/compile error, never an
+  uncaught throw.
+
+. *Registered names extend the schema.* Helpers registered for a run are added to the validation schema
+  (known name, inline kind, `AnyArity` unless declared), so they neither trip "unknown helper" nor lose
+  the arity diagnostics the prelude gets.
+
+. *Explicit primitives; a familiar shim.* The primitives are `renderWith(helpers, template, data)` and
+  `compileWith(helpers, template)` — a helpers *bag* passed per call, *no* global mutable registry
+  (clean for tests and for a shared Lab). A thin, stateful `registerHelper(name, fn)` is provided for
+  Handlebars-copy-paste familiarity, documented as sugar that accumulates into a bag.
+
+. *The Lab runs helpers sandboxed.* Custom helper JS executes in a *Worker* (no DOM, no
+  same-origin ambient authority), feeding the same bag into render and compile. Helper source is *not*
+  serialised into share URLs silently: a workspace that carries helper code is flagged, and opening such
+  a link requires explicit consent before any helper runs. This keeps the "playground link" from
+  becoming an XSS delivery vector while preserving the live-render dogfooding.
+
+== Consequences
+
+* `flatbars-js` gains a public helper API (`renderWith`/`compileWith`/`registerHelper`, `safe`), and the
+  compiled runtime gains `rt.register`/`rt.safe` and a host-registry fallback in `rt.call`. The existing
+  `check:bundle` gate keeps the editor engine in step.
+* The interpreter gains a small, contained FFI surface (a marshaller calling a JS function over JSON);
+  the canonical PureScript `prelude`/`render` are unchanged — the FFI lives at the facade boundary.
+* `test:compile` is extended with custom-helper cases; the equivalence invariant now also covers
+  host-supplied meaning.
+* Two new honest limits, documented in-source: *block* custom helpers are unsupported (compile can't
+  express them), and the Lab's helper sandbox is a Worker, not a full capability jail — adequate for a
+  playground, called out as such.
+
+== Alternatives rejected
+
+* *Global mutable `registerHelper` as the primitive* (Handlebars-style). Hidden state poisons a shared
+  Lab and test isolation; the bag-per-call primitive with a shim wrapper gives the familiar API without
+  the global.
+* *Compile-only or interpret-only helpers.* Either breaks `test:compile` or breaks the Lab's live
+  render. Dual-mode through one registration is the only option that preserves both.
+* *Custom block helpers in v1.* No compiled equivalent (`rt.block`), so they cannot be made
+  mode-equivalent; deferred until/unless the emitter gains generic block emission.
+* *Running Lab helpers on the main thread.* Shared-link code execution in the victim's origin; the
+  Worker + consent model is the floor.
+
+== Open questions
+
+* *Declared helper arities.* `registerHelper` could accept an arity/kind so registered helpers get the
+  same arity diagnostics and editor completion as the prelude (ties to ADR-017's catalog-driven
+  completion). v1 admits `AnyArity`.
+* *Capability scoping in the Lab.* The Worker removes DOM/ambient authority but not all of a Worker's
+  own globals; a tighter capability jail is future work if abuse appears.

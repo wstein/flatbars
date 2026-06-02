@@ -20,6 +20,7 @@
 * xref:adr-0015-set-delimiters.adoc[ADR-015: set delimiters]
 * xref:adr-0016-minbars-compile.adoc[ADR-016: MinBars compile-to-JS]
 * xref:adr-0017-editor-support-lsp.adoc[ADR-017: editor support (LSP + TextMate) (proposed)]
+* xref:adr-0018-user-defined-helpers.adoc[ADR-018: user-defined helpers (registerHelper)]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification
