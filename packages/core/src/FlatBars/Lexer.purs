@@ -130,7 +130,6 @@ trimEndWs s =
 trimStandalone :: Array String -> Array RawTok -> Array RawTok
 trimStandalone seps toks = Array.mapWithIndex trimContent toks
   where
-  n = Array.length toks
 
   -- standalone-eligible: a block open/close/comment, or a separator whose head
   -- name is a known clause marker (so `{{else}}`/`{{elif}}` strip, output does not).
@@ -157,20 +156,32 @@ trimStandalone seps toks = Array.mapWithIndex trimContent toks
     _ -> false
 
   -- everything from the previous newline (or start of input) to the tag is blank.
+  -- Scans *through* blank content runs but stops at any other tag: an
+  -- interpolation or block tag earlier on the same line is non-whitespace source,
+  -- so the tag is not standalone (Handlebars/Mustache parity — without this, the
+  -- space in `pass:[{{#each xs}}{{this}} {{/each}}]` was wrongly stripped).
   leftBlank :: Int -> Boolean
-  leftBlank i = case Array.index toks (i - 1) of
-    Nothing -> true
-    Just (RContent s) -> allWs (afterLastNL s)
-    Just _ -> false
+  leftBlank i = goLeft (i - 1)
+    where
+    goLeft k = case Array.index toks k of
+      Nothing -> true -- start of input
+      Just (RContent s)
+        | hasNL s -> allWs (afterLastNL s) -- reached this line's start
+        | allWs s -> goLeft (k - 1) -- a wholly-blank run; keep scanning left
+        | otherwise -> false -- visible text on this line
+      Just _ -> false -- another tag on this line ⇒ not standalone
 
   -- everything from the tag to the next newline (or end of input) is blank.
   rightBlank :: Int -> Boolean
-  rightBlank i = case Array.index toks (i + 1) of
-    Nothing -> true
-    Just (RContent s)
-      | hasNL s -> allWs (beforeFirstNL s)
-      | otherwise -> allWs s && i + 1 == n - 1
-    Just _ -> false
+  rightBlank i = goRight (i + 1)
+    where
+    goRight k = case Array.index toks k of
+      Nothing -> true -- end of input
+      Just (RContent s)
+        | hasNL s -> allWs (beforeFirstNL s) -- reached this line's end
+        | allWs s -> goRight (k + 1) -- a wholly-blank run; keep scanning right
+        | otherwise -> false -- visible text on this line
+      Just _ -> false -- another tag on this line ⇒ not standalone
 
 blockLevel :: RawTok -> Boolean
 blockLevel = case _ of
