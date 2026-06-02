@@ -1,0 +1,54 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * The single source of truth for the FlatBars seven-family syntax palette — the
+ * one genuinely-unified design system across the front-ends. It feeds, in order:
+ *   • the tutorials highlighter (`.stem-*`) and chip control,
+ *   • the FlatBars Lab editor (`.cm-hb-*`),
+ *   • the inline prose tags, and
+ *   • the colour legend.
+ * The invariant: the legend can never disagree with the examples, because they
+ * read the same tokens.
+ *
+ * This file is the ONLY place to edit these values. They are GENERATED from here
+ * into the two consumers' fenced `@palette` regions by `scripts/gen-tokens.mjs`:
+ *   • tutorials/src/styles/lab-tokens.css   (Astro bundles it)
+ *   • lab/index.html                        (the static Lab serves it inline)
+ * Run `npm run gen:tokens` after editing; `npm run check:tokens` (in `npm test`)
+ * fails if a copy has drifted. (We generate rather than share one runtime file so
+ * nothing new has to be served/deployed and the Lab keeps its own cache-busting.)
+ *
+ * The families: expr (interpolation, escaped), raw (unescaped — handle with
+ * care), block (sections/clauses), partial (composition), inherit (inheritance),
+ * delim (set-delimiters directive), comment. Plus the interior-role tokens
+ * (operator/string/number, ADR-017) and the chip-tint controls. Every value
+ * clears WCAG AA (4.5:1) on its own tint — enforced by `npm run check:contrast`.
+ */
+:root {
+  --c-expr: #107937;
+  --c-raw: #14532d;
+  --c-block: #a95011;
+  --c-partial: #2460e3;
+  --c-inherit: #6d28d9;
+  --c-delim: #c91a40;
+  --c-comment: #646b78;
+  --tint-mix: 12%;
+  --directive-bg: #eceaf1;
+  --stem-op-fg: #0891b2;
+  --stem-str-fg: #e11d48;
+  --stem-num-fg: #b45309;
+}
+
+[data-theme="dark"] {
+  --c-expr: #86efac;
+  --c-raw: #5ba677;
+  --c-block: #f9a35c;
+  --c-partial: #93c5fd;
+  --c-inherit: #a78bfa;
+  --c-delim: #f6647d;
+  --c-comment: #9ca3af;
+  --tint-mix: 20%;
+  --directive-bg: #363150;
+  --stem-op-fg: #67e8f9;
+  --stem-str-fg: #fda4af;
+  --stem-num-fg: #fbbf24;
+}

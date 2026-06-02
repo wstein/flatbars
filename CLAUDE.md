@@ -197,6 +197,13 @@ Mustache conformance table is generated from the vendored spec suite
 - **One source of truth for the prelude.** `FullBars.Catalog` renders the
   helper catalog; the docs partial and the `check:catalog` gate are generated
   from `FullBars.preludeSchema`. Change the prelude → run `npm run gen:catalog`.
+- **One source of truth for the syntax palette.** The seven-family `--c-*`
+  palette (the one unified design system across front-ends) lives in
+  `shared/flatbars-tokens.css`; `scripts/gen-tokens.mjs` generates it into the
+  fenced `@palette` regions of `tutorials/src/styles/lab-tokens.css` (Astro
+  bundles it) and `lab/index.html` (the static Lab inlines it). Change a colour →
+  run `npm run gen:tokens`; `check:tokens` (in `npm test`) fails on drift. Every
+  value clears WCAG AA (4.5:1) on its own tint.
 - **Compiler ≡ interpreter.** Any compiler change must keep `npm run
   test:compile` green (byte-identical output to the interpreter).
 - **`--pedantic-packages`** is enforced via `npm run lint`; declared deps must

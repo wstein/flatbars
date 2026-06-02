@@ -57,26 +57,20 @@
   /* ── Unified syntax palette — shared by the live-example highlighter (.stem-*),
      inline prose tags, AND the Syntax-colours legend (.chip.c-*). The Chips
      control (body[data-chipstyle]) tints/outlines/fills every one together. ── */
-  /* Foregrounds darkened from the mockup's vibrant hues to clear WCAG AA (4.5:1)
-     as normal text over their own 12% tint background — hue family preserved.
-     Mockup originals: expr #16a34a, block #e06a16, partial #2563eb, delim
-     #e11d48, comment #6b7280 (raw/inherit already passed). */
-  --c-expr:    #107937;  /* interpolation · escaped — green */
-  --c-raw:     #14532d;  /* interpolation · raw — deepest green (handle with care) */
-  --c-block:   #a95011;  /* sections / clauses — warm orange */
-  --c-partial: #2460e3;  /* composition · partial — blue */
-  --c-inherit: #6d28d9;  /* composition · inheritance / block — violet */
-  --c-delim:   #c91a40;  /* directive · set delimiters — rose warning */
-  --c-comment: #646b78;  /* directive · comment — neutral grey */
-
+  /* @palette light · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
+  --c-expr: #107937;
+  --c-raw: #14532d;
+  --c-block: #a95011;
+  --c-partial: #2460e3;
+  --c-inherit: #6d28d9;
+  --c-delim: #c91a40;
+  --c-comment: #646b78;
   --tint-mix: 12%;
   --directive-bg: #eceaf1;
-
-  /* Interior-role tokens (ADR-017): operators / strings / numbers inside a
-     MaxBars tag — bold ink that punches through the tag's tint, no chip plate. */
   --stem-op-fg: #0891b2;
   --stem-str-fg: #e11d48;
   --stem-num-fg: #b45309;
+  /* @palette end */
 
   /* YAML data syntax colours (data editor + spec-only blocks) */
   --yaml-key: #2563eb;
@@ -122,8 +116,7 @@
   --warn: #fbbf24;
   --warn-faint: #3a2e10;
 
-  /* raw + delim lightened to clear AA over the 20% dark tint (mockup originals
-     #15803d / #f43f5e sat at 3.0 / 4.0); the rest already passed. */
+  /* @palette dark · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
   --c-expr: #86efac;
   --c-raw: #5ba677;
   --c-block: #f9a35c;
@@ -131,13 +124,12 @@
   --c-inherit: #a78bfa;
   --c-delim: #f6647d;
   --c-comment: #9ca3af;
-
   --tint-mix: 20%;
   --directive-bg: #363150;
-
   --stem-op-fg: #67e8f9;
   --stem-str-fg: #fda4af;
   --stem-num-fg: #fbbf24;
+  /* @palette end */
 
   --yaml-key: #93c5fd;
   --yaml-str: #86efac;
