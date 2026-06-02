@@ -33,10 +33,16 @@ workflow. The feature is genuinely *cross-cutting* — four seams move together:
   deliberate "no template `eval` / no render `policy`" stance is about *template* eval; host-registered
   helpers are a different axis — but the Lab blurs host and template.
 
-A block helper (`pass:[{{#my}}…{{/my}}]`) is a fifth seam we deliberately do *not* open: the compiled
-runtime's `rt.block` *refuses* every block helper except the internal `apply`, so a custom block helper
-could never satisfy compile ≡ interpret without generic block emission the emitter does not have. Custom
-block helpers are therefore out of scope — a stated boundary, not an MVP cut.
+A block helper (`pass:[{{#my}}…{{/my}}]`) is a fifth seam this ADR deliberately did *not* open: at the
+time, the compiled runtime's `rt.block` refused every block helper except the internal `apply`, so a
+custom block helper could not satisfy compile ≡ interpret without generic block emission the emitter
+lacked.
+
+NOTE: *Superseded for block helpers by xref:adr-0020-user-block-helpers.adoc[ADR-020].* The
+`blockHelperMissing` work gave the emitter exactly that generic block path (`rt.block` now carries the
+body as a callback), so user-defined block helpers are now supported on FullBars (one `registerHelper`,
+usage-decided `options.fn`/`inverse`). The "inline-only" limit below describes this ADR's v1, not the
+current state.
 
 == Decision
 

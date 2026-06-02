@@ -1,0 +1,138 @@
+= ADR-020: User-defined block (section) helpers (FullBars)
+:navtitle: ADR-020 User block helpers
+
+*Status:* Accepted (v1 scope set by team review — see Decision). *Date:* 2026-06-02. Extends
+xref:adr-0018-user-defined-helpers.adoc[ADR-018] (user helpers, inline-only) by lifting the one limit it
+stated: custom *block* helpers. Builds on xref:adr-0011-compile-to-js.adoc[ADR-011] (compile ≡ interpret)
+and the `blockHelperMissing` work (xref:fullbars-compat.adoc[]), which is what makes this now feasible.
+
+== Context
+
+ADR-018 shipped inline user helpers and *deferred* block helpers with a stated reason: the compiled
+runtime's `rt.block` "refuses every block helper except the internal `apply`, so a custom block helper
+could never satisfy compile ≡ interpret without generic block emission the emitter does not have."
+
+*That blocker is gone.* Closing the Handlebars `blockHelperMissing` gap required exactly that generic
+path: the emitter already emits `pass:[rt.block(name, args, frame, bodyFn, clauses)]` for *any*
+non-lowered block head, and `rt.block` now dispatches an unregistered head as a data section
+(`each`/`with`/inverse). So the compiled side already *carries the block body as a callback* (`bodyFn`)
+and the `{{else}}` clause (`clauses`). What is still missing is only a branch that hands those to a
+*user* function. The interpreter never had the blocker at all: `Operation m env = Ctl m env -> Array
+Value -> m Value`, and `Ctl` already exposes `children`, `render`, and `clause`
+(xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]) — `if`/`each`/`with` *are* block operations,
+and `renderSurfaceWithHelpers` already accepts `Operation`s at the PureScript level. The gap is the *JS
+boundary* (`buildHelpers` marshals `(args) ⇒ value` — inline only) and the *compiled* user branch.
+
+Three facts scope the decision:
+
+. *Block operations are a kernel capability, not a per-dialect feature.* RawBars/FullBars/MaxBars share
+  the engine, so the interpreter already runs any registered block operation. The new work is the JS
+  *host* affordance (`registerHelper`) plus its compiled twin.
+. *MinBars is a peer engine whose sections dispatch on the data value.* A Mustache "section lambda" is a
+  *function in the data* — precisely what `Value` deliberately is not (xref:concepts.adoc[]; the
+  conformance stance in xref:adr-0007-minbars.adoc[ADR-007]). Adding MinBars section helpers would
+  reintroduce `VFunction` or bolt a non-standard registry onto a Mustache-fidelity engine. Out of scope.
+. *The Handlebars workflow is the target.* The clone goal (xref:fullbars-compat.adoc[]) means the API is
+  Handlebars': a block helper is a registered function that receives an `options` object with `fn`
+  (render the body) and `inverse` (render `{{else}}`). "Paste your Handlebars block helper and it runs"
+  is the bar.
+
+== Decision
+
+. *`registerHelper` block helpers are FullBars-only; RawBars and MaxBars do not get them.* The kernel
+  block-operation *capability* is dialect-agnostic (it already runs any `Operation` seeded at the
+  PureScript level), but `registerHelper` is the *FullBars* JS affordance — the Handlebars-compat boundary
+  word (ADR-018). RawBars and MaxBars use a *different concept and terminology* — *operations* /
+  *definitions* per xref:adr-0019-operation-vocabulary.adoc[ADR-019] — so they get *no* `registerHelper`,
+  and their facades (`render`, `renderMaxbars`) deliberately take no helpers bag. A native MaxBars
+  block-operation registration is ADR-019's concern, not this one. MinBars section helpers are *not*
+  provided either — its sections are function-in-data, which `Value` does not model, and faking it would
+  regress ADR-007's conformance posture. So this ADR adds the JS-source block-helper path and its compiled
+  twin to the *FullBars* facade (`renderWith`) alone.
+
+. *One registration; usage decides block vs inline (Handlebars-compatible).* `registerHelper(name,
+  fn[, arity])` is unchanged. The engine passes a trailing `options` object whenever the call site is a
+  block (`pass:[{{#name …}}…{{/name}}]`); `options.fn` is present only then. A helper used inline
+  (`pass:[{{name …}}]`) sees no `fn`. No separate `registerBlockHelper` — a second primitive would break
+  the paste-compatibility the clone goal rests on.
+
+. *The v1 `options` surface is `fn` and `inverse` — and only those.*
++
+[source,js]
+----
+registerHelper("list", (items, options) =>
+  safe("<ul>" + items.map((i) => "<li>" + options.fn(i) + "</li>").join("") + "</ul>"));
+// {{#list people}}{{name}}{{/list}}
+----
++
+  * `options.fn(ctx)` renders the block body with `ctx` as the new context (called with no argument ⇒
+    the current context, matching Handlebars `options.fn(this)`).
+  * `options.inverse(ctx)` renders the `{{else}}` clause (empty string if there is none).
+  * Every other Handlebars `options.*` — `hash`, `data`/`@`-vars, `blockParams`, `ids`, `loc`,
+    `lookupProperty` — *throws* a located error ("`options.hash` is not supported in a FlatBars block
+    helper (v1)") rather than returning `undefined`. A loud partial cannot become a silent conformance
+    lie. `hash`, `data`, and block params are *Phase 2* (hash splitting is ambiguous at our boundary and
+    none of the v1 acceptance cases need it).
+
+. *Return escaping branches on usage* (one `fn`, two wrappings). Used *inline* (`pass:[{{name …}}]`), the
+  return is an *escaped* `VString` unless `safe(…)` (ADR-018, unchanged). Used as a *block*
+  (`pass:[{{#name}}…{{/name}}]`), the return is `VSafe` (raw) — matching Handlebars, which treats block
+  output as already-safe HTML assembled from already-escaped sub-renders. `options.fn`/`inverse` return
+  already-escaped body text. A thrown JS error becomes a located render/compile error (ADR-018).
+
+. *Dual-mode through one marshalling, gated byte-for-byte.* The interpreter's existing JS-helper
+  marshaller becomes `Ctl`-aware (one path, not two): it always appends `options`, with `fn`/`inverse`
+  present only when `ctl.children` is non-empty (block usage). To call *back* into the pure interpreter
+  without throwing across the FFI, `options.fn`/`inverse` are backed by a PureScript callback returning
+  `{ ok, value, error }` (run `ctl.render` over the main/`else` body with `pushFrame` for the context
+  shift); the JS `options.fn` wrapper unwraps it and throws *in JS* on `!ok`, caught by the marshaller's
+  existing `try/catch`. The compiler adds a `userBlockHelpers[name]` branch to `rt.block` that builds the
+  *same* `options` from `bodyFn`/`elseFn`/`frame` and returns a `Safe`. `test:compile` is extended with
+  block-helper cases — per `options.fn` call-count (0 / 1 / N renders), `inverse`, and return-escaping —
+  so interpreter ≡ compiled is proven, not assumed.
+
+. *Arity counts positional arguments only.* `options` is never counted. A declared arity
+  (`registerHelper(name, fn, 1)`) validates the positional args; the diagnostics match ADR-018's.
+
+. *Terminology (xref:adr-0019-operation-vocabulary.adoc[ADR-019]).* Natively this is a *block
+  operation*; at the JS host boundary it is a *block helper* (the frozen boundary word). Surface/concept
+  docs say "block operation"; the JS API says `registerHelper`.
+
+== Consequences
+
+* `flatbars-js` block helpers work in both the interpreter and the compiled module; the FullBars
+  Handlebars-conformance corpus's one block-helper miss (`pass:[{{#bold}}]`) flips to a pass
+  (96% → ~98%), and `fullbars-compat.adoc` §3's "user-defined block helpers" roadmap item moves ☐ → ☑.
+  The numbers are the acceptance test.
+* The interpreter FFI grows by one call site (`callJsBlockHelperImpl`) and one wrapper
+  (`jsBlockOperation`); the canonical PureScript `prelude`/engine are unchanged.
+* `rt.block` grows a user-block branch beside the existing `apply` and `blockHelperMissing` arms; the
+  block-body callback (`bodyFn`) and clause object it already receives are reused, so no new emit shape.
+* New honest limits, documented in-source: the v1 `options` surface is `fn`/`inverse`/`hash` (the rest
+  throw), and MinBars section helpers remain unsupported by design.
+
+== Alternatives rejected
+
+* *A separate `registerBlockHelper` / FlatBars-native block handle.* Cleaner separation, but it breaks
+  "paste your Handlebars helper and it runs" — the whole point of the clone. One registration with a
+  usage-decided `options` is the Handlebars model.
+* *MinBars section helpers via function-in-`Value` or a registry fallback.* The first breaks the
+  pure-data core; the second is non-standard Mustache. Both regress ADR-007. MinBars stays out.
+* *The full Handlebars `options` surface in v1* (`data`, `blockParams`, `ids`, …). A large, drift-prone
+  surface to keep interpreter ≡ compiled; ship `fn`/`inverse`/`hash` first and *throw* on the rest, so
+  the gap is loud. Phase 2.
+* *Do nothing (keep inline-only).* The block-helper case is the documented section-lambda path
+  (xref:fullbars-compat.adoc[]) and a measured conformance miss; the `blockHelperMissing` work already
+  paid the hard cost (generic block emission), so the remaining delta is small.
+
+== Open questions
+
+* *Phase 2 `options`:* `options.hash` (resolve the trailing-dict ambiguity), `options.data`
+  (`@index`/`@root` inside a user block), and block params (`pass:[{{#list xs as |x|}}]`) once the
+  minimal `fn`/`inverse` surface is proven and gated.
+* *RawBars / MaxBars block operations* — a *native* registration under
+  xref:adr-0019-operation-vocabulary.adoc[ADR-019]'s vocabulary (*operation* / *definition*, not
+  `registerHelper`). The kernel `rt.block` branch and the marshalling generalise, but the *surface and
+  terminology* are ADR-019's to define; this ADR does not pre-empt them.
+* *Lab surfacing:* a user block helper in the Lab's `helpers.js` editor runs in the same Worker (ADR-018);
+  no new capability, but the helpers pane copy should show a block example.
