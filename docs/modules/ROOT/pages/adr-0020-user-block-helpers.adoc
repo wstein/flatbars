@@ -66,7 +66,11 @@ registerHelper("list", (items, options) =>
 ----
 +
   * `options.fn(ctx)` renders the block body with `ctx` as the new context (called with no argument ⇒
-    the current context, matching Handlebars `options.fn(this)`).
+    the current context, matching Handlebars `options.fn(this)`). The shift changes only the context: the
+    body *inherits* the enclosing scope's data — `pass:[{{@index}}]`/`pass:[{{@key}}]`/`../`/block params
+    resolve as they would just outside the block (both render paths build the shifted frame the same way:
+    the interpreter's `pushFrame Map.empty ctx` and the compiled `{ …frame, ctx }`, gated by a conformance
+    case). A helper *supplying its own* `@data` (Handlebars' `options.fn(ctx, { data })`) is Phase 2.
   * `options.inverse(ctx)` renders the `{{else}}` clause (empty string if there is none).
   * Every other Handlebars `options.*` — `hash`, `data`/`@`-vars, `blockParams`, `ids`, `loc`,
     `lookupProperty` — *throws* a located error ("`options.hash` is not supported in a FlatBars block

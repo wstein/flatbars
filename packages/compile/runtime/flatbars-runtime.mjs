@@ -478,7 +478,11 @@ function block(name, args, frame, bodyFn, clauses) {
   const ub = userHelpers[name];
   if (ub) {
     const elseFn = (clauses && clauses.else) || (() => "");
-    const shift = (ctx) => childFrame(frame, ctx, null, null, null, null, null);
+    // options.fn(ctx) shifts the context but INHERITS the enclosing scope (loop
+    // vars, parent, root, falsy, block params) — mirroring the interpreter's
+    // `pushFrame Map.empty ctx` (keep the frame stack, change only `ctx`). Using
+    // `childFrame` here would null @index/@key/etc. and diverge from the interpreter.
+    const shift = (ctx) => ({ ...frame, ctx });
     const options = {
       fn: function (ctx) { return bodyFn(arguments.length === 0 ? frame : shift(ctx)); },
       inverse: function (ctx) { return elseFn(arguments.length === 0 ? frame : shift(ctx)); },

@@ -109,6 +109,9 @@ const helperCases = [
   { name: "block:inverse", dialect: "surface", helpers: { ifAny: (xs, options) => (xs.length ? options.fn() : options.inverse()) }, t: "{{#ifAny xs}}some{{else}}none{{/ifAny}}", d: { xs: [] }, expect: "none" },
   { name: "block:zero-renders", dialect: "surface", helpers: { hide: () => "" }, t: "{{#hide}}secret{{/hide}}", d: {}, expect: "" },
   { name: "block:n-renders", dialect: "surface", helpers: { twice: (options) => options.fn() + options.fn() }, t: "{{#twice}}x{{/twice}}", d: {}, expect: "xx" },
+  // A context-shifting user block INSIDE a loop: scoped vars (@index) from the
+  // enclosing frame must be inherited identically by both render paths.
+  { name: "block:inherits-scope", dialect: "surface", helpers: { wrap: (x, options) => options.fn(x) }, t: "{{#each rows}}{{#wrap this}}{{@index}}={{label}} {{/wrap}}{{/each}}", d: { rows: [{ label: "a" }, { label: "b" }] }, expect: "0=a 1=b " },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 
