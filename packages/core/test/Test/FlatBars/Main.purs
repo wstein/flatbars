@@ -427,7 +427,9 @@ main = do
     (kinds hlMustache "{{^x}}b{{/x}}{{&y}}" == [ "block-inverse", "block-close", "raw" ])
   -- `inheritance = false` (the kernel/FullBars config) disallows {{<}}/{{$}}.
   assert' "highlight: inheritance-off disallows {{<l}}/{{$b}} → error"
-    (kinds hlKernel "{{<l}}{{$b}}x{{/b}}{{/l}}" == [ "error", "error", "block-close", "block-close" ])
+    ( kinds hlKernel "{{<l}}{{$b}}x{{/b}}{{/l}}" ==
+        [ "error", "error", "block-close", "block-close" ]
+    )
 
   -- Interior tokens (ADR-017 PosToken end offsets): operators/strings/numbers
   -- punch through the tag's colour; identifiers/whitespace/delimiters stay it.
