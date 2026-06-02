@@ -134,6 +134,29 @@ that the parser is universal across the `pass:[{{ }}]` family. RawBars is that c
 FlatBars's own maximal language on top. The normative contract for all four is this spec, not any one
 dialect.
 
+== 8. One compiler, too
+
+The same generalization carries to compilation (xref:adr-0011-compile-to-js.adoc[ADR-011]): there is
+*not* a per-dialect compiler. A single meaning-free *emit driver* (`FlatBars.Compile`) walks the lowered
+core AST and calls into a pluggable `Emit` record — the fourth instance of the IoC pattern, alongside
+interpret, desugar, and validate. The dialects on the kernel ladder do not have separate compilers; they
+have separate *front-ends* that desugar to the same core, then share one driver and one `Emit`:
+
+* *RawBars* parses core directly, then `compile meta emit nodes`.
+* *FullBars* / *MaxBars* desugar the surface (the `parseExpr` seam, block params, MaxBars infix/pipes)
+  to the same core AST, then call the *same* `compile` with the *same* emit rules — MaxBars `score >= 50`
+  is already core `App` by the time the compiler sees it, so it compiles for free.
+
+So "compiles to JS" is a property of the *core*, inherited by every surface that lowers to it — not a
+RawBars-only feature. The `test:compile` gate asserts the compiled JS is byte-identical to the
+interpreter for every golden case across these dialects, so the compiler can never silently diverge from
+the walk.
+
+MinBars is the one engine *not* on this driver: as a Mustache *peer* (its own context-stack scope and
+truthiness, no kernel lowering) it compiles through a separate inlining model
+(xref:adr-0016-minbars-compile.adoc[ADR-016]). That is a deliberate factoring — folding Mustache
+semantics into the kernel `Emit` would add code and drift, not remove it — not a gap.
+
 == A note on naming
 
 The mark is a set of *bare rods*: the {hbs} braces stripped to their vertical strokes. The triple
