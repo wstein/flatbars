@@ -23,7 +23,7 @@ do **not** assume a global install.
 ```sh
 npm install            # installs purescript + spago + esbuild
 npm run build          # spago build — compile every package
-npm test               # full suite: per-package spago tests + catalog + isolation + compile & mustache conformance + Lab unit tests
+npm test               # full suite: format:check + per-package spago tests + catalog + isolation + compile & (handlebars/mustache) conformance + Lab unit tests
 npm run cli -- --help  # run the CLI (spago run -p flatbars-cli)
 npm run lint           # spago build --pedantic-packages (catches unused/missing deps)
 npm run format         # purs-tidy format-in-place; format:check to verify only
