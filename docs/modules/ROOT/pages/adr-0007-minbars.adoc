@@ -1,7 +1,19 @@
 = ADR-007: MinBars — a Mustache-compatible peer engine
 :navtitle: ADR-007 MinBars
 
-*Status:* Accepted (implemented; MinBars ships at 170/170 on the vendored mustache/spec suite). *Date:* 2026-06-01.
+*Status:* Accepted (implemented). *Date:* 2026-06-01.
+
+[NOTE]
+====
+*Conformance (full official `mustache/spec`).* Measured against the *whole* upstream suite — every
+module, the optional `~dynamic-names` / `~inheritance` / `~lambdas` included — MinBars passes *136/136
+(100%) of the required modules* and *185/194 (95.4%) of the full spec*. The only gap is the optional
+*lambdas* module (1/10): a Mustache lambda is a *function* in the data, and FlatBars `Value` has no
+function variant (xref:concepts.adoc[]), so MinBars cannot run one — the same irreducible function-in-data
+limit FullBars hits with Handlebars (xref:fullbars-compat.adoc[]). The proof is differential against the
+spec's own `expected` (`conformance/mustache/`, gated by `npm run check:mustache-conformance`); it
+measures the full spec so it cannot over-claim, unlike the curated `packages/minbars/test/spec` subset.
+====
 
 == Context
 

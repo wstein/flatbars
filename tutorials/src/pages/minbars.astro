@@ -310,13 +310,17 @@ const lambdaHtml = highlightTemplate(lambdaCode, "minbars");
             </td>
           </tr>
         ))}
-        <tr><td>Lambdas</td><td class="no">✗ not in suite · not implemented</td></tr>
+        <tr><td>Lambdas</td><td class="no">✗ 1/10 · no function value type</td></tr>
       </tbody>
     </table>
     <p class="tip">
-      Lambdas are the one Mustache feature MinBars does not implement (no function
-      value type, <a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>) — so the
-      table claims nothing for them rather than a hollow ✓.
+      The table above is the core suite. Measured against the <b>full official
+      <code>mustache/spec</code></b> — the optional <code>dynamic-names</code>,
+      <code>inheritance</code> and <code>lambdas</code> modules included — MinBars passes
+      <b>100% of the required modules</b> and <b>95.4% of the whole spec</b>; the only gap is
+      lambdas. A Mustache lambda is a <em>function</em> in the data, and MinBars has no function
+      value type (<a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>), so it claims 1/10
+      rather than a hollow ✓. The full-spec proof lives in <code>conformance/mustache/</code>.
     </p>
     <h3>Where to go next</h3>
     <p>
