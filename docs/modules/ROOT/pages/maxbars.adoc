@@ -132,6 +132,38 @@ which re-enters the full expression grammar.
 {{#each (people | reverse) as |p|}}{{p.name}}{{/each}}
 ----
 
+== Labelled loops
+
+A trailing `pass:[label NAME]` clause (xref:adr-0013-labelled-loops.adoc[ADR-013])
+names the loop's *frame*, so an inner body can read the **enclosing** loop's full
+state — not just its element. The label binds the frame reified as an object whose
+fields are the bare loop variables:
+
+[source,handlebars]
+----
+{{#each rows as |row| label outer}}
+  {{#each row}}{{outer.index1}}/{{outer.length}}: {{this}}{{#if outer.first}} (first row){{/if}}
+  {{/each}}
+{{/each}}
+----
+
+`outer` exposes `this` / `index0` / `index1` / `rindex0` / `rindex1` / `first` /
+`last` / `length` / `key` — the same values, and the same normative arithmetic, as
+the bare loop variables of that loop. It is an *immutable per-iteration snapshot*,
+reached by ordinary path lookup (`pass:[{{outer.length}}]`), so the interpreter and
+compiler agree by construction. A label and block params compose:
+`pass:[{{#each rows as |row| label outer}}]` binds both `row` (the element) and
+`outer` (the frame).
+
+Notes:
+
+* The label object names *one* loop and carries no `parent` field — to reach two
+  enclosing loops, label both (no `pass:[../]` climbing).
+* Choosing a bare loop-variable name as the label (`pass:[label index0]`) shadows
+  that variable for the body; the MaxBars lint warns and suggests a fresh name.
+* `label` is a surface-desugar feature on `each`, so FullBars accepts it too; only
+  the bare-loop-variable *vocabulary* is MaxBars-only.
+
 == Host-registered operations
 
 `renderWithOperations` renders MaxBars source against a bag of host-supplied

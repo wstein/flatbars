@@ -1,8 +1,8 @@
 = ADR-013: Labelled loops (lifting the outer-loop limit)
 :navtitle: ADR-013 Labelled loops
 
-*Status:* Accepted (design — no engine code yet). *Date:* 2026-06-02 (accepted; proposed 2026-06-01).
-Lifts the v1 limit documented in xref:adr-0006-maxbars-loop-variables.adoc[] §5.
+*Status:* Accepted and *implemented*. *Date:* 2026-06-03 (implemented; accepted 2026-06-02; proposed
+2026-06-01). Lifts the v1 limit documented in xref:adr-0006-maxbars-loop-variables.adoc[] §5.
 
 == Context
 
@@ -44,12 +44,19 @@ not scope-declared. So a label must be a **scope-declared binding**, exactly lik
   loop-variable name (`label index0` must not silently re-open the §4 footgun). The risk is lower than
   for bare loop variables, since a label is an explicit author-chosen name rather than an implicit
   vocabulary word.
-. *MaxBars-only* — like the bare loop variables it extends. FullBars keeps `@`/`pass:[../]` via
-  `noLoopVars` and is unchanged.
-. *No transitive frame-climbing in v1* — one label names *one* enclosing frame. To reach two loops,
-  label both; `outer.parent` is the enclosing *context* (already on the frame), not a second metadata
-  frame. This is the guardrail that stops the feature from quietly becoming the `pass:[../]` stack
-  ADR-001 §4 dropped.
+. *Available in both surface dialects (FullBars + MaxBars)* — *revised at implementation* from the
+  proposed "MaxBars-only". The `label NAME` recognizer lives in the *shared* surface desugar and is gated
+  on the `each` head, not the dialect, so FullBars accepts it too. This is safe because — unlike the bare
+  loop variables, which change bare-name *resolution* and so are MaxBars-only — a label is purely
+  additive new syntax with no Handlebars equivalent: a template that does not write `label NAME` is
+  unaffected, so there is no semantic divergence to contain. Gating it MaxBars-only would have meant
+  threading a flag through the whole desugar/render/compile chain for no behavioural benefit. RawBars,
+  having no surface desugar, has no labels. (The shadow lint below is MaxBars-only, since it reads the
+  bare loop-variable vocabulary.)
+. *No transitive frame-climbing in v1* — one label names *one* enclosing frame. The label object exposes
+  that loop's own state (`this` is its element); it carries *no* `parent` field, so it cannot be used to
+  climb further out. To reach two enclosing loops, label both. This is the guardrail that stops the
+  feature from quietly becoming the `pass:[../]` stack ADR-001 §4 dropped.
 
 == Consequences
 
@@ -63,15 +70,30 @@ not scope-declared. So a label must be a **scope-declared binding**, exactly lik
 
 == Resolved questions
 
-* *Label syntax* — the `label NAME` clause (Decision §2); labels are MaxBars-only (Decision §5).
+* *Label syntax* — the `label NAME` clause (Decision §2); available in both surface dialects (Decision §5).
 * *Depth interaction with the recursion budget* (xref:adr-0012-recursion-budget.adoc[]) — *none by
   construction*: a label is one scoped helper, so nesting N labelled loops installs N scoped helpers
   (ordinary block nesting), not recursion. The budget guards self-inclusion (a partial including
   itself), which labels do not touch.
 
-== Implementation note
+== Implementation
 
-Design-only ADR: no engine code lands with this acceptance. Implementation is a follow-up — the
-expected phases are (1) the `label NAME` desugar recognizer + `scope` entry; (2) `iterate` reifying the
-frame object and binding it; (3) the compiler's `each` lowering emitting the same object, gated by
-`test:compile`; (4) the shadow-lint extension; (5) docs (maxbars.adoc) + a runnable tutorial example.
+Shipped across the five expected phases:
+
+. *Desugar* — `FullBars.Surface.extractLabel` strips a trailing `label NAME` off an `each` head, adds
+  `NAME` to `scope`, and `blockHeadArgs` emits a reserved `@label` marker. `core` `splitBlockArgs` lifts
+  it into a new `label` field (dropped from the positional list) and the engine seam carries it as
+  `Ctl.loopLabel`.
+. *Interpreter* — `Kernel.Prelude.iterate` reifies the frame as a `VObject` (`frameObject`) under the
+  label name, added last to the frame map.
+. *Compiler* — `frameBlock` emits the label to `rt.each`, which binds `frame.binds[label]` to the same
+  field set. *One design refinement surfaced here:* the runtime's `childFrame` now *inherits* its
+  parent's `binds` (an `Object.create` chain), so an outer label — and outer block params — stay visible
+  in a nested block, matching the interpreter's pushed-frame stack. This also fixed a latent, previously
+  untested divergence for nested block-param access. Gated by `test:compile` (`mx:label-*` and
+  `mx:blockparams-nested-outer`, interpreter ≡ compiled).
+. *Lint* — `MaxBars.Lint.labelShadowWarnings` warns when a label name is a bare loop variable.
+. *Docs + tutorial* — this ADR, the MaxBars page's *Labelled loops* section, and a runnable example.
+
+The normative field set shipped as decided — `{ this, index0, index1, rindex0, rindex1, first, last,
+length, key }` — with *no* `parent` (see Decision §6).

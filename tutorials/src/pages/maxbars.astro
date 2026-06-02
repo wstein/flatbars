@@ -199,6 +199,16 @@ const t = (s) => s;
       to <em>pipe</em> a head argument, parenthesise it — <code>{t("{{#each (rows | reverse) as |r|}}")}</code>.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.blockParams.template} data={ex.blockParams.data} />
+    <h3>Labelled loops</h3>
+    <p>
+      Block params reach an outer <em>element</em>, but not the outer loop's <code>{t("index")}</code> /
+      <code>{t("length")}</code> / <code>{t("first")}</code>. A trailing <code>{t("label NAME")}</code> clause
+      (ADR-013) names the loop <b>frame</b>, binding it as an
+      object whose fields are the bare loop variables — so an inner loop reads
+      <code>{t("outer.index1")}</code>, <code>{t("outer.length")}</code>, <code>{t("outer.first")}</code> of the
+      enclosing loop. It is an immutable per-iteration snapshot, reached by ordinary path lookup.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.labelledLoop.template} data={ex.labelledLoop.data} />
   </section>
 
   <!-- ─────────────────────── Inherited from FullBars ─────────────────── -->

@@ -137,6 +137,23 @@ export const examples = {
     data: { rows: [{ label: "A", tags: ["x", "y"] }, { label: "B", tags: ["z"] }] },
   },
 
+  labelledLoop: {
+    // A `label NAME` clause names the loop FRAME, so an inner loop reads the
+    // OUTER loop's full state — index1 / length / first / … — not just its element.
+    // The label object exposes the bare loop variables as fields.
+    engine: "maxbars",
+    compiles: true,
+    template: `{{#each sections as |section| label outer}}
+{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each section.items}} {{this}}{{/each}}{{#if outer.last}} (last){{/if}}
+{{/each}}`,
+    data: {
+      sections: [
+        { title: "Fruit", items: ["Pear", "Plum"] },
+        { title: "Veg", items: ["Leek"] },
+      ],
+    },
+  },
+
   // ── Inherited from FullBars (operators shown inside) ──────────────────────
   inheritedEach: {
     // Everything FullBars does still works — here {{#each}}, {{#if}}, dotted
