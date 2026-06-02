@@ -10,12 +10,13 @@ differently, on purpose — yet it is a near-complete clone in practice.
 
 [NOTE]
 ====
-*FullBars matches Handlebars on 96% (48/50) of a differential conformance corpus* — every case rendered
+*FullBars matches Handlebars on 98% (49/50) of a differential conformance corpus* — every case rendered
 through the real `handlebars` npm package *and* FullBars and asserted byte-identical (`conformance/handlebars/`,
-gated by `npm run check:hbs-conformance`). The corpus misses are user-defined *block* helpers (§3) and a
-raw-block corner. In-data *functions/lambdas* are not a corpus target — a `Value` is pure data; a
-value-producing lambda is precalculated before rendering and a section lambda is a helper (§2). This
-figure is *measured, not asserted* — it cannot
+gated by `npm run check:hbs-conformance`). The one corpus miss is a raw-block corner. (User-defined block
+helpers, formerly a miss, are now implemented — xref:adr-0020-user-block-helpers.adoc[ADR-020], §3.) In-data
+*functions/lambdas* are not a corpus target — a `Value` is pure data; a value-producing lambda is
+precalculated before rendering and a section lambda is a helper (§2). This figure is *measured, not
+asserted* — it cannot
 over-claim what upstream Handlebars does not produce.
 ====
 
@@ -172,10 +173,13 @@ semantic objection.
 helper (xref:appendix-handlebars.adoc#decorators[A.8]) — none is in the prelude yet.
 
 |User-defined *block* helpers (`registerHelper` + `options.fn`/`options.inverse`)
-|☐ ADR-018 host helpers are *inline-only* (a user `pass:[{{#bold}}…{{/bold}}]` does not run the body).
-The built-in block helpers (`if`/`each`/`with`/…) and `blockHelperMissing` cover the common cases; a
-host-defined block helper that renders its body is the one differential-conformance miss that is buildable
-(future work — would lift FullBars past the current 96%).
+|☑ Implemented (xref:adr-0020-user-block-helpers.adoc[ADR-020]), FullBars. One `registerHelper`; *usage
+decides* block vs inline — a block call passes a Handlebars-style `options` whose `fn(ctx)` renders the
+body and `inverse(ctx)` the `pass:[{{else}}]`. v1 surface is `fn`/`inverse` (every other `options.*`
+throws); `hash`/`data`/block-params are Phase 2. `registerHelper` is FullBars-only — RawBars/MaxBars use
+the *operation*/*definition* vocabulary (xref:adr-0019-operation-vocabulary.adoc[ADR-019]), not
+`registerHelper`. This flipped the one buildable
+conformance miss (`pass:[{{#bold}}]`): FullBars is now 49/50 (98%) vs Handlebars.
 
 |Block-partial sigils `pass:[{{#> name}}]` / `pass:[{{#*inline}}]`
 |☑ Accepted in FullBars — they parse as plain `pass:[{{#}}]`-section blocks headed by the sigil, with
@@ -217,16 +221,19 @@ This is the actual compatibility table.
 |`pass:[{{else if c}}]` |⇒ `pass:[{{elif c}}]` |✓ |Native short-circuit clause; see §1.3.
 |Mustache-style section `pass:[{{#x}}…{{/x}}]` over data |`blockHelperMissing`: array ⇒ `each`, truthy ⇒ `with`, falsy/empty ⇒ `{{else}}` |✓ |An unregistered block head is looked up as data and dispatched exactly as {hbs} does (`Kernel.Prelude.blockHelperMissing` / `rt.block`). The inverted form `pass:[{{^x}}]` desugars to `pass:[{{#unless x}}]`.
 |`helperMissing` (inline `pass:[{{foo bar}}]`, unknown `foo`) |hard `UnknownHelper` |✓ |Matches {hbs}, which throws "Missing helper" for an unknown helper *called with arguments*; a bare `pass:[{{foo}}]` is a data read either way.
+|`registerHelper` *inline* helper |same | ✓ |Escaped in `pass:[{{ }}]`, raw via `safe(…)` (xref:adr-0018-user-defined-helpers.adoc[ADR-018]).
+|`registerHelper` *block* helper (`options.fn`/`inverse`) |same |✓ |One registration, usage decides; v1 surface `fn`/`inverse` (xref:adr-0020-user-block-helpers.adoc[ADR-020]). `hash`/`data` ⇒ Phase 2 (throw).
 |===
 
 [NOTE]
 ====
 The §4 table is *measured, not asserted*: `conformance/handlebars/` renders a categorised corpus through
 both the real `handlebars` npm package and FullBars and asserts byte-equality (`npm run
-gen:hbs-conformance`). FullBars currently matches Handlebars on **48/50** cases (96%). The two corpus
-misses are *user-defined block helpers* (ADR-018 user helpers are inline-only; §3) and a raw-block corner.
-In-data *functions/lambdas* are not a corpus target: a `Value` is pure data, so a value-producing lambda
-is precalculated before rendering and a section lambda is a helper (§2) — the pure-data core stays intact.
+gen:hbs-conformance`). FullBars currently matches Handlebars on **49/50** cases (98%). The one remaining
+corpus miss is a raw-block corner; user-defined *block* helpers are now implemented
+(xref:adr-0020-user-block-helpers.adoc[ADR-020], §3). In-data *functions/lambdas* are not a corpus target:
+a `Value` is pure data, so a value-producing lambda is precalculated before rendering and a section lambda
+is a helper (§2) — the pure-data core stays intact.
 ====
 
 == 5. FullBars extensions (no Handlebars built-in)

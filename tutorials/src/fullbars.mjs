@@ -253,6 +253,20 @@ grade: fail
     data: { name: "Ada" },
   },
 
+  // ── A user-defined BLOCK helper (ADR-020) ────────────────────────────────────
+  blockHelper: {
+    // One `registerHelper`; usage decides block vs inline. As a block, the helper
+    // gets `options.fn(ctx)` to render the body with `ctx` as context — here the
+    // Handlebars `list` helper, verbatim. Gated through `renderWith` like the
+    // inline helper cards.
+    engine: "fullbars",
+    template: "{{#list people}}{{name}}{{/list}}",
+    data: { people: [{ name: "Ada" }, { name: "Lin" }] },
+    helpers:
+      "registerHelper('list', (items, options) =>\n" +
+      "  safe('<ul>' + items.map((i) => '<li>' + options.fn(i) + '</li>').join('') + '</ul>'))",
+  },
+
   // ── Lambdas → precalculated values (the "after" render) ──────────────────────
   precompute: {
     // A Handlebars value-lambda (a function on the context returning a string) is

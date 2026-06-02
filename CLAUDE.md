@@ -51,6 +51,23 @@ npm run gen:catalog    # regenerate that partial after changing the prelude
 These Node scripts import from `output/` (the spago build product), so they
 always test current source — rebuild before running them.
 
+Differential conformance proofs live under `conformance/` (both gated in `npm
+test`, both write a committed `report.json` so the score can't silently drift):
+
+```sh
+npm run gen:hbs-conformance       # FullBars vs the REAL handlebars npm pkg (dev-only oracle),
+npm run check:hbs-conformance     # asserting byte-identical; currently 49/50 (98%)
+npm run gen:mustache-conformance  # MinBars vs the FULL official mustache/spec (every module),
+npm run check:mustache-conformance # 184/184 (100%) of the modules MinBars implements
+```
+
+`conformance/handlebars/` renders a categorised corpus through real Handlebars
+*and* FullBars; `conformance/mustache/` runs the whole vendored `mustache/spec`
+(optional `~` modules included) through MinBars against each fixture's own
+`expected`. Each dir's `README.md` documents the method and the boundary
+(in-data lambdas: value-producing → precompute, body-aware → a block helper —
+ADR-020; functions-in-`Value` stays out by design).
+
 Mustache conformance for MinBars (both run from real `mustache/spec` fixtures):
 
 ```sh

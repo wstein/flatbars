@@ -227,15 +227,25 @@ $ ~> | $ | {
       shape for a helper with named options.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.customHelperHash.template} data={ex.customHelperHash.data} helpers={ex.customHelperHash.helpers} />
+    <h3>Block helpers</h3>
+    <p>
+      One <code>registerHelper</code>, <b>usage decides</b> block vs inline: a block call
+      (<code>{t("{{#name}}…{{/name}}")}</code>) passes a Handlebars-style <code>options</code> whose
+      <code>options.fn(ctx)</code> renders the body and <code>options.inverse(ctx)</code> the
+      <code>{t("{{else}}")}</code> — so the canonical <code>list</code> helper runs verbatim
+      (<a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>):
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.blockHelper.template} data={ex.blockHelper.data} helpers={ex.blockHelper.helpers} />
     <div class="callout info">
       <p>
-        Two honest limits (<a href={`${SPEC_BASE}adr-0018-user-defined-helpers.html`}>ADR-018</a>):
-        custom helpers are <b>inline only</b> — a custom <em>block</em> helper
-        (<code>{t("{{#my}}…{{/my}}")}</code>) is out of scope, because it has no compiled
-        equivalent yet. And declaring an arity
-        (<code>registerHelper('loud', fn, 1)</code>) gives the same arity diagnostics as a
-        built-in. In the <b>Lab</b>, helper code runs in a Worker (no page access), not a
-        full sandbox — adequate for a playground.
+        Honest limits: the v1 block <code>options</code> surface is <code>fn</code>/<code>inverse</code>
+        only — <code>options.hash</code>/<code>data</code>/block-params <b>throw</b> (Phase 2,
+        <a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>). <code>registerHelper</code>
+        is <b>FullBars-only</b>: RawBars and MaxBars use a different concept and terminology
+        (operations / definitions, <a href={`${SPEC_BASE}adr-0019-operation-vocabulary.html`}>ADR-019</a>).
+        Declaring an arity (<code>registerHelper('loud', fn, 1)</code>) gives the same diagnostics
+        as a built-in. In the <b>Lab</b>, helper code runs in a Worker (no page access), not a full
+        sandbox — adequate for a playground.
       </p>
     </div>
   </section>
@@ -399,11 +409,11 @@ $ ~> | $ | {
       <code>blockHelperMissing</code> (array&nbsp;⇒&nbsp;<code>each</code>,
       truthy&nbsp;⇒&nbsp;<code>with</code>, empty&nbsp;⇒&nbsp;<code>{t("{{else}}")}</code>).
       Writing <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> explicitly is still
-      the clearer style. FullBars matches Handlebars on <b>96%</b> of a differential
-      conformance corpus (rendered through the real Handlebars engine); the corpus misses are
-      user-defined <em>block</em> helpers and a raw-block corner. In-data lambdas aren't a gap:
-      a value is pure data, so value-producing lambdas are precalculated before rendering and
-      section lambdas are helpers.
+      the clearer style. FullBars matches Handlebars on <b>98%</b> of a differential
+      conformance corpus (rendered through the real Handlebars engine); the one corpus miss is a
+      raw-block corner (user-defined block helpers now pass — <a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>).
+      In-data lambdas aren't a gap: a value is pure data, so value-producing lambdas are precalculated
+      before rendering and section lambdas are helpers.
     </p>
   </section>
 
