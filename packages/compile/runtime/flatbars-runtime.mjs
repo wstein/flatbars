@@ -455,7 +455,7 @@ function truthyWith(set, v, opts) {
 // Mirrors the interpreter's `applyH` (Kernel.Prelude). A non-block target is
 // invoked as an inline helper (its body ignored, as the interpreter does) and
 // its value stringified; an unknown name throws, like `rt.call`.
-function block(name, args, frame, bodyFn, clauses) {
+function block(name, args, frame, bodyFn, clauses, channel) {
   if (name === "apply") {
     const target = args[0];
     if (typeof target !== "string") {
@@ -478,25 +478,33 @@ function block(name, args, frame, bodyFn, clauses) {
   const ub = userHelpers[name];
   if (ub) {
     const elseFn = (clauses && clauses.else) || (() => "");
-    // options.fn(ctx, { data }) shifts the context but INHERITS the enclosing scope
-    // (loop vars, parent, root, falsy, block params) — mirroring the interpreter's
+    // options.fn(ctx, { data, blockParams }) shifts the context but INHERITS the
+    // enclosing scope (loop vars, parent, root, falsy) — mirroring the interpreter's
     // `pushFrame Map.empty ctx` (keep the frame stack, change only `ctx`). Using
     // `childFrame` here would null @index/@key/etc. and diverge from the interpreter.
-    // `data` keys layer into `binds` (rt.call checks binds first, so they win as
-    // scoped @vars over the fixed frame fields) — the interpreter's pushed frame.
-    const dataOf = (opts) => (opts && typeof opts === "object" && opts.data && typeof opts.data === "object" ? opts.data : null);
+    // `data` keys and the declared block-param names (`channel.params` bound to the
+    // supplied `blockParams` values) layer into `binds` (rt.call checks binds first,
+    // so they win as scoped vars) — the interpreter's pushed frame (ADR-020 Phase 3).
+    const ch = channel || {};
     const shift = (ctx, opts) => {
-      const data = dataOf(opts);
       const fr = { ...frame, ctx };
-      return data ? { ...fr, binds: { ...fr.binds, ...data } } : fr;
+      let binds = fr.binds;
+      if (opts && typeof opts.data === "object" && opts.data) binds = { ...binds, ...opts.data };
+      if (opts && Array.isArray(opts.blockParams) && ch.params && ch.params.length) {
+        const bp = {};
+        for (let i = 0; i < ch.params.length; i++) bp[ch.params[i]] = opts.blockParams[i];
+        binds = { ...binds, ...bp };
+      }
+      return binds === fr.binds ? fr : { ...fr, binds };
     };
     const options = {
+      hash: ch.hash == null ? {} : ch.hash,
       fn: function (ctx, opts) { return bodyFn(arguments.length === 0 ? frame : shift(ctx, opts)); },
       inverse: function (ctx, opts) { return elseFn(arguments.length === 0 ? frame : shift(ctx, opts)); },
     };
-    for (const k of ["hash", "blockParams", "ids", "loc", "lookupProperty"]) {
+    for (const k of ["ids", "loc", "lookupProperty"]) {
       Object.defineProperty(options, k, {
-        get() { throw new Error("options." + k + " is not supported in a FlatBars block helper (v1)"); },
+        get() { throw new Error("options." + k + " is not supported in a FlatBars block helper"); },
       });
     }
     return callUserBlock(name, ub, args, options, frame.ctx);

@@ -31,13 +31,13 @@ module FullBars.JS
 import Prelude
 
 import Control.Monad.Error.Class (throwError)
-import Data.Argonaut.Core (Json, caseJsonObject, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
-import Data.Array (elem, head, null, uncons) as Array
+import Data.Argonaut.Core (Json, caseJsonArray, caseJsonObject, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
+import Data.Array (elem, head, length, null, take, uncons, zipWith) as Array
 import Data.Either (Either(..), either)
 import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
-import Data.Map (empty, fromFoldable) as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Map (fromFoldable, union) as Map
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
 import FlatBars.Error (Error(ArityError, HelperError))
@@ -111,19 +111,22 @@ foreign import callJsHelperImpl
   :: String -> JsHelperFn -> Array Json -> { tag :: String, payload :: Json }
 
 -- | Invoke a host helper used as a *block* (ADR-020): Handlebars-style, with a
--- | trailing `options` object whose `fn`/`inverse` render the body / `{{else}}`
--- | clause. `currentCtx` is the context for a no-arg `options.fn()`; `renderBody`
--- | / `renderInverse` are pure thunks `(ctx, data) -> { ok, value, error }` (run
--- | `ctl.render`), which the FFI unwraps + throws in JS on `!ok`. `data` is the
--- | `options.fn(ctx, { data })` frame (its keys become scoped `@vars`), or null.
--- | Tags: `"safe"` (raw block output ⇒ `VSafe`), `"arity"`, `"error"`.
+-- | trailing `options` object exposing `hash`, `fn`, and `inverse`. `currentCtx`
+-- | is the context for a no-arg `options.fn()`; the hash is passed as a `Json`
+-- | (`jsonNull` ⇒ `{}`). `renderBody`/`renderInverse` are pure thunks
+-- | `(ctx, opts) -> { ok, value, error }` (run `ctl.render`), which the FFI unwraps
+-- | and throws in JS on `!ok`; `opts` is `options.fn`'s second argument
+-- | (`{ data, blockParams }`), from which the PureScript side layers scoped `@vars`
+-- | and binds the declared block-param names. Tags: `"safe"` (raw block output ⇒
+-- | `VSafe`), `"arity"`, `"error"`.
 foreign import callJsBlockHelperImpl
   :: String
   -> JsHelperFn
-  -> Array Json
-  -> Json
-  -> (Json -> Json -> { ok :: Boolean, value :: String, error :: String })
-  -> (Json -> Json -> { ok :: Boolean, value :: String, error :: String })
+  -> Array Json -- positional args, already trimmed of the hash + block-param values
+  -> Json -- currentCtx (for a no-arg options.fn())
+  -> Json -- the surface hash object for options.hash (jsonNull ⇒ {})
+  -> (Json -> Json -> { ok :: Boolean, value :: String, error :: String }) -- renderBody (ctx, opts)
+  -> (Json -> Json -> { ok :: Boolean, value :: String, error :: String }) -- renderInverse (ctx, opts)
   -> { tag :: String, payload :: Json }
 
 -- | The `SafeString` equivalent a helper returns for raw markup. `safe(string)`.
@@ -155,20 +158,35 @@ renderWith = mkFn4 \helpers partials tpl json ->
       else
         let
           clause = ctl.clause "else"
-          -- An `options.fn(ctx, { data })` frame: its keys become scoped `@vars`
-          -- (constant helpers), layered over the inherited scope by `pushFrame`.
-          dataFrame dataJson = caseJsonObject Map.empty
-            ( \obj -> Map.fromFoldable
+          -- The engine split the head's hash + block-param values into the trailing
+          -- positional slots (hash, then the `as |…|` values); drop them so the JS
+          -- fn sees Handlebars-style positional args.
+          nDrop = Array.length ctl.blockParams + (if isJust ctl.hash then 1 else 0)
+          forwardArgs = Array.take (Array.length args - nDrop) args
+          -- The body frame from `options.fn(ctx, { data, blockParams })`: `data` keys
+          -- become scoped `@vars`, and the declared `as |…|` names bind to the
+          -- `blockParams` values — both layered over the inherited scope by `pushFrame`.
+          optsFrame optsJson =
+            let
+              o = caseJsonObject FO.empty identity optsJson
+              dataObj = caseJsonObject FO.empty identity (fromMaybe jsonNull (FO.lookup "data" o))
+              bpVals = caseJsonArray [] identity (fromMaybe jsonNull (FO.lookup "blockParams" o))
+              dataMap = Map.fromFoldable
                 ( map (\(Tuple k v) -> Tuple k (constOperation (fromJson v)))
-                    (FO.toUnfoldable obj :: Array (Tuple String Json))
+                    (FO.toUnfoldable dataObj :: Array (Tuple String Json))
                 )
-            )
-            dataJson
-          renderClause nodes ctxJson dataJson =
-            case ctl.render (pushFrame (dataFrame dataJson) (fromJson ctxJson) ctl.env) nodes of
+              bpMap = Map.fromFoldable
+                ( Array.zipWith (\n v -> Tuple n (constOperation (fromJson v))) ctl.blockParams
+                    bpVals
+                )
+            in
+              Map.union bpMap dataMap
+          renderClause nodes ctxJson optsJson =
+            case ctl.render (pushFrame (optsFrame optsJson) (fromJson ctxJson) ctl.env) nodes of
               Right s -> { ok: true, value: s, error: "" }
               Left e -> { ok: false, value: "", error: show e }
-          r = callJsBlockHelperImpl name fn (map toJson args) (toJson (refContext ctl.env))
+          r = callJsBlockHelperImpl name fn (map toJson forwardArgs) (toJson (refContext ctl.env))
+            (maybe jsonNull toJson ctl.hash)
             (renderClause clause.before)
             (renderClause (fromMaybe [] clause.body))
         in

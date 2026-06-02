@@ -21,7 +21,7 @@ import Prelude
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Set as Set
 import Data.String (joinWith)
 import FlatBars.Compile (Ctx, Emit, Rec, jsString)
@@ -122,20 +122,20 @@ args' rec ctx = joinWith ", " <<< map (rec.expr ctx)
 
 fbBlock :: Rec -> Ctx -> Ident -> Array Expr -> Template -> String
 fbBlock rec ctx name args body =
-  -- Demarker `@hash`/`@param` once, centrally (ADR-020 Phase 3): every lowering
-  -- then sees the plain positional args it saw before (the interpreter does the
-  -- same in its `blockArgs` seam). `rtBlock` also reads the hash/param channel.
+  -- Demarker `@hash`/`@param` once, centrally (ADR-020 Phase 3): the built-in
+  -- lowerings see the plain positional args they saw before (the interpreter does
+  -- the same in its `blockArgs` seam); `rtBlock` also reads the hash/param channel.
   let
-    pos = (splitBlockArgs args).positional
+    split = splitBlockArgs args
   in
     case name of
-      "if" -> ifBlock rec ctx (truthyTest rec ctx pos) body
-      "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx pos <> ")") body
-      "each" -> frameBlock rec ctx "each" pos body
-      "with" -> frameBlock rec ctx "with" pos body
+      "if" -> ifBlock rec ctx (truthyTest rec ctx split.positional) body
+      "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx split.positional <> ")") body
+      "each" -> frameBlock rec ctx "each" split.positional body
+      "with" -> frameBlock rec ctx "with" split.positional body
       -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
       "inline" -> ""
-      _ -> rtBlock rec ctx name pos body
+      _ -> rtBlock rec ctx name split body
 
 -- The condition test: 1 arg ⇒ `rt.truthy`; an options object (includeZero) ⇒
 -- `rt.truthyWith`.
@@ -206,17 +206,35 @@ lambda rec ctx body =
 
 -- An unrecognised block helper: hand the body to the runtime as closures, so the
 -- engine's control handle survives as JS functions (the baseline tier).
-rtBlock :: Rec -> Ctx -> Ident -> Array Expr -> Template -> String
-rtBlock rec ctx name args body =
+rtBlock
+  :: Rec
+  -> Ctx
+  -> Ident
+  -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }
+  -> Template
+  -> String
+rtBlock rec ctx name split body =
   let
     s = splitClauses body
+    -- The hash + block-param values occupy the trailing positional slots (hash,
+    -- then the `as |…|` values); drop them from the args and pass them through the
+    -- `options` channel instead (ADR-020 Phase 3) — mirroring the interpreter.
+    nDrop = Array.length split.params + (if isJust split.hash then 1 else 0)
+    realArgs = Array.take (Array.length split.positional - nDrop) split.positional
+    hashJs = maybe "null" (rec.expr ctx) split.hash
+    paramsJs = "[" <> joinWith ", " (map jsString split.params) <> "]"
   in
-    "  out += rt.block(" <> jsString name <> ", [" <> args' rec ctx args <> "], "
+    "  out += rt.block(" <> jsString name <> ", [" <> args' rec ctx realArgs <> "], "
       <> ctx.scope
       <> ", "
       <> lambda rec (rec.child ctx) s.before
       <> ", "
       <> clausesObj rec ctx s.clauses
+      <> ", { hash: "
+      <> hashJs
+      <> ", params: "
+      <> paramsJs
+      <> " }"
       <> ");\n"
 
 clausesObj :: Rec -> Ctx -> Array Clause -> String

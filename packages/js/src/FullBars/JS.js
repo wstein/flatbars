@@ -51,12 +51,16 @@ export const callJsHelperImpl = (name) => (descriptor) => (args) => {
 // re-enter the *pure* interpreter via PureScript thunks returning
 // `{ ok, value, error }`; we unwrap and throw IN JS (caught here), so the engine
 // never throws across the FFI. A block helper's return is RAW (the VSafe
-// analogue) — Handlebars treats block output as already-safe markup. v1 surface
-// is `fn`/`inverse` only; every other `options.*` throws rather than silently
-// reading `undefined` (ADR-020). `this` is the current context, so
-// `options.fn(this)` works.
+// analogue) — Handlebars treats block output as already-safe markup. `this` is
+// the current context, so `options.fn(this)` works. `args` is already the
+// trimmed positional list (the hash + block-param values are split off by the
+// engine). `hash` is the surface `k=v` object (`{}` when none). `options.fn(ctx,
+// { data, blockParams })` shifts context and, via the PureScript thunk, layers
+// `data` as scoped `@vars` and binds the declared `as |…|` names to `blockParams`
+// (ADR-020 Phase 3). Reading any other `options.*` throws rather than silently
+// returning `undefined`.
 export const callJsBlockHelperImpl =
-  (name) => (descriptor) => (args) => (currentCtx) => (renderBody) => (renderInverse) => {
+  (name) => (descriptor) => (args) => (currentCtx) => (hash) => (renderBody) => (renderInverse) => {
     const fn = typeof descriptor === "function" ? descriptor : descriptor.fn;
     const arity = typeof descriptor === "function" ? undefined : descriptor.arity;
     if (!arityOk(arity, args.length)) {
@@ -66,18 +70,14 @@ export const callJsBlockHelperImpl =
       if (!r.ok) throw new Error(r.error);
       return r.value;
     };
-    // options.fn(ctx, { data }) — `data` keys become scoped vars (@key) in the body,
-    // layered over the inherited scope (Handlebars' runtime-options `data` frame);
-    // a non-object/absent `data` ⇒ null (no extra vars). `render*` take (ctx, data).
-    const dataOf = (opts) => (opts && typeof opts === "object" && opts.data && typeof opts.data === "object" ? opts.data : null);
     const options = {
-      fn: function (ctx, opts) { return unwrap(renderBody(arguments.length === 0 ? currentCtx : ctx)(dataOf(opts))); },
-      inverse: function (ctx, opts) { return unwrap(renderInverse(arguments.length === 0 ? currentCtx : ctx)(dataOf(opts))); },
+      hash: hash && typeof hash === "object" ? hash : {},
+      fn: function (ctx, opts) { return unwrap(renderBody(arguments.length === 0 ? currentCtx : ctx)(opts || {})); },
+      inverse: function (ctx, opts) { return unwrap(renderInverse(arguments.length === 0 ? currentCtx : ctx)(opts || {})); },
     };
-    // v1: an unsupported options.* is a loud error, never a silent `undefined`.
-    for (const k of ["hash", "blockParams", "ids", "loc", "lookupProperty"]) {
+    for (const k of ["ids", "loc", "lookupProperty"]) {
       Object.defineProperty(options, k, {
-        get() { throw new Error("options." + k + " is not supported in a FlatBars block helper (v1)"); },
+        get() { throw new Error("options." + k + " is not supported in a FlatBars block helper"); },
       });
     }
     try {
