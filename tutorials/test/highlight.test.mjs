@@ -68,3 +68,14 @@ test("special characters in a tag body are HTML-escaped", () => {
 test("text outside any tag stays plain (and escaped)", () => {
   assert.equal(highlightTemplate("a < b", "minbars"), "a &lt; b");
 });
+
+test("a dialect-disallowed shape is flagged stem-error, not painted valid", () => {
+  // MaxBars (extras off) rejects {{&x}} / {{^x}} / {{{{…}}}}; the highlighter
+  // agrees with the parser by colouring them stem-error.
+  assert.ok(highlightTemplate("{{&x}}", "maxbars").startsWith('<span class="stem-error">'));
+  assert.ok(highlightTemplate("{{{{#raw}}}}b{{{{/raw}}}}", "maxbars").includes('class="stem-error"'));
+  // FullBars (inheritance off) rejects the Mustache {{<l}} sigil.
+  assert.ok(highlightTemplate("{{<l}}x{{/l}}", "fullbars").startsWith('<span class="stem-error">'));
+  // …but MinBars allows them, so there it is the raw family, not an error.
+  assert.ok(highlightTemplate("{{&x}}", "minbars").startsWith('<span class="stem-raw">'));
+});

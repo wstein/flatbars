@@ -40,7 +40,10 @@ import FlatBars.Token (LexOptions, PosToken, Token(..), tokenizeInterior)
 -- | a stable `kind` tag the presenter maps to a CSS class. Tag-role kinds:
 -- | `expr`, `raw`, `raw-block`, `block-open`, `block-inverse`, `block-parent`,
 -- | `block-decl`, `block-close`, `partial`, `keyword`, `comment`,
--- | `set-delimiter`. Interior-role kinds: `operator`, `string`, `number`.
+-- | `set-delimiter`. Interior-role kinds: `operator`, `string`, `number`. The
+-- | `error` kind marks a structurally-valid tag the *dialect disallows* (an
+-- | `extras`/`inheritance`-gated shape — see `HighlightConfig`), so a presenter
+-- | can flag it the way it would a lex error.
 type HSpan = { from :: Int, to :: Int, kind :: String }
 
 -- | The dialect seams the highlighter needs — the same ones the parser threads.
@@ -50,10 +53,20 @@ type HSpan = { from :: Int, to :: Int, kind :: String }
 -- | as operators); `clauseSeps` is the dialect's clause-separator names, so
 -- | `{{else}}` / `{{elif …}}` are coloured as statements only where the dialect
 -- | treats them as separators (empty for MinBars, where `else` is a variable).
+-- |
+-- | `extras` and `inheritance` are the parser's own dialect gates (the same
+-- | fields `ParseOptions` carries): when off, the structurally-valid shapes the
+-- | dialect *rejects* are coloured `error` rather than painted as valid. With
+-- | `extras = false` (RawBars/MaxBars) that is `{{&x}}` (unescaped), `{{^x}}`
+-- | (inverse), and `{{{{…}}}}` (raw block); with `inheritance = false`
+-- | (RawBars/MaxBars/FullBars) it is `{{<x}}` / `{{$x}}`. So the highlighter never
+-- | paints a shape valid that the same dialect would reject at parse.
 type HighlightConfig =
   { lexConfig :: LexConfig
   , lexOptions :: LexOptions
   , clauseSeps :: Array String
+  , extras :: Boolean
+  , inheritance :: Boolean
   }
 
 -- | Tokenize template source into positioned highlight spans. A lex error
@@ -68,8 +81,12 @@ highlightSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
   spanOf = case _ of
     RContent _ -> []
     ROutput sp base interior -> tagSpans sp base interior "raw"
-    RAmp sp base interior -> tagSpans sp base interior "raw"
-    ROpen sp sig base interior -> tagSpans sp base interior (sigilKind sig)
+    -- `{{&x}}` (unescaped) is a Handlebars-extra: disallowed when `extras` is off
+    -- (RawBars/MaxBars), exactly as the parser gates it.
+    RAmp sp base interior
+      | cfg.extras -> tagSpans sp base interior "raw"
+      | otherwise -> [ whole sp "error" ]
+    ROpen sp sig base interior -> openSpans sp sig base interior
     RClose sp base interior -> tagSpans sp base interior "block-close"
     RSep sp base interior
       | isPartialHead interior -> [ whole sp "partial" ]
@@ -77,10 +94,29 @@ highlightSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
       | otherwise -> tagSpans sp base interior "expr"
     -- Raw blocks carry a literal body (not an expression); comments and the
     -- set-delimiter tag have no expression interior — all stay one whole-tag span.
-    RRaw sp _ _ _ -> [ whole sp "raw-block" ]
+    -- `{{{{…}}}}` raw blocks are a Handlebars-extra: disallowed when `extras` is off.
+    RRaw sp _ _ _
+      | cfg.extras -> [ whole sp "raw-block" ]
+      | otherwise -> [ whole sp "error" ]
     RComment sp _ _ -> [ whole sp "comment" ]
     RLongComment sp -> [ whole sp "comment" ]
     RSetDelim sp -> [ whole sp "set-delimiter" ]
+
+  -- Block openers, gated like the parser: `{{#x}}` (Section) is always core;
+  -- `{{^x}}` (Inverse) needs `extras`; `{{<x}}` (Parent) / `{{$x}}` (BlockDef)
+  -- need `inheritance`. A disallowed opener is coloured `error`.
+  openSpans :: Span -> Sigil -> Int -> String -> Array HSpan
+  openSpans sp sig base interior = case sig of
+    Section -> tagSpans sp base interior "block-open"
+    Inverse
+      | cfg.extras -> tagSpans sp base interior "block-inverse"
+      | otherwise -> [ whole sp "error" ]
+    Parent
+      | cfg.inheritance -> tagSpans sp base interior "block-parent"
+      | otherwise -> [ whole sp "error" ]
+    BlockDef
+      | cfg.inheritance -> tagSpans sp base interior "block-decl"
+      | otherwise -> [ whole sp "error" ]
 
   whole :: Span -> String -> HSpan
   whole sp kind = { from: sp.start, to: sp.end, kind }
@@ -121,13 +157,6 @@ tile start end headKind punches =
   gap a b acc
     | b > a = Array.snoc acc { from: a, to: b, kind: headKind }
     | otherwise = acc
-
-sigilKind :: Sigil -> String
-sigilKind = case _ of
-  Section -> "block-open"
-  Inverse -> "block-inverse"
-  Parent -> "block-parent"
-  BlockDef -> "block-decl"
 
 isSpace :: Char -> Boolean
 isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'

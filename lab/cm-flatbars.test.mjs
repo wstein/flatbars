@@ -70,11 +70,22 @@ test("set delimiters are stateful — only the engine gets the following tag rig
 });
 
 test("inheritance sigils and raw/comment get their own palette slots", () => {
-  const decos = decorate("{{<base}}{{$title}}d{{/title}}{{/base}}{{{x}}}{{! c }}", "fullbars");
+  // MinBars enables inheritance, so {{<}}/{{$}} paint as the inherit family.
+  const decos = decorate("{{<base}}{{$title}}d{{/title}}{{/base}}{{{x}}}{{! c }}", "minbars");
   assert.deepEqual(
     tagClasses(decos),
     ["cm-hb-inherit", "cm-hb-inherit", "cm-hb-block", "cm-hb-block", "cm-hb-raw", "cm-hb-comment"],
   );
+});
+
+test("a dialect-disallowed shape is painted cm-hb-error (the highlighter agrees with the parser)", () => {
+  // MaxBars has extras off, so {{&}} / {{^}} / {{{{…}}}} are disallowed → error.
+  assert.deepEqual(tagClasses(decorate("{{&x}}", "maxbars")), ["cm-hb-error"]);
+  assert.deepEqual(tagClasses(decorate("{{^x}}b{{/x}}", "maxbars")), ["cm-hb-error", "cm-hb-block"]);
+  // FullBars has inheritance off, so the Mustache {{<}}/{{$}} sigils are errors there.
+  assert.deepEqual(tagClasses(decorate("{{<l}}x{{/l}}", "fullbars")), ["cm-hb-error", "cm-hb-block"]);
+  // …but the same shapes are valid where the dialect allows them.
+  assert.deepEqual(tagClasses(decorate("{{&x}}", "minbars")), ["cm-hb-raw"]);
 });
 
 test("MaxBars interior tokens punch through with their own classes", () => {

@@ -17,7 +17,7 @@ import {
   renderMustache as bbRenderMustache,
   compileMinbars as bbCompileMinbars,
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
-} from "./vendor/flatbars-engine.mjs?v=13";
+} from "./vendor/flatbars-engine.mjs?v=14";
 
 const MIN_VERSION = "0.1.0";
 

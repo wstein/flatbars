@@ -204,6 +204,11 @@ body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-parti
 .stem-str { color: var(--stem-str-fg); font-weight: 700; }
 .stem-num { color: var(--stem-num-fg); font-weight: 700; }
 
+/* A tag the dialect disallows (an extras/inheritance-gated shape the engine
+   rejects at parse) — flagged with a wavy underline, mirroring the Lab's
+   .cm-hb-error, so the highlighter never paints a render-rejecting shape valid. */
+.stem-error { text-decoration: underline wavy var(--danger); text-decoration-skip-ink: none; }
+
 .y-key { color: var(--yaml-key); }
 .y-str { color: var(--yaml-str); }
 .y-num { color: var(--yaml-num); }

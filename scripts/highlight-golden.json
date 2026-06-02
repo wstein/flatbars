@@ -248,12 +248,12 @@
         {
           "from": 0,
           "to": 11,
-          "kind": "block-parent"
+          "kind": "error"
         },
         {
           "from": 11,
           "to": 21,
-          "kind": "block-decl"
+          "kind": "error"
         },
         {
           "from": 28,
@@ -465,6 +465,129 @@
           "from": 31,
           "to": 34,
           "kind": "expr"
+        }
+      ]
+    },
+    {
+      "id": "maxbars-extras-amp",
+      "dialect": "maxbars",
+      "note": "extras off: {{&x}} (unescaped) is disallowed → error, not raw",
+      "src": "{{&x}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 6,
+          "kind": "error"
+        }
+      ]
+    },
+    {
+      "id": "maxbars-extras-inverse",
+      "dialect": "maxbars",
+      "note": "extras off: {{^x}} (inverse) is disallowed → error; the close stays block-close",
+      "src": "{{^x}}b{{/x}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 6,
+          "kind": "error"
+        },
+        {
+          "from": 7,
+          "to": 13,
+          "kind": "block-close"
+        }
+      ]
+    },
+    {
+      "id": "maxbars-extras-rawblock",
+      "dialect": "maxbars",
+      "note": "extras off: {{{{…}}}} raw block (with or without a #) is disallowed → error",
+      "src": "{{{{#raw}}}}b{{{{/raw}}}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 25,
+          "kind": "error"
+        }
+      ]
+    },
+    {
+      "id": "fullbars-inheritance-off",
+      "dialect": "fullbars",
+      "note": "inheritance off: the Mustache {{<l}}/{{$b}} sigils are disallowed → error (FullBars is not a Mustache surface)",
+      "src": "{{<l}}{{$b}}x{{/b}}{{/l}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 6,
+          "kind": "error"
+        },
+        {
+          "from": 6,
+          "to": 12,
+          "kind": "error"
+        },
+        {
+          "from": 13,
+          "to": 19,
+          "kind": "block-close"
+        },
+        {
+          "from": 19,
+          "to": 25,
+          "kind": "block-close"
+        }
+      ]
+    },
+    {
+      "id": "minbars-inheritance-on",
+      "dialect": "minbars",
+      "note": "inheritance on: the same {{<l}}/{{$b}} sigils ARE valid block kinds in MinBars",
+      "src": "{{<l}}{{$b}}x{{/b}}{{/l}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 6,
+          "kind": "block-parent"
+        },
+        {
+          "from": 6,
+          "to": 12,
+          "kind": "block-decl"
+        },
+        {
+          "from": 13,
+          "to": 19,
+          "kind": "block-close"
+        },
+        {
+          "from": 19,
+          "to": 25,
+          "kind": "block-close"
+        }
+      ]
+    },
+    {
+      "id": "minbars-extras-on",
+      "dialect": "minbars",
+      "note": "extras on: {{^x}} (inverse) and {{&x}} (unescaped) are valid in MinBars",
+      "src": "{{^x}}b{{/x}}{{&y}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 6,
+          "kind": "block-inverse"
+        },
+        {
+          "from": 7,
+          "to": 13,
+          "kind": "block-close"
+        },
+        {
+          "from": 13,
+          "to": 19,
+          "kind": "raw"
         }
       ]
     }

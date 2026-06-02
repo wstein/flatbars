@@ -266,21 +266,32 @@ highlightSpans = mkFn2 \tpl dialect -> Highlight.highlightSpans (highlightConfig
 -- | settings (the single source of truth — drift is caught by `check:highlight`):
 -- | RawBars/MaxBars/MinBars enable the `{{=A B=}}` set-delimiter tag
 -- | (`mustacheDelims`), FullBars does not; the kernel dialects treat
--- | `else`/`elif` as clause separators, MinBars (Mustache) treats none.
+-- | `else`/`elif` as clause separators, MinBars (Mustache) treats none. `extras`
+-- | / `inheritance` mirror each dialect's parse gates, so a shape the dialect
+-- | rejects is coloured `error` rather than painted valid: RawBars/MaxBars set
+-- | `extras = false`; only MinBars enables `inheritance` (the Mustache
+-- | `{{<}}`/`{{$}}` shapes).
 highlightConfig :: String -> Highlight.HighlightConfig
 highlightConfig = case _ of
   "maxbars" ->
     { lexConfig: maxOptions.lexConfig { keepLongComments = true }
     , lexOptions: maxOptions.lexOptions
     , clauseSeps: maxOptions.standaloneSeps
+    , extras: false
+    , inheritance: false
     }
   "rawbars" ->
-    { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: kernelClauses }
-  "minbars" -> { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: [] }
+    { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: kernelClauses
+    , extras: false, inheritance: false }
+  "minbars" ->
+    { lexConfig: withSetDelims, lexOptions: defaultLexOptions, clauseSeps: []
+    , extras: true, inheritance: true }
   _ ->
     { lexConfig: defaultLexConfig { keepLongComments = true }
     , lexOptions: defaultLexOptions
     , clauseSeps: kernelClauses
+    , extras: true
+    , inheritance: false
     }
   where
   -- Highlighting wants the long comments rendering drops, so it can colour them.

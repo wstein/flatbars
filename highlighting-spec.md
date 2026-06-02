@@ -45,7 +45,8 @@ type Dialect = "rawbars" | "fullbars" | "maxbars" | "minbars"
 type Span    = { from: number, to: number, kind: Kind }          // UTF-16 offsets into `template`
 ```
 
-- **Total / never-throws.** The outer lexer is all-or-nothing (`Either`), so on a lex error `highlightSpans` returns `[]` — highlighting degrades to plain text rather than guessing where the engine would have stopped (it never disagrees with the lexer). The `error` kind is reserved for a future error-tolerant path; presenters may keep the last good span set to avoid flicker while typing.
+- **Total / never-throws.** The outer lexer is all-or-nothing (`Either`), so on a lex error `highlightSpans` returns `[]` — highlighting degrades to plain text rather than guessing where the engine would have stopped (it never disagrees with the lexer). Presenters may keep the last good span set to avoid flicker while typing.
+- **Dialect gates applied (`extras` / `inheritance`).** The lexer is permissive (structural), so a few shapes lex in every dialect but are *rejected by the parser* per the dialect's gates. `HighlightConfig` carries the same `extras` and `inheritance` flags `ParseOptions` does, and a gated shape is coloured **`error`** rather than painted valid: with `extras = false` (RawBars/MaxBars) that is `{{&x}}` (unescaped), `{{^x}}` (inverse), and `{{{{…}}}}` (raw block, with or without a `#`); with `inheritance = false` (RawBars/MaxBars/FullBars) it is `{{<x}}` / `{{$x}}`. So the highlighter never paints a shape valid that the same dialect would reject at parse — the agreement ADR-014 is about now extends to dialect semantics, not just tag boundaries.
 - **Pure & fast.** No async, no per-token FFI. The bundle is resident and the lexer already runs every render; one extra lex of a small string is negligible.
 - **Offsets, not markup.** Non-overlapping, ordered; gaps are literal text. Each host renders in its own idiom (here: CM decorations).
 
@@ -69,7 +70,7 @@ Each tag produces a span tagged by its structural role (the `RawTok` constructor
 | `comment` | `RComment` (`{{! }}`) and `RLongComment` (`{{!-- --}}`, `{{~!--`) | `{{!-- … --}}` |
 | `set-delimiter` | `RSetDelim` (ADR-015) | `{{=<% %>=}}` |
 | `raw-block` | `RRaw` (whole block) | `{{{{raw}}}} … {{{{/raw}}}}` |
-| `error` | lex error | unterminated tag (degrades to `[]`, see §3) |
+| `error` | a dialect-disallowed shape (an `extras`/`inheritance`-gated tag, see §3) | `{{&x}}`, `{{^x}}`, `{{{{…}}}}` in RawBars/MaxBars; `{{<x}}`/`{{$x}}` outside MinBars |
 
 **Interior-role kinds** (from `tokenizeInterior`, ADR-017): `operator` (`TOp` — MaxBars `+ - * / % ?? \| && \|\| == …`), `string` (`TStr`), `number` (`TNum`). Identifiers/paths (`TIdent`) and parens stay the tag's head colour.
 
@@ -118,7 +119,7 @@ The tutorials' `OpenInLab.jsx` `CodeEditor` is a `<textarea>` + a highlight-`<pr
 
 ## 6. Lab — rewire to the shared extension
 
-- **[done]** Replaced `handlebarsHighlighting` / `HB_TAG_RE` / `hbMarkFor` with `flatbarsHighlight({ ViewPlugin, Decoration }, highlightSpans, ENGINE)` from `cm-flatbars.mjs` (the `ENGINE` global is the active dialect, fixed per page load since switching reloads). The Lab now highlights set delimiters and the inheritance sigils `{{<}}`/`{{$}}` correctly. The `error` kind gained a defensive `.cm-hb-error` style (the palette is inline in `index.html`, not a separate stylesheet).
+- **[done]** Replaced `handlebarsHighlighting` / `HB_TAG_RE` / `hbMarkFor` with `flatbarsHighlight({ ViewPlugin, Decoration }, highlightSpans, ENGINE)` from `cm-flatbars.mjs` (the `ENGINE` global is the active dialect, fixed per page load since switching reloads). The Lab now highlights set delimiters and the inheritance sigils `{{<}}`/`{{$}}` correctly. The `error` kind has a `.cm-hb-error` style (wavy underline) — now used both for a future error-tolerant path and for the dialect-disallowed shapes the gates flag (§3); the tutorials overlay mirrors it with `.stem-error`. The palette is inline in `index.html`, not a separate stylesheet.
 - **`yamlDecorator` is kept** (data-side scalar tint for `true`/`false`/`null`/numbers): it is host-*data* colouring over a real `lang-yaml` grammar, not a fork of FlatBars *syntax*, so it is outside ADR-014's grammar-unification scope. Consolidating data-format highlighting is a separate concern.
 - The four DSL `StreamLanguage`s (`jsonataLang`/`jsLang`/`bytecodeLang`/`st4SourceLang`) are untouched (§9).
 
@@ -128,6 +129,7 @@ Upgrade `scripts/gen-highlight.mjs` (`check:highlight`) from "snapshot the regex
 
 - **set-delimiters** cases (default switch, switch-back, a tag *after* a switch — the case every regex fails);
 - **per-dialect** cases (MaxBars operators/pipes; RawBars bare; MinBars sigils);
+- **dialect-gate** cases (an `extras`/`inheritance`-disallowed shape → `error` in RawBars/MaxBars/FullBars, the same shape valid where the dialect allows it);
 - the existing Exhibit A/B + per-construct cases (carried forward as the acceptance set).
 
 A lexer change not reflected in highlighting then fails the build — highlighting joins the "measured, not asserted" gates (`examples:verify`, `test:compile`, `check:catalog`).

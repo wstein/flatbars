@@ -49,13 +49,16 @@ nodeCount src = case parse src of
     }
     t
 
--- Highlight configs: a kernel-dialect config (FullBars-like — `else`/`elif` are
--- clause separators) and a Mustache config (set delimiters on, no clause words).
+-- Highlight configs mirror each dialect's parse gates. A kernel-dialect config
+-- (FullBars-like — `else`/`elif` are clause separators, extras on, inheritance
+-- off) and a Mustache config (set delimiters on, no clause words, inheritance on).
 hlKernel :: HighlightConfig
 hlKernel =
   { lexConfig: defaultLexConfig { keepLongComments = true }
   , lexOptions: defaultLexOptions
   , clauseSeps: [ "else", "elif" ]
+  , extras: true
+  , inheritance: false
   }
 
 hlMustache :: HighlightConfig
@@ -63,15 +66,20 @@ hlMustache =
   { lexConfig: defaultLexConfig { mustacheDelims = true, keepLongComments = true }
   , lexOptions: defaultLexOptions
   , clauseSeps: []
+  , extras: true
+  , inheritance: true
   }
 
 -- MaxBars-like: infix operators tokenize, so interior `+ - * / % ?? | …` punch
--- through as `operator` spans.
+-- through as `operator` spans; extras off (so `{{&}}`/`{{^}}`/`{{{{…}}}}` are
+-- disallowed shapes), inheritance off.
 hlMax :: HighlightConfig
 hlMax =
   { lexConfig: defaultLexConfig { keepLongComments = true }
   , lexOptions: { infixArith: true }
   , clauseSeps: [ "else", "elif" ]
+  , extras: false
+  , inheritance: false
   }
 
 kinds :: HighlightConfig -> String -> Array String
@@ -380,9 +388,10 @@ main = do
     (kinds hlMustache "{{else}}" == [ "expr" ])
   assert' "highlight: {{> p}} is a partial"
     (highlightSpans hlKernel "{{> p}}" == [ { from: 0, to: 7, kind: "partial" } ])
-  -- The inheritance sigils the old regex mis-painted as plain expressions.
+  -- The inheritance sigils the old regex mis-painted as plain expressions — a
+  -- Mustache config (inheritance on) paints them as their own block kinds.
   assert' "highlight: inheritance {{<…}}/{{$…}} sigils are block kinds"
-    ( kinds hlKernel "{{<base}}{{$title}}d{{/title}}{{/base}}" ==
+    ( kinds hlMustache "{{<base}}{{$title}}d{{/title}}{{/base}}" ==
         [ "block-parent", "block-decl", "block-close", "block-close" ]
     )
   assert' "highlight: triple-stash is raw, comment is comment"
@@ -403,6 +412,22 @@ main = do
     )
   assert' "highlight: a lex error degrades to no spans (plain text)"
     (highlightSpans hlKernel "{{oops" == [])
+
+  -- Dialect gates (ADR-014): a structurally-valid shape the dialect REJECTS is
+  -- coloured `error`, never painted valid. `extras = false` (MaxBars) disallows
+  -- `{{&}}` (unescaped), `{{^}}` (inverse), and `{{{{…}}}}` (raw block).
+  assert' "highlight: extras-off disallows {{&x}} → error"
+    (kinds hlMax "{{&x}}" == [ "error" ])
+  assert' "highlight: extras-off disallows {{^x}} (inverse) → error, close stays block-close"
+    (kinds hlMax "{{^x}}b{{/x}}" == [ "error", "block-close" ])
+  assert' "highlight: extras-off disallows {{{{…}}}} raw block → error"
+    (kinds hlMax "{{{{r}}}}b{{{{/r}}}}" == [ "error" ])
+  -- …but with extras on (Mustache) the same shapes are valid kinds.
+  assert' "highlight: extras-on allows {{^x}} (inverse) and {{&x}} (raw)"
+    (kinds hlMustache "{{^x}}b{{/x}}{{&y}}" == [ "block-inverse", "block-close", "raw" ])
+  -- `inheritance = false` (the kernel/FullBars config) disallows {{<}}/{{$}}.
+  assert' "highlight: inheritance-off disallows {{<l}}/{{$b}} → error"
+    (kinds hlKernel "{{<l}}{{$b}}x{{/b}}{{/l}}" == [ "error", "error", "block-close", "block-close" ])
 
   -- Interior tokens (ADR-017 PosToken end offsets): operators/strings/numbers
   -- punch through the tag's colour; identifiers/whitespace/delimiters stay it.
