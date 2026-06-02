@@ -224,18 +224,9 @@
 .oil .oil-lab:hover .oil-lab-ic { transform: translate(1px, -1px); }
 .oil .oil-lab[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 
-/* ── Syntax colours (GLOBAL — used by the card editors AND the static spec-only
-   blocks, which live outside `.oil`). Map to the Lab's stem palette. ── */
-.stem-expr { color: var(--stem-expr-fg); font-weight: 600; }
-.stem-block { color: var(--stem-block-fg); font-weight: 600; }
-.stem-partial { color: var(--stem-partial-fg); font-weight: 600; }
-.stem-raw { color: var(--stem-raw-fg); font-weight: 600; }
-.stem-comment { color: var(--stem-comment-fg); font-style: italic; }
-.y-key { color: var(--yaml-key); }
-.y-str { color: var(--yaml-str); }
-.y-num { color: var(--yaml-num); }
-.y-kw { color: var(--yaml-kw); font-weight: 600; }
-.y-comment { color: var(--stem-comment-fg); font-style: italic; }
+/* Syntax-colour classes (.stem-*, .y-*) live in lab-tokens.css — they are
+   token-level and GLOBAL (the card editors, the static spec-only blocks, and the
+   highlight legend all use them, and the landing page imports only lab-tokens). */
 
 /* Static (spec-only) code blocks — set-delimiters & lambdas: shown for spec
    completeness, syntax-highlighted, but with no live preview (they can't run). */

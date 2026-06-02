@@ -1,0 +1,109 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The syntax-highlighting legend (the "agenda"): every colour/style the runnable
+// examples use, in one key. Each sample is highlighted by the REAL engine
+// (`highlightTemplate` / `highlightYaml`), so the legend can never drift from what
+// the cards actually render — and it uses the same `.stem-*` / `.y-*` palette as
+// the FlatBars Lab. The per-row `dialect` picks the lexer config that makes that
+// construct light up (e.g. set delimiters need a Mustache-family dialect).
+import { highlightTemplate, highlightYaml } from "../lib/highlight.mjs";
+
+const tags = [
+  { code: "{{name}}", dialect: "fullbars", label: "Interpolation", note: "a value, HTML-escaped" },
+  { code: "{{{html}}}", dialect: "fullbars", label: "Unescaped output", note: "{{{…}}} or {{&…}}" },
+  { code: "{{#each xs}} … {{/each}}", dialect: "fullbars", label: "Block / section", note: "opens & closes a region" },
+  { code: "{{else}} {{elif ok}}", dialect: "fullbars", label: "Clause keyword", note: "a separator inside a block" },
+  { code: "{{> card}}", dialect: "fullbars", label: "Partial", note: "includes another template" },
+  { code: "{{<layout}} {{$title}}", dialect: "fullbars", label: "Inheritance", note: "parent layout · overridable block" },
+  { code: "{{! note }} {{!-- long --}}", dialect: "fullbars", label: "Comment", note: "dropped from output" },
+  { code: "{{=<% %>=}}", dialect: "minbars", label: "Set delimiters", note: "switches the {{ }} pair" },
+];
+
+const data = [
+  { code: "name: Ada", label: "Key · string" },
+  { code: "count: 42", label: "Number" },
+  { code: "active: true", label: "Boolean / null" },
+  { code: "ratio: 1  # note", label: "Comment" },
+];
+---
+
+<section class="hl-legend" aria-labelledby="hl-legend-h">
+  <h2 id="hl-legend-h">Syntax colours</h2>
+  <p class="hl-lede">
+    How every tag and data value is coloured in the runnable examples below — the
+    same palette as the <strong>FlatBars Lab</strong>. The colours come straight
+    from the engine lexer, so they match exactly what each template parses to.
+  </p>
+
+  <div class="hl-cols">
+    <div class="hl-group">
+      <h3>Template tags</h3>
+      <dl class="hl-list">
+        {tags.map((r) => (
+          <div class="hl-row">
+            <dt><code class="hl-code" set:html={highlightTemplate(r.code, r.dialect)} /></dt>
+            <dd><b>{r.label}</b><span class="hl-note">{r.note}</span></dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+
+    <div class="hl-group">
+      <h3>Data (YAML)</h3>
+      <dl class="hl-list">
+        {data.map((r) => (
+          <div class="hl-row">
+            <dt><code class="hl-code" set:html={highlightYaml(r.code)} /></dt>
+            <dd><b>{r.label}</b></dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hl-legend {
+    margin: 2rem 0;
+    padding: 1.25rem 1.35rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--bg-1);
+  }
+  .hl-legend h2 { font-size: 1.15rem; margin: 0 0 0.3rem; }
+  .hl-lede { margin: 0 0 1.1rem; color: var(--fg-muted); font-size: 0.95rem; }
+  .hl-lede strong { color: var(--accent-2); font-weight: 600; }
+
+  .hl-cols { display: grid; grid-template-columns: 1fr; gap: 1.2rem; }
+  @media (min-width: 40rem) {
+    .hl-cols { grid-template-columns: 1.6fr 1fr; gap: 2rem; }
+  }
+  .hl-group h3 {
+    font: 600 11px/1 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-faint);
+    margin: 0 0 0.7rem;
+  }
+
+  .hl-list { margin: 0; display: grid; gap: 0.55rem; }
+  .hl-row {
+    display: grid;
+    grid-template-columns: minmax(0, auto) 1fr;
+    align-items: baseline;
+    gap: 0.9rem;
+  }
+  .hl-row dt { margin: 0; min-width: 0; }
+  .hl-row dd { margin: 0; color: var(--fg-muted); font-size: 0.9rem; min-width: 0; }
+  .hl-row dd b { color: var(--fg); font-weight: 600; }
+  .hl-note { display: block; font-size: 0.82rem; color: var(--fg-faint); }
+
+  .hl-code {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    white-space: nowrap;
+    background: none;
+    padding: 0;
+  }
+</style>

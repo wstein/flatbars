@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import "../styles/lab-tokens.css";
 import { lessons, surfaces } from "../examples.mjs";
+import HighlightLegend from "../components/HighlightLegend.astro";
 
 // Mustache leads (debate consensus item 8): it's the universally-known on-ramp
 // and the comprehensive reference, so it gets the hero. The per-surface lessons
@@ -100,5 +101,7 @@ const surfaceCards = surfaces.map((s) => ({
         </li>
       ))}
     </ul>
+
+    <HighlightLegend />
   </body>
 </html>

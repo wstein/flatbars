@@ -43,11 +43,15 @@
   --warn: #b45309;
   --warn-faint: #fef3c7;
 
-  /* Template-tag syntax colours (match the Lab's stem palette) */
+  /* Template-tag syntax colours (match the Lab's stem palette — fg + bg tint) */
   --stem-block-fg: #c026d3;
+  --stem-block-bg: rgba(192, 38, 211, 0.1);
   --stem-expr-fg: #16a34a;
+  --stem-expr-bg: rgba(22, 163, 74, 0.1);
   --stem-partial-fg: #2563eb;
+  --stem-partial-bg: rgba(37, 99, 235, 0.1);
   --stem-raw-fg: #ea580c;
+  --stem-raw-bg: rgba(234, 88, 12, 0.1);
   --stem-comment-fg: #9b8fc0;
 
   /* YAML data syntax colours (data editor + spec-only blocks) */
@@ -94,9 +98,13 @@
     --warn-faint: #3a2e10;
 
     --stem-block-fg: #f0abfc;
+    --stem-block-bg: rgba(240, 171, 252, 0.16);
     --stem-expr-fg: #86efac;
+    --stem-expr-bg: rgba(134, 239, 172, 0.16);
     --stem-partial-fg: #93c5fd;
+    --stem-partial-bg: rgba(147, 197, 253, 0.16);
     --stem-raw-fg: #fdba74;
+    --stem-raw-bg: rgba(253, 186, 116, 0.18);
     --stem-comment-fg: #8a83a6;
 
     --yaml-key: #93c5fd;
@@ -108,3 +116,20 @@
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
   }
 }
+
+/* ── Syntax-colour classes (GLOBAL) ───────────────────────────────────────────
+   Used by the card editors, the static spec-only blocks, and the highlight
+   legend. These mirror the FlatBars Lab's `.cm-hb-*` rules exactly — a tinted,
+   rounded chunk per tag — so a template reads identically here and in the Lab.
+   (The editor font is monospace, so the heavier weight does not shift the
+   highlight overlay out of alignment with the textarea beneath it.) */
+.stem-expr { color: var(--stem-expr-fg); background: var(--stem-expr-bg); font-weight: 600; border-radius: 3px; }
+.stem-block { color: var(--stem-block-fg); background: var(--stem-block-bg); font-weight: 700; border-radius: 3px; }
+.stem-partial { color: var(--stem-partial-fg); background: var(--stem-partial-bg); font-weight: 700; border-radius: 3px; }
+.stem-raw { color: var(--stem-raw-fg); background: var(--stem-raw-bg); font-weight: 700; border-radius: 3px; }
+.stem-comment { color: var(--stem-comment-fg); font-style: italic; }
+.y-key { color: var(--yaml-key); }
+.y-str { color: var(--yaml-str); }
+.y-num { color: var(--yaml-num); }
+.y-kw { color: var(--yaml-kw); font-weight: 600; }
+.y-comment { color: var(--stem-comment-fg); font-style: italic; }
