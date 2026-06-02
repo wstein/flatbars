@@ -1,0 +1,296 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The comprehensive MaxBars reference — the full FlatBars surface: FullBars PLUS
+// infix operators, a pipe, and bare loop variables. Structured deltas-first
+// (operators → pipes → the identity → loop vars), Jinja-style around an
+// expression core rather than re-walking the Handlebars spine — then the inherited
+// FullBars constructs (shown only with operators woven through, linking to
+// /fullbars rather than re-teaching), the divergences, compile, and a "when (not)
+// to use" close. Prose is illustrative only; every runnable example comes from the
+// single gate-validated source ../maxbars.mjs and renders through the real
+// `maxbars` engine. The ~80-helper prelude is NOT re-listed (the generated catalog
+// owns that) — this page teaches the expression layer and links the catalog.
+import Reference from "../layouts/Reference.astro";
+import OpenInLab from "../components/OpenInLab.jsx";
+import { examples as ex } from "../maxbars.mjs";
+
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
+
+// Sticky left-nav: MaxBars concepts, then the sibling surfaces, then the Lab.
+const groups = [
+  {
+    label: "MaxBars",
+    items: [
+      { href: "#intro", label: "What MaxBars is" },
+      { href: "#operators", label: "Operators" },
+      { href: "#pipes", label: "Pipes" },
+      { href: "#identity", label: "The identity" },
+      { href: "#loops", label: "Loop variables" },
+      { href: "#inherited", label: "From FullBars" },
+      { href: "#divergences", label: "Where it diverges" },
+      { href: "#compile", label: "Compiles to JS" },
+      { href: "#when", label: "When (not) to use" },
+    ],
+  },
+  {
+    label: "Other surfaces",
+    items: [
+      { href: "/minbars", label: "MinBars — Mustache" },
+      { href: "/rawbars", label: "RawBars — the core" },
+      { href: "/fullbars", label: "FullBars — Handlebars" },
+    ],
+  },
+  {
+    label: "Play",
+    items: [{ href: "/lab/index.html?engine=maxbars", label: "FlatBars Lab ↗" }],
+  },
+];
+
+// Inline tag references — kept in a helper so Astro never parses the {{ }}.
+const t = (s) => s;
+---
+
+<Reference
+  title="MaxBars — the full FlatBars language"
+  subtitle="MaxBars is FullBars plus an expression layer: infix operators ({{ a >= b }}), a pipe ({{ value | helper }}), and bare loop variables. The most expressive surface in the family — and still the same meaning-free core underneath, where every operator is just a helper application."
+  groups={groups}
+  spec="maxbars"
+>
+  <!-- ─────────────────────────── Intro ─────────────────────────── -->
+  <section id="intro">
+    <h2>What MaxBars is</h2>
+    <p>
+      <b>MaxBars is the native FlatBars surface — FullBars with an expression layer
+      on top.</b> If you've read the <a href="/fullbars">FullBars reference</a>, you
+      already have the whole language; MaxBars adds three things and changes almost
+      nothing else:
+    </p>
+    <ul class="conv">
+      <li><b>Infix operators</b> — <code>{t("{{score >= 50}}")}</code>, <code>{t("{{price * qty}}")}</code>, <code>{t("{{a && b}}")}</code> — instead of nesting subexpressions.</li>
+      <li><b>A pipe</b> — <code>{t("{{value | helper}}")}</code> — to read transformations left-to-right.</li>
+      <li><b>Bare loop variables</b> — <code>{t("index1")}</code>, <code>{t("first")}</code>, <code>{t("length")}</code> — inside <code>{t("{{#each}}")}</code>.</li>
+    </ul>
+    <p>
+      None of it is new machinery. <code>{t("{{price * qty}}")}</code> <em>desugars to</em>
+      <code>{t("(multiply price qty)")}</code> — the same helper application FullBars and
+      RawBars run. MaxBars is sugar that compiles down the ladder, not a second engine.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.intro.template} data={ex.intro.data} />
+    <div class="callout info">
+      <p>
+        <b>Where MaxBars sits.</b> It's the most permissive surface in the family —
+        expressions live in the template. If you want strict model-view separation
+        (the StringTemplate philosophy — no logic in templates), drop down the ladder:
+        <a href="/rawbars">RawBars</a> is the same engine with none of this sugar, and
+        <a href="/fullbars">FullBars</a> sits in between. One core, four levels of
+        expressiveness.
+      </p>
+    </div>
+  </section>
+
+  <!-- ──────────────────────────── Operators ─────────────────────────── -->
+  <section id="operators">
+    <h2>Operators</h2>
+    <p>
+      Every operator is infix sugar for a prelude helper. Arithmetic is <b>strictly
+      numeric</b> — there is no string <code>+</code> (that throws). Comparisons are
+      non-associative (no <code>{t("a < b < c")}</code> chains). Group with parentheses
+      to control precedence.
+    </p>
+    <table class="cmp">
+      <thead><tr><th>Operators</th><th>Desugars to</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td><code>+ - * / %</code></td><td><code>add subtract multiply divide modulo</code></td><td><code>{t("{{price * qty}}")}</code> → <code>12</code></td></tr>
+        <tr><td><code>== != &lt; &gt; &lt;= &gt;=</code></td><td><code>eq ne lt gt lte gte</code></td><td><code>{t("{{qty >= 1}}")}</code> → <code>true</code></td></tr>
+        <tr><td><code>&amp;&amp; || !</code></td><td><code>and or not</code></td><td><code>{t("{{a && !b}}")}</code></td></tr>
+        <tr><td><code>??</code></td><td><code>coalesce</code></td><td><code>{t("{{nick ?? name}}")}</code></td></tr>
+      </tbody>
+    </table>
+    <h3>Comparisons in conditions</h3>
+    <p>
+      The everyday use: a comparison as the head of <code>{t("{{#if}}")}</code>. Where
+      FullBars writes the subexpression <code>{t("{{#if (gte qty 1)}}")}</code>, MaxBars
+      writes the infix form.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.comparison.template} data={ex.comparison.data} />
+    <h3>Arithmetic</h3>
+    <OpenInLab client:visible engine="maxbars" template={ex.math.template} data={ex.math.data} />
+    <h3>Logic and <code>??</code></h3>
+    <p>
+      <code>&amp;&amp;</code> binds tighter than <code>||</code> and looser than the
+      comparisons; parenthesise when in doubt. <code>??</code> is <b>null-coalescing</b>,
+      not a truthiness fallback — it only substitutes when the left side is null/undefined,
+      so an empty string or <code>0</code> on the left is kept.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.logic.template} data={ex.logic.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.coalesce.template} data={ex.coalesce.data} />
+  </section>
+
+  <!-- ──────────────────────────── Pipes ─────────────────────────── -->
+  <section id="pipes">
+    <h2>Pipes</h2>
+    <p>
+      The pipe <code>|</code> feeds the value on its left in as the helper's
+      <b>first argument</b>: <code>{t("{{name | uppercase}}")}</code> is exactly
+      <code>{t("(uppercase name)")}</code>. Any further arguments follow the helper
+      name, so <code>{t("{{price | toFixed 2}}")}</code> is <code>{t("(toFixed price 2)")}</code>.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.pipeSimple.template} data={ex.pipeSimple.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.pipeArgs.template} data={ex.pipeArgs.data} />
+    <h3>Chaining</h3>
+    <p>
+      Pipes chain left-to-right, each stage feeding the next — the readable way to
+      express a sequence of transforms that would otherwise nest inside-out. Read this
+      as "pull the names out of the items, then join them":
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.pipeChain.template} data={ex.pipeChain.data} />
+    <p class="tip">
+      The right-hand side of a pipe is a helper from the
+      <a href={`${SPEC_BASE}prelude.html`}>prelude catalog</a> (here <code>pluck</code>,
+      <code>join</code>, <code>uppercase</code>, <code>toFixed</code>) — or one a host
+      registers. The pipe doesn't add helpers; it's a second way to call them.
+    </p>
+  </section>
+
+  <!-- ─────────────── The identity: op ⇄ helper ⇄ subexpr ────────────── -->
+  <section id="identity">
+    <h2>The identity: operator ⇄ helper ⇄ subexpression</h2>
+    <p>
+      This is the idea the whole family rests on. An infix operator, a named helper
+      call, and a parenthesised subexpression are <b>the same operation written three
+      ways</b> — they parse to the identical core application and render identically.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.identity.template} data={ex.identity.data} />
+    <p>
+      So "MaxBars vs FullBars vs RawBars" isn't three engines — it's how much sugar the
+      surface gives you over one core. <a href="/rawbars">RawBars</a> shows the bottom of
+      that ladder, where <code>{t("(multiply price qty)")}</code> is all there is.
+    </p>
+  </section>
+
+  <!-- ────────────────────────── Loop variables ──────────────────────── -->
+  <section id="loops">
+    <h2>Loop variables</h2>
+    <p>
+      Inside <code>{t("{{#each}}")}</code>, MaxBars exposes the loop state as
+      <b>bare variables</b> — no sigil, just names you apply like any other helper.
+    </p>
+    <table class="cmp">
+      <thead><tr><th>Variable</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>{t("index0")}</code> / <code>{t("index1")}</code></td><td>position, 0-based / 1-based</td></tr>
+        <tr><td><code>{t("rindex0")}</code> / <code>{t("rindex1")}</code></td><td>remaining, 0-based / 1-based</td></tr>
+        <tr><td><code>{t("first")}</code> / <code>{t("last")}</code></td><td><code>true</code> on the first / last element</td></tr>
+        <tr><td><code>{t("length")}</code></td><td>the collection's length</td></tr>
+        <tr><td><code>{t("key")}</code></td><td>the property name when iterating an object</td></tr>
+      </tbody>
+    </table>
+    <OpenInLab client:visible engine="maxbars" template={ex.loopVars.template} data={ex.loopVars.data} />
+    <h3>Over an object</h3>
+    <p>Iterating an object, <code>{t("key")}</code> is the property name and <code>{t("{{this}}")}</code> the value.</p>
+    <OpenInLab client:visible engine="maxbars" template={ex.loopObject.template} data={ex.loopObject.data} />
+  </section>
+
+  <!-- ─────────────────────── Inherited from FullBars ─────────────────── -->
+  <section id="inherited">
+    <h2>Everything FullBars does — with operators inside</h2>
+    <p>
+      MaxBars <em>is</em> FullBars underneath, so paths (<code>{t("user.address.city")}</code>,
+      <code>{t("../x")}</code>, <code>{t("@root")}</code>), the block helpers
+      <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> / <code>{t("{{#with}}")}</code> /
+      <code>{t("{{#unless}}")}</code>, escaping, and subexpressions all work exactly as the
+      <a href="/fullbars">FullBars reference</a> documents them. The only difference is that
+      operators and pipes can now appear anywhere a value can. Here a single
+      <code>{t("{{#each}}")}</code> mixes a path, arithmetic, a pipe, and an <code>==</code>:
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.inheritedEach.template} data={ex.inheritedEach.data} />
+    <h3><code>with</code> and subexpressions</h3>
+    <OpenInLab client:visible engine="maxbars" template={ex.withBlock.template} data={ex.withBlock.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.subexpr.template} data={ex.subexpr.data} />
+    <h3>Escaping</h3>
+    <p><code>{t("{{x}}")}</code> HTML-escapes; the triple-stash <code>{t("{{{x}}}")}</code> emits raw markup — unchanged from FullBars.</p>
+    <OpenInLab client:visible engine="maxbars" template={ex.escaping.template} data={ex.escaping.data} />
+  </section>
+
+  <!-- ───────────────── Where MaxBars diverges ──────────────────────── -->
+  <section id="divergences">
+    <h2>Where MaxBars diverges from FullBars</h2>
+    <p>
+      The expression layer costs a few things FullBars has. Each is a direct
+      consequence of putting operators and a pipe into the grammar — none is a
+      surprise once you see why.
+    </p>
+    <table class="cmp">
+      <thead><tr><th>FullBars</th><th>MaxBars</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Block params <code>{t("{{#each xs as |x|}}")}</code></td>
+          <td><b>not available</b> — a lex error</td>
+          <td>The <code>|</code> bars collide with the pipe operator.</td>
+        </tr>
+        <tr>
+          <td>Partials <code>{t("{{> card}}")}</code>, inline <code>{t("{{#*inline}}")}</code></td>
+          <td><b>not covered here</b></td>
+          <td><code>{t("{{#*inline}}")}</code> isn't in the MaxBars grammar, and the host entrypoint doesn't thread external partials. Use <a href="/fullbars">FullBars</a> for partial composition.</td>
+        </tr>
+        <tr>
+          <td>Infix anywhere</td>
+          <td>not in a <b>clause separator</b></td>
+          <td><code>{t("{{else if (gt n 0)}}")}</code> must parenthesise. The bare form <code>{t("{{else if n > 0}}")}</code> parses but silently takes the wrong branch.</td>
+        </tr>
+        <tr>
+          <td>JS-flavoured <code>+</code></td>
+          <td>arithmetic is <b>strictly numeric</b></td>
+          <td><code>{t("\"a\" + \"b\"")}</code> throws — there is no string concatenation operator.</td>
+        </tr>
+        <tr>
+          <td>Mustache-style <code>{t("{{^x}}")}</code> / <code>{t("{{&x}}")}</code> / <code>{t("{{{{raw}}}}")}</code></td>
+          <td>rejected</td>
+          <td>MaxBars sets <code>extras = false</code> — it's not the Handlebars-compatibility dialect.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="tip">
+      The separator rule is the one real trap: a bare infix condition in
+      <code>{t("{{else if …}}")}</code> doesn't error, it just renders wrong. Always
+      wrap it. Here's the correct, parenthesised form:
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.separatorParens.template} data={ex.separatorParens.data} />
+  </section>
+
+  <!-- ────────────────────────── Compiles to JS ──────────────────────── -->
+  <section id="compile">
+    <h2>Compiles to JS</h2>
+    <p>
+      Like the other surfaces, MaxBars <b>compiles to a standalone JS module</b>, and
+      FlatBars gates that the compiled module and the interpreter produce
+      <b>byte-identical</b> output — operators and pipes included, since they desugar
+      before compilation. Expand <b>Compiled JS</b> on the loop example:
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.loopVars.template} data={ex.loopVars.data} compile />
+  </section>
+
+  <!-- ──────────────────── When (not) to use MaxBars ─────────────────── -->
+  <section id="when">
+    <h2>When (not) to use MaxBars</h2>
+    <p>
+      MaxBars is the right surface when the <b>view genuinely needs expressions</b> —
+      formatting, thresholds, small computed values — and you'd rather write
+      <code>{t("{{price * qty | toFixed 2}}")}</code> than thread a pre-computed field
+      through your model for every cell.
+    </p>
+    <p>Reach for a sibling instead when:</p>
+    <ul class="conv">
+      <li>You want <b>strict model-view separation</b> — push all logic into the model and keep templates dumb. That's <a href="/rawbars">RawBars</a> (or, outside this family, StringTemplate).</li>
+      <li>You want <b>Handlebars compatibility</b> — block params, partials, the <code>{t("{{&x}}")}</code> spellings. That's <a href="/fullbars">FullBars</a>.</li>
+      <li>You're porting <b>Mustache</b> templates. That's <a href="/minbars">MinBars</a>.</li>
+    </ul>
+    <p>
+      Same engine, same compiler, same ~80-helper <a href={`${SPEC_BASE}prelude.html`}>prelude</a>
+      under all four — MaxBars just turns the most sugar on. Jump into the
+      <a href="/lab/index.html?engine=maxbars">Lab</a> and start typing, or read the
+      normative <a href={`${SPEC_BASE}maxbars.html`}>maxbars.adoc</a>.
+    </p>
+  </section>
+</Reference>

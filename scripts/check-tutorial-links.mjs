@@ -15,6 +15,7 @@ import { lessons } from "../tutorials/src/examples.mjs";
 import { examples as mustacheExamples } from "../tutorials/src/mustache.mjs";
 import { examples as rawbarsExamples } from "../tutorials/src/rawbars.mjs";
 import { examples as fullbarsExamples } from "../tutorials/src/fullbars.mjs";
+import { examples as maxbarsExamples } from "../tutorials/src/maxbars.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../lab/minbars.mjs";
 import { renderWith, safe } from "../lab/vendor/flatbars-engine.mjs";
@@ -211,6 +212,42 @@ for (const [key, fex] of Object.entries(fullbarsExamples)) {
     collapseWarn(`${key} (fullbars)`, fex, out);
   } catch (e) {
     console.error(`  ✗ ${key} (fullbars): ${e && e.message ? e.message : e}`);
+    fail++;
+  }
+}
+
+// MaxBars reference examples (tutorials/src/maxbars.mjs) — every one runs under
+// the `maxbars` engine (FullBars + infix operators, pipes, bare loop vars); a
+// `compiles` example must also emit JS via compileToJs. Orphan guard against
+// examples never shown on maxbars.astro.
+console.log("\nMaxBars reference examples (maxbars):");
+const maxPageSrc = readFileSync(new URL("../tutorials/src/pages/maxbars.astro", import.meta.url), "utf8");
+const mbr = await createFlatBarsRenderer("maxbars");
+for (const [key, mex] of Object.entries(maxbarsExamples)) {
+  if (!maxPageSrc.includes(`ex.${key}.`)) {
+    console.error(`  ✗ ${key}: defined in maxbars.mjs but never referenced by maxbars.astro (orphan)`);
+    fail++;
+  }
+  try {
+    await labHref("maxbars", mex, { labUrl: "/lab/index.html" });
+  } catch (e) {
+    console.error(`  ✗ ${key}: Open-in-Lab link failed to build — ${e.message}`);
+    fail++;
+    continue;
+  }
+  try {
+    const out = mbr.render(mbr.compile(mex.template, mex.partials || {}).program, mex.data ?? {});
+    if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
+    let note = "";
+    if (mex.compiles) {
+      const c = mbr.compileToJs(mex.template);
+      if (!c || !c.ok) throw new Error("compileToJs failed: " + ((c && c.error) || "unknown"));
+      note = ` [compiles ✓ ${c.value.length}b]`;
+    }
+    console.log(`  ✓ ${key} (maxbars) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}${note}`);
+    collapseWarn(`${key} (maxbars)`, mex, out);
+  } catch (e) {
+    console.error(`  ✗ ${key} (maxbars): ${e && e.message ? e.message : e}`);
     fail++;
   }
 }
