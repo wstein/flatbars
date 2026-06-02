@@ -14,10 +14,16 @@ of FlatBars surface syntax:
 
 . the authoritative one — `FlatBars.Lexer` + `FlatBars.Token` (`tokenizeInterior`), the meaning-free
   structural tokenizer ADR-001 rests on, dialect-scoped through `LexOptions` / the `parseExpr` seam;
-. the Lab's CodeMirror `StreamLanguage`;
-. the tutorials' regex highlighter.
+. the Lab's template highlighter — a CodeMirror `ViewPlugin` over a hand-written tag regex
+  (`HB_TAG_RE` + `hbMarkFor`); *not* the engine, and a separate regex from (3);
+. the tutorials' regex highlighter (`tutorials/src/lib/highlight.mjs`).
 
-(2) and (3) are *approximations* of (1), and approximations drift. Two bugs shipped from this:
+(2) and (3) are *separate* regex approximations of (1) — they drift from the engine and from each
+other (e.g. the Lab's `hbMarkFor` mis-classifies `pass:[{{<p}}]`/`pass:[{{$b}}]` inheritance as plain
+expressions; neither handles set delimiters or MaxBars operators). A fourth and fifth definition exist
+for the host *data* format: the tutorials hand-roll a line-regex YAML highlighter, while the Lab uses a
+real `lang-yaml` grammar plus a bespoke value decorator (see `highlighting-spec.md` §1 for the full
+audit). Two template bugs shipped from this:
 
 * *Exhibit A* — `pass:[Hello, {{!-- name --}}!]` highlighted the comment as closing at the inner
   `pass:[}}]`, leaving `pass:[--}}!]` as plain text. The regex did not know the `pass:[{{!-- … --}}]`
@@ -35,15 +41,24 @@ had no such gate, so the drift was silent.
 
 . *Highlighting is a structural concern and MUST derive from the engine lexer.* Tokenizing template
   source for display is the same job the meaning-free lexer already does. Front-ends MUST NOT fork the
-  grammar. The engine exposes a tokenization API (`tokenizeTemplate(source, { dialect })` →
-  positioned spans; see `highlighting-spec.md`), shipped in the same `flatbars-js` bundle the Lab and
+  grammar. The engine exposes a tokenization API (`highlightSpans(template, dialect)` →
+  positioned whole-tag spans; a thin `FlatBars.Highlight` core module over the lexer; see
+  `highlighting-spec.md`), shipped in the same `flatbars-js` bundle the Lab and
   tutorials already load. A single `kind → CSS-class` map is shared; presenters differ (a CodeMirror
   `ViewPlugin` for the Lab, a highlight-layer overlay for the tutorials) but the *grammar is one*.
 
-. *Per-dialect by construction.* Because the source is the dialect-scoped lexer (`LexOptions`,
-  `parseExpr`), MaxBars operators/pipes, RawBars bare syntax, and MinBars/FullBars forms are coloured
-  correctly without per-dialect highlighter code. A regex cannot even *tokenize* MaxBars (operator
-  chars vs path chars), which is decisive against the regex as a permanent solution.
+. *Per-dialect by construction.* Because the source is the dialect-scoped lexer (`LexConfig`,
+  `LexOptions`, `parseExpr`), each dialect's tag boundaries and roles are coloured correctly without
+  per-dialect highlighter code: set delimiters (the stateful `mustacheDelims` pair) on RawBars/MaxBars/
+  MinBars, the inheritance sigils `pass:[{{<}}]`/`pass:[{{$}}]`, and — critically — the clause
+  separators `pass:[{{else}}]` / `pass:[{{elif …}}]`, which paint as *statements* only when the head is
+  one the dialect treats as a separator. That set is the parser's own `standaloneSeps`
+  (`["else","elif"]` for the kernel dialects, *empty* for MinBars, where `else` is just a variable) —
+  IoC, the same seam `trimStandalone` consults, never a hardcoded keyword list. A regex cannot even
+  *tokenize* MaxBars (operator chars vs path chars) nor know a dialect's separator set, which is
+  decisive against the regex as a permanent solution. (Colouring *interior* tokens — operators vs paths
+  *within* a MaxBars tag — is a tracked enhancement; it needs token end offsets the interior lexer does
+  not yet record. Whole-tag colouring is correct in the interim.)
 
 . *A drift gate is mandatory* (`check:highlight`, mirroring `check:catalog`), wired into `npm test`.
   Highlighting joins "measured, not asserted": a lexer change not reflected in highlighting fails the
