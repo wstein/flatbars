@@ -17,8 +17,10 @@
 -- | `rindex1` never read as data fields, so they are not flagged.)
 module MaxBars.Lint
   ( shadowProneNames
+  , loopVarNames
   , loopVarShadowWarnings
   , strayHeadBarWarnings
+  , labelShadowWarnings
   ) where
 
 import Prelude
@@ -26,6 +28,7 @@ import Prelude
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import FlatBars.Syntax (Expr(..), Template)
+import FlatBars.Value (Value(..))
 import FullBars.Surface (extractBlockParams)
 import Kernel.Walk (Issue, RefKind(..), Severity(..), foldTemplate, operationRefs)
 
@@ -91,3 +94,51 @@ strayHeadBarWarnings = foldTemplate
         "a bar in a block head is the block-parameter delimiter, not the pipe "
           <> "operator; to pipe a block argument, parenthesise it — e.g. (x | f)"
     }
+
+-- | The full bare loop-variable vocabulary (MaxBars), against which a loop
+-- | `label NAME` is checked: choosing one of these as a label name silently
+-- | re-binds the loop variable to the label object (`labelBind` is added last to
+-- | the frame), so a bare `{{index0}}` would no longer read the index. Superset of
+-- | `shadowProneNames`, which is only the field-like subset.
+loopVarNames :: Array String
+loopVarNames =
+  [ "index0"
+  , "index1"
+  , "rindex0"
+  , "rindex1"
+  , "first"
+  , "last"
+  , "length"
+  , "key"
+  , "index"
+  , "rindex"
+  , "size"
+  , "this"
+  ]
+
+-- | Warn on a loop `label NAME` whose name collides with a bare loop variable
+-- | (ADR-013 §4 / ADR-006 §4): the label would shadow that variable for the whole
+-- | body, re-opening the shadowing footgun. Runs over the *desugared* template,
+-- | where a label survives as the reserved `@label` marker the surface emits.
+labelShadowWarnings :: Template -> Array Issue
+labelShadowWarnings = foldTemplate
+  { content: const []
+  , output: const []
+  , raw: \_ _ _ -> []
+  , sep: \_ _ -> []
+  , block: \b -> Array.mapMaybe labelOf b.args <> b.recurse b.children
+  , concat: Array.concat
+  }
+  where
+  labelOf = case _ of
+    App "@label" [ Lit (VString nm) ] | Array.elem nm loopVarNames ->
+      Just
+        { severity: Warn
+        , name: nm
+        , message:
+            "loop label '" <> nm <> "' shadows the bare loop variable '" <> nm
+              <> "'; choose a different label name so {{"
+              <> nm
+              <> "}} still reads the loop variable"
+        }
+    _ -> Nothing

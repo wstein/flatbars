@@ -267,6 +267,15 @@ main = do
   assert' "headbar-warn: {{#each xs as |x|}} does not warn"
     (Array.null (warnNames "{{#each xs as |x|}}{{x}}{{/each}}"))
 
+  -- label-shadow lint (ADR-013): a loop `label NAME` whose name is a bare loop
+  -- variable shadows it for the whole body, so it warns; a fresh name does not.
+  assert' "label-warn: {{#each xs label index0}} warns"
+    (warnNames "{{#each xs label index0}}{{this}}{{/each}}" == [ "index0" ])
+  assert' "label-warn: {{#each xs label first}} warns (field-like loop var)"
+    (warnNames "{{#each xs label first}}{{this}}{{/each}}" == [ "first" ])
+  assert' "label-warn: {{#each xs label outer}} (fresh name) does not warn"
+    (Array.null (warnNames "{{#each xs label outer}}{{outer.index0}}{{/each}}"))
+
   -- ── Set delimiters (ADR-015): MaxBars enables `mustacheDelims` ─────────────
   expectM "set-delim: inline switch" "{{=<% %>=}}<%name%>"
     (obj [ Tuple "name" (VString "Ada") ])

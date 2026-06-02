@@ -30,7 +30,7 @@ import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
-import MaxBars.Lint (loopVarShadowWarnings, strayHeadBarWarnings)
+import MaxBars.Lint (labelShadowWarnings, loopVarShadowWarnings, strayHeadBarWarnings)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -112,7 +112,10 @@ compileMaxJs = compileSurfaceWith maxLoopVars maxOptions
 maxbarsWarnings :: String -> Either ParseError (Array Issue)
 maxbarsWarnings src = do
   { nodes } <- parseWith maxOptions src
-  -- loop-var shadows read the *desugared* tree (a bare loop var is a nullary
-  -- application there); the stray-bar lint reads the *parsed* tree (the desugar
-  -- rewrites a bare bar into a `lookup`, erasing the signal).
-  pure (loopVarShadowWarnings (desugarSurfaceWith maxLoopVars nodes) <> strayHeadBarWarnings nodes)
+  -- loop-var shadows + label shadows read the *desugared* tree (a bare loop var is
+  -- a nullary application there; a label survives as the `@label` marker); the
+  -- stray-bar lint reads the *parsed* tree (the desugar rewrites a bare bar into a
+  -- `lookup`, erasing the signal).
+  let desugared = desugarSurfaceWith maxLoopVars nodes
+  pure
+    (loopVarShadowWarnings desugared <> labelShadowWarnings desugared <> strayHeadBarWarnings nodes)
