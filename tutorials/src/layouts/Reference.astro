@@ -5,7 +5,7 @@
 // FEEL, without its many-pages cause — see the design debate), lab-themed via
 // the shared token sheet, with scroll-spy that highlights the current section.
 // `groups` is [{ label, items: [{ href, label }] }]; the page body is the slot.
-import "../styles/lab-tokens.css";
+import BaseHead from "../components/BaseHead.astro";
 import "../styles/open-in-lab.css";
 import "../styles/reference-content.css";
 
@@ -16,17 +16,7 @@ const { title, subtitle, groups = [], spec } = Astro.props;
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} · FlatBars</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
+    <BaseHead title={`${title} · FlatBars`} />
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>

@@ -48,11 +48,14 @@ spec is published (default `/flatbars/`).
 - **Prose illustrates; the spec is the contract.** Page copy annotates verified,
   runnable examples and links to the Antora spec — it never forks the normative
   text.
-- **Shared chrome:** `src/layouts/Reference.astro` gives every page a sticky
-  left navigation (scroll-spy on the reference, active-page on the surfaces) and
-  the Lab's look via the token-only stylesheets `src/styles/lab-tokens.css`
-  (violet palette + IBM Plex) and `src/styles/open-in-lab.css`. Tokens are
-  copied, not the Lab's component CSS, so the two can't drift.
+- **Shared chrome:** `src/layouts/Reference.astro` gives every reference and
+  surface page a sticky left navigation (scroll-spy on the reference, active-page
+  on the surfaces). The Lab's look comes from the token-only stylesheets
+  `src/styles/lab-tokens.css` (violet palette + IBM Plex) and
+  `src/styles/open-in-lab.css` — tokens are copied, not the Lab's component CSS,
+  so the two can't drift. A single `src/components/BaseHead.astro` owns the
+  `<head>` (meta, the one canonical font link, the token sheet) for **both** the
+  landing and `Reference.astro`, so the two heads can't drift on fonts again.
 - **Open in Lab** uses the shared `lab/open-in-lab.mjs` (`labHref`), which encodes
   the workspace with the Lab's own share-state codec into the URL — self-
   contained, no vendoring, no fetch.

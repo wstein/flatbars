@@ -1,0 +1,25 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The single shared <head> for the tutorials site: meta, the one canonical font
+// link, and the lab design tokens (which carry `color-scheme`). Used by BOTH the
+// landing (index.astro) and the reference layout (Reference.astro) so the two
+// can't drift on fonts or token wiring again — they had already diverged (the
+// landing was missing a Mono weight and the preconnects). `title` is the full
+// <title> string the page wants.
+import "../styles/lab-tokens.css";
+
+const { title } = Astro.props;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{title}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+  media="print"
+  onload="this.media='all'"
+/>
