@@ -2360,11 +2360,16 @@
                   ov.name = v; ov.dirty = true; markCustom(); scheduleRun(); return true;
                 } }
             ))},
-          { key: "transform", label: "TRANSFORM", files: [
+          // The "Controller" editor. On the FullBars surface it is the custom-helper
+          // file (registerHelper source, run in the Worker sandbox — ADR-018); on
+          // the other engines it is the JSONata data→view-model transform.
+          { key: "transform", label: ENGINE === "fullbars" ? "HELPERS" : "TRANSFORM", files: [
             { icon: "fn",
-              name: "transform.jsonata",
+              name: ENGINE === "fullbars" ? "helpers.js" : "transform.jsonata",
               active: xfActive, dirty: transformDirty,
-              title: "data → view-model transform (JSONata)",
+              title: ENGINE === "fullbars"
+                ? "custom helpers — registerHelper(name, fn[, arity]); runs in a sandboxed Worker (ADR-018)"
+                : "data → view-model transform (JSONata)",
               on: () => selectTransformTab() },
           ]},
           { key: "config", label: "CONFIG", files: [
@@ -2539,8 +2544,11 @@
             const isTfm = activeView === "tmpl" && templateMode === "transform";
             const tfm = document.createElement("div");
             tfm.className = "tab tab-transform" + (isTfm ? " active" : "");
-            tfm.title = "data → view-model transform (JSONata)";
-            tfm.append(document.createTextNode("transform.jsonata"));
+            const isHelpers = ENGINE === "fullbars";
+            tfm.title = isHelpers
+              ? "custom helpers — registerHelper(name, fn[, arity]); runs in a sandboxed Worker (ADR-018)"
+              : "data → view-model transform (JSONata)";
+            tfm.append(document.createTextNode(isHelpers ? "helpers.js" : "transform.jsonata"));
             tfm.addEventListener("click", selectTransformTab);
             tfm.append(tabCloseBtn(() => closeEditor("transform")));
             bar.append(tfm);
@@ -2814,8 +2822,9 @@
           // transformSrc in the same editor. Stem: a JSONata data→view-model
           // transform. Handlebars: a JS controller that registers custom helpers.
           setEditorText(templateView, transformSrc);
-          templateView.dispatch({ effects: templateLangComp.reconfigure([jsonataLang]) });
-          byId("sources-sub").textContent = "transform · JSONata";
+          const isHelpers = ENGINE === "fullbars";
+          templateView.dispatch({ effects: templateLangComp.reconfigure([isHelpers ? jsLang : jsonataLang]) });
+          byId("sources-sub").textContent = isHelpers ? "helpers · JS · registerHelper" : "transform · JSONata";
         } else {
           setEditorText(templateView, activeTab().source); // programmatic → no auto-run
           templateView.dispatch({
