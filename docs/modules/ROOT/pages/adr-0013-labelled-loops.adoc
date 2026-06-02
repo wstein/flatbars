@@ -1,36 +1,77 @@
 = ADR-013: Labelled loops (lifting the outer-loop limit)
 :navtitle: ADR-013 Labelled loops
 
-*Status:* Proposed. *Date:* 2026-06-01. Lifts the v1 limit documented in
-xref:adr-0006-maxbars-loop-variables.adoc[] §5.
+*Status:* Accepted (design — no engine code yet). *Date:* 2026-06-02 (accepted; proposed 2026-06-01).
+Lifts the v1 limit documented in xref:adr-0006-maxbars-loop-variables.adoc[] §5.
 
 == Context
 
-MaxBars v1 reaches only the *outer element/index/key*, via block params `as |user uidx|`. The outer
-loop's `first`/`last`/`length`/`rindex` are unreachable, and the companion spec's "compute from a
+MaxBars v1 reaches only the *outer element/index/key*, via block params `pass:[{{#each users as |user uidx|}}]`.
+The outer loop's `first`/`last`/`length`/`rindex` are unreachable, and the companion spec's "compute from a
 named outer length" idea was shown wrong: block params bind only the item plus index/key, so the
 outer length cannot be named. Reaching full outer-loop state needs a *naming/scoping* construct, not
 another block param.
 
-== Decision (proposed, sketch)
+The design rests on one observed fact about the surface desugar. A loop already builds a per-iteration
+frame (`Kernel.Prelude.iterate`): `this`, `index0`…`length`, `first`, `last`, `key`, `parent`. A path
+*head* resolves against that frame **only if the name is in the desugar's `scope` set**, which `as |…|`
+populates. A block param reaches it — `pass:[{{#with o as |c|}}{{c.deep.n}}]` renders `n` — but the
+frame's own `parent` helper does *not* (`pass:[{{parent.title}}]` renders empty), because `parent` is
+not scope-declared. So a label must be a **scope-declared binding**, exactly like a block param.
 
-. *A loop label names the frame, not just the datum* — an inner body can address
-  `outer.length`/`outer.rindex0`/… of a labelled enclosing loop.
-. *Scoping reuses ADR-001 §4* ("scope is scoped helpers"): a label installs a *namespaced accessor
-  frame* for the duration of its body, then removes it — no `../` walk, no `@parent` stack.
-. *The interaction with the bare loop-variable shadowing rule* (xref:adr-0006-maxbars-loop-variables.adoc[]
-  §4) must be defined — a label namespace must not silently re-open the shadowing footgun.
+== Decision
+
+. *A label is a block param bound to the loop frame reified as an object* — not a `../` walk or a
+  `@parent` stack (ADR-001 §4, "scope is scoped helpers", stays intact). `each` reifies the current
+  frame as a `VObject` and binds it to the labelled name; an inner body then reads
+  `pass:[{{outer.length}}]` / `pass:[{{outer.rindex0}}]` / `pass:[{{outer.first}}]` as an ordinary path
+  lookup on that object — the same mechanism a block param already uses for `pass:[{{c.deep.n}}]`.
+. *Surface syntax: a `label NAME` clause, parallel to `as |…|`* —
+  `pass:[{{#each users as |user uidx| label outer}}]`. `label` is parsed as structure and is
+  single-sourced in the surface desugar beside `extractBlockParams` (it adds `NAME` to `scope` and has
+  `each` bind the frame-object). Rejected alternatives: a static `pass:[loop="outer"]` hash (a hash
+  value is a runtime expression, but a label is a *static* scope fact — special-casing a string-literal
+  hash is magic); an `pass:[as |user ^outer|]` sigil (MaxBars deliberately dropped sigils, ADR-006).
+. *The frame-object field set is normative* —
+  `{ this, index0, index1, rindex0, rindex1, first, last, length, key }`, reusing ADR-006's fixed
+  arithmetic (`rindex0 = length − 1 − index0`, `first = index0 == 0`, …). It is an **immutable
+  per-iteration snapshot**: `outer.index0` is the enclosing loop's index at the moment the inner body
+  renders. Because the field set and arithmetic are fixed, the compiler emits the label object into the
+  `each` frame exactly as the interpreter's `iterate` does, and the equality is gated by `test:compile`
+  (interpreter ≡ compiled), like block params.
+. *Shadowing is contained by extending the warn-always lint* (xref:adr-0006-maxbars-loop-variables.adoc[]
+  §4): warn when a label shadows a likely data field, and *hard-warn* when a label name is itself a bare
+  loop-variable name (`label index0` must not silently re-open the §4 footgun). The risk is lower than
+  for bare loop variables, since a label is an explicit author-chosen name rather than an implicit
+  vocabulary word.
+. *MaxBars-only* — like the bare loop variables it extends. FullBars keeps `@`/`pass:[../]` via
+  `noLoopVars` and is unchanged.
+. *No transitive frame-climbing in v1* — one label names *one* enclosing frame. To reach two loops,
+  label both; `outer.parent` is the enclosing *context* (already on the frame), not a second metadata
+  frame. This is the guardrail that stops the feature from quietly becoming the `pass:[../]` stack
+  ADR-001 §4 dropped.
 
 == Consequences
 
 * *Pro:* removes the documented v1 limit; composes with the existing normative loop-variable arithmetic
-  rather than replacing it.
-* *Con:* a new surface form and new scoping rules; risk of re-importing the Handlebars `../`/`@parent`
-  complexity the core *deliberately* dropped (ADR-001 §4) — the design must stay inside the
-  scoped-helper model.
+  rather than replacing it; reuses the block-param scope-and-bind machinery wholesale, so the engine
+  delta is "reify the frame as an object and bind it" plus one desugar recognizer.
+* *Pro:* no new resolution machinery — `outer.length` is the proven scoped-helper-returning-object +
+  path-lookup pattern (the same shape block params already use).
+* *Con:* a new surface keyword (`label`) and a new immutable-snapshot object; the shadowing surface
+  grows by one lint case. All contained in the MaxBars dialect layer.
 
-== Open questions
+== Resolved questions
 
-* *Label syntax* (and whether labels are MaxBars-only, like the bare loop variables they extend).
-* *Depth interaction* with the recursion budget (xref:adr-0012-recursion-budget.adoc[]) once nested
-  labelled loops can address arbitrarily many enclosing frames.
+* *Label syntax* — the `label NAME` clause (Decision §2); labels are MaxBars-only (Decision §5).
+* *Depth interaction with the recursion budget* (xref:adr-0012-recursion-budget.adoc[]) — *none by
+  construction*: a label is one scoped helper, so nesting N labelled loops installs N scoped helpers
+  (ordinary block nesting), not recursion. The budget guards self-inclusion (a partial including
+  itself), which labels do not touch.
+
+== Implementation note
+
+Design-only ADR: no engine code lands with this acceptance. Implementation is a follow-up — the
+expected phases are (1) the `label NAME` desugar recognizer + `scope` entry; (2) `iterate` reifying the
+frame object and binding it; (3) the compiler's `each` lowering emitting the same object, gated by
+`test:compile`; (4) the shadow-lint extension; (5) docs (maxbars.adoc) + a runnable tutorial example.
