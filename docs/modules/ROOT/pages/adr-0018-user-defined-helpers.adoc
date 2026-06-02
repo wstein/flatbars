@@ -74,6 +74,10 @@ block helpers are therefore out of scope — a stated boundary, not an MVP cut.
   renders *out of band* — its result is cached by input key and painted when fresh; a miss kicks off the
   async render, which re-runs once it lands. A Worker is not a full capability jail (it still has
   `fetch`); it removes the page-takeover surface, which is the threat a shared "playground link" poses.
+  The Lab surfaces helpers as a *separate* `helpers.js` editor (its own explorer group / tab / share
+  field `h`), FullBars-only — distinct from the JSONata data `transform`, because helpers extend the
+  *engine* while the transform pre-processes the *data*. (RawBars/MaxBars helper terminology is
+  xref:adr-0019-operation-vocabulary.adoc[ADR-019]'s concern, not this one.)
 
 == Consequences
 

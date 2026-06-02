@@ -1789,18 +1789,19 @@
       let focusMode    = null;
       let templateDiagnostics = [];
       let yamlSrc      = "";
-      // Optional transform applied to the parsed data before rendering
-      // (the data->view-model "Controller"). Empty string = pass data through.
-      // For Stem it is a JSONata transform; on the FullBars surface it is
-      // registerHelper(...) source (ADR-018), built into a helper bag below.
+      // The transform — a data → view-model PREPROCESS (JSONata), applied to the
+      // parsed data before rendering. Engine-agnostic; empty = pass data through.
       let transformSrc = "";
-      // Custom-helper isolation (ADR-018, the "floor"): Controller helper JS is
-      // evaluated and run in a Worker (no DOM / no page access), never on the
-      // main thread — so a shared workspace cannot deface or read the page, and
-      // no run-it? consent prompt is needed. `run()` is synchronous, so the
-      // Worker renders OUT OF BAND: its result is cached by input key and painted
-      // when fresh; a stale/absent entry kicks off the async render (which
-      // re-runs once it lands). FullBars surface only.
+      // Custom helpers (ADR-018) — a fundamentally different thing from the
+      // transform: registerHelper(...) JS that extends the FullBars engine. A
+      // SEPARATE editor (helpers.js), FullBars only. The source is evaluated and
+      // run in a Worker (no DOM / no page access), never on the main thread, so a
+      // shared workspace cannot deface or read the page (no consent prompt
+      // needed). `run()` is synchronous, so the Worker renders OUT OF BAND: its
+      // result is cached by input key and painted when fresh; a stale/absent
+      // entry kicks off the async render (which re-runs once it lands).
+      let helpersSrc = "";
+      let helpersDirty = false;
       const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=1");
       let helperCache = { key: null, output: "", error: "" };
       let helperInFlight = null;
@@ -1828,7 +1829,7 @@
       // files the user has opened (from the explorer or by navigating), not
       // every partial. Keys: "main" (entry, pinned) · partial name · "transform".
       // Closing a tab removes it here but never deletes the underlying file.
-      let openEditors = ["main", "data", "transform"];
+      let openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
       let yamlDirty      = false;
       let transformDirty = false;
 
@@ -2105,6 +2106,9 @@
                 if (templateMode === "transform") {
                   transformSrc = text;
                   transformDirty = true;
+                } else if (templateMode === "helpers") {
+                  helpersSrc = text;
+                  helpersDirty = true;
                 } else {
                   activeTab().source = text;
                   tabs[activeTabIdx].dirty = true;
@@ -2294,7 +2298,7 @@
         fn:   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13c0-7 .5-10 3-10 1 0 1.5.5 1.7 1.2"/><path d="M3.5 7.2h5"/></svg>',
         cfg:  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4"/></svg>',
       };
-      const EXP_GROUP_KEYS = ["template", "partials", "data", "overlays", "transform", "config"];
+      const EXP_GROUP_KEYS = ["template", "partials", "data", "overlays", "transform", "helpers", "config"];
 
       function renderExplorer() {
         if (renderingExplorer) return; // re-entrancy guard (see renderingExplorer)
@@ -2318,6 +2322,7 @@
         expRenameFinishing = false;
         const tmplActive = activeView === "tmpl" && templateMode === "tmpl";
         const xfActive   = activeView === "tmpl" && templateMode === "transform";
+        const hlpActive  = activeView === "tmpl" && templateMode === "helpers";
         const cfgNonDefault = !!escapeMode || !standalone || st4Mode || allowList !== null;
 
         const groups = [
@@ -2362,16 +2367,23 @@
             ))},
           // The "Controller" editor. On the FullBars surface it is the custom-helper
           // file (registerHelper source, run in the Worker sandbox — ADR-018); on
-          // the other engines it is the JSONata data→view-model transform.
-          { key: "transform", label: ENGINE === "fullbars" ? "HELPERS" : "TRANSFORM", files: [
+          // The transform is a data → view-model preprocess (JSONata), all engines.
+          { key: "transform", label: "TRANSFORM", files: [
             { icon: "fn",
-              name: ENGINE === "fullbars" ? "helpers.js" : "transform.jsonata",
+              name: "transform.jsonata",
               active: xfActive, dirty: transformDirty,
-              title: ENGINE === "fullbars"
-                ? "custom helpers — registerHelper(name, fn[, arity]); runs in a sandboxed Worker (ADR-018)"
-                : "data → view-model transform (JSONata)",
+              title: "data → view-model transform (JSONata)",
               on: () => selectTransformTab() },
           ]},
+          // Custom helpers (ADR-018) are a separate, FullBars-only editor — they
+          // extend the engine, not the data. (RawBars/MaxBars terminology: ADR-019.)
+          ...(ENGINE === "fullbars" ? [{ key: "helpers", label: "HELPERS", files: [
+            { icon: "fn",
+              name: "helpers.js",
+              active: hlpActive, dirty: helpersDirty,
+              title: "custom helpers — registerHelper(name, fn[, arity]); runs in a sandboxed Worker (ADR-018)",
+              on: () => selectHelpersTab() },
+          ]}] : []),
           { key: "config", label: "CONFIG", files: [
             { icon: "cfg", name: "stem.config.yaml", active: activeView === "config", dirty: cfgNonDefault,
               title: "render config — escape · trim · ST4 · allow-list",
@@ -2544,14 +2556,22 @@
             const isTfm = activeView === "tmpl" && templateMode === "transform";
             const tfm = document.createElement("div");
             tfm.className = "tab tab-transform" + (isTfm ? " active" : "");
-            const isHelpers = ENGINE === "fullbars";
-            tfm.title = isHelpers
-              ? "custom helpers — registerHelper(name, fn[, arity]); runs in a sandboxed Worker (ADR-018)"
-              : "data → view-model transform (JSONata)";
-            tfm.append(document.createTextNode(isHelpers ? "helpers.js" : "transform.jsonata"));
+            tfm.title = "data → view-model transform (JSONata)";
+            tfm.append(document.createTextNode("transform.jsonata"));
             tfm.addEventListener("click", selectTransformTab);
             tfm.append(tabCloseBtn(() => closeEditor("transform")));
             bar.append(tfm);
+            continue;
+          }
+          if (key === "helpers") {
+            const isHlp = activeView === "tmpl" && templateMode === "helpers";
+            const hlp = document.createElement("div");
+            hlp.className = "tab tab-transform" + (isHlp ? " active" : "");
+            hlp.title = "custom helpers — registerHelper(name, fn[, arity]); runs in a sandboxed Worker (ADR-018)";
+            hlp.append(document.createTextNode("helpers.js"));
+            hlp.addEventListener("click", selectHelpersTab);
+            hlp.append(tabCloseBtn(() => closeEditor("helpers")));
+            bar.append(hlp);
             continue;
           }
           if (key === "config" || key === "data" || overlayByName(key)) continue; // bottom strip
@@ -2614,6 +2634,7 @@
       // Is `key` the currently-active editor? (Single edit pane — one active.)
       function isActiveKey(key) {
         if (key === "transform") return activeView === "tmpl" && templateMode === "transform";
+        if (key === "helpers")   return activeView === "tmpl" && templateMode === "helpers";
         if (key === "config")    return activeView === "config";
         if (key === "data")      return activeView === "data" && dataTab === "edit" && dataFile === "data";
         if (key === "context" || key === "ast") return activeView === "data" && dataTab === key;
@@ -2626,6 +2647,7 @@
       // Activate an editor by key (used when closing the active one).
       function openKey(key) {
         if (key === "transform") return selectTransformTab();
+        if (key === "helpers") return selectHelpersTab();
         if (key === "config") return selectConfigTab();
         if (key === "main") return selectTemplateTab(0);
         if (key === "data") return selectDataTab("data");
@@ -2818,13 +2840,18 @@
         byId("template-editor-container").hidden = false;
         byId("edit-empty").hidden = true;
         if (templateMode === "transform") {
-          // The controller tab lives in the template pane's strip but shows
-          // transformSrc in the same editor. Stem: a JSONata data→view-model
-          // transform. Handlebars: a JS controller that registers custom helpers.
+          // The transform is a data → view-model preprocess (JSONata), shown in
+          // the template editor; it is engine-agnostic.
           setEditorText(templateView, transformSrc);
-          const isHelpers = ENGINE === "fullbars";
-          templateView.dispatch({ effects: templateLangComp.reconfigure([isHelpers ? jsLang : jsonataLang]) });
-          byId("sources-sub").textContent = isHelpers ? "helpers · JS · registerHelper" : "transform · JSONata";
+          templateView.dispatch({ effects: templateLangComp.reconfigure([jsonataLang]) });
+          byId("sources-sub").textContent = "transform · JSONata";
+        } else if (templateMode === "helpers") {
+          // Custom helpers (ADR-018) — a fundamentally different thing from the
+          // transform: registerHelper(...) JS that extends the engine, FullBars
+          // only, run in the Worker sandbox.
+          setEditorText(templateView, helpersSrc);
+          templateView.dispatch({ effects: templateLangComp.reconfigure([jsLang]) });
+          byId("sources-sub").textContent = "helpers · JS · registerHelper";
         } else {
           setEditorText(templateView, activeTab().source); // programmatic → no auto-run
           templateView.dispatch({
@@ -2847,6 +2874,15 @@
         templateMode = "transform";
         activeView = "tmpl";
         ensureOpen("transform");
+        showActiveTab();
+      }
+
+      // Activate the helpers.js editor (FullBars custom helpers, ADR-018) — a
+      // separate editor from the transform.
+      function selectHelpersTab() {
+        templateMode = "helpers";
+        activeView = "tmpl";
+        ensureOpen("helpers");
         showActiveTab();
       }
 
@@ -3055,6 +3091,7 @@
           name: "transform.jsonata",
           content: transformSrc,
         });
+        if (helpersSrc.trim()) files.push({ name: "helpers.js", content: helpersSrc });
         files.push({ name: "output.txt", content: lastOutput });
         files.push({ name: "README.md", content: await buildMarkdownDoc() });
         return files;
@@ -3437,10 +3474,9 @@
           });
         }
 
-        // Controller step: a JSONata transform (data → view-model). On the
-        // FullBars surface the Controller holds registerHelper source instead
-        // (rendered in the Worker sandbox below), so JSONata is skipped there.
-        if (ENGINE !== "fullbars" && transformSrc.trim()) {
+        // Transform step: a JSONata data → view-model preprocess (all engines).
+        // Custom helpers are a separate concern, applied at render below.
+        if (transformSrc.trim()) {
           try {
             data = jsonata(transformSrc).evaluate(data);
           } catch (err) {
@@ -3519,7 +3555,7 @@
           // matches the current inputs; otherwise show "rendering…" and let the
           // async render re-run. Provenance segments aren't produced for helper
           // renders (as the in-process renderWith path also returns none).
-          const helperSrc = (ENGINE === "fullbars") ? (transformSrc || "").trim() : "";
+          const helperSrc = (ENGINE === "fullbars") ? (helpersSrc || "").trim() : "";
           let output, segments;
           if (helperSrc) {
             const key = helperKey(mainSource, partialsMap(), data, helperSrc);
@@ -3614,7 +3650,7 @@
         const overlay = activeView === "data" ? overlayByName(dataFile) : null;
         const fileName = activeView === "config" ? "stem.config.yaml"
           : activeView !== "data"
-            ? (templateMode === "transform" ? "transform" : activeTab().name)
+            ? (templateMode === "transform" ? "transform" : templateMode === "helpers" ? "helpers.js" : activeTab().name)
             : overlay ? overlay.name + ".yaml" : "data.yaml";
         // Just the caret location — the language is implied by the active tab and
         // the encoding is always UTF-8, so both were noise.
@@ -4209,6 +4245,7 @@
         transformSrc = ex.transform
           ? await fetch(dir + ex.transform).then((r) => r.text())
           : "";
+        helpersSrc = ""; // catalog examples carry no custom helpers
         // Reset + load data overlays from the manifest, if any. Each entry
         // is `{ name, file }` — name is the slash-path the overlay mounts
         // at, file is fetched alongside data.yaml. A stale overlay from
@@ -4223,7 +4260,7 @@
             dataOverlays.push({ name: o.name, source: overlayTexts[i], dirty: false });
           });
         }
-        dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform"];
+        dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
         templateMode = "tmpl";
         showDataTab();
         escapeMode = "";
@@ -4286,8 +4323,9 @@
         activeTabIdx = 0; activeView = "tmpl";
         yamlSrc = ws.dataText;
         transformSrc = "";
+        helpersSrc = "";
         dataOverlays = [];
-        dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform"];
+        dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
         templateMode = "tmpl";
         showDataTab();
         escapeMode = "";
@@ -4338,6 +4376,8 @@
           tabs: tabs.map((t) => ({ n: t.name, s: t.source })),
           d: yamlSrc,
           t: transformSrc,
+          // Custom-helper source (ADR-018), a separate field from the transform.
+          ...(helpersSrc.trim() ? { h: helpersSrc } : {}),
           // Data overlays — each entry is { n: name, s: source }. Omitted when
           // there are none so legacy/short links stay compact.
           ...(dataOverlays.length ? { do: dataOverlays.map((o) => ({ n: o.name, s: o.source })) } : {}),
@@ -4349,6 +4389,7 @@
           // Active template-pane mode (1 = transform tab, 0/omitted = tmpl).
           // Persisted so a shared "I'm editing the transform" link round-trips.
           ...(templateMode === "transform" ? { tm: 1 } : {}),
+          ...(templateMode === "helpers" ? { hm: 1 } : {}),
           x: loadedExampleIdx, // which example (or -1 for an edited "custom" state)
         };
       }
@@ -4385,6 +4426,7 @@
           activeView = s.av === "data" ? "data" : "tmpl";
           yamlSrc = s.d ?? "";
           transformSrc = s.t ?? "";
+          helpersSrc = s.h ?? ""; // custom-helper source (ADR-018), separate field
           // Data overlays — accept only entries whose name passes the same
           // validator the UI enforces, dedupe by name (last write wins so
           // the shared snapshot's order is preserved as far as possible).
@@ -4401,8 +4443,8 @@
           }
           yamlDirty = false; transformDirty = false;
           exampleModified = false;
-          dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform"];
-          templateMode = s.tm === 1 ? "transform" : "tmpl";
+          dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
+          templateMode = s.hm === 1 ? "helpers" : s.tm === 1 ? "transform" : "tmpl";
           showDataTab();
           escapeMode = s.e ?? "";
           byId("escape-select").value = escapeMode;
@@ -4735,6 +4777,7 @@
       function fileSourceByKind(file, kind) {
         if (kind === "data") return yamlSrc;
         if (kind === "transform") return transformSrc;
+        if (kind === "helpers") return helpersSrc;
         const i = tabIndexByFile(file);
         return i >= 0 ? tabs[i].source : "";
       }
@@ -4748,6 +4791,9 @@
           transformSrc = next;
           // The transform now lives in the template pane.
           if (activeView === "tmpl" && templateMode === "transform") setEditorText(templateView, next);
+        } else if (kind === "helpers") {
+          helpersSrc = next;
+          if (activeView === "tmpl" && templateMode === "helpers") setEditorText(templateView, next);
         } else {
           const i = tabIndexByFile(file);
           if (i < 0) return;

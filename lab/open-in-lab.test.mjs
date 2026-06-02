@@ -47,15 +47,16 @@ test("workspaceState defaults are Lab-restorable", () => {
   assert.equal(s.x, -1);
   assert.equal(s.d, ""); // no data → empty editor
   assert.equal(s.tabs.length, 1);
-  assert.equal(s.t, undefined); // no helpers → no Controller field
+  assert.equal(s.h, undefined); // no helpers → no `h` field
 });
 
-test("workspaceState carries custom-helper source in the Controller field `t` (ADR-018)", () => {
+test("workspaceState carries custom-helper source in its own field `h` (ADR-018)", () => {
   const src = "registerHelper('loud', (s) => s.toUpperCase())";
   const s = workspaceState({ template: "{{loud x}}", helpers: src });
-  assert.equal(s.t, src);
+  assert.equal(s.h, src);
+  assert.equal(s.t, undefined); // separate from the data transform
   // whitespace-only helpers are treated as none
-  assert.equal(workspaceState({ template: "x", helpers: "  \n" }).t, undefined);
+  assert.equal(workspaceState({ template: "x", helpers: "  \n" }).h, undefined);
 });
 
 test("openInLab returns the URL when there is no window (SSR/build)", async () => {
