@@ -100,6 +100,15 @@ const helperCases = [
   // `expectError` (a substring), not the value-equality path — and it is what
   // pins the two render-path arity-text copies (JS.js + the runtime) together.
   { name: "helper:arity-mismatch", dialect: "surface", helpers: { loud: { fn: up, arity: 1 } }, t: "{{loud x y}}", d: { x: "a", y: "b" }, expectError: "expected exactly 1 argument(s), got 2" },
+  // ── ADR-020 block (section) helpers — usage decides; options.fn/inverse ──────
+  // Each must render identically in the interpreter (callJsBlockHelperImpl) and
+  // the compiled path (rt.block → callUserBlock). The block return is RAW.
+  { name: "block:simple", dialect: "surface", helpers: { bold: (options) => safe("<b>" + options.fn() + "</b>") }, t: "{{#bold}}hi{{/bold}}", d: {}, expect: "<b>hi</b>" },
+  { name: "block:context-shift", dialect: "surface", helpers: { list: (items, options) => safe("<ul>" + items.map((i) => "<li>" + options.fn(i) + "</li>").join("") + "</ul>") }, t: "{{#list people}}{{name}}{{/list}}", d: { people: [{ name: "Ada" }, { name: "Lin" }] }, expect: "<ul><li>Ada</li><li>Lin</li></ul>" },
+  { name: "block:this", dialect: "surface", helpers: { bold: function (options) { return safe("<b>" + options.fn(this) + "</b>"); } }, t: "{{#bold}}{{name}}{{/bold}}", d: { name: "Ada" }, expect: "<b>Ada</b>" },
+  { name: "block:inverse", dialect: "surface", helpers: { ifAny: (xs, options) => (xs.length ? options.fn() : options.inverse()) }, t: "{{#ifAny xs}}some{{else}}none{{/ifAny}}", d: { xs: [] }, expect: "none" },
+  { name: "block:zero-renders", dialect: "surface", helpers: { hide: () => "" }, t: "{{#hide}}secret{{/hide}}", d: {}, expect: "" },
+  { name: "block:n-renders", dialect: "surface", helpers: { twice: (options) => options.fn() + options.fn() }, t: "{{#twice}}x{{/twice}}", d: {}, expect: "xx" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 

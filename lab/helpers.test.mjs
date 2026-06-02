@@ -92,3 +92,34 @@ test("the bag drives renderWith end-to-end (escaped + safe)", () => {
   // safe() emits raw markup even in {{ }}
   assert.equal(renderWith(helpers, {}, "{{em x}}", { x: "hi" }).value, "<em>hi</em>");
 });
+
+test("a block helper renders the body via options.fn (ADR-020)", () => {
+  const { helpers } = buildHelpers(
+    "registerHelper('bold', function (options) { return safe('<b>' + options.fn(this) + '</b>'); })",
+    safe,
+  );
+  // options.fn(this) renders the body in the current context; the return is raw.
+  assert.equal(renderWith(helpers, {}, "{{#bold}}{{name}}{{/bold}}", { name: "Ada" }).value, "<b>Ada</b>");
+  // the same registration used inline sees no options.fn (usage decides).
+  assert.equal(renderWith(helpers, {}, "{{bold}}", {}).value, "");
+});
+
+test("options.fn(ctx) shifts context; options.inverse renders {{else}} (ADR-020)", () => {
+  const { helpers } = buildHelpers(
+    "registerHelper('list', (xs, o) => safe('<ul>' + xs.map((i) => '<li>' + o.fn(i) + '</li>').join('') + '</ul>'));\n" +
+      "registerHelper('ifAny', (xs, o) => (xs.length ? o.fn() : o.inverse()))",
+    safe,
+  );
+  assert.equal(
+    renderWith(helpers, {}, "{{#list people}}{{name}}{{/list}}", { people: [{ name: "Ada" }, { name: "Lin" }] }).value,
+    "<ul><li>Ada</li><li>Lin</li></ul>",
+  );
+  assert.equal(renderWith(helpers, {}, "{{#ifAny xs}}some{{else}}none{{/ifAny}}", { xs: [] }).value, "none");
+});
+
+test("v1 block options surface is fn/inverse — the rest throw (ADR-020)", () => {
+  const { helpers } = buildHelpers("registerHelper('h', (options) => options.hash.x)", safe);
+  const r = renderWith(helpers, {}, "{{#h}}b{{/h}}", {});
+  assert.equal(r.ok, false);
+  assert.match(r.error, /options\.hash is not supported/);
+});
