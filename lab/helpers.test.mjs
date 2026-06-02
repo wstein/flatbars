@@ -8,6 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildHelpers } from "./helpers.mjs";
+import { runHelperRequest } from "./helpers-worker.mjs";
 import { renderWith, safe } from "./vendor/flatbars-engine.mjs";
 
 test("buildHelpers collects registerHelper calls into a bag", () => {
@@ -57,6 +58,27 @@ test("range arities: [min, max] is enforced when over the max", () => {
   const over = renderWith(helpers, {}, "{{between a b c}}", { a: "x", b: "y", c: "z" });
   assert.equal(over.ok, false);
   assert.match(over.error, /^ArityError: between: expected 1.2 argument\(s\), got 3$/); // 1–2 (en-dash)
+});
+
+test("the Worker core (runHelperRequest) builds + renders off-thread (ADR-018)", () => {
+  const ok = runHelperRequest({
+    template: "{{loud x}}",
+    data: { x: "<b>ada" },
+    helperSrc: "registerHelper('loud', (s) => String(s).toUpperCase(), 1)",
+  });
+  assert.deepEqual(ok, { ok: true, value: "&lt;B&gt;ADA", error: "" });
+
+  const arity = runHelperRequest({
+    template: "{{loud x y}}",
+    data: { x: "a", y: "b" },
+    helperSrc: "registerHelper('loud', (s) => s, 1)",
+  });
+  assert.equal(arity.ok, false);
+  assert.match(arity.error, /ArityError: loud: expected exactly 1/);
+
+  const broken = runHelperRequest({ template: "{{x}}", data: {}, helperSrc: "registerHelper('x'," });
+  assert.equal(broken.ok, false);
+  assert.match(broken.error, /helper error/);
 });
 
 test("the bag drives renderWith end-to-end (escaped + safe)", () => {

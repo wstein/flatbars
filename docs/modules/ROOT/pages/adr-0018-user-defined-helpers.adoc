@@ -66,11 +66,14 @@ block helpers are therefore out of scope — a stated boundary, not an MVP cut.
   (clean for tests and for a shared Lab). A thin, stateful `registerHelper(name, fn)` is provided for
   Handlebars-copy-paste familiarity, documented as sugar that accumulates into a bag.
 
-. *The Lab runs helpers sandboxed.* Custom helper JS executes in a *Worker* (no DOM, no
-  same-origin ambient authority), feeding the same bag into render and compile. Helper source is *not*
-  serialised into share URLs silently: a workspace that carries helper code is flagged, and opening such
-  a link requires explicit consent before any helper runs. This keeps the "playground link" from
-  becoming an XSS delivery vector while preserving the live-render dogfooding.
+. *The Lab runs helpers in a Worker.* Custom helper JS is evaluated and executed in a *Worker*
+  (`lab/helpers-worker.mjs`), never on the main thread — a Worker has no DOM and no `window`, so a
+  shared workspace's helper code cannot read or deface the playground page. This *isolation* is the
+  mechanism (it supersedes the earlier confirm-prompt: even auto-run shared code can't touch the page).
+  Because the render then crosses a thread boundary while the Lab's `run()` is synchronous, the Worker
+  renders *out of band* — its result is cached by input key and painted when fresh; a miss kicks off the
+  async render, which re-runs once it lands. A Worker is not a full capability jail (it still has
+  `fetch`); it removes the page-takeover surface, which is the threat a shared "playground link" poses.
 
 == Consequences
 

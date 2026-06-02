@@ -1575,8 +1575,8 @@
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
-      import { highlightSpans, safe as fbSafe } from "./vendor/flatbars-engine.mjs?v=6";
-      import { buildHelpers } from "./helpers.mjs?v=1";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=6";
+      import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
       import {
@@ -1794,23 +1794,26 @@
       // For Stem it is a JSONata transform; on the FullBars surface it is
       // registerHelper(...) source (ADR-018), built into a helper bag below.
       let transformSrc = "";
-      // Consent to run Controller helper JS that arrived via a shared link
-      // (ADR-018): true for the user's own typed code, false until they accept a
-      // shared workspace's helpers. The user editing the Controller takes ownership.
-      let helperShareConsent = true;
-
-      // The custom-helper bag for a render, or null. FullBars surface only; shared
-      // helper code prompts for consent before its first run.
-      function helperBag() {
-        const src = (transformSrc || "").trim();
-        if (ENGINE !== "fullbars" || !src) return null;
-        if (!helperShareConsent) {
-          helperShareConsent = window.confirm(
-            "This shared workspace defines custom JavaScript helpers (the Controller tab). Run them?");
-          if (!helperShareConsent) return null;
-        }
-        const built = buildHelpers(src, fbSafe);
-        return built.ok ? built.helpers : null;
+      // Custom-helper isolation (ADR-018, the "floor"): Controller helper JS is
+      // evaluated and run in a Worker (no DOM / no page access), never on the
+      // main thread — so a shared workspace cannot deface or read the page, and
+      // no run-it? consent prompt is needed. `run()` is synchronous, so the
+      // Worker renders OUT OF BAND: its result is cached by input key and painted
+      // when fresh; a stale/absent entry kicks off the async render (which
+      // re-runs once it lands). FullBars surface only.
+      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=1");
+      let helperCache = { key: null, output: "", error: "" };
+      let helperInFlight = null;
+      function helperKey(tmpl, partials, data, src) {
+        try { return JSON.stringify([tmpl, partials, data, src]); } catch { return null; }
+      }
+      async function requestHelperRender(key, req) {
+        if (helperInFlight === key) return; // this exact input is already rendering
+        helperInFlight = key;
+        const res = await helperSandbox.render(req);
+        helperInFlight = null;
+        helperCache = { key, output: res.ok ? res.value : "", error: res.ok ? "" : res.error };
+        run(); // re-render; the cache now matches → synchronous paint
       }
       // Active data tab — either a built-in id ("data" / "transform" /
       // "context" / "ast") or an overlay name (e.g. "users/active") that
@@ -2102,7 +2105,6 @@
                 if (templateMode === "transform") {
                   transformSrc = text;
                   transformDirty = true;
-                  helperShareConsent = true; // the user owns code they edit themselves
                 } else {
                   activeTab().source = text;
                   tabs[activeTabIdx].dirty = true;
@@ -3324,7 +3326,7 @@
         const tCompileStart = performance.now();
         // Compile with span provenance so the rendered output can be mapped back
         // to its source files/tags in the Source view.
-        const compiled = renderer.compile(mainSource, partialsMap(), { map: true, standalone, helpers: helperBag() });
+        const compiled = renderer.compile(mainSource, partialsMap(), { map: true, standalone });
         const tCompileEnd = performance.now();
 
         if (compiled.errors) {
@@ -3428,7 +3430,7 @@
 
         // Controller step: a JSONata transform (data → view-model). On the
         // FullBars surface the Controller holds registerHelper source instead
-        // (applied via helperBag → renderer.compile), so JSONata is skipped there.
+        // (rendered in the Worker sandbox below), so JSONata is skipped there.
         if (ENGINE !== "fullbars" && transformSrc.trim()) {
           try {
             data = jsonata(transformSrc).evaluate(data);
@@ -3503,7 +3505,28 @@
         }
         try {
           const program = applyEscape(compiled.program, escapeMode);
-          const { output, segments } = renderer.render(program, data, { map: true });
+          // Custom-helper render (ADR-018): FullBars + Controller source runs in
+          // the Worker sandbox, out of band. Use the cached result when it
+          // matches the current inputs; otherwise show "rendering…" and let the
+          // async render re-run. Provenance segments aren't produced for helper
+          // renders (as the in-process renderWith path also returns none).
+          const helperSrc = (ENGINE === "fullbars") ? (transformSrc || "").trim() : "";
+          let output, segments;
+          if (helperSrc) {
+            const key = helperKey(mainSource, partialsMap(), data, helperSrc);
+            if (helperCache.key !== key) {
+              requestHelperRender(key, { template: mainSource, data, partials: partialsMap(), helperSrc });
+              setOutput("rendering…"); setError(""); renderDock(); saveHash(); lastTimings = null;
+              return;
+            }
+            if (helperCache.error) {
+              setError(helperCache.error); setOutput(""); renderDock(); saveHash(); lastTimings = null;
+              return;
+            }
+            output = helperCache.output; segments = [];
+          } else {
+            ({ output, segments } = renderer.render(program, data, { map: true }));
+          }
           setOutput(output, segments);
           setError("");
         } catch (err) {
@@ -4353,10 +4376,6 @@
           activeView = s.av === "data" ? "data" : "tmpl";
           yamlSrc = s.d ?? "";
           transformSrc = s.t ?? "";
-          // A shared workspace's Controller code is not run until the user
-          // consents (ADR-018); their own edits re-grant it. (Only FullBars
-          // helper JS is gated; Stem JSONata is unaffected — see helperBag.)
-          helperShareConsent = !(transformSrc.trim());
           // Data overlays — accept only entries whose name passes the same
           // validator the UI enforces, dedupe by name (last write wins so
           // the shared snapshot's order is preserved as far as possible).
