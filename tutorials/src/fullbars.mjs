@@ -255,16 +255,18 @@ grade: fail
 
   // ── A user-defined BLOCK helper (ADR-020) ────────────────────────────────────
   blockHelper: {
-    // One `registerHelper`; usage decides block vs inline. As a block, the helper
-    // gets `options.fn(ctx)` to render the body with `ctx` as context — here the
-    // Handlebars `list` helper, verbatim. Gated through `renderWith` like the
-    // inline helper cards.
+    // One `registerHelper`; usage decides block vs inline. The full block surface
+    // (ADR-020): `options.hash` reads `class="roster"`, `options.fn(item, { blockParams })`
+    // renders the body with the context shifted to `item` and binds the `as |person i|`
+    // names. The Handlebars `list` helper, verbatim. Gated through `renderWith`.
     engine: "fullbars",
-    template: "{{#list people}}{{name}}{{/list}}",
+    template: '{{#list people class="roster" as |person i|}}<li>{{i}}: {{person.name}}</li>{{/list}}',
     data: { people: [{ name: "Ada" }, { name: "Lin" }] },
     helpers:
-      "registerHelper('list', (items, options) =>\n" +
-      "  safe('<ul>' + items.map((i) => '<li>' + options.fn(i) + '</li>').join('') + '</ul>'))",
+      "registerHelper('list', (items, o) =>\n" +
+      "  safe('<ul class=\"' + o.hash.class + '\">'\n" +
+      "    + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('')\n" +
+      "    + '</ul>'))",
   },
 
   // ── Lambdas → precalculated values (the "after" render) ──────────────────────

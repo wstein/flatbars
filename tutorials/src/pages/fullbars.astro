@@ -231,9 +231,11 @@ $ ~> | $ | {
     <h3>Block helpers</h3>
     <p>
       One <code>registerHelper</code>, <b>usage decides</b> block vs inline: a block call
-      (<code>{t("{{#name}}…{{/name}}")}</code>) passes a Handlebars-style <code>options</code> whose
-      <code>options.fn(ctx)</code> renders the body and <code>options.inverse(ctx)</code> the
-      <code>{t("{{else}}")}</code> — so the canonical <code>list</code> helper runs verbatim
+      (<code>{t("{{#name}}…{{/name}}")}</code>) passes a Handlebars-style <code>options</code> with
+      <code>options.hash</code> (the <code>k=v</code> args), <code>options.fn(ctx, &#123; blockParams &#125;)</code>
+      to render the body with a shifted context and bind <code>as |…|</code> names, and
+      <code>options.inverse</code> for <code>{t("{{else}}")}</code> — so the canonical <code>list</code>
+      helper (hash + block params and all) runs verbatim
       (<a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>):
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.blockHelper.template} data={ex.blockHelper.data} helpers={ex.blockHelper.helpers} />
