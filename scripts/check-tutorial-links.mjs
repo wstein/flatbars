@@ -23,6 +23,25 @@ const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
 let fail = 0;
 const warnings = [];
 
+// Shared-<head> guard: the landing and the reference layout must both route
+// their <head> through src/components/BaseHead.astro, never hand-roll a font
+// link of their own — that is exactly how the two heads drifted before (the
+// landing was missing a Mono weight). BaseHead is the only place the Google
+// Fonts link may appear, so any other page referencing it has re-forked the head.
+console.log("Shared <head> (BaseHead) guard:");
+for (const page of ["src/pages/index.astro", "src/layouts/Reference.astro"]) {
+  const src = readFileSync(new URL(`../tutorials/${page}`, import.meta.url), "utf8");
+  if (!/\bBaseHead\b/.test(src)) {
+    console.error(`  ✗ ${page}: does not use BaseHead — the <head> must come from the shared partial`);
+    fail++;
+  } else if (src.includes("fonts.googleapis.com")) {
+    console.error(`  ✗ ${page}: hand-rolls a font <link> — fonts belong only in BaseHead.astro (head drift risk)`);
+    fail++;
+  } else {
+    console.log(`  ✓ ${page} routes its <head> through BaseHead`);
+  }
+}
+
 // Heuristic (non-fatal): a list example that renders its items on one line with
 // no separator reads as "broken" to newcomers — the standalone-trim footgun the
 // partial examples hit. Flag a block-iterating example whose data holds a 2+

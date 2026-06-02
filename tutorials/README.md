@@ -55,7 +55,8 @@ spec is published (default `/flatbars/`).
   `src/styles/open-in-lab.css` — tokens are copied, not the Lab's component CSS,
   so the two can't drift. A single `src/components/BaseHead.astro` owns the
   `<head>` (meta, the one canonical font link, the token sheet) for **both** the
-  landing and `Reference.astro`, so the two heads can't drift on fonts again.
+  landing and `Reference.astro`, so the two heads can't drift on fonts again;
+  `check:tutorial-links` fails if either page hand-rolls its own font link.
 - **Open in Lab** uses the shared `lab/open-in-lab.mjs` (`labHref`), which encodes
   the workspace with the Lab's own share-state codec into the URL — self-
   contained, no vendoring, no fetch.
