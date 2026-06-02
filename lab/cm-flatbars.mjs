@@ -16,34 +16,44 @@
 // engine's `highlightSpans` is injected for the same reason.
 //
 // Colour contract: the consumer's stylesheet must define the classes in
-// `FLATBARS_KIND_CLASS` (the Lab's `--stem-*` palette already does, bar
-// `.cm-hb-error`). Kinds are grouped onto the existing palette so `{{else}}`
-// reads as a statement alongside `{{#…}}`, and set-delimiter tags read like
-// comments (inert, render nothing).
+// `FLATBARS_KIND_CLASS` (the unified `--c-*` palette — shared with the
+// tutorials and the legend — plus `.cm-hb-pn` for the dimmed delimiters and
+// `.cm-hb-error`). Kinds are grouped onto seven palette families so `{{else}}`
+// reads as a statement alongside `{{#…}}`.
 
-// kind (from `FlatBars.Highlight`) → CSS class. Several kinds share a palette
-// slot on purpose: every block sigil and the clause keywords read as control
-// flow; partials and the inheritance sigils (`{{<}}`/`{{$}}`) read as
-// composition; triple-stash and raw blocks read as unescaped output.
+// kind (from `FlatBars.Highlight`) → CSS class, the seven-family system shared
+// with the tutorials and the colour legend. Several kinds share a slot on
+// purpose: every block sigil and the clause keywords read as control flow
+// (block); the inheritance sigils (`{{<}}`/`{{$}}`) get their own composition
+// slot (inherit), distinct from a `{{> partial}}` (partial); set-delimiter tags
+// get their own directive slot (delim), distinct from a comment; triple-stash
+// and raw blocks read as unescaped output (raw).
 export const FLATBARS_KIND_CLASS = {
   expr: "cm-hb-expr",
   keyword: "cm-hb-block",
   "block-open": "cm-hb-block",
   "block-inverse": "cm-hb-block",
   "block-close": "cm-hb-block",
-  "block-parent": "cm-hb-partial",
-  "block-decl": "cm-hb-partial",
+  "block-parent": "cm-hb-inherit",
+  "block-decl": "cm-hb-inherit",
   partial: "cm-hb-partial",
   raw: "cm-hb-raw",
   "raw-block": "cm-hb-raw",
   comment: "cm-hb-comment",
-  "set-delimiter": "cm-hb-comment",
+  "set-delimiter": "cm-hb-delim",
   error: "cm-hb-error",
   // interior-role kinds (ADR-017): operators/strings/numbers inside a tag
   operator: "cm-hb-op",
   string: "cm-hb-str",
   number: "cm-hb-num",
 };
+
+// Kinds whose span text is a whole `{{…}}` tag (not an interior op/str/num
+// token) — only these get their leading/trailing delimiters dimmed.
+const TAG_KINDS = new Set([
+  "expr", "keyword", "block-open", "block-inverse", "block-close",
+  "block-parent", "block-decl", "partial", "raw", "comment", "set-delimiter",
+]);
 
 // Map a span kind to its CSS class; an unknown kind falls back to `expr` so a
 // future lexer kind degrades to plain interpolation styling rather than vanishing.
@@ -68,8 +78,20 @@ export function flatbarsHighlight(cm, highlightSpans, dialect) {
     const spans = highlightSpans(text, dialect) || [];
     const ranges = [];
     for (const s of spans) {
-      if (s && s.to > s.from) {
-        ranges.push(Decoration.mark({ class: kindClass(s.kind) }).range(s.from, s.to));
+      if (!(s && s.to > s.from)) continue;
+      ranges.push(Decoration.mark({ class: kindClass(s.kind) }).range(s.from, s.to));
+      // Dim the tag's own `{{`/`}}` delimiters with a nested mark — the sigil +
+      // name stay loud, exactly like the legend chips and the tutorials editor.
+      // Only default `{{`-style delimiters dim (custom set-delimiter pairs keep
+      // their full colour); the start/end guards keep this safe on short tags.
+      if (TAG_KINDS.has(s.kind)) {
+        const t = text.slice(s.from, s.to);
+        const open = t.startsWith("{{{") ? 3 : t.startsWith("{{") ? 2 : 0;
+        const close = t.endsWith("}}}") ? 3 : t.endsWith("}}") ? 2 : 0;
+        if (open) ranges.push(Decoration.mark({ class: "cm-hb-pn" }).range(s.from, s.from + open));
+        if (close && s.to - close >= s.from + open) {
+          ranges.push(Decoration.mark({ class: "cm-hb-pn" }).range(s.to - close, s.to));
+        }
       }
     }
     // `true` sorts the ranges (spans are already in order, but the flag is cheap

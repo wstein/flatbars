@@ -93,15 +93,18 @@ flatbarsHighlightTheme: Extension         // maps kinds → the --stem-* palette
 ```
 
 - The `ViewPlugin` scans the document (templates are small; full-doc scan avoids the cross-line `{{!-- … --}}` issue the Lab already documents), calls `highlightSpans`, and emits one `Decoration.mark({ class })` per span. On `docChanged`, recompute.
-- The **kind → class** map lives here, once, reusing the committed `--stem-*` palette (`lab-tokens.css`); new kinds (`set-delimiter`/`error`, and the per-sigil block kinds) get palette entries in light + dark so both surfaces look identical:
+- The **kind → class** map lives here, once, over the unified **seven-family `--c-*` palette** — one source shared by the tutorials editor (`stem-*`), the Lab editor (`cm-hb-*`), the inline prose tags, AND the colour legend, so the legend can never lie about the examples. The families: `expr` (escaped, green), `raw` (unescaped, deep green), `block` (sections + clause keywords, orange), `partial` (composition, blue), `inherit` (layout/overridable-block sigils, violet), `delim` (set-delimiters directive, rose), `comment` (grey). Defined in light + dark (`lab-tokens.css` for the tutorials, the inline `--c-*` tokens in `lab/index.html`), retuned to clear **WCAG AA (4.5:1)** on each family's own tint:
 
 ```
-expr→stem-expr  raw|raw-block→stem-raw
-block-open|block-inverse|block-close|keyword→stem-block   block-parent|block-decl|partial→stem-partial
-comment|set-delimiter→stem-comment  error→stem-error
+expr→…-expr  raw|raw-block→…-raw
+block-open|block-inverse|block-close|keyword→…-block   partial→…-partial
+block-parent|block-decl→…-inherit   set-delimiter→…-delim
+comment→…-comment  error→…-error
 ```
 
-`keyword` (the `{{else}}`/`{{elif}}` clause separators) shares `stem-block`, so it reads as a statement alongside `{{#…}}` — the user-requested behavior, derived from the dialect rather than hardcoded.
+`keyword` (the `{{else}}`/`{{elif}}` clause separators) shares the `block` family, so it reads as a statement alongside `{{#…}}` — the user-requested behavior, derived from the dialect rather than hardcoded. The inheritance sigils (`{{<}}`/`{{$}}`) and the set-delimiters tag get their **own** families (`inherit`, `delim`) rather than folding into `partial`/`comment`, so composition-by-layout reads distinctly from composition-by-partial and the directive reads as a warning.
+
+Each presenter also dims the tag's own `{{`/`}}` delimiters — a nested `.pn` / `.cm-hb-pn` sub-span at 0.42 opacity — keeping the sigil + name as the loud part (this resolves the §10 open question; see below). The **Chips** control (`body[data-chipstyle]` = tint | outline | solid) restyles every family's chip — editor, inline, and legend — together; tint is the default.
 
 Because both hosts use this one extension, "the kind→class map" and "the presenter" are a single artifact — there is nothing to keep in sync between Lab and tutorials.
 
@@ -154,5 +157,5 @@ Steps 1–3 + 5 are done; step 4 (tutorials CM6) remains. The tutorials' regex s
 
 ## 11. Open questions
 
-- Whether `tokenizeTemplate` emits separate `delimiter` spans for the `{{`/`}}` punctuation, or folds them into the head kind — a palette decision, not a grammar one.
-- Whether the tutorials' static lambda spec-block is highlighted by a read-only CM instance or a build-time engine-tokenized render (both work; the latter avoids a CM instance for a non-editable block).
+- **Resolved — delimiter spans.** The `{{`/`}}` punctuation is *not* emitted as separate lexer spans; `tokenizeTemplate` keeps whole-tag spans (the grammar is unchanged). Instead each **presenter** dims the delimiters: it detects the leading `{{`/`{{{` and trailing `}}`/`}}}` of a tag-kind span and wraps them in a nested dimmed sub-span (`.pn` in the tutorials, `.cm-hb-pn` in the Lab, 0.42 opacity). This keeps the dimming a presentation choice (no grammar churn, default `{{`-style delimiters only — custom set-delimiter pairs keep full colour) and matches the colour legend.
+- Whether the tutorials' static lambda spec-block is highlighted by a read-only CM instance or a build-time engine-tokenized render (both work; the latter avoids a CM instance for a non-editable block). *(Shipped: the tutorials use a build-time `highlightTemplate` render — no CM instance.)*

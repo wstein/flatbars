@@ -31,11 +31,16 @@ function decorate(template, dialect) {
   return ext.opts.decorations(inst);
 }
 
+// The tag highlighting now also emits dimmed `cm-hb-pn` delimiter marks nested in
+// each tag; the kind-mapping tests below assert the TAG classes, so drop the pn
+// marks (a dedicated test covers them).
+const tagClasses = (decos) => decos.filter((d) => d.class !== "cm-hb-pn").map((d) => d.class);
+
 test("kindClass maps every lexer kind, with an expr fallback", () => {
   assert.equal(kindClass("keyword"), "cm-hb-block");
   assert.equal(kindClass("block-open"), "cm-hb-block");
-  assert.equal(kindClass("block-parent"), "cm-hb-partial");
-  assert.equal(kindClass("set-delimiter"), "cm-hb-comment");
+  assert.equal(kindClass("block-parent"), "cm-hb-inherit");
+  assert.equal(kindClass("set-delimiter"), "cm-hb-delim");
   assert.equal(kindClass("error"), "cm-hb-error");
   assert.equal(kindClass("totally-unknown"), "cm-hb-expr");
   // every declared kind resolves to a class
@@ -45,31 +50,30 @@ test("kindClass maps every lexer kind, with an expr fallback", () => {
 });
 
 test("{{else}} paints as a statement (block class) between open/close", () => {
-  const decos = decorate("{{#if c}}{{else}}{{/if}}", "maxbars");
+  const tags = decorate("{{#if c}}{{else}}{{/if}}", "maxbars").filter((d) => d.class !== "cm-hb-pn");
   assert.deepEqual(
-    decos.map((d) => d.class),
+    tags.map((d) => d.class),
     ["cm-hb-block", "cm-hb-block", "cm-hb-block"],
   );
   // and the offsets are the engine's, not a regex's
-  assert.deepEqual(decos.map((d) => [d.from, d.to]), [[0, 9], [9, 17], [17, 24]]);
+  assert.deepEqual(tags.map((d) => [d.from, d.to]), [[0, 9], [9, 17], [17, 24]]);
 });
 
 test("dialect-dependence: {{else}} is plain interpolation in MinBars", () => {
-  const decos = decorate("{{else}}", "minbars");
-  assert.deepEqual(decos.map((d) => d.class), ["cm-hb-expr"]);
+  assert.deepEqual(tagClasses(decorate("{{else}}", "minbars")), ["cm-hb-expr"]);
 });
 
 test("set delimiters are stateful — only the engine gets the following tag right", () => {
-  const decos = decorate("{{=<% %>=}}x<%y%>", "minbars");
-  assert.deepEqual(decos.map((d) => d.class), ["cm-hb-comment", "cm-hb-expr"]);
-  assert.deepEqual(decos.map((d) => [d.from, d.to]), [[0, 11], [12, 17]]);
+  const tags = decorate("{{=<% %>=}}x<%y%>", "minbars").filter((d) => d.class !== "cm-hb-pn");
+  assert.deepEqual(tags.map((d) => d.class), ["cm-hb-delim", "cm-hb-expr"]);
+  assert.deepEqual(tags.map((d) => [d.from, d.to]), [[0, 11], [12, 17]]);
 });
 
 test("inheritance sigils and raw/comment get their own palette slots", () => {
   const decos = decorate("{{<base}}{{$title}}d{{/title}}{{/base}}{{{x}}}{{! c }}", "fullbars");
   assert.deepEqual(
-    decos.map((d) => d.class),
-    ["cm-hb-partial", "cm-hb-partial", "cm-hb-block", "cm-hb-block", "cm-hb-raw", "cm-hb-comment"],
+    tagClasses(decos),
+    ["cm-hb-inherit", "cm-hb-inherit", "cm-hb-block", "cm-hb-block", "cm-hb-raw", "cm-hb-comment"],
   );
 });
 
@@ -77,10 +81,25 @@ test("MaxBars interior tokens punch through with their own classes", () => {
   // `+` is an operator span between expr (head-coloured) spans; a simple tag
   // stays one expr chunk.
   assert.deepEqual(
-    decorate("{{ a + b }}", "maxbars").map((d) => d.class),
+    tagClasses(decorate("{{ a + b }}", "maxbars")),
     ["cm-hb-expr", "cm-hb-op", "cm-hb-expr"],
   );
-  assert.deepEqual(decorate("{{name}}", "maxbars").map((d) => d.class), ["cm-hb-expr"]);
+  assert.deepEqual(tagClasses(decorate("{{name}}", "maxbars")), ["cm-hb-expr"]);
+});
+
+test("a tag's {{ }} delimiters get dimmed cm-hb-pn marks, nested in the tag", () => {
+  // {{name}} → the tag mark plus a pn mark over `{{` and over `}}`.
+  const decos = decorate("{{name}}", "fullbars");
+  assert.deepEqual(
+    decos.map((d) => [d.class, d.from, d.to]),
+    [["cm-hb-expr", 0, 8], ["cm-hb-pn", 0, 2], ["cm-hb-pn", 6, 8]],
+  );
+  // triple-stash dims all three braces each side
+  const raw = decorate("{{{x}}}", "fullbars").filter((d) => d.class === "cm-hb-pn");
+  assert.deepEqual(raw.map((d) => [d.from, d.to]), [[0, 3], [4, 7]]);
+  // a custom-delimiter tag keeps its full colour (only `{{`-style dims)
+  const custom = decorate("{{=<% %>=}}<%y%>", "minbars").filter((d) => d.class === "cm-hb-pn");
+  assert.deepEqual(custom.map((d) => [d.from, d.to]), [[0, 2], [9, 11]]);
 });
 
 test("a lex error degrades to no decorations", () => {

@@ -56,21 +56,24 @@
         --tok-str: #047857;
         --tok-num: #b45309;
 
-        /* Stem-tag palette — separately tuned from --tok-* so the four kinds
-           of `{{ }}` tags read as distinct visual chips against dense HTML
-           (the syntax-token vocabulary is muted by design for long-form
-           code; Stem tags need to *pop*). Each entry pairs a saturated
-           foreground with a soft tinted background — same hue, ~12% alpha
-           — so a tag reads as a chip without the layout shift a padding
-           change would cause. Overridden in dark mode below. */
-        --stem-block-fg:    #c026d3;  /* fuchsia-600 — control flow */
-        --stem-block-bg:    rgba(192, 38, 211, 0.10);
-        --stem-expr-fg:     #16a34a;  /* green-600 — interpolation {{val}} */
-        --stem-expr-bg:     rgba(22, 163, 74, 0.10);
-        --stem-partial-fg:  #2563eb;  /* blue-600 — partial {{> part}} */
-        --stem-partial-bg:  rgba(37, 99, 235, 0.10);
-        --stem-raw-fg:      #ea580c;  /* orange-600 — unescaped emit */
-        --stem-raw-bg:      rgba(234, 88, 12, 0.10);
+        /* Syntax-tag palette — separately tuned from the long-form --tok-* so the
+           `{{ }}` tags read as distinct chips against dense markup (the code
+           vocabulary is muted by design; tags need to *pop*). This is the same
+           seven-family system the tutorials use — one source for the legend AND
+           the editor — retuned to clear WCAG AA on its own tint. The chip
+           treatment (tint / outline / solid) is chosen in Appearance ▸ Tag chips
+           (body[data-chipstyle]); the legend popover reuses these tokens, so it
+           is an honest key. Dark-mode overrides live in the [data-theme] blocks. */
+        --c-expr:    #107937;  /* interpolation · escaped — green */
+        --c-raw:     #14532d;  /* interpolation · raw — deepest green (care) */
+        --c-block:   #a95011;  /* sections / clauses — warm orange */
+        --c-partial: #2460e3;  /* composition · partial — blue */
+        --c-inherit: #6d28d9;  /* composition · inheritance / block — violet */
+        --c-delim:   #c91a40;  /* directive · set delimiters — rose */
+        --c-comment: #646b78;  /* directive · comment — neutral grey */
+        --tint-mix: 12%;
+        --directive-bg: #eceaf1;
+        --chip-solid-fg: #fff;  /* text on a SOLID chip — flips dark in dark mode */
         --stem-op-fg:       #0891b2;  /* cyan-600 — interior operators (a + b, a | f) */
         --stem-str-fg:      #e11d48;  /* rose-600 — interior string literals */
         --stem-num-fg:      #b45309;  /* amber-700 — interior number literals */
@@ -149,22 +152,25 @@
 
       /* Topbar tool buttons — flat and light (the diagnostics-toggle look the
          user preferred), with a leading icon, grouped into a tool bar. */
-      button.btn {
+      /* `.btn` (not `button.btn`) so the toolbar's one anchor button — the Docs
+         backlink — gets the same flat sizing, including the 13px icon cap; an
+         unscoped <a> svg otherwise renders at its intrinsic size. */
+      .btn {
         display: inline-flex; align-items: center; gap: 5px;
         height: 26px; padding: 0 9px;
         border: 1px solid var(--border); border-radius: var(--radius);
         background: transparent; color: var(--fg-secondary);
-        font: 11px var(--font-ui); cursor: pointer;
+        font: 11px var(--font-ui); cursor: pointer; text-decoration: none;
         transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
       }
-      button.btn:hover { background: var(--bg-2); color: var(--fg); }
+      .btn:hover { background: var(--bg-2); color: var(--fg); }
       /* Toolbar action cluster: borderless (no dividers either) for a clean look. */
-      .topbar .toolbar button.btn { border-color: transparent; }
-      .topbar .toolbar button.btn:hover { background: var(--bg-2); border-color: transparent; }
+      .topbar .toolbar .btn { border-color: transparent; }
+      .topbar .toolbar .btn:hover { background: var(--bg-2); border-color: transparent; }
       button.btn.active { color: var(--accent); border-color: var(--accent-soft); background: var(--accent-softer); }
-      button.btn:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-      button.btn svg { width: 13px; height: 13px; flex: 0 0 auto; opacity: .85; }
-      button.btn .kbd-inline { color: var(--fg-faint); margin-left: 4px; font: 11px/1 var(--font-mono); }
+      .btn:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+      .btn svg { width: 13px; height: 13px; flex: 0 0 auto; opacity: .85; }
+      .btn .kbd-inline { color: var(--fg-faint); margin-left: 4px; font: 11px/1 var(--font-mono); }
       /* The action buttons sit together as one bar with hairline separators. */
       .toolbar { display: inline-flex; align-items: center; gap: 4px; }
 
@@ -539,36 +545,134 @@
          the whole class set is bold + chip-tinted — without that lift the
          tags blur into the surrounding markup at typical editor sizes
          (the cheat-sheet and Group-dictionary examples make this visible).
-         Each kind gets its own hue and a matching ~12% background tint so
-         eye-scanning separates structure from interpolation from a
-         partial dispatch from an unescaped raw emit without having to
-         read every tag's body. The palette lives in the `--stem-*-fg/bg`
-         tokens at the top of this file so dark mode can re-tune both
-         axes independently of the long-form-code `--tok-*` vocabulary.
+         Each family gets its own hue (the unified `--c-*` palette at the top of
+         this file, shared with the legend) so eye-scanning separates structure
+         from interpolation from composition from an unescaped raw emit without
+         reading every tag's body:
 
-           BLOCK   fuchsia, weight 700  — control flow skeleton
-           PARTIAL teal,    weight 700  — runtime dispatch
-           EXPR    blue,    weight 600  — the common interpolation case
-           RAW     orange,  weight 700  — flags the SSTI-adjacent unescaped emit
-           COMMENT muted grey, italic, no bold/bg — out-of-band notes
+           EXPR     green,  weight 600  — the common interpolation case
+           RAW      deep green, 700     — the SSTI-adjacent unescaped emit (care)
+           BLOCK    orange, weight 700  — control-flow skeleton + clause keywords
+           PARTIAL  blue,   weight 700  — runtime dispatch
+           INHERIT  violet, weight 700  — layout / overridable-block sigils
+           DELIM    rose,   weight 700  — the set-delimiters directive
+           COMMENT  grey, italic, no bg — out-of-band notes
 
-         A small horizontal `padding` + `border-radius` would read more
-         like a chip but would shift the editor's character grid and break
-         cursor positioning at tag boundaries; the tinted background +
-         rounded `border-radius` alone is enough to chunk the tag. */
-      .cm-hb-comment { color: var(--tok-cmt); font-style: italic; }
-      .cm-hb-block   { color: var(--stem-block-fg);   background: var(--stem-block-bg);   font-weight: 700; border-radius: 3px; }
-      .cm-hb-partial { color: var(--stem-partial-fg); background: var(--stem-partial-bg); font-weight: 700; border-radius: 3px; }
-      .cm-hb-raw     { color: var(--stem-raw-fg);     background: var(--stem-raw-bg);     font-weight: 700; border-radius: 3px; }
-      .cm-hb-expr    { color: var(--stem-expr-fg);    background: var(--stem-expr-bg);    font-weight: 600; border-radius: 3px; }
+         The chip treatment (tint / outline / solid) is the body[data-chipstyle]
+         set in Appearance ▸ Tag chips; the `{{ }}` delimiters themselves are
+         dimmed (`.cm-hb-pn`) so the sigil + name stay the loud part. A small
+         horizontal `padding` would read more like a chip but would shift the
+         editor's character grid and break cursor positioning at tag boundaries;
+         the background/outline + `border-radius` alone chunk the tag. */
+      /* Each tag class sets --c from the unified palette; tint = a color-mix of
+         --c into the page so the chip reads without a layout-shifting padding.
+         inherit (violet) + delim (rose) are their own families now, matching the
+         tutorials, instead of folding into partial / comment. */
+      .cm-hb-expr    { --c: var(--c-expr);    color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 600; border-radius: 3px; }
+      .cm-hb-raw     { --c: var(--c-raw);     color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
+      .cm-hb-block   { --c: var(--c-block);   color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
+      .cm-hb-partial { --c: var(--c-partial); color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
+      .cm-hb-inherit { --c: var(--c-inherit); color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
+      .cm-hb-delim   { --c: var(--c-delim);   color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
+      .cm-hb-comment { color: var(--c-comment); font-style: italic; }
+      /* Dimmed {{ }} delimiters — keep the sigil + name loud (matches the legend). */
+      .cm-hb-pn      { opacity: 0.42; }
       /* Interior tokens (ADR-017): operators/strings/numbers inside a tag — bold
          ink, no chip background, so they read on top of the tag's faint tint. */
       .cm-hb-op      { color: var(--stem-op-fg);  font-weight: 700; }
       .cm-hb-str     { color: var(--stem-str-fg); font-weight: 700; }
       .cm-hb-num     { color: var(--stem-num-fg); font-weight: 700; }
+      /* Tag chip style — Appearance ▸ Tag chips (body[data-chipstyle]). The tag
+         classes above carry the TINT default; outline/solid swap the treatment.
+         Interior op/str/num are excluded (no chip). box-shadow (not border) keeps
+         the editor's character grid from shifting under the textarea cursor. */
+      body[data-chipstyle="outline"] :is(.cm-hb-expr, .cm-hb-raw, .cm-hb-block, .cm-hb-partial, .cm-hb-inherit, .cm-hb-delim) {
+        background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 42%, var(--bg));
+      }
+      body[data-chipstyle="solid"] :is(.cm-hb-expr, .cm-hb-raw, .cm-hb-block, .cm-hb-partial, .cm-hb-inherit, .cm-hb-delim) {
+        background: var(--c); color: var(--chip-solid-fg);
+      }
       /* A lexer error span (ADR-014): today `highlightSpans` degrades to no
          spans, so this is the defensive style for the `error` kind. */
       .cm-hb-error   { text-decoration: underline wavy #ef4444; text-decoration-skip-ink: none; }
+
+      /* ── Colour legend (toolbar popover) — the same key the tutorials show,
+         keyed to the editor's --c-* palette so it's an honest legend. ── */
+      .legend-swatch {
+        width: 14px; height: 14px; border-radius: 3px; flex: none;
+        display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 1.5px;
+      }
+      .legend-swatch i { border-radius: 1.5px; }
+      .legend-swatch i:nth-child(1) { background: var(--c-expr); }
+      .legend-swatch i:nth-child(2) { background: var(--c-partial); }
+      .legend-swatch i:nth-child(3) { background: var(--c-block); }
+      .legend-swatch i:nth-child(4) { background: var(--c-inherit); }
+      #legend-btn[aria-expanded="true"] { border-color: var(--accent) !important; color: var(--accent-2); }
+
+      .legend-pop {
+        position: absolute; top: calc(100% + 6px); right: 0;
+        width: min(420px, 92vw); max-height: 74vh; overflow: auto;
+        background: var(--bg); border: 1px solid var(--border-strong);
+        border-radius: 10px; box-shadow: var(--shadow-pop);
+        padding: 14px 16px 16px; z-index: 60;
+      }
+      .legend-pop[hidden] { display: none; }
+      .legend-pop-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+      .legend-pop-head .lph-title { font-size: 14px; font-weight: 700; color: var(--fg); }
+      .legend-pop-head .lph-sub { font-size: 11.5px; color: var(--fg-faint); }
+      .legend-grid { margin: 10px 0 0; }
+      .legend-grid .fam { margin-bottom: 15px; }
+      .legend-grid .fam:last-child { margin-bottom: 0; }
+      .legend-grid .fam-label {
+        display: flex; align-items: center; gap: 10px; margin: 0 0 9px;
+        font-size: 11.5px; font-weight: 600; color: var(--fg);
+      }
+      .legend-grid .fam-label .sub { color: var(--fg-faint); font-weight: 500; white-space: nowrap; }
+      .legend-grid .fam-label::after {
+        content: ""; flex: 1; height: 1px;
+        background: linear-gradient(90deg, var(--border-strong), transparent);
+      }
+      .legend-grid .item {
+        display: grid; grid-template-columns: 8.5rem minmax(0, 1fr);
+        align-items: baseline; column-gap: 14px; row-gap: 4px; margin-bottom: 7px;
+      }
+      .legend-grid .item:last-child { margin-bottom: 0; }
+      .legend-grid .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+      .legend-grid .chip-br { flex-basis: 100%; height: 0; }
+      .legend-grid .chip {
+        --c: var(--fg); color: var(--c);
+        font-family: var(--font-mono); font-weight: 600; font-size: 12px; line-height: 1.3;
+        padding: 0; border-radius: 4px; white-space: nowrap;
+        background: color-mix(in srgb, var(--c) var(--tint-mix), var(--bg));
+      }
+      .legend-grid .chip.is-directive { background: var(--directive-bg); }
+      .legend-grid .chip .pn { opacity: 0.42; }
+      /* Legend chips track the same Tag-chips style as the editor. */
+      body[data-chipstyle="outline"] .legend-grid .chip {
+        background: transparent; border: 1px solid color-mix(in srgb, var(--c) 42%, var(--bg));
+      }
+      body[data-chipstyle="outline"] .legend-grid .chip.is-directive {
+        border-color: color-mix(in srgb, var(--fg) 20%, var(--bg)); background: var(--directive-bg);
+      }
+      body[data-chipstyle="solid"] .legend-grid .chip { background: var(--c); color: var(--chip-solid-fg); }
+      .legend-grid .c-expr { --c: var(--c-expr); }
+      .legend-grid .c-raw { --c: var(--c-raw); }
+      .legend-grid .c-block { --c: var(--c-block); }
+      .legend-grid .c-partial { --c: var(--c-partial); }
+      .legend-grid .c-inherit { --c: var(--c-inherit); }
+      .legend-grid .c-delim { --c: var(--c-delim); }
+      .legend-grid .c-comment { --c: var(--c-comment); font-style: italic; font-weight: 500; }
+      .legend-grid .meta { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+      .legend-grid .name { font-size: 12.5px; font-weight: 600; color: var(--fg); white-space: nowrap; }
+      .legend-grid .name .qual { font-weight: 500; color: var(--fg-faint); }
+      .legend-grid .desc { font-size: 11.5px; color: var(--fg-muted); margin: 0; }
+      .legend-grid .meta .desc::before { content: "·"; margin-right: 6px; color: var(--border-strong); }
+      .legend-grid .desc code { font-family: var(--font-mono); font-size: 0.92em; background: none; padding: 0; }
+      .legend-foot {
+        margin: 13px 0 0; padding-top: 11px; border-top: 1px solid var(--border);
+        font-size: 11.5px; color: var(--fg-faint); line-height: 1.55;
+      }
+      .legend-foot b { color: var(--fg-muted); font-weight: 600; }
       /* YAML scalar keywords (true/false/null/…) and numbers — the YAML grammar
          leaves these as plain content, so they are highlighted via a decorator. */
       .cm-yaml-kw    { color: var(--tok-tag); font-weight: 600; }
@@ -1104,6 +1208,11 @@
         --accent-soft: #2e2747; --accent-softer: #221d36;
         --tok-tag: #c4b5fd; --tok-cmt: #8a84a0; --tok-key: #93c5fd;
         --tok-str: #86efac; --tok-num: #fbbf24;
+        /* Unified palette, dark — same set as the system-dark block below. */
+        --c-expr: #86efac; --c-raw: #5ba677; --c-block: #f9a35c; --c-partial: #93c5fd;
+        --c-inherit: #a78bfa; --c-delim: #f6647d; --c-comment: #9ca3af;
+        --tint-mix: 20%; --directive-bg: #363150; --chip-solid-fg: #0e0c16;
+        --stem-op-fg: #67e8f9; --stem-str-fg: #fda4af; --stem-num-fg: #fbbf24;
         --success: #4ade80;
         --danger: #f87171; --danger-faint: #3a1414; --warn: #fbbf24; --warn-faint: #3a2e10; --success-faint: #14321f;
         --shadow-pop: 0 12px 32px -8px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.4);
@@ -1122,13 +1231,11 @@
           --accent-soft: #2e2747; --accent-softer: #221d36;
           --tok-tag: #c4b5fd; --tok-cmt: #8a84a0; --tok-key: #93c5fd;
           --tok-str: #86efac; --tok-num: #fbbf24;
-          /* Stem-tag palette, dark — bumped saturation/lightness so the
-             chip background stays readable on a #16141d page and the
-             foreground keeps high contrast. */
-          --stem-block-fg:   #f0abfc; --stem-block-bg:   rgba(240, 171, 252, 0.16);
-          --stem-expr-fg:    #86efac; --stem-expr-bg:    rgba(134, 239, 172, 0.16);
-          --stem-partial-fg: #93c5fd; --stem-partial-bg: rgba(147, 197, 253, 0.16);
-          --stem-raw-fg:     #fdba74; --stem-raw-bg:     rgba(253, 186, 116, 0.18);
+          /* Unified palette, dark — lifted for AA on a #16141d page; raw + delim
+             lightened so they clear the 20% tint. Mirrors the tutorials' dark set. */
+          --c-expr: #86efac; --c-raw: #5ba677; --c-block: #f9a35c; --c-partial: #93c5fd;
+          --c-inherit: #a78bfa; --c-delim: #f6647d; --c-comment: #9ca3af;
+          --tint-mix: 20%; --directive-bg: #363150; --chip-solid-fg: #0e0c16;
           --stem-op-fg:      #67e8f9; --stem-str-fg:     #fda4af; --stem-num-fg: #fbbf24;
           --success: #4ade80;
           --danger: #f87171; --danger-faint: #3a1414; --warn: #fbbf24; --warn-faint: #3a2e10; --success-faint: #14321f;
@@ -1291,7 +1398,7 @@
       body.compact-toolbar .topbar .kbd-inline,
       body.compact-toolbar .topbar .field-label,
       body.compact-toolbar .render-status { display: none; }
-      body.compact-toolbar .topbar button.btn { padding: 0 7px; }
+      body.compact-toolbar .topbar .btn { padding: 0 7px; }
       body.compact-toolbar .topbar #share-btn { padding: 0 8px; }
       body.compact-toolbar .render-group { gap: 4px; }
     </style>
@@ -1386,6 +1493,33 @@
           </div>
         </div>
         <div class="spacer"></div>
+        <!-- Right cluster: the colour legend (a popover keyed to the editor's
+             syntax palette) and a backlink to the docs/tutorials. -->
+        <div class="topbar-group toolbar">
+          <div id="legend" class="dropdown">
+            <button id="legend-btn" class="btn" type="button" aria-haspopup="dialog" aria-expanded="false"
+                    title="Syntax colour legend">
+              <span class="legend-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <span class="btn-label">Legend</span>
+            </button>
+            <div id="legend-pop" class="legend-pop" role="dialog" aria-label="Colour legend" hidden>
+              <div class="legend-pop-head">
+                <span class="lph-title">Colour legend</span>
+                <span class="lph-sub">how every tag is tinted in the editor</span>
+              </div>
+              <div class="legend-grid" id="legend-body"></div>
+              <p class="legend-foot"><b>Reading the system:</b> green = interpolation,
+                blue = composition, violet = inheritance, orange = sections, rose = the
+                set-delimiters directive, grey = comment. A <em>deeper</em> green marks
+                <em>raw</em> output — the one interpolation to handle with care.</p>
+            </div>
+          </div>
+          <a id="docs-link" class="btn" href="../" target="_blank" rel="noopener"
+             title="Open the FlatBars docs &amp; tutorials">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+            <span class="btn-label">Docs</span><span aria-hidden="true" style="margin-left:1px">↗</span>
+          </a>
+        </div>
       </header>
 
       <!-- ── Workspace ────────────────────────────────────────────── -->
@@ -1719,6 +1853,74 @@
         : ENGINE === "minbars" ? "MinBars"
         : "Stem";
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
+
+      // ── Docs backlink + colour-legend popover ──────────────────────────────
+      // The "Docs" button points at the reference page for the current engine
+      // (relative, so it works on whatever host serves both); the Legend popover
+      // is the same key the tutorials show, rendered from the same data and keyed
+      // to the editor's --c-* palette so it's honest.
+      (function setupDocsAndLegend() {
+        const DOCS = { rawbars: "../rawbars", fullbars: "../fullbars", maxbars: "../maxbars", minbars: "../minbars" };
+        const dl = byId("docs-link");
+        if (dl) dl.href = DOCS[ENGINE] || "../";
+
+        const FAMILIES = [
+          { id: "Interpolation", sub: "outputs a value" },
+          { id: "Sections", sub: "control flow" },
+          { id: "Composition", sub: "pulls in templates" },
+          { id: "Directives", sub: "template-only · no output" },
+        ];
+        const TAGS = [
+          { family: "Interpolation", name: "Escaped", desc: "inserts a value, HTML-escaped", chips: [{ t: "{{name}}", c: "expr" }] },
+          { family: "Interpolation", name: "Raw", desc: "the same value, left unescaped", chips: [{ t: "{{{html}}}", c: "raw" }] },
+          { family: "Sections", name: "Section", desc: "opens & closes a region", chips: [{ t: "{{#each xs}}", c: "block" }, { br: true }, { t: "{{/each}}", c: "block" }] },
+          { family: "Sections", name: "Clause", desc: "a branch inside a block", chips: [{ t: "{{else}}", c: "block" }] },
+          { family: "Composition", name: "Partial", desc: "includes another template", chips: [{ t: "{{>card}}", c: "partial" }] },
+          { family: "Composition", name: "Inheritance", desc: "extends a parent layout", chips: [{ t: "{{<layout}}", c: "inherit" }] },
+          { family: "Composition", name: "Block", desc: "an overridable region", chips: [{ t: "{{$title}}", c: "inherit" }] },
+          { family: "Directives", name: "Comment", desc: "dropped from output", chips: [{ t: "{{! note }}", c: "comment", directive: true }] },
+          { family: "Directives", name: "Set delimiters", qual: "directive", desc: "changes the <code>{{ }}</code> pair", chips: [{ t: "{{=<% %>=}}", c: "delim" }] },
+        ];
+        const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        function splitTag(t) {
+          if (t.slice(0, 3) === "{{{" && t.slice(-3) === "}}}") return ["{{{", t.slice(3, -3), "}}}"];
+          if (t.slice(0, 2) === "{{" && t.slice(-2) === "}}") return ["{{", t.slice(2, -2), "}}"];
+          return ["", t, ""];
+        }
+        const chipHTML = (ch) => {
+          if (ch.br) return '<span class="chip-br"></span>';
+          const p = splitTag(ch.t);
+          return '<code class="chip c-' + ch.c + (ch.directive ? " is-directive" : "") + '">' +
+            '<span class="pn">' + esc(p[0]) + "</span>" + esc(p[1]) + '<span class="pn">' + esc(p[2]) + "</span></code>";
+        };
+        const itemHTML = (it) =>
+          '<div class="item"><div class="chips">' + it.chips.map(chipHTML).join("") + "</div>" +
+          '<div class="meta"><span class="name">' + it.name + (it.qual ? ' <span class="qual">· ' + it.qual + "</span>" : "") +
+          '</span><span class="desc">' + it.desc + "</span></div></div>";
+        const body = byId("legend-body");
+        if (body) {
+          body.innerHTML = FAMILIES.map((fam) =>
+            '<section class="fam"><h3 class="fam-label">' + fam.id + ' <span class="sub">— ' + fam.sub + "</span></h3>" +
+            TAGS.filter((t) => t.family === fam.id).map(itemHTML).join("") + "</section>").join("");
+        }
+
+        const btn = byId("legend-btn"), pop = byId("legend-pop");
+        if (btn && pop) {
+          const onOutside = (e) => { if (!pop.contains(e.target) && !btn.contains(e.target)) close(); };
+          const onEsc = (e) => { if (e.key === "Escape") { close(); btn.focus(); } };
+          function open() {
+            pop.hidden = false; btn.setAttribute("aria-expanded", "true");
+            document.addEventListener("mousedown", onOutside, true);
+            document.addEventListener("keydown", onEsc, true);
+          }
+          function close() {
+            pop.hidden = true; btn.setAttribute("aria-expanded", "false");
+            document.removeEventListener("mousedown", onOutside, true);
+            document.removeEventListener("keydown", onEsc, true);
+          }
+          btn.addEventListener("click", () => (pop.hidden ? open() : close()));
+        }
+      })();
 
       // The engine selector. Switching is a fundamental mode change (one renderer
       // is instantiated at boot), so it navigates with the new `?engine=` param
@@ -4521,7 +4723,7 @@
         fontSize: [12, 13, 14, 16],
       };
 
-      let tweaks = { theme: "system", layout: "split", lineNumbers: true, font: "plex", fontSize: 13, compactToolbar: false };
+      let tweaks = { theme: "system", layout: "split", lineNumbers: true, font: "plex", fontSize: 13, compactToolbar: false, chipstyle: "tint" };
       try { const r = localStorage.getItem(LS_TWEAKS); if (r) tweaks = { ...tweaks, ...JSON.parse(r) }; } catch {}
       // Migrate older saved state: the former "dim" theme is now "dark", moods are gone.
       if (tweaks.theme === "dim") tweaks.theme = "dark";
@@ -4529,10 +4731,12 @@
       tweaks.lineNumbers = tweaks.lineNumbers !== false; // default on
       if (!TWEAK_OPTS.font.some((o) => o.value === tweaks.font)) tweaks.font = "plex";
       if (!TWEAK_OPTS.fontSize.includes(tweaks.fontSize)) tweaks.fontSize = 13;
+      if (!["tint", "outline", "solid"].includes(tweaks.chipstyle)) tweaks.chipstyle = "tint";
       delete tweaks.mood;
 
       function applyTweaks() {
         document.body.dataset.theme = tweaks.theme;
+        document.body.dataset.chipstyle = tweaks.chipstyle;
         document.body.classList.toggle("compact-toolbar", !!tweaks.compactToolbar);
         document.body.classList.toggle("show-line-numbers", tweaks.lineNumbers);
         const lineNumberExt = tweaks.lineNumbers ? [lineNumbers(), highlightActiveLineGutter()] : [];
@@ -4619,6 +4823,10 @@
             <${TwSection} title="Line numbers">
               <${TwSegmented} tweakKey="lineNumbers" set=${set}
                 options=${[{ value: true, label: "On" }, { value: false, label: "Off" }]} />
+            <//>
+            <${TwSection} title="Tag chips" hint=${tweaks.chipstyle}>
+              <${TwSegmented} tweakKey="chipstyle" set=${set}
+                options=${[{ value: "tint", label: "Tint" }, { value: "outline", label: "Outline" }, { value: "solid", label: "Solid" }]} />
             <//>
             <${TwSection} title="Editor font" hint="monospace">
               <${TwSegmented} tweakKey="font" set=${set}
