@@ -11517,10 +11517,10 @@ var combinators = function(toks) {
         return 0;
       }
       ;
-      throw new Error("Failed pattern match at MaxBars.Expr (line 89, column 16 - line 91, column 19): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at MaxBars.Expr (line 95, column 16 - line 97, column 19): " + [v1.constructor.name]);
     }
     ;
-    throw new Error("Failed pattern match at MaxBars.Expr (line 87, column 13 - line 91, column 19): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at MaxBars.Expr (line 93, column 13 - line 97, column 19): " + [v.constructor.name]);
   };
   var pipeOp = function(v) {
     if (v instanceof TOp && v.value0 === "|") {
@@ -11632,7 +11632,7 @@ var combinators = function(toks) {
               });
             }
             ;
-            throw new Error("Failed pattern match at MaxBars.Expr (line 101, column 20 - line 103, column 41): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at MaxBars.Expr (line 107, column 20 - line 109, column 41): " + [v.constructor.name]);
           };
         };
         return bind1(sub3(i))(function(first) {
@@ -11661,61 +11661,67 @@ var combinators = function(toks) {
       return Nothing.value;
     };
   }();
-  var ladder = function(term) {
-    var pUnary = function(i) {
-      var v = tk(i);
-      if (v instanceof Just && (v.value0 instanceof TOp && v.value0.value0 === "!")) {
-        return bind1(pUnary(i + 1 | 0))(function(r) {
-          return new Right({
-            val: new App2("not", [r.val]),
-            pos: r.pos
-          });
-        });
-      }
-      ;
-      return term(i);
-    };
-    var pMul = function(i) {
-      return binL(mulOp)(pUnary)(i);
-    };
-    var pAdd = function(i) {
-      return binL(addOp)(pMul)(i);
-    };
-    var pCmp = function(i) {
-      return bind1(pAdd(i))(function(lhs) {
-        var v = bind6(tk(lhs.pos))(cmpOp);
-        if (v instanceof Just) {
-          return bind1(pAdd(lhs.pos + 1 | 0))(function(r) {
+  var ladder = function(withPipe) {
+    return function(term) {
+      var pUnary = function(i) {
+        var v = tk(i);
+        if (v instanceof Just && (v.value0 instanceof TOp && v.value0.value0 === "!")) {
+          return bind1(pUnary(i + 1 | 0))(function(r) {
             return new Right({
-              val: v.value0(lhs.val)(r.val),
+              val: new App2("not", [r.val]),
               pos: r.pos
             });
           });
         }
         ;
-        if (v instanceof Nothing) {
-          return new Right({
-            val: lhs.val,
-            pos: lhs.pos
-          });
-        }
-        ;
-        throw new Error("Failed pattern match at MaxBars.Expr (line 115, column 33 - line 117, column 54): " + [v.constructor.name]);
-      });
+        return term(i);
+      };
+      var pMul = function(i) {
+        return binL(mulOp)(pUnary)(i);
+      };
+      var pAdd = function(i) {
+        return binL(addOp)(pMul)(i);
+      };
+      var pCmp = function(i) {
+        return bind1(pAdd(i))(function(lhs) {
+          var v = bind6(tk(lhs.pos))(cmpOp);
+          if (v instanceof Just) {
+            return bind1(pAdd(lhs.pos + 1 | 0))(function(r) {
+              return new Right({
+                val: v.value0(lhs.val)(r.val),
+                pos: r.pos
+              });
+            });
+          }
+          ;
+          if (v instanceof Nothing) {
+            return new Right({
+              val: lhs.val,
+              pos: lhs.pos
+            });
+          }
+          ;
+          throw new Error("Failed pattern match at MaxBars.Expr (line 124, column 33 - line 126, column 54): " + [v.constructor.name]);
+        });
+      };
+      var pAnd = function(i) {
+        return binL(binOp("&&")("and"))(pCmp)(i);
+      };
+      var pOr = function(i) {
+        return binL(binOp("||")("or"))(pAnd)(i);
+      };
+      var pCoalesce = function(i) {
+        return binL(binOp("??")("coalesce"))(pOr)(i);
+      };
+      var pPipe = function(i) {
+        return binL(pipeOp)(pCoalesce)(i);
+      };
+      if (withPipe) {
+        return pPipe;
+      }
+      ;
+      return pCoalesce;
     };
-    var pAnd = function(i) {
-      return binL(binOp("&&")("and"))(pCmp)(i);
-    };
-    var pOr = function(i) {
-      return binL(binOp("||")("or"))(pAnd)(i);
-    };
-    var pCoalesce = function(i) {
-      return binL(binOp("??")("coalesce"))(pOr)(i);
-    };
-    var pPipe = function(i) {
-      return binL(pipeOp)(pCoalesce)(i);
-    };
-    return pPipe;
   };
   var pAtom = function(i) {
     var v = tk(i);
@@ -11750,6 +11756,13 @@ var combinators = function(toks) {
     if (v instanceof Just && v.value0 instanceof TIdent) {
       return new Right({
         val: new App2(v.value0.value0, []),
+        pos: i + 1 | 0
+      });
+    }
+    ;
+    if (v instanceof Just && (v.value0 instanceof TOp && v.value0.value0 === "|")) {
+      return new Right({
+        val: new App2("|", []),
         pos: i + 1 | 0
       });
     }
@@ -11797,10 +11810,10 @@ var combinators = function(toks) {
     return pAtom(i);
   };
   var exprLadder = function(i) {
-    return ladder(pApp)(i);
+    return ladder(true)(pApp)(i);
   };
   var headLadder = function(i) {
-    return ladder(pAtom)(i);
+    return ladder(false)(pAtom)(i);
   };
   return {
     exprLadder,
@@ -11828,7 +11841,7 @@ var parseMaxExpr = function(toks) {
     ;
   }
   ;
-  throw new Error("Failed pattern match at MaxBars.Expr (line 44, column 21 - line 48, column 66): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at MaxBars.Expr (line 49, column 21 - line 53, column 66): " + [v.constructor.name]);
 };
 var parseMaxHead = function(toks) {
   var comb = combinators(toks);
@@ -11864,10 +11877,10 @@ var parseMaxHead = function(toks) {
             ;
           }
           ;
-          throw new Error("Failed pattern match at MaxBars.Expr (line 66, column 19 - line 70, column 62): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at MaxBars.Expr (line 72, column 19 - line 76, column 62): " + [v2.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at MaxBars.Expr (line 64, column 3 - line 70, column 62): " + [i.constructor.name, acc.constructor.name]);
+        throw new Error("Failed pattern match at MaxBars.Expr (line 70, column 3 - line 76, column 62): " + [i.constructor.name, acc.constructor.name]);
       }
       ;
       while (!$tco_done) {

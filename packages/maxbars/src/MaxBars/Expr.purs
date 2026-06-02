@@ -18,9 +18,14 @@
 -- |  * `parseMaxExpr` (output expressions) — the primary is an **application**
 -- |    (`f a b`), so `{{ f a && b }}` is `(and (f a) b)`.
 -- |  * `parseMaxHead` (block heads, the `parseHead` seam) — the head is `name`
--- |    followed by *arguments*, each a full infix expression whose primary is a
--- |    single **atom**. So `{{#if a && b}}` reads as `if (and a b)` (one condition)
--- |    and `{{#each xs}}` / `{{#if cond k=v}}` keep their positional/hash args.
+-- |    followed by *arguments*, each an infix expression whose primary is a single
+-- |    **atom**. So `{{#if a && b}}` reads as `if (and a b)` (one condition) and
+-- |    `{{#each xs}}` / `{{#if cond k=v}}` keep their positional/hash args. The head
+-- |    ladder omits the *pipe* rung: a bar in head position is **structure**, not an
+-- |    operator — it carries the block-parameter clause `as |a b|` through to the
+-- |    surface desugar (`extractBlockParams`), exactly as the core default parser
+-- |    does. Pipe an argument by parenthesising it (`{{#each (xs | reverse) as |x|}}`),
+-- |    where an atom re-enters the full expression ladder.
 module MaxBars.Expr
   ( parseMaxExpr
   , parseMaxHead
@@ -52,9 +57,10 @@ parseMaxExpr toks = case exprLadder 0 of
   len = comb.len
   posAt = comb.posAt
 
--- | Parse a *block head*: `name arg*`, where each argument is a full infix
--- | expression over atoms (so `{{#if a && b}}` is `if (and a b)`). Returns the
--- | head as an `App`, which the core tree-builder splits into `{ name, args }`.
+-- | Parse a *block head*: `name arg*`, where each argument is an infix expression
+-- | over atoms (so `{{#if a && b}}` is `if (and a b)`) — the *pipe* rung excluded,
+-- | so a trailing `as |a b|` survives as structure (see the module header). Returns
+-- | the head as an `App`, which the core tree-builder splits into `{ name, args }`.
 parseMaxHead :: Array PosToken -> Either ParseError Expr
 parseMaxHead toks = case comb.tk 0 of
   Just (TIdent name) -> App name <$> collect 1 []
@@ -103,8 +109,11 @@ combinators toks =
       Nothing -> Right { val: lhs, pos }
 
   -- the precedence ladder over a given `term` (the primary at the bottom).
-  ladder :: (Int -> Either ParseError (Step Expr)) -> Int -> Either ParseError (Step Expr)
-  ladder term = pPipe
+  -- `withPipe` is the top rung: output expressions include it; block heads omit
+  -- it (a bar there is a block-parameter delimiter, parsed as structure below).
+  ladder
+    :: Boolean -> (Int -> Either ParseError (Step Expr)) -> Int -> Either ParseError (Step Expr)
+  ladder withPipe term = if withPipe then pPipe else pCoalesce
     where
     pPipe i = binL pipeOp pCoalesce i
     pCoalesce i = binL (binOp "??" "coalesce") pOr i
@@ -121,10 +130,11 @@ combinators toks =
       Just (TOp "!") -> pUnary (i + 1) >>= \r -> Right { val: App "not" [ r.val ], pos: r.pos }
       _ -> term i
 
-  -- output expressions: the primary is an application (`f a b`).
-  exprLadder i = ladder pApp i
-  -- block-head arguments: the primary is a single atom (so `name a b` is two args).
-  headLadder i = ladder pAtom i
+  -- output expressions: the primary is an application (`f a b`); pipe included.
+  exprLadder i = ladder true pApp i
+  -- block-head arguments: the primary is a single atom (so `name a b` is two args);
+  -- the pipe rung is omitted so a bar stays structural (a block-param delimiter).
+  headLadder i = ladder false pAtom i
 
   -- an application: an identifier head applied to atom arguments, or an atom.
   pApp :: Int -> Either ParseError (Step Expr)
@@ -141,6 +151,12 @@ combinators toks =
     Just (TStr s) -> Right { val: Lit (VString s), pos: i + 1 }
     Just (TNum n) -> Right { val: Lit (VNumber n), pos: i + 1 }
     Just (TIdent name) -> Right { val: App name [], pos: i + 1 }
+    -- a bare bar is structure, not an operator: in head position (no pipe rung)
+    -- it survives as `App "|" []` so the surface desugar's `extractBlockParams`
+    -- can strip a trailing `as |…|` clause — matching the core default parser.
+    -- (In output position the pipe rung consumes the bar first, so this case is
+    -- reached only inside a block head.)
+    Just (TOp "|") -> Right { val: App "|" [], pos: i + 1 }
     _ -> Left (LexError "expected an expression" (posAt i))
 
   -- application arguments: a run of atoms (paren / literal / nullary ident).
