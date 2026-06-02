@@ -9,10 +9,10 @@
 export const lessons = {
   rawbars: {
     engine: "rawbars",
-    title: "RawBars — the austere core",
+    title: "RawBars — the meaning-free core",
     blurb:
-      "No surface sugar: every value is an explicit helper application. " +
-      "{{{ … }}} is raw output; escape with escapeHtml; read fields with lookup.",
+      "The parser, exposed: no surface sugar — every value is an explicit helper " +
+      "application. {{{ … }}} is raw output; escape with escapeHtml; read fields with lookup.",
     spec: "concepts", // docs/modules/ROOT/pages/concepts.adoc
     template:
       '<h1>{{{ escapeHtml (lookup this "name") }}}</h1>\n' +
@@ -24,8 +24,9 @@ export const lessons = {
     engine: "minbars",
     title: "MinBars — Mustache-compatible",
     blurb:
-      "Logic-less Mustache: {{name}} interpolates (HTML-escaped), {{#section}} " +
-      "iterates/guards, {{^inverted}} renders when falsy, {{.}} is the item.",
+      "Proof the core spans Mustache — a peer engine with Mustache truthiness: " +
+      "{{name}} interpolates (HTML-escaped), {{#section}} iterates/guards, " +
+      "{{^inverted}} renders when falsy, {{.}} is the item.",
     spec: "maxbars", // (Mustache surface; see the engine docs)
     template:
       "<h1>{{name}}</h1>\n" +
@@ -35,10 +36,10 @@ export const lessons = {
 
   fullbars: {
     engine: "fullbars",
-    title: "FullBars — Handlebars-flavoured",
+    title: "FullBars — Handlebars-faithful",
     blurb:
-      "The reference engine: {{ name }} auto-escapes, dotted paths read data, " +
-      "and {{#each}} / {{#if}} are block helpers.",
+      "Proof the core spans Handlebars — the reference engine: {{ name }} " +
+      "auto-escapes, dotted paths read data, {{#each}} / {{#if}} are block helpers.",
     spec: "surface", // docs/modules/ROOT/pages/surface.adoc
     template:
       "<h1>Hello, {{ name }}!</h1>\n" +
