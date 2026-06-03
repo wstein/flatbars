@@ -50,6 +50,8 @@ usage =
     , ""
     , "Usage:"
     , "  flatbars <template> [--data <data.json>] [--validate | --compile]"
+    , "  flatbars analyse <template> <data.json> [--emit-jsonata]"
+    , "  flatbars examples verify [--provider mustache]"
     , ""
     , "Options:"
     , "  -d, --data <file>   JSON data file (default: null context)"
@@ -317,29 +319,47 @@ examplesUsage =
     , "Vendor/refresh the corpus with: node scripts/vendor-mustache.mjs"
     ]
 
+analyseUsage :: String
+analyseUsage =
+  joinWith "\n"
+    [ "flatbars analyse — trace a render, report truthiness portability (ADR-022)"
+    , ""
+    , "Usage:"
+    , "  flatbars analyse <template> <data.json> [--emit-jsonata]"
+    , ""
+    , "Renders the FullBars template against the data and reports every condition"
+    , "whose branch would differ on another engine (Mustache/StringTemplate4/…),"
+    , "with a concrete fix each — and a `✓` line per portable condition."
+    , "  --emit-jsonata   emit a reviewable JSONata data-cleanup scaffold instead"
+    , "                   of the markdown report."
+    ]
+
 -- | `flatbars analyse <template> <data.json> [--emit-jsonata]` (ADR-022 Part B):
 -- | render the FullBars template against the data and print a markdown report of
 -- | every truthiness decision that would branch differently on another engine
 -- | (with a fix each), or `--emit-jsonata` for the reviewable cleanup scaffold.
 runAnalyse :: Array String -> Effect Unit
-runAnalyse args =
-  let
-    emitJsonata = Array.elem "--emit-jsonata" args
-    positional = Array.filter (\a -> not (isJust (stripPrefix (Pattern "--") a))) args
-  in
-    case positional of
-      [ tplPath, dataPath ] -> do
-        tplE <- readFileSafe tplPath
-        case tplE of
-          Left err -> die ("flatbars analyse: cannot read template '" <> tplPath <> "': " <> err)
-          Right tpl -> do
-            datE <- loadData (Just dataPath)
-            case datE of
-              Left err -> die ("flatbars analyse: " <> err)
-              Right value -> case analyseSurface tpl value of
-                Left e -> die ("flatbars analyse: " <> tplPath <> ": " <> e)
-                Right r -> writeStdout ((if emitJsonata then r.jsonata else r.report) <> "\n")
-      _ -> die "flatbars analyse: usage: flatbars analyse <template> <data.json> [--emit-jsonata]"
+runAnalyse args
+  | Array.elem "-h" args || Array.elem "--help" args = writeStdout (analyseUsage <> "\n")
+  | otherwise =
+      let
+        emitJsonata = Array.elem "--emit-jsonata" args
+        positional = Array.filter (\a -> not (isJust (stripPrefix (Pattern "--") a))) args
+      in
+        case positional of
+          [ tplPath, dataPath ] -> do
+            tplE <- readFileSafe tplPath
+            case tplE of
+              Left err -> die
+                ("flatbars analyse: cannot read template '" <> tplPath <> "': " <> err)
+              Right tpl -> do
+                datE <- loadData (Just dataPath)
+                case datE of
+                  Left err -> die ("flatbars analyse: " <> err)
+                  Right value -> case analyseSurface tpl value of
+                    Left e -> die ("flatbars analyse: " <> tplPath <> ": " <> e)
+                    Right r -> writeStdout ((if emitJsonata then r.jsonata else r.report) <> "\n")
+          _ -> die ("flatbars analyse: expected <template> <data.json>\n\n" <> analyseUsage)
 
 runExamples :: Array String -> Effect Unit
 runExamples args = case Array.uncons args of

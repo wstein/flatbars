@@ -475,6 +475,15 @@ main = do
     ( outputOf "{{#if bio}}yes{{else}}no{{/if}}" (obj [ Tuple "bio" (str "") ])
         == "no"
     )
+  -- the JSONata scaffold normalises a bare-path finding out of the ambiguous set.
+  let
+    jsonataOf src d = case analyseSurface src d of
+      Left e -> "ERR: " <> e
+      Right r -> r.jsonata
+  assert' "analyse:jsonata-empty-string"
+    ( contains (Pattern "\"bio\": bio = \"\" ? null : bio")
+        (jsonataOf "{{#if bio}}x{{/if}}" (obj [ Tuple "bio" (str "") ]))
+    )
 
   -- Standalone whitespace removal (on by default): a block open/close or comment
   -- alone on its line leaves no blank line.
