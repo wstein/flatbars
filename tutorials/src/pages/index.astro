@@ -1,151 +1,260 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 //
-// The landing leads with what FlatBars IS + proof, not negation: a positive hero,
-// a proof strip wired from the conformance reports (so it can't go stale), and one
-// live example above the fold. The "meaning-free parser" architecture line moves
-// below the fold. The app topbar (Topbar.astro) is shared with the docs, so the
-// first click no longer changes the chrome.
+// The landing — ported from the "FlatBars Landing" mock, now wired to the real
+// system: the shared Topbar/Wordmark chrome (so the first click never changes
+// the chrome), the live conformance numbers (so the proof strip is measured, not
+// asserted), and the real engine bundle behind the live playground (OpenInLab —
+// a preview and the Lab can never diverge). Structure: hero + proof, one live
+// example, the four surfaces as a spectrum, the "meaning-free parser" thesis
+// below the fold, footer.
 import BaseHead from "../components/BaseHead.astro";
 import Topbar from "../components/Topbar.astro";
+import Wordmark from "../components/Wordmark.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
-import HighlightLegend from "../components/HighlightLegend.astro";
 import "../styles/open-in-lab.css";
 import { lessons, surfaces } from "../examples.mjs";
 import { examples as ex } from "../mustache.mjs";
 // Proof numbers come from the committed conformance reports — the same data the
-// gates measure — so the strip is "measured, not asserted".
+// gates measure — so the strip can't go stale.
 import conformance from "../conformance.json";
 import hbs from "../../../conformance/handlebars/report.json";
 
+const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
+const GH = "https://github.com/wstein/flatbars";
+
 const proof = [
-  { n: `${conformance.total.pass}/${conformance.total.total}`, label: "Mustache spec modules — MinBars passes the vendored suite", href: "/minbars#conformance" },
-  { n: `${hbs.total.pass}/${hbs.total.total}`, label: "byte-identical to Handlebars 4.7.9 — FullBars", href: "/fullbars" },
-  { n: "0", label: "helpers baked into the core — every one is a plug-in (~80 in the FullBars prelude)", href: "/rawbars" },
+  {
+    num: `${conformance.total.pass}`, of: `/${conformance.total.total}`, label: "Mustache spec",
+    desc: "Every module of the official Mustache suite that MinBars implements — the spec is the oracle.",
+    href: "/minbars#conformance",
+  },
+  {
+    num: `${hbs.total.pass}`, of: `/${hbs.total.total}`, label: "byte-identical",
+    desc: "Outputs asserted differentially against handlebars@4.7.9 by FullBars.",
+    href: "/fullbars",
+  },
+  {
+    num: "0", of: "", label: "built-in helpers",
+    desc: "Nothing baked into the core. Every helper is one you supply — the parser stays meaning-free.",
+    href: "/rawbars",
+  },
 ];
 
-const surfaceCards = surfaces.map((s) => ({
-  href: s === "minbars" ? "/minbars" : `/${s}`,
-  title: lessons[s].title,
-  blurb: lessons[s].blurb,
-  featured: s === "minbars",
-}));
+// Per-surface landing copy: a short role + a one-line sample tag (compact for the
+// card spectrum). MinBars is flagged the recommended start. The blurbs here are
+// the landing's tight one-liners; the long per-surface reference text lives on
+// each /[surface] page.
+const surfaceMeta = {
+  rawbars: { role: "the meaning-free core", sample: "{{ lookup name }}",
+    blurb: "The parser, exposed. No surface sugar — every value is an explicit helper application." },
+  minbars: { role: "mustache-compatible", sample: "{{#items}}{{name}}{{/items}}", recommended: true,
+    blurb: "The complete logic-less language. New to templates? You already know it." },
+  fullbars: { role: "handlebars-faithful", sample: "{{#each xs}}{{this}}{{/each}}",
+    blurb: "The reference engine — block helpers, dotted paths, and your own registerHelper." },
+  maxbars: { role: "the full language", sample: '{{ price | money "EUR" }}',
+    blurb: "FullBars plus infix operators and pipes. The native FlatBars surface." },
+};
+const surfaceCards = surfaces.map((s) => {
+  const name = lessons[s].title.split(" — ")[0]; // "RawBars"
+  const m = surfaceMeta[s];
+  return { href: `/${s}`, prefix: name.replace(/Bars$/, ""), role: m.role, blurb: m.blurb, sample: m.sample, recommended: !!m.recommended };
+});
+
+const mustacheN = `${conformance.total.pass}/${conformance.total.total}`;
+const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
-    <BaseHead title="FlatBars — one parser, four languages" />
+    <BaseHead title="FlatBars — one parser, four surfaces" />
+    <!-- Global reset (must be is:global to reach the OpenInLab Preact island).
+         Without border-box the editor textarea's padding compounds through the
+         auto-grow height JS, so the box grows on every keystroke. -->
+    <style is:global>
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+    </style>
     <style>
-      body { font: 16px/1.65 var(--font-ui); color: var(--fg); background: var(--bg); margin: 0; }
-      /* The topbar is full-width (sticky); the page content is centred. */
-      .landing { max-width: 52rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+      body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 17px; line-height: 1.6; }
+      .mono { font-family: var(--font-mono); }
+      main { max-width: 1120px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.4rem) 0; }
 
-      .hero-title { font-size: 2rem; line-height: 1.22; margin: 0.4rem 0 0.4rem; font-weight: 700; letter-spacing: -0.01em; }
-      .hero-title .flat { color: var(--accent); }
-      .hero-title .tagline { font-weight: 400; color: var(--fg-secondary); }
-      .hero-title em { font-style: italic; color: var(--accent-2); }
-      .hero-sub { font: 600 0.92rem/1.4 var(--font-mono); color: var(--fg-muted); margin: 0 0 0.4rem; }
+      /* ---------- Hero ---------- */
+      .eyebrow { font: 600 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.16em;
+        color: var(--accent); margin: 0 0 1.3rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+      .eyebrow .chip { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em;
+        text-transform: none; color: var(--fg-muted); background: var(--bg-1); border: 1px solid var(--border);
+        border-radius: 999px; padding: 0.28em 0.7em; }
+      .eyebrow .chip.core { color: var(--accent-2); border-color: var(--border-strong); background: var(--accent-softer); }
+      .eyebrow .arrow { color: var(--fg-faint); }
 
-      /* Proof strip — wired from the conformance reports. */
-      .proof { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.25rem 0 1.5rem; }
-      .proof-stat {
-        flex: 1 1 12rem; display: block; padding: 0.8rem 1rem;
-        border: 1px solid var(--border-strong); border-radius: 10px;
-        background: var(--bg-1); text-decoration: none; color: inherit;
-      }
-      .proof-stat:hover { border-color: var(--accent); }
-      .proof-stat b { display: block; font-size: 1.55rem; line-height: 1.1; color: var(--accent-2); font-variant-numeric: tabular-nums; }
-      .proof-stat span { display: block; margin-top: 0.2rem; font-size: 0.8rem; color: var(--fg-muted); }
+      .hero { padding-top: 3.4rem; }
+      h1 { font-size: clamp(2.5rem, 5.6vw, 4rem); line-height: 1.04; letter-spacing: -0.03em; font-weight: 700;
+        margin: 0 0 1.3rem; max-width: 20ch; text-wrap: balance; }
+      h1 .flat { color: var(--accent); }
+      h1 em { font-style: italic; color: var(--accent-2); }
+      .lead { font-size: 1.28rem; line-height: 1.5; color: var(--fg-secondary); max-width: 58ch; margin: 0 0 2.4rem; text-wrap: pretty; }
+      .lead strong { color: var(--fg); font-weight: 600; }
 
-      /* Recommended-start card. */
-      .hero {
-        display: block; margin: 1.5rem 0; padding: 1.5rem;
-        border: 1px solid var(--border-strong); border-radius: 10px;
-        background: linear-gradient(135deg, var(--accent-softer), var(--bg-1));
-        text-decoration: none; color: inherit;
-      }
-      .hero:hover { border-color: var(--accent); }
-      .hero .kicker { font: 600 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2); }
-      .hero h2 { font-size: 1.5rem; margin: 0.4rem 0 0.3rem; }
-      .hero p { margin: 0; color: var(--fg-muted); }
-      .hero .go { color: var(--accent-2); font-weight: 600; }
+      .proof { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border);
+        border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card); }
+      .proof .cell { background: var(--bg-1); padding: 1.5rem 1.6rem; text-decoration: none; color: inherit; display: block; transition: background 0.12s; }
+      .proof .cell:hover { background: var(--bg-2); }
+      .proof .num { font-family: var(--font-mono); font-weight: 700; font-size: 2.4rem; line-height: 1; letter-spacing: -0.02em;
+        color: var(--accent-2); display: flex; align-items: baseline; gap: 0.1em; font-variant-numeric: tabular-nums; }
+      .proof .num .of { font-size: 1.1rem; color: var(--fg-faint); font-weight: 500; }
+      .proof .plabel { font: 600 10px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin: 1rem 0 0.35rem; }
+      .proof .desc { font-size: 0.85rem; color: var(--fg-muted); line-height: 1.45; max-width: 34ch; }
+      @media (max-width: 760px) { .proof { grid-template-columns: 1fr; } }
 
-      .grid-label { font: 600 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-faint); margin: 2rem 0 0.5rem; }
-      ul { list-style: none; padding: 0; display: grid; gap: 0.7rem; }
-      a.card { display: block; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-decoration: none; color: inherit; background: var(--bg-1); }
-      a.card:hover { border-color: var(--accent); }
-      a.card b { color: var(--accent-2); }
-      a.card span { color: var(--fg-muted); display: block; margin-top: 0.25rem; font-size: 0.9rem; }
-      a.card.featured { border-color: var(--border-strong); background: var(--accent-softer); }
-      a.card .pin { display: inline-block; margin-bottom: 0.3rem; font: 600 10px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2); }
+      /* ---------- Section frame ---------- */
+      section.block { padding-top: 5.5rem; }
+      .kicker { font: 600 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.16em; color: var(--accent);
+        margin: 0 0 0.9rem; display: flex; align-items: center; gap: 0.6rem; }
+      .kicker::before { content: ""; width: 24px; height: 2px; background: var(--accent); border-radius: 2px; }
+      h2 { font-size: clamp(1.7rem, 3.3vw, 2.3rem); line-height: 1.1; letter-spacing: -0.02em; font-weight: 700;
+        margin: 0 0 0.8rem; max-width: 22ch; text-wrap: balance; }
+      .section-lead { font-size: 1.05rem; color: var(--fg-muted); max-width: 62ch; margin: 0 0 1.8rem; text-wrap: pretty; }
+      .section-lead code { font-family: var(--font-mono); font-size: 0.85em; background: var(--bg-2); padding: 0.1em 0.35em; border-radius: 4px; color: var(--fg-secondary); }
 
-      /* Architecture note — below the fold, the "what's underneath" framing. */
-      .arch { margin: 2.5rem 0 0.6rem; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--fg-muted); }
-      .arch b { color: var(--fg); }
-      .arch a { color: var(--accent-2); font-weight: 600; }
-      .ladder { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin: 0.6rem 0 0; font: 600 12px/1 var(--font-mono); }
-      .ladder .core { color: var(--accent-2); }
-      .ladder .arrow { color: var(--fg-faint); }
-      .ladder .pill { padding: 0.2rem 0.5rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-1); color: var(--fg-secondary); }
+      /* ---------- Surfaces spectrum ---------- */
+      .surfaces { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+      @media (max-width: 900px) { .surfaces { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 540px) { .surfaces { grid-template-columns: 1fr; } }
+      .surf { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-lg);
+        padding: 1.3rem 1.3rem 1.4rem; display: flex; flex-direction: column; box-shadow: var(--shadow-card);
+        position: relative; overflow: hidden; text-decoration: none; color: inherit; transition: border-color 0.12s, transform 0.12s; }
+      .surf:hover { border-color: var(--accent); transform: translateY(-2px); }
+      .surf::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+      .surf .name { font-weight: 700; font-size: 1.12rem; letter-spacing: -0.01em; margin: 0.1rem 0 0.15rem; }
+      .surf .name b { color: var(--accent); }
+      .surf .role { font: 600 9.5px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint); margin-bottom: 0.7rem; }
+      .surf p { font-size: 0.88rem; color: var(--fg-muted); line-height: 1.5; margin: 0 0 1rem; flex: 1; }
+      .surf .sample { font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg-2); border: 1px solid var(--border);
+        border-radius: 6px; padding: 0.55rem 0.65rem; color: var(--fg-secondary); white-space: pre-wrap; word-break: break-word; }
+      .surf.rec { border-color: var(--border-strong); box-shadow: var(--shadow-pop); }
+      .surf .tagrec { position: absolute; top: 0.9rem; right: 0.9rem; font: 600 8.5px/1 var(--font-mono); text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--accent-2); background: var(--accent-softer); border: 1px solid var(--border-strong);
+        border-radius: 999px; padding: 0.32em 0.6em; }
+
+      /* ---------- Architecture (below the fold) ---------- */
+      .arch { background: var(--bg-1); border: 1px solid var(--border); border-radius: var(--radius-lg);
+        padding: clamp(1.8rem, 4vw, 3rem); box-shadow: var(--shadow-card); }
+      .arch p.big { font-size: clamp(1.3rem, 2.6vw, 1.75rem); line-height: 1.4; letter-spacing: -0.01em; color: var(--fg);
+        max-width: 30ch; margin: 0 0 1.3rem; font-weight: 500; text-wrap: balance; }
+      .arch p.big b { color: var(--accent-2); }
+      .arch p.body { font-size: 1rem; color: var(--fg-muted); max-width: 62ch; margin: 0; text-wrap: pretty; }
+      .arch p.body code { font-family: var(--font-mono); font-size: 0.85em; background: var(--bg-2); padding: 0.1em 0.35em; border-radius: 4px; color: var(--fg-secondary); }
+      .arch-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: clamp(1.5rem, 4vw, 3rem); align-items: center; }
+      @media (max-width: 760px) { .arch-grid { grid-template-columns: 1fr; } }
+      .flow { display: flex; flex-direction: column; gap: 0.55rem; }
+      .flow .step { display: flex; align-items: center; gap: 0.7rem; font-size: 0.9rem; }
+      .flow .step .pip { font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem; color: var(--accent-2);
+        background: var(--accent-softer); border: 1px solid var(--border); width: 1.7rem; height: 1.7rem; border-radius: 6px;
+        display: grid; place-items: center; flex: none; }
+      .flow .step .txt b { color: var(--fg); font-weight: 600; }
+      .flow .step .txt { color: var(--fg-muted); }
+      .flow .conn { width: 1px; height: 0.7rem; background: var(--border-strong); margin-left: 0.83rem; }
+
+      /* ---------- Footer ---------- */
+      .site-foot { margin-top: 5.5rem; padding: 2rem 0 3rem; border-top: 1px solid var(--border);
+        display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; color: var(--fg-faint); font-size: 0.85rem; }
+      .site-foot .ver { font-family: var(--font-mono); color: var(--fg-faint); font-size: 0.78rem; }
+      .site-foot .spacer { flex: 1; }
+      .site-foot .links { display: flex; gap: 1.2rem; }
+      .site-foot .links a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--border-strong); }
     </style>
   </head>
   <body data-chipstyle="tint">
     <a class="skip" href="#main">Skip to content</a>
     <Topbar />
-    <main id="main" class="landing">
-      <h1 class="hero-title">
-        <b class="flat">Flat</b>Bars <span class="tagline">— the Handlebars &amp; Mustache you
-        know, on a core small enough to <em>be the language you want.</em></span>
-      </h1>
-      <p class="hero-sub">One parser. Four surfaces. Proven against the real specs.</p>
+    <main id="main">
+      <!-- ===================== HERO ===================== -->
+      <section class="hero" id="top">
+        <p class="eyebrow">
+          <span class="chip core">flatbars core</span>
+          <span class="arrow">→</span>
+          <span class="chip">RawBars</span><span class="chip">MinBars</span>
+          <span class="chip">FullBars</span><span class="chip">MaxBars</span>
+        </p>
+        <h1>The <span class="flat">Handlebars</span> &amp; Mustache you know, on a core small enough to <em>be the language you want.</em></h1>
+        <p class="lead">One parser. Four surfaces. <strong>Proven against the real specs</strong> — Mustache and Handlebars run on it unchanged, and MaxBars is the language we built on top.</p>
 
-      <div class="proof">
-        {proof.map((p) => (
-          <a class="proof-stat" href={p.href}>
-            <b>{p.n}</b>
-            <span>{p.label}</span>
-          </a>
-        ))}
-      </div>
-
-      <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
-
-      <a class="hero" href="/minbars">
-        <span class="kicker">Recommended start</span>
-        <h2>MinBars — Mustache-compatible</h2>
-        <p>New to templates? Start with Mustache — you already know it. The complete logic-less
-          language, and FlatBars's comprehensive reference: every tag explained with examples that
-          render live and open in the Lab. <span class="go">Open the reference →</span></p>
-      </a>
-
-      <p class="grid-label">All four surfaces</p>
-      <ul>
-        {surfaceCards.map((c) => (
-          <li>
-            <a class:list={["card", { featured: c.featured }]} href={c.href}>
-              {c.featured && <span class="pin">↑ Recommended start</span>}
-              <b>{c.title}</b>
-              <span>{c.blurb}</span>
+        <div class="proof" aria-label="Conformance proof">
+          {proof.map((p) => (
+            <a class="cell" href={p.href}>
+              <div class="num">{p.num}{p.of && <span class="of">{p.of}</span>}</div>
+              <div class="plabel">{p.label}</div>
+              <div class="desc">{p.desc}</div>
             </a>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      </section>
 
-      <p class="arch">
-        <b>What's underneath:</b> FlatBars is a <b>meaning-free parser</b>. Mustache and Handlebars
-        run on it unchanged; everything you expect — helpers, escaping, control flow — is a plug-in,
-        not baked in. <a href="/rawbars">See the bare core →</a>
-      </p>
-      <p class="ladder">
-        <span class="core">flatbars core</span><span class="arrow">→</span>
-        <span class="pill">RawBars</span>
-        <span class="pill">MinBars</span>
-        <span class="pill">FullBars</span>
-        <span class="pill">MaxBars</span>
-      </p>
+      <!-- ===================== LIVE PLAYGROUND ===================== -->
+      <section class="block" id="play">
+        <p class="kicker">Live · MinBars</p>
+        <h2>Edit the template. Watch it render.</h2>
+        <p class="section-lead">No tagline beats a running example. Type in either pane — the output re-renders as you go,
+          through the very engine the Lab ships. <code>{"{{name}}"}</code> escapes, <code>{"{{{html}}}"}</code> doesn't, and the data shapes the control flow.</p>
+        <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
+      </section>
 
-      <HighlightLegend />
+      <!-- ===================== FOUR SURFACES ===================== -->
+      <section class="block" id="surfaces">
+        <p class="kicker">One core · four surfaces</p>
+        <h2>Pick how much language you want.</h2>
+        <p class="section-lead">Each surface is the same parser with more sugar layered on. Start where you're comfortable; they're siblings, not separate products.</p>
+
+        <div class="surfaces">
+          {surfaceCards.map((c) => (
+            <a class:list={["surf", { rec: c.recommended }]} href={c.href}>
+              {c.recommended && <span class="tagrec">Recommended start</span>}
+              <div class="name"><b>{c.prefix}</b>Bars</div>
+              <div class="role">{c.role}</div>
+              <p>{c.blurb}</p>
+              <div class="sample mono">{c.sample}</div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <!-- ===================== ARCHITECTURE ===================== -->
+      <section class="block" id="arch">
+        <p class="kicker">Why it holds together</p>
+        <div class="arch">
+          <div class="arch-grid">
+            <div>
+              <p class="big">FlatBars isn't a template engine — it's a <b>meaning-free parser</b> you build them on.</p>
+              <p class="body">The core attaches no meaning to a tag; it only structures it. Mustache, Handlebars, and MaxBars are
+                surfaces that decide what the structure means. That's why one parser can be <code>{mustacheN}</code> on the Mustache spec
+                and <code>{hbsN}</code> byte-identical to Handlebars at the same time — they're not forks, they're readings of the same tree.</p>
+            </div>
+            <div class="flow" aria-label="From source to surface">
+              <div class="step"><span class="pip">{"{ }"}</span><span class="txt"><b>Source template</b> — plain text with tags</span></div>
+              <div class="conn"></div>
+              <div class="step"><span class="pip">⊢</span><span class="txt"><b>Meaning-free parse</b> — structure, no semantics</span></div>
+              <div class="conn"></div>
+              <div class="step"><span class="pip">◇</span><span class="txt"><b>Surface</b> — Min / Full / Max assigns meaning</span></div>
+              <div class="conn"></div>
+              <div class="step"><span class="pip">▸</span><span class="txt"><b>Render</b> — against the data you supply</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="site-foot">
+        <Wordmark href="/" />
+        <span class="ver">core v0.1.0 · MinBars · FullBars · MaxBars</span>
+        <span class="spacer"></span>
+        <span class="links">
+          <a href="/spec/">Docs</a>
+          <a href={LAB_URL} target="_blank" rel="noopener">The Lab ↗</a>
+          <a href={GH}>GitHub ↗</a>
+        </span>
+      </footer>
     </main>
   </body>
 </html>

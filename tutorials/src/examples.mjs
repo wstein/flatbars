@@ -24,9 +24,9 @@ export const lessons = {
     engine: "minbars",
     title: "MinBars — Mustache-compatible",
     blurb:
-      "Proof the core spans Mustache — a peer engine with Mustache truthiness: " +
-      "{{name}} interpolates (HTML-escaped), {{#section}} iterates/guards, " +
-      "{{^inverted}} renders when falsy, {{.}} is the item.",
+      "The complete logic-less language, Mustache-compatible: {{name}} interpolates " +
+      "(HTML-escaped), {{#section}} iterates or guards, {{^inverted}} renders when " +
+      "falsy, {{.}} is the current item.",
     spec: "maxbars", // (Mustache surface; see the engine docs)
     template:
       "<h1>{{name}}</h1>\n" +
@@ -38,9 +38,9 @@ export const lessons = {
     engine: "fullbars",
     title: "FullBars — Handlebars-faithful",
     blurb:
-      "Proof the core spans Handlebars — the reference engine: {{name}} " +
-      "auto-escapes, dotted paths read data, {{#each}} / {{#if}} are block helpers, " +
-      "and you register your own with registerHelper (ADR-018).",
+      "The Handlebars-faithful reference engine: {{name}} auto-escapes, dotted paths " +
+      "read data, {{#each}} / {{#if}} are block helpers, and you register your own " +
+      "with registerHelper (ADR-018).",
     spec: "surface", // docs/modules/ROOT/pages/surface.adoc
     template:
       "<h1>Hello, {{loud name}}!</h1>\n" +
