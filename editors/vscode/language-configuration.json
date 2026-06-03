@@ -1,7 +1,6 @@
 {
   "comments": { "blockComment": ["{{!--", "--}}"] },
-  "//": "FlatBars has THREE legitimate brace widths — {{ }} (interpolation), {{{ }}} (raw), {{{{ }}}} (raw block). At the 2nd `{` the editor cannot know which you mean, and a declarative `{{` auto-closing pair re-fires on every following `{` (a run of N `{` inserts 2*(N-1) closers: {{{ -> }}}} ). So brace auto-closing is deliberately OFF (ADR-023 debate); `{{`/`}}` stays in `brackets` for matching only, which does not auto-close once autoClosingPairs is set. Structure comes from the grammar + LSP, not from the editor guessing.",
-  "brackets": [["{{", "}}"]],
+  "//": "No brace `brackets` on purpose. FlatBars has three brace widths — {{ }} (interpolation), {{{ }}} (raw), {{{{ }}}} (raw block). A `[\"{{\",\"}}\"]` bracket makes VS Code's bracket-pair colorization split `{{{` into a coloured `{{` + a leftover `{` (and auto-closing re-fires on every `{`). Brace structure/colour comes from the engine lexer + the TextMate grammar, which treat each opener (`{{`, `{{{`, `{{{{`, `{{#`, …) as ONE token — so we leave `brackets` empty rather than let the editor re-tokenize braces. Only string pairs auto-close.",
   "autoClosingPairs": [
     { "open": "\"", "close": "\"" },
     { "open": "'", "close": "'" }
