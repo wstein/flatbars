@@ -8,8 +8,9 @@
  *
  * `flatbars-tokens.css` is GENERATED from shared/flatbars-tokens.css by
  * `npm run gen:tokens` (gated by check:tokens) — the same single source the
- * tutorials and the Lab use. The [data-theme="dark"] block is inert until a theme
- * toggle is added (a tracked fast-follow); this pass themes light only. */
+ * tutorials and the Lab use. Both light and dark are themed: head-meta.hbs sets
+ * [data-theme] on <html> before first paint (anti-flash, persisted) and adds the
+ * navbar toggle; the dark chrome overrides live at the bottom of this file. */
 @import "flatbars-tokens.css";
 
 :root {
@@ -70,3 +71,67 @@ code, kbd, pre, .doc .colist > table code, .hljs, .source pre, .listingblock pre
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
+
+/* ── Theme toggle button (head-meta.hbs appends it to the navbar) ── */
+.fb-theme-toggle {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fb-theme-toggle:hover { background: rgba(255, 255, 255, 0.26); }
+
+/* ── Dark mode — the stock UI is light-only, so override its chrome (the dark
+   --c-* syntax tokens already ship in flatbars-tokens.css; this is page chrome). ── */
+html[data-theme="dark"] body { background: #16141d; color: #ece9f5; }
+html[data-theme="dark"] .doc,
+html[data-theme="dark"] .doc p,
+html[data-theme="dark"] .doc li,
+html[data-theme="dark"] .doc dt,
+html[data-theme="dark"] .doc dd { color: #ece9f5; }
+html[data-theme="dark"] .doc h1,
+html[data-theme="dark"] .doc h2,
+html[data-theme="dark"] .doc h3,
+html[data-theme="dark"] .doc h4,
+html[data-theme="dark"] .doc h5 { color: #f3f0fb; }
+html[data-theme="dark"] .doc h2,
+html[data-theme="dark"] .doc h3 { border-color: #2c2940; }
+/* left nav · breadcrumb toolbar · right TOC */
+html[data-theme="dark"] .nav-container,
+html[data-theme="dark"] .nav,
+html[data-theme="dark"] .nav-panel-menu,
+html[data-theme="dark"] .nav-panel-explore,
+html[data-theme="dark"] .toolbar,
+html[data-theme="dark"] aside.toc { background: #1b1925; color: #c5bedd; border-color: #2c2940; }
+html[data-theme="dark"] .toolbar,
+html[data-theme="dark"] .toc .toc-menu .title { color: #968fb0; }
+html[data-theme="dark"] .nav-link,
+html[data-theme="dark"] .nav-text,
+html[data-theme="dark"] .toc a { color: #c5bedd; }
+html[data-theme="dark"] .nav-menu .is-current-page > .nav-link,
+html[data-theme="dark"] .toc a:hover,
+html[data-theme="dark"] .doc a,
+html[data-theme="dark"] .doc a:visited { color: #bca6ff; }
+html[data-theme="dark"] .doc a:hover { color: #d7c8ff; }
+/* borders, rules, tables */
+html[data-theme="dark"] .doc table.tableblock,
+html[data-theme="dark"] .doc .tableblock th,
+html[data-theme="dark"] .doc .tableblock td,
+html[data-theme="dark"] .doc hr { border-color: #2c2940; }
+html[data-theme="dark"] .doc table.tableblock thead th { background: #232030; }
+/* code — inline + block */
+html[data-theme="dark"] .doc p code,
+html[data-theme="dark"] .doc li code,
+html[data-theme="dark"] .doc td code { background: color-mix(in srgb, #9b7dff 16%, #16141d); color: #ece9f5; }
+html[data-theme="dark"] .doc pre,
+html[data-theme="dark"] .listingblock pre,
+html[data-theme="dark"] .doc .literalblock pre { background: #0f0d16; color: #ece9f5; border-color: #2c2940; }
+/* admonitions + footer */
+html[data-theme="dark"] .admonitionblock > table td.content { background: #1b1925; color: #ece9f5; border-color: #2c2940; }
+html[data-theme="dark"] .footer { background: #16141d; color: #8a83a6; border-color: #2c2940; }
