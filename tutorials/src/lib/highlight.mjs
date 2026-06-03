@@ -41,15 +41,11 @@ const KIND_CLASS = {
   // A structurally-valid tag the dialect disallows (an extras/inheritance-gated
   // shape) — flagged like a lex error.
   error: "stem-error",
-  // interior-role kinds (ADR-017): operators/strings/numbers inside a tag
-  operator: "stem-op",
-  string: "stem-str",
-  number: "stem-num",
 };
 
-// The set of kinds whose span text is a whole tag (begins/ends with `{{`/`}}`)
-// rather than an interior token — only these get their delimiters dimmed.
-// `raw-block` (`{{{{…}}}}`) and `error` are excluded: a four-brace stem and a
+// Every emitted span is a whole tag (the highlighter colours by meaning, one
+// span per tag). This is the subset whose `{{`/`}}` delimiters get dimmed:
+// `raw-block` (`{{{{…}}}}`) and `error` are excluded — a four-brace stem and a
 // disallowed-shape span don't take the two-brace delimiter dimmer cleanly.
 const TAG_KINDS = new Set([
   "expr", "keyword", "block-open", "block-inverse", "block-close",

@@ -47,14 +47,12 @@ test("a comment reads as the grey `comment` family", () => {
   assert.ok(highlightTemplate("{{! note }}", "minbars").startsWith('<span class="stem-comment">'));
 });
 
-test("MaxBars interior operator punches through; half-tag spans dim only their own brace", () => {
-  // `{{a ` dims only its opening `{{`; `+` is an interior op (no chip, no pn);
-  // ` b}}` dims only its closing `}}`.
+test("a MaxBars expression is one expr span — operators do not split the tag", () => {
+  // The whole tag reads in the one `expr` colour; the `+` carries no colour of
+  // its own. Only the `{{`/`}}` delimiters are dimmed.
   assert.equal(
     highlightTemplate("{{a + b}}", "maxbars"),
-    '<span class="stem-expr"><span class="pn">{{</span>a </span>' +
-      '<span class="stem-op">+</span>' +
-      '<span class="stem-expr"> b<span class="pn">}}</span></span>',
+    '<span class="stem-expr"><span class="pn">{{</span>a + b<span class="pn">}}</span></span>',
   );
 });
 

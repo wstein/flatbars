@@ -18,7 +18,6 @@ import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseWith, spanText)
 import FlatBars.Highlight (HighlightConfig, highlightSpans)
 import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Token (defaultLexOptions)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -55,7 +54,6 @@ nodeCount src = case parse src of
 hlKernel :: HighlightConfig
 hlKernel =
   { lexConfig: defaultLexConfig { keepLongComments = true }
-  , lexOptions: defaultLexOptions
   , clauseSeps: [ "else", "elif" ]
   , extras: true
   , inheritance: false
@@ -64,19 +62,17 @@ hlKernel =
 hlMustache :: HighlightConfig
 hlMustache =
   { lexConfig: defaultLexConfig { mustacheDelims = true, keepLongComments = true }
-  , lexOptions: defaultLexOptions
   , clauseSeps: []
   , extras: true
   , inheritance: true
   }
 
--- MaxBars-like: infix operators tokenize, so interior `+ - * / % ?? | …` punch
--- through as `operator` spans; extras off (so `{{&}}`/`{{^}}`/`{{{{…}}}}` are
--- disallowed shapes), inheritance off.
+-- MaxBars-like: extras off (so `{{&}}`/`{{^}}`/`{{{{…}}}}` are disallowed shapes),
+-- inheritance off. Highlighting colours the whole tag by its head's meaning, so a
+-- MaxBars expression's interior operators/literals carry no separate colour.
 hlMax :: HighlightConfig
 hlMax =
   { lexConfig: defaultLexConfig { keepLongComments = true }
-  , lexOptions: { infixArith: true }
   , clauseSeps: [ "else", "elif" ]
   , extras: false
   , inheritance: false
@@ -446,20 +442,15 @@ main = do
         [ "error", "error", "block-close", "block-close" ]
     )
 
-  -- Interior tokens (ADR-017 PosToken end offsets): operators/strings/numbers
-  -- punch through the tag's colour; identifiers/whitespace/delimiters stay it.
-  assert' "highlight: a MaxBars operator punches through an expr tag"
-    ( highlightSpans hlMax "{{ a + b }}" ==
-        [ { from: 0, to: 5, kind: "expr" }
-        , { from: 5, to: 6, kind: "operator" }
-        , { from: 6, to: 11, kind: "expr" }
-        ]
-    )
-  assert' "highlight: strings and numbers punch through too"
-    (kinds hlMax "{{ x ?? \"y\" }}" == [ "expr", "operator", "expr", "string", "expr" ])
-  assert' "highlight: a simple {{name}} is still one chunk (no interior punches)"
+  -- A tag is ONE span coloured by its head's meaning; interior literals and
+  -- operators carry no colour of their own (they stay the tag's colour).
+  assert' "highlight: a MaxBars tag with an operator is one expr span"
+    (highlightSpans hlMax "{{ a + b }}" == [ { from: 0, to: 11, kind: "expr" } ])
+  assert' "highlight: strings and numbers do not split the tag"
+    (highlightSpans hlMax "{{ x ?? \"y\" }}" == [ { from: 0, to: 14, kind: "expr" } ])
+  assert' "highlight: a simple {{name}} is one chunk"
     (kinds hlKernel "{{name}}" == [ "expr" ])
-  assert' "highlight: a numeric literal in a block arg punches as a number"
-    (Array.elem "number" (kinds hlKernel "{{#if (gt x 5)}}{{/if}}"))
+  assert' "highlight: a numeric literal in a block arg does not punch a number span"
+    (kinds hlKernel "{{#if (gt x 5)}}{{/if}}" == [ "block-open", "block-close" ])
 
   log "all framework tests passed"

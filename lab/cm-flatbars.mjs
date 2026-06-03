@@ -42,14 +42,10 @@ export const FLATBARS_KIND_CLASS = {
   comment: "cm-hb-comment",
   "set-delimiter": "cm-hb-delim",
   error: "cm-hb-error",
-  // interior-role kinds (ADR-017): operators/strings/numbers inside a tag
-  operator: "cm-hb-op",
-  string: "cm-hb-str",
-  number: "cm-hb-num",
 };
 
-// Kinds whose span text is a whole `{{…}}` tag (not an interior op/str/num
-// token) — only these get their leading/trailing delimiters dimmed.
+// Every span is a whole `{{…}}` tag (one span per tag, coloured by meaning).
+// This is the subset whose leading/trailing delimiters get dimmed.
 const TAG_KINDS = new Set([
   "expr", "keyword", "block-open", "block-inverse", "block-close",
   "block-parent", "block-decl", "partial", "raw", "comment", "set-delimiter",

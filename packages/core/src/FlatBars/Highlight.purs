@@ -5,17 +5,16 @@
 -- | front-ends call `highlightSpans` and render the returned spans in their own
 -- | idiom (a CodeMirror `ViewPlugin` in the Lab, an overlay in the tutorials).
 -- |
--- | A `RawTok` becomes one whole-tag span tagged by its structural role, *tiled*
--- | with its interior tokens: operators, strings and numbers inside a tag get
--- | their own span (so MaxBars `a + b` shows the `+`, and string/number literals
--- | read distinctly), while identifiers, parens, delimiters and whitespace stay
--- | the tag's colour — a simple `{{name}}` is still one solid chunk. Content runs
--- | produce nothing (they stay default text). The dialect seams the lexer already
--- | exposes are threaded straight through — `LexConfig` (delimiters + set
--- | delimiters), `LexOptions` (`infixArith`, so MaxBars operators tokenize), and
--- | the clause-separator names — so highlighting is per-dialect *by construction*,
--- | with no highlighter-side knowledge of any dialect. This is the same IoC seam
--- | the parser uses: the highlighter drives, the dialect supplies the meaning.
+-- | A `RawTok` becomes one whole-tag span tagged by its structural role — the
+-- | meaning of its head (interpolation, block, partial, comment, …). The whole
+-- | tag reads in that one colour: an interior literal or operator carries no
+-- | meaning of its own to colour, so it stays the tag's colour rather than
+-- | competing with the role. Content runs produce nothing (they stay default
+-- | text). The dialect seams the lexer already exposes are threaded straight
+-- | through — `LexConfig` (delimiters + set delimiters) and the clause-separator
+-- | names — so highlighting is per-dialect *by construction*, with no
+-- | highlighter-side knowledge of any dialect. This is the same IoC seam the
+-- | parser uses: the highlighter drives, the dialect supplies the meaning.
 -- |
 -- | Spans are non-overlapping and in source order, so an overlay presenter can
 -- | walk them linearly (and a CodeMirror `Decoration.set` accepts them directly).
@@ -34,25 +33,23 @@ import Data.String.CodeUnits as SCU
 import FlatBars.Lexer (LexConfig, RawTok(..), tokenizeTemplate)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (LexOptions, PosToken, Token(..), tokenizeInterior)
 
 -- | A positioned highlight span: UTF-16 offsets `[from, to)` into the source and
--- | a stable `kind` tag the presenter maps to a CSS class. Tag-role kinds:
--- | `expr`, `raw`, `raw-block`, `block-open`, `block-inverse`, `block-parent`,
--- | `block-decl`, `block-close`, `partial`, `keyword`, `comment`,
--- | `set-delimiter`. Interior-role kinds: `operator`, `string`, `number`. The
--- | `error` kind marks a structurally-valid tag the *dialect disallows* (an
--- | `extras`/`inheritance`-gated shape — see `HighlightConfig`), so a presenter
--- | can flag it the way it would a lex error.
+-- | a stable `kind` tag the presenter maps to a CSS class. Every span is one
+-- | whole tag, coloured by its head role: `expr`, `raw`, `raw-block`,
+-- | `block-open`, `block-inverse`, `block-parent`, `block-decl`, `block-close`,
+-- | `partial`, `keyword`, `comment`, `set-delimiter`. The `error` kind marks a
+-- | structurally-valid tag the *dialect disallows* (an `extras`/`inheritance`-gated
+-- | shape — see `HighlightConfig`), so a presenter can flag it the way it would a
+-- | lex error.
 type HSpan = { from :: Int, to :: Int, kind :: String }
 
 -- | The dialect seams the highlighter needs — the same ones the parser threads.
 -- | `lexConfig` is the template scanner's delimiter config (including
--- | `mustacheDelims` for the `{{=A B=}}` set-delimiter tag); `lexOptions` is the
--- | interior tokenizer config (`infixArith`, so MaxBars `+ - * / % ??` tokenize
--- | as operators); `clauseSeps` is the dialect's clause-separator names, so
--- | `{{else}}` / `{{elif …}}` are coloured as statements only where the dialect
--- | treats them as separators (empty for MinBars, where `else` is a variable).
+-- | `mustacheDelims` for the `{{=A B=}}` set-delimiter tag); `clauseSeps` is the
+-- | dialect's clause-separator names, so `{{else}}` / `{{elif …}}` are coloured as
+-- | statements only where the dialect treats them as separators (empty for
+-- | MinBars, where `else` is a variable).
 -- |
 -- | `extras` and `inheritance` are the parser's own dialect gates (the same
 -- | fields `ParseOptions` carries): when off, the structurally-valid shapes the
@@ -63,7 +60,6 @@ type HSpan = { from :: Int, to :: Int, kind :: String }
 -- | paints a shape valid that the same dialect would reject at parse.
 type HighlightConfig =
   { lexConfig :: LexConfig
-  , lexOptions :: LexOptions
   , clauseSeps :: Array String
   , extras :: Boolean
   , inheritance :: Boolean
@@ -80,20 +76,21 @@ highlightSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
   spanOf :: RawTok -> Array HSpan
   spanOf = case _ of
     RContent _ -> []
-    ROutput sp base interior -> tagSpans sp base interior "raw"
+    ROutput sp _ _ -> [ whole sp "raw" ]
     -- `{{&x}}` (unescaped) is a Handlebars-extra: disallowed when `extras` is off
     -- (RawBars/MaxBars), exactly as the parser gates it.
-    RAmp sp base interior
-      | cfg.extras -> tagSpans sp base interior "raw"
+    RAmp sp _ _
+      | cfg.extras -> [ whole sp "raw" ]
       | otherwise -> [ whole sp "error" ]
-    ROpen sp sig base interior -> openSpans sp sig base interior
-    RClose sp base interior -> tagSpans sp base interior "block-close"
-    RSep sp base interior
+    ROpen sp sig _ _ -> openSpans sp sig
+    RClose sp _ _ -> [ whole sp "block-close" ]
+    -- The interior is read only as TEXT here (its head word), to tell a partial
+    -- and a clause keyword from a plain interpolation — never re-tokenized for
+    -- colour: the whole tag is one span of its head role.
+    RSep sp _ interior
       | isPartialHead interior -> [ whole sp "partial" ]
-      | Array.elem (headWord interior) cfg.clauseSeps -> tagSpans sp base interior "keyword"
-      | otherwise -> tagSpans sp base interior "expr"
-    -- Raw blocks carry a literal body (not an expression); comments and the
-    -- set-delimiter tag have no expression interior — all stay one whole-tag span.
+      | Array.elem (headWord interior) cfg.clauseSeps -> [ whole sp "keyword" ]
+      | otherwise -> [ whole sp "expr" ]
     -- `{{{{…}}}}` raw blocks are a Handlebars-extra: disallowed when `extras` is off.
     RRaw sp _ _ _
       | cfg.extras -> [ whole sp "raw-block" ]
@@ -105,58 +102,21 @@ highlightSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
   -- Block openers, gated like the parser: `{{#x}}` (Section) is always core;
   -- `{{^x}}` (Inverse) needs `extras`; `{{<x}}` (Parent) / `{{$x}}` (BlockDef)
   -- need `inheritance`. A disallowed opener is coloured `error`.
-  openSpans :: Span -> Sigil -> Int -> String -> Array HSpan
-  openSpans sp sig base interior = case sig of
-    Section -> tagSpans sp base interior "block-open"
+  openSpans :: Span -> Sigil -> Array HSpan
+  openSpans sp sig = case sig of
+    Section -> [ whole sp "block-open" ]
     Inverse
-      | cfg.extras -> tagSpans sp base interior "block-inverse"
+      | cfg.extras -> [ whole sp "block-inverse" ]
       | otherwise -> [ whole sp "error" ]
     Parent
-      | cfg.inheritance -> tagSpans sp base interior "block-parent"
+      | cfg.inheritance -> [ whole sp "block-parent" ]
       | otherwise -> [ whole sp "error" ]
     BlockDef
-      | cfg.inheritance -> tagSpans sp base interior "block-decl"
+      | cfg.inheritance -> [ whole sp "block-decl" ]
       | otherwise -> [ whole sp "error" ]
 
   whole :: Span -> String -> HSpan
   whole sp kind = { from: sp.start, to: sp.end, kind }
-
-  -- Tile the tag `[sp.start, sp.end)` with `headKind`, punching interior
-  -- operator/string/number tokens with their own kind. If the interior does not
-  -- lex (a half-typed tag), keep the whole chunk rather than guessing.
-  tagSpans :: Span -> Int -> String -> String -> Array HSpan
-  tagSpans sp base interior headKind = case tokenizeInterior cfg.lexOptions base interior of
-    Left _ -> [ whole sp headKind ]
-    Right toks -> tile sp.start sp.end headKind (Array.mapMaybe notable toks)
-
--- | The interior tokens that get their own span; everything else (identifiers,
--- | parens, delimiters, whitespace) stays the tag's head colour.
-notable :: PosToken -> Maybe HSpan
-notable t = case t.tok of
-  TOp _ -> punch "operator"
-  TStr _ -> punch "string"
-  TNum _ -> punch "number"
-  _ -> Nothing
-  where
-  punch kind = Just { from: t.at, to: t.end, kind }
-
--- | Fill `[start, end)` with `headKind`, emitting each `punch` span in place
--- | (the punches are within the range and already in source order). The head
--- | fills the gaps, so the result tiles the range with no overlap.
-tile :: Int -> Int -> String -> Array HSpan -> Array HSpan
-tile start end headKind punches =
-  let
-    step st p =
-      { pos: p.to
-      , acc: Array.snoc (gap st.pos p.from st.acc) p
-      }
-    filled = Array.foldl step { pos: start, acc: [] } punches
-  in
-    gap filled.pos end filled.acc
-  where
-  gap a b acc
-    | b > a = Array.snoc acc { from: a, to: b, kind: headKind }
-    | otherwise = acc
 
 isSpace :: Char -> Boolean
 isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'

@@ -88,13 +88,10 @@ test("a dialect-disallowed shape is painted cm-hb-error (the highlighter agrees 
   assert.deepEqual(tagClasses(decorate("{{&x}}", "minbars")), ["cm-hb-raw"]);
 });
 
-test("MaxBars interior tokens punch through with their own classes", () => {
-  // `+` is an operator span between expr (head-coloured) spans; a simple tag
-  // stays one expr chunk.
-  assert.deepEqual(
-    tagClasses(decorate("{{ a + b }}", "maxbars")),
-    ["cm-hb-expr", "cm-hb-op", "cm-hb-expr"],
-  );
+test("a MaxBars tag is one expr span — interior operators do not split it", () => {
+  // The whole tag is coloured by its head's meaning; the `+` carries no colour
+  // of its own, so `{{ a + b }}` is a single expr span like a plain tag.
+  assert.deepEqual(tagClasses(decorate("{{ a + b }}", "maxbars")), ["cm-hb-expr"]);
   assert.deepEqual(tagClasses(decorate("{{name}}", "maxbars")), ["cm-hb-expr"]);
 });
 

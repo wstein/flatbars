@@ -51,10 +51,11 @@ instance showToken :: Show Token where
 
 -- | A token with its source span: `at` is the start offset (used for located
 -- | parse errors), `end` the offset just past the token. Both are absolute
--- | source offsets (the interior `base` is already added). The span lets tooling
--- | — the syntax highlighter (ADR-014), and the editor token vocabulary of
--- | ADR-017 — colour interior tokens (operators, strings, numbers) precisely;
--- | the parsers read only `tok`/`at`.
+-- | source offsets (the interior `base` is already added). The parsers read only
+-- | `tok`/`at`; `end` is substrate for the editor token vocabulary of ADR-017 (an
+-- | opt-in LSP/TextMate semantic-token layer can recover an exact span for every
+-- | interior token from it). The whole-tag syntax highlighter (ADR-014) colours a
+-- | tag by its head's meaning and does not consume `end`.
 type PosToken = { tok :: Token, at :: Int, end :: Int }
 
 -- | Tokenize a tag interior. `base` is its offset in the source, added to every

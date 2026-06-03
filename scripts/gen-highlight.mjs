@@ -69,10 +69,11 @@ const CORPUS = [
   { id: "set-delimiter-switch", dialect: "minbars", note: "{{=A B=}} → set-delimiter, and the FOLLOWING <%x%> is lexed in the new pair (a regex cannot track this)", src: "{{=<% %>=}}<%x%>" },
   { id: "set-delimiter-switchback", dialect: "minbars", note: "switch to <% %>, then switch back to the default {{ }} pair mid-stream", src: "{{=<% %>=}}<%x%><%={{ }}=%>{{y}}" },
 
-  // ── MaxBars surface — interior tokens punch through (ADR-017 end offsets) ──
-  { id: "maxbars-operators", dialect: "maxbars", note: "infix operators get their own `operator` span; identifiers/whitespace stay `expr` (the tag's colour)", src: "{{ a + b * c }}" },
-  { id: "maxbars-pipe", dialect: "maxbars", note: "pipes `|` are operators too", src: "{{ items | sort | first }}" },
-  { id: "maxbars-literals", dialect: "maxbars", note: "string and number literals punch through as `string` / `number`", src: "{{ label ?? \"n/a\" }} {{ qty * 2 }}" },
+  // ── MaxBars surface — a tag is ONE span by its head's meaning; interior
+  //    operators and literals carry no colour of their own (ADR-014) ──
+  { id: "maxbars-operators", dialect: "maxbars", note: "an expression with infix operators is one `expr` span — the operators do not split the tag", src: "{{ a + b * c }}" },
+  { id: "maxbars-pipe", dialect: "maxbars", note: "pipes `|` do not split the tag either — still one `expr` span", src: "{{ items | sort | first }}" },
+  { id: "maxbars-literals", dialect: "maxbars", note: "string and number literals stay the tag's colour — each tag is one `expr` span", src: "{{ label ?? \"n/a\" }} {{ qty * 2 }}" },
 
   // ── Dialect gates (ADR-014): a structurally-valid shape the dialect REJECTS is
   //    coloured `error`, never painted valid — the highlighter agrees with the parser. ──
