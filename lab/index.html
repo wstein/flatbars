@@ -74,9 +74,6 @@
         --c-comment: #54597e;
         --tint-mix: 12%;
         --directive-bg: #eceaf1;
-        --stem-op-fg: #0e728d;
-        --stem-str-fg: #826600;
-        --stem-num-fg: #7c3aed;
         /* @palette end */
         --chip-solid-fg: #fff;  /* text on a SOLID chip — flips dark in dark mode (Lab-only) */
 
@@ -585,15 +582,10 @@
       .cm-hb-comment { color: var(--c-comment); font-style: italic; }
       /* Dimmed {{ }} delimiters — keep the sigil + name loud (matches the legend). */
       .cm-hb-pn      { opacity: 0.42; }
-      /* Interior tokens (ADR-017): operators/strings/numbers inside a tag — bold
-         ink, no chip background, so they read on top of the tag's faint tint. */
-      .cm-hb-op      { color: var(--stem-op-fg);  font-weight: 700; }
-      .cm-hb-str     { color: var(--stem-str-fg); font-weight: 700; }
-      .cm-hb-num     { color: var(--stem-num-fg); font-weight: 700; }
       /* Tag chip style — Appearance ▸ Tag chips (body[data-chipstyle]). The tag
          classes above carry the TINT default; outline/solid swap the treatment.
-         Interior op/str/num are excluded (no chip). box-shadow (not border) keeps
-         the editor's character grid from shifting under the textarea cursor. */
+         box-shadow (not border) keeps the editor's character grid from shifting
+         under the textarea cursor. */
       body[data-chipstyle="outline"] :is(.cm-hb-expr, .cm-hb-raw, .cm-hb-block, .cm-hb-partial, .cm-hb-inherit, .cm-hb-delim) {
         background: transparent; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 42%, var(--bg));
       }
@@ -1226,9 +1218,6 @@
         --c-comment: #8a97cc;
         --tint-mix: 20%;
         --directive-bg: #363150;
-        --stem-op-fg: #ff79c6;
-        --stem-str-fg: #f1fa8c;
-        --stem-num-fg: #bd93f9;
         /* @palette end */
         --chip-solid-fg: #0e0c16;
         --success: #4ade80;

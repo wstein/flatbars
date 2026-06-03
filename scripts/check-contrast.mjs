@@ -59,10 +59,9 @@ const MODES = {
   },
 };
 
-// The seven tag families take TINT + PAGE + SOLID; the interior ink tokens carry
-// no chip, so they're judged on PAGE only.
+// The seven tag families take TINT + PAGE + SOLID (each tag is coloured as one
+// span by its meaning; there are no separate interior-ink tokens).
 const FAMILIES = ["--c-expr", "--c-raw", "--c-block", "--c-partial", "--c-inherit", "--c-delim", "--c-comment"];
-const INTERIOR = ["--stem-op-fg", "--stem-str-fg", "--stem-num-fg"];
 
 // Documented, product-approved sub-AA exceptions: `${token} ${mode} ${surface}` → reason.
 const EXCEPTIONS = {
@@ -83,7 +82,6 @@ for (const [mode, { tokens, bg, solidText }] of Object.entries(MODES)) {
     ];
     for (const [surface, r] of checks) rows.push({ tok, mode, surface, r });
   }
-  for (const tok of INTERIOR) rows.push({ tok, mode, surface: "page", r: ratio(tokens[tok], bg) });
 }
 
 for (const { tok, mode, surface, r } of rows) {

@@ -67,9 +67,6 @@
   --c-comment: #54597e;
   --tint-mix: 12%;
   --directive-bg: #eceaf1;
-  --stem-op-fg: #0e728d;
-  --stem-str-fg: #826600;
-  --stem-num-fg: #7c3aed;
   /* @palette end */
 
   /* YAML data syntax colours (data editor + spec-only blocks) */
@@ -126,9 +123,6 @@
   --c-comment: #8a97cc;
   --tint-mix: 20%;
   --directive-bg: #363150;
-  --stem-op-fg: #ff79c6;
-  --stem-str-fg: #f1fa8c;
-  --stem-num-fg: #bd93f9;
   /* @palette end */
 
   --yaml-key: #93c5fd;
@@ -160,7 +154,7 @@
 .stem-inherit, .stem-delim { color: var(--c); font-weight: 600; }
 .stem-comment { color: var(--c); }
 
-/* Chip treatment on the tag tokens (NOT the interior op/str/num tokens). */
+/* Chip treatment on the tag tokens (every span is one whole tag). */
 :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
   border-radius: 4px;
 }
@@ -189,12 +183,6 @@ body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-parti
   opacity: 0.42;
   font-style: normal;
 }
-
-/* Interior tokens (ADR-017): bold ink, no chip background — they read on top of
-   the tag's faint tint. */
-.stem-op  { color: var(--stem-op-fg); font-weight: 700; }
-.stem-str { color: var(--stem-str-fg); font-weight: 700; }
-.stem-num { color: var(--stem-num-fg); font-weight: 700; }
 
 /* A tag the dialect disallows (an extras/inheritance-gated shape the engine
    rejects at parse) — flagged with a wavy underline, mirroring the Lab's

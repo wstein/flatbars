@@ -19,8 +19,8 @@
  * nothing new has to be served/deployed and the Lab keeps its own cache-busting.)
  *
  * THEME: a **Dracula** (dark) / **Alucard** (light) code palette, AA-corrected for
- * our own backgrounds. The chrome stays violet (Dracula owns only the syntax
- * families + interior tokens); the Chips control (tint/outline/solid) is unchanged.
+ * our own backgrounds. The chrome stays violet (Dracula owns only the seven syntax
+ * families); the Chips control (tint/outline/solid) is unchanged.
  * Two deliberate departures from the upstream Dracula/Alucard spec:
  *   1. `raw` stays a deep-green SIBLING of `expr` (not danger-red). Raw output is
  *      still an interpolation, so it reads in the interpolation family; the `{{{ }}}`
@@ -32,8 +32,9 @@
  *
  * The families: expr (interpolation, escaped), raw (unescaped — handle with
  * care), block (sections/clauses), partial (composition), inherit (inheritance),
- * delim (set-delimiters directive), comment. Plus the interior-role tokens
- * (operator/string/number, ADR-017) and the chip-tint controls.
+ * delim (set-delimiters directive), comment. Plus the chip-tint controls.
+ * (Each tag is coloured as one span by its meaning — see ADR-014; interior
+ * literals/operators have no colour of their own.)
  */
 :root {
   --c-expr: #187747;
@@ -45,9 +46,6 @@
   --c-comment: #54597e;
   --tint-mix: 12%;
   --directive-bg: #eceaf1;
-  --stem-op-fg: #0e728d;
-  --stem-str-fg: #826600;
-  --stem-num-fg: #7c3aed;
 }
 
 [data-theme="dark"] {
@@ -60,7 +58,4 @@
   --c-comment: #8a97cc;
   --tint-mix: 20%;
   --directive-bg: #363150;
-  --stem-op-fg: #ff79c6;
-  --stem-str-fg: #f1fa8c;
-  --stem-num-fg: #bd93f9;
 }
