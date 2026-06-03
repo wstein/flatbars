@@ -28,10 +28,11 @@ main = do
     ( render "{{#if (lookup this \"a\")}}Y{{else}}N{{/if}}" (obj [ Tuple "a" (VBool false) ])
         == Right "N"
     )
-  -- @truthiness applies in the core dialect too (shared engine).
-  assert' "render: @truthiness:minimal (0 truthy)"
-    ( render "{{! @truthiness:minimal }}{{#if (lookup this \"n\")}}y{{else}}m{{/if}}"
-        (obj [ Tuple "n" (VNumber 0.0) ]) == Right "y"
+  -- ADR-022: the shared engine's fixed `handlebars` rule applies in core too —
+  -- 0 is falsy; no per-file @truthiness.
+  assert' "render: 0 is falsy (handlebars rule)"
+    ( render "{{#if (lookup this \"n\")}}y{{else}}m{{/if}}"
+        (obj [ Tuple "n" (VNumber 0.0) ]) == Right "m"
     )
   -- a parse error surfaces as Left.
   assert' "render: parse error" (isLeft (render "{{ oops" (obj [])))

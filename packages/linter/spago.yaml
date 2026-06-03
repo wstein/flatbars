@@ -15,7 +15,6 @@ package:
     - kernel
     - maxbars
     - maybe
-    - ordered-collections
     - prelude
     - strings
     - tuples

@@ -14,7 +14,7 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars (Node(..), Value(..), parse)
 import Kernel.ToValue (toValue)
-import Kernel.Value (handlebars, isFalsy, minimal, mustache, resolveTruthiness, resolveTruthinessWith, truthy)
+import Kernel.Value (handlebars, isFalsy, minimal, mustache, truthy)
 import Kernel.Walk (Arity(..), foldTemplate, splitClauses, validate)
 import Test.Assert (assert')
 
@@ -47,10 +47,8 @@ main = do
   assert' "mustache: empty object truthy" (truthy mustache (VObject Map.empty) == true)
   assert' "mustache: empty array falsy" (isFalsy mustache (VArray []) == true)
   assert' "mustache: false falsy" (isFalsy mustache (VBool false) == true)
-  -- per-engine default: absent directive ⇒ the supplied default; back-compat ⇒ handlebars
-  assert' "resolveTruthinessWith mustache (absent) ⇒ mustache"
-    (resolveTruthinessWith mustache [] == Right mustache)
-  assert' "resolveTruthiness (absent) ⇒ handlebars" (resolveTruthiness [] == Right handlebars)
+  -- ADR-022: truthiness is a fixed per-engine rule (these named rules are the
+  -- data-backed menu), no per-file @truthiness resolver anymore.
 
   -- walk: foldTemplate descends into block bodies.
   assert' "foldTemplate node count" (nodeCount "a{{#each x}}b{{{this}}}{{/each}}c" == 5)

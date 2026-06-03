@@ -24,7 +24,7 @@ import FlatBars.Parser (parse, parseWith)
 import FlatBars.Value (Value(..))
 import FullBars (desugarSurfaceWith)
 import Kernel.Lower (RNode, lower)
-import Linter.Lower (lowerReport, lowerToRawBars)
+import Linter.Lower (lowerToRawBars)
 import MaxBars (maxLoopVars, maxOptions, renderMax)
 import RawBars as RawBars
 import Test.Assert (assert')
@@ -95,14 +95,6 @@ rendersSame name dir body =
             )
             (want == got)
 
--- | Assert `lowerReport`'s `materialized` flag for `src`.
-assertMaterialized :: String -> String -> Boolean -> Effect Unit
-assertMaterialized name src expected = case lowerReport src of
-  Left e -> assert' (name <> ": lower failed: " <> show e) false
-  Right r -> assert'
-    (name <> ": materialized = " <> show r.materialized <> ", want " <> show expected)
-    (r.materialized == expected)
-
 main :: Effect Unit
 main = do
   log "Linter lower round-trip tests"
@@ -153,15 +145,10 @@ main = do
   rendersSame "explicit list (minimal shapes)" "false null"
     "{{#if zero}}T{{else}}F{{/if}}"
 
-  -- the materialization is visible: the lowered source carries the directive.
-  lowersContaining "carries @truthiness" "{{! @truthiness: minimal }}{{ a }}"
+  -- source fidelity: header directives are carried verbatim into the lowering
+  -- (an inert `@truthiness` is preserved like any other directive — ADR-022).
+  lowersContaining "carries directives verbatim" "{{! @truthiness: minimal }}{{ a }}"
     "{{! @truthiness: minimal }}"
-
-  -- the `materialized` report flag: set for non-default modes, clear otherwise.
-  assertMaterialized "minimal is materialized" "{{! @truthiness: minimal }}{{ a }}" true
-  assertMaterialized "mustache is materialized" "{{! @truthiness: mustache }}{{ a }}" true
-  assertMaterialized "handlebars alias is not" "{{! @truthiness: handlebars }}{{ a }}" false
-  assertMaterialized "absent directive is not" "{{ a }}" false
 
   -- Direct shape assertions on the printer.
   lowersContaining "and shape" "{{ a && b }}"

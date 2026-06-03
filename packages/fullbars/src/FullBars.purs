@@ -40,12 +40,12 @@ import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, hoistInline, noLoopVars)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
-import Kernel.Value (FalsySet, FalsyShape(..), aliasSet, always, escapeHtml, handlebars, isFalsy, minimal, presence, resolveTruthiness, stringify, truthy)
+import Kernel.Value (FalsySet, FalsyShape(..), always, escapeHtml, handlebars, isFalsy, minimal, mustache, presence, stringify, truthy)
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).
@@ -105,22 +105,17 @@ renderSurfaceWith partialSrcs src dat =
         let
           { partials: inlineP, template } = hoistInline (desugarSurface nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
-          externalF = Map.fromFoldable (map (\p -> Tuple p.name p.falsy) ps)
-          -- external partials carry their own resolved mode; inline partials
-          -- (in `inlineP`) get no entry and inherit the file's mode (§5).
-          setup = registerPartialsFalsy externalF <<< registerPartials (Map.union inlineP externalT)
+          setup = registerPartials (Map.union inlineP externalT)
         in
           case runResolvedLenient directives setup template dat of
             Left e -> Left (show e)
             Right out -> Right out
   where
-  -- a named *external* partial: parse + desugar its body and resolve its own
-  -- `@truthiness` (a different file ⇒ its own lexical mode).
+  -- a named *external* partial: parse + desugar its body. Every partial renders
+  -- under the engine's single truthiness rule now (ADR-022) — no per-file mode.
   compilePartial (Tuple name s) = case parse s of
     Left e -> Left (show e)
-    Right { directives, nodes } -> case resolveTruthiness directives of
-      Left e -> Left (show e)
-      Right falsy -> Right { name, template: desugarSurface nodes, falsy }
+    Right { nodes } -> Right { name, template: desugarSurface nodes }
 
 -- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
 -- | `(name, helper)` is registered into the env alongside the prelude and the
@@ -161,10 +156,8 @@ renderSurfaceWithHelpersWith strict lv opts helpers partialSrcs src dat =
         let
           { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
-          externalF = Map.fromFoldable (map (\p -> Tuple p.name p.falsy) ps)
           setup =
             registerAll helpers
-              <<< registerPartialsFalsy externalF
               <<< registerPartials (Map.union inlineP externalT)
         in
           case runResolvedLenient directives setup template dat of
@@ -175,9 +168,7 @@ renderSurfaceWithHelpersWith strict lv opts helpers partialSrcs src dat =
   -- dialect's parse options + loop-var desugar.
   compilePartial (Tuple name s) = case parseWith opts s of
     Left e -> Left (renderParseErrorAt s e)
-    Right { directives, nodes } -> case resolveTruthiness directives of
-      Left e -> Left (show e)
-      Right falsy -> Right { name, template: desugarSurfaceWith lv nodes, falsy }
+    Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
 
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.

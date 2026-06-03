@@ -12,9 +12,6 @@ module Kernel.Value
   , presence
   , always
   , mustache
-  , aliasSet
-  , resolveTruthiness
-  , resolveTruthinessWith
   , isFalsy
   , truthy
   , stringify
@@ -27,21 +24,20 @@ import Prelude
 
 import Data.Array as Array
 import Data.Char (toCharCode)
-import Data.Either (Either(..), note)
+import Data.Either (Either(..))
 import Data.Foldable (foldMap)
 import Data.Int (hexadecimal, toStringAs)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (power)
 import Data.Set (Set)
 import Data.Set as Set
-import Data.String (Pattern(..), Replacement(..), length, replaceAll, split, stripSuffix)
+import Data.String (Pattern(..), Replacement(..), length, replaceAll, stripSuffix)
 import Data.String.CodeUnits (singleton, toCharArray)
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
-import FlatBars.Syntax (Directive)
 import FlatBars.Value (Value(..))
 
 -- | The closed vocabulary of *falsy shapes*: which value shapes a truthiness
@@ -119,77 +115,6 @@ always = Set.empty
 -- | would fail if `0`/`""` were treated as falsy.
 mustache :: FalsySet
 mustache = Set.fromFoldable [ FFalse, FNull, FEmptyArr ]
-
--- | The alias table — 8 accepted names → 4 sets. Canonical display names are
--- | `empty` (the default), `minimal`, `presence`, `always`; `handlebars`,
--- | `ruby`/`nil`/`lua` are accepted synonyms (a name says nothing the explicit
--- | set does not — docs always print the expansion).
-aliasSet :: String -> Maybe FalsySet
-aliasSet = case _ of
-  "empty" -> Just handlebars
-  "handlebars" -> Just handlebars
-  "minimal" -> Just minimal
-  "ruby" -> Just minimal
-  "nil" -> Just minimal
-  "lua" -> Just minimal
-  "presence" -> Just presence
-  "always" -> Just always
-  "mustache" -> Just mustache
-  _ -> Nothing
-
--- | Resolve the active falsy-set from a template's header directives, against a
--- | caller-supplied *engine default* for the absent-directive case. Finds the
--- | (≤1) `@truthiness`; parses an alias *or* an explicit space-separated list of
--- | shape-literals (`false null "" 0 [] {}`). Absent ⇒ `def`. The per-engine
--- | default lives here (one kernel place): FullBars/RawBars/MaxBars pass
--- | `handlebars`; MinBars passes `mustache`.
--- | Errors: a duplicate `@truthiness`, an empty value, or an unknown
--- | alias/literal (which also rejects an alias+list mix and the bare-flag form).
-resolveTruthinessWith :: FalsySet -> Array Directive -> Either Error FalsySet
-resolveTruthinessWith def directives = case Array.filter (\d -> d.key == "truthiness") directives of
-  [] -> Right def
-  [ d ] -> parseTruthiness d.span.start d.value
-  ds -> Left
-    ( DirectiveError "duplicate @truthiness directive (at most one per file)"
-        (maybe 0 (\d -> d.span.start) (Array.index ds 1))
-    )
-
--- | `resolveTruthinessWith handlebars` — the absent-directive default for the
--- | Handlebars-family engines (RawBars/FullBars/MaxBars).
-resolveTruthiness :: Array Directive -> Either Error FalsySet
-resolveTruthiness = resolveTruthinessWith handlebars
-
--- | Parse a `@truthiness` value: an alias name, or a non-empty list of falsy
--- | shape-literals. The empty value is illegal — use the `always` alias. `off`
--- | is the directive's source offset, threaded into every error for location.
-parseTruthiness :: Int -> String -> Either Error FalsySet
-parseTruthiness off value = case aliasSet value of
-  Just fs -> Right fs
-  Nothing -> case tokens value of
-    [] -> Left
-      (DirectiveError "empty @truthiness value; use the 'always' alias for nothing-falsy" off)
-    ts -> Set.fromFoldable <$> traverse (shapeOf off) ts
-  where
-  -- whitespace-separated, layout-insensitive (newlines/tabs count as spaces).
-  tokens v =
-    Array.filter (_ /= "")
-      ( split (Pattern " ")
-          ( replaceAll (Pattern "\t") (Replacement " ")
-              ( replaceAll (Pattern "\n") (Replacement " ")
-                  (replaceAll (Pattern "\r") (Replacement " ") v)
-              )
-          )
-      )
-
-shapeOf :: Int -> String -> Either Error FalsyShape
-shapeOf off = case _ of
-  "false" -> Right FFalse
-  "null" -> Right FNull
-  "\"\"" -> Right FEmptyStr
-  "0" -> Right FZero
-  "[]" -> Right FEmptyArr
-  "{}" -> Right FEmptyObj
-  other -> note (DirectiveError ("unknown @truthiness value '" <> other <> "'") off) Nothing
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
 -- | the `escapeHtml` helper); arrays join with `","` and objects are an error.

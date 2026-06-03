@@ -23,7 +23,6 @@ module MinBars
 import Prelude
 
 import Data.Array as Array
-import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (elem)
 import Data.List (List(..), (:))
@@ -42,7 +41,7 @@ import FlatBars.Value (Value(..))
 import Kernel.Engine (runTemplate)
 import Kernel.Env (recursionBudget)
 import Kernel.Render (formatError)
-import Kernel.Value (FalsySet, mustache, resolveTruthinessWith)
+import Kernel.Value (mustache)
 import MinBars.Compile (minEmit)
 import MinBars.Context (seedEnv)
 import MinBars.Prelude (harvestBlocks, indentTemplate, leadingIndent, minEngine)
@@ -129,15 +128,13 @@ renderCore = renderCoreWith minLexConfig
 renderCoreWith :: LexConfig -> Map String Template -> String -> Value -> Either String String
 renderCoreWith cfg partials src dat = case parseMinWith cfg src of
   Left pe -> Left (renderParseErrorAt src pe)
-  Right { directives, nodes } -> case resolveTruthinessWith mustache directives of
-    Left e -> Left (formatError src e)
-    Right falsy ->
-      let
-        seeded = seedEnv dat partials falsy
-      in
-        case runTemplate (minEngine seeded) (desugar nodes) of
-          Left e -> Left (formatError src e)
-          Right out -> Right out
+  Right { nodes } ->
+    let
+      seeded = seedEnv dat partials
+    in
+      case runTemplate (minEngine seeded) (desugar nodes) of
+        Left e -> Left (formatError src e)
+        Right out -> Right out
 
 -- | Render MinBars (Mustache) source whose *initial* delimiters are `d` rather
 -- | than the default `{{`/`}}` — the `flatbars --mustache --delimiters '<% %>'`
@@ -166,23 +163,20 @@ compileMinJs = compileMinJsWith []
 -- | partial and a *dynamic-name* partial/parent (`{{>* }}` / `{{<* }}`).
 compileMinJsWith :: Array (Tuple String String) -> String -> Either ParseError String
 compileMinJsWith partialSrcs src = do
-  { directives, nodes } <- parseMin src
-  falsy <- lmap toParseError (resolveTruthinessWith mustache directives)
+  { nodes } <- parseMin src
   partials <- Map.fromFoldable <$> traverse parsePartial partialSrcs
   inlined <- inline partials Map.empty Nil 0 (desugar nodes)
-  Right (compile (minMeta falsy) minEmit [] inlined)
+  Right (compile minMeta minEmit [] inlined)
   where
   parsePartial (Tuple name s) = parseMin s <#> \r -> Tuple name (desugar r.nodes)
-  toParseError = case _ of
-    DirectiveError m o -> BadDirective m o
-    e -> BadDirective (show e) 0
 
 -- | The MinBars compile metadata: the runtime version, the `$falsy` const (the
--- | file's resolved mode, `mustache` by default), and the root-stack seed.
-minMeta :: FalsySet -> { runtimeVersion :: String, preamble :: String, seed :: String }
-minMeta falsy =
+-- | engine's fixed `mustache` rule — ADR-022, no per-file `@truthiness`), and the
+-- | root-stack seed.
+minMeta :: { runtimeVersion :: String, preamble :: String, seed :: String }
+minMeta =
   { runtimeVersion
-  , preamble: "const $falsy = " <> falsyLiteral falsy <> ";\n"
+  , preamble: "const $falsy = " <> falsyLiteral mustache <> ";\n"
   , seed: "rt.mseed(data, $falsy)"
   }
 

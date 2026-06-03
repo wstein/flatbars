@@ -8,8 +8,8 @@
 module Kernel.Env
   ( RefEnv(..)
   , refContext
-  , refFalsy
-  , withFalsy
+  , refTruthy
+  , withTruthy
   , constOperation
   , emptyEnv
   , register
@@ -19,9 +19,7 @@ module Kernel.Env
   , pushHelpers
   , registerPartial
   , registerPartials
-  , registerPartialsFalsy
   , lookupPartial
-  , lookupPartialFalsy
   , refDepth
   , enterPartial
   , recursionBudget
@@ -44,7 +42,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value)
 import Kernel.Engine (Engine, Operation)
-import Kernel.Value (FalsySet, handlebars, stringify)
+import Kernel.Value (handlebars, stringify, truthy)
 
 -- | Lift a pure `Either Error` into the engine monad — the single place the
 -- | `Left e -> throwError e` plumbing lives, shared by `refEngine` and helpers.
@@ -55,12 +53,11 @@ newtype RefEnv m = RefEnv
   { context :: Value
   , helpers :: List (Map String (Operation m (RefEnv m)))
   , partials :: Map String Template -- named templates, for the `partial` helper
-  , falsy :: FalsySet -- the active truthiness mode (per file/partial)
-  -- each *external* partial's own truthiness mode (resolved from its own
-  -- `@truthiness`); an entry here means "switch to this mode when entering that
-  -- partial". Inline (same-file) partials have no entry — they inherit the
-  -- file's mode lexically. See truthiness spec §5.
-  , partialFalsy :: Map String FalsySet
+  -- The engine's *fixed* truthiness rule (ADR-022): the lambda the engine plugs
+  -- in, governing `if`/`unless`/`and`/`or`/`not`. One rule per engine, the same
+  -- everywhere (no per-file `@truthiness`, no per-partial switch); the built-in
+  -- implementations are the named `Value` rules (`truthy handlebars`, etc.).
+  , truthy :: Value -> Boolean
   -- how many partials deep this environment is. `partialH` bumps it on entry and
   -- refuses to recurse past `recursionBudget`, so a cyclic partial raises a
   -- located `RecursionLimit` rather than overflowing the stack.
@@ -70,17 +67,15 @@ newtype RefEnv m = RefEnv
 refContext :: forall m. RefEnv m -> Value
 refContext (RefEnv e) = e.context
 
--- | The active falsy-set governing `if`/`unless`/`and`/`or`/`not` in this
--- | environment. Lexically scoped: a partial renders under its own env (and so
--- | its own mode); see the truthiness spec §4.2/§5.
-refFalsy :: forall m. RefEnv m -> FalsySet
-refFalsy (RefEnv e) = e.falsy
+-- | The engine's truthiness rule for this environment (ADR-022). Fixed per
+-- | engine — `if`/`unless`/`and`/`or`/`not` test through it.
+refTruthy :: forall m. RefEnv m -> Value -> Boolean
+refTruthy (RefEnv e) = e.truthy
 
--- | Seed the active truthiness mode (the engine resolves it from the file's
--- | `@truthiness` directive; absent ⇒ the `handlebars` default already set by
--- | `emptyEnv`). Partials get their own via `registerPartials` + a re-seed.
-withFalsy :: forall m. FalsySet -> RefEnv m -> RefEnv m
-withFalsy fs (RefEnv e) = RefEnv (e { falsy = fs })
+-- | Seed the engine's truthiness rule. FullBars/RawBars/MaxBars keep the
+-- | `handlebars` default `emptyEnv` installs; MinBars seeds `truthy mustache`.
+withTruthy :: forall m. (Value -> Boolean) -> RefEnv m -> RefEnv m
+withTruthy tf (RefEnv e) = RefEnv (e { truthy = tf })
 
 -- | A nullary helper that always returns a fixed value (scoped helpers like
 -- | `index`, `first`, `this`).
@@ -93,8 +88,7 @@ emptyEnv ctx = RefEnv
   { context: ctx
   , helpers: Map.empty : Nil
   , partials: Map.empty
-  , falsy: handlebars
-  , partialFalsy: Map.empty
+  , truthy: truthy handlebars
   , depth: 0
   }
 
@@ -146,19 +140,9 @@ registerPartial name tmpl (RefEnv e) = RefEnv (e { partials = Map.insert name tm
 registerPartials :: forall m. Map String Template -> RefEnv m -> RefEnv m
 registerPartials ps (RefEnv e) = RefEnv (e { partials = Map.union ps e.partials })
 
--- | Register the truthiness modes of *external* partials (each resolved from its
--- | own `@truthiness`), so the `partial` helper switches into them. Partials
--- | without an entry inherit the current (file) mode.
-registerPartialsFalsy :: forall m. Map String FalsySet -> RefEnv m -> RefEnv m
-registerPartialsFalsy fs (RefEnv e) = RefEnv (e { partialFalsy = Map.union fs e.partialFalsy })
-
 -- | Look up a registered partial by name.
 lookupPartial :: forall m. String -> RefEnv m -> Maybe Template
 lookupPartial name (RefEnv e) = Map.lookup name e.partials
-
--- | A partial's own truthiness mode, if it declared one (external partials only).
-lookupPartialFalsy :: forall m. String -> RefEnv m -> Maybe FalsySet
-lookupPartialFalsy name (RefEnv e) = Map.lookup name e.partialFalsy
 
 -- | The reference `Engine`: resolve from the frame stack (throwing
 -- | `UnknownHelper`), stringify via `Value.stringify`.

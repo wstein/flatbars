@@ -35,8 +35,10 @@ main = do
     , "rt.partial(\"row\", c1.ctx, null, partials, rt)"
     ]
 
-  expectJsS "@truthiness:minimal emits the minimal falsy-set + threads it"
-    "{{! @truthiness:minimal }}{{#if n}}y{{else}}m{{/if}}"
-    [ "const $falsy = { b: 1, n: 1 }", "rt.truthy(c0.falsy," ]
+  -- ADR-022: truthiness is the engine's fixed `handlebars` rule (no per-file
+  -- @truthiness) — compiled output bakes the fixed falsy-set and threads it.
+  expectJsS "emits the fixed handlebars falsy-set + threads it"
+    "{{#if n}}y{{else}}m{{/if}}"
+    [ "const $falsy = { b: 1, n: 1, s: 1, z: 1, a: 1 }", "rt.truthy(c0.falsy," ]
 
   log "all FullBars.Compile surface emitter tests passed"

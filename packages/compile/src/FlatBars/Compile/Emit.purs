@@ -19,16 +19,15 @@ module FlatBars.Compile.Emit
 import Prelude
 
 import Data.Array as Array
-import Data.Bifunctor (lmap)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Set as Set
 import Data.String (joinWith)
 import FlatBars.Compile (Ctx, Emit, Rec, jsString)
-import FlatBars.Error (Error(..), ParseError(..))
+import FlatBars.Error (ParseError)
 import FlatBars.Syntax (Directive, Expr(..), Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
-import Kernel.Value (FalsySet, FalsyShape(..), resolveTruthiness)
+import Kernel.Value (FalsySet, FalsyShape(..), handlebars)
 import Kernel.Walk (Clause, splitClauses)
 
 -- | The runtime contract version, recorded in the compiled header and checked by
@@ -37,9 +36,8 @@ runtimeVersion :: String
 runtimeVersion = "0.1.0"
 
 -- | The compile metadata: the runtime version, a module-level `$falsy` constant
--- | (the file's resolved truthiness mode), and the root-frame seed that hands
--- | `$falsy` to `rt.scope`. Inline partials reference the same module const, so
--- | they inherit the file's mode (Phase 3 parity in the compiled path).
+-- | (the engine's fixed `handlebars` rule — ADR-022, no per-file `@truthiness`),
+-- | and the root-frame seed that hands `$falsy` to `rt.scope`.
 metaFor :: FalsySet -> { runtimeVersion :: String, preamble :: String, seed :: String }
 metaFor fs =
   { runtimeVersion
@@ -47,14 +45,12 @@ metaFor fs =
   , seed: "rt.scope(data, $falsy)"
   }
 
--- | Resolve the file's `@truthiness` mode for codegen, mapping a resolution
--- | error into the compiler's `ParseError` channel (a located `BadDirective`).
+-- | The fixed truthiness rule baked into compiled FullBars/RawBars output
+-- | (ADR-022). Retains the `Array Directive -> Either ParseError FalsySet` shape
+-- | for call-site compatibility, but ignores directives — truthiness is no longer
+-- | per-file. Always the `handlebars` rule.
 resolveForCompile :: Array Directive -> Either ParseError FalsySet
-resolveForCompile = lmap toParseError <<< resolveTruthiness
-  where
-  toParseError = case _ of
-    DirectiveError m o -> BadDirective m o
-    e -> BadDirective (show e) 0
+resolveForCompile _ = Right handlebars
 
 -- | The falsy-set as a JS object literal `{ b:1, n:1, … }` — one key per present
 -- | shape (false/null/""/0/[]/{}); the runtime reads `!!set.<k>`. Mirrors

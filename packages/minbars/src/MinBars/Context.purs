@@ -10,7 +10,6 @@ module MinBars.Context
   ( MinEnv(..)
   , minStack
   , minPartials
-  , minFalsy
   , minDepth
   , minBlocks
   , push
@@ -32,16 +31,15 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), split)
 import FlatBars.Syntax (Template)
 import FlatBars.Value (Value(..))
-import Kernel.Value (FalsySet)
 
 -- | The MinBars environment: a Mustache *context stack* plus the partial
--- | registry, the active truthiness mode, and the partial-recursion depth.
+-- | registry and the partial-recursion depth. Truthiness is MinBars' fixed
+-- | `mustache` rule (ADR-022), applied directly where needed — not carried here.
 -- | A `newtype` so `MinEnv -> Operation m MinEnv -> Ctl m MinEnv -> MinEnv`
 -- | is well-founded (see `Kernel.Env.RefEnv`).
 newtype MinEnv = MinEnv
   { stack :: List Value -- the context stack, top = head
   , partials :: Map String Template -- named partial templates
-  , falsy :: FalsySet -- active truthiness mode (`mustache` by default)
   , depth :: Int -- partial-recursion depth, guarded against the budget
   , blocks :: List (Map String Template)
   -- the inheritance block-override stack — a namespace *distinct* from the
@@ -55,9 +53,6 @@ minStack (MinEnv e) = e.stack
 
 minPartials :: MinEnv -> Map String Template
 minPartials (MinEnv e) = e.partials
-
-minFalsy :: MinEnv -> FalsySet
-minFalsy (MinEnv e) = e.falsy
 
 minDepth :: MinEnv -> Int
 minDepth (MinEnv e) = e.depth
@@ -96,12 +91,11 @@ blookup name = List.foldl pick Nothing
     Nothing -> acc
 
 -- | The starting environment: the root datum as the sole stack frame, the given
--- | partials and truthiness mode, depth 0.
-seedEnv :: Value -> Map String Template -> FalsySet -> MinEnv
-seedEnv dat partials falsy = MinEnv
+-- | partials, depth 0.
+seedEnv :: Value -> Map String Template -> MinEnv
+seedEnv dat partials = MinEnv
   { stack: dat : Nil
   , partials
-  , falsy
   , depth: 0
   , blocks: Nil
   }

@@ -25,7 +25,7 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, resolveTruthiness, stringify, truthy)
+import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, stringify, truthy)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
 import Kernel.Walk (arityOk, foldTemplate, validate)
@@ -432,53 +432,17 @@ main = do
   row "safe-empty" (VSafe "") false true true true
   row "NaN" (VNumber nan) true true true true
 
-  -- Phase 2: the @truthiness directive retunes the *active* mode per file, and
-  -- the conditionals/operators read it. Rendering matrix (surface) + resolver.
+  -- ADR-022: truthiness is the engine's *fixed* rule (handlebars for FullBars) —
+  -- there is no per-file @truthiness directive. The conditionals/operators read
+  -- that one rule; `includeZero` is the only per-call exception.
   let
     n0 = obj [ Tuple "n" (VNumber 0.0) ]
-  -- default (no directive) ⇒ handlebars: 0 is falsy.
-  expectS "truth:default-zero-falsy" "{{#if n}}y{{else}}m{{/if}}" n0 "m"
-  -- @truthiness:minimal ⇒ 0/""/[]/{} truthy; only false/null falsy.
-  expectS "truth:minimal-zero-truthy" "{{! @truthiness:minimal }}{{#if n}}y{{else}}m{{/if}}" n0 "y"
-  expectS "truth:minimal-empty-string-truthy"
-    "{{! @truthiness:minimal }}{{#if s}}y{{else}}m{{/if}}"
-    (obj [ Tuple "s" (str "") ])
-    "y"
-  -- the three language synonyms expand to the same set as `minimal`.
-  for_ [ "ruby", "nil", "lua" ] \alias ->
-    expectS ("truth:synonym-" <> alias)
-      ("{{! @truthiness:" <> alias <> " }}{{#if n}}y{{else}}m{{/if}}")
-      n0
-      "y"
-  -- the explicit shape-list form (false null ≡ minimal).
-  expectS "truth:explicit-list" "{{! @truthiness: false null }}{{#if n}}y{{else}}m{{/if}}" n0 "y"
-  -- presence: empty array/object are falsy (where handlebars calls {} truthy).
-  expectS "truth:presence-empty-array-falsy"
-    "{{! @truthiness:presence }}{{#if xs}}y{{else}}m{{/if}}"
-    (obj [ Tuple "xs" (arr []) ])
-    "m"
-  expectS "truth:presence-empty-object-falsy"
-    "{{! @truthiness:presence }}{{#if o}}y{{else}}m{{/if}}"
-    (obj [ Tuple "o" (obj []) ])
-    "m"
-  -- always: nothing is falsy, so even false takes the then-branch.
-  expectS "truth:always-false-truthy"
-    "{{! @truthiness:always }}{{#if b}}y{{else}}m{{/if}}"
-    (obj [ Tuple "b" (VBool false) ])
-    "y"
-  -- the operators read the active mode too (and 0 5 ⇒ true under minimal).
-  expectS "truth:and-retuned" "{{! @truthiness:minimal }}{{{ and 0 5 }}}" VNull "true"
+  -- handlebars: 0 is falsy.
+  expectS "truth:zero-falsy" "{{#if n}}y{{else}}m{{/if}}" n0 "m"
+  -- the operators read the engine rule too (and 0 5 ⇒ false under handlebars).
   expectS "truth:and-default" "{{{ and 0 5 }}}" VNull "false"
-  -- includeZero is a per-call exception layered on the mode (here: handlebars).
-  expectS "truth:includeZero-compose"
-    "{{! @truthiness:empty }}{{#if n includeZero=true}}y{{else}}m{{/if}}"
-    n0
-    "y"
-  -- resolver errors: empty value, duplicate, unknown alias/literal.
-  assert' "truth:empty-value errors" (isLeft (renderSurface "{{! @truthiness: }}x" VNull))
-  assert' "truth:duplicate errors"
-    (isLeft (renderSurface "{{! @truthiness:ruby }}{{! @truthiness:lua }}x" VNull))
-  assert' "truth:unknown-alias errors" (isLeft (renderSurface "{{! @truthiness:bogus }}x" VNull))
+  -- includeZero (re-homed off the falsy-set machinery) makes 0 truthy for one test.
+  expectS "truth:includeZero" "{{#if n includeZero=true}}y{{else}}m{{/if}}" n0 "y"
 
   -- Standalone whitespace removal (on by default): a block open/close or comment
   -- alone on its line leaves no blank line.
@@ -498,26 +462,13 @@ main = do
     (obj [ Tuple "c" (VBool true) ])
     "a X b"
 
-  -- Phase 3: partial-boundary truthiness scoping. An external partial branches
-  -- by its OWN @truthiness, never the caller's (§5, file-based & lexical).
-  -- minimal-mode partial called from a default caller: 0 is truthy in the partial.
-  expectP "partial:external-uses-own-mode"
-    [ Tuple "card" "{{! @truthiness:minimal }}{{#if n}}has{{else}}none{{/if}}" ]
+  -- ADR-022: every partial (external or inline) renders under the engine's one
+  -- truthiness rule — there is no per-partial mode to inherit or override.
+  expectP "partial:external-uses-engine-rule"
+    [ Tuple "card" "{{#if n}}has{{else}}none{{/if}}" ]
     "{{> card this}}"
     n0
-    "has"
-  -- a directive-less external partial uses handlebars even when the caller is
-  -- minimal — the caller's mode is NOT inherited across the boundary.
-  expectP "partial:no-inherit-from-caller"
-    [ Tuple "card" "{{#if n}}has{{else}}none{{/if}}" ]
-    "{{! @truthiness:minimal }}{{> card this}}"
-    n0
     "none"
-  -- an inline (same-file) partial DOES inherit the file's mode (it's lexical).
-  expectS "partial:inline-inherits-file-mode"
-    "{{! @truthiness:minimal }}{{#*inline \"row\"}}{{#if n}}y{{else}}m{{/if}}{{/inline}}{{> row this}}"
-    n0
-    "y"
 
   -- Phase 4: directive diagnostics.
   let
@@ -530,17 +481,12 @@ main = do
   assert' "lint:known-directives-silent"
     (Array.null (directiveLints (dirsOf "{{! @truthiness:minimal }}{{! @trim:standalone }}x")))
   -- a partial whose mode differs from the caller warns; a matching mode is silent.
+  -- (`crossBoundaryWarnings` is a pure lint over named rules — still valid.)
   assert' "lint:cross-boundary-mismatch"
     ( map _.name
         (crossBoundaryWarnings handlebars [ Tuple "card" minimal, Tuple "same" handlebars ])
         == [ "card" ]
     )
-  -- a rejected @truthiness carries the offending directive's source offset.
-  case resolveTruthiness (dirsOf "{{! @truthiness:bogus }}x") of
-    Left (DirectiveError msg off) ->
-      assert' ("lint:located-error " <> msg <> " @" <> show off)
-        (off == 4 && contains (Pattern "bogus") msg)
-    _ -> assert' "lint:located-error expected a located DirectiveError" false
 
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at

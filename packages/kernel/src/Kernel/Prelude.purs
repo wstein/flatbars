@@ -47,9 +47,9 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
-import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, lookupPartialFalsy, pushFrame, recursionBudget, refContext, refDepth, refFalsy, withFalsy)
+import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTruthy)
 import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
-import Kernel.Value (FalsySet, FalsyShape(..), escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
+import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
 
 --------------------------------------------------------------------------------
@@ -430,7 +430,7 @@ coalesceH _ args = pure (fromMaybe VNull (Array.find notNull args))
 -- | `not`: logical negation under the *active* truthiness mode (`ctl.env`).
 notH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 notH ctl args = case args of
-  [ a ] -> pure (VBool (not (truthy (refFalsy ctl.env) a)))
+  [ a ] -> pure (VBool (not (refTruthy ctl.env a)))
   _ -> throwError (ArityError "not: expected exactly 1 argument")
 
 -- | `and`/`or`: fold truthiness across the arguments with the given quantifier,
@@ -441,7 +441,7 @@ boolH
    . Applicative m
   => ((Value -> Boolean) -> Array Value -> Boolean)
   -> Operation m (RefEnv m)
-boolH quant ctl args = pure (VBool (quant (truthy (refFalsy ctl.env)) args))
+boolH quant ctl args = pure (VBool (quant (refTruthy ctl.env) args))
 
 --------------------------------------------------------------------------------
 -- Value primitives — string pack (helper-packs-spec §4)
@@ -860,8 +860,8 @@ renderElse ctl = renderSafe ctl ctl.env (elseBody ctl)
 ifH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 ifH ctl args = do
   cond <- case args of
-    [ c ] -> pure (truthy (refFalsy ctl.env) c)
-    [ c, opts ] -> pure (truthyWith (refFalsy ctl.env) opts c)
+    [ c ] -> pure (refTruthy ctl.env c)
+    [ c, opts ] -> pure (truthyWith (refTruthy ctl.env) opts c)
     _ -> throwError (ArityError (wrong1or2 "if" args))
   let
     { before, clauses } = splitClauses ctl.children
@@ -887,8 +887,8 @@ pickClause ctl clauses = case Array.uncons clauses of
       elifBranch condE mOpts = do
         cond <- ctl.eval ctl.env condE
         hit <- case mOpts of
-          Nothing -> pure (truthy (refFalsy ctl.env) cond)
-          Just optsE -> (\opts -> truthyWith (refFalsy ctl.env) opts cond) <$> ctl.eval ctl.env
+          Nothing -> pure (refTruthy ctl.env cond)
+          Just optsE -> (\opts -> truthyWith (refTruthy ctl.env) opts cond) <$> ctl.eval ctl.env
             optsE
         if hit then renderSafe ctl ctl.env cl.body else pickClause ctl tail
     other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
@@ -912,8 +912,8 @@ checkIfClauses clauses = case Array.uncons clauses of
 
 unlessH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 unlessH ctl args = case args of
-  [ c ] -> branchOn (not (truthy (refFalsy ctl.env) c)) ctl
-  [ c, opts ] -> branchOn (not (truthyWith (refFalsy ctl.env) opts c)) ctl
+  [ c ] -> branchOn (not (refTruthy ctl.env c)) ctl
+  [ c, opts ] -> branchOn (not (truthyWith (refTruthy ctl.env) opts c)) ctl
   _ -> throwError (ArityError (wrong1or2 "unless" args))
 
 -- | Render the main clause when the condition holds, else the `{{else}}` clause.
@@ -923,13 +923,21 @@ branchOn cond ctl = if cond then renderMain ctl else renderElse ctl
 wrong1or2 :: String -> Array Value -> String
 wrong1or2 name args = name <> ": expected 1 or 2 arguments, got " <> show (Array.length args)
 
--- | Truthiness under the active mode, honoring an options object's `includeZero`
--- | flag as a *per-call exception*: when set, `FZero` is removed from the mode
--- | for this one test (so `0` counts as truthy), composing with whatever the
--- | file's `@truthiness` is (a no-op when the mode already omits `0`). See spec
--- | §3.3.
-truthyWith :: FalsySet -> Value -> Value -> Boolean
-truthyWith fs opts v = truthy (if optFlag "includeZero" opts then Set.delete FZero fs else fs) v
+-- | Truthiness under the engine's rule, honoring an options object's
+-- | `includeZero` flag as a *per-call exception* (ADR-022): when set, the number
+-- | `0` counts as truthy regardless of the engine's rule (a no-op when the rule
+-- | already treats `0` as truthy). Re-homed off the old `FalsySet` machinery — it
+-- | is now a plain override on top of the engine's `truthy` lambda.
+truthyWith :: (Value -> Boolean) -> Value -> Value -> Boolean
+truthyWith tf opts v
+  | optFlag "includeZero" opts, isZeroNum v = true
+  | otherwise = tf v
+
+-- | The number `0` (the only shape `includeZero` overrides).
+isZeroNum :: Value -> Boolean
+isZeroNum = case _ of
+  VNumber n -> n == 0.0
+  _ -> false
 
 -- | Read a boolean option from an options object (`VObject`); absent ⇒ false.
 optFlag :: String -> Value -> Boolean
@@ -1113,7 +1121,7 @@ iterate ctl names items = do
 withH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 withH ctl args = case Array.uncons args of
   Just { head: v, tail: rest } ->
-    if truthy (refFalsy ctl.env) v then do
+    if refTruthy ctl.env v then do
       -- `with` is not a loop, so it binds no `loop`; it installs `@parentchain`
       -- (the reserved `parent` chain, ADR-021) and inherits the enclosing `loop`.
       parentChain <- buildContextChain ctl
@@ -1197,9 +1205,8 @@ partialH ctl args = case args of
         body _ _ = VSafe <$> ctl.render ctl.env ctl.children
       in
         Map.fromFoldable [ Tuple "partial-block" body, Tuple "yield" body ]
-  -- a partial renders under its own truthiness mode if it declared one (external
-  -- partial); otherwise it inherits the current file's mode (inline partial).
-  -- Scoping is lexical and never inherited across an external boundary (§5).
+  -- every partial renders under the engine's single truthiness rule (ADR-022):
+  -- there is no per-partial mode to switch into anymore.
   renderPartial name ctx = case lookupPartial name ctl.env of
     Just tmpl
       | refDepth ctl.env >= recursionBudget -> throwError (RecursionLimit recursionBudget)
@@ -1208,11 +1215,8 @@ partialH ctl args = case args of
             -- increment the partial depth so a cyclic partial chain hits the
             -- budget instead of overflowing the stack (threaded like pushFrame).
             entered = enterPartial (pushFrame blockFrame ctx ctl.env)
-            scoped = case lookupPartialFalsy name ctl.env of
-              Just fs -> withFalsy fs entered
-              Nothing -> entered
           in
-            VSafe <$> ctl.render scoped tmpl
+            VSafe <$> ctl.render entered tmpl
     Nothing
       | Array.null ctl.children -> throwError (HelperError ("unknown partial '" <> name <> "'"))
       | otherwise -> VSafe <$> ctl.render ctl.env ctl.children -- block body is the fallback

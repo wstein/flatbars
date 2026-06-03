@@ -38,10 +38,9 @@ import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, registerAll, registerPartials, registerPartialsFalsy)
+import Kernel.Env (RefEnv, registerAll, registerPartials)
 import Kernel.Render (formatError, runResolved)
 import Kernel.ToValue (class ToValue, toValue)
-import Kernel.Value (resolveTruthiness)
 
 --------------------------------------------------------------------------------
 -- Rendering (core syntax + the FullBars engine)
@@ -113,19 +112,15 @@ renderWithOperations operations partialSrcs src dat =
       Right { directives, nodes } ->
         let
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
-          externalF = Map.fromFoldable (map (\p -> Tuple p.name p.falsy) ps)
           setup =
             registerAll operations
-              <<< registerPartialsFalsy externalF
               <<< registerPartials externalT
         in
           lmap (formatError src) (runResolved directives setup nodes dat)
   where
   compilePartial (Tuple name s) = case parseWith coreOptions s of
     Left e -> Left (renderParseErrorAt s e)
-    Right { directives, nodes } -> case resolveTruthiness directives of
-      Left e -> Left (show e)
-      Right falsy -> Right { name, template: nodes, falsy }
+    Right { nodes } -> Right { name, template: nodes }
 
 -- | The async instantiation: the same engine in `ExceptT Error Aff`.
 renderAff :: String -> Value -> Aff (Either Error String)
