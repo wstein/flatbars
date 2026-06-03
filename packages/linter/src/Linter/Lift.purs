@@ -45,7 +45,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Data.String as String
 import Data.Tuple (Tuple(..), fst, snd)
@@ -275,12 +275,30 @@ exprWith span arg expr = case expr of
         }
     _, _ -> reSugarCall span arg name args
 
+-- | A scoped loop-variable name (and the ADR-006 aliases) → its field on the
+-- | MaxBars `loop` object (ADR-021). `Nothing` for any other name.
+liftLoopVar :: Ident -> Maybe String
+liftLoopVar = case _ of
+  "index0" -> Just "loop.index0"
+  "index1" -> Just "loop.index1"
+  "index" -> Just "loop.index0"
+  "rindex0" -> Just "loop.rindex0"
+  "rindex1" -> Just "loop.rindex1"
+  "rindex" -> Just "loop.rindex0"
+  "first" -> Just "loop.first"
+  "last" -> Just "loop.last"
+  "length" -> Just "loop.length"
+  "size" -> Just "loop.length"
+  "key" -> Just "loop.key"
+  _ -> Nothing
+
 -- | Re-sugar a plain helper application that is not an operator: a path, a nullary
 -- | call, a unary-filter pipe, or a flagged call.
 reSugarCall :: Span -> Boolean -> Ident -> Array Expr -> Out
 reSugarCall span arg name args = case args of
-  -- a nullary application: a bare name (loop var / scoped helper / nullary call).
-  [] -> emptyOut { text = name }
+  -- a nullary application: a scoped loop variable lifts to the `loop` object
+  -- (ADR-021: `(index1)` ⇒ `loop.index1`); any other bare name stays as-is.
+  [] -> emptyOut { text = fromMaybe name (liftLoopVar name) }
 
   -- a single-argument call. A recognised unary filter ⇒ the pipe `a | f`; an
   -- unrecognised one is left as a call and flagged.

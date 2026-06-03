@@ -15,6 +15,7 @@ package:
     - kernel
     - maybe
     - prelude
+    - strings
     - tuples
   test:
     main: Test.MaxBars.Main

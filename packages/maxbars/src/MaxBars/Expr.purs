@@ -35,11 +35,22 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
+import Data.String (Pattern(..), stripPrefix)
 import FlatBars.Error (ParseError(..))
 import FlatBars.Syntax (Expr(..))
 import FlatBars.Token (PosToken, Token(..))
 import FlatBars.Value (Value(..))
+
+-- | MaxBars drops the Handlebars `@` namespace (ADR-021): `@index`/`@root`/`@key`
+-- | are rejected — read the loop/context model instead. (`../` is already gone:
+-- | `/` is MaxBars' division operator, so `../x` is arithmetic, not a path.)
+isAtVar :: String -> Boolean
+isAtVar name = isJust (stripPrefix (Pattern "@") name)
+
+atVarError :: Int -> ParseError
+atVarError = LexError
+  "'@…' variables are not used in MaxBars; read the loop/context model instead (e.g. {{loop.index0}}, {{parent.x}}, {{root.y}})"
 
 type Step a = { val :: a, pos :: Int }
 
@@ -63,7 +74,9 @@ parseMaxExpr toks = case exprLadder 0 of
 -- | the head as an `App`, which the core tree-builder splits into `{ name, args }`.
 parseMaxHead :: Array PosToken -> Either ParseError Expr
 parseMaxHead toks = case comb.tk 0 of
-  Just (TIdent name) -> App name <$> collect 1 []
+  Just (TIdent name)
+    | isAtVar name -> Left (atVarError (comb.posAt 0))
+    | otherwise -> App name <$> collect 1 []
   _ -> Left (LexError "expected a block helper name" (comb.posAt 0))
   where
   comb = combinators toks
@@ -139,7 +152,9 @@ combinators toks =
   -- an application: an identifier head applied to atom arguments, or an atom.
   pApp :: Int -> Either ParseError (Step Expr)
   pApp i = case tk i of
-    Just (TIdent name) -> pArgs (i + 1) [] >>= \r -> Right { val: App name r.val, pos: r.pos }
+    Just (TIdent name)
+      | isAtVar name -> Left (atVarError (posAt i))
+      | otherwise -> pArgs (i + 1) [] >>= \r -> Right { val: App name r.val, pos: r.pos }
     _ -> pAtom i
 
   -- an atom: a parenthesised full expression, a literal, or a nullary identifier.
@@ -150,7 +165,9 @@ combinators toks =
       _ -> Left (LexError "expected )" (posAt r.pos))
     Just (TStr s) -> Right { val: Lit (VString s), pos: i + 1 }
     Just (TNum n) -> Right { val: Lit (VNumber n), pos: i + 1 }
-    Just (TIdent name) -> Right { val: App name [], pos: i + 1 }
+    Just (TIdent name)
+      | isAtVar name -> Left (atVarError (posAt i))
+      | otherwise -> Right { val: App name [], pos: i + 1 }
     -- a bare bar is structure, not an operator: in head position (no pipe rung)
     -- it survives as `App "|" []` so the surface desugar's `extractBlockParams`
     -- can strip a trailing `as |…|` clause — matching the core default parser.
@@ -165,7 +182,9 @@ combinators toks =
     Just TLParen -> pAtom i >>= \r -> pArgs r.pos (Array.snoc acc r.val)
     Just (TStr s) -> pArgs (i + 1) (Array.snoc acc (Lit (VString s)))
     Just (TNum n) -> pArgs (i + 1) (Array.snoc acc (Lit (VNumber n)))
-    Just (TIdent name) -> pArgs (i + 1) (Array.snoc acc (App name []))
+    Just (TIdent name)
+      | isAtVar name -> Left (atVarError (posAt i))
+      | otherwise -> pArgs (i + 1) (Array.snoc acc (App name []))
     _ -> Right { val: acc, pos: i }
 
   binOp :: String -> String -> Token -> Maybe (Expr -> Expr -> Expr)

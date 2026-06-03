@@ -193,9 +193,9 @@ main = do
   -- ── Direct source-shape assertions ──
   migratesContaining "unless open shape" "{{^items}}none{{/items}}" "{{#unless items}}"
   migratesContaining "unless close shape" "{{^items}}none{{/items}}" "{{/unless}}"
-  migratesContaining "index0 rewrite" "{{#each items}}{{@index}}{{/each}}" "index0"
-  -- the leading `@` is dropped; the bare loop var remains and `@first` is gone.
-  migratesContaining "first bare" "{{#each items}}{{@first}}{{/each}}" "{{first}}"
+  -- ADR-021: `@index` migrates to the loop object, `@first` likewise; `@` is gone.
+  migratesContaining "loop.index0 rewrite" "{{#each items}}{{@index}}{{/each}}" "loop.index0"
+  migratesContaining "loop.first rewrite" "{{#each items}}{{@first}}{{/each}}" "{{loop.first}}"
   assertNotContaining "first @ dropped" "{{#each items}}{{@first}}{{/each}}" "@first"
   migratesContaining "amp to triple" "{{&x}}" "{{{x}}}"
   migratesContaining "elif rewrite" "{{#if a}}x{{else if b}}y{{/if}}" "{{elif b}}"

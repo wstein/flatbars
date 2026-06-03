@@ -181,9 +181,9 @@ main = do
   expectM "blockparams-with" "{{#with o as |c|}}{{c.n}}{{/with}}"
     (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
     "Z"
-  -- a block param shadows a loop variable: `as |index0|` binds the *element*, not
-  -- the loop index (the surface `pathExpr` checks scope before loop vars).
-  expectM "blockparams-shadow-loopvar" "{{#each xs as |index0|}}{{index0}}{{/each}}" xs3 "abc"
+  -- a block param binds a bare name directly (there are no bare loop variables in
+  -- ADR-021, so nothing to shadow): `as |x|` binds the element.
+  expectM "blockparams-bind" "{{#each xs as |x|}}{{x}}{{/each}}" xs3 "abc"
   -- outer block param stays in scope inside a nested block.
   expectM "blockparams-nested"
     "{{#each rows as |row|}}{{#each row.cells}}{{row.id}}{{this}} {{/each}}{{/each}}"
@@ -237,23 +237,14 @@ main = do
     Right js -> assert' ("compile: expected rt.call(\"and\" in\n" <> js)
       (contains (Pattern "rt.call(\"and\"") js)
 
-  -- loop-var shadow lint (ADR-006 warn-always tier): a bare shadow-prone loop
-  -- variable warns; an unambiguous one and an explicit `this.` path do not.
+  -- there are no bare loop variables (ADR-021): a bare {{first}}/{{length}} is an
+  -- ordinary data field, so it does NOT warn (the old shadow lint is retired).
   let
     warnNames src = case maxbarsWarnings src of
       Left _ -> [ "<parse error>" ]
       Right is -> map _.name is
-  assert' "shadow-warn: bare {{first}} warns"
-    (warnNames "{{#each xs}}{{first}}{{/each}}" == [ "first" ])
-  assert' "shadow-warn: {{length}}+{{key}} both warn"
-    (warnNames "{{#each xs}}{{length}}{{key}}{{/each}}" == [ "length", "key" ])
-  assert' "shadow-warn: {{index0}} (unambiguous) does not warn"
-    (Array.null (warnNames "{{#each xs}}{{index0}}{{/each}}"))
-  assert' "shadow-warn: {{this.first}} (explicit data path) does not warn"
-    (Array.null (warnNames "{{#each xs}}{{this.first}}{{/each}}"))
-  -- warn-always: it fires with no schema and even outside a loop (the name is a
-  -- loop variable wherever it appears bare).
-  assert' "shadow-warn: fires with no loop/schema" (warnNames "{{first}}" == [ "first" ])
+  assert' "no-shadow-warn: bare {{first}} is a data field, no warning"
+    (Array.null (warnNames "{{#each xs}}{{first}}{{length}}{{key}}{{/each}}"))
 
   -- stray-head-bar lint (ADR-019): an unparenthesised pipe in a block head is
   -- parsed as structure, so it warns with the bar `|` as the issue name.
@@ -266,12 +257,13 @@ main = do
   assert' "headbar-warn: {{#each xs as |x|}} does not warn"
     (Array.null (warnNames "{{#each xs as |x|}}{{x}}{{/each}}"))
 
-  -- label-shadow lint (ADR-013): a loop `label NAME` whose name is a bare loop
-  -- variable shadows it for the whole body, so it warns; a fresh name does not.
-  assert' "label-warn: {{#each xs label index0}} warns"
-    (warnNames "{{#each xs label index0}}{{this}}{{/each}}" == [ "index0" ])
-  assert' "label-warn: {{#each xs label first}} warns (field-like loop var)"
-    (warnNames "{{#each xs label first}}{{this}}{{/each}}" == [ "first" ])
+  -- label-shadow lint (ADR-021): a loop `label NAME` whose name is a reserved root
+  -- (this/loop/root/parent) shadows it for the whole body, so it warns; a fresh
+  -- name does not.
+  assert' "label-warn: {{#each xs label loop}} warns"
+    (warnNames "{{#each xs label loop}}{{this}}{{/each}}" == [ "loop" ])
+  assert' "label-warn: {{#each xs label parent}} warns"
+    (warnNames "{{#each xs label parent}}{{this}}{{/each}}" == [ "parent" ])
   assert' "label-warn: {{#each xs label outer}} (fresh name) does not warn"
     (Array.null (warnNames "{{#each xs label outer}}{{outer.index0}}{{/each}}"))
 

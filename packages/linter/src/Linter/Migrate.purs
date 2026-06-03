@@ -258,11 +258,13 @@ matchData cs i = Array.findMap tryOne mapped
   continues j = maybe false isIdentChar (Array.index cs j)
   -- longest first so `@index` is preferred where applicable; `@index0` never
   -- matches `@index` because the trailing `0` is an ident-continuation char.
+  -- ADR-021: Handlebars `@`-vars migrate to the MaxBars `loop` object (no bare
+  -- loop variables). `@index` → `loop.index0`, `@first` → `loop.first`, etc.
   mapped =
-    [ Tuple "index" "index0"
-    , Tuple "first" "first"
-    , Tuple "last" "last"
-    , Tuple "key" "key"
+    [ Tuple "index" "loop.index0"
+    , Tuple "first" "loop.first"
+    , Tuple "last" "loop.last"
+    , Tuple "key" "loop.key"
     ]
 
 -- | Identifier-continuation characters for Handlebars paths/data names: letters,
@@ -322,12 +324,13 @@ parentDataResidual span interior
       [ { kind: "parent-data"
         , span
         , message:
-            "parent-or-root data reference (`@../` / `@root`) cannot be migrated "
-              <> "mechanically — MaxBars reaches an outer loop's state by binding it "
-              <> "with a block param on the outer `each`, not by walking up the data tree."
+            "parent-or-root data reference (`@../` / `@root`) is left for review — "
+              <> "MaxBars reaches outer and root state through the reserved variable "
+              <> "model (ADR-021), not by walking up the `@` data tree."
         , suggestion:
-            "Name the outer loop's bindings, e.g. `{{#each items as |item idx|}}`, then "
-              <> "reference `item` / `idx` inside the inner loop instead of `@../…` / `@root`."
+            "Use `parent` / `root` for the enclosing and root context (`{{parent.x}}`, "
+              <> "`{{root.y}}`), and `loop.parent` for the enclosing loop's state "
+              <> "(`{{loop.parent.index0}}`), instead of `@../…` / `@root`."
         }
       ]
   | otherwise = []

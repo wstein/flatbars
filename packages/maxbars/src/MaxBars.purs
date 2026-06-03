@@ -18,7 +18,6 @@ module MaxBars
 import Prelude
 
 import Data.Either (Either)
-import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple)
 import FlatBars.Error (Error, ParseError)
 import FlatBars.Lexer (defaultLexConfig)
@@ -26,12 +25,12 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
 import FullBars.Compile (compileSurfaceWith)
-import FullBars.Surface (reservedScope)
+import FullBars.Surface (noLoopVars, reservedScope)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
-import MaxBars.Lint (labelShadowWarnings, loopVarShadowWarnings, strayHeadBarWarnings)
+import MaxBars.Lint (labelShadowWarnings, strayHeadBarWarnings)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -50,31 +49,15 @@ maxOptions =
     , lexConfig = defaultLexConfig { mustacheDelims = true }
     }
 
--- | MaxBars' loop variables: bare (no-`@`) scoped names usable inside `each`.
--- | The canonical set `index0/index1/rindex0/rindex1/first/last/length/key` maps
--- | to itself; the aliases `index`/`rindex`/`size` map to `index0`/`rindex0`/
--- | `length`. Everything else is a data path (FullBars semantics). This is the
--- | one place the "MaxBars-only" loop variables are *named*; the underlying
--- | frame metadata is shared (`Kernel.Prelude` `iterate`), but only this
--- | resolver turns a bare `{{index0}}` into the scoped call `(index0)`.
--- | Wrapped with `reservedScope` so the desugar turns on the ADR-021 reserved
--- | variable model (`loop`/`root`/`parent` scope-declared, `parent` climbing) for
--- | every MaxBars desugar path — no call-site threading. The bare loop-variable
--- | cases below are unchanged (they remain until ADR-021 increment C drops them).
+-- | MaxBars' surface variable resolver (ADR-021). There are *no bare loop
+-- | variables*: a bare `{{first}}`/`{{index0}}` is an ordinary data field. Loop
+-- | state is read through the `loop` object (`{{loop.first}}`, `{{loop.index0}}`),
+-- | the enclosing context through `parent`/`parent.parent`, and the root through
+-- | `root` — all turned on by wrapping `noLoopVars` with `reservedScope`, which
+-- | makes the desugar treat `loop`/`root`/`parent` as scope-declared reserved
+-- | names. (Superseded ADR-006's bare-variable vocabulary and its shadow footgun.)
 maxLoopVars :: LoopVars
-maxLoopVars = reservedScope case _ of
-  "index0" -> Just "index0"
-  "index1" -> Just "index1"
-  "rindex0" -> Just "rindex0"
-  "rindex1" -> Just "rindex1"
-  "first" -> Just "first"
-  "last" -> Just "last"
-  "length" -> Just "length"
-  "key" -> Just "key"
-  "index" -> Just "index0" -- alias
-  "rindex" -> Just "rindex0" -- alias
-  "size" -> Just "length" -- alias
-  _ -> Nothing
+maxLoopVars = reservedScope noLoopVars
 
 -- | Render MaxBars surface source against data, reusing FullBars' surface
 -- | pipeline (desugar → hoist → @truthiness → engine) with located errors and
@@ -105,22 +88,19 @@ compileMaxJs :: String -> Either ParseError String
 compileMaxJs = compileSurfaceWith maxLoopVars maxOptions
 
 -- | The MaxBars source warnings (schema-less *warn-always* tier). Parses `src`,
--- | desugars with the loop-var resolver, then runs the dialect lints (see
--- | `MaxBars.Lint`); a parse error short-circuits. Two warnings today:
+-- | desugars, then runs the dialect lints (see `MaxBars.Lint`); a parse error
+-- | short-circuits. Two warnings:
 -- |
--- |  * *loop-variable shadow* (ADR-006): a bare loop variable whose name reads
--- |    like a data field (`first`/`last`/`length`/`key`), since dropping the `@`
--- |    sigil lets it silently shadow a field — the fix is `{{ this.NAME }}`.
+-- |  * *label shadow* (ADR-021): a loop `label NAME` whose name is a reserved root
+-- |    (`this`/`loop`/`root`/`parent`).
 -- |  * *stray head bar* (ADR-019): an unparenthesised top-level `|` in a block
 -- |    head, parsed as structure rather than the pipe operator — the fix is to
 -- |    parenthesise the pipe, `{{#x (a | f)}}`.
 maxbarsWarnings :: String -> Either ParseError (Array Issue)
 maxbarsWarnings src = do
   { nodes } <- parseWith maxOptions src
-  -- loop-var shadows + label shadows read the *desugared* tree (a bare loop var is
-  -- a nullary application there; a label survives as the `@label` marker); the
-  -- stray-bar lint reads the *parsed* tree (the desugar rewrites a bare bar into a
-  -- `lookup`, erasing the signal).
+  -- label shadows read the *desugared* tree (a label survives as the `@label`
+  -- marker); the stray-bar lint reads the *parsed* tree (the desugar rewrites a
+  -- bare bar into a `lookup`, erasing the signal).
   let desugared = desugarSurfaceWith maxLoopVars nodes
-  pure
-    (loopVarShadowWarnings desugared <> labelShadowWarnings desugared <> strayHeadBarWarnings nodes)
+  pure (labelShadowWarnings desugared <> strayHeadBarWarnings nodes)
