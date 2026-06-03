@@ -1,8 +1,23 @@
 = ADR-010: Header directives — `@truthiness` and `@trim`
 :navtitle: ADR-010 Header directives
 
-*Status:* Accepted. *Date:* 2026-06-01. Records the truthiness spec (Phases 0–5) and the standalone
-`@trim` directive. Companion spec: xref:directives.adoc[].
+*Status:* Accepted for `@trim`; the *`@truthiness` half is **Superseded** by*
+xref:adr-0022-analyse-mode.adoc[ADR-022] (2026-06-03). *Date:* 2026-06-01. Records the standalone `@trim`
+directive and the original per-file `@truthiness` spec (Phases 0–5). Companion spec:
+xref:directives.adoc[].
+
+[NOTE]
+====
+*The per-file `@truthiness` directive is superseded.* Team review (xref:adr-0022-analyse-mode.adoc[ADR-022])
+found the per-file *configuration surface* — the directive meaning, the alias table, the shape-literal
+list, lexical per-partial scoping (`partialFalsy`), the linter's truthiness-*materialization* phase, and
+the compiler's `$falsy` baking — to be over-engineered: it has **zero golden-case usage**, yet costs a
+24-file blast radius and a dedicated linter phase. Truthiness becomes a *fixed per-engine rule* expressed
+as a lambda the engine plugs in (FullBars/RawBars/MaxBars: the Handlebars rule; MinBars: Mustache), with
+the named rules kept as introspectable data the engine selects from. `includeZero` is re-homed as a
+per-call helper option. Decision points 2 and 3 below are retained for the historical record; ADR-022 is
+the live design. *`@trim` (point 4) is unaffected* and remains Accepted.
+====
 
 == Context
 
@@ -20,7 +35,8 @@ carriage mechanism that does not breach the meaning-free core (ADR-001).
   JSDoc `@param`, e-mail handles, etc. are safe by construction). Unknown keys are *carried and
   lint-warned*, not errors (forward compatibility).
 
-. *`@truthiness` selects the falsy set* for `if`/`unless`/`and`/`or`/`not` (and MaxBars'
+. [.line-through]##*`@truthiness` selects the falsy set*## — *superseded by xref:adr-0022-analyse-mode.adoc[ADR-022]; retained for the record.*
+  `@truthiness` selected the falsy set for `if`/`unless`/`and`/`or`/`not` (and MaxBars'
   `&&`/`||`/`!`), per file, *lexically* scoped — a condition branches by the set declared where it is
   *written*, never render-global, never inherited across a partial boundary. The value is *one alias*
   *or* a non-empty space-separated list of shape-literals (`false null "" 0 [] {}`). Canonical aliases:
@@ -29,11 +45,12 @@ carriage mechanism that does not breach the meaning-free core (ADR-001).
   explicit set does not). `includeZero` on a single `if`/`unless` is a per-call exception. The empty
   value is illegal — use the `always` alias.
 
-. *The per-engine default is a kernel parameter.* `resolveTruthinessWith :: FalsySet -> Array Directive
-  -> Either Error FalsySet` (`Value.purs`) takes the absent-directive default; the Handlebars-family
-  dialects pass `handlebars`, MinBars passes `mustache`. This is the lazy extraction ADR-003 predicted
-  and xref:adr-0007-minbars.adoc[] §2 required — and it is *already in the code*, so MinBars' truthiness
-  prerequisite is met ahead of the engine.
+. [.line-through]##*The per-engine default is a kernel parameter.*## — *superseded by xref:adr-0022-analyse-mode.adoc[ADR-022].*
+  `resolveTruthinessWith :: FalsySet -> Array Directive -> Either Error FalsySet` (`Value.purs`) took the
+  absent-directive default; the Handlebars-family dialects passed `handlebars`, MinBars `mustache`. Under
+  ADR-022 the *resolver disappears* (no directive to resolve) and the per-engine default becomes the
+  *only* rule — the lambda the engine plugs in directly. The MinBars-vs-Handlebars split survives as two
+  fixed lambdas, so xref:adr-0007-minbars.adoc[] §2's prerequisite is still met.
 
 . *`@trim` selects standalone-whitespace handling* — `standalone` (default; strips the line a lone
   block/comment tag sits on) or `none`. It is acted *in the core lexer* (`trimStandalone`), default-on
@@ -51,5 +68,6 @@ carriage mechanism that does not breach the meaning-free core (ADR-001).
 
 == Known gap
 
-`directives.adoc`'s alias table does not yet list `mustache`, although `aliasSet` accepts it. The doc
-table should gain the row (the xref:adr-final-review.adoc[final review] tracks this).
+[.line-through]##`directives.adoc`'s alias table does not yet list `mustache`.## — *moot under
+xref:adr-0022-analyse-mode.adoc[ADR-022]:* the alias table itself is removed (the named rules become an
+engine's plugged-in lambda, not a per-file directive value), so there is no table row to reconcile.
