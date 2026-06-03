@@ -27,19 +27,24 @@
 -- |    name is a string literal, a parenthesized expression is a dynamic name;
 -- |    hash pairs merge onto the partial's context; §5.7).
 -- |  * block partial `{{#partial name}}body{{/partial}}` (body = fallback and the
--- |    `{{> @partial-block}}` yield) and inline partial `{{#inline name}}body
--- |    {{/inline}}` (a definition, hoisted by `hoistInline`); §5.7. A bare name is
--- |    literalized. `{{> @partial-block}}` ⇒ a `(partial-block)` call.
+-- |    `{{> @partial-block}}` yield) and the inline-partial decorator
+-- |    `{{#*inline "name"}}body{{/inline}}` (a definition, hoisted by `hoistInline`);
+-- |    §5.7. A bare name is literalized. `{{> @partial-block}}` ⇒ a `(partial-block)`
+-- |    call. The `*` decorator sigil is REQUIRED in FullBars: the bare
+-- |    `{{#inline …}}` spelling is rejected (`FullBars.checkBareInline` /
+-- |    `bareInlineOffset`), Handlebars-faithful — there is no `inline` block helper.
+-- |    (MaxBars is the exception: its `{{#*inline}}` is a `LexError`, so it keeps the
+-- |    bare spelling and does not run the gate.)
 -- |
 -- |    `@../index` (and `key`/`first`/`last`) reads the enclosing loop's datum
 -- |    via the `parent-*` helpers (one `../` level).
 -- |
 -- |  * the Handlebars partial block `{{#> name}}…{{/name}}` ⇒ the same as
 -- |    `{{#partial name}}…{{/partial}}`, and the inline-partial decorator
--- |    `{{#*inline "name"}}…{{/inline}}` ⇒ the same as `{{#inline "name"}}`. Both
--- |    parse as plain `{{#`-Section blocks headed by the sigil (`>` / `*inline`);
--- |    their `{{/…}}` close is matched via `Parser.blockCloseName` (on the partial
--- |    name / `inline`). No new sigil or gate — this rewrite just maps those heads.
+-- |    `{{#*inline "name"}}…{{/inline}}` ⇒ the core `inline` form. Both parse as
+-- |    plain `{{#`-Section blocks headed by the sigil (`>` / `*inline`); their
+-- |    `{{/…}}` close is matched via `Parser.blockCloseName` (on the partial name /
+-- |    `inline`). No new sigil — this rewrite just maps those heads.
 module FullBars.Surface
   ( desugar
   , desugarWith
@@ -48,6 +53,7 @@ module FullBars.Surface
   , noLoopVars
   , reservedScope
   , hoistInline
+  , bareInlineOffset
   ) where
 
 import Prelude
@@ -134,6 +140,10 @@ desugarWith lv clauseNames = go []
       -- is the partial *name* (a string), like `{{> name}}`.
       Block sp Section "partial" args body ->
         Block sp Section "partial" (partialArgs lv scope args) (go scope (expandElseIf body))
+      -- bare `{{#inline name}}` reaches here only on the *lenient* path (MaxBars,
+      -- whose `{{#*inline}}` decorator is a LexError so the bare form is its only
+      -- inline-partial spelling). FullBars rejects it before desugar (it requires
+      -- the `{{#*inline}}` decorator below) via `bareInlineOffset`.
       Block sp Section "inline" args body ->
         Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
       -- the Handlebars partial *block* `{{#> name …}}…{{/name}}`: the core parses
@@ -480,6 +490,22 @@ hoistInline nodes = Array.foldl step { partials: Map.empty, template: [] } nodes
     other -> acc { template = Array.snoc acc.template other }
   inlineName args = case Array.head args of
     Just (Lit (VString n)) -> Just n
+    _ -> Nothing
+
+-- | The source offset of the first *bare* `{{#inline …}}` block, searched
+-- | depth-first through block bodies (`Nothing` when there is none). The inline
+-- | decorator parses headed `*inline` (its `{{/inline}}` close matched by
+-- | `Parser.blockCloseName`), so it is deliberately *not* matched here. FullBars
+-- | uses this to reject the bare spelling — an inline partial must be written as
+-- | the decorator `{{#*inline "name"}}` (ADR-0009 amendment / surface.adoc §5.7).
+-- | MaxBars does not run this gate: its `{{#*inline}}` is a `LexError`, so the
+-- | bare `{{#inline}}` is its only inline-partial form.
+bareInlineOffset :: Template -> Maybe Int
+bareInlineOffset nodes = Array.head (Array.mapMaybe node nodes)
+  where
+  node = case _ of
+    Block sp Section "inline" _ _ -> Just sp.start
+    Block _ _ _ _ body -> bareInlineOffset body
     _ -> Nothing
 
 -- | Strip leading `../` runs, counting the parent depth.

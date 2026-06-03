@@ -84,6 +84,14 @@ expectS name src dat expected = case renderSurface src dat of
   Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
     (out == expected)
 
+-- | Assert that *Surface* source `src` fails to render and the located error
+-- | message contains `needle`.
+expectSError :: String -> String -> String -> Effect Unit
+expectSError name src needle = case renderSurface src VNull of
+  Left err -> assert' (name <> ": error " <> show err <> " lacks " <> show needle)
+    (contains (Pattern needle) err)
+  Right out -> assert' (name <> ": expected an error, got " <> show out) false
+
 -- | Assert that Surface `src` with the given named partials yields `expected`.
 expectP :: String -> Array (Tuple String String) -> String -> Value -> String -> Effect Unit
 expectP name partials src dat expected = case renderSurfaceWith partials src dat of
@@ -507,7 +515,7 @@ main = do
     "none"
   -- an inline (same-file) partial DOES inherit the file's mode (it's lexical).
   expectS "partial:inline-inherits-file-mode"
-    "{{! @truthiness:minimal }}{{#inline \"row\"}}{{#if n}}y{{else}}m{{/if}}{{/inline}}{{> row this}}"
+    "{{! @truthiness:minimal }}{{#*inline \"row\"}}{{#if n}}y{{else}}m{{/if}}{{/inline}}{{> row this}}"
     n0
     "y"
 
@@ -819,12 +827,14 @@ main = do
     "<div><b>Ada</b></div>"
   expectS "block-partial-fallback" "{{#partial \"missing\"}}<i>fb</i>{{/partial}}" VNull "<i>fb</i>"
 
-  -- Inline partials: {{#inline "name"}}body{{/inline}} defines a partial (hoisted
-  -- before render) usable by later {{> name}}; a bare name is literalized.
-  expectS "inline-partial" "{{#inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
+  -- Inline partials: the {{#*inline "name"}}body{{/inline}} decorator defines a
+  -- partial (hoisted before render) usable by later {{> name}}; a bare name is
+  -- literalized. The `*` decorator sigil is REQUIRED (Handlebars-faithful): the
+  -- bare {{#inline …}} spelling is rejected (see `inline-bare-rejected` below).
+  expectS "inline-partial" "{{#*inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
     "[a][b]"
-  expectS "inline-partial-unquoted" "{{#inline greet}}hi {{ name }}{{/inline}}{{> greet}}"
+  expectS "inline-partial-unquoted" "{{#*inline greet}}hi {{ name }}{{/inline}}{{> greet}}"
     (obj [ Tuple "name" (str "Bo") ])
     "hi Bo"
 
@@ -842,18 +852,23 @@ main = do
     (obj [ Tuple "name" (str "Ada") ])
     "<div><b>Ada</b></div>"
 
-  -- inline-partial decorator {{#*inline "name"}}…{{/inline}} (FullBars only):
-  -- desugars to the SAME core form as {{#inline "name"}}…{{/inline}}; the lexer
-  -- keeps `inline` as the head and `"row"` as its sole argument, so the close
-  -- {{/inline}} matches by the headed name.
+  -- inline-partial decorator {{#*inline "name"}}…{{/inline}} (FullBars): parses
+  -- headed `*inline` (close {{/inline}} matched by the stripped name), `"row"` its
+  -- sole argument; desugars to the core `inline` form and hoists.
   expectS "inline-decorator-sigil"
     "{{#*inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
     "[a][b]"
-  expectS "inline-decorator-matches-inline-spelling"
+  -- the `*` decorator sigil is REQUIRED: bare {{#inline …}} is rejected with a
+  -- located DisallowedShape (Handlebars has no `inline` block helper — it is a
+  -- decorator). MaxBars keeps the bare spelling (its {{#*inline}} is a LexError).
+  expectSError "inline-bare-rejected"
     "{{#inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
-    (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
-    "[a][b]"
+    "{{#inline}}"
+  -- the rejection finds a nested bare inline too (depth-first search of bodies).
+  expectSError "inline-bare-rejected-nested"
+    "{{#each xs}}{{#inline \"row\"}}x{{/inline}}{{/each}}"
+    "DisallowedShape"
 
   -- a {{#> name}} whose partial is missing renders its body as the fallback
   -- (the {{#partial}} block-body fallback, reached through the sigil).

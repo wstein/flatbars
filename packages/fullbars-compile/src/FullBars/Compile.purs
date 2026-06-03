@@ -18,20 +18,23 @@ import FlatBars.Compile (compile)
 import FlatBars.Compile.Emit (fullbarsEmit, metaFor, resolveForCompile)
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
-import FullBars (LoopVars, desugarSurfaceWith, hoistInline, noLoopVars)
+import FullBars (LoopVars, checkBareInline, desugarSurfaceWith, hoistInline, noLoopVars)
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
 -- | `{{#inline}}` definitions into the partial registry (as `renderSurfaceWith`
 -- | does), then emit. The emit rules are dialect-pure — they only ever see core.
 compileSurface :: String -> Either ParseError String
-compileSurface = compileSurfaceWith noLoopVars defaultParseOptions
+compileSurface = compileSurfaceWith true noLoopVars defaultParseOptions
 
 -- | `compileSurface` with explicit parse options and a dialect `LoopVars`
 -- | resolver (CLI/config + dialect path: standalone trim, MaxBars loop vars).
-compileSurfaceWith :: LoopVars -> ParseOptions -> String -> Either ParseError String
-compileSurfaceWith lv opts src = do
+-- | The leading `strict` flag gates the bare-`{{#inline}}` rejection (FullBars
+-- | requires the `{{#*inline}}` decorator; MaxBars passes `false`).
+compileSurfaceWith :: Boolean -> LoopVars -> ParseOptions -> String -> Either ParseError String
+compileSurfaceWith strict lv opts src = do
   { directives, nodes } <- parseWith opts src
+  checkBareInline strict nodes
   fs <- resolveForCompile directives
   let h = hoistInline (desugarSurfaceWith lv nodes)
   pure (compile (metaFor fs) fullbarsEmit (Map.toUnfoldable h.partials) h.template)

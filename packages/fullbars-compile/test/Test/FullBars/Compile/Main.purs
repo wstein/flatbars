@@ -1,5 +1,5 @@
 -- | Emitter unit tests for the FullBars **surface** compile path
--- | (`FullBars.Compile.compileSurface`): desugar + `{{#inline}}` hoist + emit.
+-- | (`FullBars.Compile.compileSurface`): desugar + `{{#*inline}}` hoist + emit.
 -- | These cover codegen that only exists after surface desugaring (inline
 -- | partials, `@truthiness` falsy-set threading); the dialect-free driver/emit
 -- | shape tests live in the `flatbars-compile` package, and byte-for-byte
@@ -29,7 +29,7 @@ main = do
   log "FullBars.Compile surface emitter tests"
 
   expectJsS "surface inline def becomes a partial registry; {{> }} calls rt.partial"
-    "{{#inline \"row\"}}[{{ this }}]{{/inline}}{{#each items}}{{> row}}{{/each}}"
+    "{{#*inline \"row\"}}[{{ this }}]{{/inline}}{{#each items}}{{> row}}{{/each}}"
     [ "partials = Object.assign({}, partials, {"
     , "\"row\": function (data, rt, partials)"
     , "rt.partial(\"row\", c1.ctx, null, partials, rt)"

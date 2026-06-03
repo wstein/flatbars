@@ -14,6 +14,7 @@ module FullBars
   , module Kernel.Render
   , module FullBars.Surface
   , surfaceClauses
+  , checkBareInline
   , desugarSurface
   , desugarSurfaceWith
   , compileSurface
@@ -30,13 +31,14 @@ import Prelude
 
 import Data.Either (Either(..))
 import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FlatBars.Error (Error, ParseError, renderParseErrorAt)
+import FlatBars.Error (Error, ParseError(..), renderParseErrorAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
-import FullBars.Surface (LoopVars, desugar, desugarWith, hoistInline, noLoopVars)
+import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, hoistInline, noLoopVars)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials, registerPartialsFalsy, withFalsy)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
@@ -59,11 +61,28 @@ desugarSurface = desugar surfaceClauses
 desugarSurfaceWith :: LoopVars -> Template -> Template
 desugarSurfaceWith lv = desugarWith lv surfaceClauses
 
+-- | Reject a bare `{{#inline}}` block on the *strict* (FullBars/CLI) surface: an
+-- | inline partial must be the decorator `{{#*inline "name"}}` (surface.adoc
+-- | §5.7), reported as a located `DisallowedShape`. MaxBars passes
+-- | `strict = false` — its `{{#*inline}}` is a `LexError`, so the bare spelling
+-- | is its only inline-partial form (left as-is). Runs on the *parsed* nodes,
+-- | before desugar collapses `*inline`/`inline` to one head.
+checkBareInline :: Boolean -> Template -> Either ParseError Unit
+checkBareInline strict nodes
+  | strict = case bareInlineOffset nodes of
+      Just off -> Left
+        ( DisallowedShape "{{#inline}} (an inline partial uses the {{#*inline \"name\"}} decorator)"
+            off
+        )
+      Nothing -> pure unit
+  | otherwise = pure unit
+
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.
 compileSurface :: String -> Either ParseError (Value -> Either Error String)
 compileSurface src = do
   { directives, nodes } <- parse src
+  checkBareInline true nodes
   let
     { partials, template } = hoistInline (desugarSurface nodes)
   pure \dat -> runResolvedLenient directives (registerPartials partials) template dat
@@ -81,6 +100,7 @@ renderSurfaceWith partialSrcs src dat =
     Left e -> Left e
     Right ps -> case parse src of
       Left e -> Left (show e)
+      Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
       Right { directives, nodes } ->
         let
           { partials: inlineP, template } = hoistInline (desugarSurface nodes)
@@ -114,25 +134,29 @@ renderSurfaceWithHelpers
   -> String
   -> Value
   -> Either String String
-renderSurfaceWithHelpers = renderSurfaceWithHelpersWith noLoopVars defaultParseOptions
+renderSurfaceWithHelpers = renderSurfaceWithHelpersWith true noLoopVars defaultParseOptions
 
 -- | `renderSurfaceWithHelpers` parameterised by the dialect's `LoopVars` and
 -- | `ParseOptions`, so MaxBars (`renderWithOperations`, ADR-019 addendum) registers
 -- | host operations over *its* surface (infix/pipes/loop vars). FullBars is the
--- | `noLoopVars` / `defaultParseOptions` specialisation above.
+-- | `noLoopVars` / `defaultParseOptions` specialisation above. The leading
+-- | `strict` flag gates the bare-`{{#inline}}` rejection (`checkBareInline`):
+-- | `true` for FullBars/CLI, `false` for MaxBars.
 renderSurfaceWithHelpersWith
-  :: LoopVars
+  :: Boolean
+  -> LoopVars
   -> ParseOptions
   -> Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
   -> Array (Tuple String String)
   -> String
   -> Value
   -> Either String String
-renderSurfaceWithHelpersWith lv opts helpers partialSrcs src dat =
+renderSurfaceWithHelpersWith strict lv opts helpers partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
     Right ps -> case parseWith opts src of
       Left pe -> Left (renderParseErrorAt src pe)
+      Right { nodes } | Left e <- checkBareInline strict nodes -> Left (renderParseErrorAt src e)
       Right { directives, nodes } ->
         let
           { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
@@ -158,14 +182,17 @@ renderSurfaceWithHelpersWith lv opts helpers partialSrcs src dat =
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
 renderSurfaceDiag :: String -> Value -> Either String String
-renderSurfaceDiag = renderSurfaceDiagWith noLoopVars defaultParseOptions
+renderSurfaceDiag = renderSurfaceDiagWith true noLoopVars defaultParseOptions
 
 -- | `renderSurfaceDiag` with explicit parse options and a dialect `LoopVars`
 -- | resolver (the CLI/config + dialect path; FullBars passes `noLoopVars`,
--- | MaxBars its loop-variable map).
-renderSurfaceDiagWith :: LoopVars -> ParseOptions -> String -> Value -> Either String String
-renderSurfaceDiagWith lv opts src dat = case parseWith opts src of
+-- | MaxBars its loop-variable map). The leading `strict` flag gates the
+-- | bare-`{{#inline}}` rejection: `true` for FullBars/CLI, `false` for MaxBars.
+renderSurfaceDiagWith
+  :: Boolean -> LoopVars -> ParseOptions -> String -> Value -> Either String String
+renderSurfaceDiagWith strict lv opts src dat = case parseWith opts src of
   Left pe -> Left (renderParseErrorAt src pe)
+  Right { nodes } | Left e <- checkBareInline strict nodes -> Left (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
       { partials, template } = hoistInline (desugarSurfaceWith lv nodes)

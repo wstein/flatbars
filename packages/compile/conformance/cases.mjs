@@ -100,11 +100,11 @@ export const cases = [
   { name: "s:helper-call", dialect: "surface", t: "{{#if (eq a b)}}eq{{else}}ne{{/if}}", d: { a: 1, b: 1 } },
   { name: "s:parent-path", dialect: "surface", t: "{{#each xs}}{{ ../title }}:{{ this }};{{/each}}", d: { title: "T", xs: ["a", "b"] } },
 
-  // ── partials (inline-defined, self-contained) ───────────────────────────────
-  { name: "p:inline-each", dialect: "surface", t: "{{#inline \"row\"}}[{{ this }}]{{/inline}}{{#each items}}{{> row}}{{/each}}", d: { items: ["a", "b"] } },
-  { name: "p:inline-ctx", dialect: "surface", t: "{{#inline \"greet\"}}Hi {{ name }}!{{/inline}}{{> greet user}}", d: { user: { name: "Ada" } } },
-  { name: "p:inline-hash", dialect: "surface", t: "{{#inline \"tag\"}}<{{ kind }}>{{/inline}}{{> tag this kind=\"b\"}}", d: {} },
-  { name: "p:inline-nested", dialect: "surface", t: "{{#inline \"a\"}}A{{> b}}{{/inline}}{{#inline \"b\"}}B{{/inline}}{{> a}}", d: {} },
+  // ── partials (inline-defined, self-contained; the {{#*inline}} decorator) ────
+  { name: "p:inline-each", dialect: "surface", t: "{{#*inline \"row\"}}[{{ this }}]{{/inline}}{{#each items}}{{> row}}{{/each}}", d: { items: ["a", "b"] } },
+  { name: "p:inline-ctx", dialect: "surface", t: "{{#*inline \"greet\"}}Hi {{ name }}!{{/inline}}{{> greet user}}", d: { user: { name: "Ada" } } },
+  { name: "p:inline-hash", dialect: "surface", t: "{{#*inline \"tag\"}}<{{ kind }}>{{/inline}}{{> tag this kind=\"b\"}}", d: {} },
+  { name: "p:inline-nested", dialect: "surface", t: "{{#*inline \"a\"}}A{{> b}}{{/inline}}{{#*inline \"b\"}}B{{/inline}}{{> a}}", d: {} },
 
   // ── @truthiness modes (compiled per-mode codegen vs interpreter) ─────────────
   { name: "t:default-zero-falsy", dialect: "surface", t: "{{#if n}}y{{else}}m{{/if}}", d: { n: 0 } },

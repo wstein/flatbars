@@ -194,7 +194,7 @@ run opts = do
                   of
                   Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                   Right out -> writeStdout out
-            | opts.surface -> case renderSurfaceDiagWith noLoopVars popts tpl value of
+            | opts.surface -> case renderSurfaceDiagWith true noLoopVars popts tpl value of
                 Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                 Right out -> writeStdout out
             | otherwise -> case compileWith popts tpl of
@@ -206,7 +206,9 @@ run opts = do
 -- | Compile a template to a JS ES module and print it to stdout (surface or core).
 runCompile :: ParseOptions -> Options -> String -> Effect Unit
 runCompile popts opts tpl =
-  case (if opts.surface then Compile.compileSurfaceWith noLoopVars else compileJsWith) popts tpl of
+  case
+    (if opts.surface then Compile.compileSurfaceWith true noLoopVars else compileJsWith) popts tpl
+    of
     Left pe -> die ("flatbars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
     Right js -> writeStdout js
 

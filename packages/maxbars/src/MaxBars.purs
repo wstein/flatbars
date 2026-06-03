@@ -63,7 +63,7 @@ maxLoopVars = reservedScope noLoopVars
 -- | pipeline (desugar → hoist → @truthiness → engine) with located errors and
 -- | MaxBars' bare loop variables.
 renderMax :: String -> Value -> Either String String
-renderMax = renderSurfaceDiagWith maxLoopVars maxOptions
+renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own
@@ -79,13 +79,13 @@ renderWithOperations
   -> String
   -> Value
   -> Either String String
-renderWithOperations = renderSurfaceWithHelpersWith maxLoopVars maxOptions
+renderWithOperations = renderSurfaceWithHelpersWith false maxLoopVars maxOptions
 
 -- | Compile MaxBars surface source to a JS ES module, reusing the FullBars
 -- | compiler (`FlatBars.Compile`) — infix/pipe and loop vars desugar to the same
 -- | core helpers the emit rules already handle.
 compileMaxJs :: String -> Either ParseError String
-compileMaxJs = compileSurfaceWith maxLoopVars maxOptions
+compileMaxJs = compileSurfaceWith false maxLoopVars maxOptions
 
 -- | The MaxBars source warnings (schema-less *warn-always* tier). Parses `src`,
 -- | desugars, then runs the dialect lints (see `MaxBars.Lint`); a parse error
