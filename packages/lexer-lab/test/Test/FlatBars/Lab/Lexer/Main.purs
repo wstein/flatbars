@@ -63,10 +63,11 @@ main = do
     , expected: [ Open, Sigil PartialBlock, Ident "block", CloseTag ]
     }
 
-  -- 3. Brackets and parens break out of the path (a deliberate divergence).
+  -- 3. Paths are segmented (L3): `.` is a Dot token, brackets break out — no
+  -- dangling dot on the ident.
   assertEqual
     { actual: seqOf cfg "{{ items.[0] }}"
-    , expected: [ Open, Ident "items.", LBracket, Num 0.0, RBracket, CloseTag ]
+    , expected: [ Open, Ident "items", Dot, LBracket, Num 0.0, RBracket, CloseTag ]
     }
   assertEqual
     { actual: seqOf cfg "{{ (now) }}"
@@ -90,7 +91,7 @@ main = do
     }
   assertEqual
     { actual: seqOf cfg "{{ ../x }}"
-    , expected: [ Open, Ident "../x", CloseTag ]
+    , expected: [ Open, Dot, Dot, Slash, Ident "x", CloseTag ]
     }
 
   -- 6. Comments collapse to one lexeme; long vs short both work.

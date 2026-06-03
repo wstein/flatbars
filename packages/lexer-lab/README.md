@@ -29,8 +29,12 @@ breaks a template into a **delimiter-level** token stream:
   `}}` (`CloseTag`), `}}}` (`CloseTriple`), plus coarse raw-block fences.
 - **Sigils** (`#`, `^`, `/`, `>`, `&`, `$`, `<`, `#*`, `#>`) as their own
   lexemes, separate from the head identifier.
-- **Structural punctuation** `[ ] ( )` broken out (a deliberate divergence from
-  `FlatBars.Token`, which folds `[…]` into a path ident).
+- **Segmented paths** (L3): `[ ] ( )` are tokens, and so are the path separators
+  `.` (`Dot`) and `/` (`Slash`) — a path like `items.[0]` lexes as
+  `Ident "items", Dot, LBracket, Num 0, RBracket` (no dangling dot), `../x` as
+  `Dot, Dot, Slash, Ident "x"`. A deliberate divergence from `FlatBars.Token`,
+  which keeps a whole path in one ident; here every element is individually
+  addressable. Under `infixArith`, `/` is the division `Op` instead.
 - **Literals** — single/double-quoted strings (with `\n \t \r \\ \" \'`
   escapes) and numbers (including negative and fractional).
 - **Operators** — `&& || == != <= >= < > ! |`, plus `?? + - * / %` under
@@ -94,7 +98,7 @@ so the hand lexer inherits the parsing spike's correctness for free.
 | - | - | - |
 | L1 | **Strict `tokenize` is fatal** (`Left` on first error). | The hand lexer adds `tokenizeRecovering` (never fails; emits `Invalid` tokens) — see *Wiring to the LSP*. Strict mode stays for the parity test; the parsing spike is still strict-only. |
 | L2 | **Coarse raw-block fences** — one lexeme per fence, not `{{{{`/name/`}}}}`. | Edge form; keeps the spikes small. |
-| L3 | **Dangling path dot** — `items.[0]` → `Ident "items."`, `[`, `0`, `]`. | Brackets-as-tokens divergence; the parser owns reassembly. |
+| L3 | ~~Dangling path dot~~ ✓ resolved — paths are segmented (`.`→`Dot`, `/`→`Slash`); see *What they do*. | — |
 | L4 | **Parsing spike ~4–5× slower** than the incumbent on tag-bearing input. | Combinator cost (CPS monad, `try`, allocation). *Resolved by the hand spike*, which is faster than the incumbent on every profile — see Benchmark. |
 | L5 | **ASCII-only parity** — `index` is code-unit in the hand spike but code-point in `parsing`'s `Position`. | They diverge on non-BMP input; the parity test (and all corpora) are ASCII. |
 
@@ -196,7 +200,8 @@ classification table, the wire `data`, the recovery, and the diagnostics.
    readable executable reference the parity test pins it against.
 2. ~~**P2** — error recovery~~ ✓ done (`tokenizeRecovering`, in-tag) + diagnostics
    (`Invalid` carries a message; `lsp.mjs:diagnostics` emits `publishDiagnostics`).
-3. Decide the bracket/path-segment model with the parser team (L3).
+3. ~~Decide the bracket/path-segment model (L3)~~ ✓ done — segmented paths
+   (`.`→`Dot`, `/`→`Slash`, brackets as tokens), both lexers, parity-checked.
 4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate
    against `FlatBars.Lexer` (boundaries + literals), and lift line/column into a
    shared `Types` module so both spikes import one source of truth.

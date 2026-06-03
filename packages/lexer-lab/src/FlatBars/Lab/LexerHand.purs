@@ -461,10 +461,15 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
       else if c == ')' then one RParen
       else if c == '"' || c == '\'' then readStr i pos c
       else if isDigit c || (c == '-' && maybe false isDigit (peek (i + 1))) then readNum i pos
+      -- L3: `.` is always a path separator (numbers consumed their own `.` above).
+      else if c == '.' then one Dot
       else case readOp i of
         Just op -> Right (Just (mk (Op op) pos (i + SCU.length op)))
         Nothing ->
-          if identChar arith c then
+          -- `/` is a path separator here; under infixArith `readOp` already took
+          -- it as the division Op, so this branch is the non-arith case.
+          if c == '/' then one Slash
+          else if identChar arith c then
             let
               e = runWhile (identChar arith) i
             in
@@ -606,14 +611,13 @@ isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 identChar :: Boolean -> Char -> Boolean
 identChar arith c = baseIdent c && not (arith && arithChar c)
 
+-- | Single-segment identifier chars (L3: `.`/`/` are separate Dot/Slash tokens).
 baseIdent :: Char -> Boolean
 baseIdent c =
   isAlpha c || isDigit c
     || c == '_'
     || c == '-'
-    || c == '.'
     || c == '@'
-    || c == '/'
     || c == '+'
     || c == '*'
     || c == '?'

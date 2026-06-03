@@ -145,7 +145,9 @@ data Lexeme
   | RBracket -- ]
   | LParen -- (
   | RParen -- )
-  | Ident String -- a path/name run (dots, @, /, - kept verbatim; see identChar)
+  | Dot -- . — a path separator (L3: paths are segmented, not one ident)
+  | Slash -- / — a path separator (under infixArith, `/` is an Op instead)
+  | Ident String -- a single path segment / name (no `.` or `/`; see identChar)
   | Str String -- a quoted string literal
   | Num Number -- a numeric literal
   | Op String -- an operator lexeme (meaning-free; MaxBars decides)
@@ -171,6 +173,8 @@ instance showLexeme :: Show Lexeme where
     RBracket -> "RBracket"
     LParen -> "LParen"
     RParen -> "RParen"
+    Dot -> "Dot"
+    Slash -> "Slash"
     Ident s -> "Ident " <> show s
     Str s -> "Str " <> show s
     Num n -> "Num " <> show n
@@ -433,6 +437,11 @@ tokenize cfg input =
     , Str <$> try stringLit
     , Num <$> try numberLit
     , Op <$> try operatorLex
+    -- L3: `.`/`/` are path separators, their own tokens (so `items.[0]` carries
+    -- no dangling dot). Placed after operatorLex so that under infixArith `/`
+    -- is consumed there as the division Op instead.
+    , char '.' $> Dot
+    , char '/' $> Slash
     , Ident <$> identLex
     ]
 
@@ -596,14 +605,15 @@ isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 identChar :: Boolean -> Char -> Boolean
 identChar infixArith c = baseIdent c && not (infixArith && arithChar c)
 
+-- | Identifier (single path segment) chars. `.` and `/` are NOT here (L3: they
+-- | are separate `Dot`/`Slash` tokens). `@` stays (for `@root`/`@index`); `=`
+-- | stays (for `key=value` hash args).
 baseIdent :: Char -> Boolean
 baseIdent c =
   isAlpha c || isDigit c
     || c == '_'
     || c == '-'
-    || c == '.'
     || c == '@'
-    || c == '/'
     || c == '+'
     || c == '*'
     || c == '?'
