@@ -21,8 +21,9 @@ compileMaxJs = compileSurfaceWith   maxLoopVars maxOptions  -- FullBars compiler
 ----
 
 The second seam, `maxLoopVars`, is a `LoopVars` resolver the surface desugar
-consults for *bare loop variables* (below); FullBars passes `noLoopVars`, so its
-bare names stay data paths.
+consults; MaxBars wraps `noLoopVars` with `reservedScope` to turn on the *reserved
+variable model* (below) — `loop`/`root`/`parent` as scope-declared names. FullBars
+passes `noLoopVars`, keeping `@`/`pass:[../]` and leaving bare names as data paths.
 
 A shared semantic *kernel* (truthiness/stringify/escape, frame mechanics) is
 extracted lazily — only for proven overlaps, never a vague `common` package.
@@ -62,35 +63,41 @@ strictly numeric — a non-number operand is a `TypeError` (no coercion) — and
 is *null*-coalescing (a present `0`/`""`/`[]` wins), independent of the file's
 `@truthiness` mode.
 
-== Loop variables
+== The variable model
 
-Inside `pass:[{{#each}}]`, MaxBars exposes the loop metadata as **bare** scoped
-variables (no `@` sigil — that is the FullBars/Handlebars spelling). They desugar
-to scoped-helper calls; the underlying frame is the shared engine's, so the
-interpreter and compiler agree by construction.
+MaxBars has *no bare loop variables* and *no `@` namespace*
+(xref:adr-0021-maxbars-variable-model.adoc[ADR-021], superseding ADR-006). A bare
+`pass:[{{first}}]`/`pass:[{{length}}]` is an ordinary *data field*. Loop state, the
+enclosing context, and the root are read through five reserved, chainable scoped
+names — `this` / `loop` / `root` / `parent` / `outer`:
 
-[cols="1,2",options="header"]
+[cols="1,3",options="header"]
 |===
-|Variable |Value (0-based, `n` = collection length)
+|Name |Reads
 
-|`index0` |the current index (`0…n-1`)
-|`index1` |`index0 + 1` (1-based)
-|`rindex0` |`n - 1 - index0` (remaining, 0-based)
-|`rindex1` |`n - index0` (remaining, 1-based)
-|`length` |`n`
-|`first` `last` |`true` on the first / last element
-|`key` |the array index (as a string) or object key
+|`this` |the current context (`pass:[{{this}}]`, `pass:[{{this.name}}]`).
+|`loop` |the *current loop* object: `loop.index0`/`index1`/`rindex0`/`rindex1`/
+  `length`/`first`/`last`/`key`/`this`. Chains over enclosing loops:
+  `pass:[{{loop.parent.index0}}]`, `pass:[{{loop.parent.parent.length}}]`,
+  `pass:[{{loop.root.length}}]`.
+|`outer` |a *named* enclosing loop's object — any `pass:[label NAME]` clause
+  (xref:adr-0013-labelled-loops.adoc[ADR-013]); same shape as `loop`.
+|`parent` |the *enclosing context*: `pass:[{{parent.name}}]`, chained
+  `pass:[{{parent.parent.name}}]`.
+|`root` |the *root context*: `pass:[{{root.title}}]`.
 |===
 
-Aliases: `index` → `index0`, `rindex` → `rindex0`, `size` → `length`. A block
-parameter of the same name (`pass:[as |index0|]`) shadows the loop variable. A
-bare name that is *not* a loop variable is a data path, exactly as in FullBars —
-so `pass:[{{ length }}]` is the loop size inside `each`, while a data field named
-`length` must be read with an explicit path (e.g. `pass:[{{ this.length }}]`).
+The index arithmetic is normative (`rindex0 = length − 1 − index0`,
+`first = index0 == 0`, …), and the objects are immutable per-iteration snapshots —
+the interpreter and compiler build the identical object, so they agree by
+construction. `@root` becomes `root`, `pass:[../x]` becomes `parent.x`, and an
+`@`-prefixed name is a *located parse error* pointing at this model.
 
 [source,handlebars]
 ----
-{{#each items}}{{index1}}/{{length}}: {{ this.name }}{{#unless last}}, {{/unless}}{{/each}}
+{{#each items}}{{loop.index1}}/{{loop.length}}: {{this.name}}{{#unless loop.last}}, {{/unless}}{{/each}}
+
+{{#each rows}}{{#each this}}{{loop.parent.index0}}.{{loop.index0}} {{parent.label}} {{root.title}}{{/each}}{{/each}}
 ----
 
 == Block conditions
@@ -136,8 +143,9 @@ which re-enters the full expression grammar.
 
 A trailing `pass:[label NAME]` clause (xref:adr-0013-labelled-loops.adoc[ADR-013])
 names the loop's *frame*, so an inner body can read the **enclosing** loop's full
-state — not just its element. The label binds the frame reified as an object whose
-fields are the bare loop variables:
+state — not just its element. `outer` is the named twin of `loop` (same object
+shape); it binds the frame reified as an object whose fields are the loop
+variables (`index0`/`first`/`length`/…):
 
 [source,handlebars]
 ----
