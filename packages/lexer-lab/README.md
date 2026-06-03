@@ -8,11 +8,15 @@
 > [`FlatBars.Lexer`](../core/src/FlatBars/Lexer.purs) before any adoption
 > decision.
 
-This package holds **two** spikes that share one token model
-(`Lexeme`/`Trivia`/`Span`/`LexToken`), so they can be compared head-to-head and
-a parity test can assert they agree token-for-token:
+This package holds **two** spikes over **one** shared token model, so they can
+be compared head-to-head and a parity test can assert they agree token-for-token:
 
-- **`FlatBars.Lab.Lexer`** — built on `purescript-parsing` (combinators).
+- **`FlatBars.Lab.Lexer.Types`** — the single source of truth: the
+  lexeme/trivia/span types, their classification (`semanticTokenType`/`lspEmits`),
+  the lexical character classes, and the pieces→tokens `assemble` fold. Both
+  lexers import it, so they cannot drift.
+- **`FlatBars.Lab.Lexer`** — built on `purescript-parsing` (combinators);
+  re-exports the `Types` model.
 - **`FlatBars.Lab.LexerHand`** — a hand-written tail-recursive index scan.
 
 The headline finding (see Benchmark): the **hand-written** lexer is *faster than
@@ -202,6 +206,7 @@ classification table, the wire `data`, the recovery, and the diagnostics.
    (`Invalid` carries a message; `lsp.mjs:diagnostics` emits `publishDiagnostics`).
 3. ~~Decide the bracket/path-segment model (L3)~~ ✓ done — segmented paths
    (`.`→`Dot`, `/`→`Slash`, brackets as tokens), both lexers, parity-checked.
-4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate
-   against `FlatBars.Lexer` (boundaries + literals), and lift line/column into a
-   shared `Types` module so both spikes import one source of truth.
+4. ~~Lift the shared token model into a `Types` module~~ ✓ done
+   (`FlatBars.Lab.Lexer.Types`; both lexers import it). If adopted: replace the
+   coarse raw fences and add a `tokenize`-parity gate against `FlatBars.Lexer`
+   (boundaries + literals).

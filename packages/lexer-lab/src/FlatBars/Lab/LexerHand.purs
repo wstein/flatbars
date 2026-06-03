@@ -29,7 +29,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Number as Number
 import Data.String.CodeUnits as SCU
 import Data.Tuple (Tuple(..))
-import FlatBars.Lab.Lexer
+import FlatBars.Lab.Lexer.Types
   ( LexConfig
   , LexToken
   , Lexeme(..)
@@ -37,6 +37,13 @@ import FlatBars.Lab.Lexer
   , Sigil(..)
   , SourcePos
   , Trivia(..)
+  , assemble
+  , firstWord
+  , identChar
+  , isDigit
+  , isSpace
+  , unescape
+  , words
   )
 import Partial.Unsafe (unsafePartial)
 
@@ -57,7 +64,7 @@ type Step = { pieces :: Array Piece, i :: Int, pos :: SourcePos, open :: String,
 
 -- | Strict: a lexical error is fatal (`Left`). Used by the parity test.
 tokenize :: LexConfig -> String -> Either LexError (Array LexToken)
-tokenize cfg src = map assemble (run false cfg src)
+tokenize cfg src = map toTokens (run false cfg src)
 
 -- | Forgiving (ADR-023): never fails. A malformed tag becomes an `Invalid`
 -- | lexeme spanning its opener, and lexing resyncs just past it — so an LSP
@@ -65,8 +72,13 @@ tokenize cfg src = map assemble (run false cfg src)
 -- | wiring in `lsp.mjs` consumes.
 tokenizeRecovering :: LexConfig -> String -> Array LexToken
 tokenizeRecovering cfg src = case run true cfg src of
-  Right pieces -> assemble pieces
+  Right pieces -> toTokens pieces
   Left _ -> [] -- unreachable: recovery never returns Left
+
+-- | `run` accumulates pieces reversed; reverse to source order, then fold to
+-- | tokens with the shared `assemble`.
+toTokens :: List Piece -> Array LexToken
+toTokens = assemble <<< Array.fromFoldable <<< List.reverse
 
 run :: Boolean -> LexConfig -> String -> Either LexError (List Piece)
 run recover cfg src = go 0 origin cfg.open cfg.close Nil
@@ -570,84 +582,3 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
   cu :: String -> Array Char
   cu = SCU.toCharArray
 
---------------------------------------------------------------------------------
--- Pieces → tokens (identical to the parsing spike's assemble).
---------------------------------------------------------------------------------
-
-assemble :: List Piece -> Array LexToken
-assemble revPieces =
-  let
-    pieces = Array.fromFoldable (List.reverse revPieces)
-    acc = foldl stepP { tokens: Nil, buf: Nil, lastEnd: { index: 0, line: 1, column: 1 } } pieces
-    eofTok =
-      { lexeme: Eof, span: { start: acc.lastEnd, end: acc.lastEnd }, leading: flushT acc.buf }
-  in
-    Array.fromFoldable (List.reverse (eofTok : acc.tokens))
-  where
-  flushT = Array.fromFoldable <<< List.reverse
-
-  stepP acc = case _ of
-    Triv t -> acc { buf = t : acc.buf, lastEnd = t.span.end }
-    Lex l ->
-      acc
-        { tokens = { lexeme: l.value, span: l.span, leading: flushT acc.buf } : acc.tokens
-        , buf = Nil
-        , lastEnd = l.span.end
-        }
-
---------------------------------------------------------------------------------
--- Char classes (mirror FlatBars.Lab.Lexer / FlatBars.Token) and tiny utils.
---------------------------------------------------------------------------------
-
-isSpace :: Char -> Boolean
-isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
-
-isDigit :: Char -> Boolean
-isDigit c = c >= '0' && c <= '9'
-
-isAlpha :: Char -> Boolean
-isAlpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-
-identChar :: Boolean -> Char -> Boolean
-identChar arith c = baseIdent c && not (arith && arithChar c)
-
--- | Single-segment identifier chars (L3: `.`/`/` are separate Dot/Slash tokens).
-baseIdent :: Char -> Boolean
-baseIdent c =
-  isAlpha c || isDigit c
-    || c == '_'
-    || c == '-'
-    || c == '@'
-    || c == '+'
-    || c == '*'
-    || c == '?'
-    || c == '='
-
-arithChar :: Char -> Boolean
-arithChar c = c == '+' || c == '-' || c == '*' || c == '/' || c == '?'
-
-unescape :: Char -> Maybe Char
-unescape = case _ of
-  'n' -> Just '\n'
-  't' -> Just '\t'
-  'r' -> Just '\r'
-  '\\' -> Just '\\'
-  '"' -> Just '"'
-  '\'' -> Just '\''
-  _ -> Nothing
-
-words :: String -> Array String
-words = Array.filter (_ /= "") <<< SCU.toCharArray >>> groupWords
-  where
-  groupWords = go [] []
-    where
-    go done cur arr = case Array.uncons arr of
-      Nothing -> Array.snoc done (SCU.fromCharArray cur)
-      Just { head: c, tail } ->
-        if isSpace c then go (Array.snoc done (SCU.fromCharArray cur)) [] tail
-        else go done (Array.snoc cur c) tail
-
-firstWord :: String -> String
-firstWord s = case Array.head (words s) of
-  Just w -> w
-  Nothing -> ""
