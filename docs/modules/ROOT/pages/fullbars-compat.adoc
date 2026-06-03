@@ -184,8 +184,9 @@ the *operation*/*definition* vocabulary (xref:adr-0019-operation-vocabulary.adoc
 conformance miss (`pass:[{{#bold}}]`): FullBars is now 49/50 (98%) vs Handlebars.
 
 |Block-partial sigil `pass:[{{#> name}}]` / inline-partial decorator `pass:[{{#*inline}}]`
-|☑ The FullBars author forms — they parse as plain `pass:[{{#}}]`-section blocks headed by the sigil,
-with the `pass:[{{/…}}]` close resolved by `Parser.blockCloseName` (the partial name / `inline`). The
+|☑ The FullBars author forms — the core lexes them as the distinct `PartialBlock` / `Decorator`
+sigils (each with a clean head — the partial name / `inline` — and a `pass:[{{/…}}]` close that repeats
+it), gated by `ParseOptions.partialBlocks` / `decorators`. The
 block-partial sigil desugars to the `pass:[{{#partial}}]` core spelling; the `pass:[{{#*inline}}]`
 decorator desugars to the core `inline` helper (xref:surface.adoc[] §5.7). The bare
 `pass:[{{#inline}}]` is *rejected* in FullBars (`FullBars.checkBareInline`, `DisallowedShape`) —

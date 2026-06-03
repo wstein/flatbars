@@ -51,10 +51,12 @@ The Handlebars block-partial *sigil* `pass:[{{#> name}}…{{/name}}]` is also
 accepted and desugars to the same core form as the `pass:[{{#partial}}]`
 spelling; the inline-partial *decorator* `pass:[{{#*inline "name"}}…{{/inline}}]`
 is the *required* FullBars author form and desugars internally to the core
-`inline` helper. They parse
-as ordinary `pass:[{{#}}]`-section blocks headed by the sigil (`>` / `*inline`);
-the matching `pass:[{{/…}}]` close is resolved by `Parser.blockCloseName` (the
-partial name for `pass:[{{#>}}]`, `inline` for `pass:[{{#*inline}}]`). The bare
+`inline` helper. The core lexes `pass:[{{#>]` and `pass:[{{#*]` as the distinct
+`PartialBlock` and `Decorator` sigils — each with a clean head (the partial name
+for `pass:[{{#>}}]`, the decorator name `inline` for `pass:[{{#*inline}}]`) and a
+`pass:[{{/…}}]` close that simply repeats that head. They are opt-in via
+`ParseOptions.partialBlocks` / `decorators` (on for FullBars; the austere dialects
+gate them off as a located `DisallowedShape`). The bare
 `pass:[{{#inline}}]` is rejected by `FullBars.checkBareInline` with a located
 `DisallowedShape` error — this gate is FullBars-surface-only (RawBars and MaxBars
 still accept bare `pass:[{{#inline}}]`). See the

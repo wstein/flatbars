@@ -44,9 +44,9 @@ privileged one; the architecture must keep it swappable even as it serves as the
 * *Pro:* one engine doubles as the Handlebars migration target *and* the catalog's source of truth;
   the surface-as-rewrite is the concrete proof of ADR-001's "no surface parser, no surface AST."
 * *Note:* the Handlebars block sigils `pass:[{{#> name}}]` and `pass:[{{#*inline}}]` are now accepted
-  (they parse as `pass:[{{#}}]`-section blocks headed by the sigil, closing via `Parser.blockCloseName`,
-  and desugar to the `pass:[{{#partial}}]`/`pass:[{{#inline}}]` core spellings) — the opener-sigil/
-  close-name mismatch is resolved without a new sigil or gate.
+  (the core lexes them as the distinct `PartialBlock` / `Decorator` sigils — each with a clean head
+  and a `pass:[{{/…}}]` close that repeats it — gated by `ParseOptions.partialBlocks` / `decorators`,
+  and they desugar to the `pass:[{{#partial}}]`/`pass:[{{#inline}}]` core spellings).
 * *Con:* because every other dialect is defined *relative to* FullBars, it carries gravitational
   weight despite being "just one engine" — the same tension ADR-001 logged as the
   shared-reference-lowering point.

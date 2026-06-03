@@ -18,13 +18,16 @@ recognizes a small set of *tag openers* and treats everything else as literal *c
 
 |`pass:[{{{]`  |`pass:[}}}]`   |*Output* — evaluate one expression, write its value. The only inline output form.
 |`pass:[{{#]`  |`pass:[}}]` … `pass:[{{/name}}]` |*Block* — a named application that also captures one sub-template (its body).
+|`pass:[{{#>]` |`pass:[}}]` … `pass:[{{/name}}]` |*Partial block* — a `PartialBlock`-sigil block over a clean partial-name head. Opt-in via `ParseOptions.partialBlocks`.
+|`pass:[{{#*]` |`pass:[}}]` … `pass:[{{/name}}]` |*Decorator* — a `Decorator`-sigil block over a clean decorator-name head (e.g. `pass:[{{#*inline}}]`). Opt-in via `ParseOptions.decorators`.
 |`pass:[{{!]`  |`pass:[}}]`    |*Short comment* — discarded. May not contain `pass:[}}]`.
 |`pass:[{{!--]`|`pass:[--}}]`  |*Long comment* — discarded. May contain `pass:[}}]`, `pass:[{{]`, and `--`.
 |`pass:[{{{{#]`|`pass:[}}}}]` … `pass:[{{{{/name}}}}]` |*Raw block* — body captured verbatim, never tokenized.
 |`pass:[{{]` _Ident_ `pass:[}}]`| |*Separator* — the bare double-stash `pass:[{{ name args }}]`. A flat marker; the lexer reads the *shape*, never the name.
 |===
 
-That is the entire opener set. `pass:[{{#]` is the only block *opener*; the bare double-stash
+That is the entire opener set. `pass:[{{#]` is the general block *opener* (`pass:[{{#>]` and
+`pass:[{{#*]` are its two opt-in specialisations); the bare double-stash
 `pass:[{{ … }}]` is a *separator*, recognized by shape. There is deliberately no:
 
 * `pass:[{{^}}]` inverse opener — "render when falsy" is the `unless` helper, not a syntax.
@@ -34,7 +37,8 @@ That is the entire opener set. `pass:[{{#]` is the only block *opener*; the bare
 
 The separator's identifier — `else`, `elif`, `case`, `default` — is *opaque to the lexer and parser*
 (xref:grammar.adoc[] §2.4). The lexer matches the *longest opener*: `pass:[{{{{]` before
-`pass:[{{{]` before `pass:[{{#]` before a bare `pass:[{{]`, and `pass:[{{!--]` before `pass:[{{!]`.
+`pass:[{{{]` before `pass:[{{#*]` / `pass:[{{#>]` before `pass:[{{#]` before a bare `pass:[{{]`, and
+`pass:[{{!--]` before `pass:[{{!]`.
 
 == 1.3 Content and brace escaping
 

@@ -48,8 +48,12 @@ Ident, String, Number, RawText    (* from the lexer; see Chapter 1 *)
 A `Block` captures exactly one `Template`; it has no built-in inverse. Branching is written with
 `Separator` markers — the bare double-stash `pass:[{{ Ident Arg* }}]` — which the parser keeps as
 meaningless `Sep` nodes for the engine walk to interpret (§2.4, xref:concepts.adoc[] §5). A block's
-opener carries a *sigil* the core records but never interprets: `Section` (`pass:[{{#x}}]`) or
-`Inverse` (`pass:[{{^x}}]` / the triple `pass:[{{{^x}}}]`).
+opener carries a *sigil* the core records but never interprets: `Section` (`pass:[{{#x}}]`),
+`Inverse` (`pass:[{{^x}}]` / the triple `pass:[{{{^x}}}]`), `PartialBlock` (`pass:[{{#>x}}]`), or
+`Decorator` (`pass:[{{#*x}}]`). The last two carry a *clean* head (the partial / decorator name, with
+no `>` / `*`) and a `pass:[{{/…}}]` close that repeats it; each is opt-in via a `ParseOptions` flag
+(`partialBlocks` / `decorators`), and a dialect that gates it off rejects the opener as a located
+`DisallowedShape` (the same gating `extras` applies to `Inverse`).
 
 == 2.2 Reading the grammar
 
@@ -141,8 +145,9 @@ has a home in the surface dialect or the engine:
 |hash arguments `key=val` |surface → trailing `(dict "key" val)` argument
 |block params `as \|x i\|` |surface → binding-name arguments to the block helper
 |`true` / `false` / `null` / `undefined` |engine helpers `(true)` `(false)` `(null)`
-|partials `pass:[{{> p}}]`, `pass:[{{#> p}}]`, `pass:[{{#*inline}}]` |surface → `partial` / `inline` helpers
-|decorators `pass:[{{* …}}]`, `pass:[{{#* …}}]` |engine block helpers
+|partial reference `pass:[{{> p}}]` |surface → `partial` helper
+|partial block `pass:[{{#> p}}]`, inline-partial decorator `pass:[{{#*inline}}]` |a core `PartialBlock` / `Decorator` sigil (opt-in via `partialBlocks` / `decorators`); the surface maps them onto the `partial` / `inline` helpers
+|decorator `pass:[{{* …}}]` |engine block helper
 |===
 
 == 2.6 Worked parse
