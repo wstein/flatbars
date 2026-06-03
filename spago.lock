@@ -136,6 +136,31 @@
           ]
         }
       },
+      "flatbars-lexer-lab": {
+        "path": "packages/lexer-lab",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "control",
+            "either",
+            "foldable-traversable",
+            "maybe",
+            "numbers",
+            "parsing",
+            "prelude",
+            "strings",
+            "transformers",
+            "tuples"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "assert",
+            "console",
+            "effect"
+          ]
+        }
+      },
       "fullbars": {
         "path": "packages/fullbars",
         "core": {
@@ -1471,6 +1496,38 @@
         "transformers"
       ]
     },
+    "parsing": {
+      "type": "registry",
+      "version": "10.2.0",
+      "integrity": "sha256-cwEGJ8HgyhRPdVwLLD4rsqdZMDjGwAdnT7b13xqkKEQ=",
+      "dependencies": [
+        "arrays",
+        "control",
+        "effect",
+        "either",
+        "enums",
+        "foldable-traversable",
+        "functions",
+        "identity",
+        "integers",
+        "lazy",
+        "lists",
+        "maybe",
+        "newtype",
+        "nullable",
+        "numbers",
+        "partial",
+        "prelude",
+        "st",
+        "strings",
+        "tailrec",
+        "transformers",
+        "tuples",
+        "unfoldable",
+        "unicode",
+        "unsafe-coerce"
+      ]
+    },
     "partial": {
       "type": "registry",
       "version": "4.0.0",
@@ -1660,6 +1717,21 @@
         "partial",
         "prelude",
         "tuples"
+      ]
+    },
+    "unicode": {
+      "type": "registry",
+      "version": "6.0.0",
+      "integrity": "sha256-5KugCNyYxscmZpnMbssOQA96XimuBN/bjHpdrtd5qaY=",
+      "dependencies": [
+        "arrays",
+        "enums",
+        "integers",
+        "maybe",
+        "partial",
+        "prelude",
+        "strings",
+        "unsafe-coerce"
       ]
     },
     "unsafe-coerce": {

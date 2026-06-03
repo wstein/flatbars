@@ -1,0 +1,29 @@
+# Standalone lexer SPIKE — NOT part of the FlatBars engine.
+#
+# An experiment exploring a `purescript-parsing`-based, *stateful*,
+# delimiter-level tokenizer with CST-style leading trivia (the host-text
+# "ocean" and inner whitespace are trivia attached to the following lexeme;
+# the final token is a synthetic EOF carrying the trailing ocean). Built to
+# evaluate the shape against the existing hand-written `FlatBars.Lexer`
+# before deciding whether to adopt it. Nothing in the workspace depends on
+# this package; it pulls in no `flatbars*` package, so it stays isolated.
+package:
+  name: flatbars-lexer-lab
+  dependencies:
+    - prelude
+    - arrays
+    - control
+    - either
+    - foldable-traversable
+    - maybe
+    - numbers
+    - parsing
+    - strings
+    - transformers
+    - tuples
+  test:
+    main: Test.FlatBars.Lab.Lexer.Main
+    dependencies:
+      - effect
+      - console
+      - assert
