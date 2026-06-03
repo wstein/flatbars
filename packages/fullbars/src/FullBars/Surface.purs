@@ -41,10 +41,10 @@
 -- |
 -- |  * the Handlebars partial block `{{#> name}}…{{/name}}` ⇒ the same as
 -- |    `{{#partial name}}…{{/partial}}`, and the inline-partial decorator
--- |    `{{#*inline "name"}}…{{/inline}}` ⇒ the core `inline` form. Both parse as
--- |    plain `{{#`-Section blocks headed by the sigil (`>` / `*inline`); their
--- |    `{{/…}}` close is matched via `Parser.blockCloseName` (on the partial name /
--- |    `inline`). No new sigil — this rewrite just maps those heads.
+-- |    `{{#*inline "name"}}…{{/inline}}` ⇒ the core `inline` form. The core lexes
+-- |    `{{#>` and `{{#*` as the distinct `PartialBlock` / `Decorator` sigils (each
+-- |    with a clean head — the partial name / the decorator name), so this rewrite
+-- |    just maps those sigils onto `partial` / `inline`.
 module FullBars.Surface
   ( desugar
   , desugarWith
@@ -141,22 +141,22 @@ desugarWith lv clauseNames = go []
       Block sp Section "partial" args body ->
         Block sp Section "partial" (partialArgs lv scope args) (go scope (expandElseIf body))
       -- bare `{{#inline name}}` reaches here only on the *lenient* path (MaxBars,
-      -- whose `{{#*inline}}` decorator is a LexError so the bare form is its only
+      -- which gates the `{{#*inline}}` decorator off so the bare form is its only
       -- inline-partial spelling). FullBars rejects it before desugar (it requires
-      -- the `{{#*inline}}` decorator below) via `bareInlineOffset`.
+      -- the `{{#*inline}}` decorator) via `bareInlineOffset`.
       Block sp Section "inline" args body ->
         Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
-      -- the Handlebars partial *block* `{{#> name …}}…{{/name}}`: the core parses
-      -- it headed by the partial sigil `>` (close matched against the partial name
-      -- via `Parser.blockCloseName`), with the name + context/hash as its args —
-      -- exactly the `{{#partial}}` construct, so desugar it identically.
-      Block sp Section ">" args body ->
-        Block sp Section "partial" (partialArgs lv scope args) (go scope (expandElseIf body))
-      -- the Handlebars inline-partial decorator `{{#*inline "name"}}…{{/inline}}`:
-      -- headed `*inline` (close matched on `inline`), the `"name"` arg is the sole
-      -- argument — exactly the `{{#inline "name"}}` shape, so reuse `inlineArgs`.
-      Block sp Section "*inline" args body ->
+      -- the inline-partial *decorator* `{{#*inline "name"}}…{{/inline}}` (Decorator
+      -- sigil; the decorator name `inline` is the head, the partial name its arg).
+      -- Same definition as the bare `{{#inline}}` form, hoisted by `hoistInline`.
+      Block sp Decorator "inline" args body ->
         Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
+      -- the Handlebars partial *block* `{{#> name …}}…{{/name}}` (PartialBlock
+      -- sigil; the partial name is the head). Prepend the head to the args so it
+      -- reuses `partialArgs` — exactly the `{{#partial}}` construct.
+      Block sp PartialBlock name args body ->
+        Block sp Section "partial" (partialArgs lv scope (Array.cons (App name []) args))
+          (go scope (expandElseIf body))
       -- the inverted section `{{^x}}…{{/x}}` desugars to `{{#unless x}}…{{/unless}}`
       -- (the FullBars way to "render when falsy"); the head becomes the condition.
       Block sp Inverse name args body ->
@@ -494,12 +494,12 @@ hoistInline nodes = Array.foldl step { partials: Map.empty, template: [] } nodes
 
 -- | The source offset of the first *bare* `{{#inline …}}` block, searched
 -- | depth-first through block bodies (`Nothing` when there is none). The inline
--- | decorator parses headed `*inline` (its `{{/inline}}` close matched by
--- | `Parser.blockCloseName`), so it is deliberately *not* matched here. FullBars
--- | uses this to reject the bare spelling — an inline partial must be written as
--- | the decorator `{{#*inline "name"}}` (ADR-0009 amendment / surface.adoc §5.7).
--- | MaxBars does not run this gate: its `{{#*inline}}` is a `LexError`, so the
--- | bare `{{#inline}}` is its only inline-partial form.
+-- | decorator lexes as the distinct `Decorator` sigil, so a `Section "inline"`
+-- | block is unambiguously the bare misuse — `Decorator` blocks are not matched
+-- | here. FullBars uses this to reject the bare spelling — an inline partial must
+-- | be written as the decorator `{{#*inline "name"}}` (ADR-0009 amendment /
+-- | surface.adoc §5.7). MaxBars does not run this gate: it gates the decorator off
+-- | and keeps bare `{{#inline}}` as its only inline-partial form.
 bareInlineOffset :: Template -> Maybe Int
 bareInlineOffset nodes = Array.head (Array.mapMaybe node nodes)
   where

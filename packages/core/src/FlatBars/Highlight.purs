@@ -139,6 +139,10 @@ tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
   openSpans :: Span -> Sigil -> Int -> String -> Array TSpan
   openSpans sp sig base txt = case sig of
     Section -> tag sp "block-open" <> interior base txt
+    -- the partial-block `{{#>}}` and inline-decorator `{{#*}}` openers carve like a
+    -- plain block opener (the `>`/`*` is part of the opener tag span, not interior).
+    PartialBlock -> tag sp "block-open" <> interior base txt
+    Decorator -> tag sp "block-open" <> interior base txt
     Inverse
       | cfg.extras -> tag sp "block-inverse" <> interior base txt
       | otherwise -> tag sp "error"

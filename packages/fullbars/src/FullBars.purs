@@ -63,10 +63,10 @@ desugarSurfaceWith lv = desugarWith lv surfaceClauses
 
 -- | Reject a bare `{{#inline}}` block on the *strict* (FullBars/CLI) surface: an
 -- | inline partial must be the decorator `{{#*inline "name"}}` (surface.adoc
--- | §5.7), reported as a located `DisallowedShape`. MaxBars passes
--- | `strict = false` — its `{{#*inline}}` is a `LexError`, so the bare spelling
--- | is its only inline-partial form (left as-is). Runs on the *parsed* nodes,
--- | before desugar collapses `*inline`/`inline` to one head.
+-- | §5.7), reported as a located `DisallowedShape`. The decorator lexes as the
+-- | distinct `Decorator` sigil, so a `Block Section "inline"` is unambiguously the
+-- | bare misuse. MaxBars passes `strict = false` — it gates the decorator off and
+-- | keeps the bare form as its only inline-partial spelling (left as-is).
 checkBareInline :: Boolean -> Template -> Either ParseError Unit
 checkBareInline strict nodes
   | strict = case bareInlineOffset nodes of

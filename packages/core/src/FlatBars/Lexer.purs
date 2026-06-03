@@ -472,6 +472,13 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
     | matchAt cs i "{{{" = readOutput i
     | matchAt cs i "{{~!" = readShortComment i "{{~!"
     | matchAt cs i "{{!" = readShortComment i "{{!"
+    -- `{{#*name}}` (inline-partial decorator) and `{{#>name}}` (partial block) are
+    -- distinct openers — matched before bare `{{#}}` so the `*`/`>` is consumed as
+    -- part of the opener, not folded into the head.
+    | matchAt cs i "{{~#*" = readBlockOpen i "{{~#*" Decorator "}}"
+    | matchAt cs i "{{#*" = readBlockOpen i "{{#*" Decorator "}}"
+    | matchAt cs i "{{~#>" = readBlockOpen i "{{~#>" PartialBlock "}}"
+    | matchAt cs i "{{#>" = readBlockOpen i "{{#>" PartialBlock "}}"
     | matchAt cs i "{{~#" = readBlockOpen i "{{~#" Section "}}"
     | matchAt cs i "{{#" = readBlockOpen i "{{#" Section "}}"
     | matchAt cs i "{{~^" = readBlockOpen i "{{~^" Inverse "}}"
@@ -744,7 +751,12 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
             mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
           in
             case Array.index cs start of
-              Just '#' -> mk (ROpen span Section (start + 1) afterSig)
+              -- `#*name` (decorator) / `#>name` (partial block): the marker after
+              -- `#` opens a distinct sigil, with the head starting two chars in.
+              Just '#' -> case Array.index cs (start + 1) of
+                Just '*' -> mk (ROpen span Decorator (start + 2) (slice cs (start + 2) q))
+                Just '>' -> mk (ROpen span PartialBlock (start + 2) (slice cs (start + 2) q))
+                _ -> mk (ROpen span Section (start + 1) afterSig)
               Just '^' -> mk (ROpen span Inverse (start + 1) afterSig)
               Just '<' -> mk (ROpen span Parent (start + 1) afterSig)
               Just '$' -> mk (ROpen span BlockDef (start + 1) afterSig)

@@ -58,7 +58,11 @@ import Kernel.Value (resolveTruthiness)
 -- | delimiters).
 coreOptions :: ParseOptions
 coreOptions = defaultParseOptions
-  { extras = false, lexConfig = defaultLexConfig { mustacheDelims = true } }
+  { extras = false
+  , decorators = false
+  , partialBlocks = false
+  , lexConfig = defaultLexConfig { mustacheDelims = true }
+  }
 
 -- | Parse core source and return a pure renderer; the `@truthiness` mode is
 -- | resolved once and baked in.
@@ -68,7 +72,9 @@ compile = compileWith coreOptions
 -- | `compile` with explicit parse options; RawBars always rejects extras.
 compileWith :: ParseOptions -> String -> Either ParseError (Value -> Either Error String)
 compileWith opts src = do
-  { directives, nodes } <- parseWith (opts { extras = false }) src
+  { directives, nodes } <- parseWith
+    (opts { extras = false, decorators = false, partialBlocks = false })
+    src
   pure \dat -> runResolved directives identity nodes dat
 
 -- | One-shot render of core source against data.
@@ -140,6 +146,8 @@ compileJs = compileJsWith coreOptions
 -- | `compileJs` with explicit parse options; RawBars always rejects extras.
 compileJsWith :: ParseOptions -> String -> Either ParseError String
 compileJsWith opts src = do
-  { directives, nodes } <- parseWith (opts { extras = false }) src
+  { directives, nodes } <- parseWith
+    (opts { extras = false, decorators = false, partialBlocks = false })
+    src
   fs <- resolveForCompile directives
   pure (Driver.compile (metaFor fs) fullbarsEmit [] nodes)

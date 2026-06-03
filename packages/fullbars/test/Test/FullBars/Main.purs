@@ -852,16 +852,16 @@ main = do
     (obj [ Tuple "name" (str "Ada") ])
     "<div><b>Ada</b></div>"
 
-  -- inline-partial decorator {{#*inline "name"}}…{{/inline}} (FullBars): parses
-  -- headed `*inline` (close {{/inline}} matched by the stripped name), `"row"` its
-  -- sole argument; desugars to the core `inline` form and hoists.
+  -- inline-partial decorator {{#*inline "name"}}…{{/inline}} (FullBars): the core
+  -- lexes `{{#*` as the `Decorator` sigil (head `inline`, close {{/inline}}), `"row"`
+  -- its sole argument; the surface maps it to the hoisted inline definition.
   expectS "inline-decorator-sigil"
     "{{#*inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])
     "[a][b]"
   -- the `*` decorator sigil is REQUIRED: bare {{#inline …}} is rejected with a
   -- located DisallowedShape (Handlebars has no `inline` block helper — it is a
-  -- decorator). MaxBars keeps the bare spelling (its {{#*inline}} is a LexError).
+  -- decorator). MaxBars keeps the bare spelling (it gates the decorator off).
   expectSError "inline-bare-rejected"
     "{{#inline \"row\"}}[{{ . }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}"
     "{{#inline}}"
@@ -874,10 +874,10 @@ main = do
   -- (the {{#partial}} block-body fallback, reached through the sigil).
   expectS "block-partial-sigil-fallback" "{{#> missing}}<i>fb</i>{{/missing}}" VNull "<i>fb</i>"
 
-  -- the {{#>}} sigil is meaningful only in FullBars: the core parses it (the
-  -- `>`-headed block closes on the partial name via `blockCloseName`) but RawBars
-  -- has no surface to map `>` onto `partial`, so it fails at render (unknown
-  -- helper `>`) — a Left, just at render rather than parse.
+  -- the {{#>}} sigil is meaningful only in FullBars: the core lexes it as the
+  -- `PartialBlock` sigil (head = the partial name), but the raw engine has no
+  -- surface to map it onto `partial`, so the head `x` is an unknown helper — a
+  -- Left at render.
   assert' "block-partial-core-has-no-meaning"
     (isLeft (renderCore "{{#> x}}body{{/x}}" VNull))
 

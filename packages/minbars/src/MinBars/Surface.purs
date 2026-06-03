@@ -73,6 +73,10 @@ desugar = map node
     Block sp BlockDef name args body ->
       Block sp Section "block" (Array.cons (Lit (VString name)) (indentArgs args))
         (desugar body)
+    -- the Handlebars block sigils `{{#*…}}` (Decorator) / `{{#>…}}` (PartialBlock)
+    -- are gated off for MinBars (`minOptions`), so the parser rejects them before
+    -- here; carry any stray one verbatim to keep this desugar total.
+    Block sp sig name args body -> Block sp sig name args (desugar body)
     -- raw blocks are not part of the Mustache surface; carry them verbatim.
     RawBlock sp name args raw -> RawBlock sp name args raw
 

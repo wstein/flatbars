@@ -58,7 +58,14 @@ import MinBars.Surface (desugar)
 -- | eligible-tag set and the partial-indentation capture differ; §4.8).
 minOptions :: ParseOptions
 minOptions = defaultParseOptions
-  { extras = true, inheritance = true, trimStandalone = false }
+  -- the Handlebars block sigils `{{#*}}` (decorator) / `{{#>}}` (partial block) are
+  -- not part of the Mustache surface, so they stay gated off (a located error).
+  { extras = true
+  , inheritance = true
+  , decorators = false
+  , partialBlocks = false
+  , trimStandalone = false
+  }
 
 -- | MinBars lexes with Mustache set-delimiters enabled (`{{=<% %>=}}`). Each
 -- | template — including every partial, which is parsed by its own `parseMin` —

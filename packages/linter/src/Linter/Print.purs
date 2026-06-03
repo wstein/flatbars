@@ -27,7 +27,7 @@ import Data.Foldable (foldMap)
 import Data.Maybe (Maybe(..))
 import Data.String (joinWith)
 import Data.String as String
-import FlatBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil(..), Template)
+import FlatBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil, Template)
 import FlatBars.Value (Value(..))
 
 -- | Pretty-print a desugared core `Template` as RawBars source text.
@@ -56,15 +56,12 @@ printNode = case _ of
     "{{{{" <> head name args <> "}}}}" <> raw <> "{{{{/" <> name <> "}}}}"
 
 -- | A `{{#name …}}…{{/name}}` section. The desugared MaxBars corpus only ever
--- | carries `Section` sigils; `Inverse`/`Parent`/`BlockDef` are printed in the
--- | same section shape (total, but unreachable for the corpus — the entrypoint
--- | rejects inheritance before printing).
+-- | carries `Section` sigils; every other sigil (`Inverse`/`Parent`/`BlockDef`
+-- | and the `PartialBlock`/`Decorator` block sigils) is printed in the same
+-- | section shape — total, but unreachable for the corpus (the entrypoint rejects
+-- | inheritance/decorators/partial-blocks before printing).
 printBlock :: Sigil -> Ident -> Array Expr -> Template -> String
-printBlock sig name args body = case sig of
-  Section -> section
-  Inverse -> section
-  Parent -> section
-  BlockDef -> section
+printBlock _ name args body = section
   where
   section =
     "{{#" <> head name args <> "}}" <> printRawBars body <> "{{/" <> name <> "}}"

@@ -66,12 +66,14 @@ data Node
 -- | and a dialect must opt in (`ParseOptions.inheritance`) to accept the
 -- | inheritance shapes at all.
 -- |
--- | The Handlebars block-partial `{{#>name}}` and inline decorator
--- | `{{#*inline …}}` are NOT separate sigils: both lex as plain `Section`
--- | blocks (`{{#`), distinguished only by their head (`>`, `*inline`), and their
--- | `{{/…}}` close matches via `Parser.blockCloseName`. The dialect surface maps
--- | those heads onto `partial`/`inline`.
-data Sigil = Section | Inverse | Parent | BlockDef
+-- | The Handlebars block-partial opener `{{#>name}}` and the inline-partial
+-- | *decorator* `{{#*name …}}` ARE first-class sigils: `{{#>` lexes as
+-- | `PartialBlock` and `{{#*` as `Decorator`, each with a clean head (the partial
+-- | name / the decorator name — no composite `>`/`*` prefix). Their `{{/…}}` close
+-- | repeats that head. A dialect must opt in (`ParseOptions.partialBlocks` /
+-- | `ParseOptions.decorators`) to accept them; the surface maps `PartialBlock` onto
+-- | `partial` and a `Decorator` onto the hoisted inline definition.
+data Sigil = Section | Inverse | Parent | BlockDef | PartialBlock | Decorator
 
 derive instance eqSigil :: Eq Sigil
 
@@ -80,6 +82,8 @@ instance showSigil :: Show Sigil where
   show Inverse = "Inverse"
   show Parent = "Parent"
   show BlockDef = "BlockDef"
+  show PartialBlock = "PartialBlock"
+  show Decorator = "Decorator"
 
 data Expr
   = Lit Value

@@ -43,6 +43,10 @@ maxOptions =
     { parseExpr = parseMaxExpr
     , parseHead = parseMaxHead
     , extras = false
+    -- inline partials in MaxBars use the bare `{{#inline}}` form (the old model);
+    -- the `{{#*}}` decorator and `{{#>}}` partial block stay gated off.
+    , decorators = false
+    , partialBlocks = false
     , lexOptions = { infixArith: true }
     -- Set delimiters enabled (ADR-015): inline `{{=<% %>=}}` + the
     -- `{{! @delimiters: <% %> }}` directive. FullBars stays Handlebars-faithful.
