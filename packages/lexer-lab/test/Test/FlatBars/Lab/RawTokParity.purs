@@ -11,6 +11,7 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Lab.Lexer.Types (defaultLexConfig) as Lab
 import FlatBars.Lab.RawTok (parse, toRawToks)
 import FlatBars.Lexer (defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (parse) as Core
@@ -56,11 +57,9 @@ corpus =
   , "{{! a short comment }}"
   , "x {{! c }} y"
   , "{{!-- a long\ncomment with }} inside --}}tail"
-  -- NB: no set-delimiters here — the engine's defaultLexConfig has
-  -- mustacheDelims=false (so `{{=A B=}}` is a plain separator), whereas the hand
-  -- lexer always recognises them. That divergence would need a config gate to
-  -- reconcile; it is covered by the lexer parity battery, not this default-config
-  -- corpus.
+  -- under defaultLexConfig (mustacheDelims off) `{{=A B=}}` is a plain separator
+  -- in BOTH the structural scanner and the incumbent — they agree.
+  , "{{=<% %>=}}<% x %> done"
   , "{{{{raw}}}}verbatim {{x}} body{{{{/raw}}}}"
   , "x {{~ y ~}} z"
   , "a {{~#each xs}}{{this}}{{~/each}} b"
@@ -75,7 +74,7 @@ tests :: Effect Unit
 tests = do
   log "FlatBars.Lab.RawTok — RawTok parity vs tokenizeTemplate"
   for_ corpus \src ->
-    case toRawToks src, tokenizeTemplate defaultLexConfig src of
+    case toRawToks Lab.defaultLexConfig src, tokenizeTemplate defaultLexConfig src of
       Right lab, Right eng ->
         assertTrue'
           ("RawTok mismatch on " <> show src <> "\n  lab: " <> show lab <> "\n  eng: " <> show eng)
@@ -87,7 +86,7 @@ tests = do
   -- End-to-end: adapter parse (via trimStandalone + the engine tree builder)
   -- vs FlatBars.parse — proves standalone whitespace is handled (P2).
   for_ standaloneCorpus \src ->
-    case parse src, Core.parse src of
+    case parse Lab.defaultLexConfig src, Core.parse src of
       Right lab, Right core ->
         assertTrue'
           ( "standalone AST mismatch on " <> show src <> "\n  lab:  " <> show (map norm lab)

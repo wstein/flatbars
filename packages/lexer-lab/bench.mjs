@@ -30,7 +30,7 @@ const labRawTok = await import(out("FlatBars.Lab.RawTok"));
 // buildFromTokens) vs the migration path (hand lexer → RawTok adapter → the
 // SAME trimStandalone + buildFromTokens). Both produce the same Syntax AST.
 const parseCore = coreParser.parse;
-const parseLab = labRawTok.parse;
+const parseLab = labRawTok.parse(spike.defaultLexConfig);
 // Right → count nodes; Left → throw (work can't be elided either way).
 function forceParse(either) {
   if (either.constructor.name !== "Right") throw new Error("parse returned Left");
@@ -137,10 +137,10 @@ for (const [name, input] of Object.entries(CORPORA)) {
 // ── End-to-end: parse to the Syntax AST ───────────────────────────────────
 // Both paths share the engine's buildFromTokens (interior tokenizing + Expr +
 // tree) and trimStandalone; they differ only in the FRONT — the incumbent's
-// tokenizeTemplate vs the hand lexer + RawTok adapter. Same AST out (proven by
-// RawTokParity); this is the cost of the swap, end to end.
+// tokenizeTemplate vs the lab's structural RawTok scanner. Same AST out (proven
+// by RawTokParity); this is the cost of the swap, end to end.
 console.log("\n── end-to-end parse → Syntax AST ──");
-console.log("profile  bytes   incumbent (FlatBars.parse)  lab (hand→RawTok→parser)  ratio");
+console.log("profile  bytes   incumbent (FlatBars.parse)  lab (structural→parser)   ratio");
 console.log("───────  ──────  ─────────────────────────  ────────────────────────  ─────");
 for (const [name, input] of Object.entries(CORPORA)) {
   forceParse(parseCore(input)); // sanity: both parse
