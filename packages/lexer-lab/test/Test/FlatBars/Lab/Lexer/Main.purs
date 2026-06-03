@@ -23,6 +23,7 @@ import FlatBars.Lab.Lexer
 import Test.Assert (assertEqual, assertTrue')
 import Test.FlatBars.Lab.LexerHand as LexerHand
 import Test.FlatBars.Lab.ParserParity as ParserParity
+import Test.FlatBars.Lab.RawTokParity as RawTokParity
 
 cfg :: { close :: String, infixArith :: Boolean, open :: String }
 cfg = defaultLexConfig
@@ -228,3 +229,6 @@ main = do
 
   -- Phase-1: the lab parser's AST parity against the engine's FlatBars.parse.
   ParserParity.tests
+
+  -- Phase-2/3: the RawTok adapter's parity against the engine lexer.
+  RawTokParity.tests

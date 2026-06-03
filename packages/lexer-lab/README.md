@@ -178,6 +178,30 @@ semantic-token and the diagnostic channels — the ADR-023 split (one recovering
 parser, two LSP outputs). `node packages/lexer-lab/lsp.test.mjs` demos the
 classification table, the wire `data`, the recovery, and the diagnostics.
 
+## Parser (migration evaluation)
+
+Two parser tracks over the hand lexer, both parity-checked against the engine:
+
+- **`FlatBars.Lab.Parser`** (phase 1) — a *native* tree-builder over `LexToken`
+  that produces the engine's `Syntax` AST directly. Each tag's interior is sliced
+  from source and parsed by the engine's `tokenizeInterior` + `FlatBars.Expr`, so
+  the `Expr` is exact and path reassembly (L3) is free. `ParserParity` asserts
+  span-erased AST equality with `FlatBars.parse` on a 23-case corpus.
+- **`FlatBars.Lab.RawTok`** (phases 2–3) — the migration-realistic path: adapt the
+  hand lexer's tokens into the engine's `RawTok` stream (reproducing `~`
+  whitespace control), then reuse the engine's `trimStandalone` + `buildFromTokens`
+  unchanged. `RawTokParity` asserts `toRawToks src == tokenizeTemplate src`
+  byte-for-byte across a broad corpus (`~`, raw blocks, short/long comments,
+  nesting, escapes), plus an end-to-end `parse` vs `FlatBars.parse` check on
+  standalone-whitespace templates (`{{#if}}/{{else}}`, indentation, comments).
+
+The takeaway: **swap the lexer, keep the proven parser.** Because the RawTok
+streams match exactly, standalone whitespace, header directives, raw blocks, and
+recovering parse are all inherited for free. The one deliberate divergence is
+set-delimiters: the hand lexer always recognises `{{=A B=}}`, while the engine's
+`defaultLexConfig` gates them behind `mustacheDelims` — reconciling that needs a
+config gate on the hand lexer (tracked).
+
 ## Done in this iteration
 
 - **Lab 2** — the hand-written lexer + a parity battery proving it equals the
@@ -206,7 +230,6 @@ classification table, the wire `data`, the recovery, and the diagnostics.
    (`Invalid` carries a message; `lsp.mjs:diagnostics` emits `publishDiagnostics`).
 3. ~~Decide the bracket/path-segment model (L3)~~ ✓ done — segmented paths
    (`.`→`Dot`, `/`→`Slash`, brackets as tokens), both lexers, parity-checked.
-4. ~~Lift the shared token model into a `Types` module~~ ✓ done
-   (`FlatBars.Lab.Lexer.Types`; both lexers import it). If adopted: replace the
-   coarse raw fences and add a `tokenize`-parity gate against `FlatBars.Lexer`
-   (boundaries + literals).
+4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate
+   against `FlatBars.Lexer` (boundaries + literals), and lift line/column into a
+   shared `Types` module so both spikes import one source of truth.
