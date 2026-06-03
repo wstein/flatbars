@@ -1,0 +1,11 @@
+# The Lab engine bundle is a committed *generated* artifact (esbuild of the
+# flatbars-js facade; regenerate with `npm run gen:bundle`, verified by
+# `check:bundle`). It is served statically by the Lab/Pages, so it stays in the
+# repo — but it is never hand-edited or hand-merged.
+#
+#   binary            → no textual diff, and (crucially) no auto-merge: a rebase/
+#                       merge conflict leaves one side intact instead of
+#                       splicing two regenerated bundles into a broken one.
+#                       Resolve by picking a side, then `npm run gen:bundle`.
+#   linguist-generated → collapse it in GitHub diffs; exclude from language stats.
+lab/vendor/flatbars-engine.mjs binary linguist-generated=true
