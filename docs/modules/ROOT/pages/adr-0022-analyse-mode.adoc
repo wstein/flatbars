@@ -46,13 +46,17 @@ its implementations stay introspectable.
 
 . *Truthiness is one rule per engine, plugged in as a lambda* `truthy :: Value -> Boolean`, the same IoC
   shape interpret/desugar/validate/compile already use ("don't call FlatBars, FlatBars calls you").
-  FullBars, RawBars and MaxBars plug in the Handlebars rule; MinBars plugs in the Mustache rule. *There is
-  no per-file override* — the engine's rule is the only rule a template runs under.
+  FullBars plugs in the Handlebars rule; *RawBars and MaxBars plug in `nonEmpty`* (`false null "" [] {}`
+  falsy — `0` truthy, every empty container falsy; the dialects deliberately diverge in value policy since
+  RawBars/MaxBars are not Handlebars clones); MinBars plugs in the Mustache rule. *There is no per-file
+  override* — the engine's rule is the only rule a template runs under, swapped in at the dialect's render
+  and compile entry points (interpreter via `withTruthy`; compiler via the seeded runtime callback).
 
-. *The built-in rules stay data-backed and introspectable.* `Kernel.Value` keeps `handlebars`,
-  `mustache`, `minimal`, `presence` as named predicates (today's `FalsySet`-derived functions) — the
-  *menu* an engine selects from, what docs print as explicit expansions, and what Part B replays for
-  divergence. The **interface is a lambda; the implementations are data.** This is the synthesis the
+. *The built-in rules are named `Value -> Boolean` predicates.* `Kernel.Value` keeps `handlebars`,
+  `nonEmpty`, `mustache` (the engine rules) plus `minimal`/`presence` (analyse comparison rules) as the
+  *menu* an engine selects from and what Part B replays for divergence. (Originally these were
+  `FalsySet`-derived data; a later step purged the falsy-set form entirely, so a rule is now *only* a
+  callback.) This is the synthesis the
   debate reached: an *opaque* lambda was rejected (it can be neither baked nor reasoned about), and a
   fixed lambda *backed by a named set* keeps every introspection the data form gave us.
 

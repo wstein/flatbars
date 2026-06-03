@@ -34,13 +34,14 @@ Rules (xref:lexical.adoc[]):
 [IMPORTANT]
 ====
 *The per-file `pass:[{{! @truthiness: … }}]` directive was removed* — see
-xref:adr-0022-analyse-mode.adoc[ADR-022]. Truthiness is now the engine's *one fixed rule*:
-FullBars/RawBars/MaxBars use the `handlebars` rule, MinBars uses `mustache`. There is no per-file
-override, no per-partial scoping, and no alias/shape-list value to write. A leftover `@truthiness`
-directive in an old template is *inert* — carried, never an error, but **lint-warned as deprecated** so a
-stale directive does not silently mislead. The model below describes those
-fixed rules and how to write *portable* templates; the analyse mode (ADR-022 Part B) checks portability
-against real data.
+xref:adr-0022-analyse-mode.adoc[ADR-022]. Truthiness is now each engine's *one fixed rule*: **FullBars**
+uses `handlebars` (Handlebars fidelity), **RawBars** and **MaxBars** use `nonEmpty`, **MinBars** uses
+`mustache`. (The dialects therefore *diverge* in value policy — RawBars/MaxBars are not Handlebars clones.)
+There is no per-file override, no per-partial scoping, and no alias/shape-list value to write. A leftover
+`@truthiness` directive in an old template is *inert* — carried, never an error, but **lint-warned as
+deprecated** so a stale directive does not silently mislead. The model below describes those fixed rules
+and how to write *portable* templates; the analyse mode (ADR-022 Part B) checks portability against real
+data.
 ====
 
 Each engine's rule decides which value *shapes* `if`/`unless`/`and`/`or`/`not` (and MaxBars' `&&`/`||`/`!`)
@@ -50,15 +51,16 @@ treat as false. The named rules — the menu engines are built from — are:
 |===
 |Rule |Falsy set |Notes
 
-|`handlebars` |`false null "" 0 []` |FullBars/RawBars/MaxBars; `pass:[{}]` truthy, `"0"` truthy
-|`minimal` |`false null` |only `false`/`null` are false; `0`/`""`/`[]`/`pass:[{}]` truthy
-|`presence` |`false null [] {}` |present ⇒ truthy; matches *StringTemplate4* (see below)
-|`mustache` |`false null []` |MinBars' rule; `0`/`""`/`pass:[{}]` truthy
+|`handlebars` |`false null "" 0 []` |*FullBars*; `pass:[{}]` truthy, `"0"` truthy
+|`nonEmpty` |`false null "" [] {}` |*RawBars/MaxBars*; truthy ⟺ non-empty present value — `0` truthy (use `val > 0`), every empty container falsy
+|`mustache` |`false null []` |*MinBars*; `0`/`""`/`pass:[{}]` truthy
+|`minimal` |`false null` |comparison only (analyse): only `false`/`null` false
+|`presence` |`false null [] {}` |comparison only (analyse): present ⇒ truthy; matches *StringTemplate4* (see below)
 |===
 
-Decisions worth stating: `"0"` is truthy under every rule; `pass:[{}]` is falsy only under `presence`;
-`NaN` is always truthy; `safe ""` is falsy iff `""` is in the rule (content-based —
-xref:fullbars-compat.adoc[] §1.4).
+Decisions worth stating: `"0"` is truthy under every rule; `0` is falsy only under `handlebars`; `pass:[{}]`
+is falsy under `nonEmpty`/`presence`; `""` is falsy under `handlebars`/`nonEmpty`; `NaN` is always truthy;
+`safe ""` is falsy iff `""` is in the rule (content-based — xref:fullbars-compat.adoc[] §1.4).
 
 `includeZero` on a single `if`/`unless` makes the number `0` truthy *for that one test* — genuine
 Handlebars compat, but a Handlebars-only escape hatch (not portable). It is a per-call helper option, no
@@ -128,8 +130,9 @@ directory, then the built-in default (on).
 
 == Compilation
 
-Both interpreter and compiler honour `@trim` identically. The compiler bakes the
-engine's *fixed* truthiness rule into the emitted module (a `$falsy` constant the
-runtime reads — `handlebars` for FullBars/RawBars, `mustache` for MinBars), so a
-compiled template branches under the same rule as the interpreter — asserted
-byte-for-byte by the conformance harness (xref:adr-0022-analyse-mode.adoc[ADR-022]).
+Both interpreter and compiler honour `@trim` identically. Truthiness is a
+*callback* in both: the compiled module seeds its root frame with the engine's
+truthiness callback — `rt.truthyHandlebars` (FullBars), `rt.truthyNonEmpty`
+(RawBars/MaxBars), or `rt.truthyMustache` (MinBars) — so a compiled template
+branches under the same rule as the interpreter, asserted byte-for-byte by the
+conformance harness (xref:adr-0022-analyse-mode.adoc[ADR-022]).

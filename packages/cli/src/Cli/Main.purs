@@ -30,7 +30,7 @@ import FlatBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorA
 import FlatBars.Json (parseValue)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
-import FullBars (analyseSurface, directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
+import FullBars (analyseSurface, directiveLints, handlebars, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
 import MinBars (renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
@@ -198,9 +198,10 @@ run opts = do
                   of
                   Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
                   Right out -> writeStdout out
-            | opts.surface -> case renderSurfaceDiagWith true noLoopVars popts tpl value of
-                Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
-                Right out -> writeStdout out
+            | opts.surface ->
+                case renderSurfaceDiagWith true noLoopVars popts handlebars tpl value of
+                  Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
+                  Right out -> writeStdout out
             | otherwise -> case compileWith popts tpl of
                 Left pe -> die ("flatbars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
                 Right render -> case render value of
@@ -211,7 +212,11 @@ run opts = do
 runCompile :: ParseOptions -> Options -> String -> Effect Unit
 runCompile popts opts tpl =
   case
-    (if opts.surface then Compile.compileSurfaceWith true noLoopVars else compileJsWith) popts tpl
+    ( if opts.surface
+      -- surface = FullBars (Handlebars rule); core = RawBars (nonEmpty rule).
+      then Compile.compileSurfaceWith true noLoopVars popts "rt.truthyHandlebars" tpl
+      else compileJsWith popts tpl
+    )
     of
     Left pe -> die ("flatbars: " <> opts.template <> ":" <> renderParseErrorAt tpl pe)
     Right js -> writeStdout js

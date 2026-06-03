@@ -29,17 +29,17 @@ import Kernel.Walk (Clause, splitClauses)
 runtimeVersion :: String
 runtimeVersion = "0.1.0"
 
--- | The compile metadata for FullBars/RawBars: the runtime version and the
--- | root-frame seed that hands the engine's truthiness *callback* to `rt.scope`
--- | (ADR-022 — truthiness is only ever a `Value -> Boolean` callback, never a
--- | baked falsy-set). The callback is `rt.truthyHandlebars` from the runtime, so
--- | the seed references it directly (no module-level const — `rt` is only in
--- | scope inside the emitted function). MinBars supplies its own `rt.truthyMustache`.
-metaFor :: { runtimeVersion :: String, preamble :: String, seed :: String }
-metaFor =
+-- | The compile metadata for the RefEnv dialects, parameterised by the runtime
+-- | truthiness *callback* the root frame is seeded with (ADR-022 — truthiness is
+-- | only ever a `Value -> Boolean` callback, never a baked falsy-set):
+-- | `"rt.truthyHandlebars"` for FullBars, `"rt.truthyNonEmpty"` for RawBars/MaxBars.
+-- | The seed references the callback directly (no module-level const — `rt` is only
+-- | in scope inside the emitted function). MinBars supplies its own metadata.
+metaFor :: String -> { runtimeVersion :: String, preamble :: String, seed :: String }
+metaFor truthyCallback =
   { runtimeVersion
   , preamble: ""
-  , seed: "rt.scope(data, rt.truthyHandlebars)"
+  , seed: "rt.scope(data, " <> truthyCallback <> ")"
   }
 
 fullbarsEmit :: Emit

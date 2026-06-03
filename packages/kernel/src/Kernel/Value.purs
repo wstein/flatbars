@@ -9,6 +9,7 @@ module Kernel.Value
   , handlebars
   , minimal
   , presence
+  , nonEmpty
   , mustache
   , stringify
   , jsonStringify
@@ -71,6 +72,22 @@ presence = case _ of
   VArray a -> not (Array.null a)
   VObject o -> not (Map.isEmpty o)
   _ -> true
+
+-- | `nonEmpty` (`false null "" [] {}`): truthy ⟺ a *non-empty, present* value.
+-- | `false`/`null` and every empty container — `""`, `[]`, `{}` — are falsy, but
+-- | `0` is truthy (it is a present value, not emptiness; test magnitude with an
+-- | explicit compare, e.g. `val > 0`). This is RawBars/MaxBars' rule (ADR-022):
+-- | `presence` plus empty-string-is-empty. FullBars keeps `handlebars` (Handlebars
+-- | fidelity), so the dialects deliberately diverge in value policy here.
+nonEmpty :: Truthy
+nonEmpty = case _ of
+  VBool b -> b
+  VNull -> false
+  VString s -> s /= ""
+  VSafe s -> s /= ""
+  VArray a -> not (Array.null a)
+  VObject o -> not (Map.isEmpty o)
+  VNumber _ -> true
 
 -- | `mustache` (`false null []`): the Mustache rule — `false`, `null`, and the
 -- | empty *array* are falsy, but `0`, `""`, and `{}` are **truthy**. Distinct

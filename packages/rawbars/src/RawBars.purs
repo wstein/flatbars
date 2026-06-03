@@ -39,9 +39,10 @@ import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, registerAll, registerPartials)
+import Kernel.Env (RefEnv, registerAll, registerPartials, withTruthy)
 import Kernel.Render (formatError, runResolved)
 import Kernel.ToValue (class ToValue, toValue)
+import Kernel.Value (nonEmpty)
 
 --------------------------------------------------------------------------------
 -- Rendering (core syntax + the FullBars engine)
@@ -79,19 +80,20 @@ compileWith opts src = do
   { directives, nodes } <- parseWith
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
-  pure \dat -> runResolved directives identity nodes dat
+  pure \dat -> runResolved directives (withTruthy nonEmpty) nodes dat
 
 -- | One-shot render of core source against data.
 render :: String -> Value -> Either String String
 render src dat = case parseWith coreOptions src of
   Left pe -> Left (show (ParseFailure pe))
-  Right { directives, nodes } -> lmap show (runResolved directives identity nodes dat)
+  Right { directives, nodes } -> lmap show (runResolved directives (withTruthy nonEmpty) nodes dat)
 
 -- | `render` with located parse-error messages (`line:column:`).
 renderDiag :: String -> Value -> Either String String
 renderDiag src dat = case parseWith coreOptions src of
   Left pe -> Left (renderParseErrorAt src pe)
-  Right { directives, nodes } -> lmap (formatError src) (runResolved directives identity nodes dat)
+  Right { directives, nodes } ->
+    lmap (formatError src) (runResolved directives (withTruthy nonEmpty) nodes dat)
 
 -- | Render core source against native PureScript data (lowered via `ToValue`).
 renderValue :: forall a. ToValue a => String -> a -> Either String String
@@ -118,7 +120,8 @@ renderWithOperations operations partialSrcs src dat =
         let
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           setup =
-            registerAll operations
+            withTruthy nonEmpty
+              <<< registerAll operations
               <<< registerPartials externalT
         in
           lmap (formatError src) (runResolved directives setup nodes dat)
@@ -131,7 +134,7 @@ renderWithOperations operations partialSrcs src dat =
 renderAff :: String -> Value -> Aff (Either Error String)
 renderAff src dat = case parseWith coreOptions src of
   Left pe -> pure (Left (ParseFailure pe))
-  Right { directives, nodes } -> runExceptT (runResolved directives identity nodes dat)
+  Right { directives, nodes } -> runExceptT (runResolved directives (withTruthy nonEmpty) nodes dat)
 
 --------------------------------------------------------------------------------
 -- Compilation (core syntax → JS, via the shared driver + FullBars Emit)
@@ -149,4 +152,4 @@ compileJsWith opts src = do
   { nodes } <- parseWith
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
-  pure (Driver.compile metaFor fullbarsEmit [] nodes)
+  pure (Driver.compile (metaFor "rt.truthyNonEmpty") fullbarsEmit [] nodes)

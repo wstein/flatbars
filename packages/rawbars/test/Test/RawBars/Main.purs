@@ -28,11 +28,19 @@ main = do
     ( render "{{#if (lookup this \"a\")}}Y{{else}}N{{/if}}" (obj [ Tuple "a" (VBool false) ])
         == Right "N"
     )
-  -- ADR-022: the shared engine's fixed `handlebars` rule applies in core too —
-  -- 0 is falsy; no per-file @truthiness.
-  assert' "render: 0 is falsy (handlebars rule)"
+  -- RawBars uses the `nonEmpty` rule: 0 is TRUTHY (test magnitude with `gt`),
+  -- but "" and the empty array/object are falsy.
+  assert' "render: 0 is truthy (nonEmpty rule)"
     ( render "{{#if (lookup this \"n\")}}y{{else}}m{{/if}}"
-        (obj [ Tuple "n" (VNumber 0.0) ]) == Right "m"
+        (obj [ Tuple "n" (VNumber 0.0) ]) == Right "y"
+    )
+  assert' "render: empty string is falsy (nonEmpty rule)"
+    ( render "{{#if (lookup this \"s\")}}y{{else}}m{{/if}}"
+        (obj [ Tuple "s" (VString "") ]) == Right "m"
+    )
+  assert' "render: empty array is falsy (nonEmpty rule)"
+    ( render "{{#if (lookup this \"xs\")}}y{{else}}m{{/if}}"
+        (obj [ Tuple "xs" (VArray []) ]) == Right "m"
     )
   -- a parse error surfaces as Left.
   assert' "render: parse error" (isLeft (render "{{ oops" (obj [])))

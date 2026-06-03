@@ -14,7 +14,7 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars (Node(..), Value(..), parse)
 import Kernel.ToValue (toValue)
-import Kernel.Value (handlebars, minimal, mustache)
+import Kernel.Value (handlebars, minimal, mustache, nonEmpty)
 import Kernel.Walk (Arity(..), foldTemplate, splitClauses, validate)
 import Test.Assert (assert')
 
@@ -48,6 +48,13 @@ main = do
   assert' "mustache: empty object truthy" (mustache (VObject Map.empty) == true)
   assert' "mustache: empty array falsy" (mustache (VArray []) == false)
   assert' "mustache: false falsy" (mustache (VBool false) == false)
+  -- nonEmpty rule (RawBars/MaxBars): false/null/""/[]/{} falsy; 0 truthy
+  assert' "nonEmpty: 0 is truthy" (nonEmpty (VNumber 0.0) == true)
+  assert' "nonEmpty: empty string falsy" (nonEmpty (VString "") == false)
+  assert' "nonEmpty: non-empty string truthy" (nonEmpty (VString "x") == true)
+  assert' "nonEmpty: empty array falsy" (nonEmpty (VArray []) == false)
+  assert' "nonEmpty: empty object falsy" (nonEmpty (VObject Map.empty) == false)
+  assert' "nonEmpty: false falsy" (nonEmpty (VBool false) == false)
   -- ADR-022: truthiness is a fixed per-engine rule (these named rules are the
   -- data-backed menu), no per-file @truthiness resolver anymore.
 

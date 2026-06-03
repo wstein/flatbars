@@ -63,7 +63,8 @@ main = do
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "a"
   -- pipe chain is left-assoc: not(not(0)) = false.
-  expectM "pipe-chain" "{{{ n | not | not }}}" (obj [ Tuple "n" (num 0.0) ]) "false"
+  -- MaxBars uses the `nonEmpty` rule: 0 is truthy, so not·not 0 = true.
+  expectM "pipe-chain" "{{{ n | not | not }}}" (obj [ Tuple "n" (num 0.0) ]) "true"
 
   -- arithmetic operators (desugar to add/subtract/multiply/divide/modulo).
   expectM "arith-add" "{{ a + b }}" (obj [ Tuple "a" (num 2.0), Tuple "b" (num 3.0) ]) "5"
@@ -114,9 +115,14 @@ main = do
     "{{#if score >= 100}}<b>pass</b>{{elif 0 includeZero=true}}<b>fail</b>{{/if}}"
     (obj [ Tuple "score" (num 50.0) ])
     "<b>fail</b>"
-  -- without the flag, the bare-0 elif is falsy → falls through (empty here).
-  expectM "elif-no-includeZero" "{{#if score >= 100}}P{{elif 0}}Z{{/if}}"
+  -- under MaxBars' `nonEmpty` rule a bare 0 is truthy, so the elif fires even
+  -- without the flag (`includeZero` is a no-op here — 0 is already truthy). An
+  -- empty string, by contrast, IS falsy under nonEmpty → falls through.
+  expectM "elif-bare-0-fires" "{{#if score >= 100}}P{{elif 0}}Z{{/if}}"
     (obj [ Tuple "score" (num 50.0) ])
+    "Z"
+  expectM "elif-empty-string-falls-through" "{{#if score >= 100}}P{{elif s}}Z{{/if}}"
+    (obj [ Tuple "score" (num 50.0), Tuple "s" (VString "") ])
     ""
   -- the hash works on a data-driven elif condition + an else fallback too.
   expectM "elif-includeZero-data" "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}"

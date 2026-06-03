@@ -38,7 +38,7 @@ main = do
   expectJs "header + scope seeded with the truthiness callback" "hi"
     [ "runtime 0.1.0"
     , "function (data, rt, partials)"
-    , "rt.scope(data, rt.truthyHandlebars)" -- handlebars rule, as a callback (ADR-022)
+    , "rt.scope(data, rt.truthyNonEmpty)" -- RawBars uses the nonEmpty rule (ADR-022), as a callback
     , "out += \"hi\""
     ]
 

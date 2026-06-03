@@ -69,6 +69,21 @@ function truthyMustache(v) {
   return true; // 0, "", {}, other objects
 }
 
+// nonEmpty (RawBars/MaxBars): truthy ⟺ a non-empty, present value. false / null
+// and every empty container — "" / [] / {} — are falsy; 0 is truthy (test
+// magnitude with an explicit compare, e.g. `val > 0`). = presence + empty-string.
+function truthyNonEmpty(v) {
+  if (isSafe(v)) return v.s !== "";
+  if (v === null || v === undefined) return false;
+  switch (typeof v) {
+    case "boolean": return v;
+    case "string": return v !== "";
+    case "number": return true; // 0 is truthy
+  }
+  if (Array.isArray(v)) return v.length > 0;
+  return Object.keys(v).length > 0; // {} is falsy
+}
+
 // Apply a truthiness callback (the emit calls `rt.truthy(scope.truthy, v)`).
 function truthy(f, v) {
   return f(v);
@@ -664,7 +679,7 @@ function mindentOverride(indent, body) {
 
 export const rt = {
   RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, block, raw, Safe,
-  truthyHandlebars, truthyMustache, // ADR-022: the named truthiness callbacks ($truthy binds one)
+  truthyHandlebars, truthyMustache, truthyNonEmpty, // ADR-022: the named truthiness callbacks (the seed binds one)
   register, // ADR-018: host-registered inline helpers
   mseed, mlookup, msection, mfalsy, mindentOverride,
 };

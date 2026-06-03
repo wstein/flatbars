@@ -23,7 +23,7 @@ import FlatBars.Error (Error, ParseError)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
-import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
+import FullBars (LoopVars, desugarSurfaceWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
 import FullBars.Compile (compileSurfaceWith)
 import FullBars.Surface (noLoopVars, reservedScope)
 import Kernel.Engine (Operation)
@@ -71,7 +71,7 @@ maxLoopVars = reservedScope noLoopVars
 -- | pipeline (desugar → hoist → engine) with located errors and MaxBars' bare
 -- | loop variables.
 renderMax :: String -> Value -> Either String String
-renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions
+renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own
@@ -87,13 +87,13 @@ renderWithOperations
   -> String
   -> Value
   -> Either String String
-renderWithOperations = renderSurfaceWithHelpersWith false maxLoopVars maxOptions
+renderWithOperations = renderSurfaceWithHelpersWith false maxLoopVars maxOptions nonEmpty
 
 -- | Compile MaxBars surface source to a JS ES module, reusing the FullBars
 -- | compiler (`FlatBars.Compile`) — infix/pipe and loop vars desugar to the same
 -- | core helpers the emit rules already handle.
 compileMaxJs :: String -> Either ParseError String
-compileMaxJs = compileSurfaceWith false maxLoopVars maxOptions
+compileMaxJs = compileSurfaceWith false maxLoopVars maxOptions "rt.truthyNonEmpty"
 
 -- | The MaxBars source warnings (schema-less *warn-always* tier). Parses `src`,
 -- | desugars, then runs the dialect lints (see `MaxBars.Lint`); a parse error

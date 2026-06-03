@@ -25,15 +25,17 @@ import FullBars (LoopVars, checkBareInline, desugarSurfaceWith, hoistInline, noL
 -- | `{{#inline}}` definitions into the partial registry (as `renderSurfaceWith`
 -- | does), then emit. The emit rules are dialect-pure — they only ever see core.
 compileSurface :: String -> Either ParseError String
-compileSurface = compileSurfaceWith true noLoopVars defaultParseOptions
+compileSurface = compileSurfaceWith true noLoopVars defaultParseOptions "rt.truthyHandlebars"
 
--- | `compileSurface` with explicit parse options and a dialect `LoopVars`
--- | resolver (CLI/config + dialect path: standalone trim, MaxBars loop vars).
--- | The leading `strict` flag gates the bare-`{{#inline}}` rejection (FullBars
--- | requires the `{{#*inline}}` decorator; MaxBars passes `false`).
-compileSurfaceWith :: Boolean -> LoopVars -> ParseOptions -> String -> Either ParseError String
-compileSurfaceWith strict lv opts src = do
+-- | `compileSurface` with explicit parse options, a dialect `LoopVars` resolver,
+-- | and the runtime truthiness *callback* to seed (`"rt.truthyHandlebars"` for
+-- | FullBars, `"rt.truthyNonEmpty"` for MaxBars). The leading `strict` flag gates
+-- | the bare-`{{#inline}}` rejection (FullBars requires the `{{#*inline}}`
+-- | decorator; MaxBars passes `false`).
+compileSurfaceWith
+  :: Boolean -> LoopVars -> ParseOptions -> String -> String -> Either ParseError String
+compileSurfaceWith strict lv opts truthyCallback src = do
   { nodes } <- parseWith opts src
   checkBareInline strict nodes
   let h = hoistInline (desugarSurfaceWith lv nodes)
-  pure (compile metaFor fullbarsEmit (Map.toUnfoldable h.partials) h.template)
+  pure (compile (metaFor truthyCallback) fullbarsEmit (Map.toUnfoldable h.partials) h.template)

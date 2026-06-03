@@ -42,12 +42,12 @@ import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, hoistInline, noLoopVars)
 import Kernel.Analyse (Finding, findings, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTruthy)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (blockHelperMissing, prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
-import Kernel.Value (Truthy, escapeHtml, handlebars, minimal, mustache, presence, stringify)
+import Kernel.Value (Truthy, escapeHtml, handlebars, minimal, mustache, nonEmpty, presence, stringify)
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).
@@ -132,6 +132,7 @@ renderSurfaceWithHelpers
   -> Value
   -> Either String String
 renderSurfaceWithHelpers = renderSurfaceWithHelpersWith true noLoopVars defaultParseOptions
+  handlebars
 
 -- | `renderSurfaceWithHelpers` parameterised by the dialect's `LoopVars` and
 -- | `ParseOptions`, so MaxBars (`renderWithOperations`, ADR-019 addendum) registers
@@ -143,12 +144,13 @@ renderSurfaceWithHelpersWith
   :: Boolean
   -> LoopVars
   -> ParseOptions
+  -> Truthy
   -> Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
   -> Array (Tuple String String)
   -> String
   -> Value
   -> Either String String
-renderSurfaceWithHelpersWith strict lv opts helpers partialSrcs src dat =
+renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
     Right ps -> case parseWith opts src of
@@ -159,7 +161,8 @@ renderSurfaceWithHelpersWith strict lv opts helpers partialSrcs src dat =
           { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           setup =
-            registerAll helpers
+            withTruthy truthy
+              <<< registerAll helpers
               <<< registerPartials (Map.union inlineP externalT)
         in
           case runResolvedLenient directives setup template dat of
@@ -175,22 +178,24 @@ renderSurfaceWithHelpersWith strict lv opts helpers partialSrcs src dat =
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
 renderSurfaceDiag :: String -> Value -> Either String String
-renderSurfaceDiag = renderSurfaceDiagWith true noLoopVars defaultParseOptions
+renderSurfaceDiag = renderSurfaceDiagWith true noLoopVars defaultParseOptions handlebars
 
 -- | `renderSurfaceDiag` with explicit parse options and a dialect `LoopVars`
 -- | resolver (the CLI/config + dialect path; FullBars passes `noLoopVars`,
 -- | MaxBars its loop-variable map). The leading `strict` flag gates the
 -- | bare-`{{#inline}}` rejection: `true` for FullBars/CLI, `false` for MaxBars.
 renderSurfaceDiagWith
-  :: Boolean -> LoopVars -> ParseOptions -> String -> Value -> Either String String
-renderSurfaceDiagWith strict lv opts src dat = case parseWith opts src of
+  :: Boolean -> LoopVars -> ParseOptions -> Truthy -> String -> Value -> Either String String
+renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of
   Left pe -> Left (renderParseErrorAt src pe)
   Right { nodes } | Left e <- checkBareInline strict nodes -> Left (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
       { partials, template } = hoistInline (desugarSurfaceWith lv nodes)
     in
-      case runResolvedLenient directives (registerPartials partials) template dat of
+      case
+        runResolvedLenient directives (withTruthy truthy <<< registerPartials partials) template dat
+        of
         Left e -> Left (formatError src e)
         Right out -> Right out
 
