@@ -63,7 +63,6 @@
     },
     "configurationDefaults": {
       "editor.tokenColorCustomizations": {
-        "comment": "FlatBars tag delimiters ({{ }} {{{ {{# {{/ {{{{# }}}}) carry the FlatBars-specific `punctuation.section.expression.flatbars` scope (only this grammar emits it, so these defaults touch FlatBars files only). Bold + the design-system violet accent (`--c-inherit`) so the brackets read strongly against the page; users override freely.",
         "textMateRules": [
           {
             "scope": "punctuation.section.expression.flatbars",
