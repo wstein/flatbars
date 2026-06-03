@@ -182,6 +182,9 @@ printNode = case _ of
       h = headOut span name args
     in
       h { text = "{{{{" <> h.text <> "}}}}" <> raw <> "{{{{/" <> name <> "}}}}" }
+  -- a recovered parse error (ADR-023): re-print it as a comment. Lifting only
+  -- runs on error-free trees (the fail-fast parse projection rejects the rest).
+  NodeError _ msg -> emptyOut { text = "{{! " <> msg <> " }}" }
 
 -- | Escaped output `{{ e }}` — the re-sugar of `(escapeHtml e)`.
 escaped :: Span -> Expr -> Out

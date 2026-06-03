@@ -55,6 +55,12 @@ data Node
   | RawBlock Span Ident (Array Expr) String
   -- span, head, args (a name-agnostic separator marker)
   | Sep Span Ident (Array Expr)
+  -- A RECOVERED parse error (ADR-023): the span of the offending tag and a
+  -- message. Only the *recovering* parser (`parseRecovering`) ever emits this —
+  -- it keeps parsing past an error so an IDE can report every problem at once.
+  -- The total `parse` is a fail-fast projection that returns `Left` whenever any
+  -- error was recovered, so the render/compile path never sees a `NodeError`.
+  | NodeError Span String
 
 -- | A block's opener *sigil* — a structural marker the core records but assigns
 -- | no meaning. `Section` is `{{#name}}`; `Inverse` is `{{^name}}` (and the
@@ -105,6 +111,7 @@ instance showNode :: Show Node where
       "Block " <> show sig <> " " <> show n <> " " <> show args <> " " <> show body
     RawBlock _ n args raw -> "RawBlock " <> show n <> " " <> show args <> " " <> show raw
     Sep _ n args -> "Sep " <> show n <> " " <> show args
+    NodeError _ msg -> "NodeError " <> show msg
 
 -- | Split a block head's arguments into the positional args, the surface hash,
 -- | the `as |…|` block-param names, and a loop `label NAME` (ADR-013) — recognising

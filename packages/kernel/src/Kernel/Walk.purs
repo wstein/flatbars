@@ -101,6 +101,7 @@ foldRefs f = foldMap (node f)
       g { name, kind: RawRef, argc: Array.length args } <> foldMap (expr g) args
     Sep _ name args ->
       g { name, kind: SepRef, argc: Array.length args } <> foldMap (expr g) args
+    NodeError _ _ -> mempty -- a recovered error references no operations
 
   -- Expression refs via the shared `foldExpr`: each application emits its own
   -- ref and combines the refs collected from its arguments.
@@ -132,6 +133,10 @@ type Algebra a =
       , recurse :: Template -> a
       }
       -> a
+  -- A recovered parse error (ADR-023). Only a tree from `parseRecovering` ever
+  -- contains one; the total `parse` projects errors to `Left`, so render/compile
+  -- never reach it. Tooling folds (diagnostics, pretty-print) handle it.
+  , nodeError :: Span -> String -> a
   , concat :: Array a -> a
   }
 
@@ -148,6 +153,7 @@ foldTemplate alg = go
     RawBlock _ name args raw' -> alg.raw name args raw'
     Sep _ name args -> alg.sep name args
     Block span _ name args children -> alg.block { span, name, args, children, recurse: go }
+    NodeError span msg -> alg.nodeError span msg
 
 --------------------------------------------------------------------------------
 -- Clause splitting (for separator-driven control flow)

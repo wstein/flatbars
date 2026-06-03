@@ -15,7 +15,7 @@ import Data.Monoid (power)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseWith, spanText)
+import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, spanText)
 import FlatBars.Highlight (HighlightConfig, highlightSpans, tokenizeSpans)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Token (defaultLexOptions)
@@ -45,6 +45,7 @@ nodeCount src = case parse src of
     , raw: \_ _ _ -> 1
     , sep: \_ _ -> 1
     , block: \b -> 1 + b.recurse b.children
+    , nodeError: \_ _ -> 1
     , concat: Array.foldl (+) 0
     }
     t
@@ -117,6 +118,36 @@ main = do
           ]
       )
   assert' "parse: an empty {{}} is still an error" (isLeft (parse "{{}}"))
+
+  -- ── Recovering parse (ADR-023): one parser; `parse` is its fail-fast projection.
+  -- A well-formed template recovers nothing — same tree, no errors.
+  case parseRecovering defaultParseOptions "a{{x}}{{#s}}b{{/s}}" of
+    { errors: [], nodes: [ Content "a", Sep _ "x" [], Block _ Section "s" [] [ Content "b" ] ] } ->
+      assert' "recover: clean template ⇒ no errors, normal tree" true
+    r -> assert'
+      ("recover: clean template unexpected " <> show r.nodes <> " errs " <> show r.errors)
+      false
+  -- A bad block head salvages its name and still nests — the body and close parse,
+  -- and exactly one error (the bad args) is recorded. `parse` rejects it.
+  case parseRecovering defaultParseOptions "{{#if a == 1}}x{{/if}}" of
+    { errors, nodes: [ Block _ Section "if" [] [ Content "x" ] ] } ->
+      assert' "recover: bad block head nests, one error" (Array.length errors == 1)
+    r -> assert' ("recover: bad block head not recovered " <> show r.nodes) false
+  assert' "recover: the projection still rejects it" (isLeft (parse "{{#if a == 1}}x{{/if}}"))
+  -- Multiple errors are collected in one pass (the whole point).
+  assert' "recover: two bad blocks ⇒ two errors"
+    ( Array.length
+        (parseRecovering defaultParseOptions "{{#if a == 1}}{{/if}}{{#al b == 2}}{{/al}}").errors ==
+        2
+    )
+  -- Structural recovery: a missing close still builds the block + flags it.
+  case parseRecovering defaultParseOptions "{{#each x}}y" of
+    { errors, nodes: [ Block _ Section "each" _ [ Content "y" ] ] } ->
+      assert' "recover: missing close ⇒ block kept, one error" (Array.length errors == 1)
+    r -> assert' ("recover: missing close not recovered " <> show r.nodes) false
+  -- A stray close at top level is reported and recovered past.
+  assert' "recover: a stray {{/wat}} is one error"
+    (Array.length (parseRecovering defaultParseOptions "{{/wat}}").errors == 1)
   assert' "parse: a literal block head {{#42}} is still an error" (isLeft (parse "{{#42}}t{{/42}}"))
 
   -- foldTemplate counts every node, recursing into bodies.

@@ -125,6 +125,9 @@ desugarWith lv clauseNames = go []
     where
     node = case _ of
       Content s -> Content s
+      -- a recovered parse error (ADR-023) passes through untouched; the fail-fast
+      -- parse projection means desugar only ever runs on error-free trees.
+      NodeError sp msg -> NodeError sp msg
       -- `{{{ E }}}` — raw output; path-rewrite the expression, no escaping.
       Output sp e -> Output sp (rewrite lv scope e)
       Sep sp name args

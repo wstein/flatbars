@@ -50,6 +50,9 @@ printNode = case _ of
   Sep _ name args -> "{{" <> head name args <> "}}"
   RawBlock _ name args raw ->
     "{{{{" <> head name args <> "}}}}" <> raw <> "{{{{/" <> name <> "}}}}"
+  -- a recovered parse error (ADR-023): print it as a comment. The linter runs on
+  -- error-free trees, so this is for completeness, not normal output.
+  NodeError _ msg -> "{{! " <> msg <> " }}"
 
 -- | A `{{#name …}}…{{/name}}` section. The desugared MaxBars corpus only ever
 -- | carries `Section` sigils; every other sigil (`Inverse`/`Parent`/`BlockDef`

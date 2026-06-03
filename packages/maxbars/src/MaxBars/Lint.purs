@@ -40,6 +40,7 @@ strayHeadBarWarnings = foldTemplate
   , output: const []
   , raw: \_ _ _ -> []
   , sep: \_ _ -> []
+  , nodeError: \_ _ -> []
   , block: \b -> headBars b.args <> b.recurse b.children
   , concat: Array.concat
   }
@@ -74,6 +75,7 @@ labelShadowWarnings = foldTemplate
   , raw: \_ _ _ -> []
   , sep: \_ _ -> []
   , block: \b -> Array.mapMaybe labelOf b.args <> b.recurse b.children
+  , nodeError: \_ _ -> []
   , concat: Array.concat
   }
   where

@@ -10,6 +10,8 @@
 module FlatBars.Parser
   ( parse
   , parseWith
+  , parseRecovering
+  , ParseResult
   , ParseOptions
   , ExprParser
   , defaultParseOptions
@@ -20,13 +22,13 @@ module FlatBars.Parser
 import Prelude
 
 import Data.Array as Array
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..), maybe)
 import Data.String (trim)
 import Data.String.CodeUnits as SCU
-import FlatBars.Error (ParseError(..))
+import FlatBars.Error (ParseError(..), parseErrorMessage)
 import FlatBars.Expr as Expr
 import FlatBars.Lexer (LexConfig, RawTok(..), defaultLexConfig, tokenizeTemplate, trimStandalone)
 import FlatBars.Span (Span)
@@ -107,27 +109,66 @@ defaultParseOptions =
 parse :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
 parse = parseWith defaultParseOptions
 
--- | `parse` with explicit front-end options (the CLI/config path). Whitespace is
--- | the one concern the core owns by `@`-directive: `@trim` overrides the
--- | supplied `trimStandalone`.
+-- | A *recovering* parse (ADR-023). It never bails on the first error: it keeps
+-- | scanning, dropping `NodeError` markers and recording every parse error in
+-- | source order, so it returns a best-effort tree plus ALL errors. Editor
+-- | tooling (`flatbars-lsp` diagnostics) consumes this; `parse`/`parseWith` are
+-- | its fail-fast projection. There is one parser — fail-fast is a policy over it.
+type ParseResult = { directives :: Array Directive, nodes :: Template, errors :: Array ParseError }
+
+parseRecovering :: ParseOptions -> String -> ParseResult
+parseRecovering opts src = case tokenizeTemplate opts.lexConfig src of
+  -- a lex error breaks the token stream itself, so nothing downstream can run.
+  Left e -> { directives: [], nodes: [], errors: [ e ] }
+  Right toks ->
+    let
+      dirRes = collectDirectives toks
+      directives = either (const []) identity dirRes
+      dirErrs = either Array.singleton (const []) dirRes
+      trimRes = effectiveTrim opts directives
+      standalone = either (const false) identity trimRes
+      trimErrs = either Array.singleton (const []) trimRes
+      toks' = if standalone then trimStandalone opts.standaloneSeps toks else toks
+      -- comments carry no output; drop them before the tree builder.
+      filtered = Array.filter (not <<< isComment) toks'
+      seq = runSeq filtered 0 [] []
+    in
+      { directives, nodes: seq.nodes, errors: dirErrs <> trimErrs <> seq.errors }
+  where
+  -- The top-level loop: a `{{/x}}` with no open is a stray close — record it and
+  -- recover past it so the rest of the document still parses.
+  runSeq
+    :: Array RawTok
+    -> Int
+    -> Template
+    -> Array ParseError
+    -> { nodes :: Template, errors :: Array ParseError }
+  runSeq toks idx accNodes accErrs =
+    let
+      r = parseSeq opts.parseExpr opts.parseHead (gatesOf opts) opts.lexOptions toks idx
+      nodes' = accNodes <> r.nodes
+      errs' = accErrs <> r.errors
+    in
+      case r.stop of
+        StopEOF -> { nodes: nodes', errors: errs' }
+        StopClose name pos -> runSeq toks pos nodes'
+          (Array.snoc errs' (MismatchedBlock "<none>" name 0))
+
+-- | `parse` with explicit front-end options (the CLI/config path). The fail-fast
+-- | projection over `parseRecovering`: a well-formed template (no recovered
+-- | errors) is `Right`; otherwise `Left` the first error in source order, exactly
+-- | as the total parser always did. There is no second parser to drift.
 parseWith
   :: ParseOptions
   -> String
   -> Either ParseError { directives :: Array Directive, nodes :: Template }
-parseWith opts src = do
-  toks <- tokenizeTemplate opts.lexConfig src
-  directives <- collectDirectives toks
-  standalone <- effectiveTrim opts directives
-  let toks' = if standalone then trimStandalone opts.standaloneSeps toks else toks
-  -- comments carry no output; drop them before the tree builder, which then
-  -- never has to know about `RComment` (the standalone pass needs them, so it
-  -- runs first).
-  res <- parseSeq opts.parseExpr opts.parseHead (gatesOf opts) opts.lexOptions
-    (Array.filter (not <<< isComment) toks')
-    0
-  case res.stop of
-    StopEOF -> Right { directives, nodes: res.nodes }
-    StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
+parseWith opts src =
+  let
+    r = parseRecovering opts src
+  in
+    case Array.head r.errors of
+      Just e -> Left e
+      Nothing -> Right { directives: r.directives, nodes: r.nodes }
 
 -- | Build the node tree from an *already tokenized* (and, where a dialect wants
 -- | it, already whitespace-trimmed) `RawTok` stream. This is the same tree
@@ -135,16 +176,20 @@ parseWith opts src = do
 -- | own token-stream pass — e.g. MinBars' Mustache standalone-whitespace +
 -- | partial-indentation pass — between tokenizing and building, without the core
 -- | committing to that pass. Comments are dropped here (they carry no output);
--- | any standalone pass that needs them must therefore run *before* this. The
--- | core's own `parseWith` path is unchanged, so other engines are unaffected.
+-- | any standalone pass that needs them must therefore run *before* this. Fail-
+-- | fast, like `parseWith` (it projects the recovering `parseSeq`).
 buildFromTokens :: ParseOptions -> Array RawTok -> Either ParseError Template
-buildFromTokens opts toks = do
-  res <- parseSeq opts.parseExpr opts.parseHead (gatesOf opts) opts.lexOptions
-    (Array.filter (not <<< isComment) toks)
-    0
-  case res.stop of
-    StopEOF -> Right res.nodes
-    StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
+buildFromTokens opts toks =
+  let
+    r = parseSeq opts.parseExpr opts.parseHead (gatesOf opts) opts.lexOptions
+      (Array.filter (not <<< isComment) toks)
+      0
+  in
+    case Array.head r.errors of
+      Just e -> Left e
+      Nothing -> case r.stop of
+        StopEOF -> Right r.nodes
+        StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
 
 isComment :: RawTok -> Boolean
 isComment = case _ of
@@ -300,6 +345,34 @@ gatesOf opts =
   , partialBlocks: opts.partialBlocks
   }
 
+-- | `headed`, but for the *recovering* parser: it never discards everything on a
+-- | failure. When the interior won't parse it still salvages the head identifier
+-- | (the leading token) so a block can keep nesting — `{{#if a == 1}}` yields
+-- | name `"if"`, no args, and the args error. Only a genuinely head-less interior
+-- | (no leading identifier) yields `name = Nothing`.
+headedRecovering
+  :: LexOptions
+  -> ExprParser
+  -> Span
+  -> Int
+  -> String
+  -> { name :: Maybe String, args :: Array Expr, error :: Maybe ParseError }
+headedRecovering lx pe span base s
+  | trim s == "" = { name: Nothing, args: [], error: Just (HeadNotIdent span.start) }
+  | otherwise = case tokenizeInterior lx base s of
+      Left e -> { name: Nothing, args: [], error: Just e }
+      Right toks -> case pe (partialHead toks) of
+        Right (App name args) -> { name: Just name, args, error: Nothing }
+        Right _ -> { name: Nothing, args: [], error: Just (HeadNotIdent span.start) }
+        Left e -> { name: salvageName (partialHead toks), args: [], error: Just e }
+
+-- | The leading identifier of an interior token stream, if any — the head name a
+-- | recovered block keeps even when its arguments don't parse.
+salvageName :: Array PosToken -> Maybe String
+salvageName toks = case Array.head toks of
+  Just { tok: TIdent n } -> Just n
+  _ -> Nothing
+
 --------------------------------------------------------------------------------
 -- Tree building over the flat RawTok stream
 --------------------------------------------------------------------------------
@@ -308,7 +381,12 @@ data Stop
   = StopEOF
   | StopClose String Int -- closed name, index after {{/name}}
 
-type SeqResult = { nodes :: Template, stop :: Stop }
+-- | The recovering tree builder's result: the (best-effort) nodes, the stop
+-- | reason, and every error recovered, *in source order* (ADR-023). The total
+-- | `parse` is a fail-fast projection over this — empty `errors` ⇒ the tree is
+-- | well-formed; a non-empty `errors` ⇒ `Left (head errors)`. Errors are few, so
+-- | they accumulate in a forward `Array` (`snoc`); nodes stay a reversed `List`.
+type SeqResult = { nodes :: Template, stop :: Stop, errors :: Array ParseError }
 
 -- | Parse a run of nodes starting at index `i`, stopping at end of input or at
 -- | a close `{{/name}}`. A block captures a single body; multi-branch control
@@ -329,45 +407,56 @@ parseSeq
   -> LexOptions
   -> Array RawTok
   -> Int
-  -> Either ParseError SeqResult
-parseSeq pe ph gates lx toks = go Nil
+  -> SeqResult
+parseSeq pe ph gates lx toks = go Nil []
   where
   -- Siblings accumulate in a *reversed* `List` (O(1) prepend); the finished
   -- run is reversed into an `Array` once. Building the `Template` with
   -- `Array.snoc` per node would be O(n²).
-  done :: List Node -> Stop -> SeqResult
-  done acc stop = { nodes: Array.fromFoldable (List.reverse acc), stop }
+  done :: List Node -> Array ParseError -> Stop -> SeqResult
+  done acc errs stop = { nodes: Array.fromFoldable (List.reverse acc), stop, errors: errs }
+
+  -- A recovered error: drop a `NodeError` marker in place, record the error in
+  -- source order, and carry on. Tail-recursive like every other arm.
+  recover :: List Node -> Array ParseError -> Span -> ParseError -> Int -> SeqResult
+  recover acc errs sp e next =
+    go (NodeError sp (parseErrorMessage e) : acc) (Array.snoc errs e) next
 
   -- The linear sibling scan. Every recursive `go` call is kept in *tail*
   -- position (explicit `case`, never `do`) so PureScript loops it — otherwise a
   -- bind-wrapped recursive call defeats the tail-call optimization for the whole
   -- function and a long node sequence overflows the stack. (Block *nesting* still
   -- recurses through `parseSeq`, but that depth is bounded by how deep blocks
-  -- nest, not by sequence length.)
-  go :: List Node -> Int -> Either ParseError SeqResult
-  go acc i = case Array.index toks i of
-    Nothing -> Right (done acc StopEOF)
+  -- nest, not by sequence length.) `go` no longer returns `Either` — it always
+  -- recovers and returns a tree; errors travel in the accumulator.
+  go :: List Node -> Array ParseError -> Int -> SeqResult
+  go acc errs i = case Array.index toks i of
+    Nothing -> done acc errs StopEOF
     Just t -> case t of
-      RContent s -> go (Content s : acc) (i + 1)
-      RComment _ _ _ -> go acc (i + 1) -- filtered upstream; skip defensively
-      RLongComment _ -> go acc (i + 1) -- highlight-only token (keepLongComments); never reaches the parser
-      RSetDelim _ -> go acc (i + 1) -- renders nothing; the delimiter swap already happened in the lexer
+      RContent s -> go (Content s : acc) errs (i + 1)
+      RComment _ _ _ -> go acc errs (i + 1) -- filtered upstream; skip defensively
+      RLongComment _ -> go acc errs (i + 1) -- highlight-only token (keepLongComments); never reaches the parser
+      RSetDelim _ -> go acc errs (i + 1) -- renders nothing; the delimiter swap already happened in the lexer
       ROutput span base s -> case outputExpr lx pe span base s of
-        Left e -> Left e
-        Right e -> go (Output span e : acc) (i + 1)
+        Left e -> recover acc errs span e (i + 1)
+        Right e -> go (Output span e : acc) errs (i + 1)
       -- `{{&x}}` is unescaped output (= `{{{x}}}`); a Handlebars-extra, gated.
       RAmp span base s
-        | not gates.extras -> Left (DisallowedShape "{{& }} (unescaped output)" span.start)
+        | not gates.extras -> recover acc errs span
+            (DisallowedShape "{{& }} (unescaped output)" span.start)
+            (i + 1)
         | otherwise -> case outputExpr lx pe span base s of
-            Left e -> Left e
-            Right e -> go (Output span e : acc) (i + 1)
+            Left e -> recover acc errs span e (i + 1)
+            Right e -> go (Output span e : acc) errs (i + 1)
       RRaw span base s body
-        | not gates.extras -> Left (DisallowedShape "{{{{ }}}} (raw block)" span.start)
+        | not gates.extras -> recover acc errs span
+            (DisallowedShape "{{{{ }}}} (raw block)" span.start)
+            (i + 1)
         | otherwise -> case headed lx pe span base s of
-            Left e -> Left e
-            Right h -> go (RawBlock span h.name h.args body : acc) (i + 1)
+            Left e -> recover acc errs span e (i + 1)
+            Right h -> go (RawBlock span h.name h.args body : acc) errs (i + 1)
       RSep span base s -> case headed lx pe span base s of
-        Right h -> go (Sep span h.name h.args : acc) (i + 1)
+        Right h -> go (Sep span h.name h.args : acc) errs (i + 1)
         -- A non-empty interior that is a bare literal (`{{42}}`, `{{"x"}}`) is not
         -- an application head, but it is still a valid value — emit it as output,
         -- the same node the triple-stash (`{{{42}}}`) produces. Blocks and closes
@@ -375,43 +464,92 @@ parseSeq pe ph gates lx toks = go Nil
         -- `{{}}` keeps its HeadNotIdent error (the guard excludes it).
         Left (HeadNotIdent _)
           | trim s /= "" -> case outputExpr lx pe span base s of
-              Left e -> Left e
-              Right e -> go (Output span e : acc) (i + 1)
-        Left e -> Left e
-      RClose _ base s -> case headed lx pe { start: base, end: base } base s of
-        Left e -> Left e
-        Right h -> Right (done acc (StopClose h.name (i + 1)))
+              Left e -> recover acc errs span e (i + 1)
+              Right e -> go (Output span e : acc) errs (i + 1)
+        Left e -> recover acc errs span e (i + 1)
+      RClose span base s -> case headed lx pe { start: base, end: base } base s of
+        -- A malformed close head can't name a block; flag it and keep scanning,
+        -- so the enclosing block still reports its own missing close.
+        Left e -> recover acc errs span e (i + 1)
+        Right h -> done acc errs (StopClose h.name (i + 1))
       -- `{{^x}}` (Inverse) is a Handlebars-extra, gated; `{{#x}}` (Section) is core.
       -- `{{<x}}` (Parent) / `{{$x}}` (BlockDef) are the Mustache-inheritance shapes,
       -- gated by `inheritance`; the dynamic `*`-headed spelling lexes as the same
-      -- sigil with a `*`-led head, so it is matched here too.
+      -- sigil with a `*`-led head, so it is matched here too. A gate rejection is a
+      -- recoverable error: the shape is structurally valid (so it still nests), it
+      -- is just disallowed in this dialect — recorded via `gateErr`.
       ROpen span sigil base s
-        | sigil == Inverse && not gates.extras -> Left
-            (DisallowedShape "{{^ }} (inverse block)" span.start)
-        | sigil == Parent && not gates.inheritance -> Left
-            (DisallowedShape "{{< }} (parent block)" span.start)
-        | sigil == BlockDef && not gates.inheritance -> Left
-            (DisallowedShape "{{$ }} (override block)" span.start)
-        | sigil == Decorator && not gates.decorators -> Left
-            (DisallowedShape "{{#* }} (inline-partial decorator)" span.start)
-        | sigil == PartialBlock && not gates.partialBlocks -> Left
-            (DisallowedShape "{{#> }} (partial block)" span.start)
-        | otherwise -> buildBlock acc span sigil base s (i + 1)
+        | sigil == Inverse && not gates.extras ->
+            buildBlock acc errs (Just (DisallowedShape "{{^ }} (inverse block)" span.start)) span
+              sigil
+              base
+              s
+              (i + 1)
+        | sigil == Parent && not gates.inheritance ->
+            buildBlock acc errs (Just (DisallowedShape "{{< }} (parent block)" span.start)) span
+              sigil
+              base
+              s
+              (i + 1)
+        | sigil == BlockDef && not gates.inheritance ->
+            buildBlock acc errs (Just (DisallowedShape "{{$ }} (override block)" span.start)) span
+              sigil
+              base
+              s
+              (i + 1)
+        | sigil == Decorator && not gates.decorators ->
+            buildBlock acc errs
+              (Just (DisallowedShape "{{#* }} (inline-partial decorator)" span.start))
+              span
+              sigil
+              base
+              s
+              (i + 1)
+        | sigil == PartialBlock && not gates.partialBlocks ->
+            buildBlock acc errs (Just (DisallowedShape "{{#> }} (partial block)" span.start)) span
+              sigil
+              base
+              s
+              (i + 1)
+        | otherwise -> buildBlock acc errs Nothing span sigil base s (i + 1)
 
-  buildBlock :: List Node -> Span -> Sigil -> Int -> String -> Int -> Either ParseError SeqResult
-  buildBlock acc span sigil base s i = case headed lx ph span base s of
-    Left e -> Left e
-    Right h ->
-      let
-        -- every sigil now carries a clean head (the `>`/`*` markers are consumed by
-        -- the lexer into the opener), so the `{{/…}}` close simply repeats the head.
-        expected = h.name
-      in
-        case parseSeq pe ph gates lx toks i of
-          Left e -> Left e
-          Right inner -> case inner.stop of
-            -- point the diagnostic at the *opener* (its span start), not offset 0.
-            StopEOF -> Left (MismatchedBlock expected "<eof>" span.start)
-            StopClose closed pos
-              | closed == expected -> go (Block span sigil h.name h.args inner.nodes : acc) pos
-              | otherwise -> Left (MismatchedBlock expected closed span.start)
+  -- A block opener, recovering. `gateErr` is a dialect-gate rejection recorded
+  -- alongside any head error. A *salvageable* head (a leading identifier, even if
+  -- the args won't parse — e.g. `{{#if a == 1}}` in FullBars) still nests, so the
+  -- body and close parse and only the bad args/shape are flagged; an unsalvageable
+  -- head degrades to a `NodeError` and the scan resumes after the opener.
+  buildBlock
+    :: List Node
+    -> Array ParseError
+    -> Maybe ParseError
+    -> Span
+    -> Sigil
+    -> Int
+    -> String
+    -> Int
+    -> SeqResult
+  buildBlock acc errs gateErr span sigil base s i =
+    let
+      hr = headedRecovering lx ph span base s
+      errs1 = errs <> Array.catMaybes [ gateErr, hr.error ]
+    in
+      case hr.name of
+        Nothing -> go (NodeError span (maybe "parse error" parseErrorMessage hr.error) : acc) errs1
+          i
+        Just name ->
+          let
+            inner = parseSeq pe ph gates lx toks i
+            errs2 = errs1 <> inner.errors
+            node = Block span sigil name hr.args inner.nodes
+          in
+            case inner.stop of
+              -- missing close: still build the block with the partial body, flag it.
+              StopEOF -> go (node : acc)
+                (Array.snoc errs2 (MismatchedBlock name "<eof>" span.start))
+                (Array.length toks)
+              StopClose closed pos
+                | closed == name -> go (node : acc) errs2 pos
+                -- mismatched close: close the block anyway, flag the mismatch.
+                | otherwise -> go (node : acc)
+                    (Array.snoc errs2 (MismatchedBlock name closed span.start))
+                    pos

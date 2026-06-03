@@ -100,6 +100,9 @@ runTemplate engine = renderTemplate engine.initial
     -- block helper that cares (e.g. `if` at `{{else}}`) intercepts it by
     -- splitting its children before rendering, so it is never reached there.
     Sep span name args -> evalExpr env span (App name args) >>= engine.stringify
+    -- a recovered parse error (ADR-023) renders nothing: the interpreter only runs
+    -- on error-free trees (the fail-fast parse projection rejects the rest).
+    NodeError _ _ -> pure ""
 
   applyBlock :: env -> Span -> Ident -> Array Expr -> Template -> m String
   applyBlock env span name args body = do

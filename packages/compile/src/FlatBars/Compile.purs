@@ -133,6 +133,9 @@ compile meta emit partials main =
       )
     -- a raw block's verbatim body, passed through its raw helper.
     RawBlock _ name _ raw -> stmtOut ("rt.raw(" <> jsString name <> ", " <> jsString raw <> ")")
+    -- a recovered parse error (ADR-023) emits nothing: the compiler only runs on
+    -- error-free trees (the fail-fast parse projection rejects the rest).
+    NodeError _ _ -> ""
 
   commaArgs :: Ctx -> Array Expr -> String
   commaArgs ctx = String.joinWith ", " <<< map (rec.expr ctx)

@@ -15,7 +15,7 @@ module FlatBars
   ) where
 
 import FlatBars.Error (Error(..), ParseDiagnostic, ParseError(..), parseErrorAt, parseErrorOffset, renderError, renderParseError, renderParseErrorAt)
-import FlatBars.Parser (ExprParser, ParseOptions, defaultParseOptions, parse, parseWith)
+import FlatBars.Parser (ExprParser, ParseOptions, ParseResult, defaultParseOptions, parse, parseRecovering, parseWith)
 import FlatBars.Span (Span, lineColumn, spanText)
 import FlatBars.Syntax (Directive, Expr(..), Ident, Node(..), Sigil(..), Template)
 import FlatBars.Value (Value(..))

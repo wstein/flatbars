@@ -921,6 +921,7 @@ main = do
       , raw: \_ _ _ -> 1
       , sep: \_ _ -> 1
       , block: \b -> 1 + b.recurse b.children
+      , nodeError: \_ _ -> 1
       , concat: Array.foldl (+) 0
       }
   case parse "a{{#each x}}b{{{this}}}{{/each}}c" of

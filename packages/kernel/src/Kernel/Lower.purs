@@ -64,6 +64,9 @@ lower = foldTemplate
   , raw: \_ _ body -> [ RRaw body ]
   , sep: \name args -> [ RSep name args ]
   , block: \b -> [ lowerBlock b.name b.args b.children b.recurse ]
+  -- a recovered parse error (ADR-023) lowers to nothing; lowering only runs on
+  -- error-free trees (the fail-fast parse projection rejects the rest).
+  , nodeError: \_ _ -> []
   , concat: join
   }
   where
