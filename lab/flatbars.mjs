@@ -65,6 +65,7 @@ const BB_FEATURES = [
   "required-assigns",
   "partial-graph",
   "compile-js", // FlatBars-only: compile the template to a JS module (Compiled JS view)
+  "analyse", // ADR-022: trace a render, report truthiness portability (Truthiness view)
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
   "maxbars-dialect", // FullBars + infix operators, pipes, bare loop variables

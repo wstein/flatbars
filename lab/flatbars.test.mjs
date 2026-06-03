@@ -120,6 +120,21 @@ test("compileToJs emits a JS module (the compile-js feature)", async () => {
   assert.match(c.value, /export default function/);
 });
 
+test("analyze reports a truthiness portability finding (the analyse feature)", async () => {
+  const r = await createFlatBarsRenderer();
+  assert.equal(typeof r.analyze, "function");
+  assert.ok(r.engineInfo().features.includes("analyse"));
+  // an empty string in a condition diverges (falsy in handlebars, truthy elsewhere).
+  const a = r.analyze({ source: "{{#if bio}}x{{/if}}" }, { bio: "" });
+  assert.ok(a.ok, a.error);
+  assert.match(a.report, /1 portability finding/);
+  assert.match(a.report, /data path: `bio`/);
+  assert.match(a.jsonata, /"bio": bio = "" \? null : bio/);
+  // false agrees under every rule — no finding.
+  const b = r.analyze({ source: "{{#if ok}}x{{/if}}" }, { ok: false });
+  assert.match(b.report, /0 portability finding/);
+});
+
 test("the catalog entries have the cheat-sheet shape", async () => {
   const r = await createFlatBarsRenderer();
   for (const e of r.catalog()) {

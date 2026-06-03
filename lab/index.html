@@ -1695,7 +1695,7 @@
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
       import { createRenderer } from "./stem.mjs?v=1";
-      import { createFlatBarsRenderer } from "./flatbars.mjs?v=2";
+      import { createFlatBarsRenderer } from "./flatbars.mjs?v=3";
       import { createMinBarsRenderer } from "./minbars.mjs?v=1";
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
@@ -3204,6 +3204,7 @@
         if (view === "data") return lastData != null;
         if (view === "bytecode") return lastProgram != null;
         if (view === "compiled") return true; // depends only on the template source
+        if (view === "analyse") return typeof renderer.analyze === "function"; // template-only
         return !!lastOutput;
       }
 
@@ -3396,6 +3397,16 @@
             text = r.ok ? r.value : "// compile error: " + r.error;
           }
           setOutputDoc(text, Decoration.none);
+        } else if (outputView === "analyse") {
+          // ADR-022 analyse mode: trace this render against the current data and
+          // report the conditions whose branch would differ on another engine.
+          lastSegViews = [];
+          let text = "This engine has no analyse mode.";
+          if (typeof renderer.analyze === "function") {
+            const r = renderer.analyze({ source: templateSourceFor("main") }, lastData);
+            text = r.ok ? r.report : "Analyse error: " + r.error;
+          }
+          setOutputDoc(text, Decoration.none);
         } else {
           const { segViews, deco } = buildProvenance(lastOutput, lastSegments);
           lastSegViews = segViews;
@@ -3464,6 +3475,11 @@
         }
         if (outputView === "compiled") {
           outputEditor.dispatch({ effects: outLangComp.reconfigure([jsLang]) });
+          return;
+        }
+        if (outputView === "analyse") {
+          // the analyse report is markdown.
+          outputEditor.dispatch({ effects: outLangComp.reconfigure([markdown()]) });
           return;
         }
         if (outputView !== "source") return;
@@ -3875,6 +3891,9 @@
         { view: "bytecode", label: "Bytecode", requires: ["bytecode-wire"] },
         // FlatBars-only: the template compiled to a JS module (FlatBars.Compile).
         { view: "compiled", label: "Compiled JS", requires: ["compile-js"] },
+        // ADR-022: trace this render and report the conditions whose branch would
+        // differ on another engine, with a fix each (markdown report).
+        { view: "analyse", label: "Truthiness", requires: ["analyse"] },
       ];
 
       // Views the loaded engine actually exposes (ADR-0020 gate applied).
@@ -3981,7 +4000,7 @@
         // use the text pane; "rendered" and "markdown" use the iframe.
         const isText =
           view === "source" || view === "data" || view === "bytecode" || view === "st4" ||
-          view === "compiled";
+          view === "compiled" || view === "analyse";
         byId("output-text").hidden = !isText;
         byId("output-preview").hidden = isText;
         hideSegTip(); clearLink();
