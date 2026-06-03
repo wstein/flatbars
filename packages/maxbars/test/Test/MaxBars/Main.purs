@@ -277,12 +277,14 @@ main = do
     (Array.null (warnNames "{{#each xs as |x|}}{{x}}{{/each}}"))
 
   -- label-shadow lint (ADR-021): a loop `label NAME` whose name is a reserved root
-  -- (this/loop/root/parent) shadows it for the whole body, so it warns; a fresh
-  -- name does not.
+  -- (this/loop/root/parent/yield) shadows it for the whole body, so it warns; a
+  -- fresh name does not.
   assert' "label-warn: {{#each xs label loop}} warns"
     (warnNames "{{#each xs label loop}}{{this}}{{/each}}" == [ "loop" ])
   assert' "label-warn: {{#each xs label parent}} warns"
     (warnNames "{{#each xs label parent}}{{this}}{{/each}}" == [ "parent" ])
+  assert' "label-warn: {{#each xs label yield}} warns"
+    (warnNames "{{#each xs label yield}}{{this}}{{/each}}" == [ "yield" ])
   assert' "label-warn: {{#each xs label outer}} (fresh name) does not warn"
     (Array.null (warnNames "{{#each xs label outer}}{{outer.index0}}{{/each}}"))
 

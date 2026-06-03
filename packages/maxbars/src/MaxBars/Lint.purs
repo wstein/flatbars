@@ -59,9 +59,10 @@ strayHeadBarWarnings = foldTemplate
 
 -- | The reserved variable roots (ADR-021): a loop `label NAME` that picks one of
 -- | these shadows the reserved name for the whole body, so a bare `{{loop.…}}` /
--- | `{{parent.…}}` / `{{root.…}}` / `{{this}}` would resolve the label instead.
+-- | `{{parent.…}}` / `{{root.…}}` / `{{this}}` / `{{yield}}` would resolve the
+-- | label instead.
 reservedNames :: Array String
-reservedNames = [ "this", "loop", "root", "parent" ]
+reservedNames = [ "this", "loop", "root", "parent", "yield" ]
 
 -- | Warn on a loop `label NAME` whose name collides with a reserved root
 -- | (ADR-021). Runs over the *desugared* template, where a label survives as the
