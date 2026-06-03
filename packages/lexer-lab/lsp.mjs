@@ -43,7 +43,9 @@ export function buildLegend(vocab = vocabulary) {
 // PureScript `Maybe String` → JS string | null (a `Just` carries `.value0`).
 const fromMaybe = (m) => (m && "value0" in m ? m.value0 : null);
 
-const arithConfig = { ...defaultLexConfig, infixArith: true };
+// The MaxBars profile: infix operators AND set-delimiters (ADR-015). Both gates
+// match maxOptions, so the demo's `{{=<% %>=}}` resolves to a SetDelimiter.
+const arithConfig = { ...defaultLexConfig, infixArith: true, mustacheDelims: true };
 
 // Run the hand lexer and return every non-trivia token as a flat JS record —
 // the basis for both the wire encoding and the human-readable table below.

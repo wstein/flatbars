@@ -30,7 +30,9 @@ const labRawTok = await import(out("FlatBars.Lab.RawTok"));
 // buildFromTokens) vs the migration path (hand lexer → RawTok adapter → the
 // SAME trimStandalone + buildFromTokens). Both produce the same Syntax AST.
 const parseCore = coreParser.parse;
-const parseLab = labRawTok.parse(spike.defaultLexConfig);
+// `Lab.parse` now takes per-dialect `ParseOptions` (it derives its LexConfig from
+// the options' `lexConfig`), matching the incumbent's default-FullBars `parse`.
+const parseLab = labRawTok.parse(coreParser.defaultParseOptions);
 // Right → count nodes; Left → throw (work can't be elided either way).
 function forceParse(either) {
   if (either.constructor.name !== "Right") throw new Error("parse returned Left");
