@@ -17,38 +17,49 @@
  * fails if a copy has drifted. (We generate rather than share one runtime file so
  * nothing new has to be served/deployed and the Lab keeps its own cache-busting.)
  *
+ * THEME: a **Dracula** (dark) / **Alucard** (light) code palette, AA-corrected for
+ * our own backgrounds. The chrome stays violet (Dracula owns only the syntax
+ * families + interior tokens); the Chips control (tint/outline/solid) is unchanged.
+ * Two deliberate departures from the upstream Dracula/Alucard spec:
+ *   1. `raw` stays a deep-green SIBLING of `expr` (not danger-red). Raw output is
+ *      still an interpolation, so it reads in the interpolation family; the `{{{ }}}`
+ *      sigil already signals "handle with care", and red would collide with `delim`.
+ *   2. Several values are nudged a few points darker/lighter than canonical so they
+ *      clear **WCAG AA (4.5:1)** on OUR tint/page/solid surfaces (canonical Dracula
+ *      `comment #6272a4` is ~3.1:1 here — below AA — so we ship `#8a97cc`).
+ * Every value is machine-verified by `npm run check:contrast` (in `npm test`).
+ *
  * The families: expr (interpolation, escaped), raw (unescaped — handle with
  * care), block (sections/clauses), partial (composition), inherit (inheritance),
  * delim (set-delimiters directive), comment. Plus the interior-role tokens
- * (operator/string/number, ADR-017) and the chip-tint controls. Every value
- * clears WCAG AA (4.5:1) on its own tint — enforced by `npm run check:contrast`.
+ * (operator/string/number, ADR-017) and the chip-tint controls.
  */
 :root {
-  --c-expr: #107937;
-  --c-raw: #14532d;
-  --c-block: #a95011;
-  --c-partial: #2460e3;
+  --c-expr: #187747;
+  --c-raw: #0f6e3a;
+  --c-block: #a8520f;
+  --c-partial: #0e728d;
   --c-inherit: #6d28d9;
-  --c-delim: #c91a40;
-  --c-comment: #646b78;
+  --c-delim: #ba2c8b;
+  --c-comment: #54597e;
   --tint-mix: 12%;
   --directive-bg: #eceaf1;
-  --stem-op-fg: #0e7490;
-  --stem-str-fg: #e11d48;
-  --stem-num-fg: #b45309;
+  --stem-op-fg: #0e728d;
+  --stem-str-fg: #826600;
+  --stem-num-fg: #7c3aed;
 }
 
 [data-theme="dark"] {
-  --c-expr: #86efac;
-  --c-raw: #5ba677;
-  --c-block: #f9a35c;
-  --c-partial: #93c5fd;
-  --c-inherit: #a78bfa;
-  --c-delim: #f6647d;
-  --c-comment: #9ca3af;
+  --c-expr: #50fa7b;
+  --c-raw: #2faf60;
+  --c-block: #ffb86c;
+  --c-partial: #8be9fd;
+  --c-inherit: #bd93f9;
+  --c-delim: #ff79c6;
+  --c-comment: #8a97cc;
   --tint-mix: 20%;
   --directive-bg: #363150;
-  --stem-op-fg: #67e8f9;
-  --stem-str-fg: #fda4af;
-  --stem-num-fg: #fbbf24;
+  --stem-op-fg: #ff79c6;
+  --stem-str-fg: #f1fa8c;
+  --stem-num-fg: #bd93f9;
 }

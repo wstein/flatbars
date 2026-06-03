@@ -58,18 +58,18 @@
      inline prose tags, AND the Syntax-colours legend (.chip.c-*). The Chips
      control (body[data-chipstyle]) tints/outlines/fills every one together. ── */
   /* @palette light · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
-  --c-expr: #107937;
-  --c-raw: #14532d;
-  --c-block: #a95011;
-  --c-partial: #2460e3;
+  --c-expr: #187747;
+  --c-raw: #0f6e3a;
+  --c-block: #a8520f;
+  --c-partial: #0e728d;
   --c-inherit: #6d28d9;
-  --c-delim: #c91a40;
-  --c-comment: #646b78;
+  --c-delim: #ba2c8b;
+  --c-comment: #54597e;
   --tint-mix: 12%;
   --directive-bg: #eceaf1;
-  --stem-op-fg: #0e7490;
-  --stem-str-fg: #e11d48;
-  --stem-num-fg: #b45309;
+  --stem-op-fg: #0e728d;
+  --stem-str-fg: #826600;
+  --stem-num-fg: #7c3aed;
   /* @palette end */
 
   /* YAML data syntax colours (data editor + spec-only blocks) */
@@ -117,18 +117,18 @@
   --warn-faint: #3a2e10;
 
   /* @palette dark · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
-  --c-expr: #86efac;
-  --c-raw: #5ba677;
-  --c-block: #f9a35c;
-  --c-partial: #93c5fd;
-  --c-inherit: #a78bfa;
-  --c-delim: #f6647d;
-  --c-comment: #9ca3af;
+  --c-expr: #50fa7b;
+  --c-raw: #2faf60;
+  --c-block: #ffb86c;
+  --c-partial: #8be9fd;
+  --c-inherit: #bd93f9;
+  --c-delim: #ff79c6;
+  --c-comment: #8a97cc;
   --tint-mix: 20%;
   --directive-bg: #363150;
-  --stem-op-fg: #67e8f9;
-  --stem-str-fg: #fda4af;
-  --stem-num-fg: #fbbf24;
+  --stem-op-fg: #ff79c6;
+  --stem-str-fg: #f1fa8c;
+  --stem-num-fg: #bd93f9;
   /* @palette end */
 
   --yaml-key: #93c5fd;
