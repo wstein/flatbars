@@ -195,7 +195,7 @@ with that synonym.
 | block helper
 
 | *operator*
-| MaxBars only: an infix symbol (`+`, `>=`, `pass:[|]`) — surface sugar that desugars to an operation
+| MaxBars only: an infix symbol (`+`, `>=`, `\|`) — surface sugar that desugars to an operation
   application (§8). Not a separate mechanism, and not a "function": nothing produces a callable value (§3).
 | —
 |===

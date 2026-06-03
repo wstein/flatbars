@@ -224,7 +224,7 @@ This is the actual compatibility table.
 |Mustache-style section `pass:[{{#x}}…{{/x}}]` over data |`blockHelperMissing`: array ⇒ `each`, truthy ⇒ `with`, falsy/empty ⇒ `{{else}}` |✓ |An unregistered block head is looked up as data and dispatched exactly as {hbs} does (`Kernel.Prelude.blockHelperMissing` / `rt.block`). The inverted form `pass:[{{^x}}]` desugars to `pass:[{{#unless x}}]`.
 |`helperMissing` (inline `pass:[{{foo bar}}]`, unknown `foo`) |hard `UnknownHelper` |✓ |Matches {hbs}, which throws "Missing helper" for an unknown helper *called with arguments*; a bare `pass:[{{foo}}]` is a data read either way.
 |`registerHelper` *inline* helper |same | ✓ |Escaped in `pass:[{{ }}]`, raw via `safe(…)` (xref:adr-0018-user-defined-helpers.adoc[ADR-018]).
-|`registerHelper` *block* helper (`fn`/`inverse`/`hash` + `options.fn(ctx, {data, blockParams})`) |same |✓ |One registration, usage decides; hash, scoped `@vars`, and `as |…|` block params all work (xref:adr-0020-user-block-helpers.adoc[ADR-020]); only `ids`/`loc`/`lookupProperty` throw.
+|`registerHelper` *block* helper (`fn`/`inverse`/`hash` + `options.fn(ctx, {data, blockParams})`) |same |✓ |One registration, usage decides; hash, scoped `@vars`, and `as \|…\|` block params all work (xref:adr-0020-user-block-helpers.adoc[ADR-020]); only `ids`/`loc`/`lookupProperty` throw.
 |===
 
 [NOTE]
