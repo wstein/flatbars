@@ -1,19 +1,29 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
+//
+// The landing leads with what FlatBars IS + proof, not negation: a positive hero,
+// a proof strip wired from the conformance reports (so it can't go stale), and one
+// live example above the fold. The "meaning-free parser" architecture line moves
+// below the fold. The app topbar (Topbar.astro) is shared with the docs, so the
+// first click no longer changes the chrome.
 import BaseHead from "../components/BaseHead.astro";
 import Topbar from "../components/Topbar.astro";
-import { lessons, surfaces } from "../examples.mjs";
+import OpenInLab from "../components/OpenInLab.jsx";
 import HighlightLegend from "../components/HighlightLegend.astro";
+import "../styles/open-in-lab.css";
+import { lessons, surfaces } from "../examples.mjs";
+import { examples as ex } from "../mustache.mjs";
+// Proof numbers come from the committed conformance reports — the same data the
+// gates measure — so the strip is "measured, not asserted".
+import conformance from "../conformance.json";
+import hbs from "../../../conformance/handlebars/report.json";
 
-// The page leads with the THESIS (what/why), not a surface name — FlatBars is the
-// parser, the four surfaces are languages built on it. Mustache still gets the
-// honest on-ramp (it's what readers already know) but it's labelled "recommended
-// start", and the word "reference" lives in the card body where MinBars genuinely
-// is the comprehensive one.
-//
-// The grid below shows ALL FOUR surfaces for completeness (the "four languages"
-// framing). MinBars is also the on-ramp above, so its card is marked as featured
-// rather than read as a duplicate.
+const proof = [
+  { n: `${conformance.total.pass}/${conformance.total.total}`, label: "Mustache spec modules — MinBars passes the vendored suite", href: "/minbars#conformance" },
+  { n: `${hbs.total.pass}/${hbs.total.total}`, label: "byte-identical to Handlebars 4.7.9 — FullBars", href: "/fullbars" },
+  { n: "0", label: "helpers baked into the core — every one is a plug-in (~80 in the FullBars prelude)", href: "/rawbars" },
+];
+
 const surfaceCards = surfaces.map((s) => ({
   href: s === "minbars" ? "/minbars" : `/${s}`,
   title: lessons[s].title,
@@ -27,122 +37,115 @@ const surfaceCards = surfaces.map((s) => ({
   <head>
     <BaseHead title="FlatBars — one parser, four languages" />
     <style>
-      body {
-        font: 16px/1.65 var(--font-ui);
-        color: var(--fg);
-        background: var(--bg);
-        margin: 0;
-      }
+      body { font: 16px/1.65 var(--font-ui); color: var(--fg); background: var(--bg); margin: 0; }
       /* The topbar is full-width (sticky); the page content is centred. */
       .landing { max-width: 52rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
-      h1 { font-size: 2rem; margin: 0 0 0.5rem; }
-      h1 b { color: var(--accent); }
-      /* The thesis: promoted out of grey sub-text into the page's lede voice. */
-      .thesis { color: var(--fg); font-size: 1.2rem; line-height: 1.5; margin: 0 0 0.9rem; }
-      .thesis b { color: var(--accent-2); font-weight: 600; }
-      /* One-line core → surfaces visual reinforcing the thesis. */
-      .ladder {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.45rem;
-        margin: 0 0 0.5rem;
-        font: 600 12px/1 var(--font-mono);
+
+      .hero-title { font-size: 2rem; line-height: 1.22; margin: 0.4rem 0 0.4rem; font-weight: 700; letter-spacing: -0.01em; }
+      .hero-title .flat { color: var(--accent); }
+      .hero-title .tagline { font-weight: 400; color: var(--fg-secondary); }
+      .hero-title em { font-style: italic; color: var(--accent-2); }
+      .hero-sub { font: 600 0.92rem/1.4 var(--font-mono); color: var(--fg-muted); margin: 0 0 0.4rem; }
+
+      /* Proof strip — wired from the conformance reports. */
+      .proof { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.25rem 0 1.5rem; }
+      .proof-stat {
+        flex: 1 1 12rem; display: block; padding: 0.8rem 1rem;
+        border: 1px solid var(--border-strong); border-radius: 10px;
+        background: var(--bg-1); text-decoration: none; color: inherit;
       }
-      .ladder .core { color: var(--accent-2); }
-      .ladder .arrow { color: var(--fg-faint); }
-      .ladder .pill {
-        padding: 0.2rem 0.5rem;
-        border: 1px solid var(--border-strong);
-        border-radius: 999px;
-        background: var(--bg-1);
-        color: var(--fg-secondary);
-      }
+      .proof-stat:hover { border-color: var(--accent); }
+      .proof-stat b { display: block; font-size: 1.55rem; line-height: 1.1; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+      .proof-stat span { display: block; margin-top: 0.2rem; font-size: 0.8rem; color: var(--fg-muted); }
+
+      /* Recommended-start card. */
       .hero {
-        display: block;
-        margin: 1.75rem 0;
-        padding: 1.5rem;
-        border: 1px solid var(--border-strong);
-        border-radius: 10px;
+        display: block; margin: 1.5rem 0; padding: 1.5rem;
+        border: 1px solid var(--border-strong); border-radius: 10px;
         background: linear-gradient(135deg, var(--accent-softer), var(--bg-1));
-        text-decoration: none;
-        color: inherit;
+        text-decoration: none; color: inherit;
       }
       .hero:hover { border-color: var(--accent); }
-      .hero .kicker {
-        font: 600 11px/1 var(--font-mono);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--accent-2);
-      }
+      .hero .kicker { font: 600 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2); }
       .hero h2 { font-size: 1.5rem; margin: 0.4rem 0 0.3rem; }
       .hero p { margin: 0; color: var(--fg-muted); }
       .hero .go { color: var(--accent-2); font-weight: 600; }
-      .grid-label {
-        font: 600 11px/1 var(--font-mono);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--fg-faint);
-        margin: 2rem 0 0.5rem;
-      }
+
+      .grid-label { font: 600 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-faint); margin: 2rem 0 0.5rem; }
       ul { list-style: none; padding: 0; display: grid; gap: 0.7rem; }
-      a.card {
-        display: block;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 1rem;
-        text-decoration: none;
-        color: inherit;
-        background: var(--bg-1);
-      }
+      a.card { display: block; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-decoration: none; color: inherit; background: var(--bg-1); }
       a.card:hover { border-color: var(--accent); }
       a.card b { color: var(--accent-2); }
       a.card span { color: var(--fg-muted); display: block; margin-top: 0.25rem; font-size: 0.9rem; }
       a.card.featured { border-color: var(--border-strong); background: var(--accent-softer); }
-      a.card .pin {
-        display: inline-block;
-        margin-bottom: 0.3rem;
-        font: 600 10px/1 var(--font-mono);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--accent-2);
-      }
+      a.card .pin { display: inline-block; margin-bottom: 0.3rem; font: 600 10px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-2); }
+
+      /* Architecture note — below the fold, the "what's underneath" framing. */
+      .arch { margin: 2.5rem 0 0.6rem; padding-top: 1.25rem; border-top: 1px solid var(--border); color: var(--fg-muted); }
+      .arch b { color: var(--fg); }
+      .arch a { color: var(--accent-2); font-weight: 600; }
+      .ladder { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin: 0.6rem 0 0; font: 600 12px/1 var(--font-mono); }
+      .ladder .core { color: var(--accent-2); }
+      .ladder .arrow { color: var(--fg-faint); }
+      .ladder .pill { padding: 0.2rem 0.5rem; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-1); color: var(--fg-secondary); }
     </style>
   </head>
   <body data-chipstyle="tint">
     <a class="skip" href="#main">Skip to content</a>
     <Topbar />
     <main id="main" class="landing">
-    <h1><b>Flat</b>Bars</h1>
-    <p class="thesis">FlatBars isn't a template engine — it's a <b>meaning-free parser you build them on</b>. Mustache and Handlebars run on it unchanged; MaxBars is the language we built on top.</p>
-    <p class="ladder">
-      <span class="core">flatbars core</span><span class="arrow">→</span>
-      <span class="pill">RawBars</span>
-      <span class="pill">MinBars</span>
-      <span class="pill">FullBars</span>
-      <span class="pill">MaxBars</span>
-    </p>
+      <h1 class="hero-title">
+        <b class="flat">Flat</b>Bars <span class="tagline">— the Handlebars &amp; Mustache you
+        know, on a core small enough to <em>be the language you want.</em></span>
+      </h1>
+      <p class="hero-sub">One parser. Four surfaces. Proven against the real specs.</p>
 
-    <a class="hero" href="/minbars">
-      <span class="kicker">Recommended start</span>
-      <h2>MinBars — Mustache-compatible</h2>
-      <p>New to templates? Start with Mustache — you already know it. The complete logic-less language, and FlatBars's comprehensive reference: every tag explained with examples that render live and open in the Lab. <span class="go">Open the reference →</span></p>
-    </a>
-
-    <p class="grid-label">All four surfaces</p>
-    <ul>
-      {surfaceCards.map((c) => (
-        <li>
-          <a class:list={["card", { featured: c.featured }]} href={c.href}>
-            {c.featured && <span class="pin">↑ Recommended start</span>}
-            <b>{c.title}</b>
-            <span>{c.blurb}</span>
+      <div class="proof">
+        {proof.map((p) => (
+          <a class="proof-stat" href={p.href}>
+            <b>{p.n}</b>
+            <span>{p.label}</span>
           </a>
-        </li>
-      ))}
-    </ul>
+        ))}
+      </div>
 
-    <HighlightLegend />
+      <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
+
+      <a class="hero" href="/minbars">
+        <span class="kicker">Recommended start</span>
+        <h2>MinBars — Mustache-compatible</h2>
+        <p>New to templates? Start with Mustache — you already know it. The complete logic-less
+          language, and FlatBars's comprehensive reference: every tag explained with examples that
+          render live and open in the Lab. <span class="go">Open the reference →</span></p>
+      </a>
+
+      <p class="grid-label">All four surfaces</p>
+      <ul>
+        {surfaceCards.map((c) => (
+          <li>
+            <a class:list={["card", { featured: c.featured }]} href={c.href}>
+              {c.featured && <span class="pin">↑ Recommended start</span>}
+              <b>{c.title}</b>
+              <span>{c.blurb}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      <p class="arch">
+        <b>What's underneath:</b> FlatBars is a <b>meaning-free parser</b>. Mustache and Handlebars
+        run on it unchanged; everything you expect — helpers, escaping, control flow — is a plug-in,
+        not baked in. <a href="/rawbars">See the bare core →</a>
+      </p>
+      <p class="ladder">
+        <span class="core">flatbars core</span><span class="arrow">→</span>
+        <span class="pill">RawBars</span>
+        <span class="pill">MinBars</span>
+        <span class="pill">FullBars</span>
+        <span class="pill">MaxBars</span>
+      </p>
+
+      <HighlightLegend />
     </main>
   </body>
 </html>
