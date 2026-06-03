@@ -363,8 +363,8 @@ highlightConfig = case _ of
 -- | with expressions as `lit`/`identifier`/`path`/`context`/`call`/data vars.
 astJson :: Fn2 String String Json
 astJson = mkFn2 \dialect src ->
-  case (if dialect == "maxbars" then parseWith maxOptions else parse) src of
-    Left pe ->
+  let
+    errObj pe =
       let
         d = parseErrorAt src pe
       in
@@ -377,22 +377,34 @@ astJson = mkFn2 \dialect src ->
                   ]
               )
           ]
-    Right { nodes: tmpl } ->
-      let
-        -- `core` is the austere syntax (no desugar); `surface` and `maxbars` both
-        -- desugar (MaxBars adds bare loop variables via `maxLoopVars`).
-        desugared = case dialect of
-          "core" -> tmpl
-          "maxbars" -> desugarSurfaceWith maxLoopVars tmpl
-          _ -> desugarSurface tmpl
-        nodes = lower desugared
-      in
-        obj
-          [ Tuple "ast"
-              ( obj
-                  [ Tuple "version" (str "flatbars-ast/v1"), Tuple "nodes" (arr (map rnode nodes)) ]
-              )
-          ]
+  in
+    case (if dialect == "maxbars" then parseWith maxOptions else parse) src of
+      Left pe -> errObj pe
+      -- the FullBars surface also *rejects* a bare `{{#inline}}` (the decorator is
+      -- required) via `checkBareInline`; mirror that in the AST view so the Lab
+      -- reports the same `DisallowedShape` a render would, not a misleading node.
+      Right { nodes: tmpl }
+        | dialect /= "core"
+        , dialect /= "maxbars"
+        , Left pe <- FullBars.checkBareInline true tmpl -> errObj pe
+      Right { nodes: tmpl } ->
+        let
+          -- `core` is the austere syntax (no desugar); `surface` and `maxbars` both
+          -- desugar (MaxBars adds bare loop variables via `maxLoopVars`).
+          desugared = case dialect of
+            "core" -> tmpl
+            "maxbars" -> desugarSurfaceWith maxLoopVars tmpl
+            _ -> desugarSurface tmpl
+          nodes = lower desugared
+        in
+          obj
+            [ Tuple "ast"
+                ( obj
+                    [ Tuple "version" (str "flatbars-ast/v1")
+                    , Tuple "nodes" (arr (map rnode nodes))
+                    ]
+                )
+            ]
 
 --------------------------------------------------------------------------------
 -- JSON builders
