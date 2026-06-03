@@ -30,7 +30,9 @@ token model isn't the cost — the combinator machinery is.
 breaks a template into a **delimiter-level** token stream:
 
 - **Delimiters** as distinct lexemes — `{{` (`Open`), `{{{` (`OpenTriple`),
-  `}}` (`CloseTag`), `}}}` (`CloseTriple`), plus coarse raw-block fences.
+  `}}` (`CloseTag`), `}}}` (`CloseTriple`), and raw-block fences (`{{{{`
+  `OpenRaw` / `}}}}` `CloseRaw`, with the opening sigil distinguishing the bare
+  `{{{{name}}}}` and `#`-prefixed `{{{{#name}}}}` spellings).
 - **Sigils** (`#`, `^`, `/`, `>`, `&`, `$`, `<`, `#*`, `#>`) as their own
   lexemes, separate from the head identifier.
 - **Segmented paths** (L3): `[ ] ( )` are tokens, and so are the path separators
@@ -103,7 +105,7 @@ so the hand lexer inherits the parsing spike's correctness for free.
 | # | Limitation | Why deferred |
 | - | - | - |
 | L1 | **Strict `tokenize` is fatal** (`Left` on first error). | The hand lexer adds `tokenizeRecovering` (never fails; emits `Invalid` tokens) — see *Wiring to the LSP*. Strict mode stays for the parity test; the parsing spike is still strict-only. |
-| L2 | **Coarse raw-block fences** — one lexeme per fence, not `{{{{`/name/`}}}}`. | Edge form; keeps the spikes small. |
+| L2 | ~~Coarse raw-block fences~~ ✓ resolved — both spikes lex raw blocks finely: `{{{{`/`}}}}` delimiters, opening sigil (bare for Handlebars/FullBars, `#` for RawBars/MaxBars), `/` close sigil, name `Ident`, head whitespace as trivia. The structural RawTok scanner keeps the coarse `RRaw` for the engine parse path. | — |
 | L3 | ~~Dangling path dot~~ ✓ resolved — paths are segmented (`.`→`Dot`, `/`→`Slash`); see *What they do*. | — |
 | L4 | **Parsing spike ~4–5× slower** than the incumbent on tag-bearing input. | Combinator cost (CPS monad, `try`, allocation). *Resolved by the hand spike*, which is faster than the incumbent on every profile — see Benchmark. |
 | L5 | **ASCII-only parity** — `index` is code-unit in the hand spike but code-point in `parsing`'s `Position`. | They diverge on non-BMP input; the parity test (and all corpora) are ASCII. |
