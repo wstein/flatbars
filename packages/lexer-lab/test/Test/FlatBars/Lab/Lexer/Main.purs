@@ -21,6 +21,7 @@ import FlatBars.Lab.Lexer
   , tokenize
   )
 import Test.Assert (assertEqual, assertTrue')
+import Test.FlatBars.Lab.LexerHand as LexerHand
 
 cfg :: { close :: String, infixArith :: Boolean, open :: String }
 cfg = defaultLexConfig
@@ -219,3 +220,6 @@ main = do
         }
 
   log "  all lexer-lab assertions passed"
+
+  -- The hand-written lexer's own suite + parity against this parsing spike.
+  LexerHand.tests

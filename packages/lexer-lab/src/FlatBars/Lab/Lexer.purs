@@ -152,6 +152,7 @@ data Lexeme
   | Comment String -- {{! … }} / {{!-- … --}}
   | SetDelimiter String String -- {{=open close=}} (mutates the active pair)
   | RawBody String -- the verbatim body between raw-block fences
+  | Invalid String -- a malformed region kept by a *forgiving* lexer (recovery)
   | Eof -- synthetic end token; its leading trivia is the trailing ocean
 
 derive instance eqLexeme :: Eq Lexeme
@@ -177,6 +178,7 @@ instance showLexeme :: Show Lexeme where
     Comment s -> "Comment " <> show s
     SetDelimiter o c -> "SetDelimiter " <> show o <> " " <> show c
     RawBody s -> "RawBody " <> show s
+    Invalid s -> "Invalid " <> show s
     Eof -> "Eof"
 
 -- | A lexeme with its span and the leading trivia accumulated before it.
@@ -268,15 +270,15 @@ tokenize cfg input =
   oceanRun :: Lexer String
   oceanRun = do
     st <- get
-    consumeWith \input ->
+    consumeWith \rest ->
       let
-        stop = oceanStopIndex st.open input
+        stop = oceanStopIndex st.open rest
       in
         if stop == 0 then Left "no host text here"
         else Right
-          { value: SCU.take stop input
-          , consumed: SCU.take stop input
-          , remainder: SCU.drop stop input
+          { value: SCU.take stop rest
+          , consumed: SCU.take stop rest
+          , remainder: SCU.drop stop rest
           }
 
   backslashChar :: Lexer String
@@ -555,6 +557,7 @@ semanticTokenType = case _ of
   Op _ -> Just "operator"
   Comment _ -> Just "comment"
   SetDelimiter _ _ -> Just "keyword"
+  Invalid _ -> Just "variable" -- ADR-017 `error` kind: variable + `invalid` modifier
   Sigil s -> Just (sigilType s)
   _ -> Nothing
   where
@@ -572,6 +575,7 @@ lspEmits = case _ of
   Str _ -> true
   Num _ -> true
   SetDelimiter _ _ -> true
+  Invalid _ -> true
   _ -> false
 
 --------------------------------------------------------------------------------

@@ -20,11 +20,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const out = (m) => resolve(here, "../../output", m, "index.js");
 
 const spike = await import(out("FlatBars.Lab.Lexer"));
+const hand = await import(out("FlatBars.Lab.LexerHand"));
 const incumbent = await import(out("FlatBars.Lexer"));
 const token = await import(out("FlatBars.Token"));
 
 // Curried PureScript entry points.
 const lexSpike = spike.tokenize(spike.defaultLexConfig);
+const lexHand = hand.tokenize(spike.defaultLexConfig);
 const lexL1 = incumbent.tokenizeTemplate(incumbent.defaultLexConfig);
 const lexInterior = token.tokenizeInterior(token.defaultLexOptions);
 
@@ -96,22 +98,24 @@ function bench(run, input) {
   return { perIter, mbPerSec: input.length / 1e6 / (perIter / 1e3), tokens: acc / iters };
 }
 
-console.log(`FlatBars FULL-pipeline benchmark — spike vs. incumbent (node ${process.version})\n`);
-console.log("Spike: single-pass full tokenization. Incumbent-L1: structural scan only");
-console.log("(interiors opaque). Incumbent-full: L1 + level-2 interior lexer = same work.\n");
-console.log("profile  bytes   incumbent-L1   incumbent-full  spike          full÷spike");
-console.log("───────  ──────  ─────────────  ──────────────  ─────────────  ──────────");
+console.log(`FlatBars FULL-pipeline benchmark — three lexers (node ${process.version})\n`);
+console.log("All do the SAME work (full interior tokenization). incumbent-full = the");
+console.log("incumbent's level-1 scan + level-2 tokenizeInterior; parsing/hand = the two");
+console.log("single-pass spikes. (incumbent-L1 = structural scan only, for reference.)\n");
+console.log("profile  bytes   incumbent-L1  incumbent-full  parsing-spike  hand-spike");
+console.log("───────  ──────  ────────────  ──────────────  ─────────────  ──────────");
 
 for (const [name, input] of Object.entries(CORPORA)) {
   force(lexSpike(input)); // sanity: all succeed
+  force(lexHand(input));
   force(lexL1(input));
   incumbentFull(input);
   const l1 = bench((x) => force(lexL1(x)), input);
   const full = bench(incumbentFull, input);
-  const s = bench((x) => force(lexSpike(x)), input);
+  const p = bench((x) => force(lexSpike(x)), input);
+  const h = bench((x) => force(lexHand(x)), input);
   const mb = (b) => `${b.mbPerSec.toFixed(1).padStart(5)} MB/s`;
-  const ratio = (full.perIter / s.perIter).toFixed(2);
   console.log(
-    `${name.padEnd(7)}  ${String(input.length).padStart(6)}  ${mb(l1)}     ${mb(full)}      ${mb(s)}     ${ratio}×`,
+    `${name.padEnd(7)}  ${String(input.length).padStart(6)}  ${mb(l1)}   ${mb(full)}      ${mb(p)}    ${mb(h)}`,
   );
 }
