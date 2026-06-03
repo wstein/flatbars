@@ -1,14 +1,26 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# flatbars-lexer-lab — a standalone lexer spike
+# flatbars-lexer-lab — standalone lexer spikes
 
 > **Status: SPIKE.** Not wired into the engine. Depends on no `flatbars*`
 > package; nothing in the workspace depends on it. Built to evaluate a
-> `purescript-parsing`-based, stateful, CST-style tokenizer against the
-> hand-written [`FlatBars.Lexer`](../core/src/FlatBars/Lexer.purs) before any
-> adoption decision.
+> stateful, CST-style tokenizer against the hand-written
+> [`FlatBars.Lexer`](../core/src/FlatBars/Lexer.purs) before any adoption
+> decision.
 
-## What it does
+This package holds **two** spikes that share one token model
+(`Lexeme`/`Trivia`/`Span`/`LexToken`), so they can be compared head-to-head and
+a parity test can assert they agree token-for-token:
+
+- **`FlatBars.Lab.Lexer`** — built on `purescript-parsing` (combinators).
+- **`FlatBars.Lab.LexerHand`** — a hand-written tail-recursive index scan.
+
+The headline finding (see Benchmark): the **hand-written** lexer is *faster than
+the incumbent on every profile* while producing the richer CST-style stream
+(trivia + line/column spans); the **combinator** version is ~4–5× slower. The
+token model isn't the cost — the combinator machinery is.
+
+## What they do
 
 `FlatBars.Lab.Lexer.tokenize :: LexConfig -> String -> Either ParseError (Array LexToken)`
 breaks a template into a **delimiter-level** token stream:
@@ -65,66 +77,115 @@ ident    := identChar+   (identChar per FlatBars.Token, gated by infixArith)
 
 ## Test matrix
 
-`spago test -p flatbars-lexer-lab` — 23 cases. Core (1–15): double/triple,
-sigils, brackets, parens, string + number literals, operator gating, comments
-(long/short), trim, ocean→leading-trivia + EOF tail, inner-whitespace trivia,
-**stateful set-delimiter**, escaped opener, raw block, empty input, LSP
-classification, unterminated-tag error. Adversarial (16–23): empty interior,
-stray inner brace (error), CRLF in ocean, tab between set-delimiter words,
-spaced raw-block head, empty short comment, fractional literal, and a
-**line/column span** assertion.
+`spago test -p flatbars-lexer-lab` runs both spikes. The parsing spike has 23
+cases (1–15 core: double/triple, sigils, brackets, parens, string + number
+literals, operator gating, comments, trim, ocean→leading-trivia + EOF tail,
+inner-whitespace trivia, **stateful set-delimiter**, escaped opener, raw block,
+empty input, LSP classification, unterminated-tag error; 16–23 adversarial:
+empty interior, stray inner brace, CRLF, tab in set-delimiter, spaced raw head,
+empty comment, fractional literal, line/column span). The hand spike adds smoke
+checks plus a **parity battery**: ~40 inputs run through *both* lexers, asserting
+identical `Array LexToken` (lexeme + span + leading trivia) or that both reject —
+so the hand lexer inherits the parsing spike's correctness for free.
 
 ## Known limitations (deferred on purpose)
 
 | # | Limitation | Why deferred |
 | - | - | - |
-| L1 | **No error recovery** — first lexical error is fatal (`Left`). | ADR-023 wants a *recovering* parser; `purescript-parsing` does not recover. Adoption blocker, tracked (P2). |
-| L2 | **Coarse raw-block fences** — one lexeme per fence, not `{{{{`/name/`}}}}`. | Edge form; keeps the spike small. |
+| L1 | **Strict `tokenize` is fatal** (`Left` on first error). | The hand lexer adds `tokenizeRecovering` (never fails; emits `Invalid` tokens) — see *Wiring to the LSP*. Strict mode stays for the parity test; the parsing spike is still strict-only. |
+| L2 | **Coarse raw-block fences** — one lexeme per fence, not `{{{{`/name/`}}}}`. | Edge form; keeps the spikes small. |
 | L3 | **Dangling path dot** — `items.[0]` → `Ident "items."`, `[`, `0`, `]`. | Brackets-as-tokens divergence; the parser owns reassembly. |
-| L4 | **~4× slower than the incumbent's full two-pass pipeline on tag-bearing input** (≈par on pure text). | Per-tag combinator cost (CPS monad, `try`, per-record allocation) plus a finer-grained stream. Acceptable for typical files; weigh for huge tag-dense batch paths. |
+| L4 | **Parsing spike ~4–5× slower** than the incumbent on tag-bearing input. | Combinator cost (CPS monad, `try`, allocation). *Resolved by the hand spike*, which is faster than the incumbent on every profile — see Benchmark. |
+| L5 | **ASCII-only parity** — `index` is code-unit in the hand spike but code-point in `parsing`'s `Position`. | They diverge on non-BMP input; the parity test (and all corpora) are ASCII. |
 
 ## Benchmark
 
 `node packages/lexer-lab/bench.mjs` (after `spago build`). Throughput is
-dominated by **tag density**, not byte count. The fair comparison is the spike's
-single pass against the incumbent's **full** pipeline — its level-1 structural
-scan *plus* the level-2 interior lexer (`FlatBars.Token.tokenizeInterior`),
-which does the same total work. Three ~50 KiB profiles, Node v26:
+dominated by **tag density**, not byte count. All three do the **same work** (full interior tokenization): `incumbent-full` is
+the level-1 structural scan *plus* the level-2 interior lexer
+(`FlatBars.Token.tokenizeInterior`); the two spikes are single-pass. Three
+~50 KiB profiles, Node v26:
 
-| profile | incumbent L1 | incumbent full (L1+L2) | spike (1 pass) | spike vs full |
-| - | - | - | - | - |
-| ocean (no tags) | 32.5 MB/s | 34.8 MB/s | 27.2 MB/s | 1.3× slower |
-| prose (~1 tag/90 B) | 10.6 MB/s | 9.9 MB/s | 2.5 MB/s | ~4× slower |
-| dense (~1 tag/6 B) | 1.7 MB/s | 1.5 MB/s | 0.4 MB/s | ~4× slower |
+| profile | incumbent-full | parsing-spike | hand-spike |
+| - | - | - | - |
+| ocean (no tags) | 34.8 MB/s | 27.7 MB/s | **39.9 MB/s** |
+| prose (~1 tag/90 B) | 10.0 MB/s | 2.5 MB/s | **12.6 MB/s** |
+| dense (~1 tag/6 B) | 1.6 MB/s | 0.4 MB/s | **1.8 MB/s** |
 
 Takeaways:
 
-- **Neither lexer is "slow" on realistic input.** The incumbent's full pipeline
-  does prose at ~10 MB/s (50 KB in ~5 ms); the spike at 2.5 MB/s (~20 ms) — both
-  fine for an LSP. The 6 MB/s figure in an earlier draft came from a
-  pathologically tag-dense corpus.
-- **The incumbent's second pass is nearly free** (prose 10.6 → 9.9 MB/s): the
-  interior lexer is another tight index-loop, so the two-phase design costs
-  almost nothing over the level-1 scan alone.
-- **The spike matches the incumbent on pure text** (native-`indexOf` ocean scan)
-  and is ~4× slower only on tag-bearing input — pure per-tag combinator overhead.
-  (The `incumbent-full` figure is, if anything, conservative: it glues the two
-  passes in JS, which the real PureScript `parse` path does not.)
+- **The hand-written lexer wins on every profile** — and emits the *richer* CST
+  stream (trivia + line/column spans + finer tokens). It even beats the incumbent
+  on pure ocean (39.9 vs 34.8) because its fused scan uses `Array.unsafeIndex`
+  (no per-char `Maybe`), where the incumbent's `Array.index` allocates a `Just`
+  per character — enough to pay for the line/column tracking it adds.
+- **The combinator version is ~4–5× slower on tag-bearing input** (prose 2.5 MB/s).
+  Same token model, same rules — so the cost is the `purescript-parsing`
+  machinery (CPS monad, `try`, per-record allocation), not the design.
+- **The incumbent's second pass is nearly free** (prose 10.9 → 10.0 MB/s): the
+  interior lexer is another tight index-loop, so its two-phase split costs almost
+  nothing over the level-1 scan.
+- The ocean scan went 21.5 → 39.9 MB/s once a redundant second traversal was
+  removed: the original walked each run twice (find-stopper, then advance
+  line/column) and ran `Maybe`-allocating `matchAt` per character. The fused
+  single pass tracks position inline and only calls `matchAt` when a character
+  could begin the opener.
+
+## Lab 2 — the hand-written lexer
+
+`FlatBars.Lab.LexerHand.tokenize` reproduces the parsing spike's exact output
+(token-for-token, asserted by the parity test) via a tail-recursive index scan
+over a `Char` array — `Array.unsafeIndex` on the hot path, escape-free ocean
+taken in one slice, a reversed-`List` accumulator, and `parsing`'s exact
+line/column rules. It is the answer to L4: dropping the combinator machinery
+recovers the throughput (prose 2.5 → 12.6 MB/s, *faster* than the incumbent) with
+no change to the token model.
+
+## Wiring to the LSP (forgiveness)
+
+`lsp.mjs` turns the hand lexer's tokens into the `textDocument/semanticTokens/full`
+wire shape — the same contract the shipping server
+([editors/lsp](../../editors/lsp/src/tokens.mjs)) honours: the legend is derived
+from the shared [token-vocabulary.json](../../editors/token-vocabulary.json), and
+the output is delta-encoded `[deltaLine, deltaStartChar, length, type, modifiers]`
+5-tuples. Because every `LexToken` already carries a line/column `Span`, the
+conversion is a direct map — no flatten-back-to-lines pass. Like the production
+server it emits **sparse corrections** (`lspEmits`: operator/string/number/set-
+delimiter), leaving the structural braces to the TextMate floor.
+
+**Forgiveness (ADR-023).** An editor must keep highlighting while you type, so the
+wiring drives `FlatBars.Lab.LexerHand.tokenizeRecovering`, which never fails: a
+malformed opener (a half-typed `{{ oops`) becomes an `Invalid` lexeme — emitted
+with the ADR-017 `error` kind's `invalid` modifier — and lexing resyncs just past
+it, so everything around the error still gets tokens. `node
+packages/lexer-lab/lsp.test.mjs` demos the classification table, the wire `data`,
+and the recovery (it asserts a half-typed template still yields tokens).
 
 ## Done in this iteration
 
+- **Lab 2** — the hand-written lexer + a parity battery proving it equals the
+  parsing spike; it is faster than the incumbent's full pipeline on every density
+  profile (after a fused single-pass ocean scan: 21.5 → 39.9 MB/s on pure text).
+- **Forgiveness + LSP** — `tokenizeRecovering` (emits `Invalid`, never fails) and
+  `lsp.mjs`, which feeds the hand lexer's tokens to LSP semantic tokens; a
+  half-typed template still highlights.
 - **P1** — ocean scanned in one slice, via a **native `String.indexOf`**
   (`consumeWith`) rather than `anyTill`'s per-code-point loop: pure-ocean
   throughput went 1.3 → 27 MB/s, matching the incumbent.
 - **P3** — spans carry full `SourcePos` (`index` + `line` + `column`).
 - **P4** — eight adversarial cases added (16–23).
-- **Benchmark** — `bench.mjs` (three density profiles); along the way it caught
+- **Benchmark** — `bench.mjs` (three lexers × three density profiles); it caught
   and fixed an O(n²) in `assemble` (`Array.snoc`-in-fold → reversed-`List`).
 
 ## Next steps
 
-1. **Benchmark** against `FlatBars.Lexer` on a 50 KB corpus (gate adoption on it).
-2. **P2** — error recovery (sentinel re-sync at the next opener, emitting an
-   `Error` lexeme that also feeds ADR-017's `error` kind) to meet ADR-023.
+1. **Pick the hand-written lexer** as the adoption basis — it carries the
+   CST-style token model at the incumbent's speed; the parsing spike stays as the
+   readable executable reference the parity test pins it against.
+2. ~~**P2** — error recovery~~ ✓ done (`tokenizeRecovering`). Follow-up: recover
+   *inside* a tag (bad interior char) too, not just at the opener, and carry an
+   error message on `Invalid` for diagnostics.
 3. Decide the bracket/path-segment model with the parser team (L3).
-4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate.
+4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate
+   against `FlatBars.Lexer` (boundaries + literals), and lift line/column into a
+   shared `Types` module so both spikes import one source of truth.
