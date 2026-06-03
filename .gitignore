@@ -35,3 +35,11 @@ public/
 
 # VS Code extension packaging artifacts
 *.vsix
+
+# JetBrains plugin: Gradle + generated/bundled assets
+editors/jetbrains/build/
+editors/jetbrains/.gradle/
+editors/jetbrains/src/main/resources/server/
+editors/jetbrains/src/main/resources/textmate-bundle/
+editors/jetbrains/.intellijPlatform/
+editors/jetbrains/.kotlin/

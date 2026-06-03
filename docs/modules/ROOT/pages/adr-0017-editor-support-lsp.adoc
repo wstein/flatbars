@@ -11,9 +11,9 @@ JetBrains — for production use.
 [NOTE]
 ====
 *Implemented (semantic-token highlighting).* The token vocabulary, the
-engine-backed language server, the TextMate fallback, and a VS Code extension all
+engine-backed language server, the TextMate fallback, and both editor plugins
 landed; only the post-highlighting DX (diagnostics/hover, which need the recovering
-parser) and JetBrains packaging remain. What shipped:
+parser) and Marketplace publishing remain. What shipped:
 
 * `editors/token-vocabulary.json` — the single source of truth the three consumers
   share (engine `tokenize` kinds, LSP legend, TextMate scopes).
@@ -25,6 +25,10 @@ parser) and JetBrains packaging remain. What shipped:
   and the real `vscode-textmate` engine and asserts agreement).
 * `editors/lsp` — `flatbars-lsp`, the semantic-tokens server (`test:lsp`).
 * `editors/vscode` — the extension bundling the client + grammar (`test:vscode`).
+* `editors/jetbrains` — the Gradle/Kotlin plugin: the TextMate grammar via a
+  `TextMateBundleProvider` (all IDEs), plus the LSP path on Ultimate (`-PwithLsp`;
+  the platform LSP API is Ultimate-only and absent from the open SDK, so the LSP
+  layer is an opt-in build). `test:jetbrains` is the offline gate.
 ====
 
 == Context

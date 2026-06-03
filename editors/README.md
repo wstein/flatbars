@@ -9,6 +9,7 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
 | `flatbars.tmLanguage.json` | The hand-authored TextMate **fallback** grammar — the *floor*. Colours the default-delimiter forms for no-LSP contexts (diffs, `bat`, first paint, JetBrains Community). Best-effort and non-authoritative: it gives up (leaves plain) on set delimiters, MaxBars operators, and dialect-error shapes rather than mis-colouring. |
 | `lsp/` | **`flatbars-lsp`** — the authoritative semantic-tokens server (the *ceiling*). Embeds the committed `flatbars-js` bundle and answers `textDocument/semanticTokens/full` from `tokenize`. Stateful by construction, so set delimiters and dialects are correct. |
 | `vscode/` | The VS Code extension: contributes the fallback grammar and spawns `flatbars-lsp`. `dist/` is a git-ignored build product (`npm run build`). |
+| `jetbrains/` | The JetBrains plugin (Gradle/Kotlin): bundles the fallback grammar via a `TextMateBundleProvider` (all IDEs) and, on Ultimate (`-PwithLsp`), spawns `flatbars-lsp` through the platform LSP API. `build/` and the synced resources are git-ignored. |
 
 ## How they stay in sync (gates, all in `npm test`)
 
@@ -22,6 +23,10 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
 - **`test:vscode`** drives the *bundled* server over LSP and runs `vsce package`
   to build a `.vsix` (manifest + grammar valid). Live-editor rendering and the
   Marketplace are out of scope here.
+- **`test:jetbrains`** drives the *bundled* server over LSP and checks the
+  descriptors + canonical grammar — no JVM needed. The full `gradle buildPlugin`
+  (TextMate layer) compiles/packages against the real IntelliJ SDK in CI; the
+  Ultimate-only LSP layer (`-PwithLsp`) needs that API on the classpath.
 
 ## Changing things
 
@@ -34,5 +39,6 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
 ## Tracked follow-ups
 
 Diagnostics / hover / completion (need the recovering parser — ADR-017 open
-question), a JetBrains plugin, and a `tree-sitter` fallback for Zed/Neovim/GitHub
-(as *another* gated fallback, never the engine's parser).
+question), Marketplace/JetBrains-Marketplace publishing, and a `tree-sitter`
+fallback for Zed/Neovim/GitHub (as *another* gated fallback, never the engine's
+parser).

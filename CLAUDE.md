@@ -208,8 +208,13 @@ for no-LSP contexts), drift-bounded by `check:tmgrammar`. `editors/lsp`
 committed `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize`
 (`test:lsp`). `editors/vscode` is the VS Code extension bundling the LSP client +
 grammar (`test:vscode`, a headless smoke test; its `dist/` is a git-ignored build
-product). Diagnostics/hover are deferred (they need a recovering parser — ADR-017
-open question); JetBrains packaging is a tracked follow-up.
+product). `editors/jetbrains` is the JetBrains plugin (Gradle/Kotlin): the
+TextMate grammar via a `TextMateBundleProvider` for all IDEs, plus the LSP path on
+Ultimate (`-PwithLsp`; the platform LSP API is Ultimate-only and absent from the
+open SDK). `test:jetbrains` is the offline gate (drives the bundled server, checks
+descriptors — no JVM); the full `gradle buildPlugin` is a CI/JDK-17 step.
+Diagnostics/hover are deferred (they need a recovering parser — ADR-017 open
+question); Marketplace publishing is a tracked follow-up.
 
 ### Conventions worth knowing
 

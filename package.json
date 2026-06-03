@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "spago build",
-    "test": "npm run format:check && spago test -p flatbars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p flatbars-json && spago test -p flatbars-js && spago test -p flatbars-compile && spago test -p linter && npm run check:tokens && npm run check:contrast && npm run check:wordmark && npm run check:catalog && npm run check:glossary && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:conformance && npm run test:tutorials && npm run check:hbs-conformance && npm run check:mustache-conformance && npm run check:highlight && npm run check:tmgrammar && npm run check:bundle && npm run test:lab && npm run test:lsp && npm run test:vscode",
+    "test": "npm run format:check && spago test -p flatbars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p flatbars-json && spago test -p flatbars-js && spago test -p flatbars-compile && spago test -p linter && npm run check:tokens && npm run check:contrast && npm run check:wordmark && npm run check:catalog && npm run check:glossary && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:conformance && npm run test:tutorials && npm run check:hbs-conformance && npm run check:mustache-conformance && npm run check:highlight && npm run check:tmgrammar && npm run check:bundle && npm run test:lab && npm run test:lsp && npm run test:vscode && npm run test:jetbrains",
     "check:isolation": "node scripts/check-package-isolation.mjs",
     "check:glossary": "node scripts/check-glossary.mjs",
     "examples:verify": "spago build -p flatbars-cli && spago run -p flatbars-cli -- examples verify",
@@ -31,6 +31,7 @@
     "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs && node lab/helpers.test.mjs",
     "test:lsp": "node editors/lsp/test/tokens.test.mjs && node editors/lsp/test/protocol.test.mjs",
     "test:vscode": "node editors/vscode/test/package.smoke.test.mjs",
+    "test:jetbrains": "node editors/jetbrains/test/plugin.smoke.test.mjs",
     "cli": "spago run -p flatbars-cli",
     "lab": "node scripts/serve-lab.mjs",
     "docs": "antora --fetch antora-playbook.yml",

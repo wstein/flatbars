@@ -1,0 +1,8 @@
+<idea-plugin>
+  <!-- Loaded only when com.intellij.modules.ultimate is present (the platform LSP
+       API is Ultimate-only). Community IDEs skip this and keep just the TextMate
+       fallback registered by the base plugin. -->
+  <extensions defaultExtensionNs="com.intellij">
+    <platform.lsp.serverSupportProvider implementation="com.flatbars.idea.FlatBarsLspServerSupportProvider"/>
+  </extensions>
+</idea-plugin>
