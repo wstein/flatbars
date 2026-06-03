@@ -154,21 +154,26 @@ server it emits **sparse corrections** (`lspEmits`: operator/string/number/set-
 delimiter), leaving the structural braces to the TextMate floor.
 
 **Forgiveness (ADR-023).** An editor must keep highlighting while you type, so the
-wiring drives `FlatBars.Lab.LexerHand.tokenizeRecovering`, which never fails: a
-malformed opener (a half-typed `{{ oops`) becomes an `Invalid` lexeme — emitted
-with the ADR-017 `error` kind's `invalid` modifier — and lexing resyncs just past
-it, so everything around the error still gets tokens. `node
-packages/lexer-lab/lsp.test.mjs` demos the classification table, the wire `data`,
-and the recovery (it asserts a half-typed template still yields tokens).
+wiring drives `FlatBars.Lab.LexerHand.tokenizeRecovering`, which never fails.
+Recovery is **in-tag**, not just opener-level: an unterminated tag keeps every
+interior token it already lexed (so `{{ price * 2` still highlights the `*` and
+`2`), and only a genuinely unparseable tail becomes an `Invalid` lexeme — emitted
+with the ADR-017 `error` kind's `invalid` modifier — with lexing resyncing at the
+next close or opener. (A malformed comment/raw fence still falls back to marking
+its opener `Invalid`.) `node packages/lexer-lab/lsp.test.mjs` demos the
+classification table, the wire `data`, and the recovery.
 
 ## Done in this iteration
 
 - **Lab 2** — the hand-written lexer + a parity battery proving it equals the
   parsing spike; it is faster than the incumbent's full pipeline on every density
   profile (after a fused single-pass ocean scan: 21.5 → 39.9 MB/s on pure text).
-- **Forgiveness + LSP** — `tokenizeRecovering` (emits `Invalid`, never fails) and
+- **Forgiveness + LSP** — `tokenizeRecovering` (in-tag recovery: keeps an
+  unterminated tag's interior tokens, marks only the bad tail `Invalid`) and
   `lsp.mjs`, which feeds the hand lexer's tokens to LSP semantic tokens; a
-  half-typed template still highlights.
+  half-typed template still highlights. Also fixed a delimiter-persistence bug
+  (a custom pair was dropped after one tag) caught by a two-custom-tag parity
+  case.
 - **P1** — ocean scanned in one slice, via a **native `String.indexOf`**
   (`consumeWith`) rather than `anyTill`'s per-code-point loop: pure-ocean
   throughput went 1.3 → 27 MB/s, matching the incumbent.
@@ -182,9 +187,9 @@ and the recovery (it asserts a half-typed template still yields tokens).
 1. **Pick the hand-written lexer** as the adoption basis — it carries the
    CST-style token model at the incumbent's speed; the parsing spike stays as the
    readable executable reference the parity test pins it against.
-2. ~~**P2** — error recovery~~ ✓ done (`tokenizeRecovering`). Follow-up: recover
-   *inside* a tag (bad interior char) too, not just at the opener, and carry an
-   error message on `Invalid` for diagnostics.
+2. ~~**P2** — error recovery~~ ✓ done (`tokenizeRecovering`, in-tag). Follow-up:
+   carry an error message on `Invalid` so the wiring can also emit diagnostics
+   (`publishDiagnostics`), not just semantic tokens.
 3. Decide the bracket/path-segment model with the parser team (L3).
 4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate
    against `FlatBars.Lexer` (boundaries + literals), and lift line/column into a

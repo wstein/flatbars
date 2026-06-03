@@ -55,6 +55,7 @@ battery =
   , "hi {{x}}!"
   , "{{   x   }}"
   , "{{=<% %>=}}<% x %>"
+  , "{{=<% %>=}}<% a %> between <% b %>" -- two custom tags: delimiters must persist
   , "\\{{x}}"
   , "{{{{raw}}}}{{x}}{{{{/raw}}}}"
   , ""

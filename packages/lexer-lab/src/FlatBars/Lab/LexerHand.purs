@@ -211,14 +211,21 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
   readTag i pos open close = case trySetDelim i pos open close of
     Just r -> r
     Nothing ->
-      if open == "{{" && close == "}}" then
-        if matchAt i (cu "{{{{") then readRaw i pos
-        else if matchAt i (cu "{{!--") then readComment i pos "{{!--" "--}}"
-        else if matchAt i (cu "{{!") then readComment i pos "{{!" "}}"
-        else if matchAt i (cu "{{{") then readDelimited i pos "{{{" "}}}" OpenTriple CloseTriple
-          false
-        else readDelimited i pos "{{" "}}" Open CloseTag true
-      else readDelimited i pos open close Open CloseTag false
+      let
+        result =
+          if open == "{{" && close == "}}" then
+            if matchAt i (cu "{{{{") then readRaw i pos
+            else if matchAt i (cu "{{!--") then readComment i pos "{{!--" "--}}"
+            else if matchAt i (cu "{{!") then readComment i pos "{{!" "}}"
+            else if matchAt i (cu "{{{") then readDelimited i pos "{{{" "}}}" OpenTriple CloseTriple
+              false
+            else readDelimited i pos "{{" "}}" Open CloseTag true
+          else readDelimited i pos open close Open CloseTag false
+      in
+        -- Only a set-delimiter changes the active pair; every other tag leaves it
+        -- as it was. (The readers return a placeholder pair, so reset it here —
+        -- otherwise a custom pair was dropped after a single tag.)
+        map (_ { open = open, close = close }) result
 
   -- {{=A B=}} — needs a well-formed `=close`; otherwise fall back (Nothing) to
   -- a plain tag, exactly as the parsing spike's `try setDelimTag` does.
@@ -318,6 +325,7 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
             tr =
               if allowTrim then readTrim inr.i inr.pos else { pieces: [], i: inr.i, pos: inr.pos }
             closeCh = cu close
+            base = Array.concat [ [ openP ], tl.pieces, sg.pieces, inr.pieces, tr.pieces ]
           in
             if matchAt tr.i closeCh then
               let
@@ -326,10 +334,44 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
                 closeP = Lex { value: closeL, span: { start: tr.pos, end: posC } }
               in
                 Right
-                  { pieces: Array.concat
-                      [ [ openP ], tl.pieces, sg.pieces, inr.pieces, tr.pieces, [ closeP ] ]
-                  , i: next
-                  , pos: posC
+                  { pieces: Array.snoc base closeP, i: next, pos: posC, open: "{{", close: "}}" }
+            -- In-tag recovery: the interior tokens already lexed STAY; only the
+            -- unparseable tail becomes Invalid. Resync at the next close (consume
+            -- it) or the next opener (leave it for the main loop), whichever comes
+            -- first — or EOF.
+            else if recover then
+              let
+                j = tr.i
+                openCh = cu open
+                plan = case findFrom j closeCh of
+                  Just c | maybe true (\o -> c < o) (findFrom j openCh) ->
+                    { invEnd: c, withClose: true, next: c + SCU.length close }
+                  _ -> case findFrom j openCh of
+                    Just o -> { invEnd: o, withClose: false, next: o }
+                    Nothing -> { invEnd: len, withClose: false, next: len }
+                posInv = advance tr.pos j plan.invEnd
+                invPieces =
+                  if plan.invEnd > j then
+                    [ Lex
+                        { value: Invalid (sliceStr j plan.invEnd)
+                        , span: { start: tr.pos, end: posInv }
+                        }
+                    ]
+                  else []
+                closed =
+                  if plan.withClose then
+                    let
+                      pc = advance posInv plan.invEnd plan.next
+                    in
+                      { pieces: [ Lex { value: closeL, span: { start: posInv, end: pc } } ]
+                      , pos: pc
+                      }
+                  else { pieces: [], pos: posInv }
+              in
+                Right
+                  { pieces: Array.concat [ base, invPieces, closed.pieces ]
+                  , i: plan.next
+                  , pos: closed.pos
                   , open: "{{"
                   , close: "}}"
                   }
@@ -382,9 +424,13 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
   readInterior i0 pos0 close = loop i0 pos0 Nil
     where
     closeCh = cu close
+    stop i pos acc = { pieces: Array.fromFoldable (List.reverse acc), i, pos }
     loop i pos acc
-      | matchAt i closeCh = Right { pieces: Array.fromFoldable (List.reverse acc), i, pos }
-      | i >= len = Left (LexError "unterminated tag" pos0)
+      | matchAt i closeCh = Right (stop i pos acc)
+      -- EOF before the close: stop and keep what we have when recovering (the
+      -- caller marks the rest Invalid); strict mode still fails.
+      | i >= len =
+          if recover then Right (stop i pos acc) else Left (LexError "unterminated tag" pos0)
       | isSpace (at i) =
           let
             e = runWhile isSpace i
@@ -393,8 +439,10 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
             loop e pos1
               (Triv { value: Whitespace (sliceStr i e), span: { start: pos, end: pos1 } } : acc)
       | otherwise = case lexeme i pos of
-          Left err -> Left err
-          Right Nothing -> Right { pieces: Array.fromFoldable (List.reverse acc), i, pos }
+          -- A malformed literal: in recovery, stop here (the bad span becomes
+          -- part of the caller's Invalid tail); strict mode propagates the error.
+          Left err -> if recover then Right (stop i pos acc) else Left err
+          Right Nothing -> Right (stop i pos acc)
           Right (Just r) -> loop r.i r.pos (r.piece : acc)
 
   -- One interior lexeme, or `Nothing` if nothing can start here (stop).

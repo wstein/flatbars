@@ -57,17 +57,38 @@ ok("sample yields a sparse operator/number/set-delimiter stream");
 assert.ok(!lex("{{ title }}").some((t) => t.emit && t.kind === "Open"), "{{ is not emitted");
 ok("structural braces stay silent (sparse corrections only)");
 
-// FORGIVENESS: a half-typed template still lexes and still highlights.
-const HALF = 'hi {{ count }} and then {{ oops';
+// FORGIVENESS: a half-typed template still lexes — every valid token survives,
+// including the interior of the still-open last tag (in-tag recovery), so the
+// editor never goes dark mid-keystroke.
+const HALF = "hi {{ count }} and then {{ oops";
 const half = lex(HALF);
-assert.ok(half.some((t) => t.kind === "Invalid"), "the dangling {{ becomes Invalid");
-assert.ok(half.some((t) => t.kind === "Num" || t.text === "count"), "tokens before the error survive");
-const halfDecoded = decode(HALF);
-assert.ok(
-  halfDecoded.some((t) => t.type === "variable" && t.modifiers.includes("invalid")),
-  "the Invalid region carries the `invalid` modifier for the LSP",
-);
+assert.ok(half.some((t) => t.kind === "Ident" && t.text === "count"), "the completed tag survives");
+assert.ok(half.some((t) => t.kind === "Ident" && t.text === "oops"), "the open tag's interior survives");
 ok("a half-typed template still produces tokens (no go-dark on first error)");
+
+// IN-TAG recovery: an unterminated tag keeps the interior tokens it already
+// lexed, so the operator and number in `{{ price * 2` still get semantic tokens
+// — opener-only recovery would have lost them to ocean.
+const INTAG = "{{ price * 2";
+const intag = lex(INTAG);
+assert.ok(intag.some((t) => t.kind === "Op" && t.text === "*"), "operator survives in-tag recovery");
+assert.ok(intag.some((t) => t.kind === "Num"), "number survives in-tag recovery");
+const intagTypes = decode(INTAG).map((t) => t.type);
+assert.ok(intagTypes.includes("operator") && intagTypes.includes("number"), "they still emit semantic tokens");
+ok("in-tag recovery keeps an unterminated tag's interior (operator + number)");
+
+// Only the unparseable TAIL is Invalid, and lexing resyncs at the close so the
+// next tag is unaffected.
+const TAIL = "{{ a ; b }} ok {{ y }}"; // `;` can't start an interior lexeme
+const tail = lex(TAIL);
+assert.ok(tail.some((t) => t.kind === "Invalid"), "the bad interior tail is Invalid");
+assert.ok(tail.some((t) => t.text === "a"), "the valid prefix (a) is kept");
+assert.equal(tail.filter((t) => t.kind === "Ident" && t.text === "y").length, 1, "the next tag still lexes");
+assert.ok(
+  decode(TAIL).some((t) => t.type === "variable" && t.modifiers.includes("invalid")),
+  "the Invalid tail reaches the LSP wire with the `invalid` modifier",
+);
+ok("in-tag recovery marks only the bad tail Invalid and resyncs at the close");
 
 // And it is genuinely forgiving across several breakages.
 for (const bad of ["{{", "{{ x", "{{#each", "before {{!{{ after {{ y }}", "{{{ z"]) {
