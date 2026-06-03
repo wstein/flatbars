@@ -68,10 +68,12 @@ test("text outside any tag stays plain (and escaped)", () => {
 });
 
 test("a dialect-disallowed shape is flagged stem-error, not painted valid", () => {
-  // MaxBars (extras off) rejects {{&x}} / {{^x}} / {{{{…}}}}; the highlighter
-  // agrees with the parser by colouring them stem-error.
+  // MaxBars (extras off) rejects {{&x}} / {{^x}} and the *Handlebars* no-hash raw
+  // block {{{{name}}}}; the highlighter agrees by colouring them stem-error. (Per
+  // the per-dialect raw-block gating, MaxBars *accepts* the FlatBars-native hash
+  // spelling {{{{#name}}}}, so that one is not an error here.)
   assert.ok(highlightTemplate("{{&x}}", "maxbars").startsWith('<span class="stem-error">'));
-  assert.ok(highlightTemplate("{{{{#raw}}}}b{{{{/raw}}}}", "maxbars").includes('class="stem-error"'));
+  assert.ok(highlightTemplate("{{{{raw}}}}b{{{{/raw}}}}", "maxbars").includes('class="stem-error"'));
   // FullBars (inheritance off) rejects the Mustache {{<l}} sigil.
   assert.ok(highlightTemplate("{{<l}}x{{/l}}", "fullbars").startsWith('<span class="stem-error">'));
   // …but MinBars allows them, so there it is the raw family, not an error.
