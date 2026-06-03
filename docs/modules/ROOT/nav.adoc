@@ -25,6 +25,7 @@
 * xref:adr-0020-user-block-helpers.adoc[ADR-020: user block helpers (proposed)]
 * xref:adr-0021-maxbars-variable-model.adoc[ADR-021: MaxBars/RawBars variable model (proposed)]
 * xref:adr-0022-analyse-mode.adoc[ADR-022: truthiness lambda + analyse mode (proposed)]
+* xref:adr-0023-recovering-parser.adoc[ADR-023: recovering parser (diagnostics)]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification

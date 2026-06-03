@@ -141,7 +141,9 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 ### Package layers (dependencies point downward)
 
 - **`core` (`flatbars`)** — the framework: lexer, parser, skeleton AST, `Value`,
-  spans, errors. No engine, no helpers, no validation.
+  spans, errors. No engine, no helpers, no validation. The parser is *recovering*
+  (`parseRecovering` → tree + all errors, `NodeError` nodes); the total fail-fast
+  `parse` is its projection — one parser, not two (ADR-023).
 - **`kernel`** — the shared engine machinery, dialect-agnostic: `Engine` (IoC
   interpret driver), `Env`/`RefEnv`, `Helper` (arity combinators), `Lower`
   (structural → typed "real" AST), `Prelude` (the reference helpers + schema),
@@ -205,8 +207,9 @@ legend, the TextMate scopes). `editors/flatbars.tmLanguage.json` is the best-eff
 TextMate *fallback* (the floor for no-LSP contexts): the well-known Handlebars
 grammar re-identified as `source.flatbars` and extended for all four dialects,
 keeping its familiar scope names, drift-bounded by `check:tmgrammar`. `editors/lsp`
-(`flatbars-lsp`) is the authoritative semantic-tokens server — it embeds the
-committed `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize`
+(`flatbars-lsp`) is the authoritative language server — it embeds the committed
+`flatbars-js` bundle and answers `semanticTokens/full` from `tokenize` plus
+`publishDiagnostics` from `diagnostics` (the recovering parser, ADR-023)
 (`test:lsp`). `editors/vscode` is the VS Code extension bundling the LSP client +
 grammar (`test:vscode`, a headless smoke test; its `dist/` is a git-ignored build
 product). `editors/jetbrains` is the JetBrains plugin (Gradle/Kotlin): the
@@ -214,8 +217,8 @@ TextMate grammar via a `TextMateBundleProvider` for all IDEs, plus the LSP path 
 Ultimate (`-PwithLsp`; the platform LSP API is Ultimate-only and absent from the
 open SDK). `test:jetbrains` is the offline gate (drives the bundled server, checks
 descriptors — no JVM); the full `gradle buildPlugin` is a CI/JDK-17 step.
-Diagnostics/hover are deferred (they need a recovering parser — ADR-017 open
-question); Marketplace publishing is a tracked follow-up.
+Diagnostics shipped (ADR-023's recovering parser); hover/completion and Marketplace
+publishing are the tracked follow-ups.
 
 ### Conventions worth knowing
 
