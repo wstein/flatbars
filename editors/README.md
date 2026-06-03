@@ -39,7 +39,11 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
 
 ## Tracked follow-ups
 
-Diagnostics / hover / completion (need the recovering parser — ADR-017 open
-question), Marketplace/JetBrains-Marketplace publishing, and a `tree-sitter`
-fallback for Zed/Neovim/GitHub (as *another* gated fallback, never the engine's
-parser).
+Hover / completion (on the recovering parser's `NodeError` substrate — ADR-023;
+diagnostics already ship), Marketplace/JetBrains-Marketplace publishing, a
+`tree-sitter` fallback for Zed/Neovim/GitHub (as *another* gated fallback, never
+the engine's parser), and an **opt-in brace-close convenience**: brace
+auto-closing is deliberately OFF (FlatBars has `{{ }}` / `{{{ }}}` / `{{{{ }}}}`
+widths, so a declarative `{{` pair over-inserts on a run of `{`), so the
+convenience would return as a `{{ $0 }}` snippet/completion or a VS-Code-only
+"grow the pair" type-handler — never as a declarative auto-closing pair.

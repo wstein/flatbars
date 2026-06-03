@@ -1,11 +1,8 @@
 {
   "comments": { "blockComment": ["{{!--", "--}}"] },
-  "brackets": [
-    ["{{", "}}"],
-    ["{{{", "}}}"]
-  ],
+  "//": "FlatBars has THREE legitimate brace widths — {{ }} (interpolation), {{{ }}} (raw), {{{{ }}}} (raw block). At the 2nd `{` the editor cannot know which you mean, and a declarative `{{` auto-closing pair re-fires on every following `{` (a run of N `{` inserts 2*(N-1) closers: {{{ -> }}}} ). So brace auto-closing is deliberately OFF (ADR-023 debate); `{{`/`}}` stays in `brackets` for matching only, which does not auto-close once autoClosingPairs is set. Structure comes from the grammar + LSP, not from the editor guessing.",
+  "brackets": [["{{", "}}"]],
   "autoClosingPairs": [
-    { "open": "{{", "close": "}}" },
     { "open": "\"", "close": "\"" },
     { "open": "'", "close": "'" }
   ],
