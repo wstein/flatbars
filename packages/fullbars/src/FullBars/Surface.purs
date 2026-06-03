@@ -46,6 +46,7 @@ module FullBars.Surface
   , extractBlockParams
   , LoopVars
   , noLoopVars
+  , reservedScope
   , hoistInline
   ) where
 
@@ -56,7 +57,7 @@ import Data.Foldable (foldl)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number as Number
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
 import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
@@ -85,6 +86,24 @@ type LoopVars = Ident -> Maybe Ident
 -- | scoped vars are reached only through `@`).
 noLoopVars :: LoopVars
 noLoopVars _ = Nothing
+
+-- | An internal capability marker on the `LoopVars` hook (ADR-021). The desugar's
+-- | `pathExpr` asks `lv reservedMarker`: when answered, the *reserved variable
+-- | model* is on (`loop`/`root`/`parent` are scope-declared names, with
+-- | `parent`/`parent.parent` climbing and `loop`/`root` as scoped operations).
+-- | FullBars' `noLoopVars` never answers it (Handlebars-faithful: those are data
+-- | fields, `@`/`../` reach scope); MaxBars wraps its resolver with `reservedScope`.
+-- | A control-char string no author can type, so it never collides with a path.
+reservedMarker :: Ident
+reservedMarker = "\x0000reserved"
+
+-- | Turn the *reserved variable model* on for a dialect by wrapping its `LoopVars`
+-- | resolver so it also answers `reservedMarker` (ADR-021). The wrapped resolver is
+-- | otherwise unchanged, so loop-variable resolution is untouched.
+reservedScope :: LoopVars -> LoopVars
+reservedScope lv name
+  | name == reservedMarker = Just reservedMarker
+  | otherwise = lv name
 
 -- | `desugarWith noLoopVars` — the FullBars surface (Handlebars-faithful).
 desugar :: Array Ident -> Template -> Template
@@ -356,32 +375,47 @@ pathOrLit lv scope name
 pathExpr :: LoopVars -> Scope -> Ident -> Expr
 pathExpr lv scope raw
   | raw == "this" || raw == "." = App "this" []
-  | otherwise = case stripPrefix (Pattern "@") raw of
-      Just dataPath -> dataExpr dataPath
-      Nothing ->
-        let
-          { depth, rest } = stripParents raw 0
-          segs = segmentsOf rest
-        in
-          case Array.uncons segs of
-            Just { head: first, tail }
-              -- a block param (`as |x|`) shadows everything — it wins first.
-              | depth == 0 && Array.elem first scope ->
-                  if Array.null tail then App first []
-                  else App "lookup" (Array.cons (App first []) (map segKey tail))
-              -- then a dialect loop variable: a *whole* bare name the resolver
-              -- claims becomes a scoped-helper call (MaxBars only). Match on the
-              -- original `raw`, not the segmented head, so an explicit path like
-              -- `this.first` / `../first` (which reduces to the segment `first`)
-              -- is NOT hijacked — it stays a data lookup, the escape hatch.
-              | depth == 0 && Array.null tail
-              , Just canonical <- lv raw -> App canonical []
-            _ ->
-              let
-                base = parents depth
-              in
-                if Array.null segs then base
-                else App "lookup" (Array.cons base (map segKey segs))
+  | otherwise =
+      case stripPrefix (Pattern "@") raw of
+        Just dataPath -> dataExpr dataPath
+        Nothing ->
+          let
+            { depth, rest } = stripParents raw 0
+            segs = segmentsOf rest
+          in
+            case Array.uncons segs of
+              Just { head: first, tail }
+                -- a block param (`as |x|`) shadows everything — it wins first.
+                | depth == 0 && Array.elem first scope ->
+                    if Array.null tail then App first []
+                    else App "lookup" (Array.cons (App first []) (map segKey tail))
+                -- reserved variable model (ADR-021, MaxBars): `loop`/`root` are scoped
+                -- operations (the loop object / root context). `parent` maps to the
+                -- internal `@parentchain` object the frame installs — a materialized
+                -- chain of enclosing contexts, so `parent.parent.x` is an ordinary
+                -- nested lookup (`@parentchain.parent.x`), not a special climb. Using a
+                -- distinct binding keeps FullBars' `@../`-facing `parent` helper intact.
+                | reserved && depth == 0 && first == "loop" -> scopedHead "loop" tail
+                | reserved && depth == 0 && first == "root" -> scopedHead "root" tail
+                | reserved && depth == 0 && first == "parent" -> scopedHead "@parentchain" tail
+                -- then a dialect loop variable: a *whole* bare name the resolver
+                -- claims becomes a scoped-helper call (MaxBars only). Match on the
+                -- original `raw`, not the segmented head, so an explicit path like
+                -- `this.first` / `../first` (which reduces to the segment `first`)
+                -- is NOT hijacked — it stays a data lookup, the escape hatch.
+                | depth == 0 && Array.null tail
+                , Just canonical <- lv raw -> App canonical []
+              _ ->
+                let
+                  base = parents depth
+                in
+                  if Array.null segs then base
+                  else App "lookup" (Array.cons base (map segKey segs))
+      where
+      reserved = isJust (lv reservedMarker)
+      scopedHead name tail =
+        if Array.null tail then App name []
+        else App "lookup" (Array.cons (App name []) (map segKey tail))
 
 -- | A `@data` path: the first segment is a scoped helper, any remaining
 -- | segments are looked up on its value. `@index` ⇒ `(index)`; `@root.x` ⇒

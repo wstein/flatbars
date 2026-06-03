@@ -190,6 +190,25 @@ function bindLoop(frame, label) {
   return frame;
 }
 
+// The `@parentchain` object backing the reserved `parent` name (ADR-021): the
+// ENCLOSING context (parentFrame.ctx) wrapped as a chain — its data fields, plus
+// `this`/`parent`/`root` (reserved fields win). Mirrors the interpreter's
+// `buildContextChain`, so `parent.x`/`parent.parent.x` agree across paths.
+function bindContextChain(frame, parentFrame) {
+  const enclosingCtx = parentFrame.ctx;
+  const enclosingChain = parentFrame.binds["@parentchain"];
+  const ctxFields =
+    enclosingCtx && typeof enclosingCtx === "object" && !Array.isArray(enclosingCtx) && !isSafe(enclosingCtx)
+      ? enclosingCtx
+      : {};
+  frame.binds["@parentchain"] = Object.assign({}, ctxFields, {
+    this: enclosingCtx,
+    parent: enclosingChain || null,
+    root: enclosingChain ? enclosingChain.root : enclosingCtx,
+  });
+  return frame;
+}
+
 // ── iteration: `each` over array or object (FullBars eachH) ──────────────────
 // `names` are block-param names (`as |item i|`): item = element, i = index
 // (array) or key (object), matching the interpreter.
@@ -209,12 +228,15 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
   let out = "";
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
-    const fr = bindLoop(
-      bindNames(
-        childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1, items.length),
-        names, [it.val, it.idx],
+    const fr = bindContextChain(
+      bindLoop(
+        bindNames(
+          childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1, items.length),
+          names, [it.val, it.idx],
+        ),
+        label,
       ),
-      label,
+      parent,
     );
     out += bodyFn(fr);
   }
@@ -228,7 +250,9 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
 // surface only emits a loop label on `each`, so it is null here in practice.
 function withCtx(val, parent, names, label, bodyFn, elseFn) {
   if (!truthy(parent.falsy, val)) return elseFn(parent);
-  return bodyFn(bindNames(childFrame(parent, val, null, null, null, null), names, [val]));
+  return bodyFn(
+    bindContextChain(bindNames(childFrame(parent, val, null, null, null, null), names, [val]), parent),
+  );
 }
 
 // ── partials: render a registered partial (FullBars partialH) ────────────────

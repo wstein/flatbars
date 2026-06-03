@@ -26,6 +26,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import FullBars (LoopVars, desugarSurfaceWith, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
 import FullBars.Compile (compileSurfaceWith)
+import FullBars.Surface (reservedScope)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Walk (Issue)
@@ -56,8 +57,12 @@ maxOptions =
 -- | one place the "MaxBars-only" loop variables are *named*; the underlying
 -- | frame metadata is shared (`Kernel.Prelude` `iterate`), but only this
 -- | resolver turns a bare `{{index0}}` into the scoped call `(index0)`.
+-- | Wrapped with `reservedScope` so the desugar turns on the ADR-021 reserved
+-- | variable model (`loop`/`root`/`parent` scope-declared, `parent` climbing) for
+-- | every MaxBars desugar path — no call-site threading. The bare loop-variable
+-- | cases below are unchanged (they remain until ADR-021 increment C drops them).
 maxLoopVars :: LoopVars
-maxLoopVars = case _ of
+maxLoopVars = reservedScope case _ of
   "index0" -> Just "index0"
   "index1" -> Just "index1"
   "rindex0" -> Just "rindex0"

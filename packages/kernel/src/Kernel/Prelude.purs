@@ -987,6 +987,35 @@ parentData ctl =
   where
   rebind (Tuple newName srcName) = Tuple newName <$> lookupOperation srcName ctl.env
 
+-- | The `@parentchain` object backing the reserved `parent` name (ADR-021): the
+-- | enclosing context wrapped as a chain — its own data fields, plus `this` (the
+-- | enclosing context), `parent` (the enclosing frame's chain, or `VNull`), and
+-- | `root` (the outermost context). Reserved fields win over same-named data
+-- | fields. Built by every frame-shifting block (`each`/`with`); a body reads
+-- | `parent.x`, `parent.parent.x`, `parent.root.x` as ordinary nested lookups.
+buildContextChain :: forall m. MonadThrow Error m => Ctl m (RefEnv m) -> m Value
+buildContextChain ctl = do
+  enclosingChain <- case lookupOperation "@parentchain" ctl.env of
+    Just op -> op ctl []
+    Nothing -> pure VNull
+  let
+    enclosingCtx = refContext ctl.env
+    ctxFields = case enclosingCtx of
+      VObject m -> m
+      _ -> Map.empty
+    rootCtx = case enclosingChain of
+      VObject m -> fromMaybe enclosingCtx (Map.lookup "root" m)
+      _ -> enclosingCtx
+  pure
+    ( VObject
+        ( Map.union
+            ( Map.fromFoldable
+                [ Tuple "this" enclosingCtx, Tuple "parent" enclosingChain, Tuple "root" rootCtx ]
+            )
+            ctxFields
+        )
+    )
+
 iterate
   :: forall m
    . MonadThrow Error m
@@ -1002,6 +1031,10 @@ iterate ctl names items = do
   enclosingLoop <- case lookupOperation "loop" ctl.env of
     Just op -> op ctl []
     Nothing -> pure VNull
+  -- the `@parentchain` object: the enclosing context and its own chain, so
+  -- `parent`/`parent.parent` (ADR-021) climb. Same for every iteration (it depends
+  -- on the enclosing context, not the element), so built once.
+  parentChain <- buildContextChain ctl
   let
     main = mainBody ctl
     n = Array.length items
@@ -1034,9 +1067,12 @@ iterate ctl names items = do
           )
       )
     -- `loop` is bound on every iteration (ADR-021); a `label NAME` (ADR-013) binds
-    -- the same object under the chosen name (`outer`).
+    -- the same object under the chosen name (`outer`). `@parentchain` backs the
+    -- reserved `parent` name; it is the same object for every iteration.
     loopBinds i val key =
-      [ Tuple "loop" (constOperation (loopObject i val key)) ]
+      [ Tuple "loop" (constOperation (loopObject i val key))
+      , Tuple "@parentchain" (constOperation parentChain)
+      ]
         <> case ctl.loopLabel of
           Just lbl -> [ Tuple lbl (constOperation (loopObject i val key)) ]
           Nothing -> []
@@ -1073,16 +1109,20 @@ iterate ctl names items = do
 withH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 withH ctl args = case Array.uncons args of
   Just { head: v, tail: rest } ->
-    if truthy (refFalsy ctl.env) v then
+    if truthy (refFalsy ctl.env) v then do
+      -- `with` is not a loop, so it binds no `loop`; it installs `@parentchain`
+      -- (the reserved `parent` chain, ADR-021) and inherits the enclosing `loop`.
+      parentChain <- buildContextChain ctl
       let
         binds = Array.zipWith (\nm val -> Tuple nm (constOperation val)) (bindingNames rest) [ v ]
         frame = Map.fromFoldable
-          ( [ Tuple "parent" (constOperation (refContext ctl.env)) ]
+          ( [ Tuple "parent" (constOperation (refContext ctl.env))
+            , Tuple "@parentchain" (constOperation parentChain)
+            ]
               <> parentData ctl
               <> binds
           )
-      in
-        renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)
+      renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)
     else renderElse ctl
   Nothing -> throwError (ArityError "with: expected at least 1 argument(s), got 0")
 

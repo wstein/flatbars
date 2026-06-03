@@ -292,6 +292,11 @@ export const cases = [
   { name: "mx:label-outer-array", dialect: "maxbars", t: "{{#each rows as |row| label outer}}{{#each row}}{{outer.index1}}/{{outer.length}}:{{this}}{{#if outer.first}}*{{/if}} {{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
   { name: "mx:label-single", dialect: "maxbars", t: "{{#each xs label l}}{{l.index0}}:{{this}}/{{l.last}} {{/each}}", d: { xs: ["a", "b", "c"] } },
   { name: "mx:label-object-key", dialect: "maxbars", t: "{{#each rows as |r| label outer}}{{#each r}}[{{r}}@{{outer.key}}]{{/each}}{{/each}}", d: { rows: { A: ["x"], B: ["y", "z"] } } },
+  // ── ADR-021 reserved variable model: loop / root / parent (chainable) ─────────
+  { name: "mx:loop-fields", dialect: "maxbars", t: "{{#each xs}}{{loop.index1}}/{{loop.length}}{{#if loop.first}}<{{/if}}{{#if loop.last}}>{{/if}} {{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:loop-parent", dialect: "maxbars", t: "{{#each rows}}{{#each this}}[{{loop.index0}}@{{loop.parent.index0}}/{{loop.root.length}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "mx:root", dialect: "maxbars", t: "{{#each xs}}{{root.title}}:{{this}} {{/each}}", d: { title: "T", xs: ["a", "b"] } },
+  { name: "mx:parent-chain", dialect: "maxbars", t: "{{#each rows}}{{#each cells}}[{{parent.tag}}|{{parent.parent.title}}|{{parent.root.title}}]{{/each}}{{/each}}", d: { title: "R", rows: [{ tag: "A", cells: ["x", "y"] }, { tag: "B", cells: ["z"] }] } },
 
   // canonical escapers escapeHtml/escapeJson (compiled ≡ interpreter).
   { name: "escapeHtml-canonical", t: "{{{escapeHtml (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },
