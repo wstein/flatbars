@@ -110,10 +110,13 @@ stateful regions. The grammar is the floor; the engine is the ceiling.
 
 * *Token vocabulary.* Define the stable kind set (tag-role × interior-role) that the `tokenize` API, the
   LSP semantic-token legend, and the TextMate scopes all map to — the single contract the three
-  consumers share. The enabling step is done: `FlatBars.Token.PosToken` now carries an `end` offset, so
-  `highlightSpans` already emits the interior-role kinds (`operator` / `string` / `number`) alongside the
-  tag-role kinds — that span set is the draft vocabulary the LSP legend and TextMate scopes will map to.
-  The *operation*-kind axis (value / inline / block / operator) it pairs with is owned by
+  consumers share. The enabling step is done: `FlatBars.Token.PosToken` carries an `end` offset, so a
+  consumer can recover an exact source span for every interior token. `highlightSpans` itself emits only
+  the tag-role kinds — each tag is painted once, by the meaning of its head (an interior literal or
+  operator carries no meaning of its own to colour; see xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014]).
+  The interior-role axis (`operator` / `string` / `number`) is therefore the LSP/TextMate vocabulary's
+  to define when those richer, opt-in semantic-token consumers land — the `end` offset is the substrate
+  that keeps it cheap. The *operation*-kind axis (value / inline / block / operator) it pairs with is owned by
   xref:adr-0019-operation-vocabulary.adoc[ADR-019]; completion labels should reference that taxonomy
   rather than coin their own.
 * *Incremental semantic tokens.* Whole-document retokenization is fine at current sizes; add range

@@ -56,10 +56,14 @@ had no such gate, so the drift was silent.
   (`["else","elif"]` for the kernel dialects, *empty* for MinBars, where `else` is just a variable) —
   IoC, the same seam `trimStandalone` consults, never a hardcoded keyword list. A regex cannot even
   *tokenize* MaxBars (operator chars vs path chars) nor know a dialect's separator set, which is
-  decisive against the regex as a permanent solution. *Interior* tokens are coloured too — `operator` /
-  `string` / `number` punch through the tag's head colour (so MaxBars `a + b`, `a ?? b` read with
-  operators distinct from paths) — once `FlatBars.Token.PosToken` gained an `end` offset
-  (xref:adr-0017-editor-support-lsp.adoc[ADR-017]).
+  decisive against the regex as a permanent solution. *A tag is coloured as one span by its meaning* —
+  the structural role of its head (interpolation, block, partial, comment, …). Interior tokens
+  (operators, string and number literals) are *not* singled out: a literal carries no meaning of its
+  own beyond "an argument to this tag", so painting it a second colour competes with the tag's role
+  rather than clarifying it. (An earlier iteration tiled each tag with `operator` / `string` / `number`
+  sub-spans; it was removed in favour of this one-colour-per-meaning rule. The per-token `end` offset
+  that enabled it stays in `FlatBars.Token.PosToken` as substrate for the future LSP token vocabulary —
+  xref:adr-0017-editor-support-lsp.adoc[ADR-017].)
 
 . *A drift gate is mandatory* (`check:highlight`, mirroring `check:catalog`), wired into `npm test`.
   Highlighting joins "measured, not asserted": a lexer change not reflected in highlighting fails the

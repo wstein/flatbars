@@ -52,7 +52,7 @@ type Span    = { from: number, to: number, kind: Kind }          // UTF-16 offse
 
 ### 3.1 `Kind` enumeration (from the lexer's own vocabulary)
 
-Each tag produces a span tagged by its structural role (the `RawTok` constructor + sigil), **tiled** with its interior tokens — operators, strings and numbers get their own span; identifiers, parens, delimiters and whitespace stay the tag's colour, so a simple `{{name}}` is one chunk. Content runs produce no span — they stay default text.
+Each tag produces **one** span tagged by its structural role (the `RawTok` constructor + sigil). The whole tag reads in that single colour — head, arguments, and any interior literals or operators alike: a literal (`"admin"`, `898`) or an operator (`+`, `??`, `|`) carries no meaning of its own to colour beyond "an argument to this tag", so a second colour would compete with the tag's role rather than clarify it. Content runs produce no span — they stay default text.
 
 **Tag-role kinds** (from the `RawTok` constructor):
 
@@ -72,17 +72,17 @@ Each tag produces a span tagged by its structural role (the `RawTok` constructor
 | `raw-block` | `RRaw` (whole block) | `{{{{raw}}}} … {{{{/raw}}}}` |
 | `error` | a dialect-disallowed shape (an `extras`/`inheritance`-gated tag, see §3) | `{{&x}}`, `{{^x}}`, `{{{{…}}}}` in RawBars/MaxBars; `{{<x}}`/`{{$x}}` outside MinBars |
 
-**Interior-role kinds** (from `tokenizeInterior`, ADR-017): `operator` (`TOp` — MaxBars `+ - * / % ?? \| && \|\| == …`), `string` (`TStr`), `number` (`TNum`). Identifiers/paths (`TIdent`) and parens stay the tag's head colour.
+There are **no interior-role kinds**: a tag's whole `[from, to)` is one span of its head-role kind. Operators (`TOp`), string literals (`TStr`), number literals (`TNum`), identifiers/paths (`TIdent`) and parens all stay the tag's colour — the meaning lives in the *tag*, not in any one argument inside it. (The richer interior vocabulary — `operator` / `string` / `number` per ADR-017 — is left to the opt-in LSP/TextMate semantic-token layer, which the `PosToken` `end` offset already makes cheap to build.)
 
 `keyword` is the user-facing payoff of deriving from the engine: `{{else}}`/`{{elif …}}` paint as statements (same palette slot as the block kinds), and *which* words count is the dialect's `clauseSeps` — `["else","elif"]` for the kernel dialects (RawBars/FullBars/MaxBars), `[]` for MinBars. A regex would have to hardcode the list and would mis-paint `else` in a Mustache template.
 
-### 3.2 Implementation — tag tiling with interior tokens
+### 3.2 Implementation — one span per tag, by meaning
 
 1. Run the outer `FlatBars.Lexer.tokenizeTemplate` (with the dialect's `LexConfig` — including `mustacheDelims` for set delimiters) → `RawTok`s, each carrying a `Span`. `RSetDelim` and a custom-delimited tag both arrive here already correctly delimited, **because the lexer carries the live pair** — this is the set-delimiters payoff.
-2. Map each `RawTok` to its head-role kind; for `RSep`, dispatch on `>` head (partial) → `clauseSeps` membership (keyword) → otherwise `expr`. For tags with an expression interior (`ROutput`/`RAmp`/`ROpen`/`RClose`/non-partial `RSep`), run `tokenizeInterior (lexOptionsFor dialect)` and **tile** the tag span with the head kind, punching the notable interior tokens (`TOp`/`TStr`/`TNum`) as `operator`/`string`/`number` using their `PosToken` `at`/`end` offsets (ADR-017). Comments, the set-delimiter tag, and raw blocks (literal body) stay one whole-tag span. Content runs map to nothing.
+2. Map each `RawTok` to its head-role kind and emit that one whole-tag span: for `RSep`, dispatch on the interior's `>` head (partial) → `clauseSeps` membership (keyword) → otherwise `expr`; `ROpen` dispatches on its sigil; everything else maps directly (`raw`, `block-close`, `comment`, `set-delimiter`, `raw-block`). The dialect gates (`extras`/`inheritance`) recolour a rejected shape `error`. The interior is read only as *text* (`RSep` head classification); it is never re-tokenized for colouring. Content runs map to nothing.
 3. `LexConfig` + `clauseSeps` are the two dialect seams, supplied by the facade from each dialect's existing settings (`RawBars`/`MaxBars`/`MinBars` set `mustacheDelims = true`; FullBars default-off) — **no new dialect logic**.
 
-**Interior token kinds are deferred** (`path`/`string`/`number`/`operator` *inside* a MaxBars tag). They can't be derived from the current interior lexer: `FlatBars.Token.PosToken` carries only a token *start* (`at`) and, for numbers/strings, the *parsed value* rather than source text, so an exact end offset isn't recoverable. Surfacing them needs `PosToken` to gain an end offset — an invasive change to `FlatBars.Token` and every parser consumer — so it is tracked in §10, not phase 1. Whole-tag coloring is *correct* (it matches/exceeds today's whole-tag regex coloring and fixes every structural bug); interior granularity is an enhancement, not a correctness gap.
+**Interior token colouring is out of scope by design.** Whole-tag colouring is the model: the meaning of a tag is its head role, so a tag is one colour. An argument *inside* a tag — a path, a string, a number, a MaxBars operator — has no colour of its own; a second hue there competes with the role rather than clarifying it. The opt-in LSP/TextMate semantic-token layer (ADR-017) may surface a finer interior vocabulary for editors that want it; the `PosToken` `end` offset is kept as the substrate that makes recovering an exact interior span cheap.
 
 ## 4. The shared CM6 presenter — `lab/cm-flatbars.mjs`
 
@@ -152,7 +152,7 @@ Steps 1–3 + 5 are done; step 4 (tutorials CM6) remains. The tutorials' regex s
 
 ## 10. Future developments
 
-- **Interior token kinds** — *done* (ADR-017). `FlatBars.Token.PosToken` gained an `end` offset, so `highlightSpans` tiles each tag with its interior `operator`/`string`/`number` tokens (MaxBars `a | f`, `a ?? b`, `n + 1` read with operators distinct from paths) while identifiers stay the tag's colour. The `end` field is additive — the parsers read only `tok`/`at`, so render/compile are byte-identical.
+- **Interior token kinds** — *intentionally not in `highlightSpans`*. An earlier iteration tiled each tag with interior `operator`/`string`/`number` sub-spans (enabled by the `PosToken` `end` offset ADR-017 added); it was removed because a literal or operator carries no meaning of its own to colour, so the second hue competed with the tag's role. `highlightSpans` now paints one span per tag, by meaning. The `end` offset stays in `FlatBars.Token.PosToken` (additive — parsers read only `tok`/`at`, so render/compile are byte-identical) as the substrate for the opt-in **LSP/TextMate semantic-token** layer, which is where a richer interior vocabulary belongs (next bullet).
 - **Tutorials CM6 adoption:** swap the `OpenInLab` textarea+overlay for a CodeMirror 6 `EditorView` per editor — template = the shared `flatbarsHighlight` extension (one presenter with the Lab), data = real `@codemirror/lang-yaml` (retiring `highlightYaml`). Deferred this iteration for the ~150–250 KB gz dependency and because a client-mounted island isn't verifiable in the current gates; the engine-derived overlay already removes the FlatBars-syntax regex.
 - **Semantic layer:** with engine spans in hand, distinguish *known* vs *unknown* helper heads via `preludeSchema` (the linter's `Linter.Aliases` already computes this) and surface lexer `ParseError` spans as editor squiggles (the Lab already imports `lintGutter`/`linter`).
 - **WASM lexer:** compile a slice of `FlatBars.Lexer` to WASM to back a tree-sitter external scanner — making even the external/portable grammar set-delimiter-correct, still from one source.
