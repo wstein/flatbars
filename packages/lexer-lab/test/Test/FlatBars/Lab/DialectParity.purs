@@ -1,11 +1,12 @@
--- | Per-surface parser parity: `FlatBars.Lab.RawTok.parse opts` must equal the
--- | engine's `FlatBars.parseWith opts` for each dialect's own `ParseOptions`
--- | (FullBars `defaultParseOptions`, RawBars `coreOptions`, MaxBars `maxOptions`)
--- | — proving all four surfaces that route through `parseWith` parse through the
--- | swapped lexer too. (MinBars is excluded: it uses its own standalone pipeline,
--- | not `parseWith`.) Equality holds by construction — both paths share the
--- | engine's `buildFromTokens`; only the lexer differs, and RawTok parity makes
--- | the streams identical — so this gate catches any drift.
+-- | Per-surface parser parity — all four surfaces parse through the swapped
+-- | lexer. The three that route through `parseWith` (FullBars
+-- | `defaultParseOptions`, RawBars `coreOptions`, MaxBars `maxOptions`) are
+-- | checked as `Lab.parse opts == parseWith opts`; MinBars, which runs its own
+-- | `mustacheStandalone` pipeline instead, is driven the same way over the lab
+-- | lexer and compared to that pipeline over the incumbent lexer. Equality holds
+-- | by construction — every path shares the engine's `buildFromTokens`; only the
+-- | lexer differs, and RawTok parity makes the streams identical — so this gate
+-- | catches any drift.
 module Test.FlatBars.Lab.DialectParity (tests) where
 
 import Prelude
@@ -15,10 +16,14 @@ import Data.Foldable (for_)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FlatBars.Lab.RawTok (parse) as Lab
-import FlatBars.Parser (defaultParseOptions, parseWith)
+import FlatBars.Lab.Lexer.Types (defaultLexConfig) as LT
+import FlatBars.Lab.RawTok (parse, toRawToks) as Lab
+import FlatBars.Lexer (defaultLexConfig, tokenizeTemplate) as E
+import FlatBars.Parser (buildFromTokens, collectDirectives, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Node(..))
 import MaxBars (maxOptions)
+import MinBars (minOptions)
+import MinBars.Standalone (mustacheStandalone)
 import RawBars (coreOptions)
 import Test.Assert (assertTrue')
 
@@ -78,3 +83,47 @@ tests = do
           Left _, Left _ -> pure unit
           _, _ -> assertTrue' (name <> ": exactly one parser errored on " <> show src) false
   log "  per-dialect parse parity assertions passed"
+
+  -- MinBars routes through its OWN pipeline (mustacheStandalone, not
+  -- trimStandalone), so drive that with the lab lexer and compare to the same
+  -- pipeline over the incumbent lexer — the migration claim for the 4th surface.
+  let
+    -- = MinBars.minLexConfig (unexported): the default pair with set-delimiters on.
+    minLab = LT.defaultLexConfig { mustacheDelims = true }
+    minEng = E.defaultLexConfig { mustacheDelims = true }
+    labMin src = do
+      raw <- Lab.toRawToks minLab src
+      _ <- collectDirectives raw
+      buildFromTokens minOptions (mustacheStandalone raw)
+    engMin src = do
+      toks <- E.tokenizeTemplate minEng src
+      _ <- collectDirectives toks
+      buildFromTokens minOptions (mustacheStandalone toks)
+  for_ minbarsCorpus \src ->
+    case labMin src, engMin src of
+      Right lab, Right eng ->
+        assertTrue'
+          ( "MinBars parse mismatch on " <> show src <> "\n  lab:  " <> show (map norm lab)
+              <> "\n  eng: "
+              <> show (map norm eng)
+          )
+          (map norm lab == map norm eng)
+      Left _, Left _ -> pure unit
+      _, _ -> assertTrue' ("MinBars: exactly one parser errored on " <> show src) false
+  log "  MinBars parse parity (mustacheStandalone) assertions passed"
+
+minbarsCorpus :: Array String
+minbarsCorpus =
+  [ "{{x}}"
+  , "{{{x}}}"
+  , "{{&x}}"
+  , "Hello {{name}}!"
+  , "{{#person}}{{name}}{{/person}}"
+  , "{{^empty}}none{{/empty}}"
+  , "{{> partial}}"
+  , "{{< base}}{{$body}}hi{{/body}}{{/base}}"
+  , "{{=<% %>=}}<% y %> tail"
+  , "{{! a comment }}"
+  , "begin\n{{#section}}\n  {{item}}\n{{/section}}\nend\n"
+  , "  {{! standalone comment }}\nbody\n"
+  ]

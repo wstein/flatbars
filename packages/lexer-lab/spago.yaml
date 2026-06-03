@@ -34,3 +34,4 @@ package:
       # dialect ParseOptions for the per-surface parser-parity test (test-only).
       - rawbars
       - maxbars
+      - minbars

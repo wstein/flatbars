@@ -197,12 +197,14 @@ Two parser tracks over the hand lexer, both parity-checked against the engine:
   tokenizeTemplate src` byte-for-byte across a broad corpus (`~`, raw blocks,
   short/long comments, nesting, escapes, `mustacheDelims` set/custom delimiters),
   plus an end-to-end standalone-whitespace check.
-- **`parse :: ParseOptions -> …`** is dialect-driven, so every surface that
-  routes through `parseWith` parses through the swapped lexer. `DialectParity`
-  asserts `Lab.parse opts == parseWith opts` for **FullBars** (`defaultParseOptions`),
-  **RawBars** (`coreOptions`), and **MaxBars** (`maxOptions` — real infix grammar),
-  over a corpus of valid and dialect-disallowed shapes. (MinBars is excluded: it
-  uses its own standalone pipeline, not `parseWith`.)
+- **`parse :: ParseOptions -> …`** is dialect-driven, so every surface parses
+  through the swapped lexer. `DialectParity` covers **all four**: **FullBars**
+  (`defaultParseOptions`), **RawBars** (`coreOptions`), and **MaxBars**
+  (`maxOptions` — real infix grammar) are checked as `Lab.parse opts ==
+  parseWith opts`; **MinBars**, which runs its own `mustacheStandalone` pipeline
+  rather than `parseWith`, is driven the same way over the lab lexer and compared
+  to that pipeline over the incumbent — across valid and dialect-disallowed
+  shapes, set-delimiters, inheritance (`{{<}}`/`{{$}}`), and standalone lines.
 
 ### End-to-end parse benchmark
 
@@ -272,8 +274,8 @@ concerns — they come from the engine `ParseOptions` the RawTok path reuses.
 4. ~~Add a tokenize-parity gate~~ ✓ done — `spago test -p flatbars-lexer-lab` is
    in `npm test` (`RawTokParity` byte-checks `toRawToks` vs `tokenizeTemplate`).
 5. ~~Drive `parse` per dialect~~ ✓ done — `parse :: ParseOptions -> …`, with
-   `DialectParity` over FullBars/RawBars/MaxBars.
-6. Remaining for real adoption: a MinBars path (its custom standalone pipeline,
-   not `parseWith`); replace the coarse raw-block fences with proper `{{{{`/name/
-   `}}}}` lexemes; and the go/no-go to wire the hand lexer into the engine
-   proper, retiring `FlatBars.Lexer`/`FlatBars.Token`.
+   `DialectParity` over **all four** surfaces (MinBars via its `mustacheStandalone`
+   pipeline).
+6. Remaining for real adoption: replace the coarse raw-block fences with proper
+   `{{{{`/name/`}}}}` lexemes (L2); and the go/no-go to wire the hand lexer into
+   the engine proper, retiring `FlatBars.Lexer`/`FlatBars.Token`.

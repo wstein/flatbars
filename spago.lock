@@ -160,6 +160,7 @@
             "console",
             "effect",
             "maxbars",
+            "minbars",
             "rawbars"
           ]
         }
