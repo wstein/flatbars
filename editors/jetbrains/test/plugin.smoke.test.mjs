@@ -61,13 +61,15 @@ try {
   });
   assert.ok(init.capabilities.semanticTokensProvider, "bundled server advertises semantic tokens");
   await conn.sendNotification("initialized", {});
-  const uri = "file:///t/page.flatbars";
+  // Semantic tokens are sparse corrections: a plain interpolation emits nothing
+  // (the grammar paints it), but a MaxBars operator does.
+  const uri = "file:///t/page.maxbars";
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri, languageId: "flatbars", version: 1, text: "Hi {{name}}" },
+    textDocument: { uri, languageId: "maxbars", version: 1, text: "{{ a ?? b }}" },
   });
   const r = await conn.sendRequest("textDocument/semanticTokens/full", { textDocument: { uri } });
-  const variable = init.capabilities.semanticTokensProvider.legend.tokenTypes.indexOf("variable");
-  assert.deepEqual([...r.data], [0, 3, 8, variable, 0], "one expr token over {{name}}");
+  const operator = init.capabilities.semanticTokensProvider.legend.tokenTypes.indexOf("operator");
+  assert.deepEqual([...r.data], [0, 5, 2, operator, 0], "one operator token over `??`");
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");
 } finally {

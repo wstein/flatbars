@@ -32,27 +32,27 @@ t("legend types/modifiers are the vocabulary's, de-duplicated in order", () => {
   }
 });
 
-// ── Flatten + RLE: tag fills, interior literals override, by line ───────────
-t("tokensOf carves interior operator/string out of the tag run", () => {
-  // {{ a ?? "b" }} — MaxBars: one expr tag with an interior `??` operator and a
-  // string literal punched out of it.
+// ── Sparse emission: only the kinds the grammar can't get right ─────────────
+t("tokensOf emits ONLY interior operator/string for a MaxBars tag (not the tag)", () => {
+  // {{ a ?? "b" }} — the LSP corrects `??` and "b" (dialect-scoped); the `expr` tag
+  // is left to the TextMate grammar, so no whole-tag token is emitted.
   assert.deepEqual(tokensOf('{{ a ?? "b" }}', "maxbars"), [
-    { line: 0, char: 0, length: 5, kind: "expr" },
     { line: 0, char: 5, length: 2, kind: "operator" },
-    { line: 0, char: 7, length: 1, kind: "expr" },
     { line: 0, char: 8, length: 3, kind: "string" },
-    { line: 0, char: 11, length: 3, kind: "expr" },
   ]);
 });
 
-t("tokensOf splits a multi-line comment at the newline (no token crosses \\n)", () => {
-  const toks = tokensOf("a {{!--\nx--}} b", "fullbars");
-  // the comment spans two lines; each line gets its own comment token.
-  assert.deepEqual(
-    toks.filter((x) => x.kind === "comment").map((x) => x.line),
-    [0, 1],
-  );
-  assert.ok(toks.every((x) => x.kind === "comment"), "only the comment is tokenized");
+t("tokensOf leaves structural tags to the grammar (no whole-tag tokens)", () => {
+  // The reported bug: {{{x}}} must NOT be flattened to one semantic token; the
+  // grammar paints braces-vs-name. Likewise plain interpolation and comments.
+  assert.deepEqual(tokensOf("{{{test}}}", "fullbars"), [], "raw output: grammar shows through");
+  assert.deepEqual(tokensOf("{{name}}", "fullbars"), [], "interpolation: grammar shows through");
+  assert.deepEqual(tokensOf("a {{!-- c --}} b", "fullbars"), [], "comment: grammar shows through");
+});
+
+t("tokensOf still emits the kinds the grammar gives up on", () => {
+  assert.deepEqual(tokensOf("{{=<% %>=}}", "minbars").map((x) => x.kind), ["set-delimiter"]);
+  assert.deepEqual(tokensOf("{{&x}}", "rawbars").map((x) => x.kind), ["error"]);
 });
 
 t("plain content produces no tokens", () => {
@@ -107,22 +107,18 @@ t("encodeSemanticTokens delta-encodes; decoding restores the tokens", () => {
     char = dL === 0 ? char + dC : dC;
     decoded.push({ line, char, length: len, type: legend.tokenTypes[type], mods });
   }
+  // Sparse: only the operator and string are emitted (the expr tag is the grammar's).
   assert.deepEqual(decoded, [
-    { line: 0, char: 0, length: 5, type: "variable", mods: 0 },
     { line: 0, char: 5, length: 2, type: "operator", mods: 0 },
-    { line: 0, char: 7, length: 1, type: "variable", mods: 0 },
     { line: 0, char: 8, length: 3, type: "string", mods: 0 },
-    { line: 0, char: 11, length: 3, type: "variable", mods: 0 },
   ]);
 });
 
-t("raw output carries the readonly modifier bit", () => {
+t("a dialect-disallowed shape emits an error token with the invalid modifier", () => {
   const legend = buildLegend();
-  const { data } = encodeSemanticTokens("{{{x}}}", "fullbars");
-  // a single raw token: type variable, modifier readonly (bit 0 -> 1).
-  const mods = data[4];
+  const { data } = encodeSemanticTokens("{{&x}}", "rawbars"); // extras off ⇒ error
   assert.equal(legend.tokenTypes[data[3]], "variable");
-  assert.equal(mods, 1 << legend.tokenModifiers.indexOf("readonly"));
+  assert.equal(data[4], 1 << legend.tokenModifiers.indexOf("invalid"), "invalid modifier set");
 });
 
 console.log(`✓ flatbars-lsp tokens unit tests passed (${passed})`);

@@ -104,8 +104,13 @@ HTML/CSS/JS embedding is removed and host text is left plain. It is explicitly *
 non-authoritative*: being stateless it cannot follow a
 set-delimiter *switch* (the tags past `pass:[{{=A B=}}]`) and is FullBars-flavoured (it paints
 `else`/`each` as keywords even in MinBars, and paints RawBars/MaxBars's `extras`-off shapes as valid).
-When the LSP is attached, semantic tokens override it and correct exactly those regions. The grammar is
-the floor; the engine is the ceiling.
+When the LSP is attached, its semantic tokens are *sparse corrections*, not a blanket re-colour: because
+the floor is now a rich, familiar grammar, the LSP emits a token ONLY where it knows something the
+stateless grammar cannot — dialect-scoped interior operators/literals, set delimiters, and
+dialect-disallowed errors (the vocabulary's `lspEmitKinds`). The structural tags (interpolation, raw,
+blocks, partials, comments) are left to the grammar, so `pass:[{{{x}}}]` keeps its braces-vs-name colour
+instead of being flattened to one whole-tag semantic token. The grammar is the floor; the engine is the
+ceiling *only where the engine knows more*.
 
 . *The fallback is a derived artifact and MUST be drift-bounded, like every other.* But it is *richer*
   than the engine — it splits a tag into sigil / name / args / literals, where the engine paints one kind

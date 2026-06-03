@@ -75,14 +75,20 @@ export function parseDiagnostics(text, dialect) {
   });
 }
 
-// The flattened, NON-OVERLAPPING per-offset kind map LSP semantic tokens require:
-// the tag span fills its range, the interior literal/operator spans override their
-// sub-ranges (the engine emits the layered view; the LSP flattens it).
+// Semantic tokens are SPARSE CORRECTIONS over the TextMate floor (ADR-017), not a
+// blanket re-colour: the LSP emits only the kinds in `lspEmitKinds` — the ones the
+// stateless grammar can't get right (dialect-scoped interior operators/literals,
+// set delimiters, dialect-disallowed errors). The structural tags (interpolation,
+// raw, blocks, partials, comments) are left to the grammar, which already paints
+// the familiar braces-vs-name look — so the LSP does not flatten `{{{x}}}` to one
+// colour. This builds the flattened, non-overlapping per-offset kind map.
+const emitKinds = new Set(vocabulary.lspEmitKinds);
+
 function flatten(text, dialect) {
   const kinds = new Array(text.length).fill(null);
   const spans = tokenize(text, dialect);
-  for (const s of spans) if (s.role === "tag") fillRange(kinds, s.from, s.to, s.kind);
-  for (const s of spans) if (s.role === "interior") fillRange(kinds, s.from, s.to, s.kind);
+  for (const s of spans) if (s.role === "tag" && emitKinds.has(s.kind)) fillRange(kinds, s.from, s.to, s.kind);
+  for (const s of spans) if (s.role === "interior" && emitKinds.has(s.kind)) fillRange(kinds, s.from, s.to, s.kind);
   return kinds;
 }
 

@@ -29,8 +29,19 @@
     "inside a tag). `lsp.type`/`lsp.modifiers` are the semantic-token legend entry.",
     "`tmScopes` are the grammar scopes that express this kind; `[]` means the",
     "stateless fallback gives up (the LSP corrects it). Only the `string`/`number`",
-    "scopes are gate-checked as literals; the tag scopes are documentation."
+    "scopes are gate-checked as literals; the tag scopes are documentation.",
+    "",
+    "`lspEmitKinds` is the SPARSE set of kinds the LSP semantic-token layer emits.",
+    "Semantic tokens are CORRECTIONS over the rich TextMate floor, not a blanket",
+    "re-colour: the LSP emits only where it knows something the stateless grammar",
+    "cannot — dialect-scoped interior operators/literals, set delimiters, and",
+    "dialect-disallowed errors. For the structural tags (interpolation, raw, blocks,",
+    "partials, comments) the grammar already paints the familiar Handlebars look",
+    "(braces vs name), so the LSP stays SILENT and lets it show through, rather than",
+    "flattening `{{{x}}}` to one whole-tag colour. (Trade-off: a set-delimiter",
+    "SWITCH's following tags are not semantic-corrected — a rare, documented give-up.)"
   ],
+  "lspEmitKinds": ["operator", "string", "number", "set-delimiter", "error"],
   "kinds": {
     "expr": {
       "role": "tag",

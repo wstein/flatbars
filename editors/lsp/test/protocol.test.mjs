@@ -63,9 +63,11 @@ try {
     textDocument: { uri },
   });
 
-  // MaxBars: 5 tokens, including the `??` operator the dialect resolution proves.
+  // Sparse semantic tokens (corrections only): the `??` operator and the "b"
+  // string are emitted; the expr tag is left to the grammar. languageId 'maxbars'
+  // is what makes `??` an operator at all.
   const operator = provider.legend.tokenTypes.indexOf("operator");
-  assert.equal(result.data.length, 5 * 5, "five MaxBars tokens");
+  assert.equal(result.data.length, 2 * 5, "two MaxBars correction tokens (operator + string)");
   assert.ok([...result.data].includes(operator), "languageId 'maxbars' resolved → `??` is an operator");
   assert.deepEqual(await maxDiags, [], "valid MaxBars publishes no diagnostics");
 

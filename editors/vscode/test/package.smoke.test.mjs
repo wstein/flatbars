@@ -56,8 +56,9 @@ try {
   });
   const res = await conn.sendRequest("textDocument/semanticTokens/full", { textDocument: { uri } });
 
-  // MaxBars: `??` operator and "b" string carved out of the expr tag — 5 tokens.
-  assert.equal(res.data.length, 5 * 5, "bundled server emits the 5 MaxBars tokens");
+  // Sparse semantic tokens: only the `??` operator and "b" string (the expr tag is
+  // the grammar's) — 2 correction tokens.
+  assert.equal(res.data.length, 2 * 5, "bundled server emits the 2 MaxBars correction tokens");
   const op = legend.tokenTypes.indexOf("operator");
   const str = legend.tokenTypes.indexOf("string");
   assert.ok(res.data.includes(op) && res.data.includes(str), "operator and string tokens present");
