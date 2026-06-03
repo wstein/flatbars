@@ -160,7 +160,7 @@ test("requiredAssigns is exact (path roots only, no helpers/params)", async () =
 
 test("parseAst surfaces partial uses and inline defs as semantic nodes", async () => {
   const r = await createFlatBarsRenderer();
-  const { ast } = r.parseAst('{{#inline "row"}}<li>{{ this }}</li>{{/inline}}{{> row}}{{> missing}}');
+  const { ast } = r.parseAst('{{#*inline "row"}}<li>{{ this }}</li>{{/inline}}{{> row}}{{> missing}}');
   const top = ast.nodes;
   const inline = top.find((n) => n.t === "inline");
   assert.equal(inline && inline.name, "row");
@@ -177,7 +177,7 @@ test("named partial documents render (multi-document)", async () => {
 
 test("inline-defined partials actually render", async () => {
   const r = await createFlatBarsRenderer();
-  const out = run(r, '{{#inline "row"}}[{{ this }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}', { xs: ["a", "b"] });
+  const out = run(r, '{{#*inline "row"}}[{{ this }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}', { xs: ["a", "b"] });
   assert.equal(out, "[a][b]");
 });
 
