@@ -358,7 +358,8 @@ diagnostics = mkFn2 \src dialect ->
     opts = case dialect of
       "maxbars" -> maxOptions
       "minbars" -> MinBars.minOptions
-      _ -> defaultParseOptions
+      "rawbars" -> RawBars.coreOptions
+      _ -> defaultParseOptions -- fullbars (parsed with the default options)
   in
     map (parseErrorAt src) (parseRecovering opts src).errors
 
@@ -382,6 +383,8 @@ highlightConfig = case _ of
     , lexOptions: maxOptions.lexOptions
     , extras: false
     , inheritance: false
+    , rawBlockHbs: false
+    , rawBlockHash: true
     }
   "rawbars" ->
     { lexConfig: withSetDelims
@@ -389,6 +392,8 @@ highlightConfig = case _ of
     , lexOptions: defaultLexOptions
     , extras: false
     , inheritance: false
+    , rawBlockHbs: false
+    , rawBlockHash: true
     }
   "minbars" ->
     { lexConfig: withSetDelims
@@ -396,6 +401,9 @@ highlightConfig = case _ of
     , lexOptions: defaultLexOptions
     , extras: true
     , inheritance: true
+    -- Mustache has no raw blocks: neither spelling.
+    , rawBlockHbs: false
+    , rawBlockHash: false
     }
   _ ->
     { lexConfig: defaultLexConfig { keepLongComments = true }
@@ -403,6 +411,9 @@ highlightConfig = case _ of
     , lexOptions: defaultLexOptions
     , extras: true
     , inheritance: false
+    -- FullBars is Handlebars-faithful: the bare `{{{{name}}}}` only.
+    , rawBlockHbs: true
+    , rawBlockHash: false
     }
   where
   -- Highlighting wants the long comments rendering drops, so it can colour them.

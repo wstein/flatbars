@@ -47,6 +47,10 @@ maxOptions =
     -- the `{{#*}}` decorator and `{{#>}}` partial block stay gated off.
     , decorators = false
     , partialBlocks = false
+    -- like RawBars, MaxBars uses the FlatBars `{{{{#name}}}}` raw-block spelling,
+    -- not the Handlebars bare `{{{{name}}}}` form.
+    , rawBlockHbs = false
+    , rawBlockHash = true
     , lexOptions = { infixArith: true }
     -- Set delimiters enabled (ADR-015): inline `{{=<% %>=}}` + the
     -- `{{! @delimiters: <% %> }}` directive. FullBars stays Handlebars-faithful.

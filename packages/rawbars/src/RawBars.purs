@@ -11,7 +11,8 @@
 -- | the `fullbars` package — its dependency closure is FullBars-free (see ADR-008).
 -- | It exists so the three dialects are symmetric packages over one engine.
 module RawBars
-  ( render
+  ( coreOptions
+  , render
   , renderDiag
   , renderValue
   , renderWithOperations
@@ -60,6 +61,10 @@ coreOptions = defaultParseOptions
   { extras = false
   , decorators = false
   , partialBlocks = false
+  -- RawBars uses the FlatBars `{{{{#name}}}}` raw-block spelling, not the
+  -- Handlebars bare `{{{{name}}}}` form.
+  , rawBlockHbs = false
+  , rawBlockHash = true
   , lexConfig = defaultLexConfig { mustacheDelims = true }
   }
 

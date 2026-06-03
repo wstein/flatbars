@@ -63,6 +63,9 @@ minOptions = defaultParseOptions
   , inheritance = true
   , decorators = false
   , partialBlocks = false
+  -- Mustache has no raw blocks: reject both spellings (the default already rejects
+  -- the `#` form; turn off the Handlebars bare form too).
+  , rawBlockHbs = false
   , trimStandalone = false
   }
 

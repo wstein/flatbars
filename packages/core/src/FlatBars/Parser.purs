@@ -78,6 +78,12 @@ type ParseOptions =
   -- accepts `{{#>name}}` (partial block). Off ⇒ a located `DisallowedShape`.
   , decorators :: Boolean
   , partialBlocks :: Boolean
+  -- raw blocks have two spellings gated separately: `rawBlockHbs` accepts the bare
+  -- `{{{{name}}}}` (the real Handlebars form — FullBars only), `rawBlockHash`
+  -- accepts the FlatBars `{{{{#name}}}}` form (RawBars/MaxBars). Mustache has
+  -- neither, so MinBars sets both off.
+  , rawBlockHbs :: Boolean
+  , rawBlockHash :: Boolean
   , standaloneSeps :: Array String
   , lexOptions :: LexOptions
   , lexConfig :: LexConfig
@@ -97,6 +103,10 @@ defaultParseOptions =
   -- (RawBars/MinBars/MaxBars) turn these off in their own options.
   , decorators: true
   , partialBlocks: true
+  -- the default is the FullBars stance: the Handlebars `{{{{name}}}}` raw block is
+  -- accepted; the FlatBars `{{{{#name}}}}` spelling is not (Handlebars rejects it).
+  , rawBlockHbs: true
+  , rawBlockHash: false
   , standaloneSeps: [ "else", "elif" ]
   , lexOptions: defaultLexOptions
   , lexConfig: defaultLexConfig
@@ -343,6 +353,8 @@ gatesOf opts =
   , inheritance: opts.inheritance
   , decorators: opts.decorators
   , partialBlocks: opts.partialBlocks
+  , rawBlockHbs: opts.rawBlockHbs
+  , rawBlockHash: opts.rawBlockHash
   }
 
 -- | `headed`, but for the *recovering* parser: it never discards everything on a
@@ -398,6 +410,8 @@ type Gates =
   , inheritance :: Boolean
   , decorators :: Boolean
   , partialBlocks :: Boolean
+  , rawBlockHbs :: Boolean
+  , rawBlockHash :: Boolean
   }
 
 parseSeq
@@ -448,8 +462,13 @@ parseSeq pe ph gates lx toks = go Nil []
         | otherwise -> case outputExpr lx pe span base s of
             Left e -> recover acc errs span e (i + 1)
             Right e -> go (Output span e : acc) errs (i + 1)
-      RRaw span base s body
-        | not gates.extras -> recover acc errs span
+      -- Two raw-block spellings, gated separately: `{{{{#name}}}}` (FlatBars,
+      -- RawBars/MaxBars) vs the bare `{{{{name}}}}` (Handlebars, FullBars only).
+      RRaw span hash base s body
+        | hash && not gates.rawBlockHash -> recover acc errs span
+            (DisallowedShape "{{{{# }}}} (raw block)" span.start)
+            (i + 1)
+        | not hash && not gates.rawBlockHbs -> recover acc errs span
             (DisallowedShape "{{{{ }}}} (raw block)" span.start)
             (i + 1)
         | otherwise -> case headed lx pe span base s of

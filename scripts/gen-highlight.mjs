@@ -94,7 +94,12 @@ const CORPUS = [
   //    coloured `error`, never painted valid — the highlighter agrees with the parser. ──
   { id: "maxbars-extras-amp", dialect: "maxbars", note: "extras off: {{&x}} (unescaped) is disallowed → error, not raw", src: "{{&x}}" },
   { id: "maxbars-extras-inverse", dialect: "maxbars", note: "extras off: {{^x}} (inverse) is disallowed → error; the close stays block-close", src: "{{^x}}b{{/x}}" },
-  { id: "maxbars-extras-rawblock", dialect: "maxbars", note: "extras off: {{{{…}}}} raw block (with or without a #) is disallowed → error", src: "{{{{#raw}}}}b{{{{/raw}}}}" },
+  // Raw blocks have two spellings, gated per dialect: the FlatBars `{{{{#name}}}}`
+  // (RawBars/MaxBars) vs the Handlebars bare `{{{{name}}}}` (FullBars). MinBars has
+  // neither (Mustache). A spelling the dialect rejects colours `error`.
+  { id: "maxbars-rawblock-hash", dialect: "maxbars", note: "MaxBars accepts the FlatBars {{{{#raw}}}} spelling → raw-block", src: "{{{{#raw}}}}b{{{{/raw}}}}" },
+  { id: "maxbars-rawblock-bare", dialect: "maxbars", note: "MaxBars rejects the Handlebars bare {{{{raw}}}} spelling → error", src: "{{{{raw}}}}b{{{{/raw}}}}" },
+  { id: "fullbars-rawblock-hash", dialect: "fullbars", note: "FullBars rejects the FlatBars {{{{#raw}}}} spelling (not Handlebars) → error", src: "{{{{#raw}}}}b{{{{/raw}}}}" },
   { id: "fullbars-inheritance-off", dialect: "fullbars", note: "inheritance off: the Mustache {{<l}}/{{$b}} sigils are disallowed → error (FullBars is not a Mustache surface)", src: "{{<l}}{{$b}}x{{/b}}{{/l}}" },
   { id: "minbars-inheritance-on", dialect: "minbars", note: "inheritance on: the same {{<l}}/{{$b}} sigils ARE valid block kinds in MinBars", src: "{{<l}}{{$b}}x{{/b}}{{/l}}" },
   { id: "minbars-extras-on", dialect: "minbars", note: "extras on: {{^x}} (inverse) and {{&x}} (unescaped) are valid in MinBars", src: "{{^x}}b{{/x}}{{&y}}" },

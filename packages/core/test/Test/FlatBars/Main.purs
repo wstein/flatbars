@@ -60,6 +60,8 @@ hlKernel =
   , lexOptions: defaultLexOptions
   , extras: true
   , inheritance: false
+  , rawBlockHbs: true -- FullBars: the bare `{{{{name}}}}` (Handlebars)
+  , rawBlockHash: false -- but not the `{{{{#name}}}}` FlatBars spelling
   }
 
 hlMustache :: HighlightConfig
@@ -69,6 +71,8 @@ hlMustache =
   , lexOptions: defaultLexOptions
   , extras: true
   , inheritance: true
+  , rawBlockHbs: false -- Mustache has no raw blocks: neither spelling
+  , rawBlockHash: false
   }
 
 -- MaxBars-like: extras off (so `{{&}}`/`{{^}}`/`{{{{…}}}}` are disallowed shapes),
@@ -83,6 +87,8 @@ hlMax =
   , lexOptions: { infixArith: true }
   , extras: false
   , inheritance: false
+  , rawBlockHbs: false -- MaxBars: the `{{{{#name}}}}` FlatBars spelling only
+  , rawBlockHash: true
   }
 
 kinds :: HighlightConfig -> String -> Array String
@@ -468,9 +474,20 @@ main = do
     (kinds hlMax "{{&x}}" == [ "error" ])
   assert' "highlight: extras-off disallows {{^x}} (inverse) → error, close stays block-close"
     (kinds hlMax "{{^x}}b{{/x}}" == [ "error", "block-close" ])
-  assert' "highlight: extras-off disallows {{{{…}}}} raw block → error"
+  -- Raw blocks have two spellings gated separately. FullBars accepts the bare
+  -- Handlebars `{{{{r}}}}` and rejects the FlatBars `{{{{#r}}}}`; MaxBars/RawBars
+  -- are the mirror; MinBars rejects both (Mustache has no raw blocks).
+  assert' "highlight: FullBars allows the bare {{{{r}}}} raw block"
+    (kinds hlKernel "{{{{r}}}}b{{{{/r}}}}" == [ "raw-block" ])
+  assert' "highlight: FullBars rejects the {{{{#r}}}} FlatBars spelling → error"
+    (kinds hlKernel "{{{{#r}}}}b{{{{/r}}}}" == [ "error" ])
+  assert' "highlight: MaxBars rejects the bare {{{{r}}}} → error"
     (kinds hlMax "{{{{r}}}}b{{{{/r}}}}" == [ "error" ])
-  -- …but with extras on (Mustache) the same shapes are valid kinds.
+  assert' "highlight: MaxBars allows the {{{{#r}}}} FlatBars spelling"
+    (kinds hlMax "{{{{#r}}}}b{{{{/r}}}}" == [ "raw-block" ])
+  assert' "highlight: MinBars (Mustache) rejects raw blocks → error"
+    (kinds hlMustache "{{{{#r}}}}b{{{{/r}}}}" == [ "error" ])
+  -- …but with extras on (Mustache) the {{^}}/{{&}} shapes are valid kinds.
   assert' "highlight: extras-on allows {{^x}} (inverse) and {{&x}} (raw)"
     (kinds hlMustache "{{^x}}b{{/x}}{{&y}}" == [ "block-inverse", "block-close", "raw" ])
   -- `inheritance = false` (the kernel/FullBars config) disallows {{<}}/{{$}}.

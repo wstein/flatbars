@@ -167,7 +167,7 @@ step src acc = case _ of
 
   RComment span _ _ -> emit acc (sliceSpan src span)
 
-  RRaw span _ _ _ -> emit acc (sliceSpan src span)
+  RRaw span _ _ _ _ -> emit acc (sliceSpan src span)
 
   -- Migrate runs under default delimiters, so a set-delimiter tag never appears;
   -- pass it through verbatim if one ever does (minimal-diff rewrite).

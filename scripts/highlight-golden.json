@@ -932,9 +932,51 @@
       ]
     },
     {
-      "id": "maxbars-extras-rawblock",
+      "id": "maxbars-rawblock-hash",
       "dialect": "maxbars",
-      "note": "extras off: {{{{…}}}} raw block (with or without a #) is disallowed → error",
+      "note": "MaxBars accepts the FlatBars {{{{#raw}}}} spelling → raw-block",
+      "src": "{{{{#raw}}}}b{{{{/raw}}}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 25,
+          "kind": "raw-block"
+        }
+      ],
+      "tokens": [
+        {
+          "from": 0,
+          "to": 25,
+          "kind": "raw-block",
+          "role": "tag"
+        }
+      ]
+    },
+    {
+      "id": "maxbars-rawblock-bare",
+      "dialect": "maxbars",
+      "note": "MaxBars rejects the Handlebars bare {{{{raw}}}} spelling → error",
+      "src": "{{{{raw}}}}b{{{{/raw}}}}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 24,
+          "kind": "error"
+        }
+      ],
+      "tokens": [
+        {
+          "from": 0,
+          "to": 24,
+          "kind": "error",
+          "role": "tag"
+        }
+      ]
+    },
+    {
+      "id": "fullbars-rawblock-hash",
+      "dialect": "fullbars",
+      "note": "FullBars rejects the FlatBars {{{{#raw}}}} spelling (not Handlebars) → error",
       "src": "{{{{#raw}}}}b{{{{/raw}}}}",
       "spans": [
         {

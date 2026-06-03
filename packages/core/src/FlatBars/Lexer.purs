@@ -42,7 +42,10 @@ data RawTok
   | ROpen Span Sigil Int String -- {{# / {{^ / {{< / {{$ <interior> }} — sigil distinguishes them
   | RClose Span Int String -- {{/ <interior> }}
   | RSep Span Int String -- {{ <interior> }} — a name-agnostic separator
-  | RRaw Span Int String String -- {{{{# <interior> }}}} <body> {{{{/ name }}}}
+  -- span, `hasHash` (true for the `{{{{# }}}}` FlatBars spelling, false for the
+  -- bare `{{{{ }}}}` Handlebars spelling — gated separately per dialect), base,
+  -- head, body. `{{{{# <interior> }}}} <body> {{{{/ name }}}}`.
+  | RRaw Span Boolean Int String String
   -- {{! <interior> }} — a *short* comment, kept for directive lifting (the parser
   -- scans its interior for `@key` heads). Long `{{!-- … --}}` comments are never
   -- emitted (inert prose).
@@ -70,7 +73,7 @@ instance showRawTok :: Show RawTok where
     ROpen _ sig _ s -> "ROpen " <> show sig <> " " <> show s
     RClose _ _ s -> "RClose " <> show s
     RSep _ _ s -> "RSep " <> show s
-    RRaw _ _ s b -> "RRaw " <> show s <> " " <> show b
+    RRaw _ hash _ s b -> "RRaw " <> show hash <> " " <> show s <> " " <> show b
     RComment _ _ s -> "RComment " <> show s
     RSetDelim _ -> "RSetDelim"
     RLongComment _ -> "RLongComment"
@@ -672,7 +675,8 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
                   end = qc + SCU.length closePat
                 in
                   Right
-                    { mtok: Just (RRaw { start: i, end } start head (slice cs bodyStart qc))
+                    { mtok: Just
+                        (RRaw { start: i, end } (sigil == 5) start head (slice cs bodyStart qc))
                     , next: end
                     , trimL: false
                     , trimR: false

@@ -94,6 +94,11 @@ type HighlightConfig =
   , lexOptions :: LexOptions
   , extras :: Boolean
   , inheritance :: Boolean
+  -- the two raw-block spellings, gated separately (mirrors `ParseOptions`):
+  -- `rawBlockHbs` = the bare `{{{{name}}}}` (FullBars), `rawBlockHash` =
+  -- `{{{{#name}}}}` (RawBars/MaxBars). A disallowed spelling colours `error`.
+  , rawBlockHbs :: Boolean
+  , rawBlockHash :: Boolean
   }
 
 -- | The full token vocabulary (ADR-017): tag spans plus interior literal/operator
@@ -124,9 +129,12 @@ tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
       | isPartialHead txt -> tag sp "partial"
       | Array.elem (headWord txt) cfg.clauseSeps -> tag sp "keyword" <> interior base txt
       | otherwise -> tag sp "expr" <> interior base txt
-    -- `{{{{…}}}}` raw blocks are a Handlebars-extra: disallowed when `extras` is off.
-    RRaw sp _ _ _
-      | cfg.extras -> tag sp "raw-block"
+    -- Two raw-block spellings, each gated: `{{{{#name}}}}` (FlatBars) by
+    -- `rawBlockHash`, the bare `{{{{name}}}}` (Handlebars) by `rawBlockHbs`. A
+    -- spelling the dialect rejects colours `error`.
+    RRaw sp hash _ _ _
+      | hash && cfg.rawBlockHash -> tag sp "raw-block"
+      | not hash && cfg.rawBlockHbs -> tag sp "raw-block"
       | otherwise -> tag sp "error"
     RComment sp _ _ -> tag sp "comment"
     RLongComment sp -> tag sp "comment"

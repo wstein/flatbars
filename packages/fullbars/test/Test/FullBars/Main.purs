@@ -605,9 +605,11 @@ main = do
     (obj [ Tuple "top" (str "T"), Tuple "u" (obj [ Tuple "name" (str "x") ]) ])
     "T"
 
-  expect "raw-block" "{{{{#raw}}}}{{name}} stays{{{{/raw}}}}" VNull "{{name}} stays"
-  -- the Handlebars raw-block form (no `#`) lexes identically.
-  expect "raw-block-no-hash" "{{{{raw}}}}{{name}} stays{{{{/raw}}}}" VNull "{{name}} stays"
+  -- FullBars accepts the Handlebars raw block `{{{{raw}}}}` (no `#`); the FlatBars
+  -- `{{{{#raw}}}}` spelling is a RawBars/MaxBars shape that real Handlebars rejects,
+  -- so FullBars rejects it too.
+  expect "raw-block" "{{{{raw}}}}{{name}} stays{{{{/raw}}}}" VNull "{{name}} stays"
+  expectError "raw-block-hash-rejected" "{{{{#raw}}}}{{name}} stays{{{{/raw}}}}" VNull
 
   -- Handlebars-extra shapes (FullBars accepts). The inverted section {{^x}}
   -- desugars to {{#unless x}}; the triple variant {{{^x}}} is the same.
