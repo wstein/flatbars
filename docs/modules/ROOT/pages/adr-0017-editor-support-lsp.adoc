@@ -44,11 +44,18 @@ correctly in any editor is therefore to *run the engine lexer*, not to approxima
   bundle and the ADR-014 `tokenize(source, { dialect })` API) computes positioned token kinds for the
   document — stateful by construction, so set delimiters, dialects, raw blocks and separators are all
   correct because there is no second grammar to be wrong. Both VS Code (semantic-tokens LSP client) and
-  JetBrains (LSP API, 2023.2+) consume *the same server*; one implementation, all editors. The server is
+  JetBrains (LSP API, 2023.2+) consume *the same server*; one implementation, all editors. (The JetBrains
+  platform LSP API has historically been Ultimate-only; Community-edition IDEs do not attach the server
+  and see only the TextMate fallback below — which is exactly why that fallback is mandatory, not a reason
+  against the LSP.) The server is
   also the substrate for the rest of DX — diagnostics from a *tolerant* parse (errors + spans; the
   canonical `parse` stays fail-fast/total per ADR-001, only tooling consumes the recovering variant),
   helper hover/completion from `preludeSchema` and the catalog, and go-to-partial. Highlighting is the
-  first feature on this substrate, not a separate subsystem.
+  first feature on this substrate, not a separate subsystem — and it needs *none* of the recovering
+  parser, so it can ship first. The tolerant/recovering parse those later features rest on does not yet
+  exist and is a non-trivial engine undertaking in its own right (a span-preserving error-recovery variant
+  alongside the total `parse`); it is a *prerequisite* for diagnostics and squiggles, tracked as an open
+  question below, not a thing this ADR assumes already built.
 
 . *A shared `flatbars.tmLanguage.json` is a mandatory, committed fallback — not optional.* Every plugin
   ships it. The LSP is not always present or instant, and some contexts have *no* language server at
@@ -70,10 +77,12 @@ plain rather than mis-colouring). When the LSP is attached, semantic tokens over
 stateful regions. The grammar is the floor; the engine is the ceiling.
 
 . *The fallback is a derived artifact and MUST be drift-bounded, like every other.* Because it is a
-  second representation of the grammar, it gets the same discipline ADR-014 mandates: it is generated
-  from / pinned against the engine for the default-delimiter corpus by a gate (extend `check:highlight`,
-  or a `gen:tmgrammar` mirroring `gen:highlight`), wired into `npm test`, and labelled in-source
-  "approximate fallback — the LSP is authoritative." ADR-014's stopgap was *time-boxed*; this fallback is
+  second representation of the grammar, it gets the same discipline ADR-014 mandates: a gate *pins it
+  against the engine* for the default-delimiter corpus (extend `check:highlight`, or a `gen:tmgrammar`
+  mirroring `gen:highlight`), wired into `npm test`, and labelled in-source "approximate fallback — the
+  LSP is authoritative." Whether that gate verifies a hand-authored grammar or regenerates it from the
+  engine's token boundaries is deferred (see Open questions — generation preferred where feasible); the
+  *gate* is mandatory either way. ADR-014's stopgap was *time-boxed*; this fallback is
   *permanent* (it serves the no-LSP contexts forever), so its gate is permanent too. The token vocabulary
   is defined once and shared by three consumers — the `tokenize` API, the semantic-token legend, and the
   TextMate scopes — so they cannot name kinds differently.
@@ -119,6 +128,11 @@ stateful regions. The grammar is the floor; the engine is the ceiling.
   that keeps it cheap. The *operation*-kind axis (value / inline / block / operator) it pairs with is owned by
   xref:adr-0019-operation-vocabulary.adoc[ADR-019]; completion labels should reference that taxonomy
   rather than coin their own.
+* *Recovering parser (prerequisite for diagnostics).* Highlighting needs only the existing lexer, but the
+  diagnostics / squiggle / hover layer needs a *tolerant* parse that recovers past an error and preserves
+  spans, kept separate from the total fail-fast `parse` (ADR-001). That variant is unbuilt and is the
+  gating dependency for everything past highlighting; scope and sequence it before committing to the
+  diagnostics features, rather than treating them as immediate consequences of the server existing.
 * *Incremental semantic tokens.* Whole-document retokenization is fine at current sizes; add range
   requests / deltas only if a profile shows it (ties to the deferred incremental-parse trigger noted in
   the parser review).

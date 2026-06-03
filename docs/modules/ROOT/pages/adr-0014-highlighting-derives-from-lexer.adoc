@@ -75,8 +75,11 @@ had no such gate, so the drift was silent.
   tutorials via `highlightTemplate(src, dialect)` rewritten over `highlightSpans`. The template regexes
   (the Lab's `HB_TAG_RE`/`hbMarkFor`, the tutorials' `TAG_RE`/`highlightTemplate` body) are *gone*.
   `check:highlight` is now engine-derived (golden = `highlightSpans`), so a lexer change unreflected in
-  highlighting fails the build. Interior token kinds also landed: `FlatBars.Token.PosToken` gained an
-  `end` offset (ADR-017), so operators/strings/numbers inside a tag get their own span. One follow-up
+  highlighting fails the build. An interior-token pass was tried and *reverted*: a tag is coloured as one
+  span by its head's meaning (§2), so operators/strings/numbers inside a tag get *no* span of their own.
+  The enabling substrate stays — `FlatBars.Token.PosToken` carries an `end` offset — but it is now held
+  for the future opt-in LSP/TextMate vocabulary (xref:adr-0017-editor-support-lsp.adoc[ADR-017]), not
+  consumed by `highlightSpans`. One follow-up
   remains, an *enhancement, not the bug class this ADR closes*: full CodeMirror 6 adoption in the
   tutorials (real `lang-yaml`, a single presenter with the Lab), deferred for bundle weight. Host-*data*
   (YAML) highlighting — the Lab's `yamlDecorator`, the tutorials' `highlightYaml` — is a separate concern
