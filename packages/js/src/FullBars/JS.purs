@@ -31,6 +31,7 @@ module FullBars.JS
   , safe
   , highlightSpans
   , tokenize
+  , diagnostics
   ) where
 
 import Prelude
@@ -44,8 +45,8 @@ import Data.Int (toNumber)
 import Data.Map (fromFoldable, union) as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Tuple (Tuple(..))
-import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
-import FlatBars.Error (Error(ArityError, HelperError))
+import FlatBars (Expr(..), ParseError, defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt)
+import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
 import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
@@ -343,6 +344,23 @@ highlightSpans = mkFn2 \tpl dialect -> Highlight.highlightSpans (highlightConfig
 -- | semantic-tokens server consumes it. See `FlatBars.Highlight`.
 tokenize :: Fn2 String String (Array Highlight.TSpan)
 tokenize = mkFn2 \tpl dialect -> Highlight.tokenizeSpans (highlightConfig dialect) tpl
+
+-- | Located parse diagnostics for `src` under `dialect` (ADR-023):
+-- | `diagnostics(template, dialect)` runs the RECOVERING parser with that
+-- | dialect's options and returns every error as a plain JS object
+-- | `{ line, column, offset, message }` (1-based line/column). It derives from the
+-- | SAME parser the render path uses — fail-fast there, recovering here — so the
+-- | editor flags exactly what the dialect would reject (e.g. `{{#if a == 1}}` in
+-- | every surface but MaxBars). `flatbars-lsp` publishes these as squiggles.
+diagnostics :: Fn2 String String (Array ParseDiagnostic)
+diagnostics = mkFn2 \src dialect ->
+  let
+    opts = case dialect of
+      "maxbars" -> maxOptions
+      "minbars" -> MinBars.minOptions
+      _ -> defaultParseOptions
+  in
+    map (parseErrorAt src) (parseRecovering opts src).errors
 
 -- | Map a dialect name to its highlight seams, mirroring each dialect's own parse
 -- | settings (the single source of truth — drift is caught by `check:highlight`):

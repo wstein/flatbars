@@ -6,4 +6,4 @@
 // only place the bundle path appears; packaging the server (e.g. into the VS Code
 // .vsix) copies the bundle alongside and rewrites this re-export, leaving the rest
 // of the server path-agnostic.
-export { tokenize } from "../../../lab/vendor/flatbars-engine.mjs";
+export { tokenize, diagnostics } from "../../../lab/vendor/flatbars-engine.mjs";

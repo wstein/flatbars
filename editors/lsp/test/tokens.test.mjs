@@ -9,6 +9,7 @@ import {
   dialectForLanguageId,
   dialectForUri,
   encodeSemanticTokens,
+  parseDiagnostics,
   resolveDialect,
   tokensOf,
   vocabulary,
@@ -71,6 +72,18 @@ t("dialectForUri maps native extensions only (no .hbs/.mustache), null otherwise
   assert.equal(dialectForUri("file:///x/page.flatbars"), null); // umbrella, not a dialect
   assert.equal(dialectForUri("file:///x/page.mustache"), null); // not claimed anymore
 });
+// ── Parse diagnostics (ADR-023): per-dialect, with tag-covering ranges ──────
+t("parseDiagnostics flags {{#if a == 1}} off MaxBars, clean on MaxBars", () => {
+  const src = "{{#if a == 1}}x{{/if}}";
+  const full = parseDiagnostics(src, "fullbars");
+  assert.equal(full.length, 1, "one error off MaxBars");
+  assert.match(full[0].message, /unexpected token/i);
+  assert.equal(full[0].start, 8, "points at the ==");
+  assert.equal(full[0].end, 14, "range extends to the tag close }}");
+  assert.deepEqual(parseDiagnostics(src, "maxbars"), [], "MaxBars accepts ==");
+  assert.deepEqual(parseDiagnostics("{{name}}", "fullbars"), [], "a clean template has none");
+});
+
 t("resolveDialect: languageId wins, then uri, then the configured default", () => {
   assert.equal(resolveDialect("maxbars", "file:///x/a.flatbars", "fullbars"), "maxbars"); // id wins
   assert.equal(resolveDialect("flatbars", "file:///x/a.rawbars", "fullbars"), "rawbars"); // umbrella -> uri

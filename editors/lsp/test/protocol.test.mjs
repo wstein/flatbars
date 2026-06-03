@@ -37,10 +37,24 @@ try {
     "legend carries the vocabulary's token types",
   );
 
+  // Capture pushed diagnostics, keyed by uri.
+  const diagWaiters = new Map();
+  const waitDiagnostics = (uri) =>
+    new Promise((resolve) => diagWaiters.set(uri, resolve));
+  conn.onNotification("textDocument/publishDiagnostics", (p) => {
+    const resolve = diagWaiters.get(p.uri);
+    if (resolve) {
+      diagWaiters.delete(p.uri);
+      resolve(p.diagnostics);
+    }
+  });
+
   await conn.sendNotification("initialized", {});
 
-  // languageId drives the dialect: open as `maxbars` so `??` is an operator.
+  // languageId drives the dialect: open as `maxbars` so `??` is an operator and the
+  // template is valid (no diagnostics).
   const uri = "file:///test/page.flatbars";
+  const maxDiags = waitDiagnostics(uri);
   await conn.sendNotification("textDocument/didOpen", {
     textDocument: { uri, languageId: "maxbars", version: 1, text: '{{ a ?? "b" }}' },
   });
@@ -53,10 +67,24 @@ try {
   const operator = provider.legend.tokenTypes.indexOf("operator");
   assert.equal(result.data.length, 5 * 5, "five MaxBars tokens");
   assert.ok([...result.data].includes(operator), "languageId 'maxbars' resolved → `??` is an operator");
+  assert.deepEqual(await maxDiags, [], "valid MaxBars publishes no diagnostics");
+
+  // A FullBars doc with `{{#if a == 1}}` → one parse diagnostic (ADR-023): the same
+  // dialect resolution that makes `==` valid in MaxBars makes it an error here.
+  const badUri = "file:///test/bad.fullbars";
+  const badDiags = waitDiagnostics(badUri);
+  await conn.sendNotification("textDocument/didOpen", {
+    textDocument: { uri: badUri, languageId: "fullbars", version: 1, text: "{{#if a == 1}}x{{/if}}" },
+  });
+  const ds = await badDiags;
+  assert.equal(ds.length, 1, "one parse diagnostic");
+  assert.match(ds[0].message, /unexpected token/i);
+  assert.equal(ds[0].severity, 1, "Error severity");
+  assert.equal(ds[0].range.start.line, 0, "diagnostic on line 0");
 
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");
-  console.log("✓ flatbars-lsp protocol smoke test passed (initialize -> didOpen -> semanticTokens/full)");
+  console.log("✓ flatbars-lsp protocol smoke test passed (semantic tokens + diagnostics)");
 } finally {
   conn.dispose();
   child.kill();

@@ -5,15 +5,16 @@
 // token vocabulary, and answers `textDocument/semanticTokens/full` by running the
 // engine lexer over the document — stateful by construction, so set delimiters,
 // dialects, raw blocks and separators are all correct because there is no second
-// grammar to be wrong. Highlighting is the first feature on this substrate;
-// diagnostics/hover/completion are deferred (they need the recovering parser noted
-// in ADR-017's open questions).
+// grammar to be wrong. Highlighting was the first feature on this substrate;
+// diagnostics (ADR-023) are the second — published from the recovering parser, so
+// the editor flags exactly what the dialect would reject. Hover/completion follow.
 import {
+  DiagnosticSeverity,
   TextDocuments,
   TextDocumentSyncKind,
 } from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { buildLegend, encodeSemanticTokens, resolveDialect } from "./tokens.mjs";
+import { buildLegend, encodeSemanticTokens, parseDiagnostics, resolveDialect } from "./tokens.mjs";
 
 // Wire a server onto an already-created LSP `connection`. Kept separate from the
 // stdio entry point so a test can drive it over any transport.
@@ -44,6 +45,20 @@ export function startServer(connection) {
     const dialect = resolveDialect(doc.languageId, doc.uri, defaultDialect);
     return encodeSemanticTokens(doc.getText(), dialect);
   });
+
+  // Publish parse diagnostics (ADR-023) on open and every edit. The recovering
+  // parser reports every error at once; offsets map to LSP ranges via positionAt.
+  const publishDiagnostics = (doc) => {
+    const dialect = resolveDialect(doc.languageId, doc.uri, defaultDialect);
+    const items = parseDiagnostics(doc.getText(), dialect).map((d) => ({
+      range: { start: doc.positionAt(d.start), end: doc.positionAt(d.end) },
+      severity: DiagnosticSeverity.Error,
+      source: "flatbars",
+      message: d.message,
+    }));
+    connection.sendDiagnostics({ uri: doc.uri, diagnostics: items });
+  };
+  documents.onDidChangeContent((e) => publishDiagnostics(e.document));
 
   documents.listen(connection);
   connection.listen();

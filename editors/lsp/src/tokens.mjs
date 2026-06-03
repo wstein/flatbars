@@ -8,7 +8,7 @@
 // The legend and the kind→(type, modifiers) mapping are derived from the shared
 // editors/token-vocabulary.json — the single source of truth (ADR-017). The
 // server therefore cannot name a token type the vocabulary does not declare.
-import { tokenize } from "./engine.mjs";
+import { tokenize, diagnostics as engineDiagnostics } from "./engine.mjs";
 // The shared single source of truth (ADR-017), imported as data so the bundler
 // can inline it into the self-contained server — no runtime file read.
 import vocabularyJson from "../../token-vocabulary.json" with { type: "json" };
@@ -61,6 +61,18 @@ export function dialectForUri(uri) {
 // configured default (FullBars unless overridden).
 export function resolveDialect(languageId, uri, fallback = "fullbars") {
   return dialectForLanguageId(languageId) ?? dialectForUri(uri) ?? fallback;
+}
+
+// Parse diagnostics (ADR-023) as engine offset ranges. The recovering parser
+// reports each error at the offending tag's start; we extend the range to that
+// tag's close (`}}`) so the squiggle covers the whole tag (falling back to a
+// two-char width when no close is found — an unterminated tag).
+export function parseDiagnostics(text, dialect) {
+  return engineDiagnostics(text, dialect).map((d) => {
+    const close = text.indexOf("}}", d.offset);
+    const end = close < 0 ? Math.min(d.offset + 2, text.length) : close + 2;
+    return { start: d.offset, end, message: d.message };
+  });
 }
 
 // The flattened, NON-OVERLAPPING per-offset kind map LSP semantic tokens require:
