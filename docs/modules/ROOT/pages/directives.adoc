@@ -37,7 +37,8 @@ Rules (xref:lexical.adoc[]):
 xref:adr-0022-analyse-mode.adoc[ADR-022]. Truthiness is now the engine's *one fixed rule*:
 FullBars/RawBars/MaxBars use the `handlebars` rule, MinBars uses `mustache`. There is no per-file
 override, no per-partial scoping, and no alias/shape-list value to write. A leftover `@truthiness`
-directive in an old template is *inert* (carried, ignored, not an error). The model below describes those
+directive in an old template is *inert* — carried, never an error, but **lint-warned as deprecated** so a
+stale directive does not silently mislead. The model below describes those
 fixed rules and how to write *portable* templates; the analyse mode (ADR-022 Part B) checks portability
 against real data.
 ====

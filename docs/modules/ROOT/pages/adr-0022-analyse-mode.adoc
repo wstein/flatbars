@@ -61,8 +61,8 @@ its implementations stay introspectable.
   `RefEnv.partialFalsy`, `registerPartialsFalsy` and the cross-partial scoping rules; and the linter's
   truthiness-*materialization* phase (it existed *only* to keep non-default modes render-exact — with no
   non-default modes, MaxBars→RawBars lowering is render-exact for free). The core `Directive` carriage is
-  untouched — `@trim` still needs it, and a now-inert `@truthiness` stays a *recognised* directive key
-  (carried, no warning) so existing templates do not start erroring.
+  untouched — `@trim` still needs it, and a now-inert `@truthiness` is *carried, never an error*, but
+  `directiveLints` warns it as deprecated so a stale directive does not silently mislead.
 +
 *As-built note (compiler).* The plan said the compiler should drop the baked `$falsy` constant entirely.
 In practice the FullBars and MinBars compiled paths share one runtime (`flatbars-runtime.mjs`) but need

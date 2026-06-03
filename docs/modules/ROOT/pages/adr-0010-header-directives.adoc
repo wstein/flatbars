@@ -15,7 +15,8 @@ the compiler's `$falsy` baking — to be over-engineered: it has **zero golden-c
 24-file blast radius and a dedicated linter phase. Truthiness becomes a *fixed per-engine rule* expressed
 as a lambda the engine plugs in (FullBars/RawBars/MaxBars: the Handlebars rule; MinBars: Mustache), with
 the named rules kept as introspectable data the engine selects from. `includeZero` is re-homed as a
-per-call helper option. Decision points 2 and 3 below are retained for the historical record; ADR-022 is
+per-call helper option. A leftover `@truthiness` directive is carried but inert, and `directiveLints`
+warns it as deprecated. Decision points 2 and 3 below are retained for the historical record; ADR-022 is
 the live design. *`@trim` (point 4) is unaffected* and remains Accepted.
 ====
 
