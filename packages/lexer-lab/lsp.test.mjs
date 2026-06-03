@@ -7,7 +7,7 @@
 // (3) the decoded tokens — and asserts the sparse stream and, crucially, that a
 // HALF-TYPED template still produces tokens (forgiveness) with an `Invalid` mark.
 import assert from "node:assert/strict";
-import { buildLegend, decode, lex, semanticTokens } from "./lsp.mjs";
+import { buildLegend, decode, diagnostics, lex, semanticTokens } from "./lsp.mjs";
 
 const ok = (msg) => console.log(`  ✓ ${msg}`);
 
@@ -96,5 +96,32 @@ for (const bad of ["{{", "{{ x", "{{#each", "before {{!{{ after {{ y }}", "{{{ z
   assert.ok(Array.isArray(r) && r.length >= 1, `recovers on: ${JSON.stringify(bad)}`);
 }
 ok("recovers on a range of malformed inputs");
+
+// DIAGNOSTICS from the same recovering pass: every Invalid token → an LSP
+// Diagnostic with a 0-based range and a message.
+console.log("\n— diagnostics (publishDiagnostics) —");
+const DIAG = "{{ a ; b }}\nfine {{ c }}\n{{!-- never closed";
+for (const d of diagnostics(DIAG)) {
+  console.log(
+    `  ${d.range.start.line}:${d.range.start.character}-${d.range.end.line}:${d.range.end.character}  ${d.message}`,
+  );
+}
+
+const diags = diagnostics(DIAG);
+assert.ok(diags.length >= 2, "reports a diagnostic per malformed span");
+assert.ok(diags.every((d) => d.severity === 1 && d.source === "flatbars-lexer-lab"), "Error severity + source");
+assert.ok(
+  diags.some((d) => d.message === "unterminated comment"),
+  "the unterminated comment carries the reader's message",
+);
+assert.ok(
+  diags.some((d) => /unexpected input|unterminated tag/.test(d.message)),
+  "the malformed tag interior carries a message",
+);
+assert.ok(
+  diags.every((d) => d.range.start.line >= 0 && d.range.start.character >= 0),
+  "ranges are 0-based LSP positions",
+);
+ok("diagnostics: each Invalid span becomes an LSP Diagnostic (range + message)");
 
 console.log("\nall lsp-wiring assertions passed");

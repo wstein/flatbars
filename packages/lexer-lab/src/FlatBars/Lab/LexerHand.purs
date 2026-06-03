@@ -43,6 +43,9 @@ import Partial.Unsafe (unsafePartial)
 -- | A lexical error: a message and the source position it occurred at.
 data LexError = LexError String SourcePos
 
+lexErrorMsg :: LexError -> String
+lexErrorMsg (LexError m _) = m
+
 derive instance eqLexError :: Eq LexError
 
 instance showLexError :: Show LexError where
@@ -121,7 +124,7 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
         Left e
           | recover ->
               let
-                inv = invalidStep i pos open
+                inv = invalidStep i pos open (lexErrorMsg e)
               in
                 go inv.i inv.pos open close (prepend inv.pieces acc)
           | otherwise -> Left e
@@ -131,16 +134,18 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
         in
           go s.i s.pos open close (prepend s.pieces acc)
 
-  -- Recovery: emit the failed opener as one `Invalid` lexeme and resync just
-  -- past it; the interior re-lexes as ocean (or the next tag). Advancing by the
-  -- opener's length guarantees forward progress (no re-match loop).
-  invalidStep :: Int -> SourcePos -> String -> { pieces :: Array Piece, i :: Int, pos :: SourcePos }
-  invalidStep i pos open =
+  -- Recovery: emit the failed opener as one `Invalid` lexeme carrying the
+  -- reader's diagnostic message, and resync just past it; the interior re-lexes
+  -- as ocean (or the next tag). Advancing by the opener's length guarantees
+  -- forward progress (no re-match loop).
+  invalidStep
+    :: Int -> SourcePos -> String -> String -> { pieces :: Array Piece, i :: Int, pos :: SourcePos }
+  invalidStep i pos open message =
     let
       endI = min len (i + SCU.length open)
       pos1 = advance pos i endI
     in
-      { pieces: [ Lex { value: Invalid (sliceStr i endI), span: { start: pos, end: pos1 } } ]
+      { pieces: [ Lex { value: Invalid message, span: { start: pos, end: pos1 } } ]
       , i: endI
       , pos: pos1
       }
@@ -350,13 +355,10 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
                     Just o -> { invEnd: o, withClose: false, next: o }
                     Nothing -> { invEnd: len, withClose: false, next: len }
                 posInv = advance tr.pos j plan.invEnd
+                message = if plan.withClose then "unexpected input in tag" else "unterminated tag"
                 invPieces =
                   if plan.invEnd > j then
-                    [ Lex
-                        { value: Invalid (sliceStr j plan.invEnd)
-                        , span: { start: tr.pos, end: posInv }
-                        }
-                    ]
+                    [ Lex { value: Invalid message, span: { start: tr.pos, end: posInv } } ]
                   else []
                 closed =
                   if plan.withClose then

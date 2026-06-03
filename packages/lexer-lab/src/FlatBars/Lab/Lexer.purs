@@ -152,7 +152,7 @@ data Lexeme
   | Comment String -- {{! … }} / {{!-- … --}}
   | SetDelimiter String String -- {{=open close=}} (mutates the active pair)
   | RawBody String -- the verbatim body between raw-block fences
-  | Invalid String -- a malformed region kept by a *forgiving* lexer (recovery)
+  | Invalid String -- recovery: a diagnostic message for the malformed span
   | Eof -- synthetic end token; its leading trivia is the trailing ocean
 
 derive instance eqLexeme :: Eq Lexeme

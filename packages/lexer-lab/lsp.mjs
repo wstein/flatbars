@@ -49,14 +49,38 @@ const arithConfig = { ...defaultLexConfig, infixArith: true };
 // the basis for both the wire encoding and the human-readable table below.
 export function lex(text, cfg = arithConfig) {
   const toks = tokenizeRecovering(cfg)(text); // forgiving: always an array
-  return toks.map((t) => ({
-    kind: t.lexeme.constructor.name, // Open / Sigil / Ident / Op / Str / Num / …
-    type: fromMaybe(semanticTokenType(t.lexeme)), // ADR-017 semantic-token type
-    emit: lspEmits(t.lexeme), // in the sparse correction set?
-    start: t.span.start, // { index, line, column } (1-based line/col)
-    end: t.span.end,
-    text: text.slice(t.span.start.index, t.span.end.index),
-  }));
+  return toks.map((t) => {
+    const kind = t.lexeme.constructor.name; // Open / Sigil / Ident / Op / Invalid / …
+    return {
+      kind,
+      type: fromMaybe(semanticTokenType(t.lexeme)), // ADR-017 semantic-token type
+      emit: lspEmits(t.lexeme), // in the sparse correction set?
+      message: kind === "Invalid" ? t.lexeme.value0 : null, // recovery diagnostic
+      start: t.span.start, // { index, line, column } (1-based line/col)
+      end: t.span.end,
+      text: text.slice(t.span.start.index, t.span.end.index),
+    };
+  });
+}
+
+// publishDiagnostics from the SAME recovering pass: every Invalid token becomes
+// an LSP Diagnostic (0-based range, Error severity). So one lex feeds both the
+// semantic-token and the diagnostic channels.
+export function diagnostics(text, { cfg = arithConfig } = {}) {
+  const diags = [];
+  for (const t of lex(text, cfg)) {
+    if (t.kind !== "Invalid") continue;
+    diags.push({
+      range: {
+        start: { line: t.start.line - 1, character: t.start.column - 1 },
+        end: { line: t.end.line - 1, character: t.end.column - 1 },
+      },
+      severity: 1, // DiagnosticSeverity.Error
+      source: "flatbars-lexer-lab",
+      message: t.message,
+    });
+  }
+  return diags;
 }
 
 // The LSP `semanticTokens/full` response: { legend, data }. Sparse by default,

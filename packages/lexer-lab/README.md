@@ -160,8 +160,15 @@ interior token it already lexed (so `{{ price * 2` still highlights the `*` and
 `2`), and only a genuinely unparseable tail becomes an `Invalid` lexeme — emitted
 with the ADR-017 `error` kind's `invalid` modifier — with lexing resyncing at the
 next close or opener. (A malformed comment/raw fence still falls back to marking
-its opener `Invalid`.) `node packages/lexer-lab/lsp.test.mjs` demos the
-classification table, the wire `data`, and the recovery.
+its opener `Invalid`.)
+
+**Diagnostics from the same pass.** Each `Invalid` token carries a message (the
+reader's — "unterminated comment", "unexpected input in tag", …), and
+`lsp.mjs:diagnostics(text)` turns them into the LSP `publishDiagnostics` shape
+(0-based range + Error severity). So one recovering lex feeds *both* the
+semantic-token and the diagnostic channels — the ADR-023 split (one recovering
+parser, two LSP outputs). `node packages/lexer-lab/lsp.test.mjs` demos the
+classification table, the wire `data`, the recovery, and the diagnostics.
 
 ## Done in this iteration
 
@@ -187,9 +194,8 @@ classification table, the wire `data`, and the recovery.
 1. **Pick the hand-written lexer** as the adoption basis — it carries the
    CST-style token model at the incumbent's speed; the parsing spike stays as the
    readable executable reference the parity test pins it against.
-2. ~~**P2** — error recovery~~ ✓ done (`tokenizeRecovering`, in-tag). Follow-up:
-   carry an error message on `Invalid` so the wiring can also emit diagnostics
-   (`publishDiagnostics`), not just semantic tokens.
+2. ~~**P2** — error recovery~~ ✓ done (`tokenizeRecovering`, in-tag) + diagnostics
+   (`Invalid` carries a message; `lsp.mjs:diagnostics` emits `publishDiagnostics`).
 3. Decide the bracket/path-segment model with the parser team (L3).
 4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate
    against `FlatBars.Lexer` (boundaries + literals), and lift line/column into a
