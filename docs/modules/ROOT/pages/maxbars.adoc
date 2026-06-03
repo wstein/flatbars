@@ -8,9 +8,10 @@ the surface is reused unchanged.
 == Reuse by dependency
 
 MaxBars desugars to the same core `Expr` that FullBars already understands, so it
-reuses FullBars *wholesale by dependency* — the engine, prelude, value policy,
-surface desugar, **and the compiler**. The only new piece is the interior
-expression grammar, plugged in through the `ParseOptions.parseExpr` seam
+reuses FullBars *wholesale by dependency* — the engine, prelude, surface desugar,
+**and the compiler**. (One value-policy axis differs: truthiness — MaxBars uses
+the `nonEmpty` rule, not FullBars' `handlebars`; see below.) The only new piece is
+the interior expression grammar, plugged in through the `ParseOptions.parseExpr` seam
 (xref:grammar.adoc[]); the structural tree-builder stays grammar-agnostic.
 
 [source,purescript]
@@ -60,8 +61,8 @@ operators — but this is a *MaxBars-only* lexer mode (`ParseOptions.lexOptions`
 characters in **every** dialect, so a dotted path like `price.net` is still one
 path even in MaxBars (and `/` is therefore unambiguously division). Arithmetic is
 strictly numeric — a non-number operand is a `TypeError` (no coercion) — and `??`
-is *null*-coalescing (a present `0`/`""`/`[]` wins), independent of the file's
-`@truthiness` mode.
+is *null*-coalescing (a present `0`/`""`/`[]` wins), independent of the engine's
+truthiness rule.
 
 == The variable model
 
@@ -246,7 +247,11 @@ plain functions into these operations (the FlatBars Lab and `flatbars-js`).
 
 == Truthiness
 
-MaxBars shares FullBars' truthiness, including the per-file `@truthiness`
-directive (xref:directives.adoc[]). A reader can rely on `pass:[{{#if x}}]` and
-`pass:[{{ x && y }}]` always agreeing within one file, because both consult the
-file's falsy set.
+MaxBars uses the `nonEmpty` rule (ADR-022): `false`/`null`/`""`/`pass:[[]]`/`pass:[{}]`
+are falsy, but `0` is *truthy* — test magnitude with the built-in compare,
+`pass:[{{#if val > 0}}]`. This *differs* from FullBars (`handlebars`, where `0`
+and `pass:[{}]` flip); MaxBars is not a Handlebars clone, so it leans on its
+compare operators rather than coercing `0`. There is no `@truthiness` directive
+(removed in xref:adr-0022-analyse-mode.adoc[ADR-022]). `pass:[{{#if x}}]` and
+`pass:[{{ x && y }}]` always agree (both test through the engine's one rule).
+`includeZero` is a no-op here (`0` is already truthy). See xref:directives.adoc[].

@@ -19,7 +19,8 @@ an *engine*, not a substrate.
   surfaced through `Ctl.stringify` and the engine's value module. The substrate stays policy-free.
 
 . *Safety is a conformance contract on engines, not a core feature.* Every conforming engine MUST
-  declare: (a) an HTML-escape function, (b) a `stringify`, (c) a truthiness default (`FalsySet`), and
+  declare: (a) an HTML-escape function, (b) a `stringify`, (c) a truthiness rule (a `Truthy` =
+  `Value -> Boolean` callback — ADR-022), and
   (d) a raw-output safety stance — does `pass:[{{{ }}}]` escape? (Reference answer: no.) This belongs
   in the xref:host-api.adoc[] engine checklist.
 

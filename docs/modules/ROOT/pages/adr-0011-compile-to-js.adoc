@@ -26,8 +26,10 @@ than no compiler. The decision is therefore not "add a compiler" but "keep *two*
   runtime, so compiled code operates on plain JS values — not the `Value` ADT.
 
 . *The runtime contract is versioned.* `runtimeVersion` is stamped in the compiled module header and
-  checked by the runtime; it is bumped on any runtime-incompatible codegen change. The resolved
-  `@truthiness` set is baked as a module-level `$falsy` constant (xref:adr-0010-header-directives.adoc[]).
+  checked by the runtime; it is bumped on any runtime-incompatible codegen change. The engine's
+  truthiness rule is a *callback* the root frame is seeded with — `rt.truthyHandlebars` (FullBars),
+  `rt.truthyNonEmpty` (RawBars/MaxBars), or `rt.truthyMustache` (MinBars); no baked falsy-set
+  (xref:adr-0022-analyse-mode.adoc[ADR-022] superseded the old `$falsy` constant).
 
 . *The interpreter is the executable spec; a conformance gate enforces equality.*
   `packages/compile/conformance.mjs` (`npm run test:compile`) renders every case with *both* the

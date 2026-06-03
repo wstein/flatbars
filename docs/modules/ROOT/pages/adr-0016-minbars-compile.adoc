@@ -34,11 +34,11 @@ ops into the *reused* emit driver (the IoC move, mirroring its own `Engine m Min
   `escapeHtml`/`stringify` already match the kernel's, gated by the existing compile conformance);
   `(mlookup "name")` → `rt.mlookup(env, name)`; `section` → `rt.msection(value, env, fn)` pushing a
   frame per item; `inverted` → an inline `if (rt.mfalsy(env, value)) { … }`.
-* *Runtime* (`flatbars-runtime.mjs`, `m*` ops): the MinBars "scope" is `{ stack, falsy }`; `mseed`
+* *Runtime* (`flatbars-runtime.mjs`, `m*` ops): the MinBars "scope" is `{ stack, truthy }`; `mseed`
   builds the root stack, `mlookup` is `MinBars.Context.mresolve` (implicit-iterator `.`, dotted-name
   descent, parent-fallback stack walk), `msection` is the polymorphic coercion + push, `mfalsy` is the
-  mode test. The falsy-set is the already-threaded `$falsy` const (mustache by default), so truthiness
-  is correct for free.
+  rule test. The scope is seeded with MinBars' truthiness *callback* (`rt.truthyMustache`; ADR-022
+  replaced the old `$falsy` const), so truthiness is correct for free.
 * *Seam*: `FullBars.JS` exposes `compileMinbars`/`renderMinbars`; the compile-conformance harness
   (`packages/compile/conformance.mjs`) dispatches the `minbars` dialect and asserts *compiled ≡
   interpreter* byte-for-byte — the contract that forces the runtime to replicate `MinEnv` exactly.

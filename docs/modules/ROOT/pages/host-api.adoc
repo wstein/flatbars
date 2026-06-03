@@ -176,9 +176,9 @@ example.
 | how a `Value` becomes output text (`Ctl.stringify :: Value -> m String`)
 | `Kernel.Value.stringify`
 
-| *Truthiness default*
-| the `FalsySet` used when no `@truthiness` directive is present
-| `handlebars` (`empty`) — passed to `resolveTruthinessWith` (xref:adr-0010-header-directives.adoc[])
+| *Truthiness rule*
+| the engine's `Truthy` callback (`Value -> Boolean`), seeded into the env — no falsy-set data, no `@truthiness` directive
+| `handlebars` (FullBars), `nonEmpty` (RawBars/MaxBars), `mustache` (MinBars) — xref:adr-0022-analyse-mode.adoc[ADR-022]
 
 | *Raw-output safety stance*
 | does `pass:[{{{ }}}]` escape? is there a "you forgot to escape" lint?

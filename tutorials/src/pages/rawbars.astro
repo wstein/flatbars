@@ -170,7 +170,7 @@ const t = (s) => s;
     <p>
       <code>{t("{{! … }}")}</code> is dropped by the lexer and never reaches the
       output. (A comment can also carry a header directive, e.g.
-      <code>{t("{{! @truthiness: … }}")}</code> — but that's a separate topic.)
+      <code>{t("{{! @trim: none }}")}</code> — but that's a separate topic.)
     </p>
     <OpenInLab client:visible engine="rawbars" template={ex.comment.template} data={ex.comment.data} />
   </section>

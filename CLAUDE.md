@@ -147,14 +147,18 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 - **`kernel`** — the shared engine machinery, dialect-agnostic: `Engine` (IoC
   interpret driver), `Env`/`RefEnv`, `Helper` (arity combinators), `Lower`
   (structural → typed "real" AST), `Prelude` (the reference helpers + schema),
-  `Render` (`runResolved`: parse → resolve `@truthiness` → seed → run), `Value`,
-  `Walk`.
+  `Render` (`runResolved`: parse → seed the prelude env with the engine's fixed
+  truthiness rule → run), `Value`, `Walk`.
 - **`fullbars`** — the reference engine + its surface dialect (`{{ }}`
   auto-escape, dotted paths, `@data`, `as |x|`). Re-exports kernel modules and
   adds surface desugar/compile/render.
 - **The dialect ladder: RawBars ⊂ FullBars ⊂ MaxBars.** All three share one
-  engine, prelude, value policy, and compiler — they differ only in *surface
-  syntax*, swapped in through the `ParseOptions.parseExpr` seam:
+  engine, prelude, and compiler, differing mainly in *surface syntax* (swapped in
+  through the `ParseOptions.parseExpr` seam). They *diverge* in one value-policy
+  axis — truthiness (ADR-022): FullBars uses `handlebars`, RawBars/MaxBars use
+  `nonEmpty` (`false null "" [] {}` falsy; `0` truthy), MinBars uses `mustache`.
+  Truthiness is a `Value -> Boolean` callback the engine plugs in (no falsy-set
+  data, no per-file `@truthiness`):
   - **`rawbars`** — core skeleton syntax directly, no surface sugar.
   - **`fullbars`** — adds the Handlebars-style surface desugar.
   - **`maxbars`** — FullBars plus infix operators and pipes (`MaxBars.Expr`),
@@ -181,8 +185,7 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   even though `check:bundle` is green).
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
-- **`linter`** — cross-dialect lowering (MaxBars → RawBars source), incl.
-  truthiness materialization via directive-carry.
+- **`linter`** — cross-dialect lowering (MaxBars → RawBars source).
 
 The web playground is **`lab`** (the FlatBars Lab — plain HTML/JS/WASM,
 not a PureScript package). The old Halogen `packages/playground` was removed.

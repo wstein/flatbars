@@ -93,11 +93,11 @@ so it is kept on purpose. The sharp edge to know: `safe`/`escapeHtml` *stringify
 an escaped/safe value is a category error — they are *output*, not data — and `escapingWarnings`
 flags exactly that on `if`/`unless` conditions.
 
-The *default* mode is familiar (Handlebars): `false`, `null`, `0`, `""`, and the empty array are
-falsy; `pass:[{}]` and non-zero numbers are truthy; `0` is falsy unless `includeZero` is set, written
-as the surface hash `pass:[{{#if n includeZero=true}}]`. The falsy set is **per-file configurable** via
-the `pass:[{{! @truthiness: … }}]` directive (`minimal`/`presence`/`always`/an explicit shape-list) —
-see xref:directives.adoc[]. With no directive, the behaviour above is exactly today's.
+FullBars' rule is Handlebars': `false`, `null`, `0`, `""`, and the empty array are falsy; `pass:[{}]` and
+non-zero numbers are truthy; `0` is falsy unless `includeZero` is set, written as the surface hash
+`pass:[{{#if n includeZero=true}}]`. This is *fixed* for FullBars — there is no `@truthiness` directive
+(removed in xref:adr-0022-analyse-mode.adoc[ADR-022]; a leftover one is inert and lint-warned). Other
+dialects use other rules (RawBars/MaxBars `nonEmpty`, MinBars `mustache`) — see xref:directives.adoc[].
 
 === 1.5 Standalone whitespace is trimmed (on by default, configurable)
 

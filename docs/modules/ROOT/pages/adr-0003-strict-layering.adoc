@@ -22,7 +22,7 @@ Three tiers plus adapters, dependencies pointing strictly downward.
 
 . *kernel (new package)* — the shared engine: `Engine` (the IoC driver), `Walk`
   (`foldTemplate`/`splitClauses`/`validate`/`Schema`), `Helper` combinators, `ToValue`, `Value`
-  (value policy — `truthy`/`stringify`/`escapeHtml`/`FalsySet`/`resolveTruthiness`), `Env`/`RefEnv`,
+  (value policy — the named `Truthy` rules / `stringify` / `escapeHtml`), `Env`/`RefEnv`,
   `Prelude`, `Lower`, and `Render` (the `runResolved` glue).
 
 . *dialects (`rawbars`/`fullbars`/`maxbars`)* — each only its grammar + desugar + render/compile entry
