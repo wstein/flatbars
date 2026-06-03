@@ -259,9 +259,9 @@ const t = (s) => s;
           <td>The head grammar drops the top-level pipe rung so a bar can delimit <code>{t("as |x|")}</code>; write <code>{t("{{#each (xs | f) as |x|}}")}</code>. An unparenthesised head bar is treated as structure (like FullBars), not a pipe.</td>
         </tr>
         <tr>
-          <td>Partials <code>{t("{{> card}}")}</code>, inline <code>{t("{{#*inline}}")}</code></td>
-          <td><b>not covered here</b></td>
-          <td><code>{t("{{#*inline}}")}</code> isn't in the MaxBars grammar, and the host entrypoint doesn't thread external partials. Use <a href="/fullbars">FullBars</a> for partial composition.</td>
+          <td>Block partials + <code>{t("{{yield}}")}</code></td>
+          <td><b>inline only</b></td>
+          <td>Inline-defined partials work — <code>{t("{{#inline \"layout\"}}<{{yield}}>{{/inline}}")}</code> then <code>{t("{{#partial \"layout\"}}…{{/partial}}")}</code> — where <code>{t("{{yield}}")}</code> renders the caller's block body (MaxBars' bare spelling of Handlebars' <code>{t("{{> @partial-block}}")}</code>; the <code>@</code> sigil is reserved, so that Handlebars form is rejected). Not supported: the <code>{t("{{#*inline}}")}</code> <em>decorator</em> (FullBars-only; MaxBars uses bare <code>{t("{{#inline}}")}</code>) and host-threaded <em>external</em> partial files — for those use <a href="/fullbars">FullBars</a>.</td>
         </tr>
         <tr>
           <td>Infix anywhere</td>
