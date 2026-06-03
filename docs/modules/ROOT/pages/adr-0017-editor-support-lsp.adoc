@@ -1,12 +1,31 @@
 = ADR-017: Editor support via an engine-backed LSP, with a mandatory TextMate fallback
 :navtitle: ADR-017 Editor support (LSP + TextMate)
 
-*Status:* Proposed. *Date:* 2026-06-02. Builds on
+*Status:* Accepted; the highlighting foundation is *implemented*. *Date:* 2026-06-02. Builds on
 xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014] (highlighting derives from the lexer) and
 xref:adr-0001-structural-parser-and-walker.adoc[ADR-001] (one structural parser); the stateful driver is
 xref:adr-0015-set-delimiters.adoc[ADR-015] (set delimiters). This record extends "one grammar, derived
 downstream" from our own front-ends (the Lab, the tutorials) to *third-party editors* — VS Code and
 JetBrains — for production use.
+
+[NOTE]
+====
+*Implemented (semantic-token highlighting).* The token vocabulary, the
+engine-backed language server, the TextMate fallback, and a VS Code extension all
+landed; only the post-highlighting DX (diagnostics/hover, which need the recovering
+parser) and JetBrains packaging remain. What shipped:
+
+* `editors/token-vocabulary.json` — the single source of truth the three consumers
+  share (engine `tokenize` kinds, LSP legend, TextMate scopes).
+* `tokenize(template, dialect)` on the `flatbars-js` bundle — the tag-role *and*
+  interior-role (`string`/`number`/`operator`) token stream; `highlightSpans` is
+  now its tag-role projection. Gated by `check:highlight` (pins both views).
+* `editors/flatbars.tmLanguage.json` — the hand-authored fallback, gated by
+  `check:tmgrammar` (tokenizes a default-delimiter corpus through both the engine
+  and the real `vscode-textmate` engine and asserts agreement).
+* `editors/lsp` — `flatbars-lsp`, the semantic-tokens server (`test:lsp`).
+* `editors/vscode` — the extension bundling the client + grammar (`test:vscode`).
+====
 
 == Context
 
@@ -41,7 +60,8 @@ correctly in any editor is therefore to *run the engine lexer*, not to approxima
 
 . *Editor support derives from the engine; the authoritative highlighter is the engine lexer delivered
   as LSP semantic tokens.* A single language server (`flatbars-lsp`, Node, embedding the `flatbars-js`
-  bundle and the ADR-014 `tokenize(source, { dialect })` API) computes positioned token kinds for the
+  bundle and its `tokenize(template, dialect)` API — the interior-aware superset of ADR-014's
+  `highlightSpans`) computes positioned token kinds for the
   document — stateful by construction, so set delimiters, dialects, raw blocks and separators are all
   correct because there is no second grammar to be wrong. Both VS Code (semantic-tokens LSP client) and
   JetBrains (LSP API, 2023.2+) consume *the same server*; one implementation, all editors. (The JetBrains
@@ -77,15 +97,19 @@ plain rather than mis-colouring). When the LSP is attached, semantic tokens over
 stateful regions. The grammar is the floor; the engine is the ceiling.
 
 . *The fallback is a derived artifact and MUST be drift-bounded, like every other.* Because it is a
-  second representation of the grammar, it gets the same discipline ADR-014 mandates: a gate *pins it
-  against the engine* for the default-delimiter corpus (extend `check:highlight`, or a `gen:tmgrammar`
-  mirroring `gen:highlight`), wired into `npm test`, and labelled in-source "approximate fallback — the
-  LSP is authoritative." Whether that gate verifies a hand-authored grammar or regenerates it from the
-  engine's token boundaries is deferred (see Open questions — generation preferred where feasible); the
-  *gate* is mandatory either way. ADR-014's stopgap was *time-boxed*; this fallback is
-  *permanent* (it serves the no-LSP contexts forever), so its gate is permanent too. The token vocabulary
-  is defined once and shared by three consumers — the `tokenize` API, the semantic-token legend, and the
-  TextMate scopes — so they cannot name kinds differently.
+  second representation of the grammar, it gets the same discipline ADR-014 mandates. The grammar is
+  *hand-authored* (TextMate's begin/end regex rules don't generate cleanly from a token-boundary list),
+  and `check:tmgrammar` *pins it against the engine* for the default-delimiter corpus: it tokenizes a
+  curated corpus through both the engine (`tokenize`) and the real `vscode-textmate` engine, maps every
+  TextMate scope back to an engine kind via the token vocabulary, and asserts (a) *no mis-colour* — the
+  grammar never paints a kind the engine disagrees with — and (b) *floor coverage* — each fixture's
+  default-delimiter forms are actually painted. The gate is wired into `npm test`, and the grammar is
+  labelled in-source "approximate fallback — the LSP is authoritative." ADR-014's stopgap was
+  *time-boxed*; this fallback is *permanent* (it serves the no-LSP contexts forever), so its gate is
+  permanent too. The token vocabulary (`editors/token-vocabulary.json`) is defined once and shared by
+  three consumers — the `tokenize` API, the semantic-token legend, and the TextMate scopes — so they
+  cannot name kinds differently; a kind whose `tmScopes` is empty is one the stateless fallback
+  deliberately gives up on (set delimiters, dialect-error shapes, MaxBars operators).
 
 . *Reject tree-sitter as the FlatBars parser/highlighter.* A tree-sitter grammar is a second source of
   truth (the drift ADR-001 and ADR-014 exist to prevent); it cannot track the dialect seam without N
@@ -108,26 +132,29 @@ stateful regions. The grammar is the floor; the engine is the ceiling.
 * *Two highlighting representations exist by design* (the engine and the TextMate fallback). Unlike the
   drift ADR-014 fought, the authority is unambiguous (the engine always wins where it runs), and the
   fallback is gated, scoped to default delimiters, and labelled — *bounded* drift, not silent drift.
-* The Lab's hand-written `StreamLanguage` and the tutorials' regex (ADR-014) still retire in favour of
-  the engine `tokenize` API; the TextMate grammar is for *external / no-LSP* contexts, not for our own
-  in-process front-ends.
+* The in-process front-ends keep painting from `highlightSpans` (the tag-role projection, ADR-014, one
+  colour per tag); the richer interior axis lives only in `tokenize`, which the editor layer consumes. The
+  TextMate grammar is for *external / no-LSP* contexts, not for our own front-ends.
 * Set-delimiter and MaxBars-operator regions are *knowingly* approximate without a server — documented,
   and corrected the instant one attaches. That is the honest limit of any stateless fallback, and the
   reason the fallback is a floor rather than the design.
 
+== Resolved
+
+* *Token vocabulary (resolved — implemented).* The stable kind set (tag-role × interior-role) is
+  `editors/token-vocabulary.json`, the single contract the three consumers share. `highlightSpans` still
+  emits only the tag-role kinds — each tag painted once, by the meaning of its head (ADR-014) — and the
+  interior-role axis (`operator` / `string` / `number`) is carved by the superset `tokenize`, recovered
+  from `FlatBars.Token.PosToken`'s `end` offset exactly as anticipated. The *operation*-kind axis
+  (value / inline / block / operator) it pairs with is owned by
+  xref:adr-0019-operation-vocabulary.adoc[ADR-019]; completion labels (when they land) should reference
+  that taxonomy rather than coin their own.
+* *Grammar provenance (resolved — hand-authored + conformance gate).* The fallback grammar is
+  hand-authored; `check:tmgrammar` is the conformance gate (see Decision 3). Generation from token
+  boundaries was rejected as a poor fit for TextMate's begin/end regex model.
+
 == Open questions
 
-* *Token vocabulary.* Define the stable kind set (tag-role × interior-role) that the `tokenize` API, the
-  LSP semantic-token legend, and the TextMate scopes all map to — the single contract the three
-  consumers share. The enabling step is done: `FlatBars.Token.PosToken` carries an `end` offset, so a
-  consumer can recover an exact source span for every interior token. `highlightSpans` itself emits only
-  the tag-role kinds — each tag is painted once, by the meaning of its head (an interior literal or
-  operator carries no meaning of its own to colour; see xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014]).
-  The interior-role axis (`operator` / `string` / `number`) is therefore the LSP/TextMate vocabulary's
-  to define when those richer, opt-in semantic-token consumers land — the `end` offset is the substrate
-  that keeps it cheap. The *operation*-kind axis (value / inline / block / operator) it pairs with is owned by
-  xref:adr-0019-operation-vocabulary.adoc[ADR-019]; completion labels should reference that taxonomy
-  rather than coin their own.
 * *Recovering parser (prerequisite for diagnostics).* Highlighting needs only the existing lexer, but the
   diagnostics / squiggle / hover layer needs a *tolerant* parse that recovers past an error and preserves
   spans, kept separate from the total fail-fast `parse` (ADR-001). That variant is unbuilt and is the

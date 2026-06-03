@@ -28,7 +28,7 @@ do **not** assume a global install.
 ```sh
 npm install            # installs purescript + spago + esbuild
 npm run build          # spago build — compile every package
-npm test               # full suite: format:check + per-package spago tests + catalog + isolation + compile & (handlebars/mustache) conformance + Lab unit tests
+npm test               # full suite: format:check + per-package spago tests + catalog + isolation + compile & (handlebars/mustache) conformance + Lab unit tests + editor gates (highlight/tmgrammar/lsp/vscode)
 npm run cli -- --help  # run the CLI (spago run -p flatbars-cli)
 npm run lint           # spago build --pedantic-packages (catches unused/missing deps)
 npm run format         # purs-tidy format-in-place; format:check to verify only
@@ -197,6 +197,20 @@ supersede it.) Runnable examples are gate-validated
 Mustache conformance table is generated from the vendored spec suite
 (`gen:conformance`); see `tutorials/README.md`.
 
+The **`editors`** tree (also not PureScript) is the third-party editor support of
+ADR-017 — highlighting in real editors by *running the engine lexer*, never by
+approximating it. `editors/token-vocabulary.json` is the single source of truth
+its three consumers share (the engine `tokenize` kinds, the LSP semantic-token
+legend, the TextMate scopes). `editors/flatbars.tmLanguage.json` is the
+hand-authored, best-effort TextMate *fallback* (the floor: default-delimiter forms
+for no-LSP contexts), drift-bounded by `check:tmgrammar`. `editors/lsp`
+(`flatbars-lsp`) is the authoritative semantic-tokens server — it embeds the
+committed `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize`
+(`test:lsp`). `editors/vscode` is the VS Code extension bundling the LSP client +
+grammar (`test:vscode`, a headless smoke test; its `dist/` is a git-ignored build
+product). Diagnostics/hover are deferred (they need a recovering parser — ADR-017
+open question); JetBrains packaging is a tracked follow-up.
+
 ### Conventions worth knowing
 
 - **One source of truth for the prelude.** `FullBars.Catalog` renders the
@@ -214,6 +228,16 @@ Mustache conformance table is generated from the vendored spec suite
   value clears WCAG AA (4.5:1) on its tint, the page bg, and as a solid chip —
   machine-checked by `npm run check:contrast` (also in `npm test`); documented
   sub-AA exceptions live in that script's `EXCEPTIONS` map.
+- **One source of truth for the editor token vocabulary (ADR-017).**
+  `editors/token-vocabulary.json` maps each engine token `kind` to its `role`
+  (`tag`/`interior`), its LSP semantic-token type/modifiers, and its TextMate
+  scopes. The engine `tokenize` (the kinds), the `flatbars-lsp` legend, and the
+  TextMate grammar all derive from it. Two gates keep it honest, both in `npm
+  test`: `check:highlight` pins what the engine emits (`spans` + `tokens`),
+  `check:tmgrammar` pins that the fallback grammar agrees with the engine on the
+  default-delimiter corpus. Change a `kind` → update the vocabulary and rerun
+  `npm run gen:highlight`. The bundle carries `tokenize`, so an engine change
+  needs `npm run gen:bundle` + a cache-buster bump like any other.
 - **One app shell + one wordmark.** The docs layout and the landing share
   `Topbar.astro` (wordmark · Chips · Theme · Legend · Open-the-Lab); the canonical
   lockup lives in `Wordmark.astro` and the static Lab copies its markup —
