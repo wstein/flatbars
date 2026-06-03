@@ -17,6 +17,7 @@ import { highlightTemplate } from "../lib/highlight.mjs";
 // table below can never claim more than the suite proves on the shipped engine.
 import conformance from "../conformance.json";
 
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
 const conformanceGreen = conformance.modules.every((m) => m.pass === m.total);
 
 // Sticky left-nav model (consensus item 1): Mustache concepts, then the sibling
@@ -357,7 +358,7 @@ $ ~> | $ | {
       <code>inheritance</code> modules included — MinBars passes <b>100% (184/184) of every module
       it implements</b>. The optional <code>lambdas</code> module isn't a target: a lambda is a
       <em>function in the data</em>, and a <code>Value</code> is pure data
-      (<a href="/flatbars/adr-0007-minbars.html">ADR-0007</a>) — value-producing lambdas are
+      (<a href={`${SPEC_BASE}adr-0007-minbars.html`}>ADR-0007</a>) — value-producing lambdas are
       <a href="#lambdas">precalculated before rendering</a>, section lambdas are helpers. The proof
       lives in <code>conformance/mustache/</code>.
     </p>

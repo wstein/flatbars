@@ -32,8 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        # Full repo: the Astro build imports the committed engine bundle and the
-        # Lab from ../lab (vite fs.allow), and astro.config from ../scripts.
+        with:
+          # Full history: the Astro build imports the committed engine bundle and
+          # the Lab from ../lab; Antora's git content aggregator (url: .) reads the
+          # spec from HEAD and is unhappy with a shallow clone.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -41,19 +44,27 @@ jobs:
           cache: npm
           cache-dependency-path: tutorials/package-lock.json
 
+      - name: Build the Antora spec site (themed via docs/supplemental-ui)
+        run: npx --yes antora@3.1.15 --fetch antora-playbook.yml
+        # Outputs ./build/site (component pages under build/site/flatbars/…).
+
       - name: Install tutorials dependencies
         working-directory: tutorials
         run: npm ci
 
-      - name: Build the site under the Pages sub-path, then bundle the Lab
+      - name: Build the site under the Pages sub-path, then bundle the Lab + spec
         working-directory: tutorials
         env:
           PUBLIC_BASE_PATH: /flatbars
           PUBLIC_SITE: https://wstein.github.io
           PUBLIC_LAB_URL: /flatbars/lab/index.html
+          # The Antora spec lives under the component path inside dist/spec, so its
+          # ADR pages resolve at /flatbars/spec/flatbars/<name>.html.
+          PUBLIC_SPEC_BASE: /flatbars/spec/flatbars/
         run: |
           npm run build
           cp -R ../lab dist/lab
+          cp -R ../build/site dist/spec
           touch dist/.nojekyll
 
       - uses: actions/upload-pages-artifact@v5

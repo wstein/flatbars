@@ -50,17 +50,16 @@ parameterised by three env vars (set in the workflow; unset locally ⇒ root, so
 | `PUBLIC_BASE_PATH` | `/flatbars` | Astro `base`; `astro.config` then normalises the hand-written root-absolute links (`/minbars`, prose cross-links) to that base in the built HTML |
 | `PUBLIC_LAB_URL` | `/flatbars/lab/index.html` | bakes the based Lab URL into the runnable-example island (client JS the build-time rewrite can't reach) |
 | `PUBLIC_SITE` | `https://wstein.github.io` | Astro `site` |
+| `PUBLIC_SPEC_BASE` | `/flatbars/spec/flatbars/` | where the footer "normative reference" links point — the Antora spec's ADR pages |
 
 The Lab is plain static files with **relative** asset paths, so the workflow just
 copies `lab/` into `dist/lab/` (served at `/flatbars/lab/`); its "Docs" backlink
-(`../<engine>`) resolves to `/flatbars/<engine>`. To deploy at a **root** origin
-instead (custom domain or a user/org page), drop `PUBLIC_BASE_PATH` (and add a
-`CNAME`); the links then stay root-absolute as authored.
-
-> The Antora **spec** (`PUBLIC_SPEC_BASE`, default `/flatbars/`) is a *separate*
-> build and is not published by this workflow, so the footer "normative
-> reference" links 404 until you point `PUBLIC_SPEC_BASE` at where the spec is
-> actually hosted (or publish it alongside).
+(`../<engine>`) resolves to `/flatbars/<engine>`. The **Antora spec** is built in
+the same workflow (`npm run docs`) and copied to `dist/spec/`, so it ships on the
+same origin and the footer links resolve (the spec lives under Antora's component
+path, hence `…/spec/flatbars/`). To deploy at a **root** origin instead (custom
+domain or a user/org page), drop `PUBLIC_BASE_PATH` (and add a `CNAME`); the links
+then stay root-absolute as authored.
 
 ## How it works
 
