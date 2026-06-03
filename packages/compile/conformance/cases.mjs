@@ -105,6 +105,19 @@ export const cases = [
   { name: "p:inline-ctx", dialect: "surface", t: "{{#*inline \"greet\"}}Hi {{ name }}!{{/inline}}{{> greet user}}", d: { user: { name: "Ada" } } },
   { name: "p:inline-hash", dialect: "surface", t: "{{#*inline \"tag\"}}<{{ kind }}>{{/inline}}{{> tag this kind=\"b\"}}", d: {} },
   { name: "p:inline-nested", dialect: "surface", t: "{{#*inline \"a\"}}A{{> b}}{{/inline}}{{#*inline \"b\"}}B{{/inline}}{{> a}}", d: {} },
+  // ── block partials + body-yield (the rt-stack: a {{#>name}}/{{#partial}} block
+  //     threads its body so {{> @partial-block}} / {{yield}} inside the partial
+  //     renders it — must match the interpreter's pushed frame, Prelude.partialH) ─
+  // FullBars: the {{#>name}} sigil + the {{> @partial-block}} body reference.
+  { name: "p:block-yield", dialect: "surface", t: "{{#*inline \"layout\"}}[{{> @partial-block}}]{{/inline}}{{#>layout}}hi{{/layout}}", d: {} },
+  // the body renders in the CALLER frame: the partial's hash (title) is invisible
+  // to the yielded body, so {{title}} there is empty — proves frame separation.
+  { name: "p:block-yield-caller-frame", dialect: "surface", t: "{{#*inline \"layout\"}}{{title}}:{{> @partial-block}}{{/inline}}{{#>layout title=\"T\"}}{{title}}{{/layout}}", d: {} },
+  // a missing block partial ⇒ the body itself is the fallback (rendered raw).
+  { name: "p:block-missing-fallback", dialect: "surface", t: "{{#>missing}}fb{{/missing}}", d: {} },
+  // MaxBars: the bare {{#inline}}/{{#partial}} blocks + the reserved {{yield}}
+  // keyword (the cross-dialect synonym; MaxBars reserves @, so no @partial-block).
+  { name: "p:max-yield", dialect: "maxbars", t: "{{#inline \"layout\"}}<{{yield}}>{{/inline}}{{#partial \"layout\"}}HI{{/partial}}", d: {} },
 
   // ── @truthiness modes (compiled per-mode codegen vs interpreter) ─────────────
   { name: "t:default-zero-falsy", dialect: "surface", t: "{{#if n}}y{{else}}m{{/if}}", d: { n: 0 } },

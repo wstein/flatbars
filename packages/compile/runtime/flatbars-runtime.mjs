@@ -297,6 +297,34 @@ function partial(name, ctx, hash, partials, rt) {
   return new Safe(fn(data, rt, partials));
 }
 
+// The block-partial body stack (the "rt-stack"). A `{{#partial name}}…{{/partial}}`
+// / `{{#>name}}…{{/name}}` block pushes a thunk that renders the caller's body in
+// the CALLER's frame; inside the named partial, `{{> @partial-block}}` / `{{yield}}`
+// renders the top thunk. This mirrors the interpreter's pushed `partial-block`/
+// `yield` frame (Kernel.Prelude.partialH) — rendering is synchronous, so a plain
+// stack with balanced push/pop tracks nesting exactly.
+const yieldStack = [];
+
+// A block partial: like `partial`, but the caller's body (a `bodyThunk` closed
+// over the caller's frame) is exposed inside the partial as `{{yield}}` /
+// `{{> @partial-block}}`. A missing partial renders the body as the fallback —
+// the interpreter's behaviour (Kernel.Prelude.partialH).
+function partialBlock(name, ctx, hash, partials, rt, bodyThunk) {
+  const fn = partials && partials[name];
+  let data = ctx;
+  const obj = (v) => v != null && typeof v === "object" && !Array.isArray(v) && !isSafe(v);
+  if (obj(hash)) data = obj(ctx) ? Object.assign({}, ctx, hash) : hash;
+  // returned RAW (a block result, concatenated via `out += rt.partialBlock(...)`,
+  // like rt.block/each/with) — the partial's own escaping already applied.
+  if (typeof fn !== "function") return bodyThunk(); // missing ⇒ body is the fallback
+  yieldStack.push(bodyThunk);
+  try {
+    return stringify(fn(data, rt, partials));
+  } finally {
+    yieldStack.pop();
+  }
+}
+
 // ── JSON serialization (FullBars.Value.jsonStringify): compact or pretty, with
 //    sorted object keys (ordered Map) and per-code-unit string escaping ────────
 function jsonQuote(s) {
@@ -521,6 +549,13 @@ function call(name, args, frame) {
   // registry, like the interpreter's scoped frame helpers. `in` walks the binds
   // prototype chain so an outer binding stays visible in a nested block.
   if (frame && frame.binds && name in frame.binds) return frame.binds[name];
+  // `{{> @partial-block}}` / `{{yield}}`: render the enclosing block partial's
+  // body (the top of the rt-stack). Outside a block partial the stack is empty,
+  // so this falls through to the UnknownHelper throw — matching the interpreter,
+  // where `partial-block`/`yield` live only in the pushed block-partial frame.
+  if ((name === "partial-block" || name === "yield") && yieldStack.length) {
+    return new Safe(yieldStack[yieldStack.length - 1]());
+  }
   const h = helpers[name];
   if (h) return h(args, frame);
   const u = userHelpers[name];
@@ -678,7 +713,7 @@ function mindentOverride(indent, body) {
 }
 
 export const rt = {
-  RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, block, raw, Safe,
+  RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, partialBlock, block, raw, Safe,
   truthyHandlebars, truthyMustache, truthyNonEmpty, // ADR-022: the named truthiness callbacks (the seed binds one)
   register, // ADR-018: host-registered inline helpers
   mseed, mlookup, msection, mfalsy, mindentOverride,

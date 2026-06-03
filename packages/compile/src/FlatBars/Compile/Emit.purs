@@ -105,6 +105,18 @@ fbBlock rec ctx name args body =
       "with" -> frameBlock rec ctx "with" split.positional split.label body
       -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
       "inline" -> ""
+      -- A block partial (`{{#partial name}}body{{/partial}}` / `{{#>name}}`): like
+      -- the inline `{{> name}}` but the body is threaded as a thunk so that
+      -- `{{> @partial-block}}` / `{{yield}}` inside the partial render it (the
+      -- rt-stack — `rt.partialBlock`). The body renders in the *caller's* frame
+      -- (`ctx.scope`, closed over), matching `Kernel.Prelude.partialH`.
+      "partial" ->
+        "  out += rt.partialBlock(" <> argAt rec ctx args 0 <> ", " <> argAt rec ctx args 1
+          <> ", "
+          <> argAt rec ctx args 2
+          <> ", partials, rt, "
+          <> bodyThunk rec ctx body
+          <> ");\n"
       _ -> rtBlock rec ctx name split body
 
 -- The condition test: 1 arg ⇒ `rt.truthy`; an options object (includeZero) ⇒
@@ -178,6 +190,13 @@ bindingNames = Array.mapMaybe case _ of
 lambda :: Rec -> Ctx -> Template -> String
 lambda rec ctx body =
   "function (" <> ctx.scope <> ") { let out = \"\";\n" <> rec.nodes ctx body <> "  return out; }"
+
+-- A *zero-arg* body thunk for a block partial: renders the body in the caller's
+-- frame (`ctx.scope`, captured by the closure rather than passed in), so the
+-- rt-stack can invoke it from inside the named partial for `{{yield}}`.
+bodyThunk :: Rec -> Ctx -> Template -> String
+bodyThunk rec ctx body =
+  "function () { let out = \"\";\n" <> rec.nodes ctx body <> "  return out; }"
 
 -- An unrecognised block helper: hand the body to the runtime as closures, so the
 -- engine's control handle survives as JS functions (the baseline tier).
