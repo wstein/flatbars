@@ -32,3 +32,6 @@ lab/test/screenshots/
 # --- Antora ---
 docs/build/
 public/
+
+# VS Code extension packaging artifacts
+*.vsix

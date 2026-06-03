@@ -1,0 +1,7 @@
+# Ship only the built assets + manifest; everything else is dev-only.
+src/
+scripts/
+test/
+node_modules/
+.gitignore
+**/*.map

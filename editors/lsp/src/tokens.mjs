@@ -8,15 +8,12 @@
 // The legend and the kind→(type, modifiers) mapping are derived from the shared
 // editors/token-vocabulary.json — the single source of truth (ADR-017). The
 // server therefore cannot name a token type the vocabulary does not declare.
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
 import { tokenize } from "./engine.mjs";
+// The shared single source of truth (ADR-017), imported as data so the bundler
+// can inline it into the self-contained server — no runtime file read.
+import vocabularyJson from "../../token-vocabulary.json" with { type: "json" };
 
-const here = dirname(fileURLToPath(import.meta.url));
-export const vocabulary = JSON.parse(
-  readFileSync(resolve(here, "..", "..", "token-vocabulary.json"), "utf8"),
-);
+export const vocabulary = vocabularyJson;
 
 // The LSP semantic-tokens legend, derived from the vocabulary in stable order.
 export function buildLegend(vocab = vocabulary) {

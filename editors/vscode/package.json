@@ -1,0 +1,49 @@
+{
+  "name": "flatbars",
+  "displayName": "FlatBars",
+  "description": "FlatBars / Handlebars / Mustache syntax highlighting — a TextMate fallback plus the engine-backed flatbars-lsp for correct, stateful semantic tokens (ADR-017).",
+  "version": "0.1.0",
+  "publisher": "flatbars",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://codeberg.org/aion-foundation/flatbars" },
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "languages": [
+      {
+        "id": "flatbars",
+        "aliases": ["FlatBars", "Handlebars", "Mustache"],
+        "extensions": [".hbs", ".handlebars", ".flatbars", ".mustache", ".rawbars", ".maxbars"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "flatbars",
+        "scopeName": "source.flatbars",
+        "path": "./dist/flatbars.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "FlatBars",
+      "properties": {
+        "flatbars.defaultDialect": {
+          "type": "string",
+          "enum": ["fullbars", "minbars", "rawbars", "maxbars"],
+          "default": "fullbars",
+          "description": "The dialect used for files whose extension does not pick one (the .hbs/.handlebars/.flatbars default surface)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/sync-assets.mjs",
+    "package": "node scripts/sync-assets.mjs && vsce package --no-dependencies",
+    "test": "node test/package.smoke.test.mjs"
+  },
+  "devDependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}
