@@ -172,3 +172,38 @@ body[data-chipstyle="solid"] .legend-grid .chip { background: var(--c); color: #
 .legend-grid .desc { font-size: 0.89rem; color: var(--fg-muted); line-height: 1.45; margin: 0; }
 .legend-grid .meta .desc::before { content: "·"; margin-right: 0.5rem; color: var(--border-strong); }
 .legend-grid .desc code { font-family: var(--font-mono); font-size: 0.92em; background: none; padding: 0; }
+
+/* ── Topbar shell + canonical wordmark (shared by the docs layout AND the
+   landing via Topbar.astro; the Lab mirrors the .brand/.flat/.suffix markup). ── */
+.skip { position: absolute; left: -999px; }
+.skip:focus {
+  left: 8px; top: 8px; z-index: 20;
+  background: var(--accent); color: #fff;
+  padding: 0.4rem 0.7rem; border-radius: var(--radius);
+}
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 1rem;
+  height: 52px; padding: 0 1.25rem;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { color: var(--fg); text-decoration: none; font-weight: 600; display: inline-flex; align-items: baseline; }
+.brand .flat { color: var(--accent); }
+.brand .suffix {
+  font: 600 0.62rem/1 var(--font-mono);
+  text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--fg-faint); margin-left: 0.4rem;
+}
+.topbar .lab-link {
+  color: var(--accent-2); text-decoration: none;
+  font-weight: 600; font-size: 0.9rem; white-space: nowrap;
+}
+.topbar .lab-link:hover { color: var(--accent); }
+.nav-toggle {
+  display: none; background: none;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  color: var(--fg); font-size: 1rem; padding: 0.1rem 0.5rem; cursor: pointer;
+}
+@media (max-width: 52rem) { .nav-toggle { display: inline-block; } }

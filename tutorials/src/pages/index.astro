@@ -1,6 +1,7 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 import BaseHead from "../components/BaseHead.astro";
+import Topbar from "../components/Topbar.astro";
 import { lessons, surfaces } from "../examples.mjs";
 import HighlightLegend from "../components/HighlightLegend.astro";
 
@@ -30,10 +31,10 @@ const surfaceCards = surfaces.map((s) => ({
         font: 16px/1.65 var(--font-ui);
         color: var(--fg);
         background: var(--bg);
-        max-width: 52rem;
-        margin: 0 auto;
-        padding: 2.5rem 1.25rem 4rem;
+        margin: 0;
       }
+      /* The topbar is full-width (sticky); the page content is centred. */
+      .landing { max-width: 52rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
       h1 { font-size: 2rem; margin: 0 0 0.5rem; }
       h1 b { color: var(--accent); }
       /* The thesis: promoted out of grey sub-text into the page's lede voice. */
@@ -108,7 +109,10 @@ const surfaceCards = surfaces.map((s) => ({
       }
     </style>
   </head>
-  <body>
+  <body data-chipstyle="tint">
+    <a class="skip" href="#main">Skip to content</a>
+    <Topbar />
+    <main id="main" class="landing">
     <h1><b>Flat</b>Bars</h1>
     <p class="thesis">FlatBars isn't a template engine — it's a <b>meaning-free parser you build them on</b>. Mustache and Handlebars run on it unchanged; MaxBars is the language we built on top.</p>
     <p class="ladder">
@@ -139,5 +143,6 @@ const surfaceCards = surfaces.map((s) => ({
     </ul>
 
     <HighlightLegend />
+    </main>
   </body>
 </html>

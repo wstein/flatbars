@@ -137,8 +137,14 @@
       .brand .mark {
         width: 40px; height: 40px; flex: 0 0 40px; display: block;
       }
-      .brand .brand-name { font-size: 27px; line-height: 1; font-weight: 400; color: var(--fg-secondary); white-space: nowrap; }
-      .brand .brand-name b { font-weight: 700; color: var(--fg); }
+      .brand .brand-name { font-size: 27px; line-height: 1; font-weight: 400; color: var(--fg); white-space: nowrap; }
+      /* Canonical FlatBars wordmark lockup (shared markup with the docs/landing
+         topbar; the Lab scales it up). check:wordmark pins the markup. */
+      .brand .brand-name .flat { font-weight: 700; color: var(--accent); }
+      .brand .brand-name .suffix {
+        font: 600 0.62rem/1 var(--font-mono); text-transform: uppercase;
+        letter-spacing: 0.16em; color: var(--fg-faint); margin-left: 0.4rem; vertical-align: 0.5em;
+      }
       .topbar .divider { width: 1px; height: 18px; background: var(--border); }
       .topbar-group { display: flex; align-items: center; gap: 6px; }
       .field-label { color: var(--fg-muted); font-size: 12px; padding-right: 2px; }
@@ -1431,7 +1437,7 @@
             <path class="stem-line" d="M24 29 C27 27 29 27 31 28" stroke="var(--stem-green)" stroke-width="2" stroke-linecap="round"/>
             <circle class="stem-dot" cx="24" cy="13" r="2" fill="var(--stem-green)"/>
           </svg>
-          <span class="brand-name"><b>FlatBars</b> Lab</span>
+          <span class="brand-name"><b class="flat">Flat</b>Bars<span class="suffix">LAB</span></span>
         </div>
         <div class="divider"></div>
         <div class="topbar-group">
