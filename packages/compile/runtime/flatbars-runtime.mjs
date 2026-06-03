@@ -165,17 +165,28 @@ function bindNames(frame, names, values) {
   return frame;
 }
 
-// A loop `label NAME` (ADR-013) binds the frame reified as an object — the bare
-// loop variables (this/index0/…/length/key) as fields — so an inner body reads
-// `label.length`/`label.first`. The field set + arithmetic mirror the
-// interpreter's `iterate.frameObject`, so the two paths produce the same object.
-function labelFrame(frame, label) {
-  if (!label) return frame;
-  frame.binds[label] = {
+// The `loop` object (ADR-021): the bare loop variables (this/index0/…/length/key)
+// as fields, plus the chain links `parent` (the enclosing loop's object, or null)
+// and `root` (the outermost loop's shallow object). An inner body reads
+// `loop.length`, `loop.parent.index0`, `loop.root.length`. The field set +
+// arithmetic mirror the interpreter's `iterate.loopObject`, so the two paths
+// produce the same object. Every `each` binds `loop`; a `label NAME` (ADR-013)
+// binds the SAME object under the chosen name (`outer`).
+function bindLoop(frame, label) {
+  const meta = {
     this: frame.ctx, index0: frame.index0, index1: frame.index1,
     rindex0: frame.rindex0, rindex1: frame.rindex1,
     first: frame.first, last: frame.last, length: frame.length, key: frame.key,
   };
+  // the enclosing loop's object, inherited through the binds prototype chain (so a
+  // `with` between two loops is skipped). `undefined` when this loop is outermost.
+  const enclosing = frame.binds.loop;
+  const obj = Object.assign({}, meta, {
+    parent: enclosing || null,
+    root: enclosing ? enclosing.root : Object.assign({}, meta), // shallow, no cycle
+  });
+  frame.binds.loop = obj;
+  if (label) frame.binds[label] = obj;
   return frame;
 }
 
@@ -198,7 +209,7 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
   let out = "";
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
-    const fr = labelFrame(
+    const fr = bindLoop(
       bindNames(
         childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1, items.length),
         names, [it.val, it.idx],
@@ -211,11 +222,13 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
 }
 
 // ── context shift: `with` (FullBars withH) ───────────────────────────────────
-// `label` is accepted for signature symmetry with `each`; the surface only emits
-// a loop label on `each`, so it is null here in practice.
+// `with` is not a loop, so it binds no `loop`; it INHERITS the enclosing loop's
+// object through the binds chain (so `loop`/`loop.parent` keep working across a
+// context shift). `label` is accepted for signature symmetry with `each` but the
+// surface only emits a loop label on `each`, so it is null here in practice.
 function withCtx(val, parent, names, label, bodyFn, elseFn) {
   if (!truthy(parent.falsy, val)) return elseFn(parent);
-  return bodyFn(labelFrame(bindNames(childFrame(parent, val, null, null, null, null), names, [val]), label));
+  return bodyFn(bindNames(childFrame(parent, val, null, null, null, null), names, [val]));
 }
 
 // ── partials: render a registered partial (FullBars partialH) ────────────────

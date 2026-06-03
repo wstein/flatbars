@@ -994,32 +994,52 @@ iterate
   -> Array String
   -> Array { val :: Value, key :: Value, idx :: Value }
   -> m Value
-iterate ctl names items =
+iterate ctl names items = do
+  -- the enclosing loop's `loop` object (ADR-021), read once — the inner loop
+  -- embeds it as `loop.parent`, chaining `loop.parent.parent`/`loop.root`. `VNull`
+  -- when this loop is outermost (`with` inherits its enclosing `loop`, so the
+  -- chain skips context shifts).
+  enclosingLoop <- case lookupOperation "loop" ctl.env of
+    Just op -> op ctl []
+    Nothing -> pure VNull
   let
     main = mainBody ctl
     n = Array.length items
     -- block params bind, in order, the element value and its index/key.
     binds val idx = Array.zipWith (\nm v -> Tuple nm (constOperation v)) names [ val, idx ]
-    -- a loop `label NAME` (ADR-013) binds the *frame reified as an object* — the
-    -- bare loop variables `this`/`index0`/…/`length`/`key` as fields — so an inner
-    -- body reads `label.length`/`label.first` of this enclosing loop. It is an
+    -- the bare loop variables as fields: `this`/`index0`/…/`length`/`key`. An
     -- immutable per-iteration snapshot; the compiler builds the same object.
-    frameObject i val key = VObject
+    metaFields i val key =
+      [ Tuple "this" val
+      , Tuple "index0" (VNumber (Int.toNumber i))
+      , Tuple "index1" (VNumber (Int.toNumber (i + 1)))
+      , Tuple "rindex0" (VNumber (Int.toNumber (n - 1 - i)))
+      , Tuple "rindex1" (VNumber (Int.toNumber (n - i)))
+      , Tuple "first" (VBool (i == 0))
+      , Tuple "last" (VBool (i == n - 1))
+      , Tuple "length" (VNumber (Int.toNumber n))
+      , Tuple "key" key
+      ]
+    -- the outermost loop's object, a *shallow* snapshot (no `parent`/`root`) so the
+    -- `loop.root` chain terminates without a cycle.
+    rootLoop i val key = case enclosingLoop of
+      VObject m -> fromMaybe (VObject (Map.fromFoldable (metaFields i val key)))
+        (Map.lookup "root" m)
+      _ -> VObject (Map.fromFoldable (metaFields i val key))
+    -- the `loop`/`label`/`outer` object: metadata + the chain links.
+    loopObject i val key = VObject
       ( Map.fromFoldable
-          [ Tuple "this" val
-          , Tuple "index0" (VNumber (Int.toNumber i))
-          , Tuple "index1" (VNumber (Int.toNumber (i + 1)))
-          , Tuple "rindex0" (VNumber (Int.toNumber (n - 1 - i)))
-          , Tuple "rindex1" (VNumber (Int.toNumber (n - i)))
-          , Tuple "first" (VBool (i == 0))
-          , Tuple "last" (VBool (i == n - 1))
-          , Tuple "length" (VNumber (Int.toNumber n))
-          , Tuple "key" key
-          ]
+          ( metaFields i val key <>
+              [ Tuple "parent" enclosingLoop, Tuple "root" (rootLoop i val key) ]
+          )
       )
-    labelBind i val key = case ctl.loopLabel of
-      Just lbl -> [ Tuple lbl (constOperation (frameObject i val key)) ]
-      Nothing -> []
+    -- `loop` is bound on every iteration (ADR-021); a `label NAME` (ADR-013) binds
+    -- the same object under the chosen name (`outer`).
+    loopBinds i val key =
+      [ Tuple "loop" (constOperation (loopObject i val key)) ]
+        <> case ctl.loopLabel of
+          Just lbl -> [ Tuple lbl (constOperation (loopObject i val key)) ]
+          Nothing -> []
     renderItem i { val, key, idx } =
       let
         frame = Map.fromFoldable
@@ -1042,12 +1062,11 @@ iterate ctl names items =
             , Tuple "rindex0" (constOperation (VNumber (Int.toNumber (n - 1 - i))))
             , Tuple "rindex1" (constOperation (VNumber (Int.toNumber (n - i))))
             , Tuple "length" (constOperation (VNumber (Int.toNumber n)))
-            ] <> parentData ctl <> binds val idx <> labelBind i val key
+            ] <> parentData ctl <> binds val idx <> loopBinds i val key
           )
       in
         ctl.render (pushFrame frame val ctl.env) main
-  in
-    (VSafe <<< joinWith "") <$> traverse identity (Array.mapWithIndex renderItem items)
+  (VSafe <<< joinWith "") <$> traverse identity (Array.mapWithIndex renderItem items)
 
 -- | `with ctx [name]`: an optional trailing string argument is a block param
 -- | (surface `as |name|`) bound to the shifted context.
