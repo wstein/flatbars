@@ -37,14 +37,22 @@ preview views, confirm the iframe renders.
 - [ ] **HTML Preview** / **Markdown Preview** — iframe renders (text pane hidden).
 - [ ] **Render Data** — the view-model as YAML.
 - [ ] **Compiled JS** — the emitted module (FlatBars dialect), JS-highlighted.
-- [ ] **Truthiness** (ADR-022) — for a template with an ambiguous condition over
-      empty/zero data (e.g. `{{#if bio}}…{{/if}}` with `{"bio":""}`):
-  - [ ] the report renders as **markdown** (headings, the `⚠`/`✓` lines).
-  - [ ] it names the finding, the flipping engines, the fix, and `data path:`.
-  - [ ] editing the data re-runs the report (no stale content).
-  - [ ] switching away and back repaints (no blank pane, no leftover iframe).
-  - [ ] the tab is **absent** when a non-FlatBars engine is selected (it gates on
-        the `analyse` capability).
+
+## Checklist — Truthiness diagnostics panel (ADR-022)
+
+The truthiness report is a **dock panel** (next to Coverage / Data Access), not an
+output view. With a template that has an ambiguous condition over empty/zero data
+(e.g. `{{#if bio}}…{{/if}}` with `{"bio":""}`):
+
+- [ ] the **Truthiness** tab appears in the diagnostics dock, with a finding count
+      and an amber badge (green when there are none).
+- [ ] each finding row shows the tag, the value tested, the engines it flips
+      under, `main:line:col`, and a **Fix:** line.
+- [ ] clicking a row jumps to the condition in the template editor.
+- [ ] editing the data re-runs it (a finding clears when the value stops being
+      ambiguous; `0 findings — portable` shows).
+- [ ] the tab is **absent** when a non-FlatBars engine is selected (it gates on
+      the `analyse` capability).
 
 ## When a view is added or changed
 

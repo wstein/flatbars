@@ -1700,7 +1700,7 @@
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=27";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=28";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -1740,9 +1740,8 @@
         visibleViews as ovVisibleViews,
         validView as ovValidView,
         viewKind,
-        analyseText,
         applyView,
-      } from "./output-view.mjs?v=1";
+      } from "./output-view.mjs?v=2";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -3203,6 +3202,7 @@
       let lastCalls = [];           // #4: [{ name, file, start, end }]
       let lastEscapeRuns = null;    // #5: { html, plain, raw, total }
       let lastCoverage = [];        // #7: [{ kind, file, start, end, line, col, executed, count }]
+      let lastAnalyse = { ok: true, findings: [] }; // ADR-022: truthiness portability (Truthiness panel)
       let lastRequiredAssigns = []; // engine reflection: assign names the program reads
       let lastMissingAssigns = [];  // intersection: requiredAssigns NOT in current data
 
@@ -3213,7 +3213,6 @@
         if (view === "data") return lastData != null;
         if (view === "bytecode") return lastProgram != null;
         if (view === "compiled") return true; // depends only on the template source
-        if (view === "analyse") return typeof renderer.analyze === "function"; // template-only
         return !!lastOutput;
       }
 
@@ -3406,12 +3405,6 @@
             text = r.ok ? r.value : "// compile error: " + r.error;
           }
           setOutputDoc(text, Decoration.none);
-        } else if (outputView === "analyse") {
-          // ADR-022 analyse mode: trace this render against the current data and
-          // report the conditions whose branch would differ on another engine.
-          // The decision lives in lab/output-view.mjs (analyseText).
-          lastSegViews = [];
-          setOutputDoc(analyseText(renderer, templateSourceFor("main"), lastData), Decoration.none);
         } else {
           const { segViews, deco } = buildProvenance(lastOutput, lastSegments);
           lastSegViews = segViews;
@@ -3480,11 +3473,6 @@
         }
         if (outputView === "compiled") {
           outputEditor.dispatch({ effects: outLangComp.reconfigure([jsLang]) });
-          return;
-        }
-        if (outputView === "analyse") {
-          // the analyse report is markdown.
-          outputEditor.dispatch({ effects: outLangComp.reconfigure([markdown()]) });
           return;
         }
         if (outputView !== "source") return;
@@ -3580,6 +3568,7 @@
         // Reset per-run analyses so a stale value never leaks into the dock.
         lastTimings = null; lastAst = null; lastDataAccess = []; lastWhitespace = [];
         lastDeps = null; lastCalls = []; lastEscapeRuns = null; lastCoverage = [];
+        lastAnalyse = { ok: true, findings: [] };
         lastRequiredAssigns = []; lastMissingAssigns = [];
         const dataSource = yamlSrc; // the YAML tab's source (editor may show the transform)
         const mainSource = tabs[0].source;
@@ -3716,6 +3705,11 @@
         // uses the engine's default truthiness for dead-branch classification.
         lastDataAccess = analyseDataAccess(astsByFile, data);
         lastCoverage = analyseCoverage(astsByFile, data);
+        // ADR-022: trace the render and collect the truthiness portability
+        // findings for the Truthiness dock panel (FlatBars engine only).
+        lastAnalyse = typeof renderer.analyze === "function"
+          ? renderer.analyze({ source: mainSource }, data)
+          : { ok: true, findings: [] };
         refreshCoverageGutter();
         // Engine-reported assigns that aren't present at the data root — a
         // tight, false-positive-free "missing assigns" signal (Data Access).
@@ -5367,6 +5361,15 @@
             return dead ? "warn" : "success";
           },
           render: renderCoverage },
+        // ADR-022: conditions whose branch would differ on another engine
+        // (Mustache/StringTemplate4/…), with a portable fix each.
+        { id: "truthiness", label: "Truthiness", requires: ["analyse"],
+          count: () => lastAnalyse.findings.length,
+          badge: () => {
+            if (!lastAnalyse.ok) return "";
+            return lastAnalyse.findings.length ? "warn" : "success";
+          },
+          render: renderTruthiness },
         // The read-only inspectors (moved here from the Sources pane). They are
         // not analyses with a count — `noBadge` suppresses the badge — and follow
         // the active file / last render (re-rendered by renderDock after each run).
@@ -5833,6 +5836,52 @@
           row.title = "jump to source";
           row.addEventListener("click", () => openProblem({ file: r.file, line: pos.line, col: pos.column }));
           list.append(row);
+        }
+        section.append(list);
+        body.append(section);
+      }
+
+      // ── Panel: Truthiness (ADR-022) ──────────────────────────────────
+      // The conditions whose branch would differ on another engine, from the
+      // engine's analyse mode. Each row jump-links to the source tag; the fix is
+      // the portable rewrite. Reuses the Coverage panel's `cv-*` styling.
+      function renderTruthiness(body) {
+        const a = lastAnalyse;
+        const section = makeEl("div", { class: "cv-section" });
+        // strip markdown code-ticks — this is a plain diagnostics panel, not markdown.
+        const plain = (s) => String(s).replace(/`/g, "");
+        if (!a.ok) {
+          section.append(makeEl("div", { class: "cv-empty" },
+            "Analyse unavailable: " + (a.error || "the template did not render.")));
+          body.append(section);
+          return;
+        }
+        const rows = a.findings;
+        section.append(makeEl("div", { class: "cv-head" }, [
+          makeEl("strong", {}, "Truthiness"),
+          " — ", String(rows.length), " portability finding", rows.length === 1 ? "" : "s",
+        ]));
+        if (rows.length === 0) {
+          section.append(makeEl("div", { class: "cv-empty" },
+            "Every condition agrees across engines for this data — portable."));
+          body.append(section);
+          return;
+        }
+        section.append(makeEl("div", { class: "cv-hint" },
+          "Each condition branches differently on another engine. Branch explicitly so the result does not ride on the host's truthiness rule."));
+        const list = makeEl("div", { class: "cv-rows" });
+        for (const f of rows) {
+          const row = makeEl("div", { class: "cv-row dead" }, [
+            makeEl("span", { class: "cv-kind" }, f.tag),
+            makeEl("span", { class: "cv-label" },
+              `tested ${plain(f.value)} — flips under ${f.flips.join(", ")}`),
+            makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
+          ]);
+          row.title = "jump to source";
+          row.addEventListener("click", () => openProblem({ file: "main", line: f.line, col: f.column }));
+          list.append(row);
+          list.append(makeEl("div", { class: "cv-hint" },
+            [makeEl("strong", {}, "Fix: "), plain(f.fix)]));
         }
         section.append(list);
         body.append(section);

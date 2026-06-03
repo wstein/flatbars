@@ -4,8 +4,8 @@
 // view system is testable without a browser (the `playground_utils.mjs` pattern).
 //
 // Three layers (see docs/playground-smoke.md):
-//   1. DECISION — VIEW_TABS / visibleViews / validView / viewKind / analyseText:
-//      pure functions, unit-tested in Node.
+//   1. DECISION — VIEW_TABS / visibleViews / validView / viewKind: pure
+//      functions, unit-tested in Node.
 //   2. WIRING   — applyView: mutates the DOM *interface* (`hidden` flags) given
 //      injected elements; tested against a hand-rolled fake document. It touches
 //      no layout/CodeMirror — that is deliberately out of scope here.
@@ -25,9 +25,6 @@ export const VIEW_TABS = [
   { view: "data", label: "Render Data" },
   { view: "bytecode", label: "Bytecode", requires: ["bytecode-wire"] },
   { view: "compiled", label: "Compiled JS", requires: ["compile-js"] },
-  // ADR-022: trace this render and report the conditions whose branch would
-  // differ on another engine, with a fix each (markdown report).
-  { view: "analyse", label: "Truthiness", requires: ["analyse"] },
 ];
 
 // The views the loaded engine actually exposes (ADR-0020 gate applied).
@@ -42,21 +39,12 @@ export function validView(view, features) {
 }
 
 // Whether a view paints into the read-only text editor (vs the preview iframe).
-// The text views: Plain Text, Render Data, Bytecode, ST4, Compiled JS, Truthiness.
+// The text views: Plain Text, Render Data, Bytecode, ST4, Compiled JS.
 export function viewKind(view) {
   const text =
     view === "source" || view === "data" || view === "bytecode" || view === "st4" ||
-    view === "compiled" || view === "analyse";
+    view === "compiled";
   return text ? "text" : "preview";
-}
-
-// The analyse (Truthiness) view's text: the engine's markdown portability report
-// for `source` against `data`, or a placeholder when the engine has no analyse
-// mode (ADR-022). Pure — `renderer.analyze` does the work.
-export function analyseText(renderer, source, data) {
-  if (typeof renderer.analyze !== "function") return "This engine has no analyse mode.";
-  const r = renderer.analyze({ source }, data);
-  return r.ok ? r.report : "Analyse error: " + r.error;
 }
 
 // WIRING (layer 2): show the text pane or the preview iframe for `view` by

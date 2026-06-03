@@ -17,19 +17,18 @@ import {
   visibleViews,
   validView,
   viewKind,
-  analyseText,
   applyView,
 } from "./output-view.mjs";
 
 // A FlatBars-shaped feature vector (mirrors flatbars.mjs BB_FEATURES, trimmed).
-const FB = ["surface-dialect", "core-dialect", "compile-js", "analyse"];
-// An engine without the analyse capability (e.g. a minimal/other engine).
-const NO_ANALYSE = ["surface-dialect", "core-dialect"];
+const FB = ["surface-dialect", "core-dialect", "compile-js"];
+// An engine without the compile-js capability (e.g. a minimal/other engine).
+const NO_COMPILE = ["surface-dialect", "core-dialect"];
 
 // ── Layer 1: decision ───────────────────────────────────────────────────────
 
 test("viewKind: text views paint the editor, previews use the iframe", () => {
-  for (const v of ["source", "data", "bytecode", "st4", "compiled", "analyse"]) {
+  for (const v of ["source", "data", "bytecode", "st4", "compiled"]) {
     assert.equal(viewKind(v), "text", `${v} should be a text view`);
   }
   for (const v of ["rendered", "markdown"]) {
@@ -43,35 +42,17 @@ test("every VIEW_TABS entry has a defined kind (no unhandled view)", () => {
   }
 });
 
-test("visibleViews gates the Truthiness view on the analyse capability", () => {
-  assert.ok(visibleViews(FB).some((t) => t.view === "analyse"), "shown when advertised");
-  assert.ok(!visibleViews(NO_ANALYSE).some((t) => t.view === "analyse"), "hidden otherwise");
+test("visibleViews applies the ADR-0020 capability gate", () => {
+  assert.ok(visibleViews(FB).some((t) => t.view === "compiled"), "shown when advertised");
+  assert.ok(!visibleViews(NO_COMPILE).some((t) => t.view === "compiled"), "hidden otherwise");
   // capability-free views are always present
-  assert.ok(visibleViews(NO_ANALYSE).some((t) => t.view === "rendered"));
+  assert.ok(visibleViews(NO_COMPILE).some((t) => t.view === "rendered"));
 });
 
 test("validView keeps an exposed view and falls back to rendered otherwise", () => {
-  assert.equal(validView("analyse", FB), "analyse");
-  assert.equal(validView("analyse", NO_ANALYSE), "rendered"); // gated off ⇒ fallback
+  assert.equal(validView("compiled", FB), "compiled");
+  assert.equal(validView("compiled", NO_COMPILE), "rendered"); // gated off ⇒ fallback
   assert.equal(validView("bogus", FB), "rendered");
-});
-
-test("analyseText returns the report, the error, or a no-engine placeholder", () => {
-  const ok = { analyze: () => ({ ok: true, report: "# Truthiness analysis\n…", jsonata: "" }) };
-  assert.match(analyseText(ok, "{{#if x}}…{{/if}}", { x: "" }), /Truthiness analysis/);
-
-  const bad = { analyze: () => ({ ok: false, error: "1:1: parse boom" }) };
-  assert.match(analyseText(bad, "{{#if", {}), /Analyse error: 1:1: parse boom/);
-
-  assert.match(analyseText({}, "x", {}), /no analyse mode/); // engine without analyze
-});
-
-test("analyseText passes the source through as the program (not the data)", () => {
-  let seenSource = null, seenData = null;
-  const spy = { analyze: (p, d) => { seenSource = p.source; seenData = d; return { ok: true, report: "" }; } };
-  analyseText(spy, "TPL", { k: 1 });
-  assert.equal(seenSource, "TPL");
-  assert.deepEqual(seenData, { k: 1 });
 });
 
 // ── Layer 2: wiring (hand-rolled fake DOM — interface only, no layout) ────────
@@ -81,7 +62,7 @@ const fakeEls = () => ({ text: { hidden: null }, preview: { hidden: null } });
 
 test("applyView shows the text pane and hides the iframe for a text view", () => {
   const els = fakeEls();
-  const kind = applyView(els, "analyse");
+  const kind = applyView(els, "compiled");
   assert.equal(kind, "text");
   assert.equal(els.text.hidden, false);
   assert.equal(els.preview.hidden, true);

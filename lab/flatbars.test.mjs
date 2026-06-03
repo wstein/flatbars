@@ -130,9 +130,19 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   assert.match(a.report, /1 portability finding/);
   assert.match(a.report, /data path: `bio`/);
   assert.match(a.jsonata, /"bio": bio = "" \? null : bio/);
+  // structured findings drive the Truthiness dock panel.
+  assert.equal(a.findings.length, 1);
+  const f = a.findings[0];
+  assert.equal(f.line, 1);
+  assert.equal(f.tag, "{{#if bio}}");
+  assert.equal(f.path, "bio");
+  assert.deepEqual(f.flips, ["mustache", "minimal", "presence"]);
+  assert.match(f.value, /empty string/);
+  assert.match(f.fix, /ne s/);
   // false agrees under every rule — no finding.
   const b = r.analyze({ source: "{{#if ok}}x{{/if}}" }, { ok: false });
   assert.match(b.report, /0 portability finding/);
+  assert.equal(b.findings.length, 0);
 });
 
 test("the catalog entries have the cheat-sheet shape", async () => {
