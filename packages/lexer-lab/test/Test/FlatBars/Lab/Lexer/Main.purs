@@ -22,6 +22,7 @@ import FlatBars.Lab.Lexer
   )
 import Test.Assert (assertEqual, assertTrue')
 import Test.FlatBars.Lab.LexerHand as LexerHand
+import Test.FlatBars.Lab.ParserParity as ParserParity
 
 cfg :: { close :: String, infixArith :: Boolean, open :: String }
 cfg = defaultLexConfig
@@ -224,3 +225,6 @@ main = do
 
   -- The hand-written lexer's own suite + parity against this parsing spike.
   LexerHand.tests
+
+  -- Phase-1: the lab parser's AST parity against the engine's FlatBars.parse.
+  ParserParity.tests

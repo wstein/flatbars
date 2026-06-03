@@ -143,6 +143,7 @@
             "arrays",
             "control",
             "either",
+            "flatbars",
             "foldable-traversable",
             "maybe",
             "numbers",
