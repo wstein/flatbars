@@ -195,6 +195,25 @@ Two parser tracks over the hand lexer, both parity-checked against the engine:
   nesting, escapes), plus an end-to-end `parse` vs `FlatBars.parse` check on
   standalone-whitespace templates (`{{#if}}/{{else}}`, indentation, comments).
 
+### End-to-end parse benchmark
+
+`bench.mjs` also times the full parse to the `Syntax` AST — incumbent
+`FlatBars.parse` vs the migration path (hand lexer → RawTok adapter → the *same*
+`trimStandalone` + `buildFromTokens`). Same AST out; this is the cost of the swap
+(node v26, ~50 KiB profiles):
+
+| profile | incumbent `FlatBars.parse` | lab (hand → RawTok → parser) |
+| - | - | - |
+| ocean | 35.0 MB/s | **39.1 MB/s** (0.90× time) |
+| prose | 8.2 MB/s | **8.8 MB/s** (0.93× time) |
+| dense | 1.3 MB/s | 0.8 MB/s (1.60× time) |
+
+So end-to-end the migration path is **faster than the incumbent on realistic
+input** (its faster lexer front more than pays for the adapter), and slower only
+on the pathological all-tags corpus — where the hand lexer's finer stream (≈3.4×
+more tokens) plus the adapter's re-walk cost more than the incumbent's coarse
+single-pass `tokenizeTemplate`. The shared `buildFromTokens` dominates both.
+
 The takeaway: **swap the lexer, keep the proven parser.** Because the RawTok
 streams match exactly, standalone whitespace, header directives, raw blocks, and
 recovering parse are all inherited for free. The one deliberate divergence is

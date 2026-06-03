@@ -23,6 +23,20 @@ const spike = await import(out("FlatBars.Lab.Lexer"));
 const hand = await import(out("FlatBars.Lab.LexerHand"));
 const incumbent = await import(out("FlatBars.Lexer"));
 const token = await import(out("FlatBars.Token"));
+const coreParser = await import(out("FlatBars.Parser"));
+const labRawTok = await import(out("FlatBars.Lab.RawTok"));
+
+// End-to-end parse-to-AST: the incumbent (tokenizeTemplate → trimStandalone →
+// buildFromTokens) vs the migration path (hand lexer → RawTok adapter → the
+// SAME trimStandalone + buildFromTokens). Both produce the same Syntax AST.
+const parseCore = coreParser.parse;
+const parseLab = labRawTok.parse;
+// Right → count nodes; Left → throw (work can't be elided either way).
+function forceParse(either) {
+  if (either.constructor.name !== "Right") throw new Error("parse returned Left");
+  const v = either.value0;
+  return Array.isArray(v) ? v.length : v.nodes.length;
+}
 
 // Curried PureScript entry points.
 const lexSpike = spike.tokenize(spike.defaultLexConfig);
@@ -117,5 +131,25 @@ for (const [name, input] of Object.entries(CORPORA)) {
   const mb = (b) => `${b.mbPerSec.toFixed(1).padStart(5)} MB/s`;
   console.log(
     `${name.padEnd(7)}  ${String(input.length).padStart(6)}  ${mb(l1)}   ${mb(full)}      ${mb(p)}    ${mb(h)}`,
+  );
+}
+
+// ── End-to-end: parse to the Syntax AST ───────────────────────────────────
+// Both paths share the engine's buildFromTokens (interior tokenizing + Expr +
+// tree) and trimStandalone; they differ only in the FRONT — the incumbent's
+// tokenizeTemplate vs the hand lexer + RawTok adapter. Same AST out (proven by
+// RawTokParity); this is the cost of the swap, end to end.
+console.log("\n── end-to-end parse → Syntax AST ──");
+console.log("profile  bytes   incumbent (FlatBars.parse)  lab (hand→RawTok→parser)  ratio");
+console.log("───────  ──────  ─────────────────────────  ────────────────────────  ─────");
+for (const [name, input] of Object.entries(CORPORA)) {
+  forceParse(parseCore(input)); // sanity: both parse
+  forceParse(parseLab(input));
+  const c = bench((x) => forceParse(parseCore(x)), input);
+  const l = bench((x) => forceParse(parseLab(x)), input);
+  const mb = (b) => `${b.mbPerSec.toFixed(1).padStart(5)} MB/s ${b.perIter.toFixed(1).padStart(5)} ms`;
+  const ratio = (l.perIter / c.perIter).toFixed(2);
+  console.log(
+    `${name.padEnd(7)}  ${String(input.length).padStart(6)}  ${mb(c)}          ${mb(l)}        ${ratio}×`,
   );
 }

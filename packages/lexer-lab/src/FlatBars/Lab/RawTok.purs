@@ -60,7 +60,10 @@ trimEndWs s =
 build :: String -> Array LexToken -> Array E.RawTok
 build src toks = Array.fromFoldable (List.reverse (go 0 false Nil))
   where
-  sub a b = SCU.take (b - a) (SCU.drop a src)
+  -- Slice a char array, not the String: `SCU.drop a` is O(a), so a per-tag
+  -- `take∘drop` would be O(n²) on tag-dense input (the incumbent slices an array).
+  cs = SCU.toCharArray src
+  sub a b = SCU.fromCharArray (Array.slice a b cs)
 
   spanOf j = case Array.index toks j of
     Just t -> t.span
@@ -88,21 +91,23 @@ build src toks = Array.fromFoldable (List.reverse (go 0 false Nil))
     | otherwise = findClose closeLex (j + 1)
 
   -- `pend` = the previous tag had a trailing `~`, so trim the start of the
-  -- content that precedes the next tag.
+  -- content that precedes the next tag. `go` is the ONLY recursive function (the
+  -- emitters return the next state) so its tail self-calls are loop-optimised —
+  -- mutual recursion through the emitters would overflow on large input.
   go :: Int -> Boolean -> List E.RawTok -> List E.RawTok
   go i pend acc = case Array.index toks i of
     Nothing -> acc
     Just tok -> case tok.lexeme of
       T.Eof -> flushContent (leadingText i) pend false acc
-      T.Comment _ -> comment i pend acc
+      T.Comment _ -> let r = comment i pend acc in go r.next r.pend r.acc
       T.SetDelimiter _ _ ->
         let
           acc1 = flushContent (leadingText i) pend false acc
         in
           go (i + 1) false (E.RSetDelim (coreSpan (spanOf i)) : acc1)
-      T.OpenRaw -> rawBlock i pend acc
-      T.OpenTriple -> tag i pend acc T.CloseTriple
-      T.Open -> tag i pend acc T.CloseTag
+      T.OpenRaw -> let r = rawBlock i pend acc in go r.next r.pend r.acc
+      T.OpenTriple -> let r = tag i pend acc T.CloseTriple in go r.next r.pend r.acc
+      T.Open -> let r = tag i pend acc T.CloseTag in go r.next r.pend r.acc
       _ -> go (i + 1) pend acc
 
   -- Flush a content run with the pending leading trim and an optional trailing
@@ -115,7 +120,6 @@ build src toks = Array.fromFoldable (List.reverse (go 0 false Nil))
     in
       if s2 == "" then acc else E.RContent s2 : acc
 
-  tag :: Int -> Boolean -> List E.RawTok -> T.Lexeme -> List E.RawTok
   tag i pend acc closeLex =
     let
       closeIdx = findClose closeLex (i + 1)
@@ -136,7 +140,7 @@ build src toks = Array.fromFoldable (List.reverse (go 0 false Nil))
           Just s | Just syn <- blockSigil s -> E.ROpen span syn base interior
           _ -> E.RSep span base interior
     in
-      go (closeIdx + 1) trimR (rawTok : acc1)
+      { acc: rawTok : acc1, next: closeIdx + 1, pend: trimR }
 
   -- The interior's source offset, after the opener and any leading `~`/sigil.
   -- `>` (Partial) keeps its sigil in the interior (the engine's `RSep` does).
@@ -151,23 +155,21 @@ build src toks = Array.fromFoldable (List.reverse (go 0 false Nil))
 
   -- {{! … }} short comment → RComment; {{!-- … --}} long comment → dropped
   -- (the engine's default config does not keep long comments).
-  comment :: Int -> Boolean -> List E.RawTok -> List E.RawTok
   comment i pend acc =
     let
       sp = spanOf i
       open = sub sp.start.index sp.end.index
       acc1 = flushContent (leadingText i) pend false acc
     in
-      if SCU.take 5 open == "{{!--" then go (i + 1) false acc1 -- long comment dropped
+      if SCU.take 5 open == "{{!--" then { acc: acc1, next: i + 1, pend: false } -- long: dropped
       else
         let
           base = sp.start.index + 3 -- after "{{!"
           interior = sub base (sp.end.index - 2) -- before "}}"
         in
-          go (i + 1) false (E.RComment (coreSpan sp) base interior : acc1)
+          { acc: E.RComment (coreSpan sp) base interior : acc1, next: i + 1, pend: false }
 
   -- OpenRaw / RawBody / CloseRaw (3 lexemes) → one RRaw.
-  rawBlock :: Int -> Boolean -> List E.RawTok -> List E.RawTok
   rawBlock i pend acc =
     let
       openSp = spanOf i
@@ -181,7 +183,7 @@ build src toks = Array.fromFoldable (List.reverse (go 0 false Nil))
       span = coreSpan { start: openSp.start, end: closeSp.end }
       acc1 = flushContent (leadingText i) pend false acc
     in
-      go (i + 3) false (E.RRaw span hash headStart head body : acc1)
+      { acc: E.RRaw span hash headStart head body : acc1, next: i + 3, pend: false }
 
 zero3 :: { index :: Int, line :: Int, column :: Int }
 zero3 = { index: 0, line: 1, column: 1 }
