@@ -57,8 +57,8 @@ test("renders the maxbars dialect: infix, bare-infix block conditions, loop vars
   assert.equal(mx("{{ x > 0 && x < 10 }}", { x: 5 }), "true");
   // bare (un-parenthesised) infix block condition
   assert.equal(mx("{{#if a && b}}Y{{else}}N{{/if}}", { a: true, b: false }), "N");
-  // bare loop variables (canonical + alias)
-  assert.equal(mx("{{#each xs}}[{{index1}}/{{length}}]{{/each}}", { xs: ["a", "b"] }), "[1/2][2/2]");
+  // loop variables through the loop object (ADR-021)
+  assert.equal(mx("{{#each xs}}[{{loop.index1}}/{{loop.length}}]{{/each}}", { xs: ["a", "b"] }), "[1/2][2/2]");
   // a pipe
   assert.equal(mx("{{{ o | json }}}", { o: { a: 1 } }), '{"a":1}');
 });
