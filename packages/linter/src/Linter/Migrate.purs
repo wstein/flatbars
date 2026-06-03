@@ -43,7 +43,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either)
-import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.String.CodeUnits as SCU
