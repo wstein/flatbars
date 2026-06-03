@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "spago build",
-    "test": "npm run format:check && spago test -p flatbars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p flatbars-json && spago test -p flatbars-js && spago test -p flatbars-compile && spago test -p linter && npm run check:tokens && npm run check:contrast && npm run check:wordmark && npm run check:catalog && npm run check:glossary && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:conformance && npm run test:tutorials && npm run check:hbs-conformance && npm run check:mustache-conformance && npm run check:highlight && npm run check:tmgrammar && npm run check:bundle && npm run test:lab",
+    "test": "npm run format:check && spago test -p flatbars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p flatbars-json && spago test -p flatbars-js && spago test -p flatbars-compile && spago test -p linter && npm run check:tokens && npm run check:contrast && npm run check:wordmark && npm run check:catalog && npm run check:glossary && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:conformance && npm run test:tutorials && npm run check:hbs-conformance && npm run check:mustache-conformance && npm run check:highlight && npm run check:tmgrammar && npm run check:bundle && npm run test:lab && npm run test:lsp",
     "check:isolation": "node scripts/check-package-isolation.mjs",
     "check:glossary": "node scripts/check-glossary.mjs",
     "examples:verify": "spago build -p flatbars-cli && spago run -p flatbars-cli -- examples verify",
@@ -29,6 +29,7 @@
     "gen:bundle": "spago build -p flatbars-js && npx --yes esbuild@0.23.0 output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs",
     "check:bundle": "spago build -p flatbars-js && node scripts/check-bundle.mjs",
     "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs && node lab/helpers.test.mjs",
+    "test:lsp": "node editors/lsp/test/tokens.test.mjs && node editors/lsp/test/protocol.test.mjs",
     "cli": "spago run -p flatbars-cli",
     "lab": "node scripts/serve-lab.mjs",
     "docs": "antora --fetch antora-playbook.yml",
@@ -48,6 +49,9 @@
     "purs-tidy": "^0.11.1",
     "rimraf": "^5.0.0",
     "spago": "^0.93.0",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.2.0"
   }
