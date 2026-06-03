@@ -33,7 +33,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Compile (compile)
 import FlatBars.Compile.Emit (falsyLiteral, runtimeVersion)
-import FlatBars.Error (Error(..), ParseError(..), renderParseErrorAt)
+import FlatBars.Error (ParseError(..), renderParseErrorAt)
 import FlatBars.Lexer (LexConfig, defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
 import FlatBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
@@ -117,9 +117,9 @@ renderMinWith partialSrcs src dat =
 renderMinDiag :: String -> Value -> Either String String
 renderMinDiag = renderMin
 
--- | The shared glue: parse → resolve `@truthiness` against the `mustache` default
--- | → desugar → seed the env (stack = `[data]`, partials, falsy, depth 0) →
--- | run. Every error is rendered to a `String` for the host boundary.
+-- | The shared glue: parse → desugar → seed the env (stack = `[data]`, partials,
+-- | depth 0) → run under MinBars' fixed `mustache` rule. Every error is rendered
+-- | to a `String` for the host boundary.
 renderCore :: Map String Template -> String -> Value -> Either String String
 renderCore = renderCoreWith minLexConfig
 
@@ -156,7 +156,7 @@ compileMinJs = compileMinJsWith []
 -- | runs against `runtime/flatbars-runtime.mjs`; `compile_conformance.mjs` asserts
 -- | it is byte-identical to `renderMin`/`renderMinWith`.
 -- |
--- | The pipeline is parse → resolve `@truthiness` → desugar → `inline` (resolve
+-- | The pipeline is parse → desugar → `inline` (resolve
 -- | partials + inheritance into a partial-free, inheritance-free template; see
 -- | its doc) → `compile`. The only constructs `inline` cannot express are
 -- | rejected with a `DisallowedShape` (loud, never a miscompile): a *recursive*

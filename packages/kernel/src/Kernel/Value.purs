@@ -60,10 +60,9 @@ derive instance Ord FalsyShape
 -- | `isFalsy`/`truthy` machinery is fixed.
 type FalsySet = Set FalsyShape
 
--- | The default mode — Handlebars: `false`, `null`, `""`, `0`, and the empty
--- | array are falsy; `{}` and every non-empty/non-zero value are truthy. This is
--- | the behaviour of the engine when no `@truthiness` directive is present, so
--- | existing templates are unaffected.
+-- | The Handlebars rule: `false`, `null`, `""`, `0`, and the empty array are
+-- | falsy; `{}` and every non-empty/non-zero value are truthy. The fixed
+-- | truthiness rule of FullBars/RawBars/MaxBars (ADR-022).
 handlebars :: FalsySet
 handlebars = Set.fromFoldable [ FFalse, FNull, FEmptyStr, FZero, FEmptyArr ]
 
@@ -90,10 +89,10 @@ truthy :: FalsySet -> Value -> Boolean
 truthy fs = not <<< isFalsy fs
 
 --------------------------------------------------------------------------------
--- Named modes & the @truthiness resolver (truthiness spec §2.3, §4.2)
+-- The named rules (the data-backed menu engines pick from; ADR-022)
 --------------------------------------------------------------------------------
 
--- | `minimal` (≡ `ruby`/`nil`/`lua`): only `false`/`null` are falsy — `0`, `""`,
+-- | `minimal` (≡ Ruby/Lua/Lisp `nil`): only `false`/`null` are falsy — `0`, `""`,
 -- | `[]`, `{}` are all truthy.
 minimal :: FalsySet
 minimal = Set.fromFoldable [ FFalse, FNull ]
@@ -103,16 +102,17 @@ minimal = Set.fromFoldable [ FFalse, FNull ]
 presence :: FalsySet
 presence = Set.fromFoldable [ FFalse, FNull, FEmptyArr, FEmptyObj ]
 
--- | `always`: nothing is falsy — every value is truthy (the empty set). The
--- | named replacement for the illegal empty directive form.
+-- | `always`: nothing is falsy — every value is truthy (the empty set). Not an
+-- | engine rule; retained as the documented "nothing-falsy" point of the rule
+-- | space (and the `truthy always` identity in tests).
 always :: FalsySet
 always = Set.empty
 
 -- | `mustache` (`false null []`): the Mustache rule — `false`, `null`, and the
 -- | empty *array* are falsy, but `0`, `""`, and `{}` are **truthy**. Distinct
 -- | from `presence` (which also makes `{}` falsy) and from `handlebars` (which
--- | also makes `""`/`0` falsy). This is MinBars' engine default; the spec suite
--- | would fail if `0`/`""` were treated as falsy.
+-- | also makes `""`/`0` falsy). This is MinBars' fixed rule; the spec suite would
+-- | fail if `0`/`""` were treated as falsy.
 mustache :: FalsySet
 mustache = Set.fromFoldable [ FFalse, FNull, FEmptyArr ]
 

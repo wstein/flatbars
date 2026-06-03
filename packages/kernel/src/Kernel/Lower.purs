@@ -19,7 +19,6 @@ module Kernel.Lower
   , lower
   , escapingWarnings
   , directiveLints
-  , crossBoundaryWarnings
   ) where
 
 import Prelude
@@ -28,7 +27,6 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..), uncurry)
 import FlatBars.Syntax (Directive, Expr(..), Ident, Template)
-import Kernel.Value (FalsySet)
 import Kernel.Walk (Clause, Issue, Severity(..), foldTemplate, splitClause, splitClauses)
 
 -- | The reference real AST. Control flow is explicit (branches, not a flat
@@ -168,37 +166,28 @@ escapingWarnings = walk <<< lower
   safeProducers = [ "escapeHtml", "safe", "raw" ]
 
 --------------------------------------------------------------------------------
--- Directive lints (truthiness spec §6 / Phase 4)
+-- Directive lints
 --------------------------------------------------------------------------------
 
--- | Warn on unknown header-directive keys: they are carried for forward
--- | compatibility (the core never rejects them) but mean nothing to this engine.
--- | The understood keys are `truthiness` (engine) and `trim` (core whitespace).
+-- | Lint header-directive keys. `trim` (core whitespace) is the one understood
+-- | key, so it is silent. `truthiness` is *deprecated* (ADR-022): truthiness is a
+-- | fixed per-engine rule now, so a `@truthiness` directive is inert — it warns
+-- | (carried, never an error) so a stale directive does not silently mislead. Any
+-- | other key is unknown (carried for forward compatibility) and also warns.
 directiveLints :: Array Directive -> Array Issue
 directiveLints = Array.mapMaybe lintOne
   where
-  known = [ "truthiness", "trim" ]
-  lintOne d
-    | Array.elem d.key known = Nothing
-    | otherwise = Just
-        { severity: Warn
-        , name: d.key
-        , message: "unknown directive '@" <> d.key
-            <> "' — carried but not understood by this engine"
-        }
-
--- | Warn when an external partial's truthiness mode differs from the caller's:
--- | one render then runs two truthiness rules. This is *by design* (each file
--- | owns its mode), so it is informational, not an error. `caller` is the
--- | calling file's resolved mode; each `(name, mode)` is an external partial's.
-crossBoundaryWarnings :: FalsySet -> Array (Tuple Ident FalsySet) -> Array Issue
-crossBoundaryWarnings caller = Array.mapMaybe (uncurry check)
-  where
-  check name mode
-    | mode == caller = Nothing
-    | otherwise = Just
-        { severity: Warn
-        , name
-        , message: "partial '" <> name
-            <> "' uses a different truthiness mode than its caller (two modes in one render)"
-        }
+  lintOne d = case d.key of
+    "trim" -> Nothing
+    "truthiness" -> Just
+      { severity: Warn
+      , name: d.key
+      , message: "'@truthiness' is no longer honoured (ADR-022) — truthiness is a "
+          <> "fixed per-engine rule; the directive is carried but inert"
+      }
+    _ -> Just
+      { severity: Warn
+      , name: d.key
+      , message: "unknown directive '@" <> d.key
+          <> "' — carried but not understood by this engine"
+      }

@@ -36,7 +36,6 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Number (abs, ceil, floor, fromString, round, trunc) as Number
 import Data.Number.Format (fixed, toStringWith) as Number
-import Data.Set as Set
 import Data.String (Pattern(..), Replacement(..))
 import Data.String as String
 import Data.String.CodeUnits as CodeUnits
@@ -420,22 +419,22 @@ jsMod a b = a - b * Number.trunc (a / b)
 -- | `coalesce a b …`: the first non-`VNull` argument, else `VNull`. The desugar
 -- | target of the MaxBars `??` operator (null-coalescing, *not* truthiness — so
 -- | a falsy-but-present `0`/`""`/`[]` is returned, keeping `??` decoupled from the
--- | active `@truthiness` set).
+-- | engine's truthiness rule).
 coalesceH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 coalesceH _ args = pure (fromMaybe VNull (Array.find notNull args))
   where
   notNull VNull = false
   notNull _ = true
 
--- | `not`: logical negation under the *active* truthiness mode (`ctl.env`).
+-- | `not`: logical negation under the engine's truthiness rule (`ctl.env`).
 notH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 notH ctl args = case args of
   [ a ] -> pure (VBool (not (refTruthy ctl.env a)))
   _ -> throwError (ArityError "not: expected exactly 1 argument")
 
 -- | `and`/`or`: fold truthiness across the arguments with the given quantifier,
--- | consulting the active mode — so the file's `@truthiness` retunes them too
--- | (and `{{#if x}}`/`{{x && y}}` always agree). See truthiness spec §6.1.
+-- | consulting the engine's truthiness rule — so `{{#if x}}` and `{{x && y}}`
+-- | always agree.
 boolH
   :: forall m
    . Applicative m

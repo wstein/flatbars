@@ -153,8 +153,9 @@ isComment = case _ of
 
 -- | The effective standalone-trim setting: a `@trim` header directive overrides
 -- | the front-end option. `@trim: standalone` ⇒ on, `@trim: none` ⇒ off; any
--- | other value is a parse error (it is a core-acted, *syntactic* directive,
--- | unlike the engine's semantic `@truthiness`).
+-- | other value is a parse error. `@trim` is the one *syntactic* directive the
+-- | core itself acts on; every other directive is carried meaning-free for an
+-- | engine (or, like `@truthiness`, is inert — ADR-022).
 effectiveTrim :: ParseOptions -> Array Directive -> Either ParseError Boolean
 effectiveTrim opts directives = case Array.find (\d -> d.key == "trim") directives of
   Nothing -> Right opts.trimStandalone

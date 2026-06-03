@@ -5,7 +5,7 @@
 -- | and pipes. The engine, value policy, prelude, and compiler are all shared.)
 -- |
 -- | This is a thin dialect layer: it reuses the reference engine's `runResolved`
--- | (`Kernel.Render`: parse → resolve `@truthiness` → seed → engine) and the
+-- | (`Kernel.Render`: parse → seed the prelude env → engine) and the
 -- | shared compiler's `Emit` (`FlatBars.Compile.Emit.fullbarsEmit`), swapping in
 -- | *no* surface desugar. Note it depends on `kernel` + `flatbars-compile`, *not*
 -- | the `fullbars` package — its dependency closure is FullBars-free (see ADR-008).
@@ -63,8 +63,8 @@ coreOptions = defaultParseOptions
   , lexConfig = defaultLexConfig { mustacheDelims = true }
   }
 
--- | Parse core source and return a pure renderer; the `@truthiness` mode is
--- | resolved once and baked in.
+-- | Parse core source and return a pure renderer (the engine's fixed `handlebars`
+-- | truthiness rule applies; ADR-022).
 compile :: String -> Either ParseError (Value -> Either Error String)
 compile = compileWith coreOptions
 

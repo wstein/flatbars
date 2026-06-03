@@ -118,8 +118,9 @@ data Error
   -- carries the budget that was exceeded. Guards against a cyclic partial that
   -- would otherwise overflow the stack.
   | RecursionLimit Int
-  -- a header directive the engine rejects (bad `@truthiness`); carries the
-  -- offending directive's source offset for a located diagnostic.
+  -- a header directive an engine rejects; carries the offending directive's
+  -- source offset for a located diagnostic. (No engine currently produces it —
+  -- reserved for header-directive validation.)
   | DirectiveError String Int
   | ParseFailure ParseError
 

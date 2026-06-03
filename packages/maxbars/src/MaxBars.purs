@@ -64,8 +64,8 @@ maxLoopVars :: LoopVars
 maxLoopVars = reservedScope noLoopVars
 
 -- | Render MaxBars surface source against data, reusing FullBars' surface
--- | pipeline (desugar → hoist → @truthiness → engine) with located errors and
--- | MaxBars' bare loop variables.
+-- | pipeline (desugar → hoist → engine) with located errors and MaxBars' bare
+-- | loop variables.
 renderMax :: String -> Value -> Either String String
 renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions
 

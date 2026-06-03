@@ -35,14 +35,10 @@ printRawBars :: Template -> String
 printRawBars nodes = joinWith "" (map printNode nodes)
 
 -- | Re-emit a template's header `@`-directives as leading short-comment source,
--- | one comment per directive (`{{! @key: value }}`). This is how the lower
--- | *materializes truthiness* (loopvars-linter-spec.md §B.5 / X1): a
--- | non-`handlebars`-mode file carries its own `@truthiness` directive into the
--- | lowered RawBars source, which the core parser collects exactly as it did in
--- | the original — so the lowered file renders under the same falsy-set, with no
--- | per-condition guard helper required. Directives are header-only, so these
--- | comments must precede every tag; `printRawBars` output follows them. `@trim`
--- | and any other header directive are carried verbatim for faithfulness.
+-- | one comment per directive (`{{! @key: value }}`), carried verbatim for source
+-- | faithfulness (e.g. `@trim`; an inert `@truthiness` is preserved like any
+-- | other). Directives are header-only, so these comments must precede every tag;
+-- | `printRawBars` output follows them.
 printDirectives :: Array Directive -> String
 printDirectives = foldMap (\d -> "{{! @" <> d.key <> ": " <> d.value <> " }}")
 

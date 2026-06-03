@@ -1,7 +1,7 @@
--- | The shared *render glue*: assemble the prelude environment, resolve a file's
--- | `@truthiness` mode, seed it, and run the engine. Dialect-agnostic — every
--- | dialect (RawBars/FullBars/MaxBars) renders through `runResolved`, so it lives
--- | in the kernel, not in any one dialect.
+-- | The shared *render glue*: assemble the prelude environment (with the engine's
+-- | fixed truthiness rule) and run the engine. Dialect-agnostic — every dialect
+-- | (RawBars/FullBars/MaxBars) renders through `runResolved`, so it lives in the
+-- | kernel, not in any one dialect.
 module Kernel.Render
   ( preludeEnv
   , runResolved

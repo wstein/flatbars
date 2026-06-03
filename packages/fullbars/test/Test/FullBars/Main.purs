@@ -25,7 +25,7 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, analyseSurface, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, stringify, truthy)
+import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, analyseSurface, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, stringify, truthy)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
 import Kernel.Walk (arityOk, foldTemplate, validate)
@@ -507,18 +507,15 @@ main = do
     dirsOf s = case parse s of
       Right { directives } -> directives
       Left _ -> []
-  -- unknown directive key warns (carried for forward-compat); known keys silent.
+  -- unknown directive key warns (carried for forward-compat); `@trim` is silent.
   assert' "lint:unknown-directive-warns"
     (map _.name (directiveLints (dirsOf "{{! @foobar:1 }}{{! @trim:none }}x")) == [ "foobar" ])
-  assert' "lint:known-directives-silent"
-    (Array.null (directiveLints (dirsOf "{{! @truthiness:minimal }}{{! @trim:standalone }}x")))
-  -- a partial whose mode differs from the caller warns; a matching mode is silent.
-  -- (`crossBoundaryWarnings` is a pure lint over named rules — still valid.)
-  assert' "lint:cross-boundary-mismatch"
-    ( map _.name
-        (crossBoundaryWarnings handlebars [ Tuple "card" minimal, Tuple "same" handlebars ])
-        == [ "card" ]
-    )
+  assert' "lint:trim-silent"
+    (Array.null (directiveLints (dirsOf "{{! @trim:standalone }}x")))
+  -- ADR-022: `@truthiness` is deprecated (inert) — it now lint-warns so a stale
+  -- directive does not silently mislead.
+  assert' "lint:truthiness-deprecation-warns"
+    (map _.name (directiveLints (dirsOf "{{! @truthiness:minimal }}x")) == [ "truthiness" ])
 
   -- `{{else}}` is a name-agnostic *separator*: the lexer/parser keep it as a
   -- meaningless marker, and the engine's `if`/`each`/`with` split their body at

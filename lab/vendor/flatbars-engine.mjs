@@ -3602,7 +3602,7 @@ var renderError = function(v) {
     return "ParseFailure: " + renderParseError(v.value0);
   }
   ;
-  throw new Error("Failed pattern match at FlatBars.Error (line 132, column 15 - line 140, column 61): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FlatBars.Error (line 133, column 15 - line 141, column 61): " + [v.constructor.name]);
 };
 var showError = {
   show: renderError
@@ -6441,7 +6441,7 @@ var outputExpr = function(lx) {
             return bind4(tokenizeInterior(lx)(base)(s))(pe);
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Parser (line 260, column 1 - line 260, column 90): " + [lx.constructor.name, pe.constructor.name, span2.constructor.name, base.constructor.name, s.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Parser (line 261, column 1 - line 261, column 90): " + [lx.constructor.name, pe.constructor.name, span2.constructor.name, base.constructor.name, s.constructor.name]);
         };
       };
     };
@@ -6490,7 +6490,7 @@ var parseDirectives = function(base) {
           return;
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Parser (line 212, column 3 - line 215, column 35): " + [k.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Parser (line 213, column 3 - line 216, column 35): " + [k.constructor.name]);
       }
       ;
       while (!$tco_done) {
@@ -6590,7 +6590,7 @@ var parseDirectives = function(base) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Parser (line 217, column 3 - line 217, column 50): " + [j.constructor.name, acc.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Parser (line 218, column 3 - line 218, column 50): " + [j.constructor.name, acc.constructor.name]);
         }
         ;
         while (!$tco_done3) {
@@ -6636,10 +6636,10 @@ var headed = function(lx) {
               return new Left(new HeadNotIdent(span2.start));
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Parser (line 276, column 17 - line 279, column 48): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Parser (line 277, column 17 - line 280, column 48): " + [v.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Parser (line 267, column 1 - line 273, column 62): " + [lx.constructor.name, pe.constructor.name, span2.constructor.name, base.constructor.name, s.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Parser (line 268, column 1 - line 274, column 62): " + [lx.constructor.name, pe.constructor.name, span2.constructor.name, base.constructor.name, s.constructor.name]);
         };
       };
     };
@@ -6708,7 +6708,7 @@ var parseSeq = function(pe) {
                       return;
                     }
                     ;
-                    throw new Error("Failed pattern match at FlatBars.Parser (line 354, column 30 - line 356, column 52): " + [v1.constructor.name]);
+                    throw new Error("Failed pattern match at FlatBars.Parser (line 355, column 30 - line 357, column 52): " + [v1.constructor.name]);
                   }
                   ;
                   if (v.value0 instanceof RAmp) {
@@ -6730,7 +6730,7 @@ var parseSeq = function(pe) {
                         return;
                       }
                       ;
-                      throw new Error("Failed pattern match at FlatBars.Parser (line 360, column 24 - line 362, column 56): " + [v1.constructor.name]);
+                      throw new Error("Failed pattern match at FlatBars.Parser (line 361, column 24 - line 363, column 56): " + [v1.constructor.name]);
                     }
                     ;
                   }
@@ -6754,7 +6754,7 @@ var parseSeq = function(pe) {
                         return;
                       }
                       ;
-                      throw new Error("Failed pattern match at FlatBars.Parser (line 365, column 24 - line 367, column 75): " + [v1.constructor.name]);
+                      throw new Error("Failed pattern match at FlatBars.Parser (line 366, column 24 - line 368, column 75): " + [v1.constructor.name]);
                     }
                     ;
                   }
@@ -6780,7 +6780,7 @@ var parseSeq = function(pe) {
                         return;
                       }
                       ;
-                      throw new Error("Failed pattern match at FlatBars.Parser (line 376, column 29 - line 378, column 58): " + [v2.constructor.name]);
+                      throw new Error("Failed pattern match at FlatBars.Parser (line 377, column 29 - line 379, column 58): " + [v2.constructor.name]);
                     }
                     ;
                     if (v1 instanceof Left) {
@@ -6788,7 +6788,7 @@ var parseSeq = function(pe) {
                       return new Left(v1.value0);
                     }
                     ;
-                    throw new Error("Failed pattern match at FlatBars.Parser (line 368, column 27 - line 379, column 25): " + [v1.constructor.name]);
+                    throw new Error("Failed pattern match at FlatBars.Parser (line 369, column 27 - line 380, column 25): " + [v1.constructor.name]);
                   }
                   ;
                   if (v.value0 instanceof RClose) {
@@ -6806,7 +6806,7 @@ var parseSeq = function(pe) {
                       return new Right(done(acc)(new StopClose(v1.value0.name, i + 1 | 0)));
                     }
                     ;
-                    throw new Error("Failed pattern match at FlatBars.Parser (line 380, column 26 - line 382, column 63): " + [v1.constructor.name]);
+                    throw new Error("Failed pattern match at FlatBars.Parser (line 381, column 26 - line 383, column 63): " + [v1.constructor.name]);
                   }
                   ;
                   if (v.value0 instanceof ROpen) {
@@ -6842,10 +6842,10 @@ var parseSeq = function(pe) {
                     ;
                   }
                   ;
-                  throw new Error("Failed pattern match at FlatBars.Parser (line 349, column 15 - line 398, column 64): " + [v.value0.constructor.name]);
+                  throw new Error("Failed pattern match at FlatBars.Parser (line 350, column 15 - line 399, column 64): " + [v.value0.constructor.name]);
                 }
                 ;
-                throw new Error("Failed pattern match at FlatBars.Parser (line 347, column 14 - line 398, column 64): " + [v.constructor.name]);
+                throw new Error("Failed pattern match at FlatBars.Parser (line 348, column 14 - line 399, column 64): " + [v.constructor.name]);
               }
               ;
               while (!$tco_done) {
@@ -6888,13 +6888,13 @@ var parseSeq = function(pe) {
                             ;
                           }
                           ;
-                          throw new Error("Failed pattern match at FlatBars.Parser (line 411, column 26 - line 416, column 79): " + [v1.value0.stop.constructor.name]);
+                          throw new Error("Failed pattern match at FlatBars.Parser (line 412, column 26 - line 417, column 79): " + [v1.value0.stop.constructor.name]);
                         }
                         ;
-                        throw new Error("Failed pattern match at FlatBars.Parser (line 409, column 9 - line 416, column 79): " + [v1.constructor.name]);
+                        throw new Error("Failed pattern match at FlatBars.Parser (line 410, column 9 - line 417, column 79): " + [v1.constructor.name]);
                       }
                       ;
-                      throw new Error("Failed pattern match at FlatBars.Parser (line 401, column 40 - line 416, column 79): " + [v.constructor.name]);
+                      throw new Error("Failed pattern match at FlatBars.Parser (line 402, column 40 - line 417, column 79): " + [v.constructor.name]);
                     };
                   };
                 };
@@ -6936,7 +6936,7 @@ var effectiveTrim = function(opts) {
       return new Left(new BadDirective("invalid @trim value '" + (v.value0.value + "'; expected 'standalone' or 'none'"), v.value0.span.start));
     }
     ;
-    throw new Error("Failed pattern match at FlatBars.Parser (line 159, column 33 - line 167, column 8): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FlatBars.Parser (line 160, column 33 - line 168, column 8): " + [v.constructor.name]);
   };
 };
 var defaultParseOptions = {
@@ -6988,7 +6988,7 @@ var collectDirectives = function(toks) {
               return;
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Parser (line 190, column 14 - line 192, column 42): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Parser (line 191, column 14 - line 193, column 42): " + [v1.constructor.name]);
           }
           ;
           if (v instanceof Just && v.value0 instanceof RContent) {
@@ -7005,7 +7005,7 @@ var collectDirectives = function(toks) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Parser (line 183, column 25 - line 194, column 35): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Parser (line 184, column 25 - line 195, column 35): " + [v.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -8947,7 +8947,7 @@ var isFalsy = function($copy_fs) {
         return;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Value (line 76, column 14 - line 84, column 36): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Value (line 75, column 14 - line 83, column 36): " + [v.constructor.name]);
     }
     ;
     while (!$tco_done) {
@@ -9471,7 +9471,7 @@ var startsWithH = function(dictMonadThrow) {
             return false;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 568, column 24 - line 570, column 21): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 567, column 24 - line 569, column 21): " + [v.constructor.name]);
         };
       };
       return bind9(stringifyM1(sv))(function(s) {
@@ -9638,7 +9638,7 @@ var partialH = function(dictMonadThrow) {
             ;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 1210, column 28 - line 1222, column 63): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 1209, column 28 - line 1221, column 63): " + [v.constructor.name]);
         };
       };
       if (args.length === 2 && args[0] instanceof VString) {
@@ -9774,7 +9774,7 @@ var truthyWith = function(tf) {
           return tf(v);
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Prelude (line 931, column 1 - line 931, column 62): " + [tf.constructor.name, opts.constructor.name, v.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Prelude (line 930, column 1 - line 930, column 62): " + [tf.constructor.name, opts.constructor.name, v.constructor.name]);
       };
       var $572 = optFlag("includeZero")(opts);
       if ($572) {
@@ -9825,7 +9825,7 @@ var pickClause = function(dictMonadThrow) {
                     })(ctl["eval"](ctl.env)(mOpts.value0));
                   }
                   ;
-                  throw new Error("Failed pattern match at Kernel.Prelude (line 889, column 16 - line 892, column 18): " + [mOpts.constructor.name]);
+                  throw new Error("Failed pattern match at Kernel.Prelude (line 888, column 16 - line 891, column 18): " + [mOpts.constructor.name]);
                 }())(function(hit) {
                   if (hit) {
                     return renderSafe1(ctl)(ctl.env)(v.value0.head.body);
@@ -9850,7 +9850,7 @@ var pickClause = function(dictMonadThrow) {
         return throwError3(new ClauseError("if: unexpected clause '" + (v.value0.head.name + "'")));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 875, column 26 - line 894, column 82): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 874, column 26 - line 893, column 82): " + [v.constructor.name]);
     };
   };
 };
@@ -9886,7 +9886,7 @@ var indexValue = function(v) {
         return VNull.value;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 810, column 38 - line 812, column 19): " + [v2.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 809, column 38 - line 811, column 19): " + [v2.constructor.name]);
     }
     ;
     return VNull.value;
@@ -9915,7 +9915,7 @@ var lookupH = function(dictMonadThrow) {
         return pure7(foldl2(step)(v1.value0.head)(v1.value0.tail));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 798, column 18 - line 800, column 59): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 797, column 18 - line 799, column 59): " + [v1.constructor.name]);
     };
   };
 };
@@ -10067,7 +10067,7 @@ var endsWithH = function(dictMonadThrow) {
             return false;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 578, column 26 - line 580, column 21): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 577, column 26 - line 579, column 21): " + [v.constructor.name]);
         };
       };
       return bind9(stringifyM1(sv))(function(s) {
@@ -10117,7 +10117,7 @@ var dictH = function(dictMonadThrow) {
                 return throwError3(new ArityError("dict: odd number of arguments"));
               }
               ;
-              throw new Error("Failed pattern match at Kernel.Prelude (line 1170, column 39 - line 1172, column 73): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at Kernel.Prelude (line 1169, column 39 - line 1171, column 73): " + [v2.constructor.name]);
             }
             ;
             if (v1 instanceof Just) {
@@ -10125,7 +10125,7 @@ var dictH = function(dictMonadThrow) {
               return throwError3(new $$TypeError("dict: keys must be strings"));
             }
             ;
-            throw new Error("Failed pattern match at Kernel.Prelude (line 1168, column 18 - line 1173, column 66): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at Kernel.Prelude (line 1167, column 18 - line 1172, column 66): " + [v1.constructor.name]);
           }
           ;
           while (!$tco_done) {
@@ -10229,7 +10229,7 @@ var clampIndex = function(len) {
       return min3(i)(len);
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Prelude (line 542, column 1 - line 542, column 32): " + [len.constructor.name, i.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Prelude (line 541, column 1 - line 541, column 32): " + [len.constructor.name, i.constructor.name]);
   };
 };
 var checkIfClauses = function(dictMonadThrow) {
@@ -10268,7 +10268,7 @@ var checkIfClauses = function(dictMonadThrow) {
       return throwError3(new ClauseError("if: unexpected clause '" + (v.value0.head.name + "'")));
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Prelude (line 901, column 26 - line 911, column 82): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Prelude (line 900, column 26 - line 910, column 82): " + [v.constructor.name]);
   };
 };
 var ifH = function(dictMonadThrow) {
@@ -10316,7 +10316,7 @@ var capitalizeStr = function(s) {
     return toUpper(singleton6(v.value0.head)) + v.value0.tail;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Prelude (line 468, column 19 - line 470, column 68): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Prelude (line 467, column 19 - line 469, column 68): " + [v.constructor.name]);
 };
 var buildContextChain = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
@@ -10333,7 +10333,7 @@ var buildContextChain = function(dictMonadThrow) {
         return pure7(VNull.value);
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 1010, column 21 - line 1012, column 26): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 1009, column 21 - line 1011, column 26): " + [v.constructor.name]);
     }())(function(enclosingChain) {
       var enclosingCtx = refContext(ctl.env);
       var rootCtx = function() {
@@ -10377,7 +10377,7 @@ var iterate2 = function(dictMonadThrow) {
             return pure7(VNull.value);
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 1043, column 20 - line 1045, column 26): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 1042, column 20 - line 1044, column 26): " + [v.constructor.name]);
         }())(function(enclosingLoop) {
           return bind9(buildContextChain1(ctl))(function(parentChain) {
             var n = length(items);
@@ -10419,7 +10419,7 @@ var iterate2 = function(dictMonadThrow) {
                       return [];
                     }
                     ;
-                    throw new Error("Failed pattern match at Kernel.Prelude (line 1088, column 12 - line 1090, column 24): " + [ctl.loopLabel.constructor.name]);
+                    throw new Error("Failed pattern match at Kernel.Prelude (line 1087, column 12 - line 1089, column 24): " + [ctl.loopLabel.constructor.name]);
                   }());
                 };
               };
@@ -10510,7 +10510,7 @@ var trimEndStr = function(s) {
     return take2(v.value0 + length2(trim(s)) | 0)(s);
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Prelude (line 484, column 16 - line 486, column 68): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Prelude (line 483, column 16 - line 485, column 68): " + [v.constructor.name]);
 };
 var trimStartStr = function(s) {
   var v = bodyStart(s);
@@ -10522,7 +10522,7 @@ var trimStartStr = function(s) {
     return drop2(v.value0)(s);
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Prelude (line 479, column 18 - line 481, column 31): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Prelude (line 478, column 18 - line 480, column 31): " + [v.constructor.name]);
 };
 var bindingNames = /* @__PURE__ */ mapMaybe(function(v) {
   if (v instanceof VString) {
@@ -10580,7 +10580,7 @@ var eachH = function(dictMonadThrow) {
         return throwError3(new ArityError("each: expected at least 1 argument(s), got 0"));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 956, column 18 - line 977, column 84): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 955, column 18 - line 976, column 84): " + [v.constructor.name]);
     };
   };
 };
@@ -10616,7 +10616,7 @@ var withH = function(dictMonadThrow) {
         return throwError3(new ArityError("with: expected at least 1 argument(s), got 0"));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Prelude (line 1122, column 18 - line 1139, column 84): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Prelude (line 1121, column 18 - line 1138, column 84): " + [v.constructor.name]);
     };
   };
 };
@@ -10640,7 +10640,7 @@ var sectionOp = function(dictMonadThrow) {
           return withH1(ctl)([v]);
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Prelude (line 1154, column 1 - line 1154, column 77): " + [name2.constructor.name, ctl.constructor.name, args.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Prelude (line 1153, column 1 - line 1153, column 77): " + [name2.constructor.name, ctl.constructor.name, args.constructor.name]);
       };
     };
   };
@@ -10734,7 +10734,7 @@ var sliceH = function(dictMonadThrow) {
                     return asInt1(mEndv.value0);
                   }
                   ;
-                  throw new Error("Failed pattern match at Kernel.Prelude (line 532, column 12 - line 534, column 30): " + [mEndv.constructor.name]);
+                  throw new Error("Failed pattern match at Kernel.Prelude (line 531, column 12 - line 533, column 30): " + [mEndv.constructor.name]);
                 }())(function(end) {
                   var lo = clampIndex(len)(start);
                   var hi = clampIndex(len)(end);
@@ -10878,7 +10878,7 @@ var applyH = function(dictMonadThrow) {
           return throwError3(new UnknownHelper(v.value0.head.value0));
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Prelude (line 1177, column 40 - line 1179, column 47): " + [v1.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Prelude (line 1176, column 40 - line 1178, column 47): " + [v1.constructor.name]);
       }
       ;
       return throwError3(new $$TypeError("apply: first argument must be a helper-name string"));
@@ -11470,7 +11470,7 @@ var lower = /* @__PURE__ */ function() {
             return recurse(v2.value0.head.body);
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Lower (line 107, column 22 - line 111, column 32): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Lower (line 105, column 22 - line 109, column 32): " + [v2.constructor.name]);
         };
         var v = splitClauses(children);
         return new RIf(cond, recurse(v.before), foldClauses(v.clauses));
