@@ -52,6 +52,24 @@ atVarError :: Int -> ParseError
 atVarError = LexError
   "'@…' variables are not used in MaxBars; read the loop/context model instead (e.g. {{loop.index0}}, {{parent.x}}, {{root.y}})"
 
+-- | The MaxBars partial-block re-spell. The `@` reserve (above) rejects the
+-- | Handlebars yield `{{> @partial-block}}`; MaxBars spells it `{{> partialBlock}}`
+-- | — camelCase, because the Handlebars hyphen is a subtraction operator under
+-- | MaxBars' infix arithmetic (`partial-block` would lex as `partial - block`).
+-- | Under a partial head (`>`), rewrite a bare `partialBlock` argument back to the
+-- | `@partial-block` marker the shared FullBars surface already recognizes as the
+-- | enclosing block partial's yield — keeping the desugar (and FullBars) untouched.
+-- | Synthesized *after* the `@` guard, so it never trips it.
+respellPartialBlock :: String -> Array Expr -> Array Expr
+respellPartialBlock head args
+  | head == ">" = map respellYield args
+  | otherwise = args
+
+respellYield :: Expr -> Expr
+respellYield e = case e of
+  App "partialBlock" [] -> App "@partial-block" []
+  _ -> e
+
 type Step a = { val :: a, pos :: Int }
 
 -- | Parse a tag interior's tokens into one `Expr` (output position), consuming
@@ -154,7 +172,8 @@ combinators toks =
   pApp i = case tk i of
     Just (TIdent name)
       | isAtVar name -> Left (atVarError (posAt i))
-      | otherwise -> pArgs (i + 1) [] >>= \r -> Right { val: App name r.val, pos: r.pos }
+      | otherwise -> pArgs (i + 1) [] >>= \r ->
+          Right { val: App name (respellPartialBlock name r.val), pos: r.pos }
     _ -> pAtom i
 
   -- an atom: a parenthesised full expression, a literal, or a nullary identifier.

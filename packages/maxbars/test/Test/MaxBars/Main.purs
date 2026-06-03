@@ -231,6 +231,20 @@ main = do
   assert' "reject: unescaped {{&}}" (isLeft (renderMax "{{&a}}" (obj [])))
   assert' "reject: raw block {{{{}}}}" (isLeft (renderMax "{{{{r}}}}body{{{{/r}}}}" (obj [])))
 
+  -- partial-block (ADR-021 §5 carve-out): the `@` reserve rejects the Handlebars
+  -- yield `{{> @partial-block}}`; MaxBars spells the yield `{{> partialBlock}}`
+  -- (camelCase — the hyphen is subtraction under infix arithmetic), re-spelled to
+  -- the `@partial-block` marker the surface yields. An inline-defined layout yields
+  -- the block-partial body.
+  expectM "partial-block-yield"
+    "{{#inline \"layout\"}}<{{> partialBlock}}>{{/inline}}{{#partial \"layout\"}}HI{{/partial}}"
+    (obj [])
+    "<HI>"
+  -- the Handlebars `@partial-block` spelling is rejected (reserved `@` sigil); the
+  -- hyphenated bare `partial-block` is `partial - block` (subtraction), not a name.
+  assert' "reject: @partial-block (reserved @ sigil)"
+    (isLeft (renderMax "{{> @partial-block}}" (obj [])))
+
   -- compilation reuses the FullBars compiler: && desugars to the `and` helper.
   case compileMaxJs "{{ a && b }}" of
     Left e -> assert' ("compile: unexpected error " <> show e) false
