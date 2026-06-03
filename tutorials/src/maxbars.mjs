@@ -155,6 +155,23 @@ export const examples = {
     },
   },
 
+  contextModel: {
+    // `parent` is the enclosing CONTEXT (chainable: parent.parent), `root` is the
+    // root context, and `loop.parent` is the enclosing LOOP's metadata. No @ and
+    // no ../ — those are gone. A bare {{title}} would be a data field on `this`.
+    engine: "maxbars",
+    compiles: true,
+    template: `{{#each chapters}}{{#each sections}}{{#each items}}
+{{loop.parent.index1}}.{{loop.index1}} {{this}} — {{parent.heading}} / {{parent.parent.title}} ({{root.book}})
+{{/each}}{{/each}}{{/each}}`,
+    data: {
+      book: "Cookbook",
+      chapters: [
+        { title: "Starters", sections: [{ heading: "Soups", items: ["Pea", "Leek"] }] },
+      ],
+    },
+  },
+
   // ── Inherited from FullBars (operators shown inside) ──────────────────────
   inheritedEach: {
     // Everything FullBars does still works — here {{#each}}, {{#if}}, dotted

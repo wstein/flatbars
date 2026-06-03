@@ -209,6 +209,16 @@ const t = (s) => s;
       enclosing loop. It is an immutable per-iteration snapshot, reached by ordinary path lookup.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.labelledLoop.template} data={ex.labelledLoop.data} />
+    <h3>The context model: <code>parent</code> / <code>root</code></h3>
+    <p>
+      Where <code>{t("loop")}</code> / <code>{t("outer")}</code> read loop <em>metadata</em>,
+      <code>{t("parent")}</code> reads the enclosing <em>context</em> and <code>{t("root")}</code> the root —
+      both chainable: <code>{t("parent.parent.x")}</code> climbs two contexts, and <code>{t("loop.parent")}</code> is
+      the enclosing loop. There is no <code>{t("@")}</code> and no <code>{t("../")}</code> in MaxBars
+      (<code>{t("@root")}</code> → <code>{t("root")}</code>, <code>{t("../x")}</code> → <code>{t("parent.x")}</code>); an
+      <code>{t("@")}</code>-name is a parse error.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.contextModel.template} data={ex.contextModel.data} />
   </section>
 
   <!-- ─────────────────────── Inherited from FullBars ─────────────────── -->
