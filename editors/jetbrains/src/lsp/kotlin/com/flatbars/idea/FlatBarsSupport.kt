@@ -12,8 +12,10 @@ import java.nio.file.StandardCopyOption
  * `node` can run it.
  */
 object FlatBarsSupport {
-  /** The FlatBars surfaces; the LSP resolves the dialect from the extension. */
-  val EXTENSIONS = setOf("hbs", "handlebars", "flatbars", "mustache", "rawbars", "maxbars")
+  /** The FlatBars-native extensions (one per dialect, plus the `flatbars`
+   *  umbrella); the LSP resolves the dialect from these. We deliberately do NOT
+   *  claim .hbs/.handlebars/.mustache — those belong to their own ecosystems. */
+  val EXTENSIONS = setOf("flatbars", "rawbars", "minbars", "fullbars", "maxbars")
 
   fun isSupported(file: VirtualFile): Boolean = file.extension?.lowercase() in EXTENSIONS
 

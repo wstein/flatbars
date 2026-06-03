@@ -32,7 +32,9 @@ function activate(context) {
     },
   };
   const clientOptions = {
-    documentSelector: [{ language: "flatbars" }],
+    // The umbrella + the four dialect languages; the server reads the dialect from
+    // each document's languageId (falling back to the extension / defaultDialect).
+    documentSelector: ["flatbars", "rawbars", "minbars", "fullbars", "maxbars"].map((language) => ({ language })),
     initializationOptions: { defaultDialect },
   };
 

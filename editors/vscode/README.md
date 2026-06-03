@@ -19,10 +19,16 @@ there is no second grammar to drift, which is the whole point of ADR-017.
 
 ## Dialect
 
-The dialect follows the file extension — `.mustache` → MinBars, `.rawbars` →
-RawBars, `.maxbars` → MaxBars, `.hbs` / `.handlebars` / `.flatbars` → FullBars.
-Override the default for the unmarked extensions with the `flatbars.defaultDialect`
-setting.
+Each dialect is its own language, registered on its native extension: **RawBars**
+(`.rawbars`), **MinBars** (`.minbars`), **FullBars** (`.fullbars`), **MaxBars**
+(`.maxbars`), plus the **FlatBars** umbrella (`.flatbars`). The server reads the
+dialect from the document's language — so you can also pick it from the status bar
+(e.g. mark a file "MaxBars"). The `flatbars` umbrella resolves via
+`flatbars.defaultDialect` (FullBars by default).
+
+We deliberately do **not** claim `.hbs`/`.handlebars`/`.mustache` — those belong to
+the Handlebars/Mustache extensions. To use FlatBars on such a file, add a
+`files.associations` entry (e.g. `"*.hbs": "fullbars"`).
 
 ## Building
 

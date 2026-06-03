@@ -43,19 +43,20 @@ try {
     processId: process.pid,
     rootUri: null,
     capabilities: {},
-    initializationOptions: { defaultDialect: "maxbars" },
+    initializationOptions: { defaultDialect: "fullbars" },
   });
   const legend = init.capabilities.semanticTokensProvider.legend;
   await conn.sendNotification("initialized", {});
 
-  const uri = "file:///t/page.maxbars";
+  // languageId 'maxbars' on a `.flatbars` URI with a fullbars default: the dialect
+  // must come from the languageId, so `??` is an operator and "b" a string.
+  const uri = "file:///t/page.flatbars";
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri, languageId: "flatbars", version: 1, text: '{{ a ?? "b" }}' },
+    textDocument: { uri, languageId: "maxbars", version: 1, text: '{{ a ?? "b" }}' },
   });
   const res = await conn.sendRequest("textDocument/semanticTokens/full", { textDocument: { uri } });
 
-  // The bundled server resolves .maxbars -> MaxBars, so `??` is an operator and
-  // "b" a string carved out of the expr tag — 5 tokens.
+  // MaxBars: `??` operator and "b" string carved out of the expr tag — 5 tokens.
   assert.equal(res.data.length, 5 * 5, "bundled server emits the 5 MaxBars tokens");
   const op = legend.tokenTypes.indexOf("operator");
   const str = legend.tokenTypes.indexOf("string");

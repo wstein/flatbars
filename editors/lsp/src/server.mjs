@@ -13,7 +13,7 @@ import {
   TextDocumentSyncKind,
 } from "vscode-languageserver/node.js";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { buildLegend, dialectForUri, encodeSemanticTokens } from "./tokens.mjs";
+import { buildLegend, encodeSemanticTokens, resolveDialect } from "./tokens.mjs";
 
 // Wire a server onto an already-created LSP `connection`. Kept separate from the
 // stdio entry point so a test can drive it over any transport.
@@ -41,7 +41,7 @@ export function startServer(connection) {
   connection.languages.semanticTokens.on((params) => {
     const doc = documents.get(params.textDocument.uri);
     if (!doc) return { data: [] };
-    const dialect = dialectForUri(doc.uri, defaultDialect);
+    const dialect = resolveDialect(doc.languageId, doc.uri, defaultDialect);
     return encodeSemanticTokens(doc.getText(), dialect);
   });
 

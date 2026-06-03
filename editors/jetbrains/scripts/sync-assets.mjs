@@ -54,17 +54,20 @@ writeFileSync(
       version: "0.1.0",
       engines: { vscode: "*" },
       contributes: {
+        // The `flatbars` umbrella + one language per dialect, native extensions
+        // only (not .hbs/.handlebars/.mustache). All share the one grammar.
         languages: [
-          {
-            id: "flatbars",
-            aliases: ["FlatBars", "Handlebars", "Mustache"],
-            extensions: [".hbs", ".handlebars", ".flatbars", ".mustache", ".rawbars", ".maxbars"],
-            configuration: "./language-configuration.json",
-          },
+          { id: "flatbars", aliases: ["FlatBars"], extensions: [".flatbars"], configuration: "./language-configuration.json" },
+          { id: "rawbars", aliases: ["RawBars"], extensions: [".rawbars"], configuration: "./language-configuration.json" },
+          { id: "minbars", aliases: ["MinBars"], extensions: [".minbars"], configuration: "./language-configuration.json" },
+          { id: "fullbars", aliases: ["FullBars"], extensions: [".fullbars"], configuration: "./language-configuration.json" },
+          { id: "maxbars", aliases: ["MaxBars"], extensions: [".maxbars"], configuration: "./language-configuration.json" },
         ],
-        grammars: [
-          { language: "flatbars", scopeName: "source.flatbars", path: "./flatbars.tmLanguage.json" },
-        ],
+        grammars: ["flatbars", "rawbars", "minbars", "fullbars", "maxbars"].map((language) => ({
+          language,
+          scopeName: "source.flatbars",
+          path: "./flatbars.tmLanguage.json",
+        })),
       },
     },
     null,

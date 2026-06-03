@@ -6,8 +6,10 @@
 import assert from "node:assert/strict";
 import {
   buildLegend,
+  dialectForLanguageId,
   dialectForUri,
   encodeSemanticTokens,
+  resolveDialect,
   tokensOf,
   vocabulary,
 } from "../src/tokens.mjs";
@@ -56,13 +58,23 @@ t("plain content produces no tokens", () => {
   assert.deepEqual(tokensOf("just text, no tags", "fullbars"), []);
 });
 
-// ── Dialect resolution by file name ─────────────────────────────────────────
-t("dialectForUri maps extensions, defaulting to fullbars", () => {
-  assert.equal(dialectForUri("file:///x/page.mustache"), "minbars");
-  assert.equal(dialectForUri("file:///x/page.rawbars"), "rawbars");
+// ── Dialect resolution: languageId first, then native extension, then default ──
+t("dialectForLanguageId maps the four dialect languages; umbrella/others -> null", () => {
+  assert.equal(dialectForLanguageId("maxbars"), "maxbars");
+  assert.equal(dialectForLanguageId("rawbars"), "rawbars");
+  assert.equal(dialectForLanguageId("flatbars"), null); // umbrella
+  assert.equal(dialectForLanguageId("handlebars"), null); // not ours
+});
+t("dialectForUri maps native extensions only (no .hbs/.mustache), null otherwise", () => {
+  assert.equal(dialectForUri("file:///x/page.minbars"), "minbars");
   assert.equal(dialectForUri("file:///x/page.maxbars"), "maxbars");
-  assert.equal(dialectForUri("file:///x/page.hbs"), "fullbars");
-  assert.equal(dialectForUri("file:///x/page.hbs", "rawbars"), "rawbars");
+  assert.equal(dialectForUri("file:///x/page.flatbars"), null); // umbrella, not a dialect
+  assert.equal(dialectForUri("file:///x/page.mustache"), null); // not claimed anymore
+});
+t("resolveDialect: languageId wins, then uri, then the configured default", () => {
+  assert.equal(resolveDialect("maxbars", "file:///x/a.flatbars", "fullbars"), "maxbars"); // id wins
+  assert.equal(resolveDialect("flatbars", "file:///x/a.rawbars", "fullbars"), "rawbars"); // umbrella -> uri
+  assert.equal(resolveDialect("flatbars", "file:///x/a.flatbars", "minbars"), "minbars"); // -> default
 });
 
 // ── LSP wire encoding round-trips to the same positioned tokens ─────────────

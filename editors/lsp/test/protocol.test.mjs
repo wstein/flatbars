@@ -39,18 +39,20 @@ try {
 
   await conn.sendNotification("initialized", {});
 
-  const uri = "file:///test/page.hbs";
+  // languageId drives the dialect: open as `maxbars` so `??` is an operator.
+  const uri = "file:///test/page.flatbars";
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri, languageId: "handlebars", version: 1, text: "Hello, {{name}}!" },
+    textDocument: { uri, languageId: "maxbars", version: 1, text: '{{ a ?? "b" }}' },
   });
 
   const result = await conn.sendRequest("textDocument/semanticTokens/full", {
     textDocument: { uri },
   });
 
-  // {{name}} is one `expr` (variable) token at line 0, char 7, length 8.
-  const variable = provider.legend.tokenTypes.indexOf("variable");
-  assert.deepEqual([...result.data], [0, 7, 8, variable, 0], "one expr token over {{name}}");
+  // MaxBars: 5 tokens, including the `??` operator the dialect resolution proves.
+  const operator = provider.legend.tokenTypes.indexOf("operator");
+  assert.equal(result.data.length, 5 * 5, "five MaxBars tokens");
+  assert.ok([...result.data].includes(operator), "languageId 'maxbars' resolved → `??` is an operator");
 
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");

@@ -39,14 +39,28 @@ function kindEncoder(vocab, legend) {
   return map;
 }
 
-// Map a document URI / file name to its dialect. FlatBars has four surfaces; the
-// extension picks one, defaulting to FullBars (the Handlebars-faithful surface).
-export function dialectForUri(uri, fallback = "fullbars") {
+// FlatBars has four surfaces, each a first-class editor language. The dialect is
+// the document's `languageId` — `rawbars`/`minbars`/`fullbars`/`maxbars`; the
+// `flatbars` umbrella (and anything else) yields null so the caller falls back.
+export const DIALECTS = ["rawbars", "minbars", "fullbars", "maxbars"];
+
+export function dialectForLanguageId(languageId) {
+  return DIALECTS.includes(languageId) ? languageId : null;
+}
+
+// A robust fallback when the languageId is not a dialect (the `flatbars` umbrella,
+// or a host — e.g. JetBrains — that doesn't send our id): map the native extension.
+// Returns null if the extension picks no dialect.
+export function dialectForUri(uri) {
   const lower = String(uri).toLowerCase();
-  if (lower.endsWith(".mustache") || lower.endsWith(".min.hbs")) return "minbars";
-  if (lower.endsWith(".rawbars") || lower.endsWith(".raw.hbs")) return "rawbars";
-  if (lower.endsWith(".maxbars") || lower.endsWith(".max.hbs")) return "maxbars";
-  return fallback;
+  for (const d of DIALECTS) if (lower.endsWith(`.${d}`)) return d;
+  return null;
+}
+
+// The resolution the server uses: languageId first, then the URI, then the
+// configured default (FullBars unless overridden).
+export function resolveDialect(languageId, uri, fallback = "fullbars") {
+  return dialectForLanguageId(languageId) ?? dialectForUri(uri) ?? fallback;
 }
 
 // The flattened, NON-OVERLAPPING per-offset kind map LSP semantic tokens require:

@@ -61,7 +61,7 @@ try {
   });
   assert.ok(init.capabilities.semanticTokensProvider, "bundled server advertises semantic tokens");
   await conn.sendNotification("initialized", {});
-  const uri = "file:///t/page.hbs";
+  const uri = "file:///t/page.flatbars";
   await conn.sendNotification("textDocument/didOpen", {
     textDocument: { uri, languageId: "flatbars", version: 1, text: "Hi {{name}}" },
   });

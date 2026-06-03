@@ -14,17 +14,41 @@
     "languages": [
       {
         "id": "flatbars",
-        "aliases": ["FlatBars", "Handlebars", "Mustache"],
-        "extensions": [".hbs", ".handlebars", ".flatbars", ".mustache", ".rawbars", ".maxbars"],
+        "aliases": ["FlatBars"],
+        "extensions": [".flatbars"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "rawbars",
+        "aliases": ["RawBars"],
+        "extensions": [".rawbars"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "minbars",
+        "aliases": ["MinBars"],
+        "extensions": [".minbars"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "fullbars",
+        "aliases": ["FullBars"],
+        "extensions": [".fullbars"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "maxbars",
+        "aliases": ["MaxBars"],
+        "extensions": [".maxbars"],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
-      {
-        "language": "flatbars",
-        "scopeName": "source.flatbars",
-        "path": "./dist/flatbars.tmLanguage.json"
-      }
+      { "language": "flatbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
+      { "language": "rawbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
+      { "language": "minbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
+      { "language": "fullbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
+      { "language": "maxbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" }
     ],
     "configuration": {
       "title": "FlatBars",
@@ -33,7 +57,7 @@
           "type": "string",
           "enum": ["fullbars", "minbars", "rawbars", "maxbars"],
           "default": "fullbars",
-          "description": "The dialect used for files whose extension does not pick one (the .hbs/.handlebars/.flatbars default surface)."
+          "description": "The dialect for the `flatbars` umbrella language (`.flatbars` files). The dialect-specific languages (RawBars/MinBars/FullBars/MaxBars) ignore this."
         }
       }
     }
