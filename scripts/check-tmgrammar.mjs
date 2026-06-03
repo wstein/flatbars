@@ -5,25 +5,28 @@
 //
 //   node scripts/check-tmgrammar.mjs
 //
-// WHY THIS EXISTS: the TextMate grammar is a SECOND representation of FlatBars
-// surface syntax (the drift ADR-014 fought). It is a permanent, non-authoritative
-// fallback for the no-LSP contexts, so — like every other derived artifact — it is
-// drift-bounded by a gate. We tokenize a curated DEFAULT-DELIMITER corpus through
-// BOTH the engine (`tokenize`, the authority) and the real `vscode-textmate`
-// engine running `editors/flatbars.tmLanguage.json`, mapping each TextMate scope
-// back to an engine token kind via `editors/token-vocabulary.json` (the single
-// source of truth all three consumers share). Two assertions:
+// The fallback is the well-known Handlebars TextMate grammar, re-identified as
+// `source.flatbars` and extended for all four dialects (inverse sections, Mustache
+// inheritance, set delimiters, MaxBars operators). It keeps the standard Handlebars
+// scope names so themes colour FlatBars the way developers already know.
 //
-//   1. NO MIS-COLOUR — wherever the grammar paints a character with a scope that
-//      maps to a kind, the engine agrees on that kind at that character. The
-//      grammar is allowed to leave a region PLAIN (give up — set delimiters,
-//      MaxBars operators, dialect-error shapes), but it must never paint it WRONG.
-//   2. FLOOR COVERAGE — each fixture's `expect` kinds (the default-delimiter forms
-//      the fallback is responsible for) are actually painted somewhere, so the gate
-//      can't pass with a degenerate empty grammar.
+// That grammar is RICHER than the engine — it splits a tag into sigil / name /
+// args / literals, where the engine paints one kind per tag — so a scope==kind
+// bijection does not fit. Instead this gate checks, FOR EACH DIALECT, the two
+// things the engine actually defines and a stateless grammar can be held to:
 //
-// The grammar is the floor; the engine is the ceiling. Set-delimiter and MaxBars-
-// operator regions are deliberately out of the corpus (the fallback gives up).
+//   1. TAG BOUNDARIES — exactly the characters the engine marks as inside a
+//      FlatBars tag are the characters the grammar scopes as a tag. (Every FlatBars
+//      tag scope ends in `.handlebars`; HTML/JS/CSS/YAML content keeps `*.html`
+//      etc. — that is the tag/content boundary.) This catches the Exhibit-A/B class
+//      of begin/end drift across every dialect.
+//   2. LITERALS — wherever the engine carves a `string`/`number`, the grammar
+//      scopes it `string.quoted.*` / `constant.numeric.*` too.
+//
+// Everything else (which helper is a keyword, argument colouring, operators) is
+// allowed enrichment: the fallback is the floor, the LSP is the authority. Set-
+// delimiter SWITCHES are out of scope — a stateless grammar cannot track the new
+// delimiters that follow `{{=A B=}}` (the LSP does); the directive itself is checked.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -37,122 +40,131 @@ const onigPath = require.resolve("vscode-oniguruma/release/onig.wasm");
 const { Registry, parseRawGrammar, INITIAL } = (await import("vscode-textmate")).default;
 const oniguruma = (await import("vscode-oniguruma")).default;
 
-// ── The curated corpus. Default delimiters only; no set-delimiter / MaxBars-
-//    operator forms (the fallback gives up on those by design). `expect` lists the
-//    engine kinds the grammar MUST cover for this fixture. ──────────────────────
-const CORPUS = [
-  { src: "Hello, {{name}}!", dialect: "fullbars", expect: ["expr"] },
-  { src: "{{name.first}} {{name.last}}", dialect: "fullbars", expect: ["expr"] },
-  { src: "raw: {{{html}}}", dialect: "fullbars", expect: ["raw"] },
-  { src: "amp: {{&html}}", dialect: "fullbars", expect: ["raw"] },
-  { src: "{{#items}}{{name}}{{/items}}", dialect: "fullbars", expect: ["block-open", "expr", "block-close"] },
-  { src: "{{^items}}none{{/items}}", dialect: "fullbars", expect: ["block-inverse", "block-close"] },
-  { src: "{{#if a}}x{{else}}y{{/if}}", dialect: "fullbars", expect: ["block-open", "keyword", "block-close"] },
-  { src: "{{> row}}", dialect: "fullbars", expect: ["partial"] },
-  { src: "{{>* which}}", dialect: "fullbars", expect: ["partial"] },
-  { src: "{{<layout}}{{$title}}Hi{{/title}}{{/layout}}", dialect: "minbars", expect: ["block-parent", "block-decl", "block-close"] },
-  { src: "Total{{! dropped }}: {{total}}", dialect: "fullbars", expect: ["comment", "expr"] },
-  { src: "Hello, {{!-- name --}}!", dialect: "fullbars", expect: ["comment"] },
-  { src: "{{{{raw}}}}{{x}}{{{{/raw}}}}", dialect: "fullbars", expect: ["raw-block"] },
-  { src: "{{#if (gt qty 5)}}{{/if}}", dialect: "fullbars", expect: ["block-open", "number", "block-close"] },
-  { src: "{{ label }} {{ \"n/a\" }}", dialect: "fullbars", expect: ["expr", "string"] },
-];
-
-// Build the scope → kind reverse map from the vocabulary (exact leaf-scope match).
-const vocab = JSON.parse(readFileSync(resolve(editors, "token-vocabulary.json"), "utf8"));
-const scopeToKind = new Map();
-for (const [kind, def] of Object.entries(vocab.kinds)) {
-  for (const scope of def.tmScopes) {
-    if (scopeToKind.has(scope)) {
-      fail(`vocabulary: scope "${scope}" maps to both "${scopeToKind.get(scope)}" and "${kind}"`);
-    }
-    scopeToKind.set(scope, kind);
-  }
-}
-
 function fail(msg) {
   console.error(`✗ check:tmgrammar — ${msg}`);
   process.exit(1);
 }
 
-// The engine's per-character kind map: the tag span fills its range, interior
-// literal spans override their sub-ranges (the flattened, non-overlapping view).
-function engineKinds(src, dialect) {
-  const out = new Array(src.length).fill(null);
-  const spans = tokenize(src, dialect);
-  for (const s of spans.filter((s) => s.role === "tag")) {
-    for (let i = s.from; i < s.to; i++) out[i] = s.kind;
-  }
-  for (const s of spans.filter((s) => s.role === "interior")) {
-    for (let i = s.from; i < s.to; i++) out[i] = s.kind;
-  }
-  return out;
+// Literal scopes (string/number) from the shared vocabulary — the only scopes the
+// gate maps to an engine kind.
+const vocab = JSON.parse(readFileSync(resolve(editors, "token-vocabulary.json"), "utf8"));
+const litScope = new Map();
+for (const kind of ["string", "number"]) {
+  for (const s of vocab.kinds[kind].tmScopes) litScope.set(s, kind);
 }
 
-// The grammar's per-character kind map: tokenize each line, and for each token pick
-// the MOST SPECIFIC scope (innermost) that the vocabulary maps to a kind. Scopes
-// with no mapping (punctuation, meta.*, the root) leave the character plain.
-function grammarKinds(grammar, src) {
-  const out = new Array(src.length).fill(null);
-  let ruleStack = INITIAL;
-  let base = 0;
-  const lines = src.split("\n");
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
-    const r = grammar.tokenizeLine(line, ruleStack);
-    for (const t of r.tokens) {
-      let kind = null;
-      for (let k = t.scopes.length - 1; k >= 0; k--) {
-        if (scopeToKind.has(t.scopes[k])) {
-          kind = scopeToKind.get(t.scopes[k]);
-          break;
-        }
-      }
-      if (kind !== null) {
-        for (let i = t.startIndex; i < t.endIndex; i++) out[base + i] = kind;
-      }
-    }
-    ruleStack = r.ruleStack;
-    base += line.length + 1; // + the "\n"
-  }
-  return out;
-}
+// ── The per-dialect corpus. Default delimiters; no set-delimiter SWITCH (the
+//    stateless fallback gives up past `{{=A B=}}`). `note` documents the form. ────
+const CORPUS = [
+  // FullBars — Handlebars-faithful.
+  { dialect: "fullbars", src: "Hello, {{name}}!", note: "interpolation" },
+  { dialect: "fullbars", src: "{{name.first}} {{name.last}}", note: "dotted paths" },
+  { dialect: "fullbars", src: "raw: {{{html}}} {{&html}}", note: "unescaped" },
+  { dialect: "fullbars", src: "{{#each items}}{{name}}{{/each}}", note: "section + close" },
+  { dialect: "fullbars", src: "{{#if a}}x{{else}}y{{/if}}", note: "block + else" },
+  { dialect: "fullbars", src: "{{> row}} {{>* which}}", note: "partials" },
+  { dialect: "fullbars", src: "a{{! short }}b {{!-- long {{x}} --}}c", note: "comments" },
+  { dialect: "fullbars", src: "{{{{raw}}}}{{x}}{{{{/raw}}}}", note: "raw block (body inside)" },
+  { dialect: "fullbars", src: '{{ "x" }} {{#if (gt qty 5)}}{{/if}}', note: "string + number literals" },
+  // MinBars — Mustache: inverse, inheritance, set-delimiter directive.
+  { dialect: "minbars", src: "{{#items}}{{.}}{{/items}}", note: "section + implicit" },
+  { dialect: "minbars", src: "{{^items}}none{{/items}}", note: "inverted section" },
+  { dialect: "minbars", src: "{{<layout}}{{$title}}Hi{{/title}}{{/layout}}", note: "inheritance" },
+  { dialect: "minbars", src: "{{=<% %>=}}", note: "set-delimiter directive (no switch follow-up)" },
+  { dialect: "minbars", src: "{{! c }} {{&raw}} {{{trip}}}", note: "comment + unescaped" },
+  // RawBars — meaning-free core; extras off ⇒ {{&}}/{{^}}/{{{{…}}}} are error tags.
+  { dialect: "rawbars", src: "{{city}} {{#each x}}{{/each}}", note: "core forms" },
+  { dialect: "rawbars", src: "{{&x}} {{^x}}b{{/x}}", note: "disallowed shapes are still tags (engine: error)" },
+  // MaxBars — infix operators + pipes (enrichment) over the same tags.
+  { dialect: "maxbars", src: "{{ a + b * c }}", note: "arithmetic operators" },
+  { dialect: "maxbars", src: '{{ label ?? "n/a" }}', note: "coalesce + string" },
+  { dialect: "maxbars", src: "{{ items | first }}", note: "pipe" },
+  { dialect: "maxbars", src: "{{#if a}}x{{elif b}}y{{/if}}", note: "elif clause" },
+  { dialect: "maxbars", src: "{{ qty * 2 }}", note: "number literal" },
+  { dialect: "maxbars", src: "{{ (add a 1) }}", note: "subexpression + number" },
+  // Interaction cases: `|` as a block param (not a pipe), hash args + string literal.
+  { dialect: "fullbars", src: "{{#each xs as |x i|}}{{x}}{{/each}}", note: "block params" },
+  { dialect: "fullbars", src: '{{> row name="x"}}', note: "partial hash + string" },
+];
 
-const wasm = readFileSync(onigPath);
-await oniguruma.loadWASM(wasm.buffer);
-
+// ── Load the grammar; the external includes get empty stub grammars (their content
+//    is HTML/JS/etc., never a FlatBars tag, so an empty grammar is correct here). ──
+const EXTERNAL = ["text.html.basic", "source.js", "source.css", "source.yaml"];
+await oniguruma.loadWASM(readFileSync(onigPath).buffer);
 const registry = new Registry({
   onigLib: Promise.resolve({
-    createOnigScanner: (patterns) => new oniguruma.OnigScanner(patterns),
+    createOnigScanner: (p) => new oniguruma.OnigScanner(p),
     createOnigString: (s) => new oniguruma.OnigString(s),
   }),
-  loadGrammar: async () =>
-    parseRawGrammar(readFileSync(resolve(editors, "flatbars.tmLanguage.json"), "utf8"), "flatbars.tmLanguage.json"),
+  loadGrammar: async (scope) => {
+    if (scope === "source.flatbars") {
+      return parseRawGrammar(readFileSync(resolve(editors, "flatbars.tmLanguage.json"), "utf8"), "flatbars.tmLanguage.json");
+    }
+    if (EXTERNAL.includes(scope)) {
+      return parseRawGrammar(JSON.stringify({ scopeName: scope, patterns: [] }), `${scope}.json`);
+    }
+    return null;
+  },
 });
-
 const grammar = await registry.loadGrammar("source.flatbars");
-if (!grammar) fail("could not load editors/flatbars.tmLanguage.json");
+if (!grammar) fail("could not load editors/flatbars.tmLanguage.json as source.flatbars");
+
+// The engine's per-character truth: which chars are inside a tag, and the literals.
+function engineMasks(src, dialect) {
+  const tag = new Array(src.length).fill(false);
+  const lit = new Array(src.length).fill(null);
+  for (const s of tokenize(src, dialect)) {
+    if (s.role === "tag") {
+      for (let i = s.from; i < s.to; i++) tag[i] = true;
+    } else if (s.kind === "string" || s.kind === "number") {
+      for (let i = s.from; i < s.to; i++) lit[i] = s.kind;
+    }
+  }
+  return { tag, lit };
+}
+
+// The grammar's per-character view: a char is "in a tag" if any scope ends in
+// `.handlebars`; literals come from the vocabulary's string/number scopes.
+function grammarMasks(src) {
+  const tag = new Array(src.length).fill(false);
+  const lit = new Array(src.length).fill(null);
+  let stack = INITIAL;
+  let base = 0;
+  for (const line of src.split("\n")) {
+    const r = grammar.tokenizeLine(line, stack);
+    for (const t of r.tokens) {
+      const isTag = t.scopes.some((s) => s.endsWith(".handlebars"));
+      let litKind = null;
+      for (const s of t.scopes) if (litScope.has(s)) litKind = litScope.get(s);
+      for (let i = t.startIndex; i < t.endIndex; i++) {
+        tag[base + i] = isTag;
+        if (litKind) lit[base + i] = litKind;
+      }
+    }
+    stack = r.ruleStack;
+    base += line.length + 1; // + the "\n"
+  }
+  return { tag, lit };
+}
 
 let checked = 0;
-for (const { src, dialect, expect } of CORPUS) {
-  const eng = engineKinds(src, dialect);
-  const tm = grammarKinds(grammar, src);
+for (const { src, dialect, note } of CORPUS) {
+  const e = engineMasks(src, dialect);
+  const g = grammarMasks(src);
 
-  // 1. No mis-colour: where the grammar paints a kind, the engine must agree.
   for (let i = 0; i < src.length; i++) {
-    if (tm[i] !== null && tm[i] !== eng[i]) {
+    if (src[i] === "\n") continue;
+    if (e.tag[i] !== g.tag[i]) {
       const ctx = `${JSON.stringify(src)} @${i} (${JSON.stringify(src[i])})`;
-      fail(`mis-colour in ${ctx}: grammar=${tm[i]} but engine=${eng[i] ?? "plain"}`);
+      fail(`[${dialect}] ${note}: tag-boundary disagreement at ${ctx} — engine ${e.tag[i] ? "tag" : "content"}, grammar ${g.tag[i] ? "tag" : "content"}`);
+    }
+    if (e.lit[i] && g.lit[i] !== e.lit[i]) {
+      const ctx = `${JSON.stringify(src)} @${i} (${JSON.stringify(src[i])})`;
+      fail(`[${dialect}] ${note}: literal disagreement at ${ctx} — engine ${e.lit[i]}, grammar ${g.lit[i] ?? "plain"}`);
     }
   }
-  // 2. Floor coverage: each expected kind is actually painted by the grammar.
-  const painted = new Set(tm.filter((k) => k !== null));
-  for (const k of expect) {
-    if (!painted.has(k)) {
-      fail(`floor coverage: ${JSON.stringify(src)} — grammar never painted "${k}" (the fallback must cover this default-delimiter form)`);
-    }
-  }
+  if (!e.tag.includes(true)) fail(`[${dialect}] ${note}: fixture exercises no tag (corpus bug)`);
   checked++;
 }
 
-console.log(`✓ check:tmgrammar — TextMate fallback agrees with the engine on ${checked} default-delimiter fixtures (no mis-colour; floor covered)`);
+console.log(`✓ check:tmgrammar — Handlebars fallback agrees with the engine on tag boundaries + literals across ${checked} fixtures (rawbars/minbars/fullbars/maxbars)`);

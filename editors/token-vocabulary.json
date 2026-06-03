@@ -4,117 +4,127 @@
     "ONE contract shared by the three consumers it names: the engine `tokenize`",
     "API (whose `kind` strings are the keys below), the `flatbars-lsp` semantic-",
     "token legend (built from the `lsp` mappings), and the TextMate fallback",
-    "grammar (whose scopes must map back to a kind via `tmScopes`).",
+    "grammar (`editors/flatbars.tmLanguage.json`).",
     "",
-    "Each kind has a `role`: `tag` (a whole-tag span, painted by the meaning of its",
-    "head — what `highlightSpans` returns and the Lab/tutorials paint) or `interior`",
-    "(a literal/operator carved inside a tag — the richer axis only the editor layer",
-    "consumes). `lsp.type`/`lsp.modifiers` are the semantic-token legend entry. ",
-    "`tmScopes` are the TextMate scopes the *stateless fallback* emits for this kind;",
-    "an empty list means the fallback deliberately GIVES UP on this kind (set",
-    "delimiters, dialect-error shapes, and — per ADR-017 — MaxBars infix operators),",
-    "leaving it plain for the LSP to correct rather than mis-colouring it.",
+    "The fallback grammar is the well-known Handlebars TextMate grammar, re-",
+    "identified as `source.flatbars` and extended to cover all four dialects",
+    "(inverse sections, Mustache inheritance `{{<}}`/`{{$}}`, set delimiters, and",
+    "MaxBars operators). We keep its standard scope names (`keyword.control.*`,",
+    "`support.function.*`, `string.quoted.*`, …) on purpose: themes already colour",
+    "them, so FlatBars looks like the Handlebars developers know. Every FlatBars",
+    "tag scope ends in `.handlebars`; HTML/JS/CSS/YAML content keeps its own",
+    "(`*.html`, `*.js`, …) — that suffix is how the gate tells a tag from content.",
     "",
-    "Drift is gated: `check:highlight` pins what the engine emits, `check:tmgrammar`",
-    "pins that the grammar's scopes agree with the engine on the default-delimiter",
-    "corpus. Change a kind here and both gates plus the LSP legend move together."
+    "Because the grammar is RICHER than the engine (it splits a tag into sigil /",
+    "name / args / literals, where the engine paints one kind per tag), the drift",
+    "gate does NOT assert a scope==kind bijection. `check:tmgrammar` asserts, per",
+    "dialect, that the grammar agrees with the engine on (1) TAG BOUNDARIES (which",
+    "characters are inside a FlatBars tag) and (2) LITERAL positions (string /",
+    "number). Everything else is allowed enrichment — the fallback is the floor,",
+    "the LSP is the authority. `check:highlight` still pins what the engine emits.",
+    "",
+    "`role`: `tag` (a whole-tag span) or `interior` (a literal/operator carved",
+    "inside a tag). `lsp.type`/`lsp.modifiers` are the semantic-token legend entry.",
+    "`tmScopes` are the grammar scopes that express this kind; `[]` means the",
+    "stateless fallback gives up (the LSP corrects it). Only the `string`/`number`",
+    "scopes are gate-checked as literals; the tag scopes are documentation."
   ],
   "kinds": {
     "expr": {
       "role": "tag",
       "lsp": { "type": "variable", "modifiers": [] },
-      "tmScopes": ["variable.other.flatbars"],
+      "tmScopes": ["meta.function.inline.handlebars", "variable.parameter.handlebars"],
       "description": "{{name}} — an interpolation (escaped output)."
     },
     "raw": {
       "role": "tag",
       "lsp": { "type": "variable", "modifiers": ["readonly"] },
-      "tmScopes": ["variable.other.raw.flatbars"],
+      "tmScopes": ["meta.variable.unescaped.handlebars"],
       "description": "{{{x}}} / {{&x}} — unescaped (raw) output."
     },
     "raw-block": {
       "role": "tag",
       "lsp": { "type": "macro", "modifiers": [] },
-      "tmScopes": ["entity.name.tag.raw-block.flatbars"],
+      "tmScopes": ["meta.block.raw.handlebars"],
       "description": "{{{{raw}}}} … {{{{/raw}}}} — a raw block."
     },
     "block-open": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["keyword.control.section.flatbars"],
+      "tmScopes": ["meta.function.block.start.handlebars", "keyword.control.handlebars", "support.function.handlebars"],
       "description": "{{#x}} — a section open."
     },
     "block-inverse": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["keyword.control.inverted.flatbars"],
+      "tmScopes": ["meta.function.block.inverse.handlebars"],
       "description": "{{^x}} — an inverted section open."
     },
     "block-parent": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["keyword.control.parent.flatbars"],
+      "tmScopes": ["meta.function.block.parent.handlebars"],
       "description": "{{<x}} — an inheritance parent open."
     },
     "block-decl": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["keyword.control.block-decl.flatbars"],
+      "tmScopes": ["meta.function.block.declaration.handlebars"],
       "description": "{{$x}} — an inheritance block declaration open."
     },
     "block-close": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["keyword.control.end.flatbars"],
+      "tmScopes": ["meta.function.block.end.handlebars"],
       "description": "{{/x}} — a block close."
     },
     "partial": {
       "role": "tag",
       "lsp": { "type": "macro", "modifiers": [] },
-      "tmScopes": ["keyword.control.partial.flatbars", "variable.other.partial.flatbars"],
+      "tmScopes": ["meta.function.partial.handlebars", "entity.name.function.partial.handlebars"],
       "description": "{{> name}} — a partial include."
     },
     "keyword": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["keyword.control.clause.flatbars"],
+      "tmScopes": ["keyword.control.handlebars"],
       "description": "{{else}} / {{elif …}} — a clause separator (dialect-dependent)."
     },
     "comment": {
       "role": "tag",
       "lsp": { "type": "comment", "modifiers": [] },
-      "tmScopes": ["comment.block.flatbars"],
+      "tmScopes": ["comment.block.handlebars"],
       "description": "{{! … }} / {{!-- … --}} — a comment."
     },
     "set-delimiter": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": [],
-      "description": "{{=A B=}} — a set-delimiter directive. STATEFUL: the fallback gives up; only the LSP colours it."
+      "tmScopes": ["meta.set-delimiter.handlebars"],
+      "description": "{{=A B=}} — a set-delimiter directive. The DIRECTIVE is coloured; the stateless fallback cannot track the new delimiters that follow it (the LSP does)."
     },
     "error": {
       "role": "tag",
       "lsp": { "type": "variable", "modifiers": ["invalid"] },
       "tmScopes": [],
-      "description": "A structurally-valid tag the dialect disallows. DIALECT-DEPENDENT: the stateless fallback gives up; only the LSP knows the dialect."
+      "description": "A structurally-valid tag the dialect disallows. DIALECT-DEPENDENT: the stateless fallback paints the shape as valid; only the LSP knows the dialect."
     },
     "string": {
       "role": "interior",
       "lsp": { "type": "string", "modifiers": [] },
-      "tmScopes": ["string.quoted.double.flatbars", "string.quoted.single.flatbars"],
+      "tmScopes": ["string.quoted.single.handlebars", "string.quoted.double.handlebars"],
       "description": "A quoted string literal inside a tag."
     },
     "number": {
       "role": "interior",
       "lsp": { "type": "number", "modifiers": [] },
-      "tmScopes": ["constant.numeric.flatbars"],
+      "tmScopes": ["constant.numeric.handlebars"],
       "description": "A numeric literal inside a tag."
     },
     "operator": {
       "role": "interior",
       "lsp": { "type": "operator", "modifiers": [] },
-      "tmScopes": [],
-      "description": "An infix/prefix operator inside a tag. MaxBars-only and dialect-scoped: the stateless fallback gives up; only the LSP colours it."
+      "tmScopes": ["keyword.operator.handlebars"],
+      "description": "An infix/prefix operator inside a tag (MaxBars). Coloured as enrichment; not gate-checked, since the engine only carves operators under MaxBars' infixArith."
     }
   }
 }

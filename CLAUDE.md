@@ -201,9 +201,10 @@ The **`editors`** tree (also not PureScript) is the third-party editor support o
 ADR-017 — highlighting in real editors by *running the engine lexer*, never by
 approximating it. `editors/token-vocabulary.json` is the single source of truth
 its three consumers share (the engine `tokenize` kinds, the LSP semantic-token
-legend, the TextMate scopes). `editors/flatbars.tmLanguage.json` is the
-hand-authored, best-effort TextMate *fallback* (the floor: default-delimiter forms
-for no-LSP contexts), drift-bounded by `check:tmgrammar`. `editors/lsp`
+legend, the TextMate scopes). `editors/flatbars.tmLanguage.json` is the best-effort
+TextMate *fallback* (the floor for no-LSP contexts): the well-known Handlebars
+grammar re-identified as `source.flatbars` and extended for all four dialects,
+keeping its familiar scope names, drift-bounded by `check:tmgrammar`. `editors/lsp`
 (`flatbars-lsp`) is the authoritative semantic-tokens server — it embeds the
 committed `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize`
 (`test:lsp`). `editors/vscode` is the VS Code extension bundling the LSP client +
@@ -239,8 +240,9 @@ question); Marketplace publishing is a tracked follow-up.
   scopes. The engine `tokenize` (the kinds), the `flatbars-lsp` legend, and the
   TextMate grammar all derive from it. Two gates keep it honest, both in `npm
   test`: `check:highlight` pins what the engine emits (`spans` + `tokens`),
-  `check:tmgrammar` pins that the fallback grammar agrees with the engine on the
-  default-delimiter corpus. Change a `kind` → update the vocabulary and rerun
+  `check:tmgrammar` pins that the fallback grammar agrees with the engine, per
+  dialect, on tag boundaries + literals (the grammar may be richer — enrichment is
+  allowed). Change a `kind` → update the vocabulary and rerun
   `npm run gen:highlight`. The bundle carries `tokenize`, so an engine change
   needs `npm run gen:bundle` + a cache-buster bump like any other.
 - **One app shell + one wordmark.** The docs layout and the landing share

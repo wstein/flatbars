@@ -1,23 +1,18 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "Handlebars",
-  "scopeName": "text.html.handlebars",
+  "name": "FlatBars",
+  "scopeName": "source.flatbars",
   "fileTypes": [
-    "handlebars",
-    "handlebars.html",
-    "hbr",
-    "hbrs",
+    "flatbars",
+    "rawbars",
+    "minbars",
+    "fullbars",
+    "maxbars",
     "hbs",
-    "hdbs",
-    "hjs",
-    "mu",
-    "mustache",
-    "rac",
-    "stache",
-    "template",
-    "tmpl"
+    "handlebars",
+    "mustache"
   ],
-  "uuid": "70E91676-DE0A-4266-A2B9-3AD2E535E484",
+  "uuid": "47231B67-C29F-40A3-9604-097652D77088",
   "patterns": [
     {
       "include": "#yfm"
@@ -350,6 +345,9 @@
           "include": "#segment_literal"
         },
         {
+          "include": "#operator"
+        },
+        {
           "include": "#path"
         }
       ]
@@ -391,6 +389,9 @@
           "include": "#comment"
         },
         {
+          "include": "#set_delimiter"
+        },
+        {
           "include": "#decorator_block"
         },
         {
@@ -398,6 +399,12 @@
         },
         {
           "include": "#block_helper"
+        },
+        {
+          "include": "#inverse_block"
+        },
+        {
+          "include": "#inheritance"
         },
         {
           "include": "#end_block"
@@ -418,6 +425,98 @@
           "include": "#variable"
         }
       ]
+    },
+    "set_delimiter": {
+      "name": "meta.set-delimiter.handlebars",
+      "match": "(\\{\\{~?=)([^=]*)(=~?\\}\\})",
+      "captures": {
+        "1": {
+          "name": "punctuation.section.expression.handlebars"
+        },
+        "2": {
+          "name": "keyword.operator.handlebars"
+        },
+        "3": {
+          "name": "punctuation.section.expression.handlebars"
+        }
+      }
+    },
+    "inverse_block": {
+      "name": "meta.function.block.inverse.handlebars",
+      "begin": "(\\{\\{~?\\^)\\s*([-a-zA-Z0-9_./]+)?",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.handlebars"
+        },
+        "2": {
+          "name": "support.function.handlebars"
+        }
+      },
+      "end": "(~?\\}\\})",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.section.expression.handlebars"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "inheritance": {
+      "patterns": [
+        {
+          "name": "meta.function.block.parent.handlebars",
+          "begin": "(\\{\\{~?<)\\s*([-a-zA-Z0-9_./*]+)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.handlebars"
+            },
+            "2": {
+              "name": "support.function.handlebars"
+            }
+          },
+          "end": "(~?\\}\\})",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.section.expression.handlebars"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        },
+        {
+          "name": "meta.function.block.declaration.handlebars",
+          "begin": "(\\{\\{~?\\$)\\s*([-a-zA-Z0-9_./]+)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.handlebars"
+            },
+            "2": {
+              "name": "support.function.handlebars"
+            }
+          },
+          "end": "(~?\\}\\})",
+          "endCaptures": {
+            "1": {
+              "name": "punctuation.section.expression.handlebars"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#expression"
+            }
+          ]
+        }
+      ]
+    },
+    "operator": {
+      "match": "(==|!=|<=|>=|&&|\\|\\||\\?\\?|[+*%<>]|\\|)",
+      "name": "keyword.operator.handlebars"
     },
     "hash": {
       "match": "([a-zA-Z0-9_][-a-zA-Z0-9_]*)\\s*(=)",

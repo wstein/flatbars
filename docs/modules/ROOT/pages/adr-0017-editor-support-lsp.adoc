@@ -20,9 +20,11 @@ parser) and Marketplace publishing remain. What shipped:
 * `tokenize(template, dialect)` on the `flatbars-js` bundle — the tag-role *and*
   interior-role (`string`/`number`/`operator`) token stream; `highlightSpans` is
   now its tag-role projection. Gated by `check:highlight` (pins both views).
-* `editors/flatbars.tmLanguage.json` — the hand-authored fallback, gated by
-  `check:tmgrammar` (tokenizes a default-delimiter corpus through both the engine
-  and the real `vscode-textmate` engine and asserts agreement).
+* `editors/flatbars.tmLanguage.json` — the fallback: the well-known Handlebars
+  grammar re-identified as `source.flatbars` and extended for all four dialects
+  (inverse sections, Mustache inheritance, set delimiters, MaxBars operators),
+  keeping its standard scope names so themes colour FlatBars familiarly. Gated by
+  `check:tmgrammar` (per dialect: tag-boundary + literal agreement with the engine).
 * `editors/lsp` — `flatbars-lsp`, the semantic-tokens server (`test:lsp`).
 * `editors/vscode` — the extension bundling the client + grammar (`test:vscode`).
 * `editors/jetbrains` — the Gradle/Kotlin plugin: the TextMate grammar via a
@@ -93,27 +95,30 @@ correctly in any editor is therefore to *run the engine lexer*, not to approxima
 * a degraded/crashed or still-starting server — DX must never fall to *no* colour.
 --
 +
-Because those contexts are real and unavoidable, shipping the grammar is non-negotiable. It is, however,
-explicitly *best-effort and non-authoritative*: being stateless it colours the *default-delimiter* forms
-(`pass:[{{ }}]`, `pass:[{{{ }}}]`, `pass:[{{# }}]`, `pass:[{{! }}]`, `pass:[{{> }}]`, `pass:[{{< }}]`,
-`pass:[{{$ }}]`) and gives up *gracefully* on set-delimiter regions and MaxBars operators (it leaves them
-plain rather than mis-colouring). When the LSP is attached, semantic tokens override it and correct the
-stateful regions. The grammar is the floor; the engine is the ceiling.
+Because those contexts are real and unavoidable, shipping the grammar is non-negotiable. We use the
+*well-known Handlebars TextMate grammar*, re-identified as `source.flatbars` and extended for all four
+dialects (inverse sections, Mustache inheritance `pass:[{{<}}]`/`pass:[{{$}}]`, set delimiters, and
+MaxBars operators), keeping its standard scope names (`keyword.control.*`, `support.function.*`,
+`string.quoted.*`, …) *on purpose* — themes already colour them, so FlatBars looks like the Handlebars
+developers know. It is explicitly *best-effort and non-authoritative*: being stateless it cannot follow a
+set-delimiter *switch* (the tags past `pass:[{{=A B=}}]`) and is FullBars-flavoured (it paints
+`else`/`each` as keywords even in MinBars, and paints RawBars/MaxBars's `extras`-off shapes as valid).
+When the LSP is attached, semantic tokens override it and correct exactly those regions. The grammar is
+the floor; the engine is the ceiling.
 
-. *The fallback is a derived artifact and MUST be drift-bounded, like every other.* Because it is a
-  second representation of the grammar, it gets the same discipline ADR-014 mandates. The grammar is
-  *hand-authored* (TextMate's begin/end regex rules don't generate cleanly from a token-boundary list),
-  and `check:tmgrammar` *pins it against the engine* for the default-delimiter corpus: it tokenizes a
-  curated corpus through both the engine (`tokenize`) and the real `vscode-textmate` engine, maps every
-  TextMate scope back to an engine kind via the token vocabulary, and asserts (a) *no mis-colour* — the
-  grammar never paints a kind the engine disagrees with — and (b) *floor coverage* — each fixture's
-  default-delimiter forms are actually painted. The gate is wired into `npm test`, and the grammar is
-  labelled in-source "approximate fallback — the LSP is authoritative." ADR-014's stopgap was
-  *time-boxed*; this fallback is *permanent* (it serves the no-LSP contexts forever), so its gate is
-  permanent too. The token vocabulary (`editors/token-vocabulary.json`) is defined once and shared by
-  three consumers — the `tokenize` API, the semantic-token legend, and the TextMate scopes — so they
-  cannot name kinds differently; a kind whose `tmScopes` is empty is one the stateless fallback
-  deliberately gives up on (set delimiters, dialect-error shapes, MaxBars operators).
+. *The fallback is a derived artifact and MUST be drift-bounded, like every other.* But it is *richer*
+  than the engine — it splits a tag into sigil / name / args / literals, where the engine paints one kind
+  per tag (ADR-014) — so a scope-to-kind bijection does not fit, and we do not force one. `check:tmgrammar`
+  instead pins, *for each dialect*, the two things the engine defines and a stateless grammar can be held
+  to: (a) *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
+  characters the grammar scopes as a tag (every tag scope ends in `.handlebars`; HTML/JS/CSS/YAML content
+  keeps its own scopes), which catches the Exhibit-A/B begin/end drift across all four dialects; and
+  (b) *literals* — wherever the engine carves a `string`/`number`, the grammar scopes it as one. Everything
+  else (which helper is a keyword, argument and operator colouring) is allowed *enrichment*. Dialect-error
+  shapes and set-delimiter switches are out of scope (the LSP owns them). The gate is wired into `npm
+  test`; ADR-014's stopgap was *time-boxed*, but this fallback is *permanent* (it serves the no-LSP
+  contexts forever), so its gate is permanent too. The token vocabulary (`editors/token-vocabulary.json`)
+  is still the one place the kinds, the LSP legend, and the grammar's literal scopes are defined together.
 
 . *Reject tree-sitter as the FlatBars parser/highlighter.* A tree-sitter grammar is a second source of
   truth (the drift ADR-001 and ADR-014 exist to prevent); it cannot track the dialect seam without N
@@ -153,9 +158,11 @@ stateful regions. The grammar is the floor; the engine is the ceiling.
   (value / inline / block / operator) it pairs with is owned by
   xref:adr-0019-operation-vocabulary.adoc[ADR-019]; completion labels (when they land) should reference
   that taxonomy rather than coin their own.
-* *Grammar provenance (resolved — hand-authored + conformance gate).* The fallback grammar is
-  hand-authored; `check:tmgrammar` is the conformance gate (see Decision 3). Generation from token
-  boundaries was rejected as a poor fit for TextMate's begin/end regex model.
+* *Grammar provenance (resolved — adopt the Handlebars grammar + conformance gate).* The fallback is the
+  established Handlebars TextMate grammar, re-identified as `source.flatbars` and extended for the four
+  dialects, kept honest by `check:tmgrammar` (see Decision 3). This was chosen over both a from-scratch
+  hand-authored grammar and generation from token boundaries: reusing the grammar developers' themes
+  already target is what makes FlatBars *look familiar*, which is the fallback's whole job.
 
 == Open questions
 
