@@ -26,18 +26,23 @@ import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as SCU
 import Data.String.Common (joinWith)
 import FlatBars.Error (ParseError(..))
-import FlatBars.Lab.Lexer.Types (LexConfig, firstWord, isSpace)
+import FlatBars.Lab.Lexer.Types (LexConfig, firstWord, isSpace, words)
 import FlatBars.Lexer (RawTok(..), trimStandalone) as E
 import FlatBars.Parser (buildFromTokens, defaultParseOptions)
 import FlatBars.Syntax (Sigil(..)) as Syn
 import FlatBars.Syntax (Template)
 
--- | Tokenize a template into the engine's `RawTok` stream (default delimiters).
+-- | Tokenize a template into the engine's `RawTok` stream. Honours
+-- | `mustacheDelims`: off, the default-delimiter grammar; on, `{{=A B=}}`
+-- | set-delimiters swap the active pair and the reduced custom-delimiter grammar
+-- | applies to following tags (ADR-015), mirroring `FlatBars.Lexer`.
 toRawToks :: LexConfig -> String -> Either ParseError (Array E.RawTok)
-toRawToks _ src = map (Array.fromFoldable <<< List.reverse) (go 0 false 0 [] Nil)
+toRawToks cfg src =
+  map (Array.fromFoldable <<< List.reverse) (go 0 false cfg.open cfg.close 0 [] Nil)
   where
   cs = SCU.toCharArray src
   len = Array.length cs
+  mustache = cfg.mustacheDelims
 
   at i = case Array.index cs i of
     Just c -> c
@@ -61,27 +66,55 @@ toRawToks _ src = map (Array.fromFoldable <<< List.reverse) (go 0 false 0 [] Nil
   pushSeg segStart frags end lit = Array.snoc (Array.snoc frags (slice segStart end)) lit
 
   -- Main scan: accumulate a content run (a slice plus escape fragments) until a
-  -- tag, flushing it with the pending leading trim and the tag's trimL.
-  go :: Int -> Boolean -> Int -> Array String -> List E.RawTok -> Either ParseError (List E.RawTok)
-  go i pend segStart frags acc
+  -- tag, flushing it with the pending leading trim and the tag's trimL. `open`/
+  -- `close` are the active delimiters (a set-delimiter swaps them mid-stream).
+  go
+    :: Int
+    -> Boolean
+    -> String
+    -> String
+    -> Int
+    -> Array String
+    -> List E.RawTok
+    -> Either ParseError (List E.RawTok)
+  go i pend open close segStart frags acc
     | i >= len = Right (flush (contentTo segStart frags i) acc pend false)
-    | at i == '\\' =
-        if matchAt (i + 1) "\\" then go (i + 2) pend (i + 2) (pushSeg segStart frags i "\\") acc
+    -- {{=A B=}} set-delimiter (gated): emit RSetDelim and swap the active pair.
+    | mustache && matchAt i (open <> "=") = case readSetDelim i open close of
+        Left e -> Left e
+        Right sd ->
+          let
+            acc1 = E.RSetDelim (span i sd.next) : flush (contentTo segStart frags i) acc pend false
+          in
+            go sd.next false sd.open sd.close sd.next [] acc1
+    -- Default delimiters: the full grammar (escapes, triple, raw, comments, ~).
+    | open == "{{" && close == "}}" && at i == '\\' =
+        if matchAt (i + 1) "\\" then
+          go (i + 2) pend open close (i + 2) (pushSeg segStart frags i "\\") acc
         else case escapedOpenerAt (i + 1) of
           Just lit ->
             let
               next = i + 1 + SCU.length lit
             in
-              go next pend next (pushSeg segStart frags i lit) acc
-          Nothing -> go (i + 1) pend (i + 1) (pushSeg segStart frags i "\\") acc
-    | at i == '{' && isOpenerAt i = case readTag i of
+              go next pend open close next (pushSeg segStart frags i lit) acc
+          Nothing -> go (i + 1) pend open close (i + 1) (pushSeg segStart frags i "\\") acc
+    | open == "{{" && close == "}}" && at i == '{' && isOpenerAt i = case readTag i of
         Left e -> Left e
         Right res ->
           let
             acc1 = consTok res.mtok (flush (contentTo segStart frags i) acc pend res.trimL)
           in
-            go res.next res.trimR res.next [] acc1
-    | otherwise = go (i + 1) pend segStart frags acc
+            go res.next res.trimR open close res.next [] acc1
+    | open == "{{" && close == "}}" = go (i + 1) pend open close segStart frags acc
+    -- Custom delimiters (post-set-delim): the reduced Mustache grammar.
+    | matchAt i open = case readCustomTag i open close of
+        Left e -> Left e
+        Right res ->
+          let
+            acc1 = consTok res.mtok (flush (contentTo segStart frags i) acc pend false)
+          in
+            go res.next false open close res.next [] acc1
+    | otherwise = go (i + 1) pend open close segStart frags acc
 
   consTok mtok acc = case mtok of
     Just t -> t : acc
@@ -313,6 +346,57 @@ toRawToks _ src = map (Array.fromFoldable <<< List.reverse) (go 0 false 0 [] Nil
                     , trimL: false
                     , trimR: false
                     }
+
+  -- {{=A B=}} — read the two delimiter words, validate, return the new pair.
+  readSetDelim i open close =
+    let
+      start = i + SCU.length open + 1 -- after "<open>="
+      closePat = "=" <> close
+    in
+      case findFrom start closePat of
+        Nothing -> Left
+          (LexError ("unterminated set-delimiter tag (expected '=" <> close <> "')") i)
+        Just q -> case delimWords (slice start q) of
+          Just d | validDelim d.open && validDelim d.close ->
+            Right { next: q + SCU.length closePat, open: d.open, close: d.close }
+          _ -> Left (LexError "set-delimiter expects two '='-free words" i)
+
+  -- A tag under custom delimiters: the reduced Mustache grammar (no triple / raw
+  -- / long comment / `~`). The sigil is the single char after `open`.
+  readCustomTag i open close =
+    let
+      start = i + SCU.length open
+      cl = SCU.length close
+    in
+      case findFrom start close of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            sp = span i (q + cl)
+            next = q + cl
+            afterSig = slice (start + 1) q
+            interior = slice start q
+            mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
+          in
+            case at start of
+              '#' -> case at (start + 1) of
+                '*' -> mk (E.ROpen sp Syn.Decorator (start + 2) (slice (start + 2) q))
+                '>' -> mk (E.ROpen sp Syn.PartialBlock (start + 2) (slice (start + 2) q))
+                _ -> mk (E.ROpen sp Syn.Section (start + 1) afterSig)
+              '^' -> mk (E.ROpen sp Syn.Inverse (start + 1) afterSig)
+              '<' -> mk (E.ROpen sp Syn.Parent (start + 1) afterSig)
+              '$' -> mk (E.ROpen sp Syn.BlockDef (start + 1) afterSig)
+              '/' -> mk (E.RClose sp (start + 1) afterSig)
+              '&' -> mk (E.RAmp sp (start + 1) afterSig)
+              '!' -> mk (E.RComment sp (start + 1) afterSig)
+              _ -> mk (E.RSep sp start interior)
+
+  -- Exactly two whitespace-separated, `=`-free delimiter words.
+  delimWords s = case words s of
+    [ a, b ] -> Just { open: a, close: b }
+    _ -> Nothing
+
+  validDelim d = not (Array.elem '=' (SCU.toCharArray d))
 
 -- | Parse via the structural scanner, reusing the engine's whitespace + tree
 -- | builder — the same path `FlatBars.parse` takes, only the lexer swapped.

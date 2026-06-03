@@ -97,3 +97,21 @@ tests = do
       Left _, Left _ -> pure unit
       _, _ -> assertTrue' ("exactly one parser errored on " <> show src) false
   log "  standalone end-to-end parity assertions passed"
+
+  -- mustacheDelims ON: the structural scanner's set-delimiter + custom-delimiter
+  -- path must match the incumbent with mustacheDelims on (MinBars surface).
+  let
+    labMustache = Lab.defaultLexConfig { mustacheDelims = true }
+    engMustache = defaultLexConfig { mustacheDelims = true }
+  for_ [ "{{=<% %>=}}<% x %> done", "{{=<% %>=}}<% a %>mid<% b %>", "a {{=[[ ]]=}}[[ y ]] b" ]
+    \src ->
+      case toRawToks labMustache src, tokenizeTemplate engMustache src of
+        Right lab, Right eng ->
+          assertTrue'
+            ( "set-delim RawTok mismatch on " <> show src <> "\n  lab: " <> show lab <> "\n  eng: "
+                <> show eng
+            )
+            (lab == eng)
+        Left _, Left _ -> pure unit
+        _, _ -> assertTrue' ("exactly one lexer errored on " <> show src) false
+  log "  mustacheDelims RawTok parity assertions passed"

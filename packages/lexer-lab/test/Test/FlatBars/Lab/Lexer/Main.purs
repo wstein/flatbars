@@ -11,7 +11,8 @@ import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Lab.Lexer
-  ( Lexeme(..)
+  ( LexConfig
+  , Lexeme(..)
   , Sigil(..)
   , Trivia(..)
   , defaultLexConfig
@@ -25,14 +26,17 @@ import Test.FlatBars.Lab.LexerHand as LexerHand
 import Test.FlatBars.Lab.ParserParity as ParserParity
 import Test.FlatBars.Lab.RawTokParity as RawTokParity
 
-cfg :: { close :: String, infixArith :: Boolean, open :: String }
+cfg :: LexConfig
 cfg = defaultLexConfig
 
-arith :: { close :: String, infixArith :: Boolean, open :: String }
+arith :: LexConfig
 arith = defaultLexConfig { infixArith = true }
 
+mustache :: LexConfig
+mustache = defaultLexConfig { mustacheDelims = true }
+
 -- The lexeme sequence (trivia/EOF dropped) for a successful lex; `[]` on error.
-seqOf :: { close :: String, infixArith :: Boolean, open :: String } -> String -> Array Lexeme
+seqOf :: LexConfig -> String -> Array Lexeme
 seqOf c src = case tokenize c src of
   Right toks -> lexemes toks
   Left _ -> []
@@ -136,7 +140,7 @@ main = do
 
   -- 10. Stateful set-delimiter: the switch changes how following tags lex.
   assertEqual
-    { actual: seqOf cfg "{{=<% %>=}}<% x %>"
+    { actual: seqOf mustache "{{=<% %>=}}<% x %>"
     , expected: [ SetDelimiter "<%" "%>", Open, Ident "x", CloseTag ]
     }
 
@@ -196,7 +200,7 @@ main = do
 
   -- 19. A tab between set-delimiter words is normalised (not two empty words).
   assertEqual
-    { actual: seqOf cfg "{{=<%\t%>=}}"
+    { actual: seqOf mustache "{{=<%\t%>=}}"
     , expected: [ SetDelimiter "<%" "%>" ]
     }
 

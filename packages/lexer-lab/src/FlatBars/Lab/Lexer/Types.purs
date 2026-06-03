@@ -179,14 +179,18 @@ derive instance eqPiece :: Eq Piece
 -- Configuration
 --------------------------------------------------------------------------------
 
--- | `open`/`close` seed the active delimiter pair (set-delimiters may change it
--- | mid-stream). `infixArith` mirrors `FlatBars.Token.LexOptions`: off, the
--- | arithmetic characters `+ - * / ?` stay *identifier* characters; on, they
--- | lex as operators (and `/` becomes the division `Op` rather than `Slash`).
-type LexConfig = { open :: String, close :: String, infixArith :: Boolean }
+-- | `open`/`close` seed the active delimiter pair. `infixArith` mirrors
+-- | `FlatBars.Token.LexOptions`: off, the arithmetic characters `+ - * / ?` stay
+-- | *identifier* characters; on, they lex as operators (and `/` becomes the
+-- | division `Op` rather than `Slash`). `mustacheDelims` is the dialect gate
+-- | (ADR-015): off (FullBars/RawBars/MaxBars), `{{=A B=}}` is an ordinary
+-- | separator; on (MinBars), it is a set-delimiter that swaps the active pair
+-- | mid-stream. Default off — byte-identical to the incumbent's defaultLexConfig.
+type LexConfig =
+  { open :: String, close :: String, infixArith :: Boolean, mustacheDelims :: Boolean }
 
 defaultLexConfig :: LexConfig
-defaultLexConfig = { open: "{{", close: "}}", infixArith: false }
+defaultLexConfig = { open: "{{", close: "}}", infixArith: false, mustacheDelims: false }
 
 --------------------------------------------------------------------------------
 -- Pieces → tokens (attach leading trivia; synthesize the EOF token)

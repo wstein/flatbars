@@ -216,10 +216,21 @@ single-pass `tokenizeTemplate`. The shared `buildFromTokens` dominates both.
 
 The takeaway: **swap the lexer, keep the proven parser.** Because the RawTok
 streams match exactly, standalone whitespace, header directives, raw blocks, and
-recovering parse are all inherited for free. The one deliberate divergence is
-set-delimiters: the hand lexer always recognises `{{=A B=}}`, while the engine's
-`defaultLexConfig` gates them behind `mustacheDelims` — reconciling that needs a
-config gate on the hand lexer (tracked).
+recovering parse are all inherited for free.
+
+### Dialect gates
+
+The lab `LexConfig` now carries the lexer-level dialect knobs: `infixArith`
+(MaxBars operators in the fine interior) and **`mustacheDelims`** (ADR-015).
+With `mustacheDelims` off (FullBars/RawBars/MaxBars, the default), `{{=A B=}}`
+is an ordinary separator; on (MinBars), all three lab lexers recognise it as a
+set-delimiter, and the structural scanner additionally handles the reduced
+custom-delimiter grammar that follows a switch (`<% … %>`, `[[ … ]]`). This
+closes the one divergence the parity tests had found (the hand lexer used to
+recognise set-delimiters unconditionally). `RawTokParity` checks both off (the
+default corpus) and on (a `mustacheDelims`-true corpus). The remaining
+parser-level gates (`extras`/`inheritance`/raw-block variants) are not lexer
+concerns — they come from the engine `ParseOptions` the RawTok path reuses.
 
 ## Done in this iteration
 

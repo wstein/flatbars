@@ -86,6 +86,7 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
   cs = SCU.toCharArray src
   len = Array.length cs
   arith = cfg.infixArith
+  mustache = cfg.mustacheDelims
   origin = { index: 0, line: 1, column: 1 }
 
   -- Unsafe read on the hot path; only called with `i < len` established.
@@ -225,7 +226,7 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
   -- Tag dispatch (mirrors the parsing spike's `tagChunk` ordering).
   --------------------------------------------------------------------------
   readTag :: Int -> SourcePos -> String -> String -> Either LexError Step
-  readTag i pos open close = case trySetDelim i pos open close of
+  readTag i pos open close = case (if mustache then trySetDelim i pos open close else Nothing) of
     Just r -> r
     Nothing ->
       let

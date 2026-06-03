@@ -142,7 +142,9 @@ tokenize cfg input =
   tagChunk = do
     st <- get
     choice $ map try $
-      [ setDelimTag st.open st.close ] <>
+      -- set-delimiters are a dialect gate (ADR-015): only MinBars (mustacheDelims)
+      -- recognises `{{=A B=}}`; otherwise it is an ordinary separator.
+      (if cfg.mustacheDelims then [ setDelimTag st.open st.close ] else []) <>
         if st.open == "{{" && st.close == "}}" then
           [ rawBlockTag, longCommentTag, shortCommentTag, tripleTag, doubleTag ]
         else [ simpleTag st.open st.close ]

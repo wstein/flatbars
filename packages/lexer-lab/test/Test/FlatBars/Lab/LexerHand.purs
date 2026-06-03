@@ -12,24 +12,27 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Effect (Effect)
 import Effect.Console (log)
-import FlatBars.Lab.Lexer (Lexeme(..), Sigil(..), defaultLexConfig)
+import FlatBars.Lab.Lexer (LexConfig, Lexeme(..), Sigil(..), defaultLexConfig)
 import FlatBars.Lab.Lexer as PL
 import FlatBars.Lab.LexerHand as H
 import Test.Assert (assertEqual, assertTrue')
 
-cfg :: { close :: String, infixArith :: Boolean, open :: String }
+cfg :: LexConfig
 cfg = defaultLexConfig
 
-arith :: { close :: String, infixArith :: Boolean, open :: String }
+arith :: LexConfig
 arith = defaultLexConfig { infixArith = true }
 
-seqH :: { close :: String, infixArith :: Boolean, open :: String } -> String -> Array Lexeme
+mustache :: LexConfig
+mustache = defaultLexConfig { mustacheDelims = true }
+
+seqH :: LexConfig -> String -> Array Lexeme
 seqH c s = case H.tokenize c s of
   Right t -> PL.lexemes t
   Left _ -> []
 
 -- Assert the two lexers produce identical token streams, or both reject.
-parity :: { close :: String, infixArith :: Boolean, open :: String } -> String -> Effect Unit
+parity :: LexConfig -> String -> Effect Unit
 parity c input = case PL.tokenize c input, H.tokenize c input of
   Right a, Right b -> assertTrue' ("parity mismatch on " <> show input) (a == b)
   Left _, Left _ -> pure unit
@@ -54,8 +57,6 @@ battery =
   , "{{~ x ~}}"
   , "hi {{x}}!"
   , "{{   x   }}"
-  , "{{=<% %>=}}<% x %>"
-  , "{{=<% %>=}}<% a %> between <% b %>" -- two custom tags: delimiters must persist
   , "\\{{x}}"
   , "{{{{raw}}}}{{x}}{{{{/raw}}}}"
   , ""
@@ -71,6 +72,14 @@ battery =
   , "{{ {x} }}" -- both reject
   , "{{ x" -- both reject
   , "{{!-- unterminated"
+  ]
+
+-- Set-delimiters are gated on mustacheDelims, so they get their own config.
+mustacheBattery :: Array String
+mustacheBattery =
+  [ "{{=<% %>=}}<% x %>"
+  , "{{=<% %>=}}<% a %> between <% b %>" -- two custom tags: delimiters must persist
+  , "{{=<%\t%>=}}<% y %>"
   ]
 
 arithBattery :: Array String
@@ -96,7 +105,7 @@ tests = do
     , expected: [ Open, Sigil Section, Ident "each", Ident "items", CloseTag ]
     }
   assertEqual
-    { actual: seqH cfg "{{=<% %>=}}<% x %>"
+    { actual: seqH mustache "{{=<% %>=}}<% x %>"
     , expected: [ SetDelimiter "<%" "%>", Open, Ident "x", CloseTag ]
     }
   case H.tokenize cfg "hi {{x}}!" of
@@ -107,5 +116,6 @@ tests = do
   -- Parity: the hand lexer must match the parsing spike on everything.
   for_ battery (parity cfg)
   for_ arithBattery (parity arith)
+  for_ mustacheBattery (parity mustache)
 
   log "  hand lexer + parity assertions passed"
