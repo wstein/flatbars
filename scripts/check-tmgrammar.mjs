@@ -17,9 +17,9 @@
 //
 //   1. TAG BOUNDARIES — exactly the characters the engine marks as inside a
 //      FlatBars tag are the characters the grammar scopes as a tag. (Every FlatBars
-//      tag scope ends in `.handlebars`; HTML/JS/CSS/YAML content keeps `*.html`
-//      etc. — that is the tag/content boundary.) This catches the Exhibit-A/B class
-//      of begin/end drift across every dialect.
+//      tag scope ends in `.handlebars`; everything else — host text, and a leading
+//      YAML front-matter block — is left plain or scoped `*.yaml`, never
+//      `.handlebars`.) This catches the Exhibit-A/B class of begin/end drift.
 //   2. LITERALS — wherever the engine carves a `string`/`number`, the grammar
 //      scopes it `string.quoted.*` / `constant.numeric.*` too.
 //
@@ -87,9 +87,9 @@ const CORPUS = [
   { dialect: "fullbars", src: '{{> row name="x"}}', note: "partial hash + string" },
 ];
 
-// ── Load the grammar; the external includes get empty stub grammars (their content
-//    is HTML/JS/etc., never a FlatBars tag, so an empty grammar is correct here). ──
-const EXTERNAL = ["text.html.basic", "source.js", "source.css", "source.yaml"];
+// ── Load the grammar; the one external include (YAML front matter) gets an empty
+//    stub grammar (its content is never a FlatBars tag, so empty is correct here). ──
+const EXTERNAL = ["source.yaml"];
 await oniguruma.loadWASM(readFileSync(onigPath).buffer);
 const registry = new Registry({
   onigLib: Promise.resolve({

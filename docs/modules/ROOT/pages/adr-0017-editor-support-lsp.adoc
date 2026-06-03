@@ -100,7 +100,10 @@ Because those contexts are real and unavoidable, shipping the grammar is non-neg
 dialects (inverse sections, Mustache inheritance `pass:[{{<}}]`/`pass:[{{$}}]`, set delimiters, and
 MaxBars operators), keeping its standard scope names (`keyword.control.*`, `support.function.*`,
 `string.quoted.*`, …) *on purpose* — themes already colour them, so FlatBars looks like the Handlebars
-developers know. It is explicitly *best-effort and non-authoritative*: being stateless it cannot follow a
+developers know. It colours *only* the template syntax and a leading YAML front-matter block: a FlatBars
+template's output is not necessarily HTML (it may be JSON, SQL, Markdown, plain text), so the grammar's
+HTML/CSS/JS embedding is removed and host text is left plain. It is explicitly *best-effort and
+non-authoritative*: being stateless it cannot follow a
 set-delimiter *switch* (the tags past `pass:[{{=A B=}}]`) and is FullBars-flavoured (it paints
 `else`/`each` as keywords even in MinBars, and paints RawBars/MaxBars's `extras`-off shapes as valid).
 When the LSP is attached, semantic tokens override it and correct exactly those regions. The grammar is
@@ -111,8 +114,8 @@ the floor; the engine is the ceiling.
   per tag (ADR-014) — so a scope-to-kind bijection does not fit, and we do not force one. `check:tmgrammar`
   instead pins, *for each dialect*, the two things the engine defines and a stateless grammar can be held
   to: (a) *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
-  characters the grammar scopes as a tag (every tag scope ends in `.handlebars`; HTML/JS/CSS/YAML content
-  keeps its own scopes), which catches the Exhibit-A/B begin/end drift across all four dialects; and
+  characters the grammar scopes as a tag (every tag scope ends in `.handlebars`; host text and the YAML
+  front-matter block never do), which catches the Exhibit-A/B begin/end drift across all four dialects; and
   (b) *literals* — wherever the engine carves a `string`/`number`, the grammar scopes it as one. Everything
   else (which helper is a keyword, argument and operator colouring) is allowed *enrichment*. Dialect-error
   shapes and set-delimiter switches are out of scope (the LSP owns them). The gate is wired into `npm
