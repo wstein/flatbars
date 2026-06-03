@@ -38,7 +38,6 @@ import FlatBars.Lab.Lexer.Types
   , SourcePos
   , Trivia(..)
   , assemble
-  , firstWord
   , identChar
   , isDigit
   , isSpace
@@ -288,42 +287,92 @@ run recover cfg src = go 0 origin cfg.open cfg.close Nil
             Right (single (Comment (sliceStr bodyStart q)) pos pos1 next open close)
 
   -- {{{{name}}}} body {{{{/name}}}} — coarse fences + verbatim body.
+  -- A raw block, lexed FINE: `{{{{`/`}}}}` are their own `OpenRaw`/`CloseRaw`
+  -- delimiters, the spelling sigil (`#` FlatBars form / `/` close) is a `Sigil`,
+  -- the name is an `Ident`, and head whitespace is `Whitespace` trivia — so an
+  -- editor can colour each part. The structural `RawTok` scanner keeps the coarse
+  -- `RRaw`; this is only the editor-facing stream.
   readRaw :: Int -> SourcePos -> Either LexError Step
   readRaw i pos =
     let
-      afterOpen = i + 4 + (if peek (i + 4) == Just '#' then 1 else 0)
+      hash = peek (i + 4) == Just '#'
+      openEnd = i + 4
+      sigEnd = if hash then openEnd + 1 else openEnd
+      nameStart = runWhile isSpace sigEnd
+      nameEnd = runWhile rawNameChar nameStart
+      name = sliceStr nameStart nameEnd
     in
-      case findFrom afterOpen (cu "}}}}") of
+      case findFrom nameEnd (cu "}}}}") of
         Nothing -> Left (LexError "unterminated raw block" pos)
         Just qh ->
           let
-            foe = qh + 4
-            name = firstWord (sliceStr afterOpen qh)
             closeFence = cu ("{{{{/" <> name <> "}}}}")
           in
-            case findFrom foe closeFence of
+            case findFrom (qh + 4) closeFence of
               Nothing -> Left (LexError "unterminated raw block" pos)
               Just qc ->
                 let
-                  fe = qc + Array.length closeFence
-                  posOpen = advance pos i foe
-                  posBody = advance posOpen foe qc
-                  posEnd = advance posBody qc fe
+                  pOpen = advance pos i openEnd
+                  pSig = advance pOpen openEnd sigEnd
+                  pNameStart = advance pSig sigEnd nameStart
+                  pName = advance pNameStart nameStart nameEnd
+                  pRest = advance pName nameEnd qh
+                  pHeadClose = advance pRest qh (qh + 4)
+                  pBody = advance pHeadClose (qh + 4) qc
+                  cOpenEnd = qc + 4
+                  pCOpen = advance pBody qc cOpenEnd
+                  pCSig = advance pCOpen cOpenEnd (cOpenEnd + 1)
+                  cNameEnd = cOpenEnd + 1 + SCU.length name
+                  pCName = advance pCSig (cOpenEnd + 1) cNameEnd
+                  fe = cNameEnd + 4
+                  pEnd = advance pCName cNameEnd fe
+                  sigP =
+                    if hash then [ Lex { value: Sigil Section, span: { start: pOpen, end: pSig } } ]
+                    else []
+                  lwsP =
+                    if nameStart > sigEnd then
+                      [ Triv
+                          { value: Whitespace (sliceStr sigEnd nameStart)
+                          , span: { start: pSig, end: pNameStart }
+                          }
+                      ]
+                    else []
+                  restP =
+                    if qh > nameEnd then
+                      [ Triv
+                          { value: Whitespace (sliceStr nameEnd qh)
+                          , span: { start: pName, end: pRest }
+                          }
+                      ]
+                    else []
                 in
                   Right
-                    { pieces:
-                        [ Lex { value: OpenRaw, span: { start: pos, end: posOpen } }
-                        , Lex
-                            { value: RawBody (sliceStr foe qc)
-                            , span: { start: posOpen, end: posBody }
-                            }
-                        , Lex { value: CloseRaw, span: { start: posBody, end: posEnd } }
+                    { pieces: Array.concat
+                        [ [ Lex { value: OpenRaw, span: { start: pos, end: pOpen } } ]
+                        , sigP
+                        , lwsP
+                        , [ Lex { value: Ident name, span: { start: pNameStart, end: pName } } ]
+                        , restP
+                        , [ Lex { value: CloseRaw, span: { start: pRest, end: pHeadClose } }
+                          , Lex
+                              { value: RawBody (sliceStr (qh + 4) qc)
+                              , span: { start: pHeadClose, end: pBody }
+                              }
+                          , Lex { value: OpenRaw, span: { start: pBody, end: pCOpen } }
+                          , Lex { value: Sigil Close, span: { start: pCOpen, end: pCSig } }
+                          , Lex { value: Ident name, span: { start: pCSig, end: pCName } }
+                          , Lex { value: CloseRaw, span: { start: pCName, end: pEnd } }
+                          ]
                         ]
                     , i: fe
-                    , pos: posEnd
+                    , pos: pEnd
                     , open: "{{"
                     , close: "}}"
                     }
+
+  -- A raw-block name char: anything but whitespace and braces (≈ `firstWord`).
+  rawNameChar :: Char -> Boolean
+  rawNameChar c = not (isSpace c) && c /= '{' && c /= '}'
 
   -- open [~] sigil? interior [~] close
   readDelimited

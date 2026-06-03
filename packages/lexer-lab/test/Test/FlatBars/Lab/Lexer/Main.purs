@@ -155,10 +155,35 @@ main = do
         , expected: Just (Text "{{x}}")
         }
 
-  -- 12. Raw block: coarse fences + verbatim body.
+  -- 12. Raw block, lexed FINE: {{{{ / }}}} delimiters, name Ident, verbatim body,
+  -- and the close sigil. The `#` (FlatBars/RawBars/MaxBars) spelling carries a
+  -- Sigil Section; the bare (Handlebars) spelling does not.
   assertEqual
     { actual: seqOf cfg "{{{{raw}}}}{{x}}{{{{/raw}}}}"
-    , expected: [ OpenRaw, RawBody "{{x}}", CloseRaw ]
+    , expected:
+        [ OpenRaw
+        , Ident "raw"
+        , CloseRaw
+        , RawBody "{{x}}"
+        , OpenRaw
+        , Sigil Close
+        , Ident "raw"
+        , CloseRaw
+        ]
+    }
+  assertEqual
+    { actual: seqOf cfg "{{{{#raw}}}}b{{{{/raw}}}}"
+    , expected:
+        [ OpenRaw
+        , Sigil Section
+        , Ident "raw"
+        , CloseRaw
+        , RawBody "b"
+        , OpenRaw
+        , Sigil Close
+        , Ident "raw"
+        , CloseRaw
+        ]
     }
 
   -- 13. Empty input still yields the EOF token (with no leading trivia).
@@ -205,10 +230,12 @@ main = do
     , expected: [ SetDelimiter "<%" "%>" ]
     }
 
-  -- 20. A raw-block head with surrounding spaces still name-matches its close.
+  -- 20. A raw-block head with surrounding spaces still name-matches its close
+  -- (the spaces are Whitespace trivia, dropped from the lexeme view).
   assertEqual
     { actual: seqOf cfg "{{{{ raw }}}}B{{{{/raw}}}}"
-    , expected: [ OpenRaw, RawBody "B", CloseRaw ]
+    , expected:
+        [ OpenRaw, Ident "raw", CloseRaw, RawBody "B", OpenRaw, Sigil Close, Ident "raw", CloseRaw ]
     }
 
   -- 21. An empty short comment.

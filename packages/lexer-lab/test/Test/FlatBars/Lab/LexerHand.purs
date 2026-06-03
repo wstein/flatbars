@@ -59,6 +59,7 @@ battery =
   , "{{   x   }}"
   , "\\{{x}}"
   , "{{{{raw}}}}{{x}}{{{{/raw}}}}"
+  , "{{{{#raw}}}}body{{{{/raw}}}}" -- the FlatBars/RawBars/MaxBars `#` spelling
   , ""
   , "{{}}"
   , "{{!}}"

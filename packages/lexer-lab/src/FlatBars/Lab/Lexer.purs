@@ -45,7 +45,7 @@ import Data.Number as Number
 import Data.String (Pattern(..))
 import Data.String.CodeUnits as SCU
 import Data.Tuple (Tuple(..))
-import FlatBars.Lab.Lexer.Types (LexConfig, LexToken, Lexeme(..), Piece(..), Sigil(..), SourcePos, Span, Spanned, Trivia(..), assemble, defaultLexConfig, firstWord, identChar, isDigit, isSpace, lexemes, lspEmits, semanticTokenType, unescape, words)
+import FlatBars.Lab.Lexer.Types (LexConfig, LexToken, Lexeme(..), Piece(..), Sigil(..), SourcePos, Span, Spanned, Trivia(..), assemble, defaultLexConfig, identChar, isDigit, isSpace, lexemes, lspEmits, semanticTokenType, unescape, words)
 import Parsing (ParseError, ParserT, Position(..), fail, position, runParserT)
 import Parsing.Combinators (choice, notFollowedBy, optionMaybe, try)
 import Parsing.Combinators.Array as PA
@@ -218,25 +218,54 @@ tokenize cfg input =
   -- A raw block `{{{{name}}}} body {{{{/name}}}}`. Fences are emitted coarsely
   -- (one `OpenRaw`/`CloseRaw` lexeme each); the body is captured verbatim as a
   -- `RawBody`. The closing fence is name-matched, like `FlatBars.Lexer`.
+  -- A raw block, lexed FINE (matches FlatBars.Lab.LexerHand.readRaw): `{{{{`/`}}}}`
+  -- delimiters, `#`/`/` sigil, name `Ident`, head whitespace as trivia.
   rawBlockTag :: Lexer (Array Piece)
   rawBlockTag = do
     fos <- pos
     _ <- string "{{{{"
-    _ <- optionMaybe (char '#')
-    head <- charsUntil "}}}}"
+    pOpen <- pos
+    mhash <- optionMaybe (char '#')
+    pSig <- pos
+    lws <- SCU.fromCharArray <$> PA.many (satisfy isSpace)
+    pNameStart <- pos
+    name <- run1 rawNameChar
+    pName <- pos
+    rest <- charsUntil "}}}}"
+    pRest <- pos
     _ <- string "}}}}"
-    foe <- pos
-    let closeFence = "{{{{/" <> firstWord head <> "}}}}"
-    bs <- pos
+    pHeadClose <- pos
+    let
+      closeFence = "{{{{/" <> name <> "}}}}"
     body <- charsUntil closeFence
-    be <- pos
-    _ <- string closeFence
-    fe <- pos
-    pure
-      [ Lex { value: OpenRaw, span: { start: fos, end: foe } }
-      , Lex { value: RawBody body, span: { start: bs, end: be } }
-      , Lex { value: CloseRaw, span: { start: be, end: fe } }
+    pBody <- pos
+    _ <- string "{{{{"
+    pCOpen <- pos
+    _ <- char '/'
+    pCSig <- pos
+    _ <- string name
+    pCName <- pos
+    _ <- string "}}}}"
+    pEnd <- pos
+    pure $ Array.concat
+      [ [ Lex { value: OpenRaw, span: { start: fos, end: pOpen } } ]
+      , maybe [] (const [ Lex { value: Sigil Section, span: { start: pOpen, end: pSig } } ]) mhash
+      , if lws /= "" then [ Triv { value: Whitespace lws, span: { start: pSig, end: pNameStart } } ]
+        else []
+      , [ Lex { value: Ident name, span: { start: pNameStart, end: pName } } ]
+      , if rest /= "" then [ Triv { value: Whitespace rest, span: { start: pName, end: pRest } } ]
+        else []
+      , [ Lex { value: CloseRaw, span: { start: pRest, end: pHeadClose } }
+        , Lex { value: RawBody body, span: { start: pHeadClose, end: pBody } }
+        , Lex { value: OpenRaw, span: { start: pBody, end: pCOpen } }
+        , Lex { value: Sigil Close, span: { start: pCOpen, end: pCSig } }
+        , Lex { value: Ident name, span: { start: pCSig, end: pCName } }
+        , Lex { value: CloseRaw, span: { start: pCName, end: pEnd } }
+        ]
       ]
+
+  rawNameChar :: Char -> Boolean
+  rawNameChar c = not (isSpace c) && c /= '{' && c /= '}'
 
   ----------------------------------------------------------------------------
   -- Tag interior
