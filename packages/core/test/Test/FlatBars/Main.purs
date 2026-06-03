@@ -16,8 +16,9 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseWith, spanText)
-import FlatBars.Highlight (HighlightConfig, highlightSpans)
+import FlatBars.Highlight (HighlightConfig, highlightSpans, tokenizeSpans)
 import FlatBars.Lexer (defaultLexConfig)
+import FlatBars.Token (defaultLexOptions)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -55,6 +56,7 @@ hlKernel :: HighlightConfig
 hlKernel =
   { lexConfig: defaultLexConfig { keepLongComments = true }
   , clauseSeps: [ "else", "elif" ]
+  , lexOptions: defaultLexOptions
   , extras: true
   , inheritance: false
   }
@@ -63,17 +65,21 @@ hlMustache :: HighlightConfig
 hlMustache =
   { lexConfig: defaultLexConfig { mustacheDelims = true, keepLongComments = true }
   , clauseSeps: []
+  , lexOptions: defaultLexOptions
   , extras: true
   , inheritance: true
   }
 
 -- MaxBars-like: extras off (so `{{&}}`/`{{^}}`/`{{{{…}}}}` are disallowed shapes),
--- inheritance off. Highlighting colours the whole tag by its head's meaning, so a
--- MaxBars expression's interior operators/literals carry no separate colour.
+-- inheritance off, and the infix-arithmetic interior lexer on. The tag-role view
+-- (`highlightSpans`) still colours the whole tag by its head's meaning; the
+-- interior-role view (`tokenizeSpans`, ADR-017) additionally carves operators and
+-- literals into their own spans.
 hlMax :: HighlightConfig
 hlMax =
   { lexConfig: defaultLexConfig { keepLongComments = true }
   , clauseSeps: [ "else", "elif" ]
+  , lexOptions: { infixArith: true }
   , extras: false
   , inheritance: false
   }
@@ -452,5 +458,44 @@ main = do
     (kinds hlKernel "{{name}}" == [ "expr" ])
   assert' "highlight: a numeric literal in a block arg does not punch a number span"
     (kinds hlKernel "{{#if (gt x 5)}}{{/if}}" == [ "block-open", "block-close" ])
+
+  -- Interior token vocabulary (ADR-017): `tokenizeSpans` is the superset — the
+  -- tag-role spans `highlightSpans` returns PLUS interior `string`/`number`/
+  -- `operator` literals carved at their exact source spans. Each interior span is
+  -- nested inside its tag span.
+  assert' "tokenize: a MaxBars operator carves an interior operator span"
+    ( tokenizeSpans hlMax "{{ a + b }}" ==
+        [ { from: 0, to: 11, kind: "expr", role: "tag" }
+        , { from: 5, to: 6, kind: "operator", role: "interior" }
+        ]
+    )
+  assert' "tokenize: strings and numbers carve interior spans, identifiers do not"
+    ( tokenizeSpans hlMax "{{ x ?? \"y\" }}" ==
+        [ { from: 0, to: 14, kind: "expr", role: "tag" }
+        , { from: 5, to: 7, kind: "operator", role: "interior" }
+        , { from: 8, to: 11, kind: "string", role: "interior" }
+        ]
+    )
+  assert' "tokenize: a numeric literal in a block arg carves a number span"
+    ( tokenizeSpans hlKernel "{{#if (gt x 5)}}" ==
+        [ { from: 0, to: 16, kind: "block-open", role: "tag" }
+        , { from: 12, to: 13, kind: "number", role: "interior" }
+        ]
+    )
+  -- Off MaxBars, `+`/`-`/`*`/`/` are path punctuation, not operators — so a kernel
+  -- dialect carves no operator span for them (the interior seam is `lexOptions`).
+  assert' "tokenize: kernel dialect does not treat path punctuation as operators"
+    ( tokenizeSpans hlKernel "{{ a-b }}" ==
+        [ { from: 0, to: 9, kind: "expr", role: "tag" } ]
+    )
+  -- A partial's leading `>` is the tag's meaning, not an operator: no interior span.
+  assert' "tokenize: a partial carves no interior span for its `>` head"
+    (tokenizeSpans hlKernel "{{> p}}" == [ { from: 0, to: 7, kind: "partial", role: "tag" } ])
+  -- `highlightSpans` is exactly the tag-role projection of `tokenizeSpans`.
+  assert' "tokenize: highlightSpans is tokenizeSpans filtered to role == tag"
+    ( map _.kind (highlightSpans hlMax "{{ x ?? \"y\" }}")
+        == map _.kind
+          (Array.filter (\s -> s.role == "tag") (tokenizeSpans hlMax "{{ x ?? \"y\" }}"))
+    )
 
   log "all framework tests passed"

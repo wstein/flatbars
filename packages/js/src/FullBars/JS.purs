@@ -28,6 +28,7 @@ module FullBars.JS
   , renderMaxWith
   , safe
   , highlightSpans
+  , tokenize
   ) where
 
 import Prelude
@@ -43,9 +44,10 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, parse, parseErrorAt, parseWith, renderParseErrorAt)
 import FlatBars.Error (Error(ArityError, HelperError))
-import FlatBars.Highlight (HSpan, HighlightConfig, highlightSpans) as Highlight
+import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
+import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
 import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
@@ -294,11 +296,23 @@ compileResultAt src = case _ of
 highlightSpans :: Fn2 String String (Array Highlight.HSpan)
 highlightSpans = mkFn2 \tpl dialect -> Highlight.highlightSpans (highlightConfig dialect) tpl
 
+-- | Tokenize template source into the full ADR-017 token vocabulary for the given
+-- | dialect: `tokenize(template, dialect)` returns a plain JS array of
+-- | `{ from, to, kind, role }` (UTF-16 offsets + a kind tag + `"tag"`/`"interior"`).
+-- | This is the superset `highlightSpans` projects (the tag-role spans plus the
+-- | interior `string`/`number`/`operator` literals); the `flatbars-lsp`
+-- | semantic-tokens server consumes it. See `FlatBars.Highlight`.
+tokenize :: Fn2 String String (Array Highlight.TSpan)
+tokenize = mkFn2 \tpl dialect -> Highlight.tokenizeSpans (highlightConfig dialect) tpl
+
 -- | Map a dialect name to its highlight seams, mirroring each dialect's own parse
 -- | settings (the single source of truth — drift is caught by `check:highlight`):
 -- | RawBars/MaxBars/MinBars enable the `{{=A B=}}` set-delimiter tag
 -- | (`mustacheDelims`), FullBars does not; the kernel dialects treat
--- | `else`/`elif` as clause separators, MinBars (Mustache) treats none. `extras`
+-- | `else`/`elif` as clause separators, MinBars (Mustache) treats none; only
+-- | MaxBars enables the infix-arithmetic interior lexer (`lexOptions.infixArith`),
+-- | so `+`/`-`/`*`/`/` carve as `operator` spans there and stay path punctuation
+-- | elsewhere (`tokenize`'s interior axis, ADR-017). `extras`
 -- | / `inheritance` mirror each dialect's parse gates, so a shape the dialect
 -- | rejects is coloured `error` rather than painted valid: RawBars/MaxBars set
 -- | `extras = false`; only MinBars enables `inheritance` (the Mustache
@@ -308,24 +322,28 @@ highlightConfig = case _ of
   "maxbars" ->
     { lexConfig: maxOptions.lexConfig { keepLongComments = true }
     , clauseSeps: maxOptions.standaloneSeps
+    , lexOptions: maxOptions.lexOptions
     , extras: false
     , inheritance: false
     }
   "rawbars" ->
     { lexConfig: withSetDelims
     , clauseSeps: kernelClauses
+    , lexOptions: defaultLexOptions
     , extras: false
     , inheritance: false
     }
   "minbars" ->
     { lexConfig: withSetDelims
     , clauseSeps: []
+    , lexOptions: defaultLexOptions
     , extras: true
     , inheritance: true
     }
   _ ->
     { lexConfig: defaultLexConfig { keepLongComments = true }
     , clauseSeps: kernelClauses
+    , lexOptions: defaultLexOptions
     , extras: true
     , inheritance: false
     }

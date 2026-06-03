@@ -14,11 +14,16 @@
 // diff (rerun gen:highlight), never an accident.
 //
 // ENGINE-DERIVED (ADR-014, Tier 1): the golden source is the engine itself —
-// `highlightSpans(src, dialect)` from the committed `flatbars-js` bundle, the
-// same function both front-ends paint from. This is now the true
-// "highlighting == what the engine lexes" oracle, not a snapshot of a regex. The
-// corpus carries the Exhibit A/B regressions plus the cases a regex cannot do:
-// set-delimiter statefulness, per-dialect tag boundaries, and the clause keywords.
+// `highlightSpans(src, dialect)` and `tokenize(src, dialect)` from the committed
+// `flatbars-js` bundle, the same functions the front-ends and `flatbars-lsp` paint
+// from. This is the true "highlighting == what the engine lexes" oracle, not a
+// snapshot of a regex. The corpus carries the Exhibit A/B regressions plus the
+// cases a regex cannot do: set-delimiter statefulness, per-dialect tag boundaries,
+// the clause keywords, and (ADR-017) the interior string/number/operator axis.
+//
+// Each case pins BOTH views: `spans` (the tag-role projection the Lab/tutorials
+// paint) and `tokens` (the full ADR-017 tag+interior vocabulary the editor layer
+// consumes). A drift in either fails the gate.
 //
 // NOTE: long comments `{{!-- … --}}` are coloured (the lexer emits them as a
 // span-only token under `keepLongComments`, which only the highlighter sets — the
@@ -28,7 +33,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { highlightSpans } from "../lab/vendor/flatbars-engine.mjs";
+import { highlightSpans, tokenize } from "../lab/vendor/flatbars-engine.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outFile = resolve(here, "highlight-golden.json");
@@ -75,6 +80,16 @@ const CORPUS = [
   { id: "maxbars-pipe", dialect: "maxbars", note: "pipes `|` do not split the tag either — still one `expr` span", src: "{{ items | sort | first }}" },
   { id: "maxbars-literals", dialect: "maxbars", note: "string and number literals stay the tag's colour — each tag is one `expr` span", src: "{{ label ?? \"n/a\" }} {{ qty * 2 }}" },
 
+  // ── Interior token vocabulary (ADR-017): the tag stays ONE `expr`/`block-*`
+  //    span (see `spans`), and the richer `tokens` view ALSO carves interior
+  //    string/number/operator literals at their exact spans. The interior axis is
+  //    dialect-scoped: `+ - * /` are operators only under MaxBars' `infixArith`. ──
+  { id: "interior-maxbars-operators", dialect: "maxbars", note: "MaxBars: `+`/`*` carve interior `operator` spans inside the one `expr` tag", src: "{{ a + b * c }}" },
+  { id: "interior-maxbars-string-coalesce", dialect: "maxbars", note: "MaxBars: `??` carves an `operator` span and the quoted literal a `string` span", src: "{{ label ?? \"n/a\" }}" },
+  { id: "interior-number-in-block-arg", dialect: "fullbars", note: "a numeric literal in a block arg carves a `number` span; the tag stays `block-open`", src: "{{#if (gt qty 5)}}{{/if}}" },
+  { id: "interior-kernel-path-punctuation", dialect: "fullbars", note: "OFF MaxBars, `a-b` is a path (no operator span) — the interior seam follows the dialect's `lexOptions`", src: "{{ a-b }}" },
+  { id: "interior-partial-no-op", dialect: "fullbars", note: "a partial's leading `>` is the tag's meaning, never an interior `operator` span", src: "{{> row}}" },
+
   // ── Dialect gates (ADR-014): a structurally-valid shape the dialect REJECTS is
   //    coloured `error`, never painted valid — the highlighter agrees with the parser. ──
   { id: "maxbars-extras-amp", dialect: "maxbars", note: "extras off: {{&x}} (unescaped) is disallowed → error, not raw", src: "{{&x}}" },
@@ -87,13 +102,18 @@ const CORPUS = [
 
 const data = {
   _generated: "by scripts/gen-highlight.mjs — DO NOT EDIT; run `npm run gen:highlight`",
-  source: "lab/vendor/flatbars-engine.mjs — highlightSpans(src, dialect) (ENGINE-DERIVED; ADR-014)",
+  source: "lab/vendor/flatbars-engine.mjs — highlightSpans (tag-role, ADR-014) + tokenize (full vocabulary, ADR-017), ENGINE-DERIVED",
   cases: CORPUS.map(({ id, dialect, note, src }) => ({
     id,
     dialect,
     note,
     src,
+    // `spans` = the tag-role projection (ADR-014, what the Lab/tutorials paint).
+    // `tokens` = the full ADR-017 vocabulary (tag spans + interior string/number/
+    // operator literals) the editor layer (LSP/TextMate) consumes. `highlightSpans`
+    // is `tokenize` filtered to `role == "tag"`, so the two cannot disagree.
     spans: highlightSpans(src, dialect),
+    tokens: tokenize(src, dialect),
   })),
 };
 const text = JSON.stringify(data, null, 2) + "\n";
