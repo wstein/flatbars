@@ -1734,6 +1734,15 @@
       // loaded index.html never pairs with a stale cached module (which silently
       // ran the old, uncompressed encodeState). Bumped for the vendored source link (E2).
       } from "./playground_utils.mjs?v=16";
+      // Output-view decisions (extracted for testability; lab/output-view.test.mjs).
+      import {
+        VIEW_TABS,
+        visibleViews as ovVisibleViews,
+        validView as ovValidView,
+        viewKind,
+        analyseText,
+        applyView,
+      } from "./output-view.mjs?v=1";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -3400,13 +3409,9 @@
         } else if (outputView === "analyse") {
           // ADR-022 analyse mode: trace this render against the current data and
           // report the conditions whose branch would differ on another engine.
+          // The decision lives in lab/output-view.mjs (analyseText).
           lastSegViews = [];
-          let text = "This engine has no analyse mode.";
-          if (typeof renderer.analyze === "function") {
-            const r = renderer.analyze({ source: templateSourceFor("main") }, lastData);
-            text = r.ok ? r.report : "Analyse error: " + r.error;
-          }
-          setOutputDoc(text, Decoration.none);
+          setOutputDoc(analyseText(renderer, templateSourceFor("main"), lastData), Decoration.none);
         } else {
           const { segViews, deco } = buildProvenance(lastOutput, lastSegments);
           lastSegViews = segViews;
@@ -3871,33 +3876,12 @@
       // Valid output views; anything else — an old share link, or a view the
       // loaded engine doesn't expose (ADR-0020 gate, e.g. `bytecode` without
       // `bytecode-wire`) — falls back to the always-present iframe Preview.
-      const validView = (v) =>
-        (visibleViews().some((t) => t.view === v) ? v : "rendered");
+      const validView = (v) => ovValidView(v, engineFeatures);
 
-      // The output view tabs, mirroring the data sub-pane tab strip. Order and
-      // keys match validView; labels are the user-facing names. `requires` is
-      // the ADR-0020 capability gate: a view shows only when the engine
-      // advertises every listed feature (no `requires` ⇒ always shown).
-      const VIEW_TABS = [
-        { view: "source", label: "Plain Text" },
-        { view: "rendered", label: "HTML Preview" },
-        { view: "markdown", label: "Markdown Preview" },
-        // ST4 Preview: shows the current template emitted as StringTemplate
-        // source (`.st`) for the Stem→ST source transpiler. Phase 3 of the
-        // export-only ST interop effort — until the transpiler ships, the
-        // pane shows a placeholder describing what it will render.
-        { view: "st4", label: "ST4 Preview", requires: ["st4-modes"] },
-        { view: "data", label: "Render Data" },
-        { view: "bytecode", label: "Bytecode", requires: ["bytecode-wire"] },
-        // FlatBars-only: the template compiled to a JS module (FlatBars.Compile).
-        { view: "compiled", label: "Compiled JS", requires: ["compile-js"] },
-        // ADR-022: trace this render and report the conditions whose branch would
-        // differ on another engine, with a fix each (markdown report).
-        { view: "analyse", label: "Truthiness", requires: ["analyse"] },
-      ];
-
-      // Views the loaded engine actually exposes (ADR-0020 gate applied).
-      const visibleViews = () => VIEW_TABS.filter(tabVisible);
+      // The output view tabs + the visible/valid decisions live in
+      // lab/output-view.mjs (extracted for testability). These thin wrappers bind
+      // the engine's advertised features so existing call sites stay arg-free.
+      const visibleViews = () => ovVisibleViews(engineFeatures);
 
       // Phase 3 transpiler is live (`transpileSt4` in playground_utils.mjs).
       // The ST4 Preview pane shows the current template emitted as `.stg`
@@ -3995,14 +3979,11 @@
 
       function setOutputView(view) {
         outputView = view;
-        // "source" (provenance), "data" (view-model YAML), "bytecode" (Stem
-        // wire disassembly), and "st4" (ST4 bytecode disassembly fixture) all
-        // use the text pane; "rendered" and "markdown" use the iframe.
+        // Text views (Plain Text / Render Data / Bytecode / ST4 / Compiled JS /
+        // Truthiness) paint into the editor; "rendered"/"markdown" use the iframe.
+        // `applyView` (lab/output-view.mjs) toggles the panes and reports the kind.
         const isText =
-          view === "source" || view === "data" || view === "bytecode" || view === "st4" ||
-          view === "compiled" || view === "analyse";
-        byId("output-text").hidden = !isText;
-        byId("output-preview").hidden = isText;
+          applyView({ text: byId("output-text"), preview: byId("output-preview") }, view) === "text";
         hideSegTip(); clearLink();
         renderViewTabs();
         // Contextual controls row: only the highlight-language picker, shown for
