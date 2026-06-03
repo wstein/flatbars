@@ -13,12 +13,14 @@
 -- | menu) against the recorded value — no value-shape introspection needed.
 module Kernel.Analyse
   ( Decision
+  , Finding
   , AnalyseM
   , analysisWrappers
   , runAnalysis
   , namedRules
   , divergence
   , isFinding
+  , findings
   , reportMarkdown
   , jsonataScaffold
   ) where
@@ -82,6 +84,42 @@ divergence v here =
 -- | A decision is a *finding* when some engine would branch the other way.
 isFinding :: Decision -> Boolean
 isFinding d = not (Array.null d.diverges)
+
+-- | A structured portability finding for a host UI (the Lab's Truthiness dock
+-- | panel): location, the condition tag, a description of the ambiguous value,
+-- | the engines whose branch flips, the portable fix, and the data path (`""`
+-- | when the condition is computed rather than a bare path).
+type Finding =
+  { line :: Int
+  , column :: Int
+  , tag :: String
+  , value :: String
+  , flips :: Array String
+  , fix :: String
+  , path :: String
+  }
+
+-- | The findings (ambiguous-four conditions that diverge), as structured records
+-- | for a host UI. The markdown `reportMarkdown` and this share the same
+-- | `describe`/`fixFor`/path-recovery, so the panel and the report never drift.
+findings :: String -> Array Decision -> Array Finding
+findings src = map toFinding <<< Array.filter isFinding
+  where
+  toFinding d =
+    let
+      lc = lineColumn src d.span.start
+      tagTxt = Str.trim (spanText src d.span)
+    in
+      { line: lc.line
+      , column: lc.column
+      , tag: tagTxt
+      , value: describe d.value
+      , flips: map fst d.diverges
+      , fix: fixFor d.value
+      , path: case recoverPath tagTxt of
+          Just p -> p
+          Nothing -> ""
+      }
 
 -- | The five truthiness operations, each wrapped to `tell` a `Decision` and then
 -- | delegate to the real operation (looked up from the prelude — never

@@ -40,7 +40,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, hoistInline, noLoopVars)
-import Kernel.Analyse (jsonataScaffold, reportMarkdown, runAnalysis)
+import Kernel.Analyse (Finding, findings, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
@@ -206,7 +206,10 @@ renderSurfaceValue src = renderSurfaceDiag src <<< toValue
 -- | and a reviewable JSONata data-cleanup scaffold. Pure (the trace rides a
 -- | writer); located parse/eval errors as `Left`.
 analyseSurface
-  :: String -> Value -> Either String { output :: String, report :: String, jsonata :: String }
+  :: String
+  -> Value
+  -> Either String
+       { output :: String, report :: String, jsonata :: String, findings :: Array Finding }
 analyseSurface src dat = case parse src of
   Left e -> Left (renderParseErrorAt src e)
   Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
@@ -222,4 +225,5 @@ analyseSurface src dat = case parse src of
           { output: r.output
           , report: reportMarkdown src r.decisions
           , jsonata: jsonataScaffold src r.decisions
+          , findings: findings src r.decisions
           }
