@@ -28,6 +28,8 @@ lab/test/screenshots/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
 
 # --- Antora ---
 docs/build/

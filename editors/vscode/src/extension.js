@@ -22,7 +22,14 @@ function activate(context) {
 
   const serverOptions = {
     run: { module: serverModule, transport: TransportKind.stdio },
-    debug: { module: serverModule, transport: TransportKind.stdio },
+    // Under the Extension Development Host (F5), the client uses `debug`, which
+    // opens a Node inspector on 6009 so the "Attach to flatbars-lsp" launch config
+    // can step through the server. Production uses `run` (no inspector).
+    debug: {
+      module: serverModule,
+      transport: TransportKind.stdio,
+      options: { execArgv: ["--nolazy", "--inspect=6009"] },
+    },
   };
   const clientOptions = {
     documentSelector: [{ language: "flatbars" }],

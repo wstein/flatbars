@@ -31,6 +31,20 @@ server, and the client into `dist/`, then builds a `.vsix`. The bundled server h
 no runtime `node_modules` dependency — `vscode-languageserver`, the engine, and the
 inlined token vocabulary are all esbuilt into one file.
 
+## Debugging
+
+Open the repo root in VS Code and pick a config from **Run and Debug** (the
+root `.vscode/launch.json`):
+
+- **Run FlatBars Extension** — builds (`sync-assets`) and opens an Extension
+  Development Host with the extension loaded; open a `.hbs`/`.mustache`/`.maxbars`
+  file to see it work, and set breakpoints in `src/extension.js`.
+- **Attach to flatbars-lsp** — attaches to the language server, which the debug
+  build launches with `--inspect=6009`, so you can step through the server.
+- **Extension + Server** (compound) — both at once.
+
+The build emits source maps (kept out of the shipped `.vsix` by `.vscodeignore`).
+
 ## Status
 
 The Marketplace listing and JetBrains packaging are tracked follow-ups; the

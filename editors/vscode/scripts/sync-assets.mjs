@@ -30,11 +30,14 @@ mkdirSync(resolve(dist, "server"), { recursive: true });
 // server embeds vscode-languageserver, which is CJS and uses dynamic `require` of
 // node builtins — that breaks under an ESM bundle, so we target CJS (node runs the
 // .cjs entry directly).
+// Source maps are emitted for debugging (the F5 "Attach to flatbars-lsp" config);
+// .vscodeignore keeps **/*.map out of the shipped .vsix.
 await esbuild.build({
   entryPoints: [resolve(root, "editors", "lsp", "bin", "flatbars-lsp.mjs")],
   bundle: true,
   platform: "node",
   format: "cjs",
+  sourcemap: true,
   outfile: resolve(dist, "server", "flatbars-lsp.cjs"),
   logLevel: "warning",
 });
@@ -46,6 +49,7 @@ await esbuild.build({
   platform: "node",
   format: "cjs",
   external: ["vscode"],
+  sourcemap: true,
   outfile: resolve(dist, "extension.js"),
   logLevel: "warning",
 });

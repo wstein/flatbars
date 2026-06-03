@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build flatbars extension",
+      "detail": "Bundle the grammar, server, and extension into editors/vscode/dist (sync-assets).",
+      "type": "shell",
+      "command": "node scripts/sync-assets.mjs",
+      "options": { "cwd": "${workspaceFolder}/editors/vscode" },
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run FlatBars Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/editors/vscode"],
+      "outFiles": ["${workspaceFolder}/editors/vscode/dist/**/*.js"],
+      "preLaunchTask": "build flatbars extension"
+    },
+    {
+      "name": "Attach to flatbars-lsp",
+      "type": "node",
+      "request": "attach",
+      "port": 6009,
+      "restart": true,
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/editors/vscode/dist/server/**/*.cjs"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Extension + Server",
+      "configurations": ["Run FlatBars Extension", "Attach to flatbars-lsp"],
+      "stopAll": true
+    }
+  ]
+}
