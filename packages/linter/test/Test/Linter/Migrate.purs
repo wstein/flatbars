@@ -200,15 +200,17 @@ main = do
   migratesContaining "amp to triple" "{{&x}}" "{{{x}}}"
   migratesContaining "elif rewrite" "{{#if a}}x{{else if b}}y{{/if}}" "{{elif b}}"
 
-  -- ── Residual assertions ──
-
-  -- @../index → parent-data residual with span + suggestion inside the tag
-  findResidual "parent-data residual"
+  -- ADR-021: @../ and @root auto-migrate to the reserved variable model (no
+  -- residual). @../index is the enclosing loop's index; @root.x is the root context.
+  migratesContaining "@../index → loop.parent"
     "{{#each items}}{{#each this.sub}}{{@../index}}{{/each}}{{/each}}"
-    "parent-data"
-  findResidual "root residual"
+    "loop.parent.index0"
+  migratesContaining "@root → root"
     "{{#each items}}{{@root.title}}{{/each}}"
-    "parent-data"
+    "root.title"
+  assertNotContaining "@root @ dropped" "{{#each items}}{{@root.title}}{{/each}}" "@root"
+
+  -- ── Residual assertions ──
 
   -- bare Mustache section {{#widget}}…{{/widget}} → ambiguous-section
   findResidual "ambiguous-section residual"
@@ -225,11 +227,12 @@ main = do
     "{{=<% %>=}}<%x%>"
     "set-delimiters"
 
-  -- every residual on a residual-rich template is well-formed
+  -- every residual on a residual-rich template is well-formed (the bare section
+  -- and the set-delimiters; `@root.x` auto-migrates, so it is no longer a residual).
   case migrateToMaxBars "{{#each items}}{{@root.x}}{{/each}}{{#widget}}y{{/widget}}{{=<% %>=}}" of
     Left e -> assert' ("well-formed: migrate failed " <> show e) false
     Right res -> do
-      assert' "expected multiple residuals" (Array.length res.residuals >= 3)
+      assert' "expected multiple residuals" (Array.length res.residuals >= 2)
       allResidualsWellFormed "multi" res.residuals
 
   log "Linter migrate tests passed"

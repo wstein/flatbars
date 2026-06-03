@@ -15,17 +15,16 @@
 -- |    sections close correctly.
 -- |  * `{{&x}}` (amp-unescaped) → `{{{x}}}`. (`{{&x}}` and `{{{x}}}` already lex
 -- |    to the same skeleton — this is a cosmetic source normalization.)
--- |  * inside ANY tag interior: the whole-token `@`-data names
--- |    `@index`→`index0`, `@first`→`first`, `@last`→`last`, `@key`→`key`
--- |    (word-boundary; `@root`, `@../…`, `@partial-block`, `@index0` are left
--- |    alone).
+-- |  * inside ANY tag interior: the `@`-data names migrate to the MaxBars reserved
+-- |    variable model (ADR-021): `@index`→`loop.index0`, `@first`→`loop.first`,
+-- |    `@key`→`loop.key`, …; `@root.x`→`root.x`; and `../` runs climb —
+-- |    `@../index`→`loop.parent.index0`, `@../../x`→`parent.parent.x`. (`@partial-block`
+-- |    is left alone.)
 -- |  * `{{else if c}}` → `{{elif c}}`.
 -- |
 -- | ## Residuals (detected + reported, NOT rewritten — each carries a span,
 -- | a message, and a suggested fix):
 -- |
--- |  * `parent-data` — any interior mentioning `@../` or `@root` (needs a manual
--- |    `as |x i|` outer-loop binding; cannot be done mechanically — §B.4 row).
 -- |  * `ambiguous-section` — a bare Mustache section `{{#name}}` where `name` is
 -- |    not a known block helper and carries no arguments (`{{#if name}}` vs
 -- |    `{{#each name}}`?).
@@ -44,7 +43,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String (Pattern(..))
 import Data.String as String
 import Data.String.CodeUnits as SCU
@@ -160,14 +159,11 @@ step src acc = case _ of
         emit (popStack acc) (mapDataInTag (sliceSpan src span))
 
   -- A separator. `{{else if c}}` → `{{elif c}}`; otherwise verbatim (with
-  -- `@`-data mapping). Parent-data residuals are detected on its interior too.
+  -- `@`-data mapping, which auto-migrates any `@../`/`@root` too — ADR-021).
   RSep span _ interior ->
-    let
-      acc1 = addResiduals acc (parentDataResidual span interior)
-    in
-      case rewriteElseIf interior of
-        Just rebuilt -> emit acc1 ("{{" <> rebuilt <> "}}")
-        Nothing -> emit acc1 (mapDataInTag (sliceSpan src span))
+    case rewriteElseIf interior of
+      Just rebuilt -> emit acc ("{{" <> rebuilt <> "}}")
+      Nothing -> emit acc (mapDataInTag (sliceSpan src span))
 
   RComment span _ _ -> emit acc (sliceSpan src span)
 
@@ -243,29 +239,71 @@ precededByBoundary cs i = case Array.index cs (i - 1) of
 -- | (so `@index0` and `@index-x` do not match `@index`). Returns the replacement
 -- | text and the number of source chars consumed (`@` + name length).
 matchData :: Array Char -> Int -> Maybe (Tuple String Int)
-matchData cs i = Array.findMap tryOne mapped
-  where
-  tryOne (Tuple name repl) =
-    let
-      nameChars = SCU.toCharArray name
-      nlen = Array.length nameChars
-      after = i + 1 + nlen
-    in
-      if Array.slice (i + 1) after cs == nameChars && not (continues after) then
-        Just (Tuple repl (1 + nlen))
-      else
-        Nothing
-  continues j = maybe false isIdentChar (Array.index cs j)
-  -- longest first so `@index` is preferred where applicable; `@index0` never
-  -- matches `@index` because the trailing `0` is an ident-continuation char.
-  -- ADR-021: Handlebars `@`-vars migrate to the MaxBars `loop` object (no bare
-  -- loop variables). `@index` → `loop.index0`, `@first` → `loop.first`, etc.
-  mapped =
-    [ Tuple "index" "loop.index0"
-    , Tuple "first" "loop.first"
-    , Tuple "last" "loop.last"
-    , Tuple "key" "loop.key"
-    ]
+matchData cs i =
+  let
+    -- the whole `@name` run (`.`/`/` are identifier chars, so `@root.title` and
+    -- `@../index` come out as one blob).
+    run = Array.takeWhile isIdentChar (Array.drop (i + 1) cs)
+  in
+    case migrateAtName (SCU.fromCharArray run) of
+      Just repl -> Just (Tuple repl (1 + Array.length run))
+      Nothing -> Nothing
+
+-- | Migrate one Handlebars `@`-name (without the `@`) to the MaxBars reserved
+-- | variable model (ADR-021), or `Nothing` to leave it. The full *model*:
+-- |
+-- |  * loop vars → the `loop` object: `index`/`index0` → `loop.index0`,
+-- |    `first` → `loop.first`, … (`index`/`rindex`/`size` are ADR-006 aliases).
+-- |  * `root[.…]` → `root[.…]` (the `@` is dropped; root is a reserved name).
+-- |  * `../…` runs climb: a loop var → `loop.parent…`, anything else → the
+-- |    `parent` context chain. `@../index` → `loop.parent.index0`,
+-- |    `@../../x` → `parent.parent.x`, `@../user.name` → `parent.user.name`.
+migrateAtName :: String -> Maybe String
+migrateAtName name =
+  let
+    { depth, rest } = stripDotDot name 0
+  in
+    if depth > 0 then Just
+      ( case loopField rest of
+          Just f -> "loop" <> joinReplicate depth ".parent" <> "." <> f
+          Nothing ->
+            let
+              chain = String.joinWith "." (Array.replicate depth "parent")
+            in
+              if rest == "" then chain else chain <> "." <> rest
+      )
+    else case loopField name of
+      Just f -> Just ("loop." <> f)
+      _
+        | name == "root" || isJust (String.stripPrefix (Pattern "root.") name)
+            || isJust (String.stripPrefix (Pattern "root/") name) -> Just name
+        | otherwise -> Nothing
+
+-- | A loop-variable name (and the ADR-006 aliases) → its canonical `loop` field.
+loopField :: String -> Maybe String
+loopField = case _ of
+  "index" -> Just "index0"
+  "index0" -> Just "index0"
+  "index1" -> Just "index1"
+  "rindex" -> Just "rindex0"
+  "rindex0" -> Just "rindex0"
+  "rindex1" -> Just "rindex1"
+  "first" -> Just "first"
+  "last" -> Just "last"
+  "key" -> Just "key"
+  "length" -> Just "length"
+  "size" -> Just "length"
+  _ -> Nothing
+
+-- | Strip leading `../` runs, counting the depth.
+stripDotDot :: String -> Int -> { depth :: Int, rest :: String }
+stripDotDot s depth = case String.stripPrefix (Pattern "../") s of
+  Just more -> stripDotDot more (depth + 1)
+  Nothing -> { depth, rest: s }
+
+-- | `joinReplicate 2 ".parent"` ⇒ `".parent.parent"`.
+joinReplicate :: Int -> String -> String
+joinReplicate n sep = String.joinWith "" (Array.replicate n sep)
 
 -- | Identifier-continuation characters for Handlebars paths/data names: letters,
 -- | digits, `_`, `-`, `.`, `/` (the path/segment characters). `@` is excluded so
@@ -310,30 +348,13 @@ rewriteElseIf interior =
 -- Residual detection
 --------------------------------------------------------------------------------
 
--- | Residuals for an `ROpen`: a parent-data flag on its interior, plus an
--- | ambiguous-section flag for a bare `{{#name}}` whose name is not a known
--- | block helper and carries no arguments.
+-- | Residuals for an `ROpen`: an ambiguous-section flag for a bare `{{#name}}`
+-- | whose name is not a known block helper and carries no arguments. (`@../` /
+-- | `@root` are no longer residuals — they auto-migrate to the reserved variable
+-- | model, ADR-021: `@root.x` → `root.x`, `@../index` → `loop.parent.index0`,
+-- | `@../x` → `parent.x`.)
 openResiduals :: Span -> Sigil -> String -> Array Residual
-openResiduals span sigil interior =
-  parentDataResidual span interior <> ambiguousSection span sigil interior
-
--- | A `parent-data` residual when the interior mentions `@../` or `@root`.
-parentDataResidual :: Span -> String -> Array Residual
-parentDataResidual span interior
-  | String.contains (Pattern "@../") interior || String.contains (Pattern "@root") interior =
-      [ { kind: "parent-data"
-        , span
-        , message:
-            "parent-or-root data reference (`@../` / `@root`) is left for review — "
-              <> "MaxBars reaches outer and root state through the reserved variable "
-              <> "model (ADR-021), not by walking up the `@` data tree."
-        , suggestion:
-            "Use `parent` / `root` for the enclosing and root context (`{{parent.x}}`, "
-              <> "`{{root.y}}`), and `loop.parent` for the enclosing loop's state "
-              <> "(`{{loop.parent.index0}}`), instead of `@../…` / `@root`."
-        }
-      ]
-  | otherwise = []
+openResiduals span sigil interior = ambiguousSection span sigil interior
 
 -- | An `ambiguous-section` residual for a bare Mustache section `{{#name}}`: a
 -- | `Section` open whose interior is a single bare identifier that is NOT a known
