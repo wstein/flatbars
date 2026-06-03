@@ -175,21 +175,21 @@ reportMarkdown src decisions =
       , "Engine rule: `handlebars` · "
           <> show (Array.length decisions)
           <> " condition(s) evaluated, **"
-          <> show (Array.length findings)
+          <> show (Array.length flagged)
           <> " portability finding(s)**"
       , ""
       ]
         <>
-          ( if Array.null findings then
+          ( if Array.null flagged then
               [ "_No portability findings — every condition agrees across engines for this data._"
               , ""
               ]
-            else map findingSection findings
+            else map findingSection flagged
           )
         <> (if Array.null clean then [] else [ "## Portable conditions" ] <> map cleanLine clean)
     )
   where
-  findings = Array.filter isFinding decisions
+  flagged = Array.filter isFinding decisions
   clean = Array.filter (not <<< isFinding) decisions
 
   loc d = let lc = lineColumn src d.span.start in "line " <> show lc.line
@@ -262,9 +262,9 @@ jsonataScaffold src decisions =
         <> (if Array.null computed then [] else [ "" ] <> computed)
     )
   where
-  findings = Array.filter isFinding decisions
-  transforms = Array.nub (Array.mapMaybe scaffoldLine findings)
-  computed = Array.nub (Array.mapMaybe computedNote findings)
+  flagged = Array.filter isFinding decisions
+  transforms = Array.nub (Array.mapMaybe scaffoldLine flagged)
+  computed = Array.nub (Array.mapMaybe computedNote flagged)
 
   scaffoldLine d = recoverPath (Str.trim (spanText src d.span)) <#> \p ->
     "$ ~> |" <> parentOf p <> "|{ " <> jsq (leafOf p) <> ": " <> normOf p d.value <> " }|"

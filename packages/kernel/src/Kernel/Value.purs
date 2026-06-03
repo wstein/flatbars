@@ -9,7 +9,6 @@ module Kernel.Value
   , handlebars
   , minimal
   , presence
-  , always
   , mustache
   , stringify
   , jsonStringify
@@ -72,11 +71,6 @@ presence = case _ of
   VArray a -> not (Array.null a)
   VObject o -> not (Map.isEmpty o)
   _ -> true
-
--- | `always`: nothing is falsy — every value is truthy. Not an engine rule;
--- | retained as the documented "nothing-falsy" point of the rule space.
-always :: Truthy
-always = const true
 
 -- | `mustache` (`false null []`): the Mustache rule — `false`, `null`, and the
 -- | empty *array* are falsy, but `0`, `""`, and `{}` are **truthy**. Distinct

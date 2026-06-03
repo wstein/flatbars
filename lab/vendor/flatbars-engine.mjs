@@ -8569,7 +8569,7 @@ var stringify2 = function(v) {
     return new Left(new $$TypeError("cannot stringify an object"));
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Value (line 96, column 13 - line 103, column 61): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Value (line 90, column 13 - line 97, column 61): " + [v.constructor.name]);
 };
 var mustache = function(v) {
   if (v instanceof VBool) {
@@ -8656,7 +8656,7 @@ var renderJson = function(mIndent) {
             })(items)) + ("\n" + (power2(mIndent.value0)(depth) + close))));
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Value (line 152, column 32 - line 160, column 17): " + [mIndent.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Value (line 146, column 32 - line 154, column 17): " + [mIndent.constructor.name]);
         };
       };
     };
@@ -8669,7 +8669,7 @@ var renderJson = function(mIndent) {
         return ":";
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Value (line 147, column 11 - line 149, column 19): " + [mIndent.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Value (line 141, column 11 - line 143, column 19): " + [mIndent.constructor.name]);
     }();
     var member = function(v) {
       return jsonQuote(v.value0) + (colon + renderJson(mIndent)(depth + 1 | 0)(v.value1));
@@ -8707,7 +8707,7 @@ var renderJson = function(mIndent) {
         return container("{")("}")(map14(member)(toUnfoldable5(v.value0)));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Value (line 135, column 28 - line 144, column 70): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Value (line 129, column 28 - line 138, column 70): " + [v.constructor.name]);
     };
   };
 };
@@ -8756,7 +8756,7 @@ var handlebars = function($copy_v) {
       return;
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Value (line 49, column 14 - line 56, column 36): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Value (line 48, column 14 - line 55, column 36): " + [v.constructor.name]);
   }
   ;
   while (!$tco_done) {
@@ -10887,8 +10887,8 @@ var jsonataScaffold = function(src) {
         return "$ ~> |" + (parentOf(p) + ("|{ " + (jsq(leafOf(p)) + (": " + (normOf(p)(d.value) + " }|")))));
       });
     };
-    var findings1 = filter(isFinding)(decisions);
-    var transforms = nub2(mapMaybe(scaffoldLine)(findings1));
+    var flagged = filter(isFinding)(decisions);
+    var transforms = nub2(mapMaybe(scaffoldLine)(flagged));
     var computedNote = function(d) {
       var v = recoverPath(trim(spanText(src)(d.span)));
       if (v instanceof Just) {
@@ -10901,7 +10901,7 @@ var jsonataScaffold = function(src) {
       ;
       throw new Error("Failed pattern match at Kernel.Analyse (line 272, column 20 - line 275, column 98): " + [v.constructor.name]);
     };
-    var computed = nub2(mapMaybe(computedNote)(findings1));
+    var computed = nub2(mapMaybe(computedNote)(flagged));
     return joinWith("\n")(append14(["(* Truthiness cleanup scaffold (ADR-022) \u2014 REVIEW each rule before applying. *)", "(* Each path resolved to an engine-ambiguous value in a condition. *)"])(append14(function() {
       var $70 = $$null(transforms);
       if ($70) {
@@ -11057,7 +11057,7 @@ var reportMarkdown = function(src) {
       var lc = lineColumn(src)(d.span.start);
       return "line " + show22(lc.line);
     };
-    var findings1 = filter(isFinding)(decisions);
+    var flagged = filter(isFinding)(decisions);
     var findingSection = function(d) {
       return joinWith("\n")(["## \u26A0 " + (loc(d) + (" \u2014 `" + (tag(d) + ("` tested " + describe(d.value))))), "Under `handlebars` (engine) this is **" + (verdict(d.truthyHere) + ("**; it flips under " + (joinWith(", ")(map17(function(t) {
         return "`" + (fst(t) + "`");
@@ -11069,13 +11069,13 @@ var reportMarkdown = function(src) {
     var clean = filter(function($107) {
       return !isFinding($107);
     })(decisions);
-    return joinWith("\n")(append14(["# Truthiness analysis", "Engine rule: `handlebars` \xB7 " + (show22(length(decisions)) + (" condition(s) evaluated, **" + (show22(length(findings1)) + " portability finding(s)**"))), ""])(append14(function() {
-      var $93 = $$null(findings1);
+    return joinWith("\n")(append14(["# Truthiness analysis", "Engine rule: `handlebars` \xB7 " + (show22(length(decisions)) + (" condition(s) evaluated, **" + (show22(length(flagged)) + " portability finding(s)**"))), ""])(append14(function() {
+      var $93 = $$null(flagged);
       if ($93) {
         return ["_No portability findings \u2014 every condition agrees across engines for this data._", ""];
       }
       ;
-      return map17(findingSection)(findings1);
+      return map17(findingSection)(flagged);
     }())(function() {
       var $94 = $$null(clean);
       if ($94) {

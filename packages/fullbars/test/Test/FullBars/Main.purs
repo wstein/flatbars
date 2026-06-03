@@ -24,7 +24,7 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (RNode(..), RefEnv, always, analyseSurface, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
+import FullBars (RNode(..), RefEnv, analyseSurface, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
 import Kernel.Walk (arityOk, foldTemplate, validate)
@@ -411,22 +411,21 @@ main = do
   -- (ADR-022; no falsy-set data). Locks the cross-engine semantics. `minimal` is
   -- the Ruby/Lua `nil` rule (false/null only).
   let
-    row label v hb' rb' pr' al' = do
+    row label v hb' rb' pr' = do
       assert' (label <> " handlebars") (handlebars v == hb')
       assert' (label <> " minimal") (minimal v == rb')
       assert' (label <> " presence") (presence v == pr')
-      assert' (label <> " always") (always v == al')
-  --      value                     hb     minimal presence always
-  row "false" (VBool false) false false false true
-  row "null" VNull false false false true
-  row "0" (VNumber 0.0) false true true true
-  row "\"0\"" (VString "0") true true true true
-  row "empty-string" (VString "") false true true true
-  row "blank-string" (VString " ") true true true true
-  row "[]" (VArray []) false true false true
-  row "{}" (VObject Map.empty) true true false true
-  row "safe-empty" (VSafe "") false true true true
-  row "NaN" (VNumber nan) true true true true
+  --      value                     hb     minimal presence
+  row "false" (VBool false) false false false
+  row "null" VNull false false false
+  row "0" (VNumber 0.0) false true true
+  row "\"0\"" (VString "0") true true true
+  row "empty-string" (VString "") false true true
+  row "blank-string" (VString " ") true true true
+  row "[]" (VArray []) false true false
+  row "{}" (VObject Map.empty) true true false
+  row "safe-empty" (VSafe "") false true true
+  row "NaN" (VNumber nan) true true true
 
   -- ADR-022: truthiness is the engine's *fixed* rule (handlebars for FullBars) —
   -- there is no per-file @truthiness directive. The conditionals/operators read
