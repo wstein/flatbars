@@ -231,19 +231,24 @@ main = do
   assert' "reject: unescaped {{&}}" (isLeft (renderMax "{{&a}}" (obj [])))
   assert' "reject: raw block {{{{}}}}" (isLeft (renderMax "{{{{r}}}}body{{{{/r}}}}" (obj [])))
 
-  -- partial-block (ADR-021 §5 carve-out): the `@` reserve rejects the Handlebars
-  -- yield `{{> @partial-block}}`; MaxBars spells the yield `{{> partialBlock}}`
-  -- (camelCase — the hyphen is subtraction under infix arithmetic), re-spelled to
-  -- the `@partial-block` marker the surface yields. An inline-defined layout yields
-  -- the block-partial body.
-  expectM "partial-block-yield"
-    "{{#inline \"layout\"}}<{{> partialBlock}}>{{/inline}}{{#partial \"layout\"}}HI{{/partial}}"
+  -- block-partial yield: the reserved `{{yield}}` (the `partial-block` synonym)
+  -- renders the caller's block body. It is `{{ }}`-escaped by MaxBars' rule but
+  -- the body is a `VSafe` value, so escapeHtml is the identity — no double-escape.
+  expectM "yield"
+    "{{#inline \"layout\"}}<{{yield}}>{{/inline}}{{#partial \"layout\"}}HI{{/partial}}"
     (obj [])
     "<HI>"
-  -- the Handlebars `@partial-block` spelling is rejected (reserved `@` sigil); the
+  -- the Handlebars `@partial-block` spelling is rejected (MaxBars reserves `@`); the
   -- hyphenated bare `partial-block` is `partial - block` (subtraction), not a name.
   assert' "reject: @partial-block (reserved @ sigil)"
     (isLeft (renderMax "{{> @partial-block}}" (obj [])))
+  -- a data field named `yield` is shadowed by the reserved name everywhere (like
+  -- loop/root/parent — even `{{this.yield}}` resolves the reserved name, since the
+  -- path reduces to the segment `yield`). The escape hatch is an explicit lookup.
+  expectM "yield-field-escape-hatch"
+    "{{lookup this \"yield\"}}"
+    (obj [ Tuple "yield" (VString "5%") ])
+    "5%"
 
   -- compilation reuses the FullBars compiler: && desugars to the `and` helper.
   case compileMaxJs "{{ a && b }}" of

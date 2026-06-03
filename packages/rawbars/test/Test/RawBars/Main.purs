@@ -11,7 +11,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import RawBars (compileJs, render)
+import RawBars (compileJs, render, renderWithOperations)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -62,6 +62,17 @@ main = do
     )
   -- a malformed set-delimiter (not exactly two delimiters) is a parse error.
   assert' "set-delim: malformed rejected" (isLeft (render "{{=onlyone=}}" (obj [])))
+
+  -- block-partial yield: the `yield` operation (the `partial-block` synonym)
+  -- renders the caller's block body. RawBars has no surface, so it is the explicit
+  -- raw spelling `{{{yield}}}` inside a registered partial, invoked as a block
+  -- partial (the ctx is passed explicitly — no surface to default it to `this`).
+  assert' "yield: block-partial body via {{{yield}}}"
+    ( renderWithOperations [] [ Tuple "layout" "<{{{yield}}}>" ]
+        "{{#partial \"layout\" this}}HI{{/partial}}"
+        (obj [])
+        == Right "<HI>"
+    )
 
   -- compile core syntax to a JS module.
   case compileJs "{{{this}}}" of

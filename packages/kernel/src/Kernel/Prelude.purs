@@ -331,6 +331,10 @@ scopedSpecs =
   , Tuple "parent-first" { block: false, arity: Exactly 0 }
   , Tuple "parent-last" { block: false, arity: Exactly 0 }
   , Tuple "partial-block" { block: false, arity: Exactly 0 }
+  -- `yield` — the cross-dialect synonym of `partial-block` (the block-partial
+  -- body yield). Hyphen-free so it is writable bare in MaxBars (where `-` is
+  -- subtraction); installed under both names in the partial block frame above.
+  , Tuple "yield" { block: false, arity: Exactly 0 }
   ]
 
 -- | Lift `Value.stringify` (pure, `Either Error`) into the engine monad.
@@ -1183,10 +1187,16 @@ partialH ctl args = case args of
   _ -> throwError (TypeError "partial: expected (name string, context, [options])")
   where
   -- the caller's block body, rendered in the caller's context — exposed inside
-  -- the partial as `partial-block`. Only installed when there is a body.
+  -- the partial as `partial-block` (Handlebars `{{> @partial-block}}`) and its
+  -- cross-dialect synonym `yield` (MaxBars `{{yield}}`, RawBars `{{{yield}}}`).
+  -- Only installed when there is a body.
   blockFrame =
     if Array.null ctl.children then Map.empty
-    else Map.singleton "partial-block" (\_ _ -> VSafe <$> ctl.render ctl.env ctl.children)
+    else
+      let
+        body _ _ = VSafe <$> ctl.render ctl.env ctl.children
+      in
+        Map.fromFoldable [ Tuple "partial-block" body, Tuple "yield" body ]
   -- a partial renders under its own truthiness mode if it declared one (external
   -- partial); otherwise it inherits the current file's mode (inline partial).
   -- Scoping is lexical and never inherited across an external boundary (§5).

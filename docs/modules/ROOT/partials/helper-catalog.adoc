@@ -96,4 +96,5 @@
 |`upcase` |value |1 |alias of `uppercase`
 |`uppercase` |value |1 |registered
 |`with` |block |≥1 |registered
+|`yield` |value |0 |scoped
 |===

@@ -408,6 +408,10 @@ pathExpr lv scope raw
                 | reserved && depth == 0 && first == "loop" -> scopedHead "loop" tail
                 | reserved && depth == 0 && first == "root" -> scopedHead "root" tail
                 | reserved && depth == 0 && first == "parent" -> scopedHead "@parentchain" tail
+                -- `yield` — the block-partial body (the `partial-block` synonym).
+                -- Reserved so MaxBars `{{yield}}` is the scoped operation, not a
+                -- data field; read a field named `yield` with `{{this.yield}}`.
+                | reserved && depth == 0 && first == "yield" -> scopedHead "yield" tail
                 -- then a dialect loop variable: a *whole* bare name the resolver
                 -- claims becomes a scoped-helper call (MaxBars only). Match on the
                 -- original `raw`, not the segmented head, so an explicit path like
