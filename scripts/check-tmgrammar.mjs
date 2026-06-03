@@ -85,6 +85,10 @@ const CORPUS = [
   // Interaction cases: `|` as a block param (not a pipe), hash args + string literal.
   { dialect: "fullbars", src: "{{#each xs as |x i|}}{{x}}{{/each}}", note: "block params" },
   { dialect: "fullbars", src: '{{> row name="x"}}', note: "partial hash + string" },
+  // Inline decorators and partial blocks (a3360f6 / 845aed4) — already correct, now pinned.
+  { dialect: "fullbars", src: '{{#*inline "layout"}}b{{/inline}}', note: "inline decorator block + string" },
+  { dialect: "fullbars", src: "{{#>layout}}b{{/layout}}", note: "partial block" },
+  { dialect: "maxbars", src: "{{#>layout}}b{{/layout}}", note: "partial block (maxbars re-spelling)" },
 ];
 
 // ── Load the grammar; the one external include (YAML front matter) gets an empty
