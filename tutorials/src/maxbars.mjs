@@ -104,21 +104,22 @@ export const examples = {
 
   // ── Loop variables (bare) ─────────────────────────────────────────────────
   loopVars: {
-    // Inside {{#each}}, MaxBars exposes bare loop variables: index0 / index1,
-    // rindex0 / rindex1, first, last, and length. No @ sigil.
+    // Inside {{#each}}, the loop object exposes the loop state: loop.index0 /
+    // loop.index1, loop.rindex0 / loop.rindex1, loop.first, loop.last, loop.length,
+    // loop.key. No @ sigil and no bare magic — it is all under `loop.`.
     engine: "maxbars",
     compiles: true,
     template: `{{#each items}}
-{{index1}}/{{length}}. {{name}}{{#if first}} (first){{/if}}{{#if last}} (last){{/if}}
+{{loop.index1}}/{{loop.length}}. {{name}}{{#if loop.first}} (first){{/if}}{{#if loop.last}} (last){{/if}}
 {{/each}}`,
     data: { items: [{ name: "Pen" }, { name: "Ink" }, { name: "Pad" }] },
   },
 
   loopObject: {
-    // Over an object, `key` is the property name and `this` the value.
+    // Over an object, `loop.key` is the property name and `this` the value.
     engine: "maxbars",
     template: `{{#each prefs}}
-{{key}} = {{this}}
+{{loop.key}} = {{this}}
 {{/each}}`,
     data: { prefs: { theme: "dark", lang: "en" } },
   },

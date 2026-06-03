@@ -152,26 +152,25 @@ main = do
   expectM "path" "{{ user.name }}" (obj [ Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
     "Ada"
 
-  -- bare loop variables (MaxBars-only): index0/index1/rindex0/rindex1/length.
+  -- loop variables through the `loop` object (ADR-021): index0/index1/rindex0/
+  -- rindex1/length.
   let xs3 = obj [ Tuple "xs" (VArray [ VString "a", VString "b", VString "c" ]) ]
   expectM "loopvars-all"
-    "{{#each xs}}[{{index0}}/{{index1}}/{{rindex0}}/{{rindex1}}/{{length}}]{{/each}}"
+    "{{#each xs}}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{{/each}}"
     xs3
     "[0/1/2/3/3][1/2/1/2/3][2/3/0/1/3]"
-  -- aliases: index⇒index0, rindex⇒rindex0, size⇒length.
-  expectM "loopvars-aliases" "{{#each xs}}{{index}}{{rindex}}{{size}}{{/each}}" xs3 "023113203"
-  -- first/last as bare names.
-  expectM "loopvars-first" "{{#each xs}}{{#if first}}F{{else}}-{{/if}}{{/each}}" xs3 "F--"
-  expectM "loopvars-last" "{{#each xs}}{{#if last}}L{{else}}-{{/if}}{{/each}}" xs3 "--L"
-  -- object iteration exposes the bare `key`; array iteration's `key` is null
-  -- (Handlebars parity — use index0 for the array position).
-  expectM "loopvars-key" "{{#each o}}{{key}}{{/each}}"
+  -- first/last via the loop object.
+  expectM "loopvars-first" "{{#each xs}}{{#if loop.first}}F{{else}}-{{/if}}{{/each}}" xs3 "F--"
+  expectM "loopvars-last" "{{#each xs}}{{#if loop.last}}L{{else}}-{{/if}}{{/each}}" xs3 "--L"
+  -- object iteration exposes `loop.key`; array iteration's key is null
+  -- (Handlebars parity — use loop.index0 for the array position).
+  expectM "loopvars-key" "{{#each o}}{{loop.key}}{{/each}}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "xy"
-  expectM "loopvars-key-array-null" "{{#each xs}}[{{key}}]{{/each}}" xs3 "[][][]"
-  -- the escape hatch: `{{this.first}}` reads the *data field* `first`, not the
-  -- loop variable (a path is never loop-var-resolved — only a whole bare name).
-  expectM "loopvar-escape-this-dot" "{{#each xs}}{{this.first}}{{/each}}"
+  expectM "loopvars-key-array-null" "{{#each xs}}[{{loop.key}}]{{/each}}" xs3 "[][][]"
+  -- a data field named `first` is read with an explicit path; `loop.first` is the
+  -- loop variable (the names never collide — one is `loop.`-namespaced).
+  expectM "loopvar-data-field" "{{#each xs}}{{this.first}}{{/each}}"
     (obj [ Tuple "xs" (VArray [ obj [ Tuple "first" (VString "D") ] ]) ])
     "D"
   -- block params (`as |a b|`): the head ladder omits the pipe rung, so the bars
@@ -220,11 +219,11 @@ main = do
     (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0), Tuple "b" (num 2.0) ]) ])
     "a=1 b=2 "
 
-  -- compiled path names the loop variable as a scoped helper call.
-  case compileMaxJs "{{#each xs}}{{index1}}{{/each}}" of
+  -- compiled path reaches the loop variable through the `loop` object (ADR-021).
+  case compileMaxJs "{{#each xs}}{{loop.index1}}{{/each}}" of
     Left e -> assert' ("compile loopvar: unexpected error " <> show e) false
-    Right js -> assert' ("compile loopvar: expected rt.call(\"index1\" in\n" <> js)
-      (contains (Pattern "rt.call(\"index1\"") js)
+    Right js -> assert' ("compile loopvar: expected rt.call(\"loop\" in\n" <> js)
+      (contains (Pattern "rt.call(\"loop\"") js)
 
   -- MaxBars also rejects the Handlebars-only shapes (not the Handlebars-compat
   -- dialect): inverse {{^}}, unescaped {{&}}, and raw blocks {{{{}}}}.

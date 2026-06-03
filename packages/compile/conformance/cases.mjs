@@ -138,11 +138,10 @@ export const cases = [
   { name: "mx:if-bare-cmp", dialect: "maxbars", t: "{{#if x >= 18}}adult{{else}}minor{{/if}}", d: { x: 21 } },
   { name: "mx:unless-bare-infix", dialect: "maxbars", t: "{{#unless a || b}}none{{/unless}}", d: { a: false, b: false } },
   { name: "mx:if-bare-precedence", dialect: "maxbars", t: "{{#if x > 0 && x < 10}}in{{else}}out{{/if}}", d: { x: 5 } },
-  // bare loop variables (the canonical set + aliases).
-  { name: "mx:loopvars", dialect: "maxbars", t: "{{#each xs}}[{{index0}}/{{index1}}/{{rindex0}}/{{rindex1}}/{{length}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:loopvar-aliases", dialect: "maxbars", t: "{{#each xs}}{{index}}{{rindex}}{{size}}{{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:loopvar-first-last", dialect: "maxbars", t: "{{#each xs}}{{#if first}}<{{/if}}{{this}}{{#if last}}>{{/if}}{{/each}}", d: { xs: ["a", "b"] } },
-  { name: "mx:loopvar-key", dialect: "maxbars", t: "{{#each o}}{{key}}={{this}};{{/each}}", d: { o: { x: 1, y: 2 } } },
+  // the loop variables, read through the `loop` object (ADR-021).
+  { name: "mx:loopvars", dialect: "maxbars", t: "{{#each xs}}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:loopvar-first-last", dialect: "maxbars", t: "{{#each xs}}{{#if loop.first}}<{{/if}}{{this}}{{#if loop.last}}>{{/if}}{{/each}}", d: { xs: ["a", "b"] } },
+  { name: "mx:loopvar-key", dialect: "maxbars", t: "{{#each o}}{{loop.key}}={{this}};{{/each}}", d: { o: { x: 1, y: 2 } } },
   // a dotted path is still a path (not a loop var) in MaxBars.
   { name: "mx:path-still-works", dialect: "maxbars", t: "{{ user.name }}", d: { user: { name: "Ada" } } },
 
