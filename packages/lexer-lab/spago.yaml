@@ -31,3 +31,6 @@ package:
       - effect
       - console
       - assert
+      # dialect ParseOptions for the per-surface parser-parity test (test-only).
+      - rawbars
+      - maxbars

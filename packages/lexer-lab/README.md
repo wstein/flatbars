@@ -85,7 +85,9 @@ ident    := identChar+   (identChar per FlatBars.Token, gated by infixArith)
 
 ## Test matrix
 
-`spago test -p flatbars-lexer-lab` runs both spikes. The parsing spike has 23
+`spago test -p flatbars-lexer-lab` is wired into **`npm test`** as a gate — the
+tokenize-parity (`RawTokParity`) and per-dialect parse-parity (`DialectParity`)
+suites keep the spike honest against the engine in CI. The parsing spike has 23
 cases (1–15 core: double/triple, sigils, brackets, parens, string + number
 literals, operator gating, comments, trim, ocean→leading-trivia + EOF tail,
 inner-whitespace trivia, **stateful set-delimiter**, escaped opener, raw block,
@@ -187,32 +189,39 @@ Two parser tracks over the hand lexer, both parity-checked against the engine:
   from source and parsed by the engine's `tokenizeInterior` + `FlatBars.Expr`, so
   the `Expr` is exact and path reassembly (L3) is free. `ParserParity` asserts
   span-erased AST equality with `FlatBars.parse` on a 23-case corpus.
-- **`FlatBars.Lab.RawTok`** (phases 2–3) — the migration-realistic path: adapt the
-  hand lexer's tokens into the engine's `RawTok` stream (reproducing `~`
-  whitespace control), then reuse the engine's `trimStandalone` + `buildFromTokens`
-  unchanged. `RawTokParity` asserts `toRawToks src == tokenizeTemplate src`
-  byte-for-byte across a broad corpus (`~`, raw blocks, short/long comments,
-  nesting, escapes), plus an end-to-end `parse` vs `FlatBars.parse` check on
-  standalone-whitespace templates (`{{#if}}/{{else}}`, indentation, comments).
+- **`FlatBars.Lab.RawTok`** (phases 2–3) — the migration-realistic path: a
+  self-contained structural scan emits the engine's `RawTok` stream directly
+  (reproducing `~` whitespace control), then `parse opts` reuses the engine's
+  directive lift + `trimStandalone` + `buildFromTokens` — the exact `parseWith`
+  pipeline, only the lexer swapped. `RawTokParity` asserts `toRawToks src ==
+  tokenizeTemplate src` byte-for-byte across a broad corpus (`~`, raw blocks,
+  short/long comments, nesting, escapes, `mustacheDelims` set/custom delimiters),
+  plus an end-to-end standalone-whitespace check.
+- **`parse :: ParseOptions -> …`** is dialect-driven, so every surface that
+  routes through `parseWith` parses through the swapped lexer. `DialectParity`
+  asserts `Lab.parse opts == parseWith opts` for **FullBars** (`defaultParseOptions`),
+  **RawBars** (`coreOptions`), and **MaxBars** (`maxOptions` — real infix grammar),
+  over a corpus of valid and dialect-disallowed shapes. (MinBars is excluded: it
+  uses its own standalone pipeline, not `parseWith`.)
 
 ### End-to-end parse benchmark
 
-`bench.mjs` also times the full parse to the `Syntax` AST — incumbent
-`FlatBars.parse` vs the migration path (hand lexer → RawTok adapter → the *same*
-`trimStandalone` + `buildFromTokens`). Same AST out; this is the cost of the swap
-(node v26, ~50 KiB profiles):
+`bench.mjs` times the full parse to the `Syntax` AST — incumbent
+`FlatBars.parse` vs the migration path (structural scanner → the *same*
+directive/`trimStandalone`/`buildFromTokens` pipeline). Same AST out; this is the
+cost of the swap (node v26, ~50 KiB profiles):
 
-| profile | incumbent `FlatBars.parse` | lab (hand → RawTok → parser) |
+| profile | incumbent `FlatBars.parse` | lab (structural → parser) |
 | - | - | - |
-| ocean | 35.0 MB/s | **39.1 MB/s** (0.90× time) |
-| prose | 8.2 MB/s | **8.8 MB/s** (0.93× time) |
-| dense | 1.3 MB/s | 0.8 MB/s (1.60× time) |
+| ocean | 33.2 MB/s | 30.9 MB/s (1.07×) |
+| prose | 7.8 MB/s | 7.8 MB/s (1.01×) |
+| dense | 1.3 MB/s | 1.2 MB/s (1.06×) |
 
-So end-to-end the migration path is **faster than the incumbent on realistic
-input** (its faster lexer front more than pays for the adapter), and slower only
-on the pathological all-tags corpus — where the hand lexer's finer stream (≈3.4×
-more tokens) plus the adapter's re-walk cost more than the incumbent's coarse
-single-pass `tokenizeTemplate`. The shared `buildFromTokens` dominates both.
+End-to-end the migration path is **at par** across every profile (1.01–1.07×;
+sub-millisecond ocean noise aside) — the shared `buildFromTokens` dominates, and
+the structural scanner's front matches the incumbent's `tokenizeTemplate`. (An
+earlier fine→RawTok *re-walk* adapter was 1.6× on dense; replacing it with the
+structural scanner closed that gap.)
 
 The takeaway: **swap the lexer, keep the proven parser.** Because the RawTok
 streams match exactly, standalone whitespace, header directives, raw blocks, and
@@ -260,6 +269,11 @@ concerns — they come from the engine `ParseOptions` the RawTok path reuses.
    (`Invalid` carries a message; `lsp.mjs:diagnostics` emits `publishDiagnostics`).
 3. ~~Decide the bracket/path-segment model (L3)~~ ✓ done — segmented paths
    (`.`→`Dot`, `/`→`Slash`, brackets as tokens), both lexers, parity-checked.
-4. If adopted, replace the coarse raw fences and add a `tokenize`-parity gate
-   against `FlatBars.Lexer` (boundaries + literals), and lift line/column into a
-   shared `Types` module so both spikes import one source of truth.
+4. ~~Add a tokenize-parity gate~~ ✓ done — `spago test -p flatbars-lexer-lab` is
+   in `npm test` (`RawTokParity` byte-checks `toRawToks` vs `tokenizeTemplate`).
+5. ~~Drive `parse` per dialect~~ ✓ done — `parse :: ParseOptions -> …`, with
+   `DialectParity` over FullBars/RawBars/MaxBars.
+6. Remaining for real adoption: a MinBars path (its custom standalone pipeline,
+   not `parseWith`); replace the coarse raw-block fences with proper `{{{{`/name/
+   `}}}}` lexemes; and the go/no-go to wire the hand lexer into the engine
+   proper, retiring `FlatBars.Lexer`/`FlatBars.Token`.

@@ -158,7 +158,9 @@
           "dependencies": [
             "assert",
             "console",
-            "effect"
+            "effect",
+            "maxbars",
+            "rawbars"
           ]
         }
       },

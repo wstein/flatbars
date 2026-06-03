@@ -14,7 +14,7 @@ import Effect.Console (log)
 import FlatBars.Lab.Lexer.Types (defaultLexConfig) as Lab
 import FlatBars.Lab.RawTok (parse, toRawToks)
 import FlatBars.Lexer (defaultLexConfig, tokenizeTemplate)
-import FlatBars.Parser (parse) as Core
+import FlatBars.Parser (defaultParseOptions, parse) as Core
 import FlatBars.Syntax (Node(..))
 import Test.Assert (assertTrue')
 
@@ -86,14 +86,14 @@ tests = do
   -- End-to-end: adapter parse (via trimStandalone + the engine tree builder)
   -- vs FlatBars.parse — proves standalone whitespace is handled (P2).
   for_ standaloneCorpus \src ->
-    case parse Lab.defaultLexConfig src, Core.parse src of
+    case parse Core.defaultParseOptions src, Core.parse src of
       Right lab, Right core ->
         assertTrue'
-          ( "standalone AST mismatch on " <> show src <> "\n  lab:  " <> show (map norm lab)
+          ( "standalone AST mismatch on " <> show src <> "\n  lab:  " <> show (map norm lab.nodes)
               <> "\n  core: "
               <> show (map norm core.nodes)
           )
-          (map norm lab == map norm core.nodes)
+          (map norm lab.nodes == map norm core.nodes)
       Left _, Left _ -> pure unit
       _, _ -> assertTrue' ("exactly one parser errored on " <> show src) false
   log "  standalone end-to-end parity assertions passed"

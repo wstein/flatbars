@@ -28,9 +28,9 @@ import Data.String.Common (joinWith)
 import FlatBars.Error (ParseError(..))
 import FlatBars.Lab.Lexer.Types (LexConfig, firstWord, isSpace, words)
 import FlatBars.Lexer (RawTok(..), trimStandalone) as E
-import FlatBars.Parser (buildFromTokens, defaultParseOptions)
+import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives)
+import FlatBars.Syntax (Directive, Template)
 import FlatBars.Syntax (Sigil(..)) as Syn
-import FlatBars.Syntax (Template)
 
 -- | Tokenize a template into the engine's `RawTok` stream. Honours
 -- | `mustacheDelims`: off, the default-delimiter grammar; on, `{{=A B=}}`
@@ -398,12 +398,44 @@ toRawToks cfg src =
 
   validDelim d = not (Array.elem '=' (SCU.toCharArray d))
 
--- | Parse via the structural scanner, reusing the engine's whitespace + tree
--- | builder — the same path `FlatBars.parse` takes, only the lexer swapped.
-parse :: LexConfig -> String -> Either ParseError Template
-parse cfg src = do
-  raw <- toRawToks cfg src
-  buildFromTokens defaultParseOptions (E.trimStandalone [ "else", "elif" ] raw)
+-- | Parse via the structural scanner, reusing the engine's directive lift,
+-- | standalone-whitespace pass, and tree builder — the same pipeline as
+-- | `FlatBars.parseWith opts`, only the lexer swapped. Driven by the dialect's
+-- | own `ParseOptions`, so any surface (RawBars/FullBars/MaxBars — and any other
+-- | that goes through `parseWith`) parses through it. The structural-scan config
+-- | is derived from the dialect's `lexConfig`/`lexOptions`.
+parse
+  :: ParseOptions
+  -> String
+  -> Either ParseError { directives :: Array Directive, nodes :: Template }
+parse opts src = do
+  raw <- toRawToks (labCfg opts) src
+  directives <- collectDirectives raw
+  standalone <- effectiveTrim opts directives
+  let toks' = if standalone then E.trimStandalone opts.standaloneSeps raw else raw
+  nodes <- buildFromTokens opts toks'
+  pure { directives, nodes }
+  where
+  -- the structural scanner only needs open/close + mustacheDelims (it slices
+  -- interiors; infixArith is the *parser's* interior concern, carried for shape).
+  labCfg o =
+    { open: o.lexConfig.open
+    , close: o.lexConfig.close
+    , infixArith: o.lexOptions.infixArith
+    , mustacheDelims: o.lexConfig.mustacheDelims
+    }
+
+  -- `@trim` header directive overrides the option, exactly like the engine's
+  -- (unexported) effectiveTrim.
+  effectiveTrim o dirs = case Array.find (\d -> d.key == "trim") dirs of
+    Nothing -> Right o.trimStandalone
+    Just d -> case d.value of
+      "standalone" -> Right true
+      "none" -> Right false
+      other -> Left
+        ( BadDirective ("invalid @trim value '" <> other <> "'; expected 'standalone' or 'none'")
+            d.span.start
+        )
 
 isWs :: Char -> Boolean
 isWs = isSpace

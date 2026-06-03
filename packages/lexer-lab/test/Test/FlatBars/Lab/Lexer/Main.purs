@@ -22,6 +22,7 @@ import FlatBars.Lab.Lexer
   , tokenize
   )
 import Test.Assert (assertEqual, assertTrue')
+import Test.FlatBars.Lab.DialectParity as DialectParity
 import Test.FlatBars.Lab.LexerHand as LexerHand
 import Test.FlatBars.Lab.ParserParity as ParserParity
 import Test.FlatBars.Lab.RawTokParity as RawTokParity
@@ -236,3 +237,6 @@ main = do
 
   -- Phase-2/3: the RawTok adapter's parity against the engine lexer.
   RawTokParity.tests
+
+  -- Per-dialect: the lab parse matches parseWith for each surface's options.
+  DialectParity.tests
