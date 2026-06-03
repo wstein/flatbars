@@ -234,6 +234,14 @@ const t = (s) => s;
       <a href={`${SPEC_BASE}prelude.html`}>helper catalog</a>. Every one is
       available identically in FullBars and MaxBars.
     </p>
+    <p>
+      One scoped helper has no surface sugar: <code>{t("{{{yield}}}")}</code> renders
+      the caller's body inside a block partial
+      (<code>{t("{{#partial \"name\" ctx}} … {{/partial}}")}</code>). It is RawBars'
+      spelling of Handlebars' <code>{t("{{> @partial-block}}")}</code> — MaxBars
+      writes the bare <code>{t("{{yield}}")}</code>, and all three name the one
+      scoped <code>partial-block</code> operation.
+    </p>
   </section>
 
 </Reference>

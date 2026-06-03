@@ -231,7 +231,9 @@ rendering.
 Partials render *unescaped* — a partial produces markup, not a data value, so the desugaring is the
 plain triple-stash with no `escapeHtml`. The partial *name* desugars to a `STRING` literal; a dynamic
 partial keeps the computed expression. `partial`, `inline`, and the scoped `partial-block` are engine
-helpers; see xref:appendix-handlebars.adoc#partials[A.6].
+helpers; see xref:appendix-handlebars.adoc#partials[A.6]. The scoped `partial-block` is also installed
+under the synonym `yield`, the hyphen-free spelling the non-Handlebars dialects use for the same yield
+(MaxBars `pass:[{{yield}}]`, RawBars `pass:[{{{yield}}}]`; see xref:maxbars.adoc[]).
 
 == 5.8 What Surface does *not* change
 

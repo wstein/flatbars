@@ -89,11 +89,25 @@ is the enclosing loop's index; `pass:[{{parent.name}}]` is a field on the enclos
   standalone `index0`/`first`/… operations, so RawBars' `pass:[{{{index}}}]` / `pass:[{{{first}}}]` /
   `pass:[{{{parent-index}}}]` are likewise replaced by `loop.*`.
 
+. *The block-partial body is the reserved name `yield`.* Handlebars' `pass:[{{> @partial-block}}]`
+  yield is unwritable in the non-Handlebars dialects — `@` is reserved (§5), and a bare `partial-block`
+  lexes as the subtraction `partial - block` under MaxBars' infix arithmetic. `yield` is added as a
+  hyphen-free *synonym* of the `partial-block` scoped operation, installed under both names in the
+  partial block frame, so the one yield is spelled `pass:[{{yield}}]` (MaxBars), `pass:[{{{yield}}}]`
+  (RawBars), and `pass:[{{> @partial-block}}]` (FullBars, unchanged). It is reserved like the other
+  roots: a same-named data field is shadowed (read it with an explicit `pass:[{{lookup this "yield"}}]`),
+  and a `pass:[label yield]` is flagged by the label-shadow lint. The yield is escape-safe (`VSafe`), so
+  MaxBars' `pass:[{{ }}]` form does not re-escape it.
+
 . *The warn-always shadow lint is retired.* The footgun was "any field-like bare name silently shadows a
-  field"; with the metadata behind `loop.`, the only reserved roots are `this`/`loop`/`root`/`parent`/
-  `outer` — words rarely used as fields, and explicit. ADR-006's `loopVarShadowWarnings` is deleted. The
-  ADR-013 `labelShadowWarnings` (a `label NAME` colliding with a reserved root) stays; a lighter optional
-  lint may warn when a data field named one of the five roots is shadowed in a block body.
+  field"; with the metadata behind `loop.`, the reserved roots are `this`/`loop`/`root`/`parent`/`outer`
+  (and `yield` inside a block partial) — explicit, and rarely data fields except `yield`, whose escape
+  hatch is the explicit lookup above. ADR-006's `loopVarShadowWarnings` is deleted. The
+  ADR-013 `labelShadowWarnings` (a `label NAME` colliding with a reserved root — `this`/`loop`/`root`/
+  `parent`/`yield`) stays; a lighter optional lint may warn when a data field named one of the roots is
+  shadowed in a block body. NOTE: a reserved root shadows a field *everywhere*, even through an explicit
+  `pass:[{{this.NAME}}]` (the path reduces to the segment `NAME`), so the explicit `lookup` is the only
+  field escape.
 
 . *Compiler parity.* The frame chain + reserved-name objects are emitted by the compiler exactly as the
   interpreter builds them — the ADR-013 `rt.each`/`childFrame` `binds` chain extends to carry `loop` /
@@ -150,9 +164,10 @@ is the enclosing loop's index; `pass:[{{parent.name}}]` is a field on the enclos
   behind `loop.`); `@`/`pass:[../]` are dropped from the non-Handlebars dialects as intended; reuses the
   ADR-013 frame mechanism.
 * *Con:* a *breaking change* to every MaxBars/RawBars template using bare loop vars or `@`/`pass:[../]`
-  (no compat shim); a non-trivial migration; five reserved roots now shadow same-named fields inside a
-  block body; building the frame *chain* (`parent`/`root` links, multi-level) is more engine/compiler work
-  than ADR-013's single frame.
+  (no compat shim); a non-trivial migration; the reserved roots now shadow same-named fields inside a
+  block body — `yield` most notably, a common data field (bond/crop yield), whose only escape is the
+  explicit `pass:[{{lookup this "yield"}}]`; building the frame *chain* (`parent`/`root` links,
+  multi-level) is more engine/compiler work than ADR-013's single frame.
 
 == Open questions
 

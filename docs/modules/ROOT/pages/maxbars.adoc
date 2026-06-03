@@ -100,6 +100,40 @@ construction. `@root` becomes `root`, `pass:[../x]` becomes `parent.x`, and an
 {{#each rows}}{{#each this}}{{loop.parent.index0}}.{{loop.index0}} {{parent.label}} {{root.title}}{{/each}}{{/each}}
 ----
 
+== The block-partial body (`yield`)
+
+Inside a block partial — `pass:[{{#partial "name"}}…{{/partial}}]` or the
+Handlebars block-partial sigil `pass:[{{#> name}}…{{/name}}]` — the caller's body
+is rendered by the reserved name **`yield`**:
+
+[source,handlebars]
+----
+{{!-- the "layout" partial --}}    <main>{{yield}}</main>
+{{#partial "layout"}}<p>hi</p>{{/partial}}    {{!-- → <main><p>hi</p></main> --}}
+----
+
+`yield` is the hyphen-free, cross-dialect spelling of Handlebars'
+`pass:[{{> @partial-block}}]`, which MaxBars cannot use: the `@` sigil is reserved,
+and a bare `partial-block` would lex as the subtraction `partial - block`. One
+scoped operation, reached one way per dialect:
+
+[cols="1,2",options="header"]
+|===
+|Dialect |Spelling
+
+|MaxBars |`pass:[{{yield}}]`
+|RawBars |`pass:[{{{yield}}}]`
+|{hbs} / FullBars |`pass:[{{> @partial-block}}]`
+|===
+
+The body is already-rendered, escape-safe output (a `VSafe` value), so MaxBars'
+`pass:[{{ }}]` auto-escape is a no-op on it — `pass:[{{yield}}]` and
+`pass:[{{{yield}}}]` emit identical bytes.
+
+`yield` is reserved like `this`/`loop`/`root`/`parent`: a same-named data field is
+shadowed (read it with an explicit `pass:[{{lookup this "yield"}}]`), and a loop
+`pass:[label yield]` is flagged by the MaxBars lint.
+
 == Block conditions
 
 A block *open* parses its head as the helper name followed by arguments, each a
@@ -167,8 +201,9 @@ Notes:
 
 * The label object names *one* loop and carries no `parent` field — to reach two
   enclosing loops, label both (no `pass:[../]` climbing).
-* Choosing a bare loop-variable name as the label (`pass:[label index0]`) shadows
-  that variable for the body; the MaxBars lint warns and suggests a fresh name.
+* Choosing a *reserved root* as the label — `pass:[label this]` / `loop` / `root` /
+  `parent` / `yield` — shadows that name for the body; the MaxBars lint warns and
+  suggests a fresh name.
 * `label` is a surface-desugar feature on `each`, so FullBars accepts it too; only
   the bare-loop-variable *vocabulary* is MaxBars-only.
 
