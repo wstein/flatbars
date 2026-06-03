@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Antora site playbook for the FlatBars spec/ADRs. `docs/antora.yml` is the
+# component descriptor (name/nav/attributes); THIS is the site config that builds
+# it (`npm run docs`). The supplemental UI brings the spec into the FlatBars
+# design system — see docs/supplemental-ui (tokens + IBM Plex + violet + logo).
+site:
+  title: FlatBars
+  start_page: flatbars::index.adoc
+content:
+  sources:
+    - url: .
+      start_path: docs
+      branches: HEAD
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+  supplemental_files: ./docs/supplemental-ui
+output:
+  dir: ./build/site

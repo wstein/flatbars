@@ -13,7 +13,12 @@ implementation and a CLI, plus the normative spec in `docs/` and the FlatBars La
 
 The spec in `docs/` is the contract; the PureScript packages target it.
 `docs/modules/ROOT/pages/concepts.adoc` is the fastest way to understand the
-core model; `host-api.adoc` defines the API `core` exposes.
+core model; `host-api.adoc` defines the API `core` exposes. `npm run docs` builds
+the spec site (Antora: `antora-playbook.yml` is the site config, `docs/antora.yml`
+the component descriptor); the `docs/supplemental-ui/` UI brings it into the
+FlatBars design system (the shared tokens + IBM Plex + violet accent + logo). The
+build reads content from git HEAD, so a *linked git worktree* can't build it in
+place — run it from a normal checkout.
 
 ## Toolchain & commands
 
@@ -198,11 +203,14 @@ Mustache conformance table is generated from the vendored spec suite
   helper catalog; the docs partial and the `check:catalog` gate are generated
   from `FullBars.preludeSchema`. Change the prelude → run `npm run gen:catalog`.
 - **One source of truth for the syntax palette.** The seven-family `--c-*`
-  palette (the one unified design system across front-ends) lives in
-  `shared/flatbars-tokens.css`; `scripts/gen-tokens.mjs` generates it into the
-  fenced `@palette` regions of `tutorials/src/styles/lab-tokens.css` (Astro
-  bundles it) and `lab/index.html` (the static Lab inlines it). Change a colour →
-  run `npm run gen:tokens`; `check:tokens` (in `npm test`) fails on drift. Every
+  palette (a Dracula/Alucard code theme, the one unified design system across
+  front-ends) lives in `shared/flatbars-tokens.css`; `scripts/gen-tokens.mjs`
+  generates it into the fenced `@palette` regions of
+  `tutorials/src/styles/lab-tokens.css` (Astro bundles it) and `lab/index.html`
+  (the static Lab inlines it), plus a verbatim copy at
+  `docs/supplemental-ui/css/flatbars-tokens.css` (the Antora spec serves it).
+  Change a colour → run `npm run gen:tokens`; `check:tokens` (in `npm test`)
+  fails on drift. Every
   value clears WCAG AA (4.5:1) on its tint, the page bg, and as a solid chip —
   machine-checked by `npm run check:contrast` (also in `npm test`); documented
   sub-AA exceptions live in that script's `EXCEPTIONS` map.

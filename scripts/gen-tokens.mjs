@@ -74,12 +74,32 @@ for (const file of TARGETS) {
   }
 }
 
+// Verbatim copies: a consumer that can't fence the tokens into its own file gets a
+// whole generated copy instead. The Antora supplemental UI serves the palette as a
+// standalone stylesheet its site-extra.css @imports.
+const COPIES = ["docs/supplemental-ui/css/flatbars-tokens.css"];
+const banner = `/* @generated from ${SOURCE} by \`npm run gen:tokens\` — do not edit. */\n`;
+const copyBody = banner + src;
+for (const file of COPIES) {
+  const path = resolve(root, file);
+  let before = "";
+  try { before = readFileSync(path, "utf8"); } catch {}
+  if (before === copyBody) continue;
+  stale++;
+  if (check) console.error(`✗ ${file} — palette copy is stale (run \`npm run gen:tokens\`)`);
+  else {
+    writeFileSync(path, copyBody);
+    console.log(`✓ wrote ${file}`);
+  }
+}
+
+const consumers = TARGETS.length + COPIES.length;
 if (check) {
   if (stale) {
     console.error(`check:tokens: ${stale} file(s) drifted from ${SOURCE}.`);
     process.exit(1);
   }
-  console.log(`✓ palette current — ${TARGETS.length} consumer(s) match ${SOURCE}`);
+  console.log(`✓ palette current — ${consumers} consumer(s) match ${SOURCE}`);
 } else if (!stale) {
   console.log("✓ palette already current — nothing to write");
 }

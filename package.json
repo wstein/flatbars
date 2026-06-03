@@ -30,7 +30,7 @@
     "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs && node lab/helpers.test.mjs",
     "cli": "spago run -p flatbars-cli",
     "lab": "node scripts/serve-lab.mjs",
-    "docs": "antora docs/antora.yml",
+    "docs": "antora --fetch antora-playbook.yml",
     "gen:catalog": "spago build && node scripts/generate-helper-catalog.mjs",
     "check:catalog": "spago build && node scripts/generate-helper-catalog.mjs --check",
     "format": "purs-tidy format-in-place \"packages/*/src/**/*.purs\" \"packages/*/test/**/*.purs\"",
