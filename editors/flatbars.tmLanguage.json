@@ -1,0 +1,167 @@
+{
+  "_doc": "APPROXIMATE FALLBACK — the LSP is authoritative (ADR-017). This stateless TextMate grammar colours only the DEFAULT-DELIMITER forms ({{ }} / {{{ }}}) for the no-LSP contexts (GitHub/Gitea diffs, bat/less, first paint, JetBrains Community). It GIVES UP gracefully on the stateful regions a grammar cannot track — set delimiters ({{=A B=}}) and MaxBars infix operators — leaving them plain rather than mis-colouring; semantic tokens override and correct them the instant a server attaches. Every scope here maps back to an engine token kind via editors/token-vocabulary.json, and check:tmgrammar pins that they agree with the engine on the default-delimiter corpus.",
+  "name": "FlatBars",
+  "scopeName": "source.flatbars",
+  "patterns": [
+    { "include": "#comment-long" },
+    { "include": "#comment-short" },
+    { "include": "#set-delimiter" },
+    { "include": "#raw-block" },
+    { "include": "#triple" },
+    { "include": "#clause" },
+    { "include": "#amp" },
+    { "include": "#partial" },
+    { "include": "#section" },
+    { "include": "#inverted" },
+    { "include": "#parent" },
+    { "include": "#block-decl" },
+    { "include": "#close" },
+    { "include": "#interpolation" }
+  ],
+  "repository": {
+    "comment-long": {
+      "name": "comment.block.flatbars",
+      "begin": "\\{\\{~?!--",
+      "end": "--~?\\}\\}"
+    },
+    "comment-short": {
+      "name": "comment.block.flatbars",
+      "begin": "\\{\\{~?!",
+      "end": "~?\\}\\}"
+    },
+    "set-delimiter": {
+      "comment": "{{=A B=}} — STATEFUL; the fallback gives up (no mapped scope), only the LSP colours it.",
+      "name": "meta.set-delimiter.flatbars",
+      "match": "\\{\\{~?=.*?=~?\\}\\}"
+    },
+    "raw-block": {
+      "comment": "A raw block is a begin/end region: the engine paints the whole block (open, body, close) one `raw-block` span, so the body must stay inside the region (NOT re-tokenized as interpolation). The body is left plain — a give-up the engine corrects.",
+      "name": "meta.tag.raw-block.flatbars",
+      "begin": "(\\{\\{\\{\\{)~?\\s*([^/\\s}][^}]*?)\\s*(\\}\\}\\}\\})",
+      "end": "(\\{\\{\\{\\{)~?\\s*/\\s*[^}]*?\\s*(\\}\\}\\}\\})",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "entity.name.tag.raw-block.flatbars" },
+        "3": { "name": "punctuation.definition.tag.end.flatbars" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "punctuation.definition.tag.end.flatbars" }
+      }
+    },
+    "triple": {
+      "name": "meta.interpolation.raw.flatbars",
+      "begin": "(\\{\\{\\{)~?\\s*",
+      "end": "\\s*~?(\\}\\}\\})",
+      "beginCaptures": { "1": { "name": "punctuation.definition.tag.begin.flatbars" } },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.flatbars" } },
+      "patterns": [
+        { "include": "#literals" },
+        { "match": "[A-Za-z_@.][\\w.@/\\[\\]-]*", "name": "variable.other.raw.flatbars" }
+      ]
+    },
+    "clause": {
+      "name": "meta.tag.clause.flatbars",
+      "begin": "(\\{\\{~?)\\s*(else|elif)\\b",
+      "end": "~?\\}\\}",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "keyword.control.clause.flatbars" }
+      },
+      "patterns": [{ "include": "#literals" }]
+    },
+    "amp": {
+      "name": "meta.interpolation.raw.flatbars",
+      "begin": "(\\{\\{~?)\\s*&\\s*",
+      "end": "\\s*~?(\\}\\})",
+      "beginCaptures": { "1": { "name": "punctuation.definition.tag.begin.flatbars" } },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.flatbars" } },
+      "patterns": [
+        { "include": "#literals" },
+        { "match": "[A-Za-z_@.][\\w.@/\\[\\]-]*", "name": "variable.other.raw.flatbars" }
+      ]
+    },
+    "partial": {
+      "name": "meta.tag.partial.flatbars",
+      "begin": "(\\{\\{~?)\\s*(>\\*?)\\s*",
+      "end": "~?(\\}\\})",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "keyword.control.partial.flatbars" }
+      },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.flatbars" } },
+      "patterns": [
+        { "include": "#literals" },
+        { "match": "[A-Za-z_@.][\\w.@/\\[\\]-]*", "name": "variable.other.partial.flatbars" }
+      ]
+    },
+    "section": {
+      "name": "meta.tag.section.flatbars",
+      "begin": "(\\{\\{~?)\\s*(#)",
+      "end": "~?\\}\\}",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "keyword.control.section.flatbars" }
+      },
+      "patterns": [{ "include": "#literals" }]
+    },
+    "inverted": {
+      "name": "meta.tag.inverted.flatbars",
+      "begin": "(\\{\\{~?)\\s*(\\^)",
+      "end": "~?\\}\\}",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "keyword.control.inverted.flatbars" }
+      },
+      "patterns": [{ "include": "#literals" }]
+    },
+    "parent": {
+      "name": "meta.tag.parent.flatbars",
+      "begin": "(\\{\\{~?)\\s*(<)",
+      "end": "~?\\}\\}",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "keyword.control.parent.flatbars" }
+      },
+      "patterns": [{ "include": "#literals" }]
+    },
+    "block-decl": {
+      "name": "meta.tag.block-decl.flatbars",
+      "begin": "(\\{\\{~?)\\s*(\\$)",
+      "end": "~?\\}\\}",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "keyword.control.block-decl.flatbars" }
+      },
+      "patterns": [{ "include": "#literals" }]
+    },
+    "close": {
+      "name": "meta.tag.close.flatbars",
+      "begin": "(\\{\\{~?)\\s*(/)",
+      "end": "~?\\}\\}",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.flatbars" },
+        "2": { "name": "keyword.control.end.flatbars" }
+      },
+      "patterns": [{ "include": "#literals" }]
+    },
+    "interpolation": {
+      "name": "meta.interpolation.flatbars",
+      "begin": "(\\{\\{~?)\\s*",
+      "end": "\\s*~?(\\}\\})",
+      "beginCaptures": { "1": { "name": "punctuation.definition.tag.begin.flatbars" } },
+      "endCaptures": { "1": { "name": "punctuation.definition.tag.end.flatbars" } },
+      "patterns": [
+        { "include": "#literals" },
+        { "match": "[A-Za-z_@.][\\w.@/\\[\\]-]*", "name": "variable.other.flatbars" }
+      ]
+    },
+    "literals": {
+      "patterns": [
+        { "match": "\"(\\\\.|[^\"\\\\])*\"", "name": "string.quoted.double.flatbars" },
+        { "match": "'(\\\\.|[^'\\\\])*'", "name": "string.quoted.single.flatbars" },
+        { "match": "(?<![\\w.])-?\\d+(\\.\\d+)?", "name": "constant.numeric.flatbars" }
+      ]
+    }
+  }
+}
