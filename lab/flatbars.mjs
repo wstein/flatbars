@@ -33,7 +33,8 @@ import {
   compileSurface as bbCompileSurface,
   compileMaxbars as bbCompileMaxbars,
   renderWith as bbRenderWith,
-} from "./vendor/flatbars-engine.mjs?v=25";
+  analyze as bbAnalyze,
+} from "./vendor/flatbars-engine.mjs?v=26";
 
 const BB_VERSION = "0.1.0";
 
@@ -146,6 +147,14 @@ export async function createFlatBarsRenderer(dialectArg) {
     return renderResult(res, map);
   }
 
+  // Analyse mode (ADR-022 Part B): render + report the truthiness decisions that
+  // would branch differently on another engine. Returns the facade's
+  // { ok, report, jsonata, output, error } object (always the FullBars rule).
+  function analyze(program, data) {
+    const d = data == null ? {} : data;
+    return bbAnalyze(program.source, d);
+  }
+
   // ── AST + static analyses ──────────────────────────────────────────────────
   // parseAst returns the lowered AST in the host's {t:…} node shape (or {error}).
   // The engine facade does the parse+lower+map in PureScript; the analyses below
@@ -233,6 +242,7 @@ export async function createFlatBarsRenderer(dialectArg) {
 
   return {
     render,
+    analyze,
     compile,
     parseAst,
     inspectAt,

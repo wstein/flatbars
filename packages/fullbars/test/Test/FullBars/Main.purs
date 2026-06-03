@@ -25,7 +25,7 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, stringify, truthy)
+import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, analyseSurface, crossBoundaryWarnings, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, stringify, truthy)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
 import Kernel.Walk (arityOk, foldTemplate, validate)
@@ -443,6 +443,38 @@ main = do
   expectS "truth:and-default" "{{{ and 0 5 }}}" VNull "false"
   -- includeZero (re-homed off the falsy-set machinery) makes 0 truthy for one test.
   expectS "truth:includeZero" "{{#if n includeZero=true}}y{{else}}m{{/if}}" n0 "y"
+
+  -- ADR-022 Part B: analyse mode. Render + observe; an ambiguous value tested in a
+  -- condition is a portability finding, with a located fix; output is unchanged.
+  let
+    reportOf src d = case analyseSurface src d of
+      Left e -> "ERR: " <> e
+      Right r -> r.report
+    outputOf src d = case analyseSurface src d of
+      Left e -> "ERR: " <> e
+      Right r -> r.output
+    containsR name src d needle =
+      assert' (name <> ": report should mention " <> show needle)
+        (contains (Pattern needle) (reportOf src d))
+  -- empty string in a condition diverges (falsy in handlebars, truthy elsewhere).
+  containsR "analyse:empty-string-finding" "{{#if bio}}x{{/if}}" (obj [ Tuple "bio" (str "") ])
+    "1 portability finding"
+  containsR "analyse:empty-string-fix" "{{#if bio}}x{{/if}}" (obj [ Tuple "bio" (str "") ])
+    "(ne s"
+  containsR "analyse:empty-string-path" "{{#if bio}}x{{/if}}" (obj [ Tuple "bio" (str "") ])
+    "data path: `bio`"
+  -- empty array suggests {{#each}}.
+  containsR "analyse:empty-array-each" "{{#if items}}x{{else}}n{{/if}}"
+    (obj [ Tuple "items" (arr []) ])
+    "{{#each"
+  -- false is portable (every rule agrees) — no finding.
+  containsR "analyse:false-portable" "{{#if ok}}x{{/if}}" (obj [ Tuple "ok" (VBool false) ])
+    "0 portability finding"
+  -- the analysed output is byte-identical to a normal render (drift-proof).
+  assert' "analyse:output-identical"
+    ( outputOf "{{#if bio}}yes{{else}}no{{/if}}" (obj [ Tuple "bio" (str "") ])
+        == "no"
+    )
 
   -- Standalone whitespace removal (on by default): a block open/close or comment
   -- alone on its line leaves no blank line.

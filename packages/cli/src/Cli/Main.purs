@@ -21,7 +21,7 @@ import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
-import Data.String (Pattern(..), contains, joinWith, split, stripSuffix)
+import Data.String (Pattern(..), contains, joinWith, split, stripPrefix, stripSuffix)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -30,7 +30,7 @@ import FlatBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorA
 import FlatBars.Json (parseValue)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
-import FullBars (directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
+import FullBars (analyseSurface, directiveLints, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
 import MinBars (renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
@@ -98,6 +98,8 @@ main = do
   case Array.uncons args of
     -- `flatbars examples …` — the vendored example/conformance corpus subcommand.
     Just { head: "examples", tail } -> runExamples tail
+    -- `flatbars analyse <template> <data.json> [--emit-jsonata]` — ADR-022 Part B.
+    Just { head: "analyse", tail } -> runAnalyse tail
     _ -> case parseArgs args of
       Help -> writeStdout (usage <> "\n")
       Invalid msg -> die ("flatbars: " <> msg <> "\n\n" <> usage)
@@ -314,6 +316,30 @@ examplesUsage =
     , "  actual == expected — a divergence is a conformance failure. Exit ≠ 0 on any miss."
     , "Vendor/refresh the corpus with: node scripts/vendor-mustache.mjs"
     ]
+
+-- | `flatbars analyse <template> <data.json> [--emit-jsonata]` (ADR-022 Part B):
+-- | render the FullBars template against the data and print a markdown report of
+-- | every truthiness decision that would branch differently on another engine
+-- | (with a fix each), or `--emit-jsonata` for the reviewable cleanup scaffold.
+runAnalyse :: Array String -> Effect Unit
+runAnalyse args =
+  let
+    emitJsonata = Array.elem "--emit-jsonata" args
+    positional = Array.filter (\a -> not (isJust (stripPrefix (Pattern "--") a))) args
+  in
+    case positional of
+      [ tplPath, dataPath ] -> do
+        tplE <- readFileSafe tplPath
+        case tplE of
+          Left err -> die ("flatbars analyse: cannot read template '" <> tplPath <> "': " <> err)
+          Right tpl -> do
+            datE <- loadData (Just dataPath)
+            case datE of
+              Left err -> die ("flatbars analyse: " <> err)
+              Right value -> case analyseSurface tpl value of
+                Left e -> die ("flatbars analyse: " <> tplPath <> ": " <> e)
+                Right r -> writeStdout ((if emitJsonata then r.jsonata else r.report) <> "\n")
+      _ -> die "flatbars analyse: usage: flatbars analyse <template> <data.json> [--emit-jsonata]"
 
 runExamples :: Array String -> Effect Unit
 runExamples args = case Array.uncons args of

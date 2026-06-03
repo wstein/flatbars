@@ -9,7 +9,9 @@
 -- | data-access inspectors can walk it.
 module FullBars.JS
   ( Result
+  , AnalyseResult
   , render
+  , analyze
   , renderSurface
   , renderMaxbars
   , renderMinbars
@@ -69,6 +71,20 @@ result = either (\e -> { ok: false, value: "", error: e }) (\v -> { ok: true, va
 -- | Render a core-syntax template against JS data. `render(template, data)`.
 render :: Fn2 String Json Result
 render = mkFn2 \tpl json -> result (RawBars.renderDiag tpl (fromJson json))
+
+-- | An analyse outcome (ADR-022 Part B) as a plain JS object: the markdown
+-- | `report`, the JSONata cleanup `jsonata` scaffold, and the byte-identical
+-- | `output`; `ok`/`error` carry a parse/eval failure.
+type AnalyseResult =
+  { ok :: Boolean, report :: String, jsonata :: String, output :: String, error :: String }
+
+-- | Analyse a FullBars surface template against JS data: render and report every
+-- | truthiness decision that would branch differently on another engine.
+-- | `analyze(template, data)`.
+analyze :: Fn2 String Json AnalyseResult
+analyze = mkFn2 \tpl json -> case FullBars.analyseSurface tpl (fromJson json) of
+  Left e -> { ok: false, report: "", jsonata: "", output: "", error: e }
+  Right r -> { ok: true, report: r.report, jsonata: r.jsonata, output: r.output, error: "" }
 
 -- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result

@@ -25,6 +25,7 @@ module FullBars
   , renderSurfaceDiag
   , renderSurfaceDiagWith
   , renderSurfaceValue
+  , analyseSurface
   ) where
 
 import Prelude
@@ -39,10 +40,11 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, hoistInline, noLoopVars)
+import Kernel.Analyse (jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, register, registerAll, registerPartials)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials)
 import Kernel.Lower (RNode(..), crossBoundaryWarnings, directiveLints, escapingWarnings, lower)
-import Kernel.Prelude (prelude, preludeSchema)
+import Kernel.Prelude (blockHelperMissing, prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (FalsySet, FalsyShape(..), always, escapeHtml, handlebars, isFalsy, minimal, mustache, presence, stringify, truthy)
@@ -197,3 +199,27 @@ renderSurfaceDiagWith strict lv opts src dat = case parseWith opts src of
 -- | located error messages.
 renderSurfaceValue :: forall a. ToValue a => String -> a -> Either String String
 renderSurfaceValue src = renderSurfaceDiag src <<< toValue
+
+-- | Analyse mode (ADR-022 Part B): render `src` against `dat` and return the
+-- | (byte-identical) output plus a markdown report of every truthiness decision
+-- | that would branch differently on another engine — with a concrete fix each —
+-- | and a reviewable JSONata data-cleanup scaffold. Pure (the trace rides a
+-- | writer); located parse/eval errors as `Left`.
+analyseSurface
+  :: String -> Value -> Either String { output :: String, report :: String, jsonata :: String }
+analyseSurface src dat = case parse src of
+  Left e -> Left (renderParseErrorAt src e)
+  Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
+  Right { nodes } ->
+    let
+      { partials, template } = hoistInline (desugarSurface nodes)
+    in
+      case
+        runAnalysis (refEngineWith blockHelperMissing) (registerPartials partials) template dat
+        of
+        Left e -> Left (formatError src e)
+        Right r -> Right
+          { output: r.output
+          , report: reportMarkdown src r.decisions
+          , jsonata: jsonataScaffold src r.decisions
+          }
