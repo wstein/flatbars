@@ -262,16 +262,19 @@ than walk a stack: `pass:[{{#each teams as \|team\|}}…{{#each team.members}}{{
 *Status.* Partials are implemented via `renderSurfaceWith`: `pass:[{{> name}}]`,
 `pass:[{{> name ctx}}]`, dynamic `pass:[{{> (expr)}}]`, hash context `pass:[{{> name k=v}}]`, block
 partials `pass:[{{#partial name}}body{{/partial}}]` (body = fallback + `pass:[{{> @partial-block}}]`
-yield), and inline partials `pass:[{{#inline "name"}}body{{/inline}}]` (hoisted into the registry) —
-see xref:fullbars-compat.adoc[compatibility matrix] §3. The core spellings `pass:[{{#partial}}]` /
-`pass:[{{#inline}}]` are used in place of the Handlebars `pass:[{{#> }}]` / `pass:[{{#*inline}}]`
-sigils, which the meaning-free parser does not yet match.
+yield), and inline partials `pass:[{{#*inline "name"}}body{{/inline}}]` (the Handlebars decorator
+form, hoisted into the registry) — see xref:fullbars-compat.adoc[compatibility matrix] §3. The
+Handlebars `pass:[{{#> }}]` sigil and the `pass:[{{#*inline}}]` decorator are the FullBars author
+forms; they desugar internally to the core `partial` / `inline` helpers. The bare
+`pass:[{{#inline "name"}}]` spelling is *rejected* (`DisallowedShape`) in FullBars — `inline` is a
+decorator, not a block helper to be written bare.
 ====
 
 All partial forms become the engine helpers `partial` (inline and block) and `inline`, plus the
 scoped `partial-block` (xref:prelude.adoc[] §6.6; xref:surface.adoc[] §5.7). The rows below show the
-mapping shape; the implemented core spellings are `pass:[{{#partial}}]` / `pass:[{{#inline}}]` (see
-the status note above). Partials emit *unescaped*.
+mapping shape; the FullBars author forms are `pass:[{{#partial}}]` / `pass:[{{#> }}]` for block
+partials and the `pass:[{{#*inline}}]` decorator for inline partials (see the status note above).
+Partials emit *unescaped*.
 
 [cols="2,3,1",options="header"]
 |===
@@ -364,9 +367,11 @@ with the CLI `--trim none` / `flatbars.json`; explicit `~` composes on top. Outp
 ====
 *Not yet implemented.* FullBars ships no *decorator* helpers; the mapping below is the design
 (xref:fullbars-compat.adoc[compatibility matrix] §3). Because a decorator is just a block helper
-here, no grammar or core change is needed to add them. (Inline *partials* — Handlebars' decorator-like
-`pass:[{{#*inline}}]` — *are* implemented, but as the ordinary block helper `pass:[{{#inline}}]`,
-not via a decorator mechanism; see xref:prelude.adoc[] §6.6.)
+here, no grammar or core change is needed to add them. (Inline *partials* — Handlebars'
+`pass:[{{#*inline}}]` decorator — *are* implemented: in FullBars the `pass:[{{#*inline}}]` decorator
+is the required author form, desugaring internally to the core `inline` block helper rather than to a
+distinct decorator mechanism; the bare `pass:[{{#inline}}]` spelling is rejected. See
+xref:prelude.adoc[] §6.6.)
 ====
 
 {hbs} decorators (`pass:[{{#*helper}}]`, `pass:[{{*helper}}]`) modify a block or its `options`. FlatBars

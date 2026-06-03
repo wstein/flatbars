@@ -30,8 +30,11 @@ literal). *Partials* (§5.7) work via `renderSurfaceWith`: `pass:[{{> name}}]`,
 registered partial (unescaped). *Block partials* `pass:[{{#partial name}}body{{/partial}}]`
 render the partial with `body` as the fallback (if missing) and the
 `pass:[{{> @partial-block}}]` yield point; *inline partials*
-`pass:[{{#inline "name"}}body{{/inline}}]` define a partial, hoisted into the
-registry before rendering. *Hash arguments* (§5.4) collect into a trailing `dict`:
+`pass:[{{#*inline "name"}}body{{/inline}}]` (the Handlebars decorator form,
+with the `*` sigil) define a partial, hoisted into the
+registry before rendering. The bare `pass:[{{#inline "name"}}]` is *rejected*
+(`DisallowedShape`): in FullBars, as in Handlebars, `inline` is a decorator, not
+a block helper. *Hash arguments* (§5.4) collect into a trailing `dict`:
 `pass:[{{ f a k=v k2="s"}}]` ⇒ `pass:[{{{ escapeHtml (f (lookup this "a") (dict "k" … "k2" "s")) }}}]`
 — this is what feeds `if`/`unless`' `includeZero`, e.g. `pass:[{{#if n includeZero=true}}]`.
 *Block params* (§5.5) work too: `pass:[{{#each xs as \|item i\|}}]` binds `item`/`i` as scoped
@@ -44,14 +47,18 @@ in-scope param desugars to a `pass:[(param)]` call (lexically scoped, visible in
 of `parent` for context). A deeper run (`@../../index`) still resolves to the
 immediate parent.
 
-The Handlebars block-partial *sigils* `pass:[{{#> name}}…{{/name}}]` /
-`pass:[{{#*inline}}…{{/inline}}]` are also accepted and desugar to the same core
-forms as the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` spellings. They parse
+The Handlebars block-partial *sigil* `pass:[{{#> name}}…{{/name}}]` is also
+accepted and desugars to the same core form as the `pass:[{{#partial}}]`
+spelling; the inline-partial *decorator* `pass:[{{#*inline "name"}}…{{/inline}}]`
+is the *required* FullBars author form and desugars internally to the core
+`inline` helper. They parse
 as ordinary `pass:[{{#}}]`-section blocks headed by the sigil (`>` / `*inline`);
 the matching `pass:[{{/…}}]` close is resolved by `Parser.blockCloseName` (the
-partial name for `pass:[{{#>}}]`, `inline` for `pass:[{{#*inline}}]`) — no new
-sigil or gate. See the xref:fullbars-compat.adoc[compatibility matrix] for
-per-feature status.
+partial name for `pass:[{{#>}}]`, `inline` for `pass:[{{#*inline}}]`). The bare
+`pass:[{{#inline}}]` is rejected by `FullBars.checkBareInline` with a located
+`DisallowedShape` error — this gate is FullBars-surface-only (RawBars and MaxBars
+still accept bare `pass:[{{#inline}}]`). See the
+xref:fullbars-compat.adoc[compatibility matrix] for per-feature status.
 ====
 
 [IMPORTANT]
@@ -206,13 +213,15 @@ instead. (The austere RawBars and MaxBars dialects do *not* accept `pass:[{{^}}]
 |`pass:[{{> (expr)}}]` (dynamic) |`pass:[{{{ partial (expr) this }}}]`
 |`pass:[{{#partial name k=v}}body{{/partial}}]` |`pass:[{{#partial "name" this (dict "k" v)}}body{{/partial}}]`
 |`pass:[{{> @partial-block}}]` |`pass:[{{{ partial-block }}}]`
-|`pass:[{{#inline name}}body{{/inline}}]` |`pass:[{{#inline "name"}}body{{/inline}}]`
+|`pass:[{{#*inline "name"}}body{{/inline}}]` |`pass:[{{#inline "name"}}body{{/inline}}]`
 |===
 
-Block and inline partials are written with the *core spellings* `pass:[{{#partial}}]` /
-`pass:[{{#inline}}]` (a bare name is literalized like `pass:[{{> name}}]`) *or* the equivalent
-Handlebars *sigils* `pass:[{{#> name}}…{{/name}}]` / `pass:[{{#*inline "name"}}…{{/inline}}]`, which
-desugar to the same forms. A block `partial`
+Block partials are written with the *core spelling* `pass:[{{#partial}}]`
+(a bare name is literalized like `pass:[{{> name}}]`) *or* the equivalent
+Handlebars *sigil* `pass:[{{#> name}}…{{/name}}]`. Inline partials use the
+Handlebars *decorator* `pass:[{{#*inline "name"}}…{{/inline}}]`, which desugars to
+the core `inline` helper; the bare `pass:[{{#inline …}}]` spelling is *rejected*
+(`DisallowedShape`) in FullBars — authors do not write `inline` bare. A block `partial`
 renders the named partial with its `body` as both the fallback (when the partial is missing) and the
 `pass:[{{> @partial-block}}]` yield point; `inline` definitions are hoisted into the registry before
 rendering.

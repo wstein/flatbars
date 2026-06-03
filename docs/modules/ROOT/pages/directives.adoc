@@ -60,7 +60,7 @@ that already omits `0`, e.g. `minimal`).
 **Scoping is file-based and lexical.** A condition branches by the set declared in
 the file where it is *written* — never render-global, never inherited across an
 *external* partial boundary. An external partial uses its own `@truthiness`
-(default `handlebars` if it declares none); an inline `pass:[{{#inline}}]` partial
+(default `handlebars` if it declares none); an inline `pass:[{{#*inline}}]` partial
 is lexically part of its file and uses the file's mode. (A linter surfaces a
 caller/partial mode mismatch as information.)
 

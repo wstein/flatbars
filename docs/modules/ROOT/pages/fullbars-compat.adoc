@@ -183,12 +183,14 @@ the *operation*/*definition* vocabulary (xref:adr-0019-operation-vocabulary.adoc
 `registerHelper`. This flipped the one buildable
 conformance miss (`pass:[{{#bold}}]`): FullBars is now 49/50 (98%) vs Handlebars.
 
-|Block-partial sigils `pass:[{{#> name}}]` / `pass:[{{#*inline}}]`
-|☑ Accepted in FullBars — they parse as plain `pass:[{{#}}]`-section blocks headed by the sigil, with
-the `pass:[{{/…}}]` close resolved by `Parser.blockCloseName` (the partial name / `inline`), and
-desugar to the `pass:[{{#partial}}]` / `pass:[{{#inline}}]` core spellings (xref:surface.adoc[] §5.7).
-No new sigil or parse gate; the core parses them but only FullBars' surface gives them meaning (other
-dialects fail at render, not parse).
+|Block-partial sigil `pass:[{{#> name}}]` / inline-partial decorator `pass:[{{#*inline}}]`
+|☑ The FullBars author forms — they parse as plain `pass:[{{#}}]`-section blocks headed by the sigil,
+with the `pass:[{{/…}}]` close resolved by `Parser.blockCloseName` (the partial name / `inline`). The
+block-partial sigil desugars to the `pass:[{{#partial}}]` core spelling; the `pass:[{{#*inline}}]`
+decorator desugars to the core `inline` helper (xref:surface.adoc[] §5.7). The bare
+`pass:[{{#inline}}]` is *rejected* in FullBars (`FullBars.checkBareInline`, `DisallowedShape`) —
+`inline` is a decorator, not a block helper. RawBars/MaxBars are unaffected (they still accept bare
+`pass:[{{#inline}}]`; the core parses every form and only the surface gates the bare spelling).
 |===
 
 == 4. Familiar — works as a Handlebars author expects
@@ -219,7 +221,7 @@ This is the actual compatibility table.
 |Block params `pass:[as \|a b\|]` |surface ⇒ name strings |✓ |`each`/`with` bind them (xref:surface.adoc[] §5.5).
 |Partials `pass:[{{> name [ctx] [k=v]}}]`, dynamic `pass:[{{> (expr)}}]` |surface ⇒ `partial` |✓ |`renderSurfaceWith` registers them; hash merges onto context.
 |Block partials `pass:[{{#partial}}]`, `pass:[{{> @partial-block}}]` |block-aware `partial` |✓ |Body is the fallback + the `@partial-block` yield (core spelling; see §3).
-|Inline partials `pass:[{{#inline "n"}}]` |hoisted into the registry |✓ |Global to the render (core spelling; see §3).
+|Inline partials `pass:[{{#*inline "n"}}]` |hoisted into the registry |✓ |Global to the render (the `pass:[{{#*inline}}]` decorator is required; bare `pass:[{{#inline}}]` is rejected — see §3).
 |`pass:[{{else if c}}]` |⇒ `pass:[{{elif c}}]` |✓ |Native short-circuit clause; see §1.3.
 |Mustache-style section `pass:[{{#x}}…{{/x}}]` over data |`blockHelperMissing`: array ⇒ `each`, truthy ⇒ `with`, falsy/empty ⇒ `{{else}}` |✓ |An unregistered block head is looked up as data and dispatched exactly as {hbs} does (`Kernel.Prelude.blockHelperMissing` / `rt.block`). The inverted form `pass:[{{^x}}]` desugars to `pass:[{{#unless x}}]`.
 |`helperMissing` (inline `pass:[{{foo bar}}]`, unknown `foo`) |hard `UnknownHelper` |✓ |Matches {hbs}, which throws "Missing helper" for an unknown helper *called with arguments*; a bare `pass:[{{foo}}]` is a data read either way.

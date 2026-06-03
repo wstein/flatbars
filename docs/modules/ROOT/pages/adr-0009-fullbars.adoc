@@ -50,3 +50,19 @@ privileged one; the architecture must keep it swappable even as it serves as the
 * *Con:* because every other dialect is defined *relative to* FullBars, it carries gravitational
   weight despite being "just one engine" — the same tension ADR-001 logged as the
   shared-reference-lowering point.
+
+== Amendment (2026-06-03): inline partials require the `pass:[{{#*inline}}]` decorator
+
+FullBars now *requires* the Handlebars decorator form `pass:[{{#*inline "name"}}…{{/inline}}]`
+for inline partials and *rejects* the bare `pass:[{{#inline "name"}}…{{/inline}}]` spelling with a
+located `DisallowedShape` parse error. This matches Handlebars, where `inline` is a *decorator*, not
+a block helper. The original "Note" above — that `pass:[{{#*inline}}]` is merely accepted and
+desugars to a `pass:[{{#inline}}]` core spelling — is superseded *for the FullBars surface*: the
+decorator is now the author form, and it still desugars internally to the core `inline` helper
+(hoisted by `hoistInline`).
+
+This is a *FullBars-surface-only* gate (`FullBars.checkBareInline`, which also governs the CLI
+`--surface` path). The shared kernel `inline` helper is *retained* (a no-op block), so *RawBars and
+MaxBars are unchanged*: they still accept bare `pass:[{{#inline}}]` (MaxBars's grammar bans the `*`
+head, so bare is its only inline form). The generated helper catalog is unaffected — the helper still
+exists.
