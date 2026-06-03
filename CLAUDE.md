@@ -206,6 +206,10 @@ Mustache conformance table is generated from the vendored spec suite
   value clears WCAG AA (4.5:1) on its tint, the page bg, and as a solid chip —
   machine-checked by `npm run check:contrast` (also in `npm test`); documented
   sub-AA exceptions live in that script's `EXCEPTIONS` map.
+- **One app shell + one wordmark.** The docs layout and the landing share
+  `Topbar.astro` (wordmark · Chips · Theme · Legend · Open-the-Lab); the canonical
+  lockup lives in `Wordmark.astro` and the static Lab copies its markup —
+  `npm run check:wordmark` (in `npm test`) pins that they match.
 - **Compiler ≡ interpreter.** Any compiler change must keep `npm run
   test:compile` green (byte-identical output to the interpreter).
 - **`--pedantic-packages`** is enforced via `npm run lint`; declared deps must
