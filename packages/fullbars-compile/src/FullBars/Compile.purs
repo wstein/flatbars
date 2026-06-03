@@ -15,7 +15,7 @@ import Prelude
 import Data.Either (Either)
 import Data.Map as Map
 import FlatBars.Compile (compile)
-import FlatBars.Compile.Emit (fullbarsEmit, metaFor, resolveForCompile)
+import FlatBars.Compile.Emit (fullbarsEmit, metaFor)
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FullBars (LoopVars, checkBareInline, desugarSurfaceWith, hoistInline, noLoopVars)
@@ -33,8 +33,7 @@ compileSurface = compileSurfaceWith true noLoopVars defaultParseOptions
 -- | requires the `{{#*inline}}` decorator; MaxBars passes `false`).
 compileSurfaceWith :: Boolean -> LoopVars -> ParseOptions -> String -> Either ParseError String
 compileSurfaceWith strict lv opts src = do
-  { directives, nodes } <- parseWith opts src
+  { nodes } <- parseWith opts src
   checkBareInline strict nodes
-  fs <- resolveForCompile directives
   let h = hoistInline (desugarSurfaceWith lv nodes)
-  pure (compile (metaFor fs) fullbarsEmit (Map.toUnfoldable h.partials) h.template)
+  pure (compile metaFor fullbarsEmit (Map.toUnfoldable h.partials) h.template)

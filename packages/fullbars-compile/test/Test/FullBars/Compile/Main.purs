@@ -35,10 +35,10 @@ main = do
     , "rt.partial(\"row\", c1.ctx, null, partials, rt)"
     ]
 
-  -- ADR-022: truthiness is the engine's fixed `handlebars` rule (no per-file
-  -- @truthiness) — compiled output bakes the fixed falsy-set and threads it.
-  expectJsS "emits the fixed handlebars falsy-set + threads it"
+  -- ADR-022: truthiness is the engine's fixed `handlebars` rule, emitted as a
+  -- callback ($truthy = rt.truthyHandlebars) and threaded — no falsy-set data.
+  expectJsS "seeds + threads the handlebars truthiness callback"
     "{{#if n}}y{{else}}m{{/if}}"
-    [ "const $falsy = { b: 1, n: 1, s: 1, z: 1, a: 1 }", "rt.truthy(c0.falsy," ]
+    [ "rt.scope(data, rt.truthyHandlebars)", "rt.truthy(c0.truthy," ]
 
   log "all FullBars.Compile surface emitter tests passed"

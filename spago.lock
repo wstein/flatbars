@@ -214,12 +214,10 @@
         "core": {
           "dependencies": [
             "arrays",
-            "either",
             "flatbars",
             "foldable-traversable",
             "kernel",
             "maybe",
-            "ordered-collections",
             "prelude",
             "strings",
             "tuples"
@@ -274,6 +272,7 @@
             "assert",
             "console",
             "effect",
+            "either",
             "rawbars"
           ],
           "build_plan": [

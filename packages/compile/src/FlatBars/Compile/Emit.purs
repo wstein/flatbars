@@ -10,24 +10,18 @@
 -- | runs against `runtime/flatbars-runtime.mjs`.
 module FlatBars.Compile.Emit
   ( fullbarsEmit
-  , falsyLiteral
   , metaFor
-  , resolveForCompile
   , runtimeVersion
   ) where
 
 import Prelude
 
 import Data.Array as Array
-import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, maybe)
-import Data.Set as Set
 import Data.String (joinWith)
 import FlatBars.Compile (Ctx, Emit, Rec, jsString)
-import FlatBars.Error (ParseError)
-import FlatBars.Syntax (Directive, Expr(..), Ident, Template, splitBlockArgs)
+import FlatBars.Syntax (Expr(..), Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
-import Kernel.Value (FalsySet, FalsyShape(..), handlebars)
 import Kernel.Walk (Clause, splitClauses)
 
 -- | The runtime contract version, recorded in the compiled header and checked by
@@ -35,38 +29,18 @@ import Kernel.Walk (Clause, splitClauses)
 runtimeVersion :: String
 runtimeVersion = "0.1.0"
 
--- | The compile metadata: the runtime version, a module-level `$falsy` constant
--- | (the engine's fixed `handlebars` rule — ADR-022, no per-file `@truthiness`),
--- | and the root-frame seed that hands `$falsy` to `rt.scope`.
-metaFor :: FalsySet -> { runtimeVersion :: String, preamble :: String, seed :: String }
-metaFor fs =
+-- | The compile metadata for FullBars/RawBars: the runtime version and the
+-- | root-frame seed that hands the engine's truthiness *callback* to `rt.scope`
+-- | (ADR-022 — truthiness is only ever a `Value -> Boolean` callback, never a
+-- | baked falsy-set). The callback is `rt.truthyHandlebars` from the runtime, so
+-- | the seed references it directly (no module-level const — `rt` is only in
+-- | scope inside the emitted function). MinBars supplies its own `rt.truthyMustache`.
+metaFor :: { runtimeVersion :: String, preamble :: String, seed :: String }
+metaFor =
   { runtimeVersion
-  , preamble: "const $falsy = " <> falsyLiteral fs <> ";\n"
-  , seed: "rt.scope(data, $falsy)"
+  , preamble: ""
+  , seed: "rt.scope(data, rt.truthyHandlebars)"
   }
-
--- | The fixed truthiness rule baked into compiled FullBars/RawBars output
--- | (ADR-022). Retains the `Array Directive -> Either ParseError FalsySet` shape
--- | for call-site compatibility, but ignores directives — truthiness is no longer
--- | per-file. Always the `handlebars` rule.
-resolveForCompile :: Array Directive -> Either ParseError FalsySet
-resolveForCompile _ = Right handlebars
-
--- | The falsy-set as a JS object literal `{ b:1, n:1, … }` — one key per present
--- | shape (false/null/""/0/[]/{}); the runtime reads `!!set.<k>`. Mirrors
--- | `Kernel.Value.isFalsy` so the compiled path matches the interpreter.
-falsyLiteral :: FalsySet -> String
-falsyLiteral fs = "{ " <> joinWith ", " (Array.mapMaybe flag shapes) <> " }"
-  where
-  shapes = [ FFalse, FNull, FEmptyStr, FZero, FEmptyArr, FEmptyObj ]
-  flag sh = if Set.member sh fs then Just (key sh <> ": 1") else Nothing
-  key = case _ of
-    FFalse -> "b"
-    FNull -> "n"
-    FEmptyStr -> "s"
-    FZero -> "z"
-    FEmptyArr -> "a"
-    FEmptyObj -> "o"
 
 fullbarsEmit :: Emit
 fullbarsEmit = { expr: fbExpr, block: fbBlock }
@@ -134,12 +108,12 @@ fbBlock rec ctx name args body =
       _ -> rtBlock rec ctx name split body
 
 -- The condition test: 1 arg ⇒ `rt.truthy`; an options object (includeZero) ⇒
--- `rt.truthyWith`.
+-- `rt.truthyWith`. `scope.truthy` is the engine's truthiness *callback* (ADR-022).
 truthyTest :: Rec -> Ctx -> Array Expr -> String
 truthyTest rec ctx args = case args of
-  [ c ] -> "rt.truthy(" <> ctx.scope <> ".falsy, " <> rec.expr ctx c <> ")"
+  [ c ] -> "rt.truthy(" <> ctx.scope <> ".truthy, " <> rec.expr ctx c <> ")"
   [ c, opts ] ->
-    "rt.truthyWith(" <> ctx.scope <> ".falsy, " <> rec.expr ctx c <> ", " <> rec.expr ctx opts <>
+    "rt.truthyWith(" <> ctx.scope <> ".truthy, " <> rec.expr ctx c <> ", " <> rec.expr ctx opts <>
       ")"
   _ -> "false"
 

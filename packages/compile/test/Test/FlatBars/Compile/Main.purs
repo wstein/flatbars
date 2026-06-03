@@ -35,11 +35,10 @@ main :: Effect Unit
 main = do
   log "FlatBars.Compile emitter tests"
 
-  expectJs "header + scope + falsy-set preamble" "hi"
+  expectJs "header + scope seeded with the truthiness callback" "hi"
     [ "runtime 0.1.0"
     , "function (data, rt, partials)"
-    , "const $falsy = { b: 1, n: 1, s: 1, z: 1, a: 1 }" -- handlebars default
-    , "rt.scope(data, $falsy)"
+    , "rt.scope(data, rt.truthyHandlebars)" -- handlebars rule, as a callback (ADR-022)
     , "out += \"hi\""
     ]
 
@@ -49,7 +48,7 @@ main = do
 
   expectJs "if/else compiles to native control flow"
     "{{#if (lookup this \"a\")}}X{{else}}Y{{/if}}"
-    [ "if (rt.truthy(c0.falsy, rt.lookup(c0.ctx, \"a\"))) {"
+    [ "if (rt.truthy(c0.truthy, rt.lookup(c0.ctx, \"a\"))) {"
     , "} else {"
     , "out += \"X\""
     , "out += \"Y\""
@@ -57,11 +56,11 @@ main = do
 
   expectJs "elif chains to else-if"
     "{{#if (lookup this \"a\")}}A{{elif (lookup this \"b\")}}B{{else}}C{{/if}}"
-    [ "} else if (rt.truthy(c0.falsy, rt.lookup(c0.ctx, \"b\"))) {" ]
+    [ "} else if (rt.truthy(c0.truthy, rt.lookup(c0.ctx, \"b\"))) {" ]
 
   expectJs "unless negates the test"
     "{{#unless (lookup this \"a\")}}N{{/unless}}"
-    [ "if (!(rt.truthy(c0.falsy, rt.lookup(c0.ctx, \"a\")))) {" ]
+    [ "if (!(rt.truthy(c0.truthy, rt.lookup(c0.ctx, \"a\")))) {" ]
 
   expectJs "each compiles to a frame loop with a child scope"
     "{{#each (lookup this \"xs\")}}{{{this}}}{{/each}}"

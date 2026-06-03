@@ -33,7 +33,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
-import FlatBars.Compile.Emit (fullbarsEmit, metaFor, resolveForCompile)
+import FlatBars.Compile.Emit (fullbarsEmit, metaFor)
 import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
@@ -146,8 +146,7 @@ compileJs = compileJsWith coreOptions
 -- | `compileJs` with explicit parse options; RawBars always rejects extras.
 compileJsWith :: ParseOptions -> String -> Either ParseError String
 compileJsWith opts src = do
-  { directives, nodes } <- parseWith
+  { nodes } <- parseWith
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
-  fs <- resolveForCompile directives
-  pure (Driver.compile (metaFor fs) fullbarsEmit [] nodes)
+  pure (Driver.compile metaFor fullbarsEmit [] nodes)

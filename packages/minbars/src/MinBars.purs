@@ -32,7 +32,7 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Compile (compile)
-import FlatBars.Compile.Emit (falsyLiteral, runtimeVersion)
+import FlatBars.Compile.Emit (runtimeVersion)
 import FlatBars.Error (ParseError(..), renderParseErrorAt)
 import FlatBars.Lexer (LexConfig, defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives, defaultParseOptions)
@@ -41,7 +41,6 @@ import FlatBars.Value (Value(..))
 import Kernel.Engine (runTemplate)
 import Kernel.Env (recursionBudget)
 import Kernel.Render (formatError)
-import Kernel.Value (mustache)
 import MinBars.Compile (minEmit)
 import MinBars.Context (seedEnv)
 import MinBars.Prelude (harvestBlocks, indentTemplate, leadingIndent, minEngine)
@@ -173,14 +172,14 @@ compileMinJsWith partialSrcs src = do
   where
   parsePartial (Tuple name s) = parseMin s <#> \r -> Tuple name (desugar r.nodes)
 
--- | The MinBars compile metadata: the runtime version, the `$falsy` const (the
--- | engine's fixed `mustache` rule — ADR-022, no per-file `@truthiness`), and the
--- | root-stack seed.
+-- | The MinBars compile metadata: the runtime version, a module-level `$truthy`
+-- | **callback** bound to the fixed `mustache` rule (ADR-022 — truthiness is only
+-- | ever a `Value -> Boolean` callback), and the root-stack seed.
 minMeta :: { runtimeVersion :: String, preamble :: String, seed :: String }
 minMeta =
   { runtimeVersion
-  , preamble: "const $falsy = " <> falsyLiteral mustache <> ";\n"
-  , seed: "rt.mseed(data, $falsy)"
+  , preamble: ""
+  , seed: "rt.mseed(data, rt.truthyMustache)"
   }
 
 -- | Resolve partials and inheritance into a partial-free, inheritance-free

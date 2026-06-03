@@ -48,7 +48,7 @@ import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
 import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTruthy)
 import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
-import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify, truthy)
+import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
 
 --------------------------------------------------------------------------------
@@ -941,7 +941,7 @@ isZeroNum = case _ of
 -- | Read a boolean option from an options object (`VObject`); absent ⇒ false.
 optFlag :: String -> Value -> Boolean
 optFlag key = case _ of
-  VObject m -> maybe false (truthy handlebars) (Map.lookup key m)
+  VObject m -> maybe false handlebars (Map.lookup key m)
   _ -> false
 
 --------------------------------------------------------------------------------

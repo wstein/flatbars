@@ -14,7 +14,7 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars (Node(..), Value(..), parse)
 import Kernel.ToValue (toValue)
-import Kernel.Value (handlebars, isFalsy, minimal, mustache, truthy)
+import Kernel.Value (handlebars, minimal, mustache)
 import Kernel.Walk (Arity(..), foldTemplate, splitClauses, validate)
 import Test.Assert (assert')
 
@@ -37,17 +37,17 @@ main :: Effect Unit
 main = do
   log "Kernel tests"
 
-  -- value policy: truthiness under a falsy-set.
-  assert' "truthy: false is falsy (handlebars)" (truthy handlebars (VBool false) == false)
-  assert' "truthy: 0 is falsy (handlebars)" (truthy handlebars (VNumber 0.0) == false)
-  assert' "truthy: 0 is truthy (minimal)" (truthy minimal (VNumber 0.0) == true)
-  assert' "truthy: non-empty string truthy" (truthy handlebars (VString "x") == true)
-  -- mustache set: false/null/[] falsy; 0/""/{}  truthy (the Mustache rule)
-  assert' "mustache: 0 is truthy" (truthy mustache (VNumber 0.0) == true)
-  assert' "mustache: empty string truthy" (truthy mustache (VString "") == true)
-  assert' "mustache: empty object truthy" (truthy mustache (VObject Map.empty) == true)
-  assert' "mustache: empty array falsy" (isFalsy mustache (VArray []) == true)
-  assert' "mustache: false falsy" (isFalsy mustache (VBool false) == true)
+  -- value policy: truthiness is a Value -> Boolean rule (ADR-022 — callback only).
+  assert' "handlebars: false is falsy" (handlebars (VBool false) == false)
+  assert' "handlebars: 0 is falsy" (handlebars (VNumber 0.0) == false)
+  assert' "minimal: 0 is truthy" (minimal (VNumber 0.0) == true)
+  assert' "handlebars: non-empty string truthy" (handlebars (VString "x") == true)
+  -- mustache rule: false/null/[] falsy; 0/""/{} truthy
+  assert' "mustache: 0 is truthy" (mustache (VNumber 0.0) == true)
+  assert' "mustache: empty string truthy" (mustache (VString "") == true)
+  assert' "mustache: empty object truthy" (mustache (VObject Map.empty) == true)
+  assert' "mustache: empty array falsy" (mustache (VArray []) == false)
+  assert' "mustache: false falsy" (mustache (VBool false) == false)
   -- ADR-022: truthiness is a fixed per-engine rule (these named rules are the
   -- data-backed menu), no per-file @truthiness resolver anymore.
 

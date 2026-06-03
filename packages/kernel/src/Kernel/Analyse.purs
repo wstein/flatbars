@@ -45,7 +45,7 @@ import Kernel.Engine (Engine, Operation, runTemplate)
 import Kernel.Env (RefEnv, refTruthy, registerAll)
 import Kernel.Prelude (prelude)
 import Kernel.Render (preludeEnv)
-import Kernel.Value (FalsySet, handlebars, minimal, mustache, presence, truthy)
+import Kernel.Value (Truthy, handlebars, minimal, mustache, presence)
 
 -- | One observed truthiness decision: where the condition tag is, which operation
 -- | tested it, the value it resolved to, whether the *engine* judged it truthy,
@@ -65,7 +65,7 @@ type AnalyseM = WriterT (Array Decision) (Either Error)
 -- | The named, data-backed rules Part B replays to decide divergence (ADR-022
 -- | Part A.2). `handlebars` is the engine rule the analysed FullBars render uses;
 -- | the others are the cross-engine comparison set.
-namedRules :: Array (Tuple String FalsySet)
+namedRules :: Array (Tuple String Truthy)
 namedRules =
   [ Tuple "handlebars" handlebars
   , Tuple "mustache" mustache
@@ -79,7 +79,7 @@ namedRules =
 divergence :: Value -> Boolean -> Array (Tuple String Boolean)
 divergence v here =
   Array.filter (\t -> snd t /= here)
-    (map (\t -> Tuple (fst t) (truthy (snd t) v)) namedRules)
+    (map (\t -> Tuple (fst t) ((snd t) v)) namedRules)
 
 -- | A decision is a *finding* when some engine would branch the other way.
 isFinding :: Decision -> Boolean

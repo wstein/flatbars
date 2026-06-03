@@ -14,7 +14,6 @@ import Data.Foldable (for_)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Number (nan)
-import Data.Set as Set
 import Data.String (Pattern(..), contains, toUpper)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -25,7 +24,7 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (FalsySet, FalsyShape(..), RNode(..), RefEnv, analyseSurface, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, prelude, preludeEnv, preludeSchema, refEngine, renderSurface, renderSurfaceWith, stringify, truthy)
+import FullBars (RNode(..), RefEnv, always, analyseSurface, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
 import Kernel.Walk (arityOk, foldTemplate, validate)
@@ -406,21 +405,18 @@ main = do
   -- object, so even an empty one is truthy; that divergence is intentional.)
   for_ [ "", "0", "x" ] \s ->
     assert' ("safe-truthiness invariant for " <> show s)
-      (truthy handlebars (VSafe s) == truthy handlebars (VString s))
+      (handlebars (VSafe s) == handlebars (VString s))
 
-  -- §8 truthiness matrix — the engine's value policy across modes. This is the
-  -- semantics EVERY dialect shares (RawBars/FullBars/future MaxBars all render
-  -- through one `truthy`, parameterised only by the falsy-set); locks §3.2/§8.
+  -- §8 truthiness matrix — the named rules as plain `Value -> Boolean` callbacks
+  -- (ADR-022; no falsy-set data). Locks the cross-engine semantics. `minimal` is
+  -- the Ruby/Lua `nil` rule (false/null only).
   let
-    ruby = Set.fromFoldable [ FFalse, FNull ]
-    presence = Set.fromFoldable [ FFalse, FNull, FEmptyArr, FEmptyObj ]
-    always = Set.empty :: FalsySet
     row label v hb' rb' pr' al' = do
-      assert' (label <> " @handlebars") (truthy handlebars v == hb')
-      assert' (label <> " @ruby") (truthy ruby v == rb')
-      assert' (label <> " @presence") (truthy presence v == pr')
-      assert' (label <> " @always") (truthy always v == al')
-  --      value                     hb     ruby   presence always
+      assert' (label <> " handlebars") (handlebars v == hb')
+      assert' (label <> " minimal") (minimal v == rb')
+      assert' (label <> " presence") (presence v == pr')
+      assert' (label <> " always") (always v == al')
+  --      value                     hb     minimal presence always
   row "false" (VBool false) false false false true
   row "null" VNull false false false true
   row "0" (VNumber 0.0) false true true true

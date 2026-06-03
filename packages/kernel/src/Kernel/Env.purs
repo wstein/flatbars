@@ -42,7 +42,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value)
 import Kernel.Engine (Engine, Operation)
-import Kernel.Value (handlebars, stringify, truthy)
+import Kernel.Value (handlebars, stringify)
 
 -- | Lift a pure `Either Error` into the engine monad — the single place the
 -- | `Left e -> throwError e` plumbing lives, shared by `refEngine` and helpers.
@@ -88,7 +88,7 @@ emptyEnv ctx = RefEnv
   { context: ctx
   , helpers: Map.empty : Nil
   , partials: Map.empty
-  , truthy: truthy handlebars
+  , truthy: handlebars
   , depth: 0
   }
 

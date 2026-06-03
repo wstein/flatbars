@@ -47,7 +47,7 @@ import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (blockHelperMissing, prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
-import Kernel.Value (FalsySet, FalsyShape(..), always, escapeHtml, handlebars, isFalsy, minimal, mustache, presence, stringify, truthy)
+import Kernel.Value (Truthy, always, escapeHtml, handlebars, minimal, mustache, presence, stringify)
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).

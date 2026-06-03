@@ -12,10 +12,8 @@ package:
     - strings
     - maybe
     - foldable-traversable
-    - either
     - flatbars
     - kernel
-    - ordered-collections
     - tuples
   test:
     main: Test.FlatBars.Compile.Main
@@ -23,4 +21,5 @@ package:
       - effect
       - console
       - assert
+      - either
       - rawbars

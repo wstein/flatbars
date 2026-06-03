@@ -5,15 +5,12 @@
 -- | A different engine could define truthiness, escaping, and stringification
 -- | differently; these are this engine's choices.
 module Kernel.Value
-  ( FalsyShape(..)
-  , FalsySet
+  ( Truthy
   , handlebars
   , minimal
   , presence
   , always
   , mustache
-  , isFalsy
-  , truthy
   , stringify
   , jsonStringify
   , jsonStringifyPretty
@@ -30,8 +27,6 @@ import Data.Int (hexadecimal, toStringAs)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Monoid (power)
-import Data.Set (Set)
-import Data.Set as Set
 import Data.String (Pattern(..), Replacement(..), length, replaceAll, stripSuffix)
 import Data.String.CodeUnits (singleton, toCharArray)
 import Data.String.Common (joinWith)
@@ -40,81 +35,60 @@ import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
 import FlatBars.Value (Value(..))
 
--- | The closed vocabulary of *falsy shapes*: which value shapes a truthiness
--- | mode treats as false. These denote shapes, not values — value-specific
--- | logic (e.g. "is it the string `"no"`") is `eq`'s job, never truthiness.
--- | See `docs/.../truthiness` §2.2.
-data FalsyShape
-  = FFalse -- `VBool false`
-  | FNull -- `VNull`
-  | FEmptyStr -- the empty string `VString ""`
-  | FZero -- numeric zero `VNumber 0.0`
-  | FEmptyArr -- the empty array `VArray []`
-  | FEmptyObj -- the empty object `VObject` (no keys)
-
-derive instance Eq FalsyShape
-derive instance Ord FalsyShape
-
--- | A truthiness *mode*: the set of shapes that count as false. The set is the
--- | only thing that varies between modes (`handlebars`/`ruby`/`presence`/…); the
--- | `isFalsy`/`truthy` machinery is fixed.
-type FalsySet = Set FalsyShape
+-- | A truthiness *rule* (ADR-022): the engine's *only* truthiness representation
+-- | — a callback from a value to whether it is truthy. There is no data/config
+-- | form; an engine plugs in one of these. The named rules below are the standard
+-- | implementations. `VSafe` is judged by its content (a safe `""` tests as `""`);
+-- | `NaN` is truthy under every rule (`NaN /= 0.0`).
+type Truthy = Value -> Boolean
 
 -- | The Handlebars rule: `false`, `null`, `""`, `0`, and the empty array are
 -- | falsy; `{}` and every non-empty/non-zero value are truthy. The fixed
 -- | truthiness rule of FullBars/RawBars/MaxBars (ADR-022).
-handlebars :: FalsySet
-handlebars = Set.fromFoldable [ FFalse, FNull, FEmptyStr, FZero, FEmptyArr ]
-
--- | Is a value falsy under the given mode? Each shape is false only if its
--- | marker is in the set; everything else is truthy. A `VSafe` is judged by its
--- | *content* (a safe empty string is as falsy as a plain empty string) — the
--- | engine's long-standing content-based rule. `NaN` is truthy under every mode
--- | (`NaN == 0.0` is false, so `FZero` never matches it).
-isFalsy :: FalsySet -> Value -> Boolean
-isFalsy fs = case _ of
-  VBool b -> not b && FFalse `Set.member` fs
-  VNull -> FNull `Set.member` fs
-  VString "" -> FEmptyStr `Set.member` fs
-  VString _ -> false
-  VNumber n -> n == 0.0 && FZero `Set.member` fs
-  VArray a -> Array.null a && FEmptyArr `Set.member` fs
-  VObject o -> Map.isEmpty o && FEmptyObj `Set.member` fs
-  VSafe s -> isFalsy fs (VString s)
-
--- | Truthiness under a mode — the negation of `isFalsy`. (`includeZero` on
--- | `if`/`unless` is a per-call exception layered on the mode; see
--- | `Kernel.Prelude.truthyWith`.)
-truthy :: FalsySet -> Value -> Boolean
-truthy fs = not <<< isFalsy fs
-
---------------------------------------------------------------------------------
--- The named rules (the data-backed menu engines pick from; ADR-022)
---------------------------------------------------------------------------------
+handlebars :: Truthy
+handlebars = case _ of
+  VBool b -> b
+  VNull -> false
+  VString s -> s /= ""
+  VNumber n -> n /= 0.0
+  VArray a -> not (Array.null a)
+  VObject _ -> true
+  VSafe s -> handlebars (VString s)
 
 -- | `minimal` (≡ Ruby/Lua/Lisp `nil`): only `false`/`null` are falsy — `0`, `""`,
 -- | `[]`, `{}` are all truthy.
-minimal :: FalsySet
-minimal = Set.fromFoldable [ FFalse, FNull ]
+minimal :: Truthy
+minimal = case _ of
+  VBool b -> b
+  VNull -> false
+  _ -> true
 
 -- | `presence`: present ⇒ truthy. `false`/`null` and the *empty* collections are
 -- | falsy, but scalars (`0`, `""`) are truthy. `false` is kept falsy on purpose.
-presence :: FalsySet
-presence = Set.fromFoldable [ FFalse, FNull, FEmptyArr, FEmptyObj ]
+presence :: Truthy
+presence = case _ of
+  VBool b -> b
+  VNull -> false
+  VArray a -> not (Array.null a)
+  VObject o -> not (Map.isEmpty o)
+  _ -> true
 
--- | `always`: nothing is falsy — every value is truthy (the empty set). Not an
--- | engine rule; retained as the documented "nothing-falsy" point of the rule
--- | space (and the `truthy always` identity in tests).
-always :: FalsySet
-always = Set.empty
+-- | `always`: nothing is falsy — every value is truthy. Not an engine rule;
+-- | retained as the documented "nothing-falsy" point of the rule space.
+always :: Truthy
+always = const true
 
 -- | `mustache` (`false null []`): the Mustache rule — `false`, `null`, and the
 -- | empty *array* are falsy, but `0`, `""`, and `{}` are **truthy**. Distinct
 -- | from `presence` (which also makes `{}` falsy) and from `handlebars` (which
 -- | also makes `""`/`0` falsy). This is MinBars' fixed rule; the spec suite would
 -- | fail if `0`/`""` were treated as falsy.
-mustache :: FalsySet
-mustache = Set.fromFoldable [ FFalse, FNull, FEmptyArr ]
+mustache :: Truthy
+mustache = case _ of
+  VBool b -> b
+  VNull -> false
+  VArray a -> not (Array.null a)
+  _ -> true
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
 -- | the `escapeHtml` helper); arrays join with `","` and objects are an error.

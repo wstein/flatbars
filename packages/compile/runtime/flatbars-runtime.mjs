@@ -40,26 +40,38 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
 
-// ── truthiness (FullBars.Value) — parameterised by a falsy-set ───────────────
-// A *set* is `{ b,n,s,z,a,o }` of booleans for the six falsy shapes
-// (false / null / "" / 0 / [] / {}); an absent key ⇒ that shape is NOT falsy.
-// `HB` is the Handlebars default, used for runtime-internal/config truthiness
-// (e.g. the `pretty` option) that is not governed by a file's @truthiness.
-const HB = { b: 1, n: 1, s: 1, z: 1, a: 1 };
+// ── truthiness (FullBars.Value) — a Value→boolean CALLBACK (ADR-022) ─────────
+// Truthiness is *only* a callback; there is no falsy-set data form. A scope
+// carries its rule in `.truthy`; the compiled module binds one of the named
+// rules below (`$truthy = rt.truthyHandlebars` / `rt.truthyMustache`). These
+// mirror `Kernel.Value` exactly so the compiled path matches the interpreter.
 
-function isFalsy(set, v) {
-  if (isSafe(v)) return isFalsy(set, v.s);        // a safe string tests as its content
-  if (v === null || v === undefined) return !!set.n;
+// Handlebars: false / null / "" / 0 / [] are falsy; {} and non-empty/non-zero
+// are truthy. (NaN !== 0 ⇒ truthy. A safe string tests as its content.)
+function truthyHandlebars(v) {
+  if (isSafe(v)) return truthyHandlebars(v.s);
+  if (v === null || v === undefined) return false;
   switch (typeof v) {
-    case "boolean": return v === false && !!set.b;
-    case "string": return v === "" && !!set.s;
-    case "number": return v === 0 && !!set.z;     // NaN: NaN===0 is false ⇒ truthy
+    case "boolean": return v;
+    case "string": return v !== "";
+    case "number": return v !== 0;
   }
-  if (Array.isArray(v)) return v.length === 0 && !!set.a;
-  return Object.keys(v).length === 0 && !!set.o;  // {} falsy only under `presence`
+  if (Array.isArray(v)) return v.length > 0;
+  return true; // {} is truthy
 }
-function truthy(set, v) {
-  return !isFalsy(set, v);
+
+// Mustache: false / null / [] are falsy; 0 / "" / {} are truthy.
+function truthyMustache(v) {
+  if (isSafe(v)) return true;
+  if (v === null || v === undefined) return false;
+  if (typeof v === "boolean") return v;
+  if (Array.isArray(v)) return v.length > 0;
+  return true; // 0, "", {}, other objects
+}
+
+// Apply a truthiness callback (the emit calls `rt.truthy(scope.truthy, v)`).
+function truthy(f, v) {
+  return f(v);
 }
 
 // ── value equality / ordering (structural, like the prelude helpers) ─────────
@@ -117,7 +129,7 @@ function pathOf(v, key) {
 }
 
 // ── frames ───────────────────────────────────────────────────────────────────
-function scope(data, falsy) {
+function scope(data, truthyFn) {
   return {
     ctx: data ?? null, index: null, key: null, first: null, last: null,
     index0: null, index1: null, rindex0: null, rindex1: null, length: null,
@@ -126,7 +138,7 @@ function scope(data, falsy) {
     // scoped bindings (block params + loop labels). A null-proto object so the
     // `in` test never finds Object.prototype members; child frames chain onto it.
     binds: Object.create(null),
-    falsy: falsy || HB,             // the active @truthiness mode (default Handlebars)
+    truthy: truthyFn || truthyHandlebars, // the engine's truthiness callback (ADR-022)
   };
 }
 // A child frame, exposing the *enclosing* frame's loop data under `parent-*`
@@ -150,7 +162,7 @@ function childFrame(parent, ctx, index, key, first, last, len) {
     // labels stay visible inward), with this frame's own binds shadowing them —
     // matching the interpreter's pushed-frame stack.
     binds: Object.create(parent.binds),
-    falsy: parent.falsy,            // a loop/with body inherits the file's mode
+    truthy: parent.truthy,          // a loop/with body inherits the engine's rule
   };
 }
 
@@ -249,7 +261,7 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
 // context shift). `label` is accepted for signature symmetry with `each` but the
 // surface only emits a loop label on `each`, so it is null here in practice.
 function withCtx(val, parent, names, label, bodyFn, elseFn) {
-  if (!truthy(parent.falsy, val)) return elseFn(parent);
+  if (!truthy(parent.truthy, val)) return elseFn(parent);
   return bodyFn(
     bindContextChain(bindNames(childFrame(parent, val, null, null, null, null), names, [val]), parent),
   );
@@ -305,7 +317,7 @@ function renderJson(v, indent, depth) {
   const members = Object.keys(v).sort().map((k) => jsonQuote(k) + colon + renderJson(v[k], indent, depth + 1));
   return wrap("{", "}", members);
 }
-const jsonText = (v, opts) => renderJson(v, opts && typeof opts === "object" && truthy(HB, opts.pretty) ? "  " : null, 0);
+const jsonText = (v, opts) => renderJson(v, opts && typeof opts === "object" && truthyHandlebars(opts.pretty) ? "  " : null, 0);
 
 // ── output / escaping helpers the codegen inlines ────────────────────────────
 const out = (v) => stringify(v);
@@ -354,9 +366,9 @@ const helpers = {
   gt: (a) => order((o) => o === 1, a[0], a[1]),
   lte: (a) => order((o) => o !== 1, a[0], a[1]),
   gte: (a) => order((o) => o !== -1, a[0], a[1]),
-  not: (a, f) => !truthy(f.falsy, a[0]),
-  and: (a, f) => a.every((v) => truthy(f.falsy, v)),
-  or: (a, f) => a.some((v) => truthy(f.falsy, v)),
+  not: (a, f) => !truthy(f.truthy, a[0]),
+  and: (a, f) => a.every((v) => truthy(f.truthy, v)),
+  or: (a, f) => a.some((v) => truthy(f.truthy, v)),
   // arithmetic — strictly numeric (matches the interpreter's asNum): a non-number
   // operand throws. JS `+ - * /` are the same ops the PureScript interpreter
   // compiles to; modulo uses the trunc form, identical to `Kernel.Prelude.jsMod`.
@@ -501,12 +513,13 @@ function call(name, args, frame) {
   throw new Error("UnknownHelper: no helper named '" + name + "' in any frame");
 }
 
-// truthiness under a set, honouring an options object's includeZero as a
-// per-call exception (FullBars truthyWith): includeZero removes the zero shape
-// for this one test, composing with whatever the file's mode is.
-function truthyWith(set, v, opts) {
-  const inc = opts && typeof opts === "object" && truthy(HB, opts.includeZero);
-  return truthy(inc ? { ...set, z: 0 } : set, v);
+// truthiness under a callback, honouring an options object's includeZero as a
+// per-call exception (FullBars truthyWith): the number 0 counts as truthy for
+// this one test, on top of the engine's rule `f` (ADR-022).
+function truthyWith(f, v, opts) {
+  const inc = opts && typeof opts === "object" && truthyHandlebars(opts.includeZero);
+  if (inc && v === 0) return true;
+  return f(v);
 }
 
 // Block helpers not lowered to native control flow (the emitter routes them
@@ -529,8 +542,8 @@ function block(name, args, frame, bodyFn, clauses, channel) {
     const rest = args.slice(1);
     const elseFn = (clauses && clauses.else) || (() => "");
     switch (target) {
-      case "if": return truthy(frame.falsy, rest[0]) ? bodyFn(frame) : elseFn(frame);
-      case "unless": return truthy(frame.falsy, rest[0]) ? elseFn(frame) : bodyFn(frame);
+      case "if": return truthy(frame.truthy, rest[0]) ? bodyFn(frame) : elseFn(frame);
+      case "unless": return truthy(frame.truthy, rest[0]) ? elseFn(frame) : bodyFn(frame);
       case "each": return each(rest[0], frame, [], null, bodyFn, elseFn);
       case "with": return withCtx(rest[0], frame, [], null, bodyFn, elseFn);
       // an inline helper target: call it (body ignored) and stringify the result.
@@ -597,12 +610,11 @@ function raw(_name, body) { return body; }
 // not the RefEnv frame. These mirror MinBars.Context/MinBars.Prelude exactly
 // (the compile-conformance gate enforces it). Output/escape reuse out/esc/stringify
 // above — the runtime's escapeHtml/stringify already match the kernel's.
-const MUSTACHE = { b: 1, n: 1, a: 1 }; // false/null/[] falsy (fallback; $falsy is generated)
-
 // The root MinBars scope: the datum as the sole stack frame (MinBars.Context.seedEnv).
-function mseed(data, falsy) { return { stack: [data ?? null], falsy: falsy || MUSTACHE }; }
+// `truthy` is MinBars' fixed `mustache` callback (the module binds $truthy).
+function mseed(data, truthyFn) { return { stack: [data ?? null], truthy: truthyFn || truthyMustache }; }
 // Push a frame (sections render their body under a push; MinBars.Context.push).
-function mpush(env, v) { return { stack: [v, ...env.stack], falsy: env.falsy }; }
+function mpush(env, v) { return { stack: [v, ...env.stack], truthy: env.truthy }; }
 // A plain (non-array, non-Safe) object frame that owns `key` (the walk predicate).
 const mhas = (v, key) =>
   v !== null && typeof v === "object" && !Array.isArray(v) && !isSafe(v) &&
@@ -627,7 +639,7 @@ function mlookup(env, name) {
 // falsy value renders zero times. Bodies are joined raw (already escaped by their
 // own interpolations).
 function msection(v, env, bodyFn) {
-  const items = Array.isArray(v) ? v : (isFalsy(env.falsy, v) ? [] : [v]);
+  const items = Array.isArray(v) ? v : (env.truthy(v) ? [v] : []);
   let out = "";
   for (const it of items) out += bodyFn(mpush(env, it));
   return out;
@@ -635,7 +647,7 @@ function msection(v, env, bodyFn) {
 
 // Inverted-section test (MinBars.Prelude.invertedH renders iff the value is falsy
 // under the active mode; the body runs in the unchanged context).
-const mfalsy = (env, v) => isFalsy(env.falsy, v);
+const mfalsy = (env, v) => !env.truthy(v);
 
 // Block-override reindentation (ADR-016 slice 3 / MinBars.Prelude.indentOverride):
 // add a standalone `{{$block}}`'s expansion indent to each non-empty line of the
@@ -652,6 +664,7 @@ function mindentOverride(indent, body) {
 
 export const rt = {
   RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, block, raw, Safe,
+  truthyHandlebars, truthyMustache, // ADR-022: the named truthiness callbacks ($truthy binds one)
   register, // ADR-018: host-registered inline helpers
   mseed, mlookup, msection, mfalsy, mindentOverride,
 };
