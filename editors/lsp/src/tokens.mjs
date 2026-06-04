@@ -51,15 +51,20 @@ export function dialectForLanguageId(languageId) {
 
 // A robust fallback when the languageId is not a dialect (the `flatbars` umbrella,
 // or a host — e.g. JetBrains — that doesn't send our id): map the native extension.
-// Returns null if the extension picks no dialect. Each dialect ships two native
-// extensions — long (`.rawbars`) and short (`.rbars`); both resolve here.
+// Returns null if the extension picks no dialect. Each dialect ships long-form
+// (`.rawbars`) and short-form (`.rbars`) extensions; FullBars also claims the
+// Handlebars extensions and MinBars the Mustache extension (see
+// editors/shared/sync.mjs LANGUAGES for the canonical mapping).
 const URI_EXTENSION_DIALECT = {
   ".rawbars": "rawbars",
   ".rbars": "rawbars",
   ".minbars": "minbars",
   ".mbars": "minbars",
+  ".mustache": "minbars",
   ".fullbars": "fullbars",
   ".fbars": "fullbars",
+  ".hbs": "fullbars",
+  ".handlebars": "fullbars",
   ".maxbars": "maxbars",
   ".xbars": "maxbars",
 };
@@ -111,20 +116,29 @@ function flatten(text, dialect) {
 }
 
 // Paint operation-position identifiers (helper names) as the `operation` kind.
-// `expr` / `raw` / `partial` tags get a head paint; every tag scans its body for
-// subexpression heads (`(` + IDENT). The TextMate grammar handles control-tag
-// sigils (`#each`, `/if`, …) as `keyword.control.section`, so this only touches
-// what the grammar leaves default. Gated on the operations catalog so plain
-// variables (`{{name}}`) stay default-coloured; partial names always paint.
-const HEAD_OPERATION_TAG_KINDS = new Set(["expr", "raw", "partial"]);
-const NO_OPERATION_TAG_KINDS = new Set(["comment", "raw-block", "error", "set-delimiter", "keyword"]);
+// Per-tag-kind position policy comes from the vocabulary's `operationPosition`
+// field, so a vocab edit (e.g. flipping a new kind to `any`) immediately changes
+// LSP behaviour without touching this file. Catalog lookup gates `head` and `any`
+// (plain variables stay default-coloured); `always-head` skips the catalog (used
+// for partial names — user-defined, never in the catalogue).
+const operationPositionByKind = (() => {
+  const m = new Map();
+  for (const [k, def] of Object.entries(vocabulary.kinds)) {
+    if (def.role === "tag" && def.operationPosition) m.set(k, def.operationPosition);
+  }
+  return m;
+})();
 const IDENT_RE = /^[A-Za-z_][\w-]*/;
 
 function paintOperations(kinds, text, spans) {
   for (const s of spans) {
     if (s.role !== "tag") continue;
-    if (NO_OPERATION_TAG_KINDS.has(s.kind)) continue;
-    if (HEAD_OPERATION_TAG_KINDS.has(s.kind)) paintHeadOperation(kinds, text, s);
+    const pos = operationPositionByKind.get(s.kind);
+    if (!pos || pos === "none") continue;
+    if (pos === "head") paintHeadOperation(kinds, text, s, false);
+    else if (pos === "always-head") paintHeadOperation(kinds, text, s, true);
+    // `any` (block tags): the head is the grammar's keyword.control.section;
+    // we only scan subexpression heads + pipe targets inside the body.
     paintSubexpressionHeads(kinds, text, s);
     paintPipeTargets(kinds, text, s);
   }
@@ -142,7 +156,7 @@ function paintPipeTargets(kinds, text, s) {
   }
 }
 
-function paintHeadOperation(kinds, text, s) {
+function paintHeadOperation(kinds, text, s, alwaysPaint) {
   let i = s.from;
   // Skip braces, whitespace-control `~`, raw sigil `&`, whitespace.
   while (i < s.to && /[{}~&\s]/.test(text[i])) i++;
@@ -152,7 +166,7 @@ function paintHeadOperation(kinds, text, s) {
     if (text[i] === "*") i++;
     while (i < s.to && /\s/.test(text[i])) i++;
   }
-  paintIdentAt(kinds, text, i, s.to, s.kind === "partial");
+  paintIdentAt(kinds, text, i, s.to, alwaysPaint);
 }
 
 function paintSubexpressionHeads(kinds, text, s) {
@@ -273,6 +287,165 @@ export function hoverAt(text, dialect, offset) {
 // ({ label, detail, kind, sortText }); server.mjs maps `kind` to CompletionItemKind.
 export function completionsAt(text, dialect, offset) {
   return inTagContext(text, dialect, offset) ? completionItems() : [];
+}
+
+// ── Folding (ADR-026) ────────────────────────────────────────────────────────
+// Every matched (block-open, block-close) pair is a fold region; every raw-block
+// open/close pair is one too. We pair by the block-open's *body word* — Mustache
+// requires `{{/name}}` to match the open's `{{#name}}`, so two scans by `bodyWord`
+// give a correct stack. Unbalanced opens are dropped silently (the diagnostics
+// path already reports them as parse errors).
+const BLOCK_OPEN_KINDS = new Set(["block-open", "block-inverse", "block-parent", "block-decl", "raw-block"]);
+const BLOCK_CLOSE_KIND = "block-close";
+
+export function foldingRangesOf(text, dialect) {
+  const spans = tokenize(text, dialect);
+  const stack = [];
+  const ranges = [];
+  // raw-block tokens come as a single span; its `from`/`to` cover the WHOLE block
+  // (open through close). Emit it directly. Other block tags pair up.
+  for (const s of spans) {
+    if (s.role !== "tag") continue;
+    if (s.kind === "raw-block") {
+      ranges.push({ start: lineOf(text, s.from), end: lineOf(text, s.to - 1) });
+      continue;
+    }
+    if (BLOCK_OPEN_KINDS.has(s.kind)) stack.push({ word: bodyWord(text, s), line: lineOf(text, s.from) });
+    else if (s.kind === BLOCK_CLOSE_KIND) {
+      const word = bodyWord(text, s);
+      // Pop until we find a matching open (silently drops unbalanced opens).
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i].word === word) {
+          ranges.push({ start: stack[i].line, end: lineOf(text, s.from) });
+          stack.splice(i);
+          break;
+        }
+      }
+    }
+  }
+  // Drop zero-length folds (open + close on same line) — they're invalid LSP.
+  return ranges.filter((r) => r.end > r.start);
+}
+
+function bodyWord(text, s) {
+  // Skip braces, sigils, `~`, whitespace; capture the next identifier.
+  let i = s.from;
+  while (i < s.to && /[{}~#/\^<$>&!\s]/.test(text[i])) i++;
+  const m = IDENT_RE.exec(text.slice(i, s.to));
+  return m ? m[0] : "";
+}
+
+function lineOf(text, offset) {
+  let line = 0;
+  for (let i = 0; i < offset && i < text.length; i++) if (text[i] === "\n") line++;
+  return line;
+}
+
+// ── Document symbols (ADR-026) ───────────────────────────────────────────────
+// Project the block-nesting hierarchy as an LSP `DocumentSymbol[]` tree. Used by
+// IntelliJ's Structure View and VS Code's outline. Symbol name = body word; range
+// covers the whole block; selectionRange = the open tag's body word.
+export function documentSymbolsOf(text, dialect) {
+  const spans = tokenize(text, dialect);
+  const root = { children: [] };
+  const stack = [root];
+  for (const s of spans) {
+    if (s.role !== "tag") continue;
+    if (s.kind === "raw-block") {
+      stack[stack.length - 1].children.push(makeSymbol(text, s, s.to, "raw-block"));
+      continue;
+    }
+    if (BLOCK_OPEN_KINDS.has(s.kind)) {
+      const sym = makeSymbol(text, s, null, s.kind);
+      stack[stack.length - 1].children.push(sym);
+      stack.push(sym);
+    } else if (s.kind === BLOCK_CLOSE_KIND) {
+      const word = bodyWord(text, s);
+      for (let i = stack.length - 1; i > 0; i--) {
+        if (stack[i].word === word) {
+          stack[i].endOffset = s.to;
+          stack.length = i;
+          break;
+        }
+      }
+    }
+  }
+  return projectSymbols(text, root.children);
+}
+
+function makeSymbol(text, openSpan, endOffset, kind) {
+  return {
+    word: bodyWord(text, openSpan) || "(anonymous)",
+    kind,
+    startOffset: openSpan.from,
+    endOffset, // filled when the matching close is seen (null = unbalanced; we drop these)
+    children: [],
+  };
+}
+
+function projectSymbols(text, items) {
+  const result = [];
+  for (const s of items) {
+    if (s.endOffset == null) continue; // unbalanced — parse diagnostics will flag it
+    result.push({
+      name: `#${s.word}`,
+      kind: s.kind === "raw-block" ? "macro" : "function",
+      from: s.startOffset,
+      to: s.endOffset,
+      children: projectSymbols(text, s.children),
+    });
+  }
+  return result;
+}
+
+// ── Formatting (ADR-026) ─────────────────────────────────────────────────────
+// Canonical-spacing inside `{{ … }}`: idempotent, dialect-agnostic. The rules
+// follow Handlebars / Mustache convention rather than blanket-padding:
+//   * No-sigil tags get Mustache-style padding ({{ name }}).
+//   * Sigil tags glue the sigil to its identifier ({{#each items}}).
+//   * Partial sigil keeps the conventional space ({{> partial}}).
+//   * Set-delim pairs balance ({{= <% %> =}}).
+//   * Comments and raw-block bodies are opaque and never reformatted.
+const SKIP_FORMAT_KINDS = new Set(["comment", "raw-block"]);
+
+export function formatDocument(text, dialect) {
+  const edits = [];
+  for (const s of tokenize(text, dialect)) {
+    if (s.role !== "tag") continue;
+    if (SKIP_FORMAT_KINDS.has(s.kind)) continue;
+    const tag = text.slice(s.from, s.to);
+    const formatted = canonicaliseTag(tag);
+    if (formatted !== tag) edits.push({ from: s.from, to: s.to, newText: formatted });
+  }
+  return edits;
+}
+
+function canonicaliseTag(tag) {
+  const openMatch = tag.match(/^(\{+)(~?)([#/\^<$>&=!]?)(\*?)/);
+  const closeMatch = tag.match(/(=?)(~?)(\}+)$/);
+  if (!openMatch || !closeMatch) return tag;
+  const [, openBraces, openTilde, sigil, partialStar] = openMatch;
+  const [, closeEq, closeTilde, closeBraces] = closeMatch;
+  const bodyStart = openMatch[0].length;
+  const bodyEnd = tag.length - closeMatch[0].length;
+  if (bodyStart > bodyEnd) return tag; // overlapping match: leave alone
+  const body = tag.slice(bodyStart, bodyEnd).trim().replace(/\s+/g, " ");
+  const open = openBraces + openTilde + sigil + partialStar;
+  const close = closeEq + closeTilde + closeBraces;
+  return open + canonicaliseBody(body, sigil) + close;
+}
+
+function canonicaliseBody(body, sigil) {
+  if (body === "") return sigil === "" ? " " : "";
+  // No sigil → Mustache padding ({{ name }}).
+  if (sigil === "") return " " + body + " ";
+  // Set-delim → balanced spaces inside the `=` pair ({{= A B =}}).
+  if (sigil === "=") return " " + body + " ";
+  // Partial → conventional space between `>` and the partial name ({{> p}}).
+  if (sigil === ">") return " " + body;
+  // Other sigils (`#`, `/`, `^`, `<`, `$`, `&`, `!`) — glue at both ends, the
+  // Handlebars convention: `{{#each items}}`, `{{/each}}`, `{{^empty}}`.
+  return body;
 }
 
 // A canonicalization rewrite for the operation/variable under `offset` (inside a

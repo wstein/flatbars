@@ -1,6 +1,6 @@
 {
   "_doc": [
-    "The FlatBars editor token vocabulary — ADR-017's single source of truth, the",
+    "The FlatBars editor token vocabulary \u2014 ADR-017's single source of truth, the",
     "ONE contract shared by the three consumers it names: the engine `tokenize`",
     "API (whose `kind` strings are the keys below), the `flatbars-lsp` semantic-",
     "token legend (built from the `lsp` mappings), and the TextMate fallback",
@@ -10,7 +10,7 @@
     "by SEMANTIC ROLE of every emitted span:",
     "",
     "  Every brace cluster ({{ }} / {{{ }}} / {{& / {{{{ }}}} / {{! / --}} ) is an",
-    "  ESCAPE TOKEN — `punctuation.section.embedded.{begin,end}.handlebars`.",
+    "  ESCAPE TOKEN \u2014 `punctuation.section.embedded.{begin,end}.handlebars`.",
     "",
     "  The SIGIL-WITH-IDENTIFIER inside control tags is captured SEPARATELY and",
     "  carries `keyword.control.*.handlebars` (section / inheritance / import) or",
@@ -18,180 +18,262 @@
     "",
     "Every tag region carries `meta.embedded.{line,block}.handlebars`. Inner content",
     "(identifiers, paths, args after the sigil) is default-coloured at the floor.",
-    "The LSP is the authority — it emits semantic tokens as CORRECTIONS over the",
+    "The LSP is the authority \u2014 it emits semantic tokens as CORRECTIONS over the",
     "floor for everything the stateless grammar can't classify dialect-aware:",
     "keywords (`{{else}}`/`{{elif}}`), in-tag literals (string, number), operators",
     "(MaxBars), the set-delimiter directive runs that follow it, and dialect errors.",
     "",
     "Three drift gates keep the contract from rotting:",
-    "  • `check:tmgrammar` — the grammar agrees with the engine on TAG BOUNDARIES",
+    "  \u2022 `check:tmgrammar` \u2014 the grammar agrees with the engine on TAG BOUNDARIES",
     "    (which characters are inside a FlatBars tag) for every dialect.",
-    "  • `check:vocab` — every `tmScopes` entry below exists in the grammar; every",
+    "  \u2022 `check:vocab` \u2014 every `tmScopes` entry below exists in the grammar; every",
     "    kind with empty `tmScopes` is in `lspEmitKinds` (uncolourable otherwise).",
-    "  • `check:highlight` — pins what the engine's own highlighter emits.",
+    "  \u2022 `check:highlight` \u2014 pins what the engine's own highlighter emits.",
     "",
     "`role`: `tag` (a whole-tag span) or `interior` (a literal/operator carved",
     "inside a tag). `lsp.type`/`lsp.modifiers` are the semantic-token legend entry.",
     "`tmScopes` are the grammar scopes a theme can target; `[]` means the floor",
     "is silent and the LSP fills in.",
     "",
-    "`lspEmitKinds` is the sparse set the LSP emits over the floor."
+    "`lspEmitKinds` is the sparse set the LSP emits over the floor.",
+    "",
+    "`operationPosition` on each tag-role kind drives the LSP helper-name painter (`paintOperations` in `editors/lsp/src/tokens.mjs`). Values:",
+    "  * `head` — the tag's first identifier paints as `operation` when the operations catalogue knows it (so `{{lookup x y}}` lights up `lookup`, plain `{{name}}` stays default-coloured).",
+    "  * `always-head` — the tag's first identifier always paints; used for `{{> partial}}` where partial names are user-defined and never in the catalogue.",
+    "  * `any` — head identifier handled by the TextMate grammar as `keyword.control.*`, but subexpression heads (`(helper arg)`) and pipe targets (`x | helper`) inside the body still scan and paint when known.",
+    "  * `none` — never paint (comments, raw-block bodies, set-delim, errors, `{{else}}`/`{{elif}}` keywords — handled elsewhere)."
   ],
-  "lspEmitKinds": ["keyword", "operator", "string", "number", "set-delimiter", "error", "operation"],
+  "lspEmitKinds": [
+    "keyword",
+    "operator",
+    "string",
+    "number",
+    "set-delimiter",
+    "error",
+    "operation"
+  ],
   "kinds": {
     "expr": {
       "role": "tag",
-      "lsp": { "type": "variable", "modifiers": [] },
+      "lsp": {
+        "type": "variable",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars"
       ],
-      "description": "{{name}} — an interpolation (escaped output). No internal sigil."
+      "description": "{{name}} \u2014 an interpolation (escaped output). No internal sigil.",
+      "operationPosition": "head"
     },
     "raw": {
       "role": "tag",
-      "lsp": { "type": "variable", "modifiers": ["readonly"] },
+      "lsp": {
+        "type": "variable",
+        "modifiers": [
+          "readonly"
+        ]
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.operator.raw.handlebars"
       ],
-      "description": "{{{x}}} / {{&x}} — unescaped (raw) output. For {{&x}} the `&` sigil is split out as `keyword.operator.raw`."
+      "description": "{{{x}}} / {{&x}} \u2014 unescaped (raw) output. For {{&x}} the `&` sigil is split out as `keyword.operator.raw`.",
+      "operationPosition": "head"
     },
     "raw-block": {
       "role": "tag",
-      "lsp": { "type": "macro", "modifiers": [] },
+      "lsp": {
+        "type": "macro",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.block.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars"
       ],
-      "description": "{{{{raw}}}} … {{{{/raw}}}} — a raw block (multi-line)."
+      "description": "{{{{raw}}}} \u2026 {{{{/raw}}}} \u2014 a raw block (multi-line).",
+      "operationPosition": "none"
     },
     "block-open": {
       "role": "tag",
-      "lsp": { "type": "keyword", "modifiers": [] },
+      "lsp": {
+        "type": "keyword",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.control.section.handlebars"
       ],
-      "description": "{{#x}} — a section open. Braces are escape tokens; `#x` is the control keyword."
+      "description": "{{#x}} \u2014 a section open. Braces are escape tokens; `#x` is the control keyword.",
+      "operationPosition": "any"
     },
     "block-inverse": {
       "role": "tag",
-      "lsp": { "type": "keyword", "modifiers": [] },
+      "lsp": {
+        "type": "keyword",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.control.section.handlebars"
       ],
-      "description": "{{^x}} — an inverted section open."
+      "description": "{{^x}} \u2014 an inverted section open.",
+      "operationPosition": "any"
     },
     "block-parent": {
       "role": "tag",
-      "lsp": { "type": "keyword", "modifiers": [] },
+      "lsp": {
+        "type": "keyword",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.control.inheritance.handlebars"
       ],
-      "description": "{{<x}} — an inheritance parent open. The `<` sigil alone is the control keyword."
+      "description": "{{<x}} \u2014 an inheritance parent open. The `<` sigil alone is the control keyword.",
+      "operationPosition": "any"
     },
     "block-decl": {
       "role": "tag",
-      "lsp": { "type": "keyword", "modifiers": [] },
+      "lsp": {
+        "type": "keyword",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.control.inheritance.handlebars"
       ],
-      "description": "{{$x}} — an inheritance block declaration open. The `$` sigil alone is the control keyword."
+      "description": "{{$x}} \u2014 an inheritance block declaration open. The `$` sigil alone is the control keyword.",
+      "operationPosition": "any"
     },
     "block-close": {
       "role": "tag",
-      "lsp": { "type": "keyword", "modifiers": [] },
+      "lsp": {
+        "type": "keyword",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.control.section.handlebars"
       ],
-      "description": "{{/x}} — a block close."
+      "description": "{{/x}} \u2014 a block close.",
+      "operationPosition": "any"
     },
     "partial": {
       "role": "tag",
-      "lsp": { "type": "macro", "modifiers": [] },
+      "lsp": {
+        "type": "macro",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.control.import.handlebars"
       ],
-      "description": "{{> name}} — a partial include. The `>` (or `>*`) sigil alone is the control keyword."
+      "description": "{{> name}} \u2014 a partial include. The `>` (or `>*`) sigil alone is the control keyword.",
+      "operationPosition": "always-head"
     },
     "keyword": {
       "role": "tag",
-      "lsp": { "type": "keyword", "modifiers": [] },
+      "lsp": {
+        "type": "keyword",
+        "modifiers": []
+      },
       "tmScopes": [],
-      "description": "{{else}} / {{elif …}} — a clause separator (dialect-dependent). LSP-emitted: the thin-floor grammar matches it as a generic interpolation."
+      "description": "{{else}} / {{elif \u2026}} \u2014 a clause separator (dialect-dependent). LSP-emitted: the thin-floor grammar matches it as a generic interpolation.",
+      "operationPosition": "none"
     },
     "comment": {
       "role": "tag",
-      "lsp": { "type": "comment", "modifiers": [] },
+      "lsp": {
+        "type": "comment",
+        "modifiers": []
+      },
       "tmScopes": [
         "comment.block.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars"
       ],
-      "description": "{{! … }} / {{!-- … --}} — a comment. The body is `comment.block.*`; the braces are `punctuation.section.embedded.*` (escape-into-comment)."
+      "description": "{{! \u2026 }} / {{!-- \u2026 --}} \u2014 a comment. The body is `comment.block.*`; the braces are `punctuation.section.embedded.*` (escape-into-comment).",
+      "operationPosition": "none"
     },
     "set-delimiter": {
       "role": "tag",
-      "lsp": { "type": "keyword", "modifiers": [] },
+      "lsp": {
+        "type": "keyword",
+        "modifiers": []
+      },
       "tmScopes": [
         "meta.embedded.line.handlebars",
         "punctuation.section.embedded.begin.handlebars",
         "punctuation.section.embedded.end.handlebars",
         "keyword.directive.handlebars"
       ],
-      "description": "{{=A B=}} — a set-delimiter directive. The matched `=` pair is the directive keyword. The stateless fallback cannot track the new delimiters that follow (the LSP does)."
+      "description": "{{=A B=}} \u2014 a set-delimiter directive. The matched `=` pair is the directive keyword. The stateless fallback cannot track the new delimiters that follow (the LSP does).",
+      "operationPosition": "none"
     },
     "error": {
       "role": "tag",
-      "lsp": { "type": "variable", "modifiers": ["invalid"] },
+      "lsp": {
+        "type": "variable",
+        "modifiers": [
+          "invalid"
+        ]
+      },
       "tmScopes": [],
-      "description": "A structurally-valid tag the dialect disallows. DIALECT-DEPENDENT: the stateless fallback paints the shape as valid; only the LSP knows the dialect."
+      "description": "A structurally-valid tag the dialect disallows. DIALECT-DEPENDENT: the stateless fallback paints the shape as valid; only the LSP knows the dialect.",
+      "operationPosition": "none"
     },
     "string": {
       "role": "interior",
-      "lsp": { "type": "string", "modifiers": [] },
+      "lsp": {
+        "type": "string",
+        "modifiers": []
+      },
       "tmScopes": [],
       "description": "A quoted string literal inside a tag. LSP-emitted: the thin-floor grammar leaves the in-tag body uncoloured."
     },
     "number": {
       "role": "interior",
-      "lsp": { "type": "number", "modifiers": [] },
+      "lsp": {
+        "type": "number",
+        "modifiers": []
+      },
       "tmScopes": [],
       "description": "A numeric literal inside a tag. LSP-emitted."
     },
     "operator": {
       "role": "interior",
-      "lsp": { "type": "operator", "modifiers": [] },
+      "lsp": {
+        "type": "operator",
+        "modifiers": []
+      },
       "tmScopes": [],
       "description": "An infix/prefix operator inside a tag (MaxBars). LSP-emitted: dialect-scoped."
     },
     "operation": {
       "role": "interior",
-      "lsp": { "type": "function", "modifiers": [] },
+      "lsp": {
+        "type": "function",
+        "modifiers": []
+      },
       "tmScopes": [],
-      "description": "A helper / operation name in operation position: the first identifier of a value/raw tag, the identifier of a {{> partial}}, or the identifier immediately after `(` in a subexpression. LSP-emitted: only when the identifier resolves in the operations catalog (operations.json) — so `{{name}}` where `name` is a plain variable stays default-coloured. Partial names always paint (user-defined). Control-tag sigils ({{#each}}, {{/if}}, …) are not re-painted here; the TextMate grammar already covers them as `keyword.control.section`."
+      "description": "A helper / operation name in operation position: the first identifier of a value/raw tag, the identifier of a {{> partial}}, or the identifier immediately after `(` in a subexpression. LSP-emitted: only when the identifier resolves in the operations catalog (operations.json) \u2014 so `{{name}}` where `name` is a plain variable stays default-coloured. Partial names always paint (user-defined). Control-tag sigils ({{#each}}, {{/if}}, \u2026) are not re-painted here; the TextMate grammar already covers them as `keyword.control.section`."
     }
   }
 }

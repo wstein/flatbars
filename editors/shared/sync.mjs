@@ -46,18 +46,21 @@ export async function bundleServer(esbuild, { repoRoot, outfile, sourcemap = fal
   });
 }
 
-// The editor language set — one language per surface dialect, native extensions
-// only (not .hbs/.handlebars/.mustache). Single source for the VS Code manifest
-// (asserted by its smoke test) and the JetBrains TextMate bundle manifest. All
-// four share the one `source.flatbars` grammar.
+// The editor language set — one language per surface dialect. Single source for
+// the VS Code manifest (asserted by its smoke test) and the JetBrains TextMate
+// bundle manifest. All four share the one `source.flatbars` grammar.
 //
 // Each dialect ships TWO native extensions: the long form (`.rawbars`) and a
-// short alias (`.rbars`). Both are equivalent; the short form is for keyboards
-// where the long name is awkward.
+// short alias (`.rbars`). FullBars and MinBars additionally claim the
+// Handlebars / Mustache extensions they're semantically compatible with —
+// `.hbs` / `.handlebars` for FullBars (Handlebars surface), `.mustache` for
+// MinBars (Mustache spec). Users who already have a Handlebars or Mustache
+// extension installed should choose one via `files.associations` to
+// disambiguate; the FlatBars plugin is happy to defer.
 export const LANGUAGES = [
   { id: "rawbars", aliases: ["RawBars"], extensions: [".rawbars", ".rbars"] },
-  { id: "minbars", aliases: ["MinBars"], extensions: [".minbars", ".mbars"] },
-  { id: "fullbars", aliases: ["FullBars"], extensions: [".fullbars", ".fbars"] },
+  { id: "minbars", aliases: ["MinBars"], extensions: [".minbars", ".mbars", ".mustache"] },
+  { id: "fullbars", aliases: ["FullBars"], extensions: [".fullbars", ".fbars", ".hbs", ".handlebars"] },
   { id: "maxbars", aliases: ["MaxBars"], extensions: [".maxbars", ".xbars"] },
 ];
 

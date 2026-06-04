@@ -66,11 +66,24 @@ t("dialectForLanguageId maps the four dialect languages; umbrella/others -> null
   assert.equal(dialectForLanguageId("flatbars"), null); // umbrella
   assert.equal(dialectForLanguageId("handlebars"), null); // not ours
 });
-t("dialectForUri maps native extensions only (no .hbs/.mustache), null otherwise", () => {
+t("dialectForUri maps every dialect extension (long, short, and host-compat)", () => {
+  // Long-form per-dialect natives
+  assert.equal(dialectForUri("file:///x/page.rawbars"), "rawbars");
   assert.equal(dialectForUri("file:///x/page.minbars"), "minbars");
+  assert.equal(dialectForUri("file:///x/page.fullbars"), "fullbars");
   assert.equal(dialectForUri("file:///x/page.maxbars"), "maxbars");
-  assert.equal(dialectForUri("file:///x/page.flatbars"), null); // umbrella, not a dialect
-  assert.equal(dialectForUri("file:///x/page.mustache"), null); // not claimed anymore
+  // Short-form aliases
+  assert.equal(dialectForUri("file:///x/page.rbars"), "rawbars");
+  assert.equal(dialectForUri("file:///x/page.mbars"), "minbars");
+  assert.equal(dialectForUri("file:///x/page.fbars"), "fullbars");
+  assert.equal(dialectForUri("file:///x/page.xbars"), "maxbars");
+  // Host-compat: Handlebars / Mustache extensions claimed by their semantic peers
+  assert.equal(dialectForUri("file:///x/page.hbs"), "fullbars");
+  assert.equal(dialectForUri("file:///x/page.handlebars"), "fullbars");
+  assert.equal(dialectForUri("file:///x/page.mustache"), "minbars");
+  // The retired umbrella and unrelated extensions resolve to null.
+  assert.equal(dialectForUri("file:///x/page.flatbars"), null);
+  assert.equal(dialectForUri("file:///x/page.txt"), null);
 });
 // ── Parse diagnostics (ADR-023): per-dialect, with tag-covering ranges ──────
 t("parseDiagnostics flags {{#if a == 1}} off MaxBars, clean on MaxBars", () => {

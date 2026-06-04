@@ -15,8 +15,11 @@ object FlatBarsLanguages {
     "rbars",
     "minbars",
     "mbars",
+    "mustache",
     "fullbars",
     "fbars",
+    "hbs",
+    "handlebars",
     "maxbars",
     "xbars",
   )

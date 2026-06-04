@@ -12,7 +12,9 @@ import {
   CodeActionKind,
   CompletionItemKind,
   DiagnosticSeverity,
+  FoldingRangeKind,
   MarkupKind,
+  SymbolKind,
   TextDocuments,
   TextDocumentSyncKind,
 } from "vscode-languageserver/node";
@@ -21,7 +23,10 @@ import {
   buildLegend,
   canonAt,
   completionsAt,
+  documentSymbolsOf,
   encodeSemanticTokens,
+  foldingRangesOf,
+  formatDocument,
   hoverAt,
   parseDiagnostics,
   resolveDialect,
@@ -50,9 +55,59 @@ export function startServer(connection) {
         // (the next head/argument); the editor also invokes on demand.
         completionProvider: { triggerCharacters: ["#", ">", "(", " "] },
         codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
+        foldingRangeProvider: true,
+        documentSymbolProvider: true,
+        documentFormattingProvider: true,
       },
       serverInfo: { name: "flatbars-lsp" },
     };
+  });
+
+  // Folding (ADR-026): every (block-open, block-close) pair is a region; raw blocks
+  // fold as a whole. The pairs come from the engine's tag spans, matched by body
+  // word, so the folds always agree with the dialect's structural validity.
+  connection.languages.foldingRange.on((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+    const dialect = resolveDialect(doc.languageId, doc.uri, defaultDialect);
+    return foldingRangesOf(doc.getText(), dialect).map((r) => ({
+      startLine: r.start,
+      endLine: r.end,
+      kind: FoldingRangeKind.Region,
+    }));
+  });
+
+  // Document symbols (ADR-026): the block-nesting hierarchy as a symbol tree.
+  // Feeds IntelliJ's Structure View and VS Code's outline.
+  connection.onDocumentSymbol((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+    const dialect = resolveDialect(doc.languageId, doc.uri, defaultDialect);
+    const project = (items) =>
+      items.map((s) => {
+        const range = { start: doc.positionAt(s.from), end: doc.positionAt(s.to) };
+        return {
+          name: s.name,
+          kind: s.kind === "macro" ? SymbolKind.Function : SymbolKind.Function,
+          range,
+          selectionRange: range,
+          children: project(s.children),
+        };
+      });
+    return project(documentSymbolsOf(doc.getText(), dialect));
+  });
+
+  // Document formatting (ADR-026): normalise whitespace inside `{{ … }}` to
+  // exactly one space after the opener and before the closer. Idempotent;
+  // leaves comments and raw-block bodies untouched.
+  connection.onDocumentFormatting((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+    const dialect = resolveDialect(doc.languageId, doc.uri, defaultDialect);
+    return formatDocument(doc.getText(), dialect).map((e) => ({
+      range: { start: doc.positionAt(e.from), end: doc.positionAt(e.to) },
+      newText: e.newText,
+    }));
   });
 
   connection.languages.semanticTokens.on((params) => {

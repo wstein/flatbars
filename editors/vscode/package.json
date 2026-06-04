@@ -43,7 +43,8 @@
         ],
         "extensions": [
           ".minbars",
-          ".mbars"
+          ".mbars",
+          ".mustache"
         ],
         "configuration": "./language-configuration.json"
       },
@@ -54,7 +55,9 @@
         ],
         "extensions": [
           ".fullbars",
-          ".fbars"
+          ".fbars",
+          ".hbs",
+          ".handlebars"
         ],
         "configuration": "./language-configuration.json"
       },
