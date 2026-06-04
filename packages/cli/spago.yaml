@@ -20,5 +20,6 @@ package:
     - fullbars
     - rawbars
     - minbars
+    - linter
   run:
     main: Cli.Main

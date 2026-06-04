@@ -33,10 +33,11 @@ import FlatBars.Value (Value(..))
 import FullBars (analyseSurface, directiveLints, handlebars, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
+import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import MinBars (renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
-import RawBars (compileJsWith, compileWith)
+import RawBars (compileJsWith, compileWith, coreOptions)
 
 foreign import argv :: Effect (Array String)
 foreign import writeStdout :: String -> Effect Unit
@@ -51,6 +52,7 @@ usage =
     , "Usage:"
     , "  flatbars <template> [--data <data.json>] [--validate | --compile]"
     , "  flatbars analyse <template> <data.json> [--emit-jsonata]"
+    , "  flatbars lint <template> [--surface]"
     , "  flatbars examples verify [--provider mustache]"
     , ""
     , "Options:"
@@ -102,6 +104,8 @@ main = do
     Just { head: "examples", tail } -> runExamples tail
     -- `flatbars analyse <template> <data.json> [--emit-jsonata]` — ADR-022 Part B.
     Just { head: "analyse", tail } -> runAnalyse tail
+    -- `flatbars lint <template> [--surface]` — on-demand canonicalization lints.
+    Just { head: "lint", tail } -> runLint tail
     _ -> case parseArgs args of
       Help -> writeStdout (usage <> "\n")
       Invalid msg -> die ("flatbars: " <> msg <> "\n\n" <> usage)
@@ -365,6 +369,63 @@ runAnalyse args
                     Left e -> die ("flatbars analyse: " <> tplPath <> ": " <> e)
                     Right r -> writeStdout ((if emitJsonata then r.jsonata else r.report) <> "\n")
           _ -> die ("flatbars analyse: expected <template> <data.json>\n\n" <> analyseUsage)
+
+lintUsage :: String
+lintUsage =
+  joinWith "\n"
+    [ "flatbars lint — on-demand canonicalization lints (never blocks rendering)"
+    , ""
+    , "Usage:"
+    , "  flatbars lint <template> [--surface]"
+    , ""
+    , "Reports, one warning per use (exit ≠ 0 if any):"
+    , "  • deprecated aliases    e.g. `plus` → `add`, `downcase` → `lowercase`"
+    , "  • scoped-variable spelling (core/MaxBars only)  `index` → `index0`, `partial-block` → `yield`"
+    , ""
+    , "Core syntax by default; --surface lints the FullBars surface (aliases only — the"
+    , "scoped-variable lint is for the native RawBars/MaxBars spelling, not Handlebars @index)."
+    , "The lift/migrate assist is what rewrites these; this command only reports."
+    ]
+
+-- | `flatbars lint <template> [--surface]`: run the on-demand canonicalization
+-- | lints (`Linter.Aliases`) and report them. Core/RawBars by default — alias +
+-- | scoped-variable (`index`→`index0`, `partial-block`→`yield`) warnings; with
+-- | `--surface` it lints the FullBars surface for aliases only (the scoped-variable
+-- | spelling is RawBars/MaxBars-native, not Handlebars). Exit ≠ 0 on any finding.
+runLint :: Array String -> Effect Unit
+runLint args
+  | Array.elem "-h" args || Array.elem "--help" args = writeStdout (lintUsage <> "\n")
+  | otherwise =
+      let
+        surface = Array.elem "-s" args || Array.elem "--surface" args
+        positional = Array.filter (\a -> not (isJust (stripPrefix (Pattern "-") a))) args
+      in
+        case positional of
+          [ tplPath ] -> do
+            tplE <- readFileSafe tplPath
+            case tplE of
+              Left err -> die ("flatbars lint: cannot read template '" <> tplPath <> "': " <> err)
+              Right tpl ->
+                let
+                  popts = if surface then defaultParseOptions else coreOptions
+                in
+                  case parseWith popts tpl of
+                    Left pe -> die
+                      ("flatbars lint: " <> tplPath <> ":" <> renderParseErrorAt tpl pe)
+                    Right { nodes } ->
+                      -- The scoped-variable lint is for the native (core/MaxBars)
+                      -- spelling; on the FullBars surface `@index`/`@partial-block`
+                      -- are canonical, so run aliases only there.
+                      case
+                        aliasWarnings nodes <> (if surface then [] else scopedCanonWarnings nodes)
+                        of
+                        [] -> writeStdout "ok: no lint findings\n"
+                        issues -> do
+                          writeStderr (joinWith "\n" (map fmt issues) <> "\n")
+                          setExitCode 1
+          _ -> die ("flatbars lint: expected <template>\n\n" <> lintUsage)
+      where
+      fmt issue = show issue.severity <> ": " <> issue.message
 
 runExamples :: Array String -> Effect Unit
 runExamples args = case Array.uncons args of
