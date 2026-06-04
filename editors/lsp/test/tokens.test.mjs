@@ -359,6 +359,43 @@ t("dialectDiagnostics — RawBars matches MinBars on the extended rules", () => 
   assert.equal(dialectDiagnostics("{{ a ?? b }}", "rawbars").length, 1);
 });
 
+t("dialectDiagnostics — every rule still fires inside a delim-switched tag", () => {
+  // `bodyOfTag` strips the active opener / closer by length; without that fix
+  // the rules saw `% lookup x y %>` instead of `lookup x y` and either
+  // false-positived on the leading space or missed the real shape.
+  const ctx = "{{=<% %>=}}\n";
+  // 1) helper-args inside switched tag — already covered earlier; verify still fires.
+  const helper = dialectDiagnostics(ctx + "<% lookup x y %>", "minbars");
+  assert.ok(helper.some((d) => /Helper invocations/.test(d.message)));
+  // 2) block params inside switched tag.
+  const blockp = dialectDiagnostics(ctx + "<%#each xs as |i|%><%/each%>", "minbars");
+  assert.ok(blockp.some((d) => /Block parameters/.test(d.message)));
+  // 3) partial hash args inside switched tag.
+  const hash = dialectDiagnostics(ctx + '<%> p k="v"%>', "minbars");
+  assert.ok(hash.some((d) => /Partial hash arguments/.test(d.message)));
+  // 4) MaxBars-only operator inside switched tag.
+  const op = dialectDiagnostics(ctx + "<% a ?? b %>", "minbars");
+  assert.ok(op.some((d) => /Operator `\?\?`/.test(d.message)));
+});
+
+t("paintOperations — `always-head` paints partial names with whitespace-control / decorator sigils", () => {
+  // `{{~> mypartial ~}}` — whitespace-control on both ends, partial name in
+  // the middle. paintHeadOperation skips `~&\s` then optional `>` + `*` + ws.
+  const src1 = "{{~> mypartial ~}}";
+  const toks1 = tokensOf(src1, "fullbars");
+  const op1 = toks1.find((t) => t.kind === "operation");
+  assert.ok(op1, "partial name painted under whitespace control");
+  assert.equal(src1.slice(op1.char, op1.char + op1.length), "mypartial");
+
+  // `{{>* decorator}}` — partial-block decorator marker. The `*` must be
+  // consumed BEFORE the identifier scan.
+  const src2 = "{{>* decoblock}}";
+  const toks2 = tokensOf(src2, "fullbars");
+  const op2 = toks2.find((t) => t.kind === "operation");
+  assert.ok(op2, "partial-block decorator name painted past `>*`");
+  assert.equal(src2.slice(op2.char, op2.char + op2.length), "decoblock");
+});
+
 t("dialectDiagnostics — delim-switched tags use active delimiters when extracting body", () => {
   // After `{{=<% %>=}}` the active delimiters are `<%` / `%>`. A delim-switched
   // tag with a single-name body (`<% erb_style_tags %>`) MUST be silent — the

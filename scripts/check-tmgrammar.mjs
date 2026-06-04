@@ -76,6 +76,15 @@ const CORPUS = [
   { dialect: "minbars", src: "{{<layout}}{{$title}}Hi{{/title}}{{/layout}}", note: "inheritance" },
   { dialect: "minbars", src: "{{=<% %>=}}", note: "set-delimiter directive (no switch follow-up)" },
   { dialect: "minbars", src: "{{! c }} {{&raw}} {{{trip}}}", note: "comment + unescaped" },
+  // REGRESSION FIXTURE: the `set_delimiter` rule's END pattern is `=}}`; before
+  // commit d76e093 the rule included `#tag_interior`, which let `tag_operator`'s
+  // multi-char regex (`>=` / `<=` / `==`) greedily consume the `=` the END
+  // needed, leaving the rule unclosed and dragging `meta.embedded.line.flatbars`
+  // state across every subsequent line. This fixture exercises the exact char
+  // sequence that triggered it (a `>` immediately before the trailing `=}}`);
+  // any future change re-introducing operator-class regexes into set_delimiter
+  // would fail this gate at the `default_tag` boundary on the following line.
+  { dialect: "minbars", src: "{{=<% %>=}}\n{{default_tag}}", note: "set-delim with `>` (regression: greedy `>=` consumed END)" },
   // RawBars — meaning-free core; extras off ⇒ {{&}}/{{^}}/{{{{…}}}} are error tags.
   { dialect: "rawbars", src: "{{city}} {{#each x}}{{/each}}", note: "core forms" },
   { dialect: "rawbars", src: "{{&x}} {{^x}}b{{/x}}", note: "disallowed shapes are still tags (engine: error)" },
