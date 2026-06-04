@@ -17,13 +17,13 @@ import Prelude
 import Data.Either (Either)
 import Data.Foldable (foldMap, lookup)
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Set as Set
 import Data.Tuple (Tuple(..), fst)
 import FlatBars.Error (Error)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
-import Kernel.Prelude (prelude, preludeAliases, preludeSchema, preludeSynonyms)
+import Kernel.Prelude (OperationDef, operationDefs, prelude, preludeAliases, preludeSchema, preludeSynonyms)
 import Kernel.Walk (Arity(..))
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
@@ -32,6 +32,13 @@ registeredNames :: Set.Set String
 registeredNames =
   Set.fromFoldable
     (map fst (prelude :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))))
+
+-- | Each operation's one-line doc, keyed by name. Scoped variables (installed by
+-- | block helpers, not in `operationDefs`) have no entry — they carry no doc.
+docByName :: Map.Map String String
+docByName =
+  Map.fromFoldable
+    (map (\d -> Tuple d.name d.doc) (operationDefs :: Array (OperationDef (Either Error))))
 
 renderArity :: Arity -> String
 renderArity = case _ of
@@ -73,14 +80,16 @@ helperCatalogAdoc =
 -- | hover/completion). `kind` is the ADR-019 axis derived structurally; `source`
 -- | separates callable helpers from the scoped variables blocks install and from
 -- | the alias/synonym relationships; `canonical` is the target of an alias/synonym
--- | (empty when none — the generator normalises it to JSON `null`). No prose docs
--- | — only what the engine actually knows.
+-- | (empty when none — the generator normalises it to JSON `null`); `doc` is the
+-- | operation's one-line description from `OperationDef.doc` (empty for scoped
+-- | variables, which carry none).
 type OpInfo =
   { name :: String
   , kind :: String
   , arity :: String
   , source :: String
   , canonical :: String
+  , doc :: String
   }
 
 -- | The ADR-019 operation kind, derived from the schema (operator is a MaxBars
@@ -111,6 +120,7 @@ operations =
       , arity: renderArity spec.arity
       , source: classified.source
       , canonical: classified.canonical
+      , doc: fromMaybe "" (Map.lookup name docByName)
       }
   classify name = case lookup name preludeAliases of
     Just canonical -> { source: "alias", canonical }

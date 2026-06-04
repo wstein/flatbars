@@ -15,7 +15,9 @@
 -- | `Kernel.Operation` combinators (arity enforced by construction); block and
 -- | bespoke helpers are written directly against `Operation`.
 module Kernel.Prelude
-  ( prelude
+  ( OperationDef
+  , operationDefs
+  , prelude
   , preludeSchema
   , preludeAliases
   , preludeSynonyms
@@ -60,6 +62,12 @@ import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
 -- | projections of `operationDefs`, so the two never disagree.
 type OperationDef m =
   { name :: String
+  -- | A one-line, prose description of what the operation does, in the present
+  -- | tense — the single source the editor surfaces on hover and the helper
+  -- | catalog renders (`FullBars.Catalog`). Required (set via `valDef`/`gen`), so
+  -- | an operation cannot ship undocumented. Keep it one sentence; the long-form
+  -- | reference prose lives in `prelude.adoc`.
+  , doc :: String
   , block :: Boolean
   , arity :: Arity
   , run :: Operation m (RefEnv m)
@@ -89,17 +97,22 @@ type OperationDef m =
 -- | combinator pins the arity, so the schema entry below is derived from the
 -- | very guard the runtime uses.
 valDef
-  :: forall m. MonadThrow Error m => String -> (String -> ArgSpec m (RefEnv m)) -> OperationDef m
-valDef name mk =
+  :: forall m
+   . MonadThrow Error m
+  => String
+  -> String
+  -> (String -> ArgSpec m (RefEnv m))
+  -> OperationDef m
+valDef name doc mk =
   let
     s = mk name
   in
-    { name, block: false, arity: s.arity, run: s.run, alias: Nothing, synonymOf: Nothing }
+    { name, doc, block: false, arity: s.arity, run: s.run, alias: Nothing, synonymOf: Nothing }
 
 -- | A block or bespoke helper written directly against `Operation`, with its arity
 -- | declared explicitly (and enforced inside the helper body).
-gen :: forall m. String -> Boolean -> Arity -> Operation m (RefEnv m) -> OperationDef m
-gen name block arity run = { name, block, arity, run, alias: Nothing, synonymOf: Nothing }
+gen :: forall m. String -> String -> Boolean -> Arity -> Operation m (RefEnv m) -> OperationDef m
+gen name doc block arity run = { name, doc, block, arity, run, alias: Nothing, synonymOf: Nothing }
 
 -- | Mark a helper definition as a (warned, lifted) deprecation alias of `canonical`.
 withAlias :: forall m. String -> OperationDef m -> OperationDef m
@@ -122,63 +135,106 @@ operationDefs = coreOperationDefs <> primitiveOperationDefs
 -- | The core helpers — everything that is not a value primitive.
 coreOperationDefs :: forall m. MonadThrow Error m => Array (OperationDef m)
 coreOperationDefs =
-  [ gen "this" false (Exactly 0) thisH
-  , gen "lookup" false (AtLeast 1) lookupH
-  , valDef "true" (nullary (pure (VBool true)))
-  , valDef "false" (nullary (pure (VBool false)))
-  , valDef "null" (nullary (pure VNull))
+  [ gen "this" "The current context." false (Exactly 0) thisH
+  , gen "lookup" "Indexes a value by each key or index in turn, returning null at the first miss."
+      false
+      (AtLeast 1)
+      lookupH
+  , valDef "true" "The boolean literal true." (nullary (pure (VBool true)))
+  , valDef "false" "The boolean literal false." (nullary (pure (VBool false)))
+  , valDef "null" "The null literal." (nullary (pure VNull))
   -- escaping (camelCase canonical names; no snake_case aliases).
-  , valDef "escapeHtml" (unary escHtml)
-  , valDef "safe" (unary safe)
-  , gen "json" false (Between 1 2) jsonH
-  , gen "escapeJson" false (Between 1 2) escJsonH
-  , gen "raw" true AnyArity rawH
-  , gen "if" true (Between 1 2) ifH
-  , gen "unless" true (Between 1 2) unlessH
-  , gen "each" true (AtLeast 1) eachH
-  , gen "with" true (AtLeast 1) withH
-  , valDef "else" (nullary (pure (VSafe "")))
+  , valDef "escapeHtml"
+      "HTML-escapes its argument and marks it safe; idempotent on already-safe values."
+      (unary escHtml)
+  , valDef "safe" "Marks its argument as safe (trusted) markup, without escaping." (unary safe)
+  , gen "json" "Serializes its argument as JSON text (optionally pretty-printed)." false
+      (Between 1 2)
+      jsonH
+  , gen "escapeJson"
+      "Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML."
+      false
+      (Between 1 2)
+      escJsonH
+  , gen "raw" "A raw block that returns its body verbatim, untouched by the engine." true AnyArity
+      rawH
+  , gen "if" "Renders its body when the condition is truthy, else the {{elif}}/{{else}} clauses."
+      true
+      (Between 1 2)
+      ifH
+  , gen "unless" "Renders its body when the condition is falsy — the inverse of if." true
+      (Between 1 2)
+      unlessH
+  , gen "each" "Iterates an array or object, installing the loop's scoped variables per item." true
+      (AtLeast 1)
+      eachH
+  , gen "with" "Shifts the context to its argument for the body (else the {{else}} clause)." true
+      (AtLeast 1)
+      withH
+  , valDef "else" "A clause separator the enclosing block splits on; renders nothing on its own."
+      (nullary (pure (VSafe "")))
   -- `elif cond [opts]`: a clause marker (its body/condition are handled by the
   -- enclosing `if` via splitClauses). The optional 2nd arg is an options object
   -- (surface hash `includeZero=true`), exactly like `if`'s — so the schema admits
   -- 1 or 2 args; the marker itself renders nothing.
-  , gen "elif" false (Between 1 2) (\_ _ -> pure (VSafe ""))
-  , gen "dict" false AnyArity dictH
-  , gen "apply" true (AtLeast 1) applyH
-  , gen "partial" false (Between 2 3) partialH
-  , gen "inline" true (AtLeast 1) inlineH
-  , valDef "eq" (binary eq')
-  , valDef "ne" (binary ne')
-  , valDef "lt" (binary (cmp (_ == LT)))
-  , valDef "gt" (binary (cmp (_ == GT)))
-  , valDef "lte" (binary (cmp (_ /= GT)))
-  , valDef "gte" (binary (cmp (_ /= LT)))
+  , gen "elif" "An else-if clause the enclosing if evaluates; renders nothing on its own." false
+      (Between 1 2)
+      (\_ _ -> pure (VSafe ""))
+  , gen "dict" "Builds an object from alternating key/value arguments (the hash target)." false
+      AnyArity
+      dictH
+  , gen "apply" "Calls a helper named by a string argument with the remaining arguments." true
+      (AtLeast 1)
+      applyH
+  , gen "partial"
+      "Renders a registered partial with the given context (the block body is the fallback)."
+      false
+      (Between 2 3)
+      partialH
+  , gen "inline" "Defines a partial from its body, hoisted before rendering; emits nothing." true
+      (AtLeast 1)
+      inlineH
+  , valDef "eq" "True when its two arguments are equal." (binary eq')
+  , valDef "ne" "True when its two arguments are not equal." (binary ne')
+  , valDef "lt" "True when the first argument is less than the second." (binary (cmp (_ == LT)))
+  , valDef "gt" "True when the first argument is greater than the second." (binary (cmp (_ == GT)))
+  , valDef "lte" "True when the first argument is less than or equal to the second."
+      (binary (cmp (_ /= GT)))
+  , valDef "gte" "True when the first argument is greater than or equal to the second."
+      (binary (cmp (_ /= LT)))
   -- `isnt` reads as "is not" — a canonical synonym of `ne` (endorsed and equal),
   -- NOT a warned alias. See the two-bucket policy on `OperationDef`.
-  , withSynonym "ne" (valDef "isnt" (binary ne'))
-  , gen "not" false (Exactly 1) notH
-  , gen "and" false AnyArity (boolH Array.all)
-  , gen "or" false AnyArity (boolH Array.any)
+  , withSynonym "ne" (valDef "isnt" "True when its two arguments are not equal." (binary ne'))
+  , gen "not" "Logical negation of its argument's truthiness." false (Exactly 1) notH
+  , gen "and" "True when every argument is truthy." false AnyArity (boolH Array.all)
+  , gen "or" "True when any argument is truthy." false AnyArity (boolH Array.any)
   -- arithmetic: the desugar targets of the MaxBars `+ - * / %` operators, also
   -- callable explicitly in RawBars/FullBars (`(add a b)`). Strictly numeric:
   -- both operands must be `VNumber` (no string coercion — determinism), so the
   -- interpreter (which is itself JS) and the compiled runtime share JS's `+ - * /`
   -- bit-for-bit; `modulo` uses the `trunc` form, which equals JS `%`.
-  , valDef "add" (binary (arith (+)))
-  , valDef "subtract" (binary (arith (-)))
-  , valDef "multiply" (binary (arith (*)))
-  , valDef "divide" (binary (arith (/)))
-  , valDef "modulo" (binary (arith jsMod))
+  , valDef "add" "Adds two numbers — the `+` operator's helper." (binary (arith (+)))
+  , valDef "subtract" "Subtracts the second number from the first — the `-` operator's helper."
+      (binary (arith (-)))
+  , valDef "multiply" "Multiplies two numbers — the `*` operator's helper." (binary (arith (*)))
+  , valDef "divide" "Divides the first number by the second — the `/` operator's helper."
+      (binary (arith (/)))
+  , valDef "modulo"
+      "The remainder of dividing the first number by the second — the `%` operator's helper."
+      (binary (arith jsMod))
   -- handlebars-helpers aliases: render identically to the canonical helpers
   -- (`add`/`subtract`/`multiply`); marked as aliases so the catalog flags them,
   -- the alias lint warns, and the lift normalises them to the `+ - *` operators.
-  , withAlias "add" (valDef "plus" (binary (arith (+))))
-  , withAlias "subtract" (valDef "minus" (binary (arith (-))))
-  , withAlias "multiply" (valDef "times" (binary (arith (*))))
+  , withAlias "add" (valDef "plus" "Adds two numbers." (binary (arith (+))))
+  , withAlias "subtract"
+      (valDef "minus" "Subtracts the second number from the first." (binary (arith (-))))
+  , withAlias "multiply" (valDef "times" "Multiplies two numbers." (binary (arith (*))))
   -- null-coalescing: the desugar target of `??`. Returns the first non-`VNull`
   -- argument (else `VNull`). Distinct from truthiness — `0`/`""`/`[]` pass.
-  , gen "coalesce" false (AtLeast 1) coalesceH
-  , valDef "log" (atLeast 1 (const (pure VNull)))
+  , gen "coalesce" "Returns the first non-null argument — the `??` operator's helper." false
+      (AtLeast 1)
+      coalesceH
+  , valDef "log" "Logs its arguments to the host and returns null." (atLeast 1 (const (pure VNull)))
   ]
 
 -- | The value-primitive pack (helper-packs-spec §4) — the *separable* batch.
@@ -192,50 +248,58 @@ coreOperationDefs =
 primitiveOperationDefs :: forall m. MonadThrow Error m => Array (OperationDef m)
 primitiveOperationDefs =
   -- case
-  [ valDef "lowercase" (unary (strUnary toLower))
-  , valDef "uppercase" (unary (strUnary toUpper))
-  , valDef "capitalize" (unary (strUnary capitalizeStr))
+  [ valDef "lowercase" "Lowercases its argument." (unary (strUnary toLower))
+  , valDef "uppercase" "Uppercases its argument." (unary (strUnary toUpper))
+  , valDef "capitalize" "Uppercases the first character of its argument."
+      (unary (strUnary capitalizeStr))
   -- whitespace
-  , valDef "trim" (unary (strUnary String.trim))
-  , valDef "trimStart" (unary (strUnary trimStartStr))
-  , valDef "trimEnd" (unary (strUnary trimEndStr))
+  , valDef "trim" "Removes leading and trailing whitespace." (unary (strUnary String.trim))
+  , valDef "trimStart" "Removes leading whitespace." (unary (strUnary trimStartStr))
+  , valDef "trimEnd" "Removes trailing whitespace." (unary (strUnary trimEndStr))
   -- substring & membership
-  , valDef "split" (binary splitH)
-  , gen "replace" false (Exactly 3) replaceH
-  , gen "slice" false (Between 2 3) sliceH
-  , valDef "includes" (binary includesH)
-  , valDef "startsWith" (binary startsWithH)
-  , valDef "endsWith" (binary endsWithH)
-  , gen "truncate" false (Between 2 3) truncateH
+  , valDef "split" "Splits a string into an array on a separator." (binary splitH)
+  , gen "replace" "Replaces every occurrence of a substring with another." false (Exactly 3)
+      replaceH
+  , gen "slice" "Returns a substring from a start index to an optional end index." false
+      (Between 2 3)
+      sliceH
+  , valDef "includes" "True when the subject string or array contains the given value."
+      (binary includesH)
+  , valDef "startsWith" "True when the string starts with the given prefix." (binary startsWithH)
+  , valDef "endsWith" "True when the string ends with the given suffix." (binary endsWithH)
+  , gen "truncate" "Shortens a string to a maximum length, appending an optional ellipsis." false
+      (Between 2 3)
+      truncateH
   -- concatenation
-  , valDef "append" (binary appendH)
-  , valDef "prepend" (binary prependH)
+  , valDef "append" "Appends the second string to the first." (binary appendH)
+  , valDef "prepend" "Prepends the second string to the first." (binary prependH)
   -- case aliases (handlebars-helpers parity): render identically to the
   -- canonical case helpers, reusing the very same `strUnary` transform.
-  , withAlias "lowercase" (valDef "downcase" (unary (strUnary toLower)))
-  , withAlias "uppercase" (valDef "upcase" (unary (strUnary toUpper)))
+  , withAlias "lowercase" (valDef "downcase" "Lowercases its argument." (unary (strUnary toLower)))
+  , withAlias "uppercase" (valDef "upcase" "Uppercases its argument." (unary (strUnary toUpper)))
   -- number pack
-  , valDef "abs" (unary (numUnary Number.abs))
-  , valDef "floor" (unary (numUnary Number.floor))
-  , valDef "ceil" (unary (numUnary Number.ceil))
-  , valDef "round" (unary (numUnary Number.round))
-  , valDef "toFixed" (binary toFixedH)
-  , valDef "toInt" (unary toIntH)
-  , valDef "toFloat" (unary toFloatH)
+  , valDef "abs" "The absolute value of a number." (unary (numUnary Number.abs))
+  , valDef "floor" "Rounds a number down to the nearest integer." (unary (numUnary Number.floor))
+  , valDef "ceil" "Rounds a number up to the nearest integer." (unary (numUnary Number.ceil))
+  , valDef "round" "Rounds a number to the nearest integer." (unary (numUnary Number.round))
+  , valDef "toFixed" "Formats a number with a fixed number of decimal places." (binary toFixedH)
+  , valDef "toInt" "Parses its argument as an integer." (unary toIntH)
+  , valDef "toFloat" "Parses its argument as a floating-point number." (unary toFloatH)
   -- array pack
-  , valDef "join" (binary joinH)
-  , valDef "count" (unary countH)
+  , valDef "join" "Joins an array into a string with a separator." (binary joinH)
+  , valDef "count" "The number of items in an array (or characters in a string)." (unary countH)
   -- `size` ≡ `count`: a canonical synonym (not a deprecation alias) — labelled
   -- in the catalog, never warned.
-  , withSynonym "count" (valDef "size" (unary countH))
-  , valDef "at" (binary atH)
-  , valDef "take" (binary takeH)
-  , valDef "takeRight" (binary takeRightH)
-  , valDef "reverse" (unary reverseH)
-  , valDef "unique" (unary uniqueH)
-  , valDef "sortBy" (binary sortByH)
-  , valDef "pluck" (binary pluckH)
-  , valDef "groupBy" (binary groupByH)
+  , withSynonym "count"
+      (valDef "size" "The number of items in an array (or characters in a string)." (unary countH))
+  , valDef "at" "The element at an index (negative counts from the end)." (binary atH)
+  , valDef "take" "The first n elements of an array." (binary takeH)
+  , valDef "takeRight" "The last n elements of an array." (binary takeRightH)
+  , valDef "reverse" "Reverses an array or string." (unary reverseH)
+  , valDef "unique" "The array with duplicate elements removed." (unary uniqueH)
+  , valDef "sortBy" "Sorts an array of objects by a key." (binary sortByH)
+  , valDef "pluck" "Extracts a key's value from each object in an array." (binary pluckH)
+  , valDef "groupBy" "Groups an array of objects into an object keyed by a field." (binary groupByH)
   ]
 
 -- | The registry: name → runtime helper.
