@@ -16,13 +16,17 @@ import { existsSync, readFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
+import { ESBUILD_VERSION } from "../editors/shared/sync.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ENTRY = resolve(root, "output/FullBars.JS/index.js");
 const COMMITTED = resolve(root, "lab/vendor/flatbars-engine.mjs");
 // Pinned so the regen is byte-reproducible regardless of the local toolchain;
-// the committed bundle is produced by this exact command.
-const ESBUILD = "esbuild@0.23.0";
+// the committed bundle is produced by this exact command. The version is the
+// repo-wide pin from `editors/shared/sync.mjs` (the same `gen:bundle` and the
+// editor packagers use) — imported, not duplicated, so the gate can never drift
+// from it again.
+const ESBUILD = `esbuild@${ESBUILD_VERSION}`;
 const REGEN_CMD = `npx --yes ${ESBUILD} output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs`;
 
 if (!existsSync(ENTRY)) {
