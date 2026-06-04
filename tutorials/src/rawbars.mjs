@@ -65,4 +65,14 @@ guest
     template: "A{{! dropped }}B",
     data: {},
   },
+
+  // ── Block partials: define with {{#inline}}, fill with {{{yield}}} ─────────
+  // RawBars hoists {{#inline "name"}} definitions into the partial registry (the
+  // shared Kernel.Hoist, same engine step as FullBars/MaxBars); {{#partial "name"
+  // ctx}} then invokes it with the block body, dropped in at {{{yield}}}. Bare
+  // core: triple-stash and an explicit context — no surface sugar.
+  yield: {
+    template: '{{#inline "frame"}}<main>{{{yield}}}</main>{{/inline}}{{#partial "frame" this}}{{{lookup this "name"}}}{{/partial}}',
+    data: { name: "Ada" },
+  },
 };

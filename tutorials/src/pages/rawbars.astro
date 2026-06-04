@@ -271,8 +271,13 @@ const t = (s) => s;
       (<code>{t("{{#partial \"name\" ctx}} … {{/partial}}")}</code>). It is RawBars'
       spelling of Handlebars' <code>{t("{{> @partial-block}}")}</code> — MaxBars
       writes the bare <code>{t("{{yield}}")}</code>, and all three name the one
-      scoped <code>partial-block</code> operation.
+      scoped <code>partial-block</code> operation. A partial can be defined inline with
+      <code>{t("{{#inline \"name\"}} … {{/inline}}")}</code> (hoisted into the registry,
+      the same shared engine step FullBars and MaxBars run) — so partials/inline/yield
+      are core capability, not surface sugar; RawBars differs from the others only in
+      syntax.
     </p>
+    <OpenInLab client:visible engine="rawbars" template={ex.yield.template} data={ex.yield.data} />
 
     <h3>Where to go next</h3>
     <p>
