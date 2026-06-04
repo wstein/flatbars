@@ -247,3 +247,13 @@ ladder, mandated for no one.'
   so the "core reused unchanged" folklore is killed at the source and not just in prose.
 . **Add a regression test asserting the `else`/`user` indistinguishability** (`parse` yields the same
   `Sep` shape for both) so the crown-jewel property can't silently regress under a future seam.
+
+== Amendment (2026-06-04): interiors are emitted pre-lexed
+
+The structural scan still produces the meaning-free `RawTok` skeleton exactly as
+decided here. What is new (xref:adr-0004-token-lexer-and-grammar-seams.adoc[ADR-004]
+amendment) is that `FlatBars.Tokenizer` pairs each `RawTok` with its interior
+token stream *before* the tree builder runs, so the parser consumes interiors
+pre-lexed rather than re-lexing them itself. The thesis is unchanged: the skeleton
+is meaning-free, interior operator-carving stays `infixArith`-driven, and the
+`else`/`user` indistinguishability holds (both are still a name-agnostic `RSep`).

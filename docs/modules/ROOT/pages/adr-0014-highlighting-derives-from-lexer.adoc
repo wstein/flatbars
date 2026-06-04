@@ -86,6 +86,17 @@ had no such gate, so the drift was silent.
   (YAML) highlighting — the Lab's `yamlDecorator`, the tutorials' `highlightYaml` — is a separate concern
   and is unchanged. See `highlighting-spec.md`.
 
+== Amendment (2026-06-04): the highlighter shares the parser's tokenizer
+
+This ADR's principle — highlighting derives from the engine lexer — is now
+literal: `tokenizeSpans` no longer re-runs `tokenizeInterior` itself. It scans
+via `FlatBars.Tokenizer.tokenizeWithInteriors` and carves interior spans from each
+tag's *pre-lexed* `interior`, the same `ITok` stream the parser consumes
+(xref:adr-0004-token-lexer-and-grammar-seams.adoc[ADR-004] amendment). The
+highlighter and the parser therefore read every interior through *one* tokenizer
+call and cannot drift on how it is lexed. Byte-identical: the `check:highlight`
+golden was unchanged by the migration.
+
 == Consequences
 
 * The Lab's and the tutorials' template regexes are retired: both now paint from the shared

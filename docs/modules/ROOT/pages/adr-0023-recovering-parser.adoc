@@ -72,3 +72,14 @@ compiler rejects the file anyway, so the extra work is never wasted on output.
 * *Deferred, not blocked:* richer recovery for an unsalvageable block head (currently a `NodeError` plus a
   flat tail), and hover/completion built on the in-tree error nodes. Diagnostic *ranges* currently cover
   the offending tag (start → its `}}`); finer spans can come from `NodeError`'s span when needed.
+
+== Amendment (2026-06-04): recovery over pre-lexed interiors
+
+`headedRecovering`/`salvageName` now consume each tag's *pre-lexed* interior from
+the unified tokenizer (xref:adr-0004-token-lexer-and-grammar-seams.adoc[ADR-004]
+amendment) instead of re-lexing it. Per-tag recovery is preserved precisely
+because that interior is carried as the *deferred* `Either ParseError (Array
+PosToken)`: a malformed interior is a `Left` that rides inside its own tag and is
+handled exactly where `tokenizeInterior` used to fail, so one bad tag never breaks
+the structural scan or the rest of the document. Behaviour is unchanged
+(`parseRecovering` tests + `test:compile` 300/300).
