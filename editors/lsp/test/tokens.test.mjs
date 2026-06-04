@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import {
   buildLegend,
+  dialectDiagnostics,
   dialectForLanguageId,
   dialectForUri,
   documentSymbolsOf,
@@ -247,6 +248,50 @@ t("operation painter: dialect-cross — MaxBars `??` is silent in MinBars", () =
   assert.deepEqual(max, ["operator", "string"], "MaxBars sees the operator + string");
   const min = tokensOf('{{ a ?? "b" }}', "minbars").map((t) => t.kind);
   for (const k of min) assert.notEqual(k, "operator", "MinBars must NOT paint `??` as operator");
+});
+
+// ── Dialect diagnostics: shapes the parser accepts but the dialect rejects ──
+t("dialectDiagnostics — plain MinBars stays clean", () => {
+  assert.deepEqual(dialectDiagnostics("{{name}}", "minbars"), []);
+  assert.deepEqual(dialectDiagnostics("{{#items}}{{.}}{{/items}}", "minbars"), []);
+  assert.deepEqual(dialectDiagnostics("{{a.b.c}}", "minbars"), []);
+  assert.deepEqual(dialectDiagnostics("{{!-- comment --}}", "minbars"), []);
+});
+
+t("dialectDiagnostics — MinBars flags subexpressions", () => {
+  const src = '{{#each (lookup x "y")}}{{/each}}';
+  const ds = dialectDiagnostics(src, "minbars");
+  assert.equal(ds.length, 1);
+  assert.match(ds[0].message, /Subexpressions/);
+  assert.equal(src[ds[0].start], "(", "diagnostic lands on the open paren");
+});
+
+t("dialectDiagnostics — MinBars flags helper invocations", () => {
+  const ds = dialectDiagnostics("{{lookup x y}}", "minbars");
+  assert.equal(ds.length, 1);
+  assert.match(ds[0].message, /Helper invocations/);
+});
+
+t("dialectDiagnostics — RawBars flags the same shapes", () => {
+  assert.equal(dialectDiagnostics("{{#each (lookup x)}}{{/each}}", "rawbars").length, 1);
+  assert.equal(dialectDiagnostics("{{lookup x y}}", "rawbars").length, 1);
+});
+
+t("dialectDiagnostics — FullBars and MaxBars accept both shapes", () => {
+  assert.deepEqual(dialectDiagnostics('{{#each (lookup x "y")}}{{/each}}', "fullbars"), []);
+  assert.deepEqual(dialectDiagnostics("{{lookup x y}}", "fullbars"), []);
+  assert.deepEqual(dialectDiagnostics("{{ a ?? b }}", "maxbars"), []);
+});
+
+t("parseDiagnostics merges parser and dialect findings", () => {
+  // The user's exact case from the session: opens cleanly as fullbars, fires two
+  // diagnostics in minbars (the subexpression + the helper invocation later in
+  // the template).
+  const tpl = '{{#each (lookup this "items")}}{{escapeHtml this}}{{/each}}';
+  const fb = parseDiagnostics(tpl, "fullbars");
+  assert.equal(fb.length, 0, "fullbars accepts subexpressions and helper invocations");
+  const mb = parseDiagnostics(tpl, "minbars");
+  assert.ok(mb.length >= 2, "minbars flags both the subexpression and the helper invocation");
 });
 
 // ── Folding ranges (ADR-026) ────────────────────────────────────────────────

@@ -86,11 +86,122 @@ export function resolveDialect(languageId, uri, fallback = "fullbars") {
 // tag's close (`}}`) so the squiggle covers the whole tag (falling back to a
 // two-char width when no close is found — an unterminated tag).
 export function parseDiagnostics(text, dialect) {
-  return engineDiagnostics(text, dialect).map((d) => {
+  const parser = engineDiagnostics(text, dialect).map((d) => {
     const close = text.indexOf("}}", d.offset);
     const end = close < 0 ? Math.min(d.offset + 2, text.length) : close + 2;
     return { start: d.offset, end, message: d.message };
   });
+  return [...parser, ...dialectDiagnostics(text, dialect)];
+}
+
+// Dialect-level diagnostics: shapes the engine's STRUCTURAL parser accepts but
+// the dialect's semantics reject. The structural parser (ADR-001) is shared
+// across dialects — it doesn't know that Mustache (MinBars) has no
+// subexpressions, no helper invocations, and no block parameters. Without this
+// pass, `{{#each (lookup this "items")}}` would surface no diagnostic in a
+// `.minbars` file even though the engine refuses to render it.
+//
+// The checks operate on token spans the engine already gives us, scoped per
+// non-comment / non-raw-block tag. Each violation reports the OFFENDING SUBSPAN
+// (the `(` for subexpression, or the helper-arg gap) so the squiggle lands on
+// the actual problem, not the whole tag. Per-dialect rules:
+//   * MinBars — no subexpressions, no helper invocations (tag body must be a
+//     single path: `name`, `name.foo`, `name/foo`, `[seg.with.dot]`).
+//   * RawBars — same as MinBars (core dialect has no helpers either).
+//   * FullBars / MaxBars — no extra checks; the parser already accepts their
+//     full surface.
+export function dialectDiagnostics(text, dialect) {
+  if (dialect !== "minbars" && dialect !== "rawbars") return [];
+  const out = [];
+  for (const s of tokenize(text, dialect)) {
+    if (s.role !== "tag") continue;
+    if (s.kind === "comment" || s.kind === "raw-block" || s.kind === "error") continue;
+    if (s.kind === "set-delimiter") continue; // {{=A B=}} legitimately has internal space
+    const body = bodyOfTag(text, s);
+    if (!body) continue;
+    // Subexpression: a `(` outside any string literal.
+    const subexpAt = findOutsideStrings(body.text, "(");
+    if (subexpAt >= 0) {
+      out.push({
+        start: body.from + subexpAt,
+        end: body.from + subexpAt + 1,
+        message: `Subexpressions \`(…)\` are not valid in ${displayName(dialect)} — only a single path is allowed in a tag.`,
+      });
+      continue; // one finding per tag keeps the output focused
+    }
+    // Helper-args: any whitespace between non-string tokens in the body. A
+    // legitimate Mustache tag body is a single path with optional leading/
+    // trailing whitespace; `{{lookup x}}` packs two tokens and is invalid.
+    const helperGapAt = findHelperArgsGap(body.text);
+    if (helperGapAt >= 0) {
+      out.push({
+        start: body.from + helperGapAt,
+        end: body.from + helperGapAt + 1,
+        message: `Helper invocations with arguments are not valid in ${displayName(dialect)} — a tag body is a single path, not a function call.`,
+      });
+    }
+  }
+  return out;
+}
+
+function bodyOfTag(text, s) {
+  // Skip braces, sigils, ~ at both ends; the rest is the body.
+  let from = s.from;
+  let to = s.to;
+  while (from < to && /[{}~]/.test(text[from])) from++;
+  if (from < to && /[#/\^<$>&!=]/.test(text[from])) from++; // sigil
+  if (from < to && text[from] === "*") from++; // partial-block decorator
+  while (to > from && /[{}~]/.test(text[to - 1])) to--;
+  if (to > from && text[to - 1] === "=") to--; // set-delim close (defensive)
+  return from < to ? { from, text: text.slice(from, to) } : null;
+}
+
+function findOutsideStrings(s, ch) {
+  let inStr = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) {
+      if (c === inStr) inStr = null;
+    } else if (c === '"' || c === "'") {
+      inStr = c;
+    } else if (c === ch) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function findHelperArgsGap(s) {
+  // Trim leading/trailing whitespace, then scan for the first whitespace run
+  // that separates two non-string identifiers. Strings are skipped entirely
+  // so `{{> "p"}}` (illegal in different ways) doesn't flag here.
+  let i = 0;
+  while (i < s.length && /\s/.test(s[i])) i++;
+  // Skip the first identifier / path / bracketed segment.
+  let inStr = null;
+  while (i < s.length) {
+    const c = s[i];
+    if (inStr) {
+      if (c === inStr) inStr = null;
+      i++;
+    } else if (c === '"' || c === "'") {
+      inStr = c;
+      i++;
+    } else if (/\s/.test(c)) {
+      break;
+    } else {
+      i++;
+    }
+  }
+  // i is now on the first whitespace or end of body. Check whether there's a
+  // non-whitespace token after — if so, it's helper-args territory.
+  const ws = i;
+  while (i < s.length && /\s/.test(s[i])) i++;
+  return i < s.length ? ws : -1;
+}
+
+function displayName(dialect) {
+  return dialect === "minbars" ? "MinBars (Mustache)" : "RawBars";
 }
 
 // Semantic tokens are SPARSE CORRECTIONS over the TextMate floor (ADR-017), not a

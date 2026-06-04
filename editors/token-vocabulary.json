@@ -38,10 +38,10 @@
     "`lspEmitKinds` is the sparse set the LSP emits over the floor.",
     "",
     "`operationPosition` on each tag-role kind drives the LSP helper-name painter (`paintOperations` in `editors/lsp/src/tokens.mjs`). Values:",
-    "  * `head` — the tag's first identifier paints as `operation` when the operations catalogue knows it (so `{{lookup x y}}` lights up `lookup`, plain `{{name}}` stays default-coloured).",
-    "  * `always-head` — the tag's first identifier always paints; used for `{{> partial}}` where partial names are user-defined and never in the catalogue.",
-    "  * `any` — head identifier handled by the TextMate grammar as `keyword.control.*`, but subexpression heads (`(helper arg)`) and pipe targets (`x | helper`) inside the body still scan and paint when known.",
-    "  * `none` — never paint (comments, raw-block bodies, set-delim, errors, `{{else}}`/`{{elif}}` keywords — handled elsewhere)."
+    "  * `head` \u2014 the tag's first identifier paints as `operation` when the operations catalogue knows it (so `{{lookup x y}}` lights up `lookup`, plain `{{name}}` stays default-coloured).",
+    "  * `always-head` \u2014 the tag's first identifier always paints; used for `{{> partial}}` where partial names are user-defined and never in the catalogue.",
+    "  * `any` \u2014 head identifier handled by the TextMate grammar as `keyword.control.*`, but subexpression heads (`(helper arg)`) and pipe targets (`x | helper`) inside the body still scan and paint when known.",
+    "  * `none` \u2014 never paint (comments, raw-block bodies, set-delim, errors, `{{else}}`/`{{elif}}` keywords \u2014 handled elsewhere)."
   ],
   "lspEmitKinds": [
     "keyword",
@@ -60,9 +60,9 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars"
       ],
       "description": "{{name}} \u2014 an interpolation (escaped output). No internal sigil.",
       "operationPosition": "head"
@@ -76,10 +76,10 @@
         ]
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.operator.raw.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.operator.raw.flatbars"
       ],
       "description": "{{{x}}} / {{&x}} \u2014 unescaped (raw) output. For {{&x}} the `&` sigil is split out as `keyword.operator.raw`.",
       "operationPosition": "head"
@@ -91,9 +91,9 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.block.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars"
+        "meta.embedded.block.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars"
       ],
       "description": "{{{{raw}}}} \u2026 {{{{/raw}}}} \u2014 a raw block (multi-line).",
       "operationPosition": "none"
@@ -105,10 +105,10 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.control.section.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.control.section.flatbars"
       ],
       "description": "{{#x}} \u2014 a section open. Braces are escape tokens; `#x` is the control keyword.",
       "operationPosition": "any"
@@ -120,10 +120,10 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.control.section.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.control.section.flatbars"
       ],
       "description": "{{^x}} \u2014 an inverted section open.",
       "operationPosition": "any"
@@ -135,10 +135,10 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.control.inheritance.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.control.inheritance.flatbars"
       ],
       "description": "{{<x}} \u2014 an inheritance parent open. The `<` sigil alone is the control keyword.",
       "operationPosition": "any"
@@ -150,10 +150,10 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.control.inheritance.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.control.inheritance.flatbars"
       ],
       "description": "{{$x}} \u2014 an inheritance block declaration open. The `$` sigil alone is the control keyword.",
       "operationPosition": "any"
@@ -165,10 +165,10 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.control.section.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.control.section.flatbars"
       ],
       "description": "{{/x}} \u2014 a block close.",
       "operationPosition": "any"
@@ -180,10 +180,10 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.control.import.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.control.import.flatbars"
       ],
       "description": "{{> name}} \u2014 a partial include. The `>` (or `>*`) sigil alone is the control keyword.",
       "operationPosition": "always-head"
@@ -205,9 +205,9 @@
         "modifiers": []
       },
       "tmScopes": [
-        "comment.block.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars"
+        "comment.block.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars"
       ],
       "description": "{{! \u2026 }} / {{!-- \u2026 --}} \u2014 a comment. The body is `comment.block.*`; the braces are `punctuation.section.embedded.*` (escape-into-comment).",
       "operationPosition": "none"
@@ -219,10 +219,10 @@
         "modifiers": []
       },
       "tmScopes": [
-        "meta.embedded.line.handlebars",
-        "punctuation.section.embedded.begin.handlebars",
-        "punctuation.section.embedded.end.handlebars",
-        "keyword.directive.handlebars"
+        "meta.embedded.line.flatbars",
+        "punctuation.section.embedded.begin.flatbars",
+        "punctuation.section.embedded.end.flatbars",
+        "keyword.directive.flatbars"
       ],
       "description": "{{=A B=}} \u2014 a set-delimiter directive. The matched `=` pair is the directive keyword. The stateless fallback cannot track the new delimiters that follow (the LSP does).",
       "operationPosition": "none"

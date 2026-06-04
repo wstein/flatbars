@@ -22,11 +22,11 @@
     "",
     "  Every brace cluster ({{ }} / {{{ }}} / {{& / {{{{ }}}} / {{! / --}} ) is an",
     "  ESCAPE TOKEN \u2014 it opens or closes an embedded FlatBars context. They all carry",
-    "  `punctuation.section.embedded.{begin,end}.handlebars`, so themes that paint ERB /",
+    "  `punctuation.section.embedded.{begin,end}.flatbars`, so themes that paint ERB /",
     "  PHP / Vue embedded delimiters paint FlatBars identically.",
     "",
     "  The SIGIL-WITH-IDENTIFIER that distinguishes control tags is captured SEPARATELY",
-    "  from the brace cluster and carries `keyword.control.*.handlebars`:",
+    "  from the brace cluster and carries `keyword.control.*.flatbars`:",
     "    {{#name}}  \u2192  {{  +  #name   \u2192  keyword.control.section",
     "    {{/name}}  \u2192  {{  +  /name   \u2192  keyword.control.section",
     "    {{^name}}  \u2192  {{  +  ^name   \u2192  keyword.control.section",
@@ -35,7 +35,7 @@
     "    {{>name}}  \u2192  {{  +  >       \u2192  keyword.control.import",
     "    {{=A B=}}  \u2192  {{  +  =  \u2026  =  +  }}   \u2192  keyword.directive",
     "",
-    "Every tag region carries `meta.embedded.{line,block}.handlebars`. Inner content",
+    "Every tag region carries `meta.embedded.{line,block}.flatbars`. Inner content",
     "(identifiers, paths, args after the sigil) is default-coloured at the floor; the",
     "LSP corrects in-tag literals, operators, `{{else}}` / `{{elif}}` keywords, and",
     "dialect-disallowed errors via semantic tokens (see token-vocabulary.json",
@@ -129,125 +129,137 @@
     "tag_constant": {
       "_doc": "true / false / null literals \u2014 the three language constants supported across all FlatBars dialects. Word-boundary anchored so identifiers like `truely`/`nullable`/`falsey` aren't false-matched.",
       "match": "\\b(true|false|null)\\b",
-      "name": "constant.language.handlebars"
+      "name": "constant.language.flatbars"
     },
     "tag_string_double": {
       "begin": "\"",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.definition.string.begin.handlebars"
+          "name": "punctuation.definition.string.begin.flatbars"
         }
       },
       "end": "\"",
       "endCaptures": {
         "0": {
-          "name": "punctuation.definition.string.end.handlebars"
+          "name": "punctuation.definition.string.end.flatbars"
         }
       },
-      "name": "string.quoted.double.handlebars"
+      "name": "string.quoted.double.flatbars"
     },
     "tag_string_single": {
       "begin": "'",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.definition.string.begin.handlebars"
+          "name": "punctuation.definition.string.begin.flatbars"
         }
       },
       "end": "'",
       "endCaptures": {
         "0": {
-          "name": "punctuation.definition.string.end.handlebars"
+          "name": "punctuation.definition.string.end.flatbars"
         }
       },
-      "name": "string.quoted.single.handlebars"
+      "name": "string.quoted.single.flatbars"
     },
     "tag_number": {
       "_doc": "Integers and decimals, optionally signed.",
       "match": "(?<![\\w.])-?\\d+(?:\\.\\d+)?(?![\\w.])",
-      "name": "constant.numeric.handlebars"
+      "name": "constant.numeric.flatbars"
     },
     "tag_operator": {
       "_doc": "MaxBars infix + pipe + nullish coalescing. Multi-char operators MUST come before single-char so `==`/`!=`/`<=`/`>=`/`??`/`&&`/`||`/`<-` aren't split.",
       "match": "==|!=|<=|>=|<-|\\?\\?|&&|\\|\\||[+\\-*%<>!|]",
-      "name": "keyword.operator.handlebars"
+      "name": "keyword.operator.flatbars"
     },
     "tag_paren": {
       "_doc": "Subexpression parens: `(helper arg)`.",
       "match": "[()]",
-      "name": "punctuation.section.parens.handlebars"
+      "name": "punctuation.section.parens.flatbars"
     },
     "tag_bracket": {
       "_doc": "MaxBars list-literal brackets (ADR-025) and Handlebars `[seg.with.dot]` path segments.",
       "match": "[\\[\\]]",
-      "name": "punctuation.section.brackets.handlebars"
+      "name": "punctuation.section.brackets.flatbars"
     },
     "tag_path_separator": {
       "_doc": "Dot/slash path separator (`foo.bar` / `foo/bar`).",
       "match": "[./]",
-      "name": "punctuation.accessor.handlebars"
+      "name": "punctuation.accessor.flatbars"
     },
     "//": "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 PURE ESCAPE TAGS (no internal sigil) \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
     "raw_block": {
       "_doc": "{{{{ \u2026 }}}} \u2026 {{{{/ \u2026 }}}} \u2014 quad-brace raw block. Accepts Handlebars's {{{{name}}}} and the FlatBars-native hash form {{{{#name}}}}. The sigils `#` and `/` split out as `keyword.control.section`, mirroring how the double-brace control tags ({{#each}}, {{/each}}) capture their sigils \u2014 every brace cluster is a pure escape token, every control sigil is a separate keyword span. The `(?!/)` between the optional `#` and the name keeps the begin from also matching the close form.",
-      "name": "meta.embedded.block.handlebars",
+      "name": "meta.embedded.block.flatbars",
       "begin": "(\\{\\{\\{\\{)\\s*(#?)\\s*(?!/)[^}]*(\\}\\}\\}\\})",
       "beginCaptures": {
-        "1": { "name": "punctuation.section.embedded.begin.handlebars" },
-        "2": { "name": "keyword.control.section.handlebars" },
-        "3": { "name": "punctuation.section.embedded.end.handlebars" }
+        "1": {
+          "name": "punctuation.section.embedded.begin.flatbars"
+        },
+        "2": {
+          "name": "keyword.control.section.flatbars"
+        },
+        "3": {
+          "name": "punctuation.section.embedded.end.flatbars"
+        }
       },
       "end": "(\\{\\{\\{\\{)\\s*(/)[^}]*(\\}\\}\\}\\})",
       "endCaptures": {
-        "1": { "name": "punctuation.section.embedded.begin.handlebars" },
-        "2": { "name": "keyword.control.section.handlebars" },
-        "3": { "name": "punctuation.section.embedded.end.handlebars" }
+        "1": {
+          "name": "punctuation.section.embedded.begin.flatbars"
+        },
+        "2": {
+          "name": "keyword.control.section.flatbars"
+        },
+        "3": {
+          "name": "punctuation.section.embedded.end.flatbars"
+        }
       }
     },
     "comment_long": {
       "_doc": "{{!-- \u2026 --}} \u2014 body may contain }} that do NOT terminate the comment.",
-      "name": "comment.block.handlebars",
+      "name": "comment.block.flatbars",
       "begin": "\\{\\{!--",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         }
       },
       "end": "--\\}\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       }
     },
     "comment_short": {
       "_doc": "{{! \u2026 }} \u2014 comment ends at the first }}.",
-      "name": "comment.block.handlebars",
+      "name": "comment.block.flatbars",
       "begin": "\\{\\{!",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         }
       },
       "end": "\\}\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       }
     },
     "triple_stash": {
       "_doc": "{{{ \u2026 }}} \u2014 raw triple-stash. Must precede #variable so triple braces match before double.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "\\{\\{\\{(?!\\{)",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         }
       },
       "end": "\\}\\}\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -258,20 +270,20 @@
     },
     "amp_unescaped": {
       "_doc": "{{& \u2026 }} \u2014 Mustache-style raw alias for triple-stash. Split like the control tags: the `{{` and `}}` are escape tokens (embedded), the `&` is a raw-output sigil pulled out as `keyword.operator.raw`.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{)(&)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.operator.raw.handlebars"
+          "name": "keyword.operator.raw.flatbars"
         }
       },
       "end": "(\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -282,17 +294,17 @@
     },
     "variable": {
       "_doc": "{{ \u2026 }} \u2014 escape-by-default interpolation. Catch-all; negative lookahead excludes every sigil already handled.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "\\{\\{~?(?![!=#/^<$>&{])",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         }
       },
       "end": "~?\\}\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -304,20 +316,20 @@
     "//control": "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 CONTROL TAGS \u2014 braces SPLIT from sigil+identifier \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
     "block_open": {
       "_doc": "{{#name \u2026}} \u2014 block helper open. The braces are escape tokens; the `#name` sigil-and-identifier is a control keyword.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{~?)(#[\\w./@-]*)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.control.section.handlebars"
+          "name": "keyword.control.section.flatbars"
         }
       },
       "end": "(~?\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -328,20 +340,20 @@
     },
     "block_close": {
       "_doc": "{{/name}} \u2014 block close. The braces are escape tokens; `/name` is a control keyword.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{~?)(/[\\w./@-]*)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.control.section.handlebars"
+          "name": "keyword.control.section.flatbars"
         }
       },
       "end": "(~?\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -352,20 +364,20 @@
     },
     "inverse_block": {
       "_doc": "{{^name}} \u2014 Mustache inverted section open.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{~?)(\\^[\\w./@-]*)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.control.section.handlebars"
+          "name": "keyword.control.section.flatbars"
         }
       },
       "end": "(~?\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -376,20 +388,20 @@
     },
     "inheritance_parent": {
       "_doc": "{{<parent}} \u2014 Mustache inheritance parent. The `<` sigil alone is the control keyword.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{)(<)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.control.inheritance.handlebars"
+          "name": "keyword.control.inheritance.flatbars"
         }
       },
       "end": "(\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -400,20 +412,20 @@
     },
     "inheritance_block": {
       "_doc": "{{$name}} \u2014 Mustache inheritance block declaration. The `$` sigil alone is the control keyword.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{)(\\$)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.control.inheritance.handlebars"
+          "name": "keyword.control.inheritance.flatbars"
         }
       },
       "end": "(\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -424,20 +436,20 @@
     },
     "partial": {
       "_doc": "{{>name}} / {{>*name}} \u2014 partial include. The `>` (or `>*`) sigil alone is the control keyword.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{)(>\\*?)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.control.import.handlebars"
+          "name": "keyword.control.import.flatbars"
         }
       },
       "end": "(\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [
@@ -448,23 +460,23 @@
     },
     "set_delimiter": {
       "_doc": "{{=A B=}} \u2014 set-delimiter directive. Both `=` sigils are matched-pair directive keywords; the braces are escape tokens.",
-      "name": "meta.embedded.line.handlebars",
+      "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{)(=)",
       "beginCaptures": {
         "1": {
-          "name": "punctuation.section.embedded.begin.handlebars"
+          "name": "punctuation.section.embedded.begin.flatbars"
         },
         "2": {
-          "name": "keyword.directive.handlebars"
+          "name": "keyword.directive.flatbars"
         }
       },
       "end": "(=)(\\}\\})",
       "endCaptures": {
         "1": {
-          "name": "keyword.directive.handlebars"
+          "name": "keyword.directive.flatbars"
         },
         "2": {
-          "name": "punctuation.section.embedded.end.handlebars"
+          "name": "punctuation.section.embedded.end.flatbars"
         }
       },
       "patterns": [

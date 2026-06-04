@@ -16,7 +16,7 @@
 // things the engine actually defines and a stateless grammar can be held to:
 //
 // The fallback is a THIN FLOOR — it recognises only tag-delimiter shapes and
-// scopes each whole tag with a `meta.*.handlebars` name; tag interiors are left
+// scopes each whole tag with a `meta.*.flatbars` name; tag interiors are left
 // uncoloured. The LSP corrects everything dialect-aware (operators, in-tag
 // string/number literals, keywords like `{{else}}`, set-delimiter, errors).
 //
@@ -24,9 +24,9 @@
 //
 //   * TAG BOUNDARIES — exactly the characters the engine marks as inside a
 //     FlatBars tag are the characters the grammar scopes as a tag. (Every FlatBars
-//     tag scope ends in `.handlebars`; everything else — host text, and a leading
+//     tag scope ends in `.flatbars`; everything else — host text, and a leading
 //     YAML front-matter block — is left plain or scoped `*.yaml`, never
-//     `.handlebars`.) This catches the Exhibit-A/B class of begin/end drift.
+//     `.flatbars`.) This catches the Exhibit-A/B class of begin/end drift.
 //
 // In-tag literal positions (string/number) are NOT gated here any more: the LSP
 // emits them as semantic-token corrections over the silent floor (see
@@ -130,7 +130,7 @@ function engineMasks(src, dialect) {
 }
 
 // The grammar's per-character view: a char is "in a tag" if any scope on it ends
-// in `.handlebars`.
+// in `.flatbars`.
 function grammarMasks(src) {
   const tag = new Array(src.length).fill(false);
   let stack = INITIAL;
@@ -138,7 +138,12 @@ function grammarMasks(src) {
   for (const line of src.split("\n")) {
     const r = grammar.tokenizeLine(line, stack);
     for (const t of r.tokens) {
-      const isTag = t.scopes.some((s) => s.endsWith(".handlebars"));
+      // A char is "in a tag" when SOME scope on the stack is a tag-marker scope —
+      // i.e. ends in `.flatbars` AND isn't the root `source.flatbars` (which is
+      // on every character, including host text). After the .handlebars → .flatbars
+      // scope rename the root scope ALSO ends in `.flatbars`, so the old
+      // suffix-only heuristic over-matched and flagged plain text as tag.
+      const isTag = t.scopes.some((s) => s.endsWith(".flatbars") && s !== "source.flatbars");
       for (let i = t.startIndex; i < t.endIndex; i++) tag[base + i] = isTag;
     }
     stack = r.ruleStack;
