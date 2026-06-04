@@ -111,28 +111,40 @@ export function parseDiagnostics(text, dialect) {
 //   * FullBars / MaxBars — no extra checks; the parser already accepts their
 //     full surface.
 export function dialectDiagnostics(text, dialect) {
-  // FullBars (Handlebars surface) has no set-delimiter support, so `{{=A B=}}`
-  // hits the engine as a malformed interpolation and the recovering parser
-  // emits a generic "LexError: unexpected character" with no hint that the
-  // feature itself is dialect-gated. Surface a clear, actionable message at the
-  // `=` instead. The other dialects (MinBars / RawBars / MaxBars) all support
-  // set-delim and tokenize the directive normally.
-  if (dialect === "fullbars") {
+  // Set-delimiter directives are a MinBars (Mustache) feature only (ADR-015
+  // amendment). RawBars, MaxBars, and FullBars all reject `{{=A B=}}` at the
+  // parser; the recovering parser surfaces a generic "LexError: unexpected
+  // character" without telling the user the feature is dialect-gated. Surface
+  // an actionable message at the `=` instead. MinBars accepts silently.
+  if (dialect === "fullbars" || dialect === "rawbars" || dialect === "maxbars") {
     const out = [];
     const re = /\{\{=/g;
     let m;
+    const dialectName = { fullbars: "FullBars (Handlebars surface)", rawbars: "RawBars", maxbars: "MaxBars" }[dialect];
     while ((m = re.exec(text)) !== null) {
       out.push({
         start: m.index,
         end: m.index + 3,
         message:
-          "Set-delimiter directives `{{=A B=}}` are not valid in FullBars (the Handlebars surface). " +
-          "Switch the file to MinBars (Mustache), RawBars, or MaxBars to use them — " +
-          "Cmd-Shift-P → Change Language Mode.",
+          `Set-delimiter directives \`{{=A B=}}\` are not valid in ${dialectName} — ` +
+          `they're a Mustache feature reserved for MinBars. Switch the file to MinBars ` +
+          `to use them (Cmd-Shift-P → Change Language Mode).`,
       });
     }
-    return out;
+    if (dialect === "fullbars") return out;
+    // RawBars/MaxBars still want the rest of the dialect rules (they're not
+    // Handlebars-compatible and have their own constraints — see below).
+    // Continue into the shared MinBars/RawBars rules… but RawBars only.
+    if (dialect === "maxbars") return out;
+    // Fall through to RawBars validation rules below.
+    const rest = dialectRulesFor(text, dialect);
+    return out.concat(rest);
   }
+  if (dialect !== "minbars" && dialect !== "rawbars") return [];
+  return dialectRulesFor(text, dialect);
+}
+
+function dialectRulesFor(text, dialect) {
   if (dialect !== "minbars" && dialect !== "rawbars") return [];
   const out = [];
   for (const s of tokenize(text, dialect)) {

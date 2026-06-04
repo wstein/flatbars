@@ -99,3 +99,38 @@ precedes a passing fixture.
   config / runtime / CLI / the `pass:[{{! @delimiters: <% %> }}]` directive — all seeding the same lexer
   pair-config MinBars uses. FullBars stays Handlebars-faithful (no set delimiters). The off-by-default
   invariant keeps existing ladder templates byte-identical.
+
+
+== Amendment (2026-06-04): set delimiters are MinBars-exclusive
+
+The original decision enabled `mustacheDelims` in RawBars and MaxBars
+alongside MinBars, on the rationale that they're "non-Handlebars dialects".
+That rationale was wrong: set-delimiter is a *Mustache* feature, not a
+"non-Handlebars" feature. RawBars (the meaning-free core) and MaxBars
+(the operators + pipes flagship) have no semantic reason to ship a
+Mustache lexer mode; carrying it just produced three yeses and one no
+where the dialect ladder benefits from one consistent answer.
+
+Effective immediately:
+
+* MinBars accepts `{{=A B=}}` and the `{{! @delimiters: <% %> }}`
+  long-comment directive (unchanged).
+* RawBars, MaxBars, and FullBars all reject the inline form at the
+  parser (`LexError: unexpected character`).
+* The `{{! @delimiters: …}}` long-comment form parses as a normal
+  comment in RawBars / MaxBars / FullBars and the directive inside is
+  silently ignored — Mustache's @-prefixed directive convention has no
+  meaning in the Handlebars surface.
+* The LSP surfaces a clear, actionable diagnostic in all three
+  non-MinBars dialects: "Set-delimiter directives `{{=A B=}}` are not
+  valid in *<Dialect>* — they're a Mustache feature reserved for
+  MinBars. Switch the file to MinBars to use them."
+
+Implementation: `RawBars.coreOptions.lexConfig` and
+`MaxBars.maxOptions.lexConfig` revert to `defaultLexConfig` (no
+`mustacheDelims`); `editors/js/src/FullBars/JS.purs` `highlightConfig`
+matches at the highlight layer; the rawbars and maxbars test suites
+flip from "asserts switching works" to "asserts the inline form is
+rejected". `dialectDiagnostics` in `editors/lsp/src/tokens.mjs` emits
+the actionable message for FullBars / RawBars / MaxBars; MinBars
+silent.

@@ -53,11 +53,11 @@ import Kernel.Value (nonEmpty)
 -- | (`{{{{…}}}}` raw blocks, `{{^…}}` inverse, `{{&…}}` unescaped) — `extras`
 -- | off. Front-end knobs like standalone trimming still pass through.
 -- |
--- | Set delimiters are enabled (`mustacheDelims`): RawBars and MaxBars are
--- | non-Handlebars dialects, so inline `{{=<% %>=}}` and the
--- | `{{! @delimiters: <% %> }}` directive both work (ADR-015). FullBars — the
--- | Handlebars-faithful dialect — leaves them off (Handlebars has no set
--- | delimiters).
+-- | Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is a
+-- | Mustache feature and only MinBars accepts it. RawBars, MaxBars, and FullBars
+-- | all reject set-delim directives — the dialect ladder treats set-delim as
+-- | MinBars-exclusive so the four surfaces have a single, consistent answer to
+-- | "does delimiter switching work here?" instead of three yeses and one no.
 coreOptions :: ParseOptions
 coreOptions = defaultParseOptions
   { extras = false
@@ -67,7 +67,6 @@ coreOptions = defaultParseOptions
   -- Handlebars bare `{{{{name}}}}` form.
   , rawBlockHbs = false
   , rawBlockHash = true
-  , lexConfig = defaultLexConfig { mustacheDelims = true }
   }
 
 -- | Parse core source and return a pure renderer (the engine's fixed `handlebars`

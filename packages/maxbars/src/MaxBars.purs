@@ -52,9 +52,10 @@ maxOptions =
     , rawBlockHbs = false
     , rawBlockHash = true
     , lexOptions = { infixArith: true }
-    -- Set delimiters enabled (ADR-015): inline `{{=<% %>=}}` + the
-    -- `{{! @delimiters: <% %> }}` directive. FullBars stays Handlebars-faithful.
-    , lexConfig = defaultLexConfig { mustacheDelims = true }
+    -- Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is
+    -- a Mustache feature reserved for MinBars. RawBars / MaxBars / FullBars all
+    -- reject it so the dialect ladder has one consistent answer to "does
+    -- delimiter switching work here?" — yes only on the Mustache surface.
     }
 
 -- | MaxBars' surface variable resolver (ADR-021). There are *no bare loop

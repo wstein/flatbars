@@ -309,18 +309,20 @@ t("dialectDiagnostics — FullBars and MaxBars accept both shapes", () => {
   assert.deepEqual(dialectDiagnostics("{{ a ?? b }}", "maxbars"), []);
 });
 
-t("dialectDiagnostics — FullBars flags set-delimiter usage with a clear message", () => {
-  // Handlebars (and so FullBars) has no `{{=A B=}}` directive. Without this
-  // rule the recovering parser emits a generic "LexError: unexpected character"
-  // — the user has no way to tell the feature requires a different dialect.
-  const ds = dialectDiagnostics("{{=<% %>=}}\n<%name%>", "fullbars");
-  assert.ok(ds.length >= 1, "set-delim directive flagged in FullBars");
-  assert.match(ds[0].message, /Set-delimiter directives/);
-  assert.match(ds[0].message, /MinBars.*RawBars.*MaxBars/);
-  // Other dialects do not flag set-delim.
+t("dialectDiagnostics — every non-MinBars dialect flags set-delim usage", () => {
+  // Set-delim `{{=A B=}}` is a Mustache feature reserved for MinBars (ADR-015
+  // amendment). FullBars / RawBars / MaxBars all reject it; without the
+  // dialect rule the recovering parser emits a generic "LexError" with no
+  // hint that the feature is dialect-gated.
+  for (const dialect of ["fullbars", "rawbars", "maxbars"]) {
+    const ds = dialectDiagnostics("{{=<% %>=}}\n<%name%>", dialect);
+    assert.ok(ds.length >= 1, `set-delim flagged in ${dialect}`);
+    const setDelimFinding = ds.find((d) => /Set-delimiter directives/.test(d.message));
+    assert.ok(setDelimFinding, `set-delim-specific message in ${dialect}`);
+    assert.match(setDelimFinding.message, /Mustache feature reserved for MinBars/);
+  }
+  // MinBars accepts set-delim silently (it IS the Mustache surface).
   assert.deepEqual(dialectDiagnostics("{{=<% %>=}}", "minbars"), []);
-  assert.deepEqual(dialectDiagnostics("{{=<% %>=}}", "rawbars"), []);
-  assert.deepEqual(dialectDiagnostics("{{=<% %>=}}", "maxbars"), []);
 });
 
 t("dialectDiagnostics — MinBars flags block parameters", () => {

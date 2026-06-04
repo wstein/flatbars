@@ -387,7 +387,10 @@ highlightConfig = case _ of
     , rawBlockHash: true
     }
   "rawbars" ->
-    { lexConfig: withSetDelims
+    -- RawBars does not enable set-delim (per ADR-015 amendment); use the
+    -- default lex config so highlighting agrees with parsing and the
+    -- editor flags `{{=A B=}}` in `.rawbars` files instead of accepting it.
+    { lexConfig: defaultLexConfig { keepLongComments = true }
     , clauseSeps: kernelClauses
     , lexOptions: defaultLexOptions
     , extras: false

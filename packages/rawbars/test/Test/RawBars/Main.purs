@@ -53,24 +53,17 @@ main = do
   -- the same rejection in the compiled path.
   assert' "reject (compile): inverse" (isLeft (compileJs "{{^a}}x{{/a}}"))
 
-  -- ── Set delimiters (ADR-015): RawBars enables `mustacheDelims` ─────────────
-  -- inline `{{=<% %>=}}` switches the active delimiters; the block then uses `<% %>`.
-  assert' "set-delim: inline switch"
-    ( render "{{=<% %>=}}<%#if (lookup this \"a\")%>Y<%else%>N<%/if%>"
-        (obj [ Tuple "a" (VBool true) ]) == Right "Y"
-    )
-  -- the `{{! @delimiters: <% %> }}` directive switches the same way (positional).
-  assert' "set-delim: @delimiters directive"
-    ( render "{{! @delimiters: <% %> }}<%#if (lookup this \"a\")%>Y<%/if%>"
-        (obj [ Tuple "a" (VBool true) ]) == Right "Y"
-    )
-  -- `<%={{ }}=%>` switches back to the default braces.
-  assert' "set-delim: switch back to default"
-    ( render "{{=<% %>=}}<%={{ }}=%>{{{lookup this \"x\"}}}"
-        (obj [ Tuple "x" (VString "hi") ]) == Right "hi"
-    )
-  -- a malformed set-delimiter (not exactly two delimiters) is a parse error.
-  assert' "set-delim: malformed rejected" (isLeft (render "{{=onlyone=}}" (obj [])))
+  -- ── Set delimiters (ADR-015 amendment): MinBars-exclusive ─────────────────
+  -- RawBars REJECTS set-delim. The Mustache `{{=A B=}}` inline directive is a
+  -- hard parse error in RawBars/MaxBars/FullBars; the `{{! @delimiters: …}}`
+  -- long-comment form parses as a normal comment and the directive inside is
+  -- silently ignored (no delimiter switch happens, so `<%name%>` reads as
+  -- plain content). The dialect ladder has one consistent answer to "does
+  -- delimiter switching work here?" — yes only on the Mustache surface.
+  assert' "set-delim: inline `{{=A B=}}` is rejected"
+    (isLeft (render "{{=<% %>=}}<%a%>" (obj [])))
+  assert' "set-delim: `{{! @delimiters: …}}` directive is ignored — `<%a%>` stays content"
+    (render "{{! @delimiters: <% %> }}<%a%>" (obj []) == Right "<%a%>")
 
   -- block-partial yield: the `yield` operation (the `partial-block` synonym)
   -- renders the caller's block body. RawBars has no surface, so it is the explicit

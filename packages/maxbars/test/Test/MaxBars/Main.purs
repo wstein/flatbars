@@ -294,15 +294,16 @@ main = do
   assert' "label-warn: {{#each xs label outer}} (fresh name) does not warn"
     (Array.null (warnNames "{{#each xs label outer}}{{outer.index0}}{{/each}}"))
 
-  -- ── Set delimiters (ADR-015): MaxBars enables `mustacheDelims` ─────────────
-  expectM "set-delim: inline switch" "{{=<% %>=}}<%name%>"
-    (obj [ Tuple "name" (VString "Ada") ])
-    "Ada"
-  expectM "set-delim: @delimiters directive" "{{! @delimiters: <% %> }}<%name%>"
-    (obj [ Tuple "name" (VString "Ada") ])
-    "Ada"
-  expectM "set-delim: switch back to default" "{{=<% %>=}}<%={{ }}=%>{{name}}"
-    (obj [ Tuple "name" (VString "Ada") ])
-    "Ada"
+  -- ── Set delimiters (ADR-015 amendment): MinBars-exclusive ─────────────────
+  -- MaxBars REJECTS set-delim. The inline `{{=A B=}}` form is a hard parse
+  -- error; the `{{! @delimiters: …}}` long-comment form parses as a normal
+  -- comment and the directive inside is silently ignored (no delimiter switch
+  -- happens, so `<%name%>` reads as plain content). The dialect ladder has
+  -- one consistent answer to "does delimiter switching work here?" — yes only
+  -- on the Mustache surface.
+  assert' "set-delim: inline `{{=A B=}}` is rejected"
+    (isLeft (renderMax "{{=<% %>=}}<%name%>" (obj [])))
+  assert' "set-delim: `{{! @delimiters: …}}` directive is ignored — `<%name%>` stays content"
+    (renderMax "{{! @delimiters: <% %> }}<%name%>" (obj []) == Right "<%name%>")
 
   log "all MaxBars tests passed"
