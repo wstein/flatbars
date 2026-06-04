@@ -162,6 +162,10 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   through the `ParseOptions.parseExpr` seam). They *diverge* in one value-policy
   axis — truthiness (ADR-022): FullBars uses `handlebars`, RawBars/MaxBars use
   `nonEmpty` (`false null "" [] {}` falsy; `0` truthy), MinBars uses `mustache`.
+  `check:parity` (in `npm test`) machine-checks that RawBars ≡ MaxBars — the exact
+  `nonEmpty` falsy set and byte-identical rendering over a shared core corpus —
+  modulo documented surface exceptions (the ADR-021 loop-variable model; the
+  `{{#*inline}}` decorator).
   Truthiness is a `Value -> Boolean` callback the engine plugs in (no falsy-set
   data, no per-file `@truthiness`):
   - **`rawbars`** — core skeleton syntax directly, no surface sugar.
