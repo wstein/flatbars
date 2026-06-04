@@ -3,5 +3,29 @@ src/
 scripts/
 test/
 node_modules/
+
+# Build / VCS / IDE residue — anything that's not load-bearing for end users.
 .gitignore
+.git/
+.git*
 **/*.map
+
+# Don't recursively embed prior .vsix builds when vsce re-packages.
+*.vsix
+flatbars-*.vsix
+
+# Editor + OS detritus that has no business in a marketplace artifact.
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# TypeScript / tooling configs aren't needed at runtime.
+tsconfig*.json
+.eslintrc*
+.prettierrc*
+
+# Logs / coverage / scratch files
+*.log
+npm-debug.log*
+.coverage/
+.nyc_output/
