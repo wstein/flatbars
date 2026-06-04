@@ -9,7 +9,7 @@ ADR-017's two-layer model (`docs/modules/ROOT/pages/adr-0017-editor-support-lsp.
   included. Best-effort and non-authoritative: it leaves set-delimiter regions and
   MaxBars operators plain rather than mis-colouring them.
 - **`flatbars-lsp` semantic tokens — the ceiling.** On IntelliJ **Ultimate**
-  (2023.2+, which has the platform LSP API), the plugin starts the same
+  (2024.2+, matching `build.gradle.kts` `sinceBuild = "242"`), the plugin starts the same
   engine-backed server the VS Code extension ships; the IDE consumes its semantic
   tokens automatically and they **override** the grammar, correcting the stateful
   regions a grammar cannot track. The engine always wins where it runs.
@@ -126,7 +126,7 @@ a real IntelliJ (the CI build compiles it; it does not launch an IDE) are
 tracked follow-ups. The shared `flatbars-lsp` ships diagnostics (ADR-023),
 hover/completion (from `editors/operations.json`), the canonicalisation
 quick-fix, folding ranges, document symbols, and formatting; the platform LSP
-client consumes every advertised capability automatically (IDEA 2023.3+ —
+client consumes every advertised capability automatically (IDEA 2024.2+, our `sinceBuild` —
 `LspCustomization` is only for *disabling* features). The offline gate proves
 the bundled server delivers them; the platform consuming them is exercised by
 the `-PwithLsp` CI build.

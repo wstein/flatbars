@@ -162,6 +162,12 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   through the `ParseOptions.parseExpr` seam). They *diverge* in one value-policy
   axis — truthiness (ADR-022): FullBars uses `handlebars`, RawBars/MaxBars use
   `nonEmpty` (`false null "" [] {}` falsy; `0` truthy), MinBars uses `mustache`.
+  A second `LexConfig` knob diverges too — **`mustacheDelims`** (set-delimiter
+  support, `{{=A B=}}`): **MinBars only** (ADR-015 amendment). FullBars / RawBars /
+  MaxBars all set `mustacheDelims = false`, and the LSP layers
+  `dialectDiagnostics` on top so an attempted set-delim in one of those dialects
+  surfaces as an actionable "use MinBars" message instead of a raw parse failure
+  (rule inventory pinned by `check:dialect-diagnostics`).
   `check:parity` (in `npm test`) machine-checks that RawBars ≡ MaxBars — the exact
   `nonEmpty` falsy set and byte-identical rendering over a shared core corpus —
   modulo documented surface exceptions (the ADR-021 loop-variable model; the

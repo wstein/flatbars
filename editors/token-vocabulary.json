@@ -41,7 +41,9 @@
     "  * `head` \u2014 the tag's first identifier paints as `operation` when the operations catalogue knows it (so `{{lookup x y}}` lights up `lookup`, plain `{{name}}` stays default-coloured).",
     "  * `always-head` \u2014 the tag's first identifier always paints; used for `{{> partial}}` where partial names are user-defined and never in the catalogue.",
     "  * `any` \u2014 head identifier handled by the TextMate grammar as `keyword.control.*`, but subexpression heads (`(helper arg)`) and pipe targets (`x | helper`) inside the body still scan and paint when known.",
-    "  * `none` \u2014 never paint (comments, raw-block bodies, set-delim, errors, `{{else}}`/`{{elif}}` keywords \u2014 handled elsewhere)."
+    "  * `none` \u2014 never paint (comments, raw-block bodies, set-delim, errors, `{{else}}`/`{{elif}}` keywords \u2014 handled elsewhere).",
+    "",
+    "`customSemanticTypes` (below) declares custom VS Code semantic-token types the LSP emits beyond the standard set (https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide). Each entry codegens into the VS Code manifest's `contributes.semanticTokenTypes` (with `superType`/`description`) and `contributes.semanticTokenScopes` (mapping the custom id to TextMate scopes so themes targeting the grammar floor automatically pick up the LSP-emitted spans too). `check:vocab` enforces parity: every kind whose `lsp.type` isn't a VS Code standard MUST appear here, and every declared custom type MUST be referenced by at least one kind."
   ],
   "customSemanticTypes": [
     {
