@@ -250,6 +250,27 @@ t("operation painter: dialect-cross — MaxBars `??` is silent in MinBars", () =
   for (const k of min) assert.notEqual(k, "operator", "MinBars must NOT paint `??` as operator");
 });
 
+// ── Delimiter-switched tags: LSP paints what the grammar can't see ──────────
+t("tokensOf paints whole-tag spans for non-default delimiters", () => {
+  // After `{{=<% %>=}}` the active delimiters become `<%` / `%>`. The grammar
+  // is hard-coded to `{{` / `}}` and can't recognise `<%name%>` as a tag; the
+  // LSP fills that gap by emitting a semantic token over the full span. After
+  // the second directive switches back, the grammar takes over again and the
+  // LSP stays silent on the now-default-delimited tags.
+  const src = "{{=<% %>=}}\n<%name%>\n{{age}}\n<%={{ }}=%>\n{{name}}\n{{age}}";
+  const kinds = tokensOf(src, "minbars").map((t) => `L${t.line}/${t.kind}`);
+  // set-delim directives both fire as `set-delimiter` (lspEmitKinds).
+  assert.ok(kinds.some((k) => k === "L0/set-delimiter"), "first directive painted");
+  assert.ok(kinds.some((k) => k === "L3/set-delimiter"), "second directive painted");
+  // <%name%> on line 1: switched delimiter, the LSP paints the whole `expr` tag.
+  assert.ok(kinds.some((k) => k === "L1/expr"), "<%name%> painted as expr by the LSP");
+  // {{age}} between switches (line 2) is plain content — the engine doesn't
+  // emit a tag, so the LSP doesn't either. {{name}} / {{age}} after the second
+  // switch (lines 4/5) are default-delim, painted by the grammar — no LSP token.
+  assert.ok(!kinds.some((k) => k === "L2/expr"), "{{age}} between switches stays content");
+  assert.ok(!kinds.some((k) => k === "L4/expr"), "{{name}} after switch-back stays grammar-painted");
+});
+
 // ── Dialect diagnostics: shapes the parser accepts but the dialect rejects ──
 t("dialectDiagnostics — plain MinBars stays clean", () => {
   assert.deepEqual(dialectDiagnostics("{{name}}", "minbars"), []);

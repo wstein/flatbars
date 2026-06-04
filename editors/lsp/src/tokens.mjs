@@ -275,14 +275,33 @@ const emitKinds = new Set(vocabulary.lspEmitKinds);
 function flatten(text, dialect) {
   const kinds = new Array(text.length).fill(null);
   const spans = tokenize(text, dialect);
-  for (const s of spans)
-    if (s.role === "tag" && emitKinds.has(s.kind)) {
+  for (const s of spans) {
+    if (s.role !== "tag") continue;
+    if (emitKinds.has(s.kind)) {
       const [from, to] = shrinkToInner(text, s.from, s.to);
       fillRange(kinds, from, to, s.kind);
+    } else if (isDelimiterSwitched(text, s)) {
+      // After a `{{=A B=}}` directive the active delimiters change (ADR-015) and
+      // the stateless TextMate grammar can no longer match subsequent tags —
+      // `<%name%>` reads as content. The engine still tokenises them correctly,
+      // so the LSP fills the gap by emitting whole-tag semantic tokens for any
+      // tag whose delimiters aren't the grammar's hard-coded default `{{`/`}}`.
+      // This is the one place the LSP paints tag-level tokens for an `expr` /
+      // `block-open` / etc. kind outside `lspEmitKinds`.
+      fillRange(kinds, s.from, s.to, s.kind);
     }
+  }
   for (const s of spans) if (s.role === "interior" && emitKinds.has(s.kind)) fillRange(kinds, s.from, s.to, s.kind);
   if (emitKinds.has("operation")) paintOperations(kinds, text, spans);
   return kinds;
+}
+
+// True when the tag's opener is not the grammar's default `{{` (i.e. a directive
+// earlier in the document switched the active delimiters via `{{=A B=}}`). The
+// TextMate grammar hard-codes `{{`/`}}` patterns, so a tag opening with anything
+// else needs the LSP to paint the whole span.
+function isDelimiterSwitched(text, s) {
+  return text[s.from] !== "{";
 }
 
 // Paint operation-position identifiers (helper names) as the `operation` kind.
