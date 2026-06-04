@@ -194,3 +194,15 @@ body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-parti
 .y-num { color: var(--yaml-num); }
 .y-kw { color: var(--yaml-kw); font-weight: 600; }
 .y-comment { color: var(--c-comment); font-style: italic; }
+
+/* JSONata expression highlighting (Data shaping guide) — plain coloured tokens,
+   not the .stem-* tag chips. Strings/numbers share the data pane's YAML colours
+   so the two editors read consistently; functions/vars/ops use the --c-* family. */
+.j-fn      { color: var(--c-partial); font-weight: 600; }
+.j-var     { color: var(--c-inherit); font-weight: 600; }
+.j-op      { color: var(--c-delim); }
+.j-kw      { color: var(--c-block); font-weight: 600; }
+.j-regex   { color: var(--c-raw); }
+.j-str     { color: var(--yaml-str); }
+.j-num     { color: var(--yaml-num); }
+.j-comment { color: var(--c-comment); font-style: italic; }

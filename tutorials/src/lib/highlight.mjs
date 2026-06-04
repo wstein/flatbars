@@ -116,6 +116,40 @@ function highlightYamlLine(raw) {
   return hlYamlValue(line) + comment;
 }
 
+// Highlight a JSONata expression (the "Data shaping" guide's editors + the
+// surface pages' static transform blocks). JSONata is NOT a FlatBars dialect, so
+// it has its own small tokenizer rather than the engine lexer: a single
+// left-to-right scan trying each token kind in priority order (comment, string,
+// regex literal, number, $function / $variable, operator, keyword) and leaving
+// field names + punctuation in the default colour. Colours map to plain-text
+// classes (`.j-*` in lab-tokens.css) — not the `.stem-*` tag chips — so an
+// expression reads like code, not a row of boxed tags.
+const JSONATA_KW = /^(function|true|false|null|and|or|in)\b/;
+export function highlightJsonata(src) {
+  const s = String(src);
+  let out = "";
+  let i = 0;
+  const N = s.length;
+  const push = (cls, t) => (out += '<span class="' + cls + '">' + esc(t) + "</span>");
+  while (i < N) {
+    const r = s.slice(i);
+    let m;
+    if ((m = /^\/\*[\s\S]*?\*\//.exec(r))) { push("j-comment", m[0]); i += m[0].length; continue; }
+    if ((m = /^"(?:[^"\\]|\\.)*"/.exec(r)) || (m = /^'(?:[^'\\]|\\.)*'/.exec(r))) { push("j-str", m[0]); i += m[0].length; continue; }
+    if ((m = /^\/(?:[^/\\\n]|\\.)+\/[a-z]*/.exec(r))) { push("j-regex", m[0]); i += m[0].length; continue; }
+    if ((m = /^\d+(?:\.\d+)?/.exec(r))) { push("j-num", m[0]); i += m[0].length; continue; }
+    if ((m = /^\$\$/.exec(r))) { push("j-var", m[0]); i += m[0].length; continue; }
+    if ((m = /^\$[A-Za-z_]\w*(?=\s*\()/.exec(r))) { push("j-fn", m[0]); i += m[0].length; continue; }
+    if ((m = /^\$[A-Za-z_]\w*/.exec(r)) || (m = /^\$/.exec(r))) { push("j-var", m[0]); i += m[0].length; continue; }
+    if ((m = /^(:=|~>|>=|<=|!=|\?|&|=|>|<|\+|\*|\||%)/.exec(r))) { push("j-op", m[0]); i += m[0].length; continue; }
+    if ((m = JSONATA_KW.exec(r))) { push("j-kw", m[0]); i += m[0].length; continue; }
+    if ((m = /^[A-Za-z_]\w*/.exec(r))) { out += esc(m[0]); i += m[0].length; continue; } // field name → default colour
+    out += esc(s[i]);
+    i += 1;
+  }
+  return out;
+}
+
 function hlYamlValue(v) {
   // Classify the value as a WHOLE scalar, not by matching substrings — otherwise
   // a digit run inside a plain scalar (`default111`) is mis-coloured as a number,

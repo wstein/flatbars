@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { highlightTemplate, esc } from "../src/lib/highlight.mjs";
+import { highlightTemplate, highlightJsonata, esc } from "../src/lib/highlight.mjs";
 
 test("a plain tag is one expr chunk with dimmed {{ }} delimiters", () => {
   assert.equal(
@@ -78,4 +78,26 @@ test("a dialect-disallowed shape is flagged stem-error, not painted valid", () =
   assert.ok(highlightTemplate("{{<l}}x{{/l}}", "fullbars").startsWith('<span class="stem-error">'));
   // …but MinBars allows them, so there it is the raw family, not an error.
   assert.ok(highlightTemplate("{{&x}}", "minbars").startsWith('<span class="stem-raw">'));
+});
+
+// ── JSONata highlighter (the Data shaping guide's expression editors) ──
+// Not a FlatBars dialect: its own tokenizer, mapped to plain `.j-*` colour
+// classes (NOT the `.stem-*` tag chips). These pin the token classification.
+
+test("a function call is j-fn; a $variable and $$ root are j-var", () => {
+  assert.equal(highlightJsonata("$sum(items)"), '<span class="j-fn">$sum</span>(items)');
+  assert.equal(highlightJsonata("$t"), '<span class="j-var">$t</span>');
+  assert.equal(highlightJsonata("$$"), '<span class="j-var">$$</span>');
+});
+
+test("strings, numbers, operators and the function keyword get their classes", () => {
+  assert.equal(highlightJsonata('"x"'), '<span class="j-str">&quot;x&quot;</span>');
+  assert.equal(highlightJsonata("2.34"), '<span class="j-num">2.34</span>');
+  assert.equal(highlightJsonata("a ~> b"), 'a <span class="j-op">~&gt;</span> b');
+  assert.ok(highlightJsonata("function($x){$x}").startsWith('<span class="j-kw">function</span>'));
+});
+
+test("a /regex/ literal is j-regex; field names stay the default colour", () => {
+  assert.equal(highlightJsonata("/[A-Z]+/"), '<span class="j-regex">/[A-Z]+/</span>');
+  assert.equal(highlightJsonata("order.customer"), "order.customer"); // no spans on plain paths
 });

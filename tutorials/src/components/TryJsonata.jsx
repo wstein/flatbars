@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
 import { load as loadYaml, dump as dumpYaml } from "../../../lab/vendor/js-yaml.mjs";
-import { highlightYaml, esc } from "../lib/highlight.mjs";
+import { highlightYaml, highlightJsonata, esc } from "../lib/highlight.mjs";
 
 // data prop may be an object (dumped to YAML for the editor) or a YAML string
 // (taken verbatim — lets an example show specific formatting/comments).
@@ -27,7 +27,7 @@ function toYaml(data) {
 function Editor({ lang, value, onInput }) {
   const taRef = useRef(null);
   const preRef = useRef(null);
-  const html = (lang === "yaml" ? highlightYaml(value) : esc(value)) + "\n";
+  const html = (lang === "yaml" ? highlightYaml(value) : lang === "jsonata" ? highlightJsonata(value) : esc(value)) + "\n";
   useEffect(() => {
     const ta = taRef.current, pre = preRef.current;
     if (!ta || !pre) return;

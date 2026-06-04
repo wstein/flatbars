@@ -16,7 +16,7 @@ import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 import { renderWith, safe } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
-import { highlightTemplate, highlightYaml, esc } from "../lib/highlight.mjs";
+import { highlightTemplate, highlightYaml, highlightJsonata, esc } from "../lib/highlight.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
 
@@ -34,7 +34,7 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
   // template → engine highlighter; yaml → data highlighter; js (custom helpers)
   // → plain escaped text (no JS grammar — the source has no FlatBars tags).
   const html =
-    (lang === "yaml" ? highlightYaml(value) : lang === "js" || lang === "jsonata" ? esc(value) : highlightTemplate(value, dialect)) + "\n";
+    (lang === "yaml" ? highlightYaml(value) : lang === "jsonata" ? highlightJsonata(value) : lang === "js" ? esc(value) : highlightTemplate(value, dialect)) + "\n";
 
   useEffect(() => {
     const ta = taRef.current, pre = preRef.current;
