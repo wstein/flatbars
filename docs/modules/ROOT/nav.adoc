@@ -26,7 +26,8 @@
 * xref:adr-0021-maxbars-variable-model.adoc[ADR-021: MaxBars/RawBars variable model (proposed)]
 * xref:adr-0022-analyse-mode.adoc[ADR-022: truthiness lambda + analyse mode (proposed)]
 * xref:adr-0023-recovering-parser.adoc[ADR-023: recovering parser (diagnostics)]
-* xref:adr-0024-let-and-collection-literals.adoc[ADR-024: `let` & collection literals (proposed)]
+* xref:adr-0024-let-and-dict-literal.adoc[ADR-024: `let` & dict literal (proposed)]
+* xref:adr-0025-list-literal.adoc[ADR-025: list literal & `list` helper (proposed)]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification
