@@ -20,6 +20,17 @@ export function operationByName(name) {
   return byName.get(name) ?? null;
 }
 
+// The canonical rewrite for a name, or null. Offered for deprecated `alias`es
+// (e.g. downcase → lowercase) and the non-canonical `scoped` spellings (index →
+// index0, partial-block → yield) — NOT `synonym`s, which are endorsed equals.
+// Returns { canonical, source } so the caller can dialect-scope the scoped case.
+export function rewriteFor(name) {
+  const op = byName.get(name);
+  if (!op || !op.canonical) return null;
+  if (op.source === "alias" || op.source === "scoped") return { canonical: op.canonical, source: op.source };
+  return null;
+}
+
 // A one-line usage, derived from the ADR-019 kind. Engine-shaped, not prose.
 export function signatureOf(op) {
   switch (op.kind) {

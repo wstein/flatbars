@@ -27,7 +27,7 @@ import Data.Tuple (Tuple(..), fst)
 import FlatBars.Error (Error)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
-import Kernel.Prelude (OperationDef, operationDefs, prelude, preludeAliases, preludeSchema, preludeSynonyms, scopedDocs)
+import Kernel.Prelude (OperationDef, operationDefs, prelude, preludeAliases, preludeSchema, preludeSynonyms, scopedCanonical, scopedDocs)
 import Kernel.Walk (Arity(..))
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
@@ -143,5 +143,7 @@ operations =
       Just canonical -> { source: "synonym", canonical }
       Nothing ->
         { source: if Set.member name registeredNames then "registered" else "scoped"
-        , canonical: ""
+        -- A scoped variable with a non-canonical spelling (`index`/`partial-block`)
+        -- carries its native canonical; everything else has none.
+        , canonical: fromMaybe "" (lookup name scopedCanonical)
         }

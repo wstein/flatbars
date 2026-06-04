@@ -22,6 +22,7 @@ module Kernel.Prelude
   , preludeAliases
   , preludeSynonyms
   , scopedDocs
+  , scopedCanonical
   , preludeUnaryHelpers
   , coreOperationDefs
   , primitiveOperationDefs
@@ -464,6 +465,22 @@ scopedSchema = map (\s -> Tuple s.name { block: s.block, arity: s.arity }) scope
 -- | hover/completion alongside the registered operations' `OperationDef.doc`.
 scopedDocs :: Array (Tuple String String)
 scopedDocs = map (\s -> Tuple s.name s.doc) scopedSpecs
+
+-- | Non-canonical scoped-variable spellings → their native RawBars/MaxBars
+-- | canonical form: `index` → `index0` (the bare native index), `partial-block` →
+-- | `yield` (the bare native block-body name). The engine installs *both* spellings
+-- | and renders them identically (they are all in `scopedSpecs`); this table only
+-- | expresses the editor/linter *preference* — it is NOT a render concern, a
+-- | `scopedSpecs` field, or an `OperationDef.synonymOf`. Shared here so the linter
+-- | (`Linter.Aliases.scopedCanonWarnings`), the catalog/editor projection
+-- | (`FullBars.Catalog.operations` → `editors/operations.json`), and the CLI all
+-- | read one source. Surface-scoped: only the native dialects prefer it (FullBars
+-- | keeps Handlebars' `@index`/`@partial-block`).
+scopedCanonical :: Array (Tuple String String)
+scopedCanonical =
+  [ Tuple "index" "index0"
+  , Tuple "partial-block" "yield"
+  ]
 
 -- | Lift `Value.stringify` (pure, `Either Error`) into the engine monad.
 stringifyM :: forall m. MonadThrow Error m => Value -> m String

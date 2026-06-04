@@ -12,7 +12,7 @@ import { tokenize, diagnostics as engineDiagnostics } from "./engine.mjs";
 // The shared single source of truth (ADR-017), imported as data so the bundler
 // can inline it into the self-contained server — no runtime file read.
 import vocabularyJson from "../../token-vocabulary.json" with { type: "json" };
-import { operationByName, hoverMarkdown, completionItems } from "./operations.mjs";
+import { operationByName, hoverMarkdown, completionItems, rewriteFor } from "./operations.mjs";
 
 export const vocabulary = vocabularyJson;
 
@@ -146,9 +146,12 @@ function inTagContext(text, dialect, offset) {
   return inTag && !inLiteral;
 }
 
-// The identifier under `offset` (operation names are `[A-Za-z0-9_]`), or null.
+// The identifier under `offset`, or null. FlatBars operation/scoped names are
+// `[A-Za-z0-9_]` plus `-` (the hyphenated scoped vars: `partial-block`,
+// `parent-index`, …). A bare `-` in MaxBars arithmetic is space-delimited, so this
+// only over-captures an unspaced `a-b`, which resolves to no operation (harmless).
 function wordAt(text, offset) {
-  const isWord = (c) => c !== undefined && /[A-Za-z0-9_]/.test(c);
+  const isWord = (c) => c !== undefined && /[A-Za-z0-9_-]/.test(c);
   let start = offset;
   let end = offset;
   while (start > 0 && isWord(text[start - 1])) start--;
@@ -171,6 +174,21 @@ export function hoverAt(text, dialect, offset) {
 // ({ label, detail, kind, sortText }); server.mjs maps `kind` to CompletionItemKind.
 export function completionsAt(text, dialect, offset) {
   return inTagContext(text, dialect, offset) ? completionItems() : [];
+}
+
+// A canonicalization rewrite for the operation/variable under `offset` (inside a
+// tag), or null — the data behind the "rewrite X → Y" quick-fix. Returns the word
+// range and the canonical replacement. Alias rewrites apply in any dialect; the
+// scoped-variable rewrite (index → index0, partial-block → yield) is native to
+// RawBars/MaxBars only (FullBars/MinBars keep Handlebars' @index/@partial-block).
+export function canonAt(text, dialect, offset) {
+  if (!inTagContext(text, dialect, offset)) return null;
+  const w = wordAt(text, offset);
+  if (!w) return null;
+  const r = rewriteFor(w.word);
+  if (!r) return null;
+  if (r.source === "scoped" && dialect !== "rawbars" && dialect !== "maxbars") return null;
+  return { from: w.start, to: w.end, name: w.word, canonical: r.canonical };
 }
 
 // The LSP `SemanticTokens.data`: a flat array of 5-tuples

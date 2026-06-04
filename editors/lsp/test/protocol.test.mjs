@@ -38,6 +38,7 @@ try {
   );
   assert.equal(init.capabilities.hoverProvider, true, "server advertises a hover provider");
   assert.ok(init.capabilities.completionProvider, "server advertises a completion provider");
+  assert.ok(init.capabilities.codeActionProvider, "server advertises a code-action provider");
 
   // Capture pushed diagnostics, keyed by uri.
   const diagWaiters = new Map();
@@ -117,9 +118,28 @@ try {
   assert.ok(labels.includes("each") && labels.includes("uppercase"), "completion offers prelude operations");
   assert.ok(!labels.includes("downcase"), "completion excludes deprecated aliases");
 
+  // Code action: a RawBars doc with the non-canonical `index` offers a one-click
+  // rewrite to `index0` (the scoped-variable quick-fix; dialect resolved from the
+  // .rawbars extension). The edit replaces just the `index` word.
+  const caUri = "file:///test/loop.rawbars";
+  await conn.sendNotification("textDocument/didOpen", {
+    textDocument: { uri: caUri, languageId: "rawbars", version: 1, text: "{{{index}}}" },
+  });
+  const actions = await conn.sendRequest("textDocument/codeAction", {
+    textDocument: { uri: caUri },
+    range: { start: { line: 0, character: 5 }, end: { line: 0, character: 5 } },
+    context: { diagnostics: [] },
+  });
+  assert.equal(actions.length, 1, "one code action offered for `index`");
+  assert.match(actions[0].title, /index.*index0/, "titled the rewrite");
+  const edit = actions[0].edit.changes[caUri][0];
+  assert.equal(edit.newText, "index0", "edit replaces with the canonical name");
+  assert.equal(edit.range.start.character, 3, "edit range starts at `index`");
+  assert.equal(edit.range.end.character, 8, "edit range ends at `index`");
+
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");
-  console.log("✓ flatbars-lsp protocol smoke test passed (semantic tokens + diagnostics + hover + completion)");
+  console.log("✓ flatbars-lsp protocol smoke test passed (semantic tokens + diagnostics + hover + completion + code-action)");
 } finally {
   conn.dispose();
   child.kill();

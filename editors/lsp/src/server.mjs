@@ -9,6 +9,7 @@
 // diagnostics (ADR-023) are the second — published from the recovering parser, so
 // the editor flags exactly what the dialect would reject. Hover/completion follow.
 import {
+  CodeActionKind,
   CompletionItemKind,
   DiagnosticSeverity,
   MarkupKind,
@@ -18,6 +19,7 @@ import {
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   buildLegend,
+  canonAt,
   completionsAt,
   encodeSemanticTokens,
   hoverAt,
@@ -47,6 +49,7 @@ export function startServer(connection) {
         // Trigger after a block/partial sigil, a subexpression open, or a space
         // (the next head/argument); the editor also invokes on demand.
         completionProvider: { triggerCharacters: ["#", ">", "(", " "] },
+        codeActionProvider: { codeActionKinds: [CodeActionKind.QuickFix] },
       },
       serverInfo: { name: "flatbars-lsp" },
     };
@@ -86,6 +89,26 @@ export function startServer(connection) {
       kind: c.kind === "variable" ? CompletionItemKind.Variable : CompletionItemKind.Function,
       sortText: c.sortText,
     }));
+  });
+
+  // Code action: a one-click "rewrite X → Y" quick-fix when the cursor is on a
+  // canonicalizable name (a deprecated alias, or — in RawBars/MaxBars — a
+  // non-canonical scoped variable). The replacement comes from the same
+  // editors/operations.json the hover reads (projected from the prelude).
+  connection.onCodeAction((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+    const dialect = resolveDialect(doc.languageId, doc.uri, defaultDialect);
+    const c = canonAt(doc.getText(), dialect, doc.offsetAt(params.range.start));
+    if (!c) return [];
+    const range = { start: doc.positionAt(c.from), end: doc.positionAt(c.to) };
+    return [
+      {
+        title: `Rewrite \`${c.name}\` → \`${c.canonical}\``,
+        kind: CodeActionKind.QuickFix,
+        edit: { changes: { [doc.uri]: [{ range, newText: c.canonical }] } },
+      },
+    ];
   });
 
   // Publish parse diagnostics (ADR-023) on open and every edit. The recovering

@@ -5,8 +5,8 @@
 // (tokens.mjs hoverAt/completionsAt). No transport — protocol.test.mjs covers the
 // wire.
 import assert from "node:assert/strict";
-import { hoverAt, completionsAt } from "../src/tokens.mjs";
-import { OPERATIONS, operationByName, signatureOf, hoverMarkdown, completionItems } from "../src/operations.mjs";
+import { hoverAt, completionsAt, canonAt } from "../src/tokens.mjs";
+import { OPERATIONS, operationByName, signatureOf, hoverMarkdown, completionItems, rewriteFor } from "../src/operations.mjs";
 
 let passed = 0;
 const t = (name, fn) => {
@@ -20,8 +20,10 @@ t("operations carry the engine's facts: kind, source, canonical, and prose doc",
   for (const o of OPERATIONS) {
     assert.ok(["value", "inline", "block"].includes(o.kind), `${o.name}: ADR-019 kind`);
     assert.ok(["registered", "scoped", "alias", "synonym"].includes(o.source), `${o.name}: source`);
+    // alias/synonym always name a canonical; a scoped var MAY (index→index0,
+    // partial-block→yield); a registered op never does.
     if (o.source === "alias" || o.source === "synonym") assert.ok(o.canonical, `${o.name}: canonical target`);
-    else assert.equal(o.canonical, null, `${o.name}: no canonical`);
+    else if (o.source === "registered") assert.equal(o.canonical, null, `${o.name}: no canonical`);
     // Every operation is documented — registered ops via the required
     // OperationDef.doc field, scoped variables via scopedDocs.
     assert.ok(typeof o.doc === "string" && o.doc.length > 0, `${o.name}: has a prose doc`);
@@ -86,4 +88,28 @@ t("completionsAt offers operations in a tag, nothing outside", () => {
   assert.equal(completionsAt(tpl, "fullbars", 0).length, 0, "outside any tag");
 });
 
-console.log(`✓ flatbars-lsp operations (hover/completion) unit tests passed (${passed})`);
+// ── Canonicalization (rewriteFor / canonAt — the quick-fix data) ─────────────
+t("rewriteFor offers alias + scoped rewrites, not synonyms or canonical names", () => {
+  assert.equal(rewriteFor("downcase").canonical, "lowercase"); // deprecated alias
+  assert.equal(rewriteFor("index").canonical, "index0"); // scoped non-canonical
+  assert.equal(rewriteFor("partial-block").canonical, "yield");
+  assert.equal(rewriteFor("isnt"), null, "synonym is endorsed — not rewritten");
+  assert.equal(rewriteFor("index0"), null, "already canonical");
+  assert.equal(rewriteFor("uppercase"), null, "ordinary operation");
+});
+
+t("canonAt resolves the word range + canonical inside a tag", () => {
+  const c = canonAt("Hi {{{index}}}", "rawbars", 8); // inside `index`
+  assert.ok(c && c.canonical === "index0");
+  assert.equal("Hi {{{index}}}".slice(c.from, c.to), "index", "range is the word");
+  // hyphenated scoped name captured whole
+  assert.equal(canonAt("{{{partial-block}}}", "rawbars", 8).canonical, "yield");
+});
+
+t("canonAt is dialect-scoped and tag-scoped", () => {
+  assert.equal(canonAt("{{{index}}}", "fullbars", 5), null, "scoped rewrite is RawBars/MaxBars-only");
+  assert.ok(canonAt("{{{downcase x}}}", "fullbars", 5), "alias rewrite applies in any dialect");
+  assert.equal(canonAt("index", "rawbars", 1), null, "outside any tag");
+});
+
+console.log(`✓ flatbars-lsp operations (hover/completion/code-action) unit tests passed (${passed})`);

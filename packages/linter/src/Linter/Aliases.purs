@@ -24,7 +24,6 @@
 module Linter.Aliases
   ( aliasWarnings
   , aliasWarningsOf
-  , scopedCanonical
   , scopedCanonWarnings
   , scopedCanonWarningsOf
   ) where
@@ -35,11 +34,10 @@ import Data.Array as Array
 import Data.Either (Either)
 import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (parse)
 import FlatBars.Syntax (Template)
-import Kernel.Prelude (preludeAliases)
+import Kernel.Prelude (preludeAliases, scopedCanonical)
 import Kernel.Walk (Issue, Severity(..), operationRefs)
 
 -- | Warn on every use of an alias helper in a (parsed) template, pointing at its
@@ -67,21 +65,6 @@ aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
 -- | and uses `aliasWarnings` directly.
 aliasWarningsOf :: String -> Either ParseError (Array Issue)
 aliasWarningsOf src = (aliasWarnings <<< _.nodes) <$> parse src
-
--- | The non-canonical scoped-variable spellings and their native RawBars/MaxBars
--- | canonical form (ADR-021). `index0`/`index1`/`yield` are canonical; `index` is
--- | the legacy bare index, `partial-block` the Handlebars-derived block-body name.
--- | A lint table, deliberately *not* a `scopedSpecs` field or `synonymOf` — the
--- | engine installs both spellings and renders them identically; only the editor
--- | tooling expresses the preference. (Complements `Linter.Lift.liftLoopVar`,
--- | which maps the same names to the MaxBars `loop.` *surface* when re-sugaring
--- | across dialects; here we normalise the *bare* name within core/MaxBars. Both
--- | agree `index0` is canonical, not `index`.)
-scopedCanonical :: Array (Tuple String String)
-scopedCanonical =
-  [ Tuple "index" "index0"
-  , Tuple "partial-block" "yield"
-  ]
 
 -- | Warn on every use of a non-canonical scoped variable (`index` → `index0`,
 -- | `partial-block` → `yield`), pointing at the native spelling. Surface-scoped:

@@ -300,3 +300,14 @@ the drift fear — solved instead by making the prelude itself the one source.)
 Scoped variables live outside `operationDefs` and carry no doc, so hover simply
 omits the line. The long-form reference prose stays in `prelude.adoc`; `doc` is the
 one-line summary. Covered by `test:lsp` (unit + protocol) and the real-IDE path.
+
+A `codeAction` quick-fix completes the loop: on a deprecated alias or a
+non-canonical scoped variable the server offers a one-click *rewrite to the
+canonical form* (`downcase`→`lowercase`, `index`→`index0`, `partial-block`→`yield`).
+The replacement is the `canonical` field already in `operations.json` — aliases from
+`preludeAliases`, scoped from `Kernel.Prelude.scopedCanonical` (the shared table the
+`Linter.Aliases` lint and the `flatbars lint` CLI also read; *not* `synonymOf` —
+synonyms are endorsed and never offered). It is dialect-scoped: alias rewrites apply
+anywhere, the scoped rewrite only in RawBars/MaxBars (FullBars/MinBars keep
+Handlebars' `@index`/`@partial-block`). So the same single source drives the lint
+(report), the CLI (`flatbars lint`), and the editor (one-click fix).

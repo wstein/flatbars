@@ -242,7 +242,11 @@ so did hover/completion: the server reads `editors/operations.json` — `prelude
 projected by `FullBars.Catalog.operations`, gated by `check:operations` like the
 catalog — and gates both on being inside a tag via `tokenize`. Hover shows the
 ADR-019 kind, arity, and a one-line prose doc from the required `OperationDef.doc`
-field (the single source; run `npm run gen:operations` after a prelude change).
+field (the single source; run `npm run gen:operations` after a prelude change). A
+`codeAction` quick-fix rewrites a deprecated alias or non-canonical scoped variable
+to its canonical form (`index`→`index0`, `partial-block`→`yield`, dialect-scoped),
+reading the same `operations.json` `canonical` field (from `Kernel.Prelude.scopedCanonical`
++ the aliases). The `flatbars lint` CLI surfaces the same canonicalization findings.
 Marketplace publishing is the remaining tracked follow-up.
 
 ### Conventions worth knowing
