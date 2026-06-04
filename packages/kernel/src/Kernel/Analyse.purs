@@ -234,7 +234,7 @@ fixFor = case _ of
     "if 0 should count, `includeZero=true` (Handlebars-only — not portable); for portability test explicitly: `(ne x 0)`."
   VArray _ ->
     "iterate instead — `{{#each xs}}…{{else}}…{{/each}}` renders `else` on empty on every engine."
-  VObject _ -> "only `presence`/StringTemplate4 call `{}` falsy; test a known key explicitly."
+  VObject _ -> "only the `presence` rule calls `{}` falsy; test a known key explicitly."
   _ -> "branch explicitly so the decision does not ride on the host's truthiness rule."
 
 --------------------------------------------------------------------------------

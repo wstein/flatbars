@@ -11166,7 +11166,7 @@ var fixFor = function(v) {
   }
   ;
   if (v instanceof VObject) {
-    return "only `presence`/StringTemplate4 call `{}` falsy; test a known key explicitly.";
+    return "only the `presence` rule calls `{}` falsy; test a known key explicitly.";
   }
   ;
   return "branch explicitly so the decision does not ride on the host's truthiness rule.";

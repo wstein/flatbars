@@ -339,7 +339,7 @@ analyseUsage =
     , "  flatbars analyse <template> <data.json> [--emit-jsonata]"
     , ""
     , "Renders the FullBars template against the data and reports every condition"
-    , "whose branch would differ on another engine (Mustache/StringTemplate4/…),"
+    , "whose branch would differ on another engine (Mustache, presence, …),"
     , "with a concrete fix each — and a `✓` line per portable condition."
     , "  --emit-jsonata   emit a reviewable JSONata data-cleanup scaffold instead"
     , "                   of the markdown report."

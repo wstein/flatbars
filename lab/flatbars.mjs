@@ -34,7 +34,7 @@ import {
   compileMaxbars as bbCompileMaxbars,
   renderWith as bbRenderWith,
   analyze as bbAnalyze,
-} from "./vendor/flatbars-engine.mjs?v=40";
+} from "./vendor/flatbars-engine.mjs?v=41";
 
 const BB_VERSION = "0.1.0";
 

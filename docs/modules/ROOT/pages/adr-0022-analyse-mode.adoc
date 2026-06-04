@@ -130,7 +130,7 @@ surviving (it does). A finding is a `Decision` whose `value` is one of the ambig
 |`0` |`includeZero=true` (per-call); if 0 should stay falsy, `pass:[(ne x 0)]`
 |`pass:[""]` |make it explicit and rule-free: `pass:[(ne s "")]` / `pass:[(eq s "")]`
 |`pass:[[]]` |iterate — `pass:[{{#each xs}}…{{else}}…{{/each}}]` renders `else` on empty on every engine
-|`pass:[{}]` |only `presence`/ST4 call this falsy; test a known key explicitly
+|`pass:[{}]` |only `presence` calls this falsy; test a known key explicitly
 |===
 +
 The tag text shown per section is recovered by *slicing the template source at `span`* (the lexer already
@@ -144,13 +144,12 @@ index-slices — no whole-file re-parse). Fixes name only helpers that exist
   driver, for a benefit the syntactic recovery already covers where it matters).
 
 . *Surface: both the CLI and the Lab, sharing one `reportMarkdown`.* `flatbars analyse <template>
-  <data.json> [--rule <name>] [--emit-jsonata]` writes the report to stdout (scriptable, CI-gateable — the
+  <data.json> [--emit-jsonata]` writes the report to stdout (scriptable, CI-gateable — the
   `examples verify` precedent); the FlatBars Lab renders the same report in a panel beside output (the
   `?vendored=` corpus becomes a portability gallery). Both call the one
   `Kernel.Analyse.reportMarkdown` exposed through the `flatbars-js` bundle, so they cannot drift; shipping
-  the Lab path needs the usual `gen:bundle` + cache-buster bump. (`--rule` overrides which engine rule the
-  *analysis* renders under; it is an analysis knob, **not** the deleted per-file directive — it never
-  reaches a shipped template.)
+  the Lab path needs the usual `gen:bundle` + cache-buster bump. (A `--rule` knob to render the analysis
+  under a chosen rule was specced but **not built** — see the As-built note.)
 
 . *JSONata cleanup is a reviewable scaffold, not a silent rewrite.* `--emit-jsonata` turns the *bare-path*
   findings into a JSONata transform that normalises each offending path out of the ambiguous zone before
@@ -158,6 +157,38 @@ index-slices — no whole-file re-parse). Fixes name only helpers that exist
   Bounded and stated in the output: computed-condition findings are listed but not emitted (no single
   path), and "what *normalise* means" is a per-finding human choice, so the script is a scaffold the
   author reviews — never applied automatically.
+
+== As-built (2026-06-05): where the implementation differs from this record
+
+Three deliberate simplifications landed differently from the decision text above;
+recorded here so the spec stops describing code that does not exist.
+
+* *The trace sink is a pure `WriterT`, not a `Ref` on `ExceptT Aff`.* Item 2 above
+  describes a closure-captured `Ref (Array Decision)` appended via `liftEffect`.
+  The implementation is `type AnalyseM = WriterT (Array Decision) (Either Error)`
+  — the wrappers `tell` a `Decision`; no `Effect`/`Ref`/`Aff`. This is *stricter
+  and simpler* than the spec (analysis is as pure as a normal render) and is the
+  shipped form.
+
+* *The `Decision` record is leaner.* The implemented record is
+  `{ span, op, value, truthyHere :: Boolean, diverges :: Array (Tuple String
+  Boolean) }` — there is no `taken :: Branch` (a `Boolean` truthiness verdict
+  carries the same information for the two-way control points) and no
+  `path :: Maybe Path` field. The data path (item 5) is recovered syntactically in
+  the *`Finding`* projection, not stored on `Decision`. Net behaviour is exactly as
+  specified; only the intermediate shape is smaller.
+
+* *`--rule` was not built.* The CLI ships `flatbars analyse <template> <data.json>
+  [--emit-jsonata]`; there is no `--rule` knob. The analysis always renders under
+  the engine's own rule and the report already lists *every* named rule that
+  flips, so a single-rule override added little. Deferred, not dropped — revisit
+  if a "show me only the Mustache delta" use case appears.
+
+The `presence` named rule remains (it is the rule under which `{}`/empty
+collections flip — see <<divergence>>); the analyser's fix text names `presence`
+rather than branding it "ST4". The *StringTemplate4 source transpiler* that once
+previewed in the Lab was a proof-of-concept and is being retired from the Lab
+(tracked separately, since it is browser-verified).
 
 == Consequences
 
