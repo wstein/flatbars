@@ -22,10 +22,23 @@
 
 export const examples = {
   // ── Expressions & escaping ───────────────────────────────────────────────
-  hello: {
+  // A first taste that exercises what the intro prose promises — a dotted path,
+  // an `each`, and an `unless` block — rather than a bare interpolation.
+  intro: {
     engine: "fullbars",
-    template: "Hello, {{name}}!",
-    data: { name: "Ada" },
+    template: `{{shop.name}}
+{{#each shop.items}}
+  {{name}} ({{price}}){{#unless inStock}} — sold out{{/unless}}
+{{/each}}`,
+    data: {
+      shop: {
+        name: "Ada's Keys",
+        items: [
+          { name: "Keyboard", price: "€89", inStock: true },
+          { name: "Mouse", price: "€39", inStock: false },
+        ],
+      },
+    },
   },
 
   escaping: {
