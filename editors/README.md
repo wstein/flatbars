@@ -40,8 +40,12 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
   extension auto-activates and that a semantic token **and** a published diagnostic
   actually surface — the end-to-end ceiling the offline smoke test can't reach.
   Heavy (a VS Code download + a windowed run); the Marketplace is still out of scope.
-- **`test:jetbrains`** drives the *bundled* server over LSP and checks the
-  descriptors + canonical grammar — no JVM needed.
+- **`test:jetbrains`** drives the *bundled* server over LSP (semantic tokens **and**
+  the `index` → `index0` code-action quick-fix, proving the JetBrains-shipped server
+  delivers the same capabilities the VS Code one does) and checks the descriptors +
+  canonical grammar — no JVM needed. The platform LSP client consumes those
+  capabilities by default (IDEA 2023.3+); that consumption is exercised by the
+  `-PwithLsp` CI build, not offline.
 - **`.github/workflows/editors.yml`** (CI, path-filtered to the editor surface)
   runs the node gates + the real-IDE VS Code test (under `xvfb`), and a separate
   job that provisions JDK 17 + Gradle (no wrapper in-repo) and runs

@@ -61,6 +61,7 @@ try {
     initializationOptions: { defaultDialect: "fullbars" },
   });
   assert.ok(init.capabilities.semanticTokensProvider, "bundled server advertises semantic tokens");
+  assert.ok(init.capabilities.codeActionProvider, "bundled server advertises code actions");
   await conn.sendNotification("initialized", {});
   // Semantic tokens are sparse corrections: a plain interpolation emits nothing
   // (the grammar paints it), but a MaxBars operator does.
@@ -71,6 +72,22 @@ try {
   const r = await conn.sendRequest("textDocument/semanticTokens/full", { textDocument: { uri } });
   const operator = init.capabilities.semanticTokensProvider.legend.tokenTypes.indexOf("operator");
   assert.deepEqual([...r.data], [0, 5, 2, operator, 0], "one operator token over `??`");
+  // The canonicalization quick-fix ships in the same bundle, so the JetBrains
+  // plugin offers it too: the platform LSP client consumes textDocument/codeAction
+  // by default (IDEA 2023.3+), this proves the bundled server delivers it. A
+  // RawBars doc with the non-canonical `index` offers a one-click rewrite to `index0`.
+  const caUri = "file:///t/page.rawbars";
+  await conn.sendNotification("textDocument/didOpen", {
+    textDocument: { uri: caUri, languageId: "rawbars", version: 1, text: "{{{index}}}" },
+  });
+  const actions = await conn.sendRequest("textDocument/codeAction", {
+    textDocument: { uri: caUri },
+    range: { start: { line: 0, character: 5 }, end: { line: 0, character: 5 } },
+    context: { diagnostics: [] },
+  });
+  assert.equal(actions.length, 1, "bundled server offers the `index` → `index0` quick-fix");
+  assert.match(actions[0].title, /index.*index0/, "titled the rewrite");
+  assert.equal(actions[0].edit.changes[caUri][0].newText, "index0", "edit replaces with the canonical name");
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");
 } finally {

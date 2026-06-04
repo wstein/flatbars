@@ -66,6 +66,10 @@ is no wrapper in-repo).
 
 Marketplace publishing and a live-IDE check of the LSP override *running* inside a
 real IntelliJ (the CI build compiles it; it does not launch an IDE) are tracked
-follow-ups. Diagnostics (ADR-023) and hover/completion (from
-`editors/operations.json`, the prelude schema) ship through the shared
-`flatbars-lsp`, so the JetBrains Ultimate path gets them for free.
+follow-ups. Diagnostics (ADR-023), hover/completion (from `editors/operations.json`,
+the prelude schema), and the canonicalization code-action quick-fix all ship through
+the shared `flatbars-lsp`, so the JetBrains Ultimate path gets them for free: the
+platform LSP client consumes every advertised capability automatically and by
+default (IDEA 2023.3+ — `LspCustomization` is only for *disabling* one). The offline
+gate proves the bundled server *delivers* the quick-fix (`index` → `index0`); the
+platform *consuming* it is exercised by the `-PwithLsp` CI build, not at runtime.

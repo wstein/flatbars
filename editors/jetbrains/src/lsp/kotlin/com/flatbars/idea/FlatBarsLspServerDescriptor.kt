@@ -7,10 +7,12 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
 
 /**
- * Describes the flatbars-lsp process. The JetBrains LSP client consumes semantic
- * tokens automatically from the server's advertised `semanticTokensProvider`
- * capability — no opt-in needed — so this descriptor only has to start the server
- * and say which files it covers. Those tokens override the TextMate fallback and
+ * Describes the flatbars-lsp process. The JetBrains LSP client consumes every
+ * capability the server advertises — semantic tokens, diagnostics, hover,
+ * completion, and the canonicalization code-action quick-fix — automatically and
+ * by default (IDEA 2023.3+); none needs an opt-in, and `LspCustomization` is only
+ * for *disabling* a feature, so this descriptor just starts the server and says
+ * which files it covers. The semantic tokens override the TextMate fallback and
  * correct the stateful regions (set delimiters, dialects, MaxBars operators) a
  * grammar cannot track (ADR-017).
  */
