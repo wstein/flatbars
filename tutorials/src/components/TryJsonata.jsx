@@ -94,18 +94,15 @@ export default function TryJsonata({ data = {}, expr = "" }) {
 
   return (
     <figure class={"oil oil-jsonata" + (edited ? " is-edited" : "")}>
-      <header class="oil-bar">
-        <div class="oil-bar-l">
-          <span class="oil-kicker">Runnable</span>
-          <span class="oil-engine">jsonata</span>
-          <span class="oil-live"><span class="oil-dot" />live</span>
-        </div>
-        <div class="oil-actions">
+      {/* Floating Reset (design Option C): reveals on hover/focus-within, and only
+          once the cell is edited — a pristine cell shows no action chrome. */}
+      <div class="oil-actions">
+        {edited && (
           <button type="button" class="oil-reset" title="Restore the original example" onClick={reset}>
             <span class="oil-ic">↺</span> Reset
           </button>
-        </div>
-      </header>
+        )}
+      </div>
 
       <div class="oil-grid">
         <div class="oil-cell">

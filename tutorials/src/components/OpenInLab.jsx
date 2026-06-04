@@ -183,24 +183,21 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
 
   return (
     <figure class={"oil" + (edited ? " is-edited" : "")} data-affordance="dock">
-      <header class="oil-bar">
-        <div class="oil-bar-l">
-          <span class="oil-kicker">Runnable</span>
-          <span class="oil-engine">{engine}</span>
-          <span class="oil-live"><span class="oil-dot" />live</span>
-        </div>
-        <div class="oil-actions">
+      {/* Floating actions (design Option C): reveal on hover/focus-within; Reset
+          appears only once edited — a pristine card shows just Open-in-Lab. */}
+      <div class="oil-actions">
+        {edited && (
           <button type="button" class="oil-reset" title="Restore the original example" onClick={reset}>
             <span class="oil-ic">↺</span> Reset
           </button>
-          {/* A named target reuses one Lab tab across every "Open in Lab" click. */}
-          <a class="oil-lab oil-lab-dock" href={href ?? "#"} target="flatbars-lab" rel="noopener"
-             aria-disabled={href == null} title="Open this example in the full Lab editor">
-            <span class="oil-lab-txt">Open in Lab</span>
-            <span class="oil-lab-ic" aria-hidden="true">↗</span>
-          </a>
-        </div>
-      </header>
+        )}
+        {/* A named target reuses one Lab tab across every "Open in Lab" click. */}
+        <a class="oil-lab oil-lab-dock" href={href ?? "#"} target="flatbars-lab" rel="noopener"
+           aria-disabled={href == null} title="Open this example in the full Lab editor">
+          <span class="oil-lab-txt">Open in Lab</span>
+          <span class="oil-lab-ic" aria-hidden="true">↗</span>
+        </a>
+      </div>
 
       <div class={gridClass}>
         <div class="oil-cell oil-tpl">

@@ -16,6 +16,7 @@
 
 /* ── The card ── */
 .oil {
+  position: relative;
   margin: 1.4rem 0 2rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
@@ -24,73 +25,47 @@
   overflow: hidden;
 }
 
-/* Header toolbar */
-.oil .oil-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.6rem 0.5rem 0.85rem;
-  background: var(--bg-1);
-  border-bottom: 1px solid var(--border);
-}
-.oil .oil-bar-l { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
-.oil .oil-kicker {
-  font: 600 11px/1 var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--fg-faint);
-}
-.oil .oil-engine {
-  font: 600 11px/1 var(--font-mono);
-  color: var(--accent-2);
-  background: var(--accent-soft);
-  padding: 3px 7px;
-  border-radius: 999px;
-}
-.oil .oil-live {
+/* ── Floating actions (design handoff, Option C) ──
+   No header strip: Reset + Open-in-Lab float in the card's top-right corner and
+   reveal on hover OR focus-within — so keyboard (tab into an editor) and touch
+   (tap an editor) reach them too, not just mouse hover. The live output + caret
+   already signal "editable", so at rest the card opens straight into content.
+   Reset is rendered only once the example is edited (a pristine card shows just
+   Open-in-Lab); see the components. */
+.oil .oil-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.55rem;
+  z-index: 6;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font: 500 11px/1 var(--font-mono);
-  color: var(--success);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  gap: 0.4rem;
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
-.oil .oil-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 60%, transparent);
-  animation: oil-pulse 2s infinite;
+.oil:hover .oil-actions,
+.oil:focus-within .oil-actions {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
 }
-@keyframes oil-pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent); }
-  70% { box-shadow: 0 0 0 5px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .oil .oil-dot { animation: none; }
-}
-
-.oil .oil-actions { margin-left: auto; display: flex; align-items: center; gap: 0.4rem; }
 .oil .oil-reset {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font: 500 0.8rem/1 var(--font-ui);
+  font: 600 0.78rem/1 var(--font-ui);
   color: var(--fg-muted);
-  background: none;
-  border: 1px solid transparent;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 0.32rem 0.55rem;
+  padding: 0.34rem 0.55rem;
   cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  box-shadow: var(--shadow-card);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .oil .oil-reset .oil-ic { font-size: 0.95rem; }
-.oil.is-edited .oil-reset { opacity: 1; pointer-events: auto; }
 .oil .oil-reset:hover { background: var(--bg-2); color: var(--fg); }
 
 /* Inputs grid. Templates are usually wider than their data, so the template
@@ -234,6 +209,7 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--bg);
+  box-shadow: var(--shadow-card);
 }
 .oil .oil-lab .oil-lab-ic { transition: transform 0.15s ease; }
 .oil .oil-lab:hover { border-color: var(--accent); background: var(--accent-softer); color: var(--accent); }
