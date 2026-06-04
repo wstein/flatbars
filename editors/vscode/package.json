@@ -1,7 +1,7 @@
 {
   "name": "flatbars",
   "displayName": "FlatBars",
-  "description": "FlatBars / Handlebars / Mustache syntax highlighting \u2014 a TextMate fallback plus the engine-backed flatbars-lsp for correct, stateful semantic tokens (ADR-017).",
+  "description": "FlatBars / Handlebars / Mustache syntax highlighting — a TextMate fallback plus the engine-backed flatbars-lsp for correct, stateful semantic tokens (ADR-017).",
   "version": "0.1.0",
   "publisher": "flatbars",
   "license": "Apache-2.0",

@@ -13,6 +13,11 @@ const path = require("path");
 const { workspace } = require("vscode");
 const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
 
+// The four dialect language ids the extension contributes. Kept identical to
+// editors/shared/sync.mjs LANGUAGES (codegened into package.json via
+// editors/scripts/sync-manifests.mjs, gated by check:editors-manifests).
+const LANGUAGE_IDS = ["rawbars", "minbars", "fullbars", "maxbars"];
+
 let client;
 
 function activate(context) {
@@ -32,9 +37,10 @@ function activate(context) {
     },
   };
   const clientOptions = {
-    // The umbrella + the four dialect languages; the server reads the dialect from
-    // each document's languageId (falling back to the extension / defaultDialect).
-    documentSelector: ["flatbars", "rawbars", "minbars", "fullbars", "maxbars"].map((language) => ({ language })),
+    // One document selector per dialect language. The server reads the dialect
+    // from each document's languageId (falling back to the extension or to the
+    // configured defaultDialect when neither resolves).
+    documentSelector: LANGUAGE_IDS.map((language) => ({ language })),
     initializationOptions: { defaultDialect },
   };
 
