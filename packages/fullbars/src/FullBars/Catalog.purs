@@ -1,11 +1,13 @@
 -- | Generate the helper-catalog documentation from the single source of truth.
 -- |
 -- | `Kernel.Prelude.preludeSchema` already lists every helper the engine knows
--- | (name, block-ness, arity), projected from `operationDefs`. Rather than maintain
--- | a parallel table by hand in the docs — which is exactly how a phantom helper
--- | like `partial>` slips in — this module renders that schema to an AsciiDoc
--- | fragment. `scripts/generate-helper-catalog.mjs` writes it to a partial the
--- | prelude page includes, and re-runs with `--check` in CI to fail on drift.
+-- | (name, block-ness, arity), projected from `operationDefs`; each operation's
+-- | one-line `doc` (and the scoped variables' `scopedDocs`) supplies the
+-- | Description column — the single source the prelude page's summary table is
+-- | generated from, never a hand-kept parallel (which is exactly how a phantom
+-- | helper like `partial>` slips in). `scripts/generate-helper-catalog.mjs` writes
+-- | this to a partial the prelude page includes, and re-runs with `--check` in CI
+-- | to fail on drift.
 module FullBars.Catalog
   ( helperCatalogAdoc
   , OpInfo
@@ -19,6 +21,8 @@ import Data.Foldable (foldMap, lookup)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Set as Set
+import Data.String (Pattern(..), Replacement(..))
+import Data.String.Common (replaceAll)
 import Data.Tuple (Tuple(..), fst)
 import FlatBars.Error (Error)
 import Kernel.Engine (Operation)
@@ -51,7 +55,7 @@ renderArity = case _ of
 
 renderRow :: Tuple String { block :: Boolean, arity :: Arity } -> String
 renderRow (Tuple name spec) =
-  "|`" <> name <> "` |" <> form <> " |" <> renderArity spec.arity <> " |" <> source
+  "|`" <> name <> "` |" <> form <> " |" <> renderArity spec.arity <> " |" <> source <> " |" <> desc
   where
   form = if spec.block then "block" else "value"
   source = case lookup name preludeAliases of
@@ -59,13 +63,22 @@ renderRow (Tuple name spec) =
     Nothing -> case lookup name preludeSynonyms of
       Just canonical -> "synonym of `" <> canonical <> "`"
       Nothing -> if Set.member name registeredNames then "registered" else "scoped"
+  -- The one-line doc, escaped for AsciiDoc: a leading `{` of a `{{…}}` tag would
+  -- otherwise be read as an attribute reference, so neutralise every brace.
+  desc = escAdoc (fromMaybe "" (Map.lookup name docByName))
+
+-- | Escape AsciiDoc attribute-reference syntax in generated cell text: `\{` is a
+-- | literal brace, so `{{name}}` survives verbatim instead of being substituted.
+escAdoc :: String -> String
+escAdoc = replaceAll (Pattern "{") (Replacement "\\{")
 
 -- | The full AsciiDoc partial: a generated, do-not-edit table of every helper in
 -- | `preludeSchema`, sorted by name (the `Map` is already key-ordered).
 helperCatalogAdoc :: String
 helperCatalogAdoc =
   header
-    <> "[cols=\"2,1,1,1\",options=\"header\"]\n|===\n|Operation |Form |Arity |Source\n\n"
+    <>
+      "[cols=\"2,1,1,2,4\",options=\"header\"]\n|===\n|Operation |Form |Arity |Source |Description\n\n"
     <> rows
     <> "|===\n"
   where

@@ -1,100 +1,100 @@
 // Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit.
 // Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`.
 
-[cols="2,1,1,1",options="header"]
+[cols="2,1,1,2,4",options="header"]
 |===
-|Operation |Form |Arity |Source
+|Operation |Form |Arity |Source |Description
 
-|`abs` |value |1 |registered
-|`add` |value |2 |registered
-|`and` |value |any |registered
-|`append` |value |2 |registered
-|`apply` |block |≥1 |registered
-|`at` |value |2 |registered
-|`capitalize` |value |1 |registered
-|`ceil` |value |1 |registered
-|`coalesce` |value |≥1 |registered
-|`count` |value |1 |registered
-|`dict` |value |any |registered
-|`divide` |value |2 |registered
-|`downcase` |value |1 |alias of `lowercase`
-|`each` |block |≥1 |registered
-|`elif` |value |1–2 |registered
-|`else` |value |0 |registered
-|`endsWith` |value |2 |registered
-|`eq` |value |2 |registered
-|`escapeHtml` |value |1 |registered
-|`escapeJson` |value |1–2 |registered
-|`false` |value |0 |registered
-|`first` |value |0 |scoped
-|`floor` |value |1 |registered
-|`groupBy` |value |2 |registered
-|`gt` |value |2 |registered
-|`gte` |value |2 |registered
-|`if` |block |1–2 |registered
-|`includes` |value |2 |registered
-|`index` |value |0 |scoped
-|`index0` |value |0 |scoped
-|`index1` |value |0 |scoped
-|`inline` |block |≥1 |registered
-|`isnt` |value |2 |synonym of `ne`
-|`join` |value |2 |registered
-|`json` |value |1–2 |registered
-|`key` |value |0 |scoped
-|`last` |value |0 |scoped
-|`length` |value |0 |scoped
-|`log` |value |≥1 |registered
-|`lookup` |value |≥1 |registered
-|`lowercase` |value |1 |registered
-|`lt` |value |2 |registered
-|`lte` |value |2 |registered
-|`minus` |value |2 |alias of `subtract`
-|`modulo` |value |2 |registered
-|`multiply` |value |2 |registered
-|`ne` |value |2 |registered
-|`not` |value |1 |registered
-|`null` |value |0 |registered
-|`or` |value |any |registered
-|`parent` |value |0–1 |scoped
-|`parent-first` |value |0 |scoped
-|`parent-index` |value |0 |scoped
-|`parent-key` |value |0 |scoped
-|`parent-last` |value |0 |scoped
-|`partial` |value |2–3 |registered
-|`partial-block` |value |0 |scoped
-|`pluck` |value |2 |registered
-|`plus` |value |2 |alias of `add`
-|`prepend` |value |2 |registered
-|`raw` |block |any |registered
-|`replace` |value |3 |registered
-|`reverse` |value |1 |registered
-|`rindex0` |value |0 |scoped
-|`rindex1` |value |0 |scoped
-|`root` |value |0 |scoped
-|`round` |value |1 |registered
-|`safe` |value |1 |registered
-|`size` |value |1 |synonym of `count`
-|`slice` |value |2–3 |registered
-|`sortBy` |value |2 |registered
-|`split` |value |2 |registered
-|`startsWith` |value |2 |registered
-|`subtract` |value |2 |registered
-|`take` |value |2 |registered
-|`takeRight` |value |2 |registered
-|`this` |value |0 |registered
-|`times` |value |2 |alias of `multiply`
-|`toFixed` |value |2 |registered
-|`toFloat` |value |1 |registered
-|`toInt` |value |1 |registered
-|`trim` |value |1 |registered
-|`trimEnd` |value |1 |registered
-|`trimStart` |value |1 |registered
-|`true` |value |0 |registered
-|`truncate` |value |2–3 |registered
-|`unique` |value |1 |registered
-|`unless` |block |1–2 |registered
-|`upcase` |value |1 |alias of `uppercase`
-|`uppercase` |value |1 |registered
-|`with` |block |≥1 |registered
-|`yield` |value |0 |scoped
+|`abs` |value |1 |registered |The absolute value of a number.
+|`add` |value |2 |registered |Adds two numbers — the `+` operator's helper.
+|`and` |value |any |registered |True when every argument is truthy.
+|`append` |value |2 |registered |Appends the second string to the first.
+|`apply` |block |≥1 |registered |Calls a helper named by a string argument with the remaining arguments.
+|`at` |value |2 |registered |The element at an index (negative counts from the end).
+|`capitalize` |value |1 |registered |Uppercases the first character of its argument.
+|`ceil` |value |1 |registered |Rounds a number up to the nearest integer.
+|`coalesce` |value |≥1 |registered |Returns the first non-null argument — the `??` operator's helper.
+|`count` |value |1 |registered |The number of items in an array (or characters in a string).
+|`dict` |value |any |registered |Builds an object from alternating key/value arguments (the hash target).
+|`divide` |value |2 |registered |Divides the first number by the second — the `/` operator's helper.
+|`downcase` |value |1 |alias of `lowercase` |Lowercases its argument.
+|`each` |block |≥1 |registered |Iterates an array or object, installing the loop's scoped variables per item.
+|`elif` |value |1–2 |registered |An else-if clause the enclosing if evaluates; renders nothing on its own.
+|`else` |value |0 |registered |A clause separator the enclosing block splits on; renders nothing on its own.
+|`endsWith` |value |2 |registered |True when the string ends with the given suffix.
+|`eq` |value |2 |registered |True when its two arguments are equal.
+|`escapeHtml` |value |1 |registered |HTML-escapes its argument and marks it safe; idempotent on already-safe values.
+|`escapeJson` |value |1–2 |registered |Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML.
+|`false` |value |0 |registered |The boolean literal false.
+|`first` |value |0 |scoped |True on the loop's first iteration.
+|`floor` |value |1 |registered |Rounds a number down to the nearest integer.
+|`groupBy` |value |2 |registered |Groups an array of objects into an object keyed by a field.
+|`gt` |value |2 |registered |True when the first argument is greater than the second.
+|`gte` |value |2 |registered |True when the first argument is greater than or equal to the second.
+|`if` |block |1–2 |registered |Renders its body when the condition is truthy, else the \{\{elif}}/\{\{else}} clauses.
+|`includes` |value |2 |registered |True when the subject string or array contains the given value.
+|`index` |value |0 |scoped |The current loop item's 0-based index.
+|`index0` |value |0 |scoped |The current loop item's 0-based index.
+|`index1` |value |0 |scoped |The current loop item's 1-based index.
+|`inline` |block |≥1 |registered |Defines a partial from its body, hoisted before rendering; emits nothing.
+|`isnt` |value |2 |synonym of `ne` |True when its two arguments are not equal.
+|`join` |value |2 |registered |Joins an array into a string with a separator.
+|`json` |value |1–2 |registered |Serializes its argument as JSON text (optionally pretty-printed).
+|`key` |value |0 |scoped |The current key when iterating an object.
+|`last` |value |0 |scoped |True on the loop's last iteration.
+|`length` |value |0 |scoped |The number of items in the current loop.
+|`log` |value |≥1 |registered |Logs its arguments to the host and returns null.
+|`lookup` |value |≥1 |registered |Indexes a value by each key or index in turn, returning null at the first miss.
+|`lowercase` |value |1 |registered |Lowercases its argument.
+|`lt` |value |2 |registered |True when the first argument is less than the second.
+|`lte` |value |2 |registered |True when the first argument is less than or equal to the second.
+|`minus` |value |2 |alias of `subtract` |Subtracts the second number from the first.
+|`modulo` |value |2 |registered |The remainder of dividing the first number by the second — the `%` operator's helper.
+|`multiply` |value |2 |registered |Multiplies two numbers — the `*` operator's helper.
+|`ne` |value |2 |registered |True when its two arguments are not equal.
+|`not` |value |1 |registered |Logical negation of its argument's truthiness.
+|`null` |value |0 |registered |The null literal.
+|`or` |value |any |registered |True when any argument is truthy.
+|`parent` |value |0–1 |scoped |The enclosing block's context (chainable).
+|`parent-first` |value |0 |scoped |True on the enclosing loop's first iteration.
+|`parent-index` |value |0 |scoped |The enclosing loop's current index.
+|`parent-key` |value |0 |scoped |The enclosing loop's current key.
+|`parent-last` |value |0 |scoped |True on the enclosing loop's last iteration.
+|`partial` |value |2–3 |registered |Renders a registered partial with the given context (the block body is the fallback).
+|`partial-block` |value |0 |scoped |Inside a block partial, the caller's block body (the \{\{> @partial-block}} target).
+|`pluck` |value |2 |registered |Extracts a key's value from each object in an array.
+|`plus` |value |2 |alias of `add` |Adds two numbers.
+|`prepend` |value |2 |registered |Prepends the second string to the first.
+|`raw` |block |any |registered |A raw block that returns its body verbatim, untouched by the engine.
+|`replace` |value |3 |registered |Replaces every occurrence of a substring with another.
+|`reverse` |value |1 |registered |Reverses an array or string.
+|`rindex0` |value |0 |scoped |The current loop item's 0-based index, counting from the end.
+|`rindex1` |value |0 |scoped |The current loop item's 1-based index, counting from the end.
+|`root` |value |0 |scoped |The root (top-level) context.
+|`round` |value |1 |registered |Rounds a number to the nearest integer.
+|`safe` |value |1 |registered |Marks its argument as safe (trusted) markup, without escaping.
+|`size` |value |1 |synonym of `count` |The number of items in an array (or characters in a string).
+|`slice` |value |2–3 |registered |Returns a substring from a start index to an optional end index.
+|`sortBy` |value |2 |registered |Sorts an array of objects by a key.
+|`split` |value |2 |registered |Splits a string into an array on a separator.
+|`startsWith` |value |2 |registered |True when the string starts with the given prefix.
+|`subtract` |value |2 |registered |Subtracts the second number from the first — the `-` operator's helper.
+|`take` |value |2 |registered |The first n elements of an array.
+|`takeRight` |value |2 |registered |The last n elements of an array.
+|`this` |value |0 |registered |The current context.
+|`times` |value |2 |alias of `multiply` |Multiplies two numbers.
+|`toFixed` |value |2 |registered |Formats a number with a fixed number of decimal places.
+|`toFloat` |value |1 |registered |Parses its argument as a floating-point number.
+|`toInt` |value |1 |registered |Parses its argument as an integer.
+|`trim` |value |1 |registered |Removes leading and trailing whitespace.
+|`trimEnd` |value |1 |registered |Removes trailing whitespace.
+|`trimStart` |value |1 |registered |Removes leading whitespace.
+|`true` |value |0 |registered |The boolean literal true.
+|`truncate` |value |2–3 |registered |Shortens a string to a maximum length, appending an optional ellipsis.
+|`unique` |value |1 |registered |The array with duplicate elements removed.
+|`unless` |block |1–2 |registered |Renders its body when the condition is falsy — the inverse of if.
+|`upcase` |value |1 |alias of `uppercase` |Uppercases its argument.
+|`uppercase` |value |1 |registered |Uppercases its argument.
+|`with` |block |≥1 |registered |Shifts the context to its argument for the body (else the \{\{else}} clause).
+|`yield` |value |0 |scoped |Inside a block partial, the caller's block body (MaxBars' spelling of @partial-block).
 |===

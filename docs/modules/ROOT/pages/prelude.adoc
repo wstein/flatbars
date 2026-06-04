@@ -145,8 +145,10 @@ presumes which of these exist.
 
 The table below is *generated* from `FullBars.preludeSchema` — the same single source the validator
 uses (`FullBars.Catalog.helperCatalogAdoc`; regenerate with `npm run gen:catalog`, checked in CI by
-`npm run check:catalog`). It is the authoritative list of names, arities, and block-ness; the prose
-sections above explain behaviour. *Source* is `registered` for helpers with a runtime in `prelude`
-and `scoped` for variables a block helper installs (`root`/`parent`/`index`/`key`/`first`/`last`/`partial-block`).
+`npm run check:catalog`). It is the authoritative list of names, arities, block-ness, and one-line
+*descriptions*; each description is the operation's own `doc` (the same string the editor shows on
+hover), so it never drifts from the engine — the prose sections above remain the long-form reference.
+*Source* is `registered` for helpers with a runtime in `prelude` and `scoped` for variables a block
+helper installs (`root`/`parent`/`index`/`key`/`first`/`last`/`partial-block`).
 
 include::partial$helper-catalog.adoc[]
