@@ -13,7 +13,8 @@
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Snippets"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [],
@@ -128,5 +129,27 @@
   "devDependencies": {
     "@vscode/test-electron": "2.5.2",
     "vscode-languageclient": "^10.0.0"
+  },
+  "icon": "icon.png",
+  "bugs": {
+    "url": "https://github.com/wstein/flatbars/issues"
+  },
+  "homepage": "https://github.com/wstein/flatbars#readme",
+  "keywords": [
+    "handlebars",
+    "mustache",
+    "templates",
+    "hbs",
+    "lsp",
+    "flatbars",
+    "rawbars",
+    "minbars",
+    "fullbars",
+    "maxbars"
+  ],
+  "qna": "https://github.com/wstein/flatbars/discussions",
+  "galleryBanner": {
+    "color": "#7c4dff",
+    "theme": "dark"
   }
 }

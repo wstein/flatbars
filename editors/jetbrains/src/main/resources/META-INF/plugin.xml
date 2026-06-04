@@ -1,7 +1,7 @@
 <idea-plugin>
   <id>com.flatbars.flatbars</id>
   <name>FlatBars</name>
-  <vendor url="https://github.com/wstein/flatbars">FlatBars</vendor>
+  <vendor email="claude@wstein.de" url="https://github.com/wstein/flatbars">FlatBars</vendor>
   <description><![CDATA[
     Syntax support for FlatBars templates (and the Handlebars / Mustache surfaces it
     covers), implementing the two-layer model of ADR-017:
@@ -9,11 +9,37 @@
       <li><b>A TextMate grammar (the floor)</b> colours the default-delimiter forms
       everywhere — including Community IDEs and before the server attaches.</li>
       <li><b>flatbars-lsp semantic tokens (the ceiling)</b>, on IntelliJ Ultimate
-      (2023.2+), run the actual engine lexer and override the grammar, correcting the
+      (2024.2+), run the actual engine lexer and override the grammar, correcting the
       stateful regions (set delimiters, dialects, MaxBars operators) a grammar cannot
       track. The engine always wins where it runs. (Built with -PwithLsp.)</li>
     </ul>
+    <p>
+      Supports every JetBrains IDE (TextMate floor) and IntelliJ IDEA Ultimate
+      2024.2+ (LSP ceiling — semantic tokens, diagnostics, hover, completion,
+      canonicalisation quick-fix, structure view, code folding, formatting).
+    </p>
   ]]></description>
+
+  <change-notes><![CDATA[
+    <h3>0.1.0 (2026-06-04)</h3>
+    <ul>
+      <li>First public release.</li>
+      <li>TextMate fallback (every JetBrains IDE) and Ultimate-only LSP ceiling
+      (IntelliJ IDEA Ultimate 2024.2+).</li>
+      <li>Eight native extensions per dialect — long (.rawbars / .minbars /
+      .fullbars / .maxbars) and short (.rbars / .mbars / .fbars / .xbars).</li>
+      <li>Helper-name highlighting from the prelude catalogue; canonicalisation
+      quick-fix on deprecated aliases.</li>
+      <li>Hybrid-template injection grammar — *.host.flatbars-ext files paint
+      both the host syntax and the FlatBars tags (set the file association in
+      IDE Settings → Editor → File Types).</li>
+      <li>Community-edition users keep the TextMate floor; an EditorNotifications
+      banner explains the Ultimate-only LSP capabilities.</li>
+      <li>See <a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0026-editor-capability-matrix.adoc">ADR-026</a>
+      for the full LSP capability matrix (what we ship and what we deliberately
+      do not, with rationale).</li>
+    </ul>
+  ]]></change-notes>
 
   <!-- Base capabilities load everywhere (incl. Community): the TextMate fallback. -->
   <depends>com.intellij.modules.platform</depends>
@@ -24,5 +50,12 @@
 
   <extensions defaultExtensionNs="com.intellij.textmate">
     <bundleProvider implementation="com.flatbars.idea.FlatBarsTextMateBundleProvider"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Community-edition banner: the LSP ceiling is Ultimate-only; this banner
+         tells Community users so the missing diagnostics/hover/completion are
+         never a silent gap. Dismissable per-file. -->
+    <editorNotificationProvider implementation="com.flatbars.idea.FlatBarsCommunityNoticeProvider"/>
   </extensions>
 </idea-plugin>

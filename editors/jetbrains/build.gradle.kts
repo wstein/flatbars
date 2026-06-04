@@ -63,6 +63,16 @@ intellijPlatform {
       untilBuild = provider { null }
     }
   }
+
+  // Marketplace verifier — fails the build on any incompatibility against the
+  // recommended IDE matrix for the declared since-build. Run via
+  // `gradle verifyPlugin`. Without this, the Marketplace listing would still
+  // run the verifier on upload, but breaks there instead of at build time.
+  pluginVerification {
+    ides {
+      recommended()
+    }
+  }
 }
 
 // Sync the engine-backed server bundle + the TextMate grammar into resources before

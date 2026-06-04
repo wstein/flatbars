@@ -7,6 +7,12 @@
 // drift and cannot float onto an unpinned esbuild.
 import { resolve } from "node:path";
 
+// The shipped plugin version. Single source for VS Code's package.json, the
+// JetBrains Gradle build, the LSP server package, and every other place that
+// would otherwise hand-replicate it. Bump here and run `npm run gen:editors-manifests`
+// + `npm run check:plugin-version` to validate the propagation.
+export const PLUGIN_VERSION = "0.1.0";
+
 // Pinned esbuild version — the same one `gen:bundle` pins for the engine bundle
 // (package.json: `npx esbuild@0.28.0`). One esbuild across the repo keeps the
 // shipped server bytes reproducible. Bump here AND in the gen:bundle script

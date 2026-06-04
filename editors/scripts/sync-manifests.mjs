@@ -22,7 +22,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { LANGUAGES } from "../shared/sync.mjs";
+import { LANGUAGES, PLUGIN_VERSION } from "../shared/sync.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
@@ -46,6 +46,14 @@ export { INJECTION_HOSTS };
 function genVscodePackageJson() {
   const path = resolve(root, "editors/vscode/package.json");
   const pkg = JSON.parse(readFileSync(path, "utf8"));
+  pkg.version = PLUGIN_VERSION;
+  pkg.icon = "icon.png";
+  pkg.bugs = { url: "https://github.com/wstein/flatbars/issues" };
+  pkg.homepage = "https://github.com/wstein/flatbars#readme";
+  pkg.keywords = ["handlebars", "mustache", "templates", "hbs", "lsp", "flatbars", "rawbars", "minbars", "fullbars", "maxbars"];
+  pkg.qna = "https://github.com/wstein/flatbars/discussions";
+  pkg.categories = ["Programming Languages", "Snippets"];
+  pkg.galleryBanner = { color: "#7c4dff", theme: "dark" };
   pkg.contributes.languages = LANGUAGES.map((l) => ({
     id: l.id,
     aliases: l.aliases,
