@@ -243,12 +243,21 @@ t("operation painter: identifier followed by `.` or `/` (path) stays default", (
 
 t("operation painter: dialect-cross — MaxBars `??` is silent in MinBars", () => {
   // `{{ a ?? "b" }}` on MaxBars emits operator+string; the same source on MinBars
-  // should emit NEITHER (MinBars doesn't have the operator and the engine doesn't
-  // even reach the `??` as a known token).
+  // gets no operator span from the engine AND surfaces an actionable
+  // `dialectDiagnostics` rule pointing at `??`.
   const max = tokensOf('{{ a ?? "b" }}', "maxbars").map((t) => t.kind);
   assert.deepEqual(max, ["operator", "string"], "MaxBars sees the operator + string");
+  // Negative: no operator span from the LSP under MinBars.
   const min = tokensOf('{{ a ?? "b" }}', "minbars").map((t) => t.kind);
   for (const k of min) assert.notEqual(k, "operator", "MinBars must NOT paint `??` as operator");
+  // Positive: dialectDiagnostics fires the MaxBars-operator message on `??`.
+  // Without this, the test would pass even if the entire diagnostic rule were
+  // accidentally dropped — the old assertion checked only the kind absence.
+  const ds = parseDiagnostics('{{ a ?? "b" }}', "minbars");
+  assert.ok(
+    ds.some((d) => /Operator `\?\?`.*MaxBars/.test(d.message)),
+    "MinBars surfaces the MaxBars-operator diagnostic for `??`",
+  );
 });
 
 // ── Delimiter-switched tags: LSP paints the new delimiters as `set-delimiter` ──

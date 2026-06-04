@@ -68,10 +68,28 @@ try {
 
   // Sparse semantic tokens (corrections only): the `??` operator and the "b"
   // string are emitted; the expr tag is left to the grammar. languageId 'maxbars'
-  // is what makes `??` an operator at all.
-  const operator = provider.legend.tokenTypes.indexOf("operator");
-  assert.equal(result.data.length, 2 * 5, "two MaxBars correction tokens (operator + string)");
-  assert.ok([...result.data].includes(operator), "languageId 'maxbars' resolved → `??` is an operator");
+  // is what makes `??` an operator at all. Decode + assert SEMANTICALLY so
+  // additive painters (a future helper-name highlight, etc.) can land without
+  // breaking this with opaque numeric diffs — the previous exact-length
+  // assertion (`data.length === 2 * 5`) was brittle.
+  const text = '{{ a ?? "b" }}';
+  const decoded = [];
+  let line = 0;
+  let char = 0;
+  for (let i = 0; i < result.data.length; i += 5) {
+    const [dL, dC, len, type] = result.data.slice(i, i + 5);
+    line += dL;
+    char = dL === 0 ? char + dC : dC;
+    decoded.push({ type: provider.legend.tokenTypes[type], slice: text.slice(char, char + len) });
+  }
+  assert.ok(
+    decoded.some((t) => t.type === "operator" && t.slice === "??"),
+    "languageId 'maxbars' resolved → `??` is an operator span",
+  );
+  assert.ok(
+    decoded.some((t) => t.type === "string" && t.slice === '"b"'),
+    "the `\"b\"` string literal is emitted as a string span",
+  );
   assert.deepEqual(await maxDiags, [], "valid MaxBars publishes no diagnostics");
 
   // A FullBars doc with `{{#if a == 1}}` → one parse diagnostic (ADR-023): the same
