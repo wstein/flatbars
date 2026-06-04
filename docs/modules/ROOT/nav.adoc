@@ -28,6 +28,7 @@
 * xref:adr-0023-recovering-parser.adoc[ADR-023: recovering parser (diagnostics)]
 * xref:adr-0024-let-and-dict-literal.adoc[ADR-024: `let` & dict literal (proposed)]
 * xref:adr-0025-list-literal.adoc[ADR-025: list literal & `list` helper (proposed)]
+* xref:adr-0026-editor-capability-matrix.adoc[ADR-026: editor capability matrix]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification

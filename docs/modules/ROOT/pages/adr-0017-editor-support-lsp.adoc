@@ -311,3 +311,70 @@ synonyms are endorsed and never offered). It is dialect-scoped: alias rewrites a
 anywhere, the scoped rewrite only in RawBars/MaxBars (FullBars/MinBars keep
 Handlebars' `@index`/`@partial-block`). So the same single source drives the lint
 (report), the CLI (`flatbars lint`), and the editor (one-click fix).
+
+
+== Amendment (2026-06-04): support matrix locked in
+
+The JetBrains side now formally targets **all JetBrains IDEs (TextMate floor)
++ IDEA Ultimate (LSP ceiling)**. The default Gradle build (`buildPlugin`)
+produces a TextMate-only plugin compatible with every Community + Ultimate
+IDE; the `-PwithLsp` build adds the `flatbars-lsp` server consumed via the
+Ultimate-only platform LSP API. `runPluginVerifier` is wired against the
+since-build range so any compatibility regression fails before publish.
+
+Community-edition users see an `EditorNotificationProvider` banner on first
+opening a FlatBars file, linking to the Ultimate upgrade path so the missing
+LSP capabilities never surface as a silent gap.
+
+
+== Amendment (2026-06-04): editor floor refined to ERB-canonical scopes
+
+The TextMate floor switched from FlatBars-bespoke `meta.function.*` /
+`meta.variable.unescaped.*` scopes to the canonical ERB/PHP/EJS pattern:
+every brace cluster carries `punctuation.section.embedded.{begin,end}`,
+every tag region carries `meta.embedded.{line,block}`, and control-tag
+sigils split out as `keyword.control.{section,inheritance,import}`. Themes
+that style ERB braces now style FlatBars braces identically with zero
+hardcoded colour in either editor manifest.
+
+`#tag_interior` patterns added on every expression-bearing tag rule paint
+the body's literals (`string.quoted.*`, `constant.numeric.*`,
+`constant.language.*` for `true`/`false`/`null`), operators
+(`keyword.operator.*`), subexpression parens (`punctuation.section.parens`),
+list-literal brackets (`punctuation.section.brackets`), and path separators
+(`punctuation.accessor`).
+
+LSP `shrinkToInner` trims `{`/`}`/`~`/whitespace off every tag-level
+semantic-token span before emission, so the `keyword`/`set-delimiter`/`error`
+spans cover only the inner body and leave the braces to the grammar's
+embedded scope. `paintOperations` adds a new `operation` semantic kind that
+paints helper names from `operations.json` in head / subexpression-head /
+pipe-target positions; gated by the catalogue so plain variables stay
+default-coloured.
+
+
+== Amendment (2026-06-04): short-form dialect extensions + hybrid templates
+
+Each dialect now ships two equivalent native extensions — the long form
+(`.rawbars`/`.minbars`/`.fullbars`/`.maxbars`) and a short alias
+(`.rbars`/`.mbars`/`.fbars`/`.xbars`). Both resolve to the same language id;
+both are listed in every consumer (`shared/sync.mjs`, VS Code's
+`package.json`, JetBrains's TextMate bundle, the grammar's `fileTypes`,
+LSP's `dialectForUri`). The packagers' language tables are now codegenerated
+from the single `LANGUAGES` source so adding an extension touches one place.
+
+`editors/flatbars-injection.tmLanguage.json` is an injection grammar with
+`injectTo` covering 26 common host scopes (`source.java`, `source.ruby`,
+`source.python`, …, `text.html.basic`). Paired with `files.associations`
+(`*.java.xbars` → `java`), the host paints its native syntax and the
+injection layers `{{…}}` tag highlighting on top. The LSP attaches to the
+host — hybrid templates are syntax-only for tag intelligence; users wanting
+full IntelliSense open with the dialect's language id.
+
+
+== Amendment (2026-06-04): capability matrix split into ADR-026
+
+The full list of LSP capabilities we ship vs deliberately omit (the latter
+being principled design decisions tied to the engine's deliberately
+absent cross-template scope graph) lives in
+xref:adr-0026-editor-capability-matrix.adoc[ADR-026].
