@@ -17,8 +17,9 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, spanText)
 import FlatBars.Highlight (HighlightConfig, highlightSpans, tokenizeSpans)
-import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Token (defaultLexOptions)
+import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
+import FlatBars.Token (Token(..), defaultLexOptions)
+import FlatBars.Tokenizer (attachInteriors)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -34,6 +35,12 @@ schema =
       , Tuple "x" { block: false, arity: Exactly 0 }
       ]
   }
+
+-- Is a RawTok an interior-bearing tag (not a plain content run)?
+notContent :: RawTok -> Boolean
+notContent = case _ of
+  RContent _ -> false
+  _ -> true
 
 -- foldTemplate node counter (descends into block bodies).
 nodeCount :: String -> Int
@@ -545,5 +552,32 @@ main = do
         == map _.kind
           (Array.filter (\s -> s.role == "tag") (tokenizeSpans hlMax "{{ x ?? \"y\" }}"))
     )
+
+  -- ---- The unified tokenizer (FlatBars.Tokenizer.attachInteriors) ----
+  -- The single producer the parser and highlighter both consume: every RawTok
+  -- paired with its pre-lexed interior. These pin the two non-trivial properties
+  -- — raw blocks attach their HEAD (not the body), and `infixArith` is threaded
+  -- through — so the embedded tokens are exactly what `outputExpr`/`headed` and
+  -- the highlighter would otherwise re-lex.
+  let
+    interiorToksOf lx src =
+      case map (attachInteriors lx) (tokenizeTemplate defaultLexConfig src) of
+        Right its -> Array.find (notContent <<< _.raw) its >>= \it ->
+          case it.interior of
+            Right ts -> Just (map _.tok ts)
+            Left _ -> Nothing
+        Left _ -> Nothing
+    lxOn = defaultLexOptions { infixArith = true }
+  -- A raw block is one RawTok; its interior is the HEAD's tokens, not the body's.
+  assert' "tokenizer: a raw block attaches its head tokens (not the verbatim body)"
+    (interiorToksOf defaultLexOptions "{{{{raw}}}}verbatim {{x}} body{{{{/raw}}}}" == Just [ TIdent "raw" ])
+  -- Off MaxBars, `+` is path punctuation, so `a+b` is one ident; on, it carves.
+  assert' "tokenizer: infixArith off keeps `a+b` a single ident interior"
+    (interiorToksOf defaultLexOptions "{{ a+b }}" == Just [ TIdent "a+b" ])
+  assert' "tokenizer: infixArith on carves `a+b` into ident/op/ident"
+    (interiorToksOf lxOn "{{ a+b }}" == Just [ TIdent "a", TOp "+", TIdent "b" ])
+  -- `=` is an ident-continuation char in both modes (the surface hash splits later).
+  assert' "tokenizer: `key=value` stays one interior ident in both modes"
+    (interiorToksOf lxOn "{{ key=val }}" == Just [ TIdent "key=val" ])
 
   log "all framework tests passed"
