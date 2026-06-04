@@ -6,13 +6,22 @@
     "token legend (built from the `lsp` mappings), and the TextMate fallback",
     "grammar (`editors/flatbars.tmLanguage.json`).",
     "",
-    "The fallback grammar is a THIN FLOOR (it recognises tag delimiters and scopes",
-    "each tag region with a Handlebars-style `meta.*.handlebars` name; inside a tag",
-    "the body is default-coloured). The LSP is the authority — it emits semantic",
-    "tokens as CORRECTIONS over the floor for everything the stateless grammar can't",
-    "classify dialect-aware: keywords (`{{else}}`/`{{elif}}`), in-tag literals",
-    "(string, number), operators (MaxBars), the set-delimiter directive, and",
-    "dialect-disallowed errors.",
+    "The fallback grammar is a THIN FLOOR modeled on ERB's tmGrammar shape, split",
+    "by SEMANTIC ROLE of every emitted span:",
+    "",
+    "  Every brace cluster ({{ }} / {{{ }}} / {{& / {{{{ }}}} / {{! / --}} ) is an",
+    "  ESCAPE TOKEN — `punctuation.section.embedded.{begin,end}.handlebars`.",
+    "",
+    "  The SIGIL-WITH-IDENTIFIER inside control tags is captured SEPARATELY and",
+    "  carries `keyword.control.*.handlebars` (section / inheritance / import) or",
+    "  `keyword.directive.handlebars` (set-delim's matched `=` pair).",
+    "",
+    "Every tag region carries `meta.embedded.{line,block}.handlebars`. Inner content",
+    "(identifiers, paths, args after the sigil) is default-coloured at the floor.",
+    "The LSP is the authority — it emits semantic tokens as CORRECTIONS over the",
+    "floor for everything the stateless grammar can't classify dialect-aware:",
+    "keywords (`{{else}}`/`{{elif}}`), in-tag literals (string, number), operators",
+    "(MaxBars), the set-delimiter directive runs that follow it, and dialect errors.",
     "",
     "Three drift gates keep the contract from rotting:",
     "  • `check:tmgrammar` — the grammar agrees with the engine on TAG BOUNDARIES",
@@ -26,65 +35,106 @@
     "`tmScopes` are the grammar scopes a theme can target; `[]` means the floor",
     "is silent and the LSP fills in.",
     "",
-    "`lspEmitKinds` is the sparse set the LSP emits over the floor. Tag-class kinds",
-    "with distinctive `meta.*` scopes are left to the grammar (a theme can already",
-    "chip them). The LSP emits only where the grammar can't be dialect-aware."
+    "`lspEmitKinds` is the sparse set the LSP emits over the floor."
   ],
-  "lspEmitKinds": ["keyword", "operator", "string", "number", "set-delimiter", "error"],
+  "lspEmitKinds": ["keyword", "operator", "string", "number", "set-delimiter", "error", "operation"],
   "kinds": {
     "expr": {
       "role": "tag",
       "lsp": { "type": "variable", "modifiers": [] },
-      "tmScopes": ["meta.function.inline.handlebars"],
-      "description": "{{name}} — an interpolation (escaped output)."
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars"
+      ],
+      "description": "{{name}} — an interpolation (escaped output). No internal sigil."
     },
     "raw": {
       "role": "tag",
       "lsp": { "type": "variable", "modifiers": ["readonly"] },
-      "tmScopes": ["meta.variable.unescaped.handlebars"],
-      "description": "{{{x}}} / {{&x}} — unescaped (raw) output."
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.operator.raw.handlebars"
+      ],
+      "description": "{{{x}}} / {{&x}} — unescaped (raw) output. For {{&x}} the `&` sigil is split out as `keyword.operator.raw`."
     },
     "raw-block": {
       "role": "tag",
       "lsp": { "type": "macro", "modifiers": [] },
-      "tmScopes": ["meta.block.raw.handlebars"],
-      "description": "{{{{raw}}}} … {{{{/raw}}}} — a raw block."
+      "tmScopes": [
+        "meta.embedded.block.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars"
+      ],
+      "description": "{{{{raw}}}} … {{{{/raw}}}} — a raw block (multi-line)."
     },
     "block-open": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["meta.function.block.start.handlebars"],
-      "description": "{{#x}} — a section open."
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.control.section.handlebars"
+      ],
+      "description": "{{#x}} — a section open. Braces are escape tokens; `#x` is the control keyword."
     },
     "block-inverse": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["meta.function.block.inverse.handlebars"],
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.control.section.handlebars"
+      ],
       "description": "{{^x}} — an inverted section open."
     },
     "block-parent": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["meta.function.block.parent.handlebars"],
-      "description": "{{<x}} — an inheritance parent open."
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.control.inheritance.handlebars"
+      ],
+      "description": "{{<x}} — an inheritance parent open. The `<` sigil alone is the control keyword."
     },
     "block-decl": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["meta.function.block.declaration.handlebars"],
-      "description": "{{$x}} — an inheritance block declaration open."
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.control.inheritance.handlebars"
+      ],
+      "description": "{{$x}} — an inheritance block declaration open. The `$` sigil alone is the control keyword."
     },
     "block-close": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["meta.function.block.end.handlebars"],
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.control.section.handlebars"
+      ],
       "description": "{{/x}} — a block close."
     },
     "partial": {
       "role": "tag",
       "lsp": { "type": "macro", "modifiers": [] },
-      "tmScopes": ["meta.function.partial.handlebars"],
-      "description": "{{> name}} — a partial include."
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.control.import.handlebars"
+      ],
+      "description": "{{> name}} — a partial include. The `>` (or `>*`) sigil alone is the control keyword."
     },
     "keyword": {
       "role": "tag",
@@ -95,14 +145,23 @@
     "comment": {
       "role": "tag",
       "lsp": { "type": "comment", "modifiers": [] },
-      "tmScopes": ["comment.block.handlebars"],
-      "description": "{{! … }} / {{!-- … --}} — a comment."
+      "tmScopes": [
+        "comment.block.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars"
+      ],
+      "description": "{{! … }} / {{!-- … --}} — a comment. The body is `comment.block.*`; the braces are `punctuation.section.embedded.*` (escape-into-comment)."
     },
     "set-delimiter": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["meta.set-delimiter.handlebars"],
-      "description": "{{=A B=}} — a set-delimiter directive. The DIRECTIVE is coloured; the stateless fallback cannot track the new delimiters that follow it (the LSP does)."
+      "tmScopes": [
+        "meta.embedded.line.handlebars",
+        "punctuation.section.embedded.begin.handlebars",
+        "punctuation.section.embedded.end.handlebars",
+        "keyword.directive.handlebars"
+      ],
+      "description": "{{=A B=}} — a set-delimiter directive. The matched `=` pair is the directive keyword. The stateless fallback cannot track the new delimiters that follow (the LSP does)."
     },
     "error": {
       "role": "tag",
@@ -127,6 +186,12 @@
       "lsp": { "type": "operator", "modifiers": [] },
       "tmScopes": [],
       "description": "An infix/prefix operator inside a tag (MaxBars). LSP-emitted: dialect-scoped."
+    },
+    "operation": {
+      "role": "interior",
+      "lsp": { "type": "function", "modifiers": [] },
+      "tmScopes": [],
+      "description": "A helper / operation name in operation position: the first identifier of a value/raw tag, the identifier of a {{> partial}}, or the identifier immediately after `(` in a subexpression. LSP-emitted: only when the identifier resolves in the operations catalog (operations.json) — so `{{name}}` where `name` is a plain variable stays default-coloured. Partial names always paint (user-defined). Control-tag sigils ({{#each}}, {{/if}}, …) are not re-painted here; the TextMate grammar already covers them as `keyword.control.section`."
     }
   }
 }

@@ -35,7 +35,14 @@ const root = resolve(here, "..");
 // grammar no longer distinguishes `{{else}}` / `{{elif …}}` from other `{{…}}`
 // interpolations, so the LSP fills the gap by emitting the `keyword` kind too.
 // See ADR-017 (amendment) and editors/token-vocabulary.json `lspEmitKinds`.
-const EXPECTED_LSP_EMIT = ["error", "keyword", "number", "operator", "set-delimiter", "string"];
+const EXPECTED_LSP_EMIT = ["error", "keyword", "number", "operation", "operator", "set-delimiter", "string"];
+
+// LSP-synthesized kinds — emitted by the server, NOT by the engine's tokenize. They
+// are exempt from the engine ⇄ vocabulary corpus parity check below: there is no
+// tokenize span to witness in the highlight corpus. The server creates these by
+// inspecting tag bodies (e.g. "operation" — the helper name in operation position,
+// painted from operations.json). Keep this list TIGHT; widen only with intent.
+const LSP_SYNTHESIZED = new Set(["operation"]);
 
 const fail = [];
 const ok = (msg) => console.log(`  ✓ ${msg}`);
@@ -54,7 +61,7 @@ console.log("Engine ⇄ vocabulary kind parity (witness: gen-highlight CORPUS):"
 const emitted = new Set();
 for (const c of CORPUS) for (const t of tokenize(c.src, c.dialect)) emitted.add(t.kind);
 const emittedNotInVocab = [...emitted].filter((k) => !kinds[k]).sort();
-const vocabNotEmitted = vocabKinds.filter((k) => !emitted.has(k)).sort();
+const vocabNotEmitted = vocabKinds.filter((k) => !emitted.has(k) && !LSP_SYNTHESIZED.has(k)).sort();
 if (emittedNotInVocab.length) bad(`engine emits kind(s) the vocabulary does not declare: ${emittedNotInVocab.join(", ")}`);
 if (vocabNotEmitted.length) bad(`vocabulary declares kind(s) no corpus case exercises (dead vocab or missing coverage): ${vocabNotEmitted.join(", ")}`);
 if (!emittedNotInVocab.length && !vocabNotEmitted.length) ok(`${vocabKinds.length} kinds, engine ≡ vocabulary`);
