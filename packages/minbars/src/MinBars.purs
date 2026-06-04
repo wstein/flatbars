@@ -66,6 +66,12 @@ minOptions = defaultParseOptions
   -- the `#` form; turn off the Handlebars bare form too).
   , rawBlockHbs = false
   , trimStandalone = false
+  -- Mustache enables `{{=A B=}}` set-delimiter switching (ADR-015); thread that
+  -- into the parse options so `parseRecovering minOptions` (the path the LSP
+  -- diagnostics use) lexes set-delim tags correctly. `parseMin` always passed
+  -- `minLexConfig` explicitly; without the line below the recovering path
+  -- diverged and flagged every `{{=…=}}` as a LexError.
+  , lexConfig = minLexConfig
   }
 
 -- | MinBars lexes with Mustache set-delimiters enabled (`{{=<% %>=}}`). Each
