@@ -18,6 +18,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
@@ -34,6 +35,7 @@ import FullBars (analyseSurface, directiveLints, handlebars, noLoopVars, prelude
 import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
+import MaxBars (maxOptions)
 import MinBars (renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
@@ -52,7 +54,7 @@ usage =
     , "Usage:"
     , "  flatbars <template> [--data <data.json>] [--validate | --compile]"
     , "  flatbars analyse <template> <data.json> [--emit-jsonata]"
-    , "  flatbars lint <template> [--surface]"
+    , "  flatbars lint <template> [--surface | --maxbars] [--max-warnings <n>]"
     , "  flatbars examples verify [--provider mustache]"
     , ""
     , "Options:"
@@ -376,38 +378,74 @@ lintUsage =
     [ "flatbars lint — on-demand canonicalization lints (never blocks rendering)"
     , ""
     , "Usage:"
-    , "  flatbars lint <template> [--surface]"
+    , "  flatbars lint <template> [--surface | --maxbars] [--max-warnings <n>]"
     , ""
-    , "Reports, one warning per use (exit ≠ 0 if any):"
+    , "Reports, one warning per use:"
     , "  • deprecated aliases    e.g. `plus` → `add`, `downcase` → `lowercase`"
-    , "  • scoped-variable spelling (core/MaxBars only)  `index` → `index0`, `partial-block` → `yield`"
+    , "  • scoped-variable spelling (core/MaxBars)  `index` → `index0`, `partial-block` → `yield`"
     , ""
-    , "Core syntax by default; --surface lints the FullBars surface (aliases only — the"
-    , "scoped-variable lint is for the native RawBars/MaxBars spelling, not Handlebars @index)."
+    , "Dialect (default core/RawBars):"
+    , "  -s, --surface   lint the FullBars surface — aliases only (the scoped-variable lint"
+    , "                  is the native RawBars/MaxBars spelling, not Handlebars @index)."
+    , "      --maxbars   lint MaxBars source (infix operators, pipes) — aliases + scoped."
+    , ""
+    , "Exit code:"
+    , "      --max-warnings <n>   exit non-zero only if findings exceed n (default 0: any"
+    , "                           finding fails, for CI gating). Use -1 for no limit"
+    , "                           (report but never fail). Findings always print to stderr."
+    , ""
     , "The lift/migrate assist is what rewrites these; this command only reports."
     ]
 
--- | `flatbars lint <template> [--surface]`: run the on-demand canonicalization
--- | lints (`Linter.Aliases`) and report them. Core/RawBars by default — alias +
--- | scoped-variable (`index`→`index0`, `partial-block`→`yield`) warnings; with
--- | `--surface` it lints the FullBars surface for aliases only (the scoped-variable
--- | spelling is RawBars/MaxBars-native, not Handlebars). Exit ≠ 0 on any finding.
+type LintArgs =
+  { surface :: Boolean, maxbars :: Boolean, maxWarnings :: Int, positional :: Array String }
+
+-- | Parse the `lint` flags: dialect (`--surface`/`--maxbars`) and `--max-warnings <n>`
+-- | (default 0; `-1` = no limit). The value after `--max-warnings` is consumed here
+-- | so it is not mistaken for the template path.
+parseLintArgs :: Array String -> LintArgs
+parseLintArgs = go { surface: false, maxbars: false, maxWarnings: 0, positional: [] }
+  where
+  go acc as = case Array.uncons as of
+    Nothing -> acc
+    Just { head, tail } -> case head of
+      flag | flag == "-s" || flag == "--surface" -> go (acc { surface = true }) tail
+      "--maxbars" -> go (acc { maxbars = true }) tail
+      "--max-warnings" -> case Array.uncons tail of
+        Just { head: v, tail: rest } -> go (acc { maxWarnings = fromMaybe 0 (Int.fromString v) })
+          rest
+        Nothing -> go acc tail
+      other
+        | isJust (stripPrefix (Pattern "-") other) -> go acc tail -- ignore unknown flags
+        | otherwise -> go (acc { positional = Array.snoc acc.positional other }) tail
+
+-- | `flatbars lint <template> [--surface | --maxbars] [--max-warnings <n>]`: run
+-- | the on-demand canonicalization lints (`Linter.Aliases`) and report them. Core/
+-- | RawBars by default — alias + scoped-variable (`index`→`index0`,
+-- | `partial-block`→`yield`) warnings; `--surface` lints the FullBars surface for
+-- | aliases only (the scoped-variable spelling is RawBars/MaxBars-native, not
+-- | Handlebars); `--maxbars` lints MaxBars source. Findings print to stderr; the
+-- | exit code is governed by `--max-warnings` (default 0 ⇒ any finding fails).
 runLint :: Array String -> Effect Unit
 runLint args
   | Array.elem "-h" args || Array.elem "--help" args = writeStdout (lintUsage <> "\n")
   | otherwise =
       let
-        surface = Array.elem "-s" args || Array.elem "--surface" args
-        positional = Array.filter (\a -> not (isJust (stripPrefix (Pattern "-") a))) args
+        a = parseLintArgs args
       in
-        case positional of
+        if a.surface && a.maxbars then
+          die "flatbars lint: choose at most one of --surface / --maxbars"
+        else case a.positional of
           [ tplPath ] -> do
             tplE <- readFileSafe tplPath
             case tplE of
               Left err -> die ("flatbars lint: cannot read template '" <> tplPath <> "': " <> err)
               Right tpl ->
                 let
-                  popts = if surface then defaultParseOptions else coreOptions
+                  popts =
+                    if a.surface then defaultParseOptions
+                    else if a.maxbars then maxOptions
+                    else coreOptions
                 in
                   case parseWith popts tpl of
                     Left pe -> die
@@ -417,12 +455,14 @@ runLint args
                       -- spelling; on the FullBars surface `@index`/`@partial-block`
                       -- are canonical, so run aliases only there.
                       case
-                        aliasWarnings nodes <> (if surface then [] else scopedCanonWarnings nodes)
+                        aliasWarnings nodes <> (if a.surface then [] else scopedCanonWarnings nodes)
                         of
                         [] -> writeStdout "ok: no lint findings\n"
                         issues -> do
                           writeStderr (joinWith "\n" (map fmt issues) <> "\n")
-                          setExitCode 1
+                          -- Exit non-zero only past the threshold (-1 ⇒ never).
+                          when (a.maxWarnings >= 0 && Array.length issues > a.maxWarnings)
+                            (setExitCode 1)
           _ -> die ("flatbars lint: expected <template>\n\n" <> lintUsage)
       where
       fmt issue = show issue.severity <> ": " <> issue.message

@@ -4,6 +4,7 @@ package:
     - prelude
     - effect
     - arrays
+    - integers
     - maybe
     - either
     - strings
@@ -19,6 +20,7 @@ package:
     - fullbars-compile
     - fullbars
     - rawbars
+    - maxbars
     - minbars
     - linter
   run:
