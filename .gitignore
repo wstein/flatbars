@@ -41,6 +41,7 @@ public/
 
 # JetBrains plugin: Gradle + generated/bundled assets
 editors/jetbrains/build/
+editors/jetbrains/bin/
 editors/jetbrains/.gradle/
 editors/jetbrains/src/main/resources/server/
 editors/jetbrains/src/main/resources/textmate-bundle/
