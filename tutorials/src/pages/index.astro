@@ -21,6 +21,11 @@ import conformance from "../conformance.json";
 import hbs from "../../../conformance/handlebars/report.json";
 
 const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
+// Same convention as the reference pages (Reference.astro): the Antora spec lives
+// under PUBLIC_SPEC_BASE in production (/flatbars/spec/flatbars/). Like every spec
+// link, this resolves in the deployed build and 404s in plain `npm run dev` (the
+// spec isn't built there) — see tutorials/README.md.
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
 const GH = "https://github.com/wstein/flatbars";
 
 const proof = [
@@ -253,7 +258,7 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
         <span class="ver">core v0.1.0 · MinBars · FullBars · MaxBars</span>
         <span class="spacer"></span>
         <span class="links">
-          <a href="/spec/">Docs</a>
+          <a href={`${SPEC_BASE}index.html`}>Docs</a>
           <a href={LAB_URL} target="_blank" rel="noopener">The Lab ↗</a>
           <a href={GH}>GitHub ↗</a>
         </span>

@@ -61,6 +61,13 @@ path, hence `…/spec/flatbars/`). To deploy at a **root** origin instead (custo
 domain or a user/org page), drop `PUBLIC_BASE_PATH` (and add a `CNAME`); the links
 then stay root-absolute as authored.
 
+In plain `npm run dev` (no `PUBLIC_SPEC_BASE`) every spec link — the footer "Docs"
+and the per-page "normative reference" links — points at `/flatbars/…` and 404s,
+because the Antora spec isn't built by the dev server. That's expected; the links
+resolve only in the deployed build. The footer "Docs" link is authored through
+`PUBLIC_SPEC_BASE` like the rest, and `check:tutorial-links` fails on a hardcoded
+`/spec/` so it can't regress to the broken-everywhere form.
+
 ## How it works
 
 - **One source per example, gate-validated:** the Mustache reference's runnable
@@ -125,6 +132,12 @@ then stay root-absolute as authored.
   deep-link exists (never a focusable, dead `aria-disabled` link). `npm run
   check:a11y` (in `npm test`) pins all of these at source; a headless axe-core smoke
   gate over a built page is a tracked follow-up.
+- **The landing's "0 built-in helpers" is an architecture invariant, not a runtime
+  count.** It's about the `flatbars` *core* package — the meaning-free parser, which
+  has no engine or prelude — guaranteed by the package dependency graph and `npm run
+  lint` (`--pedantic-packages`). The shipped engine bundle *does* carry the ~80-helper
+  FullBars prelude (a plug-in), so grepping the bundle for helpers would be the wrong
+  check; the claim is verified by the layering, not a count.
 - **Conformance badges are generated, not asserted.** `npm run gen:conformance`
   runs the vendored `mustache/spec` suite through the shipped MinBars bundle and
   writes `src/conformance.json`; the reference renders its support table from

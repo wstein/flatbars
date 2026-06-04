@@ -46,6 +46,24 @@ for (const page of ["src/pages/index.astro", "src/layouts/Reference.astro"]) {
   }
 }
 
+// Spec-link guard: every link into the Antora spec must go through
+// PUBLIC_SPEC_BASE (like the reference pages), so it resolves at the deployed
+// path /flatbars/spec/flatbars/. A hardcoded `/spec/` is both 404 in dev and
+// wrong in production — that was the landing footer's "Docs" bug.
+console.log("\nSpec-link guard:");
+for (const page of ["src/pages/index.astro"]) {
+  const src = readFileSync(new URL(`../tutorials/${page}`, import.meta.url), "utf8");
+  if (/href=["'`]\/spec\//.test(src) || /href=\{`\/spec\//.test(src)) {
+    console.error(`  ✗ ${page}: hardcodes a /spec/ link — route it through PUBLIC_SPEC_BASE (SPEC_BASE)`);
+    fail++;
+  } else if (!/PUBLIC_SPEC_BASE/.test(src)) {
+    console.error(`  ✗ ${page}: the footer "Docs" link must resolve via PUBLIC_SPEC_BASE (SPEC_BASE)`);
+    fail++;
+  } else {
+    console.log(`  ✓ ${page} links the spec via PUBLIC_SPEC_BASE`);
+  }
+}
+
 // Heuristic (non-fatal): a list example that renders its items on one line with
 // no separator reads as "broken" to newcomers — the standalone-trim footgun the
 // partial examples hit. Flag a block-iterating example whose data holds a 2+
