@@ -33,6 +33,11 @@
       <li>Hybrid-template injection grammar — *.host.flatbars-ext files paint
       both the host syntax and the FlatBars tags (set the file association in
       IDE Settings → Editor → File Types).</li>
+      <li>Live Templates: <code>if</code>, <code>ifelse</code>, <code>each</code>,
+      <code>eachas</code>, <code>with</code>, <code>unless</code>, <code>let</code>,
+      <code>partial</code>, <code>comment</code>, <code>rawblock</code>.</li>
+      <li>Tools ▸ FlatBars action group: Open in Lab, Show Helper Catalogue,
+      Report Issue.</li>
       <li>Community-edition users keep the TextMate floor; an EditorNotifications
       banner explains the Ultimate-only LSP capabilities.</li>
       <li>See <a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0026-editor-capability-matrix.adoc">ADR-026</a>
@@ -57,5 +62,26 @@
          tells Community users so the missing diagnostics/hover/completion are
          never a silent gap. Dismissable per-file. -->
     <editorNotificationProvider implementation="com.flatbars.idea.FlatBarsCommunityNoticeProvider"/>
+
+    <!-- Notifications group used by node-missing errors and Tools-menu actions. -->
+    <notificationGroup id="FlatBars" displayType="BALLOON" isLogByDefault="true"/>
+
+    <!-- The runnable file templates "New ▸ FlatBars Template" surface, gated by
+         the textmate bundle providing the dialect language registration. -->
+    <internalFileTemplate name="FlatBars Template.fullbars"/>
+
+    <!-- Live Templates (every common block form). The XML lives at
+         resources/liveTemplates/FlatBars.xml. -->
+    <defaultLiveTemplates file="liveTemplates/FlatBars.xml"/>
   </extensions>
+
+  <actions>
+    <group id="FlatBars.Tools" text="FlatBars" description="FlatBars actions" popup="true">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+      <action id="FlatBars.OpenInLab"     class="com.flatbars.idea.OpenInLabAction"/>
+      <action id="FlatBars.OpenCatalogue" class="com.flatbars.idea.OpenCatalogueAction"/>
+      <separator/>
+      <action id="FlatBars.ReportIssue"   class="com.flatbars.idea.ReportIssueAction"/>
+    </group>
+  </actions>
 </idea-plugin>

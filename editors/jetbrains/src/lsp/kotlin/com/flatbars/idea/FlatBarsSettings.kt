@@ -21,7 +21,10 @@ import com.intellij.openapi.components.Storage
 @Service(Service.Level.APP)
 @State(name = "FlatBarsSettings", storages = [Storage("flatbars.xml")])
 class FlatBarsSettings : PersistentStateComponent<FlatBarsSettings.State> {
-  data class State(var defaultDialect: String = DEFAULT_DIALECT)
+  data class State(
+    var defaultDialect: String = DEFAULT_DIALECT,
+    var nodePath: String = "",
+  )
 
   private var state = State()
 
@@ -35,6 +38,16 @@ class FlatBarsSettings : PersistentStateComponent<FlatBarsSettings.State> {
     get() = state.defaultDialect.ifBlank { DEFAULT_DIALECT }
     set(value) {
       state.defaultDialect = if (value in DIALECTS) value else DEFAULT_DIALECT
+    }
+
+  /**
+   * Override for the `node` executable. Blank means "look it up on `PATH`"
+   * (`FlatBarsSupport.resolveNode()` consults this first, then PATH).
+   */
+  var nodePath: String
+    get() = state.nodePath
+    set(value) {
+      state.nodePath = value.trim()
     }
 
   companion object {

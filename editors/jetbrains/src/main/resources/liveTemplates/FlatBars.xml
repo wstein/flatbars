@@ -1,0 +1,67 @@
+<templateSet group="FlatBars">
+  <template name="if" value="{{#if $COND$}}&#10;  $END$&#10;{{/if}}" description="FlatBars if/endif" toReformat="false" toShortenFQNames="false">
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="ifelse" value="{{#if $COND$}}&#10;  $THEN$&#10;{{else}}&#10;  $ELSE$&#10;{{/if}}" description="FlatBars if/else block" toReformat="false" toShortenFQNames="false">
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true"/>
+    <variable name="THEN" expression="" defaultValue="&quot;then&quot;" alwaysStopAt="true"/>
+    <variable name="ELSE" expression="" defaultValue="&quot;else&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="each" value="{{#each $ITEMS$}}&#10;  {{this}}&#10;{{/each}}" description="FlatBars each block" toReformat="false" toShortenFQNames="false">
+    <variable name="ITEMS" expression="" defaultValue="&quot;items&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="eachas" value="{{#each $ITEMS$ as |$ITEM$ $IDX$|}}&#10;  $END$&#10;{{/each}}" description="FlatBars each block with block params" toReformat="false" toShortenFQNames="false">
+    <variable name="ITEMS" expression="" defaultValue="&quot;items&quot;" alwaysStopAt="true"/>
+    <variable name="ITEM" expression="" defaultValue="&quot;item&quot;" alwaysStopAt="true"/>
+    <variable name="IDX" expression="" defaultValue="&quot;index&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="with" value="{{#with $VALUE$}}&#10;  $END$&#10;{{/with}}" description="FlatBars with block" toReformat="false" toShortenFQNames="false">
+    <variable name="VALUE" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="unless" value="{{#unless $COND$}}&#10;  $END$&#10;{{/unless}}" description="FlatBars unless block" toReformat="false" toShortenFQNames="false">
+    <variable name="COND" expression="" defaultValue="&quot;condition&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="let" value="{{#let $NAME$=$VAL$}}&#10;  $END$&#10;{{/let}}" description="FlatBars let block (block-scoped binding)" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <variable name="VAL" expression="" defaultValue="&quot;value&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="partial" value="{{&gt; $NAME$}}" description="FlatBars partial include" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;name&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="comment" value="{{! $TEXT$ }}" description="FlatBars short comment" toReformat="false" toShortenFQNames="false">
+    <variable name="TEXT" expression="" defaultValue="&quot;text&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+  <template name="rawblock" value="{{{{#$NAME$}}}}&#10;  $END$&#10;{{{{/$NAME$}}}}" description="FlatBars raw block (quad-brace)" toReformat="false" toShortenFQNames="false">
+    <variable name="NAME" expression="" defaultValue="&quot;raw&quot;" alwaysStopAt="true"/>
+    <context>
+      <option name="OTHER" value="true"/>
+    </context>
+  </template>
+</templateSet>

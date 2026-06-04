@@ -3,45 +3,67 @@ package com.flatbars.idea
 
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.ComboBox
-import java.awt.FlowLayout
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.ui.dsl.builder.AlignX
+import com.intellij.ui.dsl.builder.panel
 import javax.swing.JComponent
-import javax.swing.JLabel
-import javax.swing.JPanel
 
 /**
- * Settings ▸ Languages & Frameworks ▸ FlatBars: pick the default dialect for the
- * `.flatbars` umbrella extension. Mirrors the VS Code `flatbars.defaultDialect`
- * setting. Registered only on the Ultimate LSP path (flatbars-lsp.xml), since the
- * dialect only matters to the engine-backed server; the change takes effect for
- * servers started afterwards (reopen a file / restart, like the VS Code client,
- * which reads its setting at activation).
+ * Settings ▸ Languages & Frameworks ▸ FlatBars (Ultimate-only, since the
+ * settings only affect the engine-backed server). Two fields:
+ *
+ *   * Default dialect — fallback for URIs that don't resolve via extension.
+ *     Mirrors the VS Code `flatbars.defaultDialect` setting.
+ *   * Node executable — blank means "look up `node` on PATH". Overriding lets
+ *     users on `nvm` / `volta` / corporate workstations point at a specific
+ *     install. Validated on next server start.
+ *
+ * Both changes take effect for servers started afterwards (reopen the file /
+ * restart), the same way the VS Code client reads its settings at activation.
  */
 class FlatBarsConfigurable : Configurable {
-  private var combo: ComboBox<String>? = null
+  private var dialectCombo: ComboBox<String>? = null
+  private var nodeField: TextFieldWithBrowseButton? = null
 
   override fun getDisplayName(): String = "FlatBars"
 
   override fun createComponent(): JComponent {
-    val box = ComboBox(FlatBarsSettings.DIALECTS)
-    box.selectedItem = FlatBarsSettings.instance.defaultDialect
-    combo = box
-    val panel = JPanel(FlowLayout(FlowLayout.LEFT))
-    panel.add(JLabel("Default dialect for .flatbars files:"))
-    panel.add(box)
-    return panel
+    val initialDialect = FlatBarsSettings.instance.defaultDialect
+    val initialNode = FlatBarsSettings.instance.nodePath
+    val dialect = ComboBox(FlatBarsSettings.DIALECTS).apply { selectedItem = initialDialect }
+    val node = TextFieldWithBrowseButton().apply { text = initialNode }
+    dialectCombo = dialect
+    nodeField = node
+    return panel {
+      row("Default dialect:") {
+        cell(dialect).align(AlignX.LEFT)
+      }.comment("Used when the file's URI extension does not pick a dialect on its own.")
+      row("Node executable:") {
+        cell(node).align(AlignX.FILL)
+      }.comment("Leave blank to use <code>node</code> on PATH. Required for the LSP server to start.")
+    }
   }
 
-  override fun isModified(): Boolean = combo?.selectedItem != FlatBarsSettings.instance.defaultDialect
+  override fun isModified(): Boolean {
+    val s = FlatBarsSettings.instance
+    return dialectCombo?.selectedItem != s.defaultDialect ||
+      (nodeField?.text ?: "") != s.nodePath
+  }
 
   override fun apply() {
-    FlatBarsSettings.instance.defaultDialect = combo?.selectedItem as? String ?: FlatBarsSettings.DEFAULT_DIALECT
+    val s = FlatBarsSettings.instance
+    s.defaultDialect = dialectCombo?.selectedItem as? String ?: FlatBarsSettings.DEFAULT_DIALECT
+    s.nodePath = nodeField?.text ?: ""
   }
 
   override fun reset() {
-    combo?.selectedItem = FlatBarsSettings.instance.defaultDialect
+    val s = FlatBarsSettings.instance
+    dialectCombo?.selectedItem = s.defaultDialect
+    nodeField?.text = s.nodePath
   }
 
   override fun disposeUIResources() {
-    combo = null
+    dialectCombo = null
+    nodeField = null
   }
 }

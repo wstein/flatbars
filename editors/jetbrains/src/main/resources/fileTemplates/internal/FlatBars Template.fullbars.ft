@@ -1,0 +1,10 @@
+{{!-- ${NAME} --}}
+{{#if title}}
+<h1>{{title}}</h1>
+{{/if}}
+
+{{#each items}}
+  <li>{{this}}</li>
+{{else}}
+  <li>(empty)</li>
+{{/each}}
