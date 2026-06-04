@@ -49,10 +49,11 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as SCU
-import FlatBars.Lexer (LexConfig, RawTok(..), tokenizeTemplate)
+import FlatBars.Lexer (LexConfig, RawTok(..))
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (LexOptions, Token(..), tokenizeInterior)
+import FlatBars.Token (LexOptions, Token(..))
+import FlatBars.Tokenizer (ITok, Interior, tokenizeWithInteriors)
 
 -- | A positioned highlight span: UTF-16 offsets `[from, to)` into the source and
 -- | a stable `kind` tag the presenter maps to a CSS class. Every span is one
@@ -106,29 +107,29 @@ type HighlightConfig =
 -- | where the engine would have stopped — the highlighter never disagrees with the
 -- | lexer.
 tokenizeSpans :: HighlightConfig -> String -> Array TSpan
-tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
+tokenizeSpans cfg src = case tokenizeWithInteriors cfg.lexConfig cfg.lexOptions src of
   Left _ -> []
-  Right toks -> Array.concatMap spansOf toks
+  Right itoks -> Array.concatMap spansOf itoks
   where
-  spansOf :: RawTok -> Array TSpan
-  spansOf = case _ of
+  spansOf :: ITok -> Array TSpan
+  spansOf it = case it.raw of
     RContent _ -> []
-    ROutput sp base txt -> tag sp "raw" <> interior base txt
+    ROutput sp _ _ -> tag sp "raw" <> carveInterior it.interior
     -- `{{&x}}` (unescaped) is a Handlebars-extra: disallowed when `extras` is off
     -- (RawBars/MaxBars), exactly as the parser gates it.
-    RAmp sp base txt
-      | cfg.extras -> tag sp "raw" <> interior base txt
+    RAmp sp _ _
+      | cfg.extras -> tag sp "raw" <> carveInterior it.interior
       | otherwise -> tag sp "error"
-    ROpen sp sig base txt -> openSpans sp sig base txt
-    RClose sp base txt -> tag sp "block-close" <> interior base txt
+    ROpen sp sig _ _ -> openSpans sp sig it.interior
+    RClose sp _ _ -> tag sp "block-close" <> carveInterior it.interior
     -- The interior's head word distinguishes a partial and a clause keyword from a
     -- plain interpolation. A partial's leading `>` is the tag's meaning, not an
     -- operator, so its interior is not carved; a keyword's head word lexes as an
     -- identifier (no interior span), so carving the rest (e.g. `elif x > 0`) is safe.
-    RSep sp base txt
+    RSep sp _ txt
       | isPartialHead txt -> tag sp "partial"
-      | Array.elem (headWord txt) cfg.clauseSeps -> tag sp "keyword" <> interior base txt
-      | otherwise -> tag sp "expr" <> interior base txt
+      | Array.elem (headWord txt) cfg.clauseSeps -> tag sp "keyword" <> carveInterior it.interior
+      | otherwise -> tag sp "expr" <> carveInterior it.interior
     -- Two raw-block spellings, each gated: `{{{{#name}}}}` (FlatBars) by
     -- `rawBlockHash`, the bare `{{{{name}}}}` (Handlebars) by `rawBlockHbs`. A
     -- spelling the dialect rejects colours `error`.
@@ -144,29 +145,30 @@ tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig src of
   -- `{{^x}}` (Inverse) needs `extras`; `{{<x}}` (Parent) / `{{$x}}` (BlockDef)
   -- need `inheritance`. A disallowed opener is coloured `error` and its interior is
   -- not carved (the whole tag reads as the error).
-  openSpans :: Span -> Sigil -> Int -> String -> Array TSpan
-  openSpans sp sig base txt = case sig of
-    Section -> tag sp "block-open" <> interior base txt
+  openSpans :: Span -> Sigil -> Interior -> Array TSpan
+  openSpans sp sig int = case sig of
+    Section -> tag sp "block-open" <> carveInterior int
     -- the partial-block `{{#>}}` and inline-decorator `{{#*}}` openers carve like a
     -- plain block opener (the `>`/`*` is part of the opener tag span, not interior).
-    PartialBlock -> tag sp "block-open" <> interior base txt
-    Decorator -> tag sp "block-open" <> interior base txt
+    PartialBlock -> tag sp "block-open" <> carveInterior int
+    Decorator -> tag sp "block-open" <> carveInterior int
     Inverse
-      | cfg.extras -> tag sp "block-inverse" <> interior base txt
+      | cfg.extras -> tag sp "block-inverse" <> carveInterior int
       | otherwise -> tag sp "error"
     Parent
-      | cfg.inheritance -> tag sp "block-parent" <> interior base txt
+      | cfg.inheritance -> tag sp "block-parent" <> carveInterior int
       | otherwise -> tag sp "error"
     BlockDef
-      | cfg.inheritance -> tag sp "block-decl" <> interior base txt
+      | cfg.inheritance -> tag sp "block-decl" <> carveInterior int
       | otherwise -> tag sp "error"
 
-  -- The interior-role spans: re-lex the tag interior (with the dialect's
-  -- `LexOptions`) and carve only the literals and operators. Identifiers, paths,
-  -- and parens carry no colour of their own — they stay the tag's colour. A lex
-  -- error inside the interior yields no interior spans (the tag span still stands).
-  interior :: Int -> String -> Array TSpan
-  interior base txt = case tokenizeInterior cfg.lexOptions base txt of
+  -- The interior-role spans: from the *pre-lexed* interior (the one tokenizer ran
+  -- `tokenizeInterior` with the dialect's `LexOptions`, the same call the parser
+  -- reads), carve only the literals and operators. Identifiers, paths, and parens
+  -- carry no colour of their own — they stay the tag's colour. A lex error inside
+  -- the interior yields no interior spans (the tag span still stands).
+  carveInterior :: Interior -> Array TSpan
+  carveInterior = case _ of
     Left _ -> []
     Right toks -> Array.mapMaybe interiorSpan toks
 
