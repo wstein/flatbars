@@ -78,10 +78,9 @@
       "tmScopes": [
         "meta.embedded.line.flatbars",
         "punctuation.section.embedded.begin.flatbars",
-        "punctuation.section.embedded.end.flatbars",
-        "keyword.operator.raw.flatbars"
+        "punctuation.section.embedded.end.flatbars"
       ],
-      "description": "{{{x}}} / {{&x}} \u2014 unescaped (raw) output. For {{&x}} the `&` sigil is split out as `keyword.operator.raw`.",
+      "description": "{{{x}}} / {{&x}} \u2014 unescaped (raw) output. Both forms paint the entire opening brace cluster (including the `&` for the Mustache alias) as one `punctuation.section.embedded.begin` span.",
       "operationPosition": "head"
     },
     "raw-block": {

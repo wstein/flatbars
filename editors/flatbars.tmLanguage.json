@@ -269,20 +269,17 @@
       ]
     },
     "amp_unescaped": {
-      "_doc": "{{& \u2026 }} \u2014 Mustache-style raw alias for triple-stash. Split like the control tags: the `{{` and `}}` are escape tokens (embedded), the `&` is a raw-output sigil pulled out as `keyword.operator.raw`.",
+      "_doc": "{{& \u2026 }} \u2014 Mustache-style raw alias for triple-stash. The `&` joins the brace cluster as a single escape-token capture, mirroring how `{{`, `{{{`, and `{{{{` paint as one `punctuation.section.embedded.begin` span \u2014 the user reads `{{&` as one delimiter, not as braces plus a separate sigil.",
       "name": "meta.embedded.line.flatbars",
-      "begin": "(\\{\\{)(&)",
+      "begin": "\\{\\{&",
       "beginCaptures": {
-        "1": {
+        "0": {
           "name": "punctuation.section.embedded.begin.flatbars"
-        },
-        "2": {
-          "name": "keyword.operator.raw.flatbars"
         }
       },
-      "end": "(\\}\\})",
+      "end": "\\}\\}",
       "endCaptures": {
-        "1": {
+        "0": {
           "name": "punctuation.section.embedded.end.flatbars"
         }
       },
