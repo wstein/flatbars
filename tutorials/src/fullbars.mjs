@@ -103,13 +103,13 @@ grade: fail
 
   // ── each: lists, objects, loop data, the empty case ───────────────────────
   eachList: {
-    // {{#each}} iterates; @index is the position, @last the end-of-list flag.
+    // {{#each}} iterates; @index is the position and @first/@last flag the ends.
     // This example also compiles to JS (the compiled-JS pane below).
     engine: "fullbars",
     compiles: true,
     template: `<ol>
 {{#each items}}
-  <li>{{@index}}: {{name}} (×{{qty}})</li>
+  <li>{{@index}}: {{name}} (×{{qty}}){{#if @first}} ← first{{/if}}{{#if @last}} ← last{{/if}}</li>
 {{/each}}
 </ol>`,
     data: { items: [{ name: "pen", qty: 3 }, { name: "ink", qty: 1 }] },

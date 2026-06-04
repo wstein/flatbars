@@ -113,7 +113,7 @@ export const examples = {
     engine: "maxbars",
     compiles: true,
     template: `{{#each items}}
-{{loop.index1}}/{{loop.length}}. {{name}}{{#if loop.first}} (first){{/if}}{{#if loop.last}} (last){{/if}}
+[{{loop.index0}}] {{loop.index1}}/{{loop.length}} ({{loop.rindex0}} after, {{loop.rindex1}} left). {{name}}{{#if loop.first}} (first){{/if}}{{#if loop.last}} (last){{/if}}
 {{/each}}`,
     data: { items: [{ name: "Pen" }, { name: "Ink" }, { name: "Pad" }] },
   },
