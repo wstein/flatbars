@@ -20,7 +20,6 @@ import Prelude
 import Data.Either (Either)
 import Data.Tuple (Tuple)
 import FlatBars.Error (Error, ParseError)
-import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import FullBars (LoopVars, desugarSurfaceWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)

@@ -35,7 +35,6 @@ import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (fullbarsEmit, metaFor)
 import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
-import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)

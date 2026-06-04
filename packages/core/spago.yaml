@@ -21,5 +21,6 @@ package:
       - effect
       - console
       - assert
+      - foldable-traversable
       - tuples
       - kernel

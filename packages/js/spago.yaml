@@ -20,9 +20,11 @@ package:
     - maxbars
     - minbars
     - fullbars-compile
+    - linter
     - arrays
     - integers
     - maybe
+    - strings
     - tuples
     - foreign-object
     - ordered-collections
@@ -35,4 +37,5 @@ package:
       - assert
       - functions
       - argonaut
+      - arrays
       - strings

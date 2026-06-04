@@ -9,13 +9,14 @@ module Test.FullBars.JS.Main where
 import Prelude
 
 import Data.Argonaut (Json, jsonParser)
+import Data.Array (any, length)
 import Data.Either (Either(..))
-import Data.Function.Uncurried (runFn2)
+import Data.Function.Uncurried (runFn1, runFn2)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FullBars.JS (Result, compileFor, render, renderSurface)
+import FullBars.JS (Result, compileFor, lint, migrate, render, renderSurface)
 import Test.Assert (assert')
 
 -- Parse a JSON literal for use as render data, failing the test on a bad fixture.
@@ -77,5 +78,31 @@ main = do
   -- The Result type really is a plain { ok, value, error } record.
   let probe = { ok: true, value: "v", error: "" } :: Result
   assert' "Result shape" (probe.ok && probe.value == "v" && probe.error == "")
+
+  -- lint: RawBars/MaxBars flag a non-canonical scoped variable + a deprecated
+  -- alias; the report mirrors the CLI ("warning: …" lines).
+  let lr = runFn2 lint "{{#each xs}}{{index}}{{/each}}{{ plus a b }}" "maxbars"
+  assert' "lint ok flag" lr.ok
+  assert' ("lint flags index → index0: " <> lr.report) (contains (Pattern "index0") lr.report)
+  assert' ("lint flags the plus alias: " <> lr.report) (contains (Pattern "add") lr.report)
+  assert' "lint report uses the CLI severity word" (contains (Pattern "warning:") lr.report)
+  assert' "lint findings are structured" (length lr.findings == 2)
+  -- FullBars keeps @index canonical, so only the alias is flagged there.
+  let lf = runFn2 lint "{{ plus a b }}" "fullbars"
+  assert' "fullbars lint flags the alias" (length lf.findings == 1)
+  -- A clean template reports the CLI's no-findings line.
+  let lc = runFn2 lint "{{ name }}" "rawbars"
+  assert' "clean lint report" (lc.report == "ok: no lint findings")
+
+  -- migrate: Handlebars → MaxBars. `{{^x}}` → `{{#unless x}}`, `@index` →
+  -- `loop.index0`; an ambiguous bare section surfaces as a residual.
+  let mr = runFn1 migrate "{{#each xs}}{{@index}}{{/each}}{{^done}}todo{{/done}}"
+  assert' "migrate ok flag" mr.ok
+  assert' ("migrate rewrites @index: " <> mr.source) (contains (Pattern "loop.index0") mr.source)
+  assert' ("migrate rewrites inverted section: " <> mr.source)
+    (contains (Pattern "{{#unless done}}") mr.source)
+  let mres = runFn1 migrate "{{#widget}}x{{/widget}}"
+  assert' "migrate surfaces an ambiguous-section residual"
+    (any (\r -> r.kind == "ambiguous-section") mres.residuals)
 
   log "all facade tests passed"

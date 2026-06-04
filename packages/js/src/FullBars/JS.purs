@@ -10,8 +10,12 @@
 module FullBars.JS
   ( Result
   , AnalyseResult
+  , LintResult
+  , MigrateOutcome
   , render
   , analyze
+  , lint
+  , migrate
   , renderSurface
   , renderMaxbars
   , renderMinbars
@@ -44,6 +48,7 @@ import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
 import Data.Map (fromFoldable, union) as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.String.Common (joinWith)
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt)
 import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
@@ -58,6 +63,9 @@ import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
+import Kernel.Walk (Severity)
+import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
+import Linter.Migrate (migrateToMaxBars)
 import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
 import MinBars as MinBars
@@ -107,6 +115,73 @@ analyze = mkFn2 \tpl json -> case FullBars.analyseSurface tpl (fromJson json) of
     , report: r.report
     , jsonata: r.jsonata
     , output: r.output
+    , error: ""
+    }
+
+-- | A lint outcome (`Linter.Aliases`, the on-demand canonicalization lints) as a
+-- | plain JS object: structured `findings` (severity, the offending `name`, the
+-- | message pointing at the canonical form) and a `report` string that mirrors the
+-- | `flatbars lint` CLI. `ok`/`error` carry a parse failure.
+type LintResult =
+  { ok :: Boolean
+  , findings :: Array { severity :: String, name :: String, message :: String }
+  , report :: String
+  , error :: String
+  }
+
+-- | Lint a template for deprecated aliases and non-canonical scoped variables.
+-- | `lint(template, dialect)`, where `dialect` is `"rawbars"` | `"fullbars"` |
+-- | `"maxbars"` (anything else is treated as `"rawbars"`). FullBars lints aliases
+-- | only (its `@`-data spellings are canonical there); RawBars/MaxBars also flag
+-- | non-canonical scoped variables (`index` → `index0`, `partial-block` → `yield`).
+-- | Never blocks rendering — this is a host/CI hygiene check (ADR-019).
+lint :: Fn2 String String LintResult
+lint = mkFn2 \tpl dialect ->
+  let
+    surface = dialect == "fullbars"
+    opts = case dialect of
+      "maxbars" -> maxOptions
+      "fullbars" -> defaultParseOptions
+      _ -> RawBars.coreOptions
+  in
+    case parseWith opts tpl of
+      Left pe -> { ok: false, findings: [], report: "", error: renderParseErrorAt tpl pe }
+      Right { nodes } ->
+        let
+          issues = aliasWarnings nodes <> (if surface then [] else scopedCanonWarnings nodes)
+          fmt i = sevText i.severity <> ": " <> i.message
+        in
+          { ok: true
+          , findings: map (\i -> { severity: sevText i.severity, name: i.name, message: i.message })
+              issues
+          , report:
+              if Array.null issues then "ok: no lint findings" else joinWith "\n" (map fmt issues)
+          , error: ""
+          }
+
+-- | The CLI/host spelling of a lint severity (matches `Show Severity`).
+sevText :: Severity -> String
+sevText = show
+
+-- | A migrate outcome (`Linter.Migrate`) as a plain JS object: the rewritten
+-- | MaxBars `source`, and the `residuals` the migrator flagged but did not rewrite
+-- | (each a `kind`, a `message`, and a `suggestion`). `migrate(template)` —
+-- | Handlebars → MaxBars source. `ok`/`error` carry a lex failure.
+type MigrateOutcome =
+  { ok :: Boolean
+  , source :: String
+  , residuals :: Array { kind :: String, message :: String, suggestion :: String }
+  , error :: String
+  }
+
+migrate :: Fn1 String MigrateOutcome
+migrate = mkFn1 \tpl -> case migrateToMaxBars tpl of
+  Left pe -> { ok: false, source: "", residuals: [], error: renderParseErrorAt tpl pe }
+  Right r ->
+    { ok: true
+    , source: r.source
+    , residuals: map (\x -> { kind: x.kind, message: x.message, suggestion: x.suggestion })
+        r.residuals
     , error: ""
     }
 
