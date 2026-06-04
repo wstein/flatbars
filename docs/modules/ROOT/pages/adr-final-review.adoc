@@ -140,6 +140,9 @@ and the RawBars docstring. *Rating 4.*
   (`extras`/sigils) — in ADR-004; stop letting one word cover both.
 . *Separate "superset" from "isolation"* in ADR-003/005; the ladder's `⊂` is about surface, the
   isolation rule is about imports, and they have exactly one sanctioned crossing (`maxbars → fullbars`).
+  (Later narrowed: the 2026-06-04 ADR-005 amendment redefines `⊂` as surface-superset *modulo
+  documented exceptions* — MaxBars borrows most of FullBars's surface, not all, so Kai's "genuinely
+  *is* a superset" above holds only up to those exceptions.)
 . *Write the engine-conformance checklist now* — it is load-bearing in ADR-001/002/007 and exists
   nowhere.
 . *MinBars is the worked example of lazy extraction*, not a violation of it; its P0 prereqs

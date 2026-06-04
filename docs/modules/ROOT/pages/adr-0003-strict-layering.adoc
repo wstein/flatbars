@@ -30,7 +30,9 @@ Three tiers plus adapters, dependencies pointing strictly downward.
   (the intentional superset; see xref:adr-0005-dialect-ladder.adoc[]).
 +
 *Isolation is an import property, not the ladder's `⊂`.* "No dialect imports another" is about the
-package graph; the ladder's `⊂` (xref:adr-0005-dialect-ladder.adoc[]) is about *surface supersetting*.
+package graph; the ladder's `⊂` (xref:adr-0005-dialect-ladder.adoc[]) is about *surface supersetting*
+(narrowed by the ADR-005 amendment to surface-superset *modulo documented exceptions* — MaxBars is the
+flagship that reuses FullBars's engine wholesale and borrows most, not all, of its surface).
 RawBars *has* import isolation (a FullBars-free closure, xref:adr-0008-rawbars.adoc[]); MaxBars
 *trades* it for reuse because it genuinely is a FullBars superset. The two properties must not be
 conflated — there is exactly *one* sanctioned import crossing.

@@ -1,8 +1,8 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 //
-// The comprehensive MaxBars reference — the full FlatBars surface: FullBars PLUS
-// infix operators, a pipe, and bare loop variables. Structured deltas-first
+// The comprehensive MaxBars reference — FlatBars' flagship surface: most of FullBars,
+// reinterpreted, plus infix operators, a pipe, and bare loop variables. Structured deltas-first
 // (operators → pipes → the identity → loop vars), Jinja-style around an
 // expression core rather than re-walking the Handlebars spine — then the inherited
 // FullBars constructs (shown only with operators woven through, linking to
@@ -52,8 +52,8 @@ const t = (s) => s;
 ---
 
 <Reference
-  title="MaxBars — the full FlatBars language"
-  subtitle="MaxBars is FullBars plus an expression layer: infix operators ({{ a >= b }}), a pipe ({{ value | helper }}), and bare loop variables. The most expressive surface in the family — and still the same meaning-free core underneath, where every operator is just a helper application."
+  title="MaxBars — the FlatBars expression language"
+  subtitle="MaxBars is FlatBars' flagship surface — an expression layer over the same meaning-free core: infix operators ({{ a >= b }}), a pipe ({{ value | helper }}), and bare loop variables. The most capable surface in the family; it borrows most of FullBars and adds the expression freedom FullBars holds back — and underneath, every operator is still just a helper application."
   groups={groups}
   spec="maxbars"
   dialect="maxbars"
@@ -62,10 +62,11 @@ const t = (s) => s;
   <section id="intro">
     <h2>What MaxBars is</h2>
     <p>
-      <b>MaxBars is the native FlatBars surface — FullBars with an expression layer
-      on top.</b> If you've read the <a href="/fullbars">FullBars reference</a>, you
-      already have the whole language; MaxBars adds three things and changes almost
-      nothing else:
+      <b>MaxBars is FlatBars' flagship surface — an expression layer over the same
+      meaning-free core.</b> If you've read the <a href="/fullbars">FullBars reference</a>,
+      you'll recognise most of it: MaxBars borrows the bulk of FullBars and adds three
+      things on top (a few FullBars-only constructs are the deliberate exceptions —
+      see <a href="#divergences">where MaxBars and FullBars diverge</a>):
     </p>
     <ul class="conv">
       <li><b>Infix operators</b> — <code>{t("{{score >= 50}}")}</code>, <code>{t("{{price * qty}}")}</code>, <code>{t("{{a && b}}")}</code> — instead of nesting subexpressions.</li>
@@ -223,14 +224,16 @@ const t = (s) => s;
 
   <!-- ─────────────────────── Inherited from FullBars ─────────────────── -->
   <section id="inherited">
-    <h2>Everything FullBars does — with operators inside</h2>
+    <h2>Most of FullBars — with operators inside</h2>
     <p>
-      MaxBars <em>is</em> FullBars underneath, so paths (<code>{t("user.address.city")}</code>,
+      MaxBars borrows FullBars's core underneath, so paths (<code>{t("user.address.city")}</code>,
       <code>{t("../x")}</code>, <code>{t("@root")}</code>), the block helpers
       <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> / <code>{t("{{#with}}")}</code> /
-      <code>{t("{{#unless}}")}</code>, escaping, and subexpressions all work exactly as the
-      <a href="/fullbars">FullBars reference</a> documents them. The only difference is that
-      operators and pipes can now appear anywhere a value can. Here a single
+      <code>{t("{{#unless}}")}</code>, escaping, and subexpressions all work as the
+      <a href="/fullbars">FullBars reference</a> documents them. The headline addition is that
+      operators and pipes can now appear anywhere a value can — and a handful of FullBars-only
+      constructs are the deliberate exceptions (see <a href="#divergences">where it diverges</a>).
+      Here a single
       <code>{t("{{#each}}")}</code> mixes a path, arithmetic, a pipe, and an <code>==</code>:
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.inheritedEach.template} data={ex.inheritedEach.data} />

@@ -38,7 +38,7 @@ export const lessons = {
     engine: "fullbars",
     title: "FullBars — Handlebars-faithful",
     blurb:
-      "The Handlebars-faithful reference engine: {{name}} auto-escapes, dotted paths " +
+      "Faithful to Handlebars, the industry-standard {{ }} engine: {{name}} auto-escapes, dotted paths " +
       "read data, {{#each}} / {{#if}} are block helpers, and you register your own " +
       "with registerHelper (ADR-018).",
     spec: "surface", // docs/modules/ROOT/pages/surface.adoc
@@ -54,10 +54,12 @@ export const lessons = {
 
   maxbars: {
     engine: "maxbars",
-    title: "MaxBars — the full FlatBars language",
+    title: "MaxBars — the FlatBars expression language",
     blurb:
-      "The complete, native FlatBars surface — FullBars plus infix operators and " +
-      "pipes: write conditions like score >= 50 and transform with value | helper.",
+      "FlatBars' flagship and most capable surface. Infix operators, pipes, and bare " +
+      "loop variables put real expression back in the template: write conditions like " +
+      "score >= 50 and transform with value | helper. It borrows most of FullBars — not " +
+      "quite all — on its own terms.",
     spec: "maxbars", // docs/modules/ROOT/pages/maxbars.adoc
     template:
       "<p>{{greeting}}, {{name}}!</p>\n" +

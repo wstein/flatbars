@@ -152,7 +152,10 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 - **`fullbars`** — the reference engine + its surface dialect (`{{ }}`
   auto-escape, dotted paths, `@data`, `as |x|`). Re-exports kernel modules and
   adds surface desugar/compile/render.
-- **The dialect ladder: RawBars ⊂ FullBars ⊂ MaxBars.** All three share one
+- **The dialect ladder: RawBars ⊂ FullBars ⊂ MaxBars** (the `⊂` is surface-superset
+  *modulo documented exceptions* — MaxBars is the flagship that reuses FullBars's engine
+  wholesale and borrows most, not all, of its surface; see the ADR-005 amendment).
+  All three share one
   engine, prelude, and compiler, differing mainly in *surface syntax* (swapped in
   through the `ParseOptions.parseExpr` seam). They *diverge* in one value-policy
   axis — truthiness (ADR-022): FullBars uses `handlebars`, RawBars/MaxBars use
@@ -161,8 +164,10 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   data, no per-file `@truthiness`):
   - **`rawbars`** — core skeleton syntax directly, no surface sugar.
   - **`fullbars`** — adds the Handlebars-style surface desugar.
-  - **`maxbars`** — FullBars plus infix operators and pipes (`MaxBars.Expr`),
-    desugaring to the same core `Expr`.
+  - **`maxbars`** — the flagship surface: reuses FullBars's engine by dependency and
+    adds infix operators and pipes (`MaxBars.Expr`), desugaring to the same core
+    `Expr`. Borrows most of FullBars's surface, not quite all (a few FullBars-only
+    constructs diverge — see `maxbars.adoc`).
 - **`compile`** (`flatbars-compile`) — the dialect-agnostic emit driver →
   `export default function (data, rt)`. **`fullbars-compile`** layers the
   surface compiler on top. Emitted JS runs against
@@ -195,7 +200,7 @@ learner-facing front end: every surface now has a comprehensive runnable
 reference — **MinBars/Mustache** (`/minbars`, the recommended start) leads, with
 **RawBars** (`/rawbars`, the meaning-free core, live compiled-JS pane),
 **FullBars** (`/fullbars`, Handlebars-faithful), and **MaxBars** (`/maxbars`, the
-full expression layer: infix operators, pipes, bare loop vars) alongside. (The
+flagship: infix operators, pipes, bare loop vars) alongside. (The
 old one-example `[surface].astro` lesson page is gone — the dedicated references
 supersede it.) Runnable examples are gate-validated
 (`check:tutorial-links`, which also asserts the compile flagship emits JS) and the

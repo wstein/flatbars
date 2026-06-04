@@ -8,7 +8,8 @@
 // of truth; the page's prose only annotates it; the normative text stays in docs/
 // (maxbars.adoc) and is never forked here.
 //
-// MaxBars is FullBars PLUS infix operators, a pipe, and bare loop variables. The
+// MaxBars is FlatBars' flagship surface: it borrows most of FullBars and adds infix
+// operators, a pipe, and bare loop variables. The
 // examples lead with those deltas; the inherited FullBars constructs appear only
 // to show the operators working *inside* them. Several things every example here
 // is written to respect, because the engine enforces them (all verified):
@@ -174,7 +175,7 @@ export const examples = {
 
   // ── Inherited from FullBars (operators shown inside) ──────────────────────
   inheritedEach: {
-    // Everything FullBars does still works — here {{#each}}, {{#if}}, dotted
+    // Most of FullBars still works — here {{#each}}, {{#if}}, dotted
     // access — now with arithmetic, a pipe, and an == comparison woven through.
     engine: "maxbars",
     template: `{{#each items}}

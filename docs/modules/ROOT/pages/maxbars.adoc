@@ -1,9 +1,11 @@
 = The MaxBars dialect (infix operators & pipes)
 :hbs: Handlebars
 
-MaxBars is the top of the dialect ladder — **RawBars ⊂ FullBars ⊂ MaxBars**. It
-is FullBars plus a richer *surface*: infix operators and pipes. Everything below
-the surface is reused unchanged.
+MaxBars is FlatBars' flagship surface, the top of the dialect ladder — **RawBars ⊂
+FullBars ⊂ MaxBars**. It reuses FullBars's engine wholesale and adds a richer
+*surface*: infix operators and pipes. Everything below the surface is reused
+unchanged; the surface itself borrows most of FullBars — the handful of exceptions
+are noted under "v1 limitations" below.
 
 == Reuse by dependency
 
@@ -244,6 +246,20 @@ plain functions into these operations (the FlatBars Lab and `flatbars-js`).
   a bar can serve as the `pass:[as |x|]` block-parameter delimiter; an
   unparenthesised top-level bar in a head is therefore treated as structure, not a
   pipe (the same way FullBars and the core parser treat it).
+* **A few FullBars surface constructs are not accepted** — these are the documented
+  exceptions to the `⊂` of `RawBars ⊂ FullBars ⊂ MaxBars` (surface-superset *modulo
+  documented exceptions*; xref:adr-0005-dialect-ladder.adoc[] amendment), the reason
+  MaxBars borrows *most* of FullBars's surface, not all:
++
+--
+** the `pass:[{{#*inline}}]` *decorator* — MaxBars spells inline partials with bare
+   `pass:[{{#inline "name"}}…{{/inline}}]` / `pass:[{{#partial "name"}}…{{/partial}}]`;
+   the `*`-prefixed decorator form is FullBars-only.
+** `pass:[{{> @partial-block}}]` — the `@` sigil is reserved, so render the caller's
+   body with bare `pass:[{{yield}}]` instead (see "The block-partial body" above).
+** host-threaded *external* partial files — for host-loaded partials, use
+   xref:fullbars-compat.adoc[FullBars].
+--
 
 == Truthiness
 

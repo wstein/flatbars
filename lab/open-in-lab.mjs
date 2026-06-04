@@ -25,7 +25,9 @@ export const LAB_ENGINES = ["rawbars", "minbars", "fullbars", "maxbars", "stem"]
 export function dataText(data) {
   if (data == null) return "";
   if (typeof data === "string") return data;
-  return dumpYaml(data);
+  // js-yaml's dump() always appends a trailing newline; drop it so the data
+  // editor (tutorial preview and Lab alike) has no dangling blank last line.
+  return dumpYaml(data).replace(/\n+$/, "");
 }
 
 // The Lab workspace snapshot for a one-off example. `x: -1` marks a custom edit

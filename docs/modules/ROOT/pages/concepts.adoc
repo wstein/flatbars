@@ -128,9 +128,10 @@ and the shape gates, never a fork of the grammar:
 * *RawBars* — the meaning-free core itself, written out (`pass:[{{{ lookup this "x" }}}]`).
 * *MinBars* — a Mustache-compatible *peer* engine, with its own context-stack scope and Mustache
   truthiness (`0` and `pass:[""]` are truthy); it passes the vendored `mustache/spec` suite.
-* *FullBars* — the Handlebars-faithful reference engine (`pass:[{{ name }}]`, dotted paths,
-  `pass:[{{#each}}]`).
-* *MaxBars* — the full FlatBars surface language: FullBars plus infix operators and pipes.
+* *FullBars* — faithful to Handlebars, the industry-standard `pass:[{{ }}]` engine (`pass:[{{ name }}]`,
+  dotted paths, `pass:[{{#each}}]`).
+* *MaxBars* — the flagship surface: infix operators, pipes, and bare loop variables. It borrows
+  most of FullBars (not quite all) on its own expression-first terms.
 
 That MinBars (Mustache) and FullBars (Handlebars) — two *mutually incompatible* template languages,
 differing in scope rules and truthiness — both render through one structural core is the demonstration
