@@ -98,6 +98,43 @@ for (const k of emit) {
 }
 if (shapeOk) ok(`${vocabKinds.length} kinds well-formed; legend = {${legend.tokenTypes.join(", ")}}`);
 
+// ── 3b. customSemanticTypes ↔ kind `lsp.type` parity ──────────────────────────
+// Every custom semantic type the extension contributes MUST be referenced by
+// at least one kind, and every kind's `lsp.type` MUST be either a standard
+// VS Code semantic-token type or a declared custom type. Without this, a kind
+// could name an `lsp.type` the extension never contributes (theme can't paint
+// it) or a custom type could be declared but unused (dead contribution).
+console.log("customSemanticTypes ↔ kind `lsp.type` parity:");
+const STANDARD_SEMANTIC_TYPES = new Set([
+  // VS Code's built-in semantic token type set — kept in sync with
+  // https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide
+  "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+  "parameter", "variable", "property", "enumMember", "decorator", "event",
+  "function", "method", "macro", "label", "comment", "string", "keyword",
+  "number", "regexp", "operator",
+]);
+const customTypes = vocabulary.customSemanticTypes ?? [];
+const customIds = new Set(customTypes.map((t) => t.id));
+const kindTypes = new Set(Object.values(kinds).map((d) => d.lsp?.type).filter(Boolean));
+const unknownKindTypes = [...kindTypes].filter((t) => !STANDARD_SEMANTIC_TYPES.has(t) && !customIds.has(t)).sort();
+const unusedCustomTypes = [...customIds].filter((t) => !kindTypes.has(t)).sort();
+let parityOk = true;
+if (unknownKindTypes.length) {
+  bad(`kind(s) reference unknown semantic-token type(s): ${unknownKindTypes.join(", ")} — either add to STANDARD_SEMANTIC_TYPES (VS Code standard) or to vocabulary.customSemanticTypes (custom contribution).`);
+  parityOk = false;
+}
+if (unusedCustomTypes.length) {
+  bad(`customSemanticTypes declares type(s) no kind uses: ${unusedCustomTypes.join(", ")} — dead contribution; either drop or wire to a kind.`);
+  parityOk = false;
+}
+for (const t of customTypes) {
+  if (typeof t.id !== "string" || !t.id) { bad(`customSemanticTypes: entry missing id`); parityOk = false; continue; }
+  if (typeof t.superType !== "string" || !t.superType) { bad(`customSemanticTypes['${t.id}']: missing superType`); parityOk = false; }
+  if (typeof t.description !== "string" || !t.description) { bad(`customSemanticTypes['${t.id}']: missing description`); parityOk = false; }
+  if (!Array.isArray(t.scopes) || t.scopes.length === 0) { bad(`customSemanticTypes['${t.id}']: scopes must be a non-empty array`); parityOk = false; }
+}
+if (parityOk) ok(`${customTypes.length} custom type(s) all wired to kind(s), ${kindTypes.size - customIds.size} kind types are VS Code standard`);
+
 // ── 4. Grammar parity: every vocabulary tmScope exists in the fallback grammar ─
 console.log("TextMate grammar scope parity:");
 const grammar = JSON.parse(readFileSync(resolve(root, "editors", "flatbars.tmLanguage.json"), "utf8"));

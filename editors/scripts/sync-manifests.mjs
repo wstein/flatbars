@@ -28,6 +28,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
 const CHECK = process.argv.includes("--check");
 
+// The custom semantic-token types this extension contributes, sourced from the
+// vocabulary's `customSemanticTypes` block. The vocab is the single source of
+// truth; this codegen reads it so a new custom type added there flows into
+// VS Code's `contributes.semanticTokenTypes` + `semanticTokenScopes` without
+// a code edit. `check:vocab` enforces that every kind's `lsp.type` is either
+// a standard VS Code semantic type or appears in `customSemanticTypes`.
+const vocabulary = JSON.parse(
+  readFileSync(resolve(here, "..", "token-vocabulary.json"), "utf8"),
+);
+const customSemanticTypes = vocabulary.customSemanticTypes ?? [];
+
 // Host scope set the injection grammar attaches to. Single-sourced here so the
 // VS Code manifest and the JetBrains TextMate-bundle manifest never drift.
 const INJECTION_HOSTS = [
@@ -76,25 +87,19 @@ function genVscodePackageJson() {
     language: l.id,
     path: "./snippets/flatbars.json",
   }));
-  // Custom semantic-token type for set-delimiter directives and the brace pairs
-  // they introduce — paired with a `semanticTokenScopes` mapping so the user's
-  // theme paints them with the same TextMate scope (and therefore the same
-  // colour) as the grammar's `punctuation.section.embedded.flatbars` braces. Without
-  // this, the LSP would have to emit `keyword` and pick up the theme's keyword
-  // colour, which doesn't match the grammar's brace colour.
-  pkg.contributes.semanticTokenTypes = [
-    {
-      id: "embeddedDelimiter",
-      superType: "keyword",
-      description:
-        "A set-delimiter directive ({{=A B=}}) and the brace pair it introduces. Visually paired with the grammar's punctuation.section.embedded scope via a semanticTokenScopes mapping below.",
-    },
-  ];
+  // Custom semantic-token types + TextMate-scope mappings, derived from the
+  // vocabulary's `customSemanticTypes` block. The list is the single source of
+  // truth — a kind in `vocabulary.kinds` whose `lsp.type` names a custom type
+  // must have a matching entry here. `check:vocab` enforces that contract so
+  // adding a new custom type without updating both sides fails CI.
+  pkg.contributes.semanticTokenTypes = customSemanticTypes.map((t) => ({
+    id: t.id,
+    superType: t.superType,
+    description: t.description,
+  }));
   pkg.contributes.semanticTokenScopes = LANGUAGES.map((l) => ({
     language: l.id,
-    scopes: {
-      embeddedDelimiter: ["punctuation.section.embedded.flatbars"],
-    },
+    scopes: Object.fromEntries(customSemanticTypes.map((t) => [t.id, t.scopes])),
   }));
   pkg.contributes.languages = LANGUAGES.map((l) => ({
     id: l.id,

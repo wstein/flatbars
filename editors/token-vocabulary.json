@@ -43,6 +43,16 @@
     "  * `any` \u2014 head identifier handled by the TextMate grammar as `keyword.control.*`, but subexpression heads (`(helper arg)`) and pipe targets (`x | helper`) inside the body still scan and paint when known.",
     "  * `none` \u2014 never paint (comments, raw-block bodies, set-delim, errors, `{{else}}`/`{{elif}}` keywords \u2014 handled elsewhere)."
   ],
+  "customSemanticTypes": [
+    {
+      "id": "embeddedDelimiter",
+      "superType": "keyword",
+      "description": "A set-delimiter directive ({{=A B=}}) and the brace pair it introduces under a switched delimiter. Visually paired with the grammar's punctuation.section.embedded.flatbars scope via a semanticTokenScopes mapping, so themes paint the LSP-emitted spans the same colour as the grammar-emitted ones without per-theme work.",
+      "scopes": [
+        "punctuation.section.embedded.flatbars"
+      ]
+    }
+  ],
   "lspEmitKinds": [
     "keyword",
     "operator",
