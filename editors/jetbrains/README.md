@@ -63,14 +63,42 @@ LSP layer) compiles and packages against the real IntelliJ IDEA Ultimate 2024.2 
 in CI — `.github/workflows/editors.yml`, on JDK 17 with a provisioned Gradle (there
 is no wrapper in-repo).
 
+## Support matrix
+
+**Every JetBrains IDE** for the TextMate floor (Community + Ultimate, IDEA /
+WebStorm / PyCharm / GoLand / RubyMine / RustRover / DataGrip / …). **IntelliJ
+IDEA Ultimate 2024.2+** for the LSP ceiling — semantic tokens, diagnostics,
+hover, completion, canonicalisation quick-fix, folding ranges, document symbols
+(Structure View), and document formatting. The `runPluginVerifier` task
+(wired in `build.gradle.kts`) fails the build on any compatibility regression
+before the Marketplace verifier catches it on upload.
+
+## JetBrains-native features
+
+* **Live Templates** (Settings ▸ Editor ▸ Live Templates ▸ FlatBars) — `if`,
+  `ifelse`, `each`, `eachas`, `with`, `unless`, `let`, `partial`, `comment`,
+  `rawblock`.
+* **File template** (New ▸ FlatBars Template) — a runnable scaffold with a
+  comment, a conditional title, and an each/else loop.
+* **Tools ▸ FlatBars** menu — Open in FlatBars Lab (deep-links the current
+  editor contents to the playground), Show Helper Catalogue, Report a FlatBars
+  Issue.
+* **Community-edition banner** — a one-time dismissable notice explaining that
+  the LSP capabilities require Ultimate, surfaced on the first FlatBars file
+  opened in Community / WebStorm / PyCharm / … editions.
+* **Node-missing notification** — if the LSP server can't find `node` on PATH,
+  a balloon links to Settings ▸ FlatBars ▸ Node executable for an override.
+* **Per-dialect file icons** — 16×16 SVGs (R / M / F / X marks) in the project
+  tree and editor tabs.
+
 ## Status / follow-ups
 
-Marketplace publishing and a live-IDE check of the LSP override *running* inside a
-real IntelliJ (the CI build compiles it; it does not launch an IDE) are tracked
-follow-ups. Diagnostics (ADR-023), hover/completion (from `editors/operations.json`,
-the prelude schema), and the canonicalization code-action quick-fix all ship through
-the shared `flatbars-lsp`, so the JetBrains Ultimate path gets them for free: the
-platform LSP client consumes every advertised capability automatically and by
-default (IDEA 2023.3+ — `LspCustomization` is only for *disabling* one). The offline
-gate proves the bundled server *delivers* the quick-fix (`index` → `index0`); the
-platform *consuming* it is exercised by the `-PwithLsp` CI build, not at runtime.
+Marketplace publishing and a live-IDE check of the LSP override *running* inside
+a real IntelliJ (the CI build compiles it; it does not launch an IDE) are
+tracked follow-ups. The shared `flatbars-lsp` ships diagnostics (ADR-023),
+hover/completion (from `editors/operations.json`), the canonicalisation
+quick-fix, folding ranges, document symbols, and formatting; the platform LSP
+client consumes every advertised capability automatically (IDEA 2023.3+ —
+`LspCustomization` is only for *disabling* features). The offline gate proves
+the bundled server delivers them; the platform consuming them is exercised by
+the `-PwithLsp` CI build.

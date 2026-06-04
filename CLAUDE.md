@@ -28,7 +28,7 @@ do **not** assume a global install.
 ```sh
 npm install            # installs purescript + spago + esbuild
 npm run build          # spago build — compile every package
-npm test               # full suite: format:check + per-package spago tests + catalog + isolation + compile & (handlebars/mustache) conformance + Lab unit tests + editor gates (highlight/tmgrammar/vocab/lsp/vscode/jetbrains)
+npm test               # full suite: format:check + per-package spago tests + catalog + isolation + compile & (handlebars/mustache) conformance + Lab unit tests + editor gates (highlight/tmgrammar/vocab/lsp/vscode/jetbrains/manifests/plugin-version/operations-paint/jetbrains-bundle)
 npm run cli -- --help  # run the CLI (spago run -p flatbars-cli)
 npm run lint           # spago build --pedantic-packages (catches unused/missing deps)
 npm run format         # purs-tidy format-in-place; format:check to verify only
@@ -247,7 +247,21 @@ field (the single source; run `npm run gen:operations` after a prelude change). 
 to its canonical form (`index`→`index0`, `partial-block`→`yield`, dialect-scoped),
 reading the same `operations.json` `canonical` field (from `Kernel.Prelude.scopedCanonical`
 + the aliases). The `flatbars lint` CLI surfaces the same canonicalization findings.
-Marketplace publishing is the remaining tracked follow-up.
+
+The 2026-06-04 round added per-tag-class refinement and four new LSP capabilities
+(see ADR-026): every brace cluster is `punctuation.section.embedded.*` with the
+sigil split out as `keyword.control.*` (ERB-canonical); LSP `shrinkToInner` trims
+braces off tag-level semantic-token spans; `paintOperations` highlights helper
+names from `operations.json` (vocabulary-driven via `operationPosition: head | always-head | any | none`);
+the server now also advertises `foldingRange`, `documentSymbol`, and `formatting`.
+Marketplace metadata, plugin icons, snippets, JetBrains live templates / file
+template / Tools-menu actions / Community-edition banner all ship; the JetBrains
+plugin codegens `FlatBarsLanguages.kt` from `editors/shared/sync.mjs` LANGUAGES.
+Three new drift gates joined `npm test`: `check:editors-manifests` (vocab → vscode
+package.json + Kotlin extension set), `check:plugin-version` (single source for
+the 0.1.0 stamp), `check:operations-paint` (catalog ↔ painter parity, 90 ops + 2
+keywords + 5 negatives), `check:jetbrains-bundle` (TextMate-bundle integrity);
+plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
 
 ### Conventions worth knowing
 

@@ -50,10 +50,31 @@ root `.vscode/launch.json`):
 
 The build emits source maps (kept out of the shipped `.vsix` by `.vscodeignore`).
 
+## Capabilities
+
+The server advertises semantic tokens, diagnostics, hover, completion,
+canonicalisation code-action, folding ranges, document symbols (outline / quick
+nav), and document formatting (canonical-spacing inside tags). See
+`docs/modules/ROOT/pages/adr-0026-editor-capability-matrix.adoc` for the full
+matrix and the principled omissions (definition / references / rename, which
+would need a cross-template scope graph the engine deliberately doesn't keep).
+
+## Snippets, settings, hybrid templates
+
+`Settings ▸ FlatBars ▸ Default dialect` selects the dialect the server falls back
+to when a document's URI extension doesn't pick one. Common block forms
+(`if`, `each`, `with`, `let`, `partial`, comment, …) are available as snippets
+under every dialect language.
+
+Hybrid templates like `*.java.xbars` get FlatBars tag highlighting layered over
+Java's grammar via an injection grammar contributed by this extension. With
+`files.associations` set (`"*.java.xbars": "java"`), Java's grammar paints
+keywords/strings/comments and FlatBars tags light up on top.
+
 ## Status
 
-The Marketplace listing is a tracked follow-up; the extension and its
-engine-backed server are complete and exercised by a headless smoke test
-(`npm test`) plus a real-IDE test (`npm run test:vscode:ide`, in CI) that opens a
-fixture in a downloaded VS Code and asserts auto-activation surfaces semantic
-tokens and diagnostics.
+The extension and its engine-backed server are complete and exercised by a
+headless smoke test (`npm test`), an end-to-end `.vsix` integrity gate
+(`npm run check:vsix-integrity`, run before publish), and a real-IDE test
+(`npm run test:vscode:ide`, in CI) that opens a fixture in a downloaded VS Code
+and asserts auto-activation surfaces semantic tokens and diagnostics.
