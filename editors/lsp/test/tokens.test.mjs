@@ -8,7 +8,10 @@ import {
   buildLegend,
   dialectForLanguageId,
   dialectForUri,
+  documentSymbolsOf,
   encodeSemanticTokens,
+  foldingRangesOf,
+  formatDocument,
   parseDiagnostics,
   resolveDialect,
   tokensOf,
@@ -132,6 +135,204 @@ t("a dialect-disallowed shape emits an error token with the invalid modifier", (
   const { data } = encodeSemanticTokens("{{&x}}", "rawbars"); // extras off ⇒ error
   assert.equal(legend.tokenTypes[data[3]], "variable");
   assert.equal(data[4], 1 << legend.tokenModifiers.indexOf("invalid"), "invalid modifier set");
+});
+
+// ── shrinkToInner edge cases: braces, whitespace-control ~, set-delim, raw block ──
+// All flow through encodeSemanticTokens → tokensOf → flatten → shrinkToInner. We
+// pick the embedded text out of the source so an offset edit doesn't break the
+// assertion.
+function findToken(src, dialect, needle) {
+  const at = src.indexOf(needle);
+  for (const t of tokensOf(src, dialect)) {
+    if (t.char === at && t.length === needle.length) return t;
+  }
+  return null;
+}
+
+t("shrinkToInner trims braces and whitespace-control sigils off keyword spans", () => {
+  // {{else}}, {{~else~}}, {{~ else ~}} — the LSP `keyword` span must cover the
+  // word `else` only, leaving every brace and `~` to the grammar's embedded scope.
+  for (const src of ["{{else}}", "{{~else~}}", "{{~ else ~}}", "{{ else }}"]) {
+    const tok = findToken(src, "fullbars", "else");
+    assert.ok(tok, `keyword span carved out for ${JSON.stringify(src)}`);
+    assert.equal(tok.kind, "keyword");
+  }
+});
+
+t("shrinkToInner trims set-delim and error tag spans likewise", () => {
+  // {{= <% %> =}} — the trim takes braces and whitespace; the `=` markers stay
+  // INSIDE the set-delim semantic token (intentional: themes paint them as the
+  // directive). Span: `= <% %> =`.
+  const setSrc = "{{= <% %> =}}";
+  const setToks = tokensOf(setSrc, "minbars");
+  assert.equal(setToks.length, 1);
+  const [setTok] = setToks;
+  assert.equal(setTok.kind, "set-delimiter");
+  assert.equal(setTok.char, 2, "set-delim starts after `{{`");
+  assert.equal(setSrc.slice(setTok.char, setTok.char + setTok.length), "= <% %> =");
+  // {{&x}} on rawbars → error; trim skips `{{` and `}}`, leaves `&x`.
+  const errSrc = "{{&x}}";
+  const errToks = tokensOf(errSrc, "rawbars");
+  assert.equal(errToks.length, 1);
+  assert.equal(errToks[0].kind, "error");
+  assert.equal(errToks[0].char, 2, "error skips the leading {{");
+  assert.equal(errToks[0].length, 2, "error covers `&x`, not the closing `}}`");
+});
+
+// ── Operation-painter coverage (vocab-driven operationPosition) ─────────────
+t("operation painter: head identifier, no sigil, in catalog → painted", () => {
+  // `lookup` is in the prelude. `{{lookup x y}}` → `lookup` painted as operation,
+  // `x` and `y` stay default.
+  const src = "{{lookup x y}}";
+  const opTok = findToken(src, "fullbars", "lookup");
+  assert.ok(opTok && opTok.kind === "operation", "lookup painted");
+});
+
+t("operation painter: plain variable stays default-coloured", () => {
+  // `name` isn't in the catalog → no tokens emitted.
+  assert.deepEqual(tokensOf("{{name}}", "fullbars"), []);
+});
+
+t("operation painter: partial name always paints (no catalog check)", () => {
+  // `mypartial` is a user-defined partial name, never in the catalog.
+  const src = "{{> mypartial}}";
+  const tok = findToken(src, "fullbars", "mypartial");
+  assert.ok(tok && tok.kind === "operation", "partial name always paints");
+});
+
+t("operation painter: control-tag heads handled by the grammar, not LSP", () => {
+  // {{#if cond}} — the `#if` is grammar-painted (keyword.control.section); the
+  // LSP must NOT emit an `operation` span over `if`. `cond` isn't in the catalog.
+  const toks = tokensOf("{{#if cond}}", "fullbars");
+  for (const t of toks) assert.notEqual(t.kind, "operation");
+});
+
+t("operation painter: subexpression heads paint when known", () => {
+  // {{#if (lookup ctx "x")}} — `lookup` inside the parens is a head.
+  const src = '{{#if (lookup ctx "x")}}';
+  const tok = findToken(src, "fullbars", "lookup");
+  assert.ok(tok && tok.kind === "operation");
+});
+
+t("operation painter: MaxBars pipe targets paint when known", () => {
+  // {{ x | upcase }} — `upcase` is the pipe target, in the catalog.
+  const src = "{{ x | upcase }}";
+  const tok = findToken(src, "maxbars", "upcase");
+  assert.ok(tok && tok.kind === "operation");
+});
+
+t("operation painter: `||` (logical-or) does not fire a pipe paint", () => {
+  // `{{#if a || b}}` — the `||` is two `|` characters; the painter must skip both.
+  const toks = tokensOf("{{#if a || b}}", "maxbars");
+  for (const tok of toks) assert.notEqual(tok.kind, "operation");
+});
+
+t("operation painter: trailing `|` doesn't crash", () => {
+  // {{ xs | }} — the painter looks for an identifier after the pipe; none here.
+  assert.doesNotThrow(() => tokensOf("{{ xs | }}", "maxbars"));
+});
+
+t("operation painter: identifier followed by `.` or `/` (path) stays default", () => {
+  // `lookup.foo` — even if `lookup` is in the catalog, this is path access, not
+  // a bare helper call. Must NOT paint.
+  const toks = tokensOf("{{lookup.foo}}", "fullbars");
+  for (const tok of toks) assert.notEqual(tok.kind, "operation");
+});
+
+t("operation painter: dialect-cross — MaxBars `??` is silent in MinBars", () => {
+  // `{{ a ?? "b" }}` on MaxBars emits operator+string; the same source on MinBars
+  // should emit NEITHER (MinBars doesn't have the operator and the engine doesn't
+  // even reach the `??` as a known token).
+  const max = tokensOf('{{ a ?? "b" }}', "maxbars").map((t) => t.kind);
+  assert.deepEqual(max, ["operator", "string"], "MaxBars sees the operator + string");
+  const min = tokensOf('{{ a ?? "b" }}', "minbars").map((t) => t.kind);
+  for (const k of min) assert.notEqual(k, "operator", "MinBars must NOT paint `??` as operator");
+});
+
+// ── Folding ranges (ADR-026) ────────────────────────────────────────────────
+t("foldingRangesOf pairs block-open / block-close by body word", () => {
+  const text = "{{#each xs}}\n  body\n{{/each}}";
+  assert.deepEqual(foldingRangesOf(text, "fullbars"), [{ start: 0, end: 2 }]);
+});
+
+t("foldingRangesOf drops same-line opens (zero-length folds are invalid LSP)", () => {
+  // {{#if cond}}body{{/if}} on one line: no fold range.
+  assert.deepEqual(foldingRangesOf("{{#if x}}body{{/if}}", "fullbars"), []);
+});
+
+t("foldingRangesOf folds raw-block regions as a whole", () => {
+  // Handlebars-form raw block (no `#` sigil; the `#` form is FlatBars-native and
+  // would parse as an `error` in `fullbars`). The single raw-block span covers
+  // open through close, so the fold range covers all three lines.
+  const text = "{{{{raw}}}}\nliteral\n{{{{/raw}}}}";
+  const ranges = foldingRangesOf(text, "fullbars");
+  assert.equal(ranges.length, 1);
+  assert.equal(ranges[0].start, 0);
+  assert.equal(ranges[0].end, 2);
+});
+
+// ── Document symbols (ADR-026) ──────────────────────────────────────────────
+t("documentSymbolsOf projects block nesting as a symbol tree", () => {
+  const text = "{{#each xs}}\n  {{#if cond}}\n    body\n  {{/if}}\n{{/each}}";
+  const syms = documentSymbolsOf(text, "fullbars");
+  assert.equal(syms.length, 1);
+  assert.equal(syms[0].name, "#each");
+  assert.equal(syms[0].children.length, 1);
+  assert.equal(syms[0].children[0].name, "#if");
+});
+
+t("documentSymbolsOf drops unbalanced opens (parse diagnostics flag them)", () => {
+  // Bare {{#if cond}} with no close.
+  const syms = documentSymbolsOf("{{#if cond}}\nbody\n", "fullbars");
+  assert.deepEqual(syms, []);
+});
+
+// ── Formatter (ADR-026) ─────────────────────────────────────────────────────
+function applyEdits(text, edits) {
+  let s = text;
+  for (let i = edits.length - 1; i >= 0; i--) s = s.slice(0, edits[i].from) + edits[i].newText + s.slice(edits[i].to);
+  return s;
+}
+
+t("formatter: no-sigil tags get Mustache padding ({{ name }})", () => {
+  assert.equal(applyEdits("{{name}}", formatDocument("{{name}}", "fullbars")), "{{ name }}");
+  assert.equal(applyEdits("{{   name   }}", formatDocument("{{   name   }}", "fullbars")), "{{ name }}");
+});
+
+t("formatter: control sigils glue at both ends ({{#each items}})", () => {
+  assert.equal(
+    applyEdits("{{#each  items}}", formatDocument("{{#each  items}}", "fullbars")),
+    "{{#each items}}",
+  );
+  assert.equal(
+    applyEdits("{{/each}}", formatDocument("{{/each}}", "fullbars")),
+    "{{/each}}",
+  );
+});
+
+t("formatter: partial keeps the space after `>` ({{> partial}})", () => {
+  assert.equal(
+    applyEdits("{{>partial}}", formatDocument("{{>partial}}", "fullbars")),
+    "{{> partial}}",
+  );
+});
+
+t("formatter: set-delim balances spaces inside the `=` pair ({{= A B =}})", () => {
+  assert.equal(
+    applyEdits("{{=<% %>=}}", formatDocument("{{=<% %>=}}", "minbars")),
+    "{{= <% %> =}}",
+  );
+});
+
+t("formatter: idempotent (running twice yields no further edits)", () => {
+  const messy = "{{  name  }}\n{{#if  cond  }}\n{{/if}}\n";
+  const once = applyEdits(messy, formatDocument(messy, "fullbars"));
+  assert.deepEqual(formatDocument(once, "fullbars"), [], "second pass is a no-op");
+});
+
+t("formatter: leaves comments and raw blocks untouched", () => {
+  assert.deepEqual(formatDocument("{{!  comment  }}", "fullbars"), []);
+  assert.deepEqual(formatDocument("{{{{#raw}}}}body{{{{/raw}}}}", "fullbars"), []);
 });
 
 console.log(`✓ flatbars-lsp tokens unit tests passed (${passed})`);

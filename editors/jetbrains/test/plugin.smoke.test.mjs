@@ -64,25 +64,43 @@ try {
   assert.ok(init.capabilities.codeActionProvider, "bundled server advertises code actions");
   await conn.sendNotification("initialized", {});
   // Semantic tokens are sparse corrections: a plain interpolation emits nothing
-  // (the grammar paints it), but a MaxBars operator does.
+  // (the grammar paints it), but a MaxBars operator does. Decode the delta stream
+  // and assert SEMANTICALLY so an additive painter doesn't break this gate.
   const uri = "file:///t/page.maxbars";
+  const text = "{{ a ?? b }}";
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri, languageId: "maxbars", version: 1, text: "{{ a ?? b }}" },
+    textDocument: { uri, languageId: "maxbars", version: 1, text },
   });
   const r = await conn.sendRequest("textDocument/semanticTokens/full", { textDocument: { uri } });
-  const operator = init.capabilities.semanticTokensProvider.legend.tokenTypes.indexOf("operator");
-  assert.deepEqual([...r.data], [0, 5, 2, operator, 0], "one operator token over `??`");
+  const legend = init.capabilities.semanticTokensProvider.legend;
+  assert.equal(r.data.length % 5, 0, "delta stream is 5-tuples");
+  const decoded = [];
+  let line = 0;
+  let char = 0;
+  for (let i = 0; i < r.data.length; i += 5) {
+    const [dL, dC, len, type] = r.data.slice(i, i + 5);
+    line += dL;
+    char = dL === 0 ? char + dC : dC;
+    decoded.push({ type: legend.tokenTypes[type], slice: text.slice(char, char + len) });
+  }
+  assert.ok(
+    decoded.some((t) => t.type === "operator" && t.slice === "??"),
+    "bundled server tokenises `??` as a MaxBars operator",
+  );
   // The canonicalization quick-fix ships in the same bundle, so the JetBrains
   // plugin offers it too: the platform LSP client consumes textDocument/codeAction
   // by default (IDEA 2023.3+), this proves the bundled server delivers it. A
   // RawBars doc with the non-canonical `index` offers a one-click rewrite to `index0`.
+  // Positions computed from the source so cosmetic edits don't break the test.
   const caUri = "file:///t/page.rawbars";
+  const caText = "{{{index}}}";
+  const caTarget = caText.indexOf("index");
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri: caUri, languageId: "rawbars", version: 1, text: "{{{index}}}" },
+    textDocument: { uri: caUri, languageId: "rawbars", version: 1, text: caText },
   });
   const actions = await conn.sendRequest("textDocument/codeAction", {
     textDocument: { uri: caUri },
-    range: { start: { line: 0, character: 5 }, end: { line: 0, character: 5 } },
+    range: { start: { line: 0, character: caTarget + 1 }, end: { line: 0, character: caTarget + 1 } },
     context: { diagnostics: [] },
   });
   assert.equal(actions.length, 1, "bundled server offers the `index` → `index0` quick-fix");

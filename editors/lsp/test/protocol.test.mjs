@@ -88,14 +88,16 @@ try {
   assert.equal(ds[0].range.start.line, 0, "diagnostic on line 0");
 
   // Hover + completion (ADR-017) over a FullBars doc with a real operation head.
+  // Position is computed from the source so a cosmetic edit doesn't break the test.
   const hovUri = "file:///test/hov.fullbars";
+  const hovText = "{{uppercase name}}";
+  const hovTarget = hovText.indexOf("uppercase");
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri: hovUri, languageId: "fullbars", version: 1, text: "{{uppercase name}}" },
+    textDocument: { uri: hovUri, languageId: "fullbars", version: 1, text: hovText },
   });
-  // Position over `uppercase` (chars 2–10): hover reports its ADR-019 kind.
   const hover = await conn.sendRequest("textDocument/hover", {
     textDocument: { uri: hovUri },
-    position: { line: 0, character: 5 },
+    position: { line: 0, character: hovTarget + 2 },
   });
   assert.ok(hover && hover.contents, "hover returned for an operation under the cursor");
   assert.match(hover.contents.value, /uppercase/, "hover names the operation");
@@ -112,30 +114,60 @@ try {
   // Completion inside the tag offers operations (and excludes deprecated aliases).
   const items = await conn.sendRequest("textDocument/completion", {
     textDocument: { uri: hovUri },
-    position: { line: 0, character: 5 },
+    position: { line: 0, character: hovTarget + 2 },
   });
   const labels = (Array.isArray(items) ? items : items.items).map((i) => i.label);
   assert.ok(labels.includes("each") && labels.includes("uppercase"), "completion offers prelude operations");
   assert.ok(!labels.includes("downcase"), "completion excludes deprecated aliases");
 
   // Code action: a RawBars doc with the non-canonical `index` offers a one-click
-  // rewrite to `index0` (the scoped-variable quick-fix; dialect resolved from the
-  // .rawbars extension). The edit replaces just the `index` word.
+  // rewrite to `index0`. Positions are computed from the source so the test stays
+  // robust under cosmetic edits to the fixture.
   const caUri = "file:///test/loop.rawbars";
+  const caText = "{{{index}}}";
+  const caTarget = caText.indexOf("index");
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri: caUri, languageId: "rawbars", version: 1, text: "{{{index}}}" },
+    textDocument: { uri: caUri, languageId: "rawbars", version: 1, text: caText },
   });
   const actions = await conn.sendRequest("textDocument/codeAction", {
     textDocument: { uri: caUri },
-    range: { start: { line: 0, character: 5 }, end: { line: 0, character: 5 } },
+    range: { start: { line: 0, character: caTarget + 1 }, end: { line: 0, character: caTarget + 1 } },
     context: { diagnostics: [] },
   });
   assert.equal(actions.length, 1, "one code action offered for `index`");
   assert.match(actions[0].title, /index.*index0/, "titled the rewrite");
   const edit = actions[0].edit.changes[caUri][0];
   assert.equal(edit.newText, "index0", "edit replaces with the canonical name");
-  assert.equal(edit.range.start.character, 3, "edit range starts at `index`");
-  assert.equal(edit.range.end.character, 8, "edit range ends at `index`");
+  assert.equal(caText.slice(edit.range.start.character, edit.range.end.character), "index", "edit range covers exactly `index`");
+
+  // ── new capabilities (ADR-026): folding, document symbols, formatting ──────
+  const capUri = "file:///test/cap.fullbars";
+  const capText = "<ul>\n{{#each items}}\n  <li>{{this}}</li>\n{{/each}}\n</ul>\n";
+  await conn.sendNotification("textDocument/didOpen", {
+    textDocument: { uri: capUri, languageId: "fullbars", version: 1, text: capText },
+  });
+  const folds = await conn.sendRequest("textDocument/foldingRange", { textDocument: { uri: capUri } });
+  assert.equal(folds.length, 1, "one fold for the each block");
+  assert.equal(folds[0].startLine, 1, "fold starts at {{#each}}");
+  assert.equal(folds[0].endLine, 3, "fold ends at {{/each}}");
+  const symbols = await conn.sendRequest("textDocument/documentSymbol", { textDocument: { uri: capUri } });
+  assert.equal(symbols.length, 1, "one top-level symbol");
+  assert.equal(symbols[0].name, "#each", "the each block surfaces as a symbol");
+  // Formatter — request edits for a messy version of the same template.
+  const messyUri = "file:///test/messy.fullbars";
+  const messyText = "{{   name   }}\n{{#each  items  }}\n{{/each}}\n";
+  await conn.sendNotification("textDocument/didOpen", {
+    textDocument: { uri: messyUri, languageId: "fullbars", version: 1, text: messyText },
+  });
+  const fmtEdits = await conn.sendRequest("textDocument/formatting", {
+    textDocument: { uri: messyUri },
+    options: { tabSize: 2, insertSpaces: true },
+  });
+  assert.ok(Array.isArray(fmtEdits) && fmtEdits.length >= 2, "formatter returns edits for whitespace-irregular tags");
+  for (const edit of fmtEdits) {
+    assert.ok(typeof edit.newText === "string");
+    assert.ok(typeof edit.range.start.character === "number");
+  }
 
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");

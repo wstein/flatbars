@@ -71,17 +71,33 @@ try {
   // languageId 'maxbars' on a `.rawbars` URI with a fullbars default: the dialect
   // must come from the languageId, so `??` is an operator and "b" a string.
   const uri = "file:///t/page.rawbars";
+  const text = '{{ a ?? "b" }}';
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri, languageId: "maxbars", version: 1, text: '{{ a ?? "b" }}' },
+    textDocument: { uri, languageId: "maxbars", version: 1, text },
   });
   const res = await conn.sendRequest("textDocument/semanticTokens/full", { textDocument: { uri } });
 
-  // Sparse semantic tokens: only the `??` operator and "b" string (the expr tag is
-  // the grammar's) — 2 correction tokens.
-  assert.equal(res.data.length, 2 * 5, "bundled server emits the 2 MaxBars correction tokens");
-  const op = legend.tokenTypes.indexOf("operator");
-  const str = legend.tokenTypes.indexOf("string");
-  assert.ok(res.data.includes(op) && res.data.includes(str), "operator and string tokens present");
+  // Decode the delta stream and assert SEMANTICALLY: the `??` is an operator and
+  // "b" is a string. Doesn't care about token count (so additive painters — e.g.
+  // an `operation` kind painting a known head — don't false-fail this gate).
+  assert.equal(res.data.length % 5, 0, "delta-encoded token stream is 5-tuples");
+  const decoded = [];
+  let line = 0;
+  let char = 0;
+  for (let i = 0; i < res.data.length; i += 5) {
+    const [dL, dC, len, type] = res.data.slice(i, i + 5);
+    line += dL;
+    char = dL === 0 ? char + dC : dC;
+    decoded.push({ type: legend.tokenTypes[type], slice: text.slice(char, char + len) });
+  }
+  assert.ok(
+    decoded.some((t) => t.type === "operator" && t.slice === "??"),
+    "the bundled server tokenises `??` as a MaxBars operator",
+  );
+  assert.ok(
+    decoded.some((t) => t.type === "string" && t.slice === '"b"'),
+    "the bundled server tokenises `\"b\"` as a string literal",
+  );
 
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");
