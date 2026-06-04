@@ -28,7 +28,7 @@ const t = (name, fn) => {
 // ── Legend derives from the vocabulary ──────────────────────────────────────
 t("legend types/modifiers are the vocabulary's, de-duplicated in order", () => {
   const legend = buildLegend();
-  assert.deepEqual(legend.tokenTypes, ["variable", "macro", "keyword", "comment", "string", "number", "operator", "function"]);
+  assert.deepEqual(legend.tokenTypes, ["variable", "macro", "keyword", "comment", "embeddedDelimiter", "string", "number", "operator", "function"]);
   assert.deepEqual(legend.tokenModifiers, ["readonly", "invalid"]);
   // every kind's lsp.type is in the legend (no kind names a type the legend omits)
   for (const def of Object.values(vocabulary.kinds)) {

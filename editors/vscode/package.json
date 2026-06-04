@@ -160,6 +160,47 @@
         "language": "maxbars",
         "path": "./snippets/flatbars.json"
       }
+    ],
+    "semanticTokenTypes": [
+      {
+        "id": "embeddedDelimiter",
+        "superType": "keyword",
+        "description": "A set-delimiter directive ({{=A B=}}) and the brace pair it introduces. Visually paired with the grammar's punctuation.section.embedded scope via a semanticTokenScopes mapping below."
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "rawbars",
+        "scopes": {
+          "embeddedDelimiter": [
+            "punctuation.section.embedded.flatbars"
+          ]
+        }
+      },
+      {
+        "language": "minbars",
+        "scopes": {
+          "embeddedDelimiter": [
+            "punctuation.section.embedded.flatbars"
+          ]
+        }
+      },
+      {
+        "language": "fullbars",
+        "scopes": {
+          "embeddedDelimiter": [
+            "punctuation.section.embedded.flatbars"
+          ]
+        }
+      },
+      {
+        "language": "maxbars",
+        "scopes": {
+          "embeddedDelimiter": [
+            "punctuation.section.embedded.flatbars"
+          ]
+        }
+      }
     ]
   },
   "scripts": {

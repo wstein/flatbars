@@ -76,6 +76,26 @@ function genVscodePackageJson() {
     language: l.id,
     path: "./snippets/flatbars.json",
   }));
+  // Custom semantic-token type for set-delimiter directives and the brace pairs
+  // they introduce — paired with a `semanticTokenScopes` mapping so the user's
+  // theme paints them with the same TextMate scope (and therefore the same
+  // colour) as the grammar's `punctuation.section.embedded.flatbars` braces. Without
+  // this, the LSP would have to emit `keyword` and pick up the theme's keyword
+  // colour, which doesn't match the grammar's brace colour.
+  pkg.contributes.semanticTokenTypes = [
+    {
+      id: "embeddedDelimiter",
+      superType: "keyword",
+      description:
+        "A set-delimiter directive ({{=A B=}}) and the brace pair it introduces. Visually paired with the grammar's punctuation.section.embedded scope via a semanticTokenScopes mapping below.",
+    },
+  ];
+  pkg.contributes.semanticTokenScopes = LANGUAGES.map((l) => ({
+    language: l.id,
+    scopes: {
+      embeddedDelimiter: ["punctuation.section.embedded.flatbars"],
+    },
+  }));
   pkg.contributes.languages = LANGUAGES.map((l) => ({
     id: l.id,
     aliases: l.aliases,

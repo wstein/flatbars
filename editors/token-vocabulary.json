@@ -214,7 +214,7 @@
     "set-delimiter": {
       "role": "tag",
       "lsp": {
-        "type": "keyword",
+        "type": "embeddedDelimiter",
         "modifiers": []
       },
       "tmScopes": [
