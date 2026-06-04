@@ -111,6 +111,28 @@ export function parseDiagnostics(text, dialect) {
 //   * FullBars / MaxBars — no extra checks; the parser already accepts their
 //     full surface.
 export function dialectDiagnostics(text, dialect) {
+  // FullBars (Handlebars surface) has no set-delimiter support, so `{{=A B=}}`
+  // hits the engine as a malformed interpolation and the recovering parser
+  // emits a generic "LexError: unexpected character" with no hint that the
+  // feature itself is dialect-gated. Surface a clear, actionable message at the
+  // `=` instead. The other dialects (MinBars / RawBars / MaxBars) all support
+  // set-delim and tokenize the directive normally.
+  if (dialect === "fullbars") {
+    const out = [];
+    const re = /\{\{=/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      out.push({
+        start: m.index,
+        end: m.index + 3,
+        message:
+          "Set-delimiter directives `{{=A B=}}` are not valid in FullBars (the Handlebars surface). " +
+          "Switch the file to MinBars (Mustache), RawBars, or MaxBars to use them — " +
+          "Cmd-Shift-P → Change Language Mode.",
+      });
+    }
+    return out;
+  }
   if (dialect !== "minbars" && dialect !== "rawbars") return [];
   const out = [];
   for (const s of tokenize(text, dialect)) {

@@ -304,6 +304,20 @@ t("dialectDiagnostics — FullBars and MaxBars accept both shapes", () => {
   assert.deepEqual(dialectDiagnostics("{{ a ?? b }}", "maxbars"), []);
 });
 
+t("dialectDiagnostics — FullBars flags set-delimiter usage with a clear message", () => {
+  // Handlebars (and so FullBars) has no `{{=A B=}}` directive. Without this
+  // rule the recovering parser emits a generic "LexError: unexpected character"
+  // — the user has no way to tell the feature requires a different dialect.
+  const ds = dialectDiagnostics("{{=<% %>=}}\n<%name%>", "fullbars");
+  assert.ok(ds.length >= 1, "set-delim directive flagged in FullBars");
+  assert.match(ds[0].message, /Set-delimiter directives/);
+  assert.match(ds[0].message, /MinBars.*RawBars.*MaxBars/);
+  // Other dialects do not flag set-delim.
+  assert.deepEqual(dialectDiagnostics("{{=<% %>=}}", "minbars"), []);
+  assert.deepEqual(dialectDiagnostics("{{=<% %>=}}", "rawbars"), []);
+  assert.deepEqual(dialectDiagnostics("{{=<% %>=}}", "maxbars"), []);
+});
+
 t("dialectDiagnostics — MinBars flags block parameters", () => {
   const ds = dialectDiagnostics("{{#each items as |item|}}{{/each}}", "minbars");
   assert.equal(ds.length, 1);
