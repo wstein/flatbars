@@ -14,10 +14,7 @@
 module Kernel.Analyse
   ( Decision
   , Finding
-  , AnalyseM
-  , analysisWrappers
   , runAnalysis
-  , namedRules
   , divergence
   , isFinding
   , findings

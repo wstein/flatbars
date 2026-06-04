@@ -462,6 +462,20 @@ main = do
   containsR "analyse:empty-array-each" "{{#if items}}x{{else}}n{{/if}}"
     (obj [ Tuple "items" (arr []) ])
     "{{#each"
+  -- `0` is the canonical Handlebars↔Mustache divergence (falsy in handlebars,
+  -- truthy in mustache/minimal/presence) — a finding, with the `includeZero` fix.
+  containsR "analyse:zero-finding" "{{#if n}}x{{else}}m{{/if}}" (obj [ Tuple "n" (VNumber 0.0) ])
+    "1 portability finding"
+  containsR "analyse:zero-path" "{{#if n}}x{{else}}m{{/if}}" (obj [ Tuple "n" (VNumber 0.0) ])
+    "data path: `n`"
+  containsR "analyse:zero-fix" "{{#if n}}x{{else}}m{{/if}}" (obj [ Tuple "n" (VNumber 0.0) ])
+    "includeZero=true"
+  -- `{}` is truthy in handlebars AND mustache; it flips only under `presence`, so
+  -- it is still a finding (the non-obvious case the report must catch).
+  containsR "analyse:empty-object-finding" "{{#if o}}x{{/if}}" (obj [ Tuple "o" (obj []) ])
+    "1 portability finding"
+  containsR "analyse:empty-object-presence" "{{#if o}}x{{/if}}" (obj [ Tuple "o" (obj []) ])
+    "presence"
   -- false is portable (every rule agrees) — no finding.
   containsR "analyse:false-portable" "{{#if ok}}x{{/if}}" (obj [ Tuple "ok" (VBool false) ])
     "0 portability finding"
