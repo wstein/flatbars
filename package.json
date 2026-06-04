@@ -2,12 +2,12 @@
   "name": "flatbars-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "FlatBars — a template-engine construction kit. PureScript monorepo: core library, CLI, and web playground.",
+  "description": "FlatBars \u2014 a template-engine construction kit. PureScript monorepo: core library, CLI, and web playground.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "build": "spago build",
-    "test": "npm run format:check && spago test -p flatbars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p flatbars-json && spago test -p flatbars-js && spago test -p flatbars-compile && spago test -p linter && spago test -p flatbars-lexer-lab && npm run check:tokens && npm run check:contrast && npm run check:wordmark && npm run check:catalog && npm run check:operations && npm run check:glossary && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:jsonata && npm run check:a11y && npm run check:conformance && npm run test:tutorials && npm run check:hbs-conformance && npm run check:mustache-conformance && npm run check:highlight && npm run check:tmgrammar && npm run check:vocab && npm run check:editors-manifests && npm run check:plugin-version && npm run check:operations-paint && npm run check:jetbrains-bundle && npm run check:bundle && npm run check:parity && npm run test:lab && npm run test:lsp && npm run test:vscode && npm run test:jetbrains",
+    "test": "npm run format:check && spago test -p flatbars && spago test -p kernel && spago test -p rawbars && spago test -p fullbars && spago test -p maxbars && spago test -p minbars && spago test -p fullbars-compile && spago test -p flatbars-json && spago test -p flatbars-js && spago test -p flatbars-compile && spago test -p linter && spago test -p flatbars-lexer-lab && npm run check:tokens && npm run check:contrast && npm run check:wordmark && npm run check:catalog && npm run check:operations && npm run check:glossary && npm run check:isolation && npm run test:compile && npm run test:minbars-spec && npm run examples:verify && npm run check:tutorial-links && npm run check:jsonata && npm run check:a11y && npm run check:conformance && npm run test:tutorials && npm run check:hbs-conformance && npm run check:mustache-conformance && npm run check:highlight && npm run check:tmgrammar && npm run check:vocab && npm run check:editors-manifests && npm run check:plugin-version && npm run check:operations-paint && npm run check:tmgrammar-scopes && npm run check:jetbrains-bundle && npm run check:bundle && npm run check:parity && npm run test:lab && npm run test:lsp && npm run test:vscode && npm run test:jetbrains",
     "check:isolation": "node scripts/check-package-isolation.mjs",
     "check:glossary": "node scripts/check-glossary.mjs",
     "examples:verify": "spago build -p flatbars-cli && spago run -p flatbars-cli -- examples verify",
@@ -56,7 +56,8 @@
     "check:vsix-integrity": "node scripts/check-vsix-integrity.mjs",
     "check:jetbrains-bundle": "node scripts/check-jetbrains-bundle.mjs",
     "check:operations-paint": "node scripts/check-operations-paint.mjs",
-    "perf:minbars": "node scripts/perf-guard-minbars.mjs"
+    "perf:minbars": "node scripts/perf-guard-minbars.mjs",
+    "check:tmgrammar-scopes": "node scripts/check-tmgrammar-scopes.mjs"
   },
   "devDependencies": {
     "@vscode/test-electron": "2.5.2",
