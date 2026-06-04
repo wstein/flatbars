@@ -243,6 +243,18 @@ const t = (s) => s;
     <h3>Escaping</h3>
     <p><code>{t("{{x}}")}</code> HTML-escapes; the triple-stash <code>{t("{{{x}}}")}</code> emits raw markup — unchanged from FullBars.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.escaping.template} data={ex.escaping.data} />
+
+    <h3>Inline partials &amp; <code>{t("{{yield}}")}</code></h3>
+    <p>
+      Inline partials work in MaxBars: <code>{t("{{#inline \"x\"}}…{{/inline}}")}</code> defines a
+      partial (hoisted before the render), and <code>{t("{{#partial \"x\"}}body{{/partial}}")}</code>
+      invokes it with the block body — which the definition drops in at <code>{t("{{yield}}")}</code>,
+      MaxBars' bare spelling of Handlebars' <code>{t("{{> @partial-block}}")}</code>. The
+      <code>{t("{{#*inline}}")}</code> <em>decorator</em> and host-threaded <em>external</em> partial
+      files are the parts that stay a <a href="/fullbars">FullBars</a> job (see
+      <a href="#divergences">where it diverges</a>).
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.blockPartial.template} data={ex.blockPartial.data} />
   </section>
 
   <!-- ───────────────── Where MaxBars diverges ──────────────────────── -->

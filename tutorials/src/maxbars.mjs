@@ -19,8 +19,10 @@
 //   • Clause-separator conditions MUST be parenthesised: `{{else if (gt n 0)}}`.
 //     A bare infix separator (`{{else if n > 0}}`) does not error — it silently
 //     takes the wrong branch.
-//   • No partials. `{{#*inline}}` is a LexError in MaxBars and the host entrypoint
-//     doesn't thread external partials — partial composition is a FullBars job.
+//   • Inline partials work: `{{#inline "x"}}…{{yield}}…{{/inline}}` then
+//     `{{#partial "x"}}…{{/partial}}` (the {{yield}} layout pattern). NOT supported:
+//     the `{{#*inline}}` decorator (a LexError — MaxBars uses bare `{{#inline}}`)
+//     and host-threaded EXTERNAL partial files — for those use FullBars.
 //   • Arithmetic is strictly numeric: `"x" + "y"` throws (no string concat).
 
 export const examples = {
@@ -196,6 +198,17 @@ export const examples = {
     engine: "maxbars",
     template: "{{#with totals}}{{count}} items · {{total | toFixed 2}}{{/with}}",
     data: { totals: { count: 2, total: 9.5 } },
+  },
+
+  blockPartial: {
+    // Inline partials + {{yield}} — MaxBars' bare spelling of layout reuse.
+    // {{#inline "x"}} defines a partial (hoisted before the render); {{#partial
+    // "x"}}body{{/partial}} invokes it with the block body, which the definition
+    // drops in at {{yield}} — the bare form of Handlebars' {{> @partial-block}}.
+    // Self-contained (no host-threaded partials), so it runs here unchanged.
+    engine: "maxbars",
+    template: '{{#inline "layout"}}<main>{{yield}}</main>{{/inline}}{{#partial "layout"}}<h1>{{title}}</h1>{{/partial}}',
+    data: { title: "Home" },
   },
 
   escaping: {
