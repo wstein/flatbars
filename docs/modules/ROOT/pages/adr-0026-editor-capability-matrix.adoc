@@ -105,9 +105,14 @@ here turns the absence into a feature.
 * **Verifier**: `check:operations-paint` (added alongside this ADR) keeps the
   catalog / painter parity honest, so the helper-name highlighting stays
   trustworthy even as the prelude grows.
-* **Future**: Adding a cross-template scope graph (a real "module system" for
-  FlatBars) would unlock `definition`, `references`, `rename`. That is a
-  language-level change behind a fresh ADR, not an editor follow-up.
+* **Future**: Adding a cross-template scope graph would unlock `definition`,
+  `references`, `rename`, and `documentHighlight`. Designed in
+  xref:adr-0027-cross-template-scope-graph.adoc[ADR-027] as an editor-side
+  workspace indexer over the engine's `tokenize`, no language-level changes
+  needed. Adding full LSP intelligence inside hybrid host+FlatBars templates
+  (`*.java.xbars` and friends) is designed in
+  xref:adr-0028-hybrid-template-lsp.adoc[ADR-028] via VS Code's
+  `EmbeddedLanguageInfoProvider` API plus a virtual-document shim.
 
 == Status
 

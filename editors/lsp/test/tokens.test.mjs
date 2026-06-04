@@ -283,6 +283,39 @@ t("dialectDiagnostics — FullBars and MaxBars accept both shapes", () => {
   assert.deepEqual(dialectDiagnostics("{{ a ?? b }}", "maxbars"), []);
 });
 
+t("dialectDiagnostics — MinBars flags block parameters", () => {
+  const ds = dialectDiagnostics("{{#each items as |item|}}{{/each}}", "minbars");
+  assert.equal(ds.length, 1);
+  assert.match(ds[0].message, /Block parameters/);
+});
+
+t("dialectDiagnostics — MinBars flags partial hash args", () => {
+  const ds = dialectDiagnostics('{{> p name="v"}}', "minbars");
+  assert.equal(ds.length, 1);
+  assert.match(ds[0].message, /Partial hash arguments/);
+});
+
+t("dialectDiagnostics — MinBars flags MaxBars-only operators", () => {
+  for (const [op, src] of [
+    ["??", "{{ a ?? b }}"],
+    ["==", "{{ a == b }}"],
+    ["!=", "{{ a != b }}"],
+    ["<=", "{{ a <= b }}"],
+    ["<-", "{{ a <- b }}"],
+    ["&&", "{{ a && b }}"],
+  ]) {
+    const ds = dialectDiagnostics(src, "minbars");
+    assert.ok(ds.length >= 1, `${op} flagged`);
+    assert.match(ds[0].message, new RegExp(`Operator.*${op.replace(/[?+*]/g, "\\$&")}.*MaxBars`));
+  }
+});
+
+t("dialectDiagnostics — RawBars matches MinBars on the extended rules", () => {
+  assert.equal(dialectDiagnostics("{{#each xs as |i|}}{{/each}}", "rawbars").length, 1);
+  assert.equal(dialectDiagnostics('{{> p k="v"}}', "rawbars").length, 1);
+  assert.equal(dialectDiagnostics("{{ a ?? b }}", "rawbars").length, 1);
+});
+
 t("parseDiagnostics merges parser and dialect findings", () => {
   // The user's exact case from the session: opens cleanly as fullbars, fires two
   // diagnostics in minbars (the subexpression + the helper invocation later in

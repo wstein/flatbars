@@ -119,29 +119,88 @@ export function dialectDiagnostics(text, dialect) {
     if (s.kind === "set-delimiter") continue; // {{=A B=}} legitimately has internal space
     const body = bodyOfTag(text, s);
     if (!body) continue;
-    // Subexpression: a `(` outside any string literal.
-    const subexpAt = findOutsideStrings(body.text, "(");
-    if (subexpAt >= 0) {
-      out.push({
-        start: body.from + subexpAt,
-        end: body.from + subexpAt + 1,
-        message: `Subexpressions \`(…)\` are not valid in ${displayName(dialect)} — only a single path is allowed in a tag.`,
-      });
-      continue; // one finding per tag keeps the output focused
-    }
-    // Helper-args: any whitespace between non-string tokens in the body. A
-    // legitimate Mustache tag body is a single path with optional leading/
-    // trailing whitespace; `{{lookup x}}` packs two tokens and is invalid.
-    const helperGapAt = findHelperArgsGap(body.text);
-    if (helperGapAt >= 0) {
-      out.push({
-        start: body.from + helperGapAt,
-        end: body.from + helperGapAt + 1,
-        message: `Helper invocations with arguments are not valid in ${displayName(dialect)} — a tag body is a single path, not a function call.`,
-      });
+    // Most-specific rules first, so the diagnostic message matches the actual
+    // construct rather than the generic "helper invocation" catch-all. Each rule
+    // returns the diagnostic offset in body.text (or -1); we stop at the first
+    // hit per tag so squiggle spam stays manageable.
+    const finders = [
+      findSubexpression,
+      findBlockParam,
+      findPartialHashArg(s.kind),
+      findOperator,
+      findHelperArgs,
+    ];
+    for (const finder of finders) {
+      const hit = finder(body.text);
+      if (hit) {
+        out.push({
+          start: body.from + hit.at,
+          end: body.from + hit.at + hit.len,
+          message: hit.msg(displayName(dialect)),
+        });
+        break;
+      }
     }
   }
   return out;
+}
+
+function findSubexpression(body) {
+  const at = findOutsideStrings(body, "(");
+  if (at < 0) return null;
+  return {
+    at, len: 1,
+    msg: (d) => `Subexpressions \`(…)\` are not valid in ${d} — only a single path is allowed in a tag.`,
+  };
+}
+
+function findBlockParam(body) {
+  // ` as |x|` or ` as |x y|`. The leading space is mandatory so we don't false-
+  // positive on identifiers that happen to start with `as`.
+  const m = /\sas\s*\|/.exec(body);
+  if (!m) return null;
+  return {
+    at: m.index, len: m[0].length,
+    msg: (d) => `Block parameters (\`as |…|\`) are not valid in ${d} — sections take only a single name.`,
+  };
+}
+
+function findPartialHashArg(kind) {
+  return (body) => {
+    if (kind !== "partial") return null;
+    // `name=value` anywhere in the body outside strings; `=` outside a string
+    // is the simplest signal. Skip the partial sigil (`>`/`>*`) plus the
+    // partial name — those don't contain `=`.
+    const at = findOutsideStrings(body, "=");
+    if (at < 0) return null;
+    return {
+      at, len: 1,
+      msg: (d) => `Partial hash arguments (\`name=value\`) are not valid in ${d} — only the partial name is allowed.`,
+    };
+  };
+}
+
+function findOperator(body) {
+  // MaxBars operators that the engine's tokenize doesn't classify as `error`
+  // when the dialect doesn't support them — `??` / `==` / `!=` / `<=` / `>=` /
+  // `<-` / `&&` / `||`. Single-char operators (`<`/`>`/`+`/`*`/`%`/`!`/`|`/`-`)
+  // are too noisy to flag at this layer because identifier punctuation often
+  // overlaps; the helper-args rule catches them via the whitespace-gap test.
+  const multi = body.match(/\?\?|==|!=|<=|>=|<-|&&|\|\|/);
+  if (!multi) return null;
+  return {
+    at: multi.index, len: multi[0].length,
+    msg: (d) => `Operator \`${multi[0]}\` is a MaxBars feature, not valid in ${d}.`,
+  };
+}
+
+function findHelperArgs(body) {
+  const at = findHelperArgsGap(body);
+  if (at < 0) return null;
+  return {
+    at, len: 1,
+    msg: (d) => `Helper invocations with arguments are not valid in ${d} — a tag body is a single path, not a function call.`,
+  };
 }
 
 function bodyOfTag(text, s) {
