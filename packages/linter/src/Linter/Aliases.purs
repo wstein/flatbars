@@ -12,9 +12,21 @@
 -- | The alias set is read from `Kernel.Prelude.preludeAliases` (the single source
 -- | of truth, projected from `OperationDef.alias`), so adding an alias to the
 -- | prelude automatically teaches this lint about it.
+-- |
+-- | This module also carries the *scoped-variable* canonicalization lint
+-- | (`scopedCanonWarnings`): the loop/partial variables have a non-canonical legacy
+-- | spelling (`index` → `index0`, `partial-block` → `yield`) and a native
+-- | RawBars/MaxBars canonical one. The engine installs *both* names (they render
+-- | identically — `scopedSpecs`), so this is purely a *lint* preference, not a
+-- | render or `synonymOf` concern; it is surface-scoped (run it for RawBars/MaxBars
+-- | source, where the native form is canonical — not FullBars, where `@index` /
+-- | `@partial-block` are the Handlebars-faithful spelling).
 module Linter.Aliases
   ( aliasWarnings
   , aliasWarningsOf
+  , scopedCanonical
+  , scopedCanonWarnings
+  , scopedCanonWarningsOf
   ) where
 
 import Prelude
@@ -23,6 +35,7 @@ import Data.Array as Array
 import Data.Either (Either)
 import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (parse)
 import FlatBars.Syntax (Template)
@@ -54,3 +67,37 @@ aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
 -- | and uses `aliasWarnings` directly.
 aliasWarningsOf :: String -> Either ParseError (Array Issue)
 aliasWarningsOf src = (aliasWarnings <<< _.nodes) <$> parse src
+
+-- | The non-canonical scoped-variable spellings and their native RawBars/MaxBars
+-- | canonical form (ADR-021). `index0`/`index1`/`yield` are canonical; `index` is
+-- | the legacy bare index, `partial-block` the Handlebars-derived block-body name.
+-- | A lint table, deliberately *not* a `scopedSpecs` field or `synonymOf` — the
+-- | engine installs both spellings and renders them identically; only the editor
+-- | tooling expresses the preference.
+scopedCanonical :: Array (Tuple String String)
+scopedCanonical =
+  [ Tuple "index" "index0"
+  , Tuple "partial-block" "yield"
+  ]
+
+-- | Warn on every use of a non-canonical scoped variable (`index` → `index0`,
+-- | `partial-block` → `yield`), pointing at the native spelling. Surface-scoped:
+-- | the caller runs it for RawBars/MaxBars source (where the native form is
+-- | canonical), not FullBars. Same shape as `aliasWarnings`; one `Warn` per use.
+scopedCanonWarnings :: Template -> Array Issue
+scopedCanonWarnings = Array.mapMaybe warnOf <<< operationRefs
+  where
+  warnOf ref = case lookup ref.name scopedCanonical of
+    Just canonical -> Just
+      { severity: Warn
+      , name: ref.name
+      , message:
+          "`" <> ref.name <> "` is the non-canonical scoped variable — prefer `" <> canonical
+            <> "` (the native RawBars/MaxBars spelling)"
+      }
+    Nothing -> Nothing
+
+-- | Parse `src` with the default (core) parser and warn on any non-canonical
+-- | scoped-variable use — the convenience entry point for RawBars/MaxBars source.
+scopedCanonWarningsOf :: String -> Either ParseError (Array Issue)
+scopedCanonWarningsOf src = (scopedCanonWarnings <<< _.nodes) <$> parse src

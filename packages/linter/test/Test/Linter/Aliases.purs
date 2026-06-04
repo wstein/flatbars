@@ -9,12 +9,18 @@ import Data.Either (Either(..))
 import Data.String (Pattern(..), contains)
 import Effect (Effect)
 import Effect.Console (log)
-import Linter.Aliases (aliasWarningsOf)
+import Linter.Aliases (aliasWarningsOf, scopedCanonWarningsOf)
 import Test.Assert (assert')
 
 -- | The alias names warned for one template (or a parse-error marker).
 warnNames :: String -> Array String
 warnNames src = case aliasWarningsOf src of
+  Left _ -> [ "<parse error>" ]
+  Right issues -> map _.name issues
+
+-- | The scoped-canonicalization names warned for one template.
+scopedNames :: String -> Array String
+scopedNames src = case scopedCanonWarningsOf src of
   Left _ -> [ "<parse error>" ]
   Right issues -> map _.name issues
 
@@ -49,5 +55,23 @@ main = do
     Right [ issue ] -> assert' ("plus → add message, got: " <> issue.message)
       (contains (Pattern "add") issue.message)
     other -> assert' ("plus: expected one warning, got " <> show (map _.name <$> other)) false
+
+  -- scoped-variable canonicalization (ADR-021): non-canonical spellings warn and
+  -- point at the native form; the canonical names (and ordinary names) do not.
+  assert' ("index warns, got " <> show (scopedNames "{{{index}}}"))
+    (scopedNames "{{{index}}}" == [ "index" ])
+  assert' ("partial-block warns, got " <> show (scopedNames "{{{partial-block}}}"))
+    (scopedNames "{{{partial-block}}}" == [ "partial-block" ])
+  assert' ("index0 (canonical) does not warn, got " <> show (scopedNames "{{{index0}}}"))
+    (scopedNames "{{{index0}}}" == [])
+  assert' ("yield (canonical) does not warn, got " <> show (scopedNames "{{{yield}}}"))
+    (scopedNames "{{{yield}}}" == [])
+  assert' ("plain path does not scoped-warn, got " <> show (scopedNames "{{{lookup this \"x\"}}}"))
+    (scopedNames "{{{lookup this \"x\"}}}" == [])
+  -- the message names the canonical target.
+  case scopedCanonWarningsOf "{{{index}}}" of
+    Right [ issue ] -> assert' ("index → index0 message, got: " <> issue.message)
+      (contains (Pattern "index0") issue.message)
+    other -> assert' ("index: expected one warning, got " <> show (map _.name <$> other)) false
 
   log "Linter alias-warning tests passed"
