@@ -10,21 +10,23 @@
 package:
   name: flatbars-lexer-lab
   dependencies:
-    - prelude
     - arrays
     - control
     - either
-    - foldable-traversable
-    - maybe
-    - numbers
-    - parsing
-    - strings
-    - transformers
-    - tuples
     # Phase-1 parser parity: the lab parser targets the engine's Syntax AST and
     # reuses its interior expression grammar, so it depends on core here. (The
     # two lexers themselves still import nothing from flatbars.)
     - flatbars
+    - foldable-traversable
+    - lists
+    - maybe
+    - numbers
+    - parsing
+    - partial
+    - prelude
+    - strings
+    - transformers
+    - tuples
   test:
     main: Test.FlatBars.Lab.Lexer.Main
     dependencies:
