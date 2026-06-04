@@ -117,7 +117,7 @@ ceiling *only where the engine knows more*.
   per tag (ADR-014) — so a scope-to-kind bijection does not fit, and we do not force one. `check:tmgrammar`
   instead pins, *for each dialect*, the two things the engine defines and a stateless grammar can be held
   to: (a) *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
-  characters the grammar scopes as a tag (every tag scope ends in `.handlebars`; host text and the YAML
+  characters the grammar scopes as a tag (every tag scope ends in `.flatbars`; host text and the YAML
   front-matter block never do), which catches the Exhibit-A/B begin/end drift across all four dialects; and
   (b) *literals* — wherever the engine carves a `string`/`number`, the grammar scopes it as one. Everything
   else (which helper is a keyword, argument and operator colouring) is allowed *enrichment*. Dialect-error
