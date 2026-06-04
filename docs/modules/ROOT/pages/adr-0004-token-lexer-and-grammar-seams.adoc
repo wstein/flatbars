@@ -50,29 +50,32 @@ independent axes, and only one of them is the grammar seam:
 MinBars grows axis B, not axis A; it is *not* the forbidden third grammar seam.
 ====
 
-== Amendment (2026-06-04): one tokenizer, two consumers
+== Amendment (2026-06-04): one tokenizer — `RawTok` carries its interior
 
-The structural scan and the interior tokenizer are now composed in *one* place,
-`FlatBars.Tokenizer`. `attachInteriors` pairs every `RawTok` with its interior
-tokenization — `ITok = { raw :: RawTok, interior :: Either ParseError (Array
-PosToken) }` — and *both* the parser (`buildFromTokens`/`parseRecovering`) and
-the editor highlighter (`FlatBars.Highlight.tokenizeSpans`) consume that `ITok`
-stream. Previously each consumer composed the two primitives independently
+The structural scan and the interior tokenizer are composed in *one* place:
+`tokenizeTemplate` now takes the interior `LexOptions` and populates each
+expression-bearing `RawTok`'s interior at scan time. The interior travels *on the
+token* — `RawTok`'s `ROutput`/`RAmp`/`ROpen`/`RClose`/`RSep` (and `RRaw`'s head)
+carry an `Interior = Either ParseError (Array PosToken)` field — so *both* the
+parser (`buildFromTokens`/`parseRecovering`) and the editor highlighter
+(`FlatBars.Highlight.tokenizeSpans`) read the pre-lexed interior directly off the
+token. Previously each consumer composed the two primitives independently
 (structural scan, then a per-tag `tokenizeInterior` re-lex), so the interior
 tokenizer ran once *per consumer* with no shared guarantee they agreed.
 
 Nothing in the decision above changes: the interior tokenizer, its meaning-free
 operator lexing, and the two grammar seams are exactly as specified — the seam is
-still `Array PosToken -> Either ParseError Expr`, fed the same tokens. What changes
-is *where* the composition lives. `tokenizeInterior` runs once, inside the shared
-path; `outputExpr`/`headed`/`headedRecovering` take the pre-lexed `Interior`
-(the blank-interior guard `trim s == ""` is exactly `Right []`), so the parser no
+still `Array PosToken -> Either ParseError Expr`, fed the same tokens; and
+`tokenizeTemplate` stays meaning-free (`LexOptions` governs only the interior
+token lexing, never the structural shape). `tokenizeInterior` runs once, at scan;
+`outputExpr`/`headed`/`headedRecovering` take the pre-lexed `Interior` (the
+blank-interior guard `trim s == ""` is exactly `Right []`), so the parser no
 longer re-lexes. The interior is kept as the *deferred* `Either` (not flattened)
 so a malformed interior rides inside its tag and never breaks the structural scan
-(preserving ADR-023 recovery). Interiors are attached *after* any dialect-specific
-interior rewrite (MinBars' Mustache standalone/partial-indent pass), so they are
-lexed from the final strings, never stale. The change is byte-identical end to
-end (`test:compile` 300/300; the highlight golden unchanged).
+(preserving ADR-023 recovery). The one dialect that *mutates* an interior string
+after the scan — MinBars' Mustache standalone/partial-indent pass — re-tokenizes
+those tags in lockstep, so their carried interior is never stale. The change is
+byte-identical end to end (`test:compile` 300/300; the highlight golden unchanged).
 
 == Consequences
 

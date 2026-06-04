@@ -90,12 +90,13 @@ had no such gate, so the drift was silent.
 
 This ADR's principle — highlighting derives from the engine lexer — is now
 literal: `tokenizeSpans` no longer re-runs `tokenizeInterior` itself. It scans
-via `FlatBars.Tokenizer.tokenizeWithInteriors` and carves interior spans from each
-tag's *pre-lexed* `interior`, the same `ITok` stream the parser consumes
+via `tokenizeTemplate` (which now lexes each tag's interior at scan time) and
+carves interior spans from the tag's *pre-lexed* interior — the same `RawTok`
+stream the parser consumes
 (xref:adr-0004-token-lexer-and-grammar-seams.adoc[ADR-004] amendment). The
-highlighter and the parser therefore read every interior through *one* tokenizer
-call and cannot drift on how it is lexed. Byte-identical: the `check:highlight`
-golden was unchanged by the migration.
+highlighter and the parser therefore read every interior off the *same* token and
+cannot drift on how it is lexed. Byte-identical: the `check:highlight` golden was
+unchanged by the migration.
 
 == Consequences
 

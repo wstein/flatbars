@@ -252,8 +252,8 @@ ladder, mandated for no one.'
 
 The structural scan still produces the meaning-free `RawTok` skeleton exactly as
 decided here. What is new (xref:adr-0004-token-lexer-and-grammar-seams.adoc[ADR-004]
-amendment) is that `FlatBars.Tokenizer` pairs each `RawTok` with its interior
-token stream *before* the tree builder runs, so the parser consumes interiors
-pre-lexed rather than re-lexing them itself. The thesis is unchanged: the skeleton
-is meaning-free, interior operator-carving stays `infixArith`-driven, and the
-`else`/`user` indistinguishability holds (both are still a name-agnostic `RSep`).
+amendment) is that `tokenizeTemplate` now populates each `RawTok`'s *interior* (a
+pre-lexed token stream carried on the token) at scan time, so the parser consumes
+interiors pre-lexed rather than re-lexing them itself. The thesis is unchanged: the
+skeleton is meaning-free, interior operator-carving stays `infixArith`-driven, and
+the `else`/`user` indistinguishability holds (both are still a name-agnostic `RSep`).

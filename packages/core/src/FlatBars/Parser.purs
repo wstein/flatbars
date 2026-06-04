@@ -316,7 +316,7 @@ isSpace c = c == ' ' || c == '\t' || c == '\n' || c == '\r'
 --------------------------------------------------------------------------------
 
 -- | The single `Expr` filling an output tag, over the tag's pre-lexed interior
--- | (`FlatBars.Tokenizer` already ran `tokenizeInterior`). An empty interior
+-- | (`tokenizeTemplate` already ran `tokenizeInterior`). An empty interior
 -- | (`Right []`, i.e. blank or whitespace-only) is `EmptyOutput` at the tag's
 -- | offset (not the interior's), matching the diagnostics tests; an interior lex
 -- | error rides through as `Left`.

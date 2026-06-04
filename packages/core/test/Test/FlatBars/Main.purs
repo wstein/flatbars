@@ -557,12 +557,11 @@ main = do
           (Array.filter (\s -> s.role == "tag") (tokenizeSpans hlMax "{{ x ?? \"y\" }}"))
     )
 
-  -- ---- The unified tokenizer (FlatBars.Tokenizer.attachInteriors) ----
-  -- The single producer the parser and highlighter both consume: every RawTok
-  -- paired with its pre-lexed interior. These pin the two non-trivial properties
-  -- — raw blocks attach their HEAD (not the body), and `infixArith` is threaded
-  -- through — so the embedded tokens are exactly what `outputExpr`/`headed` and
-  -- the highlighter would otherwise re-lex.
+  -- ---- The interior `tokenizeTemplate` carries on each RawTok ----
+  -- The parser and highlighter both read this pre-lexed interior off the token.
+  -- These pin the two non-trivial properties — raw blocks carry their HEAD
+  -- interior (not the body), and `infixArith` is threaded through — so the carried
+  -- tokens are exactly what `outputExpr`/`headed` and the highlighter consume.
   let
     interiorToksOf lx src =
       case tokenizeTemplate defaultLexConfig lx src of

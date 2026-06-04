@@ -186,9 +186,9 @@ ceiling *only where the engine knows more*.
 == Amendment (2026-06-04): interior token offsets come from the one tokenizer
 
 The interior-role spans `tokenizeSpans` emits (the `PosToken.end` substrate this
-ADR's semantic-token layer recovers) now come from the shared
-`FlatBars.Tokenizer` pass that the parser also consumes, rather than a
-highlighter-private `tokenizeInterior` re-lex
+ADR's semantic-token layer recovers) now come off each `RawTok`'s interior —
+populated by `tokenizeTemplate`, the same tokens the parser consumes — rather than
+a highlighter-private `tokenizeInterior` re-lex
 (xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014] amendment). Offsets
 and the token vocabulary are unchanged — the `check:highlight` golden and the
 `flatbars-lsp` token tests were byte-identical across the migration.
