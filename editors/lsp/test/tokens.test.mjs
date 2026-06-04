@@ -590,4 +590,14 @@ t("formatter: leaves comments and raw blocks untouched", () => {
   assert.deepEqual(formatDocument("{{{{#raw}}}}body{{{{/raw}}}}", "fullbars"), []);
 });
 
+t("formatter: leaves malformed set-delim tags alone (set-delim consistency check)", () => {
+  // `{{==}}` is a malformed set-delim shape the engine rejects — the formatter
+  // must not rewrite it (would change byte length on an already-bad tag and
+  // break "Format Document" idempotence on unparseable text). Same for
+  // `{{=A=}}` / `{{=A}}` / `{{A=}}` — partial / missing `=` on either side.
+  for (const malformed of ["{{==}}", "{{=A B}}", "{{A B=}}"]) {
+    assert.deepEqual(formatDocument(malformed, "fullbars"), [], `malformed ${JSON.stringify(malformed)} left alone`);
+  }
+});
+
 console.log(`✓ flatbars-lsp tokens unit tests passed (${passed})`);

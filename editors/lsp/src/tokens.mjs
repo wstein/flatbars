@@ -244,16 +244,16 @@ function findHelperArgs(body) {
 function bodyOfTag(text, s, openDelim = "{{", closeDelim = "}}") {
   // Strip the active opening / closing delimiter pair (passed in so we cope
   // with `<%` / `%>` after a `{{=<% %>=}}` directive switched them), then any
-  // ~ control, sigil character, or `*` partial-block decorator at the
-  // (now-inside-the-braces) ends. What's left is the tag body — the part the
-  // dialect rules check.
+  // ~ control character and tag-shape sigil at the (now-inside-the-braces)
+  // ends. What's left is the tag body — the part the dialect rules check.
+  // Set-delimiter spans never reach here (caller skips `s.kind ===
+  // "set-delimiter"` upstream), so no defensive `=` trim is needed.
   let from = s.from + openDelim.length;
   let to = s.to - closeDelim.length;
   if (from < to && text[from] === "~") from++;
-  if (from < to && /[#/\^<$>&!=]/.test(text[from])) from++;
+  if (from < to && /[#/\^<$>&!]/.test(text[from])) from++;
   if (from < to && text[from] === "*") from++; // partial-block decorator after `>`
   if (to > from && text[to - 1] === "~") to--;
-  if (to > from && text[to - 1] === "=") to--; // set-delim close (defensive)
   return from < to ? { from, text: text.slice(from, to) } : null;
 }
 
@@ -741,6 +741,12 @@ function canonicaliseTag(tag) {
   const bodyStart = openMatch[0].length;
   const bodyEnd = tag.length - closeMatch[0].length;
   if (bodyStart > bodyEnd) return tag; // overlapping match: leave alone
+  // Set-delim consistency: the open's `=` sigil and the close's `=` must agree.
+  // Mismatch (e.g. `{{==}}` matched as open=`{{=` + close=`}}` with no closing
+  // `=`) is malformed input the engine would reject — leave it untouched so the
+  // formatter is idempotent on unparseable text and "Format Document" can't
+  // change byte length of something already rejected by the parser.
+  if ((sigil === "=") !== (closeEq === "=")) return tag;
   const body = tag.slice(bodyStart, bodyEnd).trim().replace(/\s+/g, " ");
   const open = openBraces + openTilde + sigil + partialStar;
   const close = closeEq + closeTilde + closeBraces;
