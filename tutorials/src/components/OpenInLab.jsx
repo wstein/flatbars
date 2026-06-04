@@ -192,12 +192,17 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
             <span class="oil-ic">↺</span> Reset
           </button>
         )}
-        {/* A named target reuses one Lab tab across every "Open in Lab" click. */}
-        <a class="oil-lab oil-lab-dock" href={href ?? "#"} target="flatbars-lab" rel="noopener"
-           aria-disabled={href == null} title="Open this example in the full Lab editor">
-          <span class="oil-lab-txt">Open in Lab</span>
-          <span class="oil-lab-ic" aria-hidden="true">↗</span>
-        </a>
+        {/* A named target reuses one Lab tab across every "Open in Lab" click.
+            Rendered only once the deep-link is built — `aria-disabled` doesn't
+            actually disable an <a>, so a null-href link would just be a focusable
+            dead control. The link resolves near-instantly on the client. */}
+        {href && (
+          <a class="oil-lab oil-lab-dock" href={href} target="flatbars-lab" rel="noopener"
+             title="Open this example in the full Lab editor">
+            <span class="oil-lab-txt">Open in Lab</span>
+            <span class="oil-lab-ic" aria-hidden="true">↗</span>
+          </a>
+        )}
       </div>
 
       <div class={gridClass}>

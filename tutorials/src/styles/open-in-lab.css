@@ -57,6 +57,13 @@
 @media (hover: none) {
   .oil .oil-actions { opacity: 1; transform: none; pointer-events: auto; }
 }
+/* Respect a reduced-motion preference: reveal/transition instantly, don't slide. */
+@media (prefers-reduced-motion: reduce) {
+  .oil .oil-actions,
+  .oil .oil-reset,
+  .oil .oil-lab,
+  .oil .oil-lab .oil-lab-ic { transition: none; }
+}
 .oil .oil-reset {
   display: inline-flex;
   align-items: center;
@@ -220,7 +227,6 @@
 .oil .oil-lab .oil-lab-ic { transition: transform 0.15s ease; }
 .oil .oil-lab:hover { border-color: var(--accent); background: var(--accent-softer); color: var(--accent); }
 .oil .oil-lab:hover .oil-lab-ic { transform: translate(1px, -1px); }
-.oil .oil-lab[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
 
 /* Syntax-colour classes (.stem-*, .y-*) live in lab-tokens.css — they are
    token-level and GLOBAL (the card editors, the static spec-only blocks, and the

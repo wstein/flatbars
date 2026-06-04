@@ -51,6 +51,33 @@ for (const comp of ["src/components/OpenInLab.jsx", "src/components/TryJsonata.j
     /@media\s*\(hover:\s*none\)\s*\{[^}]*\.oil-actions\s*\{[^}]*opacity:\s*1/.test(css),
     "add @media (hover:none){ .oil-actions{opacity:1;pointer-events:auto} } so Open-in-Lab is reachable on touch",
   );
+  // 3. The reveal/transition respects a reduced-motion preference.
+  check(
+    "open-in-lab.css: reduced-motion disables the action transitions",
+    /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[^}]*\.oil-actions[^}]*transition:\s*none/.test(css),
+    "add a @media (prefers-reduced-motion: reduce) block setting transition:none on .oil-actions",
+  );
+}
+
+// 4. Keyboard focus is visible on the topbar segmented controls.
+{
+  const css = read("src/styles/docs-chrome.css");
+  check(
+    "docs-chrome.css: segmented control has a visible focus ring",
+    /\.seg button:focus-visible\s*\{[^}]*outline/.test(css),
+    "add `.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }`",
+  );
+}
+
+// 5. A not-yet-available "Open in Lab" link is not rendered as a focusable dead
+//    control (aria-disabled does not disable an <a>); render it only when href.
+{
+  const src = read("src/components/OpenInLab.jsx");
+  check(
+    "OpenInLab.jsx: Lab link is conditionally rendered, not aria-disabled",
+    /\{href\s*&&\s*\(/.test(src) && !/aria-disabled=/.test(src),
+    "render the .oil-lab <a> inside `{href && ( … )}` and drop the aria-disabled= attribute",
+  );
 }
 
 console.log(fail ? `\n${fail} accessibility guard(s) failed` : "\nall accessibility guards pass");

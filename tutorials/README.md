@@ -119,9 +119,12 @@ then stay root-absolute as authored.
   Open-in-Lab float top-right and reveal on hover/focus-within, with an
   always-visible fallback on touch (no-hover) devices so the per-example "Open in
   Lab" is never undiscoverable. Each editor `<textarea>` carries an `aria-label`
-  (its visible caption lives in an `aria-hidden` highlight layer). `npm run
-  check:a11y` (in `npm test`) pins these invariants at source; a headless axe-core
-  smoke gate over a built page is a tracked follow-up.
+  (its visible caption lives in an `aria-hidden` highlight layer). The topbar
+  segmented controls have a visible keyboard focus ring, the action reveal honours
+  `prefers-reduced-motion`, and the "Open in Lab" link is rendered only once its
+  deep-link exists (never a focusable, dead `aria-disabled` link). `npm run
+  check:a11y` (in `npm test`) pins all of these at source; a headless axe-core smoke
+  gate over a built page is a tracked follow-up.
 - **Conformance badges are generated, not asserted.** `npm run gen:conformance`
   runs the vendored `mustache/spec` suite through the shipped MinBars bundle and
   writes `src/conformance.json`; the reference renders its support table from
