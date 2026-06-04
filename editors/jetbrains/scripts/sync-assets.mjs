@@ -37,9 +37,25 @@ copyFileSync(
   resolve(res, "textmate-bundle", "flatbars.tmLanguage.json"),
 );
 copyFileSync(
+  resolve(root, "editors", "flatbars-injection.tmLanguage.json"),
+  resolve(res, "textmate-bundle", "flatbars-injection.tmLanguage.json"),
+);
+copyFileSync(
   resolve(root, "editors", "vscode", "language-configuration.json"),
   resolve(res, "textmate-bundle", "language-configuration.json"),
 );
+// Hosts to inject FlatBars tag highlighting into for hybrid templates
+// (test.java.xbars, test.rb.fbars, …). VS Code uses the same list — single-sourced
+// here to keep packagers from drifting.
+const INJECTION_HOSTS = [
+  "source.java", "source.ruby", "source.python", "source.go",
+  "source.js", "source.ts", "source.jsx", "source.tsx",
+  "source.css", "source.scss", "source.less",
+  "source.sql", "source.shell", "source.yaml", "source.json",
+  "source.rust", "source.cpp", "source.cs", "source.kotlin", "source.swift",
+  "source.php", "source.lua", "source.elixir",
+  "text.html.basic", "text.html.markdown", "text.xml",
+];
 writeFileSync(
   resolve(res, "textmate-bundle", "package.json"),
   JSON.stringify(
@@ -54,11 +70,19 @@ writeFileSync(
         // editors/shared/sync.mjs so the manifest can't drift from the VS Code
         // extension or the LSP's dialect set. All share the one grammar.
         languages: LANGUAGES.map((l) => ({ ...l, configuration: "./language-configuration.json" })),
-        grammars: LANGUAGES.map((l) => ({
-          language: l.id,
-          scopeName: "source.flatbars",
-          path: "./flatbars.tmLanguage.json",
-        })),
+        grammars: [
+          ...LANGUAGES.map((l) => ({
+            language: l.id,
+            scopeName: "source.flatbars",
+            path: "./flatbars.tmLanguage.json",
+          })),
+          // The injection grammar — layers FlatBars tags over host languages.
+          {
+            path: "./flatbars-injection.tmLanguage.json",
+            scopeName: "flatbars.injection",
+            injectTo: INJECTION_HOSTS,
+          },
+        ],
       },
     },
     null,

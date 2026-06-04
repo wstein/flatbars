@@ -52,4 +52,11 @@ copyFileSync(
   resolve(dist, "flatbars.tmLanguage.json"),
 );
 
-console.log("✓ vscode assets synced to editors/vscode/dist (grammar + bundled server + extension)");
+// The injection grammar — layers FlatBars tag highlighting into host grammars
+// for hybrid templates (test.java.xbars, test.rb.fbars, …).
+copyFileSync(
+  resolve(root, "editors", "flatbars-injection.tmLanguage.json"),
+  resolve(dist, "flatbars-injection.tmLanguage.json"),
+);
+
+console.log("✓ vscode assets synced to editors/vscode/dist (grammar + injection + bundled server + extension)");

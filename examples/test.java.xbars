@@ -1,0 +1,35 @@
+// A hybrid Java + MaxBars template. With *.java.xbars → java in files.associations,
+// Java highlights keywords/strings/comments and the FlatBars injection grammar
+// layers tag highlighting on top.
+package com.example.{{ package_name }};
+
+import java.util.List;
+
+public class {{ class_name | capitalize }} {
+    {{#each fields}}
+    private final {{ this.type }} {{ this.name }};
+    {{/each}}
+
+    public {{ class_name | capitalize }}({{#each fields}}{{ this.type }} {{ this.name }}{{#unless @last}}, {{/unless}}{{/each}}) {
+        {{#each fields}}
+        this.{{ this.name }} = {{ this.name }};
+        {{/each}}
+    }
+
+    {{#each fields}}
+    public {{ this.type }} get{{ this.name | capitalize }}() {
+        return this.{{ this.name }};
+    }
+    {{/each}}
+
+    // {{! Comment inside Java — note the FlatBars comment stays grey }}
+    public String greet(String name) {
+        return "Hello, {{ greeting_prefix }} " + name + "!";
+        // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NOTE: tags inside Java strings are
+        // NOT painted by the injection grammar — `-string` in the injectionSelector
+        // says "host owns its string content". Whether that's desirable is a design
+        // call. For most templating engines it isn't, because real Java would
+        // never substitute inside a literal — but FlatBars CAN, so you may want to
+        // remove `-string` from the injectionSelector if you need it.
+    }
+}

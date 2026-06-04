@@ -1,84 +1,123 @@
 {
   "name": "flatbars",
   "displayName": "FlatBars",
-  "description": "FlatBars / Handlebars / Mustache syntax highlighting — a TextMate fallback plus the engine-backed flatbars-lsp for correct, stateful semantic tokens (ADR-017).",
+  "description": "FlatBars / Handlebars / Mustache syntax highlighting \u2014 a TextMate fallback plus the engine-backed flatbars-lsp for correct, stateful semantic tokens (ADR-017).",
   "version": "0.1.0",
   "publisher": "flatbars",
   "license": "Apache-2.0",
-  "repository": { "type": "git", "url": "https://github.com/wstein/flatbars" },
-  "engines": { "vscode": "^1.75.0" },
-  "categories": ["Programming Languages"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wstein/flatbars"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "main": "./dist/extension.js",
   "activationEvents": [],
   "contributes": {
     "languages": [
       {
-        "id": "flatbars",
-        "aliases": ["FlatBars"],
-        "extensions": [".flatbars"],
-        "configuration": "./language-configuration.json"
-      },
-      {
         "id": "rawbars",
-        "aliases": ["RawBars"],
-        "extensions": [".rawbars"],
+        "aliases": [
+          "RawBars"
+        ],
+        "extensions": [
+          ".rawbars",
+          ".rbars"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "minbars",
-        "aliases": ["MinBars"],
-        "extensions": [".minbars"],
+        "aliases": [
+          "MinBars"
+        ],
+        "extensions": [
+          ".minbars",
+          ".mbars"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "fullbars",
-        "aliases": ["FullBars"],
-        "extensions": [".fullbars"],
+        "aliases": [
+          "FullBars"
+        ],
+        "extensions": [
+          ".fullbars",
+          ".fbars"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "maxbars",
-        "aliases": ["MaxBars"],
-        "extensions": [".maxbars"],
+        "aliases": [
+          "MaxBars"
+        ],
+        "extensions": [
+          ".maxbars",
+          ".xbars"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
-      { "language": "flatbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
-      { "language": "rawbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
-      { "language": "minbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
-      { "language": "fullbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" },
-      { "language": "maxbars", "scopeName": "source.flatbars", "path": "./dist/flatbars.tmLanguage.json" }
-    ],
-    "configuration": {
-      "title": "FlatBars",
-      "properties": {
-        "flatbars.defaultDialect": {
-          "type": "string",
-          "enum": ["fullbars", "minbars", "rawbars", "maxbars"],
-          "default": "fullbars",
-          "description": "The dialect for the `flatbars` umbrella language (`.flatbars` files). The dialect-specific languages (RawBars/MinBars/FullBars/MaxBars) ignore this."
-        }
+      {
+        "language": "rawbars",
+        "scopeName": "source.flatbars",
+        "path": "./dist/flatbars.tmLanguage.json"
+      },
+      {
+        "language": "minbars",
+        "scopeName": "source.flatbars",
+        "path": "./dist/flatbars.tmLanguage.json"
+      },
+      {
+        "language": "fullbars",
+        "scopeName": "source.flatbars",
+        "path": "./dist/flatbars.tmLanguage.json"
+      },
+      {
+        "language": "maxbars",
+        "scopeName": "source.flatbars",
+        "path": "./dist/flatbars.tmLanguage.json"
+      },
+      {
+        "path": "./dist/flatbars-injection.tmLanguage.json",
+        "scopeName": "flatbars.injection",
+        "injectTo": [
+          "source.java",
+          "source.ruby",
+          "source.python",
+          "source.go",
+          "source.js",
+          "source.ts",
+          "source.jsx",
+          "source.tsx",
+          "source.css",
+          "source.scss",
+          "source.less",
+          "source.sql",
+          "source.shell",
+          "source.yaml",
+          "source.json",
+          "source.rust",
+          "source.cpp",
+          "source.cs",
+          "source.kotlin",
+          "source.swift",
+          "source.php",
+          "source.lua",
+          "source.elixir",
+          "text.html.basic",
+          "text.html.markdown",
+          "text.xml"
+        ]
       }
-    },
-    "configurationDefaults": {
-      "editor.tokenColorCustomizations": {
-        "textMateRules": [
-          {
-            "scope": "punctuation.section.expression.flatbars",
-            "settings": { "fontStyle": "bold", "foreground": "#bd93f9" }
-          }
-        ],
-        "[*Light*]": {
-          "textMateRules": [
-            {
-              "scope": "punctuation.section.expression.flatbars",
-              "settings": { "fontStyle": "bold", "foreground": "#6d28d9" }
-            }
-          ]
-        }
-      }
-    }
+    ]
   },
   "scripts": {
     "build": "node scripts/sync-assets.mjs",
@@ -88,6 +127,6 @@
   },
   "devDependencies": {
     "@vscode/test-electron": "2.5.2",
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^10.0.0"
   }
 }

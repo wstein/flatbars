@@ -1,0 +1,41 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "scopeName": "flatbars.injection",
+  "_doc": [
+    "TextMate INJECTION grammar — pairs with `source.flatbars` to give every host",
+    "language (Java/Ruby/Python/Go/HTML/CSS/JS/TS/SQL/Markdown/YAML/JSON/shell)",
+    "FlatBars tag highlighting on top of its own. The pattern: open a file like",
+    "`test.java.xbars` → user's `files.associations` resolves it to `java` →",
+    "Java's grammar paints keywords/strings/comments → VS Code sees this grammar's",
+    "`injectTo` list includes `source.java`, layers it on top → our tag rules fire",
+    "for every `{{…}}` cluster, painted with the same scopes as the standalone",
+    "FlatBars grammar (`punctuation.section.embedded.*`, `keyword.control.*`, etc).",
+    "",
+    "`injectionSelector` gates WHERE inside the host's scope tree the injection",
+    "fires. `L:` = left-priority (the injection wins over host rules in conflict).",
+    "`-comment -string` excludes the host's comments and strings so `\"{{x}}\"` in",
+    "a Java string literal does NOT get FlatBars-tokenised (the host owns its",
+    "string content).",
+    "",
+    "`injectTo` declares which host scopes this grammar attaches to. The list is",
+    "intentionally broad — `source` alone wouldn't reach `text.html.*` etc.",
+    "Add a host here when you want hybrid templates to light up; missing hosts",
+    "simply degrade to the host's plain syntax (no FlatBars highlighting)."
+  ],
+  "injectionSelector": "L:source -comment -string, L:text.html -comment -string, L:text.xml -comment -string",
+  "patterns": [
+    { "include": "source.flatbars#raw_block" },
+    { "include": "source.flatbars#comment_long" },
+    { "include": "source.flatbars#comment_short" },
+    { "include": "source.flatbars#triple_stash" },
+    { "include": "source.flatbars#amp_unescaped" },
+    { "include": "source.flatbars#block_open" },
+    { "include": "source.flatbars#block_close" },
+    { "include": "source.flatbars#inverse_block" },
+    { "include": "source.flatbars#inheritance_parent" },
+    { "include": "source.flatbars#inheritance_block" },
+    { "include": "source.flatbars#set_delimiter" },
+    { "include": "source.flatbars#partial" },
+    { "include": "source.flatbars#variable" }
+  ]
+}
