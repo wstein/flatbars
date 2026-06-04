@@ -54,11 +54,15 @@ const fnCount = taughtFunctions.length;
   <section id="intro">
     <h2>Why shape data</h2>
     <p>
-      Every FlatBars surface is <b>logic-less</b> by design — even MaxBars keeps its
-      sugar thin. A template should say <em>what</em> the output looks like, not
-      compute <em>which</em> data to show. So the computing happens <b>before</b>
-      rendering: you transform the raw input into a clean <b>view-model</b> — an
-      object shaped exactly like the template expects — and the template just walks it.
+      Say your data is a flat list of git commits and you want a grouped changelog —
+      Features, then Fixes, then Chores, each counted, empty groups dropped. Where
+      does that grouping happen? Not in the template: every FlatBars surface is
+      <b>logic-less</b> by design (even MaxBars keeps its sugar thin), so a template
+      says <em>what</em> the output looks like, never computes <em>which</em> data to
+      show. The computing happens <b>before</b> rendering — you reshape the raw input
+      into a clean <b>view-model</b>, an object shaped exactly like the template
+      expects, and the template just walks it. (That changelog is the
+      <a href="#flagship">worked example</a> at the end.)
     </p>
     <div class="ds-flow" aria-label="data to view to output">
       <span class="box">raw data</span><span class="arr">→</span>
