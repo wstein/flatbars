@@ -2,7 +2,7 @@
   "name": "flatbars-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "FlatBars \u2014 a template-engine construction kit. PureScript monorepo: core library, CLI, and web playground.",
+  "description": "FlatBars — a template-engine construction kit. PureScript monorepo: core library, CLI, and web playground.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -55,7 +55,8 @@
     "check:plugin-version": "node scripts/check-plugin-version.mjs",
     "check:vsix-integrity": "node scripts/check-vsix-integrity.mjs",
     "check:jetbrains-bundle": "node scripts/check-jetbrains-bundle.mjs",
-    "check:operations-paint": "node scripts/check-operations-paint.mjs"
+    "check:operations-paint": "node scripts/check-operations-paint.mjs",
+    "perf:minbars": "node scripts/perf-guard-minbars.mjs"
   },
   "devDependencies": {
     "@vscode/test-electron": "2.5.2",

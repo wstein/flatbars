@@ -393,21 +393,23 @@ toRawToks cfg src =
             afterSig = slice (start + 1) q
             afterHash = slice (start + 2) q
             interior = slice start q
-            -- mirrors Lexer.purs readCustomTag interiors
-            sigInt = interiorAt (start + 1) afterSig
-            hashInt = interiorAt (start + 2) afterHash
             mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
+            -- interior lexed in the chosen branch only (mirrors Lexer.purs
+            -- readCustomTag): exactly one tokenizeInterior per tag.
+            sigOpen sig = mk (E.ROpen sp sig (start + 1) afterSig (interiorAt (start + 1) afterSig))
+            hashOpen sig = mk
+              (E.ROpen sp sig (start + 2) afterHash (interiorAt (start + 2) afterHash))
           in
             case at start of
               '#' -> case at (start + 1) of
-                '*' -> mk (E.ROpen sp Syn.Decorator (start + 2) afterHash hashInt)
-                '>' -> mk (E.ROpen sp Syn.PartialBlock (start + 2) afterHash hashInt)
-                _ -> mk (E.ROpen sp Syn.Section (start + 1) afterSig sigInt)
-              '^' -> mk (E.ROpen sp Syn.Inverse (start + 1) afterSig sigInt)
-              '<' -> mk (E.ROpen sp Syn.Parent (start + 1) afterSig sigInt)
-              '$' -> mk (E.ROpen sp Syn.BlockDef (start + 1) afterSig sigInt)
-              '/' -> mk (E.RClose sp (start + 1) afterSig sigInt)
-              '&' -> mk (E.RAmp sp (start + 1) afterSig sigInt)
+                '*' -> hashOpen Syn.Decorator
+                '>' -> hashOpen Syn.PartialBlock
+                _ -> sigOpen Syn.Section
+              '^' -> sigOpen Syn.Inverse
+              '<' -> sigOpen Syn.Parent
+              '$' -> sigOpen Syn.BlockDef
+              '/' -> mk (E.RClose sp (start + 1) afterSig (interiorAt (start + 1) afterSig))
+              '&' -> mk (E.RAmp sp (start + 1) afterSig (interiorAt (start + 1) afterSig))
               '!' -> mk (E.RComment sp (start + 1) afterSig)
               _ -> mk (E.RSep sp start interior (interiorAt start interior))
 

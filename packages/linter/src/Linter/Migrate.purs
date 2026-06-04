@@ -87,6 +87,10 @@ knownBlockHelpers =
 -- | A lex failure is propagated as `Left`.
 migrateToMaxBars :: String -> Either ParseError MigrateResult
 migrateToMaxBars src = do
+  -- NB: this rewrites from source slices + interior *strings* only; the pre-lexed
+  -- interior tokens `tokenizeTemplate` populates are unused here (it has no
+  -- structure-only mode). Wasted work, but the migrator is a rare offline tool —
+  -- not a bug to "fix" by dropping the interior.
   toks <- tokenizeTemplate defaultLexConfig defaultLexOptions src
   let
     delimResiduals = scanSetDelimiters src

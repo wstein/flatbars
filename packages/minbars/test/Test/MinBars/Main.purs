@@ -6,14 +6,35 @@ module Test.MinBars.Main where
 
 import Prelude
 
+import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (for_)
 import Data.Map as Map
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+import FlatBars.Lexer (RawTok(..), tokenizeTemplate)
+import FlatBars.Token (LexOptions, tokenizeInterior)
 import FlatBars.Value (Value(..))
-import MinBars (renderMin, renderMinDelimsDiag, renderMinWith)
+import MinBars (minOptions, renderMin, renderMinDelimsDiag, renderMinWith)
+import MinBars.Standalone (mustacheStandalone)
 import Test.Assert (assert')
+
+-- P2 (mutation guard): MinBars' standalone pass rewrites the interior *string* of
+-- standalone partials / parents / override-blocks (appending the captured indent),
+-- and must re-lex them in lockstep. On the POST-standalone stream, assert each
+-- tag's carried interior equals `tokenizeInterior` of its (rewritten) string — so a
+-- future change that mutates the string but forgets to re-lex fails here, not in a
+-- single render case.
+interiorMatches :: LexOptions -> RawTok -> Boolean
+interiorMatches lx = case _ of
+  ROutput _ base s int -> int == tokenizeInterior lx base s
+  RAmp _ base s int -> int == tokenizeInterior lx base s
+  ROpen _ _ base s int -> int == tokenizeInterior lx base s
+  RClose _ base s int -> int == tokenizeInterior lx base s
+  RSep _ base s int -> int == tokenizeInterior lx base s
+  RRaw _ _ base head int _ -> int == tokenizeInterior lx base head
+  _ -> true
 
 obj :: Array (Tuple String Value) -> Value
 obj = VObject <<< Map.fromFoldable
@@ -250,5 +271,20 @@ main = do
   expectD "delims-switch-back" erb "<%x%><%={{ }}=%>{{y}}"
     (obj [ Tuple "x" (str "A"), Tuple "y" (str "B") ])
     "AB"
+
+  -- P2 mutation guard: standalone partials / parents / override-blocks have their
+  -- interior string rewritten by mustacheStandalone; the carried interior must be
+  -- re-lexed to match. Checked on the post-standalone stream (the real pipeline).
+  let lx = minOptions.lexOptions
+  for_
+    [ "  {{> p}}\n"
+    , "{{#a}}\n  {{> q}}\n{{/a}}\n"
+    , "  {{<base}}\n  {{$x}}body{{/x}}\n  {{/base}}\n"
+    , "line\n  {{> r}}\n  more {{x}}\n"
+    ]
+    \src -> case tokenizeTemplate minOptions.lexConfig lx src of
+      Right toks -> assert' ("standalone re-lex invariant on " <> show src)
+        (Array.all (interiorMatches lx) (mustacheStandalone lx toks))
+      Left _ -> assert' ("corpus should lex: " <> show src) false
 
   log "all MinBars tests passed"

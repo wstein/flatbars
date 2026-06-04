@@ -9,6 +9,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)
+import Data.Foldable (for_)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Monoid (power)
@@ -18,7 +19,7 @@ import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, spanText)
 import FlatBars.Highlight (HighlightConfig, highlightSpans, tokenizeSpans)
 import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
-import FlatBars.Token (Token(..), defaultLexOptions)
+import FlatBars.Token (LexOptions, Token(..), defaultLexOptions, tokenizeInterior)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -45,6 +46,21 @@ interiorTokens = case _ of
   RSep _ _ _ (Right ts) -> Just (map _.tok ts)
   RRaw _ _ _ _ (Right ts) _ -> Just (map _.tok ts)
   _ -> Nothing
+
+-- P2 invariant: a tag's carried interior is *exactly* `tokenizeInterior` of its
+-- own (base, string) — under the same `LexOptions` it was built with. Catches a
+-- construction site pairing the wrong base/string (e.g. RRaw's body slipping into
+-- the interior slot) or a future mutation that rewrites the string but forgets to
+-- re-lex. (RRaw carries its HEAD interior; the body is verbatim.)
+interiorMatches :: LexOptions -> RawTok -> Boolean
+interiorMatches lx = case _ of
+  ROutput _ base s int -> int == tokenizeInterior lx base s
+  RAmp _ base s int -> int == tokenizeInterior lx base s
+  ROpen _ _ base s int -> int == tokenizeInterior lx base s
+  RClose _ base s int -> int == tokenizeInterior lx base s
+  RSep _ base s int -> int == tokenizeInterior lx base s
+  RRaw _ _ base head int _ -> int == tokenizeInterior lx base head
+  _ -> true
 
 -- foldTemplate node counter (descends into block bodies).
 nodeCount :: String -> Int
@@ -581,5 +597,24 @@ main = do
   -- `=` is an ident-continuation char in both modes (the surface hash splits later).
   assert' "tokenizer: `key=value` stays one interior ident in both modes"
     (interiorToksOf lxOn "{{ key=val }}" == Just [ TIdent "key=val" ])
+
+  -- P2 + P6: over a multi-tag corpus (every tag, not just the first), under both
+  -- `infixArith` settings, each tag's carried interior equals `tokenizeInterior`
+  -- of its own (base, string). This is the structural guard the wrapper used to
+  -- give for free; it fails deterministically on a mis-paired base/string or a
+  -- mispositioned RRaw body. (Dialect *mutation* paths — MinBars standalone — are
+  -- guarded in the minbars suite.)
+  for_ [ defaultLexOptions, lxOn ] \lx ->
+    for_
+      [ "{{x}}{{{y}}}{{&z}} {{ a.b c }}"
+      , "{{#each items}}{{this}}{{else}}{{/each}}"
+      , "{{{{raw}}}}body {{x}} more{{{{/raw}}}}"
+      , "pre {{ f 1 \"s\" }} mid {{> p}} post"
+      , "{{ a+b }}{{ c*d }}{{ key=val }}"
+      ]
+      \src -> case tokenizeTemplate defaultLexConfig lx src of
+        Right toks -> assert' ("interior invariant holds on " <> show src)
+          (Array.all (interiorMatches lx) toks)
+        Left _ -> assert' ("invariant corpus should lex: " <> show src) false
 
   log "all framework tests passed"

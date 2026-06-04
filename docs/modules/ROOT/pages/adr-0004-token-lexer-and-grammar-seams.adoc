@@ -65,9 +65,15 @@ tokenizer ran once *per consumer* with no shared guarantee they agreed.
 
 Nothing in the decision above changes: the interior tokenizer, its meaning-free
 operator lexing, and the two grammar seams are exactly as specified — the seam is
-still `Array PosToken -> Either ParseError Expr`, fed the same tokens; and
-`tokenizeTemplate` stays meaning-free (`LexOptions` governs only the interior
-token lexing, never the structural shape). `tokenizeInterior` runs once, at scan;
+still `Array PosToken -> Either ParseError Expr`, fed the same tokens. To be
+precise about the cost: `tokenizeTemplate` now produces a meaning-free *shape*
+(tag boundaries, sigils, spans, raw bodies, set-delimiter state — all
+`LexOptions`-independent), but its *interior* is lexed meaning-free **and
+dialect-parameterized** — it takes `LexOptions` (`infixArith`) and so can no
+longer be run without committing to a dialect's interior rules. That is a real
+narrowing (a consumer wanting structure only still pays for interiors — e.g.
+`Linter.Migrate`), accepted because the only two callers that matter, the parser
+and the highlighter, both want the interior. `tokenizeInterior` runs once, at scan;
 `outputExpr`/`headed`/`headedRecovering` take the pre-lexed `Interior` (the
 blank-interior guard `trim s == ""` is exactly `Right []`), so the parser no
 longer re-lexes. The interior is kept as the *deferred* `Either` (not flattened)

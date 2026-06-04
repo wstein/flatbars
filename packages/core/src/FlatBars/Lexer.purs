@@ -772,22 +772,26 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
             afterSig = slice cs (start + 1) q
             afterHash = slice cs (start + 2) q
             interior = slice cs start q
-            -- interiors lexed at the matching base, like the default-delimiter path.
-            sigInt = interiorAt (start + 1) afterSig
-            hashInt = interiorAt (start + 2) afterHash
             mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
+            -- The interior is lexed inside the chosen branch (these helpers are
+            -- functions, so `interiorAt` fires only when the branch is taken) — so
+            -- each tag tokenizes its interior exactly once, never the unused
+            -- sigil/hash variant.
+            sigOpen sig = mk (ROpen span sig (start + 1) afterSig (interiorAt (start + 1) afterSig))
+            hashOpen sig = mk
+              (ROpen span sig (start + 2) afterHash (interiorAt (start + 2) afterHash))
           in
             case Array.index cs start of
               -- `#*name` (decorator) / `#>name` (partial block): the marker after
               -- `#` opens a distinct sigil, with the head starting two chars in.
               Just '#' -> case Array.index cs (start + 1) of
-                Just '*' -> mk (ROpen span Decorator (start + 2) afterHash hashInt)
-                Just '>' -> mk (ROpen span PartialBlock (start + 2) afterHash hashInt)
-                _ -> mk (ROpen span Section (start + 1) afterSig sigInt)
-              Just '^' -> mk (ROpen span Inverse (start + 1) afterSig sigInt)
-              Just '<' -> mk (ROpen span Parent (start + 1) afterSig sigInt)
-              Just '$' -> mk (ROpen span BlockDef (start + 1) afterSig sigInt)
-              Just '/' -> mk (RClose span (start + 1) afterSig sigInt)
-              Just '&' -> mk (RAmp span (start + 1) afterSig sigInt)
+                Just '*' -> hashOpen Decorator
+                Just '>' -> hashOpen PartialBlock
+                _ -> sigOpen Section
+              Just '^' -> sigOpen Inverse
+              Just '<' -> sigOpen Parent
+              Just '$' -> sigOpen BlockDef
+              Just '/' -> mk (RClose span (start + 1) afterSig (interiorAt (start + 1) afterSig))
+              Just '&' -> mk (RAmp span (start + 1) afterSig (interiorAt (start + 1) afterSig))
               Just '!' -> mk (RComment span (start + 1) afterSig)
               _ -> mk (RSep span start interior (interiorAt start interior))
