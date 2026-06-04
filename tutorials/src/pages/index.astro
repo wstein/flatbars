@@ -14,7 +14,6 @@ import Wordmark from "../components/Wordmark.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import "../styles/open-in-lab.css";
 import { lessons, surfaces } from "../examples.mjs";
-import { examples as ex } from "../mustache.mjs";
 // Proof numbers come from the committed conformance reports — the same data the
 // gates measure — so the strip can't go stale.
 import conformance from "../conformance.json";
@@ -57,7 +56,7 @@ const surfaceMeta = {
   fullbars: { role: "handlebars-faithful", sample: "{{#each xs}}\n  {{this}}\n{{/each}}",
     blurb: "Faithful to Handlebars, the industry-standard engine — block helpers, dotted paths, and your own registerHelper." },
   maxbars: { role: "the flagship", sample: "{{#if score >= 50}}\n  {{ name | uppercase }}\n{{/if}}",
-    blurb: "The most capable surface — infix operators, pipes, and bare loop variables put real expression back in the template. It borrows most of FullBars, on its own terms." },
+    blurb: "The most capable surface — infix operators, pipes, and bare loop variables put real expression back in the template." },
 };
 const surfaceCards = surfaces.map((s) => {
   const name = lessons[s].title.split(" — ")[0]; // "RawBars"
@@ -200,11 +199,13 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
 
       <!-- ===================== LIVE PLAYGROUND ===================== -->
       <section class="block" id="play">
-        <p class="kicker">Live · MinBars</p>
+        <p class="kicker">Live · MaxBars</p>
         <h2>Edit the template. Watch it render.</h2>
-        <p class="section-lead">No tagline beats a running example. Type in either pane — the output re-renders as you go,
-          through the very engine the Lab ships. <code>{"{{name}}"}</code> escapes, <code>{"{{{html}}}"}</code> doesn't, and the data shapes the control flow.</p>
-        <OpenInLab client:visible engine="minbars" template={ex.hello.template} data={ex.hello.data} />
+        <p class="section-lead">No tagline beats a running example. This is the flagship surface, <b>MaxBars</b> —
+          type in either pane and the output re-renders through the very engine the Lab ships. A pipe
+          (<code>{"{{ title | uppercase }}"}</code>), block params with an index (<code>{"as |p i|"}</code>),
+          and infix expressions (<code>{"i + 1"}</code>, <code>{"p.score >= 90"}</code>), all in one screen.</p>
+        <OpenInLab client:visible engine="maxbars" template={lessons.maxbars.template} data={lessons.maxbars.data} />
       </section>
 
       <!-- ===================== FOUR SURFACES ===================== -->

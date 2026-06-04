@@ -58,13 +58,23 @@ export const lessons = {
     blurb:
       "FlatBars' flagship and most capable surface. Infix operators, pipes, and bare " +
       "loop variables put real expression back in the template: write conditions like " +
-      "score >= 50 and transform with value | helper. It borrows most of FullBars — not " +
-      "quite all — on its own terms.",
+      "score >= 50 and transform with value | helper.",
     spec: "maxbars", // docs/modules/ROOT/pages/maxbars.adoc
-    template:
-      "<p>{{greeting}}, {{name}}!</p>\n" +
-      "{{#if score >= 50}}<b>pass</b>{{else}}<b>fail</b>{{/if}}",
-    data: { greeting: "Hi", name: "Ada", score: 72 },
+    // The landing's "Edit the template. Watch it render." flagship — one screen of
+    // MaxBars' signature: a pipe (uppercase), block params with an index (as |p i|),
+    // infix arithmetic (i + 1), and an infix comparison (p.score >= 90).
+    template: `{{ title | uppercase }}
+{{#each players as |p i|}}
+{{ i + 1 }}. {{ p.name }} — {{ p.score }} {{#if p.score >= 90}}👑{{/if}}
+{{/each}}`,
+    data: {
+      title: "top scorers",
+      players: [
+        { name: "Ada", score: 92 },
+        { name: "Lin", score: 47 },
+        { name: "Bo", score: 63 },
+      ],
+    },
   },
 };
 
