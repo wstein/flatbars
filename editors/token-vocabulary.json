@@ -6,47 +6,36 @@
     "token legend (built from the `lsp` mappings), and the TextMate fallback",
     "grammar (`editors/flatbars.tmLanguage.json`).",
     "",
-    "The fallback grammar is the well-known Handlebars TextMate grammar, re-",
-    "identified as `source.flatbars` and extended to cover all four dialects",
-    "(inverse sections, Mustache inheritance `{{<}}`/`{{$}}`, set delimiters, and",
-    "MaxBars operators). We keep its standard scope names (`keyword.control.*`,",
-    "`support.function.*`, `string.quoted.*`, …) on purpose: themes already colour",
-    "them, so FlatBars looks like the Handlebars developers know. The grammar",
-    "colours ONLY template syntax plus a leading YAML front-matter block (`---`);",
-    "host text (HTML, etc.) is left plain, since a FlatBars template's output is not",
-    "necessarily HTML. Every FlatBars tag scope ends in `.handlebars` — that suffix",
-    "is how the gate tells a tag from content.",
+    "The fallback grammar is a THIN FLOOR (it recognises tag delimiters and scopes",
+    "each tag region with a Handlebars-style `meta.*.handlebars` name; inside a tag",
+    "the body is default-coloured). The LSP is the authority — it emits semantic",
+    "tokens as CORRECTIONS over the floor for everything the stateless grammar can't",
+    "classify dialect-aware: keywords (`{{else}}`/`{{elif}}`), in-tag literals",
+    "(string, number), operators (MaxBars), the set-delimiter directive, and",
+    "dialect-disallowed errors.",
     "",
-    "Because the grammar is RICHER than the engine (it splits a tag into sigil /",
-    "name / args / literals, where the engine paints one kind per tag), the drift",
-    "gate does NOT assert a scope==kind bijection. `check:tmgrammar` asserts, per",
-    "dialect, that the grammar agrees with the engine on (1) TAG BOUNDARIES (which",
-    "characters are inside a FlatBars tag) and (2) LITERAL positions (string /",
-    "number). Everything else is allowed enrichment — the fallback is the floor,",
-    "the LSP is the authority. `check:highlight` still pins what the engine emits.",
+    "Three drift gates keep the contract from rotting:",
+    "  • `check:tmgrammar` — the grammar agrees with the engine on TAG BOUNDARIES",
+    "    (which characters are inside a FlatBars tag) for every dialect.",
+    "  • `check:vocab` — every `tmScopes` entry below exists in the grammar; every",
+    "    kind with empty `tmScopes` is in `lspEmitKinds` (uncolourable otherwise).",
+    "  • `check:highlight` — pins what the engine's own highlighter emits.",
     "",
     "`role`: `tag` (a whole-tag span) or `interior` (a literal/operator carved",
     "inside a tag). `lsp.type`/`lsp.modifiers` are the semantic-token legend entry.",
-    "`tmScopes` are the grammar scopes that express this kind; `[]` means the",
-    "stateless fallback gives up (the LSP corrects it). Only the `string`/`number`",
-    "scopes are gate-checked as literals; the tag scopes are documentation.",
+    "`tmScopes` are the grammar scopes a theme can target; `[]` means the floor",
+    "is silent and the LSP fills in.",
     "",
-    "`lspEmitKinds` is the SPARSE set of kinds the LSP semantic-token layer emits.",
-    "Semantic tokens are CORRECTIONS over the rich TextMate floor, not a blanket",
-    "re-colour: the LSP emits only where it knows something the stateless grammar",
-    "cannot — dialect-scoped interior operators/literals, set delimiters, and",
-    "dialect-disallowed errors. For the structural tags (interpolation, raw, blocks,",
-    "partials, comments) the grammar already paints the familiar Handlebars look",
-    "(braces vs name), so the LSP stays SILENT and lets it show through, rather than",
-    "flattening `{{{x}}}` to one whole-tag colour. (Trade-off: a set-delimiter",
-    "SWITCH's following tags are not semantic-corrected — a rare, documented give-up.)"
+    "`lspEmitKinds` is the sparse set the LSP emits over the floor. Tag-class kinds",
+    "with distinctive `meta.*` scopes are left to the grammar (a theme can already",
+    "chip them). The LSP emits only where the grammar can't be dialect-aware."
   ],
-  "lspEmitKinds": ["operator", "string", "number", "set-delimiter", "error"],
+  "lspEmitKinds": ["keyword", "operator", "string", "number", "set-delimiter", "error"],
   "kinds": {
     "expr": {
       "role": "tag",
       "lsp": { "type": "variable", "modifiers": [] },
-      "tmScopes": ["meta.function.inline.handlebars", "variable.parameter.handlebars"],
+      "tmScopes": ["meta.function.inline.handlebars"],
       "description": "{{name}} — an interpolation (escaped output)."
     },
     "raw": {
@@ -64,7 +53,7 @@
     "block-open": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["meta.function.block.start.handlebars", "keyword.control.handlebars", "support.function.handlebars"],
+      "tmScopes": ["meta.function.block.start.handlebars"],
       "description": "{{#x}} — a section open."
     },
     "block-inverse": {
@@ -94,14 +83,14 @@
     "partial": {
       "role": "tag",
       "lsp": { "type": "macro", "modifiers": [] },
-      "tmScopes": ["meta.function.partial.handlebars", "entity.name.function.partial.handlebars"],
+      "tmScopes": ["meta.function.partial.handlebars"],
       "description": "{{> name}} — a partial include."
     },
     "keyword": {
       "role": "tag",
       "lsp": { "type": "keyword", "modifiers": [] },
-      "tmScopes": ["keyword.control.handlebars"],
-      "description": "{{else}} / {{elif …}} — a clause separator (dialect-dependent)."
+      "tmScopes": [],
+      "description": "{{else}} / {{elif …}} — a clause separator (dialect-dependent). LSP-emitted: the thin-floor grammar matches it as a generic interpolation."
     },
     "comment": {
       "role": "tag",
@@ -124,20 +113,20 @@
     "string": {
       "role": "interior",
       "lsp": { "type": "string", "modifiers": [] },
-      "tmScopes": ["string.quoted.single.handlebars", "string.quoted.double.handlebars"],
-      "description": "A quoted string literal inside a tag."
+      "tmScopes": [],
+      "description": "A quoted string literal inside a tag. LSP-emitted: the thin-floor grammar leaves the in-tag body uncoloured."
     },
     "number": {
       "role": "interior",
       "lsp": { "type": "number", "modifiers": [] },
-      "tmScopes": ["constant.numeric.handlebars"],
-      "description": "A numeric literal inside a tag."
+      "tmScopes": [],
+      "description": "A numeric literal inside a tag. LSP-emitted."
     },
     "operator": {
       "role": "interior",
       "lsp": { "type": "operator", "modifiers": [] },
-      "tmScopes": ["keyword.operator.handlebars"],
-      "description": "An infix/prefix operator inside a tag (MaxBars). Coloured as enrichment; not gate-checked, since the engine only carves operators under MaxBars' infixArith."
+      "tmScopes": [],
+      "description": "An infix/prefix operator inside a tag (MaxBars). LSP-emitted: dialect-scoped."
     }
   }
 }

@@ -13,6 +13,16 @@
     "mustache"
   ],
   "uuid": "47231B67-C29F-40A3-9604-097652D77088",
+  "_doc": [
+    "The FlatBars TextMate fallback — a THIN FLOOR per ADR-017. It recognises only",
+    "the bracket-delimiter shapes ({{ {{# {{/ {{^ {{< {{$ {{> {{= {{! {{!-- {{{ {{&",
+    "{{{{ {{{{# {{{{/ and their closers) and scopes the whole tag region with a",
+    "Handlebars-style meta name so themes can chip it. Inside a tag the body is",
+    "default-coloured; classifying helpers, paths, keywords, operators, strings, and",
+    "numbers is the LSP's job (it emits semantic tokens over this floor). check:vocab",
+    "asserts every vocabulary tmScope still exists in the grammar; check:tmgrammar",
+    "asserts the grammar agrees with the engine on TAG BOUNDARIES (per dialect)."
+  ],
   "patterns": [
     {
       "include": "#yfm"
@@ -22,706 +32,6 @@
     }
   ],
   "repository": {
-    "block_comment": {
-      "patterns": [
-        {
-          "name": "comment.block.handlebars",
-          "begin": "\\{\\{~?!--",
-          "beginCaptures": {
-            "0": {
-              "name": "punctuation.definition.comment.begin.handlebars"
-            }
-          },
-          "end": "--~?\\}\\}",
-          "endCaptures": {
-            "0": {
-              "name": "punctuation.definition.comment.end.handlebars"
-            }
-          },
-          "patterns": [
-            {
-              "match": "@\\w*",
-              "name": "keyword.annotation.handlebars"
-            }
-          ]
-        }
-      ]
-    },
-    "block_helper": {
-      "name": "meta.function.block.start.handlebars",
-      "begin": "(\\{\\{~?#)\\s*(?:(if|unless|each|with|else)|([-a-zA-Z0-9_./]+))",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "keyword.control.handlebars"
-        },
-        "3": {
-          "name": "support.function.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "block_params": {
-      "name": "meta.block-parameter.handlebars",
-      "begin": "\\b(as)\\s+(\\|)",
-      "beginCaptures": {
-        "1": {
-          "name": "keyword.control.as.handlebars"
-        },
-        "2": {
-          "name": "punctuation.definition.block-parameter.begin.handlebars"
-        }
-      },
-      "end": "(\\|)",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.definition.block-parameter.end.handlebars"
-        }
-      },
-      "patterns": [
-        {
-          "match": "[a-zA-Z0-9_]+",
-          "name": "variable.parameter.block.handlebars"
-        }
-      ]
-    },
-    "comment": {
-      "patterns": [
-        {
-          "name": "comment.block.handlebars",
-          "begin": "\\{\\{~?!",
-          "beginCaptures": {
-            "0": {
-              "name": "punctuation.definition.comment.begin.handlebars"
-            }
-          },
-          "end": "~?\\}\\}",
-          "endCaptures": {
-            "0": {
-              "name": "punctuation.definition.comment.end.handlebars"
-            }
-          },
-          "patterns": [
-            {
-              "match": "@\\w*",
-              "name": "keyword.annotation.handlebars"
-            }
-          ]
-        }
-      ]
-    },
-    "constant": {
-      "match": "\\b(true|false|null|undefined)\\b",
-      "name": "constant.language.handlebars"
-    },
-    "context_keyword": {
-      "patterns": [
-        {
-          "match": "\\bthis\\b",
-          "name": "variable.language.this.handlebars"
-        },
-        {
-          "match": "\\.\\.(?=[/.}\\s~)|])",
-          "name": "variable.language.parent.handlebars"
-        },
-        {
-          "match": "(?<![\\w.])\\.(?=[/}\\s~)|])",
-          "name": "variable.language.this.handlebars"
-        }
-      ]
-    },
-    "data_variable": {
-      "match": "(@)([a-zA-Z0-9_]+(?:[-.][a-zA-Z0-9_]+)*|\\.\\.?(?:/[a-zA-Z0-9_]+)*)",
-      "captures": {
-        "1": {
-          "name": "punctuation.definition.variable.handlebars"
-        },
-        "2": {
-          "name": "variable.other.data.handlebars"
-        }
-      }
-    },
-    "decorator": {
-      "name": "meta.function.decorator.inline.handlebars",
-      "begin": "(\\{\\{~?\\*)\\s*([-a-zA-Z0-9_./]+)",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "entity.name.function.decorator.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "decorator_block": {
-      "name": "meta.function.decorator.block.handlebars",
-      "begin": "(\\{\\{~?#\\*)\\s*([-a-zA-Z0-9_./]+)",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "entity.name.function.decorator.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "else_token": {
-      "name": "meta.function.inline.else.handlebars",
-      "begin": "(\\{\\{~?)\\s*(else)\\b\\s*(?:(if|unless)\\b)?",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "keyword.control.handlebars"
-        },
-        "3": {
-          "name": "keyword.control.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "end_block": {
-      "name": "meta.function.block.end.handlebars",
-      "begin": "(\\{\\{~?/)\\s*(?:(if|unless|each|with)|([-a-zA-Z0-9_./]+))",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "keyword.control.handlebars"
-        },
-        "3": {
-          "name": "support.function.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      }
-    },
-    "escaped-double-quote": {
-      "match": "\\\\\"",
-      "name": "constant.character.escape.js"
-    },
-    "escaped-single-quote": {
-      "match": "\\\\'",
-      "name": "constant.character.escape.js"
-    },
-    "expression": {
-      "patterns": [
-        {
-          "include": "#subexpression"
-        },
-        {
-          "include": "#string"
-        },
-        {
-          "include": "#block_params"
-        },
-        {
-          "include": "#data_variable"
-        },
-        {
-          "include": "#constant"
-        },
-        {
-          "include": "#number"
-        },
-        {
-          "include": "#context_keyword"
-        },
-        {
-          "include": "#hash"
-        },
-        {
-          "include": "#segment_literal"
-        },
-        {
-          "include": "#operator"
-        },
-        {
-          "include": "#path"
-        }
-      ]
-    },
-    "extends": {
-      "patterns": [
-        {
-          "name": "meta.preprocessor.handlebars",
-          "begin": "(\\{\\{~?!<)\\s*([-a-zA-Z0-9_./]+)",
-          "beginCaptures": {
-            "1": {
-              "name": "support.function.handlebars"
-            },
-            "2": {
-              "name": "support.class.handlebars"
-            }
-          },
-          "end": "(~?\\}\\})",
-          "endCaptures": {
-            "1": {
-              "name": "support.function.handlebars"
-            }
-          }
-        }
-      ]
-    },
-    "handlebars": {
-      "patterns": [
-        {
-          "include": "#raw_block"
-        },
-        {
-          "include": "#extends"
-        },
-        {
-          "include": "#block_comment"
-        },
-        {
-          "include": "#comment"
-        },
-        {
-          "include": "#set_delimiter"
-        },
-        {
-          "include": "#decorator_block"
-        },
-        {
-          "include": "#partial_block"
-        },
-        {
-          "include": "#block_helper"
-        },
-        {
-          "include": "#inverse_block"
-        },
-        {
-          "include": "#inheritance"
-        },
-        {
-          "include": "#end_block"
-        },
-        {
-          "include": "#else_token"
-        },
-        {
-          "include": "#decorator"
-        },
-        {
-          "include": "#partial"
-        },
-        {
-          "include": "#unescaped"
-        },
-        {
-          "include": "#variable"
-        }
-      ]
-    },
-    "set_delimiter": {
-      "name": "meta.set-delimiter.handlebars",
-      "match": "(\\{\\{~?=)([^=]*)(=~?\\}\\})",
-      "captures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "keyword.operator.handlebars"
-        },
-        "3": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      }
-    },
-    "inverse_block": {
-      "name": "meta.function.block.inverse.handlebars",
-      "begin": "(\\{\\{~?\\^)\\s*([-a-zA-Z0-9_./]+)?",
-      "beginCaptures": {
-        "1": {
-          "name": "keyword.control.handlebars"
-        },
-        "2": {
-          "name": "support.function.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "inheritance": {
-      "patterns": [
-        {
-          "name": "meta.function.block.parent.handlebars",
-          "begin": "(\\{\\{~?<)\\s*([-a-zA-Z0-9_./*]+)",
-          "beginCaptures": {
-            "1": {
-              "name": "keyword.control.handlebars"
-            },
-            "2": {
-              "name": "support.function.handlebars"
-            }
-          },
-          "end": "(~?\\}\\})",
-          "endCaptures": {
-            "1": {
-              "name": "punctuation.section.expression.flatbars"
-            }
-          },
-          "patterns": [
-            {
-              "include": "#expression"
-            }
-          ]
-        },
-        {
-          "name": "meta.function.block.declaration.handlebars",
-          "begin": "(\\{\\{~?\\$)\\s*([-a-zA-Z0-9_./]+)",
-          "beginCaptures": {
-            "1": {
-              "name": "keyword.control.handlebars"
-            },
-            "2": {
-              "name": "support.function.handlebars"
-            }
-          },
-          "end": "(~?\\}\\})",
-          "endCaptures": {
-            "1": {
-              "name": "punctuation.section.expression.flatbars"
-            }
-          },
-          "patterns": [
-            {
-              "include": "#expression"
-            }
-          ]
-        }
-      ]
-    },
-    "operator": {
-      "match": "(==|!=|<=|>=|&&|\\|\\||\\?\\?|[+*%<>]|\\|)",
-      "name": "keyword.operator.handlebars"
-    },
-    "hash": {
-      "match": "([a-zA-Z0-9_][-a-zA-Z0-9_]*)\\s*(=)",
-      "captures": {
-        "1": {
-          "name": "variable.parameter.handlebars"
-        },
-        "2": {
-          "name": "keyword.operator.assignment.handlebars"
-        }
-      }
-    },
-    "number": {
-      "match": "(?<![\\w./])-?[0-9]+(?:\\.[0-9]+)?\\b",
-      "name": "constant.numeric.handlebars"
-    },
-    "partial": {
-      "name": "meta.function.partial.handlebars",
-      "begin": "(\\{\\{~?>)\\s*(@?[-a-zA-Z0-9_./]+)?",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "entity.name.function.partial.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "partial_block": {
-      "name": "meta.function.partial.block.handlebars",
-      "begin": "(\\{\\{~?#>)\\s*(@?[-a-zA-Z0-9_./]+)?",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "entity.name.function.partial.handlebars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "path": {
-      "match": "(@?[a-zA-Z0-9_$][-a-zA-Z0-9_$]*)((?:[./][-a-zA-Z0-9_$]+)*)",
-      "captures": {
-        "1": {
-          "name": "variable.parameter.handlebars"
-        },
-        "2": {
-          "name": "variable.parameter.handlebars"
-        }
-      }
-    },
-    "raw_block": {
-      "name": "meta.block.raw.handlebars",
-      "begin": "(\\{\\{\\{\\{)\\s*(?!/)([-a-zA-Z0-9_./]+)([^}]*)(\\}\\}\\}\\})",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "support.function.handlebars"
-        },
-        "3": {
-          "name": "variable.parameter.handlebars"
-        },
-        "4": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "end": "(\\{\\{\\{\\{)\\s*(/)\\s*([-a-zA-Z0-9_./]+)\\s*(\\}\\}\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        },
-        "2": {
-          "name": "punctuation.definition.block.end.handlebars"
-        },
-        "3": {
-          "name": "support.function.handlebars"
-        },
-        "4": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      }
-    },
-    "segment_literal": {
-      "match": "(\\.)?(\\[)([^\\]]*)(\\])",
-      "captures": {
-        "1": {
-          "name": "punctuation.accessor.handlebars"
-        },
-        "2": {
-          "name": "punctuation.definition.segment.begin.handlebars"
-        },
-        "3": {
-          "name": "variable.other.segment.handlebars"
-        },
-        "4": {
-          "name": "punctuation.definition.segment.end.handlebars"
-        }
-      }
-    },
-    "string": {
-      "patterns": [
-        {
-          "include": "#string-single-quoted"
-        },
-        {
-          "include": "#string-double-quoted"
-        }
-      ]
-    },
-    "string-double-quoted": {
-      "begin": "\"",
-      "beginCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.begin.html"
-        }
-      },
-      "end": "\"",
-      "endCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.end.html"
-        }
-      },
-      "name": "string.quoted.double.handlebars",
-      "patterns": [
-        {
-          "include": "#escaped-double-quote"
-        },
-        {
-          "include": "#handlebars"
-        }
-      ]
-    },
-    "string-single-quoted": {
-      "begin": "'",
-      "beginCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.begin.html"
-        }
-      },
-      "end": "'",
-      "endCaptures": {
-        "0": {
-          "name": "punctuation.definition.string.end.html"
-        }
-      },
-      "name": "string.quoted.single.handlebars",
-      "patterns": [
-        {
-          "include": "#escaped-single-quote"
-        },
-        {
-          "include": "#handlebars"
-        }
-      ]
-    },
-    "subexpression": {
-      "name": "meta.subexpression.handlebars",
-      "begin": "(\\()\\s*([-a-zA-Z0-9_./]+)?",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.subexpression.begin.handlebars"
-        },
-        "2": {
-          "name": "support.function.handlebars"
-        }
-      },
-      "end": "(\\))",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.subexpression.end.handlebars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
-    "unescaped": {
-      "patterns": [
-        {
-          "name": "meta.variable.unescaped.handlebars",
-          "begin": "(\\{\\{~?\\{)",
-          "beginCaptures": {
-            "1": {
-              "name": "punctuation.section.expression.flatbars"
-            }
-          },
-          "end": "(\\}~?\\}\\})",
-          "endCaptures": {
-            "1": {
-              "name": "punctuation.section.expression.flatbars"
-            }
-          },
-          "patterns": [
-            {
-              "include": "#expression"
-            }
-          ]
-        },
-        {
-          "name": "meta.variable.unescaped.handlebars",
-          "begin": "(\\{\\{~?&)",
-          "beginCaptures": {
-            "1": {
-              "name": "punctuation.section.expression.flatbars"
-            }
-          },
-          "end": "(~?\\}\\})",
-          "endCaptures": {
-            "1": {
-              "name": "punctuation.section.expression.flatbars"
-            }
-          },
-          "patterns": [
-            {
-              "include": "#expression"
-            }
-          ]
-        }
-      ]
-    },
-    "variable": {
-      "name": "meta.function.inline.handlebars",
-      "begin": "(\\{\\{~?)",
-      "beginCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "end": "(~?\\}\\})",
-      "endCaptures": {
-        "1": {
-          "name": "punctuation.section.expression.flatbars"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
-    },
     "yfm": {
       "patterns": [
         {
@@ -735,6 +45,195 @@
           ]
         }
       ]
+    },
+    "handlebars": {
+      "_doc": "Dispatch order: longer bracket clusters first, then specific sigils, then the bare {{...}} variable as the catch-all.",
+      "patterns": [
+        { "include": "#raw_block" },
+        { "include": "#long_comment" },
+        { "include": "#short_comment" },
+        { "include": "#set_delimiter" },
+        { "include": "#triple_stash" },
+        { "include": "#amp_unescaped" },
+        { "include": "#block_open" },
+        { "include": "#block_close" },
+        { "include": "#inverse_block" },
+        { "include": "#inheritance_parent" },
+        { "include": "#inheritance_block" },
+        { "include": "#partial" },
+        { "include": "#variable" }
+      ]
+    },
+
+    "raw_block": {
+      "_doc": "Quad-brace raw block. Open accepts the Handlebars form {{{{name}}}} and the FlatBars-native hash form {{{{#name}}}}; close is {{{{/name}}}}. The sigil is part of the punctuation capture, mirroring {{# / {{/.",
+      "name": "meta.block.raw.handlebars",
+      "begin": "(\\{\\{\\{\\{\\s*#?)\\s*(?!/)[^}]*(\\}\\}\\}\\})",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" },
+        "2": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\{\\{\\{\\{\\s*/)[^}]*(\\}\\}\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" },
+        "2": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "long_comment": {
+      "_doc": "{{!-- ... --}} — body may contain }} that don't terminate the comment.",
+      "name": "comment.block.handlebars",
+      "begin": "(\\{\\{!--)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(--\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "short_comment": {
+      "_doc": "{{! ... }} — comment ends at the first }}.",
+      "name": "comment.block.handlebars",
+      "begin": "(\\{\\{!)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "set_delimiter": {
+      "_doc": "{{=A B=}} — set-delimiter directive. The stateless fallback cannot track delimiters that follow; the LSP does (token-vocabulary.json).",
+      "name": "meta.set-delimiter.handlebars",
+      "begin": "(\\{\\{=)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(=\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "triple_stash": {
+      "_doc": "{{{x}}} — unescaped (raw) interpolation. Must come before #variable so triple braces match before double.",
+      "name": "meta.variable.unescaped.handlebars",
+      "begin": "(\\{\\{\\{)(?!\\{)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\}\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "amp_unescaped": {
+      "_doc": "{{&x}} — Mustache-style unescaped alias for triple-stash.",
+      "name": "meta.variable.unescaped.handlebars",
+      "begin": "(\\{\\{&)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "block_open": {
+      "_doc": "{{#name ...}} — block helper open. The # is part of the punctuation capture (same convention as {{/).",
+      "name": "meta.function.block.start.handlebars",
+      "begin": "(\\{\\{~?#)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(~?\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "block_close": {
+      "_doc": "{{/name}} — block close. The / is part of the punctuation capture.",
+      "name": "meta.function.block.end.handlebars",
+      "begin": "(\\{\\{~?/)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(~?\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "inverse_block": {
+      "_doc": "{{^x}} — Mustache inverted section open.",
+      "name": "meta.function.block.inverse.handlebars",
+      "begin": "(\\{\\{\\^)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "inheritance_parent": {
+      "_doc": "{{<layout}} — Mustache inheritance parent.",
+      "name": "meta.function.block.parent.handlebars",
+      "begin": "(\\{\\{<)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "inheritance_block": {
+      "_doc": "{{$block}} — Mustache inheritance block declaration.",
+      "name": "meta.function.block.declaration.handlebars",
+      "begin": "(\\{\\{\\$)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "partial": {
+      "_doc": "{{> name}} (and {{>* name}}) — partial include.",
+      "name": "meta.function.partial.handlebars",
+      "begin": "(\\{\\{>\\*?)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
+    },
+
+    "variable": {
+      "_doc": "{{name ...}} — the escape-by-default interpolation. Catch-all that runs LAST: the negative lookahead excludes every sigil already handled above.",
+      "name": "meta.function.inline.handlebars",
+      "begin": "(\\{\\{~?)(?![!=#/^<$>&{])",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      },
+      "end": "(~?\\}\\})",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.expression.flatbars" }
+      }
     }
   }
 }

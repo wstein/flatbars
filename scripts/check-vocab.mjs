@@ -31,7 +31,11 @@ const root = resolve(here, "..");
 // flattening the two-layer design exists to avoid, narrowing it drops a correction
 // the stateless grammar can't make. Either is a deliberate, reviewable change to
 // THIS pin, never an accident.
-const EXPECTED_LSP_EMIT = ["error", "number", "operator", "set-delimiter", "string"];
+// Updated when the TextMate fallback was thinned to a delimiter-only floor: the
+// grammar no longer distinguishes `{{else}}` / `{{elif …}}` from other `{{…}}`
+// interpolations, so the LSP fills the gap by emitting the `keyword` kind too.
+// See ADR-017 (amendment) and editors/token-vocabulary.json `lspEmitKinds`.
+const EXPECTED_LSP_EMIT = ["error", "keyword", "number", "operator", "set-delimiter", "string"];
 
 const fail = [];
 const ok = (msg) => console.log(`  ✓ ${msg}`);

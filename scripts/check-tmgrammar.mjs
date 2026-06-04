@@ -15,18 +15,24 @@
 // bijection does not fit. Instead this gate checks, FOR EACH DIALECT, the two
 // things the engine actually defines and a stateless grammar can be held to:
 //
-//   1. TAG BOUNDARIES — exactly the characters the engine marks as inside a
-//      FlatBars tag are the characters the grammar scopes as a tag. (Every FlatBars
-//      tag scope ends in `.handlebars`; everything else — host text, and a leading
-//      YAML front-matter block — is left plain or scoped `*.yaml`, never
-//      `.handlebars`.) This catches the Exhibit-A/B class of begin/end drift.
-//   2. LITERALS — wherever the engine carves a `string`/`number`, the grammar
-//      scopes it `string.quoted.*` / `constant.numeric.*` too.
+// The fallback is a THIN FLOOR — it recognises only tag-delimiter shapes and
+// scopes each whole tag with a `meta.*.handlebars` name; tag interiors are left
+// uncoloured. The LSP corrects everything dialect-aware (operators, in-tag
+// string/number literals, keywords like `{{else}}`, set-delimiter, errors).
 //
-// Everything else (which helper is a keyword, argument colouring, operators) is
-// allowed enrichment: the fallback is the floor, the LSP is the authority. Set-
-// delimiter SWITCHES are out of scope — a stateless grammar cannot track the new
-// delimiters that follow `{{=A B=}}` (the LSP does); the directive itself is checked.
+// So this gate checks the ONE thing a stateless grammar can be held to:
+//
+//   * TAG BOUNDARIES — exactly the characters the engine marks as inside a
+//     FlatBars tag are the characters the grammar scopes as a tag. (Every FlatBars
+//     tag scope ends in `.handlebars`; everything else — host text, and a leading
+//     YAML front-matter block — is left plain or scoped `*.yaml`, never
+//     `.handlebars`.) This catches the Exhibit-A/B class of begin/end drift.
+//
+// In-tag literal positions (string/number) are NOT gated here any more: the LSP
+// emits them as semantic-token corrections over the silent floor (see
+// token-vocabulary.json `lspEmitKinds`). Set-delimiter SWITCHES remain out of
+// scope — a stateless grammar cannot track the new delimiters that follow
+// `{{=A B=}}` (the LSP does); the directive itself is checked.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -45,13 +51,11 @@ function fail(msg) {
   process.exit(1);
 }
 
-// Literal scopes (string/number) from the shared vocabulary — the only scopes the
-// gate maps to an engine kind.
-const vocab = JSON.parse(readFileSync(resolve(editors, "token-vocabulary.json"), "utf8"));
-const litScope = new Map();
-for (const kind of ["string", "number"]) {
-  for (const s of vocab.kinds[kind].tmScopes) litScope.set(s, kind);
-}
+// Vocabulary is imported only to keep the source-of-truth assertion that this
+// gate matches the contract in token-vocabulary.json — no per-scope mapping is
+// needed any more, since the thin-floor grammar leaves in-tag literals to the
+// LSP (see check:vocab for the scope-presence contract).
+JSON.parse(readFileSync(resolve(editors, "token-vocabulary.json"), "utf8"));
 
 // ── The per-dialect corpus. Default delimiters; no set-delimiter SWITCH (the
 //    stateless fallback gives up past `{{=A B=}}`). `note` documents the form. ────
@@ -82,6 +86,7 @@ const CORPUS = [
   { dialect: "maxbars", src: "{{#if a}}x{{elif b}}y{{/if}}", note: "elif clause" },
   { dialect: "maxbars", src: "{{ qty * 2 }}", note: "number literal" },
   { dialect: "maxbars", src: "{{ (add a 1) }}", note: "subexpression + number" },
+  { dialect: "maxbars", src: "{{{{#raw}}}}{{x}}{{{{/raw}}}}", note: "raw block — MaxBars-native hash form" },
   // Interaction cases: `|` as a block param (not a pipe), hash args + string literal.
   { dialect: "fullbars", src: "{{#each xs as |x i|}}{{x}}{{/each}}", note: "block params" },
   { dialect: "fullbars", src: '{{> row name="x"}}', note: "partial hash + string" },
@@ -113,42 +118,33 @@ const registry = new Registry({
 const grammar = await registry.loadGrammar("source.flatbars");
 if (!grammar) fail("could not load editors/flatbars.tmLanguage.json as source.flatbars");
 
-// The engine's per-character truth: which chars are inside a tag, and the literals.
+// The engine's per-character truth: which chars are inside a FlatBars tag.
 function engineMasks(src, dialect) {
   const tag = new Array(src.length).fill(false);
-  const lit = new Array(src.length).fill(null);
   for (const s of tokenize(src, dialect)) {
     if (s.role === "tag") {
       for (let i = s.from; i < s.to; i++) tag[i] = true;
-    } else if (s.kind === "string" || s.kind === "number") {
-      for (let i = s.from; i < s.to; i++) lit[i] = s.kind;
     }
   }
-  return { tag, lit };
+  return { tag };
 }
 
-// The grammar's per-character view: a char is "in a tag" if any scope ends in
-// `.handlebars`; literals come from the vocabulary's string/number scopes.
+// The grammar's per-character view: a char is "in a tag" if any scope on it ends
+// in `.handlebars`.
 function grammarMasks(src) {
   const tag = new Array(src.length).fill(false);
-  const lit = new Array(src.length).fill(null);
   let stack = INITIAL;
   let base = 0;
   for (const line of src.split("\n")) {
     const r = grammar.tokenizeLine(line, stack);
     for (const t of r.tokens) {
       const isTag = t.scopes.some((s) => s.endsWith(".handlebars"));
-      let litKind = null;
-      for (const s of t.scopes) if (litScope.has(s)) litKind = litScope.get(s);
-      for (let i = t.startIndex; i < t.endIndex; i++) {
-        tag[base + i] = isTag;
-        if (litKind) lit[base + i] = litKind;
-      }
+      for (let i = t.startIndex; i < t.endIndex; i++) tag[base + i] = isTag;
     }
     stack = r.ruleStack;
     base += line.length + 1; // + the "\n"
   }
-  return { tag, lit };
+  return { tag };
 }
 
 let checked = 0;
@@ -162,13 +158,9 @@ for (const { src, dialect, note } of CORPUS) {
       const ctx = `${JSON.stringify(src)} @${i} (${JSON.stringify(src[i])})`;
       fail(`[${dialect}] ${note}: tag-boundary disagreement at ${ctx} — engine ${e.tag[i] ? "tag" : "content"}, grammar ${g.tag[i] ? "tag" : "content"}`);
     }
-    if (e.lit[i] && g.lit[i] !== e.lit[i]) {
-      const ctx = `${JSON.stringify(src)} @${i} (${JSON.stringify(src[i])})`;
-      fail(`[${dialect}] ${note}: literal disagreement at ${ctx} — engine ${e.lit[i]}, grammar ${g.lit[i] ?? "plain"}`);
-    }
   }
   if (!e.tag.includes(true)) fail(`[${dialect}] ${note}: fixture exercises no tag (corpus bug)`);
   checked++;
 }
 
-console.log(`✓ check:tmgrammar — Handlebars fallback agrees with the engine on tag boundaries + literals across ${checked} fixtures (rawbars/minbars/fullbars/maxbars)`);
+console.log(`✓ check:tmgrammar — thin-floor grammar agrees with the engine on tag boundaries across ${checked} fixtures (rawbars/minbars/fullbars/maxbars)`);
