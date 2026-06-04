@@ -147,11 +147,24 @@ export function dialectDiagnostics(text, dialect) {
 function dialectRulesFor(text, dialect) {
   if (dialect !== "minbars" && dialect !== "rawbars") return [];
   const out = [];
+  // Track the active delimiter pair across `{{=A B=}}` directives in source
+  // order — same machinery as `flatten`. Without it, `bodyOfTag` would not
+  // strip `<%` / `%>` from a delim-switched tag and the helper-args rule would
+  // false-positive on the space between the delimiter and the body.
+  let openDelim = "{{";
+  let closeDelim = "}}";
   for (const s of tokenize(text, dialect)) {
     if (s.role !== "tag") continue;
+    if (s.kind === "set-delimiter") {
+      const switched = parseSetDelimBody(text.slice(s.from, s.to));
+      if (switched) {
+        openDelim = switched.open;
+        closeDelim = switched.close;
+      }
+      continue;
+    }
     if (s.kind === "comment" || s.kind === "raw-block" || s.kind === "error") continue;
-    if (s.kind === "set-delimiter") continue; // {{=A B=}} legitimately has internal space
-    const body = bodyOfTag(text, s);
+    const body = bodyOfTag(text, s, openDelim, closeDelim);
     if (!body) continue;
     // Most-specific rules first, so the diagnostic message matches the actual
     // construct rather than the generic "helper invocation" catch-all. Each rule
@@ -237,14 +250,18 @@ function findHelperArgs(body) {
   };
 }
 
-function bodyOfTag(text, s) {
-  // Skip braces, sigils, ~ at both ends; the rest is the body.
-  let from = s.from;
-  let to = s.to;
-  while (from < to && /[{}~]/.test(text[from])) from++;
-  if (from < to && /[#/\^<$>&!=]/.test(text[from])) from++; // sigil
-  if (from < to && text[from] === "*") from++; // partial-block decorator
-  while (to > from && /[{}~]/.test(text[to - 1])) to--;
+function bodyOfTag(text, s, openDelim = "{{", closeDelim = "}}") {
+  // Strip the active opening / closing delimiter pair (passed in so we cope
+  // with `<%` / `%>` after a `{{=<% %>=}}` directive switched them), then any
+  // ~ control, sigil character, or `*` partial-block decorator at the
+  // (now-inside-the-braces) ends. What's left is the tag body — the part the
+  // dialect rules check.
+  let from = s.from + openDelim.length;
+  let to = s.to - closeDelim.length;
+  if (from < to && text[from] === "~") from++;
+  if (from < to && /[#/\^<$>&!=]/.test(text[from])) from++;
+  if (from < to && text[from] === "*") from++; // partial-block decorator after `>`
+  if (to > from && text[to - 1] === "~") to--;
   if (to > from && text[to - 1] === "=") to--; // set-delim close (defensive)
   return from < to ? { from, text: text.slice(from, to) } : null;
 }

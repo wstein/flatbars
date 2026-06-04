@@ -358,6 +358,25 @@ t("dialectDiagnostics — RawBars matches MinBars on the extended rules", () => 
   assert.equal(dialectDiagnostics("{{ a ?? b }}", "rawbars").length, 1);
 });
 
+t("dialectDiagnostics — delim-switched tags use active delimiters when extracting body", () => {
+  // After `{{=<% %>=}}` the active delimiters are `<%` / `%>`. A delim-switched
+  // tag with a single-name body (`<% erb_style_tags %>`) MUST be silent — the
+  // body is a single identifier, identical to a default-delim `{{ name }}`.
+  // Without delim-aware body extraction, `bodyOfTag` would leave `% ... %>` in
+  // the body and the helper-args rule would false-positive on the leading space.
+  const valid = `{{=<% %>=}}
+<% erb_style_tags %>
+<%={{ }}=%>
+{{ ok }}`;
+  assert.deepEqual(dialectDiagnostics(valid, "minbars"), [], "single-identifier body in switched tag stays silent");
+  // But a REAL helper-args call inside a delim-switched tag must still fire.
+  const invalid = `{{=<% %>=}}
+<% lookup x y %>`;
+  const ds = dialectDiagnostics(invalid, "minbars");
+  assert.ok(ds.length >= 1, "helper-args inside switched tag still flagged");
+  assert.match(ds[0].message, /Helper invocations/);
+});
+
 t("parseDiagnostics merges parser and dialect findings", () => {
   // The user's exact case from the session: opens cleanly as fullbars, fires two
   // diagnostics in minbars (the subexpression + the helper invocation later in
