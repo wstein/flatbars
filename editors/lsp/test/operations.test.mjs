@@ -22,11 +22,9 @@ t("operations carry the engine's facts: kind, source, canonical, and prose doc",
     assert.ok(["registered", "scoped", "alias", "synonym"].includes(o.source), `${o.name}: source`);
     if (o.source === "alias" || o.source === "synonym") assert.ok(o.canonical, `${o.name}: canonical target`);
     else assert.equal(o.canonical, null, `${o.name}: no canonical`);
-    assert.equal(typeof o.doc, "string", `${o.name}: doc is a string`);
-    // Every callable operation is documented (the doc field is required in the
-    // prelude); only the scoped variables — which live outside operationDefs —
-    // carry none.
-    if (o.source !== "scoped") assert.ok(o.doc.length > 0, `${o.name}: has a prose doc`);
+    // Every operation is documented — registered ops via the required
+    // OperationDef.doc field, scoped variables via scopedDocs.
+    assert.ok(typeof o.doc === "string" && o.doc.length > 0, `${o.name}: has a prose doc`);
   }
 });
 
@@ -47,6 +45,10 @@ t("hoverMarkdown distinguishes alias/synonym/scoped and includes the prose doc",
   assert.match(up, /inline operation/);
   assert.match(up, /Uppercases its argument\./, "includes the prelude doc prose");
   assert.match(hoverMarkdown(operationByName("downcase")), /deprecated alias of `lowercase`/);
+  // Scoped variables are documented too (scopedDocs).
+  const first = hoverMarkdown(operationByName("first"));
+  assert.match(first, /scoped variable/);
+  assert.match(first, /first iteration/, "scoped variables carry a prose doc");
 });
 
 t("completionItems exclude deprecated aliases; scoped sort after helpers", () => {

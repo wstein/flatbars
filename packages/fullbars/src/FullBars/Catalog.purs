@@ -23,7 +23,7 @@ import Data.Tuple (Tuple(..), fst)
 import FlatBars.Error (Error)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
-import Kernel.Prelude (OperationDef, operationDefs, prelude, preludeAliases, preludeSchema, preludeSynonyms)
+import Kernel.Prelude (OperationDef, operationDefs, prelude, preludeAliases, preludeSchema, preludeSynonyms, scopedDocs)
 import Kernel.Walk (Arity(..))
 
 -- | The set of *registered* helper names (those with a runtime in `prelude`).
@@ -33,12 +33,14 @@ registeredNames =
   Set.fromFoldable
     (map fst (prelude :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))))
 
--- | Each operation's one-line doc, keyed by name. Scoped variables (installed by
--- | block helpers, not in `operationDefs`) have no entry — they carry no doc.
+-- | Each operation's one-line doc, keyed by name — the registered operations from
+-- | `operationDefs` plus the scoped variables block helpers install (`scopedDocs`).
 docByName :: Map.Map String String
 docByName =
   Map.fromFoldable
-    (map (\d -> Tuple d.name d.doc) (operationDefs :: Array (OperationDef (Either Error))))
+    ( map (\d -> Tuple d.name d.doc) (operationDefs :: Array (OperationDef (Either Error))) <>
+        scopedDocs
+    )
 
 renderArity :: Arity -> String
 renderArity = case _ of
@@ -81,8 +83,8 @@ helperCatalogAdoc =
 -- | separates callable helpers from the scoped variables blocks install and from
 -- | the alias/synonym relationships; `canonical` is the target of an alias/synonym
 -- | (empty when none — the generator normalises it to JSON `null`); `doc` is the
--- | operation's one-line description from `OperationDef.doc` (empty for scoped
--- | variables, which carry none).
+-- | operation's one-line description (from `OperationDef.doc` for registered
+-- | operations, `scopedDocs` for scoped variables).
 type OpInfo =
   { name :: String
   , kind :: String

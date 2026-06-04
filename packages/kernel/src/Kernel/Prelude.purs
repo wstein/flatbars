@@ -21,6 +21,7 @@ module Kernel.Prelude
   , preludeSchema
   , preludeAliases
   , preludeSynonyms
+  , scopedDocs
   , preludeUnaryHelpers
   , coreOperationDefs
   , primitiveOperationDefs
@@ -356,7 +357,7 @@ preludeSchema :: Schema
 preludeSchema =
   { allowUnknown: false
   , helpers: Map.fromFoldable
-      (scopedSpecs <> map operationSpec (operationDefs :: Array (OperationDef (Either Error))))
+      (scopedSchema <> map operationSpec (operationDefs :: Array (OperationDef (Either Error))))
   }
 
 -- | The schema for the *core* helpers alone (no value primitives) — used to
@@ -366,39 +367,103 @@ coreSchema :: Schema
 coreSchema =
   { allowUnknown: false
   , helpers: Map.fromFoldable
-      (scopedSpecs <> map operationSpec (coreOperationDefs :: Array (OperationDef (Either Error))))
+      (scopedSchema <> map operationSpec (coreOperationDefs :: Array (OperationDef (Either Error))))
   }
 
 operationSpec :: forall m. OperationDef m -> Tuple String { block :: Boolean, arity :: Arity }
 operationSpec d = Tuple d.name { block: d.block, arity: d.arity }
 
-scopedSpecs :: Array (Tuple String { block :: Boolean, arity :: Arity })
+-- | The scoped variables that block helpers install at runtime — the loop state
+-- | (`each`), the shifted context (`with`), the block-partial body (`partial`).
+-- | They have no standalone runtime so they are not in `operationDefs`, but they
+-- | are real names the editor offers, so each carries a one-line `doc` too,
+-- | surfaced on hover via `scopedDocs`. `scopedSchema` below projects name + block
+-- | + arity for the validator (which ignores the doc).
+scopedSpecs :: Array { name :: String, block :: Boolean, arity :: Arity, doc :: String }
 scopedSpecs =
-  [ Tuple "root" { block: false, arity: Exactly 0 }
-  , Tuple "parent" { block: false, arity: Between 0 1 }
-  , Tuple "index" { block: false, arity: Exactly 0 }
-  , Tuple "key" { block: false, arity: Exactly 0 }
-  , Tuple "first" { block: false, arity: Exactly 0 }
-  , Tuple "last" { block: false, arity: Exactly 0 }
+  [ { name: "root", block: false, arity: Exactly 0, doc: "The root (top-level) context." }
+  , { name: "parent"
+    , block: false
+    , arity: Between 0 1
+    , doc: "The enclosing block's context (chainable)."
+    }
+  , { name: "index", block: false, arity: Exactly 0, doc: "The current loop item's 0-based index." }
+  , { name: "key"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The current key when iterating an object."
+    }
+  , { name: "first", block: false, arity: Exactly 0, doc: "True on the loop's first iteration." }
+  , { name: "last", block: false, arity: Exactly 0, doc: "True on the loop's last iteration." }
   -- `index0` ≡ `index` (both 0-based). It's a canonical synonym, but scoped
   -- vars carry no synonym marker yet, so the catalog still lists it as "scoped"
   -- rather than "synonym of `index`" — tracked follow-up (extend synonymOf to
   -- scopedSpecs). `index1` is 1-based — a distinct helper, not a synonym.
-  , Tuple "index0" { block: false, arity: Exactly 0 }
-  , Tuple "index1" { block: false, arity: Exactly 0 }
-  , Tuple "rindex0" { block: false, arity: Exactly 0 }
-  , Tuple "rindex1" { block: false, arity: Exactly 0 }
-  , Tuple "length" { block: false, arity: Exactly 0 }
-  , Tuple "parent-index" { block: false, arity: Exactly 0 }
-  , Tuple "parent-key" { block: false, arity: Exactly 0 }
-  , Tuple "parent-first" { block: false, arity: Exactly 0 }
-  , Tuple "parent-last" { block: false, arity: Exactly 0 }
-  , Tuple "partial-block" { block: false, arity: Exactly 0 }
+  , { name: "index0"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The current loop item's 0-based index."
+    }
+  , { name: "index1"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The current loop item's 1-based index."
+    }
+  , { name: "rindex0"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The current loop item's 0-based index, counting from the end."
+    }
+  , { name: "rindex1"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The current loop item's 1-based index, counting from the end."
+    }
+  , { name: "length"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The number of items in the current loop."
+    }
+  , { name: "parent-index"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The enclosing loop's current index."
+    }
+  , { name: "parent-key", block: false, arity: Exactly 0, doc: "The enclosing loop's current key." }
+  , { name: "parent-first"
+    , block: false
+    , arity: Exactly 0
+    , doc: "True on the enclosing loop's first iteration."
+    }
+  , { name: "parent-last"
+    , block: false
+    , arity: Exactly 0
+    , doc: "True on the enclosing loop's last iteration."
+    }
+  , { name: "partial-block"
+    , block: false
+    , arity: Exactly 0
+    , doc: "Inside a block partial, the caller's block body (the {{> @partial-block}} target)."
+    }
   -- `yield` — the cross-dialect synonym of `partial-block` (the block-partial
   -- body yield). Hyphen-free so it is writable bare in MaxBars (where `-` is
   -- subtraction); installed under both names in the partial block frame above.
-  , Tuple "yield" { block: false, arity: Exactly 0 }
+  , { name: "yield"
+    , block: false
+    , arity: Exactly 0
+    , doc: "Inside a block partial, the caller's block body (MaxBars' spelling of @partial-block)."
+    }
   ]
+
+-- | The scoped variables projected to schema entries (name → block + arity); the
+-- | validator does not see the doc. Used by `preludeSchema`/`coreSchema`.
+scopedSchema :: Array (Tuple String { block :: Boolean, arity :: Arity })
+scopedSchema = map (\s -> Tuple s.name { block: s.block, arity: s.arity }) scopedSpecs
+
+-- | Each scoped variable's one-line doc, keyed by name — the editor surfaces it on
+-- | hover/completion alongside the registered operations' `OperationDef.doc`.
+scopedDocs :: Array (Tuple String String)
+scopedDocs = map (\s -> Tuple s.name s.doc) scopedSpecs
 
 -- | Lift `Value.stringify` (pure, `Either Error`) into the engine monad.
 stringifyM :: forall m. MonadThrow Error m => Value -> m String

@@ -175,7 +175,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "True on the loop's first iteration."
     },
     {
       "name": "floor",
@@ -231,7 +231,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The current loop item's 0-based index."
     },
     {
       "name": "index0",
@@ -239,7 +239,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The current loop item's 0-based index."
     },
     {
       "name": "index1",
@@ -247,7 +247,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The current loop item's 1-based index."
     },
     {
       "name": "inline",
@@ -287,7 +287,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The current key when iterating an object."
     },
     {
       "name": "last",
@@ -295,7 +295,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "True on the loop's last iteration."
     },
     {
       "name": "length",
@@ -303,7 +303,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The number of items in the current loop."
     },
     {
       "name": "log",
@@ -407,7 +407,7 @@
       "arity": "0–1",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The enclosing block's context (chainable)."
     },
     {
       "name": "parent-first",
@@ -415,7 +415,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "True on the enclosing loop's first iteration."
     },
     {
       "name": "parent-index",
@@ -423,7 +423,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The enclosing loop's current index."
     },
     {
       "name": "parent-key",
@@ -431,7 +431,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The enclosing loop's current key."
     },
     {
       "name": "parent-last",
@@ -439,7 +439,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "True on the enclosing loop's last iteration."
     },
     {
       "name": "partial",
@@ -455,7 +455,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "Inside a block partial, the caller's block body (the {{> @partial-block}} target)."
     },
     {
       "name": "pluck",
@@ -511,7 +511,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The current loop item's 0-based index, counting from the end."
     },
     {
       "name": "rindex1",
@@ -519,7 +519,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The current loop item's 1-based index, counting from the end."
     },
     {
       "name": "root",
@@ -527,7 +527,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "The root (top-level) context."
     },
     {
       "name": "round",
@@ -735,7 +735,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": ""
+      "doc": "Inside a block partial, the caller's block body (MaxBars' spelling of @partial-block)."
     }
   ]
 }
