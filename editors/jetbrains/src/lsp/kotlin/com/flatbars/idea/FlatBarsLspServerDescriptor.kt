@@ -21,4 +21,10 @@ class FlatBarsLspServerDescriptor(project: Project) :
 
   override fun createCommandLine(): GeneralCommandLine =
     GeneralCommandLine("node", FlatBarsSupport.serverScript().toString())
+
+  // Pass the user's default dialect to the server (parity with the VS Code client).
+  // The server uses it for the `.flatbars` umbrella; dialect-specific extensions
+  // resolve from the file name. Read at server start, like the VS Code client.
+  override fun createInitializationOptions(): Any =
+    mapOf("defaultDialect" to FlatBarsSettings.instance.defaultDialect)
 }

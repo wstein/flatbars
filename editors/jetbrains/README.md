@@ -30,6 +30,18 @@ VS Code-style bundle under `src/main/resources/textmate-bundle/`. Both, plus
 `build/` and `.gradle/`, are git-ignored build products. The build needs a **JDK 17
 toolchain** (the IntelliJ Platform baseline) — Gradle can auto-provision it.
 
+### Settings
+
+**Settings ▸ Languages & Frameworks ▸ FlatBars** offers a **default dialect** for
+the `.flatbars` umbrella extension (parity with the VS Code `flatbars.defaultDialect`
+setting); the dialect-specific extensions (`.rawbars`/`.minbars`/`.fullbars`/
+`.maxbars`) resolve themselves. It's an application-level preference
+(`FlatBarsSettings`) passed to the server as an initialization option
+(`FlatBarsLspServerDescriptor.createInitializationOptions`); like the VS Code client,
+it is read when a server starts, so a change applies to files opened afterwards. The
+settings page is part of the Ultimate LSP layer, since the dialect only affects the
+engine-backed server.
+
 ### Why the LSP layer is opt-in
 
 The IntelliJ Platform LSP API (`com.intellij.platform.lsp`) is **Ultimate-only**

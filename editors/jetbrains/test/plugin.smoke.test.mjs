@@ -44,6 +44,7 @@ assert.match(pluginXml, /<depends>org\.jetbrains\.plugins\.textmate<\/depends>/,
 
 const lspXml = readFileSync(resolve(plugin, "src", "lsp", "resources", "META-INF", "flatbars-lsp.xml"), "utf8");
 assert.match(lspXml, /platform\.lsp\.serverSupportProvider implementation="com\.flatbars\.idea\.FlatBarsLspServerSupportProvider"/, "the LSP fragment registers the server support provider");
+assert.match(lspXml, /<applicationConfigurable[^]*?instance="com\.flatbars\.idea\.FlatBarsConfigurable"/, "the LSP fragment registers the default-dialect settings page");
 
 // ── 1. The bundled server speaks LSP ─────────────────────────────────────────
 const child = spawn(process.execPath, [serverBundle], { stdio: ["pipe", "pipe", "inherit"] });

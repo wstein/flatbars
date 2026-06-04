@@ -4,5 +4,13 @@
        fallback registered by the base plugin. -->
   <extensions defaultExtensionNs="com.intellij">
     <platform.lsp.serverSupportProvider implementation="com.flatbars.idea.FlatBarsLspServerSupportProvider"/>
+    <!-- The default-dialect setting (parity with VS Code's flatbars.defaultDialect).
+         Ultimate-only, like the server it feeds; the FlatBarsSettings service is
+         auto-registered via @Service. -->
+    <applicationConfigurable
+      instance="com.flatbars.idea.FlatBarsConfigurable"
+      displayName="FlatBars"
+      groupId="language"
+      id="com.flatbars.settings"/>
   </extensions>
 </idea-plugin>
