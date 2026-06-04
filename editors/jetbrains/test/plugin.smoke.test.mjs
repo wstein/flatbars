@@ -16,7 +16,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import * as rpcNs from "vscode-jsonrpc/node.js";
+import * as rpcNs from "vscode-jsonrpc/node";
 
 const rpc = rpcNs.default ?? rpcNs;
 const here = dirname(fileURLToPath(import.meta.url));

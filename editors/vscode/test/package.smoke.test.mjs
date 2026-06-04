@@ -17,7 +17,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { existsSync, statSync, rmSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import * as rpcNs from "vscode-jsonrpc/node.js";
+import * as rpcNs from "vscode-jsonrpc/node";
 import { LANGUAGE_IDS } from "../../shared/sync.mjs";
 
 const rpc = rpcNs.default ?? rpcNs;
@@ -63,9 +63,9 @@ try {
   const legend = init.capabilities.semanticTokensProvider.legend;
   await conn.sendNotification("initialized", {});
 
-  // languageId 'maxbars' on a `.flatbars` URI with a fullbars default: the dialect
+  // languageId 'maxbars' on a `.rawbars` URI with a fullbars default: the dialect
   // must come from the languageId, so `??` is an operator and "b" a string.
-  const uri = "file:///t/page.flatbars";
+  const uri = "file:///t/page.rawbars";
   await conn.sendNotification("textDocument/didOpen", {
     textDocument: { uri, languageId: "maxbars", version: 1, text: '{{ a ?? "b" }}' },
   });

@@ -51,10 +51,22 @@ export function dialectForLanguageId(languageId) {
 
 // A robust fallback when the languageId is not a dialect (the `flatbars` umbrella,
 // or a host — e.g. JetBrains — that doesn't send our id): map the native extension.
-// Returns null if the extension picks no dialect.
+// Returns null if the extension picks no dialect. Each dialect ships two native
+// extensions — long (`.rawbars`) and short (`.rbars`); both resolve here.
+const URI_EXTENSION_DIALECT = {
+  ".rawbars": "rawbars",
+  ".rbars": "rawbars",
+  ".minbars": "minbars",
+  ".mbars": "minbars",
+  ".fullbars": "fullbars",
+  ".fbars": "fullbars",
+  ".maxbars": "maxbars",
+  ".xbars": "maxbars",
+};
+
 export function dialectForUri(uri) {
   const lower = String(uri).toLowerCase();
-  for (const d of DIALECTS) if (lower.endsWith(`.${d}`)) return d;
+  for (const [ext, d] of Object.entries(URI_EXTENSION_DIALECT)) if (lower.endsWith(ext)) return d;
   return null;
 }
 
@@ -88,9 +100,96 @@ const emitKinds = new Set(vocabulary.lspEmitKinds);
 function flatten(text, dialect) {
   const kinds = new Array(text.length).fill(null);
   const spans = tokenize(text, dialect);
-  for (const s of spans) if (s.role === "tag" && emitKinds.has(s.kind)) fillRange(kinds, s.from, s.to, s.kind);
+  for (const s of spans)
+    if (s.role === "tag" && emitKinds.has(s.kind)) {
+      const [from, to] = shrinkToInner(text, s.from, s.to);
+      fillRange(kinds, from, to, s.kind);
+    }
   for (const s of spans) if (s.role === "interior" && emitKinds.has(s.kind)) fillRange(kinds, s.from, s.to, s.kind);
+  if (emitKinds.has("operation")) paintOperations(kinds, text, spans);
   return kinds;
+}
+
+// Paint operation-position identifiers (helper names) as the `operation` kind.
+// `expr` / `raw` / `partial` tags get a head paint; every tag scans its body for
+// subexpression heads (`(` + IDENT). The TextMate grammar handles control-tag
+// sigils (`#each`, `/if`, …) as `keyword.control.section`, so this only touches
+// what the grammar leaves default. Gated on the operations catalog so plain
+// variables (`{{name}}`) stay default-coloured; partial names always paint.
+const HEAD_OPERATION_TAG_KINDS = new Set(["expr", "raw", "partial"]);
+const NO_OPERATION_TAG_KINDS = new Set(["comment", "raw-block", "error", "set-delimiter", "keyword"]);
+const IDENT_RE = /^[A-Za-z_][\w-]*/;
+
+function paintOperations(kinds, text, spans) {
+  for (const s of spans) {
+    if (s.role !== "tag") continue;
+    if (NO_OPERATION_TAG_KINDS.has(s.kind)) continue;
+    if (HEAD_OPERATION_TAG_KINDS.has(s.kind)) paintHeadOperation(kinds, text, s);
+    paintSubexpressionHeads(kinds, text, s);
+    paintPipeTargets(kinds, text, s);
+  }
+}
+
+// MaxBars `value | helper` — the identifier after every `|` (that isn't part of
+// `||`) is in operation position. Block params (`{{#each xs as |x|}}`) feed
+// non-helper identifiers; the catalog check skips them.
+function paintPipeTargets(kinds, text, s) {
+  for (let i = s.from; i < s.to; i++) {
+    if (text[i] !== "|" || text[i - 1] === "|" || text[i + 1] === "|") continue;
+    let j = i + 1;
+    while (j < s.to && /\s/.test(text[j])) j++;
+    paintIdentAt(kinds, text, j, s.to, false);
+  }
+}
+
+function paintHeadOperation(kinds, text, s) {
+  let i = s.from;
+  // Skip braces, whitespace-control `~`, raw sigil `&`, whitespace.
+  while (i < s.to && /[{}~&\s]/.test(text[i])) i++;
+  // Partial sigil `>` (with optional `*` decorator) then whitespace.
+  if (text[i] === ">") {
+    i++;
+    if (text[i] === "*") i++;
+    while (i < s.to && /\s/.test(text[i])) i++;
+  }
+  paintIdentAt(kinds, text, i, s.to, s.kind === "partial");
+}
+
+function paintSubexpressionHeads(kinds, text, s) {
+  for (let i = s.from; i < s.to - 1; i++) {
+    if (text[i] !== "(" || kinds[i] !== null) continue;
+    let j = i + 1;
+    while (j < s.to && /\s/.test(text[j])) j++;
+    paintIdentAt(kinds, text, j, s.to, false);
+  }
+}
+
+// `alwaysPaint` skips the catalog check (used for partial names — user-defined,
+// never in the catalog). Otherwise we only paint if the identifier resolves as
+// a known operation, and never if it's followed by a `.` or `/` (path access,
+// not a bare helper call).
+function paintIdentAt(kinds, text, i, to, alwaysPaint) {
+  const m = IDENT_RE.exec(text.slice(i, to));
+  if (!m) return;
+  const after = text[i + m[0].length];
+  if (after === "." || after === "/") return;
+  if (!alwaysPaint && !operationByName(m[0])) return;
+  for (let k = i; k < i + m[0].length; k++) if (kinds[k] === null) kinds[k] = "operation";
+}
+
+// Trim braces / whitespace-control sigils / surrounding whitespace off a tag span
+// so the LSP-emitted semantic token covers only the INNER body — `{{~ else ~}}` →
+// `else`. The grammar already paints `{{`, `~`, `}}` (and the `=` of set-delim) as
+// `punctuation.section.embedded.*`; without this trim, the tag-level semantic token
+// (keyword, set-delimiter, error) would override the braces too, blotting out the
+// embedded colour the theme applies. The trim is correct for any tag shape because
+// `{`/`}`/`~`/whitespace never appear in a FlatBars identifier body.
+function shrinkToInner(text, from, to) {
+  let s = from;
+  let e = to;
+  while (s < e && /[{}~\s]/.test(text[s])) s++;
+  while (e > s && /[{}~\s]/.test(text[e - 1])) e--;
+  return [s, e];
 }
 
 function fillRange(arr, from, to, value) {

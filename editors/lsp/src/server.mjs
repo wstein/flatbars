@@ -15,7 +15,7 @@ import {
   MarkupKind,
   TextDocuments,
   TextDocumentSyncKind,
-} from "vscode-languageserver/node.js";
+} from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
   buildLegend,
