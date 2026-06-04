@@ -22,9 +22,10 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Parser (parse, parseWith)
 import FlatBars.Value (Value(..))
-import FullBars (desugarSurfaceWith)
+import FullBars (desugarSurfaceWith, renderSurface)
 import Kernel.Lower (RNode, lower)
 import Linter.Lower (lowerToRawBars)
+import Linter.Migrate (migrateToMaxBars)
 import MaxBars (maxLoopVars, maxOptions, renderMax)
 import RawBars as RawBars
 import Test.Assert (assert')
@@ -95,9 +96,49 @@ rendersSame name dir body =
             )
             (want == got)
 
+-- | The full assist chain end to end: Handlebars --migrate--> MaxBars --lower-->
+-- | RawBars must (a) lower without error — proving the migrator's output is
+-- | actually lowerable — and (b) render identically to the original Handlebars.
+-- | The per-tool suites only proved each hop in isolation; this proves the chain.
+migrateThenLower :: String -> Value -> Effect Unit
+migrateThenLower hbs dat = case migrateToMaxBars hbs of
+  Left e -> assert' ("migrate→lower " <> show hbs <> ": migrate failed: " <> show e) false
+  Right mres -> case lowerToRawBars mres.source of
+    Left e -> assert'
+      ( "migrate→lower " <> show hbs <> ": lower failed: " <> show e <> "\n  maxbars = " <>
+          mres.source
+      )
+      false
+    Right lowered ->
+      assert'
+        ( "migrate→lower " <> show hbs <> ": handlebars " <> show (renderSurface hbs dat)
+            <> " ≠ lowered RawBars "
+            <> show (RawBars.render lowered dat)
+            <> "\n  maxbars = "
+            <> mres.source
+            <> "\n  rawbars = "
+            <> lowered
+        )
+        (renderSurface hbs dat == RawBars.render lowered dat)
+
 main :: Effect Unit
 main = do
   log "Linter lower round-trip tests"
+
+  -- Handlebars → Migrate → Lower → RawBars, render-equivalent to the original.
+  let
+    chainData = VObject $ Map.fromFoldable
+      [ Tuple "items" (VArray [ VString "a", VString "b" ])
+      , Tuple "flag" (VBool true)
+      , Tuple "name" (VString "Zed")
+      , Tuple "empty" (VArray [])
+      ]
+  migrateThenLower "{{#each items}}{{@index}}:{{this}}|{{/each}}" chainData
+  migrateThenLower "{{#each items}}{{@first}}/{{@last}} {{/each}}" chainData
+  migrateThenLower "{{^empty}}none{{/empty}}" chainData
+  migrateThenLower "{{#if flag}}on{{else}}off{{/if}}" chainData
+  migrateThenLower "{{&name}}" chainData
+  migrateThenLower "{{#if flag}}x{{else if name}}y{{/if}}" chainData
 
   -- Round-trip corpus: truthiness-default MaxBars templates spanning
   -- interpolation, paths, sections, inverted sections, each + loop vars, infix

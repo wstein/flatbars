@@ -200,6 +200,14 @@ main = do
   migratesContaining "amp to triple" "{{&x}}" "{{{x}}}"
   migratesContaining "elif rewrite" "{{#if a}}x{{else if b}}y{{/if}}" "{{elif b}}"
 
+  -- The block-partial reference `{{> @partial-block}}` migrates to `{{yield}}`
+  -- (MaxBars' spelling); the `@partial-block` name must not survive (it is not
+  -- valid MaxBars).
+  migratesContaining "partial-block → yield" "x {{> @partial-block}} y" "{{yield}}"
+  assertNotContaining "partial-block @ dropped" "x {{> @partial-block}} y" "@partial-block"
+  -- a normal partial reference is untouched (not mistaken for the block ref).
+  migratesContaining "ordinary partial kept" "{{> header}}" "{{> header}}"
+
   -- ADR-021: @../ and @root auto-migrate to the reserved variable model (no
   -- residual). @../index is the enclosing loop's index; @root.x is the root context.
   migratesContaining "@../index → loop.parent"

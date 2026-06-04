@@ -18,8 +18,9 @@
 -- |  * inside ANY tag interior: the `@`-data names migrate to the MaxBars reserved
 -- |    variable model (ADR-021): `@index`→`loop.index0`, `@first`→`loop.first`,
 -- |    `@key`→`loop.key`, …; `@root.x`→`root.x`; and `../` runs climb —
--- |    `@../index`→`loop.parent.index0`, `@../../x`→`parent.parent.x`. (`@partial-block`
--- |    is left alone.)
+-- |    `@../index`→`loop.parent.index0`, `@../../x`→`parent.parent.x`.
+-- |  * the block-partial reference `{{> @partial-block}}` → `{{yield}}` (MaxBars'
+-- |    spelling; the bare `@partial-block` name is otherwise left alone).
 -- |  * `{{else if c}}` → `{{elif c}}`.
 -- |
 -- | ## Residuals (detected + reported, NOT rewritten — each carries a span,
@@ -43,6 +44,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either)
+import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (Pattern(..))
 import Data.String as String
@@ -53,6 +55,7 @@ import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
 import FlatBars.Token (defaultLexOptions)
+import Kernel.Prelude (blockHelperNames, loopFieldCanonical)
 
 -- | One flagged construct the migrator could not (or should not) rewrite
 -- | mechanically. `kind` is a stable tag (`"parent-data"`, `"ambiguous-section"`,
@@ -80,8 +83,7 @@ type MigrateResult =
 -- | `each`, `with`, `raw`, `apply`, `inline`, `partial`. (`let` is NOT a prelude
 -- | helper — there is no `let` block — so it is intentionally absent.)
 knownBlockHelpers :: Array String
-knownBlockHelpers =
-  [ "if", "unless", "each", "with", "raw", "apply", "inline", "partial" ]
+knownBlockHelpers = blockHelperNames
 
 -- | Migrate Handlebars source to MaxBars source, collecting a residual report.
 -- | A lex failure is propagated as `Left`.
@@ -163,12 +165,17 @@ step src acc = case _ of
       _ ->
         emit (popStack acc) (mapDataInTag (sliceSpan src span))
 
-  -- A separator. `{{else if c}}` → `{{elif c}}`; otherwise verbatim (with
-  -- `@`-data mapping, which auto-migrates any `@../`/`@root` too — ADR-021).
+  -- A separator. `{{else if c}}` → `{{elif c}}`; the Handlebars block-partial
+  -- reference `{{> @partial-block}}` → `{{yield}}` (the MaxBars spelling — dropping
+  -- the `>` sigil, since it is a direct yield, not a partial *named* yield);
+  -- otherwise verbatim (with `@`-data mapping, which auto-migrates `@../`/`@root`
+  -- too — ADR-021).
   RSep span _ interior _ ->
     case rewriteElseIf interior of
       Just rebuilt -> emit acc ("{{" <> rebuilt <> "}}")
-      Nothing -> emit acc (mapDataInTag (sliceSpan src span))
+      Nothing
+        | isPartialBlockRef interior -> emit acc "{{yield}}"
+        | otherwise -> emit acc (mapDataInTag (sliceSpan src span))
 
   RComment span _ _ -> emit acc (sliceSpan src span)
 
@@ -197,6 +204,14 @@ popStack acc = acc { stack = fromMaybe [] (Array.tail acc.stack) }
 --------------------------------------------------------------------------------
 -- Interior rewriting
 --------------------------------------------------------------------------------
+
+-- | Is this separator interior the Handlebars block-partial reference
+-- | `{{> @partial-block}}` (interior `> @partial-block`)? It migrates to the
+-- | MaxBars `{{yield}}` rather than a partial *named* `@partial-block`.
+isPartialBlockRef :: String -> Boolean
+isPartialBlockRef interior = case String.stripPrefix (Pattern ">") (String.trim interior) of
+  Just rest -> String.trim rest == "@partial-block"
+  Nothing -> false
 
 -- | Map the `@`-data names inside the *interior* of a tag's source slice. The
 -- | slice still has its braces/sigil/`~`, so we operate over the whole slice but
@@ -284,21 +299,11 @@ migrateAtName name =
             || isJust (String.stripPrefix (Pattern "root/") name) -> Just name
         | otherwise -> Nothing
 
--- | A loop-variable name (and the ADR-006 aliases) → its canonical `loop` field.
+-- | A loop-variable name (and the ADR-006 aliases) → its canonical bare `loop`
+-- | field, from the shared `Kernel.Prelude.loopFieldCanonical` table (the lifter
+-- | reads the same table for its `loop.`-scoped form).
 loopField :: String -> Maybe String
-loopField = case _ of
-  "index" -> Just "index0"
-  "index0" -> Just "index0"
-  "index1" -> Just "index1"
-  "rindex" -> Just "rindex0"
-  "rindex0" -> Just "rindex0"
-  "rindex1" -> Just "rindex1"
-  "first" -> Just "first"
-  "last" -> Just "last"
-  "key" -> Just "key"
-  "length" -> Just "length"
-  "size" -> Just "length"
-  _ -> Nothing
+loopField name = lookup name loopFieldCanonical
 
 -- | Strip leading `../` runs, counting the depth.
 stripDotDot :: String -> Int -> { depth :: Int, rest :: String }

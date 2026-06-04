@@ -45,6 +45,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Either (Either)
+import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Data.String as String
@@ -54,7 +55,7 @@ import FlatBars.Parser (defaultParseOptions, parseWith)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Sigil, Template)
 import FlatBars.Value (Value(..))
-import Kernel.Prelude (preludeUnaryHelpers)
+import Kernel.Prelude (loopFieldCanonical, preludeUnaryHelpers)
 
 -- | One advisory ambiguity flag raised during a lift. `kind` is a stable tag
 -- | (`"lookup-path"`, `"unrecognised-filter"`, `"multi-arg-call"`); `span` locates
@@ -97,6 +98,13 @@ unaryFilters = Array.filter (not <<< dedicatedSurface) preludeUnaryHelpers
 -- | and `coalesce` (`??`) lift exactly like the comparison/boolean operators;
 -- | conservative parenthesisation (any infix operand is wrapped) keeps the
 -- | re-sugar render-equivalent without modelling the full precedence ladder.
+-- |
+-- | NB: this is the *inverse* of `MaxBars.Expr`'s desugar (`&&`→`and`, …), which
+-- | scatters its pairs as inline `binOp` calls in the precedence ladder rather
+-- | than a single table — so this can't yet derive from one shared source (unlike
+-- | the loop fields, which `Kernel.Prelude.loopFieldCanonical` now unifies). If an
+-- | operator is added to MaxBars but not here, lift degrades gracefully (it leaves
+-- | the call form, which renders identically) rather than misbehaving.
 binaryOps :: Array (Tuple String String)
 binaryOps =
   [ Tuple "and" "&&"
@@ -287,19 +295,7 @@ exprWith span arg expr = case expr of
 -- | *across* dialects to the `loop.` surface, the canon lint normalises the *bare*
 -- | scoped name *within* core/MaxBars. Both treat `index0` (not `index`) as canonical.
 liftLoopVar :: Ident -> Maybe String
-liftLoopVar = case _ of
-  "index0" -> Just "loop.index0"
-  "index1" -> Just "loop.index1"
-  "index" -> Just "loop.index0"
-  "rindex0" -> Just "loop.rindex0"
-  "rindex1" -> Just "loop.rindex1"
-  "rindex" -> Just "loop.rindex0"
-  "first" -> Just "loop.first"
-  "last" -> Just "loop.last"
-  "length" -> Just "loop.length"
-  "size" -> Just "loop.length"
-  "key" -> Just "loop.key"
-  _ -> Nothing
+liftLoopVar name = ("loop." <> _) <$> lookup name loopFieldCanonical
 
 -- | Re-sugar a plain helper application that is not an operator: a path, a nullary
 -- | call, a unary-filter pipe, or a flagged call.

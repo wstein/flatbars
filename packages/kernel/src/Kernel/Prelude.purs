@@ -23,6 +23,8 @@ module Kernel.Prelude
   , preludeSynonyms
   , scopedDocs
   , scopedCanonical
+  , loopFieldCanonical
+  , blockHelperNames
   , preludeUnaryHelpers
   , coreOperationDefs
   , primitiveOperationDefs
@@ -481,6 +483,37 @@ scopedCanonical =
   [ Tuple "index" "index0"
   , Tuple "partial-block" "yield"
   ]
+
+-- | Each loop-variable spelling (the canonical names + the ADR-006 aliases
+-- | `index`/`rindex`/`size`) → its canonical loop field. The single source the
+-- | migrate and lift assists share: `Linter.Migrate` emits the bare field
+-- | (`@index` → `index0`), `Linter.Lift` the `loop`-scoped surface form
+-- | (`(index0)` → `loop.index0`). Defining it once here means a new loop field
+-- | updates both assists with no risk of the two tables drifting apart.
+loopFieldCanonical :: Array (Tuple String String)
+loopFieldCanonical =
+  [ Tuple "index" "index0"
+  , Tuple "index0" "index0"
+  , Tuple "index1" "index1"
+  , Tuple "rindex" "rindex0"
+  , Tuple "rindex0" "rindex0"
+  , Tuple "rindex1" "rindex1"
+  , Tuple "first" "first"
+  , Tuple "last" "last"
+  , Tuple "key" "key"
+  , Tuple "length" "length"
+  , Tuple "size" "length"
+  ]
+
+-- | The names of the prelude's *block* helpers (`d.block`), projected from
+-- | `operationDefs` (the single source). `Linter.Migrate`'s ambiguous-section
+-- | detector uses it: a bare `{{#name}}` whose name is not a known block helper is
+-- | ambiguous (`{{#if name}}` vs `{{#each name}}`?). Deriving it here means a new
+-- | block helper propagates to the migrator with no linter edit.
+blockHelperNames :: Array String
+blockHelperNames =
+  Array.mapMaybe (\d -> if d.block then Just d.name else Nothing)
+    (operationDefs :: Array (OperationDef (Either Error)))
 
 -- | Lift `Value.stringify` (pure, `Either Error`) into the engine monad.
 stringifyM :: forall m. MonadThrow Error m => Value -> m String
