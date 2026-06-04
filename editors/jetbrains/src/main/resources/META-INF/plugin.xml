@@ -1,7 +1,7 @@
 <idea-plugin>
   <id>com.flatbars.flatbars</id>
   <name>FlatBars</name>
-  <vendor url="https://codeberg.org/aion-foundation/flatbars">FlatBars</vendor>
+  <vendor url="https://github.com/wstein/flatbars">FlatBars</vendor>
   <description><![CDATA[
     Syntax support for FlatBars templates (and the Handlebars / Mustache surfaces it
     covers), implementing the two-layer model of ADR-017:
