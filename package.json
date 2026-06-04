@@ -30,7 +30,7 @@
     "check:tmgrammar": "node scripts/check-tmgrammar.mjs",
     "check:vocab": "node scripts/check-vocab.mjs",
     "check:parity": "node scripts/check-parity.mjs",
-    "gen:bundle": "spago build -p flatbars-js && npx --yes esbuild@0.23.0 output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs",
+    "gen:bundle": "spago build -p flatbars-js && npx --yes esbuild@0.28.0 output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs",
     "check:bundle": "spago build -p flatbars-js && node scripts/check-bundle.mjs",
     "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs && node lab/helpers.test.mjs && node lab/output-view.test.mjs",
     "test:lsp": "node editors/lsp/test/tokens.test.mjs && node editors/lsp/test/operations.test.mjs && node editors/lsp/test/protocol.test.mjs",
@@ -53,18 +53,18 @@
   },
   "devDependencies": {
     "@vscode/test-electron": "2.5.2",
-    "@vscode/vsce": "^3.2.1",
-    "esbuild": "0.23.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "0.28.0",
     "handlebars": "^4.7.9",
-    "purescript": "^0.15.15",
+    "purescript": "^0.15.16",
     "purs-tidy": "^0.11.1",
-    "rimraf": "^5.0.0",
-    "spago": "^0.93.0",
-    "vscode-jsonrpc": "^8.2.1",
-    "vscode-languageclient": "^9.0.1",
-    "vscode-languageserver": "^9.0.1",
+    "rimraf": "^6.1.3",
+    "spago": "^1.0.4",
+    "vscode-jsonrpc": "^9.0.0",
+    "vscode-languageclient": "^10.0.0",
+    "vscode-languageserver": "^10.0.0",
     "vscode-languageserver-textdocument": "^1.0.12",
     "vscode-oniguruma": "^2.0.1",
-    "vscode-textmate": "^9.2.0"
+    "vscode-textmate": "^9.3.2"
   }
 }

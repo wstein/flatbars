@@ -8,10 +8,10 @@
 import { resolve } from "node:path";
 
 // Pinned esbuild version — the same one `gen:bundle` pins for the engine bundle
-// (package.json: `npx esbuild@0.23.0`). One esbuild across the repo keeps the
+// (package.json: `npx esbuild@0.28.0`). One esbuild across the repo keeps the
 // shipped server bytes reproducible. Bump here AND in the gen:bundle script
 // together.
-export const ESBUILD_VERSION = "0.23.0";
+export const ESBUILD_VERSION = "0.28.0";
 
 export function assertEsbuildVersion(esbuild) {
   if (esbuild.version !== ESBUILD_VERSION) {
