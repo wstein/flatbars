@@ -17,7 +17,12 @@
     "Snippets"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:rawbars",
+    "onLanguage:minbars",
+    "onLanguage:fullbars",
+    "onLanguage:maxbars"
+  ],
   "contributes": {
     "languages": [
       {
@@ -117,6 +122,40 @@
           "text.html.markdown",
           "text.xml"
         ]
+      }
+    ],
+    "configuration": {
+      "title": "FlatBars",
+      "properties": {
+        "flatbars.defaultDialect": {
+          "type": "string",
+          "enum": [
+            "rawbars",
+            "minbars",
+            "fullbars",
+            "maxbars"
+          ],
+          "default": "fullbars",
+          "description": "Dialect the FlatBars language server falls back to when the document's languageId and URI extension both fail to resolve. Defaults to FullBars (Handlebars-faithful)."
+        }
+      }
+    },
+    "snippets": [
+      {
+        "language": "rawbars",
+        "path": "./snippets/flatbars.json"
+      },
+      {
+        "language": "minbars",
+        "path": "./snippets/flatbars.json"
+      },
+      {
+        "language": "fullbars",
+        "path": "./snippets/flatbars.json"
+      },
+      {
+        "language": "maxbars",
+        "path": "./snippets/flatbars.json"
       }
     ]
   },

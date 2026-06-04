@@ -37,7 +37,12 @@ const langIds = manifest.contributes.languages.map((l) => l.id).sort();
 assert.deepEqual(langIds, [...LANGUAGE_IDS].sort(), "contributes.languages matches the canonical dialect set");
 const [, major, minor] = manifest.engines.vscode.match(/(\d+)\.(\d+)/);
 assert.ok(Number(major) > 1 || (Number(major) === 1 && Number(minor) >= 74), "engines.vscode >= 1.74 (onLanguage auto-generation)");
-assert.ok(Array.isArray(manifest.activationEvents) && manifest.activationEvents.length === 0, "no redundant explicit activationEvents (auto-generated)");
+// Activation events are spelled out — one `onLanguage:<dialect>` per contributed
+// language. Auto-generation since 1.74 would cover the common case, but the
+// explicit list keeps older clients and CI environments deterministic. Each event
+// must reference a contributed language id, otherwise the LSP never starts.
+const expectedActivations = manifest.contributes.languages.map((l) => `onLanguage:${l.id}`).sort();
+assert.deepEqual([...manifest.activationEvents].sort(), expectedActivations, "activationEvents = one onLanguage per contributed dialect");
 
 // ── Build the shippable assets (grammar + bundled server + extension) ────────
 execFileSync(process.execPath, [resolve(ext, "scripts", "sync-assets.mjs")], { stdio: "pipe" });

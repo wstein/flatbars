@@ -8,5 +8,25 @@
   "surroundingPairs": [
     ["\"", "\""],
     ["'", "'"]
-  ]
+  ],
+  "folding": {
+    "//": "FlatBars block tags fold as code. Marker regexp form keeps the editor's folding model dialect-agnostic (no engine call): every block-open is a region start, every matching close is the end. The explicit region markers ({{!--region--}} / {{!--endregion--}}) are an opt-in convention many template languages use; they fold a comment-style range with no semantic meaning to the engine.",
+    "markers": {
+      "start": "^\\s*\\{\\{!--\\s*region\\b.*--\\}\\}|\\{\\{~?[#$<]",
+      "end": "^\\s*\\{\\{!--\\s*endregion\\b.*--\\}\\}|\\{\\{~?/"
+    }
+  },
+  "onEnterRules": [
+    {
+      "//": "Pressing Enter between {{#block}}/{{/block}} on the same line indents the new line by one level and pushes the close down with matching indent — the same affordance VS Code provides between matched HTML tags.",
+      "beforeText": "\\{\\{~?#[\\w./@-]*\\b[^}]*\\}\\}\\s*$",
+      "afterText": "^\\s*\\{\\{~?/",
+      "action": { "indent": "indentOutdent" }
+    }
+  ],
+  "indentationRules": {
+    "//": "Block-open tags increase indent for the following line; block-close tags decrease the current line's indent. Matches the conventions of Handlebars / Mustache plugins so reformat doesn't fight the user.",
+    "increaseIndentPattern": "\\{\\{~?#[\\w./@-]*\\b[^}]*\\}\\}\\s*$",
+    "decreaseIndentPattern": "^\\s*\\{\\{~?/"
+  }
 }

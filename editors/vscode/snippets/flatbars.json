@@ -1,0 +1,72 @@
+{
+  "if": {
+    "prefix": "if",
+    "body": ["{{#if ${1:condition}}}", "  $0", "{{/if}}"],
+    "description": "FlatBars if/endif block"
+  },
+  "if-else": {
+    "prefix": "ifelse",
+    "body": [
+      "{{#if ${1:condition}}}",
+      "  ${2:then}",
+      "{{else}}",
+      "  ${3:else}",
+      "{{/if}}"
+    ],
+    "description": "FlatBars if/else block"
+  },
+  "each": {
+    "prefix": "each",
+    "body": ["{{#each ${1:items}}}", "  {{${2:this}}}", "{{/each}}"],
+    "description": "FlatBars each block"
+  },
+  "each-as": {
+    "prefix": "eachas",
+    "body": [
+      "{{#each ${1:items} as |${2:item} ${3:index}|}}",
+      "  $0",
+      "{{/each}}"
+    ],
+    "description": "FlatBars each block with block params (item + index aliases)"
+  },
+  "with": {
+    "prefix": "with",
+    "body": ["{{#with ${1:value}}}", "  $0", "{{/with}}"],
+    "description": "FlatBars with block (scope into a value)"
+  },
+  "unless": {
+    "prefix": "unless",
+    "body": ["{{#unless ${1:condition}}}", "  $0", "{{/unless}}"],
+    "description": "FlatBars unless block"
+  },
+  "let": {
+    "prefix": "let",
+    "body": ["{{#let ${1:name}=${2:value}}}", "  $0", "{{/let}}"],
+    "description": "FlatBars let block (block-scoped binding)"
+  },
+  "partial": {
+    "prefix": "partial",
+    "body": ["{{> ${1:name}}}"],
+    "description": "FlatBars partial include"
+  },
+  "comment": {
+    "prefix": "comment",
+    "body": ["{{! ${1:text} }}"],
+    "description": "FlatBars short comment"
+  },
+  "comment-long": {
+    "prefix": "comment-long",
+    "body": ["{{!-- ${1:text} --}}"],
+    "description": "FlatBars long comment (body may contain }})"
+  },
+  "raw-block": {
+    "prefix": "rawblock",
+    "body": ["{{{{${1:#raw}}}}}", "  $0", "{{{{/${1:raw}}}}}"],
+    "description": "FlatBars raw block (quad-brace, contents left literal)"
+  },
+  "set-delimiter": {
+    "prefix": "delim",
+    "body": ["{{= ${1:<%} ${2:%>} =}}"],
+    "description": "FlatBars set-delimiter directive"
+  }
+}

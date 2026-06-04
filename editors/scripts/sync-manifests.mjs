@@ -54,6 +54,28 @@ function genVscodePackageJson() {
   pkg.qna = "https://github.com/wstein/flatbars/discussions";
   pkg.categories = ["Programming Languages", "Snippets"];
   pkg.galleryBanner = { color: "#7c4dff", theme: "dark" };
+  // Explicit activation events. With contributes.languages alone VS Code
+  // auto-activates on every language id (since 1.74), but spelling them out
+  // means older clients and CI test environments behave the same way.
+  pkg.activationEvents = LANGUAGES.map((l) => `onLanguage:${l.id}`);
+  // Settings surface for flatbars.defaultDialect — the same option the LSP
+  // client reads. Surfacing it via contributes.configuration makes it
+  // tunable from the Settings UI and IntelliSense-discoverable in JSON.
+  pkg.contributes.configuration = {
+    title: "FlatBars",
+    properties: {
+      "flatbars.defaultDialect": {
+        type: "string",
+        enum: LANGUAGES.map((l) => l.id),
+        default: "fullbars",
+        description: "Dialect the FlatBars language server falls back to when the document's languageId and URI extension both fail to resolve. Defaults to FullBars (Handlebars-faithful).",
+      },
+    },
+  };
+  pkg.contributes.snippets = LANGUAGES.map((l) => ({
+    language: l.id,
+    path: "./snippets/flatbars.json",
+  }));
   pkg.contributes.languages = LANGUAGES.map((l) => ({
     id: l.id,
     aliases: l.aliases,
