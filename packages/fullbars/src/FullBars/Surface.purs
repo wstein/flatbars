@@ -52,7 +52,6 @@ module FullBars.Surface
   , LoopVars
   , noLoopVars
   , reservedScope
-  , hoistInline
   , bareInlineOffset
   ) where
 
@@ -470,34 +469,6 @@ expandElseIf = map toElif
       | Just { head: App "if" [], tail } <- Array.uncons args
       , not (Array.null tail) -> Sep sp "elif" tail
     other -> other
-
--- | Hoist `{{#inline "name"}}body{{/inline}}` definitions out of a (desugared)
--- | template into a partial registry, returning that registry and the template
--- | with the `inline` blocks removed. Definitions are *global* to the render
--- | (not lexically scoped) — a simplification of Handlebars' block scoping.
-hoistInline :: Template -> { partials :: Map String Template, template :: Template }
-hoistInline nodes = Array.foldl step { partials: Map.empty, template: [] } nodes
-  where
-  step acc = case _ of
-    Block _ _ "inline" args body
-      | Just name <- inlineName args ->
-          let
-            inner = hoistInline body
-          in
-            acc
-              { partials = Map.insert name inner.template (Map.union acc.partials inner.partials) }
-    Block sp sig name args body ->
-      let
-        inner = hoistInline body
-      in
-        acc
-          { partials = Map.union acc.partials inner.partials
-          , template = Array.snoc acc.template (Block sp sig name args inner.template)
-          }
-    other -> acc { template = Array.snoc acc.template other }
-  inlineName args = case Array.head args of
-    Just (Lit (VString n)) -> Just n
-    _ -> Nothing
 
 -- | The source offset of the first *bare* `{{#inline …}}` block, searched
 -- | depth-first through block bodies (`Nothing` when there is none). The inline

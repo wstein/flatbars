@@ -4,7 +4,7 @@ module Test.RawBars.Main where
 
 import Prelude
 
-import Data.Either (Either(..), isLeft)
+import Data.Either (Either(..), isLeft, isRight)
 import Data.Map as Map
 import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
@@ -81,6 +81,25 @@ main = do
         "{{#partial \"layout\" this}}HI{{/partial}}"
         (obj [])
         == Right "<HI>"
+    )
+
+  -- Inline-partial hoisting — parity with FullBars/MaxBars (ADR-005/008): a bare
+  -- {{#inline "x"}} in the template defines a partial (hoisted by the shared
+  -- Kernel.Hoist.hoistInline), invoked by {{#partial "x" this}} with {{{yield}}}
+  -- the caller's body. Same engine; only the surface syntax differs.
+  assert' "inline: {{#inline}} is hoisted, {{{yield}}} renders the caller body"
+    ( render
+        "{{#inline \"frame\"}}<{{{yield}}}>{{/inline}}{{#partial \"frame\" this}}HI{{/partial}}"
+        (obj [])
+        == Right "<HI>"
+    )
+  -- ...and the same template compiles to JS (the hoisted partial is emitted),
+  -- where it was previously a no-op inline + an unregistered-partial runtime error.
+  assert' "compile: {{#inline}} is hoisted into the compiled module"
+    ( isRight
+        ( compileJs
+            "{{#inline \"frame\"}}<{{{yield}}}>{{/inline}}{{#partial \"frame\" this}}HI{{/partial}}"
+        )
     )
 
   -- compile core syntax to a JS module.

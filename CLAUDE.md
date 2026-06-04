@@ -147,6 +147,8 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
 - **`kernel`** — the shared engine machinery, dialect-agnostic: `Engine` (IoC
   interpret driver), `Env`/`RefEnv`, `Helper` (arity combinators), `Lower`
   (structural → typed "real" AST), `Prelude` (the reference helpers + schema),
+  `Hoist` (`hoistInline`: lift `{{#inline}}` definitions into the partial registry —
+  a shared pre-pass every dialect runs, not a surface feature),
   `Render` (`runResolved`: parse → seed the prelude env with the engine's fixed
   truthiness rule → run), `Value`, `Walk`.
 - **`fullbars`** — the reference engine + its surface dialect (`{{ }}`

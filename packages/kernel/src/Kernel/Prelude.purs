@@ -1358,7 +1358,7 @@ partialH ctl args = case args of
 
 -- | `inline` defines a partial (`{{#inline "name"}}body{{/inline}}`). The
 -- | definition is hoisted into the partial registry *before* rendering (see
--- | `FullBars.Surface.hoistInline`), so at render time the block itself emits
--- | nothing.
+-- | `Kernel.Hoist.hoistInline`, run by every dialect), so at render time the block
+-- | itself emits nothing.
 inlineH :: forall m. Applicative m => Operation m (RefEnv m)
 inlineH _ _ = pure (VSafe "")

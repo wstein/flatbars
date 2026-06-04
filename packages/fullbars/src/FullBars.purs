@@ -12,6 +12,7 @@ module FullBars
   , module Kernel.Prelude
   , module Kernel.Lower
   , module Kernel.Render
+  , module Kernel.Hoist
   , module FullBars.Surface
   , surfaceClauses
   , checkBareInline
@@ -39,10 +40,11 @@ import FlatBars.Error (Error, ParseError(..), renderParseErrorAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
-import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, hoistInline, noLoopVars)
+import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, noLoopVars)
 import Kernel.Analyse (Finding, findings, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTruthy)
+import Kernel.Hoist (hoistInline)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (blockHelperMissing, prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)

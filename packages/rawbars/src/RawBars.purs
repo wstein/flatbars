@@ -40,6 +40,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, registerAll, registerPartials, withTruthy)
+import Kernel.Hoist (hoistInline)
 import Kernel.Render (formatError, runResolved)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (nonEmpty)
@@ -80,20 +81,36 @@ compileWith opts src = do
   { directives, nodes } <- parseWith
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
-  pure \dat -> runResolved directives (withTruthy nonEmpty) nodes dat
+  let h = hoistInline nodes
+  pure \dat -> runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials)
+    h.template
+    dat
 
 -- | One-shot render of core source against data.
 render :: String -> Value -> Either String String
 render src dat = case parseWith coreOptions src of
   Left pe -> Left (show (ParseFailure pe))
-  Right { directives, nodes } -> lmap show (runResolved directives (withTruthy nonEmpty) nodes dat)
+  Right { directives, nodes } ->
+    let
+      h = hoistInline nodes
+    in
+      lmap show
+        ( runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials) h.template
+            dat
+        )
 
 -- | `render` with located parse-error messages (`line:column:`).
 renderDiag :: String -> Value -> Either String String
 renderDiag src dat = case parseWith coreOptions src of
   Left pe -> Left (renderParseErrorAt src pe)
   Right { directives, nodes } ->
-    lmap (formatError src) (runResolved directives (withTruthy nonEmpty) nodes dat)
+    let
+      h = hoistInline nodes
+    in
+      lmap (formatError src)
+        ( runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials) h.template
+            dat
+        )
 
 -- | Render core source against native PureScript data (lowered via `ToValue`).
 renderValue :: forall a. ToValue a => String -> a -> Either String String
@@ -118,13 +135,16 @@ renderWithOperations operations partialSrcs src dat =
       Left pe -> Left (renderParseErrorAt src pe)
       Right { directives, nodes } ->
         let
+          h = hoistInline nodes
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          -- Inline definitions in the template win over same-named external
+          -- partials (left-biased union), matching FullBars.
           setup =
             withTruthy nonEmpty
               <<< registerAll operations
-              <<< registerPartials externalT
+              <<< registerPartials (Map.union h.partials externalT)
         in
-          lmap (formatError src) (runResolved directives setup nodes dat)
+          lmap (formatError src) (runResolved directives setup h.template dat)
   where
   compilePartial (Tuple name s) = case parseWith coreOptions s of
     Left e -> Left (renderParseErrorAt s e)
@@ -134,15 +154,23 @@ renderWithOperations operations partialSrcs src dat =
 renderAff :: String -> Value -> Aff (Either Error String)
 renderAff src dat = case parseWith coreOptions src of
   Left pe -> pure (Left (ParseFailure pe))
-  Right { directives, nodes } -> runExceptT (runResolved directives (withTruthy nonEmpty) nodes dat)
+  Right { directives, nodes } ->
+    let
+      h = hoistInline nodes
+    in
+      runExceptT
+        ( runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials) h.template
+            dat
+        )
 
 --------------------------------------------------------------------------------
 -- Compilation (core syntax → JS, via the shared driver + FullBars Emit)
 --------------------------------------------------------------------------------
 
--- | Compile core source to a JS ES module. Core does *not* hoist `{{#inline}}`
--- | (matching `render`): an `{{#inline}}` is a no-op and a partial to an
--- | unregistered name is a runtime error.
+-- | Compile core source to a JS ES module. `{{#inline "name"}}` definitions are
+-- | hoisted into the partial registry (the shared `Kernel.Hoist.hoistInline`),
+-- | exactly as `render` does and as FullBars/MaxBars compile — so RawBars differs
+-- | only in surface syntax, not capability (ADR-005/008).
 compileJs :: String -> Either ParseError String
 compileJs = compileJsWith coreOptions
 
@@ -152,4 +180,8 @@ compileJsWith opts src = do
   { nodes } <- parseWith
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
-  pure (Driver.compile (metaFor "rt.truthyNonEmpty") fullbarsEmit [] nodes)
+  let h = hoistInline nodes
+  pure
+    ( Driver.compile (metaFor "rt.truthyNonEmpty") fullbarsEmit (Map.toUnfoldable h.partials)
+        h.template
+    )

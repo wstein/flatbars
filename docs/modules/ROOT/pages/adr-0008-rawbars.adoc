@@ -51,3 +51,20 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
   the one most authors should reach for. The module docstring still says "the FullBars reference
   engine"/"the compiler's FullBars `Emit`," which is cosmetic drift: that engine and that `Emit` now
   live in `kernel`/`flatbars-compile`, which is *why* the closure is FullBars-free.
+
+== Amendment (2026-06-04): inline-partial hoisting is shared, so RawBars has full parity
+
+RawBars previously could *not* hoist `pass:[{{#inline "name"}}…{{/inline}}]` definitions: the
+`hoistInline` pre-pass lived in `FullBars.Surface`, so only FullBars/MaxBars ran it, and a RawBars
+`pass:[{{#inline}}]` was a no-op (the matching `pass:[{{#partial}}]` then failed as an unregistered
+partial). That was a *functional* gap, contradicting this ADR's "same engine, no rewrite": hoisting
+is not surface sugar — it is the semantic step that populates the registry the prelude's `partial`
+helper reads.
+
+`hoistInline` is now `Kernel.Hoist.hoistInline`, a shared concept every dialect runs. RawBars'
+`render`/`renderWithOperations`/`compileJs` hoist before rendering/compiling exactly as
+FullBars/MaxBars do; FullBars/MaxBars re-import it (behaviour unchanged). So `pass:[{{#inline}}]` +
+`pass:[{{{yield}}}]` (the bare-core spelling of FullBars' `pass:[{{> @partial-block}}]`) now work in
+RawBars, and the three dialects differ *only* in surface syntax (and truthiness, ADR-022) — the
+ladder's actual contract. Inline-free templates render byte-identically (the hoist is a no-op on
+them), so the change is additive; `test:compile` stays 300/300.
