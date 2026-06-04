@@ -56,7 +56,8 @@ export const sections = [
       { id: "split", label: "$split", note: "The inverse of $join — string to array.",
         data: {}, expr: '$split("a-b-c", "-")', expect: ["a", "b", "c"] },
       { id: "replace", label: "$replace (with regex)", note: "A /…/ literal replaces by pattern; here, redact a date.",
-        data: { line: "2024-01-01 ERROR disk full" }, expr: '$replace(line, /\\d{4}-\\d{2}-\\d{2}/, "<date>")', expect: "<date> ERROR disk full" },
+        data: { line: "2024-01-01 ERROR disk full" }, expr: `$replace(line, /\\d{4}-\\d{2}-\\d{2}/,
+  "<date>")`, expect: "<date> ERROR disk full" },
     ],
   },
   {
@@ -162,7 +163,10 @@ export const sections = [
   function($p) { $p.age >= 35 }
 ).n`, expect: ["Ada", "Lin"] },
       { id: "hofReduce", label: "$reduce", note: "Fold a list to a single value with an accumulator.",
-        data: cart, expr: "$reduce(items.price, function($acc, $v) { $acc + $v }, 0)", expect: 17 },
+        data: cart, expr: `$reduce(items.price,
+  function($acc, $v) { $acc + $v },
+  0
+)`, expect: 17 },
     ],
   },
 ];
