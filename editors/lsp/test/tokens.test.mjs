@@ -250,25 +250,30 @@ t("operation painter: dialect-cross — MaxBars `??` is silent in MinBars", () =
   for (const k of min) assert.notEqual(k, "operator", "MinBars must NOT paint `??` as operator");
 });
 
-// ── Delimiter-switched tags: LSP paints what the grammar can't see ──────────
-t("tokensOf paints whole-tag spans for non-default delimiters", () => {
+// ── Delimiter-switched tags: LSP paints the new delimiters as `set-delimiter` ──
+t("tokensOf paints opener+closer of non-default-delim tags", () => {
   // After `{{=<% %>=}}` the active delimiters become `<%` / `%>`. The grammar
   // is hard-coded to `{{` / `}}` and can't recognise `<%name%>` as a tag; the
-  // LSP fills that gap by emitting a semantic token over the full span. After
-  // the second directive switches back, the grammar takes over again and the
-  // LSP stays silent on the now-default-delimited tags.
+  // LSP paints ONLY the `<%` and `%>` (as `set-delimiter`, the same kind as
+  // the directive that introduced them) so the body stays default-coloured
+  // and the tag reads like default-delim tags do under the grammar.
   const src = "{{=<% %>=}}\n<%name%>\n{{age}}\n<%={{ }}=%>\n{{name}}\n{{age}}";
-  const kinds = tokensOf(src, "minbars").map((t) => `L${t.line}/${t.kind}`);
-  // set-delim directives both fire as `set-delimiter` (lspEmitKinds).
-  assert.ok(kinds.some((k) => k === "L0/set-delimiter"), "first directive painted");
-  assert.ok(kinds.some((k) => k === "L3/set-delimiter"), "second directive painted");
-  // <%name%> on line 1: switched delimiter, the LSP paints the whole `expr` tag.
-  assert.ok(kinds.some((k) => k === "L1/expr"), "<%name%> painted as expr by the LSP");
-  // {{age}} between switches (line 2) is plain content — the engine doesn't
-  // emit a tag, so the LSP doesn't either. {{name}} / {{age}} after the second
-  // switch (lines 4/5) are default-delim, painted by the grammar — no LSP token.
-  assert.ok(!kinds.some((k) => k === "L2/expr"), "{{age}} between switches stays content");
-  assert.ok(!kinds.some((k) => k === "L4/expr"), "{{name}} after switch-back stays grammar-painted");
+  const toks = tokensOf(src, "minbars");
+  // Both directives are painted as `set-delimiter` (inner body).
+  const directives = toks.filter((t) => t.line === 0 || t.line === 3);
+  assert.equal(directives.length, 2, "two set-delim directives painted");
+  assert.ok(directives.every((t) => t.kind === "set-delimiter"));
+  // <%name%> on line 1: opener at C0 (2 chars), closer at C6 (2 chars), body
+  // (`name`) untouched.
+  const lineOneToks = toks.filter((t) => t.line === 1);
+  assert.equal(lineOneToks.length, 2, "opener + closer painted, body untouched");
+  assert.deepEqual(lineOneToks.map((t) => ({ char: t.char, len: t.length, kind: t.kind })), [
+    { char: 0, len: 2, kind: "set-delimiter" },
+    { char: 6, len: 2, kind: "set-delimiter" },
+  ]);
+  // {{age}} between switches (line 2): plain content, engine doesn't see a tag.
+  // {{name}} / {{age}} after switch-back (lines 4/5): grammar-painted, no LSP.
+  assert.equal(toks.filter((t) => t.line === 2 || t.line === 4 || t.line === 5).length, 0);
 });
 
 // ── Dialect diagnostics: shapes the parser accepts but the dialect rejects ──

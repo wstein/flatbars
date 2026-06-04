@@ -297,20 +297,35 @@ const emitKinds = new Set(vocabulary.lspEmitKinds);
 function flatten(text, dialect) {
   const kinds = new Array(text.length).fill(null);
   const spans = tokenize(text, dialect);
+  // Track the active delimiter pair across `{{=A B=}}` directives — starts at
+  // the grammar's default `{{` / `}}` and updates on every directive in source
+  // order. The TextMate grammar can't follow the switch (it's stateless), so the
+  // LSP fills the gap below.
+  let openDelim = "{{";
+  let closeDelim = "}}";
   for (const s of spans) {
     if (s.role !== "tag") continue;
+    if (s.kind === "set-delimiter") {
+      const [from, to] = shrinkToInner(text, s.from, s.to);
+      fillRange(kinds, from, to, s.kind);
+      const switched = parseSetDelimBody(text.slice(s.from, s.to));
+      if (switched) {
+        openDelim = switched.open;
+        closeDelim = switched.close;
+      }
+      continue;
+    }
     if (emitKinds.has(s.kind)) {
       const [from, to] = shrinkToInner(text, s.from, s.to);
       fillRange(kinds, from, to, s.kind);
-    } else if (isDelimiterSwitched(text, s)) {
-      // After a `{{=A B=}}` directive the active delimiters change (ADR-015) and
-      // the stateless TextMate grammar can no longer match subsequent tags —
-      // `<%name%>` reads as content. The engine still tokenises them correctly,
-      // so the LSP fills the gap by emitting whole-tag semantic tokens for any
-      // tag whose delimiters aren't the grammar's hard-coded default `{{`/`}}`.
-      // This is the one place the LSP paints tag-level tokens for an `expr` /
-      // `block-open` / etc. kind outside `lspEmitKinds`.
-      fillRange(kinds, s.from, s.to, s.kind);
+    } else if (text[s.from] !== "{") {
+      // Delimiter-switched tag — the stateless grammar can't see it because it
+      // hard-codes `{{` / `}}`. Paint ONLY the opener and closer (as the same
+      // `set-delimiter` kind as the directive that introduced them — themes
+      // paint them like the directive), so the body stays default-coloured and
+      // the tag reads visually consistent with default-delim tags.
+      fillRange(kinds, s.from, s.from + openDelim.length, "set-delimiter");
+      fillRange(kinds, s.to - closeDelim.length, s.to, "set-delimiter");
     }
   }
   for (const s of spans) if (s.role === "interior" && emitKinds.has(s.kind)) fillRange(kinds, s.from, s.to, s.kind);
@@ -318,12 +333,19 @@ function flatten(text, dialect) {
   return kinds;
 }
 
-// True when the tag's opener is not the grammar's default `{{` (i.e. a directive
-// earlier in the document switched the active delimiters via `{{=A B=}}`). The
-// TextMate grammar hard-codes `{{`/`}}` patterns, so a tag opening with anything
-// else needs the LSP to paint the whole span.
-function isDelimiterSwitched(text, s) {
-  return text[s.from] !== "{";
+// Parse `{{=A B=}}` (or the equivalent under any active pair) — strip the
+// surrounding open / `=` / `=` / close brackets and split the inner pair on
+// whitespace. Returns `null` for malformed input (we fall back to the previous
+// active pair rather than corrupting subsequent paint).
+function parseSetDelimBody(tag) {
+  // Strip leading opener (run of `{` or `<` etc. — anything up to the `=`):
+  const open = tag.search(/=/);
+  const close = tag.lastIndexOf("=");
+  if (open < 0 || close <= open) return null;
+  const body = tag.slice(open + 1, close).trim();
+  const parts = body.split(/\s+/);
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  return { open: parts[0], close: parts[1] };
 }
 
 // Paint operation-position identifiers (helper names) as the `operation` kind.
