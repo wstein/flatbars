@@ -399,6 +399,61 @@ t("foldingRangesOf drops same-line opens (zero-length folds are invalid LSP)", (
   assert.deepEqual(foldingRangesOf("{{#if x}}body{{/if}}", "fullbars"), []);
 });
 
+t("paintOperations head identifier paints under switched delimiters", () => {
+  // `lookup` is a catalogue operation; after `{{=<% %>=}}` it should still
+  // paint via paintHeadOperation, which previously skipped only `{}~&\s` and
+  // failed on the `<` opener.
+  const src = "{{=<% %>=}}\n<%lookup x%>";
+  const toks = tokensOf(src, "minbars");
+  const opTok = toks.find((t) => t.line === 1 && t.kind === "operation");
+  assert.ok(opTok, "head operation painted under <% %>");
+  assert.equal(src.split("\n")[1].slice(opTok.char, opTok.char + opTok.length), "lookup");
+});
+
+t("shrinkToInner trims the active delimiter pair, not just {} / }}", () => {
+  // For a `keyword`-kind tag (`{{else}}` under default delimiters), shrinkToInner
+  // must trim exactly the active opener / closer length. Default-delim case is
+  // the canonical use site of shrinkToInner; verify the keyword span covers
+  // only `else`, not `{{else}}`.
+  const src = "{{else}}";
+  const toks = tokensOf(src, "fullbars");
+  const kw = toks.find((t) => t.kind === "keyword");
+  assert.ok(kw, "keyword span emitted");
+  assert.equal(src.slice(kw.char, kw.char + kw.length), "else", "keyword span = `else` only");
+  // Under switched delimiters the engine reclassifies `<%else%>` as plain
+  // `expr` (clause-separator detection is hard-coded to the default `{{` /
+  // `}}`), so the keyword path isn't exercised here — the paintOperations
+  // catalogue test below covers the visible behaviour.
+});
+
+t("paintOperations finds `else` (a catalogue entry) under switched delimiters", () => {
+  // The engine emits `<%else%>` as `expr` after a switch (keyword detection
+  // is delim-bound). `else` IS in operations.json, so paintHeadOperation
+  // paints it; the test proves the head walker advances past the `<%` opener.
+  const src = "{{=<% %>=}}\n<%else%>";
+  const toks = tokensOf(src, "minbars");
+  const op = toks.find((t) => t.line === 1 && t.kind === "operation");
+  assert.ok(op, "head identifier paints under <% %>");
+  assert.equal(src.split("\n")[1].slice(op.char, op.char + op.length), "else");
+  // The brace pair carries set-delimiter (not the body).
+  const opener = toks.find((t) => t.line === 1 && t.char === 0 && t.kind === "set-delimiter");
+  const closer = toks.find((t) => t.line === 1 && t.char === 6 && t.kind === "set-delimiter");
+  assert.ok(opener && closer, "<% and %> painted as set-delimiter (theme-mapped to embedded colour)");
+});
+
+t("foldingRangesOf pairs blocks opened under switched delimiters", () => {
+  // `<%#each xs%>` / `<%/each%>` — bodyWord must resolve `each` for both,
+  // otherwise both return "" and the fold pairs incorrectly.
+  const src = "{{=<% %>=}}\n<%#each xs%>\n  body\n<%/each%>";
+  const folds = foldingRangesOf(src, "minbars");
+  assert.equal(folds.length, 1);
+  assert.equal(folds[0].start, 1);
+  assert.equal(folds[0].end, 3);
+  const syms = documentSymbolsOf(src, "minbars");
+  assert.equal(syms.length, 1);
+  assert.equal(syms[0].name, "#each");
+});
+
 t("foldingRangesOf folds raw-block regions as a whole", () => {
   // Handlebars-form raw block (no `#` sigil; the `#` form is FlatBars-native and
   // would parse as an `error` in `fullbars`). The single raw-block span covers

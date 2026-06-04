@@ -147,22 +147,13 @@ export function dialectDiagnostics(text, dialect) {
 function dialectRulesFor(text, dialect) {
   if (dialect !== "minbars" && dialect !== "rawbars") return [];
   const out = [];
-  // Track the active delimiter pair across `{{=A B=}}` directives in source
-  // order — same machinery as `flatten`. Without it, `bodyOfTag` would not
-  // strip `<%` / `%>` from a delim-switched tag and the helper-args rule would
-  // false-positive on the space between the delimiter and the body.
-  let openDelim = "{{";
-  let closeDelim = "}}";
-  for (const s of tokenize(text, dialect)) {
+  // Walk the per-span active-delim context (same machinery `flatten` uses) so
+  // `bodyOfTag` strips the correct opener/closer length for delim-switched
+  // tags. Without this, `<% lookup x %>` would leave `% lookup x %>` in the
+  // body and the helper-args rule would false-positive on the leading space.
+  for (const { span: s, openDelim, closeDelim } of spansWithActiveDelims(tokenize(text, dialect), text)) {
     if (s.role !== "tag") continue;
-    if (s.kind === "set-delimiter") {
-      const switched = parseSetDelimBody(text.slice(s.from, s.to));
-      if (switched) {
-        openDelim = switched.open;
-        closeDelim = switched.close;
-      }
-      continue;
-    }
+    if (s.kind === "set-delimiter") continue; // skip the directive itself
     if (s.kind === "comment" || s.kind === "raw-block" || s.kind === "error") continue;
     const body = bodyOfTag(text, s, openDelim, closeDelim);
     if (!body) continue;
@@ -326,28 +317,24 @@ const emitKinds = new Set(vocabulary.lspEmitKinds);
 function flatten(text, dialect) {
   const kinds = new Array(text.length).fill(null);
   const spans = tokenize(text, dialect);
-  // Track the active delimiter pair across `{{=A B=}}` directives — starts at
-  // the grammar's default `{{` / `}}` and updates on every directive in source
-  // order. The TextMate grammar can't follow the switch (it's stateless), so the
-  // LSP fills the gap below.
-  let openDelim = "{{";
-  let closeDelim = "}}";
-  for (const s of spans) {
+  // Precompute, for every tag span, the active delimiter pair AT the time the
+  // engine emitted it — the pair that opened and closed it. Set-delimiter
+  // directives are themselves emitted at the OLD pair (they use it to open),
+  // then update the pair for everything that follows. Every body-walking
+  // helper below threads through this resolution so it never assumes
+  // `{{` / `}}` and silently misbehaves after a switch.
+  const ctxBySpan = spansWithActiveDelims(spans, text);
+  for (const { span: s, openDelim, closeDelim } of ctxBySpan) {
     if (s.role !== "tag") continue;
     if (s.kind === "set-delimiter") {
-      const [from, to] = shrinkToInner(text, s.from, s.to);
+      const [from, to] = shrinkToInner(text, s.from, s.to, openDelim, closeDelim);
       fillRange(kinds, from, to, s.kind);
-      const switched = parseSetDelimBody(text.slice(s.from, s.to));
-      if (switched) {
-        openDelim = switched.open;
-        closeDelim = switched.close;
-      }
       continue;
     }
     if (emitKinds.has(s.kind)) {
-      const [from, to] = shrinkToInner(text, s.from, s.to);
+      const [from, to] = shrinkToInner(text, s.from, s.to, openDelim, closeDelim);
       fillRange(kinds, from, to, s.kind);
-    } else if (text[s.from] !== "{") {
+    } else if (!startsWithOpen(text, s.from, openDelim) || openDelim !== "{{") {
       // Delimiter-switched tag — the stateless grammar can't see it because it
       // hard-codes `{{` / `}}`. Paint ONLY the opener and closer (as the same
       // `set-delimiter` kind as the directive that introduced them — themes
@@ -358,8 +345,36 @@ function flatten(text, dialect) {
     }
   }
   for (const s of spans) if (s.role === "interior" && emitKinds.has(s.kind)) fillRange(kinds, s.from, s.to, s.kind);
-  if (emitKinds.has("operation")) paintOperations(kinds, text, spans);
+  if (emitKinds.has("operation")) paintOperations(kinds, text, ctxBySpan);
   return kinds;
+}
+
+// Project the engine's flat span stream onto a stream of (span, active opener,
+// active closer) records. The opener / closer the engine USED for the span is
+// the active pair AT EMISSION — a set-delimiter directive itself parses under
+// the old pair and only afterwards switches to the new one. Every per-span
+// helper that walks the tag body needs this to skip the right number of
+// characters off each end.
+function spansWithActiveDelims(spans, text) {
+  let openDelim = "{{";
+  let closeDelim = "}}";
+  const out = [];
+  for (const s of spans) {
+    out.push({ span: s, openDelim, closeDelim });
+    if (s.role === "tag" && s.kind === "set-delimiter") {
+      const switched = parseSetDelimBody(text.slice(s.from, s.to));
+      if (switched) {
+        openDelim = switched.open;
+        closeDelim = switched.close;
+      }
+    }
+  }
+  return out;
+}
+
+function startsWithOpen(text, at, openDelim) {
+  for (let i = 0; i < openDelim.length; i++) if (text[at + i] !== openDelim[i]) return false;
+  return true;
 }
 
 // Parse `{{=A B=}}` (or the equivalent under any active pair) — strip the
@@ -392,51 +407,56 @@ const operationPositionByKind = (() => {
 })();
 const IDENT_RE = /^[A-Za-z_][\w-]*/;
 
-function paintOperations(kinds, text, spans) {
-  for (const s of spans) {
+function paintOperations(kinds, text, ctxBySpan) {
+  for (const { span: s, openDelim, closeDelim } of ctxBySpan) {
     if (s.role !== "tag") continue;
     const pos = operationPositionByKind.get(s.kind);
     if (!pos || pos === "none") continue;
-    if (pos === "head") paintHeadOperation(kinds, text, s, false);
-    else if (pos === "always-head") paintHeadOperation(kinds, text, s, true);
+    if (pos === "head") paintHeadOperation(kinds, text, s, openDelim, closeDelim, false);
+    else if (pos === "always-head") paintHeadOperation(kinds, text, s, openDelim, closeDelim, true);
     // `any` (block tags): the head is the grammar's keyword.control.section;
     // we only scan subexpression heads + pipe targets inside the body.
-    paintSubexpressionHeads(kinds, text, s);
-    paintPipeTargets(kinds, text, s);
+    const bodyStart = s.from + openDelim.length;
+    const bodyEnd = s.to - closeDelim.length;
+    paintSubexpressionHeads(kinds, text, bodyStart, bodyEnd);
+    paintPipeTargets(kinds, text, bodyStart, bodyEnd);
   }
 }
 
 // MaxBars `value | helper` — the identifier after every `|` (that isn't part of
 // `||`) is in operation position. Block params (`{{#each xs as |x|}}`) feed
-// non-helper identifiers; the catalog check skips them.
-function paintPipeTargets(kinds, text, s) {
-  for (let i = s.from; i < s.to; i++) {
+// non-helper identifiers; the catalog check skips them. Bounds are the tag
+// BODY range (delimiters already excluded by the caller).
+function paintPipeTargets(kinds, text, bodyStart, bodyEnd) {
+  for (let i = bodyStart; i < bodyEnd; i++) {
     if (text[i] !== "|" || text[i - 1] === "|" || text[i + 1] === "|") continue;
     let j = i + 1;
-    while (j < s.to && /\s/.test(text[j])) j++;
-    paintIdentAt(kinds, text, j, s.to, false);
+    while (j < bodyEnd && /\s/.test(text[j])) j++;
+    paintIdentAt(kinds, text, j, bodyEnd, false);
   }
 }
 
-function paintHeadOperation(kinds, text, s, alwaysPaint) {
-  let i = s.from;
-  // Skip braces, whitespace-control `~`, raw sigil `&`, whitespace.
-  while (i < s.to && /[{}~&\s]/.test(text[i])) i++;
+function paintHeadOperation(kinds, text, s, openDelim, closeDelim, alwaysPaint) {
+  // Start inside the opener; bound at the start of the closer.
+  let i = s.from + openDelim.length;
+  const end = s.to - closeDelim.length;
+  // Skip whitespace-control `~`, raw sigil `&`, whitespace.
+  while (i < end && /[~&\s]/.test(text[i])) i++;
   // Partial sigil `>` (with optional `*` decorator) then whitespace.
   if (text[i] === ">") {
     i++;
     if (text[i] === "*") i++;
-    while (i < s.to && /\s/.test(text[i])) i++;
+    while (i < end && /\s/.test(text[i])) i++;
   }
-  paintIdentAt(kinds, text, i, s.to, alwaysPaint);
+  paintIdentAt(kinds, text, i, end, alwaysPaint);
 }
 
-function paintSubexpressionHeads(kinds, text, s) {
-  for (let i = s.from; i < s.to - 1; i++) {
+function paintSubexpressionHeads(kinds, text, bodyStart, bodyEnd) {
+  for (let i = bodyStart; i < bodyEnd - 1; i++) {
     if (text[i] !== "(" || kinds[i] !== null) continue;
     let j = i + 1;
-    while (j < s.to && /\s/.test(text[j])) j++;
-    paintIdentAt(kinds, text, j, s.to, false);
+    while (j < bodyEnd && /\s/.test(text[j])) j++;
+    paintIdentAt(kinds, text, j, bodyEnd, false);
   }
 }
 
@@ -453,18 +473,19 @@ function paintIdentAt(kinds, text, i, to, alwaysPaint) {
   for (let k = i; k < i + m[0].length; k++) if (kinds[k] === null) kinds[k] = "operation";
 }
 
-// Trim braces / whitespace-control sigils / surrounding whitespace off a tag span
-// so the LSP-emitted semantic token covers only the INNER body — `{{~ else ~}}` →
-// `else`. The grammar already paints `{{`, `~`, `}}` (and the `=` of set-delim) as
-// `punctuation.section.embedded.*`; without this trim, the tag-level semantic token
-// (keyword, set-delimiter, error) would override the braces too, blotting out the
-// embedded colour the theme applies. The trim is correct for any tag shape because
-// `{`/`}`/`~`/whitespace never appear in a FlatBars identifier body.
-function shrinkToInner(text, from, to) {
-  let s = from;
-  let e = to;
-  while (s < e && /[{}~\s]/.test(text[s])) s++;
-  while (e > s && /[{}~\s]/.test(text[e - 1])) e--;
+// Trim the active opener / closer / whitespace-control sigils / surrounding
+// whitespace off a tag span so the LSP-emitted semantic token covers only the
+// INNER body — `{{~ else ~}}` → `else`, `<% else %>` (after a switch) → `else`.
+// The grammar (or `flatten`'s set-delimiter painter) already paints the
+// delimiter braces; without this trim, the tag-level semantic token (keyword,
+// set-delimiter, error) would override the braces too. The opener / closer
+// chars are stripped by length so we cope with `<%` / `%>` after a
+// `{{=<% %>=}}` directive switched the active pair.
+function shrinkToInner(text, from, to, openDelim, closeDelim) {
+  let s = from + openDelim.length;
+  let e = to - closeDelim.length;
+  while (s < e && /[~\s]/.test(text[s])) s++;
+  while (e > s && /[~\s]/.test(text[e - 1])) e--;
   return [s, e];
 }
 
@@ -562,19 +583,23 @@ const BLOCK_CLOSE_KIND = "block-close";
 
 export function foldingRangesOf(text, dialect) {
   const spans = tokenize(text, dialect);
+  const ctxBySpan = spansWithActiveDelims(spans, text);
   const stack = [];
   const ranges = [];
   // raw-block tokens come as a single span; its `from`/`to` cover the WHOLE block
-  // (open through close). Emit it directly. Other block tags pair up.
-  for (const s of spans) {
+  // (open through close). Emit it directly. Other block tags pair up by name,
+  // resolved per-span with the active delimiter pair (so blocks opened under
+  // `<% %>` after a switch still pair correctly).
+  for (const { span: s, openDelim, closeDelim } of ctxBySpan) {
     if (s.role !== "tag") continue;
     if (s.kind === "raw-block") {
       ranges.push({ start: lineOf(text, s.from), end: lineOf(text, s.to - 1) });
       continue;
     }
-    if (BLOCK_OPEN_KINDS.has(s.kind)) stack.push({ word: bodyWord(text, s), line: lineOf(text, s.from) });
-    else if (s.kind === BLOCK_CLOSE_KIND) {
-      const word = bodyWord(text, s);
+    if (BLOCK_OPEN_KINDS.has(s.kind)) {
+      stack.push({ word: bodyWord(text, s, openDelim, closeDelim), line: lineOf(text, s.from) });
+    } else if (s.kind === BLOCK_CLOSE_KIND) {
+      const word = bodyWord(text, s, openDelim, closeDelim);
       // Pop until we find a matching open (silently drops unbalanced opens).
       for (let i = stack.length - 1; i >= 0; i--) {
         if (stack[i].word === word) {
@@ -589,11 +614,15 @@ export function foldingRangesOf(text, dialect) {
   return ranges.filter((r) => r.end > r.start);
 }
 
-function bodyWord(text, s) {
-  // Skip braces, sigils, `~`, whitespace; capture the next identifier.
-  let i = s.from;
-  while (i < s.to && /[{}~#/\^<$>&!\s]/.test(text[i])) i++;
-  const m = IDENT_RE.exec(text.slice(i, s.to));
+function bodyWord(text, s, openDelim, closeDelim) {
+  // Start inside the opener; end before the closer; then skip sigils and
+  // whitespace and capture the next identifier. The opener / closer chars are
+  // stripped by length so a delim-switched `<%#each xs%>` resolves `each`
+  // identically to a default-delim `{{#each xs}}`.
+  let i = s.from + openDelim.length;
+  const end = s.to - closeDelim.length;
+  while (i < end && /[~#/\^<$>&!\s]/.test(text[i])) i++;
+  const m = IDENT_RE.exec(text.slice(i, end));
   return m ? m[0] : "";
 }
 
@@ -609,20 +638,21 @@ function lineOf(text, offset) {
 // covers the whole block; selectionRange = the open tag's body word.
 export function documentSymbolsOf(text, dialect) {
   const spans = tokenize(text, dialect);
+  const ctxBySpan = spansWithActiveDelims(spans, text);
   const root = { children: [] };
   const stack = [root];
-  for (const s of spans) {
+  for (const { span: s, openDelim, closeDelim } of ctxBySpan) {
     if (s.role !== "tag") continue;
     if (s.kind === "raw-block") {
-      stack[stack.length - 1].children.push(makeSymbol(text, s, s.to, "raw-block"));
+      stack[stack.length - 1].children.push(makeSymbol(text, s, openDelim, closeDelim, s.to, "raw-block"));
       continue;
     }
     if (BLOCK_OPEN_KINDS.has(s.kind)) {
-      const sym = makeSymbol(text, s, null, s.kind);
+      const sym = makeSymbol(text, s, openDelim, closeDelim, null, s.kind);
       stack[stack.length - 1].children.push(sym);
       stack.push(sym);
     } else if (s.kind === BLOCK_CLOSE_KIND) {
-      const word = bodyWord(text, s);
+      const word = bodyWord(text, s, openDelim, closeDelim);
       for (let i = stack.length - 1; i > 0; i--) {
         if (stack[i].word === word) {
           stack[i].endOffset = s.to;
@@ -635,9 +665,9 @@ export function documentSymbolsOf(text, dialect) {
   return projectSymbols(text, root.children);
 }
 
-function makeSymbol(text, openSpan, endOffset, kind) {
+function makeSymbol(text, openSpan, openDelim, closeDelim, endOffset, kind) {
   return {
-    word: bodyWord(text, openSpan) || "(anonymous)",
+    word: bodyWord(text, openSpan, openDelim, closeDelim) || "(anonymous)",
     kind,
     startOffset: openSpan.from,
     endOffset, // filled when the matching close is seen (null = unbalanced; we drop these)
