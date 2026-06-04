@@ -45,10 +45,14 @@ default build deliberately omits it so the TextMate plugin builds anywhere.
 The repo's offline gate (`npm run test:jetbrains`, in `npm test`) needs no JVM: it
 drives the **bundled server** over real LSP, asserts the synced grammar equals the
 canonical one, and checks the descriptors register the right extension points. The
-full `gradle buildPlugin` (TextMate layer) is verified to compile and package
-against the real IntelliJ 2024.2 SDK; run it in CI for the JVM-side check.
+full `gradle buildPlugin -PwithLsp` (the TextMate floor **and** the Ultimate-only
+LSP layer) compiles and packages against the real IntelliJ IDEA Ultimate 2024.2 SDK
+in CI — `.github/workflows/editors.yml`, on JDK 17 with a provisioned Gradle (there
+is no wrapper in-repo).
 
 ## Status / follow-ups
 
-Marketplace publishing and a live-IDE check of the LSP override are tracked
-follow-ups. Diagnostics/hover need the recovering parser (ADR-017 open question).
+Marketplace publishing and a live-IDE check of the LSP override *running* inside a
+real IntelliJ (the CI build compiles it; it does not launch an IDE) are tracked
+follow-ups. Diagnostics ship from the recovering parser (ADR-023); hover/completion
+remain the open follow-on.

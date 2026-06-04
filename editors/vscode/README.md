@@ -53,6 +53,8 @@ The build emits source maps (kept out of the shipped `.vsix` by `.vscodeignore`)
 
 ## Status
 
-The Marketplace listing and JetBrains packaging are tracked follow-ups; the
-extension and its engine-backed server are complete and exercised by a headless
-smoke test (`npm test`).
+The Marketplace listing is a tracked follow-up; the extension and its
+engine-backed server are complete and exercised by a headless smoke test
+(`npm test`) plus a real-IDE test (`npm run test:vscode:ide`, in CI) that opens a
+fixture in a downloaded VS Code and asserts auto-activation surfaces semantic
+tokens and diagnostics.

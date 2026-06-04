@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Editor-support CI (ADR-017, blocker 2). Two things `npm test` cannot do on its
+# own and which previously ran on no machine we control:
+#
+#   * the real-IDE VS Code test (blocker 1) — needs a windowed VS Code, so it runs
+#     here under xvfb, not in `npm test`;
+#   * `gradle buildPlugin -PwithLsp` — the JetBrains plugin's Kotlin + the
+#     Ultimate-only LSP layer compiled nowhere before now.
+#
+# Path-filtered to the editor surface so it only runs when something it covers
+# changes. There is no Gradle wrapper in the repo, so the JVM job provisions Gradle.
+name: Editors
+
+on:
+  push:
+    branches: [develop]
+    paths: &editor-paths
+      - "editors/**"
+      - "scripts/check-vocab.mjs"
+      - "scripts/gen-highlight.mjs"
+      - "scripts/check-tmgrammar.mjs"
+      - "lab/vendor/flatbars-engine.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/editors.yml"
+  pull_request:
+    paths: *editor-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: editors-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Node-side gates + the real-IDE VS Code test. These consume the committed engine
+  # bundle (lab/vendor/flatbars-engine.mjs), so no PureScript toolchain is needed.
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Editor gates (highlight / tmgrammar / vocab / lsp / vscode / jetbrains)
+        run: |
+          npm run check:highlight
+          npm run check:tmgrammar
+          npm run check:vocab
+          npm run test:lsp
+          npm run test:vscode
+          npm run test:jetbrains
+
+      # Cache the downloaded VS Code between runs (keyed on the test-electron pin).
+      - name: Cache VS Code for the real-IDE test
+        uses: actions/cache@v4
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Real-IDE VS Code test (activation -> semantic tokens + diagnostics)
+        run: xvfb-run -a npm run test:vscode:ide
+
+  # The JetBrains plugin's JVM build, including the Ultimate-only LSP layer. Heavy
+  # (it downloads the IntelliJ IDEA Ultimate SDK), so it is its own job.
+  jetbrains-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      # syncAssets (a Gradle Exec task) runs node + esbuild from the root deps, so
+      # Node and the npm install must be present before the Gradle build.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10"
+
+      - name: gradle buildPlugin -PwithLsp (TextMate floor + Ultimate LSP layer)
+        working-directory: editors/jetbrains
+        run: gradle --no-daemon buildPlugin -PwithLsp

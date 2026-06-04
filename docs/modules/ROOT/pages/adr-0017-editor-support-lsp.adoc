@@ -224,10 +224,13 @@ VS Code Marketplace / Open VSX / JetBrains Marketplace. The decisions:
   (JetBrains).* `test:jetbrains` validates the bundled JS transport (descriptors,
   grammar canonicality, an LSP round-trip) but never compiles Kotlin; the
   Ultimate-only LSP layer (`-PwithLsp`, the platform LSP API absent from the open
-  SDK) is built nowhere we control. *Decision:* add a path-filtered CI job
-  (`editors/jetbrains/**`) running `gradle buildPlugin -PwithLsp` on JDK 17, plus a
-  real-IDE VS Code run, so neither client ships code that has only ever been
-  type-checked by hand.
+  SDK) is built nowhere we control. *Decision (implemented):* a path-filtered
+  workflow, `.github/workflows/editors.yml`, with two jobs — a `gates` job
+  (the editor node gates + the real-IDE VS Code test under `xvfb`) and a
+  `jetbrains-build` job that provisions JDK 17 + Gradle (there is no wrapper in the
+  repo) and runs `gradle buildPlugin -PwithLsp`, downloading the IntelliJ IDEA
+  Ultimate SDK so the Ultimate-only LSP layer compiles. Neither client now ships
+  code that has only ever been type-checked by hand.
 
 . *The "one vocabulary, three consumers" seams are ungated, so they are
   release-blocking (shared).* The contract this ADR rests on has unchecked joints:

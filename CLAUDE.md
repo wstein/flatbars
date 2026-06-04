@@ -219,14 +219,20 @@ keeping its familiar scope names, drift-bounded by `check:tmgrammar`. `editors/l
 `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize` plus
 `publishDiagnostics` from `diagnostics` (the recovering parser, ADR-023)
 (`test:lsp`). `editors/vscode` is the VS Code extension bundling the LSP client +
-grammar (`test:vscode`, a headless smoke test; its `dist/` is a git-ignored build
-product). `editors/jetbrains` is the JetBrains plugin (Gradle/Kotlin): the
-TextMate grammar via a `TextMateBundleProvider` for all IDEs, plus the LSP path on
-Ultimate (`-PwithLsp`; the platform LSP API is Ultimate-only and absent from the
-open SDK). `test:jetbrains` is the offline gate (drives the bundled server, checks
-descriptors — no JVM); the full `gradle buildPlugin` is a CI/JDK-17 step.
-Diagnostics shipped (ADR-023's recovering parser); hover/completion and Marketplace
-publishing are the tracked follow-ups.
+grammar (`test:vscode`, a headless smoke test that also asserts the auto-activation
+precondition; its `dist/` is a git-ignored build product). The end-to-end activation
+path — auto-activate on opening a file → semantic tokens + diagnostics surface — is
+proven by a real-IDE test (`test:vscode:ide`, `@vscode/test-electron`), too heavy for
+`npm test` so it runs in CI. `editors/jetbrains` is the JetBrains plugin
+(Gradle/Kotlin): the TextMate grammar via a `TextMateBundleProvider` for all IDEs,
+plus the LSP path on Ultimate (`-PwithLsp`; the platform LSP API is Ultimate-only and
+absent from the open SDK). `test:jetbrains` is the offline gate (drives the bundled
+server, checks descriptors — no JVM). The real-IDE test and the full
+`gradle buildPlugin -PwithLsp` (JDK 17 + a provisioned Gradle — no wrapper in-repo)
+run in `.github/workflows/editors.yml`, path-filtered to the editor surface (ADR-017
+amendment). Both VS Code and JetBrains packagers share one esbuild-pinned bundle step
+(`editors/shared/sync.mjs`). Diagnostics shipped (ADR-023's recovering parser);
+hover/completion and Marketplace publishing are the tracked follow-ups.
 
 ### Conventions worth knowing
 
