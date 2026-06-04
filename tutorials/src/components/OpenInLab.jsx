@@ -28,7 +28,7 @@ const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
 // One code editor: a syntax-highlight layer with a transparent textarea atop, so
 // the reader edits real text while seeing colour. Heights are synced after every
 // render (the textarea auto-grows; the highlight <pre> follows it).
-function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
+function CodeEditor({ lang, value, onInput, dialect = "fullbars", label }) {
   const taRef = useRef(null);
   const preRef = useRef(null);
   // template → engine highlighter; yaml → data highlighter; js (custom helpers)
@@ -53,6 +53,7 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
       <textarea
         ref={taRef}
         class="oil-ed-input"
+        aria-label={label}
         spellcheck={false}
         autocomplete="off"
         autocapitalize="off"
@@ -202,28 +203,28 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       <div class={gridClass}>
         <div class="oil-cell oil-tpl">
           <div class="oil-cell-head"><span class="oil-cap">template</span></div>
-          <CodeEditor lang="template" value={tpl} onInput={onTpl} dialect={engine} />
+          <CodeEditor lang="template" value={tpl} onInput={onTpl} dialect={engine} label="Template — editable" />
         </div>
         <div class="oil-cell oil-data">
           <div class="oil-cell-head"><span class="oil-cap">data</span></div>
-          <CodeEditor lang="yaml" value={dataStr} onInput={onData} />
+          <CodeEditor lang="yaml" value={dataStr} onInput={onData} label="Data — YAML, editable" />
         </div>
         {hasTransform && (
           <div class="oil-cell oil-transform">
             <div class="oil-cell-head"><span class="oil-cap">transform · JSONata</span><span class="oil-js-note">— data → view-model</span></div>
-            <CodeEditor lang="jsonata" value={transformStr} onInput={onTransform} />
+            <CodeEditor lang="jsonata" value={transformStr} onInput={onTransform} label="Transform — JSONata, editable" />
           </div>
         )}
         {Object.keys(parts).map((name) => (
           <div class="oil-cell" key={name}>
             <div class="oil-cell-head"><span class="oil-cap">partial · {name}</span></div>
-            <CodeEditor lang="template" value={parts[name]} onInput={(v) => onPart(name, v)} dialect={engine} />
+            <CodeEditor lang="template" value={parts[name]} onInput={(v) => onPart(name, v)} dialect={engine} label={`Partial ${name} — editable`} />
           </div>
         ))}
         {hasHelpers && (
           <div class="oil-cell">
             <div class="oil-cell-head"><span class="oil-cap">helpers · JS</span><span class="oil-js-note">— registerHelper</span></div>
-            <CodeEditor lang="js" value={helpersStr} onInput={onHelpers} />
+            <CodeEditor lang="js" value={helpersStr} onInput={onHelpers} label="Helpers — JavaScript, editable" />
           </div>
         )}
       </div>

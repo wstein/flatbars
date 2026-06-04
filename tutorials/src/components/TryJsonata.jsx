@@ -24,7 +24,7 @@ function toYaml(data) {
 
 // One editor: a highlight <pre> with a transparent <textarea> on top, height
 // synced to content after each render (same technique as OpenInLab's CodeEditor).
-function Editor({ lang, value, onInput }) {
+function Editor({ lang, value, onInput, label }) {
   const taRef = useRef(null);
   const preRef = useRef(null);
   const html = (lang === "yaml" ? highlightYaml(value) : lang === "jsonata" ? highlightJsonata(value) : esc(value)) + "\n";
@@ -44,6 +44,7 @@ function Editor({ lang, value, onInput }) {
       <textarea
         ref={taRef}
         class="oil-ed-input"
+        aria-label={label}
         spellcheck={false}
         autocomplete="off"
         autocapitalize="off"
@@ -107,11 +108,11 @@ export default function TryJsonata({ data = {}, expr = "" }) {
       <div class="oil-grid">
         <div class="oil-cell">
           <div class="oil-cell-head"><span class="oil-cap">JSONata</span></div>
-          <Editor lang="jsonata" value={exprStr} onInput={onExpr} />
+          <Editor lang="jsonata" value={exprStr} onInput={onExpr} label="JSONata expression — editable" />
         </div>
         <div class="oil-cell">
           <div class="oil-cell-head"><span class="oil-cap">data · YAML</span></div>
-          <Editor lang="yaml" value={dataStr} onInput={onData} />
+          <Editor lang="yaml" value={dataStr} onInput={onData} label="Data — YAML, editable" />
         </div>
       </div>
 

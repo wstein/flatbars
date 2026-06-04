@@ -51,6 +51,12 @@
   transform: none;
   pointer-events: auto;
 }
+/* Touch / no-hover devices can't reveal-on-hover and may never focus an editor,
+   so the actions (notably the per-example "Open in Lab") would be undiscoverable.
+   Keep them always visible there. */
+@media (hover: none) {
+  .oil .oil-actions { opacity: 1; transform: none; pointer-events: auto; }
+}
 .oil .oil-reset {
   display: inline-flex;
   align-items: center;

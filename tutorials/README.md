@@ -115,6 +115,13 @@ then stay root-absolute as authored.
   the engine it teaches. Its **Open in Lab** button targets one named tab, so
   repeated clicks reuse a single Lab window. CI's `check:bundle` keeps that
   bundle from going stale.
+- **Accessible runnable examples.** The cards open straight into content; Reset +
+  Open-in-Lab float top-right and reveal on hover/focus-within, with an
+  always-visible fallback on touch (no-hover) devices so the per-example "Open in
+  Lab" is never undiscoverable. Each editor `<textarea>` carries an `aria-label`
+  (its visible caption lives in an `aria-hidden` highlight layer). `npm run
+  check:a11y` (in `npm test`) pins these invariants at source; a headless axe-core
+  smoke gate over a built page is a tracked follow-up.
 - **Conformance badges are generated, not asserted.** `npm run gen:conformance`
   runs the vendored `mustache/spec` suite through the shipped MinBars bundle and
   writes `src/conformance.json`; the reference renders its support table from
