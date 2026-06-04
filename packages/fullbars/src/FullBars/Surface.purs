@@ -60,8 +60,6 @@ import Prelude
 import Data.Array as Array
 import Data.Foldable (foldl)
 import Data.Int as Int
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Number as Number
 import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPrefix)
