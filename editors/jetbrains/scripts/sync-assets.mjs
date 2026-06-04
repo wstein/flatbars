@@ -16,25 +16,20 @@ import { mkdirSync, copyFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import esbuild from "esbuild";
+import { assertEsbuildVersion, bundleServer, LANGUAGES } from "../../shared/sync.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const plugin = resolve(here, "..");
 const root = resolve(plugin, "..", "..");
 const res = resolve(plugin, "src", "main", "resources");
 
+assertEsbuildVersion(esbuild);
 mkdirSync(resolve(res, "server"), { recursive: true });
 mkdirSync(resolve(res, "textmate-bundle"), { recursive: true });
 
-// The engine-backed server, bundled to one self-contained CJS file (vscode-
-// languageserver is CJS and dynamically requires node builtins, so CJS output).
-await esbuild.build({
-  entryPoints: [resolve(root, "editors", "lsp", "bin", "flatbars-lsp.mjs")],
-  bundle: true,
-  platform: "node",
-  format: "cjs",
-  outfile: resolve(res, "server", "flatbars-lsp.cjs"),
-  logLevel: "warning",
-});
+// The engine-backed server, bundled to one self-contained CJS file — the same step
+// (and pinned esbuild) the VS Code extension runs, shared via editors/shared/sync.mjs.
+await bundleServer(esbuild, { repoRoot: root, outfile: resolve(res, "server", "flatbars-lsp.cjs") });
 
 // The TextMate fallback, as a VS Code-style bundle dir (JetBrains reads these).
 copyFileSync(
@@ -55,16 +50,12 @@ writeFileSync(
       engines: { vscode: "*" },
       contributes: {
         // The `flatbars` umbrella + one language per dialect, native extensions
-        // only (not .hbs/.handlebars/.mustache). All share the one grammar.
-        languages: [
-          { id: "flatbars", aliases: ["FlatBars"], extensions: [".flatbars"], configuration: "./language-configuration.json" },
-          { id: "rawbars", aliases: ["RawBars"], extensions: [".rawbars"], configuration: "./language-configuration.json" },
-          { id: "minbars", aliases: ["MinBars"], extensions: [".minbars"], configuration: "./language-configuration.json" },
-          { id: "fullbars", aliases: ["FullBars"], extensions: [".fullbars"], configuration: "./language-configuration.json" },
-          { id: "maxbars", aliases: ["MaxBars"], extensions: [".maxbars"], configuration: "./language-configuration.json" },
-        ],
-        grammars: ["flatbars", "rawbars", "minbars", "fullbars", "maxbars"].map((language) => ({
-          language,
+        // only (not .hbs/.handlebars/.mustache). Single-sourced from
+        // editors/shared/sync.mjs so the manifest can't drift from the VS Code
+        // extension or the LSP's dialect set. All share the one grammar.
+        languages: LANGUAGES.map((l) => ({ ...l, configuration: "./language-configuration.json" })),
+        grammars: LANGUAGES.map((l) => ({
+          language: l.id,
           scopeName: "source.flatbars",
           path: "./flatbars.tmLanguage.json",
         })),

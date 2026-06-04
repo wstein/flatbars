@@ -192,3 +192,70 @@ a highlighter-private `tokenizeInterior` re-lex
 (xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014] amendment). Offsets
 and the token vocabulary are unchanged — the `check:highlight` golden and the
 `flatbars-lsp` token tests were byte-identical across the migration.
+
+== Amendment (2026-06-04): three release-blockers gate marketplace publishing
+
+A team review of the three integrations (`flatbars-lsp`, the VS Code extension,
+the JetBrains plugin) confirmed the two-layer design of this ADR but found the
+*release readiness* is gated on process and seam gaps, not features. Until the
+three blockers below are closed, the extensions are **not** to be published to the
+VS Code Marketplace / Open VSX / JetBrains Marketplace. The decisions:
+
+. *Activation is unverified, so it is release-blocking (VS Code).* The extension
+  ships `pass:[activationEvents: []]` (`editors/vscode/package.json`). The TextMate
+  floor is declarative and paints regardless, but the language *client* — and thus
+  the entire LSP ceiling (semantic tokens + diagnostics) — starts in `activate()`,
+  which has no trigger; VS Code does not auto-infer `onLanguage` for a contributed
+  language. The smoke test cannot catch this: it spawns the server process
+  directly, bypassing activation. *Decision:* declare explicit
+  `pass:[onLanguage:{rawbars,minbars,fullbars,maxbars,flatbars}]` activation events,
+  and add a *real-IDE* test that asserts both a semantic token and a published
+  diagnostic actually surface in a running editor (not just that the server speaks
+  LSP over a pipe).
+
+. *The JVM/LSP path compiles on no CI machine, so it is release-blocking
+  (JetBrains).* `test:jetbrains` validates the bundled JS transport (descriptors,
+  grammar canonicality, an LSP round-trip) but never compiles Kotlin; the
+  Ultimate-only LSP layer (`-PwithLsp`, the platform LSP API absent from the open
+  SDK) is built nowhere we control. *Decision:* add a path-filtered CI job
+  (`editors/jetbrains/**`) running `gradle buildPlugin -PwithLsp` on JDK 17, plus a
+  real-IDE VS Code run, so neither client ships code that has only ever been
+  type-checked by hand.
+
+. *The "one vocabulary, three consumers" seams are ungated, so they are
+  release-blocking (shared).* The contract this ADR rests on has unchecked joints:
+  `lspEmitKinds` (`editors/token-vocabulary.json`) drives the sparse-correction
+  design but is pinned by no test — adding `expr` to it would silently flatten
+  `pass:[{{{x}}}]` to one colour, the exact failure Decision 1's floor design
+  guards against, with every gate green; `check:tmgrammar` asserts tag boundaries
+  and literals but *not* that the grammar's scope names still match the vocabulary's
+  `tmScopes`; and the embedded engine bundle (`lab/vendor/flatbars-engine.mjs`,
+  re-exported by `editors/lsp/src/engine.mjs`) carries no API-version the server can
+  assert. Packaging compounds it: the two `sync-assets.mjs` scripts call `esbuild`
+  *unpinned* and duplicate the dialect list by hand, undercutting the
+  byte-reproducibility `check:bundle` enforces (it pins `esbuild@0.23.0`).
+  *Decision (implemented):* add a vocabulary-integrity gate, `check:vocab`
+  (`scripts/check-vocab.mjs`, in `npm test`), asserting engine kinds ≡ vocabulary
+  kinds — witnessed by the `check:highlight` corpus, so there is no second corpus —
+  the *pinned* `lspEmitKinds` set, the LSP legend derivation, and grammar scope
+  names ⊇ vocabulary `tmScopes`; and pin + centralise the packaging `esbuild` in
+  `editors/shared/sync.mjs` (the shared bundle step + single-sourced language set,
+  pinned to the `esbuild@0.23.0` `gen:bundle` already uses). The "engine-shape
+  compatibility" the bundle API-version idea targeted is met by this gate (kinds ≡
+  vocabulary ≡ legend) together with `check:bundle`'s existing byte-identical
+  freshness guarantee, rather than a runtime version constant — no change to the
+  generated engine bundle, and the contract is checked in CI rather than asserted
+  at startup.
+
+*Rejected at the same review:* making the LSP emit *full* semantic tokens (instead
+of sparse corrections over the TextMate floor). It contradicts Decision 2 of this
+ADR — the floor must stand alone in no-LSP contexts (GitHub, `bat`, diffs) and full
+emission flattens the braces-vs-name distinction. The sparse split is kept; only
+its seam is gated (blocker 3).
+
+*Unchanged / still deferred:* the TextMate floor remains the guaranteed baseline
+(Community / no-LSP users are first-class); hover/completion stay post-1.0 on the
+ADR-023 substrate; JetBrains `defaultDialect` parity with VS Code and incremental
+`semanticTokens/range` are tracked but non-blocking. (Process note: the review's
+draft flagged a committed `editors/vscode/dist/` as a high risk; `git ls-files`
+shows it untracked — `.gitignore` covers `dist/` — so that finding was withdrawn.)

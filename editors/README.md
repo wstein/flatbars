@@ -19,6 +19,11 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
   and the real `vscode-textmate` engine and asserts they agree on **tag boundaries**
   and **literals** (the grammar is richer than the engine, so extra sub-token
   colouring is allowed enrichment). The grammar is the floor; the engine is the ceiling.
+- **`check:vocab`** pins the joints of the "one vocabulary, three consumers"
+  contract (ADR-017): engine kinds ≡ `token-vocabulary.json` kinds (witnessed by the
+  `check:highlight` corpus, so no second corpus), the pinned sparse `lspEmitKinds`
+  set (widening it would re-flatten `{{{x}}}` — guarded here), the LSP legend
+  derivation, and that every vocabulary `tmScope` still exists in the grammar.
 - **`test:lsp`** unit-tests the pure token logic and drives the real stdio server
   over LSP (`initialize` → `didOpen` → `semanticTokens/full`).
 - **`test:vscode`** drives the *bundled* server over LSP and runs `vsce package`
@@ -36,6 +41,9 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
   cache-buster) and `npm run gen:highlight`.
 - After any engine change, `npm run gen:bundle` keeps `flatbars-lsp` and the
   extension on current source (they embed the committed bundle).
+- The VS Code and JetBrains packagers share one bundle step and language set —
+  `editors/shared/sync.mjs` (pinned to the same esbuild `gen:bundle` uses). Change
+  the dialect set or bump esbuild there, in one place.
 
 ## Tracked follow-ups
 

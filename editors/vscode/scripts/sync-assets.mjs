@@ -18,29 +18,21 @@ import { mkdirSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import esbuild from "esbuild";
+import { assertEsbuildVersion, bundleServer } from "../../shared/sync.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ext = resolve(here, "..");
 const root = resolve(ext, "..", "..");
 const dist = resolve(ext, "dist");
 
+assertEsbuildVersion(esbuild);
 mkdirSync(resolve(dist, "server"), { recursive: true });
 
-// The engine-backed server, bundled to one self-contained file. CJS output: the
-// server embeds vscode-languageserver, which is CJS and uses dynamic `require` of
-// node builtins — that breaks under an ESM bundle, so we target CJS (node runs the
-// .cjs entry directly).
-// Source maps are emitted for debugging (the F5 "Attach to flatbars-lsp" config);
-// .vscodeignore keeps **/*.map out of the shipped .vsix.
-await esbuild.build({
-  entryPoints: [resolve(root, "editors", "lsp", "bin", "flatbars-lsp.mjs")],
-  bundle: true,
-  platform: "node",
-  format: "cjs",
-  sourcemap: true,
-  outfile: resolve(dist, "server", "flatbars-lsp.cjs"),
-  logLevel: "warning",
-});
+// The engine-backed server, bundled to one self-contained CJS file (the same step
+// the JetBrains plugin runs, shared via editors/shared/sync.mjs). Source maps are
+// emitted for debugging (the F5 "Attach to flatbars-lsp" config); .vscodeignore
+// keeps **/*.map out of the shipped .vsix.
+await bundleServer(esbuild, { repoRoot: root, outfile: resolve(dist, "server", "flatbars-lsp.cjs"), sourcemap: true });
 
 // The extension client, bundled CJS with `vscode` left external (host-provided).
 await esbuild.build({

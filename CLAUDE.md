@@ -28,7 +28,7 @@ do **not** assume a global install.
 ```sh
 npm install            # installs purescript + spago + esbuild
 npm run build          # spago build — compile every package
-npm test               # full suite: format:check + per-package spago tests + catalog + isolation + compile & (handlebars/mustache) conformance + Lab unit tests + editor gates (highlight/tmgrammar/lsp/vscode)
+npm test               # full suite: format:check + per-package spago tests + catalog + isolation + compile & (handlebars/mustache) conformance + Lab unit tests + editor gates (highlight/tmgrammar/vocab/lsp/vscode/jetbrains)
 npm run cli -- --help  # run the CLI (spago run -p flatbars-cli)
 npm run lint           # spago build --pedantic-packages (catches unused/missing deps)
 npm run format         # purs-tidy format-in-place; format:check to verify only
@@ -249,13 +249,16 @@ publishing are the tracked follow-ups.
   `editors/token-vocabulary.json` maps each engine token `kind` to its `role`
   (`tag`/`interior`), its LSP semantic-token type/modifiers, and its TextMate
   scopes. The engine `tokenize` (the kinds), the `flatbars-lsp` legend, and the
-  TextMate grammar all derive from it. Two gates keep it honest, both in `npm
+  TextMate grammar all derive from it. Three gates keep it honest, all in `npm
   test`: `check:highlight` pins what the engine emits (`spans` + `tokens`),
   `check:tmgrammar` pins that the fallback grammar agrees with the engine, per
   dialect, on tag boundaries + literals (the grammar may be richer — enrichment is
-  allowed). Change a `kind` → update the vocabulary and rerun
-  `npm run gen:highlight`. The bundle carries `tokenize`, so an engine change
-  needs `npm run gen:bundle` + a cache-buster bump like any other.
+  allowed), and `check:vocab` pins the contract's joints (ADR-017): engine kinds ≡
+  vocabulary kinds (witnessed by the `check:highlight` corpus), the sparse
+  `lspEmitKinds` set, the LSP legend derivation, and that every vocabulary
+  `tmScope` still exists in the grammar. Change a `kind` → update the vocabulary
+  and rerun `npm run gen:highlight`. The bundle carries `tokenize`, so an engine
+  change needs `npm run gen:bundle` + a cache-buster bump like any other.
 - **One app shell + one wordmark.** The docs layout and the landing share
   `Topbar.astro` (wordmark · Chips · Theme · Legend · Open-the-Lab); the canonical
   lockup lives in `Wordmark.astro` and the static Lab copies its markup —

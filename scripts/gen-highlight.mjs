@@ -39,8 +39,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const outFile = resolve(here, "highlight-golden.json");
 
 // The corpus. Each case runs through `highlightSpans(src, dialect)`. `note`
-// documents the invariant the case protects.
-const CORPUS = [
+// documents the invariant the case protects. Exported so the vocabulary-integrity
+// gate (scripts/check-vocab.mjs) can reuse the one curated corpus as its witness
+// of the kinds the engine actually emits — no second corpus to drift.
+export const CORPUS = [
   // ── Regression exhibits from the design debate ──────────────────────────
   { id: "exhibit-a-long-comment", dialect: "fullbars", note: "the whole {{!-- name --}} is ONE comment span and the trailing `!` is OUTSIDE it — the regex closed the comment at the inner }} (Exhibit A fixed)", src: "Hello, {{!-- name --}}!" },
   { id: "exhibit-b-unterminated-comment", dialect: "fullbars", note: "an unterminated {{!-- swallows to the next --}} (one comment span) exactly as the lexer does — no stray raw tag (Exhibit B fixed)", src: "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}" },
@@ -105,42 +107,46 @@ const CORPUS = [
   { id: "minbars-extras-on", dialect: "minbars", note: "extras on: {{^x}} (inverse) and {{&x}} (unescaped) are valid in MinBars", src: "{{^x}}b{{/x}}{{&y}}" },
 ];
 
-const data = {
-  _generated: "by scripts/gen-highlight.mjs — DO NOT EDIT; run `npm run gen:highlight`",
-  source: "lab/vendor/flatbars-engine.mjs — highlightSpans (tag-role, ADR-014) + tokenize (full vocabulary, ADR-017), ENGINE-DERIVED",
-  cases: CORPUS.map(({ id, dialect, note, src }) => ({
-    id,
-    dialect,
-    note,
-    src,
-    // `spans` = the tag-role projection (ADR-014, what the Lab/tutorials paint).
-    // `tokens` = the full ADR-017 vocabulary (tag spans + interior string/number/
-    // operator literals) the editor layer (LSP/TextMate) consumes. `highlightSpans`
-    // is `tokenize` filtered to `role == "tag"`, so the two cannot disagree.
-    spans: highlightSpans(src, dialect),
-    tokens: tokenize(src, dialect),
-  })),
-};
-const text = JSON.stringify(data, null, 2) + "\n";
+// Run the gen/check only when invoked as a script (`node scripts/gen-highlight.mjs`),
+// not when imported for the CORPUS — importing must have no side effects.
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
+  const data = {
+    _generated: "by scripts/gen-highlight.mjs — DO NOT EDIT; run `npm run gen:highlight`",
+    source: "lab/vendor/flatbars-engine.mjs — highlightSpans (tag-role, ADR-014) + tokenize (full vocabulary, ADR-017), ENGINE-DERIVED",
+    cases: CORPUS.map(({ id, dialect, note, src }) => ({
+      id,
+      dialect,
+      note,
+      src,
+      // `spans` = the tag-role projection (ADR-014, what the Lab/tutorials paint).
+      // `tokens` = the full ADR-017 vocabulary (tag spans + interior string/number/
+      // operator literals) the editor layer (LSP/TextMate) consumes. `highlightSpans`
+      // is `tokenize` filtered to `role == "tag"`, so the two cannot disagree.
+      spans: highlightSpans(src, dialect),
+      tokens: tokenize(src, dialect),
+    })),
+  };
+  const text = JSON.stringify(data, null, 2) + "\n";
 
-if (process.argv.includes("--check")) {
-  let current = "";
-  try {
-    current = readFileSync(outFile, "utf8");
-  } catch {
-    /* missing → stale */
+  if (process.argv.includes("--check")) {
+    let current = "";
+    try {
+      current = readFileSync(outFile, "utf8");
+    } catch {
+      /* missing → stale */
+    }
+    if (current !== text) {
+      console.error(
+        "✗ scripts/highlight-golden.json is stale vs the engine bundle.\n" +
+          "  Highlighting (the lexer's spans) changed. If intended, run `npm run gen:highlight`\n" +
+          "  and commit; review the diff to confirm no construct (esp. Exhibits A & B, set\n" +
+          "  delimiters, clause keywords) regressed. If the engine changed, also rebundle.",
+      );
+      process.exit(1);
+    }
+    console.log(`✓ highlight-golden.json current — ${data.cases.length} engine-derived highlighter cases pinned`);
+  } else {
+    writeFileSync(outFile, text);
+    console.log(`wrote ${outFile}\n  ${data.cases.length} engine-derived highlighter cases pinned (incl. Exhibits A & B, set delimiters, clause keywords)`);
   }
-  if (current !== text) {
-    console.error(
-      "✗ scripts/highlight-golden.json is stale vs the engine bundle.\n" +
-        "  Highlighting (the lexer's spans) changed. If intended, run `npm run gen:highlight`\n" +
-        "  and commit; review the diff to confirm no construct (esp. Exhibits A & B, set\n" +
-        "  delimiters, clause keywords) regressed. If the engine changed, also rebundle.",
-    );
-    process.exit(1);
-  }
-  console.log(`✓ highlight-golden.json current — ${data.cases.length} engine-derived highlighter cases pinned`);
-} else {
-  writeFileSync(outFile, text);
-  console.log(`wrote ${outFile}\n  ${data.cases.length} engine-derived highlighter cases pinned (incl. Exhibits A & B, set delimiters, clause keywords)`);
 }
