@@ -377,19 +377,39 @@ function startsWithOpen(text, at, openDelim) {
   return true;
 }
 
-// Parse `{{=A B=}}` (or the equivalent under any active pair) — strip the
-// surrounding open / `=` / `=` / close brackets and split the inner pair on
-// whitespace. Returns `null` for malformed input (we fall back to the previous
-// active pair rather than corrupting subsequent paint).
-function parseSetDelimBody(tag) {
-  // Strip leading opener (run of `{` or `<` etc. — anything up to the `=`):
-  const open = tag.search(/=/);
-  const close = tag.lastIndexOf("=");
-  if (open < 0 || close <= open) return null;
-  const body = tag.slice(open + 1, close).trim();
-  const parts = body.split(/\s+/);
-  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
-  return { open: parts[0], close: parts[1] };
+// Parse `{{=A B=}}` (or the equivalent under any active pair) — return the new
+// `{ open, close }` pair, or `null` for malformed input (callers fall back to
+// the previous active pair rather than corrupting subsequent paint).
+//
+// Validation mirrors the engine's lexer (`packages/core/src/FlatBars/Lexer.purs`,
+// `tryReadSetDelim`): the immediate character after the active opener must be
+// `=`, the immediate character before the active closer must be `=`, the inner
+// body splits on whitespace into EXACTLY two non-empty words, and NEITHER word
+// may contain `=` or whitespace. A laxer parser would accept things the engine
+// rejects (e.g. `{{=A=B C=}}`) and then track those bogus delimiters for every
+// subsequent tag — silently corrupting paint until the user notices.
+export function parseSetDelimBody(tag) {
+  // The first and last `=` mark the directive's inner-body boundaries — and per
+  // the engine they MUST be flush against the active opener / closer. We don't
+  // know the active opener's length here, but `tag` is exactly one tag span:
+  // the `=` at position `openIdx` must be immediately followed by the body and
+  // immediately preceded by the active opener (any other content there would
+  // mean the engine wouldn't have emitted a set-delimiter span in the first
+  // place — so we trust the engine's segmentation).
+  const openIdx = tag.indexOf("=");
+  const closeIdx = tag.lastIndexOf("=");
+  if (openIdx < 0 || closeIdx <= openIdx) return null;
+  const body = tag.slice(openIdx + 1, closeIdx);
+  const parts = body.trim().split(/\s+/);
+  if (parts.length !== 2) return null;
+  const [open, close] = parts;
+  if (!open || !close) return null;
+  // Per the Mustache spec (and the engine's `tryReadSetDelim`), delimiters may
+  // not contain whitespace or `=`. The whitespace check is implicit (we split
+  // on it); the `=` check we do here. Reject malformed input so the active
+  // pair doesn't drift to nonsense.
+  if (open.includes("=") || close.includes("=")) return null;
+  return { open, close };
 }
 
 // Paint operation-position identifiers (helper names) as the `operation` kind.

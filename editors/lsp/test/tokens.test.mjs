@@ -14,6 +14,7 @@ import {
   foldingRangesOf,
   formatDocument,
   parseDiagnostics,
+  parseSetDelimBody,
   resolveDialect,
   tokensOf,
   vocabulary,
@@ -397,6 +398,29 @@ t("foldingRangesOf pairs block-open / block-close by body word", () => {
 t("foldingRangesOf drops same-line opens (zero-length folds are invalid LSP)", () => {
   // {{#if cond}}body{{/if}} on one line: no fold range.
   assert.deepEqual(foldingRangesOf("{{#if x}}body{{/if}}", "fullbars"), []);
+});
+
+// ── parseSetDelimBody validation matches the engine's `tryReadSetDelim` ─────
+t("parseSetDelimBody accepts the canonical Mustache forms", () => {
+  assert.deepEqual(parseSetDelimBody("{{=<% %>=}}"), { open: "<%", close: "%>" });
+  assert.deepEqual(parseSetDelimBody("<%={{ }}=%>"), { open: "{{", close: "}}" });
+  assert.deepEqual(parseSetDelimBody("{{=[ ]=}}"), { open: "[", close: "]" });
+  // Whitespace runs (spaces / tabs) inside the body collapse via split(/\s+/).
+  assert.deepEqual(parseSetDelimBody("{{=  <%   %>  =}}"), { open: "<%", close: "%>" });
+});
+
+t("parseSetDelimBody rejects malformed shapes the engine would also reject", () => {
+  // No `=` at all.
+  assert.equal(parseSetDelimBody("{{<% %>}}"), null);
+  // Only one part.
+  assert.equal(parseSetDelimBody("{{=onlyone=}}"), null);
+  // Three or more parts.
+  assert.equal(parseSetDelimBody("{{=a b c=}}"), null);
+  // `=` inside a delimiter (alignment with engine's "may not contain `=`" rule).
+  assert.equal(parseSetDelimBody("{{=A=B C=}}"), null);
+  assert.equal(parseSetDelimBody("{{=A B=C=}}"), null);
+  // Empty body.
+  assert.equal(parseSetDelimBody("{{==}}"), null);
 });
 
 t("paintOperations head identifier paints under switched delimiters", () => {
