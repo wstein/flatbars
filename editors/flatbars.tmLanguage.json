@@ -115,17 +115,32 @@
     "tag_interior": {
       "_doc": "The pattern set every expression-bearing tag includes inside its region. Covers the lexical pieces shared across all FlatBars dialects: quoted strings, numeric literals, boolean/null constants, operators (FullBars `as |x|` / MaxBars infix + pipe), subexpression parens, list-literal brackets, and path separators (`.` / `/` for nested paths). Stateless: cannot distinguish first-position helper names from later-position arguments \u2014 that's the LSP's job. The LSP's semantic tokens override these where they overlap.",
       "patterns": [
-        { "include": "#tag_string_double" },
-        { "include": "#tag_string_single" },
-        { "include": "#tag_constant" },
-        { "include": "#tag_number" },
-        { "include": "#tag_operator" },
-        { "include": "#tag_paren" },
-        { "include": "#tag_bracket" },
-        { "include": "#tag_path_separator" }
+        {
+          "include": "#tag_string_double"
+        },
+        {
+          "include": "#tag_string_single"
+        },
+        {
+          "include": "#tag_constant"
+        },
+        {
+          "include": "#tag_number"
+        },
+        {
+          "include": "#tag_operator"
+        },
+        {
+          "include": "#tag_paren"
+        },
+        {
+          "include": "#tag_bracket"
+        },
+        {
+          "include": "#tag_path_separator"
+        }
       ]
     },
-
     "tag_constant": {
       "_doc": "true / false / null literals \u2014 the three language constants supported across all FlatBars dialects. Word-boundary anchored so identifiers like `truely`/`nullable`/`falsey` aren't false-matched.",
       "match": "\\b(true|false|null)\\b",
@@ -456,7 +471,7 @@
       ]
     },
     "set_delimiter": {
-      "_doc": "{{=A B=}} \u2014 set-delimiter directive. Both `=` sigils are matched-pair directive keywords; the braces are escape tokens.",
+      "_doc": "{{=A B=}} \u2014 set-delimiter directive. Both `=` sigils are matched-pair directive keywords; the braces are escape tokens. NO `#tag_interior` here on purpose: the body is the new delimiter pair (literal chars, e.g. `<%` `%>`), not an expression. Including tag_interior would have `tag_operator`'s `>=` / `<=` regex greedily consume the `=` that the END pattern `=\\}\\}` needs, leaving the rule unclosed and corrupting state on subsequent lines.",
       "name": "meta.embedded.line.flatbars",
       "begin": "(\\{\\{)(=)",
       "beginCaptures": {
@@ -475,12 +490,7 @@
         "2": {
           "name": "punctuation.section.embedded.end.flatbars"
         }
-      },
-      "patterns": [
-        {
-          "include": "#tag_interior"
-        }
-      ]
+      }
     }
   }
 }
