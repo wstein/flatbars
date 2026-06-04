@@ -160,7 +160,9 @@ and the RawBars docstring. *Rating 4.*
   *implementation*, and it touches MinBars, labelled loops, and self-including partials.
 * *xref:adr-0013-labelled-loops.adoc[ADR-013] (labelled loops)* — now drafted (Proposed); lifts the
   ADR-006 §5 v1 outer-loop limit once a naming/scoping design is settled.
-* *Set-delimiters* (deferred in ADR-007) will reopen the shape-gate axis if a corpus ever justifies it.
+* *Set-delimiters* shipped MinBars-only (xref:adr-0015-set-delimiters.adoc[ADR-015] +
+  2026-06-04 scope narrowing); the dialect ladder deliberately excludes them. A future
+  cross-dialect demand reopens that ADR rather than the shape-gate axis.
 * *A third grammar seam*, if one is ever proposed, triggers a review of axis A rather than a quiet
   addition (ADR-004 Watch).
 

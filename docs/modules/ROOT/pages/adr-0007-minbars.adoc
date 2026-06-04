@@ -36,8 +36,9 @@ unchanged" claims to be false. They are recorded here because they reshape the p
   dotted names, implicit iterator, standalone whitespace — *plus* inheritance
   (`pass:[{{<p}}]`/`pass:[{{$b}}]`/`pass:[{{<*}}]`/`pass:[{{/*}}]`) and dynamic-name partials
   (`pass:[{{>* }}]`). Lambdas are dropped (`Value` has no function arm). Set delimiters
-  (`pass:[{{=<% %>=}}]`) were initially deferred but are now *implemented* (ADR-015; MinBars passes
-  the full `delimiters` module, 14/14).
+  (`pass:[{{=<% %>=}}]`) were initially deferred but are now *implemented* MinBars-exclusively
+  (xref:adr-0015-set-delimiters.adoc[ADR-015] + 2026-06-04 scope narrowing; RawBars / MaxBars /
+  FullBars reject the inline form). MinBars passes the full `delimiters` module, 14/14.
 
 . *Truthiness `mustache` default = a shared parameter.* Add `mustache = false null []` to the alias
   table *and* thread a per-engine default `FalsySet` through `resolveTruthiness` + `runResolved`

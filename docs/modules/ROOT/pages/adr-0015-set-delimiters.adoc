@@ -1,136 +1,173 @@
 = ADR-015: Mustache set delimiters via a gated lexer mode
 :navtitle: ADR-015 Set delimiters
 
-*Status:* Accepted (implemented across all four phases; MinBars 14/14 on the mustache/spec `delimiters`
-module, RawBars/MaxBars opt-in shipped). *Date:* 2026-06-01. Lifts the set-delimiters deferral recorded in
-xref:adr-0007-minbars.adoc[ADR-007]; constrained by xref:adr-0001-structural-parser-and-walker.adoc[ADR-001]
-(one structural lexer) and xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014] (no forked
-grammar). Implementation plan: `set-delimiters-spec.md` (to be written before coding).
+*Status:* Accepted. *Date:* 2026-06-01; narrowed to MinBars-exclusive 2026-06-04
+(see "Scope narrowing" below). MinBars passes 14/14 on the mustache/spec
+`delimiters` module. Lifts the set-delimiters deferral recorded in
+xref:adr-0007-minbars.adoc[ADR-007]; constrained by
+xref:adr-0001-structural-parser-and-walker.adoc[ADR-001] (one structural lexer)
+and xref:adr-0014-highlighting-derives-from-lexer.adoc[ADR-014] (no forked
+grammar).
 
 == Context
 
 Mustache lets a template change its own tag delimiters mid-stream:
-`pass:[{{=<% %>=}}]` switches `pass:[{{ }}]` to `pass:[<% %>]` until a later `pass:[<%={{ }}=%>]`
-switches back. ADR-007 deferred it ("no customer corpus to audit"); the tutorial shows it as a static
-`spec-only` block. It is the last unimplemented *core* `mustache/spec` module (delimiters is core, not
-a `~optional` module like inheritance / dynamic-names), so MinBars's "Mustache-conformant" claim is
-currently "conformant except the one module we skip."
+`pass:[{{=<% %>=}}]` switches `pass:[{{ }}]` to `pass:[<% %>]` until a later
+`pass:[<%={{ }}=%>]` switches back. ADR-007 deferred it ("no customer corpus to
+audit"); the tutorial showed it as a static `spec-only` block. It is the last
+unimplemented *core* `mustache/spec` module (delimiters is core, not a
+`~optional` module like inheritance / dynamic-names), so MinBars's
+"Mustache-conformant" claim was previously "conformant except the one module
+we skip."
 
-The decisive constraint, found in the code: **MinBars lexes through the *shared* core lexer** —
-`FlatBars.Lexer.tokenizeTemplate`, the same lexer the RawBars ⊂ FullBars ⊂ MaxBars ladder uses, whose
-`openerLiteralAt` hardcodes `pass:[{{]` / `pass:[{{{]` / `pass:[{{!--]` … via `matchAt cs i "{{"`. Set
-delimiters makes the open/close pair **mutable mid-parse**. So this is a shared-lexer question, not a
-MinBars-local one, and Handlebars (hence FullBars/MaxBars) has no `pass:[{{=...=}}]` — the feature is
-Mustache-only.
+The decisive constraint, found in the code: **MinBars lexes through the
+*shared* core lexer** — `FlatBars.Lexer.tokenizeTemplate`, the same lexer the
+RawBars ⊂ FullBars ⊂ MaxBars ladder uses, whose `openerLiteralAt` hardcodes
+`pass:[{{]` / `pass:[{{{]` / `pass:[{{!--]` … via `matchAt cs i "{{"`. Set
+delimiters makes the open/close pair **mutable mid-parse**. So this is a
+shared-lexer question, not a MinBars-local one, and Handlebars (hence
+FullBars / MaxBars) has no `pass:[{{=...=}}]` — the feature is Mustache-only.
 
 == Decision
 
-Implement set delimiters as a **flag-gated mode of the one core lexer**, following the
-`LexOptions { infixArith }` precedent (the established dialect-scoping seam):
+Implement set delimiters as a **flag-gated mode of the one core lexer**,
+following the `LexOptions { infixArith }` precedent (the established
+dialect-scoping seam):
 
-. Add `mustacheDelims :: Boolean` to `LexOptions`. When **false** (the default for the whole ladder),
-  the lexer behaves byte-identically to today — the meaning-free core and the Handlebars-family
-  dialects are untouched, and the index-slicing hot path is unaffected.
-. When **true**, the lexer carries a *current* `{ open, close }` pair, initialised to `pass:[{{]` /
-  `pass:[}}]`. On encountering a `pass:[<open>=A B=<close>]` tag it swaps the pair and emits a new
-  `RSetDelim` `RawTok`. Single pass, O(n); spans stay correct because the lexer already threads a `base`
-  offset. No re-lex, no source rewrite, no second lexer. Per the Mustache manual, the new open/close are
-  whitespace-separated and **may not contain whitespace or `=`** — which also makes a space-separated
-  directive/CLI value unambiguous to parse.
+. Add `mustacheDelims :: Boolean` to `LexConfig`. When **false** (the default
+  for every dialect except MinBars), the lexer behaves byte-identically to
+  today — the meaning-free core and the Handlebars-family dialects are
+  untouched, and the index-slicing hot path is unaffected.
+. When **true**, the lexer carries a *current* `{ open, close }` pair,
+  initialised to `pass:[{{]` / `pass:[}}]`. On encountering a
+  `pass:[<open>=A B=<close>]` tag it swaps the pair and emits a new
+  `RSetDelim` `RawTok`. Single pass, O(n); spans stay correct because the
+  lexer already threads a `base` offset. No re-lex, no source rewrite, no
+  second lexer. Per the Mustache manual, the new open/close are
+  whitespace-separated and **may not contain whitespace or `=`** — which also
+  makes a space-separated directive value unambiguous to parse.
 
-*Who sets the flag — by mimicking Mustache and Handlebars.* Mustache **has** set delimiters; Handlebars
-**does not**. So:
+*Per-dialect flag values:* set-delimiter is a *Mustache* feature, not a
+"non-Handlebars" feature. Only MinBars enables it; the rest of the ladder
+keeps the flag off so the dialect ladder has a single consistent answer to
+"does delimiter switching work here?" — yes only on the Mustache surface.
 
-* *MinBars* — `mustacheDelims = true` by **default** (Mustache conformance), inline `pass:[{{=...=}}]`
-  changes supported mid-stream.
-* *RawBars and MaxBars* — **opt-in**, off by default, via any of four mechanisms: project **config**
-  (`flatbars.json` `"delimiters": ["<%","%>"]`), **runtime** (`ParseOptions { delimiters }`), **CLI**
-  (`--delimiters '<% %>'`), and a per-file **directive** `pass:[{{! @delimiters: <% %> }}]` (rides the
-  comment lexeme like `@truthiness` / `@trim`; sets the file's *initial* pair). When enabled, inline
-  `pass:[{{=...=}}]` changes work too.
-* *FullBars* — **excluded**. FullBars is the Handlebars-faithful dialect, and Handlebars has no set
-  delimiters, so it gains nothing here.
+* *MinBars* — `mustacheDelims = true`. Inline `pass:[{{=...=}}]` switches the
+  active pair mid-stream; the `pass:[{{! @delimiters: <% %> }}]` long-comment
+  directive seeds the file's initial pair.
+* *RawBars*, *MaxBars*, *FullBars* — `mustacheDelims = false`. The inline form
+  is rejected at the parser (a `LexError: unexpected character` from the
+  recovering parser, refined into the actionable LSP diagnostic below). The
+  `{{! @delimiters: …}}` long-comment form parses as a normal comment, and the
+  directive inside is silently ignored — the `@`-prefixed directive convention
+  has no meaning outside the Mustache surface.
 
-The off-by-default invariant is the contract: *with the flag off, every ladder dialect lexes exactly as
-before* (byte-identical). This keeps **one grammar** (ADR-001 / ADR-014) and confines the stateful
-behaviour behind a single flag whose default preserves today's behaviour everywhere.
+The off-by-default invariant is the contract: *with the flag off, every
+non-MinBars dialect lexes exactly as before* (byte-identical). This keeps **one
+grammar** (ADR-001 / ADR-014) and confines the stateful behaviour behind a
+single flag whose default preserves today's behaviour everywhere outside
+MinBars.
 
 === Normative rulings (the spec-suite traps)
 
-* *Rebasing scope.* Under custom delimiters, only the **2-char pair + the Mustache sigils**
-  (`# / ^ & > ! =`) rebase. The FlatBars/Handlebars extensions `pass:[{{{]` (triple), `pass:[{{!--]`
-  (long comment), `pass:[{{{{]` (raw block), and `pass:[{{<]` / `pass:[{{$]` (inheritance) do **not**
-  rebase — their behaviour under custom delimiters is undefined by the spec. (Unescaped output under
-  custom delimiters is the ampersand form `pass:[<%& name %>]`.)
-* *Standalone whitespace.* A set-delimiter tag alone on a line is **standalone**: the line is stripped.
-  `RSetDelim` must be standalone-eligible in `MinBars.Standalone`.
-* *Partial-boundary reset.* Delimiter changes are **template-scoped** — a partial begins with the
-  default `pass:[{{ }}]` regardless of the caller's current delimiters.
-* *Highlighting.* `RSetDelim` carries a token kind so `pass:[<%=...=%>]` and custom-delimited tags
-  colour in both front-ends — folds into the ADR-014 Tier-1 `tokenizeTemplate` span work, so the
-  highlighter never disagrees with the engine.
+* *Rebasing scope.* Under custom delimiters, only the **2-char pair + the
+  Mustache sigils** (`# / ^ & > ! =`) rebase. The FlatBars / Handlebars
+  extensions `pass:[{{{]` (triple), `pass:[{{!--]` (long comment),
+  `pass:[{{{{]` (raw block), and `pass:[{{<]` / `pass:[{{$]` (inheritance) do
+  **not** rebase — their behaviour under custom delimiters is undefined by the
+  spec. (Unescaped output under custom delimiters is the ampersand form
+  `pass:[<%& name %>]`.)
+* *Standalone whitespace.* A set-delimiter tag alone on a line is
+  **standalone**: the line is stripped. `RSetDelim` is standalone-eligible in
+  `MinBars.Standalone`.
+* *Partial-boundary reset.* Delimiter changes are **template-scoped** — a
+  partial begins with the default `pass:[{{ }}]` regardless of the caller's
+  current delimiters.
+* *Highlighting.* `RSetDelim` carries a token kind so `pass:[<%=...=%>]` and
+  custom-delimited tags colour in both front-ends — folds into the ADR-014
+  Tier-1 `tokenizeTemplate` span work, so the highlighter never disagrees with
+  the engine.
+
+=== Editor diagnostic on non-MinBars use
+
+The LSP (`editors/lsp/src/tokens.mjs` `dialectDiagnostics`) surfaces a clear,
+actionable message in every non-MinBars dialect, at the `{{=` offset:
+
+____
+Set-delimiter directives `pass:[{{=A B=}}]` are not valid in *<Dialect>* —
+they're a Mustache feature reserved for MinBars. Switch the file to MinBars to
+use them (Cmd-Shift-P → Change Language Mode).
+____
+
+This replaces the generic `LexError: unexpected character` the recovering
+parser otherwise emits — users get a remediation instead of a cryptic lexer
+error.
 
 === Measured, not asserted
 
-Corpus-first, per the project's gate culture (`examples:verify`, `test:compile`): vendor `mustache/spec`'s
-`delimiters.json`, baseline it honestly (≈0/N today), implement, **then** flip it into the strict
-`examples:verify` / `test:minbars-spec` gates and regenerate the conformance table. No conformance claim
+Corpus-first, per the project's gate culture (`examples:verify`,
+`test:compile`): the `mustache/spec` `delimiters.json` corpus is vendored,
+gated, and currently 14/14 (`test:minbars-spec`). No conformance claim
 precedes a passing fixture.
 
 == Alternatives considered
 
-* *(A) Mutable delimiters in the core lexer for every dialect* — puts Mustache-only stateful behaviour
-  into the meaning-free core and onto the ladder, which has no such feature. Rejected.
-* *(C) MinBars source-rewrite pre-pass* (normalise `pass:[<% %>]` → `pass:[{{ }}]` before lexing) — the
-  rewriter must tokenize with dynamic delimiters anyway (same hard problem), and rewriting **destroys
-  source offsets**, breaking error spans and ADR-014 highlighting. Rejected.
-* *(D) MinBars forks its own Mustache lexer* — a second lexer (ADR-014 anti-pattern); duplicates
-  standalone/whitespace logic and will drift. Rejected.
-* *(E) Stay deferred* (status quo) — honest, zero-risk, but leaves MinBars one core module short of the
-  conformance it advertises. Superseded by this ADR once the corpus confirms there is something to pass.
+* *(A) Mutable delimiters in the core lexer for every dialect* — puts
+  Mustache-only stateful behaviour into the meaning-free core and onto the
+  ladder, which has no such feature. Rejected.
+* *(B) RawBars + MaxBars opt-in via config / runtime / CLI / directive* —
+  shipped in the original 2026-06-01 decision, withdrawn in the 2026-06-04
+  scope narrowing (see "Scope narrowing"). Producing three yeses and one no
+  for the same feature added complexity without a use case; the editor-side
+  diagnostic now explains the MinBars-exclusive policy.
+* *(C) MinBars source-rewrite pre-pass* (normalise `pass:[<% %>]` →
+  `pass:[{{ }}]` before lexing) — the rewriter must tokenize with dynamic
+  delimiters anyway (same hard problem), and rewriting **destroys source
+  offsets**, breaking error spans and ADR-014 highlighting. Rejected.
+* *(D) MinBars forks its own Mustache lexer* — a second lexer (ADR-014
+  anti-pattern); duplicates standalone / whitespace logic and will drift.
+  Rejected.
+* *(E) Stay deferred* (status quo) — honest, zero-risk, but leaves MinBars one
+  core module short of the conformance it advertises. Superseded by this ADR
+  once the corpus confirmed there is something to pass.
 
 == Consequences
 
-* `flatbars-js` / the core lexer gain a small, principled config knob and one new `RawTok` (`RSetDelim`);
-  the ladder is provably unaffected (flag off ⇒ identical lexing).
-* The conformance table can finally claim delimiters — *after* the gate proves it.
-* ADR-007's deferral is lifted; the tutorial's static set-delimiters block becomes a live runnable card.
-* RawBars and MaxBars gain set delimiters as an **opt-in** (off by default) via four mechanisms —
-  config / runtime / CLI / the `pass:[{{! @delimiters: <% %> }}]` directive — all seeding the same lexer
-  pair-config MinBars uses. FullBars stays Handlebars-faithful (no set delimiters). The off-by-default
-  invariant keeps existing ladder templates byte-identical.
+* `flatbars-js` / the core lexer gain a small, principled config knob and one
+  new `RawTok` (`RSetDelim`); the ladder is provably unaffected (flag off ⇒
+  identical lexing).
+* The conformance table claims delimiters — `test:minbars-spec` confirms
+  14/14.
+* ADR-007's deferral is lifted; the tutorial's static set-delimiters block is
+  a live runnable card.
+* FullBars stays Handlebars-faithful (no set delimiters). The off-by-default
+  invariant keeps existing RawBars / MaxBars / FullBars templates
+  byte-identical.
 
+== Scope narrowing (2026-06-04)
 
-== Amendment (2026-06-04): set delimiters are MinBars-exclusive
+The 2026-06-01 decision enabled `mustacheDelims` on RawBars and MaxBars (via
+the four opt-in mechanisms in alternative (B)) on the rationale that they're
+"non-Handlebars dialects". That rationale was wrong: set-delimiter is a
+*Mustache* feature, not a "non-Handlebars" feature. RawBars (the meaning-free
+core) and MaxBars (the operators + pipes flagship) have no semantic reason to
+ship a Mustache lexer mode; carrying it produced three yeses and one no where
+the dialect ladder benefits from one consistent answer.
 
-The original decision enabled `mustacheDelims` in RawBars and MaxBars
-alongside MinBars, on the rationale that they're "non-Handlebars dialects".
-That rationale was wrong: set-delimiter is a *Mustache* feature, not a
-"non-Handlebars" feature. RawBars (the meaning-free core) and MaxBars
-(the operators + pipes flagship) have no semantic reason to ship a
-Mustache lexer mode; carrying it just produced three yeses and one no
-where the dialect ladder benefits from one consistent answer.
+The Decision section above is the binding policy as of 2026-06-04. The
+implementation collapsed accordingly:
 
-Effective immediately:
+* `RawBars.coreOptions.lexConfig` and `MaxBars.maxOptions.lexConfig` revert to
+  `defaultLexConfig` (no `mustacheDelims`).
+* `packages/js/src/FullBars/JS.purs` `highlightConfig` matches at the
+  highlight layer for `rawbars`, so highlighting agrees with parsing.
+* The rawbars and maxbars test suites flip from "asserts switching works" to
+  "asserts the inline form is rejected and the long-comment form is ignored".
+* `dialectDiagnostics` (`editors/lsp/src/tokens.mjs`) emits the actionable
+  message described in "Editor diagnostic" above for FullBars / RawBars /
+  MaxBars; MinBars silent.
 
-* MinBars accepts `{{=A B=}}` and the `{{! @delimiters: <% %> }}`
-  long-comment directive (unchanged).
-* RawBars, MaxBars, and FullBars all reject the inline form at the
-  parser (`LexError: unexpected character`).
-* The `{{! @delimiters: …}}` long-comment form parses as a normal
-  comment in RawBars / MaxBars / FullBars and the directive inside is
-  silently ignored — Mustache's @-prefixed directive convention has no
-  meaning in the Handlebars surface.
-* The LSP surfaces a clear, actionable diagnostic in all three
-  non-MinBars dialects: "Set-delimiter directives `{{=A B=}}` are not
-  valid in *<Dialect>* — they're a Mustache feature reserved for
-  MinBars. Switch the file to MinBars to use them."
-
-Implementation: `RawBars.coreOptions.lexConfig` and
-`MaxBars.maxOptions.lexConfig` revert to `defaultLexConfig` (no
-`mustacheDelims`); `editors/js/src/FullBars/JS.purs` `highlightConfig`
-matches at the highlight layer; the rawbars and maxbars test suites
-flip from "asserts switching works" to "asserts the inline form is
-rejected". `dialectDiagnostics` in `editors/lsp/src/tokens.mjs` emits
-the actionable message for FullBars / RawBars / MaxBars; MinBars
-silent.
+The four opt-in mechanisms (config / runtime / CLI / directive) listed in
+alternative (B) above are withdrawn — they're no longer reachable from any
+shipped dialect. If a future use case demands cross-dialect support, this
+section becomes the next ADR's "Context".
