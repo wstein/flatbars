@@ -63,6 +63,34 @@ LSP layer) compiles and packages against the real IntelliJ IDEA Ultimate 2024.2 
 in CI — `.github/workflows/editors.yml`, on JDK 17 with a provisioned Gradle (there
 is no wrapper in-repo).
 
+## Signing & publishing
+
+`gradle signPlugin` and `gradle publishPlugin` are wired in `build.gradle.kts` and
+driven by environment variables — credentials never sit in the repo:
+
+| Variable | Purpose |
+| --- | --- |
+| `JETBRAINS_MARKETPLACE_CERT_CHAIN_FILE` | Path to PEM-encoded x509 certificate chain |
+| `JETBRAINS_MARKETPLACE_PRIVATE_KEY_FILE` | Path to PEM-encoded private key |
+| `JETBRAINS_MARKETPLACE_PRIVATE_KEY_PASSWORD` | Key password (optional) |
+| `JETBRAINS_MARKETPLACE_TOKEN` | Publishing token from <https://plugins.jetbrains.com/author/me/tokens> |
+| `JETBRAINS_MARKETPLACE_CHANNEL` (or `-PpublishChannel=…`) | Distribution channel; default `default` (Stable). Use `beta` / `eap` for staged rollouts. |
+
+```sh
+# Sign a built artifact
+JETBRAINS_MARKETPLACE_CERT_CHAIN_FILE=… JETBRAINS_MARKETPLACE_PRIVATE_KEY_FILE=… \
+JETBRAINS_MARKETPLACE_PRIVATE_KEY_PASSWORD=… \
+  gradle signPlugin
+
+# Publish to Marketplace (auto-runs verifyPlugin first)
+JETBRAINS_MARKETPLACE_TOKEN=… gradle publishPlugin
+```
+
+`publishPlugin` declares a `dependsOn("verifyPlugin")` so a compatibility regression
+fails locally before the Marketplace verifier catches it on upload. Without the env
+vars, `signPlugin` / `publishPlugin` no-op cleanly — local builds and CI work
+without secrets; the failure surface is only at the actual publish step.
+
 ## Support matrix
 
 **Every JetBrains IDE** for the TextMate floor (Community + Ultimate, IDEA /

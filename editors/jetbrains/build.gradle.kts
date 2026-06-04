@@ -73,6 +73,44 @@ intellijPlatform {
       recommended()
     }
   }
+
+  // Marketplace signing & publishing. Both are env-var driven so credentials
+  // never sit in this repo — gradle pulls them from:
+  //
+  //   JETBRAINS_MARKETPLACE_CERT_CHAIN    PEM-encoded x509 certificate chain
+  //   JETBRAINS_MARKETPLACE_PRIVATE_KEY   PEM-encoded private key
+  //   JETBRAINS_MARKETPLACE_PRIVATE_KEY_PASSWORD   key password (optional)
+  //   JETBRAINS_MARKETPLACE_TOKEN         publishing token (from
+  //                                        https://plugins.jetbrains.com/author/me/tokens)
+  //
+  // `gradle signPlugin` and `gradle publishPlugin` no-op cleanly when the env
+  // vars aren't set, so CI/local builds without secrets still succeed; the
+  // failure surface is only at publish time.
+  signing {
+    certificateChainFile = providers.environmentVariable("JETBRAINS_MARKETPLACE_CERT_CHAIN_FILE")
+      .map { layout.projectDirectory.file(it) }.orNull
+    privateKeyFile = providers.environmentVariable("JETBRAINS_MARKETPLACE_PRIVATE_KEY_FILE")
+      .map { layout.projectDirectory.file(it) }.orNull
+    password = providers.environmentVariable("JETBRAINS_MARKETPLACE_PRIVATE_KEY_PASSWORD").orNull
+  }
+
+  publishing {
+    token = providers.environmentVariable("JETBRAINS_MARKETPLACE_TOKEN").orNull
+    // Distribution channel — defaults to "default" (the Stable channel on
+    // JetBrains Marketplace). Override at publish time to "beta" / "eap" /
+    // a custom string for staged rollouts:
+    //   gradle publishPlugin -PpublishChannel=beta
+    channels = providers.gradleProperty("publishChannel")
+      .orElse(providers.environmentVariable("JETBRAINS_MARKETPLACE_CHANNEL"))
+      .orElse("default")
+      .map { listOf(it) }
+  }
+}
+
+// Gate `publishPlugin` on a clean `verifyPlugin` run so a compatibility
+// regression can't slip past the local build and fail at upload instead.
+tasks.named("publishPlugin") {
+  dependsOn("verifyPlugin")
 }
 
 // Sync the engine-backed server bundle + the TextMate grammar into resources before
