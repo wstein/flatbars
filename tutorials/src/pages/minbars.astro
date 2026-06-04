@@ -297,7 +297,7 @@ $ ~> | $ | {
         FlatBars keeps <b><code>Value</code> pure data — never a function</b>, so a lambda lives
         outside the value. Its two jobs split cleanly: a <b>value-producing lambda</b> (format a
         date, compute a total) is <b>precalculated before rendering</b> — in the Lab, with the
-        <a href="/lab/index.html?engine=minbars">JSONata transform</a> (first-class functions and
+        <a href="/transform">JSONata transform</a> (first-class functions and
         closures), though any host-side computation works; the engine just receives plain data. A
         <b>section lambda</b> that rewrites its block body is a <a href="/fullbars">FullBars</a>
         <b>helper</b>, where render-time behaviour belongs — a preprocess step never sees the
@@ -313,8 +313,9 @@ $ ~> | $ | {
     </p>
     <pre class="oil-static"><code>{valueLambdaCode}</code></pre>
     <p>
-      In FlatBars you compute it <b>before</b> rendering — here with the Lab's JSONata transform
-      (its first-class functions and closures do the work) — and emit plain data:
+      In FlatBars you compute it <b>before</b> rendering — here with a
+      <a href="/transform">JSONata transform</a> (its first-class functions and closures do the
+      work) — and emit plain data:
     </p>
     <pre class="oil-static"><code>{jsonataCode}</code></pre>
     <p>

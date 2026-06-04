@@ -1,0 +1,146 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// "Data shaping" — the guide for turning raw input into the exact view-model a
+// logic-less FlatBars template renders. JSONata is the tool; this is NOT a fifth
+// surface and NOT a JSONata language reference (the long tail links to
+// jsonata.org). Every runnable cell + the flagship round-trip come from the one
+// gate-validated source (../jsonata.mjs, gated by scripts/check-jsonata.mjs), so
+// a snippet can never drift from what the Lab's vendored engine produces.
+import Reference from "../layouts/Reference.astro";
+import OpenInLab from "../components/OpenInLab.jsx";
+import TryJsonata from "../components/TryJsonata.jsx";
+import { sections, flagship, taughtFunctions } from "../jsonata.mjs";
+
+const navLabels = {
+  basics: "The basics", strings: "Strings", numbers: "Numbers & aggregation",
+  arrays: "Arrays", objects: "Objects", booleans: "Booleans & tests",
+  datetime: "Date & time", regex: "Regular expressions", "higher-order": "Higher-order",
+};
+const groups = [
+  {
+    label: "Data shaping",
+    items: [
+      { href: "#intro", label: "Why shape data" },
+      ...sections.map((s) => ({ href: `#${s.id}`, label: navLabels[s.id] || s.title })),
+      { href: "#flagship", label: "Flagship: a changelog" },
+      { href: "#beyond", label: "Beyond this guide" },
+    ],
+  },
+];
+const fnCount = taughtFunctions.length;
+---
+
+<Reference
+  title="Data shaping"
+  subtitle="FlatBars templates are logic-less on purpose. This runnable guide shows where the logic goes: JSONata reshapes raw input into the exact view-model your template renders — every snippet runs live through the engine the Lab ships."
+  groups={groups}
+  dialect="maxbars"
+>
+  <style>
+    .ds-cell { margin: 1rem 0 1.6rem; }
+    .ds-cell .ds-h { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .ds-cell .ds-h b { color: var(--accent-2); font-family: var(--font-mono); }
+    .ds-cell .ds-h span { color: var(--fg-muted); }
+    .ds-flow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      font: 600 12px/1.4 var(--font-mono); margin: 1.1rem 0; }
+    .ds-flow .box { padding: 0.35rem 0.6rem; border: 1px solid var(--border-strong);
+      border-radius: 6px; background: var(--bg-1); color: var(--fg-secondary); }
+    .ds-flow .box.mid { color: var(--accent-2); border-color: var(--accent); background: var(--accent-softer); }
+    .ds-flow .arr { color: var(--fg-faint); }
+  </style>
+
+  <!-- ─────────────────────────── Intro ─────────────────────────── -->
+  <section id="intro">
+    <h2>Why shape data</h2>
+    <p>
+      Every FlatBars surface is <b>logic-less</b> by design — even MaxBars keeps its
+      sugar thin. A template should say <em>what</em> the output looks like, not
+      compute <em>which</em> data to show. So the computing happens <b>before</b>
+      rendering: you transform the raw input into a clean <b>view-model</b> — an
+      object shaped exactly like the template expects — and the template just walks it.
+    </p>
+    <div class="ds-flow" aria-label="data to view to output">
+      <span class="box">raw data</span><span class="arr">→</span>
+      <span class="box mid">JSONata transform</span><span class="arr">→</span>
+      <span class="box">view-model</span><span class="arr">→</span>
+      <span class="box">template → output</span>
+    </div>
+    <p>
+      The tool for that middle step is <a href="https://jsonata.org" target="_blank" rel="noopener">JSONata ↗</a>,
+      a small query-and-transform language for JSON. The Lab ships it as the
+      <b>transform</b> tab, and so does this guide: the cells below run the exact
+      same engine. Edit either pane — the result re-evaluates as you type.
+    </p>
+    <TryJsonata client:visible data={sections[0].cells[0].data} expr={sections[0].cells[0].expr} />
+    <p class="tip">
+      This guide teaches the <b>{fnCount}</b> JSONata functions FlatBars users reach
+      for most, each demonstrated live. The full function library lives at
+      <a href="https://docs.jsonata.org" target="_blank" rel="noopener">docs.jsonata.org ↗</a> — we
+      don’t fork it here.
+    </p>
+  </section>
+
+  {sections.map((sec) => (
+    <section id={sec.id}>
+      <h2>{sec.title}</h2>
+      <p>{sec.lead}</p>
+      {sec.functions.length > 0 && (
+        <p class="tip">Functions: {sec.functions.map((f, i) => <span>{i > 0 ? " · " : ""}<code>{f}</code></span>)}</p>
+      )}
+      {sec.cells.map((c, i) => (
+        <div class="ds-cell">
+          <p class="ds-h"><b>{c.label}</b> — <span>{c.note}</span></p>
+          {/* The first basics cell already ran in the intro; show the rest. */}
+          {!(sec.id === "basics" && i === 0) && <TryJsonata client:visible data={c.data} expr={c.expr} />}
+        </div>
+      ))}
+    </section>
+  ))}
+
+  <!-- ─────────────────────────── Flagship ─────────────────────────── -->
+  <section id="flagship">
+    <h2>Flagship: a changelog, end to end</h2>
+    <p>
+      Here is the whole idea in one cell. The <b>data</b> is a flat list of
+      conventional commits. The <b>transform</b> groups them by type, fixes the
+      section order, drops empty groups, and labels each — producing a view-model
+      of titled sections. The <b>MaxBars</b> template has <em>zero</em> branching:
+      it just walks <code>sections</code> and <code>items</code>. All the logic is
+      upstream, as data.
+    </p>
+    <OpenInLab
+      client:visible
+      engine={flagship.engine}
+      data={flagship.data}
+      transform={flagship.transform}
+      template={flagship.template}
+    />
+    <p class="tip">
+      Notice <code>$$.commits</code> in the transform: inside a mapping the context
+      is the current section key, so the root reference <code>$$</code> reaches back
+      to the original input. <b>Open in Lab</b> carries the data, transform, and
+      template across together.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── Beyond ─────────────────────────── -->
+  <section id="beyond">
+    <h2>Beyond this guide</h2>
+    <p>
+      This is the data-shaping subset, not all of JSONata. For the complete
+      function library, operators, and semantics — date/time pictures, the full
+      regex surface, <code>$reduce</code> patterns, partial application — go to the
+      source:
+    </p>
+    <ul>
+      <li><a href="https://docs.jsonata.org" target="_blank" rel="noopener">docs.jsonata.org ↗</a> — the language reference.</li>
+      <li><a href="https://try.jsonata.org" target="_blank" rel="noopener">try.jsonata.org ↗</a> — the official Exerciser, a full playground.</li>
+    </ul>
+    <p>
+      Back in FlatBars, every surface pairs with this step:
+      <a href="/minbars">MinBars</a>, <a href="/fullbars">FullBars</a>, and
+      <a href="/maxbars">MaxBars</a> all render a view-model you shaped here.
+    </p>
+  </section>
+</Reference>

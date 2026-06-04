@@ -15,6 +15,7 @@ import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 import { renderWith, safe } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
+import jsonata from "../../../lab/vendor/jsonata.mjs";
 import { highlightTemplate, highlightYaml, esc } from "../lib/highlight.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
@@ -33,7 +34,7 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
   // template → engine highlighter; yaml → data highlighter; js (custom helpers)
   // → plain escaped text (no JS grammar — the source has no FlatBars tags).
   const html =
-    (lang === "yaml" ? highlightYaml(value) : lang === "js" ? esc(value) : highlightTemplate(value, dialect)) + "\n";
+    (lang === "yaml" ? highlightYaml(value) : lang === "js" || lang === "jsonata" ? esc(value) : highlightTemplate(value, dialect)) + "\n";
 
   useEffect(() => {
     const ta = taRef.current, pre = preRef.current;
@@ -69,10 +70,11 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars" }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", labUrl = LAB_URL, compile = false }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", labUrl = LAB_URL, compile = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
+  const [transformStr, setTransformStr] = useState(transform || "");
   const [parts, setParts] = useState(partials || {});
   // Custom-helper JS source (ADR-018). Only the FullBars/Handlebars surface has
   // user helpers; the cell shows when an example supplies them.
@@ -106,6 +108,16 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       setOut({ ok: false, text: "⚠ data isn’t valid YAML — " + ((e && e.message) || e) });
       return;
     }
+    // Optional JSONata data-shaping pass (data → view-model) before rendering —
+    // the same preprocess the Lab's transform tab runs (sync evaluate).
+    if ((transformStr || "").trim()) {
+      try {
+        data = jsonata(transformStr).evaluate(data);
+      } catch (e) {
+        setOut({ ok: false, text: "⚠ transform error — " + ((e && e.message) || e) });
+        return;
+      }
+    }
     // With custom helpers, render through the engine facade's `renderWith`
     // (which marshals the JS helpers into the interpreter); otherwise the
     // adapter's plain render. `safe(html)` is available to the helper source.
@@ -123,7 +135,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     } catch (e) {
       setOut({ ok: false, text: String((e && e.message) || e) });
     }
-  }, [renderer, tpl, dataStr, parts, helpersStr]);
+  }, [renderer, tpl, dataStr, transformStr, parts, helpersStr]);
 
   // Optional: compile the template to a JS module (RawBars/FullBars/MaxBars only).
   useEffect(() => {
@@ -135,32 +147,39 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace.
   useEffect(() => {
     let live = true;
-    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr }, { labUrl })
+    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr }, { labUrl })
       .then((h) => { if (live) setHref(h); })
       .catch(() => {});
     return () => { live = false; };
-  }, [tpl, dataStr, parts, helpersStr]);
+  }, [tpl, dataStr, transformStr, parts, helpersStr]);
 
   // A full-width template row only pays off when the template is actually wide
   // (multi-line or long); a short one-liner like `{{> card}}` would just leave a
   // near-empty band, so it shares the row with data + partials instead.
   const partialNames = Object.keys(parts);
   const wideTemplate = tpl.includes("\n") || tpl.length > 30;
+  const hasHelpers = (helpersStr || "").trim().length > 0;
+  const hasTransform = (transformStr || "").trim().length > 0;
+  // With a JSONata transform (and no partials) the cell uses a dedicated layout:
+  // transform + data side by side on top, template spanning both columns below
+  // (see open-in-lab.css).
   const gridClass =
-    "oil-grid" + (partialNames.length ? " has-partials" : "") + (partialNames.length && wideTemplate ? " wide-tpl" : "");
+    "oil-grid" + (partialNames.length ? " has-partials" : "") + (partialNames.length && wideTemplate ? " wide-tpl" : "") +
+    (hasTransform && !partialNames.length ? " has-transform" : "");
 
   const onTpl = (v) => { setTpl(v); setEdited(true); };
   const onData = (v) => { setDataStr(v); setEdited(true); };
   const onPart = (name, v) => { setParts((p) => ({ ...p, [name]: v })); setEdited(true); };
   const onHelpers = (v) => { setHelpersStr(v); setEdited(true); };
+  const onTransform = (v) => { setTransformStr(v); setEdited(true); };
   const reset = () => {
     setTpl(template);
     setDataStr(initialData);
+    setTransformStr(transform || "");
     setParts(partials || {});
     setHelpersStr(helpers || "");
     setEdited(false);
   };
-  const hasHelpers = (helpersStr || "").trim().length > 0;
 
   return (
     <figure class={"oil" + (edited ? " is-edited" : "")} data-affordance="dock">
@@ -184,14 +203,20 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       </header>
 
       <div class={gridClass}>
-        <div class="oil-cell">
+        <div class="oil-cell oil-tpl">
           <div class="oil-cell-head"><span class="oil-cap">template</span></div>
           <CodeEditor lang="template" value={tpl} onInput={onTpl} dialect={engine} />
         </div>
-        <div class="oil-cell">
+        <div class="oil-cell oil-data">
           <div class="oil-cell-head"><span class="oil-cap">data</span></div>
           <CodeEditor lang="yaml" value={dataStr} onInput={onData} />
         </div>
+        {hasTransform && (
+          <div class="oil-cell oil-transform">
+            <div class="oil-cell-head"><span class="oil-cap">transform · JSONata</span><span class="oil-js-note">— data → view-model</span></div>
+            <CodeEditor lang="jsonata" value={transformStr} onInput={onTransform} />
+          </div>
+        )}
         {Object.keys(parts).map((name) => (
           <div class="oil-cell" key={name}>
             <div class="oil-cell-head"><span class="oil-cap">partial · {name}</span></div>

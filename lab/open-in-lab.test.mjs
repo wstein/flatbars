@@ -42,6 +42,19 @@ test("labHref rejects an unknown engine", async () => {
   await assert.rejects(() => labHref("handlebars", { template: "x" }), /unknown engine/);
 });
 
+test("labHref carries a JSONata transform as s.t (lands in the Lab's transform tab)", async () => {
+  const href = await labHref("maxbars", {
+    template: "{{name}}",
+    data: { raw: 1 },
+    transform: "{ \"name\": raw }",
+  });
+  const state = await decodeFragment(href);
+  assert.equal(state.t, '{ "name": raw }');
+  // Absent transform leaves t unset (no empty-string noise in the workspace).
+  const bare = await decodeFragment(await labHref("maxbars", { template: "x", data: {} }));
+  assert.equal(bare.t, undefined);
+});
+
 test("workspaceState defaults are Lab-restorable", () => {
   const s = workspaceState({ template: "hi" });
   assert.equal(s.x, -1);

@@ -88,6 +88,8 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
         text-transform: none; color: var(--fg-muted); background: var(--bg-1); border: 1px solid var(--border);
         border-radius: 999px; padding: 0.28em 0.7em; }
       .eyebrow .chip.core { color: var(--accent-2); border-color: var(--border-strong); background: var(--accent-softer); }
+      .eyebrow .chip-link { color: var(--accent-2); border-color: var(--border-strong); text-decoration: none; transition: background 0.12s; }
+      .eyebrow .chip-link:hover { background: var(--accent-softer); }
       .eyebrow .arrow { color: var(--fg-faint); }
 
       .hero { padding-top: 3.4rem; }
@@ -134,6 +136,9 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
       .surf .sample { font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg-2); border: 1px solid var(--border);
         border-radius: 6px; padding: 0.55rem 0.65rem; color: var(--fg-secondary); white-space: pre-wrap; word-break: break-word; }
       .surf.rec { border-color: var(--border-strong); box-shadow: var(--shadow-pop); }
+      .surf-after { margin: 1.4rem 0 0; font-size: 1rem; color: var(--fg-muted); text-align: center; }
+      .surf-after a { color: var(--accent-2); font-weight: 600; text-decoration: none; }
+      .surf-after a:hover { text-decoration: underline; }
       .surf .tagrec { position: absolute; top: 0.9rem; right: 0.9rem; font: 600 8.5px/1 var(--font-mono); text-transform: uppercase;
         letter-spacing: 0.08em; color: var(--accent-2); background: var(--accent-softer); border: 1px solid var(--border-strong);
         border-radius: 999px; padding: 0.32em 0.6em; }
@@ -175,8 +180,8 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
         <p class="eyebrow">
           <span class="chip core">flatbars core</span>
           <span class="arrow">→</span>
-          <span class="chip">RawBars</span><span class="chip">MinBars</span>
-          <span class="chip">FullBars</span><span class="chip">MaxBars</span>
+          <a class="chip chip-link" href="/rawbars">RawBars</a><a class="chip chip-link" href="/minbars">MinBars</a>
+          <a class="chip chip-link" href="/fullbars">FullBars</a><a class="chip chip-link" href="/maxbars">MaxBars</a>
         </p>
         <h1>The <span class="flat">Handlebars</span> &amp; Mustache you know, on a core small enough to <em>be the language you want.</em></h1>
         <p class="lead">One parser. Four surfaces. <strong>Proven against the real specs</strong> — Mustache and Handlebars run on it unchanged, and MaxBars is the language we built on top.</p>
@@ -218,6 +223,10 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
             </a>
           ))}
         </div>
+        <p class="surf-after">
+          Every surface renders <em>data</em> — but raw data rarely fits the template.
+          <a href="/transform">Data shaping →</a> turns it into the view-model they want, with JSONata.
+        </p>
       </section>
 
       <!-- ===================== ARCHITECTURE ===================== -->

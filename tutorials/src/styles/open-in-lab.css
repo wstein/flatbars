@@ -103,6 +103,10 @@
   gap: 1px;
   background: var(--border);
 }
+/* The JSONata "Data shaping" cell gives the expression (left) a touch more room
+   than the data (right) — 55/45 — rather than the template-heavy 1.7/1 of the
+   render playground. */
+.oil-jsonata .oil-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
 /* With partials there are 3+ inputs; a 50/50-ish split leaves an empty cell and
    a cramped template. Instead the template takes a full-width row, and the data
    and partial(s) sit side by side below it. Flex (not grid auto-fit) so the row
@@ -117,9 +121,21 @@
    full-width row; a short one-liner shares the row with data + partials so it
    doesn't leave a near-empty band. */
 .oil .oil-grid.has-partials.wide-tpl .oil-cell:first-child { flex-basis: 100%; }
+/* Flagship "Data shaping" layout: the JSONata transform (left) and the raw input
+   data (right) sit side by side on top; the template spans BOTH columns below,
+   then the output. Reads top-to-bottom as the pipeline: transform + data → template. */
+.oil .oil-grid.has-transform {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+.oil .oil-grid.has-transform .oil-transform { grid-column: 1; grid-row: 1; }
+.oil .oil-grid.has-transform .oil-data      { grid-column: 2; grid-row: 1; }
+.oil .oil-grid.has-transform .oil-tpl       { grid-column: 1 / -1; grid-row: 2; }
 @media (max-width: 40rem) {
   .oil .oil-grid { grid-template-columns: 1fr; }
   .oil .oil-grid.has-partials .oil-cell { flex-basis: 100%; }
+  /* Stack on narrow screens: transform → template → data, top to bottom. */
+  .oil .oil-grid.has-transform { display: block; }
 }
 .oil .oil-cell { background: var(--bg); min-width: 0; padding: 0.55rem 0.7rem 0.7rem; }
 .oil .oil-cell-head { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.4rem; }

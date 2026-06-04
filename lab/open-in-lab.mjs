@@ -32,7 +32,7 @@ export function dataText(data) {
 // (restoreHash restores it verbatim rather than reloading a catalog example);
 // tab 0 is the main template, the rest are named partials. Mirrors the field
 // shape `restoreHash` reads (`tabs:[{n,s}]`, `d`, `av`, `ai`).
-export function workspaceState({ template = "", data, partials, helpers } = {}) {
+export function workspaceState({ template = "", data, partials, helpers, transform } = {}) {
   const tabs = [{ s: template }];
   const p = partials || {};
   for (const name of Object.keys(p)) tabs.push({ n: name, s: p[name] });
@@ -41,6 +41,10 @@ export function workspaceState({ template = "", data, partials, helpers } = {}) 
   // (`t`). The Lab loads it into its FullBars-only helpers.js editor and runs it
   // in a sandboxed Worker (no DOM access), so a shared link cannot touch the page.
   if (helpers && helpers.trim()) st.h = helpers;
+  // A JSONata data transform (the data → view-model preprocess `restoreHash`
+  // reads as `s.t`). Lets a "Data shaping" example land in the Lab's transform
+  // tab with the expression already loaded.
+  if (transform && transform.trim()) st.t = transform;
   return st;
 }
 

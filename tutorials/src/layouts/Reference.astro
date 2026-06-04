@@ -15,6 +15,19 @@ const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
 // `dialect` drives the topbar "Open the Lab" target and the runtime inline-code
 // highlighter (so a prose `{{name}}` lights up in the page's own dialect).
 const { title, subtitle, groups = [], spec, dialect = "fullbars" } = Astro.props;
+
+// Persistent cross-reference nav, appended to every reference sidebar below the
+// page's own TOC, so the siblings — and the Data shaping guide — are reachable
+// from the left nav on any page. The current page is matched by path suffix
+// (works with or without the deploy base prefix) and rendered inactive.
+const PATH = Astro.url.pathname.replace(/\/$/, "");
+const xref = [
+  { href: "/rawbars", label: "RawBars" },
+  { href: "/minbars", label: "MinBars" },
+  { href: "/fullbars", label: "FullBars" },
+  { href: "/maxbars", label: "MaxBars" },
+  { href: "/transform", label: "Data shaping" },
+].map((it) => ({ ...it, active: PATH.endsWith(it.href) }));
 ---
 
 <!doctype html>
@@ -50,6 +63,18 @@ const { title, subtitle, groups = [], spec, dialect = "fullbars" } = Astro.props
             </ul>
           </div>
         ))}
+        <div class="nav-group nav-xref">
+          <p class="nav-label">References</p>
+          <ul>
+            {xref.map((it) => (
+              <li>
+                <a class:list={["nav-link", { active: it.active }]} href={it.href} aria-current={it.active ? "page" : null}>
+                  {it.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
       </nav>
 
       <main id="main" class="content">
@@ -145,6 +170,8 @@ const { title, subtitle, groups = [], spec, dialect = "fullbars" } = Astro.props
         background: var(--bg-1);
       }
       .nav-group { margin-bottom: 1.25rem; }
+      /* Cross-reference group: set off from the in-page TOC by a rule above it. */
+      .nav-xref { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
       .nav-label {
         font: 600 11px/1 var(--font-mono);
         text-transform: uppercase;
