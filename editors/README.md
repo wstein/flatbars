@@ -26,9 +26,15 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
   derivation, and that every vocabulary `tmScope` still exists in the grammar.
 - **`test:lsp`** unit-tests the pure token logic and drives the real stdio server
   over LSP (`initialize` → `didOpen` → `semanticTokens/full`).
-- **`test:vscode`** drives the *bundled* server over LSP and runs `vsce package`
-  to build a `.vsix` (manifest + grammar valid). Live-editor rendering and the
-  Marketplace are out of scope here.
+- **`test:vscode`** drives the *bundled* server over LSP, asserts the
+  auto-activation precondition (`engines.vscode >= 1.74` so VS Code generates the
+  `onLanguage` events, and `contributes.languages` ≡ the shared dialect set), and
+  runs `vsce package` to build a `.vsix` (manifest + grammar valid).
+- **`test:vscode:ide`** (CI / on demand, not in `npm test`) downloads a real VS
+  Code and, in the Extension Host, opens a `.maxbars` fixture and asserts the
+  extension auto-activates and that a semantic token **and** a published diagnostic
+  actually surface — the end-to-end ceiling the offline smoke test can't reach.
+  Heavy (a VS Code download + a windowed run); the Marketplace is still out of scope.
 - **`test:jetbrains`** drives the *bundled* server over LSP and checks the
   descriptors + canonical grammar — no JVM needed. The full `gradle buildPlugin`
   (TextMate layer) compiles/packages against the real IntelliJ SDK in CI; the

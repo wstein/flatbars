@@ -14,15 +14,30 @@
 // NOT covered (documented limits): live VS Code rendering and Marketplace publish.
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
-import { existsSync, statSync, rmSync } from "node:fs";
+import { existsSync, statSync, rmSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import * as rpcNs from "vscode-jsonrpc/node.js";
+import { LANGUAGE_IDS } from "../../shared/sync.mjs";
 
 const rpc = rpcNs.default ?? rpcNs;
 const here = dirname(fileURLToPath(import.meta.url));
 const ext = resolve(here, "..");
 const root = resolve(ext, "..", "..");
+
+// ── 0. The manifest's auto-activation precondition holds ─────────────────────
+// The extension carries no explicit activationEvents: since VS Code 1.74 the
+// onLanguage events are generated from contributes.languages, so the extension
+// (and the LSP client it starts) auto-activates on opening a FlatBars file. That
+// guarantee rests on two manifest facts, asserted here; the end-to-end proof that
+// activation actually surfaces tokens + diagnostics is the real-IDE test
+// (test/ide, run in CI). The dialect set is single-sourced from editors/shared.
+const manifest = JSON.parse(readFileSync(resolve(ext, "package.json"), "utf8"));
+const langIds = manifest.contributes.languages.map((l) => l.id).sort();
+assert.deepEqual(langIds, [...LANGUAGE_IDS].sort(), "contributes.languages matches the canonical dialect set");
+const [, major, minor] = manifest.engines.vscode.match(/(\d+)\.(\d+)/);
+assert.ok(Number(major) > 1 || (Number(major) === 1 && Number(minor) >= 74), "engines.vscode >= 1.74 (onLanguage auto-generation)");
+assert.ok(Array.isArray(manifest.activationEvents) && manifest.activationEvents.length === 0, "no redundant explicit activationEvents (auto-generated)");
 
 // ── Build the shippable assets (grammar + bundled server + extension) ────────
 execFileSync(process.execPath, [resolve(ext, "scripts", "sync-assets.mjs")], { stdio: "pipe" });

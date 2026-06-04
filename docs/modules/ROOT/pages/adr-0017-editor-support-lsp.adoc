@@ -201,17 +201,24 @@ the JetBrains plugin) confirmed the two-layer design of this ADR but found the
 three blockers below are closed, the extensions are **not** to be published to the
 VS Code Marketplace / Open VSX / JetBrains Marketplace. The decisions:
 
-. *Activation is unverified, so it is release-blocking (VS Code).* The extension
-  ships `pass:[activationEvents: []]` (`editors/vscode/package.json`). The TextMate
-  floor is declarative and paints regardless, but the language *client* — and thus
-  the entire LSP ceiling (semantic tokens + diagnostics) — starts in `activate()`,
-  which has no trigger; VS Code does not auto-infer `onLanguage` for a contributed
-  language. The smoke test cannot catch this: it spawns the server process
-  directly, bypassing activation. *Decision:* declare explicit
-  `pass:[onLanguage:{rawbars,minbars,fullbars,maxbars,flatbars}]` activation events,
-  and add a *real-IDE* test that asserts both a semantic token and a published
-  diagnostic actually surface in a running editor (not just that the server speaks
-  LSP over a pipe).
+. *Activation is unverified end-to-end, so it is release-blocking (VS Code).* The
+  review's first framing was that `pass:[activationEvents: []]`
+  (`editors/vscode/package.json`) left the language client — and thus the whole LSP
+  ceiling (semantic tokens + diagnostics) — without a trigger. *That framing was
+  wrong, and the manifest validator caught it:* since VS Code 1.74 the `onLanguage`
+  events are *generated* from `contributes.languages`, and `engines.vscode` is
+  `^1.75`, so the extension auto-activates on opening a FlatBars file — declaring
+  the events explicitly is redundant (and now flagged as removable). The real gap
+  is that *nothing proves it*: the smoke test spawns the server over a pipe,
+  bypassing activation entirely, so a regression (a broken client, a dropped
+  language contribution) would ship silently. *Decision (implemented):* keep
+  `pass:[activationEvents: []]` (rely on the generated events); assert the
+  auto-activation precondition offline in the smoke test (`engines.vscode >= 1.74`
+  and `contributes.languages` ≡ the shared dialect set); and add a *real-IDE* test
+  (`editors/vscode/test/ide`, `npm run test:vscode:ide`) that opens a `.maxbars`
+  fixture in a downloaded VS Code and asserts the extension auto-activates and that
+  a semantic token *and* a published diagnostic actually surface. It is heavy (a VS
+  Code download + a windowed run), so it runs in CI (blocker 2), not in `npm test`.
 
 . *The JVM/LSP path compiles on no CI machine, so it is release-blocking
   (JetBrains).* `test:jetbrains` validates the bundled JS transport (descriptors,

@@ -16,6 +16,7 @@ yarn-error.log*
 dist/
 build/
 .parcel-cache/
+.vscode-test/
 
 # --- Reference playground build artifacts (kept as reference, not built here) ---
 lab/wasm/*.wasm
