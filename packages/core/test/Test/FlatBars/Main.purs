@@ -570,7 +570,9 @@ main = do
     lxOn = defaultLexOptions { infixArith = true }
   -- A raw block is one RawTok; its interior is the HEAD's tokens, not the body's.
   assert' "tokenizer: a raw block attaches its head tokens (not the verbatim body)"
-    (interiorToksOf defaultLexOptions "{{{{raw}}}}verbatim {{x}} body{{{{/raw}}}}" == Just [ TIdent "raw" ])
+    ( interiorToksOf defaultLexOptions "{{{{raw}}}}verbatim {{x}} body{{{{/raw}}}}" == Just
+        [ TIdent "raw" ]
+    )
   -- Off MaxBars, `+` is path punctuation, so `a+b` is one ident; on, it carves.
   assert' "tokenizer: infixArith off keeps `a+b` a single ident interior"
     (interiorToksOf defaultLexOptions "{{ a+b }}" == Just [ TIdent "a+b" ])
