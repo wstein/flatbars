@@ -31,6 +31,7 @@ import FlatBars.Lexer (RawTok(..), trimStandalone) as E
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Syntax (Sigil(..)) as Syn
+import FlatBars.Token (tokenizeInterior) as E
 
 -- | Tokenize a template into the engine's `RawTok` stream. Honours
 -- | `mustacheDelims`: off, the default-delimiter grammar; on, `{{=A B=}}`
@@ -43,6 +44,12 @@ toRawToks cfg src =
   cs = SCU.toCharArray src
   len = Array.length cs
   mustache = cfg.mustacheDelims
+
+  -- Lex a tag interior with this dialect's `infixArith` — mirrors the engine
+  -- `FlatBars.Lexer.tokenizeTemplate` populating each `RawTok`'s interior at scan
+  -- time, so the two RawTok streams stay byte-identical (RawTokParity now also
+  -- covers interiors). Same `tokenizeInterior` the engine calls.
+  interiorAt base s = E.tokenizeInterior { infixArith: cfg.infixArith } base s
 
   at i = case Array.index cs i of
     Just c -> c
@@ -222,7 +229,8 @@ toRawToks cfg src =
             t = splitTrims (slice start q)
           in
             Right
-              { mtok: Just (E.ROutput (span i (q + 3)) start t.core)
+              -- mirrors Lexer.purs readOutput
+              { mtok: Just (E.ROutput (span i (q + 3)) start t.core (interiorAt start t.core))
               , next: q + 3
               , trimL: t.trimL
               , trimR: t.trimR
@@ -240,7 +248,8 @@ toRawToks cfg src =
             t = splitTrims (slice start q)
           in
             Right
-              { mtok: Just (E.ROpen (span i (q + cl)) sigil start t.core)
+              -- mirrors Lexer.purs readBlockOpen
+              { mtok: Just (E.ROpen (span i (q + cl)) sigil start t.core (interiorAt start t.core))
               , next: q + cl
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -258,7 +267,8 @@ toRawToks cfg src =
             t = splitTrims (slice start q)
           in
             Right
-              { mtok: Just (E.RClose (span i (q + cl)) start t.core)
+              -- mirrors Lexer.purs readClose
+              { mtok: Just (E.RClose (span i (q + cl)) start t.core (interiorAt start t.core))
               , next: q + cl
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -275,7 +285,8 @@ toRawToks cfg src =
             t = splitTrims (slice start q)
           in
             Right
-              { mtok: Just (E.RAmp (span i (q + 2)) start t.core)
+              -- mirrors Lexer.purs readAmp
+              { mtok: Just (E.RAmp (span i (q + 2)) start t.core (interiorAt start t.core))
               , next: q + 2
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -292,7 +303,8 @@ toRawToks cfg src =
             t = splitTrims (slice start q)
           in
             Right
-              { mtok: Just (E.RSep (span i (q + 2)) start t.core)
+              -- mirrors Lexer.purs readSeparator
+              { mtok: Just (E.RSep (span i (q + 2)) start t.core (interiorAt start t.core))
               , next: q + 2
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -341,7 +353,11 @@ toRawToks cfg src =
                   end = qc + SCU.length closePat
                 in
                   Right
-                    { mtok: Just (E.RRaw (span i end) (sigil == 5) start head (slice bodyStart qc))
+                    -- mirrors Lexer.purs readRaw (interior = head; body verbatim)
+                    { mtok: Just
+                        ( E.RRaw (span i end) (sigil == 5) start head (interiorAt start head)
+                            (slice bodyStart qc)
+                        )
                     , next: end
                     , trimL: false
                     , trimR: false
@@ -375,21 +391,25 @@ toRawToks cfg src =
             sp = span i (q + cl)
             next = q + cl
             afterSig = slice (start + 1) q
+            afterHash = slice (start + 2) q
             interior = slice start q
+            -- mirrors Lexer.purs readCustomTag interiors
+            sigInt = interiorAt (start + 1) afterSig
+            hashInt = interiorAt (start + 2) afterHash
             mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
           in
             case at start of
               '#' -> case at (start + 1) of
-                '*' -> mk (E.ROpen sp Syn.Decorator (start + 2) (slice (start + 2) q))
-                '>' -> mk (E.ROpen sp Syn.PartialBlock (start + 2) (slice (start + 2) q))
-                _ -> mk (E.ROpen sp Syn.Section (start + 1) afterSig)
-              '^' -> mk (E.ROpen sp Syn.Inverse (start + 1) afterSig)
-              '<' -> mk (E.ROpen sp Syn.Parent (start + 1) afterSig)
-              '$' -> mk (E.ROpen sp Syn.BlockDef (start + 1) afterSig)
-              '/' -> mk (E.RClose sp (start + 1) afterSig)
-              '&' -> mk (E.RAmp sp (start + 1) afterSig)
+                '*' -> mk (E.ROpen sp Syn.Decorator (start + 2) afterHash hashInt)
+                '>' -> mk (E.ROpen sp Syn.PartialBlock (start + 2) afterHash hashInt)
+                _ -> mk (E.ROpen sp Syn.Section (start + 1) afterSig sigInt)
+              '^' -> mk (E.ROpen sp Syn.Inverse (start + 1) afterSig sigInt)
+              '<' -> mk (E.ROpen sp Syn.Parent (start + 1) afterSig sigInt)
+              '$' -> mk (E.ROpen sp Syn.BlockDef (start + 1) afterSig sigInt)
+              '/' -> mk (E.RClose sp (start + 1) afterSig sigInt)
+              '&' -> mk (E.RAmp sp (start + 1) afterSig sigInt)
               '!' -> mk (E.RComment sp (start + 1) afterSig)
-              _ -> mk (E.RSep sp start interior)
+              _ -> mk (E.RSep sp start interior (interiorAt start interior))
 
   -- Exactly two whitespace-separated, `=`-free delimiter words.
   delimWords s = case words s of

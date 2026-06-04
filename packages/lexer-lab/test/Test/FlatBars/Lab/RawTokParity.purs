@@ -16,6 +16,7 @@ import FlatBars.Lab.RawTok (parse, toRawToks)
 import FlatBars.Lexer (defaultLexConfig, tokenizeTemplate)
 import FlatBars.Parser (defaultParseOptions, parse) as Core
 import FlatBars.Syntax (Node(..))
+import FlatBars.Token (defaultLexOptions)
 import Test.Assert (assertTrue')
 
 -- Erase spans so the end-to-end AST comparison is structural.
@@ -74,7 +75,10 @@ tests :: Effect Unit
 tests = do
   log "FlatBars.Lab.RawTok — RawTok parity vs tokenizeTemplate"
   for_ corpus \src ->
-    case toRawToks Lab.defaultLexConfig src, tokenizeTemplate defaultLexConfig src of
+    case
+      toRawToks Lab.defaultLexConfig src,
+      tokenizeTemplate defaultLexConfig defaultLexOptions src
+      of
       Right lab, Right eng ->
         assertTrue'
           ("RawTok mismatch on " <> show src <> "\n  lab: " <> show lab <> "\n  eng: " <> show eng)
@@ -105,7 +109,7 @@ tests = do
     engMustache = defaultLexConfig { mustacheDelims = true }
   for_ [ "{{=<% %>=}}<% x %> done", "{{=<% %>=}}<% a %>mid<% b %>", "a {{=[[ ]]=}}[[ y ]] b" ]
     \src ->
-      case toRawToks labMustache src, tokenizeTemplate engMustache src of
+      case toRawToks labMustache src, tokenizeTemplate engMustache defaultLexOptions src of
         Right lab, Right eng ->
           assertTrue'
             ( "set-delim RawTok mismatch on " <> show src <> "\n  lab: " <> show lab <> "\n  eng: "

@@ -29,6 +29,7 @@ import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as SCU
 import FlatBars.Lexer (RawTok(..))
 import FlatBars.Syntax (Sigil(..))
+import FlatBars.Token (LexOptions, tokenizeInterior)
 
 isSpaceCU :: Char -> Boolean
 isSpaceCU c = c == ' ' || c == '\t' || c == '\r' || c == '\n'
@@ -81,11 +82,11 @@ dropTrailingIndent s = case nlIndex false s of
 -- | partial (`{{> …}}`, head `>`), never a plain `{{x}}` interpolation.
 eligible :: RawTok -> Boolean
 eligible = case _ of
-  ROpen _ _ _ _ -> true
-  RClose _ _ _ -> true
+  ROpen _ _ _ _ _ -> true
+  RClose _ _ _ _ -> true
   RComment _ _ _ -> true
   RSetDelim _ -> true -- a lone `{{=<% %>=}}` line is standalone (spec §delimiters)
-  RSep _ _ s -> isPartialInterior s
+  RSep _ _ s _ -> isPartialInterior s
   _ -> false
 
 -- A partial separator's interior begins (after optional whitespace) with `>`.
@@ -99,8 +100,8 @@ isPartialInterior s = case Array.head (dropWs (SCU.toCharArray s)) of
 -- | The Mustache standalone pass. Mirrors the core trim's structure (strip the
 -- | previous tag's trailing line and the following indent around each standalone
 -- | tag), then injects each standalone partial's captured indent.
-mustacheStandalone :: Array RawTok -> Array RawTok
-mustacheStandalone toks0 = Array.mapWithIndex inject trimmed
+mustacheStandalone :: LexOptions -> Array RawTok -> Array RawTok
+mustacheStandalone lx toks0 = Array.mapWithIndex inject trimmed
   where
   trimmed = Array.mapWithIndex trimContent toks0
 
@@ -161,17 +162,24 @@ mustacheStandalone toks0 = Array.mapWithIndex inject trimmed
   -- (indent is whitespace-only, so quoting is always safe). The desugar reads it
   -- back: a `>`-headed separator's indent re-applies to the partial's lines, a
   -- `Parent` open's indent re-applies to the expanded parent template's lines.
+  -- Appending the indent rewrites the interior *string*, so its pre-lexed
+  -- interior must be recomputed in lockstep (the token now carries an extra
+  -- trailing string literal). `lx` is MinBars' own LexOptions — the same the tree
+  -- builder would have used.
+  reindent i base s =
+    let s' = s <> " \"" <> indentAt i <> "\"" in { s: s', int: tokenizeInterior lx base s' }
+
   inject :: Int -> RawTok -> RawTok
   inject i = case _ of
-    RSep span base s
+    RSep span base s _
       | isPartialInterior s && standaloneAt i ->
-          RSep span base (s <> " \"" <> indentAt i <> "\"")
-    ROpen span Parent base s
+          let r = reindent i base s in RSep span base r.s r.int
+    ROpen span Parent base s _
       | standaloneAt i ->
-          ROpen span Parent base (s <> " \"" <> indentAt i <> "\"")
+          let r = reindent i base s in ROpen span Parent base r.s r.int
     -- a standalone override-block open carries its indent too: the override (or
     -- default) body is re-indented to it at expansion (§4.6.2 reindentation).
-    ROpen span BlockDef base s
+    ROpen span BlockDef base s _
       | standaloneAt i ->
-          ROpen span BlockDef base (s <> " \"" <> indentAt i <> "\"")
+          let r = reindent i base s in ROpen span BlockDef base r.s r.int
     other -> other

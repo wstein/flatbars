@@ -33,8 +33,7 @@ import FlatBars.Expr as Expr
 import FlatBars.Lexer (LexConfig, RawTok(..), defaultLexConfig, tokenizeTemplate, trimStandalone)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Directive, Expr(..), Node(..), Sigil(..), Template)
-import FlatBars.Token (LexOptions, PosToken, Token(..), defaultLexOptions)
-import FlatBars.Tokenizer (ITok, Interior, attachInteriors)
+import FlatBars.Token (Interior, LexOptions, PosToken, Token(..), defaultLexOptions)
 
 -- | A tag-interior expression parser: it consumes the interior **token stream**
 -- | (the core tokenizes interiors via `FlatBars.Token.tokenizeInterior`; this
@@ -128,7 +127,7 @@ parse = parseWith defaultParseOptions
 type ParseResult = { directives :: Array Directive, nodes :: Template, errors :: Array ParseError }
 
 parseRecovering :: ParseOptions -> String -> ParseResult
-parseRecovering opts src = case tokenizeTemplate opts.lexConfig src of
+parseRecovering opts src = case tokenizeTemplate opts.lexConfig opts.lexOptions src of
   -- a lex error breaks the token stream itself, so nothing downstream can run.
   Left e -> { directives: [], nodes: [], errors: [ e ] }
   Right toks ->
@@ -140,10 +139,9 @@ parseRecovering opts src = case tokenizeTemplate opts.lexConfig src of
       standalone = either (const false) identity trimRes
       trimErrs = either Array.singleton (const []) trimRes
       toks' = if standalone then trimStandalone opts.standaloneSeps toks else toks
-      -- comments carry no output; drop them before the tree builder, then attach
-      -- each surviving tag's pre-lexed interior (the parser reads it instead of
-      -- re-lexing).
-      filtered = attachInteriors opts.lexOptions (Array.filter (not <<< isComment) toks')
+      -- comments carry no output; drop them before the tree builder. Each tag
+      -- already carries its pre-lexed interior (from `tokenizeTemplate`).
+      filtered = Array.filter (not <<< isComment) toks'
       seq = runSeq filtered 0 [] []
     in
       { directives, nodes: seq.nodes, errors: dirErrs <> trimErrs <> seq.errors }
@@ -151,7 +149,7 @@ parseRecovering opts src = case tokenizeTemplate opts.lexConfig src of
   -- The top-level loop: a `{{/x}}` with no open is a stray close — record it and
   -- recover past it so the rest of the document still parses.
   runSeq
-    :: Array ITok
+    :: Array RawTok
     -> Int
     -> Template
     -> Array ParseError
@@ -194,11 +192,11 @@ parseWith opts src =
 buildFromTokens :: ParseOptions -> Array RawTok -> Either ParseError Template
 buildFromTokens opts toks =
   let
-    -- Attach interiors here (not at scan time) so a dialect that mutated tag
-    -- interiors first — MinBars' Mustache standalone/partial-indent pass — has
-    -- them lexed from the final strings, never stale.
+    -- Each tag already carries its pre-lexed interior (`tokenizeTemplate`, or a
+    -- dialect pass that re-tokenized after mutating it — see MinBars' Mustache
+    -- standalone/partial-indent pass).
     r = parseSeq opts.parseExpr opts.parseHead (gatesOf opts)
-      (attachInteriors opts.lexOptions (Array.filter (not <<< isComment) toks))
+      (Array.filter (not <<< isComment) toks)
       0
   in
     case Array.head r.errors of
@@ -427,7 +425,7 @@ parseSeq
   :: ExprParser
   -> ExprParser
   -> Gates
-  -> Array ITok
+  -> Array RawTok
   -> Int
   -> SeqResult
 parseSeq pe ph gates toks = go Nil []
@@ -454,36 +452,36 @@ parseSeq pe ph gates toks = go Nil []
   go :: List Node -> Array ParseError -> Int -> SeqResult
   go acc errs i = case Array.index toks i of
     Nothing -> done acc errs StopEOF
-    Just it -> case it.raw of
+    Just t -> case t of
       RContent s -> go (Content s : acc) errs (i + 1)
       RComment _ _ _ -> go acc errs (i + 1) -- filtered upstream; skip defensively
       RLongComment _ -> go acc errs (i + 1) -- highlight-only token (keepLongComments); never reaches the parser
       RSetDelim _ -> go acc errs (i + 1) -- renders nothing; the delimiter swap already happened in the lexer
-      ROutput span _ _ -> case outputExpr pe span it.interior of
+      ROutput span _ _ int -> case outputExpr pe span int of
         Left e -> recover acc errs span e (i + 1)
         Right e -> go (Output span e : acc) errs (i + 1)
       -- `{{&x}}` is unescaped output (= `{{{x}}}`); a Handlebars-extra, gated.
-      RAmp span _ _
+      RAmp span _ _ int
         | not gates.extras -> recover acc errs span
             (DisallowedShape "{{& }} (unescaped output)" span.start)
             (i + 1)
-        | otherwise -> case outputExpr pe span it.interior of
+        | otherwise -> case outputExpr pe span int of
             Left e -> recover acc errs span e (i + 1)
             Right e -> go (Output span e : acc) errs (i + 1)
       -- Two raw-block spellings, gated separately: `{{{{#name}}}}` (FlatBars,
       -- RawBars/MaxBars) vs the bare `{{{{name}}}}` (Handlebars, FullBars only).
-      -- `it.interior` is the raw block's HEAD tokens (the body stays verbatim).
-      RRaw span hash _ _ body
+      -- `int` is the raw block's HEAD interior (the body stays verbatim).
+      RRaw span hash _ _ int body
         | hash && not gates.rawBlockHash -> recover acc errs span
             (DisallowedShape "{{{{# }}}} (raw block)" span.start)
             (i + 1)
         | not hash && not gates.rawBlockHbs -> recover acc errs span
             (DisallowedShape "{{{{ }}}} (raw block)" span.start)
             (i + 1)
-        | otherwise -> case headed pe span it.interior of
+        | otherwise -> case headed pe span int of
             Left e -> recover acc errs span e (i + 1)
             Right h -> go (RawBlock span h.name h.args body : acc) errs (i + 1)
-      RSep span _ s -> case headed pe span it.interior of
+      RSep span _ s int -> case headed pe span int of
         Right h -> go (Sep span h.name h.args : acc) errs (i + 1)
         -- A non-empty interior that is a bare literal (`{{42}}`, `{{"x"}}`) is not
         -- an application head, but it is still a valid value — emit it as output,
@@ -491,11 +489,11 @@ parseSeq pe ph gates toks = go Nil []
         -- still go through `headed`, so `{{#42}}` / `{{/42}}` stay errors. An empty
         -- `{{}}` keeps its HeadNotIdent error (the guard excludes it).
         Left (HeadNotIdent _)
-          | trim s /= "" -> case outputExpr pe span it.interior of
+          | trim s /= "" -> case outputExpr pe span int of
               Left e -> recover acc errs span e (i + 1)
               Right e -> go (Output span e : acc) errs (i + 1)
         Left e -> recover acc errs span e (i + 1)
-      RClose span base _ -> case headed pe { start: base, end: base } it.interior of
+      RClose span base _ int -> case headed pe { start: base, end: base } int of
         -- A malformed close head can't name a block; flag it and keep scanning,
         -- so the enclosing block still reports its own missing close.
         Left e -> recover acc errs span e (i + 1)
@@ -506,35 +504,35 @@ parseSeq pe ph gates toks = go Nil []
       -- sigil with a `*`-led head, so it is matched here too. A gate rejection is a
       -- recoverable error: the shape is structurally valid (so it still nests), it
       -- is just disallowed in this dialect — recorded via `gateErr`.
-      ROpen span sigil _ _
+      ROpen span sigil _ _ int
         | sigil == Inverse && not gates.extras ->
             buildBlock acc errs (Just (DisallowedShape "{{^ }} (inverse block)" span.start)) span
               sigil
-              it.interior
+              int
               (i + 1)
         | sigil == Parent && not gates.inheritance ->
             buildBlock acc errs (Just (DisallowedShape "{{< }} (parent block)" span.start)) span
               sigil
-              it.interior
+              int
               (i + 1)
         | sigil == BlockDef && not gates.inheritance ->
             buildBlock acc errs (Just (DisallowedShape "{{$ }} (override block)" span.start)) span
               sigil
-              it.interior
+              int
               (i + 1)
         | sigil == Decorator && not gates.decorators ->
             buildBlock acc errs
               (Just (DisallowedShape "{{#* }} (inline-partial decorator)" span.start))
               span
               sigil
-              it.interior
+              int
               (i + 1)
         | sigil == PartialBlock && not gates.partialBlocks ->
             buildBlock acc errs (Just (DisallowedShape "{{#> }} (partial block)" span.start)) span
               sigil
-              it.interior
+              int
               (i + 1)
-        | otherwise -> buildBlock acc errs Nothing span sigil it.interior (i + 1)
+        | otherwise -> buildBlock acc errs Nothing span sigil int (i + 1)
 
   -- A block opener, recovering. `gateErr` is a dialect-gate rejection recorded
   -- alongside any head error. A *salvageable* head (a leading identifier, even if

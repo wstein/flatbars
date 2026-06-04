@@ -30,22 +30,27 @@ import Data.String.Common (joinWith)
 import FlatBars.Error (ParseError(..))
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
+import FlatBars.Token (Interior, LexOptions, tokenizeInterior)
 
 -- | A flat template token. Comments never appear (they are dropped); `~`
 -- | whitespace control has already been applied to the `Content` runs. Each tag
--- | carries its `Span`, the source offset of its interior (`Int`), and the
--- | interior text — the parser turns that text into `Expr`s.
+-- | carries its `Span`, the source offset of its interior (`Int`), the interior
+-- | text, and — for the expression-bearing tags — that interior already lexed
+-- | (`Interior`, the meaning-free `PosToken` stream or its deferred lex error).
+-- | The parser and the highlighter consume the pre-lexed `Interior` rather than
+-- | re-lexing the text; the text is retained for directive lifting,
+-- | standalone-whitespace head-words, and raw-block close-matching.
 data RawTok
   = RContent String
-  | ROutput Span Int String -- {{{ <interior> }}}
-  | RAmp Span Int String -- {{& <interior> }} — unescaped output (Handlebars `&`)
-  | ROpen Span Sigil Int String -- {{# / {{^ / {{< / {{$ <interior> }} — sigil distinguishes them
-  | RClose Span Int String -- {{/ <interior> }}
-  | RSep Span Int String -- {{ <interior> }} — a name-agnostic separator
+  | ROutput Span Int String Interior -- {{{ <interior> }}}
+  | RAmp Span Int String Interior -- {{& <interior> }} — unescaped output (Handlebars `&`)
+  | ROpen Span Sigil Int String Interior -- {{# / {{^ / {{< / {{$ <interior> }} — sigil distinguishes them
+  | RClose Span Int String Interior -- {{/ <interior> }}
+  | RSep Span Int String Interior -- {{ <interior> }} — a name-agnostic separator
   -- span, `hasHash` (true for the `{{{{# }}}}` FlatBars spelling, false for the
   -- bare `{{{{ }}}}` Handlebars spelling — gated separately per dialect), base,
-  -- head, body. `{{{{# <interior> }}}} <body> {{{{/ name }}}}`.
-  | RRaw Span Boolean Int String String
+  -- head, the head's `Interior`, body. `{{{{# <interior> }}}} <body> {{{{/ name }}}}`.
+  | RRaw Span Boolean Int String Interior String
   -- {{! <interior> }} — a *short* comment, kept for directive lifting (the parser
   -- scans its interior for `@key` heads). Long `{{!-- … --}}` comments are never
   -- emitted (inert prose).
@@ -68,12 +73,12 @@ derive instance eqRawTok :: Eq RawTok
 instance showRawTok :: Show RawTok where
   show = case _ of
     RContent s -> "RContent " <> show s
-    ROutput _ _ s -> "ROutput " <> show s
-    RAmp _ _ s -> "RAmp " <> show s
-    ROpen _ sig _ s -> "ROpen " <> show sig <> " " <> show s
-    RClose _ _ s -> "RClose " <> show s
-    RSep _ _ s -> "RSep " <> show s
-    RRaw _ hash _ s b -> "RRaw " <> show hash <> " " <> show s <> " " <> show b
+    ROutput _ _ s _ -> "ROutput " <> show s
+    RAmp _ _ s _ -> "RAmp " <> show s
+    ROpen _ sig _ s _ -> "ROpen " <> show sig <> " " <> show s
+    RClose _ _ s _ -> "RClose " <> show s
+    RSep _ _ s _ -> "RSep " <> show s
+    RRaw _ hash _ s _ b -> "RRaw " <> show hash <> " " <> show s <> " " <> show b
     RComment _ _ s -> "RComment " <> show s
     RSetDelim _ -> "RSetDelim"
     RLongComment _ -> "RLongComment"
@@ -138,7 +143,7 @@ trimStandalone seps toks = Array.mapWithIndex trimContent toks
   -- name is a known clause marker (so `{{else}}`/`{{elif}}` strip, output does not).
   eligible :: RawTok -> Boolean
   eligible t = blockLevel t || case t of
-    RSep _ _ s -> Array.elem (sepHead s) seps
+    RSep _ _ s _ -> Array.elem (sepHead s) seps
     _ -> false
 
   trimContent :: Int -> RawTok -> RawTok
@@ -188,8 +193,8 @@ trimStandalone seps toks = Array.mapWithIndex trimContent toks
 
 blockLevel :: RawTok -> Boolean
 blockLevel = case _ of
-  ROpen _ _ _ _ -> true
-  RClose _ _ _ -> true
+  ROpen _ _ _ _ _ -> true
+  RClose _ _ _ _ -> true
   RComment _ _ _ -> true
   RSetDelim _ -> true -- standalone-eligible (a lone `{{=<% %>=}}` line is stripped)
   _ -> false
@@ -278,11 +283,22 @@ type SetDelimResult =
   , trimR :: Boolean
   }
 
-tokenizeTemplate :: LexConfig -> String -> Either ParseError (Array RawTok)
-tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
+-- | Scan a template into the flat `RawTok` stream. `LexOptions` (the interior
+-- | tokenizer's dialect seam — `infixArith`) is threaded through so each tag's
+-- | interior is lexed *here*, at scan time, and carried on the token. The
+-- | structural shape is `LexOptions`-independent (tag boundaries, sigils, spans,
+-- | raw bodies, set-delimiter state); `LexOptions` only governs the meaning-free
+-- | interior token lexing.
+tokenizeTemplate :: LexConfig -> LexOptions -> String -> Either ParseError (Array RawTok)
+tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
   where
   cs = SCU.toCharArray src
   len = Array.length cs
+
+  -- Lex a tag interior at its source offset — the pre-lexed `Interior` every
+  -- expression-bearing `RawTok` carries.
+  interiorAt :: Int -> String -> Interior
+  interiorAt base s = tokenizeInterior lexOpts base s
 
   -- Tokens accumulate in a *reversed* `List` (O(1) prepend) and are reversed
   -- into an `Array` once, for the same O(n²)-avoidance as the content scan.
@@ -524,7 +540,7 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
             t = splitTrims (slice cs start q)
           in
             Right
-              { mtok: Just (ROutput { start: i, end: q + 3 } start t.core)
+              { mtok: Just (ROutput { start: i, end: q + 3 } start t.core (interiorAt start t.core))
               , next: q + 3
               , trimL: t.trimL
               , trimR: t.trimR
@@ -546,7 +562,8 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
             t = splitTrims (slice cs start q)
           in
             Right
-              { mtok: Just (ROpen { start: i, end: q + cl } sigil start t.core)
+              { mtok: Just
+                  (ROpen { start: i, end: q + cl } sigil start t.core (interiorAt start t.core))
               , next: q + cl
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -567,7 +584,7 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
             t = splitTrims (slice cs start q)
           in
             Right
-              { mtok: Just (RClose { start: i, end: q + cl } start t.core)
+              { mtok: Just (RClose { start: i, end: q + cl } start t.core (interiorAt start t.core))
               , next: q + cl
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -586,7 +603,7 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
             t = splitTrims (slice cs start q)
           in
             Right
-              { mtok: Just (RAmp { start: i, end: q + 2 } start t.core)
+              { mtok: Just (RAmp { start: i, end: q + 2 } start t.core (interiorAt start t.core))
               , next: q + 2
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -607,7 +624,7 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
             t = splitTrims (slice cs start q)
           in
             Right
-              { mtok: Just (RSep { start: i, end: q + 2 } start t.core)
+              { mtok: Just (RSep { start: i, end: q + 2 } start t.core (interiorAt start t.core))
               , next: q + 2
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
@@ -676,7 +693,9 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
                 in
                   Right
                     { mtok: Just
-                        (RRaw { start: i, end } (sigil == 5) start head (slice cs bodyStart qc))
+                        ( RRaw { start: i, end } (sigil == 5) start head (interiorAt start head)
+                            (slice cs bodyStart qc)
+                        )
                     , next: end
                     , trimL: false
                     , trimR: false
@@ -751,20 +770,24 @@ tokenizeTemplate cfg src = map finalize (go 0 cfg.open cfg.close 0 [] Nil false)
             span = { start: i, end: q + cl }
             next = q + cl
             afterSig = slice cs (start + 1) q
+            afterHash = slice cs (start + 2) q
             interior = slice cs start q
+            -- interiors lexed at the matching base, like the default-delimiter path.
+            sigInt = interiorAt (start + 1) afterSig
+            hashInt = interiorAt (start + 2) afterHash
             mk tok = Right { mtok: Just tok, next, trimL: false, trimR: false }
           in
             case Array.index cs start of
               -- `#*name` (decorator) / `#>name` (partial block): the marker after
               -- `#` opens a distinct sigil, with the head starting two chars in.
               Just '#' -> case Array.index cs (start + 1) of
-                Just '*' -> mk (ROpen span Decorator (start + 2) (slice cs (start + 2) q))
-                Just '>' -> mk (ROpen span PartialBlock (start + 2) (slice cs (start + 2) q))
-                _ -> mk (ROpen span Section (start + 1) afterSig)
-              Just '^' -> mk (ROpen span Inverse (start + 1) afterSig)
-              Just '<' -> mk (ROpen span Parent (start + 1) afterSig)
-              Just '$' -> mk (ROpen span BlockDef (start + 1) afterSig)
-              Just '/' -> mk (RClose span (start + 1) afterSig)
-              Just '&' -> mk (RAmp span (start + 1) afterSig)
+                Just '*' -> mk (ROpen span Decorator (start + 2) afterHash hashInt)
+                Just '>' -> mk (ROpen span PartialBlock (start + 2) afterHash hashInt)
+                _ -> mk (ROpen span Section (start + 1) afterSig sigInt)
+              Just '^' -> mk (ROpen span Inverse (start + 1) afterSig sigInt)
+              Just '<' -> mk (ROpen span Parent (start + 1) afterSig sigInt)
+              Just '$' -> mk (ROpen span BlockDef (start + 1) afterSig sigInt)
+              Just '/' -> mk (RClose span (start + 1) afterSig sigInt)
+              Just '&' -> mk (RAmp span (start + 1) afterSig sigInt)
               Just '!' -> mk (RComment span (start + 1) afterSig)
-              _ -> mk (RSep span start interior)
+              _ -> mk (RSep span start interior (interiorAt start interior))

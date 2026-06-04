@@ -19,7 +19,6 @@ import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defau
 import FlatBars.Highlight (HighlightConfig, highlightSpans, tokenizeSpans)
 import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
 import FlatBars.Token (Token(..), defaultLexOptions)
-import FlatBars.Tokenizer (attachInteriors)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -36,11 +35,16 @@ schema =
       ]
   }
 
--- Is a RawTok an interior-bearing tag (not a plain content run)?
-notContent :: RawTok -> Boolean
-notContent = case _ of
-  RContent _ -> false
-  _ -> true
+-- The lexed interior tokens (`.tok` only) an interior-bearing RawTok carries.
+interiorTokens :: RawTok -> Maybe (Array Token)
+interiorTokens = case _ of
+  ROutput _ _ _ (Right ts) -> Just (map _.tok ts)
+  RAmp _ _ _ (Right ts) -> Just (map _.tok ts)
+  ROpen _ _ _ _ (Right ts) -> Just (map _.tok ts)
+  RClose _ _ _ (Right ts) -> Just (map _.tok ts)
+  RSep _ _ _ (Right ts) -> Just (map _.tok ts)
+  RRaw _ _ _ _ (Right ts) _ -> Just (map _.tok ts)
+  _ -> Nothing
 
 -- foldTemplate node counter (descends into block bodies).
 nodeCount :: String -> Int
@@ -561,11 +565,8 @@ main = do
   -- the highlighter would otherwise re-lex.
   let
     interiorToksOf lx src =
-      case map (attachInteriors lx) (tokenizeTemplate defaultLexConfig src) of
-        Right its -> Array.find (notContent <<< _.raw) its >>= \it ->
-          case it.interior of
-            Right ts -> Just (map _.tok ts)
-            Left _ -> Nothing
+      case tokenizeTemplate defaultLexConfig lx src of
+        Right toks -> Array.findMap interiorTokens toks
         Left _ -> Nothing
     lxOn = defaultLexOptions { infixArith = true }
   -- A raw block is one RawTok; its interior is the HEAD's tokens, not the body's.

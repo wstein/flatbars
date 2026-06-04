@@ -43,7 +43,8 @@ function forceParse(either) {
 // Curried PureScript entry points.
 const lexSpike = spike.tokenize(spike.defaultLexConfig);
 const lexHand = hand.tokenize(spike.defaultLexConfig);
-const lexL1 = incumbent.tokenizeTemplate(incumbent.defaultLexConfig);
+// tokenizeTemplate now also takes LexOptions (it populates each tag's interior).
+const lexL1 = incumbent.tokenizeTemplate(incumbent.defaultLexConfig)(token.defaultLexOptions);
 const lexInterior = token.tokenizeInterior(token.defaultLexOptions);
 
 // The incumbent's FULL pipeline: the level-1 structural scan, then the level-2

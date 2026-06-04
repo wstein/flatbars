@@ -52,6 +52,7 @@ import FlatBars.Error (ParseError)
 import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
+import FlatBars.Token (defaultLexOptions)
 
 -- | One flagged construct the migrator could not (or should not) rewrite
 -- | mechanically. `kind` is a stable tag (`"parent-data"`, `"ambiguous-section"`,
@@ -86,7 +87,7 @@ knownBlockHelpers =
 -- | A lex failure is propagated as `Left`.
 migrateToMaxBars :: String -> Either ParseError MigrateResult
 migrateToMaxBars src = do
-  toks <- tokenizeTemplate defaultLexConfig src
+  toks <- tokenizeTemplate defaultLexConfig defaultLexOptions src
   let
     delimResiduals = scanSetDelimiters src
     walk = rewrite src toks
@@ -130,14 +131,14 @@ step :: String -> Acc -> RawTok -> Acc
 step src acc = case _ of
   RContent s -> emit acc s
 
-  ROutput span _ _ -> emit acc (mapDataInTag (sliceSpan src span))
+  ROutput span _ _ _ -> emit acc (mapDataInTag (sliceSpan src span))
 
   -- `{{&x}}` (amp-unescaped) → `{{{x}}}` (cosmetic normalization). The interior
   -- still gets the `@`-data mapping (e.g. `{{&@key}}` → `{{{key}}}`).
-  RAmp _ _ interior ->
+  RAmp _ _ interior _ ->
     emit acc ("{{{" <> mapDataNames interior <> "}}}")
 
-  ROpen span sigil _ interior ->
+  ROpen span sigil _ interior _ ->
     let
       acc1 = addResiduals acc (openResiduals span sigil interior)
     in
@@ -151,7 +152,7 @@ step src acc = case _ of
           -- (only `@`-data names mapped) and pair its close verbatim.
           push (emit acc1 (mapDataInTag (sliceSpan src span))) CloseVerbatim
 
-  RClose span _ _ ->
+  RClose span _ _ _ ->
     case Array.head acc.stack of
       Just CloseUnless ->
         emit (popStack acc) "{{/unless}}"
@@ -160,14 +161,14 @@ step src acc = case _ of
 
   -- A separator. `{{else if c}}` → `{{elif c}}`; otherwise verbatim (with
   -- `@`-data mapping, which auto-migrates any `@../`/`@root` too — ADR-021).
-  RSep span _ interior ->
+  RSep span _ interior _ ->
     case rewriteElseIf interior of
       Just rebuilt -> emit acc ("{{" <> rebuilt <> "}}")
       Nothing -> emit acc (mapDataInTag (sliceSpan src span))
 
   RComment span _ _ -> emit acc (sliceSpan src span)
 
-  RRaw span _ _ _ _ -> emit acc (sliceSpan src span)
+  RRaw span _ _ _ _ _ -> emit acc (sliceSpan src span)
 
   -- Migrate runs under default delimiters, so a set-delimiter tag never appears;
   -- pass it through verbatim if one ever does (minimal-diff rewrite).

@@ -49,11 +49,10 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits as SCU
-import FlatBars.Lexer (LexConfig, RawTok(..))
+import FlatBars.Lexer (LexConfig, RawTok(..), tokenizeTemplate)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
-import FlatBars.Token (LexOptions, Token(..))
-import FlatBars.Tokenizer (ITok, Interior, tokenizeWithInteriors)
+import FlatBars.Token (Interior, LexOptions, Token(..))
 
 -- | A positioned highlight span: UTF-16 offsets `[from, to)` into the source and
 -- | a stable `kind` tag the presenter maps to a CSS class. Every span is one
@@ -107,33 +106,33 @@ type HighlightConfig =
 -- | where the engine would have stopped — the highlighter never disagrees with the
 -- | lexer.
 tokenizeSpans :: HighlightConfig -> String -> Array TSpan
-tokenizeSpans cfg src = case tokenizeWithInteriors cfg.lexConfig cfg.lexOptions src of
+tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig cfg.lexOptions src of
   Left _ -> []
-  Right itoks -> Array.concatMap spansOf itoks
+  Right toks -> Array.concatMap spansOf toks
   where
-  spansOf :: ITok -> Array TSpan
-  spansOf it = case it.raw of
+  spansOf :: RawTok -> Array TSpan
+  spansOf = case _ of
     RContent _ -> []
-    ROutput sp _ _ -> tag sp "raw" <> carveInterior it.interior
+    ROutput sp _ _ int -> tag sp "raw" <> carveInterior int
     -- `{{&x}}` (unescaped) is a Handlebars-extra: disallowed when `extras` is off
     -- (RawBars/MaxBars), exactly as the parser gates it.
-    RAmp sp _ _
-      | cfg.extras -> tag sp "raw" <> carveInterior it.interior
+    RAmp sp _ _ int
+      | cfg.extras -> tag sp "raw" <> carveInterior int
       | otherwise -> tag sp "error"
-    ROpen sp sig _ _ -> openSpans sp sig it.interior
-    RClose sp _ _ -> tag sp "block-close" <> carveInterior it.interior
+    ROpen sp sig _ _ int -> openSpans sp sig int
+    RClose sp _ _ int -> tag sp "block-close" <> carveInterior int
     -- The interior's head word distinguishes a partial and a clause keyword from a
     -- plain interpolation. A partial's leading `>` is the tag's meaning, not an
     -- operator, so its interior is not carved; a keyword's head word lexes as an
     -- identifier (no interior span), so carving the rest (e.g. `elif x > 0`) is safe.
-    RSep sp _ txt
+    RSep sp _ txt int
       | isPartialHead txt -> tag sp "partial"
-      | Array.elem (headWord txt) cfg.clauseSeps -> tag sp "keyword" <> carveInterior it.interior
-      | otherwise -> tag sp "expr" <> carveInterior it.interior
+      | Array.elem (headWord txt) cfg.clauseSeps -> tag sp "keyword" <> carveInterior int
+      | otherwise -> tag sp "expr" <> carveInterior int
     -- Two raw-block spellings, each gated: `{{{{#name}}}}` (FlatBars) by
     -- `rawBlockHash`, the bare `{{{{name}}}}` (Handlebars) by `rawBlockHbs`. A
     -- spelling the dialect rejects colours `error`.
-    RRaw sp hash _ _ _
+    RRaw sp hash _ _ _ _
       | hash && cfg.rawBlockHash -> tag sp "raw-block"
       | not hash && cfg.rawBlockHbs -> tag sp "raw-block"
       | otherwise -> tag sp "error"

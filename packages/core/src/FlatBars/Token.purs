@@ -12,6 +12,7 @@
 module FlatBars.Token
   ( Token(..)
   , PosToken
+  , Interior
   , LexOptions
   , defaultLexOptions
   , tokenizeInterior
@@ -57,6 +58,14 @@ instance showToken :: Show Token where
 -- | interior token from it). The whole-tag syntax highlighter (ADR-014) colours a
 -- | tag by its head's meaning and does not consume `end`.
 type PosToken = { tok :: Token, at :: Int, end :: Int }
+
+-- | A tag interior, pre-lexed: either its `PosToken` stream or the *deferred*
+-- | interior lex error. Each interior-bearing `RawTok` (`FlatBars.Lexer`) carries
+-- | one, so the parser and the highlighter consume pre-lexed interiors instead of
+-- | re-lexing. Kept as the `Either` (not flattened) so a malformed interior rides
+-- | inside its own tag and never breaks the structural scan (ADR-023 recovery). A
+-- | token with no interior expression carries `Right []`.
+type Interior = Either ParseError (Array PosToken)
 
 -- | Tokenize a tag interior. `base` is its offset in the source, added to every
 -- | token's position so a downstream parse error points into the original

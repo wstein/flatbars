@@ -94,11 +94,11 @@ tests = do
     labMin src = do
       raw <- Lab.toRawToks minLab src
       _ <- collectDirectives raw
-      buildFromTokens minOptions (mustacheStandalone raw)
+      buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions raw)
     engMin src = do
-      toks <- E.tokenizeTemplate minEng src
+      toks <- E.tokenizeTemplate minEng minOptions.lexOptions src
       _ <- collectDirectives toks
-      buildFromTokens minOptions (mustacheStandalone toks)
+      buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions toks)
   for_ minbarsCorpus \src ->
     case labMin src, engMin src of
       Right lab, Right eng ->
