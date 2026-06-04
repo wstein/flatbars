@@ -286,13 +286,17 @@ parse buys nothing. Instead:
 * The server gates hover and completion on being *inside a tag*, decided by the
   engine's own `tokenize` (not a re-implemented lexer) — the offset must fall in a
   `tag` span and not in an interior `string`/`number` literal. *Hover* on a known
-  operation reports its kind, arity, alias/synonym relationship, and a signature
-  *synthesised from the kind* — never prose, which lives in the spec and would only
-  drift. *Completion* inside a tag offers the operations, excluding deprecated
-  aliases (they still hover, so existing code is explained) and sorting scoped
-  variables after helpers.
+  operation reports its kind, arity, alias/synonym relationship, a signature
+  *synthesised from the kind*, and its one-line prose doc. *Completion* inside a tag
+  offers the operations, excluding deprecated aliases (they still hover, so existing
+  code is explained) and sorting scoped variables after helpers.
 
-There is intentionally **no per-operation documentation string**: the schema
-carries none, and duplicating the spec's prose into code would create a second
-source to drift. Hover/completion surface only what the engine actually knows.
-Covered by `test:lsp` (unit + protocol) and the real-IDE test path.
+The prose comes from a **required `doc` field on `OperationDef`** (a follow-up to
+this amendment): the single source, populated for every operation and
+compiler-enforced by the `valDef`/`gen` smart constructors, so an operation cannot
+ship undocumented and there is no parallel doc table to drift. (This supersedes
+this amendment's first cut, which deliberately carried *no* doc string for exactly
+the drift fear — solved instead by making the prelude itself the one source.)
+Scoped variables live outside `operationDefs` and carry no doc, so hover simply
+omits the line. The long-form reference prose stays in `prelude.adoc`; `doc` is the
+one-line summary. Covered by `test:lsp` (unit + protocol) and the real-IDE path.

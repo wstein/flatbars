@@ -6,644 +6,736 @@
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The absolute value of a number."
     },
     {
       "name": "add",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Adds two numbers — the `+` operator's helper."
     },
     {
       "name": "and",
       "kind": "inline",
       "arity": "any",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when every argument is truthy."
     },
     {
       "name": "append",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Appends the second string to the first."
     },
     {
       "name": "apply",
       "kind": "block",
       "arity": "≥1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Calls a helper named by a string argument with the remaining arguments."
     },
     {
       "name": "at",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The element at an index (negative counts from the end)."
     },
     {
       "name": "capitalize",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Uppercases the first character of its argument."
     },
     {
       "name": "ceil",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Rounds a number up to the nearest integer."
     },
     {
       "name": "coalesce",
       "kind": "inline",
       "arity": "≥1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Returns the first non-null argument — the `??` operator's helper."
     },
     {
       "name": "count",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The number of items in an array (or characters in a string)."
     },
     {
       "name": "dict",
       "kind": "inline",
       "arity": "any",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Builds an object from alternating key/value arguments (the hash target)."
     },
     {
       "name": "divide",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Divides the first number by the second — the `/` operator's helper."
     },
     {
       "name": "downcase",
       "kind": "inline",
       "arity": "1",
       "source": "alias",
-      "canonical": "lowercase"
+      "canonical": "lowercase",
+      "doc": "Lowercases its argument."
     },
     {
       "name": "each",
       "kind": "block",
       "arity": "≥1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Iterates an array or object, installing the loop's scoped variables per item."
     },
     {
       "name": "elif",
       "kind": "inline",
       "arity": "1–2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "An else-if clause the enclosing if evaluates; renders nothing on its own."
     },
     {
       "name": "else",
       "kind": "value",
       "arity": "0",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "A clause separator the enclosing block splits on; renders nothing on its own."
     },
     {
       "name": "endsWith",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when the string ends with the given suffix."
     },
     {
       "name": "eq",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when its two arguments are equal."
     },
     {
       "name": "escapeHtml",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "HTML-escapes its argument and marks it safe; idempotent on already-safe values."
     },
     {
       "name": "escapeJson",
       "kind": "inline",
       "arity": "1–2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML."
     },
     {
       "name": "false",
       "kind": "value",
       "arity": "0",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The boolean literal false."
     },
     {
       "name": "first",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "floor",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Rounds a number down to the nearest integer."
     },
     {
       "name": "groupBy",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Groups an array of objects into an object keyed by a field."
     },
     {
       "name": "gt",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when the first argument is greater than the second."
     },
     {
       "name": "gte",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when the first argument is greater than or equal to the second."
     },
     {
       "name": "if",
       "kind": "block",
       "arity": "1–2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Renders its body when the condition is truthy, else the {{elif}}/{{else}} clauses."
     },
     {
       "name": "includes",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when the subject string or array contains the given value."
     },
     {
       "name": "index",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "index0",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "index1",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "inline",
       "kind": "block",
       "arity": "≥1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Defines a partial from its body, hoisted before rendering; emits nothing."
     },
     {
       "name": "isnt",
       "kind": "inline",
       "arity": "2",
       "source": "synonym",
-      "canonical": "ne"
+      "canonical": "ne",
+      "doc": "True when its two arguments are not equal."
     },
     {
       "name": "join",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Joins an array into a string with a separator."
     },
     {
       "name": "json",
       "kind": "inline",
       "arity": "1–2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Serializes its argument as JSON text (optionally pretty-printed)."
     },
     {
       "name": "key",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "last",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "length",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "log",
       "kind": "inline",
       "arity": "≥1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Logs its arguments to the host and returns null."
     },
     {
       "name": "lookup",
       "kind": "inline",
       "arity": "≥1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Indexes a value by each key or index in turn, returning null at the first miss."
     },
     {
       "name": "lowercase",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Lowercases its argument."
     },
     {
       "name": "lt",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when the first argument is less than the second."
     },
     {
       "name": "lte",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when the first argument is less than or equal to the second."
     },
     {
       "name": "minus",
       "kind": "inline",
       "arity": "2",
       "source": "alias",
-      "canonical": "subtract"
+      "canonical": "subtract",
+      "doc": "Subtracts the second number from the first."
     },
     {
       "name": "modulo",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The remainder of dividing the first number by the second — the `%` operator's helper."
     },
     {
       "name": "multiply",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Multiplies two numbers — the `*` operator's helper."
     },
     {
       "name": "ne",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when its two arguments are not equal."
     },
     {
       "name": "not",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Logical negation of its argument's truthiness."
     },
     {
       "name": "null",
       "kind": "value",
       "arity": "0",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The null literal."
     },
     {
       "name": "or",
       "kind": "inline",
       "arity": "any",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when any argument is truthy."
     },
     {
       "name": "parent",
       "kind": "inline",
       "arity": "0–1",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "parent-first",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "parent-index",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "parent-key",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "parent-last",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "partial",
       "kind": "inline",
       "arity": "2–3",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Renders a registered partial with the given context (the block body is the fallback)."
     },
     {
       "name": "partial-block",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "pluck",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Extracts a key's value from each object in an array."
     },
     {
       "name": "plus",
       "kind": "inline",
       "arity": "2",
       "source": "alias",
-      "canonical": "add"
+      "canonical": "add",
+      "doc": "Adds two numbers."
     },
     {
       "name": "prepend",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Prepends the second string to the first."
     },
     {
       "name": "raw",
       "kind": "block",
       "arity": "any",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "A raw block that returns its body verbatim, untouched by the engine."
     },
     {
       "name": "replace",
       "kind": "inline",
       "arity": "3",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Replaces every occurrence of a substring with another."
     },
     {
       "name": "reverse",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Reverses an array or string."
     },
     {
       "name": "rindex0",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "rindex1",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "root",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     },
     {
       "name": "round",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Rounds a number to the nearest integer."
     },
     {
       "name": "safe",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Marks its argument as safe (trusted) markup, without escaping."
     },
     {
       "name": "size",
       "kind": "inline",
       "arity": "1",
       "source": "synonym",
-      "canonical": "count"
+      "canonical": "count",
+      "doc": "The number of items in an array (or characters in a string)."
     },
     {
       "name": "slice",
       "kind": "inline",
       "arity": "2–3",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Returns a substring from a start index to an optional end index."
     },
     {
       "name": "sortBy",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Sorts an array of objects by a key."
     },
     {
       "name": "split",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Splits a string into an array on a separator."
     },
     {
       "name": "startsWith",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "True when the string starts with the given prefix."
     },
     {
       "name": "subtract",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Subtracts the second number from the first — the `-` operator's helper."
     },
     {
       "name": "take",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The first n elements of an array."
     },
     {
       "name": "takeRight",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The last n elements of an array."
     },
     {
       "name": "this",
       "kind": "value",
       "arity": "0",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The current context."
     },
     {
       "name": "times",
       "kind": "inline",
       "arity": "2",
       "source": "alias",
-      "canonical": "multiply"
+      "canonical": "multiply",
+      "doc": "Multiplies two numbers."
     },
     {
       "name": "toFixed",
       "kind": "inline",
       "arity": "2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Formats a number with a fixed number of decimal places."
     },
     {
       "name": "toFloat",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Parses its argument as a floating-point number."
     },
     {
       "name": "toInt",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Parses its argument as an integer."
     },
     {
       "name": "trim",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Removes leading and trailing whitespace."
     },
     {
       "name": "trimEnd",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Removes trailing whitespace."
     },
     {
       "name": "trimStart",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Removes leading whitespace."
     },
     {
       "name": "true",
       "kind": "value",
       "arity": "0",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The boolean literal true."
     },
     {
       "name": "truncate",
       "kind": "inline",
       "arity": "2–3",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Shortens a string to a maximum length, appending an optional ellipsis."
     },
     {
       "name": "unique",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "The array with duplicate elements removed."
     },
     {
       "name": "unless",
       "kind": "block",
       "arity": "1–2",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Renders its body when the condition is falsy — the inverse of if."
     },
     {
       "name": "upcase",
       "kind": "inline",
       "arity": "1",
       "source": "alias",
-      "canonical": "uppercase"
+      "canonical": "uppercase",
+      "doc": "Uppercases its argument."
     },
     {
       "name": "uppercase",
       "kind": "inline",
       "arity": "1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Uppercases its argument."
     },
     {
       "name": "with",
       "kind": "block",
       "arity": "≥1",
       "source": "registered",
-      "canonical": null
+      "canonical": null,
+      "doc": "Shifts the context to its argument for the body (else the {{else}} clause)."
     },
     {
       "name": "yield",
       "kind": "value",
       "arity": "0",
       "source": "scoped",
-      "canonical": null
+      "canonical": null,
+      "doc": ""
     }
   ]
 }

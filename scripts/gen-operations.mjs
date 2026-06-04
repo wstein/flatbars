@@ -13,8 +13,9 @@
 //
 // Each entry carries only what the engine actually knows: name, the ADR-019 kind
 // (value/inline/block, derived structurally), arity, source (registered / scoped /
-// alias / synonym), and the alias/synonym target (`null` otherwise). No prose docs
-// — those live in the spec, and duplicating them here would just drift.
+// alias / synonym), the alias/synonym target (`null` otherwise), and the one-line
+// `doc` from OperationDef (the single source; empty for scoped variables, which
+// carry none).
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -26,7 +27,7 @@ const outFile = resolve(here, "..", "editors", "operations.json");
 const data = {
   _generated: "by scripts/gen-operations.mjs from FullBars.preludeSchema — DO NOT EDIT; run `npm run gen:operations`",
   operations: operations
-    .map((o) => ({ name: o.name, kind: o.kind, arity: o.arity, source: o.source, canonical: o.canonical || null }))
+    .map((o) => ({ name: o.name, kind: o.kind, arity: o.arity, source: o.source, canonical: o.canonical || null, doc: o.doc || "" }))
     .sort((a, b) => a.name.localeCompare(b.name)),
 };
 const text = JSON.stringify(data, null, 2) + "\n";

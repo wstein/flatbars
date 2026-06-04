@@ -234,8 +234,10 @@ amendment). Both VS Code and JetBrains packagers share one esbuild-pinned bundle
 (`editors/shared/sync.mjs`). Diagnostics shipped (ADR-023's recovering parser), and
 so did hover/completion: the server reads `editors/operations.json` — `preludeSchema`
 projected by `FullBars.Catalog.operations`, gated by `check:operations` like the
-catalog — and gates both on being inside a tag via `tokenize` (ADR-019 kinds, no
-prose docs). Marketplace publishing is the remaining tracked follow-up.
+catalog — and gates both on being inside a tag via `tokenize`. Hover shows the
+ADR-019 kind, arity, and a one-line prose doc from the required `OperationDef.doc`
+field (the single source; run `npm run gen:operations` after a prelude change).
+Marketplace publishing is the remaining tracked follow-up.
 
 ### Conventions worth knowing
 

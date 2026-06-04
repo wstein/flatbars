@@ -99,6 +99,7 @@ try {
   assert.ok(hover && hover.contents, "hover returned for an operation under the cursor");
   assert.match(hover.contents.value, /uppercase/, "hover names the operation");
   assert.match(hover.contents.value, /inline operation/, "hover states the ADR-019 kind");
+  assert.match(hover.contents.value, /Uppercases its argument\./, "hover includes the prelude prose doc");
 
   // Hover off any operation (in surrounding text) → null.
   const noHover = await conn.sendRequest("textDocument/hover", {

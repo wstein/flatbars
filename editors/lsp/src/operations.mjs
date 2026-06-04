@@ -32,15 +32,20 @@ export function signatureOf(op) {
   }
 }
 
-// The hover body (Markdown). Aliases/synonyms point at their canonical name;
-// everything else states its kind + arity and a synthesised signature.
+// The hover body (Markdown): a heading (kind / alias / synonym), the operation's
+// one-line prose doc from the prelude (when it has one — scoped variables don't), a
+// synthesised signature, and the arity.
 export function hoverMarkdown(op) {
   let head;
   if (op.source === "alias") head = `**${op.name}** — deprecated alias of \`${op.canonical}\``;
   else if (op.source === "synonym") head = `**${op.name}** — synonym of \`${op.canonical}\``;
   else if (op.source === "scoped") head = `**${op.name}** — ${op.kind} (scoped variable)`;
   else head = `**${op.name}** — ${op.kind} operation`;
-  return `${head}\n\n\`\`\`handlebars\n${signatureOf(op)}\n\`\`\`\n\narity: ${op.arity}`;
+  const parts = [head];
+  if (op.doc) parts.push(op.doc);
+  parts.push(`\`\`\`handlebars\n${signatureOf(op)}\n\`\`\``);
+  parts.push(`arity: ${op.arity}`);
+  return parts.join("\n\n");
 }
 
 // The completion detail (a one-liner shown beside the label).

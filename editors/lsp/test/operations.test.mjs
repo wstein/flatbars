@@ -15,13 +15,18 @@ const t = (name, fn) => {
 };
 
 // ── operations.json projection ──────────────────────────────────────────────
-t("operations carry the engine's structural facts only", () => {
+t("operations carry the engine's facts: kind, source, canonical, and prose doc", () => {
   assert.ok(OPERATIONS.length > 50, "the prelude projects many operations");
   for (const o of OPERATIONS) {
     assert.ok(["value", "inline", "block"].includes(o.kind), `${o.name}: ADR-019 kind`);
     assert.ok(["registered", "scoped", "alias", "synonym"].includes(o.source), `${o.name}: source`);
     if (o.source === "alias" || o.source === "synonym") assert.ok(o.canonical, `${o.name}: canonical target`);
     else assert.equal(o.canonical, null, `${o.name}: no canonical`);
+    assert.equal(typeof o.doc, "string", `${o.name}: doc is a string`);
+    // Every callable operation is documented (the doc field is required in the
+    // prelude); only the scoped variables — which live outside operationDefs —
+    // carry none.
+    if (o.source !== "scoped") assert.ok(o.doc.length > 0, `${o.name}: has a prose doc`);
   }
 });
 
@@ -37,8 +42,10 @@ t("signatureOf is synthesised from the kind (no prose)", () => {
   assert.equal(signatureOf({ name: "eq", kind: "inline" }), "{{eq …}}");
 });
 
-t("hoverMarkdown distinguishes alias/synonym/scoped from a plain operation", () => {
-  assert.match(hoverMarkdown(operationByName("uppercase")), /inline operation/);
+t("hoverMarkdown distinguishes alias/synonym/scoped and includes the prose doc", () => {
+  const up = hoverMarkdown(operationByName("uppercase"));
+  assert.match(up, /inline operation/);
+  assert.match(up, /Uppercases its argument\./, "includes the prelude doc prose");
   assert.match(hoverMarkdown(operationByName("downcase")), /deprecated alias of `lowercase`/);
 });
 
