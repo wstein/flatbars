@@ -188,9 +188,9 @@
     },
     "//": "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 PURE ESCAPE TAGS (no internal sigil) \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
     "raw_block": {
-      "_doc": "{{{{ \u2026 }}}} \u2026 {{{{/ \u2026 }}}} \u2014 quad-brace raw block. Accepts Handlebars's {{{{name}}}} and the FlatBars-native hash form {{{{#name}}}}. The sigils `#` and `/` split out as `keyword.control.section`, mirroring how the double-brace control tags ({{#each}}, {{/each}}) capture their sigils \u2014 every brace cluster is a pure escape token, every control sigil is a separate keyword span. The `(?!/)` between the optional `#` and the name keeps the begin from also matching the close form.",
+      "_doc": "{{{{ \u2026 }}}} \u2026 {{{{/ \u2026 }}}} \u2014 quad-brace raw block. Accepts both Handlebars's bare form ({{{{name}}}}) and the FlatBars-native hash form ({{{{#name}}}}). The whole name span \u2014 including the optional `#` sigil on the open and the mandatory `/` on the close \u2014 is captured as `keyword.control.section`, so the block name reads visually as a control keyword (mirroring how {{#each}} / {{/each}} are captured at the double-brace level). The `\\w` at the start of the begin's name capture keeps it from matching the close form (which starts with `/`).",
       "name": "meta.embedded.block.flatbars",
-      "begin": "(\\{\\{\\{\\{)\\s*(#?)\\s*(?!/)[^}]*(\\}\\}\\}\\})",
+      "begin": "(\\{\\{\\{\\{)\\s*(#?\\w[\\w./@-]*)\\s*(\\}\\}\\}\\})",
       "beginCaptures": {
         "1": {
           "name": "punctuation.section.embedded.begin.flatbars"
@@ -202,7 +202,7 @@
           "name": "punctuation.section.embedded.end.flatbars"
         }
       },
-      "end": "(\\{\\{\\{\\{)\\s*(/)[^}]*(\\}\\}\\}\\})",
+      "end": "(\\{\\{\\{\\{)\\s*(/\\w[\\w./@-]*)\\s*(\\}\\}\\}\\})",
       "endCaptures": {
         "1": {
           "name": "punctuation.section.embedded.begin.flatbars"
