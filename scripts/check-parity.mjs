@@ -69,6 +69,11 @@ for (const [label, value, expectFalsy] of WITNESS) {
 if (!fail.length) ok(`${WITNESS.length} witness values: identical in both, falsy set = { false, null, "", [], {} }, 0 truthy`);
 
 // ── 2. Render sweep over a shared core corpus ────────────────────────────────
+// MAINTAINER NOTE: this corpus is the cheap place to pin the parity contract —
+// when a new construct lands that both dialects share (a new prelude op, a block
+// form), add a line here so the contract keeps pace. Keep entries in *core syntax*
+// only (so both parse to the same AST); a divergent surface form (operators,
+// dialect-specific loop-var spelling) belongs in the documented exceptions, not here.
 console.log("\nRender parity (RawBars ≡ MaxBars) over shared core syntax:");
 const CORPUS = [
   { id: "escape", tpl: `{{{escapeHtml (lookup this "h")}}}`, data: { h: "<b>&\"'" } },

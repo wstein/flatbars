@@ -73,7 +73,10 @@ aliasWarningsOf src = (aliasWarnings <<< _.nodes) <$> parse src
 -- | the legacy bare index, `partial-block` the Handlebars-derived block-body name.
 -- | A lint table, deliberately *not* a `scopedSpecs` field or `synonymOf` — the
 -- | engine installs both spellings and renders them identically; only the editor
--- | tooling expresses the preference.
+-- | tooling expresses the preference. (Complements `Linter.Lift.liftLoopVar`,
+-- | which maps the same names to the MaxBars `loop.` *surface* when re-sugaring
+-- | across dialects; here we normalise the *bare* name within core/MaxBars. Both
+-- | agree `index0` is canonical, not `index`.)
 scopedCanonical :: Array (Tuple String String)
 scopedCanonical =
   [ Tuple "index" "index0"

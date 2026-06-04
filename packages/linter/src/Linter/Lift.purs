@@ -280,6 +280,12 @@ exprWith span arg expr = case expr of
 
 -- | A scoped loop-variable name (and the ADR-006 aliases) → its field on the
 -- | MaxBars `loop` object (ADR-021). `Nothing` for any other name.
+-- |
+-- | NB: this targets the MaxBars *surface* spelling (`loop.index0`) because lift
+-- | re-sugars core → MaxBars. That is NOT in tension with `Linter.Aliases`'
+-- | `scopedCanonical` (`index` → bare `index0`): different jobs — lift rewrites
+-- | *across* dialects to the `loop.` surface, the canon lint normalises the *bare*
+-- | scoped name *within* core/MaxBars. Both treat `index0` (not `index`) as canonical.
 liftLoopVar :: Ident -> Maybe String
 liftLoopVar = case _ of
   "index0" -> Just "loop.index0"
