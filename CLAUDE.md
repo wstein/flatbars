@@ -231,8 +231,11 @@ server, checks descriptors — no JVM). The real-IDE test and the full
 `gradle buildPlugin -PwithLsp` (JDK 17 + a provisioned Gradle — no wrapper in-repo)
 run in `.github/workflows/editors.yml`, path-filtered to the editor surface (ADR-017
 amendment). Both VS Code and JetBrains packagers share one esbuild-pinned bundle step
-(`editors/shared/sync.mjs`). Diagnostics shipped (ADR-023's recovering parser);
-hover/completion and Marketplace publishing are the tracked follow-ups.
+(`editors/shared/sync.mjs`). Diagnostics shipped (ADR-023's recovering parser), and
+so did hover/completion: the server reads `editors/operations.json` — `preludeSchema`
+projected by `FullBars.Catalog.operations`, gated by `check:operations` like the
+catalog — and gates both on being inside a tag via `tokenize` (ADR-019 kinds, no
+prose docs). Marketplace publishing is the remaining tracked follow-up.
 
 ### Conventions worth knowing
 

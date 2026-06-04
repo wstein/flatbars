@@ -8,6 +8,8 @@
 -- | prelude page includes, and re-runs with `--check` in CI to fail on drift.
 module FullBars.Catalog
   ( helperCatalogAdoc
+  , OpInfo
+  , operations
   ) where
 
 import Prelude
@@ -66,3 +68,55 @@ helperCatalogAdoc =
       ( Map.toUnfoldable preludeSchema.helpers
           :: Array (Tuple String { block :: Boolean, arity :: Arity })
       )
+
+-- | One operation, projected from the schema for the editor layer (ADR-017
+-- | hover/completion). `kind` is the ADR-019 axis derived structurally; `source`
+-- | separates callable helpers from the scoped variables blocks install and from
+-- | the alias/synonym relationships; `canonical` is the target of an alias/synonym
+-- | (empty when none — the generator normalises it to JSON `null`). No prose docs
+-- | — only what the engine actually knows.
+type OpInfo =
+  { name :: String
+  , kind :: String
+  , arity :: String
+  , source :: String
+  , canonical :: String
+  }
+
+-- | The ADR-019 operation kind, derived from the schema (operator is a MaxBars
+-- | surface form, not a runtime kind, so it never appears here).
+opKind :: { block :: Boolean, arity :: Arity } -> String
+opKind spec
+  | spec.block = "block"
+  | otherwise = case spec.arity of
+      Exactly 0 -> "value"
+      _ -> "inline"
+
+-- | Every operation in `preludeSchema`, name-ordered (the `Map` is key-ordered),
+-- | as plain records the editor tooling consumes. The single source the
+-- | `editors/operations.json` gate (scripts/gen-operations.mjs) projects.
+operations :: Array OpInfo
+operations =
+  map toInfo
+    ( Map.toUnfoldable preludeSchema.helpers
+        :: Array (Tuple String { block :: Boolean, arity :: Arity })
+    )
+  where
+  toInfo (Tuple name spec) =
+    let
+      classified = classify name
+    in
+      { name
+      , kind: opKind spec
+      , arity: renderArity spec.arity
+      , source: classified.source
+      , canonical: classified.canonical
+      }
+  classify name = case lookup name preludeAliases of
+    Just canonical -> { source: "alias", canonical }
+    Nothing -> case lookup name preludeSynonyms of
+      Just canonical -> { source: "synonym", canonical }
+      Nothing ->
+        { source: if Set.member name registeredNames then "registered" else "scoped"
+        , canonical: ""
+        }

@@ -12,6 +12,7 @@ import { tokenize, diagnostics as engineDiagnostics } from "./engine.mjs";
 // The shared single source of truth (ADR-017), imported as data so the bundler
 // can inline it into the self-contained server — no runtime file read.
 import vocabularyJson from "../../token-vocabulary.json" with { type: "json" };
+import { operationByName, hoverMarkdown, completionItems } from "./operations.mjs";
 
 export const vocabulary = vocabularyJson;
 
@@ -128,6 +129,48 @@ export function tokensOf(text, dialect) {
     tokens.push({ line: startLine, char: startChar, length: len, kind });
   }
   return tokens;
+}
+
+// ── Hover & completion (ADR-017) ──────────────────────────────────────────────
+// Both are gated on being INSIDE a tag, decided by the engine's own `tokenize`
+// (never a re-implemented lexer): the offset must fall in a `tag` span and not in
+// an interior string/number literal. So hover/completion fire on operation names
+// and arguments, never in surrounding text or inside a quoted string.
+function inTagContext(text, dialect, offset) {
+  let inTag = false;
+  let inLiteral = false;
+  for (const s of tokenize(text, dialect)) {
+    if (s.role === "tag" && offset >= s.from && offset <= s.to) inTag = true;
+    if (s.role === "interior" && (s.kind === "string" || s.kind === "number") && offset > s.from && offset < s.to) inLiteral = true;
+  }
+  return inTag && !inLiteral;
+}
+
+// The identifier under `offset` (operation names are `[A-Za-z0-9_]`), or null.
+function wordAt(text, offset) {
+  const isWord = (c) => c !== undefined && /[A-Za-z0-9_]/.test(c);
+  let start = offset;
+  let end = offset;
+  while (start > 0 && isWord(text[start - 1])) start--;
+  while (end < text.length && isWord(text[end])) end++;
+  return start === end ? null : { word: text.slice(start, end), start, end };
+}
+
+// Hover for a known operation under the cursor (inside a tag). Returns the Markdown
+// body and the word's offset range, or null. server.mjs maps offsets to positions.
+export function hoverAt(text, dialect, offset) {
+  if (!inTagContext(text, dialect, offset)) return null;
+  const w = wordAt(text, offset);
+  if (!w) return null;
+  const op = operationByName(w.word);
+  if (!op) return null;
+  return { markdown: hoverMarkdown(op), start: w.start, end: w.end };
+}
+
+// Completion candidates when the cursor is inside a tag; [] otherwise. Plain items
+// ({ label, detail, kind, sortText }); server.mjs maps `kind` to CompletionItemKind.
+export function completionsAt(text, dialect, offset) {
+  return inTagContext(text, dialect, offset) ? completionItems() : [];
 }
 
 // The LSP `SemanticTokens.data`: a flat array of 5-tuples

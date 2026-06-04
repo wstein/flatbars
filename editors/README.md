@@ -7,7 +7,7 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
 | --- | --- |
 | `token-vocabulary.json` | **The single source of truth.** Each engine token `kind` → its `role` (`tag`/`interior`), LSP semantic-token `type`/`modifiers`, and TextMate `tmScopes`. The three consumers below all derive from it. |
 | `flatbars.tmLanguage.json` | The TextMate **fallback** grammar — the *floor*. The well-known Handlebars grammar, re-identified as `source.flatbars` and extended for all four dialects (inverse, Mustache inheritance, set delimiters, MaxBars operators), keeping its standard scope names so themes colour FlatBars familiarly. Colours **only template syntax + a leading YAML front-matter block** — host text is left plain (a FlatBars template's output need not be HTML). Best-effort and non-authoritative: stateless, FullBars-flavoured, and it cannot follow a set-delimiter *switch* — the LSP corrects those. |
-| `lsp/` | **`flatbars-lsp`** — the authoritative semantic-tokens server (the *ceiling*). Embeds the committed `flatbars-js` bundle and answers `textDocument/semanticTokens/full` from `tokenize`. Stateful by construction, so set delimiters and dialects are correct. |
+| `lsp/` | **`flatbars-lsp`** — the authoritative server (the *ceiling*). Embeds the committed `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize`, `publishDiagnostics` from the recovering parser (ADR-023), and `hover`/`completion` from `editors/operations.json` (the prelude schema projected by `FullBars.Catalog.operations`). Stateful by construction, so set delimiters and dialects are correct. |
 | `vscode/` | The VS Code extension: contributes the fallback grammar and spawns `flatbars-lsp`. `dist/` is a git-ignored build product (`npm run build`). |
 | `jetbrains/` | The JetBrains plugin (Gradle/Kotlin): bundles the fallback grammar via a `TextMateBundleProvider` (all IDEs) and, on Ultimate (`-PwithLsp`), spawns `flatbars-lsp` through the platform LSP API. `build/` and the synced resources are git-ignored. |
 
@@ -24,8 +24,12 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
   `check:highlight` corpus, so no second corpus), the pinned sparse `lspEmitKinds`
   set (widening it would re-flatten `{{{x}}}` — guarded here), the LSP legend
   derivation, and that every vocabulary `tmScope` still exists in the grammar.
-- **`test:lsp`** unit-tests the pure token logic and drives the real stdio server
-  over LSP (`initialize` → `didOpen` → `semanticTokens/full`).
+- **`test:lsp`** unit-tests the pure token + hover/completion logic and drives the
+  real stdio server over LSP (`semanticTokens/full`, `hover`, `completion`,
+  `publishDiagnostics`).
+- **`check:operations`** (in `npm test`, needs a build like `check:catalog`) keeps
+  `editors/operations.json` in step with `FullBars.preludeSchema` — the hover /
+  completion data the server reads.
 - **`test:vscode`** drives the *bundled* server over LSP, asserts the
   auto-activation precondition (`engines.vscode >= 1.74` so VS Code generates the
   `onLanguage` events, and `contributes.languages` ≡ the shared dialect set), and
@@ -56,8 +60,7 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
 
 ## Tracked follow-ups
 
-Hover / completion (on the recovering parser's `NodeError` substrate — ADR-023;
-diagnostics already ship), Marketplace/JetBrains-Marketplace publishing, a
+Marketplace/JetBrains-Marketplace publishing, a
 `tree-sitter` fallback for Zed/Neovim/GitHub (as *another* gated fallback, never
 the engine's parser), and an **opt-in brace-close convenience**: brace
 auto-closing is deliberately OFF (FlatBars has `{{ }}` / `{{{ }}}` / `{{{{ }}}}`

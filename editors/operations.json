@@ -1,0 +1,649 @@
+{
+  "_generated": "by scripts/gen-operations.mjs from FullBars.preludeSchema — DO NOT EDIT; run `npm run gen:operations`",
+  "operations": [
+    {
+      "name": "abs",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "add",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "and",
+      "kind": "inline",
+      "arity": "any",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "append",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "apply",
+      "kind": "block",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "at",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "capitalize",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "ceil",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "coalesce",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "count",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "dict",
+      "kind": "inline",
+      "arity": "any",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "divide",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "downcase",
+      "kind": "inline",
+      "arity": "1",
+      "source": "alias",
+      "canonical": "lowercase"
+    },
+    {
+      "name": "each",
+      "kind": "block",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "elif",
+      "kind": "inline",
+      "arity": "1–2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "else",
+      "kind": "value",
+      "arity": "0",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "endsWith",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "eq",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "escapeHtml",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "escapeJson",
+      "kind": "inline",
+      "arity": "1–2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "false",
+      "kind": "value",
+      "arity": "0",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "first",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "floor",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "groupBy",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "gt",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "gte",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "if",
+      "kind": "block",
+      "arity": "1–2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "includes",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "index",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "index0",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "index1",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "inline",
+      "kind": "block",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "isnt",
+      "kind": "inline",
+      "arity": "2",
+      "source": "synonym",
+      "canonical": "ne"
+    },
+    {
+      "name": "join",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "json",
+      "kind": "inline",
+      "arity": "1–2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "key",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "last",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "length",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "log",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "lookup",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "lowercase",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "lt",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "lte",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "minus",
+      "kind": "inline",
+      "arity": "2",
+      "source": "alias",
+      "canonical": "subtract"
+    },
+    {
+      "name": "modulo",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "multiply",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "ne",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "not",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "null",
+      "kind": "value",
+      "arity": "0",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "or",
+      "kind": "inline",
+      "arity": "any",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "parent",
+      "kind": "inline",
+      "arity": "0–1",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "parent-first",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "parent-index",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "parent-key",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "parent-last",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "partial",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "partial-block",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "pluck",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "plus",
+      "kind": "inline",
+      "arity": "2",
+      "source": "alias",
+      "canonical": "add"
+    },
+    {
+      "name": "prepend",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "raw",
+      "kind": "block",
+      "arity": "any",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "replace",
+      "kind": "inline",
+      "arity": "3",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "reverse",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "rindex0",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "rindex1",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "root",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    },
+    {
+      "name": "round",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "safe",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "size",
+      "kind": "inline",
+      "arity": "1",
+      "source": "synonym",
+      "canonical": "count"
+    },
+    {
+      "name": "slice",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "sortBy",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "split",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "startsWith",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "subtract",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "take",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "takeRight",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "this",
+      "kind": "value",
+      "arity": "0",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "times",
+      "kind": "inline",
+      "arity": "2",
+      "source": "alias",
+      "canonical": "multiply"
+    },
+    {
+      "name": "toFixed",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "toFloat",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "toInt",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "trim",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "trimEnd",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "trimStart",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "true",
+      "kind": "value",
+      "arity": "0",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "truncate",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "unique",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "unless",
+      "kind": "block",
+      "arity": "1–2",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "upcase",
+      "kind": "inline",
+      "arity": "1",
+      "source": "alias",
+      "canonical": "uppercase"
+    },
+    {
+      "name": "uppercase",
+      "kind": "inline",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "with",
+      "kind": "block",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null
+    },
+    {
+      "name": "yield",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null
+    }
+  ]
+}

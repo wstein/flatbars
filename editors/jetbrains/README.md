@@ -54,5 +54,6 @@ is no wrapper in-repo).
 
 Marketplace publishing and a live-IDE check of the LSP override *running* inside a
 real IntelliJ (the CI build compiles it; it does not launch an IDE) are tracked
-follow-ups. Diagnostics ship from the recovering parser (ADR-023); hover/completion
-remain the open follow-on.
+follow-ups. Diagnostics (ADR-023) and hover/completion (from
+`editors/operations.json`, the prelude schema) ship through the shared
+`flatbars-lsp`, so the JetBrains Ultimate path gets them for free.

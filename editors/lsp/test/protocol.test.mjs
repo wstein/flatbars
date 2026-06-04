@@ -36,6 +36,8 @@ try {
     provider.legend.tokenTypes.includes("variable") && provider.legend.tokenTypes.includes("operator"),
     "legend carries the vocabulary's token types",
   );
+  assert.equal(init.capabilities.hoverProvider, true, "server advertises a hover provider");
+  assert.ok(init.capabilities.completionProvider, "server advertises a completion provider");
 
   // Capture pushed diagnostics, keyed by uri.
   const diagWaiters = new Map();
@@ -84,9 +86,39 @@ try {
   assert.equal(ds[0].severity, 1, "Error severity");
   assert.equal(ds[0].range.start.line, 0, "diagnostic on line 0");
 
+  // Hover + completion (ADR-017) over a FullBars doc with a real operation head.
+  const hovUri = "file:///test/hov.fullbars";
+  await conn.sendNotification("textDocument/didOpen", {
+    textDocument: { uri: hovUri, languageId: "fullbars", version: 1, text: "{{uppercase name}}" },
+  });
+  // Position over `uppercase` (chars 2–10): hover reports its ADR-019 kind.
+  const hover = await conn.sendRequest("textDocument/hover", {
+    textDocument: { uri: hovUri },
+    position: { line: 0, character: 5 },
+  });
+  assert.ok(hover && hover.contents, "hover returned for an operation under the cursor");
+  assert.match(hover.contents.value, /uppercase/, "hover names the operation");
+  assert.match(hover.contents.value, /inline operation/, "hover states the ADR-019 kind");
+
+  // Hover off any operation (in surrounding text) → null.
+  const noHover = await conn.sendRequest("textDocument/hover", {
+    textDocument: { uri: hovUri },
+    position: { line: 0, character: 0 },
+  });
+  assert.equal(noHover, null, "no hover outside a tag");
+
+  // Completion inside the tag offers operations (and excludes deprecated aliases).
+  const items = await conn.sendRequest("textDocument/completion", {
+    textDocument: { uri: hovUri },
+    position: { line: 0, character: 5 },
+  });
+  const labels = (Array.isArray(items) ? items : items.items).map((i) => i.label);
+  assert.ok(labels.includes("each") && labels.includes("uppercase"), "completion offers prelude operations");
+  assert.ok(!labels.includes("downcase"), "completion excludes deprecated aliases");
+
   await conn.sendRequest("shutdown");
   await conn.sendNotification("exit");
-  console.log("✓ flatbars-lsp protocol smoke test passed (semantic tokens + diagnostics)");
+  console.log("✓ flatbars-lsp protocol smoke test passed (semantic tokens + diagnostics + hover + completion)");
 } finally {
   conn.dispose();
   child.kill();

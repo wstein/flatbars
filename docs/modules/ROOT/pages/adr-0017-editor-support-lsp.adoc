@@ -179,9 +179,7 @@ ceiling *only where the engine knows more*.
 * *Incremental semantic tokens.* Whole-document retokenization is fine at current sizes; add range
   requests / deltas only if a profile shows it (ties to the deferred incremental-parse trigger noted in
   the parser review).
-* *Hover / completion.* The recovering parser's in-tree `NodeError` nodes (ADR-023) are the substrate;
-  helper hover/completion would read `preludeSchema` and the catalog, keyed to the operation taxonomy of
-  xref:adr-0019-operation-vocabulary.adoc[ADR-019].
+* *Hover / completion.* _Resolved — implemented; see the 2026-06-04 amendment below._
 
 == Amendment (2026-06-04): interior token offsets come from the one tokenizer
 
@@ -264,8 +262,37 @@ emission flattens the braces-vs-name distinction. The sparse split is kept; only
 its seam is gated (blocker 3).
 
 *Unchanged / still deferred:* the TextMate floor remains the guaranteed baseline
-(Community / no-LSP users are first-class); hover/completion stay post-1.0 on the
-ADR-023 substrate; JetBrains `defaultDialect` parity with VS Code and incremental
-`semanticTokens/range` are tracked but non-blocking. (Process note: the review's
-draft flagged a committed `editors/vscode/dist/` as a high risk; `git ls-files`
-shows it untracked — `.gitignore` covers `dist/` — so that finding was withdrawn.)
+(Community / no-LSP users are first-class); incremental `semanticTokens/range` is
+tracked but non-blocking. (Process note: the review's draft flagged a committed
+`editors/vscode/dist/` as a high risk; `git ls-files` shows it untracked —
+`.gitignore` covers `dist/` — so that finding was withdrawn.)
+
+== Amendment (2026-06-04): hover + completion
+
+The third capability on this substrate (after highlighting and diagnostics) is
+hover + completion, the open question above. They are *not* keyed to the recovering
+parser's `NodeError` nodes after all — the operation set is static, so a per-edit
+parse buys nothing. Instead:
+
+* `FullBars.Catalog.operations` projects `preludeSchema` (the same single source the
+  helper catalog renders) to each operation's name, its ADR-019 kind
+  (xref:adr-0019-operation-vocabulary.adoc[ADR-019]; `value`/`inline`/`block`,
+  derived structurally — `operator` is a MaxBars surface form, not a runtime kind),
+  arity, source (`registered`/`scoped`/`alias`/`synonym`), and any alias/synonym
+  target. `scripts/gen-operations.mjs` writes that to `editors/operations.json`,
+  gated by `check:operations` (in `npm test`) exactly like the catalog — so the
+  editor can never offer an operation the engine does not know. The server inlines
+  it like the token vocabulary.
+* The server gates hover and completion on being *inside a tag*, decided by the
+  engine's own `tokenize` (not a re-implemented lexer) — the offset must fall in a
+  `tag` span and not in an interior `string`/`number` literal. *Hover* on a known
+  operation reports its kind, arity, alias/synonym relationship, and a signature
+  *synthesised from the kind* — never prose, which lives in the spec and would only
+  drift. *Completion* inside a tag offers the operations, excluding deprecated
+  aliases (they still hover, so existing code is explained) and sorting scoped
+  variables after helpers.
+
+There is intentionally **no per-operation documentation string**: the schema
+carries none, and duplicating the spec's prose into code would create a second
+source to drift. Hover/completion surface only what the engine actually knows.
+Covered by `test:lsp` (unit + protocol) and the real-IDE test path.
