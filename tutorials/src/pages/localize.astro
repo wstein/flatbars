@@ -11,15 +11,16 @@
 // scripts/check-i18n.mjs), so a snippet can never drift from what the engine
 // produces.
 import Reference from "../layouts/Reference.astro";
-import TryI18n from "../components/TryI18n.jsx";
-import OpenInLab from "../components/OpenInLab.jsx";
-import { sections, flagship, integrationSource, escapeHatch, flagshipCatalogYaml } from "../i18n.mjs";
+import I18nCard from "../components/I18nCard.jsx";
+import CatalogReference from "../components/CatalogReference.jsx";
+import { sections, flagship, integrationSource, escapeHatch, localeNames, locales } from "../i18n.mjs";
 
 const groups = [
   {
     label: "Localization",
     items: [
       { href: "#intro", label: "The seam" },
+      { href: "#catalog", label: "The catalog" },
       ...sections.map((s) => ({ href: `#${s.id}`, label: s.title })),
       { href: "#wiring", label: "Wiring it up" },
       { href: "#flagship", label: "Flagship" },
@@ -27,7 +28,6 @@ const groups = [
     ],
   },
 ];
-const intro = sections[0].cells[0];
 ---
 
 <Reference
@@ -47,16 +47,6 @@ const intro = sections[0].cells[0];
       border-radius: 6px; background: var(--bg-1); color: var(--fg-secondary); }
     .lz-flow .box.mid { color: var(--accent-2); border-color: var(--accent); background: var(--accent-softer); }
     .lz-flow .arr { color: var(--fg-faint); }
-    .i18n-controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 0 0 0.6rem; }
-    .i18n-locales { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-    .i18n-loc { font: 600 12px/1 var(--font-mono); padding: 0.4rem 0.7rem; background: var(--bg-1);
-      color: var(--fg-secondary); border: 0; border-right: 1px solid var(--border); cursor: pointer; }
-    .i18n-loc:last-child { border-right: 0; }
-    .i18n-loc.is-active { background: var(--accent-softer); color: var(--accent-2); }
-    .i18n-count { font: 600 12px/1 var(--font-mono); color: var(--fg-muted); display: inline-flex;
-      align-items: center; gap: 0.4rem; }
-    .i18n-count input { width: 5rem; font: inherit; padding: 0.35rem 0.4rem; background: var(--bg-1);
-      color: var(--fg); border: 1px solid var(--border); border-radius: 6px; }
     .lz-code { font: 500 12.5px/1.5 var(--font-mono); padding: 0.85rem 1rem; background: var(--bg-1);
       border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; color: var(--fg-secondary); }
   </style>
@@ -92,22 +82,41 @@ const intro = sections[0].cells[0];
       <code>Intl.NumberFormat</code> groups digits per locale, both at <b>zero</b>
       bundle cost. That is why the Lab does <em>not</em> vendor i18next: the platform
       already does the hard part (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029 amendment</a>).
-      Flip the locale or change the count below — the output re-derives live.
+      The examples below are interactive — flip the locale or change the count on any
+      card and the output re-derives live, all reading from <a href="#catalog">one shared
+      catalog</a>.
     </p>
-    <TryI18n client:visible template={intro.template} data={intro.data} locale={intro.locale} />
+  </section>
+
+  <!-- ─────────────────────────── Catalog ─────────────────────────── -->
+  <section id="catalog">
+    <h2>The catalog</h2>
+    <p>
+      One message catalog backs every example on this page — the host's strings, keyed
+      by locale then message key (an object value is a CLDR plural set). It is
+      <b>editable</b>: change a translation, fix a placeholder, or add a missing key,
+      and every <code>t</code> card below re-renders against it. Each example carries
+      only its template and data — the catalog lives here, once.
+    </p>
+    <CatalogReference client:visible />
   </section>
 
   {sections.map((sec) => (
     <section id={sec.id}>
       <h2>{sec.title}</h2>
       <p>{sec.lead}</p>
-      {sec.cells.map((c, i) => (
+      {sec.cells.map((c) => (
         <div class="lz-cell">
           <p class="lz-h"><b>{c.label}</b> — <span>{c.note}</span></p>
-          {/* The first cell already ran in the intro; show the rest. */}
-          {!(sec.id === sections[0].id && i === 0) && (
-            <TryI18n client:visible template={c.template} data={c.data} locale={c.locale} />
-          )}
+          <I18nCard
+            client:visible
+            engine="fullbars"
+            template={c.template}
+            data={c.data}
+            locale={c.locale}
+            locales={locales}
+            localeNames={localeNames}
+          />
         </div>
       ))}
     </section>
@@ -141,22 +150,21 @@ const intro = sections[0].cells[0];
     <p>
       Two helpers, one locale (Polish, with its four plural categories). The template
       stays a pair of plain <code>t</code> calls; all the locale knowledge lives in
-      the host's catalogue and the platform's <code>Intl</code>.
+      the host's catalogue and the platform's <code>Intl</code>. The card renders
+      through the real engine with the full catalogue applied — flip the locale to
+      watch every plural form re-derive. <b>Open in Lab</b> carries the workspace
+      across into the Lab's dedicated <code>catalog.yaml</code> (LOCALIZATION) and
+      <code>config.yaml</code> (<code>i18n.locale</code>) sections — strings as data,
+      locale as a setting.
     </p>
-    <TryI18n client:visible template={flagship.template} data={flagship.data} locale={flagship.locale} />
-    <p>
-      The preview above renders through the real engine with the catalogue + locale
-      applied. <b>Open in Lab</b> carries them across into the Lab's dedicated
-      <code>catalog.yaml</code> (LOCALIZATION) and <code>config.yaml</code>
-      (<code>i18n.locale</code>) sections — strings as data, locale as a setting.
-    </p>
-    <OpenInLab
+    <I18nCard
       client:visible
       engine="fullbars"
       template={flagship.template}
       data={flagship.data}
-      catalog={flagshipCatalogYaml}
       locale={flagship.locale}
+      locales={locales}
+      localeNames={localeNames}
     />
   </section>
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The "Localize" guide content — ONE source for the page (TryI18n cells) and the
+// The "Localize" guide content — ONE source for the page (OpenInLab i18n cards) and the
 // gate (scripts/check-i18n.mjs). It demonstrates ADR-029's i18n *seam*: FlatBars
 // ships no i18n; the Lab acts as the HOST and wires a `t` helper to the browser's
 // native `Intl` (the CLDR plural/format brain, zero bundle cost) through the
@@ -51,7 +51,10 @@ export const catalog = {
 
 export const locales = Object.keys(catalog);
 
-// ── The i18n helper bag for the page's TryI18n cells ──────────────────────────
+// Human labels for the locale switcher (the page's OpenInLab i18n cards).
+export const localeNames = { en: "English", de: "Deutsch", pl: "Polski" };
+
+// ── The i18n helper bag (still used by the gate's live-render check) ──────────
 // Built from the catalog above bound to a locale, reusing the Lab's single i18n
 // core (lab/i18n.mjs makeI18nBag) — the translate/plural/format logic lives in ONE
 // place, so the page and the Lab can't drift (the t/number/… helpers, the native
@@ -92,7 +95,7 @@ export const sections = [
       {
         id: "greeting",
         label: "A named placeholder",
-        note: "{name} is a hash argument; the host's translate() substitutes it. Use the locale picker to switch.",
+        note: "{name} is a hash argument the host's translate() substitutes. Flip the locale picker — en/de/pl all read from the one catalog above.",
         locale: "en",
         template: '{{t "greeting" name=name}}',
         data: { name: "Ada" },
@@ -105,54 +108,18 @@ export const sections = [
     title: "Plurals — Intl.PluralRules, for free",
     lead:
       "Pluralization is not string concatenation: Polish has four categories " +
-      "(one/few/many/other). The host picks the right variant with the browser's " +
-      "native Intl.PluralRules — no plural data shipped, which is why i18next is not " +
-      "vendored.",
+      "(one/few/many/other), English two. The host picks the right variant with the " +
+      "browser's native Intl.PluralRules — no plural data shipped, which is why " +
+      "i18next is not vendored. One interactive card covers every case.",
     cells: [
       {
-        id: "en-one",
-        label: "English — singular",
-        note: "count=1 selects the `one` category.",
-        locale: "en",
-        template: '{{t "cart.items" count=count}}',
-        data: { count: 1 },
-        expect: "1 item in your cart",
-      },
-      {
-        id: "en-other",
-        label: "English — plural",
-        note: "count=3 selects `other`.",
-        locale: "en",
-        template: '{{t "cart.items" count=count}}',
-        data: { count: 3 },
-        expect: "3 items in your cart",
-      },
-      {
-        id: "pl-one",
-        label: "Polish — one",
-        note: "count=1 → `one`.",
-        locale: "pl",
-        template: '{{t "files.deleted" count=count}}',
-        data: { count: 1 },
-        expect: "Usunięto 1 plik",
-      },
-      {
-        id: "pl-few",
-        label: "Polish — few",
-        note: "count=2 → `few` (2–4).",
+        id: "plural",
+        label: "Plural categories — try the count and locale",
+        note: "Bump the count to 1 (one), 2 (few), 5 (many) and flip to Polski: English collapses 2 and 5 into `other`, Polish keeps them distinct. The variants all live in the catalog above.",
         locale: "pl",
         template: '{{t "files.deleted" count=count}}',
         data: { count: 2 },
         expect: "Usunięto 2 pliki",
-      },
-      {
-        id: "pl-many",
-        label: "Polish — many",
-        note: "count=5 → `many` (0, 5–21, …). A category English doesn't have.",
-        locale: "pl",
-        template: '{{t "files.deleted" count=count}}',
-        data: { count: 5 },
-        expect: "Usunięto 5 plików",
       },
     ],
   },
@@ -164,22 +131,13 @@ export const sections = [
       "so digit grouping follows the language — again, native and free.",
     cells: [
       {
-        id: "en-grouping",
-        label: "English grouping (comma)",
-        note: "1000 → 1,000 in en.",
+        id: "grouping",
+        label: "Digit grouping — flip the locale",
+        note: "Switch English ↔ Deutsch and watch 1,000 (comma) become 1.000 (period). Same count, grouped per locale.",
         locale: "en",
         template: '{{t "cart.items" count=count}}',
         data: { count: 1000 },
         expect: "1,000 items in your cart",
-      },
-      {
-        id: "de-grouping",
-        label: "German grouping (period)",
-        note: "1000 → 1.000 in de.",
-        locale: "de",
-        template: '{{t "cart.items" count=count}}',
-        data: { count: 1000 },
-        expect: "1.000 Artikel im Warenkorb",
       },
     ],
   },
@@ -187,36 +145,25 @@ export const sections = [
     id: "formatting",
     title: "Formatting helpers — number, date, relative, selectPlural",
     lead:
-      "All four are blessed prelude operations like t (ADR-029): catalogued and " +
-      "painted, with pure fallbacks (plain text; the English one/other rule; \"N units " +
-      "ago\"), overridden here by the host's native-Intl versions. number/date/relative " +
-      "format through Intl.NumberFormat / DateTimeFormat / RelativeTimeFormat; " +
-      "selectPlural exposes the raw CLDR category. Each takes an Intl options hash — the " +
-      "trailing dict (style/currency, type=\"ordinal\", numeric=\"always\") passes straight " +
-      "through, no arity change. All native, all locale-bound, no data shipped.",
+      "Four more blessed prelude operations (ADR-029), overridden here by the host's " +
+      "native-Intl versions: number/date/relative format through Intl.NumberFormat / " +
+      "DateTimeFormat / RelativeTimeFormat; selectPlural exposes the raw CLDR category. " +
+      "Each also takes a trailing Intl options hash (noted inline to try). Flip the " +
+      "locale on any card to watch it re-derive — these use no catalog, only the platform.",
     cells: [
       {
         id: "number",
         label: "number — Intl.NumberFormat",
-        note: "Decimal + grouping per locale.",
+        note: 'Decimal + grouping per locale. Add an options hash to format money — try style="currency" currency="EUR".',
         locale: "de",
-        template: "{{number n}}",
-        data: { n: 1234.5 },
+        template: "{{number num}}",
+        data: { num: 1234.5 },
         expect: "1.234,5",
-      },
-      {
-        id: "number-currency",
-        label: "number — with an Intl options hash",
-        note: 'style="currency" currency="EUR" — the hash passes straight to Intl.NumberFormat.',
-        locale: "en",
-        template: '{{number n style="currency" currency="EUR"}}',
-        data: { n: 1234.5 },
-        expect: "€1,234.50",
       },
       {
         id: "date",
         label: "date — Intl.DateTimeFormat",
-        note: "Numeric fields, UTC; the locale orders and separates them.",
+        note: "Numeric fields, UTC. Flip the locale to reorder day/month/year and swap the separators.",
         locale: "en",
         template: "{{date d}}",
         data: { d: "2026-06-05" },
@@ -225,38 +172,20 @@ export const sections = [
       {
         id: "relative",
         label: "relative — Intl.RelativeTimeFormat",
-        note: "numeric:auto yields the idiomatic word.",
+        note: 'numeric:auto yields the idiom (pl "wczoraj", en "yesterday"). Add numeric="always" to force the numeric form ("1 day ago").',
         locale: "pl",
         template: "{{relative offset unit}}",
         data: { offset: -1, unit: "day" },
         expect: "wczoraj",
       },
       {
-        id: "relative-always",
-        label: "relative — with an Intl options hash",
-        note: 'numeric="always" forces the numeric form over the idiom (auto → "yesterday").',
-        locale: "en",
-        template: '{{relative offset unit numeric="always"}}',
-        data: { offset: -1, unit: "day" },
-        expect: "1 day ago",
-      },
-      {
         id: "selectPlural",
         label: "selectPlural — the raw category",
-        note: "count=2 in Polish is the `few` category (English would be `other`).",
+        note: 'The CLDR category itself (Polish 2 → `few`; English → `other`). Add type="ordinal" for ordinal categories.',
         locale: "pl",
-        template: "{{selectPlural n}}",
-        data: { n: 2 },
+        template: "{{selectPlural count}}",
+        data: { count: 2 },
         expect: "few",
-      },
-      {
-        id: "selectPlural-ordinal",
-        label: "selectPlural — with an Intl options hash",
-        note: 'type="ordinal" switches to ordinal categories (English 2 → "two", for 2nd).',
-        locale: "en",
-        template: '{{selectPlural n type="ordinal"}}',
-        data: { n: 2 },
-        expect: "two",
       },
     ],
   },
@@ -271,7 +200,7 @@ export const sections = [
       {
         id: "missing",
         label: "Unknown key → the key",
-        note: "No catalog entry, so the key surfaces verbatim — easy to spot and flag.",
+        note: "`checkout.title` has no catalog entry, so the key surfaces verbatim — easy to spot and flag. Add it to the catalog above and watch this resolve live.",
         locale: "en",
         template: '{{t "checkout.title"}}',
         data: {},
@@ -286,8 +215,8 @@ export const sections = [
 export const flagship = {
   engine: "fullbars",
   locale: "pl",
-  template: '{{t "greeting" name=user}}\n{{t "files.deleted" count=num}}',
-  data: { user: "Ada", num: 5 },
+  template: '{{t "greeting" name=user}}\n{{t "files.deleted" count=count}}',
+  data: { user: "Ada", count: 5 },
   expect: "Cześć, Ada!\nUsunięto 5 plików",
 };
 
