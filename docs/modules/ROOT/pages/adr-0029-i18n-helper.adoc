@@ -213,3 +213,17 @@ Decision and rationale:
 
 Future option (non-blocking): if users ask to demo *their* i18next setup, load it lazily via dynamic
 `import()` on demand, never in the base bundle, keeping the 0-byte default.
+
+=== Lab integration (2026-06-05): first-class catalog.yaml + config.yaml views
+
+The Lab exposes the seam as two dedicated sidebar *views* (not partial tabs), mirroring the engine's
+data/config split: a *LOCALIZATION* section with *`catalog.yaml`* (the message DATA, locale-keyed; shown
+on every surface except MinBars) and a generalized *`config.yaml`* (the former Stem-only `stem.config.yaml`)
+that now also carries `i18n.locale` on the t-surfaces and `minbars.truthiness` on MinBars — the latter
+replacing the old mustache.js-truthiness UI toggle. The render routes RawBars/FullBars/MaxBars through the
+helper Worker (`lab/i18n.mjs` `buildI18nHelpers` + `lab/config.mjs` `parseConfig`), so
+`pass:[{{t …}}]`/`number`/`date`/`selectPlural`/`relative` resolve from `catalog.yaml` bound to
+`config.yaml`'s locale. One shared catalog/config (the groups are surface-scoped), not per-surface storage.
+The `/localize` *Open in Lab* round-trips the catalog + locale into those views (`cat`/`loc` workspace
+fields). The data pane is shared by data/config/catalog, so a `dataPaneMode` flag routes edits by what the
+pane displays — config/catalog keystrokes never fall through to `data.yaml`.
