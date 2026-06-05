@@ -13,7 +13,7 @@
 import Reference from "../layouts/Reference.astro";
 import TryI18n from "../components/TryI18n.jsx";
 import OpenInLab from "../components/OpenInLab.jsx";
-import { sections, flagship, integrationSource, escapeHatch, flagshipCatalogYaml } from "../i18n.mjs";
+import { sections, flagship, integrationSource, escapeHatch, flagshipCatalogYaml, flagshipConfigYaml } from "../i18n.mjs";
 
 const groups = [
   {
@@ -140,10 +140,11 @@ const intro = sections[0].cells[0];
     </p>
     <TryI18n client:visible template={flagship.template} data={flagship.data} locale={flagship.locale} />
     <p>
-      <b>Open in Lab</b> carries the whole setup across — the template, the data, and
-      the catalogue as a dedicated <code>catalog.yaml</code> tab (strings as YAML, not
-      code). The Lab reserves that tab name, parses it, and builds the
-      <code>t</code>/<code>number</code>/… bag from it, rendering the same output.
+      <b>Open in Lab</b> carries the whole setup across — the template, the data, the
+      strings as a dedicated <code>catalog.yaml</code> tab (data, not code), and the
+      locale in <code>config.yaml</code>. The Lab reserves both tab names, parses
+      them, and builds the <code>t</code>/<code>number</code>/… bag, rendering the
+      same output.
     </p>
     <OpenInLab
       client:visible
@@ -151,6 +152,7 @@ const intro = sections[0].cells[0];
       template={flagship.template}
       data={flagship.data}
       catalog={flagshipCatalogYaml}
+      config={flagshipConfigYaml}
     />
   </section>
 

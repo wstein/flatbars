@@ -72,14 +72,17 @@ test("workspaceState carries custom-helper source in its own field `h` (ADR-018)
   assert.equal(workspaceState({ template: "x", helpers: "  \n" }).h, undefined);
 });
 
-test("workspaceState carries an i18n catalog as a reserved `catalog.yaml` tab (ADR-029)", () => {
-  const catalog = "locale: pl\nmessages:\n  pl:\n    greeting: \"Cześć, {name}!\"";
-  const s = workspaceState({ template: '{{t "greeting" name=name}}', catalog });
+test("workspaceState carries catalog.yaml (data) + config.yaml (settings) as reserved tabs (ADR-029)", () => {
+  const catalog = "pl:\n  greeting: \"Cześć, {name}!\"";
+  const config = "i18n:\n  locale: pl";
+  const s = workspaceState({ template: '{{t "greeting" name=name}}', catalog, config });
   const cat = s.tabs.find((t) => t.n === "catalog.yaml");
-  assert.ok(cat, "a catalog.yaml tab is present");
+  const cfg = s.tabs.find((t) => t.n === "config.yaml");
+  assert.ok(cat && cfg, "catalog.yaml and config.yaml tabs are present");
   assert.equal(cat.s, catalog);
-  // whitespace-only catalogs are treated as none
-  assert.equal(workspaceState({ template: "x", catalog: "  \n" }).tabs.find((t) => t.n === "catalog.yaml"), undefined);
+  assert.equal(cfg.s, config);
+  // whitespace-only values are treated as none
+  assert.equal(workspaceState({ template: "x", catalog: "  \n", config: " " }).tabs.length, 1);
 });
 
 test("workspaceState carries an output view (`v`) and dock panel (`dk`)", async () => {

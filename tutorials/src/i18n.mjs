@@ -126,33 +126,6 @@ import { IntlMessageFormat } from "intl-messageformat";
 registerHelper("t", (key, args) =>
   new IntlMessageFormat(catalog[locale][key], locale).format(args));`;
 
-// A self-contained registerHelper source that carries the catalog + locale into
-// the FlatBars Lab (the "Open in Lab" round-trip, mirroring the JSONata transform
-// one). The Lab runs it sandboxed, so it inlines everything (no imports) and uses
-// native Intl. `check:i18n` asserts it renders identically to makeI18nHelpers, so
-// this string can never drift from the live helpers above.
-export function i18nHelperSource(locale) {
-  return `// The Lab acts as the HOST: native Intl is the CLDR brain (ADR-029).
-const locale = ${JSON.stringify(locale)};
-const catalog = ${JSON.stringify(catalog, null, 2)};
-function translate(key, args) {
-  const message = catalog[locale] && catalog[locale][key];
-  if (message === undefined) return key;            // fallback-and-flag
-  const variant = typeof message === "string"
-    ? message
-    : (message[new Intl.PluralRules(locale).select(Number(args.count))] || message.other || key);
-  return variant.replace(/\\{(\\w+)\\}/g, (_, name) =>
-    name === "count" && args.count !== undefined
-      ? new Intl.NumberFormat(locale).format(Number(args.count))
-      : (args[name] !== undefined ? String(args[name]) : "{" + name + "}"));
-}
-registerHelper("t", (key, args) => translate(key, args || {}));
-registerHelper("number", (n, opts) => new Intl.NumberFormat(locale, opts || {}).format(Number(n)));
-registerHelper("date", (iso, opts) => new Intl.DateTimeFormat(locale, (opts && Object.keys(opts).length) ? { timeZone: "UTC", ...opts } : { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" }).format(new Date(iso)));
-registerHelper("relative", (v, u, opts) => new Intl.RelativeTimeFormat(locale, { numeric: "auto", ...(opts || {}) }).format(Number(v), u));
-registerHelper("selectPlural", (n, opts) => new Intl.PluralRules(locale, opts || {}).select(Number(n)));`;
-}
-
 // ── The runnable cells ───────────────────────────────────────────────────────
 export const sections = [
   {
@@ -365,7 +338,9 @@ export const flagship = {
   expect: "Cześć, Ada!\nUsunięto 5 plików",
 };
 
-// The same catalog rendered as a `catalog.yaml` document (locale + messages), for
-// the Open-in-Lab round-trip into the Lab's dedicated catalog tab (ADR-029). The
-// strings live as YAML, not code; check:i18n asserts it renders the flagship.
-export const flagshipCatalogYaml = dumpYaml({ locale: flagship.locale, messages: catalog }).replace(/\n+$/, "");
+// The catalog rendered as a `catalog.yaml` document (message DATA only — the
+// locale lives in config.yaml) and the matching `config.yaml`, for the
+// Open-in-Lab round-trip into the Lab's reserved tabs (ADR-029). Strings live as
+// YAML, not code; check:i18n asserts they render the flagship.
+export const flagshipCatalogYaml = dumpYaml(catalog).replace(/\n+$/, "");
+export const flagshipConfigYaml = dumpYaml({ i18n: { locale: flagship.locale } }).replace(/\n+$/, "");

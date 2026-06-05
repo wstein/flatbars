@@ -34,14 +34,17 @@ export function dataText(data) {
 // (restoreHash restores it verbatim rather than reloading a catalog example);
 // tab 0 is the main template, the rest are named partials. Mirrors the field
 // shape `restoreHash` reads (`tabs:[{n,s}]`, `d`, `av`, `ai`).
-export function workspaceState({ template = "", data, partials, helpers, transform, catalog, view, dock } = {}) {
+export function workspaceState({ template = "", data, partials, helpers, transform, catalog, config, view, dock } = {}) {
   const tabs = [{ s: template }];
   const p = partials || {};
   for (const name of Object.keys(p)) tabs.push({ n: name, s: p[name] });
-  // The i18n catalog (ADR-029) travels as a reserved-name tab `catalog.yaml`. The
-  // Lab excludes it from the partial set and feeds it to the i18n helper bag, so
-  // a "Localize" example lands with its strings already loaded.
+  // The i18n catalog (message DATA) and the per-surface settings travel as the
+  // reserved tabs `catalog.yaml` and `config.yaml` (ADR-029). The Lab excludes
+  // both from the partial set, feeding catalog.yaml to the i18n helper bag and
+  // config.yaml to the locale / MinBars-truthiness — so a "Localize" example
+  // lands with its strings and settings already loaded.
   if (catalog && catalog.trim()) tabs.push({ n: "catalog.yaml", s: catalog });
+  if (config && config.trim()) tabs.push({ n: "config.yaml", s: config });
   const st = { x: -1, tabs, d: dataText(data), av: "tmpl", ai: 0 };
   // Custom-helper JS (ADR-018) — a separate field `h` from the data transform
   // (`t`). The Lab loads it into its FullBars-only helpers.js editor and runs it

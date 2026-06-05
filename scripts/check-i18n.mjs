@@ -15,12 +15,11 @@
 //      deliberate `missing` fallback cell) — the no-dangling / no-over-claim
 //      contract, mirroring check-jsonata's function coverage.
 import assert from "node:assert/strict";
-import { sections, flagship, catalog, locales, makeI18nHelpers, i18nHelperSource, flagshipCatalogYaml } from "../tutorials/src/i18n.mjs";
+import { sections, flagship, catalog, locales, makeI18nHelpers, flagshipCatalogYaml, flagshipConfigYaml } from "../tutorials/src/i18n.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
-import { buildHelpers } from "../lab/helpers.mjs";
 import { buildI18nHelpers } from "../lab/i18n.mjs";
+import { parseConfig } from "../lab/config.mjs";
 import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
-import { safe } from "../lab/vendor/flatbars-engine.mjs";
 
 let fail = 0;
 const allCells = sections.flatMap((s) => s.cells.map((c) => ({ section: s.id, ...c })));
@@ -56,40 +55,30 @@ try {
   fail++;
 }
 
-// ── Open-in-Lab round-trip: the self-contained helper source ─────────────────
-// i18nHelperSource(locale) inlines the catalog + locale into a registerHelper
-// string the Lab runs sandboxed. Assert it renders every cell identically to the
-// live makeI18nHelpers, so the round-trip can never drift from the page.
-console.log("\nOpen-in-Lab round-trip (i18nHelperSource ≡ makeI18nHelpers):");
+// ── catalog.yaml + config.yaml route: the Lab's reserved tabs (ADR-029) ──────
+// flagshipCatalogYaml is the catalog rendered as message-only YAML; the Lab's
+// buildI18nHelpers (its worker builder) bound to the config.yaml locale must
+// render every cell — and the flagship — identically to the live makeI18nHelpers,
+// so the catalog.yaml/config.yaml round-trip can't drift from the page.
+console.log("\ncatalog.yaml + config.yaml route (Lab builder ≡ page):");
 try {
   const r = await createFlatBarsRenderer("fullbars");
   for (const cell of allCells) {
     if (cell.missing) continue;
-    const built = buildHelpers(i18nHelperSource(cell.locale), safe);
-    assert.ok(built.ok, `helper source built for ${cell.locale}: ${built.error}`);
+    const built = buildI18nHelpers(flagshipCatalogYaml, cell.locale, loadYaml);
+    assert.ok(built.ok, `catalog built for ${cell.locale}: ${built.error}`);
     const prog = r.compile(cell.template, {}, { helpers: built.helpers }).program;
-    assert.equal(r.render(prog, cell.data), cell.expect, `round-trip ${cell.section}/${cell.id}`);
+    assert.equal(r.render(prog, cell.data), cell.expect, `catalog route ${cell.section}/${cell.id}`);
   }
-  console.log(`  ✓ source renders all ${allCells.filter((c) => !c.missing).length} cells identically`);
+  // the flagship, with the locale taken from config.yaml (verifies that file too)
+  const cfg = parseConfig(flagshipConfigYaml, loadYaml);
+  assert.ok(cfg.ok, `config parsed: ${cfg.error}`);
+  const fb = buildI18nHelpers(flagshipCatalogYaml, cfg.config.locale, loadYaml);
+  const prog = r.compile(flagship.template, {}, { helpers: fb.helpers }).program;
+  assert.equal(r.render(prog, flagship.data), flagship.expect, "catalog.yaml + config.yaml render the flagship");
+  console.log(`  ✓ ${allCells.filter((c) => !c.missing).length} cells + flagship render identically (locale from config.yaml)`);
 } catch (e) {
-  console.error(`  ✗ round-trip: ${e && e.message ? e.message.split("\n")[0] : e}`);
-  fail++;
-}
-
-// ── catalog.yaml route: the dedicated Lab tab (ADR-029) ──────────────────────
-// flagshipCatalogYaml is the catalog rendered as YAML; buildI18nHelpers (the Lab's
-// worker builder) must render the flagship identically to the live helpers, so the
-// catalog.yaml tab can't drift from the page.
-console.log("\ncatalog.yaml route (buildI18nHelpers ≡ flagship):");
-try {
-  const built = buildI18nHelpers(flagshipCatalogYaml, loadYaml);
-  assert.ok(built.ok, `catalog built: ${built.error}`);
-  const r = await createFlatBarsRenderer("fullbars");
-  const prog = r.compile(flagship.template, {}, { helpers: built.helpers }).program;
-  assert.equal(r.render(prog, flagship.data), flagship.expect, "catalog.yaml renders the flagship");
-  console.log(`  ✓ flagshipCatalogYaml → ${JSON.stringify(flagship.expect)}`);
-} catch (e) {
-  console.error(`  ✗ catalog.yaml: ${e && e.message ? e.message.split("\n")[0] : e}`);
+  console.error(`  ✗ catalog/config route: ${e && e.message ? e.message.split("\n")[0] : e}`);
   fail++;
 }
 
