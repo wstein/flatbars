@@ -155,10 +155,11 @@ legacy spellings are a lint concern, ADR-019).
 | Correct plurals out of the box, but tens of KB of data in core/runtime.
 | Rejected — violates meaning-free + bundle gates.
 
-| E — `number` / `date` / `selectPlural` helpers
+| E — `number` / `date` / `selectPlural` (+ `relative`) helpers
 | A locale-aware formatting helper set, same host-register discipline.
-| *Adopted* — now blessed prelude operations alongside `t` (pure fallbacks: plain text; the English
-  one/other rule). `relative` stays a Lab demo helper.
+| *Adopted* — all are blessed prelude operations alongside `t` (pure fallbacks: plain text; the English
+  one/other rule; "N units ago"). `number` / `date` accept an Intl options hash (`AtLeast 1`, no arity
+  change).
 |===
 
 == Follow-ups
@@ -168,9 +169,11 @@ legacy spellings are a lint concern, ADR-019).
 . ✅ *Done — this ADR (C):* the `t` prelude operation (RawBars/FullBars/MaxBars; not MinBars), the host
   brain via the ADR-018 registration seam (interpreter + compiled runtime), the pure key-returning
   fallback, catalog/operations generation, and `test:compile` parity.
-. ✅ *Done — the E formatting set:* `number` / `date` / `selectPlural` are blessed prelude operations
-  alongside `t` (pure fallbacks — plain text and the English one/other rule — overridden by the host's
-  native `Intl`). `relative` remains a Lab demo helper (Intl.RelativeTimeFormat), not blessed.
+. ✅ *Done — the E formatting set:* `number` / `date` / `selectPlural` / `relative` are blessed prelude
+  operations alongside `t` (pure fallbacks — plain text, the English one/other rule, and "N units ago" —
+  overridden by the host's native `Intl`). `number` / `date` read an Intl options hash
+  (`pass:[{{number n style="currency" currency="EUR"}}]`), which the trailing dict delivers without an
+  arity change.
 . *Conformance note:* add an `i18n` row to xref:fullbars-compat.adoc[] documenting that the `t` operation
   (shared by RawBars/FullBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
   Handlebars built-in), the same framing ADR-018 used for `registerHelper`.

@@ -164,6 +164,11 @@ coreOperationDefs =
       false
       (AtLeast 1)
       selectPluralH
+  , gen "relative"
+      "Formats a relative time (value, unit) for the host's locale (Intl.RelativeTimeFormat); falls back to a plain English phrasing when no host formatter is registered (ADR-029)."
+      false
+      (AtLeast 2)
+      relativeH
   , valDef "true" "The boolean literal true." (nullary (pure (VBool true)))
   , valDef "false" "The boolean literal false." (nullary (pure (VBool false)))
   , valDef "null" "The null literal." (nullary (pure VNull))
@@ -1034,6 +1039,23 @@ selectPluralH _ args = case Array.head args of
   Just v -> do
     n <- asNum v
     pure (VString (if n == 1.0 then "one" else "other"))
+
+-- | `relative value unit` falls back to a plain English phrasing (pure, no CLDR
+-- | data): "N units ago" / "in N units" / "this unit". A host registers the real
+-- | `Intl.RelativeTimeFormat` for idiomatic output ("yesterday", "wczoraj").
+relativeH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+relativeH _ args = case Array.index args 0, Array.index args 1 of
+  Just vv, Just uu -> do
+    v <- asNum vv
+    unit <- liftEither (stringify uu)
+    magStr <- liftEither (stringify (VNumber (Number.abs v)))
+    let punit = if Number.abs v == 1.0 then unit else unit <> "s"
+    pure $ VString
+      if v < 0.0 then magStr <> " " <> punit <> " ago"
+      else if v > 0.0 then "in " <> magStr <> " " <> punit
+      else "this " <> unit
+  _, _ -> throwError
+    (ArityError ("relative: expected at least 2 argument(s), got " <> show (Array.length args)))
 
 indexValue :: Value -> Value -> Value
 indexValue (VObject m) (VString k) = fromMaybe VNull (Map.lookup k m)

@@ -410,6 +410,13 @@ const helpers = {
   number: (a) => { const u = userHelpers["number"]; return u ? callUser("number", u, a) : stringify(a[0]); },
   date: (a) => { const u = userHelpers["date"]; return u ? callUser("date", u, a) : stringify(a[0]); },
   selectPlural: (a) => { const u = userHelpers["selectPlural"]; return u ? callUser("selectPlural", u, a) : (num(a[0]) === 1 ? "one" : "other"); },
+  relative: (a) => {
+    const u = userHelpers["relative"];
+    if (u) return callUser("relative", u, a);
+    const v = num(a[0]), unit = stringify(a[1]), mag = Math.abs(v), magStr = stringify(mag);
+    const punit = mag === 1 ? unit : unit + "s";
+    return v < 0 ? magStr + " " + punit + " ago" : v > 0 ? "in " + magStr + " " + punit : "this " + unit;
+  },
   escapeHtml: (a) => esc(a[0]),
   safe: (a) => safe(a[0]),
   eq: (a) => deepEq(a[0], a[1]),

@@ -506,6 +506,14 @@
       "doc": "A raw block that returns its body verbatim, untouched by the engine."
     },
     {
+      "name": "relative",
+      "kind": "inline",
+      "arity": "≥2",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Formats a relative time (value, unit) for the host's locale (Intl.RelativeTimeFormat); falls back to a plain English phrasing when no host formatter is registered (ADR-029)."
+    },
+    {
       "name": "replace",
       "kind": "inline",
       "arity": "3",

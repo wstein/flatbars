@@ -70,17 +70,20 @@ export function translate(locale, key, args = {}) {
 }
 
 // ── The ADR-029 "E" helpers — locale-aware formatting, all native Intl ────────
-// number/date/relative/selectPlural: the deferred follow-up set, demonstrated as
-// host helpers (not blessed prelude operations) on the same register seam as `t`.
-// Each is locale-bound and leans entirely on the platform's CLDR data.
-export function fmtNumber(locale, n) {
-  return new Intl.NumberFormat(locale).format(Number(n));
+// number/date/selectPlural/relative are blessed prelude operations (ADR-029); the
+// host overrides their pure fallbacks here with the real Intl behaviour. number
+// and date take an Intl options hash (`{{number n style="currency" currency="EUR"}}`),
+// delivered as a trailing object — the blessed op is AtLeast 1, so no arity change.
+export function fmtNumber(locale, n, opts = {}) {
+  return new Intl.NumberFormat(locale, opts).format(Number(n));
 }
-export function fmtDate(locale, iso) {
-  // Numeric fields + a fixed zone keep the output ICU-stable across runtimes
-  // (month *names* would vary); the locale still orders/​separates them.
-  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" })
-    .format(new Date(iso));
+export function fmtDate(locale, iso, opts = {}) {
+  // With no options, numeric fields + a fixed zone keep the output ICU-stable
+  // (month *names* would vary); a caller's options override, still UTC-anchored.
+  const o = opts && Object.keys(opts).length
+    ? { timeZone: "UTC", ...opts }
+    : { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" };
+  return new Intl.DateTimeFormat(locale, o).format(new Date(iso));
 }
 export function fmtRelative(locale, value, unit) {
   return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Number(value), unit);
@@ -90,15 +93,15 @@ export function selectPlural(locale, n) {
 }
 
 // The full i18n helper bag (ADR-018) the Lab/host binds for a chosen locale and
-// passes to the engine's renderWith. `t` overrides the blessed prelude operation
-// (ADR-029); the rest are the formatting helpers. For an inline helper the
-// key=value hash arrives as a trailing object directly (FullBars convention), so
-// `t "key" a=b` calls t("key", { a: b }); it is `undefined` when no hash is written.
+// passes to the engine's renderWith — each entry overrides the blessed prelude
+// operation's fallback (ADR-029). For an inline helper the key=value hash arrives
+// as a trailing object directly (FullBars convention), so `number n style="…"`
+// calls number(n, { style: "…" }); it is `undefined` when no hash is written.
 export function makeI18nHelpers(locale) {
   return {
     t: (key, args) => translate(locale, key, args || {}),
-    number: (n) => fmtNumber(locale, n),
-    date: (iso) => fmtDate(locale, iso),
+    number: (n, opts) => fmtNumber(locale, n, opts || {}),
+    date: (iso, opts) => fmtDate(locale, iso, opts || {}),
     relative: (value, unit) => fmtRelative(locale, value, unit),
     selectPlural: (n) => selectPlural(locale, n),
   };
@@ -142,8 +145,8 @@ function translate(key, args) {
       : (args[name] !== undefined ? String(args[name]) : "{" + name + "}"));
 }
 registerHelper("t", (key, args) => translate(key, args || {}));
-registerHelper("number", (n) => new Intl.NumberFormat(locale).format(Number(n)));
-registerHelper("date", (iso) => new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" }).format(new Date(iso)));
+registerHelper("number", (n, opts) => new Intl.NumberFormat(locale, opts || {}).format(Number(n)));
+registerHelper("date", (iso, opts) => new Intl.DateTimeFormat(locale, (opts && Object.keys(opts).length) ? { timeZone: "UTC", ...opts } : { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" }).format(new Date(iso)));
 registerHelper("relative", (v, u) => new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Number(v), u));
 registerHelper("selectPlural", (n) => new Intl.PluralRules(locale).select(Number(n)));`;
 }
@@ -265,12 +268,12 @@ export const sections = [
     id: "formatting",
     title: "Formatting helpers — number, date, relative, selectPlural",
     lead:
-      "number / date / selectPlural are blessed prelude operations like t (ADR-029): " +
-      "catalogued and painted, with pure fallbacks (plain text; the English one/other " +
-      "rule), overridden here by the host's native-Intl versions. relative stays a Lab " +
-      "demo helper. number/date/relative format through Intl.NumberFormat / " +
-      "DateTimeFormat / RelativeTimeFormat; selectPlural exposes the raw CLDR category. " +
-      "All native, all locale-bound, no data shipped.",
+      "All four are blessed prelude operations like t (ADR-029): catalogued and " +
+      "painted, with pure fallbacks (plain text; the English one/other rule; \"N units " +
+      "ago\"), overridden here by the host's native-Intl versions. number/date/relative " +
+      "format through Intl.NumberFormat / DateTimeFormat / RelativeTimeFormat; " +
+      "selectPlural exposes the raw CLDR category. number and date also take an Intl " +
+      "options hash. All native, all locale-bound, no data shipped.",
     cells: [
       {
         id: "number",
@@ -280,6 +283,15 @@ export const sections = [
         template: "{{number n}}",
         data: { n: 1234.5 },
         expect: "1.234,5",
+      },
+      {
+        id: "number-currency",
+        label: "number — with an Intl options hash",
+        note: 'style="currency" currency="EUR" — the hash passes straight to Intl.NumberFormat.',
+        locale: "en",
+        template: '{{number n style="currency" currency="EUR"}}',
+        data: { n: 1234.5 },
+        expect: "€1,234.50",
       },
       {
         id: "date",

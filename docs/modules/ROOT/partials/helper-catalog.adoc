@@ -68,6 +68,7 @@
 |`plus` |value |2 |alias of `add` |Adds two numbers.
 |`prepend` |value |2 |registered |Prepends the second string to the first.
 |`raw` |block |any |registered |A raw block that returns its body verbatim, untouched by the engine.
+|`relative` |value |≥2 |registered |Formats a relative time (value, unit) for the host's locale (Intl.RelativeTimeFormat); falls back to a plain English phrasing when no host formatter is registered (ADR-029).
 |`replace` |value |3 |registered |Replaces every occurrence of a substring with another.
 |`reverse` |value |1 |registered |Reverses an array or string.
 |`rindex0` |value |0 |scoped |The current loop item's 0-based index, counting from the end.
