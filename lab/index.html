@@ -2037,15 +2037,17 @@
       // entry kicks off the async render (which re-runs once it lands).
       let helpersSrc = "";
       let helpersDirty = false;
-      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=2");
-      // The reserved tab name whose YAML is the i18n catalog (ADR-029), not a
-      // partial. partialsMap() excludes it; catalogSrc() reads it; the worker
-      // builds the t/number/date/selectPlural/relative bag from it.
+      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=3");
+      // Reserved tab names (ADR-029), neither a partial: catalog.yaml is the i18n
+      // message DATA (built into the t/number/… bag, not on MinBars); config.yaml
+      // is the per-surface SETTINGS (i18n.locale, minbars.truthiness). partialsMap()
+      // excludes both; catalogSrc()/configSrc() read them.
       const CATALOG_TAB = "catalog.yaml";
+      const CONFIG_TAB = "config.yaml";
       let helperCache = { key: null, output: "", error: "" };
       let helperInFlight = null;
-      function helperKey(tmpl, partials, data, src, catalog) {
-        try { return JSON.stringify([tmpl, partials, data, src, catalog]); } catch { return null; }
+      function helperKey(tmpl, partials, data, src, catalog, config, dialect) {
+        try { return JSON.stringify([tmpl, partials, data, src, catalog, config, dialect]); } catch { return null; }
       }
       async function requestHelperRender(key, req) {
         if (helperInFlight === key) return; // this exact input is already rendering
@@ -2087,14 +2089,18 @@
 
       function partialsMap() {
         const map = {};
-        for (let i = 1; i < tabs.length; i++) if (tabs[i].name !== CATALOG_TAB) map[tabs[i].name] = tabs[i].source;
+        for (let i = 1; i < tabs.length; i++) if (tabs[i].name !== CATALOG_TAB && tabs[i].name !== CONFIG_TAB) map[tabs[i].name] = tabs[i].source;
         return map;
       }
-      // The i18n catalog tab's YAML (ADR-029), or "" when there is no such tab.
-      function catalogSrc() {
-        for (let i = 1; i < tabs.length; i++) if (tabs[i].name === CATALOG_TAB) return tabs[i].source || "";
+      // A reserved tab's source by name (ADR-029), or "" when there is no such tab.
+      function reservedTabSrc(name) {
+        for (let i = 1; i < tabs.length; i++) if (tabs[i].name === name) return tabs[i].source || "";
         return "";
       }
+      // The i18n catalog (message data); empty on MinBars (no t there).
+      function catalogSrc() { return ENGINE === "minbars" ? "" : reservedTabSrc(CATALOG_TAB); }
+      // The per-surface settings tab (locale, MinBars truthiness).
+      function configSrc() { return reservedTabSrc(CONFIG_TAB); }
 
       // ── CodeMirror ────────────────────────────────────────────────────
       // Template highlighting derives from the engine lexer (ADR-014): one
@@ -3839,13 +3845,17 @@
           // matches the current inputs; otherwise show "rendering…" and let the
           // async render re-run. Provenance segments aren't produced for helper
           // renders (as the in-process renderWith path also returns none).
+          // helpers.js is FullBars-only; the catalog (t/number/…) works on the
+          // t-surfaces (RawBars/FullBars/MaxBars — catalogSrc() is "" on MinBars).
+          // Both render in the Worker via the surface's operations-aware entry.
           const helperSrc = (ENGINE === "fullbars") ? (helpersSrc || "").trim() : "";
-          const catSrc = (ENGINE === "fullbars") ? catalogSrc().trim() : "";
+          const catSrc = catalogSrc().trim();
+          const cfgSrc = configSrc().trim();
           let output, segments;
           if (helperSrc || catSrc) {
-            const key = helperKey(mainSource, partialsMap(), data, helperSrc, catSrc);
+            const key = helperKey(mainSource, partialsMap(), data, helperSrc, catSrc, cfgSrc, ENGINE);
             if (helperCache.key !== key) {
-              requestHelperRender(key, { template: mainSource, data, partials: partialsMap(), helperSrc, catalogSrc: catSrc });
+              requestHelperRender(key, { dialect: ENGINE, template: mainSource, data, partials: partialsMap(), helperSrc, catalogSrc: catSrc, configSrc: cfgSrc });
               setOutput("rendering…"); setError(""); renderDock(); saveHash(); lastTimings = null;
               return;
             }
