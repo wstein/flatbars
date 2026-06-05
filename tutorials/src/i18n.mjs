@@ -333,8 +333,8 @@ export const sections = [
 export const flagship = {
   engine: "fullbars",
   locale: "pl",
-  template: '{{t "greeting" name=user}}\n{{t "files.deleted" count=n}}',
-  data: { user: "Ada", n: 5 },
+  template: '{{t "greeting" name=user}}\n{{t "files.deleted" count=num}}',
+  data: { user: "Ada", num: 5 },
   expect: "Cześć, Ada!\nUsunięto 5 plików",
 };
 
