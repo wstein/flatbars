@@ -162,3 +162,39 @@ legacy spellings are a lint concern, ADR-019).
 . *Conformance note:* add an `i18n` row to xref:fullbars-compat.adoc[] documenting that the `t` operation
   (shared by RawBars/FullBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
   Handlebars built-in), the same framing ADR-018 used for `registerHelper`.
+
+== Amendment (2026-06-05): the Lab demonstrates the seam via native `Intl` — i18next is not vendored
+
+The question arose of whether to vendor *i18next* into the FlatBars Lab and build an i18n guide around
+it, the way the Lab vendors `jsonata` (`lab/vendor/jsonata.mjs`, ~78 KB) for the data-shaping guide. Team
+review (debate recorded against this ADR) rejected vendoring and adopted *option C+*: the Lab demonstrates
+the i18n integration *seam* using the browser's native `Intl`, with i18next available only as an
+*unbundled* documented escape hatch.
+
+Decision and rationale:
+
+. *No i18next in the bundle.* The browser already ships the CLDR brain — `Intl.PluralRules` (every
+  language's plural categories), `Intl.NumberFormat`, `Intl.DateTimeFormat` — at *zero* bytes. JSONata
+  earned its vendor because data-shaping-before-render has no platform equivalent; i18n's plural/format
+  machinery *is* the platform, so vendoring i18next would be redundant weight plus a version/CVE pin and an
+  ecosystem blessing. The Lab vendors a library only when the platform can't already do the job.
+
+. *Demonstrate the seam, framed as Lab-as-host.* A live card (`tutorials/src/components/TryI18n.jsx`,
+  sibling of `TryJsonata.jsx`) and a `/localize` guide wire a `t` helper to native `Intl` via the existing
+  `registerHelper` / `renderWith` path (ADR-018) — *not* a new engine feature. This *reinforces* the
+  ADR's "i18n is the host's job" thesis (the Lab is acting as the host) rather than implying FlatBars does
+  i18n; the page says so explicitly.
+
+. *No dependency on the unimplemented `t` operation.* Riding the ADR-018 `registerHelper`/`renderWith`
+  seam, the demo ships today as the living proof of follow-up 1 (the interim recipe) and migrates to the
+  blessed `t` (follow-up 2) when the module lands.
+
+. *Cheap gate.* `scripts/check-i18n.mjs` (mirroring `check:jsonata`) renders the `pass:[{{t …}}]` cells
+  across locales — including one with non-trivial plurals (Polish: one/few/many/other) and per-locale
+  number grouping — and asserts the output. There is no vendored dependency to pin.
+
+. *Escape hatch, unbundled.* The guide shows a one-paragraph stub for swapping the `Intl` wrapper for
+  i18next or ICU MessageFormat (`@formatjs`) in a real host — fidelity without the bytes.
+
+Future option (non-blocking): if users ask to demo *their* i18next setup, load it lazily via dynamic
+`import()` on demand, never in the base bundle, keeping the 0-byte default.
