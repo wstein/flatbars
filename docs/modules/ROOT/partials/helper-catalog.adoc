@@ -79,6 +79,7 @@
 |`split` |value |2 |registered |Splits a string into an array on a separator.
 |`startsWith` |value |2 |registered |True when the string starts with the given prefix.
 |`subtract` |value |2 |registered |Subtracts the second number from the first — the `-` operator's helper.
+|`t` |value |≥1 |registered |Translates a message key via the host's i18n callback; returns the key unchanged when no translator is registered (ADR-029 fallback-and-flag).
 |`take` |value |2 |registered |The first n elements of an array.
 |`takeRight` |value |2 |registered |The last n elements of an array.
 |`this` |value |0 |registered |The current context.

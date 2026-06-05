@@ -144,6 +144,11 @@ coreOperationDefs =
       false
       (AtLeast 1)
       lookupH
+  , gen "t"
+      "Translates a message key via the host's i18n callback; returns the key unchanged when no translator is registered (ADR-029 fallback-and-flag)."
+      false
+      (AtLeast 1)
+      translateH
   , valDef "true" "The boolean literal true." (nullary (pure (VBool true)))
   , valDef "false" "The boolean literal false." (nullary (pure (VBool false)))
   , valDef "null" "The null literal." (nullary (pure VNull))
@@ -980,6 +985,18 @@ lookupH _ args = case Array.uncons args of
   step :: Value -> Value -> Value
   step VNull _ = VNull
   step v key = indexValue v key
+
+-- | The blessed `t` (translate) operation (ADR-029). FlatBars ships no i18n: the
+-- | localization brain is the host's. The engine reserves the name (so `t` is
+-- | catalogued, schema-validated, and editor-painted) and supplies the
+-- | *fallback* — returning the message key unchanged. A host plugs in real
+-- | translation by registering `t` (the interpreter's `renderWith` helper bag, or
+-- | the compiled runtime's `rt.register`), which shadows this fallback. The
+-- | fallback is pure, so it renders identically interpreted and compiled.
+translateH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+translateH _ args = case Array.head args of
+  Nothing -> throwError (ArityError "t: expected at least 1 argument(s), got 0")
+  Just key -> VString <$> liftEither (stringify key)
 
 indexValue :: Value -> Value -> Value
 indexValue (VObject m) (VString k) = fromMaybe VNull (Map.lookup k m)

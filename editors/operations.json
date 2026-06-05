@@ -594,6 +594,14 @@
       "doc": "Subtracts the second number from the first — the `-` operator's helper."
     },
     {
+      "name": "t",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Translates a message key via the host's i18n callback; returns the key unchanged when no translator is registered (ADR-029 fallback-and-flag)."
+    },
+    {
       "name": "take",
       "kind": "inline",
       "arity": "2",

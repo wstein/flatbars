@@ -401,6 +401,11 @@ const helpers = {
   false: () => false,
   null: () => null,
   lookup: (a) => lookup(...a),
+  // ADR-029: the blessed `t` (translate) operation. FlatBars ships no i18n — a
+  // host supplies the brain via rt.register("t", fn), which this delegates to;
+  // with none registered it falls back to the key unchanged, matching the
+  // interpreter's prelude fallback (so compile ≡ interpret).
+  t: (a) => { const u = userHelpers["t"]; return u ? callUser("t", u, a) : stringify(a[0]); },
   escapeHtml: (a) => esc(a[0]),
   safe: (a) => safe(a[0]),
   eq: (a) => deepEq(a[0], a[1]),

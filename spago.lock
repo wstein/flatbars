@@ -20,6 +20,7 @@
             "assert",
             "console",
             "effect",
+            "foldable-traversable",
             "kernel",
             "tuples"
           ]
@@ -96,12 +97,14 @@
             "functions",
             "integers",
             "kernel",
+            "linter",
             "maxbars",
             "maybe",
             "minbars",
             "ordered-collections",
             "prelude",
             "rawbars",
+            "strings",
             "transformers",
             "tuples"
           ]
@@ -109,6 +112,7 @@
         "test": {
           "dependencies": [
             "argonaut",
+            "arrays",
             "assert",
             "console",
             "effect",
