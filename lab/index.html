@@ -2463,7 +2463,9 @@
       // Both editors are visible, so "active view" follows whichever has focus —
       // it drives the status bar, copy, and save actions.
       byId("template-editor-container").addEventListener("focusin", () => { activeView = "tmpl"; updateStatusMeta(); });
-      byId("data-editor-container").addEventListener("focusin", () => { activeView = "data"; updateStatusMeta(); });
+      // config.yaml is edited in this same pane; focusing it must NOT flip the view
+      // to "data" (that routed config keystrokes into data.yaml, overwriting it).
+      byId("data-editor-container").addEventListener("focusin", () => { if (activeView !== "config") activeView = "data"; updateStatusMeta(); });
 
       // ── Virtual file explorer ───────────────────────────────────────────
       // A type-grouped navigator over every editable file. It does not own any
