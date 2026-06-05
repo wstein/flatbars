@@ -364,10 +364,6 @@
       .tabs-wrap > .focus-toggle { flex: 0 0 auto; align-self: center; margin-right: 6px; }
       .tabs-wrap > #out-copy { margin-left: auto; margin-right: 0; }
       #out-copy.copied { color: #10b981; }
-      .tabs-wrap > .mj-truthy { flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center;
-        gap: 5px; margin-right: 8px; font: 11px var(--font-mono); color: var(--fg-secondary); cursor: pointer;
-        user-select: none; white-space: nowrap; }
-      .tabs-wrap > .mj-truthy input { margin: 0; cursor: pointer; }
 
       /* ── Tabs ────────────────────────────────────────────────────── */
       .tabs-wrap {
@@ -1600,14 +1596,8 @@
                 <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
               </svg>
             </button>
-            <!-- MinBars truthiness toggle (ADR-022 S2): flip the language-agnostic
-                 spec rule (0/"" truthy) to mustache.js' (0/"" falsy). Shown only
-                 under the MinBars engine; unhidden at boot. -->
-            <label id="mj-truthy" class="mj-truthy" hidden
-                   title="MinBars truthiness — default (spec/Ruby): 0 and empty string are truthy; mustache.js: 0 and empty string are falsy">
-              <input type="checkbox" id="mj-truthy-cb" />
-              <span>mustache.js truthiness</span>
-            </label>
+            <!-- MinBars truthiness is set in the config.yaml view now
+                 (minbars.truthiness; default mustacheJs), not a UI toggle (ADR-029). -->
           </div>
 
           <!-- Contextual controls for the active view; toggled by setOutputView. -->
@@ -1865,23 +1855,8 @@
         : "Stem";
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
 
-      // MinBars truthiness toggle (ADR-022 S2): reveal it under MinBars and wire it
-      // to re-render under the chosen rule, persisting the choice in the share link.
-      if (ENGINE === "minbars") {
-        byId("mj-truthy").hidden = false;
-        byId("mj-truthy-cb").addEventListener("change", (e) => {
-          minbarsCompat = e.target.checked;
-          markCustom();
-          run();
-          saveHash();
-        });
-      }
-      // Reflect `minbarsCompat` on the toggle checkbox (restore / example reset).
-      // The input is always in the DOM (hidden off MinBars), so this is safe there.
-      function syncMinbarsToggle() {
-        const cb = byId("mj-truthy-cb");
-        if (cb) cb.checked = minbarsCompat;
-      }
+      // MinBars truthiness is set in the config.yaml view (minbars.truthiness),
+      // default mustacheJs/true (ADR-029) — no UI toggle to wire or sync.
 
       // ── Docs backlink + colour-legend popover ──────────────────────────────
       // The "Docs" button points at the reference page for the current engine
@@ -2008,7 +1983,7 @@
       // MinBars truthiness toggle (ADR-022 S2): false = the language-agnostic spec
       // rule (0/"" truthy), true = the mustache.js rule (0/"" falsy). MinBars only;
       // threaded into render/compileToJs as `compat` and persisted as `mj`.
-      let minbarsCompat = false;
+      let minbarsCompat = true; // default mustacheJs (ADR-029); set by the config.yaml view + hash `mj`
       // Compiler & runtime options (ADR-0016).
       // `standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
       let standalone      = true;
@@ -2620,7 +2595,7 @@
               on: () => selectHelpersTab() },
           ]}] : []),
           { key: "config", label: "CONFIG", files: [
-            { icon: "cfg", name: "stem.config.yaml", active: activeView === "config", dirty: cfgNonDefault,
+            { icon: "cfg", name: "config.yaml", active: activeView === "config", dirty: cfgNonDefault,
               title: "render config — escape · trim · ST4 · allow-list",
               on: () => selectConfigTab() },
           ]},
@@ -2827,7 +2802,7 @@
         }
       }
 
-      // BOTTOM strip (#data-tabs): data.yaml, overlays, and stem.config.yaml —
+      // BOTTOM strip (#data-tabs): data.yaml, overlays, and config.yaml —
       // everything edited in the YAML editor `dataView`.
       function renderDataStrip() {
         const bar = byId("data-tabs");
@@ -2839,7 +2814,7 @@
             const t = document.createElement("div");
             t.className = "tab tab-transform" + (isActive ? " active" : "");
             t.title = "render config — escape · trim · ST4 · allow-list";
-            t.append(document.createTextNode("stem.config.yaml"));
+            t.append(document.createTextNode("config.yaml"));
             t.addEventListener("click", () => selectConfigTab());
             t.append(tabCloseBtn(() => closeEditor("config")));
             bar.append(t);
@@ -2898,7 +2873,7 @@
         showActiveTab();
       }
 
-      // stem.config.yaml — a first-class editor (opens in the edit pane, not a
+      // config.yaml — a first-class editor (opens in the edit pane, not a
       // popup). Reuses the YAML editor; edits are parsed + applied live, so the
       // render options stay in sync. Parse errors surface in the Problems dock.
       let configError = null;
@@ -2923,7 +2898,7 @@
         const res = parseConfigYaml(text);
         if (!res.ok) {
           configError = res.error;
-          dockProblems = [{ severity: "error", file: "stem.config.yaml", line: 1, col: 1, message: res.error }];
+          dockProblems = [{ severity: "error", file: "config.yaml", line: 1, col: 1, message: res.error }];
           setError("config error: " + res.error);
           renderDock(); renderTabs();
           return;
@@ -2932,7 +2907,7 @@
         const v = res.value;
         escapeMode = v.escape; byId("escape-select").value = v.escape;
         standalone = v.trim;   byId("standalone-cb").checked = v.trim;
-        st4Mode = v.st4; allowList = v.allow;
+        st4Mode = v.st4; allowList = v.allow; minbarsCompat = v.mustacheJs;
         updateRenderStatus(); renderTabs();
         scheduleRun(); saveHash();
       }
@@ -3923,7 +3898,7 @@
         // either an overlay name, the JSONata transform, or the current
         // template tab. In the data pane: an overlay name or `data.yaml`.
         const overlay = activeView === "data" ? overlayByName(dataFile) : null;
-        const fileName = activeView === "config" ? "stem.config.yaml"
+        const fileName = activeView === "config" ? "config.yaml"
           : activeView !== "data"
             ? (templateMode === "transform" ? "transform" : templateMode === "helpers" ? "helpers.js" : activeTab().name)
             : overlay ? overlay.name + ".yaml" : "data.yaml";
@@ -4521,7 +4496,7 @@
         byId("escape-select").value = "";
         standalone = true;
         st4Mode = false;
-        minbarsCompat = false; syncMinbarsToggle();
+        minbarsCompat = true; // default mustacheJs (ADR-029)
         allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
@@ -4587,7 +4562,7 @@
         byId("escape-select").value = "";
         standalone = true;
         st4Mode = false;
-        minbarsCompat = false; syncMinbarsToggle();
+        minbarsCompat = true; // default mustacheJs (ADR-029)
         allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
@@ -4643,7 +4618,7 @@
           ...(allowList !== null ? { al: allowList } : {}), // ADR-0013 transformer allow-list
           av: activeView, ai: activeTabIdx,
           // MinBars truthiness toggle (ADR-022 S2); omitted when off so links stay compact.
-          ...(minbarsCompat ? { mj: 1 } : {}),
+          ...(minbarsCompat ? {} : { mj: 0 }), // default mustacheJs; persist only the spec opt-out
           // Active template-pane mode (1 = transform tab, 0/omitted = tmpl).
           // Persisted so a shared "I'm editing the transform" link round-trips.
           ...(templateMode === "transform" ? { tm: 1 } : {}),
@@ -4708,8 +4683,7 @@
           byId("escape-select").value = escapeMode;
           standalone   = s.sa !== 0;  // default true; explicit 0 opts out
           st4Mode = s.s4 === 1;
-          minbarsCompat = s.mj === 1; // MinBars truthiness toggle (no-op off MinBars)
-          syncMinbarsToggle();
+          minbarsCompat = s.mj !== 0; // default mustacheJs; explicit mj:0 = spec (ADR-029)
           allowList = Array.isArray(s.al) ? s.al.map(String) : null;
           syncStandaloneUI();
           updateRenderStatus();
@@ -6491,7 +6465,7 @@
         run(); saveHash();
       });
 
-      // ── Render Config (stem.config.yaml popover) ────────────────────────
+      // ── Render Config (config.yaml popover) ────────────────────────
       // One home for the per-render options that were scattered across the
       // output strip (escape, trim whitespace) plus two that had no GUI at all
       // (ST4 mode, ADR-0013 transformer allow-list). Edited as a small YAML
@@ -6519,6 +6493,10 @@
           "",
           "transformers:",
           `  allow: ${allow}` + " ".repeat(Math.max(1, 12 - allow.length)) + "# ADR-0013 positive list — ~ = unconstrained (default); [eval] = only listed names render",
+          // MinBars-only: the truthiness rule (ADR-029). Replaces the old UI toggle.
+          ...(ENGINE === "minbars"
+            ? ["", "minbars:", `  truthiness: ${minbarsCompat ? "mustacheJs" : "spec"}   # mustacheJs (0/\"\" falsy, default) · spec (0/\"\" truthy)`]
+            : []),
         ].join("\n");
       }
 
@@ -6539,6 +6517,9 @@
 
         const trim = cfg.trim_whitespace !== false; // default on
         const st4 = cfg.st4_mode === true;
+        // MinBars truthiness (ADR-029): default mustacheJs (true); only "spec" opts out.
+        const minbars = cfg.minbars && typeof cfg.minbars === "object" ? cfg.minbars : {};
+        const mustacheJs = minbars.truthiness !== "spec";
 
         // ADR-0013 allow-list: missing or `~` means unconstrained (null);
         // an explicit list (even empty) is the positive surface.
@@ -6552,10 +6533,10 @@
           if (unknown.length)
             return { ok: false, error: `transformers.allow: unknown transformer${unknown.length > 1 ? "s" : ""} — ${unknown.join(", ")}` };
         }
-        return { ok: true, value: { escape: esc, trim, st4, allow } };
+        return { ok: true, value: { escape: esc, trim, st4, allow, mustacheJs } };
       }
 
-      // Render config changed → refresh the explorer (the stem.config.yaml row's
+      // Render config changed → refresh the explorer (the config.yaml row's
       // non-default dirty dot). The old toolbar chip + Render-button dot were
       // removed when the config moved to the explorer file, so this is now just
       // an explorer repaint kept under its original name for its many callers.
@@ -6563,7 +6544,7 @@
         renderExplorer();
       }
 
-      // stem.config.yaml is edited as a normal file in the edit pane
+      // config.yaml is edited as a normal file in the edit pane
       // (selectConfigTab / applyConfigText) — no popup. updateRenderStatus()
       // just refreshes the explorer's config-file dirty dot.
       updateRenderStatus();
