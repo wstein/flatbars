@@ -28,7 +28,7 @@ const NO_COMPILE = ["surface-dialect", "core-dialect"];
 // ── Layer 1: decision ───────────────────────────────────────────────────────
 
 test("viewKind: text views paint the editor, previews use the iframe", () => {
-  for (const v of ["source", "data", "bytecode", "st4", "compiled", "migrated"]) {
+  for (const v of ["source", "data", "bytecode", "compiled", "migrated"]) {
     assert.equal(viewKind(v), "text", `${v} should be a text view`);
   }
   for (const v of ["rendered", "markdown"]) {

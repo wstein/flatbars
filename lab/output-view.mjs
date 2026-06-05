@@ -21,7 +21,6 @@ export const VIEW_TABS = [
   { view: "source", label: "Plain Text" },
   { view: "rendered", label: "HTML Preview" },
   { view: "markdown", label: "Markdown Preview" },
-  { view: "st4", label: "ST4 Preview", requires: ["st4-modes"] },
   { view: "data", label: "Render Data" },
   { view: "bytecode", label: "Bytecode", requires: ["bytecode-wire"] },
   { view: "compiled", label: "Compiled JS", requires: ["compile-js"] },
@@ -40,10 +39,10 @@ export function validView(view, features) {
 }
 
 // Whether a view paints into the read-only text editor (vs the preview iframe).
-// The text views: Plain Text, Render Data, Bytecode, ST4, Compiled JS, Migrated.
+// The text views: Plain Text, Render Data, Bytecode, Compiled JS, Migrated.
 export function viewKind(view) {
   const text =
-    view === "source" || view === "data" || view === "bytecode" || view === "st4" ||
+    view === "source" || view === "data" || view === "bytecode" ||
     view === "compiled" || view === "migrated";
   return text ? "text" : "preview";
 }

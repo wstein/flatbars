@@ -22,9 +22,7 @@ import {
   mergeDataOverlays,
   stemTruthy,
   partialNameAt,
-  scanTruthinessPragma,
   tabVisibleUnder,
-  transpileSt4,
   validateOverlayName,
   vendoredWorkspace,
   vendoredVerdict,
@@ -38,7 +36,7 @@ import {
 const STEM_VECTOR = [
   "escape-modes", "eval-opt-in", "partials", "source-map", "standalone",
   "context-inspect", "bytecode-wire", "catalog", "used-transformers",
-  "required-assigns", "partial-graph", "st4-modes", "stem-allow-list",
+  "required-assigns", "partial-graph", "stem-allow-list",
 ];
 const HBS_VECTOR = [
   "partials", "catalog", "used-transformers:approximate",
@@ -74,7 +72,7 @@ test("tabVisibleUnder gates panels per the engine vector", () => {
   // inert under Stem (the Phase 1 proof).
   const PANEL_REQUIRES = [
     ["catalog"], ["required-assigns"], ["standalone"], ["partial-graph"],
-    ["stem-allow-list"], ["st4-modes"], ["bytecode-wire"],
+    ["stem-allow-list"], ["bytecode-wire"],
   ];
   for (const requires of PANEL_REQUIRES) {
     assert.equal(tabVisibleUnder(STEM_VECTOR, requires), true, requires.join());
@@ -82,7 +80,6 @@ test("tabVisibleUnder gates panels per the engine vector", () => {
   // Under the thin Handlebars vector the Stem-only panels drop out, while the
   // shared ones (catalog, partial-graph at approximate fidelity) stay.
   assert.equal(tabVisibleUnder(HBS_VECTOR, ["bytecode-wire"]), false);
-  assert.equal(tabVisibleUnder(HBS_VECTOR, ["st4-modes"]), false);
   assert.equal(tabVisibleUnder(HBS_VECTOR, ["stem-allow-list"]), false);
   assert.equal(tabVisibleUnder(HBS_VECTOR, ["standalone"]), false);
   assert.equal(tabVisibleUnder(HBS_VECTOR, ["catalog"]), true);
@@ -711,8 +708,8 @@ test("disassemble dumps each compiled partial body after the main listing", () =
   // each compiled body alongside `instructions` as `partials: {name: [...]}`.
   // The playground's Bytecode view dumps them inline so the user can see what
   // each `INVOKE_PARTIAL` resolves to without leaving the disasm — sibling
-  // sections similar to how the ST4 Preview emits a `.stg` group file with
-  // one entry per partial. Names are listed alphabetically for a stable scan.
+  // sections, one entry per partial. Names are listed alphabetically for a
+  // stable scan.
   const program = {
     version: "stem-bc/v1",
     instructions: [
@@ -742,188 +739,6 @@ test("disassemble omits the partials section when none are referenced", () => {
     instructions: [{ t: "text", text: "hi" }],
   });
   assert.equal(out, '; stem-bc/v1\nEMIT_TEXT "hi"\n');
-});
-
-// ── scanTruthinessPragma + transpileSt4 (playground live preview) ────────
-
-test("scanTruthinessPragma reads {{! @truthiness: st4 }} at the top", () => {
-  assert.equal(scanTruthinessPragma("{{! @truthiness: st4 }}\nhi"), "st4");
-  assert.equal(scanTruthinessPragma("{{! @truthiness: elixir }}foo"), "elixir");
-  assert.equal(scanTruthinessPragma("{{!-- @truthiness: stem --}}"), "stem");
-});
-
-test("scanTruthinessPragma returns null when absent or not at the top", () => {
-  assert.equal(scanTruthinessPragma("Hello {{name}}!"), null);
-  assert.equal(scanTruthinessPragma("hello {{! @truthiness: st4 }}"), null);
-  assert.equal(scanTruthinessPragma(""), null);
-});
-
-test("scanTruthinessPragma does not match plain comments without @", () => {
-  assert.equal(scanTruthinessPragma("{{! truthiness: st4 }}<x>"), null);
-});
-
-test("transpileSt4 emits plain text verbatim", () => {
-  const nodes = [{ t: "text", text: "Hello, world!" }];
-  assert.equal(transpileSt4(nodes, { truthiness: "st4" }), "Hello, world!");
-});
-
-test("transpileSt4 emits {{{name}}} as <name>", () => {
-  const nodes = [
-    { t: "emit", expr: { t: "identifier", name: "name" }, escape: "none" },
-  ];
-  assert.equal(transpileSt4(nodes, { truthiness: "st4" }), "<name>");
-});
-
-test("transpileSt4 emits {{name}} as <name; format=stem.escape.html>", () => {
-  const nodes = [
-    { t: "emit", expr: { t: "identifier", name: "name" }, escape: "html" },
-  ];
-  assert.equal(
-    transpileSt4(nodes, { truthiness: "st4" }),
-    '<name; format="stem.escape.html">',
-  );
-});
-
-test("transpileSt4 emits {{#if cond}}A{{else}}B{{/if}} → <if(cond)>A<else>B<endif>", () => {
-  const nodes = [
-    {
-      t: "if",
-      cond: { t: "identifier", name: "cond" },
-      then: [{ t: "text", text: "A" }],
-      else: [{ t: "text", text: "B" }],
-    },
-  ];
-  assert.equal(
-    transpileSt4(nodes, { truthiness: "st4" }),
-    "<if(cond)>A<else>B<endif>",
-  );
-});
-
-test("transpileSt4 emits {{#each items}}-{{{@this}}}{{/each}} → <items:{ it | -<it>}>", () => {
-  const nodes = [
-    {
-      t: "each",
-      subject: { t: "identifier", name: "items" },
-      body: [
-        { t: "text", text: "-" },
-        { t: "emit", expr: { t: "context", kind: "this", path: [] }, escape: "none" },
-      ],
-      else: [],
-    },
-  ];
-  assert.equal(
-    transpileSt4(nodes, { truthiness: "st4" }),
-    "<items:{ it | -<it>}>",
-  );
-});
-
-test("transpileSt4 emits {{upcase name}} → <name; format=upper>", () => {
-  const nodes = [
-    {
-      t: "emit",
-      expr: {
-        t: "call",
-        name: "upcase",
-        args: [{ kind: "positional", value: { t: "identifier", name: "name" } }],
-      },
-      escape: "none",
-    },
-  ];
-  assert.equal(
-    transpileSt4(nodes, { truthiness: "st4" }),
-    '<name; format="upper">',
-  );
-});
-
-test("transpileSt4 flags an incompatible transformer as <! transpile-error: ... !>", () => {
-  const nodes = [
-    {
-      t: "emit",
-      expr: {
-        t: "call",
-        name: "filter",
-        args: [{ kind: "positional", value: { t: "identifier", name: "items" } }],
-      },
-      escape: "none",
-    },
-  ];
-  const out = transpileSt4(nodes, { truthiness: "st4" });
-  assert.match(out, /<! transpile-error: transformer `filter`/);
-});
-
-test("transpileSt4 flags missing truthiness pragma with a leading comment", () => {
-  const nodes = [{ t: "text", text: "hi" }];
-  const out = transpileSt4(nodes, { truthiness: "stem" });
-  assert.match(out, /^<! Stem→ST4 transpile gate: source must declare/);
-  assert.match(out, /hi/);
-});
-
-test("transpileSt4 with {map:true} returns segments mapping output ranges back to source spans", () => {
-  // Stem source: `{{name}}{{filter items}}` (paths/spans are illustrative).
-  const nodes = [
-    {
-      t: "emit",
-      expr: { t: "identifier", name: "name" },
-      escape: "none",
-      src: { start: 0, end: 8 },
-    },
-    {
-      t: "emit",
-      expr: {
-        t: "call",
-        name: "filter",
-        args: [{ kind: "positional", value: { t: "identifier", name: "items" } }],
-      },
-      escape: "none",
-      src: { start: 8, end: 24 },
-    },
-  ];
-  const result = transpileSt4(nodes, { truthiness: "st4", map: true });
-
-  assert.equal(typeof result.output, "string");
-  assert.ok(Array.isArray(result.segments));
-
-  // Two segments — one emit + one error — each covering its own
-  // contiguous range of the output and carrying its original source span.
-  assert.equal(result.segments.length, 2);
-
-  const [s1, s2] = result.segments;
-  assert.equal(s1.kind, "emit");
-  assert.equal(s1.start, 0);
-  assert.equal(s1.end, 8);
-  assert.equal(result.output.slice(s1.outBegin, s1.outEnd), "<name>");
-
-  assert.equal(s2.kind, "error");
-  assert.equal(s2.start, 8);
-  assert.equal(s2.end, 24);
-  assert.match(result.output.slice(s2.outBegin, s2.outEnd), /^<! transpile-error: /);
-});
-
-test("transpileSt4 map mode tags partials with file=<partial-name>", () => {
-  const main = [{ t: "partial", name: "row", context: null, hash: {}, src: { start: 0, end: 9 } }];
-  const partials = {
-    row: [{ t: "text", text: "- item", src: { start: 5, end: 11 } }],
-  };
-  const result = transpileSt4(main, { truthiness: "st4", map: true }, partials);
-
-  const fileTags = new Set(result.segments.map((s) => s.file));
-  assert.ok(fileTags.has("main"));
-  assert.ok(fileTags.has("row"));
-
-  const rowSeg = result.segments.find((s) => s.file === "row" && s.kind === "text");
-  assert.equal(rowSeg.start, 5);
-  assert.equal(rowSeg.end, 11);
-});
-
-test("transpileSt4 wraps partials into a .stg group file", () => {
-  const main = [{ t: "partial", name: "row", context: null, hash: {} }];
-  const partials = { row: [{ t: "text", text: "- item" }] };
-  const out = transpileSt4(main, { truthiness: "st4" }, partials);
-  assert.match(out, /^delimiters "<", ">"/);
-  assert.match(out, /main\(\) ::= <</);
-  assert.match(out, /<row\(\)>/);
-  assert.match(out, /row\(\) ::= <</);
-  assert.match(out, /- item/);
 });
 
 test("vendoredWorkspace maps a fixture to a Lab workspace payload", () => {

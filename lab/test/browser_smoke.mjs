@@ -260,58 +260,6 @@ try {
   // Capture an overlays screenshot for the docs.
   await page.screenshot({ path: join(SCREENSHOT_DIR, "playground-overlays.png") });
 
-  // Output-view check — the "ST4 Preview" tab sits to the right of Markdown
-  // Preview. The Stem→ST source transpiler is Phase 3 of the export-only
-  // interop effort, so for now this pane shows a placeholder explaining
-  // what will land here. Confirm the tab exists, clicks paint the
-  // placeholder, and the tab order is markdown → ST4 Preview → data.
-  const st4Clicked = await page.evaluate(() => {
-    const tabs = Array.from(document.querySelectorAll("#view-tabs .view-tab"));
-    const tab = tabs.find((b) => (b.textContent || "").trim() === "ST4 Preview");
-    if (!tab) return false;
-    tab.click();
-    return true;
-  });
-  check("ST4 Preview output-view tab exists and was clicked", st4Clicked);
-  if (st4Clicked) {
-    await new Promise((r) => setTimeout(r, 200));
-    const st4Body = await page.evaluate(() => {
-      const cm = document.querySelector("#output-text .cm-content");
-      return cm ? cm.textContent || "" : "";
-    });
-    // The live transpiler emits actual ST4 source for the current Cheat
-    // Sheet template. The fixture template is rich enough that the output
-    // always contains at least one ST4 attribute reference (`<name>`) or
-    // a control-form keyword (`<if(...)>`). Fall back to the
-    // empty-AST/loading placeholder text if no AST has parsed yet.
-    check(
-      "ST4 Preview shows live transpiler output (or its empty-AST hint)",
-      /<\w/.test(st4Body) || /Edit the template/.test(st4Body),
-      st4Body.slice(0, 80),
-    );
-    const tabOrder = await page.evaluate(() =>
-      Array.from(document.querySelectorAll("#view-tabs .view-tab")).map((b) =>
-        (b.textContent || "").trim(),
-      ),
-    );
-    const idxMarkdown = tabOrder.indexOf("Markdown Preview");
-    const idxSt4 = tabOrder.indexOf("ST4 Preview");
-    check(
-      "ST4 Preview sits immediately to the right of Markdown Preview",
-      idxSt4 === idxMarkdown + 1 && idxMarkdown >= 0,
-      `tabs: ${tabOrder.join(", ")}`,
-    );
-    await page.screenshot({ path: join(SCREENSHOT_DIR, "playground-st4-preview.png") });
-    console.log(`  saved ${join(SCREENSHOT_DIR, "playground-st4-preview.png")}`);
-    // Restore the source view so the overview screenshot stays canonical.
-    await page.evaluate(() => {
-      const tabs = Array.from(document.querySelectorAll("#view-tabs .view-tab"));
-      const tab = tabs.find((b) => (b.textContent || "").trim() === "Plain Text");
-      tab?.click();
-    });
-    await new Promise((r) => setTimeout(r, 200));
-  }
-
   // Renaming an *existing* file is keyboard-driven now (no double-click): focus
   // its Explorer row and press the rename key (F2 on Windows/Linux, Enter on
   // macOS; F2 also works on macOS). Assert F2 on the focused overlay row opens
@@ -427,7 +375,6 @@ try {
     capturedAt: new Date().toISOString(),
     panels: PANELS.map((p) => ({ id: p.id, label: p.label, file: `screenshots/dock-${p.id}.png` })),
     overview: "screenshots/playground-overview.png",
-    outputViews: { st4: "screenshots/playground-st4-preview.png" },
   };
   await writeFile(
     join(SCREENSHOT_DIR, "manifest.json"),

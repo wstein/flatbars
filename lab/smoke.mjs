@@ -76,7 +76,6 @@ const { compile, render, parseAst, usedTransformers, requiredAssigns, partialGra
 // thinner adapter exists.
 const features = engineInfo().features;
 const PANEL_REQUIRES = {
-  "view:ST4 Preview": ["st4-modes"],
   "view:Bytecode": ["bytecode-wire"],
   "dock:Transformers": ["catalog"],
   "dock:Data Access": ["required-assigns"],

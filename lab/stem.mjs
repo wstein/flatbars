@@ -50,7 +50,6 @@ const STEM_FEATURES = [
   "used-transformers",
   "required-assigns",
   "partial-graph",
-  "st4-modes",
   "stem-allow-list",
 ];
 

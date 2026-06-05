@@ -703,14 +703,6 @@
         font-weight: 700; color: var(--tok-key);
         box-shadow: inset 0 -1px 0 var(--accent-soft);
       }
-      /* ST4 transpile-error marker: distinct amber border so the
-         `<! transpile-error: ... !>` comments are visible at a glance,
-         with the same hover-link affordance as normal segments. */
-      #output-text .seg-error {
-        background: var(--danger-soft, rgba(220, 90, 60, 0.10));
-        box-shadow: inset 0 0 0 1px var(--danger, #d97706);
-        color: var(--danger, #b25500);
-      }
       /* The full-segment hover/caret link highlight is applied as a JS decoration
          (.cm-out-linked) over the run's whole range, so a run that wraps across
          output lines lights up on every line — not just the fragment under the
@@ -1726,9 +1718,7 @@
         hasFeature,
         mergeDataOverlays,
         partialNameAt,
-        scanTruthinessPragma,
         tabVisibleUnder,
-        transpileSt4,
         validateOverlayName,
         vendoredVerdict,
         vendoredWorkspace,
@@ -2005,9 +1995,6 @@
       // Compiler & runtime options (ADR-0016).
       // `standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
       let standalone      = true;
-      // `st4Mode`        — force the `{{! @truthiness: st4 }}` gate for ST4 export
-      //                    even when the pragma is absent (ST4 Preview / emit).
-      let st4Mode         = false;
       // `allowList`      — ADR-0013 positive allow-list: when an array, only
       //                    listed transformer names are callable at render
       //                    time (the production "close unused ports" lever).
@@ -2218,32 +2205,6 @@
           if (stream.match(/-?\d+(\.\d+)?/)) return "number";
           if (stream.match(/(?:true|false|nil|null)\b/)) return "atom";
           if (stream.match(/[A-Za-z_]\w*/)) return "variableName";
-          stream.next();
-          return null;
-        },
-      });
-
-      // Highlighter for the ST4 Preview pane (Phase 3 live transpiler).
-      // Recognises ST4's `<...>` attribute references and the few control
-      // keywords (`if`/`else`/`endif`/`elseif`/`delimiters`), plus quoted
-      // option values and the `format`/`null`/`separator` option names the
-      // four ST4-compatible transformers emit.
-      const ST4_KEYWORDS = /^(?:if|elseif|else|endif|delimiters)\b/;
-      const ST4_OPTIONS = /^(?:format|null|separator|wrap|anchor|indent)\b/;
-      const st4SourceLang = StreamLanguage.define({
-        token(stream) {
-          if (stream.match(/<!.*?!>/)) return "comment";
-          if (stream.eatSpace()) return null;
-          if (stream.match(/"(?:[^"\\]|\\.)*"/)) return "string";
-          if (stream.peek() === "<") {
-            stream.next();
-            return "punctuation";
-          }
-          if (stream.match(ST4_KEYWORDS)) return "keyword";
-          if (stream.match(ST4_OPTIONS)) return "propertyName";
-          if (stream.match(/[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*/)) return "variableName";
-          if (stream.match(/-?\d+/)) return "number";
-          if (stream.match(/::=|=|;|,|>|\||{|}|\(|\)|\.|!/)) return "operator";
           stream.next();
           return null;
         },
@@ -2568,7 +2529,7 @@
         const tmplActive = activeView === "tmpl" && templateMode === "tmpl";
         const xfActive   = activeView === "tmpl" && templateMode === "transform";
         const hlpActive  = activeView === "tmpl" && templateMode === "helpers";
-        const cfgNonDefault = !!escapeMode || !standalone || st4Mode || allowList !== null;
+        const cfgNonDefault = !!escapeMode || !standalone || allowList !== null;
 
         const groups = [
           { key: "template", label: "TEMPLATE", files: [
@@ -2637,7 +2598,7 @@
           ]}]),
           { key: "config", label: "CONFIG", files: [
             { icon: "cfg", name: "config.yaml", active: activeView === "config", dirty: cfgNonDefault,
-              title: "render config — escape · trim · ST4 · allow-list · i18n locale · MinBars truthiness",
+              title: "render config — escape · trim · allow-list · i18n locale · MinBars truthiness",
               on: () => selectConfigTab() },
           ]},
         ];
@@ -2854,7 +2815,7 @@
             const isActive = activeView === "config";
             const t = document.createElement("div");
             t.className = "tab tab-transform" + (isActive ? " active" : "");
-            t.title = "render config — escape · trim · ST4 · allow-list";
+            t.title = "render config — escape · trim · allow-list";
             t.append(document.createTextNode("config.yaml"));
             t.addEventListener("click", () => selectConfigTab());
             t.append(tabCloseBtn(() => closeEditor("config")));
@@ -2979,7 +2940,7 @@
         const v = res.value;
         escapeMode = v.escape; byId("escape-select").value = v.escape;
         standalone = v.trim;   byId("standalone-cb").checked = v.trim;
-        st4Mode = v.st4; allowList = v.allow; minbarsCompat = v.mustacheJs; labLocale = v.locale;
+        allowList = v.allow; minbarsCompat = v.mustacheJs; labLocale = v.locale;
         updateRenderStatus(); renderTabs();
         scheduleRun(); saveHash();
       }
@@ -3460,16 +3421,6 @@
         if (outputView === "bytecode") {
           lastSegViews = [];
           setOutputDoc(lastProgram ? disassemble(lastProgram) : "", Decoration.none);
-        } else if (outputView === "st4") {
-          // Live ST4 source emit driven by `transpileSt4` against the
-          // current parsed AST. Re-renders on each compile cycle alongside
-          // the Bytecode disasm tab. Provenance segments wire the hover/
-          // click handlers so a `<! transpile-error: ... !>` comment jumps
-          // straight to the offending Stem source span.
-          const { output, segments } = renderSt4Preview();
-          const { segViews, deco } = buildSt4Decorations(segments);
-          lastSegViews = segViews;
-          setOutputDoc(output, deco);
         } else if (outputView === "data") {
           let text = "";
           if (lastData != null) {
@@ -3564,14 +3515,6 @@
         }
         if (outputView === "bytecode") {
           outputEditor.dispatch({ effects: outLangComp.reconfigure([bytecodeLang]) });
-          return;
-        }
-        if (outputView === "st4") {
-          // ST4 source grammar — highlights `<...>` references, ST keywords
-          // (`<if(...)>`/`<endif>`/etc.), option names (`format`/`null`/
-          // `separator`), quoted option values, and `<! transpile-error: ... !>`
-          // comments emitted for ❌ rows.
-          outputEditor.dispatch({ effects: outLangComp.reconfigure([st4SourceLang]) });
           return;
         }
         if (outputView === "compiled") {
@@ -3998,77 +3941,6 @@
       // the engine's advertised features so existing call sites stay arg-free.
       const visibleViews = () => ovVisibleViews(engineFeatures);
 
-      // Phase 3 transpiler is live (`transpileSt4` in playground_utils.mjs).
-      // The ST4 Preview pane shows the current template emitted as `.stg`
-      // group source against the latest parsed AST. The walker mirrors the
-      // BEAM `Stem.ST4.Transpile` for the matrix's ✅/⚠️ rows and renders
-      // ❌ rows inline as `<! transpile-error: ... !>` ST4 comments so the
-      // preview is never empty (the canonical walker raises; the preview
-      // displays). The empty-AST placeholder shown before a first compile:
-      const ST4_PREVIEW_EMPTY =
-        "// Stem → ST4 source transpiler. Edit the template to see the\n" +
-        "// emitted `.stg` group source here.\n" +
-        "//\n" +
-        "// Templates intended for ST4 export must declare\n" +
-        "//     {{! @truthiness: st4 }}\n" +
-        "// at the top. Without it, the preview shows the source emit but\n" +
-        "// flags the truthiness gate failure as a comment — Stem.ST4.Transpile\n" +
-        "// (the canonical walker used by `mix stem.st4.emit` and the parity\n" +
-        "// gate) raises Stem.ST4.TranspileError on the same condition.\n";
-
-      // Build the live ST4 preview from the current parsed AST. Returns
-      // `{ output, segments }` where `segments` carries `{outBegin, outEnd,
-      // file, start, end, kind}` per emitted run — fed to buildSt4Decorations
-      // so the playground's hover/click handlers can localise both Stem
-      // constructs and `<! transpile-error: ... !>` comments back to the
-      // template source. With no parsed AST yet, returns the empty-hint
-      // placeholder and no segments.
-      function renderSt4Preview() {
-        if (!lastAst || !lastAst.main) {
-          return { output: ST4_PREVIEW_EMPTY, segments: [] };
-        }
-        const main = lastAst.main;
-        const truthiness = scanTruthinessPragma(templateSourceFor("main")) || (st4Mode ? "st4" : "stem");
-        const partialsAst = {};
-        for (const [name, nodes] of Object.entries(lastAst)) {
-          if (name !== "main") partialsAst[name] = nodes;
-        }
-        const hasPartials = Object.keys(partialsAst).length > 0;
-        return transpileSt4(
-          main,
-          { truthiness, map: true },
-          hasPartials ? partialsAst : null,
-        );
-      }
-
-      // Build CodeMirror mark decorations + the segViews shape the source-
-      // view hover/click handlers consume. ST4 segments are already char-
-      // indexed (the JS transpiler tracks JS string positions), so we don't
-      // need the UTF-8 byte-to-char dance `buildProvenance` does for the
-      // wasm-emitted source-map.
-      function buildSt4Decorations(segments) {
-        const segViews = [];
-        const ranges = [];
-        for (const seg of segments) {
-          const from = seg.outBegin;
-          const to = seg.outEnd;
-          if (from >= to) continue;
-          const i = segViews.length;
-          segViews.push({
-            from, to,
-            file: seg.file || "main",
-            kind: seg.kind || "emit",
-            start: typeof seg.start === "number" ? seg.start : null,
-            end: typeof seg.end === "number" ? seg.end : null,
-          });
-          ranges.push(Decoration.mark({
-            class: "seg" + (seg.kind === "error" ? " seg-error" : seg.kind === "emit" ? " seg-expr" : ""),
-            attributes: { "data-i": String(i) },
-          }).range(from, to));
-        }
-        return { segViews, deco: ranges.length ? Decoration.set(ranges, true) : Decoration.none };
-      }
-
       function templateSourceFor(file) {
         if (file === "main") return tabs[0]?.source || "";
         return partialsMap()[file] || "";
@@ -4094,7 +3966,7 @@
 
       function setOutputView(view) {
         outputView = view;
-        // Text views (Plain Text / Render Data / Bytecode / ST4 / Compiled JS /
+        // Text views (Plain Text / Render Data / Bytecode / Compiled JS /
         // Truthiness) paint into the editor; "rendered"/"markdown" use the iframe.
         // `applyView` (lab/output-view.mjs) toggles the panes and reports the kind.
         const isText =
@@ -4113,7 +3985,7 @@
         caretLinkKey = null; syncOutputToCaret();
         // Re-render the dock (Coverage panel) and the inspector pane (Context
         // Inspector) so their render-only placeholders show when switching
-        // into ST4 Preview and revert to live data on switch back.
+        // into a render-only view and revert to live data on switch back.
         renderDock();
         renderDataInspect();
       }
@@ -4133,11 +4005,6 @@
         const file = sv.file;
         const isExpr = sv.kind === "emit";
         const isError = sv.kind === "error";
-        // ST4 Preview is a source-to-source transpile, not a render. The
-        // segments map ST4 tokens back to the Stem source they were transformed
-        // from, so the tooltip uses "transpiled from" to make the domain
-        // explicit and prevent confusion with render-time provenance.
-        const isTranspile = outputView === "st4";
         segTip.textContent = "";
 
         // Header forms:
@@ -4149,9 +4016,7 @@
         kindEl.textContent = isError
           ? "transpile error"
           : isExpr ? "expression" : "literal";
-        const connector = isError
-          ? " at "
-          : isTranspile ? " transpiled from " : " from ";
+        const connector = isError ? " at " : " from ";
         head.append(kindEl, document.createTextNode(connector));
         const fileEl = document.createElement("span");
         fileEl.className = "seg-tip-file";
@@ -4260,10 +4125,9 @@
       let userMovedCaret = false;
 
       function syncOutputToCaret() {
-        // Suppressed mid-render (offsets stale), when neither the Plain Text
-        // nor ST4 Preview view is showing, and on the default boot caret
-        // before any user interaction.
-        if (renderPending || (outputView !== "source" && outputView !== "st4") || !userMovedCaret) {
+        // Suppressed mid-render (offsets stale), when the Plain Text view is
+        // not showing, and on the default boot caret before any user interaction.
+        if (renderPending || outputView !== "source" || !userMovedCaret) {
           outputEditor.dispatch({ effects: setOutLink.of(Decoration.none) });
           caretLinkKey = null;
           return;
@@ -4308,7 +4172,7 @@
       // Keyboard parity: Enter on the output editor jumps from the run under the
       // cursor to its source (arrows/Home/End navigate via the default keymap).
       function jumpToSourceAtCursor(view) {
-        if ((outputView !== "source" && outputView !== "st4") || !lastSegViews.length)
+        if (outputView !== "source" || !lastSegViews.length)
           return false;
         const pos = view.state.selection.main.head;
         const sv = lastSegViews.find((s) => pos >= s.from && pos < s.to)
@@ -4343,9 +4207,9 @@
           const sv = svOf(e.target);
           if (!sv) return;
           openSourceLocation(sv.file, sv.start, sv.end);
-          // Context Inspector reads scope at a Plain-Text output span; ST4 (and
-          // future non-source views) share the seg/click model only for caret
-          // navigation, so the dock auto-switch would be a surprise here.
+          // Context Inspector reads scope at a Plain-Text output span; other
+          // views share the seg/click model only for caret navigation, so the
+          // dock auto-switch would be a surprise here.
           if (outputView === "source") setContextTarget(sv);
         });
       })();
@@ -4575,7 +4439,6 @@
         escapeMode = "";
         byId("escape-select").value = "";
         standalone = true;
-        st4Mode = false;
         minbarsCompat = true; // default mustacheJs (ADR-029)
         allowList = null;
         syncStandaloneUI();
@@ -4642,7 +4505,6 @@
         escapeMode = "";
         byId("escape-select").value = "";
         standalone = true;
-        st4Mode = false;
         minbarsCompat = true; // default mustacheJs (ADR-029)
         allowList = null;
         syncStandaloneUI();
@@ -4698,7 +4560,6 @@
           ...(dataOverlays.length ? { do: dataOverlays.map((o) => ({ n: o.name, s: o.source })) } : {}),
           e: escapeMode, v: outputView,
           sa: standalone ? 1 : 0,       // ADR-0016 standalone flag
-          ...(st4Mode ? { s4: 1 } : {}),            // ST4 truthiness gate
           ...(allowList !== null ? { al: allowList } : {}), // ADR-0013 transformer allow-list
           av: activeView, ai: activeTabIdx,
           // MinBars truthiness toggle (ADR-022 S2); omitted when off so links stay compact.
@@ -4768,7 +4629,6 @@
           escapeMode = s.e ?? "";
           byId("escape-select").value = escapeMode;
           standalone   = s.sa !== 0;  // default true; explicit 0 opts out
-          st4Mode = s.s4 === 1;
           minbarsCompat = s.mj !== 0; // default mustacheJs; explicit mj:0 = spec (ADR-029)
           allowList = Array.isArray(s.al) ? s.al.map(String) : null;
           syncStandaloneUI();
@@ -5792,7 +5652,7 @@
 
       // ── Panel #5: Capabilities / escape provenance ────────────────────
       // The security profile is per-engine (ADR-0020): Stem renders its
-      // render-time host policy (allow-list, eval gate, escape modes, ST4);
+      // render-time host policy (allow-list, eval gate, escape modes);
       // Handlebars renders its own — compile-time helper whitelist, prototype-
       // access hardening, and the global escaping model — never remapping
       // Stem's controls onto it (no false parity, no "N/A" shown as green). The
@@ -5854,7 +5714,6 @@
         pol("Engine", `${engineMeta.version} · ${engineMeta.builtins.length} built-ins · ${engineMeta.bcVersion}`, "ok");
         pol("Escape mode", escapeMode, "ok");
         pol("Trim whitespace", standalone ? "ON (ADR-0016 standalone-tag stripping)" : "off", "ok");
-        pol("ST4 mode", st4Mode ? "ON (forces {{! @truthiness: st4 }} gate)" : "off (pragma-driven)", st4Mode ? "warn" : "ok");
         pol(
           "Allow-list",
           allowList === null
@@ -5942,17 +5801,6 @@
       // how many iterations.
       function renderCoverage(body) {
         // Coverage counts conditional / iteration hits during the render.
-        // ST4 Preview only transpiles the Stem source — no branches are
-        // executed — so the counts from the last render don't apply here.
-        if (outputView === "st4") {
-          const section = makeEl("div", { class: "cv-section" });
-          section.append(makeEl("div", { class: "cv-empty" },
-            "Coverage counts conditional / iteration hits during render. " +
-            "ST4 Preview only transpiles the Stem source; no branches are " +
-            "executed. Switch to Plain Text to see coverage."));
-          body.append(section);
-          return;
-        }
         const rows = lastCoverage;
         const section = makeEl("div", { class: "cv-section" });
         section.append(makeEl("div", { class: "cv-head" }, [
@@ -6083,17 +5931,6 @@
       function renderContext(body) {
         const pane = makeEl("div", { class: "ctx-pane" });
         // Context Inspector reads render-time scope at a Stem source span.
-        // ST4 Preview is a source-to-source transpile (no render), so there is
-        // no scope to inspect — surface a placeholder instead of stale data
-        // from the last Plain Text click.
-        if (outputView === "st4") {
-          pane.append(makeEl("div", { class: "ctx-hint" },
-            "Context Inspector reads render-time scope. ST4 Preview transpiles " +
-            "the Stem source to ST4 source without executing it, so no scope " +
-            "exists at the clicked span. Switch to Plain Text to inspect render-time scope."));
-          body.append(pane);
-          return;
-        }
         if (!ctxTarget || !lastProgram) {
           pane.append(makeEl("div", { class: "ctx-hint" },
             "Click an expression in the Plain Text output to inspect its scope here. " +
@@ -6554,11 +6391,11 @@
       // ── Render Config (config.yaml popover) ────────────────────────
       // One home for the per-render options that were scattered across the
       // output strip (escape, trim whitespace) plus two that had no GUI at all
-      // (ST4 mode, ADR-0013 transformer allow-list). Edited as a small YAML
+      // (the ADR-0013 transformer allow-list). Edited as a small YAML
       // doc with inline descriptions. `escape-select` / `standalone-cb` stay
       // the canonical backing state (share links, examples, restore all read
       // them), so Save syncs them and the rest of the app is unchanged.
-      const RENDER_CFG_DEFAULTS = { escape: "", trim: true, st4: false, allow: null };
+      const RENDER_CFG_DEFAULTS = { escape: "", trim: true, allow: null };
       const VALID_ESCAPE = ["", "html", "xml", "json", "none"];
 
       // Serialise current state to the editable YAML (values inlined into a fixed
@@ -6568,7 +6405,7 @@
       function cfgLine(kv, comment) {
         return kv + " ".repeat(Math.max(1, 26 - kv.length)) + "# " + comment;
       }
-      function buildConfigYaml(v = { escape: escapeMode, trim: standalone, st4: st4Mode, allow: allowList }) {
+      function buildConfigYaml(v = { escape: escapeMode, trim: standalone, allow: allowList }) {
         const esc = v.escape ? v.escape : '""';
         // `null` = unconstrained (the default); a real array (even empty)
         // locks the surface to that positive list. Mirrors the engine's
@@ -6580,7 +6417,6 @@
           "",
           cfgLine(`escape: ${esc}`, 'html · xml · json · none · "" (as-compiled)'),
           cfgLine(`trim_whitespace: ${v.trim}`, "strip standalone tag-only lines (ADR-0016)"),
-          cfgLine(`st4_mode: ${v.st4}`, "force {{! @truthiness: st4 }} gate for ST4 export"),
           "",
           "transformers:",
           cfgLine(`  allow: ${allow}`, "ADR-0013 positive list — ~ = unconstrained (default); [eval] = only listed names render"),
@@ -6608,7 +6444,6 @@
           return { ok: false, error: `escape: must be html, xml, json, none, or "" — got "${esc}"` };
 
         const trim = cfg.trim_whitespace !== false; // default on
-        const st4 = cfg.st4_mode === true;
         // MinBars truthiness (ADR-029): default mustacheJs (true); only "spec" opts out.
         const minbars = cfg.minbars && typeof cfg.minbars === "object" ? cfg.minbars : {};
         const mustacheJs = minbars.truthiness !== "spec";
@@ -6628,7 +6463,7 @@
           if (unknown.length)
             return { ok: false, error: `transformers.allow: unknown transformer${unknown.length > 1 ? "s" : ""} — ${unknown.join(", ")}` };
         }
-        return { ok: true, value: { escape: esc, trim, st4, allow, mustacheJs, locale } };
+        return { ok: true, value: { escape: esc, trim, allow, mustacheJs, locale } };
       }
 
       // Render config changed → refresh the explorer (the config.yaml row's
