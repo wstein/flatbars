@@ -14,6 +14,8 @@ module FullBars.JS
   , MigrateOutcome
   , render
   , analyze
+  , analyzeWith
+  , JsPathSchema
   , lint
   , migrate
   , renderSurface
@@ -69,6 +71,7 @@ import Foreign.Object as FO
 import FullBars (RNode(..), Translator, desugarSurface, desugarSurfaceWith, lower)
 import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
+import Kernel.Analyse (Finding, PathSchema) as Analyse
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
 import Kernel.Walk (Severity)
@@ -113,10 +116,25 @@ type AnalyseResult =
   }
 
 -- | Analyse a FullBars surface template against JS data: render and report every
--- | truthiness decision that would branch differently on another engine.
--- | `analyze(template, data)`.
+-- | truthiness decision that would branch differently on another engine — observed
+-- | *and* the symbolic same-type potential what-ifs (ADR-030). `analyze(template,
+-- | data)`.
 analyze :: Fn2 String Json AnalyseResult
-analyze = mkFn2 \tpl json -> case FullBars.analyseSurface tpl (fromJson json) of
+analyze = mkFn2 \tpl json -> analyseResult (FullBars.analyseSurface tpl (fromJson json))
+
+-- | `analyze` with a host `PathSchema` (ADR-030): `schema(path, value) => boolean`
+-- | answers "could this path hold this value?", suppressing potential findings the
+-- | host's types rule out. `analyzeWith(schema, template, data)`.
+analyzeWith :: Fn3 JsPathSchema String Json AnalyseResult
+analyzeWith = mkFn3 \schema tpl json ->
+  analyseResult (FullBars.analyseSurfaceWith (toPathSchema schema) tpl (fromJson json))
+
+-- | Shared marshalling of an `analyseSurface*` outcome to the JS `AnalyseResult`.
+analyseResult
+  :: Either String
+       { output :: String, report :: String, jsonata :: String, findings :: Array Analyse.Finding }
+  -> AnalyseResult
+analyseResult = case _ of
   Left e -> { ok: false, findings: [], report: "", jsonata: "", output: "", error: e }
   Right r ->
     { ok: true
@@ -289,6 +307,19 @@ toTranslator jt = \name args ->
     r = callJsTranslatorImpl jt name (map toJson args)
   in
     if r.hit then Just r.value else Nothing
+
+-- | A host path schema (ADR-030): a JS `(path, value) => boolean` answering "could
+-- | this path hold this value?".
+foreign import data JsPathSchema :: Type
+
+-- | Invoke a host path schema over a path + a JSON-marshalled candidate value.
+foreign import callJsPathSchemaImpl :: JsPathSchema -> String -> Json -> Boolean
+
+-- | Marshal a host `JsPathSchema` into the engine's `PathSchema` seam (the value is
+-- | Value→JSON). A throwing host predicate defaults to admitting the what-if (handled
+-- | in the FFI), so a buggy schema never hides a real divergence.
+toPathSchema :: JsPathSchema -> Analyse.PathSchema
+toPathSchema schema = \p v -> callJsPathSchemaImpl schema p (toJson v)
 
 -- | Invoke a host helper (by `name`, for diagnostics) over JSON-marshalled args,
 -- | tagging the outcome: `"ok"` (payload is the value), `"safe"` (payload is raw

@@ -107,3 +107,15 @@ export const callJsTranslatorImpl = (translator) => (name) => (args) => {
     return { hit: false, value: "" };
   }
 };
+
+// FFI for the ADR-030 path-schema seam. Call a host `schema(path, value)` asking
+// "could this path hold this candidate ambiguous value?"; a falsy return suppresses
+// the matching *potential* finding. A throw (defensively) admits the what-if, so a
+// buggy schema never hides a real divergence. Curried to match the other seams.
+export const callJsPathSchemaImpl = (schema) => (path) => (value) => {
+  try {
+    return schema(path, value) !== false;
+  } catch (_e) {
+    return true;
+  }
+};

@@ -24,7 +24,7 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (RNode(..), RefEnv, analyseSurface, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
+import FullBars (RNode(..), RefEnv, analyseSurface, analyseSurfaceWith, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Env (withTranslator)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
@@ -489,6 +489,24 @@ main = do
   containsR "analyse:potential-zero-line" "{{#if n}}x{{else}}m{{/if}}"
     (obj [ Tuple "n" (VNumber 5.0) ])
     "would diverge if it held the number `0`"
+  -- ADR-030 PathSchema: a host schema that rules out the path suppresses its
+  -- potential what-if; one that admits it leaves the finding standing.
+  let
+    schemaReportOf schema src d = case analyseSurfaceWith schema src d of
+      Left e -> "ERR: " <> e
+      Right r -> r.report
+  assert' "analyse:schema-suppresses-potential"
+    ( contains (Pattern "0 potential")
+        ( schemaReportOf (\path _ -> path /= "n") "{{#if n}}x{{else}}m{{/if}}"
+            (obj [ Tuple "n" (VNumber 5.0) ])
+        )
+    )
+  assert' "analyse:schema-admits-potential"
+    ( contains (Pattern "1 potential")
+        ( schemaReportOf (\_ _ -> true) "{{#if n}}x{{else}}m{{/if}}"
+            (obj [ Tuple "n" (VNumber 5.0) ])
+        )
+    )
   -- the analysed output is byte-identical to a normal render (drift-proof).
   assert' "analyse:output-identical"
     ( outputOf "{{#if bio}}yes{{else}}no{{/if}}" (obj [ Tuple "bio" (str "") ])

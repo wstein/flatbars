@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { createFlatBarsRenderer } from "./flatbars.mjs";
 
 const SEAM = [
-  "render", "analyze", "lint", "migrate", "compile", "parseAst", "inspectAt",
+  "render", "analyze", "analyzeWith", "lint", "migrate", "compile", "parseAst", "inspectAt",
   "usedTransformers", "requiredAssigns", "partialGraph", "allTransformers",
   "catalog", "engineInfo", "version",
 ];
@@ -189,6 +189,12 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   assert.ok(pot, "a potential finding is present");
   assert.equal(pot.path, "count");
   assert.match(pot.value, /the number `0`/);
+  // ADR-030 path schema: a host predicate ruling out the path suppresses the
+  // potential what-if (the count is never the ambiguous `0`).
+  const schema = (path /*, value */) => path !== "count";
+  const d = r.analyzeWith(schema, { source: "{{#if count}}x{{else}}y{{/if}}" }, { count: 5 });
+  assert.match(d.report, /0 potential/);
+  assert.equal(d.findings.filter((x) => x.kind === "potential").length, 0);
 });
 
 test("the catalog entries have the cheat-sheet shape", async () => {

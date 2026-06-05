@@ -28,6 +28,7 @@ module FullBars
   , renderSurfaceValue
   , renderSurfaceI18n
   , analyseSurface
+  , analyseSurfaceWith
   ) where
 
 import Prelude
@@ -45,7 +46,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, noLoopVars)
-import Kernel.Analyse (Finding, allFindings, jsonataScaffold, reportMarkdown, runAnalysis)
+import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTranslator, withTruthy)
 import Kernel.Hoist (hoistInline)
@@ -241,7 +242,19 @@ analyseSurface
   -> Value
   -> Either String
        { output :: String, report :: String, jsonata :: String, findings :: Array Finding }
-analyseSurface src dat = case parse src of
+analyseSurface = analyseSurfaceWith anyPath
+
+-- | `analyseSurface` with a host `PathSchema` (ADR-030): the host plugs in "could
+-- | path `p` hold value `v`?" so it can suppress *potential* findings its own types
+-- | rule out (e.g. "`count` is always a present positive number"). The default
+-- | (`analyseSurface`) supplies `anyPath`, admitting every what-if.
+analyseSurfaceWith
+  :: PathSchema
+  -> String
+  -> Value
+  -> Either String
+       { output :: String, report :: String, jsonata :: String, findings :: Array Finding }
+analyseSurfaceWith schema src dat = case parse src of
   Left e -> Left (renderParseErrorAt src e)
   Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
   Right { nodes } ->
@@ -254,9 +267,9 @@ analyseSurface src dat = case parse src of
         Left e -> Left (formatError src e)
         Right r -> Right
           { output: r.output
-          , report: reportMarkdown src r.decisions <> i18nNote template
+          , report: reportMarkdown schema src r.decisions <> i18nNote template
           , jsonata: jsonataScaffold src r.decisions
-          , findings: allFindings src r.decisions
+          , findings: allFindings schema src r.decisions
           }
 
 -- | The blessed i18n operations (ADR-029) — the names the host `Translator` drives.

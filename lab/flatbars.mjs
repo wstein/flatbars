@@ -35,9 +35,10 @@ import {
   renderWith as bbRenderWith,
   renderSurfaceI18n as bbRenderSurfaceI18n,
   analyze as bbAnalyze,
+  analyzeWith as bbAnalyzeWith,
   lint as bbLint,
   migrate as bbMigrate,
-} from "./vendor/flatbars-engine.mjs?v=56";
+} from "./vendor/flatbars-engine.mjs?v=57";
 
 const BB_VERSION = "0.1.0";
 
@@ -166,6 +167,14 @@ export async function createFlatBarsRenderer(dialectArg) {
     return bbAnalyze(program.source, d);
   }
 
+  // ADR-030: `analyze` with a host path schema — `schema(path, value) => boolean`
+  // ("could this path hold this value?") suppresses potential what-ifs the host's
+  // types rule out. Same result shape as `analyze`.
+  function analyzeWith(schema, program, data) {
+    const d = data == null ? {} : data;
+    return bbAnalyzeWith(schema, program.source, d);
+  }
+
   // Canonicalization lint (ADR-019, the `lint` feature): the deprecated-alias and
   // non-canonical scoped-variable warnings for the active dialect. Returns the
   // facade's { ok, findings: [{severity, name, message}], report, error } object.
@@ -275,6 +284,7 @@ export async function createFlatBarsRenderer(dialectArg) {
   return {
     render,
     analyze,
+    analyzeWith,
     lint,
     migrate,
     compile,

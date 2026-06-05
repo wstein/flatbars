@@ -14,6 +14,8 @@
 module Kernel.Analyse
   ( Decision
   , Finding
+  , PathSchema
+  , anyPath
   , runAnalysis
   , divergence
   , isFinding
@@ -146,13 +148,25 @@ sameTypeAmbiguous = case _ of
   VObject m | not (Map.isEmpty m) -> Just (VObject Map.empty)
   _ -> Nothing
 
+-- | A host *path schema* (ADR-030): "could path `p` ever hold value `v`?". Seeded
+-- | like `Truthy` (ADR-022) and `Translator` (ADR-029), never baked — the core
+-- | stays meaning-free. A potential finding whose path the host rules out is
+-- | suppressed. The default `anyPath` admits every what-if (no schema ⇒ no
+-- | suppression), so it costs nothing when unused.
+type PathSchema = String -> Value -> Boolean
+
+-- | The default path schema: every path could hold every value (no suppression).
+anyPath :: PathSchema
+anyPath _ _ = true
+
 -- | The *potential* findings (ADR-030): for each condition whose observed value
 -- | was NOT ambiguous, the same-type ambiguous value it could hold — so coverage
--- | stops depending on the data sample. Deduped by tag+value, and a path already
--- | flagged by an *observed* finding is not re-reported as potential. The engine
--- | verdict for the hypothetical is the `handlebars` rule (the analysed engine).
-potentialFindings :: String -> Array Decision -> Array Finding
-potentialFindings src decisions =
+-- | stops depending on the data sample. Deduped by tag+value; a path already
+-- | flagged by an *observed* finding, or one the host `PathSchema` rules out, is
+-- | not reported. The engine verdict for the hypothetical is the `handlebars`
+-- | rule (the analysed engine).
+potentialFindings :: PathSchema -> String -> Array Decision -> Array Finding
+potentialFindings schema src decisions =
   Array.nubByEq sameTagValue (Array.mapMaybe toPotential decisions)
   where
   observedPaths = Array.mapMaybe
@@ -164,12 +178,15 @@ potentialFindings src decisions =
     in
       if Array.null finding.flips then Nothing
       else if finding.path /= "" && Array.elem finding.path observedPaths then Nothing
+      else if finding.path /= "" && not (schema finding.path av) then Nothing
       else Just finding
   sameTagValue a b = a.tag == b.tag && a.value == b.value
 
--- | Observed findings then potential findings — the full host-UI finding set.
-allFindings :: String -> Array Decision -> Array Finding
-allFindings src decisions = findings src decisions <> potentialFindings src decisions
+-- | Observed findings then potential findings (the host `PathSchema` filtering the
+-- | latter) — the full host-UI finding set.
+allFindings :: PathSchema -> String -> Array Decision -> Array Finding
+allFindings schema src decisions =
+  findings src decisions <> potentialFindings schema src decisions
 
 -- | The five truthiness operations, each wrapped to `tell` a `Decision` and then
 -- | delegate to the real operation (looked up from the prelude — never
@@ -218,8 +235,8 @@ runAnalysis toEngine setup nodes dat =
 -- | (a condition that would branch differently on another engine), each with the
 -- | value, the rules that flip, and a concrete fix; then a `✓` line per portable
 -- | condition as positive evidence. Slices `src` at each span for the tag text.
-reportMarkdown :: String -> Array Decision -> String
-reportMarkdown src decisions =
+reportMarkdown :: PathSchema -> String -> Array Decision -> String
+reportMarkdown schema src decisions =
   Str.joinWith "\n"
     ( [ "# Truthiness analysis"
       , "Engine rule: `handlebars` · "
@@ -262,7 +279,7 @@ reportMarkdown src decisions =
   where
   flagged = Array.filter isFinding decisions
   clean = Array.filter (not <<< isFinding) decisions
-  potentials = potentialFindings src decisions
+  potentials = potentialFindings schema src decisions
 
   loc d = let lc = lineColumn src d.span.start in "line " <> show lc.line
   tag d = Str.trim (spanText src d.span)
