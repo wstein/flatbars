@@ -69,12 +69,39 @@ export function translate(locale, key, args = {}) {
   });
 }
 
-// The `{ t: fn }` helper bag (ADR-018) the Lab/host binds for a chosen locale and
-// passes to the engine's renderWith. For an inline helper the key=value hash
-// arrives as a trailing object directly (FullBars convention), so `t "key" a=b`
-// calls t("key", { a: b }); it is `undefined` when no hash is written.
-export function makeTHelper(locale) {
-  return { t: (key, args) => translate(locale, key, args || {}) };
+// ── The ADR-029 "E" helpers — locale-aware formatting, all native Intl ────────
+// number/date/relative/selectPlural: the deferred follow-up set, demonstrated as
+// host helpers (not blessed prelude operations) on the same register seam as `t`.
+// Each is locale-bound and leans entirely on the platform's CLDR data.
+export function fmtNumber(locale, n) {
+  return new Intl.NumberFormat(locale).format(Number(n));
+}
+export function fmtDate(locale, iso) {
+  // Numeric fields + a fixed zone keep the output ICU-stable across runtimes
+  // (month *names* would vary); the locale still orders/​separates them.
+  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" })
+    .format(new Date(iso));
+}
+export function fmtRelative(locale, value, unit) {
+  return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Number(value), unit);
+}
+export function selectPlural(locale, n) {
+  return new Intl.PluralRules(locale).select(Number(n));
+}
+
+// The full i18n helper bag (ADR-018) the Lab/host binds for a chosen locale and
+// passes to the engine's renderWith. `t` overrides the blessed prelude operation
+// (ADR-029); the rest are the formatting helpers. For an inline helper the
+// key=value hash arrives as a trailing object directly (FullBars convention), so
+// `t "key" a=b` calls t("key", { a: b }); it is `undefined` when no hash is written.
+export function makeI18nHelpers(locale) {
+  return {
+    t: (key, args) => translate(locale, key, args || {}),
+    number: (n) => fmtNumber(locale, n),
+    date: (iso) => fmtDate(locale, iso),
+    relative: (value, unit) => fmtRelative(locale, value, unit),
+    selectPlural: (n) => selectPlural(locale, n),
+  };
 }
 
 // ── The teaching artifacts the page shows verbatim ───────────────────────────
@@ -93,6 +120,33 @@ registerHelper("t", (key, args) => i18next.t(key, args));
 import { IntlMessageFormat } from "intl-messageformat";
 registerHelper("t", (key, args) =>
   new IntlMessageFormat(catalog[locale][key], locale).format(args));`;
+
+// A self-contained registerHelper source that carries the catalog + locale into
+// the FlatBars Lab (the "Open in Lab" round-trip, mirroring the JSONata transform
+// one). The Lab runs it sandboxed, so it inlines everything (no imports) and uses
+// native Intl. `check:i18n` asserts it renders identically to makeI18nHelpers, so
+// this string can never drift from the live helpers above.
+export function i18nHelperSource(locale) {
+  return `// The Lab acts as the HOST: native Intl is the CLDR brain (ADR-029).
+const locale = ${JSON.stringify(locale)};
+const catalog = ${JSON.stringify(catalog, null, 2)};
+function translate(key, args) {
+  const message = catalog[locale] && catalog[locale][key];
+  if (message === undefined) return key;            // fallback-and-flag
+  const variant = typeof message === "string"
+    ? message
+    : (message[new Intl.PluralRules(locale).select(Number(args.count))] || message.other || key);
+  return variant.replace(/\\{(\\w+)\\}/g, (_, name) =>
+    name === "count" && args.count !== undefined
+      ? new Intl.NumberFormat(locale).format(Number(args.count))
+      : (args[name] !== undefined ? String(args[name]) : "{" + name + "}"));
+}
+registerHelper("t", (key, args) => translate(key, args || {}));
+registerHelper("number", (n) => new Intl.NumberFormat(locale).format(Number(n)));
+registerHelper("date", (iso) => new Intl.DateTimeFormat(locale, { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" }).format(new Date(iso)));
+registerHelper("relative", (v, u) => new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Number(v), u));
+registerHelper("selectPlural", (n) => new Intl.PluralRules(locale).select(Number(n)));`;
+}
 
 // ── The runnable cells ───────────────────────────────────────────────────────
 export const sections = [
@@ -204,6 +258,53 @@ export const sections = [
         template: '{{t "cart.items" count=count}}',
         data: { count: 1000 },
         expect: "1.000 Artikel im Warenkorb",
+      },
+    ],
+  },
+  {
+    id: "formatting",
+    title: "Formatting helpers — number, date, relative, selectPlural",
+    lead:
+      "The ADR-029 \"E\" helpers, demonstrated as host helpers on the same seam as t " +
+      "(not blessed operations). number/date/relative format through Intl.NumberFormat / " +
+      "DateTimeFormat / RelativeTimeFormat; selectPlural exposes the raw CLDR category. " +
+      "All native, all locale-bound, no data shipped.",
+    cells: [
+      {
+        id: "number",
+        label: "number — Intl.NumberFormat",
+        note: "Decimal + grouping per locale.",
+        locale: "de",
+        template: "{{number n}}",
+        data: { n: 1234.5 },
+        expect: "1.234,5",
+      },
+      {
+        id: "date",
+        label: "date — Intl.DateTimeFormat",
+        note: "Numeric fields, UTC; the locale orders and separates them.",
+        locale: "en",
+        template: "{{date d}}",
+        data: { d: "2026-06-05" },
+        expect: "06/05/2026",
+      },
+      {
+        id: "relative",
+        label: "relative — Intl.RelativeTimeFormat",
+        note: "numeric:auto yields the idiomatic word.",
+        locale: "pl",
+        template: "{{relative offset unit}}",
+        data: { offset: -1, unit: "day" },
+        expect: "wczoraj",
+      },
+      {
+        id: "selectPlural",
+        label: "selectPlural — the raw category",
+        note: "count=2 in Polish is the `few` category (English would be `other`).",
+        locale: "pl",
+        template: "{{selectPlural n}}",
+        data: { n: 2 },
+        expect: "few",
       },
     ],
   },

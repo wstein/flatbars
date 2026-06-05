@@ -12,7 +12,8 @@
 // produces.
 import Reference from "../layouts/Reference.astro";
 import TryI18n from "../components/TryI18n.jsx";
-import { sections, flagship, integrationSource, escapeHatch } from "../i18n.mjs";
+import OpenInLab from "../components/OpenInLab.jsx";
+import { sections, flagship, integrationSource, escapeHatch, i18nHelperSource } from "../i18n.mjs";
 
 const groups = [
   {
@@ -65,12 +66,14 @@ const intro = sections[0].cells[0];
     <h2>The seam</h2>
     <p>
       Translation is <b>meaning</b>, and meaning in FlatBars is plugged in, not built
-      in. So FlatBars ships no <code>t</code> built-in — i18n is the <b>host's</b> job
-      (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029</a>).
-      The host registers a <code>t</code> helper that looks a message key up in its
-      catalogue, picks the right plural form, and fills in the placeholders. The
-      template just calls it — <code>{`{{t "key" count=n}}`}</code> — like any other
-      operation.
+      in. FlatBars <em>does</em> ship a blessed <code>t</code> operation
+      (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029</a>):
+      <code>{`{{t "key"}}`}</code> is catalogued, validated, and editor-painted, and on
+      its own it simply returns the key. What it does <b>not</b> ship is the i18n
+      <em>brain</em> — that is the <b>host's</b> job. The host registers <code>t</code>
+      to look a key up in its catalogue, pick the right plural form, and fill in the
+      placeholders; that registration shadows the fallback. The template never
+      changes — <code>{`{{t "key" count=n}}`}</code>, like any other operation.
     </p>
     <div class="lz-flow" aria-label="key to output">
       <span class="box">{`{{t "key" count=n}}`}</span><span class="arr">→</span>
@@ -136,6 +139,19 @@ const intro = sections[0].cells[0];
       the host's catalogue and the platform's <code>Intl</code>.
     </p>
     <TryI18n client:visible template={flagship.template} data={flagship.data} locale={flagship.locale} />
+    <p>
+      <b>Open in Lab</b> carries the whole setup across — the template, the data, and
+      a self-contained <code>registerHelper("t", …)</code> that inlines the catalogue
+      and locale (the i18n round-trip, mirroring the <a href="/transform">Data shaping</a>
+      transform one). The Lab runs that helper sandboxed and renders the same output.
+    </p>
+    <OpenInLab
+      client:visible
+      engine="fullbars"
+      template={flagship.template}
+      data={flagship.data}
+      helpers={i18nHelperSource(flagship.locale)}
+    />
   </section>
 
   <!-- ─────────────────────────── Beyond ─────────────────────────── -->

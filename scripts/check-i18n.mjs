@@ -15,8 +15,10 @@
 //      deliberate `missing` fallback cell) — the no-dangling / no-over-claim
 //      contract, mirroring check-jsonata's function coverage.
 import assert from "node:assert/strict";
-import { sections, flagship, catalog, locales, makeTHelper } from "../tutorials/src/i18n.mjs";
+import { sections, flagship, catalog, locales, makeI18nHelpers, i18nHelperSource } from "../tutorials/src/i18n.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
+import { buildHelpers } from "../lab/helpers.mjs";
+import { safe } from "../lab/vendor/flatbars-engine.mjs";
 
 let fail = 0;
 const allCells = sections.flatMap((s) => s.cells.map((c) => ({ section: s.id, ...c })));
@@ -24,7 +26,7 @@ const allCells = sections.flatMap((s) => s.cells.map((c) => ({ section: s.id, ..
 // Render a cell's template through FullBars with `t` bound to the cell's locale.
 async function renderCell(cell) {
   const r = await createFlatBarsRenderer("fullbars");
-  const program = r.compile(cell.template, {}, { helpers: makeTHelper(cell.locale) }).program;
+  const program = r.compile(cell.template, {}, { helpers: makeI18nHelpers(cell.locale) }).program;
   return r.render(program, cell.data);
 }
 
@@ -43,12 +45,32 @@ for (const cell of allCells) {
 console.log("\nFlagship (plural + interpolation, one locale):");
 try {
   const r = await createFlatBarsRenderer(flagship.engine);
-  const program = r.compile(flagship.template, {}, { helpers: makeTHelper(flagship.locale) }).program;
+  const program = r.compile(flagship.template, {}, { helpers: makeI18nHelpers(flagship.locale) }).program;
   const out = r.render(program, flagship.data);
   assert.equal(out, flagship.expect);
   console.log(`  ✓ flagship [${flagship.locale}] → ${JSON.stringify(out)}`);
 } catch (e) {
   console.error(`  ✗ flagship: ${e && e.message ? e.message.split("\n")[0] : e}`);
+  fail++;
+}
+
+// ── Open-in-Lab round-trip: the self-contained helper source ─────────────────
+// i18nHelperSource(locale) inlines the catalog + locale into a registerHelper
+// string the Lab runs sandboxed. Assert it renders every cell identically to the
+// live makeI18nHelpers, so the round-trip can never drift from the page.
+console.log("\nOpen-in-Lab round-trip (i18nHelperSource ≡ makeI18nHelpers):");
+try {
+  const r = await createFlatBarsRenderer("fullbars");
+  for (const cell of allCells) {
+    if (cell.missing) continue;
+    const built = buildHelpers(i18nHelperSource(cell.locale), safe);
+    assert.ok(built.ok, `helper source built for ${cell.locale}: ${built.error}`);
+    const prog = r.compile(cell.template, {}, { helpers: built.helpers }).program;
+    assert.equal(r.render(prog, cell.data), cell.expect, `round-trip ${cell.section}/${cell.id}`);
+  }
+  console.log(`  ✓ source renders all ${allCells.filter((c) => !c.missing).length} cells identically`);
+} catch (e) {
+  console.error(`  ✗ round-trip: ${e && e.message ? e.message.split("\n")[0] : e}`);
   fail++;
 }
 
