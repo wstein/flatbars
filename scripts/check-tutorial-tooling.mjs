@@ -76,8 +76,8 @@ for (const [key, ex] of Object.entries(migrateExamples)) {
     miss(`${key}: migrate errored: ${r.error}`);
     continue;
   }
-  for (const m of ex.containsSource ?? [])
-    if (!r.source.includes(m)) miss(`${key}: migrated source missing ${JSON.stringify(m)}\n${r.source}`);
+  if (r.source !== ex.source)
+    miss(`${key}: migrated source\n  got:  ${JSON.stringify(r.source)}\n  want: ${JSON.stringify(ex.source)}`);
   if (ex.residualKind && !r.residuals.some((x) => x.kind === ex.residualKind))
     miss(`${key}: expected a ${ex.residualKind} residual, got [${r.residuals.map((x) => x.kind).join(", ")}]`);
   if (fail === before) console.log(`  ✓ ${key}`);
@@ -86,6 +86,8 @@ for (const [key, ex] of Object.entries(migrateExamples)) {
 console.log("Page references (orphan guard):");
 const beforeOrphans = fail;
 noOrphans("tutorials/src/pages/analyse.astro", "ex", Object.keys(analyseExamples));
+noOrphans("tutorials/src/pages/lint.astro", "lintExamples", Object.keys(lintExamples));
+noOrphans("tutorials/src/pages/lint.astro", "migrateExamples", Object.keys(migrateExamples));
 if (fail === beforeOrphans) console.log("  ✓ every example is shown on its page");
 
 const total =

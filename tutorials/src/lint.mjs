@@ -2,35 +2,31 @@
 //
 // Runnable examples for the "Linting & migration" reference. ONE source, imported
 // by both the page and the CI gate (scripts/check-tutorial-tooling.mjs), which runs
-// each through the real engine bundle:
-//   • lintExamples    → lint(template, dialect): finding count + report substrings,
-//                       or `report` for the clean "ok: no lint findings" case.
-//   • migrateExamples → migrate(template): the migrated MaxBars source must contain
-//                       each `containsSource` string; `residualKind` (if set) must
-//                       appear among the residuals.
-// So the page can never show a finding or rewrite the tools do not produce. The
-// normative text lives in docs/ (adr-0019-operation-vocabulary, adr-0021-maxbars-
-// variable-model); the page only annotates these.
+// each through the real engine bundle and asserts the EXACT output the page shows:
+//   • lintExamples    → lint(template, dialect).report === report
+//   • migrateExamples → migrate(template).source === source  (+ residualKind, if set)
+// So the before/after shown on the page is byte-for-byte what the tools produce —
+// never hand-written. The normative text lives in docs/ (adr-0019-operation-
+// vocabulary, adr-0021-maxbars-variable-model).
 
 // `flatbars lint` findings: deprecated aliases and non-canonical scoped variables.
-// Both are warn-only (never block rendering) — a host/CI hygiene check.
+// Both are warn-only (never block rendering) — a host/CI hygiene check. `report` is
+// the exact CLI output (the `warning: …` line, or the clean no-findings line).
 export const lintExamples = {
-  // A deprecated alias: `plus` renders identically to `add`, but the canonical name
-  // is `add`. Flagged in every dialect.
+  // A deprecated alias: `plus` renders identically to `add`, but `add` is canonical.
+  // Flagged in every dialect.
   alias: {
     engine: "maxbars",
     template: "{{ plus a b }}",
-    findings: 1,
-    expect: ["`plus` is a deprecated alias of `add`", "prefer `add`", "warning:"],
+    report: "warning: `plus` is a deprecated alias of `add` — prefer `add` (the lift/migrate assist rewrites it)",
   },
   // A non-canonical scoped variable: the loop index is `index0` in RawBars/MaxBars
-  // (the bare `index` is the legacy spelling). Flagged in RawBars/MaxBars only —
-  // FullBars keeps Handlebars' `@index`, so it is canonical there.
+  // (bare `index` is the legacy spelling). Flagged in RawBars/MaxBars only — FullBars
+  // keeps Handlebars' `@index`, so it is canonical there.
   scopedVariable: {
     engine: "maxbars",
     template: "{{#each items}}{{index}}. {{this}}{{/each}}",
-    findings: 1,
-    expect: ["non-canonical scoped variable", "prefer `index0`"],
+    report: "warning: `index` is the non-canonical scoped variable — prefer `index0` (the native RawBars/MaxBars spelling)",
   },
   // A clean template reports the CLI's no-findings line (exit 0 under any
   // `--max-warnings`).
@@ -41,31 +37,32 @@ export const lintExamples = {
   },
 };
 
-// `migrate` rewrites Handlebars source to MaxBars source, with a residual report
-// for the constructs it cannot rewrite mechanically.
+// `migrate` rewrites Handlebars source to MaxBars source (minimal-diff: untouched
+// tags keep their exact spacing). `source` is the exact migrated output; an
+// unrewritable construct carries a `residualKind` instead of a clean rewrite.
 export const migrateExamples = {
   // `@`-data loop variables migrate to the MaxBars `loop` object (ADR-021).
   loopVars: {
     template: "{{#each items}}{{@index}}. {{this}}\n{{/each}}",
-    containsSource: ["loop.index0"],
+    source: "{{#each items}}{{loop.index0}}. {{this}}\n{{/each}}",
   },
   // An inverted section `{{^x}}` becomes `{{#unless x}}` (its close pairs too).
   inverted: {
     template: "{{^items}}nothing here{{/items}}",
-    containsSource: ["{{#unless items}}", "{{/unless}}"],
+    source: "{{#unless items}}nothing here{{/unless}}",
   },
-  // The block-partial reference `{{> @partial-block}}` becomes `{{yield}}` (the
-  // MaxBars spelling — a direct yield, not a partial named `@partial-block`).
+  // The block-partial reference `{{> @partial-block}}` becomes `{{yield}}` (a direct
+  // yield, not a partial named `@partial-block`).
   partialBlock: {
     template: "{{> @partial-block}}",
-    containsSource: ["{{yield}}"],
+    source: "{{yield}}",
   },
-  // What migration CANNOT do: a bare Mustache section `{{#name}}` whose name is not
-  // a known block helper is ambiguous (`{{#if}}` vs `{{#each}}`?) — reported as a
-  // residual for a human to resolve, never guessed.
+  // What migration CANNOT do: a bare Mustache section `{{#name}}` whose name is not a
+  // known block helper is ambiguous (`{{#if}}` guard vs `{{#each}}` iteration?) — left
+  // verbatim and reported as a residual for a human to resolve, never guessed.
   ambiguousSection: {
     template: "{{#widget}}{{title}}{{/widget}}",
-    containsSource: ["{{#widget}}"],
+    source: "{{#widget}}{{title}}{{/widget}}",
     residualKind: "ambiguous-section",
   },
 };
