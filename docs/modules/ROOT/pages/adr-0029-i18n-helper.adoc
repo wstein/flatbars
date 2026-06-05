@@ -221,9 +221,29 @@ data/config split: a *LOCALIZATION* section with *`catalog.yaml`* (the message D
 on every surface except MinBars) and a generalized *`config.yaml`* (the former Stem-only `stem.config.yaml`)
 that now also carries `i18n.locale` on the t-surfaces and `minbars.truthiness` on MinBars — the latter
 replacing the old mustache.js-truthiness UI toggle. The render routes RawBars/FullBars/MaxBars through the
-helper Worker (`lab/i18n.mjs` `buildI18nHelpers` + `lab/config.mjs` `parseConfig`), so
-`pass:[{{t …}}]`/`number`/`date`/`selectPlural`/`relative` resolve from `catalog.yaml` bound to
-`config.yaml`'s locale. One shared catalog/config (the groups are surface-scoped), not per-surface storage.
+helper Worker (`lab/i18n.mjs` `buildI18nHelpers`), so
+`pass:[{{t …}}]`/`number`/`date`/`selectPlural`/`relative` resolve from `catalog.yaml` bound to the locale
+the Lab parses from `config.yaml` (its inline `parseConfigYaml`). One shared catalog/config (the groups are
+surface-scoped), not per-surface storage.
 The `/localize` *Open in Lab* round-trips the catalog + locale into those views (`cat`/`loc` workspace
 fields). The data pane is shared by data/config/catalog, so a `dataPaneMode` flag routes edits by what the
 pane displays — config/catalog keystrokes never fall through to `data.yaml`.
+
+==== The Lab's MinBars truthiness default is `mustacheJs`, by design
+
+The engine, CLI, and JS facade default MinBars to the *language-agnostic spec* rule (`0`/`""`/`{}` truthy,
+as in Ruby/Python Mustache); `mustacheJs` (`0`/`""` falsy) is the opt-in (`renderMinbars({compat})`,
+`flatbars --mustache-js`). The *Lab* deliberately inverts that default: `config.yaml`'s
+`minbars.truthiness` starts at *`mustacheJs`*, not `spec`.
+
+The reason is the Lab's audience and habitat. It runs in the browser, where `mustache.js` is *the* Mustache
+people have used — so its truthiness (`0`/`""` falsy) is what a JS author already expects. Defaulting the
+playground to the rule its visitors carry in their heads minimises surprising "why did my `0` render?"
+moments, especially for beginners meeting Mustache through the Lab. The spec rule stays one keystroke away
+(`minbars.truthiness: spec`); the engine's own default is unchanged, so nothing downstream of the Lab
+shifts. This is a *presentation* choice scoped to the playground, not an engine policy change (ADR-022).
+
+Consistent with that default, the share link omits the truthiness field for `mustacheJs` and records only
+the spec opt-out (`mj=0`), keeping the common link compact. (One consequence: a pre-2026-06-05 MinBars link
+that relied on the *old* default-`spec` — no `mj` field — now renders under `mustacheJs`; such links predate
+the i18n/config work and are vanishingly rare. Add `minbars.truthiness: spec` to restore the old reading.)

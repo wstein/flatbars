@@ -1997,6 +1997,10 @@
       // MinBars truthiness toggle (ADR-022 S2): false = the language-agnostic spec
       // rule (0/"" truthy), true = the mustache.js rule (0/"" falsy). MinBars only;
       // threaded into render/compileToJs as `compat` and persisted as `mj`.
+      // The Lab defaults to mustacheJs (unlike the engine, which defaults to spec):
+      // it runs in the browser, where mustache.js' 0/"" -falsy rule is what JS users
+      // already expect, so it minimises surprise — see ADR-029, "The Lab's MinBars
+      // truthiness default is mustacheJs, by design". Set the rule in config.yaml.
       let minbarsCompat = true; // default mustacheJs (ADR-029); set by the config.yaml view + hash `mj`
       // Compiler & runtime options (ADR-0016).
       // `standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
