@@ -90,7 +90,9 @@ needed — they import the committed lab bundle):
 npm run check:tutorial-links    # render every tutorial example through the real engine + build its
                                 # Open-in-Lab link; also fails on an orphaned (defined-but-unshown) example
 npm run check:tutorial-tooling  # the linter/analyser references aren't renders: run each example through
-                                # the bundle's analyze/lint/migrate and assert the finding/report/source + orphan guard
+                                # the bundle's analyze/lint/migrate and assert the finding/report/source; also
+                                # builds + decodes each /lint Open-in-Lab deep-link (lint→Lint panel `dk`,
+                                # migrate→Migrated view `v`) + orphan guard
 npm run check:jsonata           # the Data-shaping (JSONata) guide: every cell + the flagship round-trip
 npm run gen:conformance         # regenerate tutorials/src/conformance.json from the vendored mustache/spec suite
 npm run check:conformance       # fail if that file is stale (so the reference can't over-claim conformance)

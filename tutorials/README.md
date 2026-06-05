@@ -31,7 +31,12 @@ through the real engine). The `/analyse` and `/lint` examples aren't renders, so
 they have their own gate, `check:tutorial-tooling`, which runs each through the
 bundle's `analyze` / `lint` / `migrate` and asserts the finding count, report, and
 migrated source — same single-source contract: the example is the source of truth,
-the page only annotates it. `/transform` is gated by `check:jsonata`.
+the page only annotates it. The `/lint` examples also carry into the Lab (parity
+with the dialect pages): each has an **Open in Lab** link built at build time from
+the example's target (a lint example opens the Lab's Lint dock panel; a migrate
+example the Migrated MaxBars output view), and `check:tutorial-tooling` decodes
+every one to prove the engine + target + template round-trip. `/transform` is
+gated by `check:jsonata`.
 
 **`npm run dev` serves the Lab too.** The dev server mounts the repo's `lab/` at
 `/lab/` (same handler as `npm run lab`), so the tutorials and the Lab share one

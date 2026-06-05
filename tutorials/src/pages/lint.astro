@@ -10,9 +10,27 @@
 // scripts/check-tutorial-tooling.mjs). The normative text lives in docs/
 // (adr-0019-operation-vocabulary, adr-0021-maxbars-variable-model).
 import Reference from "../layouts/Reference.astro";
-import { lintExamples, migrateExamples } from "../lint.mjs";
+import { lintExamples, migrateExamples, lintLabInput, migrateLabInput } from "../lint.mjs";
+import { labHref } from "../../../lab/open-in-lab.mjs";
 
 const t = (s) => s; // readability helper for inline tag literals
+
+// Open-in-Lab parity with the dialect pages: each example carries into the Lab —
+// lint examples land with the Lint dock panel open, migrate examples in the
+// Migrated MaxBars output view. The deep-links are built at build time from the
+// same per-kind target the CI gate validates (lint.mjs). Same env var the
+// OpenInLab island uses, so dev and the GitHub-Pages sub-path both resolve.
+const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
+const lintHref = {};
+for (const [k, ex] of Object.entries(lintExamples)) {
+  const { engine, example } = lintLabInput(ex);
+  lintHref[k] = await labHref(engine, example, { labUrl: LAB_URL });
+}
+const migrateHref = {};
+for (const [k, ex] of Object.entries(migrateExamples)) {
+  const { engine, example } = migrateLabInput(ex);
+  migrateHref[k] = await labHref(engine, example, { labUrl: LAB_URL });
+}
 
 const groups = [
   {
@@ -62,6 +80,11 @@ const groups = [
       background: var(--accent-softer); border-radius: 0 6px 6px 0; font-size: 0.92rem; }
     .resid b { color: var(--accent-2); }
     .resid .sug { display: block; margin-top: 0.4rem; color: var(--fg-secondary); }
+    .oil-link { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0.1rem 0 0.4rem;
+      font: 600 12px var(--font-mono); color: var(--accent-2); text-decoration: none;
+      border: 1px solid var(--border-strong); border-radius: 6px; padding: 0.25rem 0.6rem;
+      background: var(--bg-1); }
+    .oil-link:hover { border-color: var(--accent); color: var(--accent); }
   </style>
 
   <!-- ─────────────────────────── Intro ─────────────────────────── -->
@@ -94,6 +117,7 @@ const groups = [
       <pre class="cli"><code>{lintExamples.alias.template}</code></pre>
       <span class="lbl">flatbars lint</span>
       <pre class="cli"><code class="warn">{lintExamples.alias.report}</code></pre>
+      <a class="oil-link" href={lintHref.alias}>Open in Lab ↗</a>
     </div>
   </section>
 
@@ -111,6 +135,7 @@ const groups = [
       <pre class="cli"><code>{lintExamples.scopedVariable.template}</code></pre>
       <span class="lbl">flatbars lint --maxbars</span>
       <pre class="cli"><code class="warn">{lintExamples.scopedVariable.report}</code></pre>
+      <a class="oil-link" href={lintHref.scopedVariable}>Open in Lab ↗</a>
     </div>
     <p>
       This lint is <b>surface-scoped</b>: it runs for RawBars/MaxBars, where the bare native
@@ -137,6 +162,7 @@ const groups = [
 {lintExamples.clean.report}
 
 $ flatbars lint src/email.maxbars --maxbars --max-warnings 0   # CI gate</code></pre>
+    <a class="oil-link" href={lintHref.clean}>Open a clean template in Lab ↗</a>
   </section>
 
   <!-- ─────────────────────────── Migrate ─────────────────────────── -->
@@ -153,6 +179,7 @@ $ flatbars lint src/email.maxbars --maxbars --max-warnings 0   # CI gate</code><
       <pre class="cli"><code>{migrateExamples.loopVars.template}</code></pre>
       <span class="arr">migrate ↓</span>
       <pre class="cli"><code>{migrateExamples.loopVars.source}</code></pre>
+      <a class="oil-link" href={migrateHref.loopVars}>Open in Lab ↗</a>
     </div>
 
     <h3>Inverted section → <code>{t("{{#unless}}")}</code></h3>
@@ -160,6 +187,7 @@ $ flatbars lint src/email.maxbars --maxbars --max-warnings 0   # CI gate</code><
       <pre class="cli"><code>{migrateExamples.inverted.template}</code></pre>
       <span class="arr">migrate ↓</span>
       <pre class="cli"><code>{migrateExamples.inverted.source}</code></pre>
+      <a class="oil-link" href={migrateHref.inverted}>Open in Lab ↗</a>
     </div>
 
     <h3>Block-partial reference → <code>{t("{{yield}}")}</code></h3>
@@ -167,6 +195,7 @@ $ flatbars lint src/email.maxbars --maxbars --max-warnings 0   # CI gate</code><
       <pre class="cli"><code>{migrateExamples.partialBlock.template}</code></pre>
       <span class="arr">migrate ↓</span>
       <pre class="cli"><code>{migrateExamples.partialBlock.source}</code></pre>
+      <a class="oil-link" href={migrateHref.partialBlock}>Open in Lab ↗</a>
     </div>
   </section>
 
@@ -182,6 +211,7 @@ $ flatbars lint src/email.maxbars --maxbars --max-warnings 0   # CI gate</code><
       <pre class="cli"><code>{migrateExamples.ambiguousSection.template}</code></pre>
       <span class="arr">migrate ↓ (unchanged)</span>
       <pre class="cli"><code>{migrateExamples.ambiguousSection.source}</code></pre>
+      <a class="oil-link" href={migrateHref.ambiguousSection}>Open in Lab ↗</a>
     </div>
     <div class="resid">
       <b>Residual · ambiguous-section.</b> A bare Mustache section <code>{t("{{#widget}}")}</code>
