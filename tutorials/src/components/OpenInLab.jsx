@@ -157,14 +157,16 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     setJs(r && r.ok ? { ok: true, text: r.value } : { ok: false, text: (r && r.error) || "compile failed" });
   }, [canCompile, renderer, tpl]);
 
-  // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace.
+  // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace. The
+  // i18n catalog/config aren't carried yet — the Lab's catalog.yaml/config.yaml
+  // sidebar sections are still to be built; the live preview above uses them.
   useEffect(() => {
     let live = true;
-    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr, catalog, config }, { labUrl })
+    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr }, { labUrl })
       .then((h) => { if (live) setHref(h); })
       .catch(() => {});
     return () => { live = false; };
-  }, [tpl, dataStr, transformStr, parts, helpersStr, catalog, config]);
+  }, [tpl, dataStr, transformStr, parts, helpersStr]);
 
   // A full-width template row only pays off when the template is actually wide
   // (multi-line or long); a short one-liner like `{{> card}}` would just leave a

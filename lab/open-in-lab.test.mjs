@@ -72,18 +72,6 @@ test("workspaceState carries custom-helper source in its own field `h` (ADR-018)
   assert.equal(workspaceState({ template: "x", helpers: "  \n" }).h, undefined);
 });
 
-test("workspaceState carries catalog.yaml (data) + config.yaml (settings) as reserved tabs (ADR-029)", () => {
-  const catalog = "pl:\n  greeting: \"Cześć, {name}!\"";
-  const config = "i18n:\n  locale: pl";
-  const s = workspaceState({ template: '{{t "greeting" name=name}}', catalog, config });
-  const cat = s.tabs.find((t) => t.n === "catalog.yaml");
-  const cfg = s.tabs.find((t) => t.n === "config.yaml");
-  assert.ok(cat && cfg, "catalog.yaml and config.yaml tabs are present");
-  assert.equal(cat.s, catalog);
-  assert.equal(cfg.s, config);
-  // whitespace-only values are treated as none
-  assert.equal(workspaceState({ template: "x", catalog: "  \n", config: " " }).tabs.length, 1);
-});
 
 test("workspaceState carries an output view (`v`) and dock panel (`dk`)", async () => {
   // A "Migrate" example lands in the Migrated MaxBars output view; a "Lint"

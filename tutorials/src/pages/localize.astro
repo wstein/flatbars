@@ -140,11 +140,10 @@ const intro = sections[0].cells[0];
     </p>
     <TryI18n client:visible template={flagship.template} data={flagship.data} locale={flagship.locale} />
     <p>
-      <b>Open in Lab</b> carries the whole setup across — the template, the data, the
-      strings as a dedicated <code>catalog.yaml</code> tab (data, not code), and the
-      locale in <code>config.yaml</code>. The Lab reserves both tab names, parses
-      them, and builds the <code>t</code>/<code>number</code>/… bag, rendering the
-      same output.
+      The preview above renders through the real engine with the catalogue + locale
+      applied. (Carrying the strings into the Lab as dedicated <code>catalog.yaml</code>
+      / <code>config.yaml</code> sidebar sections is in progress; <b>Open in Lab</b>
+      currently takes the template and data.)
     </p>
     <OpenInLab
       client:visible
