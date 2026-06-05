@@ -1976,7 +1976,12 @@
       let activeTabIdx = 0;
       let loadedExampleIdx = -1;      // which example is loaded (-1 = custom/edited)
       let exampleModified  = false;  // true when a loaded example has been edited
-      let activeView   = "tmpl";      // "tmpl" | "data"
+      let activeView   = "tmpl";      // "tmpl" | "data" | "config" | "catalog"
+      // What the bottom (data) pane currently DISPLAYS: "data" | "config" |
+      // "catalog". The pane is shared, so focusing it must restore activeView to
+      // what's shown — not assume "data" — or config/catalog edits route into
+      // data.yaml (ADR-029 hardening).
+      let dataPaneMode = "data";
       let outputView   = "source";  // "source" (Plain Text) is the default landing view
       let allowScripts = true;       // HTML/Markdown preview always runs <script> in an isolated (null-origin) sandbox
       let escapeMode   = "";
@@ -2363,9 +2368,11 @@
             EditorView.updateListener.of((u) => {
               if (u.docChanged && !isProgrammatic(u)) {
                 const text = u.state.doc.toString();
-                if (activeView === "config") {
+                // Route by what the pane DISPLAYS, not activeView — the data pane
+                // is shared by data/config/catalog (ADR-029 hardening).
+                if (dataPaneMode === "config") {
                   applyConfigText(text);
-                } else if (activeView === "catalog") {
+                } else if (dataPaneMode === "catalog") {
                   catalogSource = text;
                   catalogDirty = true;
                   renderTabs();
@@ -2478,7 +2485,7 @@
       byId("template-editor-container").addEventListener("focusin", () => { activeView = "tmpl"; updateStatusMeta(); });
       // config.yaml is edited in this same pane; focusing it must NOT flip the view
       // to "data" (that routed config keystrokes into data.yaml, overwriting it).
-      byId("data-editor-container").addEventListener("focusin", () => { if (activeView !== "config" && activeView !== "catalog") activeView = "data"; updateStatusMeta(); });
+      byId("data-editor-container").addEventListener("focusin", () => { activeView = dataPaneMode; updateStatusMeta(); });
 
       // ── Virtual file explorer ───────────────────────────────────────────
       // A type-grouped navigator over every editable file. It does not own any
@@ -2923,6 +2930,7 @@
         byId("data-editor-container").hidden = false;
         // (Re)generate the YAML from the current render state on every open so the
         // buffer always reflects the live config.
+        dataPaneMode = "config";
         setEditorText(dataView, buildConfigYaml());
         dataView.dispatch({ effects: dataLangComp.reconfigure([yaml(), yamlHighlighting]) });
         renderTabs();
@@ -2939,6 +2947,7 @@
       }
       function showCatalogTab() {
         byId("data-editor-container").hidden = false;
+        dataPaneMode = "catalog";
         setEditorText(dataView, catalogSource);
         dataView.dispatch({ effects: dataLangComp.reconfigure([yaml(), yamlHighlighting]) });
         renderTabs();
@@ -3040,6 +3049,7 @@
       function showDataTab() {
         // the bottom (data) pane is always visible alongside the template pane.
         byId("data-editor-container").hidden = false;
+        dataPaneMode = "data";
         const overlay = overlayByName(dataFile);
         setEditorText(dataView, overlay ? overlay.source : yamlSrc);
         dataView.dispatch({
