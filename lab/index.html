@@ -1940,10 +1940,19 @@
           location.href = u.toString();
         });
       }
-      // The on-disk extension for this engine's template/partial files
-      // (`.hbs` for Handlebars/FlatBars — surface is Handlebars-flavoured —
-      // `.stem` for Stem) — used wherever a file name is shown.
-      const TEMPLATE_EXT = ENGINE === "stem" ? "stem" : "hbs";
+      // The file extension shown for this engine's template/partial files — one
+      // per dialect, so a file name reflects the surface it is written in
+      // (`.stem`, `.rawbars`, `.mustache` for MinBars, `.hbs` for the
+      // Handlebars-flavoured FullBars, `.maxbars`). Used wherever a file name is
+      // displayed or downloaded. (The on-disk *example* files keep the catalog's
+      // own extension — see the example loader — so this is purely the label.)
+      const TEMPLATE_EXT =
+        ({ stem: "stem", rawbars: "rawbars", minbars: "mustache", fullbars: "hbs", maxbars: "maxbars" })[ENGINE] ||
+        "hbs";
+      // The Markdown code-fence language for an exported template: only `mustache`
+      // and `handlebars` are languages a Markdown highlighter knows, so MinBars
+      // uses `mustache` and the rest fall back to the Handlebars-flavoured tag.
+      const TEMPLATE_FENCE = ENGINE === "minbars" ? "mustache" : "handlebars";
       // Engine reflection: canonical built-in list and capability metadata,
       // live from the loaded WASM binary. Used to drive the cheat-sheet section
       // in the Transformers dock tab and validate the risk-tier map below.
@@ -3342,7 +3351,7 @@
         ];
         for (const t of tabs) {
           out.push(`## ${t.name === "main" ? "Template — main" : "Partial — " + t.name}`, "");
-          out.push(mdFence(t.source, "handlebars"), "");
+          out.push(mdFence(t.source, TEMPLATE_FENCE), "");
         }
         out.push("## Data", "", mdFence(yamlSrc, "yaml"), "");
         if (transformSrc.trim()) out.push(

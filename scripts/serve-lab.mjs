@@ -33,6 +33,9 @@ export const MIME = {
   ".txt": "text/plain; charset=utf-8",
   ".hbs": "text/plain; charset=utf-8",
   ".stem": "text/plain; charset=utf-8",
+  ".rawbars": "text/plain; charset=utf-8",
+  ".mustache": "text/plain; charset=utf-8",
+  ".maxbars": "text/plain; charset=utf-8",
   ".yaml": "text/plain; charset=utf-8",
 };
 
