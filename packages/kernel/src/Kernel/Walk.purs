@@ -64,9 +64,11 @@ instance showRefKind :: Show RefKind where
     RawRef -> "RawRef"
     SepRef -> "SepRef"
 
--- | A single occurrence of a name, with how it was used and how many arguments
--- | it was given.
-type OperationRef = { name :: Ident, kind :: RefKind, argc :: Int }
+-- | A single occurrence of a name, with how it was used, how many arguments it
+-- | was given, and the span of the enclosing tag (so a host can locate it — e.g.
+-- | the linter's click-to-jump). Expression refs carry their enclosing node's
+-- | span (the skeleton `Expr` has no spans of its own; spans live on nodes).
+type OperationRef = { name :: Ident, kind :: RefKind, argc :: Int, span :: Span }
 
 -- | A catamorphism over an `Expr`: `app` receives the *already-folded* results
 -- | of its arguments (bottom-up). It is the single expression-recursion
@@ -92,23 +94,25 @@ foldRefs f = foldMap (node f)
   node :: (OperationRef -> m) -> Node -> m
   node g = case _ of
     Content _ -> mempty
-    Output _ e -> expr g e
-    Block _ _ name args body ->
-      g { name, kind: BlockRef, argc: Array.length args }
-        <> foldMap (expr g) args
+    Output sp e -> expr g sp e
+    Block sp _ name args body ->
+      g { name, kind: BlockRef, argc: Array.length args, span: sp }
+        <> foldMap (expr g sp) args
         <> foldRefs g body
-    RawBlock _ name args _ ->
-      g { name, kind: RawRef, argc: Array.length args } <> foldMap (expr g) args
-    Sep _ name args ->
-      g { name, kind: SepRef, argc: Array.length args } <> foldMap (expr g) args
+    RawBlock sp name args _ ->
+      g { name, kind: RawRef, argc: Array.length args, span: sp } <> foldMap (expr g sp) args
+    Sep sp name args ->
+      g { name, kind: SepRef, argc: Array.length args, span: sp } <> foldMap (expr g sp) args
     NodeError _ _ -> mempty -- a recovered error references no operations
 
   -- Expression refs via the shared `foldExpr`: each application emits its own
-  -- ref and combines the refs collected from its arguments.
-  expr :: (OperationRef -> m) -> Expr -> m
-  expr g = foldExpr
+  -- ref and combines the refs collected from its arguments. The skeleton `Expr`
+  -- carries no span, so every ref inherits the enclosing node's span `sp`.
+  expr :: (OperationRef -> m) -> Span -> Expr -> m
+  expr g sp = foldExpr
     { lit: \_ -> mempty
-    , app: \name children -> g { name, kind: AppRef, argc: Array.length children } <> fold children
+    , app: \name children -> g { name, kind: AppRef, argc: Array.length children, span: sp } <> fold
+        children
     }
 
 -- | Every helper reference in a template, in depth-first order.

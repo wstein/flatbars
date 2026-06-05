@@ -9,9 +9,10 @@ module Test.FullBars.JS.Main where
 import Prelude
 
 import Data.Argonaut (Json, jsonParser)
-import Data.Array (any, length)
+import Data.Array (any, head, length)
 import Data.Either (Either(..))
 import Data.Function.Uncurried (runFn1, runFn2)
+import Data.Maybe (maybe)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect (Effect)
@@ -93,6 +94,11 @@ main = do
   -- A clean template reports the CLI's no-findings line.
   let lc = runFn2 lint "{{ name }}" "rawbars"
   assert' "clean lint report" (lc.report == "ok: no lint findings")
+  -- findings carry the source location of the offending tag (line/column), so a
+  -- host can jump to them (the Lab's Lint panel click-to-jump).
+  let ll = runFn2 lint "ok\n{{ plus a b }}" "maxbars"
+  assert' "lint finding carries its line"
+    (maybe false (\f -> f.line == 2 && f.column == 1) (head ll.findings))
 
   -- migrate: Handlebars → MaxBars. `{{^x}}` → `{{#unless x}}`, `@index` →
   -- `loop.index0`; an ambiguous bare section surfaces as a residual.

@@ -129,6 +129,9 @@ test("lint flags a deprecated alias and is surface-scoped (the lint feature)", a
   assert.ok(aliased.ok, aliased.error);
   assert.equal(aliased.findings.length, 1);
   assert.match(aliased.findings[0].message, /add/);
+  // findings carry the source location (the Lint panel's click-to-jump).
+  assert.equal(aliased.findings[0].line, 1);
+  assert.equal(aliased.findings[0].column, 1);
   // a non-canonical scoped variable (`index` for `index0`) — flagged in maxbars
   // (native), but NOT in the FullBars surface where {{@index}} is canonical.
   const scoped = "{{#each xs}}{{ index }}{{/each}}";

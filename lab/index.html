@@ -1700,7 +1700,7 @@
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=45";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=46";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -5964,10 +5964,14 @@
           "Each finding renders identically today, but a canonical spelling keeps the template portable. The editor quick-fix and flatbars lint steer to it."));
         const list = makeEl("div", { class: "cv-rows" });
         for (const f of rows) {
-          list.append(makeEl("div", { class: "cv-row" }, [
+          const row = makeEl("div", { class: "cv-row" }, [
             makeEl("span", { class: "cv-kind" }, f.name || f.severity),
             makeEl("span", { class: "cv-label" }, plain(f.message)),
-          ]));
+            makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
+          ]);
+          row.title = "jump to source";
+          row.addEventListener("click", () => openProblem({ file: "main", line: f.line, col: f.column }));
+          list.append(row);
         }
         section.append(list);
         body.append(section);

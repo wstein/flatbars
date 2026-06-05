@@ -51,8 +51,8 @@ template using a deprecated alias or legacy scoped variable
 
 - [ ] the **Lint** tab appears in the diagnostics dock, with a finding count and an
       amber badge (green when there are none).
-- [ ] each finding row shows the offending name and the message naming the
-      canonical spelling.
+- [ ] each finding row shows the offending name, the message naming the canonical
+      spelling, and `main:line:col`; clicking a row jumps to the tag in the editor.
 - [ ] the tab is **absent** under a non-FlatBars engine (gates on the `lint`
       capability), and the scoped-variable lint does **not** fire in FullBars (where
       `{{@index}}` is canonical).

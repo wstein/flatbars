@@ -22,7 +22,8 @@
 -- | source, where the native form is canonical — not FullBars, where `@index` /
 -- | `@partial-block` are the Handlebars-faithful spelling).
 module Linter.Aliases
-  ( aliasWarnings
+  ( LintWarning
+  , aliasWarnings
   , aliasWarningsOf
   , scopedCanonWarnings
   , scopedCanonWarningsOf
@@ -36,15 +37,22 @@ import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..))
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (parse)
-import FlatBars.Syntax (Template)
+import FlatBars.Span (Span)
+import FlatBars.Syntax (Ident, Template)
 import Kernel.Prelude (preludeAliases, scopedCanonical)
-import Kernel.Walk (Issue, Severity(..), operationRefs)
+import Kernel.Walk (Severity(..), operationRefs)
+
+-- | A located lint warning: the `Issue` triple (severity/name/message) plus the
+-- | source `span` of the offending tag, so a host can jump to it — the Lab's Lint
+-- | panel click-to-jump, mirroring the analyse findings. A superset of
+-- | `Kernel.Walk.Issue`; the CLI report reads only severity/message, ignoring span.
+type LintWarning = { severity :: Severity, name :: Ident, message :: String, span :: Span }
 
 -- | Warn on every use of an alias helper in a (parsed) template, pointing at its
 -- | canonical name. Dialect-agnostic: the caller parses with whatever dialect it
 -- | wants and passes the `Template` (mirrors `MaxBars.loopVarShadowWarnings`).
 -- | One `Warn` per occurrence.
-aliasWarnings :: Template -> Array Issue
+aliasWarnings :: Template -> Array LintWarning
 aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
   where
   warnOf ref = case lookup ref.name preludeAliases of
@@ -56,6 +64,7 @@ aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
             <> "` — prefer `"
             <> canonical
             <> "` (the lift/migrate assist rewrites it)"
+      , span: ref.span
       }
     Nothing -> Nothing
 
@@ -63,14 +72,14 @@ aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
 -- | convenience entry point for the RawBars/FullBars explicit-call form
 -- | (`{{plus a b}}` / `(plus a b)`). A MaxBars caller parses with `maxOptions`
 -- | and uses `aliasWarnings` directly.
-aliasWarningsOf :: String -> Either ParseError (Array Issue)
+aliasWarningsOf :: String -> Either ParseError (Array LintWarning)
 aliasWarningsOf src = (aliasWarnings <<< _.nodes) <$> parse src
 
 -- | Warn on every use of a non-canonical scoped variable (`index` → `index0`,
 -- | `partial-block` → `yield`), pointing at the native spelling. Surface-scoped:
 -- | the caller runs it for RawBars/MaxBars source (where the native form is
 -- | canonical), not FullBars. Same shape as `aliasWarnings`; one `Warn` per use.
-scopedCanonWarnings :: Template -> Array Issue
+scopedCanonWarnings :: Template -> Array LintWarning
 scopedCanonWarnings = Array.mapMaybe warnOf <<< operationRefs
   where
   warnOf ref = case lookup ref.name scopedCanonical of
@@ -80,10 +89,11 @@ scopedCanonWarnings = Array.mapMaybe warnOf <<< operationRefs
       , message:
           "`" <> ref.name <> "` is the non-canonical scoped variable — prefer `" <> canonical
             <> "` (the native RawBars/MaxBars spelling)"
+      , span: ref.span
       }
     Nothing -> Nothing
 
 -- | Parse `src` with the default (core) parser and warn on any non-canonical
 -- | scoped-variable use — the convenience entry point for RawBars/MaxBars source.
-scopedCanonWarningsOf :: String -> Either ParseError (Array Issue)
+scopedCanonWarningsOf :: String -> Either ParseError (Array LintWarning)
 scopedCanonWarningsOf src = (scopedCanonWarnings <<< _.nodes) <$> parse src

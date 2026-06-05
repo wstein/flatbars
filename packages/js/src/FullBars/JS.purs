@@ -57,6 +57,7 @@ import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
 import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
+import FlatBars.Span (lineColumn)
 import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
@@ -126,7 +127,8 @@ analyze = mkFn2 \tpl json -> case FullBars.analyseSurface tpl (fromJson json) of
 -- | `flatbars lint` CLI. `ok`/`error` carry a parse failure.
 type LintResult =
   { ok :: Boolean
-  , findings :: Array { severity :: String, name :: String, message :: String }
+  , findings ::
+      Array { severity :: String, name :: String, message :: String, line :: Int, column :: Int }
   , report :: String
   , error :: String
   }
@@ -152,9 +154,21 @@ lint = mkFn2 \tpl dialect ->
         let
           issues = aliasWarnings nodes <> (if surface then [] else scopedCanonWarnings nodes)
           fmt i = sevText i.severity <> ": " <> i.message
+          locate i = lineColumn tpl i.span.start
         in
           { ok: true
-          , findings: map (\i -> { severity: sevText i.severity, name: i.name, message: i.message })
+          , findings: map
+              ( \i ->
+                  let
+                    lc = locate i
+                  in
+                    { severity: sevText i.severity
+                    , name: i.name
+                    , message: i.message
+                    , line: lc.line
+                    , column: lc.column
+                    }
+              )
               issues
           , report:
               if Array.null issues then "ok: no lint findings" else joinWith "\n" (map fmt issues)

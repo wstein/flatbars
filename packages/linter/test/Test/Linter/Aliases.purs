@@ -50,10 +50,14 @@ main = do
   -- the canonical escaper is not an alias and so never warns.
   expectWarns "escapeHtml (canonical) does not warn" "{{{escapeHtml (lookup this \"x\")}}}" []
 
-  -- the message names the canonical target.
-  case aliasWarningsOf "{{{plus a b}}}" of
-    Right [ issue ] -> assert' ("plus → add message, got: " <> issue.message)
-      (contains (Pattern "add") issue.message)
+  -- the message names the canonical target, and the warning carries the source
+  -- span of the offending tag (so a host can locate it — the Lab's click-to-jump).
+  case aliasWarningsOf "  {{{plus a b}}}" of
+    Right [ issue ] -> do
+      assert' ("plus → add message, got: " <> issue.message)
+        (contains (Pattern "add") issue.message)
+      assert' ("plus span points past the leading spaces, got: " <> show issue.span.start)
+        (issue.span.start == 2)
     other -> assert' ("plus: expected one warning, got " <> show (map _.name <$> other)) false
 
   -- scoped-variable canonicalization (ADR-021): non-canonical spellings warn and
