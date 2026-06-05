@@ -6,6 +6,7 @@
 -- | differently; these are this engine's choices.
 module Kernel.Value
   ( Truthy
+  , Translator
   , handlebars
   , minimal
   , presence
@@ -42,6 +43,16 @@ import FlatBars.Value (Value(..))
 -- | implementations. `VSafe` is judged by its content (a safe `""` tests as `""`);
 -- | `NaN` is truthy under every rule (`NaN /= 0.0`).
 type Truthy = Value -> Boolean
+
+-- | The host's i18n brain (ADR-029), seeded per-engine exactly like `Truthy`
+-- | (ADR-022): given a blessed op name (`"t"`/`"number"`/`"date"`) and its
+-- | evaluated arguments, return the localized text — or `Nothing` to fall back to
+-- | the argument's plain text. Its *absence* on the env (a `Nothing` translator)
+-- | is "no host wired", which the engine can flag (analyse mode), and is why this
+-- | is a first-class seam rather than a `registerHelper` override: the engine
+-- | knows whether a translator exists, so the fallback never masquerades as a
+-- | real translation.
+type Translator = String -> Array Value -> Maybe String
 
 -- | The Handlebars rule: `false`, `null`, `""`, `0`, and the empty array are
 -- | falsy; `{}` and every non-empty/non-zero value are truthy. The fixed

@@ -26,7 +26,9 @@ import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
 import FullBars (RNode(..), RefEnv, analyseSurface, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
+import Kernel.Env (withTranslator)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
+import Kernel.Render (runResolved)
 import Kernel.Walk (arityOk, foldTemplate, validate)
 import Test.Assert (assert')
 
@@ -1122,6 +1124,21 @@ main = do
   expect "set-delim excluded from FullBars" "{{! @delimiters: <% %> }}<%name%>"
     (obj [ Tuple "name" (str "Ada") ])
     "<%name%>"
+
+  -- ADR-029: the i18n `t` seam (first-class, like truthiness). A host-seeded
+  -- `Translator` drives `{{t}}`; with none, the op falls back to the key. This is
+  -- the wired path the old passthrough+registerHelper mechanism could not express.
+  let
+    tr = \name args -> case name, args of
+      "t", [ VString "greeting" ] -> Just "Hola"
+      _, _ -> Nothing
+  case _.nodes <$> parse "{{{t \"greeting\"}}}" of
+    Left _ -> assert' "i18n seam: template should parse" false
+    Right nodes -> do
+      assert' "t seam translates a wired key"
+        ((runResolved [] (withTranslator tr) nodes (obj []) :: Either Error String) == Right "Hola")
+      assert' "t falls back to the key when unwired"
+        ((runResolved [] identity nodes (obj []) :: Either Error String) == Right "greeting")
 
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do

@@ -53,7 +53,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
-import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTruthy)
+import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy)
 import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
 import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
@@ -1008,29 +1008,35 @@ lookupH _ args = case Array.uncons args of
   step v key = indexValue v key
 
 -- | The blessed i18n operations (ADR-029). FlatBars ships no i18n: the brain is
--- | the host's. The engine reserves the names (so `t`/`number`/`date`/
--- | `selectPlural` are catalogued, schema-validated, and editor-painted) and
--- | supplies a *pure fallback*. A host plugs in real behaviour by registering the
--- | operation (the interpreter's `renderWith` bag, or the compiled runtime's
--- | `rt.register`), which shadows the fallback. The fallbacks are pure, so they
--- | render identically interpreted and compiled.
--- |
--- | `t`/`number`/`date` fall back to their argument's plain text (translate
--- | returns the key; number/date return the value unformatted).
+-- | the host's, seeded as a first-class `Translator` seam (`RefEnv.translator`),
+-- | exactly the way truthiness is seeded (ADR-022) — *not* a `registerHelper`
+-- | override. The engine reserves the names (so `t`/`number`/`date`/`selectPlural`
+-- | are catalogued, schema-validated, and editor-painted) and consults the seeded
+-- | translator; with no host wired (`Nothing`) — or when the translator declines a
+-- | key (`Nothing`) — it supplies a *pure fallback*: the argument's plain text
+-- | (translate returns the key; number/date return the value unformatted). Because
+-- | the seam is part of the env, the engine *knows* whether a host is wired, so
+-- | analyse mode can flag the unwired calls and the fallback never poses as a real
+-- | translation. The fallback is pure, so it renders identically interpreted and
+-- | compiled.
 translateH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
-translateH = passthrough "t"
+translateH = i18nOp "t"
 
 numberH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
-numberH = passthrough "number"
+numberH = i18nOp "number"
 
 dateH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
-dateH = passthrough "date"
+dateH = i18nOp "date"
 
--- | The shared "return my first argument as text" fallback for `t`/`number`/`date`.
-passthrough :: forall m. MonadThrow Error m => String -> Operation m (RefEnv m)
-passthrough name _ args = case Array.head args of
+-- | A blessed i18n op: consult the env's seeded `Translator` with the op name and
+-- | its args; on a hit return the localized text, otherwise fall back to the first
+-- | argument's plain text (the unwired/declined path).
+i18nOp :: forall m. MonadThrow Error m => String -> Operation m (RefEnv m)
+i18nOp name ctl args = case Array.head args of
   Nothing -> throwError (ArityError (name <> ": expected at least 1 argument(s), got 0"))
-  Just v -> VString <$> liftEither (stringify v)
+  Just v -> case refTranslator ctl.env >>= \tr -> tr name args of
+    Just s -> pure (VString s)
+    Nothing -> VString <$> liftEither (stringify v)
 
 -- | `selectPlural` falls back to the English one/other rule (pure, no CLDR data);
 -- | a host registers the real `Intl.PluralRules` category.

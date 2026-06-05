@@ -10,6 +10,8 @@ module Kernel.Env
   , refContext
   , refTruthy
   , withTruthy
+  , refTranslator
+  , withTranslator
   , constOperation
   , emptyEnv
   , register
@@ -42,7 +44,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value)
 import Kernel.Engine (Engine, Operation)
-import Kernel.Value (handlebars, stringify)
+import Kernel.Value (Translator, handlebars, stringify)
 
 -- | Lift a pure `Either Error` into the engine monad — the single place the
 -- | `Left e -> throwError e` plumbing lives, shared by `refEngine` and helpers.
@@ -58,6 +60,11 @@ newtype RefEnv m = RefEnv
   -- everywhere (no per-file `@truthiness`, no per-partial switch); the built-in
   -- implementations are the named `Value` rules (`truthy handlebars`, etc.).
   , truthy :: Value -> Boolean
+  -- The host's i18n brain (ADR-029), seeded per-engine like `truthy`. `Nothing`
+  -- means no host wired: `t`/`number`/`date` fall back to their argument's plain
+  -- text, and analyse mode flags the unwired calls. A first-class seam (not a
+  -- `registerHelper` override), so the engine always knows whether one is present.
+  , translator :: Maybe Translator
   -- how many partials deep this environment is. `partialH` bumps it on entry and
   -- refuses to recurse past `recursionBudget`, so a cyclic partial raises a
   -- located `RecursionLimit` rather than overflowing the stack.
@@ -77,6 +84,17 @@ refTruthy (RefEnv e) = e.truthy
 withTruthy :: forall m. (Value -> Boolean) -> RefEnv m -> RefEnv m
 withTruthy tf (RefEnv e) = RefEnv (e { truthy = tf })
 
+-- | The host's i18n translator for this environment (ADR-029), or `Nothing` when
+-- | no host is wired. `t`/`number`/`date` consult it; analyse flags its absence.
+refTranslator :: forall m. RefEnv m -> Maybe Translator
+refTranslator (RefEnv e) = e.translator
+
+-- | Seed the host's i18n brain (ADR-029) — the i18n analogue of `withTruthy`. A
+-- | host (the `flatbars-js` facade, the Lab) plugs in one translator that drives
+-- | `t`/`number`/`date`; the default env carries `Nothing` (no host).
+withTranslator :: forall m. Translator -> RefEnv m -> RefEnv m
+withTranslator tr (RefEnv e) = RefEnv (e { translator = Just tr })
+
 -- | A nullary helper that always returns a fixed value (scoped helpers like
 -- | `index`, `first`, `this`).
 constOperation :: forall m. Applicative m => Value -> Operation m (RefEnv m)
@@ -89,6 +107,7 @@ emptyEnv ctx = RefEnv
   , helpers: Map.empty : Nil
   , partials: Map.empty
   , truthy: handlebars
+  , translator: Nothing
   , depth: 0
   }
 
