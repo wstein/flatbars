@@ -3132,33 +3132,82 @@ var alter = function(dictOrd) {
   };
 };
 
-// output/Data.String.Common/foreign.js
-var replaceAll = function(s1) {
-  return function(s2) {
-    return function(s3) {
-      return s3.replace(new RegExp(s1.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "g"), s2);
+// output/Data.String.CodePoints/foreign.js
+var hasArrayFrom = typeof Array.from === "function";
+var hasStringIterator = typeof Symbol !== "undefined" && Symbol != null && typeof Symbol.iterator !== "undefined" && typeof String.prototype[Symbol.iterator] === "function";
+var hasFromCodePoint = typeof String.prototype.fromCodePoint === "function";
+var hasCodePointAt = typeof String.prototype.codePointAt === "function";
+var _unsafeCodePointAt0 = function(fallback) {
+  return hasCodePointAt ? function(str2) {
+    return str2.codePointAt(0);
+  } : fallback;
+};
+var _toCodePointArray = function(fallback) {
+  return function(unsafeCodePointAt02) {
+    if (hasArrayFrom) {
+      return function(str2) {
+        return Array.from(str2, unsafeCodePointAt02);
+      };
+    }
+    return fallback;
+  };
+};
+
+// output/Data.Enum/foreign.js
+function toCharCode(c) {
+  return c.charCodeAt(0);
+}
+function fromCharCode(c) {
+  return String.fromCharCode(c);
+}
+
+// output/Data.Enum/index.js
+var bottom1 = /* @__PURE__ */ bottom(boundedChar);
+var top1 = /* @__PURE__ */ top(boundedChar);
+var fromEnum = function(dict) {
+  return dict.fromEnum;
+};
+var defaultSucc = function(toEnum$prime) {
+  return function(fromEnum$prime) {
+    return function(a) {
+      return toEnum$prime(fromEnum$prime(a) + 1 | 0);
     };
   };
 };
-var split = function(sep) {
-  return function(s) {
-    return s.split(sep);
+var defaultPred = function(toEnum$prime) {
+  return function(fromEnum$prime) {
+    return function(a) {
+      return toEnum$prime(fromEnum$prime(a) - 1 | 0);
+    };
   };
 };
-var toLower = function(s) {
-  return s.toLowerCase();
+var charToEnum = function(v) {
+  if (v >= toCharCode(bottom1) && v <= toCharCode(top1)) {
+    return new Just(fromCharCode(v));
+  }
+  ;
+  return Nothing.value;
 };
-var toUpper = function(s) {
-  return s.toUpperCase();
+var enumChar = {
+  succ: /* @__PURE__ */ defaultSucc(charToEnum)(toCharCode),
+  pred: /* @__PURE__ */ defaultPred(charToEnum)(toCharCode),
+  Ord0: function() {
+    return ordChar;
+  }
 };
-var trim = function(s) {
-  return s.trim();
-};
-var joinWith = function(s) {
-  return function(xs) {
-    return xs.join(s);
+var boundedEnumChar = /* @__PURE__ */ (function() {
+  return {
+    cardinality: toCharCode(top1) - toCharCode(bottom1) | 0,
+    toEnum: charToEnum,
+    fromEnum: toCharCode,
+    Bounded0: function() {
+      return boundedChar;
+    },
+    Enum1: function() {
+      return enumChar;
+    }
   };
-};
+})();
 
 // output/Data.String.CodeUnits/foreign.js
 var fromCharArray = function(a) {
@@ -3277,6 +3326,120 @@ var contains = function(pat) {
   var $23 = indexOf(pat);
   return function($24) {
     return isJust($23($24));
+  };
+};
+
+// output/Data.String.Common/foreign.js
+var replaceAll = function(s1) {
+  return function(s2) {
+    return function(s3) {
+      return s3.replace(new RegExp(s1.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "g"), s2);
+    };
+  };
+};
+var split = function(sep) {
+  return function(s) {
+    return s.split(sep);
+  };
+};
+var toLower = function(s) {
+  return s.toLowerCase();
+};
+var toUpper = function(s) {
+  return s.toUpperCase();
+};
+var trim = function(s) {
+  return s.trim();
+};
+var joinWith = function(s) {
+  return function(xs) {
+    return xs.join(s);
+  };
+};
+
+// output/Data.String.CodePoints/index.js
+var fromEnum2 = /* @__PURE__ */ fromEnum(boundedEnumChar);
+var map5 = /* @__PURE__ */ map(functorMaybe);
+var unfoldr2 = /* @__PURE__ */ unfoldr(unfoldableArray);
+var unsurrogate = function(lead) {
+  return function(trail) {
+    return (((lead - 55296 | 0) * 1024 | 0) + (trail - 56320 | 0) | 0) + 65536 | 0;
+  };
+};
+var isTrail = function(cu) {
+  return 56320 <= cu && cu <= 57343;
+};
+var isLead = function(cu) {
+  return 55296 <= cu && cu <= 56319;
+};
+var uncons3 = function(s) {
+  var v = length2(s);
+  if (v === 0) {
+    return Nothing.value;
+  }
+  ;
+  if (v === 1) {
+    return new Just({
+      head: fromEnum2(charAt(0)(s)),
+      tail: ""
+    });
+  }
+  ;
+  var cu1 = fromEnum2(charAt(1)(s));
+  var cu0 = fromEnum2(charAt(0)(s));
+  var $43 = isLead(cu0) && isTrail(cu1);
+  if ($43) {
+    return new Just({
+      head: unsurrogate(cu0)(cu1),
+      tail: drop2(2)(s)
+    });
+  }
+  ;
+  return new Just({
+    head: cu0,
+    tail: drop2(1)(s)
+  });
+};
+var unconsButWithTuple = function(s) {
+  return map5(function(v) {
+    return new Tuple(v.head, v.tail);
+  })(uncons3(s));
+};
+var toCodePointArrayFallback = function(s) {
+  return unfoldr2(unconsButWithTuple)(s);
+};
+var unsafeCodePointAt0Fallback = function(s) {
+  var cu0 = fromEnum2(charAt(0)(s));
+  var $47 = isLead(cu0) && length2(s) > 1;
+  if ($47) {
+    var cu1 = fromEnum2(charAt(1)(s));
+    var $48 = isTrail(cu1);
+    if ($48) {
+      return unsurrogate(cu0)(cu1);
+    }
+    ;
+    return cu0;
+  }
+  ;
+  return cu0;
+};
+var unsafeCodePointAt0 = /* @__PURE__ */ _unsafeCodePointAt0(unsafeCodePointAt0Fallback);
+var toCodePointArray = /* @__PURE__ */ _toCodePointArray(toCodePointArrayFallback)(unsafeCodePointAt0);
+var length3 = function($74) {
+  return length(toCodePointArray($74));
+};
+var lastIndexOf2 = function(p) {
+  return function(s) {
+    return map5(function(i) {
+      return length3(take2(i)(s));
+    })(lastIndexOf(p)(s));
+  };
+};
+var indexOf2 = function(p) {
+  return function(s) {
+    return map5(function(i) {
+      return length3(take2(i)(s));
+    })(indexOf(p)(s));
   };
 };
 
@@ -4592,7 +4755,7 @@ var notEq3 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
 var elem3 = /* @__PURE__ */ elem2(eqChar);
 var fromFoldable4 = /* @__PURE__ */ fromFoldable(foldableList);
 var bind2 = /* @__PURE__ */ bind(bindMaybe);
-var map5 = /* @__PURE__ */ map(functorEither);
+var map6 = /* @__PURE__ */ map(functorEither);
 var elem1 = /* @__PURE__ */ elem2(eqString);
 var RContent = /* @__PURE__ */ (function() {
   function RContent2(value0) {
@@ -5825,7 +5988,7 @@ var tokenizeTemplate = function(cfg) {
           };
         };
       };
-      return map5(finalize)(go(0)(cfg.open)(cfg.close)(0)([])(Nil.value)(false));
+      return map6(finalize)(go(0)(cfg.open)(cfg.close)(0)([])(Nil.value)(false));
     };
   };
 };
@@ -6285,7 +6448,7 @@ var $runtime_lazy3 = function(name2, moduleName, init2) {
     return val;
   };
 };
-var map6 = /* @__PURE__ */ map(functorArray);
+var map7 = /* @__PURE__ */ map(functorArray);
 var fromFoldable5 = /* @__PURE__ */ fromFoldable2(foldableArray);
 var toUnfoldable4 = /* @__PURE__ */ toUnfoldable3(unfoldableArray);
 var fromFoldable1 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
@@ -6312,11 +6475,11 @@ var toJson = function(v) {
   }
   ;
   if (v instanceof VArray) {
-    return id(map6(toJson)(v.value0));
+    return id(map7(toJson)(v.value0));
   }
   ;
   if (v instanceof VObject) {
-    return id(fromFoldable5(map6(function(v1) {
+    return id(fromFoldable5(map7(function(v1) {
       return new Tuple(v1.value0, toJson(v1.value1));
     })(toUnfoldable4(v.value0))));
   }
@@ -6327,9 +6490,9 @@ var $lazy_fromJson = /* @__PURE__ */ $runtime_lazy3("fromJson", "FlatBars.Json",
   return caseJson(function(v) {
     return VNull.value;
   })(VBool.create)(VNumber.create)(VString.create)(function(arr2) {
-    return new VArray(map6($lazy_fromJson(25))(arr2));
+    return new VArray(map7($lazy_fromJson(25))(arr2));
   })(function(obj2) {
-    return new VObject(fromFoldable1(map6(function(v) {
+    return new VObject(fromFoldable1(map7(function(v) {
       return new Tuple(v.value0, $lazy_fromJson(28)(v.value1));
     })(toUnfoldable1(obj2))));
   });
@@ -6337,11 +6500,11 @@ var $lazy_fromJson = /* @__PURE__ */ $runtime_lazy3("fromJson", "FlatBars.Json",
 var fromJson = /* @__PURE__ */ $lazy_fromJson(19);
 
 // output/FlatBars.Expr/index.js
-var map7 = /* @__PURE__ */ map(functorMaybe);
+var map8 = /* @__PURE__ */ map(functorMaybe);
 var bind3 = /* @__PURE__ */ bind(bindEither);
 var parseExpr = function(toks) {
   var tk = function(i) {
-    return map7(function(v2) {
+    return map8(function(v2) {
       return v2.tok;
     })(index(toks)(i));
   };
@@ -7482,7 +7645,7 @@ var monadThrowWriterT = function(dictMonoid) {
 // output/FullBars.Surface/index.js
 var foldl3 = /* @__PURE__ */ foldl(foldableArray);
 var notEq1 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqString));
-var map8 = /* @__PURE__ */ map(functorArray);
+var map9 = /* @__PURE__ */ map(functorArray);
 var elem5 = /* @__PURE__ */ elem2(eqString);
 var append1 = /* @__PURE__ */ append(semigroupArray);
 var pure2 = /* @__PURE__ */ pure(applicativeArray);
@@ -7747,7 +7910,7 @@ var expandElseIf = /* @__PURE__ */ (function() {
     ;
     return v1(true);
   };
-  return map8(toElif);
+  return map9(toElif);
 })();
 var dictExpr = function(pairs) {
   return new App2("dict", concatMap(function(p) {
@@ -7771,7 +7934,7 @@ var dataExpr = function(raw) {
     }
     ;
     if (otherwise) {
-      return new App2("lookup", cons(new App2(prefix + v1.value0.head, []))(map8(segKey)(v1.value0.tail)));
+      return new App2("lookup", cons(new App2(prefix + v1.value0.head, []))(map9(segKey)(v1.value0.tail)));
     }
     ;
   }
@@ -7797,7 +7960,7 @@ var pathExpr = function(lv) {
               return new App2(name2, []);
             }
             ;
-            return new App2("lookup", cons(new App2(name2, []))(map8(segKey)(tail2)));
+            return new App2("lookup", cons(new App2(name2, []))(map9(segKey)(tail2)));
           };
         };
         var reserved = isJust(lv(reservedMarker));
@@ -7817,7 +7980,7 @@ var pathExpr = function(lv) {
                 return new App2(v2.value0.head, []);
               }
               ;
-              return new App2("lookup", cons(new App2(v2.value0.head, []))(map8(segKey)(v2.value0.tail)));
+              return new App2("lookup", cons(new App2(v2.value0.head, []))(map9(segKey)(v2.value0.tail)));
             }
             ;
             if (reserved && (v1.depth === 0 && v2.value0.head === "loop")) {
@@ -7845,7 +8008,7 @@ var pathExpr = function(lv) {
               return base;
             }
             ;
-            return new App2("lookup", cons(base)(map8(segKey)(segs)));
+            return new App2("lookup", cons(base)(map9(segKey)(segs)));
           };
           if (v2 instanceof Just) {
             var $146 = v1.depth === 0 && $$null(v2.value0.tail);
@@ -7957,10 +8120,10 @@ var rewriteArgs = function(lv) {
       var h = collectHash(lv)(scope)(args);
       var $180 = $$null(h.pairs);
       if ($180) {
-        return map8(rewrite(lv)(scope))(h.positional);
+        return map9(rewrite(lv)(scope))(h.positional);
       }
       ;
-      return snoc(map8(rewrite(lv)(scope))(h.positional))(dictExpr(h.pairs));
+      return snoc(map9(rewrite(lv)(scope))(h.positional))(dictExpr(h.pairs));
     };
   };
 };
@@ -8088,7 +8251,7 @@ var blockHeadArgs = function(lv) {
             })(pairs));
           };
           var h = collectHash(lv)(scope)(mainArgs);
-          var pos = map8(rewrite(lv)(scope))(h.positional);
+          var pos = map9(rewrite(lv)(scope))(h.positional);
           var withHash = (function() {
             var $200 = $$null(h.pairs);
             if ($200) {
@@ -8097,7 +8260,7 @@ var blockHeadArgs = function(lv) {
             ;
             return snoc(pos)(hashMarker(h.pairs));
           })();
-          return append1(withHash)(append1(map8(paramMarker)(params))(labelMarker(label)));
+          return append1(withHash)(append1(map9(paramMarker)(params))(labelMarker(label)));
         };
       };
     };
@@ -8291,168 +8454,12 @@ var desugarWith = function(lv) {
         ;
         throw new Error("Failed pattern match at FullBars.Surface (line 123, column 12 - line 186, column 61): " + [v.constructor.name]);
       };
-      return map8(node);
+      return map9(node);
     };
     return go([]);
   };
 };
 var desugar = /* @__PURE__ */ desugarWith(noLoopVars);
-
-// output/Data.String.CodePoints/foreign.js
-var hasArrayFrom = typeof Array.from === "function";
-var hasStringIterator = typeof Symbol !== "undefined" && Symbol != null && typeof Symbol.iterator !== "undefined" && typeof String.prototype[Symbol.iterator] === "function";
-var hasFromCodePoint = typeof String.prototype.fromCodePoint === "function";
-var hasCodePointAt = typeof String.prototype.codePointAt === "function";
-var _unsafeCodePointAt0 = function(fallback) {
-  return hasCodePointAt ? function(str2) {
-    return str2.codePointAt(0);
-  } : fallback;
-};
-var _toCodePointArray = function(fallback) {
-  return function(unsafeCodePointAt02) {
-    if (hasArrayFrom) {
-      return function(str2) {
-        return Array.from(str2, unsafeCodePointAt02);
-      };
-    }
-    return fallback;
-  };
-};
-
-// output/Data.Enum/foreign.js
-function toCharCode(c) {
-  return c.charCodeAt(0);
-}
-function fromCharCode(c) {
-  return String.fromCharCode(c);
-}
-
-// output/Data.Enum/index.js
-var bottom1 = /* @__PURE__ */ bottom(boundedChar);
-var top1 = /* @__PURE__ */ top(boundedChar);
-var fromEnum = function(dict) {
-  return dict.fromEnum;
-};
-var defaultSucc = function(toEnum$prime) {
-  return function(fromEnum$prime) {
-    return function(a) {
-      return toEnum$prime(fromEnum$prime(a) + 1 | 0);
-    };
-  };
-};
-var defaultPred = function(toEnum$prime) {
-  return function(fromEnum$prime) {
-    return function(a) {
-      return toEnum$prime(fromEnum$prime(a) - 1 | 0);
-    };
-  };
-};
-var charToEnum = function(v) {
-  if (v >= toCharCode(bottom1) && v <= toCharCode(top1)) {
-    return new Just(fromCharCode(v));
-  }
-  ;
-  return Nothing.value;
-};
-var enumChar = {
-  succ: /* @__PURE__ */ defaultSucc(charToEnum)(toCharCode),
-  pred: /* @__PURE__ */ defaultPred(charToEnum)(toCharCode),
-  Ord0: function() {
-    return ordChar;
-  }
-};
-var boundedEnumChar = /* @__PURE__ */ (function() {
-  return {
-    cardinality: toCharCode(top1) - toCharCode(bottom1) | 0,
-    toEnum: charToEnum,
-    fromEnum: toCharCode,
-    Bounded0: function() {
-      return boundedChar;
-    },
-    Enum1: function() {
-      return enumChar;
-    }
-  };
-})();
-
-// output/Data.String.CodePoints/index.js
-var fromEnum2 = /* @__PURE__ */ fromEnum(boundedEnumChar);
-var map9 = /* @__PURE__ */ map(functorMaybe);
-var unfoldr2 = /* @__PURE__ */ unfoldr(unfoldableArray);
-var unsurrogate = function(lead) {
-  return function(trail) {
-    return (((lead - 55296 | 0) * 1024 | 0) + (trail - 56320 | 0) | 0) + 65536 | 0;
-  };
-};
-var isTrail = function(cu) {
-  return 56320 <= cu && cu <= 57343;
-};
-var isLead = function(cu) {
-  return 55296 <= cu && cu <= 56319;
-};
-var uncons3 = function(s) {
-  var v = length2(s);
-  if (v === 0) {
-    return Nothing.value;
-  }
-  ;
-  if (v === 1) {
-    return new Just({
-      head: fromEnum2(charAt(0)(s)),
-      tail: ""
-    });
-  }
-  ;
-  var cu1 = fromEnum2(charAt(1)(s));
-  var cu0 = fromEnum2(charAt(0)(s));
-  var $43 = isLead(cu0) && isTrail(cu1);
-  if ($43) {
-    return new Just({
-      head: unsurrogate(cu0)(cu1),
-      tail: drop2(2)(s)
-    });
-  }
-  ;
-  return new Just({
-    head: cu0,
-    tail: drop2(1)(s)
-  });
-};
-var unconsButWithTuple = function(s) {
-  return map9(function(v) {
-    return new Tuple(v.head, v.tail);
-  })(uncons3(s));
-};
-var toCodePointArrayFallback = function(s) {
-  return unfoldr2(unconsButWithTuple)(s);
-};
-var unsafeCodePointAt0Fallback = function(s) {
-  var cu0 = fromEnum2(charAt(0)(s));
-  var $47 = isLead(cu0) && length2(s) > 1;
-  if ($47) {
-    var cu1 = fromEnum2(charAt(1)(s));
-    var $48 = isTrail(cu1);
-    if ($48) {
-      return unsurrogate(cu0)(cu1);
-    }
-    ;
-    return cu0;
-  }
-  ;
-  return cu0;
-};
-var unsafeCodePointAt0 = /* @__PURE__ */ _unsafeCodePointAt0(unsafeCodePointAt0Fallback);
-var toCodePointArray = /* @__PURE__ */ _toCodePointArray(toCodePointArrayFallback)(unsafeCodePointAt0);
-var length3 = function($74) {
-  return length(toCodePointArray($74));
-};
-var lastIndexOf2 = function(p) {
-  return function(s) {
-    return map9(function(i) {
-      return length3(take2(i)(s));
-    })(lastIndexOf(p)(s));
-  };
-};
 
 // output/Kernel.Walk/index.js
 var map10 = /* @__PURE__ */ map(functorMaybe);
@@ -16207,7 +16214,7 @@ var migrate = function(tpl) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 196, column 25 - line 204, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 204, column 25 - line 212, column 6): " + [v.constructor.name]);
 };
 var litName = function(args) {
   var v = head(args);
@@ -16249,7 +16256,7 @@ var lint = function(tpl, dialect) {
   ;
   if (v instanceof Right) {
     var locate = function(i) {
-      return lineColumn(tpl)(i.span.start);
+      return lineColumn(tpl)(i.span.start + fromMaybe(0)(indexOf2(i.name)(spanText(tpl)(i.span))) | 0);
     };
     var issues = append5(aliasWarnings(v.value0.nodes))((function() {
       if (surface) {
@@ -16285,7 +16292,7 @@ var lint = function(tpl, dialect) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 153, column 5 - line 178, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 154, column 5 - line 186, column 12): " + [v.constructor.name]);
 };
 var jsOperation = function(name2) {
   return function(fn) {
@@ -16310,7 +16317,7 @@ var jsOperation = function(name2) {
             return pure7(fromJson(v.payload));
           }
           ;
-          throw new Error("Failed pattern match at FullBars.JS (line 305, column 35 - line 310, column 47): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FullBars.JS (line 313, column 35 - line 318, column 47): " + [v.constructor.name]);
         }
         ;
         var optsFrame = function(optsJson) {
@@ -16347,7 +16354,7 @@ var jsOperation = function(name2) {
                 };
               }
               ;
-              throw new Error("Failed pattern match at FullBars.JS (line 336, column 9 - line 338, column 60): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at FullBars.JS (line 344, column 9 - line 346, column 60): " + [v2.constructor.name]);
             };
           };
         };
@@ -16512,7 +16519,7 @@ var compileResultAt = function(src) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 443, column 23 - line 445, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 451, column 23 - line 453, column 49): " + [v.constructor.name]);
   };
 };
 var compileSurface2 = function(tpl) {
@@ -16588,7 +16595,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map26(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 683, column 9 - line 692, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 691, column 9 - line 700, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
@@ -16608,7 +16615,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map26($lazy_rnode(659))(ns));
+    return arr(map26($lazy_rnode(667))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -16631,7 +16638,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         })()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 633, column 21 - line 640, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 641, column 21 - line 648, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -16664,7 +16671,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 628, column 1 - line 628, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 636, column 1 - line 636, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
         var $146 = litName(v.value1);
@@ -16689,7 +16696,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(628);
+var rnode = /* @__PURE__ */ $lazy_rnode(636);
 var astJson = function(dialect, src) {
   var errObj = function(pe) {
     var d = parseErrorAt(src)(pe);
@@ -16724,7 +16731,7 @@ var astJson = function(dialect, src) {
       return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map26(rnode)(nodes)))]))]);
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 557, column 1 - line 557, column 34): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 565, column 1 - line 565, column 34): " + [v.constructor.name]);
   };
   if (v instanceof Right) {
     var $165 = dialect !== "core";
@@ -16771,7 +16778,7 @@ var analyze = function(tpl, json) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 115, column 30 - line 124, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 116, column 30 - line 125, column 6): " + [v.constructor.name]);
 };
 export {
   analyze,

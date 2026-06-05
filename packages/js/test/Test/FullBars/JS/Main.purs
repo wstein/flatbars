@@ -94,11 +94,12 @@ main = do
   -- A clean template reports the CLI's no-findings line.
   let lc = runFn2 lint "{{ name }}" "rawbars"
   assert' "clean lint report" (lc.report == "ok: no lint findings")
-  -- findings carry the source location of the offending tag (line/column), so a
-  -- host can jump to them (the Lab's Lint panel click-to-jump).
+  -- findings carry the source location *of the offending name* (not the tag
+  -- start), so a host can jump straight to it (the Lab's Lint panel click-to-jump).
+  -- "ok\n{{ plus a b }}": `plus` is on line 2 at column 4 (after "{{ ").
   let ll = runFn2 lint "ok\n{{ plus a b }}" "maxbars"
-  assert' "lint finding carries its line"
-    (maybe false (\f -> f.line == 2 && f.column == 1) (head ll.findings))
+  assert' "lint finding locates the name (line 2, col 4)"
+    (maybe false (\f -> f.line == 2 && f.column == 4) (head ll.findings))
 
   -- migrate: Handlebars → MaxBars. `{{^x}}` → `{{#unless x}}`, `@index` →
   -- `loop.index0`; an ambiguous bare section surfaces as a residual.

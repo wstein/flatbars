@@ -52,6 +52,7 @@ import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
 import Data.Map (fromFoldable, union) as Map
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.String (Pattern(..), indexOf)
 import Data.String.Common (joinWith)
 import Data.Tuple (Tuple(..))
 import FlatBars (Expr(..), ParseError, defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt)
@@ -59,7 +60,7 @@ import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
 import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Span (lineColumn)
+import FlatBars.Span (lineColumn, spanText)
 import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
@@ -156,7 +157,14 @@ lint = mkFn2 \tpl dialect ->
         let
           issues = aliasWarnings nodes <> (if surface then [] else scopedCanonWarnings nodes)
           fmt i = sevText i.severity <> ": " <> i.message
-          locate i = lineColumn tpl i.span.start
+          -- Refine the location to the offending NAME within its tag rather than
+          -- the tag start: scan the tag slice for `name` and offset into it. The
+          -- skeleton `Expr` carries no per-name spans, so `OperationRef.span` is the
+          -- enclosing tag; this tag-local scan recovers name precision for the Lab's
+          -- Lint-panel click-to-jump. A name repeated in one tag resolves to its
+          -- first occurrence (a rare, minor imprecision; the tag is still correct).
+          locate i = lineColumn tpl
+            (i.span.start + fromMaybe 0 (indexOf (Pattern i.name) (spanText tpl i.span)))
         in
           { ok: true
           , findings: map

@@ -129,9 +129,10 @@ test("lint flags a deprecated alias and is surface-scoped (the lint feature)", a
   assert.ok(aliased.ok, aliased.error);
   assert.equal(aliased.findings.length, 1);
   assert.match(aliased.findings[0].message, /add/);
-  // findings carry the source location (the Lint panel's click-to-jump).
+  // findings locate the offending NAME, not the tag start (Lint panel click-to-jump):
+  // "{{ plus a b }}" → `plus` is at column 4 (after "{{ ").
   assert.equal(aliased.findings[0].line, 1);
-  assert.equal(aliased.findings[0].column, 1);
+  assert.equal(aliased.findings[0].column, 4);
   // a non-canonical scoped variable (`index` for `index0`) — flagged in maxbars
   // (native), but NOT in the FullBars surface where {{@index}} is canonical.
   const scoped = "{{#each xs}}{{ index }}{{/each}}";
