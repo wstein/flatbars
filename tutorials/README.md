@@ -21,7 +21,17 @@ Pages: `/` (landing — thesis first, MinBars the recommended start) · `/minbar
 `/fullbars` (the comprehensive FullBars / Handlebars reference) · `/maxbars`
 (the comprehensive MaxBars reference — infix operators, pipes, bare loop vars).
 All four surfaces now have a dedicated reference, so there is no generic
-per-surface lesson page any more.
+per-surface lesson page any more. Three tooling guides sit alongside the dialects:
+`/transform` (data shaping with JSONata), `/analyse` (truthiness portability —
+analyse mode, ADR-022) and `/lint` (linting & migration — `flatbars lint` /
+`flatbars migrate`).
+
+The dialect examples are gate-validated by `check:tutorial-links` (rendered
+through the real engine). The `/analyse` and `/lint` examples aren't renders, so
+they have their own gate, `check:tutorial-tooling`, which runs each through the
+bundle's `analyze` / `lint` / `migrate` and asserts the finding count, report, and
+migrated source — same single-source contract: the example is the source of truth,
+the page only annotates it. `/transform` is gated by `check:jsonata`.
 
 **`npm run dev` serves the Lab too.** The dev server mounts the repo's `lab/` at
 `/lab/` (same handler as `npm run lab`), so the tutorials and the Lab share one

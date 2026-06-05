@@ -149,7 +149,8 @@ index-slices — no whole-file re-parse). Fixes name only helpers that exist
   `?vendored=` corpus becomes a portability gallery). Both call the one
   `Kernel.Analyse.reportMarkdown` exposed through the `flatbars-js` bundle, so they cannot drift; shipping
   the Lab path needs the usual `gen:bundle` + cache-buster bump. (A `--rule` knob to render the analysis
-  under a chosen rule was specced but **not built** — see the As-built note.)
+  under a chosen rule was specced but **not built** — see the As-built note.) The learner-facing walkthrough
+  is the tutorials' **Truthiness portability** reference (`/analyse`), gated by `check:tutorial-tooling`.
 
 . *JSONata cleanup is a reviewable scaffold, not a silent rewrite.* `--emit-jsonata` turns the *bare-path*
   findings into a JSONata transform that normalises each offending path out of the ambiguous zone before

@@ -83,14 +83,17 @@ npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; alw
 npm run test:lab              # FlatBars Lab pure-Node unit tests (playground_utils, adapter)
 ```
 
-The `tutorials` site has its own two gates (both in `npm test`, no `spago build`
+The `tutorials` site has its own gates (all in `npm test`, no `spago build`
 needed — they import the committed lab bundle):
 
 ```sh
-npm run check:tutorial-links  # render every tutorial example through the real engine + build its
-                              # Open-in-Lab link; also fails on an orphaned (defined-but-unshown) example
-npm run gen:conformance       # regenerate tutorials/src/conformance.json from the vendored mustache/spec suite
-npm run check:conformance     # fail if that file is stale (so the reference can't over-claim conformance)
+npm run check:tutorial-links    # render every tutorial example through the real engine + build its
+                                # Open-in-Lab link; also fails on an orphaned (defined-but-unshown) example
+npm run check:tutorial-tooling  # the linter/analyser references aren't renders: run each example through
+                                # the bundle's analyze/lint/migrate and assert the finding/report/source + orphan guard
+npm run check:jsonata           # the Data-shaping (JSONata) guide: every cell + the flagship round-trip
+npm run gen:conformance         # regenerate tutorials/src/conformance.json from the vendored mustache/spec suite
+npm run check:conformance       # fail if that file is stale (so the reference can't over-claim conformance)
 ```
 
 `examples:verify` is the `flatbars examples verify` CLI subcommand (see
@@ -212,12 +215,17 @@ learner-facing front end: every surface now has a comprehensive runnable
 reference — **MinBars/Mustache** (`/minbars`, the recommended start) leads, with
 **RawBars** (`/rawbars`, the meaning-free core, live compiled-JS pane),
 **FullBars** (`/fullbars`, Handlebars-faithful), and **MaxBars** (`/maxbars`, the
-flagship: infix operators, pipes, bare loop vars) alongside. (The
-old one-example `[surface].astro` lesson page is gone — the dedicated references
-supersede it.) Runnable examples are gate-validated
-(`check:tutorial-links`, which also asserts the compile flagship emits JS) and the
-Mustache conformance table is generated from the vendored spec suite
-(`gen:conformance`); see `tutorials/README.md`.
+flagship: infix operators, pipes, bare loop vars) alongside. Beyond the dialects,
+two *tooling* guides: **Truthiness portability** (`/analyse`, analyse mode —
+Lab-first, the ambiguous-value findings + JSONata fix) and **Linting & migration**
+(`/lint`, the CLI/CI guide to `flatbars lint` + `flatbars migrate`), plus **Data
+shaping** (`/transform`, JSONata). (The old one-example `[surface].astro` lesson
+page is gone — the dedicated references supersede it.) Runnable examples are
+gate-validated (`check:tutorial-links`, which also asserts the compile flagship
+emits JS; the tooling pages by `check:tutorial-tooling`, which runs each example
+through the bundle's `analyze`/`lint`/`migrate`) and the Mustache conformance
+table is generated from the vendored spec suite (`gen:conformance`); see
+`tutorials/README.md`.
 
 The **`editors`** tree (also not PureScript) is the third-party editor support of
 ADR-017 — highlighting in real editors by *running the engine lexer*, never by

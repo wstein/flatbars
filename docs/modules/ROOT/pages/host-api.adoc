@@ -149,7 +149,12 @@ This is an external adapter, kept out of the core (it pulls the JSON dependency)
 `renderSurfaceValue "<h1>{{ name }}</h1>" { name: "Ada" }`.
 * *JavaScript hosts* — the `flatbars-js` facade (`FullBars.JS`, §A) exposes uncurried
 `render(template, data)` / `renderSurface(template, data)` over plain JS values, returning a
-`{ ok, value, error }` object; parse failures come back located (`line:column`).
+`{ ok, value, error }` object; parse failures come back located (`line:column`). The same facade
+exposes the engine's *analysis* tools over plain JS data: `analyze(template, data)` (truthiness
+portability — `{ ok, findings, report, jsonata, output }`, ADR-022), `lint(template, dialect)`
+(deprecated-alias + non-canonical-scoped-variable warnings — `{ ok, findings, report }`), and
+`migrate(template)` (Handlebars → MaxBars source with a residual report — `{ ok, source, residuals }`).
+The Lab and the `/analyse` + `/lint` tutorials drive these.
 
 The located-error renderers `renderWithDiag` / `renderSurfaceDiag` (and `formatError`) report a parse
 failure as `line:column: message` (§7.2's `renderParseErrorAt`); the plain `renderWith` /
