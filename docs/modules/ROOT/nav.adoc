@@ -31,6 +31,7 @@
 * xref:adr-0026-editor-capability-matrix.adoc[ADR-026: editor capability matrix]
 * xref:adr-0027-cross-template-scope-graph.adoc[ADR-027: cross-template scope graph (proposed)]
 * xref:adr-0028-hybrid-template-lsp.adoc[ADR-028: hybrid host+FlatBars LSP (proposed)]
+* xref:adr-0029-i18n-helper.adoc[ADR-029: i18n helper (proposed)]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification
