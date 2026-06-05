@@ -46,6 +46,36 @@ const lspXml = readFileSync(resolve(plugin, "src", "lsp", "resources", "META-INF
 assert.match(lspXml, /platform\.lsp\.serverSupportProvider implementation="com\.flatbars\.idea\.FlatBarsLspServerSupportProvider"/, "the LSP fragment registers the server support provider");
 assert.match(lspXml, /<applicationConfigurable[^]*?instance="com\.flatbars\.idea\.FlatBarsConfigurable"/, "the LSP fragment registers the default-dialect settings page");
 
+// ── 3b. Bold "isle" emphasis on the LSP ceiling (ADR-017) ────────────────────
+// VS Code bolds the whole tag via configurationDefaults; JetBrains can only do
+// it on the LSP ceiling (the TextMate floor has no plugin-side font-weight hook),
+// via a semantic-tokens customizer + an additionalTextAttributes scheme delta.
+// We can't compile the Ultimate-only Kotlin here, so pin the wiring + the
+// key-set contract textually (the repo's offline bar; real bold is CI-verified).
+assert.match(lspXml, /<additionalTextAttributes\s+scheme="Default"\s+file="colorSchemes\/FlatBarsBold\.xml"\s*\/>/, "the LSP fragment registers the bold scheme delta");
+
+const descriptorKt = readFileSync(resolve(plugin, "src", "lsp", "kotlin", "com", "flatbars", "idea", "FlatBarsLspServerDescriptor.kt"), "utf8");
+assert.match(descriptorKt, /override val lspCustomization/, "descriptor installs an lspCustomization");
+assert.match(descriptorKt, /semanticTokensCustomizer\s*=\s*FlatBarsSemanticTokensSupport\(\)/, "lspCustomization wires the bold semantic-tokens customizer");
+
+// The bold legend (token types the customizer bolds) must equal the server's
+// legend — the vocabulary's lsp.type values plus the custom semantic types.
+const vocab = JSON.parse(readFileSync(resolve(root, "editors", "token-vocabulary.json"), "utf8"));
+const expectBold = new Set([
+  ...Object.values(vocab.kinds).map((k) => k.lsp?.type).filter(Boolean),
+  ...(vocab.customSemanticTypes ?? []).map((t) => t.id),
+]);
+const tokensKt = readFileSync(resolve(plugin, "src", "lsp", "kotlin", "com", "flatbars", "idea", "FlatBarsSemanticTokens.kt"), "utf8");
+const ktTypes = new Set([...tokensKt.matchAll(/"([A-Za-z]+)"\s+to\s+bold\(/g)].map((m) => m[1]));
+assert.deepEqual([...ktTypes].sort(), [...expectBold].sort(), "BOLD_KEYS covers exactly the server's semantic legend (no drift vs token-vocabulary.json)");
+
+// Every bold key the Kotlin defines has a matching FONT_TYPE=bold delta in the
+// scheme, and vice-versa — the two halves of the colour overlay stay in lockstep.
+const ktKeyNames = new Set([...tokensKt.matchAll(/bold\("([A-Z_]+)"/g)].map((m) => `FLATBARS_${m[1]}`));
+const scheme = readFileSync(resolve(plugin, "src", "lsp", "resources", "colorSchemes", "FlatBarsBold.xml"), "utf8");
+const schemeKeys = new Set([...scheme.matchAll(/<option name="(FLATBARS_[A-Z_]+)">/g)].map((m) => m[1]));
+assert.deepEqual([...ktKeyNames].sort(), [...schemeKeys].sort(), "FlatBarsBold.xml deltas match the FLATBARS_* keys declared in Kotlin");
+
 // ── 1. The bundled server speaks LSP ─────────────────────────────────────────
 const child = spawn(process.execPath, [serverBundle], { stdio: ["pipe", "pipe", "inherit"] });
 const conn = rpc.createMessageConnection(

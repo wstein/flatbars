@@ -10,6 +10,7 @@ import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.lsp.api.customization.LspCustomization
 import java.io.IOException
 
 /**
@@ -29,6 +30,16 @@ class FlatBarsLspServerDescriptor(project: Project) :
   ProjectWideLspServerDescriptor(project, "FlatBars") {
 
   override fun isSupportedFile(file: VirtualFile): Boolean = FlatBarsSupport.isSupported(file)
+
+  // Render the whole tag bold by installing a semantic-tokens customizer that
+  // maps the server's token types to bold text-attribute keys (see
+  // FlatBarsSemanticTokensSupport). `lspCustomization` is the documented hook for
+  // fine-tuning LSP features; `semanticTokensCustomizer` carries the colours. Both
+  // live in the closed Ultimate LSP API and compile only under -PwithLsp — the
+  // CI-verified API contact point (see FlatBarsSemanticTokens.kt).
+  override val lspCustomization: LspCustomization = object : LspCustomization() {
+    override val semanticTokensCustomizer = FlatBarsSemanticTokensSupport()
+  }
 
   override fun createCommandLine(): GeneralCommandLine {
     val node = FlatBarsSupport.resolveNode() ?: run {

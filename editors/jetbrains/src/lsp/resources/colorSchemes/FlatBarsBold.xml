@@ -1,0 +1,44 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  Bold "isle" emphasis for the LSP semantic tokens (ADR-017), registered via
+  <additionalTextAttributes> in flatbars-lsp.xml. Each FLATBARS_* key is defined
+  in FlatBarsSemanticTokens.kt with a FALLBACK to a standard highlighter colour,
+  so it already tracks the user's scheme; here we add only FONT_TYPE = 1 (bold),
+  leaving FOREGROUND unset so the fallback colour shows through. Adding weight,
+  not replacing colour — the JetBrains counterpart to the VS Code fontStyle:bold
+  configurationDefaults. Applies to every scheme (parent_scheme="Default").
+
+  Keep the key set in sync with FlatBarsSemanticTokensSupport.BOLD_KEYS; the
+  offline smoke test pins that they match.
+-->
+<scheme name="FlatBars Bold" version="142" parent_scheme="Default">
+  <attributes>
+    <option name="FLATBARS_VARIABLE">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_FUNCTION">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_MACRO">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_KEYWORD">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_OPERATOR">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_STRING">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_NUMBER">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_COMMENT">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+    <option name="FLATBARS_EMBEDDED_DELIMITER">
+      <value><option name="FONT_TYPE" value="1" /></value>
+    </option>
+  </attributes>
+</scheme>

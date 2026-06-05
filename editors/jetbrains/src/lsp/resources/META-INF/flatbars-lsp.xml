@@ -12,5 +12,10 @@
       displayName="FlatBars"
       groupId="language"
       id="com.flatbars.settings"/>
+    <!-- Bold "isle" emphasis for the LSP semantic tokens: overlays FONT_TYPE=bold
+         on the FLATBARS_* keys (FlatBarsSemanticTokens.kt), foreground inherited
+         from each key's fallback. The JetBrains counterpart to VS Code's
+         fontStyle:bold configurationDefaults. -->
+    <additionalTextAttributes scheme="Default" file="colorSchemes/FlatBarsBold.xml"/>
   </extensions>
 </idea-plugin>

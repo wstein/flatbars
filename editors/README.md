@@ -52,6 +52,47 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
   `gradle buildPlugin -PwithLsp` — compiling the TextMate floor *and* the
   Ultimate-only LSP layer against the downloaded IntelliJ IDEA Ultimate SDK.
 
+## Bold tag emphasis (the "isle in the ocean")
+
+Every FlatBars tag — both brace clusters (`{{` `{{{` `{{{{` `{{&` … `}}` `}}}`
+`}}}}`) **and** everything between them — renders **bold**, so template logic
+stands out from the host text it's embedded in. This is a *theming* decision:
+a TextMate grammar assigns scopes, never font weight, so we never touch the
+grammar — we ship overridable defaults derived from `token-vocabulary.json`.
+
+- **VS Code — bold everywhere, all themes.** `editors/scripts/sync-manifests.mjs`
+  codegens a `contributes.configurationDefaults` block into the extension manifest,
+  in two layers (a semantic token overrides the TextMate scope under it, so both
+  are needed):
+  - `editor.tokenColorCustomizations.textMateRules` — bolds the `*.flatbars`
+    scopes (the *floor*, and tags **injected into host files**). These scopes are
+    unique to FlatBars, so the global rule is safe.
+  - `editor.semanticTokenColorCustomizations` — bolds every semantic type, scoped
+    to the four dialect languages (`[fullbars]` …) so we never bold a shared type
+    like `variable` outside a FlatBars document (the *ceiling*).
+
+  Both are **defaults** — override in your `settings.json`, e.g. to turn it off:
+
+  ```jsonc
+  "editor.semanticTokenColorCustomizations": { "[fullbars]": { "rules": { "variable": { "fontStyle": "" } } } }
+  ```
+
+  `check:editors-manifests` diffs the whole manifest, so the bold block can't drift
+  from the vocabulary.
+
+- **JetBrains — bold on the LSP ceiling (Ultimate 2024.2+).** The descriptor's
+  `lspCustomization` installs `FlatBarsSemanticTokensSupport`, which maps each
+  semantic-token type to a `FLATBARS_*` text-attribute key; `FlatBarsBold.xml`
+  (registered via `additionalTextAttributes`) overlays `FONT_TYPE = bold` while the
+  foreground inherits from each key's fallback, keeping it theme-agnostic. The
+  offline `test:jetbrains` pins the wiring and the key-set ↔ vocabulary parity;
+  real bold is verified by the `-PwithLsp` build in `editors.yml`.
+  - **Community / TextMate floor: theme-controlled, not forced.** JetBrains paints
+    TextMate scopes from the *active color scheme* and exposes no plugin-side hook
+    to force a font weight on a scope, so bold there is the user's scheme choice
+    (no `configurationDefaults` equivalent). This is a platform limitation, the
+    same class as the Ultimate-only LSP ceiling.
+
 ## Changing things
 
 - New/renamed token kind → edit `token-vocabulary.json`, update the engine

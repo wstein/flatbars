@@ -39,6 +39,37 @@ const vocabulary = JSON.parse(
 );
 const customSemanticTypes = vocabulary.customSemanticTypes ?? [];
 
+// ── Bold "isle" emphasis, derived from the vocabulary ────────────────────────
+// The whole FlatBars tag — both brace clusters and everything between them (the
+// "isle in the ocean") — renders BOLD. This is a *theming* decision, not a
+// grammar one: a TextMate grammar assigns scopes, never font weight, so we ship
+// it as `contributes.configurationDefaults` (overridable defaults, not a theme
+// that hijacks the user's colours). Two layers, because in VS Code a semantic
+// token overrides the TextMate scope under it:
+//
+//   • textMateRules — the FLOOR (and tags injected into host files). Every
+//     `*.flatbars` scope the vocabulary names is unique to us, so bolding them
+//     globally is safe and also reaches injected-in-host tags. `meta.embedded.*`
+//     catches the default-coloured interior the floor leaves unscoped.
+//   • semanticTokenColorCustomizations — the CEILING (native files, server
+//     attached). The LSP repaints the interior with shared semantic types
+//     (`variable`, `keyword`, …) that are NOT ours, so these MUST be scoped to
+//     the four dialect languages or we'd bold every variable in the user's JS.
+//
+// Both sets are projected from token-vocabulary.json so a new kind/scope flows
+// in without a hand-edit; `check:editors-manifests` diffs the whole manifest.
+const BOLD_TM_SCOPES = [
+  ...new Set(Object.values(vocabulary.kinds).flatMap((k) => k.tmScopes ?? [])),
+].sort();
+const BOLD_SEMANTIC_TYPES = [
+  ...new Set([
+    ...Object.values(vocabulary.kinds).map((k) => k.lsp?.type).filter(Boolean),
+    ...customSemanticTypes.map((t) => t.id),
+  ]),
+].sort();
+
+export { BOLD_TM_SCOPES, BOLD_SEMANTIC_TYPES };
+
 // Host scope set the injection grammar attaches to. Single-sourced here so the
 // VS Code manifest and the JetBrains TextMate-bundle manifest never drift.
 const INJECTION_HOSTS = [
@@ -119,6 +150,29 @@ function genVscodePackageJson() {
       injectTo: INJECTION_HOSTS,
     },
   ];
+  // Bold the whole tag — braces + interior — as an overridable default. The
+  // textMateRules are global (our `*.flatbars` scopes are unique, so this also
+  // bolds tags injected into host files); the semantic rules are per-dialect so
+  // we never touch a shared semantic type outside a FlatBars document.
+  pkg.contributes.configurationDefaults = {
+    "editor.tokenColorCustomizations": {
+      textMateRules: BOLD_TM_SCOPES.map((scope) => ({
+        scope,
+        settings: { fontStyle: "bold" },
+      })),
+    },
+    "editor.semanticTokenColorCustomizations": Object.fromEntries(
+      LANGUAGES.map((l) => [
+        `[${l.id}]`,
+        {
+          enabled: true,
+          rules: Object.fromEntries(
+            BOLD_SEMANTIC_TYPES.map((t) => [t, { fontStyle: "bold" }]),
+          ),
+        },
+      ]),
+    ),
+  };
   return [path, JSON.stringify(pkg, null, 2) + "\n"];
 }
 

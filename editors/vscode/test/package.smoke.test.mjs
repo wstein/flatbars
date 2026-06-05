@@ -44,6 +44,29 @@ assert.ok(Number(major) > 1 || (Number(major) === 1 && Number(minor) >= 74), "en
 const expectedActivations = manifest.contributes.languages.map((l) => `onLanguage:${l.id}`).sort();
 assert.deepEqual([...manifest.activationEvents].sort(), expectedActivations, "activationEvents = one onLanguage per contributed dialect");
 
+// ── Bold "isle" emphasis: configurationDefaults bold the whole tag ───────────
+// VS Code bolds every brace cluster + interior via overridable configurationDefaults,
+// codegenned from the vocabulary. Assert both layers match token-vocabulary.json so the
+// generated manifest can't silently drift from the contract (the positive companion to
+// check:editors-manifests' whole-file diff; mirrors the JetBrains parity assertion).
+const vocab = JSON.parse(readFileSync(resolve(root, "editors", "token-vocabulary.json"), "utf8"));
+const cfgDefaults = manifest.contributes.configurationDefaults;
+const expectTmScopes = [...new Set(Object.values(vocab.kinds).flatMap((k) => k.tmScopes ?? []))].sort();
+const boldTmScopes = cfgDefaults["editor.tokenColorCustomizations"].textMateRules
+  .filter((r) => r.settings.fontStyle === "bold")
+  .map((r) => r.scope)
+  .sort();
+assert.deepEqual(boldTmScopes, expectTmScopes, "textMateRules bold exactly the vocabulary's tmScopes");
+const expectSemTypes = [...new Set([
+  ...Object.values(vocab.kinds).map((k) => k.lsp?.type).filter(Boolean),
+  ...(vocab.customSemanticTypes ?? []).map((t) => t.id),
+])].sort();
+for (const id of LANGUAGE_IDS) {
+  const rules = cfgDefaults["editor.semanticTokenColorCustomizations"][`[${id}]`].rules;
+  const bold = Object.entries(rules).filter(([, v]) => v.fontStyle === "bold").map(([k]) => k).sort();
+  assert.deepEqual(bold, expectSemTypes, `[${id}] semantic rules bold exactly the vocabulary's token types`);
+}
+
 // ── Build the shippable assets (grammar + bundled server + extension) ────────
 execFileSync(process.execPath, [resolve(ext, "scripts", "sync-assets.mjs")], { stdio: "pipe" });
 const serverBundle = resolve(ext, "dist", "server", "flatbars-lsp.cjs");

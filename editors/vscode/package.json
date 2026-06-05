@@ -201,7 +201,197 @@
           ]
         }
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "comment.block.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.control.import.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.control.inheritance.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.control.section.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.directive.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "meta.embedded.block.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "meta.embedded.line.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "punctuation.section.embedded.begin.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "punctuation.section.embedded.end.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          }
+        ]
+      },
+      "editor.semanticTokenColorCustomizations": {
+        "[rawbars]": {
+          "enabled": true,
+          "rules": {
+            "comment": {
+              "fontStyle": "bold"
+            },
+            "embeddedDelimiter": {
+              "fontStyle": "bold"
+            },
+            "function": {
+              "fontStyle": "bold"
+            },
+            "keyword": {
+              "fontStyle": "bold"
+            },
+            "macro": {
+              "fontStyle": "bold"
+            },
+            "number": {
+              "fontStyle": "bold"
+            },
+            "operator": {
+              "fontStyle": "bold"
+            },
+            "string": {
+              "fontStyle": "bold"
+            },
+            "variable": {
+              "fontStyle": "bold"
+            }
+          }
+        },
+        "[minbars]": {
+          "enabled": true,
+          "rules": {
+            "comment": {
+              "fontStyle": "bold"
+            },
+            "embeddedDelimiter": {
+              "fontStyle": "bold"
+            },
+            "function": {
+              "fontStyle": "bold"
+            },
+            "keyword": {
+              "fontStyle": "bold"
+            },
+            "macro": {
+              "fontStyle": "bold"
+            },
+            "number": {
+              "fontStyle": "bold"
+            },
+            "operator": {
+              "fontStyle": "bold"
+            },
+            "string": {
+              "fontStyle": "bold"
+            },
+            "variable": {
+              "fontStyle": "bold"
+            }
+          }
+        },
+        "[fullbars]": {
+          "enabled": true,
+          "rules": {
+            "comment": {
+              "fontStyle": "bold"
+            },
+            "embeddedDelimiter": {
+              "fontStyle": "bold"
+            },
+            "function": {
+              "fontStyle": "bold"
+            },
+            "keyword": {
+              "fontStyle": "bold"
+            },
+            "macro": {
+              "fontStyle": "bold"
+            },
+            "number": {
+              "fontStyle": "bold"
+            },
+            "operator": {
+              "fontStyle": "bold"
+            },
+            "string": {
+              "fontStyle": "bold"
+            },
+            "variable": {
+              "fontStyle": "bold"
+            }
+          }
+        },
+        "[maxbars]": {
+          "enabled": true,
+          "rules": {
+            "comment": {
+              "fontStyle": "bold"
+            },
+            "embeddedDelimiter": {
+              "fontStyle": "bold"
+            },
+            "function": {
+              "fontStyle": "bold"
+            },
+            "keyword": {
+              "fontStyle": "bold"
+            },
+            "macro": {
+              "fontStyle": "bold"
+            },
+            "number": {
+              "fontStyle": "bold"
+            },
+            "operator": {
+              "fontStyle": "bold"
+            },
+            "string": {
+              "fontStyle": "bold"
+            },
+            "variable": {
+              "fontStyle": "bold"
+            }
+          }
+        }
+      }
+    }
   },
   "scripts": {
     "build": "node scripts/sync-assets.mjs",

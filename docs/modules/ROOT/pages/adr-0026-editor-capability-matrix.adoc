@@ -81,6 +81,14 @@ by name in a host-supplied registry, see ADR-003):
 | Canonical-spacing inside `{{ … }}` (one space after the opener, one before
   the closer, normalised internal whitespace). Single-document, deterministic.
 
+| Bold tag emphasis ("isle in the ocean")
+| Ship (new)
+| The whole tag — braces + interior — renders bold. VS Code: vocab-driven
+  `configurationDefaults` (overridable), bold on every theme + injected hosts.
+  JetBrains: bold on the LSP ceiling only (`lspCustomization` semantic-token
+  attributes); the TextMate floor stays theme-controlled (no plugin hook to
+  force a scope's font weight) — the same Ultimate-vs-Community asymmetry as LSP.
+
 | `textDocument/definition`
 | Do not ship
 | Would require a cross-template scope graph (which partial defines which
