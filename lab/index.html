@@ -1695,7 +1695,7 @@
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
       import { createRenderer } from "./stem.mjs?v=1";
-      import { createFlatBarsRenderer } from "./flatbars.mjs?v=3";
+      import { createFlatBarsRenderer } from "./flatbars.mjs?v=4";
       import { createMinBarsRenderer } from "./minbars.mjs?v=1";
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
@@ -1741,7 +1741,7 @@
         validView as ovValidView,
         viewKind,
         applyView,
-      } from "./output-view.mjs?v=2";
+      } from "./output-view.mjs?v=3";
       import { EditorState, Annotation, StateField, StateEffect, Compartment } from "https://esm.sh/@codemirror/state@6.5.2/es2022/state.mjs";
       import {
         Decoration,
@@ -3203,6 +3203,7 @@
       let lastEscapeRuns = null;    // #5: { html, plain, raw, total }
       let lastCoverage = [];        // #7: [{ kind, file, start, end, line, col, executed, count }]
       let lastAnalyse = { ok: true, findings: [] }; // ADR-022: truthiness portability (Truthiness panel)
+      let lastLint = { ok: true, findings: [] }; // ADR-019: canonicalization lint findings (Lint panel)
       let lastRequiredAssigns = []; // engine reflection: assign names the program reads
       let lastMissingAssigns = [];  // intersection: requiredAssigns NOT in current data
 
@@ -3213,6 +3214,7 @@
         if (view === "data") return lastData != null;
         if (view === "bytecode") return lastProgram != null;
         if (view === "compiled") return true; // depends only on the template source
+        if (view === "migrated") return true; // depends only on the template source
         return !!lastOutput;
       }
 
@@ -3405,6 +3407,25 @@
             text = r.ok ? r.value : "// compile error: " + r.error;
           }
           setOutputDoc(text, Decoration.none);
+        } else if (outputView === "migrated") {
+          // The template rewritten from Handlebars to MaxBars source (the
+          // `migrate` engine extension). Residuals the migrator could not safely
+          // rewrite are surfaced as leading `{{! … }}` MaxBars comments, so the
+          // pane stays valid MaxBars and a clean migration shows pure source.
+          lastSegViews = [];
+          let text = "{{! this engine has no migrator }}";
+          if (typeof renderer.migrate === "function") {
+            const r = renderer.migrate(templateSourceFor("main"));
+            if (!r.ok) {
+              text = "{{! migrate error: " + r.error + " }}";
+            } else {
+              const head = (r.residuals || []).map((x) =>
+                "{{! residual — " + x.kind + ": " + x.message +
+                (x.suggestion ? " — " + x.suggestion : "") + " }}").join("\n");
+              text = head ? head + "\n" + r.source : r.source;
+            }
+          }
+          setOutputDoc(text, Decoration.none);
         } else {
           const { segViews, deco } = buildProvenance(lastOutput, lastSegments);
           lastSegViews = segViews;
@@ -3473,6 +3494,12 @@
         }
         if (outputView === "compiled") {
           outputEditor.dispatch({ effects: outLangComp.reconfigure([jsLang]) });
+          return;
+        }
+        if (outputView === "migrated") {
+          // Migrated output is MaxBars template source — highlight it with the
+          // engine's own template grammar, like the source editor.
+          outputEditor.dispatch({ effects: outLangComp.reconfigure([htmlLang(), flatbarsHighlighting]) });
           return;
         }
         if (outputView !== "source") return;
@@ -3569,6 +3596,7 @@
         lastTimings = null; lastAst = null; lastDataAccess = []; lastWhitespace = [];
         lastDeps = null; lastCalls = []; lastEscapeRuns = null; lastCoverage = [];
         lastAnalyse = { ok: true, findings: [] };
+        lastLint = { ok: true, findings: [] };
         lastRequiredAssigns = []; lastMissingAssigns = [];
         const dataSource = yamlSrc; // the YAML tab's source (editor may show the transform)
         const mainSource = tabs[0].source;
@@ -3709,6 +3737,11 @@
         // findings for the Truthiness dock panel (FlatBars engine only).
         lastAnalyse = typeof renderer.analyze === "function"
           ? renderer.analyze({ source: mainSource }, data)
+          : { ok: true, findings: [] };
+        // ADR-019: deprecated-alias + non-canonical scoped-variable findings for
+        // the active dialect (the Lint dock panel; FlatBars engines only).
+        lastLint = typeof renderer.lint === "function"
+          ? renderer.lint(mainSource)
           : { ok: true, findings: [] };
         refreshCoverageGutter();
         // Engine-reported assigns that aren't present at the data root — a
@@ -4643,6 +4676,12 @@
           loadedExampleIdx = -1;
           setExampleLabel("(custom)");
           setOutputView(validView(s.v));
+          // A shared "Lint" link opens the requested dock panel (feature-gated
+          // like any tab, so it no-ops under an engine that lacks the feature).
+          if (typeof s.dk === "string") {
+            const dt = dockTabById(s.dk);
+            if (dt && tabVisible(dt)) { dockActiveTab = s.dk; setDockVisible(true); }
+          }
           showActiveTab(); run();
           return true;
         } catch { return false; }
@@ -5370,6 +5409,15 @@
             return lastAnalyse.findings.length ? "warn" : "success";
           },
           render: renderTruthiness },
+        // ADR-019: deprecated aliases + non-canonical scoped variables, each with
+        // the canonical spelling the editor quick-fix / `flatbars lint` steers to.
+        { id: "lint", label: "Lint", requires: ["lint"],
+          count: () => lastLint.findings.length,
+          badge: () => {
+            if (!lastLint.ok) return "";
+            return lastLint.findings.length ? "warn" : "success";
+          },
+          render: renderLint },
         // The read-only inspectors (moved here from the Sources pane). They are
         // not analyses with a count — `noBadge` suppresses the badge — and follow
         // the active file / last render (re-rendered by renderDock after each run).
@@ -5882,6 +5930,44 @@
           list.append(row);
           list.append(makeEl("div", { class: "cv-hint" },
             [makeEl("strong", {}, "Fix: "), plain(f.fix)]));
+        }
+        section.append(list);
+        body.append(section);
+      }
+
+      // Lint panel (ADR-019): the deprecated-alias + non-canonical scoped-variable
+      // findings for the active dialect — the same canonicalization the editor
+      // quick-fix and `flatbars lint` surface. Each row is severity + the message
+      // that names the canonical spelling; a clean template is positive evidence.
+      function renderLint(body) {
+        const a = lastLint;
+        const section = makeEl("div", { class: "cv-section" });
+        const plain = (s) => String(s).replace(/`/g, "");
+        if (!a.ok) {
+          section.append(makeEl("div", { class: "cv-empty" },
+            "Lint unavailable: " + (a.error || "the template did not parse.")));
+          body.append(section);
+          return;
+        }
+        const rows = a.findings;
+        section.append(makeEl("div", { class: "cv-head" }, [
+          makeEl("strong", {}, "Lint"),
+          " — ", String(rows.length), " canonicalization finding", rows.length === 1 ? "" : "s",
+        ]));
+        if (rows.length === 0) {
+          section.append(makeEl("div", { class: "cv-empty" },
+            "Every name is canonical — no deprecated aliases or legacy scoped variables."));
+          body.append(section);
+          return;
+        }
+        section.append(makeEl("div", { class: "cv-hint" },
+          "Each finding renders identically today, but a canonical spelling keeps the template portable. The editor quick-fix and flatbars lint steer to it."));
+        const list = makeEl("div", { class: "cv-rows" });
+        for (const f of rows) {
+          list.append(makeEl("div", { class: "cv-row" }, [
+            makeEl("span", { class: "cv-kind" }, f.name || f.severity),
+            makeEl("span", { class: "cv-label" }, plain(f.message)),
+          ]));
         }
         section.append(list);
         body.append(section);

@@ -37,6 +37,26 @@ preview views, confirm the iframe renders.
 - [ ] **HTML Preview** / **Markdown Preview** — iframe renders (text pane hidden).
 - [ ] **Render Data** — the view-model as YAML.
 - [ ] **Compiled JS** — the emitted module (FlatBars dialect), JS-highlighted.
+- [ ] **Migrated MaxBars** — the template rewritten from Handlebars to MaxBars
+      (template-grammar highlighted); residuals appear as leading `{{! … }}`
+      comments. The tab is **absent** under a non-FlatBars engine (gates on the
+      `migrate` capability). Opening `/lint`'s migrate examples via *Open in Lab*
+      lands here.
+
+## Checklist — Lint diagnostics panel (ADR-019)
+
+The canonicalization lint is a **dock panel** (next to Truthiness). With a
+template using a deprecated alias or legacy scoped variable
+(e.g. `{{ plus a b }}`, or `{{#each xs}}{{ index }}{{/each}}` in RawBars/MaxBars):
+
+- [ ] the **Lint** tab appears in the diagnostics dock, with a finding count and an
+      amber badge (green when there are none).
+- [ ] each finding row shows the offending name and the message naming the
+      canonical spelling.
+- [ ] the tab is **absent** under a non-FlatBars engine (gates on the `lint`
+      capability), and the scoped-variable lint does **not** fire in FullBars (where
+      `{{@index}}` is canonical).
+- [ ] opening `/lint`'s lint examples via *Open in Lab* lands with this panel open.
 
 ## Checklist — Truthiness diagnostics panel (ADR-022)
 

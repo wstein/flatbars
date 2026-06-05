@@ -25,6 +25,7 @@ export const VIEW_TABS = [
   { view: "data", label: "Render Data" },
   { view: "bytecode", label: "Bytecode", requires: ["bytecode-wire"] },
   { view: "compiled", label: "Compiled JS", requires: ["compile-js"] },
+  { view: "migrated", label: "Migrated MaxBars", requires: ["migrate"] },
 ];
 
 // The views the loaded engine actually exposes (ADR-0020 gate applied).
@@ -39,11 +40,11 @@ export function validView(view, features) {
 }
 
 // Whether a view paints into the read-only text editor (vs the preview iframe).
-// The text views: Plain Text, Render Data, Bytecode, ST4, Compiled JS.
+// The text views: Plain Text, Render Data, Bytecode, ST4, Compiled JS, Migrated.
 export function viewKind(view) {
   const text =
     view === "source" || view === "data" || view === "bytecode" || view === "st4" ||
-    view === "compiled";
+    view === "compiled" || view === "migrated";
   return text ? "text" : "preview";
 }
 

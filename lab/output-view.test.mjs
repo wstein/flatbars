@@ -21,14 +21,14 @@ import {
 } from "./output-view.mjs";
 
 // A FlatBars-shaped feature vector (mirrors flatbars.mjs BB_FEATURES, trimmed).
-const FB = ["surface-dialect", "core-dialect", "compile-js"];
-// An engine without the compile-js capability (e.g. a minimal/other engine).
+const FB = ["surface-dialect", "core-dialect", "compile-js", "migrate"];
+// An engine without the compile-js / migrate capabilities (e.g. MinBars).
 const NO_COMPILE = ["surface-dialect", "core-dialect"];
 
 // ── Layer 1: decision ───────────────────────────────────────────────────────
 
 test("viewKind: text views paint the editor, previews use the iframe", () => {
-  for (const v of ["source", "data", "bytecode", "st4", "compiled"]) {
+  for (const v of ["source", "data", "bytecode", "st4", "compiled", "migrated"]) {
     assert.equal(viewKind(v), "text", `${v} should be a text view`);
   }
   for (const v of ["rendered", "markdown"]) {
@@ -53,6 +53,13 @@ test("validView keeps an exposed view and falls back to rendered otherwise", () 
   assert.equal(validView("compiled", FB), "compiled");
   assert.equal(validView("compiled", NO_COMPILE), "rendered"); // gated off ⇒ fallback
   assert.equal(validView("bogus", FB), "rendered");
+});
+
+test("the Migrated MaxBars view is gated on the `migrate` capability", () => {
+  assert.ok(visibleViews(FB).some((t) => t.view === "migrated"), "shown when migrate advertised");
+  assert.ok(!visibleViews(NO_COMPILE).some((t) => t.view === "migrated"), "hidden otherwise");
+  assert.equal(validView("migrated", FB), "migrated");
+  assert.equal(validView("migrated", NO_COMPILE), "rendered"); // gated off ⇒ fallback
 });
 
 // ── Layer 2: wiring (hand-rolled fake DOM — interface only, no layout) ────────
