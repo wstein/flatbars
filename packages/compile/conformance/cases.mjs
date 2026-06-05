@@ -424,4 +424,13 @@ export const cases = [
   { name: "i18n-t-fallback", dialect: "surface", t: "{{ t \"greeting\" }}", d: {} },
   { name: "i18n-number-fallback", dialect: "surface", t: "{{ number n }}", d: { n: 1234 } },
   { name: "i18n-date-fallback", dialect: "surface", t: "{{ date d }}", d: { d: "2020-01-02" } },
+
+  // ── i18n WIRED (ADR-029) ─────────────────────────────────────────────────────
+  // With a host translator seeded on BOTH paths (interpreter via renderSurfaceI18n,
+  // compiled via rt.registerTranslator), the i18n ops return its text identically —
+  // gating the compile ≡ interpret invariant for the wired seam path (#1 complete).
+  { name: "i18n-t-wired", dialect: "surface", t: "{{ t \"hi\" }}", d: {},
+    translator: (name, args) => (name === "t" && args[0] === "hi" ? "salut" : undefined), expect: "salut" },
+  { name: "i18n-number-wired", dialect: "surface", t: "{{ number n }}", d: { n: 1234.5 },
+    translator: (name) => (name === "number" ? "1,234.5" : undefined), expect: "1,234.5" },
 ];

@@ -25,7 +25,7 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsCompat, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMinbarsCompat, renderMustache, renderWith, renderRawWith, renderMaxWith, safe } =
+const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsCompat, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMinbarsCompat, renderMustache, renderWith, renderRawWith, renderMaxWith, renderSurfaceI18n, safe } =
   await import(enginePath);
 
 // Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
@@ -53,15 +53,19 @@ const renderWithFor = (dialect) =>
   dialect === "rawbars" ? renderRawWith
     : dialect === "maxbars" ? renderMaxWith
     : renderWith;
-const interpret = (t, d, dialect, partials, helpers) =>
-  helpers ? renderWithFor(dialect)(helpers, partials || {}, t, d == null ? null : d)
+const interpret = (t, d, dialect, partials, helpers, translator) =>
+  translator ? renderSurfaceI18n(translator, t, d == null ? null : d)
+    : helpers ? renderWithFor(dialect)(helpers, partials || {}, t, d == null ? null : d)
     : (dialect === "minbars" && partials) ? renderMustache(partials, t, d == null ? null : d)
     : interpreterFor(dialect)(t, d == null ? null : d);
 
 // Compile then execute against the runtime: -> { ok, value, error }. Custom-helper
 // cases (ADR-018) register their helpers on the runtime first, then compile as
 // surface — the same names route through `rt.call` → the registry.
-async function runCompiled(t, d, dialect, partials, helpers) {
+async function runCompiled(t, d, dialect, partials, helpers, translator) {
+  // ADR-029: seed (or clear) the host translator on the runtime so the compiled
+  // i18n ops consult the same brain the interpreter does — the wired seam path.
+  rt.registerTranslator(translator || null);
   if (helpers) {
     for (const [n, f] of Object.entries(helpers)) {
       const fn = typeof f === "function" ? f : f.fn; // a bag value is fn or { fn, arity }
@@ -161,9 +165,9 @@ const allCases = [...corpus, ...exampleCases(), ...helperCases];
 
 let pass = 0, fail = 0;
 const fails = [];
-for (const { name, t, d, dialect, partials, helpers, expect, expectError } of allCases) {
-  const spec = interpret(t, d, dialect, partials, helpers);
-  const got = await runCompiled(t, d, dialect, partials, helpers);
+for (const { name, t, d, dialect, partials, helpers, translator, expect, expectError } of allCases) {
+  const spec = interpret(t, d, dialect, partials, helpers, translator);
+  const got = await runCompiled(t, d, dialect, partials, helpers, translator);
   // `expectError`: both paths must fail, each reporting the same diagnostic text
   // (e.g. the arity message) — gates the interpreter/compiled error agreement.
   if (expectError !== undefined) {
