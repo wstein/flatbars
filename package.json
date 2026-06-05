@@ -34,7 +34,7 @@
     "check:parity": "node scripts/check-parity.mjs",
     "gen:bundle": "spago build -p flatbars-js && npx --yes esbuild@0.28.0 output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs",
     "check:bundle": "spago build -p flatbars-js && node scripts/check-bundle.mjs",
-    "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/minbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs && node lab/helpers.test.mjs && node lab/i18n.test.mjs && node lab/config.test.mjs && node lab/output-view.test.mjs",
+    "test:lab": "node lab/playground_utils.test.mjs && node lab/flatbars.test.mjs && node lab/minbars.test.mjs && node lab/open-in-lab.test.mjs && node lab/cm-flatbars.test.mjs && node lab/helpers.test.mjs && node lab/i18n.test.mjs && node lab/output-view.test.mjs",
     "test:lsp": "node editors/lsp/test/tokens.test.mjs && node editors/lsp/test/operations.test.mjs && node editors/lsp/test/protocol.test.mjs",
     "test:vscode": "node editors/vscode/test/package.smoke.test.mjs",
     "test:vscode:ide": "node editors/vscode/test/ide/runTest.mjs",

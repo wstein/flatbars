@@ -3873,10 +3873,9 @@
           const catSrc = (ENGINE !== "minbars") ? (catalogSource || "").trim() : "";
           let output, segments;
           if (helperSrc || catSrc) {
-            const cfgSrc = `i18n:\n  locale: ${labLocale}`;
             const key = helperKey(mainSource, partialsMap(), data, helperSrc, catSrc, labLocale, ENGINE);
             if (helperCache.key !== key) {
-              requestHelperRender(key, { dialect: ENGINE, template: mainSource, data, partials: partialsMap(), helperSrc, catalogSrc: catSrc, configSrc: cfgSrc });
+              requestHelperRender(key, { dialect: ENGINE, template: mainSource, data, partials: partialsMap(), helperSrc, catalogSrc: catSrc, locale: labLocale });
               setOutput("rendering…"); setError(""); renderDock(); saveHash(); lastTimings = null;
               return;
             }

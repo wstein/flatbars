@@ -54,11 +54,11 @@ try {
   fail++;
 }
 
-// ── catalog.yaml + config.yaml route: the Lab's reserved tabs (ADR-029) ──────
+// ── catalog.yaml route: the Lab's LOCALIZATION view (ADR-029) ────────────────
 // flagshipCatalogYaml is the catalog rendered as message-only YAML; the Lab's
-// buildI18nHelpers (its worker builder) bound to the config.yaml locale must
-// render every cell — and the flagship — identically to the live makeI18nHelpers,
-// so the catalog.yaml round-trip can't drift from the page.
+// buildI18nHelpers (its worker builder), bound to a locale, must render every
+// cell — and the flagship — identically to the live makeI18nHelpers, so the
+// catalog.yaml round-trip can't drift from the page.
 console.log("\ncatalog.yaml route (Lab builder ≡ page):");
 try {
   const r = await createFlatBarsRenderer("fullbars");

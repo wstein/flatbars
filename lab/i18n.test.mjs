@@ -30,7 +30,6 @@ pl:
     many: "Usunięto {count} plików"
     other: "Usunięto {count} pliku"
 `;
-const CONFIG_PL = "i18n:\n  locale: pl";
 
 test("empty catalog is a valid empty bag", () => {
   assert.deepEqual(buildI18nHelpers("", "en", loadYaml), { ok: true, helpers: {}, error: "" });
@@ -57,23 +56,23 @@ test("a malformed / non-mapping catalog is reported, not thrown", () => {
   assert.match(buildI18nHelpers("- a\n- b", "en", loadYaml).error, /catalog\.yaml/);
 });
 
-test("the worker renders against catalog + config for each t-supporting dialect", () => {
+test("the worker renders against catalog + locale for each t-supporting dialect", () => {
   // FullBars: hash-arg surface
-  const fb = runHelperRequest({ dialect: "fullbars", template: '{{t "greeting" name=who}}', data: { who: "Ada" }, catalogSrc: CATALOG, configSrc: CONFIG_PL });
+  const fb = runHelperRequest({ dialect: "fullbars", template: '{{t "greeting" name=who}}', data: { who: "Ada" }, catalogSrc: CATALOG, locale: "pl" });
   assert.equal(fb.value, "Cześć, Ada!", fb.error);
   // MaxBars: borrows the FullBars surface
-  const mx = runHelperRequest({ dialect: "maxbars", template: '{{t "greeting" name=who}}', data: { who: "Ada" }, catalogSrc: CATALOG, configSrc: CONFIG_PL });
+  const mx = runHelperRequest({ dialect: "maxbars", template: '{{t "greeting" name=who}}', data: { who: "Ada" }, catalogSrc: CATALOG, locale: "pl" });
   assert.equal(mx.value, "Cześć, Ada!", mx.error);
   // RawBars: the desugared core surface — explicit dict + lookup, no hash sugar
-  const rb = runHelperRequest({ dialect: "rawbars", template: '{{{t "greeting" (dict "name" (lookup this "who"))}}}', data: { who: "Ada" }, catalogSrc: CATALOG, configSrc: CONFIG_PL });
+  const rb = runHelperRequest({ dialect: "rawbars", template: '{{{t "greeting" (dict "name" (lookup this "who"))}}}', data: { who: "Ada" }, catalogSrc: CATALOG, locale: "pl" });
   assert.equal(rb.value, "Cześć, Ada!", rb.error);
-  const rb2 = runHelperRequest({ dialect: "rawbars", template: '{{{t "hello"}}}', data: {}, catalogSrc: CATALOG, configSrc: CONFIG_PL });
+  const rb2 = runHelperRequest({ dialect: "rawbars", template: '{{{t "hello"}}}', data: {}, catalogSrc: CATALOG, locale: "pl" });
   assert.equal(rb2.value, "Witaj!", rb2.error);
 });
 
-test("config.yaml drives the locale; default is en", () => {
-  const noCfg = runHelperRequest({ dialect: "fullbars", template: '{{t "hello"}}', data: {}, catalogSrc: CATALOG });
-  assert.equal(noCfg.value, "Hi there", noCfg.error); // en default
+test("locale defaults to en when none is given", () => {
+  const noLoc = runHelperRequest({ dialect: "fullbars", template: '{{t "hello"}}', data: {}, catalogSrc: CATALOG });
+  assert.equal(noLoc.value, "Hi there", noLoc.error); // en default
 });
 
 test("helpers.js overrides a catalog-derived helper", () => {
@@ -82,13 +81,12 @@ test("helpers.js overrides a catalog-derived helper", () => {
     template: '{{t "greeting" name=who}}',
     data: { who: "Ada" },
     catalogSrc: CATALOG,
-    configSrc: CONFIG_PL,
+    locale: "pl",
     helperSrc: "registerHelper('t', (k) => 'OVERRIDDEN:' + k)",
   });
   assert.equal(res.value, "OVERRIDDEN:greeting", res.error);
 });
 
-test("a malformed catalog/config surfaces as a render error, not a throw", () => {
+test("a malformed catalog surfaces as a render error, not a throw", () => {
   assert.match(runHelperRequest({ template: "{{x}}", data: {}, catalogSrc: "- bad" }).error, /catalog\.yaml/);
-  assert.match(runHelperRequest({ template: "{{x}}", data: {}, configSrc: "- bad" }).error, /config\.yaml/);
 });

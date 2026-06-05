@@ -15,7 +15,6 @@
 
 import { buildHelpers } from "./helpers.mjs";
 import { buildI18nHelpers } from "./i18n.mjs";
-import { parseConfig } from "./config.mjs";
 import { load as loadYaml } from "./vendor/js-yaml.mjs";
 import { renderWith, renderRawWith, renderMaxWith, safe } from "./vendor/flatbars-engine.mjs?v=49";
 
@@ -23,19 +22,17 @@ import { renderWith, renderRawWith, renderMaxWith, safe } from "./vendor/flatbar
 // catalog/`t` are excluded, ADR-029), so it never reaches the worker.
 const RENDER_BY_DIALECT = { rawbars: renderRawWith, fullbars: renderWith, maxbars: renderMaxWith };
 
-const DEPS = { buildHelpers, buildI18nHelpers, parseConfig, loadYaml, renderByDialect: RENDER_BY_DIALECT, safe };
+const DEPS = { buildHelpers, buildI18nHelpers, loadYaml, renderByDialect: RENDER_BY_DIALECT, safe };
 
-// Render `req = { dialect, template, data, partials, helperSrc, catalogSrc, configSrc }`.
+// Render `req = { dialect, template, data, partials, helperSrc, catalogSrc, locale }`.
 // The i18n bag (t/number/…) is built from the `catalog.yaml` messages bound to the
-// `config.yaml` locale (ADR-029); explicit `helpers.js` overrides it. The render
-// entry is picked by dialect (RawBars/FullBars/MaxBars). Returns `{ ok, value,
-// error }`. Pure (modulo the injected engine); never throws.
+// active `locale` (from config.yaml, ADR-029); explicit `helpers.js` overrides it.
+// The render entry is picked by dialect (RawBars/FullBars/MaxBars). Returns
+// `{ ok, value, error }`. Pure (modulo the injected engine); never throws.
 export function runHelperRequest(req, deps = DEPS) {
-  const { buildHelpers: build, buildI18nHelpers: buildI18n, parseConfig: parseCfg, loadYaml: yaml, renderByDialect, safe: safeFn } = deps;
+  const { buildHelpers: build, buildI18nHelpers: buildI18n, loadYaml: yaml, renderByDialect, safe: safeFn } = deps;
   const r = req || {};
-  const cfg = parseCfg(r.configSrc || "", yaml);
-  if (!cfg.ok) return { ok: false, value: "", error: cfg.error };
-  const i18n = buildI18n(r.catalogSrc || "", cfg.config.locale, yaml);
+  const i18n = buildI18n(r.catalogSrc || "", r.locale || "en", yaml);
   if (!i18n.ok) return { ok: false, value: "", error: i18n.error };
   const built = build(r.helperSrc || "", safeFn);
   if (!built.ok) return { ok: false, value: "", error: "helper error — " + built.error };
