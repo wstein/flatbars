@@ -13,7 +13,7 @@
 import Reference from "../layouts/Reference.astro";
 import TryI18n from "../components/TryI18n.jsx";
 import OpenInLab from "../components/OpenInLab.jsx";
-import { sections, flagship, integrationSource, escapeHatch, i18nHelperSource } from "../i18n.mjs";
+import { sections, flagship, integrationSource, escapeHatch, flagshipCatalogYaml } from "../i18n.mjs";
 
 const groups = [
   {
@@ -141,16 +141,16 @@ const intro = sections[0].cells[0];
     <TryI18n client:visible template={flagship.template} data={flagship.data} locale={flagship.locale} />
     <p>
       <b>Open in Lab</b> carries the whole setup across — the template, the data, and
-      a self-contained <code>registerHelper("t", …)</code> that inlines the catalogue
-      and locale (the i18n round-trip, mirroring the <a href="/transform">Data shaping</a>
-      transform one). The Lab runs that helper sandboxed and renders the same output.
+      the catalogue as a dedicated <code>catalog.yaml</code> tab (strings as YAML, not
+      code). The Lab reserves that tab name, parses it, and builds the
+      <code>t</code>/<code>number</code>/… bag from it, rendering the same output.
     </p>
     <OpenInLab
       client:visible
       engine="fullbars"
       template={flagship.template}
       data={flagship.data}
-      helpers={i18nHelperSource(flagship.locale)}
+      catalog={flagshipCatalogYaml}
     />
   </section>
 

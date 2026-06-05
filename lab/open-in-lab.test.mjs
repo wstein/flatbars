@@ -72,6 +72,16 @@ test("workspaceState carries custom-helper source in its own field `h` (ADR-018)
   assert.equal(workspaceState({ template: "x", helpers: "  \n" }).h, undefined);
 });
 
+test("workspaceState carries an i18n catalog as a reserved `catalog.yaml` tab (ADR-029)", () => {
+  const catalog = "locale: pl\nmessages:\n  pl:\n    greeting: \"Cześć, {name}!\"";
+  const s = workspaceState({ template: '{{t "greeting" name=name}}', catalog });
+  const cat = s.tabs.find((t) => t.n === "catalog.yaml");
+  assert.ok(cat, "a catalog.yaml tab is present");
+  assert.equal(cat.s, catalog);
+  // whitespace-only catalogs are treated as none
+  assert.equal(workspaceState({ template: "x", catalog: "  \n" }).tabs.find((t) => t.n === "catalog.yaml"), undefined);
+});
+
 test("workspaceState carries an output view (`v`) and dock panel (`dk`)", async () => {
   // A "Migrate" example lands in the Migrated MaxBars output view; a "Lint"
   // example opens the Lint dock panel. Both are feature-gated on restore.

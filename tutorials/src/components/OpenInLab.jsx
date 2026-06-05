@@ -15,6 +15,7 @@ import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 import { renderWith, safe } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
+import { buildI18nHelpers } from "../../../lab/i18n.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
 import { highlightTemplate, highlightYaml, highlightJsonata, esc } from "../lib/highlight.mjs";
 
@@ -71,7 +72,7 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars", label }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", labUrl = LAB_URL, compile = false }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", labUrl = LAB_URL, compile = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
@@ -122,11 +123,15 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     // With custom helpers, render through the engine facade's `renderWith`
     // (which marshals the JS helpers into the interpreter); otherwise the
     // adapter's plain render. `safe(html)` is available to the helper source.
+    // The i18n catalog (ADR-029) builds the t/number/… bag; explicit helpers.js
+    // overrides it — the same merge the Lab's worker does.
+    const i18n = buildI18nHelpers(catalog || "", loadYaml);
+    if (!i18n.ok) { setOut({ ok: false, text: "⚠ " + i18n.error }); return; }
     const hsrc = (helpersStr || "").trim();
-    if (hsrc) {
+    if (hsrc || Object.keys(i18n.helpers).length) {
       const built = buildHelpers(hsrc, safe);
       if (!built.ok) { setOut({ ok: false, text: "⚠ helper error — " + built.error }); return; }
-      const r = renderWith(built.helpers, parts || {}, tpl, data ?? {});
+      const r = renderWith({ ...i18n.helpers, ...built.helpers }, parts || {}, tpl, data ?? {});
       setOut(r.ok ? { ok: true, text: r.value } : { ok: false, text: r.error });
       return;
     }
@@ -136,7 +141,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     } catch (e) {
       setOut({ ok: false, text: String((e && e.message) || e) });
     }
-  }, [renderer, tpl, dataStr, transformStr, parts, helpersStr]);
+  }, [renderer, tpl, dataStr, transformStr, parts, helpersStr, catalog]);
 
   // Optional: compile the template to a JS module (RawBars/FullBars/MaxBars only).
   useEffect(() => {
@@ -148,11 +153,11 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace.
   useEffect(() => {
     let live = true;
-    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr }, { labUrl })
+    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr, catalog }, { labUrl })
       .then((h) => { if (live) setHref(h); })
       .catch(() => {});
     return () => { live = false; };
-  }, [tpl, dataStr, transformStr, parts, helpersStr]);
+  }, [tpl, dataStr, transformStr, parts, helpersStr, catalog]);
 
   // A full-width template row only pays off when the template is actually wide
   // (multi-line or long); a short one-liner like `{{> card}}` would just leave a

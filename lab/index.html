@@ -2037,11 +2037,15 @@
       // entry kicks off the async render (which re-runs once it lands).
       let helpersSrc = "";
       let helpersDirty = false;
-      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=1");
+      const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=2");
+      // The reserved tab name whose YAML is the i18n catalog (ADR-029), not a
+      // partial. partialsMap() excludes it; catalogSrc() reads it; the worker
+      // builds the t/number/date/selectPlural/relative bag from it.
+      const CATALOG_TAB = "catalog.yaml";
       let helperCache = { key: null, output: "", error: "" };
       let helperInFlight = null;
-      function helperKey(tmpl, partials, data, src) {
-        try { return JSON.stringify([tmpl, partials, data, src]); } catch { return null; }
+      function helperKey(tmpl, partials, data, src, catalog) {
+        try { return JSON.stringify([tmpl, partials, data, src, catalog]); } catch { return null; }
       }
       async function requestHelperRender(key, req) {
         if (helperInFlight === key) return; // this exact input is already rendering
@@ -2083,8 +2087,13 @@
 
       function partialsMap() {
         const map = {};
-        for (let i = 1; i < tabs.length; i++) map[tabs[i].name] = tabs[i].source;
+        for (let i = 1; i < tabs.length; i++) if (tabs[i].name !== CATALOG_TAB) map[tabs[i].name] = tabs[i].source;
         return map;
+      }
+      // The i18n catalog tab's YAML (ADR-029), or "" when there is no such tab.
+      function catalogSrc() {
+        for (let i = 1; i < tabs.length; i++) if (tabs[i].name === CATALOG_TAB) return tabs[i].source || "";
+        return "";
       }
 
       // ── CodeMirror ────────────────────────────────────────────────────
@@ -3831,11 +3840,12 @@
           // async render re-run. Provenance segments aren't produced for helper
           // renders (as the in-process renderWith path also returns none).
           const helperSrc = (ENGINE === "fullbars") ? (helpersSrc || "").trim() : "";
+          const catSrc = (ENGINE === "fullbars") ? catalogSrc().trim() : "";
           let output, segments;
-          if (helperSrc) {
-            const key = helperKey(mainSource, partialsMap(), data, helperSrc);
+          if (helperSrc || catSrc) {
+            const key = helperKey(mainSource, partialsMap(), data, helperSrc, catSrc);
             if (helperCache.key !== key) {
-              requestHelperRender(key, { template: mainSource, data, partials: partialsMap(), helperSrc });
+              requestHelperRender(key, { template: mainSource, data, partials: partialsMap(), helperSrc, catalogSrc: catSrc });
               setOutput("rendering…"); setError(""); renderDock(); saveHash(); lastTimings = null;
               return;
             }

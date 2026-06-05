@@ -14,6 +14,8 @@
 // number grouping cells show `Intl.NumberFormat` per locale — both for free from
 // the platform, which is exactly why i18next is NOT vendored.
 
+import { dump as dumpYaml } from "../../lab/vendor/js-yaml.mjs";
+
 // ── The host's message catalog ───────────────────────────────────────────────
 // A plain object the host owns (ADR-029: the host supplies the brain). A string
 // value is a direct message; an object value is keyed by CLDR plural category,
@@ -362,3 +364,8 @@ export const flagship = {
   data: { user: "Ada", n: 5 },
   expect: "Cześć, Ada!\nUsunięto 5 plików",
 };
+
+// The same catalog rendered as a `catalog.yaml` document (locale + messages), for
+// the Open-in-Lab round-trip into the Lab's dedicated catalog tab (ADR-029). The
+// strings live as YAML, not code; check:i18n asserts it renders the flagship.
+export const flagshipCatalogYaml = dumpYaml({ locale: flagship.locale, messages: catalog }).replace(/\n+$/, "");

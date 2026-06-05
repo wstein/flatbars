@@ -14,20 +14,27 @@
 // bottom is guarded so importing the module in Node is side-effect-free.
 
 import { buildHelpers } from "./helpers.mjs";
+import { buildI18nHelpers } from "./i18n.mjs";
+import { load as loadYaml } from "./vendor/js-yaml.mjs";
 import { renderWith, safe } from "./vendor/flatbars-engine.mjs?v=49";
 
-const DEPS = { buildHelpers, renderWith, safe };
+const DEPS = { buildHelpers, buildI18nHelpers, loadYaml, renderWith, safe };
 
-// Render `req = { template, data, partials, helperSrc }` with the helpers built
-// from `helperSrc`. Returns `{ ok, value, error }`. Pure (modulo the injected
-// engine); never throws.
+// Render `req = { template, data, partials, helperSrc, catalogSrc }` with the
+// helpers built from `helperSrc` (ADR-018) plus the i18n bag built from the
+// `catalog.yaml` tab (ADR-029). The explicit helpers.js source overrides the
+// catalog-derived t/number/… so a user can still customise. Returns
+// `{ ok, value, error }`. Pure (modulo the injected engine); never throws.
 export function runHelperRequest(req, deps = DEPS) {
-  const { buildHelpers: build, renderWith: render, safe: safeFn } = deps;
+  const { buildHelpers: build, buildI18nHelpers: buildI18n, loadYaml: yaml, renderWith: render, safe: safeFn } = deps;
   const r = req || {};
+  const i18n = buildI18n(r.catalogSrc || "", yaml);
+  if (!i18n.ok) return { ok: false, value: "", error: i18n.error };
   const built = build(r.helperSrc || "", safeFn);
   if (!built.ok) return { ok: false, value: "", error: "helper error — " + built.error };
+  const helpers = { ...i18n.helpers, ...built.helpers };
   try {
-    const out = render(built.helpers, r.partials || {}, r.template || "", r.data == null ? {} : r.data);
+    const out = render(helpers, r.partials || {}, r.template || "", r.data == null ? {} : r.data);
     return { ok: !!out.ok, value: out.value || "", error: out.error || "" };
   } catch (e) {
     return { ok: false, value: "", error: String((e && e.message) || e) };

@@ -15,9 +15,11 @@
 //      deliberate `missing` fallback cell) — the no-dangling / no-over-claim
 //      contract, mirroring check-jsonata's function coverage.
 import assert from "node:assert/strict";
-import { sections, flagship, catalog, locales, makeI18nHelpers, i18nHelperSource } from "../tutorials/src/i18n.mjs";
+import { sections, flagship, catalog, locales, makeI18nHelpers, i18nHelperSource, flagshipCatalogYaml } from "../tutorials/src/i18n.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { buildHelpers } from "../lab/helpers.mjs";
+import { buildI18nHelpers } from "../lab/i18n.mjs";
+import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
 import { safe } from "../lab/vendor/flatbars-engine.mjs";
 
 let fail = 0;
@@ -71,6 +73,23 @@ try {
   console.log(`  ✓ source renders all ${allCells.filter((c) => !c.missing).length} cells identically`);
 } catch (e) {
   console.error(`  ✗ round-trip: ${e && e.message ? e.message.split("\n")[0] : e}`);
+  fail++;
+}
+
+// ── catalog.yaml route: the dedicated Lab tab (ADR-029) ──────────────────────
+// flagshipCatalogYaml is the catalog rendered as YAML; buildI18nHelpers (the Lab's
+// worker builder) must render the flagship identically to the live helpers, so the
+// catalog.yaml tab can't drift from the page.
+console.log("\ncatalog.yaml route (buildI18nHelpers ≡ flagship):");
+try {
+  const built = buildI18nHelpers(flagshipCatalogYaml, loadYaml);
+  assert.ok(built.ok, `catalog built: ${built.error}`);
+  const r = await createFlatBarsRenderer("fullbars");
+  const prog = r.compile(flagship.template, {}, { helpers: built.helpers }).program;
+  assert.equal(r.render(prog, flagship.data), flagship.expect, "catalog.yaml renders the flagship");
+  console.log(`  ✓ flagshipCatalogYaml → ${JSON.stringify(flagship.expect)}`);
+} catch (e) {
+  console.error(`  ✗ catalog.yaml: ${e && e.message ? e.message.split("\n")[0] : e}`);
   fail++;
 }
 
