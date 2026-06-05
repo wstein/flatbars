@@ -34,7 +34,7 @@ export function dataText(data) {
 // (restoreHash restores it verbatim rather than reloading a catalog example);
 // tab 0 is the main template, the rest are named partials. Mirrors the field
 // shape `restoreHash` reads (`tabs:[{n,s}]`, `d`, `av`, `ai`).
-export function workspaceState({ template = "", data, partials, helpers, transform } = {}) {
+export function workspaceState({ template = "", data, partials, helpers, transform, view, dock } = {}) {
   const tabs = [{ s: template }];
   const p = partials || {};
   for (const name of Object.keys(p)) tabs.push({ n: name, s: p[name] });
@@ -47,6 +47,13 @@ export function workspaceState({ template = "", data, partials, helpers, transfo
   // reads as `s.t`). Lets a "Data shaping" example land in the Lab's transform
   // tab with the expression already loaded.
   if (transform && transform.trim()) st.t = transform;
+  // The output view to land on (`restoreHash` reads `s.v`, gated by the engine's
+  // features). Lets a "Migrate" example open straight into the "Migrated MaxBars"
+  // view instead of HTML Preview.
+  if (view) st.v = view;
+  // The dock panel to open (`restoreHash` reads `s.dk`, feature-gated). Lets a
+  // "Lint" example land with the Lint panel already showing its findings.
+  if (dock) st.dk = dock;
   return st;
 }
 

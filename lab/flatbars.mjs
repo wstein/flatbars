@@ -34,6 +34,8 @@ import {
   compileMaxbars as bbCompileMaxbars,
   renderWith as bbRenderWith,
   analyze as bbAnalyze,
+  lint as bbLint,
+  migrate as bbMigrate,
 } from "./vendor/flatbars-engine.mjs?v=44";
 
 const BB_VERSION = "0.1.0";
@@ -66,6 +68,8 @@ const BB_FEATURES = [
   "partial-graph",
   "compile-js", // FlatBars-only: compile the template to a JS module (Compiled JS view)
   "analyse", // ADR-022: trace a render, report truthiness portability (Truthiness view)
+  "lint", // ADR-019: deprecated-alias + non-canonical scoped-variable warnings (Lint panel)
+  "migrate", // Handlebars → MaxBars source rewrite, with a residual report (Migrated view)
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
   "maxbars-dialect", // FullBars + infix operators, pipes, bare loop variables
@@ -156,6 +160,27 @@ export async function createFlatBarsRenderer(dialectArg) {
     return bbAnalyze(program.source, d);
   }
 
+  // Canonicalization lint (ADR-019, the `lint` feature): the deprecated-alias and
+  // non-canonical scoped-variable warnings for the active dialect. Returns the
+  // facade's { ok, findings: [{severity, name, message}], report, error } object.
+  // The scoped-variable lint is surface-scoped, so it runs for rawbars/maxbars but
+  // not the FullBars surface — exactly as `flatbars lint` does on the CLI. The
+  // facade keys on the UI dialect name, so map the engine-internal one back
+  // (`core` → `rawbars`, `surface` → `fullbars`).
+  function lint(source, dialect) {
+    const internal = normalizeDialect(dialect) ?? activeDialect;
+    const ui = internal === "core" ? "rawbars" : internal === "surface" ? "fullbars" : internal;
+    return bbLint(source, ui);
+  }
+
+  // Handlebars → MaxBars source migration (the `migrate` feature): returns the
+  // facade's { ok, source, residuals: [{kind, message, suggestion}], error }
+  // object. Drives the "Migrated MaxBars" output view; residuals are the shapes
+  // the migrator flagged for a human rather than guessing.
+  function migrate(source) {
+    return bbMigrate(source);
+  }
+
   // ── AST + static analyses ──────────────────────────────────────────────────
   // parseAst returns the lowered AST in the host's {t:…} node shape (or {error}).
   // The engine facade does the parse+lower+map in PureScript; the analyses below
@@ -244,6 +269,8 @@ export async function createFlatBarsRenderer(dialectArg) {
   return {
     render,
     analyze,
+    lint,
+    migrate,
     compile,
     parseAst,
     inspectAt,

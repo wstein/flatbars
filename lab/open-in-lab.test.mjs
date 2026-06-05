@@ -72,6 +72,25 @@ test("workspaceState carries custom-helper source in its own field `h` (ADR-018)
   assert.equal(workspaceState({ template: "x", helpers: "  \n" }).h, undefined);
 });
 
+test("workspaceState carries an output view (`v`) and dock panel (`dk`)", async () => {
+  // A "Migrate" example lands in the Migrated MaxBars output view; a "Lint"
+  // example opens the Lint dock panel. Both are feature-gated on restore.
+  const mig = workspaceState({ template: "{{^x}}y{{/x}}", view: "migrated" });
+  assert.equal(mig.v, "migrated");
+  assert.equal(mig.dk, undefined);
+  const lint = workspaceState({ template: "{{ plus a b }}", dock: "lint" });
+  assert.equal(lint.dk, "lint");
+  assert.equal(lint.v, undefined);
+  // both absent → no noise in the workspace (short links stay compact).
+  const bare = workspaceState({ template: "x" });
+  assert.equal(bare.v, undefined);
+  assert.equal(bare.dk, undefined);
+  // and they survive the share-state round-trip through a labHref.
+  const href = await labHref("maxbars", { template: "{{ plus a b }}", dock: "lint" });
+  const state = await decodeFragment(href);
+  assert.equal(state.dk, "lint");
+});
+
 test("openInLab returns the URL when there is no window (SSR/build)", async () => {
   const href = await openInLab("rawbars", { template: "{{{ this }}}" }, { labUrl: "/lab/index.html" });
   assert.match(href, /^\/lab\/index\.html\?engine=rawbars#/);
