@@ -208,6 +208,13 @@
 .oil .oil-js .oil-out-pre { max-height: 22rem; }
 .oil .oil-js-note { font: 400 11px/1.4 var(--font-mono); color: var(--fg-faint); text-transform: none; letter-spacing: 0; }
 
+/* Live `flatbars lint` pane (opt-in): the same dark screen as the output. The
+   findings are FIXED colours — amber for a warning, green for the clean line —
+   because the pane is always dark in both themes (a theme token would vanish in
+   light mode, the bug that prompted this pane). */
+.oil .oil-lint .oil-lint-warn { color: #fbbf24; }
+.oil .oil-lint .oil-lint-ok { color: #86efac; }
+
 /* ── Lab affordance: DOCK (header toolbar) — quiet, labelled, always visible ── */
 .oil .oil-lab {
   text-decoration: none;

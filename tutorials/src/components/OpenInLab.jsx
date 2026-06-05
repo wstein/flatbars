@@ -13,7 +13,7 @@ import { labHref, dataText } from "../../../lab/open-in-lab.mjs";
 import { load as loadYaml } from "../../../lab/vendor/js-yaml.mjs";
 import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
-import { renderWith, renderRawWith, renderMaxWith, safe } from "../../../lab/vendor/flatbars-engine.mjs";
+import { renderWith, renderRawWith, renderMaxWith, safe, lint as runLint } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
 import { buildI18nHelpers } from "../../../lab/i18n.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
@@ -74,7 +74,7 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars", label }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", locale = "en", labUrl = LAB_URL, compile = false }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", locale = "en", labUrl = LAB_URL, compile = false, lint = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
@@ -87,6 +87,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   const [renderer, setRenderer] = useState(null);
   const [out, setOut] = useState({ ok: true, text: null }); // text === null ⇒ "rendering…"
   const [js, setJs] = useState(null); // compiled-JS pane (opt-in via `compile`)
+  const [lintRes, setLintRes] = useState(null); // live lint pane (opt-in via `lint`)
   const [href, setHref] = useState(null);
   // Only the compiling dialects (RawBars/FullBars/MaxBars) expose compileToJs;
   // MinBars doesn't, so the pane is gated on the method actually existing.
@@ -153,6 +154,21 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     const r = renderer.compileToJs(tpl);
     setJs(r && r.ok ? { ok: true, text: r.value } : { ok: false, text: (r && r.error) || "compile failed" });
   }, [canCompile, renderer, tpl]);
+
+  // Optional: run `flatbars lint` live as the template is edited, so the canonical-
+  // ization findings track every keystroke (the same `lint` the CLI/CI gate uses).
+  // Pure analysis — no render needed, so it doesn't wait on the engine adapter.
+  useEffect(() => {
+    if (!lint) return;
+    try {
+      const r = runLint(tpl, engine);
+      setLintRes(r && r.ok
+        ? { ok: true, report: r.report, findings: r.findings || [] }
+        : { ok: false, report: (r && r.error) || "lint failed", findings: [] });
+    } catch (e) {
+      setLintRes({ ok: false, report: String((e && e.message) || e), findings: [] });
+    }
+  }, [lint, tpl, engine]);
 
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace. The
   // i18n catalog + locale round-trip into the Lab's LOCALIZATION/catalog.yaml and
@@ -261,6 +277,20 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
           {js == null
             ? <pre class="oil-out-pre"><em>compiling…</em></pre>
             : <pre class={"oil-out-pre" + (js.ok ? "" : " err")}><code>{js.text}</code></pre>}
+        </div>
+      )}
+
+      {lint && (
+        <div class="oil-out oil-lint">
+          <div class="oil-cell-head oil-out-head">
+            <span class="oil-cap">flatbars lint</span>
+            <span class="oil-js-note">— live canonicalization findings</span>
+          </div>
+          {lintRes == null
+            ? <pre class="oil-out-pre"><em>linting…</em></pre>
+            : <pre class={"oil-out-pre" + (lintRes.ok ? "" : " err")}>
+                <code class={lintRes.findings.length ? "oil-lint-warn" : "oil-lint-ok"}>{lintRes.report}</code>
+              </pre>}
         </div>
       )}
     </figure>
