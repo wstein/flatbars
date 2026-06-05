@@ -402,17 +402,18 @@ const helpers = {
   null: () => null,
   lookup: (a) => lookup(...a),
   // ADR-029: the blessed i18n operations. FlatBars ships no i18n — a host supplies
-  // the brain via rt.register(name, fn), which these delegate to; with none
-  // registered they fall back purely, matching the interpreter's prelude
+  // the brain via rt.registerTranslator(fn), the first-class seam (NOT the
+  // user-helper registry), exactly mirroring the interpreter's RefEnv.translator.
+  // With none seeded they fall back purely, matching the interpreter's prelude
   // fallbacks (so compile ≡ interpret). t/number/date → the argument's plain text;
   // selectPlural → the English one/other rule.
-  t: (a) => { const u = userHelpers["t"]; return u ? callUser("t", u, a) : stringify(a[0]); },
-  number: (a) => { const u = userHelpers["number"]; return u ? callUser("number", u, a) : stringify(a[0]); },
-  date: (a) => { const u = userHelpers["date"]; return u ? callUser("date", u, a) : stringify(a[0]); },
-  selectPlural: (a) => { const u = userHelpers["selectPlural"]; return u ? callUser("selectPlural", u, a) : (num(a[0]) === 1 ? "one" : "other"); },
+  t: (a) => { const s = i18n("t", a); return s != null ? s : stringify(a[0]); },
+  number: (a) => { const s = i18n("number", a); return s != null ? s : stringify(a[0]); },
+  date: (a) => { const s = i18n("date", a); return s != null ? s : stringify(a[0]); },
+  selectPlural: (a) => { const s = i18n("selectPlural", a); return s != null ? s : (num(a[0]) === 1 ? "one" : "other"); },
   relative: (a) => {
-    const u = userHelpers["relative"];
-    if (u) return callUser("relative", u, a);
+    const s = i18n("relative", a);
+    if (s != null) return s;
     const v = num(a[0]), unit = stringify(a[1]), mag = Math.abs(v), magStr = stringify(mag);
     const punit = mag === 1 ? unit : unit + "s";
     return v < 0 ? magStr + " " + punit + " ago" : v > 0 ? "in " + magStr + " " + punit : "this " + unit;
@@ -518,6 +519,15 @@ const helpers = {
 // compiled module (this registry) and the interpreter (the facade marshals the
 // same functions into engine helpers), so the two paths agree.
 const userHelpers = Object.create(null);
+// ADR-029: the host's i18n brain — a single `translator(name, args)` the host
+// seeds via rt.registerTranslator. The blessed i18n ops (t/number/date/
+// selectPlural/relative) consult it (the seam) and fall back purely when it is
+// absent or returns null/undefined, so compile ≡ interpret. This is the runtime
+// twin of the interpreter's RefEnv.translator — deliberately NOT the user-helper
+// registry, so the engine always knows whether a host is wired.
+let translator = null;
+function registerTranslator(fn) { translator = typeof fn === "function" ? fn : null; return rt; }
+function i18n(name, args) { return translator ? translator(name, args) : undefined; }
 // Arity descriptor → text / check, matching the prelude (Kernel.Walk) and the
 // engine facade's FFI so a custom helper's arity diagnostics read like a
 // built-in's. `arity` is a number (exactly N), `[min, max]` (max null/Infinity ⇒
@@ -739,6 +749,7 @@ export const rt = {
   RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, partialBlock, block, raw, Safe,
   truthyHandlebars, truthyMustache, truthyNonEmpty, // ADR-022: the named truthiness callbacks (the seed binds one)
   register, // ADR-018: host-registered inline helpers
+  registerTranslator, // ADR-029: the host's i18n translator seam (t/number/date/…)
   mseed, mlookup, msection, mfalsy, mindentOverride,
 };
 export default rt;

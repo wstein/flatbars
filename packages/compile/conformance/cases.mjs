@@ -415,4 +415,13 @@ export const cases = [
   { name: "mjs:nonzero-truthy", dialect: "minbars-compat", t: "{{#n}}has{{/n}}{{^n}}none{{/n}}", d: { n: 5 } },
   { name: "mjs:empty-object-truthy", dialect: "minbars-compat", t: "{{#o}}has{{/o}}{{^o}}none{{/o}}", d: { o: {} } },
   { name: "mjs:empty-array-falsy", dialect: "minbars-compat", t: "{{#xs}}x{{/xs}}{{^xs}}none{{/xs}}", d: { xs: [] } },
+
+  // ── i18n fallback (ADR-029) ──────────────────────────────────────────────────
+  // The blessed i18n ops with NO host translator seeded: the interpreter prelude
+  // and the compiled runtime must both fall back to the argument's plain text.
+  // This gates ADR-029's compile ≡ interpret constraint for the unwired path (the
+  // permanent invariant); the wired-translator path is gated by check:i18n.
+  { name: "i18n-t-fallback", dialect: "surface", t: "{{ t \"greeting\" }}", d: {} },
+  { name: "i18n-number-fallback", dialect: "surface", t: "{{ number n }}", d: { n: 1234 } },
+  { name: "i18n-date-fallback", dialect: "surface", t: "{{ date d }}", d: { d: "2020-01-02" } },
 ];
