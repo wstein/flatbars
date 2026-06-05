@@ -31,9 +31,12 @@ module FullBars
 
 import Prelude
 
+import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Foldable (elem)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error, ParseError(..), renderParseErrorAt)
@@ -50,6 +53,7 @@ import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (Truthy, escapeHtml, handlebars, minimal, mustache, nonEmpty, presence, stringify)
+import Kernel.Walk (operationRefs)
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
 -- | `{{else}}` is a clause marker, not escaped output).
@@ -230,7 +234,32 @@ analyseSurface src dat = case parse src of
         Left e -> Left (formatError src e)
         Right r -> Right
           { output: r.output
-          , report: reportMarkdown src r.decisions
+          , report: reportMarkdown src r.decisions <> i18nNote template
           , jsonata: jsonataScaffold src r.decisions
           , findings: findings src r.decisions
           }
+
+-- | The blessed i18n operations (ADR-029) — the names the host `Translator` drives.
+i18nOpNames :: Array Ident
+i18nOpNames = [ "t", "number", "date", "selectPlural", "relative" ]
+
+-- | The ADR-029 flag, made precise by the first-class seam: analyse mode renders
+-- | with **no translator seeded** (`RefEnv.translator = Nothing`), so every i18n op
+-- | necessarily fell back to its key/value. Surface that as an informational report
+-- | note (not a truthiness finding — i18n has no branch that flips), so a host sees
+-- | "wire a translator or ship keys". Silent off a template that uses no i18n op.
+i18nNote :: Template -> String
+i18nNote template =
+  let
+    used = Array.filter (\r -> elem r.name i18nOpNames) (operationRefs template)
+  in
+    if Array.null used then ""
+    else
+      "\n\n## ℹ Localization (ADR-029)\n"
+        <> "This template calls "
+        <> show (Array.length used)
+        <> " i18n operation(s) ("
+        <> joinWith ", " (Array.nub (map _.name used))
+        <> ") — analysed with **no translator wired**, so each rendered its key/value "
+        <> "unchanged. Register a host translator (`registerTranslator`, or "
+        <> "`withTranslator` in PureScript) or they ship untranslated."

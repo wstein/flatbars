@@ -1140,6 +1140,20 @@ main = do
       assert' "t falls back to the key when unwired"
         ((runResolved [] identity nodes (obj []) :: Either Error String) == Right "greeting")
 
+  -- ADR-029 flag: analyse runs with no translator seeded, so a template using i18n
+  -- ops gets an informational "no translator wired" note (not a truthiness finding).
+  case analyseSurface "{{t \"greeting\"}} {{number n}}" (obj [ Tuple "n" (VNumber 3.0) ]) of
+    Left e -> assert' ("i18n analyse note: unexpected error: " <> e) false
+    Right a -> do
+      assert' ("i18n note present, got: " <> a.report)
+        (contains (Pattern "no translator wired") a.report)
+      assert' "i18n note lists the ops used" (contains (Pattern "t, number") a.report)
+  -- A template with no i18n op gets no note.
+  case analyseSurface "{{#if x}}y{{/if}}" (obj [ Tuple "x" (VBool true) ]) of
+    Left e -> assert' ("no-i18n analyse: unexpected error: " <> e) false
+    Right a -> assert' "no i18n note when unused"
+      (not (contains (Pattern "Localization (ADR-029)") a.report))
+
   -- Pluggable monad: the reference engine also runs in `ExceptT Error Aff`.
   launchAff_ do
     let dat = obj [ Tuple "name" (str "Ada") ]
