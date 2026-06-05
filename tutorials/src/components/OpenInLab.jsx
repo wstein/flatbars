@@ -15,7 +15,7 @@ import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 import { renderWith, renderRawWith, renderMaxWith, safe, lint as runLint } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
-import { buildI18nHelpers } from "../../../lab/i18n.mjs";
+import { makeI18nBag } from "../../../lab/i18n.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
 import { highlightTemplate, highlightYaml, highlightJsonata, esc } from "../lib/highlight.mjs";
 
@@ -74,10 +74,24 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars", label }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", locale = "en", labUrl = LAB_URL, compile = false, lint = false }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", locale = "en", locales = null, localeNames = {}, sharedCatalog = false, labUrl = LAB_URL, compile = false, lint = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
+  // i18n cards (ADR-029) get a live locale switcher; `loc` drives the render, the
+  // deep-link, and the output caption. The message `catalog.yaml` is editable too —
+  // shown as its own pane (below) so the example is self-contained — so it is state.
+  // `isI18n` = a catalog or a locale switcher is present, so the t/number/date/… bag
+  // is built even when the catalog is empty (the formatting cells use no `t` key but
+  // still need the native-Intl helpers).
+  const [loc, setLoc] = useState(locale);
+  const [catalogStr, setCatalogStr] = useState(catalog || "");
+  // `sharedCatalog` cards take the catalog from a shared store (passed live via the
+  // `catalog` prop, re-supplied on every edit) and show no catalog pane — the
+  // catalog lives once, at the top of the page. Plain cards own an editable copy
+  // (`catalogStr`) shown as a pane.
+  const effectiveCatalog = sharedCatalog ? (catalog || "") : catalogStr;
+  const isI18n = !!(effectiveCatalog && effectiveCatalog.trim()) || !!(locales && locales.length);
   const [transformStr, setTransformStr] = useState(transform || "");
   const [parts, setParts] = useState(partials || {});
   // Custom-helper JS source (ADR-018). Only the FullBars/Handlebars surface has
@@ -126,17 +140,29 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     // With custom helpers, render through the engine facade's `renderWith`
     // (which marshals the JS helpers into the interpreter); otherwise the
     // adapter's plain render. `safe(html)` is available to the helper source.
-    // The i18n catalog (ADR-029) builds the t/number/… bag, bound to `locale`;
-    // explicit helpers.js overrides it — the same merge the Lab's worker does.
-    // Renders through the surface's operations-aware entry.
-    const i18n = buildI18nHelpers(catalog || "", locale, loadYaml);
-    if (!i18n.ok) { setOut({ ok: false, text: "⚠ " + i18n.error }); return; }
+    // The i18n catalog (ADR-029) builds the t/number/… bag, bound to the active
+    // `loc`; explicit helpers.js overrides it — the same merge the Lab's worker
+    // does. The bag is built whenever this is an i18n card, even with an empty
+    // catalog, so the pure-formatting cells (number/date/…) get their helpers.
+    let i18nHelpers = {};
+    if (isI18n) {
+      let messages = {};
+      if (effectiveCatalog && effectiveCatalog.trim()) {
+        try {
+          messages = loadYaml(effectiveCatalog) || {};
+        } catch (e) {
+          setOut({ ok: false, text: "⚠ catalog.yaml — " + ((e && e.message) || e) });
+          return;
+        }
+      }
+      i18nHelpers = makeI18nBag(messages, loc);
+    }
     const hsrc = (helpersStr || "").trim();
-    if (hsrc || Object.keys(i18n.helpers).length) {
+    if (hsrc || Object.keys(i18nHelpers).length) {
       const built = buildHelpers(hsrc, safe);
       if (!built.ok) { setOut({ ok: false, text: "⚠ helper error — " + built.error }); return; }
       const render = RENDER_WITH[engine] || renderWith;
-      const r = render({ ...i18n.helpers, ...built.helpers }, parts || {}, tpl, data ?? {});
+      const r = render({ ...i18nHelpers, ...built.helpers }, parts || {}, tpl, data ?? {});
       setOut(r.ok ? { ok: true, text: r.value } : { ok: false, text: r.error });
       return;
     }
@@ -146,7 +172,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     } catch (e) {
       setOut({ ok: false, text: String((e && e.message) || e) });
     }
-  }, [renderer, tpl, dataStr, transformStr, parts, helpersStr, catalog, locale]);
+  }, [renderer, tpl, dataStr, transformStr, parts, helpersStr, effectiveCatalog, loc, isI18n]);
 
   // Optional: compile the template to a JS module (RawBars/FullBars/MaxBars only).
   useEffect(() => {
@@ -175,11 +201,11 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   // config.yaml views (ADR-029).
   useEffect(() => {
     let live = true;
-    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr, catalog, locale }, { labUrl })
+    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr, catalog: effectiveCatalog, locale: loc }, { labUrl })
       .then((h) => { if (live) setHref(h); })
       .catch(() => {});
     return () => { live = false; };
-  }, [tpl, dataStr, transformStr, parts, helpersStr, catalog, locale]);
+  }, [tpl, dataStr, transformStr, parts, helpersStr, effectiveCatalog, loc]);
 
   // A full-width template row only pays off when the template is actually wide
   // (multi-line or long); a short one-liner like `{{> card}}` would just leave a
@@ -191,21 +217,52 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   // With a JSONata transform (and no partials) the cell uses a dedicated layout:
   // transform + data side by side on top, template spanning both columns below
   // (see open-in-lab.css).
+  const showCatalog = !sharedCatalog && (catalogStr || "").trim().length > 0;
   const gridClass =
     "oil-grid" + (partialNames.length ? " has-partials" : "") + (partialNames.length && wideTemplate ? " wide-tpl" : "") +
-    (hasTransform && !partialNames.length ? " has-transform" : "");
+    (hasTransform && !partialNames.length ? " has-transform" : "") + (showCatalog ? " has-catalog" : "");
+
+  // i18n controls: a locale switcher (when `locales` is given) and a ± stepper for
+  // every numeric data field the template references (count, num, offset, …) — a
+  // quick way to explore plural categories and formatting without hand-editing the
+  // YAML. Each stepper writes its field back to the data YAML (one source of truth:
+  // it stays visible/editable in the data pane and rides the deep-link).
+  const showLocales = isI18n && locales && locales.length > 1;
+  const numFields = (() => {
+    if (!isI18n) return [];
+    let d;
+    try { d = dataStr.trim() === "" ? {} : loadYaml(dataStr); } catch { return []; }
+    if (!d || typeof d !== "object" || Array.isArray(d)) return [];
+    return Object.keys(d)
+      .filter((k) => typeof d[k] === "number" && new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(tpl))
+      .map((k) => ({ name: k, value: d[k] }));
+  })();
 
   const onTpl = (v) => { setTpl(v); setEdited(true); };
   const onData = (v) => { setDataStr(v); setEdited(true); };
   const onPart = (name, v) => { setParts((p) => ({ ...p, [name]: v })); setEdited(true); };
   const onHelpers = (v) => { setHelpersStr(v); setEdited(true); };
   const onTransform = (v) => { setTransformStr(v); setEdited(true); };
+  const onCatalog = (v) => { setCatalogStr(v); setEdited(true); };
+  const onLoc = (v) => { setLoc(v); setEdited(true); };
+  // A `count` is a non-negative quantity, so its stepper floors at 0; a genuinely
+  // signed field — a relative-time `offset`, a value to `number`-format — is left
+  // free to go negative.
+  const minForField = (field) => (field.toLowerCase() === "count" ? 0 : -Infinity);
+  const onNum = (field, v) => {
+    let d;
+    try { d = dataStr.trim() === "" ? {} : loadYaml(dataStr); } catch { return; }
+    setDataStr(dataText({ ...(d || {}), [field]: Math.max(minForField(field), Number(v) || 0) }));
+    setEdited(true);
+  };
   const reset = () => {
     setTpl(template);
     setDataStr(initialData);
     setTransformStr(transform || "");
     setParts(partials || {});
     setHelpersStr(helpers || "");
+    setCatalogStr(catalog || "");
+    setLoc(locale);
     setEdited(false);
   };
 
@@ -232,6 +289,40 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
         )}
       </div>
 
+      {(showLocales || numFields.length > 0) && (
+        <div class="oil-i18n-bar">
+          {showLocales && (
+            <div class="oil-loc-field">
+              <span class="oil-cap">locale</span>
+              <div class="oil-loc-seg" role="group" aria-label="Locale">
+                {locales.map((l) => (
+                  <button type="button" key={l} class={"oil-loc" + (l === loc ? " is-active" : "")}
+                          aria-pressed={l === loc} onClick={() => onLoc(l)}>
+                    {localeNames[l] || l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {numFields.map(({ name, value }) => (
+            <div class="oil-count-field" key={name}>
+              <span class="oil-cap">{name}</span>
+              <div class="oil-count">
+                <button type="button" class="oil-count-btn" aria-label={`Decrease ${name}`}
+                        disabled={value <= minForField(name)}
+                        onClick={() => onNum(name, value - 1)}>−</button>
+                <input type="number" class="oil-count-in" value={value}
+                       min={minForField(name) === -Infinity ? undefined : minForField(name)}
+                       aria-label={`${name} — numeric value`}
+                       onInput={(e) => onNum(name, e.currentTarget.value)} />
+                <button type="button" class="oil-count-btn" aria-label={`Increase ${name}`}
+                        onClick={() => onNum(name, value + 1)}>+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div class={gridClass}>
         <div class="oil-cell oil-tpl">
           <div class="oil-cell-head"><span class="oil-cap">template</span></div>
@@ -241,6 +332,12 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
           <div class="oil-cell-head"><span class="oil-cap">data</span></div>
           <CodeEditor lang="yaml" value={dataStr} onInput={onData} label="Data — YAML, editable" />
         </div>
+        {showCatalog && (
+          <div class="oil-cell oil-catalog">
+            <div class="oil-cell-head"><span class="oil-cap">catalog · YAML</span><span class="oil-js-note">— host messages, by locale</span></div>
+            <CodeEditor lang="yaml" value={catalogStr} onInput={onCatalog} label="Message catalog — YAML, editable" />
+          </div>
+        )}
         {hasTransform && (
           <div class="oil-cell oil-transform">
             <div class="oil-cell-head"><span class="oil-cap">transform · JSONata</span><span class="oil-js-note">— data → view-model</span></div>
@@ -262,7 +359,10 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       </div>
 
       <div class="oil-out">
-        <div class="oil-cell-head oil-out-head"><span class="oil-cap">output</span></div>
+        <div class="oil-cell-head oil-out-head">
+          <span class="oil-cap">output</span>
+          {isI18n && <span class="oil-js-note">— {localeNames[loc] || loc}</span>}
+        </div>
         {out.text == null
           ? <pre class="oil-out-pre"><em>rendering…</em></pre>
           : <pre class={"oil-out-pre" + (out.ok ? "" : " err")}><code>{out.text}</code></pre>}

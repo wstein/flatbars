@@ -105,6 +105,20 @@
   flex-wrap: wrap;
 }
 .oil .oil-grid.has-partials .oil-cell { flex: 1 1 11rem; min-width: 0; }
+/* i18n cards add a third input — the message catalog. Layout: template (top-left)
+   and data (below it) stack in the left column; the catalog is a tall right column
+   spanning both rows (it carries every locale's strings, so it runs taller). */
+.oil .oil-grid.has-catalog {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.oil .oil-grid.has-catalog .oil-tpl     { grid-column: 1; grid-row: 1; }
+.oil .oil-grid.has-catalog .oil-data    { grid-column: 1; grid-row: 2; }
+.oil .oil-grid.has-catalog .oil-catalog { grid-column: 2; grid-row: 1 / 3; }
+@media (max-width: 40rem) {
+  /* Stack on narrow screens: template → data → catalog, top to bottom. */
+  .oil .oil-grid.has-catalog { display: block; }
+}
 /* Only a WIDE template (multi-line/long, set by the component) gets its own
    full-width row; a short one-liner shares the row with data + partials so it
    doesn't leave a near-empty band. */
@@ -214,6 +228,80 @@
    light mode, the bug that prompted this pane). */
 .oil .oil-lint .oil-lint-warn { color: #fbbf24; }
 .oil .oil-lint .oil-lint-ok { color: #86efac; }
+
+/* The shared catalog reference (top of the Localize guide): the same card chrome
+   as an example, anchored with an accent edge so it reads as the one source every
+   card below pulls from. */
+.oil.oil-catalog-ref { border-left: 3px solid var(--accent); }
+
+/* ── i18n control bar (opt-in via `locales`): a locale segmented control + an
+   optional count stepper. Styled to the page design system — the segmented
+   control mirrors the reference sidebar's active-link treatment (accent-soft fill,
+   accent-2 text), the stepper reuses the editor input chrome. ── */
+.oil .oil-i18n-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+}
+.oil .oil-loc-field,
+.oil .oil-count-field { display: inline-flex; align-items: center; gap: 0.5rem; }
+.oil .oil-loc-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg);
+}
+.oil .oil-loc {
+  font: 600 12px/1 var(--font-mono);
+  padding: 0.4rem 0.7rem;
+  background: transparent;
+  color: var(--fg-secondary);
+  border: 0;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.oil .oil-loc:last-child { border-right: 0; }
+.oil .oil-loc:hover { background: var(--bg-2); }
+.oil .oil-loc.is-active { background: var(--accent-soft); color: var(--accent-2); }
+.oil .oil-count {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg);
+}
+.oil .oil-count-btn {
+  font: 600 14px/1 var(--font-mono);
+  width: 1.9rem;
+  background: transparent;
+  color: var(--accent-2);
+  border: 0;
+  cursor: pointer;
+}
+.oil .oil-count-btn:first-child { border-right: 1px solid var(--border); }
+.oil .oil-count-btn:last-child { border-left: 1px solid var(--border); }
+.oil .oil-count-btn:hover { background: var(--accent-soft); }
+.oil .oil-count-btn:disabled { opacity: 0.35; cursor: default; background: transparent; }
+.oil .oil-count-in {
+  width: 3.2rem;
+  font: 600 12px/1 var(--font-mono);
+  text-align: center;
+  padding: 0.4rem 0.3rem;
+  background: transparent;
+  color: var(--fg);
+  border: 0;
+  -moz-appearance: textfield;
+}
+.oil .oil-count-in::-webkit-outer-spin-button,
+.oil .oil-count-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.oil .oil-count-in:focus { outline: none; box-shadow: inset 0 0 0 2px var(--accent-softer); }
 
 /* ── Lab affordance: DOCK (header toolbar) — quiet, labelled, always visible ── */
 .oil .oil-lab {
