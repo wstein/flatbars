@@ -24,21 +24,14 @@
 // CLDR plural category, selected by Intl.PluralRules. A missing key returns the
 // key itself (ADR-029 fallback-and-flag).
 
-export function buildI18nHelpers(catalogYaml, locale, loadYaml) {
-  if (!catalogYaml || !catalogYaml.trim()) return { ok: true, helpers: {}, error: "" };
-  let messages;
-  try {
-    messages = loadYaml(catalogYaml) || {};
-  } catch (e) {
-    return { ok: false, helpers: {}, error: "catalog.yaml — " + ((e && e.message) || e) };
-  }
-  if (typeof messages !== "object" || Array.isArray(messages)) {
-    return { ok: false, helpers: {}, error: "catalog.yaml — expected a mapping of locale → messages" };
-  }
+// The i18n helper bag from a messages object (locale → key → message) + a locale.
+// This is the single source of the t/number/date/relative/selectPlural logic,
+// reused by the Lab (parsing catalog.yaml) and the tutorials (a JS catalog const).
+export function makeI18nBag(messages, locale) {
   const loc = typeof locale === "string" && locale ? locale : "en";
+  const table = (messages && messages[loc]) || {};
 
   function translate(key, args) {
-    const table = messages[loc] || {};
     const m = table[key];
     if (m === undefined) return key; // fallback-and-flag (ADR-029)
     const variant =
@@ -54,7 +47,7 @@ export function buildI18nHelpers(catalogYaml, locale, loadYaml) {
     );
   }
 
-  const helpers = {
+  return {
     t: (key, args) => translate(key, args || {}),
     number: (n, opts) => new Intl.NumberFormat(loc, opts || {}).format(Number(n)),
     date: (iso, opts) =>
@@ -65,5 +58,18 @@ export function buildI18nHelpers(catalogYaml, locale, loadYaml) {
     relative: (v, u, opts) => new Intl.RelativeTimeFormat(loc, { numeric: "auto", ...(opts || {}) }).format(Number(v), u),
     selectPlural: (n, opts) => new Intl.PluralRules(loc, opts || {}).select(Number(n)),
   };
-  return { ok: true, helpers, error: "" };
+}
+
+export function buildI18nHelpers(catalogYaml, locale, loadYaml) {
+  if (!catalogYaml || !catalogYaml.trim()) return { ok: true, helpers: {}, error: "" };
+  let messages;
+  try {
+    messages = loadYaml(catalogYaml) || {};
+  } catch (e) {
+    return { ok: false, helpers: {}, error: "catalog.yaml — " + ((e && e.message) || e) };
+  }
+  if (typeof messages !== "object" || Array.isArray(messages)) {
+    return { ok: false, helpers: {}, error: "catalog.yaml — expected a mapping of locale → messages" };
+  }
+  return { ok: true, helpers: makeI18nBag(messages, locale), error: "" };
 }

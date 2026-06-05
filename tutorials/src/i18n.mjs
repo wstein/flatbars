@@ -15,6 +15,7 @@
 // the platform, which is exactly why i18next is NOT vendored.
 
 import { dump as dumpYaml } from "../../lab/vendor/js-yaml.mjs";
+import { makeI18nBag } from "../../lab/i18n.mjs";
 
 // ── The host's message catalog ───────────────────────────────────────────────
 // A plain object the host owns (ADR-029: the host supplies the brain). A string
@@ -50,64 +51,15 @@ export const catalog = {
 
 export const locales = Object.keys(catalog);
 
-// ── The native-Intl translate brain ──────────────────────────────────────────
-// Look up a message, pick the plural variant via Intl.PluralRules, and interpolate
-// {placeholders} — formatting {count} through Intl.NumberFormat for the locale. A
-// missing key returns the key itself: ADR-029's fallback-and-flag (a visible
-// marker, never a throw). This is the ~20 lines the host writes; swap it for
-// i18next / ICU MessageFormat in production (see `escapeHatch`).
-export function translate(locale, key, args = {}) {
-  const message = catalog[locale]?.[key];
-  if (message === undefined) return key; // fallback-and-flag (ADR-029)
-  const variant =
-    typeof message === "string"
-      ? message
-      : message[new Intl.PluralRules(locale).select(Number(args.count))] ?? message.other ?? key;
-  return variant.replace(/\{(\w+)\}/g, (_, name) => {
-    if (name === "count" && args.count !== undefined) {
-      return new Intl.NumberFormat(locale).format(Number(args.count));
-    }
-    return args[name] !== undefined ? String(args[name]) : `{${name}}`;
-  });
-}
-
-// ── The ADR-029 "E" helpers — locale-aware formatting, all native Intl ────────
-// number/date/selectPlural/relative are blessed prelude operations (ADR-029); the
-// host overrides their pure fallbacks here with the real Intl behaviour. number
-// and date take an Intl options hash (`{{number n style="currency" currency="EUR"}}`),
-// delivered as a trailing object — the blessed op is AtLeast 1, so no arity change.
-export function fmtNumber(locale, n, opts = {}) {
-  return new Intl.NumberFormat(locale, opts).format(Number(n));
-}
-export function fmtDate(locale, iso, opts = {}) {
-  // With no options, numeric fields + a fixed zone keep the output ICU-stable
-  // (month *names* would vary); a caller's options override, still UTC-anchored.
-  const o = opts && Object.keys(opts).length
-    ? { timeZone: "UTC", ...opts }
-    : { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" };
-  return new Intl.DateTimeFormat(locale, o).format(new Date(iso));
-}
-export function fmtRelative(locale, value, unit, opts = {}) {
-  return new Intl.RelativeTimeFormat(locale, { numeric: "auto", ...opts }).format(Number(value), unit);
-}
-export function selectPlural(locale, n, opts = {}) {
-  return new Intl.PluralRules(locale, opts).select(Number(n));
-}
-
-// The full i18n helper bag (ADR-018) the Lab/host binds for a chosen locale and
-// passes to the engine's renderWith — each entry overrides the blessed prelude
-// operation's fallback (ADR-029). For an inline helper the key=value hash arrives
-// as a trailing object directly (FullBars convention), so `number n style="…"`
-// calls number(n, { style: "…" }); it is `undefined` when no hash is written.
-export function makeI18nHelpers(locale) {
-  return {
-    t: (key, args) => translate(locale, key, args || {}),
-    number: (n, opts) => fmtNumber(locale, n, opts || {}),
-    date: (iso, opts) => fmtDate(locale, iso, opts || {}),
-    relative: (value, unit, opts) => fmtRelative(locale, value, unit, opts || {}),
-    selectPlural: (n, opts) => selectPlural(locale, n, opts || {}),
-  };
-}
+// ── The i18n helper bag for the page's TryI18n cells ──────────────────────────
+// Built from the catalog above bound to a locale, reusing the Lab's single i18n
+// core (lab/i18n.mjs makeI18nBag) — the translate/plural/format logic lives in ONE
+// place, so the page and the Lab can't drift (the t/number/… helpers, the native
+// `Intl` brain). For an inline helper the key=value hash arrives as a trailing
+// object directly (FullBars convention), so `number n style="…"` calls
+// number(n, { style: "…" }). Swap native Intl for i18next/ICU in production (see
+// `escapeHatch`).
+export const makeI18nHelpers = (locale) => makeI18nBag(catalog, locale);
 
 // ── The teaching artifacts the page shows verbatim ───────────────────────────
 // How a host wires the seam (the code behind every cell on this page). For an
