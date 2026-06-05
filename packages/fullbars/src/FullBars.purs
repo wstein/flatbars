@@ -46,7 +46,7 @@ import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTruthy)
 import Kernel.Hoist (hoistInline)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
-import Kernel.Prelude (blockHelperMissing, prelude, preludeSchema)
+import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (Truthy, escapeHtml, handlebars, minimal, mustache, nonEmpty, presence, stringify)
@@ -225,7 +225,7 @@ analyseSurface src dat = case parse src of
       { partials, template } = hoistInline (desugarSurface nodes)
     in
       case
-        runAnalysis (refEngineWith blockHelperMissing) (registerPartials partials) template dat
+        runAnalysis (refEngineWith lenientResolve) (registerPartials partials) template dat
         of
         Left e -> Left (formatError src e)
         Right r -> Right

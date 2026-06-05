@@ -385,6 +385,25 @@ export const cases = [
   { name: "bhm:empty-array-else", dialect: "surface", t: "{{#tags}}{{.}}{{else}}none{{/tags}}", d: { tags: [] } },
   { name: "bhm:nested-section", dialect: "surface", t: "{{#user}}{{name}}: {{#roles}}{{.}} {{/roles}}{{/user}}", d: { user: { name: "Ada", roles: ["admin", "dev"] } } },
 
+  // ── value-helper shadow — a bare `{{#count}}` is a section, not a helper call ──
+  // A prelude *value* helper (`count`, `uppercase`, …) used as a bare block has no
+  // argument to apply, so the lenient dialects read the head as DATA — the same
+  // Handlebars section path as blockHelperMissing — instead of raising the helper's
+  // arity error (`Kernel.Prelude.valueOrSection`; the runtime's `channel.section`).
+  // With an argument it stays a real helper call (body ignored), and the field
+  // falls back through truthiness (0 ⇒ {{else}}) exactly like blockHelperMissing.
+  { name: "vsh:count-with-once", dialect: "surface", t: "{{#count}}{{.}} unread{{/count}}", d: { count: 5 } },
+  { name: "vsh:count-array-iterates", dialect: "surface", t: "{{#count}}[{{.}}]{{/count}}", d: { count: ["a", "b"] } },
+  { name: "vsh:count-zero-else", dialect: "surface", t: "{{#count}}some{{else}}none{{/count}}", d: { count: 0 } },
+  { name: "vsh:count-inline-helper", dialect: "surface", t: "{{count items}}", d: { items: ["a", "b", "c"] } },
+  { name: "vsh:count-block-with-arg", dialect: "surface", t: "{{#count items}}body{{/count}}", d: { items: ["a", "b"] } },
+  { name: "vsh:uppercase-section", dialect: "surface", t: "{{#uppercase}}{{.}}{{/uppercase}}", d: { uppercase: "hi" } },
+  // An EMPTY-body block sections too (Handlebars renders it as an empty section,
+  // not an arity error): empty args ⟹ block position, since a bare inline
+  // `{{count}}` desugars to a data path and never resolves the helper.
+  { name: "vsh:count-empty-body", dialect: "surface", t: "[{{#count}}{{/count}}]", d: { count: 5 } },
+  { name: "vsh:count-empty-body-zero", dialect: "surface", t: "[{{#count}}{{/count}}]", d: { count: 0 } },
+
   // ── MinBars mustache.js-compat truthiness (ADR-022, the renderMinbarsCompat /
   // compileMinbarsCompat pair) ────────────────────────────────────────────────
   // mustache.js skips a section on `!value`, so 0 and "" are FALSY (unlike the

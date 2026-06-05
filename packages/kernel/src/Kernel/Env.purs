@@ -36,7 +36,7 @@ import Data.Foldable (foldl)
 import Data.List (List(..), (:))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template, splitBlockArgs)
@@ -147,25 +147,26 @@ lookupPartial name (RefEnv e) = Map.lookup name e.partials
 -- | The reference `Engine`: resolve from the frame stack (throwing
 -- | `UnknownHelper`), stringify via `Value.stringify`.
 refEngine :: forall m. MonadThrow Error m => RefEnv m -> Engine m (RefEnv m)
-refEngine = refEngineWith (\_ name -> throwError (UnknownHelper name))
+refEngine = refEngineWith (\_ name -> maybe (throwError (UnknownHelper name)) pure)
 
--- | Like `refEngine`, but with a pluggable *missing-helper* policy: `onMissing`
--- | is consulted when no frame defines `name`. The strict default (`refEngine`)
--- | throws `UnknownHelper`; FullBars supplies a `blockHelperMissing` fallback
--- | (Handlebars-style implicit sections) so a bare `{{#x}}` over data iterates /
--- | renders rather than erroring. RawBars keeps the strict default — the
--- | divergence stays a per-dialect choice, not a core change.
+-- | Like `refEngine`, but with a pluggable *resolve policy*: `policy` is handed
+-- | the name and the frame-stack lookup result (`Just h` when some frame defines
+-- | it, `Nothing` when none does) and decides the operation to run. The strict
+-- | default (`refEngine`) returns the found helper and throws `UnknownHelper`
+-- | otherwise; FullBars supplies `Kernel.Prelude.lenientResolve` (Handlebars-style
+-- | implicit sections) so a bare `{{#x}}` over data — whether `x` is unknown or a
+-- | prelude value helper used in block position — iterates / renders rather than
+-- | erroring. RawBars keeps the strict default — the divergence stays a
+-- | per-dialect choice, not a core change.
 refEngineWith
   :: forall m
    . MonadThrow Error m
-  => (RefEnv m -> Ident -> m (Operation m (RefEnv m)))
+  => (RefEnv m -> Ident -> Maybe (Operation m (RefEnv m)) -> m (Operation m (RefEnv m)))
   -> RefEnv m
   -> Engine m (RefEnv m)
-refEngineWith onMissing initial =
+refEngineWith policy initial =
   { initial
-  , resolve: \env name -> case lookupOperation name env of
-      Just h -> pure h
-      Nothing -> onMissing env name
+  , resolve: \env name -> policy env name (lookupOperation name env)
   , stringify: \v -> liftEither (stringify v)
   -- The marker-aware split (ADR-020 Phase 3). Recognises FullBars' `@hash`/`@param`
   -- block markers; a no-op for RawBars/MaxBars, which emit none — so this is safe

@@ -655,7 +655,14 @@ function block(name, args, frame, bodyFn, clauses, channel) {
   }
   // A built-in inline helper (or a block-param binding) used in block position:
   // invoke it inline (body ignored), exactly as the interpreter's `resolve` does.
-  if (helpers[name] || (frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name))) {
+  // EXCEPTION: the compiler flags a prelude value helper used as a bare block
+  // (`{{#count}}…{{/count}}`, no args) with `channel.section` — it has nothing to
+  // apply, so it falls through to the section path below, reading the head as data
+  // (mirrors the interpreter's `Kernel.Prelude.valueOrSection`).
+  if (
+    !(channel && channel.section) &&
+    (helpers[name] || (frame.binds && Object.prototype.hasOwnProperty.call(frame.binds, name)))
+  ) {
     return stringify(call(name, args, frame));
   }
   // Otherwise Handlebars' `blockHelperMissing` (FullBars policy, mirrors

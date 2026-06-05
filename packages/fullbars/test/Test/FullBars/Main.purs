@@ -712,6 +712,33 @@ main = do
     "hi"
   expectS "surface-literal" "{{ true }}" VNull "true"
 
+  -- value-helper shadow: a bare `{{#count}}` (a prelude value op used as a block
+  -- with no argument) is read as a DATA section, not a helper call — so it does not
+  -- raise `count`'s arity error. Mirrors Handlebars' implicit sections; the
+  -- interpreter≡compiler parity is pinned by the `vsh:*` conformance cases.
+  expectS "section-value-shadow-once" "{{#count}}{{ . }} unread{{/count}}"
+    (obj [ Tuple "count" (VNumber 5.0) ])
+    "5 unread"
+  expectS "section-value-shadow-array" "{{#count}}[{{ . }}]{{/count}}"
+    (obj [ Tuple "count" (arr [ str "a", str "b" ]) ])
+    "[a][b]"
+  expectS "section-value-shadow-zero-else" "{{#count}}some{{else}}none{{/count}}"
+    (obj [ Tuple "count" (VNumber 0.0) ])
+    "none"
+  -- with an argument it stays the real helper (body ignored).
+  expectS "section-value-shadow-with-arg" "{{#count items}}body{{/count}}"
+    (obj [ Tuple "items" (arr [ str "a", str "b" ]) ])
+    "2"
+  -- an EMPTY-body block sections too (Handlebars renders it as an empty section,
+  -- not an arity error): a truthy field renders the empty body once, a falsy one
+  -- the (absent) inverse — both "".
+  expectS "section-value-shadow-empty-body" "[{{#count}}{{/count}}]"
+    (obj [ Tuple "count" (VNumber 5.0) ])
+    "[]"
+  expectS "section-value-shadow-empty-body-zero" "[{{#count}}{{/count}}]"
+    (obj [ Tuple "count" (VNumber 0.0) ])
+    "[]"
+
   -- @data variables (§5.5): scoped-helper calls installed by each / the host.
   expectS "surface-at-index" "{{#each xs}}{{@index}}:{{ . }};{{/each}}"
     (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ])

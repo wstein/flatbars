@@ -435,12 +435,16 @@ to `escapeHtml`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
 |HTML-escaping by default |Surface `pass:[{{ }}]` ⇒ `escapeHtml`; core never escapes |SURFACE
 |===
 
-FlatBars adopts *no* Mustache truthy/list *section* semantics: `pass:[{{#x}}]` *always* means "apply
-the block helper `x`" — never "this is a truthy/list section over `x`". Iterate with
-`pass:[{{#each x}}…{{/each}}]`, branch with `if`/`unless`. (Given `{"list":[1,2,3]}`, Mustache's
-`pass:[{{#list}}…{{/list}}]` is *not* FlatBars; write `pass:[{{#each list}}…{{/each}}]`.) The
-*inverted* opener `pass:[{{^x}}]` *is* recognized by the core (a `Block` with the `Inverse` sigil);
-FullBars desugars it to `pass:[{{#unless x}}]`, while RawBars/MaxBars reject it.
+The *core* parser adopts no section semantics: structurally `pass:[{{#x}}]` is just "apply the block
+operation `x`". The *FullBars engine* then layers on Handlebars' implicit sections (its lenient
+resolve, `Kernel.Prelude.lenientResolve`): when `x` names no helper — *or* names a prelude value
+helper used as a *bare* block, which has no argument to apply (`pass:[{{#count}}…{{/count}}]` with a
+numeric `count`) — `x` is read as data and dispatched like Handlebars (array ⇒ `each`, truthy ⇒
+`with`, falsy/empty ⇒ `{{else}}`); see xref:fullbars-compat.adoc[] §4. RawBars keeps the strict resolve
+(unknown / value-as-block ⇒ `UnknownHelper` / arity error), so there you iterate with
+`pass:[{{#each x}}…{{/each}}]` and branch with `if`/`unless` explicitly. The *inverted* opener
+`pass:[{{^x}}]` *is* recognized by the core (a `Block` with the `Inverse` sigil); FullBars desugars it
+to `pass:[{{#unless x}}]`, while RawBars/MaxBars reject it.
 
 [#coverage]
 == A.12 Coverage checklist

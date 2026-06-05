@@ -6,7 +6,8 @@
 -- |
 -- | This is a thin dialect layer: it reuses the reference engine's `runResolved`
 -- | (`Kernel.Render`: parse → seed the prelude env → engine) and the
--- | shared compiler's `Emit` (`FlatBars.Compile.Emit.fullbarsEmit`), swapping in
+-- | shared compiler's `Emit` (`FlatBars.Compile.Emit.coreEmit` — the strict emit,
+-- | matching RawBars' strict `runResolved`: no value-helper sectioning), swapping in
 -- | *no* surface desugar. Note it depends on `kernel` + `flatbars-compile`, *not*
 -- | the `fullbars` package — its dependency closure is FullBars-free (see ADR-008).
 -- | It exists so the three dialects are symmetric packages over one engine.
@@ -33,7 +34,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
-import FlatBars.Compile.Emit (fullbarsEmit, metaFor)
+import FlatBars.Compile.Emit (coreEmit, metaFor)
 import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
@@ -180,6 +181,6 @@ compileJsWith opts src = do
     src
   let h = hoistInline nodes
   pure
-    ( Driver.compile (metaFor "rt.truthyNonEmpty") fullbarsEmit (Map.toUnfoldable h.partials)
+    ( Driver.compile (metaFor "rt.truthyNonEmpty") coreEmit (Map.toUnfoldable h.partials)
         h.template
     )

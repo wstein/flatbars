@@ -29,7 +29,8 @@ module Kernel.Prelude
   , coreOperationDefs
   , primitiveOperationDefs
   , coreSchema
-  , blockHelperMissing
+  , sectionableValueNames
+  , lenientResolve
   ) where
 
 import Prelude
@@ -1392,18 +1393,59 @@ withH ctl args = case Array.uncons args of
     else renderElse ctl
   Nothing -> throwError (ArityError "with: expected at least 1 argument(s), got 0")
 
--- | Handlebars' `blockHelperMissing` — the FullBars *missing-helper* policy
--- | (`Kernel.Env.refEngineWith`). When `{{#x}}…{{/x}}` names no registered
--- | helper, Handlebars treats `x` as data: an array iterates (`each`), a truthy
--- | non-array shifts context and renders once (`with`), a falsy value (or empty
--- | array) renders the `{{else}}` inverse. We get all three for free by looking
--- | `x` up in the current context and delegating to `each`/`with`, which already
--- | encode exactly those rules. An *inline* unknown application with arguments
--- | (`{{foo bar}}`, no block body) is still a hard `UnknownHelper`, matching
--- | Handlebars' "Missing helper" throw — only the block form is rescued.
-blockHelperMissing
-  :: forall m. MonadThrow Error m => RefEnv m -> Ident -> m (Operation m (RefEnv m))
-blockHelperMissing _ name = pure (sectionOp name)
+-- | The FullBars *resolve policy* (`Kernel.Env.refEngineWith`), Handlebars-style.
+-- | Two cases turn a `{{#x}}…{{/x}}` block into an implicit *section* over data
+-- | rather than a helper application:
+-- |
+-- |   * `x` names no registered helper — Handlebars' `blockHelperMissing`; and
+-- |   * `x` names a prelude *value* helper that needs an argument (`count`,
+-- |     `uppercase`, …) but is used as a *bare* block (`{{#count}}…{{/count}}`),
+-- |     so there is nothing to apply — reading it as data avoids the arity error
+-- |     and matches Mustache/Handlebars, where `{{#field}}` is a section.
+-- |
+-- | Both delegate to `sectionOp`: an array iterates (`each`), a truthy non-array
+-- | shifts context and renders once (`with`), a falsy value (or empty array)
+-- | renders the `{{else}}` inverse. A genuine block helper (`if`/`each`/`with`/
+-- | `unless`/…), a nullary/var-arity value op (`this`/`and`/…), and any
+-- | user-registered helper are applied unchanged; an inline value-helper call
+-- | (`{{count xs}}`) still runs the real helper. An *inline* unknown application
+-- | with arguments (`{{foo bar}}`, no block body) is still a hard `UnknownHelper`,
+-- | matching Handlebars' "Missing helper" throw — only the block form is rescued.
+lenientResolve
+  :: forall m
+   . MonadThrow Error m
+  => RefEnv m
+  -> Ident
+  -> Maybe (Operation m (RefEnv m))
+  -> m (Operation m (RefEnv m))
+lenientResolve _ name = case _ of
+  Just h
+    | Array.elem name sectionableValueNames -> pure (valueOrSection name h)
+    | otherwise -> pure h
+  Nothing -> pure (sectionOp name)
+
+-- | A prelude value op runs as itself, EXCEPT in block position with no arguments
+-- | (`{{#count}}…{{/count}}`), where it has nothing to apply and is read as a data
+-- | section (`sectionOp`) instead — for *any* body, including the empty block
+-- | `{{#count}}{{/count}}` (Handlebars renders that as an empty section, not an
+-- | arity error). Inline uses (`{{count xs}}`) and block uses *with* arguments
+-- | keep calling the real helper.
+-- |
+-- | `Array.null args` alone is the right signal: a *bare* inline `{{count}}`
+-- | desugars to a `lookup` data path (`FullBars.Surface.rewriteHead`) and never
+-- | reaches `resolve`/`valueOrSection`, so the only thing that resolves the helper
+-- | with no positional args is the **block** form. Hence empty args ⟹ block
+-- | position, body or not. (The compiler's emit gates identically — block-only,
+-- | no positional args — so the two paths stay byte-identical; `test:compile`.)
+valueOrSection
+  :: forall m
+   . MonadThrow Error m
+  => Ident
+  -> Operation m (RefEnv m)
+  -> Operation m (RefEnv m)
+valueOrSection name h ctl args
+  | Array.null args = sectionOp name ctl args
+  | otherwise = h ctl args
 
 sectionOp :: forall m. MonadThrow Error m => Ident -> Operation m (RefEnv m)
 sectionOp name ctl args
@@ -1411,6 +1453,31 @@ sectionOp name ctl args
   | otherwise = case indexValue (refContext ctl.env) (VString name) of
       v@(VArray _) -> eachH ctl [ v ]
       v -> withH ctl [ v ]
+
+-- | The *value* (non-block) helpers that cannot be applied with zero arguments —
+-- | `count`, `uppercase`, `eq`, `json`, … (every value op whose arity excludes 0).
+-- | Projected from `operationDefs` (the single source). `lenientResolve` reads it:
+-- | such a helper used as a bare block (`{{#count}}`) has no argument to apply, so
+-- | it is reinterpreted as a data section rather than raising an arity error.
+-- | Nullary / var-arity value ops (`this`, `and`, `or`, `coalesce`, …) are *not*
+-- | listed — they CAN run with no args, so they keep their block behaviour. The
+-- | compiler's emit (`FlatBars.Compile.Emit`) reads the same set, so the
+-- | interpreter and compiled paths stay byte-identical (`test:compile`).
+sectionableValueNames :: Array String
+sectionableValueNames =
+  Array.mapMaybe pick (operationDefs :: Array (OperationDef (Either Error)))
+  where
+  pick d
+    | d.block = Nothing
+    | arityAdmitsZero d.arity = Nothing
+    | otherwise = Just d.name
+
+arityAdmitsZero :: Arity -> Boolean
+arityAdmitsZero = case _ of
+  Exactly n -> n == 0
+  AtLeast n -> n == 0
+  Between lo _ -> lo == 0
+  AnyArity -> true
 
 --------------------------------------------------------------------------------
 -- Composition / data

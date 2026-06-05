@@ -17,7 +17,7 @@ import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
 import Kernel.Engine (Engine, runTemplate)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, refEngine, refEngineWith, register, registerAll)
-import Kernel.Prelude (blockHelperMissing, prelude)
+import Kernel.Prelude (lenientResolve, prelude)
 
 -- | An environment with the reference prelude, the given data as context, and a
 -- | `root` helper returning the top-level data. Polymorphic in `m`.
@@ -40,10 +40,11 @@ runResolved
   -> m String
 runResolved = runResolvedUsing refEngine
 
--- | Like `runResolved`, but with FullBars' Handlebars-style *missing-helper*
--- | policy: an unregistered `{{#x}}` block over data iterates / renders rather
--- | than erroring (`Kernel.Prelude.blockHelperMissing`). FullBars (and MaxBars,
--- | its superset) render through this; RawBars keeps the strict `runResolved`.
+-- | Like `runResolved`, but with FullBars' Handlebars-style *lenient resolve*: a
+-- | `{{#x}}` block over data iterates / renders rather than erroring — whether `x`
+-- | is unregistered or a prelude value helper used as a bare block
+-- | (`Kernel.Prelude.lenientResolve`). FullBars (and MaxBars, its superset) render
+-- | through this; RawBars keeps the strict `runResolved`.
 runResolvedLenient
   :: forall m
    . MonadThrow Error m
@@ -52,7 +53,7 @@ runResolvedLenient
   -> Template
   -> Value
   -> m String
-runResolvedLenient = runResolvedUsing (refEngineWith blockHelperMissing)
+runResolvedLenient = runResolvedUsing (refEngineWith lenientResolve)
 
 -- | Shared body of `runResolved` / `runResolvedLenient`, parameterised by how the
 -- | seeded environment becomes an `Engine` (strict vs lenient resolve).

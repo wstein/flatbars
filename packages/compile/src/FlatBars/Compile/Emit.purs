@@ -10,6 +10,7 @@
 -- | runs against `runtime/flatbars-runtime.mjs`.
 module FlatBars.Compile.Emit
   ( fullbarsEmit
+  , coreEmit
   , metaFor
   , runtimeVersion
   ) where
@@ -22,6 +23,7 @@ import Data.String (joinWith)
 import FlatBars.Compile (Ctx, Emit, Rec, jsString)
 import FlatBars.Syntax (Expr(..), Ident, Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
+import Kernel.Prelude (sectionableValueNames)
 import Kernel.Walk (Clause, splitClauses)
 
 -- | The runtime contract version, recorded in the compiled header and checked by
@@ -42,8 +44,20 @@ metaFor truthyCallback =
   , seed: "rt.scope(data, " <> truthyCallback <> ")"
   }
 
+-- | The *lenient* emit (FullBars / MaxBars): a prelude value helper used as a
+-- | bare block (`{{#count}}…{{/count}}`) compiles to a data *section*, mirroring
+-- | the interpreter's `Kernel.Prelude.lenientResolve`.
 fullbarsEmit :: Emit
-fullbarsEmit = { expr: fbExpr, block: fbBlock }
+fullbarsEmit = emitWith true
+
+-- | The *strict* emit (RawBars): no value-helper sectioning — RawBars keeps the
+-- | austere `runResolved` resolve, so a value helper in block position is applied
+-- | as-is (matching its interpreter), not rescued as a section.
+coreEmit :: Emit
+coreEmit = emitWith false
+
+emitWith :: Boolean -> Emit
+emitWith lenient = { expr: fbExpr, block: fbBlock lenient }
 
 --------------------------------------------------------------------------------
 -- Expressions
@@ -90,13 +104,23 @@ args' rec ctx = joinWith ", " <<< map (rec.expr ctx)
 -- Blocks — native control flow for the prelude, runtime fallback otherwise
 --------------------------------------------------------------------------------
 
-fbBlock :: Rec -> Ctx -> Ident -> Array Expr -> Template -> String
-fbBlock rec ctx name args body =
+fbBlock :: Boolean -> Rec -> Ctx -> Ident -> Array Expr -> Template -> String
+fbBlock lenient rec ctx name args body =
   -- Demarker `@hash`/`@param` once, centrally (ADR-020 Phase 3): the built-in
   -- lowerings see the plain positional args they saw before (the interpreter does
   -- the same in its `blockArgs` seam); `rtBlock` also reads the hash/param channel.
   let
     split = splitBlockArgs args
+    -- A prelude value helper used as a *bare* block (`{{#count}}…{{/count}}`, any
+    -- body) has no argument to apply, so the lenient dialects read it as a data
+    -- section — the compiled twin of `Kernel.Prelude.valueOrSection`. The runtime
+    -- is told via `channel.section`. `fbBlock` only ever runs in block position, so
+    -- the gate is just (sectionable name, no positional args) — the exact mirror of
+    -- the interpreter's `Array.null args`, keeping the two paths byte-identical.
+    section =
+      lenient
+        && Array.elem name sectionableValueNames
+        && Array.null split.positional
   in
     case name of
       "if" -> ifBlock rec ctx (truthyTest rec ctx split.positional) body
@@ -117,7 +141,7 @@ fbBlock rec ctx name args body =
           <> ", partials, rt, "
           <> bodyThunk rec ctx body
           <> ");\n"
-      _ -> rtBlock rec ctx name split body
+      _ -> rtBlock section rec ctx name split body
 
 -- The condition test: 1 arg ⇒ `rt.truthy`; an options object (includeZero) ⇒
 -- `rt.truthyWith`. `scope.truthy` is the engine's truthiness *callback* (ADR-022).
@@ -199,15 +223,19 @@ bodyThunk rec ctx body =
   "function () { let out = \"\";\n" <> rec.nodes ctx body <> "  return out; }"
 
 -- An unrecognised block helper: hand the body to the runtime as closures, so the
--- engine's control handle survives as JS functions (the baseline tier).
+-- engine's control handle survives as JS functions (the baseline tier). `section`
+-- flags a prelude value helper used as a bare block (`{{#count}}`): the runtime
+-- then reads the head as data instead of applying the helper (see `block` in
+-- `flatbars-runtime.mjs`), mirroring the interpreter's `lenientResolve`.
 rtBlock
-  :: Rec
+  :: Boolean
+  -> Rec
   -> Ctx
   -> Ident
   -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String, label :: Maybe String }
   -> Template
   -> String
-rtBlock rec ctx name split body =
+rtBlock section rec ctx name split body =
   let
     s = splitClauses body
     -- The hash + block-param values occupy the trailing positional slots (hash,
@@ -228,6 +256,8 @@ rtBlock rec ctx name split body =
       <> hashJs
       <> ", params: "
       <> paramsJs
+      <> ", section: "
+      <> (if section then "true" else "false")
       <> " }"
       <> ");\n"
 
