@@ -271,8 +271,12 @@ was aspirational. The implementation is now the *first-class seam* the Decision 
   host recipe all seed a translator (`registerTranslator`), not `registerHelper`. FullBars carrying these
   ops is recorded as an explicit exception in xref:adr-0009-fullbars.adoc[ADR-009] (no faithfulness-by-omission).
 
-Open follow-ups (tracked, non-blocking): the Lab's combined worker (`helpers-worker.mjs`) still builds an
-i18n bag because it *merges* i18n with ADR-018 custom helpers in one render — it needs a combined
-translator+helpers entry (it still works: a registered helper shadows the seamed prelude op); and a
-*wired*-translator `test:compile` case (the compiled≡interpret wired path — the fallback path is already
-gated).
+The Lab worker (`helpers-worker.mjs`) renders pure i18n (no custom helpers, FullBars — the common
+localization case) through the seam (`renderSurfaceI18n`); the *combined* i18n+custom-helpers render (and
+RawBars/MaxBars i18n) still merges the i18n bag with the custom helpers, where a registered i18n op shadows
+the seamed prelude op (identical output). The wired-translator `test:compile` case now gates the
+compiled≡interpret wired path too (the fallback path was already gated).
+
+Remaining (tracked, non-blocking): a combined translator+helpers render entry across all three core-surface
+dialects, which would let the worker's combined/RawBars/MaxBars i18n use the seam directly rather than the
+shadowing bag.

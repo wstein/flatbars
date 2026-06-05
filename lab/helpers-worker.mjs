@@ -14,32 +14,53 @@
 // bottom is guarded so importing the module in Node is side-effect-free.
 
 import { buildHelpers } from "./helpers.mjs";
-import { buildI18nHelpers } from "./i18n.mjs";
+import { buildI18nHelpers, buildTranslator } from "./i18n.mjs";
 import { load as loadYaml } from "./vendor/js-yaml.mjs";
-import { renderWith, renderRawWith, renderMaxWith, safe } from "./vendor/flatbars-engine.mjs?v=55";
+import { renderWith, renderRawWith, renderMaxWith, renderSurfaceI18n, safe } from "./vendor/flatbars-engine.mjs?v=55";
 
 // The dialect → operations-aware render entry. MinBars has no helper path (its
 // catalog/`t` are excluded, ADR-029), so it never reaches the worker.
 const RENDER_BY_DIALECT = { rawbars: renderRawWith, fullbars: renderWith, maxbars: renderMaxWith };
 
-const DEPS = { buildHelpers, buildI18nHelpers, loadYaml, renderByDialect: RENDER_BY_DIALECT, safe };
+const DEPS = { buildHelpers, buildI18nHelpers, buildTranslator, loadYaml, renderByDialect: RENDER_BY_DIALECT, renderSurfaceI18n, safe };
 
 // Render `req = { dialect, template, data, partials, helperSrc, catalogSrc, locale }`.
-// The i18n bag (t/number/…) is built from the `catalog.yaml` messages bound to the
-// active `locale` (from config.yaml, ADR-029); explicit `helpers.js` overrides it.
-// The render entry is picked by dialect (RawBars/FullBars/MaxBars). Returns
-// `{ ok, value, error }`. Pure (modulo the injected engine); never throws.
+// i18n (t/number/…) is driven by the `catalog.yaml` messages bound to the active
+// `locale` (from config.yaml, ADR-029). When the request has i18n but NO custom
+// helpers (the common LOCALIZATION case, FullBars) it renders through the
+// first-class translator seam (`renderSurfaceI18n`, ADR-029). When custom helpers
+// are also present — or the dialect is RawBars/MaxBars — it merges the i18n bag
+// with the custom helpers and renders by dialect; the registered i18n ops shadow
+// the seamed prelude op, so the result is identical. (A combined translator+helpers
+// entry across all dialects is a tracked follow-up.) Returns `{ ok, value, error }`.
+// Pure (modulo the injected engine); never throws.
 export function runHelperRequest(req, deps = DEPS) {
-  const { buildHelpers: build, buildI18nHelpers: buildI18n, loadYaml: yaml, renderByDialect, safe: safeFn } = deps;
+  const {
+    buildHelpers: build, buildI18nHelpers: buildI18n, buildTranslator: buildTr,
+    loadYaml: yaml, renderByDialect, renderSurfaceI18n: renderI18n, safe: safeFn,
+  } = deps;
   const r = req || {};
-  const i18n = buildI18n(r.catalogSrc || "", r.locale || "en", yaml);
-  if (!i18n.ok) return { ok: false, value: "", error: i18n.error };
   const built = build(r.helperSrc || "", safeFn);
   if (!built.ok) return { ok: false, value: "", error: "helper error — " + built.error };
-  const helpers = { ...i18n.helpers, ...built.helpers };
-  const render = renderByDialect[r.dialect] || renderByDialect.fullbars;
+  const hasI18n = !!(r.catalogSrc && r.catalogSrc.trim());
+  const hasHelpers = Object.keys(built.helpers).length > 0;
+  const dialect = r.dialect || "fullbars";
+  const data = r.data == null ? {} : r.data;
   try {
-    const out = render(helpers, r.partials || {}, r.template || "", r.data == null ? {} : r.data);
+    // The common path: i18n, no custom helpers, FullBars → the seam.
+    if (hasI18n && !hasHelpers && dialect === "fullbars") {
+      const tr = buildTr(r.catalogSrc, r.locale || "en", yaml);
+      if (!tr.ok) return { ok: false, value: "", error: tr.error };
+      const out = renderI18n(tr.translator, r.template || "", data);
+      return { ok: !!out.ok, value: out.value || "", error: out.error || "" };
+    }
+    // Combined (i18n + custom helpers) or RawBars/MaxBars i18n: merge the bag — the
+    // registered i18n ops shadow the seamed prelude op (identical output).
+    const i18n = buildI18n(r.catalogSrc || "", r.locale || "en", yaml);
+    if (!i18n.ok) return { ok: false, value: "", error: i18n.error };
+    const helpers = { ...i18n.helpers, ...built.helpers };
+    const render = renderByDialect[dialect] || renderByDialect.fullbars;
+    const out = render(helpers, r.partials || {}, r.template || "", data);
     return { ok: !!out.ok, value: out.value || "", error: out.error || "" };
   } catch (e) {
     return { ok: false, value: "", error: String((e && e.message) || e) };
