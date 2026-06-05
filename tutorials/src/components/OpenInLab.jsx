@@ -16,7 +16,6 @@ import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
 import { renderWith, renderRawWith, renderMaxWith, safe } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
 import { buildI18nHelpers } from "../../../lab/i18n.mjs";
-import { parseConfig } from "../../../lab/config.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
 import { highlightTemplate, highlightYaml, highlightJsonata, esc } from "../lib/highlight.mjs";
 
@@ -75,7 +74,7 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars", label }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", config = "", labUrl = LAB_URL, compile = false }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", locale = "en", labUrl = LAB_URL, compile = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
@@ -126,12 +125,10 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     // With custom helpers, render through the engine facade's `renderWith`
     // (which marshals the JS helpers into the interpreter); otherwise the
     // adapter's plain render. `safe(html)` is available to the helper source.
-    // The i18n catalog (ADR-029) builds the t/number/… bag, bound to the locale
-    // from config.yaml; explicit helpers.js overrides it — the same merge the
-    // Lab's worker does. Renders through the surface's operations-aware entry.
-    const cfg = parseConfig(config || "", loadYaml);
-    if (!cfg.ok) { setOut({ ok: false, text: "⚠ " + cfg.error }); return; }
-    const i18n = buildI18nHelpers(catalog || "", cfg.config.locale, loadYaml);
+    // The i18n catalog (ADR-029) builds the t/number/… bag, bound to `locale`;
+    // explicit helpers.js overrides it — the same merge the Lab's worker does.
+    // Renders through the surface's operations-aware entry.
+    const i18n = buildI18nHelpers(catalog || "", locale, loadYaml);
     if (!i18n.ok) { setOut({ ok: false, text: "⚠ " + i18n.error }); return; }
     const hsrc = (helpersStr || "").trim();
     if (hsrc || Object.keys(i18n.helpers).length) {
@@ -148,7 +145,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     } catch (e) {
       setOut({ ok: false, text: String((e && e.message) || e) });
     }
-  }, [renderer, tpl, dataStr, transformStr, parts, helpersStr, catalog, config]);
+  }, [renderer, tpl, dataStr, transformStr, parts, helpersStr, catalog, locale]);
 
   // Optional: compile the template to a JS module (RawBars/FullBars/MaxBars only).
   useEffect(() => {
@@ -158,15 +155,15 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   }, [canCompile, renderer, tpl]);
 
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace. The
-  // i18n catalog/config aren't carried yet — the Lab's catalog.yaml/config.yaml
-  // sidebar sections are still to be built; the live preview above uses them.
+  // i18n catalog + locale round-trip into the Lab's LOCALIZATION/catalog.yaml and
+  // config.yaml views (ADR-029).
   useEffect(() => {
     let live = true;
-    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr }, { labUrl })
+    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr, catalog, locale }, { labUrl })
       .then((h) => { if (live) setHref(h); })
       .catch(() => {});
     return () => { live = false; };
-  }, [tpl, dataStr, transformStr, parts, helpersStr]);
+  }, [tpl, dataStr, transformStr, parts, helpersStr, catalog, locale]);
 
   // A full-width template row only pays off when the template is actually wide
   // (multi-line or long); a short one-liner like `{{> card}}` would just leave a

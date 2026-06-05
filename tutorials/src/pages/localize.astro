@@ -13,7 +13,7 @@
 import Reference from "../layouts/Reference.astro";
 import TryI18n from "../components/TryI18n.jsx";
 import OpenInLab from "../components/OpenInLab.jsx";
-import { sections, flagship, integrationSource, escapeHatch, flagshipCatalogYaml, flagshipConfigYaml } from "../i18n.mjs";
+import { sections, flagship, integrationSource, escapeHatch, flagshipCatalogYaml } from "../i18n.mjs";
 
 const groups = [
   {
@@ -141,9 +141,9 @@ const intro = sections[0].cells[0];
     <TryI18n client:visible template={flagship.template} data={flagship.data} locale={flagship.locale} />
     <p>
       The preview above renders through the real engine with the catalogue + locale
-      applied. (Carrying the strings into the Lab as dedicated <code>catalog.yaml</code>
-      / <code>config.yaml</code> sidebar sections is in progress; <b>Open in Lab</b>
-      currently takes the template and data.)
+      applied. <b>Open in Lab</b> carries them across into the Lab's dedicated
+      <code>catalog.yaml</code> (LOCALIZATION) and <code>config.yaml</code>
+      (<code>i18n.locale</code>) sections — strings as data, locale as a setting.
     </p>
     <OpenInLab
       client:visible
@@ -151,7 +151,7 @@ const intro = sections[0].cells[0];
       template={flagship.template}
       data={flagship.data}
       catalog={flagshipCatalogYaml}
-      config={flagshipConfigYaml}
+      locale={flagship.locale}
     />
   </section>
 

@@ -72,6 +72,17 @@ test("workspaceState carries custom-helper source in its own field `h` (ADR-018)
   assert.equal(workspaceState({ template: "x", helpers: "  \n" }).h, undefined);
 });
 
+test("workspaceState carries the i18n catalog (`cat`) + locale (`loc`) (ADR-029)", () => {
+  const catalog = "pl:\n  greeting: \"Cześć, {name}!\"";
+  const s = workspaceState({ template: '{{t "greeting" name=name}}', catalog, locale: "pl" });
+  assert.equal(s.cat, catalog); // → LOCALIZATION/catalog.yaml
+  assert.equal(s.loc, "pl");    // → config.yaml i18n.locale
+  // default-en locale + empty catalog are omitted to keep links compact
+  const bare = workspaceState({ template: "x", catalog: "  \n", locale: "en" });
+  assert.equal(bare.cat, undefined);
+  assert.equal(bare.loc, undefined);
+});
+
 
 test("workspaceState carries an output view (`v`) and dock panel (`dk`)", async () => {
   // A "Migrate" example lands in the Migrated MaxBars output view; a "Lint"

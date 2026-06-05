@@ -339,8 +339,7 @@ export const flagship = {
 };
 
 // The catalog rendered as a `catalog.yaml` document (message DATA only — the
-// locale lives in config.yaml) and the matching `config.yaml`, for the
-// Open-in-Lab round-trip into the Lab's reserved tabs (ADR-029). Strings live as
-// YAML, not code; check:i18n asserts they render the flagship.
+// locale travels separately as `flagship.locale`), for the Open-in-Lab round-trip
+// into the Lab's LOCALIZATION/catalog.yaml view (ADR-029). Strings live as YAML,
+// not code; check:i18n asserts they render the flagship.
 export const flagshipCatalogYaml = dumpYaml(catalog).replace(/\n+$/, "");
-export const flagshipConfigYaml = dumpYaml({ i18n: { locale: flagship.locale } }).replace(/\n+$/, "");

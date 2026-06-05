@@ -15,10 +15,9 @@
 //      deliberate `missing` fallback cell) — the no-dangling / no-over-claim
 //      contract, mirroring check-jsonata's function coverage.
 import assert from "node:assert/strict";
-import { sections, flagship, catalog, locales, makeI18nHelpers, flagshipCatalogYaml, flagshipConfigYaml } from "../tutorials/src/i18n.mjs";
+import { sections, flagship, catalog, locales, makeI18nHelpers, flagshipCatalogYaml } from "../tutorials/src/i18n.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { buildI18nHelpers } from "../lab/i18n.mjs";
-import { parseConfig } from "../lab/config.mjs";
 import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
 
 let fail = 0;
@@ -59,8 +58,8 @@ try {
 // flagshipCatalogYaml is the catalog rendered as message-only YAML; the Lab's
 // buildI18nHelpers (its worker builder) bound to the config.yaml locale must
 // render every cell — and the flagship — identically to the live makeI18nHelpers,
-// so the catalog.yaml/config.yaml round-trip can't drift from the page.
-console.log("\ncatalog.yaml + config.yaml route (Lab builder ≡ page):");
+// so the catalog.yaml round-trip can't drift from the page.
+console.log("\ncatalog.yaml route (Lab builder ≡ page):");
 try {
   const r = await createFlatBarsRenderer("fullbars");
   for (const cell of allCells) {
@@ -70,13 +69,11 @@ try {
     const prog = r.compile(cell.template, {}, { helpers: built.helpers }).program;
     assert.equal(r.render(prog, cell.data), cell.expect, `catalog route ${cell.section}/${cell.id}`);
   }
-  // the flagship, with the locale taken from config.yaml (verifies that file too)
-  const cfg = parseConfig(flagshipConfigYaml, loadYaml);
-  assert.ok(cfg.ok, `config parsed: ${cfg.error}`);
-  const fb = buildI18nHelpers(flagshipCatalogYaml, cfg.config.locale, loadYaml);
+  // the flagship, with its locale (what Open-in-Lab carries as `loc`)
+  const fb = buildI18nHelpers(flagshipCatalogYaml, flagship.locale, loadYaml);
   const prog = r.compile(flagship.template, {}, { helpers: fb.helpers }).program;
-  assert.equal(r.render(prog, flagship.data), flagship.expect, "catalog.yaml + config.yaml render the flagship");
-  console.log(`  ✓ ${allCells.filter((c) => !c.missing).length} cells + flagship render identically (locale from config.yaml)`);
+  assert.equal(r.render(prog, flagship.data), flagship.expect, "catalog.yaml renders the flagship");
+  console.log(`  ✓ ${allCells.filter((c) => !c.missing).length} cells + flagship render identically`);
 } catch (e) {
   console.error(`  ✗ catalog/config route: ${e && e.message ? e.message.split("\n")[0] : e}`);
   fail++;
