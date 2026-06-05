@@ -93,3 +93,17 @@ export const callJsBlockHelperImpl =
 // `{{ … }}` (ADR-018). A plain sentinel object so it travels across the engine
 // bundle and the separate compiled runtime without an instanceof dependency.
 export const safe = (s) => ({ __fbSafe: typeof s === "string" ? s : String(s) });
+
+// FFI for the ADR-029 i18n seam. Call a host `translator(name, args)` over
+// already-marshalled (JSON / plain-JS) op arguments; a string return is a hit,
+// `null`/`undefined` (or a throw, defensively) means "no translation" so the
+// engine falls back to the key. Returns a tagged record the PureScript side maps
+// to `Maybe String`. Curried to match the `callJsHelperImpl` calling convention.
+export const callJsTranslatorImpl = (translator) => (name) => (args) => {
+  try {
+    const r = translator(name, args);
+    return r === undefined || r === null ? { hit: false, value: "" } : { hit: true, value: String(r) };
+  } catch (_e) {
+    return { hit: false, value: "" };
+  }
+};

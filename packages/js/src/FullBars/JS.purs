@@ -31,6 +31,8 @@ module FullBars.JS
   , compileMinbarsCompatWithPartials
   , compileFor
   , renderSurfaceWithPartials
+  , renderSurfaceI18n
+  , JsTranslator
   , renderMustache
   , JsHelperFn
   , renderWith
@@ -64,7 +66,7 @@ import FlatBars.Span (lineColumn, spanText)
 import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
-import FullBars (RNode(..), desugarSurface, desugarSurfaceWith, lower)
+import FullBars (RNode(..), Translator, desugarSurface, desugarSurfaceWith, lower)
 import FullBars as FullBars
 import FullBars.Compile (compileSurface) as Compile
 import Kernel.Engine (Operation)
@@ -247,6 +249,14 @@ renderSurfaceWithPartials :: Fn3 (FO.Object String) String Json Result
 renderSurfaceWithPartials = mkFn3 \partials tpl json ->
   result (FullBars.renderSurfaceWith (FO.toUnfoldable partials) tpl (fromJson json))
 
+-- | Render a surface template with a host i18n translator seeded (ADR-029): the
+-- | first-class seam that drives `t`/`number`/`date`/… The Lab and any JS host wire
+-- | localization through this, not `registerHelper`. `renderSurfaceI18n(translator,
+-- | template, data)`, where `translator` is a `(name, args) => string | null`.
+renderSurfaceI18n :: Fn3 JsTranslator String Json Result
+renderSurfaceI18n = mkFn3 \jt tpl json ->
+  result (FullBars.renderSurfaceI18n (toTranslator jt) tpl (fromJson json))
+
 -- | Render a *MinBars* template (the mustache-conformant core dialect) with a
 -- | set of named partials, against JS data. `renderMustache(partials, template,
 -- | data)`, where `partials` is a plain `{ name: source }` object. Drives the
@@ -261,6 +271,23 @@ renderMustache = mkFn3 \partials tpl json ->
 
 -- | An opaque host JS helper: `(...args) => value`. Marshalled by `renderWith`.
 foreign import data JsHelperFn :: Type
+
+-- | A host i18n translator (ADR-029): a JS `(name, args) => string | null`.
+foreign import data JsTranslator :: Type
+
+-- | Invoke a host translator over an op name + its JSON-marshalled args; a `hit`
+-- | string is the localized text, `hit: false` means "no translation" (fall back).
+foreign import callJsTranslatorImpl
+  :: JsTranslator -> String -> Array Json -> { hit :: Boolean, value :: String }
+
+-- | Marshal a host `JsTranslator` into the engine's `Translator` seam: op args
+-- | Value→JSON, the result back to `Maybe String` (Nothing ⇒ fall back to the key).
+toTranslator :: JsTranslator -> Translator
+toTranslator jt = \name args ->
+  let
+    r = callJsTranslatorImpl jt name (map toJson args)
+  in
+    if r.hit then Just r.value else Nothing
 
 -- | Invoke a host helper (by `name`, for diagnostics) over JSON-marshalled args,
 -- | tagging the outcome: `"ok"` (payload is the value), `"safe"` (payload is raw

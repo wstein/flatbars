@@ -1028,30 +1028,39 @@ numberH = i18nOp "number"
 dateH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 dateH = i18nOp "date"
 
--- | A blessed i18n op: consult the env's seeded `Translator` with the op name and
--- | its args; on a hit return the localized text, otherwise fall back to the first
--- | argument's plain text (the unwired/declined path).
+-- | Drive a blessed i18n op through the seeded `Translator` (ADR-029): consult it
+-- | with the op name + args; on a hit return the localized text, otherwise run the
+-- | op's pure `fallback`. Every i18n op is seam-driven this way — so the seam, not
+-- | the op identity, decides translated-vs-fallback (interpreter ≡ compiled), and
+-- | richer fallbacks (selectPlural/relative) are preserved.
+seamed :: forall m. MonadThrow Error m => String -> Operation m (RefEnv m) -> Operation m (RefEnv m)
+seamed name fallback ctl args = case refTranslator ctl.env >>= \tr -> tr name args of
+  Just s -> pure (VString s)
+  Nothing -> fallback ctl args
+
+-- | A blessed i18n op whose fallback is the first argument's plain text
+-- | (`t`/`number`/`date`): translate returns the key, number/date the value.
 i18nOp :: forall m. MonadThrow Error m => String -> Operation m (RefEnv m)
-i18nOp name ctl args = case Array.head args of
-  Nothing -> throwError (ArityError (name <> ": expected at least 1 argument(s), got 0"))
-  Just v -> case refTranslator ctl.env >>= \tr -> tr name args of
-    Just s -> pure (VString s)
-    Nothing -> VString <$> liftEither (stringify v)
+i18nOp name = seamed name passthrough
+  where
+  passthrough _ args = case Array.head args of
+    Nothing -> throwError (ArityError (name <> ": expected at least 1 argument(s), got 0"))
+    Just v -> VString <$> liftEither (stringify v)
 
 -- | `selectPlural` falls back to the English one/other rule (pure, no CLDR data);
--- | a host registers the real `Intl.PluralRules` category.
+-- | a host translator returns the real `Intl.PluralRules` category.
 selectPluralH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
-selectPluralH _ args = case Array.head args of
+selectPluralH = seamed "selectPlural" \_ args -> case Array.head args of
   Nothing -> throwError (ArityError "selectPlural: expected at least 1 argument(s), got 0")
   Just v -> do
     n <- asNum v
     pure (VString (if n == 1.0 then "one" else "other"))
 
 -- | `relative value unit` falls back to a plain English phrasing (pure, no CLDR
--- | data): "N units ago" / "in N units" / "this unit". A host registers the real
--- | `Intl.RelativeTimeFormat` for idiomatic output ("yesterday", "wczoraj").
+-- | data): "N units ago" / "in N units" / "this unit". A host translator returns
+-- | the real `Intl.RelativeTimeFormat` output ("yesterday", "wczoraj").
 relativeH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
-relativeH _ args = case Array.index args 0, Array.index args 1 of
+relativeH = seamed "relative" \_ args -> case Array.index args 0, Array.index args 1 of
   Just vv, Just uu -> do
     v <- asNum vv
     unit <- liftEither (stringify uu)

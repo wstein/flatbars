@@ -15,7 +15,7 @@
 // the platform, which is exactly why i18next is NOT vendored.
 
 import { dump as dumpYaml } from "../../lab/vendor/js-yaml.mjs";
-import { makeI18nBag } from "../../lab/i18n.mjs";
+import { makeTranslator as labMakeTranslator } from "../../lab/i18n.mjs";
 
 // ── The host's message catalog ───────────────────────────────────────────────
 // A plain object the host owns (ADR-029: the host supplies the brain). A string
@@ -59,24 +59,25 @@ export const locales = Object.keys(catalog);
 // object directly (FullBars convention), so `number n style="…"` calls
 // number(n, { style: "…" }). Swap native Intl for i18next/ICU in production (see
 // `escapeHatch`).
-export const makeI18nHelpers = (locale) => makeI18nBag(catalog, locale);
+export const makeTranslator = (locale) => labMakeTranslator(catalog, locale);
 
 // ── The teaching artifacts the page shows verbatim ───────────────────────────
 // How a host wires the seam (the code behind every cell on this page). For an
 // inline helper the key=value hash arrives as a trailing object directly.
-export const integrationSource = `// The Lab acts as the HOST. FlatBars ships no i18n; wire \`t\` to native Intl —
-// the browser's CLDR plural/format brain, at zero bundle cost (ADR-029).
-registerHelper("t", (key, args) => translate(locale, key, args));`;
+export const integrationSource = `// The Lab acts as the HOST. FlatBars ships no i18n; seed ONE translator (the
+// first-class seam — NOT registerHelper) that drives t / number / date, backed
+// by native Intl — the browser's CLDR plural/format brain, zero bundle (ADR-029).
+registerTranslator((name, args) => translate(locale, name, args));`;
 
-// The unbundled escape hatch: drop in your real stack instead of native Intl.
+// The unbundled escape hatch: drop in your real stack behind the same seam.
 export const escapeHatch = `// i18next:
 import i18next from "i18next";
-registerHelper("t", (key, args) => i18next.t(key, args));
+registerTranslator((name, args) => name === "t" ? i18next.t(args[0], args[1]) : args[0]);
 
 // or ICU MessageFormat (@formatjs/intl-messageformat):
 import { IntlMessageFormat } from "intl-messageformat";
-registerHelper("t", (key, args) =>
-  new IntlMessageFormat(catalog[locale][key], locale).format(args));`;
+registerTranslator((name, args) =>
+  name === "t" ? new IntlMessageFormat(catalog[locale][args[0]], locale).format(args[1]) : args[0]);`;
 
 // ── The runnable cells ───────────────────────────────────────────────────────
 export const sections = [

@@ -33,10 +33,11 @@ import {
   compileSurface as bbCompileSurface,
   compileMaxbars as bbCompileMaxbars,
   renderWith as bbRenderWith,
+  renderSurfaceI18n as bbRenderSurfaceI18n,
   analyze as bbAnalyze,
   lint as bbLint,
   migrate as bbMigrate,
-} from "./vendor/flatbars-engine.mjs?v=53";
+} from "./vendor/flatbars-engine.mjs?v=54";
 
 const BB_VERSION = "0.1.0";
 
@@ -121,7 +122,7 @@ export async function createFlatBarsRenderer(dialectArg) {
     // "core"/"surface". `opts.helpers` is a built `{ name: fn }` bag of
     // user-defined helpers (ADR-018) — surface/FullBars only.
     const dialect = normalizeDialect(opts.dialect) ?? activeDialect;
-    return { program: { source, dialect, partials: partials || {}, helpers: opts.helpers || null } };
+    return { program: { source, dialect, partials: partials || {}, helpers: opts.helpers || null, translator: opts.translator || null } };
   }
 
   function render(program, data, { map = false, policy } = {}) {
@@ -134,7 +135,12 @@ export async function createFlatBarsRenderer(dialectArg) {
     const hasPartials = program.partials && Object.keys(program.partials).length > 0;
     const hasHelpers = program.helpers && Object.keys(program.helpers).length > 0;
     let res;
-    if (program.dialect === "core") {
+    if (program.translator) {
+      // ADR-029: localization wires the first-class translator seam (not
+      // registerHelper) — the surface render with `t`/`number`/`date`/… driven by
+      // the host translator. (The Lab's i18n examples are FullBars/surface.)
+      res = bbRenderSurfaceI18n(program.translator, program.source, d);
+    } else if (program.dialect === "core") {
       res = bbRender(program.source, d);
     } else if (program.dialect === "maxbars") {
       // MaxBars reuses the FullBars surface pipeline; named external partials are

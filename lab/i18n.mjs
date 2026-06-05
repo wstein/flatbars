@@ -60,6 +60,30 @@ export function makeI18nBag(messages, locale) {
   };
 }
 
+// Wrap a helper bag as the ADR-029 translator seam: a single (name, args) =>
+// string|undefined the engine seeds via withTranslator / rt.registerTranslator.
+// The op's positional Value args arrive marshalled; each bag fn takes them
+// directly (t(key, hash), number(n, opts), …), so spreading is the dispatch.
+function bagToTranslator(bag) {
+  return (name, args) => {
+    const fn = bag[name];
+    return fn ? fn(...(args || [])) : undefined;
+  };
+}
+
+// The host translator from a messages object + locale (the page's JS catalog).
+export function makeTranslator(messages, locale) {
+  return bagToTranslator(makeI18nBag(messages, locale));
+}
+
+// The host translator from the Lab's `catalog.yaml` tab (the LOCALIZATION view).
+export function buildTranslator(catalogYaml, locale, loadYaml) {
+  const b = buildI18nHelpers(catalogYaml, locale, loadYaml);
+  return b.ok
+    ? { ok: true, translator: bagToTranslator(b.helpers), error: "" }
+    : { ok: false, translator: null, error: b.error };
+}
+
 export function buildI18nHelpers(catalogYaml, locale, loadYaml) {
   if (!catalogYaml || !catalogYaml.trim()) return { ok: true, helpers: {}, error: "" };
   let messages;

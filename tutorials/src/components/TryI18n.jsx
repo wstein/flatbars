@@ -8,8 +8,8 @@
 // no i18next vendored, no engine feature. Chrome reuses the .oil-* classes from
 // open-in-lab.css (imported by the Reference layout) so the cell matches the rest.
 import { useEffect, useRef, useState } from "preact/hooks";
-import { makeI18nHelpers, locales } from "../i18n.mjs";
-import { renderWith } from "../../../lab/vendor/flatbars-engine.mjs";
+import { makeTranslator, locales } from "../i18n.mjs";
+import { renderSurfaceI18n } from "../../../lab/vendor/flatbars-engine.mjs";
 import { highlightTemplate, esc } from "../lib/highlight.mjs";
 
 const LOCALE_NAMES = { en: "English", de: "Deutsch", pl: "Polski" };
@@ -69,7 +69,7 @@ export default function TryI18n({ template = "", data = {}, locale = "en" }) {
     if (tpl.trim() === "") { setOut({ ok: true, text: "" }); return; }
     try {
       const renderData = usesCount ? { ...data, count } : data;
-      const r = renderWith(makeI18nHelpers(loc), {}, tpl, renderData ?? {});
+      const r = renderSurfaceI18n(makeTranslator(loc), tpl, renderData ?? {});
       setOut(r.ok ? { ok: true, text: r.value } : { ok: false, text: r.error });
     } catch (e) {
       setOut({ ok: false, text: String((e && e.message) || e) });

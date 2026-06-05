@@ -15,9 +15,9 @@
 //      deliberate `missing` fallback cell) — the no-dangling / no-over-claim
 //      contract, mirroring check-jsonata's function coverage.
 import assert from "node:assert/strict";
-import { sections, flagship, catalog, locales, makeI18nHelpers, flagshipCatalogYaml } from "../tutorials/src/i18n.mjs";
+import { sections, flagship, catalog, locales, makeTranslator, flagshipCatalogYaml } from "../tutorials/src/i18n.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
-import { buildI18nHelpers } from "../lab/i18n.mjs";
+import { buildTranslator } from "../lab/i18n.mjs";
 import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
 
 let fail = 0;
@@ -26,7 +26,7 @@ const allCells = sections.flatMap((s) => s.cells.map((c) => ({ section: s.id, ..
 // Render a cell's template through FullBars with `t` bound to the cell's locale.
 async function renderCell(cell) {
   const r = await createFlatBarsRenderer("fullbars");
-  const program = r.compile(cell.template, {}, { helpers: makeI18nHelpers(cell.locale) }).program;
+  const program = r.compile(cell.template, {}, { translator: makeTranslator(cell.locale) }).program;
   return r.render(program, cell.data);
 }
 
@@ -45,7 +45,7 @@ for (const cell of allCells) {
 console.log("\nFlagship (plural + interpolation, one locale):");
 try {
   const r = await createFlatBarsRenderer(flagship.engine);
-  const program = r.compile(flagship.template, {}, { helpers: makeI18nHelpers(flagship.locale) }).program;
+  const program = r.compile(flagship.template, {}, { translator: makeTranslator(flagship.locale) }).program;
   const out = r.render(program, flagship.data);
   assert.equal(out, flagship.expect);
   console.log(`  ✓ flagship [${flagship.locale}] → ${JSON.stringify(out)}`);
@@ -56,22 +56,22 @@ try {
 
 // ── catalog.yaml route: the Lab's LOCALIZATION view (ADR-029) ────────────────
 // flagshipCatalogYaml is the catalog rendered as message-only YAML; the Lab's
-// buildI18nHelpers (its worker builder), bound to a locale, must render every
-// cell — and the flagship — identically to the live makeI18nHelpers, so the
+// buildTranslator (its worker builder), bound to a locale, must render every
+// cell — and the flagship — identically to the live makeTranslator, so the
 // catalog.yaml round-trip can't drift from the page.
 console.log("\ncatalog.yaml route (Lab builder ≡ page):");
 try {
   const r = await createFlatBarsRenderer("fullbars");
   for (const cell of allCells) {
     if (cell.missing) continue;
-    const built = buildI18nHelpers(flagshipCatalogYaml, cell.locale, loadYaml);
+    const built = buildTranslator(flagshipCatalogYaml, cell.locale, loadYaml);
     assert.ok(built.ok, `catalog built for ${cell.locale}: ${built.error}`);
-    const prog = r.compile(cell.template, {}, { helpers: built.helpers }).program;
+    const prog = r.compile(cell.template, {}, { translator: built.translator }).program;
     assert.equal(r.render(prog, cell.data), cell.expect, `catalog route ${cell.section}/${cell.id}`);
   }
   // the flagship, with its locale (what Open-in-Lab carries as `loc`)
-  const fb = buildI18nHelpers(flagshipCatalogYaml, flagship.locale, loadYaml);
-  const prog = r.compile(flagship.template, {}, { helpers: fb.helpers }).program;
+  const fb = buildTranslator(flagshipCatalogYaml, flagship.locale, loadYaml);
+  const prog = r.compile(flagship.template, {}, { translator: fb.translator }).program;
   assert.equal(r.render(prog, flagship.data), flagship.expect, "catalog.yaml renders the flagship");
   console.log(`  ✓ ${allCells.filter((c) => !c.missing).length} cells + flagship render identically`);
 } catch (e) {
