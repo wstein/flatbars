@@ -6550,6 +6550,11 @@
 
       // Serialise current state to the editable YAML (values inlined into a fixed
       // commented scaffold so the descriptions are always present).
+      // Align an inline `# comment` to a fixed column — keeps the generated config
+      // readable without per-line magic-number padding.
+      function cfgLine(kv, comment) {
+        return kv + " ".repeat(Math.max(1, 26 - kv.length)) + "# " + comment;
+      }
       function buildConfigYaml(v = { escape: escapeMode, trim: standalone, st4: st4Mode, allow: allowList }) {
         const esc = v.escape ? v.escape : '""';
         // `null` = unconstrained (the default); a real array (even empty)
@@ -6560,17 +6565,17 @@
           "# Render config — applies to every compile + render.",
           "# Edits apply live as you type; fix any error shown in Problems.",
           "",
-          `escape: ${esc}` + " ".repeat(Math.max(1, 8 - esc.length)) + "# html · xml · json · none · \"\" (as-compiled)",
-          `trim_whitespace: ${v.trim}` + (v.trim ? "   " : "  ") + "# strip standalone tag-only lines (ADR-0016)",
-          `st4_mode: ${v.st4}` + (v.st4 ? "         " : "        ") + "# force {{! @truthiness: st4 }} gate for ST4 export",
+          cfgLine(`escape: ${esc}`, 'html · xml · json · none · "" (as-compiled)'),
+          cfgLine(`trim_whitespace: ${v.trim}`, "strip standalone tag-only lines (ADR-0016)"),
+          cfgLine(`st4_mode: ${v.st4}`, "force {{! @truthiness: st4 }} gate for ST4 export"),
           "",
           "transformers:",
-          `  allow: ${allow}` + " ".repeat(Math.max(1, 12 - allow.length)) + "# ADR-0013 positive list — ~ = unconstrained (default); [eval] = only listed names render",
+          cfgLine(`  allow: ${allow}`, "ADR-0013 positive list — ~ = unconstrained (default); [eval] = only listed names render"),
           // MinBars-only: the truthiness rule (ADR-029). Replaces the old UI toggle.
           ...(ENGINE === "minbars"
-            ? ["", "minbars:", `  truthiness: ${minbarsCompat ? "mustacheJs" : "spec"}   # mustacheJs (0/\"\" falsy, default) · spec (0/\"\" truthy)`]
+            ? ["", "minbars:", cfgLine(`  truthiness: ${minbarsCompat ? "mustacheJs" : "spec"}`, 'mustacheJs (0/"" falsy, default) · spec (0/"" truthy)')]
             // t-surfaces: the active locale for catalog.yaml's messages (ADR-029).
-            : ["", "i18n:", `  locale: ${labLocale}   # the locale catalog.yaml is rendered in`]),
+            : ["", "i18n:", cfgLine(`  locale: ${labLocale}`, "the locale catalog.yaml is rendered in")]),
         ].join("\n");
       }
 
