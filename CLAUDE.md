@@ -186,7 +186,9 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `{{#*inline}}` decorator).
   Truthiness is a `Value -> Boolean` callback the engine plugs in (no falsy-set
   data, no per-file `@truthiness`):
-  - **`rawbars`** — core skeleton syntax directly, no surface sugar.
+  - **`rawbars`** — the *desugared core surface*: core skeleton syntax directly, no surface sugar
+    (it still runs the engine — it is the form the richer surfaces desugar to, *not* the meaning-free
+    core, which is the `core`/`flatbars` parser package).
   - **`fullbars`** — adds the Handlebars-style surface desugar.
   - **`maxbars`** — the flagship surface: reuses FullBars's engine by dependency and
     adds infix operators and pipes (`MaxBars.Expr`), desugaring to the same core
@@ -222,7 +224,7 @@ not a PureScript package). The old Halogen `packages/playground` was removed.
 The **`tutorials`** site (Astro + Preact, also not a PureScript package) is the
 learner-facing front end: every surface now has a comprehensive runnable
 reference — **MinBars/Mustache** (`/minbars`, the recommended start) leads, with
-**RawBars** (`/rawbars`, the meaning-free core, live compiled-JS pane),
+**RawBars** (`/rawbars`, the desugared core surface, live compiled-JS pane),
 **FullBars** (`/fullbars`, Handlebars-faithful), and **MaxBars** (`/maxbars`, the
 flagship: infix operators, pipes, bare loop vars) alongside. Beyond the dialects,
 two *tooling* guides: **Truthiness portability** (`/analyse`, analyse mode —

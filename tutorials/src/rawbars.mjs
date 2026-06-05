@@ -3,8 +3,8 @@
 // The RawBars reference's runnable examples — ONE source, imported by both the
 // reference page (live preview + Open-in-Lab + the compiled-JS pane) and the CI
 // gate (scripts/check-tutorial-links.mjs), which renders every one through the
-// real engine bundle and asserts it produces output. RawBars is the meaning-free
-// core: no surface sugar, so every value is an explicit helper application.
+// real engine bundle and asserts it produces output. RawBars is the desugared
+// core surface: no surface sugar, so every value is an explicit helper application.
 //
 // `engine` defaults to "rawbars"; the `sugar` example is FullBars on purpose —
 // it's the left half of the "sugar → core" diptych (what `{{name}}` desugars

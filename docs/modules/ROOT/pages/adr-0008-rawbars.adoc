@@ -47,7 +47,7 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
 
 * *Pro:* the substrate's central promise is a *running dialect*, not prose; the FullBars-free closure
   turns ADR-003's layering into something a CI test can assert.
-* *Con:* authoring is verbose (every `lookup` is explicit) — RawBars is a substrate/test dialect, not
+* *Con:* authoring is verbose (every `lookup` is explicit) — RawBars is the desugared core surface, a base/test dialect, not
   the one most authors should reach for. The module docstring still says "the FullBars reference
   engine"/"the compiler's FullBars `Emit`," which is cosmetic drift: that engine and that `Emit` now
   live in `kernel`/`flatbars-compile`, which is *why* the closure is FullBars-free.

@@ -125,7 +125,10 @@ Because the parser attaches no meaning, the *same* lexer and structural tree ser
 incompatible semantics — the dialect supplies the meaning through the `parseExpr` / `parseHead` seam
 and the shape gates, never a fork of the grammar:
 
-* *RawBars* — the meaning-free core itself, written out (`pass:[{{{ lookup this "x" }}}]`).
+* *RawBars* — the desugared core surface: the core skeleton syntax written out directly
+  (`pass:[{{{ lookup this "x" }}}]`). It runs the engine (so it carries meaning); what it lacks is
+  *surface sugar* — it is the form the richer surfaces desugar to, not the meaning-free core itself
+  (that is the parser).
 * *MinBars* — a Mustache-compatible *peer* engine, with its own context-stack scope and Mustache
   truthiness (`0` and `pass:[""]` are truthy); it passes the vendored `mustache/spec` suite.
 * *FullBars* — faithful to Handlebars, the industry-standard `pass:[{{ }}]` engine (`pass:[{{ name }}]`,

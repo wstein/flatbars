@@ -9,9 +9,9 @@
 export const lessons = {
   rawbars: {
     engine: "rawbars",
-    title: "RawBars — the meaning-free core",
+    title: "RawBars — the desugared core surface",
     blurb:
-      "The parser, exposed: no surface sugar — every value is an explicit helper " +
+      "The core syntax, exposed: no surface sugar — every value is an explicit helper " +
       "application. {{{ … }}} is raw output; escape with escapeHtml; read fields with lookup.",
     spec: "concepts", // docs/modules/ROOT/pages/concepts.adoc
     template:

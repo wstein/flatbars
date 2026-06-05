@@ -149,8 +149,8 @@ precedes a passing fixture.
 The 2026-06-01 decision enabled `mustacheDelims` on RawBars and MaxBars (via
 the four opt-in mechanisms in alternative (B)) on the rationale that they're
 "non-Handlebars dialects". That rationale was wrong: set-delimiter is a
-*Mustache* feature, not a "non-Handlebars" feature. RawBars (the meaning-free
-core) and MaxBars (the operators + pipes flagship) have no semantic reason to
+*Mustache* feature, not a "non-Handlebars" feature. RawBars (the desugared core
+surface) and MaxBars (the operators + pipes flagship) have no semantic reason to
 ship a Mustache lexer mode; carrying it produced three yeses and one no where
 the dialect ladder benefits from one consistent answer.
 

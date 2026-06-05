@@ -175,7 +175,7 @@ register and is exactly the two-register model applied at the boundary, not just
 
 * *RawBars* — `renderWithOperations(operations, partials, template, data)` (and the source-level
   `registerOperation(name, fn[, arity])` affordance, mirroring `registerHelper`). RawBars is the
-  meaning-free core: it has *no surface sugar*, so a block head emits no `@hash`/`@param` markers — a
+  desugared core surface: it has *no surface sugar*, so a block head emits no `@hash`/`@param` markers — a
   RawBars block operation therefore gets `options.fn`/`options.inverse` (and `options.fn(ctx, { data })`
   for scoped vars) but *no* `options.hash` and no `as |…|` block params (there is no surface to write
   them). Resolution stays *strict* — an unknown operation is `UnknownHelper`, never `blockHelperMissing`

@@ -17,7 +17,7 @@ npm run build          # static site → dist/
 ```
 
 Pages: `/` (landing — thesis first, MinBars the recommended start) · `/minbars`
-(the comprehensive MinBars / Mustache reference) · `/rawbars` (the meaning-free core reference) ·
+(the comprehensive MinBars / Mustache reference) · `/rawbars` (the desugared core surface reference) ·
 `/fullbars` (the comprehensive FullBars / Handlebars reference) · `/maxbars`
 (the comprehensive MaxBars reference — infix operators, pipes, bare loop vars).
 All four surfaces now have a dedicated reference, so there is no generic

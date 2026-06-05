@@ -1,8 +1,8 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 //
-// The RawBars reference — a focused, honest-substrate page (design debate
-// consensus). RawBars is the meaning-free core: no surface sugar, every value an
+// The RawBars reference — a focused, honest core-surface page (design debate
+// consensus). RawBars is the desugared core surface: no surface sugar, every value an
 // explicit helper application. Prose illustrates; runnable examples come from the
 // single gate-validated source ../rawbars.mjs. One flagship example shows the
 // live compiled-JS pane (RawBars compiles; MinBars doesn't). The deep-dive links
@@ -49,8 +49,8 @@ const t = (s) => s;
 ---
 
 <Reference
-  title="RawBars — the meaning-free core"
-  subtitle="RawBars is the structural core of FlatBars with no surface sugar: every value is an explicit helper application. You rarely hand-write it — it's the framework you build sugar-rich engines (Mustache, Handlebars) on top of. This reference shows the bare core running live, and compiling to JS."
+  title="RawBars — the desugared core surface"
+  subtitle="RawBars is the desugared core surface of FlatBars: the core skeleton syntax exposed as a runnable dialect, with no surface sugar — every value is an explicit helper application. You rarely hand-write it — it's the desugared form the sugar-rich surfaces (Mustache, Handlebars) lower to. This reference shows the bare core syntax running live, and compiling to JS."
   groups={groups}
   spec="concepts"
   dialect="rawbars"
@@ -281,7 +281,7 @@ const t = (s) => s;
 
     <h3>Where to go next</h3>
     <p>
-      You rarely write RawBars by hand — it's the substrate you target. For everyday
+      You rarely write RawBars by hand — it's the desugared core surface you target. For everyday
       templating, climb the ladder: <a href="/minbars">MinBars</a> is the
       logic-less on-ramp, <a href="/fullbars">FullBars</a> adds Handlebars-style blocks
       and helpers, and <a href="/maxbars">MaxBars</a> adds infix operators and pipes —
