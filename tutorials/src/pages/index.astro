@@ -101,6 +101,9 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
       h1 .flat { color: var(--accent); }
       h1 em { font-style: italic; color: var(--accent-2); }
       .lead { font-size: 1.28rem; line-height: 1.5; color: var(--fg-secondary); max-width: 58ch; margin: 0 0 2.4rem; text-wrap: pretty; }
+      .hero-cta { margin: 0 0 2.4rem; font-size: 1.05rem; }
+      .hero-cta a { color: var(--accent-2); text-decoration: none; font-weight: 600; }
+      .hero-cta a:hover { color: var(--accent); text-decoration: underline; }
       .lead strong { color: var(--fg); font-weight: 600; }
 
       .proof { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border);
@@ -185,6 +188,7 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
         </p>
         <h1>The <span class="flat">Handlebars</span> &amp; Mustache you know, on a core small enough to <em>be the language you want.</em></h1>
         <p class="lead">One parser. Four surfaces. <strong>Proven against the real specs</strong> — Mustache and Handlebars run on it unchanged, and MaxBars is the flagship we built on top.</p>
+        <p class="hero-cta"><a href="/start">New to FlatBars? Start here →</a></p>
 
         <div class="proof" aria-label="Conformance proof">
           {proof.map((p) => (

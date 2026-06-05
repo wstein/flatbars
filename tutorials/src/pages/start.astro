@@ -1,0 +1,222 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// "Getting started" — the on-ramp (NOT a fifth reference). It gets you rendering
+// in one example, helps you pick a dialect by the job, teaches the one discipline
+// that keeps templates simple (shape data in the host), names the one real trap
+// (truthiness) and how to disarm it, then shows the moment MaxBars earns its keep.
+//
+// Per the team consensus, this page forks NO normative prose (theory lives in
+// concepts.adoc, linked) and adds NO example corpus: every runnable beat reuses an
+// already-gated example object, shown through the same mechanism its home gate
+// validates — so the page inherits coverage:
+//   • mustache.hello / mustache.truthyZero / fullbars.ifBlock / maxbars.comparison
+//       → plain render, gated by scripts/check-tutorial-links.mjs
+//   • analyse.zero  → the cross-engine point; its analyze() finding is gated by
+//       scripts/check-tutorial-tooling.mjs (here it is a plain FullBars render that
+//       shows the *opposite* branch from the same data — the trap, made concrete)
+//   • flagship      → rendered with the JSONata `transform` applied (OpenInLab's
+//       transform prop), gated by scripts/check-jsonata.mjs
+import Reference from "../layouts/Reference.astro";
+import OpenInLab from "../components/OpenInLab.jsx";
+import { examples as mustache } from "../mustache.mjs";
+import { examples as fullbars } from "../fullbars.mjs";
+import { examples as maxbars } from "../maxbars.mjs";
+import { examples as analyse } from "../analyse.mjs";
+import { flagship } from "../jsonata.mjs";
+
+const t = (s) => s; // readability helper for inline tag literals (Astro eats bare {{ }})
+
+const groups = [
+  {
+    label: "Getting started",
+    items: [
+      { href: "#first-render", label: "Your first template" },
+      { href: "#choose", label: "Which dialect?" },
+      { href: "#data-prep", label: "Shape data in the host" },
+      { href: "#pitfalls", label: "The one trap: truthiness" },
+      { href: "#outgrow", label: "When if isn't enough" },
+      { href: "#next", label: "Where to go next" },
+    ],
+  },
+  {
+    label: "References",
+    items: [
+      { href: "/minbars", label: "MinBars (Mustache)" },
+      { href: "/transform", label: "Data shaping" },
+      { href: "/analyse", label: "Truthiness" },
+    ],
+  },
+  {
+    label: "Play",
+    items: [{ href: "/lab/index.html?engine=minbars", label: "FlatBars Lab ↗" }],
+  },
+];
+---
+
+<Reference
+  title="Getting started"
+  subtitle="Render your first template, pick the dialect that fits the job, and keep templates simple by shaping data in the host — plus the one truthiness trap and how to disarm it."
+  groups={groups}
+  dialect="minbars"
+  spec="concepts"
+>
+  <style>
+    .choose { width: 100%; border-collapse: collapse; margin: 0.9rem 0 0.4rem; font-size: 0.94rem; }
+    .choose th, .choose td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .choose th { color: var(--fg-faint); font: 600 11px/1 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; }
+    .choose td:nth-child(2) { font: 600 13px var(--font-mono); white-space: nowrap; }
+    .choose a { color: var(--accent-2); text-decoration: none; }
+    .choose a:hover { color: var(--accent); }
+    .pair { display: grid; gap: 1rem; margin: 0.9rem 0 1.2rem; }
+    @media (min-width: 60rem) { .pair { grid-template-columns: 1fr 1fr; } }
+    .pair .lbl { font: 600 11px/1 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg-faint); margin-bottom: 0.3rem; }
+    .note { margin: 0.9rem 0 1.4rem; padding: 0.7rem 0.9rem; border-left: 3px solid var(--accent); background: var(--accent-softer); border-radius: 0 6px 6px 0; font-size: 0.92rem; }
+    .note b { color: var(--accent-2); }
+  </style>
+
+  <!-- ─────────────────────────── 1 · First render ─────────────────────────── -->
+  <section id="first-render">
+    <h2>Your first template</h2>
+    <p>
+      A template is just text with <code>{t("{{ }}")}</code> holes that data fills in.
+      Edit the template or the data below and watch it render — through the same engine
+      the FlatBars Lab ships.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={mustache.hello.template} data={mustache.hello.data} />
+    <p>That's the whole loop: <em>template + data → text</em>. Now let's pick the right tool.</p>
+  </section>
+
+  <!-- ─────────────────────────── 2 · Which dialect? ───────────────────────── -->
+  <section id="choose">
+    <h2>Which dialect?</h2>
+    <p>
+      FlatBars isn't one language — it's a meaning-free core with four surfaces built on
+      it. They aren't tiers of quality; pick by your <b>constraint</b>, not by prestige.
+    </p>
+    <table class="choose">
+      <thead><tr><th>Your job</th><th>Use</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Logic-less email / CMS snippets; Mustache parity</td>
+          <td><a href="/minbars">MinBars</a></td>
+          <td>the smallest surface — one sitting to learn it all; 184/184 of the Mustache spec</td>
+        </tr>
+        <tr>
+          <td>Importing existing Handlebars templates</td>
+          <td><a href="/fullbars">FullBars</a></td>
+          <td>Handlebars-faithful (49/50 vs the real engine); your team already knows it</td>
+        </tr>
+        <tr>
+          <td>App views with real expressions (<code>x &gt; 3</code>, pipes, loop vars)</td>
+          <td><a href="/maxbars">MaxBars</a></td>
+          <td>the flagship surface — infix operators, pipes, bare loop variables</td>
+        </tr>
+        <tr>
+          <td>Building your own engine on the core</td>
+          <td><a href="/rawbars">RawBars</a></td>
+          <td>the austere, meaning-free substrate the others desugar to</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="tip">
+      It's a superset ladder — RawBars ⊂ FullBars ⊂ MaxBars — plus logic-less MinBars
+      off to the side. The <a href="/minbars">MinBars reference</a> is the recommended
+      place to <em>learn the language</em>; the rest of this page is the recommended
+      first ten minutes.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── 3 · Data prep ────────────────────────────── -->
+  <section id="data-prep">
+    <h2>Keep templates dumb: shape data in the host</h2>
+    <p>
+      The single habit that keeps templates portable and reviewable: <b>do the logic
+      where you have a real language</b>, and hand the template a view-model it can walk
+      without branching. Here is the whole idea in one cell — a flat list of commits, a
+      transform that groups and labels them, and a template with <em>zero</em> branching:
+    </p>
+    <OpenInLab
+      client:visible
+      engine={flagship.engine}
+      data={flagship.data}
+      transform={flagship.transform}
+      template={flagship.template}
+    />
+    <p>
+      All the decisions live upstream, as data; the template just iterates. When the
+      reshaping gets real, that middle step is <a href="/transform">JSONata</a> — and,
+      as the next section shows, it's also how you sidestep the one real trap.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── 4 · Truthiness trap ──────────────────────── -->
+  <section id="pitfalls">
+    <h2>The one trap: truthiness</h2>
+    <p>
+      <code>false</code> and <code>null</code> are falsy everywhere — portable. The other
+      four — <code>0</code>, <code>""</code>, <code>[]</code>, <code>{t("{}")}</code> —
+      are <em>not</em>, and engines disagree. In MinBars (and the language-agnostic
+      Mustache spec) <code>0</code> is <b>truthy</b>, so a section over <code>count: 0</code>
+      <em>renders</em>:
+    </p>
+    <OpenInLab client:visible engine="minbars" template={mustache.truthyZero.template} data={mustache.truthyZero.data} />
+    <p>
+      Hand the <em>same</em> <code>count: 0</code> to Handlebars (FullBars), where
+      <code>0</code> is <b>falsy</b>, and the identical question takes the
+      <em>opposite</em> branch:
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={analyse.zero.template} data={analyse.zero.data} />
+    <div class="note">
+      <b>Same data, opposite output — that's the trap.</b> Don't memorize four falsy
+      tables. Two fixes, in order of preference: (1) <b>shape the ambiguity out</b> in the
+      host (the previous section) so the template never asks an ambiguous question; (2)
+      ask explicitly — <code>{t("{{#if (ne count 0)}}")}</code>. The
+      <a href="/analyse">Truthiness analyser</a> renders your template against your real
+      data and flags every condition that would flip — with a rule-free fix.
+    </div>
+    <p class="tip">
+      One sharp edge: <code>mustache.js</code> (the JS implementation) treats
+      <code>0</code>/<code>""</code> as falsy like Handlebars, <em>not</em> like the spec;
+      and MaxBars uses a third rule again (<code>nonEmpty</code>: <code>0</code> truthy,
+      but <code>""</code>/<code>[]</code>/<code>{t("{}")}</code> falsy). Which is the real
+      reason to lean on data prep, not on truthiness.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── 5 · Outgrow {{#if}} ──────────────────────── -->
+  <section id="outgrow">
+    <h2>When <code>{t("{{#if}}")}</code> isn't enough → MaxBars</h2>
+    <p>
+      Start where your team is. In FullBars a condition is a Handlebars
+      <b>subexpression</b> — a helper application, <code>{t("(gte score 90)")}</code>:
+    </p>
+    <div class="pair">
+      <div>
+        <div class="lbl">FullBars — subexpression</div>
+        <OpenInLab client:visible engine="fullbars" template={fullbars.ifBlock.template} data={fullbars.ifBlock.data} />
+      </div>
+      <div>
+        <div class="lbl">MaxBars — infix</div>
+        <OpenInLab client:visible engine="maxbars" template={maxbars.comparison.template} data={maxbars.comparison.data} />
+      </div>
+    </div>
+    <p>
+      The day <code>{t("(gte score 90)")}</code> wants to read <code>score &gt;= 90</code>
+      — with <code>&amp;&amp;</code>, pipes (<code>value | helper</code>), and bare loop
+      variables — that's <a href="/maxbars">MaxBars</a>. It's the same engine and prelude
+      as FullBars, just an expression surface on top; you don't restart, you grow into it.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── 6 · Next ─────────────────────────────────── -->
+  <section id="next">
+    <h2>Where to go next</h2>
+    <ul>
+      <li><a href="/minbars">MinBars</a> — learn the whole logic-less language, tag by tag.</li>
+      <li><a href="/maxbars">MaxBars</a> — the expressive flagship: infix, pipes, loop variables.</li>
+      <li><a href="/transform">Data shaping</a> — the JSONata habit from section 3, in depth.</li>
+      <li><a href="/lint">Linting &amp; migration</a> — keep templates canonical, import Handlebars.</li>
+    </ul>
+  </section>
+</Reference>
