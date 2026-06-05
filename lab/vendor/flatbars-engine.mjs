@@ -16163,6 +16163,9 @@ var renderSurface = function(tpl, json) {
 var renderMustache = function(partials, tpl, json) {
   return result(renderMinWith(toUnfoldable9(partials))(tpl)(fromJson(json)));
 };
+var renderMinbarsCompatWithPartials = function(partials, tpl, json) {
+  return result(renderMinCompatWith(toUnfoldable9(partials))(tpl)(fromJson(json)));
+};
 var renderMinbarsCompat = function(tpl, json) {
   return result(renderMinCompat(tpl)(fromJson(json)));
 };
@@ -16204,7 +16207,7 @@ var migrate = function(tpl) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 194, column 25 - line 202, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 196, column 25 - line 204, column 6): " + [v.constructor.name]);
 };
 var litName = function(args) {
   var v = head(args);
@@ -16282,7 +16285,7 @@ var lint = function(tpl, dialect) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 151, column 5 - line 176, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 153, column 5 - line 178, column 12): " + [v.constructor.name]);
 };
 var jsOperation = function(name2) {
   return function(fn) {
@@ -16307,7 +16310,7 @@ var jsOperation = function(name2) {
             return pure7(fromJson(v.payload));
           }
           ;
-          throw new Error("Failed pattern match at FullBars.JS (line 295, column 35 - line 300, column 47): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FullBars.JS (line 305, column 35 - line 310, column 47): " + [v.constructor.name]);
         }
         ;
         var optsFrame = function(optsJson) {
@@ -16344,7 +16347,7 @@ var jsOperation = function(name2) {
                 };
               }
               ;
-              throw new Error("Failed pattern match at FullBars.JS (line 326, column 9 - line 328, column 60): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at FullBars.JS (line 336, column 9 - line 338, column 60): " + [v2.constructor.name]);
             };
           };
         };
@@ -16509,7 +16512,7 @@ var compileResultAt = function(src) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 426, column 23 - line 428, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 443, column 23 - line 445, column 49): " + [v.constructor.name]);
   };
 };
 var compileSurface2 = function(tpl) {
@@ -16517,6 +16520,9 @@ var compileSurface2 = function(tpl) {
 };
 var compileMinbarsWithPartials = function(partials, tpl) {
   return compileResultAt(tpl)(compileMinJsWith(toUnfoldable9(partials))(tpl));
+};
+var compileMinbarsCompatWithPartials = function(partials, tpl) {
+  return compileResultAt(tpl)(compileMinJsCompatWith(toUnfoldable9(partials))(tpl));
 };
 var compileMinbarsCompat = function(tpl) {
   return compileResultAt(tpl)(compileMinJsCompat(tpl));
@@ -16582,7 +16588,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map26(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 666, column 9 - line 675, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 683, column 9 - line 692, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
@@ -16602,7 +16608,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map26($lazy_rnode(642))(ns));
+    return arr(map26($lazy_rnode(659))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -16625,7 +16631,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         })()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 616, column 21 - line 623, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 633, column 21 - line 640, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -16658,7 +16664,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 611, column 1 - line 611, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 628, column 1 - line 628, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
         var $146 = litName(v.value1);
@@ -16683,7 +16689,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(611);
+var rnode = /* @__PURE__ */ $lazy_rnode(628);
 var astJson = function(dialect, src) {
   var errObj = function(pe) {
     var d = parseErrorAt(src)(pe);
@@ -16718,7 +16724,7 @@ var astJson = function(dialect, src) {
       return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map26(rnode)(nodes)))]))]);
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 540, column 1 - line 540, column 34): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 557, column 1 - line 557, column 34): " + [v.constructor.name]);
   };
   if (v instanceof Right) {
     var $165 = dialect !== "core";
@@ -16765,7 +16771,7 @@ var analyze = function(tpl, json) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 113, column 30 - line 122, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 115, column 30 - line 124, column 6): " + [v.constructor.name]);
 };
 export {
   analyze,
@@ -16775,6 +16781,7 @@ export {
   compileMaxbars,
   compileMinbars,
   compileMinbarsCompat,
+  compileMinbarsCompatWithPartials,
   compileMinbarsWithPartials,
   compileSurface2 as compileSurface,
   diagnostics,
@@ -16786,6 +16793,7 @@ export {
   renderMaxbars,
   renderMinbars,
   renderMinbarsCompat,
+  renderMinbarsCompatWithPartials,
   renderMustache,
   renderRawWith,
   renderSurface,

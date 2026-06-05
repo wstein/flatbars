@@ -364,6 +364,10 @@
       .tabs-wrap > .focus-toggle { flex: 0 0 auto; align-self: center; margin-right: 6px; }
       .tabs-wrap > #out-copy { margin-left: auto; margin-right: 0; }
       #out-copy.copied { color: #10b981; }
+      .tabs-wrap > .mj-truthy { flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center;
+        gap: 5px; margin-right: 8px; font: 11px var(--font-mono); color: var(--fg-secondary); cursor: pointer;
+        user-select: none; white-space: nowrap; }
+      .tabs-wrap > .mj-truthy input { margin: 0; cursor: pointer; }
 
       /* ── Tabs ────────────────────────────────────────────────────── */
       .tabs-wrap {
@@ -1596,6 +1600,14 @@
                 <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
               </svg>
             </button>
+            <!-- MinBars truthiness toggle (ADR-022 S2): flip the language-agnostic
+                 spec rule (0/"" truthy) to mustache.js' (0/"" falsy). Shown only
+                 under the MinBars engine; unhidden at boot. -->
+            <label id="mj-truthy" class="mj-truthy" hidden
+                   title="MinBars truthiness — default (spec/Ruby): 0 and empty string are truthy; mustache.js: 0 and empty string are falsy">
+              <input type="checkbox" id="mj-truthy-cb" />
+              <span>mustache.js truthiness</span>
+            </label>
           </div>
 
           <!-- Contextual controls for the active view; toggled by setOutputView. -->
@@ -1696,11 +1708,11 @@
       // file with a stale cached adapter module.
       import { createRenderer } from "./stem.mjs?v=1";
       import { createFlatBarsRenderer } from "./flatbars.mjs?v=4";
-      import { createMinBarsRenderer } from "./minbars.mjs?v=1";
+      import { createMinBarsRenderer } from "./minbars.mjs?v=2";
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=46";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=47";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -1853,6 +1865,24 @@
         : "Stem";
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
 
+      // MinBars truthiness toggle (ADR-022 S2): reveal it under MinBars and wire it
+      // to re-render under the chosen rule, persisting the choice in the share link.
+      if (ENGINE === "minbars") {
+        byId("mj-truthy").hidden = false;
+        byId("mj-truthy-cb").addEventListener("change", (e) => {
+          minbarsCompat = e.target.checked;
+          markCustom();
+          run();
+          saveHash();
+        });
+      }
+      // Reflect `minbarsCompat` on the toggle checkbox (restore / example reset).
+      // The input is always in the DOM (hidden off MinBars), so this is safe there.
+      function syncMinbarsToggle() {
+        const cb = byId("mj-truthy-cb");
+        if (cb) cb.checked = minbarsCompat;
+      }
+
       // ── Docs backlink + colour-legend popover ──────────────────────────────
       // The "Docs" button points at the reference page for the current engine
       // (relative, so it works on whatever host serves both); the Legend popover
@@ -1975,6 +2005,10 @@
       let outputView   = "source";  // "source" (Plain Text) is the default landing view
       let allowScripts = true;       // HTML/Markdown preview always runs <script> in an isolated (null-origin) sandbox
       let escapeMode   = "";
+      // MinBars truthiness toggle (ADR-022 S2): false = the language-agnostic spec
+      // rule (0/"" truthy), true = the mustache.js rule (0/"" falsy). MinBars only;
+      // threaded into render/compileToJs as `compat` and persisted as `mj`.
+      let minbarsCompat = false;
       // Compiler & runtime options (ADR-0016).
       // `standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
       let standalone      = true;
@@ -3403,7 +3437,7 @@
           lastSegViews = [];
           let text = "// this engine has no compiler";
           if (typeof renderer.compileToJs === "function") {
-            const r = renderer.compileToJs(templateSourceFor("main"));
+            const r = renderer.compileToJs(templateSourceFor("main"), undefined, { compat: minbarsCompat });
             text = r.ok ? r.value : "// compile error: " + r.error;
           }
           setOutputDoc(text, Decoration.none);
@@ -3811,7 +3845,7 @@
             }
             output = helperCache.output; segments = [];
           } else {
-            ({ output, segments } = renderer.render(program, data, { map: true }));
+            ({ output, segments } = renderer.render(program, data, { map: true, compat: minbarsCompat }));
           }
           setOutput(output, segments);
           setError("");
@@ -4487,6 +4521,7 @@
         byId("escape-select").value = "";
         standalone = true;
         st4Mode = false;
+        minbarsCompat = false; syncMinbarsToggle();
         allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
@@ -4552,6 +4587,7 @@
         byId("escape-select").value = "";
         standalone = true;
         st4Mode = false;
+        minbarsCompat = false; syncMinbarsToggle();
         allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
@@ -4606,6 +4642,8 @@
           ...(st4Mode ? { s4: 1 } : {}),            // ST4 truthiness gate
           ...(allowList !== null ? { al: allowList } : {}), // ADR-0013 transformer allow-list
           av: activeView, ai: activeTabIdx,
+          // MinBars truthiness toggle (ADR-022 S2); omitted when off so links stay compact.
+          ...(minbarsCompat ? { mj: 1 } : {}),
           // Active template-pane mode (1 = transform tab, 0/omitted = tmpl).
           // Persisted so a shared "I'm editing the transform" link round-trips.
           ...(templateMode === "transform" ? { tm: 1 } : {}),
@@ -4670,6 +4708,8 @@
           byId("escape-select").value = escapeMode;
           standalone   = s.sa !== 0;  // default true; explicit 0 opts out
           st4Mode = s.s4 === 1;
+          minbarsCompat = s.mj === 1; // MinBars truthiness toggle (no-op off MinBars)
+          syncMinbarsToggle();
           allowList = Array.isArray(s.al) ? s.al.map(String) : null;
           syncStandaloneUI();
           updateRenderStatus();

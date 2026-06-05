@@ -74,6 +74,21 @@ output view. With a template that has an ambiguous condition over empty/zero dat
 - [ ] the tab is **absent** when a non-FlatBars engine is selected (it gates on
       the `analyse` capability).
 
+## Checklist — MinBars truthiness toggle (ADR-022 S2)
+
+Open the Lab under `?engine=minbars`. A **mustache.js truthiness** checkbox sits in
+the output toolbar (right of the focus button); it is absent under every other
+engine. With `{{#n}}has{{/n}}{{^n}}none{{/n}}` and data `{ "n": 0 }`:
+
+- [ ] unchecked (default): renders **has** — `0` is truthy (the language-agnostic
+      spec / Ruby rule).
+- [ ] checked: renders **none** — `0` is falsy (the mustache.js rule); the same
+      flips for an empty string, while `{}` stays truthy and `[]` falsy.
+- [ ] the **Compiled JS** view reflects the toggle (`rt.truthyHandlebars` when
+      checked, `rt.truthyMustache` when unchecked).
+- [ ] the choice round-trips through a share link (`#…` carries `mj:1`) and resets
+      when a catalog example is loaded.
+
 ## When a view is added or changed
 
 1. Add it to `VIEW_TABS` in `lab/output-view.mjs` and give it a `viewKind`.

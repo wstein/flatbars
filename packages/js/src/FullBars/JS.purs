@@ -20,6 +20,7 @@ module FullBars.JS
   , renderMaxbars
   , renderMinbars
   , renderMinbarsCompat
+  , renderMinbarsCompatWithPartials
   , astJson
   , compile
   , compileSurface
@@ -27,6 +28,7 @@ module FullBars.JS
   , compileMinbars
   , compileMinbarsCompat
   , compileMinbarsWithPartials
+  , compileMinbarsCompatWithPartials
   , compileFor
   , renderSurfaceWithPartials
   , renderMustache
@@ -221,6 +223,14 @@ renderMinbars = mkFn2 \tpl json -> result (MinBars.renderMinDiag tpl (fromJson j
 renderMinbarsCompat :: Fn2 String Json Result
 renderMinbarsCompat = mkFn2 \tpl json -> result (MinBars.renderMinCompat tpl (fromJson json))
 
+-- | `renderMinbarsCompat` with a set of named partials, against JS data —
+-- | `renderMinbarsCompatWithPartials(partials, template, data)`. The
+-- | `mustache.js`-compat twin of `renderMustache`, for a Lab toggling MinBars to
+-- | the JS truthiness rule with partials loaded.
+renderMinbarsCompatWithPartials :: Fn3 (FO.Object String) String Json Result
+renderMinbarsCompatWithPartials = mkFn3 \partials tpl json ->
+  result (MinBars.renderMinCompatWith (FO.toUnfoldable partials) tpl (fromJson json))
+
 -- | Render a surface template with a set of named partials (each a surface
 -- | source). `renderSurfaceWithPartials(partials, template, data)`, where
 -- | `partials` is a plain `{ name: source }` object — the lab's multi-document
@@ -402,6 +412,13 @@ compileMinbarsCompat = mkFn1 \tpl -> compileResultAt tpl (MinBars.compileMinJsCo
 compileMinbarsWithPartials :: Fn2 (FO.Object String) String Result
 compileMinbarsWithPartials = mkFn2 \partials tpl ->
   compileResultAt tpl (MinBars.compileMinJsWith (FO.toUnfoldable partials) tpl)
+
+-- | `compileMinbarsWithPartials` under the `mustache.js`-compat truthiness — the
+-- | compiled twin of `renderMinbarsCompatWithPartials`.
+-- | `compileMinbarsCompatWithPartials(partials, template)`.
+compileMinbarsCompatWithPartials :: Fn2 (FO.Object String) String Result
+compileMinbarsCompatWithPartials = mkFn2 \partials tpl ->
+  compileResultAt tpl (MinBars.compileMinJsCompatWith (FO.toUnfoldable partials) tpl)
 
 -- | Compile a template to JS for a named dialect — one entry over the four
 -- | per-dialect compilers. `compileFor(dialect, template)`, where `dialect` is

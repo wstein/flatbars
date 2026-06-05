@@ -15,9 +15,13 @@
 
 import {
   renderMustache as bbRenderMustache,
+  renderMinbarsCompat as bbRenderMinbarsCompat,
+  renderMinbarsCompatWithPartials as bbRenderMinbarsCompatWith,
   compileMinbars as bbCompileMinbars,
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
-} from "./vendor/flatbars-engine.mjs?v=46";
+  compileMinbarsCompat as bbCompileMinbarsCompat,
+  compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
+} from "./vendor/flatbars-engine.mjs?v=47";
 
 const MIN_VERSION = "0.1.0";
 
@@ -52,13 +56,21 @@ export async function createMinBarsRenderer() {
     return { program: { source, partials: partials || {} } };
   }
 
-  function render(program, data, { map = false, policy } = {}) {
+  // `compat` (the Lab's MinBars truthiness toggle) selects the `mustache.js`
+  // rule (`0`/`""` falsy) instead of MinBars' language-agnostic spec default
+  // (`0`/`""` truthy) — ADR-022 S2. Both rules ship in the engine bundle.
+  function render(program, data, { map = false, policy, compat = false } = {}) {
     if (policy != null) {
       const err = new Error("MinBars has no render-time { allow, eval } policy (Mustache is logic-less)");
       err.kind = "unsupported-policy";
       throw err;
     }
-    const res = bbRenderMustache(program.partials || {}, program.source, data == null ? null : data);
+    const partials = program.partials || {};
+    const d = data == null ? null : data;
+    const hasPartials = Object.keys(partials).length > 0;
+    const res = compat
+      ? (hasPartials ? bbRenderMinbarsCompatWith(partials, program.source, d) : bbRenderMinbarsCompat(program.source, d))
+      : bbRenderMustache(partials, program.source, d);
     if (res.ok) return map ? { output: res.value, segments: [] } : res.value;
     const err = new Error(res.error);
     err.kind = "render";
@@ -71,10 +83,12 @@ export async function createMinBarsRenderer() {
   // are compiled in; without them a partial inlines to "" (as a missing partial
   // renders). Recursive/dynamic partials and dynamic-name parents compile-reject
   // with a clear error (slice limitation), matching the engine.
-  function compileToJs(source, partials) {
-    return partials && Object.keys(partials).length
-      ? bbCompileMinbarsWithPartials(partials, source)
-      : bbCompileMinbars(source);
+  function compileToJs(source, partials, { compat = false } = {}) {
+    const hasPartials = partials && Object.keys(partials).length;
+    if (compat) {
+      return hasPartials ? bbCompileMinbarsCompatWith(partials, source) : bbCompileMinbarsCompat(source);
+    }
+    return hasPartials ? bbCompileMinbarsWithPartials(partials, source) : bbCompileMinbars(source);
   }
 
   // MinBars exposes no lowered-AST seam to the host yet, so the AST-derived
