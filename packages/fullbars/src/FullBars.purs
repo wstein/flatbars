@@ -45,7 +45,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, noLoopVars)
-import Kernel.Analyse (Finding, findings, jsonataScaffold, reportMarkdown, runAnalysis)
+import Kernel.Analyse (Finding, allFindings, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTranslator, withTruthy)
 import Kernel.Hoist (hoistInline)
@@ -256,7 +256,7 @@ analyseSurface src dat = case parse src of
           { output: r.output
           , report: reportMarkdown src r.decisions <> i18nNote template
           , jsonata: jsonataScaffold src r.decisions
-          , findings: findings src r.decisions
+          , findings: allFindings src r.decisions
           }
 
 -- | The blessed i18n operations (ADR-029) — the names the host `Translator` drives.

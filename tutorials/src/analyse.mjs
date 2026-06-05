@@ -25,7 +25,7 @@ export const examples = {
     template: "{{#if bio}}{{bio}}{{else}}(no bio yet){{/if}}",
     data: { bio: "" },
     finds: 1,
-    expect: ["1 portability finding", "empty string", "data path: `bio`", "(ne s", "mustache.js", "flips under `mustache-spec`"],
+    expect: ["1 observed", "empty string", "data path: `bio`", "(ne s", "mustache.js", "flips under `mustache-spec`"],
   },
   // Zero diverges between the two Mustache readings: falsy in Handlebars *and*
   // mustache.js, truthy under spec/Ruby Mustache, `minimal`, and `presence`.
@@ -36,7 +36,7 @@ export const examples = {
     template: "{{#if count}}{{count}} unread{{else}}all caught up{{/if}}",
     data: { count: 0 },
     finds: 1,
-    expect: ["1 portability finding", "the number `0`", "includeZero=true", "data path: `count`", "flips under `mustache-spec`"],
+    expect: ["1 observed", "the number `0`", "includeZero=true", "data path: `count`", "flips under `mustache-spec`"],
   },
   // An empty array (falsy in Handlebars/Mustache, but the report still steers you
   // to the engine-agnostic spelling) — iterate with `{{#each}}…{{else}}` so the
@@ -46,7 +46,7 @@ export const examples = {
     template: "{{#if items}}{{#each items}}{{this}} {{/each}}{{else}}empty{{/if}}",
     data: { items: [] },
     finds: 1,
-    expect: ["1 portability finding", "empty array", "{{#each"],
+    expect: ["1 observed", "empty array", "{{#each"],
   },
   // An empty object is truthy in Handlebars, mustache.js, AND spec Mustache; it
   // flips only under the `presence` rule — the non-obvious case the report catches.
@@ -55,7 +55,7 @@ export const examples = {
     template: "{{#if profile}}has profile{{else}}none{{/if}}",
     data: { profile: {} },
     finds: 1,
-    expect: ["1 portability finding", "empty object", "flips under `presence`", "data path: `profile`"],
+    expect: ["1 observed", "empty object", "flips under `presence`", "data path: `profile`"],
   },
   // `false` is portable — every rule agrees — so it is NOT a finding; it appears as
   // a `✓` line, positive evidence the condition is safe.
@@ -64,6 +64,6 @@ export const examples = {
     template: "{{#if active}}on{{else}}off{{/if}}",
     data: { active: false },
     finds: 0,
-    expect: ["0 portability finding"],
+    expect: ["0 observed"],
   },
 };

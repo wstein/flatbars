@@ -161,7 +161,7 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   // truthy under the spec/Ruby Mustache rule and the others).
   const a = r.analyze({ source: "{{#if bio}}x{{/if}}" }, { bio: "" });
   assert.ok(a.ok, a.error);
-  assert.match(a.report, /1 portability finding/);
+  assert.match(a.report, /1 observed/);
   assert.match(a.report, /data path: `bio`/);
   // the report legend distinguishes mustache.js (= the engine rule) from spec Mustache.
   assert.match(a.report, /mustache\.js/);
@@ -169,6 +169,7 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   // structured findings drive the Truthiness dock panel.
   assert.equal(a.findings.length, 1);
   const f = a.findings[0];
+  assert.equal(f.kind, "observed");
   assert.equal(f.line, 1);
   assert.equal(f.tag, "{{#if bio}}");
   assert.equal(f.path, "bio");
@@ -177,8 +178,17 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   assert.match(f.fix, /ne s/);
   // false agrees under every rule — no finding.
   const b = r.analyze({ source: "{{#if ok}}x{{/if}}" }, { ok: false });
-  assert.match(b.report, /0 portability finding/);
+  assert.match(b.report, /0 observed/);
   assert.equal(b.findings.length, 0);
+  // ADR-030 symbolic what-if: count=5 is portable as observed, but the same-type
+  // ambiguous `0` it could hold is flagged as a *potential* finding — coverage that
+  // does not depend on the sample.
+  const c = r.analyze({ source: "{{#if count}}x{{else}}y{{/if}}" }, { count: 5 });
+  assert.match(c.report, /1 potential finding/);
+  const pot = c.findings.find((x) => x.kind === "potential");
+  assert.ok(pot, "a potential finding is present");
+  assert.equal(pot.path, "count");
+  assert.match(pot.value, /the number `0`/);
 });
 
 test("the catalog entries have the cheat-sheet shape", async () => {

@@ -97,7 +97,8 @@ type AnalyseResult =
   { ok :: Boolean
   , findings ::
       Array
-        { line :: Int
+        { kind :: String
+        , line :: Int
         , column :: Int
         , tag :: String
         , value :: String

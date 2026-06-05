@@ -18,6 +18,8 @@ module Kernel.Analyse
   , divergence
   , isFinding
   , findings
+  , potentialFindings
+  , allFindings
   , reportMarkdown
   , jsonataScaffold
   ) where
@@ -89,11 +91,13 @@ isFinding :: Decision -> Boolean
 isFinding d = not (Array.null d.diverges)
 
 -- | A structured portability finding for a host UI (the Lab's Truthiness dock
--- | panel): location, the condition tag, a description of the ambiguous value,
--- | the engines whose branch flips, the portable fix, and the data path (`""`
--- | when the condition is computed rather than a bare path).
+-- | panel): its `kind` (`"observed"` — the sample hit an ambiguous value;
+-- | `"potential"` — the same-type ambiguous value *would* diverge, ADR-030),
+-- | location, the condition tag, a description of the value, the engines whose
+-- | branch flips, the portable fix, and the data path (`""` when computed).
 type Finding =
-  { line :: Int
+  { kind :: String
+  , line :: Int
   , column :: Int
   , tag :: String
   , value :: String
@@ -102,27 +106,70 @@ type Finding =
   , path :: String
   }
 
--- | The findings (ambiguous-four conditions that diverge), as structured records
--- | for a host UI. The markdown `reportMarkdown` and this share the same
--- | `describe`/`fixFor`/path-recovery, so the panel and the report never drift.
+-- | A `Finding` for value `v` reported at decision `d`'s location, with the given
+-- | `kind` and the rules that flip vs the engine's verdict (`here`).
+findingAt :: String -> String -> Decision -> Value -> Boolean -> Finding
+findingAt kind src d v here =
+  let
+    lc = lineColumn src d.span.start
+    tagTxt = Str.trim (spanText src d.span)
+  in
+    { kind
+    , line: lc.line
+    , column: lc.column
+    , tag: tagTxt
+    , value: describe v
+    , flips: map fst (divergence v here)
+    , fix: fixFor v
+    , path: case recoverPath tagTxt of
+        Just p -> p
+        Nothing -> ""
+    }
+
+-- | The *observed* findings: ambiguous-four conditions the sample data actually
+-- | hit, which diverge across engines. The markdown `reportMarkdown` and this
+-- | share the same helpers, so the panel and the report never drift.
 findings :: String -> Array Decision -> Array Finding
-findings src = map toFinding <<< Array.filter isFinding
+findings src = map (\d -> findingAt "observed" src d d.value d.truthyHere) <<< Array.filter
+  isFinding
+
+-- | The same-type ambiguous value a non-ambiguous, non-falsy observed value could
+-- | become (ADR-030 symbolic what-if): a positive number ⇒ `0`, a non-empty
+-- | string ⇒ `""`, a non-empty array ⇒ `[]`, a non-empty object ⇒ `{}`. `false`/
+-- | `null` (always falsy) and the ambiguous four themselves yield `Nothing`.
+sameTypeAmbiguous :: Value -> Maybe Value
+sameTypeAmbiguous = case _ of
+  VNumber n | n /= 0.0 -> Just (VNumber 0.0)
+  VString s | s /= "" -> Just (VString "")
+  VSafe s | s /= "" -> Just (VString "")
+  VArray a | not (Array.null a) -> Just (VArray [])
+  VObject m | not (Map.isEmpty m) -> Just (VObject Map.empty)
+  _ -> Nothing
+
+-- | The *potential* findings (ADR-030): for each condition whose observed value
+-- | was NOT ambiguous, the same-type ambiguous value it could hold — so coverage
+-- | stops depending on the data sample. Deduped by tag+value, and a path already
+-- | flagged by an *observed* finding is not re-reported as potential. The engine
+-- | verdict for the hypothetical is the `handlebars` rule (the analysed engine).
+potentialFindings :: String -> Array Decision -> Array Finding
+potentialFindings src decisions =
+  Array.nubByEq sameTagValue (Array.mapMaybe toPotential decisions)
   where
-  toFinding d =
+  observedPaths = Array.mapMaybe
+    (\d -> if isFinding d then recoverPath (Str.trim (spanText src d.span)) else Nothing)
+    decisions
+  toPotential d = sameTypeAmbiguous d.value >>= \av ->
     let
-      lc = lineColumn src d.span.start
-      tagTxt = Str.trim (spanText src d.span)
+      finding = findingAt "potential" src d av (handlebars av)
     in
-      { line: lc.line
-      , column: lc.column
-      , tag: tagTxt
-      , value: describe d.value
-      , flips: map fst d.diverges
-      , fix: fixFor d.value
-      , path: case recoverPath tagTxt of
-          Just p -> p
-          Nothing -> ""
-      }
+      if Array.null finding.flips then Nothing
+      else if finding.path /= "" && Array.elem finding.path observedPaths then Nothing
+      else Just finding
+  sameTagValue a b = a.tag == b.tag && a.value == b.value
+
+-- | Observed findings then potential findings — the full host-UI finding set.
+allFindings :: String -> Array Decision -> Array Finding
+allFindings src decisions = findings src decisions <> potentialFindings src decisions
 
 -- | The five truthiness operations, each wrapped to `tell` a `Decision` and then
 -- | delegate to the real operation (looked up from the prelude — never
@@ -177,9 +224,17 @@ reportMarkdown src decisions =
     ( [ "# Truthiness analysis"
       , "Engine rule: `handlebars` · "
           <> show (Array.length decisions)
-          <> " condition(s) evaluated, **"
+          <> " condition(s) evaluated · **"
           <> show (Array.length flagged)
-          <> " portability finding(s)**"
+          <> " observed**, "
+          <> show (Array.length potentials)
+          <> " potential finding(s)"
+      , ""
+      , "_Coverage: *observed* findings are conditions this **data** actually drove"
+          <> " into the ambiguous four; *potential* findings are the same-type ambiguous"
+          <> " value each other condition **could** hold (independent of the sample, so"
+          <> " stable for CI). \"No observed findings\" means portable *for this data*, not"
+          <> " for all data — read the potential section too._"
       , ""
       , "_The engine `handlebars` rule is also `mustache.js`' (`0`/`\"\"` falsy), so a"
           <> " finding's `flips under` names the engines that branch the *other* way —"
@@ -189,19 +244,37 @@ reportMarkdown src decisions =
       ]
         <>
           ( if Array.null flagged then
-              [ "_No portability findings — every condition agrees across engines for this data._"
+              [ "_No observed portability findings — every condition agrees across engines for this data._"
               , ""
               ]
             else map findingSection flagged
+          )
+        <>
+          ( if Array.null potentials then []
+            else
+              [ "## Potential findings (data-independent)"
+              , "_These were portable for your data, but the same-type ambiguous value would diverge:_"
+              , ""
+              ] <> map potentialLine potentials <> [ "" ]
           )
         <> (if Array.null clean then [] else [ "## Portable conditions" ] <> map cleanLine clean)
     )
   where
   flagged = Array.filter isFinding decisions
   clean = Array.filter (not <<< isFinding) decisions
+  potentials = potentialFindings src decisions
 
   loc d = let lc = lineColumn src d.span.start in "line " <> show lc.line
   tag d = Str.trim (spanText src d.span)
+
+  potentialLine f =
+    "* ⚠ line " <> show f.line <> " — `" <> f.tag <> "` would diverge if it held "
+      <> f.value
+      <> " (flips under "
+      <> Str.joinWith ", " (map (\r -> "`" <> r <> "`") f.flips)
+      <> ").  **Fix** · "
+      <> f.fix
+      <> (if f.path /= "" then "  ·  data path: `" <> f.path <> "`" else "")
 
   findingSection d =
     Str.joinWith "\n"

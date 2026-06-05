@@ -1694,7 +1694,7 @@
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=55";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=56";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -5852,34 +5852,48 @@
           body.append(section);
           return;
         }
-        const rows = a.findings;
+        // ADR-030 coverage honesty: observed findings the data actually hit vs
+        // potential same-type ambiguous values any condition could hold.
+        const observed = a.findings.filter((f) => f.kind !== "potential");
+        const potential = a.findings.filter((f) => f.kind === "potential");
         section.append(makeEl("div", { class: "cv-head" }, [
           makeEl("strong", {}, "Truthiness"),
-          " — ", String(rows.length), " portability finding", rows.length === 1 ? "" : "s",
+          " — ", String(observed.length), " observed, ", String(potential.length), " potential",
         ]));
-        if (rows.length === 0) {
+        if (a.findings.length === 0) {
           section.append(makeEl("div", { class: "cv-empty" },
             "Every condition agrees across engines for this data — portable."));
           body.append(section);
           return;
         }
-        section.append(makeEl("div", { class: "cv-hint" },
-          "Each condition branches differently on another engine. Branch explicitly so the result does not ride on the host's truthiness rule."));
-        const list = makeEl("div", { class: "cv-rows" });
-        for (const f of rows) {
-          const row = makeEl("div", { class: "cv-row dead" }, [
-            makeEl("span", { class: "cv-kind" }, f.tag),
-            makeEl("span", { class: "cv-label" },
-              `tested ${plain(f.value)} — flips under ${f.flips.join(", ")}`),
-            makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
-          ]);
-          row.title = "jump to source";
-          row.addEventListener("click", () => openProblem({ file: "main", line: f.line, col: f.column }));
-          list.append(row);
-          list.append(makeEl("div", { class: "cv-hint" },
-            [makeEl("strong", {}, "Fix: "), plain(f.fix)]));
+        // A finding row (observed verb "tested", potential verb "would diverge if it held").
+        const findingGroup = (rows, verb) => {
+          const list = makeEl("div", { class: "cv-rows" });
+          for (const f of rows) {
+            const row = makeEl("div", { class: "cv-row dead" }, [
+              makeEl("span", { class: "cv-kind" }, f.tag),
+              makeEl("span", { class: "cv-label" },
+                `${verb} ${plain(f.value)} — flips under ${f.flips.join(", ")}`),
+              makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
+            ]);
+            row.title = "jump to source";
+            row.addEventListener("click", () => openProblem({ file: "main", line: f.line, col: f.column }));
+            list.append(row);
+            list.append(makeEl("div", { class: "cv-hint" },
+              [makeEl("strong", {}, "Fix: "), plain(f.fix)]));
+          }
+          return list;
+        };
+        if (observed.length) {
+          section.append(makeEl("div", { class: "cv-hint" },
+            "Observed — this data drove the condition into an ambiguous value that branches differently on another engine. Branch explicitly."));
+          section.append(findingGroup(observed, "tested"));
         }
-        section.append(list);
+        if (potential.length) {
+          section.append(makeEl("div", { class: "cv-hint" },
+            "Potential — portable for this data, but the same-type ambiguous value would diverge (independent of the sample). Branch explicitly to be safe for all data."));
+          section.append(findingGroup(potential, "would diverge if it held"));
+        }
         body.append(section);
       }
 

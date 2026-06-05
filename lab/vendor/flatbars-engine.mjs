@@ -843,12 +843,12 @@ var monadEither = {
 
 // output/Control.Monad/index.js
 var ap = function(dictMonad) {
-  var bind10 = bind(dictMonad.Bind1());
+  var bind11 = bind(dictMonad.Bind1());
   var pure8 = pure(dictMonad.Applicative0());
   return function(f) {
     return function(a) {
-      return bind10(f)(function(f$prime) {
-        return bind10(a)(function(a$prime) {
+      return bind11(f)(function(f$prime) {
+        return bind11(a)(function(a$prime) {
           return pure8(f$prime(a$prime));
         });
       });
@@ -7503,10 +7503,10 @@ var monadTransWriterT = function(dictMonoid) {
   var mempty2 = mempty(dictMonoid);
   return {
     lift: function(dictMonad) {
-      var bind10 = bind(dictMonad.Bind1());
+      var bind11 = bind(dictMonad.Bind1());
       var pure8 = pure(dictMonad.Applicative0());
       return function(m) {
-        return bind10(m)(function(a) {
+        return bind11(m)(function(a) {
           return pure8(new Tuple(a, mempty2));
         });
       };
@@ -7556,14 +7556,14 @@ var bindWriterT = function(dictSemigroup) {
   var append6 = append(dictSemigroup);
   var applyWriterT1 = applyWriterT(dictSemigroup);
   return function(dictBind) {
-    var bind10 = bind(dictBind);
+    var bind11 = bind(dictBind);
     var Apply0 = dictBind.Apply0();
     var map27 = map(Apply0.Functor0());
     var applyWriterT2 = applyWriterT1(Apply0);
     return {
       bind: function(v) {
         return function(k) {
-          return bind10(v)(function(v1) {
+          return bind11(v)(function(v1) {
             var v2 = k(v1.value0);
             return map27(function(v3) {
               return new Tuple(v3.value0, append6(v1.value1)(v3.value1));
@@ -8797,7 +8797,7 @@ var runTemplate = function(dictMonad) {
   var Applicative0 = dictMonad.Applicative0();
   var traverse22 = traverse2(Applicative0);
   var pure8 = pure(Applicative0);
-  var bind10 = bind(Bind1);
+  var bind11 = bind(Bind1);
   var traverse32 = traverse12(Applicative0);
   return function(engine) {
     var renderTemplate = function(env) {
@@ -8812,7 +8812,7 @@ var runTemplate = function(dictMonad) {
         }
         ;
         if (v instanceof Output) {
-          return bind10(evalExpr(env)(v.value0)(v.value1))(engine.stringify);
+          return bind11(evalExpr(env)(v.value0)(v.value1))(engine.stringify);
         }
         ;
         if (v instanceof Block) {
@@ -8824,7 +8824,7 @@ var runTemplate = function(dictMonad) {
         }
         ;
         if (v instanceof Sep) {
-          return bind10(evalExpr(env)(v.value0)(new App2(v.value1, v.value2)))(engine.stringify);
+          return bind11(evalExpr(env)(v.value0)(new App2(v.value1, v.value2)))(engine.stringify);
         }
         ;
         if (v instanceof NodeError) {
@@ -8842,8 +8842,8 @@ var runTemplate = function(dictMonad) {
           }
           ;
           if (v instanceof App2) {
-            return bind10(traverse22(evalExpr(env)(span2))(v.value1))(function(vals) {
-              return bind10(engine.resolve(env)(v.value0))(function(h) {
+            return bind11(traverse22(evalExpr(env)(span2))(v.value1))(function(vals) {
+              return bind11(engine.resolve(env)(v.value0))(function(h) {
                 return h(ctl(env)([])(span2)(Nothing.value)([])(Nothing.value))(vals);
               });
             });
@@ -8892,10 +8892,10 @@ var runTemplate = function(dictMonad) {
           return function(args) {
             return function(body) {
               var split2 = engine.blockArgs(args);
-              return bind10(traverse22(evalExpr(env)(span2))(split2.positional))(function(vals) {
-                return bind10(traverse32(evalExpr(env)(span2))(split2.hash))(function(hashV) {
-                  return bind10(engine.resolve(env)(name2))(function(h) {
-                    return bind10(h(ctl(env)(body)(span2)(hashV)(split2.params)(split2.label))(vals))(engine.stringify);
+              return bind11(traverse22(evalExpr(env)(span2))(split2.positional))(function(vals) {
+                return bind11(traverse32(evalExpr(env)(span2))(split2.hash))(function(hashV) {
+                  return bind11(engine.resolve(env)(name2))(function(h) {
+                    return bind11(h(ctl(env)(body)(span2)(hashV)(split2.params)(split2.label))(vals))(engine.stringify);
                   });
                 });
               });
@@ -11486,6 +11486,8 @@ var append13 = /* @__PURE__ */ append(semigroupArray);
 var map16 = /* @__PURE__ */ map(functorArray);
 var show8 = /* @__PURE__ */ show(showNumber);
 var show1 = /* @__PURE__ */ show(showBoolean);
+var bind5 = /* @__PURE__ */ bind(bindMaybe);
+var elem7 = /* @__PURE__ */ elem2(eqString);
 var show22 = /* @__PURE__ */ show(showInt);
 var monadThrowWriterT2 = /* @__PURE__ */ monadThrowWriterT(monoidArray)(monadThrowEither);
 var discard3 = /* @__PURE__ */ discard(discardUnit)(/* @__PURE__ */ bindWriterT(semigroupArray)(bindEither));
@@ -11495,6 +11497,29 @@ var lookup6 = /* @__PURE__ */ lookup3(ordString);
 var preludeEnv2 = /* @__PURE__ */ preludeEnv(monadThrowWriterT2);
 var mapFlipped1 = /* @__PURE__ */ mapFlipped(functorEither);
 var runTemplate2 = /* @__PURE__ */ runTemplate(/* @__PURE__ */ monadWriterT(monoidArray)(monadEither));
+var sameTypeAmbiguous = function(v) {
+  if (v instanceof VNumber && v.value0 !== 0) {
+    return new Just(new VNumber(0));
+  }
+  ;
+  if (v instanceof VString && v.value0 !== "") {
+    return new Just(new VString(""));
+  }
+  ;
+  if (v instanceof VSafe && v.value0 !== "") {
+    return new Just(new VString(""));
+  }
+  ;
+  if (v instanceof VArray && !$$null(v.value0)) {
+    return new Just(new VArray([]));
+  }
+  ;
+  if (v instanceof VObject && !isEmpty(v.value0)) {
+    return new Just(new VObject(empty3));
+  }
+  ;
+  return Nothing.value;
+};
 var recoverPath = function(tag) {
   var stripBraces = function(s) {
     return replaceAll("{{")("")(replaceAll("}}")("")(s));
@@ -11515,8 +11540,8 @@ var recoverPath = function(tag) {
   };
   var inner = trim(dropSigil(stripBraces(tag)));
   var body = trim(dropKeyword(inner));
-  var $58 = body !== "" && all2(pathChar)(toCharArray(body));
-  if ($58) {
+  var $68 = body !== "" && all2(pathChar)(toCharArray(body));
+  if ($68) {
     return new Just(body);
   }
   ;
@@ -11540,7 +11565,7 @@ var jsonataScaffold = function(src) {
         return "$";
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 285, column 16 - line 287, column 19): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 357, column 16 - line 359, column 19): " + [v.constructor.name]);
     };
     var normOf = function(p) {
       return function(v) {
@@ -11573,7 +11598,7 @@ var jsonataScaffold = function(src) {
         return p;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 288, column 14 - line 290, column 17): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 360, column 14 - line 362, column 17): " + [v.constructor.name]);
     };
     var jsq = function(s) {
       return '"' + (s + '"');
@@ -11595,19 +11620,19 @@ var jsonataScaffold = function(src) {
         return new Just("(* computed condition, not path-targetable: " + (trim(spanText(src)(d.span)) + " *)"));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 280, column 20 - line 283, column 98): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 352, column 20 - line 355, column 98): " + [v.constructor.name]);
     };
     var computed = nub2(mapMaybe(computedNote)(flagged));
     return joinWith("\n")(append13(["(* Truthiness cleanup scaffold (ADR-022) \u2014 REVIEW each rule before applying. *)", "(* Each path resolved to an engine-ambiguous value in a condition. *)"])(append13((function() {
-      var $70 = $$null(transforms);
-      if ($70) {
+      var $80 = $$null(transforms);
+      if ($80) {
         return ["(* no bare-path findings to normalise *)"];
       }
       ;
       return transforms;
     })())((function() {
-      var $71 = $$null(computed);
-      if ($71) {
+      var $81 = $$null(computed);
+      if ($81) {
         return [];
       }
       ;
@@ -11654,8 +11679,8 @@ var describe = function(v) {
   ;
   if (v instanceof VNumber) {
     return "the number `" + ((function() {
-      var $80 = v.value0 === 0;
-      if ($80) {
+      var $90 = v.value0 === 0;
+      if ($90) {
         return "0";
       }
       ;
@@ -11672,8 +11697,8 @@ var describe = function(v) {
   }
   ;
   if (v instanceof VArray) {
-    var $83 = $$null(v.value0);
-    if ($83) {
+    var $93 = $$null(v.value0);
+    if ($93) {
       return "an empty array `[]`";
     }
     ;
@@ -11681,8 +11706,8 @@ var describe = function(v) {
   }
   ;
   if (v instanceof VObject) {
-    var $85 = isEmpty(v.value0);
-    if ($85) {
+    var $95 = isEmpty(v.value0);
+    if ($95) {
       return "an empty object `{}`";
     }
     ;
@@ -11693,37 +11718,82 @@ var describe = function(v) {
     return "a safe string";
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Analyse (line 230, column 12 - line 238, column 29): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Analyse (line 302, column 12 - line 310, column 29): " + [v.constructor.name]);
 };
-var findings = function(src) {
-  var toFinding = function(d) {
-    var tagTxt = trim(spanText(src)(d.span));
-    var lc = lineColumn(src)(d.span.start);
-    return {
-      line: lc.line,
-      column: lc.column,
-      tag: tagTxt,
-      value: describe(d.value),
-      flips: map16(fst)(d.diverges),
-      fix: fixFor(d.value),
-      path: (function() {
-        var v = recoverPath(tagTxt);
-        if (v instanceof Just) {
-          return v.value0;
-        }
-        ;
-        if (v instanceof Nothing) {
-          return "";
-        }
-        ;
-        throw new Error("Failed pattern match at Kernel.Analyse (line 122, column 15 - line 124, column 24): " + [v.constructor.name]);
-      })()
+var findingAt = function(kind) {
+  return function(src) {
+    return function(d) {
+      return function(v) {
+        return function(here) {
+          var tagTxt = trim(spanText(src)(d.span));
+          var lc = lineColumn(src)(d.span.start);
+          return {
+            kind,
+            line: lc.line,
+            column: lc.column,
+            tag: tagTxt,
+            value: describe(v),
+            flips: map16(fst)(divergence(v)(here)),
+            fix: fixFor(v),
+            path: (function() {
+              var v1 = recoverPath(tagTxt);
+              if (v1 instanceof Just) {
+                return v1.value0;
+              }
+              ;
+              if (v1 instanceof Nothing) {
+                return "";
+              }
+              ;
+              throw new Error("Failed pattern match at Kernel.Analyse (line 124, column 13 - line 126, column 22): " + [v1.constructor.name]);
+            })()
+          };
+        };
+      };
     };
   };
-  var $104 = map16(toFinding);
-  var $105 = filter(isFinding);
-  return function($106) {
-    return $104($105($106));
+};
+var findings = function(src) {
+  var $119 = map16(function(d) {
+    return findingAt("observed")(src)(d)(d.value)(d.truthyHere);
+  });
+  var $120 = filter(isFinding);
+  return function($121) {
+    return $119($120($121));
+  };
+};
+var potentialFindings = function(src) {
+  return function(decisions) {
+    var sameTagValue = function(a) {
+      return function(b) {
+        return a.tag === b.tag && a.value === b.value;
+      };
+    };
+    var observedPaths = mapMaybe(function(d) {
+      var $100 = isFinding(d);
+      if ($100) {
+        return recoverPath(trim(spanText(src)(d.span)));
+      }
+      ;
+      return Nothing.value;
+    })(decisions);
+    var toPotential = function(d) {
+      return bind5(sameTypeAmbiguous(d.value))(function(av) {
+        var finding = findingAt("potential")(src)(d)(av)(handlebars(av));
+        var $101 = $$null(finding.flips);
+        if ($101) {
+          return Nothing.value;
+        }
+        ;
+        var $102 = finding.path !== "" && elem7(finding.path)(observedPaths);
+        if ($102) {
+          return Nothing.value;
+        }
+        ;
+        return new Just(finding);
+      });
+    };
+    return nubByEq(sameTagValue)(mapMaybe(toPotential)(decisions));
   };
 };
 var reportMarkdown = function(src) {
@@ -11738,6 +11808,19 @@ var reportMarkdown = function(src) {
     var tag = function(d) {
       return trim(spanText(src)(d.span));
     };
+    var potentials = potentialFindings(src)(decisions);
+    var potentialLine = function(f) {
+      return "* \u26A0 line " + (show22(f.line) + (" \u2014 `" + (f.tag + ("` would diverge if it held " + (f.value + (" (flips under " + (joinWith(", ")(map16(function(r) {
+        return "`" + (r + "`");
+      })(f.flips)) + (").  **Fix** \xB7 " + (f.fix + (function() {
+        var $104 = f.path !== "";
+        if ($104) {
+          return "  \xB7  data path: `" + (f.path + "`");
+        }
+        ;
+        return "";
+      })())))))))));
+    };
     var pathNote = function(v) {
       if (v instanceof Just) {
         return "  \xB7  data path: `" + (v.value0 + "`");
@@ -11747,7 +11830,7 @@ var reportMarkdown = function(src) {
         return "";
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 223, column 14 - line 225, column 18): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 295, column 14 - line 297, column 18): " + [v.constructor.name]);
     };
     var loc = function(d) {
       var lc = lineColumn(src)(d.span.start);
@@ -11762,24 +11845,31 @@ var reportMarkdown = function(src) {
     var cleanLine = function(d) {
       return "* \u2713 " + (loc(d) + (" \u2014 `" + (tag(d) + ("` tested " + (describe(d.value) + " (agrees everywhere)")))));
     };
-    var clean = filter(function($107) {
-      return !isFinding($107);
+    var clean = filter(function($122) {
+      return !isFinding($122);
     })(decisions);
-    return joinWith("\n")(append13(["# Truthiness analysis", "Engine rule: `handlebars` \xB7 " + (show22(length(decisions)) + (" condition(s) evaluated, **" + (show22(length(flagged)) + " portability finding(s)**"))), "", '_The engine `handlebars` rule is also `mustache.js`\' (`0`/`""` falsy), so a finding\'s `flips under` names the engines that branch the *other* way \u2014 `mustache-spec` is the language-agnostic Mustache/Ruby reading (`0`/`""` truthy), not `mustache.js`._', ""])(append13((function() {
-      var $93 = $$null(flagged);
-      if ($93) {
-        return ["_No portability findings \u2014 every condition agrees across engines for this data._", ""];
+    return joinWith("\n")(append13(["# Truthiness analysis", "Engine rule: `handlebars` \xB7 " + (show22(length(decisions)) + (" condition(s) evaluated \xB7 **" + (show22(length(flagged)) + (" observed**, " + (show22(length(potentials)) + " potential finding(s)"))))), "", '_Coverage: *observed* findings are conditions this **data** actually drove into the ambiguous four; *potential* findings are the same-type ambiguous value each other condition **could** hold (independent of the sample, so stable for CI). "No observed findings" means portable *for this data*, not for all data \u2014 read the potential section too._', "", '_The engine `handlebars` rule is also `mustache.js`\' (`0`/`""` falsy), so a finding\'s `flips under` names the engines that branch the *other* way \u2014 `mustache-spec` is the language-agnostic Mustache/Ruby reading (`0`/`""` truthy), not `mustache.js`._', ""])(append13((function() {
+      var $107 = $$null(flagged);
+      if ($107) {
+        return ["_No observed portability findings \u2014 every condition agrees across engines for this data._", ""];
       }
       ;
       return map16(findingSection)(flagged);
+    })())(append13((function() {
+      var $108 = $$null(potentials);
+      if ($108) {
+        return [];
+      }
+      ;
+      return append13(["## Potential findings (data-independent)", "_These were portable for your data, but the same-type ambiguous value would diverge:_", ""])(append13(map16(potentialLine)(potentials))([""]));
     })())((function() {
-      var $94 = $$null(clean);
-      if ($94) {
+      var $109 = $$null(clean);
+      if ($109) {
         return [];
       }
       ;
       return append13(["## Portable conditions"])(map16(cleanLine)(clean));
-    })())));
+    })()))));
   };
 };
 var analysisWrappers = /* @__PURE__ */ (function() {
@@ -11831,7 +11921,7 @@ var analysisWrappers = /* @__PURE__ */ (function() {
       return new Just(new Tuple(v.value0, analysed(v.value0)(v.value1)(v1.value0)));
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Analyse (line 138, column 32 - line 140, column 65): " + [v1.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Analyse (line 184, column 32 - line 186, column 65): " + [v1.constructor.name]);
   };
   return mapMaybe(wrap3)(conds);
 })();
@@ -11848,6 +11938,11 @@ var runAnalysis = function(toEngine) {
         });
       };
     };
+  };
+};
+var allFindings = function(src) {
+  return function(decisions) {
+    return append13(findings(src)(decisions))(potentialFindings(src)(decisions));
   };
 };
 
@@ -12124,7 +12219,7 @@ var lower = /* @__PURE__ */ (function() {
 })();
 
 // output/FullBars/index.js
-var elem7 = /* @__PURE__ */ elem(foldableArray)(eqString);
+var elem8 = /* @__PURE__ */ elem(foldableArray)(eqString);
 var show9 = /* @__PURE__ */ show(showInt);
 var nub3 = /* @__PURE__ */ nub(ordString);
 var map17 = /* @__PURE__ */ map(functorArray);
@@ -12142,7 +12237,7 @@ var surfaceClauses = ["else", "elif"];
 var i18nOpNames = ["t", "number", "date", "selectPlural", "relative"];
 var i18nNote = function(template) {
   var used = filter(function(r) {
-    return elem7(r.name)(i18nOpNames);
+    return elem8(r.name)(i18nOpNames);
   })(operationRefs(template));
   var $60 = $$null(used);
   if ($60) {
@@ -12444,7 +12539,7 @@ var analyseSurface = function(src) {
             output: v4.value0.output,
             report: reportMarkdown(src)(v4.value0.decisions) + i18nNote(v3.template),
             jsonata: jsonataScaffold(src)(v4.value0.decisions),
-            findings: findings(src)(v4.value0.decisions)
+            findings: allFindings(src)(v4.value0.decisions)
           });
         }
         ;
@@ -12614,7 +12709,7 @@ var compile = function(meta) {
 // output/FlatBars.Compile.Emit/index.js
 var show11 = /* @__PURE__ */ show(showNumber);
 var map19 = /* @__PURE__ */ map(functorArray);
-var elem8 = /* @__PURE__ */ elem2(eqString);
+var elem9 = /* @__PURE__ */ elem2(eqString);
 var truthyTest = function(rec) {
   return function(ctx2) {
     return function(args) {
@@ -12845,7 +12940,7 @@ var fbBlock = function(lenient) {
         return function(args) {
           return function(body) {
             var split2 = splitBlockArgs(args);
-            var section = lenient && (elem8(name2)(sectionableValueNames) && $$null(split2.positional));
+            var section = lenient && (elem9(name2)(sectionableValueNames) && $$null(split2.positional));
             if (name2 === "if") {
               return ifBlock(rec)(ctx2)(truthyTest(rec)(ctx2)(split2.positional))(body);
             }
@@ -12922,7 +13017,7 @@ var coreEmit = /* @__PURE__ */ emitWith(false);
 var fullbarsEmit = /* @__PURE__ */ emitWith(true);
 
 // output/FullBars.Compile/index.js
-var bind5 = /* @__PURE__ */ bind(bindEither);
+var bind6 = /* @__PURE__ */ bind(bindEither);
 var discard4 = /* @__PURE__ */ discard(discardUnit)(bindEither);
 var pure4 = /* @__PURE__ */ pure(applicativeEither);
 var toUnfoldable7 = /* @__PURE__ */ toUnfoldable3(unfoldableArray);
@@ -12931,7 +13026,7 @@ var compileSurfaceWith = function(strict) {
     return function(opts) {
       return function(truthyCallback) {
         return function(src) {
-          return bind5(parseWith(opts)(src))(function(v) {
+          return bind6(parseWith(opts)(src))(function(v) {
             return discard4(checkBareInline(strict)(v.nodes))(function() {
               var h = hoistInline(desugarSurfaceWith(lv)(v.nodes));
               return pure4(compile(metaFor(truthyCallback))(fullbarsEmit)(toUnfoldable7(h.partials))(h.template));
@@ -12996,8 +13091,8 @@ var aliasWarnings = /* @__PURE__ */ (function() {
 // output/Linter.Migrate/index.js
 var eq5 = /* @__PURE__ */ eq(/* @__PURE__ */ eqArray(eqChar));
 var lookup8 = /* @__PURE__ */ lookup(foldableArray)(eqString);
-var elem9 = /* @__PURE__ */ elem2(eqString);
-var bind6 = /* @__PURE__ */ bind(bindEither);
+var elem10 = /* @__PURE__ */ elem2(eqString);
+var bind7 = /* @__PURE__ */ bind(bindEither);
 var pure5 = /* @__PURE__ */ pure(applicativeEither);
 var append14 = /* @__PURE__ */ append(semigroupArray);
 var CloseUnless = /* @__PURE__ */ (function() {
@@ -13393,7 +13488,7 @@ var ambiguousSection = function(span2) {
       if (sigil instanceof Section) {
         var core = stripTildes(interior);
         var name2 = trim(core);
-        var $75 = isBareName(name2) && !elem9(name2)(knownBlockHelpers);
+        var $75 = isBareName(name2) && !elem10(name2)(knownBlockHelpers);
         if ($75) {
           return [{
             kind: "ambiguous-section",
@@ -13513,7 +13608,7 @@ var rewrite2 = function(src) {
   };
 };
 var migrateToMaxBars = function(src) {
-  return bind6(tokenizeTemplate(defaultLexConfig)(defaultLexOptions)(src))(function(toks) {
+  return bind7(tokenizeTemplate(defaultLexConfig)(defaultLexOptions)(src))(function(toks) {
     var walk2 = rewrite2(src)(toks);
     var delimResiduals = scanSetDelimiters(src);
     return pure5({
@@ -13525,7 +13620,7 @@ var migrateToMaxBars = function(src) {
 
 // output/MaxBars.Expr/index.js
 var map20 = /* @__PURE__ */ map(functorMaybe);
-var bind7 = /* @__PURE__ */ bind(bindMaybe);
+var bind8 = /* @__PURE__ */ bind(bindMaybe);
 var bind1 = /* @__PURE__ */ bind(bindEither);
 var map110 = /* @__PURE__ */ map(functorEither);
 var isAtVar = function(name2) {
@@ -13657,7 +13752,7 @@ var combinators = function(toks) {
       return function(i) {
         var loop = function(lhs) {
           return function(pos) {
-            var v = bind7(tk(pos))(match);
+            var v = bind8(tk(pos))(match);
             if (v instanceof Just) {
               return bind1(sub3(pos + 1 | 0))(function(r) {
                 return loop(v.value0(lhs)(r.val))(r.pos);
@@ -13723,7 +13818,7 @@ var combinators = function(toks) {
       };
       var pCmp = function(i) {
         return bind1(pAdd(i))(function(lhs) {
-          var v = bind7(tk(lhs.pos))(cmpOp);
+          var v = bind8(tk(lhs.pos))(cmpOp);
           if (v instanceof Just) {
             return bind1(pAdd(lhs.pos + 1 | 0))(function(r) {
               return new Right({
@@ -14594,7 +14689,7 @@ var parentH = function(dictMonadThrow) {
 var blockH = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
   var Bind1 = Monad0.Bind1();
-  var bind10 = bind(Bind1);
+  var bind11 = bind(Bind1);
   var pure8 = pure(Monad0.Applicative0());
   var map27 = map(Bind1.Apply0().Functor0());
   var throwError3 = throwError(dictMonadThrow);
@@ -14603,7 +14698,7 @@ var blockH = function(dictMonadThrow) {
       if (args.length === 2 && (args[0] instanceof VString && args[1] instanceof VString)) {
         var v = blookup(args[0].value0)(minBlocks(ctl.env));
         if (v instanceof Just) {
-          return bind10((function() {
+          return bind11((function() {
             var $179 = args[1].value0 !== "";
             if ($179) {
               return pure8(args[1].value0);
@@ -14611,7 +14706,7 @@ var blockH = function(dictMonadThrow) {
             ;
             return map27(leadingIndent)(ctl.render(ctl.env)(ctl.children));
           })())(function(expand) {
-            return bind10(ctl.render(ctl.env)(v.value0))(function(out) {
+            return bind11(ctl.render(ctl.env)(v.value0))(function(out) {
               return pure8(new VSafe(indentOverride(expand)(out)));
             });
           });
@@ -15151,13 +15246,13 @@ var $lazy_desugar = /* @__PURE__ */ $runtime_lazy5("desugar", "MinBars.Surface",
 var desugar2 = /* @__PURE__ */ $lazy_desugar(40);
 
 // output/MinBars/index.js
-var bind8 = /* @__PURE__ */ bind(bindEither);
+var bind9 = /* @__PURE__ */ bind(bindEither);
 var pure6 = /* @__PURE__ */ pure(applicativeEither);
 var runTemplate3 = /* @__PURE__ */ runTemplate(monadEither);
 var minEngine2 = /* @__PURE__ */ minEngine(monadThrowEither);
 var traverse7 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
 var fromFoldable9 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
-var elem10 = /* @__PURE__ */ elem(foldableList)(eqString);
+var elem11 = /* @__PURE__ */ elem(foldableList)(eqString);
 var lookup11 = /* @__PURE__ */ lookup3(ordString);
 var union6 = /* @__PURE__ */ union(ordString);
 var map24 = /* @__PURE__ */ map(functorEither);
@@ -15195,9 +15290,9 @@ var minOptions = /* @__PURE__ */ (function() {
 })();
 var parseMinWith = function(cfg) {
   return function(src) {
-    return bind8(tokenizeTemplate(cfg)(minOptions.lexOptions)(src))(function(toks) {
-      return bind8(collectDirectives(toks))(function(directives) {
-        return bind8(buildFromTokens(minOptions)(mustacheStandalone(minOptions.lexOptions)(toks)))(function(nodes) {
+    return bind9(tokenizeTemplate(cfg)(minOptions.lexOptions)(src))(function(toks) {
+      return bind9(collectDirectives(toks))(function(directives) {
+        return bind9(buildFromTokens(minOptions)(mustacheStandalone(minOptions.lexOptions)(toks)))(function(nodes) {
           return pure6({
             directives,
             nodes
@@ -15310,7 +15405,7 @@ var inline = function(partials) {
           var recurse = inline(partials)(overrides)(chain)(depth);
           var one2 = function(v) {
             if (v instanceof Output && (v.value1 instanceof App2 && (v.value1.value0 === "partial" && (v.value1.value1.length === 2 && (v["value1"]["value1"][0] instanceof Lit && (v["value1"]["value1"][0].value0 instanceof VString && (v["value1"]["value1"][1] instanceof Lit && v["value1"]["value1"][1].value0 instanceof VString))))))) {
-              if (elem10(v["value1"]["value1"][0].value0.value0)(chain)) {
+              if (elem11(v["value1"]["value1"][0].value0.value0)(chain)) {
                 return new Left(new DisallowedShape("recursive partial '" + (v["value1"]["value1"][0].value0.value0 + "' (MinBars compile)"), 0));
               }
               ;
@@ -15366,10 +15461,10 @@ var inline = function(partials) {
                 }
                 ;
                 if (v2 instanceof Just) {
-                  return bind8(recurse(v2.value0))(function(inlinedOverride) {
+                  return bind9(recurse(v2.value0))(function(inlinedOverride) {
                     var $99 = length(v.value3) >= 2;
                     if ($99) {
-                      return bind8(expansionIndent(blockIndent(v.value3))(v.value4))(function(expand) {
+                      return bind9(expansionIndent(blockIndent(v.value3))(v.value4))(function(expand) {
                         return new Right([new Block(v.value0, Section.value, "@reindent", [new Lit(new VString(expand))], inlinedOverride)]);
                       });
                     }
@@ -15406,9 +15501,9 @@ var compileWithSeed = function(truthyFn) {
           return new Tuple(v.value0, desugar2(r.nodes));
         });
       };
-      return bind8(parseMin(src))(function(v) {
-        return bind8(map24(fromFoldable9)(traverse7(parsePartial)(partialSrcs)))(function(partials) {
-          return bind8(inline(partials)(empty3)(Nil.value)(0)(desugar2(v.nodes)))(function(inlined) {
+      return bind9(parseMin(src))(function(v) {
+        return bind9(map24(fromFoldable9)(traverse7(parsePartial)(partialSrcs)))(function(partials) {
+          return bind9(inline(partials)(empty3)(Nil.value)(0)(desugar2(v.nodes)))(function(inlined) {
             return new Right(compile(minMeta(truthyFn))(minEmit)([])(inlined));
           });
         });
@@ -16267,7 +16362,7 @@ var traverse8 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
 var fromFoldable10 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
 var map25 = /* @__PURE__ */ map(functorArray);
 var union7 = /* @__PURE__ */ union(ordString);
-var bind9 = /* @__PURE__ */ bind(bindEither);
+var bind10 = /* @__PURE__ */ bind(bindEither);
 var pure1 = /* @__PURE__ */ pure(applicativeEither);
 var toUnfoldable8 = /* @__PURE__ */ toUnfoldable3(unfoldableArray);
 var coreOptions = /* @__PURE__ */ (function() {
@@ -16363,7 +16458,7 @@ var renderWithOperations2 = function(operations) {
 };
 var compileJsWith = function(opts) {
   return function(src) {
-    return bind9(parseWith({
+    return bind10(parseWith({
       trimStandalone: opts.trimStandalone,
       parseExpr: opts.parseExpr,
       parseHead: opts.parseHead,
@@ -16409,7 +16504,7 @@ var fromFoldable12 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
 var constOperation2 = /* @__PURE__ */ constOperation(applicativeEither);
 var union8 = /* @__PURE__ */ union(ordString);
 var show15 = /* @__PURE__ */ show(showError);
-var elem11 = /* @__PURE__ */ elem2(eqString);
+var elem13 = /* @__PURE__ */ elem2(eqString);
 var toTranslator = function(jt) {
   return function(name2) {
     return function(args) {
@@ -16534,7 +16629,7 @@ var migrate = function(tpl) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 206, column 25 - line 214, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 207, column 25 - line 215, column 6): " + [v.constructor.name]);
 };
 var litName = function(args) {
   var v = head(args);
@@ -16612,7 +16707,7 @@ var lint = function(tpl, dialect) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 156, column 5 - line 188, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 157, column 5 - line 189, column 12): " + [v.constructor.name]);
 };
 var jsOperation = function(name2) {
   return function(fn) {
@@ -16637,7 +16732,7 @@ var jsOperation = function(name2) {
             return pure7(fromJson(v.payload));
           }
           ;
-          throw new Error("Failed pattern match at FullBars.JS (line 340, column 35 - line 345, column 47): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FullBars.JS (line 341, column 35 - line 346, column 47): " + [v.constructor.name]);
         }
         ;
         var optsFrame = function(optsJson) {
@@ -16674,7 +16769,7 @@ var jsOperation = function(name2) {
                 };
               }
               ;
-              throw new Error("Failed pattern match at FullBars.JS (line 371, column 9 - line 373, column 60): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at FullBars.JS (line 372, column 9 - line 374, column 60): " + [v2.constructor.name]);
             };
           };
         };
@@ -16839,7 +16934,7 @@ var compileResultAt = function(src) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 478, column 23 - line 480, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 479, column 23 - line 481, column 49): " + [v.constructor.name]);
   };
 };
 var compileSurface2 = function(tpl) {
@@ -16903,7 +16998,7 @@ var rexpr = function(v) {
   }
   ;
   if (v instanceof App2 && v.value1.length === 0) {
-    var $108 = elem11(v.value0)(dataVars);
+    var $108 = elem13(v.value0)(dataVars);
     if ($108) {
       return obj([tt2(v.value0)]);
     }
@@ -16915,7 +17010,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map26(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 718, column 9 - line 727, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 719, column 9 - line 728, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
@@ -16935,7 +17030,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map26($lazy_rnode(694))(ns));
+    return arr(map26($lazy_rnode(695))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -16958,7 +17053,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         })()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 668, column 21 - line 675, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 669, column 21 - line 676, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -16991,7 +17086,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 663, column 1 - line 663, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 664, column 1 - line 664, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
         var $147 = litName(v.value1);
@@ -17016,7 +17111,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(663);
+var rnode = /* @__PURE__ */ $lazy_rnode(664);
 var astJson = function(dialect, src) {
   var errObj = function(pe) {
     var d = parseErrorAt(src)(pe);
@@ -17051,7 +17146,7 @@ var astJson = function(dialect, src) {
       return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map26(rnode)(nodes)))]))]);
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 592, column 1 - line 592, column 34): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 593, column 1 - line 593, column 34): " + [v.constructor.name]);
   };
   if (v instanceof Right) {
     var $166 = dialect !== "core";
@@ -17098,7 +17193,7 @@ var analyze = function(tpl, json) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 118, column 30 - line 127, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 119, column 30 - line 128, column 6): " + [v.constructor.name]);
 };
 export {
   analyze,

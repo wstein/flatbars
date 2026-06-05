@@ -455,7 +455,7 @@ main = do
         (contains (Pattern needle) (reportOf src d))
   -- empty string in a condition diverges (falsy in handlebars, truthy elsewhere).
   containsR "analyse:empty-string-finding" "{{#if bio}}x{{/if}}" (obj [ Tuple "bio" (str "") ])
-    "1 portability finding"
+    "1 observed"
   containsR "analyse:empty-string-fix" "{{#if bio}}x{{/if}}" (obj [ Tuple "bio" (str "") ])
     "(ne s"
   containsR "analyse:empty-string-path" "{{#if bio}}x{{/if}}" (obj [ Tuple "bio" (str "") ])
@@ -467,7 +467,7 @@ main = do
   -- `0` is the canonical Handlebars↔Mustache divergence (falsy in handlebars,
   -- truthy in mustache/minimal/presence) — a finding, with the `includeZero` fix.
   containsR "analyse:zero-finding" "{{#if n}}x{{else}}m{{/if}}" (obj [ Tuple "n" (VNumber 0.0) ])
-    "1 portability finding"
+    "1 observed"
   containsR "analyse:zero-path" "{{#if n}}x{{else}}m{{/if}}" (obj [ Tuple "n" (VNumber 0.0) ])
     "data path: `n`"
   containsR "analyse:zero-fix" "{{#if n}}x{{else}}m{{/if}}" (obj [ Tuple "n" (VNumber 0.0) ])
@@ -475,12 +475,20 @@ main = do
   -- `{}` is truthy in handlebars AND mustache; it flips only under `presence`, so
   -- it is still a finding (the non-obvious case the report must catch).
   containsR "analyse:empty-object-finding" "{{#if o}}x{{/if}}" (obj [ Tuple "o" (obj []) ])
-    "1 portability finding"
+    "1 observed"
   containsR "analyse:empty-object-presence" "{{#if o}}x{{/if}}" (obj [ Tuple "o" (obj []) ])
     "presence"
   -- false is portable (every rule agrees) — no finding.
   containsR "analyse:false-portable" "{{#if ok}}x{{/if}}" (obj [ Tuple "ok" (VBool false) ])
-    "0 portability finding"
+    "0 observed"
+  -- ADR-030 symbolic what-if: `n = 5` is portable as *observed*, but the same-type
+  -- ambiguous `0` it could hold is a *potential* finding — coverage independent of
+  -- the sample.
+  containsR "analyse:potential-count" "{{#if n}}x{{else}}m{{/if}}" (obj [ Tuple "n" (VNumber 5.0) ])
+    "1 potential finding"
+  containsR "analyse:potential-zero-line" "{{#if n}}x{{else}}m{{/if}}"
+    (obj [ Tuple "n" (VNumber 5.0) ])
+    "would diverge if it held the number `0`"
   -- the analysed output is byte-identical to a normal render (drift-proof).
   assert' "analyse:output-identical"
     ( outputOf "{{#if bio}}yes{{else}}no{{/if}}" (obj [ Tuple "bio" (str "") ])
