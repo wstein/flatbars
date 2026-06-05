@@ -364,10 +364,6 @@
       .tabs-wrap > .focus-toggle { flex: 0 0 auto; align-self: center; margin-right: 6px; }
       .tabs-wrap > #out-copy { margin-left: auto; margin-right: 0; }
       #out-copy.copied { color: #10b981; }
-      .tabs-wrap > .mj-truthy { flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center;
-        gap: 5px; margin-right: 8px; font: 11px var(--font-mono); color: var(--fg-secondary); cursor: pointer;
-        user-select: none; white-space: nowrap; }
-      .tabs-wrap > .mj-truthy input { margin: 0; cursor: pointer; }
 
       /* ── Tabs ────────────────────────────────────────────────────── */
       .tabs-wrap {
@@ -1600,14 +1596,8 @@
                 <path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"/>
               </svg>
             </button>
-            <!-- MinBars truthiness toggle (ADR-022 S2): flip the language-agnostic
-                 spec rule (0/"" truthy) to mustache.js' (0/"" falsy). Shown only
-                 under the MinBars engine; unhidden at boot. -->
-            <label id="mj-truthy" class="mj-truthy" hidden
-                   title="MinBars truthiness — default (spec/Ruby): 0 and empty string are truthy; mustache.js: 0 and empty string are falsy">
-              <input type="checkbox" id="mj-truthy-cb" />
-              <span>mustache.js truthiness</span>
-            </label>
+            <!-- MinBars truthiness is set in the config.yaml tab now
+                 (minbars.truthiness; default mustacheJs), not a UI toggle (ADR-029). -->
           </div>
 
           <!-- Contextual controls for the active view; toggled by setOutputView. -->
@@ -1784,6 +1774,7 @@
       // js-yaml + jsonata stay vendored: the Node validator (validate.mjs) imports
       // them and runs offline with no npm. Browser-only libs load from the CDN.
       import { load as loadYaml, dump as dumpYaml } from "./vendor/js-yaml.mjs";
+      import { parseConfig, minbarsCompatFromConfig } from "./config.mjs";
       import jsonata from "./vendor/jsonata.mjs";
       // Preact + htm (from the CDN, no build step) for the incremental UI
       // migration — panels move from manual DOM to declarative `html` components
@@ -1865,23 +1856,8 @@
         : "Stem";
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
 
-      // MinBars truthiness toggle (ADR-022 S2): reveal it under MinBars and wire it
-      // to re-render under the chosen rule, persisting the choice in the share link.
-      if (ENGINE === "minbars") {
-        byId("mj-truthy").hidden = false;
-        byId("mj-truthy-cb").addEventListener("change", (e) => {
-          minbarsCompat = e.target.checked;
-          markCustom();
-          run();
-          saveHash();
-        });
-      }
-      // Reflect `minbarsCompat` on the toggle checkbox (restore / example reset).
-      // The input is always in the DOM (hidden off MinBars), so this is safe there.
-      function syncMinbarsToggle() {
-        const cb = byId("mj-truthy-cb");
-        if (cb) cb.checked = minbarsCompat;
-      }
+      // MinBars truthiness is read from the config.yaml tab (minbars.truthiness),
+      // default mustacheJs/true (ADR-029) — no UI toggle to wire or sync.
 
       // ── Docs backlink + colour-legend popover ──────────────────────────────
       // The "Docs" button points at the reference page for the current engine
@@ -2005,10 +1981,11 @@
       let outputView   = "source";  // "source" (Plain Text) is the default landing view
       let allowScripts = true;       // HTML/Markdown preview always runs <script> in an isolated (null-origin) sandbox
       let escapeMode   = "";
-      // MinBars truthiness toggle (ADR-022 S2): false = the language-agnostic spec
-      // rule (0/"" truthy), true = the mustache.js rule (0/"" falsy). MinBars only;
-      // threaded into render/compileToJs as `compat` and persisted as `mj`.
-      let minbarsCompat = false;
+      // MinBars truthiness (ADR-029): read from the config.yaml tab's
+      // `minbars.truthiness` (default mustacheJs ⇒ true = 0/"" falsy; "spec" ⇒
+      // false = 0/"" truthy). No UI toggle, no persisted `mj` — config.yaml is the
+      // source and round-trips as a tab. Threaded into render/compileToJs as `compat`.
+      function minbarsCompat() { return minbarsCompatFromConfig(parseConfig(configSrc(), loadYaml).config); }
       // Compiler & runtime options (ADR-0016).
       // `standalone`    — strip standalone-tag lines at compile time (ADR-0016, default on).
       let standalone      = true;
@@ -3452,7 +3429,7 @@
           lastSegViews = [];
           let text = "// this engine has no compiler";
           if (typeof renderer.compileToJs === "function") {
-            const r = renderer.compileToJs(templateSourceFor("main"), undefined, { compat: minbarsCompat });
+            const r = renderer.compileToJs(templateSourceFor("main"), undefined, { compat: minbarsCompat() });
             text = r.ok ? r.value : "// compile error: " + r.error;
           }
           setOutputDoc(text, Decoration.none);
@@ -3865,7 +3842,7 @@
             }
             output = helperCache.output; segments = [];
           } else {
-            ({ output, segments } = renderer.render(program, data, { map: true, compat: minbarsCompat }));
+            ({ output, segments } = renderer.render(program, data, { map: true, compat: minbarsCompat() }));
           }
           setOutput(output, segments);
           setError("");
@@ -4541,7 +4518,6 @@
         byId("escape-select").value = "";
         standalone = true;
         st4Mode = false;
-        minbarsCompat = false; syncMinbarsToggle();
         allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
@@ -4607,7 +4583,6 @@
         byId("escape-select").value = "";
         standalone = true;
         st4Mode = false;
-        minbarsCompat = false; syncMinbarsToggle();
         allowList = null;
         syncStandaloneUI();
         updateRenderStatus();
@@ -4662,8 +4637,6 @@
           ...(st4Mode ? { s4: 1 } : {}),            // ST4 truthiness gate
           ...(allowList !== null ? { al: allowList } : {}), // ADR-0013 transformer allow-list
           av: activeView, ai: activeTabIdx,
-          // MinBars truthiness toggle (ADR-022 S2); omitted when off so links stay compact.
-          ...(minbarsCompat ? { mj: 1 } : {}),
           // Active template-pane mode (1 = transform tab, 0/omitted = tmpl).
           // Persisted so a shared "I'm editing the transform" link round-trips.
           ...(templateMode === "transform" ? { tm: 1 } : {}),
@@ -4728,8 +4701,6 @@
           byId("escape-select").value = escapeMode;
           standalone   = s.sa !== 0;  // default true; explicit 0 opts out
           st4Mode = s.s4 === 1;
-          minbarsCompat = s.mj === 1; // MinBars truthiness toggle (no-op off MinBars)
-          syncMinbarsToggle();
           allowList = Array.isArray(s.al) ? s.al.map(String) : null;
           syncStandaloneUI();
           updateRenderStatus();
