@@ -265,8 +265,10 @@ export const sections = [
     id: "formatting",
     title: "Formatting helpers — number, date, relative, selectPlural",
     lead:
-      "The ADR-029 \"E\" helpers, demonstrated as host helpers on the same seam as t " +
-      "(not blessed operations). number/date/relative format through Intl.NumberFormat / " +
+      "number / date / selectPlural are blessed prelude operations like t (ADR-029): " +
+      "catalogued and painted, with pure fallbacks (plain text; the English one/other " +
+      "rule), overridden here by the host's native-Intl versions. relative stays a Lab " +
+      "demo helper. number/date/relative format through Intl.NumberFormat / " +
       "DateTimeFormat / RelativeTimeFormat; selectPlural exposes the raw CLDR category. " +
       "All native, all locale-bound, no data shipped.",
     cells: [

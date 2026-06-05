@@ -401,11 +401,15 @@ const helpers = {
   false: () => false,
   null: () => null,
   lookup: (a) => lookup(...a),
-  // ADR-029: the blessed `t` (translate) operation. FlatBars ships no i18n — a
-  // host supplies the brain via rt.register("t", fn), which this delegates to;
-  // with none registered it falls back to the key unchanged, matching the
-  // interpreter's prelude fallback (so compile ≡ interpret).
+  // ADR-029: the blessed i18n operations. FlatBars ships no i18n — a host supplies
+  // the brain via rt.register(name, fn), which these delegate to; with none
+  // registered they fall back purely, matching the interpreter's prelude
+  // fallbacks (so compile ≡ interpret). t/number/date → the argument's plain text;
+  // selectPlural → the English one/other rule.
   t: (a) => { const u = userHelpers["t"]; return u ? callUser("t", u, a) : stringify(a[0]); },
+  number: (a) => { const u = userHelpers["number"]; return u ? callUser("number", u, a) : stringify(a[0]); },
+  date: (a) => { const u = userHelpers["date"]; return u ? callUser("date", u, a) : stringify(a[0]); },
+  selectPlural: (a) => { const u = userHelpers["selectPlural"]; return u ? callUser("selectPlural", u, a) : (num(a[0]) === 1 ? "one" : "other"); },
   escapeHtml: (a) => esc(a[0]),
   safe: (a) => safe(a[0]),
   eq: (a) => deepEq(a[0], a[1]),

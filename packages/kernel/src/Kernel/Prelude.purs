@@ -149,6 +149,21 @@ coreOperationDefs =
       false
       (AtLeast 1)
       translateH
+  , gen "number"
+      "Formats a number for the host's locale (Intl.NumberFormat); returns the number's plain text when no host formatter is registered (ADR-029)."
+      false
+      (AtLeast 1)
+      numberH
+  , gen "date"
+      "Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029)."
+      false
+      (AtLeast 1)
+      dateH
+  , gen "selectPlural"
+      "Returns the CLDR plural category for a number in the host's locale; falls back to the English one/other rule when no host rule is registered (ADR-029)."
+      false
+      (AtLeast 1)
+      selectPluralH
   , valDef "true" "The boolean literal true." (nullary (pure (VBool true)))
   , valDef "false" "The boolean literal false." (nullary (pure (VBool false)))
   , valDef "null" "The null literal." (nullary (pure VNull))
@@ -986,17 +1001,39 @@ lookupH _ args = case Array.uncons args of
   step VNull _ = VNull
   step v key = indexValue v key
 
--- | The blessed `t` (translate) operation (ADR-029). FlatBars ships no i18n: the
--- | localization brain is the host's. The engine reserves the name (so `t` is
--- | catalogued, schema-validated, and editor-painted) and supplies the
--- | *fallback* — returning the message key unchanged. A host plugs in real
--- | translation by registering `t` (the interpreter's `renderWith` helper bag, or
--- | the compiled runtime's `rt.register`), which shadows this fallback. The
--- | fallback is pure, so it renders identically interpreted and compiled.
+-- | The blessed i18n operations (ADR-029). FlatBars ships no i18n: the brain is
+-- | the host's. The engine reserves the names (so `t`/`number`/`date`/
+-- | `selectPlural` are catalogued, schema-validated, and editor-painted) and
+-- | supplies a *pure fallback*. A host plugs in real behaviour by registering the
+-- | operation (the interpreter's `renderWith` bag, or the compiled runtime's
+-- | `rt.register`), which shadows the fallback. The fallbacks are pure, so they
+-- | render identically interpreted and compiled.
+-- |
+-- | `t`/`number`/`date` fall back to their argument's plain text (translate
+-- | returns the key; number/date return the value unformatted).
 translateH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
-translateH _ args = case Array.head args of
-  Nothing -> throwError (ArityError "t: expected at least 1 argument(s), got 0")
-  Just key -> VString <$> liftEither (stringify key)
+translateH = passthrough "t"
+
+numberH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+numberH = passthrough "number"
+
+dateH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+dateH = passthrough "date"
+
+-- | The shared "return my first argument as text" fallback for `t`/`number`/`date`.
+passthrough :: forall m. MonadThrow Error m => String -> Operation m (RefEnv m)
+passthrough name _ args = case Array.head args of
+  Nothing -> throwError (ArityError (name <> ": expected at least 1 argument(s), got 0"))
+  Just v -> VString <$> liftEither (stringify v)
+
+-- | `selectPlural` falls back to the English one/other rule (pure, no CLDR data);
+-- | a host registers the real `Intl.PluralRules` category.
+selectPluralH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+selectPluralH _ args = case Array.head args of
+  Nothing -> throwError (ArityError "selectPlural: expected at least 1 argument(s), got 0")
+  Just v -> do
+    n <- asNum v
+    pure (VString (if n == 1.0 then "one" else "other"))
 
 indexValue :: Value -> Value -> Value
 indexValue (VObject m) (VString k) = fromMaybe VNull (Map.lookup k m)

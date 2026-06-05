@@ -15,6 +15,7 @@
 |`ceil` |value |1 |registered |Rounds a number up to the nearest integer.
 |`coalesce` |value |≥1 |registered |Returns the first non-null argument — the `??` operator's helper.
 |`count` |value |1 |registered |The number of items in an array (or characters in a string).
+|`date` |value |≥1 |registered |Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029).
 |`dict` |value |any |registered |Builds an object from alternating key/value arguments (the hash target).
 |`divide` |value |2 |registered |Divides the first number by the second — the `/` operator's helper.
 |`downcase` |value |1 |alias of `lowercase` |Lowercases its argument.
@@ -54,6 +55,7 @@
 |`ne` |value |2 |registered |True when its two arguments are not equal.
 |`not` |value |1 |registered |Logical negation of its argument's truthiness.
 |`null` |value |0 |registered |The null literal.
+|`number` |value |≥1 |registered |Formats a number for the host's locale (Intl.NumberFormat); returns the number's plain text when no host formatter is registered (ADR-029).
 |`or` |value |any |registered |True when any argument is truthy.
 |`parent` |value |0–1 |scoped |The enclosing block's context (chainable).
 |`parent-first` |value |0 |scoped |True on the enclosing loop's first iteration.
@@ -73,6 +75,7 @@
 |`root` |value |0 |scoped |The root (top-level) context.
 |`round` |value |1 |registered |Rounds a number to the nearest integer.
 |`safe` |value |1 |registered |Marks its argument as safe (trusted) markup, without escaping.
+|`selectPlural` |value |≥1 |registered |Returns the CLDR plural category for a number in the host's locale; falls back to the English one/other rule when no host rule is registered (ADR-029).
 |`size` |value |1 |synonym of `count` |The number of items in an array (or characters in a string).
 |`slice` |value |2–3 |registered |Returns a substring from a start index to an optional end index.
 |`sortBy` |value |2 |registered |Sorts an array of objects by a key.

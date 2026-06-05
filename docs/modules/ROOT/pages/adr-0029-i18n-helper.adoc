@@ -156,8 +156,9 @@ legacy spellings are a lint concern, ADR-019).
 | Rejected — violates meaning-free + bundle gates.
 
 | E — `number` / `date` / `selectPlural` helpers
-| A locale-aware formatting helper set, same host-callback discipline.
-| Deferred — a follow-up *on top of* C, not v1.
+| A locale-aware formatting helper set, same host-register discipline.
+| *Adopted* — now blessed prelude operations alongside `t` (pure fallbacks: plain text; the English
+  one/other rule). `relative` stays a Lab demo helper.
 |===
 
 == Follow-ups
@@ -167,8 +168,9 @@ legacy spellings are a lint concern, ADR-019).
 . ✅ *Done — this ADR (C):* the `t` prelude operation (RawBars/FullBars/MaxBars; not MinBars), the host
   brain via the ADR-018 registration seam (interpreter + compiled runtime), the pure key-returning
   fallback, catalog/operations generation, and `test:compile` parity.
-. *Deferred (E):* locale-aware `number` / `date` / `selectPlural` helpers under the same host-register
-  discipline (demonstrated in the Lab via native `Intl`; not blessed prelude operations).
+. ✅ *Done — the E formatting set:* `number` / `date` / `selectPlural` are blessed prelude operations
+  alongside `t` (pure fallbacks — plain text and the English one/other rule — overridden by the host's
+  native `Intl`). `relative` remains a Lab demo helper (Intl.RelativeTimeFormat), not blessed.
 . *Conformance note:* add an `i18n` row to xref:fullbars-compat.adoc[] documenting that the `t` operation
   (shared by RawBars/FullBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
   Handlebars built-in), the same framing ADR-018 used for `registerHelper`.

@@ -82,6 +82,14 @@
       "doc": "The number of items in an array (or characters in a string)."
     },
     {
+      "name": "date",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029)."
+    },
+    {
       "name": "dict",
       "kind": "inline",
       "arity": "any",
@@ -394,6 +402,14 @@
       "doc": "The null literal."
     },
     {
+      "name": "number",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Formats a number for the host's locale (Intl.NumberFormat); returns the number's plain text when no host formatter is registered (ADR-029)."
+    },
+    {
       "name": "or",
       "kind": "inline",
       "arity": "any",
@@ -544,6 +560,14 @@
       "source": "registered",
       "canonical": null,
       "doc": "Marks its argument as safe (trusted) markup, without escaping."
+    },
+    {
+      "name": "selectPlural",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Returns the CLDR plural category for a number in the host's locale; falls back to the English one/other rule when no host rule is registered (ADR-029)."
     },
     {
       "name": "size",
