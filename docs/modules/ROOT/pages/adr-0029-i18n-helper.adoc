@@ -158,8 +158,8 @@ legacy spellings are a lint concern, ADR-019).
 | E — `number` / `date` / `selectPlural` (+ `relative`) helpers
 | A locale-aware formatting helper set, same host-register discipline.
 | *Adopted* — all are blessed prelude operations alongside `t` (pure fallbacks: plain text; the English
-  one/other rule; "N units ago"). `number` / `date` accept an Intl options hash (`AtLeast 1`, no arity
-  change).
+  one/other rule; "N units ago"). All four accept an Intl options hash — the trailing dict passes through
+  with no arity change (the fallbacks ignore it; the host reads it).
 |===
 
 == Follow-ups
@@ -171,9 +171,9 @@ legacy spellings are a lint concern, ADR-019).
   fallback, catalog/operations generation, and `test:compile` parity.
 . ✅ *Done — the E formatting set:* `number` / `date` / `selectPlural` / `relative` are blessed prelude
   operations alongside `t` (pure fallbacks — plain text, the English one/other rule, and "N units ago" —
-  overridden by the host's native `Intl`). `number` / `date` read an Intl options hash
-  (`pass:[{{number n style="currency" currency="EUR"}}]`), which the trailing dict delivers without an
-  arity change.
+  overridden by the host's native `Intl`). All four read an Intl options hash
+  (`pass:[{{number n style="currency" currency="EUR"}}]`, `pass:[{{selectPlural n type="ordinal"}}]`,
+  `pass:[{{relative v u numeric="always"}}]`), which the trailing dict delivers without an arity change.
 . *Conformance note:* add an `i18n` row to xref:fullbars-compat.adoc[] documenting that the `t` operation
   (shared by RawBars/FullBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
   Handlebars built-in), the same framing ADR-018 used for `registerHelper`.

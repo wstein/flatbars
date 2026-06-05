@@ -85,11 +85,11 @@ export function fmtDate(locale, iso, opts = {}) {
     : { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" };
   return new Intl.DateTimeFormat(locale, o).format(new Date(iso));
 }
-export function fmtRelative(locale, value, unit) {
-  return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Number(value), unit);
+export function fmtRelative(locale, value, unit, opts = {}) {
+  return new Intl.RelativeTimeFormat(locale, { numeric: "auto", ...opts }).format(Number(value), unit);
 }
-export function selectPlural(locale, n) {
-  return new Intl.PluralRules(locale).select(Number(n));
+export function selectPlural(locale, n, opts = {}) {
+  return new Intl.PluralRules(locale, opts).select(Number(n));
 }
 
 // The full i18n helper bag (ADR-018) the Lab/host binds for a chosen locale and
@@ -102,8 +102,8 @@ export function makeI18nHelpers(locale) {
     t: (key, args) => translate(locale, key, args || {}),
     number: (n, opts) => fmtNumber(locale, n, opts || {}),
     date: (iso, opts) => fmtDate(locale, iso, opts || {}),
-    relative: (value, unit) => fmtRelative(locale, value, unit),
-    selectPlural: (n) => selectPlural(locale, n),
+    relative: (value, unit, opts) => fmtRelative(locale, value, unit, opts || {}),
+    selectPlural: (n, opts) => selectPlural(locale, n, opts || {}),
   };
 }
 
@@ -147,8 +147,8 @@ function translate(key, args) {
 registerHelper("t", (key, args) => translate(key, args || {}));
 registerHelper("number", (n, opts) => new Intl.NumberFormat(locale, opts || {}).format(Number(n)));
 registerHelper("date", (iso, opts) => new Intl.DateTimeFormat(locale, (opts && Object.keys(opts).length) ? { timeZone: "UTC", ...opts } : { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" }).format(new Date(iso)));
-registerHelper("relative", (v, u) => new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Number(v), u));
-registerHelper("selectPlural", (n) => new Intl.PluralRules(locale).select(Number(n)));`;
+registerHelper("relative", (v, u, opts) => new Intl.RelativeTimeFormat(locale, { numeric: "auto", ...(opts || {}) }).format(Number(v), u));
+registerHelper("selectPlural", (n, opts) => new Intl.PluralRules(locale, opts || {}).select(Number(n)));`;
 }
 
 // ── The runnable cells ───────────────────────────────────────────────────────
@@ -272,8 +272,9 @@ export const sections = [
       "painted, with pure fallbacks (plain text; the English one/other rule; \"N units " +
       "ago\"), overridden here by the host's native-Intl versions. number/date/relative " +
       "format through Intl.NumberFormat / DateTimeFormat / RelativeTimeFormat; " +
-      "selectPlural exposes the raw CLDR category. number and date also take an Intl " +
-      "options hash. All native, all locale-bound, no data shipped.",
+      "selectPlural exposes the raw CLDR category. Each takes an Intl options hash — the " +
+      "trailing dict (style/currency, type=\"ordinal\", numeric=\"always\") passes straight " +
+      "through, no arity change. All native, all locale-bound, no data shipped.",
     cells: [
       {
         id: "number",
@@ -312,6 +313,15 @@ export const sections = [
         expect: "wczoraj",
       },
       {
+        id: "relative-always",
+        label: "relative — with an Intl options hash",
+        note: 'numeric="always" forces the numeric form over the idiom (auto → "yesterday").',
+        locale: "en",
+        template: '{{relative offset unit numeric="always"}}',
+        data: { offset: -1, unit: "day" },
+        expect: "1 day ago",
+      },
+      {
         id: "selectPlural",
         label: "selectPlural — the raw category",
         note: "count=2 in Polish is the `few` category (English would be `other`).",
@@ -319,6 +329,15 @@ export const sections = [
         template: "{{selectPlural n}}",
         data: { n: 2 },
         expect: "few",
+      },
+      {
+        id: "selectPlural-ordinal",
+        label: "selectPlural — with an Intl options hash",
+        note: 'type="ordinal" switches to ordinal categories (English 2 → "two", for 2nd).',
+        locale: "en",
+        template: '{{selectPlural n type="ordinal"}}',
+        data: { n: 2 },
+        expect: "two",
       },
     ],
   },
