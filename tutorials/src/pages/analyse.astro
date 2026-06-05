@@ -1,0 +1,207 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// "Truthiness portability" — the guide to analyse mode (ADR-022 Part B). A
+// FlatBars template renders under ONE engine's truthiness rule, but the same
+// template may branch differently on another (Handlebars vs Mustache vs …).
+// Analyse mode renders against real data and reports every condition whose branch
+// would flip elsewhere, with a portable fix. This is NOT a fifth surface; it is a
+// lint over a real render. Every example comes from the one gate-validated source
+// (../analyse.mjs, gated by scripts/check-tutorial-tooling.mjs via the engine's
+// `analyze`), so the page can never claim a finding the analyser does not produce.
+// The normative text lives in docs/ (adr-0022-analyse-mode.adoc).
+import Reference from "../layouts/Reference.astro";
+import OpenInLab from "../components/OpenInLab.jsx";
+import { examples as ex } from "../analyse.mjs";
+
+const t = (s) => s; // readability helper for inline tag literals
+
+const groups = [
+  {
+    label: "Truthiness",
+    items: [
+      { href: "#intro", label: "Why truthiness travels badly" },
+      { href: "#empty-string", label: "Empty string" },
+      { href: "#zero", label: "Zero" },
+      { href: "#collections", label: "Empty array & object" },
+      { href: "#portable", label: "What's already portable" },
+      { href: "#report", label: "The report & JSONata fix" },
+      { href: "#using", label: "In the Lab & CI" },
+    ],
+  },
+  {
+    label: "Other references",
+    items: [
+      { href: "/lint", label: "Linting & migration" },
+      { href: "/fullbars", label: "FullBars" },
+      { href: "/transform", label: "Data shaping" },
+    ],
+  },
+  {
+    label: "Play",
+    items: [{ href: "/lab/index.html?engine=fullbars", label: "FlatBars Lab ↗" }],
+  },
+];
+---
+
+<Reference
+  title="Truthiness portability"
+  subtitle="The same template can take a different branch on a different engine: false, null, 0, '', [], and {} are not all falsy everywhere. Analyse mode renders against your real data and flags every condition that would flip — with a rule-free fix — so a template stays portable."
+  groups={groups}
+  dialect="fullbars"
+>
+  <style>
+    .verdict { margin: 0.9rem 0 1.5rem; padding: 0.7rem 0.9rem; border-left: 3px solid var(--accent);
+      background: var(--accent-softer); border-radius: 0 6px 6px 0; font-size: 0.92rem; }
+    .verdict b { color: var(--accent-2); font-family: var(--font-mono); }
+    .verdict .fix { display: block; margin-top: 0.4rem; color: var(--fg-secondary); }
+    .verdict .fix code { color: var(--accent-2); }
+    .ok { border-left-color: var(--ok, #3aa76d); background: color-mix(in srgb, var(--ok, #3aa76d) 8%, transparent); }
+    .ambig { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; font: 600 12px/1.6 var(--font-mono); margin: 0.4rem 0 0; }
+    .ambig code { padding: 0.1rem 0.4rem; border: 1px solid var(--border-strong); border-radius: 5px;
+      background: var(--bg-1); color: var(--fg-secondary); }
+  </style>
+
+  <!-- ─────────────────────────── Intro ─────────────────────────── -->
+  <section id="intro">
+    <h2>Why truthiness travels badly</h2>
+    <p>
+      A FlatBars template is logic-light, but it still asks yes/no questions:
+      <code>{t("{{#if bio}}")}</code>, <code>{t("{{#unless items}}")}</code>. The answer
+      depends on a <b>truthiness rule</b>, and engines disagree. FullBars uses
+      Handlebars's rule; Mustache, StringTemplate, and others differ. Six values are
+      the flashpoints — the <b>ambiguous set</b>:
+    </p>
+    <div class="ambig">
+      <code>false</code><code>null</code><code>0</code><code>""</code><code>[]</code><code>{t("{}")}</code>
+    </div>
+    <p>
+      <code>false</code> and <code>null</code> are falsy everywhere — portable. The other four are
+      not: <code>0</code> is falsy in Handlebars but truthy in Mustache;
+      <code>""</code> the same; <code>[]</code> varies; <code>{t("{}")}</code> is truthy almost
+      everywhere but falsy under the <code>presence</code> rule. Test one of these in a
+      condition and your template can render a different branch on someone else's engine.
+    </p>
+    <p>
+      <b>Analyse mode</b> finds these without guessing. It <em>renders your template
+      against your data</em> through the real engine — byte-identical output, no second
+      interpreter — and records every truthiness decision, then replays it against the
+      other named rules. A condition whose branch flips is a <b>portability finding</b>,
+      reported with a located, rule-free fix. "No findings" on this data is a proof the
+      render is portable <em>for that data</em> — not a guarantee for all data.
+    </p>
+  </section>
+
+  <!-- ───────────────────────── Empty string ───────────────────────── -->
+  <section id="empty-string">
+    <h2>Empty string</h2>
+    <p>
+      The user left the field blank, so the value is <code>""</code>. Handlebars treats
+      that as falsy and shows the <code>{t("{{else}}")}</code> branch; Mustache treats it
+      as truthy and shows the filled branch — same template, two outputs.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.emptyString.template} data={ex.emptyString.data} />
+    <div class="verdict">
+      <b>1 portability finding.</b> <code>{t("{{#if bio}}")}</code> tested an empty string at
+      data path <b>bio</b>; it flips under <code>mustache</code> and <code>minimal</code>.
+      <span class="fix">Fix — test it explicitly so the decision doesn't ride on the host's
+      rule: <code>{t("{{#if (ne bio \"\")}}")}</code>.</span>
+    </div>
+  </section>
+
+  <!-- ───────────────────────────── Zero ───────────────────────────── -->
+  <section id="zero">
+    <h2>Zero</h2>
+    <p>
+      <code>0</code> is the canonical divergence: falsy in Handlebars, truthy in Mustache
+      and the minimal/presence rules. "0 unread" silently becomes "all caught up" on the
+      wrong engine.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.zero.template} data={ex.zero.data} />
+    <div class="verdict">
+      <b>1 portability finding.</b> <code>{t("{{#if count}}")}</code> tested the number
+      <code>0</code> at data path <b>count</b>.
+      <span class="fix">Fix — <code>includeZero=true</code> keeps it truthy on Handlebars
+      <em>only</em> (not portable); for every engine, test explicitly:
+      <code>{t("{{#if (ne count 0)}}")}</code>.</span>
+    </div>
+  </section>
+
+  <!-- ─────────────────────── Empty array & object ─────────────────────── -->
+  <section id="collections">
+    <h2>Empty array &amp; empty object</h2>
+    <p>
+      An empty <b>array</b> is falsy in Handlebars and Mustache — but the portable spelling
+      is still to <em>iterate</em>: <code>{t("{{#each}}…{{else}}…{{/each}}")}</code> renders
+      the empty branch the same way on every engine, without leaning on `if`-falsiness.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.emptyArray.template} data={ex.emptyArray.data} />
+    <div class="verdict">
+      <b>1 portability finding.</b> <code>{t("{{#if items}}")}</code> tested an empty array.
+      <span class="fix">Fix — iterate:
+      <code>{t("{{#each items}}…{{else}}empty{{/each}}")}</code>.</span>
+    </div>
+    <p>
+      An empty <b>object</b> is the non-obvious one: truthy in <em>both</em> Handlebars and
+      Mustache, so it looks safe — but it flips under the <code>presence</code> rule. The
+      analyser still catches it.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.emptyObject.template} data={ex.emptyObject.data} />
+    <div class="verdict">
+      <b>1 portability finding.</b> <code>{t("{{#if profile}}")}</code> tested an empty object
+      at data path <b>profile</b>; it flips under <code>presence</code>.
+      <span class="fix">Fix — test a known key explicitly, e.g.
+      <code>{t("{{#if profile.name}}")}</code>.</span>
+    </div>
+  </section>
+
+  <!-- ───────────────────────── What's portable ───────────────────────── -->
+  <section id="portable">
+    <h2>What's already portable</h2>
+    <p>
+      Not every condition is a problem. <code>false</code> (and <code>null</code>) are falsy
+      on every engine, so a condition testing them is safe — the analyser confirms it with a
+      <code>✓</code> line, positive evidence rather than silence.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.portable.template} data={ex.portable.data} />
+    <div class="verdict ok">
+      <b>0 portability findings.</b> <code>{t("{{#if active}}")}</code> tested <code>false</code>,
+      which every rule agrees is falsy. Nothing to fix.
+    </div>
+  </section>
+
+  <!-- ──────────────────────── The report & fix ──────────────────────── -->
+  <section id="report">
+    <h2>The report &amp; the JSONata fix</h2>
+    <p>
+      Each finding is a markdown section: the located tag, the value it tested, the rules
+      that flip, and a concrete fix that names only helpers that exist
+      (<code>ne</code>/<code>eq</code>/<code>each</code>). The fixes above are <em>in-template</em>.
+      When the cleaner fix is in the <b>data</b>, <code>--emit-jsonata</code> generates a
+      reviewable <a href="/transform">JSONata</a> scaffold that normalises each offending
+      bare path out of the ambiguous zone <em>before</em> the data reaches any engine —
+      e.g. mapping a blank <code>bio</code> to <code>null</code>. It is a scaffold to review,
+      never applied automatically: what "normalise" means is your call.
+    </p>
+  </section>
+
+  <!-- ──────────────────────────── Using it ──────────────────────────── -->
+  <section id="using">
+    <h2>In the Lab &amp; in CI</h2>
+    <p>
+      <b>In the Lab</b> — <b>Open in Lab</b> on any example above carries the template and
+      data over; switch to the <b>Truthiness</b> panel beside the output to see the findings
+      update live as you edit. The <code>?vendored=</code> corpus turns the Lab into a
+      portability gallery.
+    </p>
+    <p><b>In CI / a script</b> — the same report on the command line:</p>
+    <pre class="cli"><code>$ flatbars analyse template.hbs data.json
+$ flatbars analyse template.hbs data.json --emit-jsonata   # the cleanup scaffold</code></pre>
+    <p class="tip">
+      The CLI and the Lab share one <code>reportMarkdown</code> through the
+      <code>flatbars-js</code> bundle, so they can never disagree — and this page's examples
+      are run through that same <code>analyze</code> in CI, so the findings shown here are
+      exactly what the engine produces.
+    </p>
+  </section>
+</Reference>

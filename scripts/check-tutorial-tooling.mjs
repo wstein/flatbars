@@ -14,15 +14,27 @@
 //
 // One content source per example (tutorials/src/{analyse,lint}.mjs), the same the
 // pages import. Exits non-zero on any miss; prints a per-item ✓/✗ log.
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { analyze, lint, migrate } from "../lab/vendor/flatbars-engine.mjs";
 import { examples as analyseExamples } from "../tutorials/src/analyse.mjs";
 import { lintExamples, migrateExamples } from "../tutorials/src/lint.mjs";
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 let fail = 0;
 const miss = (msg) => {
   console.error("  ✘ " + msg);
   fail++;
 };
+
+// Orphan guard (mirrors check-tutorial-links): every example must be referenced on
+// its page, so no example is verified-but-unshown (or shown-but-unverified).
+function noOrphans(page, prefix, keys) {
+  const src = readFileSync(resolve(ROOT, page), "utf8");
+  for (const k of keys)
+    if (!src.includes(`${prefix}.${k}.`)) miss(`${k}: not referenced (\`${prefix}.${k}\`) in ${page}`);
+}
 
 console.log("Analyse examples (truthiness portability):");
 for (const [key, ex] of Object.entries(analyseExamples)) {
@@ -70,6 +82,11 @@ for (const [key, ex] of Object.entries(migrateExamples)) {
     miss(`${key}: expected a ${ex.residualKind} residual, got [${r.residuals.map((x) => x.kind).join(", ")}]`);
   if (fail === before) console.log(`  ✓ ${key}`);
 }
+
+console.log("Page references (orphan guard):");
+const beforeOrphans = fail;
+noOrphans("tutorials/src/pages/analyse.astro", "ex", Object.keys(analyseExamples));
+if (fail === beforeOrphans) console.log("  ✓ every example is shown on its page");
 
 const total =
   Object.keys(analyseExamples).length +
