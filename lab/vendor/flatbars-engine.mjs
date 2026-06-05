@@ -14908,10 +14908,10 @@ var renderCoreWith = function(rule) {
               return new Right(v1.value0);
             }
             ;
-            throw new Error("Failed pattern match at MinBars (line 167, column 7 - line 169, column 31): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at MinBars (line 168, column 7 - line 170, column 31): " + [v1.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at MinBars (line 161, column 44 - line 169, column 31): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at MinBars (line 162, column 44 - line 170, column 31): " + [v.constructor.name]);
         };
       };
     };
@@ -14971,7 +14971,7 @@ var expansionIndent = function(indent) {
       return new Left(new DisallowedShape("intrinsic block indentation with a non-static default (MinBars compile)", 0));
     }
     ;
-    throw new Error("Failed pattern match at MinBars (line 316, column 1 - line 316, column 66): " + [indent.constructor.name, body.constructor.name]);
+    throw new Error("Failed pattern match at MinBars (line 320, column 1 - line 320, column 66): " + [indent.constructor.name, body.constructor.name]);
   };
 };
 var blockIndent = function(args) {
@@ -15004,7 +15004,7 @@ var inline = function(partials) {
                   return inline(partials)(overrides)(new Cons(v["value1"]["value1"][0].value0.value0, chain))(depth)(indentTemplate(v["value1"]["value1"][1].value0.value0)(v1.value0));
                 }
                 ;
-                throw new Error("Failed pattern match at MinBars (line 273, column 22 - line 275, column 99): " + [v1.constructor.name]);
+                throw new Error("Failed pattern match at MinBars (line 277, column 22 - line 279, column 99): " + [v1.constructor.name]);
               }
               ;
             }
@@ -15028,7 +15028,7 @@ var inline = function(partials) {
                   return inline(partials)(union6(overrides)(harvestBlocks(v.value4)))(chain)(depth + 1 | 0)(indentTemplate(v["value3"][1].value0.value0)(v1.value0));
                 }
                 ;
-                throw new Error("Failed pattern match at MinBars (line 282, column 22 - line 286, column 45): " + [v1.constructor.name]);
+                throw new Error("Failed pattern match at MinBars (line 286, column 22 - line 290, column 45): " + [v1.constructor.name]);
               }
               ;
             }
@@ -15058,7 +15058,7 @@ var inline = function(partials) {
                   });
                 }
                 ;
-                throw new Error("Failed pattern match at MinBars (line 291, column 36 - line 298, column 37): " + [v2.constructor.name]);
+                throw new Error("Failed pattern match at MinBars (line 295, column 36 - line 302, column 37): " + [v2.constructor.name]);
               }
               ;
               return new Left(new DisallowedShape("malformed block override (MinBars compile)", 0));
