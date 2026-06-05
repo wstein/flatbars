@@ -1,0 +1,158 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// "Localization" — how a HOST wires i18n into FlatBars (ADR-029 + its 2026-06-05
+// amendment). This is NOT a FlatBars feature: FlatBars ships no i18n. The page
+// demonstrates the *seam* — a `t` helper bound to the browser's native Intl
+// (PluralRules/NumberFormat, the CLDR brain at zero bundle cost) — so it is the
+// Lab acting as the host. i18next is deliberately NOT vendored; an unbundled
+// escape hatch shows where it (or ICU MessageFormat) slots in. Every runnable
+// cell comes from the one gate-validated source (../i18n.mjs, gated by
+// scripts/check-i18n.mjs), so a snippet can never drift from what the engine
+// produces.
+import Reference from "../layouts/Reference.astro";
+import TryI18n from "../components/TryI18n.jsx";
+import { sections, flagship, integrationSource, escapeHatch } from "../i18n.mjs";
+
+const groups = [
+  {
+    label: "Localization",
+    items: [
+      { href: "#intro", label: "The seam" },
+      ...sections.map((s) => ({ href: `#${s.id}`, label: s.title })),
+      { href: "#wiring", label: "Wiring it up" },
+      { href: "#flagship", label: "Flagship" },
+      { href: "#beyond", label: "Beyond this guide" },
+    ],
+  },
+];
+const intro = sections[0].cells[0];
+---
+
+<Reference
+  title="Localization"
+  subtitle="FlatBars ships no i18n — it is the host's job (ADR-029). This runnable guide is the Lab acting as the host: a `t` helper wired to the browser's native Intl, so plurals and number formatting come from the platform, not a vendored library."
+  groups={groups}
+  dialect="fullbars"
+>
+  <style>
+    .lz-cell { margin: 1rem 0 1.6rem; }
+    .lz-cell .lz-h { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .lz-cell .lz-h b { color: var(--accent-2); font-family: var(--font-mono); }
+    .lz-cell .lz-h span { color: var(--fg-muted); }
+    .lz-flow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      font: 600 12px/1.4 var(--font-mono); margin: 1.1rem 0; }
+    .lz-flow .box { padding: 0.35rem 0.6rem; border: 1px solid var(--border-strong);
+      border-radius: 6px; background: var(--bg-1); color: var(--fg-secondary); }
+    .lz-flow .box.mid { color: var(--accent-2); border-color: var(--accent); background: var(--accent-softer); }
+    .lz-flow .arr { color: var(--fg-faint); }
+    .i18n-controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 0 0 0.6rem; }
+    .i18n-locales { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+    .i18n-loc { font: 600 12px/1 var(--font-mono); padding: 0.4rem 0.7rem; background: var(--bg-1);
+      color: var(--fg-secondary); border: 0; border-right: 1px solid var(--border); cursor: pointer; }
+    .i18n-loc:last-child { border-right: 0; }
+    .i18n-loc.is-active { background: var(--accent-softer); color: var(--accent-2); }
+    .i18n-count { font: 600 12px/1 var(--font-mono); color: var(--fg-muted); display: inline-flex;
+      align-items: center; gap: 0.4rem; }
+    .i18n-count input { width: 5rem; font: inherit; padding: 0.35rem 0.4rem; background: var(--bg-1);
+      color: var(--fg); border: 1px solid var(--border); border-radius: 6px; }
+    .lz-code { font: 500 12.5px/1.5 var(--font-mono); padding: 0.85rem 1rem; background: var(--bg-1);
+      border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; color: var(--fg-secondary); }
+  </style>
+
+  <!-- ─────────────────────────── Intro ─────────────────────────── -->
+  <section id="intro">
+    <h2>The seam</h2>
+    <p>
+      Translation is <b>meaning</b>, and meaning in FlatBars is plugged in, not built
+      in. So FlatBars ships no <code>t</code> built-in — i18n is the <b>host's</b> job
+      (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029</a>).
+      The host registers a <code>t</code> helper that looks a message key up in its
+      catalogue, picks the right plural form, and fills in the placeholders. The
+      template just calls it — <code>{`{{t "key" count=n}}`}</code> — like any other
+      operation.
+    </p>
+    <div class="lz-flow" aria-label="key to output">
+      <span class="box">{`{{t "key" count=n}}`}</span><span class="arr">→</span>
+      <span class="box mid">host t helper</span><span class="arr">→</span>
+      <span class="box">native Intl</span><span class="arr">→</span>
+      <span class="box">localized text</span>
+    </div>
+    <p>
+      The brain here is the browser's own <a href="https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl" target="_blank" rel="noopener">Intl ↗</a>
+      — <code>Intl.PluralRules</code> knows every language's plural categories and
+      <code>Intl.NumberFormat</code> groups digits per locale, both at <b>zero</b>
+      bundle cost. That is why the Lab does <em>not</em> vendor i18next: the platform
+      already does the hard part (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029 amendment</a>).
+      Flip the locale or change the count below — the output re-derives live.
+    </p>
+    <TryI18n client:visible template={intro.template} data={intro.data} locale={intro.locale} />
+  </section>
+
+  {sections.map((sec) => (
+    <section id={sec.id}>
+      <h2>{sec.title}</h2>
+      <p>{sec.lead}</p>
+      {sec.cells.map((c, i) => (
+        <div class="lz-cell">
+          <p class="lz-h"><b>{c.label}</b> — <span>{c.note}</span></p>
+          {/* The first cell already ran in the intro; show the rest. */}
+          {!(sec.id === sections[0].id && i === 0) && (
+            <TryI18n client:visible template={c.template} data={c.data} locale={c.locale} />
+          )}
+        </div>
+      ))}
+    </section>
+  ))}
+
+  <!-- ─────────────────────────── Wiring ─────────────────────────── -->
+  <section id="wiring">
+    <h2>Wiring it up</h2>
+    <p>
+      Every cell above is driven by one registration. The host binds <code>t</code>
+      to its <code>translate</code> — here a ~20-line wrapper over native Intl — and
+      hands it to the engine (the <code>registerHelper</code> path, ADR-018). The key
+      <code>=</code>value hash arrives as a trailing object:
+    </p>
+    <pre class="lz-code"><code>{integrationSource}</code></pre>
+    <p>
+      Nothing about this is FlatBars-specific machinery: the same seam takes your
+      real stack. Swap the native-Intl wrapper for i18next or ICU MessageFormat and
+      the templates are unchanged:
+    </p>
+    <pre class="lz-code"><code>{escapeHatch}</code></pre>
+    <p class="tip">
+      A missing key renders the key itself rather than throwing — ADR-029's
+      <b>fallback-and-flag</b>, so one untranslated string never breaks a render.
+    </p>
+  </section>
+
+  <!-- ─────────────────────────── Flagship ─────────────────────────── -->
+  <section id="flagship">
+    <h2>Flagship: plural + interpolation</h2>
+    <p>
+      Two helpers, one locale (Polish, with its four plural categories). The template
+      stays a pair of plain <code>t</code> calls; all the locale knowledge lives in
+      the host's catalogue and the platform's <code>Intl</code>.
+    </p>
+    <TryI18n client:visible template={flagship.template} data={flagship.data} locale={flagship.locale} />
+  </section>
+
+  <!-- ─────────────────────────── Beyond ─────────────────────────── -->
+  <section id="beyond">
+    <h2>Beyond this guide</h2>
+    <p>
+      This is the Lab acting as a host to <em>demonstrate</em> the seam. In your own
+      application the same <code>registerHelper("t", …)</code> wires whichever i18n
+      library you already run. When the blessed <code>t</code> operation lands
+      (ADR-029, follow-up), templates keep the same shape — only the registration
+      moves into the engine.
+    </p>
+    <p>
+      Upstream, <a href="/transform">Data shaping</a> builds the view-model your
+      localized template walks; the surfaces that render it are
+      <a href="/minbars">MinBars</a>, <a href="/fullbars">FullBars</a>, and
+      <a href="/maxbars">MaxBars</a>.
+    </p>
+  </section>
+</Reference>
