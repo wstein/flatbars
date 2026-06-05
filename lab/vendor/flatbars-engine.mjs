@@ -12256,7 +12256,7 @@ var renderSurfaceI18n = function(tr) {
             return new Right(v4.value0);
           }
           ;
-          throw new Error("Failed pattern match at FullBars (line 228, column 7 - line 230, column 31): " + [v4.constructor.name]);
+          throw new Error("Failed pattern match at FullBars (line 228, column 7 - line 232, column 31): " + [v4.constructor.name]);
         }
         ;
         throw new Error("Failed pattern match at FullBars (line 220, column 1 - line 220, column 75): " + [v.constructor.name]);
@@ -12448,10 +12448,10 @@ var analyseSurface = function(src) {
           });
         }
         ;
-        throw new Error("Failed pattern match at FullBars (line 249, column 7 - line 258, column 12): " + [v4.constructor.name]);
+        throw new Error("Failed pattern match at FullBars (line 251, column 7 - line 260, column 12): " + [v4.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars (line 237, column 1 - line 241, column 92): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FullBars (line 239, column 1 - line 243, column 92): " + [v.constructor.name]);
     };
     if (v instanceof Right) {
       var $171 = checkBareInline(true)(v.value0.nodes);
