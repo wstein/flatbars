@@ -12,6 +12,7 @@ module MinBars.Context
   , minPartials
   , minDepth
   , minBlocks
+  , minTruthy
   , push
   , enterPartial
   , layerBlocks
@@ -33,14 +34,18 @@ import FlatBars.Syntax (Template)
 import FlatBars.Value (Value(..))
 
 -- | The MinBars environment: a Mustache *context stack* plus the partial
--- | registry and the partial-recursion depth. Truthiness is MinBars' fixed
--- | `mustache` rule (ADR-022), applied directly where needed — not carried here.
--- | A `newtype` so `MinEnv -> Operation m MinEnv -> Ctl m MinEnv -> MinEnv`
--- | is well-founded (see `Kernel.Env.RefEnv`).
+-- | registry, the partial-recursion depth, and the truthiness rule. Truthiness is
+-- | a `Value -> Boolean` callback carried here (ADR-022), exactly as
+-- | `Kernel.Env.RefEnv` carries it: the default is the language-agnostic `mustache`
+-- | rule (`0`/`""` truthy), and the `mustache.js`-compat render seeds `mustacheJs`
+-- | (`0`/`""` falsy) instead — without it the rule would be hard-wired and a host
+-- | could not target `mustache.js`. A `newtype` so
+-- | `MinEnv -> Operation m MinEnv -> Ctl m MinEnv -> MinEnv` is well-founded.
 newtype MinEnv = MinEnv
   { stack :: List Value -- the context stack, top = head
   , partials :: Map String Template -- named partial templates
   , depth :: Int -- partial-recursion depth, guarded against the budget
+  , truthy :: Value -> Boolean -- the engine's truthiness rule (ADR-022)
   , blocks :: List (Map String Template)
   -- the inheritance block-override stack — a namespace *distinct* from the
   -- data context. `parent` conses one layer per parent it expands; `block`
@@ -59,6 +64,12 @@ minDepth (MinEnv e) = e.depth
 
 minBlocks :: MinEnv -> List (Map String Template)
 minBlocks (MinEnv e) = e.blocks
+
+-- | The engine's truthiness rule (ADR-022). MinBars' sections/inverted sections
+-- | branch through this rather than a hard-wired `mustache`, so a host can render
+-- | under the `mustache.js`-compat rule (`mustacheJs`).
+minTruthy :: MinEnv -> (Value -> Boolean)
+minTruthy (MinEnv e) = e.truthy
 
 -- | Push a value onto the context stack (sections/`with` render their children
 -- | under a push; the frame's lifetime is the `render` call, so there is no pop).
@@ -91,12 +102,15 @@ blookup name = List.foldl pick Nothing
     Nothing -> acc
 
 -- | The starting environment: the root datum as the sole stack frame, the given
--- | partials, depth 0.
-seedEnv :: Value -> Map String Template -> MinEnv
-seedEnv dat partials = MinEnv
+-- | partials, depth 0, and the truthiness rule to branch sections under (ADR-022;
+-- | `Kernel.Value.mustache` for the spec default, `mustacheJs` for `mustache.js`
+-- | compatibility).
+seedEnv :: (Value -> Boolean) -> Value -> Map String Template -> MinEnv
+seedEnv truthy dat partials = MinEnv
   { stack: dat : Nil
   , partials
   , depth: 0
+  , truthy
   , blocks: Nil
   }
 

@@ -164,7 +164,16 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   engine, prelude, and compiler, differing mainly in *surface syntax* (swapped in
   through the `ParseOptions.parseExpr` seam). They *diverge* in one value-policy
   axis — truthiness (ADR-022): FullBars uses `handlebars`, RawBars/MaxBars use
-  `nonEmpty` (`false null "" [] {}` falsy; `0` truthy), MinBars uses `mustache`.
+  `nonEmpty` (`false null "" [] {}` falsy; `0` truthy), MinBars uses `mustache`
+  (the *language-agnostic* spec rule — `0`/`""`/`{}` truthy, as in Ruby/Python
+  Mustache). Note `mustache.js` (the JS implementation) instead treats `0`/`""` as
+  falsy, which is the `handlebars` rule; MinBars exposes that as an opt-in compat
+  mode — `renderMinbarsCompat`/`compileMinbarsCompat` (JS facade), `renderMinCompat`
+  (engine), `flatbars --mustache-js` (CLI). The spec rule stays the default, and
+  the interpreter≡compiler agreement on the compat rule is gated by the
+  `minbars-compat` cases in `test:compile`. Analyse mode labels the spec rule
+  `mustache-spec` (not bare `mustache`) so its findings never imply a `mustache.js`
+  flip that does not apply (ADR-022 S1/S2).
   A second `LexConfig` knob diverges too — **`mustacheDelims`** (set-delimiter
   support, `{{=A B=}}`): **MinBars only** (ADR-015 amendment). FullBars / RawBars /
   MaxBars all set `mustacheDelims = false`, and the LSP layers

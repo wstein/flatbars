@@ -36,7 +36,7 @@ import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (validate)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import MaxBars (maxOptions)
-import MinBars (renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
+import MinBars (renderMinCompat, renderMinDelimsCompatDiag, renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
 import RawBars (compileJsWith, compileWith, coreOptions)
@@ -63,6 +63,8 @@ usage =
     , "                      as |x|) instead of core syntax — applies to render and --compile"
     , "  -m, --mustache      render with the Mustache (MinBars) engine — sections, inverted,"
     , "                      partials, inheritance; render-only (no --compile/--validate/--surface)"
+    , "      --mustache-js   like --mustache, but with mustache.js truthiness (0 and \"\" are falsy,"
+    , "                      as in the JS implementation); the default treats them as truthy (spec)"
     , "      --validate      validate the template against the prelude schema; do not render"
     , "  -c, --compile       compile the template to a JS module (printed to stdout); do not render"
     , "      --trim <mode>   standalone whitespace: 'standalone' (default) strips a lone block/"
@@ -94,6 +96,7 @@ type Options =
   , compileOnly :: Boolean
   , surface :: Boolean
   , mustache :: Boolean -- --mustache: render via the MinBars (Mustache) engine
+  , mustacheJs :: Boolean -- --mustache-js: MinBars under mustache.js truthiness (0/"" falsy)
   , trim :: Maybe Boolean -- --trim override; Nothing ⇒ config/default decides
   , delimiters :: Maybe { open :: String, close :: String } -- --delimiters override
   }
@@ -123,6 +126,7 @@ parseArgs =
     , compileOnly: false
     , surface: false
     , mustache: false
+    , mustacheJs: false
     , trim: Nothing
     , delimiters: Nothing
     }
@@ -136,6 +140,7 @@ parseArgs =
         , compileOnly: acc.compileOnly
         , surface: acc.surface
         , mustache: acc.mustache
+        , mustacheJs: acc.mustacheJs
         , trim: acc.trim
         , delimiters: acc.delimiters
         }
@@ -147,6 +152,8 @@ parseArgs =
       flag | flag == "-c" || flag == "--compile" -> go (acc { compileOnly = true }) tail
       flag | flag == "-s" || flag == "--surface" -> go (acc { surface = true }) tail
       flag | flag == "-m" || flag == "--mustache" -> go (acc { mustache = true }) tail
+      -- --mustache-js implies --mustache; it only swaps the truthiness rule.
+      "--mustache-js" -> go (acc { mustache = true, mustacheJs = true }) tail
       "--trim" -> case Array.uncons tail of
         Just { head: "standalone", tail: rest } -> go (acc { trim = Just true }) rest
         Just { head: "none", tail: rest } -> go (acc { trim = Just false }) rest
@@ -197,13 +204,16 @@ run opts = do
             | opts.mustache ->
                 -- --delimiters sets MinBars' INITIAL pair (Mustache {{=…=}}
                 -- switching still applies, relative to it); else the default {{ }}.
-                case
-                  maybe (MinBars.renderMinDiag tpl value)
-                    (\d -> MinBars.renderMinDelimsDiag d tpl value)
-                    delims
-                  of
-                  Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
-                  Right out -> writeStdout out
+                -- --mustache-js swaps the spec rule for mustache.js' (0/"" falsy).
+                let
+                  plain = if opts.mustacheJs then MinBars.renderMinCompat else MinBars.renderMinDiag
+                  withDelims =
+                    if opts.mustacheJs then MinBars.renderMinDelimsCompatDiag
+                    else MinBars.renderMinDelimsDiag
+                in
+                  case maybe (plain tpl value) (\d -> withDelims d tpl value) delims of
+                    Left err -> die ("flatbars: " <> opts.template <> ": " <> err)
+                    Right out -> writeStdout out
             | opts.surface ->
                 case renderSurfaceDiagWith true noLoopVars popts handlebars tpl value of
                   Left err -> die ("flatbars: " <> opts.template <> ": " <> err)

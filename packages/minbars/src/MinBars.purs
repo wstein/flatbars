@@ -16,8 +16,13 @@ module MinBars
   , renderMinWith
   , renderMinDiag
   , renderMinDelimsDiag
+  , renderMinCompat
+  , renderMinCompatWith
+  , renderMinDelimsCompatDiag
   , compileMinJs
   , compileMinJsWith
+  , compileMinJsCompat
+  , compileMinJsCompatWith
   ) where
 
 import Prelude
@@ -41,6 +46,7 @@ import FlatBars.Value (Value(..))
 import Kernel.Engine (runTemplate)
 import Kernel.Env (recursionBudget)
 import Kernel.Render (formatError)
+import Kernel.Value (Truthy, mustache, mustacheJs)
 import MinBars.Compile (minEmit)
 import MinBars.Context (seedEnv)
 import MinBars.Prelude (harvestBlocks, indentTemplate, leadingIndent, minEngine)
@@ -108,16 +114,34 @@ renderMin = renderMinWith []
 
 -- | Render MinBars source with a set of named partials, each given as Mustache
 -- | source (parsed + desugared, like `FullBars.renderSurfaceWith`). `{{> name}}`
--- | renders the registered partial under the current context stack.
+-- | renders the registered partial under the current context stack. Uses the
+-- | language-agnostic `mustache` rule (`0`/`""` truthy); see `renderMinCompatWith`
+-- | for the `mustache.js`-compatible reading.
 renderMinWith :: Array (Tuple String String) -> String -> Value -> Either String String
-renderMinWith partialSrcs src dat =
+renderMinWith = renderWithRule mustache
+
+-- | `renderMinWith` under the `mustache.js`-compat truthiness rule (`mustacheJs`:
+-- | `0`/`""` falsy, like Handlebars). The choice a host makes when it is porting a
+-- | `mustache.js` codebase and wants byte-identical section behaviour (ADR-022).
+renderMinCompatWith :: Array (Tuple String String) -> String -> Value -> Either String String
+renderMinCompatWith = renderWithRule mustacheJs
+
+-- | Shared render with an explicit truthiness rule: compile the partials, then run
+-- | the core under `rule`. `renderMinWith`/`renderMinCompatWith` fix `rule`.
+renderWithRule :: Truthy -> Array (Tuple String String) -> String -> Value -> Either String String
+renderWithRule rule partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> renderCore (Map.fromFoldable ps) src dat
+    Right ps -> renderCore rule (Map.fromFoldable ps) src dat
   where
   compilePartial (Tuple name s) = case parseMin s of
     Left pe -> Left (renderParseErrorAt s pe)
     Right { nodes } -> Right (Tuple name (desugar nodes))
+
+-- | `renderMinCompatWith` with no partials — the one-shot `mustache.js`-compat
+-- | render.
+renderMinCompat :: String -> Value -> Either String String
+renderMinCompat = renderMinCompatWith []
 
 -- | `renderMin` — the located-error entry (parse failures report `line:column`,
 -- | eval failures keep their `show` form). `renderMin`/`renderMinWith` share this
@@ -126,19 +150,20 @@ renderMinDiag :: String -> Value -> Either String String
 renderMinDiag = renderMin
 
 -- | The shared glue: parse → desugar → seed the env (stack = `[data]`, partials,
--- | depth 0) → run under MinBars' fixed `mustache` rule. Every error is rendered
--- | to a `String` for the host boundary.
-renderCore :: Map String Template -> String -> Value -> Either String String
-renderCore = renderCoreWith minLexConfig
+-- | depth 0, truthiness `rule`) → run. Every error is rendered to a `String` for
+-- | the host boundary.
+renderCore :: Truthy -> Map String Template -> String -> Value -> Either String String
+renderCore rule = renderCoreWith rule minLexConfig
 
 -- | `renderCore` with the main template's lexer config explicit (so it can start
 -- | at a custom initial delimiter pair).
-renderCoreWith :: LexConfig -> Map String Template -> String -> Value -> Either String String
-renderCoreWith cfg partials src dat = case parseMinWith cfg src of
+renderCoreWith
+  :: Truthy -> LexConfig -> Map String Template -> String -> Value -> Either String String
+renderCoreWith rule cfg partials src dat = case parseMinWith cfg src of
   Left pe -> Left (renderParseErrorAt src pe)
   Right { nodes } ->
     let
-      seeded = seedEnv dat partials
+      seeded = seedEnv rule dat partials
     in
       case runTemplate (minEngine seeded) (desugar nodes) of
         Left e -> Left (formatError src e)
@@ -150,7 +175,16 @@ renderCoreWith cfg partials src dat = case parseMinWith cfg src of
 -- | initial pair. No partials (the CLI render-only path).
 renderMinDelimsDiag
   :: { open :: String, close :: String } -> String -> Value -> Either String String
-renderMinDelimsDiag d = renderCoreWith (minLexConfig { open = d.open, close = d.close }) Map.empty
+renderMinDelimsDiag d = renderCoreWith mustache (minLexConfig { open = d.open, close = d.close })
+  Map.empty
+
+-- | `renderMinDelimsDiag` under the `mustache.js`-compat rule — the
+-- | `flatbars --mustache-js --delimiters …` path.
+renderMinDelimsCompatDiag
+  :: { open :: String, close :: String } -> String -> Value -> Either String String
+renderMinDelimsCompatDiag d = renderCoreWith mustacheJs
+  (minLexConfig { open = d.open, close = d.close })
+  Map.empty
 
 -- | Compile MinBars (Mustache) source to a JS ES module (ADR-016) with no
 -- | partials registered (`{{> p}}` then renders `""`, as the interpreter does for
@@ -170,22 +204,42 @@ compileMinJs = compileMinJsWith []
 -- | rejected with a `DisallowedShape` (loud, never a miscompile): a *recursive*
 -- | partial and a *dynamic-name* partial/parent (`{{>* }}` / `{{<* }}`).
 compileMinJsWith :: Array (Tuple String String) -> String -> Either ParseError String
-compileMinJsWith partialSrcs src = do
+compileMinJsWith = compileWithSeed "rt.truthyMustache"
+
+-- | Compile MinBars source to JS under the `mustache.js`-compat truthiness — the
+-- | compiled twin of `renderMinCompat` (seeds `rt.truthyHandlebars`, the runtime's
+-- | `mustache.js` rule; `compile_conformance.mjs` asserts byte-identity with the
+-- | interpreter). No partials registered.
+compileMinJsCompat :: String -> Either ParseError String
+compileMinJsCompat = compileMinJsCompatWith []
+
+-- | `compileMinJsCompat` with named partials.
+compileMinJsCompatWith :: Array (Tuple String String) -> String -> Either ParseError String
+compileMinJsCompatWith = compileWithSeed "rt.truthyHandlebars"
+
+-- | Compile MinBars source seeding the root stack with the named runtime
+-- | truthiness callback (`rt.truthyMustache` for the spec default,
+-- | `rt.truthyHandlebars` for the `mustache.js`-compat reading). Shared by the
+-- | spec and compat compile entries.
+compileWithSeed :: String -> Array (Tuple String String) -> String -> Either ParseError String
+compileWithSeed truthyFn partialSrcs src = do
   { nodes } <- parseMin src
   partials <- Map.fromFoldable <$> traverse parsePartial partialSrcs
   inlined <- inline partials Map.empty Nil 0 (desugar nodes)
-  Right (compile minMeta minEmit [] inlined)
+  Right (compile (minMeta truthyFn) minEmit [] inlined)
   where
   parsePartial (Tuple name s) = parseMin s <#> \r -> Tuple name (desugar r.nodes)
 
--- | The MinBars compile metadata: the runtime version, a module-level `$truthy`
--- | **callback** bound to the fixed `mustache` rule (ADR-022 — truthiness is only
--- | ever a `Value -> Boolean` callback), and the root-stack seed.
-minMeta :: { runtimeVersion :: String, preamble :: String, seed :: String }
-minMeta =
+-- | The MinBars compile metadata: the runtime version, an empty preamble, and the
+-- | root-stack seed binding the module-level `$truthy` **callback** to the named
+-- | runtime truthiness rule (ADR-022 — truthiness is only ever a `Value -> Boolean`
+-- | callback). `truthyFn` is `rt.truthyMustache` (spec) or `rt.truthyHandlebars`
+-- | (the `mustache.js`-compat rule).
+minMeta :: String -> { runtimeVersion :: String, preamble :: String, seed :: String }
+minMeta truthyFn =
   { runtimeVersion
   , preamble: ""
-  , seed: "rt.mseed(data, rt.truthyMustache)"
+  , seed: "rt.mseed(data, " <> truthyFn <> ")"
   }
 
 -- | Resolve partials and inheritance into a partial-free, inheritance-free

@@ -40,8 +40,8 @@ import FlatBars.Syntax (Expr(..), Node(..), Sigil(..), Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Engine, Operation)
 import Kernel.Env (liftEither, recursionBudget)
-import Kernel.Value (escapeHtml, mustache, stringify)
-import MinBars.Context (MinEnv, blookup, enterPartial, layerBlocks, minBlocks, minDepth, minPartials, mresolve, push)
+import Kernel.Value (escapeHtml, stringify)
+import MinBars.Context (MinEnv, blookup, enterPartial, layerBlocks, minBlocks, minDepth, minPartials, minTruthy, mresolve, push)
 
 -- | The MinBars engine over any `MonadThrow Error m`. `resolve` is closed: the
 -- | five fixed helper names map to their helpers; an unknown name (which the
@@ -99,7 +99,7 @@ sectionH ctl args = case args of
     let
       items = case v of
         VArray xs -> xs
-        _ -> if mustache v then [ v ] else []
+        _ -> if minTruthy ctl.env v then [ v ] else []
     in
       (VSafe <<< joinWith "")
         <$> traverse (\it -> ctl.render (push it ctl.env) ctl.children) items
@@ -110,7 +110,7 @@ sectionH ctl args = case args of
 invertedH :: forall m. MonadThrow Error m => Operation m MinEnv
 invertedH ctl args = case args of
   [ v ] ->
-    if not (mustache v) then VSafe <$> ctl.render ctl.env ctl.children
+    if not (minTruthy ctl.env v) then VSafe <$> ctl.render ctl.env ctl.children
     else pure (VSafe "")
   _ -> throwError (HelperError "inverted: expected exactly one argument")
 

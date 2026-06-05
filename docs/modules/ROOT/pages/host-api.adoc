@@ -154,7 +154,10 @@ exposes the engine's *analysis* tools over plain JS data: `analyze(template, dat
 portability — `{ ok, findings, report, jsonata, output }`, ADR-022), `lint(template, dialect)`
 (deprecated-alias + non-canonical-scoped-variable warnings — `{ ok, findings, report }`), and
 `migrate(template)` (Handlebars → MaxBars source with a residual report — `{ ok, source, residuals }`).
-The Lab and the `/analyse` + `/lint` tutorials drive these.
+The Lab and the `/analyse` + `/lint` tutorials drive these. For MinBars, `renderMinbars(template, data)`
+renders under the language-agnostic Mustache rule; `renderMinbarsCompat(template, data)` (and the
+compiled twin `compileMinbarsCompat`) render under `mustache.js` truthiness (`0`/`""` falsy) for hosts
+porting a `mustache.js` codebase — xref:adr-0022-analyse-mode.adoc[ADR-022 S2].
 
 The located-error renderers `renderWithDiag` / `renderSurfaceDiag` (and `formatError`) report a parse
 failure as `line:column: message` (§7.2's `renderParseErrorAt`); the plain `renderWith` /
@@ -183,7 +186,7 @@ example.
 
 | *Truthiness rule*
 | the engine's `Truthy` callback (`Value -> Boolean`), seeded into the env — no falsy-set data, no `@truthiness` directive
-| `handlebars` (FullBars), `nonEmpty` (RawBars/MaxBars), `mustache` (MinBars) — xref:adr-0022-analyse-mode.adoc[ADR-022]
+| `handlebars` (FullBars), `nonEmpty` (RawBars/MaxBars), `mustache` (MinBars, the language-agnostic spec rule; opt into the `mustacheJs` rule — `0`/`""` falsy — via the compat render/compile entries) — xref:adr-0022-analyse-mode.adoc[ADR-022]
 
 | *Set-delimiter support*
 | whether the `LexConfig.mustacheDelims` knob is enabled — does `pass:[{{=A B=}}]` switch the active delimiter pair, or raise a `DisallowedShape`?

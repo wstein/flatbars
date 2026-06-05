@@ -25,20 +25,24 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMustache, renderWith, renderRawWith, renderMaxWith, safe } =
+const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsCompat, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMinbarsCompat, renderMustache, renderWith, renderRawWith, renderMaxWith, safe } =
   await import(enginePath);
 
 // Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
-// "maxbars" (FullBars + infix/pipes/loop vars), "minbars" (Mustache), or core.
+// "maxbars" (FullBars + infix/pipes/loop vars), "minbars" (Mustache, spec
+// truthiness), "minbars-compat" (Mustache under mustache.js' 0/"" -falsy rule), or
+// core. The compat pair gates that the mustache.js render and compile agree too.
 const interpreterFor = (dialect) =>
   dialect === "surface" ? renderSurface
     : dialect === "maxbars" ? renderMaxbars
     : dialect === "minbars" ? renderMinbars
+    : dialect === "minbars-compat" ? renderMinbarsCompat
     : render;
 const compilerFor = (dialect) =>
   dialect === "surface" ? compileSurface
     : dialect === "maxbars" ? compileMaxbars
     : dialect === "minbars" ? compileMinbars
+    : dialect === "minbars-compat" ? compileMinbarsCompat
     : compile;
 
 // Render with the interpreter (the spec), in the case's dialect. A `minbars`

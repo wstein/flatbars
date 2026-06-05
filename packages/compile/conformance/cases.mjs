@@ -384,4 +384,16 @@ export const cases = [
   { name: "bhm:falsy-empty", dialect: "surface", t: "[{{#person}}{{name}}{{/person}}]", d: { person: false } },
   { name: "bhm:empty-array-else", dialect: "surface", t: "{{#tags}}{{.}}{{else}}none{{/tags}}", d: { tags: [] } },
   { name: "bhm:nested-section", dialect: "surface", t: "{{#user}}{{name}}: {{#roles}}{{.}} {{/roles}}{{/user}}", d: { user: { name: "Ada", roles: ["admin", "dev"] } } },
+
+  // ── MinBars mustache.js-compat truthiness (ADR-022, the renderMinbarsCompat /
+  // compileMinbarsCompat pair) ────────────────────────────────────────────────
+  // mustache.js skips a section on `!value`, so 0 and "" are FALSY (unlike the
+  // language-agnostic spec rule, where they are truthy). These gate that the
+  // compat render and the compat compile agree byte-for-byte on exactly that flip
+  // (section + inverted together); {} stays truthy and [] falsy in both rules.
+  { name: "mjs:zero-falsy", dialect: "minbars-compat", t: "{{#n}}has{{/n}}{{^n}}none{{/n}}", d: { n: 0 } },
+  { name: "mjs:empty-string-falsy", dialect: "minbars-compat", t: "{{#s}}has{{/s}}{{^s}}none{{/s}}", d: { s: "" } },
+  { name: "mjs:nonzero-truthy", dialect: "minbars-compat", t: "{{#n}}has{{/n}}{{^n}}none{{/n}}", d: { n: 5 } },
+  { name: "mjs:empty-object-truthy", dialect: "minbars-compat", t: "{{#o}}has{{/o}}{{^o}}none{{/o}}", d: { o: {} } },
+  { name: "mjs:empty-array-falsy", dialect: "minbars-compat", t: "{{#xs}}x{{/xs}}{{^xs}}none{{/xs}}", d: { xs: [] } },
 ];

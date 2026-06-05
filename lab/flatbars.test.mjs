@@ -124,11 +124,14 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   const r = await createFlatBarsRenderer();
   assert.equal(typeof r.analyze, "function");
   assert.ok(r.engineInfo().features.includes("analyse"));
-  // an empty string in a condition diverges (falsy in handlebars, truthy elsewhere).
+  // an empty string in a condition diverges (falsy in handlebars/mustache.js,
+  // truthy under the spec/Ruby Mustache rule and the others).
   const a = r.analyze({ source: "{{#if bio}}x{{/if}}" }, { bio: "" });
   assert.ok(a.ok, a.error);
   assert.match(a.report, /1 portability finding/);
   assert.match(a.report, /data path: `bio`/);
+  // the report legend distinguishes mustache.js (= the engine rule) from spec Mustache.
+  assert.match(a.report, /mustache\.js/);
   assert.match(a.jsonata, /"bio": bio = "" \? null : bio/);
   // structured findings drive the Truthiness dock panel.
   assert.equal(a.findings.length, 1);
@@ -136,7 +139,7 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   assert.equal(f.line, 1);
   assert.equal(f.tag, "{{#if bio}}");
   assert.equal(f.path, "bio");
-  assert.deepEqual(f.flips, ["mustache", "minimal", "presence"]);
+  assert.deepEqual(f.flips, ["mustache-spec", "minimal", "presence"]);
   assert.match(f.value, /empty string/);
   assert.match(f.fix, /ne s/);
   // false agrees under every rule — no finding.

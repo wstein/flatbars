@@ -48,9 +48,23 @@ its implementations stay introspectable.
   shape interpret/desugar/validate/compile already use ("don't call FlatBars, FlatBars calls you").
   FullBars plugs in the Handlebars rule; *RawBars and MaxBars plug in `nonEmpty`* (`false null "" [] {}`
   falsy — `0` truthy, every empty container falsy; the dialects deliberately diverge in value policy since
-  RawBars/MaxBars are not Handlebars clones); MinBars plugs in the Mustache rule. *There is no per-file
+  RawBars/MaxBars are not Handlebars clones); MinBars plugs in the language-agnostic Mustache rule
+  (`mustache`: `false null []` falsy, `0`/`""`/`{}` truthy — the Ruby/Python implementations).
+  *There is no per-file
   override* — the engine's rule is the only rule a template runs under, swapped in at the dialect's render
-  and compile entry points (interpreter via `withTruthy`; compiler via the seeded runtime callback).
+  and compile entry points (interpreter via `withTruthy` for the FlatBars dialects, the `MinEnv.truthy`
+  field for MinBars; compiler via the seeded runtime callback).
++
+[NOTE]
+S2 amendment — *MinBars `mustache.js`-compat mode.* The dominant JavaScript Mustache, `mustache.js`,
+does not follow the spec rule above: it skips a section on `!value`, so `0` and `""` are falsy there (and
+an empty list renders zero times), which is *identical to the `handlebars` rule*. `Kernel.Value` therefore
+defines `mustacheJs = handlebars` as a self-documenting alias, and MinBars exposes an opt-in compat path
+that seeds it instead of `mustache` — `renderMinbarsCompat` / `compileMinbarsCompat` in the JS facade,
+`renderMinCompat` in the engine, and `flatbars --mustache-js` on the CLI. The spec rule stays MinBars'
+default (so the 184/184 conformance is untouched); the compat path is for hosts porting a `mustache.js`
+codebase that need byte-for-byte section behaviour. The interpreter/compiler agreement on the compat rule
+is gated by the `minbars-compat` cases in the compile-conformance harness.
 
 . *The built-in rules are named `Value -> Boolean` predicates.* `Kernel.Value` keeps `handlebars`,
   `nonEmpty`, `mustache` (the engine rules) plus `minimal`/`presence` (analyse comparison rules) as the
@@ -115,7 +129,11 @@ engine rule); the *per-file configurability* — the actual over-engineering —
 ----
 +
 [[divergence]]*3a. Divergence is computed by replaying the named-rule lambdas* (Part A.2) against the
-recorded `value` — `handlebars`/`mustache`/`minimal`/`presence`. No `FalsyShape` introspection is needed;
+recorded `value` — `handlebars`/`mustache-spec`/`minimal`/`presence`. The Mustache comparison rule is
+labelled `mustache-spec` (not plain `mustache`) precisely because `mustache.js` follows the
+`handlebars` rule, not the spec one: it never diverges from the engine here, so the report's legend says
+so and a `mustache.js` reader is not misled by a `mustache-spec` flip that does not apply to them (the S1
+clarification). No `FalsyShape` introspection is needed;
 this is *simpler* than the original set-replay design and depends only on the menu of built-in rules
 surviving (it does). A finding is a `Decision` whose `value` is one of the ambiguous four **and**
 `diverges` is non-empty. Decisions on `false`/`null`/non-empty values are recorded too and surface as

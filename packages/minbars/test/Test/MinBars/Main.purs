@@ -16,7 +16,7 @@ import Effect.Console (log)
 import FlatBars.Lexer (RawTok(..), tokenizeTemplate)
 import FlatBars.Token (LexOptions, tokenizeInterior)
 import FlatBars.Value (Value(..))
-import MinBars (minOptions, renderMin, renderMinDelimsDiag, renderMinWith)
+import MinBars (minOptions, renderMin, renderMinCompat, renderMinDelimsDiag, renderMinWith)
 import MinBars.Standalone (mustacheStandalone)
 import Test.Assert (assert')
 
@@ -65,6 +65,14 @@ expectP name partials src dat expected = case renderMinWith partials src dat of
 -- | Assert with a custom INITIAL delimiter pair (the `--mustache --delimiters` path).
 expectD :: String -> { open :: String, close :: String } -> String -> Value -> String -> Effect Unit
 expectD name d src dat expected = case renderMinDelimsDiag d src dat of
+  Left err -> assert' (name <> ": unexpected error: " <> err) false
+  Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
+    (out == expected)
+
+-- | Assert under the `mustache.js`-compat truthiness (`renderMinCompat`): the
+-- | `flatbars --mustache-js` path, where `0`/`""` are falsy (ADR-022).
+expectC :: String -> String -> Value -> String -> Effect Unit
+expectC name src dat expected = case renderMinCompat src dat of
   Left err -> assert' (name <> ": unexpected error: " <> err) false
   Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
     (out == expected)
@@ -122,10 +130,22 @@ main = do
   expectM "section-false" "{{#flag}}NO{{/flag}}" (obj [ Tuple "flag" (VBool false) ]) ""
   expectM "section-null" "{{#flag}}NO{{/flag}}" (obj [ Tuple "flag" VNull ]) ""
   expectM "section-empty-array" "{{#xs}}NO{{/xs}}" (obj [ Tuple "xs" (arr []) ]) ""
-  -- Mustache truthiness: 0, "", {} are TRUTHY (unlike Handlebars).
+  -- Mustache (spec) truthiness: 0, "", {} are TRUTHY (unlike Handlebars).
   expectM "section-zero-truthy" "{{#n}}T{{/n}}" (obj [ Tuple "n" (num 0.0) ]) "T"
   expectM "section-emptystr-truthy" "{{#s}}T{{/s}}" (obj [ Tuple "s" (str "") ]) "T"
   expectM "section-emptyobj-truthy" "{{#o}}T{{/o}}" (obj [ Tuple "o" (obj []) ]) "T"
+
+  -- mustache.js-compat truthiness (`renderMinCompat`, the `--mustache-js` path):
+  -- 0 and "" flip to FALSY (mustache.js' `!value` reading), while {} stays truthy
+  -- and [] stays falsy — so only the "ambiguous two" differ from the spec rule
+  -- above. The inverted section is the mirror. (ADR-022 S2.)
+  expectC "compat-zero-falsy" "{{#n}}T{{/n}}{{^n}}F{{/n}}" (obj [ Tuple "n" (num 0.0) ]) "F"
+  expectC "compat-emptystr-falsy" "{{#s}}T{{/s}}{{^s}}F{{/s}}" (obj [ Tuple "s" (str "") ]) "F"
+  expectC "compat-nonzero-truthy" "{{#n}}T{{/n}}{{^n}}F{{/n}}" (obj [ Tuple "n" (num 5.0) ]) "T"
+  expectC "compat-emptyobj-truthy" "{{#o}}T{{/o}}{{^o}}F{{/o}}" (obj [ Tuple "o" (obj []) ]) "T"
+  expectC "compat-empty-array-falsy" "{{#xs}}T{{/xs}}{{^xs}}F{{/xs}}" (obj [ Tuple "xs" (arr []) ])
+    "F"
+  expectC "compat-false-falsy" "{{#b}}T{{/b}}{{^b}}F{{/b}}" (obj [ Tuple "b" (VBool false) ]) "F"
   -- section over an object: pushed as context, inner names resolve.
   expectM "section-object" "{{#user}}{{name}}={{age}}{{/user}}"
     (obj [ Tuple "user" (obj [ Tuple "name" (str "Ada"), Tuple "age" (num 36.0) ]) ])

@@ -11,6 +11,7 @@ module Kernel.Value
   , presence
   , nonEmpty
   , mustache
+  , mustacheJs
   , stringify
   , jsonStringify
   , jsonStringifyPretty
@@ -89,17 +90,35 @@ nonEmpty = case _ of
   VObject o -> not (Map.isEmpty o)
   VNumber _ -> true
 
--- | `mustache` (`false null []`): the Mustache rule — `false`, `null`, and the
--- | empty *array* are falsy, but `0`, `""`, and `{}` are **truthy**. Distinct
--- | from `presence` (which also makes `{}` falsy) and from `handlebars` (which
--- | also makes `""`/`0` falsy). This is MinBars' fixed rule; the spec suite would
--- | fail if `0`/`""` were treated as falsy.
+-- | `mustache` (`false null []`): the language-agnostic Mustache rule — `false`,
+-- | `null`, and the empty *array* are falsy, but `0`, `""`, and `{}` are
+-- | **truthy**. Distinct from `presence` (which also makes `{}` falsy) and from
+-- | `handlebars` (which also makes `""`/`0` falsy). This is MinBars' default rule:
+-- | it matches the reference Ruby/Python Mustache implementations and the parts of
+-- | the spec suite that exercise sections (no fixture pins `0`/`""` truthiness, so
+-- | both readings stay 184/184 — this is a deliberate spec-fidelity choice, not a
+-- | conformance requirement). Note `mustache.js`, the dominant JS implementation,
+-- | does *not* follow this rule — it skips a section on `!value`, making `0`/`""`
+-- | falsy. That JS reading is `mustacheJs` below; hosts targeting `mustache.js`
+-- | render through MinBars' opt-in compat mode (`renderMinJs`).
 mustache :: Truthy
 mustache = case _ of
   VBool b -> b
   VNull -> false
   VArray a -> not (Array.null a)
   _ -> true
+
+-- | `mustacheJs`: the truthiness of `mustache.js` (the dominant JavaScript
+-- | Mustache). It renders a section unless `!value`, so `false`/`null`/`0`/`""`
+-- | (and `NaN`) are falsy and an empty list renders zero times, with `{}` truthy
+-- | — which is *identical* to the `handlebars` rule. It is therefore defined as
+-- | an alias: the value semantics are the same callback, and the distinct name
+-- | documents intent at the call site (MinBars' `mustache.js`-compat render seeds
+-- | this instead of `mustache`, ADR-022). The contrast with the language-agnostic
+-- | `mustache` rule above (`0`/`""` truthy) is the portability hazard analyse mode
+-- | surfaces.
+mustacheJs :: Truthy
+mustacheJs = handlebars
 
 -- | Convert a value to output text. This engine never escapes here (escaping is
 -- | the `escapeHtml` helper); arrays join with `","` and objects are an error.

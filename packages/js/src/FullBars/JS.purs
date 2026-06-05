@@ -19,11 +19,13 @@ module FullBars.JS
   , renderSurface
   , renderMaxbars
   , renderMinbars
+  , renderMinbarsCompat
   , astJson
   , compile
   , compileSurface
   , compileMaxbars
   , compileMinbars
+  , compileMinbarsCompat
   , compileMinbarsWithPartials
   , compileFor
   , renderSurfaceWithPartials
@@ -195,8 +197,15 @@ renderMaxbars :: Fn2 String Json Result
 renderMaxbars = mkFn2 \tpl json -> result (MaxBars.renderMax tpl (fromJson json))
 
 -- | Render a MinBars (Mustache) template against JS data. `renderMinbars(template, data)`.
+-- | Uses the language-agnostic Mustache rule (`0`/`""` truthy).
 renderMinbars :: Fn2 String Json Result
 renderMinbars = mkFn2 \tpl json -> result (MinBars.renderMinDiag tpl (fromJson json))
+
+-- | Render a MinBars template under the **`mustache.js`-compatible** truthiness
+-- | (`0`/`""` falsy, like Handlebars) — for hosts porting a `mustache.js` codebase
+-- | (ADR-022). `renderMinbarsCompat(template, data)`.
+renderMinbarsCompat :: Fn2 String Json Result
+renderMinbarsCompat = mkFn2 \tpl json -> result (MinBars.renderMinCompat tpl (fromJson json))
 
 -- | Render a surface template with a set of named partials (each a surface
 -- | source). `renderSurfaceWithPartials(partials, template, data)`, where
@@ -363,8 +372,15 @@ compileMaxbars :: Fn1 String Result
 compileMaxbars = mkFn1 \tpl -> compileResultAt tpl (MaxBars.compileMaxJs tpl)
 
 -- | Compile a MinBars (Mustache) template to JS (ADR-016). `compileMinbars(template)`.
+-- | Seeds the language-agnostic Mustache rule (`0`/`""` truthy).
 compileMinbars :: Fn1 String Result
 compileMinbars = mkFn1 \tpl -> compileResultAt tpl (MinBars.compileMinJs tpl)
+
+-- | Compile a MinBars template to JS under the **`mustache.js`-compatible**
+-- | truthiness (`0`/`""` falsy) — the compiled twin of `renderMinbarsCompat`.
+-- | `compileMinbarsCompat(template)`.
+compileMinbarsCompat :: Fn1 String Result
+compileMinbarsCompat = mkFn1 \tpl -> compileResultAt tpl (MinBars.compileMinJsCompat tpl)
 
 -- | Compile a MinBars template to JS with a set of named partials (each a
 -- | Mustache source); `{{> name}}` is inlined. `compileMinbarsWithPartials(partials, template)`,

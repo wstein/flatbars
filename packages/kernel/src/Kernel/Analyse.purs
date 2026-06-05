@@ -61,11 +61,17 @@ type AnalyseM = WriterT (Array Decision) (Either Error)
 
 -- | The named, data-backed rules Part B replays to decide divergence (ADR-022
 -- | Part A.2). `handlebars` is the engine rule the analysed FullBars render uses;
--- | the others are the cross-engine comparison set.
+-- | the others are the cross-engine comparison set. `mustache-spec` is the
+-- | language-agnostic Mustache reading (`0`/`""` truthy, the Ruby/Python
+-- | implementations) — deliberately *not* labelled plain `mustache`, because
+-- | `mustache.js` (the dominant JS Mustache) follows the `handlebars` rule instead
+-- | (`0`/`""` falsy), so it never diverges from the engine here. The report's
+-- | legend spells that out, so a reader on `mustache.js` is not misled by a
+-- | `mustache-spec` flip that does not apply to them (ADR-022 S1).
 namedRules :: Array (Tuple String Truthy)
 namedRules =
   [ Tuple "handlebars" handlebars
-  , Tuple "mustache" mustache
+  , Tuple "mustache-spec" mustache
   , Tuple "minimal" minimal
   , Tuple "presence" presence
   ]
@@ -174,6 +180,11 @@ reportMarkdown src decisions =
           <> " condition(s) evaluated, **"
           <> show (Array.length flagged)
           <> " portability finding(s)**"
+      , ""
+      , "_The engine `handlebars` rule is also `mustache.js`' (`0`/`\"\"` falsy), so a"
+          <> " finding's `flips under` names the engines that branch the *other* way —"
+          <> " `mustache-spec` is the language-agnostic Mustache/Ruby reading (`0`/`\"\"`"
+          <> " truthy), not `mustache.js`._"
       , ""
       ]
         <>

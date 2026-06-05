@@ -77,10 +77,22 @@ const groups = [
     </div>
     <p>
       <code>false</code> and <code>null</code> are falsy everywhere — portable. The other four are
-      not: <code>0</code> is falsy in Handlebars but truthy in Mustache;
+      not: <code>0</code> is falsy in Handlebars but truthy in the
+      <b>language-agnostic Mustache</b> rule (the Ruby/Python implementations);
       <code>""</code> the same; <code>[]</code> varies; <code>{t("{}")}</code> is truthy almost
       everywhere but falsy under the <code>presence</code> rule. Test one of these in a
       condition and your template can render a different branch on someone else's engine.
+    </p>
+    <p class="tip">
+      One sharp edge worth naming: <b><code>mustache.js</code></b>, the dominant JavaScript
+      Mustache, does <em>not</em> follow that spec rule — it skips a section on
+      <code>!value</code>, so <code>0</code> and <code>""</code> are falsy there, exactly as in
+      Handlebars. So the report labels the spec reading <code>mustache-spec</code> and its legend
+      notes that the engine's <code>handlebars</code> rule is also <code>mustache.js</code>' — a
+      <code>mustache-spec</code> flip does <em>not</em> apply to a <code>mustache.js</code> target.
+      (FlatBars' own MinBars defaults to <code>mustache-spec</code>; render with
+      <code>flatbars --mustache-js</code> or <code>renderMinbarsCompat</code>
+      for byte-for-byte <code>mustache.js</code> truthiness.)
     </p>
     <p>
       <b>Analyse mode</b> finds these without guessing. It <em>renders your template
@@ -97,13 +109,14 @@ const groups = [
     <h2>Empty string</h2>
     <p>
       The user left the field blank, so the value is <code>""</code>. Handlebars treats
-      that as falsy and shows the <code>{t("{{else}}")}</code> branch; Mustache treats it
-      as truthy and shows the filled branch — same template, two outputs.
+      that as falsy and shows the <code>{t("{{else}}")}</code> branch; spec Mustache treats it
+      as truthy and shows the filled branch — same template, two outputs. (<code>mustache.js</code>
+      sides with Handlebars here.)
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.emptyString.template} data={ex.emptyString.data} />
     <div class="verdict">
       <b>1 portability finding.</b> <code>{t("{{#if bio}}")}</code> tested an empty string at
-      data path <b>bio</b>; it flips under <code>mustache</code> and <code>minimal</code>.
+      data path <b>bio</b>; it flips under <code>mustache-spec</code> and <code>minimal</code>.
       <span class="fix">Fix — test it explicitly so the decision doesn't ride on the host's
       rule: <code>{t("{{#if (ne bio \"\")}}")}</code>.</span>
     </div>
@@ -113,9 +126,9 @@ const groups = [
   <section id="zero">
     <h2>Zero</h2>
     <p>
-      <code>0</code> is the canonical divergence: falsy in Handlebars, truthy in Mustache
-      and the minimal/presence rules. "0 unread" silently becomes "all caught up" on the
-      wrong engine.
+      <code>0</code> is the canonical divergence: falsy in Handlebars (and
+      <code>mustache.js</code>), truthy under spec Mustache and the minimal/presence rules.
+      "0 unread" silently becomes "all caught up" on the wrong engine.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.zero.template} data={ex.zero.data} />
     <div class="verdict">
@@ -142,9 +155,9 @@ const groups = [
       <code>{t("{{#each items}}…{{else}}empty{{/each}}")}</code>.</span>
     </div>
     <p>
-      An empty <b>object</b> is the non-obvious one: truthy in <em>both</em> Handlebars and
-      Mustache, so it looks safe — but it flips under the <code>presence</code> rule. The
-      analyser still catches it.
+      An empty <b>object</b> is the non-obvious one: truthy in Handlebars,
+      <code>mustache.js</code>, <em>and</em> spec Mustache, so it looks safe — but it flips under
+      the <code>presence</code> rule. The analyser still catches it.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.emptyObject.template} data={ex.emptyObject.data} />
     <div class="verdict">

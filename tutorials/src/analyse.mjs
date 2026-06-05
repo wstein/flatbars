@@ -15,25 +15,28 @@
 // `""`, `[]`, `{}` — are the values whose truthiness differs across engines.
 
 export const examples = {
-  // An empty string is falsy in Handlebars but truthy in Mustache/minimal — the
-  // classic "user typed nothing, so we showed the empty branch on one engine and
-  // the filled branch on another" bug.
+  // An empty string is falsy in Handlebars *and* mustache.js, but truthy under the
+  // language-agnostic (spec/Ruby) Mustache rule and `minimal` — the classic "user
+  // typed nothing, so we showed the empty branch on one engine and the filled
+  // branch on another" bug. The report legend names mustache.js explicitly so a JS
+  // reader isn't misled by the `mustache-spec` flip.
   emptyString: {
     engine: "fullbars",
     template: "{{#if bio}}{{bio}}{{else}}(no bio yet){{/if}}",
     data: { bio: "" },
     finds: 1,
-    expect: ["1 portability finding", "empty string", "data path: `bio`", "(ne s"],
+    expect: ["1 portability finding", "empty string", "data path: `bio`", "(ne s", "mustache.js", "flips under `mustache-spec`"],
   },
-  // Zero is the canonical Handlebars↔Mustache divergence: falsy in Handlebars,
-  // truthy everywhere else. `includeZero=true` keeps it truthy on Handlebars, but
-  // the portable fix is to test explicitly.
+  // Zero diverges between the two Mustache readings: falsy in Handlebars *and*
+  // mustache.js, truthy under spec/Ruby Mustache, `minimal`, and `presence`.
+  // `includeZero=true` keeps it truthy on Handlebars, but the portable fix is to
+  // test explicitly.
   zero: {
     engine: "fullbars",
     template: "{{#if count}}{{count}} unread{{else}}all caught up{{/if}}",
     data: { count: 0 },
     finds: 1,
-    expect: ["1 portability finding", "the number `0`", "includeZero=true", "data path: `count`"],
+    expect: ["1 portability finding", "the number `0`", "includeZero=true", "data path: `count`", "flips under `mustache-spec`"],
   },
   // An empty array (falsy in Handlebars/Mustache, but the report still steers you
   // to the engine-agnostic spelling) — iterate with `{{#each}}…{{else}}` so the
@@ -45,8 +48,8 @@ export const examples = {
     finds: 1,
     expect: ["1 portability finding", "empty array", "{{#each"],
   },
-  // An empty object is truthy in BOTH Handlebars and Mustache; it flips only under
-  // the `presence` rule — the non-obvious case the report still catches.
+  // An empty object is truthy in Handlebars, mustache.js, AND spec Mustache; it
+  // flips only under the `presence` rule — the non-obvious case the report catches.
   emptyObject: {
     engine: "fullbars",
     template: "{{#if profile}}has profile{{else}}none{{/if}}",
