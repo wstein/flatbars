@@ -32,7 +32,7 @@ const intro = sections[0].cells[0];
 
 <Reference
   title="Localization"
-  subtitle="FlatBars ships no i18n — it is the host's job (ADR-029). This runnable guide is the Lab acting as the host: a `t` helper wired to the browser's native Intl, so plurals and number formatting come from the platform, not a vendored library."
+  subtitle="FlatBars ships no i18n — it is the host's job (ADR-029). Until you wire a host translator, the i18n ops render their key/value verbatim — you ship untranslated strings (analyse mode flags exactly this). This guide is the Lab acting as the host: one translator seeded onto the engine's i18n seam, backed by the browser's native Intl, so plurals and number formatting come from the platform, not a vendored library."
   groups={groups}
   dialect="fullbars"
 >
@@ -69,11 +69,16 @@ const intro = sections[0].cells[0];
       in. FlatBars <em>does</em> ship a blessed <code>t</code> operation
       (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029</a>):
       <code>{`{{t "key"}}`}</code> is catalogued, validated, and editor-painted, and on
-      its own it simply returns the key. What it does <b>not</b> ship is the i18n
-      <em>brain</em> — that is the <b>host's</b> job. The host registers <code>t</code>
-      to look a key up in its catalogue, pick the right plural form, and fill in the
-      placeholders; that registration shadows the fallback. The template never
-      changes — <code>{`{{t "key" count=n}}`}</code>, like any other operation.
+      its own it simply returns the key — <b>so a template that uses <code>t</code>
+      with no host wired ships its keys verbatim</b> (analyse mode flags this). What
+      FlatBars does <b>not</b> ship is the i18n <em>brain</em> — that is the
+      <b>host's</b> job. The host seeds <em>one</em> translator onto the engine's
+      first-class i18n seam (<code>registerTranslator</code> in the compiled runtime,
+      <code>withTranslator</code> in PureScript — the i18n analogue of the truthiness
+      seam, <b>not</b> <code>registerHelper</code>); it drives <code>t</code> /
+      <code>number</code> / <code>date</code> together — looking a key up, picking the
+      plural form, filling the placeholders. The template never changes —
+      <code>{`{{t "key" count=n}}`}</code>, like any other operation.
     </p>
     <div class="lz-flow" aria-label="key to output">
       <span class="box">{`{{t "key" count=n}}`}</span><span class="arr">→</span>
