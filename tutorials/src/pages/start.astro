@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // "Getting started" — the on-ramp (NOT a fifth reference). It gets you rendering
-// in one example, helps you pick a dialect by the job, teaches the one discipline
-// that keeps templates simple (shape data in the host), names the one real trap
-// (truthiness) and how to disarm it, then shows the moment MaxBars earns its keep.
+// in MaxBars (the promoted flagship surface — the only one with the full
+// expressiveness), helps you pick a smaller dialect when a constraint calls for it,
+// teaches the one discipline that keeps templates simple (shape data in the host),
+// and names the one real trap (truthiness) and how to disarm it.
 //
 // Per the team consensus, this page forks NO normative prose (theory lives in
 // concepts.adoc, linked) and adds NO example corpus: every runnable beat reuses an
 // already-gated example object, shown through the same mechanism its home gate
 // validates — so the page inherits coverage:
-//   • mustache.hello / mustache.truthyZero / fullbars.ifBlock / maxbars.comparison
+//   • maxbars.intro / mustache.truthyZero / fullbars.ifBlock / maxbars.comparison
 //       → plain render, gated by scripts/check-tutorial-links.mjs
 //   • analyse.zero  → the cross-engine point; its analyze() finding is gated by
 //       scripts/check-tutorial-tooling.mjs (here it is a plain FullBars render that
@@ -42,23 +43,23 @@ const groups = [
   {
     label: "References",
     items: [
-      { href: "/minbars", label: "MinBars (Mustache)" },
+      { href: "/maxbars", label: "MaxBars (flagship)" },
       { href: "/transform", label: "Data shaping" },
       { href: "/analyse", label: "Truthiness" },
     ],
   },
   {
     label: "Play",
-    items: [{ href: "/lab/index.html?engine=minbars", label: "FlatBars Lab ↗" }],
+    items: [{ href: "/lab/index.html?engine=maxbars", label: "FlatBars Lab ↗" }],
   },
 ];
 ---
 
 <Reference
   title="Getting started"
-  subtitle="Render your first template, pick the dialect that fits the job, and keep templates simple by shaping data in the host — plus the one truthiness trap and how to disarm it."
+  subtitle="Render your first template in MaxBars — the flagship surface with the full expressiveness — then learn the one habit that keeps templates simple, the one truthiness trap, and when a smaller dialect fits the job."
   groups={groups}
-  dialect="minbars"
+  dialect="maxbars"
   spec="concepts"
 >
   <style>
@@ -80,11 +81,13 @@ const groups = [
     <h2>Your first template</h2>
     <p>
       A template is just text with <code>{t("{{ }}")}</code> holes that data fills in.
-      Edit the template or the data below and watch it render — through the same engine
-      the FlatBars Lab ships.
+      This is <b>MaxBars</b>, the flagship surface — here a pipe (<code>| capitalize</code>)
+      and a helper (<code>count</code>) already showing the full expressiveness. Edit the
+      template or the data below and watch it render — through the same engine the FlatBars
+      Lab ships.
     </p>
-    <OpenInLab client:visible engine="minbars" template={mustache.hello.template} data={mustache.hello.data} />
-    <p>That's the whole loop: <em>template + data → text</em>. Now let's pick the right tool.</p>
+    <OpenInLab client:visible engine="maxbars" template={maxbars.intro.template} data={maxbars.intro.data} />
+    <p>That's the whole loop: <em>template + data → text</em>. MaxBars is what we recommend by default; next, when you'd reach for a smaller surface instead.</p>
   </section>
 
   <!-- ─────────────────────────── 2 · Which dialect? ───────────────────────── -->
@@ -92,15 +95,17 @@ const groups = [
     <h2>Which dialect?</h2>
     <p>
       FlatBars isn't one language — it's a meaning-free core with four surfaces built on
-      it. They aren't tiers of quality; pick by your <b>constraint</b>, not by prestige.
+      it. <b>MaxBars is the flagship: the full expressiveness, and what we recommend by
+      default.</b> Reach for a smaller surface only when a specific <b>constraint</b> calls
+      for it — they aren't tiers of quality, they trade features for guarantees.
     </p>
     <table class="choose">
       <thead><tr><th>Your job</th><th>Use</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
-          <td>Logic-less email / CMS snippets; Mustache parity</td>
-          <td><a href="/minbars">MinBars</a></td>
-          <td>the smallest surface — one sitting to learn it all; 184/184 of the Mustache spec</td>
+          <td>App views with real expressions (<code>x &gt; 3</code>, pipes, loop vars) — the default</td>
+          <td><a href="/maxbars">MaxBars</a></td>
+          <td>the flagship — infix operators, pipes, bare loop variables; the only surface with the full expressiveness</td>
         </tr>
         <tr>
           <td>Importing existing Handlebars templates</td>
@@ -108,9 +113,9 @@ const groups = [
           <td>Handlebars-faithful (49/50 vs the real engine); your team already knows it</td>
         </tr>
         <tr>
-          <td>App views with real expressions (<code>x &gt; 3</code>, pipes, loop vars)</td>
-          <td><a href="/maxbars">MaxBars</a></td>
-          <td>the flagship surface — infix operators, pipes, bare loop variables</td>
+          <td>Logic-less email / CMS snippets; Mustache parity</td>
+          <td><a href="/minbars">MinBars</a></td>
+          <td>the smallest surface — one sitting to learn it all; 184/184 of the Mustache spec</td>
         </tr>
         <tr>
           <td>Building your own engine on the core</td>
@@ -120,10 +125,9 @@ const groups = [
       </tbody>
     </table>
     <p class="tip">
-      It's a superset ladder — RawBars ⊂ FullBars ⊂ MaxBars — plus logic-less MinBars
-      off to the side. The <a href="/minbars">MinBars reference</a> is the recommended
-      place to <em>learn the language</em>; the rest of this page is the recommended
-      first ten minutes.
+      It's a superset ladder — RawBars ⊂ FullBars ⊂ MaxBars — plus logic-less MinBars off
+      to the side. <a href="/maxbars">MaxBars</a> gives you everything the others do and
+      more, so it's the recommended default; this page's first ten minutes use it.
     </p>
   </section>
 
@@ -186,10 +190,11 @@ const groups = [
 
   <!-- ─────────────────────────── 5 · Outgrow {{#if}} ──────────────────────── -->
   <section id="outgrow">
-    <h2>When <code>{t("{{#if}}")}</code> isn't enough → MaxBars</h2>
+    <h2>Why the flagship: real expressions</h2>
     <p>
-      Start where your team is. In FullBars a condition is a Handlebars
-      <b>subexpression</b> — a helper application, <code>{t("(gte score 90)")}</code>:
+      Here's the expressiveness in one comparison. Coming from Handlebars, a condition is a
+      <b>subexpression</b> — a helper application, <code>{t("(gte score 90)")}</code>
+      (FullBars, on the left):
     </p>
     <div class="pair">
       <div>
@@ -202,10 +207,11 @@ const groups = [
       </div>
     </div>
     <p>
-      The day <code>{t("(gte score 90)")}</code> wants to read <code>score &gt;= 90</code>
-      — with <code>&amp;&amp;</code>, pipes (<code>value | helper</code>), and bare loop
-      variables — that's <a href="/maxbars">MaxBars</a>. It's the same engine and prelude
-      as FullBars, just an expression surface on top; you don't restart, you grow into it.
+      <a href="/maxbars">MaxBars</a> reads it as <code>score &gt;= 90</code> — with
+      <code>&amp;&amp;</code>, pipes (<code>value | helper</code>), and bare loop variables.
+      That's the full expressiveness, and why it's the recommended default. It's the same
+      engine and prelude as FullBars, just an expression surface on top — so if you do start
+      on a smaller dialect, you grow into MaxBars without restarting.
     </p>
   </section>
 
@@ -213,9 +219,9 @@ const groups = [
   <section id="next">
     <h2>Where to go next</h2>
     <ul>
-      <li><a href="/minbars">MinBars</a> — learn the whole logic-less language, tag by tag.</li>
-      <li><a href="/maxbars">MaxBars</a> — the expressive flagship: infix, pipes, loop variables.</li>
+      <li><a href="/maxbars">MaxBars</a> — the expressive flagship, tag by tag: infix, pipes, loop variables. <b>Start here.</b></li>
       <li><a href="/transform">Data shaping</a> — the JSONata habit from section 3, in depth.</li>
+      <li><a href="/minbars">MinBars</a> — the whole logic-less language, if you need Mustache parity.</li>
       <li><a href="/lint">Linting &amp; migration</a> — keep templates canonical, import Handlebars.</li>
     </ul>
   </section>
