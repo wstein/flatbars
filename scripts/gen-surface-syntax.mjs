@@ -71,6 +71,18 @@ for (const s of surfaces) {
   }
 }
 
+// Deep-link integrity: every surface route must resolve to a real tutorial page
+// (the Lab's "Full reference →" link and the per-page reference both rely on it).
+for (const s of surfaces) {
+  const page = resolve(root, "tutorials", "src", "pages", s.route.replace(/^\//, "") + ".astro");
+  try {
+    readFileSync(page);
+  } catch {
+    console.error(`✗ surface "${s.id}": route ${s.route} has no tutorial page (${s.route.replace(/^\//, "")}.astro).`);
+    process.exit(1);
+  }
+}
+
 // ── write or check ────────────────────────────────────────────────────────────
 if (process.argv.includes("--check")) {
   const labCur = readFileSync(labFile, "utf8");

@@ -256,6 +256,48 @@ const TEMPLATE = `
   }
 
   @media (prefers-reduced-motion: reduce) { .bar { backdrop-filter: none; } }
+
+  /* -- Reference capability (opt-in via the reference attribute) -- */
+  .ref-btn {
+    color: var(--fg-muted, #5b4d92);
+    background: none;
+    border: 1px solid var(--border-strong, #c8bff2);
+    border-radius: var(--radius, 6px);
+    font: 600 13px/1 var(--font-ui, sans-serif);
+    display: inline-flex; align-items: center; gap: 0.35em;
+    padding: 6px 10px; cursor: pointer; white-space: nowrap;
+  }
+  .ref-btn[hidden] { display: none; }
+  .ref-btn:hover { color: var(--accent-2, #4c1d95); border-color: var(--accent, #6d28d9); }
+  .ref-btn:focus-visible { outline: 2px solid var(--accent, #6d28d9); outline-offset: 2px; }
+  .ref-btn .ico { font-size: 0.95em; }
+
+  .ref-modal { position: fixed; inset: 0; z-index: 1000; }
+  .ref-modal[hidden] { display: none; }
+  .ref-backdrop { position: absolute; inset: 0; background: rgba(20, 16, 40, 0.45); }
+  .ref-dialog {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(720px, 92vw); max-height: min(80vh, 720px); overflow: auto;
+    background: var(--bg, #fff); color: var(--fg, #18181b);
+    border: 1px solid var(--border-strong, #c8bff2); border-radius: var(--radius-lg, 12px);
+    box-shadow: var(--shadow-pop, 0 24px 60px -12px rgba(0,0,0,.35));
+    padding: 1.25rem 1.25rem 1rem;
+  }
+  .ref-close {
+    position: sticky; top: 0; float: right; margin: -0.5rem -0.5rem 0 0;
+    background: none; border: 0; font-size: 1.5rem; line-height: 1;
+    color: var(--fg-muted, #5b4d92); cursor: pointer; padding: 0.25rem 0.5rem;
+  }
+  .ref-close:hover { color: var(--accent-2, #4c1d95); }
+  .ref-close:focus-visible { outline: 2px solid var(--accent, #6d28d9); outline-offset: 2px; }
+  /* Mobile: dock the dialog as a bottom sheet. */
+  @media (max-width: 560px) {
+    .ref-dialog {
+      top: auto; bottom: 0; left: 0; transform: none;
+      width: 100%; max-height: 85vh; border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) { .ref-modal { } }
 </style>
 
 <header class="bar" part="bar">
@@ -271,6 +313,10 @@ const TEMPLATE = `
 
   <div class="tools" id="tools" part="tools">
     <slot name="tools"></slot>
+    <button class="ref-btn" id="refBtn" type="button" part="reference-button"
+            aria-haspopup="dialog" aria-expanded="false" hidden>
+      <span class="ico" aria-hidden="true">▤</span><span class="label">Reference</span>
+    </button>
     <a class="search" id="search" part="search">
       <span class="ico" aria-hidden="true">⌕</span><span class="label">Search</span><kbd>/</kbd>
     </a>
@@ -286,6 +332,15 @@ const TEMPLATE = `
     </a>
   </div>
 </header>
+
+<div class="ref-modal" id="refModal" hidden>
+  <div class="ref-backdrop" id="refBackdrop" part="reference-backdrop"></div>
+  <div class="ref-dialog" id="refDialog" part="reference-dialog" role="dialog" aria-modal="true"
+       aria-label="Surface reference" tabindex="-1">
+    <button class="ref-close" id="refClose" type="button" aria-label="Close reference">×</button>
+    <slot name="reference"></slot>
+  </div>
+</div>
 `;
 
 // Conditional base so the module is importable in plain Node (where HTMLElement
@@ -295,7 +350,7 @@ const Base = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
 class FlatBarsTopbar extends Base {
   static get observedAttributes() {
-    return ["section", "base", "version", "repo", "search", "lab-engine"];
+    return ["section", "base", "version", "repo", "search", "lab-engine", "reference", "reference-label"];
   }
 
   constructor() {
@@ -308,6 +363,10 @@ class FlatBarsTopbar extends Base {
     this._onMore = this._onMore.bind(this);
     this._onStorage = this._onStorage.bind(this);
     this._onKey = this._onKey.bind(this);
+    this._openReference = this._openReference.bind(this);
+    this._closeReference = this._closeReference.bind(this);
+    this._refOpen = false;
+    this._refReturn = null;
   }
 
   // ── attribute helpers (accept `x` or `data-x`) ──
@@ -335,6 +394,9 @@ class FlatBarsTopbar extends Base {
     this.shadowRoot.getElementById("ctx").addEventListener("click", this._onCtxClick);
     this.shadowRoot.getElementById("brand").addEventListener("click", this._onBrandClick);
     this.shadowRoot.getElementById("more").addEventListener("click", this._onMore);
+    this.shadowRoot.getElementById("refBtn").addEventListener("click", this._openReference);
+    this.shadowRoot.getElementById("refClose").addEventListener("click", this._closeReference);
+    this.shadowRoot.getElementById("refBackdrop").addEventListener("click", this._closeReference);
     window.addEventListener("storage", this._onStorage);
     document.addEventListener("keydown", this._onKey);
     this._syncTheme();
@@ -388,6 +450,16 @@ class FlatBarsTopbar extends Base {
 
     // GitHub.
     root.getElementById("gh").href = this._attr("repo", DEFAULT_REPO);
+
+    // Reference capability: opt-in via the `reference` attribute. The host fills
+    // <… slot="reference"> with the (surface-aware) reference content; the element
+    // owns the accessible dialog shell (open/close/ESC/focus-trap/return-focus).
+    const refOn = this._attr("reference", "") && this._attr("reference", "") !== "off";
+    const refBtn = root.getElementById("refBtn");
+    refBtn.hidden = !refOn;
+    const refLabel = this._attr("reference-label", "");
+    if (refLabel) refBtn.querySelector(".label").textContent = refLabel;
+    if (!refOn && this._refOpen) this._closeReference();
   }
 
   // ── theme ──
@@ -448,6 +520,12 @@ class FlatBarsTopbar extends Base {
     more.setAttribute("aria-expanded", String(open));
   }
   _onKey(e) {
+    // Reference dialog: ESC closes; Tab is trapped within the dialog.
+    if (this._refOpen) {
+      if (e.key === "Escape") { e.preventDefault(); this._closeReference(); return; }
+      if (e.key === "Tab") this._trapTab(e);
+      return;
+    }
     // "/" focuses search (unless typing in a field).
     const t = e.target;
     const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
@@ -455,6 +533,51 @@ class FlatBarsTopbar extends Base {
       e.preventDefault();
       this.shadowRoot.getElementById("search").focus();
     }
+  }
+
+  // ── reference dialog (open/close + focus management) ──
+  // Focusables span the shadow close button AND the host's slotted content, so we
+  // collect both for the Tab trap.
+  _refFocusables() {
+    const sel = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const inDialog = [...this.shadowRoot.getElementById("refDialog").querySelectorAll(sel)];
+    const slotted = this.querySelector('[slot="reference"]');
+    const inSlot = slotted ? [...slotted.querySelectorAll(sel)] : [];
+    return [...inDialog, ...inSlot].filter((el) => el.offsetParent !== null || el === this.shadowRoot.getElementById("refClose"));
+  }
+  _trapTab(e) {
+    const f = this._refFocusables();
+    if (!f.length) { e.preventDefault(); return; }
+    const path = e.composedPath();
+    const first = f[0], last = f[f.length - 1];
+    const onFirst = path.includes(first);
+    const onLast = path.includes(last);
+    if (e.shiftKey && onFirst) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && onLast) { e.preventDefault(); first.focus(); }
+    else if (!f.some((el) => path.includes(el))) { e.preventDefault(); first.focus(); }
+  }
+  _openReference() {
+    if (this._refOpen) return;
+    const modal = this.shadowRoot.getElementById("refModal");
+    modal.hidden = false;
+    this._refOpen = true;
+    this.shadowRoot.getElementById("refBtn").setAttribute("aria-expanded", "true");
+    // Remember focus to restore on close; move focus into the dialog.
+    let active = document.activeElement;
+    while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
+    this._refReturn = active;
+    const f = this._refFocusables();
+    (f[0] || this.shadowRoot.getElementById("refDialog")).focus();
+    this.dispatchEvent(new CustomEvent("flatbars:reference", { detail: { open: true }, bubbles: true, composed: true }));
+  }
+  _closeReference() {
+    if (!this._refOpen) return;
+    this.shadowRoot.getElementById("refModal").hidden = true;
+    this._refOpen = false;
+    this.shadowRoot.getElementById("refBtn").setAttribute("aria-expanded", "false");
+    if (this._refReturn && typeof this._refReturn.focus === "function") this._refReturn.focus();
+    this._refReturn = null;
+    this.dispatchEvent(new CustomEvent("flatbars:reference", { detail: { open: false }, bubbles: true, composed: true }));
   }
 }
 

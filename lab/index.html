@@ -18,7 +18,7 @@
          generated into the `@chrome` fence in the inline <style> below by
          `npm run gen:tokens` (from shared/flatbars-chrome.css), inline so they are
          in place before first paint. -->
-    <script type="module" src="./vendor/flatbars-topbar.mjs?v=2"></script>
+    <script type="module" src="./vendor/flatbars-topbar.mjs?v=3"></script>
     <style>
       /* ── Design tokens ───────────────────────────────────────────── */
       :root {
@@ -607,6 +607,29 @@
       /* A lexer error span (ADR-014): today `highlightSpans` degrades to no
          spans, so this is the defensive style for the `error` kind. */
       .cm-hb-error   { text-decoration: underline wavy #ef4444; text-decoration-skip-ink: none; }
+      /* Surface-aware Reference popup content (slotted into <flatbars-topbar>). The
+         topbar owns the dialog shell; these style the host-provided body. */
+      .sref-tabs { display: flex; gap: 4px; margin-bottom: 10px; }
+      .sref-tab {
+        font: 600 13px var(--font-mono, ui-monospace, monospace); padding: 5px 12px;
+        border: 1px solid var(--border, #d0d7de); background: var(--bg-2, #f6f8fa);
+        color: var(--fg-muted, #57606a); border-radius: 6px; cursor: pointer;
+      }
+      .sref-tab[aria-selected="true"] { background: var(--accent-soft, #efe7fb); color: var(--accent-2, #4c1d95); border-color: var(--accent, #6d28d9); }
+      .sref-tab:focus-visible { outline: 2px solid var(--accent, #6d28d9); outline-offset: 2px; }
+      .sref-title { font-size: 1.05rem; margin: 4px 0 2px; }
+      .sref-tagline { color: var(--fg-muted, #57606a); font-size: 0.84rem; margin: 0 0 10px; }
+      .sref-truthy code { font-size: 0.78em; padding: 0.05em 0.35em; border-radius: 4px; background: var(--bg-2, #f6f8fa); border: 1px solid var(--border, #d0d7de); }
+      .sref-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+      .sref-table th { text-align: left; font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border, #d0d7de); }
+      .sref-table tbody th { white-space: nowrap; }
+      .sref-table td { padding: 4px 8px; border-bottom: 1px solid var(--border, #d0d7de); vertical-align: top; }
+      .sref-table code { font-family: var(--font-mono, ui-monospace, monospace); white-space: nowrap; }
+      .sref-foot { margin: 12px 0 0; } .sref-foot a { color: var(--accent-2, #4c1d95); font-weight: 600; text-decoration: none; }
+      .sref-foot a:hover { text-decoration: underline; }
+      .sref-legend { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+      .sref-legend li { display: flex; align-items: baseline; gap: 8px; font-size: 0.85rem; }
+      .sref-legend code { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 700; }
 
       /* YAML scalar keywords (true/false/null/…) and numbers — the YAML grammar
          leaves these as plain content, so they are highlighted via a decorator. */
@@ -1353,7 +1376,7 @@
            context switcher (Home · Tutorials · Spec · Lab) and the Theme control;
            `base` is set at runtime from the path so the switcher resolves on every
            origin, and its link-search is off (the workbench has its own Search). ── -->
-      <flatbars-topbar section="lab" version="v0.1.0" search="off"></flatbars-topbar>
+      <flatbars-topbar section="lab" version="v0.1.0" search="off" reference="on" reference-label="Reference"><div slot="reference" id="refContent"></div></flatbars-topbar>
       <script>
         // Resolve the umbrella base from the path so the switcher links are right
         // on every origin (/lab/ at root in dev, /flatbars/lab/ in production), and
@@ -1628,6 +1651,9 @@
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
+      // Per-surface syntax/policy deltas (projection of shared/surface-syntax.json)
+      // for the topbar's surface-aware Reference popup.
+      import { SURFACE_SYNTAX } from "./surface-syntax.mjs?v=1";
       import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=59";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
@@ -1743,6 +1769,54 @@
       // The three FlatBars dialect engines share one adapter; the engine name
       // fixes the dialect it renders.
       const BB_DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
+
+      // ── Surface-aware Reference popup ───────────────────────────────────────
+      // Fill the shared topbar's `reference` slot with the active surface's deltas
+      // (the single source, projected into surface-syntax.mjs) + a token-role
+      // colour key. The topbar owns the accessible dialog shell; this owns content.
+      // The Lab is single-dialect per load, so this builds once (no re-render).
+      (function wireReference() {
+        const surface = SURFACE_SYNTAX.find((s) => s.id === ENGINE);
+        const bar = document.querySelector("flatbars-topbar");
+        const host = document.getElementById("refContent");
+        if (!surface || !host) { if (bar) bar.removeAttribute("reference"); return; }
+        const esc = (t) => String(t).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+        const route = "../" + surface.route.replace(/^\//, ""); // Lab sits one level under the tutorials root
+        const rows = surface.rows
+          .map((r) => `<tr><th scope="row">${esc(r.feature)}</th><td><code>${esc(r.syntax)}</code></td><td>${esc(r.note)}</td></tr>`)
+          .join("");
+        const ROLES = [
+          ["tk-keyword", "{{#each}}", "Braces & keywords"],
+          ["tk-operation", "upcase", "Operation / partial"],
+          ["tk-string", '"admin"', "String literal"],
+          ["tk-number", "90", "Number literal"],
+          ["tk-delim", "{{=<% %>=}}", "Set delimiter"],
+          ["tk-comment", "{{! note }}", "Comment"],
+        ];
+        const legend = ROLES.map(([cls, sample, label]) => `<li><code class="${cls}">${esc(sample)}</code><span>${esc(label)}</span></li>`).join("");
+        host.innerHTML = `
+          <div class="sref-tabs" role="tablist" aria-label="Reference views">
+            <button role="tab" id="sref-tab-ref" aria-controls="sref-panel-ref" aria-selected="true" data-tab="ref" class="sref-tab">Reference</button>
+            <button role="tab" id="sref-tab-col" aria-controls="sref-panel-col" aria-selected="false" data-tab="col" class="sref-tab">Colours</button>
+          </div>
+          <h2 class="sref-title">${esc(surface.label)} — surface reference</h2>
+          <p class="sref-tagline">${esc(surface.tagline)} <span class="sref-truthy">truthiness <code>${esc(surface.truthiness.rule)}</code> · falsy <code>${esc(surface.truthiness.falsy)}</code></span></p>
+          <div class="sref-panel" id="sref-panel-ref" role="tabpanel" aria-labelledby="sref-tab-ref" data-panel="ref">
+            <table class="sref-table"><thead><tr><th>Feature</th><th>Syntax</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>
+            <p class="sref-foot"><a href="${route}">Full ${esc(surface.label)} reference →</a></p>
+          </div>
+          <div class="sref-panel" id="sref-panel-col" role="tabpanel" aria-labelledby="sref-tab-col" data-panel="col" hidden>
+            <p class="sref-tagline">Inner-token colours mark a token's <em>role</em> — painted by the real engine in the editor.</p>
+            <ul class="sref-legend">${legend}</ul>
+          </div>`;
+        host.addEventListener("click", (e) => {
+          const tab = e.target.closest("[data-tab]");
+          if (!tab) return;
+          const which = tab.dataset.tab;
+          host.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === which)));
+          host.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== which; });
+        });
+      })();
       // Stem needs its wasm binary. If it is absent the dev server returns a 404
       // HTML page (not wasm) and WebAssembly.instantiate throws — so probe the
       // bytes (check the `\0asm` magic word) and fall back to FullBars rather than
