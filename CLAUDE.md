@@ -16,7 +16,13 @@ Astro Starlight site (MDX) — `spec/src/content/docs/concepts.mdx` is the faste
 way to understand the core model; `engine/host-api.mdx` defines the API `core`
 exposes. `npm run build:spec` builds it (Pagefind offline search +
 `starlight-links-validator`); the palette comes from the shared design system via
-`customCss` (the shared tokens + IBM Plex + violet accent + logo). The spec was
+`customCss` (the shared tokens + IBM Plex + violet accent + logo). The spec joins
+the umbrella chrome through Starlight component overrides
+(`spec/src/components/`): `Header.astro` replaces the native top bar with the
+shared `<flatbars-topbar>` (Pagefind `<Search/>` rides in its `tools` slot, the
+mobile menu toggle is kept), `ThemeProvider.astro` is the umbrella single-key
+anti-flash seed, and `ThemeSelect.astro` is empty (the element is the sole theme
+control). The sidebar, TOC and search are otherwise unchanged. The spec was
 migrated from Antora/AsciiDoc to Starlight in ADR-031; the `.mdx` are the
 maintained source (the one-time converter is gone), and the helper catalog is
 generated into `spec/src/partials/helper-catalog.mdx` from `FullBars.Catalog`.

@@ -35,6 +35,7 @@ const CANON = norm(`(function () {
 const SURFACES = {
   "shared/theme-seed.js": "the canonical seed (documented inline form)",
   "tutorials/src/components/BaseHead.astro": "the tutorials <head>",
+  "spec/src/components/ThemeProvider.astro": "the Starlight spec ThemeProvider override",
 };
 
 // In theme-seed.js the canonical form lives in a doc comment, so strip the

@@ -1,0 +1,24 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// Starlight ThemeProvider OVERRIDE — the umbrella anti-flash seed. It sets
+// html[data-theme] from the single shared `flatbars-theme` key before first
+// paint (replacing Starlight's own `starlight-theme` seed) so a reader's
+// light/dark choice persists across the whole umbrella (tutorials, spec, Lab).
+// The shared <flatbars-topbar> (this spec's Header override) is the sole Theme
+// control — Starlight's native picker is suppressed by the ThemeSelect override.
+// `check:theme-seed` pins this copy against shared/theme-seed.js.
+---
+
+<script is:inline>
+  (function () {
+    try {
+      var k = "flatbars-theme";
+      var t = localStorage.getItem(k);
+      if (t !== "light" && t !== "dark") {
+        t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      document.documentElement.dataset.theme = t;
+    } catch (e) {}
+  })();
+</script>

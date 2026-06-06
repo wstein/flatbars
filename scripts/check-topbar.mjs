@@ -26,6 +26,7 @@ const MOUNT = "<flatbars-topbar";
 // Surfaces that mount the shared element.
 const MOUNTS = {
   "tutorials/src/components/Topbar.astro": "the tutorials topbar",
+  "spec/src/components/Header.astro": "the Starlight spec header override",
 };
 // Surfaces still carrying the hand-written lockup (migrated in later phases).
 const LOCKUPS = {

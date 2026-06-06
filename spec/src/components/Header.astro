@@ -1,0 +1,37 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// Starlight Header OVERRIDE — replaces the spec's native top bar with the shared
+// umbrella <flatbars-topbar> (the SAME element the tutorials app and the static
+// Lab mount), so the Starlight spec joins one chrome. The element owns the
+// wordmark, the context switcher (Home · Tutorials · Spec · Lab) and the Theme
+// control; the spec keeps its own sidebar, table-of-contents and Pagefind search.
+//
+// Starlight's real <Search/> (Pagefind) rides in the element's `tools` slot so
+// search is unchanged; the element's own link-search is therefore `off`. The
+// mobile sidebar <MobileMenuToggle/> is kept — it fixes itself to the viewport.
+// The chrome tokens the element reads come from shared/flatbars-chrome.css.
+import Search from "@astrojs/starlight/components/Search.astro";
+import MobileMenuToggle from "@astrojs/starlight/components/MobileMenuToggle.astro";
+import "../../../shared/flatbars-chrome.css";
+
+// The spec mounts at `${PUBLIC_SPEC_BASE}` (e.g. /flatbars/spec); the umbrella
+// root is that minus the trailing /spec. Empty in standalone dev (links then
+// resolve at the root, where the sibling apps aren't served — expected).
+const SPEC_BASE = process.env.PUBLIC_SPEC_BASE || "";
+const BASE = SPEC_BASE.replace(/\/$/, "").replace(/\/spec$/, "");
+---
+
+<flatbars-topbar section="spec" base={BASE} version="v0.1.0" suffix="DOCS" search="off">
+  <Search />
+</flatbars-topbar>
+<MobileMenuToggle />
+
+<script>
+  // Define the shared custom element on the client (the import is a side effect).
+  import "../../../shared/flatbars-topbar.mjs";
+
+  // Astro consumes a literal `slot` on a plain element's child, so assign the
+  // element's `tools` slot (Starlight's Pagefind search) at runtime.
+  document.querySelector("flatbars-topbar site-search")?.setAttribute("slot", "tools");
+</script>

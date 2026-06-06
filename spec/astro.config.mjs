@@ -71,6 +71,27 @@ export default defineConfig({
       description: "The normative specification for FlatBars — a template-engine construction kit.",
       // The design system: the generated token palette plus spec-local chrome.
       customCss: ["./src/styles/flatbars-tokens.css", "./src/styles/spec.css"],
+      // Join the umbrella chrome: the shared <flatbars-topbar> replaces the native
+      // header, the umbrella anti-flash seed replaces Starlight's theme provider,
+      // and the native theme picker is suppressed (the element owns it). The
+      // sidebar, TOC and Pagefind search are unchanged.
+      components: {
+        Header: "./src/components/Header.astro",
+        ThemeProvider: "./src/components/ThemeProvider.astro",
+        ThemeSelect: "./src/components/ThemeSelect.astro",
+      },
+      // IBM Plex — the umbrella's UI/mono families the shared topbar reads.
+      head: [
+        { tag: "link", attrs: { rel: "preconnect", href: "https://fonts.googleapis.com" } },
+        { tag: "link", attrs: { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: true } },
+        {
+          tag: "link",
+          attrs: {
+            rel: "stylesheet",
+            href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap",
+          },
+        },
+      ],
       // Build-time link integrity — the replacement for Antora's xref guarantee.
       // It is the GATE, run in the base-less build (`npm run build:spec`), where
       // authored root-absolute links match routes 1:1. The production build sets a

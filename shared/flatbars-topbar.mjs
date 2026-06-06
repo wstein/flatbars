@@ -28,7 +28,10 @@
 //   suffix    small wordmark suffix, e.g. "Lab" or "Docs" (default none)
 //   version   plain version label beside the wordmark, e.g. "v0.1.0" (default none)
 //   repo      GitHub URL (default the FlatBars repo)
-//   search    where the search affordance routes (default `${base}/spec/`)
+//   search    where the search affordance routes (default `${base}/spec/`);
+//             set "off" to hide the built-in link — e.g. the spec slots its own
+//             Pagefind search into the `tools` slot instead
+
 //   lab-engine default engine for the Lab link, e.g. "minbars"
 //
 // Events (both bubble + composed; cancelable):
@@ -160,6 +163,7 @@ const TEMPLATE = `
     white-space: nowrap;
   }
   .search:hover { color: var(--accent-2, #4c1d95); border-color: var(--accent, #6d28d9); }
+  .search[hidden] { display: none; }
   .search .ico { font-size: 13px; }
   .search kbd {
     font: 600 10px/1 var(--font-mono, monospace);
@@ -377,10 +381,18 @@ class FlatBarsTopbar extends Base {
       return `<a href="${this._href(s)}${eng}" data-section="${s}"${cur}>${LABELS[s]}</a>`;
     }).join("");
 
-    // Search affordance — defaults to the spec index (Pagefind lives there).
+    // Search affordance — a link to the spec index (Pagefind lives there) for
+    // apps without their own search. `search="off"` hides it (the spec slots its
+    // own Pagefind search into `tools`).
     const search = root.getElementById("search");
-    search.href = this._attr("search", `${this.base}/spec/`);
-    search.title = "Search the FlatBars docs";
+    const searchUrl = this._attr("search", `${this.base}/spec/`);
+    if (searchUrl === "off") {
+      search.hidden = true;
+    } else {
+      search.hidden = false;
+      search.href = searchUrl;
+      search.title = "Search the FlatBars docs";
+    }
 
     // GitHub.
     root.getElementById("gh").href = this._attr("repo", DEFAULT_REPO);

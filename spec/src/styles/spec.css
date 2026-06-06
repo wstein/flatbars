@@ -7,6 +7,19 @@
   --sl-color-accent-low: var(--c-violet-tint, #2a1f3d);
   --sl-color-accent: var(--c-violet, #8b5cf6);
   --sl-color-accent-high: var(--c-violet-bright, #c4b5fd);
+  /* Match Starlight's reserved nav band to the shared topbar's 52px height, so
+     the sidebar/TOC `top` offsets and the content padding line up with it. */
+  --sl-nav-height: 3.25rem;
+}
+
+/* The shared <flatbars-topbar> (the Header override) IS the bar now — it carries
+   its own background, blur and border. Neutralise Starlight's native header band
+   so the element's chrome is the only thing that shows (customCss is unlayered,
+   so this beats Starlight's @layer starlight.core .header rules). */
+.header {
+  padding: 0;
+  background: transparent;
+  border-bottom: 0;
 }
 
 /* Live engine pane (ADR-031): edit a template + data, see real engine output. */
