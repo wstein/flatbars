@@ -1,0 +1,61 @@
+/* @generated from shared/flatbars-tokens.css by `npm run gen:tokens` — do not edit. */
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * The single source of truth for the FlatBars seven-family syntax palette — the
+ * one genuinely-unified design system across the front-ends. It feeds, in order:
+ *   • the tutorials highlighter (`.stem-*`) and chip control,
+ *   • the FlatBars Lab editor (`.cm-hb-*`),
+ *   • the inline prose tags, and
+ *   • the colour legend.
+ * The invariant: the legend can never disagree with the examples, because they
+ * read the same tokens.
+ *
+ * This file is the ONLY place to edit these values. They are GENERATED from here
+ * into the two consumers' fenced `@palette` regions by `scripts/gen-tokens.mjs`:
+ *   • tutorials/src/styles/lab-tokens.css   (Astro bundles it)
+ *   • lab/index.html                        (the static Lab serves it inline)
+ * Run `npm run gen:tokens` after editing; `npm run check:tokens` (in `npm test`)
+ * fails if a copy has drifted. (We generate rather than share one runtime file so
+ * nothing new has to be served/deployed and the Lab keeps its own cache-busting.)
+ *
+ * THEME: a **Dracula** (dark) / **Alucard** (light) code palette, AA-corrected for
+ * our own backgrounds. The chrome stays violet (Dracula owns only the seven syntax
+ * families); the Chips control (tint/outline/solid) is unchanged.
+ * Two deliberate departures from the upstream Dracula/Alucard spec:
+ *   1. `raw` stays a deep-green SIBLING of `expr` (not danger-red). Raw output is
+ *      still an interpolation, so it reads in the interpolation family; the `{{{ }}}`
+ *      sigil already signals "handle with care", and red would collide with `delim`.
+ *   2. Several values are nudged a few points darker/lighter than canonical so they
+ *      clear **WCAG AA (4.5:1)** on OUR tint/page/solid surfaces (canonical Dracula
+ *      `comment #6272a4` is ~3.1:1 here — below AA — so we ship `#8a97cc`).
+ * Every value is machine-verified by `npm run check:contrast` (in `npm test`).
+ *
+ * The families: expr (interpolation, escaped), raw (unescaped — handle with
+ * care), block (sections/clauses), partial (composition), inherit (inheritance),
+ * delim (set-delimiters directive), comment. Plus the chip-tint controls.
+ * (Each tag is coloured as one span by its meaning — see ADR-014; interior
+ * literals/operators have no colour of their own.)
+ */
+:root {
+  --c-expr: #187747;
+  --c-raw: #0f6e3a;
+  --c-block: #a8520f;
+  --c-partial: #0e728d;
+  --c-inherit: #6d28d9;
+  --c-delim: #ba2c8b;
+  --c-comment: #54597e;
+  --tint-mix: 12%;
+  --directive-bg: #eceaf1;
+}
+
+[data-theme="dark"] {
+  --c-expr: #50fa7b;
+  --c-raw: #2faf60;
+  --c-block: #ffb86c;
+  --c-partial: #8be9fd;
+  --c-inherit: #bd93f9;
+  --c-delim: #ff79c6;
+  --c-comment: #8a97cc;
+  --tint-mix: 20%;
+  --directive-bg: #363150;
+}

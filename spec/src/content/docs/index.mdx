@@ -1,0 +1,21 @@
+---
+title: FlatBars
+description: The normative specification for FlatBars — a template-engine construction kit.
+---
+
+import HelperCatalog from "../../partials/helper-catalog.mdx";
+
+FlatBars is a template-engine **construction kit**, not a template engine. The core
+is a meaning-free parser; everything you expect from Handlebars/Mustache (helpers,
+escaping, control flow, path semantics) is supplied by an *engine* built on top.
+
+This site is the **contract** the reference implementation targets. It is being
+migrated from Antora (AsciiDoc) to Astro Starlight per ADR-031; pages land here as
+the conversion proceeds.
+
+## Reference engine operations
+
+The table below is generated from `FullBars.preludeSchema` — the single source of
+truth — by `npm run gen:catalog`, the same source the legacy AsciiDoc catalog uses.
+
+<HelperCatalog />

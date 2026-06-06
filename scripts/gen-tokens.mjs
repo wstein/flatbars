@@ -77,7 +77,10 @@ for (const file of TARGETS) {
 // Verbatim copies: a consumer that can't fence the tokens into its own file gets a
 // whole generated copy instead. The Antora supplemental UI serves the palette as a
 // standalone stylesheet its site-extra.css @imports.
-const COPIES = ["docs/supplemental-ui/css/flatbars-tokens.css"];
+const COPIES = [
+  "docs/supplemental-ui/css/flatbars-tokens.css",
+  "spec/src/styles/flatbars-tokens.css",
+];
 const banner = `/* @generated from ${SOURCE} by \`npm run gen:tokens\` — do not edit. */\n`;
 const copyBody = banner + src;
 for (const file of COPIES) {

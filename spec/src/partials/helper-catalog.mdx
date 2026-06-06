@@ -1,0 +1,102 @@
+{/* Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit. */}
+{/* Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`. */}
+
+| Operation | Form | Arity | Source | Description |
+| --- | --- | --- | --- | --- |
+| `abs` | value | 1 | registered | The absolute value of a number. |
+| `add` | value | 2 | registered | Adds two numbers — the `+` operator's helper. |
+| `and` | value | any | registered | True when every argument is truthy. |
+| `append` | value | 2 | registered | Appends the second string to the first. |
+| `apply` | block | ≥1 | registered | Calls a helper named by a string argument with the remaining arguments. |
+| `at` | value | 2 | registered | The element at an index (negative counts from the end). |
+| `capitalize` | value | 1 | registered | Uppercases the first character of its argument. |
+| `ceil` | value | 1 | registered | Rounds a number up to the nearest integer. |
+| `coalesce` | value | ≥1 | registered | Returns the first non-null argument — the `??` operator's helper. |
+| `count` | value | 1 | registered | The number of items in an array (or characters in a string). |
+| `date` | value | ≥1 | registered | Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029). |
+| `dict` | value | any | registered | Builds an object from alternating key/value arguments (the hash target). |
+| `divide` | value | 2 | registered | Divides the first number by the second — the `/` operator's helper. |
+| `downcase` | value | 1 | alias of `lowercase` | Lowercases its argument. |
+| `each` | block | ≥1 | registered | Iterates an array or object, installing the loop's scoped variables per item. |
+| `elif` | value | 1–2 | registered | An else-if clause the enclosing if evaluates; renders nothing on its own. |
+| `else` | value | 0 | registered | A clause separator the enclosing block splits on; renders nothing on its own. |
+| `endsWith` | value | 2 | registered | True when the string ends with the given suffix. |
+| `eq` | value | 2 | registered | True when its two arguments are equal. |
+| `escapeHtml` | value | 1 | registered | HTML-escapes its argument and marks it safe; idempotent on already-safe values. |
+| `escapeJson` | value | 1–2 | registered | Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML. |
+| `false` | value | 0 | registered | The boolean literal false. |
+| `first` | value | 0 | scoped | True on the loop's first iteration. |
+| `floor` | value | 1 | registered | Rounds a number down to the nearest integer. |
+| `groupBy` | value | 2 | registered | Groups an array of objects into an object keyed by a field. |
+| `gt` | value | 2 | registered | True when the first argument is greater than the second. |
+| `gte` | value | 2 | registered | True when the first argument is greater than or equal to the second. |
+| `if` | block | 1–2 | registered | Renders its body when the condition is truthy, else the &#123;&#123;elif&#125;&#125;/&#123;&#123;else&#125;&#125; clauses. |
+| `includes` | value | 2 | registered | True when the subject string or array contains the given value. |
+| `index` | value | 0 | scoped | The current loop item's 0-based index. |
+| `index0` | value | 0 | scoped | The current loop item's 0-based index. |
+| `index1` | value | 0 | scoped | The current loop item's 1-based index. |
+| `inline` | block | ≥1 | registered | Defines a partial from its body, hoisted before rendering; emits nothing. |
+| `isnt` | value | 2 | synonym of `ne` | True when its two arguments are not equal. |
+| `join` | value | 2 | registered | Joins an array into a string with a separator. |
+| `json` | value | 1–2 | registered | Serializes its argument as JSON text (optionally pretty-printed). |
+| `key` | value | 0 | scoped | The current key when iterating an object. |
+| `last` | value | 0 | scoped | True on the loop's last iteration. |
+| `length` | value | 0 | scoped | The number of items in the current loop. |
+| `log` | value | ≥1 | registered | Logs its arguments to the host and returns null. |
+| `lookup` | value | ≥1 | registered | Indexes a value by each key or index in turn, returning null at the first miss. |
+| `lowercase` | value | 1 | registered | Lowercases its argument. |
+| `lt` | value | 2 | registered | True when the first argument is less than the second. |
+| `lte` | value | 2 | registered | True when the first argument is less than or equal to the second. |
+| `minus` | value | 2 | alias of `subtract` | Subtracts the second number from the first. |
+| `modulo` | value | 2 | registered | The remainder of dividing the first number by the second — the `%` operator's helper. |
+| `multiply` | value | 2 | registered | Multiplies two numbers — the `*` operator's helper. |
+| `ne` | value | 2 | registered | True when its two arguments are not equal. |
+| `not` | value | 1 | registered | Logical negation of its argument's truthiness. |
+| `null` | value | 0 | registered | The null literal. |
+| `number` | value | ≥1 | registered | Formats a number for the host's locale (Intl.NumberFormat); returns the number's plain text when no host formatter is registered (ADR-029). |
+| `or` | value | any | registered | True when any argument is truthy. |
+| `parent` | value | 0–1 | scoped | The enclosing block's context (chainable). |
+| `parent-first` | value | 0 | scoped | True on the enclosing loop's first iteration. |
+| `parent-index` | value | 0 | scoped | The enclosing loop's current index. |
+| `parent-key` | value | 0 | scoped | The enclosing loop's current key. |
+| `parent-last` | value | 0 | scoped | True on the enclosing loop's last iteration. |
+| `partial` | value | 2–3 | registered | Renders a registered partial with the given context (the block body is the fallback). |
+| `partial-block` | value | 0 | scoped | Inside a block partial, the caller's block body (the &#123;&#123;> @partial-block&#125;&#125; target). |
+| `pluck` | value | 2 | registered | Extracts a key's value from each object in an array. |
+| `plus` | value | 2 | alias of `add` | Adds two numbers. |
+| `prepend` | value | 2 | registered | Prepends the second string to the first. |
+| `raw` | block | any | registered | A raw block that returns its body verbatim, untouched by the engine. |
+| `relative` | value | ≥2 | registered | Formats a relative time (value, unit) for the host's locale (Intl.RelativeTimeFormat); falls back to a plain English phrasing when no host formatter is registered (ADR-029). |
+| `replace` | value | 3 | registered | Replaces every occurrence of a substring with another. |
+| `reverse` | value | 1 | registered | Reverses an array or string. |
+| `rindex0` | value | 0 | scoped | The current loop item's 0-based index, counting from the end. |
+| `rindex1` | value | 0 | scoped | The current loop item's 1-based index, counting from the end. |
+| `root` | value | 0 | scoped | The root (top-level) context. |
+| `round` | value | 1 | registered | Rounds a number to the nearest integer. |
+| `safe` | value | 1 | registered | Marks its argument as safe (trusted) markup, without escaping. |
+| `selectPlural` | value | ≥1 | registered | Returns the CLDR plural category for a number in the host's locale; falls back to the English one/other rule when no host rule is registered (ADR-029). |
+| `size` | value | 1 | synonym of `count` | The number of items in an array (or characters in a string). |
+| `slice` | value | 2–3 | registered | Returns a substring from a start index to an optional end index. |
+| `sortBy` | value | 2 | registered | Sorts an array of objects by a key. |
+| `split` | value | 2 | registered | Splits a string into an array on a separator. |
+| `startsWith` | value | 2 | registered | True when the string starts with the given prefix. |
+| `subtract` | value | 2 | registered | Subtracts the second number from the first — the `-` operator's helper. |
+| `t` | value | ≥1 | registered | Translates a message key via the host's i18n callback; returns the key unchanged when no translator is registered (ADR-029 fallback-and-flag). |
+| `take` | value | 2 | registered | The first n elements of an array. |
+| `takeRight` | value | 2 | registered | The last n elements of an array. |
+| `this` | value | 0 | registered | The current context. |
+| `times` | value | 2 | alias of `multiply` | Multiplies two numbers. |
+| `toFixed` | value | 2 | registered | Formats a number with a fixed number of decimal places. |
+| `toFloat` | value | 1 | registered | Parses its argument as a floating-point number. |
+| `toInt` | value | 1 | registered | Parses its argument as an integer. |
+| `trim` | value | 1 | registered | Removes leading and trailing whitespace. |
+| `trimEnd` | value | 1 | registered | Removes trailing whitespace. |
+| `trimStart` | value | 1 | registered | Removes leading whitespace. |
+| `true` | value | 0 | registered | The boolean literal true. |
+| `truncate` | value | 2–3 | registered | Shortens a string to a maximum length, appending an optional ellipsis. |
+| `unique` | value | 1 | registered | The array with duplicate elements removed. |
+| `unless` | block | 1–2 | registered | Renders its body when the condition is falsy — the inverse of if. |
+| `upcase` | value | 1 | alias of `uppercase` | Uppercases its argument. |
+| `uppercase` | value | 1 | registered | Uppercases its argument. |
+| `with` | block | ≥1 | registered | Shifts the context to its argument for the body (else the &#123;&#123;else&#125;&#125; clause). |
+| `yield` | value | 0 | scoped | Inside a block partial, the caller's block body (MaxBars' spelling of @partial-block). |
