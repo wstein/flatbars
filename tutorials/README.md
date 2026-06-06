@@ -76,12 +76,24 @@ it ships on the same origin and the footer links resolve (clean URLs under
 domain or a user/org page), drop `PUBLIC_BASE_PATH` (and add a `CNAME`); the links
 then stay root-absolute as authored.
 
-In plain `npm run dev` (no `PUBLIC_SPEC_BASE`) every spec link — the footer "Docs"
-and the per-page "normative reference" links — points at `/flatbars/…` and 404s,
-because the Antora spec isn't built by the dev server. That's expected; the links
-resolve only in the deployed build. The footer "Docs" link is authored through
-`PUBLIC_SPEC_BASE` like the rest, and `check:tutorial-links` fails on a hardcoded
-`/spec/` so it can't regress to the broken-everywhere form.
+In plain `npm run dev` the per-page "normative reference" links point at
+`/flatbars/…` and 404, because the spec is a separate Starlight app the tutorials
+dev server doesn't build. That's expected; they resolve in the deployed build, and
+`check:tutorial-links` fails on a hardcoded `/spec/` so they can't regress to the
+broken-everywhere form.
+
+The shared topbar's **Spec** switcher pill, by contrast, links to `/spec/`, and the
+dev server mounts the *built* spec there (the `serveSpec` plugin, mirroring how the
+Lab is mounted at `/lab/`). So the umbrella switcher works end to end in dev once
+the spec has been built under a matching base — one command:
+
+```sh
+npm run build:spec:local      # ( cd spec && PUBLIC_SPEC_BASE=/spec npm run build )
+```
+
+Until then `/spec/` simply 404s (the plugin falls through). In production the spec
+is built with `PUBLIC_SPEC_BASE=/flatbars/spec` and folded into `dist/spec/`, so the
+pill resolves to `/flatbars/spec/`.
 
 ## How it works
 
