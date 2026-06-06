@@ -29,7 +29,7 @@ import java.io.IOException
 class FlatBarsLspServerDescriptor(project: Project) :
   ProjectWideLspServerDescriptor(project, "FlatBars") {
 
-  override fun isSupportedFile(file: VirtualFile): Boolean = FlatBarsSupport.isSupported(file)
+  override fun isSupportedFile(file: VirtualFile): Boolean = FlatBarsFiles.isSupported(file)
 
   // Render the whole tag bold by installing a semantic-tokens customizer that
   // maps the server's token types to bold text-attribute keys (see

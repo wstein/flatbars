@@ -16,7 +16,7 @@ class FlatBarsLspServerSupportProvider : LspServerSupportProvider {
     file: VirtualFile,
     serverStarter: LspServerSupportProvider.LspServerStarter,
   ) {
-    if (FlatBarsSupport.isSupported(file)) {
+    if (FlatBarsFiles.isSupported(file)) {
       serverStarter.ensureServerStarted(FlatBarsLspServerDescriptor(project))
     }
   }

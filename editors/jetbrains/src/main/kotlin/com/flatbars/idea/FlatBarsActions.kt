@@ -20,7 +20,7 @@ import java.nio.charset.StandardCharsets
 class OpenInLabAction : AnAction("Open in FlatBars Lab") {
   override fun update(e: AnActionEvent) {
     val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
-    e.presentation.isEnabledAndVisible = file != null && FlatBarsSupport.isSupported(file)
+    e.presentation.isEnabledAndVisible = file != null && FlatBarsFiles.isSupported(file)
   }
 
   override fun actionPerformed(e: AnActionEvent) {

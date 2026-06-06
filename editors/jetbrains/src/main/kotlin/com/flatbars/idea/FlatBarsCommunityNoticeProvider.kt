@@ -26,7 +26,7 @@ class FlatBarsCommunityNoticeProvider : EditorNotificationProvider {
     project: Project,
     file: VirtualFile,
   ): Function<in FileEditor, out JComponent?>? {
-    if (!FlatBarsSupport.isSupported(file)) return null
+    if (!FlatBarsFiles.isSupported(file)) return null
     if (PlatformUtils.isIntelliJ() && ApplicationInfo.getInstance().build.productCode == "IU") return null
     if (file.getUserData(DISMISSED) == true) return null
     return Function { _ ->

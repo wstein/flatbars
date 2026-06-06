@@ -3,7 +3,6 @@ package com.flatbars.idea
 
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.vfs.VirtualFile
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -11,18 +10,12 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 /**
- * Shared bits for the FlatBars JetBrains plugin (ADR-017): file-extension
- * recognition, Node executable resolution, and one-time extraction of the
- * bundled engine-backed server.
- *
- * The extension set is single-sourced via [FlatBarsLanguages] (generated from
- * editors/shared/sync.mjs); never inline an extension here.
+ * LSP-layer support for the FlatBars JetBrains plugin (ADR-017): Node executable
+ * resolution and one-time extraction of the bundled engine-backed server. Lives
+ * in the Ultimate-only `src/lsp` source set. File-extension recognition is
+ * [FlatBarsFiles] in `src/main` (the Community paths need it without this layer).
  */
 object FlatBarsSupport {
-  /** True iff the file's extension belongs to a FlatBars dialect. */
-  fun isSupported(file: VirtualFile): Boolean =
-    file.extension?.lowercase() in FlatBarsLanguages.EXTENSIONS
-
   /**
    * Find the `node` executable to run the LSP server with. Honours the user's
    * explicit override (Settings ▸ FlatBars ▸ Node executable) first; if blank,
