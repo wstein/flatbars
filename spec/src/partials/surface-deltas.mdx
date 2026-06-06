@@ -1,0 +1,63 @@
+{/* Generated from shared/surface-syntax.json by scripts/gen-surface-syntax.mjs — do not edit. */}
+{/* Regenerate with `npm run gen:surface-syntax`; CI checks it with `npm run check:surface-syntax`. */}
+
+### RawBars
+
+The desugared core surface — core skeleton syntax, no sugar. Truthiness: `nonEmpty` (falsy: `false  null  ""  []  {}` — 0 is truthy; empty containers are falsy).
+
+| Feature | Syntax | Notes |
+| --- | --- | --- |
+| Output (raw only) | `{{{value}}}` | Triple-stash only; no &#123;&#123; &#125;&#125; auto-escape shorthand. |
+| Field access | `{{{(lookup this "city")}}}` | Explicit lookup helper; no dotted-path sugar. |
+| Escaping | `{{{(escapeHtml x)}}}` | Manual — escaping is a helper, never implicit. |
+| Subexpressions | `(upcase (lookup this "name"))` | Parens group a nested application into one argument. |
+| Blocks | `{{#each xs}} … {{/each}}` | Core block; head is a helper application. |
+| Inverse | `{{#unless ok}} … {{/unless}}` | Inverse via the unless helper — no &#123;&#123;^&#125;&#125; sigil. |
+| Loop variables | `{{{index}}}  {{{first}}}  {{{key}}}` | Bare scoped ops: index, key, first, last, length. No @-data. |
+| Comments | `{{! editorial note }}` | Dropped by the lexer. |
+| Partials | `{{{(partial "name" this)}}}` | Called as the partial helper, unescaped. |
+
+### FullBars
+
+The Handlebars-faithful surface — auto-escape, dotted paths, @-data. Truthiness: `handlebars` (falsy: `false  null  0  ""  []` — &#123;&#125; is truthy; 0 is falsy unless includeZero=true).
+
+| Feature | Syntax | Notes |
+| --- | --- | --- |
+| Output (auto-escape) | `{{value}}` | &#123;&#123; &#125;&#125; auto-escapes; &#123;&#123;&#123; &#125;&#125;&#125; or &#123;&#123;&amp;value&#125;&#125; for raw. |
+| Path access | `{{user.address.city}}` | Dotted paths, parent climb ../x, and @root. |
+| Block params | `{{#each xs as \|item i\|}}` | Rename the loop bindings. |
+| Subexpressions | `{{upcase (concat a b)}}` | Parens group nested applications. |
+| @-data variables | `{{@index}}  {{@key}}  {{@root}}` | Scoped data installed by each / with. |
+| Partials | `{{> sidebar}}   {{> (lookup this "p")}}` | Surface sugar; desugars to the partial helper. |
+| Else / inverse | `{{#each xs}} … {{else}} … {{/each}}` | &#123;&#123;else&#125;&#125; separator; &#123;&#123;^x&#125;&#125; inverted section. |
+| Long comments | `{{!-- note with }} inside --}}` | Handles &#125;&#125; within the comment body. |
+
+### MaxBars
+
+The flagship — FullBars plus infix operators and pipes. Truthiness: `nonEmpty` (falsy: `false  null  ""  []  {}` — 0 is truthy; same rule as RawBars).
+
+| Feature | Syntax | Notes |
+| --- | --- | --- |
+| Infix operators | `{{price * qty}}   {{score >= 90}}` | Desugar to helpers: multiply, gte, and, or, not, coalesce. |
+| Pipes | `{{name \| upcase \| truncate 8}}` | Left value becomes the helper's first argument. |
+| Boolean / coalesce | `{{a && b}}   {{a ?? fallback}}` | &amp;&amp; \|\| ! ?? as infix; group with parens. |
+| Path access | `{{user.city}}   {{root.x}}   {{parent.x}}` | Reserved names instead of @root / ../  (no @-sigil). |
+| Loop variables | `{{index0}}   {{loop.first}}   {{outer.index0}}` | Bare scoped ops or labelled loop / outer chains (ADR-021). |
+| Block params | `{{#each xs as \|item i\|}}` | The as \|…\| bars are distinct from the pipe operator. |
+| Output (auto-escape) | `{{value}}  /  {{{value}}}` | Inherits the FullBars escape model. |
+| Inline / block partials | `{{#inline "name"}} … {{/inline}}   {{yield}}` | Bare yield (no @partial-block); rejects &#123;&#123;^&#125;&#125; and &#123;&#123;#*inline&#125;&#125;. |
+
+### MinBars
+
+Mustache-compatible — logic-less, sections, set-delimiters. Truthiness: `mustache-spec` (falsy: `false  null  []` — 0, "", &#123;&#125; are all truthy (the language-agnostic spec rule)).
+
+| Feature | Syntax | Notes |
+| --- | --- | --- |
+| Output (auto-escape) | `{{value}}   {{{value}}}   {{&value}}` | &#123;&#123; &#125;&#125; escapes; &#123;&#123;&#123; &#125;&#125;&#125; and &#123;&#123;&amp;&#125;&#125; are raw. |
+| Sections | `{{#items}} … {{/items}}` | Shape decides: list iterates, truthy shows once. |
+| Inverted sections | `{{^items}} none {{/items}}` | Renders when the value is falsy / empty. |
+| Implicit iterator | `{{.}}` | The current scalar inside an array section. |
+| Set delimiters | `{{=<% %>=}} … <% x %> … <%={{ }}=%>` | Switch the active pair mid-template — MinBars only (ADR-015). |
+| Partials | `{{> header}}` | Standalone; no context override in base Mustache. |
+| Inheritance | `{{<base}} {{$block}} … {{/block}} {{/base}}` | Parent / block-override template inheritance. |
+| Comments | `{{! note }}` | Dropped by the lexer. |

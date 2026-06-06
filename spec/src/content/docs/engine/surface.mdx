@@ -4,6 +4,8 @@ sidebar:
   label: 5. The surface dialect
 ---
 
+import SurfaceDeltas from "../../../partials/surface-deltas.mdx";
+
 The core is austere by design. *FlatBars Surface* is an optional dialect that recovers Handlebars
 ergonomics. It is *not* a separate parser ([ADR-001](/adr/adr-0001-structural-parser-and-walker/)):
 the one structural parser (`parse`) is unchanged, and Surface is a *desugaring walk* over the
@@ -217,3 +219,13 @@ under the synonym `yield`, the hyphen-free spelling the non-Handlebars dialects 
 
 Comments, raw blocks, whitespace `~`, and brace-escaping are *core* features and pass through
 untouched.
+
+## 5.9 Surface deltas across the ladder
+
+The four surfaces share one engine and prelude; they differ in *surface syntax* and one
+value-policy axis (truthiness). The tables below are generated from the single source
+`shared/surface-syntax.json` — the same source the FlatBars Lab's surface-aware Reference popup
+and the tutorial reference pages read, so this reference can never drift from what those render.
+
+<SurfaceDeltas />
+
