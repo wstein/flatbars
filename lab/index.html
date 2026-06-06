@@ -65,15 +65,15 @@
            (body[data-chipstyle]); the legend popover reuses these tokens, so it
            is an honest key. Dark-mode overrides live in the [data-theme] blocks. */
         /* @palette light · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
-        --c-expr: #187747;
-        --c-raw: #0f6e3a;
-        --c-block: #a8520f;
-        --c-partial: #0e728d;
-        --c-inherit: #6d28d9;
-        --c-delim: #ba2c8b;
-        --c-comment: #54597e;
+        --c-expr: #0550ae;
+        --c-raw: #0a3069;
+        --c-block: #cd1f2d;
+        --c-partial: #116329;
+        --c-inherit: #6f42c1;
+        --c-delim: #953800;
+        --c-comment: #57606a;
         --tint-mix: 12%;
-        --directive-bg: #eceaf1;
+        --directive-bg: #eaeef2;
         /* @palette end */
         --chip-solid-fg: #fff;  /* text on a SOLID chip — flips dark in dark mode (Lab-only) */
 
@@ -573,15 +573,16 @@
          --c into the page so the chip reads without a layout-shifting padding.
          inherit (violet) + delim (rose) are their own families now, matching the
          tutorials, instead of folding into partial / comment. */
-      .cm-hb-expr    { --c: var(--c-expr);    color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 600; border-radius: 3px; }
+      .cm-hb-expr    { --c: var(--c-expr);    color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
       .cm-hb-raw     { --c: var(--c-raw);     color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
       .cm-hb-block   { --c: var(--c-block);   color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
       .cm-hb-partial { --c: var(--c-partial); color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
       .cm-hb-inherit { --c: var(--c-inherit); color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
       .cm-hb-delim   { --c: var(--c-delim);   color: var(--c); background: color-mix(in srgb, var(--c) var(--tint-mix), transparent); font-weight: 700; border-radius: 3px; }
-      .cm-hb-comment { color: var(--c-comment); font-style: italic; }
-      /* Dimmed {{ }} delimiters — keep the sigil + name loud (matches the legend). */
-      .cm-hb-pn      { opacity: 0.42; }
+      .cm-hb-comment { color: var(--c-comment); font-style: italic; font-weight: 700; }
+      /* The whole tag is bold from first `{` to last `}`; the braces are only
+         lightly recessed so the sigil + name stay marginally louder. */
+      .cm-hb-pn      { opacity: 0.7; }
       /* Tag chip style — Appearance ▸ Tag chips (body[data-chipstyle]). The tag
          classes above carry the TINT default; outline/solid swap the treatment.
          box-shadow (not border) keeps the editor's character grid from shifting
@@ -641,12 +642,12 @@
       .legend-grid .chip-br { flex-basis: 100%; height: 0; }
       .legend-grid .chip {
         --c: var(--fg); color: var(--c);
-        font-family: var(--font-mono); font-weight: 600; font-size: 12px; line-height: 1.3;
+        font-family: var(--font-mono); font-weight: 700; font-size: 12px; line-height: 1.3;
         padding: 0; border-radius: 4px; white-space: nowrap;
         background: color-mix(in srgb, var(--c) var(--tint-mix), var(--bg));
       }
       .legend-grid .chip.is-directive { background: var(--directive-bg); }
-      .legend-grid .chip .pn { opacity: 0.42; }
+      .legend-grid .chip .pn { opacity: 0.7; }
       /* Legend chips track the same Tag-chips style as the editor. */
       body[data-chipstyle="outline"] .legend-grid .chip {
         background: transparent; border: 1px solid color-mix(in srgb, var(--c) 42%, var(--bg));
@@ -1201,15 +1202,15 @@
         --tok-tag: #c4b5fd; --tok-cmt: #8a84a0; --tok-key: #93c5fd;
         --tok-str: #86efac; --tok-num: #fbbf24;
         /* @palette dark · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
-        --c-expr: #50fa7b;
-        --c-raw: #2faf60;
-        --c-block: #ffb86c;
-        --c-partial: #8be9fd;
-        --c-inherit: #bd93f9;
-        --c-delim: #ff79c6;
-        --c-comment: #8a97cc;
+        --c-expr: #79c0ff;
+        --c-raw: #a5d6ff;
+        --c-block: #ff7b72;
+        --c-partial: #7ee787;
+        --c-inherit: #d2a8ff;
+        --c-delim: #ffa657;
+        --c-comment: #969fab;
         --tint-mix: 20%;
-        --directive-bg: #363150;
+        --directive-bg: #21262d;
         /* @palette end */
         --chip-solid-fg: #0e0c16;
         --success: #4ade80;

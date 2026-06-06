@@ -58,15 +58,15 @@
      inline prose tags, AND the Syntax-colours legend (.chip.c-*). The Chips
      control (body[data-chipstyle]) tints/outlines/fills every one together. ── */
   /* @palette light · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
-  --c-expr: #187747;
-  --c-raw: #0f6e3a;
-  --c-block: #a8520f;
-  --c-partial: #0e728d;
-  --c-inherit: #6d28d9;
-  --c-delim: #ba2c8b;
-  --c-comment: #54597e;
+  --c-expr: #0550ae;
+  --c-raw: #0a3069;
+  --c-block: #cd1f2d;
+  --c-partial: #116329;
+  --c-inherit: #6f42c1;
+  --c-delim: #953800;
+  --c-comment: #57606a;
   --tint-mix: 12%;
-  --directive-bg: #eceaf1;
+  --directive-bg: #eaeef2;
   /* @palette end */
 
   /* YAML data syntax colours (data editor + spec-only blocks) */
@@ -114,15 +114,15 @@
   --warn-faint: #3a2e10;
 
   /* @palette dark · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
-  --c-expr: #50fa7b;
-  --c-raw: #2faf60;
-  --c-block: #ffb86c;
-  --c-partial: #8be9fd;
-  --c-inherit: #bd93f9;
-  --c-delim: #ff79c6;
-  --c-comment: #8a97cc;
+  --c-expr: #79c0ff;
+  --c-raw: #a5d6ff;
+  --c-block: #ff7b72;
+  --c-partial: #7ee787;
+  --c-inherit: #d2a8ff;
+  --c-delim: #ffa657;
+  --c-comment: #969fab;
   --tint-mix: 20%;
-  --directive-bg: #363150;
+  --directive-bg: #21262d;
   /* @palette end */
 
   --yaml-key: #93c5fd;
@@ -151,8 +151,7 @@
 .stem-delim   { --c: var(--c-delim); }
 .stem-comment { --c: var(--c-comment); font-style: italic; }
 .stem-expr, .stem-raw, .stem-block, .stem-partial,
-.stem-inherit, .stem-delim { color: var(--c); font-weight: 600; }
-.stem-comment { color: var(--c); }
+.stem-inherit, .stem-delim, .stem-comment { color: var(--c); font-weight: 700; }
 
 /* Chip treatment on the tag tokens (every span is one whole tag). */
 :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
@@ -177,10 +176,11 @@ body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-parti
   color: #0e0c16;
 }
 
-/* Dimmed {{ }} delimiters — keep the sigil + name as the loud part, the same
-   "highlight theme" the legend chips use. */
+/* The whole tag is bold from the first `{` to the last `}` — the braces are part
+   of the bold run, only lightly recessed so the sigil + name stay marginally
+   louder (the same "highlight theme" the legend chips use). */
 :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) .pn {
-  opacity: 0.42;
+  opacity: 0.7;
   font-style: normal;
 }
 

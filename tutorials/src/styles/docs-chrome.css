@@ -133,7 +133,7 @@
 .legend-grid .chip {
   --c: var(--fg);
   color: var(--c);
-  font-family: var(--font-mono); font-weight: 600;
+  font-family: var(--font-mono); font-weight: 700;
   font-size: 0.9rem; line-height: 1.3;
   padding: 0; border-radius: 4px; white-space: nowrap;
   border: 1px solid transparent;
@@ -144,10 +144,11 @@
 .legend-grid .c-partial { --c: var(--c-partial); }
 .legend-grid .c-inherit { --c: var(--c-inherit); }
 .legend-grid .c-delim   { --c: var(--c-delim); }
-.legend-grid .c-comment { --c: var(--c-comment); font-style: italic; font-weight: 500; }
+.legend-grid .c-comment { --c: var(--c-comment); font-style: italic; }
 
-/* Dimmed {{ }} delimiters — keep the sigil + name as the loud part. */
-.legend-grid .chip .pn { opacity: 0.42; }
+/* The whole tag is bold from first `{` to last `}`; the braces are only lightly
+   recessed so the sigil + name stay marginally louder. */
+.legend-grid .chip .pn { opacity: 0.7; }
 
 /* Chip style · TINT (default — also when no data-chipstyle attribute is set) */
 .legend-grid .chip,
