@@ -98,6 +98,56 @@ highlighter and the parser therefore read every interior off the *same* token an
 cannot drift on how it is lexed. Byte-identical: the `check:highlight` golden was
 unchanged by the migration.
 
+== Amendment (2026-06-06): the Lab + tutorials switch to inner-token highlighting
+
+§2/§4 above decided *against* interior spans — "a tag is coloured as one span by
+its head's meaning, so operators/strings/numbers get no span of their own". That
+held while FlatBars had no canonical editor rendering to match. ADR-017 then
+*shipped* one: the VS Code / JetBrains extensions paint FlatBars **inner-token**
+(the TextMate grammar floors braces + keywords, the LSP semantic tokens colour
+helper names, literals their own kind), the 2026-dark look. Against that, the
+Lab's and tutorials' one-colour-per-tag rendering read as a *different* engine.
+The decision is reversed **for those two front-ends**: they now paint inner-token
+to match VS Code. (This supersedes §2/§4's "no interior spans" rule *for the
+display front-ends only* — see below for what is unchanged.)
+
+. *The reversal is scoped to the front-ends, not the engine.* `highlightSpans`
+  (whole-tag, one-colour-per-meaning) is **unchanged** and still serves any
+  consumer that wants it; `check:highlight` (its engine golden) is untouched. The
+  inner-token paint is a *new presenter layer* — `lab/highlight-paint.mjs`
+  (`paintKinds`) — built on the SAME substrate §2 anticipated: `tokenize`'s
+  interior spans (ADR-017) for structure + literals, plus the LSP's semantic
+  *operation* pass for helper names. So "one grammar, derived downstream" still
+  holds — the painter forks no grammar; it composes the two engine-derived layers
+  VS Code already uses.
+
+. *The operation pass is a faithful PORT of the LSP*, drift-gated. The painter
+  re-implements `editors/lsp/src/tokens.mjs` (`paintHeadOperation` /
+  `paintPipeTargets` / `paintSubexpressionHeads` / `paintIdentAt`, gated by each
+  tag kind's `operationPosition`) because the browser Lab can't import the LSP at
+  runtime. `check:paint-parity` (in `npm test`) asserts the port stays
+  byte-identical to the LSP across every dialect × a corpus, so the Lab, the
+  tutorials, and VS Code cannot silently diverge — the same one-contract discipline
+  ADR-017 rests on. The prelude vocabulary the pass needs is `lab/operation-names.mjs`,
+  a projection of `editors/operations.json` (itself from `FullBars.preludeSchema`),
+  drift-gated by `check:operations` — *not* the Lab's 12-entry user-facing
+  Transformers subset, so every helper lights up exactly as the LSP paints it.
+
+. *The whole-tag chrome was retired with the switch.* One colour per tag is gone,
+  so the tutorials' "Chips" control (tint / outline / solid, which tinted each
+  whole-tag `.stem-*` / `.c-*` span) and the legend's per-construct chips had
+  nothing left to style. The Chips control is removed; the dead `.stem-*` / `.c-*`
+  classes are deleted; and the topbar colour legend became a **token-ROLE** key,
+  each sample *painted through the real engine* (`highlightTemplate`), so the
+  legend can never lie about what the examples render.
+
+. *Follow-up (single-source, debate proposal C).* The operation pass currently
+  lives twice — the LSP original and the painter's port, kept honest by
+  `check:paint-parity`. Extracting it into one shared module the LSP *imports*
+  (rather than mirrors) is the tracked next step; the parity gate is the bridge
+  until then. The Lab presenter `lab/cm-flatbars.mjs` changed signature to
+  `flatbarsHighlight(cm, dialect, isOperation)` accordingly.
+
 == Consequences
 
 * The Lab's and the tutorials' template regexes are retired: both now paint from the shared
