@@ -35,6 +35,10 @@ lab/test/screenshots/
 # --- Antora ---
 docs/build/
 public/
+# …but the unified search index is generated SOURCE (Astro serves public/ at the
+# site root), committed + drift-gated by check:search-index — re-include it.
+!tutorials/public/
+!tutorials/public/search-index.json
 
 # VS Code extension packaging artifacts
 *.vsix

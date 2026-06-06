@@ -19,7 +19,7 @@
          generated into the `@chrome` fence in the inline <style> below by
          `npm run gen:tokens` (from shared/flatbars-chrome.css), inline so they are
          in place before first paint. -->
-    <script type="module" src="./vendor/flatbars-topbar.mjs?v=3"></script>
+    <script type="module" src="./vendor/flatbars-topbar.mjs?v=5"></script>
     <style>
       /* ── Design tokens ───────────────────────────────────────────── */
       :root {
@@ -1376,8 +1376,9 @@
            tutorials app and the Starlight spec mount). It owns the wordmark, the
            context switcher (Home · Tutorials · Spec · Lab) and the Theme control;
            `base` is set at runtime from the path so the switcher resolves on every
-           origin, and its link-search is off (the workbench has its own Search). ── -->
-      <flatbars-topbar section="lab" version="v0.1.0" search="off" reference="on" reference-label="Reference"><div slot="reference" id="refContent"></div></flatbars-topbar>
+           origin. The topbar's unified search palette (search-index) spans the whole
+           umbrella; the Lab keeps its own in-workbench "find in files" too. ── -->
+      <flatbars-topbar section="lab" version="v0.1.0" search-index="/search-index.json" reference="on" reference-label="Reference"><div slot="reference" id="refContent"></div></flatbars-topbar>
       <script>
         // Resolve the umbrella base from the path so the switcher links are right
         // on every origin (/lab/ at root in dev, /flatbars/lab/ in production), and

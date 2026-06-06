@@ -58,6 +58,26 @@ export function resolveHref(section, base = "") {
   return `${b}/` || "/"; // home (and any unknown section)
 }
 
+// Pure search ranking — exported so it can be unit-tested without a DOM. Every
+// query word must appear in an entry's `terms`; matches are ordered by title
+// exact > prefix > substring, with a mild kind preference (pages/surfaces first).
+// An empty query returns a curated default (pages + surfaces).
+export function rankSearch(entries, rawQuery, limit = 30, emptyLimit = 20) {
+  const q = String(rawQuery || "").trim().toLowerCase();
+  if (!q) return entries.filter((e) => e.kind === "page" || e.kind === "surface").slice(0, emptyLimit);
+  const words = q.split(/\s+/);
+  const kindRank = { page: 0, surface: 1, adr: 2, op: 2, feature: 3, example: 4 };
+  const scored = [];
+  for (const e of entries) {
+    if (!words.every((w) => e.terms.includes(w))) continue;
+    const title = String(e.title).toLowerCase();
+    let s = title === q ? 100 : title.startsWith(q) ? 50 : title.includes(q) ? 20 : 0;
+    s += 6 - (kindRank[e.kind] ?? 4);
+    scored.push([s, e]);
+  }
+  return scored.sort((a, b) => b[0] - a[0]).slice(0, limit).map((x) => x[1]);
+}
+
 const TEMPLATE = `
 <style>
   :host {
@@ -298,6 +318,42 @@ const TEMPLATE = `
     }
   }
   @media (prefers-reduced-motion: reduce) { .ref-modal { } }
+
+  /* -- Unified search palette (opt-in via the search-index attribute) -- */
+  .pal-modal { position: fixed; inset: 0; z-index: 1001; }
+  .pal-modal[hidden] { display: none; }
+  .pal-backdrop { position: absolute; inset: 0; background: rgba(20, 16, 40, 0.45); }
+  .pal-dialog {
+    position: absolute; top: 12vh; left: 50%; transform: translateX(-50%);
+    width: min(640px, 94vw); max-height: 70vh; display: flex; flex-direction: column;
+    background: var(--bg, #fff); color: var(--fg, #18181b);
+    border: 1px solid var(--border-strong, #c8bff2); border-radius: var(--radius-lg, 12px);
+    box-shadow: var(--shadow-pop, 0 24px 60px -12px rgba(0,0,0,.35)); overflow: hidden;
+  }
+  .pal-input {
+    font: 500 16px/1.2 var(--font-ui, sans-serif); padding: 14px 16px; border: 0;
+    border-bottom: 1px solid var(--border, #ddd6f8); background: none; color: inherit; outline: none;
+  }
+  .pal-list { list-style: none; margin: 0; padding: 4px; overflow: auto; flex: 1 1 auto; }
+  .pal-list li {
+    display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border-radius: 8px;
+    cursor: pointer; font: 400 14px/1.3 var(--font-ui, sans-serif);
+  }
+  .pal-list li[aria-selected="true"] { background: var(--accent-soft, #efe7fb); }
+  .pal-kind {
+    flex: 0 0 auto; font: 600 10px/1 var(--font-mono, monospace); text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 3px 6px; border-radius: 4px; color: var(--accent-2, #4c1d95);
+    background: var(--accent-soft, #efe7fb); border: 1px solid var(--border, #ddd6f8); min-width: 4.5em; text-align: center;
+  }
+  .pal-text { min-width: 0; }
+  .pal-title { font-weight: 600; }
+  .pal-sub { color: var(--fg-muted, #5b4d92); font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pal-empty, .pal-hint { margin: 0; padding: 10px 16px; color: var(--fg-muted, #5b4d92); font-size: 0.82rem; }
+  .pal-empty[hidden] { display: none; }
+  .pal-hint { border-top: 1px solid var(--border, #ddd6f8); }
+  @media (max-width: 560px) {
+    .pal-dialog { top: 0; left: 0; transform: none; width: 100%; max-height: 100vh; height: 100%; border-radius: 0; }
+  }
 </style>
 
 <header class="bar" part="bar">
@@ -341,6 +397,18 @@ const TEMPLATE = `
     <slot name="reference"></slot>
   </div>
 </div>
+
+<div class="pal-modal" id="palModal" hidden>
+  <div class="pal-backdrop" id="palBackdrop" part="search-backdrop"></div>
+  <div class="pal-dialog" id="palDialog" part="search-dialog" role="dialog" aria-modal="true" aria-label="Search FlatBars">
+    <input id="palInput" class="pal-input" type="text" role="combobox" aria-expanded="true"
+           aria-controls="palList" aria-autocomplete="list" autocomplete="off" spellcheck="false"
+           placeholder="Search the docs, ADRs, operations, surfaces…" />
+    <ul class="pal-list" id="palList" part="search-results" role="listbox" aria-label="Search results"></ul>
+    <p class="pal-empty" id="palEmpty" hidden>No matches.</p>
+    <p class="pal-hint" id="palHint">Type to search · ↑↓ to move · ↵ to open · esc to close</p>
+  </div>
+</div>
 `;
 
 // Conditional base so the module is importable in plain Node (where HTMLElement
@@ -350,7 +418,7 @@ const Base = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
 class FlatBarsTopbar extends Base {
   static get observedAttributes() {
-    return ["section", "base", "version", "repo", "search", "lab-engine", "reference", "reference-label"];
+    return ["section", "base", "version", "repo", "search", "search-index", "lab-engine", "reference", "reference-label"];
   }
 
   constructor() {
@@ -367,6 +435,16 @@ class FlatBarsTopbar extends Base {
     this._closeReference = this._closeReference.bind(this);
     this._refOpen = false;
     this._refReturn = null;
+    this._openPalette = this._openPalette.bind(this);
+    this._closePalette = this._closePalette.bind(this);
+    this._onSearchClick = this._onSearchClick.bind(this);
+    this._onPalInput = this._onPalInput.bind(this);
+    this._onPalKey = this._onPalKey.bind(this);
+    this._palOpen = false;
+    this._palReturn = null;
+    this._palIndex = null;
+    this._palResults = [];
+    this._palActive = -1;
   }
 
   // ── attribute helpers (accept `x` or `data-x`) ──
@@ -397,6 +475,14 @@ class FlatBarsTopbar extends Base {
     this.shadowRoot.getElementById("refBtn").addEventListener("click", this._openReference);
     this.shadowRoot.getElementById("refClose").addEventListener("click", this._closeReference);
     this.shadowRoot.getElementById("refBackdrop").addEventListener("click", this._closeReference);
+    this.shadowRoot.getElementById("search").addEventListener("click", this._onSearchClick);
+    this.shadowRoot.getElementById("palBackdrop").addEventListener("click", this._closePalette);
+    this.shadowRoot.getElementById("palInput").addEventListener("input", this._onPalInput);
+    this.shadowRoot.getElementById("palInput").addEventListener("keydown", this._onPalKey);
+    this.shadowRoot.getElementById("palList").addEventListener("click", (e) => {
+      const li = e.target.closest("li[data-i]");
+      if (li) this._navigateResult(Number(li.dataset.i));
+    });
     window.addEventListener("storage", this._onStorage);
     document.addEventListener("keydown", this._onKey);
     this._syncTheme();
@@ -526,13 +612,104 @@ class FlatBarsTopbar extends Base {
       if (e.key === "Tab") this._trapTab(e);
       return;
     }
-    // "/" focuses search (unless typing in a field).
+    // The search palette owns its own keys (handled on the input).
+    if (this._palOpen) return;
+    // "/" opens the search palette (or focuses the search link) — unless typing.
     const t = e.target;
     const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
     if (e.key === "/" && !typing && !e.metaKey && !e.ctrlKey) {
       e.preventDefault();
-      this.shadowRoot.getElementById("search").focus();
+      if (this._paletteOn()) this._openPalette();
+      else this.shadowRoot.getElementById("search").focus();
     }
+  }
+
+  // ── unified search palette (opt-in via the search-index attribute) ──
+  _esc(s) {
+    return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  }
+  _paletteOn() {
+    const v = this._attr("search-index", "");
+    return v && v !== "off";
+  }
+  _onSearchClick(e) {
+    if (!this._paletteOn()) return; // no index ⇒ fall through to the link
+    e.preventDefault();
+    this._openPalette();
+  }
+  async _ensureIndex() {
+    if (this._palIndex) return this._palIndex;
+    try {
+      const res = await fetch((this.base || "") + this._attr("search-index", ""));
+      const json = await res.json();
+      this._palIndex = Array.isArray(json) ? json : json.entries || [];
+    } catch {
+      this._palIndex = [];
+    }
+    return this._palIndex;
+  }
+  _openPalette() {
+    if (this._palOpen) return;
+    this.shadowRoot.getElementById("palModal").hidden = false;
+    this._palOpen = true;
+    let active = document.activeElement;
+    while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
+    this._palReturn = active;
+    const input = this.shadowRoot.getElementById("palInput");
+    input.value = "";
+    input.focus();
+    this._ensureIndex().then(() => { if (this._palOpen) this._renderResults(""); });
+  }
+  _closePalette() {
+    if (!this._palOpen) return;
+    this.shadowRoot.getElementById("palModal").hidden = true;
+    this._palOpen = false;
+    if (this._palReturn && typeof this._palReturn.focus === "function") this._palReturn.focus();
+    this._palReturn = null;
+  }
+  _onPalInput(e) {
+    this._renderResults(e.target.value);
+  }
+  _rank(entries, raw) {
+    return rankSearch(entries, raw);
+  }
+  _renderResults(q) {
+    const list = this.shadowRoot.getElementById("palList");
+    const empty = this.shadowRoot.getElementById("palEmpty");
+    const results = this._rank(this._palIndex || [], q);
+    this._palResults = results;
+    this._palActive = results.length ? 0 : -1;
+    empty.hidden = results.length > 0 || !q.trim();
+    list.innerHTML = results
+      .map(
+        (e, i) =>
+          `<li id="pal-opt-${i}" role="option" data-i="${i}" aria-selected="${i === 0}">` +
+          `<span class="pal-kind">${this._esc(e.kind)}</span>` +
+          `<span class="pal-text"><span class="pal-title">${this._esc(e.title)}</span> <span class="pal-sub">${this._esc(e.sub || "")}</span></span></li>`,
+      )
+      .join("");
+    this._syncActive();
+  }
+  _syncActive() {
+    const input = this.shadowRoot.getElementById("palInput");
+    const items = this.shadowRoot.querySelectorAll("#palList li");
+    items.forEach((li, i) => li.setAttribute("aria-selected", String(i === this._palActive)));
+    const cur = this.shadowRoot.getElementById(`pal-opt-${this._palActive}`);
+    if (cur) { cur.scrollIntoView({ block: "nearest" }); input.setAttribute("aria-activedescendant", cur.id); }
+    else input.removeAttribute("aria-activedescendant");
+  }
+  _onPalKey(e) {
+    const n = this._palResults.length;
+    if (e.key === "Escape") { e.preventDefault(); this._closePalette(); }
+    else if (e.key === "ArrowDown" && n) { e.preventDefault(); this._palActive = (this._palActive + 1) % n; this._syncActive(); }
+    else if (e.key === "ArrowUp" && n) { e.preventDefault(); this._palActive = (this._palActive - 1 + n) % n; this._syncActive(); }
+    else if (e.key === "Enter" && this._palActive >= 0) { e.preventDefault(); this._navigateResult(this._palActive); }
+  }
+  _navigateResult(i) {
+    const e = this._palResults[i];
+    if (!e) return;
+    this._closePalette();
+    window.location.assign((this.base || "") + e.url);
   }
 
   // ── reference dialog (open/close + focus management) ──
