@@ -25,7 +25,6 @@
 // Attributes (all optional; `data-*` aliases accepted):
 //   section   "home" | "tutorials" | "spec" | "lab" — which app we're in (active state)
 //   base      deploy base path, e.g. "/flatbars" (default "")
-//   suffix    small wordmark suffix, e.g. "Lab" or "Docs" (default none)
 //   version   plain version label beside the wordmark, e.g. "v0.1.0" (default none)
 //   repo      GitHub URL (default the FlatBars repo)
 //   search    where the search affordance routes (default `${base}/spec/`);
@@ -68,15 +67,19 @@ const TEMPLATE = `
     top: 0;
     z-index: 30;
     font-family: var(--font-ui, system-ui, sans-serif);
+    /* Pin a fixed base so the bar renders identically on any host, regardless of
+       the host's root font-size (the Lab IDE uses 13px). The styles below size in
+       em units — shadow-relative to this — so they never inherit the page root. */
+    font-size: 16px;
   }
   *, *::before, *::after { box-sizing: border-box; }
 
   .bar {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 1em;
     height: 52px;
-    padding: 0 1.25rem;
+    padding: 0 1.25em;
     background: color-mix(in srgb, var(--bg, #fff) 85%, transparent);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -88,33 +91,26 @@ const TEMPLATE = `
     color: var(--fg, #18181b);
     text-decoration: none;
     font-weight: 600;
-    font-size: 1.63rem; /* wordmark scaled to 160% */
+    font-size: 1.63em; /* wordmark scaled to 160% */
     display: inline-flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.3em;
     white-space: nowrap;
     flex: none;
   }
   .brand .mark { width: 1.15em; height: 1.15em; color: var(--accent, #6d28d9); flex: none; }
   .brand .wm { display: inline-flex; align-items: baseline; }
   .brand .flat { color: var(--accent, #6d28d9); }
-  .brand .suffix {
-    font: 600 0.62rem/1 var(--font-mono, ui-monospace, monospace);
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--fg-faint, #6f5f99);
-    margin-left: 0.4rem;
-  }
   .brand:focus-visible { outline: 2px solid var(--accent, #6d28d9); outline-offset: 3px; border-radius: 4px; }
 
   /* Version label — e.g. "v0.1.0", plain text beside the wordmark. */
   .version {
-    font: 500 0.88rem/1 var(--font-mono, ui-monospace, monospace); /* shrunk to 80% of wordmark-scaled size */
+    font: 500 0.88em/1 var(--font-mono, ui-monospace, monospace); /* shrunk to 80% of wordmark-scaled size */
     letter-spacing: 0.02em;
     color: var(--fg-faint, #6f5f99);
     white-space: nowrap;
     flex: none;
-    margin-left: -0.6rem; /* tighten the gap to the wordmark */
+    margin-left: -0.6em; /* tighten the gap to the wordmark */
   }
   .version[hidden] { display: none; }
 
@@ -147,12 +143,12 @@ const TEMPLATE = `
 
   .spacer { margin-left: auto; }
 
-  .tools { display: flex; align-items: center; gap: 0.85rem; }
+  .tools { display: flex; align-items: center; gap: 0.85em; }
 
   .search {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.4em;
     font: 500 12px/1 var(--font-ui, sans-serif);
     color: var(--fg-faint, #6f5f99);
     background: var(--bg, #fff);
@@ -172,7 +168,7 @@ const TEMPLATE = `
     border: 1px solid var(--border, #ddd6f8);
     border-radius: 4px;
     padding: 2px 5px;
-    margin-left: 0.15rem;
+    margin-left: 0.15em;
   }
 
   /* Theme segmented control. */
@@ -210,7 +206,7 @@ const TEMPLATE = `
     font: 600 13px/1 var(--font-ui, sans-serif);
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.35em;
     white-space: nowrap;
   }
   .gh:hover { color: var(--accent-2, #4c1d95); }
@@ -223,7 +219,7 @@ const TEMPLATE = `
     border: 1px solid var(--border-strong, #c8bff2);
     border-radius: var(--radius, 6px);
     color: var(--fg, #18181b);
-    font-size: 1.05rem;
+    font-size: 1.05em;
     line-height: 1;
     padding: 6px 9px;
     cursor: pointer;
@@ -232,7 +228,7 @@ const TEMPLATE = `
 
   /* Responsive: collapse tools behind a menu under 760px; keep brand+switcher. */
   @media (max-width: 760px) {
-    .bar { gap: 0.65rem; padding: 0 0.9rem; }
+    .bar { gap: 0.65em; padding: 0 0.9em; }
     .search .label { display: none; }
     .gh .label { display: none; }
   }
@@ -241,15 +237,15 @@ const TEMPLATE = `
     .tools {
       position: absolute;
       top: 52px;
-      right: 0.6rem;
+      right: 0.6em;
       flex-direction: column;
       align-items: stretch;
-      gap: 0.7rem;
+      gap: 0.7em;
       background: var(--bg, #fff);
       border: 1px solid var(--border-strong, #c8bff2);
       border-radius: var(--radius-lg, 10px);
       box-shadow: var(--shadow-pop, 0 12px 32px -8px rgba(0,0,0,.2));
-      padding: 0.9rem;
+      padding: 0.9em;
       width: min(260px, 86vw);
     }
     .tools[hidden] { display: none; }
@@ -264,7 +260,7 @@ const TEMPLATE = `
 
 <header class="bar" part="bar">
   <slot name="start"></slot>
-  <a class="brand" part="brand" id="brand"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M26 13 H18 V29 H12 V35 H18 V51 H26"/><path d="M38 13 H46 V29 H52 V35 H46 V51 H38"/></g></svg><span class="wm"><b class="flat">Flat</b>Bars</span><span class="suffix" id="suffix" hidden></span></a>
+  <a class="brand" part="brand" id="brand"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M26 13 H18 V29 H12 V35 H18 V51 H26"/><path d="M38 13 H46 V29 H52 V35 H46 V51 H38"/></g></svg><span class="wm"><b class="flat">Flat</b>Bars</span></a>
   <span class="version" part="version" id="version" hidden></span>
 
   <nav class="ctx" part="switcher" aria-label="FlatBars sections" id="ctx"></nav>
@@ -299,7 +295,7 @@ const Base = typeof HTMLElement !== "undefined" ? HTMLElement : class {};
 
 class FlatBarsTopbar extends Base {
   static get observedAttributes() {
-    return ["section", "base", "suffix", "version", "repo", "search", "lab-engine"];
+    return ["section", "base", "version", "repo", "search", "lab-engine"];
   }
 
   constructor() {
@@ -356,13 +352,9 @@ class FlatBarsTopbar extends Base {
   _render() {
     const root = this.shadowRoot;
 
-    // Brand → landing hub (home), with optional suffix.
+    // Brand → landing hub (home).
     const brand = root.getElementById("brand");
     brand.href = this._home();
-    const suffix = root.getElementById("suffix");
-    const sfx = this._attr("suffix", "");
-    suffix.hidden = !sfx;
-    suffix.textContent = sfx;
 
     // Version label (e.g. "v0.1.0").
     const version = root.getElementById("version");

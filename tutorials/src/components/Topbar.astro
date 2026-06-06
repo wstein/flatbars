@@ -19,13 +19,13 @@
 import LegendPopover from "./LegendPopover.astro";
 import "../styles/docs-chrome.css";
 
-const { section = "tutorials", suffix = "", labEngine = "minbars" } = Astro.props;
+const { section = "tutorials", labEngine = "minbars" } = Astro.props;
 // Empty at root/dev, "/flatbars" on the Pages project sub-path. The element
 // resolves every cross-app link from it.
 const BASE = import.meta.env.PUBLIC_BASE_PATH || "";
 ---
 
-<flatbars-topbar section={section} base={BASE} version="v0.1.0" suffix={suffix} lab-engine={labEngine}>
+<flatbars-topbar section={section} base={BASE} version="v0.1.0" lab-engine={labEngine}>
   <slot name="start" />
   <LegendPopover />
 </flatbars-topbar>
