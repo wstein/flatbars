@@ -46,7 +46,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, noLoopVars)
-import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, jsonataScaffold, reportMarkdown, runAnalysis)
+import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTranslator, withTruthy)
 import Kernel.Hoist (hoistInline)
@@ -241,7 +241,12 @@ analyseSurface
   :: String
   -> Value
   -> Either String
-       { output :: String, report :: String, jsonata :: String, findings :: Array Finding }
+       { output :: String
+       , report :: String
+       , jsonata :: String
+       , findings :: Array Finding
+       , evaluated :: Int
+       }
 analyseSurface = analyseSurfaceWith anyPath
 
 -- | `analyseSurface` with a host `PathSchema` (ADR-030): the host plugs in "could
@@ -253,7 +258,12 @@ analyseSurfaceWith
   -> String
   -> Value
   -> Either String
-       { output :: String, report :: String, jsonata :: String, findings :: Array Finding }
+       { output :: String
+       , report :: String
+       , jsonata :: String
+       , findings :: Array Finding
+       , evaluated :: Int
+       }
 analyseSurfaceWith schema src dat = case parse src of
   Left e -> Left (renderParseErrorAt src e)
   Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
@@ -270,6 +280,7 @@ analyseSurfaceWith schema src dat = case parse src of
           , report: reportMarkdown schema src r.decisions <> i18nNote template
           , jsonata: jsonataScaffold src r.decisions
           , findings: allFindings schema src r.decisions
+          , evaluated: evaluatedCount r.decisions
           }
 
 -- | The blessed i18n operations (ADR-029) — the names the host `Translator` drives.

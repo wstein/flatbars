@@ -11655,7 +11655,7 @@ var jsonataScaffold = function(src) {
         return "$";
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 459, column 16 - line 461, column 19): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 466, column 16 - line 468, column 19): " + [v.constructor.name]);
     };
     var normOf = function(p) {
       return function(v) {
@@ -11688,7 +11688,7 @@ var jsonataScaffold = function(src) {
         return p;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 462, column 14 - line 464, column 17): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 469, column 14 - line 471, column 17): " + [v.constructor.name]);
     };
     var jsq = function(s) {
       return '"' + (s + '"');
@@ -11710,7 +11710,7 @@ var jsonataScaffold = function(src) {
         return new Just("(* computed condition, not path-targetable: " + (trim(spanText(src)(d.span)) + " *)"));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 454, column 20 - line 457, column 98): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 461, column 20 - line 464, column 98): " + [v.constructor.name]);
     };
     var computed = nub2(mapMaybe(computedNote)(flagged));
     return joinWith("\n")(append13(["(* Truthiness cleanup scaffold (ADR-022) \u2014 REVIEW each rule before applying. *)", "(* Each path resolved to an engine-ambiguous value in a condition. *)"])(append13((function() {
@@ -11749,6 +11749,14 @@ var fixFor = function(v) {
   ;
   return "branch explicitly so the decision does not ride on the host's truthiness rule.";
 };
+var evaluatedCount = /* @__PURE__ */ (function() {
+  var $143 = filter(function(d) {
+    return d.kind === "cond";
+  });
+  return function($144) {
+    return length($143($144));
+  };
+})();
 var divergence = function(v) {
   return function(here) {
     return filter(function(t) {
@@ -11808,7 +11816,7 @@ var describe = function(v) {
     return "a safe string";
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Analyse (line 404, column 12 - line 412, column 29): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Analyse (line 411, column 12 - line 419, column 29): " + [v.constructor.name]);
 };
 var findingAt = function(kind) {
   return function(src) {
@@ -11835,7 +11843,7 @@ var findingAt = function(kind) {
                 return "";
               }
               ;
-              throw new Error("Failed pattern match at Kernel.Analyse (line 130, column 13 - line 132, column 22): " + [v1.constructor.name]);
+              throw new Error("Failed pattern match at Kernel.Analyse (line 137, column 13 - line 139, column 22): " + [v1.constructor.name]);
             })()
           };
         };
@@ -11844,12 +11852,12 @@ var findingAt = function(kind) {
   };
 };
 var findings = function(src) {
-  var $143 = map16(function(d) {
+  var $145 = map16(function(d) {
     return findingAt("observed")(src)(d)(d.value)(d.truthyHere);
   });
-  var $144 = filter(isFinding);
-  return function($145) {
-    return $143($144($145));
+  var $146 = filter(isFinding);
+  return function($147) {
+    return $145($146($147));
   };
 };
 var potentialFindings = function(schema) {
@@ -11928,7 +11936,7 @@ var reportMarkdown = function(schema) {
           return "";
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Analyse (line 397, column 14 - line 399, column 18): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Analyse (line 404, column 14 - line 406, column 18): " + [v.constructor.name]);
       };
       var misses = missFindings(schema)(src)(decisions);
       var missLine = function(f) {
@@ -12054,7 +12062,7 @@ var analysisWrappers = /* @__PURE__ */ (function() {
       return [new Tuple("lookup", analysedLookup(v.value0))];
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Analyse (line 259, column 19 - line 261, column 58): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Analyse (line 266, column 19 - line 268, column 58): " + [v.constructor.name]);
   })();
   var analysed = function(name2) {
     return function(variadic) {
@@ -12088,7 +12096,7 @@ var analysisWrappers = /* @__PURE__ */ (function() {
       return new Just(new Tuple(v.value0, analysed(v.value0)(v.value1)(v1.value0)));
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Analyse (line 236, column 32 - line 238, column 65): " + [v1.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Analyse (line 243, column 32 - line 245, column 65): " + [v1.constructor.name]);
   };
   return append13(mapMaybe(wrap3)(conds))(lookupWrapper);
 })();
@@ -12709,14 +12717,15 @@ var analyseSurfaceWith = function(schema) {
               output: v4.value0.output,
               report: reportMarkdown(schema)(src)(v4.value0.decisions) + i18nNote(v3.template),
               jsonata: jsonataScaffold(src)(v4.value0.decisions),
-              findings: allFindings(schema)(src)(v4.value0.decisions)
+              findings: allFindings(schema)(src)(v4.value0.decisions),
+              evaluated: evaluatedCount(v4.value0.decisions)
             });
           }
           ;
-          throw new Error("Failed pattern match at FullBars (line 264, column 7 - line 273, column 12): " + [v4.constructor.name]);
+          throw new Error("Failed pattern match at FullBars (line 274, column 7 - line 284, column 12): " + [v4.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars (line 251, column 1 - line 256, column 92): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars (line 256, column 1 - line 266, column 9): " + [v.constructor.name]);
       };
       if (v instanceof Right) {
         var $171 = checkBareInline(true)(v.value0.nodes);
@@ -16808,7 +16817,7 @@ var migrate = function(tpl) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 225, column 25 - line 233, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 232, column 25 - line 240, column 6): " + [v.constructor.name]);
 };
 var litName = function(args) {
   var v = head(args);
@@ -16886,7 +16895,7 @@ var lint = function(tpl, dialect) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 175, column 5 - line 207, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 182, column 5 - line 214, column 12): " + [v.constructor.name]);
 };
 var jsOperation = function(name2) {
   return function(fn) {
@@ -16911,7 +16920,7 @@ var jsOperation = function(name2) {
             return pure8(fromJson(v.payload));
           }
           ;
-          throw new Error("Failed pattern match at FullBars.JS (line 372, column 35 - line 377, column 47): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FullBars.JS (line 379, column 35 - line 384, column 47): " + [v.constructor.name]);
         }
         ;
         var optsFrame = function(optsJson) {
@@ -16948,7 +16957,7 @@ var jsOperation = function(name2) {
                 };
               }
               ;
-              throw new Error("Failed pattern match at FullBars.JS (line 403, column 9 - line 405, column 60): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at FullBars.JS (line 410, column 9 - line 412, column 60): " + [v2.constructor.name]);
             };
           };
         };
@@ -17113,7 +17122,7 @@ var compileResultAt = function(src) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 510, column 23 - line 512, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 517, column 23 - line 519, column 49): " + [v.constructor.name]);
   };
 };
 var compileSurface2 = function(tpl) {
@@ -17189,7 +17198,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map26(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 750, column 9 - line 759, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 757, column 9 - line 766, column 99): " + [v.constructor.name]);
 };
 var path = function(args) {
   var v = uncons(args);
@@ -17209,7 +17218,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map26($lazy_rnode(726))(ns));
+    return arr(map26($lazy_rnode(733))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -17232,7 +17241,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
         })()))]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 700, column 21 - line 707, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 707, column 21 - line 714, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -17265,7 +17274,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value0))]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 695, column 1 - line 695, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 702, column 1 - line 702, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value0 === "partial") {
         var $147 = litName(v.value1);
@@ -17290,7 +17299,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy6("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(695);
+var rnode = /* @__PURE__ */ $lazy_rnode(702);
 var astJson = function(dialect, src) {
   var errObj = function(pe) {
     var d = parseErrorAt(src)(pe);
@@ -17325,7 +17334,7 @@ var astJson = function(dialect, src) {
       return obj([new Tuple("ast", obj([new Tuple("version", str("flatbars-ast/v1")), new Tuple("nodes", arr(map26(rnode)(nodes)))]))]);
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 624, column 1 - line 624, column 34): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 631, column 1 - line 631, column 34): " + [v.constructor.name]);
   };
   if (v instanceof Right) {
     var $166 = dialect !== "core";
@@ -17356,6 +17365,7 @@ var analyseResult = function(v) {
       report: "",
       jsonata: "",
       output: "",
+      evaluated: 0,
       error: v.value0
     };
   }
@@ -17367,11 +17377,12 @@ var analyseResult = function(v) {
       report: v.value0.report,
       jsonata: v.value0.jsonata,
       output: v.value0.output,
+      evaluated: v.value0.evaluated,
       error: ""
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 137, column 17 - line 146, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 143, column 17 - line 153, column 6): " + [v.constructor.name]);
 };
 var analyze = function(tpl, json) {
   return analyseResult(analyseSurface(tpl)(fromJson(json)));

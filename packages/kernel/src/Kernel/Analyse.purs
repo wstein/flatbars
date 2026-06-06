@@ -19,6 +19,7 @@ module Kernel.Analyse
   , runAnalysis
   , divergence
   , isFinding
+  , evaluatedCount
   , findings
   , potentialFindings
   , allFindings
@@ -95,6 +96,12 @@ divergence v here =
 -- | way. (Miss decisions are not truthiness findings — they have no divergence.)
 isFinding :: Decision -> Boolean
 isFinding d = d.kind == "cond" && not (Array.null d.diverges)
+
+-- | The number of *condition* decisions the render evaluated (the coverage
+-- | denominator: every `if`/`unless`/`and`/`or`/`not` test that actually ran,
+-- | finding or not). Excludes data-access `miss` decisions.
+evaluatedCount :: Array Decision -> Int
+evaluatedCount = Array.length <<< Array.filter (\d -> d.kind == "cond")
 
 -- | A structured portability finding for a host UI (the Lab's Truthiness dock
 -- | panel): its `kind` (`"observed"` — the sample hit an ambiguous value;

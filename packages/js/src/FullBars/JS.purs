@@ -112,6 +112,7 @@ type AnalyseResult =
   , report :: String
   , jsonata :: String
   , output :: String
+  , evaluated :: Int
   , error :: String
   }
 
@@ -132,16 +133,22 @@ analyzeWith = mkFn3 \schema tpl json ->
 -- | Shared marshalling of an `analyseSurface*` outcome to the JS `AnalyseResult`.
 analyseResult
   :: Either String
-       { output :: String, report :: String, jsonata :: String, findings :: Array Analyse.Finding }
+       { output :: String
+       , report :: String
+       , jsonata :: String
+       , findings :: Array Analyse.Finding
+       , evaluated :: Int
+       }
   -> AnalyseResult
 analyseResult = case _ of
-  Left e -> { ok: false, findings: [], report: "", jsonata: "", output: "", error: e }
+  Left e -> { ok: false, findings: [], report: "", jsonata: "", output: "", evaluated: 0, error: e }
   Right r ->
     { ok: true
     , findings: r.findings
     , report: r.report
     , jsonata: r.jsonata
     , output: r.output
+    , evaluated: r.evaluated
     , error: ""
     }
 
