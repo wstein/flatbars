@@ -48,8 +48,12 @@ kotlin {
 
 // The LSP layer is an opt-in source set + resources, only compiled with -PwithLsp
 // (the platform LSP API must be on the compile classpath for it to build).
+// The LSP sources must be registered on the *Kotlin* source set: `compileKotlin`
+// only compiles `kotlin.srcDirs`, so adding them to `java.srcDir` left them off
+// the compile path and the always-compiled `src/main` references to
+// `FlatBarsSupport` failed to resolve under -PwithLsp.
 if (withLsp) {
-  sourceSets["main"].java.srcDir("src/lsp/kotlin")
+  kotlin.sourceSets["main"].kotlin.srcDir("src/lsp/kotlin")
   sourceSets["main"].resources.srcDir("src/lsp/resources")
 }
 
