@@ -17,17 +17,36 @@
 // element. (The old whole-tag "Chips" control was retired with inner-token
 // highlighting — ADR-014.)
 import LegendPopover from "./LegendPopover.astro";
+import SurfaceDeltas from "./SurfaceDeltas.astro";
+import surfaceSyntax from "../../../shared/surface-syntax.json";
 import "../styles/docs-chrome.css";
 
-const { section = "tutorials", labEngine = "minbars" } = Astro.props;
+// `reference` opts the page into the shared topbar's Reference popup, keyed to a
+// surface id (the page's dialect). The Legend popover stays as the colours key;
+// Reference is the syntax/policy companion. Empty (e.g. the landing) ⇒ no popup.
+const { section = "tutorials", labEngine = "minbars", reference = "" } = Astro.props;
+const refSurface = surfaceSyntax.surfaces.find((s) => s.id === reference);
 // Empty at root/dev, "/flatbars" on the Pages project sub-path. The element
 // resolves every cross-app link from it.
 const BASE = import.meta.env.PUBLIC_BASE_PATH || "";
 ---
 
-<flatbars-topbar section={section} base={BASE} version="v0.1.0" lab-engine={labEngine}>
+<flatbars-topbar
+  section={section}
+  base={BASE}
+  version="v0.1.0"
+  lab-engine={labEngine}
+  reference={refSurface ? "on" : undefined}
+  reference-label="Reference"
+>
   <slot name="start" />
   <LegendPopover />
+  {refSurface && (
+    <div id="refPanel">
+      <h2 class="sref-title">{refSurface.label} — surface reference</h2>
+      <SurfaceDeltas surface={refSurface.id} />
+    </div>
+  )}
 </flatbars-topbar>
 
 <script>
@@ -40,6 +59,9 @@ const BASE = import.meta.env.PUBLIC_BASE_PATH || "";
   const bar = document.querySelector("flatbars-topbar");
   bar?.querySelector("#navToggle")?.setAttribute("slot", "start");
   bar?.querySelector(".legend-anchor")?.setAttribute("slot", "tools");
+  // The surface Reference panel (when the page opted in) fills the element's
+  // `reference` slot; the element owns the accessible dialog shell.
+  bar?.querySelector("#refPanel")?.setAttribute("slot", "reference");
 
   // Legend popover (slotted into the topbar's `tools` slot — light DOM, so it is
   // queryable by id here). The Theme control lives inside the element now.

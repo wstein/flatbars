@@ -15,6 +15,9 @@
 // by `npm run gen:tokens`).
 import Search from "@astrojs/starlight/components/Search.astro";
 import MobileMenuToggle from "@astrojs/starlight/components/MobileMenuToggle.astro";
+// The same generated per-surface delta tables §5.9 renders — the spec is
+// cross-surface, so its Reference popup shows all four surfaces (single source).
+import SurfaceDeltas from "../partials/surface-deltas.mdx";
 
 // The spec mounts at `${PUBLIC_SPEC_BASE}` (e.g. /flatbars/spec); the umbrella
 // root is that minus the trailing /spec. Empty in standalone dev (links then
@@ -23,8 +26,13 @@ const SPEC_BASE = process.env.PUBLIC_SPEC_BASE || "";
 const BASE = SPEC_BASE.replace(/\/$/, "").replace(/\/spec$/, "");
 ---
 
-<flatbars-topbar section="spec" base={BASE} version="v0.1.0" search="off">
+<flatbars-topbar section="spec" base={BASE} version="v0.1.0" search="off" reference="on" reference-label="Reference">
   <Search />
+  <div id="refPanel">
+    <h2 class="sref-title">Surface reference</h2>
+    <p class="sref-tagline">The syntax &amp; value-policy deltas across the four surfaces (§5.9) — one source.</p>
+    <SurfaceDeltas />
+  </div>
 </flatbars-topbar>
 <MobileMenuToggle />
 
@@ -33,6 +41,8 @@ const BASE = SPEC_BASE.replace(/\/$/, "").replace(/\/spec$/, "");
   import "../../../shared/flatbars-topbar.mjs";
 
   // Astro consumes a literal `slot` on a plain element's child, so assign the
-  // element's `tools` slot (Starlight's Pagefind search) at runtime.
+  // element's slots at runtime: Starlight's Pagefind search → `tools`, the
+  // all-surface reference panel → `reference`.
   document.querySelector("flatbars-topbar site-search")?.setAttribute("slot", "tools");
+  document.querySelector("flatbars-topbar #refPanel")?.setAttribute("slot", "reference");
 </script>
