@@ -14,6 +14,7 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import preact from "@astrojs/preact";
 import mermaid from "astro-mermaid";
+import remarkGfm from "remark-gfm";
 import starlightLinksValidator from "starlight-links-validator";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -88,6 +89,10 @@ export default defineConfig({
     }),
     ...(BASE ? [normalizeBaseHrefs(BASE)] : []),
   ],
+  // Astro's `gfm: true` default does not reach `.mdx` content (only `.md`), so
+  // GFM tables/strikethrough were rendering as literal pipe text. Wire remark-gfm
+  // in explicitly; astro-mermaid spreads existing remarkPlugins, so this composes.
+  markdown: { remarkPlugins: [remarkGfm] },
   // Let islands import the engine bundle from ../lab (live engine panes, ADR-031),
   // mirroring the tutorials build.
   vite: { server: { fs: { allow: [".."] } } },

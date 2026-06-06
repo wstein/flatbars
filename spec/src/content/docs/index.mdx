@@ -18,7 +18,7 @@ plus the interpreter.
 
 ## What makes it different
 
-|  |  |
+| Principle | What it means |
 | --- | --- |
 | The core has no semantics | The parser does not know what `if` does, whether output should be escaped, what a path is, or even that an identifier names a "helper." It produces `Content`, `Output`, and `Block` nodes and stops. All meaning is added by the [engine walk](/spec/evaluation/). |
 | No built-in helpers, no keywords | `if`, `each`, `with`, `unless`, `lookup`, HTML escaping — and `else` — are *userland*. The core ships none of them and reserves no names. The [reference engine](/engine/prelude/), *FullBars*, reproduces Handlebars, but you can delete, replace, or rename any of it. |
