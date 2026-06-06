@@ -34,7 +34,7 @@ export function dataText(data) {
 // (restoreHash restores it verbatim rather than reloading a catalog example);
 // tab 0 is the main template, the rest are named partials. Mirrors the field
 // shape `restoreHash` reads (`tabs:[{n,s}]`, `d`, `av`, `ai`).
-export function workspaceState({ template = "", data, partials, helpers, transform, catalog, locale, view, dock } = {}) {
+export function workspaceState({ template = "", data, partials, helpers, transform, catalog, locale, view, dock, pathSchema } = {}) {
   const tabs = [{ s: template }];
   const p = partials || {};
   for (const name of Object.keys(p)) tabs.push({ n: name, s: p[name] });
@@ -52,6 +52,10 @@ export function workspaceState({ template = "", data, partials, helpers, transfo
   // i18n.locale). Lets a "Localize" example land with its strings + locale loaded.
   if (catalog && catalog.trim()) st.cat = catalog;
   if (locale && locale !== "en") st.loc = locale;
+  // ADR-030: data paths the host guarantees safe (`restoreHash` reads `s.ps` →
+  // config.yaml's `analyse.pathSchema`). Lets an analyse-suppression example land
+  // in the Lab with the same paths already declared safe.
+  if (Array.isArray(pathSchema) && pathSchema.length) st.ps = pathSchema;
   // The output view to land on (`restoreHash` reads `s.v`, gated by the engine's
   // features). Lets a "Migrate" example open straight into the "Migrated MaxBars"
   // view instead of HTML Preview.

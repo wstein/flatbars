@@ -12,7 +12,8 @@
 // The normative text lives in docs/ (adr-0022-analyse-mode.adoc).
 import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
-import { examples as ex } from "../analyse.mjs";
+import AnalyseGallery from "../components/AnalyseGallery.jsx";
+import { examples as ex, gallery } from "../analyse.mjs";
 
 const t = (s) => s; // readability helper for inline tag literals
 
@@ -27,6 +28,7 @@ const groups = [
       { href: "#portable", label: "What's already portable" },
       { href: "#potential", label: "Observed vs potential" },
       { href: "#suppress", label: "Suppressing with a schema" },
+      { href: "#gallery", label: "Portability at scale" },
       { href: "#report", label: "The report & JSONata fix" },
       { href: "#using", label: "In the Lab & CI" },
     ],
@@ -217,6 +219,25 @@ const groups = [
       Suppression is advisory: it never changes what renders, only which what-ifs the report
       shows. Observed findings — the ones your data actually hit — are <em>never</em> suppressed,
       because they already happened.
+    </p>
+  </section>
+
+  <!-- ──────────────────────── Portability at scale ──────────────────────── -->
+  <section id="gallery">
+    <h2>Portability at scale</h2>
+    <p>
+      The cards above isolate one ambiguous value each. Real templates mix them. Here the
+      analyser runs live over a handful of production-shaped templates — each tile shows its
+      finding profile (the same <code>analyze</code> the Lab and CI use), and <b>Lab ↗</b> opens
+      it straight into the Truthiness panel. The spread is the point: an observed divergence, a
+      latent potential, a typo'd miss, and a fully portable case can all hide in everyday markup.
+    </p>
+    <AnalyseGallery client:visible items={gallery} />
+    <p class="tip">
+      These are <b>FullBars</b> templates: analyse is the FullBars engine, and the Mustache
+      conformance corpus doesn't exercise truthiness — so a portability gallery is a curated set,
+      not a fixture dump. Point <code>flatbars analyse</code> at your own template directory in CI
+      to get this profile across your real corpus.
     </p>
   </section>
 

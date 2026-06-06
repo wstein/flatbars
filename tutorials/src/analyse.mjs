@@ -91,3 +91,44 @@ export const examples = {
     expectSuppressed: 2,
   },
 };
+
+// "Portability at scale" gallery — realistic, multi-condition templates rather than
+// the single-value teaching toys above, so the analyser is shown across the spread
+// of finding kinds on templates that look like production. Each card runs through
+// the real `analyze` (client-side, and CI-gated by check-tutorial-tooling, which
+// asserts the per-kind counts below). FullBars templates: analyse is FullBars, and
+// the Mustache conformance corpus doesn't exercise truthiness — so this is curated.
+export const gallery = [
+  {
+    name: "Inbox badge",
+    desc: "A zero count silently flips “0 unread” to “Inbox zero” on a spec-Mustache host.",
+    engine: "fullbars",
+    template: "{{#if unread}}{{unread}} unread{{else}}Inbox zero{{/if}}",
+    data: { unread: 0 },
+    expect: { observed: 1, potential: 0, miss: 0 },
+  },
+  {
+    name: "Profile card",
+    desc: "An empty bio is an observed divergence; a non-empty post count is a potential one.",
+    engine: "fullbars",
+    template: "{{name}}{{#if bio}} — {{bio}}{{/if}}{{#if posts}} · {{posts}} posts{{/if}}",
+    data: { name: "Ada", bio: "", posts: 3 },
+    expect: { observed: 1, potential: 1, miss: 0 },
+  },
+  {
+    name: "Shopping cart",
+    desc: "A non-empty cart is portable now, but the empty-cart branch rides on list falsiness.",
+    engine: "fullbars",
+    template: "{{#if items}}{{#each items}}{{this}} {{/each}}{{else}}Empty{{/if}}",
+    data: { items: ["Book"] },
+    expect: { observed: 0, potential: 1, miss: 0 },
+  },
+  {
+    name: "Contact line",
+    desc: "A misspelled field resolves to absent from a present object — the typo catcher.",
+    engine: "fullbars",
+    template: "{{user.name}} <{{user.emial}}>",
+    data: { user: { name: "Ada", email: "a@x.io" } },
+    expect: { observed: 0, potential: 0, miss: 1 },
+  },
+];

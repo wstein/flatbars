@@ -20,6 +20,17 @@ import jsonata from "../../../lab/vendor/jsonata.mjs";
 import { highlightTemplate, highlightYaml, highlightJsonata, esc } from "../lib/highlight.mjs";
 
 const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
+
+// The analyse JSONata scaffold (ADR-022) carries `(* … *)` review comments that
+// this JSONata build doesn't parse (it is meant for review, not auto-apply). The
+// one-click fix strips the comment lines, leaving the runnable transform(s).
+function runnableJsonata(scaffold) {
+  return (scaffold || "")
+    .split("\n")
+    .filter((l) => l.trim() && !l.trim().startsWith("(*"))
+    .join("\n")
+    .trim();
+}
 // The operations-aware render entry per surface (for the catalog/helpers path).
 const RENDER_WITH = { rawbars: renderRawWith, fullbars: renderWith, maxbars: renderMaxWith };
 
@@ -212,7 +223,14 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     if (!analyse) return;
     let data;
     try { data = dataStr.trim() === "" ? {} : loadYaml(dataStr); }
-    catch (e) { setAnalyseRes({ ok: false, error: "data isn’t valid YAML — " + ((e && e.message) || e), findings: [], suppressed: 0 }); return; }
+    catch (e) { setAnalyseRes({ ok: false, error: "data isn’t valid YAML — " + ((e && e.message) || e), findings: [], evaluated: 0, jsonata: "", suppressed: 0 }); return; }
+    // Analyse the data the template actually renders — so an applied JSONata fix
+    // (which reshapes the data) is reflected in the findings (the value is now
+    // normalised out of the ambiguous set).
+    if ((transformStr || "").trim()) {
+      try { data = jsonata(transformStr).evaluate(data); }
+      catch (e) { setAnalyseRes({ ok: false, error: "transform error — " + ((e && e.message) || e), findings: [], evaluated: 0, jsonata: "", suppressed: 0 }); return; }
+    }
     const safePaths = pathSchemaDemo
       ? schemaStr.split(",").map((p) => p.trim()).filter(Boolean)
       : [];
@@ -227,23 +245,26 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
         if (base.ok) suppressed = Math.max(0, advisory(base) - advisory(r));
       }
       setAnalyseRes(r.ok
-        ? { ok: true, findings: r.findings || [], suppressed }
-        : { ok: false, error: r.error || "analyse failed", findings: [], suppressed: 0 });
+        ? { ok: true, findings: r.findings || [], evaluated: r.evaluated || 0, jsonata: r.jsonata || "", suppressed }
+        : { ok: false, error: r.error || "analyse failed", findings: [], evaluated: 0, jsonata: "", suppressed: 0 });
     } catch (e) {
-      setAnalyseRes({ ok: false, error: String((e && e.message) || e), findings: [], suppressed: 0 });
+      setAnalyseRes({ ok: false, error: String((e && e.message) || e), findings: [], evaluated: 0, jsonata: "", suppressed: 0 });
     }
-  }, [analyse, pathSchemaDemo, tpl, dataStr, schemaStr]);
+  }, [analyse, pathSchemaDemo, tpl, dataStr, transformStr, schemaStr]);
 
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace. The
   // i18n catalog + locale round-trip into the Lab's LOCALIZATION/catalog.yaml and
   // config.yaml views (ADR-029).
   useEffect(() => {
     let live = true;
-    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr, catalog: effectiveCatalog, locale: loc }, { labUrl })
+    // ADR-030: the typed safe-paths ride the deep link (Lab config.yaml
+    // `analyse.pathSchema`), so the suppression demo round-trips into the Lab.
+    const pathSchema = pathSchemaDemo ? schemaStr.split(",").map((p) => p.trim()).filter(Boolean) : [];
+    labHref(engine, { template: tpl, data: dataStr, partials: parts, helpers: helpersStr, transform: transformStr, catalog: effectiveCatalog, locale: loc, pathSchema }, { labUrl })
       .then((h) => { if (live) setHref(h); })
       .catch(() => {});
     return () => { live = false; };
-  }, [tpl, dataStr, transformStr, parts, helpersStr, effectiveCatalog, loc]);
+  }, [tpl, dataStr, transformStr, parts, helpersStr, effectiveCatalog, loc, pathSchemaDemo, schemaStr]);
 
   // A full-width template row only pays off when the template is actually wide
   // (multi-line or long); a short one-liner like `{{> card}}` would just leave a
@@ -452,6 +473,21 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
             : !analyseRes.ok
               ? <div class="oil-an-empty err">⚠ {analyseRes.error}</div>
               : <AnalyseFindings res={analyseRes} schemaActive={pathSchemaDemo && schemaStr.trim().length > 0} />}
+          {(() => {
+            // One-click JSONata fix: when an observed finding has a targetable path,
+            // offer to apply the cleanup scaffold as the card's transform — the data
+            // is normalised out of the ambiguous set and the finding clears live.
+            if (!analyseRes || !analyseRes.ok) return null;
+            const fix = runnableJsonata(analyseRes.jsonata);
+            const targetable = analyseRes.findings.some((f) => f.kind === "observed" && f.path);
+            if (!fix || !targetable) return null;
+            const applied = transformStr.trim() === fix;
+            return applied
+              ? <div class="oil-an-fixnote">✓ JSONata fix applied — the data is normalised (see the transform pane); the finding clears. <button type="button" class="oil-an-fixundo" onClick={() => { setTransformStr(""); setEdited(true); }}>undo</button></div>
+              : <button type="button" class="oil-an-fixbtn" onClick={() => { setTransformStr(fix); setEdited(true); }}>
+                  ⚙ Apply JSONata fix — normalise the data
+                </button>;
+          })()}
         </div>
       )}
     </figure>
@@ -471,10 +507,29 @@ function AnalyseFindings({ res, schemaActive }) {
   ];
   const by = (k) => res.findings.filter((f) => f.kind === k);
   const total = res.findings.length;
+  // Coverage meter (ADR-030): of the conditions the render evaluated, how many are
+  // portable now / carry a potential what-if / hit an observed divergence. Misses
+  // are data-access, not condition coverage, so they sit outside the bar.
+  const observedN = by("observed").length;
+  const potentialN = by("potential").length;
+  const missN = by("miss").length;
+  const evaluated = res.evaluated || 0;
+  const portableN = Math.max(0, evaluated - observedN - potentialN);
+  const seg = (n, kind, label) => n > 0 &&
+    <span class={"oil-an-seg oil-an-seg-" + kind} style={`flex:${n}`} title={`${n} ${label}`}>{n}</span>;
   return (
     <div class="oil-an">
+      {evaluated > 0 && (
+        <div class="oil-an-meter" role="img"
+             aria-label={`${evaluated} conditions: ${portableN} portable, ${potentialN} potential, ${observedN} observed`}>
+          {seg(portableN, "portable", "portable")}
+          {seg(potentialN, "potential", "potential")}
+          {seg(observedN, "observed", "observed")}
+        </div>
+      )}
       <div class="oil-an-head">
-        {by("observed").length} observed · {by("potential").length} potential · {by("miss").length} miss
+        {evaluated > 0 && <>{evaluated} condition{evaluated === 1 ? "" : "s"} · {portableN} portable · {potentialN} potential · {observedN} observed</>}
+        {missN > 0 && <span> · {missN} miss</span>}
         {schemaActive && <span class="oil-an-supp"> · {res.suppressed} suppressed</span>}
       </div>
       {total === 0 && !schemaActive && (

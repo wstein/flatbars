@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import { analyze, analyzeWith, lint, migrate } from "../lab/vendor/flatbars-engine.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
 import { decodeState } from "../lab/playground_utils.mjs";
-import { examples as analyseExamples } from "../tutorials/src/analyse.mjs";
+import { examples as analyseExamples, gallery as analyseGallery } from "../tutorials/src/analyse.mjs";
 import { lintExamples, migrateExamples, lintLabInput, migrateLabInput } from "../tutorials/src/lint.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,6 +64,19 @@ for (const [key, ex] of Object.entries(analyseExamples)) {
     }
   }
   if (fail === before) console.log(`  ✓ ${key} — ${r.findings.length} finding(s)` + (ex.pathSchema ? `, ${ex.expectSuppressed} suppressed` : ""));
+}
+
+console.log("Analyse gallery (portability at scale):");
+for (const item of analyseGallery) {
+  const before = fail;
+  const r = analyze(item.template, item.data);
+  if (!r.ok) { miss(`${item.name}: analyse errored: ${r.error}`); continue; }
+  const got = { observed: 0, potential: 0, miss: 0 };
+  for (const f of r.findings) if (f.kind in got) got[f.kind]++;
+  for (const k of ["observed", "potential", "miss"])
+    if (got[k] !== item.expect[k])
+      miss(`${item.name}: expected ${item.expect[k]} ${k}, got ${got[k]}`);
+  if (fail === before) console.log(`  ✓ ${item.name} — ${got.observed}/${got.potential}/${got.miss} obs/pot/miss`);
 }
 
 console.log("Lint examples (canonicalization):");

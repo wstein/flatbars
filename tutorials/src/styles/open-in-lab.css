@@ -262,6 +262,67 @@
 .oil .oil-an-flips { color: #9a9aa6; }
 .oil .oil-an-fix { display: block; color: #8fa6b8; font-size: 0.76rem; margin-top: 0.1rem; }
 
+/* Coverage meter (ADR-030): a stacked bar over the evaluated conditions —
+   portable (green) / potential (blue) / observed (amber). Misses sit outside it. */
+.oil .oil-an-meter {
+  display: flex; gap: 2px; height: 0.85rem; margin-bottom: 0.4rem;
+  border-radius: 4px; overflow: hidden;
+}
+.oil .oil-an-seg {
+  display: flex; align-items: center; justify-content: center; min-width: 1.1rem;
+  font: 600 0.66rem/1 var(--font-mono); color: #14141a;
+}
+.oil .oil-an-seg-portable { background: #4ade80; }
+.oil .oil-an-seg-potential { background: #7dd3fc; }
+.oil .oil-an-seg-observed { background: #fbbf24; }
+
+/* One-click JSONata fix: a button on the dark screen, and the applied note. */
+.oil .oil-an-fixbtn {
+  margin-top: 0.55rem; font: 600 0.78rem/1 var(--font-mono);
+  color: #7dd3fc; background: rgba(125, 211, 252, 0.08);
+  border: 1px solid rgba(125, 211, 252, 0.4); border-radius: 6px;
+  padding: 0.4rem 0.65rem; cursor: pointer;
+}
+.oil .oil-an-fixbtn:hover { background: rgba(125, 211, 252, 0.16); border-color: #7dd3fc; }
+.oil .oil-an-fixnote { margin-top: 0.55rem; color: #86efac; font: 400 0.78rem/1.5 var(--font-mono); }
+.oil .oil-an-fixundo {
+  color: #9a9aa6; background: none; border: none; border-bottom: 1px dashed #6b6b78;
+  cursor: pointer; font: inherit; padding: 0;
+}
+.oil .oil-an-fixundo:hover { color: #e6e6ef; }
+
+/* "Portability at scale" gallery (AnalyseGallery.jsx) — compact read-only tiles,
+   each a live finding summary. Global (the island DOM isn't in Astro's scope). */
+.ag-grid {
+  display: grid; gap: 0.7rem; margin: 1rem 0 1.4rem;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+.ag-tile {
+  margin: 0; padding: 0.7rem 0.8rem; border: 1px solid var(--border-strong);
+  border-radius: var(--radius); background: var(--bg-1); display: flex; flex-direction: column; gap: 0.4rem;
+}
+.ag-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.ag-name { color: var(--fg); font-size: 0.92rem; }
+.ag-lab { font: 600 11px/1 var(--font-mono); color: var(--accent-2); text-decoration: none; white-space: nowrap; }
+.ag-lab:hover { text-decoration: underline; }
+.ag-tile .ag-tpl {
+  margin: 0; padding: 0.45rem 0.6rem; background: var(--out-bg); border: 1px solid #000;
+  border-radius: 6px; overflow-x: auto;
+}
+.ag-tile .ag-tpl code { color: var(--out-fg); font: 500 0.76rem/1.5 var(--font-mono); background: none; padding: 0; }
+.ag-desc { margin: 0; color: var(--fg-muted); font-size: 0.8rem; line-height: 1.45; }
+.ag-badges { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: auto; }
+.ag-badge {
+  font: 600 0.7rem/1 var(--font-mono); padding: 0.22rem 0.45rem; border-radius: 5px;
+  border: 1px solid transparent;
+}
+.ag-observed { color: #b45309; background: color-mix(in srgb, #fbbf24 16%, transparent); border-color: color-mix(in srgb, #fbbf24 45%, transparent); }
+.ag-potential { color: #0369a1; background: color-mix(in srgb, #7dd3fc 16%, transparent); border-color: color-mix(in srgb, #7dd3fc 45%, transparent); }
+.ag-miss { color: #6d28d9; background: color-mix(in srgb, #c4b5fd 18%, transparent); border-color: color-mix(in srgb, #c4b5fd 50%, transparent); }
+.ag-portable { color: #15803d; background: color-mix(in srgb, #4ade80 16%, transparent); border-color: color-mix(in srgb, #4ade80 45%, transparent); }
+.ag-pending { color: var(--fg-faint); }
+.ag-err { color: #b91c1c; }
+
 /* The editable safe-paths input (the `pathSchemaDemo` card only): a small field
    above the findings that feeds analyzeWith live. */
 .oil .oil-schema { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem; }
