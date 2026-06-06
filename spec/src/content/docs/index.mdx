@@ -29,16 +29,26 @@ plus the interpreter.
 
 ## The two phases
 
-```
-@startuml
-skinparam shadowing false
-skinparam rectangle { BorderColor #1f1d1b FontName monospace }
-rectangle "Surface dialect (optional sugar)\n{{name}}  a.b.c  @index  ../x  as |x|  {{> p}}" as S #fdf0e6
-rectangle "PHASE 1 — FlatBars core\nlex + parse -> skeleton AST\n{{{ }}}   {{# }}   {{{{# }}}}   comments   ~\nstructure only; no meaning, no else, no keywords" as C #f5f3f0
-rectangle "PHASE 2 — the engine walk (you supply)\nvalidate + interpret the AST, like a JSON Schema\nhelpers, arity, truthiness, escaping, clauses (else/case/...)" as P #e9f5ee
-S --> C : desugars to
-C --> P : handed to
-@enduml
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│ Surface dialect (optional sugar)                                   │
+│   {{name}}   a.b.c   @index   ../x   as |x|   {{> p}}              │
+└──────────────────────────────────────────────────────────────────┘
+        │  desugars to
+        ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ PHASE 1 — FlatBars core                                            │
+│   lex + parse → skeleton AST                                       │
+│   {{{ }}}   {{# }}   {{{{# }}}}   comments   ~                     │
+│   structure only; no meaning, no else, no keywords                 │
+└──────────────────────────────────────────────────────────────────┘
+        │  handed to
+        ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ PHASE 2 — the engine walk (you supply)                             │
+│   validate + interpret the AST, like a JSON Schema                 │
+│   helpers, arity, truthiness, escaping, clauses (else/case/…)      │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 The [core model](/concepts/) explains the decisions. The

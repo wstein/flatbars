@@ -14,7 +14,7 @@ import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../fullbars.mjs";
 
-const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/spec/";
 
 // Sticky left-nav: FullBars concepts, then the sibling surfaces, then the Lab.
 const groups = [
@@ -242,7 +242,7 @@ $ ~> | $ | {
       to render the body with a shifted context and bind <code>as |…|</code> names, and
       <code>options.inverse</code> for <code>{t("{{else}}")}</code> — so the canonical <code>list</code>
       helper (hash + block params and all) runs verbatim
-      (<a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>):
+      (<a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>):
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.blockHelper.template} data={ex.blockHelper.data} helpers={ex.blockHelper.helpers} />
     <div class="callout info">
@@ -250,10 +250,10 @@ $ ~> | $ | {
         The full block <code>options</code> surface works: <code>fn</code>/<code>inverse</code>/<code>hash</code>
         plus <code>options.fn(ctx, &#123; data, blockParams &#125;)</code> — so <code>k=v</code> hash, scoped
         <code>@vars</code>, and <code>as |…|</code> block params are all supported
-        (<a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>); only
+        (<a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>); only
         <code>ids</code>/<code>loc</code>/<code>lookupProperty</code> throw. <code>registerHelper</code>
         is <b>FullBars-only</b>: RawBars and MaxBars use a different concept and terminology
-        (operations / definitions, <a href={`${SPEC_BASE}adr-0019-operation-vocabulary.html`}>ADR-019</a>).
+        (operations / definitions, <a href={`${SPEC_BASE}adr/adr-0019-operation-vocabulary/`}>ADR-019</a>).
         Declaring an arity (<code>registerHelper('loud', fn, 1)</code>) gives the same diagnostics
         as a built-in. In the <b>Lab</b>, helper code runs in a Worker (no page access), not a full
         sandbox — adequate for a playground.
@@ -363,7 +363,7 @@ $ ~> | $ | {
     <p>
       Most of Handlebars works unchanged. A few things differ <b>by design</b> — each a
       consequence of the meaning-free core, each with a one-line replacement. The
-      normative list is <a href={`${SPEC_BASE}fullbars-compat.html`}>fullbars-compat.adoc</a>;
+      normative list is <a href={`${SPEC_BASE}engine/fullbars-compat/`}>fullbars-compat.adoc</a>;
       this table is the short version.
     </p>
     <table class="cmp">
@@ -401,7 +401,7 @@ $ ~> | $ | {
       Writing <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> explicitly is still
       the clearer style. FullBars matches Handlebars on <b>98%</b> of a differential
       conformance corpus (rendered through the real Handlebars engine); the one corpus miss is a
-      raw-block corner (user-defined block helpers now pass — <a href={`${SPEC_BASE}adr-0020-user-block-helpers.html`}>ADR-020</a>).
+      raw-block corner (user-defined block helpers now pass — <a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>).
       In-data lambdas aren't a gap: a value is pure data, so value-producing lambdas are precalculated
       before rendering and section lambdas are helpers.
     </p>
@@ -415,14 +415,14 @@ $ ~> | $ | {
       paths, the built-in helpers, subexpressions, partials, custom helpers — running
       <b>unchanged on FullBars</b>. The complete concept-by-concept mapping (with the
       core each one desugars to) is the normative
-      <a href={`${SPEC_BASE}appendix-handlebars.html`}>Handlebars → FlatBars appendix</a>.
+      <a href={`${SPEC_BASE}appendix/handlebars/`}>Handlebars → FlatBars appendix</a>.
     </p>
     <h3>The other ~70 helpers</h3>
     <p>
       This page tours the six built-ins; the rest of the prelude — string, array, math,
       and comparison helpers like <code>uppercase</code>, <code>join</code>,
       <code>add</code>, <code>sortBy</code>, <code>eq</code> — lives in the generated
-      <a href={`${SPEC_BASE}prelude.html`}>helper catalog</a>, which is the single source
+      <a href={`${SPEC_BASE}engine/prelude/`}>helper catalog</a>, which is the single source
       of truth (it can't drift from the engine).
     </p>
     <h3>Up and down the ladder</h3>

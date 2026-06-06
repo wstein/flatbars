@@ -8,17 +8,18 @@ FlatBars is a template-engine **construction kit**, not a template engine. The
 core is a meaning-free parser; everything you expect from Handlebars/Mustache
 (helpers, escaping, control flow, path semantics) is supplied by an *engine*
 built on top. This is a PureScript monorepo holding the reference
-implementation and a CLI, plus the normative spec in `docs/` and the FlatBars Lab
+implementation and a CLI, plus the normative spec in `spec/` and the FlatBars Lab
 (a JS/WASM polyglot playground in `lab`, served as static files).
 
-The spec in `docs/` is the contract; the PureScript packages target it.
-`docs/modules/ROOT/pages/concepts.adoc` is the fastest way to understand the
-core model; `host-api.adoc` defines the API `core` exposes. `npm run docs` builds
-the spec site (Antora: `antora-playbook.yml` is the site config, `docs/antora.yml`
-the component descriptor); the `docs/supplemental-ui/` UI brings it into the
-FlatBars design system (the shared tokens + IBM Plex + violet accent + logo). The
-build reads content from git HEAD, so a *linked git worktree* can't build it in
-place — run it from a normal checkout.
+The spec in `spec/` is the contract; the PureScript packages target it. It is an
+Astro Starlight site (MDX) — `spec/src/content/docs/concepts.mdx` is the fastest
+way to understand the core model; `engine/host-api.mdx` defines the API `core`
+exposes. `npm run build:spec` builds it (Pagefind offline search +
+`starlight-links-validator`); the palette comes from the shared design system via
+`customCss` (the shared tokens + IBM Plex + violet accent + logo). The spec was
+migrated from Antora/AsciiDoc to Starlight in ADR-031; the `.mdx` are the
+maintained source (the one-time converter is gone), and the helper catalog is
+generated into `spec/src/partials/helper-catalog.mdx` from `FullBars.Catalog`.
 
 ## Toolchain & commands
 
@@ -34,24 +35,23 @@ npm run lint           # spago build --pedantic-packages (catches unused/missing
 npm run format         # purs-tidy format-in-place; format:check to verify only
 ```
 
-**Spec site, mid-migration (ADR-031, additive).** The spec is being migrated from
-Antora (AsciiDoc) to Astro Starlight (MDX). Both are live: `npm run docs` still
-builds the authoritative Antora site, while `spec/` is the new Starlight site that
-*builds green* from the same source. `scripts/migrate-spec-all.mjs` converts every
-`docs/.../pages/*.adoc` → `spec/src/content/docs/**/*.mdx` (the per-file transform,
-`scripts/migrate-spec.mjs`, is unit-tested by `test:migrate-spec`); `gen:catalog`
-emits the helper catalog as *both* an AsciiDoc and an MDX partial from the one
-`FullBars.Catalog` source. Spec commands:
+**Spec site (`spec/`, Astro Starlight — ADR-031).** The normative spec is a
+standalone Starlight app deployed at `/flatbars/spec/` (the tutorials link into it
+via `PUBLIC_SPEC_BASE`). The `.mdx` under `spec/src/content/docs/**` are the
+maintained source — edit them directly. Build/verify:
 
 ```sh
-npm run gen:spec       # regenerate spec/ MDX + sidebar from the .adoc source
-npm run check:spec     # fail if the committed MDX is stale vs the .adoc (in npm test)
 npm run build:spec     # astro build: MDX validity + Pagefind + starlight-links-validator
+( cd spec && npm install && npm run dev )   # local preview
 ```
 
-Until the cutover (delete `docs/` + the converter, repoint the four docs-reading
-gates), the `.adoc` files remain the source of truth and the `.mdx` are generated.
-Do not hand-edit `spec/src/content/docs/**` — edit the `.adoc` and `gen:spec`.
+Conventions: every ADR page must be linked from `spec/src/sidebar.ts`
+(`check:adr-nav`); the helper catalog is generated into
+`spec/src/partials/helper-catalog.mdx` by `npm run gen:catalog` from the one
+`FullBars.Catalog` source (`check:catalog`); the token palette is copied into
+`spec/src/styles/` by `gen:tokens` (`check:tokens`); `check:glossary` reads the
+spec MDX. Spec deps live in `spec/package.json` (not the root install). The one
+PlantUML diagram became an ASCII flow; richer Mermaid diagrams are a follow-up.
 
 Run one package's PureScript tests directly (faster than `npm test`):
 
@@ -156,7 +156,7 @@ of helper frames + current context).
 2. **Walk.** An engine supplies the second pass. The reference engine lives in
    `kernel` + `fullbars`.
 
-Key core facts (see `concepts.adoc`): everything is a helper application
+Key core facts (see `concepts.mdx`): everything is a helper application
 (`{{{city}}}` *calls* helper `city` — there are no variables); application is
 juxtaposition, parens only group; the head of an application is always a name;
 scope is just scoped helpers that blocks install/remove. `{{else}}` is a
@@ -214,7 +214,7 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   - **`maxbars`** — the flagship surface: reuses FullBars's engine by dependency and
     adds infix operators and pipes (`MaxBars.Expr`), desugaring to the same core
     `Expr`. Borrows most of FullBars's surface, not quite all (a few FullBars-only
-    constructs diverge — see `maxbars.adoc`).
+    constructs diverge — see `engine/maxbars.mdx`).
 - **`compile`** (`flatbars-compile`) — the dialect-agnostic emit driver →
   `export default function (data, rt)`. **`fullbars-compile`** layers the
   surface compiler on top. Emitted JS runs against
@@ -320,7 +320,7 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
   generates it into the fenced `@palette` regions of
   `tutorials/src/styles/lab-tokens.css` (Astro bundles it) and `lab/index.html`
   (the static Lab inlines it), plus a verbatim copy at
-  `docs/supplemental-ui/css/flatbars-tokens.css` (the Antora spec serves it).
+  `spec/src/styles/flatbars-tokens.css` (the Starlight spec loads it via `customCss`).
   Change a colour → run `npm run gen:tokens`; `check:tokens` (in `npm test`)
   fails on drift. Every
   value clears WCAG AA (4.5:1) on its tint, the page bg, and as a solid chip —
@@ -360,6 +360,6 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
   `gen:conformance`, which measures them through the shipped lab bundle to
   generate the tutorial's conformance table (`check:bundle` keeps the two in
   step). Change the prelude/engine and re-run `npm run gen:conformance`.
-- ADR-001 (`docs/modules/ROOT/pages/adr-0001-structural-parser-and-walker.adoc`)
+- ADR-001 (`spec/src/content/docs/adr/adr-0001-structural-parser-and-walker.mdx`)
   records the structural-parser-plus-walker decision that the whole design rests
   on.

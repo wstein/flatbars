@@ -68,7 +68,7 @@ export default defineConfig({
       customCss: ["./src/styles/flatbars-tokens.css", "./src/styles/spec.css"],
       // Build-time link integrity — the replacement for Antora's xref guarantee.
       plugins: [starlightLinksValidator()],
-      // Generated from docs/modules/ROOT/nav.adoc by scripts/migrate-spec-all.mjs.
+      // Maintained in src/sidebar.ts; check:adr-nav asserts every ADR is linked.
       sidebar,
     }),
     ...(BASE ? [normalizeBaseHrefs(BASE)] : []),

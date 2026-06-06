@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// Generated from docs/modules/ROOT/nav.adoc by scripts/migrate-spec-all.mjs — do not edit.
-// After the Antora cutover this file becomes the maintained source.
+// The Starlight spec sidebar (ADR-031). Maintained source: add a new page or ADR
+// here. `check:adr-nav` asserts every ADR page under content/docs/adr is linked.
 export const sidebar = [
   {
     "label": "Introduction",

@@ -31,10 +31,9 @@ if (!existsSync(compiled)) {
 
 const mod = await import(compiled);
 
-// One source, two rendered partials. `export` is the FullBars.Catalog binding;
-// `path` is the file it owns.
+// The rendered partial. `export` is the FullBars.Catalog binding; `path` is the
+// file it owns. The Starlight spec site imports the MDX twin (ADR-031).
 const partials = [
-  { export: "helperCatalogAdoc", path: "docs/modules/ROOT/partials/helper-catalog.adoc" },
   { export: "helperCatalogMarkdown", path: "spec/src/partials/helper-catalog.mdx" },
 ];
 

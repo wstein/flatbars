@@ -15,24 +15,24 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-const pages = resolve(dirname(fileURLToPath(import.meta.url)), "../docs/modules/ROOT/pages");
-const concepts = readFileSync(resolve(pages, "concepts.adoc"), "utf8");
-const hostApi = readFileSync(resolve(pages, "host-api.adoc"), "utf8");
-const rawbars = readFileSync(resolve(pages, "adr-0008-rawbars.adoc"), "utf8");
-const maxbars = readFileSync(resolve(pages, "maxbars.adoc"), "utf8");
+const docs = resolve(dirname(fileURLToPath(import.meta.url)), "../spec/src/content/docs");
+const concepts = readFileSync(resolve(docs, "concepts.mdx"), "utf8");
+const hostApi = readFileSync(resolve(docs, "engine/host-api.mdx"), "utf8");
+const rawbars = readFileSync(resolve(docs, "adr/adr-0008-rawbars.mdx"), "utf8");
+const maxbars = readFileSync(resolve(docs, "engine/maxbars.mdx"), "utf8");
 
 const fail = [];
 const need = (cond, msg) => { if (!cond) fail.push(msg); };
 
-// The glossary section: the `== Glossary` heading to the next top-level heading.
-need(concepts.includes("[#glossary]"), "concepts.adoc: missing the [#glossary] anchor (the §1 xref target)");
-const gi = concepts.indexOf("== Glossary");
-need(gi >= 0, "concepts.adoc: missing the '== Glossary' section");
-const after = gi >= 0 ? concepts.indexOf("\n== ", gi + 5) : -1;
+// The glossary section: the `## Glossary` heading (its slug is the #glossary xref
+// target) to the next same-level heading.
+const gi = concepts.indexOf("## Glossary");
+need(gi >= 0, "concepts.mdx: missing the '## Glossary' section (the #glossary xref target)");
+const after = gi >= 0 ? concepts.indexOf("\n## ", gi + 5) : -1;
 const glossary = gi >= 0 ? concepts.slice(gi, after >= 0 ? after : concepts.length) : "";
 
 // concepts §1 must point readers at the glossary (discoverability of the registers).
-need(/xref:concepts\.adoc#glossary/.test(concepts), "concepts.adoc: §1 must xref the #glossary");
+need(/#glossary/.test(concepts), "concepts.mdx: §1 must link the #glossary anchor");
 
 // Every native term is defined (as a bold `*term*` row) and carries its host-API
 // synonym (the migrator's word). `operator` is surface-only — no host synonym.

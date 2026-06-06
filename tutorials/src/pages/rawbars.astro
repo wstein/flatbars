@@ -12,7 +12,7 @@ import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../rawbars.mjs";
 
-const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/spec/";
 
 const groups = [
   {
@@ -215,8 +215,8 @@ const t = (s) => s;
     <h2>Under the hood — one core, four pluggable rules</h2>
     <p>
       RawBars is the bare expression of the design the whole project rests on
-      (<a href={`${SPEC_BASE}adr-0001-structural-parser-and-walker.html`}>ADR-0001</a>,
-      <a href={`${SPEC_BASE}concepts.html`}>concepts</a>): a <b>meaning-free
+      (<a href={`${SPEC_BASE}adr/adr-0001-structural-parser-and-walker/`}>ADR-0001</a>,
+      <a href={`${SPEC_BASE}concepts/`}>concepts</a>): a <b>meaning-free
       parser</b> builds a structural tree, and a pluggable rule supplies the
       meaning — <i>"don't call us, we call you."</i> The same idea appears four
       times, and you've just seen two of them run:
@@ -266,7 +266,7 @@ const t = (s) => s;
     <p>
       The full list — comparisons, arithmetic, string/array helpers, the scoped
       loop variables — is the generated
-      <a href={`${SPEC_BASE}prelude.html`}>helper catalog</a>. Every one is
+      <a href={`${SPEC_BASE}engine/prelude/`}>helper catalog</a>. Every one is
       available identically in FullBars and MaxBars.
     </p>
     <p>

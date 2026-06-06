@@ -46,10 +46,10 @@ for (const page of ["src/pages/index.astro", "src/layouts/Reference.astro"]) {
   }
 }
 
-// Spec-link guard: every link into the Antora spec must go through
+// Spec-link guard: every link into the Starlight spec must go through
 // PUBLIC_SPEC_BASE (like the reference pages), so it resolves at the deployed
-// path /flatbars/spec/flatbars/. A hardcoded `/spec/` is both 404 in dev and
-// wrong in production — that was the landing footer's "Docs" bug.
+// path /flatbars/spec/. A hardcoded `/spec/` is both 404 in dev and wrong in
+// production — that was the landing footer's "Docs" bug.
 console.log("\nSpec-link guard:");
 for (const page of ["src/pages/index.astro"]) {
   const src = readFileSync(new URL(`../tutorials/${page}`, import.meta.url), "utf8");

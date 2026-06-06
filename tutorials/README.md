@@ -69,10 +69,10 @@ parameterised by three env vars (set in the workflow; unset locally ⇒ root, so
 
 The Lab is plain static files with **relative** asset paths, so the workflow just
 copies `lab/` into `dist/lab/` (served at `/flatbars/lab/`); its "Docs" backlink
-(`../<engine>`) resolves to `/flatbars/<engine>`. The **Antora spec** is built in
-the same workflow (`npm run docs`) and copied to `dist/spec/`, so it ships on the
-same origin and the footer links resolve (the spec lives under Antora's component
-path, hence `…/spec/flatbars/`). To deploy at a **root** origin instead (custom
+(`../<engine>`) resolves to `/flatbars/<engine>`. The **Starlight spec** (`spec/`)
+is built in the same workflow (`npm run build:spec`) and copied to `dist/spec/`, so
+it ships on the same origin and the footer links resolve (clean URLs under
+`/flatbars/spec/`, no component segment). To deploy at a **root** origin instead (custom
 domain or a user/org page), drop `PUBLIC_BASE_PATH` (and add a `CNAME`); the links
 then stay root-absolute as authored.
 

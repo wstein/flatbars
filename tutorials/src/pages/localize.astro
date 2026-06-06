@@ -57,7 +57,7 @@ const groups = [
     <p>
       Translation is <b>meaning</b>, and meaning in FlatBars is plugged in, not built
       in. FlatBars <em>does</em> ship a blessed <code>t</code> operation
-      (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029</a>):
+      (<a href="https://github.com/wstein/flatbars/blob/main/spec/src/content/docs/adr/adr-0029-i18n-helper.mdx">ADR-029</a>):
       <code>{`{{t "key"}}`}</code> is catalogued, validated, and editor-painted, and on
       its own it simply returns the key — <b>so a template that uses <code>t</code>
       with no host wired ships its keys verbatim</b> (analyse mode flags this). What
@@ -81,7 +81,7 @@ const groups = [
       — <code>Intl.PluralRules</code> knows every language's plural categories and
       <code>Intl.NumberFormat</code> groups digits per locale, both at <b>zero</b>
       bundle cost. That is why the Lab does <em>not</em> vendor i18next: the platform
-      already does the hard part (<a href="https://github.com/wstein/flatbars/blob/main/docs/modules/ROOT/pages/adr-0029-i18n-helper.adoc">ADR-029 amendment</a>).
+      already does the hard part (<a href="https://github.com/wstein/flatbars/blob/main/spec/src/content/docs/adr/adr-0029-i18n-helper.mdx">ADR-029 amendment</a>).
       The examples below are interactive — flip the locale or change the count on any
       card and the output re-derives live, all reading from <a href="#catalog">one shared
       catalog</a>.

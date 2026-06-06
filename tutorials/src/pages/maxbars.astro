@@ -15,7 +15,7 @@ import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../maxbars.mjs";
 
-const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/spec/";
 
 // Sticky left-nav: MaxBars concepts, then the sibling surfaces, then the Lab.
 const groups = [
@@ -153,7 +153,7 @@ const t = (s) => s;
     <OpenInLab client:visible engine="maxbars" template={ex.pipeChain.template} data={ex.pipeChain.data} />
     <p class="tip">
       The right-hand side of a pipe is a helper from the
-      <a href={`${SPEC_BASE}prelude.html`}>prelude catalog</a> (here <code>pluck</code>,
+      <a href={`${SPEC_BASE}engine/prelude/`}>prelude catalog</a> (here <code>pluck</code>,
       <code>join</code>, <code>uppercase</code>, <code>toFixed</code>) — or one a host
       registers. The pipe doesn't add helpers; it's a second way to call them.
     </p>
@@ -335,10 +335,10 @@ const t = (s) => s;
       <li>You're porting <b>Mustache</b> templates. That's <a href="/minbars">MinBars</a>.</li>
     </ul>
     <p>
-      Same engine, same compiler, same ~80-helper <a href={`${SPEC_BASE}prelude.html`}>prelude</a>
+      Same engine, same compiler, same ~80-helper <a href={`${SPEC_BASE}engine/prelude/`}>prelude</a>
       under all four — MaxBars just turns the most sugar on. Jump into the
       <a href="/lab/index.html?engine=maxbars">Lab</a> and start typing, or read the
-      normative <a href={`${SPEC_BASE}maxbars.html`}>maxbars.adoc</a>.
+      normative <a href={`${SPEC_BASE}engine/maxbars/`}>maxbars.adoc</a>.
     </p>
   </section>
 </Reference>

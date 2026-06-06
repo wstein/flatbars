@@ -11,7 +11,7 @@ import "../styles/open-in-lab.css";
 import "../styles/reference-content.css";
 import "../styles/docs-chrome.css";
 
-const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/";
+const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/spec/";
 // `dialect` drives the topbar "Open the Lab" target and the runtime inline-code
 // highlighter (so a prose `{{name}}` lights up in the page's own dialect).
 const { title, subtitle, groups = [], spec, dialect = "fullbars" } = Astro.props;

@@ -44,9 +44,17 @@ jobs:
           cache: npm
           cache-dependency-path: tutorials/package-lock.json
 
-      - name: Build the Antora spec site (themed via docs/supplemental-ui)
-        run: npx --yes antora@3.1.15 --fetch antora-playbook.yml
-        # Outputs ./build/site (component pages under build/site/flatbars/…).
+      - name: Build the Starlight spec site (ADR-031)
+        working-directory: spec
+        env:
+          # The spec mounts at /flatbars/spec; its base-href pass prefixes the
+          # authored root-absolute links to that base.
+          PUBLIC_SPEC_BASE: /flatbars/spec
+          PUBLIC_SITE: https://wstein.github.io
+        run: |
+          npm ci
+          npm run build
+        # Outputs ./dist (clean URLs: dist/concepts/, dist/adr/<slug>/, …).
 
       - name: Install tutorials dependencies
         working-directory: tutorials
@@ -58,13 +66,13 @@ jobs:
           PUBLIC_BASE_PATH: /flatbars
           PUBLIC_SITE: https://wstein.github.io
           PUBLIC_LAB_URL: /flatbars/lab/index.html
-          # The Antora spec lives under the component path inside dist/spec, so its
-          # ADR pages resolve at /flatbars/spec/flatbars/<name>.html.
-          PUBLIC_SPEC_BASE: /flatbars/spec/flatbars/
+          # The Starlight spec serves at /flatbars/spec/, so its pages resolve at
+          # /flatbars/spec/<route>/ (clean URLs, no component segment or .html).
+          PUBLIC_SPEC_BASE: /flatbars/spec/
         run: |
           npm run build
           cp -R ../lab dist/lab
-          cp -R ../build/site dist/spec
+          cp -R ../spec/dist dist/spec
           touch dist/.nojekyll
 
       - uses: actions/upload-pages-artifact@v5

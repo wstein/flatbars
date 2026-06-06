@@ -9,8 +9,7 @@
 -- | this to a partial the prelude page includes, and re-runs with `--check` in CI
 -- | to fail on drift.
 module FullBars.Catalog
-  ( helperCatalogAdoc
-  , helperCatalogMarkdown
+  ( helperCatalogMarkdown
   , OpInfo
   , operations
   ) where
@@ -55,44 +54,6 @@ renderArity = case _ of
   Between a b -> show a <> "–" <> show b
   AnyArity -> "any"
 
-renderRow :: Tuple String { block :: Boolean, arity :: Arity } -> String
-renderRow (Tuple name spec) =
-  "|`" <> name <> "` |" <> form <> " |" <> renderArity spec.arity <> " |" <> source <> " |" <> desc
-  where
-  form = if spec.block then "block" else "value"
-  source = case lookup name preludeAliases of
-    Just canonical -> "alias of `" <> canonical <> "`"
-    Nothing -> case lookup name preludeSynonyms of
-      Just canonical -> "synonym of `" <> canonical <> "`"
-      Nothing -> if Set.member name registeredNames then "registered" else "scoped"
-  -- The one-line doc, escaped for AsciiDoc: a leading `{` of a `{{…}}` tag would
-  -- otherwise be read as an attribute reference, so neutralise every brace.
-  desc = escAdoc (fromMaybe "" (Map.lookup name docByName))
-
--- | Escape AsciiDoc attribute-reference syntax in generated cell text: `\{` is a
--- | literal brace, so `{{name}}` survives verbatim instead of being substituted.
-escAdoc :: String -> String
-escAdoc = replaceAll (Pattern "{") (Replacement "\\{")
-
--- | The full AsciiDoc partial: a generated, do-not-edit table of every helper in
--- | `preludeSchema`, sorted by name (the `Map` is already key-ordered).
-helperCatalogAdoc :: String
-helperCatalogAdoc =
-  header
-    <>
-      "[cols=\"2,1,1,2,4\",options=\"header\"]\n|===\n|Operation |Form |Arity |Source |Description\n\n"
-    <> rows
-    <> "|===\n"
-  where
-  header =
-    "// Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit.\n"
-      <> "// Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`.\n\n"
-  rows =
-    foldMap (\r -> renderRow r <> "\n")
-      ( Map.toUnfoldable preludeSchema.helpers
-          :: Array (Tuple String { block :: Boolean, arity :: Arity })
-      )
-
 -- | Escape one description cell for an MDX/GFM table. A `|` breaks table columns
 -- | everywhere, so it is always backslash-escaped. A brace in *prose* (e.g. the
 -- | `{{else}}` in "renders the else clause") would start an MDX expression, so it
@@ -128,8 +89,8 @@ renderRowMd (Tuple name spec) =
   desc = escMd (fromMaybe "" (Map.lookup name docByName))
 
 -- | The full MDX partial: a generated, do-not-edit GitHub-flavoured Markdown table
--- | of every helper in `preludeSchema`, sorted by name. The MDX twin of
--- | `helperCatalogAdoc` for the Starlight spec site (ADR-031), from the same source.
+-- | of every helper in `preludeSchema`, sorted by name. Imported by the Starlight
+-- | spec site's prelude page (ADR-031); the single source the catalog is built from.
 helperCatalogMarkdown :: String
 helperCatalogMarkdown =
   header

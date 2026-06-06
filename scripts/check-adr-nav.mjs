@@ -1,49 +1,49 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// check:adr-nav — assert every adr-*.adoc page is referenced by docs/modules/ROOT/nav.adoc
-// AND every nav xref points at a real ADR file. Catches the silent-drift failure
-// mode where a new ADR is committed (e.g. ADR-026/027/028 from the June 2026
-// editor round) but never linked from the nav, so the Antora-built site never
-// surfaces it to readers — every per-page gate stays green and the omission is
-// only noticed when someone searches the rendered site for the title.
+// check:adr-nav — assert every ADR page in the Starlight spec is linked from the
+// sidebar, and every sidebar ADR link points at a real ADR page. Catches the
+// silent-drift failure mode where a new ADR is committed but never surfaced in the
+// site navigation, so readers never find it.
 //
-// Counts only `^\* xref:adr-…` rows; the `adr-final-review.adoc` synthesis page
-// (and any explicit non-`adr-NNNN-*.adoc` reference) is exempt from the pages
-// projection.
+// The `adr-final-review` synthesis page is exempt from the numbered-ADR
+// projection (it is linked, but is not an `adr-NNNN-*` decision record).
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const pagesDir = resolve(root, "docs", "modules", "ROOT", "pages");
-const navPath = resolve(root, "docs", "modules", "ROOT", "nav.adoc");
+const adrDir = resolve(root, "spec/src/content/docs/adr");
+const sidebarPath = resolve(root, "spec/src/sidebar.ts");
 
-const ADR_FILE = /^adr-\d{4,}-[a-z0-9-]+\.adoc$/;
-const NAV_XREF = /^\* xref:(adr-[0-9a-z-]+\.adoc)/gm;
+const ADR_FILE = /^adr-\d{4,}-[a-z0-9-]+\.mdx$/;
+const adrPages = readdirSync(adrDir)
+  .filter((f) => ADR_FILE.test(f))
+  .map((f) => f.replace(/\.mdx$/, ""))
+  .sort();
 
-const pageFiles = readdirSync(pagesDir).filter((f) => ADR_FILE.test(f)).sort();
-const nav = readFileSync(navPath, "utf8");
-const navRefs = new Set();
-for (const m of nav.matchAll(NAV_XREF)) navRefs.add(m[1]);
+const sidebar = readFileSync(sidebarPath, "utf8");
+// Sidebar links are `/adr/<slug>/`; collect the slugs it references.
+const linked = new Set();
+for (const m of sidebar.matchAll(/"\/adr\/(adr-[0-9a-z-]+)\/"/g)) linked.add(m[1]);
 
-const missingFromNav = pageFiles.filter((f) => !navRefs.has(f));
-const navWithoutFile = [...navRefs].filter((f) => f.startsWith("adr-") && /^adr-\d{4,}-/.test(f) && !pageFiles.includes(f));
+const missing = adrPages.filter((p) => !linked.has(p));
+const dangling = [...linked].filter((p) => /^adr-\d{4,}-/.test(p) && !adrPages.includes(p));
 
 let failed = false;
-if (missingFromNav.length) {
-  console.error(`✗ ADR page(s) present but missing from docs/modules/ROOT/nav.adoc:`);
-  for (const f of missingFromNav) console.error(`    ${f}`);
+if (missing.length) {
+  console.error("✗ ADR page(s) present but missing from spec/src/sidebar.ts:");
+  for (const p of missing) console.error(`    ${p}`);
   failed = true;
 }
-if (navWithoutFile.length) {
-  console.error(`✗ nav.adoc xref(s) point at non-existent ADR file(s):`);
-  for (const f of navWithoutFile) console.error(`    ${f}`);
+if (dangling.length) {
+  console.error("✗ sidebar link(s) point at non-existent ADR page(s):");
+  for (const p of dangling) console.error(`    ${p}`);
   failed = true;
 }
 if (failed) {
-  console.error(`\n  fix: add the missing entry to docs/modules/ROOT/nav.adoc (or remove the stale xref)`);
+  console.error("\n  fix: add the missing entry to spec/src/sidebar.ts (or remove the stale link)");
   process.exit(1);
 }
-console.log(`✓ check:adr-nav — ${pageFiles.length} ADR pages, all linked from nav.adoc`);
+console.log(`✓ check:adr-nav — ${adrPages.length} ADR pages, all linked from the sidebar`);

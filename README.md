@@ -16,8 +16,8 @@ implementation and a CLI, alongside the normative specification and the
 
 ```
 .
-├── docs/                  Normative specification (Antora component)
-│   └── modules/ROOT/      pages/*.adoc · nav.adoc · assets/images
+├── spec/                  Normative specification (Astro Starlight site, MDX)
+│   └── src/content/docs/  concepts · spec/* · engine/* · adr/* · appendix/*
 ├── site/                  Hand-written marketing landing page (index.html)
 ├── packages/
 │   ├── core/              `flatbars` — the engine-agnostic framework (lexer · parser · driver · walk)
@@ -33,8 +33,8 @@ implementation and a CLI, alongside the normative specification and the
     └── web/               FlatBars Lab — the JS/WASM polyglot playground (Stem · RawBars · MinBars · FullBars · MaxBars)
 ```
 
-The specification (`docs/`) is the contract. The PureScript packages target it;
-`docs/modules/ROOT/pages/host-api.adoc` defines the host API the `core` package
+The specification (`spec/`) is the contract. The PureScript packages target it;
+`spec/src/content/docs/engine/host-api.mdx` defines the host API the `core` package
 exposes.
 
 The `examples/*/` folders (each `meta.json` + `template.hbs` + `data.json`) are
@@ -72,7 +72,7 @@ npm install            # installs purescript + spago (+ esbuild for the flatbars
 npm run build          # compile every package in the workspace
 npm test               # run the full suite (per-package tests + conformance gates)
 npm run cli -- --help  # run the CLI
-npm run docs           # build the Antora documentation site (requires antora)
+npm run build:spec     # build the Astro Starlight spec site (spec/)
 # FlatBars Lab: serve lab/ over HTTP and open index.html
 #   (defaults to the FullBars engine — no build needed; the Stem engine also
 #    needs its wasm: run lab/build.sh, requires the Rust wasm toolchain)
