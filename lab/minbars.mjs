@@ -21,7 +21,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=57";
+} from "./vendor/flatbars-engine.mjs?v=58";
 
 const MIN_VERSION = "0.1.0";
 

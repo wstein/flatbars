@@ -1694,7 +1694,7 @@
       // Engine-derived template highlighting (ADR-014): the shared presenter +
       // the lexer's own tokenizer, in place of a hand-written tag regex.
       import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=57";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=58";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -5852,13 +5852,16 @@
           body.append(section);
           return;
         }
-        // ADR-030 coverage honesty: observed findings the data actually hit vs
-        // potential same-type ambiguous values any condition could hold.
-        const observed = a.findings.filter((f) => f.kind !== "potential");
+        // ADR-030 coverage honesty: observed findings the data actually hit, the
+        // potential same-type ambiguous value any condition could hold, and advisory
+        // data-access misses (a bare path absent from a present object).
+        const observed = a.findings.filter((f) => f.kind === "observed");
         const potential = a.findings.filter((f) => f.kind === "potential");
+        const misses = a.findings.filter((f) => f.kind === "miss");
         section.append(makeEl("div", { class: "cv-head" }, [
           makeEl("strong", {}, "Truthiness"),
           " — ", String(observed.length), " observed, ", String(potential.length), " potential",
+          misses.length ? `, ${misses.length} miss` : "",
         ]));
         if (a.findings.length === 0) {
           section.append(makeEl("div", { class: "cv-empty" },
@@ -5866,14 +5869,14 @@
           body.append(section);
           return;
         }
-        // A finding row (observed verb "tested", potential verb "would diverge if it held").
-        const findingGroup = (rows, verb) => {
+        // A finding row; `label(f)` formats the middle column (truthiness findings
+        // name the flips; misses describe the absent path).
+        const findingGroup = (rows, label) => {
           const list = makeEl("div", { class: "cv-rows" });
           for (const f of rows) {
             const row = makeEl("div", { class: "cv-row dead" }, [
               makeEl("span", { class: "cv-kind" }, f.tag),
-              makeEl("span", { class: "cv-label" },
-                `${verb} ${plain(f.value)} — flips under ${f.flips.join(", ")}`),
+              makeEl("span", { class: "cv-label" }, label(f)),
               makeEl("span", { class: "cv-where" }, `main:${f.line}:${f.column}`),
             ]);
             row.title = "jump to source";
@@ -5884,15 +5887,21 @@
           }
           return list;
         };
+        const flipLabel = (verb) => (f) => `${verb} ${plain(f.value)} — flips under ${f.flips.join(", ")}`;
         if (observed.length) {
           section.append(makeEl("div", { class: "cv-hint" },
             "Observed — this data drove the condition into an ambiguous value that branches differently on another engine. Branch explicitly."));
-          section.append(findingGroup(observed, "tested"));
+          section.append(findingGroup(observed, flipLabel("tested")));
         }
         if (potential.length) {
           section.append(makeEl("div", { class: "cv-hint" },
             "Potential — portable for this data, but the same-type ambiguous value would diverge (independent of the sample). Branch explicitly to be safe for all data."));
-          section.append(findingGroup(potential, "would diverge if it held"));
+          section.append(findingGroup(potential, flipLabel("would diverge if it held")));
+        }
+        if (misses.length) {
+          section.append(makeEl("div", { class: "cv-hint" },
+            "Possible misses (advisory) — a bare path resolved to absent from a present object, for this data. Likely a typo or a missing field."));
+          section.append(findingGroup(misses, (f) => `\`${f.path}\` ${plain(f.value)}`));
         }
         body.append(section);
       }

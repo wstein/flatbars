@@ -38,7 +38,7 @@ import {
   analyzeWith as bbAnalyzeWith,
   lint as bbLint,
   migrate as bbMigrate,
-} from "./vendor/flatbars-engine.mjs?v=57";
+} from "./vendor/flatbars-engine.mjs?v=58";
 
 const BB_VERSION = "0.1.0";
 

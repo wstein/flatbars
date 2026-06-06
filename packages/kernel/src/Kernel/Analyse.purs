@@ -48,11 +48,14 @@ import Kernel.Prelude (prelude)
 import Kernel.Render (preludeEnv)
 import Kernel.Value (Truthy, handlebars, minimal, mustache, presence)
 
--- | One observed truthiness decision: where the condition tag is, which operation
--- | tested it, the value it resolved to, whether the *engine* judged it truthy,
--- | and the named rules whose verdict differs (empty ⇒ portable here).
+-- | One observed decision: where the tag is, which operation it came from, the
+-- | value it resolved to, and — for a `"cond"` decision — whether the *engine*
+-- | judged it truthy and the named rules whose verdict differs (empty ⇒ portable
+-- | here). A `"miss"` decision (ADR-030 #4) is a bare path that resolved to absent
+-- | from a present container (`truthyHere`/`diverges` unused).
 type Decision =
-  { span :: Span
+  { kind :: String
+  , span :: Span
   , op :: String
   , value :: Value
   , truthyHere :: Boolean
@@ -88,9 +91,10 @@ divergence v here =
   Array.filter (\t -> snd t /= here)
     (map (\t -> Tuple (fst t) ((snd t) v)) namedRules)
 
--- | A decision is a *finding* when some engine would branch the other way.
+-- | A *condition* decision is a finding when some engine would branch the other
+-- | way. (Miss decisions are not truthiness findings — they have no divergence.)
 isFinding :: Decision -> Boolean
-isFinding d = not (Array.null d.diverges)
+isFinding d = d.kind == "cond" && not (Array.null d.diverges)
 
 -- | A structured portability finding for a host UI (the Lab's Truthiness dock
 -- | panel): its `kind` (`"observed"` — the sample hit an ambiguous value;
@@ -182,18 +186,48 @@ potentialFindings schema src decisions =
       else Just finding
   sameTagValue a b = a.tag == b.tag && a.value == b.value
 
--- | Observed findings then potential findings (the host `PathSchema` filtering the
--- | latter) — the full host-UI finding set.
+-- | The *miss* findings (ADR-030 #4): bare paths that resolved to absent from a
+-- | present, non-empty container — the classic "you navigated into the object but
+-- | misspelled the last key" typo signature. Advisory and data-dependent ("for
+-- | this data"); deduped by path and filtered by the host `PathSchema` (a host can
+-- | mark a known-optional path so its miss is quiet). Only paths `recoverPath` can
+-- | name are reported (so every miss is targetable).
+missFindings :: PathSchema -> String -> Array Decision -> Array Finding
+missFindings schema src decisions =
+  Array.nubByEq sameTag (Array.mapMaybe toMiss (Array.filter (\d -> d.kind == "miss") decisions))
+  where
+  toMiss d = recoverPath (Str.trim (spanText src d.span)) >>= \p ->
+    if schema p VNull then
+      let
+        lc = lineColumn src d.span.start
+      in
+        Just
+          { kind: "miss"
+          , line: lc.line
+          , column: lc.column
+          , tag: Str.trim (spanText src d.span)
+          , value: "absent (resolved to null)"
+          , flips: []
+          , fix: "check the spelling of `" <> p <> "`, or guard it: `{{#if " <> p <> "}}…{{/if}}`."
+          , path: p
+          }
+    else Nothing
+  sameTag a b = a.path == b.path
+
+-- | Observed findings, potential findings, then advisory miss findings (the host
+-- | `PathSchema` filtering the latter two) — the full host-UI finding set.
 allFindings :: PathSchema -> String -> Array Decision -> Array Finding
 allFindings schema src decisions =
-  findings src decisions <> potentialFindings schema src decisions
+  findings src decisions
+    <> potentialFindings schema src decisions
+    <> missFindings schema src decisions
 
 -- | The five truthiness operations, each wrapped to `tell` a `Decision` and then
 -- | delegate to the real operation (looked up from the prelude — never
 -- | re-implemented). Registered *over* the prelude, so they shadow the originals
 -- | while still calling them. Built for any `MonadThrow`+`MonadTell` engine monad.
 analysisWrappers :: Array (Tuple String (Operation AnalyseM (RefEnv AnalyseM)))
-analysisWrappers = Array.mapMaybe wrap conds
+analysisWrappers = Array.mapMaybe wrap conds <> lookupWrapper
   where
   preludeMap = Map.fromFoldable prelude
   -- `true` ⇒ every argument is a condition (and/or); `false` ⇒ only the first.
@@ -210,7 +244,42 @@ analysisWrappers = Array.mapMaybe wrap conds
     let
       here = refTruthy ctl.env v
     in
-      { span: ctl.span, op: name, value: v, truthyHere: here, diverges: divergence v here }
+      { kind: "cond"
+      , span: ctl.span
+      , op: name
+      , value: v
+      , truthyHere: here
+      , diverges: divergence v here
+      }
+
+  -- The `lookup` wrapper (ADR-030 #4): after the real resolution, flag a *miss* —
+  -- a final key absent from a present, non-empty object container (the typo
+  -- signature). The parent is re-resolved through the real `lookup` (pure indexing,
+  -- no double `tell`); the value is unused (the leaf-absent test implies null).
+  lookupWrapper = case Map.lookup "lookup" preludeMap of
+    Nothing -> []
+    Just orig -> [ Tuple "lookup" (analysedLookup orig) ]
+  analysedLookup orig ctl args = do
+    r <- orig ctl args
+    case Array.uncons args of
+      Just { head: receiver, tail: keys } -> case Array.unsnoc keys of
+        Just { init, last: VString k } -> do
+          parent <- orig ctl (Array.cons receiver init)
+          case parent of
+            VObject m | not (Map.isEmpty m) && not (Map.member k m) ->
+              tell
+                [ { kind: "miss"
+                  , span: ctl.span
+                  , op: "lookup"
+                  , value: VNull
+                  , truthyHere: false
+                  , diverges: []
+                  }
+                ]
+            _ -> pure unit
+        _ -> pure unit
+      _ -> pure unit
+    pure r
 
 -- | Render `nodes` against `dat` under analysis, returning the (byte-identical)
 -- | output plus the decisions observed. `toEngine` is the dialect's engine builder
@@ -240,7 +309,7 @@ reportMarkdown schema src decisions =
   Str.joinWith "\n"
     ( [ "# Truthiness analysis"
       , "Engine rule: `handlebars` · "
-          <> show (Array.length decisions)
+          <> show (Array.length conds)
           <> " condition(s) evaluated · **"
           <> show (Array.length flagged)
           <> " observed**, "
@@ -274,12 +343,22 @@ reportMarkdown schema src decisions =
               , ""
               ] <> map potentialLine potentials <> [ "" ]
           )
+        <>
+          ( if Array.null misses then []
+            else
+              [ "## Possible data-access misses (advisory, for this data)"
+              , "_A bare path resolved to absent from a present object — a likely typo or missing field:_"
+              , ""
+              ] <> map missLine misses <> [ "" ]
+          )
         <> (if Array.null clean then [] else [ "## Portable conditions" ] <> map cleanLine clean)
     )
   where
+  conds = Array.filter (\d -> d.kind == "cond") decisions
   flagged = Array.filter isFinding decisions
-  clean = Array.filter (not <<< isFinding) decisions
+  clean = Array.filter (\d -> d.kind == "cond" && Array.null d.diverges) decisions
   potentials = potentialFindings schema src decisions
+  misses = missFindings schema src decisions
 
   loc d = let lc = lineColumn src d.span.start in "line " <> show lc.line
   tag d = Str.trim (spanText src d.span)
@@ -292,6 +371,11 @@ reportMarkdown schema src decisions =
       <> ").  **Fix** · "
       <> f.fix
       <> (if f.path /= "" then "  ·  data path: `" <> f.path <> "`" else "")
+
+  missLine f =
+    "* ⚠ line " <> show f.line <> " — `" <> f.path <> "` " <> f.value
+      <> ".  **Fix** · "
+      <> f.fix
 
   findingSection d =
     Str.joinWith "\n"

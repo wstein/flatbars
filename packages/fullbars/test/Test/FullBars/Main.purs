@@ -507,6 +507,22 @@ main = do
             (obj [ Tuple "n" (VNumber 5.0) ])
         )
     )
+  -- ADR-030 #4: a bare path absent from a present, non-empty object is a *miss*
+  -- (the typo signature) — advisory, and `recoverPath`-targetable.
+  let
+    userObj = obj [ Tuple "user" (obj [ Tuple "name" (str "Ada") ]) ]
+  containsR "analyse:miss-typo" "{{user.naem}}" userObj "Possible data-access misses"
+  containsR "analyse:miss-path" "{{user.naem}}" userObj "`user.naem`"
+  -- a present path is NOT a miss.
+  assert' "analyse:no-miss-when-present"
+    (not (contains (Pattern "data-access miss") (reportOf "{{user.name}}" userObj)))
+  -- the host schema suppresses a known-optional miss.
+  assert' "analyse:schema-suppresses-miss"
+    ( not
+        ( contains (Pattern "data-access miss")
+            (schemaReportOf (\path _ -> path /= "user.naem") "{{user.naem}}" userObj)
+        )
+    )
   -- the analysed output is byte-identical to a normal render (drift-proof).
   assert' "analyse:output-identical"
     ( outputOf "{{#if bio}}yes{{else}}no{{/if}}" (obj [ Tuple "bio" (str "") ])

@@ -195,6 +195,14 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
   const d = r.analyzeWith(schema, { source: "{{#if count}}x{{else}}y{{/if}}" }, { count: 5 });
   assert.match(d.report, /0 potential/);
   assert.equal(d.findings.filter((x) => x.kind === "potential").length, 0);
+  // ADR-030 #4: a bare path absent from a present object is an advisory miss.
+  const m = r.analyze({ source: "{{user.naem}}" }, { user: { name: "Ada" } });
+  const miss = m.findings.find((x) => x.kind === "miss");
+  assert.ok(miss, "a miss finding is present for the typo'd path");
+  assert.equal(miss.path, "user.naem");
+  // the host schema suppresses a known-optional miss.
+  const m2 = r.analyzeWith((p) => p !== "user.naem", { source: "{{user.naem}}" }, { user: { name: "Ada" } });
+  assert.equal(m2.findings.filter((x) => x.kind === "miss").length, 0);
 });
 
 test("the catalog entries have the cheat-sheet shape", async () => {
