@@ -38,6 +38,12 @@ const isBlackWhite = (h) => /^#(fff|000|ffffff|000000)$/i.test(h);
 // colours, the live-example analysis/lint legend, and the Lab's editor-syntax
 // (--tok-*) + brand-green tokens. The Lab's IDE *surfaces* were already derived
 // from the base (var(--bg…)). Shrink each budget as a palette moves to shared.
+//
+// BURN-DOWN — target: 0. The grandfathered total is reported on success so the
+// green check never implies "fully single-sourced" (it isn't yet). Retire it by
+// introducing a shared "diagnostic/editor" token group in shared/flatbars-tokens.css
+// (the --c-* palette's companion): the YAML colours, the analysis/lint legend, and
+// the editor-syntax (--tok-*) all become generated tokens, after a visual pass.
 const BUDGET = {
   "tutorials/src/styles/docs-chrome.css": 0,
   "tutorials/src/styles/reference-content.css": 0,
@@ -73,7 +79,16 @@ if (fails) {
   console.error(`\ncheck:no-raw-colors: ${fails} file(s) hard-code colours outside the shared source.`);
   process.exit(1);
 }
+// Honest success: report the grandfathered total so the green check isn't read as
+// "fully single-sourced". 0 means the whole design system is single-sourced.
+const grandfathered = Object.values(BUDGET).reduce((a, b) => a + b, 0);
+const dirty = Object.values(BUDGET).filter((b) => b > 0).length;
+const pinned = Object.values(BUDGET).filter((b) => b === 0).length;
 console.log(
-  `✓ check:no-raw-colors — ${Object.keys(BUDGET).length} surfaces within budget` +
-    (slack ? ` (${slack} now under budget — tighten)` : "; clean files pinned at 0"),
+  `✓ check:no-raw-colors — ${pinned} surface(s) pinned single-source (0 raw colours)` +
+    (grandfathered
+      ? `; ${grandfathered} raw colour(s) still grandfathered across ${dirty} file(s) ` +
+        `(content/editor palettes — burn-down target 0, see the script header)`
+      : "; everything single-sourced") +
+    (slack ? ` — ${slack} file(s) now UNDER budget, tighten the budget` : ""),
 );
