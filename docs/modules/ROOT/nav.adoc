@@ -33,6 +33,7 @@
 * xref:adr-0028-hybrid-template-lsp.adoc[ADR-028: hybrid host+FlatBars LSP (proposed)]
 * xref:adr-0029-i18n-helper.adoc[ADR-029: i18n helper]
 * xref:adr-0030-symbolic-analyse.adoc[ADR-030: symbolic analyse + PathSchema seam]
+* xref:adr-0031-spec-site-starlight.adoc[ADR-031: spec site → Starlight (proposed)]
 * xref:adr-final-review.adoc[Final ADR review (2026-06-01)]
 
 .Specification
