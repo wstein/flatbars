@@ -6,21 +6,27 @@
  * dark both flip with the one [data-theme] the shared topbar toggles.
  */
 :root {
-  /* Background + surfaces → the shared chrome (especially the dark bg, #16141d). */
-  --sl-color-bg: var(--bg);
-  --sl-color-bg-nav: var(--bg);
-  --sl-color-bg-sidebar: var(--bg-1);
-  --sl-color-bg-inline-code: var(--bg-2);
-  /* Text + borders. */
+  /* Starlight's palette is theme-relative (white = the most prominent text →
+     black = the page background); the shared chrome tokens flip on the same
+     [data-theme]. Mapping Starlight's PRIMITIVES onto the shared semantic tokens
+     therefore lets Starlight derive every surface it builds — bg, panels, code,
+     asides, borders, sidebar — from the one shared base, in both modes. */
+  --sl-color-white: var(--fg);
+  --sl-color-gray-1: var(--fg);
+  --sl-color-gray-2: var(--fg);
+  --sl-color-gray-3: var(--fg-muted);
+  --sl-color-gray-4: var(--fg-faint);
+  --sl-color-gray-5: var(--bg-3);
+  --sl-color-gray-6: var(--bg-2);
+  --sl-color-black: var(--bg);
+  /* crisp body text + borders + the unified violet accent, on top of the ramp. */
   --sl-color-text: var(--fg);
-  --sl-color-text-accent: var(--accent);
   --sl-color-hairline: var(--border);
   --sl-color-hairline-shade: var(--border);
-  --sl-color-hairline-light: var(--border);
-  /* Accent scale → the unified violet. */
   --sl-color-accent-low: var(--accent-softer);
   --sl-color-accent: var(--accent);
   --sl-color-accent-high: var(--accent-2);
+  --sl-color-text-accent: var(--accent);
   /* Match Starlight's reserved nav band to the shared topbar's 52px height, so
      the sidebar/TOC `top` offsets and the content padding line up with it. */
   --sl-nav-height: 3.25rem;
@@ -90,6 +96,6 @@
   white-space: pre-wrap;
 }
 .live-pane-out pre.live-pane-err {
-  border-left-color: var(--c-red, #ff5555);
-  color: var(--c-red, #ff5555);
+  border-left-color: var(--danger);
+  color: var(--danger);
 }
