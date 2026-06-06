@@ -27,11 +27,14 @@ const MOUNT = "<flatbars-topbar";
 const MOUNTS = {
   "tutorials/src/components/Topbar.astro": "the tutorials topbar",
   "spec/src/components/Header.astro": "the Starlight spec header override",
-};
-// Surfaces still carrying the hand-written lockup (migrated in later phases).
-const LOCKUPS = {
   "lab/index.html": "the static Lab",
 };
+// Surfaces still carrying the hand-written lockup (none — all migrated).
+const LOCKUPS = {};
+// The static Lab can't import a module from a sibling dir, so it loads a vendored
+// copy of the element (like the engine bundle). It must match shared/ verbatim;
+// regenerate with `npm run gen:topbar`.
+const VENDORED = "lab/vendor/flatbars-topbar.mjs";
 
 let fails = 0;
 const fail = (msg) => {
@@ -40,11 +43,25 @@ const fail = (msg) => {
 };
 
 // 1. The element is the single source of the wordmark lockup + host slots.
+const elementSrc = read("shared/flatbars-topbar.mjs");
 {
-  const el = read("shared/flatbars-topbar.mjs");
-  if (!el.includes(FLAT)) fail(`shared/flatbars-topbar.mjs — missing the \`${FLAT}\` lockup`);
+  if (!elementSrc.includes(FLAT)) fail(`shared/flatbars-topbar.mjs — missing the \`${FLAT}\` lockup`);
   for (const slot of ['name="start"', 'name="tools"']) {
-    if (!el.includes(`<slot ${slot}`)) fail(`shared/flatbars-topbar.mjs — missing the host \`${slot}\` slot`);
+    if (!elementSrc.includes(`<slot ${slot}`)) fail(`shared/flatbars-topbar.mjs — missing the host \`${slot}\` slot`);
+  }
+}
+
+// 1b. The Lab's vendored copy is byte-identical to the source.
+{
+  let vendored;
+  try {
+    vendored = read(VENDORED);
+  } catch {
+    vendored = null;
+    fail(`${VENDORED} — missing (run \`npm run gen:topbar\`)`);
+  }
+  if (vendored !== null && vendored !== elementSrc) {
+    fail(`${VENDORED} — stale vs shared/flatbars-topbar.mjs (run \`npm run gen:topbar\`)`);
   }
 }
 

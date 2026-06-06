@@ -12,6 +12,10 @@
     <link rel="stylesheet" media="print" onload="this.media='all'"
           href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <title>FlatBars Lab — IDE</title>
+    <!-- The shared umbrella topbar custom element, vendored from shared/ (a
+         committed artifact like the engine bundle; regenerate with
+         `npm run gen:topbar`, bump ?v= on change — check:topbar pins the copy). -->
+    <script type="module" src="./vendor/flatbars-topbar.mjs?v=1"></script>
     <style>
       /* ── Design tokens ───────────────────────────────────────────── */
       :root {
@@ -127,23 +131,8 @@
         background: var(--bg-toolbar); border-bottom: 1px solid var(--border);
         user-select: none;
       }
-      /* Icon optically centred with the wordmark. The build version lives in the
-         status bar (conventional home for it), keeping the brand uncluttered. */
-      .brand {
-        display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
-        letter-spacing: -.01em; padding-right: 10px;
-      }
-      .brand .mark {
-        width: 40px; height: 40px; flex: 0 0 40px; display: block;
-      }
-      .brand .brand-name { font-size: 27px; line-height: 1; font-weight: 400; color: var(--fg); white-space: nowrap; }
-      /* Canonical FlatBars wordmark lockup (shared markup with the docs/landing
-         topbar; the Lab scales it up). check:wordmark pins the markup. */
-      .brand .brand-name .flat { font-weight: 700; color: var(--accent); }
-      .brand .brand-name .suffix {
-        font: 600 0.62rem/1 var(--font-mono); text-transform: uppercase;
-        letter-spacing: 0.16em; color: var(--fg-faint); margin-left: 0.4rem; vertical-align: 0.5em;
-      }
+      /* The brand/wordmark + docs backlink now live in the shared
+         <flatbars-topbar> above this toolbar (the Lab's umbrella row). */
       .topbar .divider { width: 1px; height: 18px; background: var(--border); }
       .topbar-group { display: flex; align-items: center; gap: 6px; }
       .field-label { color: var(--fg-muted); font-size: 12px; padding-right: 2px; }
@@ -1337,20 +1326,6 @@
       }
       .tw-section-hint { font-size: 11px; color: var(--fg-faint); margin-left: auto; }
       .tw-section-body { display: flex; gap: 6px; flex-wrap: wrap; }
-      .tw-swatch {
-        flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
-        align-items: center; gap: 6px; padding: 8px 6px;
-        border: 1px solid var(--border); border-radius: 6px; background: var(--bg); cursor: pointer;
-        transition: border-color 120ms ease, background 120ms ease;
-      }
-      .tw-swatch:hover { background: var(--bg-1); }
-      .tw-swatch.on { border-color: var(--accent); background: var(--accent-softer); }
-      .tw-swatch-grid {
-        width: 100%; height: 28px; border-radius: 4px; border: 1px solid var(--border);
-        background: linear-gradient(135deg, var(--c1) 0%, var(--c1) 40%, var(--c2) 40%, var(--c2) 70%, var(--c3) 70%);
-      }
-      .tw-swatch-label { font-size: 11px; font-weight: 600; color: var(--fg-secondary); }
-      .tw-swatch.on .tw-swatch-label { color: var(--accent-2); }
       .tw-segmented { display: flex; flex: 1 1 100%; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
       .tw-segmented button {
         flex: 1 1 0; border: 0; background: var(--bg); padding: 8px 10px;
@@ -1407,43 +1382,56 @@
   <body>
     <!-- Apply the saved theme before first paint (the module below loads
          CodeMirror from a CDN and would otherwise set it seconds later, flashing
-         the light default). The "system" PREFERENCE is resolved here to an
-         explicit light|dark on <body>, so the dark design tokens live in ONE
-         place (`body[data-theme="dark"]`) instead of being duplicated for a
-         `[data-theme="system"]` media block. Mirrors the tweaks defaults in the
-         module (which re-resolves on toggle and on OS-theme change). -->
+         the light default). This is the umbrella anti-flash seed: the single
+         shared `flatbars-theme` key (the one the shared <flatbars-topbar> writes,
+         shared across the whole umbrella), OS fallback on first visit. The Lab's
+         dark design tokens live under `body[data-theme="dark"]`, while the shared
+         topbar (and chrome tokens) key off `html[data-theme]`, so the seed sets
+         BOTH and the theme bridge below keeps them in sync on every change. -->
     <script>
       (function () {
-        var pref = "system";
         try {
-          var tw = JSON.parse(localStorage.getItem("stem-playground:tweaks") || "{}");
-          if (tw.theme === "dim") tw.theme = "dark";
-          if (["light", "dark", "system"].indexOf(tw.theme) >= 0) pref = tw.theme;
+          var k = "flatbars-theme";
+          var t = localStorage.getItem(k);
+          if (t !== "light" && t !== "dark") {
+            t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.dataset.theme = t;
+          document.body.dataset.theme = t;
         } catch (e) {}
-        document.body.dataset.theme =
-          pref === "system" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : pref;
       })();
     </script>
     <div id="app">
-      <!-- ── Top bar ──────────────────────────────────────────────── -->
+      <!-- ── Umbrella topbar: the shared <flatbars-topbar> (the SAME element the
+           tutorials app and the Starlight spec mount). It owns the wordmark, the
+           context switcher (Home · Tutorials · Spec · Lab) and the Theme control;
+           `base` is set at runtime from the path so the switcher resolves on every
+           origin, and its link-search is off (the workbench has its own Search). ── -->
+      <flatbars-topbar section="lab" version="v0.1.0" suffix="LAB" search="off"></flatbars-topbar>
+      <script>
+        // Resolve the umbrella base from the path so the switcher links are right
+        // on every origin (/lab/ at root in dev, /flatbars/lab/ in production), and
+        // bridge the theme: the shared bar themes off html[data-theme], the Lab's
+        // own dark tokens off body[data-theme] — keep body in sync on every change.
+        (function () {
+          var bar = document.querySelector("flatbars-topbar");
+          if (!bar) return;
+          var m = location.pathname.match(/^(.*)\/lab\//);
+          bar.setAttribute("base", m ? m[1] : "");
+          bar.setAttribute("lab-engine", "minbars");
+          function mirror() {
+            document.body.dataset.theme =
+              document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+          }
+          addEventListener("flatbars:themechange", mirror);
+          addEventListener("storage", function (e) { if (e.key === "flatbars-theme") mirror(); });
+        })();
+      </script>
+
+      <!-- ── Workbench toolbar: the Lab's own controls (engine · example · search ·
+           appearance · diagnostics · share · legend). The brand + docs backlink
+           moved up into the shared topbar. ── -->
       <header class="topbar" style="flex-direction: row; justify-content: flex-start">
-        <div class="brand">
-          <!-- Nested-brace mark from the cheat-sheet reference header, themed via
-               CSS vars so it tracks light/dark. Outer braces solid, inner braces
-               faded; a green stem with two branches threads through the middle. -->
-          <svg class="mark" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-            <path d="M10 11 C6 11 6 13 6 17 L6 21 C6 23 3 24 3 24 C3 24 6 25 6 27 L6 31 C6 35 6 37 10 37" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M16 11 C12 11 12 13 12 17 L12 21 C12 23 9 24 9 24 C9 24 12 25 12 27 L12 31 C12 35 12 37 16 37" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-            <path d="M32 11 C36 11 36 13 36 17 L36 21 C36 23 39 24 39 24 C39 24 36 25 36 27 L36 31 C36 35 36 37 32 37" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>
-            <path d="M38 11 C42 11 42 13 42 17 L42 21 C42 23 45 24 45 24 C45 24 42 25 42 27 L42 31 C42 35 42 37 38 37" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path class="stem-line" d="M24 13 L24 38" stroke="var(--stem-green)" stroke-width="2.4" stroke-linecap="round"/>
-            <path class="stem-line" d="M24 22 C21 20 19 20 17 21" stroke="var(--stem-green)" stroke-width="2" stroke-linecap="round"/>
-            <path class="stem-line" d="M24 29 C27 27 29 27 31 28" stroke="var(--stem-green)" stroke-width="2" stroke-linecap="round"/>
-            <circle class="stem-dot" cx="24" cy="13" r="2" fill="var(--stem-green)"/>
-          </svg>
-          <span class="brand-name"><b class="flat">Flat</b>Bars<span class="suffix">LAB</span></span>
-        </div>
-        <div class="divider"></div>
         <div class="topbar-group">
           <span class="field-label">Engine</span>
           <select id="engine-select" class="select" aria-label="Engine">
@@ -1520,11 +1508,6 @@
                 <em>raw</em> output — the one interpolation to handle with care.</p>
             </div>
           </div>
-          <a id="docs-link" class="btn" href="../" target="_blank" rel="noopener"
-             title="Open the FlatBars docs &amp; tutorials">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
-            <span class="btn-label">Docs</span><span aria-hidden="true" style="margin-left:1px">↗</span>
-          </a>
         </div>
       </header>
 
@@ -1875,16 +1858,12 @@
       // MinBars truthiness is set in the config.yaml view (minbars.truthiness),
       // default mustacheJs/true (ADR-029) — no UI toggle to wire or sync.
 
-      // ── Docs backlink + colour-legend popover ──────────────────────────────
-      // The "Docs" button points at the reference page for the current engine
-      // (relative, so it works on whatever host serves both); the Legend popover
-      // is the same key the tutorials show, rendered from the same data and keyed
-      // to the editor's --c-* palette so it's honest.
-      (function setupDocsAndLegend() {
-        const DOCS = { rawbars: "../rawbars", fullbars: "../fullbars", maxbars: "../maxbars", minbars: "../minbars" };
-        const dl = byId("docs-link");
-        if (dl) dl.href = DOCS[ENGINE] || "../";
-
+      // ── Colour-legend popover ──────────────────────────────────────────────
+      // The cross-app docs backlink moved into the shared <flatbars-topbar>
+      // (its context switcher). The Legend popover is the same key the tutorials
+      // show, rendered from the same data and keyed to the editor's --c-* palette
+      // so it's honest.
+      (function setupLegend() {
         const FAMILIES = [
           { id: "Interpolation", sub: "outputs a value" },
           { id: "Sections", sub: "control flow" },
@@ -4749,11 +4728,6 @@
 
       // ── Tweaks panel ──────────────────────────────────────────────────
       const TWEAK_OPTS = {
-        theme: [
-          { value: "light",  label: "Light",  swatch: ["#ffffff","#f2effc","#7c4dff"] },
-          { value: "dark",   label: "Dark",   swatch: ["#1e1338","#2f1d52","#b59bff"] },
-          { value: "system", label: "System", swatch: ["#ffffff","#9e8dc4","#1e1338"] },
-        ],
         // Monospace families only — code reads best fixed-width. Each is a stack
         // that degrades gracefully when the preferred face isn't installed.
         font: [
@@ -4764,28 +4738,33 @@
         fontSize: [12, 13, 14, 16],
       };
 
-      let tweaks = { theme: "system", layout: "split", lineNumbers: true, font: "plex", fontSize: 13, compactToolbar: false, chipstyle: "tint" };
+      // Theme is no longer a tweak: it's owned by the umbrella anti-flash seed +
+      // the shared <flatbars-topbar> (single `flatbars-theme` key, html[data-theme],
+      // mirrored to body by the bridge near the topbar). The Appearance panel keeps
+      // the editor-only tweaks (layout, line numbers, font, chips).
+      let tweaks = { layout: "split", lineNumbers: true, font: "plex", fontSize: 13, compactToolbar: false, chipstyle: "tint" };
       try { const r = localStorage.getItem(LS_TWEAKS); if (r) tweaks = { ...tweaks, ...JSON.parse(r) }; } catch {}
-      // Migrate older saved state: the former "dim" theme is now "dark", moods are gone.
-      if (tweaks.theme === "dim") tweaks.theme = "dark";
-      if (!["light", "dark", "system"].includes(tweaks.theme)) tweaks.theme = "system";
+      delete tweaks.theme; // retired (was light|dark|system) — now the shared topbar owns it
       tweaks.lineNumbers = tweaks.lineNumbers !== false; // default on
       if (!TWEAK_OPTS.font.some((o) => o.value === tweaks.font)) tweaks.font = "plex";
       if (!TWEAK_OPTS.fontSize.includes(tweaks.fontSize)) tweaks.fontSize = 13;
       if (!["tint", "outline", "solid"].includes(tweaks.chipstyle)) tweaks.chipstyle = "tint";
       delete tweaks.mood;
 
-      // Matches the anti-flash script: the "system" preference resolves to an
-      // explicit light|dark on <body>, so the dark tokens have one home.
+      // Follow a live OS theme flip only while no explicit preference is stored
+      // (matches the umbrella seed's first-visit fallback); keep html + body synced.
       const prefersDark = matchMedia("(prefers-color-scheme: dark)");
-      const resolveTheme = (t) => (t === "system" ? (prefersDark.matches ? "dark" : "light") : t);
-      // Re-resolve live when the OS theme flips and the preference is "system".
       prefersDark.addEventListener("change", () => {
-        if (tweaks.theme === "system") document.body.dataset.theme = resolveTheme("system");
+        let stored;
+        try { stored = localStorage.getItem("flatbars-theme"); } catch (e) {}
+        if (stored !== "light" && stored !== "dark") {
+          const t = prefersDark.matches ? "dark" : "light";
+          document.documentElement.dataset.theme = t;
+          document.body.dataset.theme = t;
+        }
       });
 
       function applyTweaks() {
-        document.body.dataset.theme = resolveTheme(tweaks.theme);
         document.body.dataset.chipstyle = tweaks.chipstyle;
         document.body.classList.toggle("compact-toolbar", !!tweaks.compactToolbar);
         document.body.classList.toggle("show-line-numbers", tweaks.lineNumbers);
@@ -4859,13 +4838,6 @@
               <div class="tw-title"><span class="tw-pill"></span>Appearance</div>
               <button class="tw-close" title="Close" onClick=${hideTweaks}>×</button>
             </div>
-            <${TwSection} title="Theme">
-              ${TWEAK_OPTS.theme.map((o) => html`
-                <button class=${"tw-swatch" + (tweaks.theme === o.value ? " on" : "")} title=${o.label} onClick=${() => set("theme", o.value)}>
-                  <span class="tw-swatch-grid" style=${{ "--c1": o.swatch[0], "--c2": o.swatch[1], "--c3": o.swatch[2] }}></span>
-                  <span class="tw-swatch-label">${o.label}</span>
-                </button>`)}
-            <//>
             <${TwSection} title="Toolbar" hint=${tweaks.compactToolbar ? "icons only" : "icons + labels"}>
               <${TwSegmented} tweakKey="compactToolbar" set=${set}
                 options=${[{ value: false, label: "Labels" }, { value: true, label: "Compact" }]} />
