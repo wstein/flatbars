@@ -71,12 +71,18 @@ export default defineConfig({
       // The design system: the generated token palette plus spec-local chrome.
       customCss: ["./src/styles/flatbars-tokens.css", "./src/styles/spec.css"],
       // Build-time link integrity — the replacement for Antora's xref guarantee.
+      // It is the GATE, run in the base-less build (`npm run build:spec`), where
+      // authored root-absolute links match routes 1:1. The production build sets a
+      // base, so routes carry the `/flatbars/spec` prefix that the authored links
+      // do not (the base-href pass adds it afterwards) — validating there would
+      // false-positive, so the validator is skipped when a base is set.
+      //
       // Versioning (starlight-versions) is deferred until releases diverge: while
       // content/docs IS 0.1.0, a snapshot is a byte-identical duplicate of the
       // whole contract (46→91 pages) with no reader value — the bloat ADR-031 D3
       // limits. Enable at the 0.2.0 cut: `npm i starlight-versions` + add
       // `starlightVersions({ versions: [{ slug: "0.1.0" }] })` here, then build.
-      plugins: [starlightLinksValidator()],
+      plugins: BASE ? [] : [starlightLinksValidator()],
       // Maintained in src/sidebar.ts; check:adr-nav asserts every ADR is linked.
       sidebar,
     }),
