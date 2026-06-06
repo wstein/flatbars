@@ -5,7 +5,10 @@
   "type": "module",
   "description": "FlatBars Lab tutorials — one lesson per surface, each with an Open-in-Lab button.",
   "scripts": {
+    "favicon": "mkdir -p public && cp ../shared/flatbars-favicon.svg public/favicon.svg",
+    "predev": "npm run favicon",
     "dev": "astro dev",
+    "prebuild": "npm run favicon",
     "build": "astro build",
     "preview": "astro preview"
   },

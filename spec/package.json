@@ -4,7 +4,10 @@
   "private": true,
   "description": "The normative FlatBars specification + ADRs, served as an Astro Starlight site (ADR-031).",
   "scripts": {
+    "favicon": "mkdir -p public && cp ../shared/flatbars-favicon.svg public/favicon.svg",
+    "predev": "npm run favicon",
     "dev": "astro dev",
+    "prebuild": "npm run favicon",
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check"
