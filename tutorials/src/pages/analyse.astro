@@ -25,6 +25,7 @@ const groups = [
       { href: "#zero", label: "Zero" },
       { href: "#collections", label: "Empty array & object" },
       { href: "#portable", label: "What's already portable" },
+      { href: "#potential", label: "Observed vs potential" },
       { href: "#report", label: "The report & JSONata fix" },
       { href: "#using", label: "In the Lab & CI" },
     ],
@@ -182,6 +183,42 @@ const groups = [
       <b>0 portability findings.</b> <code>{t("{{#if active}}")}</code> tested <code>false</code>,
       which every rule agrees is falsy. Nothing to fix.
     </div>
+  </section>
+
+  <!-- ──────────────────────── Observed vs potential ──────────────────────── -->
+  <section id="potential">
+    <h2>Observed vs potential</h2>
+    <p>
+      Everything above is an <b>observed</b> finding — your data <em>actually</em> held the
+      ambiguous value, so the analyser saw the divergence on this render. But a green run
+      only proves the template is portable <em>for that sample</em>: <code>{t("{{#if count}}")}</code>
+      on <code>count: 5</code> says nothing about <code>count: 0</code>. Hand-crafting
+      adversarial data for every path does not scale.
+    </p>
+    <p>
+      So the analyser also reasons <b>symbolically</b>. For every condition whose observed
+      value is <em>not</em> ambiguous, it derives the <b>same-type</b> ambiguous value the path
+      could hold — a number could be <code>0</code>, a non-empty string could be <code>""</code>,
+      a list <code>[]</code>, an object <code>{t("{}")}</code> — and reports it as a
+      <b>potential</b> finding. This is a pure post-process over the render: its output is a
+      function of the <em>template</em>, not the sample, so it is stable enough to gate in CI.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.potential.template} data={ex.potential.data} />
+    <div class="verdict">
+      <b>0 observed, 1 potential.</b> <code>{t("{{#if count}}")}</code> tested <code>5</code> —
+      portable on this data — but <b>count</b> is a number, and the analyser flags that it
+      <em>would diverge if it held</em> <code>0</code>.
+      <span class="fix">Fix — the same rule-free test as the observed case:
+      <code>{t("{{#if (ne count 0)}}")}</code>. A host that knows <b>count</b> is never
+      <code>0</code> can supply a <code>PathSchema</code> to suppress the what-if
+      (<code>analyzeWith</code>).</span>
+    </div>
+    <p class="tip">
+      A third, <b>advisory</b> signal rounds out coverage: a bare path that resolves to absent
+      from a present object (<code>{t("{{user.naem}}")}</code> against <code>{t("{ user: { name } }")}</code>)
+      is reported as a possible <b>miss</b> — the typo catcher — tagged "for this data" and
+      suppressible by the same <code>PathSchema</code>.
+    </p>
   </section>
 
   <!-- ──────────────────────── The report & fix ──────────────────────── -->

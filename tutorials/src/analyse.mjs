@@ -66,4 +66,15 @@ export const examples = {
     finds: 0,
     expect: ["0 observed"],
   },
+  // ADR-030 symbolic what-if: `count` is `5` here, so it is portable as OBSERVED —
+  // but `5` is a number, and a number could be `0`, which DOES diverge. The analyser
+  // derives that same-type ambiguous value and reports a POTENTIAL finding, so
+  // coverage no longer depends on the sample happening to hold the edge value.
+  potential: {
+    engine: "fullbars",
+    template: "{{#if count}}{{count}} unread{{else}}all caught up{{/if}}",
+    data: { count: 5 },
+    finds: 1,
+    expect: ["0 observed", "1 potential", "would diverge if it held", "the number `0`", "data path: `count`"],
+  },
 };
