@@ -15,18 +15,21 @@ const { title } = Astro.props;
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 {/* Anti-flash: set the explicit [data-theme] on <html> before first paint, from
-    the saved preference (the topbar Theme control persists here) or, on first
-    visit, the OS preference. Tokens key dark mode off [data-theme="dark"], so this
-    must run before the stylesheet paints. */}
+    the single shared `flatbars-theme` key (the topbar Theme control persists
+    there, shared across the whole umbrella) or, on first visit, the OS
+    preference. Tokens key dark mode off [data-theme="dark"], so this must run
+    before the stylesheet paints. This is the canonical seed (shared/theme-seed.js);
+    `check:theme-seed` pins that every copy matches. */}
 <script is:inline>
   (function () {
     try {
-      var s = JSON.parse(localStorage.getItem("flatbars-docs-opts") || "{}");
-      var t = s.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      var k = "flatbars-theme";
+      var t = localStorage.getItem(k);
+      if (t !== "light" && t !== "dark") {
+        t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
       document.documentElement.dataset.theme = t;
-    } catch (e) {
-      document.documentElement.dataset.theme = "light";
-    }
+    } catch (e) {}
   })();
 </script>
 <title>{title}</title>

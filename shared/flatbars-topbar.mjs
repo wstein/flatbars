@@ -259,6 +259,7 @@ const TEMPLATE = `
 </style>
 
 <header class="bar" part="bar">
+  <slot name="start"></slot>
   <a class="brand" part="brand" id="brand"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M26 13 H18 V29 H12 V35 H18 V51 H26"/><path d="M38 13 H46 V29 H52 V35 H46 V51 H38"/></g></svg><span class="wm"><b class="flat">Flat</b>Bars</span><span class="suffix" id="suffix" hidden></span></a>
   <span class="version" part="version" id="version" hidden></span>
 
@@ -368,9 +369,12 @@ class FlatBarsTopbar extends Base {
     // Context switcher.
     const ctx = root.getElementById("ctx");
     const active = this.section;
+    const labEngine = this._attr("lab-engine", "");
     ctx.innerHTML = SECTIONS.map((s) => {
       const cur = s === active ? ' aria-current="page"' : "";
-      return `<a href="${this._href(s)}" data-section="${s}"${cur}>${LABELS[s]}</a>`;
+      // The Lab honours a starting `?engine=` (its own URL parsing) — forward it.
+      const eng = s === "lab" && labEngine ? `?engine=${encodeURIComponent(labEngine)}` : "";
+      return `<a href="${this._href(s)}${eng}" data-section="${s}"${cur}>${LABELS[s]}</a>`;
     }).join("");
 
     // Search affordance — defaults to the spec index (Pagefind lives there).

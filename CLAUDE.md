@@ -341,10 +341,22 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
   `tmScope` still exists in the grammar. Change a `kind` → update the vocabulary
   and rerun `npm run gen:highlight`. The bundle carries `tokenize`, so an engine
   change needs `npm run gen:bundle` + a cache-buster bump like any other.
-- **One app shell + one wordmark.** The docs layout and the landing share
-  `Topbar.astro` (wordmark · Chips · Theme · Legend · Open-the-Lab); the canonical
-  lockup lives in `Wordmark.astro` and the static Lab copies its markup —
-  `npm run check:wordmark` (in `npm test`) pins that they match.
+- **One topbar + one theme contract across the umbrella.** The chrome is the
+  shared, zero-dependency `<flatbars-topbar>` custom element
+  (`shared/flatbars-topbar.mjs`) — the SAME element the tutorials app, the
+  Starlight spec, and the static Lab all mount, so the wordmark, the context
+  switcher (Home · Tutorials · Spec · Lab), and the Theme control never drift
+  between surfaces. It hydrates controls only (no first paint), reads its links
+  from a `base` attribute, and reads the page's chrome tokens
+  (`shared/flatbars-chrome.css`) through its shadow boundary. Theme is one
+  `[data-theme]` on `<html>` persisted to the single `flatbars-theme` key, seeded
+  before first paint by `shared/theme-seed.js` (inlined in each `<head>`). Two
+  gates pin this, both in `npm test`: `check:topbar` (the element owns the
+  canonical `<b class="flat">Flat</b>Bars` lockup + its `start`/`tools` host
+  slots, and every migrated surface mounts it) and `check:theme-seed` (every
+  inline seed copy is byte-identical). The element's pure helpers are unit-tested
+  via `test:shared`. The tutorials `Topbar.astro` mounts the element and slots in
+  the docs colour-Legend (`tools`) and the sidebar nav-toggle (`start`).
 - **Compiler ≡ interpreter.** Any compiler change must keep `npm run
   test:compile` green (byte-identical output to the interpreter).
 - **`--pedantic-packages`** is enforced via `npm run lint`; declared deps must

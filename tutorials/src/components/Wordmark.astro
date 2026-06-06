@@ -1,12 +1,31 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 //
-// The canonical FlatBars wordmark lockup, shared verbatim across the docs topbar,
-// the landing, and the Lab. The exact markup + classes are pinned by
-// `npm run check:wordmark`, which asserts the static Lab copies this lockup (the
-// Lab is hand-written HTML and can't import an Astro component). Styling lives in
-// docs-chrome.css (`.brand`, `.brand .flat`, `.brand .suffix`).
+// The canonical FlatBars wordmark lockup as a standalone, self-styled component,
+// used in the landing footer. The chrome topbar's wordmark now lives inside the
+// shared <flatbars-topbar> element (shadow DOM); this component keeps the exact
+// same markup + classes so the lockup reads identically wherever it appears.
+// `check:topbar` pins the lockup across the element, this component, and the Lab.
 //   <a class="brand"><b class="flat">Flat</b>Bars <span class="suffix">DOCS</span></a>
 const { href = "/", suffix = "" } = Astro.props;
 ---
+
 <a class="brand" href={href}><b class="flat">Flat</b>Bars{suffix && <span class="suffix">{suffix}</span>}</a>
+
+<style>
+  .brand {
+    color: var(--fg);
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: baseline;
+  }
+  .brand .flat { color: var(--accent); }
+  .brand .suffix {
+    font: 600 0.62rem/1 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--fg-faint);
+    margin-left: 0.4rem;
+  }
+</style>

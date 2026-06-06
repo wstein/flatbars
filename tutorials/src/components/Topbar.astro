@@ -2,79 +2,54 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The one app topbar, shared by the docs layout (Reference.astro) AND the
-// landing — so the first click no longer changes the chrome. Wordmark · Theme ·
-// Legend · "Open the Lab", plus the control-wiring script (Theme on <html>, the
-// Legend popover) and persistence. The page owns any content-specific scripts
-// (scroll-spy, inline-code highlighting). `<slot name="start" />` is for the docs
-// nav-toggle. (The old whole-tag "Chips" tint/outline/solid control was retired
-// with the move to inner-token highlighting — there is no longer one colour per
-// tag to tint; see the ADR-014 amendment.)
-import Wordmark from "./Wordmark.astro";
+// landing — now the shared, zero-dependency <flatbars-topbar> custom element
+// (shared/flatbars-topbar.mjs), the SAME element the Starlight spec and the
+// static Lab mount, so the chrome is identical across the umbrella and the first
+// click never changes it. The element owns the wordmark, the context switcher
+// (Home · Tutorials · Spec · Lab), the Theme control (persisted to the single
+// `flatbars-theme` key), Search and GitHub.
+//
+// Two host controls ride in the element's named slots:
+//   • `start`  — the docs sidebar nav-toggle (forwarded from this component's
+//                own `start` slot, used by Reference.astro on narrow screens).
+//   • `tools`  — the docs colour-legend popover (highlighter key).
+// The Legend popover wiring stays here; the Theme control wiring moved into the
+// element. (The old whole-tag "Chips" control was retired with inner-token
+// highlighting — ADR-014.)
 import LegendPopover from "./LegendPopover.astro";
 import "../styles/docs-chrome.css";
 
-const { suffix = "", labEngine = "minbars" } = Astro.props;
-const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
+const { section = "tutorials", suffix = "", labEngine = "minbars" } = Astro.props;
+// Empty at root/dev, "/flatbars" on the Pages project sub-path. The element
+// resolves every cross-app link from it.
+const BASE = import.meta.env.PUBLIC_BASE_PATH || "";
 ---
 
-<header class="topbar">
+<flatbars-topbar section={section} base={BASE} version="v0.1.0" suffix={suffix} lab-engine={labEngine}>
   <slot name="start" />
-  <Wordmark href="/" suffix={suffix} />
-  <div class="topbar-tools">
-    <div class="hdr-ctrl">
-      <span class="lbl">Theme</span>
-      <div class="seg" data-set="theme" role="group" aria-label="Theme">
-        <button type="button" data-val="light">Light</button>
-        <button type="button" data-val="dark">Dark</button>
-      </div>
-    </div>
-    <LegendPopover />
-    <a class="lab-link" href={`${LAB_URL}?engine=${labEngine}`} target="_blank" rel="noopener">Open the Lab ↗</a>
-  </div>
-</header>
+  <LegendPopover />
+</flatbars-topbar>
 
 <script>
-  // Theme (html[data-theme]) segmented control and the Legend popover.
-  // Persistence shares the localStorage key the anti-flash <head> script reads
-  // (Theme is also set there before first paint).
-  const STORE = "flatbars-docs-opts";
-  const TARGET = { theme: document.documentElement };
-  const curVal = (key) => TARGET[key].dataset[key];
+  // Define the shared custom element on the client (the import is a side effect).
+  import "../../../shared/flatbars-topbar.mjs";
 
-  function syncButtons() {
-    document.querySelectorAll(".seg").forEach((seg) => {
-      const cur = curVal(seg.dataset.set);
-      seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.val === cur)));
-    });
-  }
-  function persist() {
-    try {
-      localStorage.setItem(STORE, JSON.stringify({ theme: curVal("theme") }));
-    } catch (e) {}
-  }
-  try {
-    const s = JSON.parse(localStorage.getItem(STORE) || "{}");
-    if (s.theme) document.documentElement.dataset.theme = s.theme;
-  } catch (e) {}
+  // Astro consumes the `slot` attribute on children of a plain element, so assign
+  // the element's named slots at runtime: the docs sidebar toggle goes to `start`,
+  // the colour-legend popover to `tools`. (The element is JS-driven regardless.)
+  const bar = document.querySelector("flatbars-topbar");
+  bar?.querySelector("#navToggle")?.setAttribute("slot", "start");
+  bar?.querySelector(".legend-anchor")?.setAttribute("slot", "tools");
 
-  document.querySelectorAll(".seg").forEach((seg) => {
-    seg.addEventListener("click", (e) => {
-      const btn = e.target.closest("button");
-      if (!btn) return;
-      TARGET[seg.dataset.set].dataset[seg.dataset.set] = btn.dataset.val;
-      syncButtons();
-      persist();
-    });
-  });
-  syncButtons();
-
+  // Legend popover (slotted into the topbar's `tools` slot — light DOM, so it is
+  // queryable by id here). The Theme control lives inside the element now.
   const legendBtn = document.getElementById("legendBtn");
   const legendPop = document.getElementById("legendPop");
   function onOutside(e) {
-    if (!legendPop.contains(e.target) && !legendBtn.contains(e.target)) closePop();
+    if (legendPop && !legendPop.contains(e.target) && !legendBtn.contains(e.target)) closePop();
   }
   function onEsc(e) {
-    if (e.key === "Escape") { closePop(); legendBtn.focus(); }
+    if (e.key === "Escape") { closePop(); legendBtn?.focus(); }
   }
   function openPop() {
     legendPop.hidden = false;
@@ -83,6 +58,7 @@ const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
     document.addEventListener("keydown", onEsc, true);
   }
   function closePop() {
+    if (!legendPop) return;
     legendPop.hidden = true;
     legendBtn.setAttribute("aria-expanded", "false");
     document.removeEventListener("mousedown", onOutside, true);

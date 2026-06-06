@@ -59,13 +59,15 @@ for (const comp of ["src/components/OpenInLab.jsx", "src/components/TryJsonata.j
   );
 }
 
-// 4. Keyboard focus is visible on the topbar segmented controls.
+// 4. Keyboard focus is visible on the topbar segmented controls. The Theme
+//    control now lives inside the shared <flatbars-topbar> element (shadow DOM),
+//    so its focus ring is pinned there.
 {
-  const css = read("src/styles/docs-chrome.css");
+  const el = readFileSync(new URL("../shared/flatbars-topbar.mjs", import.meta.url), "utf8");
   check(
-    "docs-chrome.css: segmented control has a visible focus ring",
-    /\.seg button:focus-visible\s*\{[^}]*outline/.test(css),
-    "add `.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }`",
+    "flatbars-topbar.mjs: theme segmented control has a visible focus ring",
+    /\.seg button:focus-visible\s*\{[^}]*outline/.test(el),
+    "keep `.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }` in the element styles",
   );
 }
 

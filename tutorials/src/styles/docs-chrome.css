@@ -14,36 +14,10 @@
 .content code:has([class^="tk-"]),
 .content .code:has([class^="tk-"]) { background: transparent; padding: 0; }
 
-/* ── Topbar tools ── */
-.topbar-tools { margin-left: auto; display: flex; align-items: center; gap: 0.85rem; }
+/* ── Topbar tools — the Legend anchor rides in <flatbars-topbar>'s `tools` slot
+   (light DOM, so it is styled here). The wordmark, Theme control, Search and the
+   context switcher all live inside the element's shadow DOM now. ── */
 .hdr-ctrl { display: flex; align-items: center; gap: 0.45rem; }
-.hdr-ctrl > .lbl {
-  font: 600 9.5px/1 var(--font-mono);
-  text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint);
-}
-
-/* Segmented control (Theme) */
-.seg {
-  display: inline-flex; background: var(--bg-2);
-  border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px;
-}
-.seg button {
-  font: 500 12px/1 var(--font-ui); color: var(--fg-muted);
-  background: none; border: none; padding: 5px 9px; border-radius: 6px;
-  cursor: pointer; white-space: nowrap;
-}
-.seg button:hover { color: var(--fg); }
-.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.seg button[aria-pressed="true"] {
-  background: var(--bg); color: var(--accent-2); font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--border);
-}
-
-/* The topbar "Open the Lab" link gets a divider when it sits after the tools. */
-.topbar .topbar-tools .lab-link {
-  margin-left: 0; padding-left: 0.95rem;
-  border-left: 1px solid var(--border); white-space: nowrap;
-}
 
 /* ── Legend button + popover ── */
 .legend-anchor { position: relative; display: flex; align-items: center; }
@@ -90,34 +64,15 @@
 }
 .legend-pop .legend-foot b { color: var(--fg-muted); font-weight: 600; }
 
-/* ── Topbar shell + canonical wordmark (shared by the docs layout AND the
-   landing via Topbar.astro; the Lab mirrors the .brand/.flat/.suffix markup). ── */
+/* ── Skip link + docs sidebar toggle. The topbar shell and wordmark now live in
+   the shared <flatbars-topbar> element (shadow DOM); the sidebar nav-toggle is
+   forwarded into the element's `start` slot by Reference.astro. ── */
 .skip { position: absolute; left: -999px; }
 .skip:focus {
   left: 8px; top: 8px; z-index: 20;
   background: var(--accent); color: #fff;
   padding: 0.4rem 0.7rem; border-radius: var(--radius);
 }
-.topbar {
-  position: sticky; top: 0; z-index: 10;
-  display: flex; align-items: center; gap: 1rem;
-  height: 52px; padding: 0 1.25rem;
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border);
-}
-.brand { color: var(--fg); text-decoration: none; font-weight: 600; display: inline-flex; align-items: baseline; }
-.brand .flat { color: var(--accent); }
-.brand .suffix {
-  font: 600 0.62rem/1 var(--font-mono);
-  text-transform: uppercase; letter-spacing: 0.16em;
-  color: var(--fg-faint); margin-left: 0.4rem;
-}
-.topbar .lab-link {
-  color: var(--accent-2); text-decoration: none;
-  font-weight: 600; font-size: 0.9rem; white-space: nowrap;
-}
-.topbar .lab-link:hover { color: var(--accent); }
 .nav-toggle {
   display: none; background: none;
   border: 1px solid var(--border-strong); border-radius: var(--radius);
