@@ -56,6 +56,14 @@
   --c-comment: #57606a;
   --tint-mix: 12%;
   --directive-bg: #eaeef2;
+  /* The plate behind a whole FlatBars tag, braces included — a LAVENDER fill plus a
+     deeper lavender BORDER (--tag-border), so a tag reads as one clearly-outlined
+     pill that's coherent with the violet-indigo dark sibling. The fill stays light
+     enough that every --c-* token clears WCAG AA on it (worst 4.57:1, the red
+     braces — a deeper lavender like #e2d4f7 would drop them to 3.92:1, so the depth
+     lives in the border, which carries no text). Machine-checked by check:contrast. */
+  --tag-bg: #efe7fb;
+  --tag-border: #c4a8ec;
 }
 
 [data-theme="dark"] {
@@ -68,4 +76,10 @@
   --c-comment: #969fab;
   --tint-mix: 20%;
   --directive-bg: #21262d;
+  /* Dark sibling of the rose tag pill: a brighter VIOLET-INDIGO fill + a brighter
+     violet border — more visible against the dark-violet canvas than a muted rose
+     (which went muddy), and tied to the dark theme's violet identity. Every dark
+     --c-* clears AA on the fill (worst 5.29:1, the comment grey). */
+  --tag-bg: #2e2646;
+  --tag-border: #5b4d96;
 }

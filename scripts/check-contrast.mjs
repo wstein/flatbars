@@ -78,6 +78,7 @@ for (const [mode, { tokens, bg, solidText }] of Object.entries(MODES)) {
     const checks = [
       ["tint", ratio(c, mix(c, bg, tint))],
       ["page", ratio(c, bg)],
+      ["tag", ratio(c, tokens["--tag-bg"])], // the whole-tag plate (`.tk-tag`)
       ["solid", ratio(solidText, c)],
     ];
     for (const [surface, r] of checks) rows.push({ tok, mode, surface, r });

@@ -1,17 +1,18 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
- * Docs CHROME beyond the prose: the topbar segmented controls (Chips style +
- * Theme), the "Legend" button + its colour-legend popover, and the legend grid
- * itself. Ported from the FlatBars-design mockup's styles.css. Imported globally
- * by the Reference layout (the legend popover renders server-side, so its grid
- * markup is real DOM Astro's scoped styles couldn't reach anyway). Tokens come
- * from lab-tokens.css; the legend chips reuse the SAME --c-* palette + Chips
- * control as the live examples, so the legend is an honest key. */
+ * Docs CHROME beyond the prose: the topbar Theme control, the "Legend" button +
+ * its colour-legend popover shell. Ported from the FlatBars-design mockup's
+ * styles.css. Imported globally by the Reference layout. Tokens come from
+ * lab-tokens.css; the popover's colour key is painted through the real engine
+ * (LegendPopover.astro), so the legend is an honest key for the inner-token
+ * examples. (The old whole-tag "Chips" tint/outline/solid control + its
+ * .legend-grid chips were retired with the move to inner-token — ADR-014.) */
 
 /* Inline prose code that contains a highlighted tag drops its own grey plate so
-   only the token chip shows (the runtime highlighter swaps the <code>'s text for
-   stem-* spans). */
-.content code:has([class^="stem-"]) { background: transparent; padding: 0; }
+   only the painted tokens show (the runtime highlighter swaps the <code>'s text
+   for tk-* spans). */
+.content code:has([class^="tk-"]),
+.content .code:has([class^="tk-"]) { background: transparent; padding: 0; }
 
 /* ── Topbar tools ── */
 .topbar-tools { margin-left: auto; display: flex; align-items: center; gap: 0.85rem; }
@@ -21,7 +22,7 @@
   text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-faint);
 }
 
-/* Segmented controls (Chip style + Theme) */
+/* Segmented control (Theme) */
 .seg {
   display: inline-flex; background: var(--bg-2);
   border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px;
@@ -79,101 +80,15 @@
 .legend-pop-head .lph-title { font-size: 1rem; font-weight: 700; color: var(--fg); }
 .legend-pop-head .lph-sub { font-size: 0.8rem; color: var(--fg-faint); }
 
-/* Compact legend layout inside the popover — uniform alignment: every group
-   shares one fixed chip column so all descriptions line up across groups. The
-   `.legend-pop .legend-grid .X` specificity ladder beats the base `.legend-grid
-   .X` rules below — keep it or the popover's compact sizing breaks. */
-.legend-pop .legend-grid { margin: 0.7rem 0 0; }
-.legend-pop .legend-grid .fam { margin-bottom: 1.05rem; }
-.legend-pop .legend-grid .fam:last-child { margin-bottom: 0; }
-.legend-pop .legend-grid .fam-label { font-size: 0.72rem; margin: 0 0 0.55rem; }
-.legend-pop .legend-grid .item {
-  display: grid; grid-template-columns: 9rem minmax(0, 1fr);
-  align-items: baseline; column-gap: 16px; row-gap: 4px; margin-bottom: 0.45rem;
-}
-.legend-pop .legend-grid .item:last-child { margin-bottom: 0; }
-.legend-pop .legend-grid .meta { gap: 0.4rem; }
-.legend-pop .legend-grid .name { font-size: 0.8rem; }
-.legend-pop .legend-grid .desc { font-size: 0.75rem; }
-.legend-pop .legend-grid .chip { font-size: 0.78rem; }
+/* The popover's colour key (.legend-roles / .lr-*) is scoped inside
+   LegendPopover.astro and painted through the real engine, so the key can never
+   disagree with the examples (ADR-014 amendment). Only the popover shell + foot
+   live here. */
 .legend-pop .legend-foot {
   margin: 1rem 0 0; padding-top: 0.85rem; border-top: 1px solid var(--border);
   font-size: 0.8rem; color: var(--fg-faint); line-height: 1.55; text-wrap: pretty;
 }
 .legend-pop .legend-foot b { color: var(--fg-muted); font-weight: 600; }
-
-/* ── Legend grid (the colour key) ── */
-.legend-grid .fam { margin-bottom: 1.6rem; }
-.legend-grid .fam:last-child { margin-bottom: 0; }
-.legend-grid .fam-label {
-  display: flex; align-items: center; gap: 0.85rem;
-  margin: 0 0 0.85rem; font-size: 0.82rem; font-weight: 600;
-  color: var(--fg); letter-spacing: 0; padding-top: 0; border-top: 0;
-}
-.legend-grid .fam-label .sub { color: var(--fg-faint); font-weight: 500; white-space: nowrap; }
-.legend-grid .fam-label::after {
-  content: ""; flex: 1; height: 1px;
-  background: linear-gradient(90deg, var(--border-strong), transparent);
-}
-
-.legend-grid .item {
-  display: grid; grid-template-columns: 13.5rem minmax(0, 1fr);
-  align-items: baseline; gap: 6px 18px; margin-bottom: 0.55rem;
-}
-.legend-grid .item:last-child { margin-bottom: 0; }
-@media (max-width: 540px) {
-  .legend-grid .item { grid-template-columns: 1fr; gap: 4px; }
-}
-.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
-.chips .sep { color: var(--fg-faint); font-family: var(--font-ui); }
-.chips .chip-br { flex-basis: 100%; height: 0; }
-
-/* Legend chips reuse the unified --c-* palette + Chips control, so they read
-   exactly like the live-example tokens. */
-.legend-grid .chip {
-  --c: var(--fg);
-  color: var(--c);
-  font-family: var(--font-mono); font-weight: 700;
-  font-size: 0.9rem; line-height: 1.3;
-  padding: 0; border-radius: 4px; white-space: nowrap;
-  border: 1px solid transparent;
-}
-.legend-grid .c-expr    { --c: var(--c-expr); }
-.legend-grid .c-raw     { --c: var(--c-raw); }
-.legend-grid .c-block   { --c: var(--c-block); }
-.legend-grid .c-partial { --c: var(--c-partial); }
-.legend-grid .c-inherit { --c: var(--c-inherit); }
-.legend-grid .c-delim   { --c: var(--c-delim); }
-.legend-grid .c-comment { --c: var(--c-comment); font-style: italic; }
-
-/* The whole tag is bold from first `{` to last `}`; the braces are only lightly
-   recessed so the sigil + name stay marginally louder. */
-.legend-grid .chip .pn { opacity: 0.7; }
-
-/* Chip style · TINT (default — also when no data-chipstyle attribute is set) */
-.legend-grid .chip,
-body[data-chipstyle="tint"] .legend-grid .chip {
-  background: color-mix(in srgb, var(--c) var(--tint-mix, 12%), var(--bg));
-}
-.legend-grid .chip.is-directive,
-body[data-chipstyle="tint"] .legend-grid .chip.is-directive { background: var(--directive-bg); }
-/* Chip style · OUTLINE */
-body[data-chipstyle="outline"] .legend-grid .chip {
-  background: transparent; border-color: color-mix(in srgb, var(--c) 42%, var(--bg));
-}
-body[data-chipstyle="outline"] .legend-grid .chip.is-directive {
-  border-color: color-mix(in srgb, var(--fg) 20%, var(--bg)); background: var(--directive-bg);
-}
-/* Chip style · SOLID */
-body[data-chipstyle="solid"] .legend-grid .chip { background: var(--c); color: #fff; border-color: transparent; }
-[data-theme="dark"] body[data-chipstyle="solid"] .legend-grid .chip { color: #0e0c16; }
-
-.legend-grid .meta { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
-.legend-grid .name { font-size: 0.95rem; font-weight: 600; color: var(--fg); white-space: nowrap; }
-.legend-grid .name .qual { font-weight: 500; color: var(--fg-faint); }
-.legend-grid .desc { font-size: 0.89rem; color: var(--fg-muted); line-height: 1.45; margin: 0; }
-.legend-grid .meta .desc::before { content: "·"; margin-right: 0.5rem; color: var(--border-strong); }
-.legend-grid .desc code { font-family: var(--font-mono); font-size: 0.92em; background: none; padding: 0; }
 
 /* ── Topbar shell + canonical wordmark (shared by the docs layout AND the
    landing via Topbar.astro; the Lab mirrors the .brand/.flat/.suffix markup). ── */

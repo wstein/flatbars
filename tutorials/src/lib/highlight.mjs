@@ -11,7 +11,8 @@
 // pass — see the note above `highlightYaml`. Colours map to the Lab's "stem"
 // palette via CSS classes (open-in-lab.css), so a template reads the same here
 // as in the full Lab editor.
-import { highlightSpans } from "../../../lab/vendor/flatbars-engine.mjs";
+import { paintKinds, KIND_CLASS, tagRanges } from "../../../lab/highlight-paint.mjs";
+import operationsJson from "../../../editors/operations.json" with { type: "json" };
 
 const ENT = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
@@ -19,70 +20,42 @@ export function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ENT[c]);
 }
 
-// Engine span kind → the unified "stem" palette class (the single source shared
-// with the legend). Several kinds share a slot so `{{else}}` reads as control
-// flow alongside `{{#…}}`. The mapping honours the redesign's seven families:
-// inheritance tags (`{{<layout}}`, `{{$block}}`) get their own violet `inherit`
-// slot, and set-delimiter tags their own rose `delim` slot — distinct from
-// partials and comments. Mirrors lab/cm-flatbars.mjs's grouping.
-const KIND_CLASS = {
-  expr: "stem-expr",
-  keyword: "stem-block",
-  "block-open": "stem-block",
-  "block-inverse": "stem-block",
-  "block-close": "stem-block",
-  "block-parent": "stem-inherit",
-  "block-decl": "stem-inherit",
-  partial: "stem-partial",
-  raw: "stem-raw",
-  "raw-block": "stem-raw",
-  comment: "stem-comment",
-  "set-delimiter": "stem-delim",
-  // A structurally-valid tag the dialect disallows (an extras/inheritance-gated
-  // shape) — flagged like a lex error.
-  error: "stem-error",
-};
+// The prelude operation names — so the highlighter lights up helper names (head /
+// pipe / subexpression) exactly as the Lab and VS Code's LSP do, and only for
+// names the engine actually knows (a plain `{{name}}` stays default).
+const OP_NAMES = new Set(operationsJson.operations.map((o) => o.name));
+const isOperation = (name) => OP_NAMES.has(name);
 
-// Every emitted span is a whole tag (the highlighter colours by meaning, one
-// span per tag). This is the subset whose `{{`/`}}` delimiters get dimmed:
-// `raw-block` (`{{{{…}}}}`) and `error` are excluded — a four-brace stem and a
-// disallowed-shape span don't take the two-brace delimiter dimmer cleanly.
-const TAG_KINDS = new Set([
-  "expr", "keyword", "block-open", "block-inverse", "block-close",
-  "block-parent", "block-decl", "partial", "raw",
-  "comment", "set-delimiter",
-]);
-
-// Wrap leading `{{`/`{{{` and trailing `}}`/`}}}` in a dimmed `.pn` span, keeping
-// the sigil + name as the loud part — the same "highlight theme" the legend uses.
-// Braces survive HTML-escaping (esc() doesn't touch `{`/`}`), so this is safe on
-// the already-escaped slice. Anchored to the span ends, and `{{{`/`}}}` are tried
-// before `{{`/`}}`, so a MaxBars half-tag span like `{{a ` dims only its `{{` and
-// ` b}}` only its `}}`.
-function dimDelims(escaped) {
-  return escaped
-    .replace(/^(\{\{\{?)/, '<span class="pn">$1</span>')
-    .replace(/(\}\}\}?)$/, '<span class="pn">$1</span>');
-}
-
-// Highlight a template by the engine's own spans. `dialect` selects the lexer
-// configuration (set delimiters, clause keywords, and long-comment spans) exactly
-// as the renderer would; it defaults to FullBars. Text outside any span stays the
-// default colour.
+// Highlight a template with the shared INNER-TOKEN painter (lab/highlight-
+// paint.mjs): braces + keywords one colour, helper names another, literals their
+// own — the VS Code "2026-dark" look, rather than the old whole-tag-one-colour
+// model. Every segment inside a tag is bold (the editor "bold tag" treatment),
+// and each whole tag (`{ … }`, braces included) sits on a `tk-tag` plate so it
+// reads as one pill. `dialect` selects the lexer config (set delimiters, clause
+// keywords) exactly as the renderer would; it defaults to FullBars.
 export function highlightTemplate(src, dialect = "fullbars") {
-  const spans = highlightSpans(String(src), dialect) || [];
+  const text = String(src);
+  const tags = tagRanges(text, dialect); // ascending, non-overlapping
   let out = "";
-  let pos = 0;
-  for (const s of spans) {
-    if (!s || s.to <= s.from || s.from < pos) continue; // defensive: skip overlaps
-    out += esc(src.slice(pos, s.from));
-    const cls = KIND_CLASS[s.kind] || "stem-expr";
-    let body = esc(src.slice(s.from, s.to));
-    if (TAG_KINDS.has(s.kind)) body = dimDelims(body);
-    out += '<span class="' + cls + '">' + body + "</span>";
-    pos = s.to;
+  let ti = 0;
+  let inTag = false;
+  for (const seg of paintKinds(text, dialect, isOperation)) {
+    // Open a tag plate exactly at a tag boundary (segments never cross one).
+    if (!inTag && ti < tags.length && seg.from === tags[ti].from) {
+      out += '<span class="tk-tag">';
+      inTag = true;
+    }
+    const body = esc(text.slice(seg.from, seg.to));
+    const cls = seg.kind ? KIND_CLASS[seg.kind] : seg.inTag ? "tk-in" : "";
+    out += cls ? '<span class="' + cls + '">' + body + "</span>" : body;
+    // Close it at the tag's end (so `{{a}}{{b}}` is two pills, not one).
+    if (inTag && seg.to === tags[ti].to) {
+      out += "</span>";
+      inTag = false;
+      ti++;
+    }
   }
-  return out + esc(src.slice(pos));
+  return out;
 }
 
 // Highlight YAML data line-by-line (YAML is line-oriented, which sidesteps the
@@ -122,7 +95,7 @@ function highlightYamlLine(raw) {
 // left-to-right scan trying each token kind in priority order (comment, string,
 // regex literal, number, $function / $variable, operator, keyword) and leaving
 // field names + punctuation in the default colour. Colours map to plain-text
-// classes (`.j-*` in lab-tokens.css) — not the `.stem-*` tag chips — so an
+// classes (`.j-*` in lab-tokens.css) — not the `.tk-*` template tokens — so an
 // expression reads like code, not a row of boxed tags.
 const JSONATA_KW = /^(function|true|false|null|and|or|in)\b/;
 export function highlightJsonata(src) {

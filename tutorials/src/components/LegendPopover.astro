@@ -1,77 +1,34 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 //
-// The topbar "Legend" button + its colour-legend popover. Server-rendered from
-// the FAMILIES/TAGS data (ported from the design mockup's legend.js) — no client
-// render; the only client work is open/close + outside-click + Esc, wired in the
-// Reference layout. The chips reuse the SAME unified --c-* palette and Chips
-// control as the live-example highlighter (see lab-tokens.css / docs-chrome.css),
-// so the legend is an honest key for every tag on the page.
+// The topbar "Legend" button + its colour-legend popover. With the move to
+// INNER-TOKEN highlighting (ADR-014 amendment) the colours mark a token's ROLE —
+// not one hue per construct — so this is a TOKEN-ROLE key: each sample is painted
+// by the REAL engine (`highlightTemplate`, the shared inner-token painter the
+// runnable examples and the Lab editor use), so the legend can never drift from
+// what the page actually renders. The per-row `dialect` picks the lexer config
+// that makes that construct light up (set delimiters need a Mustache-family one).
+import { highlightTemplate } from "../lib/highlight.mjs";
 
-const FAMILIES = [
-  { id: "Interpolation", sub: "outputs a value" },
-  { id: "Sections", sub: "control flow" },
-  { id: "Composition", sub: "pulls in templates" },
-  { id: "Directives", sub: "template-only · no output" },
+// One row per token ROLE. The sample is the smallest tag that surfaces the role;
+// the bold role word in `note` names the coloured token (braces appear in every
+// sample, so the description points at the one that carries the row's colour).
+const ROLES = [
+  { code: "{{#each rows}}", dialect: "fullbars", name: "Braces & keywords",
+    note: "the {{ }} delimiters, block sigils (# ^ /) and clause words (else)" },
+  { code: "{{> sidebar}}", dialect: "fullbars", name: "Operation & partial",
+    note: "a called helper or an included partial — the name in head position" },
+  { code: "{{user.name}}", dialect: "fullbars", name: "Value & path",
+    note: "a value or dotted path passed to a tag — bold, in the default colour" },
+  { code: "{{gt score 90}}", dialect: "fullbars", name: "Number",
+    note: "a numeric literal" },
+  { code: '{{eq role "admin"}}', dialect: "fullbars", name: "String",
+    note: "a quoted string literal" },
+  { code: "{{! editorial note }}", dialect: "fullbars", name: "Comment",
+    note: "dropped from output — shown italic" },
+  { code: "{{=<% %>=}}", dialect: "minbars", name: "Set delimiters",
+    note: "switches the {{ }} pair (MinBars)" },
 ];
-
-// chips: { t } a tag literal, { br } a wrap break, { sep } a separator glyph.
-const TAGS = [
-  { family: "Interpolation", name: "Escaped", desc: "inserts a value, HTML-escaped",
-    chips: [{ t: "{{name}}", c: "expr" }] },
-  { family: "Interpolation", name: "Raw", desc: "the same value, left unescaped",
-    chips: [{ t: "{{{html}}}", c: "raw" }] },
-
-  { family: "Sections", name: "Section", desc: "opens & closes a region",
-    chips: [{ t: "{{#each xs}}", c: "block" }, { br: true }, { t: "{{/each}}", c: "block" }] },
-  { family: "Sections", name: "Clause", desc: "a branch inside a block",
-    chips: [{ t: "{{else}}", c: "block" }] },
-
-  { family: "Composition", name: "Partial", desc: "includes another template",
-    chips: [{ t: "{{>card}}", c: "partial" }] },
-  { family: "Composition", name: "Inheritance", desc: "extends a parent layout",
-    chips: [{ t: "{{<layout}}", c: "inherit" }] },
-  { family: "Composition", name: "Block", desc: "an overridable region",
-    chips: [{ t: "{{$title}}", c: "inherit" }] },
-
-  { family: "Directives", name: "Comment", desc: "dropped from output",
-    chips: [{ t: "{{! note }}", c: "comment", directive: true }] },
-  { family: "Directives", name: "Set delimiters", qual: "directive", desc: "changes the <code>{{ }}</code> pair",
-    chips: [{ t: "{{=<% %>=}}", c: "delim" }] },
-];
-
-const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-function splitTag(t) {
-  if (t.slice(0, 3) === "{{{" && t.slice(-3) === "}}}") return ["{{{", t.slice(3, -3), "}}}"];
-  if (t.slice(0, 2) === "{{" && t.slice(-2) === "}}") return ["{{", t.slice(2, -2), "}}"];
-  return ["", t, ""];
-}
-function chipHTML(ch) {
-  if (ch.br) return '<span class="chip-br"></span>';
-  if (ch.sep) return '<span class="sep">' + esc(ch.sep) + "</span>";
-  const dir = ch.directive ? " is-directive" : "";
-  const p = splitTag(ch.t);
-  return '<code class="chip c-' + ch.c + dir + '">' +
-    '<span class="pn">' + esc(p[0]) + "</span>" + esc(p[1]) +
-    '<span class="pn">' + esc(p[2]) + "</span></code>";
-}
-function itemHTML(it) {
-  const chips = it.chips.map(chipHTML).join("");
-  const qual = it.qual ? ' <span class="qual">· ' + it.qual + "</span>" : "";
-  return (
-    '<div class="item"><div class="chips">' + chips + "</div>" +
-    '<div class="meta"><span class="name">' + it.name + qual + "</span>" +
-    '<span class="desc">' + it.desc + "</span></div></div>"
-  );
-}
-const bodyHTML = FAMILIES.map((fam) => {
-  const items = TAGS.filter((t) => t.family === fam.id);
-  return (
-    '<section class="fam"><h3 class="fam-label">' + fam.id +
-    ' <span class="sub">— ' + fam.sub + "</span></h3>" +
-    items.map(itemHTML).join("") + "</section>"
-  );
-}).join("");
 ---
 
 <div class="hdr-ctrl legend-anchor">
@@ -81,14 +38,42 @@ const bodyHTML = FAMILIES.map((fam) => {
   <div class="legend-pop" id="legendPop" role="dialog" aria-label="Colour legend" hidden>
     <div class="legend-pop-head">
       <span class="lph-title">Colour legend</span>
-      <span class="lph-sub">how every tag is tinted across this page</span>
+      <span class="lph-sub">what each colour means inside a tag</span>
     </div>
-    <div class="legend-grid" set:html={bodyHTML} />
+    <dl class="legend-roles">
+      {ROLES.map((r) => (
+        <div class="lr-row">
+          <dt><code class="lr-code" set:html={highlightTemplate(r.code, r.dialect)} /></dt>
+          <dd><b>{r.name}</b><span class="lr-note">{r.note}</span></dd>
+        </div>
+      ))}
+    </dl>
     <p class="legend-foot">
-      <b>Reading the system:</b> green = interpolation, blue = composition, violet =
-      inheritance, orange = sections, rose = the set-delimiters directive, grey =
-      comment. A <em>deeper</em> green marks <em>raw</em> output — the one
-      interpolation to handle with care.
+      <b>Reading the system:</b> colours mark a token's <em>role</em>, not the
+      construct — braces &amp; keywords share one hue, operations &amp; partials
+      another, and each literal its own. The whole tag is bold. This is the same
+      inner-token scheme as the FlatBars <strong>VS&nbsp;Code</strong> extension.
     </p>
   </div>
 </div>
+
+<style>
+  .legend-roles { margin: 0.7rem 0 0; display: grid; gap: 0.6rem; }
+  .lr-row {
+    display: grid;
+    grid-template-columns: minmax(0, auto) 1fr;
+    align-items: baseline;
+    gap: 0.9rem;
+  }
+  .lr-row dt { margin: 0; min-width: 0; }
+  .lr-row dd { margin: 0; min-width: 0; }
+  .lr-row dd b { display: block; font-size: 0.8rem; color: var(--fg); font-weight: 600; }
+  .lr-note { display: block; font-size: 0.75rem; color: var(--fg-faint); }
+  .lr-code {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    white-space: nowrap;
+    background: none;
+    padding: 0;
+  }
+</style>

@@ -11,11 +11,11 @@
  * prefers-color-scheme — so the toggle can override the OS preference. The
  * anti-flash seed still falls back to the OS preference on first visit.
  *
- * The syntax palette below (--c-*) is the SINGLE SOURCE for three surfaces: the
- * live-example highlighter (.stem-*), inline prose tags, AND the Syntax-colours
- * legend (.chip.c-*). One palette, so the legend can never lie about the
- * examples. The Chips control (body[data-chipstyle]) tints/outlines/fills every
- * one of them together. */
+ * The syntax palette below (--c-*) is the SINGLE SOURCE for the inner-token
+ * highlighter (.tk-*) used by the live examples, the inline prose tags, AND the
+ * colour-legend popover (which paints its samples through the same engine). One
+ * palette, mapped per token ROLE, so the legend can never lie about the
+ * examples. */
 :root {
   color-scheme: light;
 
@@ -54,9 +54,9 @@
   --warn: #b45309;
   --warn-faint: #fef3c7;
 
-  /* ── Unified syntax palette — shared by the live-example highlighter (.stem-*),
-     inline prose tags, AND the Syntax-colours legend (.chip.c-*). The Chips
-     control (body[data-chipstyle]) tints/outlines/fills every one together. ── */
+  /* ── Unified syntax palette — shared by the inner-token highlighter (.tk-*)
+     across the live examples, inline prose tags, AND the colour-legend popover
+     (painted through the same engine). Mapped per token ROLE, one palette. ── */
   /* @palette light · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
   --c-expr: #0550ae;
   --c-raw: #0a3069;
@@ -67,6 +67,8 @@
   --c-comment: #57606a;
   --tint-mix: 12%;
   --directive-bg: #eaeef2;
+  --tag-bg: #efe7fb;
+  --tag-border: #c4a8ec;
   /* @palette end */
 
   /* YAML data syntax colours (data editor + spec-only blocks) */
@@ -123,6 +125,8 @@
   --c-comment: #969fab;
   --tint-mix: 20%;
   --directive-bg: #21262d;
+  --tag-bg: #2e2646;
+  --tag-border: #5b4d96;
   /* @palette end */
 
   --yaml-key: #93c5fd;
@@ -134,60 +138,34 @@
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
 }
 
-/* ── Syntax-colour classes (GLOBAL) ───────────────────────────────────────────
-   Used by the card editors, the static spec-only blocks, the inline prose tags,
-   and the highlight legend. Each tag class sets --c from the shared palette; the
-   Chips control (body[data-chipstyle]) below tints/outlines/fills --c so the
-   examples and the legend chips always read the same way. The default (no
-   data-chipstyle attribute, e.g. the landing page) is TINT.
+/* ── Inner-token syntax classes — the VS Code "2026-dark" look, emitted by the
+   shared painter (lab/highlight-paint.mjs). Each token KIND maps to a --c-*
+   family colour: braces + keywords red (--c-block), helper names purple
+   (--c-inherit), numbers blue (--c-expr), strings (--c-raw), partial names
+   green (--c-partial), set-delim orange (--c-delim), comments grey. Everything
+   inside a tag is bold — braces to braces (the editor "bold tag" treatment) —
+   so identifiers/paths/operators get `tk-in` (bold, default colour). Each whole
+   tag sits on a subtle `tk-tag` plate (below) so it reads as one pill. ── */
+.tk-punct, .tk-keyword { color: var(--c-block); }
+.tk-operation          { color: var(--c-inherit); }
+.tk-number             { color: var(--c-expr); }
+.tk-string             { color: var(--c-raw); }
+.tk-delim              { color: var(--c-delim); }
+.tk-comment            { color: var(--c-comment); font-style: italic; }
+.tk-error              { text-decoration: underline wavy var(--danger); text-decoration-skip-ink: none; }
+.tk-punct, .tk-keyword, .tk-operation, .tk-number, .tk-string,
+.tk-delim, .tk-comment, .tk-in { font-weight: 700; }
 
-   box-shadow (not border) + zero horizontal padding keep the highlight overlay
-   pixel-aligned with the transparent <textarea> beneath it in the editors. */
-.stem-expr    { --c: var(--c-expr); }
-.stem-raw     { --c: var(--c-raw); }
-.stem-block   { --c: var(--c-block); }
-.stem-partial { --c: var(--c-partial); }
-.stem-inherit { --c: var(--c-inherit); }
-.stem-delim   { --c: var(--c-delim); }
-.stem-comment { --c: var(--c-comment); font-style: italic; }
-.stem-expr, .stem-raw, .stem-block, .stem-partial,
-.stem-inherit, .stem-delim, .stem-comment { color: var(--c); font-weight: 700; }
-
-/* Chip treatment on the tag tokens (every span is one whole tag). */
-:is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
-  border-radius: 4px;
+/* The plate behind a whole tag (`{ … }`, braces included) — a rose FILL (--tag-bg)
+   with a visible rose BORDER (--tag-border) so each tag reads as one clearly-
+   outlined pill, the per-token colours layered on top. The border is a 1px
+   box-shadow ring (not `border`) that hugs the fill, so it adds NO horizontal
+   width — glyphs never shift under the CodeMirror cursor. */
+.tk-tag {
+  background: var(--tag-bg);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--tag-border);
 }
-/* TINT — the default (also used when no data-chipstyle attribute is present). */
-:is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment),
-body[data-chipstyle="tint"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
-  background: color-mix(in srgb, var(--c) var(--tint-mix), var(--bg));
-}
-/* OUTLINE — box-shadow, never border, so the editor overlay stays aligned. */
-body[data-chipstyle="outline"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 42%, var(--bg));
-}
-/* SOLID */
-body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
-  background: var(--c);
-  color: #fff;
-}
-[data-theme="dark"] body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) {
-  color: #0e0c16;
-}
-
-/* The whole tag is bold from the first `{` to the last `}` — the braces are part
-   of the bold run, only lightly recessed so the sigil + name stay marginally
-   louder (the same "highlight theme" the legend chips use). */
-:is(.stem-expr, .stem-raw, .stem-block, .stem-partial, .stem-inherit, .stem-delim, .stem-comment) .pn {
-  opacity: 0.7;
-  font-style: normal;
-}
-
-/* A tag the dialect disallows (an extras/inheritance-gated shape the engine
-   rejects at parse) — flagged with a wavy underline, mirroring the Lab's
-   .cm-hb-error, so the highlighter never paints a render-rejecting shape valid. */
-.stem-error { text-decoration: underline wavy var(--danger); text-decoration-skip-ink: none; }
 
 .y-key { color: var(--yaml-key); }
 .y-str { color: var(--yaml-str); }
@@ -196,7 +174,7 @@ body[data-chipstyle="solid"] :is(.stem-expr, .stem-raw, .stem-block, .stem-parti
 .y-comment { color: var(--c-comment); font-style: italic; }
 
 /* JSONata expression highlighting (Data shaping guide) — plain coloured tokens,
-   not the .stem-* tag chips. Strings/numbers share the data pane's YAML colours
+   not the .tk-* template tokens. Strings/numbers share the data pane's YAML colours
    so the two editors read consistently; functions/vars/ops use the --c-* family. */
 .j-fn      { color: var(--c-partial); font-weight: 600; }
 .j-var     { color: var(--c-inherit); font-weight: 600; }

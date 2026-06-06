@@ -5,7 +5,7 @@
  * OWN DOM (Preact), so Astro's scoped styles can't reach it — this sheet is
  * imported globally by the Reference layout. Structural rules are scoped under
  * `.oil` so they outrank the layout's generic `.content pre` / `.content a`
- * rules; the syntax-colour classes (.stem-*, .y-*) are global because the
+ * rules; the syntax-colour classes (.tk-*, .y-*) are global because the
  * spec-only static blocks on the page use them too. Tokens come from
  * lab-tokens.css.
  *
@@ -432,7 +432,7 @@
 .oil .oil-lab:hover { border-color: var(--accent); background: var(--accent-softer); color: var(--accent); }
 .oil .oil-lab:hover .oil-lab-ic { transform: translate(1px, -1px); }
 
-/* Syntax-colour classes (.stem-*, .y-*) live in lab-tokens.css — they are
+/* Syntax-colour classes (.tk-*, .y-*) live in lab-tokens.css — they are
    token-level and GLOBAL (the card editors, the static spec-only blocks, and the
    highlight legend all use them, and the landing page imports only lab-tokens). */
 

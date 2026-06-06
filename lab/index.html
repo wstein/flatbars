@@ -74,6 +74,8 @@
         --c-comment: #57606a;
         --tint-mix: 12%;
         --directive-bg: #eaeef2;
+        --tag-bg: #efe7fb;
+        --tag-border: #c4a8ec;
         /* @palette end */
         --chip-solid-fg: #fff;  /* text on a SOLID chip — flips dark in dark mode (Lab-only) */
 
@@ -583,6 +585,24 @@
       /* The whole tag is bold from first `{` to last `}`; the braces are only
          lightly recessed so the sigil + name stay marginally louder. */
       .cm-hb-pn      { opacity: 0.7; }
+      /* Inner-token classes (the VS Code 2026-dark look) — emitted by the shared
+         painter (highlight-paint.mjs), the SAME .tk-* classes the tutorials use.
+         Each token kind maps to a --c-* family colour; everything inside a tag is
+         bold (tk-in is the bold default for identifiers / paths / operators). */
+      .tk-punct, .tk-keyword { color: var(--c-block); }
+      .tk-operation          { color: var(--c-inherit); }
+      .tk-number             { color: var(--c-expr); }
+      .tk-string             { color: var(--c-raw); }
+      .tk-delim              { color: var(--c-delim); }
+      .tk-comment            { color: var(--c-comment); font-style: italic; }
+      .tk-error              { text-decoration: underline wavy var(--danger); text-decoration-skip-ink: none; }
+      .tk-punct, .tk-keyword, .tk-operation, .tk-number, .tk-string,
+      .tk-delim, .tk-comment, .tk-in { font-weight: 700; }
+      /* The plate behind a whole tag ({ … }, braces included) — a rose FILL
+         (--tag-bg) + visible rose BORDER (--tag-border) so each tag reads as one
+         clearly-outlined pill. The border is a 1px box-shadow ring (not `border`)
+         that hugs the fill, so it adds no width — editor glyphs never shift. */
+      .tk-tag { background: var(--tag-bg); border-radius: 3px; box-shadow: 0 0 0 1px var(--tag-border); }
       /* Tag chip style — Appearance ▸ Tag chips (body[data-chipstyle]). The tag
          classes above carry the TINT default; outline/solid swap the treatment.
          box-shadow (not border) keeps the editor's character grid from shifting
@@ -1211,6 +1231,8 @@
         --c-comment: #969fab;
         --tint-mix: 20%;
         --directive-bg: #21262d;
+        --tag-bg: #2e2646;
+        --tag-border: #5b4d96;
         /* @palette end */
         --chip-solid-fg: #0e0c16;
         --success: #4ade80;
@@ -1692,9 +1714,13 @@
       import { createRenderer } from "./stem.mjs?v=1";
       import { createFlatBarsRenderer } from "./flatbars.mjs?v=4";
       import { createMinBarsRenderer } from "./minbars.mjs?v=2";
-      // Engine-derived template highlighting (ADR-014): the shared presenter +
-      // the lexer's own tokenizer, in place of a hand-written tag regex.
-      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=1";
+      // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
+      // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
+      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=5";
+      // The full prelude vocabulary (vendored projection of editors/operations.json)
+      // so the editor paints helper names exactly like the LSP / VS Code — NOT the
+      // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
+      import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
       import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=59";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
@@ -2088,7 +2114,12 @@
       // keywords ({{else}}/{{elif}}) the dialect treats as separators — none of
       // which the regex got right. `ENGINE` is the active dialect; switching
       // engines reloads the page, so it is fixed for this editor's lifetime.
-      const flatbarsHighlighting = flatbarsHighlight({ ViewPlugin, Decoration }, highlightSpans, ENGINE);
+      // `isOperation` is the FULL prelude vocabulary (OPERATION_NAMES, the 97-op
+      // projection of operations.json) — NOT renderer.allTransformers(), which is
+      // only the 12-entry user-facing Transformers-panel subset — so every helper
+      // lights up inner-token, exactly like the LSP / VS Code (the parity gate).
+      const opNameSet = new Set(OPERATION_NAMES);
+      const flatbarsHighlighting = flatbarsHighlight({ ViewPlugin, Decoration }, ENGINE, (name) => opNameSet.has(name));
 
         // YAML scalar-value highlighting. The YAML grammar tags bare scalars as
         // plain content, so booleans/null keywords and numbers get no color. This
