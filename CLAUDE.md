@@ -34,6 +34,25 @@ npm run lint           # spago build --pedantic-packages (catches unused/missing
 npm run format         # purs-tidy format-in-place; format:check to verify only
 ```
 
+**Spec site, mid-migration (ADR-031, additive).** The spec is being migrated from
+Antora (AsciiDoc) to Astro Starlight (MDX). Both are live: `npm run docs` still
+builds the authoritative Antora site, while `spec/` is the new Starlight site that
+*builds green* from the same source. `scripts/migrate-spec-all.mjs` converts every
+`docs/.../pages/*.adoc` → `spec/src/content/docs/**/*.mdx` (the per-file transform,
+`scripts/migrate-spec.mjs`, is unit-tested by `test:migrate-spec`); `gen:catalog`
+emits the helper catalog as *both* an AsciiDoc and an MDX partial from the one
+`FullBars.Catalog` source. Spec commands:
+
+```sh
+npm run gen:spec       # regenerate spec/ MDX + sidebar from the .adoc source
+npm run check:spec     # fail if the committed MDX is stale vs the .adoc (in npm test)
+npm run build:spec     # astro build: MDX validity + Pagefind + starlight-links-validator
+```
+
+Until the cutover (delete `docs/` + the converter, repoint the four docs-reading
+gates), the `.adoc` files remain the source of truth and the `.mdx` are generated.
+Do not hand-edit `spec/src/content/docs/**` — edit the `.adoc` and `gen:spec`.
+
 Run one package's PureScript tests directly (faster than `npm test`):
 
 ```sh
