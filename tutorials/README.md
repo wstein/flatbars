@@ -88,7 +88,10 @@ Lab is mounted at `/lab/`). So the umbrella switcher works end to end in dev onc
 the spec has been built under a matching base — one command:
 
 ```sh
+npm run dev:umbrella          # from the repo root: build the spec under /spec, then `astro dev`
+# or, separately:
 npm run build:spec:local      # ( cd spec && PUBLIC_SPEC_BASE=/spec npm run build )
+npm run dev                   # from the repo root: just the tutorials/shell dev server
 ```
 
 Until then `/spec/` simply 404s (the plugin falls through). In production the spec
