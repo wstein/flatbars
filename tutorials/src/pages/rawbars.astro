@@ -9,6 +9,7 @@
 // the spec/ADR rather than forking them, grounded in the page's own live
 // artifacts (the diptych = desugar; the compile pane = compile).
 import Reference from "../layouts/Reference.astro";
+import SurfaceDeltas from "../components/SurfaceDeltas.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../rawbars.mjs";
 
@@ -19,6 +20,7 @@ const groups = [
     label: "RawBars",
     items: [
       { href: "#intro", label: "What RawBars is" },
+      { href: "#reference", label: "Surface reference" },
       { href: "#output", label: "Output & escaping" },
       { href: "#application", label: "Application & parens" },
       { href: "#lookup", label: "Reading data" },
@@ -109,6 +111,15 @@ const t = (s) => s;
           keeps the word <em>helper</em> (<code>registerHelper</code>).</dd>
       </dl>
     </aside>
+  </section>
+
+  <!-- ────────────────────── Surface reference ───────────────────── -->
+  <section id="reference">
+    <h2>Surface reference</h2>
+    <p>The syntax and value-policy deltas that define RawBars, at a glance — generated from the
+      same single source (<code>shared/surface-syntax.json</code>) the FlatBars Lab's Reference
+      popup and the spec engine page read, so it can never drift from what they render.</p>
+    <SurfaceDeltas surface="rawbars" />
   </section>
 
   <!-- ────────────────────── Output & escaping ───────────────────── -->

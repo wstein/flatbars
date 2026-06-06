@@ -12,6 +12,7 @@
 // `maxbars` engine. The ~80-helper prelude is NOT re-listed (the generated catalog
 // owns that) — this page teaches the expression layer and links the catalog.
 import Reference from "../layouts/Reference.astro";
+import SurfaceDeltas from "../components/SurfaceDeltas.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../maxbars.mjs";
 
@@ -23,6 +24,7 @@ const groups = [
     label: "MaxBars",
     items: [
       { href: "#intro", label: "What MaxBars is" },
+      { href: "#reference", label: "Surface reference" },
       { href: "#operators", label: "Operators" },
       { href: "#pipes", label: "Pipes" },
       { href: "#identity", label: "The identity" },
@@ -93,6 +95,15 @@ const t = (s) => s;
         expressiveness.
       </p>
     </div>
+  </section>
+
+  <!-- ────────────────────── Surface reference ───────────────────── -->
+  <section id="reference">
+    <h2>Surface reference</h2>
+    <p>The syntax and value-policy deltas that define MaxBars, at a glance — generated from the
+      same single source (<code>shared/surface-syntax.json</code>) the FlatBars Lab's Reference
+      popup and the spec engine page read, so it can never drift from what they render.</p>
+    <SurfaceDeltas surface="maxbars" />
   </section>
 
   <!-- ──────────────────────────── Operators ─────────────────────────── -->

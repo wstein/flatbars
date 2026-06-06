@@ -1,0 +1,71 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The per-surface syntax/policy delta table for a dialect reference page. Reads
+// the SINGLE SOURCE shared/surface-syntax.json directly (the same source the
+// FlatBars Lab's Reference popup projects and the spec engine page imports), so
+// these three references can never drift. Pass the surface id; renders that
+// surface's tagline, truthiness chip, and a feature/syntax/notes table.
+import surfaceSyntax from "../../../shared/surface-syntax.json";
+
+interface Props {
+  surface: string;
+}
+const { surface } = Astro.props;
+const s = surfaceSyntax.surfaces.find((x) => x.id === surface);
+if (!s) throw new Error(`SurfaceDeltas: unknown surface "${surface}" (not in shared/surface-syntax.json)`);
+---
+
+<section class="surface-deltas" aria-label={`${s.label} syntax reference`}>
+  <p class="sd-tagline">
+    {s.tagline}
+    <span class="sd-truthy" title={s.truthiness.note}>
+      truthiness <code>{s.truthiness.rule}</code> · falsy <code>{s.truthiness.falsy}</code>
+    </span>
+  </p>
+  <table class="sd-table">
+    <thead>
+      <tr><th scope="col">Feature</th><th scope="col">Syntax</th><th scope="col">Notes</th></tr>
+    </thead>
+    <tbody>
+      {s.rows.map((r) => (
+        <tr>
+          <th scope="row">{r.feature}</th>
+          <td><code class="sd-syntax">{r.syntax}</code></td>
+          <td>{r.note}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</section>
+
+<style>
+  .surface-deltas { margin: 1rem 0; }
+  .sd-tagline {
+    margin: 0 0 0.75rem; color: var(--c-text-soft, #57606a); font-size: 0.95rem;
+    display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: baseline;
+  }
+  .sd-truthy { font-size: 0.8rem; color: var(--c-text-soft, #57606a); }
+  .sd-truthy code {
+    font-size: 0.78em; padding: 0.05em 0.35em; border-radius: 4px;
+    background: var(--c-surface-2, #f6f8fa); border: 1px solid var(--c-border, #d0d7de);
+  }
+  .sd-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .sd-table th[scope="col"] {
+    text-align: left; font-weight: 600; padding: 0.4rem 0.6rem;
+    border-bottom: 2px solid var(--c-border, #d0d7de); color: var(--c-text-soft, #57606a);
+  }
+  .sd-table th[scope="row"] { text-align: left; font-weight: 600; white-space: nowrap; }
+  .sd-table td, .sd-table th[scope="row"] {
+    padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--c-border, #d0d7de); vertical-align: top;
+  }
+  .sd-syntax {
+    font-family: var(--font-mono, ui-monospace, monospace); white-space: nowrap;
+    font-size: 0.88em; padding: 0.05em 0.35em; border-radius: 4px;
+    background: var(--c-surface-2, #f6f8fa); border: 1px solid var(--c-border, #d0d7de);
+  }
+  @media (max-width: 640px) {
+    .sd-table, .sd-syntax { white-space: normal; }
+    .sd-syntax { word-break: break-word; }
+  }
+</style>

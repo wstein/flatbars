@@ -11,6 +11,7 @@
 // ~80-helper prelude is NOT re-listed here (that is the generated catalog's job) —
 // this page teaches the language and the six built-ins, and links the catalog.
 import Reference from "../layouts/Reference.astro";
+import SurfaceDeltas from "../components/SurfaceDeltas.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../fullbars.mjs";
 
@@ -22,6 +23,7 @@ const groups = [
     label: "FullBars",
     items: [
       { href: "#intro", label: "What FullBars is" },
+      { href: "#reference", label: "Surface reference" },
       { href: "#expressions", label: "Expressions & escaping" },
       { href: "#paths", label: "Paths" },
       { href: "#conditionals", label: "if / unless" },
@@ -110,6 +112,15 @@ $ ~> | $ | {
       re-renders as you type. <b>Open in Lab</b> carries the example over to the full
       editor.
     </p>
+  </section>
+
+  <!-- ────────────────────── Surface reference ───────────────────── -->
+  <section id="reference">
+    <h2>Surface reference</h2>
+    <p>The syntax and value-policy deltas that define FullBars, at a glance — generated from the
+      same single source (<code>shared/surface-syntax.json</code>) the FlatBars Lab's Reference
+      popup and the spec engine page read, so it can never drift from what they render.</p>
+    <SurfaceDeltas surface="fullbars" />
   </section>
 
   <!-- ────────────────────── Expressions & escaping ───────────────────── -->

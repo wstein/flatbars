@@ -6,6 +6,7 @@
 // gate-validated source `../mustache.mjs`; the one feature MinBars cannot execute
 // (lambdas) is a static `spec-only` callout with no live button.
 import Reference from "../layouts/Reference.astro";
+import SurfaceDeltas from "../components/SurfaceDeltas.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as ex } from "../mustache.mjs";
 // The one spec-only block (lambdas) can't run, so it's static — but still
@@ -27,6 +28,7 @@ const groups = [
     label: "Mustache",
     items: [
       { href: "#intro", label: "What Mustache is" },
+      { href: "#reference", label: "Surface reference" },
       { href: "#interpolation", label: "Interpolation" },
       { href: "#sections", label: "Sections" },
       { href: "#truthiness", label: "Truthiness (gotcha)" },
@@ -119,6 +121,15 @@ $ ~> | $ | {
       output re-renders as you type. When you want the full editor,
       <b>Open in Lab</b> carries the same example over.
     </p>
+  </section>
+
+  <!-- ────────────────────── Surface reference ───────────────────── -->
+  <section id="reference">
+    <h2>Surface reference</h2>
+    <p>The syntax and value-policy deltas that define MinBars (Mustache), at a glance — generated
+      from the same single source (<code>shared/surface-syntax.json</code>) the FlatBars Lab's
+      Reference popup and the spec engine page read, so it can never drift from what they render.</p>
+    <SurfaceDeltas surface="minbars" />
   </section>
 
   <!-- ─────────────────────── Interpolation ─────────────────────── -->
