@@ -25,6 +25,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
 import FullBars (RNode(..), RefEnv, analyseSurface, analyseSurfaceWith, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
+import FullBars.Catalog (helperCatalogMarkdown)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Env (withTranslator)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
@@ -1202,5 +1203,22 @@ main = do
     out <- runExceptT
       (runString (refEngine (preludeEnv dat)) "Hi {{{escapeHtml (lookup this \"name\")}}}")
     liftEffect $ assert' ("aff render: " <> show out) (out == Right "Hi Ada")
+
+  -- Helper catalog, MDX twin (ADR-031): same single source as the AsciiDoc
+  -- partial, emitted as a GFM table for the Starlight spec site.
+  assert' "catalog-md: MDX comment header"
+    (contains (Pattern "{/* Generated from FullBars.preludeSchema") helperCatalogMarkdown)
+  assert' "catalog-md: table header row"
+    (contains (Pattern "| Operation | Form | Arity | Source | Description |") helperCatalogMarkdown)
+  assert' "catalog-md: GFM separator row"
+    (contains (Pattern "| --- | --- | --- | --- | --- |") helperCatalogMarkdown)
+  assert' "catalog-md: a registered row renders"
+    (contains (Pattern "| `abs` | value | 1 | registered |") helperCatalogMarkdown)
+  -- Prose braces (e.g. the `{{elif}}` in the `if` doc) are entity-escaped so MDX
+  -- never reads them as an expression; the raw `{{` must not survive in prose.
+  assert' "catalog-md: prose braces entity-escaped"
+    (contains (Pattern "&#123;&#123;elif&#125;&#125;") helperCatalogMarkdown)
+  assert' "catalog-md: no raw prose tag braces"
+    (not (contains (Pattern "{{elif}}") helperCatalogMarkdown))
 
   log "all core tests passed"

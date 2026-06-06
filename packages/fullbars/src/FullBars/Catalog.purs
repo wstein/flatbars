@@ -10,6 +10,7 @@
 -- | to fail on drift.
 module FullBars.Catalog
   ( helperCatalogAdoc
+  , helperCatalogMarkdown
   , OpInfo
   , operations
   ) where
@@ -18,11 +19,12 @@ import Prelude
 
 import Data.Either (Either)
 import Data.Foldable (foldMap, lookup)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Set as Set
 import Data.String (Pattern(..), Replacement(..))
-import Data.String.Common (replaceAll)
+import Data.String.Common (joinWith, replaceAll, split)
 import Data.Tuple (Tuple(..), fst)
 import FlatBars.Error (Error)
 import Kernel.Engine (Operation)
@@ -87,6 +89,60 @@ helperCatalogAdoc =
       <> "// Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`.\n\n"
   rows =
     foldMap (\r -> renderRow r <> "\n")
+      ( Map.toUnfoldable preludeSchema.helpers
+          :: Array (Tuple String { block :: Boolean, arity :: Arity })
+      )
+
+-- | Escape one description cell for an MDX/GFM table. A `|` breaks table columns
+-- | everywhere, so it is always backslash-escaped. A brace in *prose* (e.g. the
+-- | `{{else}}` in "renders the else clause") would start an MDX expression, so it
+-- | is entity-escaped — but a brace inside an inline-code span is already literal,
+-- | so the code segments (the odd indices of a backtick split) keep their braces.
+escMd :: String -> String
+escMd s = joinWith "`" (mapWithIndex esc (split (Pattern "`") s))
+  where
+  esc i seg
+    | i `mod` 2 == 0 = escPipe (escProse seg)
+    | otherwise = escPipe seg
+  escPipe = replaceAll (Pattern "|") (Replacement "\\|")
+  escProse =
+    replaceAll (Pattern "{") (Replacement "&#123;")
+      >>> replaceAll (Pattern "}") (Replacement "&#125;")
+      >>> replaceAll (Pattern "<") (Replacement "&lt;")
+
+renderRowMd :: Tuple String { block :: Boolean, arity :: Arity } -> String
+renderRowMd (Tuple name spec) =
+  "| `" <> name <> "` | " <> form <> " | " <> renderArity spec.arity
+    <> " | "
+    <> source
+    <> " | "
+    <> desc
+    <> " |"
+  where
+  form = if spec.block then "block" else "value"
+  source = case lookup name preludeAliases of
+    Just canonical -> "alias of `" <> canonical <> "`"
+    Nothing -> case lookup name preludeSynonyms of
+      Just canonical -> "synonym of `" <> canonical <> "`"
+      Nothing -> if Set.member name registeredNames then "registered" else "scoped"
+  desc = escMd (fromMaybe "" (Map.lookup name docByName))
+
+-- | The full MDX partial: a generated, do-not-edit GitHub-flavoured Markdown table
+-- | of every helper in `preludeSchema`, sorted by name. The MDX twin of
+-- | `helperCatalogAdoc` for the Starlight spec site (ADR-031), from the same source.
+helperCatalogMarkdown :: String
+helperCatalogMarkdown =
+  header
+    <> "| Operation | Form | Arity | Source | Description |\n"
+    <> "| --- | --- | --- | --- | --- |\n"
+    <> rows
+  where
+  header =
+    "{/* Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit. */}\n"
+      <>
+        "{/* Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`. */}\n\n"
+  rows =
+    foldMap (\r -> renderRowMd r <> "\n")
       ( Map.toUnfoldable preludeSchema.helpers
           :: Array (Tuple String { block :: Boolean, arity :: Arity })
       )
