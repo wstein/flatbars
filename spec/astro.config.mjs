@@ -69,6 +69,8 @@ export default defineConfig({
     starlight({
       title: "FlatBars",
       description: "The normative specification for FlatBars — a template-engine construction kit.",
+      // The umbrella brand mark (public/favicon.svg, copied from shared/).
+      favicon: "/favicon.svg",
       // The design system: the generated chrome tokens (what the shared topbar
       // reads) + the syntax palette, plus spec-local chrome. The two token files
       // are generated copies of the shared sources (`npm run gen:tokens`).
