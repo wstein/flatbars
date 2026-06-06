@@ -314,7 +314,9 @@ function displayName(dialect) {
 // colour. This builds the flattened, non-overlapping per-offset kind map.
 const emitKinds = new Set(vocabulary.lspEmitKinds);
 
-function flatten(text, dialect) {
+// Exported so the online highlighter's drift gate (scripts/check-paint-parity.mjs)
+// can assert its ported operation pass stays byte-identical to this one.
+export function flatten(text, dialect) {
   const kinds = new Array(text.length).fill(null);
   const spans = tokenize(text, dialect);
   // Precompute, for every tag span, the active delimiter pair AT the time the
