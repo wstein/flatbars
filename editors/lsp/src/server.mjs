@@ -88,7 +88,7 @@ export function startServer(connection) {
         const range = { start: doc.positionAt(s.from), end: doc.positionAt(s.to) };
         return {
           name: s.name,
-          kind: s.kind === "macro" ? SymbolKind.Function : SymbolKind.Function,
+          kind: s.kind === "macro" ? SymbolKind.Module : SymbolKind.Function,
           range,
           selectionRange: range,
           children: project(s.children),

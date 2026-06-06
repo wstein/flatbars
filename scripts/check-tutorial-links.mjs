@@ -130,7 +130,7 @@ const pageSrc = readFileSync(new URL("../tutorials/src/pages/minbars.astro", imp
 const minbars = await createMinBarsRenderer();
 for (const [key, ex] of Object.entries(mustacheExamples)) {
   if (!pageSrc.includes(`ex.${key}.`)) {
-    console.error(`  ✗ ${key}: defined in mustache.mjs but never referenced by mustache.astro (orphan)`);
+    console.error(`  ✗ ${key}: defined in mustache.mjs but never referenced by minbars.astro (orphan)`);
     fail++;
   }
   try {

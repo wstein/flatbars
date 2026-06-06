@@ -314,8 +314,9 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
   TextMate grammar all derive from it. Three gates keep it honest, all in `npm
   test`: `check:highlight` pins what the engine emits (`spans` + `tokens`),
   `check:tmgrammar` pins that the fallback grammar agrees with the engine, per
-  dialect, on tag boundaries + literals (the grammar may be richer — enrichment is
-  allowed), and `check:vocab` pins the contract's joints (ADR-017): engine kinds ≡
+  dialect, on tag boundaries only (in-tag literals are no longer gated here — the
+  LSP corrects them as semantic tokens over the silent floor; the grammar may be
+  richer — enrichment is allowed), and `check:vocab` pins the contract's joints (ADR-017): engine kinds ≡
   vocabulary kinds (witnessed by the `check:highlight` corpus), the sparse
   `lspEmitKinds` set, the LSP legend derivation, and that every vocabulary
   `tmScope` still exists in the grammar. Change a `kind` → update the vocabulary
