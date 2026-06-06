@@ -84,11 +84,13 @@ function startServer(root) {
   });
 }
 
+// The dock panels the DEFAULT engine (FullBars) advertises. Whitespace (the
+// `trim` panel, gated on the `standalone` capability) is Stem-only and is not
+// shown under FullBars, so it is not asserted here.
 const PANELS = [
   { id: "problems",     label: "Problems" },
   { id: "transformers", label: "Transformers" },
   { id: "data-access",  label: "Data Access" },
-  { id: "trim",         label: "Whitespace" },
   { id: "partials",     label: "Partials" },
   { id: "capabilities", label: "Capabilities" },
   { id: "perf",         label: "Performance" },
@@ -133,19 +135,19 @@ try {
   console.log("browser-smoke: loading playground");
   await page.goto(playgroundUrl, { waitUntil: "networkidle2", timeout: 30000 });
 
-  // Pick a representative example so every panel has interesting content
-  // to render. The cheat-sheet uses transformers from every risk tier,
-  // partials, eval, raw emits — the heaviest workout in the examples set.
+  // Pick a representative example so every panel has interesting content to
+  // render. "Real-world - profile cards" exercises each-loops, partials, and
+  // conditionals — the heaviest workout in the FullBars (handlebars) example set.
   await page.waitForSelector("#example-trigger", { visible: true });
   await page.click("#example-trigger");
   await page.waitForSelector("#example-menu li.dropdown-item", { visible: true });
   const picked = await page.evaluate(() => {
     const items = Array.from(document.querySelectorAll("#example-menu li.dropdown-item"));
-    const item = items.find((el) => /cheat[- ]?sheet/i.test(el.textContent || ""));
+    const item = items.find((el) => /profile cards/i.test(el.textContent || ""));
     if (item) { item.click(); return item.textContent; }
     return null;
   });
-  check("loaded the Cheat Sheet example", !!picked, picked || "no matching menu item");
+  check("loaded the profile-cards example", !!picked, picked || "no matching menu item");
   // Wait for the run loop to finish: the dock toggle becomes pressed once
   // there's at least one populated panel, and segments tile the output.
   await new Promise((r) => setTimeout(r, 800));
@@ -183,9 +185,9 @@ try {
   }
 
   // Data overlay end-to-end — load the Hello World example, add an overlay
-  // tab named `extra` containing `name: Overlay`, and assert the rendered
-  // output picks up the overlay value (Hello World's template emits
-  // `{{name}}`, so the override should appear in the preview).
+  // named `name` whose body is `Overlay`, and assert the rendered output picks
+  // up the overlay value (the greeting template emits `{{name}}`, so the
+  // override should appear in the preview).
   await page.click("#example-trigger");
   await page.waitForSelector("#example-menu li.dropdown-item", { visible: true });
   await page.evaluate(() => {
@@ -237,16 +239,20 @@ try {
   await new Promise((r) => setTimeout(r, 500));
   const overlayApplied = await page.evaluate(() => {
     const frame = document.querySelector("#output-preview");
-    if (!frame || !frame.contentDocument) return null;
-    return frame.contentDocument.body.textContent || "";
+    if (!frame) return null;
+    // Read the iframe's `srcdoc` attribute (always same-origin readable) rather
+    // than contentDocument: the rendered preview runs in an `allow-scripts`
+    // (null-origin) sandbox when "Allow scripts" is on — the default — which makes
+    // contentDocument cross-origin and unreadable. srcdoc carries the same HTML.
+    return frame.getAttribute("srcdoc") || "";
   });
-  // The Hello World template is `Hello {{name}}!` with data `name: World`.
+  // The greeting template is `Hello, {{name}}!` with data `name: Ada`.
   // After mounting overlay `name` = "Overlay", the render should swap to
-  // `Hello Overlay!` — proves the overlay merge actually fires and the
+  // `Hello, Overlay!` — proves the overlay merge actually fires and the
   // type-clash diagnostic does NOT cause an abort (scalar→scalar replaces
   // silently per Phase 1 semantics).
   check("overlay value reaches the rendered output",
-    typeof overlayApplied === "string" && overlayApplied.includes("Hello Overlay!"),
+    typeof overlayApplied === "string" && overlayApplied.includes("Hello, Overlay!"),
     overlayApplied ? overlayApplied.slice(0, 60) : "no preview body");
   // Editing the overlay marks it modified-from-default; the Explorer highlights
   // such files (amber name + an "M" marker, class `mod` on the row). Assert the
@@ -342,14 +348,13 @@ try {
   await new Promise((r) => setTimeout(r, 100));
 
   // Also capture the whole playground in its final state — the dock open
-  // on the last clicked tab, the editor showing the cheat-sheet, the
+  // on the last clicked tab, the editor showing the profile-cards example, the
   // rendered preview alive — as an "overview" screenshot.
-  // Switch back to the cheat-sheet for the overview shot.
   await page.click("#example-trigger");
   await page.waitForSelector("#example-menu li.dropdown-item", { visible: true });
   await page.evaluate(() => {
     const items = Array.from(document.querySelectorAll("#example-menu li.dropdown-item"));
-    const item = items.find((el) => /cheat[- ]?sheet/i.test(el.textContent || ""));
+    const item = items.find((el) => /profile cards/i.test(el.textContent || ""));
     if (item) item.click();
   });
   await new Promise((r) => setTimeout(r, 600));
