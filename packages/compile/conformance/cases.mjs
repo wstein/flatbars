@@ -157,6 +157,12 @@ export const cases = [
   { name: "mx:loopvar-key", dialect: "maxbars", t: "{{#each o}}{{loop.key}}={{this}};{{/each}}", d: { o: { x: 1, y: 2 } } },
   // a dotted path is still a path (not a loop var) in MaxBars.
   { name: "mx:path-still-works", dialect: "maxbars", t: "{{ user.name }}", d: { user: { name: "Ada" } } },
+  // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
+  // through to name (where ?? keeps the non-null "" and || yields a boolean).
+  { name: "mx:elvis-empty", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "", name: "Ada" } },
+  { name: "mx:elvis-present", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "Ace", name: "Ada" } },
+  { name: "mx:elvis-vs-coalesce", dialect: "maxbars", t: "{{ a ?: b }}|{{ a ?? b }}", d: { a: "", b: "B" } },
+  { name: "mx:elvis-chain", dialect: "maxbars", t: "{{ a ?: b ?: c }}", d: { a: "", b: 0, c: "C" } },
 
   // arithmetic + coalesce prelude helpers (explicit call form — the desugar
   // targets). Strictly numeric; the interpreter and the runtime must agree.
@@ -171,6 +177,8 @@ export const cases = [
   { name: "coalesce-first", dialect: "surface", t: "{{ coalesce a b }}", d: { a: null, b: "fallback" } },
   { name: "coalesce-zero", dialect: "surface", t: "{{ coalesce a b }}", d: { a: 0, b: "x" } },
   { name: "coalesce-chain", dialect: "surface", t: "{{ coalesce a b c }}", d: { a: null, b: null, c: "third" } },
+  { name: "firsttruthy-skip-empty", dialect: "surface", t: "{{ firstTruthy a b }}", d: { a: "", b: "x" } },
+  { name: "firsttruthy-chain", dialect: "surface", t: "{{ firstTruthy a b c }}", d: { a: null, b: "", c: "third" } },
   // handlebars-helpers arithmetic aliases (render identically to add/sub/mul).
   { name: "plus-alias", dialect: "surface", t: "{{ plus a b }}", d: { a: 2, b: 3 } },
   { name: "minus-alias", dialect: "surface", t: "{{ minus a b }}", d: { a: 7, b: 4 } },

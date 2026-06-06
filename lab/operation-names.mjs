@@ -32,6 +32,7 @@ export const OPERATION_NAMES = [
   "escapeJson",
   "false",
   "first",
+  "firstTruthy",
   "floor",
   "groupBy",
   "gt",

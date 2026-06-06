@@ -443,6 +443,9 @@ const helpers = {
   times: (a) => num(a[0]) * num(a[1]),
   // null-coalescing — the first non-null argument (the `??` desugar target).
   coalesce: (a) => { for (const v of a) if (v !== null) return v; return null; },
+  // truthy-coalescing — the first argument truthy under the engine's rule (the
+  // `?:` Elvis desugar target); skips `""`/`[]`/falsy-by-rule, unlike coalesce.
+  firstTruthy: (a, f) => { for (const v of a) if (truthy(f.truthy, v)) return v; return null; },
   log: () => null,
   // ── value primitives — string pack (helper-packs-spec §4) ──────────────────
   // Subject-first transforms. The subject and any string-valued argument are

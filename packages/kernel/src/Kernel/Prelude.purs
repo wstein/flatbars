@@ -264,6 +264,12 @@ coreOperationDefs =
   , gen "coalesce" "Returns the first non-null argument — the `??` operator's helper." false
       (AtLeast 1)
       coalesceH
+  -- truthy-coalescing: the desugar target of `?:` (Elvis). Returns the first
+  -- argument truthy under the engine's rule (so `""`/`[]`/`0`-by-rule are skipped),
+  -- distinct from `coalesce` (null only) and `or` (boolean).
+  , gen "firstTruthy" "Returns the first truthy argument — the `?:` (Elvis) operator's helper." false
+      (AtLeast 1)
+      firstTruthyH
   , valDef "log" "Logs its arguments to the host and returns null." (atLeast 1 (const (pure VNull)))
   ]
 
@@ -630,6 +636,13 @@ coalesceH _ args = pure (fromMaybe VNull (Array.find notNull args))
   where
   notNull VNull = false
   notNull _ = true
+
+-- | `firstTruthy a b …`: the first argument the engine's truthiness rule (`ctl.env`)
+-- | counts as truthy, else `VNull`. The desugar target of the MaxBars `?:` (Elvis)
+-- | operator — so `"" ?: name` yields `name` under MaxBars' `nonEmpty` rule, unlike
+-- | `??` (which keeps the non-null `""`) and `||` (which yields a boolean).
+firstTruthyH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+firstTruthyH ctl args = pure (fromMaybe VNull (Array.find (refTruthy ctl.env) args))
 
 -- | `not`: logical negation under the engine's truthiness rule (`ctl.env`).
 notH :: forall m. MonadThrow Error m => Operation m (RefEnv m)

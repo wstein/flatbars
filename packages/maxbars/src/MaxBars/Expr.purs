@@ -5,9 +5,10 @@
 -- |
 -- | Operators desugar to helper calls: `&&`→`and`, `||`→`or`, `!`→`not`,
 -- | `==`/`!=`/`<`/`>`/`<=`/`>=`→`eq`/`ne`/`lt`/`gt`/`lte`/`gte`, the
--- | null-coalescing `??`→`coalesce`, arithmetic `+`/`-`/`*`/`/`/`%`→
+-- | null-coalescing `??`→`coalesce`, the truthy-coalescing (Elvis) `?:`→
+-- | `firstTruthy`, arithmetic `+`/`-`/`*`/`/`/`%`→
 -- | `add`/`subtract`/`multiply`/`divide`/`modulo`, and `a | f x`→`(f a x)` (piped
--- | value first). Precedence loosest→tightest: pipe, `??`, `||`, `&&`, comparisons
+-- | value first). Precedence loosest→tightest: pipe, `??`, `?:`, `||`, `&&`, comparisons
 -- | (non-associative), additive (`+` `-`), multiplicative (`*` `/` `%`), prefix
 -- | `!`, application/atom. (A dotted path like `a.b` stays a single identifier —
 -- | the lexer keeps `.` an ident char — so `/` is unambiguously division here.)
@@ -129,7 +130,11 @@ combinators toks =
   ladder withPipe term = if withPipe then pPipe else pCoalesce
     where
     pPipe i = binL pipeOp pCoalesce i
-    pCoalesce i = binL (binOp "??" "coalesce") pOr i
+    pCoalesce i = binL (binOp "??" "coalesce") pElvis i
+    -- `?:` (Elvis): truthy-coalesce — first *truthy* argument's value (so `"" ?: x`
+    -- yields `x` under the dialect's truthiness rule), distinct from `??`'s
+    -- null-only test and `||`'s boolean result.
+    pElvis i = binL (binOp "?:" "firstTruthy") pOr i
     pOr i = binL (binOp "||" "or") pAnd i
     pAnd i = binL (binOp "&&" "and") pCmp i
     -- comparison is non-associative and its operands are full additive

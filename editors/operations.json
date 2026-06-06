@@ -186,6 +186,14 @@
       "doc": "True on the loop's first iteration."
     },
     {
+      "name": "firstTruthy",
+      "kind": "inline",
+      "arity": "≥1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Returns the first truthy argument — the `?:` (Elvis) operator's helper."
+    },
+    {
       "name": "floor",
       "kind": "inline",
       "arity": "1",

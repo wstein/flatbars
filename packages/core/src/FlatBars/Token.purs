@@ -118,8 +118,11 @@ tokenizeInterior cfg base src = go 0 []
           -- a leading `-` glued to a digit is a negative literal in both modes.
           | c == '-' && maybe false isDigit (at (i + 1)) -> readNumber i acc
           -- MaxBars arithmetic / coalesce operators (only under `infixArith`).
+          -- `?` opens either `??` (null-coalesce) or `?:` (Elvis, truthy-coalesce).
           | cfg.infixArith && c == '?' ->
-              if at (i + 1) == Just '?' then op2 "??" i acc else bad i
+              if at (i + 1) == Just '?' then op2 "??" i acc
+              else if at (i + 1) == Just ':' then op2 "?:" i acc
+              else bad i
           | cfg.infixArith && arithChar c -> op1 (SCU.singleton c) i acc
           | cfg.infixArith && c == '%' -> op1 "%" i acc
           | isDigit c -> readNumber i acc
