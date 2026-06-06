@@ -20,6 +20,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { sidebar } from "./src/sidebar.ts";
+import { FONT_CSS_HREF, FONT_PRECONNECT } from "../shared/fonts.mjs";
 
 const BASE = process.env.PUBLIC_SPEC_BASE || undefined;
 const SITE = process.env.PUBLIC_SITE || undefined;
@@ -88,17 +89,12 @@ export default defineConfig({
         ThemeProvider: "./src/components/ThemeProvider.astro",
         ThemeSelect: "./src/components/ThemeSelect.astro",
       },
-      // IBM Plex — the umbrella's UI/mono families the shared topbar reads.
+      // IBM Plex — the umbrella's UI/mono families the shared topbar reads. The
+      // stylesheet URL is the single source `shared/fonts.mjs` (check:fonts).
       head: [
-        { tag: "link", attrs: { rel: "preconnect", href: "https://fonts.googleapis.com" } },
-        { tag: "link", attrs: { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: true } },
-        {
-          tag: "link",
-          attrs: {
-            rel: "stylesheet",
-            href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap",
-          },
-        },
+        { tag: "link", attrs: { rel: "preconnect", href: FONT_PRECONNECT[0] } },
+        { tag: "link", attrs: { rel: "preconnect", href: FONT_PRECONNECT[1], crossorigin: true } },
+        { tag: "link", attrs: { rel: "stylesheet", href: FONT_CSS_HREF } },
       ],
       // Build-time link integrity — the replacement for Antora's xref guarantee.
       // It is the GATE, run in the base-less build (`npm run build:spec`), where

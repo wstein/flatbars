@@ -8,9 +8,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Load the web fonts without blocking first paint: the shell renders
-         immediately in the system fallback, then the fonts swap in. -->
+         immediately in the system fallback, then the fonts swap in. The URL is the
+         single source shared/fonts.mjs (this static copy is pinned by check:fonts). -->
     <link rel="stylesheet" media="print" onload="this.media='all'"
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" />
     <title>FlatBars Lab — IDE</title>
     <!-- The shared umbrella topbar element, vendored from shared/ (a committed
          artifact like the engine bundle; regenerate with `npm run gen:topbar`, bump
