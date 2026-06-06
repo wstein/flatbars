@@ -83,6 +83,19 @@ test("the Theme control writes flatbars-theme + sets html[data-theme] + fires th
   );
 });
 
+test("the search palette opens (search-index opt-in) and the dormant Reference machinery is gone", () => {
+  const el = mount('search-index="/search-index.json"');
+  // No Reference button/dialog survives the cleanup (the capability was unused).
+  assert.equal(el.shadowRoot.getElementById("refBtn"), null);
+  assert.equal(el.shadowRoot.getElementById("refModal"), null);
+  assert.equal(typeof el._openReference, "undefined");
+  // The search palette (which shared the focus/escape patterns) still works.
+  assert.equal(el._palOpen, false);
+  el.shadowRoot.getElementById("search").click();
+  assert.equal(el._palOpen, true);
+  assert.equal(el.shadowRoot.getElementById("palModal").hidden, false);
+});
+
 test("a cross-tab storage event syncs the theme", () => {
   const el = mount("");
   window.document.documentElement.dataset.theme = "light";
