@@ -33,9 +33,9 @@ import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
 import FullBars (analyseSurface, directiveLints, handlebars, noLoopVars, preludeSchema, renderSurfaceDiagWith)
 import FullBars.Compile (compileSurfaceWith) as Compile
-import Kernel.Walk (validate)
+import Kernel.Walk (Severity, validate)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
-import MaxBars (maxOptions)
+import MaxBars (maxOptions, maxbarsWarnings)
 import MinBars (renderMinCompat, renderMinDelimsCompatDiag, renderMinDelimsDiag, renderMinDiag, renderMinWith) as MinBars
 import Node.Encoding (Encoding(..))
 import Node.FS.Sync (readTextFile, readdir)
@@ -397,7 +397,9 @@ lintUsage =
     , "Dialect (default core/RawBars):"
     , "  -s, --surface   lint the FullBars surface — aliases only (the scoped-variable lint"
     , "                  is the native RawBars/MaxBars spelling, not Handlebars @index)."
-    , "      --maxbars   lint MaxBars source (infix operators, pipes) — aliases + scoped."
+    , "      --maxbars   lint MaxBars source (infix operators, pipes) — aliases + scoped,"
+    , "                  plus the dialect lints: stray head bar, label shadow, and a"
+    , "                  boolean || / && in output position (use ?? or ?: for a value)."
     , ""
     , "Exit code:"
     , "      --max-warnings <n>   exit non-zero only if findings exceed n (default 0: any"
@@ -463,18 +465,32 @@ runLint args
                     Right { nodes } ->
                       -- The scoped-variable lint is for the native (core/MaxBars)
                       -- spelling; on the FullBars surface `@index`/`@partial-block`
-                      -- are canonical, so run aliases only there.
-                      case
-                        aliasWarnings nodes <> (if a.surface then [] else scopedCanonWarnings nodes)
-                        of
-                        [] -> writeStdout "ok: no lint findings\n"
-                        issues -> do
-                          writeStderr (joinWith "\n" (map fmt issues) <> "\n")
+                      -- are canonical, so run aliases only there. `--maxbars` adds
+                      -- the MaxBars dialect lints (stray head bar, label shadow, and
+                      -- a boolean `||`/`&&` in output position — use ?? / ?:).
+                      let
+                        aliasIssues =
+                          aliasWarnings nodes
+                            <> (if a.surface then [] else scopedCanonWarnings nodes)
+                        -- MaxBars dialect lints carry no span, so format both
+                        -- sources to lines and combine the strings, not the arrays.
+                        maxLints =
+                          if a.maxbars then case maxbarsWarnings tpl of
+                            Right is -> is
+                            Left _ -> []
+                          else []
+                        lines = map fmt aliasIssues <> map fmt maxLints
+                        count = Array.length aliasIssues + Array.length maxLints
+                      in
+                        if count == 0 then writeStdout "ok: no lint findings\n"
+                        else do
+                          writeStderr (joinWith "\n" lines <> "\n")
                           -- Exit non-zero only past the threshold (-1 ⇒ never).
-                          when (a.maxWarnings >= 0 && Array.length issues > a.maxWarnings)
+                          when (a.maxWarnings >= 0 && count > a.maxWarnings)
                             (setExitCode 1)
           _ -> die ("flatbars lint: expected <template>\n\n" <> lintUsage)
       where
+      fmt :: forall r. { severity :: Severity, message :: String | r } -> String
       fmt issue = show issue.severity <> ": " <> issue.message
 
 runExamples :: Array String -> Effect Unit

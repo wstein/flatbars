@@ -29,7 +29,7 @@ import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
-import MaxBars.Lint (labelShadowWarnings, strayHeadBarWarnings)
+import MaxBars.Lint (booleanInOutputWarnings, labelShadowWarnings, strayHeadBarWarnings)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -111,4 +111,8 @@ maxbarsWarnings src = do
   -- marker); the stray-bar lint reads the *parsed* tree (the desugar rewrites a
   -- bare bar into a `lookup`, erasing the signal).
   let desugared = desugarSurfaceWith maxLoopVars nodes
-  pure (labelShadowWarnings desugared <> strayHeadBarWarnings nodes)
+  pure
+    ( labelShadowWarnings desugared
+        <> strayHeadBarWarnings nodes
+        <> booleanInOutputWarnings desugared
+    )

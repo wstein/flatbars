@@ -11,12 +11,13 @@ module MaxBars.Lint
   ( reservedNames
   , strayHeadBarWarnings
   , labelShadowWarnings
+  , booleanInOutputWarnings
   ) where
 
 import Prelude
 
 import Data.Array as Array
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import FlatBars.Syntax (Expr(..), Template)
 import FlatBars.Value (Value(..))
 import FullBars.Surface (extractBlockParams)
@@ -56,6 +57,48 @@ strayHeadBarWarnings = foldTemplate
     , message:
         "a bar in a block head is the block-parameter delimiter, not the pipe "
           <> "operator; to pipe a block argument, parenthesise it — e.g. (x | f)"
+    }
+
+-- | Warn when an *output* expression is a bare boolean logical operator —
+-- | `{{ a || b }}` / `{{ a && b }}` (desugar targets `or` / `and`). In output
+-- | position these yield the literal text `true`/`false`, which is almost always a
+-- | mistake: a JS author reaches for `||` expecting a value fallback (`Hi Ada`),
+-- | but `||` is boolean here. The fix is a value-coalesce — `??` (first non-null)
+-- | or `?:` (first truthy). Runs over the *desugared* tree, where the operators are
+-- | `or`/`and` applications; only the whole-output head is flagged, so a boolean in
+-- | a condition (`{{#if (a || b)}}`, a block-head arg) or nested as an argument
+-- | (`{{ pick (a || b) }}`) is left alone — those are legitimate boolean uses.
+booleanInOutputWarnings :: Template -> Array Issue
+booleanInOutputWarnings = foldTemplate
+  { content: const []
+  , output: \e -> maybe [] pure (boolWarn e)
+  , raw: \name _ _ -> maybe [] pure (issueFor name)
+  , sep: \_ _ -> []
+  , block: \b -> b.recurse b.children
+  , nodeError: \_ _ -> []
+  , concat: Array.concat
+  }
+  where
+  -- escaped output `{{ … }}` desugars to `escapeHtml (…)`; unwrap that one layer
+  -- so we inspect the real expression head.
+  boolWarn e = case unescape e of
+    App name _ -> issueFor name
+    _ -> Nothing
+  unescape = case _ of
+    App "escapeHtml" [ inner ] -> inner
+    other -> other
+  issueFor name = case name of
+    "or" -> Just (issue "||" "or")
+    "and" -> Just (issue "&&" "and")
+    _ -> Nothing
+  issue op nm =
+    { severity: Warn
+    , name: nm
+    , message:
+        "this tag outputs a boolean — the " <> op <> " (" <> nm
+          <> ") operator yields true/false, not a value. For a fallback value use "
+          <> "?? (first non-null) or ?: (first truthy); use " <> op
+          <> " only in a condition, e.g. {{#if a " <> op <> " b}}"
     }
 
 -- | The reserved variable roots (ADR-021): a loop `label NAME` that picks one of

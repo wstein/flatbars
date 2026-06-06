@@ -294,6 +294,22 @@ main = do
   assert' "label-warn: {{#each xs label outer}} (fresh name) does not warn"
     (Array.null (warnNames "{{#each xs label outer}}{{outer.index0}}{{/each}}"))
 
+  -- boolean-in-output lint (the ?:/??/|| debate): a bare `||`/`&&` in OUTPUT
+  -- position yields true/false, almost always a mistake — warn and point at
+  -- ?? / ?:. Conditions, value-coalesce, and nested args are NOT flagged.
+  assert' "bool-output-warn: {{ a || b }} warns with 'or'"
+    (warnNames "{{ a || b }}" == [ "or" ])
+  assert' "bool-output-warn: {{ a && b }} warns with 'and'"
+    (warnNames "{{ a && b }}" == [ "and" ])
+  assert' "bool-output-warn: {{#if a || b}}…{{/if}} (condition) does not warn"
+    (Array.null (warnNames "{{#if a || b}}Y{{/if}}"))
+  assert' "bool-output-warn: {{ a ?? b }} (null-coalesce) does not warn"
+    (Array.null (warnNames "{{ a ?? b }}"))
+  assert' "bool-output-warn: {{ a ?: b }} (truthy-coalesce) does not warn"
+    (Array.null (warnNames "{{ a ?: b }}"))
+  assert' "bool-output-warn: {{ pick (a || b) }} (nested arg) does not warn"
+    (Array.null (warnNames "{{ pick (a || b) }}"))
+
   -- ── Set delimiters (ADR-015 amendment): MinBars-exclusive ─────────────────
   -- MaxBars REJECTS set-delim. The inline `{{=A B=}}` form is a hard parse
   -- error; the `{{! @delimiters: …}}` long-comment form parses as a normal
