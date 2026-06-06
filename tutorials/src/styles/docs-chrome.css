@@ -1,68 +1,17 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
- * Docs CHROME beyond the prose: the topbar Theme control, the "Legend" button +
- * its colour-legend popover shell. Ported from the FlatBars-design mockup's
- * styles.css. Imported globally by the Reference layout. Tokens come from
- * lab-tokens.css; the popover's colour key is painted through the real engine
- * (LegendPopover.astro), so the legend is an honest key for the inner-token
- * examples. (The old whole-tag "Chips" tint/outline/solid control + its
- * .legend-grid chips were retired with the move to inner-token — ADR-014.) */
+ * Docs CHROME beyond the prose + the shared topbar: the skip link and the docs
+ * sidebar nav-toggle (forwarded into <flatbars-topbar>'s `start` slot), plus the
+ * inline-code plate reset for runtime-highlighted tags. The wordmark, Theme,
+ * Search and the context switcher live inside the element's shadow DOM; the
+ * colour-Legend popover and the surface-Reference popup were removed. Imported
+ * globally by the Reference layout; tokens come from lab-tokens.css. */
 
 /* Inline prose code that contains a highlighted tag drops its own grey plate so
    only the painted tokens show (the runtime highlighter swaps the <code>'s text
    for tk-* spans). */
 .content code:has([class^="tk-"]),
 .content .code:has([class^="tk-"]) { background: transparent; padding: 0; }
-
-/* ── Topbar tools — the Legend anchor rides in <flatbars-topbar>'s `tools` slot
-   (light DOM, so it is styled here). The wordmark, Theme control, Search and the
-   context switcher all live inside the element's shadow DOM now. ── */
-.hdr-ctrl { display: flex; align-items: center; gap: 0.45rem; }
-
-/* ── Legend button + popover ── */
-.legend-anchor { position: relative; display: flex; align-items: center; }
-.hdr-btn {
-  display: inline-flex; align-items: center; gap: 0.45rem;
-  font: 600 12px/1 var(--font-ui); color: var(--fg-secondary);
-  background: var(--bg-2); border: 1px solid var(--border); border-radius: 8px;
-  padding: 5px 11px 5px 8px; cursor: pointer; white-space: nowrap;
-}
-.hdr-btn:hover { color: var(--accent-2); border-color: var(--border-strong); }
-.hdr-btn[aria-expanded="true"] {
-  color: var(--accent-2); border-color: var(--accent);
-  background: var(--accent-softer);
-}
-.hdr-btn .lg-swatch {
-  width: 15px; height: 15px; border-radius: 3px; flex: none;
-  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 1.5px;
-}
-.hdr-btn .lg-swatch i { border-radius: 1.5px; }
-.hdr-btn .lg-swatch i:nth-child(1) { background: var(--c-expr); }
-.hdr-btn .lg-swatch i:nth-child(2) { background: var(--c-partial); }
-.hdr-btn .lg-swatch i:nth-child(3) { background: var(--c-block); }
-.hdr-btn .lg-swatch i:nth-child(4) { background: var(--c-inherit); }
-
-.legend-pop {
-  position: absolute; top: calc(100% + 9px); right: 0;
-  width: min(440px, 92vw); max-height: 74vh; overflow: auto;
-  background: var(--bg); border: 1px solid var(--border-strong);
-  border-radius: 12px; box-shadow: var(--shadow-pop);
-  padding: 1rem 1.15rem 1.15rem; z-index: 30;
-}
-.legend-pop[hidden] { display: none; }
-.legend-pop-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 0.3rem; }
-.legend-pop-head .lph-title { font-size: 1rem; font-weight: 700; color: var(--fg); }
-.legend-pop-head .lph-sub { font-size: 0.8rem; color: var(--fg-faint); }
-
-/* The popover's colour key (.legend-roles / .lr-*) is scoped inside
-   LegendPopover.astro and painted through the real engine, so the key can never
-   disagree with the examples (ADR-014 amendment). Only the popover shell + foot
-   live here. */
-.legend-pop .legend-foot {
-  margin: 1rem 0 0; padding-top: 0.85rem; border-top: 1px solid var(--border);
-  font-size: 0.8rem; color: var(--fg-faint); line-height: 1.55; text-wrap: pretty;
-}
-.legend-pop .legend-foot b { color: var(--fg-muted); font-weight: 600; }
 
 /* ── Skip link + docs sidebar toggle. The topbar shell and wordmark now live in
    the shared <flatbars-topbar> element (shadow DOM); the sidebar nav-toggle is

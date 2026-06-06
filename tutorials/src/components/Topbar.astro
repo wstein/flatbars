@@ -2,30 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The one app topbar, shared by the docs layout (Reference.astro) AND the
-// landing — now the shared, zero-dependency <flatbars-topbar> custom element
+// landing — the shared, zero-dependency <flatbars-topbar> custom element
 // (shared/flatbars-topbar.mjs), the SAME element the Starlight spec and the
-// static Lab mount, so the chrome is identical across the umbrella and the first
-// click never changes it. The element owns the wordmark, the context switcher
+// static Lab mount. It owns the wordmark, the context switcher
 // (Home · Tutorials · Spec · Lab), the Theme control (persisted to the single
-// `flatbars-theme` key), Search and GitHub.
-//
-// Two host controls ride in the element's named slots:
-//   • `start`  — the docs sidebar nav-toggle (forwarded from this component's
-//                own `start` slot, used by Reference.astro on narrow screens).
-//   • `tools`  — the docs colour-legend popover (highlighter key).
-// The Legend popover wiring stays here; the Theme control wiring moved into the
-// element. (The old whole-tag "Chips" control was retired with inner-token
-// highlighting — ADR-014.)
-import LegendPopover from "./LegendPopover.astro";
-import SurfaceDeltas from "./SurfaceDeltas.astro";
-import surfaceSyntax from "../../../shared/surface-syntax.json";
+// `flatbars-theme` key), Search and GitHub. The only host control is the docs
+// sidebar nav-toggle, forwarded into the element's `start` slot by Reference.astro
+// on narrow screens.
 import "../styles/docs-chrome.css";
 
-// `reference` opts the page into the shared topbar's Reference popup, keyed to a
-// surface id (the page's dialect). The Legend popover stays as the colours key;
-// Reference is the syntax/policy companion. Empty (e.g. the landing) ⇒ no popup.
-const { section = "tutorials", labEngine = "minbars", reference = "" } = Astro.props;
-const refSurface = surfaceSyntax.surfaces.find((s) => s.id === reference);
+const { section = "tutorials", labEngine = "minbars" } = Astro.props;
 // Empty at root/dev, "/flatbars" on the Pages project sub-path. The element
 // resolves every cross-app link from it.
 const BASE = import.meta.env.PUBLIC_BASE_PATH || "";
@@ -37,55 +23,15 @@ const BASE = import.meta.env.PUBLIC_BASE_PATH || "";
   version="v0.1.0"
   lab-engine={labEngine}
   search-index="/search-index.json"
-  reference={refSurface ? "on" : undefined}
-  reference-label="Reference"
 >
   <slot name="start" />
-  <LegendPopover />
-  {refSurface && (
-    <div id="refPanel">
-      <h2 class="sref-title">{refSurface.label} — surface reference</h2>
-      <SurfaceDeltas surface={refSurface.id} />
-    </div>
-  )}
 </flatbars-topbar>
 
 <script>
   // Define the shared custom element on the client (the import is a side effect).
   import "../../../shared/flatbars-topbar.mjs";
 
-  // Astro consumes the `slot` attribute on children of a plain element, so assign
-  // the element's named slots at runtime: the docs sidebar toggle goes to `start`,
-  // the colour-legend popover to `tools`. (The element is JS-driven regardless.)
-  const bar = document.querySelector("flatbars-topbar");
-  bar?.querySelector("#navToggle")?.setAttribute("slot", "start");
-  bar?.querySelector(".legend-anchor")?.setAttribute("slot", "tools");
-  // The surface Reference panel (when the page opted in) fills the element's
-  // `reference` slot; the element owns the accessible dialog shell.
-  bar?.querySelector("#refPanel")?.setAttribute("slot", "reference");
-
-  // Legend popover (slotted into the topbar's `tools` slot — light DOM, so it is
-  // queryable by id here). The Theme control lives inside the element now.
-  const legendBtn = document.getElementById("legendBtn");
-  const legendPop = document.getElementById("legendPop");
-  function onOutside(e) {
-    if (legendPop && !legendPop.contains(e.target) && !legendBtn.contains(e.target)) closePop();
-  }
-  function onEsc(e) {
-    if (e.key === "Escape") { closePop(); legendBtn?.focus(); }
-  }
-  function openPop() {
-    legendPop.hidden = false;
-    legendBtn.setAttribute("aria-expanded", "true");
-    document.addEventListener("mousedown", onOutside, true);
-    document.addEventListener("keydown", onEsc, true);
-  }
-  function closePop() {
-    if (!legendPop) return;
-    legendPop.hidden = true;
-    legendBtn.setAttribute("aria-expanded", "false");
-    document.removeEventListener("mousedown", onOutside, true);
-    document.removeEventListener("keydown", onEsc, true);
-  }
-  legendBtn?.addEventListener("click", () => (legendPop.hidden ? openPop() : closePop()));
+  // Astro consumes the `slot` attribute on a plain element's child, so assign the
+  // docs sidebar nav-toggle to the element's `start` slot at runtime.
+  document.querySelector("flatbars-topbar #navToggle")?.setAttribute("slot", "start");
 </script>

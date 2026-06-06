@@ -14,9 +14,6 @@
 // tokens the element reads are loaded site-wide via the spec's `customCss`
 // (src/styles/flatbars-chrome.css — generated from the shared source by `npm run gen:tokens`).
 import MobileMenuToggle from "@astrojs/starlight/components/MobileMenuToggle.astro";
-// The same generated per-surface delta tables §5.9 renders — the spec is
-// cross-surface, so its Reference popup shows all four surfaces (single source).
-import SurfaceDeltas from "../partials/surface-deltas.mdx";
 
 // The spec mounts at `${PUBLIC_SPEC_BASE}` (e.g. /flatbars/spec); the umbrella
 // root is that minus the trailing /spec. Empty in standalone dev (links then
@@ -25,20 +22,10 @@ const SPEC_BASE = process.env.PUBLIC_SPEC_BASE || "";
 const BASE = SPEC_BASE.replace(/\/$/, "").replace(/\/spec$/, "");
 ---
 
-<flatbars-topbar section="spec" base={BASE} version="v0.1.0" search-index="/search-index.json" reference="on" reference-label="Reference">
-  <div id="refPanel">
-    <h2 class="sref-title">Surface reference</h2>
-    <p class="sref-tagline">The syntax &amp; value-policy deltas across the four surfaces (§5.9) — one source.</p>
-    <SurfaceDeltas />
-  </div>
-</flatbars-topbar>
+<flatbars-topbar section="spec" base={BASE} version="v0.1.0" search-index="/search-index.json"></flatbars-topbar>
 <MobileMenuToggle />
 
 <script>
   // Define the shared custom element on the client (the import is a side effect).
   import "../../../shared/flatbars-topbar.mjs";
-
-  // Astro consumes a literal `slot` on a plain element's child, so assign the
-  // all-surface reference panel to the element's `reference` slot at runtime.
-  document.querySelector("flatbars-topbar #refPanel")?.setAttribute("slot", "reference");
 </script>
