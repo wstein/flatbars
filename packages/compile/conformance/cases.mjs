@@ -163,6 +163,15 @@ export const cases = [
   { name: "mx:elvis-present", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "Ace", name: "Ada" } },
   { name: "mx:elvis-vs-coalesce", dialect: "maxbars", t: "{{ a ?: b }}|{{ a ?? b }}", d: { a: "", b: "B" } },
   { name: "mx:elvis-chain", dialect: "maxbars", t: "{{ a ?: b ?: c }}", d: { a: "", b: 0, c: "C" } },
+  // cond ? a : b (ternary) — an inline conditional picking a/b by truthiness.
+  { name: "mx:ternary-true", dialect: "maxbars", t: "{{ ok ? yes : no }}", d: { ok: true, yes: "Y", no: "N" } },
+  { name: "mx:ternary-false", dialect: "maxbars", t: "{{ ok ? yes : no }}", d: { ok: false, yes: "Y", no: "N" } },
+  // the condition is a full expression (comparison binds tighter than `?`).
+  { name: "mx:ternary-cmp", dialect: "maxbars", t: "{{ n > 3 ? \"big\" : \"small\" }}", d: { n: 5 } },
+  // right-associative chaining: a ? b : c ? d : e == a ? b : (c ? d : e).
+  { name: "mx:ternary-chain", dialect: "maxbars", t: "{{ a ? \"A\" : b ? \"B\" : \"none\" }}", d: { a: false, b: true } },
+  // empty-string condition is falsy under MaxBars' nonEmpty rule.
+  { name: "mx:ternary-empty", dialect: "maxbars", t: "{{ s ? s : \"fallback\" }}", d: { s: "" } },
 
   // arithmetic + coalesce prelude helpers (explicit call form — the desugar
   // targets). Strictly numeric; the interpreter and the runtime must agree.
@@ -179,6 +188,8 @@ export const cases = [
   { name: "coalesce-chain", dialect: "surface", t: "{{ coalesce a b c }}", d: { a: null, b: null, c: "third" } },
   { name: "firsttruthy-skip-empty", dialect: "surface", t: "{{ firstTruthy a b }}", d: { a: "", b: "x" } },
   { name: "firsttruthy-chain", dialect: "surface", t: "{{ firstTruthy a b c }}", d: { a: null, b: "", c: "third" } },
+  { name: "ternary-true", dialect: "surface", t: "{{ ternary c a b }}", d: { c: true, a: "A", b: "B" } },
+  { name: "ternary-false", dialect: "surface", t: "{{ ternary c a b }}", d: { c: false, a: "A", b: "B" } },
   // handlebars-helpers arithmetic aliases (render identically to add/sub/mul).
   { name: "plus-alias", dialect: "surface", t: "{{ plus a b }}", d: { a: 2, b: 3 } },
   { name: "minus-alias", dialect: "surface", t: "{{ minus a b }}", d: { a: 7, b: 4 } },

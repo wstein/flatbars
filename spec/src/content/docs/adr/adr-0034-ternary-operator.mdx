@@ -1,0 +1,84 @@
+---
+title: "ADR-0034: the ? : ternary operator for MaxBars"
+sidebar:
+  label: "ADR-034 ? : ternary"
+---
+
+*Status:* Accepted — 2026-06-07. A MaxBars surface-grammar decision; it adds one
+infix operator and one prelude operation, additively. Owner: Werner. Builds on the
+truthiness model of [ADR-022](/adr/adr-0022-analyse-mode/), the
+operator-as-helper desugar of MaxBars, and the value-coalesce sibling
+[ADR-033](/adr/adr-0033-truthy-coalesce-operator/).
+
+*Implementation status — complete.* A lone `?` and a lone `:` lex under
+`infixArith` (the glued `?:` stays the Elvis operator, `??` stays null-coalesce),
+the ternary parses as the **loosest, right-associative** rung of `MaxBars.Expr`,
+and desugars to a new `ternary` prelude operation (`Kernel.Prelude`). Compiler
+parity holds (a `ternary` runtime helper using the frame's truthiness; interpreter
+≡ compiled, 331/331 conformance), it lowers to RawBars as `(ternary cond a b)`
+with no special casing, and the catalog/operations/Lab bundle are regenerated.
+
+## Context
+
+MaxBars could *select a fallback for one value* (`??`, `?:` — ADR-033) and *branch
+the template body* (`{{#if}} … {{else}} … {{/if}}`), but it had no **inline choice
+between two different values**. The everyday case — "this label or that one,
+depending on a flag" — forced a block:
+
+```handlebars
+{{#if stock > 0}}In stock{{else}}Sold out{{/if}}
+```
+
+inside what is conceptually one expression (e.g. an attribute value, or an
+argument to another helper). Every C-family and templating language an author
+arrives from spells this `cond ? a : b`; its absence is a missing rung, not a
+deliberate omission.
+
+The coalesces do **not** cover it: `a ?: b` falls back when *a itself* is falsy —
+it cannot return a *third* value, nor test one expression to choose between two
+others. `{{ stock > 0 ?: "Sold out" }}` is nonsense (`true ?: …` → `true`).
+
+## Decision
+
+Add the ternary `cond ? a : b` as the inline form of `{{#if}}`: evaluate `cond`,
+return `a` when it is truthy under the engine's rule, else `b`. It desugars to a
+new `ternary` operation (arity exactly 3), keeping the operator-is-a-helper
+identity the whole family rests on.
+
+Grammar choices, all matching the C-family expectation an author imports:
+
+- **Loosest precedence.** The ternary binds looser than every other operator
+  (including the pipe), so the condition is a full expression: `{{ n > 3 ? a : b }}`
+  reads as `{{ (n > 3) ? a : b }}`. Parenthesise to nest a ternary inside an
+  argument.
+- **Right-associative.** `a ? b : c ? d : e` is `a ? b : (c ? d : e)` — a
+  chain of else-ifs, as everywhere else.
+- **Lexing.** A glued `?:` remains the Elvis operator and `??` the null-coalesce;
+  a `?` or `:` standing alone is the ternary. The branches need no space around
+  the punctuation (`stock>0?a:b` lexes), but `a?:b` is always Elvis.
+
+## Consequences
+
+- A new, **permanent** surface operator: once authored, `{{ x ? a : b }}` can't be
+  withdrawn. The cost is bounded — it is additive (no existing template changes
+  meaning; a lone `?`/`:` was previously a lex error in MaxBars), conformance-tested,
+  and lowers cleanly to RawBars.
+- **Both branches are evaluated.** The engine is applicative: `ternary` receives
+  three already-evaluated arguments and selects one, exactly like `firstTruthy`,
+  `and`, and `or`. For the pure value expressions MaxBars composes this is
+  observably identical to short-circuiting; it is *not* a control-flow construct
+  (`{{#if}}` remains the way to avoid rendering an expensive/again-effecting
+  branch). This is stated in the operation's doc and the `/maxbars` tutorial.
+- **MaxBars-only.** The `? :` syntax is parsed only by the MaxBars grammar; the
+  `ternary` *operation* lives in the shared prelude, so RawBars/FullBars can call
+  it explicitly (`(ternary cond a b)`) but only MaxBars has the operator — one
+  more documented surface divergence in the dialect ladder.
+
+## Deferred / open
+
+- **Lower-dialect exposure.** Whether FullBars should gain an inline-conditional
+  *operator* (not just the callable `ternary` operation) is left open, like the
+  same question for `?:` in ADR-033.
+- **An `if`/`ifElse` value alias** of `ternary`, for discoverability, via the
+  prelude's `withAlias` mechanism — deferred until there's demand, to avoid two
+  names for one operation (and to keep `if` unambiguously the *block* helper).

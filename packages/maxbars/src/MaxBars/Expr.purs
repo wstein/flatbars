@@ -3,12 +3,14 @@
 -- | (`FlatBars.Token`) into plain core `Expr` (`App` calls) — so the engine,
 -- | prelude, and compiler below are reused unchanged.
 -- |
--- | Operators desugar to helper calls: `&&`→`and`, `||`→`or`, `!`→`not`,
+-- | Operators desugar to helper calls: the ternary `cond ? a : b`→`ternary`,
+-- | `&&`→`and`, `||`→`or`, `!`→`not`,
 -- | `==`/`!=`/`<`/`>`/`<=`/`>=`→`eq`/`ne`/`lt`/`gt`/`lte`/`gte`, the
 -- | null-coalescing `??`→`coalesce`, the truthy-coalescing (Elvis) `?:`→
 -- | `firstTruthy`, arithmetic `+`/`-`/`*`/`/`/`%`→
 -- | `add`/`subtract`/`multiply`/`divide`/`modulo`, and `a | f x`→`(f a x)` (piped
--- | value first). Precedence loosest→tightest: pipe, `??`, `?:`, `||`, `&&`, comparisons
+-- | value first). Precedence loosest→tightest: ternary (right-associative), pipe,
+-- | `??`, `?:`, `||`, `&&`, comparisons
 -- | (non-associative), additive (`+` `-`), multiplicative (`*` `/` `%`), prefix
 -- | `!`, application/atom. (A dotted path like `a.b` stays a single identifier —
 -- | the lexer keeps `.` an ident char — so `/` is unambiguously division here.)
@@ -127,8 +129,24 @@ combinators toks =
   -- it (a bar there is a block-parameter delimiter, parsed as structure below).
   ladder
     :: Boolean -> (Int -> Either ParseError (Step Expr)) -> Int -> Either ParseError (Step Expr)
-  ladder withPipe term = if withPipe then pPipe else pCoalesce
+  ladder withPipe term = pTernary
     where
+    -- `cond ? a : b` (ternary): the loosest construct, right-associative. The
+    -- condition is the next-looser rung (pipe in output position, `??` in head
+    -- position); the true branch is delimited by `:`, and both branches are full
+    -- ternary expressions, so `a ? b : c ? d : e` reads as `a ? b : (c ? d : e)`.
+    -- Desugars to `ternary cond a b`, which picks a/b by the engine's truthiness
+    -- rule (like `firstTruthy`) — both branches are evaluated (the engine is
+    -- applicative), consistent with the other operator helpers.
+    pTernary i = below i >>= \cond -> case tk cond.pos of
+      Just (TOp "?") -> pTernary (cond.pos + 1) >>= \thenB -> case tk thenB.pos of
+        Just (TOp ":") -> pTernary (thenB.pos + 1) >>= \elseB ->
+          Right { val: App "ternary" [ cond.val, thenB.val, elseB.val ], pos: elseB.pos }
+        _ -> Left (LexError "expected ':' to complete the ternary 'cond ? a : b'" (posAt thenB.pos))
+      _ -> Right cond
+    -- the rung just below ternary: pipe in output position, `??` in head position
+    -- (a bar there is the block-parameter delimiter, not an operator).
+    below = if withPipe then pPipe else pCoalesce
     pPipe i = binL pipeOp pCoalesce i
     pCoalesce i = binL (binOp "??" "coalesce") pElvis i
     -- `?:` (Elvis): truthy-coalesce — first *truthy* argument's value (so `"" ?: x`

@@ -97,8 +97,11 @@ booleanInOutputWarnings = foldTemplate
     , message:
         "this tag outputs a boolean — the " <> op <> " (" <> nm
           <> ") operator yields true/false, not a value. For a fallback value use "
-          <> "?? (first non-null) or ?: (first truthy); use " <> op
-          <> " only in a condition, e.g. {{#if a " <> op <> " b}}"
+          <> "?? (first non-null) or ?: (first truthy); use "
+          <> op
+          <> " only in a condition, e.g. {{#if a "
+          <> op
+          <> " b}}"
     }
 
 -- | The reserved variable roots (ADR-021): a loop `label NAME` that picks one of

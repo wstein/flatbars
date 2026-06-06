@@ -446,6 +446,9 @@ const helpers = {
   // truthy-coalescing — the first argument truthy under the engine's rule (the
   // `?:` Elvis desugar target); skips `""`/`[]`/falsy-by-rule, unlike coalesce.
   firstTruthy: (a, f) => { for (const v of a) if (truthy(f.truthy, v)) return v; return null; },
+  // ternary — `a` when the condition is truthy under the engine's rule, else `b`
+  // (the `cond ? a : b` desugar target). The desugar always passes exactly 3 args.
+  ternary: (a, f) => truthy(f.truthy, a[0]) ? a[1] : a[2],
   log: () => null,
   // ── value primitives — string pack (helper-packs-spec §4) ──────────────────
   // Subject-first transforms. The subject and any string-valued argument are

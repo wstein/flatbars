@@ -56,7 +56,7 @@
       "rows": [
         { "feature": "Infix operators", "syntax": "{{price * qty}}   {{score >= 90}}", "note": "Desugar to helpers: multiply, gte, and, or, not, coalesce.", "kind": "only" },
         { "feature": "Pipes", "syntax": "{{name | upcase | truncate 8}}", "note": "Left value becomes the helper's first argument.", "kind": "only" },
-        { "feature": "Boolean / coalesce", "syntax": "{{a && b}}   {{a ?? fallback}}", "note": "&& || ! ?? as infix; group with parens.", "kind": "only" },
+        { "feature": "Boolean / coalesce / ternary", "syntax": "{{a && b}}   {{a ?? fb}}   {{a ?: fb}}   {{ok ? a : b}}", "note": "&& || ! ?? as infix, ?: (Elvis truthy-coalesce), and the ternary cond ? a : b; group with parens.", "kind": "only" },
         { "feature": "Path access", "syntax": "{{user.city}}   {{root.x}}   {{parent.x}}", "note": "Reserved names instead of @root / ../  (no @-sigil).", "kind": "only" },
         { "feature": "Loop variables", "syntax": "{{index0}}   {{loop.first}}   {{outer.index0}}", "note": "Bare scoped ops or labelled loop / outer chains (ADR-021).", "kind": "only" },
         { "feature": "Block params", "syntax": "{{#each xs as |item i|}}", "note": "The as |…| bars are distinct from the pipe operator.", "kind": "shared" },

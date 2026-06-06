@@ -658,6 +658,14 @@
       "doc": "The last n elements of an array."
     },
     {
+      "name": "ternary",
+      "kind": "inline",
+      "arity": "3",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Returns the 2nd argument when the 1st is truthy, else the 3rd — the `? :` ternary operator's helper."
+    },
+    {
       "name": "this",
       "kind": "value",
       "arity": "0",

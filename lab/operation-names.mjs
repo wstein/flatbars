@@ -91,6 +91,7 @@ export const OPERATION_NAMES = [
   "t",
   "take",
   "takeRight",
+  "ternary",
   "this",
   "times",
   "toFixed",

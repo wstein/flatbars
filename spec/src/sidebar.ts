@@ -151,6 +151,10 @@ export const sidebar = [
         "link": "/adr/adr-0033-truthy-coalesce-operator/"
       },
       {
+        "label": "ADR-034: ? : ternary operator (MaxBars)",
+        "link": "/adr/adr-0034-ternary-operator/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }

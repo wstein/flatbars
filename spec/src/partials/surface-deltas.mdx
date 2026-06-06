@@ -40,7 +40,7 @@ The flagship — FullBars plus infix operators and pipes. Truthiness: `nonEmpty`
 | --- | --- | --- |
 | Infix operators | `{{price * qty}}   {{score >= 90}}` | Desugar to helpers: multiply, gte, and, or, not, coalesce. |
 | Pipes | `{{name \| upcase \| truncate 8}}` | Left value becomes the helper's first argument. |
-| Boolean / coalesce | `{{a && b}}   {{a ?? fallback}}` | &amp;&amp; \|\| ! ?? as infix; group with parens. |
+| Boolean / coalesce / ternary | `{{a && b}}   {{a ?? fb}}   {{a ?: fb}}   {{ok ? a : b}}` | &amp;&amp; \|\| ! ?? as infix, ?: (Elvis truthy-coalesce), and the ternary cond ? a : b; group with parens. |
 | Path access | `{{user.city}}   {{root.x}}   {{parent.x}}` | Reserved names instead of @root / ../  (no @-sigil). |
 | Loop variables | `{{index0}}   {{loop.first}}   {{outer.index0}}` | Bare scoped ops or labelled loop / outer chains (ADR-021). |
 | Block params | `{{#each xs as \|item i\|}}` | The as \|…\| bars are distinct from the pipe operator. |

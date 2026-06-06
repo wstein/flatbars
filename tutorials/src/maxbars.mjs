@@ -81,6 +81,15 @@ export const examples = {
     data: { nickname: "", name: "Ada" },
   },
 
+  ternary: {
+    // `cond ? a : b` chooses between two DIFFERENT values on a condition — the
+    // inline `{{#if}}`. The comparison binds tighter than `?`, so `stock > 0` is
+    // the condition. Desugars to `ternary (gt stock 0) "In stock" "Sold out"`.
+    engine: "maxbars",
+    template: "{{stock > 0 ? \"In stock\" : \"Sold out\"}}",
+    data: { stock: 3 },
+  },
+
   // ── Pipes: value | helper ─────────────────────────────────────────────────
   pipeSimple: {
     // The pipe feeds the left value in as the helper's FIRST argument:

@@ -267,9 +267,18 @@ coreOperationDefs =
   -- truthy-coalescing: the desugar target of `?:` (Elvis). Returns the first
   -- argument truthy under the engine's rule (so `""`/`[]`/`0`-by-rule are skipped),
   -- distinct from `coalesce` (null only) and `or` (boolean).
-  , gen "firstTruthy" "Returns the first truthy argument — the `?:` (Elvis) operator's helper." false
+  , gen "firstTruthy" "Returns the first truthy argument — the `?:` (Elvis) operator's helper."
+      false
       (AtLeast 1)
       firstTruthyH
+  -- the desugar target of the ternary `cond ? a : b`. Returns `a` when `cond` is
+  -- truthy under the engine's rule, else `b` — an inline conditional, distinct
+  -- from the `{{#if}}` block.
+  , gen "ternary"
+      "Returns the 2nd argument when the 1st is truthy, else the 3rd — the `? :` ternary operator's helper."
+      false
+      (Exactly 3)
+      ternaryH
   , valDef "log" "Logs its arguments to the host and returns null." (atLeast 1 (const (pure VNull)))
   ]
 
@@ -643,6 +652,18 @@ coalesceH _ args = pure (fromMaybe VNull (Array.find notNull args))
 -- | `??` (which keeps the non-null `""`) and `||` (which yields a boolean).
 firstTruthyH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 firstTruthyH ctl args = pure (fromMaybe VNull (Array.find (refTruthy ctl.env) args))
+
+-- | `ternary cond a b`: `a` when `cond` is truthy under the engine's rule
+-- | (`ctl.env`), else `b`. The desugar target of the MaxBars ternary
+-- | `cond ? a : b` — an inline conditional (distinct from the `{{#if}}` block).
+-- | Like the other operator helpers it receives all three arguments already
+-- | evaluated (the engine is applicative), so both branches are computed and one
+-- | is selected — observably identical for the pure value expressions MaxBars
+-- | composes.
+ternaryH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+ternaryH ctl args = case args of
+  [ cond, t, f ] -> pure (if refTruthy ctl.env cond then t else f)
+  _ -> throwError (ArityError "ternary: expected exactly 3 arguments")
 
 -- | `not`: logical negation under the engine's truthiness rule (`ctl.env`).
 notH :: forall m. MonadThrow Error m => Operation m (RefEnv m)

@@ -105,6 +105,31 @@ main = do
     Right js -> assert' ("compile coalesce: expected rt.call(\"coalesce\" in\n" <> js)
       (contains (Pattern "rt.call(\"coalesce\"") js)
 
+  -- the ternary `cond ? a : b` (desugars to `ternary`): an inline conditional
+  -- picking a/b by the engine's truthiness rule.
+  expectM "ternary-true" "{{ ok ? yes : no }}"
+    (obj [ Tuple "ok" (VBool true), Tuple "yes" (VString "Y"), Tuple "no" (VString "N") ])
+    "Y"
+  expectM "ternary-false" "{{ ok ? yes : no }}"
+    (obj [ Tuple "ok" (VBool false), Tuple "yes" (VString "Y"), Tuple "no" (VString "N") ])
+    "N"
+  -- the condition is a full expression: comparison binds tighter than `?`.
+  expectM "ternary-cmp" "{{ n > 3 ? \"big\" : \"small\" }}" (obj [ Tuple "n" (num 5.0) ]) "big"
+  -- right-associative: a ? b : c ? d : e parses as a ? b : (c ? d : e).
+  expectM "ternary-chain" "{{ a ? \"A\" : b ? \"B\" : \"none\" }}"
+    (obj [ Tuple "a" (VBool false), Tuple "b" (VBool true) ])
+    "B"
+  -- "" is falsy under MaxBars' nonEmpty rule, so the false branch is taken.
+  expectM "ternary-empty-cond" "{{ s ? s : \"fallback\" }}" (obj [ Tuple "s" (VString "") ])
+    "fallback"
+  -- a missing `:` is a parse error.
+  assert' "reject: ternary without ':'" (isLeft (renderMax "{{ a ? b }}" (obj [])))
+  -- compiled path: `? :` desugars to the `ternary` helper call.
+  case compileMaxJs "{{ c ? a : b }}" of
+    Left e -> assert' ("compile ternary: unexpected error " <> show e) false
+    Right js -> assert' ("compile ternary: expected rt.call(\"ternary\" in\n" <> js)
+      (contains (Pattern "rt.call(\"ternary\"") js)
+
   -- `elif` honours an `includeZero=true` options hash, like the head `if`: a
   -- bare 0 is falsy normally, truthy with the flag (so the elif fires).
   expectM "elif-includeZero-pass"

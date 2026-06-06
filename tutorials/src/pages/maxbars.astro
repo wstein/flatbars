@@ -123,6 +123,7 @@ const t = (s) => s;
         <tr><td><span class="code">&amp;&amp; || !</span></td><td><span class="code">and or not</span></td><td><span class="code">{t("{{a && !b}}")}</span></td></tr>
         <tr><td><span class="code">??</span></td><td><span class="code">coalesce</span></td><td><span class="code">{t("{{nick ?? name}}")}</span></td></tr>
         <tr><td><span class="code">?:</span></td><td><span class="code">firstTruthy</span></td><td><span class="code">{t("{{nick ?: name}}")}</span></td></tr>
+        <tr><td><span class="code">{t("? :")}</span></td><td><span class="code">ternary</span></td><td><span class="code">{t("{{ok ? yes : no}}")}</span></td></tr>
       </tbody>
     </table>
     <h3>Comparisons in conditions</h3>
@@ -161,6 +162,19 @@ const t = (s) => s;
     <OpenInLab client:visible engine="maxbars" template={ex.logic.template} data={ex.logic.data} />
     <OpenInLab client:visible engine="maxbars" template={ex.coalesce.template} data={ex.coalesce.data} />
     <OpenInLab client:visible engine="maxbars" template={ex.elvis.template} data={ex.elvis.data} />
+    <h3>The ternary <code>{t("? :")}</code></h3>
+    <p>
+      Where a coalesce falls back when its <em>own</em> value is missing, the ternary
+      <code>{t("cond ? a : b")}</code> chooses between <b>two different</b> values on a
+      separate condition — the inline form of <code>{t("{{#if}}")}</code>. It desugars to
+      <code>ternary cond a b</code>, returning <code>a</code> when <code>cond</code> is
+      truthy under MaxBars’ rule, else <code>b</code>. The condition is a full expression
+      (comparisons bind tighter than <code>?</code>), and it is right-associative, so
+      <code>{t("a ? b : c ? d : e")}</code> reads as <code>{t("a ? b : (c ? d : e)")}</code>.
+      Both branches are evaluated and one is selected — like every other operator, it is
+      just a helper application.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.ternary.template} data={ex.ternary.data} />
   </section>
 
   <!-- ──────────────────────────── Pipes ─────────────────────────── -->
