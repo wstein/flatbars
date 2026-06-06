@@ -117,11 +117,12 @@ ceiling *only where the engine knows more*.
 . *The fallback is a derived artifact and MUST be drift-bounded, like every other.* But it is *richer*
   than the engine — it splits a tag into sigil / name / args / literals, where the engine paints one kind
   per tag (ADR-014) — so a scope-to-kind bijection does not fit, and we do not force one. `check:tmgrammar`
-  instead pins, *for each dialect*, the two things the engine defines and a stateless grammar can be held
-  to: (a) *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
+  instead pins, *for each dialect*, the one thing the engine defines and a stateless grammar can be held
+  to: *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
   characters the grammar scopes as a tag (every tag scope ends in `.flatbars`; host text and the YAML
-  front-matter block never do), which catches the Exhibit-A/B begin/end drift across all four dialects; and
-  (b) *literals* — wherever the engine carves a `string`/`number`, the grammar scopes it as one. Everything
+  front-matter block never do), which catches the Exhibit-A/B begin/end drift across all four dialects.
+  (In-tag literals are no longer gated here — the thin-floor grammar leaves `string`/`number` carving to
+  the LSP, which corrects them as semantic tokens over the silent floor.) Everything
   else (which helper is a keyword, argument and operator colouring) is allowed *enrichment*. Dialect-error
   shapes and set-delimiter switches are out of scope (the LSP owns them). The gate is wired into `npm
   test`; ADR-014's stopgap was *time-boxed*, but this fallback is *permanent* (it serves the no-LSP

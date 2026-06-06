@@ -18,17 +18,28 @@
  * fails if a copy has drifted. (We generate rather than share one runtime file so
  * nothing new has to be served/deployed and the Lab keeps its own cache-busting.)
  *
- * THEME: a **Dracula** (dark) / **Alucard** (light) code palette, AA-corrected for
- * our own backgrounds. The chrome stays violet (Dracula owns only the seven syntax
- * families); the Chips control (tint/outline/solid) is unchanged.
- * Two deliberate departures from the upstream Dracula/Alucard spec:
- *   1. `raw` stays a deep-green SIBLING of `expr` (not danger-red). Raw output is
- *      still an interpolation, so it reads in the interpolation family; the `{{{ }}}`
- *      sigil already signals "handle with care", and red would collide with `delim`.
- *   2. Several values are nudged a few points darker/lighter than canonical so they
- *      clear **WCAG AA (4.5:1)** on OUR tint/page/solid surfaces (canonical Dracula
- *      `comment #6272a4` is ~3.1:1 here — below AA — so we ship `#8a97cc`).
- * Every value is machine-verified by `npm run check:contrast` (in `npm test`).
+ * THEME: **VS Code "GitHub" colouring** — the editor default our users already
+ * read code in. The DARK mode is the VS Code *2026-dark* token palette verbatim
+ * (`#79c0ff` blue, `#ff7b72` red, `#7ee787` green, `#d2a8ff` purple, `#ffa657`
+ * orange, `#a5d6ff` string-blue, `#8b949e` comment); the LIGHT mode keeps our
+ * light background and uses the matching **GitHub Light Default** hues — the same
+ * theme's AA-passing counterpart for a light surface — so a tag reads the same
+ * *meaning* in either mode. The seven families map to VS Code token roles:
+ *   • block → `keyword.control` (red): `{{#if}}`/`{{#each}}` are keywords.
+ *   • expr  → `constant`/`variable` (blue): the interpolated value.
+ *   • raw   → `string` (blue, darker): the unescaped sibling of `expr`.
+ *   • partial → `entity.name.tag` (green): `{{> include}}` composition.
+ *   • inherit → `entity.name.function` (purple): inheritance/decoration.
+ *   • delim → `variable`/directive (orange): the `{{= =}}` set-delimiter.
+ *   • comment → `comment` (grey).
+ * A few values are nudged a few points from GitHub-canonical so they clear
+ * **WCAG AA (4.5:1)** on OUR chip-tint surface (the strictest): in light, the
+ * comment grey (`#6e7781` → `#57606a`), the keyword red (`#cf222e` → `#cd1f2d`),
+ * and the inheritance purple (`#8250df` → `#6f42c1`); in dark, the comment grey
+ * (`#8b949e` → `#969fab`). Every value is machine-verified by `npm run
+ * check:contrast` (in `npm test`); the chrome stays violet
+ * (the palette owns only the seven syntax families) and the Chips control
+ * (tint/outline/solid) is unchanged.
  *
  * The families: expr (interpolation, escaped), raw (unescaped — handle with
  * care), block (sections/clauses), partial (composition), inherit (inheritance),
@@ -37,25 +48,39 @@
  * literals/operators have no colour of their own.)
  */
 :root {
-  --c-expr: #187747;
-  --c-raw: #0f6e3a;
-  --c-block: #a8520f;
-  --c-partial: #0e728d;
-  --c-inherit: #6d28d9;
-  --c-delim: #ba2c8b;
-  --c-comment: #54597e;
+  --c-expr: #0550ae;
+  --c-raw: #0a3069;
+  --c-block: #cd1f2d;
+  --c-partial: #116329;
+  --c-inherit: #6f42c1;
+  --c-delim: #953800;
+  --c-comment: #57606a;
   --tint-mix: 12%;
-  --directive-bg: #eceaf1;
+  --directive-bg: #eaeef2;
+  /* The plate behind a whole FlatBars tag, braces included — a LAVENDER fill plus a
+     deeper lavender BORDER (--tag-border), so a tag reads as one clearly-outlined
+     pill that's coherent with the violet-indigo dark sibling. The fill stays light
+     enough that every --c-* token clears WCAG AA on it (worst 4.57:1, the red
+     braces — a deeper lavender like #e2d4f7 would drop them to 3.92:1, so the depth
+     lives in the border, which carries no text). Machine-checked by check:contrast. */
+  --tag-bg: #efe7fb;
+  --tag-border: #c4a8ec;
 }
 
 [data-theme="dark"] {
-  --c-expr: #50fa7b;
-  --c-raw: #2faf60;
-  --c-block: #ffb86c;
-  --c-partial: #8be9fd;
-  --c-inherit: #bd93f9;
-  --c-delim: #ff79c6;
-  --c-comment: #8a97cc;
+  --c-expr: #79c0ff;
+  --c-raw: #a5d6ff;
+  --c-block: #ff7b72;
+  --c-partial: #7ee787;
+  --c-inherit: #d2a8ff;
+  --c-delim: #ffa657;
+  --c-comment: #969fab;
   --tint-mix: 20%;
-  --directive-bg: #363150;
+  --directive-bg: #21262d;
+  /* Dark sibling of the rose tag pill: a brighter VIOLET-INDIGO fill + a brighter
+     violet border — more visible against the dark-violet canvas than a muted rose
+     (which went muddy), and tied to the dark theme's violet identity. Every dark
+     --c-* clears AA on the fill (worst 5.29:1, the comment grey). */
+  --tag-bg: #2e2646;
+  --tag-border: #5b4d96;
 }
