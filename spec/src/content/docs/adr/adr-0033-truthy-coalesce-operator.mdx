@@ -1,0 +1,78 @@
+---
+title: "ADR-0033: the ?: (Elvis) truthy-coalesce operator for MaxBars"
+sidebar:
+  label: "ADR-033 ?: truthy-coalesce"
+---
+
+*Status:* Accepted — 2026-06-06. A MaxBars surface-grammar decision; it adds one
+infix operator and one prelude operation, additively. Owner: Werner. Builds on the
+truthiness model of [ADR-022](/adr/adr-0022-analyse-mode/) and the
+operator-as-helper desugar of MaxBars.
+
+*Implementation status — complete.* `?:` lexes under `infixArith`, parses as a
+precedence rung between `??` and `||` (`MaxBars.Expr`), and desugars to the
+`firstTruthy` prelude operation (`Kernel.Prelude`). Compiler parity holds (a
+`firstTruthy` runtime helper using the frame's truthiness; interpreter ≡ compiled,
+324/324 conformance), it lowers to RawBars as `(firstTruthy …)` with no special
+casing, and the catalog/operations are regenerated. A lint flags a boolean
+`||`/`&&` left in output position, pointing at `??`/`?:`.
+
+## Context
+
+MaxBars had two ways to combine values and one gap:
+
+- `||` → `or` is **boolean** ("is either truthy?") — `{{ a || b }}` outputs
+  `true`/`false`. It is the *condition* operator (`{{#if a || b}}`).
+- `??` → `coalesce` is **null-coalescing** (first non-null **value**) — JS-faithful,
+  so a present `""`/`[]`/`0` is *kept*.
+- There was **no truthy value-coalesce**: nothing that returns the first
+  *meaningful* value. The motivating case — `{{ nickname ?? name }}` with
+  `nickname: ""` — yields the empty string (it's non-null), and `{{ nickname || name }}`
+  yields `true`. Neither produces `name`. A JS author reaches for `||` expecting a
+  value fallback and is surprised; that confusion is the evidence this gap is real.
+
+This was settled by an internal design debate. The rejected options drove the
+decision:
+
+- **Make `||` return its operand (JS semantics).** Rejected: it collides with the
+  boolean `or` *helper* of the same name, and silently changes a shipped, gated
+  operator — conformance churn for no additive gain.
+- **Make `??` truthiness-aware.** Rejected: it breaks `??`'s one virtue — meaning
+  exactly what JS `??` means — and would drop a deliberate `""`.
+
+## Decision
+
+Add `?:` (the Elvis operator) as a **truthy-coalesce**: the first argument the
+engine's truthiness rule counts as truthy, else the last. It desugars to a new
+`firstTruthy` operation, distinct from both neighbours, giving three honest tools:
+
+- `??` — *is it present?* (null/undefined) → first non-null **value**
+- `?:` — *is it meaningful?* (the dialect's truthiness) → first truthy **value**
+- `||` — *is either true?* → **boolean** (for `{{#if}}`)
+
+So `{{ nickname ?: name }}` is `Hi Ada` even when `nickname` is `""`, under
+MaxBars' `nonEmpty` rule (ADR-022).
+
+## Consequences
+
+- A new, **permanent** surface operator: once authored, `{{ x ?: y }}` can't be
+  withdrawn. The cost is bounded — it's additive (no existing template changes
+  meaning), conformance-tested, and lowers cleanly to RawBars.
+- **MaxBars-only.** `?:` is surface sugar that only the MaxBars grammar parses;
+  the `firstTruthy` *operation* is in the shared prelude, so RawBars/FullBars can
+  call it explicitly (`(firstTruthy a b)`), but only MaxBars has the operator.
+  This is one more documented surface divergence in the dialect ladder.
+- The output-position lint actively steers authors away from `||`-as-fallback
+  toward `??`/`?:`. That is intentional, but it promotes a new operator from day
+  one; the lint fires only in output position and ships with the `/maxbars`
+  tutorial that explains the three-way distinction.
+
+## Deferred / open
+
+- **A `default` (or `fallback`) alias** of `firstTruthy`, for discoverability —
+  authors search for "default". The prelude's `withAlias` mechanism supports it;
+  deferred until there's demand, to avoid two names for one operation.
+- **Lower-dialect exposure.** Whether RawBars/FullBars should gain a value-coalesce
+  *operator* (not just the callable operation) is left open.
+- **Lint severity.** Revisit whether the boolean-in-output lint should be `info`
+  rather than `warn` until `?:` has shipped a release.

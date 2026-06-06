@@ -147,6 +147,10 @@ export const sidebar = [
         "link": "/adr/adr-0032-umbrella-topbar/"
       },
       {
+        "label": "ADR-033: ?: truthy-coalesce operator (MaxBars)",
+        "link": "/adr/adr-0033-truthy-coalesce-operator/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }
