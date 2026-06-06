@@ -1,0 +1,102 @@
+---
+title: "ADR-0032: one umbrella topbar — a shared web component across all three front ends"
+sidebar:
+  label: ADR-032 umbrella topbar
+---
+
+*Status:* Accepted — 2026-06-06. A front-end/design-system decision; it touches no
+engine semantics. The three sites — the Astro **tutorials** app, the Astro **Starlight
+spec**, and the hand-written static **Lab** — now mount one shared
+`<flatbars-topbar>` custom element and share a single theme contract. Owner: Werner.
+Extends the design-system single-source-of-truth contracts of
+[ADR-017](/adr/adr-0017-editor-support-lsp/) (one wordmark, shared tokens) and the
+spec-site move of [ADR-031](/adr/adr-0031-spec-site-starlight/).
+
+*Implementation status — complete.* Shipped on `feat/umbrella-topbar`: the element,
+the anti-flash theme seed, the chrome-token contract, the four-peer information
+architecture, the Starlight component overrides, the Lab chrome swap, and the
+`check:topbar` / `check:theme-seed` / `test:shared` gates.
+
+## Context
+
+The three front ends were assembled into one origin
+(`https://wstein.github.io/flatbars/`) but did not feel like one site:
+
+- **Divergent chrome.** Each app drew its own topbar. The tutorials and the Lab
+  hand-copied the wordmark (the reason [ADR-017](/adr/adr-0017-editor-support-lsp/)'s
+  `check:wordmark` gate existed at all); the Starlight spec had a wholly different
+  header, sidebar and theme toggle.
+- **No way to cross between them.** Nothing in the chrome let a reader move from the
+  tutorials to the spec to the Lab; the "first click changed the chrome".
+- **Three theme stores.** The tutorials persisted theme under `flatbars-docs-opts`,
+  the Lab under `stem-playground:tweaks` (a three-state light/dark/system control on
+  `body[data-theme]`), and Starlight under `starlight-theme`. A reader's choice did
+  not survive crossing apps, and the seeds could flash the wrong theme.
+
+The build-time `Topbar.astro` could never reach the static Lab, so a *build-time*
+component could not be the single source. The Lab can only share an artifact at
+**runtime**.
+
+## Decision
+
+Ship one zero-dependency **`<flatbars-topbar>` custom element**
+(`shared/flatbars-topbar.mjs`) that every front end mounts, and make the theme one
+contract.
+
+1. **The element is the chrome.** It owns the wordmark, the context switcher
+   (Home · Tutorials · Spec · Lab), and the Theme control. It hydrates controls only
+   — it never owns first paint — and reads the page's chrome tokens
+   (`shared/flatbars-chrome.css`, a unified IBM&nbsp;Plex + violet palette) through its
+   shadow boundary, so it matches whichever app it sits in, light or dark. It is sized
+   in `em` against a pinned `:host` font-size, so it renders identically regardless of
+   the host's root font-size (the Lab IDE uses 13px). Links resolve from a `base`
+   attribute, so the same element is correct on every origin. Host controls ride in
+   `start` / `tools` slots (the docs colour-legend; the spec's Pagefind search).
+2. **One theme contract.** A single `flatbars-theme` key and an explicit
+   `[data-theme]` on `<html>`, seeded before first paint by a byte-identical inline
+   copy of `shared/theme-seed.js` in every `<head>`. The element writes the key and
+   broadcasts a `flatbars:themechange` event; the Lab bridges `html`→`body`
+   `[data-theme]` for its own dark tokens.
+3. **A four-peer information architecture.** `/` is the umbrella landing (Home), and
+   the nine tutorial chapters gain a dedicated overview at `/tutorials/` (plural — a
+   collection). `/spec/` and `/lab/` stay singular (one normative spec, one lab). The
+   wordmark is "home"; the switcher's three other pills are the peers.
+4. **Per-host integration, one element.** The Astro apps `import` the element
+   (bundled). The Starlight spec overrides `Header` / `ThemeProvider` / `ThemeSelect`
+   (`spec/src/components/`), keeping its sidebar, table-of-contents and Pagefind
+   search. The static Lab loads a committed *vendored* copy
+   (`lab/vendor/flatbars-topbar.mjs`, like the engine bundle), so nothing new is
+   served from `shared/` and the deploy artifact is unchanged.
+5. **Drift gates.** `check:wordmark` becomes `check:topbar` — the element owns the
+   canonical lockup and its host slots, every surface mounts it, and the vendored copy
+   is byte-identical. `check:theme-seed` pins every inline seed copy; `test:shared`
+   unit-tests the element's pure link/theme helpers.
+
+## Consequences
+
+- One chrome, one theme, legible crossings between the three apps — the umbrella reads
+  as one site. The hand-copied wordmark is retired.
+- The element is the single source; a chrome change lands once. The trade-off is a
+  runtime custom element (shadow DOM) rather than build-time markup — accepted,
+  because it is the only thing the static Lab can share at runtime, and it hydrates
+  controls only (no FOUC).
+- The Lab's bespoke 44px IDE topbar becomes a workbench-controls row beneath the
+  shared bar; its three-state theme tweak is retired in favour of the shared
+  two-state control (a live OS flip still applies while no explicit choice is stored).
+- Local development needs the spec built under a matching base to preview the
+  switcher end to end (`npm run build:spec:local`; the dev server's `serveSpec` mounts
+  it at `/spec/`). Production is unchanged — the spec folds in at `/flatbars/spec/`.
+
+## Alternatives considered
+
+- **Keep three topbars, sync only the theme key.** Rejected: the chrome would still
+  shape-shift across apps and offer no crossing — the core complaint.
+- **A build-time shared component.** Rejected: an Astro component cannot reach the
+  hand-written static Lab, so it could not be the single source.
+- **Merge the spec into the tutorials app.** Rejected: it would discard Starlight's
+  Pagefind search, sidebar and authored-link integrity for no reader gain; overriding
+  three Starlight components preserves all of it.
+- **Serve one shared chrome stylesheet at runtime to all apps.** Deferred: the chrome
+  token *values* are unified in `shared/flatbars-chrome.css` and consumed per app;
+  collapsing the duplicated definitions to one generated source (as the syntax palette
+  already is) is a follow-up, not a prerequisite.

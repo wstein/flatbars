@@ -143,6 +143,10 @@ export const sidebar = [
         "link": "/adr/adr-0031-spec-site-starlight/"
       },
       {
+        "label": "ADR-032: one umbrella topbar (shared web component)",
+        "link": "/adr/adr-0032-umbrella-topbar/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }
