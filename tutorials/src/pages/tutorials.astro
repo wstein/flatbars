@@ -1,0 +1,205 @@
+---
+// SPDX-License-Identifier: Apache-2.0
+//
+// The Tutorials overview — the new `/tutorials/` index in the four-peer umbrella
+// IA (Home · Tutorials · Spec · Lab). `/` stays the umbrella landing (index.astro);
+// this page organises the nine chapters into a capability ladder (RawBars →
+// MaxBars) plus a "Work with templates" tooling row, mounting the shared topbar
+// with the Tutorials pill active. Ported from the umbrella-review design mock.
+import BaseHead from "../components/BaseHead.astro";
+import Topbar from "../components/Topbar.astro";
+
+// The four surfaces as a capability ladder; each links to its chapter.
+const ladder = [
+  { href: "/rawbars", num: "1", cap: "smallest", name: "RawBars", tag: "interpolation only",
+    blurb: "Variables, and nothing else. No logic, no blocks — the safest surface when a template should never branch.",
+    snip: ["{{", " name ", "}}"] },
+  { href: "/minbars", num: "2", cap: "logic-less", name: "MinBars", tag: "the Mustache subset",
+    blurb: "Sections, inverted sections and partials. Logic-less templating, fully Mustache-shaped.",
+    snip: ["{{#", "items", "}}…{{/", "items", "}}"] },
+  { href: "/fullbars", num: "3", cap: "compatible", name: "FullBars", tag: "Handlebars-compatible",
+    blurb: "Helpers, block helpers, partials and context paths — the Handlebars you already know.",
+    snip: ["{{", "upper name", "}}"] },
+  { href: "/maxbars", num: "4", cap: "superset", name: "MaxBars", tag: "the superset · v0.1.0",
+    blurb: "Everything in FullBars plus FlatBars' own extensions — pipes, and the full prelude.",
+    pipe: true },
+];
+
+// Tooling that operates on templates themselves.
+const ops = [
+  { href: "/analyse", ic: "⊢", name: "Analyse", desc: "Tokenize and walk a template's tree — see exactly what the parser sees." },
+  { href: "/lint", ic: "✓", name: "Lint", desc: "Surface errors and smells before a template ever ships." },
+  { href: "/localize", ic: "文", name: "Localize", desc: "Extract strings and render a template per locale." },
+  { href: "/transform", ic: "⇄", name: "Transform", desc: "Rewrite and migrate templates between surfaces and shapes." },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title="Tutorials — FlatBars" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <Topbar section="tutorials" />
+
+    <main id="main" class="wrap">
+      <section class="hero">
+        <div class="eyebrow">Tutorials</div>
+        <h1>Learn FlatBars by building.</h1>
+        <p class="lead">
+          Nine hands-on chapters. Start from the smallest possible template surface and climb to the full
+          superset — then learn the tools that work on templates themselves.
+        </p>
+
+        <div class="start">
+          <div>
+            <div class="label">Step 0 · Start here</div>
+            <h2>Install, render, and meet the four surfaces</h2>
+            <p>Five minutes from nothing to your first rendered template — and a map of which surface to reach for, and when.</p>
+          </div>
+          <a class="cta" href="/start">Start the walkthrough <span class="arrow">→</span></a>
+        </div>
+      </section>
+
+      <section>
+        <div class="shead">
+          <h2>The four surfaces</h2>
+          <span class="note">a capability ladder — each adds to the one before</span>
+        </div>
+        <p class="sub">
+          FlatBars is one parser exposing four surfaces. Pick the smallest one that does the job: less surface
+          means fewer ways for a template to surprise you.
+        </p>
+
+        <div class="ladder-rail">
+          <div class="ladder">
+            {ladder.map((s) => (
+              <a class="surface" href={s.href}>
+                <div class="top"><span class="num">{s.num}</span><span class="cap">{s.cap}</span></div>
+                <h3>{s.name}</h3>
+                <div class="tag">{s.tag}</div>
+                <p>{s.blurb}</p>
+                <div class="snip">
+                  {s.pipe ? (
+                    <Fragment><b>{"{{"}</b> name <span class="pipe">|</span> upper <b>{"}}"}</b></Fragment>
+                  ) : (
+                    s.snip.map((part, i) => (i % 2 === 0 ? <b>{part}</b> : <Fragment>{part}</Fragment>))
+                  )}
+                </div>
+                <span class="go">Open chapter →</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="shead">
+          <h2>Work with templates</h2>
+          <span class="note">tooling that operates on templates themselves</span>
+        </div>
+        <p class="sub">Beyond rendering, FlatBars treats templates as data you can inspect, check, translate and rewrite.</p>
+
+        <div class="ops">
+          {ops.map((o) => (
+            <a class="op" href={o.href}>
+              <div class="ic">{o.ic}</div>
+              <h3>{o.name}</h3>
+              <p>{o.desc}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <p>
+        This page is <span class="mono">/tutorials/</span> — the Tutorials overview. <span class="mono">/</span> is the
+        umbrella landing. Spec → <a href="/maxbars">the surfaces</a>, or jump straight to the
+        <a href="/start">10-minute on-ramp</a>. The topbar is the shared <span class="mono">&lt;flatbars-topbar&gt;</span>.
+      </p>
+    </footer>
+
+    <style is:global>
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+    </style>
+    <style>
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-ui);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      .mono { font-family: var(--font-mono); }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+      .skip { position: absolute; left: -999px; }
+      .skip:focus { left: 8px; top: 8px; z-index: 20; background: var(--accent); color: #fff; padding: 0.4rem 0.7rem; border-radius: var(--radius); }
+
+      /* Hero */
+      .hero { padding: 4rem 0 1.5rem; }
+      .eyebrow { font: 600 12px/1 var(--font-mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+      .hero h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); line-height: 1.04; letter-spacing: -0.025em; margin: 0.6rem 0 0.5rem; font-weight: 600; max-width: 16ch; text-wrap: balance; }
+      .hero .lead { font-size: 1.2rem; color: var(--fg-muted); max-width: 56ch; }
+
+      /* Start banner */
+      .start { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2rem; margin-top: 2.4rem; padding: 1.6rem 1.8rem; border: 1px solid var(--border-strong); border-radius: var(--radius-lg); background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 10%, var(--bg)), var(--bg) 70%); box-shadow: var(--shadow-pop); }
+      .start .label { font: 600 11px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+      .start h2 { font-size: 1.5rem; margin: 0.4rem 0 0.25rem; font-weight: 600; }
+      .start p { margin: 0; color: var(--fg-muted); max-width: 52ch; font-size: 0.96rem; }
+      .cta { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--accent); color: #fff; font-weight: 600; font-size: 0.98rem; padding: 0.8rem 1.4rem; border-radius: var(--radius); white-space: nowrap; }
+      .cta:hover { background: var(--accent-2); }
+      .cta .arrow { transition: transform 0.15s ease; }
+      .cta:hover .arrow { transform: translateX(3px); }
+      @media (max-width: 720px) { .start { grid-template-columns: 1fr; } }
+
+      /* Section heading */
+      .shead { margin: 4rem 0 0.3rem; display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
+      .shead h2 { font-size: 1.7rem; letter-spacing: -0.015em; margin: 0; font-weight: 600; flex: none; }
+      .shead .note { font-size: 0.92rem; color: var(--fg-muted); }
+      .sub { color: var(--fg-muted); margin: 0.2rem 0 1.6rem; max-width: 62ch; }
+
+      /* Capability ladder */
+      .ladder { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+      @media (max-width: 880px) { .ladder { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 480px) { .ladder { grid-template-columns: 1fr; } }
+      .surface { position: relative; display: flex; flex-direction: column; gap: 0.7rem; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.2rem 1.2rem 1.3rem; background: var(--bg-1); color: inherit; transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease; }
+      .surface:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: var(--shadow-pop); }
+      .surface .top { display: flex; align-items: center; justify-content: space-between; }
+      .surface .num { width: 26px; height: 26px; border-radius: 7px; flex: none; display: grid; place-items: center; font: 700 12px/1 var(--font-mono); color: #fff; background: var(--accent); }
+      .surface .cap { font: 600 9.5px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--fg-faint); }
+      .surface h3 { margin: 0; font-size: 1.18rem; font-weight: 600; }
+      .surface .tag { font: 500 11px/1 var(--font-mono); color: var(--accent-2); }
+      .surface p { margin: 0; font-size: 0.9rem; color: var(--fg-muted); flex: 1; }
+      .surface .snip { font: 600 0.8rem/1.7 var(--font-mono); background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.65rem; color: var(--fg-secondary); overflow-x: auto; white-space: nowrap; }
+      .surface .snip b { color: var(--accent-2); }
+      .surface .snip .pipe { color: var(--accent); }
+      .surface .go { font-size: 0.85rem; font-weight: 600; color: var(--accent-2); margin-top: 0.1rem; }
+      .surface:hover .go { color: var(--accent); }
+
+      /* progression rail behind the ladder on wide screens */
+      .ladder-rail { position: relative; }
+      .ladder-rail::before { content: ""; position: absolute; top: 1.85rem; left: 12%; right: 12%; height: 2px; background: linear-gradient(90deg, transparent, var(--border-strong), transparent); z-index: 0; }
+      @media (max-width: 880px) { .ladder-rail::before { display: none; } }
+      .ladder .surface { z-index: 1; }
+
+      /* Operations grid */
+      .ops { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+      @media (max-width: 880px) { .ops { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 480px) { .ops { grid-template-columns: 1fr; } }
+      .op { display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.1rem 1.15rem; background: var(--bg); color: inherit; transition: border-color 0.15s ease, background 0.15s ease; }
+      .op:hover { border-color: var(--accent); background: var(--bg-1); }
+      .op .ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--accent-softer); color: var(--accent-2); font: 700 15px/1 var(--font-mono); margin-bottom: 0.25rem; }
+      .op h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+      .op p { margin: 0; font-size: 0.87rem; color: var(--fg-muted); }
+
+      footer { border-top: 1px solid var(--border); margin-top: 4rem; padding: 2rem 0 4rem; color: var(--fg-faint); font-size: 0.85rem; }
+      footer a { color: var(--accent-2); font-weight: 600; }
+    </style>
+  </body>
+</html>

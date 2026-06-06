@@ -50,7 +50,7 @@ const DEFAULT_REPO = "https://github.com/wstein/flatbars";
 // slash; it is normalised away. Home/the wordmark resolve to `${base}/`.
 export function resolveHref(section, base = "") {
   const b = String(base).replace(/\/$/, "");
-  if (section === "tutorials") return `${b}/tutorial/`;
+  if (section === "tutorials") return `${b}/tutorials/`;
   if (section === "spec") return `${b}/spec/`;
   if (section === "lab") return `${b}/lab/`;
   return `${b}/` || "/"; // home (and any unknown section)

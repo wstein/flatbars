@@ -16,7 +16,7 @@ test("SECTIONS is the four-peer umbrella IA in switcher order", () => {
 
 test("resolveHref maps each section under a deploy base", () => {
   assert.equal(resolveHref("home", "/flatbars"), "/flatbars/");
-  assert.equal(resolveHref("tutorials", "/flatbars"), "/flatbars/tutorial/");
+  assert.equal(resolveHref("tutorials", "/flatbars"), "/flatbars/tutorials/");
   assert.equal(resolveHref("spec", "/flatbars"), "/flatbars/spec/");
   assert.equal(resolveHref("lab", "/flatbars"), "/flatbars/lab/");
 });
@@ -28,7 +28,7 @@ test("resolveHref normalises a trailing slash on base", () => {
 
 test("resolveHref resolves at the root origin (empty base)", () => {
   assert.equal(resolveHref("home", ""), "/");
-  assert.equal(resolveHref("tutorials", ""), "/tutorial/");
+  assert.equal(resolveHref("tutorials", ""), "/tutorials/");
   assert.equal(resolveHref("lab"), "/lab/");
 });
 
