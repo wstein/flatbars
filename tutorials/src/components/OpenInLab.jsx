@@ -13,7 +13,7 @@ import { labHref, dataText } from "../../../lab/open-in-lab.mjs";
 import { load as loadYaml } from "../../../lab/vendor/js-yaml.mjs";
 import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
-import { renderWith, renderRawWith, renderMaxWith, safe, lint as runLint } from "../../../lab/vendor/flatbars-engine.mjs";
+import { renderWith, renderRawWith, renderMaxWith, safe, lint as runLint, analyze as runAnalyze, analyzeWith as runAnalyzeWith } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
 import { makeI18nBag } from "../../../lab/i18n.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
@@ -74,7 +74,7 @@ function CodeEditor({ lang, value, onInput, dialect = "fullbars", label }) {
   );
 }
 
-export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", locale = "en", locales = null, localeNames = {}, sharedCatalog = false, labUrl = LAB_URL, compile = false, lint = false }) {
+export default function OpenInLab({ engine, template, data = {}, partials = {}, helpers = "", transform = "", catalog = "", locale = "en", locales = null, localeNames = {}, sharedCatalog = false, labUrl = LAB_URL, compile = false, lint = false, analyse = false, pathSchemaDemo = false }) {
   const initialData = dataText(data); // object → YAML; string → verbatim
   const [tpl, setTpl] = useState(template);
   const [dataStr, setDataStr] = useState(initialData);
@@ -102,6 +102,12 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   const [out, setOut] = useState({ ok: true, text: null }); // text === null ⇒ "rendering…"
   const [js, setJs] = useState(null); // compiled-JS pane (opt-in via `compile`)
   const [lintRes, setLintRes] = useState(null); // live lint pane (opt-in via `lint`)
+  // Live analyse pane (opt-in via `analyse`): { ok, findings, suppressed } — findings
+  // are kind-tagged (observed/potential/miss); `suppressed` counts what the path
+  // schema removed (ADR-030). `schemaStr` is the editable safe-paths input shown
+  // only on the `pathSchemaDemo` card; empty ⇒ plain analyse (nothing suppressed).
+  const [analyseRes, setAnalyseRes] = useState(null);
+  const [schemaStr, setSchemaStr] = useState("");
   const [href, setHref] = useState(null);
   // Only the compiling dialects (RawBars/FullBars/MaxBars) expose compileToJs;
   // MinBars doesn't, so the pane is gated on the method actually existing.
@@ -196,6 +202,38 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     }
   }, [lint, tpl, engine]);
 
+  // Optional: run analyse mode live (ADR-022/030). Renders the template against the
+  // edited data and reports the truthiness portability findings — observed (the data
+  // hit an ambiguous value) + potential (the same-type ambiguous value it could hold)
+  // + miss (a path absent from a present object). On the `pathSchemaDemo` card the
+  // safe-paths input feeds analyzeWith, so typing a path live-suppresses its
+  // potential/miss finding; `suppressed` counts the advisory findings removed.
+  useEffect(() => {
+    if (!analyse) return;
+    let data;
+    try { data = dataStr.trim() === "" ? {} : loadYaml(dataStr); }
+    catch (e) { setAnalyseRes({ ok: false, error: "data isn’t valid YAML — " + ((e && e.message) || e), findings: [], suppressed: 0 }); return; }
+    const safePaths = pathSchemaDemo
+      ? schemaStr.split(",").map((p) => p.trim()).filter(Boolean)
+      : [];
+    try {
+      const advisory = (r) => (r.findings || []).filter((f) => f.kind === "potential" || f.kind === "miss").length;
+      const r = safePaths.length
+        ? runAnalyzeWith((p) => !safePaths.includes(p), tpl, data)
+        : runAnalyze(tpl, data);
+      let suppressed = 0;
+      if (safePaths.length && r.ok) {
+        const base = runAnalyze(tpl, data);
+        if (base.ok) suppressed = Math.max(0, advisory(base) - advisory(r));
+      }
+      setAnalyseRes(r.ok
+        ? { ok: true, findings: r.findings || [], suppressed }
+        : { ok: false, error: r.error || "analyse failed", findings: [], suppressed: 0 });
+    } catch (e) {
+      setAnalyseRes({ ok: false, error: String((e && e.message) || e), findings: [], suppressed: 0 });
+    }
+  }, [analyse, pathSchemaDemo, tpl, dataStr, schemaStr]);
+
   // Rebuild the Open-in-Lab deep link from the (possibly edited) workspace. The
   // i18n catalog + locale round-trip into the Lab's LOCALIZATION/catalog.yaml and
   // config.yaml views (ADR-029).
@@ -263,6 +301,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     setHelpersStr(helpers || "");
     setCatalogStr(catalog || "");
     setLoc(locale);
+    setSchemaStr("");
     setEdited(false);
   };
 
@@ -393,6 +432,74 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
               </pre>}
         </div>
       )}
+
+      {analyse && (
+        <div class="oil-out oil-analyse">
+          <div class="oil-cell-head oil-out-head">
+            <span class="oil-cap">flatbars analyse</span>
+            <span class="oil-js-note">— live truthiness findings</span>
+          </div>
+          {pathSchemaDemo && (
+            <label class="oil-schema">
+              <span class="oil-schema-cap">analyse.pathSchema</span>
+              <input type="text" class="oil-schema-in" value={schemaStr} spellcheck={false}
+                     placeholder="paths you guarantee safe, e.g. count"
+                     onInput={(e) => { setSchemaStr(e.currentTarget.value); setEdited(true); }} />
+            </label>
+          )}
+          {analyseRes == null
+            ? <div class="oil-an-empty"><em>analysing…</em></div>
+            : !analyseRes.ok
+              ? <div class="oil-an-empty err">⚠ {analyseRes.error}</div>
+              : <AnalyseFindings res={analyseRes} schemaActive={pathSchemaDemo && schemaStr.trim().length > 0} />}
+        </div>
+      )}
     </figure>
+  );
+}
+
+// Compact, kind-grouped findings (ADR-030): observed (the data hit an ambiguous
+// value) → potential (the same-type ambiguous value it could hold) → miss (a path
+// absent from a present object). Faithful labels — observed and potential are not
+// interchangeable. When a path schema is active, a "N suppressed" note explains
+// why findings may be fewer.
+function AnalyseFindings({ res, schemaActive }) {
+  const groups = [
+    { kind: "observed", title: "Observed", note: "this data hit an ambiguous value that branches across engines" },
+    { kind: "potential", title: "Potential", note: "portable for this data, but the same-type ambiguous value would diverge" },
+    { kind: "miss", title: "Miss", note: "a path resolved to absent from a present object — likely a typo (advisory)" },
+  ];
+  const by = (k) => res.findings.filter((f) => f.kind === k);
+  const total = res.findings.length;
+  return (
+    <div class="oil-an">
+      <div class="oil-an-head">
+        {by("observed").length} observed · {by("potential").length} potential · {by("miss").length} miss
+        {schemaActive && <span class="oil-an-supp"> · {res.suppressed} suppressed</span>}
+      </div>
+      {total === 0 && !schemaActive && (
+        <div class="oil-an-empty">Every condition agrees across engines for this data — portable.</div>
+      )}
+      {groups.map((g) => {
+        const rows = by(g.kind);
+        if (!rows.length) return null;
+        return (
+          <div class={"oil-an-grp oil-an-" + g.kind} key={g.kind}>
+            <div class="oil-an-grp-head"><b>{g.title}</b> — {g.note}</div>
+            {rows.map((f, i) => (
+              <div class="oil-an-row" key={i}>
+                <code class="oil-an-tag">{f.tag}</code>
+                <span class="oil-an-val">
+                  {f.kind === "potential" ? "would diverge if it held " : f.kind === "miss" ? "" : "tested "}
+                  {f.value}
+                  {f.flips.length > 0 && <span class="oil-an-flips"> · flips under {f.flips.join(", ")}</span>}
+                </span>
+                <span class="oil-an-fix">{f.fix}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }

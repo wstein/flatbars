@@ -77,4 +77,17 @@ export const examples = {
     finds: 1,
     expect: ["0 observed", "1 potential", "would diverge if it held", "the number `0`", "data path: `count`"],
   },
+  // ADR-030 PathSchema suppression (the interactive demo). The base (no schema) has
+  // a potential (count could be 0) AND a miss (user.naem absent from a present
+  // user); declaring both paths safe suppresses both. `pathSchema`/`expectSuppressed`
+  // drive the gate's analyzeWith assertion (the headline interaction, CI-locked).
+  suppress: {
+    engine: "fullbars",
+    template: "{{#if count}}{{count}} unread{{/if}} {{user.naem}}",
+    data: { count: 5, user: { name: "Ada" } },
+    finds: 2,
+    expect: ["0 observed", "1 potential", "Possible data-access misses", "user.naem", "the number `0`"],
+    pathSchema: ["count", "user.naem"],
+    expectSuppressed: 2,
+  },
 };

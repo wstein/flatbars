@@ -17,7 +17,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { analyze, lint, migrate } from "../lab/vendor/flatbars-engine.mjs";
+import { analyze, analyzeWith, lint, migrate } from "../lab/vendor/flatbars-engine.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
 import { decodeState } from "../lab/playground_utils.mjs";
 import { examples as analyseExamples } from "../tutorials/src/analyse.mjs";
@@ -50,7 +50,20 @@ for (const [key, ex] of Object.entries(analyseExamples)) {
     miss(`${key}: expected ${ex.finds} finding(s), got ${r.findings.length}`);
   for (const m of ex.expect ?? [])
     if (!r.report.includes(m)) miss(`${key}: report missing ${JSON.stringify(m)}\n${r.report}`);
-  if (fail === before) console.log(`  ✓ ${key} — ${r.findings.length} finding(s)`);
+  // ADR-030: when the example demos PathSchema suppression, assert analyzeWith
+  // removes exactly `expectSuppressed` advisory (potential + miss) findings — so the
+  // interactive suppression the page teaches can't silently regress.
+  if (ex.pathSchema) {
+    const advisory = (res) => res.findings.filter((f) => f.kind === "potential" || f.kind === "miss").length;
+    const sup = analyzeWith((p) => !ex.pathSchema.includes(p), ex.template, ex.data);
+    if (!sup.ok) miss(`${key}: analyzeWith errored: ${sup.error}`);
+    else {
+      const removed = advisory(r) - advisory(sup);
+      if (removed !== ex.expectSuppressed)
+        miss(`${key}: expected ${ex.expectSuppressed} suppressed, got ${removed}`);
+    }
+  }
+  if (fail === before) console.log(`  ✓ ${key} — ${r.findings.length} finding(s)` + (ex.pathSchema ? `, ${ex.expectSuppressed} suppressed` : ""));
 }
 
 console.log("Lint examples (canonicalization):");
