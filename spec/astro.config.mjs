@@ -13,6 +13,7 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import preact from "@astrojs/preact";
+import mermaid from "astro-mermaid";
 import starlightLinksValidator from "starlight-links-validator";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -60,6 +61,9 @@ export default defineConfig({
   site: SITE,
   base: BASE,
   integrations: [
+    // Renders ```mermaid fences client-side, theme-synced to Starlight's
+    // light/dark. Must precede the starlight integration (astro-mermaid).
+    mermaid({ autoTheme: true }),
     preact(),
     starlight({
       title: "FlatBars",

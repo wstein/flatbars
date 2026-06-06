@@ -22,6 +22,17 @@ The family needs several Handlebars-lineage dialects that share one engine witho
 | *FullBars* | adds the surface desugar — paths, `@data`, `as \|x\|`, `{{ }}` auto-escape; `extras = true`. |
 | *MaxBars* | FullBars + infix operators and pipes (`MaxBars.Expr`), desugaring to the same core `Expr`; `extras = false`. |
 
+```mermaid
+flowchart LR
+    subgraph MaxBars["MaxBars — flagship surface (infix · pipes)"]
+        subgraph FullBars["FullBars — Handlebars-style surface (paths · @data · auto-escape)"]
+            subgraph RawBars["RawBars — core prefix grammar (no sugar)"]
+                engine["one shared engine<br/>prelude · compiler · value policy"]
+            end
+        end
+    end
+```
+
 . *Reuse by dependency, not copy.* MaxBars depends on `fullbars` and reuses its engine, prelude, value
   policy, surface desugar, and compiler — swapping *only* the interior grammar through the
   `parseExpr`/`parseHead` seams. A shared semantic kernel is extracted *lazily*, only on a proven

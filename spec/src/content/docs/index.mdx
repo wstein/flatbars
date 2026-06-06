@@ -29,26 +29,13 @@ plus the interpreter.
 
 ## The two phases
 
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│ Surface dialect (optional sugar)                                   │
-│   {{name}}   a.b.c   @index   ../x   as |x|   {{> p}}              │
-└──────────────────────────────────────────────────────────────────┘
-        │  desugars to
-        ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ PHASE 1 — FlatBars core                                            │
-│   lex + parse → skeleton AST                                       │
-│   {{{ }}}   {{# }}   {{{{# }}}}   comments   ~                     │
-│   structure only; no meaning, no else, no keywords                 │
-└──────────────────────────────────────────────────────────────────┘
-        │  handed to
-        ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ PHASE 2 — the engine walk (you supply)                             │
-│   validate + interpret the AST, like a JSON Schema                 │
-│   helpers, arity, truthiness, escaping, clauses (else/case/…)      │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    S["<b>Surface dialect</b> (optional sugar)<br/>name · a.b.c · @index · ../x · as &#124;x&#124; · partials"]
+    C["<b>PHASE 1 — FlatBars core</b><br/>lex + parse → skeleton AST<br/>structure only; no meaning, no else, no keywords"]
+    P["<b>PHASE 2 — the engine walk</b> (you supply)<br/>validate + interpret the AST, like a JSON Schema<br/>helpers · arity · truthiness · escaping · clauses"]
+    S -->|desugars to| C
+    C -->|handed to| P
 ```
 
 The [core model](/concepts/) explains the decisions. The
