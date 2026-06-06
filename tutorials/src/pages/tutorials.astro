@@ -138,7 +138,10 @@ const ops = [
         line-height: 1.6;
         -webkit-font-smoothing: antialiased;
       }
-      a { color: var(--accent); text-decoration: none; }
+      /* Exclude .fb-btn: Astro scopes this `a` rule to a[data-astro-cid] (higher
+         specificity than the global .fb-btn), which would override the button's
+         white label to the accent — violet-on-violet. */
+      a:not(.fb-btn) { color: var(--accent); text-decoration: none; }
       .mono { font-family: var(--font-mono); }
       /* Full-canvas width (like the spec) — fill the viewport with comfortable
          gutters rather than a centred column. */
