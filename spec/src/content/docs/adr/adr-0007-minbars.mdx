@@ -62,7 +62,7 @@ These were wrong in the draft spec; verified in the code:
   MinBars writes its *own* `Engine m MinEnv`. `MinEnv` must be a *newtype* (the `env → Helper → Ctl`
   reference is cyclic). Use a closed `resolve` mapping the desugar's fixed helper names to the MinBars
   prelude — no helper-registry frame needed.
-* `Ctl.render :: env -> Template -> m **String**` (not `m Value`) — section/inverted helpers must
+- * `Ctl.render  — env -> Template -> m **String**` (not `m Value`) — section/inverted helpers must
   ``VSafe &lt;$> ctl.render …`` then `joinWith ""`, like `eachH`; the spec's helper snippets were
   type-wrong as written.
 * The core lexer recognises a *fixed* sigil set with *no* per-engine seam. Plain-Mustache sigils

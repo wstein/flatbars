@@ -37,7 +37,7 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
                           interprets the structural tree directly
 ```
 
-. *One parser, structural only.* `parse :: String -> Either ParseError Template` produces the
+- . *One parser, structural only.* `parse  — String -> Either ParseError Template` produces the
   *structural AST* ([evaluation](/spec/evaluation/) §3.1): `Content`, `Output`, `Block`, `RawBlock`, and the
   bare double-stash `Sep`. It records every syntactic shape — brace count, identifiers, args,
   nesting — and assigns *no name* any meaning. There is **no separate surface parser and no surface
@@ -114,7 +114,7 @@ didn't say it."
 *Devi (engine / compiler).* "My objection is concrete and falsifiable: the headline diagram is
 *wrong about how rendering works*. It draws `structural AST → walker → real AST → output`. But
 `runTemplate` (`Engine.purs:61-62`) renders by interpreting the `Template` directly —
-`render :: env -> Template -> m String` (`Engine.purs:45`). `lower`/`RNode` never appears on that
+- `render  — env -> Template -> m String` (`Engine.purs:45`). `lower`/`RNode` never appears on that
 path. We now have *four* IoC instances — interpret, desugar, validate, compile — and only one of them
 (desugar) produces the real AST. Selling `lower` as 'the second pass' overstates a tooling artifact."
 

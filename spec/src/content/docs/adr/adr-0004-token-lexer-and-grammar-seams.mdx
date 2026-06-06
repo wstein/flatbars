@@ -26,7 +26,7 @@ plugs in its expression grammar.
   `==` at a token boundary is the operator. Idents include `_ - . @ / + * ?` and `[bracket]` segments;
   they exclude `& | ! < >` (those are ops).
 
-. *Two seams on `ParseOptions`.* `parseExpr :: ExprParser` parses output/argument interiors;
+- . *Two seams on `ParseOptions`.* `parseExpr  — ExprParser` parses output/argument interiors;
   `parseHead :: ExprParser` parses block-open heads (added in Phase D for bare-infix block conditions
   like `{{#if a == b}}`). The default grammar is the shared prefix grammar (`FlatBars.Expr`);
   MaxBars swaps a precedence-climbing grammar through the *same* seams (`Parser.purs:57`).

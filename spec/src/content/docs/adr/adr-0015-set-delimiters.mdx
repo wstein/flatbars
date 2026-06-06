@@ -37,7 +37,7 @@ Implement set delimiters as a **flag-gated mode of the one core lexer**,
 following the `LexOptions { infixArith }` precedent (the established
 dialect-scoping seam):
 
-. Add `mustacheDelims :: Boolean` to `LexConfig`. When **false** (the default
+- . Add `mustacheDelims  — Boolean` to `LexConfig`. When **false** (the default
   for every dialect except MinBars), the lexer behaves byte-identically to
   today — the meaning-free core and the Handlebars-family dialects are
   untouched, and the index-slicing hot path is unaffected.

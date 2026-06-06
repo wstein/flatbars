@@ -157,6 +157,17 @@ test("multiline cells are joined", () => {
   assert.match(out, /\| first continued \| second \|/);
 });
 
+test("description-list items become bold-term bullets", () => {
+  assert.match(body("= T\n\n✓ Familiar:: works as expected.\n"), /- \*\*✓ Familiar\*\* — works as expected\./);
+  // A term that already has markup is not double-emphasised:
+  assert.match(body("= T\n\n[CORE]:: a core construct.\n"), /- \[CORE\] — a core construct\./);
+  // A `::` type signature inside a code fence is untouched:
+  assert.match(
+    body("= T\n\n[source,haskell]\n----\nrender :: Template -> String\n----\n"),
+    /render :: Template -> String/,
+  );
+});
+
 test("unhandled block-attribute lines are dropped", () => {
   const out = body("= T\n\n[.lead]\nA lead paragraph.\n\n[horizontal]\nterm:: def\n");
   assert.doesNotMatch(out, /\[\.lead\]/);

@@ -352,6 +352,19 @@ export function convert(adoc) {
       continue;
     }
 
+    // Description-list item `term:: definition` → a bold-term bullet. Runs only
+    // outside code fences (so PureScript `::` type signatures are never touched);
+    // the term keeps its own markup if it already has any (avoids double emphasis).
+    const dl = line.match(/^(\S[^:]*?):: (\S.*)$/);
+    if (dl) {
+      const term = finishInline(dl[1], warnings);
+      const def = finishInline(dl[2], warnings);
+      const t = /[*`_[\]<]/.test(term) ? term : `**${term}**`;
+      out.push(`- ${t} — ${def}`);
+      i++;
+      continue;
+    }
+
     // Unhandled block-attribute line ([.lead], [horizontal], [plantuml,…]): drop
     // the directive (its block, if any, falls through as a plain fence/paragraph).
     if (/^\[[^\]]+\]$/.test(line)) {

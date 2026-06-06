@@ -11,11 +11,11 @@ Surface rules are in [surface](/engine/surface/); engine helpers in [prelude](/e
 
 A concept maps in exactly one of these ways, marked throughout:
 
-[CORE]:: a first-class core skeleton construct.
-[SURFACE]:: a pure syntactic rewrite to the core.
-[ENGINE]:: meaning assigned by the Phase-2 walk — a helper, a clause name, or a validation rule. Not built in.
-[HOST]:: an engine/assembly choice, not template syntax.
-[DROPPED]:: deliberately not provided — with the replacement stated.
+- [CORE] — a first-class core skeleton construct.
+- [SURFACE] — a pure syntactic rewrite to the core.
+- [ENGINE] — meaning assigned by the Phase-2 walk — a helper, a clause name, or a validation rule. Not built in.
+- [HOST] — an engine/assembly choice, not template syntax.
+- [DROPPED] — deliberately not provided — with the replacement stated.
 
 :::note
 *Parenthesis convention.* Top-level expressions inside `{{{ }}}` carry no wrapping parens (a
@@ -498,10 +498,10 @@ therefore tiny, and two engines differ only in the functions they plug in, never
 
 There are two entry points, for the two things a second stage does:
 
-*interpret* (with scope):: `runTemplate` — render directly. Helpers receive a *control handle* and
+- *interpret* (with scope) — `runTemplate` — render directly. Helpers receive a *control handle* and
 ask FlatBars to evaluate arguments and render children under environments the helper builds. Top-down;
 FlatBars owns dispatch, arg-evaluation, and assembly.
-*prepare* (analyze / lower):: `foldTemplate` — a catamorphism over the skeleton. The engine supplies
+- *prepare* (analyze / lower) — `foldTemplate` — a catamorphism over the skeleton. The engine supplies
 an *algebra* and FlatBars owns the recursion. Use it to lower the skeleton to your own typed AST, to
 collect diagnostics, or to pretty-print. Bottom-up; FlatBars owns the recursion.
 

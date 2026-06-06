@@ -46,7 +46,7 @@ its implementations stay introspectable.
 
 ## Part A — Decision: truthiness is a fixed per-engine lambda
 
-. *Truthiness is one rule per engine, plugged in as a lambda* `truthy :: Value -> Boolean`, the same IoC
+- . *Truthiness is one rule per engine, plugged in as a lambda* `truthy  — Value -> Boolean`, the same IoC
   shape interpret/desugar/validate/compile already use ("don't call FlatBars, FlatBars calls you").
   FullBars plugs in the Handlebars rule; *RawBars and MaxBars plug in `nonEmpty`* (`false null "" [] {}`
   falsy — `0` truthy, every empty container falsy; the dialects deliberately diverge in value policy since
