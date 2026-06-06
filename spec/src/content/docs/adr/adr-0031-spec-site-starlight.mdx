@@ -4,15 +4,27 @@ sidebar:
   label: ADR-031 spec site → Starlight
 ---
 
-*Status:* Proposed — 2026-06-06. A documentation-toolchain decision; it touches no
-engine semantics. Execution is gated on a de-risk spike (a Markdown emitter for the
-helper catalog, one converted page, and one live engine pane); the ADR flips to
-*Accepted* when that spike is green, and amends if it is not. Owner: Werner. The
-full sequencing, file map, and gate changes live in `STARLIGHT_MIGRATION_PLAN.md`
-at the repository root. Honours the design-system single-source-of-truth contracts of
+*Status:* Accepted — 2026-06-06. A documentation-toolchain decision; it touches no
+engine semantics. The de-risk spike succeeded and was carried to a full build: a
+Markdown twin of the helper catalog, a reproducible AsciiDoc→MDX converter, and the
+*entire* 45-page spec (31 ADRs included) now build in Astro Starlight with Pagefind
+search and `starlight-links-validator` reporting every internal link valid. That
+green build validates the decision, so it is Accepted. Owner: Werner. Honours the
+design-system single-source-of-truth contracts of
 [ADR-017](/adr/adr-0017-editor-support-lsp/) (tokens, vocabulary, one wordmark) and
 keeps the spec as the contract the packages target
 ([ADR-001](/adr/adr-0001-structural-parser-and-walker/)).
+
+*Implementation status.* The migration is *additive*: the Starlight site
+(`spec/`) is built and green, while Antora remains the live spec. Two steps remain
+before the destructive cutover (retiring Antora), deliberately not rushed: (1) a
+*content-fidelity pass* over the auto-converted MDX — AsciiDoc description lists,
+the one PlantUML diagram (→ Mermaid), and callout markers — so the converted
+contract reads as well as the source; and (2) the *cutover* itself — delete
+`docs/` + `antora-playbook.yml`, retire the one-time converter, and repoint the
+four `docs/`-reading gates (`check:catalog`, `check:tokens`, `check:adr-nav`,
+`check:glossary`). Keeping the authoritative AsciiDoc source until the fidelity
+pass is complete is what avoids locking conversion artefacts into the contract.
 
 ## Context
 
