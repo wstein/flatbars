@@ -1,0 +1,94 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * FlatBars shared CHROME tokens — the umbrella design system the three front
+ * ends share so the topbar, layout and theme read identically everywhere
+ * (tutorials, the Starlight spec, and the static Lab). It is the COMPANION to
+ * shared/flatbars-tokens.css: that file owns the seven-family *syntax* palette
+ * (--c-*) for the highlighter; this file owns the *chrome* (palette + IBM Plex +
+ * violet accent, [data-theme] light/dark) that <flatbars-topbar> reads as
+ * inherited custom properties through its shadow boundary.
+ *
+ * Single source of truth for the chrome tokens. The Astro apps import it; the
+ * static Lab links it. Theme is an explicit [data-theme] on <html> (seeded by
+ * theme-seed.js before first paint, toggled by the bar) — not
+ * prefers-color-scheme — so the toggle can override the OS preference. */
+:root {
+  color-scheme: light;
+  --font-ui: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* Backgrounds */
+  --bg: #ffffff;
+  --bg-1: #faf8ff;
+  --bg-2: #f2effc;
+  --bg-3: #e8e3f8;
+
+  /* Foregrounds */
+  --fg: #18181b;
+  --fg-secondary: #3b1b6b;
+  --fg-muted: #5b4d92;
+  --fg-faint: #6f5f99;
+
+  /* Borders */
+  --border: #ddd6f8;
+  --border-strong: #c8bff2;
+
+  /* Accent — the unified deep violet. The soft/softer tints are color-mixed
+     against --bg so they track both the accent and the mode. */
+  --accent: #6d28d9;
+  --accent-2: #4c1d95;
+  --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
+  --accent-softer: color-mix(in srgb, var(--accent) 9%, var(--bg));
+
+  /* Status */
+  --danger: #b91c1c;
+  --danger-faint: #fee2e2;
+  --success: #10b981;
+  --success-faint: #dcfce7;
+  --warn: #b45309;
+  --warn-faint: #fef3c7;
+
+  /* terminal / rendered-output blocks (dark in both themes) */
+  --out-bg: #1b1923;
+  --out-fg: #ece9f5;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow-pop: 0 12px 32px -8px rgba(24, 24, 27, 0.18), 0 0 0 1px rgba(24, 24, 27, 0.06);
+  --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 6px 20px -12px rgba(60, 27, 107, 0.22);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #16141d;
+  --bg-1: #1b1925;
+  --bg-2: #232030;
+  --bg-3: #2c2940;
+
+  --fg: #ece9f5;
+  --fg-secondary: #c5bedd;
+  --fg-muted: #968fb0;
+  --fg-faint: #8a83a6;
+
+  --border: #2c2940;
+  --border-strong: #423c5c;
+
+  /* In dark mode the accent lifts for contrast; --accent-soft/softer are NOT
+     overridden — the :root color-mix re-resolves against the dark accent+bg. */
+  --accent: #9b7dff;
+  --accent-2: #bca6ff;
+
+  --danger: #f87171;
+  --danger-faint: #3a1414;
+  --success: #4ade80;
+  --success-faint: #14321f;
+  --warn: #fbbf24;
+  --warn-faint: #3a2e10;
+
+  --out-bg: #0e0d13;
+  --out-fg: #ece9f5;
+
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
+}

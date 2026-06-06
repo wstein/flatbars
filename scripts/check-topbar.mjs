@@ -31,10 +31,13 @@ const MOUNTS = {
 };
 // Surfaces still carrying the hand-written lockup (none — all migrated).
 const LOCKUPS = {};
-// The static Lab can't import a module from a sibling dir, so it loads a vendored
-// copy of the element (like the engine bundle). It must match shared/ verbatim;
-// regenerate with `npm run gen:topbar`.
-const VENDORED = "lab/vendor/flatbars-topbar.mjs";
+// The static Lab can't import from a sibling dir, so it loads vendored copies of
+// the shared element + chrome tokens (like the engine bundle). They must match
+// shared/ verbatim; regenerate with `npm run gen:topbar`.
+const VENDORED = {
+  "lab/vendor/flatbars-topbar.mjs": "shared/flatbars-topbar.mjs",
+  "lab/vendor/flatbars-chrome.css": "shared/flatbars-chrome.css",
+};
 
 let fails = 0;
 const fail = (msg) => {
@@ -51,17 +54,16 @@ const elementSrc = read("shared/flatbars-topbar.mjs");
   }
 }
 
-// 1b. The Lab's vendored copy is byte-identical to the source.
-{
-  let vendored;
+// 1b. The Lab's vendored copies are byte-identical to their sources.
+for (const [copy, source] of Object.entries(VENDORED)) {
+  let vendored = null;
   try {
-    vendored = read(VENDORED);
+    vendored = read(copy);
   } catch {
-    vendored = null;
-    fail(`${VENDORED} — missing (run \`npm run gen:topbar\`)`);
+    fail(`${copy} — missing (run \`npm run gen:topbar\`)`);
   }
-  if (vendored !== null && vendored !== elementSrc) {
-    fail(`${VENDORED} — stale vs shared/flatbars-topbar.mjs (run \`npm run gen:topbar\`)`);
+  if (vendored !== null && vendored !== read(source)) {
+    fail(`${copy} — stale vs ${source} (run \`npm run gen:topbar\`)`);
   }
 }
 
