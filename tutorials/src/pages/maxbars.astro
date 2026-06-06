@@ -107,10 +107,10 @@ const t = (s) => s;
     <table class="cmp">
       <thead><tr><th>Operators</th><th>Desugars to</th><th>Example</th></tr></thead>
       <tbody>
-        <tr><td><code>+ - * / %</code></td><td><code>add subtract multiply divide modulo</code></td><td><code>{t("{{price * qty}}")}</code> → <code>12</code></td></tr>
-        <tr><td><code>== != &lt; &gt; &lt;= &gt;=</code></td><td><code>eq ne lt gt lte gte</code></td><td><code>{t("{{qty >= 1}}")}</code> → <code>true</code></td></tr>
-        <tr><td><code>&amp;&amp; || !</code></td><td><code>and or not</code></td><td><code>{t("{{a && !b}}")}</code></td></tr>
-        <tr><td><code>??</code></td><td><code>coalesce</code></td><td><code>{t("{{nick ?? name}}")}</code></td></tr>
+        <tr><td><span class="code">+ - * / %</span></td><td><span class="code">add subtract multiply divide modulo</span></td><td><span class="code">{t("{{price * qty}}")}</span> → <span class="code">12</span></td></tr>
+        <tr><td><span class="code">== != &lt; &gt; &lt;= &gt;=</span></td><td><span class="code">eq ne lt gt lte gte</span></td><td><span class="code">{t("{{qty >= 1}}")}</span> → <span class="code">true</span></td></tr>
+        <tr><td><span class="code">&amp;&amp; || !</span></td><td><span class="code">and or not</span></td><td><span class="code">{t("{{a && !b}}")}</span></td></tr>
+        <tr><td><span class="code">??</span></td><td><span class="code">coalesce</span></td><td><span class="code">{t("{{nick ?? name}}")}</span></td></tr>
       </tbody>
     </table>
     <h3>Comparisons in conditions</h3>
@@ -185,11 +185,11 @@ const t = (s) => s;
     <table class="cmp">
       <thead><tr><th>Variable</th><th>Meaning</th></tr></thead>
       <tbody>
-        <tr><td><code>{t("index0")}</code> / <code>{t("index1")}</code></td><td>position, 0-based / 1-based</td></tr>
-        <tr><td><code>{t("rindex0")}</code> / <code>{t("rindex1")}</code></td><td>remaining, 0-based / 1-based</td></tr>
-        <tr><td><code>{t("first")}</code> / <code>{t("last")}</code></td><td><code>true</code> on the first / last element</td></tr>
-        <tr><td><code>{t("length")}</code></td><td>the collection's length</td></tr>
-        <tr><td><code>{t("key")}</code></td><td>the property name when iterating an object</td></tr>
+        <tr><td><span class="code">{t("index0")}</span> / <span class="code">{t("index1")}</span></td><td>position, 0-based / 1-based</td></tr>
+        <tr><td><span class="code">{t("rindex0")}</span> / <span class="code">{t("rindex1")}</span></td><td>remaining, 0-based / 1-based</td></tr>
+        <tr><td><span class="code">{t("first")}</span> / <span class="code">{t("last")}</span></td><td><span class="code">true</span> on the first / last element</td></tr>
+        <tr><td><span class="code">{t("length")}</span></td><td>the collection's length</td></tr>
+        <tr><td><span class="code">{t("key")}</span></td><td>the property name when iterating an object</td></tr>
       </tbody>
     </table>
     <OpenInLab client:visible engine="maxbars" template={ex.loopVars.template} data={ex.loopVars.data} />
@@ -273,29 +273,29 @@ const t = (s) => s;
       <thead><tr><th>FullBars</th><th>MaxBars</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
-          <td>Pipe in a block head <code>{t("{{#each xs | f}}")}</code></td>
+          <td>Pipe in a block head <span class="code">{t("{{#each xs | f}}")}</span></td>
           <td>must be <b>parenthesised</b></td>
-          <td>The head grammar drops the top-level pipe rung so a bar can delimit <code>{t("as |x|")}</code>; write <code>{t("{{#each (xs | f) as |x|}}")}</code>. An unparenthesised head bar is treated as structure (like FullBars), not a pipe.</td>
+          <td>The head grammar drops the top-level pipe rung so a bar can delimit <span class="code">{t("as |x|")}</span>; write <span class="code">{t("{{#each (xs | f) as |x|}}")}</span>. An unparenthesised head bar is treated as structure (like FullBars), not a pipe.</td>
         </tr>
         <tr>
-          <td>Block partials + <code>{t("{{yield}}")}</code></td>
+          <td>Block partials + <span class="code">{t("{{yield}}")}</span></td>
           <td><b>inline only</b></td>
-          <td>Inline-defined partials work — <code>{t("{{#inline \"layout\"}}<{{yield}}>{{/inline}}")}</code> then <code>{t("{{#partial \"layout\"}}…{{/partial}}")}</code> — where <code>{t("{{yield}}")}</code> renders the caller's block body (MaxBars' bare spelling of Handlebars' <code>{t("{{> @partial-block}}")}</code>; the <code>@</code> sigil is reserved, so that Handlebars form is rejected). Not supported: the <code>{t("{{#*inline}}")}</code> <em>decorator</em> (FullBars-only; MaxBars uses bare <code>{t("{{#inline}}")}</code>) and host-threaded <em>external</em> partial files — for those use <a href="/fullbars">FullBars</a>.</td>
+          <td>Inline-defined partials work — <span class="code">{t("{{#inline \"layout\"}}<{{yield}}>{{/inline}}")}</span> then <span class="code">{t("{{#partial \"layout\"}}…{{/partial}}")}</span> — where <span class="code">{t("{{yield}}")}</span> renders the caller's block body (MaxBars' bare spelling of Handlebars' <span class="code">{t("{{> @partial-block}}")}</span>; the <span class="code">@</span> sigil is reserved, so that Handlebars form is rejected). Not supported: the <span class="code">{t("{{#*inline}}")}</span> <em>decorator</em> (FullBars-only; MaxBars uses bare <span class="code">{t("{{#inline}}")}</span>) and host-threaded <em>external</em> partial files — for those use <a href="/fullbars">FullBars</a>.</td>
         </tr>
         <tr>
           <td>Infix anywhere</td>
           <td>not in a <b>clause separator</b></td>
-          <td><code>{t("{{else if (gt n 0)}}")}</code> must parenthesise. The bare form <code>{t("{{else if n > 0}}")}</code> parses but silently takes the wrong branch.</td>
+          <td><span class="code">{t("{{else if (gt n 0)}}")}</span> must parenthesise. The bare form <span class="code">{t("{{else if n > 0}}")}</span> parses but silently takes the wrong branch.</td>
         </tr>
         <tr>
-          <td>JS-flavoured <code>+</code></td>
+          <td>JS-flavoured <span class="code">+</span></td>
           <td>arithmetic is <b>strictly numeric</b></td>
-          <td><code>{t("\"a\" + \"b\"")}</code> throws — there is no string concatenation operator.</td>
+          <td><span class="code">{t("\"a\" + \"b\"")}</span> throws — there is no string concatenation operator.</td>
         </tr>
         <tr>
-          <td>Mustache-style <code>{t("{{^x}}")}</code> / <code>{t("{{&x}}")}</code> / <code>{t("{{{{raw}}}}")}</code></td>
+          <td>Mustache-style <span class="code">{t("{{^x}}")}</span> / <span class="code">{t("{{&x}}")}</span> / <span class="code">{t("{{{{raw}}}}")}</span></td>
           <td>rejected</td>
-          <td>MaxBars sets <code>extras = false</code> — it's not the Handlebars-compatibility dialect.</td>
+          <td>MaxBars sets <span class="code">extras = false</span> — it's not the Handlebars-compatibility dialect.</td>
         </tr>
       </tbody>
     </table>

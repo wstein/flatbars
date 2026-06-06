@@ -370,18 +370,18 @@ $ ~> | $ | {
       <thead><tr><th>Handlebars</th><th>FullBars</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
-          <td><code>else</code> as a keyword</td>
-          <td><code>else</code> is a <b>separator</b>; <code>elif</code> is a real clause</td>
-          <td>The core has no keywords (not even <code>else</code>); a block splits on a name-agnostic separator.</td>
+          <td><span class="code">else</span> as a keyword</td>
+          <td><span class="code">else</span> is a <b>separator</b>; <span class="code">elif</span> is a real clause</td>
+          <td>The core has no keywords (not even <span class="code">else</span>); a block splits on a name-agnostic separator.</td>
         </tr>
         <tr>
-          <td><code>true</code> / <code>false</code> / <code>null</code> literals</td>
+          <td><span class="code">true</span> / <span class="code">false</span> / <span class="code">null</span> literals</td>
           <td>the same spellings — but they're <b>helpers</b></td>
-          <td>The core's only literals are strings and numbers; <code>true</code>/<code>false</code>/<code>null</code> aren't keywords but nullary helpers.</td>
+          <td>The core's only literals are strings and numbers; <span class="code">true</span>/<span class="code">false</span>/<span class="code">null</span> aren't keywords but nullary helpers.</td>
         </tr>
         <tr>
-          <td>Mustache set delimiters <code>{t("{{=<% %>=}}")}</code></td>
-          <td>fixed <code>{t("{{ }}")}</code> / <code>{t("{{{ }}}")}</code></td>
+          <td>Mustache set delimiters <span class="code">{t("{{=<% %>=}}")}</span></td>
+          <td>fixed <span class="code">{t("{{ }}")}</span> / <span class="code">{t("{{{ }}}")}</span></td>
           <td>A fixed grammar keeps the parser meaning-free and the tooling simple. (A Mustache feature; Handlebars fixes the delimiters too.)</td>
         </tr>
         <tr>

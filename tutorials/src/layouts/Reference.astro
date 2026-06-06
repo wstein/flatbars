@@ -138,7 +138,7 @@ const xref = [
       // The Chips/Theme/Legend control wiring lives in Topbar.astro.
       import { highlightTemplate } from "../lib/highlight.mjs";
       const dialect = document.body.dataset.dialect || "fullbars";
-      document.querySelectorAll(".content :not(pre) > code").forEach((c) => {
+      document.querySelectorAll(".content :not(pre) > code, .content :not(pre) > .code").forEach((c) => {
         if (c.textContent.includes("{{")) c.innerHTML = highlightTemplate(c.textContent, dialect);
       });
     </script>
@@ -216,7 +216,8 @@ const xref = [
       .content h3 { font-size: 1.08rem; margin: 1.5rem 0 0.4rem; }
       .content p { margin: 0.6rem 0; }
       .content a { color: var(--accent-2); }
-      .content code {
+      .content code,
+      .content .code {
         font-family: var(--font-mono);
         font-size: 0.88em;
         background: var(--bg-2);
