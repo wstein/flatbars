@@ -2024,6 +2024,11 @@
       let catalogSource = "";
       let catalogDirty = false;
       let labLocale = "en";
+      // ADR-030: the host PathSchema, as a list of data paths the host guarantees
+      // safe (never their ambiguous value, never absent). Set in config.yaml
+      // (`analyse.pathSchema`); drives `analyzeWith` so the Truthiness panel
+      // suppresses those paths' potential + miss findings. Empty ⇒ plain `analyze`.
+      let labPathSchema = [];
       const helperSandbox = createHelperSandbox("./helpers-worker.mjs?v=5");
       let helperCache = { key: null, output: "", error: "" };
       let helperInFlight = null;
@@ -2598,7 +2603,7 @@
           ]}]),
           { key: "config", label: "CONFIG", files: [
             { icon: "cfg", name: "config.yaml", active: activeView === "config", dirty: cfgNonDefault,
-              title: "render config — escape · trim · allow-list · i18n locale · MinBars truthiness",
+              title: "render config — escape · trim · allow-list · i18n locale · MinBars truthiness · analyse pathSchema",
               on: () => selectConfigTab() },
           ]},
         ];
@@ -2941,6 +2946,7 @@
         escapeMode = v.escape; byId("escape-select").value = v.escape;
         standalone = v.trim;   byId("standalone-cb").checked = v.trim;
         allowList = v.allow; minbarsCompat = v.mustacheJs; labLocale = v.locale;
+        labPathSchema = v.pathSchema;
         updateRenderStatus(); renderTabs();
         scheduleRun(); saveHash();
       }
@@ -3759,10 +3765,14 @@
         lastDataAccess = analyseDataAccess(astsByFile, data);
         lastCoverage = analyseCoverage(astsByFile, data);
         // ADR-022: trace the render and collect the truthiness portability
-        // findings for the Truthiness dock panel (FlatBars engine only).
-        lastAnalyse = typeof renderer.analyze === "function"
-          ? renderer.analyze({ source: mainSource }, data)
-          : { ok: true, findings: [] };
+        // findings for the Truthiness dock panel (FlatBars engine only). ADR-030:
+        // when config.yaml declares safe paths, route through analyzeWith so the
+        // panel suppresses those paths' potential + miss findings.
+        lastAnalyse = typeof renderer.analyze !== "function"
+          ? { ok: true, findings: [] }
+          : (labPathSchema.length && typeof renderer.analyzeWith === "function")
+            ? renderer.analyzeWith((p) => !labPathSchema.includes(p), { source: mainSource }, data)
+            : renderer.analyze({ source: mainSource }, data);
         // ADR-019: deprecated-alias + non-canonical scoped-variable findings for
         // the active dialect (the Lint dock panel; FlatBars engines only).
         lastLint = typeof renderer.lint === "function"
@@ -4419,6 +4429,7 @@
           : "";
         helpersSrc = ""; // catalog examples carry no custom helpers
         catalogSource = ""; catalogDirty = false; labLocale = "en"; // i18n reset (ADR-029)
+        labPathSchema = []; // ADR-030 path-schema reset
         // Reset + load data overlays from the manifest, if any. Each entry
         // is `{ name, file }` — name is the slash-path the overlay mounts
         // at, file is fetched alongside data.yaml. A stale overlay from
@@ -4498,6 +4509,7 @@
         transformSrc = "";
         helpersSrc = "";
         catalogSource = ""; catalogDirty = false; labLocale = "en"; // i18n reset (ADR-029)
+        labPathSchema = []; // ADR-030 path-schema reset
         dataOverlays = [];
         dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
         templateMode = "tmpl";
@@ -4555,6 +4567,8 @@
           // i18n (ADR-029): the message catalog + the active locale (default en omitted).
           ...(catalogSource.trim() ? { cat: catalogSource } : {}),
           ...(labLocale && labLocale !== "en" ? { loc: labLocale } : {}),
+          // ADR-030 analyse path schema — persisted so a "watch suppression" link round-trips.
+          ...(labPathSchema.length ? { ps: labPathSchema } : {}),
           // Data overlays — each entry is { n: name, s: source }. Omitted when
           // there are none so legacy/short links stay compact.
           ...(dataOverlays.length ? { do: dataOverlays.map((o) => ({ n: o.name, s: o.source })) } : {}),
@@ -4607,6 +4621,7 @@
           helpersSrc = s.h ?? ""; // custom-helper source (ADR-018), separate field
           catalogSource = s.cat ?? ""; // i18n message catalog (ADR-029)
           labLocale = s.loc ?? "en";   // i18n active locale
+          labPathSchema = Array.isArray(s.ps) ? s.ps.map((p) => String(p)) : []; // ADR-030 path schema
           // Data overlays — accept only entries whose name passes the same
           // validator the UI enforces, dedupe by name (last write wins so
           // the shared snapshot's order is preserved as far as possible).
@@ -5863,6 +5878,13 @@
           " — ", String(observed.length), " observed, ", String(potential.length), " potential",
           misses.length ? `, ${misses.length} miss` : "",
         ]));
+        // ADR-030: when config.yaml declares safe paths, say so — the panel's
+        // potential/miss findings for those paths are suppressed, so this explains
+        // why they're absent (the interactive suppression demo).
+        if (labPathSchema.length) {
+          section.append(makeEl("div", { class: "cv-hint" },
+            `PathSchema active — suppressing potential & miss findings for ${labPathSchema.map((p) => "`" + p + "`").join(", ")} (config.yaml → analyse.pathSchema).`));
+        }
         if (a.findings.length === 0) {
           section.append(makeEl("div", { class: "cv-empty" },
             "Every condition agrees across engines for this data — portable."));
@@ -6446,8 +6468,10 @@
           // MinBars-only: the truthiness rule (ADR-029). Replaces the old UI toggle.
           ...(ENGINE === "minbars"
             ? ["", "minbars:", cfgLine(`  truthiness: ${minbarsCompat ? "mustacheJs" : "spec"}`, 'mustacheJs (0/"" falsy, default) · spec (0/"" truthy)')]
-            // t-surfaces: the active locale for catalog.yaml's messages (ADR-029).
-            : ["", "i18n:", cfgLine(`  locale: ${labLocale}`, "the locale catalog.yaml is rendered in")]),
+            // t-surfaces: the active locale for catalog.yaml's messages (ADR-029),
+            // plus the ADR-030 analyse path schema (paths the host guarantees safe).
+            : ["", "i18n:", cfgLine(`  locale: ${labLocale}`, "the locale catalog.yaml is rendered in"),
+              "", "analyse:", cfgLine(`  pathSchema: [${labPathSchema.join(", ")}]`, "ADR-030 — paths guaranteed safe; suppresses their potential/miss findings")]),
         ].join("\n");
       }
 
@@ -6474,6 +6498,18 @@
         const i18n = cfg.i18n && typeof cfg.i18n === "object" ? cfg.i18n : {};
         const locale = typeof i18n.locale === "string" && i18n.locale ? i18n.locale : "en";
 
+        // ADR-030 path schema: data paths the host guarantees safe — the Truthiness
+        // panel suppresses their potential/miss findings. A list of bare paths;
+        // missing/empty ⇒ no suppression (plain analyse).
+        const analyse = cfg.analyse && typeof cfg.analyse === "object" ? cfg.analyse : {};
+        let pathSchema = [];
+        const rawSchema = analyse.pathSchema;
+        if (rawSchema != null) {
+          if (!Array.isArray(rawSchema))
+            return { ok: false, error: "analyse.pathSchema: must be a list of data paths, e.g. [count, items]" };
+          pathSchema = [...new Set(rawSchema.map((p) => String(p).trim()).filter(Boolean))];
+        }
+
         // ADR-0013 allow-list: missing or `~` means unconstrained (null);
         // an explicit list (even empty) is the positive surface.
         let allow = null;
@@ -6486,7 +6522,7 @@
           if (unknown.length)
             return { ok: false, error: `transformers.allow: unknown transformer${unknown.length > 1 ? "s" : ""} — ${unknown.join(", ")}` };
         }
-        return { ok: true, value: { escape: esc, trim, allow, mustacheJs, locale } };
+        return { ok: true, value: { escape: esc, trim, allow, mustacheJs, locale, pathSchema } };
       }
 
       // Render config changed → refresh the explorer (the config.yaml row's

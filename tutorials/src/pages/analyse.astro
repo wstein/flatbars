@@ -243,7 +243,10 @@ const groups = [
       <b>In the Lab</b> — <b>Open in Lab</b> on any example above carries the template and
       data over; switch to the <b>Truthiness</b> panel beside the output to see the findings
       update live as you edit. The <code>?vendored=</code> corpus turns the Lab into a
-      portability gallery.
+      portability gallery. To watch <b>suppression</b> interactively, edit
+      <code>config.yaml</code> → <code>analyse.pathSchema</code>: add a path you guarantee
+      safe (e.g. <code>[count]</code>) and its potential/miss findings vanish from the panel,
+      with a note naming the active schema — the <code>PathSchema</code> seam, live.
     </p>
     <p><b>In CI / a script</b> — the same report on the command line:</p>
     <pre class="cli"><code>$ flatbars analyse template.hbs data.json
