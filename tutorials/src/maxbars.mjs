@@ -71,6 +71,16 @@ export const examples = {
     data: { name: "Ada" },
   },
 
+  elvis: {
+    // `?:` (Elvis) is truthy-coalescing: it returns the first TRUTHY value, so a
+    // blank "" nickname falls through to name. Contrast with `??` (keeps the
+    // present "") and `||` (yields the boolean `true`). The empty-string fallback
+    // case where `?:` is the operator you want.
+    engine: "maxbars",
+    template: "Hi {{nickname ?: name}}",
+    data: { nickname: "", name: "Ada" },
+  },
+
   // ── Pipes: value | helper ─────────────────────────────────────────────────
   pipeSimple: {
     // The pipe feeds the left value in as the helper's FIRST argument:

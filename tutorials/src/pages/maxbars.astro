@@ -122,6 +122,7 @@ const t = (s) => s;
         <tr><td><span class="code">== != &lt; &gt; &lt;= &gt;=</span></td><td><span class="code">eq ne lt gt lte gte</span></td><td><span class="code">{t("{{qty >= 1}}")}</span> → <span class="code">true</span></td></tr>
         <tr><td><span class="code">&amp;&amp; || !</span></td><td><span class="code">and or not</span></td><td><span class="code">{t("{{a && !b}}")}</span></td></tr>
         <tr><td><span class="code">??</span></td><td><span class="code">coalesce</span></td><td><span class="code">{t("{{nick ?? name}}")}</span></td></tr>
+        <tr><td><span class="code">?:</span></td><td><span class="code">firstTruthy</span></td><td><span class="code">{t("{{nick ?: name}}")}</span></td></tr>
       </tbody>
     </table>
     <h3>Comparisons in conditions</h3>
@@ -133,15 +134,33 @@ const t = (s) => s;
     <OpenInLab client:visible engine="maxbars" template={ex.comparison.template} data={ex.comparison.data} />
     <h3>Arithmetic</h3>
     <OpenInLab client:visible engine="maxbars" template={ex.math.template} data={ex.math.data} />
-    <h3>Logic and <code>??</code></h3>
+    <h3>Logic, <code>??</code>, and <code>?:</code></h3>
     <p>
       <code>&amp;&amp;</code> binds tighter than <code>||</code> and looser than the
-      comparisons; parenthesise when in doubt. <code>??</code> is <b>null-coalescing</b>,
-      not a truthiness fallback — it only substitutes when the left side is null/undefined,
-      so an empty string or <code>0</code> on the left is kept.
+      comparisons; parenthesise when in doubt. The three are <b>distinct</b>, and reaching
+      for the wrong one is the classic trap — <code>||</code> is the <em>boolean</em>
+      operator (it answers “is either truthy?”), so <code>{t("{{nickname || name}}")}</code>
+      outputs the text <code>true</code>, not a name. To <em>fall back to a value</em>,
+      use a coalesce:
+    </p>
+    <table class="cmp">
+      <thead><tr><th>Operator</th><th>Answers</th><th>Yields</th><th><code>{t("{{nickname OP name}}")}</code>, <code>nickname: ""</code></th></tr></thead>
+      <tbody>
+        <tr><td><span class="code">||</span></td><td>is either <em>truthy</em>?</td><td>a boolean</td><td><span class="code">Hi true</span></td></tr>
+        <tr><td><span class="code">??</span></td><td>is the left <em>present</em>? (non-null)</td><td>a value</td><td><span class="code">Hi </span> (keeps the <code>""</code>)</td></tr>
+        <tr><td><span class="code">?:</span></td><td>is the left <em>truthy</em>?</td><td>a value</td><td><span class="code">Hi Ada</span></td></tr>
+      </tbody>
+    </table>
+    <p>
+      So <code>??</code> only substitutes on null/undefined (an empty string or <code>0</code>
+      on the left is kept), while <code>?:</code> (Elvis) substitutes whenever the left is
+      falsy under MaxBars’ rule — the operator you want for a blank-or-missing fallback.
+      A boolean <code>||</code>/<code>&amp;&amp;</code> left in output position is flagged by
+      <code>flatbars lint --maxbars</code>.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.logic.template} data={ex.logic.data} />
     <OpenInLab client:visible engine="maxbars" template={ex.coalesce.template} data={ex.coalesce.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.elvis.template} data={ex.elvis.data} />
   </section>
 
   <!-- ──────────────────────────── Pipes ─────────────────────────── -->
