@@ -333,7 +333,18 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
   `npm run gen:tokens`; `check:tokens` (in `npm test`) fails on drift. Every
   value clears WCAG AA (4.5:1) on its tint, the page bg, and as a solid chip —
   machine-checked by `npm run check:contrast` (also in `npm test`); documented
-  sub-AA exceptions live in that script's `EXCEPTIONS` map.
+  sub-AA exceptions live in that script's `EXCEPTIONS` map. Three more guards keep
+  the design system single-sourced end to end: `check:no-raw-colors` forbids hard-
+  coded colours outside the shared sources + generated fences (a ratchet: the
+  chrome-clean files are pinned at 0, the residual content/editor palettes have a
+  shrinking budget); `check:fonts` pins the one IBM Plex stylesheet URL
+  (`shared/fonts.mjs`, imported by the Astro apps, hard-copied in the Lab) so the
+  weights can't drift; and the Starlight spec maps its whole `--sl-color-*` ramp
+  (white→fg … black→bg, the grays → the `--bg-*`/`--fg-*` scale) onto the shared
+  base in `spec/src/styles/spec.css`, so it derives every surface from it. Shared
+  UI component primitives beyond the topbar live in `shared/flatbars-ui.css`
+  (token-driven `.fb-*`; adopt incrementally, the `/tutorials/` overview is the
+  first consumer).
 - **One source of truth for the editor token vocabulary (ADR-017).**
   `editors/token-vocabulary.json` maps each engine token `kind` to its `role`
   (`tag`/`interior`), its LSP semantic-token type/modifiers, and its TextMate
