@@ -137,7 +137,9 @@ const ops = [
       }
       a { color: var(--accent); text-decoration: none; }
       .mono { font-family: var(--font-mono); }
-      .wrap { max-width: 1080px; margin: 0 auto; padding: 0 1.5rem; }
+      /* Full-canvas width (like the spec) — fill the viewport with comfortable
+         gutters rather than a centred column. */
+      .wrap { max-width: none; margin: 0; padding: 0 clamp(1.5rem, 4vw, 3rem); }
       .skip { position: absolute; left: -999px; }
       .skip:focus { left: 8px; top: 8px; z-index: 20; background: var(--accent); color: #fff; padding: 0.4rem 0.7rem; border-radius: var(--radius); }
 

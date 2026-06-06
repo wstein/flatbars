@@ -156,11 +156,13 @@ const xref = [
          landing via Topbar.astro). */
 
       /* Layout */
+      /* Full-canvas width (like the spec): the sidebar + content span the whole
+         viewport. The prose itself stays readable via .content's own max-width. */
       .shell {
         display: grid;
         grid-template-columns: 16rem minmax(0, 1fr);
-        max-width: 78rem;
-        margin: 0 auto;
+        max-width: none;
+        margin: 0;
       }
       .sidebar {
         position: sticky;
