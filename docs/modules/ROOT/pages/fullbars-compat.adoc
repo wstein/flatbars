@@ -135,7 +135,7 @@ They are nullary helper calls returning `VBool`/`VNull`, not reserved words — 
 
 A refusal, not a TODO — each with its replacement. These will not return.
 
-NOTE: Two former entries have *moved to xref:_4_familiar_works_as_a_handlebars_author_expects[§4]*: Mustache-style implicit
+NOTE: Two former entries have *moved to <<familiar,§4>>*: Mustache-style implicit
 sections (`pass:[{{#x}}]` over data) and `blockHelperMissing` are now implemented (see §4 and the
 differential conformance harness, `conformance/handlebars/`). What remains below are the two genuine
 non-clonable items — one a Mustache (not {hbs}) feature, one a consequence of the pure-data core.
@@ -194,6 +194,7 @@ decorator desugars to the core `inline` helper (xref:surface.adoc[] §5.7). The 
 `pass:[{{#inline}}]`; the core parses every form and only the surface gates the bare spelling).
 |===
 
+[#familiar]
 == 4. Familiar — works as a Handlebars author expects
 
 Quiet background: these behave as you would expect from {hbs} (some via the surface dialect, noted).

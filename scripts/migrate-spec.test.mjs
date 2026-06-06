@@ -6,7 +6,14 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { convert, escapeProseMdx, resolveXref, routeFor, unwrapPass } from "./migrate-spec.mjs";
+import {
+  convert,
+  escapeProseMdx,
+  resolveXref,
+  routeFor,
+  splitCells,
+  unwrapPass,
+} from "./migrate-spec.mjs";
 
 const body = (adoc) => convert(adoc).body;
 const fm = (adoc) => convert(adoc).frontmatter;
@@ -23,9 +30,10 @@ test("section headings shift = levels to # levels", () => {
   assert.match(body("= T\n\n==== Deep\n"), /^#### Deep$/m);
 });
 
-test("explicit anchor before a heading is preserved as {#id}", () => {
+test("explicit anchor before a heading becomes a raw anchor element", () => {
   const out = body("= T\n\n[#expressions]\n== Expressions & paths\n");
-  assert.match(out, /^## Expressions & paths \{#expressions\}$/m);
+  assert.match(out, /<a id="expressions"><\/a>/);
+  assert.match(out, /^## Expressions & paths$/m);
 });
 
 test("xref to a known page resolves to its route", () => {
@@ -82,6 +90,17 @@ test("pass:[] passthrough unwraps; braces escape in prose, stay literal in code"
   assert.match(body("= T\n\nthe `pass:[{{/name}}]` closer"), /the `\{\{\/name\}\}` closer/);
 });
 
+test("inline [[id]] anchor becomes a raw anchor element, not escaped", () => {
+  const out = body("= T\n\n[[divergence]]*3a. Divergence* is computed.\n");
+  assert.match(out, /<a id="divergence"><\/a>/);
+  assert.doesNotMatch(out, /&lt;a id/); // not escaped
+});
+
+test("AsciiDoc <<id>> and <<id,text>> become anchor links", () => {
+  assert.match(body("= T\n\nSee <<divergence>> and <<watch,the watch list>>."), /\[divergence\]\(#divergence\)/);
+  assert.match(body("= T\n\nSee <<watch,the watch list>>."), /\[the watch list\]\(#watch\)/);
+});
+
 test("inline admonition becomes a Starlight aside", () => {
   const out = body("= T\n\nNOTE: mind the gap.\n");
   assert.match(out, /:::note\nmind the gap\.\n:::/);
@@ -98,6 +117,51 @@ test("block admonition without delimiters wraps the next paragraph", () => {
   const out = body("= T\n\n[TIP]\nA single-line tip.\n\nNext para.\n");
   assert.match(out, /:::tip\nA single-line tip\.\n:::/);
   assert.match(out, /Next para\./);
+});
+
+test("splitCells respects code spans and escaped pipes", () => {
+  assert.deepEqual(splitCells("|`a` |b"), ["`a`", "b"]);
+  assert.deepEqual(splitCells("|the `|>` op |pipes"), ["the `|>` op", "pipes"]);
+  assert.deepEqual(splitCells("|x \\| y |z"), ["x | y", "z"]);
+});
+
+test("a header table becomes a GFM table", () => {
+  const out = body(
+    [
+      "= T",
+      "",
+      '[cols="1,3",options="header"]',
+      "|===",
+      "|Error |Cause",
+      "",
+      "|`UnterminatedTag` |an opener with no closer",
+      "|===",
+    ].join("\n"),
+  );
+  assert.match(out, /\| Error \| Cause \|/);
+  assert.match(out, /\| --- \| --- \|/);
+  assert.match(out, /\| `UnterminatedTag` \| an opener with no closer \|/);
+});
+
+test("a headerless table gets a synthesized header row", () => {
+  const out = body(["= T", "", "|===", "|a |b", "|c |d", "|==="].join("\n"));
+  assert.match(out, /\|  \|  \|\n\| --- \| --- \|/); // empty header
+  assert.match(out, /\| a \| b \|/);
+  assert.match(out, /\| c \| d \|/);
+});
+
+test("multiline cells are joined", () => {
+  const out = body(
+    ["= T", "", '[cols="1,1"]', "|===", "|first", "continued |second", "|==="].join("\n"),
+  );
+  assert.match(out, /\| first continued \| second \|/);
+});
+
+test("unhandled block-attribute lines are dropped", () => {
+  const out = body("= T\n\n[.lead]\nA lead paragraph.\n\n[horizontal]\nterm:: def\n");
+  assert.doesNotMatch(out, /\[\.lead\]/);
+  assert.doesNotMatch(out, /\[horizontal\]/);
+  assert.match(out, /A lead paragraph\./);
 });
 
 test("routeFor knows the explicit pages and the ADR pattern", () => {

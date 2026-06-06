@@ -4,17 +4,57 @@
 // it links to/from the tutorials app via the existing PUBLIC_SPEC_BASE seam, and
 // shares the design system (tokens, wordmark) without sharing a build.
 //
-// Deploy target is env-driven, mirroring tutorials/astro.config.mjs: locally the
-// base is `/spec`; under the GitHub Pages project page it is `/flatbars/spec`.
-//   PUBLIC_BASE_PATH=/flatbars  PUBLIC_SITE=https://wstein.github.io
+// Deploy target is env-driven, mirroring tutorials/astro.config.mjs. Locally the
+// base is root ("/") so authored links (`/concepts/`) match routes 1:1 and the
+// link validator passes; in production the spec mounts at `/flatbars/spec` via
+// PUBLIC_SPEC_BASE, and the base-href pass prefixes the authored root-absolute
+// links that Astro itself does not rewrite.
+//   PUBLIC_SPEC_BASE=/flatbars/spec  PUBLIC_SITE=https://wstein.github.io
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import preact from "@astrojs/preact";
 import starlightLinksValidator from "starlight-links-validator";
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { sidebar } from "./src/sidebar.ts";
 
-const PREFIX = (process.env.PUBLIC_BASE_PATH || "").replace(/\/$/, "");
-const BASE = `${PREFIX}/spec`;
+const BASE = process.env.PUBLIC_SPEC_BASE || undefined;
 const SITE = process.env.PUBLIC_SITE || undefined;
+
+// Prefix the hand-authored root-absolute links (`/concepts/`, `/adr/…`) in the
+// built HTML with the deploy base — Astro only rewrites its own route/asset
+// output, not markdown link hrefs. No-op when BASE is root. Mirrors tutorials.
+function normalizeBaseHrefs(base) {
+  const prefix = base.replace(/\/$/, "");
+  const re = /\b(href)="(\/(?!\/)[^"]*)"/g;
+  return {
+    name: "flatbars-spec-base-href",
+    hooks: {
+      "astro:build:done": async ({ dir, logger }) => {
+        let touched = 0;
+        const walk = async (d) => {
+          for (const ent of await readdir(d, { withFileTypes: true })) {
+            const p = resolve(d, ent.name);
+            if (ent.isDirectory()) await walk(p);
+            else if (ent.name.endsWith(".html")) {
+              const html = await readFile(p, "utf8");
+              const out = html.replace(re, (m, attr, val) =>
+                val === prefix || val.startsWith(prefix + "/") ? m : `${attr}="${prefix}${val}"`,
+              );
+              if (out !== html) {
+                await writeFile(p, out);
+                touched++;
+              }
+            }
+          }
+        };
+        await walk(fileURLToPath(dir));
+        logger.info(`base-href: prefixed root-absolute links with ${prefix}/ in ${touched} file(s)`);
+      },
+    },
+  };
+}
 
 export default defineConfig({
   site: SITE,
@@ -28,10 +68,10 @@ export default defineConfig({
       customCss: ["./src/styles/flatbars-tokens.css", "./src/styles/spec.css"],
       // Build-time link integrity — the replacement for Antora's xref guarantee.
       plugins: [starlightLinksValidator()],
-      sidebar: [
-        { label: "Introduction", link: "/" },
-      ],
+      // Generated from docs/modules/ROOT/nav.adoc by scripts/migrate-spec-all.mjs.
+      sidebar,
     }),
+    ...(BASE ? [normalizeBaseHrefs(BASE)] : []),
   ],
   // Let islands import the engine bundle from ../lab (live engine panes, ADR-031),
   // mirroring the tutorials build.

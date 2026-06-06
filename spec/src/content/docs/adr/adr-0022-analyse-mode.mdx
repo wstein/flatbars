@@ -1,0 +1,259 @@
+---
+title: "ADR-022: Truthiness as an engine lambda (no per-file config), and analyse mode"
+sidebar:
+  label: ADR-022 Truthiness lambda + analyse mode
+---
+
+*Status:* Accepted — *implemented* 2026-06-03 (Part A: truthiness model; Part B: analyse mode, CLI
+`flatbars analyse`, JSONata scaffold, `flatbars-js` `analyze` + Lab bundle). *Date:* 2026-06-03.
+*Supersedes the `@truthiness` half of*
+[ADR-010](/adr/adr-0010-header-directives/) (the `@trim` half stands). Builds on the value policy of
+[ADR-002](/adr/adr-0002-escaping-and-value-policy/) and the IoC interpret driver of
+[ADR-001](/adr/adr-0001-structural-parser-and-walker/); touches the compiler of
+[ADR-011](/adr/adr-0011-compile-to-js/) (it *removes* the `$falsy` baking) and the cross-dialect
+lowering of the linter.
+
+This ADR has two coupled parts. *Part A* revises how truthiness is represented (the model). *Part B* adds
+*analyse mode*, an observer built on that model. They are one ADR because Part B's divergence reasoning is
+defined in terms of Part A's rules.
+
+## Context
+
+Two pressures meet here.
+
+*The model is over-engineered.* The per-file `@truthiness` directive (ADR-010) shipped a whole
+configuration language for conditionals: a closed six-shape vocabulary
+(`FFalse FNull FEmptyStr FZero FEmptyArr FEmptyObj`), an 8-name → 4-set alias table
+(`ruby`/`nil`/`lua`/`handlebars`/…), an explicit shape-literal list parser (`false null "" 0 [] {}`),
+*lexical per-partial scoping* (`RefEnv.partialFalsy`, `registerPartialsFalsy`, `withFalsy`), a resolver
+(`resolveTruthinessWith`/`resolveTruthiness`/`parseTruthiness`), the compiler's baked `$falsy` constant
+(ADR-011), and a dedicated linter *truthiness-materialization* phase that re-spells non-default modes so
+the MaxBars→RawBars lowering stays render-exact. Measured footprint: **24 PureScript files** reference the
+machinery and `includeZero` alone has **28** references. Measured usage: the `@truthiness` directive
+appears in **zero** golden or vendored fixtures — only unit tests. A configuration surface with no users
+is paying a 24-file tax.
+
+*Portability is undecidable by inspection.* A template that renders on more than one engine (Handlebars,
+Mustache, StringTemplate4, …) silently diverges whenever a condition tests one of the *ambiguous four* —
+`""`, `0`, `[]`, `{}` — on which engines disagree. The divergence is invisible on the
+happy path; it surfaces only for the input whose value lands on an ambiguous shape, which is exactly the
+input the author's fixtures omit. FlatBars cannot flag it statically (no value types).
+
+Team review (debate recorded against this ADR) separated two questions the original instinct fused:
+*configurability* (the cost) from *representation* (a `Set` of shapes vs a lambda). The cost is the
+configurability; the representation is fine either way and a lambda interface is the right IoC shape *if*
+its implementations stay introspectable.
+
+## Part A — Decision: truthiness is a fixed per-engine lambda
+
+. *Truthiness is one rule per engine, plugged in as a lambda* `truthy :: Value -> Boolean`, the same IoC
+  shape interpret/desugar/validate/compile already use ("don't call FlatBars, FlatBars calls you").
+  FullBars plugs in the Handlebars rule; *RawBars and MaxBars plug in `nonEmpty`* (`false null "" [] {}`
+  falsy — `0` truthy, every empty container falsy; the dialects deliberately diverge in value policy since
+  RawBars/MaxBars are not Handlebars clones); MinBars plugs in the language-agnostic Mustache rule
+  (`mustache`: `false null []` falsy, `0`/`""`/`{}` truthy — the Ruby/Python implementations).
+  *There is no per-file
+  override* — the engine's rule is the only rule a template runs under, swapped in at the dialect's render
+  and compile entry points (interpreter via `withTruthy` for the FlatBars dialects, the `MinEnv.truthy`
+  field for MinBars; compiler via the seeded runtime callback).
++
+:::note
+S2 amendment — *MinBars `mustache.js`-compat mode.* The dominant JavaScript Mustache, `mustache.js`,
+does not follow the spec rule above: it skips a section on `!value`, so `0` and `""` are falsy there (and
+an empty list renders zero times), which is *identical to the `handlebars` rule*. `Kernel.Value` therefore
+defines `mustacheJs = handlebars` as a self-documenting alias, and MinBars exposes an opt-in compat path
+that seeds it instead of `mustache` — `renderMinbarsCompat` / `compileMinbarsCompat` in the JS facade,
+`renderMinCompat` in the engine, and `flatbars --mustache-js` on the CLI. The spec rule stays MinBars'
+default (so the 184/184 conformance is untouched); the compat path is for hosts porting a `mustache.js`
+codebase that need byte-for-byte section behaviour. The interpreter/compiler agreement on the compat rule
+is gated by the `minbars-compat` cases in the compile-conformance harness.
+:::
+
+. *The built-in rules are named `Value -> Boolean` predicates.* `Kernel.Value` keeps `handlebars`,
+  `nonEmpty`, `mustache` (the engine rules) plus `minimal`/`presence` (analyse comparison rules) as the
+  *menu* an engine selects from and what Part B replays for divergence. (Originally these were
+  `FalsySet`-derived data; a later step purged the falsy-set form entirely, so a rule is now *only* a
+  callback.) This is the synthesis the
+  debate reached: an *opaque* lambda was rejected (it can be neither baked nor reasoned about), and a
+  fixed lambda *backed by a named set* keeps every introspection the data form gave us.
+
+. *Delete the configuration surface.* Removed: the `@truthiness` *directive meaning*; `aliasSet`,
+  `resolveTruthiness`/`resolveTruthinessWith`/`parseTruthiness`, the shape-literal parser; `withFalsy`,
+  `RefEnv.partialFalsy`, `registerPartialsFalsy` and the cross-partial scoping rules; and the linter's
+  truthiness-*materialization* phase (it existed *only* to keep non-default modes render-exact — with no
+  non-default modes, MaxBars→RawBars lowering is render-exact for free). The core `Directive` carriage is
+  untouched — `@trim` still needs it, and a now-inert `@truthiness` is *carried, never an error*, but
+  `directiveLints` warns it as deprecated so a stale directive does not silently mislead.
++
+*As-built note (compiler).* The plan said the compiler should drop the baked `$falsy` constant entirely.
+In practice the FullBars and MinBars compiled paths share one runtime (`flatbars-runtime.mjs`) but need
+*different* fixed rules (handlebars vs mustache), so ripping `$falsy` out would mean a rule table in the
+shared runtime — disproportionate risk for no behavioural gain. The implemented change keeps `$falsy` but
+bakes it as a **fixed per-dialect constant** (`resolveForCompile` ignores directives and returns the
+engine rule); the *per-file configurability* — the actual over-engineering — is gone, and
+`test:compile` stays byte-identical (296/296).
+
+. *`includeZero` survives, decoupled from the machinery.* It becomes a per-call helper option on
+  `if`/`unless` (`0` + `includeZero` ⇒ truthy), not a `FalsySet` mutation. It is genuine Handlebars
+  compat (the clone goal — [fullbars-compat](/engine/fullbars-compat/)); the 28 references simplify rather than vanish.
+
+. *An open (arbitrary host) truthiness lambda is rejected for now.* Letting a host pass any
+  `Value -> Boolean` (e.g. "the string `"no"` is falsy") is expressive but (a) *non-compilable* — the
+  emitter cannot serialise a host closure, so it would break compile ≡ interpret (ADR-011), and (b) makes
+  cross-engine portability *undecidable by inspection* (Part B could no longer replay a known menu). If it
+  ever ships it is interpreter-only and explicitly non-bakeable. Deferred.
+
+## Part B — Decision: analyse mode
+
+. *Analyse mode is an engine **variant**, not a second interpreter.* `Kernel.Analyse` builds the analysis
+  engine as the real prelude with the five truthiness operations — `if`/`unless`/`and`/`or`/`not` (the
+  only places `truthy` is consulted; MaxBars' `&&`/`||`/`!` desugar to them) — *wrapped*. Each wrapper
+  **delegates to the original operation** to produce output, then records a `Decision`. Output is
+  *byte-identical to a normal render by construction* — there is no second evaluator to drift from the
+  first (the discipline ADR-011 enforces between compiler and interpreter, applied here between analyser
+  and interpreter). An analyse run that reports zero findings is a *proof* that the render is
+  truthiness-portable against that data.
+
+. *The trace sink is a closure-captured `Ref`, not an env field.* The analysis entry point runs on the
+  existing `ExceptT Error Aff` path, creates a `Ref (Array Decision)`, and the five wrappers append via
+  `liftEffect`. `RefEnv` is **not** extended and the pure `Either` render path is **untouched**.
+
+. *A `Decision` is the closed record:*
++
+```
+{ span     :: Span     -- location of the enclosing tag (Ctl already carries it, "for diagnostics")
+, op       :: String   -- "if" | "unless" | "and" | "or" | "not"
+, value    :: Value    -- the evaluated condition value (so divergence is exact, not shape-approximated)
+, taken    :: Branch   -- then | else, under THIS engine's rule
+, diverges :: Array (Tuple String Branch)  -- named rules whose branch differs (see 3a)
+, path     :: Maybe Path   -- the data path, for bare-path conditions only (see 5)
+}
+```
++
+<a id="divergence"></a>*3a. Divergence is computed by replaying the named-rule lambdas* (Part A.2) against the
+recorded `value` — `handlebars`/`mustache-spec`/`minimal`/`presence`. The Mustache comparison rule is
+labelled `mustache-spec` (not plain `mustache`) precisely because `mustache.js` follows the
+`handlebars` rule, not the spec one: it never diverges from the engine here, so the report's legend says
+so and a `mustache.js` reader is not misled by a `mustache-spec` flip that does not apply to them (the S1
+clarification). No `FalsyShape` introspection is needed;
+this is *simpler* than the original set-replay design and depends only on the menu of built-in rules
+surviving (it does). A finding is a `Decision` whose `value` is one of the ambiguous four **and**
+`diverges` is non-empty. Decisions on `false`/`null`/non-empty values are recorded too and surface as
+`✓` lines — positive evidence of portability.
+
+. *The report is markdown, one section per decision, findings first.* Each finding states the value, the
+  active branch, the rules that flip, and a *concrete fix*:
++
+| Value tested | Suggested fix in the report |
+| --- | --- |
+| `0` | `includeZero=true` (per-call); if 0 should stay falsy, `(ne x 0)` |
+| `""` | make it explicit and rule-free: `(ne s "")` / `(eq s "")` |
+| `[]` | iterate — `{{#each xs}}…{{else}}…{{/each}}` renders `else` on empty on every engine |
+| `{}` | only `presence` calls this falsy; test a known key explicitly |
++
+The tag text shown per section is recovered by *slicing the template source at `span`* (the lexer already
+index-slices — no whole-file re-parse). Fixes name only helpers that exist
+(`eq`/`ne`/`each`/`includeZero`); the report never invents an operation.
+
+. *The data path is recovered syntactically, for bare-path conditions only.* A wrapper sees the evaluated
+  `Value`, not the `Expr`, so provenance is recovered by re-parsing the *tag slice*: `{{#if user.bio}}`
+  ⇒ `user.bio`. A *computed* condition (`{{#if (gt a b)}}`) has no single path — reported, but
+  `path = Nothing`. *Threading provenance through `eval` is rejected* (invasive against ADR-001's clean
+  driver, for a benefit the syntactic recovery already covers where it matters).
+
+. *Surface: both the CLI and the Lab, sharing one `reportMarkdown`.* `flatbars analyse <template>
+  &lt;data.json> [--emit-jsonata]` writes the report to stdout (scriptable, CI-gateable — the
+  `examples verify` precedent); the FlatBars Lab renders the same report in a panel beside output (the
+  `?vendored=` corpus becomes a portability gallery). Both call the one
+  `Kernel.Analyse.reportMarkdown` exposed through the `flatbars-js` bundle, so they cannot drift; shipping
+  the Lab path needs the usual `gen:bundle` + cache-buster bump. (A `--rule` knob to render the analysis
+  under a chosen rule was specced but **not built** — see the As-built note.) The learner-facing walkthrough
+  is the tutorials' **Truthiness portability** reference (`/analyse`), gated by `check:tutorial-tooling`.
+
+. *JSONata cleanup is a reviewable scaffold, not a silent rewrite.* `--emit-jsonata` turns the *bare-path*
+  findings into a JSONata transform that normalises each offending path out of the ambiguous zone before
+  the data reaches any engine — e.g. `$ ~> |invoice|{ "discount": discount = 0 ? false : discount }|`.
+  Bounded and stated in the output: computed-condition findings are listed but not emitted (no single
+  path), and "what *normalise* means" is a per-finding human choice, so the script is a scaffold the
+  author reviews — never applied automatically.
+
+## As-built (2026-06-05): where the implementation differs from this record
+
+Three deliberate simplifications landed differently from the decision text above;
+recorded here so the spec stops describing code that does not exist.
+
+* *The trace sink is a pure `WriterT`, not a `Ref` on `ExceptT Aff`.* Item 2 above
+  describes a closure-captured `Ref (Array Decision)` appended via `liftEffect`.
+  The implementation is `type AnalyseM = WriterT (Array Decision) (Either Error)`
+  — the wrappers `tell` a `Decision`; no `Effect`/`Ref`/`Aff`. This is *stricter
+  and simpler* than the spec (analysis is as pure as a normal render) and is the
+  shipped form.
+
+* *The `Decision` record is leaner.* The implemented record is
+  `{ span, op, value, truthyHere :: Boolean, diverges :: Array (Tuple String
+  Boolean) &#125;` — there is no `taken :: Branch` (a `Boolean` truthiness verdict
+  carries the same information for the two-way control points) and no
+  `path :: Maybe Path` field. The data path (item 5) is recovered syntactically in
+  the *`Finding`* projection, not stored on `Decision`. Net behaviour is exactly as
+  specified; only the intermediate shape is smaller.
+
+* *`--rule` was not built.* The CLI ships `flatbars analyse <template> <data.json>
+  [--emit-jsonata]`; there is no `--rule` knob. The analysis always renders under
+  the engine's own rule and the report already lists *every* named rule that
+  flips, so a single-rule override added little. Deferred, not dropped — revisit
+  if a "show me only the Mustache delta" use case appears.
+
+The `presence` named rule remains (it is the rule under which `{}`/empty
+collections flip — see [divergence](#divergence)); the analyser's fix text names `presence`
+rather than branding it "ST4". The *StringTemplate4 source transpiler* that once
+previewed in the Lab was a proof-of-concept and *has been removed* (2026-06-06):
+the `st4` "ST4 Preview" output view, the `st4-modes` engine capability, the
+`transpileSt4`/`scanTruthinessPragma` machinery in `lab/playground_utils.mjs`, the
+`st4Mode` render-config option (with its `config.yaml` `st4_mode` field and the
+share-link `s4` flag), and the ST4 source highlighter are all gone, along with
+their unit and browser-smoke assertions. The Stem WASM engine itself is untouched
+(it is the Lab's separate legacy comparison engine, not part of this transpiler).
+The Node-level gates (`npm run test:lab`) pass; the browser smoke (`lab/test`) is
+CI-only and still warrants a manual Lab boot to confirm the view strip and config
+panel render without it.
+
+## Consequences
+
+* *Net deletion, not addition.* Part A removes a 24-file configuration surface, a linter phase, and the
+  compiler's `$falsy` baking; Part B adds one observer module that reuses the engine. The hot render path
+  and the emitter get *simpler*.
+* *Drift-proof.* The named rules are the single source of truth for both rendering (Part A) and divergence
+  (Part B.3a); the analyser delegates to real operations, so it cannot disagree with a real render.
+* *The guarantee is data-relative, and the report says so.* "No findings" means *portable against this
+  data*, not *for all inputs*. A CI gate gains teeth by running analyse over a representative or fuzzed
+  corpus (a tracked follow-up — the data-driven harness).
+* *Lost capability, deliberately:* per-file truthiness selection and per-partial truthiness scoping are
+  gone. Evidence that this is acceptable: zero golden-case usage. A template that genuinely needs
+  "0 counts here" uses `includeZero` or an explicit `(ne x 0)` — both portable, both surviving.
+
+## Alternatives considered
+
+* *Replace `FalsySet` with an opaque per-engine lambda (the original proposal).* Rejected as stated: an
+  opaque lambda is non-bakeable (breaks ADR-011) and makes Part B undecidable. Part A keeps the lambda
+  *interface* but backs it with the named data rules — the synthesis.
+* *Keep per-file `@truthiness`, just document it better.* Rejected: zero usage does not justify the
+  24-file tax, the linter materialization phase, and `$falsy` baking.
+* *A render-time guard that throws on the ambiguous four.* Rejected as a default (it 500s in production on
+  a legitimately empty value); analyse mode *observes* instead. May return later as an opt-in CI-only
+  strategy.
+* *A static lint over bare conditionals.* Rejected: no value types ⇒ must flag every conditional ⇒ noise
+  ⇒ disabled.
+* *Threading value provenance through `eval`.* Rejected: invasive for a benefit the syntactic tag-slice
+  recovery already approximates.
+
+## Open questions
+
+* *Stringification and missing-vs-null.* Truthiness is the first portability axis, not the only one:
+  array/object stringification and absent-path-vs-explicit-`null` also diverge. The `Decision`/report
+  shape is general enough to grow a `kind` beyond `truthiness`; whether to do so here or in a follow-up is
+  open.
+* *Compiler parity for analyse.* Whether compiled modules self-report via a baked trace hook behind a flag
+  (keeping `test:compile` honest) or analysis stays interpreter-only is deferred.
+* *Docs cleanup.* [directives](/engine/directives/) must drop the `@truthiness` directive/alias sections and re-cast
+  the named rules as *per-engine* rules (not per-file aliases); the `stringtemplate4`-as-alias line
+  becomes "the rule FullBars could plug in," not a directive token.

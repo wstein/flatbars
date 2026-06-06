@@ -1,0 +1,94 @@
+---
+title: "ADR-009: FullBars — the reference engine and surface dialect"
+sidebar:
+  label: ADR-009 FullBars
+---
+
+*Status:* Accepted. *Date:* 2026-06-01. The middle rung of the ladder
+([adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/)); "flat bars" to FlatBars' "bare rods."
+
+## Context
+
+The substrate needs *one* worked, Handlebars-faithful engine — to validate the host API (ADR-001
+§A.13), to be the family's reference and Handlebars migration target, and to be the surface the other
+dialects are defined against. FullBars is "one *possible* engine over the substrate" (ADR-001), not a
+privileged one; the architecture must keep it swappable even as it serves as the default.
+
+## Decision
+
+. *FullBars = value policy + environment + prelude + lowering + surface desugar*, wired into
+  convenience renderers. After the kernel extraction (ADR-003) the value policy
+  (`truthy`/`escapeHtml`/`stringify`), `RefEnv`, prelude, and `lower` live in `kernel`; the `fullbars`
+  package owns the *surface desugar* (`FullBars.Surface`), the convenience renderers, and the helper
+  *catalog* (the single source of truth for `gen:catalog`).
+
+. *`extras = true`.* FullBars admits the Handlebars-only shapes (raw blocks, inverse, unescaped) that
+  RawBars ([adr-0008-rawbars](/adr/adr-0008-rawbars/)) and MaxBars reject.
+
+. *The surface is a desugar, not a parser* (ADR-001). `FullBars.Surface.desugar` is a pure
+  `Template → Template` rewrite into core forms, then the reference renderer (or `lower`) runs the
+  result unchanged. It rewrites: `{{ E }}` ⇒ escaped `{{{ escapeHtml E }}}`; bare/dotted
+  *paths* ⇒ `lookup` chains (`name` ⇒ `lookup this "name"`, `a.b`, `a.[1]`, `../a` ⇒
+  `lookup (parent) …`); `@data` ⇒ scoped calls (`@index` ⇒ `(index)`, `@root.x`); `else if` chains ⇒
+  flat `{{elif}}`; hash args `k=v` ⇒ a trailing `dict`; block params `as |item i|` ⇒ string
+  args (and a bare in-scope reference ⇒ a call `(item)`); partials `{{> name ctx k=v}}`;
+  `{{#partial}}`/`{{#inline}}`.
+
+. *`noLoopVars` — every bare name is a data path* (the Handlebars rule); scoped loop state is reached
+  only through `@`. This is the deliberate contrast with MaxBars
+  ([adr-0006-maxbars-loop-variables](/adr/adr-0006-maxbars-loop-variables/)), which maps bare names to loop variables through the
+  *same* `LoopVars` hook.
+
+. *Safe-by-default* ([adr-0002-escaping-and-value-policy](/adr/adr-0002-escaping-and-value-policy/)): `{{ }}` escapes,
+  `{{{ }}}` is raw, and `escapingWarnings` flags raw output of untrusted accessors.
+
+## Consequences
+
+* *Pro:* one engine doubles as the Handlebars migration target *and* the catalog's source of truth;
+  the surface-as-rewrite is the concrete proof of ADR-001's "no surface parser, no surface AST."
+* *Note:* the Handlebars block sigils `{{#> name}}` and `{{#*inline}}` are now accepted
+  (the core lexes them as the distinct `PartialBlock` / `Decorator` sigils — each with a clean head
+  and a `{{/…}}` close that repeats it — gated by `ParseOptions.partialBlocks` / `decorators`,
+  and they desugar to the `{{#partial}}`/`{{#inline}}` core spellings).
+* *Con:* because every other dialect is defined *relative to* FullBars, it carries gravitational
+  weight despite being "just one engine" — the same tension ADR-001 logged as the
+  shared-reference-lowering point.
+
+## Amendment (2026-06-03): inline partials require the `{{#*inline}}` decorator
+
+FullBars now *requires* the Handlebars decorator form `{{#*inline "name"}}…{{/inline}}`
+for inline partials and *rejects* the bare `{{#inline "name"}}…{{/inline}}` spelling with a
+located `DisallowedShape` parse error. This matches Handlebars, where `inline` is a *decorator*, not
+a block helper. The original "Note" above — that `{{#*inline}}` is merely accepted and
+desugars to a `{{#inline}}` core spelling — is superseded *for the FullBars surface*: the
+decorator is now the author form, and it still desugars internally to the core `inline` helper
+(hoisted by `hoistInline`).
+
+This is a *FullBars-surface-only* gate (`FullBars.checkBareInline`, which also governs the CLI
+`--surface` path). The shared kernel `inline` helper is *retained* (a no-op block), so *RawBars and
+MaxBars are unchanged*: they still accept bare `{{#inline}}` (MaxBars's grammar bans the `*`
+head, so bare is its only inline form). The generated helper catalog is unaffected — the helper still
+exists.
+
+## Amendment (2026-06-05): FullBars carries the blessed i18n operations (ADR-029)
+
+FullBars's prelude includes the blessed i18n operations `t` / `number` / `date` / `selectPlural` /
+`relative` ([ADR-029](/adr/adr-0029-i18n-helper/)), which *Handlebars does not have*. This is a
+*deliberate, documented exception* to "Handlebars-faithful", recorded here so faithfulness is never
+claimed by omission: these names are reserved at the prelude level, host-driven through the first-class
+`Translator` seam (`RefEnv.translator` / `rt.registerTranslator`, the i18n analogue of the truthiness
+seam — ADR-022), and render their argument's plain text when no host is wired.
+
+Why this does *not* erode the faithfulness the ADR rests on:
+
+* *No behavioural divergence on real Handlebars templates.* The operations only fire when *applied with
+  arguments* (`{{t "k"}}`); a bare `{{t}}` still reads the data field `t`. A Handlebars
+  template that never calls `t`/`number`/`date` is byte-identical (the `handlebars` conformance corpus
+  stays 49/50 — but note the *guarantee* is the application-gated semantics, not merely that the corpus
+  happens not to exercise them).
+* *Shared-prelude scope is deliberate.* They live in the *core-surface* prelude (RawBars/FullBars/MaxBars)
+  so FullBars's `{{t …}}` has a desugar target; they are *absent from MinBars* (its closed
+  Mustache prelude), so [ADR-007](/adr/adr-0007-minbars/)'s "pure Mustache" claim is intact.
+* *No bundled CLDR.* The seam carries no locale data; the brain is the host's (ADR-029).
+
+In short: FullBars is "Handlebars + the host-pluggable i18n seam", and that "+" is stated, not hidden.

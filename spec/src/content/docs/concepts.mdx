@@ -1,0 +1,191 @@
+---
+title: The core model
+---
+
+FlatBars rests on a few decisions. Every later rule is a consequence of them.
+
+## 0. Two phases: a skeleton, then a walk
+
+The core is a *parser*. Its entire output is a *skeleton AST* — a uniform tree of `Content`,
+`Output`, and `Block` nodes ([evaluation](/spec/evaluation/)). The parser attaches *no meaning*: it does not
+know what any identifier does, does not know which identifiers are "helpers," does not know `else`,
+and performs no checks beyond "is this well-formed structure."
+
+Meaning is a *second pass*: a *walk* over the skeleton, supplied by the engine you build. The walk
+validates the tree against the engine's rules and interprets it — precisely the relationship
+between a JSON document and a JSON Schema. FlatBars defines the tree and the walking contract; the
+engine defines the schema and the interpreter.
+
+Everything below describes the interpretation of the reference engine, *FullBars*. A different engine may choose
+differently; the core does not care.
+
+## 1. Everything is an operation
+
+A template is a sequence of *content* and *outputs*. An output evaluates one expression and writes
+its value. The only compound expression is an *operation* — an *application* of a name. (At the host
+API this same thing is called a *helper*, the term Handlebars uses; the [glossary](/concepts/#glossary)
+pairs the native words with that synonym, and [host-api](/engine/host-api/) keeps it.)
+
+```text
+{{{city}}}                          <1>
+{{{lookup this "city"}}}            <2>
+{{{upcase (lookup this "name")}}}   <3>
+```
+&lt;1> Calls the operation `city` with no arguments. Not a variable, not `this.city`.
+&lt;2> Reads the `city` field of the current context, by calling the operations `lookup` and `this`.
+&lt;3> `upcase` applied to one argument — the grouped sub-application `(lookup this "name")`.
+
+There are *no variables*. The parser sees `city` as an identifier at the head of an application; the
+engine resolves it in the *environment* and invokes it. And there is no logic-less core for an operation
+to be an *escape hatch from* — application *is* the language — so an operation is not a "helper" in the
+subordinate, auxiliary sense the word carries elsewhere; it is the primary thing.
+
+## 2. Application is juxtaposition; parentheses are grouping
+
+`head arg1 arg2` applies. Parentheses do not mean "call"; they *group* a multi-token application so
+it fits a single argument slot. A whole top-level expression therefore needs *no* parentheses:
+
+```text
+{{{lookup this "age"}}}             top-level application — no parens
+{{{upcase (lookup this "name")}}}   upcase of ONE argument (the group)
+{{{upcase lookup this "name"}}}     WRONG: upcase applied to THREE arguments
+```
+
+This is the Handlebars subexpression model (and ML/Haskell-style application), *not* Lisp prefix
+notation where every call is parenthesized. The only parentheses you ever write group a nested
+application that sits in argument position.
+
+## 3. The head of an application is always a name
+
+The operator position holds an *identifier*, never a computed value. Nothing in the language
+produces a callable value, so nothing else can sit there. This is enforced syntactically for blocks
+(the closing `{{/name}}` must repeat the name) and is what keeps a `Value` free of functions
+([evaluation](/spec/evaluation/)). Higher-order use goes through a helper such as `apply`.
+
+## 4. Scope is helpers, installed by blocks
+
+Because a bare name is a helper call, *scoped state is just scoped helpers*. A block helper such as
+`each` installs nullary helpers (`index`, `first`, the item context `this`, …) for the duration of
+its body, then removes them.
+
+```text
+{{#each people}}
+  {{{lookup this "name"}}} is number {{{index}}}   <1>
+{{/each}}
+{{{index}}}                                         <2>
+```
+&lt;1> Inside the block, `index` and `this` resolve — `each` installed them.
+&lt;2> Outside, `index` is undefined; resolving it is a validation error in the engine walk.
+
+This replaces Handlebars' `@index`/`@parent`/context-stack with ordinary lexical scoping over the helper
+environment. There is no `@` namespace and no `../` operator in the core.
+
+## 5. No keywords — not even `else`
+
+The core reserves *nothing*. `true`, `false`, `null` are not literals; they are reference-engine
+helpers `(true)`, `(false)`, `(null)`. HTML escaping is the helper `escapeHtml`; the core never
+escapes. And *`else` is not special*:
+
+:::note[Important]
+The *word* `else` never reaches the lexer or the parser. Branching is written with a *separator* —
+the bare double-stash `{{ name args }}` — which the core keeps as a meaningless marker:
+
+[source,text]
+```
+&#123;&#123;#if cond&#125;&#125;
+  yes
+  &#123;&#123;else&#125;&#125;     &lt;1>
+  no
+&#123;&#123;/if&#125;&#125;
+```
+&lt;1> The lexer recognizes the double-stash *shape* and the parser emits `Sep "else" []` — a flat
+marker sitting in `if`'s body. It assigns `else` no meaning. The reference `if` helper splits its
+body at that separator ([evaluation](/spec/evaluation/)). The name is the engine's choice — `else`, `el`,
+`elif`, `otherwise`, `case`, `default`; the core never singles any of them out. A lone separator,
+with no enclosing block to interpret it, simply renders as an application of its head.
+
+The core *recognizes* the inverse opener `{{^x}}` structurally — it records the opener sigil on
+the `Block` node (`Section` vs `Inverse`) but assigns it no meaning. FullBars desugars `{{^x}}`
+to `{{#unless x}}`; the austere RawBars and MaxBars dialects reject it (write the `unless`
+helper). See [directives](/engine/directives/).
+:::
+
+## 6. No sugar in the core
+
+If a construct can be explained as a rewrite to a smaller one, it does not belong in the core; it
+belongs in the [surface dialect](/engine/surface/). `{{name}}` (escaped), `a.b.c`, `@index`,
+`../x`, `as \|x\|`, and `{{> p}}` are *all* surface sugar.
+
+## 7. One parser, four languages
+
+Because the parser attaches no meaning, the *same* lexer and structural tree serve languages with
+incompatible semantics — the dialect supplies the meaning through the `parseExpr` / `parseHead` seam
+and the shape gates, never a fork of the grammar:
+
+* *RawBars* — the desugared core surface: the core skeleton syntax written out directly
+  (`{{{ lookup this "x" }}}`). It runs the engine (so it carries meaning); what it lacks is
+  *surface sugar* — it is the form the richer surfaces desugar to, not the meaning-free core itself
+  (that is the parser).
+* *MinBars* — a Mustache-compatible *peer* engine, with its own context-stack scope and Mustache
+  truthiness (`0` and `""` are truthy); it passes the vendored `mustache/spec` suite.
+* *FullBars* — faithful to Handlebars, the industry-standard `{{ }}` engine (`{{ name }}`,
+  dotted paths, `{{#each}}`).
+* *MaxBars* — the flagship surface: infix operators, pipes, and bare loop variables. It borrows
+  most of FullBars (not quite all) on its own expression-first terms.
+
+That MinBars (Mustache) and FullBars (Handlebars) — two *mutually incompatible* template languages,
+differing in scope rules and truthiness — both render through one structural core is the demonstration
+that the parser is universal across the `{{ }}` family. RawBars is that core exposed; MaxBars is
+FlatBars's own maximal language on top. The normative contract for all four is this spec, not any one
+dialect.
+
+## 8. One compiler, too
+
+The same generalization carries to compilation ([ADR-011](/adr/adr-0011-compile-to-js/)): there is
+*not* a per-dialect compiler. A single meaning-free *emit driver* (`FlatBars.Compile`) walks the lowered
+core AST and calls into a pluggable `Emit` record — the fourth instance of the IoC pattern, alongside
+interpret, desugar, and validate. The dialects on the kernel ladder do not have separate compilers; they
+have separate *front-ends* that desugar to the same core, then share one driver and one `Emit`:
+
+* *RawBars* parses core directly, then `compile meta emit nodes`.
+* *FullBars* / *MaxBars* desugar the surface (the `parseExpr` seam, block params, MaxBars infix/pipes)
+  to the same core AST, then call the *same* `compile` with the *same* emit rules — MaxBars `score >= 50`
+  is already core `App` by the time the compiler sees it, so it compiles for free.
+
+So "compiles to JS" is a property of the *core*, inherited by every surface that lowers to it — not a
+RawBars-only feature. The `test:compile` gate asserts the compiled JS is byte-identical to the
+interpreter for every golden case across these dialects, so the compiler can never silently diverge from
+the walk.
+
+MinBars is the one engine *not* on this driver: as a Mustache *peer* (its own context-stack scope and
+truthiness, no kernel lowering) it compiles through a separate inlining model
+([ADR-016](/adr/adr-0016-minbars-compile/)). That is a deliberate factoring — folding Mustache
+semantics into the kernel `Emit` would add code and drift, not remove it — not a gap.
+
+<a id="glossary"></a>
+
+## Glossary
+
+The native-dialect names for the model above. The host API ([host-api](/engine/host-api/)) keeps Handlebars' own word
+*helper* for the same machinery, so a migrator's vocabulary still works; the table pairs each native term
+with that synonym.
+
+| Native term | Meaning | Host-API synonym |
+| --- | --- | --- |
+| *operation* | What a name invokes at a call site — the only compound expression (§1). Either *inline* or *block*. | helper |
+| *definition* | What a name resolves to in the environment; what a block or the host *installs*. A *nullary* definition is how a *value* appears — there are no variables, so a value is just an operation that takes no arguments. | (registered) helper / partial |
+| *scope* | The set of definitions in force at a point. A block installs definitions for its body and removes them after (§4) — scope is ordinary lexical scoping over the environment, not a context stack. | context / data frame |
+| *inline operation* | An operation that ignores the control handle and returns a `Value` (`upcase`, `lookup`). | inline helper |
+| *block operation* | An operation that uses the control handle to render its body and separator-delimited clauses (`if`, `each`). | block helper |
+| *operator* | MaxBars only: an infix symbol (`+`, `>=`, `\|`) — surface sugar that desugars to an operation application (§8). Not a separate mechanism, and not a "function": nothing produces a callable value (§3). | — |
+
+The lambda-vs-helper split of the Handlebars/Mustache family does *not* survive here. Mustache (logic-less, no
+helpers) binds a *lambda* in the data, at a leaf; Handlebars registers a *helper* on the side — a binding-site
+distinction across two languages. FlatBars has one binding site, the environment: a lambda bound to a data
+leaf is a *nullary operation installed in scope*, and a "helper applied to a block" is a *block operation*.
+One axis, not two.
+
+## A note on naming
+
+The mark is a set of *bare rods*: the Handlebars braces stripped to their vertical strokes. The triple
+stash `{{{ }}}` — the core's one and only inline output form — is the logo's source.

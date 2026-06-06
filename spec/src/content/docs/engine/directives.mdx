@@ -1,0 +1,131 @@
+---
+title: "Header directives (`@trim`) and the truthiness model"
+---
+
+A *directive* is a `@key`/`@key: value` marker carried in a short `{{! … }}`
+comment at the **head** of a file. The core lifts directives meaning-free (the
+`Sep` precedent applied to comments — [grammar](/spec/grammar/)); the engine assigns
+meaning. Because carriage lives in the core parser, every dialect (RawBars,
+FullBars, MaxBars) inherits directives uniformly.
+
+## The mechanism
+
+```handlebars
+{{! @trim: none }}
+Hello {{ name }}!
+```
+
+Rules ([lexical](/spec/lexical/)):
+
+* Directives live **only** in short `{{! … }}` comments. A long
+  `{{!-- … --}}` comment is inert prose — so JSDoc `@param`, e-mail
+  handles, etc. are safe by construction.
+* The parser keys on `@<key>` heads (`[A-Za-z][A-Za-z0-9_-]*`); a value runs to
+  the next head or the block end, trimmed. A bare `@key` (no colon) is a flag
+  (`= @key:true`). Layout is free; canonical style is one `@key:value` per line.
+* **Header-only.** Directives are recognised before the first non-comment tag.
+  Leading content/whitespace does not close the header — only a real tag does. A
+  directive after that point is a `DirectiveAfterHeader` parse error.
+* Unknown keys are **carried but lint-warned** (forward compatibility), not an
+  error.
+
+## Truthiness — a fixed per-engine rule (ADR-022)
+
+:::note[Important]
+*The per-file `{{! @truthiness: … }}` directive was removed* — see
+[ADR-022](/adr/adr-0022-analyse-mode/). Truthiness is now each engine's *one fixed rule*: **FullBars**
+uses `handlebars` (Handlebars fidelity), **RawBars** and **MaxBars** use `nonEmpty`, **MinBars** uses
+`mustache`. (The dialects therefore *diverge* in value policy — RawBars/MaxBars are not Handlebars clones.)
+There is no per-file override, no per-partial scoping, and no alias/shape-list value to write. A leftover
+`@truthiness` directive in an old template is *inert* — carried, never an error, but **lint-warned as
+deprecated** so a stale directive does not silently mislead. The model below describes those fixed rules
+and how to write *portable* templates; the analyse mode (ADR-022 Part B) checks portability against real
+data.
+:::
+
+Each engine's rule decides which value *shapes* `if`/`unless`/`and`/`or`/`not` (and MaxBars' `&&`/`||`/`!`)
+treat as false. The named rules — the menu engines are built from — are:
+
+| Rule | Falsy set | Notes |
+| --- | --- | --- |
+| `handlebars` | `false null "" 0 []` | *FullBars*; `{}` truthy, `"0"` truthy |
+| `nonEmpty` | `false null "" [] {}` | *RawBars/MaxBars*; truthy ⟺ non-empty present value — `0` truthy (use `val > 0`), every empty container falsy |
+| `mustache` | `false null []` | *MinBars*; `0`/`""`/`{}` truthy |
+| `minimal` | `false null` | comparison only (analyse): only `false`/`null` false |
+| `presence` | `false null [] {}` | comparison only (analyse): present ⇒ truthy; matches *StringTemplate4* (see below) |
+
+Decisions worth stating: `"0"` is truthy under every rule; `0` is falsy only under `handlebars`; `{}`
+is falsy under `nonEmpty`/`presence`; `""` is falsy under `handlebars`/`nonEmpty`; `NaN` is always truthy;
+`safe ""` is falsy iff `""` is in the rule (content-based — [fullbars-compat](/engine/fullbars-compat/) §1.4).
+
+`includeZero` on a single `if`/`unless` makes the number `0` truthy *for that one test* — genuine
+Handlebars compat, but a Handlebars-only escape hatch (not portable). It is a per-call helper option, no
+longer tied to any falsy-set machinery.
+
+### Where other engines sit
+
+Each named rule is some real engine's rule — which is why they are the useful targets for a *portable*
+template, and the set the analyse mode replays to detect divergence.
+
+| Engine | Falsy set | FlatBars rule |
+| --- | --- | --- |
+| Handlebars (default) | `false null "" 0 []` | `handlebars` |
+| Mustache | `false null []` | `mustache` |
+| Ruby / Lua / Lisp `nil` | `false null` | `minimal` |
+| *StringTemplate4* | `false null [] {}` | `presence` |
+
+*StringTemplate4* (Parr's ST4) tests a conditional with `Interpreter.testAttributeTrue`:
+`null` and `Boolean false` are false; an empty `Collection`/`Map`/`Iterator` is
+false; **every other non-null object — including `""` and `0` — is true**
+("it's present"). That is exactly `presence`. ST4 thus disagrees with Handlebars on
+`""`/`0` (truthy in ST4, falsy in Handlebars) and with Mustache on `{}`
+(falsy in ST4, truthy in Mustache).
+
+### The portable core
+
+Reading the table by *shape* rather than by engine isolates what is safe to lean
+on across engines:
+
+* **Always falsy** (every rule): `false`, `null`.
+* **Always truthy** (every rule): a non-empty string, a non-zero number, a
+  non-empty array, a non-empty object, and `NaN`.
+* **Engine-dependent — the ambiguous four:** `""`, `0`, `[]`,
+  `{}`. No two of the mainstream engines agree on all four (`""`/`0`:
+  falsy in Handlebars, truthy elsewhere; `[]`: falsy everywhere except
+  `minimal`; `{}`: falsy only in `presence`/ST4).
+
+A template that must render identically under more than one engine should
+therefore **never put one of the ambiguous four in a boolean position.** Branch
+on them *explicitly* instead — `{{#each xs}}…{{else}}…{{/each}}` for a
+"non-empty list" (it renders `else` on empty on every engine), an explicit
+`{{#if (eq s "")}}` for "blank" — so the decision no longer rides on the
+host's truthiness rule. FlatBars cannot prove this statically (it has no value
+types — a name's runtime shape is unknown at parse time), so the guarantee is
+checked *against real data* by the analyse mode
+([ADR-022](/adr/adr-0022-analyse-mode/)): `pass:[flatbars analyse <template>
+&lt;data.json>]` reports every condition that would branch differently on another
+engine, with a fix each, and `--emit-jsonata` emits a reviewable data-cleanup
+scaffold.
+
+## `@trim` — standalone whitespace (core, syntactic)
+
+`@trim: standalone | none` toggles Handlebars-style standalone-line trimming: a
+line holding only a block open/close or a comment has its indentation and
+trailing newline removed. **On by default.** This is the one directive the *core*
+itself acts on, because whitespace is syntactic (the core already owns `~`).
+
+Output tags (`{{ }}` / `{{{ }}}`) and bare `{{else}}`
+separators are never standalone-trimmed. Explicit `~` composes on top.
+
+Precedence (highest first): the `@trim` directive, the CLI `--trim standalone|none`,
+a `flatbars.json` `{ "trim": "standalone" | "none" }` in the working
+directory, then the built-in default (on).
+
+## Compilation
+
+Both interpreter and compiler honour `@trim` identically. Truthiness is a
+*callback* in both: the compiled module seeds its root frame with the engine's
+truthiness callback — `rt.truthyHandlebars` (FullBars), `rt.truthyNonEmpty`
+(RawBars/MaxBars), or `rt.truthyMustache` (MinBars) — so a compiled template
+branches under the same rule as the interpreter, asserted byte-for-byte by the
+conformance harness ([ADR-022](/adr/adr-0022-analyse-mode/)).

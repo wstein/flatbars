@@ -1,0 +1,51 @@
+---
+title: "ADR-002: Escaping and the value-policy contract"
+sidebar:
+  label: "ADR-002 Escaping & value policy"
+---
+
+*Status:* Accepted. *Date:* 2026-06-01. Promised by the [ADR-001 review](/adr/adr-0001-structural-parser-and-walker/#review) consensus.
+
+## Context
+
+The core assigns no value policy. The reference engine supplies `truthy`/`escapeHtml`/`stringify`
+(`Kernel.Value`), exposes `stringify` through the engine `Ctl` (`Engine.purs:57`), and never
+auto-escapes raw output (`{{{ }}}`); the surface dialect's `{{ }}` escapes by lowering
+to `escapeHtml`. The ADR-001 debate flagged the tension: framing `escapingWarnings` (an *ignorable
+lint*, `Lower.purs:125`) as the safety mechanism is "opt-in XSS." But the substrate *cannot* mandate
+escaping without choosing a value policy — and a chosen value policy is exactly what makes something
+an *engine*, not a substrate.
+
+## Decision
+
+. *Core mandates no escaping.* HTML-escaping, truthiness, and stringification are an engine concern,
+  surfaced through `Ctl.stringify` and the engine's value module. The substrate stays policy-free.
+
+. *Safety is a conformance contract on engines, not a core feature.* Every conforming engine MUST
+  declare: (a) an HTML-escape function, (b) a `stringify`, (c) a truthiness rule (a `Truthy` =
+  `Value -> Boolean` callback — ADR-022), and
+  (d) a raw-output safety stance — does `{{{ }}}` escape? (Reference answer: no.) This belongs
+  in the [host-api](/engine/host-api/) engine checklist.
+
+. *The reference engine is safe-by-default for the surface.* `{{ }}` escapes (lowers to
+  `escapeHtml`); `{{{ }}}` does not; `escapingWarnings` flags raw output of untrusted accessors
+  (`lookup`/`this`/scoped) not wrapped in `safe`.
+
+. *The lint is on by default in tooling.* The playground already runs it (`Main.purs:211`); the CLI
+  gains it with an explicit `--no-escape-lint` opt-out, rather than being opt-in.
+
+. *One shared `escapeHtml`.* It escapes `& < > " '` and *not* backtick/`=` (`Value.purs:265`)
+  — already Mustache-conformant, so every engine in the family reuses it rather than re-deriving it.
+
+## Consequences
+
+* *Pro:* safety becomes *testable* (a checklist entry) rather than folklore; one `escapeHtml` is
+  shared; the substrate/engine boundary from ADR-001 is preserved exactly.
+* *Con:* XSS protection still depends on an engine honouring the contract — a careless engine can
+  declare a no-op escaper. Mitigation is the lint plus the conformance checklist, not enforcement.
+
+## Alternatives considered
+
+* *Bake escaping into core.* Rejected: it smuggles a value policy into the substrate, contradicting
+  ADR-001's whole reason to exist.
+* *Auto-escape `{{{ }}}` too.* Rejected: then the language has no raw-output construct at all.

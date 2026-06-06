@@ -1,0 +1,245 @@
+---
+title: "ADR-024: Block-scoped `let` and the dict literal — MaxBars surface, FullBars unchanged"
+sidebar:
+  label: "ADR-024 `let` & dict literal"
+---
+
+*Status:* Proposed (revised 2026-06-04 after team review — see *Resolved during review* below; the list
+literal was split out to [ADR-025](/adr/adr-0025-list-literal/)).
+*Date:* 2026-06-04. Applies to *MaxBars and RawBars* only; *FullBars is unchanged*
+(Handlebars-faithful — see [ADR-009](/adr/adr-0009-fullbars/) and the conformance line at
+[ADR-005](/adr/adr-0005-dialect-ladder/)). Sits alongside
+[ADR-021](/adr/adr-0021-maxbars-variable-model/) (the MaxBars/RawBars variable model) as the
+expression-sugar half of the same dialect carve-out.
+
+This ADR covers the two constructs that need *no shared-prelude change*: block-scoped `{{#let}}` and the
+dict literal (which reuses the existing `dict` helper). The *list literal* needs a new `list` constructor
+in the shared prelude, a different blast radius, so it is its own decision —
+[ADR-025](/adr/adr-0025-list-literal/). The two ADRs share this Context and the lexing/dialect model.
+
+## Context
+
+Template authors recurringly need *template-local constants* — a forge-name → URL lookup table, a
+status → label enum, an alias for a deep path used many times — that are intrinsic to the template,
+identical on every render, and have no business in the host data. Today the only spelling is to pass
+them in through the render context on every call, which is friction for what is effectively a `const`
+inside the template.
+
+Three things make this a design problem, not a one-helper fix:
+
+* *No variables.* The [concepts](/concepts/) thesis is strict — *"the only compound expression is
+  an application of a name."* Any new construct must either *be* an application or *desugar* to one. A
+  literal expression class (`Lit`-typed nodes for `{…}`/`[…]`) cannot live in the kernel AST.
+* *No host-format dependency in core.* [ADR-003](/adr/adr-0003-strict-layering/) keeps `JSON` ⇆ `Value`
+  out of the core (*"JSON-ness is a host concern"*). YAML / JSON-style literal collections in *tag*
+  bodies would re-import the same dependency under a different name.
+* *Dialect carve-out is the established lever.* [ADR-005](/adr/adr-0005-dialect-ladder/) gives MaxBars
+  the room for surface additions FullBars cannot have, by reuse-by-dependency: MaxBars depends on
+  `fullbars`, swaps the interior expression grammar, and FullBars's Handlebars conformance
+  (`49/50` byte-identical, gated by `check:hbs-conformance`) is untouched. [ADR-006](/adr/adr-0006-maxbars-loop-variables/)
+  /[ADR-021](/adr/adr-0021-maxbars-variable-model/) use this for the variable model; this ADR uses it
+  for `let` and the dict literal.
+
+The space of candidates was enumerated in the design debate. The salient negative results — captured
+here so future revivals don't relitigate, and shared with [ADR-025](/adr/adr-0025-list-literal/) —
+were:
+
+* *JSON-style literals* (`{"b":1,"c":2}`, `[1,2,3]`) — imported `:` and `,` as new tag-body tokens with
+  no FlatBars precedent, broke whitespace-separated args, doubled the editor-tooling contract
+  ([ADR-017](/adr/adr-0017-editor-support-lsp/) token-vocabulary).
+* *Unified `[…]` for both dicts and lists*, content-disambiguated (all-`name=value` ⇒ dict, otherwise
+  list). Killed by the empty-collection case: `[]` cannot mean both, leaving no literal spelling for
+  the empty dict — and discarded the universal `{} / []` shape convention every comparable language
+  (including Lua's tables) honours. This is *why* the dict literal is `{…}` (here) and the list literal
+  is `[…]` (ADR-025), as two distinct shapes.
+* *Dict sugar at the helper level only* (e.g. renaming `dict` → `obj`). One character saved per call,
+  capped by name quality; not worth a prelude churn on a well-established helper.
+* *Dropping `{{#with}}` in favour of `{{#let}}`*. `with` does two jobs (re-root context + optional alias);
+  `let` does one (alias only). The aliases are equivalent only when the body never uses bare names. `with`
+  also lives in the shared prelude, so removing it requires either splitting the prelude or adding a
+  surface-level rejection — both heavier than the saving. See *Relationship to `{{#with}}`* below.
+
+## Decision
+
+Two constructs ship here, scoped to *MaxBars only*, *surface-stage* desugared, with *no shared-prelude
+change*: block-scoped `{{#let}}` and the dict literal. (The list literal and its required `list` helper
+are [ADR-025](/adr/adr-0025-list-literal/).)
+
+### 1. Block-scoped `{{#let}}` — alias only, never re-root
+
+`{{#let}}` installs *nullary operations* at the block's lexical scope; they vanish at `{{/let}}`. It is
+the operation model applied to template-local *constants* — no new concept, just a new way to write one.
+
+```handlebars
+{{#let n=expr [n=expr …]}}
+  … body where each n is a nullary operation that returns expr …
+{{/let}}
+```
+
+Semantics:
+
+* *Bindings* evaluate left-to-right, each in the scope *extended by the bindings to its left*: in
+  `{{#let a=1 b=(add a 1)}}`, `b` sees `a`. A binding sees neither itself nor any binding to its
+  right, so there is no self-reference and no fixpoint — this is a *sequential* `let`, not a `letrec`,
+  and it remains a single total walk (no second pass). The sequential form removes the nesting tax the
+  earlier parallel design imposed (which forced `{{#let a=1}}{{#let b=(add a 1)}} … {{/let}}{{/let}}`
+  for what is the common case).
+* *Scope* is block-scoped lexically: names exist between `{{#let}}` and `{{/let}}`. Inner blocks inherit;
+  partials called inside inherit (the standing scope-chain rule).
+* *Shadowing.* A `let` name that collides with an in-scope helper shadows it inside the body, then the
+  original is unshadowed at `{{/let}}`. A collision with a `{{#each xs as |x|}}` block param of the same
+  name in the *same* scope is a parse error.
+* *Does not re-root context.* `{{#let u=user}}{{name}}{{/let}}` resolves `name` against the *root*, not
+  against `user`. To re-root, use `{{#with}}` (which stays — see below).
+
+### 2. Dict literal `{name=expr name=expr …}` — MaxBars expression sugar
+
+A brace-delimited list of hash-arg pairs in expression position is sugar for `(dict …)`. The interior
+syntax is FlatBars-native — *bare* keys, `=` separator, *whitespace*-separated pairs — no JSON
+conventions are imported.
+
+```handlebars
+{{#let forges={codeberg="…" github="…" gitlab="…"}}}
+  …
+{{/let}}
+```
+
+Desugars at the MaxBars parser stage to `(dict codeberg="…" github="…" gitlab="…")`. The `dict`
+helper already lives in the shared prelude ([prelude](/engine/prelude/)); *no kernel or prelude change* — this is
+the property that lets the dict literal ship ahead of the list literal.
+
+Empty: `{}` is the empty dict — clean, unambiguous, lowers to `(dict)`.
+
+### 3. Lexing: desugar at the MaxBars expression stage, structure lexer untouched
+
+The dict literal is resolved entirely in the MaxBars interior grammar (`MaxBars.Expr`, plugged in
+through the `ParseOptions.parseExpr` seam). The *structure* lexer (`tokenizeTemplate`) never gains `{` or
+`}` as structural tokens, and tag-boundary detection is unchanged. This is what keeps the three
+delimiter widths (`{{ }}` / `{{{ }}}` / `{{{{ }}}}`) intact: width detection runs *first* and fixes the
+tag span; only then does the interior tokenizer see the literal braces. (ADR-025 extends the same
+principle to `[`/`]`; the rule is identical.)
+
+The one consequence for the surface: inside an already-delimited tag, the interior tokenizer matches `{`
+against its closing `}` by nesting depth, so a literal collection's own closing brace is consumed before
+the tag close. `{{#let x={a=1}}}` therefore reads as `#let x=` · `{a=1}` · `}}` (dict-close, then
+tag-close), and the nested `{{#let x={a={b=1}}}}}` as `{a={b=1}}` · `}}` — no ambiguity, because
+the tag span was settled by width detection before the interior is scanned. *Authors never insert a
+disambiguating space.* This is the load-bearing lexing claim, so it is gated by a dedicated tokenizer
+corpus (see *Gates*).
+
+### 4. Dialect scope
+
+| Surface | `{{#let}}` | `{…}` dict literal | Notes |
+| --- | --- | --- | --- |
+| *RawBars* | ✓ (explicit form: `{{#let (bind a x)}}…{{/let}}`) | ✗ (no sugar at all by design) | Writes the kernel form directly. |
+| *FullBars* | *✗* | *✗* | Handlebars-faithful. Authors use `{{#with x as \|n\|}}` for aliasing and `(dict …)` for collections. |
+| *MaxBars* | ✓ (with `n=expr` surface sugar) | ✓ (`{name=expr …}`) | The flagship; the list literal is added by ADR-025. |
+
+This is the same asymmetry already enforced for MaxBars operators (`>=` is MaxBars-only sugar that
+lowers to `(gte …)`; `gte` is a shared-prelude helper).
+
+### 5. Kernel footprint
+
+One addition, small and decided here (not deferred):
+
+* *A dedicated `Let [(name, expr)] body` AST node* (resolved during review — see below). It pushes a
+  helpers-only frame onto the env stack at `{{#let}}` and pops it at `{{/let}}`. The env stack already
+  exists — `pushFrame` (`Kernel.Env`) is what block params and `{{#with}}` use — but note `pushFrame`
+  bundles *helpers + context*; `let` pushes the binding helpers while *passing the current context
+  through unchanged* (that is the "never re-root" guarantee of §1, expressed mechanically). No new
+  `Value` shape.
+
+The dict literal adds *nothing* to the kernel: `{…}` desugars before the AST is built, so the kernel sees
+an ordinary `Application` node — `(dict …)` — and `dict` is already in the prelude. (The list literal of
+ADR-025 is the one construct that *does* touch the shared prelude.)
+
+### 6. Relationship to `{{#with}}`
+
+`{{#with}}` stays in *every* dialect. `let` and `with` are complements, not competitors:
+
+| Operation | Alias | Re-root `this` / bare names |
+| --- | --- | --- |
+| `{{#let n=x}}` | ✓ | ✗ |
+| `{{#with x}}` | ✗ | ✓ |
+| `{{#with x as \|n\|}}` | ✓ | ✓ |
+
+The identity worth recording: `{{#with x as |n|}}` ≡ `{{#with x}}{{#let n=x}} … {{/let}}{{/with}}`.
+`let` desugars *part* of `with`, not the whole thing.
+
+## Consequences
+
+### Gates
+
+* *Tokenizer corpus (precondition — must land before implementation).* A golden corpus in the
+  `check:highlight` style that pins the lexing claim of §3 over the adjacent-brace cases: `{{#let x={a=1}}}`,
+  `{{#let x={}}}`, and the nested `{{#let x={a={b=1}}}}}` (five trailing braces). Each must
+  tokenize with the tag span fixed by width detection *before* the interior is scanned. No corpus, no
+  merge — this is the construct's highest-risk surface. (ADR-025 adds the bracket cases.)
+* *`check:hbs-conformance`* — already in `npm test`. Catches any FullBars regression from the `49/50`
+  byte-identical line. If `let`/`{…}` ever bleed into the FullBars surface parser, the next run of this
+  gate flags it. (Unlike ADR-025, this ADR adds no prelude helper, so there is no catalog/conformance
+  churn here.)
+* *`check:isolation`* — extended with one MaxBars-only-surface assertion per construct, source-pinned in
+  the style of `check:a11y`: a FullBars template containing `{{#let …}}` or `{name=expr}` in
+  expression position must produce a surface diagnostic, not silent acceptance.
+* *Linter round-trip* (`Linter.Lower`) — pins that `{{#let a=1}}` lowers to
+  `{{#let (bind a 1)}}` and `{b=1 c=2}` lowers to `(dict b=1 c=2)`. One canonical RawBars
+  form per construct — no AST drift, no two-way sugar.
+
+### Linter
+
+* New hint *`prefer-let-over-with-as`* (MaxBars only): suggest `{{#let n=x}}…{{/let}}` when the
+  body of a `{{#with x as |n|}}…{{/with}}` never uses bare names — the exact case where the
+  forms are equivalent. *Soundness boundary:* the scope-chain rule (§1) means a partial invoked in the
+  body inherits the re-rooted context and may consume bare names *invisibly* — and a host-supplied
+  partial cannot be analysed at all. So the hint fires *only when the body invokes no partial*
+  (`{{> …}}`, `{{#> …}}`, `{{yield}}`); a body that calls a partial is left alone
+  rather than risk a rewrite that changes rendering. The genuine `with` use-cases (re-root with no
+  alias, or re-root + alias with a bare-name body) are untouched.
+
+### Editor tooling (ADR-017 contract)
+
+The token vocabulary gains two new tag-body tokens, scoped to the MaxBars grammar variant: `{` and `}`
+(the dict literal's delimiters). The LSP semantic-token emitter, the TextMate fallback grammar, and the
+VS Code / JetBrains extension grammars each receive a one-time update; the *contract source*
+([ADR-017](/adr/adr-0017-editor-support-lsp/) token-vocabulary.json) is the single edit point. (ADR-025
+adds the `[`/`]` tokens, including the `[` dual-context disambiguation.)
+
+### Documentation
+
+* `maxbars.adoc` gains a `Let` section and a `Dict literal` section.
+* `rawbars.adoc` adds one paragraph: the explicit `(bind …)` form is the desugared canonical;
+  surface sugar lives in MaxBars.
+* `fullbars.adoc` is *not* modified. The existing convention rule in `tutorials/src/fullbars.mjs`
+  (*"No MaxBars operators"*) gains a parallel line: *"No MaxBars block-scoped bindings, no MaxBars dict
+  literals."*
+
+### Non-goals (deliberately deferred)
+
+* *File-level front matter* (template-scoped data via a `---` YAML header). A host-layer concern (see
+  the front-matter debate notes); `let` is the engine-side, lexically-scoped answer. If a front-matter
+  adapter ships later it should *desugar at the host* into a top-level `let` — keeping one canonical
+  binding mechanism.
+* *Dropping `{{#with}}`* in MaxBars/RawBars. Considered and rejected — the carve-out cost exceeds the
+  gain, and the philosophical objection (`with` re-roots ⇒ "hidden variable") already coexists with
+  `{{#each}}`'s identical re-rooting. The linter hint covers the cases where `let` would actually
+  read more clearly.
+
+## Resolved during review
+
+The team review of 2026-06-04 closed the questions that were previously left open or mis-scoped:
+
+* *The list literal was split out to [ADR-025](/adr/adr-0025-list-literal/).* It alone needs a new
+  `list` constructor in the *shared* prelude (the prelude has no list constructor today), so it carries a
+  catalog + conformance blast radius that `let` and the dict literal do not. Keeping them in one ADR
+  conflated "pure MaxBars surface" with "shared-prelude change"; the split makes each decision honest and
+  lets `let` + dict ship first.
+* *Kernel primitive: a dedicated `Let [(name, expr)] body` AST node*, not a sugar that lowers to a chain
+  of single-binding scope-frame ops. The runtime behaviour is identical, but the `Linter.Lower`
+  round-trip is a *stated gate* (see *Consequences*), and it cannot be specified without fixing the
+  canonical form: a dedicated node round-trips one-to-one, whereas the sugar-chain lowers
+  `{{#let a=1 b=2}}` to *nested* `(bind)` blocks — two-way drift, the exact failure the gate
+  exists to prevent. So the node is the canonical form.
+* *Binding semantics are sequential* (§1), not parallel-in-the-enclosing-scope. The dedicated node makes
+  forward reference (`b` sees `a`) free, and it matches every author's mental model of `let` while
+  staying a single total walk.

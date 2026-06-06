@@ -1,0 +1,103 @@
+---
+title: ADR-028 — Full LSP intelligence in hybrid host+FlatBars templates
+---
+
+## Context
+
+[ADR-017](/adr/adr-0017-editor-support-lsp/) amended on 2026-06-04 added an
+injection grammar (`editors/flatbars-injection.tmLanguage.json`) so a hybrid
+file like `test.java.xbars` — opened as `java` via `files.associations` —
+gets Java syntax highlighting from the host grammar AND FlatBars tag
+highlighting layered on top via the injection. Hybrid templates work for
+*syntax highlighting* immediately, with zero per-file setup beyond the file
+association.
+
+What hybrid templates do NOT get is LSP intelligence on the FlatBars regions:
+the LSP attaches to the *host* language (Java's LSP), not to FlatBars. Hover,
+completion, diagnostics, the canonicalisation quick-fix, the new
+documentSymbol / foldingRange / formatting capabilities — none of these fire
+on `{{ … }}` tags in a hybrid file.
+
+The path forward is VS Code's `vscode.languages.registerEmbeddedLanguageInfoProvider`
+API (introduced 1.86) plus an `EmbeddedDocumentProvider` style scheme: extract
+the embedded FlatBars regions into a synthetic virtual document, forward LSP
+requests across the two languages, and map positions back through the
+extraction. This record proposes the design.
+
+## Decision
+
+The VS Code extension adds an `EmbeddedLanguageInfoProvider` for every host
+language listed in `editors/flatbars-injection.tmLanguage.json` `injectTo`
+(currently 26 hosts). For each FlatBars region in a hybrid file the provider
+exposes a *virtual document* the FlatBars LSP attaches to; the extension
+shims LSP requests between the user's editor (which targets the physical
+file) and the LSP (which sees the virtual file).
+
+Concretely:
+
+* **Region extraction.** A new helper in `editors/vscode/src/embedded.js`
+  scans the physical document for `{{ … }}` runs (the same regex the
+  injection grammar uses, in a JS port to keep them in lock-step). For each
+  run it records `(physicalRange, virtualOffset)`.
+* **Virtual document.** The hybrid document is reflected at a `flatbars-embedded:`
+  URI; its content is ` `-padded host text with the FlatBars tags spliced
+  in at their original offsets so column numbers match the physical document
+  exactly. The padding glyph is a non-breaking space that the FlatBars
+  tokenizer treats as content (never a tag).
+* **Request forwarding.** The extension intercepts every LSP request on the
+  physical document whose position falls inside an extracted region and
+  re-issues it against the virtual URI, then translates result ranges back.
+  Capabilities forwarded: hover, completion, codeAction, foldingRange,
+  documentSymbol, formatting. Diagnostics flow the other way — the LSP
+  publishes onto the virtual URI and the extension forwards them onto the
+  physical URI with translated ranges.
+* **Capability gating.** Requests whose position falls OUTSIDE every region
+  pass through to the host language unchanged. This is what makes "Java
+  intelligence on Java code, FlatBars intelligence on `{{ … }}` tags"
+  work simultaneously in one buffer.
+
+JetBrains follow-up: IntelliJ has an analogous concept (the LSP customization
+hook plus the `MultiHostLanguage` API). Wiring it is a separate ticket
+because the JetBrains Marketplace plugin currently consumes the LSP through
+the platform's stock client, which does not expose the multi-host hook.
+
+## Phased plan
+
+. **Phase 1 — extraction + virtual document.** Land `embedded.js` with a
+  unit test exercising every host's region extraction. No LSP wiring.
+. **Phase 2 — hover + diagnostics on virtual.** Wire the smallest pair to
+  prove the round-trip; gate behind a `flatbars.experimental.hybridLsp`
+  setting until the rough edges shake out.
+. **Phase 3 — completion + codeAction.** Adds the request types that mutate
+  the document (codeAction's `WorkspaceEdit` needs physical-URI ranges).
+. **Phase 4 — foldingRange + documentSymbol + formatting.** Same wiring as
+  Phase 3; documentSymbol's nested children need physical ranges.
+. **Phase 5 — drop the experimental gate.** Flip the default; document in
+  the editor README.
+
+Tests per phase: hybrid fixture corpus under `editors/vscode/test/embedded/`,
+one per host language, asserting position mapping in both directions
+(physical → virtual and virtual → physical).
+
+## Consequences
+
+* Unlocks every LSP capability inside hybrid templates without changing the
+  injection grammar or the LSP server. The complexity is purely
+  client-side wiring.
+* Performance: a hybrid file holds two LSP sessions simultaneously. The
+  virtual-document representation should be ephemeral (live in extension
+  memory, not the workspace) to keep watchers and indexers from doubling.
+* The padding strategy means line numbers in the virtual document always
+  match the physical document, which the LSP can stay oblivious to —
+  position translation is identity on column except across newlines. We
+  accept the small wasted bytes (` ` per host character) as the price
+  of zero column-math edge cases.
+* JetBrains side stays syntax-only until the multi-host hook ships there or
+  we add a custom integration. Communicate this in the JetBrains README so
+  Ultimate users aren't surprised.
+
+## Status
+
+Proposed 2026-06-04. Implementation gated on
+`vscode.languages.registerEmbeddedLanguageInfoProvider` (1.86+) and a small
+client-side region extractor; no engine or LSP server changes are required.

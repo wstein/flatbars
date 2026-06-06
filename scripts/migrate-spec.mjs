@@ -109,6 +109,90 @@ function substituteAttributes(line) {
   );
 }
 
+// ── Tables ───────────────────────────────────────────────────────────────────
+// Split a line on top-level `|`, respecting inline code spans (a `|` inside
+// backticks — e.g. the `|>` pipe operator — does not split) and escaped `\|`.
+// Returns every segment, including the one before the first `|` (which a table
+// continuation line appends to the previous cell).
+function topLevelSplit(line) {
+  const segs = [];
+  let buf = "";
+  let inCode = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === "`") {
+      inCode = !inCode;
+      buf += ch;
+    } else if (ch === "\\" && line[i + 1] === "|") {
+      buf += "|";
+      i++;
+    } else if (ch === "|" && !inCode) {
+      segs.push(buf);
+      buf = "";
+    } else {
+      buf += ch;
+    }
+  }
+  segs.push(buf);
+  return segs;
+}
+
+// One AsciiDoc table line → its cells (the leading pre-`|` segment dropped).
+export function splitCells(line) {
+  const segs = topLevelSplit(line).map((c) => c.trim());
+  if (segs.length && segs[0] === "") segs.shift();
+  return segs;
+}
+
+// Parse an AsciiDoc table (`|===` … `|===`) starting at `start` (the opening
+// delimiter) into a GitHub-flavoured Markdown table. `cols` is the column count
+// from a `[cols=…]` attribute (or null → inferred from the first row); `header`
+// is whether the first row is a header row.
+function parseTable(lines, start, cols, header, warnings) {
+  let i = start + 1;
+  const cells = [];
+  let firstRowCount = 0;
+  while (i < lines.length && lines[i].trim() !== "|===") {
+    const line = lines[i];
+    if (line.trim() === "") {
+      i++;
+      continue;
+    }
+    const segs = topLevelSplit(line).map((s) => s.trim());
+    if (/^\s*\|/.test(line)) {
+      const row = segs.slice(1); // drop the empty pre-`|` segment
+      if (firstRowCount === 0) firstRowCount = row.length;
+      for (const c of row) cells.push(c);
+    } else {
+      // Continuation: the pre-`|` text extends the previous cell; any further
+      // segments on the line are new cells.
+      if (cells.length && segs[0] !== "") cells[cells.length - 1] += " " + segs[0];
+      for (const c of segs.slice(1)) cells.push(c);
+    }
+    i++;
+  }
+  const next = i + 1; // past the closing |===
+  const colCount = cols || firstRowCount || 1;
+  if (cells.length % colCount !== 0) {
+    warnings.push(`table cell count ${cells.length} not a multiple of ${colCount} columns`);
+  }
+  const cell = (t) => pipeEscape(finishInline(t, warnings));
+  const rows = [];
+  for (let k = 0; k < cells.length; k += colCount) rows.push(cells.slice(k, k + colCount));
+  const head = header && rows.length ? rows.shift() : new Array(colCount).fill("");
+  const linesOut = [
+    "| " + head.map(cell).join(" | ") + " |",
+    "| " + new Array(colCount).fill("---").join(" | ") + " |",
+    ...rows.map((r) => "| " + r.map(cell).join(" | ") + " |"),
+  ];
+  return { gfm: linesOut.join("\n"), next };
+}
+
+// A `|` inside a Markdown table cell must be escaped or it splits the column.
+function pipeEscape(s) {
+  return s.replace(/\|/g, "\\|");
+}
+
 // ── Main transform ───────────────────────────────────────────────────────────
 export function convert(adoc) {
   const lines = adoc.replace(/\r\n/g, "\n").split("\n");
@@ -118,6 +202,7 @@ export function convert(adoc) {
 
   let i = 0;
   let inFence = false; // inside a converted ``` code fence
+  let needsCatalog = false; // page includes the generated helper-catalog partial
 
   const isAdmoLabel = (l) => {
     const m = l.match(/^\[(NOTE|TIP|IMPORTANT|CAUTION|WARNING)\]$/);
@@ -161,6 +246,20 @@ export function convert(adoc) {
       continue;
     }
 
+    // The one include directive in the corpus: the generated helper catalog. The
+    // driver injects the import; here we drop in the component where it appeared.
+    if (/^include::partial\$helper-catalog\.adoc\[\]$/.test(line)) {
+      needsCatalog = true;
+      out.push("<HelperCatalog />");
+      i++;
+      continue;
+    }
+    if (/^include::/.test(line)) {
+      warnings.push(`unhandled include: ${line}`);
+      i++;
+      continue;
+    }
+
     // Source block: `[source,lang]` then `----`. Open a fenced block with lang.
     const src = line.match(/^\[source(?:,\s*([a-zA-Z0-9_-]+))?\]$/);
     if (src && (lines[i + 1] === "----" || lines[i + 1] === "....")) {
@@ -177,6 +276,24 @@ export function convert(adoc) {
       continue;
     }
 
+    // Table: an optional `[cols=…,options="header"]` then `|===` … `|===`.
+    const tableAttr = line.match(/^\[(cols=|%|\.)[^\]]*\]$/);
+    if (tableAttr && (lines[i + 1] || "").trim() === "|===") {
+      const colsM = line.match(/cols="([^"]+)"/);
+      const colCount = colsM ? colsM[1].split(",").length : null;
+      const header = /header/.test(line);
+      const t = parseTable(lines, i + 1, colCount, header, warnings);
+      out.push(t.gfm);
+      i = t.next;
+      continue;
+    }
+    if (line.trim() === "|===") {
+      const t = parseTable(lines, i, null, false, warnings);
+      out.push(t.gfm);
+      i = t.next;
+      continue;
+    }
+
     // Headings: `==`..`====` → `##`..`####`, honouring a preceding `[#id]`/`[[id]]`.
     let anchor = null;
     const anchorM = line.match(/^\[(?:#|\[)([a-zA-Z0-9-_]+)\]?\]?$/);
@@ -188,8 +305,15 @@ export function convert(adoc) {
     const h = line.match(/^(={2,5}) (.+)$/);
     if (h) {
       const level = h[1].length; // 2..5 → ##..#####
-      let text = finishInline(h[2], warnings);
-      out.push("#".repeat(level) + " " + text + (anchor ? ` {#${anchor}}` : ""));
+      const text = finishInline(h[2], warnings);
+      // MDX rejects `{#id}` heading syntax (`{` starts an expression), so an
+      // explicit AsciiDoc anchor becomes a raw anchor element before the heading;
+      // the heading itself stays pure markdown and Starlight auto-slugs it.
+      if (anchor) {
+        out.push(`<a id="${anchor}"></a>`);
+        out.push("");
+      }
+      out.push("#".repeat(level) + " " + text);
       i++;
       continue;
     }
@@ -228,6 +352,16 @@ export function convert(adoc) {
       continue;
     }
 
+    // Unhandled block-attribute line ([.lead], [horizontal], [plantuml,…]): drop
+    // the directive (its block, if any, falls through as a plain fence/paragraph).
+    if (/^\[[^\]]+\]$/.test(line)) {
+      if (/^\[plantuml/.test(line)) {
+        warnings.push("plantuml block dropped to a code fence — convert to Mermaid (ADR-031 follow-up)");
+      }
+      i++;
+      continue;
+    }
+
     // Ordinary body line.
     out.push(finishInline(line, warnings));
     i++;
@@ -235,7 +369,7 @@ export function convert(adoc) {
 
   const frontmatter = renderFrontmatter(fm);
   const body = out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
-  return { frontmatter, body, warnings };
+  return { frontmatter, body, warnings, needsCatalog };
 }
 
 // A body line inside a delimited admonition may itself open a fence; keep the
@@ -252,10 +386,26 @@ function convertBodyLine(line, warnings) {
 function finishInline(line, warnings) {
   let s = line.replace(/\\\{/g, "{");
   s = convertXrefs(s, warnings);
+  s = convertInternalRefs(s);
   s = substituteAttributes(s);
   s = unwrapPass(s);
   s = escapeProseMdx(s);
+  s = convertInlineAnchors(s); // last: emits raw <a> that must survive escaping
   return s;
+}
+
+// AsciiDoc inline anchor `[[id]]` → a raw anchor element (`<a id>` is a valid
+// fragment target the link validator accepts). Run after MDX escaping so the
+// emitted `<a>` is not turned into `&lt;a>`.
+export function convertInlineAnchors(s) {
+  return s.replace(/\[\[([a-zA-Z][a-zA-Z0-9-_]*)\]\]/g, '<a id="$1"></a>');
+}
+
+// AsciiDoc same-page cross-reference shorthand `<<id>>` / `<<id,text>>` → a
+// markdown anchor link. Run before MDX escaping so the `<<` is not turned into
+// `&lt;&lt;`.
+export function convertInternalRefs(s) {
+  return s.replace(/<<([a-z][a-z0-9-]*)(?:,([^>]+))?>>/g, (_, id, text) => `[${text || id}](#${id})`);
 }
 
 // AsciiDoc `pass:[…]` (and `pass:c[…]`) render their content verbatim — the

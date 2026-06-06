@@ -1,0 +1,61 @@
+---
+title: "4. Validation & errors"
+---
+
+Errors fall in two phases. *Structural* errors come from the core parser: the bytes are not a
+well-formed skeleton. *Validation* errors come from the engine walk: the skeleton is well-formed but
+violates the engine's schema (an unknown helper, a bad arity, an illegal clause). The split mirrors
+"is this valid JSON?" versus "does this JSON satisfy the schema?".
+
+## 4.1 Structural (parse) errors — raised by the core
+
+| Error | Cause |
+| --- | --- |
+| `UnterminatedTag` | an opener with no matching closer before end of input |
+| `UnterminatedComment` | `{{!--` with no `--}}` |
+| `UnterminatedRaw` | `{{{{#name}}}}` with no `{{{{/name}}}}` |
+| `MismatchedBlock` | `{{/a}}` closing a `{{#b}}` |
+| `HeadNotIdent` | a group or literal in *head* position — a block/close/separator head must be an `Ident` (e.g. `{{#42}}`). A bare literal in *output* position, `{{42}}`, is allowed (it emits like `{{{42}}}`). |
+| `EmptyOutput` | `{{{}}}` with no expression |
+| `BadEscape` | an invalid string escape inside a `STRING` |
+
+Note what is *absent*: there is no `MultipleElse` or `ElseOutsideBlock`, because the core has no
+`else`. `{{else}}…` is just a block; if it appears where the engine does not expect
+a clause, that is a *validation* error (4.2), not a parse error. Every structural error carries a
+source offset (`parseErrorOffset`) pointing at the offending tag — an unclosed/mismatched block
+points at its *opener*. Given the source, `parseErrorAt src pe` returns the 1-based
+`{ line, column, offset, message }` (via `Span.lineColumn`), and `renderParseErrorAt src pe` formats
+it as `line:column: message` for a host to print.
+
+## 4.2 Validation errors — raised by the engine walk
+
+| Error | Cause |
+| --- | --- |
+| `UnknownHelper name` | `name` is not defined in any helper frame |
+| `ArityError` | a helper received the wrong number of arguments |
+| `TypeError` | a helper received an argument of the wrong shape |
+| `ClauseError` | a block contains a separator the helper does not accept, or in an illegal order |
+| `HelperError` | any other failure a helper chooses to raise |
+
+These are the engine's "schema" being enforced. A conforming engine MAY run this validation as a
+*separate up-front pass* over the whole `Template` (rejecting a template before any output, the way
+a schema validator rejects a document) or *lazily* during rendering. The reference engine, *FullBars*, validates
+lazily; a stricter engine can fold the same checks into a visitor that walks the AST once and
+reports every violation with its source span.
+
+:::note
+There is no "missing variable" error, because there are no variables. Reading an absent *data field*
+(`{{{lookup this "nope"}}}`) is *not* an error in the reference engine — `lookup` returns
+`VNull`, which stringifies to the empty string, matching Handlebars. A strict engine may install a
+`lookup` that raises instead ([A.9](/appendix/handlebars/#options)).
+:::
+
+## 4.3 Diagnostics quality
+
+Because validation is a walk over the AST, an engine SHOULD attach the originating node's source span
+to every diagnostic, so `UnknownHelper "uppcase"` points at the typo rather than at the document. The
+spans are available: every tag-level node carries one, and during rendering the control handle
+exposes it as `ctl.span` ([evaluation](/spec/evaluation/) §3.6) — so a helper that raises `HelperError` can
+quote `spanText`/`lineColumn` of the very tag it was called from. Implementing Phase 2 as an explicit
+visitor (rather than inlined into rendering) makes this — and whole-template linting —
+straightforward.

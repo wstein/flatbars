@@ -1,0 +1,88 @@
+---
+title: "ADR-023: One recovering parser; fail-fast `parse` is its projection"
+sidebar:
+  label: ADR-023 Recovering parser
+---
+
+*Status:* Accepted; *implemented*. *Date:* 2026-06-03. Builds on
+[ADR-001](/adr/adr-0001-structural-parser-and-walker/) (one structural parser) and unblocks the
+editor diagnostics deferred by [ADR-017](/adr/adr-0017-editor-support-lsp/).
+
+## Context
+
+ADR-017 shipped engine-backed *highlighting*, but left editor *diagnostics* (the red squiggle for a
+malformed tag) deferred behind a "recovering parser" it called a prerequisite. The naïve reading is that
+an IDE needs a second, error-tolerant parser alongside the engine's total, fail-fast `parse`. That is the
+exact *drift trap* this project fights everywhere else (ADR-001/014): two definitions of the grammar that
+must be kept in lock-step, and an IDE that can disagree with the compiler about what is even valid.
+
+The core also distinguishes a *fail-fast* contract the compiler genuinely needs — you cannot codegen a
+syntactically invalid template, so `parse` must be total and reject bad input — from the *implementation*
+that delivers it. The question is whether fail-fast must be dropped, kept as a second engine, or
+re-expressed.
+
+A template language makes recovery unusually tractable: the lexer (`tokenizeTemplate`) already delimits
+tags into a flat `RawTok` stream, so *tag boundaries are natural synchronization points*. An error in one
+tag's interior need not blank the rest of the document.
+
+## Decision
+
+. *There is ONE parser, and it recovers.* `parseSeq` (the tree builder over the `RawTok` stream) no
+  longer returns `Either`: it always produces a best-effort tree plus *every* error in source order. The
+  recovery is local and bounded, anchored at tag boundaries:
++
+--
+* a tag with a bad interior drops a `NodeError Span String` marker and the scan continues;
+* a *block* opener with a salvageable head (a leading identifier — `{{#if a == 1}}` yields name
+  `if` even though the args won't parse) still nests, so its body and close parse and only the bad args
+  are flagged — no cascade of spurious errors;
+* a missing or mismatched `{{/x}}` builds the block anyway and records the mismatch; a stray
+  top-level close is reported and recovered past.
+--
+
+. *Fail-fast is kept, but re-expressed as a PROJECTION over the recovering parser — not dropped, not a
+  second engine.* `parse` / `parseWith` run `parseRecovering` and return `Right tree` iff no error was
+  recovered, else `Left` the first error in source order — byte-for-byte the result the total parser
+  always gave. The compiler/render path keeps its total, fail-fast contract; it simply gets the verdict
+  from the one parser. Editor tooling calls `parseRecovering` directly. *One grammar, two views — drift
+  is impossible by construction*, which is ADR-001's principle, now fulfilled more truly (a fail-fast-only
+  parser is exactly what would have forced a second one).
++
+The cost on a *valid* template is zero: recovery only triggers on an error, and on the error path the
+compiler rejects the file anyway, so the extra work is never wasted on output.
+
+. *`NodeError` is a first-class AST node.* It carries the offending span and a message and appears *only*
+  in a `parseRecovering` tree. Because `parse` projects any recovered error to `Left`, the render /
+  compile / lower / desugar paths never receive one; each consumer's `NodeError` arm is a total,
+  unreachable-in-practice neutral (the foldTemplate algebra gained a `nodeError` case). Tooling folds
+  (diagnostics, pretty-print) handle it meaningfully. We chose an in-tree node over a sidecar error list
+  so a later phase (hover, selection ranges) can attach to the error's position in the tree.
+
+. *Diagnostics are derived, not heuristic.* `flatbars-js` exposes `diagnostics(template, dialect)` —
+  `parseRecovering` with that dialect's `ParseOptions`, each error located via `parseErrorAt`. The same
+  dialect seam that makes `==` an operator in MaxBars makes `{{#if a == 1}}` an error in every
+  other surface — so the editor flags exactly what the dialect rejects. `flatbars-lsp` publishes these as
+  `textDocument/publishDiagnostics` on open and every edit.
+
+## Consequences
+
+* Editor diagnostics work, four dialects, with no second parser and no change to the fail-fast contract.
+  ADR-017's "recovering parser (prerequisite)" open question is resolved by this record.
+* `parse`/`parseWith` stay byte-compatible — every spago suite passes and `test:compile` is 296/296
+  (compiled ≡ interpreter). The recovering behaviour has its own tests (`parseRecovering`).
+* `NodeError` widens the `Node` sum, so every match on it is total by construction; a new consumer of the
+  skeleton AST must add a `nodeError` arm (a one-line neutral unless it is tooling).
+* *Deferred, not blocked:* richer recovery for an unsalvageable block head (currently a `NodeError` plus a
+  flat tail), and hover/completion built on the in-tree error nodes. Diagnostic *ranges* currently cover
+  the offending tag (start → its `}}`); finer spans can come from `NodeError`'s span when needed.
+
+## Amendment (2026-06-04): recovery over pre-lexed interiors
+
+`headedRecovering`/`salvageName` now consume each tag's *pre-lexed* interior,
+carried on the `RawTok` itself and populated by `tokenizeTemplate`
+([ADR-004](/adr/adr-0004-token-lexer-and-grammar-seams/) amendment), instead of
+re-lexing it. Per-tag recovery is preserved precisely because that interior is the
+*deferred* `Either ParseError (Array PosToken)`: a malformed interior is a `Left`
+that rides inside its own tag and is handled exactly where `tokenizeInterior` used
+to fail, so one bad tag never breaks the structural scan or the rest of the
+document. Behaviour is unchanged (`parseRecovering` tests + `test:compile` 300/300).

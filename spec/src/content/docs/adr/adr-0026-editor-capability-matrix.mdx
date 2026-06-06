@@ -1,0 +1,75 @@
+---
+title: ADR-026 — Editor capability matrix
+---
+
+## Context
+
+ADR-017 set the two-layer model — TextMate grammar (the floor) plus
+`flatbars-lsp` semantic tokens (the ceiling) — and shipped the minimum LSP
+surface needed to demonstrate it: `semanticTokens/full`, `publishDiagnostics`,
+`textDocument/hover`, `textDocument/completion`, and a `codeAction`
+canonicalisation quick-fix.
+
+The June 2026 editor-plugin review surfaced a follow-up question: what is the
+*complete* set of LSP capabilities the editors advertise, and which IDE-native
+features (Find Usages, Rename, Reformat, Structure View, Folding, Breadcrumbs,
+Go to Definition) is the plugin expected to provide? The platform LSP client in
+JetBrains does not auto-wire most of those; the server must both advertise the
+capability and the editor side must opt in.
+
+This ADR fixes the matrix.
+
+## Decision
+
+The editors ship the following LSP capabilities, gated on what the engine can
+honestly compute from a *single* template document (the FlatBars engine does
+not maintain a cross-template scope graph, by design — partials are looked up
+by name in a host-supplied registry, see ADR-003):
+
+|  |  |  |
+| --- | --- | --- |
+| Capability | Status | Source |
+| `semanticTokens/full` | Ship | ADR-017 — engine `tokenize` + vocab-driven legend. The legend is augmented with one *custom* semantic-token type — `embeddedDelimiter` — declared in `editors/token-vocabulary.json` under `customSemanticTypes` and codegenned into the VS Code manifest's `contributes.semanticTokenTypes` + `semanticTokenScopes` so the LSP-emitted brace pair under a switched delimiter (`{{=<% %>=}}` → subsequent `<% … %>`) themes identically to the grammar's `punctuation.section.embedded.flatbars` floor without per-theme work. `check:vocab` enforces parity between the kind's `lsp.type` and the custom-type declaration. |
+| `publishDiagnostics` | Ship | ADR-023 — recovering parser → `NodeError` ranges. The LSP layers a second diagnostic source on top — `dialectDiagnostics` in `editors/lsp/src/tokens.mjs` — a small finder array that flags surface constructs the *engine* accepts but the *dialect* does not (e.g. set-delim outside MinBars, MaxBars `??` in any other dialect, subexpressions / block params / partial-hash-args / helper invocations in MinBars). Each finder produces an actionable, dialect-named message instead of leaving the user with an opaque parse failure. The rule inventory is pinned by `check:dialect-diagnostics` so refactoring the finders array cannot silently drop a rule. |
+| `textDocument/hover` | Ship | `operations.json` derived from `FullBars.preludeSchema`. |
+| `textDocument/completion` | Ship | Same source as hover, gated on `inTagContext`. |
+| `textDocument/codeAction` | Ship | Canonicalisation rewrites (`index` → `index0`, `partial-block` → `yield`). |
+| `textDocument/foldingRange` | Ship (new) | Every block-open / block-close pair is a fold region; raw-block regions fold. Single-document, structurally trivial from the engine tokens. |
+| `textDocument/documentSymbol` | Ship (new) | The block nesting hierarchy projected as a symbol tree — feeds IntelliJ Structure View and VS Code outline. |
+| `textDocument/formatting` | Ship (new) | Canonical-spacing inside `{{ … }}` (one space after the opener, one before the closer, normalised internal whitespace). Single-document, deterministic. |
+| Bold tag emphasis ("isle in the ocean") | Ship (new) | The whole tag — braces + interior — renders bold. VS Code: vocab-driven `configurationDefaults` (overridable), bold on every theme + injected hosts. JetBrains: bold on the LSP ceiling only (`lspCustomization` semantic-token attributes); the TextMate floor stays theme-controlled (no plugin hook to force a scope's font weight) — the same Ultimate-vs-Community asymmetry as LSP. |
+| `textDocument/definition` | Do not ship | Would require a cross-template scope graph (which partial defines which identifier, where a `{{> partial}}` resolves). FlatBars uses a runtime partial registry the engine never indexes; building an editor-time index duplicates the host's data and would drift. Out of scope for the editor. |
+| `textDocument/references` | Do not ship | Same reason as definition: no global identifier graph. |
+| `textDocument/rename` | Do not ship | Same reason; refactoring partial names would have to coordinate with the host application's partial registry. |
+| `textDocument/documentHighlight` | Do not ship | Without a scope graph, single-buffer "highlight uses of `name`" devolves to string search — strictly worse than the editor's built-in word highlight. |
+
+The "do not ship" decisions are *principled*, not deferred: the engine model
+deliberately keeps partials and helpers as host-registry lookups, so the
+editor has no honest source of truth for those refactorings. Documenting that
+here turns the absence into a feature.
+
+## Consequences
+
+* **VS Code**: All "ship" capabilities surface through `vscode-languageclient`
+  with no additional wiring — VS Code consumes advertised server capabilities
+  automatically.
+* **JetBrains**: The platform LSP client auto-consumes hover/completion/
+  diagnostics/codeAction. The new capabilities (`foldingRange`,
+  `documentSymbol`, `formatting`) require an `LspCustomization` opt-in or the
+  corresponding `Lsp4j*` extension in the descriptor; ADR-017's editor-side
+  amendment tracks the JetBrains-specific wiring as a maintenance item.
+* **Verifier**: `check:operations-paint` (added alongside this ADR) keeps the
+  catalog / painter parity honest, so the helper-name highlighting stays
+  trustworthy even as the prelude grows.
+* **Future**: Adding a cross-template scope graph would unlock `definition`,
+  `references`, `rename`, and `documentHighlight`. Designed in
+  [ADR-027](/adr/adr-0027-cross-template-scope-graph/) as an editor-side
+  workspace indexer over the engine's `tokenize`, no language-level changes
+  needed. Adding full LSP intelligence inside hybrid host+FlatBars templates
+  (`*.java.xbars` and friends) is designed in
+  [ADR-028](/adr/adr-0028-hybrid-template-lsp/) via VS Code's
+  `EmbeddedLanguageInfoProvider` API plus a virtual-document shim.
+
+## Status
+
+Accepted 2026-06-04. Effective immediately.

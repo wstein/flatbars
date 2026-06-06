@@ -1,0 +1,378 @@
+---
+title: "ADR-017: Editor support via an engine-backed LSP, with a mandatory TextMate fallback"
+sidebar:
+  label: ADR-017 Editor support (LSP + TextMate)
+---
+
+*Status:* Accepted; the highlighting foundation is *implemented*. *Date:* 2026-06-02. Builds on
+[ADR-014](/adr/adr-0014-highlighting-derives-from-lexer/) (highlighting derives from the lexer) and
+[ADR-001](/adr/adr-0001-structural-parser-and-walker/) (one structural parser); the stateful driver is
+[ADR-015](/adr/adr-0015-set-delimiters/) (set delimiters). This record extends "one grammar, derived
+downstream" from our own front-ends (the Lab, the tutorials) to *third-party editors* — VS Code and
+JetBrains — for production use.
+
+:::note
+*Implemented (semantic-token highlighting + diagnostics).* The token vocabulary, the
+engine-backed language server, the TextMate fallback, and both editor plugins
+landed; *diagnostics* followed via the recovering parser
+([ADR-023](/adr/adr-0023-recovering-parser/)). Only hover/completion and
+Marketplace publishing remain. What shipped:
+
+* `editors/token-vocabulary.json` — the single source of truth the three consumers
+  share (engine `tokenize` kinds, LSP legend, TextMate scopes).
+* `tokenize(template, dialect)` on the `flatbars-js` bundle — the tag-role *and*
+  interior-role (`string`/`number`/`operator`) token stream; `highlightSpans` is
+  now its tag-role projection. Gated by `check:highlight` (pins both views).
+* `editors/flatbars.tmLanguage.json` — the fallback: the well-known Handlebars
+  grammar re-identified as `source.flatbars` and extended for all four dialects
+  (inverse sections, Mustache inheritance, set delimiters, MaxBars operators),
+  keeping its standard scope names so themes colour FlatBars familiarly. Gated by
+  `check:tmgrammar` (per dialect: tag-boundary + literal agreement with the engine).
+* `editors/lsp` — `flatbars-lsp`, the semantic-tokens server (`test:lsp`).
+* `editors/vscode` — the extension bundling the client + grammar (`test:vscode`).
+* `editors/jetbrains` — the Gradle/Kotlin plugin: the TextMate grammar via a
+  `TextMateBundleProvider` (all IDEs), plus the LSP path on Ultimate (`-PwithLsp`;
+  the platform LSP API is Ultimate-only and absent from the open SDK, so the LSP
+  layer is an opt-in build). `test:jetbrains` is the offline gate.
+:::
+
+## Context
+
+Production use needs VS Code and JetBrains plugins with first-class DX. ADR-014 already decided that
+highlighting must derive from the engine lexer rather than a forked grammar, but it spoke to our
+in-process JS front-ends (the Lab's CodeMirror plugin, the tutorials' overlay). Real editors need a
+*delivery mechanism*, and that forces a sharper question than "which grammar format."
+
+The decisive constraint is that highlighting FlatBars is *stateful and content-dependent*:
+
+* *Set delimiters* (ADR-015): after `{{=<% %>=}}` every later tag uses the new pair until
+  `<%={{ }}=%>`. A correct highlighter must carry the *active delimiter pair* as state across the
+  document.
+* *Per-dialect grammar*: the `parseExpr` / `parseHead` seam and `LexOptions` make tag interiors and the
+  legal shape set differ across RawBars / FullBars / MaxBars / MinBars; the separator set that paints as
+  a statement is the parser's own `standaloneSeps` (empty for MinBars), never a fixed keyword list.
+* Raw blocks `{{{{ … }}}}`, long comments `{{!-- … --}}`, the inheritance sigils
+  `{{<}}` / `{{$}}`.
+
+Stateless mechanisms cannot express this. A *TextMate* grammar has a scope stack (begin/end) but no data
+state — it cannot capture "the delimiters are now `<% %>`" and use it later. A *tree-sitter* grammar is
+context-free for the same reason; its only escape hatch is a hand-written C *external scanner*, i.e. a
+second copy of the delimiter logic. So a grammar-format highlighter is *structurally incapable* of being
+correct for FlatBars, and — per ADR-014's Exhibits A & B and the tutorials' YAML `111` bug — any second
+definition of the grammar drifts from the engine.
+
+The engine lexer already implements the state (it threads `mustacheDelims`), is dialect-scoped, and is
+*already JavaScript* (the `flatbars-js` bundle the Lab and tutorials load). The way to highlight
+correctly in any editor is therefore to *run the engine lexer*, not to approximate it.
+
+## Decision
+
+. *Editor support derives from the engine; the authoritative highlighter is the engine lexer delivered
+  as LSP semantic tokens.* A single language server (`flatbars-lsp`, Node, embedding the `flatbars-js`
+  bundle and its `tokenize(template, dialect)` API — the interior-aware superset of ADR-014's
+  `highlightSpans`) computes positioned token kinds for the
+  document — stateful by construction, so set delimiters, dialects, raw blocks and separators are all
+  correct because there is no second grammar to be wrong. Both VS Code (semantic-tokens LSP client) and
+  JetBrains (LSP API, 2023.2+) consume *the same server*; one implementation, all editors. (The JetBrains
+  platform LSP API has historically been Ultimate-only; Community-edition IDEs do not attach the server
+  and see only the TextMate fallback below — which is exactly why that fallback is mandatory, not a reason
+  against the LSP.) The server is
+  also the substrate for the rest of DX — diagnostics from the recovering parser
+  ([ADR-023](/adr/adr-0023-recovering-parser/): ONE parser that recovers, of which the canonical
+  fail-fast `parse` is a projection — not a second engine), helper hover/completion from `preludeSchema`
+  and the catalog, and go-to-partial. Highlighting was the first feature on this substrate, needing *none*
+  of the recovering parser, so it shipped first; diagnostics followed once ADR-023 landed.
+
+. *A shared `flatbars.tmLanguage.json` is a mandatory, committed fallback — not optional.* Every plugin
+  ships it. The LSP is not always present or instant, and some contexts have *no* language server at
+  all, where the TextMate grammar is the only highlighting the user ever sees:
++
+--
+* first paint, before the server activates / attaches;
+* environments with no LSP: code review on GitHub/Gitea, diffs, `bat`/`less`/`cat` previews, marketplace
+  screenshots, documentation code blocks;
+* JetBrains' TextMate-bundle path for files before (or without) the plugin;
+* a degraded/crashed or still-starting server — DX must never fall to *no* colour.
+--
++
+Because those contexts are real and unavoidable, shipping the grammar is non-negotiable. We use the
+*well-known Handlebars TextMate grammar*, re-identified as `source.flatbars` and extended for all four
+dialects (inverse sections, Mustache inheritance `{{<}}`/`{{$}}`, set delimiters, and
+MaxBars operators), keeping its standard scope names (`keyword.control.*`, `support.function.*`,
+`string.quoted.*`, …) *on purpose* — themes already colour them, so FlatBars looks like the Handlebars
+developers know. It colours *only* the template syntax and a leading YAML front-matter block: a FlatBars
+template's output is not necessarily HTML (it may be JSON, SQL, Markdown, plain text), so the grammar's
+HTML/CSS/JS embedding is removed and host text is left plain. It is explicitly *best-effort and
+non-authoritative*: being stateless it cannot follow a
+set-delimiter *switch* (the tags past `{{=A B=}}`) and is FullBars-flavoured (it paints
+`else`/`each` as keywords even in MinBars, and paints RawBars/MaxBars's `extras`-off shapes as valid).
+When the LSP is attached, its semantic tokens are *sparse corrections*, not a blanket re-colour: because
+the floor is now a rich, familiar grammar, the LSP emits a token ONLY where it knows something the
+stateless grammar cannot — dialect-scoped interior operators/literals, set delimiters, and
+dialect-disallowed errors (the vocabulary's `lspEmitKinds`). The structural tags (interpolation, raw,
+blocks, partials, comments) are left to the grammar, so `{{{x}}}` keeps its braces-vs-name colour
+instead of being flattened to one whole-tag semantic token. The grammar is the floor; the engine is the
+ceiling *only where the engine knows more*.
+
+. *The fallback is a derived artifact and MUST be drift-bounded, like every other.* But it is *richer*
+  than the engine — it splits a tag into sigil / name / args / literals, where the engine paints one kind
+  per tag (ADR-014) — so a scope-to-kind bijection does not fit, and we do not force one. `check:tmgrammar`
+  instead pins, *for each dialect*, the two things the engine defines and a stateless grammar can be held
+  to: (a) *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
+  characters the grammar scopes as a tag (every tag scope ends in `.flatbars`; host text and the YAML
+  front-matter block never do), which catches the Exhibit-A/B begin/end drift across all four dialects; and
+  (b) *literals* — wherever the engine carves a `string`/`number`, the grammar scopes it as one. Everything
+  else (which helper is a keyword, argument and operator colouring) is allowed *enrichment*. Dialect-error
+  shapes and set-delimiter switches are out of scope (the LSP owns them). The gate is wired into `npm
+  test`; ADR-014's stopgap was *time-boxed*, but this fallback is *permanent* (it serves the no-LSP
+  contexts forever), so its gate is permanent too. The token vocabulary (`editors/token-vocabulary.json`)
+  is still the one place the kinds, the LSP legend, and the grammar's literal scopes are defined together.
+
+. *Reject tree-sitter as the FlatBars parser/highlighter.* A tree-sitter grammar is a second source of
+  truth (the drift ADR-001 and ADR-014 exist to prevent); it cannot track the dialect seam without N
+  grammars; its statefulness requires a hand-written C external scanner duplicating set-delimiter logic;
+  and it is not JetBrains' highlighting path, so it would not unify editors. If Zed / Neovim / GitHub
+  tree-sitter highlighting later becomes a goal, a tree-sitter grammar may be added as *another
+  non-authoritative fallback* under the same drift gate — never as the engine's parser.
+
+. *Reject native per-editor lexers* (a JFlex/Kotlin lexer for JetBrains plus a separate VS Code
+  tokenizer). That is two more grammar copies, maximal drift, and double maintenance — the opposite of
+  one source of truth, for no benefit the LSP does not already give.
+
+## Consequences
+
+* One server, two (and more) plugins. The `flatbars-js` bundle runs inside `flatbars-lsp`; the existing
+  `check:bundle` gate keeps the editor's engine from going stale against the PureScript source.
+* The highlighting *layering* — TextMate first-paint, then semantic tokens as authority — is the standard
+  industry pattern (TypeScript, rust-analyzer). At template sizes the semantic round-trip is
+  imperceptible.
+* *Two highlighting representations exist by design* (the engine and the TextMate fallback). Unlike the
+  drift ADR-014 fought, the authority is unambiguous (the engine always wins where it runs), and the
+  fallback is gated, scoped to default delimiters, and labelled — *bounded* drift, not silent drift.
+* The in-process front-ends keep painting from `highlightSpans` (the tag-role projection, ADR-014, one
+  colour per tag); the richer interior axis lives only in `tokenize`, which the editor layer consumes. The
+  TextMate grammar is for *external / no-LSP* contexts, not for our own front-ends.
+* Set-delimiter and MaxBars-operator regions are *knowingly* approximate without a server — documented,
+  and corrected the instant one attaches. That is the honest limit of any stateless fallback, and the
+  reason the fallback is a floor rather than the design.
+
+## Resolved
+
+* *Token vocabulary (resolved — implemented).* The stable kind set (tag-role × interior-role) is
+  `editors/token-vocabulary.json`, the single contract the three consumers share. `highlightSpans` still
+  emits only the tag-role kinds — each tag painted once, by the meaning of its head (ADR-014) — and the
+  interior-role axis (`operator` / `string` / `number`) is carved by the superset `tokenize`, recovered
+  from `FlatBars.Token.PosToken`'s `end` offset exactly as anticipated. The *operation*-kind axis
+  (value / inline / block / operator) it pairs with is owned by
+  [ADR-019](/adr/adr-0019-operation-vocabulary/); completion labels (when they land) should reference
+  that taxonomy rather than coin their own.
+* *Grammar provenance (resolved — adopt the Handlebars grammar + conformance gate).* The fallback is the
+  established Handlebars TextMate grammar, re-identified as `source.flatbars` and extended for the four
+  dialects, kept honest by `check:tmgrammar` (see Decision 3). This was chosen over both a from-scratch
+  hand-authored grammar and generation from token boundaries: reusing the grammar developers' themes
+  already target is what makes FlatBars *look familiar*, which is the fallback's whole job.
+* *Recovering parser (resolved — implemented, [ADR-023](/adr/adr-0023-recovering-parser/)).* The
+  diagnostics layer's prerequisite turned out NOT to be a second parser: there is one recovering parser,
+  and the total fail-fast `parse` is its projection. Diagnostics ship from it (`diagnostics(template,
+  dialect)` → `publishDiagnostics`); hover/completion remain the open follow-on.
+
+## Open questions
+
+* *Incremental semantic tokens.* Whole-document retokenization is fine at current sizes; add range
+  requests / deltas only if a profile shows it (ties to the deferred incremental-parse trigger noted in
+  the parser review).
+* *Hover / completion.* _Resolved — implemented; see the 2026-06-04 amendment below._
+
+## Amendment (2026-06-04): interior token offsets come from the one tokenizer
+
+The interior-role spans `tokenizeSpans` emits (the `PosToken.end` substrate this
+ADR's semantic-token layer recovers) now come off each `RawTok`'s interior —
+populated by `tokenizeTemplate`, the same tokens the parser consumes — rather than
+a highlighter-private `tokenizeInterior` re-lex
+([ADR-014](/adr/adr-0014-highlighting-derives-from-lexer/) amendment). Offsets
+and the token vocabulary are unchanged — the `check:highlight` golden and the
+`flatbars-lsp` token tests were byte-identical across the migration.
+
+## Amendment (2026-06-04): three release-blockers gate marketplace publishing
+
+A team review of the three integrations (`flatbars-lsp`, the VS Code extension,
+the JetBrains plugin) confirmed the two-layer design of this ADR but found the
+*release readiness* is gated on process and seam gaps, not features. Until the
+three blockers below are closed, the extensions are **not** to be published to the
+VS Code Marketplace / Open VSX / JetBrains Marketplace. The decisions:
+
+. *Activation is unverified end-to-end, so it is release-blocking (VS Code).* The
+  review's first framing was that `activationEvents: []`
+  (`editors/vscode/package.json`) left the language client — and thus the whole LSP
+  ceiling (semantic tokens + diagnostics) — without a trigger. *That framing was
+  wrong, and the manifest validator caught it:* since VS Code 1.74 the `onLanguage`
+  events are *generated* from `contributes.languages`, and `engines.vscode` is
+  `^1.75`, so the extension auto-activates on opening a FlatBars file — declaring
+  the events explicitly is redundant (and now flagged as removable). The real gap
+  is that *nothing proves it*: the smoke test spawns the server over a pipe,
+  bypassing activation entirely, so a regression (a broken client, a dropped
+  language contribution) would ship silently. *Decision (implemented):* keep
+  `activationEvents: []` (rely on the generated events); assert the
+  auto-activation precondition offline in the smoke test (`engines.vscode >= 1.74`
+  and `contributes.languages` ≡ the shared dialect set); and add a *real-IDE* test
+  (`editors/vscode/test/ide`, `npm run test:vscode:ide`) that opens a `.maxbars`
+  fixture in a downloaded VS Code and asserts the extension auto-activates and that
+  a semantic token *and* a published diagnostic actually surface. It is heavy (a VS
+  Code download + a windowed run), so it runs in CI (blocker 2), not in `npm test`.
+
+. *The JVM/LSP path compiles on no CI machine, so it is release-blocking
+  (JetBrains).* `test:jetbrains` validates the bundled JS transport (descriptors,
+  grammar canonicality, an LSP round-trip) but never compiles Kotlin; the
+  Ultimate-only LSP layer (`-PwithLsp`, the platform LSP API absent from the open
+  SDK) is built nowhere we control. *Decision (implemented):* a path-filtered
+  workflow, `.github/workflows/editors.yml`, with two jobs — a `gates` job
+  (the editor node gates + the real-IDE VS Code test under `xvfb`) and a
+  `jetbrains-build` job that provisions JDK 17 + Gradle (there is no wrapper in the
+  repo) and runs `gradle buildPlugin -PwithLsp`, downloading the IntelliJ IDEA
+  Ultimate SDK so the Ultimate-only LSP layer compiles. Neither client now ships
+  code that has only ever been type-checked by hand.
+
+. *The "one vocabulary, three consumers" seams are ungated, so they are
+  release-blocking (shared).* The contract this ADR rests on has unchecked joints:
+  `lspEmitKinds` (`editors/token-vocabulary.json`) drives the sparse-correction
+  design but is pinned by no test — adding `expr` to it would silently flatten
+  `{{{x}}}` to one colour, the exact failure Decision 1's floor design
+  guards against, with every gate green; `check:tmgrammar` asserts tag boundaries
+  and literals but *not* that the grammar's scope names still match the vocabulary's
+  `tmScopes`; and the embedded engine bundle (`lab/vendor/flatbars-engine.mjs`,
+  re-exported by `editors/lsp/src/engine.mjs`) carries no API-version the server can
+  assert. Packaging compounds it: the two `sync-assets.mjs` scripts call `esbuild`
+  *unpinned* and duplicate the dialect list by hand, undercutting the
+  byte-reproducibility `check:bundle` enforces (it pins `esbuild@0.23.0`).
+  *Decision (implemented):* add a vocabulary-integrity gate, `check:vocab`
+  (`scripts/check-vocab.mjs`, in `npm test`), asserting engine kinds ≡ vocabulary
+  kinds — witnessed by the `check:highlight` corpus, so there is no second corpus —
+  the *pinned* `lspEmitKinds` set, the LSP legend derivation, and grammar scope
+  names ⊇ vocabulary `tmScopes`; and pin + centralise the packaging `esbuild` in
+  `editors/shared/sync.mjs` (the shared bundle step + single-sourced language set,
+  pinned to the `esbuild@0.23.0` `gen:bundle` already uses). The "engine-shape
+  compatibility" the bundle API-version idea targeted is met by this gate (kinds ≡
+  vocabulary ≡ legend) together with `check:bundle`'s existing byte-identical
+  freshness guarantee, rather than a runtime version constant — no change to the
+  generated engine bundle, and the contract is checked in CI rather than asserted
+  at startup.
+
+*Rejected at the same review:* making the LSP emit *full* semantic tokens (instead
+of sparse corrections over the TextMate floor). It contradicts Decision 2 of this
+ADR — the floor must stand alone in no-LSP contexts (GitHub, `bat`, diffs) and full
+emission flattens the braces-vs-name distinction. The sparse split is kept; only
+its seam is gated (blocker 3).
+
+*Unchanged / still deferred:* the TextMate floor remains the guaranteed baseline
+(Community / no-LSP users are first-class); incremental `semanticTokens/range` is
+tracked but non-blocking. (Process note: the review's draft flagged a committed
+`editors/vscode/dist/` as a high risk; `git ls-files` shows it untracked —
+`.gitignore` covers `dist/` — so that finding was withdrawn.)
+
+## Amendment (2026-06-04): hover + completion
+
+The third capability on this substrate (after highlighting and diagnostics) is
+hover + completion, the open question above. They are *not* keyed to the recovering
+parser's `NodeError` nodes after all — the operation set is static, so a per-edit
+parse buys nothing. Instead:
+
+* `FullBars.Catalog.operations` projects `preludeSchema` (the same single source the
+  helper catalog renders) to each operation's name, its ADR-019 kind
+  ([ADR-019](/adr/adr-0019-operation-vocabulary/); `value`/`inline`/`block`,
+  derived structurally — `operator` is a MaxBars surface form, not a runtime kind),
+  arity, source (`registered`/`scoped`/`alias`/`synonym`), and any alias/synonym
+  target. `scripts/gen-operations.mjs` writes that to `editors/operations.json`,
+  gated by `check:operations` (in `npm test`) exactly like the catalog — so the
+  editor can never offer an operation the engine does not know. The server inlines
+  it like the token vocabulary.
+* The server gates hover and completion on being *inside a tag*, decided by the
+  engine's own `tokenize` (not a re-implemented lexer) — the offset must fall in a
+  `tag` span and not in an interior `string`/`number` literal. *Hover* on a known
+  operation reports its kind, arity, alias/synonym relationship, a signature
+  *synthesised from the kind*, and its one-line prose doc. *Completion* inside a tag
+  offers the operations, excluding deprecated aliases (they still hover, so existing
+  code is explained) and sorting scoped variables after helpers.
+
+The prose comes from a **required `doc` field on `OperationDef`** (a follow-up to
+this amendment): the single source, populated for every operation and
+compiler-enforced by the `valDef`/`gen` smart constructors, so an operation cannot
+ship undocumented and there is no parallel doc table to drift. (This supersedes
+this amendment's first cut, which deliberately carried *no* doc string for exactly
+the drift fear — solved instead by making the prelude itself the one source.)
+Scoped variables live outside `operationDefs` and carry no doc, so hover simply
+omits the line. The long-form reference prose stays in `prelude.adoc`; `doc` is the
+one-line summary. Covered by `test:lsp` (unit + protocol) and the real-IDE path.
+
+A `codeAction` quick-fix completes the loop: on a deprecated alias or a
+non-canonical scoped variable the server offers a one-click *rewrite to the
+canonical form* (`downcase`→`lowercase`, `index`→`index0`, `partial-block`→`yield`).
+The replacement is the `canonical` field already in `operations.json` — aliases from
+`preludeAliases`, scoped from `Kernel.Prelude.scopedCanonical` (the shared table the
+`Linter.Aliases` lint and the `flatbars lint` CLI also read; *not* `synonymOf` —
+synonyms are endorsed and never offered). It is dialect-scoped: alias rewrites apply
+anywhere, the scoped rewrite only in RawBars/MaxBars (FullBars/MinBars keep
+Handlebars' `@index`/`@partial-block`). So the same single source drives the lint
+(report), the CLI (`flatbars lint`), and the editor (one-click fix).
+
+## Amendment (2026-06-04): support matrix locked in
+
+The JetBrains side now formally targets **all JetBrains IDEs (TextMate floor)
++ IDEA Ultimate (LSP ceiling)**. The default Gradle build (`buildPlugin`)
+produces a TextMate-only plugin compatible with every Community + Ultimate
+IDE; the `-PwithLsp` build adds the `flatbars-lsp` server consumed via the
+Ultimate-only platform LSP API. `runPluginVerifier` is wired against the
+since-build range so any compatibility regression fails before publish.
+
+Community-edition users see an `EditorNotificationProvider` banner on first
+opening a FlatBars file, linking to the Ultimate upgrade path so the missing
+LSP capabilities never surface as a silent gap.
+
+## Amendment (2026-06-04): editor floor refined to ERB-canonical scopes
+
+The TextMate floor switched from FlatBars-bespoke `meta.function.*` /
+`meta.variable.unescaped.*` scopes to the canonical ERB/PHP/EJS pattern:
+every brace cluster carries `punctuation.section.embedded.{begin,end}`,
+every tag region carries `meta.embedded.{line,block}`, and control-tag
+sigils split out as `keyword.control.{section,inheritance,import}`. Themes
+that style ERB braces now style FlatBars braces identically with zero
+hardcoded colour in either editor manifest.
+
+`#tag_interior` patterns added on every expression-bearing tag rule paint
+the body's literals (`string.quoted.*`, `constant.numeric.*`,
+`constant.language.*` for `true`/`false`/`null`), operators
+(`keyword.operator.*`), subexpression parens (`punctuation.section.parens`),
+list-literal brackets (`punctuation.section.brackets`), and path separators
+(`punctuation.accessor`).
+
+LSP `shrinkToInner` trims `{`/`}`/`~`/whitespace off every tag-level
+semantic-token span before emission, so the `keyword`/`set-delimiter`/`error`
+spans cover only the inner body and leave the braces to the grammar's
+embedded scope. `paintOperations` adds a new `operation` semantic kind that
+paints helper names from `operations.json` in head / subexpression-head /
+pipe-target positions; gated by the catalogue so plain variables stay
+default-coloured.
+
+## Amendment (2026-06-04): short-form dialect extensions + hybrid templates
+
+Each dialect now ships two equivalent native extensions — the long form
+(`.rawbars`/`.minbars`/`.fullbars`/`.maxbars`) and a short alias
+(`.rbars`/`.mbars`/`.fbars`/`.xbars`). Both resolve to the same language id;
+both are listed in every consumer (`shared/sync.mjs`, VS Code's
+`package.json`, JetBrains's TextMate bundle, the grammar's `fileTypes`,
+LSP's `dialectForUri`). The packagers' language tables are now codegenerated
+from the single `LANGUAGES` source so adding an extension touches one place.
+
+`editors/flatbars-injection.tmLanguage.json` is an injection grammar with
+`injectTo` covering 26 common host scopes (`source.java`, `source.ruby`,
+`source.python`, …, `text.html.basic`). Paired with `files.associations`
+(`*.java.xbars` → `java`), the host paints its native syntax and the
+injection layers `{{…}}` tag highlighting on top. The LSP attaches to the
+host — hybrid templates are syntax-only for tag intelligence; users wanting
+full IntelliSense open with the dialect's language id.
+
+## Amendment (2026-06-04): capability matrix split into ADR-026
+
+The full list of LSP capabilities we ship vs deliberately omit (the latter
+being principled design decisions tied to the engine's deliberately
+absent cross-template scope graph) lives in
+[ADR-026](/adr/adr-0026-editor-capability-matrix/).

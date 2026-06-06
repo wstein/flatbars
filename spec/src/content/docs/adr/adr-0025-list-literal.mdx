@@ -1,0 +1,146 @@
+---
+title: "ADR-025: The list literal `[…]` and the `list` prelude helper — MaxBars surface + shared prelude"
+sidebar:
+  label: ADR-025 list literal
+---
+
+*Status:* Proposed. *Date:* 2026-06-04. The list-literal half of the collection-literal design,
+*split from* [ADR-024](/adr/adr-0024-let-and-dict-literal/) during the 2026-06-04 team review.
+Applies to *MaxBars* (surface sugar) and the *shared prelude* (a new constructor). FullBars's surface is
+*unchanged*; the prelude addition is value-only and Handlebars-compatible (gated by
+`check:hbs-conformance`).
+
+This is a separate ADR from [ADR-024](/adr/adr-0024-let-and-dict-literal/) for one reason: the
+list literal is *not* pure MaxBars surface. Its desugar target does not exist, so it ships a new helper
+into the *shared* prelude — a different blast radius (catalog regen, conformance re-run, presence in
+every dialect) than `let` and the dict literal, both of which reuse what is already there. Conflating the
+two understated this cost; separating them keeps each decision honest and lets ADR-024 ship first.
+
+## Context
+
+Shared with the *Context* of [ADR-024](/adr/adr-0024-let-and-dict-literal/) — the
+template-local-constants motivation, the *no variables* / *no host-format-in-core* constraints, the
+dialect carve-out lever, and the enumerated negative results (JSON-style literals; the unified-`[…]`
+dead-end that forces distinct `{…}`/`[…]` shapes). Not repeated here.
+
+One fact specific to lists drives this ADR:
+
+* *There is no list constructor today.* The shared prelude ([prelude](/engine/prelude/)) has list-_consuming_
+  helpers — `join`, `count`, `size`, `at`, `take`, `reverse`, `unique`, `pluck` — but nothing that
+  *builds* a list. The only way to obtain one is `split` (from a string). So a template author cannot
+  write a literal sequence at all. This is a genuine capability gap, not a convenience over an existing
+  helper (contrast `dict`, which `(dict …)` has always provided). The list literal closes it, and that
+  is why it is worth a prelude addition.
+
+## Decision
+
+Two things ship together, because the surface sugar is inert without its target:
+
+### 1. A new `list` prelude helper
+
+A variadic value helper `(list e …)` that returns the array of its evaluated arguments. It lives
+in the *shared* prelude next to `dict`, so it is available in every dialect's expression position
+(RawBars/FullBars/MaxBars/MinBars), exactly as `dict` is. It adds no new `Value` shape (arrays already
+exist) and no kernel change — it is an ordinary value-producing operation, the list analogue of `dict`.
+
+This is the one piece that distinguishes this ADR from [ADR-024](/adr/adr-0024-let-and-dict-literal/):
+a *shared-prelude* change, with the catalog + conformance consequences in *Gates* below.
+
+### 2. List literal `[expr expr …]` — MaxBars expression sugar
+
+A bracket-delimited list of positional expressions in expression position is sugar for `(list …)`.
+
+```handlebars
+{{#let langs=["PureScript" "TypeScript" "Rust"]}}
+  {{#each langs}} — {{this}}{{/each}}
+{{/let}}
+```
+
+Desugars at the MaxBars parser stage to `(list "PureScript" "TypeScript" "Rust")`. Empty: `[]` is
+the empty list, lowers to `(list)`. The sugar is MaxBars-only; RawBars writes `(list …)` directly;
+FullBars has neither the sugar nor (by convention) uses it, though the `list` helper is *present* in its
+prelude.
+
+### 3. Lexing and the `[` / `.[` disambiguation
+
+Lexing follows the *Lexing* section of [ADR-024](/adr/adr-0024-let-and-dict-literal/)
+verbatim, extended from `{`/`}` to `[`/`]`: desugar happens in the MaxBars interior grammar
+(`MaxBars.Expr` via the `ParseOptions.parseExpr` seam); the *structure* lexer never gains `[`/`]` as
+structural tokens; width detection fixes the tag span before the interior is scanned, so a literal's own
+`]` is consumed by nesting depth before the tag close. `{{#let xs=[1 2}}}]`… reads cleanly, and no
+disambiguating space is ever required.
+
+The one list-specific hazard is the existing path-index form `{{a.[i}}]`. The disambiguation is
+*not* by look-behind — that is unsound under the recovering parser
+([ADR-023](/adr/adr-0023-recovering-parser/)), where the preceding token may be a `NodeError`. Instead,
+in the MaxBars interior grammar *`.[` is the only path-index form*; a `[` in any other position is
+unconditionally a list-open. The two productions never compete for the same token, so error recovery on a
+malformed tag cannot flip one into the other. (This is the one claim flagged for a confirming tokenizer
+spike — see *Open question*.)
+
+### 4. Dialect scope
+
+| Surface | `[…]` list literal | `(list …)` helper |
+| --- | --- | --- |
+| *RawBars* | ✗ (no sugar by design) | ✓ (write it directly) |
+| *FullBars* | ✗ (Handlebars-faithful surface) | ✓ (present in the shared prelude; convention says don't use it) |
+| *MaxBars* | ✓ (`[expr …]`) | ✓ |
+
+The helper is shared (a value-policy-free constructor, like `dict`); only the *sugar* is MaxBars-scoped —
+the same asymmetry as `>=` → `(gte …)`.
+
+## Consequences
+
+### Gates
+
+* *`check:catalog`* — the new `list` helper makes the generated helper catalog stale; run
+  `npm run gen:catalog` and the gate keeps the docs partial in step with `FullBars.preludeSchema`. *This
+  gate is the headline difference from [ADR-024](/adr/adr-0024-let-and-dict-literal/)*, which
+  adds no helper.
+* *`check:hbs-conformance`* — already in `npm test`. Re-run after adding `list` to confirm the `49/50`
+  byte-identical FullBars line is unmoved (a value-producing helper should be inert to it, but the gate
+  proves it). Also catches any `[…]` bleed into the FullBars surface parser.
+* *Tokenizer corpus (precondition — must land before implementation).* Extends the ADR-024 corpus with
+  the bracket cases: `{{#let xs=[}}]`, `{{#let xs=[1 2 3}}]`, the mixed
+  `{{#let x={a=[1 2}}}}]` (four trailing braces), and the path-index control `{{a.[0}}]` to
+  pin that `.[` is *not* read as a list-open. No corpus, no merge.
+* *`check:isolation`* — one MaxBars-only-surface assertion: a FullBars template with `[expr …]` in
+  expression position produces a surface diagnostic, not silent acceptance. (Note the `list` *helper* is
+  legal everywhere; only the bracket *sugar* is gated.)
+* *Linter round-trip* (`Linter.Lower`) — pins that `[1 2 3]` lowers to `(list 1 2 3)`. One
+  canonical RawBars form, no two-way sugar.
+
+### Editor tooling (ADR-017 contract)
+
+The token vocabulary gains two new tag-body tokens, scoped to the MaxBars grammar variant: `[` and `]`.
+The `[` token has two lexical contexts within tags — path-index in `.[` (existing) and list-literal
+elsewhere (new); §3 fixes the disambiguation to be position-based, not look-behind-based, so it is robust
+under the recovering parser. The LSP semantic-token emitter, the TextMate fallback grammar, and the VS
+Code / JetBrains grammars each receive a one-time update; the contract source
+([ADR-017](/adr/adr-0017-editor-support-lsp/) token-vocabulary.json) is the single edit point.
+
+### Documentation
+
+* `maxbars.adoc` gains a `List literal` subsection (alongside the `Dict literal` section added by
+  [ADR-024](/adr/adr-0024-let-and-dict-literal/)).
+* `prelude.adoc` / the generated helper catalog gain the `list` entry (via `gen:catalog`).
+* `rawbars.adoc` notes `(list …)` as the canonical form behind the MaxBars `[…]` sugar.
+* `fullbars.adoc` convention line (`tutorials/src/fullbars.mjs`) extends to *"no MaxBars list literals"*
+  (the `list` helper itself stays available, like any prelude value helper).
+
+### Non-goals (deliberately deferred)
+
+* *Bracket literals outside `{{#let}}`*. A natural future extension is `{{#each [1 2 3}}…{{/each}}]`
+  and `(map [1 2 3 …)]` — admissible because, once this ADR lands, `(list …)` is a
+  first-class expression. Out of scope here; opens cleanly if pressure shows up.
+* *A `map`/`filter`/`fold` family over lists.* The list literal makes such helpers *useful*, but each is
+  its own prelude decision; this ADR ships only the constructor.
+
+## Open question
+
+The §3 claim that *`.[` is the only path-index form and every other `[` is a list-open* is the one piece
+not yet proven against the recovering parser. Before the four editor grammars
+([ADR-017](/adr/adr-0017-editor-support-lsp/)) are touched, a small tokenizer spike should confirm that
+malformed-tag recovery never reclassifies a path-index `[` as a list-open (and vice versa). The
+implementation is otherwise straightforward; this is the only residual risk, and it is contained to the
+MaxBars interior tokenizer.

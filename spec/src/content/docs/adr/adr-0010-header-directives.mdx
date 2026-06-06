@@ -1,0 +1,76 @@
+---
+title: "ADR-010: Header directives — `@truthiness` and `@trim`"
+sidebar:
+  label: ADR-010 Header directives
+---
+
+*Status:* Accepted for `@trim`; the *`@truthiness` half is **Superseded** by*
+[ADR-022](/adr/adr-0022-analyse-mode/) (2026-06-03). *Date:* 2026-06-01. Records the standalone `@trim`
+directive and the original per-file `@truthiness` spec (Phases 0–5). Companion spec:
+[directives](/engine/directives/).
+
+:::note
+*The per-file `@truthiness` directive is superseded.* Team review ([ADR-022](/adr/adr-0022-analyse-mode/))
+found the per-file *configuration surface* — the directive meaning, the alias table, the shape-literal
+list, lexical per-partial scoping (`partialFalsy`), the linter's truthiness-*materialization* phase, and
+the compiler's `$falsy` baking — to be over-engineered: it has **zero golden-case usage**, yet costs a
+24-file blast radius and a dedicated linter phase. Truthiness becomes a *fixed per-engine rule* expressed
+as a lambda the engine plugs in (FullBars/RawBars/MaxBars: the Handlebars rule; MinBars: Mustache), with
+the named rules kept as introspectable data the engine selects from. `includeZero` is re-homed as a
+per-call helper option. A leftover `@truthiness` directive is carried but inert, and `directiveLints`
+warns it as deprecated. Decision points 2 and 3 below are retained for the historical record; ADR-022 is
+the live design. *`@trim` (point 4) is unaffected* and remains Accepted.
+:::
+
+## Context
+
+Two behaviours must be selectable *per file* — without a helper call and without per-render host
+configuration: the truthiness policy of conditionals, and standalone-whitespace handling. They need a
+carriage mechanism that does not breach the meaning-free core (ADR-001).
+
+## Decision
+
+. *Directives ride in a short `{{! … }}` comment at the file head*, keyed `@key`/`@key: value`.
+  The core lifts them *meaning-free* (the `Sep` precedent for comments); the engine assigns meaning.
+  Because carriage lives in the core parser, every dialect (RawBars/FullBars/MaxBars) inherits
+  directives uniformly. Directives are *header-only* — a real tag closes the header, after which a
+  directive is a `DirectiveAfterHeader` error. Long `{{!-- … --}}` comments are inert prose (so
+  JSDoc `@param`, e-mail handles, etc. are safe by construction). Unknown keys are *carried and
+  lint-warned*, not errors (forward compatibility).
+
+. [.line-through]##*`@truthiness` selects the falsy set*## — *superseded by [ADR-022](/adr/adr-0022-analyse-mode/); retained for the record.*
+  `@truthiness` selected the falsy set for `if`/`unless`/`and`/`or`/`not` (and MaxBars'
+  `&&`/`||`/`!`), per file, *lexically* scoped — a condition branches by the set declared where it is
+  *written*, never render-global, never inherited across a partial boundary. The value is *one alias*
+  *or* a non-empty space-separated list of shape-literals (`false null "" 0 [] {}`). Canonical aliases:
+  `empty` (= the `handlebars` default), `minimal` (= `ruby`/`nil`/`lua`), `presence`, `always`; plus
+  `mustache` for MinBars. Docs always print the *expansion* beside a name (a name says nothing the
+  explicit set does not). `includeZero` on a single `if`/`unless` is a per-call exception. The empty
+  value is illegal — use the `always` alias.
+
+. [.line-through]##*The per-engine default is a kernel parameter.*## — *superseded by [ADR-022](/adr/adr-0022-analyse-mode/).*
+  `resolveTruthinessWith :: FalsySet -> Array Directive -> Either Error FalsySet` (`Value.purs`) took the
+  absent-directive default; the Handlebars-family dialects passed `handlebars`, MinBars `mustache`. Under
+  ADR-022 the *resolver disappears* (no directive to resolve) and the per-engine default becomes the
+  *only* rule — the lambda the engine plugs in directly. The MinBars-vs-Handlebars split survives as two
+  fixed lambdas, so [adr-0007-minbars](/adr/adr-0007-minbars/) §2's prerequisite is still met.
+
+. *`@trim` selects standalone-whitespace handling* — `standalone` (default; strips the line a lone
+  block/comment tag sits on) or `none`. It is acted *in the core lexer* (`trimStandalone`), default-on
+  (`defaultParseOptions.trimStandalone = true`). Precedence: a `@trim` directive overrides the CLI
+  `--trim` flag, which overrides `flatbars.json`'s `{ "trim": … }`, which overrides the default.
+
+## Consequences
+
+* *Pro:* per-file policy with no runtime config and no helper; meaning-free carriage keeps the core
+  clean and gives every dialect directives for free; one truthiness resolver and one standalone pass,
+  shared.
+* *Con:* directives are header-only (no mid-file switch — deliberate, for lexical clarity); alias names
+  are sugar over an explicit set (mitigated by always printing the expansion); `@trim` interacts with
+  `{{else}}`-standalone, which needs dialect clause-awareness (a `Lexer` caveat).
+
+## Known gap
+
+[.line-through]##`directives.adoc`'s alias table does not yet list `mustache`.## — *moot under
+[ADR-022](/adr/adr-0022-analyse-mode/):* the alias table itself is removed (the named rules become an
+engine's plugged-in lambda, not a per-file directive value), so there is no table row to reconcile.

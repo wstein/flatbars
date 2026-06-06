@@ -1,0 +1,56 @@
+---
+title: "ADR-011: Compile to JS — dual execution path, byte-identity gate"
+sidebar:
+  label: ADR-011 Compile to JS
+---
+
+*Status:* Accepted. *Date:* 2026-06-01. The fourth IoC instance introduced by
+[adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/) §3, recorded in full here.
+
+## Context
+
+FlatBars must drop into the same places Handlebars does — including ahead-of-time *compiled*
+templates, not only interpretation. A compiler that silently diverges from the interpreter is worse
+than no compiler. The decision is therefore not "add a compiler" but "keep *two* execution paths and
+*gate* them against each other."
+
+## Decision
+
+. *The compiler is the fourth inversion-of-control instance* (interpret / desugar / validate /
+  *compile*): a dialect-agnostic *emit driver* (`FlatBars.Compile`) walks the structural `Template`
+  and assembles JS source; a per-dialect `Emit` record (`type Emit = { expr, block }`) decides how an
+  expression and a block become JavaScript. Output is one ES module —
+  `export default function (data, rt)` — run against a small runtime
+  (`packages/compile/runtime/flatbars-runtime.mjs`).
+
+. *Two `Emit` tiers.* The faithful baseline routes everything through `rt.call`/`rt.block` (the
+  reference behaviour). The FullBars optimiser (`fullbarsEmit`) additionally emits *native* JS control
+  flow for `if`/`unless`/`each`/`with`. Data-dependent work (truthiness, lookup) is deferred to the
+  runtime, so compiled code operates on plain JS values — not the `Value` ADT.
+
+. *The runtime contract is versioned.* `runtimeVersion` is stamped in the compiled module header and
+  checked by the runtime; it is bumped on any runtime-incompatible codegen change. The engine's
+  truthiness rule is a *callback* the root frame is seeded with — `rt.truthyHandlebars` (FullBars),
+  `rt.truthyNonEmpty` (RawBars/MaxBars), or `rt.truthyMustache` (MinBars); no baked falsy-set
+  ([ADR-022](/adr/adr-0022-analyse-mode/) superseded the old `$falsy` constant).
+
+. *The interpreter is the executable spec; a conformance gate enforces equality.*
+  `packages/compile/conformance.mjs` (`npm run test:compile`) renders every case with *both* the
+  interpreter (`FullBars.renderWith`) and the compiled function, and asserts *byte-identical* output.
+  The corpus is the inline `conformance/cases.mjs` plus the golden `examples/`. The harness imports
+  from `output/` (the build product), so it always tests current source.
+
+## Consequences
+
+* *Pro:* AOT performance with a *hard* correctness guarantee; the optimiser tier can be aggressive
+  precisely because the gate catches any drift; all dialects share the one driver.
+* *Con:* every codegen change must keep the gate green — *byte-identical*, not merely "equivalent";
+  there are two execution paths to maintain; the runtime is a separately versioned artifact whose
+  contract must be honoured by both the emitter and any host.
+
+## Alternatives considered
+
+* *Compile only (no interpreter).* Rejected: loses the inspectable executable spec the gate compares
+  against — there would be nothing to be "correct" *relative to*.
+* *Interpret only (no compiler).* Rejected: forfeits the Handlebars-parity ahead-of-time story that
+  motivates dropping into Handlebars' niche.

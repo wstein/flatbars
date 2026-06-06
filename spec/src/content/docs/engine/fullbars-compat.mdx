@@ -1,0 +1,217 @@
+---
+title: The FullBars dialect — differences from Handlebars
+sidebar:
+  label: FullBars vs Handlebars
+---
+
+*FullBars* is the reference engine + [surface dialect](/engine/surface/) shipped with FlatBars
+([prelude](/engine/prelude/)). It is a member of the Handlebars/Mustache family: an author who knows Handlebars is
+immediately at home. It is also its own *dialect* — the interesting parts are exactly where it chooses
+differently, on purpose — yet it is a near-complete clone in practice.
+
+:::note
+*FullBars matches Handlebars on 98% (49/50) of a differential conformance corpus* — every case rendered
+through the real `handlebars` npm package *and* FullBars and asserted byte-identical (`conformance/handlebars/`,
+gated by `npm run check:hbs-conformance`). The one corpus miss is a raw-block corner. (User-defined block
+helpers, formerly a miss, are now implemented — [ADR-020](/adr/adr-0020-user-block-helpers/), §3.) In-data
+*functions/lambdas* are not a corpus target — a `Value` is pure data; a value-producing lambda is
+precalculated before rendering and a section lambda is a helper (§2). This figure is *measured, not
+asserted* — it cannot
+over-claim what upstream Handlebars does not produce.
+:::
+
+This page is written the other way round from a compatibility matrix. The *dialect* is the subject;
+Handlebars is the familiar reference we contrast against. So it leads with the **divergences by design** —
+the choices that give FullBars its identity, each with the reasoning — then states what it
+**deliberately drops** (and the replacement), what is genuinely **not built yet**, and finally the
+large surface that is simply **familiar**. For the gap-free *language* mapping (every Handlebars concept
+expressed over the FlatBars core), see [Appendix A](/appendix/handlebars/).
+
+✓ Familiar:: works as a Handlebars author expects — quiet background.
+◆ By design:: the same job done a considered different way — the dialect's identity.
+⊘ Dropped:: deliberately not provided — a refusal, with the replacement stated.
+☐ Roadmap:: genuinely not built yet — the only honest "missing".
+
+The distinction between *⊘ Dropped* and *☐ Roadmap* is load-bearing: "we chose not to" and "we
+haven't yet" are never the same row.
+
+toc::[]
+
+## 1. Divergences by design
+
+These are not shortfalls; they are the dialect. Each does the same job as its Handlebars counterpart, a
+different way, for a stated reason.
+
+### 1.1 Everything is a helper application
+
+In the *core*, a bare identifier is a *helper call*, not a path: `{{{city}}}` invokes the
+helper `city`. To read a data field you call one — `{{{ lookup this "city" }}}`. There are no
+variables and no implicit context walk; values are pure data, helpers live in a separate scoped
+environment. This is the single defining choice ([concepts](/concepts/)), and it is what lets the core
+have *no built-in names* at all.
+
+The [surface dialect](/engine/surface/) then restores the familiar author experience: in surface,
+`{{ city }}` *is* a data read (it desugars to `{{{ escapeHtml (lookup this "city") }}}`),
+dotted/`../`/`[bracket]` paths work, and a bare name is never a helper. So a Handlebars author writes what
+they expect; the helper-first model is the *engine's* substrate beneath the sugar. Knowing which
+layer you are in is the one mental adjustment porting from Handlebars.
+
+### 1.2 Escaping is explicit
+
+There is no implicit HTML escaping. In core, output (`{{{ … }}}`) is raw; escaping is the
+ordinary `escapeHtml` helper, and the `escapingWarnings` lint flags *unescaped data* so "you forgot to
+escape" is caught at validation, not in production. `escapeHtml` returns a `VSafe`, so re-escaping is a
+no-op; `safe` is the explicit "trust this markup" (the `SafeString` analogue).
+
+The surface dialect restores Handlebars' ergonomics on top — `{{ x }}` ⇒ escaped,
+`{{{ x }}}` ⇒ raw — so authors get auto-escaping while the *engine* keeps escaping a visible,
+auditable helper rather than a hidden rule. Same safety, explicit mechanism.
+
+### 1.3 `else` is a separator; `elif` is a real clause
+
+`{{else}}` is not a keyword — it is a *name-agnostic separator* the parser emits as a flat
+marker, and the enclosing block helper (`if`/`each`/`with`/…) decides what it means by splitting on
+it. A different engine could read `otherwise` or `case` instead; the core reserves nothing
+([grammar](/spec/grammar/) §2.4).
+
+Building on that, `{{elif cond}}` is a *native* clause: `if` reads a flat
+`{{#if a}}…{{elif b}}…{{else}}…{{/if}}` chain and evaluates each condition **lazily**
+(short-circuit) through `Ctl.eval` — so a later branch that would error never runs once an earlier
+one matches. Handlebars expresses the same shape by *nesting* `else`+`if`; FullBars makes it a first-class,
+flat, short-circuiting clause rather than a desugaring trick. Surface `{{else if c}}` lowers to
+it ([surface](/engine/surface/) §5.6).
+
+### 1.4 Safe-string truthiness is content-based
+
+FullBars holds one invariant Handlebars does not: marking a string safe never changes its truthiness — a
+safe string tests as its *content* (`truthy (VSafe s) == truthy (VString s)`), so `safe ""` is
+falsy. Handlebars instead wraps safe output in a `SafeString` *object*, which is always truthy, empty or
+not. FullBars' content-based rule is the more useful one — an empty escaped section reads as empty —
+so it is kept on purpose. The sharp edge to know: `safe`/`escapeHtml` *stringify* their argument, so
+`(safe 0)` is truthy (the non-empty string `"0"`) while `0` is falsy. Testing the truthiness of
+an escaped/safe value is a category error — they are *output*, not data — and `escapingWarnings`
+flags exactly that on `if`/`unless` conditions.
+
+FullBars' rule is Handlebars': `false`, `null`, `0`, `""`, and the empty array are falsy; `{}` and
+non-zero numbers are truthy; `0` is falsy unless `includeZero` is set, written as the surface hash
+`{{#if n includeZero=true}}`. This is *fixed* for FullBars — there is no `@truthiness` directive
+(removed in [ADR-022](/adr/adr-0022-analyse-mode/); a leftover one is inert and lint-warned). Other
+dialects use other rules (RawBars/MaxBars `nonEmpty`, MinBars `mustache`) — see [directives](/engine/directives/).
+
+### 1.5 Standalone whitespace is trimmed (on by default, configurable)
+
+Like Handlebars/Mustache, FullBars strips a line that contains only a standalone block open/close or a
+comment, so a control tag leaves no blank line. This is **on by default** (Handlebars parity).
+
+| Template | Output |
+| --- | --- |
+| `{{#each xs}}\n  <li>{{ this }}</li>\n{{/each}}` | *Default* — the standalone `{{#each}}`/`{{/each}}` lines are removed: `  <li>a</li>\n  <li>b</li>\n` (matching Handlebars). |
+| same template, with `{{! @trim: none }}` in the header | Trimming off — every newline is kept verbatim: `\n  <li>a</li>\n\n  <li>b</li>\n`. |
+
+Only block opens/closes and comments are standalone-eligible. Output tags (`{{ }}` /
+`{{{ }}}`) and bare separators like `{{else}}` are **never** standalone-trimmed — at the
+structural level a `{{ x }}` separator is indistinguishable from surface output, so trimming it
+could eat real content. Explicit `~` still works and composes on top.
+
+Control (highest precedence first): a `{{! @trim: standalone | none }}` header directive (the
+one *syntactic* directive the core itself acts on), then the CLI `--trim`, then a `flatbars.json`
+`{ "trim": … }`, then the built-in default (on). See [directives](/engine/directives/).
+
+### 1.6 The literals `true` / `false` / `null` are helpers
+
+They are nullary helper calls returning `VBool`/`VNull`, not reserved words — consistent with
+"everything is a helper application," and replaceable like any other prelude entry.
+
+## 2. Deliberately dropped
+
+A refusal, not a TODO — each with its replacement. These will not return.
+
+:::note
+Two former entries have *moved to [§4](#familiar)*: Mustache-style implicit
+:::
+sections (`{{#x}}` over data) and `blockHelperMissing` are now implemented (see §4 and the
+differential conformance harness, `conformance/handlebars/`). What remains below are the two genuine
+non-clonable items — one a Mustache (not Handlebars) feature, one a consequence of the pure-data core.
+
+| Handlebars | Replacement | Why |
+| --- | --- | --- |
+| Mustache set-delimiters `{{=<% %>=}}` | fixed `{{ }}` / `{{{ }}}` | A fixed grammar keeps the parser meaning-free and tooling simple. (A Mustache feature; Handlebars fixes the delimiters too — so this is a divergence from Mustache, not Handlebars.) |
+| Data as functions / lambdas in the context | precalculate the value (preprocess), or a helper for body-aware sections | `Value` is *pure data, never a function* — the deepest core choice ([concepts](/concepts/)). The two jobs a Handlebars.js/Mustache lambda does live outside the value: a *value-producing* lambda is *precalculated before rendering* (any host-side computation; the Lab uses JSONata) and passed as plain data; a *section* lambda that rewrites its block body is a *helper* (render-time behaviour — a preprocess step never sees the unrendered body). Engine guarantee: *no arbitrary host code runs from template data, and the rendered `Value` stays pure and JSON-serialisable*. A deliberate substitution, not a shortfall. |
+
+## 3. Roadmap
+
+Genuinely not built yet — the only honest "missing". These would *narrow* the gap; none is a
+semantic objection.
+
+| Handlebars | Status |
+| --- | --- |
+| Decorators `{{*d}}` / `{{#*d}}` | ☐ No decorator concept shipped. A block helper already receives its body, so a decorator is just a helper ([A.8](/appendix/handlebars/#decorators)) — none is in the prelude yet. |
+| User-defined *block* helpers (`registerHelper` + `options.fn`/`options.inverse`) | ☑ Implemented ([ADR-020](/adr/adr-0020-user-block-helpers/)), FullBars. One `registerHelper`; *usage decides* block vs inline — a block call passes a Handlebars-style `options` whose `fn(ctx)` renders the body and `inverse(ctx)` the `{{else}}`. The full `options` surface is `fn`/`inverse`/`hash` plus `options.fn(ctx, { data, blockParams })` — so hash (`k=v`), scoped `@vars`, and `as \|…\|` block params all work (Phase 3, via the `@hash`/`@param` channel); only `ids`/`loc`/`lookupProperty` throw. `registerHelper` is FullBars-only — RawBars/MaxBars use the *operation*/*definition* vocabulary ([ADR-019](/adr/adr-0019-operation-vocabulary/)), not `registerHelper`. This flipped the one buildable conformance miss (`{{#bold}}`): FullBars is now 49/50 (98%) vs Handlebars. |
+| Block-partial sigil `{{#> name}}` / inline-partial decorator `{{#*inline}}` | ☑ The FullBars author forms — the core lexes them as the distinct `PartialBlock` / `Decorator` sigils (each with a clean head — the partial name / `inline` — and a `{{/…}}` close that repeats it), gated by `ParseOptions.partialBlocks` / `decorators`. The block-partial sigil desugars to the `{{#partial}}` core spelling; the `{{#*inline}}` decorator desugars to the core `inline` helper ([surface](/engine/surface/) §5.7). The bare `{{#inline}}` is *rejected* in FullBars (`FullBars.checkBareInline`, `DisallowedShape`) — `inline` is a decorator, not a block helper. RawBars/MaxBars are unaffected (they still accept bare `{{#inline}}`; the core parses every form and only the surface gates the bare spelling). |
+
+<a id="familiar"></a>
+
+## 4. Familiar — works as a Handlebars author expects
+
+Quiet background: these behave as you would expect from Handlebars (some via the surface dialect, noted).
+This is the actual compatibility table.
+
+| Handlebars | FullBars | Status | Notes |
+| --- | --- | --- | --- |
+| `{{#if}}` / `{{#unless}}` | same | ✓ | Explicit *value* condition; `else` clause; see §1.3, §1.4. |
+| `{{#each xs}}` | same | ✓ | Arrays *and* objects; empty ⇒ `else`; `@index`/`@key`/`@first`/`@last` scoped helpers. |
+| `{{#with o}}` | same | ✓ | Shifts context; falsy ⇒ `else` (matches Handlebars 4.x). |
+| `{{lookup o k}}` | `{{{ lookup o k }}}` | ✓ | More general: chains and string/number indexing. |
+| `{{log x}}` | `{{{ log x }}}` | ✓ | No-op in a pure host; an effectful engine logs. |
+| `{{@index/@key/@first/@last/@root}}` | surface `@`-form ⇒ scoped helper | ✓ | Installed by `each` / the host. |
+| `{{@../index}}` | ⇒ `(parent-index)` | ✓ | Enclosing loop's datum (also `key`/`first`/`last`); one `../` level. |
+| Paths `{{a.b.c}}`, `{{../a}}`, `{{a.[1}}]` | surface ⇒ `lookup` chains | ✓ | Bare/dotted/numeric/slash/`../`/`this`/`[bracket]` ([surface](/engine/surface/) §5.2). |
+| Auto-escape `{{x}}` / raw `{{{x}}}` | surface ⇒ `escapeHtml` / raw | ✓ | See §1.2. |
+| Unescaped alias `{{&x}}` | ⇒ `{{{x}}}` | ✓ | Handlebars' ampersand form, accepted as an alias of the triple-stash (the canonical spelling). RawBars/MaxBars reject `{{&}}`. |
+| Comments `{{! }}`, `{{!-- --}}` | same | ✓ | Core; discarded. |
+| Raw block `{{{{raw}}}}…` | same (+ `raw` helper) | ✓ | Verbatim body. |
+| Whitespace control `{{~ ~}}` | same | ✓ | Resolved in the lexer; see §1.5. |
+| Backslash escape `{{x}}` | same | ✓ | Emits the tag literally. |
+| Subexpressions `(helper arg)` | same | ✓ | First-class; nesting is the norm. |
+| Hash arguments `k=v` | surface ⇒ trailing `dict` | ✓ | `options.hash` ([surface](/engine/surface/) §5.4). |
+| Block params `as \|a b\|` | surface ⇒ name strings | ✓ | `each`/`with` bind them ([surface](/engine/surface/) §5.5). |
+| Partials `{{> name [ctx [k=v]}}]`, dynamic `{{> (expr)}}` | surface ⇒ `partial` | ✓ | `renderSurfaceWith` registers them; hash merges onto context. |
+| Block partials `{{#partial}}`, `{{> @partial-block}}` | block-aware `partial` | ✓ | Body is the fallback + the `@partial-block` yield (core spelling; see §3). The yield also has the synonym `yield` (MaxBars `{{yield}}`, RawBars `{{{yield}}}`). |
+| Inline partials `{{#*inline "n"}}` | hoisted into the registry | ✓ | Global to the render (the `{{#*inline}}` decorator is required; bare `{{#inline}}` is rejected — see §3). |
+| `{{else if c}}` | ⇒ `{{elif c}}` | ✓ | Native short-circuit clause; see §1.3. |
+| Mustache-style section `{{#x}}…{{/x}}` over data | `blockHelperMissing`: array ⇒ `each`, truthy ⇒ `with`, falsy/empty ⇒ `{{else}}` | ✓ | An unregistered block head is looked up as data and dispatched exactly as Handlebars does (`Kernel.Prelude.lenientResolve` / `rt.block`). The inverted form `{{^x}}` desugars to `{{#unless x}}`. |
+| Section over a field that *shadows* a value helper (`{{#count}}…{{/count}}`, `count` a number) | same data section | ✓ | A prelude *value* helper used as a *bare* block (no argument to apply) is read as data too, not called — so a field named like a helper (`count`, `uppercase`, …) sections instead of raising the helper's arity error (`Kernel.Prelude.valueOrSection`; the runtime's `channel.section`). With an argument (`{{#count xs}}`) it stays the real helper. |
+| `helperMissing` (inline `{{foo bar}}`, unknown `foo`) | hard `UnknownHelper` | ✓ | Matches Handlebars, which throws "Missing helper" for an unknown helper *called with arguments*; a bare `{{foo}}` is a data read either way. |
+| `registerHelper` *inline* helper | same | ✓ | Escaped in `{{ }}`, raw via `safe(…)` ([ADR-018](/adr/adr-0018-user-defined-helpers/)). |
+| `registerHelper` *block* helper (`fn`/`inverse`/`hash` + `options.fn(ctx, {data, blockParams})`) | same | ✓ | One registration, usage decides; hash, scoped `@vars`, and `as \|…\|` block params all work ([ADR-020](/adr/adr-0020-user-block-helpers/)); only `ids`/`loc`/`lookupProperty` throw. |
+
+:::note
+The §4 table is *measured, not asserted*: `conformance/handlebars/` renders a categorised corpus through
+both the real `handlebars` npm package and FullBars and asserts byte-equality (`npm run
+gen:hbs-conformance`). FullBars currently matches Handlebars on **49/50** cases (98%). The one remaining
+corpus miss is a raw-block corner; user-defined *block* helpers are now implemented
+([ADR-020](/adr/adr-0020-user-block-helpers/), §3). In-data *functions/lambdas* are not a corpus target:
+a `Value` is pure data, so a value-producing lambda is precalculated before rendering and a section lambda
+is a helper (§2) — the pure-data core stays intact.
+:::
+
+## 5. FullBars extensions (no Handlebars built-in)
+
+In Handlebars you would register these yourself or pull them from a helper library; they are part of the
+FullBars prelude ([§6](/engine/prelude/)).
+
+| FullBars | Purpose |
+| --- | --- |
+| `this` | the current context value (`{{{this}}}`) |
+| `true` / `false` / `null` | literal value helpers (§1.6) |
+| `escapeHtml` | HTML-escape a value to a safe string (the explicit auto-escape) |
+| `safe` | mark a string trusted (no escaping) — `VSafe` |
+| `raw` | raw-block helper returning its captured body verbatim |
+| `dict` | build an object from `key value …` pairs (hash arguments) |
+| `apply` | call a helper by name (`apply "helper" arg…`) |
+| `eq` / `ne` | value (in)equality ⇒ boolean (for `{{#if (eq a b)}}`) |
+| `lt` / `gt` / `lte` / `gte` | order numbers/strings ⇒ boolean (mixed/other types incomparable ⇒ false) |
+| `not` | logical negation of truthiness |
+| `and` / `or` | variadic boolean fold over truthiness |
+| `json` / `escapeJson` | serialize a value as JSON text (`pretty=true` to indent); `escapeJson` also HTML-escapes |
+| `else` | the inert separator marker (renders to nothing on its own) |

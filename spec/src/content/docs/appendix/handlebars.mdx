@@ -1,0 +1,686 @@
+---
+title: Appendix A — Handlebars.js → FlatBars, with no gaps
+sidebar:
+  label: A. Handlebars mapping
+---
+
+This appendix is the *contract*: every Handlebars.js concept must have a defined FlatBars equivalent, with no
+gaps. Each entry gives the Handlebars form, the *FlatBars Surface* spelling (what a template author
+writes), and the *core* skeleton it desugars to (what the parser produces and the engine walks).
+Surface rules are in [surface](/engine/surface/); engine helpers in [prelude](/engine/prelude/).
+
+A concept maps in exactly one of these ways, marked throughout:
+
+[CORE]:: a first-class core skeleton construct.
+[SURFACE]:: a pure syntactic rewrite to the core.
+[ENGINE]:: meaning assigned by the Phase-2 walk — a helper, a clause name, or a validation rule. Not built in.
+[HOST]:: an engine/assembly choice, not template syntax.
+[DROPPED]:: deliberately not provided — with the replacement stated.
+
+:::note
+*Parenthesis convention.* Top-level expressions inside `{{{ }}}` carry no wrapping parens (a
+top-level `Expr` needs no grouping). Parentheses appear only around a *nested* application in
+argument position — `(lookup …)`, `(parent)`, `(dict …)`, `(index)`. See [grammar](/spec/grammar/) §2.2.
+:::
+
+toc::[]
+
+<a id="expressions"></a>
+
+## A.1 Expressions, escaping & paths
+
+| Handlebars | FlatBars Surface | Core | Kind |
+| --- | --- | --- | --- |
+| `{{x}}` | `{{x}}` | `{{{ escapeHtml (lookup this "x") }}}` | SURFACE |
+| `{{{x}}}` | `{{{x}}}` | `{{{ lookup this "x" }}}` | SURFACE |
+| `{{&x}}` (HB unescaped alias) | `{{{x}}}` (FullBars accepts `{{&}}`) | `{{{ lookup this "x" }}}` | PROVIDED (FullBars; RawBars/MaxBars reject) |
+| `{{a.b.c}}` | same | `{{{ escapeHtml (lookup this "a" "b" "c") }}}` | SURFACE |
+| `{{a.[1}}]` / `{{a.1}}` | same | `{{{ escapeHtml (lookup this "a" 1) }}}` | SURFACE |
+| `{{a.[home town}}]` | same | `{{{ escapeHtml (lookup this "a" "home town") }}}` | SURFACE |
+| `{{a/b}}` (legacy slash) | `{{a.b}}` | `{{{ escapeHtml (lookup this "a" "b") }}}` | SURFACE |
+| `{{this}}` / `{{.}}` | `{{this}}` | `{{{ escapeHtml this }}}` | SURFACE |
+| `{{this.a}}` / `{{./a}}` | `{{this.a}}` | `{{{ escapeHtml (lookup this "a") }}}` | SURFACE |
+| `{{../a}}` | `{{../a}}` | `{{{ escapeHtml (lookup (parent) "a") }}}` | SURFACE |
+| `{{../../a}}` | same | `{{{ escapeHtml (lookup (parent (parent)) "a") }}}` | SURFACE |
+| a helper returning HTML, e.g. `{{price}}` | use `safe` in the helper | `{{{ price }}}` | ENGINE |
+
+*Escaping model.* Handlebars escapes `{{ }}` and trusts `{{{ }}}`/`SafeString`. FlatBars makes
+both explicit: `{{ }}` is the *only* thing that introduces `escapeHtml`; `escapeHtml` returns
+`VSafe` so re-escaping is a no-op; `safe`/`VSafe` is the `SafeString` analogue. See
+[evaluation](/spec/evaluation/) §3.7. The escaped set is `&`, `<`, `>`, `"`, `'`, matching Handlebars.js.
+
+*Why bare names differ between layers.* In Surface, `foo` is a *field* (`lookup this "foo"`). In the
+core, `{{{foo}}}` is a *helper call*. Authors write Surface and think in data; the desugarer
+and engine work in the core. This is the single most important thing to internalise here.
+
+<a id="helpers"></a>
+
+## A.2 Helpers, arguments & subexpressions
+
+| Handlebars | FlatBars Surface | Core | Kind |
+| --- | --- | --- | --- |
+| `{{helper a b}}` | same | `{{{ escapeHtml (helper a' b') }}}` | SURFACE/CORE |
+| positional arguments | same | evaluated left-to-right, eagerly | CORE |
+| string literal `"x"` / `'x'` | same | `Str "x"` | CORE |
+| number literal `3`, `-2.5` | same | `Num 3` | CORE |
+| `true` / `false` | same | `(true)` / `(false)` | ENGINE |
+| `null` | same | `(null)` | ENGINE |
+| `undefined` | `null` | `(null)` | DROPPED→`null` |
+| hash argument `key=value` | same | trailing `(dict "key" value')` | SURFACE |
+| subexpression `(helper a)` | same | `(helper a')` — grouping is core | CORE |
+| nested subexpr `(a (b c))` | same | unchanged | CORE |
+| `this` as an argument | same | `this` (a nullary helper) | CORE/ENGINE |
+| value helper vs. block helper | arity & `#` decide | an inline helper ignores its `Body`; a block helper uses it | CORE |
+
+Worked example (from `subexpressions/`):
+
+```text
+Handlebars:  {{upper (concat first last)}}
+Core:        {{{ escapeHtml (upper (concat (lookup this "first")
+                                         (lookup this "last"))) }}}
+```
+
+```text
+Handlebars:  {{repeat "ab" (add 1 2)}}
+Core:        {{{ escapeHtml (repeat "ab" (add 1 2)) }}}     (literals pass straight through)
+```
+
+Hash example:
+
+```text
+Handlebars:  {{field value required=true label="Name"}}
+Core:        {{{ escapeHtml (field (lookup this "value")
+                                 (dict "required" (true) "label" "Name")) }}}
+```
+
+<a id="blocks"></a>
+
+## A.3 Block helpers & branches
+
+| Handlebars | FlatBars Surface | Core | Kind |
+| --- | --- | --- | --- |
+| `{{#h}}…{{/h}}` | same | `{{#h}}…{{/h}}` | CORE |
+| `{{#h arg}}…{{/h}}` | same | args desugar like any call | CORE |
+| `{{else}}` separator | `{{else}}` | a `Sep "else"` marker the block helper splits at | CORE+ENGINE |
+| `{{^h c}}…{{/h}}` (HB inverted) | `{{#unless c}}…{{/unless}}` (FullBars desugars `{{^}}`) | `{{#unless c}}…{{/unless}}` | PROVIDED (FullBars; RawBars/MaxBars reject) |
+| `else if` (chained) | same | nested `{{#if c}}…{{/if}}` inside an `else` clause | SURFACE→ENGINE |
+| block params `{{#h x as \|a b\|}}` | same | `{{#h x "a" "b"}}` — binding-name args | SURFACE |
+| `options.fn(ctx)` | — | `ctx.render` over the body's non-clause nodes | ENGINE |
+| `options.inverse(ctx)` | — | `ctx.render` over the `else` clause found by `splitClause` | ENGINE |
+| `options.hash` | `k=v` on the block | trailing `dict` argument | SURFACE |
+| `options.data` / `createFrame` | — | the helper frame the block pushes | CORE/ENGINE |
+| `return new SafeString(…)` | `safe`/return `VSafe` | a `VSafe` value | ENGINE |
+
+`else` has *no* meaning in the core: the parser emits a flat `Sep "else"` marker in the block's body,
+and the parent helper (`if`, `each`, `with`, …) decides what a separator named `else` means by
+splitting at it. The name is the engine's choice — `el`, `elif`, `case`, `default` are equally valid
+([concepts](/concepts/) §5, [grammar](/spec/grammar/) §2.4).
+
+Worked example (`block-helpers/` — `ifEquals` with an else):
+
+```text
+Handlebars:  {{#ifEquals plan "pro"}}Pro{{else}}Upgrade{{/ifEquals}}
+Core:        {{#ifEquals (lookup this "plan") "pro"}}Pro{{else}}Upgrade{{/ifEquals}}
+```
+
+Worked example (`block-helpers/` — custom `times`, exposing a scoped helper):
+
+```text
+Handlebars:  {{#times 3}}{{@index1}}🔁{{/times}}
+Surface:     {{#times 3}}{{index1}}🔁{{/times}}
+Core:        {{#times 3}}{{{ escapeHtml (index1) }}}🔁{{/times}}
+```
+
+`times` pushes a frame per iteration and installs the scoped helper `index1`. The ENGINE writes that
+helper; the core only supplies the frame plumbing.
+
+<a id="builtins"></a>
+
+## A.4 Built-in helpers (all become ENGINE)
+
+Handlebars' six built-ins are *not* in the FlatBars core. They are reference-engine helpers
+([prelude](/engine/prelude/)); remove or replace any of them.
+
+| Handlebars built-in | Surface | Core | Kind |
+| --- | --- | --- | --- |
+| `{{#if c}}…{{else}}…{{/if}}` | same | `{{#if c'}}…{{else}}…{{/if}}` | ENGINE |
+| `{{#unless c}}…{{/unless}}` | same | `{{#unless c'}}…{{/unless}}` | ENGINE |
+| `{{#each xs}}…{{else}}…{{/each}}` | same | `{{#each xs'}}…{{else}}…{{/each}}` | ENGINE |
+| `{{#with o}}…{{/with}}` | same | `{{#with o'}}…{{/with}}` | ENGINE |
+| `{{lookup o k}}` | same | `{{{ escapeHtml (lookup o' k') }}}` | ENGINE |
+| `{{log x}}` | same | `{{{ log x' }}}` (returns `VNull` ⇒ empty output) | ENGINE |
+
+*Truthiness* (used by `if`/`unless`/`each`/`with`) matches Handlebars.js: `false`, `null`, `0`, `""`, and the
+empty array are falsy; `{}` and non-zero numbers are truthy. As in Handlebars.js, `0` is falsy unless
+`includeZero` is set — passed to `if`/`unless` as an options object ([prelude](/engine/prelude/) §6.3).
+
+Worked example (`if-unless/` — `if` with an else and Handlebars truthiness):
+
+```text
+Handlebars:  <p>tasks is {{#if tasks}}truthy{{else}}falsy (empty array){{/if}}.</p>
+Core:        <p>tasks is {{#if (lookup this "tasks")}}truthy{{else}}falsy (empty array){{/if}}.</p>
+```
+
+Worked example (`each/` — over an object, with `@key`):
+
+```text
+Handlebars:  {{#each profile}}<dt>{{@key}}</dt><dd>{{this}}</dd>{{/each}}
+Core:        {{#each (lookup this "profile")}}
+               <dt>{{{ escapeHtml (key) }}}</dt><dd>{{{ escapeHtml this }}}</dd>
+             {{/each}}
+```
+
+Worked example (`each/` — empty collection renders the `else` clause):
+
+```text
+Handlebars:  {{#each archived}}<li>{{title}}</li>{{else}}<li>Nothing archived.</li>{{/each}}
+Core:        {{#each (lookup this "archived")}}
+               <li>{{{ escapeHtml (lookup this "title") }}}</li>
+               {{else}}<li>Nothing archived.</li>
+             {{/each}}
+```
+
+<a id="data"></a>
+
+## A.5 `@data` variables (become scoped ENGINE helpers)
+
+Handlebars' `@`-namespace does not exist. Each `@x` is a *scoped nullary helper* installed by the block
+that introduces it; Surface drops the `@` ([surface](/engine/surface/) §5.5).
+
+| Handlebars | Surface | Core | Installed by |
+| --- | --- | --- | --- |
+| `{{@index}}` | `{{index}}` | `{{{ escapeHtml (index) }}}` | `each` |
+| `{{@key}}` | `{{key}}` | `{{{ escapeHtml (key) }}}` | `each` |
+| `{{@first}}` | `{{first}}` | `{{{ escapeHtml (first) }}}` | `each` |
+| `{{@last}}` | `{{last}}` | `{{{ escapeHtml (last) }}}` | `each` |
+| `{{@root}}` | `{{root}}` | `{{{ escapeHtml (root) }}}` | host (top frame) |
+| `{{@../index}}` | `{{@../index}}` | `{{{ escapeHtml (index (parent)) }}}` | `each` + `parent` |
+| custom `{{@myVar}}` | `{{myVar}}` | `{{{ escapeHtml (myVar) }}}` | the block that frames it |
+
+Worked example (`each/` — `@index`/`@first`/`@last`):
+
+```text
+Handlebars:  {{#each people}}
+               <li>{{@index}}: {{this}}{{#if @first}} — first{{/if}}{{#if @last}} — last{{/if}}</li>
+             {{/each}}
+Core:        {{#each (lookup this "people")}}
+               <li>{{{ escapeHtml (index) }}}: {{{ escapeHtml this }}}
+                 {{#if (first)}} — first{{/if}}{{#if (last)}} — last{{/if}}</li>
+             {{/each}}
+```
+
+*Parent access* (`../`, the context stack) becomes the explicit `parent` helper. From `with/` and
+`lookup/`:
+
+```text
+Handlebars:  {{#with person}}{{firstname}} works at {{../company.name}}{{/with}}
+Core:        {{#with (lookup this "person")}}
+               {{{ escapeHtml (lookup this "firstname") }}} works at
+               {{{ escapeHtml (lookup (parent) "company" "name") }}}
+             {{/with}}
+
+Handlebars:  {{#each people}}<li>{{this}} lives in {{lookup ../cities @index}}</li>{{/each}}
+Core:        {{#each (lookup this "people")}}
+               <li>{{{ escapeHtml this }}} lives in
+                   {{{ escapeHtml (lookup (lookup (parent) "cities") (index)) }}}</li>
+             {{/each}}
+```
+
+:::note
+The *idiomatic* FlatBars replacement for `../` is to *name the scope* with a block parameter rather
+than walk a stack: `{{#each teams as \|team\|}}…{{#each team.members}}{{team.name}}…`. The
+`parent` helper above is the mechanical, gap-free mapping; block params are the recommended style.
+:::
+
+<a id="partials"></a>
+
+## A.6 Partials
+
+:::note
+*Status.* Partials are implemented via `renderSurfaceWith`: `{{> name}}`,
+`{{> name ctx}}`, dynamic `{{> (expr)}}`, hash context `{{> name k=v}}`, block
+partials `{{#partial name}}body{{/partial}}` (body = fallback + `{{> @partial-block}}`
+yield), and inline partials `{{#*inline "name"}}body{{/inline}}` (the Handlebars decorator
+form, hoisted into the registry) — see [compatibility matrix](/engine/fullbars-compat/) §3. The
+Handlebars `{{#> }}` sigil and the `{{#*inline}}` decorator are the FullBars author
+forms; they desugar internally to the core `partial` / `inline` helpers. The bare
+`{{#inline "name"}}` spelling is *rejected* (`DisallowedShape`) in FullBars — `inline` is a
+decorator, not a block helper to be written bare.
+:::
+
+All partial forms become the engine helpers `partial` (inline and block) and `inline`, plus the
+scoped `partial-block` ([prelude](/engine/prelude/) §6.6; [surface](/engine/surface/) §5.7). The rows below show the
+mapping shape; the FullBars author forms are `{{#partial}}` / `{{#> }}` for block
+partials and the `{{#*inline}}` decorator for inline partials (see the status note above).
+Partials emit *unescaped*.
+
+| Handlebars | Core | Kind |
+| --- | --- | --- |
+| `{{> name}}` | `{{{ partial "name" this }}}` | SURFACE→ENGINE |
+| `{{> name ctx}}` | `{{{ partial "name" (lookup this "ctx") }}}` | SURFACE→ENGINE |
+| `{{> name key=val}}` | `{{{ partial "name" this (dict "key" val') }}}` | SURFACE→ENGINE |
+| `{{> name ctx k=v}}` | `{{{ partial "name" ctx' (dict "k" v') }}}` | SURFACE→ENGINE |
+| dynamic `{{> (lookup . "layout")}}` | `{{{ partial (lookup this "layout") this }}}` | SURFACE→ENGINE |
+| partial block `{{#> layout title="T"}}body{{/layout}}` | `{{#partial> "layout" (dict "title" "T")}}body{{/partial>}}` | SURFACE→ENGINE |
+| `{{> @partial-block}}` | `{{{ partial-block }}}` | SURFACE→ENGINE |
+| inline `{{#*inline "person"}}…{{/inline}}` | `{{#inline "person"}}…{{/inline}}` | SURFACE→ENGINE |
+| partial-block *fallback* | built into `partial>` (renders body if name unregistered) | ENGINE |
+| `explicitPartialContext` | always on — `partial` requires an explicit context; the implicit one is the Surface sugar `partial "name" this` | HOST/DROPPED |
+| `preventIndent` | a `dict` option to `partial`, or a host flag | HOST |
+
+Worked example (`partials/` — dynamic partial + hash):
+
+```text
+Handlebars:  {{> (lookup . "layout") title="Chosen dynamically"}}
+Core:        {{{ partial (lookup this "layout") this (dict "title" "Chosen dynamically") }}}
+```
+
+Worked example (`inline-partials/` — inline partial + partial block + `@partial-block`):
+
+```text
+Handlebars (main):   {{#*inline "person"}}<li>{{name}} — <em>{{role}}</em></li>{{/inline}}
+                     {{#each people}}{{> person}}{{/each}}
+                     {{#> layout title="Team"}}<p>block content</p>{{/layout}}
+
+Core (main):         {{#inline "person"}}
+                       <li>{{{ escapeHtml (lookup this "name") }}} —
+                           <em>{{{ escapeHtml (lookup this "role") }}}</em></li>
+                     {{/inline}}
+                     {{#each (lookup this "people")}}{{{ partial "person" this }}}{{/each}}
+                     {{#partial> "layout" (dict "title" "Team")}}
+                       <p>block content</p>
+                     {{/partial>}}
+
+Handlebars (layout): <div class="body">{{> @partial-block}}</div>
+Core (layout):       <div class="body">{{{ partial-block }}}</div>
+```
+
+<a id="comments-raw-ws"></a>
+
+## A.7 Comments, raw blocks & whitespace
+
+| Handlebars | Surface | Core | Kind |
+| --- | --- | --- | --- |
+| `{{! … }}` | same | CORE comment, discarded (no `}}` inside) | CORE |
+| `{{!-- … --}}` | same | CORE long comment; may contain `}}`/`{{`/`--` | CORE |
+| raw block `{{{{raw}}}}…{{{{/raw}}}}` | same | CORE raw block; body verbatim | CORE |
+| `~` whitespace control | same | CORE; resolved in the lexer | CORE |
+| backslash escape `\{{x}}` | same | CORE; emits the tag literally | CORE |
+| standalone-line auto-trim | same | CORE; on by default (Handlebars parity), configurable via `@trim` / CLI / config | CORE |
+
+Worked example (`whitespace/` + `comments/`):
+
+```text
+Handlebars:  {{~#each items~}}<li>{{this}}</li>{{~/each~}}
+Core:        {{~#each (lookup this "items")~}}<li>{{{ escapeHtml this }}}</li>{{~/each~}}
+
+Handlebars:  \{{ this stays text }}
+Core:        \{{ this stays text }}          (emitted literally; identical)
+
+Handlebars:  {{{{raw}}}}Hello {{name}}{{{{/raw}}}}
+Core:        {{{{raw}}}}Hello {{name}}{{{{/raw}}}}   (verbatim; `raw` engine helper returns body)
+```
+
+:::note
+*Standalone whitespace.* Like Handlebars, FlatBars removes a line that holds only a standalone block
+open/close or a comment, so a control tag leaves no blank line. This is **on by default** and runs as
+a post-tokenize pass in the core. Turn it off per file with `{{! @trim: none }}`, or globally
+with the CLI `--trim none` / `flatbars.json`; explicit `~` composes on top. Output tags and bare
+`{{else}}` separators are never standalone-trimmed. See [directives](/engine/directives/).
+:::
+
+<a id="decorators"></a>
+
+## A.8 Decorators
+
+:::caution
+*Not yet implemented.* FullBars ships no *decorator* helpers; the mapping below is the design
+([compatibility matrix](/engine/fullbars-compat/) §3). Because a decorator is just a block helper
+here, no grammar or core change is needed to add them. (Inline *partials* — Handlebars'
+`{{#*inline}}` decorator — *are* implemented: in FullBars the `{{#*inline}}` decorator
+is the required author form, desugaring internally to the core `inline` block helper rather than to a
+distinct decorator mechanism; the bare `{{#inline}}` spelling is rejected. See
+[prelude](/engine/prelude/) §6.6.)
+:::
+
+Handlebars decorators (`{{#*helper}}`, `{{*helper}}`) modify a block or its `options`. FlatBars
+has no separate decorator concept — *a decorator is just a block helper* that wraps the body.
+
+| Handlebars | FlatBars | Kind |
+| --- | --- | --- |
+| `{{#*inline "n"}}…{{/inline}}` (built-in) | `{{#inline "n"}}…{{/inline}}` engine block helper (A.6) | ENGINE |
+| custom block decorator `{{#*deco}}…{{/deco}}` | an ordinary block helper returning a transformed body | ENGINE |
+| inline decorator `{{*deco arg}}` | a value helper whose effect is a frame mutation it performs in `M` | ENGINE |
+| `registerDecorator` | `register` (same table as helpers) | HOST |
+
+Because FlatBars block helpers already receive the body and the frame, the decorator mechanism is
+subsumed; the `*` marker is not part of the grammar.
+
+<a id="options"></a>
+
+## A.9 Compile & runtime options
+
+Handlebars compile/runtime flags are not template syntax; in FlatBars they are *assembly choices* — which
+engine you register and how its helpers/validation behave.
+
+| Handlebars option | FlatBars | Kind |
+| --- | --- | --- |
+| `noEscape: true` | render core directly (it never escapes), or a Surface variant whose `{{ }}` omits `escapeHtml` | HOST |
+| `strict: true` | register a `lookup` that raises `TypeError` on a missing field instead of `VNull` | HOST/ENGINE |
+| `assumeObjects: true` | a `lookup` variant that skips nullish guards | HOST/ENGINE |
+| `preventIndent: true` | a `partial` option / host flag | HOST |
+| `explicitPartialContext: true` | the *default* — `partial` always takes an explicit context | HOST (default) |
+| `knownHelpers` / `knownHelpersOnly` | inherent: only registered helpers exist; the `validate` pass rejects unknown idents up front | HOST/ENGINE |
+| `data: false` | omit the `@data`-style scoped helpers from the engine | HOST |
+| `compat: true` (recursive parent lookup) | a `lookup`/`get` variant that walks `parent` frames on a miss | ENGINE |
+| custom `helpers`/`partials`/`decorators` | the `Env` you pass to `render` | HOST |
+
+<a id="api"></a>
+
+## A.10 JavaScript API
+
+See [host-api](/engine/host-api/) §7.4 for the full table. Summary: `compile`/`precompile`/`parse` map to the
+FlatBars pipeline; `registerHelper`/`registerPartial`/`registerDecorator` all map to `register`
+(partials and decorators are helpers); `options.fn`/`options.inverse` map to `ctx.render` over the
+body's nodes / over the `else` clause; `SafeString` maps to `VSafe`/`safe`; `escapeExpression` maps
+to `escapeHtml`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
+
+<a id="mustache"></a>
+
+## A.11 Mustache-only features
+
+| Mustache feature | FlatBars | Kind |
+| --- | --- | --- |
+| sections `{{#section}}` (truthy / list / lambda) | write the helper explicitly: `if`/`each` | DROPPED→`if`/`each` |
+| inverted sections `{{^section}}` | FullBars desugars to `{{#unless …}}` | PROVIDED (FullBars) |
+| implicit iterator `{{.}}` | `this` (A.1) | SURFACE |
+| lambdas (functions in the data) | values are never functions; expose behaviour as a helper, or call via `apply` | DROPPED→helper |
+| set delimiters `{{=<% %>=}}` | *not supported* — delimiters are fixed; a host may pre-process the source | DROPPED |
+| HTML-escaping by default | Surface `{{ }}` ⇒ `escapeHtml`; core never escapes | SURFACE |
+
+The *core* parser adopts no section semantics: structurally `{{#x}}` is just "apply the block
+operation `x`". The *FullBars engine* then layers on Handlebars' implicit sections (its lenient
+resolve, `Kernel.Prelude.lenientResolve`): when `x` names no helper — *or* names a prelude value
+helper used as a *bare* block, which has no argument to apply (`{{#count}}…{{/count}}` with a
+numeric `count`) — `x` is read as data and dispatched like Handlebars (array ⇒ `each`, truthy ⇒
+`with`, falsy/empty ⇒ `{{else}}`); see [fullbars-compat](/engine/fullbars-compat/) §4. RawBars keeps the strict resolve
+(unknown / value-as-block ⇒ `UnknownHelper` / arity error), so there you iterate with
+`{{#each x}}…{{/each}}` and branch with `if`/`unless` explicitly. The *inverted* opener
+`{{^x}}` *is* recognized by the core (a `Block` with the `Inverse` sigil); FullBars desugars it
+to `{{#unless x}}`, while RawBars/MaxBars reject it.
+
+<a id="coverage"></a>
+
+## A.12 Coverage checklist
+
+Every Handlebars/Mustache surface element, asserting a mapping exists. A missing ✓ would be a gap.
+
+.Expressions & paths
+* [x] `{{x}}` escaped — A.1
+* [x] `{{{x}}}` triple-stash — A.1
+* [x] dotted / index / segment-literal / slash paths — A.1
+* [x] `this` / `.` / `this.a` — A.1
+* [x] parent `../a`, `../../a` — A.1, A.5
+* [x] string / number / boolean / null / undefined literals — A.2
+
+.Helpers
+* [x] positional args, hash args, subexpressions — A.2
+* [x] `helperMissing` — `UnknownHelper` ([errors](/spec/errors/)); a host MAY override resolution — DROPPED/HOST
+* [x] `blockHelperMissing` — same — DROPPED/HOST
+
+.Blocks & branches
+* [x] block helper `{{#h}}…{{/h}}` — A.3
+* [x] `{{else}}` → a separator — A.3, A.4
+* [x] `{{^h}}` inverted — PROVIDED (FullBars → `unless`; RawBars/MaxBars reject) — A.3, A.11
+* [x] `else if` chaining — A.3
+* [x] block params `as \|a b\|` — A.3, A.5
+* [x] `options.fn` / `options.inverse` — A.3
+* [x] `options.hash` — A.2, A.3
+* [x] `options.data` / `createFrame` — A.3, A.5
+
+.Built-ins
+* [x] `if`, `unless`, `each` (array/object/`@index`/`@key`/`@first`/`@last`/empty-else), `with`, `lookup`, `log` — A.4
+* [x] truthiness rules — A.4
+
+.`@data`
+* [x] `@index`, `@key`, `@first`, `@last`, `@root` — A.5
+* [x] `@../index` and parent data — A.5
+* [x] custom `@data` via frames — A.5
+
+.Partials
+* [x] `{{> p}}`, context, hash params, per-iteration — A.6
+* [x] dynamic partial `{{> (expr)}}` — A.6
+* [x] partial block `{{#> p}}…{{/p}}` + fallback — A.6
+* [x] `{{> @partial-block}}` — A.6
+* [x] inline partial `{{#*inline}}` — A.6, A.8
+* [x] `explicitPartialContext`, `preventIndent` — A.6, A.9
+
+.Comments / raw / whitespace
+* [x] `{{! }}`, `{{!-- --}}` — A.7
+* [x] raw block `{{{{ }}}}` — A.7
+* [x] `~` whitespace control — A.7
+* [x] backslash escape `\{{` — A.7
+* [x] standalone-line trim — PROVIDED, on by default + configurable (`@trim`) — A.7
+
+.Decorators
+* [x] `{{#*inline}}`, custom decorators, `registerDecorator` — A.8
+
+.Options & API
+* [x] `noEscape`, `strict`, `assumeObjects`, `preventIndent`, `explicitPartialContext`,
+  `knownHelpers(Only)`, `data`, `compat` — A.9
+* [x] `compile`, `precompile`, `parse`, `registerHelper/Partial/Decorator`, `SafeString`,
+  `escapeExpression`, `Utils`, `Visitor` — A.10, §7.4
+
+.Mustache-only
+* [x] sections / inverted sections / implicit iterator — A.11
+* [x] lambdas — DROPPED→helper/`apply` — A.11
+* [x] set delimiters — DROPPED (fixed delimiters) — A.11
+
+:::tip
+Intentionally `DROPPED`: *set delimiters* (fixed delimiters). Reframed rather than reproduced:
+*lambdas* (values are never functions; use a
+helper or `apply`), *`helperMissing`/`blockHelperMissing`* (the engine raises `UnknownHelper`; a host
+may layer resolution), and — most importantly — *`{{else}}`*, which is not a core construct at all
+but a separator the engine interprets. Everything else is a faithful mapping. No item is
+left unaddressed — which is the contract.
+:::
+
+<a id="engine-api"></a>
+
+## A.13 Implementing the second stage: the engine API
+
+The tables above say *what* a concrete engine must mean. This section says *how* you build one — and
+the defining property is that *you never write the traversal*. FlatBars owns lexing, parsing,
+delimiter matching, recursion into children, argument evaluation, output assembly, and error/span
+propagation. Your engine plugs in a few small functions; *FlatBars calls them*. This is *inversion of
+control* — the Hollywood principle: **don't call FlatBars; FlatBars calls you.** An engine is
+therefore tiny, and two engines differ only in the functions they plug in, never in traversal code.
+
+There are two entry points, for the two things a second stage does:
+
+*interpret* (with scope):: `runTemplate` — render directly. Helpers receive a *control handle* and
+ask FlatBars to evaluate arguments and render children under environments the helper builds. Top-down;
+FlatBars owns dispatch, arg-evaluation, and assembly.
+*prepare* (analyze / lower):: `foldTemplate` — a catamorphism over the skeleton. The engine supplies
+an *algebra* and FlatBars owns the recursion. Use it to lower the skeleton to your own typed AST, to
+collect diagnostics, or to pretty-print. Bottom-up; FlatBars owns the recursion.
+
+Both invert control. Pick `runTemplate` to *execute*, `foldTemplate` to *prepare*.
+
+:::note
+*What v1 ships.* The polymorphic `Engine m env` / `Ctl m env` / `Helper m env` and the drivers
+`runTemplate` (`Monad m`) and `runString` (`MonadThrow Error m`) are implemented as shown. The
+reference engine, *FullBars*, supplies these instantiations (`renderWith`/`compile`/`renderAff` from
+`FullBars`) at both `m = Either Error` (`renderWith`/`compile`) and
+`m = ExceptT Error Aff` (`renderAff`), proving the monad is pluggable; its environment is the newtype
+`RefEnv m` (a type *synonym* `Env = { … Helper … Env }` would be cyclic — use a newtype). The handle
+carries a `span` (the opening tag's code-unit range; `Span.lineColumn` maps it to line/column), and
+`Ctl.clause`/`splitClause` return `{ before, body }`.
+:::
+
+<a id="engine-api-run"></a>
+
+### A.13.1 Interpreting: `runTemplate`
+
+FlatBars hands every helper a *control handle* `Ctl`. Everything on it is a callback *into* FlatBars:
+
+```haskell
+type Ctl m env =
+  { env      :: env                          -- the current environment (yours)
+  , children :: Template                     -- this block's body ([] for inline calls)
+  , render   :: env -> Template -> m String  -- FlatBars renders a sub-tree for you
+  , eval     :: env -> Expr -> m Value        -- FlatBars evaluates a body expression for you
+  , clause   :: Ident -> { before :: Template, body :: Maybe Template }   -- split at a separator
+  , span     :: Span }                        -- source location, for diagnostics
+
+type Helper m env = Ctl m env -> Array Value -> m Value
+```
+
+:::note
+`eval` evaluates an `Expr` a helper reads out of its own `children` — the dual of `render` (which
+produces a `String`). Positional *arguments* still arrive pre-evaluated as `Array Value`; `eval` is
+for expressions a helper finds inside its body, where it must decide *whether* to evaluate them. The
+reference engine's `elif` is the motivating case: it walks the `{{elif cond}}` clauses in its body and
+`eval`s each `cond` only until one is truthy (short-circuit). `eval` was absent in an earlier `Ctl`
+(no helper needed it then); it returned, without a breaking change, exactly as this note once
+predicted.
+:::
+
+(Chapter 3's `Body` — `{ children, render }` — is just the slice of `Ctl` that most helpers use.)
+What *you* supply is three functions; FlatBars owns everything else:
+
+```haskell
+type Engine m env =
+  { initial   :: env                                -- starting environment + root context
+  , resolve   :: env -> Ident -> m (Helper m env)   -- find a helper (throw UnknownHelper if absent)
+  , stringify :: Value -> m String }                -- how a Value becomes output text
+
+-- FlatBars provides:
+runTemplate :: forall m env. MonadThrow Error m => Engine m env -> Template -> m String
+runString   :: forall m env. MonadThrow Error m => Engine m env -> String   -> m String  -- parse + run
+```
+
+The loop, which lives *inside* FlatBars (informative): for each node it dispatches on the node kind;
+for `Output e` it calls `eval`; for `App n args` it calls `resolve`, evaluates each argument (which
+may recurse), builds a `Ctl`, and applies the helper; for `Block n args body` it does the same but
+puts `body` on the handle as `children` and closes a `render` over the walk. When a block helper
+wants to emit its body it calls `ctl.render` under an environment *it* constructs — and that call
+re-enters FlatBars, which recurses. *That re-entry is the inversion.*
+
+A complete engine for `this`, `lookup`, `escapeHtml`, `if` (with an `else` clause) and `each` — note
+there is no traversal anywhere in it:
+
+```haskell
+newtype Env = Env { ctx :: Value, helpers :: Map Ident (Helper (Either Error) Env) }  -- newtype: a synonym here would be cyclic
+
+engine :: Value -> Engine (Either Error) Env
+engine root =
+  { initial:   { ctx: root, helpers: base }
+  , resolve:   \env n -> note (UnknownHelper n) (Map.lookup n env.helpers)
+  , stringify: pure <<< stringifyValue }
+  where
+  base = Map.fromFoldable
+    [ "this"     /\ \c _        -> pure c.env.ctx
+    , "lookup"   /\ \_ (o : ks) -> pure (foldl index o ks)               -- index by each segment
+    , "escapeHtml" /\ \_ [v]      -> pure (VSafe (escape (stringifyValue v)))
+    , "if"       /\ ifH
+    , "each"     /\ eachH ]
+
+  ifH c [cond] =                                                          -- reads a nested else
+    let cl = c.clause "else"
+    in VSafe <$> c.render c.env (if truthy cond then cl.before else fromMaybe [] cl.body)
+
+  eachH c [VArray xs] =                                                   -- empty -> else clause
+    let cl = c.clause "else"
+    in if null xs
+         then VSafe <$> c.render c.env (fromMaybe [] cl.body)
+         else VSafe <<< fold <$>
+                traverse (\(i /\ x) -> c.render (frame c.env x i) cl.before) (zip (0 .. length xs) xs)
+
+  frame env x i = env { ctx = x                                          -- push a per-element frame
+                      , helpers = env.helpers
+                          # Map.insert "index" (\_ _ -> pure (VNumber (toNumber i)))
+                          # Map.insert "first" (\_ _ -> pure (VBool (i == 0))) }
+
+run :: String -> Value -> Either Error String
+run src data_ = runString (engine data_) src        -- parse Surface upstream if desired
+```
+
+FlatBars matched every `{{/each}}`, evaluated `(lookup this "x")` left-to-right, split the
+`else` clause, recursed per element, and concatenated the output. The engine only stated *what each
+name means* and *when to render its children*.
+
+<a id="engine-api-fold"></a>
+
+### A.13.2 Preparing the AST: `foldTemplate`
+
+To *prepare* rather than execute — lower the skeleton into your own typed AST, validate it, or
+print it — supply an *algebra*. FlatBars drives the recursion; the block case is handed the raw
+`children` (so it can resolve clauses) *and* a FlatBars-provided `recurse` to fold any sub-range:
+
+```haskell
+type Algebra a =
+  { content :: String -> a
+  , output  :: Expr   -> a
+  , raw     :: Ident -> Array Expr -> String -> a
+  , block   :: { name :: Ident, args :: Array Expr
+               , children :: Template, recurse :: Template -> a } -> a   -- recurse is FlatBars'
+  , concat  :: Array a -> a }                                            -- combine siblings
+
+foldTemplate :: forall a. Algebra a -> Template -> a       -- FlatBars owns the traversal
+```
+
+*Lowering* a skeleton into a typed engine AST that resolves `if`/`else` into one node — the
+"prepare the AST" the title asks for:
+
+```haskell
+data Stmt = Text String | Emit Expr
+          | If Expr (Array Stmt) (Array Stmt) | Loop Expr (Array Stmt) | Call Ident (Array Expr) (Array Stmt)
+
+lower :: Algebra (Array Stmt)
+lower =
+  { content: \s -> [Text s]
+  , output:  \e -> [Emit e]
+  , raw:     \_ _ s -> [Text s]
+  , concat:  join
+  , block: \{ name, args, children, recurse } -> case name of
+      "if"   -> let cl = splitClause "else" children
+                in [ If (head args) (recurse cl.before) (recurse (fromMaybe [] cl.body)) ]
+      "each" -> [ Loop (head args) (recurse children) ]
+      _      -> [ Call name args (recurse children) ] }
+
+prepared :: Template -> Array Stmt
+prepared = foldTemplate lower            -- a validated, clause-resolved AST, in one call
+```
+
+The *same* `foldTemplate` is a validator when `a = Array Issue` — walk once, accumulate the
+engine's schema violations with spans, no traversal written:
+
+```haskell
+checker :: Set Ident -> Algebra (Array Issue)
+checker known =
+  { content: const [], raw: \n _ _ -> nameDiag known n, concat: join
+  , output:  exprDiags known
+  , block: \{ name, args, children, recurse } ->
+      nameDiag known name <> foldMap (exprDiags known) args <> recurse children }
+
+validate' :: Template -> Array Issue
+validate' = foldTemplate (checker preludeNames)
+```
+
+<a id="engine-api-summary"></a>
+
+### A.13.3 What FlatBars does, and what you do
+
+| FlatBars owns (you never write it) | You supply (small, declarative) |
+| --- | --- |
+| lex, parse, match `{{/name}}`, drop comments, apply `~` | `initial` env / root context |
+| recurse into bodies; fold siblings; thread `M` | `resolve :: env -> Ident -> m Helper` |
+| evaluate `Expr` trees; eval args left-to-right | `stringify :: Value -> m String` |
+| build the `Ctl` handle; provide `render`/`eval`/`recurse` | each `Helper` (what a name *means*; when to render `children`) |
+| attach source spans; raise structural errors | optionally, an `Algebra` for a prepare/validate pass |
+
+The [reference engine](/engine/prelude/) (Chapter 6) is *exactly one* `Engine`: the `base` map above
+grown to the full helper set, with `else`/clauses read the same way. Swap the map and you have a
+different engine; the traversal — FlatBars — is unchanged. That is the whole point of a construction
+kit.

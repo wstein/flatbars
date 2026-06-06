@@ -1,0 +1,158 @@
+---
+title: 2. Syntactic grammar
+---
+
+This is the *complete* core grammar. It produces a *skeleton AST* — structure with no meaning. There
+is one output form, one application shape, and one block form. Everything a Handlebars user expects
+beyond that is built in the [surface dialect](/engine/surface/) or supplied by the
+[engine walk](/engine/prelude/).
+
+## 2.1 Grammar (normative)
+
+```text
+Template  ::= Node*
+
+Node      ::= Content                                   (* literal text *)
+            | Output
+            | Block
+            | RawBlock
+            | Separator
+            (* Comments are removed by the lexer and never appear here. *)
+
+Output    ::= "{{{" Expr "}}}"
+            | "{{"  Literal "}}"        (* a bare literal — the same value as the triple form *)
+
+Block     ::= "{{#"   Ident Arg* "}}"
+                  Template
+              "{{/" Ident "}}"
+
+RawBlock  ::= "{{{{#" Ident Arg* "}}}}"
+                  RawText
+              "{{{{/" Ident "}}}}"
+
+Separator ::= "{{" Ident Arg* "}}"      (* a bare double-stash marker; the name carries no meaning *)
+
+Expr      ::= Literal
+            | Ident Arg*            (* application; zero args = nullary call *)
+            | "(" Expr ")"          (* grouping; a no-op around a whole expression *)
+
+Arg       ::= Literal
+            | Ident                 (* a bare ident in argument position is a nullary call *)
+            | "(" Expr ")"          (* group a nested application into one argument *)
+
+Literal   ::= String | Number
+
+Ident, String, Number, RawText    (* from the lexer; see Chapter 1 *)
+```
+
+A `Block` captures exactly one `Template`; it has no built-in inverse. Branching is written with
+`Separator` markers — the bare double-stash `{{ Ident Arg* }}` — which the parser keeps as
+meaningless `Sep` nodes for the engine walk to interpret (§2.4, [concepts](/concepts/) §5). A block's
+opener carries a *sigil* the core records but never interprets: `Section` (`{{#x}}`),
+`Inverse` (`{{^x}}` / the triple `{{{^x}}}`), `PartialBlock` (`{{#>x}}`), or
+`Decorator` (`{{#*x}}`). The last two carry a *clean* head (the partial / decorator name, with
+no `>` / `*`) and a `{{/…}}` close that repeats it; each is opt-in via a `ParseOptions` flag
+(`partialBlocks` / `decorators`), and a dialect that gates it off rejects the opener as a located
+`DisallowedShape` (the same gating `extras` applies to `Inverse`).
+
+## 2.2 Reading the grammar
+
+One structure runs through all of it: *an application is an operator followed by arguments*, with the
+operator *immediately after an opening bracket*. There are three brackets:
+
+| Bracket | Opens with | Yields |
+| --- | --- | --- |
+| grouping | `(` … `)` | a value |
+| output | `{{{` … `}}}` | writes a value (takes exactly one `Expr`) |
+| block | `{{#` … `{{/n}}` | writes a value, *and* captures its body as a sub-tree |
+
+Because the output bracket takes *exactly one* `Expr`, and `Expr ::= Ident Arg*` is itself a whole
+application, you write top-level applications *without* parentheses:
+
+```text
+{{{lookup this "age"}}}     ok: one Expr, operator lookup with two args
+{{{f a b}}}                 ok: operator f, args a and b
+{{{(lookup this "age")}}}   redundant: the outer group wraps the whole Expr — a no-op
+```
+
+Parentheses are needed only to nest one application *inside another* as an argument, as in
+`{{{upcase (lookup this "name")}}}`. The head of an application is always an `Ident`; a group
+never appears in head position.
+
+## 2.3 Block heads must be identifiers
+
+The block opener is `{{# Ident Arg* }}` — the operator is a bare `Ident`, with the same
+argument rules as an inline application — and `{{/Ident}}` must repeat that identifier so the
+parser can match nesting. *Computed block helpers are not expressible*: there is no
+`{{#(pick) …}}`. This is the one place the "head is always a name" rule is enforced
+syntactically, and it is what makes `{{/each}}` unambiguous.
+
+## 2.4 Separators
+
+A block helper that wants alternatives reads them from *its own body*, split at `Separator` markers.
+A separator is the double-stash whose head is an identifier, `{{ Ident Arg* }}` (a bare-literal
+double-stash `{{ Literal }}` is `Output` instead — §2.1). The parser keeps a separator as a
+flat `Sep` node; it never interprets the name:
+
+```text
+{{#if cond}}A{{else}}B{{/if}}
+
+parses to:
+
+Block "if" [App "cond" []]
+  [ Content "A"
+  , Sep "else" []
+  , Content "B" ]
+```
+
+The parser assigns `else` no special status — `{{else}}`, `{{elif x}}`,
+`{{case 1}}`, `{{default}}` all parse to a `Sep` whose head is that identifier. The
+engine's `if` helper splits its body at the `else` separator ([evaluation](/spec/evaluation/),
+[prelude](/engine/prelude/)); a `switch` helper might split at `case`. The word never lands in the lexer or
+parser. A separator's head may not begin with the reserved sigils `# / ! {` (those open other tags).
+
+A few consequences the parser does *not* legislate, leaving them to the engine:
+
+* *Standalone separator.* A `Sep` with no enclosing block to interpret it is not a parse error; the
+  reference engine (*FullBars*) renders it as the application of its head, i.e. `{{x}}` ≡ `{{{x}}}`
+  when not consumed ([evaluation](/spec/evaluation/) §3.5). A standalone `{{else}}` thus just invokes
+  the (inert) `else` helper and yields nothing.
+* *Repeated separators.* A block may contain several `Sep` nodes (`{{case}}` … `{{case}}`
+  … `{{default}}`). The parser keeps them all as siblings; how many a helper recognizes, and
+  in what order, is the helper's contract. `splitClauses` returns *every* separator-delimited section
+  (`{ before, clauses }`, each clause bounded by the next separator) — the primitive a multi-way
+  helper folds over; `splitClause name` is the convenience that picks the first clause of one name.
+
+## 2.5 What is *not* in the grammar
+
+To make "no sugar in core" auditable, here is what a Handlebars author will look for and not find — each
+has a home in the surface dialect or the engine:
+
+| Absent from the core | Where it lives |
+| --- | --- |
+| `{{ }}` *as escaped output* | surface → `{{{ escapeHtml … }}}`. (In the core a bare `{{ Ident … }}` is a *separator* marker, §2.4 — not output.) |
+| `{{^}}` inverse opener | recognized as a `Block` with the `Inverse` sigil (meaning-free); FullBars desugars it to `unless`, RawBars/MaxBars reject it. (`{{else}}` *is* in the core: a separator.) |
+| dotted/parent paths `a.b`, `../a`, `this.a` | surface → `lookup` / `parent` |
+| index & segment-literal paths `a.1`, `a.[k v]` | surface → `lookup` with number / string segments |
+| `@index`, `@key`, `@root`, … | surface → scoped engine helpers `index`, `key`, `root`, … |
+| hash arguments `key=val` | surface → trailing `(dict "key" val)` argument |
+| block params `as \|x i\|` | surface → binding-name arguments to the block helper |
+| `true` / `false` / `null` / `undefined` | engine helpers `(true)` `(false)` `(null)` |
+| partial reference `{{> p}}` | surface → `partial` helper |
+| partial block `{{#> p}}`, inline-partial decorator `{{#*inline}}` | a core `PartialBlock` / `Decorator` sigil (opt-in via `partialBlocks` / `decorators`); the surface maps them onto the `partial` / `inline` helpers |
+| decorator `{{* …}}` | engine block helper |
+
+## 2.6 Worked parse
+
+```text
+template:  <li>{{{escapeHtml (lookup this "name")}}} — {{{index}}}</li>
+
+Node[0] = Content "<li>"
+Node[1] = Output (App "escapeHtml"
+                       [ App "lookup" [ App "this" [], Str "name" ] ])   <1>
+Node[2] = Content " — "
+Node[3] = Output (App "index" [])
+Node[4] = Content "</li>"
+```
+&lt;1> The group `(lookup this "name")` is parsed away — grouping affects parsing only and leaves no
+node. The abstract syntax is specified in [evaluation](/spec/evaluation/).
