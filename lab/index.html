@@ -3252,6 +3252,7 @@
       let lastEscapeRuns = null;    // #5: { html, plain, raw, total }
       let lastCoverage = [];        // #7: [{ kind, file, start, end, line, col, executed, count }]
       let lastAnalyse = { ok: true, findings: [] }; // ADR-022: truthiness portability (Truthiness panel)
+      let lastAnalyseSuppressed = 0; // ADR-030: count of potential/miss findings the pathSchema removed
       let lastLint = { ok: true, findings: [] }; // ADR-019: canonicalization lint findings (Lint panel)
       let lastRequiredAssigns = []; // engine reflection: assign names the program reads
       let lastMissingAssigns = [];  // intersection: requiredAssigns NOT in current data
@@ -3768,11 +3769,20 @@
         // findings for the Truthiness dock panel (FlatBars engine only). ADR-030:
         // when config.yaml declares safe paths, route through analyzeWith so the
         // panel suppresses those paths' potential + miss findings.
-        lastAnalyse = typeof renderer.analyze !== "function"
-          ? { ok: true, findings: [] }
-          : (labPathSchema.length && typeof renderer.analyzeWith === "function")
-            ? renderer.analyzeWith((p) => !labPathSchema.includes(p), { source: mainSource }, data)
-            : renderer.analyze({ source: mainSource }, data);
+        lastAnalyseSuppressed = 0;
+        if (typeof renderer.analyze !== "function") {
+          lastAnalyse = { ok: true, findings: [] };
+        } else if (labPathSchema.length && typeof renderer.analyzeWith === "function") {
+          // ADR-030: the schema'd pass is what the panel shows; an unschema'd pass
+          // counts how many potential/miss findings the schema removed (advisory
+          // findings only — observed findings are never suppressed).
+          lastAnalyse = renderer.analyzeWith((p) => !labPathSchema.includes(p), { source: mainSource }, data);
+          const unsch = renderer.analyze({ source: mainSource }, data);
+          const advisory = (r) => (r.findings || []).filter((f) => f.kind === "potential" || f.kind === "miss").length;
+          if (lastAnalyse.ok && unsch.ok) lastAnalyseSuppressed = Math.max(0, advisory(unsch) - advisory(lastAnalyse));
+        } else {
+          lastAnalyse = renderer.analyze({ source: mainSource }, data);
+        }
         // ADR-019: deprecated-alias + non-canonical scoped-variable findings for
         // the active dialect (the Lint dock panel; FlatBars engines only).
         lastLint = typeof renderer.lint === "function"
@@ -5882,8 +5892,9 @@
         // potential/miss findings for those paths are suppressed, so this explains
         // why they're absent (the interactive suppression demo).
         if (labPathSchema.length) {
+          const n = lastAnalyseSuppressed;
           section.append(makeEl("div", { class: "cv-hint" },
-            `PathSchema active — suppressing potential & miss findings for ${labPathSchema.map((p) => "`" + p + "`").join(", ")} (config.yaml → analyse.pathSchema).`));
+            `PathSchema active (${n} suppressed) — hiding potential & miss findings for ${labPathSchema.map((p) => "`" + p + "`").join(", ")} (config.yaml → analyse.pathSchema).`));
         }
         if (a.findings.length === 0) {
           section.append(makeEl("div", { class: "cv-empty" },
