@@ -1,0 +1,38 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * Shared UI component primitives — the cross-app "look" BEYOND the shared topbar.
+ * These classes read ONLY the shared chrome tokens (shared/flatbars-chrome.css),
+ * so a button or pill renders identically in any front end that opts in. This is
+ * the single source for those component styles; adopt it incrementally (the
+ * /tutorials/ overview is the first consumer — the landing, spec and Lab can move
+ * their bespoke equivalents onto these classes as each is visually reviewed).
+ *
+ * No raw colours here (check:no-raw-colors): every value is a token or a constant
+ * (pure white text on the accent fill, which is AA in both themes).
+ */
+
+/* Primary action button. `.fb-btn--ghost` is the secondary (outline) variant. */
+.fb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.98rem;
+  padding: 0.8rem 1.4rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.fb-btn:hover {
+  background: var(--accent-2);
+}
+.fb-btn .arrow {
+  transition: transform 0.15s ease;
+}
+.fb-btn:hover .arrow {
+  transform: translateX(3px);
+}
