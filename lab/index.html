@@ -59,13 +59,14 @@
         --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 6px 20px -12px rgba(60, 27, 107, 0.22);
         /* @chrome end */
 
-        /* IDE surfaces (atop the shared --bg/--bg-1/2/3). */
-        --bg-toolbar: #ffffff;
-        --bg-statusbar: #faf8ff;
-        --bg-tab-active: #ffffff;
+        /* IDE surfaces — DERIVED from the shared base so they track the umbrella in
+           both themes (no per-theme overrides needed; the dark block drops them). */
+        --bg-toolbar: var(--bg);
+        --bg-statusbar: var(--bg-1);
+        --bg-tab-active: var(--bg-2);
         --bg-tab-inactive: transparent;
-        --bg-pane: #ffffff;
-        --bg-gutter: #f7f4fe;
+        --bg-pane: var(--bg);
+        --bg-gutter: var(--bg-1);
 
         /* Brand greens — Lab-only. */
         --stem-green: #10b981;    /* Growth Green · green-5 */
@@ -1176,9 +1177,8 @@
         --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
         --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
         /* @chrome end */
-        /* IDE-specific dark surfaces. */
-        --bg-toolbar: #16141d; --bg-statusbar: #121019;
-        --bg-tab-active: #232030; --bg-pane: #1b1925; --bg-gutter: #16141d;
+        /* IDE surfaces are derived from the base in :root (var(--bg…)) and flip
+           automatically — no dark overrides here. */
         /* Lab-only dark accent tints — shared leaves --accent-soft/softer to its
            :root color-mix; the Lab tunes them for the editor surfaces. */
         --accent-soft: #2e2747; --accent-softer: #221d36;

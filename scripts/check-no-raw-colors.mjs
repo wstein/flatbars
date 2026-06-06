@@ -31,9 +31,13 @@ const stripFences = (s) =>
 const isBlackWhite = (h) => /^#(fff|000|ffffff|000000)$/i.test(h);
 
 // Per-file raw-colour budget. 0 = pinned single-source (must stay tokenised).
-// A non-zero budget is a documented ratchet for legacy colours still to be
-// tokenised (Lab IDE surfaces + editor theme, the live-example card CSS, the YAML
-// data colours); shrink it as they move to the shared base.
+// A non-zero budget is a documented ratchet for the remaining CONTENT/EDITOR
+// palettes — not chrome (the chrome is fully single-sourced and pinned at 0
+// below). These are per-feature, theme-fixed colour sets that need a dedicated
+// shared token group + a visual review to retire safely: the YAML data-editor
+// colours, the live-example analysis/lint legend, and the Lab's editor-syntax
+// (--tok-*) + brand-green tokens. The Lab's IDE *surfaces* were already derived
+// from the base (var(--bg…)). Shrink each budget as a palette moves to shared.
 const BUDGET = {
   "tutorials/src/styles/docs-chrome.css": 0,
   "tutorials/src/styles/reference-content.css": 0,
@@ -41,9 +45,9 @@ const BUDGET = {
   "tutorials/src/pages/tutorials.astro": 0,
   "tutorials/src/layouts/Reference.astro": 0,
   "spec/src/styles/spec.css": 0,
-  "tutorials/src/styles/lab-tokens.css": 8, // the --yaml-* data colours
-  "tutorials/src/styles/open-in-lab.css": 41, // live-example card chrome
-  "lab/index.html": 29, // IDE surfaces + CodeMirror editor theme
+  "tutorials/src/styles/lab-tokens.css": 8, // --yaml-* data-editor colours
+  "tutorials/src/styles/open-in-lab.css": 41, // live-example analysis/lint legend (fixed, on dark panes)
+  "lab/index.html": 22, // editor-syntax (--tok-*) + brand greens + accent tints
 };
 
 let fails = 0;
