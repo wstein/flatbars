@@ -1,0 +1,209 @@
+{
+  "sidebar": [
+    {
+      "label": "Introduction",
+      "items": [
+        {
+          "label": "Introduction",
+          "link": "/"
+        },
+        {
+          "label": "The core model",
+          "link": "/concepts/"
+        }
+      ]
+    },
+    {
+      "label": "Architecture decisions",
+      "items": [
+        {
+          "label": "ADR-001: structural parser + walker",
+          "link": "/adr/adr-0001-structural-parser-and-walker/"
+        },
+        {
+          "label": "ADR-002: escaping & value policy",
+          "link": "/adr/adr-0002-escaping-and-value-policy/"
+        },
+        {
+          "label": "ADR-003: strict layering",
+          "link": "/adr/adr-0003-strict-layering/"
+        },
+        {
+          "label": "ADR-004: token lexer & seams",
+          "link": "/adr/adr-0004-token-lexer-and-grammar-seams/"
+        },
+        {
+          "label": "ADR-005: dialect ladder",
+          "link": "/adr/adr-0005-dialect-ladder/"
+        },
+        {
+          "label": "ADR-006: MaxBars loop variables",
+          "link": "/adr/adr-0006-maxbars-loop-variables/"
+        },
+        {
+          "label": "ADR-007: MinBars peer engine",
+          "link": "/adr/adr-0007-minbars/"
+        },
+        {
+          "label": "ADR-008: RawBars base dialect",
+          "link": "/adr/adr-0008-rawbars/"
+        },
+        {
+          "label": "ADR-009: FullBars reference engine",
+          "link": "/adr/adr-0009-fullbars/"
+        },
+        {
+          "label": "ADR-010: header directives",
+          "link": "/adr/adr-0010-header-directives/"
+        },
+        {
+          "label": "ADR-011: compile to JS",
+          "link": "/adr/adr-0011-compile-to-js/"
+        },
+        {
+          "label": "ADR-012: recursion budget",
+          "link": "/adr/adr-0012-recursion-budget/"
+        },
+        {
+          "label": "ADR-013: labelled loops (proposed)",
+          "link": "/adr/adr-0013-labelled-loops/"
+        },
+        {
+          "label": "ADR-014: highlighting from the lexer",
+          "link": "/adr/adr-0014-highlighting-derives-from-lexer/"
+        },
+        {
+          "label": "ADR-015: set delimiters",
+          "link": "/adr/adr-0015-set-delimiters/"
+        },
+        {
+          "label": "ADR-016: MinBars compile-to-JS",
+          "link": "/adr/adr-0016-minbars-compile/"
+        },
+        {
+          "label": "ADR-017: editor support (LSP + TextMate) (proposed)",
+          "link": "/adr/adr-0017-editor-support-lsp/"
+        },
+        {
+          "label": "ADR-018: user-defined helpers (registerHelper)",
+          "link": "/adr/adr-0018-user-defined-helpers/"
+        },
+        {
+          "label": "ADR-019: operation vocabulary (proposed)",
+          "link": "/adr/adr-0019-operation-vocabulary/"
+        },
+        {
+          "label": "ADR-020: user block helpers (proposed)",
+          "link": "/adr/adr-0020-user-block-helpers/"
+        },
+        {
+          "label": "ADR-021: MaxBars/RawBars variable model (proposed)",
+          "link": "/adr/adr-0021-maxbars-variable-model/"
+        },
+        {
+          "label": "ADR-022: truthiness lambda + analyse mode (proposed)",
+          "link": "/adr/adr-0022-analyse-mode/"
+        },
+        {
+          "label": "ADR-023: recovering parser (diagnostics)",
+          "link": "/adr/adr-0023-recovering-parser/"
+        },
+        {
+          "label": "ADR-024: `let` & dict literal (proposed)",
+          "link": "/adr/adr-0024-let-and-dict-literal/"
+        },
+        {
+          "label": "ADR-025: list literal & `list` helper (proposed)",
+          "link": "/adr/adr-0025-list-literal/"
+        },
+        {
+          "label": "ADR-026: editor capability matrix",
+          "link": "/adr/adr-0026-editor-capability-matrix/"
+        },
+        {
+          "label": "ADR-027: cross-template scope graph (proposed)",
+          "link": "/adr/adr-0027-cross-template-scope-graph/"
+        },
+        {
+          "label": "ADR-028: hybrid host+FlatBars LSP (proposed)",
+          "link": "/adr/adr-0028-hybrid-template-lsp/"
+        },
+        {
+          "label": "ADR-029: i18n helper",
+          "link": "/adr/adr-0029-i18n-helper/"
+        },
+        {
+          "label": "ADR-030: symbolic analyse + PathSchema seam",
+          "link": "/adr/adr-0030-symbolic-analyse/"
+        },
+        {
+          "label": "ADR-031: spec site → Starlight (proposed)",
+          "link": "/adr/adr-0031-spec-site-starlight/"
+        },
+        {
+          "label": "Final ADR review (2026-06-01)",
+          "link": "/adr/adr-final-review/"
+        }
+      ]
+    },
+    {
+      "label": "Specification",
+      "items": [
+        {
+          "label": "1. Lexical structure",
+          "link": "/spec/lexical/"
+        },
+        {
+          "label": "2. Syntactic grammar",
+          "link": "/spec/grammar/"
+        },
+        {
+          "label": "3. The skeleton AST & the walk",
+          "link": "/spec/evaluation/"
+        },
+        {
+          "label": "4. Validation & errors",
+          "link": "/spec/errors/"
+        }
+      ]
+    },
+    {
+      "label": "Building an engine",
+      "items": [
+        {
+          "label": "5. The surface dialect (sugar)",
+          "link": "/engine/surface/"
+        },
+        {
+          "label": "6. The reference engine",
+          "link": "/engine/prelude/"
+        },
+        {
+          "label": "7. Host API",
+          "link": "/engine/host-api/"
+        },
+        {
+          "label": "Header directives (@trim) + truthiness model",
+          "link": "/engine/directives/"
+        },
+        {
+          "label": "The FullBars dialect (vs Handlebars)",
+          "link": "/engine/fullbars-compat/"
+        },
+        {
+          "label": "The MaxBars dialect (operators & pipes)",
+          "link": "/engine/maxbars/"
+        }
+      ]
+    },
+    {
+      "label": "Appendix",
+      "items": [
+        {
+          "label": "A. Handlebars.js → FlatBars, with no gaps",
+          "link": "/appendix/handlebars/"
+        }
+      ]
+    }
+  ]
+}

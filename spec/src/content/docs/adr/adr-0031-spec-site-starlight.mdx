@@ -24,8 +24,12 @@ so no conversion artefacts were locked into the contract. The four `docs/`-readi
 gates were repointed to the MDX (`check:catalog` emits only the MDX partial,
 `check:adr-nav` validates `src/sidebar.ts`, `check:glossary` reads the MDX,
 `gen:tokens` drops the docs copy), and the deploy workflow builds the Starlight
-site at `/flatbars/spec/`. Follow-ups: Mermaid diagram rendering, `starlight-versions`
-on the `0.1.0` tag, and the live engine panes.
+site at `/flatbars/spec/`. Mermaid diagram rendering (astro-mermaid) and a live
+engine pane (the real engine, in `concepts`) have since shipped. *Versioning is
+deliberately deferred:* while `content/docs` **is** 0.1.0, a `starlight-versions`
+snapshot is a byte-identical duplicate of the whole contract (46→91 pages) with no
+reader value — the bloat D3 limits. Enable it at the 0.2.0 cut (one config line;
+see `spec/astro.config.mjs`).
 
 ## Context
 
