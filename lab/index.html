@@ -534,15 +534,20 @@
       .cm-dead-line { background: repeating-linear-gradient(
         135deg, transparent 0 6px, color-mix(in srgb, var(--fg-muted) 8%, transparent) 6px 7px); }
       .cm-dead-line .cm-line { opacity: 0.55; }
-      .editor-pane .cm-gutters {
+      /* The output view (.src-view) shares the editors' gutter theme, so the
+         line-number column reads the same on both sides (no stray light strip). */
+      .editor-pane .cm-gutters,
+      .src-view .cm-gutters {
         background: var(--bg-gutter); border-right: 1px solid var(--border);
         color: var(--fg-faint); min-width: 38px;
       }
       /* Line numbers off → remove the gutter entirely (the line-number + active-line
          gutters drop via the compartment; this also hides the lint gutter so no
          empty column is left behind). Lint still shows as inline underlines. */
-      body:not(.show-line-numbers) .editor-pane .cm-gutters { display: none; }
-      .editor-pane .cm-activeLineGutter { background: var(--accent-softer); color: var(--fg-muted); }
+      body:not(.show-line-numbers) .editor-pane .cm-gutters,
+      body:not(.show-line-numbers) .src-view .cm-gutters { display: none; }
+      .editor-pane .cm-activeLineGutter,
+      .src-view .cm-activeLineGutter { background: var(--accent-softer); color: var(--fg-muted); }
       .editor-pane .cm-content { padding: 8px 0; }
       .editor-pane .cm-line { padding: 0 12px; }
       .editor-pane .cm-selectionBackground { background: var(--accent-soft) !important; }
