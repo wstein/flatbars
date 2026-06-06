@@ -1,15 +1,14 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
- * Shared design TOKENS — the FlatBars Lab's violet palette + IBM Plex families,
- * lifted as CSS custom properties only (NOT the Lab's component CSS). The debate
- * consensus (item 6): visual continuity to the Lab when a reader clicks
- * "Open in Lab", with a single place to retune and no risk of the Lab's large
- * committed stylesheet drifting against a copy.
+ * Highlighter TOKENS for the tutorials — the seven-family syntax palette (--c-*),
+ * the YAML data colours, and the JSONata colours, plus the `.tk-*` / `.y-*` /
+ * `.j-*` class rules that paint them. The CHROME tokens (palette, IBM Plex,
+ * violet accent, light/dark) live in the single shared source
+ * `shared/flatbars-chrome.css`, imported alongside this file by BaseHead — so the
+ * tutorials, the spec and the Lab can't drift on the chrome.
  *
- * Theme is an EXPLICIT [data-theme] on <html> (set by the anti-flash script in
- * BaseHead before first paint, toggled by the topbar Theme control) — not
- * prefers-color-scheme — so the toggle can override the OS preference. The
- * anti-flash seed still falls back to the OS preference on first visit.
+ * Theme is an EXPLICIT [data-theme] on <html> (set by the anti-flash seed before
+ * first paint, toggled by the shared topbar) — not prefers-color-scheme.
  *
  * The syntax palette below (--c-*) is the SINGLE SOURCE for the inner-token
  * highlighter (.tk-*) used by the live examples, the inline prose tags, AND the
@@ -17,43 +16,6 @@
  * palette, mapped per token ROLE, so the legend can never lie about the
  * examples. */
 :root {
-  color-scheme: light;
-
-  --font-ui: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-
-  /* Backgrounds */
-  --bg: #ffffff;
-  --bg-1: #faf8ff;
-  --bg-2: #f2effc;
-  --bg-3: #e8e3f8;
-
-  /* Foregrounds */
-  --fg: #18181b;
-  --fg-secondary: #3b1b6b;
-  --fg-muted: #5b4d92;
-  --fg-faint: #6f5f99;
-
-  /* Borders */
-  --border: #ddd6f8;
-  --border-strong: #c8bff2;
-
-  /* Accent — kept at the Lab's deep violet (visual continuity to the Lab), NOT
-     the mockup's lighter #7c4dff. The soft/softer tints are color-mixed against
-     --bg so they track both the accent and the mode. */
-  --accent: #6d28d9;
-  --accent-2: #4c1d95;
-  --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
-  --accent-softer: color-mix(in srgb, var(--accent) 9%, var(--bg));
-
-  /* Status */
-  --danger: #b91c1c;
-  --danger-faint: #fee2e2;
-  --success: #10b981;
-  --success-faint: #dcfce7;
-  --warn: #b45309;
-  --warn-faint: #fef3c7;
-
   /* ── Unified syntax palette — shared by the inner-token highlighter (.tk-*)
      across the live examples, inline prose tags, AND the colour-legend popover
      (painted through the same engine). Mapped per token ROLE, one palette. ── */
@@ -76,45 +38,9 @@
   --yaml-str: #16a34a;
   --yaml-num: #ea580c;
   --yaml-kw: #c026d3;
-
-  --radius: 6px;
-  --radius-lg: 10px;
-  --shadow-pop: 0 12px 32px -8px rgba(24, 24, 27, 0.18), 0 0 0 1px rgba(24, 24, 27, 0.06);
-  --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 6px 20px -12px rgba(60, 27, 107, 0.22);
-
-  /* The output "screen" — a dark pane, same in light and dark mode. */
-  --out-bg: #1b1923;
-  --out-fg: #ece9f5;
 }
 
 [data-theme="dark"] {
-  color-scheme: dark;
-
-  --bg: #16141d;
-  --bg-1: #1b1925;
-  --bg-2: #232030;
-  --bg-3: #2c2940;
-
-  --fg: #ece9f5;
-  --fg-secondary: #c5bedd;
-  --fg-muted: #968fb0;
-  --fg-faint: #8a83a6;
-
-  --border: #2c2940;
-  --border-strong: #423c5c;
-
-  /* In dark mode the accent lifts for contrast; --accent-soft/softer are NOT
-     overridden — the :root color-mix re-resolves against the dark accent+bg. */
-  --accent: #9b7dff;
-  --accent-2: #bca6ff;
-
-  --danger: #f87171;
-  --danger-faint: #3a1414;
-  --success: #4ade80;
-  --success-faint: #14321f;
-  --warn: #fbbf24;
-  --warn-faint: #3a2e10;
-
   /* @palette dark · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
   --c-expr: #79c0ff;
   --c-raw: #a5d6ff;
@@ -133,9 +59,6 @@
   --yaml-str: #86efac;
   --yaml-num: #fdba74;
   --yaml-kw: #f0abfc;
-
-  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
 }
 
 /* ── Inner-token syntax classes — the VS Code "2026-dark" look, emitted by the

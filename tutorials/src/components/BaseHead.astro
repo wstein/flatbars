@@ -7,6 +7,10 @@
 // can't drift on fonts or token wiring again — they had already diverged (the
 // landing was missing a Mono weight and the preconnects). `title` is the full
 // <title> string the page wants.
+// The umbrella chrome tokens (single source) + the syntax palette / YAML / JSONata
+// token rules (lab-tokens.css). The chrome must load first so its `:root` values
+// are in place; lab-tokens.css now carries only the highlighter tokens.
+import "../../../shared/flatbars-chrome.css";
 import "../styles/lab-tokens.css";
 
 const { title } = Astro.props;

@@ -48,7 +48,7 @@ function blockDecls(css, selector) {
   return out;
 }
 const tokensCss = read("shared/flatbars-tokens.css");
-const chromeCss = read("tutorials/src/styles/lab-tokens.css");
+const chromeCss = read("shared/flatbars-chrome.css");
 
 const MODES = {
   light: { tokens: blockDecls(tokensCss, ":root"), bg: blockDecls(chromeCss, ":root")["--bg"], solidText: "#ffffff" },
