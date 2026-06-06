@@ -1154,8 +1154,16 @@
         --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
         --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
         /* @chrome end */
-        /* IDE surfaces are derived from the base in :root (var(--bg…)) and flip
-           automatically — no dark overrides here. */
+        /* IDE surfaces are var(--bg…) of the base. Custom properties resolve at
+           their DECLARING scope, so the :root copies bake in the light base and
+           inherit unchanged into this (body-scoped) dark theme — leaving the editor
+           panes white. Re-derive them here so var() re-resolves against the dark base. */
+        --bg-toolbar: var(--bg);
+        --bg-statusbar: var(--bg-1);
+        --bg-tab-active: var(--bg-2);
+        --bg-tab-inactive: transparent;
+        --bg-pane: var(--bg);
+        --bg-gutter: var(--bg-1);
         /* Lab-only dark accent tints — shared leaves --accent-soft/softer to its
            :root color-mix; the Lab tunes them for the editor surfaces. */
         --accent-soft: #2e2747; --accent-softer: #221d36;
