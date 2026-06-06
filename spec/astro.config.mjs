@@ -69,8 +69,14 @@ export default defineConfig({
     starlight({
       title: "FlatBars",
       description: "The normative specification for FlatBars — a template-engine construction kit.",
-      // The design system: the generated token palette plus spec-local chrome.
-      customCss: ["./src/styles/flatbars-tokens.css", "./src/styles/spec.css"],
+      // The design system: the generated chrome tokens (what the shared topbar
+      // reads) + the syntax palette, plus spec-local chrome. The two token files
+      // are generated copies of the shared sources (`npm run gen:tokens`).
+      customCss: [
+        "./src/styles/flatbars-chrome.css",
+        "./src/styles/flatbars-tokens.css",
+        "./src/styles/spec.css",
+      ],
       // Join the umbrella chrome: the shared <flatbars-topbar> replaces the native
       // header, the umbrella anti-flash seed replaces Starlight's theme provider,
       // and the native theme picker is suppressed (the element owns it). The

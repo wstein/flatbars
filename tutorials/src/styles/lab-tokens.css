@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0
  *
- * Highlighter TOKENS for the tutorials — the seven-family syntax palette (--c-*),
- * the YAML data colours, and the JSONata colours, plus the `.tk-*` / `.y-*` /
- * `.j-*` class rules that paint them. The CHROME tokens (palette, IBM Plex,
- * violet accent, light/dark) live in the single shared source
- * `shared/flatbars-chrome.css`, imported alongside this file by BaseHead — so the
- * tutorials, the spec and the Lab can't drift on the chrome.
+ * Design TOKENS for the tutorials. Two GENERATED fences hold the single-sourced
+ * tokens — `@chrome` from `shared/flatbars-chrome.css` (palette, IBM Plex, violet
+ * accent, light/dark — the shared topbar reads these) and `@palette` from
+ * `shared/flatbars-tokens.css` (the seven-family --c-* highlighter palette). Both
+ * are written by `npm run gen:tokens`; edit the shared sources, not the fences.
+ * This file also owns the YAML/JSONata colours and the `.tk-*` / `.y-*` / `.j-*`
+ * class rules that paint them.
  *
  * Theme is an EXPLICIT [data-theme] on <html> (set by the anti-flash seed before
  * first paint, toggled by the shared topbar) — not prefers-color-scheme.
@@ -16,6 +17,42 @@
  * palette, mapped per token ROLE, so the legend can never lie about the
  * examples. */
 :root {
+  color-scheme: light;
+
+  /* ── Chrome design system (palette, IBM Plex, violet accent, light/dark) —
+     GENERATED from shared/flatbars-chrome.css into this fence by gen:tokens, so
+     the tutorials, the spec and the Lab can't drift on the chrome. ── */
+  /* @chrome light · generated from shared/flatbars-chrome.css — edit there, run `npm run gen:tokens` */
+  --font-ui: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --bg: #ffffff;
+  --bg-1: #faf8ff;
+  --bg-2: #f2effc;
+  --bg-3: #e8e3f8;
+  --fg: #18181b;
+  --fg-secondary: #3b1b6b;
+  --fg-muted: #5b4d92;
+  --fg-faint: #6f5f99;
+  --border: #ddd6f8;
+  --border-strong: #c8bff2;
+  --accent: #6d28d9;
+  --accent-2: #4c1d95;
+  --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
+  --accent-softer: color-mix(in srgb, var(--accent) 9%, var(--bg));
+  --danger: #b91c1c;
+  --danger-faint: #fee2e2;
+  --success: #10b981;
+  --success-faint: #dcfce7;
+  --warn: #b45309;
+  --warn-faint: #fef3c7;
+  --out-bg: #1b1923;
+  --out-fg: #ece9f5;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow-pop: 0 12px 32px -8px rgba(24, 24, 27, 0.18), 0 0 0 1px rgba(24, 24, 27, 0.06);
+  --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 6px 20px -12px rgba(60, 27, 107, 0.22);
+  /* @chrome end */
+
   /* ── Unified syntax palette — shared by the inner-token highlighter (.tk-*)
      across the live examples, inline prose tags, AND the colour-legend popover
      (painted through the same engine). Mapped per token ROLE, one palette. ── */
@@ -41,6 +78,33 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
+
+  /* @chrome dark · generated from shared/flatbars-chrome.css — edit there, run `npm run gen:tokens` */
+  --bg: #16141d;
+  --bg-1: #1b1925;
+  --bg-2: #232030;
+  --bg-3: #2c2940;
+  --fg: #ece9f5;
+  --fg-secondary: #c5bedd;
+  --fg-muted: #968fb0;
+  --fg-faint: #8a83a6;
+  --border: #2c2940;
+  --border-strong: #423c5c;
+  --accent: #9b7dff;
+  --accent-2: #bca6ff;
+  --danger: #f87171;
+  --danger-faint: #3a1414;
+  --success: #4ade80;
+  --success-faint: #14321f;
+  --warn: #fbbf24;
+  --warn-faint: #3a2e10;
+  --out-bg: #0e0d13;
+  --out-fg: #ece9f5;
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
+  /* @chrome end */
+
   /* @palette dark · generated from shared/flatbars-tokens.css — edit there, run `npm run gen:tokens` */
   --c-expr: #79c0ff;
   --c-raw: #a5d6ff;

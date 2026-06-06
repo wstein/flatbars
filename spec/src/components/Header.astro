@@ -10,10 +10,11 @@
 // Starlight's real <Search/> (Pagefind) rides in the element's `tools` slot so
 // search is unchanged; the element's own link-search is therefore `off`. The
 // mobile sidebar <MobileMenuToggle/> is kept — it fixes itself to the viewport.
-// The chrome tokens the element reads come from shared/flatbars-chrome.css.
+// The chrome tokens the element reads are loaded site-wide via the spec's
+// `customCss` (src/styles/flatbars-chrome.css — generated from the shared source
+// by `npm run gen:tokens`).
 import Search from "@astrojs/starlight/components/Search.astro";
 import MobileMenuToggle from "@astrojs/starlight/components/MobileMenuToggle.astro";
-import "../../../shared/flatbars-chrome.css";
 
 // The spec mounts at `${PUBLIC_SPEC_BASE}` (e.g. /flatbars/spec); the umbrella
 // root is that minus the trailing /spec. Empty in standalone dev (links then

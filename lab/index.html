@@ -12,21 +12,51 @@
     <link rel="stylesheet" media="print" onload="this.media='all'"
           href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <title>FlatBars Lab — IDE</title>
-    <!-- The shared umbrella chrome tokens + topbar element, vendored from shared/
-         (committed artifacts like the engine bundle; regenerate with
-         `npm run gen:topbar`, bump ?v= on change — check:topbar pins the copies).
-         The chrome stylesheet is render-blocking here, so the shared tokens are in
-         place before first paint (the IDE-specific tokens + syntax palette stay in
-         the inline <style> below). -->
-    <link rel="stylesheet" href="./vendor/flatbars-chrome.css?v=1" />
+    <!-- The shared umbrella topbar element, vendored from shared/ (a committed
+         artifact like the engine bundle; regenerate with `npm run gen:topbar`, bump
+         ?v= on change — check:topbar pins the copy). The chrome tokens it reads are
+         generated into the `@chrome` fence in the inline <style> below by
+         `npm run gen:tokens` (from shared/flatbars-chrome.css), inline so they are
+         in place before first paint. -->
     <script type="module" src="./vendor/flatbars-topbar.mjs?v=2"></script>
     <style>
       /* ── Design tokens ───────────────────────────────────────────── */
       :root {
         /* The chrome design system — palette (--bg/--fg/--border/--accent/status),
-           IBM Plex families, radius and shadows — is the single shared source
-           (vendor/flatbars-chrome.css, linked above). Only the Lab's IDE-specific
-           tokens, brand greens and the syntax palette live here. */
+           IBM Plex families, radius and shadows — is GENERATED into this fence from
+           shared/flatbars-chrome.css by `npm run gen:tokens`, so it can't drift from
+           the tutorials and the spec. The Lab's IDE-specific tokens, brand greens
+           and the syntax palette (also generated) follow. */
+        /* @chrome light · generated from shared/flatbars-chrome.css — edit there, run `npm run gen:tokens` */
+        --font-ui: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+        --bg: #ffffff;
+        --bg-1: #faf8ff;
+        --bg-2: #f2effc;
+        --bg-3: #e8e3f8;
+        --fg: #18181b;
+        --fg-secondary: #3b1b6b;
+        --fg-muted: #5b4d92;
+        --fg-faint: #6f5f99;
+        --border: #ddd6f8;
+        --border-strong: #c8bff2;
+        --accent: #6d28d9;
+        --accent-2: #4c1d95;
+        --accent-soft: color-mix(in srgb, var(--accent) 20%, var(--bg));
+        --accent-softer: color-mix(in srgb, var(--accent) 9%, var(--bg));
+        --danger: #b91c1c;
+        --danger-faint: #fee2e2;
+        --success: #10b981;
+        --success-faint: #dcfce7;
+        --warn: #b45309;
+        --warn-faint: #fef3c7;
+        --out-bg: #1b1923;
+        --out-fg: #ece9f5;
+        --radius: 6px;
+        --radius-lg: 10px;
+        --shadow-pop: 0 12px 32px -8px rgba(24, 24, 27, 0.18), 0 0 0 1px rgba(24, 24, 27, 0.06);
+        --shadow-card: 0 1px 2px rgba(24, 24, 27, 0.04), 0 6px 20px -12px rgba(60, 27, 107, 0.22);
+        /* @chrome end */
 
         /* IDE surfaces (atop the shared --bg/--bg-1/2/3). */
         --bg-toolbar: #ffffff;
@@ -1104,9 +1134,33 @@
       /* Dark — mid-dark violet. Used by the explicit Dark theme, and by
          System when the OS prefers a dark color scheme. Light is :root. */
       body[data-theme="dark"] {
-        /* IDE-specific dark surfaces. The shared chrome dark — bg/fg/border/accent/
-           status/shadow — comes from flatbars-chrome.css's [data-theme="dark"]
-           (it matches both html and body, both of which carry data-theme here). */
+        /* Shared chrome dark — bg/fg/border/accent/status/shadow — generated into
+           this fence from shared/flatbars-chrome.css's [data-theme="dark"]. */
+        /* @chrome dark · generated from shared/flatbars-chrome.css — edit there, run `npm run gen:tokens` */
+        --bg: #16141d;
+        --bg-1: #1b1925;
+        --bg-2: #232030;
+        --bg-3: #2c2940;
+        --fg: #ece9f5;
+        --fg-secondary: #c5bedd;
+        --fg-muted: #968fb0;
+        --fg-faint: #8a83a6;
+        --border: #2c2940;
+        --border-strong: #423c5c;
+        --accent: #9b7dff;
+        --accent-2: #bca6ff;
+        --danger: #f87171;
+        --danger-faint: #3a1414;
+        --success: #4ade80;
+        --success-faint: #14321f;
+        --warn: #fbbf24;
+        --warn-faint: #3a2e10;
+        --out-bg: #0e0d13;
+        --out-fg: #ece9f5;
+        --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.4);
+        --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -14px rgba(0, 0, 0, 0.7);
+        /* @chrome end */
+        /* IDE-specific dark surfaces. */
         --bg-toolbar: #16141d; --bg-statusbar: #121019;
         --bg-tab-active: #232030; --bg-pane: #1b1925; --bg-gutter: #16141d;
         /* Lab-only dark accent tints — shared leaves --accent-soft/softer to its

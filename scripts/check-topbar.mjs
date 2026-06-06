@@ -31,12 +31,12 @@ const MOUNTS = {
 };
 // Surfaces still carrying the hand-written lockup (none — all migrated).
 const LOCKUPS = {};
-// The static Lab can't import from a sibling dir, so it loads vendored copies of
-// the shared element + chrome tokens (like the engine bundle). They must match
-// shared/ verbatim; regenerate with `npm run gen:topbar`.
+// The static Lab can't import from a sibling dir, so it loads a vendored copy of
+// the shared element (like the engine bundle). It must match shared/ verbatim;
+// regenerate with `npm run gen:topbar`. (The chrome tokens are generated inline by
+// gen:tokens instead — see check:tokens.)
 const VENDORED = {
   "lab/vendor/flatbars-topbar.mjs": "shared/flatbars-topbar.mjs",
-  "lab/vendor/flatbars-chrome.css": "shared/flatbars-chrome.css",
 };
 
 let fails = 0;
