@@ -53,7 +53,7 @@ const BUDGET = {
   "spec/src/styles/spec.css": 0,
   "tutorials/src/styles/lab-tokens.css": 8, // --yaml-* data-editor colours
   "tutorials/src/styles/open-in-lab.css": 41, // live-example analysis/lint legend (fixed, on dark panes)
-  "lab/index.html": 35, // editor-syntax (--tok-*) + brand greens + accent tints + base IDE content
+  "lab/index.html": 22, // editor-syntax (--tok-*) + brand greens + accent tints
 };
 
 let fails = 0;
