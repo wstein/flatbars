@@ -15,16 +15,17 @@ design-system single-source-of-truth contracts of
 keeps the spec as the contract the packages target
 ([ADR-001](/adr/adr-0001-structural-parser-and-walker/)).
 
-*Implementation status.* The migration is *additive*: the Starlight site
-(`spec/`) is built and green, while Antora remains the live spec. Two steps remain
-before the destructive cutover (retiring Antora), deliberately not rushed: (1) a
-*content-fidelity pass* over the auto-converted MDX — AsciiDoc description lists,
-the one PlantUML diagram (→ Mermaid), and callout markers — so the converted
-contract reads as well as the source; and (2) the *cutover* itself — delete
-`docs/` + `antora-playbook.yml`, retire the one-time converter, and repoint the
-four `docs/`-reading gates (`check:catalog`, `check:tokens`, `check:adr-nav`,
-`check:glossary`). Keeping the authoritative AsciiDoc source until the fidelity
-pass is complete is what avoids locking conversion artefacts into the contract.
+*Implementation status — complete.* The cutover is done: Antora, its playbook, and
+the one-time AsciiDoc→MDX converter are removed, and the committed MDX under
+`spec/src/content/docs/` is the maintained source. The content-fidelity pass ran
+first (description lists became bullets; the one PlantUML diagram is a
+dependency-free ASCII flow — richer Mermaid rendering is the remaining follow-up),
+so no conversion artefacts were locked into the contract. The four `docs/`-reading
+gates were repointed to the MDX (`check:catalog` emits only the MDX partial,
+`check:adr-nav` validates `src/sidebar.ts`, `check:glossary` reads the MDX,
+`gen:tokens` drops the docs copy), and the deploy workflow builds the Starlight
+site at `/flatbars/spec/`. Follow-ups: Mermaid diagram rendering, `starlight-versions`
+on the `0.1.0` tag, and the live engine panes.
 
 ## Context
 
