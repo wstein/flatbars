@@ -8,3 +8,61 @@
   --sl-color-accent: var(--c-violet, #8b5cf6);
   --sl-color-accent-high: var(--c-violet-bright, #c4b5fd);
 }
+
+/* Live engine pane (ADR-031): edit a template + data, see real engine output. */
+.live-pane {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  background: var(--sl-color-gray-7, var(--sl-color-black));
+}
+.live-pane-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 50rem) {
+  .live-pane-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.live-pane label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+  color: var(--sl-color-gray-2);
+}
+.live-pane textarea {
+  font-family: var(--__sl-font-mono, ui-monospace, monospace);
+  font-size: var(--sl-text-sm);
+  padding: 0.5rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.375rem;
+  background: var(--sl-color-black);
+  color: var(--sl-color-white);
+  resize: vertical;
+}
+.live-pane-out {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+  color: var(--sl-color-gray-2);
+}
+.live-pane-out pre {
+  margin: 0;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  background: var(--sl-color-black);
+  border-left: 3px solid var(--sl-color-accent);
+  white-space: pre-wrap;
+}
+.live-pane-out pre.live-pane-err {
+  border-left-color: var(--c-red, #ff5555);
+  color: var(--c-red, #ff5555);
+}

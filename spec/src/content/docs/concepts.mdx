@@ -2,6 +2,8 @@
 title: The core model
 ---
 
+import LivePane from "../../components/LivePane.jsx";
+
 FlatBars rests on a few decisions. Every later rule is a consequence of them.
 
 ## 0. Two phases: a skeleton, then a walk
@@ -76,6 +78,17 @@ its body, then removes them.
 ```
 &lt;1> Inside the block, `index` and `this` resolve — `each` installed them.
 &lt;2> Outside, `index` is undefined; resolving it is a validation error in the engine walk.
+
+Try it — this pane runs the *real* FullBars engine (the surface dialect, where the
+scoped loop variable spells `@index`). Edit the template or data and the output
+re-renders:
+
+<LivePane
+  client:visible
+  dialect="fullbars"
+  template={`{{#each people}}{{ @index }}. {{ upcase name }}\n{{/each}}`}
+  data={`{\n  "people": [\n    { "name": "ada" },\n    { "name": "linus" },\n    { "name": "grace" }\n  ]\n}`}
+/>
 
 This replaces Handlebars' `@index`/`@parent`/context-stack with ordinary lexical scoping over the helper
 environment. There is no `@` namespace and no `../` operator in the core.
