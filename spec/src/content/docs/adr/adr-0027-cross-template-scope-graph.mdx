@@ -61,22 +61,22 @@ worst stale answer is "no result" which the four capabilities tolerate.
 
 ## Phased plan
 
-. **Phase 1 — read-only scanner.** Add `editors/lsp/src/index.mjs` that
-  consumes the engine's `tokenize` over every workspace file and builds the
-  two maps. No LSP wiring yet; expose `definitionsOf(name)` /
-  `referencesOf(name)` for tests.
-. **Phase 2 — `textDocument/definition` + `documentHighlight`.** Wire the
-  first two capabilities into `server.mjs`; advertise both in the
-  `InitializeResult`. The single-buffer documentHighlight degrades to the
-  word-bounded set of references in the active file when the index is cold.
-. **Phase 3 — `textDocument/references`.** Same shape as definition; honours
-  `includeDeclaration`.
-. **Phase 4 — `textDocument/rename`.** Returns a `WorkspaceEdit` with one
-  `TextEdit` per occurrence. A pre-check rejects renames whose target collides
-  with an existing partial name.
-. **Phase 5 — helper / operation references.** Treat catalogue identifiers as
-  references too; the catalogue entries themselves are the definitions
-  (synthetic locations into `operations.json`).
+1. **Phase 1 — read-only scanner.** Add `editors/lsp/src/index.mjs` that
+   consumes the engine's `tokenize` over every workspace file and builds the
+   two maps. No LSP wiring yet; expose `definitionsOf(name)` /
+   `referencesOf(name)` for tests.
+1. **Phase 2 — `textDocument/definition` + `documentHighlight`.** Wire the
+   first two capabilities into `server.mjs`; advertise both in the
+   `InitializeResult`. The single-buffer documentHighlight degrades to the
+   word-bounded set of references in the active file when the index is cold.
+1. **Phase 3 — `textDocument/references`.** Same shape as definition; honours
+   `includeDeclaration`.
+1. **Phase 4 — `textDocument/rename`.** Returns a `WorkspaceEdit` with one
+   `TextEdit` per occurrence. A pre-check rejects renames whose target collides
+   with an existing partial name.
+1. **Phase 5 — helper / operation references.** Treat catalogue identifiers as
+   references too; the catalogue entries themselves are the definitions
+   (synthetic locations into `operations.json`).
 
 Tests at each phase: per-fixture corpus under `editors/lsp/test/fixtures/`
 asserting the index's contents, the capability's response, and at least one

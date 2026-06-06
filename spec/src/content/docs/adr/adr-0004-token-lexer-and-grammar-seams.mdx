@@ -16,28 +16,28 @@ plugs in its expression grammar.
 
 ## Decision
 
-. *Keep the structural scanner; add an interior tokenizer.* `FlatBars.Lexer` (perf-tuned) still
-  delimits tags into raw interior strings. A *new*, meaning-free interior tokenizer
-  `FlatBars.Token.tokenizeInterior :: Int -> String -> Either ParseError (Array PosToken)` lexes that
-  interior into `TIdent`/`TStr`/`TNum`/`TLParen`/`TRParen`/`TOp`.
+1. *Keep the structural scanner; add an interior tokenizer.* `FlatBars.Lexer` (perf-tuned) still
+   delimits tags into raw interior strings. A *new*, meaning-free interior tokenizer
+   `FlatBars.Token.tokenizeInterior :: Int -> String -> Either ParseError (Array PosToken)` lexes that
+   interior into `TIdent`/`TStr`/`TNum`/`TLParen`/`TRParen`/`TOp`.
 
-. *Operators are lexed, not interpreted.* `& | ! < > == != <= >=` are matched longest-first and
-  given *no* meaning. `=` is an identifier-continuation char (so `key=value` is one `TIdent`), but
-  `==` at a token boundary is the operator. Idents include `_ - . @ / + * ?` and `[bracket]` segments;
-  they exclude `& | ! < >` (those are ops).
+1. *Operators are lexed, not interpreted.* `& | ! < > == != <= >=` are matched longest-first and
+   given *no* meaning. `=` is an identifier-continuation char (so `key=value` is one `TIdent`), but
+   `==` at a token boundary is the operator. Idents include `_ - . @ / + * ?` and `[bracket]` segments;
+   they exclude `& | ! < >` (those are ops).
 
 - . *Two seams on `ParseOptions`.* `parseExpr  — ExprParser` parses output/argument interiors;
   `parseHead :: ExprParser` parses block-open heads (added in Phase D for bare-infix block conditions
   like `{{#if a == b}}`). The default grammar is the shared prefix grammar (`FlatBars.Expr`);
   MaxBars swaps a precedence-climbing grammar through the *same* seams (`Parser.purs:57`).
 
-. *Two surface affordances that (ab)use operator chars, handled meaning-free in core.* (a) The partial
-  sigil `>` — a *leading* `TOp ">"` is remapped to `TIdent ">"` in `Parser.partialHead`, so
-  `{{> name …}}` reads as an application headed by `>`. (This remap serves the partial
-  *reference* only; the `{{#>name}}` partial *block* is a first-class `PartialBlock` opener/sigil,
-  not a `partialHead`-remapped section.) (b) Block-param bars `as |a b|` — the
-  shared prefix grammar's `pArgs` accepts a bare `TOp "|"` as a nullary `App "|" []` atom. Core
-  attaches no meaning; FullBars' `Surface` strips/splits them.
+1. *Two surface affordances that (ab)use operator chars, handled meaning-free in core.* (a) The partial
+   sigil `>` — a *leading* `TOp ">"` is remapped to `TIdent ">"` in `Parser.partialHead`, so
+   `{{> name …}}` reads as an application headed by `>`. (This remap serves the partial
+   *reference* only; the `{{#>name}}` partial *block* is a first-class `PartialBlock` opener/sigil,
+   not a `partialHead`-remapped section.) (b) Block-param bars `as |a b|` — the
+   shared prefix grammar's `pArgs` accepts a bare `TOp "|"` as a nullary `App "|" []` atom. Core
+   attaches no meaning; FullBars' `Surface` strips/splits them.
 
 :::note
 *Two orthogonal extension axes — do not conflate them.* A dialect customizes the core along *two*

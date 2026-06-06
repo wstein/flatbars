@@ -16,31 +16,31 @@ privileged one; the architecture must keep it swappable even as it serves as the
 
 ## Decision
 
-. *FullBars = value policy + environment + prelude + lowering + surface desugar*, wired into
-  convenience renderers. After the kernel extraction (ADR-003) the value policy
-  (`truthy`/`escapeHtml`/`stringify`), `RefEnv`, prelude, and `lower` live in `kernel`; the `fullbars`
-  package owns the *surface desugar* (`FullBars.Surface`), the convenience renderers, and the helper
-  *catalog* (the single source of truth for `gen:catalog`).
+1. *FullBars = value policy + environment + prelude + lowering + surface desugar*, wired into
+   convenience renderers. After the kernel extraction (ADR-003) the value policy
+   (`truthy`/`escapeHtml`/`stringify`), `RefEnv`, prelude, and `lower` live in `kernel`; the `fullbars`
+   package owns the *surface desugar* (`FullBars.Surface`), the convenience renderers, and the helper
+   *catalog* (the single source of truth for `gen:catalog`).
 
-. *`extras = true`.* FullBars admits the Handlebars-only shapes (raw blocks, inverse, unescaped) that
-  RawBars ([adr-0008-rawbars](/adr/adr-0008-rawbars/)) and MaxBars reject.
+1. *`extras = true`.* FullBars admits the Handlebars-only shapes (raw blocks, inverse, unescaped) that
+   RawBars ([adr-0008-rawbars](/adr/adr-0008-rawbars/)) and MaxBars reject.
 
-. *The surface is a desugar, not a parser* (ADR-001). `FullBars.Surface.desugar` is a pure
-  `Template → Template` rewrite into core forms, then the reference renderer (or `lower`) runs the
-  result unchanged. It rewrites: `{{ E }}` ⇒ escaped `{{{ escapeHtml E }}}`; bare/dotted
-  *paths* ⇒ `lookup` chains (`name` ⇒ `lookup this "name"`, `a.b`, `a.[1]`, `../a` ⇒
-  `lookup (parent) …`); `@data` ⇒ scoped calls (`@index` ⇒ `(index)`, `@root.x`); `else if` chains ⇒
-  flat `{{elif}}`; hash args `k=v` ⇒ a trailing `dict`; block params `as |item i|` ⇒ string
-  args (and a bare in-scope reference ⇒ a call `(item)`); partials `{{> name ctx k=v}}`;
-  `{{#partial}}`/`{{#inline}}`.
+1. *The surface is a desugar, not a parser* (ADR-001). `FullBars.Surface.desugar` is a pure
+   `Template → Template` rewrite into core forms, then the reference renderer (or `lower`) runs the
+   result unchanged. It rewrites: `{{ E }}` ⇒ escaped `{{{ escapeHtml E }}}`; bare/dotted
+   *paths* ⇒ `lookup` chains (`name` ⇒ `lookup this "name"`, `a.b`, `a.[1]`, `../a` ⇒
+   `lookup (parent) …`); `@data` ⇒ scoped calls (`@index` ⇒ `(index)`, `@root.x`); `else if` chains ⇒
+   flat `{{elif}}`; hash args `k=v` ⇒ a trailing `dict`; block params `as |item i|` ⇒ string
+   args (and a bare in-scope reference ⇒ a call `(item)`); partials `{{> name ctx k=v}}`;
+   `{{#partial}}`/`{{#inline}}`.
 
-. *`noLoopVars` — every bare name is a data path* (the Handlebars rule); scoped loop state is reached
-  only through `@`. This is the deliberate contrast with MaxBars
-  ([adr-0006-maxbars-loop-variables](/adr/adr-0006-maxbars-loop-variables/)), which maps bare names to loop variables through the
-  *same* `LoopVars` hook.
+1. *`noLoopVars` — every bare name is a data path* (the Handlebars rule); scoped loop state is reached
+   only through `@`. This is the deliberate contrast with MaxBars
+   ([adr-0006-maxbars-loop-variables](/adr/adr-0006-maxbars-loop-variables/)), which maps bare names to loop variables through the
+   *same* `LoopVars` hook.
 
-. *Safe-by-default* ([adr-0002-escaping-and-value-policy](/adr/adr-0002-escaping-and-value-policy/)): `{{ }}` escapes,
-  `{{{ }}}` is raw, and `escapingWarnings` flags raw output of untrusted accessors.
+1. *Safe-by-default* ([adr-0002-escaping-and-value-policy](/adr/adr-0002-escaping-and-value-policy/)): `{{ }}` escapes,
+   `{{{ }}}` is raw, and `escapingWarnings` flags raw output of untrusted accessors.
 
 ## Consequences
 

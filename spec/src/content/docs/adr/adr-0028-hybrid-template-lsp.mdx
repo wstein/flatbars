@@ -63,17 +63,17 @@ the platform's stock client, which does not expose the multi-host hook.
 
 ## Phased plan
 
-. **Phase 1 — extraction + virtual document.** Land `embedded.js` with a
-  unit test exercising every host's region extraction. No LSP wiring.
-. **Phase 2 — hover + diagnostics on virtual.** Wire the smallest pair to
-  prove the round-trip; gate behind a `flatbars.experimental.hybridLsp`
-  setting until the rough edges shake out.
-. **Phase 3 — completion + codeAction.** Adds the request types that mutate
-  the document (codeAction's `WorkspaceEdit` needs physical-URI ranges).
-. **Phase 4 — foldingRange + documentSymbol + formatting.** Same wiring as
-  Phase 3; documentSymbol's nested children need physical ranges.
-. **Phase 5 — drop the experimental gate.** Flip the default; document in
-  the editor README.
+1. **Phase 1 — extraction + virtual document.** Land `embedded.js` with a
+   unit test exercising every host's region extraction. No LSP wiring.
+1. **Phase 2 — hover + diagnostics on virtual.** Wire the smallest pair to
+   prove the round-trip; gate behind a `flatbars.experimental.hybridLsp`
+   setting until the rough edges shake out.
+1. **Phase 3 — completion + codeAction.** Adds the request types that mutate
+   the document (codeAction's `WorkspaceEdit` needs physical-URI ranges).
+1. **Phase 4 — foldingRange + documentSymbol + formatting.** Same wiring as
+   Phase 3; documentSymbol's nested children need physical ranges.
+1. **Phase 5 — drop the experimental gate.** Flip the default; document in
+   the editor README.
 
 Tests per phase: hybrid fixture corpus under `editors/vscode/test/embedded/`,
 one per host language, asserting position mapping in both directions

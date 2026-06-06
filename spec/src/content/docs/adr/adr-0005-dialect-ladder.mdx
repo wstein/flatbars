@@ -14,8 +14,7 @@ The family needs several Handlebars-lineage dialects that share one engine witho
 
 ## Decision
 
-. *The ladder: RawBars ⊂ FullBars ⊂ MaxBars.*
-+
+1. *The ladder: RawBars ⊂ FullBars ⊂ MaxBars.*
 | Dialect | Surface |
 | --- | --- |
 | *RawBars* | the core prefix grammar directly — explicit `{{{ lookup this "x" }}}`, no sugar; `extras = false`. |
@@ -33,20 +32,20 @@ flowchart LR
     end
 ```
 
-. *Reuse by dependency, not copy.* MaxBars depends on `fullbars` and reuses its engine, prelude, value
-  policy, surface desugar, and compiler — swapping *only* the interior grammar through the
-  `parseExpr`/`parseHead` seams. A shared semantic kernel is extracted *lazily*, only on a proven
-  second consumer (ADR-003), never speculatively.
+1. *Reuse by dependency, not copy.* MaxBars depends on `fullbars` and reuses its engine, prelude, value
+   policy, surface desugar, and compiler — swapping *only* the interior grammar through the
+   `parseExpr`/`parseHead` seams. A shared semantic kernel is extracted *lazily*, only on a proven
+   second consumer (ADR-003), never speculatively.
 
-. *Shared compile driver + per-dialect `Emit`.* `FlatBars.Compile` is the dialect-agnostic emit driver
-  — the *fourth* instance of the inversion-of-control pattern (interpret / desugar / validate /
-  *compile*). `type Emit = { expr, block }` (`Compile.purs:54`); FullBars' `fullbarsEmit`
-  (`Emit.purs:74`) emits native control flow for `if`/`each`/…. The conformance harness asserts the
-  interpreter and the compiled JS produce byte-identical output.
+1. *Shared compile driver + per-dialect `Emit`.* `FlatBars.Compile` is the dialect-agnostic emit driver
+   — the *fourth* instance of the inversion-of-control pattern (interpret / desugar / validate /
+   *compile*). `type Emit = { expr, block }` (`Compile.purs:54`); FullBars' `fullbarsEmit`
+   (`Emit.purs:74`) emits native control flow for `if`/`each`/…. The conformance harness asserts the
+   interpreter and the compiled JS produce byte-identical output.
 
-. *Operators and pipes lower to existing prelude helpers.* Pipe `{{ a | f }}` → `(f a)` (piped
-  value first); infix `&& || ! == != < > <= >=` → `and`/`or`/`not`/`eq`/… per the surface §B.7
-  table. No new engine semantics — only new *surface*.
+1. *Operators and pipes lower to existing prelude helpers.* Pipe `{{ a | f }}` → `(f a)` (piped
+   value first); infix `&& || ! == != < > <= >=` → `and`/`or`/`not`/`eq`/… per the surface §B.7
+   table. No new engine semantics — only new *surface*.
 
 ## Consequences
 
@@ -78,12 +77,10 @@ Two layers, two different truths — they must not be conflated:
   seams. Nothing below the surface diverges.
 * *Surface supersetting is "most, not all."* The MaxBars surface borrows the bulk of
   FullBars's surface, but rejects, by design:
-+
 | FullBars construct | Why MaxBars rejects it |
 | --- | --- |
 | the `{{#*inline}}` *decorator* | MaxBars spells inline partials with bare `{{#inline}}`; the `*`-decorator form is FullBars-only. |
 | `{{> @partial-block}}` | the `@` sigil is reserved in MaxBars, which renders the caller's block body via bare `{{yield}}` instead. |
-+
 (Separately, MaxBars *adds* surface — operators, pipes, bare loop vars — and tightens a
 few spellings where its richer grammar would otherwise be ambiguous: a clause-separator
 condition and a block-head pipe must be parenthesised. Those are MaxBars-only additions,

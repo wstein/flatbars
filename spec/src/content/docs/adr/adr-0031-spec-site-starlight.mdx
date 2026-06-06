@@ -65,39 +65,39 @@ since MDX has none natively.
 
 Migrate the spec — and only the spec — to Astro Starlight, as follows.
 
-. *Target = Astro Starlight (MDX).* Same stack family as the tutorials; built-in
-  offline Pagefind; reuses the design system; avoids a third framework.
+1. *Target = Astro Starlight (MDX).* Same stack family as the tutorials; built-in
+   offline Pagefind; reuses the design system; avoids a third framework.
 
-. *Standalone app, not folded into `tutorials/`.* The spec ships as its own
-  Starlight project under `/spec`, linked to/from the tutorials via the existing
-  `PUBLIC_SPEC_BASE` seam — which already separates the two surfaces across several
-  pages. Isolating the contract's build keeps a careless tutorial edit from
-  red-building the spec's deploy. Shared look-and-feel comes from a factored
-  `shared/` module (wordmark, tokens, base-path/Lab helpers), *not* a merged build.
+1. *Standalone app, not folded into `tutorials/`.* The spec ships as its own
+   Starlight project under `/spec`, linked to/from the tutorials via the existing
+   `PUBLIC_SPEC_BASE` seam — which already separates the two surfaces across several
+   pages. Isolating the contract's build keeps a careless tutorial edit from
+   red-building the spec's deploy. Shared look-and-feel comes from a factored
+   `shared/` module (wordmark, tokens, base-path/Lab helpers), *not* a merged build.
 
-. *Big-bang cutover.* One branch, one reviewable diff, one merge; rollback is a
-  revert while `docs/` stays intact until the final step.
+1. *Big-bang cutover.* One branch, one reviewable diff, one merge; rollback is a
+   revert while `docs/` stays intact until the final step.
 
-. *Versioning snapshots essential releases only.* The `starlight-versions` plugin,
-  triggered on tagged spec releases (first `0.1.0`), bounded to avoid folder-snapshot
-  bloat. HEAD is "current".
+1. *Versioning snapshots essential releases only.* The `starlight-versions` plugin,
+   triggered on tagged spec releases (first `0.1.0`), bounded to avoid folder-snapshot
+   bloat. HEAD is "current".
 
-. *All 31 ADRs convert; flat `adr/*.mdx`, status in frontmatter, grouped only in the
-  sidebar.* Status changes over an ADR's life; its URL must not, so status never
-  enters the path.
+1. *All 31 ADRs convert; flat `adr/*.mdx`, status in frontmatter, grouped only in the
+   sidebar.* Status changes over an ADR's life; its URL must not, so status never
+   enters the path.
 
-. *Route `/spec`, dropping Antora's redundant component segment* (`/flatbars/spec/<page>`,
-  not `…/spec/flatbars/<page>`). A redirect map plus a new `check:redirects` gate keep
-  old URLs and in-repo `.adoc` links resolving — link stability is gated, not hoped.
+1. *Route `/spec`, dropping Antora's redundant component segment* (`/flatbars/spec/<page>`,
+   not `…/spec/flatbars/<page>`). A redirect map plus a new `check:redirects` gate keep
+   old URLs and in-repo `.adoc` links resolving — link stability is gated, not hoped.
 
-. *Build-time guarantees are reconstructed, not dropped.* `starlight-links-validator`
-  (build-failing) replaces Antora's `xref` integrity; `astro check` + `astro build`
-  replace the AsciiDoc parse gate; a `check:mdx-braces` lint fails on unescaped
-  `{{`/`<` outside fences.
+1. *Build-time guarantees are reconstructed, not dropped.* `starlight-links-validator`
+   (build-failing) replaces Antora's `xref` integrity; `astro check` + `astro build`
+   replace the AsciiDoc parse gate; a `check:mdx-braces` lint fails on unescaped
+   `{{`/`<` outside fences.
 
-. *ADR-031 is recorded "Proposed" first and flipped to "Accepted" only after a
-  de-risk spike* proves the three unknowns together: the catalog Markdown emitter, a
-  representative page conversion (`concepts`), and one working live engine pane.
+1. *ADR-031 is recorded "Proposed" first and flipped to "Accepted" only after a
+   de-risk spike* proves the three unknowns together: the catalog Markdown emitter, a
+   representative page conversion (`concepts`), and one working live engine pane.
 
 ## Alternatives considered
 

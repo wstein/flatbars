@@ -41,14 +41,14 @@ dialect-scoping seam):
   for every dialect except MinBars), the lexer behaves byte-identically to
   today — the meaning-free core and the Handlebars-family dialects are
   untouched, and the index-slicing hot path is unaffected.
-. When **true**, the lexer carries a *current* `{ open, close }` pair,
-  initialised to `{{` / `}}`. On encountering a
-  `<open>=A B=<close>` tag it swaps the pair and emits a new
-  `RSetDelim` `RawTok`. Single pass, O(n); spans stay correct because the
-  lexer already threads a `base` offset. No re-lex, no source rewrite, no
-  second lexer. Per the Mustache manual, the new open/close are
-  whitespace-separated and **may not contain whitespace or `=`** — which also
-  makes a space-separated directive value unambiguous to parse.
+1. When **true**, the lexer carries a *current* `{ open, close }` pair,
+   initialised to `{{` / `}}`. On encountering a
+   `<open>=A B=<close>` tag it swaps the pair and emits a new
+   `RSetDelim` `RawTok`. Single pass, O(n); spans stay correct because the
+   lexer already threads a `base` offset. No re-lex, no source rewrite, no
+   second lexer. Per the Mustache manual, the new open/close are
+   whitespace-separated and **may not contain whitespace or `=`** — which also
+   makes a space-separated directive value unambiguous to parse.
 
 *Per-dialect flag values:* set-delimiter is a *Mustache* feature, not a
 "non-Handlebars" feature. Only MinBars enables it; the rest of the ladder

@@ -6,10 +6,10 @@ title: FlatBars
 
 It is two things, and only two things:
 
-. a *parser* that turns Handlebars/Mustache-style source into a *skeleton syntax tree* — pure
-  structure, no meaning; and
-. a *contract* for the *second pass* — a validating, interpreting walk over that tree — that an
-  engine supplies on top.
+1. a *parser* that turns Handlebars/Mustache-style source into a *skeleton syntax tree* — pure
+   structure, no meaning; and
+1. a *contract* for the *second pass* — a validating, interpreting walk over that tree — that an
+   engine supplies on top.
 
 The split is the whole idea. Think *JSON and JSON Schema*: JSON fixes a uniform structural syntax
 and knows nothing about what any document _means_; a schema is a separate pass that decides which

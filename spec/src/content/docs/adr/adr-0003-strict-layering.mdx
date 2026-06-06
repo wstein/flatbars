@@ -19,19 +19,18 @@ makes it a *package* split.
 
 Three tiers plus adapters, dependencies pointing strictly downward.
 
-. *core (`flatbars`)* — `Lexer`, `Token`, `Parser`, `Syntax`, `Span`, `Error`, `Value`. Meaning-free:
-  no engine, no helpers, no validation. `Value` must live at or below core because `Syntax.Expr`
-  embeds `Lit Value`; pushing it up would cycle `kernel → core`.
+1. *core (`flatbars`)* — `Lexer`, `Token`, `Parser`, `Syntax`, `Span`, `Error`, `Value`. Meaning-free:
+   no engine, no helpers, no validation. `Value` must live at or below core because `Syntax.Expr`
+   embeds `Lit Value`; pushing it up would cycle `kernel → core`.
 
-. *kernel (new package)* — the shared engine: `Engine` (the IoC driver), `Walk`
-  (`foldTemplate`/`splitClauses`/`validate`/`Schema`), `Helper` combinators, `ToValue`, `Value`
-  (value policy — the named `Truthy` rules / `stringify` / `escapeHtml`), `Env`/`RefEnv`,
-  `Prelude`, `Lower`, and `Render` (the `runResolved` glue).
+1. *kernel (new package)* — the shared engine: `Engine` (the IoC driver), `Walk`
+   (`foldTemplate`/`splitClauses`/`validate`/`Schema`), `Helper` combinators, `ToValue`, `Value`
+   (value policy — the named `Truthy` rules / `stringify` / `escapeHtml`), `Env`/`RefEnv`,
+   `Prelude`, `Lower`, and `Render` (the `runResolved` glue).
 
-. *dialects (`rawbars`/`fullbars`/`maxbars`)* — each only its grammar + desugar + render/compile entry
-  points, over the kernel, *never each other*. The single sanctioned exception is `maxbars → fullbars`
-  (the intentional superset; see [adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/)).
-+
+1. *dialects (`rawbars`/`fullbars`/`maxbars`)* — each only its grammar + desugar + render/compile entry
+   points, over the kernel, *never each other*. The single sanctioned exception is `maxbars → fullbars`
+   (the intentional superset; see [adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/)).
 *Isolation is an import property, not the ladder's `⊂`.* "No dialect imports another" is about the
 package graph; the ladder's `⊂` ([adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/)) is about *surface supersetting*
 (narrowed by the ADR-005 amendment to surface-superset *modulo documented exceptions* — MaxBars is the
@@ -40,12 +39,12 @@ RawBars *has* import isolation (a FullBars-free closure, [adr-0008-rawbars](/adr
 *trades* it for reuse because it genuinely is a FullBars superset. The two properties must not be
 conflated — there is exactly *one* sanctioned import crossing.
 
-. *compile* — `flatbars-compile` is the dialect-agnostic emit driver + `Emit` rules, kept FullBars-free
-  (`Compile.Emit` reads `Kernel.Value`); `fullbars-compile` layers the surface compiler on top, so
-  RawBars' dependency closure is fully FullBars-free.
+1. *compile* — `flatbars-compile` is the dialect-agnostic emit driver + `Emit` rules, kept FullBars-free
+   (`Compile.Emit` reads `Kernel.Value`); `fullbars-compile` layers the surface compiler on top, so
+   RawBars' dependency closure is fully FullBars-free.
 
-. *adapters* — `json` (JSON ⇆ `Value`, deliberately *out* of core: JSON-ness is a host concern), `js`
-  (FFI), `cli`, `playground`.
+1. *adapters* — `json` (JSON ⇆ `Value`, deliberately *out* of core: JSON-ness is a host concern), `js`
+   (FFI), `cli`, `playground`.
 
 ## Consequences
 

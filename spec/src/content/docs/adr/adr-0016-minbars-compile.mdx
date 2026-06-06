@@ -53,31 +53,31 @@ dependency, allowed by the isolation invariants — only `rawbars` edges are for
 
 ## Phasing
 
-. *Slice 1:* interpolation (escaped/raw/dotted/implicit/missing), polymorphic sections, inverted
-  sections.
-. *Slice 2 (shipped):* partials, by *inlining* — `compileMinJsWith` splices each static `{{> p}}`
-  into the call site, with `indentTemplate indent` applied to the partial's desugared template (the
-  standalone indent is a compile-time literal). Because the splice lands in the caller's scope, context
-  inheritance is automatic, and because `indentTemplate` runs on the *template* (not the rendered
-  string), a newline produced by an interpolated value is not indented — byte-identical to the
-  interpreter, which renders the same `indentTemplate indent tmpl` under the caller's env (proven by
-  the mustache standalone-indentation case in the corpus). Inlining cannot express a *cycle*, so a
-  *recursive* partial is rejected with a `DisallowedShape` (the interpreter bounds recursion at run
-  time with the recursion budget); a *dynamic-name* partial `{{>* name}}` is rejected too (the name is
-  unknown until run time). Both are loud failures, never a silent miscompile. No runtime/driver change
-  was needed — the slice-1 `m*` ops suffice.
-. *Slice 3 (shipped):* inheritance — also by inlining, since block resolution never consults data, so
-  the whole override structure is static. The inliner threads an *override map* (outer-wins via a
-  left-biased union: the more-derived/inherited override wins) and a *parent depth* (bounded by the
-  recursion budget). `{{<p}}` harvests its body's `{{$b}}` overrides, layers them, and inlines the
-  parent template (`indentTemplate` for a standalone parent — template-level). `{{$b}}` emits the
-  active override (or the default body). §4.6.2 reindentation: a standalone override is dedented at its
-  definition (compile-time, `harvestBlocks`) and re-indented at the expansion site (runtime
-  `rt.mindentOverride` — output-level, so it indents value newlines too, unlike partial indentation);
-  the expansion indent is the tag's own indent, or the default's intrinsic indent computed at compile
-  time from its leading static content. Inheritance "recursion" that terminates via an override (the
-  spec's *Recursion* case) inlines fine; a true cycle is bounded by the budget. A *dynamic-name* parent
-  `{{<* …}}` is rejected (loud).
+1. *Slice 1:* interpolation (escaped/raw/dotted/implicit/missing), polymorphic sections, inverted
+   sections.
+1. *Slice 2 (shipped):* partials, by *inlining* — `compileMinJsWith` splices each static `{{> p}}`
+   into the call site, with `indentTemplate indent` applied to the partial's desugared template (the
+   standalone indent is a compile-time literal). Because the splice lands in the caller's scope, context
+   inheritance is automatic, and because `indentTemplate` runs on the *template* (not the rendered
+   string), a newline produced by an interpolated value is not indented — byte-identical to the
+   interpreter, which renders the same `indentTemplate indent tmpl` under the caller's env (proven by
+   the mustache standalone-indentation case in the corpus). Inlining cannot express a *cycle*, so a
+   *recursive* partial is rejected with a `DisallowedShape` (the interpreter bounds recursion at run
+   time with the recursion budget); a *dynamic-name* partial `{{>* name}}` is rejected too (the name is
+   unknown until run time). Both are loud failures, never a silent miscompile. No runtime/driver change
+   was needed — the slice-1 `m*` ops suffice.
+1. *Slice 3 (shipped):* inheritance — also by inlining, since block resolution never consults data, so
+   the whole override structure is static. The inliner threads an *override map* (outer-wins via a
+   left-biased union: the more-derived/inherited override wins) and a *parent depth* (bounded by the
+   recursion budget). `{{<p}}` harvests its body's `{{$b}}` overrides, layers them, and inlines the
+   parent template (`indentTemplate` for a standalone parent — template-level). `{{$b}}` emits the
+   active override (or the default body). §4.6.2 reindentation: a standalone override is dedented at its
+   definition (compile-time, `harvestBlocks`) and re-indented at the expansion site (runtime
+   `rt.mindentOverride` — output-level, so it indents value newlines too, unlike partial indentation);
+   the expansion indent is the tag's own indent, or the default's intrinsic indent computed at compile
+   time from its leading static content. Inheritance "recursion" that terminates via an override (the
+   spec's *Recursion* case) inlines fine; a true cycle is bounded by the budget. A *dynamic-name* parent
+   `{{<* …}}` is rejected (loud).
 
 Each slice is gated by compile conformance before it lands.
 

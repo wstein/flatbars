@@ -48,8 +48,7 @@ spends the adoption capital ADR-018 was paid to build.
 
 ## Decision
 
-. *Two registers, split by audience.*
-+
+1. *Two registers, split by audience.*
 ** *Native conceptual register* — [concepts](/concepts/) and the RawBars / MaxBars dialect docs,
    *and the internal code identifiers*. The primary noun is *operation* (the thing a name invokes at a
    call site); the thing *installed in the environment* is a *definition*. A name *resolves* to a
@@ -62,30 +61,30 @@ spends the adoption capital ADR-018 was paid to build.
    that frozen boundary is what makes the rename below safe. (There is no `compileWith`: compilation is
    helper-agnostic — it emits `rt.call`, bound at run time — see ADR-018.)
 
-. *Operations have two kinds, the contract already forces them.* The type
-  `Ctl m env -> Array Value -> m Value` ([host-api](/engine/host-api/) §7.3) distinguishes *inline*
-  operations (ignore the control handle) from *block* operations (use it). *Values* are not a third kind:
-  a value is a *nullary inline operation* — there being no variables, that is the only way a value appears.
+1. *Operations have two kinds, the contract already forces them.* The type
+   `Ctl m env -> Array Value -> m Value` ([host-api](/engine/host-api/) §7.3) distinguishes *inline*
+   operations (ignore the control handle) from *block* operations (use it). *Values* are not a third kind:
+   a value is a *nullary inline operation* — there being no variables, that is the only way a value appears.
 
-. *Rename the internal type `Helper` → `Operation`.* The kernel/fullbars/compile `Helper` type, the
-  prelude table, and the schema's kind language (`inline` / `block`, arity) read as operations and
-  definitions. The JS-facing `registerHelper` and the rest of the `flatbars-js` facade are the *explicit
-  exception* — they stay, by Decision 1.
+1. *Rename the internal type `Helper` → `Operation`.* The kernel/fullbars/compile `Helper` type, the
+   prelude table, and the schema's kind language (`inline` / `block`, arity) read as operations and
+   definitions. The JS-facing `registerHelper` and the rest of the `flatbars-js` facade are the *explicit
+   exception* — they stay, by Decision 1.
 
-. *MaxBars gets a surface gloss, not a new model.* The infix symbols `+ >= |` are *operators* (surface
-  sugar); prefix heads and pipe stages are *operations*. We keep the entrenched word "operator" rather
-  than coin a replacement — but because *operator* and *operation* differ by one letter, every use must
-  carry the contrast: an **operator is surface sugar that desugars to an operation** (never standalone).
-  The glossary pairs them on one line for exactly this reason. There is *no "function"* —
-  [concepts](/concepts/) §3 forbids callable values, so "function" would promise first-class
-  functions the language does not have. Both desugar to the same core `App`
-  ([concepts](/concepts/) §8), so the two surface words sit over one core, exactly as "one parser,
-  four languages / one compiler" already claims.
+1. *MaxBars gets a surface gloss, not a new model.* The infix symbols `+ >= |` are *operators* (surface
+   sugar); prefix heads and pipe stages are *operations*. We keep the entrenched word "operator" rather
+   than coin a replacement — but because *operator* and *operation* differ by one letter, every use must
+   carry the contrast: an **operator is surface sugar that desugars to an operation** (never standalone).
+   The glossary pairs them on one line for exactly this reason. There is *no "function"* —
+   [concepts](/concepts/) §3 forbids callable values, so "function" would promise first-class
+   functions the language does not have. Both desugar to the same core `App`
+   ([concepts](/concepts/) §8), so the two surface words sit over one core, exactly as "one parser,
+   four languages / one compiler" already claims.
 
-. *Say the dissolution out loud.* [concepts](/concepts/) §1 gains one sentence: FlatBars has no
-  logic-less core for an operation to be an *escape hatch from* — application *is* the language, so an
-  operation is not a "helper" in the subordinate sense; and a glossary records
-  *operation / definition / scope / inline / block / operator* each with its host-API synonym.
+1. *Say the dissolution out loud.* [concepts](/concepts/) §1 gains one sentence: FlatBars has no
+   logic-less core for an operation to be an *escape hatch from* — application *is* the language, so an
+   operation is not a "helper" in the subordinate sense; and a glossary records
+   *operation / definition / scope / inline / block / operator* each with its host-API synonym.
 
 ## Consequences
 
@@ -107,7 +106,6 @@ spends the adoption capital ADR-018 was paid to build.
   "transform" — "transform" is the Lab's JSONata data-preprocess and must not be overloaded as a kind.)
 * *The `Helper` → `Operation` rename is wide and mechanical* across kernel / fullbars / compile and the
   schema language, and lands in *one* commit gated by a hard checklist, all green:
-+
 --
   . `npm run build` — every package compiles under the new type name;
   . `npm test` — full suite, including `npm run check:catalog` (the catalog prose shifts with the prelude
@@ -116,7 +114,6 @@ spends the adoption capital ADR-018 was paid to build.
     nominal (no semantics change);
   . `npm run check:bundle` — the editor bundle tracks the renamed source.
 --
-+
 The boundary word `helper` (Decision 1) does *not* move in this commit — only the internal `Operation`
 type, the prelude/schema kind language, and `concepts`/dialect prose.
 

@@ -19,28 +19,28 @@ scope is scoped helpers). The cost is that bare names can shadow data fields.
 
 ## Decision
 
-. *MaxBars-only.* FullBars stays as-is (`@index`/`@../`, via `noLoopVars`); MaxBars installs bare
-  scoped helpers via `maxLoopVars` (`MaxBars.purs:41`). The richer each-frame metadata the kernel now
-  exposes (Phase A) backs both.
+1. *MaxBars-only.* FullBars stays as-is (`@index`/`@../`, via `noLoopVars`); MaxBars installs bare
+   scoped helpers via `maxLoopVars` (`MaxBars.purs:41`). The richer each-frame metadata the kernel now
+   exposes (Phase A) backs both.
 
-. *Canonical set + aliases.* `index0 index1 rindex0 rindex1 first last length key`; aliases
-  `index → index0`, `rindex → rindex0`, `size → length`.
+1. *Canonical set + aliases.* `index0 index1 rindex0 rindex1 first last length key`; aliases
+   `index → index0`, `rindex → rindex0`, `size → length`.
 
-. *Normative arithmetic, so interpreter and compiler cannot drift.* `index1 = index0 + 1`;
-  `rindex0 = length − 1 − index0`; `rindex1 = length − index0`; `first = index0 == 0`;
-  `last = index0 == length − 1`. The spec fixes these so both execution paths compute identically.
+1. *Normative arithmetic, so interpreter and compiler cannot drift.* `index1 = index0 + 1`;
+   `rindex0 = length − 1 − index0`; `rindex1 = length − index0`; `first = index0 == 0`;
+   `last = index0 == length − 1`. The spec fixes these so both execution paths compute identically.
 
-. *Shadowing is contained by a schema-aware lint.* Dropping `@` lets `first`/`key`/`length` collide
-  with data fields. When a schema is present, a loop variable that collides with a declared field is
-  an *error*.
+1. *Shadowing is contained by a schema-aware lint.* Dropping `@` lets `first`/`key`/`length` collide
+   with data fields. When a schema is present, a loop variable that collides with a declared field is
+   an *error*.
 
-. *v1 outer-loop limit (documented).* Only the outer element/index/key are reachable, via block
-  params `as |user uidx|`. Outer `first`/`last`/`length`/`rindex` are *not* reachable — labelled loops
-  are future work. The companion spec's claim "compute from a named outer length" is wrong: block
-  params bind only the item plus index/key, so the outer length cannot be named.
+1. *v1 outer-loop limit (documented).* Only the outer element/index/key are reachable, via block
+   params `as |user uidx|`. Outer `first`/`last`/`length`/`rindex` are *not* reachable — labelled loops
+   are future work. The companion spec's claim "compute from a named outer length" is wrong: block
+   params bind only the item plus index/key, so the outer length cannot be named.
 
-. *`depth` (recursion depth) is reserved/deferred* until a recursion construct (a self-including
-  partial) exists.
+1. *`depth` (recursion depth) is reserved/deferred* until a recursion construct (a self-including
+   partial) exists.
 
 ## Consequences
 

@@ -17,14 +17,14 @@ needs a defined limit.
 
 ## Decision
 
-. *A shared kernel depth/budget*, default **64**, that — when exceeded — raises a *located*
-  `RecursionLimit` error rather than crashing the host.
-. *It hardens the reference `partialH` immediately*, so the unbounded-recursion gap closes regardless
-  of MinBars.
-. *Overridable per file* via a header directive (mechanism per [adr-0010-header-directives](/adr/adr-0010-header-directives/);
-  spelling — e.g. `@budget` — TBD).
-. *Counts render-time re-entry* (partial/block expansion depth), not expression nesting, which is
-  already bounded structurally by the parser.
+1. *A shared kernel depth/budget*, default **64**, that — when exceeded — raises a *located*
+   `RecursionLimit` error rather than crashing the host.
+1. *It hardens the reference `partialH` immediately*, so the unbounded-recursion gap closes regardless
+   of MinBars.
+1. *Overridable per file* via a header directive (mechanism per [adr-0010-header-directives](/adr/adr-0010-header-directives/);
+   spelling — e.g. `@budget` — TBD).
+1. *Counts render-time re-entry* (partial/block expansion depth), not expression nesting, which is
+   already bounded structurally by the parser.
 
 ## Implementation
 

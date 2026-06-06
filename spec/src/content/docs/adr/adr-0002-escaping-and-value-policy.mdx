@@ -18,24 +18,24 @@ an *engine*, not a substrate.
 
 ## Decision
 
-. *Core mandates no escaping.* HTML-escaping, truthiness, and stringification are an engine concern,
-  surfaced through `Ctl.stringify` and the engine's value module. The substrate stays policy-free.
+1. *Core mandates no escaping.* HTML-escaping, truthiness, and stringification are an engine concern,
+   surfaced through `Ctl.stringify` and the engine's value module. The substrate stays policy-free.
 
-. *Safety is a conformance contract on engines, not a core feature.* Every conforming engine MUST
-  declare: (a) an HTML-escape function, (b) a `stringify`, (c) a truthiness rule (a `Truthy` =
-  `Value -> Boolean` callback — ADR-022), and
-  (d) a raw-output safety stance — does `{{{ }}}` escape? (Reference answer: no.) This belongs
-  in the [host-api](/engine/host-api/) engine checklist.
+1. *Safety is a conformance contract on engines, not a core feature.* Every conforming engine MUST
+   declare: (a) an HTML-escape function, (b) a `stringify`, (c) a truthiness rule (a `Truthy` =
+   `Value -> Boolean` callback — ADR-022), and
+   (d) a raw-output safety stance — does `{{{ }}}` escape? (Reference answer: no.) This belongs
+   in the [host-api](/engine/host-api/) engine checklist.
 
-. *The reference engine is safe-by-default for the surface.* `{{ }}` escapes (lowers to
-  `escapeHtml`); `{{{ }}}` does not; `escapingWarnings` flags raw output of untrusted accessors
-  (`lookup`/`this`/scoped) not wrapped in `safe`.
+1. *The reference engine is safe-by-default for the surface.* `{{ }}` escapes (lowers to
+   `escapeHtml`); `{{{ }}}` does not; `escapingWarnings` flags raw output of untrusted accessors
+   (`lookup`/`this`/scoped) not wrapped in `safe`.
 
-. *The lint is on by default in tooling.* The playground already runs it (`Main.purs:211`); the CLI
-  gains it with an explicit `--no-escape-lint` opt-out, rather than being opt-in.
+1. *The lint is on by default in tooling.* The playground already runs it (`Main.purs:211`); the CLI
+   gains it with an explicit `--no-escape-lint` opt-out, rather than being opt-in.
 
-. *One shared `escapeHtml`.* It escapes `& < > " '` and *not* backtick/`=` (`Value.purs:265`)
-  — already Mustache-conformant, so every engine in the family reuses it rather than re-deriving it.
+1. *One shared `escapeHtml`.* It escapes `& < > " '` and *not* backtick/`=` (`Value.purs:265`)
+   — already Mustache-conformant, so every engine in the family reuses it rather than re-deriving it.
 
 ## Consequences
 

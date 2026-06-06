@@ -34,25 +34,25 @@ unchanged" claims to be false. They are recorded here because they reshape the p
 
 ## Decision (locked)
 
-. *Scope = the full Mustache spec in one pass* — interpolation, sections, inverted, comments, partials,
-  dotted names, implicit iterator, standalone whitespace — *plus* inheritance
-  (`{{<p}}`/`{{$b}}`/`{{<*}}`/`{{/*}}`) and dynamic-name partials
-  (`{{>* }}`). Lambdas are dropped (`Value` has no function arm). Set delimiters
-  (`{{=<% %>=}}`) were initially deferred but are now *implemented* MinBars-exclusively
-  ([ADR-015](/adr/adr-0015-set-delimiters/) + 2026-06-04 scope narrowing; RawBars / MaxBars /
-  FullBars reject the inline form). MinBars passes the full `delimiters` module, 14/14.
+1. *Scope = the full Mustache spec in one pass* — interpolation, sections, inverted, comments, partials,
+   dotted names, implicit iterator, standalone whitespace — *plus* inheritance
+   (`{{<p}}`/`{{$b}}`/`{{<*}}`/`{{/*}}`) and dynamic-name partials
+   (`{{>* }}`). Lambdas are dropped (`Value` has no function arm). Set delimiters
+   (`{{=<% %>=}}`) were initially deferred but are now *implemented* MinBars-exclusively
+   ([ADR-015](/adr/adr-0015-set-delimiters/) + 2026-06-04 scope narrowing; RawBars / MaxBars /
+   FullBars reject the inline form). MinBars passes the full `delimiters` module, 14/14.
 
-. *Truthiness `mustache` default = a shared parameter.* Add `mustache = false null []` to the alias
-  table *and* thread a per-engine default `FalsySet` through `resolveTruthiness` + `runResolved`
-  (today `handlebars` is hardwired, `Value.purs:69`); update the RawBars/FullBars/MaxBars call sites to
-  pass `handlebars` explicitly. Recursion budget default = 64.
+1. *Truthiness `mustache` default = a shared parameter.* Add `mustache = false null []` to the alias
+   table *and* thread a per-engine default `FalsySet` through `resolveTruthiness` + `runResolved`
+   (today `handlebars` is hardwired, `Value.purs:69`); update the RawBars/FullBars/MaxBars call sites to
+   pass `handlebars` explicitly. Recursion budget default = 64.
 
-. *Conformance harness = a Node-side runner* (`.mjs`, mirroring `packages/compile/conformance.mjs`)
-  against built `output/`, using the mustache/spec *`.json`* fixtures — built-in `JSON.parse`, *no*
-  YAML dependency.
+1. *Conformance harness = a Node-side runner* (`.mjs`, mirroring `packages/compile/conformance.mjs`)
+   against built `output/`, using the mustache/spec *`.json`* fixtures — built-in `JSON.parse`, *no*
+   YAML dependency.
 
-. *Build the shared recursion guard now* — a kernel depth/budget (error past 64) that also hardens the
-  reference engine's currently-unbounded `partialH` (`Prelude.purs:501`).
+1. *Build the shared recursion guard now* — a kernel depth/budget (error past 64) that also hardens the
+   reference engine's currently-unbounded `partialH` (`Prelude.purs:501`).
 
 ## Substrate corrections the review found
 

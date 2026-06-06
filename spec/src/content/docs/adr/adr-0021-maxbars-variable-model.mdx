@@ -30,15 +30,14 @@ scoped names, and drop `@`/`../` in MaxBars and RawBars.
 
 ## Decision
 
-. *The model is `this` / `loop` / `root` / `parent` / `outer`* — five reserved scoped names, available in
-  *MaxBars and RawBars*. FullBars is untouched: it keeps `@index`/`@root`/`../` (Handlebars
-  fidelity) and does *not* get these names. The set is *complete*: current context (`this`), current-loop
-  metadata (`loop`), a named enclosing loop's metadata (`outer`/labels), enclosing context (`parent`),
-  root context (`root`).
+1. *The model is `this` / `loop` / `root` / `parent` / `outer`* — five reserved scoped names, available in
+   *MaxBars and RawBars*. FullBars is untouched: it keeps `@index`/`@root`/`../` (Handlebars
+   fidelity) and does *not* get these names. The set is *complete*: current context (`this`), current-loop
+   metadata (`loop`), a named enclosing loop's metadata (`outer`/labels), enclosing context (`parent`),
+   root context (`root`).
 
-. *Frames chain.* Every frame-shifting block (`each`, `with`) pushes a frame linked to its parent frame
-  and the root. The reserved names resolve against this chain, and **chain from day one**:
-+
+1. *Frames chain.* Every frame-shifting block (`each`, `with`) pushes a frame linked to its parent frame
+   and the root. The reserved names resolve against this chain, and **chain from day one**:
 | Name | Resolves to |
 | --- | --- |
 | `this` | the current context (raw data). Unchanged. |
@@ -46,13 +45,11 @@ scoped names, and drop `@`/`../` in MaxBars and RawBars.
 | `outer` | a *named* enclosing loop's metadata object (any `label NAME`, ADR-013) — same shape as `loop`. |
 | `parent` | the *enclosing context* object. Chains over enclosing *contexts*: `{{parent.name}}`, `{{parent.parent.name}}`. |
 | `root` | the *root context* object (outermost context). |
-+
 `loop`/`outer` are *loop metadata* (chain over enclosing **loops**); `parent`/`root` are *contexts*
 (chain over enclosing **contexts**). They are complementary, not redundant: `{{loop.parent.index0}}`
 is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing context.
 
-. *Object shapes (normative).*
-+
+1. *Object shapes (normative).*
 * *loop-object* (`loop`, `outer`, any label): `{ index0, index1, rindex0, rindex1, first, last, length,
   key, this, parent, root &#125;`. The index/`first`/`last`/`length` arithmetic is ADR-006's (`rindex0 =
   length − 1 − index0`, `first = index0 == 0`, …); `this` is the element; `parent` is the nearest
@@ -62,9 +59,8 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
   `{ this, parent, root }` (reserved names win on collision). `parent` is the enclosing context-object
   (or `null` at the top level); `root` is the root context-object.
 
-. *Reserved-name resolution (the mechanism).* The reserved names are **scope-declared** so a dotted head
-  resolves the binding, not a data path — the ADR-013 mechanism, generalized.
-+
+1. *Reserved-name resolution (the mechanism).* The reserved names are **scope-declared** so a dotted head
+   resolves the binding, not a data path — the ADR-013 mechanism, generalized.
 * *MaxBars* — the surface desugar **seeds** the reserved names into `scope` (so `{{loop.first}}`
   desugars to `(lookup (loop) "first")`, not a data lookup). This seeding is *MaxBars-only*: it rides the
   same dialect hook that already distinguishes MaxBars from FullBars (which seeds nothing). This is "the
@@ -75,40 +71,40 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
 * The *engine* installs the same frame bindings for both dialects; FullBars' surface routes bare names to
   data lookups, so it never reaches them — no gating of the bindings is required.
 
-. *`@` and `../` are removed in MaxBars* — at the parser seam (`parseMaxExpr`/`parseMaxHead`): an
-  `@`-prefixed name or a `../` run is a *located parse error* that points the author at `root` /
-  `parent` / `loop`. MaxBars-local; FullBars' default parser keeps both. RawBars never had `@`/`../`
-  (no surface), so there is nothing to remove there.
+1. *`@` and `../` are removed in MaxBars* — at the parser seam (`parseMaxExpr`/`parseMaxHead`): an
+   `@`-prefixed name or a `../` run is a *located parse error* that points the author at `root` /
+   `parent` / `loop`. MaxBars-local; FullBars' default parser keeps both. RawBars never had `@`/`../`
+   (no surface), so there is nothing to remove there.
 
-. *The bare loop-variable vocabulary is removed* (supersedes ADR-006 §1–2). MaxBars passes
-  `noLoopVars`, so bare `{{first}}` / `{{index0}}` / `{{length}}` / `{{key}}`
-  are ordinary *data fields*; their values live as fields of `loop`. The frame no longer installs the
-  standalone `index0`/`first`/… operations, so RawBars' `{{{index}}}` / `{{{first}}}` /
-  `{{{parent-index}}}` are likewise replaced by `loop.*`.
+1. *The bare loop-variable vocabulary is removed* (supersedes ADR-006 §1–2). MaxBars passes
+   `noLoopVars`, so bare `{{first}}` / `{{index0}}` / `{{length}}` / `{{key}}`
+   are ordinary *data fields*; their values live as fields of `loop`. The frame no longer installs the
+   standalone `index0`/`first`/… operations, so RawBars' `{{{index}}}` / `{{{first}}}` /
+   `{{{parent-index}}}` are likewise replaced by `loop.*`.
 
-. *The block-partial body is the reserved name `yield`.* Handlebars' `{{> @partial-block}}`
-  yield is unwritable in the non-Handlebars dialects — `@` is reserved (§5), and a bare `partial-block`
-  lexes as the subtraction `partial - block` under MaxBars' infix arithmetic. `yield` is added as a
-  hyphen-free *synonym* of the `partial-block` scoped operation, installed under both names in the
-  partial block frame, so the one yield is spelled `{{yield}}` (MaxBars), `{{{yield}}}`
-  (RawBars), and `{{> @partial-block}}` (FullBars, unchanged). It is reserved like the other
-  roots: a same-named data field is shadowed (read it with an explicit `{{lookup this "yield"}}`),
-  and a `label yield` is flagged by the label-shadow lint. The yield is escape-safe (`VSafe`), so
-  MaxBars' `{{ }}` form does not re-escape it.
+1. *The block-partial body is the reserved name `yield`.* Handlebars' `{{> @partial-block}}`
+   yield is unwritable in the non-Handlebars dialects — `@` is reserved (§5), and a bare `partial-block`
+   lexes as the subtraction `partial - block` under MaxBars' infix arithmetic. `yield` is added as a
+   hyphen-free *synonym* of the `partial-block` scoped operation, installed under both names in the
+   partial block frame, so the one yield is spelled `{{yield}}` (MaxBars), `{{{yield}}}`
+   (RawBars), and `{{> @partial-block}}` (FullBars, unchanged). It is reserved like the other
+   roots: a same-named data field is shadowed (read it with an explicit `{{lookup this "yield"}}`),
+   and a `label yield` is flagged by the label-shadow lint. The yield is escape-safe (`VSafe`), so
+   MaxBars' `{{ }}` form does not re-escape it.
 
-. *The warn-always shadow lint is retired.* The footgun was "any field-like bare name silently shadows a
-  field"; with the metadata behind `loop.`, the reserved roots are `this`/`loop`/`root`/`parent`/`outer`
-  (and `yield` inside a block partial) — explicit, and rarely data fields except `yield`, whose escape
-  hatch is the explicit lookup above. ADR-006's `loopVarShadowWarnings` is deleted. The
-  ADR-013 `labelShadowWarnings` (a `label NAME` colliding with a reserved root — `this`/`loop`/`root`/
-  `parent`/`yield`) stays; a lighter optional lint may warn when a data field named one of the roots is
-  shadowed in a block body. NOTE: a reserved root shadows a field *everywhere*, even through an explicit
-  `{{this.NAME}}` (the path reduces to the segment `NAME`), so the explicit `lookup` is the only
-  field escape.
+1. *The warn-always shadow lint is retired.* The footgun was "any field-like bare name silently shadows a
+   field"; with the metadata behind `loop.`, the reserved roots are `this`/`loop`/`root`/`parent`/`outer`
+   (and `yield` inside a block partial) — explicit, and rarely data fields except `yield`, whose escape
+   hatch is the explicit lookup above. ADR-006's `loopVarShadowWarnings` is deleted. The
+   ADR-013 `labelShadowWarnings` (a `label NAME` colliding with a reserved root — `this`/`loop`/`root`/
+   `parent`/`yield`) stays; a lighter optional lint may warn when a data field named one of the roots is
+   shadowed in a block body. NOTE: a reserved root shadows a field *everywhere*, even through an explicit
+   `{{this.NAME}}` (the path reduces to the segment `NAME`), so the explicit `lookup` is the only
+   field escape.
 
-. *Compiler parity.* The frame chain + reserved-name objects are emitted by the compiler exactly as the
-  interpreter builds them — the ADR-013 `rt.each`/`childFrame` `binds` chain extends to carry `loop` /
-  `parent` / `root` and the parent links — gated by `test:compile` (interpreter ≡ compiled).
+1. *Compiler parity.* The frame chain + reserved-name objects are emitted by the compiler exactly as the
+   interpreter builds them — the ADR-013 `rt.each`/`childFrame` `binds` chain extends to carry `loop` /
+   `parent` / `root` and the parent links — gated by `test:compile` (interpreter ≡ compiled).
 
 ## Examples
 

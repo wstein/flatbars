@@ -28,45 +28,43 @@ boundary* (`buildHelpers` marshals `(args) ⇒ value` — inline only) and the *
 
 Three facts scope the decision:
 
-. *Block operations are a kernel capability, not a per-dialect feature.* RawBars/FullBars/MaxBars share
-  the engine, so the interpreter already runs any registered block operation. The new work is the JS
-  *host* affordance (`registerHelper`) plus its compiled twin.
-. *MinBars is a peer engine whose sections dispatch on the data value.* A Mustache "section lambda" is a
-  *function in the data* — precisely what `Value` deliberately is not ([concepts](/concepts/); the
-  conformance stance in [ADR-007](/adr/adr-0007-minbars/)). Adding MinBars section helpers would
-  reintroduce `VFunction` or bolt a non-standard registry onto a Mustache-fidelity engine. Out of scope.
-. *The Handlebars workflow is the target.* The clone goal ([fullbars-compat](/engine/fullbars-compat/)) means the API is
-  Handlebars': a block helper is a registered function that receives an `options` object with `fn`
-  (render the body) and `inverse` (render `{{else}}`). "Paste your Handlebars block helper and it runs"
-  is the bar.
+1. *Block operations are a kernel capability, not a per-dialect feature.* RawBars/FullBars/MaxBars share
+   the engine, so the interpreter already runs any registered block operation. The new work is the JS
+   *host* affordance (`registerHelper`) plus its compiled twin.
+1. *MinBars is a peer engine whose sections dispatch on the data value.* A Mustache "section lambda" is a
+   *function in the data* — precisely what `Value` deliberately is not ([concepts](/concepts/); the
+   conformance stance in [ADR-007](/adr/adr-0007-minbars/)). Adding MinBars section helpers would
+   reintroduce `VFunction` or bolt a non-standard registry onto a Mustache-fidelity engine. Out of scope.
+1. *The Handlebars workflow is the target.* The clone goal ([fullbars-compat](/engine/fullbars-compat/)) means the API is
+   Handlebars': a block helper is a registered function that receives an `options` object with `fn`
+   (render the body) and `inverse` (render `{{else}}`). "Paste your Handlebars block helper and it runs"
+   is the bar.
 
 ## Decision
 
-. *`registerHelper` block helpers are FullBars-only; RawBars and MaxBars do not get them.* The kernel
-  block-operation *capability* is dialect-agnostic (it already runs any `Operation` seeded at the
-  PureScript level), but `registerHelper` is the *FullBars* JS affordance — the Handlebars-compat boundary
-  word (ADR-018). RawBars and MaxBars use a *different concept and terminology* — *operations* /
-  *definitions* per [ADR-019](/adr/adr-0019-operation-vocabulary/) — so they get *no* `registerHelper`,
-  and their facades (`render`, `renderMaxbars`) deliberately take no helpers bag. A native MaxBars
-  block-operation registration is ADR-019's concern, not this one. MinBars section helpers are *not*
-  provided either — its sections are function-in-data, which `Value` does not model, and faking it would
-  regress ADR-007's conformance posture. So this ADR adds the JS-source block-helper path and its compiled
-  twin to the *FullBars* facade (`renderWith`) alone.
+1. *`registerHelper` block helpers are FullBars-only; RawBars and MaxBars do not get them.* The kernel
+   block-operation *capability* is dialect-agnostic (it already runs any `Operation` seeded at the
+   PureScript level), but `registerHelper` is the *FullBars* JS affordance — the Handlebars-compat boundary
+   word (ADR-018). RawBars and MaxBars use a *different concept and terminology* — *operations* /
+   *definitions* per [ADR-019](/adr/adr-0019-operation-vocabulary/) — so they get *no* `registerHelper`,
+   and their facades (`render`, `renderMaxbars`) deliberately take no helpers bag. A native MaxBars
+   block-operation registration is ADR-019's concern, not this one. MinBars section helpers are *not*
+   provided either — its sections are function-in-data, which `Value` does not model, and faking it would
+   regress ADR-007's conformance posture. So this ADR adds the JS-source block-helper path and its compiled
+   twin to the *FullBars* facade (`renderWith`) alone.
 
-. *One registration; usage decides block vs inline (Handlebars-compatible).* `registerHelper(name,
-  fn[, arity])` is unchanged. The engine passes a trailing `options` object whenever the call site is a
-  block (`{{#name …}}…{{/name}}`); `options.fn` is present only then. A helper used inline
-  (`{{name …}}`) sees no `fn`. No separate `registerBlockHelper` — a second primitive would break
-  the paste-compatibility the clone goal rests on.
+1. *One registration; usage decides block vs inline (Handlebars-compatible).* `registerHelper(name,
+   fn[, arity])` is unchanged. The engine passes a trailing `options` object whenever the call site is a
+   block (`{{#name …}}…{{/name}}`); `options.fn` is present only then. A helper used inline
+   (`{{name …}}`) sees no `fn`. No separate `registerBlockHelper` — a second primitive would break
+   the paste-compatibility the clone goal rests on.
 
-. *The v1 `options` surface is `fn` and `inverse` — and only those.*
-+
+1. *The v1 `options` surface is `fn` and `inverse` — and only those.*
 ```js
 registerHelper("list", (items, options) =>
   safe("<ul>" + items.map((i) => "<li>" + options.fn(i) + "</li>").join("") + "</ul>"));
 // {{#list people}}{{name}}{{/list}}
 ```
-+
   * `options.fn(ctx[, { data }])` renders the block body with `ctx` as the new context (called with no
     argument ⇒ the current context, matching Handlebars `options.fn(this)`). The shift changes only the
     context: the body *inherits* the enclosing scope — `{{@index}}`/`{{@key}}`/`../`
@@ -85,29 +83,29 @@ registerHelper("list", (items, options) =>
   * Only `ids`/`loc`/`lookupProperty` *throw* a located error ("not supported in a FlatBars block helper")
     rather than returning `undefined` — a loud partial cannot become a silent conformance lie.
 
-. *Return escaping branches on usage* (one `fn`, two wrappings). Used *inline* (`{{name …}}`), the
-  return is an *escaped* `VString` unless `safe(…)` (ADR-018, unchanged). Used as a *block*
-  (`{{#name}}…{{/name}}`), the return is `VSafe` (raw) — matching Handlebars, which treats block
-  output as already-safe HTML assembled from already-escaped sub-renders. `options.fn`/`inverse` return
-  already-escaped body text. A thrown JS error becomes a located render/compile error (ADR-018).
+1. *Return escaping branches on usage* (one `fn`, two wrappings). Used *inline* (`{{name …}}`), the
+   return is an *escaped* `VString` unless `safe(…)` (ADR-018, unchanged). Used as a *block*
+   (`{{#name}}…{{/name}}`), the return is `VSafe` (raw) — matching Handlebars, which treats block
+   output as already-safe HTML assembled from already-escaped sub-renders. `options.fn`/`inverse` return
+   already-escaped body text. A thrown JS error becomes a located render/compile error (ADR-018).
 
-. *Dual-mode through one marshalling, gated byte-for-byte.* The interpreter's existing JS-helper
-  marshaller becomes `Ctl`-aware (one path, not two): it always appends `options`, with `fn`/`inverse`
-  present only when `ctl.children` is non-empty (block usage). To call *back* into the pure interpreter
-  without throwing across the FFI, `options.fn`/`inverse` are backed by a PureScript callback returning
-  `{ ok, value, error }` (run `ctl.render` over the main/`else` body with `pushFrame` for the context
-  shift); the JS `options.fn` wrapper unwraps it and throws *in JS* on `!ok`, caught by the marshaller's
-  existing `try/catch`. The compiler adds a `userBlockHelpers[name]` branch to `rt.block` that builds the
-  *same* `options` from `bodyFn`/`elseFn`/`frame` and returns a `Safe`. `test:compile` is extended with
-  block-helper cases — per `options.fn` call-count (0 / 1 / N renders), `inverse`, and return-escaping —
-  so interpreter ≡ compiled is proven, not assumed.
+1. *Dual-mode through one marshalling, gated byte-for-byte.* The interpreter's existing JS-helper
+   marshaller becomes `Ctl`-aware (one path, not two): it always appends `options`, with `fn`/`inverse`
+   present only when `ctl.children` is non-empty (block usage). To call *back* into the pure interpreter
+   without throwing across the FFI, `options.fn`/`inverse` are backed by a PureScript callback returning
+   `{ ok, value, error }` (run `ctl.render` over the main/`else` body with `pushFrame` for the context
+   shift); the JS `options.fn` wrapper unwraps it and throws *in JS* on `!ok`, caught by the marshaller's
+   existing `try/catch`. The compiler adds a `userBlockHelpers[name]` branch to `rt.block` that builds the
+   *same* `options` from `bodyFn`/`elseFn`/`frame` and returns a `Safe`. `test:compile` is extended with
+   block-helper cases — per `options.fn` call-count (0 / 1 / N renders), `inverse`, and return-escaping —
+   so interpreter ≡ compiled is proven, not assumed.
 
-. *Arity counts positional arguments only.* `options` is never counted. A declared arity
-  (`registerHelper(name, fn, 1)`) validates the positional args; the diagnostics match ADR-018's.
+1. *Arity counts positional arguments only.* `options` is never counted. A declared arity
+   (`registerHelper(name, fn, 1)`) validates the positional args; the diagnostics match ADR-018's.
 
-. *Terminology ([ADR-019](/adr/adr-0019-operation-vocabulary/)).* Natively this is a *block
-  operation*; at the JS host boundary it is a *block helper* (the frozen boundary word). Surface/concept
-  docs say "block operation"; the JS API says `registerHelper`.
+1. *Terminology ([ADR-019](/adr/adr-0019-operation-vocabulary/)).* Natively this is a *block
+   operation*; at the JS host boundary it is a *block helper* (the frozen boundary word). Surface/concept
+   docs say "block operation"; the JS API says `registerHelper`.
 
 ## Consequences
 
@@ -183,35 +181,35 @@ marker operations* that *evaluate to exactly the value the built-ins already exp
 *additionally* extracts them — recognised structurally, from the head application's arg expressions — into
 two new `Ctl` fields that only the user-helper marshaller reads.
 
-. *Surface markers (FullBars desugar).* Collected hash pairs desugar to a trailing `(@hash k v …)`
-  instead of `(dict …)`; each `as |name|` to `(@param "name")` instead of a bare
-  `Lit (VString "name")`. The `@`-prefix makes them *unspellable by users* (surface `@x` strips the
-  `@` to the scoped helper `x`), so they cannot collide with a real helper or data field — but they are
-  *not* registered prelude operations (that would list them in the generated helper catalog, which has no
-  hide mechanism — `dict`/`elif` already show there). They are recognised *structurally*, below.
+1. *Surface markers (FullBars desugar).* Collected hash pairs desugar to a trailing `(@hash k v …)`
+   instead of `(dict …)`; each `as |name|` to `(@param "name")` instead of a bare
+   `Lit (VString "name")`. The `@`-prefix makes them *unspellable by users* (surface `@x` strips the
+   `@` to the scoped helper `x`), so they cannot collide with a real helper or data field — but they are
+   *not* registered prelude operations (that would list them in the generated helper catalog, which has no
+   hide mechanism — `dict`/`elif` already show there). They are recognised *structurally*, below.
 
-. *Engine seam + `Ctl` channel.* The `Engine` record gains a small pluggable `blockArgs` splitter
-  `Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }`; the kernel
-  driver stays generic (it calls the seam, evaluates the returned `positional` for the `Operation`, and
-  evaluates `hash` once to seed `Ctl`). FullBars supplies the marker-aware splitter; RawBars/MaxBars (no
-  such markers) supply the identity split — so neither the catalog nor the meaning-free core changes. `Ctl`
-  gains `hash :: Maybe Value` and `blockParams :: Array String`. *Built-ins keep working* because the
-  splitter, by default, still appends the hash dict + name strings to `positional` exactly as today — the
-  channel is *additive* (the new `Ctl` fields), and only the user-helper marshaller reads them and forwards
-  a trimmed positional list.
+1. *Engine seam + `Ctl` channel.* The `Engine` record gains a small pluggable `blockArgs` splitter
+   `Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }`; the kernel
+   driver stays generic (it calls the seam, evaluates the returned `positional` for the `Operation`, and
+   evaluates `hash` once to seed `Ctl`). FullBars supplies the marker-aware splitter; RawBars/MaxBars (no
+   such markers) supply the identity split — so neither the catalog nor the meaning-free core changes. `Ctl`
+   gains `hash :: Maybe Value` and `blockParams :: Array String`. *Built-ins keep working* because the
+   splitter, by default, still appends the hash dict + name strings to `positional` exactly as today — the
+   channel is *additive* (the new `Ctl` fields), and only the user-helper marshaller reads them and forwards
+   a trimmed positional list.
 
-. *The user-helper marshaller (interpreter).* For a block call it now: passes `options.hash = ctl.hash`
-  (the dict); binds each `ctl.blockParams[i]` to the matching value the helper supplies via
-  `options.fn(ctx, { blockParams: [v0, v1] })` (a sibling of the Phase-2 `data` frame — same pushed-frame
-  mechanism); and *strips* the trailing marker values from the positional `args` it forwards to the JS
-  function, so positional alignment matches Handlebars (`(items, options)`, not `(items, hashDict,
-  "name", options)`).
+1. *The user-helper marshaller (interpreter).* For a block call it now: passes `options.hash = ctl.hash`
+   (the dict); binds each `ctl.blockParams[i]` to the matching value the helper supplies via
+   `options.fn(ctx, { blockParams: [v0, v1] })` (a sibling of the Phase-2 `data` frame — same pushed-frame
+   mechanism); and *strips* the trailing marker values from the positional `args` it forwards to the JS
+   function, so positional alignment matches Handlebars (`(items, options)`, not `(items, hashDict,
+   "name", options)`).
 
-. *The compiler.* The emitter already lowers native `each`/`with` with block-param names as a separate
-  argument, so they are unaffected. For a *user* block (`rt.block`), the emitter — which sees the markers
-  in the AST — emits the hash and block-param names through a new trailing options argument to `rt.block`;
-  `rt.block` then builds `options.hash` and binds block params exactly as the interpreter does. The
-  positional `args` it forwards exclude the markers. Gated by `test:compile`, so the two paths stay equal.
+1. *The compiler.* The emitter already lowers native `each`/`with` with block-param names as a separate
+   argument, so they are unaffected. For a *user* block (`rt.block`), the emitter — which sees the markers
+   in the AST — emits the hash and block-param names through a new trailing options argument to `rt.block`;
+   `rt.block` then builds `options.hash` and binds block params exactly as the interpreter does. The
+   positional `args` it forwards exclude the markers. Gated by `test:compile`, so the two paths stay equal.
 
 ### Why this is the right shape
 

@@ -138,22 +138,22 @@ and the RawBars docstring. *Rating 4.*
 
 ## Consensus summary
 
-. *Name the two extension axes* — grammar seam (`parseExpr`/`parseHead`) vs. shape gate
-  (`extras`/sigils) — in ADR-004; stop letting one word cover both.
-. *Separate "superset" from "isolation"* in ADR-003/005; the ladder's `⊂` is about surface, the
-  isolation rule is about imports, and they have exactly one sanctioned crossing (`maxbars → fullbars`).
-  (Later narrowed: the 2026-06-04 ADR-005 amendment redefines `⊂` as surface-superset *modulo
-  documented exceptions* — MaxBars borrows most of FullBars's surface, not all, so Kai's "genuinely
-  *is* a superset" above holds only up to those exceptions.)
-. *Write the engine-conformance checklist now* — it is load-bearing in ADR-001/002/007 and exists
-  nowhere.
-. *MinBars is the worked example of lazy extraction*, not a violation of it; its P0 prereqs
-  (truthiness default, recursion guard) land first and stay green.
-. *The loop-variable shadow check warns always, errors with a schema.*
-. *003/004/005 stay separate* — different reversal costs — but cross-linked.
-. *Disambiguate "FullBars"* — the *reference engine* (the `kernel` machinery) vs the *FullBars
-  dialect* (the package: surface desugar + renderers + catalog). RawBars uses the former, not the
-  latter; the prose must say so.
+1. *Name the two extension axes* — grammar seam (`parseExpr`/`parseHead`) vs. shape gate
+   (`extras`/sigils) — in ADR-004; stop letting one word cover both.
+1. *Separate "superset" from "isolation"* in ADR-003/005; the ladder's `⊂` is about surface, the
+   isolation rule is about imports, and they have exactly one sanctioned crossing (`maxbars → fullbars`).
+   (Later narrowed: the 2026-06-04 ADR-005 amendment redefines `⊂` as surface-superset *modulo
+   documented exceptions* — MaxBars borrows most of FullBars's surface, not all, so Kai's "genuinely
+   *is* a superset" above holds only up to those exceptions.)
+1. *Write the engine-conformance checklist now* — it is load-bearing in ADR-001/002/007 and exists
+   nowhere.
+1. *MinBars is the worked example of lazy extraction*, not a violation of it; its P0 prereqs
+   (truthiness default, recursion guard) land first and stay green.
+1. *The loop-variable shadow check warns always, errors with a schema.*
+1. *003/004/005 stay separate* — different reversal costs — but cross-linked.
+1. *Disambiguate "FullBars"* — the *reference engine* (the `kernel` machinery) vs the *FullBars
+   dialect* (the package: surface desugar + renderers + catalog). RawBars uses the former, not the
+   latter; the prose must say so.
 
 ## Potential future developments
 
@@ -170,15 +170,15 @@ and the RawBars docstring. *Rating 4.*
 
 ## Concrete suggestions for improvement
 
-. *Land the four rating-5 doc fixes* (axes naming, superset≠isolation wording, the checklist, the
-  cross-links) — they are corrections, and the set is quotably ambiguous without them.
-. *Add the engine-conformance checklist to [host-api](/engine/host-api/)*: escape fn · stringify · truthiness
-  default · raw-output safety stance · admitted sigil set · real-AST shape (or "none").
-. *Add two regression tests*: (a) `parse` yields the same `Sep` shape for `else` and `user` (ADR-001's
-  crown jewel); (b) RawBars' dependency closure excludes `fullbars` (ADR-003/005's isolation claim).
-. *Implement the recursion guard as ADR-007 P0* and immediately point the reference `partialH` at it,
-  closing the unbounded-recursion gap that exists *today* regardless of MinBars.
-. *Promote the loop-variable shadow check to warn-always* with the schema-present error retained.
-. *Add an ADR index page* (this nav group) so the set is navigable and new ADRs have an obvious home.
-. *Fix the RawBars module docstring* to say "the reference engine" rather than "the FullBars reference
-  engine," matching ADR-008/009's split term and ADR-008's own *Con*.
+1. *Land the four rating-5 doc fixes* (axes naming, superset≠isolation wording, the checklist, the
+   cross-links) — they are corrections, and the set is quotably ambiguous without them.
+1. *Add the engine-conformance checklist to [host-api](/engine/host-api/)*: escape fn · stringify · truthiness
+   default · raw-output safety stance · admitted sigil set · real-AST shape (or "none").
+1. *Add two regression tests*: (a) `parse` yields the same `Sep` shape for `else` and `user` (ADR-001's
+   crown jewel); (b) RawBars' dependency closure excludes `fullbars` (ADR-003/005's isolation claim).
+1. *Implement the recursion guard as ADR-007 P0* and immediately point the reference `partialH` at it,
+   closing the unbounded-recursion gap that exists *today* regardless of MinBars.
+1. *Promote the loop-variable shadow check to warn-always* with the schema-present error retained.
+1. *Add an ADR index page* (this nav group) so the set is navigable and new ADRs have an obvious home.
+1. *Fix the RawBars module docstring* to say "the reference engine" rather than "the FullBars reference
+   engine," matching ADR-008/009's split term and ADR-008's own *Con*.

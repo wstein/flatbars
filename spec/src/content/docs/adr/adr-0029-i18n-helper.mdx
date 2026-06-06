@@ -35,50 +35,47 @@ engines] scores FlatBars *i18n: No*. The evidence is direct: the 90-operation pr
 
 Three hard constraints fell out of team review (debate recorded against this ADR):
 
-. *No CLDR/ICU data in our core or runtime.* The compiled runtime (`flatbars-runtime.mjs`) and the
-  committed Lab bundle are size-gated; CLDR plural data is tens of KB and would tax *every* compiled
-  template, including the majority that never localize.
-. *The prelude is one shared schema across all four dialects.* Adding `t` to the base prelude adds it to
-  *MinBars* (breaking the "pure Mustache" claim, ADR-007) and *FullBars* (Handlebars ships no `t`,
-  ADR-009) — a faithfulness regression even though byte-identical conformance would stay green (the spec
-  corpora never call `t`).
-. *Whatever ships must satisfy compile ≡ interpret (ADR-011)* or `test:compile` goes red.
+1. *No CLDR/ICU data in our core or runtime.* The compiled runtime (`flatbars-runtime.mjs`) and the
+   committed Lab bundle are size-gated; CLDR plural data is tens of KB and would tax *every* compiled
+   template, including the majority that never localize.
+1. *The prelude is one shared schema across all four dialects.* Adding `t` to the base prelude adds it to
+   *MinBars* (breaking the "pure Mustache" claim, ADR-007) and *FullBars* (Handlebars ships no `t`,
+   ADR-009) — a faithfulness regression even though byte-identical conformance would stay green (the spec
+   corpora never call `t`).
+1. *Whatever ships must satisfy compile ≡ interpret (ADR-011)* or `test:compile` goes red.
 
 ## Decision
 
 Adopt the truthiness pattern (ADR-022) for localization: *FlatBars supplies the call site; the host
 supplies the brain; we never bundle CLDR.*
 
-. *`t` is a blessed operation in the shared kernel prelude* (`Kernel.Prelude`), reserved for the
-  *core-surface family* — *RawBars, FullBars, and MaxBars* — and *absent from MinBars* (the separate
-  Mustache peer engine has its own closed prelude, so adding to the kernel prelude never touches it; ADR-007
-  stays intact). *RawBars is included precisely because it is the desugared core surface* (not a
-  meaning-free substrate): FullBars's `{{t …}}` desugars to a core `t` operation, so the operation
-  *must* exist at the RawBars level for the desugar target to be complete, and RawBars runs the same
-  prelude/engine. As implemented, the prelude `t` ships only the *fallback* (return the key unchanged); it
-  carries no locale or CLDR data. Because — like every prelude operation — `t` only fires when applied with
-  arguments (`{{t "k"}}`), a bare `{{t}}` still reads the data field `t`, so nothing is
-  shadowed.
+1. *`t` is a blessed operation in the shared kernel prelude* (`Kernel.Prelude`), reserved for the
+   *core-surface family* — *RawBars, FullBars, and MaxBars* — and *absent from MinBars* (the separate
+   Mustache peer engine has its own closed prelude, so adding to the kernel prelude never touches it; ADR-007
+   stays intact). *RawBars is included precisely because it is the desugared core surface* (not a
+   meaning-free substrate): FullBars's `{{t …}}` desugars to a core `t` operation, so the operation
+   *must* exist at the RawBars level for the desugar target to be complete, and RawBars runs the same
+   prelude/engine. As implemented, the prelude `t` ships only the *fallback* (return the key unchanged); it
+   carries no locale or CLDR data. Because — like every prelude operation — `t` only fires when applied with
+   arguments (`{{t "k"}}`), a bare `{{t}}` still reads the data field `t`, so nothing is
+   shadowed.
 
-. *The host supplies the brain by registering `t`* (the IoC seam of ADR-018), not via a separate callback
-  parameter: the interpreter's `renderWith` helper bag and the compiled runtime's `rt.register("t", fn)`
-  both shadow the prelude fallback. The registered function receives the *message key* and the *named
-  arguments* (the `key=value` hash as a trailing dict) and closes over the locale (e.g.
-  `(key, args) => translate(locale, key, args)`). The host owns the catalog, locale resolution, and
-  all CLDR/ICU behaviour (plurals, select, gender, number/date) — typically its existing i18n library, or
-  the browser's native `Intl` (see the 2026-06-05 amendment). *FlatBars ships no plural rules and no CLDR
-  data.* Conceptually this is the truthiness pattern (ADR-022) — a host-plugged rule, the same on both
-  interpreter and compiled paths — reusing the registration seam rather than a bespoke env field.
+1. *The host supplies the brain by registering `t`* (the IoC seam of ADR-018), not via a separate callback
+   parameter: the interpreter's `renderWith` helper bag and the compiled runtime's `rt.register("t", fn)`
+   both shadow the prelude fallback. The registered function receives the *message key* and the *named
+   arguments* (the `key=value` hash as a trailing dict) and closes over the locale (e.g.
+   `(key, args) => translate(locale, key, args)`). The host owns the catalog, locale resolution, and
+   all CLDR/ICU behaviour (plurals, select, gender, number/date) — typically its existing i18n library, or
+   the browser's native `Intl` (see the 2026-06-05 amendment). *FlatBars ships no plural rules and no CLDR
+   data.* Conceptually this is the truthiness pattern (ADR-022) — a host-plugged rule, the same on both
+   interpreter and compiled paths — reusing the registration seam rather than a bespoke env field.
 
-. *Surface.* The head is `t`, the first argument is the message key, the rest are named arguments:
-+
+1. *Surface.* The head is `t`, the first argument is the message key, the rest are named arguments:
 ```handlebars
 {{t "cart.summary" count=cart.size name=user.name}}
 ```
-+
 In MaxBars this also composes with pipes (`cart.size | t "cart.summary"` is *not* the shape; the key is
 the head argument — pipe sugar applies to value-producing operations, see [maxbars](/engine/maxbars/)).
-+
 *Name: lowercase `t`, not `T`.* An uppercase `T` was considered for ergonomics — it reads more like a
 sigil and is harder to overlook in a dense template — and rejected. `t` is the universal i18n function
 name (i18next, gettext, Rails, Vue, react-i18next), so it is recognized on sight and lets ported templates
@@ -90,20 +87,20 @@ layer instead — bold tag emphasis (ADR-026) and operation-name painting both a
 stand out — which is the correct place for visual salience. No `translate` alias ships (canonical-only;
 legacy spellings are a lint concern, ADR-019).
 
-. *Escaping is unchanged (ADR-002).* The callback returns a `String`; it lands *escaped* in
-  `{{t …}}` and *raw* in `{{{t …}}}`, exactly like every other helper, with `safe` as the
-  SafeString escape hatch. Messages that intentionally carry markup use the triple-stache. *No new
-  escaping axis is introduced.*
+1. *Escaping is unchanged (ADR-002).* The callback returns a `String`; it lands *escaped* in
+   `{{t …}}` and *raw* in `{{{t …}}}`, exactly like every other helper, with `safe` as the
+   SafeString escape hatch. Messages that intentionally carry markup use the triple-stache. *No new
+   escaping axis is introduced.*
 
-. *Missing-key policy: fallback-and-flag, never throw.* With no `t` registered the prelude fallback renders
-  the key unchanged (a host that returns a marker for a missing key gets that instead), and *analyse mode*
-  (ADR-022 Part B) / the linter can flag it. A strict mode that errors on a missing key is opt-in (for CI,
-  not render). Production renders never hard-fail on one missing translation.
+1. *Missing-key policy: fallback-and-flag, never throw.* With no `t` registered the prelude fallback renders
+   the key unchanged (a host that returns a marker for a missing key gets that instead), and *analyse mode*
+   (ADR-022 Part B) / the linter can flag it. A strict mode that errors on a missing key is opt-in (for CI,
+   not render). Production renders never hard-fail on one missing translation.
 
-. *compile ≡ interpret.* The prelude fallback is *pure* (return the key), so a template using `t` with no
-  host registration renders byte-identically interpreted and compiled. With a host `t`, the same registered
-  function runs on both paths (`renderWith` for the interpreter, `rt.register` for the compiled runtime).
-  `test:compile` gates the no-host case; the with-host parity is verified directly.
+1. *compile ≡ interpret.* The prelude fallback is *pure* (return the key), so a template using `t` with no
+   host registration renders byte-identically interpreted and compiled. With a host `t`, the same registered
+   function runs on both paths (`renderWith` for the interpreter, `rt.register` for the compiled runtime).
+   `test:compile` gates the no-host case; the with-host parity is verified directly.
 
 ## Consequences
 
@@ -146,19 +143,19 @@ legacy spellings are a lint concern, ADR-019).
 
 ## Follow-ups
 
-. ✅ *Done — the interim recipe and Lab demo:* the `/localize` guide renders `{{t …}}` live via the
-  host-register seam, on the browser's native `Intl` (see the 2026-06-05 amendment), gated by `check:i18n`.
-. ✅ *Done — this ADR (C):* the `t` prelude operation (RawBars/FullBars/MaxBars; not MinBars), the host
-  brain via the ADR-018 registration seam (interpreter + compiled runtime), the pure key-returning
-  fallback, catalog/operations generation, and `test:compile` parity.
-. ✅ *Done — the E formatting set:* `number` / `date` / `selectPlural` / `relative` are blessed prelude
-  operations alongside `t` (pure fallbacks — plain text, the English one/other rule, and "N units ago" —
-  overridden by the host's native `Intl`). All four read an Intl options hash
-  (`{{number n style="currency" currency="EUR"}}`, `{{selectPlural n type="ordinal"}}`,
-  `{{relative v u numeric="always"}}`), which the trailing dict delivers without an arity change.
-. *Conformance note:* add an `i18n` row to [fullbars-compat](/engine/fullbars-compat/) documenting that the `t` operation
-  (shared by RawBars/FullBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
-  Handlebars built-in), the same framing ADR-018 used for `registerHelper`.
+1. ✅ *Done — the interim recipe and Lab demo:* the `/localize` guide renders `{{t …}}` live via the
+   host-register seam, on the browser's native `Intl` (see the 2026-06-05 amendment), gated by `check:i18n`.
+1. ✅ *Done — this ADR (C):* the `t` prelude operation (RawBars/FullBars/MaxBars; not MinBars), the host
+   brain via the ADR-018 registration seam (interpreter + compiled runtime), the pure key-returning
+   fallback, catalog/operations generation, and `test:compile` parity.
+1. ✅ *Done — the E formatting set:* `number` / `date` / `selectPlural` / `relative` are blessed prelude
+   operations alongside `t` (pure fallbacks — plain text, the English one/other rule, and "N units ago" —
+   overridden by the host's native `Intl`). All four read an Intl options hash
+   (`{{number n style="currency" currency="EUR"}}`, `{{selectPlural n type="ordinal"}}`,
+   `{{relative v u numeric="always"}}`), which the trailing dict delivers without an arity change.
+1. *Conformance note:* add an `i18n` row to [fullbars-compat](/engine/fullbars-compat/) documenting that the `t` operation
+   (shared by RawBars/FullBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
+   Handlebars built-in), the same framing ADR-018 used for `registerHelper`.
 
 ## Amendment (2026-06-05): the Lab demonstrates the seam via native `Intl` — i18next is not vendored
 
@@ -170,28 +167,28 @@ the i18n integration *seam* using the browser's native `Intl`, with i18next avai
 
 Decision and rationale:
 
-. *No i18next in the bundle.* The browser already ships the CLDR brain — `Intl.PluralRules` (every
-  language's plural categories), `Intl.NumberFormat`, `Intl.DateTimeFormat` — at *zero* bytes. JSONata
-  earned its vendor because data-shaping-before-render has no platform equivalent; i18n's plural/format
-  machinery *is* the platform, so vendoring i18next would be redundant weight plus a version/CVE pin and an
-  ecosystem blessing. The Lab vendors a library only when the platform can't already do the job.
+1. *No i18next in the bundle.* The browser already ships the CLDR brain — `Intl.PluralRules` (every
+   language's plural categories), `Intl.NumberFormat`, `Intl.DateTimeFormat` — at *zero* bytes. JSONata
+   earned its vendor because data-shaping-before-render has no platform equivalent; i18n's plural/format
+   machinery *is* the platform, so vendoring i18next would be redundant weight plus a version/CVE pin and an
+   ecosystem blessing. The Lab vendors a library only when the platform can't already do the job.
 
-. *Demonstrate the seam, framed as Lab-as-host.* A live card (`tutorials/src/components/TryI18n.jsx`,
-  sibling of `TryJsonata.jsx`) and a `/localize` guide wire a `t` helper to native `Intl` via the existing
-  `registerHelper` / `renderWith` path (ADR-018) — *not* a new engine feature. This *reinforces* the
-  ADR's "i18n is the host's job" thesis (the Lab is acting as the host) rather than implying FlatBars does
-  i18n; the page says so explicitly.
+1. *Demonstrate the seam, framed as Lab-as-host.* A live card (`tutorials/src/components/TryI18n.jsx`,
+   sibling of `TryJsonata.jsx`) and a `/localize` guide wire a `t` helper to native `Intl` via the existing
+   `registerHelper` / `renderWith` path (ADR-018) — *not* a new engine feature. This *reinforces* the
+   ADR's "i18n is the host's job" thesis (the Lab is acting as the host) rather than implying FlatBars does
+   i18n; the page says so explicitly.
 
-. *No dependency on the unimplemented `t` operation.* Riding the ADR-018 `registerHelper`/`renderWith`
-  seam, the demo ships today as the living proof of follow-up 1 (the interim recipe) and migrates to the
-  blessed `t` (follow-up 2) when the module lands.
+1. *No dependency on the unimplemented `t` operation.* Riding the ADR-018 `registerHelper`/`renderWith`
+   seam, the demo ships today as the living proof of follow-up 1 (the interim recipe) and migrates to the
+   blessed `t` (follow-up 2) when the module lands.
 
-. *Cheap gate.* `scripts/check-i18n.mjs` (mirroring `check:jsonata`) renders the `{{t …}}` cells
-  across locales — including one with non-trivial plurals (Polish: one/few/many/other) and per-locale
-  number grouping — and asserts the output. There is no vendored dependency to pin.
+1. *Cheap gate.* `scripts/check-i18n.mjs` (mirroring `check:jsonata`) renders the `{{t …}}` cells
+   across locales — including one with non-trivial plurals (Polish: one/few/many/other) and per-locale
+   number grouping — and asserts the output. There is no vendored dependency to pin.
 
-. *Escape hatch, unbundled.* The guide shows a one-paragraph stub for swapping the `Intl` wrapper for
-  i18next or ICU MessageFormat (`@formatjs`) in a real host — fidelity without the bytes.
+1. *Escape hatch, unbundled.* The guide shows a one-paragraph stub for swapping the `Intl` wrapper for
+   i18next or ICU MessageFormat (`@formatjs`) in a real host — fidelity without the bytes.
 
 Future option (non-blocking): if users ask to demo *their* i18next setup, load it lazily via dynamic
 `import()` on demand, never in the base bundle, keeping the 0-byte default.

@@ -27,10 +27,9 @@ tag's interior need not blank the rest of the document.
 
 ## Decision
 
-. *There is ONE parser, and it recovers.* `parseSeq` (the tree builder over the `RawTok` stream) no
-  longer returns `Either`: it always produces a best-effort tree plus *every* error in source order. The
-  recovery is local and bounded, anchored at tag boundaries:
-+
+1. *There is ONE parser, and it recovers.* `parseSeq` (the tree builder over the `RawTok` stream) no
+   longer returns `Either`: it always produces a best-effort tree plus *every* error in source order. The
+   recovery is local and bounded, anchored at tag boundaries:
 --
 * a tag with a bad interior drops a `NodeError Span String` marker and the scan continues;
 * a *block* opener with a salvageable head (a leading identifier — `{{#if a == 1}}` yields name
@@ -40,29 +39,28 @@ tag's interior need not blank the rest of the document.
   top-level close is reported and recovered past.
 --
 
-. *Fail-fast is kept, but re-expressed as a PROJECTION over the recovering parser — not dropped, not a
-  second engine.* `parse` / `parseWith` run `parseRecovering` and return `Right tree` iff no error was
-  recovered, else `Left` the first error in source order — byte-for-byte the result the total parser
-  always gave. The compiler/render path keeps its total, fail-fast contract; it simply gets the verdict
-  from the one parser. Editor tooling calls `parseRecovering` directly. *One grammar, two views — drift
-  is impossible by construction*, which is ADR-001's principle, now fulfilled more truly (a fail-fast-only
-  parser is exactly what would have forced a second one).
-+
+1. *Fail-fast is kept, but re-expressed as a PROJECTION over the recovering parser — not dropped, not a
+   second engine.* `parse` / `parseWith` run `parseRecovering` and return `Right tree` iff no error was
+   recovered, else `Left` the first error in source order — byte-for-byte the result the total parser
+   always gave. The compiler/render path keeps its total, fail-fast contract; it simply gets the verdict
+   from the one parser. Editor tooling calls `parseRecovering` directly. *One grammar, two views — drift
+   is impossible by construction*, which is ADR-001's principle, now fulfilled more truly (a fail-fast-only
+   parser is exactly what would have forced a second one).
 The cost on a *valid* template is zero: recovery only triggers on an error, and on the error path the
 compiler rejects the file anyway, so the extra work is never wasted on output.
 
-. *`NodeError` is a first-class AST node.* It carries the offending span and a message and appears *only*
-  in a `parseRecovering` tree. Because `parse` projects any recovered error to `Left`, the render /
-  compile / lower / desugar paths never receive one; each consumer's `NodeError` arm is a total,
-  unreachable-in-practice neutral (the foldTemplate algebra gained a `nodeError` case). Tooling folds
-  (diagnostics, pretty-print) handle it meaningfully. We chose an in-tree node over a sidecar error list
-  so a later phase (hover, selection ranges) can attach to the error's position in the tree.
+1. *`NodeError` is a first-class AST node.* It carries the offending span and a message and appears *only*
+   in a `parseRecovering` tree. Because `parse` projects any recovered error to `Left`, the render /
+   compile / lower / desugar paths never receive one; each consumer's `NodeError` arm is a total,
+   unreachable-in-practice neutral (the foldTemplate algebra gained a `nodeError` case). Tooling folds
+   (diagnostics, pretty-print) handle it meaningfully. We chose an in-tree node over a sidecar error list
+   so a later phase (hover, selection ranges) can attach to the error's position in the tree.
 
-. *Diagnostics are derived, not heuristic.* `flatbars-js` exposes `diagnostics(template, dialect)` —
-  `parseRecovering` with that dialect's `ParseOptions`, each error located via `parseErrorAt`. The same
-  dialect seam that makes `==` an operator in MaxBars makes `{{#if a == 1}}` an error in every
-  other surface — so the editor flags exactly what the dialect rejects. `flatbars-lsp` publishes these as
-  `textDocument/publishDiagnostics` on open and every edit.
+1. *Diagnostics are derived, not heuristic.* `flatbars-js` exposes `diagnostics(template, dialect)` —
+   `parseRecovering` with that dialect's `ParseOptions`, each error located via `parseErrorAt`. The same
+   dialect seam that makes `==` an operator in MaxBars makes `{{#if a == 1}}` an error in every
+   other surface — so the editor flags exactly what the dialect rejects. `flatbars-lsp` publishes these as
+   `textDocument/publishDiagnostics` on open and every edit.
 
 ## Consequences
 

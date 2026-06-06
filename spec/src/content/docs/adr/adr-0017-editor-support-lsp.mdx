@@ -67,26 +67,25 @@ correctly in any editor is therefore to *run the engine lexer*, not to approxima
 
 ## Decision
 
-. *Editor support derives from the engine; the authoritative highlighter is the engine lexer delivered
-  as LSP semantic tokens.* A single language server (`flatbars-lsp`, Node, embedding the `flatbars-js`
-  bundle and its `tokenize(template, dialect)` API — the interior-aware superset of ADR-014's
-  `highlightSpans`) computes positioned token kinds for the
-  document — stateful by construction, so set delimiters, dialects, raw blocks and separators are all
-  correct because there is no second grammar to be wrong. Both VS Code (semantic-tokens LSP client) and
-  JetBrains (LSP API, 2023.2+) consume *the same server*; one implementation, all editors. (The JetBrains
-  platform LSP API has historically been Ultimate-only; Community-edition IDEs do not attach the server
-  and see only the TextMate fallback below — which is exactly why that fallback is mandatory, not a reason
-  against the LSP.) The server is
-  also the substrate for the rest of DX — diagnostics from the recovering parser
-  ([ADR-023](/adr/adr-0023-recovering-parser/): ONE parser that recovers, of which the canonical
-  fail-fast `parse` is a projection — not a second engine), helper hover/completion from `preludeSchema`
-  and the catalog, and go-to-partial. Highlighting was the first feature on this substrate, needing *none*
-  of the recovering parser, so it shipped first; diagnostics followed once ADR-023 landed.
+1. *Editor support derives from the engine; the authoritative highlighter is the engine lexer delivered
+   as LSP semantic tokens.* A single language server (`flatbars-lsp`, Node, embedding the `flatbars-js`
+   bundle and its `tokenize(template, dialect)` API — the interior-aware superset of ADR-014's
+   `highlightSpans`) computes positioned token kinds for the
+   document — stateful by construction, so set delimiters, dialects, raw blocks and separators are all
+   correct because there is no second grammar to be wrong. Both VS Code (semantic-tokens LSP client) and
+   JetBrains (LSP API, 2023.2+) consume *the same server*; one implementation, all editors. (The JetBrains
+   platform LSP API has historically been Ultimate-only; Community-edition IDEs do not attach the server
+   and see only the TextMate fallback below — which is exactly why that fallback is mandatory, not a reason
+   against the LSP.) The server is
+   also the substrate for the rest of DX — diagnostics from the recovering parser
+   ([ADR-023](/adr/adr-0023-recovering-parser/): ONE parser that recovers, of which the canonical
+   fail-fast `parse` is a projection — not a second engine), helper hover/completion from `preludeSchema`
+   and the catalog, and go-to-partial. Highlighting was the first feature on this substrate, needing *none*
+   of the recovering parser, so it shipped first; diagnostics followed once ADR-023 landed.
 
-. *A shared `flatbars.tmLanguage.json` is a mandatory, committed fallback — not optional.* Every plugin
-  ships it. The LSP is not always present or instant, and some contexts have *no* language server at
-  all, where the TextMate grammar is the only highlighting the user ever sees:
-+
+1. *A shared `flatbars.tmLanguage.json` is a mandatory, committed fallback — not optional.* Every plugin
+   ships it. The LSP is not always present or instant, and some contexts have *no* language server at
+   all, where the TextMate grammar is the only highlighting the user ever sees:
 --
 * first paint, before the server activates / attaches;
 * environments with no LSP: code review on GitHub/Gitea, diffs, `bat`/`less`/`cat` previews, marketplace
@@ -94,7 +93,6 @@ correctly in any editor is therefore to *run the engine lexer*, not to approxima
 * JetBrains' TextMate-bundle path for files before (or without) the plugin;
 * a degraded/crashed or still-starting server — DX must never fall to *no* colour.
 --
-+
 Because those contexts are real and unavoidable, shipping the grammar is non-negotiable. We use the
 *well-known Handlebars TextMate grammar*, re-identified as `source.flatbars` and extended for all four
 dialects (inverse sections, Mustache inheritance `{{<}}`/`{{$}}`, set delimiters, and
@@ -114,31 +112,31 @@ blocks, partials, comments) are left to the grammar, so `{{{x}}}` keeps its brac
 instead of being flattened to one whole-tag semantic token. The grammar is the floor; the engine is the
 ceiling *only where the engine knows more*.
 
-. *The fallback is a derived artifact and MUST be drift-bounded, like every other.* But it is *richer*
-  than the engine — it splits a tag into sigil / name / args / literals, where the engine paints one kind
-  per tag (ADR-014) — so a scope-to-kind bijection does not fit, and we do not force one. `check:tmgrammar`
-  instead pins, *for each dialect*, the one thing the engine defines and a stateless grammar can be held
-  to: *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
-  characters the grammar scopes as a tag (every tag scope ends in `.flatbars`; host text and the YAML
-  front-matter block never do), which catches the Exhibit-A/B begin/end drift across all four dialects.
-  (In-tag literals are no longer gated here — the thin-floor grammar leaves `string`/`number` carving to
-  the LSP, which corrects them as semantic tokens over the silent floor.) Everything
-  else (which helper is a keyword, argument and operator colouring) is allowed *enrichment*. Dialect-error
-  shapes and set-delimiter switches are out of scope (the LSP owns them). The gate is wired into `npm
-  test`; ADR-014's stopgap was *time-boxed*, but this fallback is *permanent* (it serves the no-LSP
-  contexts forever), so its gate is permanent too. The token vocabulary (`editors/token-vocabulary.json`)
-  is still the one place the kinds, the LSP legend, and the grammar's literal scopes are defined together.
+1. *The fallback is a derived artifact and MUST be drift-bounded, like every other.* But it is *richer*
+   than the engine — it splits a tag into sigil / name / args / literals, where the engine paints one kind
+   per tag (ADR-014) — so a scope-to-kind bijection does not fit, and we do not force one. `check:tmgrammar`
+   instead pins, *for each dialect*, the one thing the engine defines and a stateless grammar can be held
+   to: *tag boundaries* — exactly the characters the engine marks as inside a FlatBars tag are the
+   characters the grammar scopes as a tag (every tag scope ends in `.flatbars`; host text and the YAML
+   front-matter block never do), which catches the Exhibit-A/B begin/end drift across all four dialects.
+   (In-tag literals are no longer gated here — the thin-floor grammar leaves `string`/`number` carving to
+   the LSP, which corrects them as semantic tokens over the silent floor.) Everything
+   else (which helper is a keyword, argument and operator colouring) is allowed *enrichment*. Dialect-error
+   shapes and set-delimiter switches are out of scope (the LSP owns them). The gate is wired into `npm
+   test`; ADR-014's stopgap was *time-boxed*, but this fallback is *permanent* (it serves the no-LSP
+   contexts forever), so its gate is permanent too. The token vocabulary (`editors/token-vocabulary.json`)
+   is still the one place the kinds, the LSP legend, and the grammar's literal scopes are defined together.
 
-. *Reject tree-sitter as the FlatBars parser/highlighter.* A tree-sitter grammar is a second source of
-  truth (the drift ADR-001 and ADR-014 exist to prevent); it cannot track the dialect seam without N
-  grammars; its statefulness requires a hand-written C external scanner duplicating set-delimiter logic;
-  and it is not JetBrains' highlighting path, so it would not unify editors. If Zed / Neovim / GitHub
-  tree-sitter highlighting later becomes a goal, a tree-sitter grammar may be added as *another
-  non-authoritative fallback* under the same drift gate — never as the engine's parser.
+1. *Reject tree-sitter as the FlatBars parser/highlighter.* A tree-sitter grammar is a second source of
+   truth (the drift ADR-001 and ADR-014 exist to prevent); it cannot track the dialect seam without N
+   grammars; its statefulness requires a hand-written C external scanner duplicating set-delimiter logic;
+   and it is not JetBrains' highlighting path, so it would not unify editors. If Zed / Neovim / GitHub
+   tree-sitter highlighting later becomes a goal, a tree-sitter grammar may be added as *another
+   non-authoritative fallback* under the same drift gate — never as the engine's parser.
 
-. *Reject native per-editor lexers* (a JFlex/Kotlin lexer for JetBrains plus a separate VS Code
-  tokenizer). That is two more grammar copies, maximal drift, and double maintenance — the opposite of
-  one source of truth, for no benefit the LSP does not already give.
+1. *Reject native per-editor lexers* (a JFlex/Kotlin lexer for JetBrains plus a separate VS Code
+   tokenizer). That is two more grammar copies, maximal drift, and double maintenance — the opposite of
+   one source of truth, for no benefit the LSP does not already give.
 
 ## Consequences
 
@@ -202,61 +200,61 @@ the JetBrains plugin) confirmed the two-layer design of this ADR but found the
 three blockers below are closed, the extensions are **not** to be published to the
 VS Code Marketplace / Open VSX / JetBrains Marketplace. The decisions:
 
-. *Activation is unverified end-to-end, so it is release-blocking (VS Code).* The
-  review's first framing was that `activationEvents: []`
-  (`editors/vscode/package.json`) left the language client — and thus the whole LSP
-  ceiling (semantic tokens + diagnostics) — without a trigger. *That framing was
-  wrong, and the manifest validator caught it:* since VS Code 1.74 the `onLanguage`
-  events are *generated* from `contributes.languages`, and `engines.vscode` is
-  `^1.75`, so the extension auto-activates on opening a FlatBars file — declaring
-  the events explicitly is redundant (and now flagged as removable). The real gap
-  is that *nothing proves it*: the smoke test spawns the server over a pipe,
-  bypassing activation entirely, so a regression (a broken client, a dropped
-  language contribution) would ship silently. *Decision (implemented):* keep
-  `activationEvents: []` (rely on the generated events); assert the
-  auto-activation precondition offline in the smoke test (`engines.vscode >= 1.74`
-  and `contributes.languages` ≡ the shared dialect set); and add a *real-IDE* test
-  (`editors/vscode/test/ide`, `npm run test:vscode:ide`) that opens a `.maxbars`
-  fixture in a downloaded VS Code and asserts the extension auto-activates and that
-  a semantic token *and* a published diagnostic actually surface. It is heavy (a VS
-  Code download + a windowed run), so it runs in CI (blocker 2), not in `npm test`.
+1. *Activation is unverified end-to-end, so it is release-blocking (VS Code).* The
+   review's first framing was that `activationEvents: []`
+   (`editors/vscode/package.json`) left the language client — and thus the whole LSP
+   ceiling (semantic tokens + diagnostics) — without a trigger. *That framing was
+   wrong, and the manifest validator caught it:* since VS Code 1.74 the `onLanguage`
+   events are *generated* from `contributes.languages`, and `engines.vscode` is
+   `^1.75`, so the extension auto-activates on opening a FlatBars file — declaring
+   the events explicitly is redundant (and now flagged as removable). The real gap
+   is that *nothing proves it*: the smoke test spawns the server over a pipe,
+   bypassing activation entirely, so a regression (a broken client, a dropped
+   language contribution) would ship silently. *Decision (implemented):* keep
+   `activationEvents: []` (rely on the generated events); assert the
+   auto-activation precondition offline in the smoke test (`engines.vscode >= 1.74`
+   and `contributes.languages` ≡ the shared dialect set); and add a *real-IDE* test
+   (`editors/vscode/test/ide`, `npm run test:vscode:ide`) that opens a `.maxbars`
+   fixture in a downloaded VS Code and asserts the extension auto-activates and that
+   a semantic token *and* a published diagnostic actually surface. It is heavy (a VS
+   Code download + a windowed run), so it runs in CI (blocker 2), not in `npm test`.
 
-. *The JVM/LSP path compiles on no CI machine, so it is release-blocking
-  (JetBrains).* `test:jetbrains` validates the bundled JS transport (descriptors,
-  grammar canonicality, an LSP round-trip) but never compiles Kotlin; the
-  Ultimate-only LSP layer (`-PwithLsp`, the platform LSP API absent from the open
-  SDK) is built nowhere we control. *Decision (implemented):* a path-filtered
-  workflow, `.github/workflows/editors.yml`, with two jobs — a `gates` job
-  (the editor node gates + the real-IDE VS Code test under `xvfb`) and a
-  `jetbrains-build` job that provisions JDK 17 + Gradle (there is no wrapper in the
-  repo) and runs `gradle buildPlugin -PwithLsp`, downloading the IntelliJ IDEA
-  Ultimate SDK so the Ultimate-only LSP layer compiles. Neither client now ships
-  code that has only ever been type-checked by hand.
+1. *The JVM/LSP path compiles on no CI machine, so it is release-blocking
+   (JetBrains).* `test:jetbrains` validates the bundled JS transport (descriptors,
+   grammar canonicality, an LSP round-trip) but never compiles Kotlin; the
+   Ultimate-only LSP layer (`-PwithLsp`, the platform LSP API absent from the open
+   SDK) is built nowhere we control. *Decision (implemented):* a path-filtered
+   workflow, `.github/workflows/editors.yml`, with two jobs — a `gates` job
+   (the editor node gates + the real-IDE VS Code test under `xvfb`) and a
+   `jetbrains-build` job that provisions JDK 17 + Gradle (there is no wrapper in the
+   repo) and runs `gradle buildPlugin -PwithLsp`, downloading the IntelliJ IDEA
+   Ultimate SDK so the Ultimate-only LSP layer compiles. Neither client now ships
+   code that has only ever been type-checked by hand.
 
-. *The "one vocabulary, three consumers" seams are ungated, so they are
-  release-blocking (shared).* The contract this ADR rests on has unchecked joints:
-  `lspEmitKinds` (`editors/token-vocabulary.json`) drives the sparse-correction
-  design but is pinned by no test — adding `expr` to it would silently flatten
-  `{{{x}}}` to one colour, the exact failure Decision 1's floor design
-  guards against, with every gate green; `check:tmgrammar` asserts tag boundaries
-  and literals but *not* that the grammar's scope names still match the vocabulary's
-  `tmScopes`; and the embedded engine bundle (`lab/vendor/flatbars-engine.mjs`,
-  re-exported by `editors/lsp/src/engine.mjs`) carries no API-version the server can
-  assert. Packaging compounds it: the two `sync-assets.mjs` scripts call `esbuild`
-  *unpinned* and duplicate the dialect list by hand, undercutting the
-  byte-reproducibility `check:bundle` enforces (it pins `esbuild@0.23.0`).
-  *Decision (implemented):* add a vocabulary-integrity gate, `check:vocab`
-  (`scripts/check-vocab.mjs`, in `npm test`), asserting engine kinds ≡ vocabulary
-  kinds — witnessed by the `check:highlight` corpus, so there is no second corpus —
-  the *pinned* `lspEmitKinds` set, the LSP legend derivation, and grammar scope
-  names ⊇ vocabulary `tmScopes`; and pin + centralise the packaging `esbuild` in
-  `editors/shared/sync.mjs` (the shared bundle step + single-sourced language set,
-  pinned to the `esbuild@0.23.0` `gen:bundle` already uses). The "engine-shape
-  compatibility" the bundle API-version idea targeted is met by this gate (kinds ≡
-  vocabulary ≡ legend) together with `check:bundle`'s existing byte-identical
-  freshness guarantee, rather than a runtime version constant — no change to the
-  generated engine bundle, and the contract is checked in CI rather than asserted
-  at startup.
+1. *The "one vocabulary, three consumers" seams are ungated, so they are
+   release-blocking (shared).* The contract this ADR rests on has unchecked joints:
+   `lspEmitKinds` (`editors/token-vocabulary.json`) drives the sparse-correction
+   design but is pinned by no test — adding `expr` to it would silently flatten
+   `{{{x}}}` to one colour, the exact failure Decision 1's floor design
+   guards against, with every gate green; `check:tmgrammar` asserts tag boundaries
+   and literals but *not* that the grammar's scope names still match the vocabulary's
+   `tmScopes`; and the embedded engine bundle (`lab/vendor/flatbars-engine.mjs`,
+   re-exported by `editors/lsp/src/engine.mjs`) carries no API-version the server can
+   assert. Packaging compounds it: the two `sync-assets.mjs` scripts call `esbuild`
+   *unpinned* and duplicate the dialect list by hand, undercutting the
+   byte-reproducibility `check:bundle` enforces (it pins `esbuild@0.23.0`).
+   *Decision (implemented):* add a vocabulary-integrity gate, `check:vocab`
+   (`scripts/check-vocab.mjs`, in `npm test`), asserting engine kinds ≡ vocabulary
+   kinds — witnessed by the `check:highlight` corpus, so there is no second corpus —
+   the *pinned* `lspEmitKinds` set, the LSP legend derivation, and grammar scope
+   names ⊇ vocabulary `tmScopes`; and pin + centralise the packaging `esbuild` in
+   `editors/shared/sync.mjs` (the shared bundle step + single-sourced language set,
+   pinned to the `esbuild@0.23.0` `gen:bundle` already uses). The "engine-shape
+   compatibility" the bundle API-version idea targeted is met by this gate (kinds ≡
+   vocabulary ≡ legend) together with `check:bundle`'s existing byte-identical
+   freshness guarantee, rather than a runtime version constant — no change to the
+   generated engine bundle, and the contract is checked in CI rather than asserted
+   at startup.
 
 *Rejected at the same review:* making the LSP emit *full* semantic tokens (instead
 of sparse corrections over the TextMate floor). It contradicts Decision 2 of this

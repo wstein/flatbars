@@ -47,37 +47,37 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
   and `parseHead` (block-open heads). The default grammar is the shared prefix grammar
   (`FlatBars.Expr`); MaxBars swaps in a precedence-climbing grammar through the same seams.
 
-. *`{{ }}` is structural.* The two-brace stache is a first-class, meaning-free node (`Sep`).
-  `{{else}}` is just a `Sep` whose head identifier is `else`; the parser cannot tell it from
-  any other `{{ name }}`. Consequence: `{{` is significant in content and a literal one
-  is written `{{` (or inside a raw block). The brace *count* is structural data;
-  "two ⇒ escape" is a *walker* rule, not a parser fact ([lexical](/spec/lexical/) §1.2).
+1. *`{{ }}` is structural.* The two-brace stache is a first-class, meaning-free node (`Sep`).
+   `{{else}}` is just a `Sep` whose head identifier is `else`; the parser cannot tell it from
+   any other `{{ name }}`. Consequence: `{{` is significant in content and a literal one
+   is written `{{` (or inside a raw block). The brace *count* is structural data;
+   "two ⇒ escape" is a *walker* rule, not a parser fact ([lexical](/spec/lexical/) §1.2).
 
-. *Shape recognition is fixed; shape admission is dialect-gated.* The parser recognizes a *fixed* set
-  of sigils and tag shapes and knows nothing of what any *name* does — but which shapes are *legal*
-  is a per-dialect flag. `ParseOptions.extras` gates the Handlebars-only shapes (raw blocks
-  `{{{{…}}}}`, the inverse block `{{^}}`, unescaped `{{& }}`); RawBars and
-  MaxBars set `extras = false` and the parser rejects them with `DisallowedShape`. This is a
-  structural gate (which shapes exist), never a semantic one (what a name means).
+1. *Shape recognition is fixed; shape admission is dialect-gated.* The parser recognizes a *fixed* set
+   of sigils and tag shapes and knows nothing of what any *name* does — but which shapes are *legal*
+   is a per-dialect flag. `ParseOptions.extras` gates the Handlebars-only shapes (raw blocks
+   `{{{{…}}}}`, the inverse block `{{^}}`, unescaped `{{& }}`); RawBars and
+   MaxBars set `extras = false` and the parser rejects them with `DisallowedShape`. This is a
+   structural gate (which shapes exist), never a semantic one (what a name means).
 
-. *The walker is the only thing that assigns name-meaning.* It desugars and builds the real AST in the
-  same pass. Escaping (`escapeHtml` ⇒ escaped), clause-splitting (`{{else}}` consumed into typed
-  branches), and — for a surface dialect — paths (`name` ⇒ `lookup this "name"`) are all walker
-  decisions. The reference lowering is `Kernel.Lower.lower :: Template -> Array RNode`, a
-  `foldTemplate` ([A.13.2](/appendix/handlebars/#engine-api)). The surface desugar is
-  `FullBars.Surface.desugar`.
+1. *The walker is the only thing that assigns name-meaning.* It desugars and builds the real AST in the
+   same pass. Escaping (`escapeHtml` ⇒ escaped), clause-splitting (`{{else}}` consumed into typed
+   branches), and — for a surface dialect — paths (`name` ⇒ `lookup this "name"`) are all walker
+   decisions. The reference lowering is `Kernel.Lower.lower :: Template -> Array RNode`, a
+   `foldTemplate` ([A.13.2](/appendix/handlebars/#engine-api)). The surface desugar is
+   `FullBars.Surface.desugar`.
 
-. *No mandated real AST; one shared reference lowering.* `RNode` (`RIf`/`ROut`/…) is the real AST of
-  the reference lowering, now living in the shared `kernel` package and used by the whole ladder
-  (RawBars/FullBars/MaxBars) as a worked example for tool authors. Another engine (e.g. MinBars) may
-  lower to any shape. Crucially, `lower` is **not on the render path**: the reference renderer
-  (`runTemplate`, `Kernel.Engine`) interprets the structural tree *directly*; `lower` materializes
-  the real AST only for tooling (the playground's "Real AST" view) and lints (`escapingWarnings`).
+1. *No mandated real AST; one shared reference lowering.* `RNode` (`RIf`/`ROut`/…) is the real AST of
+   the reference lowering, now living in the shared `kernel` package and used by the whole ladder
+   (RawBars/FullBars/MaxBars) as a worked example for tool authors. Another engine (e.g. MinBars) may
+   lower to any shape. Crucially, `lower` is **not on the render path**: the reference renderer
+   (`runTemplate`, `Kernel.Engine`) interprets the structural tree *directly*; `lower` materializes
+   the real AST only for tooling (the playground's "Real AST" view) and lints (`escapingWarnings`).
 
-. *Safe by default.* The reference engine never auto-escapes raw output (`{{{ }}}`); the
-  `escapingWarnings` lint flags raw output of untrusted data (`lookup`/`this`/scoped accessors not
-  wrapped in `safe`). Escaping is a walker rule, so this lint is where "you forgot to escape" is
-  caught.
+1. *Safe by default.* The reference engine never auto-escapes raw output (`{{{ }}}`); the
+   `escapingWarnings` lint flags raw output of untrusted data (`lookup`/`this`/scoped accessors not
+   wrapped in `safe`). Escaping is a walker rule, so this lint is where "you forgot to escape" is
+   caught.
 
 ## Consequences
 
@@ -184,20 +184,20 @@ ladder, mandated for no one.'
 
 ## Consensus
 
-. *The principle is reworded, not reversed.* The parser is *name-agnostic* (no name has meaning —
-  `else` ≡ `user`), *shape-aware* (it recognizes a fixed sigil/shape vocabulary), and *shape-gated*
-  (`extras` and, later, MinBars sigils decide which shapes a *dialect* admits). "Meaning-free" was
-  retired as imprecise. (Decision §1, §3.)
-. *The render path is single-pass.* `runTemplate` interprets the structural tree directly; the
-  `lower`→`RNode` real AST is a *parallel* branch feeding tooling and lints, not rendering. The
-  diagram and Decision §5 now say so.
-. *One shared reference lowering, mandated for none.* `RNode` lives in `kernel` and the ladder shares
-  it, but the contract requires no engine to use it.
-. *Escaping stays swappable; safety becomes a contract.* Core will not mandate escaping (that would
-  smuggle in a value policy). Instead, engine conformance requires a declared escaping policy, and
-  the lint moves toward on-by-default everywhere.
-. *Stale identifiers and the dialect seams are now in the record.* The ADR no longer lies about
-  module names, and the `parseExpr`/`parseHead` seams + the ladder are first-class in the Decision.
+1. *The principle is reworded, not reversed.* The parser is *name-agnostic* (no name has meaning —
+   `else` ≡ `user`), *shape-aware* (it recognizes a fixed sigil/shape vocabulary), and *shape-gated*
+   (`extras` and, later, MinBars sigils decide which shapes a *dialect* admits). "Meaning-free" was
+   retired as imprecise. (Decision §1, §3.)
+1. *The render path is single-pass.* `runTemplate` interprets the structural tree directly; the
+   `lower`→`RNode` real AST is a *parallel* branch feeding tooling and lints, not rendering. The
+   diagram and Decision §5 now say so.
+1. *One shared reference lowering, mandated for none.* `RNode` lives in `kernel` and the ladder shares
+   it, but the contract requires no engine to use it.
+1. *Escaping stays swappable; safety becomes a contract.* Core will not mandate escaping (that would
+   smuggle in a value policy). Instead, engine conformance requires a declared escaping policy, and
+   the lint moves toward on-by-default everywhere.
+1. *Stale identifiers and the dialect seams are now in the record.* The ADR no longer lies about
+   module names, and the `parseExpr`/`parseHead` seams + the ladder are first-class in the Decision.
 
 ## Future developments
 
@@ -214,17 +214,17 @@ ladder, mandated for no one.'
 
 ## Concrete suggestions for improvement
 
-. **Land the four rating-5 doc fixes now** (principle wording, diagram, identifiers + seams, ladder)
-  — they are corrections, not design changes, and the ADR is currently quotably wrong.
-. **Add an engine-conformance checklist** to [host-api](/engine/host-api/) enumerating what an engine must
-  declare (escaping policy, truthiness default, sigil set, real-AST shape-or-none). This is where
-  "another engine may differ" stops being a slogan and becomes testable.
-. **Make `escapingWarnings` on-by-default in the CLI** with an explicit `--no-escape-lint` opt-out,
-  matching the playground (`Main.purs:211`).
-. **Pre-register MinBars' gated sigils** in the shared lexer behind a flag before MinBars code lands,
-  so the "core reused unchanged" folklore is killed at the source and not just in prose.
-. **Add a regression test asserting the `else`/`user` indistinguishability** (`parse` yields the same
-  `Sep` shape for both) so the crown-jewel property can't silently regress under a future seam.
+1. **Land the four rating-5 doc fixes now** (principle wording, diagram, identifiers + seams, ladder)
+   — they are corrections, not design changes, and the ADR is currently quotably wrong.
+1. **Add an engine-conformance checklist** to [host-api](/engine/host-api/) enumerating what an engine must
+   declare (escaping policy, truthiness default, sigil set, real-AST shape-or-none). This is where
+   "another engine may differ" stops being a slogan and becomes testable.
+1. **Make `escapingWarnings` on-by-default in the CLI** with an explicit `--no-escape-lint` opt-out,
+   matching the playground (`Main.purs:211`).
+1. **Pre-register MinBars' gated sigils** in the shared lexer behind a flag before MinBars code lands,
+   so the "core reused unchanged" folklore is killed at the source and not just in prose.
+1. **Add a regression test asserting the `else`/`user` indistinguishability** (`parse` yields the same
+   `Sep` shape for both) so the crown-jewel property can't silently regress under a future seam.
 
 ## Amendment (2026-06-04): interiors are emitted pre-lexed
 
