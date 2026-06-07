@@ -1,0 +1,173 @@
+[
+  {
+    "id": "hello",
+    "label": "Interpolation",
+    "group": "Interpolation",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "dotted",
+    "label": "Dotted names",
+    "group": "Interpolation",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "missing",
+    "label": "Missing → empty",
+    "group": "Interpolation",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "escaping",
+    "label": "Escaping (markup in data)",
+    "group": "Interpolation",
+    "view": "rendered",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "sectionArray",
+    "label": "Section over a list",
+    "group": "Sections",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "sectionObject",
+    "label": "Section over an object",
+    "group": "Sections",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "sectionBool",
+    "label": "Section over a boolean",
+    "group": "Sections",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "sectionNotConditional",
+    "label": "No “if” — shape decides",
+    "group": "Sections",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "truthyZero",
+    "label": "Truthiness gotcha (0 is truthy)",
+    "group": "Sections",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "inverted",
+    "label": "Inverted section (empty/falsy)",
+    "group": "Sections",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "implicit",
+    "label": "Implicit iterator {{.}}",
+    "group": "Sections",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "comment",
+    "label": "Comment {{! … }}",
+    "group": "Comments",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "partial",
+    "label": "Partial {{> name}}",
+    "group": "Partials",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [
+      "card"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "partialList",
+    "label": "Partial per row",
+    "group": "Partials",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [
+      "row"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "inheritance",
+    "label": "Template inheritance",
+    "group": "Partials",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [
+      "layout"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "dynamicPartial",
+    "label": "Dynamic-name partial",
+    "group": "Partials",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [
+      "en",
+      "de"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "setDelimiters",
+    "label": "Set delimiters {{=…=}}",
+    "group": "Set delimiters",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "precompute",
+    "label": "Lambda → precomputed value",
+    "group": "Lambdas",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  }
+]

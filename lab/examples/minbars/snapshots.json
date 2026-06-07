@@ -1,0 +1,20 @@
+{
+  "hello": "Hello, Ada!",
+  "dotted": "Ada Lovelace",
+  "missing": "name=[Ada] missing=[] null=[]",
+  "escaping": "escaped: &lt;b&gt;bold &amp; bright&lt;/b&gt;\nraw:     <b>bold & bright</b>\namp:     <b>bold & bright</b>",
+  "sectionArray": "Cart:\n- pen ×3\n- ink ×1\n",
+  "sectionObject": "Ada <ada@example.com>\n",
+  "sectionBool": "● online\n",
+  "sectionNotConditional": "admin: Ada\ndone",
+  "truthyZero": "in stock: 0",
+  "inverted": "(nothing yet)\n",
+  "implicit": "[math] [logic] [engines] ",
+  "comment": "Total: 99",
+  "partial": "Ada — author\nsince 1842",
+  "partialList": "- Ada (author)\n- Charles (engine)\n",
+  "inheritance": "== Welcome ==\nGlad you came.",
+  "dynamicPartial": "Hallo, Ada!",
+  "setDelimiters": "* default\n* erb-style\n* default again",
+  "precompute": "Ada Lovelace (AL)"
+}

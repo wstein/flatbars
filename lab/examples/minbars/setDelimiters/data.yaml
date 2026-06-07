@@ -1,0 +1,3 @@
+before: default
+during: erb-style
+after: default again

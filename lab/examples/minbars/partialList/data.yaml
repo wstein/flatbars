@@ -1,0 +1,5 @@
+people:
+  - name: Ada
+    role: author
+  - name: Charles
+    role: engine

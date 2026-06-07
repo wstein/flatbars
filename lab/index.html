@@ -1844,7 +1844,7 @@
       // subset). Loading Stem examples under a FlatBars engine — or vice-versa —
       // produces templates the active engine can't parse, so the base must follow
       // the engine.
-      const EXAMPLES_BASE = `./examples/${ENGINE === "stem" ? "stem" : "handlebars"}/`;
+      const EXAMPLES_BASE = `./examples/${ENGINE === "stem" ? "stem" : ENGINE === "minbars" ? "minbars" : "handlebars"}/`;
       const examples = await (await fetch(EXAMPLES_BASE + "examples.json")).json();
 
       // ── State ─────────────────────────────────────────────────────────
