@@ -1,7 +1,0 @@
-{{#if (gt n 9)}}
-big
-{{else if (gt n 0)}}
-small
-{{else}}
-non-positive
-{{/if}}

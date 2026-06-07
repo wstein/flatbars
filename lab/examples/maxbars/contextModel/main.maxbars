@@ -1,3 +1,0 @@
-{{#each chapters}}{{#each sections}}{{#each items}}
-{{loop.parent.index1}}.{{loop.index1}} {{this}} — {{parent.heading}} / {{parent.parent.title}} ({{root.book}})
-{{/each}}{{/each}}{{/each}}

@@ -32,18 +32,20 @@ const humanize = (id) =>
   id.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 // One dialect: its lab engine id, the typed source, the file extension, and a
-// renderer factory (the SAME path check-tutorial-links + the Lab use). MinBars,
-// RawBars and MaxBars project from typed sources; FullBars keeps its own curated
-// folder (lab/examples/fullbars/, the former shared `handlebars/` catalog — those
-// ARE FullBars examples). No dialect shares a folder anymore (the hack is gone);
-// converting FullBars to a typed-source projection too is a tracked follow-up.
+// renderer factory (the SAME path check-tutorial-links + the Lab use). All four
+// dialects now project from their typed sources — no hand-maintained catalog, no
+// shared folder. Entries carrying a custom `helpers` field (ADR-018) or a cross-
+// dialect `engine` override are page-only and skipped here (the Lab dropdown
+// hosts neither), so FullBars's helper/raw-block examples stay tutorial-only.
 const DIALECTS = [
-  // MinBars examples are deliberately non-HTML (plain text / Markdown / config /
-  // email), so they land in the "Plain Text" output view, not the HTML preview —
-  // `defaultView: "source"` (the real view-tab name; see lab/output-view.mjs).
+  // MinBars + FullBars examples are deliberately non-HTML (plain text / Markdown /
+  // config / email), so they land in the "Plain Text" output view, not the HTML
+  // preview — `defaultView: "source"` (the real view-tab name; see lab/output-view.mjs).
+  // A per-example `view: "rendered"` (e.g. the HTML `card`) overrides it.
   { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", defaultView: "source", makeRenderer: () => createMinBarsRenderer() },
+  { engine: "fullbars", module: "../tutorials/src/fullbars.mjs", ext: "hbs", defaultView: "source", makeRenderer: () => createFlatBarsRenderer("surface") },
   { engine: "rawbars", module: "../tutorials/src/rawbars.mjs", ext: "rawbars", makeRenderer: () => createFlatBarsRenderer("core") },
-  { engine: "maxbars", module: "../tutorials/src/maxbars.mjs", ext: "maxbars", makeRenderer: () => createFlatBarsRenderer("maxbars") },
+  { engine: "maxbars", module: "../tutorials/src/maxbars.mjs", ext: "maxbars", defaultView: "source", makeRenderer: () => createFlatBarsRenderer("maxbars") },
 ];
 
 // Build the full {relpath: content} map a dialect projects to. Pure (no I/O), so

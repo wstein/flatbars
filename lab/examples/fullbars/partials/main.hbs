@@ -1,18 +1,3 @@
-<h1>Partials</h1>
-
-{{! Basic partial — renders in the current context. }}
-{{> greeting}}
-
-{{! Partial with a custom context: pass an object as the first argument. }}
-{{> userBox author}}
-
-{{! Partial parameters: extra hash arguments become locals in the partial. }}
-{{> userBox person role="admin"}}
-
-{{! Each iteration renders the partial with the item as context. }}
-<ul>
-{{#each team}}{{> userBox}}{{/each}}
-</ul>
-
-{{! Dynamic partial — the name is computed at runtime. }}
-{{> (lookup . "layout") title="Chosen dynamically"}}
+{{#each people}}
+{{> (lookup this "kind")}}
+{{/each}}

@@ -136,18 +136,18 @@ try {
   await page.goto(playgroundUrl, { waitUntil: "networkidle2", timeout: 30000 });
 
   // Pick a representative example so every panel has interesting content to
-  // render. "Real-world - profile cards" exercises each-loops, partials, and
-  // conditionals — the heaviest workout in the FullBars (handlebars) example set.
+  // render. The "HTML card" example exercises each-loops, partials, and a
+  // conditional — the heaviest workout in the FullBars (handlebars) example set.
   await page.waitForSelector("#example-trigger", { visible: true });
   await page.click("#example-trigger");
   await page.waitForSelector("#example-menu li.dropdown-item", { visible: true });
   const picked = await page.evaluate(() => {
     const items = Array.from(document.querySelectorAll("#example-menu li.dropdown-item"));
-    const item = items.find((el) => /profile cards/i.test(el.textContent || ""));
+    const item = items.find((el) => /html card/i.test(el.textContent || ""));
     if (item) { item.click(); return item.textContent; }
     return null;
   });
-  check("loaded the profile-cards example", !!picked, picked || "no matching menu item");
+  check("loaded the HTML-card example", !!picked, picked || "no matching menu item");
   // Wait for the run loop to finish: the dock toggle becomes pressed once
   // there's at least one populated panel, and segments tile the output.
   await new Promise((r) => setTimeout(r, 800));
@@ -196,6 +196,14 @@ try {
     if (item) item.click();
   });
   await new Promise((r) => setTimeout(r, 400));
+  // Hello World now defaults to the Plain-Text output view; this assertion reads
+  // the HTML preview iframe, so switch to HTML Preview explicitly first.
+  await page.evaluate(() => {
+    const tab = Array.from(document.querySelectorAll(".view-tab"))
+      .find((b) => /HTML Preview/i.test(b.textContent || ""));
+    tab?.click();
+  });
+  await new Promise((r) => setTimeout(r, 200));
   // New IDE layout: overlays are created via the Explorer's OVERLAYS group
   // `＋` adder, not a tab strip. The headers are `.exp-gh` (each carries a
   // `.exp-glabel` for the group name, plus `.exp-add` on addable groups);

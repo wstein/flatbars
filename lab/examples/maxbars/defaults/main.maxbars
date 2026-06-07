@@ -1,0 +1,3 @@
+coalesce: {{nickname ?? name}}
+elvis:    {{label ?: "untitled"}}
+ternary:  {{count > 0 ? "in stock" : "sold out"}}

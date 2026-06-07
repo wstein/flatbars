@@ -1,0 +1,9 @@
+name: Ada
+items:
+  - title: Pen
+    qty: 3
+  - title: Ink
+    qty: 1
+store:
+  name: FlatMart
+  url: flatmart.example

@@ -1,70 +1,102 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The FullBars reference's runnable examples — ONE source, imported by both the
-// reference page (live preview + "Open in Lab") and the CI gate
-// (scripts/check-tutorial-links.mjs), which renders every one through the real
-// FullBars (`surface`) engine and asserts it produces output. Same contract as
-// mustache.mjs / rawbars.mjs: the runnable example is the source of truth; the
-// page's prose only annotates it; the normative text stays in docs/ (surface.adoc,
-// fullbars-compat.adoc, appendix-handlebars.adoc) and is never forked here.
+// The FullBars reference's runnable examples — ONE source, consumed by THREE
+// places so they can never drift:
+//   1. the /fullbars reference page (live preview + "Open in Lab"),
+//   2. the CI gate scripts/check-tutorial-links.mjs (renders each through the real
+//      FullBars `surface` engine and asserts output; `compiles: true` also asserts
+//      the compiled JS), and
+//   3. the FlatBars Lab's FullBars example dropdown — generated into
+//      lab/examples/fullbars/ by scripts/gen-examples.mjs, snapshot-gated by
+//      check:examples. (Helper-bearing entries carry a `helpers` field — ADR-018
+//      registerHelper source — and are page-only: the Lab dropdown skips them.)
 //
-// EVERY entry runs under FullBars — the Handlebars-faithful surface. Two rules
-// keep the examples honest to *this* dialect and off its neighbours:
+// This set is the FullBars MIRROR of the MinBars reference (mustache.mjs): every
+// MinBars concept is reimplemented in IDIOMATIC Handlebars, then the
+// Handlebars-only features are GROUPED into a few larger examples to keep the
+// count low. Like MinBars the examples are NON-HTML by default (plain text is
+// where templating lives); the two exceptions earn their markup — `escaping`
+// (the markup is in the DATA, shown as text) and the capstone `card` (its OUTPUT
+// is HTML, so it previews as HTML). ORDER IS DISPLAY ORDER and each `label`
+// carries its tier — the Lab dropdown is a flat list, read simple → advanced.
+//
+// Two rules keep every entry honest to FullBars and off its neighbours:
 //   • No MaxBars operators. `score >= 50` is MaxBars; FullBars writes the
-//     subexpression `(gte score 50)`. Conditions and transforms compose helpers.
-//   • No Mustache sections. `{{#person}}` is *not* an implicit truthy/list
-//     section here — control flow is explicit `{{#if}}` / `{{#each}}`.
-// Spacing is tight throughout — `{{name}}`, never `{{ name }}` — matching the
-// Mustache reference and the official Handlebars guide (the engine also forbids a
-// space after `{{` in a block tag, so block sigils have to stay tight regardless).
-// Custom-helper entries carry a `helpers` field (ADR-018 `registerHelper` source);
-// the page and the gate render those through the engine facade's `renderWith`.
+//     subexpression `(gte score 50)`.
+//   • No Mustache sections / set delimiters. `{{#each}}`/`{{#if}}` are explicit;
+//     `{{#person}}` is not an implicit section, and `{{=A B=}}` is MinBars-only
+//     (no Handlebars equivalent — the one MinBars concept with no mirror here).
+// Spacing is tight — `{{name}}`, never `{{ name }}`.
 
 export const examples = {
-  // ── Expressions & escaping ───────────────────────────────────────────────
-  // A first taste that exercises what the intro prose promises — a dotted path,
-  // an `each`, and an `unless` block — rather than a bare interpolation.
-  intro: {
+  // ── Simple: interpolation & paths ──────────────────────────────────────────
+  hello: {
     engine: "fullbars",
-    template: `{{shop.name}}
-{{#each shop.items}}
-  {{name}} ({{price}}){{#unless inStock}} — sold out{{/unless}}
-{{/each}}`,
-    data: {
-      shop: {
-        name: "Ada's Keys",
-        items: [
-          { name: "Keyboard", price: "€89", inStock: true },
-          { name: "Mouse", price: "€39", inStock: false },
-        ],
-      },
-    },
+    label: "Simple — Hello World",
+    template: "Hello, {{name}}!",
+    data: { name: "Ada" },
   },
 
-  escaping: {
-    // {{x}} HTML-escapes (the safe default); {{{x}}} emits raw markup. Handlebars's
-    // {{&x}} is accepted as an alias; the triple-stash is the canonical spelling.
-    engine: "fullbars",
-    template: "escaped: {{html}}\nraw:     {{{html}}}",
-    data: { html: "<b>bold & bright</b>" },
-  },
-
-  // ── Paths ──────────────────────────────────────────────────────────────────
   dotted: {
-    // Dotted paths reach into nested objects; `this` is the current context.
     engine: "fullbars",
+    label: "Simple — Dotted paths",
+    // A dot walks into nested objects; missing segments stop at empty, not error.
     template: "{{user.name}} — {{user.address.city}}",
     data: { user: { name: "Ada", address: { city: "London" } } },
   },
 
-  paths: {
-    // Inside a block, `../` climbs to the enclosing context and `@root` jumps to
-    // the top-level data — both regardless of how deep the nesting goes.
+  missing: {
     engine: "fullbars",
+    label: "Simple — Missing → empty",
+    // A path that resolves to nothing renders the empty string — never an error.
+    template: "name=[{{name}}] missing=[{{nope}}] null=[{{nada}}]",
+    data: { name: "Ada", nada: null },
+  },
+
+  escaping: {
+    engine: "fullbars",
+    label: "Simple — Escaping (markup in data)",
+    // {{x}} HTML-escapes (the safe default — Handlebars's defining feature); {{{x}}}
+    // and the {{&x}} alias emit raw. The markup is in the DATA; shown as plain text
+    // so the escaped entities are visible.
+    template: "escaped: {{html}}\nraw:     {{{html}}}\namp:     {{&html}}",
+    data: { html: "<b>bold & bright</b>" },
+  },
+
+  comment: {
+    engine: "fullbars",
+    label: "Simple — Comments",
+    // {{! … }} (and the {{!-- … --}} form, which may itself contain }}) is dropped.
+    template: "Total{{! dropped }}: {{total}}{{!-- not shown: }} --}}",
+    data: { total: 99 },
+  },
+
+  // ── Intermediate: control flow ─────────────────────────────────────────────
+  conditionals: {
+    engine: "fullbars",
+    label: "Intermediate — If / else if / else / unless",
+    // Handlebars control flow is EXPLICIT (unlike Mustache's shape-decides
+    // sections): {{#if}} takes a helper application — here the subexpression
+    // `(gte stock 10)`, the FullBars way to write `stock >= 10` — and chains via
+    // `else if`; {{#unless}} is its inverse. Note 0 is falsy in FullBars (the
+    // opposite of MinBars). Compiles to JS (the pane below).
+    compiles: true,
+    template:
+      "{{name}}: {{#if (gte stock 10)}}in stock{{else if (gte stock 1)}}low stock ({{stock}}){{else}}sold out{{/if}}{{#unless shipsFree}} · shipping extra{{/unless}}",
+    data: { name: "Keyboard", stock: 3, shipsFree: false },
+  },
+
+  eachList: {
+    engine: "fullbars",
+    label: "Intermediate — Each: nesting, loop data & parent paths",
+    // {{#each}} iterates — the idiomatic form of a Mustache list section. Nested,
+    // it shows the loop-data variables (@index, @last) AND the path climbers
+    // unique to Handlebars: `../name` reaches the enclosing context and `@root`
+    // jumps to the top-level data, however deep the nesting.
     template: `{{#each teams}}
-{{name}}:
+{{name}} ({{@root.org}}):
 {{#each members}}
-  - {{this}} ({{../name}} @ {{@root.org}})
+  {{@index}}. {{this}}{{#if @last}} (last){{/if}} — {{../name}}
 {{/each}}
 {{/each}}`,
     data: {
@@ -76,234 +108,165 @@ export const examples = {
     },
   },
 
-  // ── Conditionals: if / else / else if / unless ───────────────────────────
-  ifBlock: {
-    // {{#if}} takes a helper application, never an implicit Mustache section. The
-    // `else if` chain lowers to the engine's `elif` clause; the condition here is
-    // a subexpression, the FullBars way to write `score >= 90`.
+  eachElse: {
     engine: "fullbars",
-    template: `{{#if (gte score 90)}}
-grade: A
-{{else if (gte score 50)}}
-grade: pass
+    label: "Intermediate — Each: the empty case ({{else}})",
+    // {{#each}} carries its own {{else}} for an empty (or absent) list — the
+    // idiomatic Handlebars form of a Mustache inverted section. No separate tag.
+    template: `{{#each items}}
+- {{this}}
 {{else}}
-grade: fail
-{{/if}}`,
-    data: { score: 72 },
-  },
-
-  unless: {
-    // {{#unless x}} renders when x is falsy — the explicit inverse of {{#if}}.
-    engine: "fullbars",
-    template: `{{#unless inStock}}
-<em>out of stock</em>
-{{/unless}}`,
-    data: { inStock: false },
-  },
-
-  // ── each: lists, objects, loop data, the empty case ───────────────────────
-  eachList: {
-    // {{#each}} iterates; @index is the position and @first/@last flag the ends.
-    // This example also compiles to JS (the compiled-JS pane below).
-    engine: "fullbars",
-    compiles: true,
-    template: `<ol>
-{{#each items}}
-  <li>{{@index}}: {{name}} (×{{qty}}){{#if @first}} ← first{{/if}}{{#if @last}} ← last{{/if}}</li>
-{{/each}}
-</ol>`,
-    data: { items: [{ name: "pen", qty: 3 }, { name: "ink", qty: 1 }] },
+(nothing yet)
+{{/each}}`,
+    data: { items: [] },
   },
 
   eachObject: {
-    // Over an object, @key is the property name and `this` the value.
     engine: "fullbars",
+    label: "Intermediate — Each over an object (@key)",
+    // Over an object, @key is the property name and `this` the value — there is no
+    // Mustache equivalent (sections push an object as context; they don't iterate).
     template: `{{#each prefs}}
 {{@key}} = {{this}}
 {{/each}}`,
     data: { prefs: { theme: "dark", lang: "en" } },
   },
 
-  eachElse: {
-    // {{#each}} has its own {{else}} for the empty-list case — no separate inverse.
-    engine: "fullbars",
-    template: `<ul>
-{{#each items}}
-  <li>{{this}}</li>
-{{else}}
-  <li><em>nothing here</em></li>
-{{/each}}
-</ul>`,
-    data: { items: [] },
-  },
-
-  // ── with: re-root the context ─────────────────────────────────────────────
   withBlock: {
-    // {{#with obj}} makes obj the context for its body — handy for a deep path.
     engine: "fullbars",
-    template: `{{#with user.address}}
-{{street}}, {{city}}
+    label: "Intermediate — With: re-root the context",
+    // {{#with obj}} makes obj the body's context — the idiomatic Handlebars form of
+    // a Mustache object section ({{#user}}…{{/user}}), handy for a deep path.
+    template: `{{#with user}}
+{{name}} <{{email}}>
 {{/with}}`,
-    data: { user: { address: { street: "12 Newport", city: "London" } } },
+    data: { user: { name: "Ada", email: "ada@example.com" } },
   },
 
-  // ── lookup: dynamic keys ───────────────────────────────────────────────────
-  lookup: {
-    // {{lookup obj key}} reads a field whose name isn't known until render —
-    // an index into an array, or a property chosen by the data.
+  // ── Advanced: compose helpers, partials, capstones ─────────────────────────
+  subexprLookup: {
     engine: "fullbars",
-    template: "{{lookup colours selected}}",
+    label: "Advanced — Subexpressions & lookup",
+    // Parentheses nest one helper's result into another's arguments — how FullBars
+    // composes its ~80 prelude helpers instead of "write a JS helper for
+    // everything". {{lookup obj key}} reads a field whose name isn't known until
+    // render (an array index or a data-chosen property); here its result is upper-
+    // cased by `uppercase`.
+    template: "{{uppercase (lookup colours selected)}}",
     data: { selected: 1, colours: ["red", "green", "blue"] },
   },
 
-  // ── Subexpressions: compose the prelude ────────────────────────────────────
-  subexpr: {
-    // Parentheses nest one helper's result into another's arguments. This is how
-    // FullBars replaces "write a JS helper for everything": compose the ~80 that
-    // ship. Here: uppercase the looked-up name.
+  partials: {
     engine: "fullbars",
-    template: "{{uppercase (lookup user \"name\")}}",
-    data: { user: { name: "ada" } },
-  },
-
-  // ── Custom helpers (ADR-018) ───────────────────────────────────────────────
-  customHelper: {
-    // A host registers its own helper with the Handlebars-style
-    // registerHelper(name, fn[, arity]). `loud` returns a string (escaped in
-    // {{ }}); `shout` returns safe(...) to emit raw markup (the SafeString form).
-    engine: "fullbars",
-    helpers:
-      "registerHelper('loud', (s) => String(s).toUpperCase(), 1);\n" +
-      "registerHelper('shout', (s) => safe('<strong>' + String(s).toUpperCase() + '!</strong>'), 1);",
-    template: "{{loud name}}\n{{{shout name}}}",
-    data: { name: "ada" },
-  },
-
-  customHelperHash: {
-    // Surface hash arguments (key=value) arrive as a trailing object — the natural
-    // shape for a helper with named options, e.g. an anchor builder.
-    engine: "fullbars",
-    helpers:
-      "registerHelper('link', (text, opts) =>\n" +
-      "  safe('<a href=\"' + (opts.url || '#') + '\">' + text + '</a>'));",
-    template: "{{{link \"Home\" url=\"/home\"}}}",
-    data: {},
-  },
-
-  // ── Partials ───────────────────────────────────────────────────────────────
-  partial: {
-    // {{> name}} includes another template; it inherits the caller's context.
-    engine: "fullbars",
-    template: "{{> card}}",
-    partials: { card: "{{name}} — {{role}}" },
-    data: { name: "Ada", role: "author" },
-  },
-
-  partialList: {
-    // A partial reused per row. The {{#each}} and {{> row}} tags sit on their own
-    // lines, so standalone trimming drops the tag lines but keeps one newline per
-    // row — the partial body is just the row, no trailing newline of its own.
-    engine: "fullbars",
+    label: "Advanced — Partials: per-row & dynamic",
+    // {{> name}} includes another template, inheriting the caller's context — the
+    // natural unit of reuse. Combined here with {{#each}} (a partial per row) and a
+    // DYNAMIC name `{{> (lookup this "kind")}}`, resolved from the data per row.
     template: `{{#each people}}
-{{> row}}
+{{> (lookup this "kind")}}
 {{/each}}`,
-    partials: { row: "- {{name}} ({{role}})" },
+    partials: {
+      author: "- {{name}} writes",
+      engineer: "- {{name}} builds",
+    },
     data: {
       people: [
-        { name: "Ada", role: "author" },
-        { name: "Charles", role: "engine" },
+        { name: "Ada", kind: "author" },
+        { name: "Charles", kind: "engineer" },
       ],
     },
   },
 
-  dynamicPartial: {
-    // The partial name is itself an expression, resolved at render time — here a
-    // language chosen from the data via lookup.
+  layoutPartials: {
     engine: "fullbars",
-    template: "{{> (lookup this \"lang\")}}",
-    partials: { en: "Hello, {{name}}!", de: "Hallo, {{name}}!" },
-    data: { lang: "de", name: "Ada" },
-  },
-
-  inlinePartial: {
-    // {{#*inline "name"}}…{{/inline}} defines a partial inline, scoped to the rest
-    // of the template — a reusable row without a separate file. Deliberately inline
-    // (bracketed, single line), so opt out of the single-line-collapse heuristic.
-    inline: true,
-    engine: "fullbars",
-    template: `{{#*inline "tag"}}[{{this}}]{{/inline}}{{#each tags}}{{> tag}}{{/each}}`,
-    data: { tags: ["math", "logic"] },
-  },
-
-  blockPartial: {
-    // {{#> layout}}…{{/layout}} calls a partial and hands it a block; the partial
-    // drops it in with {{> @partial-block}} — Handlebars-style layout reuse.
-    engine: "fullbars",
-    template: `{{#> frame}}Glad you came.{{/frame}}`,
-    partials: { frame: "== Welcome ==\n{{> @partial-block}}" },
-    data: {},
-  },
-
-  // ── Comments ────────────────────────────────────────────────────────────────
-  comment: {
-    // {{! … }} (and the {{!-- … --}} form, which may contain }}) is dropped from
-    // the output entirely.
-    engine: "fullbars",
-    template: "Total{{! dropped }}: {{total}}{{!-- not shown: }} --}}",
-    data: { total: 99 },
-  },
-
-  // ── Whitespace control (~) ──────────────────────────────────────────────────
-  whitespace: {
-    // A tilde on either side of a tag trims the run of whitespace next to it —
-    // here the newline + indent before and after `name` — so a readably-formatted
-    // template can still emit tight output. Reach for it sparingly; overuse makes
-    // the template hard to read.
-    engine: "fullbars",
-    template: `<p>
-  {{~name~}}
-</p>`,
+    label: "Advanced — Layout & inline partials",
+    // Two Handlebars-only partial forms. {{#*inline "name"}}…{{/inline}} DEFINES a
+    // partial inline (scoped to the rest of the template); {{#> layout}}…{{/layout}}
+    // calls a partial and hands it a block, which the partial drops in with
+    // {{> @partial-block}} — Handlebars-style layout reuse.
+    template: `{{#*inline "hi"}}Hi {{name}}!{{/inline}}{{#> frame}}{{> hi}}{{/frame}}`,
+    partials: { frame: "== Welcome ==\n{{> @partial-block}}\n== Bye ==" },
     data: { name: "Ada" },
   },
 
-  // ── A user-defined BLOCK helper (ADR-020) ────────────────────────────────────
-  blockHelper: {
-    // One `registerHelper`; usage decides block vs inline. The full block surface
-    // (ADR-020): `options.hash` reads `class="roster"`, `options.fn(item, { blockParams })`
-    // renders the body with the context shifted to `item` and binds the `as |person i|`
-    // names. The Handlebars `list` helper, verbatim. Gated through `renderWith`.
+  helpers: {
     engine: "fullbars",
-    template: '{{#list people class="roster" as |person i|}}<li>{{i}}: {{person.name}}</li>{{/list}}',
-    data: { people: [{ name: "Ada" }, { name: "Lin" }] },
+    label: "Advanced — Custom & block helpers",
+    // A host registers its own with the Handlebars-style registerHelper(name,
+    // fn[, arity]) — the single most common extension, grouped here three ways:
+    // `loud` is a plain inline helper; `link` reads hash (key=value) arguments off
+    // options.hash; `list` is a BLOCK helper (ADR-020) whose options.fn(item, {
+    // blockParams }) renders the body with a shifted context and binds `as |p i|`.
     helpers:
+      "registerHelper('loud', (s) => String(s).toUpperCase(), 1);\n" +
+      "registerHelper('link', (text, o) => safe('<a href=\"' + (o.url || '#') + '\">' + text + '</a>'));\n" +
       "registerHelper('list', (items, o) =>\n" +
-      "  safe('<ul class=\"' + o.hash.class + '\">'\n" +
-      "    + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('')\n" +
-      "    + '</ul>'))",
+      "  safe('<ul>' + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('') + '</ul>'));",
+    template:
+      '{{loud name}}\n{{{link "Home" url="/home"}}}\n{{#list people as |p i|}}<li>{{i}}: {{p.name}}</li>{{/list}}',
+    data: { name: "ada", people: [{ name: "Ada" }, { name: "Lin" }] },
   },
 
-  // ── Raw blocks {{{{helper}}}} ────────────────────────────────────────────────
   rawBlock: {
-    // A raw block hands its body to the helper UNPROCESSED: the inner `{{bar}}` is
-    // never interpreted — it's literal text the helper receives via options.fn().
-    // `raw-loud` upper-cases that raw body, so the verbatim `{{bar}}` comes out as
-    // `{{BAR}}` (the data's `bar` is never read). The Handlebars raw-block feature,
-    // verbatim.
     engine: "fullbars",
+    label: "Advanced — Raw blocks",
+    // A raw block {{{{helper}}}}…{{{{/helper}}}} hands its body to the helper
+    // UNPROCESSED: the inner `{{bar}}` is never interpreted — it's literal text the
+    // helper receives via options.fn(). `raw-loud` upper-cases that raw body, so
+    // the verbatim `{{bar}}` comes out as `{{BAR}}` (the data's `bar` is never
+    // read). The Handlebars raw-block feature, verbatim.
     helpers: "registerHelper('raw-loud', (options) => options.fn().toUpperCase());",
     template: "{{{{raw-loud}}}}\n  {{bar}}\n{{{{/raw-loud}}}}",
-    data: null,
+    data: { bar: "ignored" },
   },
 
-  // ── Lambdas → precalculated values (the "after" render) ──────────────────────
-  precompute: {
-    // A Handlebars value-lambda (a function on the context returning a string) is
-    // replaced by precalculated PLAIN DATA — fullName/initials are fields, not a
-    // function. The JSONata that computes them is shown beside this on the page;
-    // the renderer only sees data, so {{fullName}} runs identically interpreted
-    // and compiled. (Render-time, body-aware behaviour would be a helper instead.)
+  email: {
     engine: "fullbars",
-    template: "{{fullName}} ({{initials}})",
-    data: { first: "Ada", last: "Lovelace", fullName: "Ada Lovelace", initials: "AL" },
+    label: "Advanced — Putting it together (email)",
+    // The capstone reusing familiar pieces in one realistic, non-HTML template:
+    // interpolation, dotted paths, an {{#each}} with its built-in {{else}} for the
+    // empty case, and a {{> item}} partial — a plain-text shipping notice.
+    template: `Hi {{name}},
+
+Your order shipped. Items:
+{{#each items}}
+{{> item}}
+{{else}}
+- (none)
+{{/each}}
+
+— {{store.name}} ({{store.url}})`,
+    partials: { item: "- {{title}} ×{{qty}}" },
+    data: {
+      name: "Ada",
+      items: [{ title: "Pen", qty: 3 }, { title: "Ink", qty: 1 }],
+      store: { name: "FlatMart", url: "flatmart.example" },
+    },
+  },
+
+  card: {
+    engine: "fullbars",
+    label: "Advanced — HTML card (styling in a partial)",
+    // The one example whose OUTPUT is HTML — so it previews as HTML, not text.
+    // Partials compose the markup: {{> styles}} holds the CSS once, {{> card}} is
+    // one row's markup, {{#each}} iterates, and a {{#if lead}} badge shows a
+    // conditional inside the partial.
+    view: "rendered",
+    template: "{{> styles}}\n{{#each people}}\n{{> card}}\n{{/each}}",
+    partials: {
+      styles:
+        "<style>\n" +
+        "  .card { border: 1px solid #d0d7de; border-radius: 8px; padding: .5rem .8rem; margin: .5rem 0; font-family: system-ui, sans-serif; }\n" +
+        "  .card h3 { margin: 0 0 .15rem; font-size: 1rem; }\n" +
+        "  .card p  { margin: 0; color: #57606a; }\n" +
+        "</style>",
+      card: '<div class="card">\n  <h3>{{name}}{{#if lead}} ★{{/if}}</h3>\n  <p>{{role}}</p>\n</div>',
+    },
+    data: {
+      people: [
+        { name: "Ada Lovelace", role: "Author", lead: true },
+        { name: "Charles Babbage", role: "Engine" },
+      ],
+    },
   },
 };

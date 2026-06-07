@@ -1,0 +1,6 @@
+people:
+  - name: Ada Lovelace
+    role: Author
+    lead: true
+  - name: Charles Babbage
+    role: Engine

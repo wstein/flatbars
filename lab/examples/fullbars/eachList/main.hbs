@@ -1,0 +1,6 @@
+{{#each teams}}
+{{name}} ({{@root.org}}):
+{{#each members}}
+  {{@index}}. {{this}}{{#if @last}} (last){{/if}} — {{../name}}
+{{/each}}
+{{/each}}

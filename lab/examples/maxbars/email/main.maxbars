@@ -1,0 +1,10 @@
+Hi {{name}},
+
+Your order shipped. Items:
+{{#each items}}
+{{> item}}
+{{else}}
+- (none)
+{{/each}}
+
+— {{store.name}} ({{store.url}})

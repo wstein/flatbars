@@ -1,8 +1,0 @@
-firstname: Yehuda
-lastname: Katz
-person:
-  name: Ada Lovelace
-  team: Compiler
-  home town: London
-html: "<b>bold</b> & <i>italic</i>"
-tags: [parser, runtime, docs]

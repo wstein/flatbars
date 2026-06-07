@@ -1,3 +1,0 @@
-{{#each rows as |row i|}}
-{{i}}: {{#each row.tags}}{{row.label}}#{{this}} {{/each}}
-{{/each}}

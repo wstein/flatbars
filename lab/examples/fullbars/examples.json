@@ -1,85 +1,141 @@
 [
   {
-    "id": "greeting",
-    "label": "Basics - Hello World",
-    "view": "rendered",
+    "id": "hello",
+    "label": "Simple — Hello World",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "expressions",
-    "label": "Basics - Expressions & escaping",
-    "view": "rendered",
+    "id": "dotted",
+    "label": "Simple — Dotted paths",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "comments",
-    "label": "Basics - Comments",
-    "view": "rendered",
+    "id": "missing",
+    "label": "Simple — Missing → empty",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "if-unless",
-    "label": "Built-ins - if / unless / else",
-    "view": "rendered",
+    "id": "escaping",
+    "label": "Simple — Escaping (markup in data)",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "each",
-    "label": "Built-ins - each (@index, @key, else)",
-    "view": "rendered",
+    "id": "comment",
+    "label": "Simple — Comments",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "with",
-    "label": "Built-ins - with & ../parent paths",
-    "view": "rendered",
+    "id": "conditionals",
+    "label": "Intermediate — If / else if / else / unless",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "lookup",
-    "label": "Built-ins - lookup (dynamic keys)",
-    "view": "rendered",
+    "id": "eachList",
+    "label": "Intermediate — Each: nesting, loop data & parent paths",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "eachElse",
+    "label": "Intermediate — Each: the empty case ({{else}})",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "eachObject",
+    "label": "Intermediate — Each over an object (@key)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "withBlock",
+    "label": "Intermediate — With: re-root the context",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.hbs",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "subexprLookup",
+    "label": "Advanced — Subexpressions & lookup",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [],
     "data": "data.yaml"
   },
   {
     "id": "partials",
-    "label": "Partials - context, params, dynamic",
-    "view": "rendered",
+    "label": "Advanced — Partials: per-row & dynamic",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [
-      "greeting",
-      "userBox",
-      "fancy"
+      "author",
+      "engineer"
     ],
     "data": "data.yaml"
   },
   {
-    "id": "inline-partials",
-    "label": "Partials - inline & blocks (layout)",
-    "view": "rendered",
+    "id": "layoutPartials",
+    "label": "Advanced — Layout & inline partials",
+    "group": "Examples",
+    "view": "source",
     "main": "main.hbs",
     "partials": [
-      "layout"
+      "frame"
     ],
     "data": "data.yaml"
   },
   {
-    "id": "cards",
-    "label": "Real-world - profile cards",
+    "id": "email",
+    "label": "Advanced — Putting it together (email)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.hbs",
+    "partials": [
+      "item"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "card",
+    "label": "Advanced — HTML card (styling in a partial)",
+    "group": "Examples",
     "view": "rendered",
     "main": "main.hbs",
     "partials": [

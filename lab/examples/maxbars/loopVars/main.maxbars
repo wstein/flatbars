@@ -1,3 +1,0 @@
-{{#each items}}
-[{{loop.index0}}] {{loop.index1}}/{{loop.length}} ({{loop.rindex0}} after, {{loop.rindex1}} left). {{name}}{{#if loop.first}} (first){{/if}}{{#if loop.last}} (last){{/if}}
-{{/each}}

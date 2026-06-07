@@ -1,0 +1,3 @@
+{{#inline "frame"}}== {{title}} ==
+{{yield}}
+== end =={{/inline}}{{#partial "frame"}}Glad you came.{{/partial}}

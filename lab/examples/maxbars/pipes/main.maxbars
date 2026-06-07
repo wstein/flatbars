@@ -1,0 +1,4 @@
+{{name | uppercase}}
+{{price | toFixed 2}}
+{{items | pluck "name" | join ", "}}
+{{lookup colours selected | uppercase}}

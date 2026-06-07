@@ -1,0 +1,17 @@
+{
+  "hello": "Hello, Ada!",
+  "dotted": "Ada — London",
+  "missing": "name=[Ada] missing=[] null=[]",
+  "escaping": "escaped: &lt;b&gt;bold &amp; bright&lt;/b&gt;\nraw:     <b>bold & bright</b>\namp:     <b>bold & bright</b>",
+  "comment": "Total: 99",
+  "conditionals": "Keyboard: low stock (3) · shipping extra",
+  "eachList": "Engine (Acme):\n  0. Ada — Engine\n  1. Charles (last) — Engine\nDocs (Acme):\n  0. Grace (last) — Docs\n",
+  "eachElse": "(nothing yet)\n",
+  "eachObject": "lang = en\ntheme = dark\n",
+  "withBlock": "Ada <ada@example.com>\n",
+  "subexprLookup": "GREEN",
+  "partials": "- Ada writes\n- Charles builds\n",
+  "layoutPartials": "== Welcome ==\nHi Ada!\n== Bye ==",
+  "email": "Hi Ada,\n\nYour order shipped. Items:\n- Pen ×3\n- Ink ×1\n\n— FlatMart (flatmart.example)",
+  "card": "<style>\n  .card { border: 1px solid #d0d7de; border-radius: 8px; padding: .5rem .8rem; margin: .5rem 0; font-family: system-ui, sans-serif; }\n  .card h3 { margin: 0 0 .15rem; font-size: 1rem; }\n  .card p  { margin: 0; color: #57606a; }\n</style>\n<div class=\"card\">\n  <h3>Ada Lovelace ★</h3>\n  <p>Author</p>\n</div>\n<div class=\"card\">\n  <h3>Charles Babbage</h3>\n  <p>Engine</p>\n</div>\n"
+}

@@ -30,6 +30,7 @@ const groups = [
       { href: "#identity", label: "The identity" },
       { href: "#loops", label: "Loop variables" },
       { href: "#inherited", label: "From FullBars" },
+      { href: "#together", label: "Putting it together" },
       { href: "#divergences", label: "Where it diverges" },
       { href: "#compile", label: "Compiles to JS" },
       { href: "#when", label: "When (not) to use" },
@@ -84,7 +85,8 @@ const t = (s) => s;
       <code>{t("(multiply price qty)")}</code> — the same helper application FullBars and
       RawBars run. MaxBars is sugar that compiles down the ladder, not a second engine.
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.intro.template} data={ex.intro.data} />
+    <p>The simplest template — the panes are live, so start here:</p>
+    <OpenInLab client:visible engine="maxbars" template={ex.hello.template} data={ex.hello.data} />
     <div class="callout info">
       <p>
         <b>Where MaxBars sits.</b> It's the most permissive surface in the family —
@@ -129,12 +131,14 @@ const t = (s) => s;
     <h3>Comparisons in conditions</h3>
     <p>
       The everyday use: a comparison as the head of <code>{t("{{#if}}")}</code>. Where
-      FullBars writes the subexpression <code>{t("{{#if (gte qty 1)}}")}</code>, MaxBars
-      writes the infix form.
+      FullBars writes the subexpression <code>{t("{{#if (gte stock 10)}}")}</code>, MaxBars
+      writes the infix form — and chains with <code>{t("{{else if …}}")}</code> and
+      <code>{t("{{#unless}}")}</code>. (Arithmetic gets its own showcase in
+      <a href="#identity">the identity</a> below.) The one catch: a clause separator
+      <em>must</em> parenthesise its condition (<code>{t("{{else if (gte stock 1)}}")}</code>) —
+      see <a href="#divergences">where it diverges</a>.
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.comparison.template} data={ex.comparison.data} />
-    <h3>Arithmetic</h3>
-    <OpenInLab client:visible engine="maxbars" template={ex.math.template} data={ex.math.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.conditionals.template} data={ex.conditionals.data} />
     <h3>Logic, <code>??</code>, and <code>?:</code></h3>
     <p>
       <code>&amp;&amp;</code> binds tighter than <code>||</code> and looser than the
@@ -159,22 +163,14 @@ const t = (s) => s;
       A boolean <code>||</code>/<code>&amp;&amp;</code> left in output position is flagged by
       <code>flatbars lint --maxbars</code>.
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.logic.template} data={ex.logic.data} />
-    <OpenInLab client:visible engine="maxbars" template={ex.coalesce.template} data={ex.coalesce.data} />
-    <OpenInLab client:visible engine="maxbars" template={ex.elvis.template} data={ex.elvis.data} />
-    <h3>The ternary <code>{t("? :")}</code></h3>
     <p>
-      Where a coalesce falls back when its <em>own</em> value is missing, the ternary
-      <code>{t("cond ? a : b")}</code> chooses between <b>two different</b> values on a
-      separate condition — the inline form of <code>{t("{{#if}}")}</code>. It desugars to
-      <code>ternary cond a b</code>, returning <code>a</code> when <code>cond</code> is
-      truthy under MaxBars’ rule, else <code>b</code>. The condition is a full expression
-      (comparisons bind tighter than <code>?</code>), and it is right-associative, so
-      <code>{t("a ? b : c ? d : e")}</code> reads as <code>{t("a ? b : (c ? d : e)")}</code>.
-      Both branches are evaluated and one is selected — like every other operator, it is
-      just a helper application.
+      The ternary <code>{t("cond ? a : b")}</code> is the third coalescing form — it chooses
+      between <b>two different</b> values on a separate condition (the inline
+      <code>{t("{{#if}}")}</code>), desugaring to <code>ternary cond a b</code>. The
+      comparison binds tighter than <code>?</code>, and it is right-associative. All three —
+      <code>??</code>, <code>?:</code>, and the ternary — in one example:
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.ternary.template} data={ex.ternary.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.defaults.template} data={ex.defaults.data} />
   </section>
 
   <!-- ──────────────────────────── Pipes ─────────────────────────── -->
@@ -185,16 +181,12 @@ const t = (s) => s;
       <b>first argument</b>: <code>{t("{{name | uppercase}}")}</code> is exactly
       <code>{t("(uppercase name)")}</code>. Any further arguments follow the helper
       name, so <code>{t("{{price | toFixed 2}}")}</code> is <code>{t("(toFixed price 2)")}</code>.
+      Pipes <b>chain</b> left-to-right, each stage feeding the next — the readable way to
+      express a sequence of transforms that would otherwise nest inside-out — and the
+      right of a pipe can be <code>{t("lookup")}</code>, the idiom for FullBars's
+      <code>{t("{{uppercase (lookup …)}}")}</code> subexpression. One example, four pipes:
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.pipeSimple.template} data={ex.pipeSimple.data} />
-    <OpenInLab client:visible engine="maxbars" template={ex.pipeArgs.template} data={ex.pipeArgs.data} />
-    <h3>Chaining</h3>
-    <p>
-      Pipes chain left-to-right, each stage feeding the next — the readable way to
-      express a sequence of transforms that would otherwise nest inside-out. Read this
-      as "pull the names out of the items, then join them":
-    </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.pipeChain.template} data={ex.pipeChain.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.pipes.template} data={ex.pipes.data} />
     <p class="tip">
       The right-hand side of a pipe is a helper from the
       <a href={`${SPEC_BASE}engine/prelude/`}>prelude catalog</a> (here <code>pluck</code>,
@@ -236,38 +228,33 @@ const t = (s) => s;
         <tr><td><span class="code">{t("key")}</span></td><td>the property name when iterating an object</td></tr>
       </tbody>
     </table>
-    <OpenInLab client:visible engine="maxbars" template={ex.loopVars.template} data={ex.loopVars.data} />
+    <p>
+      The state is reached under <code>{t("loop.")}</code> — <code>{t("{{loop.index0}}")}</code>,
+      <code>{t("{{loop.last}}")}</code>. Context climbs with <code>{t("parent")}</code> (the enclosing
+      context, chainable as <code>{t("parent.parent.x")}</code>) and <code>{t("root")}</code> (the
+      top-level data) — there is no <code>{t("@")}</code> and no <code>{t("../")}</code> in MaxBars
+      (<code>{t("@root")}</code> → <code>{t("root")}</code>, <code>{t("../x")}</code> → <code>{t("parent.x")}</code>);
+      an <code>{t("@")}</code>-name is a parse error. A nested loop shows it all at once:
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.eachList.template} data={ex.eachList.data} />
     <h3>Over an object</h3>
-    <p>Iterating an object, <code>{t("key")}</code> is the property name and <code>{t("{{this}}")}</code> the value.</p>
-    <OpenInLab client:visible engine="maxbars" template={ex.loopObject.template} data={ex.loopObject.data} />
-    <h3>Block parameters</h3>
+    <p>Iterating an object, <code>{t("loop.key")}</code> is the property name and <code>{t("{{this}}")}</code> the value.</p>
+    <OpenInLab client:visible engine="maxbars" template={ex.eachObject.template} data={ex.eachObject.data} />
+    <h3>Block params &amp; labelled loops</h3>
     <p>
-      A trailing <code>{t("as |name …|")}</code> binds scoped names over the block body — exactly as
-      <a href="/fullbars">FullBars</a>. They stay in scope inside nested blocks, so an inner loop can
-      still reach an outer element. The bars are the block-parameter delimiter, not the pipe operator;
-      to <em>pipe</em> a head argument, parenthesise it — <code>{t("{{#each (rows | reverse) as |r|}}")}</code>.
+      A trailing <code>{t("as |name …|")}</code> binds scoped names over the block body (as in
+      <a href="/fullbars">FullBars</a>), staying in scope inside nested blocks. Block params reach an
+      outer <em>element</em>, but not the outer loop's <code>{t("index")}</code> /
+      <code>{t("length")}</code>. A trailing <code>{t("label NAME")}</code> clause (ADR-013, MaxBars-only)
+      names the loop <b>frame</b>, so an inner loop reads <code>{t("outer.index1")}</code>,
+      <code>{t("outer.length")}</code>, <code>{t("outer.last")}</code> of the enclosing loop. (The bars are
+      the block-parameter delimiter, not the pipe; to pipe a head argument, parenthesise it —
+      <code>{t("{{#each (rows | reverse) as |r|}}")}</code>.)
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.blockParams.template} data={ex.blockParams.data} />
-    <h3>Labelled loops</h3>
-    <p>
-      Block params reach an outer <em>element</em>, but not the outer loop's <code>{t("index")}</code> /
-      <code>{t("length")}</code> / <code>{t("first")}</code>. A trailing <code>{t("label NAME")}</code> clause
-      (ADR-013) names the loop <b>frame</b>, binding it as an
-      object whose fields are the bare loop variables — so an inner loop reads
-      <code>{t("outer.index1")}</code>, <code>{t("outer.length")}</code>, <code>{t("outer.first")}</code> of the
-      enclosing loop. It is an immutable per-iteration snapshot, reached by ordinary path lookup.
-    </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.labelledLoop.template} data={ex.labelledLoop.data} />
-    <h3>The context model: <code>parent</code> / <code>root</code></h3>
-    <p>
-      Where <code>{t("loop")}</code> / <code>{t("outer")}</code> read loop <em>metadata</em>,
-      <code>{t("parent")}</code> reads the enclosing <em>context</em> and <code>{t("root")}</code> the root —
-      both chainable: <code>{t("parent.parent.x")}</code> climbs two contexts, and <code>{t("loop.parent")}</code> is
-      the enclosing loop. There is no <code>{t("@")}</code> and no <code>{t("../")}</code> in MaxBars
-      (<code>{t("@root")}</code> → <code>{t("root")}</code>, <code>{t("../x")}</code> → <code>{t("parent.x")}</code>); an
-      <code>{t("@")}</code>-name is a parse error.
-    </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.contextModel.template} data={ex.contextModel.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.loopParams.template} data={ex.loopParams.data} />
+    <h3>The empty case</h3>
+    <p><code>{t("{{#each}}")}</code> carries its own <code>{t("{{else}}")}</code> for an empty list — inherited from FullBars.</p>
+    <OpenInLab client:visible engine="maxbars" template={ex.eachElse.template} data={ex.eachElse.data} />
   </section>
 
   <!-- ─────────────────────── Inherited from FullBars ─────────────────── -->
@@ -281,13 +268,14 @@ const t = (s) => s;
       <a href="/fullbars">FullBars reference</a> documents them. The headline addition is that
       operators and pipes can now appear anywhere a value can — and a handful of FullBars-only
       constructs are the deliberate exceptions (see <a href="#divergences">where it diverges</a>).
-      Here a single
-      <code>{t("{{#each}}")}</code> mixes a path, arithmetic, a pipe, and an <code>==</code>:
+      The everyday basics carry over unchanged — a dotted path, a missing key rendering empty,
+      and comments:
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.inheritedEach.template} data={ex.inheritedEach.data} />
-    <h3><code>with</code> and subexpressions</h3>
+    <OpenInLab client:visible engine="maxbars" template={ex.dotted.template} data={ex.dotted.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.missing.template} data={ex.missing.data} />
+    <OpenInLab client:visible engine="maxbars" template={ex.comment.template} data={ex.comment.data} />
+    <h3><code>with</code> — re-root the context</h3>
     <OpenInLab client:visible engine="maxbars" template={ex.withBlock.template} data={ex.withBlock.data} />
-    <OpenInLab client:visible engine="maxbars" template={ex.subexpr.template} data={ex.subexpr.data} />
     <h3>Escaping</h3>
     <p><code>{t("{{x}}")}</code> HTML-escapes; the triple-stash <code>{t("{{{x}}}")}</code> emits raw markup — unchanged from FullBars.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.escaping.template} data={ex.escaping.data} />
@@ -306,27 +294,53 @@ const t = (s) => s;
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.rawBlock.template} data={ex.rawBlock.data} helpers={ex.rawBlock.helpers} />
 
-    <h3>Inline partials &amp; <code>{t("{{yield}}")}</code></h3>
-    <p>
-      Inline partials work in MaxBars: <code>{t("{{#inline \"x\"}}…{{/inline}}")}</code> defines a
-      partial (hoisted before the render), and <code>{t("{{#partial \"x\"}}body{{/partial}}")}</code>
-      invokes it with the block body — which the definition drops in at <code>{t("{{yield}}")}</code>,
-      MaxBars' bare spelling of Handlebars' <code>{t("{{> @partial-block}}")}</code>. Only the
-      <code>{t("{{#*inline}}")}</code> <em>decorator</em> stays a <a href="/fullbars">FullBars</a> job
-      (see <a href="#divergences">where it diverges</a>).
-    </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.blockPartial.template} data={ex.blockPartial.data} />
-
     <h3>External partials</h3>
     <p>
-      Host-threaded <b>external</b> partials work too: <code>{t("{{> name}}")}</code> renders a
-      partial the <em>host</em> supplies (the Lab's separate partial documents), each itself MaxBars
-      source — so a partial uses the full surface (the <code>{t("{{price | toFixed 2}}")}</code> pipe
-      below). Both the interpreter (<code>renderMaxbarsWithPartials</code>) and the compiler
-      (<code>compileMaxbarsWithPartials</code>) fold them into the partial registry, alongside any
-      template-local <code>{t("{{#inline}}")}</code> (which wins on a name clash).
+      MaxBars resolves <b>external</b> <code>{t("{{> name}}")}</code> against host-supplied partials —
+      each itself MaxBars source, so a partial uses the full surface (pipes, infix) — in both the
+      interpreter (<code>renderMaxbarsWithPartials</code>) and the compiler
+      (<code>compileMaxbarsWithPartials</code>), exactly like <a href="/fullbars">FullBars</a>.
+      Combined with <code>{t("{{#each}}")}</code> it templates a row each, the name resolvable from
+      the data (<code>{t("{{> (lookup this \"kind\")}}")}</code>). A template-local
+      <code>{t("{{#inline}}")}</code> of the same name wins; only the <code>{t("{{#*inline}}")}</code>
+      <em>decorator</em> stays a FullBars job (see <a href="#divergences">where it diverges</a>).
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.externalPartial.template} data={ex.externalPartial.data} partials={ex.externalPartial.partials} />
+    <OpenInLab client:visible engine="maxbars" template={ex.partials.template} data={ex.partials.data} partials={ex.partials.partials} />
+    <h3>Layout partials &amp; <code>{t("{{yield}}")}</code></h3>
+    <p>
+      <code>{t("{{#inline \"x\"}}…{{yield}}…{{/inline}}")}</code> defines a layout with a hole, and
+      <code>{t("{{#partial \"x\"}}body{{/partial}}")}</code> invokes it — the definition drops
+      <code>body</code> in at <code>{t("{{yield}}")}</code>, MaxBars' bare spelling of Handlebars'
+      <code>{t("{{> @partial-block}}")}</code>.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.layoutPartials.template} data={ex.layoutPartials.data} />
+    <h3>Custom helpers</h3>
+    <p>
+      MaxBars reuses FullBars's engine, so a host registers operations with the same
+      <code>registerHelper(name, fn)</code> at the JS boundary (native MaxBars calls these
+      operations/definitions, <a href={`${SPEC_BASE}adr/adr-0019-operation-vocabulary/`}>ADR-019</a>):
+      <code>loud</code> (inline), <code>link</code> (hash args), and <code>list</code> (a block
+      helper binding <code>{t("as |p i|")}</code>).
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.helpers.template} data={ex.helpers.data} helpers={ex.helpers.helpers} />
+  </section>
+
+  <!-- ─────────────────── Putting it together ─────────────────────── -->
+  <section id="together">
+    <h2>Putting it together</h2>
+    <p>
+      Real templates reuse these pieces at once. A plain-text shipping notice —
+      interpolation, a dotted path, an <code>{t("{{#each}}")}</code> with its
+      <code>{t("{{else}}")}</code>, and an external <code>{t("{{> item}}")}</code> partial:
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.email.template} data={ex.email.data} partials={ex.email.partials} />
+    <h3>When the output <em>is</em> HTML</h3>
+    <p>
+      The capstone is an HTML card: a <code>{t("{{> styles}}")}</code> partial holds the CSS once,
+      <code>{t("{{> card}}")}</code> is one row's markup with a <code>{t("{{#if lead}}")}</code> badge,
+      and <code>{t("{{#each}}")}</code> iterates. (The one example that previews as HTML in the Lab.)
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.card.template} data={ex.card.data} partials={ex.card.partials} />
   </section>
 
   <!-- ───────────────── Where MaxBars diverges ──────────────────────── -->
@@ -375,9 +389,10 @@ const t = (s) => s;
     <p class="tip">
       The separator rule is the one real trap: a bare infix condition in
       <code>{t("{{else if …}}")}</code> doesn't error, it just renders wrong. Always
-      wrap it. Here's the correct, parenthesised form:
+      wrap it — as the <a href="#operators">conditionals example</a> does
+      (<code>{t("{{#if stock >= 10}}")}</code> infix, but <code>{t("{{else if (gte stock 1)}}")}</code>
+      parenthesised).
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.separatorParens.template} data={ex.separatorParens.data} />
   </section>
 
   <!-- ────────────────────────── Compiles to JS ──────────────────────── -->
@@ -389,7 +404,7 @@ const t = (s) => s;
       <b>byte-identical</b> output — operators and pipes included, since they desugar
       before compilation. Expand <b>Compiled JS</b> on the loop example:
     </p>
-    <OpenInLab client:visible engine="maxbars" template={ex.loopVars.template} data={ex.loopVars.data} compile />
+    <OpenInLab client:visible engine="maxbars" template={ex.eachList.template} data={ex.eachList.data} compile />
   </section>
 
   <!-- ──────────────────── When (not) to use MaxBars ─────────────────── -->

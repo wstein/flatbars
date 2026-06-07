@@ -27,15 +27,15 @@ const groups = [
       { href: "#expressions", label: "Expressions & escaping" },
       { href: "#paths", label: "Paths" },
       { href: "#identifiers", label: "Identifiers & names" },
-      { href: "#conditionals", label: "if / unless" },
+      { href: "#conditionals", label: "if / else / unless" },
       { href: "#each", label: "each" },
       { href: "#with", label: "with" },
-      { href: "#lookup", label: "lookup & log" },
-      { href: "#subexpressions", label: "Subexpressions" },
+      { href: "#subexpressions", label: "Subexpressions & lookup" },
       { href: "#helpers", label: "Custom helpers" },
       { href: "#precompute", label: "Lambdas → values" },
       { href: "#partials", label: "Partials" },
       { href: "#comments", label: "Comments" },
+      { href: "#together", label: "Putting it together" },
       { href: "#conventions", label: "Style & conventions" },
       { href: "#compile", label: "Compiles to JS" },
       { href: "#divergences", label: "Where it diverges" },
@@ -64,8 +64,9 @@ const groups = [
 const t = (s) => s;
 
 // Worked example (P5): a Handlebars *value* lambda → a precalculated plain-data
-// field. The function-on-the-context you'd write, the JSONata that precomputes
-// it, and the plain data the renderer sees (ex.precompute, gated by the link/render checks).
+// field, shown as static code — the function-on-the-context you'd write and the
+// JSONata that precomputes it. No live example: with the value precomputed there
+// is no function left in the data to see.
 const valueLambdaCode = `// Handlebars.js — a function on the context, called as {{fullName}}
 const data = {
   first: "Ada", last: "Lovelace",
@@ -105,9 +106,8 @@ $ ~> | $ | {
       That model holds the line in a few places where Handlebars is looser — gathered
       under <a href="#divergences">Where FullBars diverges</a>.
     </p>
-    <p>A first taste — a dotted path, an <code>{t("{{#each}}")}</code>, and an
-      <code>{t("{{#unless}}")}</code>, the Handlebars you already know:</p>
-    <OpenInLab client:visible engine="fullbars" template={ex.intro.template} data={ex.intro.data} />
+    <p>The simplest template — the panes are live, so start here:</p>
+    <OpenInLab client:visible engine="fullbars" template={ex.hello.template} data={ex.hello.data} />
     <p class="tip">
       The panes are live: edit the <b>template</b> or the <b>data</b> and the output
       re-renders as you type. <b>Open in Lab</b> carries the example over to the full
@@ -145,13 +145,19 @@ $ ~> | $ | {
       and <code>{t("{{this}}")}</code> is the current context.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.dotted.template} data={ex.dotted.data} />
+    <h3>Missing keys</h3>
+    <p>
+      A path that resolves to nothing — missing or <code>null</code> — renders as the
+      empty string. FullBars never errors on a missing key.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.missing.template} data={ex.missing.data} />
     <h3>Climbing out: <code>../</code> and <code>@root</code></h3>
     <p>
       Inside a block, <code>{t("{{../x}}")}</code> climbs to the enclosing context and
       <code>{t("{{@root.x}}")}</code> jumps to the top-level data — no matter how deep
-      the nesting.
+      the nesting. Both are live in the nested <a href="#each"><code>{t("{{#each}}")}</code>
+      example</a> below.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.paths.template} data={ex.paths.data} />
   </section>
 
   <!-- ──────────────────────── Identifiers & names ──────────────────────── -->
@@ -200,13 +206,13 @@ $ ~> | $ | {
       <code>{t("{{#if x}} … {{else}} … {{/if}}")}</code> is a <b>block helper</b>: its
       head is a helper application, not a bare key. The <code>{t("{{else if …}}")}</code>
       chain works too. To test more than a bare value, nest a <a href="#subexpressions">subexpression</a>
-      — <code>{t("{{#if (gte score 50)}}")}</code> is how FullBars writes "score ≥ 50"
+      — <code>{t("{{#if (gte stock 10)}}")}</code> is how FullBars writes "stock ≥ 10"
       (the infix <code>{t(">=")}</code> belongs to <a href="/maxbars">MaxBars</a>).
+      <code>{t("{{#unless x}}")}</code> is its explicit inverse — it renders when
+      <code>x</code> is falsy. Note <code>0</code> is <b>falsy</b> in FullBars (the
+      opposite of <a href="/minbars">MinBars</a>, where a section over <code>0</code> renders).
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.ifBlock.template} data={ex.ifBlock.data} />
-    <h3><code>unless</code></h3>
-    <p><code>{t("{{#unless x}}")}</code> renders when <code>x</code> is falsy — the explicit inverse of <code>{t("{{#if}}")}</code>.</p>
-    <OpenInLab client:visible engine="fullbars" template={ex.unless.template} data={ex.unless.data} />
+    <OpenInLab client:visible engine="fullbars" template={ex.conditionals.template} data={ex.conditionals.data} />
   </section>
 
   <!-- ───────────────────────────── each ────────────────────────────── -->
@@ -241,30 +247,22 @@ $ ~> | $ | {
     <OpenInLab client:visible engine="fullbars" template={ex.withBlock.template} data={ex.withBlock.data} />
   </section>
 
-  <!-- ─────────────────────────── lookup & log ───────────────────────── -->
-  <section id="lookup">
-    <h2><code>lookup</code> &amp; <code>log</code></h2>
-    <p>
-      <code>{t("{{lookup obj key}}")}</code> reads a field whose name isn't known until
-      render — an array index, or a key chosen by the data.
-    </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.lookup.template} data={ex.lookup.data} />
-    <p>
-      <code>{t("{{log x}}")}</code> writes to the console and emits nothing — a debugging
-      aid that renders to the empty string.
-    </p>
-  </section>
-
-  <!-- ─────────────────────── Subexpressions ─────────────────────────── -->
+  <!-- ─────────────────── Subexpressions & lookup ────────────────────── -->
   <section id="subexpressions">
-    <h2>Subexpressions</h2>
+    <h2>Subexpressions &amp; <code>lookup</code></h2>
     <p>
       Parentheses nest one helper's result into another's arguments:
-      <code>{t("(lookup user \"name\")")}</code>. This is how FullBars avoids
+      <code>{t("(lookup colours selected)")}</code>. This is how FullBars avoids
       "write a JS helper for everything" — you <b>compose the ~80 helpers that ship</b>.
-      Below, the looked-up name is upper-cased in one expression.
+      <code>{t("{{lookup obj key}}")}</code> itself reads a field whose name isn't known
+      until render — an array index, or a key chosen by the data. Below, the looked-up
+      colour is upper-cased in one expression.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.subexpr.template} data={ex.subexpr.data} />
+    <OpenInLab client:visible engine="fullbars" template={ex.subexprLookup.template} data={ex.subexprLookup.data} />
+    <p>
+      <code>{t("{{log x}}")}</code> is a sibling debugging aid: it writes to the console
+      and renders to the empty string.
+    </p>
   </section>
 
   <!-- ─────────────────────── Custom helpers ─────────────────────────── -->
@@ -274,28 +272,14 @@ $ ~> | $ | {
       When the prelude isn't enough, a host registers its own with the
       Handlebars-style <code>registerHelper(name, fn)</code> — the single most common
       Handlebars extension, and it runs <b>live right here</b>. Edit the
-      <b>helpers.js</b> pane below: <code>loud</code> returns a string (escaped in
-      <code>{t("{{ }}")}</code>), and <code>shout</code> returns <code>safe(…)</code> to
-      emit raw markup (the <code>SafeString</code> equivalent).
+      <b>helpers.js</b> pane below — it registers three, one of each shape:
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.customHelper.template} data={ex.customHelper.data} helpers={ex.customHelper.helpers} />
-    <h3>Hash arguments</h3>
-    <p>
-      Trailing <code>key=value</code> pairs arrive as one options object — the natural
-      shape for a helper with named options.
-    </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.customHelperHash.template} data={ex.customHelperHash.data} helpers={ex.customHelperHash.helpers} />
-    <h3>Block helpers</h3>
-    <p>
-      One <code>registerHelper</code>, <b>usage decides</b> block vs inline: a block call
-      (<code>{t("{{#name}}…{{/name}}")}</code>) passes a Handlebars-style <code>options</code> with
-      <code>options.hash</code> (the <code>k=v</code> args), <code>options.fn(ctx, &#123; blockParams &#125;)</code>
-      to render the body with a shifted context and bind <code>as |…|</code> names, and
-      <code>options.inverse</code> for <code>{t("{{else}}")}</code> — so the canonical <code>list</code>
-      helper (hash + block params and all) runs verbatim
-      (<a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>):
-    </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.blockHelper.template} data={ex.blockHelper.data} helpers={ex.blockHelper.helpers} />
+    <ul>
+      <li><b><code>loud</code></b> — a plain inline helper returning a string (escaped in <code>{t("{{ }}")}</code>).</li>
+      <li><b><code>link</code></b> — reads trailing <code>key=value</code> <b>hash</b> arguments (<code>url=…</code>) and returns <code>safe(…)</code> raw markup.</li>
+      <li><b><code>list</code></b> — a <b>block helper</b> (<a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>): <code>options.fn(item, &#123; blockParams &#125;)</code> renders its body with a shifted context and binds <code>as |p i|</code>.</li>
+    </ul>
+    <OpenInLab client:visible engine="fullbars" template={ex.helpers.template} data={ex.helpers.data} helpers={ex.helpers.helpers} />
     <div class="callout info">
       <p>
         The full block <code>options</code> surface works: <code>fn</code>/<code>inverse</code>/<code>hash</code>
@@ -341,9 +325,8 @@ $ ~> | $ | {
     <pre><code>{jsonataCode}</code></pre>
     <p>
       Now <code>{t("{{fullName}}")}</code> is a plain interpolation — identical interpreted and
-      compiled, with no function in the context:
+      compiled, with no function in the context.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.precompute.template} data={ex.precompute.data} />
     <p class="tip">
       Rule of thumb: a computed <em>value</em> → <b>precompute</b> it (a preprocess step);
       render-time, body-aware behaviour → a <a href="#helpers">helper</a>. Either way, no function
@@ -356,22 +339,19 @@ $ ~> | $ | {
     <h2>Partials</h2>
     <p>
       <code>{t("{{> name}}")}</code> includes another template and <b>inherits the caller's
-      context</b> — the natural unit of reuse.
+      context</b> — the natural unit of reuse. Combined with <code>{t("{{#each}}")}</code>
+      it templates a row each, and the name can be an <b>expression</b> resolved per row —
+      <code>{t("{{> (lookup this \"kind\")}}")}</code> picks the partial from the data.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.partial.template} data={ex.partial.data} partials={ex.partial.partials} />
-    <h3>A partial per row</h3>
-    <OpenInLab client:visible engine="fullbars" template={ex.partialList.template} data={ex.partialList.data} partials={ex.partialList.partials} />
-    <h3>Dynamic partials</h3>
-    <p>The name can be an expression resolved at render time — here a language picked from the data.</p>
-    <OpenInLab client:visible engine="fullbars" template={ex.dynamicPartial.template} data={ex.dynamicPartial.data} partials={ex.dynamicPartial.partials} />
-    <h3>Inline &amp; block partials</h3>
+    <OpenInLab client:visible engine="fullbars" template={ex.partials.template} data={ex.partials.data} partials={ex.partials.partials} />
+    <h3>Layout &amp; inline partials</h3>
     <p>
-      <code>{t("{{#*inline \"name\"}}…{{/inline}}")}</code> defines a partial inline; a block
-      partial <code>{t("{{#> layout}}…{{/layout}}")}</code> hands its body to the partial,
-      which drops it in with <code>{t("{{> @partial-block}}")}</code>.
+      Two Handlebars-only forms. <code>{t("{{#*inline \"name\"}}…{{/inline}}")}</code> defines
+      a partial inline (scoped to the rest of the template); a block partial
+      <code>{t("{{#> layout}}…{{/layout}}")}</code> hands its body to the partial, which drops
+      it in with <code>{t("{{> @partial-block}}")}</code> — Handlebars-style layout reuse.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.inlinePartial.template} data={ex.inlinePartial.data} />
-    <OpenInLab client:visible engine="fullbars" template={ex.blockPartial.template} data={ex.blockPartial.data} partials={ex.blockPartial.partials} />
+    <OpenInLab client:visible engine="fullbars" template={ex.layoutPartials.template} data={ex.layoutPartials.data} partials={ex.layoutPartials.partials} />
   </section>
 
   <!-- ─────────────────────────── Comments ───────────────────────────── -->
@@ -382,6 +362,25 @@ $ ~> | $ | {
       <code>{t("{{!-- … --}}")}</code> form may itself contain <code>{t("}}")}</code>.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.comment.template} data={ex.comment.data} />
+  </section>
+
+  <!-- ─────────────────── Putting it together ─────────────────────── -->
+  <section id="together">
+    <h2>Putting it together</h2>
+    <p>
+      Real templates reuse these familiar pieces at once. A plain-text shipping notice —
+      interpolation, a dotted path, an <code>{t("{{#each}}")}</code> with its built-in
+      <code>{t("{{else}}")}</code>, and a <code>{t("{{> item}}")}</code> partial:
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.email.template} data={ex.email.data} partials={ex.email.partials} />
+    <h3>When the output <em>is</em> HTML</h3>
+    <p>
+      Handlebars is an HTML engine, so the capstone is an HTML card: a
+      <code>{t("{{> styles}}")}</code> partial holds the CSS once, a <code>{t("{{> card}}")}</code>
+      partial is one row's markup with a <code>{t("{{#if lead}}")}</code> badge, and
+      <code>{t("{{#each}}")}</code> iterates. (The one example that previews as HTML in the Lab.)
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.card.template} data={ex.card.data} partials={ex.card.partials} />
   </section>
 
   <!-- ───────────────────── Style & conventions ─────────────────────── -->
@@ -406,7 +405,6 @@ $ ~> | $ | {
         (<code>{t("{{~name~}}")}</code>) trims adjacent whitespace; format for humans first,
         add tildes only where the output needs them.</li>
     </ul>
-    <OpenInLab client:visible engine="fullbars" template={ex.whitespace.template} data={ex.whitespace.data} />
   </section>
 
   <!-- ────────────────────────── Compiles to JS ──────────────────────── -->
@@ -416,9 +414,9 @@ $ ~> | $ | {
       Like Handlebars's precompilation, FullBars <b>compiles a template to a JS
       module</b> — and FlatBars gates that the compiled module and the interpreter
       produce <b>byte-identical</b> output (so the pane below is the same render, just
-      ahead of time). Expand <b>Compiled JS</b> on the iteration example:
+      ahead of time). Expand <b>Compiled JS</b> on the conditionals example:
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.eachList.template} data={ex.eachList.data} compile />
+    <OpenInLab client:visible engine="fullbars" template={ex.conditionals.template} data={ex.conditionals.data} compile />
   </section>
 
   <!-- ───────────────── Where FullBars diverges ──────────────────────── -->

@@ -1,176 +1,196 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The MaxBars reference's runnable examples — ONE source, imported by both the
-// reference page (live preview + "Open in Lab") and the CI gate
-// (scripts/check-tutorial-links.mjs), which renders every one through the real
-// MaxBars (`maxbars`) engine and asserts it produces output. Same contract as
-// fullbars.mjs / mustache.mjs / rawbars.mjs: the runnable example is the source
-// of truth; the page's prose only annotates it; the normative text stays in docs/
-// (maxbars.adoc) and is never forked here.
+// The MaxBars reference's runnable examples — ONE source, consumed by THREE
+// places so they can never drift:
+//   1. the /maxbars reference page (live preview + "Open in Lab"),
+//   2. the CI gate scripts/check-tutorial-links.mjs (renders each through the real
+//      MaxBars `maxbars` engine and asserts output; `compiles: true` also asserts
+//      the compiled JS), and
+//   3. the FlatBars Lab's MaxBars example dropdown — generated into
+//      lab/examples/maxbars/ by scripts/gen-examples.mjs, snapshot-gated by
+//      check:examples. (Helper-bearing entries carry a `helpers` field — ADR-018 —
+//      and are page-only: the Lab dropdown skips them.)
 //
-// MaxBars is FlatBars' flagship surface: it borrows most of FullBars and adds infix
-// operators, a pipe, and bare loop variables. The
-// examples lead with those deltas; the inherited FullBars constructs appear only
-// to show the operators working *inside* them. Several things every example here
-// is written to respect, because the engine enforces them (all verified):
-//   • Tight delimiters, spaced operators: `{{price * qty}}`, `{{name | uppercase}}`.
-//   • Loop variables are BARE — index1 / index0 / first / last / length / key /
-//     rindex — never @-prefixed. (FullBars's @index is intentionally not shown.)
-//   • Clause-separator conditions MUST be parenthesised: `{{else if (gt n 0)}}`.
-//     A bare infix separator (`{{else if n > 0}}`) does not error — it silently
-//     takes the wrong branch.
-//   • Inline partials work: `{{#inline "x"}}…{{yield}}…{{/inline}}` then
-//     `{{#partial "x"}}…{{/partial}}` (the {{yield}} layout pattern). External
-//     (host-threaded) partials work too: `{{> name}}` resolves a partial supplied
-//     by the host (renderMaxbarsWithPartials / compileMaxbarsWithPartials), each
-//     itself MaxBars source. A template-local {{#inline}} of the same name wins.
-//     NOT supported: the `{{#*inline}}` decorator (a LexError — MaxBars uses bare
-//     `{{#inline}}`).
+// This set is the MaxBars MIRROR of the FullBars reference (fullbars.mjs): every
+// FullBars concept is reimplemented in IDIOMATIC MaxBars, then the MaxBars-only
+// features are GROUPED into a few larger examples. Like the other references it is
+// NON-HTML by default (the `card` capstone is the one HTML preview; `escaping`
+// keeps its markup in the DATA). ORDER IS DISPLAY ORDER and each `label` carries
+// its tier — the Lab dropdown is a flat list, read simple → advanced.
+//
+// MaxBars is FlatBars' flagship surface: it borrows MOST of FullBars and adds infix
+// operators, a pipe `|`, defaults (`??` `?:` `? :`), and a different loop/context
+// model. The deltas the engine ENFORCES, that shape every example here:
+//   • Operators are infix and spaced: `{{price * qty}}`, `{{qty >= 1}}`, and the
+//     pipe `{{name | uppercase}}` feeds the left value as the helper's first arg.
+//   • Loop variables are BARE under `loop.` — `loop.index0/index1/first/last/
+//     length/key/rindex0` — never @-prefixed. Context climbs with `parent`
+//     (chainable) and `root`, never `../` or `@root`.
+//   • A clause-separator condition MUST be parenthesised: `{{else if (gte n 1)}}`.
+//     A bare infix separator parses but silently takes the wrong branch.
+//   • Partials: EXTERNAL host-threaded `{{> name}}` (the partials registry, each
+//     partial itself MaxBars source — ADR/commit cfadebc) AND template-local
+//     `{{#inline "x"}}…{{/inline}}` both work, plus the `{{yield}}` layout pattern
+//     via `{{#partial}}` (inline wins on a name clash). Only the `{{#*inline}}`
+//     decorator stays FullBars-only. Raw blocks use the `{{{{#op}}}}` hash sigil.
 //   • Arithmetic is strictly numeric: `"x" + "y"` throws (no string concat).
 
 export const examples = {
-  // ── What MaxBars is ───────────────────────────────────────────────────────
-  intro: {
-    // One tag, two MaxBars features: a pipe (`customer | capitalize`) and an
-    // ordinary helper call (`count items`). Both are just helper applications.
+  // ── Simple: interpolation & paths ──────────────────────────────────────────
+  hello: {
     engine: "maxbars",
-    template: "{{customer | capitalize}}'s cart — {{count items}} lines",
-    data: {
-      customer: "ada",
-      items: [{ name: "Pen" }, { name: "Ink" }, { name: "Pad" }],
-    },
-  },
-
-  // ── Operators: math / comparison / logic / ?? ─────────────────────────────
-  math: {
-    // Infix arithmetic. `*` `+` `-` `/` `%` desugar to multiply/add/subtract/…
-    // and are strictly numeric — there is no string `+`.
-    engine: "maxbars",
-    template: "subtotal: {{price * qty}}",
-    data: { price: 1.5, qty: 3 },
-  },
-
-  comparison: {
-    // `>= > <= < == !=` are infix in MaxBars; in FullBars this is the
-    // subexpression {{#if (gte qty 1)}}.
-    engine: "maxbars",
-    template: "{{#if qty >= 1}}in stock{{else}}sold out{{/if}}",
-    data: { qty: 3 },
-  },
-
-  logic: {
-    // `&&` `||` `!` compose conditions. Parenthesise to control precedence —
-    // `&&` binds tighter than `||`, looser than the comparisons.
-    engine: "maxbars",
-    template: "{{#if featured && (qty > 0)}}★ featured{{/if}}",
-    data: { featured: true, qty: 3 },
-  },
-
-  coalesce: {
-    // `??` is null-coalescing: it falls back on null/undefined only, independent
-    // of truthiness — so an empty string or 0 on the left is kept.
-    engine: "maxbars",
-    template: "Hi {{nickname ?? name}}",
+    label: "Simple — Hello World",
+    template: "Hello, {{name}}!",
     data: { name: "Ada" },
   },
 
-  elvis: {
-    // `?:` (Elvis) is truthy-coalescing: it returns the first TRUTHY value, so a
-    // blank "" nickname falls through to name. Contrast with `??` (keeps the
-    // present "") and `||` (yields the boolean `true`). The empty-string fallback
-    // case where `?:` is the operator you want.
+  dotted: {
     engine: "maxbars",
-    template: "Hi {{nickname ?: name}}",
-    data: { nickname: "", name: "Ada" },
+    label: "Simple — Dotted paths",
+    template: "{{user.name}} — {{user.address.city}}",
+    data: { user: { name: "Ada", address: { city: "London" } } },
   },
 
-  ternary: {
-    // `cond ? a : b` chooses between two DIFFERENT values on a condition — the
-    // inline `{{#if}}`. The comparison binds tighter than `?`, so `stock > 0` is
-    // the condition. Desugars to `ternary (gt stock 0) "In stock" "Sold out"`.
+  missing: {
     engine: "maxbars",
-    template: "{{stock > 0 ? \"In stock\" : \"Sold out\"}}",
-    data: { stock: 3 },
+    label: "Simple — Missing → empty",
+    // A path that resolves to nothing renders the empty string — never an error.
+    template: "name=[{{name}}] missing=[{{nope}}] null=[{{nada}}]",
+    data: { name: "Ada", nada: null },
   },
 
-  // ── Pipes: value | helper ─────────────────────────────────────────────────
-  pipeSimple: {
-    // The pipe feeds the left value in as the helper's FIRST argument:
-    // `name | uppercase` is exactly `(uppercase name)`.
+  escaping: {
     engine: "maxbars",
-    template: "{{name | uppercase}}",
-    data: { name: "ada" },
+    label: "Simple — Escaping (markup in data)",
+    // {{x}} HTML-escapes (the safe default); {{{x}}} emits raw — identical to FullBars.
+    // The markup is in the DATA; shown as plain text so the entities are visible.
+    template: "escaped: {{html}}\nraw:     {{{html}}}",
+    data: { html: "<b>bold & bright</b>" },
   },
 
-  pipeArgs: {
-    // Extra arguments follow the helper name; the piped value is still first.
-    // `price | toFixed 2` is `(toFixed price 2)`.
+  comment: {
     engine: "maxbars",
-    template: "{{price | toFixed 2}}",
-    data: { price: 1.5 },
+    label: "Simple — Comments",
+    template: "Total{{! dropped }}: {{total}}{{!-- not shown: }} --}}",
+    data: { total: 99 },
   },
 
-  pipeChain: {
-    // Pipes chain left-to-right, each stage feeding the next. Read it as a
-    // pipeline: pull every name out of the items, then join them.
-    engine: "maxbars",
-    template: "{{items | pluck \"name\" | join \", \"}}",
-    data: { items: [{ name: "Pen" }, { name: "Ink" }, { name: "Pad" }] },
-  },
-
-  // ── The identity: operator ⇄ helper ⇄ subexpression ───────────────────────
+  // ── Intermediate: operators, pipes, defaults, control flow ─────────────────
   identity: {
-    // The whole point of MaxBars: infix, a named helper call, and a parenthesised
-    // subexpression are the SAME operation. `a * b` ≡ `multiply a b` ≡ `(multiply a b)`.
     engine: "maxbars",
+    label: "Intermediate — One operation, three spellings",
+    // THE point of MaxBars: an infix operator, a named helper call, and a
+    // parenthesised subexpression are the SAME operation. `a * b` ≡ `multiply a b`
+    // ≡ `(multiply a b)`. Arithmetic is strictly numeric (no string `+`).
     template: "infix:   {{price * qty}}\nhelper:  {{multiply price qty}}\nsubexpr: {{(multiply price qty)}}",
     data: { price: 4, qty: 3 },
   },
 
-  // ── Loop variables (bare) ─────────────────────────────────────────────────
-  loopVars: {
-    // Inside {{#each}}, the loop object exposes the loop state: loop.index0 /
-    // loop.index1, loop.rindex0 / loop.rindex1, loop.first, loop.last, loop.length,
-    // loop.key. No @ sigil and no bare magic — it is all under `loop.`.
+  pipes: {
     engine: "maxbars",
-    compiles: true,
-    template: `{{#each items}}
-[{{loop.index0}}] {{loop.index1}}/{{loop.length}} ({{loop.rindex0}} after, {{loop.rindex1}} left). {{name}}{{#if loop.first}} (first){{/if}}{{#if loop.last}} (last){{/if}}
-{{/each}}`,
-    data: { items: [{ name: "Pen" }, { name: "Ink" }, { name: "Pad" }] },
+    label: "Intermediate — Pipes (value | helper)",
+    // The pipe feeds the left value in as the helper's FIRST argument and chains
+    // left-to-right: `name | uppercase` is `(uppercase name)`; extra args follow
+    // the helper name; and `lookup` reads a data-chosen key — the MaxBars idiom for
+    // FullBars's `{{uppercase (lookup …)}}` subexpression.
+    template: "{{name | uppercase}}\n{{price | toFixed 2}}\n{{items | pluck \"name\" | join \", \"}}\n{{lookup colours selected | uppercase}}",
+    data: {
+      name: "ada",
+      price: 1.5,
+      items: [{ name: "Pen" }, { name: "Ink" }, { name: "Pad" }],
+      colours: ["red", "green", "blue"],
+      selected: 1,
+    },
   },
 
-  loopObject: {
-    // Over an object, `loop.key` is the property name and `this` the value.
+  defaults: {
     engine: "maxbars",
+    label: "Intermediate — Defaults: ?? ?: and ternary",
+    // Three coalescing forms. `??` (null-coalesce) falls back on null/undefined
+    // ONLY — a present "" or 0 is kept. `?:` (Elvis) falls back on any FALSY value,
+    // so a blank "" passes through. `cond ? a : b` chooses between two values.
+    template: "coalesce: {{nickname ?? name}}\nelvis:    {{label ?: \"untitled\"}}\nternary:  {{count > 0 ? \"in stock\" : \"sold out\"}}",
+    data: { name: "Ada", label: "", count: 0 },
+  },
+
+  conditionals: {
+    engine: "maxbars",
+    label: "Intermediate — If / else if / unless (infix)",
+    // Infix comparisons make the condition direct — `{{#if stock >= 10}}` instead of
+    // FullBars's `{{#if (gte stock 10)}}`. The ONE catch: a clause SEPARATOR must
+    // parenthesise its condition (`{{else if (gte stock 1)}}`) — a bare infix there
+    // silently takes the wrong branch. {{#unless}} is the inverse.
+    compiles: true,
+    template:
+      "{{name}}: {{#if stock >= 10}}in stock{{else if (gte stock 1)}}low ({{stock}}){{else}}sold out{{/if}}{{#unless shipsFree}} · shipping extra{{/unless}}",
+    data: { name: "Keyboard", stock: 3, shipsFree: false },
+  },
+
+  eachList: {
+    engine: "maxbars",
+    label: "Intermediate — Each: loop vars, nesting & context",
+    // {{#each}} iterates. The loop state is BARE under `loop.` (loop.index0,
+    // loop.last, loop.length, …) — never @index. Context climbs with `parent` (the
+    // enclosing context) and `root` (the top-level data) — never `../` or @root.
+    compiles: true,
+    template: `{{#each teams}}
+{{name}} ({{root.org}}):
+{{#each members}}
+  {{loop.index0}}. {{this}}{{#if loop.last}} (last){{/if}} — {{parent.name}}
+{{/each}}
+{{/each}}`,
+    data: {
+      org: "Acme",
+      teams: [
+        { name: "Engine", members: ["Ada", "Charles"] },
+        { name: "Docs", members: ["Grace"] },
+      ],
+    },
+  },
+
+  eachElse: {
+    engine: "maxbars",
+    label: "Intermediate — Each: the empty case ({{else}})",
+    // {{#each}} carries its own {{else}} for an empty list — inherited from FullBars.
+    template: `{{#each items}}
+- {{this}}
+{{else}}
+(nothing yet)
+{{/each}}`,
+    data: { items: [] },
+  },
+
+  eachObject: {
+    engine: "maxbars",
+    label: "Intermediate — Each over an object (loop.key)",
+    // Over an object, `loop.key` is the property name and `this` the value (FullBars's
+    // @key, bare).
     template: `{{#each prefs}}
 {{loop.key}} = {{this}}
 {{/each}}`,
     data: { prefs: { theme: "dark", lang: "en" } },
   },
 
-  blockParams: {
-    // Block params `as |row i|` bind scoped names over the block body — the
-    // element and its index. Their point is that they STAY in scope inside nested
-    // blocks, so the inner loop still reaches the outer `row`. (A bar in a block
-    // head is the `as |…|` delimiter, not the pipe operator — to pipe a head
-    // argument, parenthesise it: `{{#each (rows | reverse) as |row i|}}`.)
+  withBlock: {
     engine: "maxbars",
-    compiles: true,
-    template: `{{#each rows as |row i|}}
-{{i}}: {{#each row.tags}}{{row.label}}#{{this}} {{/each}}
-{{/each}}`,
-    data: { rows: [{ label: "A", tags: ["x", "y"] }, { label: "B", tags: ["z"] }] },
+    label: "Intermediate — With: re-root the context",
+    // {{#with obj}} re-roots the context, unchanged from FullBars — operators and
+    // pipes apply to the shifted context just the same.
+    template: "{{#with totals}}{{count}} items · {{total | toFixed 2}}{{/with}}",
+    data: { totals: { count: 2, total: 9.5 } },
   },
 
-  labelledLoop: {
-    // A `label NAME` clause names the loop FRAME, so an inner loop reads the
-    // OUTER loop's full state — index1 / length / first / … — not just its element.
-    // The label object exposes the bare loop variables as fields.
+  // ── Advanced: loop params, partials, helpers, capstones ────────────────────
+  loopParams: {
     engine: "maxbars",
+    label: "Advanced — Block params & labelled loops",
+    // Block params `as |x i|` bind scoped names that stay visible in nested blocks
+    // (FullBars too). A `label NAME` clause (MaxBars-only) names the loop FRAME, so
+    // an inner loop reads the OUTER loop's full state — `outer.index1`, `outer.length`,
+    // `outer.last` — not just its element.
     compiles: true,
     template: `{{#each sections as |section| label outer}}
-{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each section.items}} {{this}}{{/each}}{{#if outer.last}} (last){{/if}}
+{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each section.items as |item|}} {{item}}{{/each}}{{#if outer.last}} (last){{/if}}
 {{/each}}`,
     data: {
       sections: [
@@ -180,119 +200,117 @@ export const examples = {
     },
   },
 
-  contextModel: {
-    // `parent` is the enclosing CONTEXT (chainable: parent.parent), `root` is the
-    // root context, and `loop.parent` is the enclosing LOOP's metadata. No @ and
-    // no ../ — those are gone. A bare {{title}} would be a data field on `this`.
+  partials: {
     engine: "maxbars",
-    compiles: true,
-    template: `{{#each chapters}}{{#each sections}}{{#each items}}
-{{loop.parent.index1}}.{{loop.index1}} {{this}} — {{parent.heading}} / {{parent.parent.title}} ({{root.book}})
-{{/each}}{{/each}}{{/each}}`,
-    data: {
-      book: "Cookbook",
-      chapters: [
-        { title: "Starters", sections: [{ heading: "Soups", items: ["Pea", "Leek"] }] },
-      ],
-    },
-  },
-
-  // ── Inherited from FullBars (operators shown inside) ──────────────────────
-  inheritedEach: {
-    // Most of FullBars still works — here {{#each}}, {{#if}}, dotted
-    // access — now with arithmetic, a pipe, and an == comparison woven through.
-    engine: "maxbars",
-    template: `{{#each items}}
-{{name}}: {{(price * qty) | toFixed 2}}{{#if qty == 0}} — OUT{{/if}}
+    label: "Advanced — External partials: per-row & dynamic",
+    // MaxBars resolves EXTERNAL {{> name}} against host-supplied partials (each
+    // itself MaxBars source — render AND compile, commit cfadebc), exactly like
+    // FullBars. Combined with {{#each}} it templates a row each, and the name can
+    // be an EXPRESSION resolved per row — {{> (lookup this "kind")}} picks the
+    // partial from the data. (A template-local {{#inline}} of the same name wins.)
+    template: `{{#each people}}{{> (lookup this "kind")}}
 {{/each}}`,
+    partials: {
+      author: "- {{name}} writes",
+      engineer: "- {{name}} builds",
+    },
     data: {
-      items: [
-        { name: "Pen", price: 1.5, qty: 3 },
-        { name: "Ink", price: 4, qty: 1 },
-        { name: "Pad", price: 2.25, qty: 0 },
+      people: [
+        { name: "Ada", kind: "author" },
+        { name: "Charles", kind: "engineer" },
       ],
     },
   },
 
-  withBlock: {
-    // {{#with obj}} re-roots the context, unchanged from FullBars — operators and
-    // pipes apply to the shifted context just the same.
+  layoutPartials: {
     engine: "maxbars",
-    template: "{{#with totals}}{{count}} items · {{total | toFixed 2}}{{/with}}",
-    data: { totals: { count: 2, total: 9.5 } },
+    label: "Advanced — Layout partials ({{yield}})",
+    // The MaxBars layout pattern, the bare spelling of Handlebars' block partials:
+    // {{#inline "x"}}…{{yield}}…{{/inline}} DEFINES a layout with a hole, and
+    // {{#partial "x"}}body{{/partial}} invokes it, dropping `body` in at {{yield}}.
+    template: '{{#inline "frame"}}== {{title}} ==\n{{yield}}\n== end =={{/inline}}{{#partial "frame"}}Glad you came.{{/partial}}',
+    data: { title: "Welcome" },
   },
 
-  blockPartial: {
-    // Inline partials + {{yield}} — MaxBars' bare spelling of layout reuse.
-    // {{#inline "x"}} defines a partial (hoisted before the render); {{#partial
-    // "x"}}body{{/partial}} invokes it with the block body, which the definition
-    // drops in at {{yield}} — the bare form of Handlebars' {{> @partial-block}}.
-    // Self-contained (no host-threaded partials), so it runs here unchanged.
+  helpers: {
     engine: "maxbars",
-    template: '{{#inline "layout"}}<main>{{yield}}</main>{{/inline}}{{#partial "layout"}}<h1>{{title}}</h1>{{/partial}}',
-    data: { title: "Home" },
+    label: "Advanced — Custom & block helpers",
+    // MaxBars reuses FullBars's engine, so a host registers operations with the
+    // same registerHelper(name, fn[, arity]) at the JS boundary (ADR-018; native
+    // MaxBars calls these operations/definitions, ADR-019). Three shapes: `loud`
+    // (inline), `link` (reads trailing hash args), `list` (a BLOCK helper whose
+    // options.fn(item, { blockParams }) binds `as |p i|`).
+    helpers:
+      "registerHelper('loud', (s) => String(s).toUpperCase(), 1);\n" +
+      "registerHelper('link', (text, o) => safe('<a href=\"' + (o.url || '#') + '\">' + text + '</a>'));\n" +
+      "registerHelper('list', (items, o) =>\n" +
+      "  safe('<ul>' + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('') + '</ul>'));",
+    template:
+      '{{loud name}}\n{{{link "Home" url="/home"}}}\n{{#list people as |p i|}}<li>{{i}}: {{p.name}}</li>{{/list}}',
+    data: { name: "ada", people: [{ name: "Ada" }, { name: "Lin" }] },
   },
 
-  externalPartial: {
-    // EXTERNAL (host-threaded) partials: `{{> name}}` renders a partial supplied
-    // by the host — here `row`, defined in a separate document (the Lab's partial
-    // files) — not a template-local {{#inline}}. The partial is itself MaxBars
-    // source, so it uses the surface freely (the `| toFixed 2` pipe). Reuse a
-    // markup fragment across templates without inlining it. (renderMaxbarsWithPartials
-    // / compileMaxbarsWithPartials — a template-local {{#inline}} of the same name
-    // would win.)
-    engine: "maxbars",
-    partials: { row: "<li>{{name}} — {{price | toFixed 2}}</li>" },
-    template: "<ul>\n{{#each items}}  {{> row}}\n{{/each}}</ul>",
-    data: { items: [{ name: "Pen", price: 1.5 }, { name: "Ink", price: 4 }] },
-  },
-
-  escaping: {
-    // {{x}} HTML-escapes (the safe default); {{{x}}} emits raw markup — identical
-    // to FullBars.
-    engine: "maxbars",
-    template: "escaped: {{html}}\nraw:     {{{html}}}",
-    data: { html: "<b>bold & bright</b>" },
-  },
-
-  subexpr: {
-    // Parentheses still group, so operators and helper calls nest freely:
-    // uppercase the coalesced name.
-    engine: "maxbars",
-    template: "{{uppercase (nickname ?? name)}}",
-    data: { name: "ada" },
-  },
-
-  // ── Raw blocks {{{{#name}}}} (custom operator required) ───────────────────
   rawBlock: {
-    // A raw block hands its body to the head OPERATION completely UNPROCESSED:
-    // the inner {{bar}} is never interpreted — it is literal text the operation
-    // receives via options.fn(). `rawloud` upper-cases that raw body, so the
-    // verbatim {{bar}} comes out {{BAR}} (the data is never read). MaxBars uses
-    // the FlatBars {{{{#name}}}} spelling (hash sigil), like RawBars.
-    //
-    // The head MUST resolve to a defined operation: a raw block exists only to
-    // feed its body to one, so an undefined head is a hard UnknownHelper error —
-    // never a silent empty render (the strict-raw-block rule, every dialect).
     engine: "maxbars",
+    label: "Advanced — Raw blocks ({{{{#op}}}})",
+    // A raw block hands its body to the head OPERATION completely UNPROCESSED: the
+    // inner {{bar}} is never interpreted — it is literal text the operation receives
+    // via options.fn(). `rawloud` upper-cases that raw body, so the verbatim {{bar}}
+    // comes out {{BAR}} (the data is never read). MaxBars uses the FlatBars
+    // {{{{#name}}}} spelling (hash sigil), like RawBars — NOT the bare FullBars form;
+    // the op name has no hyphen (a `-` would parse as subtraction). The head must
+    // resolve to a defined operation (an undefined head is a hard error).
     helpers: "registerHelper('rawloud', (options) => options.fn().toUpperCase());",
     template: "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}",
-    data: null,
+    data: { bar: "ignored" },
   },
 
-  // ── Where MaxBars diverges ────────────────────────────────────────────────
-  separatorParens: {
-    // The ONE place infix is not allowed: a clause separator. `{{else if (gt n 0)}}`
-    // must parenthesise. The bare form `{{else if n > 0}}` parses but silently
-    // takes the wrong branch — so always wrap the condition.
+  email: {
     engine: "maxbars",
-    template: `{{#if (gt n 9)}}
-big
-{{else if (gt n 0)}}
-small
+    label: "Advanced — Putting it together (email)",
+    // The capstone reusing familiar pieces in one realistic, non-HTML template:
+    // interpolation, a dotted path, an {{#each}} with its built-in {{else}}, and an
+    // external {{> item}} partial — a plain-text shipping notice.
+    template: `Hi {{name}},
+
+Your order shipped. Items:
+{{#each items}}
+{{> item}}
 {{else}}
-non-positive
-{{/if}}`,
-    data: { n: 5 },
+- (none)
+{{/each}}
+
+— {{store.name}} ({{store.url}})`,
+    partials: { item: "- {{title}} ×{{qty}}" },
+    data: {
+      name: "Ada",
+      items: [{ title: "Pen", qty: 3 }, { title: "Ink", qty: 1 }],
+      store: { name: "FlatMart", url: "flatmart.example" },
+    },
+  },
+
+  card: {
+    engine: "maxbars",
+    label: "Advanced — HTML card (styling in a partial)",
+    // The one example whose OUTPUT is HTML — so it previews as HTML, not text. An
+    // external {{> styles}} partial holds the CSS once, {{> card}} is one row's
+    // markup with a {{#if lead}} badge, and {{#each}} iterates.
+    view: "rendered",
+    template: "{{> styles}}\n{{#each people}}\n{{> card}}\n{{/each}}",
+    partials: {
+      styles:
+        "<style>\n" +
+        "  .card { border: 1px solid #d0d7de; border-radius: 8px; padding: .5rem .8rem; margin: .5rem 0; font-family: system-ui, sans-serif; }\n" +
+        "  .card h3 { margin: 0 0 .15rem; font-size: 1rem; }\n" +
+        "  .card p  { margin: 0; color: #57606a; }\n" +
+        "</style>",
+      card: '<div class="card">\n  <h3>{{name}}{{#if lead}} ★{{/if}}</h3>\n  <p>{{role}}</p>\n</div>',
+    },
+    data: {
+      people: [
+        { name: "Ada Lovelace", role: "Author", lead: true },
+        { name: "Charles Babbage", role: "Engine" },
+      ],
+    },
   },
 };

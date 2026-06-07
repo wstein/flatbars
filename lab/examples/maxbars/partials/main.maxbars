@@ -1,0 +1,2 @@
+{{#each people}}{{> (lookup this "kind")}}
+{{/each}}

@@ -1,8 +1,0 @@
-rows:
-  - label: A
-    tags:
-      - x
-      - 'y'
-  - label: B
-    tags:
-      - z

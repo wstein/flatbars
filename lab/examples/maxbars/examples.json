@@ -1,200 +1,172 @@
 [
   {
-    "id": "intro",
-    "label": "Intro",
+    "id": "hello",
+    "label": "Simple — Hello World",
     "group": "Examples",
-    "view": "rendered",
+    "view": "source",
     "main": "main.maxbars",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "math",
-    "label": "Math",
+    "id": "dotted",
+    "label": "Simple — Dotted paths",
     "group": "Examples",
-    "view": "rendered",
+    "view": "source",
     "main": "main.maxbars",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "comparison",
-    "label": "Comparison",
+    "id": "missing",
+    "label": "Simple — Missing → empty",
     "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "logic",
-    "label": "Logic",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "coalesce",
-    "label": "Coalesce",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "elvis",
-    "label": "Elvis",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "ternary",
-    "label": "Ternary",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "pipeSimple",
-    "label": "Pipe Simple",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "pipeArgs",
-    "label": "Pipe Args",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "pipeChain",
-    "label": "Pipe Chain",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "identity",
-    "label": "Identity",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "loopVars",
-    "label": "Loop Vars",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "loopObject",
-    "label": "Loop Object",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "blockParams",
-    "label": "Block Params",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "labelledLoop",
-    "label": "Labelled Loop",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "contextModel",
-    "label": "Context Model",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "inheritedEach",
-    "label": "Inherited Each",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "withBlock",
-    "label": "With Block",
-    "group": "Examples",
-    "view": "rendered",
-    "main": "main.maxbars",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "blockPartial",
-    "label": "Block Partial",
-    "group": "Examples",
-    "view": "rendered",
+    "view": "source",
     "main": "main.maxbars",
     "partials": [],
     "data": "data.yaml"
   },
   {
     "id": "escaping",
-    "label": "Escaping",
+    "label": "Simple — Escaping (markup in data)",
     "group": "Examples",
-    "view": "rendered",
+    "view": "source",
     "main": "main.maxbars",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "subexpr",
-    "label": "Subexpr",
+    "id": "comment",
+    "label": "Simple — Comments",
     "group": "Examples",
-    "view": "rendered",
+    "view": "source",
     "main": "main.maxbars",
     "partials": [],
     "data": "data.yaml"
   },
   {
-    "id": "separatorParens",
-    "label": "Separator Parens",
+    "id": "identity",
+    "label": "Intermediate — One operation, three spellings",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "pipes",
+    "label": "Intermediate — Pipes (value | helper)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "defaults",
+    "label": "Intermediate — Defaults: ?? ?: and ternary",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "conditionals",
+    "label": "Intermediate — If / else if / unless (infix)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "eachList",
+    "label": "Intermediate — Each: loop vars, nesting & context",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "eachElse",
+    "label": "Intermediate — Each: the empty case ({{else}})",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "eachObject",
+    "label": "Intermediate — Each over an object (loop.key)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "withBlock",
+    "label": "Intermediate — With: re-root the context",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "loopParams",
+    "label": "Advanced — Block params & labelled loops",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "partials",
+    "label": "Advanced — External partials: per-row & dynamic",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [
+      "author",
+      "engineer"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "layoutPartials",
+    "label": "Advanced — Layout partials ({{yield}})",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "email",
+    "label": "Advanced — Putting it together (email)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [
+      "item"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "card",
+    "label": "Advanced — HTML card (styling in a partial)",
     "group": "Examples",
     "view": "rendered",
     "main": "main.maxbars",
-    "partials": [],
+    "partials": [
+      "styles",
+      "card"
+    ],
     "data": "data.yaml"
   }
 ]

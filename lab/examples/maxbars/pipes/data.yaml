@@ -1,0 +1,11 @@
+name: ada
+price: 1.5
+items:
+  - name: Pen
+  - name: Ink
+  - name: Pad
+colours:
+  - red
+  - green
+  - blue
+selected: 1

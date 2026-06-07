@@ -4410,7 +4410,7 @@
           fx = await res.json();
         } catch (e) {
           // Fall back to the default example so the Lab still boots usefully.
-          const def = examples.findIndex((e2) => e2.id === "greeting");
+          const def = examples.findIndex((e2) => e2.id === "greeting" || e2.id === "hello");
           await loadExample(def < 0 ? 0 : def);
           setExampleLabel(`vendored ${id} — not found`);
           return;
