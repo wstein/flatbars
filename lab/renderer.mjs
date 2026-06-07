@@ -53,7 +53,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=72";
+} from "./vendor/flatbars-engine.mjs?v=73";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -208,10 +208,10 @@ function flatbarsRenderer(activeDialect, _opts) {
       const m = hasPartials
         ? mapped.withPartials(program.partials, program.source, d)
         : mapped.plain(program.source, d);
-      // Tag every run with the entry template ("main") — the only file the spans
-      // index, since partial-origin emits carry none. The host's provenance UI
-      // reads `file` to pick the editor tab (tabIndexByFile).
-      if (m.ok) return { output: m.output, segments: m.segments.map((s) => ({ ...s, file: "main" })) };
+      // Each run carries its own `file` ("main" or a partial name; ADR-035), which
+      // the provenance UI reads to pick the editor tab (tabIndexByFile) — so a
+      // partial-origin emit links into its own partial document.
+      if (m.ok) return { output: m.output, segments: m.segments };
     }
     return { output: res.value, segments: [] };
   }

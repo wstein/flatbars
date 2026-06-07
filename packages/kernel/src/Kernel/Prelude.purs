@@ -53,7 +53,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
-import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName)
+import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName, withPartialFileScope)
 import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
 import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
@@ -1578,8 +1578,10 @@ partialH ctl args = case args of
       | otherwise ->
           let
             -- increment the partial depth so a cyclic partial chain hits the
-            -- budget instead of overflowing the stack (threaded like pushFrame).
-            entered = enterPartial (pushFrame blockFrame ctx ctl.env)
+            -- budget instead of overflowing the stack (threaded like pushFrame); and
+            -- shift the source-map file scope so the partial's emits index its own
+            -- source (ADR-035 — a no-op for the non-mapped render).
+            entered = withPartialFileScope name (enterPartial (pushFrame blockFrame ctx ctl.env))
           in
             VSafe <$> ctl.render entered tmpl
     Nothing

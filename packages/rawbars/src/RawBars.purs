@@ -42,7 +42,7 @@ import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorsAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, registerAll, registerPartials, withTruthy, withYieldName)
+import Kernel.Env (RefEnv, registerAll, registerPartialFiles, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
 import Kernel.Provenance (Segment, runResolvedMapped)
 import Kernel.Render (formatError, runResolved)
@@ -180,8 +180,12 @@ renderMappedWith partialSrcs src dat =
         let
           h = hoistInline nodes
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          -- inline partials index "main"; externals index their own source (ADR-035).
+          partialFiles = Map.union (map (const "main") h.partials)
+            (Map.fromFoldable (map (\p -> Tuple p.name p.name) ps))
           setup =
-            withTruthy nonEmpty
+            registerPartialFiles partialFiles
+              <<< withTruthy nonEmpty
               <<< withYieldName "yield"
               <<< registerPartials (Map.union h.partials externalT)
         in

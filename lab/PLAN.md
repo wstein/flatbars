@@ -52,16 +52,15 @@ panel**, so an unequal engine never lies about what it can do. The dock panels �
 FlatBars advertises exact (non-heuristic) `used-transformers`, `required-assigns`,
 and `partial-graph` because they are computed from the lowered AST, not guessed.
 The **core / FullBars / MaxBars dialects back `source-map`** (ADR-035): a mapped
-render returns output→source `segments`, so the three-way editor↔output provenance
-linking is live (pinned by `check:provenance`). MinBars emits none, and
-`context-inspect` is not yet natively backed, so those surfaces gate off honestly.
+render returns output→source `segments`, each tagged with its source `file`, so the
+three-way editor↔output provenance linking is live and a partial-origin run links to
+its own partial document (pinned by `check:provenance` + the `test:lab:browser`
+smoke). MinBars emits none, and `context-inspect` is not yet natively backed, so
+those surfaces gate off honestly.
 
 ## Roadmap
 
-1. **A file dimension for source maps** — thread the source file through render so
-   partial-origin emits link to their own partial tab (today they tile but carry no
-   span, since their span would index the partial's source).
-2. **Native context inspection** — `inspectAt` over the reified render-context
+1. **Native context inspection** — `inspectAt` over the reified render-context
    stack (`RefEnv`), lighting up the Context Inspector.
-3. **A defended boot path** — wrap the engine/examples fetch in a visible
+2. **A defended boot path** — wrap the engine/examples fetch in a visible
    fallback instead of a blank page on a missing asset.

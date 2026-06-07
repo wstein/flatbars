@@ -304,6 +304,7 @@ segmentJson s = fromObject $ FO.fromFoldable
   [ Tuple "out" (fromNumber (toNumber s.out))
   , Tuple "len" (fromNumber (toNumber s.len))
   , Tuple "kind" (fromString s.kind)
+  , Tuple "file" (fromString s.file)
   , Tuple "start" (maybe jsonNull (fromNumber <<< toNumber) s.start)
   , Tuple "end" (maybe jsonNull (fromNumber <<< toNumber) s.end)
   ]

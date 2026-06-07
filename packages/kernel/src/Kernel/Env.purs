@@ -24,6 +24,9 @@ module Kernel.Env
   , registerPartial
   , registerPartials
   , lookupPartial
+  , refCurrentFile
+  , withPartialFileScope
+  , registerPartialFiles
   , refDepth
   , enterPartial
   , recursionBudget
@@ -40,7 +43,7 @@ import Data.Foldable (foldl)
 import Data.List (List(..), (:))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template, splitBlockArgs)
@@ -78,6 +81,15 @@ newtype RefEnv m = RefEnv
   -- refuses to recurse past `recursionBudget`, so a cyclic partial raises a
   -- located `RecursionLimit` rather than overflowing the stack.
   , depth :: Int
+  -- Source-map provenance (ADR-035): the file whose source the spans of the
+  -- currently-rendering template index ("main" for the entry template, a partial's
+  -- name for its body). `partialH` shifts it via `withPartialFileScope`, and the
+  -- mapped recorder stamps it onto each segment so the host links to the right tab.
+  , currentFile :: String
+  -- Per-partial source file, populated by the mapped facades (`registerPartialFiles`):
+  -- an external partial indexes its own source (file = its name), an inline-hoisted
+  -- one indexes where it was defined (file = "main").
+  , partialFiles :: Map String String
   }
 
 refContext :: forall m. RefEnv m -> Value
@@ -130,6 +142,8 @@ emptyEnv ctx = RefEnv
   , translator: Nothing
   , yieldName: "partial-block"
   , depth: 0
+  , currentFile: "main"
+  , partialFiles: Map.empty
   }
 
 -- | The maximum number of nested partials the engine renders before raising
@@ -183,6 +197,24 @@ registerPartials ps (RefEnv e) = RefEnv (e { partials = Map.union ps e.partials 
 -- | Look up a registered partial by name.
 lookupPartial :: forall m. String -> RefEnv m -> Maybe Template
 lookupPartial name (RefEnv e) = Map.lookup name e.partials
+
+-- | The file the current template's spans index (ADR-035): "main" for the entry,
+-- | a partial's source file inside its body.
+refCurrentFile :: forall m. RefEnv m -> String
+refCurrentFile (RefEnv e) = e.currentFile
+
+-- | Enter a partial's file scope (`partialH`): set `currentFile` to the partial's
+-- | registered source file, defaulting to its own name when none is registered (an
+-- | external partial indexes its own source). The non-mapped render leaves
+-- | `partialFiles` empty and never records, so this only matters for the map.
+withPartialFileScope :: forall m. String -> RefEnv m -> RefEnv m
+withPartialFileScope name (RefEnv e) =
+  RefEnv (e { currentFile = fromMaybe name (Map.lookup name e.partialFiles) })
+
+-- | Register the source file of each named partial (the mapped facades): an
+-- | external partial → its own name, an inline-hoisted one → "main".
+registerPartialFiles :: forall m. Map String String -> RefEnv m -> RefEnv m
+registerPartialFiles fs (RefEnv e) = RefEnv (e { partialFiles = Map.union fs e.partialFiles })
 
 -- | The reference `Engine`: resolve from the frame stack (throwing
 -- | `UnknownHelper`), stringify via `Value.stringify`.

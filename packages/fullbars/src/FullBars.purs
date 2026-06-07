@@ -53,7 +53,7 @@ import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, noLoopVars)
 import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTranslator, withTruthy, withYieldName)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartialFiles, registerPartials, withTranslator, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
@@ -174,8 +174,13 @@ renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
         let
           { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          -- inline partials index "main" (where they are defined); externals index
+          -- their own source — the file dimension of the source map (ADR-035).
+          partialFiles = Map.union (map (const "main") inlineP)
+            (Map.fromFoldable (map (\p -> Tuple p.name p.name) ps))
           setup =
-            withTruthy truthy
+            registerPartialFiles partialFiles
+              <<< withTruthy truthy
               <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
               <<< registerPartials (Map.union inlineP externalT)
         in

@@ -54,7 +54,10 @@ for (const dialect of DIALECTS) {
     mapped++;
     if (out.segments.some((s) => s.kind === "emit" && s.start != null)) emitMapped++;
     if (!tiles(out.output, out.segments)) failures.push(`${dialect}/${ex.id}: segments do not tile the output`);
-    if (!out.segments.every((s) => s.file === "main")) failures.push(`${dialect}/${ex.id}: a run is not tagged file="main"`);
+    // every run is tagged with a known file: the entry ("main") or a declared partial.
+    const knownFiles = new Set(["main", ...(ex.partials || [])]);
+    if (!out.segments.every((s) => knownFiles.has(s.file)))
+      failures.push(`${dialect}/${ex.id}: a run has an unknown file tag`);
   }
 }
 

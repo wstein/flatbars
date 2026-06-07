@@ -35,23 +35,25 @@ import FlatBars.Span (Span)
 import FlatBars.Syntax (Template)
 import FlatBars.Value (Value)
 import Kernel.Engine (Engine, runTemplate)
-import Kernel.Env (RefEnv, refDepth, refEngine, refEngineWith)
+import Kernel.Env (RefEnv, refCurrentFile, refEngine, refEngineWith)
 import Kernel.Prelude (lenientResolve)
 import Kernel.Render (preludeEnv)
 
 -- | A contiguous run of output tied to its source. `out`/`len` are JS string
--- | indices (UTF-16 code units) into the output; `start`/`end` are the tag's span
--- | in the entry template, present on `emit` runs that originate there.
+-- | indices (UTF-16 code units) into the output; `file` is the source the run came
+-- | from ("main" for the entry template, a partial's name for its body); `start`/
+-- | `end` are the tag's span in `file`, present on `emit` runs.
 type Segment =
   { out :: Int
   , len :: Int
   , kind :: String -- "text" | "emit"
+  , file :: String
   , start :: Maybe Int
   , end :: Maybe Int
   }
 
 -- | A recorded leaf, before offsets are computed.
-type RawSeg = { isEmit :: Boolean, span :: Maybe Span, text :: String }
+type RawSeg = { isEmit :: Boolean, file :: String, span :: Maybe Span, text :: String }
 
 -- | The mapped render monad: a pure `Either Error` host with a writer of leaves.
 type Prov = WriterT (Array RawSeg) (Either Error)
@@ -88,22 +90,22 @@ runMappedUsing toEngine setup nodes dat =
       Left e -> Left e
       Right (Tuple output raws) -> Right { output, segments: assemble output raws }
 
--- | Log a literal-text run (no source span), skipping empty runs.
+-- | Log a literal-text run (no source span), tagged with the current file,
+-- | skipping empty runs.
 recordTextProv :: RefEnv Prov -> String -> Prov Unit
-recordTextProv _ text
+recordTextProv env text
   | text == "" = pure unit
-  | otherwise = tell [ { isEmit: false, span: Nothing, text } ]
+  | otherwise = tell [ { isEmit: false, file: refCurrentFile env, span: Nothing, text } ]
 
 -- | Run an expression render and log ONE emit run for it — unless it already
 -- | logged sub-runs (a partial expanding its body), in which case those cover the
--- | output and no outer run is added. An emit produced inside a partial (`depth >
--- | 0`) records no source span: it tiles the output but does not claim a location
--- | in the entry template.
+-- | output and no outer run is added. The run is tagged with the current file, so
+-- | an emit produced inside a partial links to that partial's own source.
 recordEmitProv :: RefEnv Prov -> Span -> Prov String -> Prov String
 recordEmitProv env span produce = do
   Tuple s sub <- listen produce
   when (s /= "" && Array.null sub) $
-    tell [ { isEmit: true, span: if refDepth env > 0 then Nothing else Just span, text: s } ]
+    tell [ { isEmit: true, file: refCurrentFile env, span: Just span, text: s } ]
   pure s
 
 -- | Turn ordered leaves into tiling segments — but only if they reconstruct the
@@ -119,6 +121,7 @@ assemble output raws
             { out: at
             , len: CodeUnits.length r.text
             , kind: if r.isEmit then "emit" else "text"
+            , file: r.file
             , start: map _.start r.span
             , end: map _.end r.span
             }

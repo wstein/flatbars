@@ -351,16 +351,22 @@ test("source map: a mapped surface render returns segments that tile the output 
   assert.ok(segments.every((s) => s.kind !== "text" || (s.start == null && s.end == null)));
 });
 
-test("source map: partials tile, with partial-origin emits carrying no entry span", async () => {
+test("source map: partials tile, and partial-origin emits link to their own document", async () => {
   const r = await createRenderer("fullbars");
   const prog = r.compile("{{#each xs}}{{> row}}{{/each}}", { row: "<li>{{ this }}</li>" }).program;
   const { output, segments } = r.render(prog, { xs: ["x", "y"] }, { map: true });
   assert.equal(output, "<li>x</li><li>y</li>");
   assert.ok(tilesExactly(output, segments), "segments tile the output exactly");
-  assert.ok(
-    segments.filter((s) => s.kind === "emit").every((s) => s.start == null),
-    "partial-origin emits do not claim an entry-template span",
-  );
+  // the {{ this }} emits originate in the `row` partial: they carry its file + tag
+  // span (the file dimension, ADR-035), so the UI links into the row document.
+  const emits = segments.filter((s) => s.kind === "emit");
+  assert.ok(emits.length >= 1);
+  assert.ok(emits.every((s) => s.file === "row" && s.start != null), "partial emits link to the row document");
+
+  // an inline-defined partial indexes the entry template (where it is written).
+  const inlineProg = r.compile('{{#*inline "item"}}[{{ this }}]{{/inline}}{{> item}}', {}).program;
+  const inlineOut = r.render(inlineProg, "z", { map: true });
+  assert.ok(inlineOut.segments.some((s) => s.kind === "emit" && s.file === "main" && s.start != null));
 });
 
 test("source map: the core and maxbars dialects also emit tiling segments", async () => {

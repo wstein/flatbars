@@ -57,18 +57,19 @@ Add a mapped render that is **correct-or-absent**, never wrong.
 - **`recordEmit` uses `listen` to avoid double counting.** An emit whose
   expression itself logged sub-runs (a partial expanding its body) adds no outer
   run — the sub-runs already cover it. So partials tile *fine-grained*.
-- **Partial-origin emits carry no source span.** An emit produced at partial depth
-  &gt; 0 tiles the output but records no `start`/`end`, since its span would index
-  the partial's source, not the entry template. Full multi-file linking is a
-  follow-up.
+- **Each run carries its source file.** The env threads a `currentFile` (and a
+  per-partial `partialFiles` map the mapped facades populate); `partialH` shifts it
+  when expanding a partial, so a partial-origin emit links to its *own* source — an
+  external partial to its document, an inline-hoisted one to where it is defined
+  (`"main"`). The entry template is `"main"`.
 - **Offsets are JS string indices.** PureScript `String` is UTF-16, like a JS
   string, so `out`/`len`/`start`/`end` are code-unit offsets the browser consumes
   with no byte↔char conversion.
 
-A `Segment` is `{ out, len, kind, start?, end? }`: `out`/`len` locate the run in
-the output, `kind` is `"text"` | `"emit"`, and `start`/`end` are the tag's span in
-the entry template (present on `emit` runs produced there). The segments tile the
-output: ordered, contiguous, each `len > 0`, covering exactly `[0, output.len)`.
+A `Segment` is `{ out, len, kind, file, start?, end? }`: `out`/`len` locate the run
+in the output, `kind` is `"text"` | `"emit"`, `file` is its source document, and
+`start`/`end` are the tag's span in `file` (present on `emit` runs). The segments
+tile the output: ordered, contiguous, each `len > 0`, covering `[0, output.len)`.
 
 ## Consequences
 
@@ -76,6 +77,5 @@ output: ordered, contiguous, each `len > 0`, covering exactly `[0, output.len)`.
   honestly via their capability vector.
 - Templates whose output is reshaped by a transforming helper get no map for that
   render (degrade to `[]`), which is correct, not broken.
-- Follow-ups: thread a file dimension so partial-origin emits link to their own
-  source (today they tile but carry no span); native `inspectAt` for the Context
-  Inspector, built on the same instrumentation.
+- Follow-up: native `inspectAt` for the Context Inspector, built on the same
+  instrumentation (snapshot the render-context stack at a target span).
