@@ -3924,7 +3924,16 @@
         byId("out-lang").hidden = !showLang;
         byId("out-lang-label").hidden = !showLang;
         byId("view-controls").hidden = !showLang;
-        if (isText) { paintTextView(); outputEditor.requestMeasure(); } else renderPreview();
+        // Text views paint synchronously. The preview iframe is deferred to the
+        // next frame: switching *to* the preview (on example load / a shared
+        // "rendered" deep-link) runs before run() has recomputed `lastOutput`, so a
+        // synchronous paint would show the PREVIOUS example's output ("renders to
+        // old content"), and the visibility change races the srcdoc set. By the
+        // time the frame fires, run() has updated `lastOutput` and layout settled —
+        // one clean paint of the current render. (Edits paint via setOutput, which
+        // calls renderPreview directly, so they stay instant.)
+        if (isText) { paintTextView(); outputEditor.requestMeasure(); }
+        else requestAnimationFrame(renderPreview);
         qs(".output-body").dataset.empty = outputHasContent(view) ? "false" : "true";
         caretLinkKey = null; syncOutputToCaret();
         // Re-render the dock (Coverage panel) and the inspector pane (Context
@@ -6638,11 +6647,6 @@
       applySplits();
       updateStatusMeta();
       restorePanels(); // restore persisted floating panels (Appearance)
-      // The preview iframe may have received its `srcdoc` during the synchronous
-      // boot — before applySplits() gave the output pane its size — which leaves an
-      // HTML/Markdown-first example (or a shared "rendered" deep-link) blank until
-      // the first edit. Re-assert the paint after layout settles so it shows now.
-      requestAnimationFrame(() => { if (!byId("output-preview").hidden) renderPreview(); });
     </script>
   </body>
 </html>
