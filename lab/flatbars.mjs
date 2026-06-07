@@ -33,6 +33,8 @@ import {
   compileSurface as bbCompileSurface,
   compileMaxbars as bbCompileMaxbars,
   renderWith as bbRenderWith,
+  renderRawWith as bbRenderRawWith,
+  renderMaxWith as bbRenderMaxWith,
   renderSurfaceI18n as bbRenderSurfaceI18n,
   analyze as bbAnalyze,
   analyzeWith as bbAnalyzeWith,
@@ -142,11 +144,20 @@ export async function createFlatBarsRenderer(dialectArg) {
       // the host translator. (The Lab's i18n examples are FullBars/surface.)
       res = bbRenderSurfaceI18n(program.translator, program.source, d);
     } else if (program.dialect === "core") {
-      res = bbRender(program.source, d);
+      // Custom operations (ADR-019 addendum) register through RawBars' strict
+      // registrar; otherwise the plain core render. Needed e.g. for a raw block
+      // whose head must resolve to a defined operation.
+      res = hasHelpers
+        ? bbRenderRawWith(program.helpers, program.partials || {}, program.source, d)
+        : bbRender(program.source, d);
     } else if (program.dialect === "maxbars") {
       // MaxBars reuses the FullBars surface pipeline; named external partials are
       // not threaded through its entrypoint, so inline `{{#inline}}` only here.
-      res = bbRenderMaxbars(program.source, d);
+      // With custom operations, route through MaxBars' operation registrar so a
+      // registered head (e.g. a raw block's `{{{{#op}}}}`) actually resolves.
+      res = hasHelpers
+        ? bbRenderMaxWith(program.helpers, program.partials || {}, program.source, d)
+        : bbRenderMaxbars(program.source, d);
     } else if (hasHelpers) {
       // Custom helpers (ADR-018) render through the facade's renderWith, which
       // also threads partials — the surface/FullBars path.

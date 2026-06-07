@@ -37,6 +37,19 @@ test("renders user-defined helpers via opts.helpers (ADR-018)", async () => {
   assert.equal(run(r, "{{loud x}}", { x: "<b>ada" }, { helpers }), "&lt;B&gt;ADA");
 });
 
+test("opts.helpers register for the maxbars and core dialects too (operation registrars)", async () => {
+  // A raw block's head must resolve to a defined operation (the strict-raw-block
+  // rule) — so a maxbars/rawbars example with custom ops must route through the
+  // per-dialect registrar, not the helper-less render. Regression: the Lab once
+  // rendered maxbars before checking opts.helpers, so {{{{#rawloud}}}} threw
+  // UnknownHelper in the playground despite the example registering it.
+  const r = await createFlatBarsRenderer();
+  const helpers = { rawloud: (options) => options.fn().toUpperCase() };
+  const tpl = "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}";
+  assert.equal(run(r, tpl, null, { dialect: "maxbars", helpers }), "\n  {{BAR}}\n");
+  assert.equal(run(r, tpl, null, { dialect: "core", helpers }), "\n  {{BAR}}\n");
+});
+
 test("renders the core dialect when selected", async () => {
   const r = await createFlatBarsRenderer();
   assert.equal(

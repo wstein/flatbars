@@ -1629,7 +1629,7 @@
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
       import { createRenderer } from "./stem.mjs?v=1";
-      import { createFlatBarsRenderer } from "./flatbars.mjs?v=4";
+      import { createFlatBarsRenderer } from "./flatbars.mjs?v=5";
       import { createMinBarsRenderer } from "./minbars.mjs?v=2";
       // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
       // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
@@ -1884,8 +1884,9 @@
       // parsed data before rendering. Engine-agnostic; empty = pass data through.
       let transformSrc = "";
       // Custom helpers (ADR-018) — a fundamentally different thing from the
-      // transform: registerHelper(...) JS that extends the FullBars engine. A
-      // SEPARATE editor (helpers.js), FullBars only. The source is evaluated and
+      // transform: registerHelper(...) JS that extends the engine. A SEPARATE
+      // editor (helpers.js), for every FlatBars dialect (RawBars/FullBars/MaxBars;
+      // not MinBars). The source is evaluated and
       // run in a Worker (no DOM / no page access), never on the main thread, so a
       // shared workspace cannot deface or read the page (no consent prompt
       // needed). `run()` is synchronous, so the Worker renders OUT OF BAND: its
@@ -1932,7 +1933,7 @@
       // files the user has opened (from the explorer or by navigating), not
       // every partial. Keys: "main" (entry, pinned) · partial name · "transform".
       // Closing a tab removes it here but never deletes the underlying file.
-      let openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
+      let openEditors = ["main", "data", "transform", ...(ENGINE !== "minbars" ? ["helpers"] : [])];
       let yamlDirty      = false;
       let transformDirty = false;
 
@@ -2467,9 +2468,11 @@
               title: "data → view-model transform (JSONata)",
               on: () => selectTransformTab() },
           ]},
-          // Custom helpers (ADR-018) are a separate, FullBars-only editor — they
-          // extend the engine, not the data. (RawBars/MaxBars terminology: ADR-019.)
-          ...(ENGINE === "fullbars" ? [{ key: "helpers", label: "HELPERS", files: [
+          // Custom helpers/operations (ADR-018; ADR-019 for the native dialects)
+          // are a separate editor that extends the engine, not the data — available
+          // for every FlatBars dialect (RawBars/FullBars/MaxBars), MinBars excluded
+          // (Mustache is logic-less). The Worker routes to the dialect's registrar.
+          ...(ENGINE !== "minbars" ? [{ key: "helpers", label: "HELPERS", files: [
             { icon: "fn",
               name: "helpers.js",
               active: hlpActive, dirty: helpersDirty,
@@ -3735,16 +3738,17 @@
         }
         try {
           const program = applyEscape(compiled.program, escapeMode);
-          // Custom-helper render (ADR-018): FullBars + Controller source runs in
+          // Custom-helper render (ADR-018/019): the registerHelper source runs in
           // the Worker sandbox, out of band. Use the cached result when it
           // matches the current inputs; otherwise show "rendering…" and let the
           // async render re-run. Provenance segments aren't produced for helper
           // renders (as the in-process renderWith path also returns none).
-          // helpers.js is FullBars-only; the catalog (t/number/…) works on the
-          // t-surfaces (RawBars/FullBars/MaxBars) — ADR-029, MinBars excluded. Both
-          // render in the Worker via the surface's operations-aware entry, with the
-          // locale from config.yaml.
-          const helperSrc = (ENGINE === "fullbars") ? (helpersSrc || "").trim() : "";
+          // Both helpers.js and the catalog (t/number/…) work on every FlatBars
+          // dialect — the t-surfaces RawBars/FullBars/MaxBars (ADR-029) — MinBars
+          // excluded (logic-less). The Worker routes each to the dialect's
+          // operations-aware entry (renderRawWith/renderWith/renderMaxWith), with
+          // the locale from config.yaml.
+          const helperSrc = (ENGINE !== "minbars") ? (helpersSrc || "").trim() : "";
           const catSrc = (ENGINE !== "minbars") ? (catalogSource || "").trim() : "";
           let output, segments;
           if (helperSrc || catSrc) {
