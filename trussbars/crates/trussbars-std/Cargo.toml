@@ -1,0 +1,16 @@
+[package]
+name = "trussbars-std"
+description = "The Trussbars standard helper library: monomorphized string/number/array value helpers (the prelude packs) that compiled MaxBars→Rust templates call, byte-faithful to the reference engine where the operation is deterministic."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "stdlib", "html"]
+categories = ["template-engine"]
+
+# Only trussbars-core (for ToText/Safe); std otherwise. No external dependencies.
+[dependencies]
+trussbars-core = { path = "../trussbars-core", version = "0.1.0" }
+
+[lints]
+workspace = true
