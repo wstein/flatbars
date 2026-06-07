@@ -211,9 +211,12 @@ rendering.
 Partials render *unescaped* — a partial produces markup, not a data value, so the desugaring is the
 plain triple-stash with no `escapeHtml`. The partial *name* desugars to a `STRING` literal; a dynamic
 partial keeps the computed expression. `partial`, `inline`, and the scoped `partial-block` are engine
-helpers; see [A.6](/appendix/handlebars/#partials). The scoped `partial-block` is also installed
-under the synonym `yield`, the hyphen-free spelling the non-Handlebars dialects use for the same yield
-(MaxBars `{{yield}}`, RawBars `{{{yield}}}`; see [maxbars](/engine/maxbars/)).
+helpers; see [A.6](/appendix/handlebars/#partials). `partial-block` is **FullBars'** spelling of the
+block-partial body. RawBars and MaxBars instead bind `yield` — the hyphen-free name, writable bare where
+`-` is subtraction (MaxBars `{{yield}}`, RawBars `{{{yield}}}`; see [maxbars](/engine/maxbars/)). They
+are **not** synonyms: since the ADR-005 amendment the partial frame binds only the dialect's own
+spelling, so `yield` is unavailable in FullBars (it resolves empty) and `partial-block` is unavailable in
+RawBars/MaxBars.
 
 ## 5.8 What Surface does *not* change
 

@@ -65,7 +65,7 @@ main = do
   assert' "set-delim: `{{! @delimiters: …}}` directive is ignored — `<%a%>` stays content"
     (render "{{! @delimiters: <% %> }}<%a%>" (obj []) == Right "<%a%>")
 
-  -- block-partial yield: the `yield` operation (the `partial-block` synonym)
+  -- block-partial yield: the native RawBars `yield` operation (FullBars uses `partial-block`)
   -- renders the caller's block body. RawBars has no surface, so it is the explicit
   -- raw spelling `{{{yield}}}` inside a registered partial, invoked as a block
   -- partial (the ctx is passed explicitly — no surface to default it to `this`).

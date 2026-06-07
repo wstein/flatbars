@@ -29,19 +29,23 @@ import Kernel.Walk (Clause, splitClauses)
 -- | The runtime contract version, recorded in the compiled header and checked by
 -- | `flatbars-runtime.mjs`. Bump on any runtime-incompatible codegen change.
 runtimeVersion :: String
-runtimeVersion = "0.1.0"
+runtimeVersion = "0.2.0"
 
 -- | The compile metadata for the RefEnv dialects, parameterised by the runtime
 -- | truthiness *callback* the root frame is seeded with (ADR-022 — truthiness is
 -- | only ever a `Value -> Boolean` callback, never a baked falsy-set):
 -- | `"rt.truthyHandlebars"` for FullBars, `"rt.truthyNonEmpty"` for RawBars/MaxBars.
--- | The seed references the callback directly (no module-level const — `rt` is only
--- | in scope inside the emitted function). MinBars supplies its own metadata.
-metaFor :: String -> { runtimeVersion :: String, preamble :: String, seed :: String }
-metaFor truthyCallback =
+-- | The second argument is the dialect's block-partial body spelling (ADR-005
+-- | amendment) — `"partial-block"` for FullBars, `"yield"` for RawBars/MaxBars —
+-- | seeded onto the root frame next to the truthy callback (mirrors the
+-- | interpreter's `RefEnv.yieldName`). The seed references the callback directly
+-- | (no module-level const — `rt` is only in scope inside the emitted function).
+-- | MinBars supplies its own metadata.
+metaFor :: String -> String -> { runtimeVersion :: String, preamble :: String, seed :: String }
+metaFor truthyCallback yieldName =
   { runtimeVersion
   , preamble: ""
-  , seed: "rt.scope(data, " <> truthyCallback <> ")"
+  , seed: "rt.scope(data, " <> truthyCallback <> ", " <> jsString yieldName <> ")"
   }
 
 -- | The *lenient* emit (FullBars / MaxBars): a prelude value helper used as a

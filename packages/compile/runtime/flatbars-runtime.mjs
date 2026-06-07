@@ -144,7 +144,7 @@ function pathOf(v, key) {
 }
 
 // ── frames ───────────────────────────────────────────────────────────────────
-function scope(data, truthyFn) {
+function scope(data, truthyFn, yieldName) {
   return {
     ctx: data ?? null, index: null, key: null, first: null, last: null,
     index0: null, index1: null, rindex0: null, rindex1: null, length: null,
@@ -154,6 +154,10 @@ function scope(data, truthyFn) {
     // `in` test never finds Object.prototype members; child frames chain onto it.
     binds: Object.create(null),
     truthy: truthyFn || truthyHandlebars, // the engine's truthiness callback (ADR-022)
+    // the dialect's spelling for a block partial's body (ADR-005 amendment):
+    // `partial-block` (FullBars) or `yield` (RawBars/MaxBars). Seeded per-dialect
+    // like `truthy`, mirroring the interpreter's `RefEnv.yieldName`.
+    yieldName: yieldName || "partial-block",
   };
 }
 // A child frame, exposing the *enclosing* frame's loop data under `parent-*`
@@ -178,6 +182,7 @@ function childFrame(parent, ctx, index, key, first, last, len) {
     // matching the interpreter's pushed-frame stack.
     binds: Object.create(parent.binds),
     truthy: parent.truthy,          // a loop/with body inherits the engine's rule
+    yieldName: parent.yieldName,    // …and the dialect's block-partial body spelling
   };
 }
 
@@ -581,11 +586,13 @@ function call(name, args, frame) {
   // registry, like the interpreter's scoped frame helpers. `in` walks the binds
   // prototype chain so an outer binding stays visible in a nested block.
   if (frame && frame.binds && name in frame.binds) return frame.binds[name];
-  // `{{> @partial-block}}` / `{{yield}}`: render the enclosing block partial's
-  // body (the top of the rt-stack). Outside a block partial the stack is empty,
-  // so this falls through to the UnknownHelper throw — matching the interpreter,
-  // where `partial-block`/`yield` live only in the pushed block-partial frame.
-  if ((name === "partial-block" || name === "yield") && yieldStack.length) {
+  // The block partial's body, under the DIALECT's spelling only (ADR-005
+  // amendment): `partial-block` for FullBars, `yield` for RawBars/MaxBars — the
+  // name the frame was seeded with (`frame.yieldName`), mirroring the interpreter's
+  // single-name `partialH` frame. The other spelling falls through (empty under
+  // FullBars' lenient resolve, the UnknownHelper throw under RawBars/MaxBars).
+  // Outside a block partial the stack is empty, so this falls through too.
+  if (frame && name === frame.yieldName && yieldStack.length) {
     return new Safe(yieldStack[yieldStack.length - 1]());
   }
   const h = helpers[name];

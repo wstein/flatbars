@@ -479,7 +479,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": "yield",
-      "doc": "Inside a block partial, the caller's block body (the {{> @partial-block}} target)."
+      "doc": "Inside a block partial, the caller's block body — FullBars' {{> @partial-block}} target (RawBars/MaxBars use yield)."
     },
     {
       "name": "pluck",
@@ -791,7 +791,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": "Inside a block partial, the caller's block body (MaxBars' spelling of @partial-block)."
+      "doc": "Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block)."
     }
   ]
 }

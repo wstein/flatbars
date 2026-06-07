@@ -62,7 +62,7 @@
 | `parent-key` | value | 0 | scoped | The enclosing loop's current key. |
 | `parent-last` | value | 0 | scoped | True on the enclosing loop's last iteration. |
 | `partial` | value | 2–3 | registered | Renders a registered partial with the given context (the block body is the fallback). |
-| `partial-block` | value | 0 | scoped | Inside a block partial, the caller's block body (the &#123;&#123;> @partial-block&#125;&#125; target). |
+| `partial-block` | value | 0 | scoped | Inside a block partial, the caller's block body — FullBars' &#123;&#123;> @partial-block&#125;&#125; target (RawBars/MaxBars use yield). |
 | `pluck` | value | 2 | registered | Extracts a key's value from each object in an array. |
 | `plus` | value | 2 | alias of `add` | Adds two numbers. |
 | `prepend` | value | 2 | registered | Prepends the second string to the first. |
@@ -101,4 +101,4 @@
 | `upcase` | value | 1 | alias of `uppercase` | Uppercases its argument. |
 | `uppercase` | value | 1 | registered | Uppercases its argument. |
 | `with` | block | ≥1 | registered | Shifts the context to its argument for the body (else the &#123;&#123;else&#125;&#125; clause). |
-| `yield` | value | 0 | scoped | Inside a block partial, the caller's block body (MaxBars' spelling of @partial-block). |
+| `yield` | value | 0 | scoped | Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block). |

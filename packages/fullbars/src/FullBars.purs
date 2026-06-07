@@ -50,7 +50,7 @@ import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, bareInlineOffset, desugar, desugarWith, noLoopVars)
 import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTranslator, withTruthy)
+import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartials, withTranslator, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
@@ -172,6 +172,10 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           setup =
             withTruthy truthy
+              -- ADR-005 amendment: the dialect that accepts Handlebars `{{#> }}`
+              -- block partials (`opts.partialBlocks` — FullBars) exposes the body as
+              -- `partial-block`; the others (MaxBars, reusing this path) use `yield`.
+              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
               <<< registerAll helpers
               <<< registerPartials (Map.union inlineP externalT)
         in
@@ -204,7 +208,13 @@ renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of
       { partials, template } = hoistInline (desugarSurfaceWith lv nodes)
     in
       case
-        runResolvedLenient directives (withTruthy truthy <<< registerPartials partials) template dat
+        runResolvedLenient directives
+          ( withTruthy truthy
+              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
+              <<< registerPartials partials
+          )
+          template
+          dat
         of
         Left e -> Left (formatError src e)
         Right out -> Right out

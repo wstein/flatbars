@@ -23,7 +23,8 @@
         { "feature": "Inverse", "syntax": "{{#unless ok}} … {{/unless}}", "note": "Inverse via the unless helper — no {{^}} sigil.", "kind": "shared" },
         { "feature": "Loop variables", "syntax": "{{{index}}}  {{{first}}}  {{{key}}}", "note": "Bare scoped ops: index, key, first, last, length. No @-data.", "kind": "only" },
         { "feature": "Comments", "syntax": "{{! editorial note }}", "note": "Dropped by the lexer.", "kind": "shared" },
-        { "feature": "Partials", "syntax": "{{{(partial \"name\" this)}}}", "note": "Called as the partial helper, unescaped.", "kind": "only" }
+        { "feature": "Partials", "syntax": "{{{(partial \"name\" this)}}}", "note": "Called as the partial helper, unescaped.", "kind": "only" },
+        { "feature": "Block-partial body", "syntax": "{{{yield}}}", "note": "The caller's body inside a block partial — the hyphen-free yield (FullBars uses partial-block; ADR-005).", "kind": "only" }
       ]
     },
     {
@@ -41,6 +42,7 @@
         { "feature": "Subexpressions", "syntax": "{{upcase (concat a b)}}", "note": "Parens group nested applications.", "kind": "shared" },
         { "feature": "@-data variables", "syntax": "{{@index}}  {{@key}}  {{@root}}", "note": "Scoped data installed by each / with.", "kind": "only" },
         { "feature": "Partials", "syntax": "{{> sidebar}}   {{> (lookup this \"p\")}}", "note": "Surface sugar; desugars to the partial helper.", "kind": "shared" },
+        { "feature": "Block-partial body", "syntax": "{{> @partial-block}}", "note": "The caller's body inside {{#> }}/{{#partial}} — Handlebars' partial-block (RawBars/MaxBars use yield; ADR-005).", "kind": "only" },
         { "feature": "Else / inverse", "syntax": "{{#each xs}} … {{else}} … {{/each}}", "note": "{{else}} separator; {{^x}} inverted section.", "kind": "shared" },
         { "feature": "Long comments", "syntax": "{{!-- note with }} inside --}}", "note": "Handles }} within the comment body.", "kind": "shared" }
       ]

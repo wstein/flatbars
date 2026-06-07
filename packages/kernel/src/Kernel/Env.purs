@@ -12,6 +12,8 @@ module Kernel.Env
   , withTruthy
   , refTranslator
   , withTranslator
+  , refYieldName
+  , withYieldName
   , constOperation
   , emptyEnv
   , register
@@ -65,6 +67,13 @@ newtype RefEnv m = RefEnv
   -- text, and analyse mode flags the unwired calls. A first-class seam (not a
   -- `registerHelper` override), so the engine always knows whether one is present.
   , translator :: Maybe Translator
+  -- The bare scoped name a block partial's body is exposed under (ADR-005
+  -- amendment), seeded per-dialect like `truthy`: FullBars uses Handlebars'
+  -- `partial-block` (the `{{> @partial-block}}` target); RawBars/MaxBars use the
+  -- hyphen-free `yield` (writable bare where `-` is subtraction). Only the dialect's
+  -- own spelling is bound to the body — the other resolves by the dialect's normal
+  -- rule (empty under FullBars' lenient resolve; UnknownHelper under RawBars/MaxBars).
+  , yieldName :: String
   -- how many partials deep this environment is. `partialH` bumps it on entry and
   -- refuses to recurse past `recursionBudget`, so a cyclic partial raises a
   -- located `RecursionLimit` rather than overflowing the stack.
@@ -83,6 +92,17 @@ refTruthy (RefEnv e) = e.truthy
 -- | `handlebars` default `emptyEnv` installs; MinBars seeds `truthy mustache`.
 withTruthy :: forall m. (Value -> Boolean) -> RefEnv m -> RefEnv m
 withTruthy tf (RefEnv e) = RefEnv (e { truthy = tf })
+
+-- | The scoped name this environment exposes a block partial's body under
+-- | (ADR-005 amendment): `partial-block` (FullBars) or `yield` (RawBars/MaxBars).
+refYieldName :: forall m. RefEnv m -> String
+refYieldName (RefEnv e) = e.yieldName
+
+-- | Seed the block-partial body's scoped name — the dialect analogue of
+-- | `withTruthy`. FullBars keeps the `partial-block` default `emptyEnv` installs;
+-- | RawBars/MaxBars seed `"yield"`.
+withYieldName :: forall m. String -> RefEnv m -> RefEnv m
+withYieldName n (RefEnv e) = RefEnv (e { yieldName = n })
 
 -- | The host's i18n translator for this environment (ADR-029), or `Nothing` when
 -- | no host is wired. `t`/`number`/`date` consult it; analyse flags its absence.
@@ -108,6 +128,7 @@ emptyEnv ctx = RefEnv
   , partials: Map.empty
   , truthy: handlebars
   , translator: Nothing
+  , yieldName: "partial-block"
   , depth: 0
   }
 

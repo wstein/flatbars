@@ -894,6 +894,14 @@ main = do
     "<div><b>Ada</b></div>"
   expectS "block-partial-fallback" "{{#partial \"missing\"}}<i>fb</i>{{/partial}}" VNull "<i>fb</i>"
 
+  -- ADR-005 amendment: `yield` is the RawBars/MaxBars spelling and is NOT bound in
+  -- FullBars — a partial referencing the hyphen-free `{{yield}}` finds no body and
+  -- (under FullBars' lenient resolve) renders empty. FullBars uses `{{> @partial-block}}`.
+  expectP "block-partial-yield-not-fullbars" [ Tuple "layout" "<div>{{yield}}</div>" ]
+    "{{#partial \"layout\"}}<b>{{ name }}</b>{{/partial}}"
+    (obj [ Tuple "name" (str "Ada") ])
+    "<div></div>"
+
   -- Inline partials: the {{#*inline "name"}}body{{/inline}} decorator defines a
   -- partial (hoisted before render) usable by later {{> name}}; a bare name is
   -- literalized. The `*` decorator sigil is REQUIRED (Handlebars-faithful): the

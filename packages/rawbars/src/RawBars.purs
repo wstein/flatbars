@@ -40,7 +40,7 @@ import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorsAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
-import Kernel.Env (RefEnv, registerAll, registerPartials, withTruthy)
+import Kernel.Env (RefEnv, registerAll, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
 import Kernel.Render (formatError, runResolved)
 import Kernel.ToValue (class ToValue, toValue)
@@ -82,7 +82,8 @@ compileWith opts src = do
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
   let h = hoistInline nodes
-  pure \dat -> runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials)
+  pure \dat -> runResolved directives
+    (withTruthy nonEmpty <<< withYieldName "yield" <<< registerPartials h.partials)
     h.template
     dat
 
@@ -95,7 +96,9 @@ render src dat = case parseWith coreOptions src of
       h = hoistInline nodes
     in
       lmap show
-        ( runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials) h.template
+        ( runResolved directives
+            (withTruthy nonEmpty <<< withYieldName "yield" <<< registerPartials h.partials)
+            h.template
             dat
         )
 
@@ -108,7 +111,9 @@ renderDiag src dat = case parseWith coreOptions src of
       h = hoistInline nodes
     in
       lmap (formatError src)
-        ( runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials) h.template
+        ( runResolved directives
+            (withTruthy nonEmpty <<< withYieldName "yield" <<< registerPartials h.partials)
+            h.template
             dat
         )
 
@@ -141,6 +146,7 @@ renderWithOperations operations partialSrcs src dat =
           -- partials (left-biased union), matching FullBars.
           setup =
             withTruthy nonEmpty
+              <<< withYieldName "yield"
               <<< registerAll operations
               <<< registerPartials (Map.union h.partials externalT)
         in
@@ -159,7 +165,9 @@ renderAff src dat = case parseWith coreOptions src of
       h = hoistInline nodes
     in
       runExceptT
-        ( runResolved directives (withTruthy nonEmpty <<< registerPartials h.partials) h.template
+        ( runResolved directives
+            (withTruthy nonEmpty <<< withYieldName "yield" <<< registerPartials h.partials)
+            h.template
             dat
         )
 
@@ -182,6 +190,6 @@ compileJsWith opts src = do
     src
   let h = hoistInline nodes
   pure
-    ( Driver.compile (metaFor "rt.truthyNonEmpty") coreEmit (Map.toUnfoldable h.partials)
+    ( Driver.compile (metaFor "rt.truthyNonEmpty" "yield") coreEmit (Map.toUnfoldable h.partials)
         h.template
     )

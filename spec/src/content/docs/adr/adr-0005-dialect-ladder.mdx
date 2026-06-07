@@ -80,7 +80,7 @@ Two layers, two different truths — they must not be conflated:
 | FullBars construct | Why MaxBars rejects it |
 | --- | --- |
 | the `{{#*inline}}` *decorator* | MaxBars spells inline partials with bare `{{#inline}}`; the `*`-decorator form is FullBars-only. |
-| `{{> @partial-block}}` | the `@` sigil is reserved in MaxBars, which renders the caller's block body via bare `{{yield}}` instead. |
+| `{{> @partial-block}}` (and the bare `partial-block` name) | a block partial's body is exposed under one spelling per dialect, not both: `partial-block` is FullBars-only; RawBars and MaxBars bind the hyphen-free `{{yield}}` (writable bare where `-` is subtraction). The partial frame installs only the dialect's own spelling (`RefEnv.yieldName`), so `partial-block` does not resolve in RawBars/MaxBars and `yield` resolves empty in FullBars. |
 (Separately, MaxBars *adds* surface — operators, pipes, bare loop vars — and tightens a
 few spellings where its richer grammar would otherwise be ambiguous: a clause-separator
 condition and a block-head pipe must be parenthesised. Those are MaxBars-only additions,

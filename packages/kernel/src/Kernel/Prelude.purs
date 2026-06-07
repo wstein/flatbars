@@ -53,7 +53,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
-import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy)
+import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName)
 import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
 import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
@@ -487,15 +487,19 @@ scopedSpecs =
   , { name: "partial-block"
     , block: false
     , arity: Exactly 0
-    , doc: "Inside a block partial, the caller's block body (the {{> @partial-block}} target)."
+    , doc:
+        "Inside a block partial, the caller's block body — FullBars' {{> @partial-block}} target (RawBars/MaxBars use yield)."
     }
-  -- `yield` — the cross-dialect synonym of `partial-block` (the block-partial
-  -- body yield). Hyphen-free so it is writable bare in MaxBars (where `-` is
-  -- subtraction); installed under both names in the partial block frame above.
+  -- `yield` — the RawBars/MaxBars spelling of the block-partial body (ADR-005
+  -- amendment). Hyphen-free so it is writable bare in MaxBars (where `-` is
+  -- subtraction). It is NOT a synonym installed alongside `partial-block`: the
+  -- partial frame binds only the dialect's own spelling (`refYieldName`), so
+  -- `yield` is the body in RawBars/MaxBars and `partial-block` is the body in FullBars.
   , { name: "yield"
     , block: false
     , arity: Exactly 0
-    , doc: "Inside a block partial, the caller's block body (MaxBars' spelling of @partial-block)."
+    , doc:
+        "Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block)."
     }
   ]
 
@@ -511,10 +515,12 @@ scopedDocs = map (\s -> Tuple s.name s.doc) scopedSpecs
 
 -- | Non-canonical scoped-variable spellings → their native RawBars/MaxBars
 -- | canonical form: `index` → `index0` (the bare native index), `partial-block` →
--- | `yield` (the bare native block-body name). The engine installs *both* spellings
--- | and renders them identically (they are all in `scopedSpecs`); this table only
--- | expresses the editor/linter *preference* — it is NOT a render concern, a
--- | `scopedSpecs` field, or an `OperationDef.synonymOf`. Shared here so the linter
+-- | `yield` (the bare native block-body name). `index`/`index0` co-exist (both
+-- | render, this is editor *preference*); `partial-block`/`yield`, since the
+-- | ADR-005 amendment, are the FullBars vs RawBars/MaxBars spellings of the SAME
+-- | body and each only binds in its own dialect (`refYieldName`), so in
+-- | RawBars/MaxBars `partial-block` does not render at all — the rewrite to `yield`
+-- | is the fix, not just a preference. Shared here so the linter
 -- | (`Linter.Aliases.scopedCanonWarnings`), the catalog/editor projection
 -- | (`FullBars.Catalog.operations` → `editors/operations.json`), and the CLI all
 -- | read one source. Surface-scoped: only the native dialects prefer it (FullBars
@@ -1565,16 +1571,18 @@ partialH ctl args = case args of
   _ -> throwError (TypeError "partial: expected (name string, context, [options])")
   where
   -- the caller's block body, rendered in the caller's context — exposed inside
-  -- the partial as `partial-block` (Handlebars `{{> @partial-block}}`) and its
-  -- cross-dialect synonym `yield` (MaxBars `{{yield}}`, RawBars `{{{yield}}}`).
-  -- Only installed when there is a body.
+  -- the partial under the dialect's own spelling (`refYieldName`): FullBars binds
+  -- `partial-block` (Handlebars `{{> @partial-block}}`); RawBars/MaxBars bind the
+  -- hyphen-free `yield` (ADR-005 amendment). Only the native name is bound — the
+  -- other resolves by the dialect's normal rule (empty under FullBars' lenient
+  -- resolve, UnknownHelper under RawBars/MaxBars). Only installed when there is a body.
   blockFrame =
     if Array.null ctl.children then Map.empty
     else
       let
         body _ _ = VSafe <$> ctl.render ctl.env ctl.children
       in
-        Map.fromFoldable [ Tuple "partial-block" body, Tuple "yield" body ]
+        Map.singleton (refYieldName ctl.env) body
   -- every partial renders under the engine's single truthiness rule (ADR-022):
   -- there is no per-partial mode to switch into anymore.
   renderPartial name ctx = case lookupPartial name ctl.env of

@@ -40,4 +40,11 @@ compileSurfaceWith strict lv opts truthyCallback src = do
   { nodes } <- lmap NEA.head (parseWith opts src)
   checkBareInline strict nodes
   let h = hoistInline (desugarSurfaceWith lv nodes)
-  pure (compile (metaFor truthyCallback) fullbarsEmit (Map.toUnfoldable h.partials) h.template)
+  -- ADR-005 amendment: FullBars (Handlebars `{{#> }}`, `opts.partialBlocks`)
+  -- exposes a block partial's body as `partial-block`; MaxBars (same emit) uses `yield`.
+  pure
+    ( compile (metaFor truthyCallback (if opts.partialBlocks then "partial-block" else "yield"))
+        fullbarsEmit
+        (Map.toUnfoldable h.partials)
+        h.template
+    )

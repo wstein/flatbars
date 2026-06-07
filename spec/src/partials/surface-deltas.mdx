@@ -16,6 +16,7 @@ The desugared core surface — core skeleton syntax, no sugar. Truthiness: `nonE
 | Loop variables | `{{{index}}}  {{{first}}}  {{{key}}}` | Bare scoped ops: index, key, first, last, length. No @-data. |
 | Comments | `{{! editorial note }}` | Dropped by the lexer. |
 | Partials | `{{{(partial "name" this)}}}` | Called as the partial helper, unescaped. |
+| Block-partial body | `{{{yield}}}` | The caller's body inside a block partial — the hyphen-free yield (FullBars uses partial-block; ADR-005). |
 
 ### FullBars
 
@@ -29,6 +30,7 @@ The Handlebars-faithful surface — auto-escape, dotted paths, @-data. Truthines
 | Subexpressions | `{{upcase (concat a b)}}` | Parens group nested applications. |
 | @-data variables | `{{@index}}  {{@key}}  {{@root}}` | Scoped data installed by each / with. |
 | Partials | `{{> sidebar}}   {{> (lookup this "p")}}` | Surface sugar; desugars to the partial helper. |
+| Block-partial body | `{{> @partial-block}}` | The caller's body inside &#123;&#123;#&gt; &#125;&#125;/&#123;&#123;#partial&#125;&#125; — Handlebars' partial-block (RawBars/MaxBars use yield; ADR-005). |
 | Else / inverse | `{{#each xs}} … {{else}} … {{/each}}` | &#123;&#123;else&#125;&#125; separator; &#123;&#123;^x&#125;&#125; inverted section. |
 | Long comments | `{{!-- note with }} inside --}}` | Handles &#125;&#125; within the comment body. |
 
