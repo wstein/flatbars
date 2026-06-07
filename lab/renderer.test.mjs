@@ -363,13 +363,29 @@ test("source map: partials tile, with partial-origin emits carrying no entry spa
   );
 });
 
-test("source map: the core/maxbars dialects honestly gate off (no source-map)", async () => {
-  for (const dialect of ["rawbars", "maxbars"]) {
-    const r = await createRenderer(dialect);
-    assert.ok(!r.engineInfo().features.includes("source-map"), `${dialect} omits source-map`);
-    const out = r.render(r.compile("{{ this }}").program, "x", { map: true });
-    assert.deepEqual(out, { output: "x", segments: [] });
-  }
+test("source map: the core and maxbars dialects also emit tiling segments", async () => {
+  // core (RawBars): a triple-stache emit links to its tag; the map tiles.
+  const core = await createRenderer("rawbars");
+  assert.ok(core.engineInfo().features.includes("source-map"));
+  const c = core.render(core.compile("Hi {{{ this }}}!").program, "Ada", { map: true });
+  assert.equal(c.output, "Hi Ada!");
+  assert.ok(tilesExactly(c.output, c.segments));
+  assert.ok(c.segments.some((s) => s.kind === "emit" && s.start != null && s.file === "main"));
+
+  // maxbars: an each over a pipe expression tiles, every run tagged file=main.
+  const max = await createRenderer("maxbars");
+  assert.ok(max.engineInfo().features.includes("source-map"));
+  const m = max.render(max.compile("{{#each xs}}[{{ this }}]{{/each}}").program, { xs: ["a", "b"] }, { map: true });
+  assert.equal(m.output, "[a][b]");
+  assert.ok(tilesExactly(m.output, m.segments));
+  assert.ok(m.segments.every((s) => s.file === "main"));
+});
+
+test("source map: MinBars (logic-less) has no source map", async () => {
+  const r = await createRenderer("minbars");
+  assert.ok(!r.engineInfo().features.includes("source-map"));
+  // {{.}} is Mustache's implicit iterator (renders the string context verbatim).
+  assert.deepEqual(r.render(r.compile("{{.}}").program, "x", { map: true }), { output: "x", segments: [] });
 });
 
 // ── MinBars (Mustache) ───────────────────────────────────────────────────────

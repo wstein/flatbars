@@ -17,6 +17,8 @@ module RawBars
   , renderDiag
   , renderValue
   , renderWithOperations
+  , renderMapped
+  , renderMappedWith
   , renderAff
   , compile
   , compileWith
@@ -42,6 +44,7 @@ import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, registerAll, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
+import Kernel.Provenance (Segment, runResolvedMapped)
 import Kernel.Render (formatError, runResolved)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (nonEmpty)
@@ -151,6 +154,38 @@ renderWithOperations operations partialSrcs src dat =
               <<< registerPartials (Map.union h.partials externalT)
         in
           lmap (formatError src) (runResolved directives setup h.template dat)
+  where
+  compilePartial (Tuple name s) = case parseWith coreOptions s of
+    Left es -> Left (renderParseErrorsAt s es)
+    Right { nodes } -> Right { name, template: nodes }
+
+-- | Render core source and return a source map alongside the output (ADR-035) —
+-- | the core twin of `renderSurfaceMapped`. RawBars stays strict and uses the
+-- | `nonEmpty` truthiness rule.
+renderMapped :: String -> Value -> Either String { output :: String, segments :: Array Segment }
+renderMapped = renderMappedWith []
+
+-- | `renderMapped` with named external partials (each core source).
+renderMappedWith
+  :: Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String { output :: String, segments :: Array Segment }
+renderMappedWith partialSrcs src dat =
+  case traverse compilePartial partialSrcs of
+    Left e -> Left e
+    Right ps -> case parseWith coreOptions src of
+      Left pes -> Left (renderParseErrorsAt src pes)
+      Right { nodes } ->
+        let
+          h = hoistInline nodes
+          externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          setup =
+            withTruthy nonEmpty
+              <<< withYieldName "yield"
+              <<< registerPartials (Map.union h.partials externalT)
+        in
+          lmap (formatError src) (runResolvedMapped setup h.template dat)
   where
   compilePartial (Tuple name s) = case parseWith coreOptions s of
     Left es -> Left (renderParseErrorsAt s es)

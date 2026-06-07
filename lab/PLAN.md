@@ -51,17 +51,17 @@ panel**, so an unequal engine never lies about what it can do. The dock panels �
 
 FlatBars advertises exact (non-heuristic) `used-transformers`, `required-assigns`,
 and `partial-graph` because they are computed from the lowered AST, not guessed.
-The **FullBars surface backs `source-map`** (ADR-035): a mapped render returns
-output→source `segments`, so the three-way editor↔output provenance linking is
-live. The core / MaxBars dialects do not emit segments yet, and `context-inspect`
-is not yet natively backed, so those surfaces gate off honestly.
+The **core / FullBars / MaxBars dialects back `source-map`** (ADR-035): a mapped
+render returns output→source `segments`, so the three-way editor↔output provenance
+linking is live (pinned by `check:provenance`). MinBars emits none, and
+`context-inspect` is not yet natively backed, so those surfaces gate off honestly.
 
 ## Roadmap
 
-1. **Source maps for the remaining dialects** — extend ADR-035 to core / MaxBars,
-   and thread a file dimension so partial-origin emits link to their own source
-   (today they tile but carry no span).
+1. **A file dimension for source maps** — thread the source file through render so
+   partial-origin emits link to their own partial tab (today they tile but carry no
+   span, since their span would index the partial's source).
 2. **Native context inspection** — `inspectAt` over the reified render-context
    stack (`RefEnv`), lighting up the Context Inspector.
-3. **A tiling-conformance gate** asserting the emitted segments tile the output
-   across the example corpus, plus a defended boot path.
+3. **A defended boot path** — wrap the engine/examples fetch in a visible
+   fallback instead of a blank page on a missing asset.

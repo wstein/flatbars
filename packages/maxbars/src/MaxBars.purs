@@ -11,6 +11,8 @@ module MaxBars
   , maxLoopVars
   , renderMax
   , renderMaxWithPartials
+  , renderMaxMapped
+  , renderMaxMappedWith
   , renderWithOperations
   , compileMaxJs
   , compileMaxJsWith
@@ -27,11 +29,12 @@ import FlatBars.Error (Error, ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
-import FullBars (LoopVars, desugarSurfaceWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
+import FullBars (LoopVars, desugarSurfaceWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
 import FullBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
 import FullBars.Surface (noLoopVars, reservedScope)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
+import Kernel.Provenance (Segment)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
 import MaxBars.Lint (booleanInOutputWarnings, labelShadowWarnings, strayHeadBarWarnings)
@@ -85,6 +88,20 @@ renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 -- | (and win on a clash). It is `renderWithOperations` with no host operations.
 renderMaxWithPartials :: Array (Tuple String String) -> String -> Value -> Either String String
 renderMaxWithPartials = renderWithOperations []
+
+-- | Render MaxBars source and return a source map alongside the output (ADR-035) —
+-- | the MaxBars twin of `renderSurfaceMapped`, reusing the surface mapped render
+-- | with MaxBars' loop variables, parse options, and `nonEmpty` truthiness.
+renderMaxMapped :: String -> Value -> Either String { output :: String, segments :: Array Segment }
+renderMaxMapped = renderMaxMappedWith []
+
+-- | `renderMaxMapped` with named external partials (each MaxBars source).
+renderMaxMappedWith
+  :: Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String { output :: String, segments :: Array Segment }
+renderMaxMappedWith = renderSurfaceMappedDiagWith false maxLoopVars maxOptions nonEmpty
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own

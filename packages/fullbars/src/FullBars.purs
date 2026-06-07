@@ -27,6 +27,7 @@ module FullBars
   , renderSurfaceDiagWith
   , renderSurfaceMapped
   , renderSurfaceMappedWith
+  , renderSurfaceMappedDiagWith
   , renderSurfaceValue
   , renderSurfaceI18n
   , analyseSurface
@@ -147,23 +148,42 @@ renderSurfaceMappedWith
   -> String
   -> Value
   -> Either String { output :: String, segments :: Array Segment }
-renderSurfaceMappedWith partialSrcs src dat =
+renderSurfaceMappedWith = renderSurfaceMappedDiagWith true noLoopVars defaultParseOptions handlebars
+
+-- | The mapped twin of `renderSurfaceDiagWith`, parameterised by dialect: the
+-- | bare-`{{#inline}}` strictness, the `LoopVars` resolver, the parse options, and
+-- | the truthiness rule. FullBars passes the surface defaults; MaxBars passes its
+-- | own (`maxLoopVars` / `maxOptions` / `nonEmpty`). Returns the output plus a
+-- | tiling source map (located parse/render errors as `Left`).
+renderSurfaceMappedDiagWith
+  :: Boolean
+  -> LoopVars
+  -> ParseOptions
+  -> Truthy
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String { output :: String, segments :: Array Segment }
+renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parse src of
-      Left e -> Left (show e)
-      Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
+    Right ps -> case parseWith opts src of
+      Left pes -> Left (renderParseErrorsAt src pes)
+      Right { nodes } | Left e <- checkBareInline strict nodes -> Left (renderParseErrorAt src e)
       Right { nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarSurface nodes)
+          { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
-          setup = registerPartials (Map.union inlineP externalT)
+          setup =
+            withTruthy truthy
+              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
+              <<< registerPartials (Map.union inlineP externalT)
         in
-          lmap show (runResolvedLenientMapped setup template dat)
+          lmap (formatError src) (runResolvedLenientMapped setup template dat)
   where
-  compilePartial (Tuple name s) = case parse s of
-    Left e -> Left (show e)
-    Right { nodes } -> Right { name, template: desugarSurface nodes }
+  compilePartial (Tuple name s) = case parseWith opts s of
+    Left pes -> Left (renderParseErrorsAt s pes)
+    Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
 
 -- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
 -- | `(name, helper)` is registered into the env alongside the prelude and the

@@ -37,6 +37,10 @@ module FullBars.JS
   , renderSurfaceWithPartials
   , renderSurfaceMapped
   , renderSurfaceMappedWithPartials
+  , renderMapped
+  , renderMappedWithPartials
+  , renderMaxbarsMapped
+  , renderMaxbarsMappedWithPartials
   , renderSurfaceI18n
   , JsTranslator
   , renderMustache
@@ -320,6 +324,26 @@ renderSurfaceMapped = mkFn2 \tpl json ->
 renderSurfaceMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResult
 renderSurfaceMappedWithPartials = mkFn3 \partials tpl json ->
   mappedResult (FullBars.renderSurfaceMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Mapped render of a *core* template. `renderMapped(template, data)`.
+renderMapped :: Fn2 String Json MappedResult
+renderMapped = mkFn2 \tpl json -> mappedResult (RawBars.renderMapped tpl (fromJson json))
+
+-- | Mapped render of a core template with external partials.
+-- | `renderMappedWithPartials(partials, template, data)`.
+renderMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResult
+renderMappedWithPartials = mkFn3 \partials tpl json ->
+  mappedResult (RawBars.renderMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Mapped render of a *MaxBars* template. `renderMaxbarsMapped(template, data)`.
+renderMaxbarsMapped :: Fn2 String Json MappedResult
+renderMaxbarsMapped = mkFn2 \tpl json -> mappedResult (MaxBars.renderMaxMapped tpl (fromJson json))
+
+-- | Mapped render of a MaxBars template with external partials.
+-- | `renderMaxbarsMappedWithPartials(partials, template, data)`.
+renderMaxbarsMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResult
+renderMaxbarsMappedWithPartials = mkFn3 \partials tpl json ->
+  mappedResult (MaxBars.renderMaxMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Render a surface template with a host i18n translator seeded (ADR-029): the
 -- | first-class seam that drives `t`/`number`/`date`/… The Lab and any JS host wire
