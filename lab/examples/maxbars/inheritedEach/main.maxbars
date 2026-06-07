@@ -1,0 +1,3 @@
+{{#each items}}
+{{name}}: {{(price * qty) | toFixed 2}}{{#if qty == 0}} — OUT{{/if}}
+{{/each}}

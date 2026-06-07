@@ -1,0 +1,3 @@
+infix:   {{price * qty}}
+helper:  {{multiply price qty}}
+subexpr: {{(multiply price qty)}}

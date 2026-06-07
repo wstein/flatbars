@@ -1,0 +1,5 @@
+{{#if (lookup this "admin")}}
+admin
+{{else}}
+guest
+{{/if}}

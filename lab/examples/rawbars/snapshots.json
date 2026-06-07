@@ -1,0 +1,9 @@
+{
+  "core": "Ada &lt;core&gt;",
+  "application": "ADA",
+  "lookup": "ada@example.com",
+  "each": "0: alpha\n1: beta\n",
+  "cond": "guest\n",
+  "comment": "AB",
+  "yield": "<main>Ada</main>"
+}

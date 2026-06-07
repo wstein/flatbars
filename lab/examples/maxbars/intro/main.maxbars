@@ -1,0 +1,1 @@
+{{customer | capitalize}}'s cart — {{count items}} lines

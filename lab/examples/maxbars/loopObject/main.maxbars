@@ -1,0 +1,3 @@
+{{#each prefs}}
+{{loop.key}} = {{this}}
+{{/each}}

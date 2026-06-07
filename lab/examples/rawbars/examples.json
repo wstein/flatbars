@@ -1,0 +1,65 @@
+[
+  {
+    "id": "core",
+    "label": "Core",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "application",
+    "label": "Application",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "lookup",
+    "label": "Lookup",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "each",
+    "label": "Each",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "cond",
+    "label": "Cond",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "comment",
+    "label": "Comment",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "yield",
+    "label": "Yield",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  }
+]

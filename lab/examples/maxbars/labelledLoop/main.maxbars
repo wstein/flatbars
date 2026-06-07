@@ -1,0 +1,3 @@
+{{#each sections as |section| label outer}}
+{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each section.items}} {{this}}{{/each}}{{#if outer.last}} (last){{/if}}
+{{/each}}

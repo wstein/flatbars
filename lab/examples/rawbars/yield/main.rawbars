@@ -1,0 +1,1 @@
+{{#inline "frame"}}<main>{{{yield}}}</main>{{/inline}}{{#partial "frame" this}}{{{lookup this "name"}}}{{/partial}}

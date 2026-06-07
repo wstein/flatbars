@@ -13,15 +13,17 @@
 //   node scripts/gen-examples.mjs           # regenerate
 //   node scripts/gen-examples.mjs --check    # CI: fail on drift
 //
-// Currently projects MinBars (the curated, metadata-complete source). Promoting
-// the other three dialects (killing the shared lab/examples/handlebars hack) is a
-// tracked follow-up: it needs per-example Lab-curation tags + custom-helper
-// projection (fullbars examples carry ADR-018 helpers the catalog loader omits).
+// Projects MinBars, RawBars and MaxBars from their typed sources. FullBars keeps
+// its curated lab/examples/fullbars/ set (the former shared `handlebars/` catalog),
+// so no dialect shares a folder. Examples carrying a custom `helpers` field
+// (ADR-018) or a cross-dialect `engine` override are page-only and skipped here.
+// Converting FullBars to a typed-source projection too is a tracked follow-up.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, existsSync, statSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dump as yamlDump } from "../lab/vendor/js-yaml.mjs";
 import { createMinBarsRenderer } from "../lab/minbars.mjs";
+import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
@@ -30,9 +32,15 @@ const humanize = (id) =>
   id.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 // One dialect: its lab engine id, the typed source, the file extension, and a
-// renderer factory (the SAME path check-tutorial-links + the Lab use).
+// renderer factory (the SAME path check-tutorial-links + the Lab use). MinBars,
+// RawBars and MaxBars project from typed sources; FullBars keeps its own curated
+// folder (lab/examples/fullbars/, the former shared `handlebars/` catalog — those
+// ARE FullBars examples). No dialect shares a folder anymore (the hack is gone);
+// converting FullBars to a typed-source projection too is a tracked follow-up.
 const DIALECTS = [
-  { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", makeRenderer: createMinBarsRenderer },
+  { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", makeRenderer: () => createMinBarsRenderer() },
+  { engine: "rawbars", module: "../tutorials/src/rawbars.mjs", ext: "rawbars", makeRenderer: () => createFlatBarsRenderer("core") },
+  { engine: "maxbars", module: "../tutorials/src/maxbars.mjs", ext: "maxbars", makeRenderer: () => createFlatBarsRenderer("maxbars") },
 ];
 
 // Build the full {relpath: content} map a dialect projects to. Pure (no I/O), so
@@ -45,6 +53,11 @@ async function buildDialect(d) {
   const manifest = [];
   const snapshots = {};
   for (const [id, ex] of Object.entries(examples)) {
+    // The catalog loader hosts neither custom helpers (ADR-018) nor a cross-dialect
+    // `engine` override (RawBars diptychs render `sugar` under FullBars), so those
+    // page-only examples are not projected to the Lab dropdown.
+    if (ex.helpers && ex.helpers.trim()) continue;
+    if (ex.engine && ex.engine !== d.engine) continue;
     const partials = ex.partials || {};
     const partialNames = Object.keys(partials);
     files[`${base}/${id}/main.${d.ext}`] = ex.template;
@@ -59,9 +72,9 @@ async function buildDialect(d) {
       partials: partialNames,
       data: "data.yaml",
     });
-    // Snapshot the render — the gate's expected output (asserts valid Mustache).
-    const out = renderer.render(renderer.compile(ex.template, partials).program, ex.data ?? {});
-    snapshots[id] = out;
+    // Snapshot the render — the gate's expected output (asserts the example renders).
+    const res = renderer.render(renderer.compile(ex.template, partials).program, ex.data ?? {});
+    snapshots[id] = typeof res === "string" ? res : res.output;
   }
   files[`${base}/examples.json`] = JSON.stringify(manifest, null, 2) + "\n";
   files[`${base}/snapshots.json`] = JSON.stringify(snapshots, null, 2) + "\n";
