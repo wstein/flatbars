@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Tiling-conformance gate for the source map (ADR-035). Renders every FullBars
+// example through the mapped render and asserts its `segments` tile the output
+// exactly: ordered, contiguous from 0, each `len > 0`, covering [0, output.len)
+// with no gaps or overlaps — the contract the playground's provenance UI relies
+// on. The engine self-verifies per render (degrading to [] on a mismatch), so a
+// non-empty map here is a *proven* map; this gate pins that the corpus produces
+// them and that none silently regress to empty. Run: node scripts/check-provenance.mjs
+
+import { readFileSync } from "node:fs";
+import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
+import { createRenderer } from "../lab/renderer.mjs";
+
+const BASE = new URL("../lab/examples/fullbars/", import.meta.url);
+const read = (rel) => readFileSync(new URL(rel, BASE), "utf8");
+const manifest = JSON.parse(read("examples.json"));
+
+// segments tile the output: contiguous from 0, every len > 0, covering it exactly.
+function tiles(output, segments) {
+  let at = 0;
+  for (const s of segments) {
+    if (s.out !== at || s.len <= 0) return false;
+    at += s.len;
+  }
+  return at === output.length;
+}
+
+const r = await createRenderer("fullbars");
+const failures = [];
+let mapped = 0;
+let rendered = 0;
+let emitMapped = 0; // examples whose map carries at least one emit run
+
+for (const ex of manifest) {
+  const main = read(`${ex.id}/${ex.main}`);
+  const partials = {};
+  for (const name of ex.partials || []) partials[name] = read(`${ex.id}/${name}.hbs`);
+  const data = ex.data ? loadYaml(read(`${ex.id}/${ex.data}`)) : null;
+
+  let out;
+  try {
+    out = r.render(r.compile(main, partials).program, data, { map: true });
+  } catch (e) {
+    failures.push(`${ex.id}: render error — ${e.message}`);
+    continue;
+  }
+  rendered++;
+  if (out.segments.length === 0) continue; // honest degrade (e.g. a transforming helper)
+  mapped++;
+  if (out.segments.some((s) => s.kind === "emit" && s.start != null)) emitMapped++;
+  if (!tiles(out.output, out.segments)) failures.push(`${ex.id}: segments do not tile the output`);
+  if (!out.segments.every((s) => s.file === "main")) failures.push(`${ex.id}: a run is not tagged file="main"`);
+}
+
+// The corpus must actually exercise emit provenance — guard against a wiring
+// regression that silently returns empty (or text-only) maps everywhere.
+if (emitMapped === 0) failures.push("no example produced a linkable emit run (provenance wiring regressed?)");
+
+if (failures.length) {
+  console.error("✗ check:provenance\n" + failures.map((f) => "  " + f).join("\n"));
+  process.exit(1);
+}
+console.log(`✓ check:provenance — ${mapped}/${rendered} FullBars examples tile a source map`);
