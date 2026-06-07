@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Trussbars CI — the Rust workspace that the MaxBars→Rust compiler targets
+# (`trussbars/`). Needs a Rust toolchain (cargo/rustc/clippy/rustfmt), which the
+# Node-based `npm test` does not provide, so it runs here. Path-filtered to the
+# Rust surface so it only fires when something it covers changes.
+#
+# The toolchain is pinned by `trussbars/rust-toolchain.toml` (1.96.0 + rustfmt +
+# clippy); running cargo inside `trussbars/` makes rustup install and select it,
+# so CI builds with exactly the version developers and the conformance harness use.
+name: Trussbars
+
+on:
+  push:
+    branches: [develop]
+    paths: &trussbars-paths
+      - "trussbars/**"
+      - ".github/workflows/trussbars.yml"
+  pull_request:
+    paths: *trussbars-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trussbars-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trussbars
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            trussbars/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('trussbars/Cargo.lock', 'trussbars/rust-toolchain.toml') }}
+
+      # Reading rust-toolchain.toml here installs and selects the pinned channel.
+      - name: Toolchain
+        run: rustup show && cargo --version && cargo clippy --version
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
