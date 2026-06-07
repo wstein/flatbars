@@ -2,10 +2,9 @@
 
 The FlatBars Lab is a single-page IDE that compiles and renders FlatBars-family
 templates entirely in the browser, against the PureScript `flatbars-js` engine
-bundled to `vendor/flatbars-engine.mjs` (no WASM). It descends from the
-multi-engine "Stem Playground" reference (see `13-playground-interactions.adoc`)
-but is now **FlatBars-only**: the Stem WASM engine and the Handlebars reference
-engine were dropped so the Lab targets one engine family.
+bundled to `vendor/flatbars-engine.mjs` (no WASM). It descends from a multi-engine
+"Stem Playground" reference but is now **FlatBars-only**: the Stem WASM engine and
+the Handlebars reference engine were dropped so the Lab targets one engine family.
 
 ## Engines
 
