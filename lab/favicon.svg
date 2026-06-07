@@ -1,8 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FlatBars">
   <!-- The FlatBars wordmark mark: the {{ }} delimiter squared into flat bars,
        matching the shared <flatbars-topbar> brand. Violet on the light browser
-       chrome, lifted to the dark-accent on a dark tab. Single source; copied into
-       each app's public/ (tutorials, spec) and lab/logo.svg. -->
+       chrome, lifted to the dark-accent on a dark tab. The single source for every
+       surface's favicon: copied into each app's public/ (tutorials, spec) by their
+       `favicon` prebuild hook, and vendored to lab/favicon.svg by `gen:favicon`
+       (drift-gated by check:favicon). -->
   <style>
     .mark { stroke: #6d28d9; }
     @media (prefers-color-scheme: dark) { .mark { stroke: #9b7dff; } }
