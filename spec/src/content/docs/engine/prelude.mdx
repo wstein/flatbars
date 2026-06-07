@@ -72,7 +72,8 @@ Scoped helpers installed by `each`:
 | `key` | property name (objects) or numeric index as string (arrays) |
 | `first` / `last` | `VBool` — first / last element? |
 | `parent` | the collection's enclosing context |
-| `parent-index` / `parent-key` / `parent-first` / `parent-last` | the *enclosing* loop's `index`/`key`/`first`/`last` — the target of surface `{{@../index}}` etc. (one `../` level). Installed by `each`/`with` only when an enclosing loop provided them. |
+| `loop` | the current loop's metadata object: `index0`/`index1`/`rindex0`/`rindex1`/`first`/`last`/`key`/`length`, plus `loop.parent` (the enclosing loop) and `loop.root`. |
+| `loop.parent.*` | the *enclosing* loop's fields via the `loop` chain (`loop.parent.index0`, …) — the target of surface `{{@../index}}` etc.; deeper `../` climbs it. The flat `parent-index`/`parent-key`/`parent-first`/`parent-last` names were removed (ADR-021 amendment). |
 
 ## 6.5 Composition / data helpers
 

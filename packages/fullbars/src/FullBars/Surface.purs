@@ -37,7 +37,8 @@
 -- |    bare spelling and does not run the gate.)
 -- |
 -- |    `@../index` (and `key`/`first`/`last`) reads the enclosing loop's datum
--- |    via the `parent-*` helpers (one `../` level).
+-- |    via the `loop.parent.*` chain (`@../index` ⇒ `(lookup loop "parent" "index0")`;
+-- |    deeper `../` runs climb the chain).
 -- |
 -- |  * the Handlebars partial block `{{#> name}}…{{/name}}` ⇒ the same as
 -- |    `{{#partial name}}…{{/partial}}`, and the inline-partial decorator
@@ -431,23 +432,40 @@ pathExpr lv scope raw
         if Array.null tail then App name []
         else App "lookup" (Array.cons (App name []) (map segKey tail))
 
--- | A `@data` path: the first segment is a scoped helper, any remaining
--- | segments are looked up on its value. `@index` ⇒ `(index)`; `@root.x` ⇒
--- | `(lookup (root) "x")`. A leading `../` reads the *enclosing* loop's datum:
--- | `@../index` ⇒ `(parent-index)` (and `key`/`first`/`last`), which `each`/
--- | `with` install (see `parentData`). Only one `../` level is supported — a
--- | deeper run still resolves to the immediate parent.
+-- | A `@data` path: the first segment is a scoped helper, any remaining segments
+-- | are looked up on its value. `@index` ⇒ `(index)` (the Handlebars `@data`
+-- | namespace — loops and host block helpers both supply it); `@root.x` ⇒
+-- | `(lookup (root) "x")`. A leading `../` reads the *enclosing* loop's datum
+-- | through the `loop` chain (the flat `parent-*` helpers were removed, ADR-021
+-- | amendment): `@../index` ⇒ `(lookup loop "parent" "index0")`, `@../key` ⇒
+-- | `(lookup loop "parent" "key")`, and a deeper run climbs (`@../../index` ⇒
+-- | `(lookup loop "parent" "parent" "index0")`).
 dataExpr :: String -> Expr
 dataExpr raw =
   let
     { depth, rest } = stripParents raw 0
-    prefix = if depth == 0 then "" else "parent-"
   in
     case Array.uncons (segmentsOf rest) of
       Just { head, tail }
-        | Array.null tail -> App (prefix <> head) []
-        | otherwise -> App "lookup" (Array.cons (App (prefix <> head) []) (map segKey tail))
+        -- depth 0: a scoped variable on the current frame (`@index`, `@root`, …).
+        | depth == 0 ->
+            if Array.null tail then App head []
+            else App "lookup" (Array.cons (App head []) (map segKey tail))
+        -- depth ≥ 1: the enclosing loop's field, via the `loop.parent…` chain.
+        | otherwise ->
+            App "lookup"
+              ( Array.cons (App "loop" [])
+                  ( Array.replicate depth (Lit (VString "parent"))
+                      <> Array.cons (segKey (loopField head)) (map segKey tail)
+                  )
+              )
       Nothing -> App "this" []
+  where
+  -- the `loop` chain exposes the canonical `index0` (not the bare `index` alias),
+  -- so `@../index` reaches `loop.parent.index0`.
+  loopField = case _ of
+    "index" -> "index0"
+    other -> other
 
 -- | Expand `{{else if C}}` chains into nested `{{#if C}}…{{/if}}` in the else
 -- | clause (surface.adoc §5.6) — the FullBars convention (clause `else`, helper

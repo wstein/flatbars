@@ -39,6 +39,6 @@ main = do
   -- callback ($truthy = rt.truthyHandlebars) and threaded — no falsy-set data.
   expectJsS "seeds + threads the handlebars truthiness callback"
     "{{#if n}}y{{else}}m{{/if}}"
-    [ "rt.scope(data, rt.truthyHandlebars)", "rt.truthy(c0.truthy," ]
+    [ "rt.scope(data, rt.truthyHandlebars, ", "rt.truthy(c0.truthy," ]
 
   log "all FullBars.Compile surface emitter tests passed"

@@ -148,7 +148,7 @@ function scope(data, truthyFn, yieldName) {
   return {
     ctx: data ?? null, index: null, key: null, first: null, last: null,
     index0: null, index1: null, rindex0: null, rindex1: null, length: null,
-    parent: null, parentIndex: null, parentKey: null, parentFirst: null, parentLast: null,
+    parent: null,
     root: data ?? null,
     // scoped bindings (block params + loop labels). A null-proto object so the
     // `in` test never finds Object.prototype members; child frames chain onto it.
@@ -160,10 +160,10 @@ function scope(data, truthyFn, yieldName) {
     yieldName: yieldName || "partial-block",
   };
 }
-// A child frame, exposing the *enclosing* frame's loop data under `parent-*`
-// (FullBars `parentData`: each/with rebind the parent's index/key/first/last).
-// `len` is the collection length (each only); the richer MaxBars loop variables
-// (index0/index1/rindex0/rindex1/length) derive from it, null outside a loop.
+// A child frame. `len` is the collection length (each only); the richer loop
+// variables (index0/index1/rindex0/rindex1/length) derive from it, null outside a
+// loop. The enclosing loop's fields are reached through the `loop` chain
+// (`loop.parent.index0`), not flat `parent-*` names (ADR-021 amendment).
 // Arithmetic mirrors the interpreter's `iterate` so the two paths never drift.
 function childFrame(parent, ctx, index, key, first, last, len) {
   const inLoop = index !== null && index !== undefined;
@@ -175,7 +175,6 @@ function childFrame(parent, ctx, index, key, first, last, len) {
     rindex1: inLoop ? len - index : null,
     length: inLoop ? len : null,
     parent: parent.ctx,
-    parentIndex: parent.index, parentKey: parent.key, parentFirst: parent.first, parentLast: parent.last,
     root: parent.root,
     // inherit the enclosing frame's scoped bindings (outer block params + loop
     // labels stay visible inward), with this frame's own binds shadowing them —
@@ -398,10 +397,6 @@ const helpers = {
   length: (a, f) => f.length,
   root: (a, f) => f.root,
   parent: (a, f) => f.parent,
-  "parent-index": (a, f) => f.parentIndex,
-  "parent-key": (a, f) => f.parentKey,
-  "parent-first": (a, f) => f.parentFirst,
-  "parent-last": (a, f) => f.parentLast,
   true: () => true,
   false: () => false,
   null: () => null,

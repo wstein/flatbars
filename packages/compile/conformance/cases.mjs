@@ -49,7 +49,7 @@ export const cases = [
   { name: "each-array-key-null", t: "{{#each (lookup this \"xs\")}}[{{{key}}}]{{/each}}", d: { xs: ["a", "b"] } },
   { name: "each-object-sorted", t: "{{#each (lookup this \"o\")}}{{{key}}}={{{this}}};{{/each}}", d: { o: { b: 2, a: 1, c: 3 } } },
   { name: "each-object-index", t: "{{#each (lookup this \"o\")}}{{{index}}}:{{{key}}};{{/each}}", d: { o: { z: 1, a: 2 } } },
-  { name: "each-parent-index", t: "{{#each (lookup this \"rows\")}}{{#each this}}[{{{parent-index}}}-{{{index}}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "each-parent-index", t: "{{#each (lookup this \"rows\")}}{{#each this}}[{{{lookup loop \"parent\" \"index0\"}}}-{{{index}}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
   // the `loop` object (ADR-021) reached as a core operation: current metadata, the
   // enclosing loop via loop.parent (chainable), and the outermost via loop.root.
   { name: "loop-chain", t: "{{#each (lookup this \"rows\")}}{{#each this}}[{{{lookup loop \"index0\"}}}@{{{lookup (lookup loop \"parent\") \"index0\"}}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },

@@ -47,9 +47,9 @@ in-scope param desugars to a `(param)` call (lexically scoped, visible in nested
 
 *`@../` parent-data* is desugared for one `../` level: `{{@../index}}`
 (and `@../key`/`@../first`/`@../last`) reads the *enclosing* loop's datum via the
-`parent-index`/`…` scoped helpers that `each`/`with` install (the data analogue
-of `parent` for context). A deeper run (`@../../index`) still resolves to the
-immediate parent.
+`loop` chain — `(lookup loop "parent" "index0")` — the data analogue of `parent`
+for context. A deeper run (`@../../index`) climbs the chain. (The flat
+`parent-index`/`…` helpers were removed — ADR-021 amendment.)
 
 The Handlebars block-partial *sigil* `{{#> name}}…{{/name}}` is also
 accepted and desugars to the same core form as the `{{#partial}}`
@@ -155,7 +155,7 @@ calls to them, and block params rename them:
 | Surface | Core / mechanism |
 | --- | --- |
 | `@index` `@key` `@first` `@last` | `(index)` `(key)` `(first)` `(last)` — installed by `each` |
-| `@../index` `@../key` `@../first` `@../last` | `(parent-index)` … — the *enclosing* loop's datum, installed by `each`/`with` (one `../` level) |
+| `@../index` `@../key` `@../first` `@../last` | `(lookup loop "parent" "index0")` … — the *enclosing* loop's datum via the `loop` chain (deeper `../` climbs it) |
 | `@root` | `(root)` — installed by the host at the top frame |
 | `{{#each xs as \|item i\|}}` | `{{#each xs "item" "i"}}` — `each` also installs `item` and `i` |
 | `{{#with o as \|x\|}}` | `{{#with o "x"}}` — `with` installs `x` alongside the shifted `this` |

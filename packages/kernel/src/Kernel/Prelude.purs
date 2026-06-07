@@ -431,6 +431,12 @@ scopedSpecs =
     , arity: Between 0 1
     , doc: "The enclosing block's context (chainable)."
     }
+  , { name: "loop"
+    , block: false
+    , arity: Exactly 0
+    , doc:
+        "The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length, plus the chain links loop.parent (the enclosing loop) and loop.root."
+    }
   , { name: "index", block: false, arity: Exactly 0, doc: "The current loop item's 0-based index." }
   , { name: "key"
     , block: false
@@ -468,22 +474,10 @@ scopedSpecs =
     , arity: Exactly 0
     , doc: "The number of items in the current loop."
     }
-  , { name: "parent-index"
-    , block: false
-    , arity: Exactly 0
-    , doc: "The enclosing loop's current index."
-    }
-  , { name: "parent-key", block: false, arity: Exactly 0, doc: "The enclosing loop's current key." }
-  , { name: "parent-first"
-    , block: false
-    , arity: Exactly 0
-    , doc: "True on the enclosing loop's first iteration."
-    }
-  , { name: "parent-last"
-    , block: false
-    , arity: Exactly 0
-    , doc: "True on the enclosing loop's last iteration."
-    }
+  -- The enclosing loop's fields are reached through the `loop` chain
+  -- (`loop.parent.index0`, `loop.parent.key`, …); the flat `parent-index`/
+  -- `parent-key`/`parent-first`/`parent-last` names were removed (the lint
+  -- migrates them to `loop.parent.*`, and FullBars' `@../index` lowers there).
   , { name: "partial-block"
     , block: false
     , arity: Exactly 0
@@ -528,6 +522,13 @@ scopedDocs = map (\s -> Tuple s.name s.doc) scopedSpecs
 scopedCanonical :: Array (Tuple String String)
 scopedCanonical =
   [ Tuple "index" "index0"
+  -- the flat enclosing-loop names were REMOVED; migrate to the `loop.parent.*`
+  -- chain (the canonical form is a path). The lint is static, so it flags these
+  -- identifiers whether or not the removed name still resolves.
+  , Tuple "parent-index" "loop.parent.index0"
+  , Tuple "parent-key" "loop.parent.key"
+  , Tuple "parent-first" "loop.parent.first"
+  , Tuple "parent-last" "loop.parent.last"
   , Tuple "partial-block" "yield"
   ]
 
@@ -1292,23 +1293,6 @@ bindingNames = Array.mapMaybe case _ of
   VString s -> Just s
   _ -> Nothing
 
--- | Expose the *enclosing* frame's loop data under `parent-*` names, so a body
--- | one level in can read it — this is what surface `@../index`, `@../key`,
--- | `@../first`, `@../last` desugar to (one `../` level; just as `parent`
--- | exposes the enclosing *context*). Each name rebinds the enclosing helper
--- | directly (a snapshot `constOperation`), and is omitted when the enclosing frame
--- | has none (e.g. `each` not nested in another `each`).
-parentData :: forall m. Ctl m (RefEnv m) -> Array (Tuple String (Operation m (RefEnv m)))
-parentData ctl =
-  Array.mapMaybe rebind
-    [ Tuple "parent-index" "index"
-    , Tuple "parent-key" "key"
-    , Tuple "parent-first" "first"
-    , Tuple "parent-last" "last"
-    ]
-  where
-  rebind (Tuple newName srcName) = Tuple newName <$> lookupOperation srcName ctl.env
-
 -- | The `@parentchain` object backing the reserved `parent` name (ADR-021): the
 -- | enclosing context wrapped as a chain — its own data fields, plus `this` (the
 -- | enclosing context), `parent` (the enclosing frame's chain, or `VNull`), and
@@ -1420,7 +1404,7 @@ iterate ctl names items = do
             , Tuple "rindex0" (constOperation (VNumber (Int.toNumber (n - 1 - i))))
             , Tuple "rindex1" (constOperation (VNumber (Int.toNumber (n - i))))
             , Tuple "length" (constOperation (VNumber (Int.toNumber n)))
-            ] <> parentData ctl <> binds val idx <> loopBinds i val key
+            ] <> binds val idx <> loopBinds i val key
           )
       in
         ctl.render (pushFrame frame val ctl.env) main
@@ -1441,7 +1425,6 @@ withH ctl args = case Array.uncons args of
           ( [ Tuple "parent" (constOperation (refContext ctl.env))
             , Tuple "@parentchain" (constOperation parentChain)
             ]
-              <> parentData ctl
               <> binds
           )
       renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)

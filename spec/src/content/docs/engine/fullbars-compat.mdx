@@ -164,7 +164,7 @@ This is the actual compatibility table.
 | `{{lookup o k}}` | `{{{ lookup o k }}}` | ✓ | More general: chains and string/number indexing. |
 | `{{log x}}` | `{{{ log x }}}` | ✓ | No-op in a pure host; an effectful engine logs. |
 | `{{@index/@key/@first/@last/@root}}` | surface `@`-form ⇒ scoped helper | ✓ | Installed by `each` / the host. |
-| `{{@../index}}` | ⇒ `(parent-index)` | ✓ | Enclosing loop's datum (also `key`/`first`/`last`); one `../` level. |
+| `{{@../index}}` | ⇒ `(lookup loop "parent" "index0")` | ✓ | Enclosing loop's datum (also `key`/`first`/`last`) via the `loop` chain; deeper `../` climbs it. |
 | Paths `{{a.b.c}}`, `{{../a}}`, `{{a.[1}}]` | surface ⇒ `lookup` chains | ✓ | Bare/dotted/numeric/slash/`../`/`this`/`[bracket]` ([surface](/engine/surface/) §5.2). |
 | Auto-escape `{{x}}` / raw `{{{x}}}` | surface ⇒ `escapeHtml` / raw | ✓ | See §1.2. |
 | Unescaped alias `{{&x}}` | ⇒ `{{{x}}}` | ✓ | Handlebars' ampersand form, accepted as an alias of the triple-stash (the canonical spelling). RawBars/MaxBars reject `{{&}}`. |

@@ -338,6 +338,14 @@
       "doc": "Indexes a value by each key or index in turn, returning null at the first miss."
     },
     {
+      "name": "loop",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null,
+      "doc": "The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length, plus the chain links loop.parent (the enclosing loop) and loop.root."
+    },
+    {
       "name": "lowercase",
       "kind": "inline",
       "arity": "1",
@@ -432,38 +440,6 @@
       "source": "scoped",
       "canonical": null,
       "doc": "The enclosing block's context (chainable)."
-    },
-    {
-      "name": "parent-first",
-      "kind": "value",
-      "arity": "0",
-      "source": "scoped",
-      "canonical": null,
-      "doc": "True on the enclosing loop's first iteration."
-    },
-    {
-      "name": "parent-index",
-      "kind": "value",
-      "arity": "0",
-      "source": "scoped",
-      "canonical": null,
-      "doc": "The enclosing loop's current index."
-    },
-    {
-      "name": "parent-key",
-      "kind": "value",
-      "arity": "0",
-      "source": "scoped",
-      "canonical": null,
-      "doc": "The enclosing loop's current key."
-    },
-    {
-      "name": "parent-last",
-      "kind": "value",
-      "arity": "0",
-      "source": "scoped",
-      "canonical": null,
-      "doc": "True on the enclosing loop's last iteration."
     },
     {
       "name": "partial",

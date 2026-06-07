@@ -66,6 +66,14 @@ main = do
     (scopedNames "{{{index}}}" == [ "index" ])
   assert' ("partial-block warns, got " <> show (scopedNames "{{{partial-block}}}"))
     (scopedNames "{{{partial-block}}}" == [ "partial-block" ])
+  -- the removed flat `parent-*` names migrate to the `loop.parent.*` chain (ADR-021
+  -- amendment); the lint is static, so it still flags the now-removed identifier.
+  assert' ("parent-index warns, got " <> show (scopedNames "{{{parent-index}}}"))
+    (scopedNames "{{{parent-index}}}" == [ "parent-index" ])
+  case scopedCanonWarningsOf "{{{parent-index}}}" of
+    Right [ issue ] -> assert' ("parent-index → loop.parent.index0 message, got: " <> issue.message)
+      (contains (Pattern "loop.parent.index0") issue.message)
+    other -> assert' ("parent-index: expected one warning, got " <> show (map _.name <$> other)) false
   assert' ("index0 (canonical) does not warn, got " <> show (scopedNames "{{{index0}}}"))
     (scopedNames "{{{index0}}}" == [])
   assert' ("yield (canonical) does not warn, got " <> show (scopedNames "{{{yield}}}"))

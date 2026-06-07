@@ -9,6 +9,15 @@ Decision §1–2 (the bare loop-variable vocabulary) and §5 (its v1 outer-loop 
 [ADR-013](/adr/adr-0013-labelled-loops/) (labelled loops → `outer`). Applies to *MaxBars and RawBars*
 only; FullBars is unchanged (Handlebars-faithful).
 
+*Amendment (2026-06-07).* The flat enclosing-loop names `parent-index` / `parent-key` /
+`parent-first` / `parent-last` are **removed**. The enclosing loop is reached through the
+`loop` chain instead — `loop.parent.index0`, `loop.parent.key`, … (deeper nesting climbs
+`loop.parent.parent.…`) — and `loop` is now a first-class scoped root in the catalog. FullBars'
+`@../index` lowers to `(lookup loop "parent" "index0")` (byte-identical; the Handlebars `@data`
+namespace and the bare `index`/`index0` aliases are otherwise unchanged — `index` could **not** be
+removed because `@index` is the `@data` key host block helpers supply). The on-demand lint migrates
+`parent-index` → `loop.parent.index0` (etc.).
+
 ## Context
 
 Three things converged to make the loop/context vocabulary worth redesigning:
