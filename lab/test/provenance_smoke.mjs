@@ -117,6 +117,22 @@ try {
   console.log("  ✓ caret — template caret lights up the output run it produced");
 
   if (consoleErrors.length) fail("console errors during the run:\n    " + consoleErrors.join("\n    "));
+
+  // boot defence: a missing asset shows a visible overlay, not a blank page. Fail
+  // the examples catalog fetch and assert the `.boot-error` banner appears.
+  const badPage = await browser.newPage();
+  await badPage.setRequestInterception(true);
+  badPage.on("request", (req) =>
+    req.url().endsWith("examples.json") ? req.respond({ status: 404, body: "nope" }) : req.continue(),
+  );
+  await badPage.goto(URL_, { waitUntil: "domcontentloaded", timeout: 30000 });
+  const overlay = await badPage
+    .waitForSelector(".boot-error", { timeout: 10000 })
+    .then(() => true)
+    .catch(() => false);
+  assert.ok(overlay, "a missing example catalog shows the boot-error overlay (not a blank page)");
+  console.log("  ✓ boot defence — a missing asset shows a visible error, not a blank page");
+  await badPage.close();
 } catch (e) {
   fail(e.message);
 } finally {

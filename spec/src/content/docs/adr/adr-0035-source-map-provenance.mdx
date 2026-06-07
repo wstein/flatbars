@@ -87,5 +87,5 @@ tile the output: ordered, contiguous, each `len > 0`, covering `[0, output.len)`
   honestly via their capability vector.
 - Templates whose output is reshaped by a transforming helper get no map for that
   render (degrade to `[]`), which is correct, not broken.
-- Follow-up: a defended Lab boot path (the `§9` review item) — wrap the
-  engine/examples fetch in a visible fallback instead of a blank page.
+- The Lab boot is defended: a failed engine / example-catalog fetch paints a
+  visible error overlay instead of a blank page (`test:lab:browser` covers it).

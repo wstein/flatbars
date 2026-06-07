@@ -59,7 +59,13 @@ Inspector snapshots the render context at a clicked run (one per loop iteration)
 All pinned by `check:provenance` + the `test:lab:browser` smoke. MinBars backs
 neither, so its provenance surfaces gate off honestly.
 
+The boot is defended: a failed engine / example-catalog fetch paints a visible
+error overlay (built from the inline design tokens) instead of a blank page —
+`test:lab:browser` asserts both the happy path and the missing-asset overlay.
+
 ## Roadmap
 
-1. **A defended boot path** — wrap the engine/examples fetch in a visible
-   fallback instead of a blank page on a missing asset.
+The provenance arc (ADR-035) is complete for the FlatBars dialects. Open ideas:
+context inspection / source maps already cover core / FullBars / MaxBars; the
+natural next surfaces are an embeddable Lab component and a per-example metrics
+feed into the quality dashboards.
