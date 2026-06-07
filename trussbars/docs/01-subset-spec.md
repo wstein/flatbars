@@ -284,7 +284,9 @@ the same harness).
   `nonEmpty` `Truthy` (minus numbers), and the borrowed-reference `Loop` frame model.
   (`coalesce`/`firstTruthy`/`ternary` are *not* here — they are emitted inline by codegen;
   see `02-runtime-api.md` §4.)
-- `trussbars-std` — *planned*: the prelude/stdlib operations as monomorphized functions.
+- `trussbars-std` — *implemented*: the prelude/stdlib operations as monomorphized functions —
+  the string, number, and array packs plus `safe`/`modulo`. (`json`/`escape_json`, the i18n
+  `Translator` pack, and `sort_by`/`pluck`/`group_by` are deferred; see `02-runtime-api.md` §9.)
 - `trussbars-derive` — *implemented*: the `#[derive(Trussbars)]` companion macro, generating
   the `Truthy` impl for context structs (≥1 field ⟹ truthy). No `ToText` by design, so
   `{{struct}}` stays a compile error; struct-only until §4.1 enum dispatch.

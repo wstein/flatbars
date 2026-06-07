@@ -213,35 +213,34 @@ in scope; the codegen calls them.
 ## 9. `trussbars-std` — the value-helper inventory
 
 Only the **homogeneous** helpers (uniform operand types) are library functions; operators
-from §4 and §7 are inlined by codegen. Representative signatures (full set in the crate):
+from §4 and §7 are inlined by codegen. Subjects and string arguments are coerced via the
+reference `stringify` (helpers take `impl ToText`); integer arguments are `i64`. Items below
+are *implemented* in the crate unless marked *deferred*.
 
-**Escaping / output**
-`escape_html(&str) -> Safe` · `safe<T: ToText>(&T) -> Safe` ·
-`json<T: Serialize>(&T) -> String` · `escape_json<T: Serialize>(&T) -> Safe`.
+**Escaping / output** — `safe(&impl ToText) -> Safe` *(implemented)*; `escape_html` lives in
+`trussbars-core`. `json` / `escape_json` *(deferred — need a serializer dependency)*.
 
-**Arithmetic** — mostly emitted native (`price * qty`); `modulo` is a fn for the
-trunc-toward-zero rule: `modulo(a: f64, b: f64) -> f64 { a - b * (a / b).trunc() }`.
-`divide` follows IEEE (`/0.0` → `inf`/`NaN`, then `ToText`).
+**Arithmetic** — `+ - * /` are emitted native; `modulo(a: f64, b: f64) -> f64` *(implemented;
+truncated remainder `a - b * (a / b).trunc()`, sign of the dividend)*. `divide` follows IEEE.
 
-**String pack** (`&str`-in, `String`/`bool`-out)
-`lowercase` · `uppercase` · `capitalize` · `trim` · `trim_start` · `trim_end` · `split` ·
-`replace` · `slice` (JS slice semantics, incl. negative indices) · `includes` ·
-`starts_with` · `ends_with` · `truncate` · `append` · `prepend`.
+**String pack** *(implemented)* — `lowercase` · `uppercase` · `capitalize` · `trim` ·
+`trim_start` · `trim_end` · `split` (empty separator → characters) · `replace` · `slice` /
+`slice_range` (JS negative indices + clamping) · `includes` · `starts_with` · `ends_with` ·
+`truncate` / `truncate_with` · `append` · `prepend` · `reverse`.
 
-**Number pack** (`f64`-in)
-`abs` · `floor` · `ceil` · `round` · `to_fixed(x, n)` · `to_int` · `to_float`.
+**Number pack** *(implemented)* — `abs` · `floor` · `ceil` · `round` (JS half-to-+∞) ·
+`to_fixed(x, n)` · `to_int` · `to_float`.
 
-**Array pack** (`&[T]`-in)
-`join(&[T], sep)` · `count`/`size` · `at(&[T], i)` (negative from end) · `take` ·
-`take_right` · `reverse` · `unique` (needs `T: PartialEq`) ·
-`sort_by` / `pluck` / `group_by` — **the key is a literal**, so the codegen emits a
-**field-access closure**, not a runtime string: `{{items | pluck "name"}}` →
-`items.iter().map(|x| &x.name).collect::<Vec<_>>()`. A *non-literal* key would be a
-data-derived name and is inadmissible (spec §4.3).
+**Array pack** *(implemented)* — `join(&[T], sep)` · `count` (`size` is the same fn) ·
+`at(&[T], i)` (negative from end) · `take` · `take_right` · `reverse_slice` · `unique`
+(`T: PartialEq`) · `slice_includes` (the array form of `includes`, dispatched by subject type;
+`reverse_slice` likewise to `reverse`). The key-path helpers `sort_by` / `pluck` / `group_by`
+are *deferred* — **the key is a literal**, so the codegen emits a **field-access closure**, not
+a runtime string: `{{items | pluck "name"}}` → `items.iter().map(|x| &x.name).collect::<Vec<_>>()`.
+A *non-literal* key would be a data-derived name and is inadmissible (spec §4.3).
 
-**i18n** (`t` · `number` · `date` · `select_plural` · `relative`) — a host-locale **seam**,
-not byte-identical (spec §10). Shape: a `Translator` trait the host implements; the helpers
-call it and fall back to English when absent, mirroring the JS `translator` seam (ADR-029).
+**i18n** *(deferred)* — `t` · `number` · `date` · `select_plural` · `relative`: a host-locale
+`Translator` seam, not byte-identical (spec §10), mirroring the JS `translator` seam (ADR-029).
 
 **Dropped:** `apply` and `dict` — `apply` is injection-class (spec §4.2); `dict`/collection
 literals are deferred (ADR-024), not in v1. `log` → a no-op (or `eprintln!`) returning unit.
