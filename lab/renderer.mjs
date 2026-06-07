@@ -29,6 +29,8 @@ import {
   renderRawWith as bbRenderRawWith,
   renderMaxWith as bbRenderMaxWith,
   renderSurfaceI18n as bbRenderSurfaceI18n,
+  renderSurfaceMapped as bbRenderSurfaceMapped,
+  renderSurfaceMappedWithPartials as bbRenderSurfaceMappedWith,
   // FlatBars AST + compile + tooling
   astJson,
   compile as bbCompile,
@@ -47,7 +49,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=70";
+} from "./vendor/flatbars-engine.mjs?v=71";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -75,9 +77,9 @@ const DIALECT = (() => {
 // rendering, a static helper catalog (→ Transformers panel), EXACT used-transformers
 // and data-access (→ Transformers / Data Access panels — the lowered AST is precise,
 // not heuristic like Handlebars), and an EXACT partial graph (→ Partials panel;
-// {{> name}}/{{#inline}} surface as `partial` AST nodes). Provenance (`source-map`)
-// and `context-inspect` are not yet natively backed, so they stay absent and gate
-// off honestly until the engine emits segments (Phase 2/3).
+// {{> name}}/{{#inline}} surface as `partial` AST nodes). The FullBars surface
+// also backs provenance (`source-map`, added in engineInfo); `context-inspect`
+// is not yet natively backed, so it stays absent and the inspector gates off.
 const BB_FEATURES = [
   "catalog",
   "used-transformers",
@@ -137,16 +139,6 @@ export async function createRenderer(dialectArg, opts = {}) {
 // ── FlatBars (core / surface / maxbars) ──────────────────────────────────────
 
 function flatbarsRenderer(activeDialect, _opts) {
-  // Map the engine's `{ ok, value, error }` result to the seam's render contract:
-  // the string on success (or `{ output, segments }` when mapped), a thrown
-  // `{ kind: "render" }` error otherwise.
-  function renderResult(res, map) {
-    if (res.ok) return map ? { output: res.value, segments: [] } : res.value;
-    const err = new Error(res.error);
-    err.kind = "render";
-    throw err;
-  }
-
   // `program` is opaque to the host: source + active dialect + named partial
   // documents (+ optional user helpers / translator, surface only).
   function compile(source, partials = {}, opts = {}) {
@@ -187,7 +179,26 @@ function flatbarsRenderer(activeDialect, _opts) {
         ? bbRenderSurfaceWith(program.partials, program.source, d)
         : bbRenderSurface(program.source, d);
     }
-    return renderResult(res, map);
+    if (!res.ok) {
+      const err = new Error(res.error);
+      err.kind = "render";
+      throw err;
+    }
+    if (!map) return res.value;
+    // Attach a source map where the engine backs it (ADR-035): the FullBars
+    // surface without host helpers or a translator (the mapped render threads
+    // neither). Other dialects / paths tile no map yet, so the provenance UI gates
+    // off and the render falls back to an empty `segments`.
+    if (program.dialect === "surface" && !program.translator && !hasHelpers) {
+      const m = hasPartials
+        ? bbRenderSurfaceMappedWith(program.partials, program.source, d)
+        : bbRenderSurfaceMapped(program.source, d);
+      // Tag every run with the entry template ("main") — the only file the spans
+      // index, since partial-origin emits carry none. The host's provenance UI
+      // reads `file` to pick the editor tab (tabIndexByFile).
+      if (m.ok) return { output: m.output, segments: m.segments.map((s) => ({ ...s, file: "main" })) };
+    }
+    return { output: res.value, segments: [] };
   }
 
   // Analyse mode (ADR-022 Part B): render + report the truthiness decisions that
@@ -293,7 +304,13 @@ function flatbarsRenderer(activeDialect, _opts) {
 
   function allTransformers() { return BB_CATALOG.map((e) => e.name); }
   function catalog() { return BB_CATALOG; }
-  function engineInfo() { return { version: VERSION, builtins: allTransformers(), features: BB_FEATURES }; }
+  function engineInfo() {
+    // The FullBars surface backs source maps (ADR-035), lighting up the provenance
+    // UI; the core/maxbars dialects don't emit segments yet, so they advertise it
+    // off and the provenance views gate off honestly.
+    const features = activeDialect === "surface" ? [...BB_FEATURES, "source-map"] : BB_FEATURES;
+    return { version: VERSION, builtins: allTransformers(), features };
+  }
 
   return {
     render, analyze, analyzeWith, lint, migrate, compile, parseAst, inspectAt,

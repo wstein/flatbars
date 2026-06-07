@@ -124,12 +124,12 @@ test("engineInfo advertises an honest capability vector", async () => {
   assert.match(info.version, /\d+\.\d+/);
   assert.ok(Array.isArray(info.features));
   // backs (exactly, from the lowered AST): catalog, used-transformers,
-  // required-assigns, partial-graph.
-  for (const has of ["catalog", "used-transformers", "required-assigns", "partial-graph"]) {
+  // required-assigns, partial-graph; plus source maps (ADR-035) on the surface.
+  for (const has of ["catalog", "used-transformers", "required-assigns", "partial-graph", "source-map"]) {
     assert.ok(info.features.includes(has), `should advertise ${has}`);
   }
   // not yet natively backed → those panels gate off honestly.
-  for (const absent of ["source-map", "context-inspect", "bytecode-wire", "standalone"]) {
+  for (const absent of ["context-inspect", "bytecode-wire", "standalone"]) {
     assert.ok(!info.features.includes(absent), `should not advertise ${absent} yet`);
   }
   assert.ok(info.builtins.includes("each") && info.builtins.includes("json"));
@@ -319,6 +319,57 @@ test("partialGraph builds a real dependency graph natively (the partial-graph fe
   const prog2 = r.compile("{{> gone}}", {}).program;
   const g2 = r.partialGraph(prog2);
   assert.ok(g2.nodes.some((n) => n.id === "gone" && n.missing));
+});
+
+// the source-map segments must tile the output: contiguous from 0, every len > 0,
+// covering exactly [0, output.length).
+const tilesExactly = (output, segments) => {
+  let at = 0;
+  for (const s of segments) {
+    if (s.out !== at || s.len <= 0) return false;
+    at += s.len;
+  }
+  return at === output.length;
+};
+
+test("source map: a mapped surface render returns segments that tile the output (the source-map feature)", async () => {
+  const r = await createRenderer("fullbars");
+  assert.ok(r.engineInfo().features.includes("source-map"));
+  const prog = r.compile("<b>{{ name }}</b>{{#each xs}}[{{ this }}]{{/each}}").program;
+  const { output, segments } = r.render(prog, { name: "Ada", xs: ["a", "b"] }, { map: true });
+  assert.equal(output, "<b>Ada</b>[a][b]");
+  assert.ok(tilesExactly(output, segments), "segments tile the output exactly");
+  // the {{ name }} emit links to its tag span (offsets are JS string indices).
+  const emits = segments.filter((s) => s.kind === "emit" && s.start != null);
+  assert.ok(emits.some((s) => s.start === 3 && s.end === 13), "{{ name }} carries its tag span");
+  // every run is tagged with the entry template, so the host links to its tab.
+  assert.ok(segments.every((s) => s.file === "main"), "runs are tagged file=main");
+  // both loop iterations of {{ this }} point at the same source tag.
+  const thisEnds = emits.filter((s) => s.start === 30).map((s) => s.end);
+  assert.deepEqual(thisEnds, [40, 40], "both {{ this }} iterations share the tag span");
+  // text runs carry no source span.
+  assert.ok(segments.every((s) => s.kind !== "text" || (s.start == null && s.end == null)));
+});
+
+test("source map: partials tile, with partial-origin emits carrying no entry span", async () => {
+  const r = await createRenderer("fullbars");
+  const prog = r.compile("{{#each xs}}{{> row}}{{/each}}", { row: "<li>{{ this }}</li>" }).program;
+  const { output, segments } = r.render(prog, { xs: ["x", "y"] }, { map: true });
+  assert.equal(output, "<li>x</li><li>y</li>");
+  assert.ok(tilesExactly(output, segments), "segments tile the output exactly");
+  assert.ok(
+    segments.filter((s) => s.kind === "emit").every((s) => s.start == null),
+    "partial-origin emits do not claim an entry-template span",
+  );
+});
+
+test("source map: the core/maxbars dialects honestly gate off (no source-map)", async () => {
+  for (const dialect of ["rawbars", "maxbars"]) {
+    const r = await createRenderer(dialect);
+    assert.ok(!r.engineInfo().features.includes("source-map"), `${dialect} omits source-map`);
+    const out = r.render(r.compile("{{ this }}").program, "x", { map: true });
+    assert.deepEqual(out, { output: "x", segments: [] });
+  }
 });
 
 // ── MinBars (Mustache) ───────────────────────────────────────────────────────
