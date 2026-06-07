@@ -6584,8 +6584,9 @@
       if (vendoredParam) {
         await loadVendoredById(vendoredParam);
       } else if (!(await restoreHash())) {
-        // Both catalogs ship a "greeting" entry as the default landing example.
-        const def = examples.findIndex((e) => e.id === "greeting");
+        // Landing example: "greeting" (FullBars/MaxBars catalogs) or "hello"
+        // (MinBars), else the first entry.
+        const def = examples.findIndex((e) => e.id === "greeting" || e.id === "hello");
         await loadExample(def < 0 ? 0 : def);
         // On a fresh open (no share link), default the output to Plain Text rather
         // than the example's own view. A shared link keeps its saved view.

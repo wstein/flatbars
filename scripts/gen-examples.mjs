@@ -37,21 +37,11 @@ const humanize = (id) =>
 // folder (lab/examples/fullbars/, the former shared `handlebars/` catalog — those
 // ARE FullBars examples). No dialect shares a folder anymore (the hack is gone);
 // converting FullBars to a typed-source projection too is a tracked follow-up.
-// A few passing mustache/spec fixtures derived straight into the MinBars catalog
-// (a "From the spec" group), so the Lab's coverage tracks the spec. Each is
-// rendered and asserted against its OWN `expected` — if MinBars drifts from the
-// spec, gen fails (stronger than the snapshot). Terse by nature (they're test
-// fixtures), so we keep the list short and representative.
-const SPEC_FIXTURES = [
-  "interpolation/basic-interpolation",
-  "sections/list",
-  "inverted/falsey",
-  "comments/inline",
-  "partials/basic-behavior",
-];
-
 const DIALECTS = [
-  { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", specFixtures: SPEC_FIXTURES, makeRenderer: () => createMinBarsRenderer() },
+  // MinBars examples are deliberately non-HTML (plain text / Markdown / config /
+  // email), so they land in the "Plain Text" output view, not the HTML preview —
+  // `defaultView: "source"` (the real view-tab name; see lab/output-view.mjs).
+  { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", defaultView: "source", makeRenderer: () => createMinBarsRenderer() },
   { engine: "rawbars", module: "../tutorials/src/rawbars.mjs", ext: "rawbars", makeRenderer: () => createFlatBarsRenderer("core") },
   { engine: "maxbars", module: "../tutorials/src/maxbars.mjs", ext: "maxbars", makeRenderer: () => createFlatBarsRenderer("maxbars") },
 ];
@@ -80,7 +70,7 @@ async function buildDialect(d) {
       id,
       label: ex.label || humanize(id),
       group: ex.group || "Examples",
-      view: ex.view || "rendered",
+      view: ex.view || d.defaultView || "rendered",
       main: `main.${d.ext}`,
       partials: partialNames,
       data: "data.yaml",
@@ -88,33 +78,6 @@ async function buildDialect(d) {
     // Snapshot the render — the gate's expected output (asserts the example renders).
     const res = renderer.render(renderer.compile(ex.template, partials).program, ex.data ?? {});
     snapshots[id] = typeof res === "string" ? res : res.output;
-  }
-  // Spec-derived examples (item C): a few passing mustache/spec fixtures, asserted
-  // against their own `expected` so the Lab tracks the spec.
-  for (const fxPath of d.specFixtures || []) {
-    const fx = JSON.parse(readFileSync(resolve(root, "lab/examples/vendored/mustache", fxPath + ".json"), "utf8"));
-    const id = "spec-" + fxPath.split("/").pop();
-    const partials = fx.partials || {};
-    const out = renderer.render(renderer.compile(fx.template, partials).program, fx.data ?? {});
-    const rendered = typeof out === "string" ? out : out.output;
-    if (rendered !== fx.expected) {
-      console.error(`✗ spec fixture ${fxPath}: MinBars render diverged from the spec's expected.`);
-      console.error(`  expected ${JSON.stringify(fx.expected)}\n  got      ${JSON.stringify(rendered)}`);
-      process.exit(1);
-    }
-    files[`${base}/${id}/main.${d.ext}`] = fx.template;
-    files[`${base}/${id}/data.yaml`] = fx.data && Object.keys(fx.data).length ? yamlDump(fx.data) : "{}\n";
-    for (const [name, src] of Object.entries(partials)) files[`${base}/${id}/${name}.${d.ext}`] = src;
-    manifest.push({
-      id,
-      label: humanize(fxPath.split("/").pop()) + " (spec)",
-      group: "From the spec",
-      view: "text",
-      main: `main.${d.ext}`,
-      partials: Object.keys(partials),
-      data: "data.yaml",
-    });
-    snapshots[id] = rendered;
   }
 
   files[`${base}/examples.json`] = JSON.stringify(manifest, null, 2) + "\n";

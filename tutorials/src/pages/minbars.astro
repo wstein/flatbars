@@ -35,7 +35,6 @@ const groups = [
       { href: "#inverted", label: "Inverted sections" },
       { href: "#comments", label: "Comments" },
       { href: "#partials", label: "Partials" },
-      { href: "#inheritance", label: "Template inheritance" },
       { href: "#dynamic-names", label: "Dynamic names" },
       { href: "#set-delimiters", label: "Set delimiters" },
       { href: "#lambdas", label: "Lambdas" },
@@ -74,9 +73,10 @@ Mustache.render("{{#bold}}(c) {{year}}{{/bold}}", data);
 // → "<b>(c) 2026</b>"`;
 const lambdaHtml = highlightTemplate(lambdaCode, "minbars");
 
-// Worked example (P5): a *value* lambda → a precalculated plain-data field. What
-// you'd write as a lambda, the JSONata that precomputes it, and the plain data
-// the renderer actually sees (ex.precompute, gated by check-tutorial-links).
+// Worked example (P5): a *value* lambda → a precalculated plain-data field —
+// shown as static code (what you'd write as a lambda, and the JSONata that
+// precomputes it). No live example: with the value precomputed there is no
+// lambda left in the data to see, which only reads as confusing.
 const valueLambdaCode = `// Mustache / Handlebars.js — a value lambda (a function on the data)
 const data = {
   first: "Ada", last: "Lovelace",
@@ -158,13 +158,6 @@ $ ~> | $ | {
     <p>Reach into nested objects with dots: <code>{t("{{name.first}}")}</code>.</p>
     <OpenInLab client:visible engine="minbars" template={ex.dotted.template} data={ex.dotted.data} />
 
-    <h3>The implicit iterator</h3>
-    <p>
-      Inside a section over a list of scalars, <code>{t("{{.}}")}</code> is the
-      current item itself.
-    </p>
-    <OpenInLab client:visible engine="minbars" template={ex.implicit.template} data={ex.implicit.data} />
-
     <h3>Missing keys</h3>
     <p>
       A name that resolves to nothing — missing or <code>null</code> — renders as
@@ -187,23 +180,15 @@ $ ~> | $ | {
     </ul>
 
     <h3>Iterating a list</h3>
+    <p>
+      Over a list of scalars, <code>{t("{{.}}")}</code> — the <em>implicit
+      iterator</em> — is the current item itself.
+    </p>
     <OpenInLab client:visible engine="minbars" template={ex.sectionArray.template} data={ex.sectionArray.data} />
 
     <h3>An object opens a scope</h3>
     <p>When the value is an object, that object becomes the context for the body.</p>
     <OpenInLab client:visible engine="minbars" template={ex.sectionObject.template} data={ex.sectionObject.data} />
-
-    <h3>There is no <code>if</code> — the shape decides</h3>
-    <div class="callout warn">
-      <p>
-        Mustache has <b>no conditionals</b>. <code>{t("{{#admin}}")}</code> is not an
-        <code>if</code> — it is a <em>section on the key</em> <code>admin</code>, shown when
-        <code>admin</code> is truthy/present and hidden otherwise. There is no <code>else if</code>
-        and no helper; a key that's missing simply hides its block (<code>banned</code> below).
-        This is the one thing the Handlebars examples got wrong.
-      </p>
-    </div>
-    <OpenInLab client:visible engine="minbars" template={ex.sectionNotConditional.template} data={ex.sectionNotConditional.data} />
   </section>
 
   <!-- ──────────────────────── Truthiness ───────────────────────── -->
@@ -217,6 +202,13 @@ $ ~> | $ | {
         <em>renders</em>. This is the single most common surprise for anyone
         arriving from Handlebars or JavaScript, where <code>0</code> and
         <code>""</code> are falsy.
+      </p>
+      <p>
+        And this is <em>why there is no <code>if</code></em>: a section like
+        <code>{t("{{#count}}")}</code> is not a conditional, it is a section
+        <em>keyed on the shape</em> of <code>count</code> — it renders when the
+        value is truthy and hides otherwise. No <code>else if</code>, no helper;
+        a missing key simply hides its block.
       </p>
     </div>
     <table class="cmp">
@@ -262,7 +254,6 @@ $ ~> | $ | {
       <b>inherits the caller's context</b> — it sees the same data — which makes
       partials the natural unit for reuse: a row, a card, a header/footer.
     </p>
-    <OpenInLab client:visible engine="minbars" template={ex.partial.template} data={ex.partial.data} partials={ex.partial.partials} />
     <h3>A partial per row</h3>
     <p>
       Combine a section with a partial to template each element of a list. Note
@@ -276,19 +267,6 @@ $ ~> | $ | {
       sits alone on an indented line, that indent is re-applied to every line the
       partial emits — so included blocks stay aligned.
     </p>
-  </section>
-
-  <!-- ─────────────────── Template inheritance ──────────────────── -->
-  <section id="inheritance">
-    <h2>Template inheritance</h2>
-    <p>
-      Partials include; <b>parents</b> let a child fill named holes in a layout.
-      A parent is invoked with <code>{t("{{<layout}} … {{/layout}}")}</code>;
-      inside it, the child supplies <code>{t("{{$block}} … {{/block}}")}</code>
-      overrides. The layout itself declares the same <code>{t("{{$block}}")}</code>
-      names with default content, used when the child omits an override.
-    </p>
-    <OpenInLab client:visible engine="minbars" template={ex.inheritance.template} data={ex.inheritance.data} partials={ex.inheritance.partials} />
   </section>
 
   <!-- ─────────────────────── Dynamic names ─────────────────────── -->
@@ -362,9 +340,8 @@ $ ~> | $ | {
     <pre class="oil-static"><code>{jsonataCode}</code></pre>
     <p>
       The renderer then sees ordinary fields, so <code>{"{{fullName}}"}</code> is a plain
-      interpolation — identical interpreted and compiled, with no function in the context:
+      interpolation — identical interpreted and compiled, with no function in the context.
     </p>
-    <OpenInLab client:visible engine="minbars" template={ex.precompute.template} data={ex.precompute.data} />
   </section>
 
   <!-- ──────────────────────── Conformance ──────────────────────── -->
