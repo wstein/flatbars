@@ -9,15 +9,30 @@ keywords = ["template", "maxbars", "codegen", "html"]
 categories = ["template-engine"]
 
 [features]
+# Best-in-class by default; opt out with `--no-default-features` for the pure,
+# zero-dependency, forbid(unsafe) build — where f64 formatting falls back to Rust
+# `Display` (the documented divergence from the reference engine, docs/01 §10).
+default = ["perf"]
+# The pluggable performance backends — each is itself dependency-free:
+perf = ["fast-int", "ecma-float"]
+fast-int = ["dep:itoa"]             # fast integer formatting (byte-identical bytes)
+ecma-float = ["dep:dragonbox_ecma"] # fast AND ECMA-262 byte-identical floats (JS `String(n)`)
 # Re-export `#[derive(Trussbars)]` so a host can depend on `trussbars-core` alone.
-# Off by default, keeping the default build std-only and dependency-free.
 derive = ["dep:trussbars-derive"]
 
-# Zero runtime dependencies by design — std-only, so the default build is the
-# small, auditable substrate the codegen targets. The optional `derive` feature
-# pulls the proc-macro (a build-time dependency only).
+# Pluggable, dependency-free backends behind features (the substrate stays
+# auditable; `--no-default-features` is a first-class, tested zero-dep build).
 [dependencies]
 trussbars-derive = { path = "../trussbars-derive", version = "0.1.0", optional = true }
+itoa = { version = "1", optional = true }
+dragonbox_ecma = { version = "0.1.12", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "format"
+harness = false
 
 [lints]
 workspace = true

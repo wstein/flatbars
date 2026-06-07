@@ -52,12 +52,17 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-      # Assert the default build stays dependency-free (the `derive` feature is off).
-      - name: Build (default features)
-        run: cargo build
-
-      - name: Clippy
+      # Two profiles, both gated: the default best-in-class build (itoa +
+      # dragonbox_ecma, ECMA-byte-identical floats) and the pure, zero-dependency,
+      # forbid(unsafe) build (--no-default-features, f64 = Rust Display).
+      - name: Clippy (perf)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Test
+      - name: Clippy (pure)
+        run: cargo clippy --all-targets --no-default-features -- -D warnings
+
+      - name: Test (perf + derive)
         run: cargo test --all-features
+
+      - name: Test (pure)
+        run: cargo test --no-default-features

@@ -33,22 +33,31 @@ The contract lives in `../../docs/`:
 
 ## Features
 
+- `perf` *(on by default)* — the pluggable performance backends: `fast-int`
+  (`itoa`) and `ecma-float` (`dragonbox_ecma`). `ecma-float` makes `f64` output
+  **byte-identical to JavaScript `String(n)`** (ECMA-262) — `-0`→`0`, `1e21`→`1e+21`,
+  `Infinity`, `NaN` — not merely faster.
 - `derive` *(off by default)* — re-exports `#[derive(Trussbars)]` from
   `trussbars-derive`, so a host can depend on `trussbars-core` alone.
+- `--no-default-features` — the pure, zero-dependency, `forbid(unsafe)` build;
+  `f64` falls back to Rust `Display` (the documented divergence from the reference).
 
 ## Properties
 
-- **std-only, zero runtime dependencies** by default — builds offline; a small,
-  auditable substrate. The optional `derive` feature pulls the proc-macro
-  (build-time only).
+- **Pluggable backends behind a preserved pure core.** Best-in-class by default
+  (`itoa` + `dragonbox_ecma`, each itself dependency-free); `--no-default-features`
+  is a first-class, tested zero-dependency build. Escaping is a dependency-free
+  bulk-run byte scan in every profile.
 - `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, `clippy::all` denied
-  (workspace lints).
+  (workspace lints) — both feature profiles gated in CI.
 - Toolchain pinned to Rust 1.96 (`../../rust-toolchain.toml`), edition 2024.
 
 ## Develop
 
 ```sh
 cargo +1.96.0 test   --manifest-path trussbars/Cargo.toml --all-features
+cargo +1.96.0 test   --manifest-path trussbars/Cargo.toml -p trussbars-core --no-default-features
 cargo +1.96.0 fmt    --manifest-path trussbars/Cargo.toml --all
 cargo +1.96.0 clippy --manifest-path trussbars/Cargo.toml --all-targets --all-features
+cargo +1.96.0 bench  --manifest-path trussbars/Cargo.toml -p trussbars-core   # add --no-default-features to compare
 ```

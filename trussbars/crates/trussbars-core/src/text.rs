@@ -10,10 +10,15 @@
 //! Escaping mirrors the reference `escapeHtml` exactly: `&` `<` `>` `"` `'` →
 //! `&amp;` `&lt;` `&gt;` `&quot;` `&#x27;`.
 //!
-//! One deliberate divergence: `f64`/`f32` use Rust's `Display`, which is **not**
-//! byte-identical to the reference's JavaScript `String(n)` for the long tail
-//! (`1e21`, `-0`, …). This is out of scope for v1 and masked by the conformance
-//! harness (`docs/04-conformance.md` §7).
+//! Number formatting is a **pluggable backend** (the substrate stays auditable):
+//! with the default `perf` features, integers use `itoa` (`fast-int`, byte-identical
+//! to `Display`, just faster) and `f64` uses `dragonbox_ecma` (`ecma-float`), which
+//! is **ECMA-262 byte-identical** to the reference's JavaScript `String(n)` —
+//! including `-0` → `"0"`, `1e21` → `"1e+21"`, `Infinity`, `NaN`. With
+//! `--no-default-features` the pure path uses Rust `Display`, whose `f64` output
+//! diverges from `String(n)` for that long tail (docs/01 §10; masked only on the
+//! pure profile by the conformance harness, docs/04 §7). `f32` is outside the JS
+//! number model and always uses `Display`.
 
 /// A string already safe to emit unescaped — the output of markup-producing
 /// helpers (`escapeHtml`, `safe`, partials). [`esc`] writes it through verbatim.
@@ -25,20 +30,28 @@ pub struct Safe(
 
 /// Append the HTML-escaped form of `s` to `out`.
 ///
-/// Matches the reference `escapeHtml` character set exactly. Escaping
-/// character-by-character (rather than the reference's chained `&`-first
-/// replace) is equivalent and avoids any double-encoding hazard.
+/// Matches the reference `escapeHtml` character set exactly (`&  <  >  "  '`).
+/// Scans the bytes and copies the clean runs between escapable characters in bulk
+/// (`push_str`), so only the five escapable bytes do per-character work — much
+/// faster than a char-by-char loop on typical, mostly-clean text, with no
+/// dependency and no `unsafe`. The five escapable bytes are all ASCII, so the run
+/// boundaries are always UTF-8 char boundaries.
 pub fn escape_html(s: &str, out: &mut String) {
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#x27;"),
-            _ => out.push(c),
-        }
+    let mut start = 0;
+    for (i, &b) in s.as_bytes().iter().enumerate() {
+        let entity = match b {
+            b'&' => "&amp;",
+            b'<' => "&lt;",
+            b'>' => "&gt;",
+            b'"' => "&quot;",
+            b'\'' => "&#x27;",
+            _ => continue,
+        };
+        out.push_str(&s[start..i]);
+        out.push_str(entity);
+        start = i + 1;
     }
+    out.push_str(&s[start..]);
 }
 
 /// Append the HTML-escaped output of `v` to `out` — the emission for a `{{ x }}`
@@ -106,16 +119,23 @@ impl ToText for () {
     fn write_text(&self, _out: &mut String) {}
 }
 
-macro_rules! impl_to_text_display {
+// Integers: `itoa` under `fast-int` (byte-identical to `Display`, faster), else
+// `Display`. Numbers carry no escapable characters, so `write_escaped` writes
+// directly (the default would allocate a temporary).
+macro_rules! impl_to_text_int {
     ($($t:ty),* $(,)?) => {$(
-        // Numbers carry no escapable characters, so the default escaped path
-        // (which would allocate a temporary) is overridden to write directly.
-        // NOTE: `f32`/`f64` use Rust `Display`, not byte-identical to the
-        // reference `String(n)` — out of scope for v1 (see module docs).
         impl ToText for $t {
             fn write_text(&self, out: &mut String) {
-                use core::fmt::Write as _;
-                let _ = write!(out, "{self}");
+                #[cfg(feature = "fast-int")]
+                {
+                    let mut buf = itoa::Buffer::new();
+                    out.push_str(buf.format(*self));
+                }
+                #[cfg(not(feature = "fast-int"))]
+                {
+                    use core::fmt::Write as _;
+                    let _ = write!(out, "{self}");
+                }
             }
             fn write_escaped(&self, out: &mut String) {
                 self.write_text(out);
@@ -124,9 +144,52 @@ macro_rules! impl_to_text_display {
     )*};
 }
 
-impl_to_text_display!(
-    i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64,
+impl_to_text_int!(
+    i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize
 );
+
+impl ToText for f64 {
+    fn write_text(&self, out: &mut String) {
+        #[cfg(feature = "ecma-float")]
+        {
+            write_ecma_f64(*self, out);
+        }
+        #[cfg(not(feature = "ecma-float"))]
+        {
+            use core::fmt::Write as _;
+            let _ = write!(out, "{self}");
+        }
+    }
+    fn write_escaped(&self, out: &mut String) {
+        self.write_text(out);
+    }
+}
+
+// f32 is outside the JS number model (JavaScript has only f64), so there is no
+// `String(n)` to match — it always uses `Display`.
+impl ToText for f32 {
+    fn write_text(&self, out: &mut String) {
+        use core::fmt::Write as _;
+        let _ = write!(out, "{self}");
+    }
+    fn write_escaped(&self, out: &mut String) {
+        self.write_text(out);
+    }
+}
+
+/// Format an `f64` as ECMA-262 `Number::toString` (JavaScript `String(n)`):
+/// `dragonbox_ecma` for finite values, the spec spellings for the rest.
+#[cfg(feature = "ecma-float")]
+fn write_ecma_f64(n: f64, out: &mut String) {
+    if n.is_nan() {
+        out.push_str("NaN");
+    } else if n.is_infinite() {
+        out.push_str(if n < 0.0 { "-Infinity" } else { "Infinity" });
+    } else {
+        let mut buf = dragonbox_ecma::Buffer::new();
+        out.push_str(buf.format(n));
+    }
+}
 
 impl<T: ToText> ToText for Option<T> {
     fn write_text(&self, out: &mut String) {
@@ -232,11 +295,30 @@ mod tests {
     }
 
     #[test]
-    fn floats_stringify_for_the_in_scope_cases() {
-        // f64 byte-identity with the reference is out of scope; the common,
-        // representable cases still agree.
+    fn floats_stringify_the_common_cases_under_either_backend() {
+        // These agree whether `f64` uses dragonbox_ecma or Display.
         assert_eq!(text(1.5_f64), "1.5");
         assert_eq!(text(0.0_f64), "0");
+        assert_eq!(text(42.0_f64), "42");
+    }
+
+    // With `ecma-float`, f64 output is byte-identical to JavaScript `String(n)`.
+    #[cfg(feature = "ecma-float")]
+    #[test]
+    fn ecma_float_matches_javascript_string() {
+        assert_eq!(text(-0.0_f64), "0"); // Display would give "-0"
+        assert_eq!(text(1e21_f64), "1e+21"); // Display: a 22-digit integer
+        assert_eq!(text(1e-7_f64), "1e-7"); // Display: "0.0000001"
+        assert_eq!(text(f64::INFINITY), "Infinity"); // Display: "inf"
+        assert_eq!(text(f64::NEG_INFINITY), "-Infinity");
+        assert_eq!(text(f64::NAN), "NaN");
+    }
+
+    // The pure (zero-dependency) profile falls back to Rust `Display`.
+    #[cfg(not(feature = "ecma-float"))]
+    #[test]
+    fn pure_float_uses_rust_display() {
+        assert_eq!(text(-0.0_f64), "-0"); // the documented divergence
     }
 
     #[test]
