@@ -143,6 +143,17 @@ $ ~> | $ | {
     </p>
     <OpenInLab client:visible engine="minbars" template={ex.escaping.template} data={ex.escaping.data} />
 
+    <h3>Names are just keys</h3>
+    <p>
+      Mustache has no identifier grammar. A name is the tag's text, trimmed, looked
+      up as a literal key in your data — so almost anything works:
+      <code>{t("{{first-name}}")}</code>, <code>{t("{{active?}}")}</code>, even
+      <code>{t("{{2nd}}")}</code>. The only characters a bare name can't contain are
+      whitespace, <code>.</code> (the segment separator, below) and the active
+      delimiters <code>{t("{{ }}")}</code>. Nesting is the one bit of structure: a
+      dot splits the lookup into a path.
+    </p>
+
     <h3>Dotted names</h3>
     <p>Reach into nested objects with dots: <code>{t("{{name.first}}")}</code>.</p>
     <OpenInLab client:visible engine="minbars" template={ex.dotted.template} data={ex.dotted.data} />

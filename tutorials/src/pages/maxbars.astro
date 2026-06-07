@@ -337,6 +337,11 @@ const t = (s) => s;
           <td><span class="code">{t("\"a\" + \"b\"")}</span> throws — there is no string concatenation operator.</td>
         </tr>
         <tr>
+          <td>Names with <span class="code">+ - * / % ? :</span> (e.g. <span class="code">{t("{{first-name}}")}</span>, <span class="code">{t("{{done?}}")}</span>)</td>
+          <td>need <b>[bracket] segments</b></td>
+          <td>Those are operator characters here, so <span class="code">{t("{{first-name}}")}</span> reads as subtraction and <span class="code">{t("{{done?}}")}</span> as a ternary head. Bracket the key — <span class="code">{t("{{[first-name]}}")}</span>, <span class="code">{t("{{[done?]}}")}</span> — the same segment-literal escape <a href="/fullbars#identifiers">FullBars</a> uses. (In FullBars and Mustache these are ordinary name characters.)</td>
+        </tr>
+        <tr>
           <td>Mustache-style <span class="code">{t("{{^x}}")}</span> / <span class="code">{t("{{&x}}")}</span> / <span class="code">{t("{{{{raw}}}}")}</span></td>
           <td>rejected</td>
           <td>MaxBars sets <span class="code">extras = false</span> — it's not the Handlebars-compatibility dialect.</td>

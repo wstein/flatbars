@@ -26,6 +26,7 @@ const groups = [
       { href: "#reference", label: "Surface reference" },
       { href: "#expressions", label: "Expressions & escaping" },
       { href: "#paths", label: "Paths" },
+      { href: "#identifiers", label: "Identifiers & names" },
       { href: "#conditionals", label: "if / unless" },
       { href: "#each", label: "each" },
       { href: "#with", label: "with" },
@@ -151,6 +152,45 @@ $ ~> | $ | {
       the nesting.
     </p>
     <OpenInLab client:visible engine="fullbars" template={ex.paths.template} data={ex.paths.data} />
+  </section>
+
+  <!-- ──────────────────────── Identifiers & names ──────────────────────── -->
+  <section id="identifiers">
+    <h2>Identifiers &amp; names</h2>
+    <p>
+      A bare identifier — a path segment or a helper name — may be almost any
+      character. Only whitespace and this reserved set are off-limits bare:
+    </p>
+    <p><code>{t("! \" # % & ' ( ) * + , . / ; < = > @ [ \\ ] ^ ` { | } ~")}</code></p>
+    <p>
+      So letters, digits, <code>_</code>, <code>$</code>, <code>-</code>,
+      <code>:</code> and <code>?</code> are all fine bare: kebab-case keys like
+      <code>{t("{{first-name}}")}</code> and Ruby/Mustache-style predicate keys like
+      <code>{t("{{active?}}")}</code> need no ceremony. The reserved characters carry
+      structural meaning instead — <code>.</code> and <code>/</code> separate path
+      segments, <code>@</code> prefixes data variables
+      (<code>{t("{{@index}}")}</code>, <code>{t("{{@root}}")}</code>), and the rest are
+      operators or grouping.
+    </p>
+    <h3>Anything else: <code>[segment literals]</code></h3>
+    <p>
+      Wrap a key in square brackets to use characters that aren't bare-legal —
+      spaces, dots, or reserved punctuation. This is the escape hatch:
+    </p>
+    <table class="cmp">
+      <thead><tr><th>Need</th><th>Write</th></tr></thead>
+      <tbody>
+        <tr><td>a key with a space</td><td><span class="code">{t("{{[full name]}}")}</span></td></tr>
+        <tr><td>a bracketed segment inside a path</td><td><span class="code">{t("{{address.[street name]}}")}</span></td></tr>
+        <tr><td>a key with reserved punctuation</td><td><span class="code">{t("{{[a+b]}}")}</span></td></tr>
+      </tbody>
+    </table>
+    <p>
+      Names that look like literals are literals, not lookups:
+      <code>true</code>, <code>false</code>, <code>null</code>, numbers, and quoted
+      <code>{t("\"strings\"")}</code> — use the bracket form
+      (<code>{t("{{[true]}}")}</code>) if you really have a key named <code>true</code>.
+    </p>
   </section>
 
   <!-- ───────────────────────── if / unless ─────────────────────────── -->
