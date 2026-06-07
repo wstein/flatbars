@@ -3514,7 +3514,13 @@
       function renderPreview() {
         const scripts = (outputView === "rendered" || outputView === "markdown") && allowScripts;
         const frame = byId("output-preview");
-        frame.setAttribute("sandbox", scripts ? "allow-scripts" : "allow-same-origin");
+        // Only (re)assign `sandbox` when it actually changes. Re-setting the
+        // attribute — even to the same value — reloads the iframe asynchronously,
+        // and that reload races with the `srcdoc` set below: on load the preview
+        // paints blank and only an edit (which sets `srcdoc` without re-touching
+        // `sandbox`) recovers it. Guarding the attribute makes the first paint stick.
+        const wantSandbox = scripts ? "allow-scripts" : "allow-same-origin";
+        if (frame.getAttribute("sandbox") !== wantSandbox) frame.setAttribute("sandbox", wantSandbox);
         const body = outputView === "markdown" ? marked.parse(lastOutput) : lastOutput;
         frame.srcdoc = previewDoc(body, scripts);
       }
@@ -6632,6 +6638,11 @@
       applySplits();
       updateStatusMeta();
       restorePanels(); // restore persisted floating panels (Appearance)
+      // The preview iframe may have received its `srcdoc` during the synchronous
+      // boot — before applySplits() gave the output pane its size — which leaves an
+      // HTML/Markdown-first example (or a shared "rendered" deep-link) blank until
+      // the first edit. Re-assert the paint after layout settles so it shows now.
+      requestAnimationFrame(() => { if (!byId("output-preview").hidden) renderPreview(); });
     </script>
   </body>
 </html>
