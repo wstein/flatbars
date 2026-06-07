@@ -284,7 +284,7 @@ type SetDelimResult =
   }
 
 -- | Scan a template into the flat `RawTok` stream. `LexOptions` (the interior
--- | tokenizer's dialect seam — `infixArith`) is threaded through so each tag's
+-- | tokenizer's dialect seam — `operatorChars`) is threaded through so each tag's
 -- | interior is lexed *here*, at scan time, and carried on the token. The
 -- | structural shape is `LexOptions`-independent (tag boundaries, sigils, spans,
 -- | raw bodies, set-delimiter state); `LexOptions` only governs the meaning-free

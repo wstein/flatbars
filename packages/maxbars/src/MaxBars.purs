@@ -21,6 +21,7 @@ import Data.Either (Either)
 import Data.Tuple (Tuple)
 import FlatBars.Error (Error, ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
 import FullBars (LoopVars, desugarSurfaceWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
 import FullBars.Compile (compileSurfaceWith)
@@ -50,7 +51,7 @@ maxOptions =
     -- not the Handlebars bare `{{{{name}}}}` form.
     , rawBlockHbs = false
     , rawBlockHash = true
-    , lexOptions = { infixArith: true }
+    , lexOptions = { operatorChars: infixOperatorChars }
     -- Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is
     -- a Mustache feature reserved for MinBars. RawBars / MaxBars / FullBars all
     -- reject it so the dialect ladder has one consistent answer to "does

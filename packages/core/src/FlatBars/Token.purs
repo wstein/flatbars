@@ -3,8 +3,8 @@
 -- | that text into a flat `Token` stream that a dialect grammar then parses into
 -- | an `Expr`. This is the meaning-free lexical layer: it recognizes operators,
 -- | brackets, identifiers/paths, and literals as tokens, but assigns them no
--- | meaning — a dialect decides whether `&&`/`|`/`<` are operators (MaxBars) or a
--- | parse error (RawBars/FullBars).
+-- | meaning — a dialect decides whether `&&`/`|`/`<` are operators or a parse
+-- | error.
 -- |
 -- | One subtlety: `=` is an identifier *continuation* char (so the surface hash
 -- | `key=value` lexes as a single ident the desugar later splits), while `==` at
@@ -15,6 +15,7 @@ module FlatBars.Token
   , Interior
   , LexOptions
   , defaultLexOptions
+  , infixOperatorChars
   , tokenizeInterior
   ) where
 
@@ -67,21 +68,32 @@ type PosToken = { tok :: Token, at :: Int, end :: Int }
 -- | token with no interior expression carries `Right []`.
 type Interior = Either ParseError (Array PosToken)
 
+-- | Lexer configuration — the interior lexer's one dialect seam. `operatorChars`
+-- | lists the characters that lex as **operator tokens** instead of identifier
+-- | characters. Empty (the default) is a path/name-only interior: `+ - * / ?` stay
+-- | identifier characters, so `../x`, `a/b`, `partial-block`, and predicate-style
+-- | names like `done?` lex as a single `TIdent`. A dialect with an infix surface
+-- | opts in by listing the operator chars (`infixOperatorChars` is the conventional
+-- | set); those then tokenize as `TOp`. `.` `@` `_` `=` are identifier characters
+-- | regardless, so dotted paths, `@data`, and `key=value` hashes are unaffected by
+-- | the seam. (The characters `& | ! < > =` are operators in every dialect — they
+-- | are not configurable.)
+type LexOptions = { operatorChars :: String }
+
+-- | The default: an empty operator set — a path/name-only interior.
+defaultLexOptions :: LexOptions
+defaultLexOptions = { operatorChars: "" }
+
+-- | The conventional infix-operator alphabet a dialect enables for an expression
+-- | surface: arithmetic `+ - * / %`, the ternary head `?`, and its `:` separator
+-- | (a glued `?` greedily forms `??`/`?:`). Exported so opt-in dialects share one
+-- | source instead of re-listing the characters.
+infixOperatorChars :: String
+infixOperatorChars = "+-*/%?:"
+
 -- | Tokenize a tag interior. `base` is its offset in the source, added to every
 -- | token's position so a downstream parse error points into the original
 -- | template. A blank interior yields `[]`.
--- | Lexer configuration (a dialect seam). `infixArith` turns `+ - * / % ` and
--- | `??` into operator tokens (MaxBars); when off (RawBars/FullBars default)
--- | those characters stay *identifier* characters, so path/name syntax such as
--- | `../x`, `a/b`, and `partial-block` lexes as a single `TIdent` exactly as
--- | before. `.` `@` `_` `=` remain identifier characters in **both** modes, so
--- | dotted paths, `@data`, and `key=value` hashes are untouched by the switch.
-type LexOptions = { infixArith :: Boolean }
-
--- | The default lexer config: no arithmetic operators (RawBars/FullBars).
-defaultLexOptions :: LexOptions
-defaultLexOptions = { infixArith: false }
-
 tokenizeInterior :: LexOptions -> Int -> String -> Either ParseError (Array PosToken)
 tokenizeInterior cfg base src = go 0 []
   where
@@ -90,11 +102,13 @@ tokenizeInterior cfg base src = go 0 []
   at i = Array.index cs i
   slc a b = SCU.fromCharArray (Array.slice a b cs)
 
-  -- `+ - * / ?` are operator characters only under `infixArith`; otherwise they
-  -- are identifier characters (path/name punctuation). `%` is never an identifier
-  -- character, so it is an operator under `infixArith` and invalid otherwise.
-  arithChar c = c == '+' || c == '-' || c == '*' || c == '/' || c == '?'
-  identChar c = isIdentChar c && not (cfg.infixArith && arithChar c)
+  -- The configured operator characters (`cfg.operatorChars`): when a character is
+  -- in this set it lexes as an operator rather than an identifier character. Empty
+  -- by default, so `+ - * / ?` stay path/name punctuation; an infix dialect lists
+  -- them (see `infixOperatorChars`). Precomputed once per interior.
+  opChars = SCU.toCharArray cfg.operatorChars
+  isOp c = Array.elem c opChars
+  identChar c = isIdentChar c && not (isOp c)
 
   go :: Int -> Array PosToken -> Either ParseError (Array PosToken)
   go i acc
@@ -117,18 +131,15 @@ tokenizeInterior cfg base src = go 0 []
           | c == '=' -> if at (i + 1) == Just '=' then op2 "==" i acc else bad i
           -- a leading `-` glued to a digit is a negative literal in both modes.
           | c == '-' && maybe false isDigit (at (i + 1)) -> readNumber i acc
-          -- MaxBars arithmetic / coalesce operators (only under `infixArith`).
-          -- `?` opens `??` (null-coalesce) or `?:` (Elvis, truthy-coalesce) when
-          -- glued, else a lone `?` — the ternary's `cond ? a : b` head.
-          | cfg.infixArith && c == '?' ->
+          -- Configured operator characters (`operatorChars`) lex as `TOp`. `?`
+          -- greedily opens `??` (null-coalesce) or `?:` (truthy-coalesce) when
+          -- glued, else a lone `?` (a ternary head); every other operator char is a
+          -- single-character token (e.g. `+ - * / %`, and `:` the ternary separator).
+          | isOp c && c == '?' ->
               if at (i + 1) == Just '?' then op2 "??" i acc
               else if at (i + 1) == Just ':' then op2 "?:" i acc
               else op1 "?" i acc
-          -- a lone `:` is the ternary's `cond ? a : b` separator (the glued `?:`
-          -- above is the Elvis operator, so this is reached only when standalone).
-          | cfg.infixArith && c == ':' -> op1 ":" i acc
-          | cfg.infixArith && arithChar c -> op1 (SCU.singleton c) i acc
-          | cfg.infixArith && c == '%' -> op1 "%" i acc
+          | isOp c -> op1 (SCU.singleton c) i acc
           | isDigit c -> readNumber i acc
           | identChar c || c == '[' -> readIdent i acc
           | otherwise -> bad i

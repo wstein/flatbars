@@ -19,7 +19,7 @@ import Effect.Console (log)
 import FlatBars (Expr(..), Node(..), ParseError(..), Sigil(..), Value(..), defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, spanText)
 import FlatBars.Highlight (HighlightConfig, highlightSpans, tokenizeSpans)
 import FlatBars.Lexer (RawTok(..), defaultLexConfig, tokenizeTemplate)
-import FlatBars.Token (LexOptions, Token(..), defaultLexOptions, tokenizeInterior)
+import FlatBars.Token (LexOptions, Token(..), defaultLexOptions, infixOperatorChars, tokenizeInterior)
 import Kernel.ToValue (toValue)
 import Kernel.Walk (Arity(..), foldExpr, foldTemplate, splitClause, splitClauses, validate)
 import Test.Assert (assert')
@@ -111,7 +111,7 @@ hlMax :: HighlightConfig
 hlMax =
   { lexConfig: defaultLexConfig { keepLongComments = true }
   , clauseSeps: [ "else", "elif" ]
-  , lexOptions: { infixArith: true }
+  , lexOptions: { operatorChars: infixOperatorChars }
   , extras: false
   , inheritance: false
   , rawBlockHbs: false -- MaxBars: the `{{{{#name}}}}` FlatBars spelling only
@@ -576,30 +576,31 @@ main = do
   -- ---- The interior `tokenizeTemplate` carries on each RawTok ----
   -- The parser and highlighter both read this pre-lexed interior off the token.
   -- These pin the two non-trivial properties — raw blocks carry their HEAD
-  -- interior (not the body), and `infixArith` is threaded through — so the carried
+  -- interior (not the body), and `operatorChars` is threaded through — so the carried
   -- tokens are exactly what `outputExpr`/`headed` and the highlighter consume.
   let
     interiorToksOf lx src =
       case tokenizeTemplate defaultLexConfig lx src of
         Right toks -> Array.findMap interiorTokens toks
         Left _ -> Nothing
-    lxOn = defaultLexOptions { infixArith = true }
+    lxOn = defaultLexOptions { operatorChars = infixOperatorChars }
   -- A raw block is one RawTok; its interior is the HEAD's tokens, not the body's.
   assert' "tokenizer: a raw block attaches its head tokens (not the verbatim body)"
     ( interiorToksOf defaultLexOptions "{{{{raw}}}}verbatim {{x}} body{{{{/raw}}}}" == Just
         [ TIdent "raw" ]
     )
-  -- Off MaxBars, `+` is path punctuation, so `a+b` is one ident; on, it carves.
-  assert' "tokenizer: infixArith off keeps `a+b` a single ident interior"
+  -- With an empty operator set, `+` is path punctuation, so `a+b` is one ident;
+  -- with the infix operator set it carves into ident/op/ident.
+  assert' "tokenizer: empty operatorChars keeps `a+b` a single ident interior"
     (interiorToksOf defaultLexOptions "{{ a+b }}" == Just [ TIdent "a+b" ])
-  assert' "tokenizer: infixArith on carves `a+b` into ident/op/ident"
+  assert' "tokenizer: infix operatorChars carves `a+b` into ident/op/ident"
     (interiorToksOf lxOn "{{ a+b }}" == Just [ TIdent "a", TOp "+", TIdent "b" ])
   -- `=` is an ident-continuation char in both modes (the surface hash splits later).
   assert' "tokenizer: `key=value` stays one interior ident in both modes"
     (interiorToksOf lxOn "{{ key=val }}" == Just [ TIdent "key=val" ])
 
   -- P2 + P6: over a multi-tag corpus (every tag, not just the first), under both
-  -- `infixArith` settings, each tag's carried interior equals `tokenizeInterior`
+  -- `operatorChars` settings, each tag's carried interior equals `tokenizeInterior`
   -- of its own (base, string). This is the structural guard the wrapper used to
   -- give for free; it fails deterministically on a mis-paired base/string or a
   -- mispositioned RRaw body. (Dialect *mutation* paths — MinBars standalone — are

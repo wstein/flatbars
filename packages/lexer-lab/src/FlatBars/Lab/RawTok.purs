@@ -31,7 +31,7 @@ import FlatBars.Lexer (RawTok(..), trimStandalone) as E
 import FlatBars.Parser (ParseOptions, buildFromTokens, collectDirectives)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Syntax (Sigil(..)) as Syn
-import FlatBars.Token (tokenizeInterior) as E
+import FlatBars.Token (infixOperatorChars, tokenizeInterior) as E
 
 -- | Tokenize a template into the engine's `RawTok` stream. Honours
 -- | `mustacheDelims`: off, the default-delimiter grammar; on, `{{=A B=}}`
@@ -49,7 +49,10 @@ toRawToks cfg src =
   -- `FlatBars.Lexer.tokenizeTemplate` populating each `RawTok`'s interior at scan
   -- time, so the two RawTok streams stay byte-identical (RawTokParity now also
   -- covers interiors). Same `tokenizeInterior` the engine calls.
-  interiorAt base s = E.tokenizeInterior { infixArith: cfg.infixArith } base s
+  interiorAt base s = E.tokenizeInterior
+    { operatorChars: if cfg.infixArith then E.infixOperatorChars else "" }
+    base
+    s
 
   at i = case Array.index cs i of
     Just c -> c
@@ -443,7 +446,7 @@ parse opts src = do
   labCfg o =
     { open: o.lexConfig.open
     , close: o.lexConfig.close
-    , infixArith: o.lexOptions.infixArith
+    , infixArith: o.lexOptions.operatorChars /= ""
     , mustacheDelims: o.lexConfig.mustacheDelims
     }
 

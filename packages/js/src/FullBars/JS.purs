@@ -564,7 +564,7 @@ diagnostics = mkFn2 \src dialect ->
 -- | RawBars/MaxBars/MinBars enable the `{{=A B=}}` set-delimiter tag
 -- | (`mustacheDelims`), FullBars does not; the kernel dialects treat
 -- | `else`/`elif` as clause separators, MinBars (Mustache) treats none; only
--- | MaxBars enables the infix-arithmetic interior lexer (`lexOptions.infixArith`),
+-- | MaxBars enables the infix-arithmetic interior lexer (`lexOptions.operatorChars`),
 -- | so `+`/`-`/`*`/`/` carve as `operator` spans there and stay path punctuation
 -- | elsewhere (`tokenize`'s interior axis, ADR-017). `extras`
 -- | / `inheritance` mirror each dialect's parse gates, so a shape the dialect

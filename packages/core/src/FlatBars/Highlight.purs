@@ -78,8 +78,8 @@ type TSpan = { from :: Int, to :: Int, kind :: String, role :: String }
 -- | dialect's clause-separator names, so `{{else}}` / `{{elif …}}` are coloured as
 -- | statements only where the dialect treats them as separators (empty for
 -- | MinBars, where `else` is a variable); `lexOptions` is the *interior* lexer's
--- | dialect seam (`infixArith` for MaxBars), so `+`/`-`/`*`/`/` tokenize as
--- | operators in MaxBars and stay path punctuation elsewhere.
+-- | dialect seam (`operatorChars`), so a dialect that lists `+`/`-`/`*`/`/`…
+-- | tokenizes them as operators while the others keep them path punctuation.
 -- |
 -- | `extras` and `inheritance` are the parser's own dialect gates (the same
 -- | fields `ParseOptions` carries): when off, the structurally-valid shapes the
