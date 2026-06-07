@@ -11,7 +11,7 @@
 // concepts.adoc, linked) and adds NO example corpus: every runnable beat reuses an
 // already-gated example object, shown through the same mechanism its home gate
 // validates — so the page inherits coverage:
-//   • maxbars.intro / mustache.truthyZero / fullbars.ifBlock / maxbars.comparison
+//   • maxbars.hello / mustache.truthyZero / fullbars.conditionals / maxbars.conditionals
 //       → plain render, gated by scripts/check-tutorial-links.mjs
 //   • analyse.zero  → the cross-engine point; its analyze() finding is gated by
 //       scripts/check-tutorial-tooling.mjs (here it is a plain FullBars render that
@@ -81,12 +81,11 @@ const groups = [
     <h2>Your first template</h2>
     <p>
       A template is just text with <code>{t("{{ }}")}</code> holes that data fills in.
-      This is <b>MaxBars</b>, the flagship surface — here a pipe (<code>| capitalize</code>)
-      and a helper (<code>count</code>) already showing the full expressiveness. Edit the
-      template or the data below and watch it render — through the same engine the FlatBars
-      Lab ships.
+      This is <b>MaxBars</b>, the flagship surface. Edit the template or the data below and
+      watch it render — through the same engine the FlatBars Lab ships. (The full
+      expressiveness — operators, pipes, loop variables — is just below; start simple.)
     </p>
-    <OpenInLab client:visible engine="maxbars" template={maxbars.intro.template} data={maxbars.intro.data} />
+    <OpenInLab client:visible engine="maxbars" template={maxbars.hello.template} data={maxbars.hello.data} />
     <p>That's the whole loop: <em>template + data → text</em>. MaxBars is what we recommend by default; next, when you'd reach for a smaller surface instead.</p>
   </section>
 
@@ -193,21 +192,21 @@ const groups = [
     <h2>Why the flagship: real expressions</h2>
     <p>
       Here's the expressiveness in one comparison. Coming from Handlebars, a condition is a
-      <b>subexpression</b> — a helper application, <code>{t("(gte score 90)")}</code>
+      <b>subexpression</b> — a helper application, <code>{t("(gte stock 10)")}</code>
       (FullBars, on the left):
     </p>
     <div class="pair">
       <div>
         <div class="lbl">FullBars — subexpression</div>
-        <OpenInLab client:visible engine="fullbars" template={fullbars.ifBlock.template} data={fullbars.ifBlock.data} />
+        <OpenInLab client:visible engine="fullbars" template={fullbars.conditionals.template} data={fullbars.conditionals.data} />
       </div>
       <div>
         <div class="lbl">MaxBars — infix</div>
-        <OpenInLab client:visible engine="maxbars" template={maxbars.comparison.template} data={maxbars.comparison.data} />
+        <OpenInLab client:visible engine="maxbars" template={maxbars.conditionals.template} data={maxbars.conditionals.data} />
       </div>
     </div>
     <p>
-      <a href="/maxbars">MaxBars</a> reads it as <code>score &gt;= 90</code> — with
+      <a href="/maxbars">MaxBars</a> reads it as <code>stock &gt;= 10</code> — with
       <code>&amp;&amp;</code>, pipes (<code>value | helper</code>), and bare loop variables.
       That's the full expressiveness, and why it's the recommended default. It's the same
       engine and prelude as FullBars, just an expression surface on top — so if you do start
