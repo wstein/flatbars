@@ -181,7 +181,11 @@
   height: 100%;
   background: transparent;
   color: transparent;
-  caret-color: var(--accent);
+  /* The caret reads from --fg (the editor text colour), same as the Lab's
+     CodeMirror caret — visible in both themes. The shared chrome tokens are the
+     single source for the *values* (--fg/--accent via gen:tokens @chrome); the
+     per-editor styling is each app's own, so this keeps the two carets aligned. */
+  caret-color: var(--fg);
   resize: none;
   overflow: hidden;
   border-color: transparent;
