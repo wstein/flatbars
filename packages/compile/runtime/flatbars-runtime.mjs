@@ -13,6 +13,9 @@
 
 export const RUNTIME_VERSION = "0.1.0";
 
+// The largest array a `range` may materialise — mirrors Kernel.Prelude.rangeBudget.
+const RANGE_BUDGET = 100000;
+
 // ── Safe (the VSafe analogue): trusted markup, not re-escaped ────────────────
 class Safe {
   constructor(s) { this.s = s; }
@@ -500,6 +503,12 @@ const helpers = {
   count: (a) => Array.isArray(a[0]) ? a[0].length : (a[0] !== null && typeof a[0] === "object" && !isSafe(a[0]) ? Object.keys(a[0]).length : 0),
   size: (a) => Array.isArray(a[0]) ? a[0].length : (a[0] !== null && typeof a[0] === "object" && !isSafe(a[0]) ? Object.keys(a[0]).length : 0),
   at: (a) => { if (!Array.isArray(a[0])) return null; const r = a[0].at(int(a[1])); return r === undefined ? null : r; },
+  // The inclusive integer range [a, b] (the `..` operator's helper), capped at
+  // RANGE_BUDGET — the interpreter's rangeBudget — so 1..1e9 errors, not hangs.
+  range: (a) => { const lo = int(a[0]), hi = int(a[1]); if (hi < lo) return []; if (hi - lo + 1 > RANGE_BUDGET) throw new Error(`range: ${hi - lo + 1} elements exceed the limit of ${RANGE_BUDGET}`); const out = []; for (let i = lo; i <= hi; i++) out.push(i); return out; },
+  // Pick from the values by index, wrapping (positive modulo): the pure twin of
+  // the interpreter's cycleH.
+  cycle: (a) => { const vals = a.slice(1); const n = vals.length; if (n < 1) throw new Error("cycle: expected an index followed by at least one value"); const i = int(a[0]); return vals[((i % n) + n) % n]; },
   take: (a) => Array.isArray(a[0]) ? a[0].slice(0, Math.max(0, int(a[1]))) : [],
   takeRight: (a) => { if (!Array.isArray(a[0])) return []; const n = Math.max(0, int(a[1])); return n === 0 ? [] : a[0].slice(a[0].length - Math.min(n, a[0].length)); },
   // `reverse` is polymorphic (matches the interpreter's reverseH): array ⇒

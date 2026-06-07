@@ -139,6 +139,8 @@ const BB_CATALOG = [
   { name: "escapeJson", category: "output", arity: "inline", summary: "JSON + HTML-escape (for embedding in HTML).", example: "{{{ escapeJson this }}}" },
   { name: "dict", category: "data", arity: "inline", summary: "Build an object from key/value pairs (target of hash args).", example: "{{#if n (dict \"includeZero\" true)}}…{{/if}}" },
   { name: "partial", category: "composition", arity: "inline", summary: "Render a registered partial; block form gives a fallback + {{> @partial-block}}.", example: "{{> nav user}}" },
+  { name: "range", category: "collections", arity: "inline", summary: "The inclusive integer range [a, b] as an array (the basis for counted loops); capped to keep a huge range from hanging.", example: "{{#each (range 1 count)}}{{ loop.index1 }}{{/each}}" },
+  { name: "cycle", category: "collections", arity: "inline", summary: "Pick from values by an index, wrapping — the pure take on Liquid's cycle (use the loop index).", example: "{{ cycle loop.index0 \"odd\" \"even\" }}" },
 ];
 
 // The Mustache constructs (tag *forms* — Mustache has no helpers).

@@ -82,6 +82,14 @@
       "doc": "The number of items in an array (or characters in a string)."
     },
     {
+      "name": "cycle",
+      "kind": "inline",
+      "arity": "≥2",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Picks from its values by an index, wrapping: `cycle i a b …` ⇒ the `(i mod n)`-th value."
+    },
+    {
       "name": "date",
       "kind": "inline",
       "arity": "≥1",
@@ -480,6 +488,14 @@
       "source": "registered",
       "canonical": null,
       "doc": "Prepends the second string to the first."
+    },
+    {
+      "name": "range",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null,
+      "doc": "The inclusive integer range [a, b] as an array (the `..` operator's helper)."
     },
     {
       "name": "raw",

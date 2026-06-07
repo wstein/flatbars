@@ -338,6 +338,11 @@ primitiveOperationDefs =
   , withSynonym "count"
       (valDef "size" "The number of items in an array (or characters in a string)." (unary countH))
   , valDef "at" "The element at an index (negative counts from the end)." (binary atH)
+  , valDef "range" "The inclusive integer range [a, b] as an array (the `..` operator's helper)."
+      (binary rangeH)
+  , valDef "cycle"
+      "Picks from its values by an index, wrapping: `cycle i a b …` ⇒ the `(i mod n)`-th value."
+      (atLeast 2 cycleH)
   , valDef "take" "The first n elements of an array." (binary takeH)
   , valDef "takeRight" "The last n elements of an array." (binary takeRightH)
   , valDef "reverse" "Reverses an array or string." (unary reverseH)
@@ -950,6 +955,37 @@ atH av iv = do
       in
         pure (fromMaybe VNull (Array.index xs idx))
     _ -> pure VNull
+
+-- | The largest array a `range`/`..` may materialise — the iteration analogue of
+-- | `recursionBudget`, so `1..1e9` is a located error rather than a hang.
+rangeBudget :: Int
+rangeBudget = 100000
+
+-- | `range a b` → the inclusive integer range `[a..b]` as a `VArray` (empty when
+-- | `b < a`); a span past `rangeBudget` is a located error. The `..` operator's
+-- | desugar target, for counted loops: `{{#each (range 1 count)}}`.
+rangeH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+rangeH a b = do
+  lo <- asInt a
+  hi <- asInt b
+  if hi < lo then pure (VArray [])
+  else if hi - lo + 1 > rangeBudget then
+    throwError
+      ( HelperError
+          ("range: " <> show (hi - lo + 1) <> " elements exceed the limit of " <> show rangeBudget)
+      )
+  else pure (VArray (map (VNumber <<< Int.toNumber) (Array.range lo hi)))
+
+-- | `cycle i a b c …` → the value at `i mod n` over the `n` values (positive
+-- | wrap), so `{{ cycle loop.index0 "odd" "even" }}` alternates per iteration —
+-- | the pure, index-driven take on Liquid's stateful `cycle` tag.
+cycleH :: forall m. MonadThrow Error m => Array Value -> m Value
+cycleH args = case Array.uncons args of
+  Just { head: iv, tail: vals } | not (Array.null vals) -> do
+    i <- asInt iv
+    let n = Array.length vals
+    pure (fromMaybe VNull (Array.index vals (mod (mod i n + n) n)))
+  _ -> throwError (ArityError "cycle: expected an index followed by at least one value")
 
 -- | `take arr n` / `takeRight arr n` → `VArray`: the first / last `n` elements
 -- | (clamped to `[0, length]`). `n` reads via the strict `asInt` guard. A

@@ -13,6 +13,7 @@
 | `ceil` | value | 1 | registered | Rounds a number up to the nearest integer. |
 | `coalesce` | value | ≥1 | registered | Returns the first non-null argument — the `??` operator's helper. |
 | `count` | value | 1 | registered | The number of items in an array (or characters in a string). |
+| `cycle` | value | ≥2 | registered | Picks from its values by an index, wrapping: `cycle i a b …` ⇒ the `(i mod n)`-th value. |
 | `date` | value | ≥1 | registered | Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029). |
 | `dict` | value | any | registered | Builds an object from alternating key/value arguments (the hash target). |
 | `divide` | value | 2 | registered | Divides the first number by the second — the `/` operator's helper. |
@@ -63,6 +64,7 @@
 | `pluck` | value | 2 | registered | Extracts a key's value from each object in an array. |
 | `plus` | value | 2 | alias of `add` | Adds two numbers. |
 | `prepend` | value | 2 | registered | Prepends the second string to the first. |
+| `range` | value | 2 | registered | The inclusive integer range [a, b] as an array (the `..` operator's helper). |
 | `raw` | block | any | registered | A raw block that returns its body verbatim, untouched by the engine. |
 | `relative` | value | ≥2 | registered | Formats a relative time (value, unit) for the host's locale (Intl.RelativeTimeFormat); falls back to a plain English phrasing when no host formatter is registered (ADR-029). |
 | `replace` | value | 3 | registered | Replaces every occurrence of a substring with another. |
