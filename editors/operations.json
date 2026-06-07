@@ -468,10 +468,10 @@
     {
       "name": "partial",
       "kind": "inline",
-      "arity": "2–3",
+      "arity": "1–3",
       "source": "registered",
       "canonical": null,
-      "doc": "Renders a registered partial with the given context (the block body is the fallback)."
+      "doc": "Renders a registered partial; the context defaults to the current one, options are an optional hash, and a block body is the fallback."
     },
     {
       "name": "partial-block",

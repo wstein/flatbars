@@ -15,7 +15,7 @@ The desugared core surface — core skeleton syntax, no sugar. Truthiness: `nonE
 | Inverse | `{{#unless ok}} … {{/unless}}` | Inverse via the unless helper — no &#123;&#123;^&#125;&#125; sigil. |
 | Loop variables | `{{{index}}}  {{{first}}}  {{{key}}}` | Bare scoped ops: index, key, first, last, length. No @-data. |
 | Comments | `{{! editorial note }}` | Dropped by the lexer. |
-| Partials | `{{{(partial "name" this)}}}` | Called as the partial helper, unescaped. |
+| Partials | `{{{(partial "name")}}}` | Called as the partial helper, unescaped. The context is optional (defaults to the current one); pass one to override, plus an optional hash. |
 | Block-partial body | `{{{yield}}}` | The caller's body inside a block partial — the hyphen-free yield (FullBars uses partial-block; ADR-005). |
 
 ### FullBars

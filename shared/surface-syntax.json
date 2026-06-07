@@ -23,7 +23,7 @@
         { "feature": "Inverse", "syntax": "{{#unless ok}} … {{/unless}}", "note": "Inverse via the unless helper — no {{^}} sigil.", "kind": "shared" },
         { "feature": "Loop variables", "syntax": "{{{index}}}  {{{first}}}  {{{key}}}", "note": "Bare scoped ops: index, key, first, last, length. No @-data.", "kind": "only" },
         { "feature": "Comments", "syntax": "{{! editorial note }}", "note": "Dropped by the lexer.", "kind": "shared" },
-        { "feature": "Partials", "syntax": "{{{(partial \"name\" this)}}}", "note": "Called as the partial helper, unescaped.", "kind": "only" },
+        { "feature": "Partials", "syntax": "{{{(partial \"name\")}}}", "note": "Called as the partial helper, unescaped. The context is optional (defaults to the current one); pass one to override, plus an optional hash.", "kind": "only" },
         { "feature": "Block-partial body", "syntax": "{{{yield}}}", "note": "The caller's body inside a block partial — the hyphen-free yield (FullBars uses partial-block; ADR-005).", "kind": "only" }
       ]
     },

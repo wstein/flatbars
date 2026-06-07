@@ -217,9 +217,9 @@ coreOperationDefs =
       (AtLeast 1)
       applyH
   , gen "partial"
-      "Renders a registered partial with the given context (the block body is the fallback)."
+      "Renders a registered partial; the context defaults to the current one, options are an optional hash, and a block body is the fallback."
       false
-      (Between 2 3)
+      (Between 1 3)
       partialH
   , gen "inline" "Defines a partial from its body, hoisted before rendering; emits nothing." true
       (AtLeast 1)
@@ -1566,9 +1566,13 @@ applyH ctl args = case Array.uncons args of
 -- | the partial as the scoped `partial-block` helper (surface `{{> @partial-block}}`).
 partialH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 partialH ctl args = case args of
+  -- the context is optional: omitted, it defaults to the *current* context
+  -- (like Handlebars `{{> layout}}`), so `{{#partial "layout"}}` / `(partial
+  -- "layout")` work in RawBars/MaxBars without spelling out `this`.
+  [ VString name ] -> renderPartial name (refContext ctl.env)
   [ VString name, ctx ] -> renderPartial name ctx
   [ VString name, ctx, opts ] -> renderPartial name (mergeHash ctx opts)
-  _ -> throwError (TypeError "partial: expected (name string, context, [options])")
+  _ -> throwError (TypeError "partial: expected (name string, [context], [options])")
   where
   -- the caller's block body, rendered in the caller's context — exposed inside
   -- the partial under the dialect's own spelling (`refYieldName`): FullBars binds

@@ -9888,9 +9888,9 @@ var ternaryH = function(dictMonadThrow) {
   };
 };
 var stringifyM = function(dictMonadThrow) {
-  var $849 = liftEither(dictMonadThrow);
-  return function($850) {
-    return $849(stringify2($850));
+  var $851 = liftEither(dictMonadThrow);
+  return function($852) {
+    return $851(stringify2($852));
   };
 };
 var toFloatH = function(dictMonadThrow) {
@@ -9911,8 +9911,8 @@ var toIntH = function(dictMonadThrow) {
   var pure9 = pure(Monad0.Applicative0());
   return function(v) {
     return bind13(stringifyM1(v))(function(s) {
-      return pure9(maybe(VNull.value)(function($851) {
-        return VNumber.create(trunc($851));
+      return pure9(maybe(VNull.value)(function($853) {
+        return VNumber.create(trunc($853));
       })(fromString(s)));
     });
   };
@@ -9922,8 +9922,8 @@ var strUnary = function(dictMonadThrow) {
   var stringifyM1 = stringifyM(dictMonadThrow);
   return function(f) {
     return function(v) {
-      return map32(function($852) {
-        return VString.create(f($852));
+      return map32(function($854) {
+        return VString.create(f($854));
       })(stringifyM1(v));
     };
   };
@@ -10005,8 +10005,8 @@ var safe2 = function(dictMonadThrow) {
     return map32(VSafe.create)(stringifyM1(v));
   };
 };
-var reverseCodeUnits = function($853) {
-  return fromCharArray(reverse(toCharArray($853)));
+var reverseCodeUnits = function($855) {
+  return fromCharArray(reverse(toCharArray($855)));
 };
 var reverseH = function(dictMonadThrow) {
   var Monad0 = dictMonadThrow.Monad0();
@@ -10022,8 +10022,8 @@ var reverseH = function(dictMonadThrow) {
       return pure9(new VString(reverseCodeUnits(v.value0)));
     }
     ;
-    return map32(function($854) {
-      return VString.create(reverseCodeUnits($854));
+    return map32(function($856) {
+      return VString.create(reverseCodeUnits($856));
     })(stringifyM1(v));
   };
 };
@@ -10139,9 +10139,13 @@ var partialH = function(dictMonadThrow) {
             ;
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Prelude (line 1588, column 28 - line 1600, column 63): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Prelude (line 1592, column 28 - line 1604, column 63): " + [v.constructor.name]);
         };
       };
+      if (args.length === 1 && args[0] instanceof VString) {
+        return renderPartial(args[0].value0)(refContext(ctl.env));
+      }
+      ;
       if (args.length === 2 && args[0] instanceof VString) {
         return renderPartial(args[0].value0)(args[1]);
       }
@@ -10150,7 +10154,7 @@ var partialH = function(dictMonadThrow) {
         return renderPartial(args[0].value0)(mergeHash(args[1])(args[2]));
       }
       ;
-      return throwError3(new $$TypeError("partial: expected (name string, context, [options])"));
+      return throwError3(new $$TypeError("partial: expected (name string, [context], [options])"));
     };
   };
 };
@@ -10213,8 +10217,8 @@ var jsonText = function(dictMonadThrow) {
       ;
       if (args.length === 2) {
         return pure9((function() {
-          var $637 = optFlag("pretty")(args[1]);
-          if ($637) {
+          var $639 = optFlag("pretty")(args[1]);
+          if ($639) {
             return jsonStringifyPretty;
           }
           ;
@@ -10280,10 +10284,10 @@ var truthyWith = function(tf) {
         ;
         throw new Error("Failed pattern match at Kernel.Prelude (line 1241, column 1 - line 1241, column 62): " + [tf.constructor.name, opts.constructor.name, v.constructor.name]);
       };
-      var $650 = optFlag("includeZero")(opts);
-      if ($650) {
-        var $651 = isZeroNum(v);
-        if ($651) {
+      var $652 = optFlag("includeZero")(opts);
+      if ($652) {
+        var $653 = isZeroNum(v);
+        if ($653) {
           return true;
         }
         ;
@@ -10531,8 +10535,8 @@ var groupByH = function(dictMonadThrow) {
       return bind13(stringifyM1(keyv))(function(key) {
         if (av instanceof VArray) {
           return bind13(foldM2(insertGroup(key))(empty3)(av.value0))(function(grouped) {
-            return pure9(new VObject(map23(function($855) {
-              return VArray.create(reverse($855));
+            return pure9(new VObject(map23(function($857) {
+              return VArray.create(reverse($857));
             })(grouped)));
           });
         }
@@ -10564,8 +10568,8 @@ var escJsonH = function(dictMonadThrow) {
   var jsonText1 = jsonText(dictMonadThrow);
   return function(v) {
     return function(args) {
-      return map32(function($856) {
-        return VSafe.create(escapeHtml($856));
+      return map32(function($858) {
+        return VSafe.create(escapeHtml($858));
       })(jsonText1("escapeJson")(args));
     };
   };
@@ -10580,8 +10584,8 @@ var escHtml = function(dictMonadThrow) {
       return pure9(new VSafe(v.value0));
     }
     ;
-    return map32(function($857) {
-      return VSafe.create(escapeHtml($857));
+    return map32(function($859) {
+      return VSafe.create(escapeHtml($859));
     })(stringifyM1(v));
   };
 };
@@ -10987,9 +10991,9 @@ var iterate2 = function(dictMonadThrow) {
               };
             };
             return map32((function() {
-              var $858 = joinWith("");
-              return function($859) {
-                return VSafe.create($858($859));
+              var $860 = joinWith("");
+              return function($861) {
+                return VSafe.create($860($861));
               };
             })())(traverse13(identity9)(mapWithIndex2(renderItem)(items)));
           });
@@ -11040,8 +11044,8 @@ var boolH = function(dictApplicative) {
 };
 var bodyStart = function(s) {
   var body = trim(s);
-  var $762 = body === "";
-  if ($762) {
+  var $764 = body === "";
+  if ($764) {
     return Nothing.value;
   }
   ;
@@ -11088,8 +11092,8 @@ var eachH = function(dictMonadThrow) {
       if (v instanceof Just) {
         var names = bindingNames(v.value0.tail);
         if (v.value0.head instanceof VArray) {
-          var $771 = $$null(v.value0.head.value0);
-          if ($771) {
+          var $773 = $$null(v.value0.head.value0);
+          if ($773) {
             return renderElse1(ctl);
           }
           ;
@@ -11106,8 +11110,8 @@ var eachH = function(dictMonadThrow) {
         ;
         if (v.value0.head instanceof VObject) {
           var pairs = toUnfoldable6(v.value0.head.value0);
-          var $773 = $$null(pairs);
-          if ($773) {
+          var $775 = $$null(pairs);
+          if ($775) {
             return renderElse1(ctl);
           }
           ;
@@ -11143,8 +11147,8 @@ var withH = function(dictMonadThrow) {
     return function(args) {
       var v = uncons(args);
       if (v instanceof Just) {
-        var $782 = refTruthy(ctl.env)(v.value0.head);
-        if ($782) {
+        var $784 = refTruthy(ctl.env)(v.value0.head);
+        if ($784) {
           return bind13(buildContextChain1(ctl))(function(parentChain) {
             var binds = zipWith(function(nm) {
               return function(val) {
@@ -11228,8 +11232,8 @@ var numUnary = function(dictMonadThrow) {
   var asNum1 = asNum(dictMonadThrow);
   return function(f) {
     return function(v) {
-      return map32(function($860) {
-        return VNumber.create(f($860));
+      return map32(function($862) {
+        return VNumber.create(f($862));
       })(asNum1(v));
     };
   };
@@ -11250,21 +11254,21 @@ var relativeH = function(dictMonadThrow) {
           return bind13(liftEither2(stringify2(v1.value0)))(function(unit2) {
             return bind13(liftEither2(stringify2(new VNumber(abs(v3)))))(function(magStr) {
               var punit = (function() {
-                var $799 = abs(v3) === 1;
-                if ($799) {
+                var $801 = abs(v3) === 1;
+                if ($801) {
                   return unit2;
                 }
                 ;
                 return unit2 + "s";
               })();
               return pure9(new VString((function() {
-                var $800 = v3 < 0;
-                if ($800) {
+                var $802 = v3 < 0;
+                if ($802) {
                   return magStr + (" " + (punit + " ago"));
                 }
                 ;
-                var $801 = v3 > 0;
-                if ($801) {
+                var $803 = v3 > 0;
+                if ($803) {
                   return "in " + (magStr + (" " + punit));
                 }
                 ;
@@ -11295,8 +11299,8 @@ var selectPluralH = function(dictMonadThrow) {
       if (v1 instanceof Just) {
         return bind13(asNum1(v1.value0))(function(n) {
           return pure9(new VString((function() {
-            var $805 = n === 1;
-            if ($805) {
+            var $807 = n === 1;
+            if ($807) {
               return "one";
             }
             ;
@@ -11313,8 +11317,8 @@ var asInt = function(dictMonadThrow) {
   var map32 = map(dictMonadThrow.Monad0().Bind1().Apply0().Functor0());
   var asNum1 = asNum(dictMonadThrow);
   return function(v) {
-    return map32(function($861) {
-      return round2(trunc($861));
+    return map32(function($863) {
+      return round2(trunc($863));
     })(asNum1(v));
   };
 };
@@ -11328,8 +11332,8 @@ var atH = function(dictMonadThrow) {
       return bind13(asInt1(iv))(function(i) {
         if (av instanceof VArray) {
           var idx = (function() {
-            var $808 = i < 0;
-            if ($808) {
+            var $810 = i < 0;
+            if ($810) {
               return length(av.value0) + i | 0;
             }
             ;
@@ -11372,8 +11376,8 @@ var sliceH = function(dictMonadThrow) {
                   var lo = clampIndex(len)(start);
                   var hi = clampIndex(len)(end);
                   return pure9(new VString((function() {
-                    var $812 = lo >= hi;
-                    if ($812) {
+                    var $814 = lo >= hi;
+                    if ($814) {
                       return "";
                     }
                     ;
@@ -11453,8 +11457,8 @@ var truncateH = function(dictMonadThrow) {
             return bind13(stringifyM1(sv))(function(s) {
               return bind13(asInt1(nv))(function(n) {
                 return pure9(new VString((function() {
-                  var $821 = length2(s) > n;
-                  if ($821) {
+                  var $823 = length2(s) > n;
+                  if ($823) {
                     return take2(n)(s) + suf;
                   }
                   ;
@@ -11552,7 +11556,7 @@ var coreOperationDefs = function(dictMonadThrow) {
     return function(v1) {
       return pure9(new VSafe(""));
     };
-  }), gen("dict")("Builds an object from alternating key/value arguments (the hash target).")(false)(AnyArity.value)(dictH(dictMonadThrow)), gen("apply")("Calls a helper named by a string argument with the remaining arguments.")(true)(new AtLeast(1))(applyH(dictMonadThrow)), gen("partial")("Renders a registered partial with the given context (the block body is the fallback).")(false)(new Between(2, 3))(partialH(dictMonadThrow)), gen("inline")("Defines a partial from its body, hoisted before rendering; emits nothing.")(true)(new AtLeast(1))(inlineH(Applicative0)), valDef1("eq")("True when its two arguments are equal.")(binary2(eq$prime(Applicative0))), valDef1("ne")("True when its two arguments are not equal.")(binary2(ne$prime1)), valDef1("lt")("True when the first argument is less than the second.")(binary2(cmp1(function(v) {
+  }), gen("dict")("Builds an object from alternating key/value arguments (the hash target).")(false)(AnyArity.value)(dictH(dictMonadThrow)), gen("apply")("Calls a helper named by a string argument with the remaining arguments.")(true)(new AtLeast(1))(applyH(dictMonadThrow)), gen("partial")("Renders a registered partial; the context defaults to the current one, options are an optional hash, and a block body is the fallback.")(false)(new Between(1, 3))(partialH(dictMonadThrow)), gen("inline")("Defines a partial from its body, hoisted before rendering; emits nothing.")(true)(new AtLeast(1))(inlineH(Applicative0)), valDef1("eq")("True when its two arguments are equal.")(binary2(eq$prime(Applicative0))), valDef1("ne")("True when its two arguments are not equal.")(binary2(ne$prime1)), valDef1("lt")("True when the first argument is less than the second.")(binary2(cmp1(function(v) {
     return eq42(v)(LT.value);
   }))), valDef1("gt")("True when the first argument is greater than the second.")(binary2(cmp1(function(v) {
     return eq42(v)(GT.value);

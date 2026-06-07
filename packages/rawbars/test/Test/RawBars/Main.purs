@@ -75,6 +75,25 @@ main = do
         (obj [])
         == Right "<HI>"
     )
+  -- the context is OPTIONAL: `{{#partial "layout"}}` (no context) defaults to the
+  -- current context, so it renders identically to the explicit `this` above. The
+  -- partial reads the caller's data and `{{{yield}}}` still renders the body.
+  -- the context is OPTIONAL: `{{#partial "layout"}}` (no context) defaults to the
+  -- current context, so the partial reads the caller's data (RawBars field access
+  -- is the explicit `(lookup this …)`) and `{{{yield}}}` still renders the body.
+  assert' "partial: context is optional — {{#partial \"layout\"}} defaults to this"
+    ( renderWithOperations [] [ Tuple "layout" "<{{{yield}}} for {{{(lookup this \"name\")}}}>" ]
+        "{{#partial \"layout\"}}HI{{/partial}}"
+        (obj [ Tuple "name" (VString "Ada") ])
+        == Right "<HI for Ada>"
+    )
+  -- the bare (non-block) call form is optional-context too: `(partial "layout")`.
+  assert' "partial: bare (partial \"layout\") defaults the context to this"
+    ( renderWithOperations [] [ Tuple "layout" "[{{{(lookup this \"name\")}}}]" ]
+        "{{{(partial \"layout\")}}}"
+        (obj [ Tuple "name" (VString "Bo") ])
+        == Right "[Bo]"
+    )
 
   -- Inline-partial hoisting — parity with FullBars/MaxBars (ADR-005/008): a bare
   -- {{#inline "x"}} in the template defines a partial (hoisted by the shared

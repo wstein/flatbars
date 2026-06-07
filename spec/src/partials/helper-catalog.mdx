@@ -61,7 +61,7 @@
 | `parent-index` | value | 0 | scoped | The enclosing loop's current index. |
 | `parent-key` | value | 0 | scoped | The enclosing loop's current key. |
 | `parent-last` | value | 0 | scoped | True on the enclosing loop's last iteration. |
-| `partial` | value | 2–3 | registered | Renders a registered partial with the given context (the block body is the fallback). |
+| `partial` | value | 1–3 | registered | Renders a registered partial; the context defaults to the current one, options are an optional hash, and a block body is the fallback. |
 | `partial-block` | value | 0 | scoped | Inside a block partial, the caller's block body — FullBars' &#123;&#123;> @partial-block&#125;&#125; target (RawBars/MaxBars use yield). |
 | `pluck` | value | 2 | registered | Extracts a key's value from each object in an array. |
 | `plus` | value | 2 | alias of `add` | Adds two numbers. |
