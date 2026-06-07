@@ -45,20 +45,26 @@ pub struct Safe(pub String);
 /// NOTE (v1): f64 formatting is NOT byte-identical to JS `String(n)` — out of scope
 /// per spec §10. Integers and the common float cases agree; the long tail does not.
 pub trait ToText {
+    /// Raw text — the emission for `{{{ x }}}`.
     fn write_text(&self, out: &mut String);
+    /// HTML-escaped text — the emission for `{{ x }}`. Default stringifies via
+    /// `write_text` and escapes the result; `Safe` overrides it to write through
+    /// unescaped, and `&str`/`String` override it to escape in place.
+    fn write_escaped(&self, out: &mut String) { /* default: escape write_text */ }
 }
 
 /// HTML-escape `&  <  >  "  '` to entities (exact charset mirrors the JS `escapeHtml`).
 pub fn escape_html(s: &str, out: &mut String);
 
 /// Escape a value for `{{ }}` output position — unless it is already `Safe`.
-pub fn esc<T: ToText>(v: &T, out: &mut String);   // Safe impl writes through unescaped
+pub fn esc<T: ToText + ?Sized>(v: &T, out: &mut String);   // calls v.write_escaped
 ```
 
-`ToText` impls: `&str`/`String`, `bool`, the integer types, `f64` (v1-approximate),
-`Option<T: ToText>` (`None`→nothing), `&[T]`/`Vec<T: ToText>` (join `,`), `Safe`, `()`/unit.
-Output sites emit `esc(&x, &mut out)` for `{{x}}` and a raw `x.write_text(&mut out)` for
-`{{{x}}}`.
+`ToText` impls: `str`/`String`, `bool`, the integer types, `f32`/`f64` (v1-approximate),
+`Option<T: ToText>` (`None`→nothing; its `write_escaped` delegates to the inner value so a
+`Some(Safe)` still writes through), `[T]`/`Vec<T: ToText>` (join `,`), `Safe`, `()`/unit, and
+a blanket `&T`. Output sites emit `esc(&x, &mut out)` for `{{x}}` and a raw
+`x.write_text(&mut out)` for `{{{x}}}`.
 
 ---
 
@@ -77,7 +83,7 @@ pub fn truthy<T: Truthy>(v: &T) -> bool { v.truthy() }
 | `bool` | `*self` |
 | `&str` / `String` / `Safe` | `!is_empty()` |
 | `&[T]` / `Vec<T>` | `!is_empty()` |
-| `Option<T: Truthy>` | `self.as_ref().map_or(false, Truthy::truthy)` |
+| `Option<T: Truthy>` | `self.as_ref().is_some_and(Truthy::truthy)` |
 | maps (`BTreeMap`) | `!is_empty()` |
 | a context struct | `true` (an inhabited object is truthy; via the companion derive, §12) |
 | **numeric** (`i*` / `u*` / `f64`) | *no impl* — see below |
@@ -113,8 +119,8 @@ uniform `T: Truthy + Clone`). The distinction is preserved by *type*, not a runt
 ## 5. Loop metadata & frame threading
 
 ```rust
-/// Per-iteration metadata (ADR-021). Borrowed, stack-resident — `parent`/`root`
-/// point at enclosing loops' `Loop` values, which are alive on enclosing stack frames.
+/// Per-iteration metadata (ADR-021). Borrowed, stack-resident — `parent` points
+/// at the enclosing loop's `Loop` value, alive on an enclosing stack frame.
 pub struct Loop<'p> {
     pub index0: usize,
     pub index1: usize,
@@ -125,19 +131,30 @@ pub struct Loop<'p> {
     pub length: usize,
     pub key: Option<&'p str>,          // Some(k) for map iteration, None for Vec
     pub parent: Option<&'p Loop<'p>>,  // nearest enclosing loop
-    pub root: Option<&'p Loop<'p>>,    // outermost enclosing loop
+}
+
+impl<'p> Loop<'p> {
+    /// Build iteration `index` of `length` items (index < length).
+    pub fn at(index: usize, length: usize,
+              key: Option<&'p str>, parent: Option<&'p Loop<'p>>) -> Self;
+    /// The outermost enclosing loop (`loop.root`) — `self` if outermost.
+    pub fn root(&self) -> &Loop<'p>;   // walks the `parent` chain
 }
 ```
 
+`root` is a **method**, not a field — walking `parent` avoids a self-reference at
+construction (`loop.root` of the outermost loop is the loop itself).
+
 - `{{loop.index1}}` → `cur_loop.index1`. `{{loop.last}}` → `cur_loop.last`.
 - `{{loop.parent.index0}}` → `cur_loop.parent.unwrap().index0` (the chain is borrowed refs).
+- `{{loop.root.length}}` → `cur_loop.root().length`.
 - `{{loop.key}}` → `cur_loop.key` (only present for map iteration).
 - The current element (`{{this}}` inside `each`) is the **loop binding** (`team`, `m`, …),
   not a field of `Loop`.
 
-**No `Rc`, no heap frame.** Each `for` body constructs a `Loop` on the stack and borrows
-its parent. `outer` (labelled loop, `label outer`) is just `let outer = &cur_loop;` made
-visible to inner scopes.
+**No `Rc`, no heap frame.** Each `for` body constructs a `Loop` on the stack (via
+`Loop::at`) and borrows its parent. `outer` (labelled loop, `label outer`) is just
+`let outer = &cur_loop;` made visible to inner scopes.
 
 ---
 
@@ -310,9 +327,7 @@ fn render(ctx: &Ctx) -> String {
     let teams = &ctx.teams;
     let tn = teams.len();
     for (i, team) in teams.iter().enumerate() {       // {{#each teams as |team|}}
-        let tl = Loop { index0: i, index1: i + 1, rindex0: tn - 1 - i, rindex1: tn - i,
-                        first: i == 0, last: i == tn - 1, length: tn,
-                        key: None, parent: None, root: None };
+        let tl = Loop::at(i, tn, None, None);
         esc(&team.name, &mut out);
         out.push_str(" (");
         esc(&root.org, &mut out);                     // {{root.org}}
@@ -320,9 +335,7 @@ fn render(ctx: &Ctx) -> String {
         let members = &team.members;
         let mn = members.len();
         for (j, m) in members.iter().enumerate() {    // {{#each team.members as |m|}}
-            let ml = Loop { index0: j, index1: j + 1, rindex0: mn - 1 - j, rindex1: mn - j,
-                            first: j == 0, last: j == mn - 1, length: mn,
-                            key: None, parent: Some(&tl), root: Some(&tl) };
+            let ml = Loop::at(j, mn, None, Some(&tl));
             out.push_str("  ");
             esc(&ml.index1, &mut out);                // {{loop.index1}}
             out.push_str(". ");

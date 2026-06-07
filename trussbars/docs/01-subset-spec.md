@@ -278,12 +278,17 @@ and **no string-keyed dispatch table**. The durable artifacts are the Rust runti
 `rustEmit` backend is **scaffolding**, deleted at v2 cutover (when the proc-macro passes
 the same harness).
 
-**Crate layout (planned):**
-- `trussbars-core` — `Safe`/escape glue, the `Loop` metadata struct, frame threading,
-  `coalesce`/`firstTruthy` over `Option`.
-- `trussbars-std` — the prelude/stdlib operations as monomorphized functions.
-- `trussbars-codegen` — the compiler library; in v1 driven by the PureScript `rustEmit`
-  backend, in v2 replaced by the `trussbars` proc-macro front-end.
+**Crate layout:**
+
+- `trussbars-core` — *implemented*: the `Safe`/`ToText`/`escape_html`/`esc` output layer,
+  `nonEmpty` `Truthy` (minus numbers), and the borrowed-reference `Loop` frame model.
+  (`coalesce`/`firstTruthy`/`ternary` are *not* here — they are emitted inline by codegen;
+  see `02-runtime-api.md` §4.)
+- `trussbars-std` — *planned*: the prelude/stdlib operations as monomorphized functions.
+- `trussbars-derive` — *planned*: the `#[derive(Trussbars)]` companion macro (`Truthy`/`ToText`
+  for context structs).
+- `trussbars-codegen` — *planned*: the compiler library; in v1 driven by the PureScript
+  `rustEmit` backend, in v2 replaced by the `trussbars` proc-macro front-end.
 
 ---
 

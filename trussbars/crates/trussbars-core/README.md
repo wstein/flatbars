@@ -14,8 +14,11 @@ into the small surface this crate provides.
   `esc`. Stringification mirrors the reference engine's `stringify`; escaping
   mirrors its `escapeHtml`, byte-for-byte. A context struct has no `ToText` impl,
   so `{{struct}}` is a compile error.
-- *(later phases)* `Truthy` (the `nonEmpty` rule, minus numbers) and the
-  borrowed-reference `Loop` frame model.
+- **Truthiness** — `Truthy` / `truthy`, the `nonEmpty` rule for non-numeric types.
+  Numbers have no impl, so a bare-number condition (`{{#if count}}`) does not
+  compile — write `{{#if count > 0}}`.
+- **Loop frames** — `Loop`, the per-iteration `{{#each}}` metadata, threaded as
+  borrowed references through lexical scopes (no `Rc`, no heap frame).
 
 ## Design
 
