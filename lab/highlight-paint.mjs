@@ -139,18 +139,24 @@ function paintStructure(kind, text, s, n) {
   // (The generic open/close paint below would only reach the outer `{{{{` and the
   // final `}}}}`, leaving the opener's `}}}}` and the `{{{{/` unhighlighted.)
   if (s.kind === "raw-block") {
-    // Paint only the four brace clusters (punct); the `#`/`/` sigil and the name
-    // stay default.
-    const open = tag.match(/^\{\{\{\{#?[^}]*(\}\}\}\})/);
+    // Mirror VS Code's `raw_block` grammar: the `{{{{`/`}}}}` braces are punct, and
+    // the WHOLE head — the `#`/`/` sigil + name — is one `keyword.control.section`
+    // span, so `#myraw` and `/myraw` share the section scope (painted keyword), like
+    // `{{#each}}` / `{{/each}}` at the double-brace level.
+    const open = tag.match(/^(\{\{\{\{)(\s*)(#?\w[\w./@-]*)(\s*)(\}\}\}\})/);
     if (open) {
       fill(kind, from, from + 4, "punct", n); // {{{{
+      const hs = from + open[1].length + open[2].length;
+      fill(kind, hs, hs + open[3].length, "keyword", n); // #name (section)
       const oEnd = from + open[0].length;
       fill(kind, oEnd - 4, oEnd, "punct", n); // }}}}
     }
-    const close = tag.match(/\{\{\{\{\/[^}]*\}\}\}\}$/);
+    const close = tag.match(/(\{\{\{\{)(\s*)(\/\w[\w./@-]*)(\s*)(\}\}\}\})$/);
     if (close) {
       const cFrom = to - close[0].length;
       fill(kind, cFrom, cFrom + 4, "punct", n); // {{{{
+      const hs = cFrom + close[1].length + close[2].length;
+      fill(kind, hs, hs + close[3].length, "keyword", n); // /name (section)
       fill(kind, to - 4, to, "punct", n); // }}}}
     }
     return;

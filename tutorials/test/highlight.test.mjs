@@ -83,17 +83,16 @@ test("a comment: the whole tag is tk-comment, delimiters included (like HTML/Han
   assert.ok(out.includes('<span class="tk-comment">{{! note }}</span>'), out);
 });
 
-test("a raw block highlights BOTH tags' {{{{ }}}} brace clusters (sigil + name stay default)", () => {
-  // One span covers `{{{{#name}}}}body{{{{/name}}}}`; the painter highlights all
-  // four brace clusters (punct) — the opener's and closer's — not just the outer
-  // braces. The `#`/`/` sigil, the name, and the verbatim body stay default.
+test("a raw block: braces punct, the whole head (#name / /name) is the section keyword (like VS Code)", () => {
+  // One span covers `{{{{#name}}}}body{{{{/name}}}}`; the painter highlights all four
+  // brace clusters (punct) and the whole head — sigil + name — as the section
+  // keyword (the grammar's keyword.control.section), so `#myraw`/`/myraw` share one
+  // scope. The verbatim body stays default.
   const out = highlightTemplate("{{{{#code}}}}b{{{{/code}}}}", "rawbars");
-  // both `{{{{` and both `}}}}` clusters are painted punct.
   assert.equal((out.match(/<span class="tk-punct">\{\{\{\{<\/span>/g) || []).length, 2, out);
   assert.equal((out.match(/<span class="tk-punct">\}\}\}\}<\/span>/g) || []).length, 2, out);
-  // the sigil is NOT highlighted.
-  assert.ok(!out.includes('<span class="tk-keyword">#</span>'), out);
-  assert.ok(!out.includes('<span class="tk-keyword">/</span>'), out);
+  assert.ok(out.includes('<span class="tk-keyword">#code</span>'), out); // open head
+  assert.ok(out.includes('<span class="tk-keyword">/code</span>'), out); // close head
 });
 
 test("MaxBars operators and non-helper identifiers stay default", () => {

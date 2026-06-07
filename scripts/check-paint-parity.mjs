@@ -108,6 +108,10 @@ const CASES = [
   ["{{> *dynamic}}"],
   ["{{#> layout}}body{{/layout}}"],
   ["{{#*inline \"x\"}}y{{/inline}}"],
+  // raw blocks: braces are punct, the whole head (#name / /name) is the section
+  // keyword — both spellings, in the dialects that accept each.
+  ["{{{{myraw}}}}body {{x}}{{{{/myraw}}}}", ["fullbars"]],
+  ["{{{{#myraw}}}}body {{x}}{{{{/myraw}}}}", ["rawbars", "maxbars"]],
   ["{{! comment with add toFixed }}"],
   ["{{!-- a {{nested}}-looking comment --}}"],
   ["{{a + b * c}}", ["maxbars"]],
