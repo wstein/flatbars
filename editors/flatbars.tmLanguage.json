@@ -231,34 +231,34 @@
       }
     },
     "comment_long": {
-      "_doc": "{{!-- \u2026 --}} \u2014 body may contain }} that do NOT terminate the comment.",
+      "_doc": "{{!-- \u2026 --}} \u2014 body may contain }} that do NOT terminate the comment. The braces are comment-family punctuation (punctuation.definition.comment.*), so the whole comment reads in the comment colour \u2014 the documented exception to ADR-026's brace-uniformity.",
       "name": "comment.block.flatbars",
       "begin": "\\{\\{!--",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.begin.flatbars"
+          "name": "punctuation.definition.comment.begin.flatbars"
         }
       },
       "end": "--\\}\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.end.flatbars"
+          "name": "punctuation.definition.comment.end.flatbars"
         }
       }
     },
     "comment_short": {
-      "_doc": "{{! \u2026 }} \u2014 comment ends at the first }}.",
+      "_doc": "{{! \u2026 }} \u2014 comment ends at the first }}. The braces are comment-family punctuation (punctuation.definition.comment.*), so the whole comment reads in the comment colour \u2014 the documented exception to ADR-026's brace-uniformity.",
       "name": "comment.block.flatbars",
       "begin": "\\{\\{!",
       "beginCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.begin.flatbars"
+          "name": "punctuation.definition.comment.begin.flatbars"
         }
       },
       "end": "\\}\\}",
       "endCaptures": {
         "0": {
-          "name": "punctuation.section.embedded.end.flatbars"
+          "name": "punctuation.definition.comment.end.flatbars"
         }
       }
     },

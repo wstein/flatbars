@@ -217,10 +217,10 @@
       },
       "tmScopes": [
         "comment.block.flatbars",
-        "punctuation.section.embedded.begin.flatbars",
-        "punctuation.section.embedded.end.flatbars"
+        "punctuation.definition.comment.begin.flatbars",
+        "punctuation.definition.comment.end.flatbars"
       ],
-      "description": "{{! \u2026 }} / {{!-- \u2026 --}} \u2014 a comment. The body is `comment.block.*`; the braces are `punctuation.section.embedded.*` (escape-into-comment).",
+      "description": "{{! \u2026 }} / {{!-- \u2026 --}} \u2014 a comment. The whole tag is `comment.block.*`, and the `{{!`/`}}` braces are `punctuation.definition.comment.*` (the comment family, like Handlebars/HTML/C), so the entire comment \u2014 delimiters included \u2014 reads in the comment colour. This is the one documented exception to ADR-026's brace-uniformity (every other tag's braces are `punctuation.section.embedded.*`); comments follow the universal convention that the delimiters are part of the comment.",
       "operationPosition": "none"
     },
     "set-delimiter": {

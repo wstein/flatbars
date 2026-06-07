@@ -248,6 +248,18 @@
             }
           },
           {
+            "scope": "punctuation.definition.comment.begin.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "punctuation.definition.comment.end.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
             "scope": "punctuation.section.embedded.begin.flatbars",
             "settings": {
               "fontStyle": "bold"
