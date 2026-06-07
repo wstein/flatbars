@@ -169,5 +169,52 @@
     "main": "main.mustache",
     "partials": [],
     "data": "data.yaml"
+  },
+  {
+    "id": "spec-basic-interpolation",
+    "label": "Basic interpolation (spec)",
+    "group": "From the spec",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "spec-list",
+    "label": "List (spec)",
+    "group": "From the spec",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "spec-falsey",
+    "label": "Falsey (spec)",
+    "group": "From the spec",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "spec-inline",
+    "label": "Inline (spec)",
+    "group": "From the spec",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "spec-basic-behavior",
+    "label": "Basic behavior (spec)",
+    "group": "From the spec",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [
+      "text"
+    ],
+    "data": "data.yaml"
   }
 ]
