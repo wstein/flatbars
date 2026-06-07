@@ -3751,8 +3751,14 @@
           // `err.kind === "policy"` flags an allow-list / `eval`-gate refusal
           // (badged amber); anything else is a runtime render error (red).
           const isPolicy = err && err.kind === "policy";
-          setError("render error: " + err.message);
-          dockProblems = [{ severity: isPolicy ? "cap" : "render", file: "main", line: 1, col: 1, message: err.message }];
+          // The engine prefixes a located error with `line:col: ` — lift that into
+          // the problem's position so the header reads e.g. `main:15:1` (not the
+          // default `main:1:1`), and drop the now-redundant prefix from the message.
+          let line = 1, col = 1, message = (err && err.message) || String(err);
+          const at = /^(\d+):(\d+):\s*/.exec(message);
+          if (at) { line = +at[1]; col = +at[2]; message = message.slice(at[0].length); }
+          setError("render error: " + message);
+          dockProblems = [{ severity: isPolicy ? "cap" : "render", file: "main", line, col, message }];
           setOutput("");
         }
         const tRenderEnd = performance.now();
