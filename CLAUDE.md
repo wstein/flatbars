@@ -106,6 +106,11 @@ npm run examples:verify       # STRICT gate (in `npm test`): render each vendore
 node scripts/vendor-mustache.mjs   # re-vendor lab/examples/vendored/mustache/ at the pinned commit
 npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; always exits 0
 npm run test:lab              # FlatBars Lab pure-Node unit tests (playground_utils, adapter)
+npm run check:provenance      # tiling gate (in `npm test`): the source map (ADR-035) tiles
+                              # the output for every core/FullBars/MaxBars example
+npm run test:lab:browser      # OPT-IN real-browser smoke (NOT in `npm test`): drives Brave via
+                              # puppeteer-core to confirm the three-way provenance linking paints
+                              # (needs a Chromium-family browser; set FLATBARS_BROWSER to override)
 ```
 
 The `tutorials` site has its own gates (all in `npm test`, no `spago build`

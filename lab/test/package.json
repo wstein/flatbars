@@ -1,10 +1,10 @@
 {
-  "name": "stem-playground-browser-smoke",
+  "name": "flatbars-lab-browser-smoke",
   "private": true,
   "type": "module",
-  "description": "Headless browser smoke test for the Stem playground dock panels. Uses puppeteer-core driving the locally-installed Brave Browser (Chromium) so no Chromium download is needed.",
+  "description": "Real-browser smoke tests for the FlatBars Lab. Uses puppeteer-core driving a locally-installed Chromium-family browser (Brave by default) so no Chromium download is needed. Set FLATBARS_BROWSER / CHROME_BIN to override.",
   "scripts": {
-    "test": "node browser_smoke.mjs"
+    "test": "node provenance_smoke.mjs"
   },
   "dependencies": {
     "puppeteer-core": "^23.0.0"
