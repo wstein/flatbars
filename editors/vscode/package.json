@@ -212,6 +212,12 @@
             }
           },
           {
+            "scope": "invalid.illegal.unterminated.flatbars",
+            "settings": {
+              "fontStyle": "bold"
+            }
+          },
+          {
             "scope": "keyword.control.import.flatbars",
             "settings": {
               "fontStyle": "bold"

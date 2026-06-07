@@ -140,7 +140,9 @@ parseRecovering opts src = case tokenizeTemplate opts.lexConfig opts.lexOptions 
       trimErrs = either Array.singleton (const []) trimRes
       toks' = if standalone then trimStandalone opts.standaloneSeps toks else toks
       -- comments carry no output; drop them before the tree builder. Each tag
-      -- already carries its pre-lexed interior (from `tokenizeTemplate`).
+      -- already carries its pre-lexed interior (from `tokenizeTemplate`). The
+      -- recovering lexer's `RError` markers survive: `parseSeq` records each one's
+      -- structural error (in source order) and drops a `NodeError` in its place.
       filtered = Array.filter (not <<< isComment) toks'
       seq = runSeq filtered 0 [] []
     in
@@ -457,6 +459,9 @@ parseSeq pe ph gates toks = go Nil []
       RComment _ _ _ -> go acc errs (i + 1) -- filtered upstream; skip defensively
       RLongComment _ -> go acc errs (i + 1) -- highlight-only token (keepLongComments); never reaches the parser
       RSetDelim _ -> go acc errs (i + 1) -- renders nothing; the delimiter swap already happened in the lexer
+      -- An unterminated construct from the recovering lexer (ADR-023): record its
+      -- structural error in source order and drop a `NodeError` marker in place.
+      RError sp e -> recover acc errs sp e (i + 1)
       ROutput span _ _ int -> case outputExpr pe span int of
         Left e -> recover acc errs span e (i + 1)
         Right e -> go (Output span e : acc) errs (i + 1)

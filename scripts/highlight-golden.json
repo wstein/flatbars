@@ -56,6 +56,38 @@
       ]
     },
     {
+      "id": "unterminated-tag",
+      "dialect": "fullbars",
+      "note": "an unterminated {{ with no }} recovers to an `unterminated` span (ADR-023) instead of dropping all highlighting; the earlier {{name}} stays lit and the scan resyncs to the broken tail",
+      "src": "Hi {{name}} more {{oops",
+      "spans": [
+        {
+          "from": 3,
+          "to": 11,
+          "kind": "expr"
+        },
+        {
+          "from": 17,
+          "to": 23,
+          "kind": "unterminated"
+        }
+      ],
+      "tokens": [
+        {
+          "from": 3,
+          "to": 11,
+          "kind": "expr",
+          "role": "tag"
+        },
+        {
+          "from": 17,
+          "to": 23,
+          "kind": "unterminated",
+          "role": "tag"
+        }
+      ]
+    },
+    {
       "id": "expr",
       "dialect": "fullbars",
       "note": "{{name}} → expr",

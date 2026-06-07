@@ -128,7 +128,9 @@ function paintStructure(kind, text, s, n) {
     fill(kind, to - dClose, to, "punct", n);
     return;
   }
-  if (s.kind === "error") { fill(kind, from, to, "error", n); return; }
+  // `error` (dialect-disallowed) and `unterminated` (recovering lexer, ADR-023)
+  // both paint as the error style — a broken/illegal tag, wavy-underlined.
+  if (s.kind === "error" || s.kind === "unterminated") { fill(kind, from, to, "error", n); return; }
 
   const tag = text.slice(from, to);
   const [openLen, closeLen] = braceLens(tag);

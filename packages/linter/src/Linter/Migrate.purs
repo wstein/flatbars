@@ -189,6 +189,10 @@ step src acc = case _ of
   -- emit it verbatim if one ever does (minimal-diff rewrite).
   RLongComment span -> emit acc (sliceSpan src span)
 
+  -- An unterminated construct (recovering lexer): a broken tag can't be safely
+  -- rewritten, so preserve the orphan source verbatim (minimal-diff).
+  RError span _ -> emit acc (sliceSpan src span)
+
 emit :: Acc -> String -> Acc
 emit acc s = acc { chunks = Array.cons s acc.chunks }
 

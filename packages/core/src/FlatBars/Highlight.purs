@@ -139,6 +139,10 @@ tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig cfg.lexOptions src o
     RComment sp _ _ -> tag sp "comment"
     RLongComment sp -> tag sp "comment"
     RSetDelim sp -> tag sp "set-delimiter"
+    -- An unterminated construct (recovering lexer): paint the orphan region as the
+    -- `unterminated` kind (the `invalid.illegal` floor scope) so a half-typed tag
+    -- shows an error instead of silently dropping all highlighting.
+    RError sp _ -> tag sp "unterminated"
 
   -- Block openers, gated like the parser: `{{#x}}` (Section) is always core;
   -- `{{^x}}` (Inverse) needs `extras`; `{{<x}}` (Parent) / `{{$x}}` (BlockDef)

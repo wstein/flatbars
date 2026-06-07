@@ -46,6 +46,7 @@ export const CORPUS = [
   // ── Regression exhibits from the design debate ──────────────────────────
   { id: "exhibit-a-long-comment", dialect: "fullbars", note: "the whole {{!-- name --}} is ONE comment span and the trailing `!` is OUTSIDE it — the regex closed the comment at the inner }} (Exhibit A fixed)", src: "Hello, {{!-- name --}}!" },
   { id: "exhibit-b-unterminated-comment", dialect: "fullbars", note: "an unterminated {{!-- swallows to the next --}} (one comment span) exactly as the lexer does — no stray raw tag (Exhibit B fixed)", src: "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}" },
+  { id: "unterminated-tag", dialect: "fullbars", note: "an unterminated {{ with no }} recovers to an `unterminated` span (ADR-023) instead of dropping all highlighting; the earlier {{name}} stays lit and the scan resyncs to the broken tail", src: "Hi {{name}} more {{oops" },
 
   // ── Interpolation ───────────────────────────────────────────────────────
   { id: "expr", dialect: "fullbars", note: "{{name}} → expr", src: "Hello, {{name}}!" },

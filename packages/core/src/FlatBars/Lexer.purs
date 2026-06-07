@@ -23,7 +23,7 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String (Pattern(..))
 import Data.String.CodeUnits as SCU
 import Data.String.Common (joinWith)
@@ -67,6 +67,14 @@ data RawTok
   -- still never see it). Standalone-whitespace and `~` trimming are unchanged —
   -- handled by the surrounding flush regardless of whether the token is emitted.
   | RLongComment Span
+  -- An unterminated construct: a `{{` / `{{!` / `{{!--` / `{{{{` opener with no
+  -- closer. The *recovering* scanner (ADR-023, extended to the lexer) emits this
+  -- instead of bailing — it spans the orphan opener up to the next opener (or
+  -- EOF), carries the structural `ParseError`, and resyncs there so the rest of
+  -- the template still lexes (so highlighting survives a half-typed tag). The
+  -- parser harvests its error; `tokenizeSpans` paints it as the `unterminated`
+  -- kind; the fail-fast `parse` still reports it.
+  | RError Span ParseError
 
 derive instance eqRawTok :: Eq RawTok
 
@@ -82,6 +90,7 @@ instance showRawTok :: Show RawTok where
     RComment _ _ s -> "RComment " <> show s
     RSetDelim _ -> "RSetDelim"
     RLongComment _ -> "RLongComment"
+    RError _ e -> "RError " <> show e
 
 --------------------------------------------------------------------------------
 -- Character helpers
@@ -332,7 +341,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
           -- before the opener probe so `{{=…=}}` is not read as a bare separator.
           -- It swaps the active pair for everything that follows.
           | cfg.mustacheDelims && matchAt cs i (open <> "=") -> case readSetDelim i open close of
-              Left e -> Left e
+              Left e -> recoverFrom i e segStart frags acc pend open close
               Right sd ->
                 let
                   acc1 = flush (contentTo segStart frags i) acc pend sd.trimL
@@ -353,7 +362,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
                     go next open close next (pushSeg segStart frags i lit) acc pend
                 Nothing -> go (i + 1) open close (i + 1) (pushSeg segStart frags i "\\") acc pend
           | open == "{{" && close == "}}" && c == '{' && isOpenerAt i -> case readTag i of
-              Left e -> Left e
+              Left e -> recoverFrom i e segStart frags acc pend open close
               Right res ->
                 let
                   acc2 = consTok res.mtok (flush (contentTo segStart frags i) acc pend res.trimL)
@@ -366,7 +375,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
           -- Custom delimiters: the reduced Mustache grammar (no triple/raw/long
           -- comment/`~` — those forms do not rebase, ADR-015).
           | matchAt cs i open -> case readCustomTag i open close of
-              Left e -> Left e
+              Left e -> recoverFrom i e segStart frags acc pend open close
               Right res ->
                 let
                   acc2 = consTok res.mtok (flush (contentTo segStart frags i) acc pend res.trimL)
@@ -380,6 +389,28 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
   -- Push an optional tag token onto the (reversed) accumulator.
   consTok :: Maybe RawTok -> List RawTok -> List RawTok
   consTok mtok acc1 = maybe acc1 (\t -> t : acc1) mtok
+
+  -- Recover from an unterminated construct (ADR-023, extended to the lexer): emit
+  -- an `RError` spanning the orphan opener `i` up to the *next* opener (or EOF) so
+  -- a later valid tag still lexes, flush the content before it, and resume there.
+  -- This is the COLD path (errors are rare) — the mutual call back into `go` does
+  -- not grow the hot content scan's stack, which stays in `go`'s self-recursion.
+  recoverFrom
+    :: Int
+    -> ParseError
+    -> Int
+    -> Array String
+    -> List RawTok
+    -> Boolean
+    -> String
+    -> String
+    -> Either ParseError (List RawTok)
+  recoverFrom i e segStart frags acc pend open close =
+    let
+      resync = fromMaybe len (findFrom cs (i + SCU.length open) open)
+      acc2 = RError { start: i, end: resync } e : flush (contentTo segStart frags i) acc pend false
+    in
+      go resync open close resync [] acc2 false
 
   -- Decide whether a just-read token switches the delimiters. A
   -- `{{! @delimiters: A B }}` short comment is *positional* (like an inline

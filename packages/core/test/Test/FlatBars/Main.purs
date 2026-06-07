@@ -491,8 +491,15 @@ main = do
         , { from: 12, to: 17, kind: "expr" }
         ]
     )
-  assert' "highlight: a lex error degrades to no spans (plain text)"
-    (highlightSpans hlKernel "{{oops" == [])
+  -- ADR-023 (recovering lexer): an unterminated tag no longer wipes all
+  -- highlighting. It recovers to an `unterminated` span (the orphan opener up to
+  -- the next opener / EOF), and earlier valid tags still highlight.
+  assert' "highlight: an unterminated tag recovers to an `unterminated` span"
+    (highlightSpans hlKernel "{{oops" == [ { from: 0, to: 6, kind: "unterminated" } ])
+  assert' "highlight: recovery keeps earlier tags lit and resyncs to the broken tail"
+    ( highlightSpans hlKernel "Hi {{name}} more {{oops" ==
+        [ { from: 3, to: 11, kind: "expr" }, { from: 17, to: 23, kind: "unterminated" } ]
+    )
 
   -- Dialect gates (ADR-014): a structurally-valid shape the dialect REJECTS is
   -- coloured `error`, never painted valid. `extras = false` (MaxBars) disallows

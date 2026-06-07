@@ -71,6 +71,9 @@
       "_doc": "Dispatch order matters: longer / more specific patterns first.",
       "patterns": [
         {
+          "include": "#unterminated"
+        },
+        {
           "include": "#raw_block"
         },
         {
@@ -245,6 +248,11 @@
           "name": "punctuation.definition.comment.end.flatbars"
         }
       }
+    },
+    "unterminated": {
+      "_doc": "An opener (`{{`, `{{{`, `{{!`, `{{!--`, `{{{{`, with optional `~`) that has NO `}}` to end-of-line \u2014 an unterminated construct (ADR-023 floor reconciliation). Matched BEFORE the tag rules so it flags the orphan instead of a begin/end rule consuming to a later closer. Agrees with the recovering engine lexer (a bare opener with no closer is unterminated there too). Per-line / stateless: a multi-line VALID tag's first line can false-match here in no-LSP contexts \u2014 the engine/Lab and the LSP semantic tokens are exact. Valid single-line tags always contain `}}`, so they never match.",
+      "match": "\\{\\{(?:(?!\\}\\}).)*$",
+      "name": "invalid.illegal.unterminated.flatbars"
     },
     "comment_short": {
       "_doc": "{{! \u2026 }} \u2014 comment ends at the first }}. The braces are comment-family punctuation (punctuation.definition.comment.*), so the whole comment reads in the comment colour \u2014 the documented exception to ADR-026's brace-uniformity.",

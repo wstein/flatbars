@@ -250,6 +250,20 @@
       "description": "A structurally-valid tag the dialect disallows. DIALECT-DEPENDENT: the stateless fallback paints the shape as valid; only the LSP knows the dialect.",
       "operationPosition": "none"
     },
+    "unterminated": {
+      "role": "tag",
+      "lsp": {
+        "type": "variable",
+        "modifiers": [
+          "invalid"
+        ]
+      },
+      "tmScopes": [
+        "invalid.illegal.unterminated.flatbars"
+      ],
+      "description": "An unterminated construct — a `{{` / `{{!` / `{{!--` / `{{{{` opener with no closer. The recovering lexer (ADR-023) emits it instead of dropping all highlighting, spanning the orphan opener to the next opener (or EOF). DIALECT-INDEPENDENT (broken in every dialect), so — unlike `error` — the stateless floor CAN flag it: a same-line opener-with-no-closer paints `invalid.illegal`. Not in `lspEmitKinds`: the floor handles it, so no LSP correction is needed.",
+      "operationPosition": "none"
+    },
     "string": {
       "role": "interior",
       "lsp": {
