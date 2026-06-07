@@ -551,6 +551,15 @@
       .editor-pane .cm-content { padding: 8px 0; }
       .editor-pane .cm-line { padding: 0 12px; }
       .editor-pane .cm-selectionBackground { background: var(--accent-soft) !important; }
+      /* The text caret. CM6 treats an un-flagged theme as LIGHT and so applies its
+         baseTheme `&light .cm-content { caret-color: black }`, which is invisible on
+         our dark theme (the Lab themes CM via --bg/--fg, never telling it it's dark).
+         Drive the caret from --fg so it stays visible in BOTH themes — and follows a
+         live theme toggle without reconfiguring the editors. `!important` beats CM's
+         `.cm-light .cm-content` rule. The `.cm-cursor` border covers the drawn-cursor
+         path too, should drawSelection ever be added. */
+      .cm-content { caret-color: var(--fg) !important; }
+      .cm-cursor, .cm-dropCursor { border-left-color: var(--fg) !important; }
 
       /* Stem tag colours for CM decorations. Stem syntax sits inside HTML, so
          the whole class set is bold + chip-tinted — without that lift the
