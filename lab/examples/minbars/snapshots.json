@@ -11,5 +11,6 @@
   "partialList": "- Ada (author)\n- Charles (engine)\n",
   "dynamicPartial": "Hallo, Ada!",
   "setDelimiters": "* default\n* erb-style\n* default again",
-  "email": "Hi Ada,\n\nYour order shipped. Items:\n- Pen ×3\n- Ink ×1\n\n— FlatMart (flatmart.example)"
+  "email": "Hi Ada,\n\nYour order shipped. Items:\n- Pen ×3\n- Ink ×1\n\n— FlatMart (flatmart.example)",
+  "card": "<style>\n  .card { border: 1px solid #d0d7de; border-radius: 8px; padding: .5rem .8rem; margin: .5rem 0; font-family: system-ui, sans-serif; }\n  .card h3 { margin: 0 0 .15rem; font-size: 1rem; }\n  .card p  { margin: 0; color: #57606a; }\n</style><div class=\"card\">\n  <h3>Ada Lovelace</h3>\n  <p>Author</p>\n</div><div class=\"card\">\n  <h3>Charles Babbage</h3>\n  <p>Engine</p>\n</div>"
 }

@@ -118,7 +118,21 @@
     "group": "Examples",
     "view": "source",
     "main": "main.mustache",
-    "partials": [],
+    "partials": [
+      "item"
+    ],
+    "data": "data.yaml"
+  },
+  {
+    "id": "card",
+    "label": "Advanced — HTML card (styling in a partial)",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.mustache",
+    "partials": [
+      "styles",
+      "card"
+    ],
     "data": "data.yaml"
   }
 ]

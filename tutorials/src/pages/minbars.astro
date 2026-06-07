@@ -267,6 +267,17 @@ $ ~> | $ | {
       sits alone on an indented line, that indent is re-applied to every line the
       partial emits — so included blocks stay aligned.
     </p>
+
+    <h3>Composing HTML with partials</h3>
+    <p>
+      When your output <em>is</em> HTML, partials compose it: a
+      <code>{t("{{> styles}}")}</code> partial holds the CSS once and a
+      <code>{t("{{> card}}")}</code> partial is the markup for one row, while the
+      section just iterates. Mustache stays logic-less — the partials carry the
+      structure and the style. (This is the one example that previews as HTML in
+      the Lab rather than plain text.)
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.card.template} data={ex.card.data} partials={ex.card.partials} />
   </section>
 
   <!-- ─────────────────────── Dynamic names ─────────────────────── -->
@@ -282,10 +293,11 @@ $ ~> | $ | {
     <h3>Putting it together</h3>
     <p>
       Real templates reuse these familiar pieces at once. A plain-text shipping
-      notice: interpolation, a dotted path, a list section, and an inverted fallback
-      — no new concepts, just combined.
+      notice: interpolation, a dotted path, an inverted fallback, and a list
+      section that renders each row through a <code>{t("{{> item}}")}</code>
+      partial — no new concepts, just combined.
     </p>
-    <OpenInLab client:visible engine="minbars" template={ex.email.template} data={ex.email.data} />
+    <OpenInLab client:visible engine="minbars" template={ex.email.template} data={ex.email.data} partials={ex.email.partials} />
   </section>
 
   <!-- ─────────────────────── Set delimiters ────────────────────── -->

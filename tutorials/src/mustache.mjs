@@ -9,11 +9,12 @@
 //      lab/examples/minbars/ by scripts/gen-examples.mjs, snapshot-gated by
 //      check:examples (which asserts each renders to the SAME committed output).
 //
-// Brief (design-debate consensus): every example is MINBARS-valid Mustache and
-// NON-HTML — Mustache's home turf is plain text, Markdown, config and email, and
-// angle brackets only bury the idea. The two honest exceptions: `escaping` needs
-// markup, but it lives in the DATA (rendered as text), and lambdas can't run (a
-// static spec-only note on the page).
+// Brief (design-debate consensus): examples are MINBARS-valid Mustache and
+// non-HTML by default — Mustache's home turf is plain text, Markdown, config and
+// email, and angle brackets only bury the idea. The honest exceptions: `escaping`
+// needs markup, but it lives in the DATA (rendered as text); lambdas can't run (a
+// static spec-only note on the page); and one capstone `card` example whose OUTPUT
+// genuinely is HTML, where partials compose the style + markup (view: "rendered").
 //
 // ORDER IS DISPLAY ORDER: the Lab dropdown is a flat list, so examples run
 // strictly simple → advanced and each `label` carries its tier ("Simple — …",
@@ -133,14 +134,43 @@ export const examples = {
   email: {
     label: "Advanced — Putting it together (email)",
     // An ADVANCED example reusing familiar concepts in one realistic, non-HTML
-    // template: interpolation, dotted paths, a list section over OBJECTS, an
-    // inverted fallback, and a closing signature — a plain-text shipping notice.
+    // template: interpolation, dotted paths, an inline inverted fallback
+    // (`Items: (none)` when empty), a list section that renders each row through
+    // a {{> item}} PARTIAL, and a closing signature — a plain-text shipping
+    // notice. The partial owns its trailing newline (the standalone `{{> item}}`
+    // line is trimmed) so the rows don't run together.
     template:
-      "Hi {{name}},\n\nYour order shipped. Items:\n{{#items}}\n- {{title}} ×{{qty}}\n{{/items}}{{^items}}\n- (none)\n{{/items}}\n\n— {{store.name}} ({{store.url}})",
+      "Hi {{name}},\n\nYour order shipped. Items:{{^items}} (none){{/items}}\n{{#items}}\n{{> item}}\n{{/items}}\n\n— {{store.name}} ({{store.url}})",
+    partials: { item: "- {{title}} ×{{qty}}\n" },
     data: {
       name: "Ada",
       items: [{ title: "Pen", qty: 3 }, { title: "Ink", qty: 1 }],
       store: { name: "FlatMart", url: "flatmart.example" },
+    },
+  },
+
+  card: {
+    label: "Advanced — HTML card (styling in a partial)",
+    // The one example whose OUTPUT is HTML — so it previews as HTML, not text.
+    // Partials compose the markup: {{> styles}} holds the CSS once, {{> card}} is
+    // the markup for one row, and the section just iterates. Mustache stays
+    // logic-less — the partials carry the structure and the style.
+    view: "rendered",
+    template: "{{> styles}}\n{{#people}}\n{{> card}}\n{{/people}}",
+    partials: {
+      styles:
+        "<style>\n" +
+        "  .card { border: 1px solid #d0d7de; border-radius: 8px; padding: .5rem .8rem; margin: .5rem 0; font-family: system-ui, sans-serif; }\n" +
+        "  .card h3 { margin: 0 0 .15rem; font-size: 1rem; }\n" +
+        "  .card p  { margin: 0; color: #57606a; }\n" +
+        "</style>",
+      card: '<div class="card">\n  <h3>{{name}}</h3>\n  <p>{{role}}</p>\n</div>',
+    },
+    data: {
+      people: [
+        { name: "Ada Lovelace", role: "Author" },
+        { name: "Charles Babbage", role: "Engine" },
+      ],
     },
   },
 };

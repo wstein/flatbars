@@ -1,10 +1,8 @@
 Hi {{name}},
 
-Your order shipped. Items:
+Your order shipped. Items:{{^items}} (none){{/items}}
 {{#items}}
-- {{title}} ×{{qty}}
-{{/items}}{{^items}}
-- (none)
+{{> item}}
 {{/items}}
 
 — {{store.name}} ({{store.url}})

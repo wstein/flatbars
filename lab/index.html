@@ -2740,6 +2740,24 @@
       const tmplKeyForIndex = (i) => (i === 0 ? "main" : tabs[i].name);
       function ensureOpen(key) { if (!openEditors.includes(key)) openEditors.push(key); }
 
+      // Auto-open every example file that carries content — "open all the files,
+      // but only if not empty". `main` + `data` always open (the entry template
+      // and the root @root context). Each partial, the transform, the helpers
+      // source, and each data overlay open ONLY when non-empty, so an example's
+      // blank scaffold files (e.g. an empty transform) stay closed and the tab
+      // strips reflect only real content. Order: partials before transform/helpers
+      // in the top strip; overlays after data in the bottom strip. Mirrors the
+      // tutorial Open-in-Lab card, which likewise shows a pane only when filled.
+      function autoOpenEditors() {
+        const has = (s) => typeof s === "string" && s.trim() !== "";
+        const open = ["main", "data"];
+        tabs.forEach((t, i) => { if (i > 0 && has(t.source)) open.push(t.name); });
+        if (has(transformSrc)) open.push("transform");
+        if (has(helpersSrc)) open.push("helpers");
+        for (const o of dataOverlays) if (has(o.source)) open.push(o.name);
+        return open;
+      }
+
       // Is `key` the currently-active editor? (Single edit pane — one active.)
       function isActiveKey(key) {
         if (key === "transform") return activeView === "tmpl" && templateMode === "transform";
@@ -4341,7 +4359,7 @@
             dataOverlays.push({ name: o.name, source: overlayTexts[i], dirty: false });
           });
         }
-        dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
+        dataTab = "edit"; dataFile = "data"; openEditors = autoOpenEditors();
         templateMode = "tmpl";
         showDataTab();
         escapeMode = "";
@@ -4408,7 +4426,7 @@
         catalogSource = ""; catalogDirty = false; labLocale = "en"; // i18n reset (ADR-029)
         labPathSchema = []; // ADR-030 path-schema reset
         dataOverlays = [];
-        dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
+        dataTab = "edit"; dataFile = "data"; openEditors = autoOpenEditors();
         templateMode = "tmpl";
         showDataTab();
         escapeMode = "";
@@ -4535,7 +4553,7 @@
           }
           yamlDirty = false; transformDirty = false;
           exampleModified = false;
-          dataTab = "edit"; dataFile = "data"; openEditors = ["main", "data", "transform", ...(ENGINE === "fullbars" ? ["helpers"] : [])];
+          dataTab = "edit"; dataFile = "data"; openEditors = autoOpenEditors();
           templateMode = s.hm === 1 ? "helpers" : s.tm === 1 ? "transform" : "tmpl";
           showDataTab();
           escapeMode = s.e ?? "";
