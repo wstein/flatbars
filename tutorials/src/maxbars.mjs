@@ -20,9 +20,12 @@
 //     A bare infix separator (`{{else if n > 0}}`) does not error — it silently
 //     takes the wrong branch.
 //   • Inline partials work: `{{#inline "x"}}…{{yield}}…{{/inline}}` then
-//     `{{#partial "x"}}…{{/partial}}` (the {{yield}} layout pattern). NOT supported:
-//     the `{{#*inline}}` decorator (a LexError — MaxBars uses bare `{{#inline}}`)
-//     and host-threaded EXTERNAL partial files — for those use FullBars.
+//     `{{#partial "x"}}…{{/partial}}` (the {{yield}} layout pattern). External
+//     (host-threaded) partials work too: `{{> name}}` resolves a partial supplied
+//     by the host (renderMaxbarsWithPartials / compileMaxbarsWithPartials), each
+//     itself MaxBars source. A template-local {{#inline}} of the same name wins.
+//     NOT supported: the `{{#*inline}}` decorator (a LexError — MaxBars uses bare
+//     `{{#inline}}`).
 //   • Arithmetic is strictly numeric: `"x" + "y"` throws (no string concat).
 
 export const examples = {
@@ -228,6 +231,20 @@ export const examples = {
     engine: "maxbars",
     template: '{{#inline "layout"}}<main>{{yield}}</main>{{/inline}}{{#partial "layout"}}<h1>{{title}}</h1>{{/partial}}',
     data: { title: "Home" },
+  },
+
+  externalPartial: {
+    // EXTERNAL (host-threaded) partials: `{{> name}}` renders a partial supplied
+    // by the host — here `row`, defined in a separate document (the Lab's partial
+    // files) — not a template-local {{#inline}}. The partial is itself MaxBars
+    // source, so it uses the surface freely (the `| toFixed 2` pipe). Reuse a
+    // markup fragment across templates without inlining it. (renderMaxbarsWithPartials
+    // / compileMaxbarsWithPartials — a template-local {{#inline}} of the same name
+    // would win.)
+    engine: "maxbars",
+    partials: { row: "<li>{{name}} — {{price | toFixed 2}}</li>" },
+    template: "<ul>\n{{#each items}}  {{> row}}\n{{/each}}</ul>",
+    data: { items: [{ name: "Pen", price: 1.5 }, { name: "Ink", price: 4 }] },
   },
 
   escaping: {

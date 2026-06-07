@@ -213,9 +213,11 @@
             "either",
             "flatbars",
             "flatbars-compile",
+            "foldable-traversable",
             "fullbars",
             "ordered-collections",
-            "prelude"
+            "prelude",
+            "tuples"
           ]
         },
         "test": {

@@ -50,6 +50,22 @@ test("opts.helpers register for the maxbars and core dialects too (operation reg
   assert.equal(run(r, tpl, null, { dialect: "core", helpers }), "\n  {{BAR}}\n");
 });
 
+test("maxbars threads external (host) partials through render + compileToJs", async () => {
+  // External `{{> name}}` partials, each MaxBars source (the `| uppercase` pipe),
+  // must resolve in BOTH render and the compiled JS — the renderMaxbarsWithPartials
+  // / compileMaxbarsWithPartials seam. Regression: the Lab once rendered maxbars via
+  // the helper-less entrypoint, dropping external partials (`{{> name}}` → empty).
+  const r = await createFlatBarsRenderer("maxbars");
+  const partials = { greeting: "Hi {{name | uppercase}}!" };
+  const tpl = "{{> greeting}} ({{count items}})";
+  const data = { name: "ada", items: [1, 2, 3] };
+  assert.equal(r.render(r.compile(tpl, partials, { dialect: "maxbars" }).program, data), "Hi ADA! (3)");
+  // and the compiled module folds the same partials into its registry
+  const c = r.compileToJs(tpl, partials);
+  assert.ok(c.ok, c.error);
+  assert.ok(c.value.includes("greeting"), "compiled module should register the external partial");
+});
+
 test("renders the core dialect when selected", async () => {
   const r = await createFlatBarsRenderer();
   assert.equal(

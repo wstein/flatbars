@@ -28,10 +28,12 @@ import {
   renderSurface as bbRenderSurface,
   renderSurfaceWithPartials as bbRenderSurfaceWith,
   renderMaxbars as bbRenderMaxbars,
+  renderMaxbarsWithPartials as bbRenderMaxbarsWith,
   astJson,
   compile as bbCompile,
   compileSurface as bbCompileSurface,
   compileMaxbars as bbCompileMaxbars,
+  compileMaxbarsWithPartials as bbCompileMaxbarsWith,
   renderWith as bbRenderWith,
   renderRawWith as bbRenderRawWith,
   renderMaxWith as bbRenderMaxWith,
@@ -40,7 +42,7 @@ import {
   analyzeWith as bbAnalyzeWith,
   lint as bbLint,
   migrate as bbMigrate,
-} from "./vendor/flatbars-engine.mjs?v=69";
+} from "./vendor/flatbars-engine.mjs?v=70";
 
 const BB_VERSION = "0.1.0";
 
@@ -145,19 +147,23 @@ export async function createFlatBarsRenderer(dialectArg) {
       res = bbRenderSurfaceI18n(program.translator, program.source, d);
     } else if (program.dialect === "core") {
       // Custom operations (ADR-019 addendum) register through RawBars' strict
-      // registrar; otherwise the plain core render. Needed e.g. for a raw block
-      // whose head must resolve to a defined operation.
+      // registrar (which also threads external partials); with partials but no
+      // operations, the same registrar with an empty op set; else the plain render.
       res = hasHelpers
         ? bbRenderRawWith(program.helpers, program.partials || {}, program.source, d)
-        : bbRender(program.source, d);
+        : hasPartials
+          ? bbRenderRawWith({}, program.partials, program.source, d)
+          : bbRender(program.source, d);
     } else if (program.dialect === "maxbars") {
-      // MaxBars reuses the FullBars surface pipeline; named external partials are
-      // not threaded through its entrypoint, so inline `{{#inline}}` only here.
-      // With custom operations, route through MaxBars' operation registrar so a
-      // registered head (e.g. a raw block's `{{{{#op}}}}`) actually resolves.
+      // MaxBars reuses the FullBars surface pipeline. External (host-threaded)
+      // partials now thread through its entrypoints: the operation registrar when
+      // custom ops are present (a raw block's `{{{{#op}}}}` also resolves there),
+      // renderMaxbarsWithPartials for partials alone, else the plain render.
       res = hasHelpers
         ? bbRenderMaxWith(program.helpers, program.partials || {}, program.source, d)
-        : bbRenderMaxbars(program.source, d);
+        : hasPartials
+          ? bbRenderMaxbarsWith(program.partials, program.source, d)
+          : bbRenderMaxbars(program.source, d);
     } else if (hasHelpers) {
       // Custom helpers (ADR-018) render through the facade's renderWith, which
       // also threads partials — the surface/FullBars path.
@@ -217,11 +223,16 @@ export async function createFlatBarsRenderer(dialectArg) {
   }
 
   // FlatBars-specific (the `compile-js` feature): compile the template to a JS
-  // ES module via FlatBars.Compile, honouring the active dialect. Returns
-  // `{ ok, value, error }` — `value` is the JS source. Drives the Compiled JS view.
-  function compileToJs(source) {
-    const c = activeDialect === "core" ? bbCompile : activeDialect === "maxbars" ? bbCompileMaxbars : bbCompileSurface;
-    return c(source);
+  // ES module via FlatBars.Compile, honouring the active dialect. `partials` is an
+  // optional `{ name: source }` bag of external partials folded into the compiled
+  // module's registry (MaxBars; the compiled twin of renderMaxbarsWithPartials).
+  // Returns `{ ok, value, error }` — `value` is the JS source. Drives the Compiled
+  // JS view. (The signature mirrors the MinBars adapter's compileToJs(src, partials).)
+  function compileToJs(source, partials) {
+    const ps = partials && Object.keys(partials).length > 0 ? partials : null;
+    if (activeDialect === "maxbars") return ps ? bbCompileMaxbarsWith(ps, source) : bbCompileMaxbars(source);
+    if (activeDialect === "core") return bbCompile(source);
+    return bbCompileSurface(source);
   }
 
   function walk(nodes, visit) {

@@ -12,9 +12,11 @@ package:
     - either
     - flatbars
     - flatbars-compile
+    - foldable-traversable
     - fullbars
     - ordered-collections
     - prelude
+    - tuples
   test:
     main: Test.FullBars.Compile.Main
     dependencies:

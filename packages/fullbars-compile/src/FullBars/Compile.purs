@@ -8,6 +8,7 @@
 module FullBars.Compile
   ( compileSurface
   , compileSurfaceWith
+  , compileSurfaceWithPartials
   ) where
 
 import Prelude
@@ -16,10 +17,13 @@ import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Map as Map
+import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import FlatBars.Compile (compile)
 import FlatBars.Compile.Emit (fullbarsEmit, metaFor)
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Syntax (Template)
 import FullBars (LoopVars, checkBareInline, desugarSurfaceWith, hoistInline, noLoopVars)
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
@@ -36,15 +40,46 @@ compileSurface = compileSurfaceWith true noLoopVars defaultParseOptions "rt.trut
 -- | decorator; MaxBars passes `false`).
 compileSurfaceWith
   :: Boolean -> LoopVars -> ParseOptions -> String -> String -> Either ParseError String
-compileSurfaceWith strict lv opts truthyCallback src = do
+compileSurfaceWith strict lv opts truthyCallback = compileSurfaceWithPartials strict lv opts
+  truthyCallback
+  []
+
+-- | `compileSurfaceWith` plus a set of named *external* partials (each given as
+-- | dialect-surface source). Mirrors the interpreter's `renderSurfaceWith` /
+-- | `renderSurfaceWithHelpersWith`: each external partial is parsed + desugared
+-- | with the dialect's options and folded into the compiled module's partial
+-- | registry, alongside the template's own hoisted `{{#inline}}` definitions
+-- | (inline wins on a name clash, left-biased — matching render). So `{{> name}}`
+-- | resolves a host-threaded partial in the compiled output, not only an inline one.
+compileSurfaceWithPartials
+  :: Boolean
+  -> LoopVars
+  -> ParseOptions
+  -> String
+  -> Array (Tuple String String)
+  -> String
+  -> Either ParseError String
+compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
+  externals <- traverse compilePartial partialSrcs
   { nodes } <- lmap NEA.head (parseWith opts src)
   checkBareInline strict nodes
-  let h = hoistInline (desugarSurfaceWith lv nodes)
+  let
+    h = hoistInline (desugarSurfaceWith lv nodes)
+    externalT = Map.fromFoldable externals
+    -- inline definitions win over same-named externals (left-biased), as render does.
+    registry = Map.union h.partials externalT
   -- ADR-005 amendment: FullBars (Handlebars `{{#> }}`, `opts.partialBlocks`)
   -- exposes a block partial's body as `partial-block`; MaxBars (same emit) uses `yield`.
   pure
     ( compile (metaFor truthyCallback (if opts.partialBlocks then "partial-block" else "yield"))
         fullbarsEmit
-        (Map.toUnfoldable h.partials)
+        (Map.toUnfoldable registry)
         h.template
     )
+  where
+  -- a named external partial: parse + desugar its body with the dialect's options
+  -- + loop-var map (so a MaxBars partial sees infix/pipes/loop vars).
+  compilePartial :: Tuple String String -> Either ParseError (Tuple String Template)
+  compilePartial (Tuple name s) = do
+    { nodes } <- lmap NEA.head (parseWith opts s)
+    pure (Tuple name (desugarSurfaceWith lv nodes))

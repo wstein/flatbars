@@ -1629,16 +1629,16 @@
       // engine adapters so a reload never pairs a fresh index.html / example
       // file with a stale cached adapter module.
       import { createRenderer } from "./stem.mjs?v=1";
-      import { createFlatBarsRenderer } from "./flatbars.mjs?v=5";
+      import { createFlatBarsRenderer } from "./flatbars.mjs?v=6";
       import { createMinBarsRenderer } from "./minbars.mjs?v=2";
       // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
       // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
-      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=5";
+      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=6";
       // The full prelude vocabulary (vendored projection of editors/operations.json)
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=69";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=70";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -3345,7 +3345,7 @@
           lastSegViews = [];
           let text = "// this engine has no compiler";
           if (typeof renderer.compileToJs === "function") {
-            const r = renderer.compileToJs(templateSourceFor("main"), undefined, { compat: minbarsCompat });
+            const r = renderer.compileToJs(templateSourceFor("main"), partialsMap(), { compat: minbarsCompat });
             text = r.ok ? r.value : "// compile error: " + r.error;
           }
           setOutputDoc(text, Decoration.none);

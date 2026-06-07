@@ -20,6 +20,7 @@ module FullBars.JS
   , migrate
   , renderSurface
   , renderMaxbars
+  , renderMaxbarsWithPartials
   , renderMinbars
   , renderMinbarsCompat
   , renderMinbarsCompatWithPartials
@@ -27,6 +28,7 @@ module FullBars.JS
   , compile
   , compileSurface
   , compileMaxbars
+  , compileMaxbarsWithPartials
   , compileMinbars
   , compileMinbarsCompat
   , compileMinbarsWithPartials
@@ -248,6 +250,14 @@ renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJ
 renderMaxbars :: Fn2 String Json Result
 renderMaxbars = mkFn2 \tpl json -> result (MaxBars.renderMax tpl (fromJson json))
 
+-- | Render a *MaxBars* template with a set of named *external* partials (each
+-- | MaxBars surface source). `renderMaxbarsWithPartials(partials, template, data)`,
+-- | where `partials` is a plain `{ name: source }` object — the MaxBars twin of
+-- | `renderSurfaceWithPartials`. `{{> name}}` renders the registered partial.
+renderMaxbarsWithPartials :: Fn3 (FO.Object String) String Json Result
+renderMaxbarsWithPartials = mkFn3 \partials tpl json ->
+  result (MaxBars.renderMaxWithPartials (FO.toUnfoldable partials) tpl (fromJson json))
+
 -- | Render a MinBars (Mustache) template against JS data. `renderMinbars(template, data)`.
 -- | Uses the language-agnostic Mustache rule (`0`/`""` truthy).
 renderMinbars :: Fn2 String Json Result
@@ -468,6 +478,13 @@ compileSurface = mkFn1 \tpl -> compileResultAt tpl (Compile.compileSurface tpl)
 -- | `compileMaxbars(template)`.
 compileMaxbars :: Fn1 String Result
 compileMaxbars = mkFn1 \tpl -> compileResultAt tpl (MaxBars.compileMaxJs tpl)
+
+-- | Compile a *MaxBars* template to JS with a set of named external partials
+-- | (each MaxBars surface source). `compileMaxbarsWithPartials(partials, template)`
+-- | — the compiled twin of `renderMaxbarsWithPartials`.
+compileMaxbarsWithPartials :: Fn2 (FO.Object String) String Result
+compileMaxbarsWithPartials = mkFn2 \partials tpl ->
+  compileResultAt tpl (MaxBars.compileMaxJsWith (FO.toUnfoldable partials) tpl)
 
 -- | Compile a MinBars (Mustache) template to JS (ADR-016). `compileMinbars(template)`.
 -- | Seeds the language-agnostic Mustache rule (`0`/`""` truthy).

@@ -25,7 +25,7 @@ if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
 }
-const { compile, compileSurface, compileMaxbars, compileMinbars, compileMinbarsCompat, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMinbars, renderMinbarsCompat, renderMustache, renderWith, renderRawWith, renderMaxWith, renderSurfaceI18n, safe } =
+const { compile, compileSurface, compileMaxbars, compileMaxbarsWithPartials, compileMinbars, compileMinbarsCompat, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMaxbarsWithPartials, renderMinbars, renderMinbarsCompat, renderMustache, renderWith, renderRawWith, renderMaxWith, renderSurfaceI18n, safe } =
   await import(enginePath);
 
 // Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
@@ -57,6 +57,7 @@ const interpret = (t, d, dialect, partials, helpers, translator) =>
   translator ? renderSurfaceI18n(translator, t, d == null ? null : d)
     : helpers ? renderWithFor(dialect)(helpers, partials || {}, t, d == null ? null : d)
     : (dialect === "minbars" && partials) ? renderMustache(partials, t, d == null ? null : d)
+    : (dialect === "maxbars" && partials) ? renderMaxbarsWithPartials(partials, t, d == null ? null : d)
     : interpreterFor(dialect)(t, d == null ? null : d);
 
 // Compile then execute against the runtime: -> { ok, value, error }. Custom-helper
@@ -73,7 +74,9 @@ async function runCompiled(t, d, dialect, partials, helpers, translator) {
     }
   }
   const c = helpers ? compilerFor(dialect)(t)
-    : (dialect === "minbars" && partials) ? compileMinbarsWithPartials(partials, t) : compilerFor(dialect)(t);
+    : (dialect === "minbars" && partials) ? compileMinbarsWithPartials(partials, t)
+    : (dialect === "maxbars" && partials) ? compileMaxbarsWithPartials(partials, t)
+    : compilerFor(dialect)(t);
   if (!c.ok) return { ok: false, value: "", error: "compile: " + c.error };
   try {
     const mod = await import("data:text/javascript," + encodeURIComponent(c.value));
@@ -171,6 +174,14 @@ const helperCases = [
   // undefined head: both the interpreter and the compiled output must REJECT.
   { name: "rawblock:undefined-surface", dialect: "surface", t: "{{{{nope}}}}body {{x}}{{{{/nope}}}}", d: { x: "a" }, expectError: "UnknownHelper" },
   { name: "rawblock:undefined-max", dialect: "maxbars", t: "{{{{#nope}}}}body {{x}}{{{{/nope}}}}", d: { x: "a" }, expectError: "UnknownHelper" },
+  // ── MaxBars external (host-threaded) partials — {{> name}} resolves a partial
+  //    given as MaxBars surface source. The interpreter (renderMaxbarsWithPartials)
+  //    and the compiled module (compileMaxbarsWithPartials folds them into the
+  //    partial registry) must agree. The partial body uses the MaxBars surface
+  //    (the `| uppercase` pipe), proving it desugars with MaxBars options.
+  { name: "partials:max-simple", dialect: "maxbars", partials: { greeting: "Hi {{name | uppercase}}!" }, t: "{{> greeting}}", d: { name: "ada" }, expect: "Hi ADA!" },
+  // a template-local {{#inline}} definition wins over a same-named external (left-biased union, as render does).
+  { name: "partials:max-inline-wins", dialect: "maxbars", partials: { g: "EXTERNAL" }, t: '{{#inline "g"}}INLINE{{/inline}}{{> g}}', d: {}, expect: "INLINE" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 

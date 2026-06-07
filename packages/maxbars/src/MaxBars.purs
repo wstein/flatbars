@@ -10,8 +10,10 @@ module MaxBars
   ( maxOptions
   , maxLoopVars
   , renderMax
+  , renderMaxWithPartials
   , renderWithOperations
   , compileMaxJs
+  , compileMaxJsWith
   , maxbarsWarnings
   ) where
 
@@ -26,7 +28,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
 import FullBars (LoopVars, desugarSurfaceWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceWithHelpersWith)
-import FullBars.Compile (compileSurfaceWith)
+import FullBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
 import FullBars.Surface (noLoopVars, reservedScope)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
@@ -76,6 +78,14 @@ maxLoopVars = reservedScope noLoopVars
 renderMax :: String -> Value -> Either String String
 renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 
+-- | Render MaxBars source with a set of named *external* (host-threaded) partials,
+-- | each given as MaxBars surface source — the MaxBars twin of
+-- | `FullBars.renderSurfaceWith`. `{{> name}}` renders a registered partial;
+-- | template-local `{{#inline}}` definitions are hoisted into the same registry
+-- | (and win on a clash). It is `renderWithOperations` with no host operations.
+renderMaxWithPartials :: Array (Tuple String String) -> String -> Value -> Either String String
+renderMaxWithPartials = renderWithOperations []
+
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own
 -- | surface (`maxLoopVars` / `maxOptions`). A block operation gets the full surface:
@@ -97,6 +107,15 @@ renderWithOperations = renderSurfaceWithHelpersWith false maxLoopVars maxOptions
 -- | core helpers the emit rules already handle.
 compileMaxJs :: String -> Either ParseError String
 compileMaxJs = compileSurfaceWith false maxLoopVars maxOptions "rt.truthyNonEmpty"
+
+-- | `compileMaxJs` with a set of named *external* partials (each MaxBars surface
+-- | source), folded into the compiled module's partial registry alongside the
+-- | template's hoisted `{{#inline}}` definitions — the compiled twin of
+-- | `renderMaxWithPartials`, so the interpreter and the compiled output agree on
+-- | `{{> name}}` (gated by `test:compile`).
+compileMaxJsWith :: Array (Tuple String String) -> String -> Either ParseError String
+compileMaxJsWith partials =
+  compileSurfaceWithPartials false maxLoopVars maxOptions "rt.truthyNonEmpty" partials
 
 -- | The MaxBars source warnings (schema-less *warn-always* tier). Parses `src`,
 -- | desugars, then runs the dialect lints (see `MaxBars.Lint`); a parse error
