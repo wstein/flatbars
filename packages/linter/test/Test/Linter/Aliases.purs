@@ -73,7 +73,8 @@ main = do
   case scopedCanonWarningsOf "{{{parent-index}}}" of
     Right [ issue ] -> assert' ("parent-index → loop.parent.index0 message, got: " <> issue.message)
       (contains (Pattern "loop.parent.index0") issue.message)
-    other -> assert' ("parent-index: expected one warning, got " <> show (map _.name <$> other)) false
+    other -> assert' ("parent-index: expected one warning, got " <> show (map _.name <$> other))
+      false
   assert' ("index0 (canonical) does not warn, got " <> show (scopedNames "{{{index0}}}"))
     (scopedNames "{{{index0}}}" == [])
   assert' ("yield (canonical) does not warn, got " <> show (scopedNames "{{{yield}}}"))

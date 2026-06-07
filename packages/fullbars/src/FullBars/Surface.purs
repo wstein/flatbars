@@ -77,13 +77,15 @@ type Scope = Array Ident
 
 -- | A *dialect* hook: bare names a dialect resolves to a **scoped-helper call**
 -- | rather than a data path. FullBars uses `noLoopVars` (every bare name is a
--- | path — Handlebars-faithful); MaxBars maps its loop variables (`index0`,
--- | `rindex0`, `length`, … and the aliases `index`/`rindex`/`size`) to their
--- | canonical scoped name. The resolver returns the canonical helper name, or
--- | `Nothing` to leave the name as a data path. It is consulted only for a
--- | single-segment bare name that is *not* an in-scope block param (block params
--- | still win) and *not* an `@`/`../` path — so a `{{#each … as |index|}}` body
--- | binding shadows the loop variable, as it should.
+-- | path — Handlebars-faithful); MaxBars uses `reservedScope noLoopVars` (ADR-021),
+-- | so only the reserved roots (`this`/`loop`/`root`/`parent`) resolve bare — the
+-- | loop *fields* are reached through `loop.*` (`{{loop.index0}}`), and a bare
+-- | `{{index0}}` is an ordinary data path. (RawBars has no surface, so its bare
+-- | scoped operations — `{{{index0}}}`, `{{{first}}}`, … — resolve directly off the
+-- | frame.) The resolver returns the canonical helper name, or `Nothing` to leave
+-- | the name as a data path. It is consulted only for a single-segment bare name
+-- | that is *not* an in-scope block param (block params still win) and *not* an
+-- | `@`/`../` path — so a `{{#each … as |index|}}` body binding shadows it.
 type LoopVars = Ident -> Maybe Ident
 
 -- | The FullBars resolver: no bare name is a loop variable (Handlebars rule —

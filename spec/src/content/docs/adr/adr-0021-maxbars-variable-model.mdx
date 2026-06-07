@@ -85,11 +85,15 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
    `parent` / `loop`. MaxBars-local; FullBars' default parser keeps both. RawBars never had `@`/`../`
    (no surface), so there is nothing to remove there.
 
-1. *The bare loop-variable vocabulary is removed* (supersedes ADR-006 §1–2). MaxBars passes
-   `noLoopVars`, so bare `{{first}}` / `{{index0}}` / `{{length}}` / `{{key}}`
-   are ordinary *data fields*; their values live as fields of `loop`. The frame no longer installs the
-   standalone `index0`/`first`/… operations, so RawBars' `{{{index}}}` / `{{{first}}}` /
-   `{{{parent-index}}}` are likewise replaced by `loop.*`.
+1. *The bare loop-variable vocabulary differs by dialect* (amends ADR-006 §1–2; reconciled with the
+   shipped frame, 2026-06-07). MaxBars uses `reservedScope noLoopVars`, so bare `{{first}}` / `{{index0}}` /
+   `{{length}}` / `{{key}}` are ordinary *data fields* — the loop metadata is reached through `loop.*`
+   (`{{loop.index0}}`); only the reserved roots `this`/`loop`/`root`/`parent`/`outer` resolve bare.
+   **RawBars** (no surface) is the exception: the engine *does* install the bare scoped operations on the
+   frame, so RawBars keeps its explicit `{{{index0}}}` / `{{{first}}}` / `{{{key}}}` (and `loop.*` works
+   there too). What *was* fully removed in both dialects is the flat **`parent-*`** family — `parent-index`
+   / `parent-key` / `parent-first` / `parent-last` → the `loop.parent.*` chain. (`index` and `index0`
+   co-exist; the lint prefers `index0`.)
 
 1. *The block-partial body is the reserved name `yield`.* Handlebars' `{{> @partial-block}}`
    yield is unwritable in the non-Handlebars dialects — `@` is reserved (§5), and a bare `partial-block`
@@ -151,9 +155,9 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
   `{{@root.x}}` → `{{root.x}}`; `{{../x}}` → `{{parent.x}}`. Touches the
   `mx:loopvars-*` conformance cases, the `loopVars`/`loopObject` tutorial examples, the MaxBars
   interpreter `loopvars-*` tests, and `maxbars.adoc`.
-* *RawBars / core corpus:* `{{{index}}}` / `{{{key}}}` / `first` / `last` /
-  `{{{parent-index}}}` (the `each-array`, `each-first-last`, `each-array-key-null`,
-  `each-object-*`, `each-parent-index` cases) → the `loop.*` forms.
+* *RawBars / core corpus:* the bare `{{{index0}}}` / `{{{key}}}` / `first` / `last` are **kept** (RawBars'
+  explicit scoped operations); only the removed `{{{parent-index}}}` → `{{{lookup loop "parent" "index0"}}}`
+  (the `each-parent-index` case).
 * *Lint:* delete `MaxBars.Lint.loopVarShadowWarnings` + its tests; keep `labelShadowWarnings`.
 * *Docs:* this ADR; supersession note on ADR-006 §1–2 + its §5 v1 outer-loop limit; extended-by note on
   ADR-013; `nav.adoc` registration; `maxbars.adoc` and the RawBars page.
