@@ -42,8 +42,11 @@ pub struct Safe(pub String);
 
 /// Stringification, mirroring the interpreter's `stringify`
 /// (null→"", bool→"true"/"false", number→…, array→ join with ",").
-/// NOTE (v1): f64 formatting is NOT byte-identical to JS `String(n)` — out of scope
-/// per spec §10. Integers and the common float cases agree; the long tail does not.
+/// Number formatting is a pluggable backend: with the default `perf` features,
+/// integers use `itoa` (`fast-int`) and f64 uses `dragonbox_ecma` (`ecma-float`),
+/// which is ECMA-262 BYTE-IDENTICAL to JS `String(n)` (-0→"0", 1e21→"1e+21",
+/// Infinity, NaN). `--no-default-features` falls back to Rust `Display` (the f64
+/// divergence, masked only on that profile — spec §10). f32 always uses `Display`.
 pub trait ToText {
     /// Raw text — the emission for `{{{ x }}}`.
     fn write_text(&self, out: &mut String);

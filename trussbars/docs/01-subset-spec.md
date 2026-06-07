@@ -297,9 +297,12 @@ the same harness).
 
 ## 10. Out of scope for v1
 
-- **f64 → string byte-identity.** Rust `{}` and JS `String(n)` differ (`1e21`, `-0`,
-  `NaN`, precision). Not pursued in v1; the harness normalizes numeric output and *tracks*
-  the masked cases (§11). A `number-format` lib may be added later.
+- **f64 → string byte-identity** is **achieved** under the default `ecma-float`
+  backend (`dragonbox_ecma`), which is ECMA-262 byte-identical to JS `String(n)`
+  (`-0`→`0`, `1e21`→`1e+21`, `1e-7`→`1e-7`, `Infinity`, `NaN`) — see
+  `02-runtime-api.md` §2. It remains a divergence **only** on the pure
+  `--no-default-features` build (Rust `Display`), which the conformance harness
+  masks for that profile alone (§11, `04-conformance.md` §7).
 - **i18n precision.** `t` / `number` / `date` / `selectPlural` / `relative` are a
   documented host-locale seam with English fallback, exactly as the JS engine treats the
   `translator` seam (ADR-029). Not byte-identical; not a correctness gate.

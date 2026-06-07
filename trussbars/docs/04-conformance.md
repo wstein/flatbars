@@ -26,8 +26,10 @@ interpreter and the compiled JS — in one process. Trussbars adds four difficul
 3. **It has negative cases.** Spec §4/§5 say some MaxBars constructs are *rejected* (compile
    error), not rendered. Conformance must assert those **fail to compile**, with the right
    diagnostic — a kind of case the JS gate never had.
-4. **f64 stringification is out of scope** (`01` §10). The byte diff must **normalize
-   numerics** and *track* what it masked.
+4. **f64 stringification is byte-identical under the default `ecma-float` backend**
+   (`dragonbox_ecma` = ECMA-262 = JS `String(n)`), so the default profile is a **strict**
+   byte diff for floats too. Numeric **normalization/masking applies only when testing the
+   pure `--no-default-features` profile** (Rust `Display`); see §7.
 
 The oracle is the interpreter (`renderMaxbars`). The proven-equal compiled-JS path is a free
 **cross-check** (since `test:compile` already gates interpreter ≡ compiled-JS, any disagreement
@@ -125,17 +127,22 @@ Compiling hundreds of tiny crates would dominate wall-clock. Design:
 
 ---
 
-## 7. Numeric normalization (the f64 mask)
+## 7. Numeric normalization (pure-profile only)
 
-`01` §10 puts f64-byte-identity out of scope, so the diff must not fail on `1e21` vs
-`1000000000000000000000`, `-0`, or `0.30000000000000004`. Approach:
+The default `ecma-float` backend (`dragonbox_ecma`) is **ECMA-262 byte-identical** to JS
+`String(n)`, so on the default profile floats are a **strict** byte diff — no mask. The
+`number-format` lib that `01` §10 anticipated has landed, and masked cases have graduated to
+strict byte-match.
+
+Normalization is therefore needed **only when explicitly testing the pure
+`--no-default-features` profile** (Rust `Display`), so its f64 divergence (`1e21` vs
+`1000000000000000000000`, `-0` vs `0`) does not fail the run:
 
 - Tokenize both outputs into (text, number) runs; compare text runs exactly and number runs by
   **parsed numeric value** (with a tolerance for the float tail), not by spelling.
 - A case whose match *depended* on normalization is flagged **numeric-masked** in the ledger
-  (§9) — so the headline "byte-identical" count never silently absorbs numeric divergence.
-- When a `number-format` lib lands later (`01` §10), masked cases graduate to strict
-  byte-match; the ledger makes that progress measurable.
+  (§9), and the ledger records the **profile** — so "byte-identical" on the default profile is
+  never confused with a masked pure-profile run.
 
 Non-numeric output stays a **strict byte diff** — escaping, whitespace, separators, `,`-joins
 are all in scope and must match exactly.
