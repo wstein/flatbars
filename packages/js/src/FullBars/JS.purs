@@ -51,7 +51,6 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Data.Argonaut.Core (Json, caseJsonArray, caseJsonObject, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, length, null, take, uncons, zipWith) as Array
-import Data.Array.NonEmpty as NEA
 import Data.Either (Either(..), either)
 import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
@@ -60,7 +59,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String (Pattern(..), indexOf)
 import Data.String.Common (joinWith)
 import Data.Tuple (Tuple(..))
-import FlatBars (Expr(..), ParseError, defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt, renderParseErrorsAt)
+import FlatBars (Expr(..), ParseError, defaultParseOptions, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt, renderParseErrorsAt)
 import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
 import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
@@ -632,47 +631,48 @@ highlightConfig = case _ of
 astJson :: Fn2 String String Json
 astJson = mkFn2 \dialect src ->
   let
-    errObj pe =
+    -- The AST view runs the *recovering* parser (ADR-023), like the highlighter and
+    -- `diagnostics`: it never blanks on a syntax error. A recovered `NodeError`
+    -- lowers to nothing (`Kernel.Lower.nodeError`), so the tree is the best-effort
+    -- valid structure; the located errors travel alongside in `errors`, the same
+    -- set `diagnostics` reports (both project `parseRecovering` — gated by
+    -- check:parse-views).
+    -- each dialect parses with its own gates — the same mapping `diagnostics` uses
+    -- (Lab vocabulary: "core" = RawBars, "surface" = FullBars), so the AST view and
+    -- the Problems panel agree (gated by check:parse-views).
+    opts = case dialect of
+      "maxbars" -> maxOptions
+      "core" -> RawBars.coreOptions
+      _ -> defaultParseOptions
+    r = parseRecovering opts src
+    -- `core` is the austere syntax (no desugar); `surface` and `maxbars` desugar
+    -- (MaxBars adds bare loop variables via `maxLoopVars`). Desugar passes a
+    -- `NodeError` through; `lower` drops it.
+    desugared = case dialect of
+      "core" -> r.nodes
+      "maxbars" -> desugarSurfaceWith maxLoopVars r.nodes
+      _ -> desugarSurface r.nodes
+    nodes = lower desugared
+    errJson pe =
       let
         d = parseErrorAt src pe
       in
         obj
-          [ Tuple "error"
-              ( obj
-                  [ Tuple "message" (str d.message)
-                  , Tuple "start" (int d.offset)
-                  , Tuple "end" (int d.offset)
-                  ]
-              )
+          [ Tuple "message" (str d.message)
+          , Tuple "line" (int d.line)
+          , Tuple "column" (int d.column)
+          , Tuple "offset" (int d.offset)
           ]
   in
-    case (if dialect == "maxbars" then parseWith maxOptions else parse) src of
-      Left pe -> errObj (NEA.head pe)
-      -- the FullBars surface also *rejects* a bare `{{#inline}}` (the decorator is
-      -- required) via `checkBareInline`; mirror that in the AST view so the Lab
-      -- reports the same `DisallowedShape` a render would, not a misleading node.
-      Right { nodes: tmpl }
-        | dialect /= "core"
-        , dialect /= "maxbars"
-        , Left pe <- FullBars.checkBareInline true tmpl -> errObj pe
-      Right { nodes: tmpl } ->
-        let
-          -- `core` is the austere syntax (no desugar); `surface` and `maxbars` both
-          -- desugar (MaxBars adds bare loop variables via `maxLoopVars`).
-          desugared = case dialect of
-            "core" -> tmpl
-            "maxbars" -> desugarSurfaceWith maxLoopVars tmpl
-            _ -> desugarSurface tmpl
-          nodes = lower desugared
-        in
-          obj
-            [ Tuple "ast"
-                ( obj
-                    [ Tuple "version" (str "flatbars-ast/v1")
-                    , Tuple "nodes" (arr (map rnode nodes))
-                    ]
-                )
-            ]
+    obj
+      [ Tuple "ast"
+          ( obj
+              [ Tuple "version" (str "flatbars-ast/v1")
+              , Tuple "nodes" (arr (map rnode nodes))
+              ]
+          )
+      , Tuple "errors" (arr (map errJson r.errors))
+      ]
 
 --------------------------------------------------------------------------------
 -- JSON builders

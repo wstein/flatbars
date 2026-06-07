@@ -84,3 +84,37 @@ re-lexing it. Per-tag recovery is preserved precisely because that interior is t
 that rides inside its own tag and is handled exactly where `tokenizeInterior` used
 to fail, so one bad tag never breaks the structural scan or the rest of the
 document. Behaviour is unchanged (`parseRecovering` tests + `test:compile` 300/300).
+
+## Amendment (2026-06-07): every error-aware view projects the one recovering parser
+
+The recovering parser is now the *single source* for every surface that has to
+survive a malformed template, not just the LSP's squiggles. Three consumers
+derive from it directly, so they can never disagree about what is an error:
+
+* **The Lab's AST view** — `astJson(dialect, src)` returns
+  `{ ast: { version, nodes }, errors: [...] }`. It runs `parseRecovering` with the
+  dialect's `ParseOptions` (the same per-dialect mapping `diagnostics` uses: the
+  Lab vocabulary's `core` → `coreOptions`, `surface` → `defaultParseOptions`,
+  `maxbars` → `maxOptions`), then `lower`s the recovered tree (recovered
+  `NodeError`s drop out of the typed AST). It **never blanks on a syntax error**:
+  the tree is always present, with the located errors alongside — exactly the set
+  `diagnostics` reports.
+* **`diagnostics(template, dialect)`** — the located errors `flatbars-lsp`
+  publishes (above).
+* **The Lab painter / LSP semantic tokens** — `tokenize` over the same recovering
+  lexer (the `RError` resync of the ADR-004 amendment), so highlighting degrades
+  gracefully through an unterminated construct instead of going dark.
+
+A drift gate, **`check:parse-views`** (in `npm test`), asserts that the AST view
+(`astJson`) and `diagnostics` report the *identical* error set — line, column,
+offset, message — over a malformed-template corpus across all three dialect
+pairings. If anyone re-points one view at a different parser (or a different
+per-dialect option), the gate fails.
+
+The TextMate grammar floor is the **one exception, by necessity**: it is a regex
+approximation (it cannot run the engine), so a no-LSP context — JetBrains
+Community, a host file that injects `source.flatbars`, first paint before the
+server attaches — gets the floor's best-effort colouring, *not* full recovery.
+That floor is bounded against the engine by `check:tmgrammar` (tag boundaries) and
+`check:paint-parity` (the painter ≡ grammar + LSP, per char). Where the LSP is
+present its semantic tokens overlay the floor, restoring the engine's exact view.

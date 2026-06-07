@@ -225,11 +225,15 @@ test("parseAst returns the {t:…} node shape", async () => {
   assert.deepEqual(emit.expr.segments, ["name"]);
 });
 
-test("parseAst surfaces a located parse error", async () => {
+test("parseAst is forgiving: a parse error yields a recovered tree + located errors", async () => {
   const r = await createFlatBarsRenderer();
   const res = r.parseAst("{{#each xs}}…"); // unclosed block
-  assert.ok(res.error, "expected an error result");
-  assert.equal(typeof res.error.message, "string");
+  // ADR-023: the AST view never blanks — it returns the best-effort tree…
+  assert.ok(res.ast && Array.isArray(res.ast.nodes), "expected a recovered AST tree");
+  // …plus the located errors (the same set `diagnostics` reports).
+  assert.ok(Array.isArray(res.errors) && res.errors.length > 0, "expected located errors");
+  assert.equal(typeof res.errors[0].message, "string");
+  assert.equal(typeof res.errors[0].line, "number");
 });
 
 test("requiredAssigns is exact (path roots only, no helpers/params)", async () => {

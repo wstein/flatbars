@@ -375,3 +375,13 @@ The full list of LSP capabilities we ship vs deliberately omit (the latter
 being principled design decisions tied to the engine's deliberately
 absent cross-template scope graph) lives in
 [ADR-026](/adr/adr-0026-editor-capability-matrix/).
+
+## Amendment (2026-06-07): one parser behind every error-aware view
+
+The diagnostics, the Lab's AST view, and the LSP semantic tokens all derive from
+the *single* recovering parser — see
+[ADR-023's 2026-06-07 amendment](/adr/adr-0023-recovering-parser/#amendment-2026-06-07-every-error-aware-view-projects-the-one-recovering-parser)
+and the `check:parse-views` gate. The TextMate grammar floor remains the one
+regex approximation (it cannot run the engine), serving no-LSP contexts as a
+best-effort, bounded by `check:tmgrammar` / `check:paint-parity`; the LSP overlays
+it with the engine's exact view wherever the server is attached.
