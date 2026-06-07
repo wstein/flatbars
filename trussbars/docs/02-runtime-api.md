@@ -85,7 +85,7 @@ pub fn truthy<T: Truthy>(v: &T) -> bool { v.truthy() }
 | `&[T]` / `Vec<T>` | `!is_empty()` |
 | `Option<T: Truthy>` | `self.as_ref().is_some_and(Truthy::truthy)` |
 | maps (`BTreeMap`) | `!is_empty()` |
-| a context struct | `true` (an inhabited object is truthy; via the companion derive, §12) |
+| a context struct | `true` when it has ≥1 field, else `false` (via `#[derive(Trussbars)]`; no `ToText`, so `{{struct}}` won't compile — §12) |
 | **numeric** (`i*` / `u*` / `f64`) | *no impl* — see below |
 
 **Numbers deliberately have no `Truthy` impl.** `{{#if count}}` therefore fails to compile,
@@ -278,10 +278,12 @@ uniform-typed is a call.**
 
 ## 12. Open design questions (to resolve in implementation)
 
-1. **Trait coherence for context structs.** `Truthy`/`ToText` need impls for user context
-   types that appear in conditions / `{{this}}` output. Plan: a companion **`#[derive(Trussbars)]`**
-   (or `derive(Truthy, ToText)`) emitting "struct ⟹ always truthy; `ToText` ⟹ error or a
-   debug form," so a blanket impl doesn't collide with the primitive impls.
+1. **Trait coherence for context structs.** *Resolved (`trussbars-derive`).* The companion
+   **`#[derive(Trussbars)]`** generates the `Truthy` impl a context struct needs (a struct with
+   ≥1 field is truthy, a field-less struct falsy — the nonEmpty object rule). It deliberately
+   generates **no `ToText`**, so `{{struct}}` / `{{this}}` over a struct stays a compile error —
+   the typed counterpart of "cannot stringify an object" (§3, subset spec §2). Structs only;
+   deriving on an enum/union is a compile error until §4.1 dispatch lands.
 2. **`parent`/`outer` lifetime threading depth.** Borrowed refs are correct but the codegen
    must name and thread them; confirm the borrow checker stays happy at deep nesting (the
    highest-risk codegen piece — prototype examples 10 & 14 first, per `01`'s plan).

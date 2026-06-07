@@ -285,8 +285,9 @@ the same harness).
   (`coalesce`/`firstTruthy`/`ternary` are *not* here — they are emitted inline by codegen;
   see `02-runtime-api.md` §4.)
 - `trussbars-std` — *planned*: the prelude/stdlib operations as monomorphized functions.
-- `trussbars-derive` — *planned*: the `#[derive(Trussbars)]` companion macro (`Truthy`/`ToText`
-  for context structs).
+- `trussbars-derive` — *implemented*: the `#[derive(Trussbars)]` companion macro, generating
+  the `Truthy` impl for context structs (≥1 field ⟹ truthy). No `ToText` by design, so
+  `{{struct}}` stays a compile error; struct-only until §4.1 enum dispatch.
 - `trussbars-codegen` — *planned*: the compiler library; in v1 driven by the PureScript
   `rustEmit` backend, in v2 replaced by the `trussbars` proc-macro front-end.
 
