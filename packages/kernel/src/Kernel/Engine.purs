@@ -84,6 +84,15 @@ type Engine m env =
          , params :: Array String
          , label :: Maybe String
          }
+  -- Provenance hooks for source maps (ADR-035). The normal engines supply no-ops,
+  -- so an unmapped render stays byte-identical (the compiler≡interpreter invariant);
+  -- the mapped runner (`Kernel.Provenance`) supplies recorders. `recordText` logs a
+  -- literal-text run. `recordEmit span produce` runs `produce` (an expression
+  -- render) and logs ONE emit run for it — unless `produce` itself logged sub-runs
+  -- (a partial expanding its body), in which case those cover it and no outer run is
+  -- added, avoiding a double count.
+  , recordText :: env -> String -> m Unit
+  , recordEmit :: env -> Span -> m String -> m String
   }
 
 -- | Run a parsed template against an engine. FlatBars drives the entire walk.
@@ -95,11 +104,12 @@ runTemplate engine = renderTemplate engine.initial
 
   renderNode :: env -> Node -> m String
   renderNode env = case _ of
-    Content s -> pure s
-    Output span e -> evalExpr env span e >>= engine.stringify
+    Content s -> engine.recordText env s *> pure s
+    Output span e -> engine.recordEmit env span (evalExpr env span e >>= engine.stringify)
     -- the engine applies the head as a block helper; the opener sigil (`#`/`^`)
     -- is a dialect concern (FullBars desugars `Inverse` to `unless`), so the
-    -- meaning-free driver ignores it.
+    -- meaning-free driver ignores it. A block's output is the leaves its body
+    -- renders (recorded by the nested `render`), so the driver records nothing here.
     Block span _ name args body -> applyBlock engine.resolve env span name args body
     -- a raw block resolves its head STRICTLY (undefined ⇒ UnknownHelper): its only
     -- purpose is to feed the verbatim body to a helper, so there is no meaningful
@@ -109,7 +119,8 @@ runTemplate engine = renderTemplate engine.initial
     -- A separator rendered on its own is just an application of its head; a
     -- block helper that cares (e.g. `if` at `{{else}}`) intercepts it by
     -- splitting its children before rendering, so it is never reached there.
-    Sep span name args -> evalExpr env span (App name args) >>= engine.stringify
+    Sep span name args -> engine.recordEmit env span
+      (evalExpr env span (App name args) >>= engine.stringify)
     -- a recovered parse error (ADR-023) renders nothing: the interpreter only runs
     -- on error-free trees (the fail-fast parse projection rejects the rest).
     NodeError _ _ -> pure ""

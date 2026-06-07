@@ -10,11 +10,12 @@ import Prelude
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)
-import Data.Foldable (for_)
+import Data.Foldable (any, foldl, for_)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Number (nan)
 import Data.String (Pattern(..), contains, toUpper)
+import Data.String.CodeUnits as SCU
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
@@ -24,7 +25,7 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (RNode(..), RefEnv, analyseSurface, analyseSurfaceWith, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceWith, stringify)
+import FullBars (RNode(..), RefEnv, analyseSurface, analyseSurfaceWith, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceMapped, renderSurfaceWith, stringify)
 import FullBars.Catalog (helperCatalogMarkdown)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Env (withTranslator)
@@ -129,6 +130,8 @@ customEngine root =
   , resolveStrict: res -- already strict (unknown ⇒ UnknownHelper)
   , stringify
   , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
+  , recordText: \_ _ -> pure unit
+  , recordEmit: \_ _ produce -> produce
   }
   where
   res _ name = case name of
@@ -1230,5 +1233,25 @@ main = do
     (contains (Pattern "&#123;&#123;elif&#125;&#125;") helperCatalogMarkdown)
   assert' "catalog-md: no raw prose tag braces"
     (not (contains (Pattern "{{elif}}") helperCatalogMarkdown))
+
+  -- Source maps (ADR-035): a mapped render's segments tile the output, and emit
+  -- runs carry the originating tag's byte span (text runs carry none).
+  case renderSurfaceMapped "Hi {{ name }}!" (obj [ Tuple "name" (str "Ada") ]) of
+    Left e -> assert' ("mapped: unexpected error: " <> e) false
+    Right r -> do
+      assert' "mapped: output matches the plain render" (r.output == "Hi Ada!")
+      assert' "mapped: segments tile the output exactly"
+        ( foldl
+            ( \macc s -> case macc of
+                Just at | s.out == at && s.len > 0 -> Just (at + s.len)
+                _ -> Nothing
+            )
+            (Just 0)
+            r.segments == Just (SCU.length r.output)
+        )
+      assert' "mapped: the {{ name }} emit carries its tag span"
+        (any (\s -> s.kind == "emit" && s.start == Just 3 && s.end == Just 13) r.segments)
+      assert' "mapped: text runs carry no source span"
+        (not (any (\s -> s.kind == "text" && s.start /= Nothing) r.segments))
 
   log "all core tests passed"

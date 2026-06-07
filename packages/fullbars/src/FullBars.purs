@@ -25,6 +25,8 @@ module FullBars
   , renderSurfaceWithHelpersWith
   , renderSurfaceDiag
   , renderSurfaceDiagWith
+  , renderSurfaceMapped
+  , renderSurfaceMappedWith
   , renderSurfaceValue
   , renderSurfaceI18n
   , analyseSurface
@@ -54,6 +56,7 @@ import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refE
 import Kernel.Hoist (hoistInline)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
+import Kernel.Provenance (Segment, runResolvedLenientMapped)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (Translator, Truthy, escapeHtml, handlebars, minimal, mustache, nonEmpty, presence, stringify)
@@ -125,6 +128,39 @@ renderSurfaceWith partialSrcs src dat =
   where
   -- a named *external* partial: parse + desugar its body. Every partial renders
   -- under the engine's single truthiness rule now (ADR-022) — no per-file mode.
+  compilePartial (Tuple name s) = case parse s of
+    Left e -> Left (show e)
+    Right { nodes } -> Right { name, template: desugarSurface nodes }
+
+-- | Like `renderSurface`, but also returns a source map (ADR-035): each `Segment`
+-- | ties a run of the output back to the tag in the entry template that produced
+-- | it. The map degrades to `[]` if a block helper transforms its body's output.
+renderSurfaceMapped
+  :: String -> Value -> Either String { output :: String, segments :: Array Segment }
+renderSurfaceMapped = renderSurfaceMappedWith []
+
+-- | `renderSurfaceMapped` with named external partials (each Surface source) — the
+-- | mapped twin of `renderSurfaceWith`. Emits produced inside a partial tile the
+-- | output but carry no entry-template span.
+renderSurfaceMappedWith
+  :: Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String { output :: String, segments :: Array Segment }
+renderSurfaceMappedWith partialSrcs src dat =
+  case traverse compilePartial partialSrcs of
+    Left e -> Left e
+    Right ps -> case parse src of
+      Left e -> Left (show e)
+      Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
+      Right { nodes } ->
+        let
+          { partials: inlineP, template } = hoistInline (desugarSurface nodes)
+          externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          setup = registerPartials (Map.union inlineP externalT)
+        in
+          lmap show (runResolvedLenientMapped setup template dat)
+  where
   compilePartial (Tuple name s) = case parse s of
     Left e -> Left (show e)
     Right { nodes } -> Right { name, template: desugarSurface nodes }

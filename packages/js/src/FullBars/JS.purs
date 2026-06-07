@@ -35,6 +35,8 @@ module FullBars.JS
   , compileMinbarsCompatWithPartials
   , compileFor
   , renderSurfaceWithPartials
+  , renderSurfaceMapped
+  , renderSurfaceMappedWithPartials
   , renderSurfaceI18n
   , JsTranslator
   , renderMustache
@@ -76,6 +78,7 @@ import FullBars.Compile (compileSurface) as Compile
 import Kernel.Analyse (Finding, PathSchema) as Analyse
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
+import Kernel.Provenance (Segment)
 import Kernel.Walk (Severity)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import Linter.Migrate (migrateToMaxBars)
@@ -284,6 +287,39 @@ renderMinbarsCompatWithPartials = mkFn3 \partials tpl json ->
 renderSurfaceWithPartials :: Fn3 (FO.Object String) String Json Result
 renderSurfaceWithPartials = mkFn3 \partials tpl json ->
   result (FullBars.renderSurfaceWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | A mapped render outcome (ADR-035): the output plus a `segments` source map
+-- | (each `{ out, len, kind, start, end }`, with `start`/`end` null on text runs
+-- | and partial-origin emits). `ok`/`error` carry a parse/render failure.
+type MappedResult =
+  { ok :: Boolean, output :: String, segments :: Array Json, error :: String }
+
+-- | Encode a `Segment` as a plain JS object, `start`/`end` as a number or `null`.
+segmentJson :: Segment -> Json
+segmentJson s = fromObject $ FO.fromFoldable
+  [ Tuple "out" (fromNumber (toNumber s.out))
+  , Tuple "len" (fromNumber (toNumber s.len))
+  , Tuple "kind" (fromString s.kind)
+  , Tuple "start" (maybe jsonNull (fromNumber <<< toNumber) s.start)
+  , Tuple "end" (maybe jsonNull (fromNumber <<< toNumber) s.end)
+  ]
+
+mappedResult :: Either String { output :: String, segments :: Array Segment } -> MappedResult
+mappedResult = either
+  (\e -> { ok: false, output: "", segments: [], error: e })
+  (\r -> { ok: true, output: r.output, segments: map segmentJson r.segments, error: "" })
+
+-- | Render a surface template, returning the output and its source map.
+-- | `renderSurfaceMapped(template, data)`.
+renderSurfaceMapped :: Fn2 String Json MappedResult
+renderSurfaceMapped = mkFn2 \tpl json ->
+  mappedResult (FullBars.renderSurfaceMapped tpl (fromJson json))
+
+-- | `renderSurfaceMapped` with named external partials — the mapped twin of
+-- | `renderSurfaceWithPartials`. `renderSurfaceMappedWithPartials(partials, template, data)`.
+renderSurfaceMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResult
+renderSurfaceMappedWithPartials = mkFn3 \partials tpl json ->
+  mappedResult (FullBars.renderSurfaceMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Render a surface template with a host i18n translator seeded (ADR-029): the
 -- | first-class seam that drives `t`/`number`/`date`/… The Lab and any JS host wire

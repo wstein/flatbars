@@ -57,6 +57,9 @@ minEngine initial =
   , stringify: \v -> liftEither (stringify v)
   -- Mustache has no hash / block-param / label surface, so the identity split (ADR-020 Phase 3).
   , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
+  -- MinBars has no source-map yet, so it records no provenance (ADR-035).
+  , recordText: \_ _ -> pure unit
+  , recordEmit: \_ _ produce -> produce
   }
 
 -- | The closed MinBars resolver: the fixed helper names map to their helpers; an

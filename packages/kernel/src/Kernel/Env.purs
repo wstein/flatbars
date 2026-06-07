@@ -217,4 +217,9 @@ refEngineWith policy initial =
   -- as the shared default. `splitBlockArgs` demarkers the positional list, so
   -- built-in helpers receive exactly the values they did before.
   , blockArgs: splitBlockArgs
+  -- No provenance by default: an unmapped render records nothing and `recordEmit`
+  -- just runs its production, so output stays byte-identical (the compiler≡interpreter
+  -- invariant). The mapped runner (`Kernel.Provenance`) overrides these fields.
+  , recordText: \_ _ -> pure unit
+  , recordEmit: \_ _ produce -> produce
   }
