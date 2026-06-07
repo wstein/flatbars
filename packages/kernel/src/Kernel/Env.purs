@@ -19,6 +19,7 @@ module Kernel.Env
   , register
   , registerAll
   , lookupOperation
+  , innermostFrame
   , pushFrame
   , pushHelpers
   , registerPartial
@@ -178,6 +179,14 @@ lookupOperation name (RefEnv e) = go e.helpers
   go (m : rest) = case Map.lookup name m of
     Just h -> Just h
     Nothing -> go rest
+
+-- | The innermost helper frame — the loop/with bindings of the current scope (for
+-- | the context inspector, ADR-035): a block frame's keys are its scoped vars plus
+-- | the block params, distinguishing them from the prelude in the outer frames.
+innermostFrame :: forall m. RefEnv m -> Map String (Operation m (RefEnv m))
+innermostFrame (RefEnv e) = case e.helpers of
+  m : _ -> m
+  Nil -> Map.empty
 
 -- | Push a new frame and set a new context (what `this` returns in the body).
 pushFrame :: forall m. Map String (Operation m (RefEnv m)) -> Value -> RefEnv m -> RefEnv m

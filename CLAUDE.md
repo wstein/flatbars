@@ -187,7 +187,8 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `Render` (`runResolved`: parse → seed the prelude env with the engine's fixed
   truthiness rule → run), `Provenance` (`runResolvedMapped`: the same driver run
   in a `WriterT` to emit a tiling output→source map — source maps, ADR-035),
-  `Value`, `Walk`.
+  `Inspect` (`inspectResolvedLenient`: the same driver snapshotting the render
+  context at a target span — the Context Inspector, ADR-035), `Value`, `Walk`.
 - **`fullbars`** — the reference engine + its surface dialect (`{{ }}`
   auto-escape, dotted paths, `@data`, `as |x|`). Re-exports kernel modules and
   adds surface desugar/compile/render.

@@ -41,6 +41,7 @@ module FullBars.JS
   , renderMappedWithPartials
   , renderMaxbarsMapped
   , renderMaxbarsMappedWithPartials
+  , inspectSurface
   , renderSurfaceI18n
   , JsTranslator
   , renderMustache
@@ -82,6 +83,7 @@ import FullBars.Compile (compileSurface) as Compile
 import Kernel.Analyse (Finding, PathSchema) as Analyse
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
+import Kernel.Inspect (Snapshot)
 import Kernel.Provenance (Segment)
 import Kernel.Walk (Severity)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
@@ -345,6 +347,40 @@ renderMaxbarsMapped = mkFn2 \tpl json -> mappedResult (MaxBars.renderMaxMapped t
 renderMaxbarsMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResult
 renderMaxbarsMappedWithPartials = mkFn3 \partials tpl json ->
   mappedResult (MaxBars.renderMaxMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | A context-inspector outcome (ADR-035): the snapshots at the target span (one
+-- | per execution), each a plain object `{ this, parent?, …, locals }`.
+type InspectResult = { ok :: Boolean, snapshots :: Array Json, error :: String }
+
+-- | The clicked output run's source provenance, received as a plain JS object.
+type JsTarget = { file :: String, start :: Int, end :: Int }
+
+segmentSnapshot :: Snapshot -> Json
+segmentSnapshot s = fromObject $ FO.fromFoldable $
+  [ Tuple "this" (toJson s.this) ]
+    <> optField "parent" s.parent
+    <> optField "root" s.root
+    <> optField "index" s.index
+    <> optField "index1" s.index1
+    <> optField "key" s.key
+    <> optField "first" s.first
+    <> optField "last" s.last
+    <>
+      [ Tuple "locals"
+          (fromObject (FO.fromFoldable (map (\(Tuple k v) -> Tuple k (toJson v)) s.locals)))
+      ]
+  where
+  optField name = maybe [] (\v -> [ Tuple name (toJson v) ])
+
+-- | Snapshot the render context of a *surface* template at the source span
+-- | `target` (an output run's provenance). `inspectSurface(partials, target,
+-- | template, data)`, where `target` is `{ file, start, end }`. One snapshot per
+-- | execution of the matching emit (a loop body yields one per iteration).
+inspectSurface :: Fn4 (FO.Object String) JsTarget String Json InspectResult
+inspectSurface = mkFn4 \partials target tpl json ->
+  case FullBars.inspectSurfaceWith target (FO.toUnfoldable partials) tpl (fromJson json) of
+    Left e -> { ok: false, snapshots: [], error: e }
+    Right snaps -> { ok: true, snapshots: map segmentSnapshot snaps, error: "" }
 
 -- | Render a surface template with a host i18n translator seeded (ADR-029): the
 -- | first-class seam that drives `t`/`number`/`date`/… The Lab and any JS host wire

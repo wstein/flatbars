@@ -28,6 +28,7 @@ module FullBars
   , renderSurfaceMapped
   , renderSurfaceMappedWith
   , renderSurfaceMappedDiagWith
+  , inspectSurfaceWith
   , renderSurfaceValue
   , renderSurfaceI18n
   , analyseSurface
@@ -55,6 +56,7 @@ import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartialFiles, registerPartials, withTranslator, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
+import Kernel.Inspect (Snapshot, Target, inspectResolvedLenient)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
 import Kernel.Provenance (Segment, runResolvedLenientMapped)
@@ -189,6 +191,37 @@ renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
   compilePartial (Tuple name s) = case parseWith opts s of
     Left pes -> Left (renderParseErrorsAt s pes)
     Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
+
+-- | Context Inspector (ADR-035): snapshot the render context at the source span
+-- | `target` (an output run's provenance) — one snapshot per execution of the
+-- | matching emit. The Surface twin of `renderSurfaceMappedWith`, sharing the file
+-- | dimension so a span inside a partial resolves there.
+inspectSurfaceWith
+  :: Target
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String (Array Snapshot)
+inspectSurfaceWith target partialSrcs src dat =
+  case traverse compilePartial partialSrcs of
+    Left e -> Left e
+    Right ps -> case parse src of
+      Left e -> Left (show e)
+      Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
+      Right { nodes } ->
+        let
+          { partials: inlineP, template } = hoistInline (desugarSurface nodes)
+          externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          partialFiles = Map.union (map (const "main") inlineP)
+            (Map.fromFoldable (map (\p -> Tuple p.name p.name) ps))
+          setup = registerPartialFiles partialFiles <<< registerPartials
+            (Map.union inlineP externalT)
+        in
+          lmap (formatError src) (inspectResolvedLenient setup target template dat)
+  where
+  compilePartial (Tuple name s) = case parse s of
+    Left e -> Left (show e)
+    Right { nodes } -> Right { name, template: desugarSurface nodes }
 
 -- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
 -- | `(name, helper)` is registered into the env alongside the prelude and the

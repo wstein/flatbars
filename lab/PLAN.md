@@ -54,13 +54,14 @@ and `partial-graph` because they are computed from the lowered AST, not guessed.
 The **core / FullBars / MaxBars dialects back `source-map`** (ADR-035): a mapped
 render returns output→source `segments`, each tagged with its source `file`, so the
 three-way editor↔output provenance linking is live and a partial-origin run links to
-its own partial document (pinned by `check:provenance` + the `test:lab:browser`
-smoke). MinBars emits none, and `context-inspect` is not yet natively backed, so
-those surfaces gate off honestly.
+its own partial document. The **FullBars surface also backs `context-inspect`** —
+the Context Inspector snapshots the render context at a clicked run (one per loop
+iteration). All pinned by `check:provenance` + the `test:lab:browser` smoke. MinBars
+emits no source map, so its provenance surfaces gate off honestly.
 
 ## Roadmap
 
-1. **Native context inspection** — `inspectAt` over the reified render-context
-   stack (`RefEnv`), lighting up the Context Inspector.
+1. **Context inspection for the remaining dialects** — the surface entrypoint is
+   wired; extend `inspectAt` to core / MaxBars.
 2. **A defended boot path** — wrap the engine/examples fetch in a visible
    fallback instead of a blank page on a missing asset.

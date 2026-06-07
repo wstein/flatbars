@@ -97,6 +97,15 @@ try {
   assert.ok(selected, "clicking an emit run selects its source tag in the editor");
   console.log("  ✓ click — emit run selects its source tag in the editor");
 
+  // context inspector: clicking the emit (above) also set the inspect target and
+  // opened the dock tab, which snapshots the render context at that span.
+  const ctxShown = await page
+    .waitForSelector(".ctx-snap", { timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  assert.ok(ctxShown, "the Context Inspector renders a render-context snapshot for the clicked run");
+  console.log("  ✓ context — clicking an emit shows its render-context snapshot");
+
   // source → output (caret): collapse the selection into the tag (the caret lands
   // inside its span) and assert the output run it produced lights up.
   await page.keyboard.press("ArrowLeft");

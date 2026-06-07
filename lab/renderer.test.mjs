@@ -124,13 +124,14 @@ test("engineInfo advertises an honest capability vector", async () => {
   assert.match(info.version, /\d+\.\d+/);
   assert.ok(Array.isArray(info.features));
   // backs (exactly, from the lowered AST): catalog, used-transformers,
-  // required-assigns, partial-graph; plus source maps (ADR-035) on the surface.
-  for (const has of ["catalog", "used-transformers", "required-assigns", "partial-graph", "source-map"]) {
+  // required-assigns, partial-graph; plus source maps + the context inspector
+  // (ADR-035) on the surface.
+  for (const has of ["catalog", "used-transformers", "required-assigns", "partial-graph", "source-map", "context-inspect"]) {
     assert.ok(info.features.includes(has), `should advertise ${has}`);
   }
-  // not yet natively backed → those panels gate off honestly.
-  for (const absent of ["context-inspect", "bytecode-wire", "standalone"]) {
-    assert.ok(!info.features.includes(absent), `should not advertise ${absent} yet`);
+  // not backed → those panels gate off honestly.
+  for (const absent of ["bytecode-wire", "standalone"]) {
+    assert.ok(!info.features.includes(absent), `should not advertise ${absent}`);
   }
   assert.ok(info.builtins.includes("each") && info.builtins.includes("json"));
 });
@@ -392,6 +393,44 @@ test("source map: MinBars (logic-less) has no source map", async () => {
   assert.ok(!r.engineInfo().features.includes("source-map"));
   // {{.}} is Mustache's implicit iterator (renders the string context verbatim).
   assert.deepEqual(r.render(r.compile("{{.}}").program, "x", { map: true }), { output: "x", segments: [] });
+});
+
+// the source span of the first linkable emit, used to drive the inspector.
+const firstEmitTarget = (r, prog, data) => {
+  const { segments } = r.render(prog, data, { map: true });
+  return segments.find((s) => s.kind === "emit" && s.start != null);
+};
+
+test("context inspector: per-execution snapshots of the render context (context-inspect)", async () => {
+  const r = await createRenderer("fullbars");
+  assert.ok(r.engineInfo().features.includes("context-inspect"));
+  const prog = r.compile("{{#each xs}}<b>{{ this }}</b>{{/each}}").program;
+  const data = { xs: ["a", "b"], top: "T" };
+  const snaps = r.inspectAt(prog, data, firstEmitTarget(r, prog, data));
+  assert.equal(snaps.length, 2, "one snapshot per loop iteration");
+  assert.deepEqual(snaps.map((s) => s.this), ["a", "b"]);
+  assert.deepEqual(snaps.map((s) => s.index), [0, 1]);
+  assert.equal(snaps[0].first, true);
+  assert.equal(snaps[1].last, true);
+  assert.deepEqual(snaps[0].root, data);
+});
+
+test("context inspector: block params surface as locals", async () => {
+  const r = await createRenderer("fullbars");
+  const prog = r.compile("{{#each xs as |item|}}[{{ item }}]{{/each}}").program;
+  const snaps = r.inspectAt(prog, { xs: ["x"] }, firstEmitTarget(r, prog, { xs: ["x"] }));
+  assert.deepEqual(snaps[0].locals, { item: "x" });
+});
+
+test("context inspector: non-surface dialects gate off (unsupported)", async () => {
+  for (const dialect of ["rawbars", "maxbars", "minbars"]) {
+    const r = await createRenderer(dialect);
+    assert.ok(!r.engineInfo().features.includes("context-inspect"), `${dialect} omits context-inspect`);
+    assert.throws(
+      () => r.inspectAt(r.compile("{{ this }}").program, "x", { file: "main", start: 0, end: 1 }),
+      (e) => e.kind === "unsupported",
+    );
+  }
 });
 
 // ── MinBars (Mustache) ───────────────────────────────────────────────────────
