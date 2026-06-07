@@ -13,6 +13,8 @@
 //!   f64 formatting, which is out of scope for v1 — see the module docs).
 //! - [`Truthy`] / [`truthy`] — the `nonEmpty` truthiness rule, minus numbers
 //!   ([`truthy`](mod@truthy)). A bare-number condition does not compile.
+//! - [`Loop`] — the borrowed-reference loop frame model ([`frame`]): per-iteration
+//!   `{{#each}}` metadata threaded by lexical nesting, no `Rc`, no heap frame.
 //!
 //! The design contract is the `trussbars/docs/` set: `01-subset-spec.md` (the
 //! language), `02-runtime-api.md` (this crate's surface), and `04-conformance.md`
@@ -22,8 +24,10 @@
 //! This crate is std-only and `#![forbid(unsafe_code)]` — a small, auditable
 //! substrate is part of the point.
 
+mod frame;
 mod text;
 mod truthy;
 
+pub use frame::Loop;
 pub use text::{Safe, ToText, esc, escape_html};
 pub use truthy::{Truthy, truthy};
