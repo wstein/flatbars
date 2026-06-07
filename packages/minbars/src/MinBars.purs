@@ -28,6 +28,8 @@ module MinBars
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (elem)
 import Data.List (List(..), (:))
@@ -105,7 +107,10 @@ parseMinWith
 parseMinWith cfg src = do
   toks <- tokenizeTemplate cfg minOptions.lexOptions src
   directives <- collectDirectives toks
-  nodes <- buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions toks)
+  -- buildFromTokens reports all errors (NonEmptyArray); parseMinWith keeps the
+  -- simpler `ParseError`, so take the first.
+  nodes <- lmap NEA.head
+    (buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions toks))
   pure { directives, nodes }
 
 -- | One-shot pure render of MinBars (Mustache) source against root data.

@@ -12,6 +12,8 @@ module Kernel.Render
 import Prelude
 
 import Control.Monad.Error.Class (class MonadThrow)
+import Data.Array.NonEmpty as NEA
+import Data.String.Common (joinWith)
 import FlatBars.Error (Error(ParseFailure), renderParseErrorAt)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
@@ -74,5 +76,6 @@ runResolvedUsing toEngine _directives setup nodes dat =
 -- | `show` form. What a JS/CLI facade should print instead of a bare offset.
 formatError :: String -> Error -> String
 formatError src = case _ of
-  ParseFailure pe -> renderParseErrorAt src pe
+  -- Report every parse error (ADR-023), one per line.
+  ParseFailure pes -> joinWith "\n" (map (renderParseErrorAt src) (NEA.toArray pes))
   e -> show e

@@ -12,6 +12,8 @@ module FullBars.Compile
 
 import Prelude
 
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Map as Map
 import FlatBars.Compile (compile)
@@ -35,7 +37,7 @@ compileSurface = compileSurfaceWith true noLoopVars defaultParseOptions "rt.trut
 compileSurfaceWith
   :: Boolean -> LoopVars -> ParseOptions -> String -> String -> Either ParseError String
 compileSurfaceWith strict lv opts truthyCallback src = do
-  { nodes } <- parseWith opts src
+  { nodes } <- lmap NEA.head (parseWith opts src)
   checkBareInline strict nodes
   let h = hoistInline (desugarSurfaceWith lv nodes)
   pure (compile (metaFor truthyCallback) fullbarsEmit (Map.toUnfoldable h.partials) h.template)

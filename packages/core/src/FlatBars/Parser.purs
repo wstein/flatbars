@@ -22,6 +22,8 @@ module FlatBars.Parser
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NEA
 import Data.Either (Either(..), either)
 import Data.List (List(..), (:))
 import Data.List as List
@@ -116,7 +118,9 @@ defaultParseOptions =
 -- | the default options. The directives are a meaning-free list the engine
 -- | interprets later (see `FlatBars.Syntax.Directive`); the `Template` is the
 -- | node tree (comments stripped). See `docs/.../grammar.adoc`.
-parse :: String -> Either ParseError { directives :: Array Directive, nodes :: Template }
+parse
+  :: String
+  -> Either (NonEmptyArray ParseError) { directives :: Array Directive, nodes :: Template }
 parse = parseWith defaultParseOptions
 
 -- | A *recovering* parse (ADR-023). It never bails on the first error: it keeps
@@ -174,13 +178,13 @@ parseRecovering opts src = case tokenizeTemplate opts.lexConfig opts.lexOptions 
 parseWith
   :: ParseOptions
   -> String
-  -> Either ParseError { directives :: Array Directive, nodes :: Template }
+  -> Either (NonEmptyArray ParseError) { directives :: Array Directive, nodes :: Template }
 parseWith opts src =
   let
     r = parseRecovering opts src
   in
-    case Array.head r.errors of
-      Just e -> Left e
+    case NEA.fromArray r.errors of
+      Just es -> Left es
       Nothing -> Right { directives: r.directives, nodes: r.nodes }
 
 -- | Build the node tree from an *already tokenized* (and, where a dialect wants
@@ -191,7 +195,7 @@ parseWith opts src =
 -- | committing to that pass. Comments are dropped here (they carry no output);
 -- | any standalone pass that needs them must therefore run *before* this. Fail-
 -- | fast, like `parseWith` (it projects the recovering `parseSeq`).
-buildFromTokens :: ParseOptions -> Array RawTok -> Either ParseError Template
+buildFromTokens :: ParseOptions -> Array RawTok -> Either (NonEmptyArray ParseError) Template
 buildFromTokens opts toks =
   let
     -- Each tag already carries its pre-lexed interior (`tokenizeTemplate`, or a
@@ -201,11 +205,11 @@ buildFromTokens opts toks =
       (Array.filter (not <<< isComment) toks)
       0
   in
-    case Array.head r.errors of
-      Just e -> Left e
+    case NEA.fromArray r.errors of
+      Just es -> Left es
       Nothing -> case r.stop of
         StopEOF -> Right r.nodes
-        StopClose name _ -> Left (MismatchedBlock "<none>" name 0)
+        StopClose name _ -> Left (NEA.singleton (MismatchedBlock "<none>" name 0))
 
 isComment :: RawTok -> Boolean
 isComment = case _ of

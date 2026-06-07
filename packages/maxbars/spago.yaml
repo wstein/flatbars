@@ -8,6 +8,7 @@ package:
       githubRepo: flatbars
   dependencies:
     - arrays
+    - bifunctors
     - either
     - flatbars
     - fullbars

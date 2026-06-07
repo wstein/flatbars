@@ -8,8 +8,9 @@ package:
       githubRepo: flatbars
   dependencies:
     - arrays
-    - flatbars
+    - bifunctors
     - either
+    - flatbars
     - foldable-traversable
     - fullbars
     - kernel

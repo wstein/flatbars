@@ -51,6 +51,7 @@ import Prelude
 import Control.Monad.Error.Class (throwError)
 import Data.Argonaut.Core (Json, caseJsonArray, caseJsonObject, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, length, null, take, uncons, zipWith) as Array
+import Data.Array.NonEmpty as NEA
 import Data.Either (Either(..), either)
 import Data.Function.Uncurried (Fn1, Fn2, Fn3, Fn4, mkFn1, mkFn2, mkFn3, mkFn4)
 import Data.Int (toNumber)
@@ -59,7 +60,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String (Pattern(..), indexOf)
 import Data.String.Common (joinWith)
 import Data.Tuple (Tuple(..))
-import FlatBars (Expr(..), ParseError, defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt)
+import FlatBars (Expr(..), ParseError, defaultParseOptions, parse, parseErrorAt, parseRecovering, parseWith, renderParseErrorAt, renderParseErrorsAt)
 import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
 import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
@@ -180,7 +181,7 @@ lint = mkFn2 \tpl dialect ->
       _ -> RawBars.coreOptions
   in
     case parseWith opts tpl of
-      Left pe -> { ok: false, findings: [], report: "", error: renderParseErrorAt tpl pe }
+      Left pes -> { ok: false, findings: [], report: "", error: renderParseErrorsAt tpl pes }
       Right { nodes } ->
         let
           issues = aliasWarnings nodes <> (if surface then [] else scopedCanonWarnings nodes)
@@ -646,7 +647,7 @@ astJson = mkFn2 \dialect src ->
           ]
   in
     case (if dialect == "maxbars" then parseWith maxOptions else parse) src of
-      Left pe -> errObj pe
+      Left pe -> errObj (NEA.head pe)
       -- the FullBars surface also *rejects* a bare `{{#inline}}` (the decorator is
       -- required) via `checkBareInline`; mirror that in the AST view so the Lab
       -- reports the same `DisallowedShape` a render would, not a misleading node.

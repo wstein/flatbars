@@ -7,12 +7,14 @@ package:
       githubOwner: flatbars
       githubRepo: flatbars
   dependencies:
-    - prelude
+    - arrays
+    - bifunctors
     - either
-    - ordered-collections
     - flatbars
     - flatbars-compile
     - fullbars
+    - ordered-collections
+    - prelude
   test:
     main: Test.FullBars.Compile.Main
     dependencies:

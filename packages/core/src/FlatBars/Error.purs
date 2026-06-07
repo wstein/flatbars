@@ -14,10 +14,14 @@ module FlatBars.Error
   , ParseDiagnostic
   , parseErrorAt
   , renderParseErrorAt
+  , renderParseErrorsAt
   ) where
 
 import Prelude
 
+import Data.Array.NonEmpty (NonEmptyArray)
+import Data.Array.NonEmpty as NEA
+import Data.String.Common (joinWith)
 import FlatBars.Span (lineColumn)
 
 -- | An offset is the index (in code units) into the source where the offending
@@ -103,11 +107,20 @@ renderParseErrorAt src pe =
   in
     show d.line <> ":" <> show d.column <> ": " <> d.message
 
+-- | Render every parse error the recovering parser found (ADR-023 — report ALL),
+-- | one `line:column: message` per line, in source order. The user-facing
+-- | render-diag / CLI paths use this so a malformed template surfaces all its
+-- | errors, not just the first.
+renderParseErrorsAt :: String -> NonEmptyArray ParseError -> String
+renderParseErrorsAt src = joinWith "\n" <<< map (renderParseErrorAt src) <<< NEA.toArray
+
 -- | Evaluation errors. `UnknownHelper` is the only one the core raises during
 -- | rendering; the rest are conventions helpers use to report their own
--- | contract violations. `ParseFailure` carries a structured `ParseError` so
--- | callers that run source end-to-end (`runString`) can still tell a malformed
--- | template apart from a render-time failure, rather than seeing a flat string.
+-- | contract violations. `ParseFailure` carries the *non-empty* list of structured
+-- | `ParseError`s the recovering parser found (ADR-023 — report ALL, not just the
+-- | first), so callers that run source end-to-end (`runString`) can still tell a
+-- | malformed template apart from a render-time failure, rather than seeing a flat
+-- | string.
 data Error
   = UnknownHelper String
   | ArityError String
@@ -122,7 +135,7 @@ data Error
   -- source offset for a located diagnostic. (No engine currently produces it —
   -- reserved for header-directive validation.)
   | DirectiveError String Int
-  | ParseFailure ParseError
+  | ParseFailure (NonEmptyArray ParseError)
 
 derive instance eqError :: Eq Error
 
@@ -138,4 +151,5 @@ renderError = case _ of
   HelperError m -> "HelperError: " <> m
   RecursionLimit n -> "RecursionLimit: partial recursion exceeded budget of " <> show n
   DirectiveError m o -> "DirectiveError: " <> m <> " (at " <> show o <> ")"
-  ParseFailure pe -> "ParseFailure: " <> renderParseError pe
+  -- Report every parse error (ADR-023), joined — not just the first.
+  ParseFailure pes -> "ParseFailure: " <> joinWith "; " (map renderParseError (NEA.toArray pes))

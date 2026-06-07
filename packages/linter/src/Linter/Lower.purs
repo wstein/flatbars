@@ -21,6 +21,8 @@ module Linter.Lower
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import FlatBars.Error (ParseError(..))
@@ -37,7 +39,7 @@ import MaxBars (maxLoopVars, maxOptions)
 -- | is reported as a located internal error.
 lowerToRawBars :: String -> Either ParseError String
 lowerToRawBars src = do
-  { directives, nodes } <- parseWith maxOptions src
+  { directives, nodes } <- lmap NEA.head (parseWith maxOptions src)
   let desugared = desugarSurfaceWith maxLoopVars nodes
   case findInheritance desugared of
     Just sigil ->

@@ -7,18 +7,19 @@ package:
       githubOwner: flatbars
       githubRepo: flatbars
   dependencies:
-    - prelude
     - arrays
-    - strings
-    - maybe
+    - bifunctors
     - either
-    - tuples
-    - foldable-traversable
-    - ordered-collections
-    - integers
-    - numbers
     - flatbars
+    - foldable-traversable
+    - integers
     - kernel
+    - maybe
+    - numbers
+    - ordered-collections
+    - prelude
+    - strings
+    - tuples
   test:
     main: Test.FullBars.Main
     dependencies:

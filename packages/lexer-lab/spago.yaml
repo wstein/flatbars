@@ -11,6 +11,7 @@ package:
   name: flatbars-lexer-lab
   dependencies:
     - arrays
+    - bifunctors
     - control
     - either
     # Phase-1 parser parity: the lab parser targets the engine's Syntax AST and

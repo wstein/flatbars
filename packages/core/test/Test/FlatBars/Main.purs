@@ -8,6 +8,7 @@ module Test.FlatBars.Main where
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
 import Data.Either (Either(..), isLeft)
 import Data.Foldable (for_)
 import Data.Map as Map
@@ -214,10 +215,10 @@ main = do
     Left e -> assert' ("inheritance: dynamic parent parse error " <> show e) false
   -- with the default options (`inheritance = false`) the shapes are rejected.
   case parse "{{<p}}B{{/p}}" of
-    Left (DisallowedShape _ _) -> pure unit
+    Left es | DisallowedShape _ _ <- NEA.head es -> pure unit
     _ -> assert' "inheritance: parent rejected when not opted in" false
   case parse "{{$b}}D{{/b}}" of
-    Left (DisallowedShape _ _) -> pure unit
+    Left es | DisallowedShape _ _ <- NEA.head es -> pure unit
     _ -> assert' "inheritance: block-def rejected when not opted in" false
   -- a normal section / inverse still parse unchanged (sigil regression).
   case parse "{{#x}}A{{/x}}" of
@@ -339,9 +340,9 @@ main = do
   let
     bad = "hello\nworld {{{}}}"
   case parse bad of
-    Left e ->
+    Left es ->
       let
-        d = parseErrorAt bad e
+        d = parseErrorAt bad (NEA.head es)
       in
         assert' ("parseErrorAt: " <> show d.line <> ":" <> show d.column <> " " <> d.message)
           (d.line == 2 && d.column == 7)
@@ -385,7 +386,7 @@ main = do
     (dirsOf "pre {{! @truthiness:ruby }}{{{this}}}" == [ Tuple "truthiness" "ruby" ])
   -- a directive after the first real tag is a DirectiveAfterHeader error.
   case parse "{{{this}}}{{! @foo:bar }}" of
-    Left (DirectiveAfterHeader _) -> pure unit
+    Left es | DirectiveAfterHeader _ <- NEA.head es -> pure unit
     _ -> assert' "directive: after-header must error" false
 
   -- Standalone trim (on by default) removes a lone block's line; parseWith can
@@ -414,7 +415,7 @@ main = do
     )
   -- an invalid @trim value is a BadDirective parse error.
   case parse "{{! @trim:loose }}x" of
-    Left (BadDirective _ _) -> pure unit
+    Left es | BadDirective _ _ <- NEA.head es -> pure unit
     _ -> assert' "trim: invalid @trim value must error" false
 
   -- ToValue host binding: native PureScript data lowers to the core `Value`.

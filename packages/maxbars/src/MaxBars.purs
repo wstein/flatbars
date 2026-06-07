@@ -17,6 +17,8 @@ module MaxBars
 
 import Prelude
 
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Tuple (Tuple)
 import FlatBars.Error (Error, ParseError)
@@ -107,7 +109,7 @@ compileMaxJs = compileSurfaceWith false maxLoopVars maxOptions "rt.truthyNonEmpt
 -- |    parenthesise the pipe, `{{#x (a | f)}}`.
 maxbarsWarnings :: String -> Either ParseError (Array Issue)
 maxbarsWarnings src = do
-  { nodes } <- parseWith maxOptions src
+  { nodes } <- lmap NEA.head (parseWith maxOptions src)
   -- label shadows read the *desugared* tree (a label survives as the `@label`
   -- marker); the stray-bar lint reads the *parsed* tree (the desugar rewrites a
   -- bare bar into a `lookup`, erasing the signal).

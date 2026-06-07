@@ -27,6 +27,7 @@ module RawBars
 import Prelude
 
 import Control.Monad.Except.Trans (runExceptT)
+import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -35,7 +36,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (coreEmit, metaFor)
-import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorAt)
+import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorsAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
@@ -77,7 +78,7 @@ compile = compileWith coreOptions
 -- | `compile` with explicit parse options; RawBars always rejects extras.
 compileWith :: ParseOptions -> String -> Either ParseError (Value -> Either Error String)
 compileWith opts src = do
-  { directives, nodes } <- parseWith
+  { directives, nodes } <- lmap NEA.head $ parseWith
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
   let h = hoistInline nodes
@@ -88,7 +89,7 @@ compileWith opts src = do
 -- | One-shot render of core source against data.
 render :: String -> Value -> Either String String
 render src dat = case parseWith coreOptions src of
-  Left pe -> Left (show (ParseFailure pe))
+  Left pes -> Left (show (ParseFailure pes))
   Right { directives, nodes } ->
     let
       h = hoistInline nodes
@@ -101,7 +102,7 @@ render src dat = case parseWith coreOptions src of
 -- | `render` with located parse-error messages (`line:column:`).
 renderDiag :: String -> Value -> Either String String
 renderDiag src dat = case parseWith coreOptions src of
-  Left pe -> Left (renderParseErrorAt src pe)
+  Left pes -> Left (renderParseErrorsAt src pes)
   Right { directives, nodes } ->
     let
       h = hoistInline nodes
@@ -131,7 +132,7 @@ renderWithOperations operations partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
     Right ps -> case parseWith coreOptions src of
-      Left pe -> Left (renderParseErrorAt src pe)
+      Left pes -> Left (renderParseErrorsAt src pes)
       Right { directives, nodes } ->
         let
           h = hoistInline nodes
@@ -146,7 +147,7 @@ renderWithOperations operations partialSrcs src dat =
           lmap (formatError src) (runResolved directives setup h.template dat)
   where
   compilePartial (Tuple name s) = case parseWith coreOptions s of
-    Left e -> Left (renderParseErrorAt s e)
+    Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: nodes }
 
 -- | The async instantiation: the same engine in `ExceptT Error Aff`.
@@ -176,7 +177,7 @@ compileJs = compileJsWith coreOptions
 -- | `compileJs` with explicit parse options; RawBars always rejects extras.
 compileJsWith :: ParseOptions -> String -> Either ParseError String
 compileJsWith opts src = do
-  { nodes } <- parseWith
+  { nodes } <- lmap NEA.head $ parseWith
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
   let h = hoistInline nodes

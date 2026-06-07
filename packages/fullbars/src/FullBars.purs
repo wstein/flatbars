@@ -34,6 +34,8 @@ module FullBars
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (elem)
 import Data.Map as Map
@@ -41,7 +43,7 @@ import Data.Maybe (Maybe(..))
 import Data.String.Common (joinWith)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import FlatBars.Error (Error, ParseError(..), renderParseErrorAt)
+import FlatBars.Error (Error, ParseError(..), renderParseErrorAt, renderParseErrorsAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
@@ -91,7 +93,7 @@ checkBareInline strict nodes
 -- | definitions are hoisted into the partial registry before rendering.
 compileSurface :: String -> Either ParseError (Value -> Either Error String)
 compileSurface src = do
-  { directives, nodes } <- parse src
+  { directives, nodes } <- lmap NEA.head (parse src)
   checkBareInline true nodes
   let
     { partials, template } = hoistInline (desugarSurface nodes)
@@ -162,7 +164,7 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
     Right ps -> case parseWith opts src of
-      Left pe -> Left (renderParseErrorAt src pe)
+      Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes } | Left e <- checkBareInline strict nodes -> Left (renderParseErrorAt src e)
       Right { directives, nodes } ->
         let
@@ -180,7 +182,7 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
   -- mirrors `renderSurfaceWith.compilePartial`, but locates the error and uses the
   -- dialect's parse options + loop-var desugar.
   compilePartial (Tuple name s) = case parseWith opts s of
-    Left e -> Left (renderParseErrorAt s e)
+    Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
 
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
@@ -195,7 +197,7 @@ renderSurfaceDiag = renderSurfaceDiagWith true noLoopVars defaultParseOptions ha
 renderSurfaceDiagWith
   :: Boolean -> LoopVars -> ParseOptions -> Truthy -> String -> Value -> Either String String
 renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of
-  Left pe -> Left (renderParseErrorAt src pe)
+  Left pes -> Left (renderParseErrorsAt src pes)
   Right { nodes } | Left e <- checkBareInline strict nodes -> Left (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
@@ -220,7 +222,7 @@ renderSurfaceValue src = renderSurfaceDiag src <<< toValue
 -- | localization — not `registerHelper`. Located parse/eval errors as `Left`.
 renderSurfaceI18n :: Translator -> String -> Value -> Either String String
 renderSurfaceI18n tr src dat = case parse src of
-  Left e -> Left (renderParseErrorAt src e)
+  Left es -> Left (renderParseErrorsAt src es)
   Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
@@ -265,7 +267,7 @@ analyseSurfaceWith
        , evaluated :: Int
        }
 analyseSurfaceWith schema src dat = case parse src of
-  Left e -> Left (renderParseErrorAt src e)
+  Left es -> Left (renderParseErrorsAt src es)
   Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
   Right { nodes } ->
     let

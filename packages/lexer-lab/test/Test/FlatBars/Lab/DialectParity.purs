@@ -11,6 +11,8 @@ module Test.FlatBars.Lab.DialectParity (tests) where
 
 import Prelude
 
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Tuple (Tuple(..))
@@ -94,11 +96,11 @@ tests = do
     labMin src = do
       raw <- Lab.toRawToks minLab src
       _ <- collectDirectives raw
-      buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions raw)
+      lmap NEA.head (buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions raw))
     engMin src = do
       toks <- E.tokenizeTemplate minEng minOptions.lexOptions src
       _ <- collectDirectives toks
-      buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions toks)
+      lmap NEA.head (buildFromTokens minOptions (mustacheStandalone minOptions.lexOptions toks))
   for_ minbarsCorpus \src ->
     case labMin src, engMin src of
       Right lab, Right eng ->

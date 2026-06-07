@@ -148,6 +148,7 @@
         "core": {
           "dependencies": [
             "arrays",
+            "bifunctors",
             "control",
             "either",
             "flatbars",
@@ -179,6 +180,7 @@
         "core": {
           "dependencies": [
             "arrays",
+            "bifunctors",
             "either",
             "flatbars",
             "foldable-traversable",
@@ -206,6 +208,8 @@
         "path": "packages/fullbars-compile",
         "core": {
           "dependencies": [
+            "arrays",
+            "bifunctors",
             "either",
             "flatbars",
             "flatbars-compile",
@@ -258,6 +262,7 @@
         "core": {
           "dependencies": [
             "arrays",
+            "bifunctors",
             "either",
             "flatbars",
             "foldable-traversable",
@@ -287,6 +292,7 @@
         "core": {
           "dependencies": [
             "arrays",
+            "bifunctors",
             "either",
             "flatbars",
             "fullbars",
@@ -314,6 +320,7 @@
         "core": {
           "dependencies": [
             "arrays",
+            "bifunctors",
             "either",
             "flatbars",
             "flatbars-compile",
@@ -342,6 +349,7 @@
         "core": {
           "dependencies": [
             "aff",
+            "arrays",
             "bifunctors",
             "either",
             "flatbars",

@@ -32,6 +32,8 @@ module Linter.Aliases
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..))
@@ -73,7 +75,7 @@ aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
 -- | (`{{plus a b}}` / `(plus a b)`). A MaxBars caller parses with `maxOptions`
 -- | and uses `aliasWarnings` directly.
 aliasWarningsOf :: String -> Either ParseError (Array LintWarning)
-aliasWarningsOf src = (aliasWarnings <<< _.nodes) <$> parse src
+aliasWarningsOf src = (aliasWarnings <<< _.nodes) <$> lmap NEA.head (parse src)
 
 -- | Warn on every use of a non-canonical scoped variable (`index` → `index0`,
 -- | `partial-block` → `yield`), pointing at the native spelling. Surface-scoped:
@@ -95,5 +97,7 @@ scopedCanonWarnings = Array.mapMaybe warnOf <<< operationRefs
 
 -- | Parse `src` with the default (core) parser and warn on any non-canonical
 -- | scoped-variable use — the convenience entry point for RawBars/MaxBars source.
+-- | (Lint reports the first parse error; the recovering parser's full list is for
+-- | the render/CLI paths — here `lmap NEA.head` keeps the simpler `ParseError`.)
 scopedCanonWarningsOf :: String -> Either ParseError (Array LintWarning)
-scopedCanonWarningsOf src = (scopedCanonWarnings <<< _.nodes) <$> parse src
+scopedCanonWarningsOf src = (scopedCanonWarnings <<< _.nodes) <$> lmap NEA.head (parse src)

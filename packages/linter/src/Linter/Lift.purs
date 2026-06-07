@@ -44,6 +44,8 @@ module Linter.Lift
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Foldable (lookup)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -133,7 +135,9 @@ binaryOps =
 -- | re-sugared by the MaxBars-surface printer below.
 liftToMaxBars :: String -> Either ParseError LiftResult
 liftToMaxBars src = do
-  { nodes } <- parseWith (defaultParseOptions { extras = false }) src
+  -- Lift reports the first parse error (the recovering parser's full list is for
+  -- the render/CLI paths); `lmap NEA.head` keeps the simpler `ParseError`.
+  { nodes } <- lmap NEA.head (parseWith (defaultParseOptions { extras = false }) src)
   pure (printTemplate nodes)
 
 --------------------------------------------------------------------------------

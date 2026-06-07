@@ -27,7 +27,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (message, try)
-import FlatBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt)
+import FlatBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorAt, renderParseErrorsAt)
 import FlatBars.Json (parseValue)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
@@ -240,7 +240,7 @@ runCompile popts opts tpl =
 -- | Run the skeleton-AST validation pass + directive lints and report issues.
 runValidate :: ParseOptions -> String -> Effect Unit
 runValidate popts tpl = case parseWith popts tpl of
-  Left err -> die ("flatbars: parse error at " <> renderParseErrorAt tpl err)
+  Left errs -> die ("flatbars: parse error at " <> renderParseErrorsAt tpl errs)
   Right { directives, nodes: template } ->
     case directiveLints directives <> validate preludeSchema template of
       [] -> writeStdout "ok: no issues\n"
@@ -460,8 +460,8 @@ runLint args
                     else coreOptions
                 in
                   case parseWith popts tpl of
-                    Left pe -> die
-                      ("flatbars lint: " <> tplPath <> ":" <> renderParseErrorAt tpl pe)
+                    Left pes -> die
+                      ("flatbars lint: " <> tplPath <> ":" <> renderParseErrorsAt tpl pes)
                     Right { nodes } ->
                       -- The scoped-variable lint is for the native (core/MaxBars)
                       -- spelling; on the FullBars surface `@index`/`@partial-block`

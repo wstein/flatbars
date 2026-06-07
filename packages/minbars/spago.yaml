@@ -7,19 +7,20 @@ package:
       githubOwner: flatbars
       githubRepo: flatbars
   dependencies:
-    - prelude
     - arrays
-    - lists
-    - ordered-collections
-    - maybe
+    - bifunctors
     - either
-    - strings
-    - foldable-traversable
-    - transformers
-    - tuples
     - flatbars
     - flatbars-compile
+    - foldable-traversable
     - kernel
+    - lists
+    - maybe
+    - ordered-collections
+    - prelude
+    - strings
+    - transformers
+    - tuples
   test:
     main: Test.MinBars.Main
     dependencies:

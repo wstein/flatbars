@@ -19,6 +19,8 @@ module FlatBars.Lab.RawTok
 import Prelude
 
 import Data.Array as Array
+import Data.Array.NonEmpty as NEA
+import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
@@ -438,7 +440,9 @@ parse opts src = do
   directives <- collectDirectives raw
   standalone <- effectiveTrim opts directives
   let toks' = if standalone then E.trimStandalone opts.standaloneSeps raw else raw
-  nodes <- buildFromTokens opts toks'
+  -- buildFromTokens reports all errors (NonEmptyArray); this lab parse keeps the
+  -- simpler `ParseError`, so take the first.
+  nodes <- lmap NEA.head (buildFromTokens opts toks')
   pure { directives, nodes }
   where
   -- the structural scanner only needs open/close + mustacheDelims (it slices
