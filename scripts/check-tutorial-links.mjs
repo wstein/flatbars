@@ -18,7 +18,7 @@ import { examples as fullbarsExamples } from "../tutorials/src/fullbars.mjs";
 import { examples as maxbarsExamples } from "../tutorials/src/maxbars.mjs";
 import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
 import { createMinBarsRenderer } from "../lab/minbars.mjs";
-import { renderWith, safe } from "../lab/vendor/flatbars-engine.mjs";
+import { renderWith, renderMaxWith, safe } from "../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../lab/helpers.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
 
@@ -254,7 +254,18 @@ for (const [key, mex] of Object.entries(maxbarsExamples)) {
     continue;
   }
   try {
-    const out = mbr.render(mbr.compile(mex.template, mex.partials || {}).program, mex.data ?? {});
+    // A custom-helper example (ADR-018) renders through `renderMaxWith` (MaxBars'
+    // operation registrar — the same path the card uses); otherwise plain render.
+    let out;
+    if (mex.helpers && mex.helpers.trim()) {
+      const built = buildHelpers(mex.helpers, safe);
+      if (!built.ok) throw new Error("helper source error: " + built.error);
+      const r = renderMaxWith(built.helpers, mex.partials || {}, mex.template, mex.data ?? {});
+      if (!r.ok) throw new Error(r.error);
+      out = r.value;
+    } else {
+      out = mbr.render(mbr.compile(mex.template, mex.partials || {}).program, mex.data ?? {});
+    }
     if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
     let note = "";
     if (mex.compiles) {

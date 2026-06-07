@@ -246,6 +246,23 @@ export const examples = {
     data: { name: "ada" },
   },
 
+  // ── Raw blocks {{{{#name}}}} (custom operator required) ───────────────────
+  rawBlock: {
+    // A raw block hands its body to the head OPERATION completely UNPROCESSED:
+    // the inner {{bar}} is never interpreted — it is literal text the operation
+    // receives via options.fn(). `rawloud` upper-cases that raw body, so the
+    // verbatim {{bar}} comes out {{BAR}} (the data is never read). MaxBars uses
+    // the FlatBars {{{{#name}}}} spelling (hash sigil), like RawBars.
+    //
+    // The head MUST resolve to a defined operation: a raw block exists only to
+    // feed its body to one, so an undefined head is a hard UnknownHelper error —
+    // never a silent empty render (the strict-raw-block rule, every dialect).
+    engine: "maxbars",
+    helpers: "registerHelper('rawloud', (options) => options.fn().toUpperCase());",
+    template: "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}",
+    data: null,
+  },
+
   // ── Where MaxBars diverges ────────────────────────────────────────────────
   separatorParens: {
     // The ONE place infix is not allowed: a clause separator. `{{else if (gt n 0)}}`

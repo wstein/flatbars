@@ -8981,11 +8981,11 @@ var runTemplate = function(dictMonad) {
         }
         ;
         if (v instanceof Block) {
-          return applyBlock(env)(v.value0)(v.value2)(v.value3)(v.value4);
+          return applyBlock(engine.resolve)(env)(v.value0)(v.value2)(v.value3)(v.value4);
         }
         ;
         if (v instanceof RawBlock) {
-          return applyBlock(env)(v.value0)(v.value1)(v.value2)([new Content(v.value3)]);
+          return applyBlock(engine.resolveStrict)(env)(v.value0)(v.value1)(v.value2)([new Content(v.value3)]);
         }
         ;
         if (v instanceof Sep) {
@@ -8996,7 +8996,7 @@ var runTemplate = function(dictMonad) {
           return pure9("");
         }
         ;
-        throw new Error("Failed pattern match at Kernel.Engine (line 91, column 20 - line 105, column 29): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at Kernel.Engine (line 97, column 20 - line 115, column 29): " + [v.constructor.name]);
       };
     };
     var evalExpr = function(env) {
@@ -9014,7 +9014,7 @@ var runTemplate = function(dictMonad) {
             });
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Engine (line 116, column 23 - line 121, column 50): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Engine (line 133, column 23 - line 138, column 50): " + [v.constructor.name]);
         };
       };
     };
@@ -9051,19 +9051,21 @@ var runTemplate = function(dictMonad) {
         };
       };
     };
-    var applyBlock = function(env) {
-      return function(span2) {
-        return function(name2) {
-          return function(args) {
-            return function(body) {
-              var split2 = engine.blockArgs(args);
-              return bind11(traverse22(evalExpr(env)(span2))(split2.positional))(function(vals) {
-                return bind11(traverse32(evalExpr(env)(span2))(split2.hash))(function(hashV) {
-                  return bind11(engine.resolve(env)(name2))(function(h) {
-                    return bind11(h(ctl(env)(body)(span2)(hashV)(split2.params)(split2.label))(vals))(engine.stringify);
+    var applyBlock = function(resolve) {
+      return function(env) {
+        return function(span2) {
+          return function(name2) {
+            return function(args) {
+              return function(body) {
+                var split2 = engine.blockArgs(args);
+                return bind11(traverse22(evalExpr(env)(span2))(split2.positional))(function(vals) {
+                  return bind11(traverse32(evalExpr(env)(span2))(split2.hash))(function(hashV) {
+                    return bind11(resolve(env)(name2))(function(h) {
+                      return bind11(h(ctl(env)(body)(span2)(hashV)(split2.params)(split2.label))(vals))(engine.stringify);
+                    });
                   });
                 });
-              });
+              };
             };
           };
         };
@@ -9556,6 +9558,8 @@ var liftEither = function(dictMonadThrow) {
   return either(throwError(dictMonadThrow))(pure(dictMonadThrow.Monad0().Applicative0()));
 };
 var refEngineWith = function(dictMonadThrow) {
+  var throwError3 = throwError(dictMonadThrow);
+  var pure9 = pure(dictMonadThrow.Monad0().Applicative0());
   var liftEither1 = liftEither(dictMonadThrow);
   return function(policy) {
     return function(initial) {
@@ -9564,6 +9568,11 @@ var refEngineWith = function(dictMonadThrow) {
         resolve: function(env) {
           return function(name2) {
             return policy(env)(name2)(lookupOperation(name2)(env));
+          };
+        },
+        resolveStrict: function(env) {
+          return function(name2) {
+            return maybe(throwError3(new UnknownHelper(name2)))(pure9)(lookupOperation(name2)(env));
           };
         },
         stringify: function(v) {
@@ -13015,14 +13024,14 @@ var compile = function(meta) {
             }
             ;
             if (v instanceof RawBlock) {
-              return stmtOut("rt.raw(" + (jsString(v.value1) + (", " + (jsString(v.value3) + ")"))));
+              return stmtOut("rt.raw(" + (jsString(v.value1) + (", [" + (commaArgs(ctx2)(v.value2) + ("], " + (jsString(v.value3) + (", " + (ctx2.scope + ")"))))))));
             }
             ;
             if (v instanceof NodeError) {
               return "";
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Compile (line 122, column 14 - line 138, column 24): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Compile (line 122, column 14 - line 144, column 24): " + [v.constructor.name]);
           };
         };
         var commaArgs = function(ctx2) {
@@ -14729,9 +14738,9 @@ var eq33 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqString));
 var append15 = /* @__PURE__ */ append(semigroupArray);
 var lookup10 = /* @__PURE__ */ lookup3(ordString);
 var stringifyOrEmpty = function(dictMonadThrow) {
-  var $190 = liftEither(dictMonadThrow);
-  return function($191) {
-    return $190(stringify2($191));
+  var $192 = liftEither(dictMonadThrow);
+  return function($193) {
+    return $192(stringify2($193));
   };
 };
 var sectionH = function(dictMonadThrow) {
@@ -14747,17 +14756,17 @@ var sectionH = function(dictMonadThrow) {
             return args[0].value0;
           }
           ;
-          var $110 = minTruthy(ctl.env)(args[0]);
-          if ($110) {
+          var $112 = minTruthy(ctl.env)(args[0]);
+          if ($112) {
             return [args[0]];
           }
           ;
           return [];
         })();
         return map29((function() {
-          var $192 = joinWith("");
-          return function($193) {
-            return VSafe.create($192($193));
+          var $194 = joinWith("");
+          return function($195) {
+            return VSafe.create($194($195));
           };
         })())(traverse13(function(it) {
           return ctl.render(push3(it)(ctl.env))(ctl.children);
@@ -14795,8 +14804,8 @@ var invertedH = function(dictMonadThrow) {
   return function(ctl) {
     return function(args) {
       if (args.length === 1) {
-        var $116 = !minTruthy(ctl.env)(args[0]);
-        if ($116) {
+        var $118 = !minTruthy(ctl.env)(args[0]);
+        if ($118) {
           return map29(VSafe.create)(ctl.render(ctl.env)(ctl.children));
         }
         ;
@@ -14824,8 +14833,8 @@ var indentTemplate = function(indent) {
             var piece = function(j) {
               return function(p) {
                 var lead = (function() {
-                  var $120 = j === 0 && atLineStart || j > 0;
-                  if ($120) {
+                  var $122 = j === 0 && atLineStart || j > 0;
+                  if ($122) {
                     return indent;
                   }
                   ;
@@ -14873,14 +14882,14 @@ var indentTemplate = function(indent) {
               return append15(pre)(cons(v.value0.head)(go(false)(i + 1 | 0)(v.value0.tail)));
             }
             ;
-            throw new Error("Failed pattern match at MinBars.Prelude (line 291, column 32 - line 309, column 66): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at MinBars.Prelude (line 299, column 32 - line 317, column 66): " + [v.constructor.name]);
           };
         };
       };
       return go(true)(0)(tmpl);
     }
     ;
-    throw new Error("Failed pattern match at MinBars.Prelude (line 285, column 1 - line 285, column 49): " + [indent.constructor.name, tmpl.constructor.name]);
+    throw new Error("Failed pattern match at MinBars.Prelude (line 293, column 1 - line 293, column 49): " + [indent.constructor.name, tmpl.constructor.name]);
   };
 };
 var partialH2 = function(dictMonadThrow) {
@@ -14907,7 +14916,7 @@ var partialH2 = function(dictMonadThrow) {
           return pure9(new VSafe(""));
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Prelude (line 127, column 39 - line 131, column 31): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Prelude (line 135, column 39 - line 139, column 31): " + [v.constructor.name]);
       }
       ;
       return pure9(new VSafe(""));
@@ -14921,8 +14930,8 @@ var escapeH = function(dictMonadThrow) {
   return function(v) {
     return function(args) {
       if (args.length === 1) {
-        return map29(function($194) {
-          return VSafe.create(escapeHtml($194));
+        return map29(function($196) {
+          return VSafe.create(escapeHtml($196));
         })(stringifyOrEmpty1(args[0]));
       }
       ;
@@ -14931,8 +14940,8 @@ var escapeH = function(dictMonadThrow) {
   };
 };
 var ensureTrailingNL = function(s) {
-  var $141 = takeRight(1)(s) === "\n";
-  if ($141) {
+  var $143 = takeRight(1)(s) === "\n";
+  if ($143) {
     return s;
   }
   ;
@@ -14949,8 +14958,8 @@ var indentOverride = function(indent) {
       var lastI = length(ls) - 1 | 0;
       var prefix = function(i) {
         return function(l) {
-          var $144 = i === lastI && l === "" || l === "";
-          if ($144) {
+          var $146 = i === lastI && l === "" || l === "";
+          if ($146) {
             return l;
           }
           ;
@@ -14960,7 +14969,7 @@ var indentOverride = function(indent) {
       return ensureTrailingNL(joinWith("\n")(mapWithIndex2(prefix)(ls)));
     }
     ;
-    throw new Error("Failed pattern match at MinBars.Prelude (line 265, column 1 - line 265, column 45): " + [indent.constructor.name, body.constructor.name]);
+    throw new Error("Failed pattern match at MinBars.Prelude (line 273, column 1 - line 273, column 45): " + [indent.constructor.name, body.constructor.name]);
   };
 };
 var dedentTemplate = /* @__PURE__ */ (function() {
@@ -14972,8 +14981,8 @@ var dedentTemplate = /* @__PURE__ */ (function() {
         };
         var piece = function(i) {
           return function(p) {
-            var $145 = i === 0 && !atLineStart;
-            if ($145) {
+            var $147 = i === 0 && !atLineStart;
+            if ($147) {
               return p;
             }
             ;
@@ -15007,7 +15016,7 @@ var dedentTemplate = /* @__PURE__ */ (function() {
           return cons(v.value0.head)(go(false)(amount)(v.value0.tail));
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Prelude (line 195, column 33 - line 203, column 55): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Prelude (line 203, column 33 - line 211, column 55): " + [v.constructor.name]);
       };
     };
   };
@@ -15020,8 +15029,8 @@ var dedentTemplate = /* @__PURE__ */ (function() {
       ;
       return "";
     })();
-    var $158 = amount === "";
-    if ($158) {
+    var $160 = amount === "";
+    if ($160) {
       return tmpl;
     }
     ;
@@ -15048,10 +15057,10 @@ var harvestBlocks = /* @__PURE__ */ (function() {
     ;
     return Nothing.value;
   };
-  var $195 = fromFoldable3(ordString)(foldableArray);
-  var $196 = mapMaybe(blockChild);
-  return function($197) {
-    return $195($196($197));
+  var $197 = fromFoldable3(ordString)(foldableArray);
+  var $198 = mapMaybe(blockChild);
+  return function($199) {
+    return $197($198($199));
   };
 })();
 var parentH = function(dictMonadThrow) {
@@ -15080,7 +15089,7 @@ var parentH = function(dictMonadThrow) {
           return pure9(new VSafe(""));
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Prelude (line 145, column 39 - line 156, column 31): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Prelude (line 153, column 39 - line 164, column 31): " + [v.constructor.name]);
       }
       ;
       return pure9(new VSafe(""));
@@ -15100,8 +15109,8 @@ var blockH = function(dictMonadThrow) {
         var v = blookup(args[0].value0)(minBlocks(ctl.env));
         if (v instanceof Just) {
           return bind11((function() {
-            var $179 = args[1].value0 !== "";
-            if ($179) {
+            var $181 = args[1].value0 !== "";
+            if ($181) {
               return pure9(args[1].value0);
             }
             ;
@@ -15117,7 +15126,7 @@ var blockH = function(dictMonadThrow) {
           return map29(VSafe.create)(ctl.render(ctl.env)(ctl.children));
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Prelude (line 232, column 39 - line 243, column 57): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Prelude (line 240, column 39 - line 251, column 57): " + [v.constructor.name]);
       }
       ;
       if (args.length === 1 && args[0] instanceof VString) {
@@ -15130,14 +15139,14 @@ var blockH = function(dictMonadThrow) {
           return map29(VSafe.create)(ctl.render(ctl.env)(ctl.children));
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Prelude (line 246, column 23 - line 248, column 57): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Prelude (line 254, column 23 - line 256, column 57): " + [v.constructor.name]);
       }
       ;
       return throwError3(new HelperError("block: expected exactly one string name"));
     };
   };
 };
-var minEngine = function(dictMonadThrow) {
+var minResolve = function(dictMonadThrow) {
   var pure9 = pure(dictMonadThrow.Monad0().Applicative0());
   var mlookupH1 = mlookupH(dictMonadThrow);
   var escapeH1 = escapeH(dictMonadThrow);
@@ -15147,43 +15156,48 @@ var minEngine = function(dictMonadThrow) {
   var parentH1 = parentH(dictMonadThrow);
   var blockH1 = blockH(dictMonadThrow);
   var throwError3 = throwError(dictMonadThrow);
+  return function(v) {
+    return function(name2) {
+      if (name2 === "mlookup") {
+        return pure9(mlookupH1);
+      }
+      ;
+      if (name2 === "escape") {
+        return pure9(escapeH1);
+      }
+      ;
+      if (name2 === "section") {
+        return pure9(sectionH1);
+      }
+      ;
+      if (name2 === "inverted") {
+        return pure9(invertedH1);
+      }
+      ;
+      if (name2 === "partial") {
+        return pure9(partialH1);
+      }
+      ;
+      if (name2 === "parent") {
+        return pure9(parentH1);
+      }
+      ;
+      if (name2 === "block") {
+        return pure9(blockH1);
+      }
+      ;
+      return throwError3(new HelperError("unknown MinBars helper '" + (name2 + "'")));
+    };
+  };
+};
+var minEngine = function(dictMonadThrow) {
+  var minResolve1 = minResolve(dictMonadThrow);
   var liftEither2 = liftEither(dictMonadThrow);
   return function(initial) {
     return {
       initial,
-      resolve: function(v) {
-        return function(name2) {
-          if (name2 === "mlookup") {
-            return pure9(mlookupH1);
-          }
-          ;
-          if (name2 === "escape") {
-            return pure9(escapeH1);
-          }
-          ;
-          if (name2 === "section") {
-            return pure9(sectionH1);
-          }
-          ;
-          if (name2 === "inverted") {
-            return pure9(invertedH1);
-          }
-          ;
-          if (name2 === "partial") {
-            return pure9(partialH1);
-          }
-          ;
-          if (name2 === "parent") {
-            return pure9(parentH1);
-          }
-          ;
-          if (name2 === "block") {
-            return pure9(blockH1);
-          }
-          ;
-          return throwError3(new HelperError("unknown MinBars helper '" + (name2 + "'")));
-        };
-      },
+      resolve: minResolve1,
+      resolveStrict: minResolve1,
       stringify: function(v) {
         return liftEither2(stringify2(v));
       },

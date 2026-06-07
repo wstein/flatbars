@@ -207,6 +207,10 @@ refEngineWith
 refEngineWith policy initial =
   { initial
   , resolve: \env name -> policy env name (lookupOperation name env)
+  -- raw-block heads resolve strictly regardless of `policy` (so even FullBars'
+  -- lenient implicit sections don't apply): an undefined head is `UnknownHelper`.
+  , resolveStrict: \env name -> maybe (throwError (UnknownHelper name)) pure
+      (lookupOperation name env)
   , stringify: \v -> liftEither (stringify v)
   -- The marker-aware split (ADR-020 Phase 3). Recognises FullBars' `@hash`/`@param`
   -- block markers; a no-op for RawBars/MaxBars, which emit none — so this is safe

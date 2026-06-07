@@ -694,7 +694,22 @@ function block(name, args, frame, bodyFn, clauses, channel) {
   const elseFn = (clauses && clauses.else) || (() => "");
   return Array.isArray(v) ? each(v, frame, [], null, bodyFn, elseFn) : withCtx(v, frame, [], null, bodyFn, elseFn);
 }
-function raw(_name, body) { return body; }
+// A raw block hands its verbatim body to the head helper, which receives it via
+// options.fn() (the body is never interpreted). The head resolves STRICTLY — an
+// undefined head is UnknownHelper, never an implicit section — mirroring the
+// interpreter's `Kernel.Engine` resolveStrict path for a RawBlock. A user helper
+// gets Handlebars-style `options` (fn = the raw body, inverse = ""); a built-in
+// is applied inline. Returns the (stringified) helper result, emitted unescaped.
+function raw(name, args, body, frame) {
+  const u = userHelpers[name];
+  if (u) {
+    const options = { hash: {}, fn: function () { return body; }, inverse: function () { return ""; } };
+    return callUserBlock(name, u, args, options, frame.ctx);
+  }
+  const h = helpers[name];
+  if (h) return stringify(h(args, frame));
+  throw new Error("UnknownHelper: no helper named '" + name + "' in any frame");
+}
 
 // ── MinBars (Mustache) compiled-path ops (ADR-016) ───────────────────────────
 // MinBars is a peer engine: its "scope" is a context STACK with parent fallback,

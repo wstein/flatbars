@@ -36,9 +36,9 @@ main = do
   log "FlatBars.Compile emitter tests"
 
   expectJs "header + scope seeded with the truthiness callback" "hi"
-    [ "runtime 0.1.0"
+    [ "runtime 0.2.0" -- FlatBars.Compile.Emit.runtimeVersion (the single source)
     , "function (data, rt, partials)"
-    , "rt.scope(data, rt.truthyNonEmpty)" -- RawBars uses the nonEmpty rule (ADR-022), as a callback
+    , "rt.scope(data, rt.truthyNonEmpty, \"yield\")" -- RawBars: nonEmpty rule (ADR-022) + the yield body name (ADR-005)
     , "out += \"hi\""
     ]
 

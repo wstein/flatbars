@@ -131,8 +131,14 @@ compile meta emit partials main =
       ( "rt.out(rt.call(" <> jsString name <> ", [" <> commaArgs ctx args <> "], " <> ctx.scope <>
           "))"
       )
-    -- a raw block's verbatim body, passed through its raw helper.
-    RawBlock _ name _ raw -> stmtOut ("rt.raw(" <> jsString name <> ", " <> jsString raw <> ")")
+    -- a raw block hands its verbatim body to the head helper (via options.fn()).
+    -- The head resolves STRICTLY in the runtime — undefined ⇒ UnknownHelper, never
+    -- an implicit section — mirroring the interpreter's `Engine.resolveStrict`.
+    RawBlock _ name args raw -> stmtOut
+      ( "rt.raw(" <> jsString name <> ", [" <> commaArgs ctx args <> "], " <> jsString raw <> ", "
+          <> ctx.scope
+          <> ")"
+      )
     -- a recovered parse error (ADR-023) emits nothing: the compiler only runs on
     -- error-free trees (the fail-fast parse projection rejects the rest).
     NodeError _ _ -> ""

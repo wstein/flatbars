@@ -65,6 +65,12 @@ type Operation m env = Ctl m env -> Array Value -> m Value
 type Engine m env =
   { initial :: env -- starting environment + root context
   , resolve :: env -> Ident -> m (Operation m env) -- find a helper (throw UnknownHelper if absent)
+  -- Like `resolve`, but ALWAYS strict: throw `UnknownHelper` when no frame defines
+  -- the name, bypassing any lenient resolve policy. The raw-block path uses it: a
+  -- raw block exists only to hand its verbatim body to a helper, so an undefined
+  -- head is a hard error in every dialect — never an implicit section (the lenient
+  -- `{{#x}}`-over-data fallback would silently emit the body unprocessed).
+  , resolveStrict :: env -> Ident -> m (Operation m env)
   , stringify :: Value -> m String -- how a Value becomes output text
   -- Split a block head's argument expressions into the positional args (handed to
   -- the operation, *unchanged* for built-ins), the surface hash (`@hash` marker),
@@ -94,8 +100,12 @@ runTemplate engine = renderTemplate engine.initial
     -- the engine applies the head as a block helper; the opener sigil (`#`/`^`)
     -- is a dialect concern (FullBars desugars `Inverse` to `unless`), so the
     -- meaning-free driver ignores it.
-    Block span _ name args body -> applyBlock env span name args body
-    RawBlock span name args raw -> applyBlock env span name args [ Content raw ]
+    Block span _ name args body -> applyBlock engine.resolve env span name args body
+    -- a raw block resolves its head STRICTLY (undefined ⇒ UnknownHelper): its only
+    -- purpose is to feed the verbatim body to a helper, so there is no meaningful
+    -- implicit-section fallback. See `Engine`'s `resolveStrict`.
+    RawBlock span name args raw -> applyBlock engine.resolveStrict env span name args
+      [ Content raw ]
     -- A separator rendered on its own is just an application of its head; a
     -- block helper that cares (e.g. `if` at `{{else}}`) intercepts it by
     -- splitting its children before rendering, so it is never reached there.
@@ -104,12 +114,19 @@ runTemplate engine = renderTemplate engine.initial
     -- on error-free trees (the fail-fast parse projection rejects the rest).
     NodeError _ _ -> pure ""
 
-  applyBlock :: env -> Span -> Ident -> Array Expr -> Template -> m String
-  applyBlock env span name args body = do
+  applyBlock
+    :: (env -> Ident -> m (Operation m env))
+    -> env
+    -> Span
+    -> Ident
+    -> Array Expr
+    -> Template
+    -> m String
+  applyBlock resolve env span name args body = do
     let split = engine.blockArgs args
     vals <- traverse (evalExpr env span) split.positional
     hashV <- traverse (evalExpr env span) split.hash
-    h <- engine.resolve env name
+    h <- resolve env name
     h (ctl env body span hashV split.params split.label) vals >>= engine.stringify
 
   evalExpr :: env -> Span -> Expr -> m Value

@@ -50,19 +50,27 @@ import MinBars.Context (MinEnv, blookup, enterPartial, layerBlocks, minBlocks, m
 minEngine :: forall m. MonadThrow Error m => MinEnv -> Engine m MinEnv
 minEngine initial =
   { initial
-  , resolve: \_ name -> case name of
-      "mlookup" -> pure mlookupH
-      "escape" -> pure escapeH
-      "section" -> pure sectionH
-      "inverted" -> pure invertedH
-      "partial" -> pure partialH
-      "parent" -> pure parentH
-      "block" -> pure blockH
-      other -> throwError (HelperError ("unknown MinBars helper '" <> other <> "'"))
+  , resolve: minResolve
+  -- MinBars rejects raw blocks at parse (DisallowedShape — Mustache has none), so
+  -- the strict raw-block path is never reached; its `resolve` is already closed.
+  , resolveStrict: minResolve
   , stringify: \v -> liftEither (stringify v)
   -- Mustache has no hash / block-param / label surface, so the identity split (ADR-020 Phase 3).
   , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
   }
+
+-- | The closed MinBars resolver: the fixed helper names map to their helpers; an
+-- | unknown name (which the desugar never emits) throws `HelperError`.
+minResolve :: forall m. MonadThrow Error m => MinEnv -> String -> m (Operation m MinEnv)
+minResolve _ name = case name of
+  "mlookup" -> pure mlookupH
+  "escape" -> pure escapeH
+  "section" -> pure sectionH
+  "inverted" -> pure invertedH
+  "partial" -> pure partialH
+  "parent" -> pure parentH
+  "block" -> pure blockH
+  other -> throwError (HelperError ("unknown MinBars helper '" <> other <> "'"))
 
 -- | `mlookup name` — resolve a (possibly dotted) name against the context stack
 -- | (parent fallback), per `MinBars.Context.mresolve`. The name is baked in by

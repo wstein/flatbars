@@ -322,6 +322,17 @@ Core:        {{{{raw}}}}Hello {{name}}{{{{/raw}}}}   (verbatim; `raw` engine hel
 ```
 
 :::note
+*A raw block's head resolves **strictly**.* A raw block exists only to hand its
+verbatim body to a helper (via `options.fn()`), so its head must name a defined
+operation — an undefined head is a hard `UnknownHelper` error in **every** dialect,
+never an implicit section. (This is why the worked example uses `raw`, the engine's
+identity passthrough helper, and the MaxBars/FullBars references register their own
+`rawloud`/`raw-loud`.) FullBars therefore diverges from Handlebars' `blockHelperMissing`
+here: there is no silent fall-through to a context section for a raw block. The common
+`{{{{raw}}}}…{{{{/raw}}}}` keeps working because `raw` is a prelude helper.
+:::
+
+:::note
 *Standalone whitespace.* Like Handlebars, FlatBars removes a line that holds only a standalone block
 open/close or a comment, so a control tag leaves no blank line. This is **on by default** and runs as
 a post-tokenize pass in the core. Turn it off per file with `{{! @trim: none }}`, or globally

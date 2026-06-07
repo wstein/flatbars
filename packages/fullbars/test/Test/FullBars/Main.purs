@@ -125,15 +125,17 @@ expectIssue name src = case parse src of
 customEngine :: Value -> Engine (Either Error) Value
 customEngine root =
   { initial: root
-  , resolve: \_ name -> case name of
-      "this" -> Right \ctl _ -> Right ctl.env
-      "shout" -> Right shoutH
-      "at" -> Right \ctl _ -> Right (VString (show ctl.span.start)) -- reads Ctl.span
-      _ -> Left (UnknownHelper name)
+  , resolve: res
+  , resolveStrict: res -- already strict (unknown ⇒ UnknownHelper)
   , stringify
   , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
   }
   where
+  res _ name = case name of
+    "this" -> Right \ctl _ -> Right ctl.env
+    "shout" -> Right shoutH
+    "at" -> Right \ctl _ -> Right (VString (show ctl.span.start)) -- reads Ctl.span
+    _ -> Left (UnknownHelper name)
   shoutH _ args = case args of
     [ v ] -> VString <<< toUpper <$> stringify v
     _ -> Left (ArityError "shout/1")
