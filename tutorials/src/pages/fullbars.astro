@@ -310,6 +310,19 @@ $ ~> | $ | {
         sandbox — adequate for a playground.
       </p>
     </div>
+
+    <h3>Raw blocks</h3>
+    <p>
+      A <b>raw block</b> — four staches, <code>{t("{{{{helper}}}}…{{{{/helper}}}}")}</code> —
+      hands its body to the helper <b>unprocessed</b>: the inner
+      <code>{t("{{bar}}")}</code> is never interpreted, it's literal text the helper
+      receives via <code>options.fn()</code>. Useful when a template must emit
+      mustache syntax it should <em>not</em> expand (docs, code samples). Here
+      <code>raw-loud</code> upper-cases the raw body, so the verbatim
+      <code>{t("{{bar}}")}</code> comes out as <code>{t("{{BAR}}")}</code> — the
+      data's <code>bar</code> is never read.
+    </p>
+    <OpenInLab client:visible engine="fullbars" template={ex.rawBlock.template} data={ex.rawBlock.data} helpers={ex.rawBlock.helpers} />
   </section>
 
   <!-- ─────────────────── Lambdas → precalculated values ─────────────────── -->

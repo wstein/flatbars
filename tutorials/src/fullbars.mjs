@@ -282,6 +282,19 @@ grade: fail
       "    + '</ul>'))",
   },
 
+  // ── Raw blocks {{{{helper}}}} ────────────────────────────────────────────────
+  rawBlock: {
+    // A raw block hands its body to the helper UNPROCESSED: the inner `{{bar}}` is
+    // never interpreted — it's literal text the helper receives via options.fn().
+    // `raw-loud` upper-cases that raw body, so the verbatim `{{bar}}` comes out as
+    // `{{BAR}}` (the data's `bar` is never read). The Handlebars raw-block feature,
+    // verbatim.
+    engine: "fullbars",
+    helpers: "registerHelper('raw-loud', (options) => options.fn().toUpperCase());",
+    template: "{{{{raw-loud}}}}\n  {{bar}}\n{{{{/raw-loud}}}}",
+    data: null,
+  },
+
   // ── Lambdas → precalculated values (the "after" render) ──────────────────────
   precompute: {
     // A Handlebars value-lambda (a function on the context returning a string) is
