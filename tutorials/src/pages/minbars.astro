@@ -196,6 +196,18 @@ $ ~> | $ | {
     <h3>An object opens a scope</h3>
     <p>When the value is an object, that object becomes the context for the body.</p>
     <OpenInLab client:visible engine="minbars" template={ex.sectionObject.template} data={ex.sectionObject.data} />
+
+    <h3>There is no <code>if</code> — the shape decides</h3>
+    <div class="callout warn">
+      <p>
+        Mustache has <b>no conditionals</b>. <code>{t("{{#admin}}")}</code> is not an
+        <code>if</code> — it is a <em>section on the key</em> <code>admin</code>, shown when
+        <code>admin</code> is truthy/present and hidden otherwise. There is no <code>else if</code>
+        and no helper; a key that's missing simply hides its block (<code>banned</code> below).
+        This is the one thing the Handlebars examples got wrong.
+      </p>
+    </div>
+    <OpenInLab client:visible engine="minbars" template={ex.sectionNotConditional.template} data={ex.sectionNotConditional.data} />
   </section>
 
   <!-- ──────────────────────── Truthiness ───────────────────────── -->
