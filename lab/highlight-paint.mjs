@@ -133,10 +133,31 @@ function paintStructure(kind, text, s, n) {
   if (s.kind === "error" || s.kind === "unterminated") { fill(kind, from, to, "error", n); return; }
 
   const tag = text.slice(from, to);
+  // A raw block is ONE span covering BOTH tags — the opener `{{{{[#]name}}}}` and
+  // the closer `{{{{/name}}}}` — with a verbatim body between. Paint all four brace
+  // clusters (punct) and the `#`/`/` sigils (keyword); the body + name stay default.
+  // (The generic open/close paint below would only reach the outer `{{{{` and the
+  // final `}}}}`, leaving the opener's `}}}}` and the `{{{{/` unhighlighted.)
+  if (s.kind === "raw-block") {
+    // Paint only the four brace clusters (punct); the `#`/`/` sigil and the name
+    // stay default.
+    const open = tag.match(/^\{\{\{\{#?[^}]*(\}\}\}\})/);
+    if (open) {
+      fill(kind, from, from + 4, "punct", n); // {{{{
+      const oEnd = from + open[0].length;
+      fill(kind, oEnd - 4, oEnd, "punct", n); // }}}}
+    }
+    const close = tag.match(/\{\{\{\{\/[^}]*\}\}\}\}$/);
+    if (close) {
+      const cFrom = to - close[0].length;
+      fill(kind, cFrom, cFrom + 4, "punct", n); // {{{{
+      fill(kind, to - 4, to, "punct", n); // }}}}
+    }
+    return;
+  }
   const [openLen, closeLen] = braceLens(tag);
   fill(kind, from, from + openLen, "punct", n);
   fill(kind, to - closeLen, to, "punct", n);
-  if (s.kind === "raw-block") return;
 
   // Find the first non-whitespace char after the opener.
   let i = from + openLen;

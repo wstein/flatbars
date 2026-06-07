@@ -76,13 +76,24 @@ test("a set-delimiter directive: punct braces, tk-delim body (like VS Code)", ()
   assert.ok(out.endsWith('<span class="tk-punct">}}</span></span>'), out);
 });
 
-test("a comment: punct braces/sigil, tk-comment body (like VS Code)", () => {
-  // The comment delimiters ({{! … }}) are punctuation in VS Code (the
-  // punctuation.section.embedded scope sits over comment.block); only the body grey.
+test("a comment: the whole tag is tk-comment, delimiters included (like HTML/Handlebars)", () => {
+  // The comment delimiters ({{! … }}) are comment-family punctuation, so the WHOLE
+  // comment — braces included — reads in the comment colour (commit 811adeb).
   const out = highlightTemplate("{{! note }}", "minbars");
-  assert.ok(out.startsWith('<span class="tk-tag"><span class="tk-punct">{{!</span>'), out);
-  assert.ok(out.includes('<span class="tk-comment"> note </span>'), out);
-  assert.ok(out.endsWith('<span class="tk-punct">}}</span></span>'), out);
+  assert.ok(out.includes('<span class="tk-comment">{{! note }}</span>'), out);
+});
+
+test("a raw block highlights BOTH tags' {{{{ }}}} brace clusters (sigil + name stay default)", () => {
+  // One span covers `{{{{#name}}}}body{{{{/name}}}}`; the painter highlights all
+  // four brace clusters (punct) — the opener's and closer's — not just the outer
+  // braces. The `#`/`/` sigil, the name, and the verbatim body stay default.
+  const out = highlightTemplate("{{{{#code}}}}b{{{{/code}}}}", "rawbars");
+  // both `{{{{` and both `}}}}` clusters are painted punct.
+  assert.equal((out.match(/<span class="tk-punct">\{\{\{\{<\/span>/g) || []).length, 2, out);
+  assert.equal((out.match(/<span class="tk-punct">\}\}\}\}<\/span>/g) || []).length, 2, out);
+  // the sigil is NOT highlighted.
+  assert.ok(!out.includes('<span class="tk-keyword">#</span>'), out);
+  assert.ok(!out.includes('<span class="tk-keyword">/</span>'), out);
 });
 
 test("MaxBars operators and non-helper identifiers stay default", () => {
