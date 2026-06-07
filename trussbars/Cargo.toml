@@ -1,0 +1,23 @@
+# Trussbars Rust workspace — the typed MaxBars→Rust compiler target.
+# Crates compiled MaxBars templates link against (`trussbars-core`, later
+# `trussbars-std`/`trussbars-codegen`) live under `crates/`; the design is in
+# `docs/01-subset-spec.md` … `docs/04-conformance.md`.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "Apache-2.0"
+
+# Shared lint policy — every crate opts in with `[lints]\nworkspace = true`, so
+# the quality bar can never drift between crates.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }

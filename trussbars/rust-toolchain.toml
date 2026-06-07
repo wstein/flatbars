@@ -1,0 +1,5 @@
+# Pinned so the workspace, the conformance harness (docs/04), and negative-test
+# rustc diagnostics build reproducibly. Bump deliberately, not implicitly.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
