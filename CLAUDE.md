@@ -237,7 +237,7 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   format` is stale — `gen:bundle` rebuilds first, removing that footgun. Note a
   bare `spago bundle --outfile …` resolves the path *relative to the package dir*,
   writing to `packages/js/…`, not here.) The bundle URL is imported with a `?v=N`
-  cache-buster (in `lab/index.html`, `lab/flatbars.mjs`, `lab/minbars.mjs`,
+  cache-buster (in `lab/index.html`, `lab/renderer.mjs`,
   `lab/helpers-worker.mjs`) — **bump that `N` whenever you regenerate the bundle**,
   or browsers serve a cached old copy (the cause of "the Lab runs an old engine"
   even though `check:bundle` is green).

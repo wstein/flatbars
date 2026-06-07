@@ -1,7 +1,7 @@
 {
   "_generated": "by scripts/gen-conformance.mjs — DO NOT EDIT; run `npm run gen:conformance`",
   "source": "mustache/spec (vendored: packages/minbars/test/spec)",
-  "engine": "MinBars (lab/minbars.mjs — the same bundle the page's live examples run)",
+  "engine": "MinBars (lab/renderer.mjs — the same bundle the page's live examples run)",
   "modules": [
     {
       "id": "interpolation",

@@ -1,7 +1,7 @@
 {
   "_generated": "by scripts/mustache-conformance.mjs — DO NOT EDIT; run `npm run gen:mustache-conformance`",
   "source": "mustache/spec (full official suite, vendored: conformance/mustache/spec)",
-  "engine": "MinBars (lab/minbars.mjs — the shipped Lab bundle)",
+  "engine": "MinBars (lab/renderer.mjs — the shipped Lab bundle)",
   "method": "render each spec fixture through MinBars; pass = actual === the fixture's own `expected`",
   "conformance": {
     "pass": 184,

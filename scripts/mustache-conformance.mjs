@@ -5,7 +5,7 @@
 // of scripts/hbs-conformance.mjs, but Mustache *ships* a declarative spec — each
 // fixture carries its own `expected` output — so the spec itself is the oracle;
 // no second engine is needed. For every fixture in conformance/mustache/spec/ it
-// renders the template through MinBars (lab/minbars.mjs — the shipped Lab bundle)
+// renders the template through MinBars (lab/renderer.mjs — the shipped Lab bundle)
 // and asserts `actual === expected`. The headline is conformance over every
 // module MinBars implements — all required modules plus the optional
 // dynamic-names and inheritance. The optional `~lambdas` module is excluded by
@@ -23,7 +23,7 @@
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { createMinBarsRenderer } from "../lab/minbars.mjs";
+import { createRenderer } from "../lab/renderer.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
@@ -55,7 +55,7 @@ const isOptional = (file) => file.startsWith("~");
 const verbose = process.argv.includes("--verbose");
 const check = process.argv.includes("--check");
 
-const renderer = await createMinBarsRenderer();
+const renderer = await createRenderer("minbars");
 
 // The `~lambdas` module is NOT scored: a Mustache/Handlebars lambda is a function
 // embedded in the data, and a `Value` is pure data, never a function. The two
@@ -101,7 +101,7 @@ const pct = (p, t) => (t === 0 ? "100.0" : ((100 * p) / t).toFixed(1));
 const report = {
   _generated: "by scripts/mustache-conformance.mjs — DO NOT EDIT; run `npm run gen:mustache-conformance`",
   source: "mustache/spec (full official suite, vendored: conformance/mustache/spec)",
-  engine: "MinBars (lab/minbars.mjs — the shipped Lab bundle)",
+  engine: "MinBars (lab/renderer.mjs — the shipped Lab bundle)",
   method: "render each spec fixture through MinBars; pass = actual === the fixture's own `expected`",
   // The score covers every Mustache module MinBars implements — all required
   // modules plus the optional dynamic-names and inheritance.

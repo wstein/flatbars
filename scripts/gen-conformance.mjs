@@ -9,14 +9,14 @@
 //   node scripts/gen-conformance.mjs            # regenerate
 //   node scripts/gen-conformance.mjs --check    # CI: fail if out of date
 //
-// The engine is the SAME bundle the page's live islands run (lab/minbars.mjs),
+// The engine is the SAME bundle the page's live islands run (lab/renderer.mjs),
 // so a badge can't claim a pass the reader's own preview would contradict. The
 // fixtures live in packages/minbars/test/spec/*.json (re-vendor via
 // scripts/vendor-mustache.mjs). Output: tutorials/src/conformance.json.
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { createMinBarsRenderer } from "../lab/minbars.mjs";
+import { createRenderer } from "../lab/renderer.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
@@ -42,7 +42,7 @@ const orderOf = (id) => {
   return i === -1 ? META.length : i;
 };
 
-const renderer = await createMinBarsRenderer();
+const renderer = await createRenderer("minbars");
 
 const modules = [];
 let gp = 0, gt = 0;
@@ -68,7 +68,7 @@ modules.sort((a, b) => orderOf(a.id) - orderOf(b.id) || a.id.localeCompare(b.id)
 const data = {
   _generated: "by scripts/gen-conformance.mjs — DO NOT EDIT; run `npm run gen:conformance`",
   source: "mustache/spec (vendored: packages/minbars/test/spec)",
-  engine: "MinBars (lab/minbars.mjs — the same bundle the page's live examples run)",
+  engine: "MinBars (lab/renderer.mjs — the same bundle the page's live examples run)",
   modules,
   total: { pass: gp, total: gt },
 };

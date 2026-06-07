@@ -16,7 +16,7 @@
 //      contract, mirroring check-jsonata's function coverage.
 import assert from "node:assert/strict";
 import { sections, flagship, catalog, locales, makeTranslator, flagshipCatalogYaml } from "../tutorials/src/i18n.mjs";
-import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
+import { createRenderer } from "../lab/renderer.mjs";
 import { buildTranslator } from "../lab/i18n.mjs";
 import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
 
@@ -25,7 +25,7 @@ const allCells = sections.flatMap((s) => s.cells.map((c) => ({ section: s.id, ..
 
 // Render a cell's template through FullBars with `t` bound to the cell's locale.
 async function renderCell(cell) {
-  const r = await createFlatBarsRenderer("fullbars");
+  const r = await createRenderer("fullbars");
   const program = r.compile(cell.template, {}, { translator: makeTranslator(cell.locale) }).program;
   return r.render(program, cell.data);
 }
@@ -44,7 +44,7 @@ for (const cell of allCells) {
 
 console.log("\nFlagship (plural + interpolation, one locale):");
 try {
-  const r = await createFlatBarsRenderer(flagship.engine);
+  const r = await createRenderer(flagship.engine);
   const program = r.compile(flagship.template, {}, { translator: makeTranslator(flagship.locale) }).program;
   const out = r.render(program, flagship.data);
   assert.equal(out, flagship.expect);
@@ -61,7 +61,7 @@ try {
 // catalog.yaml round-trip can't drift from the page.
 console.log("\ncatalog.yaml route (Lab builder ≡ page):");
 try {
-  const r = await createFlatBarsRenderer("fullbars");
+  const r = await createRenderer("fullbars");
   for (const cell of allCells) {
     if (cell.missing) continue;
     const built = buildTranslator(flagshipCatalogYaml, cell.locale, loadYaml);

@@ -22,8 +22,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, existsSync
 import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { dump as yamlDump } from "../lab/vendor/js-yaml.mjs";
-import { createMinBarsRenderer } from "../lab/minbars.mjs";
-import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
+import { createRenderer } from "../lab/renderer.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
@@ -42,10 +41,10 @@ const DIALECTS = [
   // config / email), so they land in the "Plain Text" output view, not the HTML
   // preview — `defaultView: "source"` (the real view-tab name; see lab/output-view.mjs).
   // A per-example `view: "rendered"` (e.g. the HTML `card`) overrides it.
-  { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", defaultView: "source", makeRenderer: () => createMinBarsRenderer() },
-  { engine: "fullbars", module: "../tutorials/src/fullbars.mjs", ext: "hbs", defaultView: "source", makeRenderer: () => createFlatBarsRenderer("surface") },
-  { engine: "rawbars", module: "../tutorials/src/rawbars.mjs", ext: "rawbars", makeRenderer: () => createFlatBarsRenderer("core") },
-  { engine: "maxbars", module: "../tutorials/src/maxbars.mjs", ext: "maxbars", defaultView: "source", makeRenderer: () => createFlatBarsRenderer("maxbars") },
+  { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", defaultView: "source", makeRenderer: () => createRenderer("minbars") },
+  { engine: "fullbars", module: "../tutorials/src/fullbars.mjs", ext: "hbs", defaultView: "source", makeRenderer: () => createRenderer("surface") },
+  { engine: "rawbars", module: "../tutorials/src/rawbars.mjs", ext: "rawbars", makeRenderer: () => createRenderer("core") },
+  { engine: "maxbars", module: "../tutorials/src/maxbars.mjs", ext: "maxbars", defaultView: "source", makeRenderer: () => createRenderer("maxbars") },
 ];
 
 // Build the full {relpath: content} map a dialect projects to. Pure (no I/O), so

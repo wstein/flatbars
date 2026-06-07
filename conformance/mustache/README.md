@@ -6,7 +6,7 @@ required modules plus the optional `dynamic-names` and `inheritance`.
 Unlike Handlebars, Mustache *ships a declarative spec*: every fixture in
 [`spec/`](spec/) carries its own `expected` output, so the spec itself is the oracle — the
 harness ([`scripts/mustache-conformance.mjs`](../../scripts/mustache-conformance.mjs)) renders
-each template through MinBars (the shipped Lab bundle, `lab/minbars.mjs`) and asserts
+each template through MinBars (the shipped Lab bundle, `lab/renderer.mjs`) and asserts
 `actual === expected`. The full official suite is vendored (every module, see
 `spec/PROVENANCE.txt`), so the score is measured against the whole spec — it cannot over-claim.
 

@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// FlatBars engine-adapter tests — verifies the adapter satisfies the polyglot
-// seam (Brace Lab's third engine) without booting the browser app. Run with:
-//   node --test flatbars.test.mjs
+// Renderer tests — verify the unified `createRenderer(dialect)` seam (the single
+// FlatBars-family adapter) without booting the browser app. Covers the FlatBars
+// dialects (RawBars / FullBars / MaxBars) and MinBars (Mustache), plus the
+// capability vector each advertises. Run with: node --test renderer.test.mjs
 // Requires vendor/flatbars-engine.mjs (the bundled flatbars-js facade).
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createFlatBarsRenderer } from "./flatbars.mjs";
+import { createRenderer } from "./renderer.mjs";
 
-const SEAM = [
+// ── FlatBars dialects (core / surface / maxbars) ─────────────────────────────
+
+const FLATBARS_SEAM = [
   "render", "analyze", "analyzeWith", "lint", "migrate", "compile", "parseAst", "inspectAt",
   "usedTransformers", "requiredAssigns", "partialGraph", "allTransformers",
   "catalog", "engineInfo", "version",
@@ -17,13 +20,13 @@ const SEAM = [
 
 const run = (r, src, data, opts) => r.render(r.compile(src, {}, opts).program, data);
 
-test("adapter exposes the full engine seam", async () => {
-  const r = await createFlatBarsRenderer();
-  for (const k of SEAM) assert.ok(k in r, `missing seam member: ${k}`);
+test("createRenderer dispatches the FlatBars dialects and exposes the full seam", async () => {
+  const r = await createRenderer("fullbars");
+  for (const k of FLATBARS_SEAM) assert.ok(k in r, `missing seam member: ${k}`);
 });
 
 test("renders the surface dialect (paths + auto-escape) by default", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer();
   assert.equal(
     run(r, "<h1>{{ name }}</h1>{{#if admin}} (admin){{/if}}", { name: "Ada & <b>", admin: true }),
     "<h1>Ada &amp; &lt;b&gt;</h1> (admin)",
@@ -31,7 +34,7 @@ test("renders the surface dialect (paths + auto-escape) by default", async () =>
 });
 
 test("renders user-defined helpers via opts.helpers (ADR-018)", async () => {
-  const r = await createFlatBarsRenderer("fullbars");
+  const r = await createRenderer("fullbars");
   const helpers = { loud: (s) => String(s).toUpperCase() };
   // escaped in {{ }}, and threaded alongside any partials
   assert.equal(run(r, "{{loud x}}", { x: "<b>ada" }, { helpers }), "&lt;B&gt;ADA");
@@ -43,7 +46,7 @@ test("opts.helpers register for the maxbars and core dialects too (operation reg
   // per-dialect registrar, not the helper-less render. Regression: the Lab once
   // rendered maxbars before checking opts.helpers, so {{{{#rawloud}}}} threw
   // UnknownHelper in the playground despite the example registering it.
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   const helpers = { rawloud: (options) => options.fn().toUpperCase() };
   const tpl = "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}";
   assert.equal(run(r, tpl, null, { dialect: "maxbars", helpers }), "\n  {{BAR}}\n");
@@ -55,7 +58,7 @@ test("maxbars threads external (host) partials through render + compileToJs", as
   // must resolve in BOTH render and the compiled JS — the renderMaxbarsWithPartials
   // / compileMaxbarsWithPartials seam. Regression: the Lab once rendered maxbars via
   // the helper-less entrypoint, dropping external partials (`{{> name}}` → empty).
-  const r = await createFlatBarsRenderer("maxbars");
+  const r = await createRenderer("maxbars");
   const partials = { greeting: "Hi {{name | uppercase}}!" };
   const tpl = "{{> greeting}} ({{count items}})";
   const data = { name: "ada", items: [1, 2, 3] };
@@ -67,7 +70,7 @@ test("maxbars threads external (host) partials through render + compileToJs", as
 });
 
 test("renders the core dialect when selected", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer();
   assert.equal(
     run(r, '{{{ json this (dict "pretty" true) }}}', { a: 1 }, { dialect: "core" }),
     '{\n  "a": 1\n}',
@@ -75,12 +78,12 @@ test("renders the core dialect when selected", async () => {
 });
 
 test("supports the elif clause chain", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer();
   assert.equal(run(r, "{{#if a}}A{{elif b}}B{{else}}C{{/if}}", { a: false, b: true }), "B");
 });
 
 test("renders the maxbars dialect: infix, bare-infix block conditions, loop vars", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("maxbars");
   const mx = (src, data) => run(r, src, data, { dialect: "maxbars" });
   // infix operators in output
   assert.equal(mx("{{ x > 0 && x < 10 }}", { x: 5 }), "true");
@@ -93,7 +96,7 @@ test("renders the maxbars dialect: infix, bare-infix block conditions, loop vars
 });
 
 test("parseAst handles maxbars infix (the AST/analysis panels)", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("maxbars");
   // a bare-infix block condition must parse as an `if` whose condition is the
   // desugared `(and …)` — not a parse error (which a stale engine would give).
   const ast = r.parseAst("{{#if a && b}}x{{/if}}", { dialect: "maxbars" });
@@ -101,21 +104,13 @@ test("parseAst handles maxbars infix (the AST/analysis panels)", async () => {
   assert.equal(ast.ast.nodes[0].t, "if");
 });
 
-test("compiles the maxbars dialect to a JS module", async () => {
-  const r = await createFlatBarsRenderer();
-  // compileToJs is URL-dialect driven; assert the seam member exists and that
-  // the maxbars render path (above) works — compile parity is covered by the
-  // PureScript conformance harness (dialect "maxbars").
-  assert.equal(typeof r.compileToJs, "function");
-});
-
 test("advertises the maxbars-dialect capability", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("maxbars");
   assert.ok(r.engineInfo().features.includes("maxbars-dialect"));
 });
 
 test("a parse error is thrown as a located render error", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer();
   assert.throws(() => run(r, "{{ oops", {}), (e) => {
     assert.equal(e.kind, "render");
     assert.match(e.message, /1:1:/); // line:column from the engine diagnostics
@@ -124,23 +119,24 @@ test("a parse error is thrown as a located render error", async () => {
 });
 
 test("engineInfo advertises an honest capability vector", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   const info = r.engineInfo();
   assert.match(info.version, /\d+\.\d+/);
   assert.ok(Array.isArray(info.features));
-  // backs: catalog, data-access, partial-graph; NOT Stem-only / unimplemented
-  // features, so those panels gate off.
-  for (const has of ["catalog", "required-assigns", "partial-graph"]) {
+  // backs (exactly, from the lowered AST): catalog, used-transformers,
+  // required-assigns, partial-graph.
+  for (const has of ["catalog", "used-transformers", "required-assigns", "partial-graph"]) {
     assert.ok(info.features.includes(has), `should advertise ${has}`);
   }
-  for (const absent of ["transformers", "bytecode-wire", "context-inspect", "standalone"]) {
+  // not yet natively backed → those panels gate off honestly.
+  for (const absent of ["source-map", "context-inspect", "bytecode-wire", "standalone"]) {
     assert.ok(!info.features.includes(absent), `should not advertise ${absent} yet`);
   }
   assert.ok(info.builtins.includes("each") && info.builtins.includes("json"));
 });
 
 test("compileToJs emits a JS module (the compile-js feature)", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   assert.equal(typeof r.compileToJs, "function");
   assert.ok(r.engineInfo().features.includes("compile-js"));
   const c = r.compileToJs("Hello {{ name }}!");
@@ -150,7 +146,7 @@ test("compileToJs emits a JS module (the compile-js feature)", async () => {
 });
 
 test("lint flags a deprecated alias and is surface-scoped (the lint feature)", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   assert.equal(typeof r.lint, "function");
   assert.ok(r.engineInfo().features.includes("lint"));
   // a deprecated alias (`plus` for `add`) — flagged in every dialect.
@@ -172,7 +168,7 @@ test("lint flags a deprecated alias and is surface-scoped (the lint feature)", a
 });
 
 test("migrate rewrites Handlebars to MaxBars with a residual report (the migrate feature)", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   assert.equal(typeof r.migrate, "function");
   assert.ok(r.engineInfo().features.includes("migrate"));
   // an inverted section migrates to {{#unless}}.
@@ -183,7 +179,7 @@ test("migrate rewrites Handlebars to MaxBars with a residual report (the migrate
 });
 
 test("analyze reports a truthiness portability finding (the analyse feature)", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   assert.equal(typeof r.analyze, "function");
   assert.ok(r.engineInfo().features.includes("analyse"));
   // an empty string in a condition diverges (falsy in handlebars/mustache.js,
@@ -235,7 +231,7 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
 });
 
 test("the catalog entries have the cheat-sheet shape", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   for (const e of r.catalog()) {
     for (const f of ["name", "category", "arity", "summary", "example"]) {
       assert.ok(f in e, `catalog entry missing ${f}`);
@@ -244,7 +240,7 @@ test("the catalog entries have the cheat-sheet shape", async () => {
 });
 
 test("parseAst returns the {t:…} node shape", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   const { ast } = r.parseAst("<h1>{{ name }}</h1>{{#each items}}{{ this }}{{/each}}");
   assert.equal(ast.version, "flatbars-ast/v1");
   const kinds = ast.nodes.map((n) => n.t);
@@ -255,7 +251,7 @@ test("parseAst returns the {t:…} node shape", async () => {
 });
 
 test("parseAst is forgiving: a parse error yields a recovered tree + located errors", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   const res = r.parseAst("{{#each xs}}…"); // unclosed block
   // ADR-023: the AST view never blanks — it returns the best-effort tree…
   assert.ok(res.ast && Array.isArray(res.ast.nodes), "expected a recovered AST tree");
@@ -266,7 +262,7 @@ test("parseAst is forgiving: a parse error yields a recovered tree + located err
 });
 
 test("requiredAssigns is exact (path roots only, no helpers/params)", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   const prog = r.compile(
     '{{ title }}{{#each rows as |row|}}{{ row.id }} {{ city.name }}{{/each}}{{#if (eq a b)}}{{ a }}{{/if}}',
     {},
@@ -276,8 +272,16 @@ test("requiredAssigns is exact (path roots only, no helpers/params)", async () =
   assert.deepEqual(r.requiredAssigns(prog), ["a", "b", "city", "rows", "title"]);
 });
 
+test("usedTransformers collects block + call helpers (the used-transformers feature)", async () => {
+  const r = await createRenderer("fullbars");
+  assert.ok(r.engineInfo().features.includes("used-transformers"));
+  const prog = r.compile("{{#each xs}}{{#if (eq a b)}}{{ x }}{{/if}}{{/each}}", {}).program;
+  const used = r.usedTransformers(prog);
+  assert.ok(used.includes("each") && used.includes("if") && used.includes("eq"));
+});
+
 test("parseAst surfaces partial uses and inline defs as semantic nodes", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   const { ast } = r.parseAst('{{#*inline "row"}}<li>{{ this }}</li>{{/inline}}{{> row}}{{> missing}}');
   const top = ast.nodes;
   const inline = top.find((n) => n.t === "inline");
@@ -287,21 +291,89 @@ test("parseAst surfaces partial uses and inline defs as semantic nodes", async (
 });
 
 test("named partial documents render (multi-document)", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   // the host passes partial documents to compile; render registers them.
   const prog = r.compile("<nav>{{> nav}}</nav>{{ title }}", { nav: "[home]" }).program;
   assert.equal(r.render(prog, { title: "T" }), "<nav>[home]</nav>T");
 });
 
 test("inline-defined partials actually render", async () => {
-  const r = await createFlatBarsRenderer();
+  const r = await createRenderer("fullbars");
   const out = run(r, '{{#*inline "row"}}[{{ this }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}', { xs: ["a", "b"] });
   assert.equal(out, "[a][b]");
 });
 
-test("usedTransformers collects block + call helpers", async () => {
-  const r = await createFlatBarsRenderer();
-  const prog = r.compile("{{#each xs}}{{#if (eq a b)}}{{ x }}{{/if}}{{/each}}", {}).program;
-  const used = r.usedTransformers(prog);
-  assert.ok(used.includes("each") && used.includes("if") && used.includes("eq"));
+test("partialGraph builds a real dependency graph natively (the partial-graph feature)", async () => {
+  const r = await createRenderer("fullbars");
+  assert.ok(r.engineInfo().features.includes("partial-graph"));
+  // main → header, main → body, body → header — drawn from the lowered AST's
+  // `{t:"partial"}` nodes across every document.
+  const prog = r.compile("{{> header}}{{> body}}", { header: "H", body: "{{> header}}" }).program;
+  const g = r.partialGraph(prog);
+  const ids = g.nodes.map((n) => n.id).sort();
+  assert.deepEqual(ids, ["body", "header", "main"]);
+  const edge = (from, to) => g.edges.some((e) => e.from === from && e.to === to);
+  assert.ok(edge("main", "header") && edge("main", "body") && edge("body", "header"));
+  assert.deepEqual(g.cycles, []);
+  // a referenced-but-undefined partial surfaces as a missing node.
+  const prog2 = r.compile("{{> gone}}", {}).program;
+  const g2 = r.partialGraph(prog2);
+  assert.ok(g2.nodes.some((n) => n.id === "gone" && n.missing));
+});
+
+// ── MinBars (Mustache) ───────────────────────────────────────────────────────
+
+const minrun = (r, src, data, opts) => r.render(r.compile(src).program, data, opts);
+
+test("createRenderer('minbars') dispatches the Mustache engine (logic-less)", async () => {
+  const r = await createRenderer("minbars");
+  const info = r.engineInfo();
+  assert.deepEqual(info.features, ["partials", "catalog", "compile-js"]);
+  assert.deepEqual(r.allTransformers(), []); // Mustache has no helper registry
+  // the AST-analysis panels gate off (no lowered-AST seam): empty, not thrown.
+  assert.deepEqual(r.partialGraph(), { nodes: [], edges: [], cycles: [] });
+  assert.deepEqual(r.usedTransformers(), []);
+});
+
+test("MinBars renders the language-agnostic Mustache (spec) rule by default — 0/'' truthy", async () => {
+  const r = await createRenderer("minbars");
+  const tpl = "{{#n}}has{{/n}}{{^n}}none{{/n}}";
+  assert.equal(minrun(r, tpl, { n: 0 }), "has");
+  assert.equal(minrun(r, "{{#s}}has{{/s}}{{^s}}none{{/s}}", { s: "" }), "has");
+});
+
+test("MinBars compat mode renders mustache.js truthiness — 0 and '' are falsy", async () => {
+  const r = await createRenderer("minbars");
+  assert.equal(minrun(r, "{{#n}}has{{/n}}{{^n}}none{{/n}}", { n: 0 }, { compat: true }), "none");
+  assert.equal(minrun(r, "{{#s}}has{{/s}}{{^s}}none{{/s}}", { s: "" }, { compat: true }), "none");
+  // a non-empty / non-zero value is truthy under both rules
+  assert.equal(minrun(r, "{{#n}}has{{/n}}{{^n}}none{{/n}}", { n: 5 }, { compat: true }), "has");
+  // {} stays truthy and [] stays falsy in both rules — only the "ambiguous two" flip
+  assert.equal(minrun(r, "{{#o}}y{{/o}}{{^o}}n{{/o}}", { o: {} }, { compat: true }), "y");
+  assert.equal(minrun(r, "{{#xs}}y{{/xs}}{{^xs}}n{{/xs}}", { xs: [] }, { compat: true }), "n");
+});
+
+test("MinBars compat is also fixable at construction (createRenderer('minbars', { compat }))", async () => {
+  const r = await createRenderer("minbars", { compat: true });
+  // the construction default applies without a per-call flag…
+  assert.equal(minrun(r, "{{#n}}has{{/n}}{{^n}}none{{/n}}", { n: 0 }), "none");
+  // …and a per-call option still overrides it.
+  assert.equal(minrun(r, "{{#n}}has{{/n}}{{^n}}none{{/n}}", { n: 0 }, { compat: false }), "has");
+});
+
+test("MinBars compat mode honors partials", async () => {
+  const r = await createRenderer("minbars");
+  const prog = r.compile("{{#n}}{{> row}}{{/n}}{{^n}}none{{/n}}", { row: "R" }).program;
+  assert.equal(r.render(prog, { n: 0 }, { compat: true }), "none"); // 0 falsy → inverted
+  assert.equal(r.render(prog, { n: 1 }, { compat: true }), "R"); // truthy → partial renders
+});
+
+test("MinBars compileToJs seeds the chosen truthiness rule", async () => {
+  const r = await createRenderer("minbars");
+  const spec = r.compileToJs("{{#n}}has{{/n}}");
+  assert.ok(spec.ok, spec.error);
+  assert.match(spec.value, /truthyMustache/);
+  const compat = r.compileToJs("{{#n}}has{{/n}}", undefined, { compat: true });
+  assert.ok(compat.ok, compat.error);
+  assert.match(compat.value, /truthyHandlebars/);
 });

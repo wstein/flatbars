@@ -10,7 +10,7 @@
 //   npm run test:minbars-spec   # spago build && node packages/minbars/test/spec-conformance.mjs
 //
 // Sibling: scripts/gen-conformance.mjs runs the SAME fixtures but through the
-// shipped lab bundle (lab/minbars.mjs) to generate the Mustache tutorial's
+// shipped lab bundle (lab/renderer.mjs) to generate the Mustache tutorial's
 // conformance table. This harness measures the spago build product (output/);
 // `npm run check:bundle` keeps the lab bundle in step with that source, so the
 // two measurements agree.

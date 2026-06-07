@@ -20,7 +20,7 @@ import {
   applyView,
 } from "./output-view.mjs";
 
-// A FlatBars-shaped feature vector (mirrors flatbars.mjs BB_FEATURES, trimmed).
+// A FlatBars-shaped feature vector (mirrors renderer.mjs BB_FEATURES, trimmed).
 const FB = ["surface-dialect", "core-dialect", "compile-js", "migrate"];
 // An engine without the compile-js / migrate capabilities (e.g. MinBars).
 const NO_COMPILE = ["surface-dialect", "core-dialect"];

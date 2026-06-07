@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { sections, flagship, taughtFunctions } from "../tutorials/src/jsonata.mjs";
 import jsonata from "../lab/vendor/jsonata.mjs";
-import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
+import { createRenderer } from "../lab/renderer.mjs";
 
 let fail = 0;
 const used = new Set();
@@ -47,7 +47,7 @@ console.log("\nFlagship round-trip (data → JSONata → MaxBars):");
 collectFns(flagship.transform);
 try {
   const vm = jsonata(flagship.transform).evaluate(flagship.data);
-  const r = await createFlatBarsRenderer(flagship.engine);
+  const r = await createRenderer(flagship.engine);
   const out = r.render(r.compile(flagship.template, {}).program, vm);
   assert.equal(out, flagship.expect);
   console.log(`  ✓ flagship renders ${JSON.stringify(out.slice(0, 40))}…`);

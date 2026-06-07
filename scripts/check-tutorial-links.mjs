@@ -16,8 +16,7 @@ import { examples as mustacheExamples } from "../tutorials/src/mustache.mjs";
 import { examples as rawbarsExamples } from "../tutorials/src/rawbars.mjs";
 import { examples as fullbarsExamples } from "../tutorials/src/fullbars.mjs";
 import { examples as maxbarsExamples } from "../tutorials/src/maxbars.mjs";
-import { createFlatBarsRenderer } from "../lab/flatbars.mjs";
-import { createMinBarsRenderer } from "../lab/minbars.mjs";
+import { createRenderer } from "../lab/renderer.mjs";
 import { renderWith, renderMaxWith, safe } from "../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../lab/helpers.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
@@ -92,7 +91,7 @@ for (const [key, ex] of Object.entries(lessons)) {
     continue;
   }
   const renderer =
-    ex.engine === "minbars" ? await createMinBarsRenderer() : await createFlatBarsRenderer(DIALECT[ex.engine]);
+    ex.engine === "minbars" ? await createRenderer("minbars") : await createRenderer(DIALECT[ex.engine]);
   try {
     // A lesson with custom helpers (ADR-018) renders through `renderWith`, the
     // same path the card uses; otherwise the adapter's plain render.
@@ -127,7 +126,7 @@ console.log("\nMustache reference examples (minbars):");
 // Orphan guard: every example must be wired into the reference page, so an
 // unused example can't accumulate as dead code.
 const pageSrc = readFileSync(new URL("../tutorials/src/pages/minbars.astro", import.meta.url), "utf8");
-const minbars = await createMinBarsRenderer();
+const minbars = await createRenderer("minbars");
 for (const [key, ex] of Object.entries(mustacheExamples)) {
   if (!pageSrc.includes(`ex.${key}.`)) {
     console.error(`  ✗ ${key}: defined in mustache.mjs but never referenced by minbars.astro (orphan)`);
@@ -171,7 +170,7 @@ for (const [key, rex] of Object.entries(rawbarsExamples)) {
     fail++;
     continue;
   }
-  const r = await createFlatBarsRenderer(DIALECT[eng]);
+  const r = await createRenderer(DIALECT[eng]);
   try {
     const out = r.render(r.compile(rex.template, rex.partials || {}).program, rex.data ?? {});
     if (typeof out !== "string" || out.length === 0) throw new Error("rendered empty output");
@@ -195,7 +194,7 @@ for (const [key, rex] of Object.entries(rawbarsExamples)) {
 // emit JS. Orphan guard against examples never shown on fullbars.astro.
 console.log("\nFullBars reference examples (fullbars):");
 const fullPageSrc = readFileSync(new URL("../tutorials/src/pages/fullbars.astro", import.meta.url), "utf8");
-const fbr = await createFlatBarsRenderer("surface");
+const fbr = await createRenderer("surface");
 for (const [key, fex] of Object.entries(fullbarsExamples)) {
   if (!fullPageSrc.includes(`ex.${key}.`)) {
     console.error(`  ✗ ${key}: defined in fullbars.mjs but never referenced by fullbars.astro (orphan)`);
@@ -240,7 +239,7 @@ for (const [key, fex] of Object.entries(fullbarsExamples)) {
 // examples never shown on maxbars.astro.
 console.log("\nMaxBars reference examples (maxbars):");
 const maxPageSrc = readFileSync(new URL("../tutorials/src/pages/maxbars.astro", import.meta.url), "utf8");
-const mbr = await createFlatBarsRenderer("maxbars");
+const mbr = await createRenderer("maxbars");
 for (const [key, mex] of Object.entries(maxbarsExamples)) {
   if (!maxPageSrc.includes(`ex.${key}.`)) {
     console.error(`  ✗ ${key}: defined in maxbars.mjs but never referenced by maxbars.astro (orphan)`);
