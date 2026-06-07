@@ -1,1 +1,0 @@
-<li>{{label}}{{#if children}}<ul>{{#each children}}{{partial "node" @this}}{{/each}}</ul>{{/if}}</li>

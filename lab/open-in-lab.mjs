@@ -15,8 +15,8 @@
 import { encodeState } from "./playground_utils.mjs";
 import { dump as dumpYaml } from "./vendor/js-yaml.mjs";
 
-// The engines the Lab accepts on `?engine=` (the four FlatBars surfaces + Stem).
-export const LAB_ENGINES = ["rawbars", "minbars", "fullbars", "maxbars", "stem"];
+// The engines the Lab accepts on `?engine=` (the four FlatBars surfaces).
+export const LAB_ENGINES = ["rawbars", "minbars", "fullbars", "maxbars"];
 
 // Render an example's data as the Lab's data-editor text. The Lab's native data
 // format is YAML (data.yaml), so an object/array is dumped to YAML; a string is

@@ -1,1 +1,0 @@
-<div class="row" title="{{@this.desc}}"><div class="expr">{{@this.example}}</div><div class="out{{#if @this.cap}} cap{{/if}}"{{#if @this.cap}} title="{{@this.result}}"{{/if}}>{{#if @this.result}}{{@this.result}}{{else}}{{eval @this.example}}{{/if}}</div></div>

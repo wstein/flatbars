@@ -1,1 +1,0 @@
-<ul class="tree">{{partial "node" tree}}</ul>

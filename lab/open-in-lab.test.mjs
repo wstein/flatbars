@@ -108,6 +108,6 @@ test("openInLab returns the URL when there is no window (SSR/build)", async () =
   assert.match(href, /^\/lab\/index\.html\?engine=rawbars#/);
 });
 
-test("LAB_ENGINES are exactly the four surfaces plus Stem", () => {
-  assert.deepEqual([...LAB_ENGINES].sort(), ["fullbars", "maxbars", "minbars", "rawbars", "stem"]);
+test("LAB_ENGINES are exactly the four FlatBars surfaces", () => {
+  assert.deepEqual([...LAB_ENGINES].sort(), ["fullbars", "maxbars", "minbars", "rawbars"]);
 });

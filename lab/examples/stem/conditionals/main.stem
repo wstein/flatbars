@@ -1,9 +1,0 @@
-<ul class="tasks">
-  {{~#each tasks}}
-    <li>
-      {{#if @this.done}}[x]{{else}}[ ]{{/if}} {{@this.title}}
-      {{#if @this.priority}}<span class="pri">priority: {{@this.priority}}</span>{{/if}}
-    </li>
-  {{~/each}}
-</ul>
-{{#unless tasks}}<p>All clear — no tasks left.</p>{{/unless}}
