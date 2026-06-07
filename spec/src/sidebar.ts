@@ -155,6 +155,10 @@ export const sidebar = [
         "link": "/adr/adr-0034-ternary-operator/"
       },
       {
+        "label": "ADR-035: source-map provenance",
+        "link": "/adr/adr-0035-source-map-provenance/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }

@@ -1,0 +1,78 @@
+---
+title: "ADR-035: source-map provenance for the render"
+sidebar:
+  label: "ADR-035 source maps"
+---
+
+*Status:* Accepted — 2026-06-07. An additive engine capability: a *mapped* render
+that returns, alongside the output, a source map tying each run of output back to
+the tag that produced it. Owner: Werner. Builds on the polymorphic interpret
+driver ([ADR-001](/adr/adr-0001-structural-parser-and-walker/)) and the engine
+seam ([ADR-020](/adr/adr-0020-user-block-helpers/)).
+
+*Implementation status — complete for the FullBars surface.* `Kernel.Engine`
+carries two no-op-by-default provenance hooks (`recordText` / `recordEmit`);
+`Kernel.Provenance` runs the driver in a `WriterT` and returns
+`{ output, segments }` (`FullBars.renderSurfaceMapped[With]`, the FFI
+`renderSurfaceMapped` / `renderSurfaceMappedWithPartials`, the Lab's
+`render(.., { map: true })`). The FlatBars Lab's three-way editor↔output linking
+runs on it. The core / MaxBars / MinBars engines do not emit segments yet and
+advertise `source-map` off, so the provenance UI gates off for them.
+
+## Context
+
+The playground's signature DX is *provenance*: hover a run of output to highlight
+its source tag, click it to jump there, move the caret in the source to light up
+the output it produced. That needs a **source map** — for each contiguous run of
+output, the originating tag's span. The Stem reference engine emitted this from
+its bytecode; the FlatBars interpret driver assembles output functionally and had
+no such data, so the Lab's provenance was dark for the native dialects.
+
+Two facts make a faithful map non-trivial:
+
+1. **Helpers can transform their body's output.** The driver does
+   `h (ctl …) vals >>= stringify`, so a block helper may return something other
+   than the concatenation of its rendered children. Naive leaf-logging then
+   desyncs from the actual output bytes.
+2. **There is no file dimension on spans, and `Content` carries none at all.**
+   A span indexes *some* source; a partial's spans index the partial's own source,
+   not the entry template.
+
+## Decision
+
+Add a mapped render that is **correct-or-absent**, never wrong.
+
+- **No-op-by-default hooks.** `Engine` gains `recordText` and `recordEmit`. The
+  reference / MinBars engines supply no-ops, so an unmapped render records nothing
+  and stays **byte-identical** — the compiler≡interpreter invariant
+  ([ADR-011](/adr/adr-0011-compile-to-js/)) holds (`test:compile` green).
+- **A writer + a tiling check.** `Kernel.Provenance` instantiates the *same*
+  polymorphic driver at a `WriterT` that logs a run per leaf, then verifies the
+  logged runs reconstruct the output exactly before returning them. A transforming
+  block helper fails the check and the map degrades to `[]` — the capability gates
+  off rather than lying.
+- **`recordEmit` uses `listen` to avoid double counting.** An emit whose
+  expression itself logged sub-runs (a partial expanding its body) adds no outer
+  run — the sub-runs already cover it. So partials tile *fine-grained*.
+- **Partial-origin emits carry no source span.** An emit produced at partial depth
+  &gt; 0 tiles the output but records no `start`/`end`, since its span would index
+  the partial's source, not the entry template. Full multi-file linking is a
+  follow-up.
+- **Offsets are JS string indices.** PureScript `String` is UTF-16, like a JS
+  string, so `out`/`len`/`start`/`end` are code-unit offsets the browser consumes
+  with no byte↔char conversion.
+
+A `Segment` is `{ out, len, kind, start?, end? }`: `out`/`len` locate the run in
+the output, `kind` is `"text"` | `"emit"`, and `start`/`end` are the tag's span in
+the entry template (present on `emit` runs produced there). The segments tile the
+output: ordered, contiguous, each `len > 0`, covering exactly `[0, output.len)`.
+
+## Consequences
+
+- The FullBars-surface provenance UI lights up; the other dialects gate off
+  honestly via their capability vector.
+- Templates whose output is reshaped by a transforming helper get no map for that
+  render (degrade to `[]`), which is correct, not broken.
+- Follow-ups: emit segments from the core / MaxBars dialects; thread a file
+  dimension so partial-origin emits link to their own source; a tiling-conformance
+  gate over the example corpus.

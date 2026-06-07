@@ -52,16 +52,17 @@ panel**, so an unequal engine never lies about what it can do. The dock panels �
 
 FlatBars advertises exact (non-heuristic) `used-transformers`, `required-assigns`,
 and `partial-graph` because they are computed from the lowered AST, not guessed.
-`source-map` (provenance) and `context-inspect` are **not yet natively backed**,
-so the provenance-linking and Context Inspector surfaces gate off honestly.
+The **FullBars surface backs `source-map`** (ADR-035): a mapped render returns
+output→source `segments`, so the three-way editor↔output provenance linking is
+live. The core / MaxBars dialects do not emit segments yet, and `context-inspect`
+is not yet natively backed, so those surfaces gate off honestly.
 
 ## Roadmap
 
-1. **Native source maps** — emit output→source `segments` from the engine
-   (instrument the polymorphic interpret driver) so the three-way
-   editor↔output provenance linking lights up for the native dialects. Offsets
-   are JS string indices (UTF-16), so no byte↔char bridge is needed.
+1. **Source maps for the remaining dialects** — extend ADR-035 to core / MaxBars,
+   and thread a file dimension so partial-origin emits link to their own source
+   (today they tile but carry no span).
 2. **Native context inspection** — `inspectAt` over the reified render-context
    stack (`RefEnv`), lighting up the Context Inspector.
-3. **A tiling-conformance gate** asserting the emitted segments tile the output,
-   plus a defended boot path.
+3. **A tiling-conformance gate** asserting the emitted segments tile the output
+   across the example corpus, plus a defended boot path.

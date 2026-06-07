@@ -180,7 +180,9 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `Hoist` (`hoistInline`: lift `{{#inline}}` definitions into the partial registry —
   a shared pre-pass every dialect runs, not a surface feature),
   `Render` (`runResolved`: parse → seed the prelude env with the engine's fixed
-  truthiness rule → run), `Value`, `Walk`.
+  truthiness rule → run), `Provenance` (`runResolvedMapped`: the same driver run
+  in a `WriterT` to emit a tiling output→source map — source maps, ADR-035),
+  `Value`, `Walk`.
 - **`fullbars`** — the reference engine + its surface dialect (`{{ }}`
   auto-escape, dotted paths, `@data`, `as |x|`). Re-exports kernel modules and
   adds surface desugar/compile/render.
