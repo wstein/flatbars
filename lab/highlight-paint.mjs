@@ -108,18 +108,12 @@ const braceLens = (tag) => [
 function paintStructure(kind, text, s, n) {
   const { from, to } = s;
   if (s.kind === "comment") {
-    // VS Code paints the comment DELIMITERS (`{{!` / `{{!--` … `--}}` / `}}`) as
-    // punctuation — the `punctuation.section.embedded` scope sits rightmost over
-    // `comment.block`, so the theme colours the braces like any other tag's — and
-    // only the body grey. Match that (opener/closer punct, body comment).
-    const tag = text.slice(from, to);
-    const om = tag.match(/^\{{2,4}~?!(?:--)?/);
-    const cm = tag.match(/(?:--)?~?\}{2,4}$/);
-    const oLen = om ? om[0].length : 0;
-    const cLen = cm ? cm[0].length : 0;
-    fill(kind, from, from + oLen, "punct", n);
-    fill(kind, from + oLen, to - cLen, "comment", n);
-    fill(kind, to - cLen, to, "punct", n);
+    // The WHOLE comment — delimiters included (`{{!` / `{{!--` … `--}}` / `}}`) —
+    // reads in the comment colour. This matches the editor grammar (the comment
+    // braces are `punctuation.definition.comment.*`, the comment family, not the
+    // generic `punctuation.section.embedded`) and the universal convention
+    // (HTML/C/Handlebars) that the delimiters are part of the comment.
+    fill(kind, from, to, "comment", n);
     return;
   }
   if (s.kind === "set-delimiter") {
