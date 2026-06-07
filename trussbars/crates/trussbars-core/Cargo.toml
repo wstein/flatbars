@@ -8,9 +8,16 @@ license.workspace = true
 keywords = ["template", "maxbars", "codegen", "html"]
 categories = ["template-engine"]
 
-# No external dependencies by design — this crate is std-only so it builds
-# offline and stays the small, auditable substrate the codegen targets.
+[features]
+# Re-export `#[derive(Trussbars)]` so a host can depend on `trussbars-core` alone.
+# Off by default, keeping the default build std-only and dependency-free.
+derive = ["dep:trussbars-derive"]
+
+# Zero runtime dependencies by design — std-only, so the default build is the
+# small, auditable substrate the codegen targets. The optional `derive` feature
+# pulls the proc-macro (a build-time dependency only).
 [dependencies]
+trussbars-derive = { path = "../trussbars-derive", version = "0.1.0", optional = true }
 
 [lints]
 workspace = true

@@ -34,6 +34,9 @@ dependencies = [
 [[package]]
 name = "trussbars-core"
 version = "0.1.0"
+dependencies = [
+ "trussbars-derive",
+]
 
 [[package]]
 name = "trussbars-derive"

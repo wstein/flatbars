@@ -52,8 +52,12 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
+      # Assert the default build stays dependency-free (the `derive` feature is off).
+      - name: Build (default features)
+        run: cargo build
+
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Test
-        run: cargo test
+        run: cargo test --all-features

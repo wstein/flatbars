@@ -31,9 +31,16 @@ The contract lives in `../../docs/`:
 | `03-schema-inference.md` | deriving the context type from a template |
 | `04-conformance.md` | the cross-language byte-identity harness |
 
+## Features
+
+- `derive` *(off by default)* — re-exports `#[derive(Trussbars)]` from
+  `trussbars-derive`, so a host can depend on `trussbars-core` alone.
+
 ## Properties
 
-- **std-only, zero dependencies** — builds offline; a small, auditable substrate.
+- **std-only, zero runtime dependencies** by default — builds offline; a small,
+  auditable substrate. The optional `derive` feature pulls the proc-macro
+  (build-time only).
 - `#![forbid(unsafe_code)]`, `#![deny(missing_docs)]`, `clippy::all` denied
   (workspace lints).
 - Toolchain pinned to Rust 1.96 (`../../rust-toolchain.toml`), edition 2024.
@@ -41,7 +48,7 @@ The contract lives in `../../docs/`:
 ## Develop
 
 ```sh
-cargo +1.96.0 test  --manifest-path trussbars/Cargo.toml
-cargo +1.96.0 fmt   --manifest-path trussbars/Cargo.toml --all
-cargo +1.96.0 clippy --manifest-path trussbars/Cargo.toml --all-targets
+cargo +1.96.0 test   --manifest-path trussbars/Cargo.toml --all-features
+cargo +1.96.0 fmt    --manifest-path trussbars/Cargo.toml --all
+cargo +1.96.0 clippy --manifest-path trussbars/Cargo.toml --all-targets --all-features
 ```

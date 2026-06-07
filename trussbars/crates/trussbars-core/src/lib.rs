@@ -22,7 +22,9 @@
 //! crate and `02-runtime-api.md` in lockstep.
 //!
 //! This crate is std-only and `#![forbid(unsafe_code)]` — a small, auditable
-//! substrate is part of the point.
+//! substrate is part of the point. Enabling the `derive` feature re-exports
+//! [`macro@Trussbars`] (`#[derive(Trussbars)]`) so a host depends on this crate
+//! alone; the feature is off by default, keeping the default build dependency-free.
 
 mod frame;
 mod text;
@@ -31,3 +33,8 @@ mod truthy;
 pub use frame::Loop;
 pub use text::{Safe, ToText, esc, escape_html};
 pub use truthy::{Truthy, truthy};
+
+/// `#[derive(Trussbars)]` — generates the [`Truthy`] impl for a context struct.
+/// Available with the `derive` feature; re-exported from `trussbars-derive`.
+#[cfg(feature = "derive")]
+pub use trussbars_derive::Trussbars;
