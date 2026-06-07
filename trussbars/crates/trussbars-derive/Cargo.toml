@@ -1,0 +1,22 @@
+[package]
+name = "trussbars-derive"
+description = "The #[derive(Trussbars)] companion macro: generates the trussbars-core Truthy impl a context struct needs (an inhabited object is truthy). Deliberately no ToText, so {{struct}} stays a compile error."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "derive", "proc-macro"]
+categories = ["template-engine", "rust-patterns"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "2"
+quote = "1"
+
+[dev-dependencies]
+trussbars-core = { path = "../trussbars-core" }
+
+[lints]
+workspace = true
