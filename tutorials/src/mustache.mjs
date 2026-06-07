@@ -24,7 +24,7 @@ export const examples = {
   // ── Interpolation ──────────────────────────────────────────────────────
   hello: {
     group: "Interpolation",
-    label: "Interpolation",
+    label: "Hello World",
     view: "text",
     template: "Hello, {{name}}!",
     data: { name: "Ada" },
@@ -75,15 +75,6 @@ export const examples = {
     // An OBJECT section pushes that object as the context for its body.
     template: "{{#user}}\n{{name}} <{{email}}>\n{{/user}}",
     data: { user: { name: "Ada", email: "ada@example.com" } },
-  },
-
-  sectionBool: {
-    group: "Sections",
-    label: "Section over a boolean",
-    view: "text",
-    // A boolean (or any truthy scalar) renders the body once; falsy omits it.
-    template: "{{#active}}\n● online\n{{/active}}",
-    data: { active: true },
   },
 
   sectionNotConditional: {
@@ -149,7 +140,7 @@ export const examples = {
   },
 
   partialList: {
-    group: "Partials",
+    group: "Advanced",
     label: "Partial per row",
     view: "text",
     // A partial reused per row. The row's newline lives INSIDE the partial body:
@@ -166,7 +157,7 @@ export const examples = {
   },
 
   inheritance: {
-    group: "Partials",
+    group: "Advanced",
     label: "Template inheritance",
     view: "text",
     // {{<layout}} renders a parent template; {{$title}} blocks override the
@@ -179,7 +170,7 @@ export const examples = {
   },
 
   dynamicPartial: {
-    group: "Partials",
+    group: "Advanced",
     label: "Dynamic-name partial",
     view: "text",
     // {{>* which}} resolves the partial name from the data at render time.
@@ -201,7 +192,7 @@ export const examples = {
 
   // ── Lambdas → precalculated values (the "after" render) ───────────────────
   precompute: {
-    group: "Lambdas",
+    group: "Advanced",
     label: "Lambda → precomputed value",
     view: "text",
     // A value-producing lambda (fullName, initials) replaced by precalculated
@@ -209,5 +200,21 @@ export const examples = {
     // sees data, so the same {{fullName}} works in every engine.
     template: "{{fullName}} ({{initials}})",
     data: { first: "Ada", last: "Lovelace", fullName: "Ada Lovelace", initials: "AL" },
+  },
+
+  email: {
+    group: "Advanced",
+    label: "Putting it together (email)",
+    view: "text",
+    // An ADVANCED example reusing familiar concepts in one realistic, non-HTML
+    // template: interpolation, dotted paths, a list section, an inverted fallback,
+    // and a closing signature — a plain-text shipping notice.
+    template:
+      "Hi {{name}},\n\nYour order shipped. Items:\n{{#items}}\n- {{title}} ×{{qty}}\n{{/items}}{{^items}}\n- (none)\n{{/items}}\n\n— {{store.name}} ({{store.url}})",
+    data: {
+      name: "Ada",
+      items: [{ title: "Pen", qty: 3 }, { title: "Ink", qty: 1 }],
+      store: { name: "FlatMart", url: "flatmart.example" },
+    },
   },
 };

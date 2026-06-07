@@ -1,7 +1,7 @@
 [
   {
     "id": "hello",
-    "label": "Interpolation",
+    "label": "Hello World",
     "group": "Interpolation",
     "view": "text",
     "main": "main.mustache",
@@ -47,15 +47,6 @@
   {
     "id": "sectionObject",
     "label": "Section over an object",
-    "group": "Sections",
-    "view": "text",
-    "main": "main.mustache",
-    "partials": [],
-    "data": "data.yaml"
-  },
-  {
-    "id": "sectionBool",
-    "label": "Section over a boolean",
     "group": "Sections",
     "view": "text",
     "main": "main.mustache",
@@ -121,7 +112,7 @@
   {
     "id": "partialList",
     "label": "Partial per row",
-    "group": "Partials",
+    "group": "Advanced",
     "view": "text",
     "main": "main.mustache",
     "partials": [
@@ -132,7 +123,7 @@
   {
     "id": "inheritance",
     "label": "Template inheritance",
-    "group": "Partials",
+    "group": "Advanced",
     "view": "text",
     "main": "main.mustache",
     "partials": [
@@ -143,7 +134,7 @@
   {
     "id": "dynamicPartial",
     "label": "Dynamic-name partial",
-    "group": "Partials",
+    "group": "Advanced",
     "view": "text",
     "main": "main.mustache",
     "partials": [
@@ -164,7 +155,16 @@
   {
     "id": "precompute",
     "label": "Lambda → precomputed value",
-    "group": "Lambdas",
+    "group": "Advanced",
+    "view": "text",
+    "main": "main.mustache",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
+    "id": "email",
+    "label": "Putting it together (email)",
+    "group": "Advanced",
     "view": "text",
     "main": "main.mustache",
     "partials": [],

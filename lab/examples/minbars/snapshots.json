@@ -5,7 +5,6 @@
   "escaping": "escaped: &lt;b&gt;bold &amp; bright&lt;/b&gt;\nraw:     <b>bold & bright</b>\namp:     <b>bold & bright</b>",
   "sectionArray": "Cart:\n- pen ×3\n- ink ×1\n",
   "sectionObject": "Ada <ada@example.com>\n",
-  "sectionBool": "● online\n",
   "sectionNotConditional": "admin: Ada\ndone",
   "truthyZero": "in stock: 0",
   "inverted": "(nothing yet)\n",
@@ -16,5 +15,6 @@
   "inheritance": "== Welcome ==\nGlad you came.",
   "dynamicPartial": "Hallo, Ada!",
   "setDelimiters": "* default\n* erb-style\n* default again",
-  "precompute": "Ada Lovelace (AL)"
+  "precompute": "Ada Lovelace (AL)",
+  "email": "Hi Ada,\n\nYour order shipped. Items:\n- Pen ×3\n- Ink ×1\n\n— FlatMart (flatmart.example)"
 }

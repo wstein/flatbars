@@ -189,10 +189,6 @@ $ ~> | $ | {
     <h3>Iterating a list</h3>
     <OpenInLab client:visible engine="minbars" template={ex.sectionArray.template} data={ex.sectionArray.data} />
 
-    <h3>As a conditional</h3>
-    <p>A boolean turns a section into a plain on/off switch.</p>
-    <OpenInLab client:visible engine="minbars" template={ex.sectionBool.template} data={ex.sectionBool.data} />
-
     <h3>An object opens a scope</h3>
     <p>When the value is an object, that object becomes the context for the body.</p>
     <OpenInLab client:visible engine="minbars" template={ex.sectionObject.template} data={ex.sectionObject.data} />
@@ -304,6 +300,14 @@ $ ~> | $ | {
       whichever partial <code>key</code> resolves to.
     </p>
     <OpenInLab client:visible engine="minbars" template={ex.dynamicPartial.template} data={ex.dynamicPartial.data} partials={ex.dynamicPartial.partials} />
+
+    <h3>Putting it together</h3>
+    <p>
+      Real templates reuse these familiar pieces at once. A plain-text shipping
+      notice: interpolation, a dotted path, a list section, and an inverted fallback
+      — no new concepts, just combined.
+    </p>
+    <OpenInLab client:visible engine="minbars" template={ex.email.template} data={ex.email.data} />
   </section>
 
   <!-- ─────────────────────── Set delimiters ────────────────────── -->
