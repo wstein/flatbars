@@ -11,8 +11,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { labHref, dataText } from "../../../lab/open-in-lab.mjs";
 import { load as loadYaml } from "../../../lab/vendor/js-yaml.mjs";
-import { createFlatBarsRenderer } from "../../../lab/flatbars.mjs";
-import { createMinBarsRenderer } from "../../../lab/minbars.mjs";
+import { createRenderer } from "../../../lab/renderer.mjs";
 import { renderWith, renderRawWith, renderMaxWith, safe, lint as runLint, analyze as runAnalyze, analyzeWith as runAnalyzeWith } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
 import { makeI18nBag } from "../../../lab/i18n.mjs";
@@ -128,8 +127,8 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   useEffect(() => {
     let live = true;
     const p = engine === "minbars"
-      ? createMinBarsRenderer()
-      : createFlatBarsRenderer(DIALECT[engine]);
+      ? createRenderer("minbars")
+      : createRenderer(DIALECT[engine]);
     p.then((r) => { if (live) setRenderer(r); });
     return () => { live = false; };
   }, []);
