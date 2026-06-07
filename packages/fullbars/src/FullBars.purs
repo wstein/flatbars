@@ -29,6 +29,7 @@ module FullBars
   , renderSurfaceMappedWith
   , renderSurfaceMappedDiagWith
   , inspectSurfaceWith
+  , inspectSurfaceDiagWith
   , renderSurfaceValue
   , renderSurfaceI18n
   , analyseSurface
@@ -202,26 +203,44 @@ inspectSurfaceWith
   -> String
   -> Value
   -> Either String (Array Snapshot)
-inspectSurfaceWith target partialSrcs src dat =
+inspectSurfaceWith = inspectSurfaceDiagWith true noLoopVars defaultParseOptions handlebars
+
+-- | The dialect-parameterised Context Inspector (the inspect twin of
+-- | `renderSurfaceMappedDiagWith`): MaxBars reuses it with its own loop variables,
+-- | parse options, and truthiness rule.
+inspectSurfaceDiagWith
+  :: Boolean
+  -> LoopVars
+  -> ParseOptions
+  -> Truthy
+  -> Target
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String (Array Snapshot)
+inspectSurfaceDiagWith strict lv opts truthy target partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parse src of
-      Left e -> Left (show e)
-      Right { nodes } | Left e <- checkBareInline true nodes -> Left (renderParseErrorAt src e)
+    Right ps -> case parseWith opts src of
+      Left pes -> Left (renderParseErrorsAt src pes)
+      Right { nodes } | Left e <- checkBareInline strict nodes -> Left (renderParseErrorAt src e)
       Right { nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarSurface nodes)
+          { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           partialFiles = Map.union (map (const "main") inlineP)
             (Map.fromFoldable (map (\p -> Tuple p.name p.name) ps))
-          setup = registerPartialFiles partialFiles <<< registerPartials
-            (Map.union inlineP externalT)
+          setup =
+            registerPartialFiles partialFiles
+              <<< withTruthy truthy
+              <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
+              <<< registerPartials (Map.union inlineP externalT)
         in
           lmap (formatError src) (inspectResolvedLenient setup target template dat)
   where
-  compilePartial (Tuple name s) = case parse s of
-    Left e -> Left (show e)
-    Right { nodes } -> Right { name, template: desugarSurface nodes }
+  compilePartial (Tuple name s) = case parseWith opts s of
+    Left pes -> Left (renderParseErrorsAt s pes)
+    Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
 
 -- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
 -- | `(name, helper)` is registered into the env alongside the prelude and the

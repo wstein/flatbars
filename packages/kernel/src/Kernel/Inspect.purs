@@ -9,6 +9,7 @@ module Kernel.Inspect
   ( Target
   , Snapshot
   , inspectResolvedLenient
+  , inspectResolvedStrict
   ) where
 
 import Prelude
@@ -26,8 +27,8 @@ import FlatBars.Error (Error)
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Template)
 import FlatBars.Value (Value(..))
-import Kernel.Engine (Ctl, runTemplate)
-import Kernel.Env (RefEnv, innermostFrame, lookupOperation, refContext, refCurrentFile, refEngineWith)
+import Kernel.Engine (Ctl, Engine, runTemplate)
+import Kernel.Env (RefEnv, innermostFrame, lookupOperation, refContext, refCurrentFile, refEngine, refEngineWith)
 import Kernel.Prelude (lenientResolve)
 import Kernel.Render (preludeEnv)
 
@@ -51,19 +52,27 @@ type Snapshot =
 -- | The inspect monad: a pure host with a writer of snapshots.
 type Insp = WriterT (Array Snapshot) (Either Error)
 
--- | Render `nodes` with the lenient engine, capturing a snapshot at every emit
--- | whose tag span + file match `target`. Returns the snapshots in execution order
--- | (empty when the span is never reached).
+-- | Render `nodes`, capturing a snapshot at every emit whose tag span + file match
+-- | `target` (in execution order; empty when the span is never reached). The lenient
+-- | variant is for FullBars / MaxBars; the strict one for RawBars.
 inspectResolvedLenient
-  :: (RefEnv Insp -> RefEnv Insp)
+  :: (RefEnv Insp -> RefEnv Insp) -> Target -> Template -> Value -> Either Error (Array Snapshot)
+inspectResolvedLenient = inspectUsing (refEngineWith lenientResolve)
+
+inspectResolvedStrict
+  :: (RefEnv Insp -> RefEnv Insp) -> Target -> Template -> Value -> Either Error (Array Snapshot)
+inspectResolvedStrict = inspectUsing refEngine
+
+inspectUsing
+  :: (RefEnv Insp -> Engine Insp (RefEnv Insp))
+  -> (RefEnv Insp -> RefEnv Insp)
   -> Target
   -> Template
   -> Value
   -> Either Error (Array Snapshot)
-inspectResolvedLenient setup target nodes dat =
+inspectUsing toEngine setup target nodes dat =
   let
-    engine = (refEngineWith lenientResolve (setup (preludeEnv dat)))
-      { recordEmit = inspectEmit target }
+    engine = (toEngine (setup (preludeEnv dat))) { recordEmit = inspectEmit target }
   in
     case runWriterT (runTemplate engine nodes) of
       Left e -> Left e

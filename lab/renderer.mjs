@@ -36,6 +36,8 @@ import {
   renderMaxbarsMapped as bbRenderMaxbarsMapped,
   renderMaxbarsMappedWithPartials as bbRenderMaxbarsMappedWith,
   inspectSurface as bbInspectSurface,
+  inspect as bbInspect,
+  inspectMaxbars as bbInspectMaxbars,
   // FlatBars AST + compile + tooling
   astJson,
   compile as bbCompile,
@@ -54,7 +56,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=74";
+} from "./vendor/flatbars-engine.mjs?v=75";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -67,6 +69,15 @@ const MAPPED = {
   core: { plain: bbRenderMapped, withPartials: bbRenderMappedWith },
   surface: { plain: bbRenderSurfaceMapped, withPartials: bbRenderSurfaceMappedWith },
   maxbars: { plain: bbRenderMaxbarsMapped, withPartials: bbRenderMaxbarsMappedWith },
+};
+
+// The context-inspector entrypoint per FlatBars dialect (ADR-035): `(partials,
+// target, source, data) -> { ok, snapshots, error }`. A dialect absent here
+// advertises no `context-inspect` and its inspector gates off.
+const INSPECT = {
+  core: bbInspect,
+  surface: bbInspectSurface,
+  maxbars: bbInspectMaxbars,
 };
 
 // Map a UI/param dialect name to the engine's internal dialect, or `null` for an
@@ -92,8 +103,8 @@ const DIALECT = (() => {
 // and data-access (→ Transformers / Data Access panels — the lowered AST is precise,
 // not heuristic like Handlebars), and an EXACT partial graph (→ Partials panel;
 // {{> name}}/{{#inline}} surface as `partial` AST nodes). The core / surface /
-// maxbars dialects back provenance (`source-map`); the FullBars surface also backs
-// the Context Inspector (`context-inspect`) — both added per-dialect in engineInfo.
+// maxbars dialects back provenance (`source-map`) and the Context Inspector
+// (`context-inspect`) — both added per-dialect in engineInfo. MinBars backs neither.
 const BB_FEATURES = [
   "catalog",
   "used-transformers",
@@ -311,15 +322,16 @@ function flatbarsRenderer(activeDialect, _opts) {
   }
 
   // context-inspect (ADR-035): snapshot the render context at a clicked output
-  // run's source span. FullBars-surface only — the engine entrypoint threads the
-  // surface desugar; the other dialects advertise it off and never reach here.
+  // run's source span, per execution. The core / surface / maxbars dialects back
+  // it; MinBars advertises it off and never reaches here.
   function inspectAt(program, data, target) {
-    if (activeDialect !== "surface") {
-      const err = new Error("The context inspector is only available for the FullBars surface");
+    const fn = INSPECT[activeDialect];
+    if (!fn) {
+      const err = new Error("The context inspector is not available for this dialect");
       err.kind = "unsupported";
       throw err;
     }
-    const res = bbInspectSurface(program.partials || {}, target, program.source, data == null ? {} : data);
+    const res = fn(program.partials || {}, target, program.source, data == null ? {} : data);
     if (!res.ok) {
       const err = new Error(res.error);
       err.kind = "render";
@@ -335,7 +347,7 @@ function flatbarsRenderer(activeDialect, _opts) {
     // up the provenance UI; a dialect without a mapped entrypoint advertises it off.
     // The FullBars surface also backs the Context Inspector (`context-inspect`).
     const features = MAPPED[activeDialect] ? [...BB_FEATURES, "source-map"] : [...BB_FEATURES];
-    if (activeDialect === "surface") features.push("context-inspect");
+    if (INSPECT[activeDialect]) features.push("context-inspect");
     return { version: VERSION, builtins: allTransformers(), features };
   }
 

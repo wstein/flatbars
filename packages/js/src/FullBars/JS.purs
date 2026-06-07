@@ -42,6 +42,8 @@ module FullBars.JS
   , renderMaxbarsMapped
   , renderMaxbarsMappedWithPartials
   , inspectSurface
+  , inspect
+  , inspectMaxbars
   , renderSurfaceI18n
   , JsTranslator
   , renderMustache
@@ -372,15 +374,29 @@ segmentSnapshot s = fromObject $ FO.fromFoldable $
   where
   optField name = maybe [] (\v -> [ Tuple name (toJson v) ])
 
+inspectResult :: Either String (Array Snapshot) -> InspectResult
+inspectResult = case _ of
+  Left e -> { ok: false, snapshots: [], error: e }
+  Right snaps -> { ok: true, snapshots: map segmentSnapshot snaps, error: "" }
+
 -- | Snapshot the render context of a *surface* template at the source span
 -- | `target` (an output run's provenance). `inspectSurface(partials, target,
 -- | template, data)`, where `target` is `{ file, start, end }`. One snapshot per
 -- | execution of the matching emit (a loop body yields one per iteration).
 inspectSurface :: Fn4 (FO.Object String) JsTarget String Json InspectResult
 inspectSurface = mkFn4 \partials target tpl json ->
-  case FullBars.inspectSurfaceWith target (FO.toUnfoldable partials) tpl (fromJson json) of
-    Left e -> { ok: false, snapshots: [], error: e }
-    Right snaps -> { ok: true, snapshots: map segmentSnapshot snaps, error: "" }
+  inspectResult (FullBars.inspectSurfaceWith target (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Context inspector for a *core* template. `inspect(partials, target, template, data)`.
+inspect :: Fn4 (FO.Object String) JsTarget String Json InspectResult
+inspect = mkFn4 \partials target tpl json ->
+  inspectResult (RawBars.inspectWith target (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Context inspector for a *MaxBars* template.
+-- | `inspectMaxbars(partials, target, template, data)`.
+inspectMaxbars :: Fn4 (FO.Object String) JsTarget String Json InspectResult
+inspectMaxbars = mkFn4 \partials target tpl json ->
+  inspectResult (MaxBars.inspectMaxWith target (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Render a surface template with a host i18n translator seeded (ADR-029): the
 -- | first-class seam that drives `t`/`number`/`date`/… The Lab and any JS host wire

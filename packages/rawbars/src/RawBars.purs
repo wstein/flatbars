@@ -19,6 +19,8 @@ module RawBars
   , renderWithOperations
   , renderMapped
   , renderMappedWith
+  , inspect
+  , inspectWith
   , renderAff
   , compile
   , compileWith
@@ -44,6 +46,7 @@ import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, registerAll, registerPartialFiles, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
+import Kernel.Inspect (Snapshot, Target, inspectResolvedStrict)
 import Kernel.Provenance (Segment, runResolvedMapped)
 import Kernel.Render (formatError, runResolved)
 import Kernel.ToValue (class ToValue, toValue)
@@ -190,6 +193,41 @@ renderMappedWith partialSrcs src dat =
               <<< registerPartials (Map.union h.partials externalT)
         in
           lmap (formatError src) (runResolvedMapped setup h.template dat)
+  where
+  compilePartial (Tuple name s) = case parseWith coreOptions s of
+    Left es -> Left (renderParseErrorsAt s es)
+    Right { nodes } -> Right { name, template: nodes }
+
+-- | Context Inspector for core (ADR-035) — the core twin of `inspectSurfaceWith`,
+-- | snapshotting the render context at a source span. RawBars stays strict.
+inspect :: Target -> String -> Value -> Either String (Array Snapshot)
+inspect target = inspectWith target []
+
+-- | `inspect` with named external partials (each core source).
+inspectWith
+  :: Target
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String (Array Snapshot)
+inspectWith target partialSrcs src dat =
+  case traverse compilePartial partialSrcs of
+    Left e -> Left e
+    Right ps -> case parseWith coreOptions src of
+      Left pes -> Left (renderParseErrorsAt src pes)
+      Right { nodes } ->
+        let
+          h = hoistInline nodes
+          externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
+          partialFiles = Map.union (map (const "main") h.partials)
+            (Map.fromFoldable (map (\p -> Tuple p.name p.name) ps))
+          setup =
+            registerPartialFiles partialFiles
+              <<< withTruthy nonEmpty
+              <<< withYieldName "yield"
+              <<< registerPartials (Map.union h.partials externalT)
+        in
+          lmap (formatError src) (inspectResolvedStrict setup target h.template dat)
   where
   compilePartial (Tuple name s) = case parseWith coreOptions s of
     Left es -> Left (renderParseErrorsAt s es)

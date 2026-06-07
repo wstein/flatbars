@@ -22,13 +22,15 @@ three-way editor↔output linking runs on it, gated by the per-dialect `source-m
 capability; `check:provenance` pins that the corpus tiles. MinBars (logic-less) emits
 no segments and advertises `source-map` off, so its provenance UI gates off.
 
-The same instrumentation backs the **Context Inspector** (`context-inspect`,
-FullBars surface): `Kernel.Inspect.inspectResolvedLenient` swaps a snapshotting
-`recordEmit` that, at every execution of the emit whose span + file match a
-clicked run, captures the render context — `this`, the scoped vars
+The same instrumentation backs the **Context Inspector** (`context-inspect`, the
+core / FullBars / MaxBars dialects): `Kernel.Inspect.inspectResolved{Lenient,Strict}`
+swaps a snapshotting `recordEmit` that, at every execution of the emit whose span +
+file match a clicked run, captures the render context — `this`, the scoped vars
 (`parent`/`root`/`index`/`first`/…), and the block-param `locals` — one snapshot
-per loop iteration (`FullBars.inspectSurfaceWith`, the FFI `inspectSurface`, the
-Lab's `inspectAt`). Verified end-to-end by `test:lab:browser`.
+per loop iteration. Each dialect exposes a facade (`FullBars.inspectSurfaceWith`,
+generalised by `inspectSurfaceDiagWith` which MaxBars reuses; `RawBars.inspectWith`)
+behind the FFI (`inspectSurface` / `inspect` / `inspectMaxbars`) and the Lab's
+`inspectAt`. MinBars gates off. Verified end-to-end by `test:lab:browser`.
 
 ## Context
 
@@ -85,5 +87,5 @@ tile the output: ordered, contiguous, each `len > 0`, covering `[0, output.len)`
   honestly via their capability vector.
 - Templates whose output is reshaped by a transforming helper get no map for that
   render (degrade to `[]`), which is correct, not broken.
-- Follow-ups: extend the Context Inspector to the core / MaxBars dialects (the
-  surface entrypoint is wired first); a defended Lab boot path.
+- Follow-up: a defended Lab boot path (the `§9` review item) — wrap the
+  engine/examples fetch in a visible fallback instead of a blank page.

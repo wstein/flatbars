@@ -13,6 +13,8 @@ module MaxBars
   , renderMaxWithPartials
   , renderMaxMapped
   , renderMaxMappedWith
+  , inspectMax
+  , inspectMaxWith
   , renderWithOperations
   , compileMaxJs
   , compileMaxJsWith
@@ -29,11 +31,12 @@ import FlatBars.Error (Error, ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
-import FullBars (LoopVars, desugarSurfaceWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
+import FullBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
 import FullBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
 import FullBars.Surface (noLoopVars, reservedScope)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
+import Kernel.Inspect (Snapshot, Target)
 import Kernel.Provenance (Segment)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
@@ -102,6 +105,20 @@ renderMaxMappedWith
   -> Value
   -> Either String { output :: String, segments :: Array Segment }
 renderMaxMappedWith = renderSurfaceMappedDiagWith false maxLoopVars maxOptions nonEmpty
+
+-- | Context Inspector for MaxBars (ADR-035) — the MaxBars twin of
+-- | `inspectSurfaceWith`, snapshotting the render context at a source span.
+inspectMax :: Target -> String -> Value -> Either String (Array Snapshot)
+inspectMax target = inspectMaxWith target []
+
+-- | `inspectMax` with named external partials (each MaxBars source).
+inspectMaxWith
+  :: Target
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String (Array Snapshot)
+inspectMaxWith = inspectSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
 -- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own

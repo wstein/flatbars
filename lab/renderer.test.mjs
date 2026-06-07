@@ -422,15 +422,32 @@ test("context inspector: block params surface as locals", async () => {
   assert.deepEqual(snaps[0].locals, { item: "x" });
 });
 
-test("context inspector: non-surface dialects gate off (unsupported)", async () => {
-  for (const dialect of ["rawbars", "maxbars", "minbars"]) {
-    const r = await createRenderer(dialect);
-    assert.ok(!r.engineInfo().features.includes("context-inspect"), `${dialect} omits context-inspect`);
-    assert.throws(
-      () => r.inspectAt(r.compile("{{ this }}").program, "x", { file: "main", start: 0, end: 1 }),
-      (e) => e.kind === "unsupported",
-    );
-  }
+test("context inspector: the maxbars dialect snapshots too", async () => {
+  const r = await createRenderer("maxbars");
+  assert.ok(r.engineInfo().features.includes("context-inspect"));
+  const prog = r.compile("{{#each xs}}[{{ this }}]{{/each}}").program;
+  const snaps = r.inspectAt(prog, { xs: ["x", "y"] }, firstEmitTarget(r, prog, { xs: ["x", "y"] }));
+  assert.deepEqual(snaps.map((s) => s.this), ["x", "y"]);
+  assert.deepEqual(snaps.map((s) => s.index), [0, 1]);
+});
+
+test("context inspector: the core dialect snapshots too", async () => {
+  const r = await createRenderer("rawbars");
+  assert.ok(r.engineInfo().features.includes("context-inspect"));
+  // core: bare names are helper calls, so iterate via an explicit lookup.
+  const prog = r.compile('{{#each (lookup this "xs")}}[{{{ this }}}]{{/each}}').program;
+  const data = { xs: ["a", "b"] };
+  const snaps = r.inspectAt(prog, data, firstEmitTarget(r, prog, data));
+  assert.deepEqual(snaps.map((s) => s.this), ["a", "b"]);
+});
+
+test("context inspector: MinBars (logic-less) gates off (unsupported)", async () => {
+  const r = await createRenderer("minbars");
+  assert.ok(!r.engineInfo().features.includes("context-inspect"));
+  assert.throws(
+    () => r.inspectAt(r.compile("{{.}}").program, "x", { file: "main", start: 0, end: 1 }),
+    (e) => e.kind === "unsupported",
+  );
 });
 
 // ── MinBars (Mustache) ───────────────────────────────────────────────────────
