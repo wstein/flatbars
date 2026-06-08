@@ -81,7 +81,8 @@
     "perf:minbars": "node scripts/perf-guard-minbars.mjs",
     "check:tmgrammar-scopes": "node scripts/check-tmgrammar-scopes.mjs",
     "check:dialect-diagnostics": "node scripts/check-dialect-diagnostics.mjs",
-    "check:adr-nav": "node scripts/check-adr-nav.mjs"
+    "check:adr-nav": "node scripts/check-adr-nav.mjs",
+    "bench": "node scripts/bench-engine.mjs"
   },
   "devDependencies": {
     "@vscode/test-electron": "2.5.2",
