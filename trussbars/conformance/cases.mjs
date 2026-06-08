@@ -130,6 +130,19 @@ export const cases = [
     data: { groups: [["x"], ["y", "z"]] },
   },
 
+  // ── parent context chain ─────────────────────────────────────────────────────
+  {
+    id: "parent-context",
+    template:
+      "{{#each teams as |team|}}{{#each team.members}}{{parent.name}}={{this}} {{/each}}{{/each}}",
+    data: {
+      teams: [
+        { name: "T1", members: ["a", "b"] },
+        { name: "T2", members: ["c"] },
+      ],
+    },
+  },
+
   // ── coalescers (?? requires the left to be Option, hence null in the data) ───
   {
     id: "coalesce",

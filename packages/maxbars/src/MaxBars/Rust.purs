@@ -13,15 +13,16 @@
 -- | this is a parallel Rust driver rather than an `Emit` record.
 -- |
 -- | **Scope (vertical slice).** Implemented: content, escaped/raw output, paths,
--- | `this`/`root`/`loop`, block params, `if`/`unless`/`elif`/`else`, `each`
--- | (+ loop metadata, block params, empty clause), `with`, the comparison /
--- | logic / arithmetic operators, the `ternary` (`? :`), the coalescers `??`
--- | (over `Option<T>`) and `?:` (over a unifying `T`), and the full value-helper
--- | pack — string (incl. integer-argument `slice`/`truncate`), number
--- | (`abs`/`round`/`toFixed`/…), and array (`join`/`count`/`at`/`take`/…). Anything
--- | else (partials, inline, yield, raw blocks, `parent`/`outer` and `loop.parent`
--- | chains, the key-path `pluck`/`sortBy`/`groupBy`, `dict`) returns a `Left`
--- | "unsupported …" so the conformance harness excludes it honestly.
+-- | `this`/`root`/`loop`, block params, the `parent` / `loop.parent` / `loop.root`
+-- | chains, `if`/`unless`/`elif`/`else`, `each` (+ loop metadata, block params,
+-- | empty clause), `with`, the comparison / logic / arithmetic operators, the
+-- | `ternary` (`? :`), the coalescers `??` (over `Option<T>`) and `?:` (over a
+-- | unifying `T`), and the full value-helper pack — string (incl. integer-argument
+-- | `slice`/`truncate`), number (`abs`/`round`/`toFixed`/…), and array
+-- | (`join`/`count`/`at`/`take`/…). Anything else (partials, inline, yield, raw
+-- | blocks, `outer` labelled-loop chains, the key-path `pluck`/`sortBy`/`groupBy`,
+-- | `dict`) returns a `Left` "unsupported …" so the conformance harness excludes it
+-- | honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -60,6 +61,7 @@ type Env =
   { scope :: String
   , loop :: Maybe String
   , params :: Map String String
+  , parents :: Array String -- enclosing context bindings, innermost first (`parent` chain)
   , depth :: Int
   }
 
@@ -80,7 +82,7 @@ compileMaxRust ctxType src = case build of
     pure (renderFn ctxType body)
 
   initialEnv :: Env
-  initialEnv = { scope: "ctx", loop: Nothing, params: Map.empty, depth: 0 }
+  initialEnv = { scope: "ctx", loop: Nothing, params: Map.empty, parents: [], depth: 0 }
 
 renderFn :: String -> String -> String
 renderFn ctxType body =
@@ -178,7 +180,13 @@ eachBlock env args body = case Array.head args of
       subVar = "__sub" <> ds
       lenVar = "__len" <> ds
       params' = bindEachParams paramNames cVar iVar env.params
-      childEnv = { scope: cVar, loop: Just lVar, params: params', depth: d }
+      childEnv =
+        { scope: cVar
+        , loop: Just lVar
+        , params: params'
+        , parents: Array.cons env.scope env.parents
+        , depth: d
+        }
       parentLoop = maybe "None" (\pl -> "Some(&" <> pl <> ")") env.loop
       s = splitClauses body
     bodyS <- nodes childEnv s.before
@@ -210,7 +218,13 @@ withBlock env args body = case Array.head args of
       d = env.depth + 1
       cVar = "__c" <> show d
       params' = maybe env.params (\n -> Map.insert n cVar env.params) (Array.index paramNames 0)
-      childEnv = { scope: cVar, loop: env.loop, params: params', depth: d }
+      childEnv =
+        { scope: cVar
+        , loop: env.loop
+        , params: params'
+        , parents: Array.cons env.scope env.parents
+        , depth: d
+        }
       s = splitClauses body
     bodyS <- nodes childEnv s.before
     elseS <- clauseBody env s.clauses
@@ -257,6 +271,9 @@ expr env = case _ of
   App "loop" [] -> case env.loop of
     Just l -> Right l
     Nothing -> Left "unsupported: 'loop' used outside an each"
+  App "@parentchain" [] -> case Array.head env.parents of
+    Just p -> Right p
+    Nothing -> Left "unsupported: 'parent' used outside an enclosing block"
   App "true" [] -> Right "true"
   App "false" [] -> Right "false"
   App "null" [] -> Right "()"
@@ -345,6 +362,12 @@ path env args = case Array.uncons args of
   Just { head: App "loop" [], tail: keys } -> case env.loop of
     Nothing -> Left "unsupported: 'loop' used outside an each"
     Just lvar -> traverse keyStr keys >>= emitLoopChain lvar
+  Just { head: subj, tail: keys }
+    | Just k <- parentIndex subj -> case Array.index env.parents k of
+        Just pvar -> do
+          segs <- traverse seg keys
+          Right (pvar <> foldMap identity segs)
+        Nothing -> Left "unsupported: 'parent' beyond the enclosing context depth"
   Just { head: subj, tail: keys } -> do
     base <- expr env subj
     segs <- traverse seg keys
@@ -356,6 +379,16 @@ path env args = case Array.uncons args of
   seg = case _ of
     Lit (VString k) -> Right ("." <> k)
     _ -> Left "unsupported: computed lookup (a data-derived field name, spec §4.3)"
+
+-- A `@parentchain` path with `k` leading `parent` hops → the `k`-th enclosing
+-- context. The desugar nests the hops: `{{parent.x}}` is `lookup @parentchain "x"`
+-- (k = 0); `{{parent.parent.x}}` is `lookup (lookup @parentchain "parent") "x"`
+-- (k = 1). The remaining keys are field accesses on that context binding.
+parentIndex :: Expr -> Maybe Int
+parentIndex = case _ of
+  App "@parentchain" [] -> Just 0
+  App "lookup" [ inner, Lit (VString "parent") ] -> (\i -> i + 1) <$> parentIndex inner
+  _ -> Nothing
 
 -- The direct (non-chained) `Loop` metadata fields.
 loopFields :: Array String

@@ -25,6 +25,7 @@
   "ternary": "in stock",
   "loop-parent": "0:a 0:b 1:c ",
   "loop-root": "2/x 2/y 2/z ",
+  "parent-context": "T1=a T1=b T2=c ",
   "coalesce": "Robert",
   "first-truthy": "Robert",
   "neg-pluck": "a,b"
