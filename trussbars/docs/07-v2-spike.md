@@ -59,6 +59,13 @@ with the macro **call-site** span. The message carries precise template
 coordinates. This is stable, total, and already within reach — Trussbars' parser
 produces exactly these spans. **Class A is solved.**
 
+**The v1 emitter already produces the message half.** In commented mode every
+"unsupported …" is prefixed with its `file:line:col` breadcrumb — e.g.
+`catalog.truss:2:1: unsupported: helper 'where'` — exactly the string v2 drops into
+`compile_error!(…)`. So the class-A diagnostic is *one `compile_error!` wrapper away*
+in v2; the located message exists today (`compileMaxRustCommented`). The same
+breadcrumb also rides as a `#[doc]` provenance attribute on each render fn.
+
 ### Class B → `quote_spanned!` + the span-source problem
 
 rustc reports the error at the `Span` of the tokens we emit. So emit the field
