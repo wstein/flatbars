@@ -112,8 +112,16 @@ non-trivial part (precedence-climbing for the operators).
    inline/partial/`{{yield}}`, raw blocks; `Scope` threaded so a binding/alias roots
    its paths at itself. Gate: 10 unit tests + **the whole 57-template corpus parses**
    (`tests/corpus.rs::parser_accepts_the_whole_corpus`).
-4. **Emit** — transcribe `MaxBars/Rust.purs` (`node`/`expr`/`block`/…) onto the Rust
-   AST. Gate: **56/56 byte-identical** + the diagnostics (`docs/07`).
+4. **Emit — ✅ DONE** (`src/emit.rs`, `src/bin/truss-emit.rs`). A faithful
+   transcription of `MaxBars/Rust.purs` onto the structured `Node`/`Expr` tree:
+   inline-partial hoisting, the render-fn wrapper + `SizeHint` capacity seed, the
+   value-helper pack (`emit_helper`/`emit_kind`), `lookup`/loop-chain paths with the
+   `parent`/`root` `Option` threading, each (with the G2 frame elision + enumerate
+   drop), if/elif/else, with (+ `find`), sequential `let`, partials/`yield`, the
+   collection filters (`where`/`reject`/`some`/`every`/`find`). Gate: the
+   conformance harness `--v2` flag emits through this Rust pipeline instead of the
+   v1 PureScript emitter and asserts the SAME golden — **56/56 byte-identical**, 1
+   excluded (`neg-dict`, deferred), 0 drift. (`dict` literals stay a v2 follow-up.)
 5. **Diagnostics** — `compile_error!` (class A) + `quote_spanned!` (class B) +
    the trybuild gate (`docs/07 §4`).
 

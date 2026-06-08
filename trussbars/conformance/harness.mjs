@@ -36,6 +36,29 @@ for (const p of [enginePath, emitterPath]) {
 const { renderMaxbars } = await import(enginePath);
 const { compileMaxRust } = await import(emitterPath);
 
+// `--v2`: emit through the Rust pipeline (`trussbars-template`, docs/08) instead of
+// the PureScript v1 emitter, asserting v2 hits the SAME byte-for-byte golden. The
+// CLI (`truss-emit`) is built once; each template is then emitted by a fast spawn.
+const useV2 = process.argv.includes("--v2");
+let v2Emit;
+if (useV2) {
+  const tmplDir = resolve(root, "trussbars/crates/trussbars-template");
+  console.error("building truss-emit (v2 CLI)…");
+  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-emit"], {
+    cwd: tmplDir,
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  const binPath = resolve(root, "trussbars/target/debug/truss-emit");
+  v2Emit = (template) => {
+    try {
+      const out = execFileSync(binPath, ["Ctx"], { input: template, encoding: "utf8" });
+      return { ok: true, out };
+    } catch (e) {
+      return { ok: false, err: (e.stderr || e.message || "emit failed").toString().trim() };
+    }
+  };
+}
+
 // A Rust raw-string literal with enough hashes to be unambiguous for `s`.
 function rawString(s) {
   let h = "#";
@@ -58,7 +81,7 @@ for (const c of cases) {
   }
   oracle[c.id] = o.value;
 
-  const emit = compileMaxRust("Ctx")(c.template);
+  const emit = useV2 ? v2Emit(c.template) : compileMaxRust("Ctx")(c.template);
   if (!emit.ok) {
     excluded.push({ id: c.id, reason: emit.err });
     continue;
