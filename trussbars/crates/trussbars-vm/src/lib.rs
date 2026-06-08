@@ -6,12 +6,14 @@
 //! AOT structurally can't — templates run against data whose shape isn't known at
 //! compile time.
 //!
-//! **This is the de-risking spike (docs/11 §4):** *tree-walk, lenient mode only.*
-//! It deliberately covers a subset — text/output/paths/operators/`if`/`each`/`with`/
-//! `let` + a handful of value helpers — and returns `Err` (never a wrong answer) for
-//! anything not yet implemented, so the conformance harness reports coverage honestly.
-//! Bytecode, the full catalog, the three render modes (incl. the required AOT-compat
-//! mode), and `no_std` come *after* the approach is proven against the oracle.
+//! **Status:** *tree-walk, lenient mode.* Covers the **whole** conformance corpus
+//! (57/57 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
+//! `if`/`each`/`with`/`let`, loop metadata incl. `loop.parent`/`loop.root`, the value
+//! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
+//! `dict`, and partials (`{{#inline}}`/`{{> }}`/`{{#partial}}`/`{{yield}}`). Anything
+//! genuinely unimplemented returns `Err` (never a wrong answer). Still to come (docs/11):
+//! the three render modes (incl. the required AOT-compat mode), host-helper registration
+//! (F3), `no_std`, and — only if a need appears — bytecode.
 //!
 //! Scalars stringify through `trussbars_core::ToText` (the same ECMA-f64 path AOT
 //! uses), and escaping through `trussbars_core::escape_html`, so VM output is
@@ -179,6 +181,12 @@ struct Env {
     parents: Parents,
     loop_frame: Option<Rc<LoopFrame>>,
     labels: BTreeMap<String, Rc<LoopFrame>>,
+    /// Hoisted `{{#inline}}` definitions, shared across the render.
+    partials: Rc<BTreeMap<String, Vec<Node>>>,
+    /// The pre-rendered body a block partial splices at its `{{yield}}`.
+    yield_html: Option<Rc<str>>,
+    /// Partial names currently expanding (recursion guard).
+    expanding: Vec<String>,
 }
 
 impl Env {
@@ -197,16 +205,19 @@ impl Env {
 /// re-allocating (the same trick as AOT's `SizeHint`).
 pub struct Template {
     nodes: Vec<Node>,
+    partials: Rc<BTreeMap<String, Vec<Node>>>,
     cap_hint: Cell<usize>,
 }
 
 impl Template {
-    /// Parse + desugar a MaxBars template (the `trussbars-template` front-end).
+    /// Parse + desugar a MaxBars template (the `trussbars-template` front-end),
+    /// hoisting `{{#inline}}` definitions into the partial registry.
     ///
     /// # Errors
     /// The parse-error reason.
     pub fn parse(src: &str) -> Result<Template, String> {
-        Ok(Template { nodes: parse(src).map_err(|e| e.message)?, cap_hint: Cell::new(64) })
+        let (registry, nodes) = hoist(parse(src).map_err(|e| e.message)?);
+        Ok(Template { nodes, partials: Rc::new(registry), cap_hint: Cell::new(64) })
     }
 
     /// Render this template against dynamic `data` (lenient mode), returning a fresh
@@ -235,9 +246,56 @@ impl Template {
             parents: None,
             loop_frame: None,
             labels: BTreeMap::new(),
+            partials: Rc::clone(&self.partials),
+            yield_html: None,
+            expanding: Vec::new(),
         };
         eval_nodes(&env, &self.nodes, out)
     }
+}
+
+/// Lift every `{{#inline "name"}}…{{/inline}}` definition (anywhere in the tree) into
+/// a registry and return the tree with those definitions removed.
+fn hoist(nodes: Vec<Node>) -> (BTreeMap<String, Vec<Node>>, Vec<Node>) {
+    let mut reg = BTreeMap::new();
+    let top = hoist_into(nodes, &mut reg);
+    (reg, top)
+}
+
+fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<Node> {
+    let mut out = Vec::new();
+    for n in nodes {
+        match n {
+            Node::Inline { name, body, .. } => {
+                let body = hoist_into(body, reg);
+                reg.insert(name, body);
+            }
+            Node::Each(mut e) => {
+                e.body = hoist_into(e.body, reg);
+                e.otherwise = hoist_into(e.otherwise, reg);
+                out.push(Node::Each(e));
+            }
+            Node::Cond(mut c) => {
+                c.body = hoist_into(c.body, reg);
+                c.elifs = c.elifs.into_iter().map(|(x, b)| (x, hoist_into(b, reg))).collect();
+                c.otherwise = hoist_into(c.otherwise, reg);
+                out.push(Node::Cond(c));
+            }
+            Node::With(mut w) => {
+                w.body = hoist_into(w.body, reg);
+                w.otherwise = hoist_into(w.otherwise, reg);
+                out.push(Node::With(w));
+            }
+            Node::Let { span, bindings, body } => {
+                out.push(Node::Let { span, bindings, body: hoist_into(body, reg) });
+            }
+            Node::PartialBlock { span, name, ctx, body } => {
+                out.push(Node::PartialBlock { span, name, ctx, body: hoist_into(body, reg) });
+            }
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 /// Render a MaxBars `template` against dynamic `data` (parse + render, lenient mode).
@@ -279,11 +337,59 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             }
             eval_nodes(&child, body, out)?;
         }
-        Node::Partial { .. } | Node::PartialBlock { .. } | Node::Inline { .. } | Node::Yield { .. } => {
-            return Err("unsupported (spike): partials / inline / yield".into());
+        Node::Inline { .. } => {} // hoisted into the registry
+        Node::Partial { name, ctx, .. } => {
+            let scope = match ctx {
+                Some(e) => eval_expr(env, e)?,
+                None => env.this.clone(),
+            };
+            expand_partial(env, name, scope, env.yield_html.clone(), out)?;
         }
+        Node::PartialBlock { name, ctx, body, .. } => {
+            // Render the block body in the CALLER frame, then splice it at `{{yield}}`.
+            let mut yielded = String::new();
+            eval_nodes(env, body, &mut yielded)?;
+            let scope = match ctx {
+                Some(e) => eval_expr(env, e)?,
+                None => env.this.clone(),
+            };
+            expand_partial(env, name, scope, Some(Rc::from(yielded.as_str())), out)?;
+        }
+        Node::Yield { .. } => match &env.yield_html {
+            Some(y) => out.push_str(y),
+            None => return Err("'{{yield}}' used outside a block partial".into()),
+        },
     }
     Ok(())
+}
+
+/// Expand the named partial with `scope` as `this` in a fresh frame (params/loop reset,
+/// like the AOT inline-expansion), with `yield_html` available to its `{{yield}}`.
+fn expand_partial(
+    env: &Env,
+    name: &str,
+    scope: Value,
+    yield_html: Option<Rc<str>>,
+    out: &mut String,
+) -> Result<(), String> {
+    if env.expanding.iter().any(|n| n == name) {
+        return Err(format!("unsupported: recursive partial '{name}'"));
+    }
+    let body = env.partials.get(name).ok_or_else(|| format!("unsupported: unknown partial '{name}'"))?;
+    let mut expanding = env.expanding.clone();
+    expanding.push(name.to_string());
+    let child = Env {
+        this: scope,
+        root: env.root.clone(),
+        params: BTreeMap::new(),
+        parents: None,
+        loop_frame: None,
+        labels: BTreeMap::new(),
+        partials: Rc::clone(&env.partials),
+        yield_html,
+        expanding,
+    };
+    eval_nodes(&child, body, out)
 }
 
 fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
@@ -769,5 +875,23 @@ mod tests {
     fn helper_pipe() {
         let d = obj(&[("name", s("ann"))]);
         assert_eq!(render("{{name | uppercase}}", d).unwrap(), "ANN");
+    }
+
+    #[test]
+    fn collection_ops() {
+        let items = arr(&[
+            obj(&[("name", s("Ann")), ("age", Value::Num(30.0))]),
+            obj(&[("name", s("Bo")), ("age", Value::Num(17.0))]),
+        ]);
+        let d = obj(&[("items", items)]);
+        assert_eq!(render(r#"{{#each (where items "age" "gt" 20)}}{{this.name}}{{/each}}"#, d).unwrap(), "Ann");
+    }
+
+    #[test]
+    fn inline_partial_and_yield() {
+        let d = obj(&[("name", s("Ann & Bo"))]);
+        assert_eq!(render(r#"{{#inline "greet"}}Hi {{name}}!{{/inline}}{{> greet}}"#, d.clone()).unwrap(), "Hi Ann &amp; Bo!");
+        let blk = r#"{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}"#;
+        assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
     }
 }
