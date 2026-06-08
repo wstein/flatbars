@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use trussbars_core::{ToText, escape_html};
-use trussbars_template::{Cond, Each, Expr, Node, Value as Lit, With, parse};
+use trussbars_template::{Cond, Each, Expr, Node, Tile, Value as Lit, With, parse};
 
 /// A dynamic runtime value. Heap variants (`Str`/`Array`/`Object`) are **`Rc`-backed**
 /// so [`Clone`] is a refcount bump, not a deep copy — the env can then hold values
@@ -429,6 +429,9 @@ pub struct Inspection {
     pub emitted_rust: Result<String, String>,
     /// data→output provenance, one entry per interpolation, in output order.
     pub interpolations: Vec<Interp>,
+    /// template→Rust provenance (the AOT source map): each node's template span paired
+    /// with the byte range of `emitted_rust` it produced.
+    pub rust_map: Vec<Tile>,
 }
 
 impl Inspection {
@@ -455,8 +458,14 @@ impl Inspection {
             Err(e) => ("null".to_string(), jstr(e)),
         };
         let compat_err = self.aot_compat_error.as_deref().map_or_else(|| "null".to_string(), jstr);
+        let rust_map = self
+            .rust_map
+            .iter()
+            .map(|t| format!("{{\"src\":[{},{}],\"rust\":[{},{}]}}", t.src_start, t.src_end, t.rust_start, t.rust_end))
+            .collect::<Vec<_>>()
+            .join(",");
         format!(
-            "{{\"template\":{},\"output\":{},\"rendered\":{},\"aotCompatOk\":{},\"aotCompatError\":{},\"emittedRust\":{},\"emitError\":{},\"interpolations\":[{}]}}",
+            "{{\"template\":{},\"output\":{},\"rendered\":{},\"aotCompatOk\":{},\"aotCompatError\":{},\"emittedRust\":{},\"emitError\":{},\"interpolations\":[{}],\"rustMap\":[{}]}}",
             jstr(&self.template),
             jstr(&self.output),
             self.rendered,
@@ -465,6 +474,7 @@ impl Inspection {
             rust,
             emit_err,
             interps,
+            rust_map,
         )
     }
 }
@@ -514,7 +524,10 @@ pub fn inspect(template: &str, data: &Value, helpers: &Rc<Helpers>) -> Inspectio
         },
         Err(e) => (false, Some(e.clone())),
     };
-    let emitted_rust = trussbars_template::emit("Ctx", template);
+    let (emitted_rust, rust_map) = match trussbars_template::emit_mapped("Ctx", template) {
+        Ok((r, tiles)) => (Ok(r), tiles),
+        Err(e) => (Err(e), Vec::new()),
+    };
     Inspection {
         template: template.to_string(),
         output,
@@ -523,6 +536,7 @@ pub fn inspect(template: &str, data: &Value, helpers: &Rc<Helpers>) -> Inspectio
         aot_compat_error,
         emitted_rust,
         interpolations,
+        rust_map,
     }
 }
 
