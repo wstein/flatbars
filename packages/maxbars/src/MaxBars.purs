@@ -61,7 +61,9 @@ maxOptions =
     -- not the Handlebars bare `{{{{name}}}}` form.
     , rawBlockHbs = false
     , rawBlockHash = true
-    , lexOptions = { operatorChars: infixOperatorChars }
+    -- the infix-operator alphabet plus the `..` range operator (MaxBars only;
+    -- `../` parent-paths are already gone here, so `..` is free — ADR-021).
+    , lexOptions = { operatorChars: infixOperatorChars, rangeOperator: true }
     -- Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is
     -- a Mustache feature reserved for MinBars. RawBars / MaxBars / FullBars all
     -- reject it so the dialect ladder has one consistent answer to "does

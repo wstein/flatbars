@@ -171,6 +171,18 @@ export const examples = {
     data: { prefs: { theme: "dark", lang: "en" } },
   },
 
+  rangeOp: {
+    engine: "maxbars",
+    label: "Intermediate — Ranges: the `..` operator",
+    // `a..b` is the inclusive integer range (sugar for the `range` helper), so
+    // `{{#each 1..n}}` counts without a data array. Bounds are expressions and
+    // additive binds tighter than `..`, so `1..pages` and `start..start+2` both
+    // read naturally. Descending bounds yield the empty list (the `{{else}}`).
+    compiles: true,
+    template: `{{#each 1..rounds}}Round {{this}}{{#unless loop.last}} · {{/unless}}{{/each}}`,
+    data: { rounds: 3 },
+  },
+
   withBlock: {
     engine: "maxbars",
     label: "Intermediate — With: re-root the context",

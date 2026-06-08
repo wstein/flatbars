@@ -240,6 +240,15 @@ const t = (s) => s;
     <h3>Over an object</h3>
     <p>Iterating an object, <code>{t("loop.key")}</code> is the property name and <code>{t("{{this}}")}</code> the value.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.eachObject.template} data={ex.eachObject.data} />
+    <h3>Ranges — the <code>..</code> operator</h3>
+    <p>
+      <code>{t("a..b")}</code> is the inclusive integer range (sugar for the <code>range</code> helper),
+      so <code>{t("{{#each 1..n}}")}</code> counts without a data array. The bounds are expressions and
+      additive binds tighter than <code>..</code> (<code>{t("start..start + 2")}</code>); descending bounds
+      yield the empty list. A single <code>.</code> is still a dotted path or decimal —
+      only a glued <code>..</code> is the range operator.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.rangeOp.template} data={ex.rangeOp.data} />
     <h3>Block params &amp; labelled loops</h3>
     <p>
       A trailing <code>{t("as |name …|")}</code> binds scoped names over the block body (as in

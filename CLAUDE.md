@@ -215,6 +215,13 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `dialectDiagnostics` on top so an attempted set-delim in one of those dialects
   surfaces as an actionable "use MinBars" message instead of a raw parse failure
   (rule inventory pinned by `check:dialect-diagnostics`).
+  A `LexOptions` knob diverges the same way — **`rangeOperator`** (the `..` range
+  operator, sugar for the `range` helper): **MaxBars only**. A glued `..` lexes as
+  `TOp ".."` (so `1..n`/`a..b` carve into `a`/`..`/`b`), while a single `.` stays an
+  identifier char (dotted paths untouched). It is MaxBars-exclusive because the
+  other dialects keep `..` for the Handlebars `../` parent-path, already gone in
+  MaxBars (ADR-021); `MaxBars.Expr` adds the parser rung between comparison and
+  additive.
   `check:parity` (in `npm test`) machine-checks that RawBars ≡ MaxBars — the exact
   `nonEmpty` falsy set and byte-identical rendering over a shared core corpus —
   modulo documented surface exceptions (the ADR-021 loop-variable model; the

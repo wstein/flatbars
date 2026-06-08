@@ -44,12 +44,15 @@ subexpression produces — so the prelude, engine, and emit rules need no change
 | `==` `!=` | `eq` `ne` | `{{ x == 1 }}` → `(eq x 1)` |
 | `<` `>` `<=` `>=` | `lt` `gt` `lte` `gte` | `{{ x >= 18 }}` → `(gte x 18)` |
 | `+` `-` `*` `/` `%` | `add` `subtract` `multiply` `divide` `modulo` | `{{ price * qty }}` → `(multiply price qty)` |
+| `..` (range) | `range` | `{{#each 1..n}}` → `(range 1 n)` (the inclusive integer span) |
 | `??` | `coalesce` | `{{ a ?? b }}` → `(coalesce a b)` (first non-null) |
 | `\|` (pipe) | application | `{{ a \| f x }}` → `(f a x)` (piped value first) |
 
 Precedence (loosest → tightest): pipe, `??`, `||`, `&&`, comparisons
-(non-associative), additive (`+` `-`), multiplicative (`*` `/` `%`), prefix `!`,
-then application/atom — so `{{ n + 1 > 5 }}` is `(gt (add n 1) 5)`.
+(non-associative), range `..` (non-associative), additive (`+` `-`),
+multiplicative (`*` `/` `%`), prefix `!`, then application/atom — so
+`{{ n + 1 > 5 }}` is `(gt (add n 1) 5)` and `{{#each 1..n + 1}}` is
+`(range 1 (add n 1))`.
 Pipe chains are left-associative: `a | f | g` ⇒ `(g (f a))`. Paths,
 literals, and `(parenthesised)` subexpressions are exactly as in FullBars.
 
@@ -58,7 +61,11 @@ operators — but this is a *MaxBars-only* lexer mode (`ParseOptions.lexOptions`
 `infixArith`): RawBars/FullBars keep `+ - * / ?` as path/name characters, so
 `../x`, `a/b`, and `partial-block` are unaffected. `.` and `@` stay identifier
 characters in **every** dialect, so a dotted path like `price.net` is still one
-path even in MaxBars (and `/` is therefore unambiguously division). Arithmetic is
+path even in MaxBars (and `/` is therefore unambiguously division). A glued
+double dot is the one exception MaxBars carves back out — `lexOptions.rangeOperator`
+splits `1..n` / `a..b` into `1`/`..`/`n`, while a single `.` stays path
+punctuation; it is MaxBars-only because RawBars/FullBars keep `..` for the
+Handlebars `../` parent-path (already gone in MaxBars — ADR-021). Arithmetic is
 strictly numeric — a non-number operand is a `TypeError` (no coercion) — and `??`
 is *null*-coalescing (a present `0`/`""`/`[]` wins), independent of the engine's
 truthiness rule.

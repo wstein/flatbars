@@ -51,8 +51,12 @@ toRawToks cfg src =
   -- `FlatBars.Lexer.tokenizeTemplate` populating each `RawTok`'s interior at scan
   -- time, so the two RawTok streams stay byte-identical (RawTokParity now also
   -- covers interiors). Same `tokenizeInterior` the engine calls.
+  -- This parity experiment does not model the MaxBars `..` range operator
+  -- (`rangeOperator` off): the companion hand-lexer has no `..` rule, so the two
+  -- streams stay byte-identical over the `..`-free parity corpus. The Lab UI and
+  -- the engine split `..` through MaxBars' own `lexOptions`.
   interiorAt base s = E.tokenizeInterior
-    { operatorChars: if cfg.infixArith then E.infixOperatorChars else "" }
+    { operatorChars: if cfg.infixArith then E.infixOperatorChars else "", rangeOperator: false }
     base
     s
 

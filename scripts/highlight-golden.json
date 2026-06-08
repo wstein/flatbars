@@ -831,6 +831,45 @@
       ]
     },
     {
+      "id": "interior-maxbars-range-op",
+      "dialect": "maxbars",
+      "note": "MaxBars: the glued `..` carves an `operator` span between two `number` spans (`rangeOperator`); a single `.` would stay path punctuation",
+      "src": "{{ 1..3 }}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 10,
+          "kind": "expr"
+        }
+      ],
+      "tokens": [
+        {
+          "from": 0,
+          "to": 10,
+          "kind": "expr",
+          "role": "tag"
+        },
+        {
+          "from": 3,
+          "to": 4,
+          "kind": "number",
+          "role": "interior"
+        },
+        {
+          "from": 4,
+          "to": 6,
+          "kind": "operator",
+          "role": "interior"
+        },
+        {
+          "from": 6,
+          "to": 7,
+          "kind": "number",
+          "role": "interior"
+        }
+      ]
+    },
+    {
       "id": "interior-number-in-block-arg",
       "dialect": "fullbars",
       "note": "a numeric literal in a block arg carves a `number` span; the tag stays `block-open`",

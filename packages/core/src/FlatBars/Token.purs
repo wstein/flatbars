@@ -78,11 +78,18 @@ type Interior = Either ParseError (Array PosToken)
 -- | regardless, so dotted paths, `@data`, and `key=value` hashes are unaffected by
 -- | the seam. (The characters `& | ! < > =` are operators in every dialect — they
 -- | are not configurable.)
-type LexOptions = { operatorChars :: String }
+-- |
+-- | `rangeOperator` opts in to the `..` range operator (MaxBars): a glued double
+-- | dot tokenizes as `TOp ".."` (so `1..5` and `a..b` carve into `a`/`..`/`b`),
+-- | while a single `.` stays an identifier char (dotted paths `a.b` are untouched).
+-- | Off by default — the dialects that keep the Handlebars `../` parent-path
+-- | (FullBars/RawBars) and MinBars leave `..` inside the identifier run.
+type LexOptions = { operatorChars :: String, rangeOperator :: Boolean }
 
--- | The default: an empty operator set — a path/name-only interior.
+-- | The default: an empty operator set, no range operator — a path/name-only
+-- | interior (`..` stays an identifier char, so `../x` parent-paths survive).
 defaultLexOptions :: LexOptions
-defaultLexOptions = { operatorChars: "" }
+defaultLexOptions = { operatorChars: "", rangeOperator: false }
 
 -- | The conventional infix-operator alphabet a dialect enables for an expression
 -- | surface: arithmetic `+ - * / %`, the ternary head `?`, and its `:` separator
@@ -110,6 +117,11 @@ tokenizeInterior cfg base src = go 0 []
   isOp c = Array.elem c opChars
   identChar c = isIdentChar c && not (isOp c)
 
+  -- the `..` range operator (MaxBars, `cfg.rangeOperator`): a double dot at offset
+  -- `j` is the two-char operator. A single `.` stays an identifier char (so dotted
+  -- paths `a.b` are untouched); only a *glued* second dot triggers the split.
+  rangeAt j = cfg.rangeOperator && at j == Just '.' && at (j + 1) == Just '.'
+
   go :: Int -> Array PosToken -> Either ParseError (Array PosToken)
   go i acc
     | i >= len = Right acc
@@ -129,6 +141,9 @@ tokenizeInterior cfg base src = go 0 []
           -- `==` is the only token-boundary use of `=`; a lone `=` here is invalid
           -- (`key=value` keeps `=` inside the ident run, below).
           | c == '=' -> if at (i + 1) == Just '=' then op2 "==" i acc else bad i
+          -- the `..` range operator (MaxBars): a glued double dot, before the
+          -- single `.` falls through to the identifier run below.
+          | rangeAt i -> op2 ".." i acc
           -- a leading `-` glued to a digit is a negative literal in both modes.
           | c == '-' && maybe false isDigit (at (i + 1)) -> readNumber i acc
           -- Configured operator characters (`operatorChars`) lex as `TOp`. `?`
@@ -157,6 +172,9 @@ tokenizeInterior cfg base src = go 0 []
       Just '[' -> case bracketEnd (j + 1) of
         Just k -> scan (k + 1)
         Nothing -> Left (LexError "unterminated [ segment" (base + j))
+      -- a `..` ends the identifier (the range operator splits `a..b`); a single
+      -- `.` keeps the dotted path together.
+      _ | rangeAt j -> go j (push acc (TIdent (slc start j)) start j)
       Just c | identChar c -> scan (j + 1)
       _ -> go j (push acc (TIdent (slc start j)) start j)
     bracketEnd k
@@ -174,9 +192,14 @@ tokenizeInterior cfg base src = go 0 []
         Just n -> go end (push acc (TNum n) start end)
         Nothing -> Left (LexError ("malformed number '" <> raw <> "'") (base + start))
     where
-    numEnd j = case at j of
-      Just c | isNumChar c -> numEnd (j + 1)
-      _ -> j
+    -- a `..` (the range operator) ends the number before the dots, so `1..5`
+    -- carves into `1`/`..`/`5` instead of a malformed `1..5` literal; a single
+    -- `.` is still a decimal point (`1.5`).
+    numEnd j
+      | rangeAt j = j
+      | otherwise = case at j of
+          Just c | isNumChar c -> numEnd (j + 1)
+          _ -> j
 
   readString :: Int -> Char -> Array PosToken -> Either ParseError (Array PosToken)
   readString start q acc = collect (start + 1) []

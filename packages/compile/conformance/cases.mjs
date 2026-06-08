@@ -157,6 +157,13 @@ export const cases = [
   { name: "mx:loopvar-key", dialect: "maxbars", t: "{{#each o}}{{loop.key}}={{this}};{{/each}}", d: { o: { x: 1, y: 2 } } },
   // a dotted path is still a path (not a loop var) in MaxBars.
   { name: "mx:path-still-works", dialect: "maxbars", t: "{{ user.name }}", d: { user: { name: "Ada" } } },
+  // `..` range operator — sugar for (range a b); a single `.` stays a path/decimal.
+  { name: "mx:range-lit", dialect: "maxbars", t: "{{#each 1..4}}{{this}}{{/each}}", d: {} },
+  { name: "mx:range-dyn", dialect: "maxbars", t: "{{#each lo..hi}}{{this}} {{/each}}", d: { lo: 2, hi: 5 } },
+  { name: "mx:range-precedence", dialect: "maxbars", t: "{{#each 1..n+1}}{{this}}{{/each}}", d: { n: 3 } },
+  { name: "mx:range-value", dialect: "maxbars", t: "{{ 1..3 }}", d: {} },
+  { name: "mx:range-decimal-untouched", dialect: "maxbars", t: "{{ 1.5 }}", d: {} },
+  { name: "mx:range-path-untouched", dialect: "maxbars", t: "{{ a.b }}", d: { a: { b: "ok" } } },
   // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
   // through to name (where ?? keeps the non-null "" and || yields a boolean).
   { name: "mx:elvis-empty", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "", name: "Ada" } },

@@ -8,12 +8,14 @@
 -- | `==`/`!=`/`<`/`>`/`<=`/`>=`→`eq`/`ne`/`lt`/`gt`/`lte`/`gte`, the
 -- | null-coalescing `??`→`coalesce`, the truthy-coalescing (Elvis) `?:`→
 -- | `firstTruthy`, arithmetic `+`/`-`/`*`/`/`/`%`→
--- | `add`/`subtract`/`multiply`/`divide`/`modulo`, and `a | f x`→`(f a x)` (piped
--- | value first). Precedence loosest→tightest: ternary (right-associative), pipe,
--- | `??`, `?:`, `||`, `&&`, comparisons
--- | (non-associative), additive (`+` `-`), multiplicative (`*` `/` `%`), prefix
--- | `!`, application/atom. (A dotted path like `a.b` stays a single identifier —
--- | the lexer keeps `.` an ident char — so `/` is unambiguously division here.)
+-- | `add`/`subtract`/`multiply`/`divide`/`modulo`, the inclusive range `a..b`→
+-- | `(range a b)`, and `a | f x`→`(f a x)` (piped value first). Precedence
+-- | loosest→tightest: ternary (right-associative), pipe, `??`, `?:`, `||`, `&&`,
+-- | comparisons (non-associative), range `..` (non-associative), additive
+-- | (`+` `-`), multiplicative (`*` `/` `%`), prefix `!`, application/atom. (A
+-- | dotted path like `a.b` stays a single identifier — the lexer keeps a *single*
+-- | `.` an ident char — so `/` is unambiguously division here; only a glued `..`
+-- | lexes as the range operator, MaxBars' own `lexOptions.rangeOperator`.)
 -- |
 -- | Two entry points share the precedence ladder, differing only in the *primary*
 -- | the operators bind over:
@@ -155,11 +157,19 @@ combinators toks =
     pElvis i = binL (binOp "?:" "firstTruthy") pOr i
     pOr i = binL (binOp "||" "or") pAnd i
     pAnd i = binL (binOp "&&" "and") pCmp i
-    -- comparison is non-associative and its operands are full additive
+    -- comparison is non-associative and its operands are full *range*
     -- expressions, so `n + 1 > 5` reads as `(gt (add n 1) 5)`.
-    pCmp i = pAdd i >>= \lhs -> case tk lhs.pos >>= cmpOp of
-      Just c -> pAdd (lhs.pos + 1) >>= \r -> Right { val: c lhs.val r.val, pos: r.pos }
+    pCmp i = pRange i >>= \lhs -> case tk lhs.pos >>= cmpOp of
+      Just c -> pRange (lhs.pos + 1) >>= \r -> Right { val: c lhs.val r.val, pos: r.pos }
       Nothing -> Right { val: lhs.val, pos: lhs.pos }
+    -- `a .. b` (the range operator): non-associative, looser than comparison and
+    -- tighter than additive, so `1 .. n + 1` reads as `(range 1 (add n 1))`.
+    -- Desugars to the prelude `range` helper (the inclusive integer array) — the
+    -- same call `(range a b)` writes, so `{{#each 1..n}}` iterates `[1..n]`.
+    pRange i = pAdd i >>= \lhs -> case tk lhs.pos of
+      Just (TOp "..") -> pAdd (lhs.pos + 1) >>= \r ->
+        Right { val: App "range" [ lhs.val, r.val ], pos: r.pos }
+      _ -> Right { val: lhs.val, pos: lhs.pos }
     pAdd i = binL addOp pMul i
     pMul i = binL mulOp pUnary i
     pUnary i = case tk i of

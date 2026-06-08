@@ -363,4 +363,26 @@ main = do
   assert' "range: a span past the budget is a located error"
     (isLeft (renderMax "{{#each (range 1 200000) as |n|}}{{n}}{{/each}}" (obj [])))
 
+  -- the `..` range operator (sugar for `(range a b)`): literal and dynamic bounds.
+  expectM "range op: 1..4 iterates the inclusive span"
+    "{{#each 1..4}}{{this}}{{/each}}"
+    (obj [])
+    "1234"
+  expectM "range op: bounds are expressions (additive binds tighter than ..)"
+    "{{#each lo..hi+1}}{{this}}{{/each}}"
+    (obj [ Tuple "lo" (num 2.0), Tuple "hi" (num 4.0) ])
+    "2345"
+  expectM "range op: a value-position range stringifies the array"
+    "{{ 1..3 }}"
+    (obj [])
+    "1,2,3"
+  expectM "range op: a single dot stays a decimal (not a range)"
+    "{{ 1.5 }}"
+    (obj [])
+    "1.5"
+  expectM "range op: a dotted path is untouched by .."
+    "{{ a.b }}"
+    (obj [ Tuple "a" (obj [ Tuple "b" (VString "ok") ]) ])
+    "ok"
+
   log "all MaxBars tests passed"
