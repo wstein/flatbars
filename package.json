@@ -71,6 +71,8 @@
     "lint": "spago build --pedantic-packages",
     "clean": "rimraf output .spago",
     "test:compile": "spago build && node packages/compile/conformance.mjs",
+    "test:trussbars-conformance": "spago build && node trussbars/conformance/harness.mjs",
+    "gen:trussbars-snapshots": "spago build && node trussbars/conformance/harness.mjs --update",
     "test:minbars-spec": "spago build && node packages/minbars/test/spec-conformance.mjs",
     "gen:editors-manifests": "node editors/scripts/sync-manifests.mjs",
     "check:editors-manifests": "node editors/scripts/sync-manifests.mjs --check",

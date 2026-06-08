@@ -1,0 +1,20 @@
+{
+  "hello": "Hello, &lt;b&gt;Ann&lt;/b&gt;!",
+  "raw": "raw: <i>x</i>",
+  "dotted": "Ann from NYC &amp; co",
+  "arithmetic": "3 x 4 = 12",
+  "comparison": "many (5)",
+  "logic": "both",
+  "float": "ratio = 0.125",
+  "uppercase": "ANN",
+  "pipe-chain": "Bob!",
+  "if-else": "off",
+  "unless": "todo",
+  "each-strings": "#x #y #z ",
+  "each-empty": "(none)",
+  "each-loopmeta": "1. A 2. B 3. C! ",
+  "with": "Bo (30)",
+  "nested-each-root": "T1 (Acme): a b \nT2 (Acme): c \n",
+  "neg-slice-helper": "Hello",
+  "neg-coalesce": "Bo"
+}

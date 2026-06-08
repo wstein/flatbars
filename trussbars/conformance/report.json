@@ -1,0 +1,23 @@
+{
+  "profile": "perf (ecma-float, default)",
+  "total": 18,
+  "positive": {
+    "count": 16,
+    "byte_matched": 16,
+    "mismatched": 0
+  },
+  "excluded": {
+    "count": 2,
+    "cases": [
+      {
+        "id": "neg-slice-helper",
+        "reason": "unsupported: helper 'slice'"
+      },
+      {
+        "id": "neg-coalesce",
+        "reason": "unsupported: helper 'coalesce'"
+      }
+    ]
+  },
+  "oracle_drift": 0
+}
