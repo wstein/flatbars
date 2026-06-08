@@ -18,6 +18,25 @@ test("buildHelpers collects registerHelper calls into a bag", () => {
   assert.equal(r.helpers.loud("hi"), "HI");
 });
 
+test("registerOperation is the native alias of registerHelper — same bag (ADR-019)", () => {
+  // The two dialect-scoped names (FullBars `registerHelper`, native
+  // `registerOperation`) fill an identical bag, so a MaxBars/RawBars card can
+  // teach the native word and still run. Pins Nadia's "the two are identical".
+  const viaHelper = buildHelpers("registerHelper('loud', (s) => String(s).toUpperCase(), 1)", safe);
+  const viaOp = buildHelpers("registerOperation('loud', (s) => String(s).toUpperCase(), 1)", safe);
+  assert.equal(viaOp.ok, true);
+  assert.deepEqual(Object.keys(viaOp.helpers), Object.keys(viaHelper.helpers));
+  assert.equal(viaOp.helpers.loud.arity, viaHelper.helpers.loud.arity);
+  // both render identically through the native MaxBars entry point
+  assert.equal(renderMaxWith(viaOp.helpers, {}, "{{loud x}}", { x: "a" }).value, "A");
+  // and a single source may mix the two names freely
+  const mixed = buildHelpers(
+    "registerOperation('a', () => 'A');\nregisterHelper('b', () => 'B')",
+    safe,
+  );
+  assert.deepEqual(Object.keys(mixed.helpers).sort(), ["a", "b"]);
+});
+
 test("empty source is a valid empty bag", () => {
   assert.deepEqual(buildHelpers("", safe), { ok: true, helpers: {}, error: "" });
   assert.deepEqual(buildHelpers("   \n", safe).helpers, {});

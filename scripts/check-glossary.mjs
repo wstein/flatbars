@@ -15,11 +15,13 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
-const docs = resolve(dirname(fileURLToPath(import.meta.url)), "../spec/src/content/docs");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const docs = resolve(root, "spec/src/content/docs");
 const concepts = readFileSync(resolve(docs, "concepts.mdx"), "utf8");
 const hostApi = readFileSync(resolve(docs, "engine/host-api.mdx"), "utf8");
 const rawbars = readFileSync(resolve(docs, "adr/adr-0008-rawbars.mdx"), "utf8");
 const maxbars = readFileSync(resolve(docs, "engine/maxbars.mdx"), "utf8");
+const buildHelpersSrc = readFileSync(resolve(root, "lab/helpers.mjs"), "utf8");
 
 const fail = [];
 const need = (cond, msg) => { if (!cond) fail.push(msg); };
@@ -67,10 +69,20 @@ need(/\boperation/i.test(rawbars), "adr-0008-rawbars.adoc: must use the native w
 need(/renderWithOperations/.test(maxbars), "maxbars.adoc: must document `renderWithOperations` (native operation boundary, ADR-019 addendum)");
 need(/\boperation/i.test(maxbars), "maxbars.adoc: must use the native word \"operation\" (not \"helper\") for MaxBars");
 
+// The SOURCE-LEVEL authoring affordance honours the same split (ADR-019 addendum):
+// `buildHelpers` (the Lab panel + tutorial cards) must inject BOTH dialect-scoped
+// names, aliasing one registrar, so native cards can teach `registerOperation`
+// while FullBars/migration cards keep `registerHelper`. Pinned so neither alias is
+// silently dropped (Nadia's "the two registers can't drift").
+const injects = buildHelpersSrc.match(/new Function\(([^)]*)\)/);
+const injected = injects ? injects[1] : "";
+need(/registerHelper/.test(injected), "lab/helpers.mjs: buildHelpers must inject `registerHelper` (FullBars boundary word)");
+need(/registerOperation/.test(injected), "lab/helpers.mjs: buildHelpers must inject `registerOperation` (native RawBars/MaxBars twin, ADR-019 addendum)");
+
 if (fail.length) {
   console.error("✗ operation-vocabulary check failed (ADR-019):");
   for (const m of fail) console.error("  - " + m);
   console.error("  Fix the glossary (concepts.adoc) or host-api.adoc so the two registers agree.");
   process.exit(1);
 }
-console.log(`✓ operation vocabulary coherent — ${terms.length} native terms paired with their host-API synonyms; renderWithOperations documented for RawBars + MaxBars`);
+console.log(`✓ operation vocabulary coherent — ${terms.length} native terms paired with their host-API synonyms; renderWithOperations documented for RawBars + MaxBars; buildHelpers injects registerHelper + registerOperation`);

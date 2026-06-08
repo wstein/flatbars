@@ -581,7 +581,7 @@ function uArityOk(arity, n) {
 }
 // `register(name, fn)` or `register(name, fn, arity)` (ADR-018).
 function register(name, fn, arity) {
-  if (typeof fn !== "function") throw new Error("rt.register: helper '" + name + "' is not a function");
+  if (typeof fn !== "function") throw new Error("rt.register: '" + name + "' is not a function");
   userHelpers[name] = { fn, arity };
   return rt;
 }
