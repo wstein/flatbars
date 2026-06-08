@@ -116,3 +116,26 @@ compiled". STViz parity comes for free from the Lab's existing three-way linking
 Phase 1 is a natural follow-on to the breadcrumb work and could even land in v1's
 PureScript emitter as a `compileMaxRustMapped` variant (another `Env.mode`),
 de-risking the v2 design — same way the commented mode prefigured the diagnostics.
+
+## Implemented — `trussbars_vm::inspect` (the in-code entry point)
+
+Phase 1 shipped on the **VM** (not the AOT emitter), because the decisive requirement
+is *inspect-my-app, invoked in code*: the Studio is a **viewer of inspections your app
+produces**, so it runs in-process with your data and your registered helpers — which
+sidesteps the "custom helpers must be compiled" wall entirely (they ran here; the
+viewer only displays the result).
+
+`inspect(template, &data, &helpers) -> Inspection` captures, in one call:
+- the lenient **output** (+ `rendered`);
+- **data→output provenance** — `interpolations: Vec<Interp>`, each `{{ }}`'s template
+  byte span → the output byte range it produced → the raw value. A looped `{{x}}` maps
+  to *one* template span and *many* output runs (the STViz core);
+- the **AOT-compat verdict** (`aot_compat_ok` + the rejection reason) — would this
+  compile under AOT, identically? (the verifying proxy);
+- the **emitted Rust** the AOT backend would generate.
+
+`Inspection::to_json()` (dependency-free) feeds the Studio viewer; the `truss-vm
+--inspect` CLI prints it. Delivery modes (docs/11 §10): (A) dump-and-load JSON, (B) an
+app-served local Studio that re-`inspect`s in-process on edit. **Phase 2** (the context
+inspector — `this`/`parent`/`root`/locals at a span) is the next layer on the same
+trace mechanism.
