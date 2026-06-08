@@ -95,6 +95,26 @@ impl Value {
     }
 }
 
+/// Write a value to `out` HTML-escaped, **without** an intermediate `String` (O3):
+/// strings escape straight into the buffer; numbers/bools carry no HTML-special
+/// characters so they write raw; arrays escape element-wise.
+fn write_escaped(v: &Value, out: &mut String) {
+    match v {
+        Value::Str(s) => escape_html(s, out),
+        Value::Null => {}
+        Value::Bool(_) | Value::Num(_) => v.raw_text(out),
+        Value::Array(a) => {
+            for (i, e) in a.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                write_escaped(e, out);
+            }
+        }
+        Value::Object(_) => {}
+    }
+}
+
 /// A loop frame: the `{{loop.*}}` metadata for the current iteration.
 #[derive(Debug, Clone)]
 struct LoopFrame {
@@ -228,9 +248,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             if *raw {
                 v.raw_text(out);
             } else {
-                let mut tmp = String::new();
-                v.raw_text(&mut tmp);
-                escape_html(&tmp, out);
+                write_escaped(&v, out);
             }
         }
         Node::Cond(c) => eval_cond(env, c, out)?,
