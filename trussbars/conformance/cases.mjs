@@ -116,10 +116,22 @@ export const cases = [
     data: { count: 5 },
   },
 
-  // ── negative: outside the slice (oracle renders; emitter excludes) ───────────
+  // ── coalescers (?? requires the left to be Option, hence null in the data) ───
   {
-    id: "neg-coalesce",
+    id: "coalesce",
     template: "{{nickname ?? name}}",
-    data: { nickname: "Bo", name: "Robert" },
+    data: { nickname: null, name: "Robert" },
+  },
+  {
+    id: "first-truthy",
+    template: "{{nick ?: name}}",
+    data: { nick: "", name: "Robert" },
+  },
+
+  // ── negative: still outside the slice (oracle renders; emitter excludes) ─────
+  {
+    id: "neg-pluck",
+    template: '{{items | pluck "name"}}',
+    data: { items: [{ name: "a" }, { name: "b" }] },
   },
 ];

@@ -1,17 +1,17 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 25,
+  "total": 27,
   "positive": {
-    "count": 24,
-    "byte_matched": 24,
+    "count": 26,
+    "byte_matched": 26,
     "mismatched": 0
   },
   "excluded": {
     "count": 1,
     "cases": [
       {
-        "id": "neg-coalesce",
-        "reason": "unsupported: helper 'coalesce'"
+        "id": "neg-pluck",
+        "reason": "unsupported: helper 'pluck'"
       }
     ]
   },

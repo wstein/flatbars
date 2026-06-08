@@ -15,13 +15,13 @@
 -- | **Scope (vertical slice).** Implemented: content, escaped/raw output, paths,
 -- | `this`/`root`/`loop`, block params, `if`/`unless`/`elif`/`else`, `each`
 -- | (+ loop metadata, block params, empty clause), `with`, the comparison /
--- | logic / arithmetic operators, the `ternary` (`? :`), and the full value-helper
+-- | logic / arithmetic operators, the `ternary` (`? :`), the coalescers `??`
+-- | (over `Option<T>`) and `?:` (over a unifying `T`), and the full value-helper
 -- | pack — string (incl. integer-argument `slice`/`truncate`), number
 -- | (`abs`/`round`/`toFixed`/…), and array (`join`/`count`/`at`/`take`/…). Anything
 -- | else (partials, inline, yield, raw blocks, `parent`/`outer` and `loop.parent`
--- | chains, the Option-typed coalescers `??`/`?:`, the key-path `pluck`/`sortBy`/
--- | `groupBy`, `dict`) returns a `Left` "unsupported …" so the conformance harness
--- | excludes it honestly.
+-- | chains, the key-path `pluck`/`sortBy`/`groupBy`, `dict`) returns a `Left`
+-- | "unsupported …" so the conformance harness excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -293,6 +293,20 @@ expr env = case _ of
     ae <- expr env a
     be <- expr env b
     Right ("(if trussbars_core::truthy(&(" <> ce <> ")) { " <> ae <> " } else { " <> be <> " })")
+  -- `a ?? b` (first non-null): the left is `Option<T>`, the right its `T`.
+  App "coalesce" [ a, b ] -> do
+    ae <- expr env a
+    be <- expr env b
+    Right ("(" <> ae <> ").clone().unwrap_or_else(|| (" <> be <> ").clone())")
+  -- `a ?: b` (first truthy): both arms unify to one `T: Truthy + Clone`.
+  App "firstTruthy" [ a, b ] -> do
+    ae <- expr env a
+    be <- expr env b
+    Right
+      ( "{ let __t = (" <> ae <> ").clone(); if trussbars_core::truthy(&__t) { __t } else { ("
+          <> be
+          <> ").clone() } }"
+      )
   App name args
     | Just r <- emitHelper env name args -> r
   App name [] -> case Map.lookup name env.params of

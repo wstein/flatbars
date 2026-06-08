@@ -23,5 +23,7 @@
   "round": "4",
   "to-fixed": "$3.50",
   "ternary": "in stock",
-  "neg-coalesce": "Bo"
+  "coalesce": "Robert",
+  "first-truthy": "Robert",
+  "neg-pluck": "a,b"
 }
