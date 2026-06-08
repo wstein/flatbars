@@ -25,12 +25,13 @@
 -- | in the caller frame), labelled loops (`label NAME` → `outer`), and the
 -- | literal-key closures `pluck` / `sortBy` / `groupBy` (the last grouping into a
 -- | map, iterated via the `Each` trait), the collection filters `where` / `reject` /
--- | `some` / `every` (ADR-036/037: predicate closures over `.iter().filter`/`.any`/
--- | `.all`), `{{#let}}` block-scoped bindings, list literals `[…]` (→ a Rust array),
--- | and raw blocks (the built-in `raw` head, emitted verbatim). Anything else
--- | (`dict` literals — which need a generated struct; `find` — which needs an
--- | Option-aware `with`; a non-`raw` raw-block head) returns a `Left` "unsupported …"
--- | so the conformance harness excludes it honestly.
+-- | `find` / `some` / `every` (ADR-036/037: predicate closures over
+-- | `.iter().filter`/`.find`/`.any`/`.all`; `find` → `Option`, unwrapped by an
+-- | Option-aware `with`), `{{#let}}` block-scoped bindings, list literals `[…]`
+-- | (→ a Rust array), and raw blocks (the built-in `raw` head, emitted verbatim).
+-- | Anything else (`dict` literals — which need a generated struct; a non-`raw`
+-- | raw-block head) returns a `Left` "unsupported …" so the conformance harness
+-- | excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -471,11 +472,45 @@ eachBlock env args label body = case Array.head args of
           <> "    }\n"
       )
 
+-- `(find coll "key" [cmp value])` — the first matching element as `Option<&T>`.
+collFind :: Env -> Array Expr -> Either String String
+collFind env args = case Array.uncons args of
+  Just { head: collE, tail } | not (Array.null tail) -> do
+    ie <- expr env collE
+    body <- predBody env tail
+    Right ("(" <> ie <> ").iter().find(|__x| " <> body <> ")")
+  _ -> Left "unsupported: find without a collection and a predicate"
+
+-- `{{#with (find …) as |x|}}` — the Option-aware `with`: unwrap the `find` result
+-- with `if let Some`, rendering the body re-rooted at the found element, else the
+-- `{{else}}` clause. (Plain `{{#with}}` can't field-access an `Option`.)
+withFind :: Env -> Array Expr -> Array Expr -> Template -> Either String String
+withFind env findArgs blockParams body = do
+  found <- collFind env findArgs
+  let
+    d = env.depth + 1
+    cVar = "__c" <> show d
+    paramNames = bindingNames blockParams
+    params' = maybe env.params (\n -> Map.insert n cVar env.params) (Array.index paramNames 0)
+    childEnv = env { scope = cVar, params = params', parents = Array.cons env.scope env.parents, depth = d }
+    s = splitClauses body
+  bodyS <- nodes childEnv s.before
+  elseS <- clauseBody env s.clauses
+  Right
+    ( "    {\n    if let Some(" <> cVar <> ") = " <> found <> " {\n"
+        <> bodyS
+        <> "    } else {\n"
+        <> elseS
+        <> "    }\n    }\n"
+    )
+
 -- `{{#with subject as |u|}}` → bind the subject and, when truthy, render the body
--- in its scope; otherwise render the `{{else}}` clause.
+-- in its scope; otherwise render the `{{else}}` clause. A `find` subject takes the
+-- Option-aware path (`withFind`).
 withBlock :: Env -> Array Expr -> Template -> Either String String
 withBlock env args body = case Array.head args of
   Nothing -> Left "unsupported: with without a subject"
+  Just (App "find" findArgs) -> withFind env findArgs (Array.drop 1 args) body
   Just subjE -> do
     subj <- expr env subjE
     let
@@ -658,6 +693,9 @@ expr env = case _ of
   App "reject" args -> collFilter env "filter" true args
   App "some" args -> collFilter env "any" false args
   App "every" args -> collFilter env "all" false args
+  -- `find` → `Option<&T>`; `{{#with (find …)}}` unwraps it (withFind), and
+  -- `{{#if (find …)}}` reads here (truthiness of the `Option`).
+  App "find" args -> collFind env args
   -- `cond ? a : b` — a native `if`-expression; the two arms must unify (Rust checks).
   App "ternary" [ c, a, b ] -> do
     ce <- expr env c

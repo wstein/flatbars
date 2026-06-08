@@ -37,7 +37,7 @@ golden-pinned pages). Source of truth for "supported" is the v1 emitter
 **Helper inventory** (monomorphized `trussbars_std::*` calls; `count`/`size`/`length` alias):
 - *string* — `uppercase capitalize lowercase trim trimStart trimEnd append prepend replace split startsWith endsWith includes slice truncate reverse`
 - *array* — `count at take takeRight join reverse unique includes slice pluck sortBy groupBy`
-- *collection filters* (ADR-036/037) — `where reject some every` (`"key"` truthiness or `"key" "cmp" value`; cmp ∈ gt/gte/lt/lte/eq/ne/startsWith/endsWith/includes). `find` (→ `Option`) is deferred (needs an Option-aware `with`).
+- *collection filters* (ADR-036/037) — `where reject find some every` (`"key"` truthiness or `"key" "cmp" value`; cmp ∈ gt/gte/lt/lte/eq/ne/startsWith/endsWith/includes). `find` returns `Option`, unwrapped by an Option-aware `{{#with}}` (`if let Some`).
 - *number* — `abs ceil floor round modulo toFixed toFloat toInt`
 - *escaping* — `escapeHtml safe raw`
 

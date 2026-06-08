@@ -203,6 +203,23 @@ export const cases = [
       ],
     },
   },
+  {
+    // find → Option, unwrapped by an Option-aware {{#with}} (hit / miss) and read
+    // by {{#if}} (truthiness of the Option).
+    id: "find-with-hit",
+    template: '{{#with (find items "name" "eq" "Bo")}}{{age}}{{else}}none{{/with}}',
+    data: { items: [{ name: "Ann", age: 30 }, { name: "Bo", age: 17 }] },
+  },
+  {
+    id: "find-with-miss",
+    template: '{{#with (find items "name" "eq" "Zz")}}{{age}}{{else}}none{{/with}}',
+    data: { items: [{ name: "Ann", age: 30 }, { name: "Bo", age: 17 }] },
+  },
+  {
+    id: "find-if",
+    template: '{{#if (find items "age" "gt" 99)}}has{{else}}no{{/if}}',
+    data: { items: [{ name: "Ann", age: 30 }] },
+  },
 
   // ── loop.parent / loop.root chains (Option-threaded) ─────────────────────────
   {
