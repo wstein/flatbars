@@ -31,5 +31,7 @@
   "partial-simple": "Hello World!",
   "partial-in-each": "<li>a</li><li>b</li>",
   "partial-context": "[Intro]",
-  "neg-pluck": "a,b"
+  "outer-label": "1:a 1:b 2:c ",
+  "pluck": "a,b",
+  "neg-yield": "[hi]"
 }

@@ -1,17 +1,17 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 33,
+  "total": 35,
   "positive": {
-    "count": 32,
-    "byte_matched": 32,
+    "count": 34,
+    "byte_matched": 34,
     "mismatched": 0
   },
   "excluded": {
     "count": 1,
     "cases": [
       {
-        "id": "neg-pluck",
-        "reason": "unsupported: helper 'pluck'"
+        "id": "neg-yield",
+        "reason": "unsupported: block helper 'partial'"
       }
     ]
   },

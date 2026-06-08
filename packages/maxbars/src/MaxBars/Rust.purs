@@ -19,11 +19,12 @@
 -- | `ternary` (`? :`), the coalescers `??` (over `Option<T>`) and `?:` (over a
 -- | unifying `T`), the full value-helper pack — string (incl. integer-argument
 -- | `slice`/`truncate`), number (`abs`/`round`/`toFixed`/…), and array
--- | (`join`/`count`/`at`/`take`/…) — and inline partials (`{{#inline}}` +
--- | `{{> name [ctx]}}`, expanded at the call site). Anything else (block partials
--- | `{{#partial}}` / `{{yield}}`, raw blocks, `outer` labelled-loop chains, the
--- | key-path `pluck`/`sortBy`/`groupBy`, `dict`) returns a `Left` "unsupported …"
--- | so the conformance harness excludes it honestly.
+-- | (`join`/`count`/`at`/`take`/…) — inline partials (`{{#inline}}` +
+-- | `{{> name [ctx]}}`, expanded at the call site), labelled loops (`label NAME` →
+-- | `outer`), and `pluck` (a literal-key field-access closure). Anything else
+-- | (block partials `{{#partial}}` / `{{yield}}`, raw blocks, the key-path
+-- | `sortBy`/`groupBy`, `dict`) returns a `Left` "unsupported …" so the conformance
+-- | harness excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -170,7 +171,7 @@ block env name args body =
       "unless" -> condBlock env "if !" split.positional body
       -- `split.positional` demarks `@param` block-param names to trailing string
       -- literals (which `bindingNames` reads); the subject is its head.
-      "each" -> eachBlock env split.positional body
+      "each" -> eachBlock env split.positional split.label body
       "with" -> withBlock env split.positional body
       _ -> Left ("unsupported: block helper '" <> name <> "'")
 
@@ -210,8 +211,8 @@ elseChain env clauses = case Array.uncons clauses of
 -- `{{#each subject as |item idx|}}` → a native `for` over `subject.iter()
 -- .enumerate()`, binding the loop metadata (`Loop::at`) and the block params, with
 -- the empty collection rendering the `{{else}}` clause in the parent scope.
-eachBlock :: Env -> Array Expr -> Template -> Either String String
-eachBlock env args body = case Array.head args of
+eachBlock :: Env -> Array Expr -> Maybe String -> Template -> Either String String
+eachBlock env args label body = case Array.head args of
   Nothing -> Left "unsupported: each without a subject"
   Just subjE -> do
     subj <- expr env subjE
@@ -225,11 +226,14 @@ eachBlock env args body = case Array.head args of
       subVar = "__sub" <> ds
       lenVar = "__len" <> ds
       params' = bindEachParams paramNames cVar iVar env.params
+      -- a `label NAME` (ADR-013) binds the loop under NAME, visible into nested loops.
+      labels' = maybe env.labels (\l -> Map.insert l lVar env.labels) label
       childEnv = env
         { scope = cVar
         , loop = Just lVar
         , params = params'
         , parents = Array.cons env.scope env.parents
+        , labels = labels'
         , depth = d
         }
       parentLoop = maybe "None" (\pl -> "Some(&" <> pl <> ")") env.loop
@@ -348,6 +352,10 @@ expr env = case _ of
   App "safe" [ a ] -> do
     ae <- expr env a
     Right ("trussbars_std::safe(&(" <> ae <> "))")
+  -- `items | pluck "key"` — a literal-key field-access closure (spec §4.3).
+  App "pluck" [ items, Lit (VString key) ] -> do
+    ie <- expr env items
+    Right ("(" <> ie <> ").iter().map(|__x| &__x." <> key <> ").collect::<Vec<_>>()")
   -- `cond ? a : b` — a native `if`-expression; the two arms must unify (Rust checks).
   App "ternary" [ c, a, b ] -> do
     ce <- expr env c
@@ -406,6 +414,8 @@ path env args = case Array.uncons args of
   Just { head: App "loop" [], tail: keys } -> case env.loop of
     Nothing -> Left "unsupported: 'loop' used outside an each"
     Just lvar -> traverse keyStr keys >>= emitLoopChain lvar
+  Just { head: App name [], tail: keys }
+    | Just lvar <- Map.lookup name env.labels -> traverse keyStr keys >>= emitLoopChain lvar
   Just { head: subj, tail: keys }
     | Just k <- parentIndex subj -> case Array.index env.parents k of
         Just pvar -> do

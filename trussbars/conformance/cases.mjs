@@ -173,10 +173,23 @@ export const cases = [
     data: { section: { title: "Intro" } },
   },
 
-  // ── negative: still outside the slice (oracle renders; emitter excludes) ─────
+  // ── labelled loop (outer) + the pluck key-path helper ────────────────────────
   {
-    id: "neg-pluck",
+    id: "outer-label",
+    template:
+      "{{#each rows as |row| label outer}}{{#each row}}{{outer.index1}}:{{this}} {{/each}}{{/each}}",
+    data: { rows: [["a", "b"], ["c"]] },
+  },
+  {
+    id: "pluck",
     template: '{{items | pluck "name"}}',
     data: { items: [{ name: "a" }, { name: "b" }] },
+  },
+
+  // ── negative: still outside the slice (oracle renders; emitter excludes) ─────
+  {
+    id: "neg-yield",
+    template: '{{#inline "frame"}}[{{yield}}]{{/inline}}{{#partial "frame"}}hi{{/partial}}',
+    data: {},
   },
 ];
