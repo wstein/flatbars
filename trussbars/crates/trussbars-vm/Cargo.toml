@@ -1,0 +1,18 @@
+[package]
+name = "trussbars-vm"
+description = "The Trussbars VM backend (spike): a dynamic-Value tree-walk interpreter for MaxBars, reusing the trussbars-template front-end. Serves dynamic/runtime templates; docs/11. Lenient mode only in this spike."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "interpreter", "vm"]
+categories = ["template-engine"]
+
+[dependencies]
+trussbars-template = { path = "../trussbars-template" }
+trussbars-core = { path = "../trussbars-core" }
+# Used only by the `truss-vm` dev CLI (JSON data → Value); the library is JSON-agnostic.
+serde_json = "1"
+
+[lints]
+workspace = true

@@ -608,6 +608,15 @@ name = "trussbars-template"
 version = "0.1.0"
 
 [[package]]
+name = "trussbars-vm"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "trussbars-core",
+ "trussbars-template",
+]
+
+[[package]]
 name = "trybuild"
 version = "1.0.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"

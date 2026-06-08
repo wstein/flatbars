@@ -36,6 +36,59 @@ for (const p of [enginePath, emitterPath]) {
 const { renderMaxbars } = await import(enginePath);
 const { compileMaxRust } = await import(emitterPath);
 
+// `--vm`: render through the Trussbars VM backend (`trussbars-vm`, docs/11) — a
+// dynamic-Value tree-walk, no codegen. The SPIKE is lenient + a subset, so cases the
+// VM doesn't yet implement are reported as `unsupported` (honest coverage), and the
+// gate is: every COVERED case must byte-match the golden. The CLI renders directly.
+if (process.argv.includes("--vm")) {
+  console.error("building truss-vm (VM CLI)…");
+  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
+    cwd: resolve(root, "trussbars/crates/trussbars-vm"),
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  const binPath = resolve(root, "trussbars/target/debug/truss-vm");
+  const snapPath = resolve(here, "snapshots.json");
+  const golden = existsSync(snapPath) ? JSON.parse(readFileSync(snapPath, "utf8")) : {};
+
+  let matched = 0,
+    oracleErrors = 0;
+  const fails = [];
+  const unsup = [];
+  for (const c of cases) {
+    const o = renderMaxbars(c.template, c.data);
+    if (!o.ok) {
+      oracleErrors++;
+      continue;
+    }
+    const expected = c.id in golden ? golden[c.id] : o.value;
+    let actual;
+    try {
+      actual = execFileSync(binPath, [], {
+        input: JSON.stringify({ template: c.template, data: c.data }),
+        encoding: "utf8",
+      });
+    } catch (e) {
+      unsup.push({ id: c.id, reason: (e.stderr || e.message || "").toString().trim() });
+      continue;
+    }
+    if (actual === expected) matched++;
+    else fails.push({ id: c.id, expected, actual });
+  }
+  const covered = matched + fails.length;
+  console.log(
+    `Trussbars VM spike (lenient tree-walk): ${matched}/${covered} covered byte-matched, ` +
+      `${unsup.length} unsupported (spike subset), ${oracleErrors} oracle errors, of ${cases.length} total.`,
+  );
+  for (const u of unsup) console.log(`  unsupported ${u.id}: ${u.reason}`);
+  for (const m of fails) {
+    console.error(`  MISMATCH ${m.id}:`);
+    console.error(`    expected: ${JSON.stringify(m.expected)}`);
+    console.error(`    vm:       ${JSON.stringify(m.actual)}`);
+  }
+  // Spike gate: every COVERED case must match; unsupported is reported, not failed.
+  process.exit(fails.length === 0 && oracleErrors === 0 ? 0 : 1);
+}
+
 // `--v2`: emit through the Rust pipeline (`trussbars-template`, docs/08) instead of
 // the PureScript v1 emitter, asserting v2 hits the SAME byte-for-byte golden. The
 // CLI (`truss-emit`) is built once; each template is then emitted by a fast spawn.
