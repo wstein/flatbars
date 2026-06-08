@@ -121,6 +121,30 @@ impl LoopFrame {
     }
 }
 
+/// The parent-context chain as an `Rc` cons-list: pushing a scope is one allocation
+/// and a refcount bump (O1) — not `Vec::insert(0, …)`, which shifted the whole vector
+/// (O(depth²) over a nested loop).
+type Parents = Option<Rc<ParentNode>>;
+
+struct ParentNode {
+    value: Value,
+    next: Parents,
+}
+
+/// The value at `depth` up the parent chain (0 = the immediately enclosing context).
+fn parent_at(parents: &Parents, depth: usize) -> Option<&Value> {
+    let mut cur = parents;
+    let mut d = depth;
+    while let Some(node) = cur {
+        if d == 0 {
+            return Some(&node.value);
+        }
+        d -= 1;
+        cur = &node.next;
+    }
+    None
+}
+
 /// The render environment threaded through eval. Because [`Value`] is cheap to clone
 /// (Rc-backed heap), the env holds values directly — entering a block scope is a
 /// handful of refcount bumps, not a deep copy of the data.
@@ -129,9 +153,20 @@ struct Env {
     this: Value,
     root: Value,
     params: BTreeMap<String, Value>,
-    parents: Vec<Value>, // parents[0] = the immediately enclosing context
+    parents: Parents,
     loop_frame: Option<LoopFrame>,
     labels: BTreeMap<String, LoopFrame>,
+}
+
+impl Env {
+    /// A child scope that re-roots `this` and pushes the old `this` onto the parent
+    /// chain (O(1)).
+    fn rerooted(&self, new_this: Value) -> Env {
+        let mut child = self.clone();
+        child.parents = Some(Rc::new(ParentNode { value: self.this.clone(), next: self.parents.clone() }));
+        child.this = new_this;
+        child
+    }
 }
 
 /// A **parsed template** — parse + desugar once, render many.
@@ -158,7 +193,7 @@ impl Template {
             this: data.clone(),
             root: data.clone(),
             params: BTreeMap::new(),
-            parents: Vec::new(),
+            parents: None,
             loop_frame: None,
             labels: BTreeMap::new(),
         };
@@ -235,10 +270,7 @@ fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
 fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
     let subj = eval_expr(env, &w.subject)?;
     if subj.truthy() {
-        let mut child = env.clone();
-        child.parents.insert(0, env.this.clone());
-        child.this = subj;
-        eval_nodes(&child, &w.body, out)
+        eval_nodes(&env.rerooted(subj), &w.body, out)
     } else {
         eval_nodes(env, &w.otherwise, out)
     }
@@ -259,9 +291,7 @@ fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
     let length = items.len();
     for (i, (key, element)) in items.into_iter().enumerate() {
         let frame = LoopFrame { index0: i, length, key };
-        let mut child = env.clone();
-        child.parents.insert(0, env.this.clone());
-        child.this = element.clone();
+        let mut child = env.rerooted(element.clone());
         if let Some(item) = &e.item {
             child.params.insert(item.clone(), element);
         }
@@ -348,7 +378,7 @@ fn eval_path(env: &Env, args: &[Expr]) -> Result<Value, String> {
     }
     // parent chains
     if let Some(depth) = parent_index(head) {
-        return match env.parents.get(depth) {
+        return match parent_at(&env.parents, depth) {
             Some(base) => navigate_ref(env, base, keys),
             None => Ok(Value::Null),
         };
