@@ -34,5 +34,6 @@
   "outer-label": "1:a 1:b 2:c ",
   "pluck": "a,b",
   "block-partial": "<div>Ann &amp; Bo</div>",
-  "neg-sortby": "a, b, c"
+  "sort-by": "a, b, c",
+  "neg-groupby": "ab"
 }

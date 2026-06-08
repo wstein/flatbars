@@ -21,10 +21,10 @@
 -- | `slice`/`truncate`), number (`abs`/`round`/`toFixed`/…), and array
 -- | (`join`/`count`/`at`/`take`/…) — inline and block partials (`{{#inline}}` +
 -- | `{{> name [ctx]}}`, and `{{#partial}}` + `{{yield}}` with the body pre-rendered
--- | in the caller frame), labelled loops (`label NAME` → `outer`), and `pluck` (a
--- | literal-key field-access closure). Anything else (raw blocks, the key-path
--- | `sortBy`/`groupBy`, `dict`) returns a `Left` "unsupported …" so the conformance
--- | harness excludes it honestly.
+-- | in the caller frame), labelled loops (`label NAME` → `outer`), and the
+-- | literal-key closures `pluck` / `sortBy`. Anything else (raw blocks, `groupBy`
+-- | (it returns a map — needs map iteration), `dict`) returns a `Left`
+-- | "unsupported …" so the conformance harness excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -390,6 +390,10 @@ expr env = case _ of
   App "pluck" [ items, Lit (VString key) ] -> do
     ie <- expr env items
     Right ("(" <> ie <> ").iter().map(|__x| &__x." <> key <> ").collect::<Vec<_>>()")
+  -- `items | sortBy "key"` — a stable sort with a literal-key closure.
+  App "sortBy" [ items, Lit (VString key) ] -> do
+    ie <- expr env items
+    Right ("trussbars_std::sort_by(&(" <> ie <> "), |__x| &__x." <> key <> ")")
   -- `cond ? a : b` — a native `if`-expression; the two arms must unify (Rust checks).
   App "ternary" [ c, a, b ] -> do
     ce <- expr env c

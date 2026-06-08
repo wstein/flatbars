@@ -194,10 +194,17 @@ export const cases = [
     data: { name: "Ann & Bo" },
   },
 
-  // ── negative: still outside the slice (oracle renders; emitter excludes) ─────
+  // ── sortBy (stable, literal-key closure) ─────────────────────────────────────
   {
-    id: "neg-sortby",
+    id: "sort-by",
     template: '{{items | sortBy "name" | pluck "name" | join ", "}}',
     data: { items: [{ name: "b" }, { name: "a" }, { name: "c" }] },
+  },
+
+  // ── negative: groupBy returns a map (needs map iteration) — still excluded ────
+  {
+    id: "neg-groupby",
+    template: '{{#each (groupBy items "name")}}{{loop.key}}{{/each}}',
+    data: { items: [{ name: "a" }, { name: "b" }] },
   },
 ];

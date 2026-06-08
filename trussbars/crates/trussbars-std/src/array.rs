@@ -69,6 +69,52 @@ pub fn slice_includes<T: PartialEq>(items: &[T], needle: &T) -> bool {
     items.iter().any(|v| v == needle)
 }
 
+/// The elements stably sorted by a key (`sortBy`); the codegen supplies the
+/// key-path closure (e.g. `|x| &x.name`). The extractor is higher-ranked so the
+/// key may borrow from the element. Borrows the input — nothing is cloned.
+#[allow(clippy::unnecessary_sort_by)] // a borrowing key cannot use `sort_by_key`
+pub fn sort_by<'a, T, K, F>(items: &'a [T], key: F) -> Vec<&'a T>
+where
+    F: for<'r> Fn(&'r T) -> &'r K,
+    K: Ord + ?Sized,
+{
+    let mut out: Vec<&'a T> = items.iter().collect();
+    out.sort_by(|a, b| key(a).cmp(key(b)));
+    out
+}
+
+#[cfg(test)]
+mod sort_tests {
+    use super::sort_by;
+
+    struct Row {
+        name: String,
+    }
+
+    #[test]
+    fn sorts_stably_by_a_borrowing_key() {
+        // Mirrors the emitted `|x| &x.name`.
+        let rows = [
+            Row {
+                name: "pear".into(),
+            },
+            Row {
+                name: "apple".into(),
+            },
+            Row { name: "fig".into() },
+        ];
+        let sorted = sort_by(&rows, |r| &r.name);
+        let names: Vec<&str> = sorted.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(names, vec!["apple", "fig", "pear"]);
+    }
+
+    #[test]
+    fn identity_key_sorts_values() {
+        let xs = [3_i64, 1, 2, 1];
+        assert_eq!(sort_by(&xs, |x| x), vec![&1, &1, &2, &3]);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -21,7 +21,9 @@ mod array;
 mod number;
 mod string;
 
-pub use array::{at, count, join, reverse_slice, slice_includes, take, take_right, unique};
+pub use array::{
+    at, count, join, reverse_slice, slice_includes, sort_by, take, take_right, unique,
+};
 pub use number::{abs, ceil, floor, modulo, round, to_fixed, to_float, to_int};
 pub use string::{
     append, capitalize, ends_with, includes, lowercase, prepend, replace, reverse, slice,
