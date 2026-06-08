@@ -1,6 +1,6 @@
 <h1>{{site.title}} — Archive</h1>
-{{#each (groupBy posts "year")}}<section>
-  <h2>{{loop.key}}</h2>
+{{#each (groupBy posts "year")}}{{#let n=(this | count)}}<section>
+  <h2>{{loop.key}} ({{n}} posts)</h2>
   <ul>{{#each post in this}}<li><a href="/posts/{{post.slug}}">{{post.title}}</a></li>{{/each}}</ul>
 </section>
-{{/each}}
+{{/let}}{{/each}}

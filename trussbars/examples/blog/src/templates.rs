@@ -2,16 +2,36 @@
 // Regenerate: `node trussbars/examples/blog/generate.mjs` (needs the spago build).
 // These are the VERBATIM render functions the Trussbars v1 emitter produces; they
 // link against trussbars-core (output) and trussbars-std (groupBy).
+// Machine-generated: the v1 emitter wraps args uniformly in `&(…)` and pushes
+// single-char literals, which clippy flags but a hand-writer wouldn't (v2 codegen
+// will be type-aware and cleaner — see the README).
+#![allow(clippy::needless_borrow, clippy::single_char_add_str)]
 use crate::context::{ArchiveCtx, IndexCtx, PostCtx};
 
 // ── index.truss ──
 pub fn render_index(ctx: &IndexCtx) -> String {
-    static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(82);
+    static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(390);
     let __root = ctx;
     let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("<h1>");
     trussbars_core::esc(&(ctx.site.title), &mut out);
-    out.push_str("</h1>\n");
+    out.push_str("</h1>\n<nav>");
+    {
+        let __sub1 = &(["All", "Rust", "Design"]);
+        let __len1 = trussbars_core::Each::each_len(__sub1);
+        if __len1 == 0 {
+        } else {
+            for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
+                let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
+                out.push_str("<a href=\"/tag/");
+                trussbars_core::esc(&(trussbars_std::lowercase(&(__c1))), &mut out);
+                out.push_str("\">");
+                trussbars_core::esc(&(__c1), &mut out);
+                out.push_str("</a> ");
+            }
+        }
+    }
+    out.push_str("</nav>\n");
     {
         let __sub1 = &(ctx.posts);
         let __len1 = trussbars_core::Each::each_len(__sub1);
@@ -98,7 +118,7 @@ pub fn render_post(ctx: &PostCtx) -> String {
 
 // ── archive.truss ──
 pub fn render_archive(ctx: &ArchiveCtx) -> String {
-    static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(3460);
+    static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(3596);
     let __root = ctx;
     let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("<h1>");
@@ -115,25 +135,33 @@ pub fn render_archive(ctx: &ArchiveCtx) -> String {
         } else {
             for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
                 let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
-                out.push_str("<section>\n  <h2>");
-                trussbars_core::esc(&(__l1.key), &mut out);
-                out.push_str("</h2>\n  <ul>");
                 {
-                    let __sub2 = &(__c1);
-                    let __len2 = trussbars_core::Each::each_len(__sub2);
-                    if __len2 == 0 {
-                    } else {
-                        for (__i2, (__k2, __c2)) in trussbars_core::Each::each(__sub2).enumerate() {
-                            let __l2 = trussbars_core::Loop::at(__i2, __len2, __k2, Some(&__l1));
-                            out.push_str("<li><a href=\"/posts/");
-                            trussbars_core::esc(&(__c2.slug), &mut out);
-                            out.push_str("\">");
-                            trussbars_core::esc(&(__c2.title), &mut out);
-                            out.push_str("</a></li>");
+                    let __let_n = trussbars_std::count(&(__c1));
+                    out.push_str("<section>\n  <h2>");
+                    trussbars_core::esc(&(__l1.key), &mut out);
+                    out.push_str(" (");
+                    trussbars_core::esc(&(__let_n), &mut out);
+                    out.push_str(" posts)</h2>\n  <ul>");
+                    {
+                        let __sub2 = &(__c1);
+                        let __len2 = trussbars_core::Each::each_len(__sub2);
+                        if __len2 == 0 {
+                        } else {
+                            for (__i2, (__k2, __c2)) in
+                                trussbars_core::Each::each(__sub2).enumerate()
+                            {
+                                let __l2 =
+                                    trussbars_core::Loop::at(__i2, __len2, __k2, Some(&__l1));
+                                out.push_str("<li><a href=\"/posts/");
+                                trussbars_core::esc(&(__c2.slug), &mut out);
+                                out.push_str("\">");
+                                trussbars_core::esc(&(__c2.title), &mut out);
+                                out.push_str("</a></li>");
+                            }
                         }
                     }
+                    out.push_str("</ul>\n</section>\n");
                 }
-                out.push_str("</ul>\n</section>\n");
             }
         }
     }

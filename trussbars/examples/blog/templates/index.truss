@@ -1,4 +1,5 @@
 <h1>{{site.title}}</h1>
+<nav>{{#each ["All", "Rust", "Design"]}}<a href="/tag/{{this | lowercase}}">{{this}}</a> {{/each}}</nav>
 {{#inline "card"}}<article>
   <h2><a href="/posts/{{slug}}">{{title}}</a></h2>
   <p class="meta">by {{author}}{{#if views > 100}} · 🔥 popular{{/if}}</p>
