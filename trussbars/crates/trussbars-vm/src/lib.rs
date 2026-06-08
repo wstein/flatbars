@@ -17,6 +17,7 @@
 //! uses), and escaping through `trussbars_core::escape_html`, so VM output is
 //! byte-identical to AOT / the oracle wherever both render.
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -189,9 +190,12 @@ impl Env {
     }
 }
 
-/// A **parsed template** — parse + desugar once, render many.
+/// A **parsed template** — parse + desugar once, render many. Carries an adaptive
+/// output-capacity hint (O2), seeded into each render's buffer so it grows without
+/// re-allocating (the same trick as AOT's `SizeHint`).
 pub struct Template {
     nodes: Vec<Node>,
+    cap_hint: Cell<usize>,
 }
 
 impl Template {
@@ -200,15 +204,28 @@ impl Template {
     /// # Errors
     /// The parse-error reason.
     pub fn parse(src: &str) -> Result<Template, String> {
-        Ok(Template { nodes: parse(src).map_err(|e| e.message)? })
+        Ok(Template { nodes: parse(src).map_err(|e| e.message)?, cap_hint: Cell::new(64) })
     }
 
-    /// Render this template against dynamic `data` (lenient mode). Cloning `data` into
-    /// the env is cheap (refcount bumps), so a host may reuse one `Value` across renders.
+    /// Render this template against dynamic `data` (lenient mode), returning a fresh
+    /// `String` seeded to the last render's length. Cloning `data` into the env is
+    /// cheap (refcount bumps), so a host may reuse one `Value` across renders.
     ///
     /// # Errors
     /// A reason string for an unimplemented construct/helper (never a wrong answer).
     pub fn render(&self, data: &Value) -> Result<String, String> {
+        let mut out = String::with_capacity(self.cap_hint.get().max(16));
+        self.render_into(data, &mut out)?;
+        self.cap_hint.set(out.len());
+        Ok(out)
+    }
+
+    /// Render appending to a caller-owned buffer — lets a host reuse one allocation
+    /// across renders (clear and re-pass the same `String`).
+    ///
+    /// # Errors
+    /// As [`Template::render`].
+    pub fn render_into(&self, data: &Value, out: &mut String) -> Result<(), String> {
         let env = Env {
             this: data.clone(),
             root: data.clone(),
@@ -217,9 +234,7 @@ impl Template {
             loop_frame: None,
             labels: BTreeMap::new(),
         };
-        let mut out = String::new();
-        eval_nodes(&env, &self.nodes, &mut out)?;
-        Ok(out)
+        eval_nodes(&env, &self.nodes, out)
     }
 }
 
