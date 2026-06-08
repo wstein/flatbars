@@ -26,6 +26,21 @@ struct Generic<T> {
     x: T,
 }
 
+// A fieldless enum: truthy + stringifies to the variant name (serde unit form).
+#[derive(Trussbars)]
+enum Status {
+    Active,
+    Pending,
+    Closed,
+}
+
+// A data-carrying enum: truthy, but no ToText (field-access dispatch is §4.1/v2).
+#[derive(Trussbars)]
+enum Shape {
+    Circle { radius: f64 },
+    Square(f64),
+}
+
 #[test]
 fn struct_with_named_fields_is_truthy() {
     let v = WithFields {
@@ -51,4 +66,20 @@ fn unit_struct_is_falsy() {
 #[test]
 fn generic_struct_is_truthy() {
     assert!(truthy(&Generic { x: 0_i64 }));
+}
+
+#[test]
+fn unit_enum_is_truthy_and_stringifies_to_the_variant_name() {
+    assert!(truthy(&Status::Active));
+    let mut s = String::new();
+    trussbars_core::ToText::write_text(&Status::Pending, &mut s);
+    assert_eq!(s, "Pending");
+}
+
+#[test]
+fn data_enum_is_truthy() {
+    // Truthy (an inhabited variant) but no ToText — `{{shape}}` stays a compile
+    // error; variant field access is the deferred §4.1 dispatch.
+    assert!(truthy(&Shape::Circle { radius: 1.0 }));
+    assert!(truthy(&Shape::Square(2.0)));
 }

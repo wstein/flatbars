@@ -51,6 +51,11 @@ golden-pinned pages). Source of truth for "supported" is the v1 emitter
   literal must be `f64` (blog finding F2). Print-only / `groupBy`-key numbers may be `i64`.
 - **Escaping** mirrors the reference `escapeHtml`: `& < > " '` → entities; raw/`safe`/
   partial output passes through.
+- **Context types** (`#[derive(Trussbars)]`): a struct is truthy iff it has ≥1 field;
+  an **enum** is always truthy, and a **fieldless** enum also stringifies to the
+  variant name (`Status::Active` → `"Active"`, matching serde's unit-variant form) —
+  so `{{status}}` and `{{#if (eq status "Active")}}` work. A **data-carrying** enum
+  gets truthiness only; variant field-access (`match`) is the §4.1 dispatch, → v2.
 - **Names are static.** A template path is the Rust field identifier verbatim — no
   rename layer (blog finding F1). Templates use snake_case to keep Rust idiomatic.
 

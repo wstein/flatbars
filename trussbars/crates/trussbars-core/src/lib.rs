@@ -48,7 +48,8 @@ pub use frame::Loop;
 pub use text::{Safe, ToText, esc, escape_html};
 pub use truthy::{Truthy, truthy};
 
-/// `#[derive(Trussbars)]` — generates the [`Truthy`] impl for a context struct.
-/// Available with the `derive` feature; re-exported from `trussbars-derive`.
+/// `#[derive(Trussbars)]` — generates [`Truthy`] for a context struct or enum (and
+/// [`ToText`] for a fieldless enum, writing the variant name). Available with the
+/// `derive` feature; re-exported from `trussbars-derive`.
 #[cfg(feature = "derive")]
 pub use trussbars_derive::Trussbars;
