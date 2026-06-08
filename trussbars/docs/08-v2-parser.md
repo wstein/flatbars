@@ -94,8 +94,12 @@ non-trivial part (precedence-climbing for the operators).
 
 ## 6. Build order (v2)
 
-1. **Lexer** — brace-aware scan → tokens with byte-spans. Gate: round-trips the
-   corpus templates' content/tag boundaries.
+1. **Lexer — ✅ DONE** (`crates/trussbars-template`, `src/lex.rs`). Brace-aware scan
+   (depth-tracked, string-skipping, so dict/list literals need no space before
+   `}}`) → `Lexeme`s with byte-`Span`s that tile the source exactly. Handles
+   `{{ }}` / `{{{ }}}` / `{{# }}` / `{{/ }}` / `{{> }}` / `{{! }}` / `{{!-- --}}` and
+   four-brace raw blocks (verbatim body). Gate: round-trips all 57 corpus templates
+   (`tests/corpus.rs`, fixture from `extract-corpus.mjs`) + 10 unit tests.
 2. **Expression parser** — precedence-climbing; paths, ops, pipes, parens, list
    literals, calls. Gate: the value-expression corpus cases.
 3. **Block parser + desugar** — each/if/with/let/partials/raw + the §3 rewrites →

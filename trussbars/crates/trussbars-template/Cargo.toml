@@ -1,0 +1,14 @@
+[package]
+name = "trussbars-template"
+description = "The Trussbars v2 compile pipeline (a library): a byte-span lexer, parser, and desugar for the MaxBars subset, plus the Rust emitter. Driven by the trussbars-macros proc-macro at compile time; the runtime is trussbars-core/std."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "parser", "codegen"]
+categories = ["template-engine", "parser-implementations"]
+
+# A build-time library (the proc-macro depends on it); std, no runtime deps yet.
+
+[lints]
+workspace = true
