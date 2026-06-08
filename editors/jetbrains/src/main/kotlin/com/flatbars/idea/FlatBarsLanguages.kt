@@ -22,5 +22,6 @@ object FlatBarsLanguages {
     "handlebars",
     "maxbars",
     "xbars",
+    "truss",
   )
 }

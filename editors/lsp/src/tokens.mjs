@@ -53,8 +53,9 @@ export function dialectForLanguageId(languageId) {
 // or a host — e.g. JetBrains — that doesn't send our id): map the native extension.
 // Returns null if the extension picks no dialect. Each dialect ships long-form
 // (`.rawbars`) and short-form (`.rbars`) extensions; FullBars also claims the
-// Handlebars extensions and MinBars the Mustache extension (see
-// editors/shared/sync.mjs LANGUAGES for the canonical mapping).
+// Handlebars extensions, MinBars the Mustache extension, and MaxBars `.truss`
+// (Trussbars AOT-compiled templates) — see editors/shared/sync.mjs LANGUAGES for
+// the canonical mapping.
 const URI_EXTENSION_DIALECT = {
   ".rawbars": "rawbars",
   ".rbars": "rawbars",
@@ -67,6 +68,7 @@ const URI_EXTENSION_DIALECT = {
   ".handlebars": "fullbars",
   ".maxbars": "maxbars",
   ".xbars": "maxbars",
+  ".truss": "maxbars",
 };
 
 export function dialectForUri(uri) {

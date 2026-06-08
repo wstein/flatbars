@@ -82,6 +82,8 @@ t("dialectForUri maps every dialect extension (long, short, and host-compat)", (
   assert.equal(dialectForUri("file:///x/page.mbars"), "minbars");
   assert.equal(dialectForUri("file:///x/page.fbars"), "fullbars");
   assert.equal(dialectForUri("file:///x/page.xbars"), "maxbars");
+  // Trussbars AOT-compiled templates are MaxBars source.
+  assert.equal(dialectForUri("file:///x/page.truss"), "maxbars");
   // Host-compat: Handlebars / Mustache extensions claimed by their semantic peers
   assert.equal(dialectForUri("file:///x/page.hbs"), "fullbars");
   assert.equal(dialectForUri("file:///x/page.handlebars"), "fullbars");

@@ -68,7 +68,8 @@
         ],
         "extensions": [
           ".maxbars",
-          ".xbars"
+          ".xbars",
+          ".truss"
         ],
         "configuration": "./language-configuration.json"
       }

@@ -21,7 +21,7 @@ there is no second grammar to drift, which is the whole point of ADR-017.
 
 Each dialect is its own language, registered on its native extensions: **RawBars**
 (`.rawbars` / `.rbars`), **MinBars** (`.minbars` / `.mbars`), **FullBars**
-(`.fullbars` / `.fbars`), **MaxBars** (`.maxbars` / `.xbars`). The server reads the
+(`.fullbars` / `.fbars`), **MaxBars** (`.maxbars` / `.xbars` / `.truss`). The server reads the
 dialect from the document's language id — pick it from the status bar to mark a
 file as a different dialect.
 

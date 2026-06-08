@@ -26,8 +26,9 @@
       <li>First public release.</li>
       <li>TextMate fallback (every JetBrains IDE) and Ultimate-only LSP ceiling
       (IntelliJ IDEA Ultimate 2024.2+).</li>
-      <li>Eight native extensions per dialect — long (.rawbars / .minbars /
-      .fullbars / .maxbars) and short (.rbars / .mbars / .fbars / .xbars).</li>
+      <li>Native extensions per dialect — long (.rawbars / .minbars /
+      .fullbars / .maxbars) and short (.rbars / .mbars / .fbars / .xbars); MaxBars
+      also claims .truss (Trussbars AOT-compiled templates).</li>
       <li>Helper-name highlighting from the prelude catalogue; canonicalisation
       quick-fix on deprecated aliases.</li>
       <li>Hybrid-template injection grammar — *.host.flatbars-ext files paint

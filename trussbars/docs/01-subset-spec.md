@@ -10,6 +10,12 @@
 > static typing as a structural metaphor, and it is the thesis of this project: the
 > template's shape is resolved and checked at compile time, with no runtime wobble. You
 > *truss* your FlatBars templates into compiled Rust.
+>
+> **File extension.** Trussbars templates carry the **`.truss`** extension. A `.truss`
+> file is MaxBars source (this subset), so the FlatBars editor tooling — the VS Code and
+> JetBrains plugins, the TextMate grammar, and the LSP — recognises `.truss` as MaxBars
+> and highlights it through the same `source.flatbars` grammar (single-sourced from
+> `editors/shared/sync.mjs` LANGUAGES).
 
 This document defines **Trussbars**: the dialect a MaxBars→Rust compiler accepts and
 emits. It is *not* a second template engine and *not* a port of the FlatBars construction

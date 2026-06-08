@@ -54,14 +54,17 @@ export async function bundleServer(esbuild, { repoRoot, outfile, sourcemap = fal
 // short alias (`.rbars`). FullBars and MinBars additionally claim the
 // Handlebars / Mustache extensions they're semantically compatible with —
 // `.hbs` / `.handlebars` for FullBars (Handlebars surface), `.mustache` for
-// MinBars (Mustache spec). Users who already have a Handlebars or Mustache
-// extension installed should choose one via `files.associations` to
-// disambiguate; the FlatBars plugin is happy to defer.
+// MinBars (Mustache spec). MaxBars additionally claims `.truss` — the on-disk
+// extension for Trussbars templates (the MaxBars→Rust AOT compiler, `trussbars/`);
+// a Trussbars template is MaxBars source, so it highlights through the same
+// grammar. Users who already have a Handlebars or Mustache extension installed
+// should choose one via `files.associations` to disambiguate; the FlatBars plugin
+// is happy to defer.
 export const LANGUAGES = [
   { id: "rawbars", aliases: ["RawBars"], extensions: [".rawbars", ".rbars"] },
   { id: "minbars", aliases: ["MinBars"], extensions: [".minbars", ".mbars", ".mustache"] },
   { id: "fullbars", aliases: ["FullBars"], extensions: [".fullbars", ".fbars", ".hbs", ".handlebars"] },
-  { id: "maxbars", aliases: ["MaxBars"], extensions: [".maxbars", ".xbars"] },
+  { id: "maxbars", aliases: ["MaxBars"], extensions: [".maxbars", ".xbars", ".truss"] },
 ];
 
 export const LANGUAGE_IDS = LANGUAGES.map((l) => l.id);
