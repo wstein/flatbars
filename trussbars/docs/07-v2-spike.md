@@ -89,8 +89,13 @@ form. This is the core constraint the spike surfaces.
    zero-cost `const _: fn(&Post) = |p| { let _ = &p.titlee; };` whose tokens carry
    the best available span and whose sole job is to make rustc point there. The
    real render code can then use a clean access.
-3. **A `// post.truss:4:12` trail** on each emitted statement — turns the
-   wrong-file location into a breadcrumb the user can follow even pre-span-mapping.
+3. **A `// {{…}}` / `// post.truss:4:12` trail** on each emitted statement — turns
+   the wrong-file location into a breadcrumb the user can follow even
+   pre-span-mapping. **The v1 emitter already does the source-trail half**
+   (`compileMaxRustCommented` annotates each statement with the originating surface,
+   sliced by the node's span; the `examples/` generated modules use it). That it
+   slices cleanly *after* `desugarSurfaceWith` is the key feasibility evidence: the
+   spans v2 needs for `quote_spanned!` survive desugaring intact.
 4. **`compile_error!` for the subset of class B Trussbars *can* pre-check** — e.g.
    `{{struct}}` (no `ToText`): rather than let rustc complain about a missing trait
    on generated code, Trussbars can emit a `compile_error!` with the template span

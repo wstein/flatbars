@@ -1,5 +1,5 @@
 // Regenerate src/templates.rs from templates/*.truss using the v1 Trussbars
-// emitter (`compileMaxRust` from the spago build). This is the moral equivalent
+// emitter (`compileMaxRustCommented` from the spago build). This is the moral equivalent
 // of what the v2 proc-macro will do at compile time; for the v1 example we commit
 // the generated module so the crate builds with plain `cargo` (no PureScript
 // toolchain at build time).
@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
-const { compileMaxRust } = await import(resolve(root, "output/MaxBars.Rust/index.js"));
+const { compileMaxRustCommented } = await import(resolve(root, "output/MaxBars.Rust/index.js"));
 
 // (template file, emitted fn name, host context type).
 const PAGES = [
@@ -26,7 +26,7 @@ const PAGES = [
 const modules = [];
 for (const p of PAGES) {
   const src = readFileSync(resolve(here, "templates", p.file), "utf8");
-  const r = compileMaxRust(p.ctx)(src);
+  const r = compileMaxRustCommented(p.ctx)(src);
   if (!r.ok) {
     console.error(`error: ${p.file} did not compile: ${r.err}`);
     process.exit(1);

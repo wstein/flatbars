@@ -8,10 +8,10 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
-const { compileMaxRust } = await import(resolve(root, "output/MaxBars.Rust/index.js"));
+const { compileMaxRustCommented } = await import(resolve(root, "output/MaxBars.Rust/index.js"));
 
 const src = readFileSync(resolve(here, "templates/changelog.truss"), "utf8");
-const r = compileMaxRust("ChangelogCtx")(src);
+const r = compileMaxRustCommented("ChangelogCtx")(src);
 if (!r.ok) {
   console.error(`error: changelog.truss did not compile: ${r.err}`);
   process.exit(1);

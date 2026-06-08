@@ -14,8 +14,10 @@ pub fn render_index(ctx: &IndexCtx) -> String {
     let __root = ctx;
     let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("<h1>");
+    // {{site.title}}
     trussbars_core::esc(&(ctx.site.title), &mut out);
     out.push_str("</h1>\n<nav>");
+    // {{#each ["All", "Rust", "Design"]}}
     {
         let __sub1 = &(["All", "Rust", "Design"]);
         let __len1 = trussbars_core::Each::each_len(__sub1);
@@ -24,14 +26,17 @@ pub fn render_index(ctx: &IndexCtx) -> String {
             for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
                 let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
                 out.push_str("<a href=\"/tag/");
+                // {{this | lowercase}}
                 trussbars_core::esc(&(trussbars_std::lowercase(&(__c1))), &mut out);
                 out.push_str("\">");
+                // {{this}}
                 trussbars_core::esc(&(__c1), &mut out);
                 out.push_str("</a> ");
             }
         }
     }
     out.push_str("</nav>\n");
+    // {{#each posts}}
     {
         let __sub1 = &(ctx.posts);
         let __len1 = trussbars_core::Each::each_len(__sub1);
@@ -39,18 +44,25 @@ pub fn render_index(ctx: &IndexCtx) -> String {
         } else {
             for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
                 let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
+                // {{> card}}
                 out.push_str("<article>\n  <h2><a href=\"/posts/");
+                // {{slug}}
                 trussbars_core::esc(&(__c1.slug), &mut out);
                 out.push_str("\">");
+                // {{title}}
                 trussbars_core::esc(&(__c1.title), &mut out);
                 out.push_str("</a></h2>\n  <p class=\"meta\">by ");
+                // {{author}}
                 trussbars_core::esc(&(__c1.author), &mut out);
+                // {{#if views > 100}}
                 if trussbars_core::truthy(&(__c1.views > 100.0)) {
                     out.push_str(" · 🔥 popular");
                 }
                 out.push_str("</p>\n  ");
+                // {{#if tags}}
                 if trussbars_core::truthy(&(__c1.tags)) {
                     out.push_str("<p class=\"tags\">");
+                    // {{#each tag in tags}}
                     {
                         let __sub2 = &(__c1.tags);
                         let __len2 = trussbars_core::Each::each_len(__sub2);
@@ -61,8 +73,10 @@ pub fn render_index(ctx: &IndexCtx) -> String {
                             {
                                 let __l2 = trussbars_core::Loop::at(__i2, __len2, __k2, None);
                                 out.push_str("<a href=\"/tags/");
+                                // {{tag | lowercase}}
                                 trussbars_core::esc(&(trussbars_std::lowercase(&(__c2))), &mut out);
                                 out.push_str("\">#");
+                                // {{tag}}
                                 trussbars_core::esc(&(__c2), &mut out);
                                 out.push_str("</a> ");
                             }
@@ -71,6 +85,7 @@ pub fn render_index(ctx: &IndexCtx) -> String {
                     out.push_str("</p>");
                 }
                 out.push_str("\n  <p>");
+                // {{excerpt}}
                 trussbars_core::esc(&(__c1.excerpt), &mut out);
                 out.push_str("</p>\n</article>\n");
             }
@@ -86,16 +101,22 @@ pub fn render_post(ctx: &PostCtx) -> String {
     let __root = ctx;
     let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("<article>\n  <h1>");
+    // {{post.title}}
     trussbars_core::esc(&(ctx.post.title), &mut out);
     out.push_str("</h1>\n  <p class=\"meta\">by ");
+    // {{post.author}}
     trussbars_core::esc(&(ctx.post.author), &mut out);
     out.push_str(" · ");
+    // {{post.date}}
     trussbars_core::esc(&(ctx.post.date), &mut out);
     out.push_str(" · ");
+    // {{post.tags | count}}
     trussbars_core::esc(&(trussbars_std::count(&(ctx.post.tags))), &mut out);
     out.push_str(" tags</p>\n  <div class=\"body\">");
+    // {{{post.body_html}}}
     trussbars_core::ToText::write_text(&(ctx.post.body_html), &mut out);
     out.push_str("</div>\n  <footer>");
+    // {{#each tag in post.tags}}
     {
         let __sub1 = &(ctx.post.tags);
         let __len1 = trussbars_core::Each::each_len(__sub1);
@@ -104,8 +125,10 @@ pub fn render_post(ctx: &PostCtx) -> String {
             for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
                 let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
                 out.push_str("<a href=\"/tags/");
+                // {{tag | lowercase}}
                 trussbars_core::esc(&(trussbars_std::lowercase(&(__c1))), &mut out);
                 out.push_str("\">#");
+                // {{tag}}
                 trussbars_core::esc(&(__c1), &mut out);
                 out.push_str("</a> ");
             }
@@ -122,8 +145,10 @@ pub fn render_archive(ctx: &ArchiveCtx) -> String {
     let __root = ctx;
     let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("<h1>");
+    // {{site.title}}
     trussbars_core::esc(&(ctx.site.title), &mut out);
     out.push_str(" — Archive</h1>\n");
+    // {{#each (groupBy posts "year")}}
     {
         let __sub1 = &(trussbars_std::group_by(&(ctx.posts), |__x| {
             let mut __s = String::new();
@@ -135,13 +160,17 @@ pub fn render_archive(ctx: &ArchiveCtx) -> String {
         } else {
             for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
                 let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
+                // {{#let n=(this | count)}}
                 {
                     let __let_n = trussbars_std::count(&(__c1));
                     out.push_str("<section>\n  <h2>");
+                    // {{loop.key}}
                     trussbars_core::esc(&(__l1.key), &mut out);
                     out.push_str(" (");
+                    // {{n}}
                     trussbars_core::esc(&(__let_n), &mut out);
                     out.push_str(" posts)</h2>\n  <ul>");
+                    // {{#each post in this}}
                     {
                         let __sub2 = &(__c1);
                         let __len2 = trussbars_core::Each::each_len(__sub2);
@@ -153,8 +182,10 @@ pub fn render_archive(ctx: &ArchiveCtx) -> String {
                                 let __l2 =
                                     trussbars_core::Loop::at(__i2, __len2, __k2, Some(&__l1));
                                 out.push_str("<li><a href=\"/posts/");
+                                // {{post.slug}}
                                 trussbars_core::esc(&(__c2.slug), &mut out);
                                 out.push_str("\">");
+                                // {{post.title}}
                                 trussbars_core::esc(&(__c2.title), &mut out);
                                 out.push_str("</a></li>");
                             }

@@ -32,8 +32,16 @@
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
 -- | `clippy -D warnings`.
+-- |
+-- | `compileMaxRustCommented` is a readability variant: it threads the original
+-- | surface through and annotates each emitted statement with a `// {{…}}` comment
+-- | sliced from the template by the node's span. The comments are inert (output is
+-- | byte-identical), and the fact that the spans survive `desugarSurfaceWith` and
+-- | slice cleanly is feasibility evidence for the v2 span-mapped diagnostics
+-- | (`trussbars/docs/07-v2-spike.md`).
 module MaxBars.Rust
   ( compileMaxRust
+  , compileMaxRustCommented
   ) where
 
 import Prelude
@@ -47,11 +55,12 @@ import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (joinWith)
+import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, trim)
 import Data.String.CodeUnits as SCU
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Parser (parseWith)
+import FlatBars.Span (Span, spanText)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
 import FullBars (desugarSurfaceWith, hoistInline)
@@ -72,6 +81,10 @@ type Env =
   , expanding :: Array String -- partials currently being inlined (recursion guard)
   , yield :: Maybe String -- pre-rendered body of an enclosing block partial (for `{{yield}}`)
   , depth :: Int
+  -- The original surface source + a flag, for the optional `// {{…}}` annotations
+  -- (`compileMaxRustCommented`); node spans index into `source`.
+  , source :: String
+  , commented :: Boolean
   }
 
 -- | Compile MaxBars surface `src` to a Rust `pub fn render(ctx: &<ctxType>) ->
@@ -79,7 +92,17 @@ type Env =
 -- | Rust source in `out`, or `!ok` with the reason in `err` (a parse error, or an
 -- | unsupported construct outside the slice).
 compileMaxRust :: String -> String -> { ok :: Boolean, out :: String, err :: String }
-compileMaxRust ctxType src = case build of
+compileMaxRust = compileWith false
+
+-- | Like `compileMaxRust`, but annotates the emitted Rust with `// {{…}}` comments
+-- | showing the originating MaxBars source (sliced from the template by each node's
+-- | span) — a readability/teaching aid for reading generated code. The comments are
+-- | inert: the rendered output is byte-for-byte identical to `compileMaxRust`.
+compileMaxRustCommented :: String -> String -> { ok :: Boolean, out :: String, err :: String }
+compileMaxRustCommented = compileWith true
+
+compileWith :: Boolean -> String -> String -> { ok :: Boolean, out :: String, err :: String }
+compileWith commented ctxType src = case build of
   Right rust -> { ok: true, out: rust, err: "" }
   Left e -> { ok: false, out: "", err: e }
   where
@@ -103,6 +126,8 @@ compileMaxRust ctxType src = case build of
     , expanding: []
     , yield: Nothing
     , depth: 0
+    , source: src
+    , commented
     }
 
 renderFn :: String -> Int -> String -> String
@@ -141,8 +166,45 @@ estimateBytes = sum <<< map est
 nodes :: Env -> Template -> Either String String
 nodes env ts = foldMap identity <$> traverse (node env) ts
 
+-- A `// {{…}}` annotation showing the originating surface for a node (commented
+-- builds only). Slices the node's span from the source, keeps the opening tag, one
+-- line, capped — enough to read the generated Rust back against the template.
+srcComment :: Env -> Span -> String
+srcComment env sp
+  | env.commented = "    // " <> openTag (spanText env.source sp) <> "\n"
+  | otherwise = ""
+
+-- The opening tag of a (possibly whole-block) source slice: up to and including the
+-- first `}}` run, collapsed to one line and capped to ~64 chars.
+openTag :: String -> String
+openTag raw =
+  let
+    oneLine = trim (replaceAll (Pattern "\n") (Replacement " ") raw)
+    tag = case SCU.indexOf (Pattern "}}") oneLine of
+      Just i ->
+        let
+          braces = SCU.length (SCU.takeWhile (_ == '}') (SCU.drop (i + 2) oneLine))
+        in
+          SCU.take (i + 2 + braces) oneLine
+      Nothing -> oneLine
+  in
+    if SCU.length tag > 64 then SCU.take 61 tag <> "…" else tag
+
+-- The `// {{…}}` source annotation for a node (commented builds only); `Content`
+-- (literal text) and `NodeError` carry none.
+commentOf :: Env -> Node -> String
+commentOf env = case _ of
+  Output sp _ -> srcComment env sp
+  Block sp _ _ _ _ -> srcComment env sp
+  RawBlock sp _ _ _ -> srcComment env sp
+  Sep sp _ _ -> srcComment env sp
+  _ -> ""
+
 node :: Env -> Node -> Either String String
-node env = case _ of
+node env n = (\code -> commentOf env n <> code) <$> nodeBody env n
+
+nodeBody :: Env -> Node -> Either String String
+nodeBody env = case _ of
   Content s -> Right ("    out.push_str(" <> rustStr s <> ");\n")
   -- `{{> name [ctx]}}` — inline the hoisted partial body at the call site.
   Output _ (App "partial" args) -> emitPartial env args
