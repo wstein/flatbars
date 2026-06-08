@@ -50,6 +50,14 @@ class-A `compile_error!` → `truss!` + `quote_spanned!` → trybuild gate → `
 then the host-helper convention (docs/09). The runtime crates and the emit logic
 (`MaxBars/Rust.purs`) are unchanged inputs.
 
+**Keep in mind — inspect/provenance (docs/10).** A Trussbars inspector (StringTemplate4
+STViz-style; the FlatBars Lab is the UX blueprint) needs the emitter to support a
+**provenance mode** producing output↔template tiling segments (and later a context
+snapshot), mirroring the interpreter's ADR-035. So **thread byte-spans through
+parse→desugar→emit** (already required for diagnostics) and **design the provenance
+emit mode alongside clean/commented from the start** — don't bolt it on. Phase 1
+(the source map) is a natural follow-on to the breadcrumb work and Lab-pluggable.
+
 ## Reference docs
 
 - `01-subset-spec.md` — the language. `02-runtime-api.md` — the runtime surface
@@ -59,3 +67,4 @@ then the host-helper convention (docs/09). The runtime crates and the emit logic
 - `07-v2-spike.md` — the diagnostic span-mapping plan (decisions resolved).
 - `08-v2-parser.md` — the Rust parser/desugar scoping (v2's dominant task).
 - `09-host-helpers.md` — the typed host-helper convention (F3).
+- `10-inspect.md` — the inspector / provenance design (STViz-style; Lab as blueprint).
