@@ -1,9 +1,15 @@
 //! Perf-regression gate (the ratchet). Asserts the machine-INDEPENDENT relative
-//! invariants — measured in the same run, so a slow CI box doesn't matter:
+//! invariants — measured in the same run, so a slow CI box doesn't matter — for
+//! BOTH canonical workloads (big-table, teams):
 //!
-//!   * Trussbars ≤ Askama   — we beat the safe typed peer;
-//!   * Trussbars × 5 ≤ handlebars — we stay far below the dynamic interpreter
-//!     (the real ratio is ~20–30×; ×5 is a deliberately safe, non-flaky margin).
+//!   * Trussbars ≤ Askama        — we beat the safe typed peer;
+//!   * Trussbars × 5 ≤ handlebars — we stay far below the dynamic interpreter.
+//!
+//! Observed margins are comfortable (Trussbars is ~2.5–2.8× Askama and ~8–55×
+//! handlebars), so the thresholds won't flake. We deliberately do NOT gate
+//! against Sailfish (faster — it embeds raw Rust, the boundary we won't cross)
+//! nor the naive `write!` baseline (the codegen engines beat it, but `core::fmt`
+//! timing is too variable to ratchet on).
 //!
 //! Meaningful only optimized, so it self-skips in debug. CI runs it with
 //! `--release`.
@@ -12,7 +18,9 @@ use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 use trussbars_benchmarks::{
-    askama_render, handlebars_registry, handlebars_render, sample, trussbars_render,
+    askama_big_table, askama_teams, big_table_data, handlebars_big_table,
+    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, teams_data,
+    trussbars_big_table, trussbars_teams,
 };
 
 /// The minimum render time over `n` runs (the min is the most noise-stable metric).
@@ -29,27 +37,44 @@ fn min_time(n: u32, f: impl Fn() -> String) -> Duration {
     best
 }
 
+fn assert_invariants(name: &str, tb: Duration, ak: Duration, hb: Duration) {
+    eprintln!("{name}: trussbars={tb:?}  askama={ak:?}  handlebars={hb:?}");
+    assert!(
+        tb <= ak,
+        "[{name}] perf regression: trussbars {tb:?} should be <= askama {ak:?}"
+    );
+    assert!(
+        tb * 5 <= hb,
+        "[{name}] perf regression: trussbars {tb:?} ×5 should be <= handlebars {hb:?}"
+    );
+}
+
 #[test]
 fn trussbars_beats_askama_and_crushes_handlebars() {
     if cfg!(debug_assertions) {
         eprintln!("perf gate skipped in debug; run `cargo test --release`");
         return;
     }
-    let ctx = sample();
-    let hb = handlebars_registry();
-    let n = 5000;
 
-    let tb = min_time(n, || trussbars_render(&ctx));
-    let ak = min_time(n, || askama_render(&ctx));
-    let hbt = min_time(n, || handlebars_render(&hb, &ctx));
-    eprintln!("trussbars={tb:?}  askama={ak:?}  handlebars={hbt:?}");
+    // big-table — each render is ~50 µs, so a smaller sample count suffices.
+    {
+        let ctx = big_table_data();
+        let hb = handlebars_big_table_registry();
+        let n = 200;
+        let tb = min_time(n, || trussbars_big_table(&ctx));
+        let ak = min_time(n, || askama_big_table(&ctx));
+        let hbt = min_time(n, || handlebars_big_table(&hb, &ctx));
+        assert_invariants("big-table", tb, ak, hbt);
+    }
 
-    assert!(
-        tb <= ak,
-        "perf regression: trussbars {tb:?} should be <= askama {ak:?}"
-    );
-    assert!(
-        tb * 5 <= hbt,
-        "perf regression: trussbars {tb:?} ×5 should be <= handlebars {hbt:?}"
-    );
+    // teams — each render is ~100 ns, so use many samples.
+    {
+        let ctx = teams_data();
+        let hb = handlebars_teams_registry();
+        let n = 5000;
+        let tb = min_time(n, || trussbars_teams(&ctx));
+        let ak = min_time(n, || askama_teams(&ctx));
+        let hbt = min_time(n, || handlebars_teams(&hb, &ctx));
+        assert_invariants("teams", tb, ak, hbt);
+    }
 }
