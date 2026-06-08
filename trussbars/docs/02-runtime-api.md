@@ -69,6 +69,19 @@ pub fn esc<T: ToText + ?Sized>(v: &T, out: &mut String);   // calls v.write_esca
 a blanket `&T`. Output sites emit `esc(&x, &mut out)` for `{{x}}` and a raw
 `x.write_text(&mut out)` for `{{{x}}}`.
 
+The per-output hot path is marked `#[inline]` (`esc`, `escape_html`, the concrete
+`ToText` impls, `Loop::at`, `Each::each_len`), so it inlines into the host crate
+even without LTO — a render that emits N cells does N inlined appends, not N
+cross-crate calls.
+
+**Output buffer sizing — `SizeHint`.** `render` opens with a fn-local
+`static __CAP: trussbars_core::SizeHint`, seeds it with the compiler's literal
+estimate, allocates `String::with_capacity(__CAP.suggest())`, and calls
+`__CAP.record(out.len())` before returning. The hint (a `Relaxed` `AtomicUsize`)
+remembers the last render's length, so a *warm* template — the server steady state
+— reallocates at most once however large the data. It is purely a capacity hint:
+it never affects the output bytes, so it is invisible to the conformance harness.
+
 ---
 
 ## 3. Truthiness: the `Truthy` trait (`nonEmpty`)

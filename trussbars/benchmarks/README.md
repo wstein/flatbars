@@ -36,29 +36,30 @@ command above.
 
 | Engine | Time | vs Trussbars | Model |
 | --- | --- | --- | --- |
-| **Sailfish** | ~17.6 µs | **0.35×** (≈2.8× faster) | embeds **raw Rust** — no injection boundary |
-| **Trussbars** | ~49.9 µs | 1.0× | typed + injection-safe codegen |
-| **Askama** | ~139.9 µs | 2.8× slower | typed, safe codegen |
-| `write` | ~195.5 µs | 3.9× slower | naive hand-written `write!` |
-| **handlebars** | ~2.71 ms | **54× slower** | runtime interpreter |
+| **Sailfish** | ~17.9 µs | **0.48×** (≈2.1× faster) | raw Rust + `unsafe` buffer — no injection boundary |
+| **Trussbars** | ~37.3 µs | 1.0× | typed + injection-safe codegen, `#![forbid(unsafe_code)]` |
+| **Askama** | ~138.5 µs | 3.7× slower | typed, safe codegen |
+| `write` | ~195.5 µs | 5.2× slower | naive hand-written `write!` |
+| **handlebars** | ~2.71 ms | **73× slower** | runtime interpreter |
 
 ### teams (small page)
 
 | Engine | Time | vs Trussbars | Model |
 | --- | --- | --- | --- |
-| **Sailfish** | ~71.6 ns | **0.74×** (≈1.35× faster) | embeds raw Rust |
-| **Trussbars** | ~96.6 ns | 1.0× | typed + injection-safe codegen |
-| `write` | ~235.9 ns | 2.4× slower | naive hand-written `write!` |
-| **Askama** | ~241.0 ns | 2.5× slower | typed, safe codegen |
-| **handlebars** | ~4.06 µs | **42× slower** | runtime interpreter |
+| **Sailfish** | ~67.7 ns | **0.77×** (≈1.3× faster) | raw Rust + `unsafe` buffer |
+| **Trussbars** | ~88.2 ns | 1.0× | typed + injection-safe codegen |
+| `write` | ~235.9 ns | 2.7× slower | naive hand-written `write!` |
+| **Askama** | ~245.6 ns | 2.8× slower | typed, safe codegen |
+| **handlebars** | ~4.06 µs | **46× slower** | runtime interpreter |
 
 ## Takeaways
 
-- **Beats Askama on both workloads (~2.5–2.8×)** — best-in-class among the
+- **Beats Askama on both workloads (~2.8–3.7×)** — best-in-class among the
   *injection-safe* typed engines, from the lean codegen plus the `itoa` /
   `dragonbox_ecma` formatting backends (`dragonbox_ecma` is fast *and*
-  ECMA-byte-identical).
-- **~42–54× over the dynamic interpreter** (handlebars): straight-line Rust vs
+  ECMA-byte-identical) and `#[inline]` on the runtime hot path (so the per-cell
+  `esc` / `ToText` / `Loop::at` calls inline into the host crate without LTO).
+- **~46–73× over the dynamic interpreter** (handlebars): straight-line Rust vs
   parse-and-walk-an-AST per render. The bulk of the "fast template engine" story,
   by construction.
 - **Beats the naive `write!` baseline.** Surprising but well-known (and visible in
@@ -66,19 +67,26 @@ command above.
   format-argument parsing is slower than emitting `itoa`-class digits and
   `push_str`-ing static literals — which is exactly what Trussbars codegen does.
   So the "obvious" hand-written floor is *not* the ceiling.
-- **Within ~1.35–2.8× of Sailfish** — the absolute fastest, which gets there by
-  letting templates embed arbitrary Rust (`<%= expr %>`): great for speed, but it
-  dissolves the injection-safety boundary that is Trussbars's reason to exist (the
-  debate's explicit non-adoption). Trussbars stays in the same order of magnitude
-  while keeping that boundary. (On big-table the gap is wider — Trussbars' emitted
-  capacity hint is template-size-based, so a data-heavy table reallocates; a
-  data-aware hint is a tracked follow-up.)
+- **Within ~1.3–2.1× of Sailfish** — the absolute fastest. Inlining the runtime
+  hot path closed big-table from ~2.8× to ~2.1×; the residual gap is Sailfish's
+  **`unsafe` buffer** (unchecked writes) and its embedding of arbitrary Rust
+  (`<%= expr %>`). Both are exactly the boundaries Trussbars refuses to cross —
+  it stays `#![forbid(unsafe_code)]` and lets no data choose code — so closing the
+  last ~2× would mean giving up the safety story that is its reason to exist.
 
 ## Notes
 
 - The engine setups live in `src/lib.rs` (shared by the bench, the perf gate, and
   the equality test); the Trussbars columns are the **verbatim** output of
   `compileMaxRust`, only the `render` fn header renamed.
+- **Two perf changes drove the latest numbers** (both shipped in the engine, not
+  the bench): `#[inline]` on the `trussbars-core` hot path — `esc` / `ToText` /
+  `escape_html` / `Loop::at` / `Each` — so they inline into the host crate even
+  without LTO (the big-table win, ~49→37 µs); and an adaptive per-template
+  `SizeHint` (`trussbars_core::SizeHint`, a fn-local `static` the emitter seeds and
+  updates with each render's length) so a warm, data-heavy template reallocates at
+  most once. The `SizeHint` is semantically inert — the conformance harness stays
+  byte-identical.
 - Sailfish needs `self.`-qualified fields in its `.stpl`
   (`templates/big-table.stpl`, `templates/teams.stpl`); handlebars registers each
   template **once**, outside the timed loop (only render is measured).

@@ -36,6 +36,7 @@ pub struct Safe(
 /// faster than a char-by-char loop on typical, mostly-clean text, with no
 /// dependency and no `unsafe`. The five escapable bytes are all ASCII, so the run
 /// boundaries are always UTF-8 char boundaries.
+#[inline]
 pub fn escape_html(s: &str, out: &mut String) {
     let mut start = 0;
     for (i, &b) in s.as_bytes().iter().enumerate() {
@@ -56,6 +57,7 @@ pub fn escape_html(s: &str, out: &mut String) {
 
 /// Append the HTML-escaped output of `v` to `out` — the emission for a `{{ x }}`
 /// tag. [`Safe`] values pass through unescaped; everything else is escaped.
+#[inline]
 pub fn esc<T: ToText + ?Sized>(v: &T, out: &mut String) {
     v.write_escaped(out);
 }
@@ -81,18 +83,22 @@ pub trait ToText {
 }
 
 impl ToText for str {
+    #[inline]
     fn write_text(&self, out: &mut String) {
         out.push_str(self);
     }
+    #[inline]
     fn write_escaped(&self, out: &mut String) {
         escape_html(self, out);
     }
 }
 
 impl ToText for String {
+    #[inline]
     fn write_text(&self, out: &mut String) {
         out.push_str(self);
     }
+    #[inline]
     fn write_escaped(&self, out: &mut String) {
         escape_html(self, out);
     }
@@ -125,6 +131,7 @@ impl ToText for () {
 macro_rules! impl_to_text_int {
     ($($t:ty),* $(,)?) => {$(
         impl ToText for $t {
+            #[inline]
             fn write_text(&self, out: &mut String) {
                 #[cfg(feature = "fast-int")]
                 {
@@ -137,6 +144,7 @@ macro_rules! impl_to_text_int {
                     let _ = write!(out, "{self}");
                 }
             }
+            #[inline]
             fn write_escaped(&self, out: &mut String) {
                 self.write_text(out);
             }
@@ -227,9 +235,11 @@ impl<T: ToText> ToText for Vec<T> {
 }
 
 impl<T: ToText + ?Sized> ToText for &T {
+    #[inline]
     fn write_text(&self, out: &mut String) {
         (**self).write_text(out);
     }
+    #[inline]
     fn write_escaped(&self, out: &mut String) {
         (**self).write_escaped(out);
     }

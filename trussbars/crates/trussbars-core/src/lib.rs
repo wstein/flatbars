@@ -15,6 +15,8 @@
 //!   ([`truthy`](mod@truthy)). A bare-number condition does not compile.
 //! - [`Loop`] — the borrowed-reference loop frame model ([`frame`]): per-iteration
 //!   `{{#each}}` metadata threaded by lexical nesting, no `Rc`, no heap frame.
+//! - [`SizeHint`] — the adaptive output-capacity hint ([`capacity`]): a warm
+//!   template reallocates at most once, however large the data.
 //!
 //! The design contract is the `trussbars/docs/` set: `01-subset-spec.md` (the
 //! language), `02-runtime-api.md` (this crate's surface), and `04-conformance.md`
@@ -26,11 +28,13 @@
 //! [`macro@Trussbars`] (`#[derive(Trussbars)]`) so a host depends on this crate
 //! alone; the feature is off by default, keeping the default build dependency-free.
 
+mod capacity;
 mod each;
 mod frame;
 mod text;
 mod truthy;
 
+pub use capacity::SizeHint;
 pub use each::Each;
 pub use frame::Loop;
 pub use text::{Safe, ToText, esc, escape_html};

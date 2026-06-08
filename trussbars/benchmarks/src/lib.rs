@@ -92,8 +92,9 @@ pub fn teams_data() -> Teams {
 // Only the `pub fn render(ctx: &T)` header was renamed; the body is untouched.
 
 pub fn trussbars_big_table(ctx: &BigTable) -> String {
+    static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(1175);
     let __root = ctx;
-    let mut out = String::with_capacity(1175);
+    let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("<table>");
     {
         let __sub1 = &(ctx.table);
@@ -121,12 +122,14 @@ pub fn trussbars_big_table(ctx: &BigTable) -> String {
         }
     }
     out.push_str("</table>");
+    __CAP.record(out.len());
     out
 }
 
 pub fn trussbars_teams(ctx: &Teams) -> String {
+    static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(500);
     let __root = ctx;
-    let mut out = String::with_capacity(500);
+    let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("<html><head><title>");
     trussbars_core::esc(&(ctx.year), &mut out);
     out.push_str("</title></head><body><h1>CSL ");
@@ -152,6 +155,7 @@ pub fn trussbars_teams(ctx: &Teams) -> String {
         }
     }
     out.push_str("</ul></body></html>");
+    __CAP.record(out.len());
     out
 }
 

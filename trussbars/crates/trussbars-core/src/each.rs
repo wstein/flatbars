@@ -20,6 +20,7 @@ pub trait Each {
 
 impl<T> Each for [T] {
     type Item = T;
+    #[inline]
     fn each_len(&self) -> usize {
         self.len()
     }
@@ -30,6 +31,7 @@ impl<T> Each for [T] {
 
 impl<T> Each for Vec<T> {
     type Item = T;
+    #[inline]
     fn each_len(&self) -> usize {
         self.len()
     }
@@ -40,6 +42,7 @@ impl<T> Each for Vec<T> {
 
 impl<V> Each for BTreeMap<String, V> {
     type Item = V;
+    #[inline]
     fn each_len(&self) -> usize {
         self.len()
     }
@@ -53,6 +56,7 @@ impl<V> Each for BTreeMap<String, V> {
 // emits — no auto-deref needed, no `use`.
 impl<T: Each + ?Sized> Each for &T {
     type Item = T::Item;
+    #[inline]
     fn each_len(&self) -> usize {
         T::each_len(*self)
     }

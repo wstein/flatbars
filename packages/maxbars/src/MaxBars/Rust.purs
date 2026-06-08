@@ -108,15 +108,22 @@ compileMaxRust ctxType src = case build of
 renderFn :: String -> Int -> String -> String
 renderFn ctxType cap body =
   "pub fn render(ctx: &" <> ctxType <> ") -> String {\n"
+    -- An adaptive per-template capacity hint (the trick Sailfish uses): the
+    -- fn-local `static` learns the last render's byte length, so a warm template
+    -- reallocates at most once. Seeded with the compile-time literal estimate.
+    -- Semantically inert — it only sizes the buffer, never the output.
+    <> "    static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(" <> show cap <> ");\n"
     <> "    let __root = ctx;\n"
-    <> "    let mut out = String::with_capacity(" <> show cap <> ");\n"
+    <> "    let mut out = String::with_capacity(__CAP.suggest());\n"
     <> body
+    <> "    __CAP.record(out.len());\n"
     <> "    out\n}\n"
 
--- A heuristic estimate of the output size, to seed `String::with_capacity` and
--- cut reallocations — a Sailfish-style hint: the static literal bytes, ~8 bytes
--- per interpolation, and a `{{#each}}` body scaled by an assumed iteration count.
--- It is only a hint; the true size depends on the data, so the buffer still grows.
+-- A heuristic estimate of the output size that SEEDS the adaptive `SizeHint`
+-- (above) for the first render: the static literal bytes, ~8 bytes per
+-- interpolation, and a `{{#each}}` body scaled by an assumed iteration count.
+-- After the first render the hint learns the true size, so this only matters
+-- cold; it must stay a safe lower-ish bound, never affecting output.
 estimateBytes :: Template -> Int
 estimateBytes = sum <<< map est
   where

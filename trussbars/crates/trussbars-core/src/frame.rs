@@ -43,6 +43,7 @@ impl<'p> Loop<'p> {
     ///
     /// `index` must be `< length` (every `{{#each}}` guards the empty case before
     /// iterating, so this always holds for generated code).
+    #[inline]
     #[must_use]
     pub fn at(
         index: usize,
