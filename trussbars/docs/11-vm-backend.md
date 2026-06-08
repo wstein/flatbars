@@ -91,6 +91,43 @@ So most of this doc is really *"a dynamic-`Value` tree-walk interpreter for MaxB
 Rust, sharing the v2 front-end."* The instruction set is deferred until there's a
 reason.
 
+### 4.1 Measured (the spike + an allocation pass)
+
+The tree-walk spike is built (`trussbars-vm`) and gated: **34/34** of the covered
+conformance corpus byte-match the oracle (the rest report `unsupported`, honestly —
+partials, the collection filters, `pluck`/`sortBy`/`groupBy`, a few helpers). It is the
+6th engine in `trussbars/benchmarks`; the perf gate asserts **AOT ≤ VM ≤ handlebars**.
+
+A first naive cut deep-cloned the context on every scope entry — **555 ms** on big-table
+(≈200× *slower* than handlebars). An allocation pass fixed it, in four commits, each the
+textbook fix for a tree-walk interpreter:
+
+| | change | effect |
+| --- | --- | --- |
+| **O5** | `Rc`-backed cheap-clone `Value` (`Str(Rc<str>)`, `Array(Rc<[Value]>)`, `Object(Rc<…>)`) | clone = refcount bump, not deep copy; env holds `Value` directly |
+| **O1** | parent chain as an `Rc` cons-list | O(1) push vs `Vec::insert(0,…)`'s O(depth²) |
+| **O3** | write-through escaped output (`write_escaped`) | no temp `String`, one fewer copy per interpolation |
+| **O2** | adaptive output-capacity hint + `render_into` | seed `with_capacity`, reuse a host buffer |
+
+Result (release, min-of-N), VM vs the field:
+
+```text
+              AOT      VM       Askama   handlebars      VM vs handlebars
+big-table     ~34 µs   826 µs   123 µs   2.61 ms         ~3.2× faster
+teams         ~42 ns   1.04 µs  166 ns   3.88 µs         ~3.7× faster
+```
+
+The allocation pass roughly **halved** the VM's time on both workloads (big-table
+1.74 ms→826 µs, teams 2.17 µs→1.04 µs) on top of the first Rc-context fix. AOT stays
+~25–800× faster than the VM — the expected compiled-vs-interpreted gap, and the reason
+AOT remains the speed story while the VM owns dynamic flexibility.
+
+**Conclusion (evidence-first, like docs/05):** a *cheap-clone `Value` + tree-walk* clears
+the bar (VM ≥ handlebars, by 3×) without bytecode. So **bytecode stays deferred**, gated
+on a real trigger — a named *embedding* consumer (a portable artifact) or the AOT-compat
+*compile pass* (load-time schema/type checks + name→slot resolution), **not** a speed
+chase.
+
 ## 5. The dynamic `Value` model (the part AOT shed)
 
 AOT works on the host's *typed* structs (`ctx.user.name`). The VM cannot — it
