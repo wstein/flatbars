@@ -58,6 +58,7 @@ module FullBars.Surface
   , noLoopVars
   , reservedScope
   , strictSurfaceViolation
+  , maxbarsEachAsViolation
   ) where
 
 import Prelude
@@ -613,6 +614,26 @@ strictSurfaceViolation nodes = Array.head (Array.mapMaybe node nodes)
   inlineShape = "{{#inline}} (an inline partial uses the {{#*inline \"name\"}} decorator)"
   letShape =
     "{{#let}} (block-scoped `let` is a MaxBars-only construct; FullBars has no `let` — alias with {{#with x as |n|}}, or build a constant with (dict …))"
+
+-- | The first MaxBars `{{#each … as …}}` in `nodes` — the *removed* trailing-`as`
+-- | loop-binding form — its offset and a "shape" string for the located
+-- | `DisallowedShape` error. MaxBars `each` binds Liquid-style (`{{#each x in xs}}`),
+-- | so a bare `as` in an `each` head is the legacy form and is rejected rather than
+-- | silently no-opping (`FullBars.checkSurfaceStrict` on the MaxBars path). Only
+-- | `each` is matched — `{{#with x as p}}` and custom block helpers keep `as`.
+maxbarsEachAsViolation :: Template -> Maybe { off :: Int, shape :: String }
+maxbarsEachAsViolation nodes = Array.head (Array.mapMaybe node nodes)
+  where
+  node = case _ of
+    Block sp Section "each" args _ | Array.any isAs args -> Just
+      { off: sp.start, shape: eachAsShape }
+    Block _ _ _ _ body -> maxbarsEachAsViolation body
+    _ -> Nothing
+  isAs = case _ of
+    App "as" [] -> true
+    _ -> false
+  eachAsShape =
+    "{{#each … as …}} (MaxBars binds loops Liquid-style — write the names before `in`, e.g. {{#each x in xs}} or {{#each x i in xs}}; the trailing `as` form is gone. `with`/custom helpers still use `as`.)"
 
 -- | Strip leading `../` runs, counting the parent depth.
 stripParents :: String -> Int -> { depth :: Int, rest :: String }

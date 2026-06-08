@@ -52,7 +52,7 @@ import FlatBars.Error (Error, ParseError(..), renderParseErrorAt, renderParseErr
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
-import FullBars.Surface (LoopVars, desugar, desugarWith, noLoopVars, strictSurfaceViolation)
+import FullBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, strictSurfaceViolation)
 import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartialFiles, registerPartials, withTranslator, withTruthy, withYieldName)
@@ -80,19 +80,27 @@ desugarSurface = desugar surfaceClauses
 desugarSurfaceWith :: LoopVars -> Template -> Template
 desugarSurfaceWith lv = desugarWith lv surfaceClauses
 
--- | Reject the FullBars-disallowed surface shapes on the *strict* (FullBars/CLI)
--- | surface, reported as a located `DisallowedShape`: a bare `{{#inline}}` (an
--- | inline partial must be the `{{#*inline "name"}}` decorator — surface.adoc §5.7)
--- | and a `{{#let}}` (block-scoped `let` is a MaxBars-only construct, ADR-024 — so a
--- | FullBars `{{#let}}` is a clear error rather than a silent no-op). MaxBars passes
--- | `strict = false` — it accepts both (and the dict/list literals), so it does not
--- | run this gate. The first violation found wins (`strictSurfaceViolation`).
+-- | Reject each dialect's disallowed *surface* shapes (the `strict` flag is the
+-- | FullBars/MaxBars distinction the render paths already thread), reported as a
+-- | located `DisallowedShape`:
+-- |
+-- |  * **FullBars** (`strict = true`) — a bare `{{#inline}}` (must be the
+-- |    `{{#*inline "name"}}` decorator, surface.adoc §5.7) and a `{{#let}}`
+-- |    (MaxBars-only, ADR-024). FullBars accepts neither.
+-- |  * **MaxBars** (`strict = false`) — the *removed* `{{#each … as …}}` loop-
+-- |    binding form (MaxBars binds `{{#each x in xs}}` now); rejecting it turns a
+-- |    silent no-op into a clear "use `x in xs`" error, the same no-silent-no-op
+-- |    bar the FullBars `{{#let}}` rejection set.
+-- |
+-- | The first violation found wins.
 checkSurfaceStrict :: Boolean -> Template -> Either ParseError Unit
-checkSurfaceStrict strict nodes
-  | strict = case strictSurfaceViolation nodes of
-      Just v -> Left (DisallowedShape v.shape v.off)
-      Nothing -> pure unit
-  | otherwise = pure unit
+checkSurfaceStrict strict nodes = case violation of
+  Just v -> Left (DisallowedShape v.shape v.off)
+  Nothing -> pure unit
+  where
+  violation
+    | strict = strictSurfaceViolation nodes
+    | otherwise = maxbarsEachAsViolation nodes
 
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.

@@ -32,6 +32,8 @@ const RULES = [
   ["maxbars",  "{{=<% %>=}}", /Set-delimiter directives.*MaxBars.*Mustache feature.*MinBars/,  "set-delim (maxbars)"],
   // `{{#let}}` is MaxBars-only (ADR-024): FullBars flags it; MaxBars/RawBars accept it.
   ["fullbars", "{{#let a=1}}{{/let}}", /\{\{#let\}\}.*MaxBars-only.*FullBars has no .let./, "let (fullbars)"],
+  // the removed `{{#each … as …}}` form is flagged in MaxBars (use `x in xs`).
+  ["maxbars", "{{#each xs as a}}{{/each}}", /Liquid-style.*names before .in.*each x in xs/, "each-as (maxbars)"],
   // MinBars / RawBars share the rest of the dialect rules. RawBars stops here
   // because it also short-circuits on set-delim above; verify the cascading
   // rules for both dialects in MinBars (the engine accepts everything we test

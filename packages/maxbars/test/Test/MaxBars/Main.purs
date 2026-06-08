@@ -318,6 +318,24 @@ main = do
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "ba"
 
+  -- the removed trailing-`as` loop-binding form on `each` is a located error, not a
+  -- silent no-op — MaxBars binds `{{#each x in xs}}` now. `with`/custom `as` stay.
+  assert' "each-as: {{#each xs as a}} is rejected (use `x in xs`)"
+    ( isLeft
+        (renderMax "{{#each xs as a}}{{a}}{{/each}}" (obj [ Tuple "xs" (VArray [ VString "x" ]) ]))
+    )
+  assert' "each-as: a nested {{#each y as z}} is rejected too"
+    ( isLeft
+        ( renderMax "{{#each x in xs}}{{#each y as z}}{{/each}}{{/each}}"
+            (obj [ Tuple "xs" (VArray []) ])
+        )
+    )
+  -- `with … as` and `{{#each x in xs}}` are unaffected (only `each … as` is gone).
+  expectM "each-as: {{#with o as p}} keeps `as`"
+    "{{#with o as p}}{{p.n}}{{/with}}"
+    (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
+    "Z"
+
   -- `each … in` binds a *third* name to the 1-based index — MaxBars' extension
   -- over the two Handlebars bindings (`item index0 index1 in xs`).
   expectM "each-in: binds element + index0 + index1"

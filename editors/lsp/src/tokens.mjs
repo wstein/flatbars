@@ -151,6 +151,24 @@ export function dialectDiagnostics(text, dialect) {
       }
     }
     if (dialect === "fullbars") return out;
+    // MaxBars binds loops Liquid-style (`{{#each x in xs}}`); the removed trailing
+    // `{{#each … as …}}` form parses but the engine rejects it at render
+    // (`checkSurfaceStrict`, MaxBars path). Flag it here too, with the `x in xs`
+    // fix, rather than letting it silently render empty. (`with`/helper `as` stays.)
+    if (dialect === "maxbars") {
+      const eachAsRe = /\{\{~?#each\b[^}]*?\sas\s/g;
+      let em;
+      while ((em = eachAsRe.exec(text)) !== null) {
+        out.push({
+          start: em.index,
+          end: em.index + em[0].length,
+          message:
+            "MaxBars binds loops Liquid-style — write the names before `in`, " +
+            "e.g. `{{#each x in xs}}` or `{{#each x i in xs}}`. The trailing `as` " +
+            "form on `each` is gone (`with`/custom helpers still use `as`).",
+        });
+      }
+    }
     // RawBars/MaxBars still want the rest of the dialect rules (they're not
     // Handlebars-compatible and have their own constraints — see below).
     // Continue into the shared MinBars/RawBars rules… but RawBars only.
