@@ -44,7 +44,7 @@ What this buys, and what it costs, stated plainly:
 | --- | --- | --- |
 | **Runtime-authored templates** | ❌ structurally impossible | ✅ **the sole irreducible reason it exists** |
 | **Injection-safe (no SSTI)** | ✅ no interpreter at all | ✅ **preserved** — static names rule (§6); no `apply`, no computed partials, no computed `lookup` |
-| **Host-typed field checking** (`{{post.titlee}}` ⇒ compile error) | ✅ rustc-enforced | ⚠️ **lost** — best effort is *optional* schema-validation at load (§7); otherwise runtime-fallible |
+| **Host-typed field checking** (`{{post.titlee}}` ⇒ compile error) | ✅ rustc-enforced | ⚠️ lost in lenient mode; **recovered in AOT-compat mode** (§7), exact for the modeled subset |
 | **Performance** | safe-Rust ceiling (~0.8 µs, docs/05) | interpreter — 10–100× slower; still expected to beat handlebars, nowhere near AOT |
 | **`no_std` + `forbid(unsafe)`** | ✅ | ✅ target (the value model is `alloc`-only; see §5) |
 
@@ -130,19 +130,41 @@ So a runtime-*authored* template is still safe to *run*: authoring fixes the nam
 the data never crosses into them. (Authoring-time trust is a separate, host concern —
 the VM's guarantee is that *running* a parsed template can't be made to eval data.)
 
-## 7. Host-data binding & the typed-checking question
+## 7. Host-data binding & the render modes
 
 The host hands the VM **data** (a `Value`, or `serde_json::Value`, or a value behind a
 trait) plus the template. **Open decision (D3):** the binding surface —
 `render(template: &str, data: &Value) -> Result<String, RenderError>` is the minimum.
 
-Two render modes worth offering:
-- **Lenient (default for dynamic):** missing key → `nonEmpty`-falsy / empty, like the
-  reference. Runtime-fallible, maximally dynamic.
-- **Schema-checked (opt-in):** validate the template's required paths against a
-  host-supplied schema *at load*, recovering *some* of AOT's safety for the dynamic
-  path without rustc. This is the bridge between the two backends and the natural home
-  for `docs/03` schema-inference. **Open decision (D4):** ship it now or later.
+Three render modes, from most dynamic to a strict AOT proxy:
+
+1. **Lenient** (the default for dynamic use): missing key → `nonEmpty`-falsy / empty,
+   like the reference. No schema needed; maximally dynamic; runtime-fallible.
+2. **Schema-checked** (opt-in): validate the template's referenced paths against a
+   host-supplied schema *at load*, recovering *some* of AOT's safety without rustc.
+   The natural home for `docs/03` schema-inference.
+3. **AOT-compat (strict) — REQUIRED.** A mode that **accepts exactly what AOT accepts
+   and produces byte-identical output** — the VM as a *verifying proxy for AOT*. Given
+   the host schema, it applies AOT's exact static rules at load:
+   - every referenced path must exist (missing field → error, *not* lenient-empty);
+   - **numeric truthiness is an error** (`{{#if count}}` is rejected — AOT's Option C,
+     no `Truthy` for numbers; `docs/01`);
+   - **a bare struct/object in output position is an error** (AOT has no `ToText` for
+     structs);
+   - operations are restricted to AOT's supported set (so the dynamic-only host-helper
+     / i18n pack of §8 is rejected *here*), and operand types must line up against the
+     schema — the checks rustc would make.
+
+   The guarantee: **if a template runs in AOT-compat mode, it will compile under AOT
+   and render identically.** This closes the `AOT ⊂ VM` asymmetry on demand, makes
+   *prototype-dynamic → ship-typed* safe, and gives the Studio (docs/10) an **AOT
+   preview without a Rust toolchain**.
+
+   It is **100% compat *modulo schema fidelity*** — it checks against the *schema*, not
+   the host's real Rust types, so it is exact for the modeled subset (structs of
+   scalars / arrays / nested structs — Trussbars' target shape). A schema single-sourced
+   with the host type (a declaration, or `docs/03` inference) keeps that boundary tight;
+   it is verified, not asserted (§9).
 
 ## 8. Where the VM *leads* AOT: host helpers & i18n (F3)
 
@@ -166,6 +188,14 @@ follows transitively on the shared subset.
 Crucially, the VM can run the corpus cases **AOT cannot** (dynamic-data / runtime
 templates) — those get their own oracle (the PureScript engine renders them too, since
 it's also dynamic), so the VM is gated everywhere, with **no silent gaps**.
+
+**AOT-compat (§7) is *gated*, not claimed.** The harness asserts, across the whole
+corpus *including the negatives*, that the VM in AOT-compat mode **accepts iff AOT
+accepts** and **outputs byte-identically** — so `neg-dict`, a bare-number `{{#if}}`,
+and bare-struct output are rejected by *both*, while every positive renders the same
+bytes. "100% compat" is therefore a tested contract, exactly the way `interpreter ≡
+AOT` already is — the harness `excluded` ledger (AOT-rejected cases) becomes the
+AOT-compat *reject* oracle.
 
 ```text
         MaxBars oracle (PureScript, reference)
@@ -191,7 +221,7 @@ the VM is the second half.
 | **D1** | Tree-walk first, bytecode later? | **Yes** (§4) — evidence-first, like docs/05 |
 | **D2** | `Value`: bespoke `enum` vs `serde_json::Value` | bespoke `enum` (no dep, `no_std`, ordered objects) — revisit if host interop dominates |
 | **D3** | Host-data binding surface | `render(&str, &Value) -> Result<String, RenderError>`; partials/helpers via registries |
-| **D4** | Schema-checked (opt-in) load mode | later — ship lenient first; wire `docs/03` inference into it |
+| **D4** | Schema-checked + **AOT-compat** load modes | **required, not optional** — AOT-compat is a launch capability (the 100%-compat guarantee, §7/§9). Lenient is the default; schema-checked + AOT-compat are opt-in modes. Wire `docs/03` inference into the schema |
 | **D5** | **Sequencing: VM next, or finish the AOT/Studio surface first?** | *the one genuinely open ordering call* — see below |
 
 ### D5, the sequencing question
