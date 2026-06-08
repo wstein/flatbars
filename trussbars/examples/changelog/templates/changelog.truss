@@ -1,0 +1,7 @@
+# {{project}} — Changelog
+{{#each (groupBy commits "category")}}
+## {{loop.key}}
+{{#each this as |c|}}
+- {{c.subject}}{{#if c.scope}} _({{c.scope}})_{{/if}} `{{c.hash}}` · {{c.date}}
+{{/each}}
+{{/each}}

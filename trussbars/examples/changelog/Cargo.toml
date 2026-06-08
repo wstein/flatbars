@@ -1,0 +1,19 @@
+[package]
+name = "changelog-example"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace.
+[workspace]
+
+[lib]
+name = "changelog_example"
+
+[[bin]]
+name = "changelog"
+path = "src/main.rs"
+
+[dependencies]
+trussbars-core = { path = "../../crates/trussbars-core" }
+trussbars-std = { path = "../../crates/trussbars-std" }

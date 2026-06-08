@@ -69,6 +69,8 @@ From the blog dogfood (`examples/blog/README.md`); each needs an explicit in/out
 | **F4** | `{{#let}}` does not parse (ADR-024). | **Open** — decide IN/OUT at freeze; re-piping is the current workaround. |
 | **F5** | No collection/`dict` literals (`{{#each (dict …)}}`). | **Deferred** — low value for typed hosts (build the collection in Rust); revisit for dashboard-style use. |
 | **F1** | Template path == Rust identifier (no rename). | **WONTFIX** — it *is* "names are static"; document only. |
+| **F7** | A **piped or bare multi-arg application used directly as an `{{#if}}`/`{{#unless}}` condition** is rejected ("options argument") — a `startsWith` applied to the subject fails as a bare condition head, whether written as a pipe or as a prefix call. **Workaround: parenthesize** the call — `{{#if (startsWith x "f")}}` works. Applications work in every position *except* a bare condition head. | **v2, IN (fix)** — the desugar should accept a piped/applied condition without the parens. Found via the changelog dogfood (`examples/changelog`); the parens form is the v1 workaround. |
+| **F8** | **Escaping is HTML-only.** `{{ }}` always HTML-escapes, so non-HTML output targets (markdown source, JSON, CSV) get entities — e.g. a commit subject `"x"` becomes `&quot;x&quot;`. Correct when the output is later HTML-rendered (GitHub markdown), literal otherwise. No per-target escaping policy. | **v2, consider** — a target-escape policy (HTML / none / JSON) selected per template, or keep HTML-only and document. Use raw `{{{ }}}` for trusted non-HTML output (XSS-unsafe if later HTML-rendered). Found via the changelog dogfood. |
 
 ## 5. The freeze
 

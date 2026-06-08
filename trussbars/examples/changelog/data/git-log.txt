@@ -1,0 +1,20 @@
+311dac1122484aee1bea61d694d8e2129d82f5f5|2026-06-08T10:21:59+02:00|docs(trussbars): corrected roadmap — strike profiling, reframe "new surface" (step 5)
+acab8b27b68c4897840c1c9210e9f706dae347ed|2026-06-08T10:20:15+02:00|docs(trussbars): v2 diagnostic span-mapping spike (step 4)
+91fe529732c338d20a4bd33e709252c2ba3783c6|2026-06-08T10:18:09+02:00|docs(trussbars): v1 feature freeze — the surface v2 targets (step 3)
+a7e55c22684fbb8da2712f6b54bb131c4c96eba0|2026-06-08T10:16:47+02:00|feat(trussbars-core): bounded no_std + alloc split (step 2)
+2516b4c3dd9820235a639937ceb28a7d7145ad99|2026-06-08T10:11:54+02:00|feat(trussbars): blog-engine dogfood example + feature-gap catalog (step 1)
+b1bbe201163dd895065a8be1fa39694d834a7854|2026-06-08T09:52:12+02:00|docs(trussbars): codegen profiling pass — at the safe-Rust ceiling
+f7e2f2d1f1e097c7f06f521e5a265bcd4397f2d6|2026-06-08T09:38:13+02:00|perf(trussbars): close the Sailfish gap on big-table (49.9→37.3µs)
+adf6848853dc1f4e48145a727a103404053c9279|2026-06-08T09:18:52+02:00|test(trussbars): rebuild benchmark on the canonical template-benchmarks-rs suite
+deaa95cd1eb743df9ccf50d8032f435a7fa74d04|2026-06-08T08:57:38+02:00|docs(trussbars): refresh benchmark medians (Trussbars 1.26→0.92µs)
+d33f38ca96d7f81a1e01de62cb655dd9a6c1e70b|2026-06-08T08:48:23+02:00|feat(editors,trussbars): adopt .truss as the MaxBars/Trussbars extension
+224e65e49ba0429493e3fe667269b318b1d31003|2026-06-08T08:42:06+02:00|feat(trussbars): raw blocks ({{{{#raw}}}}) emit their verbatim body
+348fc71263258a0eea283d5855315f3a50c21416|2026-06-08T08:38:04+02:00|feat(trussbars): emit groupBy → a map, iterated via Each
+c72f2241f20928377026722a5d28fdf8d4cf4b21|2026-06-08T08:34:38+02:00|feat(trussbars): map iteration — {{#each obj}} over a BTreeMap via an Each trait
+496931ee10bcf7a619de59bf142d0287e6992e87|2026-06-08T08:15:10+02:00|perf(trussbars): richer String::with_capacity estimate (per-output + per-loop)
+17b056e9acf0b64c619c21c9e2ee549fb9bfe71f|2026-06-08T08:13:09+02:00|feat(trussbars): emit sortBy with a stable trussbars-std::sort_by
+f0723601e069c34200408a42f6e8804d8656f36b|2026-06-08T08:04:51+02:00|feat(trussbars): emit block partials {{#partial}} + {{yield}}
+485e4dd3dc55abec475a30e5822376bf54e69465|2026-06-08T02:47:09+02:00|perf(trussbars): seed String::with_capacity from the literal-byte sum
+073e93d83e3ac71b196c9953b16fd3061b9d9886|2026-06-08T02:44:39+02:00|feat(trussbars): emit outer labelled loops and pluck
+59812d187e41edd1fd05a86e03954af2bbabb7ab|2026-06-08T02:42:02+02:00|feat(trussbars): emit inline partials ({{#inline}} + {{> name}})
+0101435fac5cf00d432fe80b2b3f786e39e8c1ad|2026-06-08T02:33:13+02:00|feat(trussbars): emit parent / parent.parent context chains

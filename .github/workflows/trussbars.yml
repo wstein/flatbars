@@ -109,14 +109,17 @@ jobs:
       - name: Perf-regression gate
         run: cargo test --release
 
-  # The blog dogfood example: build it and assert the three pages still match
-  # their committed golden HTML (no PureScript toolchain needed — the generated
-  # render module is committed).
-  example-blog:
+  # The dogfood examples: build each and assert its pages still match the committed
+  # golden output (no PureScript toolchain needed — the generated render module is
+  # committed). `blog` = authored content; `changelog` = git-log aggregation.
+  examples:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        example: [blog, changelog]
     defaults:
       run:
-        working-directory: trussbars/examples/blog
+        working-directory: trussbars/examples/${{ matrix.example }}
     steps:
       - uses: actions/checkout@v6
       - name: Cache cargo
@@ -125,8 +128,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            trussbars/examples/blog/target
-          key: trussbars-blog-${{ runner.os }}-${{ hashFiles('trussbars/examples/blog/Cargo.lock') }}
+            trussbars/examples/${{ matrix.example }}/target
+          key: trussbars-example-${{ matrix.example }}-${{ runner.os }}-${{ hashFiles(format('trussbars/examples/{0}/Cargo.lock', matrix.example)) }}
       - name: Toolchain
         run: rustup show && cargo --version
       - name: Format
