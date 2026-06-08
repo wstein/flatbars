@@ -189,6 +189,12 @@ lookupOperation name (RefEnv e) = go e.helpers
 -- | (`{{#each xs as t}}{{t}}` must read the block param `t`, not the `t` translate
 -- | helper). The compiled `rt.call` checks `frame.binds` first for the same reason,
 -- | so the two paths stay byte-identical (`test:compile`).
+-- |
+-- | Cost: O(frame depth) `Map.member` probes, but it fires only for a *sectionable*
+-- | value-op name in *lenient* (FullBars/MaxBars) resolve — a narrow slice — and
+-- | frame depth is the static block-nesting depth, not a data dimension. If a deep
+-- | `let`/loop nest ever makes this hot, short-circuit on the prelude membership
+-- | check instead of walking to the base.
 isScopedBinding :: forall m. String -> RefEnv m -> Boolean
 isScopedBinding name (RefEnv e) = go e.helpers
   where

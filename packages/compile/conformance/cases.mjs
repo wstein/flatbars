@@ -196,6 +196,15 @@ export const cases = [
   { name: "mx:let-in-loop", dialect: "maxbars", t: "{{#each items}}{{#let u=(uppercase this)}}{{u}}@{{loop.index0}} {{/let}}{{/each}}", d: { items: ["a", "b"] } },
   { name: "mx:let-shadows-op", dialect: "maxbars", t: '{{#let add="x"}}{{add}}{{/let}}', d: {} },
   { name: "mx:collections-nested", dialect: "maxbars", t: "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}", d: {} },
+  // ── feature combinations (the surface features interact; pin them together) ──
+  // let + each…in + the `..` range + the 1-based binding, all in one template.
+  { name: "mx:combo-let-each-range", dialect: "maxbars", t: "{{#let hi=(add n 1)}}{{#each x i1 in 1..hi}}{{x}}#{{i1}} {{/each}}{{/let}}", d: { n: 2 } },
+  // each…in over a list-of-dict literal, binding element + index, aliasing with let.
+  { name: "mx:combo-each-list-dict-let", dialect: "maxbars", t: '{{#each row i in [{n: "a"}, {n: "b"}]}}{{#let tag=(uppercase row.n)}}{{i}}:{{tag}} {{/let}}{{/each}}', d: {} },
+  // a dict literal as a let value, read inside a nested each…in over a range.
+  { name: "mx:combo-let-dict-each", dialect: "maxbars", t: "{{#let cfg={base: 10}}}{{#each k in 1..3}}{{add cfg.base k}} {{/each}}{{/let}}", d: {} },
+  // labelled each…in with an inner each…in reading the outer frame + a let alias.
+  { name: "mx:combo-label-let", dialect: "maxbars", t: "{{#each row j in rows label outer}}{{#each c in row}}{{#let tag=(uppercase c)}}{{outer.index1}}.{{j}}:{{tag}} {{/let}}{{/each}}{{/each}}", d: { rows: [["a"], ["b", "c"]] } },
   // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
   // through to name (where ?? keeps the non-null "" and || yields a boolean).
   { name: "mx:elvis-empty", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "", name: "Ada" } },
