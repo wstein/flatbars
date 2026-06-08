@@ -249,6 +249,17 @@ const t = (s) => s;
       only a glued <code>..</code> is the range operator.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.rangeOp.template} data={ex.rangeOp.data} />
+    <h3>Collection literals — <code>[list]</code> &amp; <code>&#123;dict&#125;</code></h3>
+    <p>
+      <code>{t("[a, b, c]")}</code> is a list literal (sugar for the <code>list</code> helper) and
+      <code>{t("{k: v}")}</code> a dict (sugar for <code>dict</code>). Elements and values are full
+      expressions, so they nest and take infix — <code>{t("[1, n + 1, {tag: x}]")}</code>. Keys are
+      bare identifiers or quoted strings; an empty <code>{t("[]")}</code>/<code>{t("{}")}</code> is
+      falsy under the <code>nonEmpty</code> rule. One delimiter gotcha: when a dict abuts the tag
+      close, keep a space — <code>{t("{{#with {a: 1} }}")}</code>, since <code>{t("}}}")}</code> would
+      close the tag early.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.collections.template} data={ex.collections.data} />
     <h3>Block params &amp; labelled loops</h3>
     <p>
       A trailing <code>{t("as elem index index1")}</code> binds scoped names over the block body —

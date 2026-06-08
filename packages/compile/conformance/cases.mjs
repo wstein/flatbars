@@ -170,6 +170,15 @@ export const cases = [
   { name: "mx:range-value", dialect: "maxbars", t: "{{ 1..3 }}", d: {} },
   { name: "mx:range-decimal-untouched", dialect: "maxbars", t: "{{ 1.5 }}", d: {} },
   { name: "mx:range-path-untouched", dialect: "maxbars", t: "{{ a.b }}", d: { a: { b: "ok" } } },
+  // `[…]` list and `{k: v}` dict literals — sugar for the `list`/`dict` helpers.
+  { name: "mx:list-lit", dialect: "maxbars", t: "{{#each [10, 20, 30]}}{{this}} {{/each}}", d: {} },
+  { name: "mx:list-exprs", dialect: "maxbars", t: "{{#each [1, n + 1, n * 2]}}{{this}} {{/each}}", d: { n: 5 } },
+  { name: "mx:list-empty", dialect: "maxbars", t: "[{{#each []}}x{{/each}}]", d: {} },
+  { name: "mx:list-value", dialect: "maxbars", t: "{{ [1, 2, 3] }}", d: {} },
+  { name: "mx:dict-lit", dialect: "maxbars", t: "{{#with {name: who, age: 30} }}{{name}}/{{age}}{{/with}}", d: { who: "Ada" } },
+  { name: "mx:dict-strkey", dialect: "maxbars", t: '{{#with {"full name": who} }}{{lookup this "full name"}}{{/with}}', d: { who: "Ada L" } },
+  { name: "mx:dict-json", dialect: "maxbars", t: "{{{ json {x: 1, y: 2} }}}", d: {} },
+  { name: "mx:collections-nested", dialect: "maxbars", t: "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}", d: {} },
   // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
   // through to name (where ?? keeps the non-null "" and || yields a boolean).
   { name: "mx:elvis-empty", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "", name: "Ada" } },

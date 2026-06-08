@@ -183,6 +183,17 @@ export const examples = {
     data: { rounds: 3 },
   },
 
+  collections: {
+    engine: "maxbars",
+    label: "Intermediate — Collection literals: [list] & {dict}",
+    // `[…]` is a list literal (sugar for the `list` helper) and `{k: v}` a dict
+    // (sugar for `dict`). Elements/values are full expressions, so they nest and
+    // take infix. Mind the space in `{…} }}` — `}}}` would close the tag early.
+    compiles: true,
+    template: `{{#each [{name: lead, role: "lead"}, {name: "Lin", role: "dev"}]}}{{name}} ({{role}}){{#unless loop.last}}, {{/unless}}{{/each}}`,
+    data: { lead: "Ada" },
+  },
+
   withBlock: {
     engine: "maxbars",
     label: "Intermediate — With: re-root the context",

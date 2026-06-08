@@ -505,6 +505,8 @@ const helpers = {
   count: (a) => Array.isArray(a[0]) ? a[0].length : (a[0] !== null && typeof a[0] === "object" && !isSafe(a[0]) ? Object.keys(a[0]).length : 0),
   size: (a) => Array.isArray(a[0]) ? a[0].length : (a[0] !== null && typeof a[0] === "object" && !isSafe(a[0]) ? Object.keys(a[0]).length : 0),
   at: (a) => { if (!Array.isArray(a[0])) return null; const r = a[0].at(int(a[1])); return r === undefined ? null : r; },
+  // Builds an array from its arguments (the `[…]` list-literal helper).
+  list: (a) => a.slice(),
   // The inclusive integer range [a, b] (the `..` operator's helper), capped at
   // RANGE_BUDGET — the interpreter's rangeBudget — so 1..1e9 errors, not hangs.
   range: (a) => { const lo = int(a[0]), hi = int(a[1]); if (hi < lo) return []; if (hi - lo + 1 > RANGE_BUDGET) throw new Error(`range: ${hi - lo + 1} elements exceed the limit of ${RANGE_BUDGET}`); const out = []; for (let i = lo; i <= hi; i++) out.push(i); return out; },

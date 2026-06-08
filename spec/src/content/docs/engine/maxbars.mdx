@@ -70,6 +70,31 @@ strictly numeric — a non-number operand is a `TypeError` (no coercion) — and
 is *null*-coalescing (a present `0`/`""`/`[]` wins), independent of the engine's
 truthiness rule.
 
+## Collection literals
+
+MaxBars adds two literal *atoms* — a `[…]` list and a `{k: v}` dict — usable
+anywhere an expression is (`each` subjects, arguments, pipe sources, nested):
+
+```handlebars
+{{#each [1, 2, 3]}}{{this}} {{/each}}            {{!-- ⇒ (list 1 2 3) --}}
+{{#each [first, n + 1, {tag: x}]}}…{{/each}}     {{!-- elements are full expressions --}}
+{{#with {name: who, age: 30} }}{{name}}{{/with}} {{!-- ⇒ (dict "name" who "age" 30) --}}
+{{{ json {"full name": who} }}}                  {{!-- a string key, for spaces --}}
+```
+
+They are pure sugar: `[e1, …]` desugars to the prelude `list` helper and
+`{k: v, …}` to `dict` (the same builder surface hash args use), so the engine,
+prelude, and compiler need no new machinery, and both nest freely
+(`[{tags: [1, 2]}]`). A dict key is a bare identifier or a quoted string; values
+are expressions. An empty `[]`/`{}` is `(list)`/`(dict)`. Under the `nonEmpty`
+rule an empty list **and** an empty dict are falsy.
+
+The lexer carves `[` `]` `{` `}` `,` as their own punctuation only in MaxBars
+(`lexOptions.collectionLiterals`). A *mid-identifier* `[seg]` — the `a.[home
+town]` path-bracket — is untouched; only a **leading** `[` opens a list. Mind the
+delimiter when a dict abuts the tag close: `{{#with {a: 1} }}` needs the space, as
+`}}}` would otherwise close the tag early.
+
 ## The variable model
 
 MaxBars has *no bare loop variables* and *no `@` namespace*

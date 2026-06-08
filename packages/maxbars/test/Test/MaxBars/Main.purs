@@ -423,4 +423,35 @@ main = do
     (obj [ Tuple "a" (obj [ Tuple "b" (VString "ok") ]) ])
     "ok"
 
+  -- collection literals: `[…]` ⇒ (list …), `{k: v}` ⇒ (dict …).
+  expectM "list literal: iterates its elements"
+    "{{#each [10, 20, 30]}}{{this}} {{/each}}"
+    (obj [])
+    "10 20 30 "
+  expectM "list literal: elements are full expressions"
+    "{{#each [1, n + 1, n * 2]}}{{this}} {{/each}}"
+    (obj [ Tuple "n" (num 5.0) ])
+    "1 6 10 "
+  expectM "list literal: empty []"
+    "[{{#each []}}x{{/each}}]"
+    (obj [])
+    "[]"
+  expectM "dict literal: bare-ident keys (note the space before }})"
+    "{{#with {name: who, age: 30} }}{{name}}/{{age}}{{/with}}"
+    (obj [ Tuple "who" (VString "Ada") ])
+    "Ada/30"
+  expectM "dict literal: a string key"
+    "{{#with {\"full name\": who} }}{{lookup this \"full name\"}}{{/with}}"
+    (obj [ Tuple "who" (VString "Ada L") ])
+    "Ada L"
+  expectM "collection literals nest"
+    "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}"
+    (obj [])
+    "12;3;"
+  -- a mid-identifier `[seg]` path-bracket is untouched (only a *leading* `[` is a list).
+  expectM "list literal: a.[k] path-bracket is not a list"
+    "{{ a.[home town] }}"
+    (obj [ Tuple "a" (obj [ Tuple "home town" (VString "Lübeck") ]) ])
+    "Lübeck"
+
   log "all MaxBars tests passed"

@@ -90,6 +90,8 @@ export const CORPUS = [
   { id: "interior-maxbars-operators", dialect: "maxbars", note: "MaxBars: `+`/`*` carve interior `operator` spans inside the one `expr` tag", src: "{{ a + b * c }}" },
   { id: "interior-maxbars-string-coalesce", dialect: "maxbars", note: "MaxBars: `??` carves an `operator` span and the quoted literal a `string` span", src: "{{ label ?? \"n/a\" }}" },
   { id: "interior-maxbars-range-op", dialect: "maxbars", note: "MaxBars: the glued `..` carves an `operator` span between two `number` spans (`rangeOperator`); a single `.` would stay path punctuation", src: "{{ 1..3 }}" },
+  { id: "interior-maxbars-list-literal", dialect: "maxbars", note: "MaxBars: a `[…]` list literal — the `[` `,` `]` punctuation stays the tag colour (like parens), only the `number` elements carve interior spans", src: "{{ [1, 2] }}" },
+  { id: "interior-maxbars-dict-literal", dialect: "maxbars", note: "MaxBars: a `{k: v}` dict literal — braces/comma stay the tag colour; the `:` carves an `operator` span and the value a `number` span", src: "{{ {a: 1} }}" },
   { id: "interior-number-in-block-arg", dialect: "fullbars", note: "a numeric literal in a block arg carves a `number` span; the tag stays `block-open`", src: "{{#if (gt qty 5)}}{{/if}}" },
   { id: "interior-kernel-path-punctuation", dialect: "fullbars", note: "OFF MaxBars, `a-b` is a path (no operator span) — the interior seam follows the dialect's `lexOptions`", src: "{{ a-b }}" },
   { id: "interior-partial-no-op", dialect: "fullbars", note: "a partial's leading `>` is the tag's meaning, never an interior `operator` span", src: "{{> row}}" },

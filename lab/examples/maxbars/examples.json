@@ -117,6 +117,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "collections",
+    "label": "Intermediate — Collection literals: [list] & {dict}",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "withBlock",
     "label": "Intermediate — With: re-root the context",
     "group": "Examples",

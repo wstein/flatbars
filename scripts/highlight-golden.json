@@ -870,6 +870,72 @@
       ]
     },
     {
+      "id": "interior-maxbars-list-literal",
+      "dialect": "maxbars",
+      "note": "MaxBars: a `[…]` list literal — the `[` `,` `]` punctuation stays the tag colour (like parens), only the `number` elements carve interior spans",
+      "src": "{{ [1, 2] }}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 12,
+          "kind": "expr"
+        }
+      ],
+      "tokens": [
+        {
+          "from": 0,
+          "to": 12,
+          "kind": "expr",
+          "role": "tag"
+        },
+        {
+          "from": 4,
+          "to": 5,
+          "kind": "number",
+          "role": "interior"
+        },
+        {
+          "from": 7,
+          "to": 8,
+          "kind": "number",
+          "role": "interior"
+        }
+      ]
+    },
+    {
+      "id": "interior-maxbars-dict-literal",
+      "dialect": "maxbars",
+      "note": "MaxBars: a `{k: v}` dict literal — braces/comma stay the tag colour; the `:` carves an `operator` span and the value a `number` span",
+      "src": "{{ {a: 1} }}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 12,
+          "kind": "expr"
+        }
+      ],
+      "tokens": [
+        {
+          "from": 0,
+          "to": 12,
+          "kind": "expr",
+          "role": "tag"
+        },
+        {
+          "from": 5,
+          "to": 6,
+          "kind": "operator",
+          "role": "interior"
+        },
+        {
+          "from": 7,
+          "to": 8,
+          "kind": "number",
+          "role": "interior"
+        }
+      ]
+    },
+    {
       "id": "interior-number-in-block-arg",
       "dialect": "fullbars",
       "note": "a numeric literal in a block arg carves a `number` span; the tag stays `block-open`",

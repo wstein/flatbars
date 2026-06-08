@@ -222,6 +222,12 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   other dialects keep `..` for the Handlebars `../` parent-path, already gone in
   MaxBars (ADR-021); `MaxBars.Expr` adds the parser rung between comparison and
   additive.
+  A third `LexOptions` knob — **`collectionLiterals`** (the `[…]` list / `{k: v}`
+  dict literals): **MaxBars only**. `[ ] { } ,` tokenize as their own punctuation, so
+  `MaxBars.Expr` parses a leading `[`/`{` atom into a `list`/`dict` prelude call
+  (pure sugar — no new engine/compiler machinery). A *mid-identifier* `[seg]` (the
+  `a.[k]` path-bracket) is untouched; only a leading `[` opens a list. Off elsewhere,
+  so `{`/`,` stay a lex error and `[…]` a path there.
   `check:parity` (in `npm test`) machine-checks that RawBars ≡ MaxBars — the exact
   `nonEmpty` falsy set and byte-identical rendering over a shared core corpus —
   modulo documented surface exceptions (the ADR-021 loop-variable model; the

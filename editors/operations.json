@@ -330,6 +330,14 @@
       "doc": "The number of items in the current loop."
     },
     {
+      "name": "list",
+      "kind": "inline",
+      "arity": "any",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Builds an array from its arguments (the `[…]` list-literal helper)."
+    },
+    {
       "name": "log",
       "kind": "inline",
       "arity": "≥1",

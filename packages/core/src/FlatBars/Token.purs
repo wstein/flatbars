@@ -38,6 +38,15 @@ data Token
   | TNum Number
   | TLParen
   | TRParen
+  -- collection-literal punctuation (`[…]` list, `{k: v}` dict, `,` separator) —
+  -- emitted only when `LexOptions.collectionLiterals` is on (MaxBars). A dialect
+  -- without it never sees these: `[` stays a path-segment opener, `{`/`,` a lex
+  -- error, exactly as before.
+  | TLBracket
+  | TRBracket
+  | TLBrace
+  | TRBrace
+  | TComma
   | TOp String
 
 derive instance eqToken :: Eq Token
@@ -49,6 +58,11 @@ instance showToken :: Show Token where
     TNum n -> "TNum " <> show n
     TLParen -> "TLParen"
     TRParen -> "TRParen"
+    TLBracket -> "TLBracket"
+    TRBracket -> "TRBracket"
+    TLBrace -> "TLBrace"
+    TRBrace -> "TRBrace"
+    TComma -> "TComma"
     TOp s -> "TOp " <> show s
 
 -- | A token with its source span: `at` is the start offset (used for located
@@ -84,12 +98,19 @@ type Interior = Either ParseError (Array PosToken)
 -- | while a single `.` stays an identifier char (dotted paths `a.b` are untouched).
 -- | Off by default — the dialects that keep the Handlebars `../` parent-path
 -- | (FullBars/RawBars) and MinBars leave `..` inside the identifier run.
-type LexOptions = { operatorChars :: String, rangeOperator :: Boolean }
+-- |
+-- | `collectionLiterals` opts in to the `[…]` list and `{k: v}` dict literals
+-- | (MaxBars): `[` `]` `{` `}` `,` tokenize as their own punctuation. Off by
+-- | default — a leading `[` then stays a path-segment opener (`[0]`), `{`/`,` a
+-- | lex error. A *mid-identifier* `[seg]` (the `a.[k]` path-bracket) is untouched
+-- | either way — only a leading `[` becomes a list opener.
+type LexOptions =
+  { operatorChars :: String, rangeOperator :: Boolean, collectionLiterals :: Boolean }
 
--- | The default: an empty operator set, no range operator — a path/name-only
--- | interior (`..` stays an identifier char, so `../x` parent-paths survive).
+-- | The default: an empty operator set, no range operator, no collection literals
+-- | — a path/name-only interior (`..`/`[`/`{` keep their path/literal-free meaning).
 defaultLexOptions :: LexOptions
-defaultLexOptions = { operatorChars: "", rangeOperator: false }
+defaultLexOptions = { operatorChars: "", rangeOperator: false, collectionLiterals: false }
 
 -- | The conventional infix-operator alphabet a dialect enables for an expression
 -- | surface: arithmetic `+ - * / %`, the ternary head `?`, and its `:` separator
@@ -131,6 +152,16 @@ tokenizeInterior cfg base src = go 0 []
           | isWs c -> go (i + 1) acc
           | c == '(' -> go (i + 1) (push acc TLParen i (i + 1))
           | c == ')' -> go (i + 1) (push acc TRParen i (i + 1))
+          -- collection-literal punctuation (MaxBars `collectionLiterals`): a leading
+          -- `[`/`{`/`,`/`}`/`]` is a list/dict token. A `]` always closes a list here
+          -- (never an ident char), but a *mid-identifier* `[seg]` is consumed by
+          -- `readIdent` below before this dispatch sees the `[`, so `a.[k]` paths and
+          -- `[…]` lists coexist.
+          | cfg.collectionLiterals && c == '[' -> go (i + 1) (push acc TLBracket i (i + 1))
+          | cfg.collectionLiterals && c == ']' -> go (i + 1) (push acc TRBracket i (i + 1))
+          | cfg.collectionLiterals && c == '{' -> go (i + 1) (push acc TLBrace i (i + 1))
+          | cfg.collectionLiterals && c == '}' -> go (i + 1) (push acc TRBrace i (i + 1))
+          | cfg.collectionLiterals && c == ',' -> go (i + 1) (push acc TComma i (i + 1))
           | c == '"' || c == '\'' -> readString i c acc
           -- operators (longest-match); `&` only as `&&`.
           | c == '&' -> if at (i + 1) == Just '&' then op2 "&&" i acc else bad i

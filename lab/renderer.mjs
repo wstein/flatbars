@@ -56,7 +56,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=78";
+} from "./vendor/flatbars-engine.mjs?v=79";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -139,6 +139,7 @@ const BB_CATALOG = [
   { name: "escapeJson", category: "output", arity: "inline", summary: "JSON + HTML-escape (for embedding in HTML).", example: "{{{ escapeJson this }}}" },
   { name: "dict", category: "data", arity: "inline", summary: "Build an object from key/value pairs (target of hash args).", example: "{{#if n (dict \"includeZero\" true)}}…{{/if}}" },
   { name: "partial", category: "composition", arity: "inline", summary: "Render a registered partial; block form gives a fallback + {{> @partial-block}}.", example: "{{> nav user}}" },
+  { name: "list", category: "collections", arity: "inline", summary: "Build an array from its arguments — the MaxBars […] list-literal helper.", example: "{{#each [\"a\", \"b\", \"c\"]}}{{this}}{{/each}}" },
   { name: "range", category: "collections", arity: "inline", summary: "The inclusive integer range [a, b] as an array (the basis for counted loops); capped to keep a huge range from hanging.", example: "{{#each (range 1 count)}}{{ loop.index1 }}{{/each}}" },
   { name: "cycle", category: "collections", arity: "inline", summary: "Pick from values by an index, wrapping — the pure take on Liquid's cycle (use the loop index).", example: "{{ cycle loop.index0 \"odd\" \"even\" }}" },
 ];

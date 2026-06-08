@@ -54,7 +54,7 @@ import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
 import Kernel.Env (RefEnv, constOperation, enterPartial, isScopedBinding, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName, withPartialFileScope)
-import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
+import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary, variadic)
 import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
 
@@ -338,6 +338,8 @@ primitiveOperationDefs =
   , withSynonym "count"
       (valDef "size" "The number of items in an array (or characters in a string)." (unary countH))
   , valDef "at" "The element at an index (negative counts from the end)." (binary atH)
+  , valDef "list" "Builds an array from its arguments (the `[…]` list-literal helper)."
+      (variadic (pure <<< VArray))
   , valDef "range" "The inclusive integer range [a, b] as an array (the `..` operator's helper)."
       (binary rangeH)
   , valDef "cycle"

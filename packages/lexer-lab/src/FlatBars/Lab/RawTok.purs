@@ -56,7 +56,10 @@ toRawToks cfg src =
   -- streams stay byte-identical over the `..`-free parity corpus. The Lab UI and
   -- the engine split `..` through MaxBars' own `lexOptions`.
   interiorAt base s = E.tokenizeInterior
-    { operatorChars: if cfg.infixArith then E.infixOperatorChars else "", rangeOperator: false }
+    { operatorChars: if cfg.infixArith then E.infixOperatorChars else ""
+    , rangeOperator: false
+    , collectionLiterals: false
+    }
     base
     s
 

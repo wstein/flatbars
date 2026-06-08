@@ -44,6 +44,7 @@
 | `key` | value | 0 | scoped | The current key when iterating an object. |
 | `last` | value | 0 | scoped | True on the loop's last iteration. |
 | `length` | value | 0 | scoped | The number of items in the current loop. |
+| `list` | value | any | registered | Builds an array from its arguments (the `[…]` list-literal helper). |
 | `log` | value | ≥1 | registered | Logs its arguments to the host and returns null. |
 | `lookup` | value | ≥1 | registered | Indexes a value by each key or index in turn, returning null at the first miss. |
 | `loop` | value | 0 | scoped | The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length, plus the chain links loop.parent (the enclosing loop) and loop.root. |

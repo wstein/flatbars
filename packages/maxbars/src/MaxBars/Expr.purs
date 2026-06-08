@@ -9,7 +9,8 @@
 -- | null-coalescing `??`→`coalesce`, the truthy-coalescing (Elvis) `?:`→
 -- | `firstTruthy`, arithmetic `+`/`-`/`*`/`/`/`%`→
 -- | `add`/`subtract`/`multiply`/`divide`/`modulo`, the inclusive range `a..b`→
--- | `(range a b)`, and `a | f x`→`(f a x)` (piped value first). Precedence
+-- | `(range a b)`, and `a | f x`→`(f a x)` (piped value first). Collection literals
+-- | are atoms: `[e1, …]`→`(list e1 …)` and `{k: v, …}`→`(dict "k" v …)`. Precedence
 -- | loosest→tightest: ternary (right-associative), pipe, `??`, `?:`, `||`, `&&`,
 -- | comparisons (non-associative), range `..` (non-associative), additive
 -- | (`+` `-`), multiplicative (`*` `/` `%`), prefix `!`, application/atom. (A
@@ -199,6 +200,12 @@ combinators toks =
       _ -> Left (LexError "expected )" (posAt r.pos))
     Just (TStr s) -> Right { val: Lit (VString s), pos: i + 1 }
     Just (TNum n) -> Right { val: Lit (VNumber n), pos: i + 1 }
+    -- collection literals (`collectionLiterals`): a `[…]` list desugars to the
+    -- `list` helper, a `{k: v}` dict to `dict` — both pure prelude calls, so the
+    -- engine and compiler need no new machinery. Elements/values are full
+    -- expressions, so they nest and take infix/pipes (`[1, a + 1, {x: b}]`).
+    Just TLBracket -> pList (i + 1)
+    Just TLBrace -> pDict (i + 1)
     Just (TIdent name)
       | isAtVar name -> Left (atVarError (posAt i))
       | otherwise -> Right { val: App name [], pos: i + 1 }
@@ -214,16 +221,55 @@ combinators toks =
       )
     _ -> Left (LexError "expected an expression" (posAt i))
 
-  -- application arguments: a run of atoms (paren / literal / nullary ident).
+  -- application arguments: a run of atoms (paren / literal / collection / nullary
+  -- ident), so `f [1, 2] {x: 1}` applies `f` to a list and a dict.
   pArgs :: Int -> Array Expr -> Either ParseError (Step (Array Expr))
   pArgs i acc = case tk i of
     Just TLParen -> pAtom i >>= \r -> pArgs r.pos (Array.snoc acc r.val)
+    Just TLBracket -> pAtom i >>= \r -> pArgs r.pos (Array.snoc acc r.val)
+    Just TLBrace -> pAtom i >>= \r -> pArgs r.pos (Array.snoc acc r.val)
     Just (TStr s) -> pArgs (i + 1) (Array.snoc acc (Lit (VString s)))
     Just (TNum n) -> pArgs (i + 1) (Array.snoc acc (Lit (VNumber n)))
     Just (TIdent name)
       | isAtVar name -> Left (atVarError (posAt i))
       | otherwise -> pArgs (i + 1) (Array.snoc acc (App name []))
     _ -> Right { val: acc, pos: i }
+
+  -- a `[…]` list literal (after the opening `[`): comma-separated full
+  -- expressions, desugaring to `(list e1 … en)`. A trailing comma is rejected; an
+  -- empty `[]` is `(list)`.
+  pList :: Int -> Either ParseError (Step Expr)
+  pList i = case tk i of
+    Just TRBracket -> Right { val: App "list" [], pos: i + 1 }
+    _ -> go i []
+    where
+    go j acc = exprLadder j >>= \e -> case tk e.pos of
+      Just TComma -> go (e.pos + 1) (Array.snoc acc e.val)
+      Just TRBracket -> Right { val: App "list" (Array.snoc acc e.val), pos: e.pos + 1 }
+      _ -> Left (LexError "expected ',' or ']' to continue the list literal" (posAt e.pos))
+
+  -- a `{k: v, …}` dict literal (after the opening `{`): comma-separated
+  -- `key: value` pairs (key = a bare identifier or a string), desugaring to
+  -- `(dict "k1" v1 …)`. An empty `{}` is `(dict)`.
+  pDict :: Int -> Either ParseError (Step Expr)
+  pDict i = case tk i of
+    Just TRBrace -> Right { val: App "dict" [], pos: i + 1 }
+    _ -> go i []
+    where
+    go j acc = key j >>= \k -> case tk k.pos of
+      Just (TOp ":") -> exprLadder (k.pos + 1) >>= \v ->
+        let
+          acc' = acc <> [ Lit (VString k.val), v.val ]
+        in
+          case tk v.pos of
+            Just TComma -> go (v.pos + 1) acc'
+            Just TRBrace -> Right { val: App "dict" acc', pos: v.pos + 1 }
+            _ -> Left (LexError "expected ',' or '}' to continue the dict literal" (posAt v.pos))
+      _ -> Left (LexError "expected ':' after a dict key" (posAt k.pos))
+    key j = case tk j of
+      Just (TIdent name) -> Right { val: name, pos: j + 1 }
+      Just (TStr s) -> Right { val: s, pos: j + 1 }
+      _ -> Left (LexError "expected a dict key (an identifier or a string)" (posAt j))
 
   binOp :: String -> String -> Token -> Maybe (Expr -> Expr -> Expr)
   binOp sym helper = case _ of

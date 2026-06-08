@@ -112,7 +112,7 @@ hlMax :: HighlightConfig
 hlMax =
   { lexConfig: defaultLexConfig { keepLongComments = true }
   , clauseSeps: [ "else", "elif" ]
-  , lexOptions: { operatorChars: infixOperatorChars, rangeOperator: true }
+  , lexOptions: { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
   , extras: false
   , inheritance: false
   , rawBlockHbs: false -- MaxBars: the `{{{{#name}}}}` FlatBars spelling only
