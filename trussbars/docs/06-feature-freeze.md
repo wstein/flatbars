@@ -1,6 +1,11 @@
 # Trussbars — v1 Feature Freeze
 
 > **Status:** Freeze candidate · **Audience:** the v2 proc-macro author.
+> **Rebaselined against current `develop`** (branch `feat/trussbars-rebaseline`):
+> develop's MaxBars dropped the `as |x|` loop form for Liquid binding
+> (`{{#each x in xs}}`) and shipped `{{#let}}` and list/dict literals. The
+> conformance harness is **39/39 byte-matched against develop** after the syntax
+> rebaseline; the freeze below reflects develop's *actual, frozen* surface.
 > **This document is the contract v2 targets.** v2 reimplements the emitter in
 > idiomatic Rust; it must accept exactly this surface and produce **byte-identical**
 > output (the conformance harness is the witness, docs/04). v2 *adds* mechanism
@@ -19,7 +24,7 @@ golden-pinned pages). Source of truth for "supported" is the v1 emitter
 | **Output** | `{{ x }}` (escaped), `{{{ x }}}` (raw), dotted paths `{{ a.b.c }}` |
 | **Reserved scope** | `this`, `root`, `parent`, `outer` (labelled loop), `loop`, `yield` |
 | **Conditionals** | `{{#if}}` / `{{else}}` / `{{#unless}}`; `else if` via the `elif` chain |
-| **Iteration** | `{{#each xs}}` over arrays **and** maps (`groupBy` result) — map iteration binds `loop.key`; block params `as |item|` / `as \|item i\|`; `{{else}}` empty arm |
+| **Iteration** | `{{#each xs}}` over arrays **and** maps (`groupBy` result) — map iteration binds `loop.key`; Liquid-style block binding `{{#each item in xs}}` / `{{#each item i in xs}}` (the `as \|…\|` form was removed on develop, ADR/commit `4729026`); `label NAME` after `in`; `{{else}}` empty arm |
 | **Loop metadata** | `loop.index0/index1/rindex0/rindex1/first/last/length/key`; `loop.parent` / `loop.root` chains; `outer` via `label NAME` |
 | **Context** | `{{#with obj}}` re-root (needs `#[derive(Trussbars)]` on `obj`'s type) |
 | **Operators (inline)** | `+ - * / %`, `== != < > <= >=`, `&& \|\| !`, `??` (coalesce), `?:` (first-truthy), `a ? b : c` (ternary) |
@@ -66,8 +71,8 @@ From the blog dogfood (`examples/blog/README.md`); each needs an explicit in/out
 | **F3** | **No host-helper registration** (`date`, `markdown`, `pluralize`, i18n `t` all `unsupported`). | **v2, IN** — design a *typed* host-helper convention (a trait or attribute the proc-macro resolves). The single highest-value addition; keeps "names static" (the helper name is still written in the template, only its impl is host-provided). |
 | **F6** | Generated module is hand-committed; a `.truss` typo is a Node error, not a `rustc` error at the call site. | **v2, IN (the motivation)** — compile-time codegen with diagnostics mapped to template spans (spike: docs/07). |
 | **F2** | A field compared to a numeric literal must be `f64`. | **v2, consider** — an integer-literal coercion rule so `views: i64` works with `> 100`. Small, optional. |
-| **F4** | `{{#let}}` does not parse (ADR-024). | **Open** — decide IN/OUT at freeze; re-piping is the current workaround. |
-| **F5** | No collection/`dict` literals (`{{#each (dict …)}}`). | **Deferred** — low value for typed hosts (build the collection in Rust); revisit for dashboard-style use. |
+| **F4** | `{{#let}}` — **develop shipped it** (block-scoped, sequential aliases; commit `7e3def9`). The blog/changelog dogfoods reported it "doesn't parse" against the *stale* surface; on current develop it parses. The **emitter** does not yet emit it. | **emitter gap, v2 IN** — no longer a language question; add `{{#let}}` to the emitter (sequential `let` bindings → Rust `let`s). |
+| **F5** | Collection / `dict` literals — **develop shipped them** (list `[…]`, dict `{k: v}`; commit `7974c29`). The emitter rejects `dict`/list literals (`neg-dict` stays excluded in the harness). | **emitter gap, v2 IN** — was wrongly "out by design"; the language has them, so the emitter should grow list/dict support (typed: a fixed-shape literal → a Rust array/struct). |
 | **F1** | Template path == Rust identifier (no rename). | **WONTFIX** — it *is* "names are static"; document only. |
 | **F7** | A **piped or bare multi-arg application used directly as an `{{#if}}`/`{{#unless}}` condition** is rejected ("options argument") — a `startsWith` applied to the subject fails as a bare condition head, whether written as a pipe or as a prefix call. **Workaround: parenthesize** the call — `{{#if (startsWith x "f")}}` works. Applications work in every position *except* a bare condition head. | **v2, IN (fix)** — the desugar should accept a piped/applied condition without the parens. Found via the changelog dogfood (`examples/changelog`); the parens form is the v1 workaround. |
 | **F8** | **Escaping is HTML-only.** `{{ }}` always HTML-escapes, so non-HTML output targets (markdown source, JSON, CSV) get entities — e.g. a commit subject `"x"` becomes `&quot;x&quot;`. Correct when the output is later HTML-rendered (GitHub markdown), literal otherwise. No per-target escaping policy. | **v2, consider** — a target-escape policy (HTML / none / JSON) selected per template, or keep HTML-only and document. Use raw `{{{ }}}` for trusted non-HTML output (XSS-unsafe if later HTML-rendered). Found via the changelog dogfood. |

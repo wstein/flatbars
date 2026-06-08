@@ -72,7 +72,7 @@ export const cases = [
   {
     id: "each-loopmeta",
     template:
-      "{{#each people as |p i|}}{{loop.index1}}. {{p.name}}{{#if loop.last}}!{{/if}} {{/each}}",
+      "{{#each p in people}}{{loop.index1}}. {{p.name}}{{#if loop.last}}!{{/if}} {{/each}}",
     data: { people: [{ name: "A" }, { name: "B" }, { name: "C" }] },
   },
   {
@@ -92,7 +92,7 @@ export const cases = [
     id: "nested-each-root",
     // Param name avoids the blessed-op collision (`t` is the translate operation).
     template:
-      "{{#each teams as |team|}}{{team.name}} ({{root.org}}): {{#each team.members}}{{this}} {{/each}}\n{{/each}}",
+      "{{#each team in teams}}{{team.name}} ({{root.org}}): {{#each team.members}}{{this}} {{/each}}\n{{/each}}",
     data: {
       org: "Acme",
       teams: [
@@ -128,13 +128,13 @@ export const cases = [
   {
     id: "loop-parent",
     template:
-      "{{#each rows as |row|}}{{#each row}}{{loop.parent.index0}}:{{this}} {{/each}}{{/each}}",
+      "{{#each row in rows}}{{#each row}}{{loop.parent.index0}}:{{this}} {{/each}}{{/each}}",
     data: { rows: [["a", "b"], ["c"]] },
   },
   {
     id: "loop-root",
     template:
-      "{{#each groups as |g|}}{{#each g}}{{loop.root.length}}/{{this}} {{/each}}{{/each}}",
+      "{{#each g in groups}}{{#each g}}{{loop.root.length}}/{{this}} {{/each}}{{/each}}",
     data: { groups: [["x"], ["y", "z"]] },
   },
 
@@ -142,7 +142,7 @@ export const cases = [
   {
     id: "parent-context",
     template:
-      "{{#each teams as |team|}}{{#each team.members}}{{parent.name}}={{this}} {{/each}}{{/each}}",
+      "{{#each team in teams}}{{#each team.members}}{{parent.name}}={{this}} {{/each}}{{/each}}",
     data: {
       teams: [
         { name: "T1", members: ["a", "b"] },
@@ -185,7 +185,7 @@ export const cases = [
   {
     id: "outer-label",
     template:
-      "{{#each rows as |row| label outer}}{{#each row}}{{outer.index1}}:{{this}} {{/each}}{{/each}}",
+      "{{#each row in rows label outer}}{{#each row}}{{outer.index1}}:{{this}} {{/each}}{{/each}}",
     data: { rows: [["a", "b"], ["c"]] },
   },
   {
