@@ -132,6 +132,23 @@ export const cases = [
     data: { price: 20, qty: 3, rate: 0.1 },
   },
 
+  // ── list literals `[…]` → a Rust array (homogeneous; rustc enforces) ──────────
+  {
+    id: "list-each-int",
+    template: "{{#each [1, 2, 3]}}{{this}} {{/each}}",
+    data: {},
+  },
+  {
+    id: "list-each-str",
+    template: '{{#each ["a", "b", "c"]}}#{{this}} {{/each}}',
+    data: {},
+  },
+  {
+    id: "list-count",
+    template: "{{[1, 2, 3, 4] | count}} items",
+    data: {},
+  },
+
   // ── loop.parent / loop.root chains (Option-threaded) ─────────────────────────
   {
     id: "loop-parent",

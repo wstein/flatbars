@@ -42,6 +42,19 @@ impl<T> Each for Vec<T> {
     }
 }
 
+// A fixed-size array — for in-template list literals (`[1, 2, 3]`), which the
+// codegen emits as a Rust array `[e, …]`. Delegates to the slice behaviour.
+impl<const N: usize, T> Each for [T; N] {
+    type Item = T;
+    #[inline]
+    fn each_len(&self) -> usize {
+        N
+    }
+    fn each(&self) -> impl Iterator<Item = (Option<&str>, &T)> {
+        self.iter().map(|v| (None, v))
+    }
+}
+
 impl<V> Each for BTreeMap<String, V> {
     type Item = V;
     #[inline]

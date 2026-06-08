@@ -469,6 +469,12 @@ expr env = case _ of
           <> be
           <> ").clone() } }"
       )
+  -- `[a, b, c]` (list literal) → a Rust array; `rustc` enforces homogeneity, so a
+  -- mixed-type list (`[1, "a"]`) is a compile error (out of the typed subset).
+  -- `Each`/`count` accept the array (the runtime impls a fixed array).
+  App "list" xs -> do
+    es <- traverse (expr env) xs
+    Right ("[" <> joinWith ", " es <> "]")
   App name args
     | Just r <- emitHelper env name args -> r
   App name [] -> case Map.lookup name env.params of
