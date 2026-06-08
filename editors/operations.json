@@ -82,14 +82,6 @@
       "doc": "The number of items in an array (or characters in a string)."
     },
     {
-      "name": "cycle",
-      "kind": "inline",
-      "arity": "≥2",
-      "source": "registered",
-      "canonical": null,
-      "doc": "Picks from its values by an index, wrapping: `cycle i a b …` ⇒ the `(i mod n)`-th value."
-    },
-    {
       "name": "date",
       "kind": "inline",
       "arity": "≥1",

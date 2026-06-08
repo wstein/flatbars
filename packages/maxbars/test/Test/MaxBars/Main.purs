@@ -385,7 +385,7 @@ main = do
   assert' "set-delim: `{{! @delimiters: …}}` directive is ignored — `<%name%>` stays content"
     (renderMax "{{! @delimiters: <% %> }}<%name%>" (obj []) == Right "<%name%>")
 
-  -- range + cycle (the Liquid-inspired iteration helpers).
+  -- range (the Liquid-inspired counted-loop helper).
   expectM "range: inclusive integer range as an array"
     "{{#each (range 1 4) as n}}{{n}}{{/each}}"
     (obj [])
@@ -394,10 +394,6 @@ main = do
     "[{{#each (range 4 1) as n}}{{n}}{{/each}}]"
     (obj [])
     "[]"
-  expectM "cycle: wraps over its values by the loop index"
-    "{{#each xs as x i}}{{ cycle i \"a\" \"b\" }}{{/each}}"
-    (obj [ Tuple "xs" (VArray [ VBool true, VBool true, VBool true ]) ])
-    "aba"
   assert' "range: a span past the budget is a located error"
     (isLeft (renderMax "{{#each (range 1 200000) as n}}{{n}}{{/each}}" (obj [])))
 

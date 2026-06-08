@@ -19,7 +19,6 @@ export const OPERATION_NAMES = [
   "ceil",
   "coalesce",
   "count",
-  "cycle",
   "date",
   "dict",
   "divide",

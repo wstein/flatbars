@@ -347,9 +347,6 @@ primitiveOperationDefs =
       (variadic (pure <<< VArray))
   , valDef "range" "The inclusive integer range [a, b] as an array (the `..` operator's helper)."
       (binary rangeH)
-  , valDef "cycle"
-      "Picks from its values by an index, wrapping: `cycle i a b …` ⇒ the `(i mod n)`-th value."
-      (atLeast 2 cycleH)
   , valDef "take" "The first n elements of an array." (binary takeH)
   , valDef "takeRight" "The last n elements of an array." (binary takeRightH)
   , valDef "reverse" "Reverses an array or string." (unary reverseH)
@@ -982,17 +979,6 @@ rangeH a b = do
           ("range: " <> show (hi - lo + 1) <> " elements exceed the limit of " <> show rangeBudget)
       )
   else pure (VArray (map (VNumber <<< Int.toNumber) (Array.range lo hi)))
-
--- | `cycle i a b c …` → the value at `i mod n` over the `n` values (positive
--- | wrap), so `{{ cycle loop.index0 "odd" "even" }}` alternates per iteration —
--- | the pure, index-driven take on Liquid's stateful `cycle` tag.
-cycleH :: forall m. MonadThrow Error m => Array Value -> m Value
-cycleH args = case Array.uncons args of
-  Just { head: iv, tail: vals } | not (Array.null vals) -> do
-    i <- asInt iv
-    let n = Array.length vals
-    pure (fromMaybe VNull (Array.index vals (mod (mod i n + n) n)))
-  _ -> throwError (ArityError "cycle: expected an index followed by at least one value")
 
 -- | `take arr n` / `takeRight arr n` → `VArray`: the first / last `n` elements
 -- | (clamped to `[0, length]`). `n` reads via the strict `asInt` guard. A
