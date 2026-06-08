@@ -103,6 +103,30 @@ export const examples = {
     },
   },
 
+  filters: {
+    engine: "maxbars",
+    label: "Intermediate — Collection filters (where / find / some)",
+    // Key-based filters (ADR-036/037), pipe-able like any collection op. `where`
+    // keeps items by a field: truthy (`"inStock"`), or a comparator + value
+    // (`"price" "<=" 100`). The comparator is a name (`lte`) or its glyph alias
+    // (`<=`) — the same operator you write infix. `find` returns the first match;
+    // `some` tests membership (`includes` is array-membership or substring). No
+    // lambdas — you filter by a key, not an arbitrary predicate (ADR-020).
+    template:
+      "In stock under 100:\n" +
+      "{{#each p in (products | where \"inStock\" | where \"price\" \"<=\" 100)}}- {{p.name}} ({{p.price}})\n{{/each}}" +
+      "Premium pick: {{lookup (products | find \"price\" \">\" 100) \"name\"}}\n" +
+      "Has a sale tag? {{#if (products | some \"tags\" \"includes\" \"sale\")}}yes{{else}}no{{/if}}",
+    data: {
+      products: [
+        { name: "Keyboard", price: 45, inStock: true, tags: ["new"] },
+        { name: "Monitor", price: 220, inStock: true, tags: ["sale", "pro"] },
+        { name: "Mouse", price: 25, inStock: false, tags: ["sale"] },
+        { name: "Webcam", price: 70, inStock: true, tags: [] },
+      ],
+    },
+  },
+
   defaults: {
     engine: "maxbars",
     label: "Intermediate — Defaults: ?? ?: and ternary",

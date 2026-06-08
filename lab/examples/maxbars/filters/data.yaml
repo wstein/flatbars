@@ -1,0 +1,21 @@
+products:
+  - name: Keyboard
+    price: 45
+    inStock: true
+    tags:
+      - new
+  - name: Monitor
+    price: 220
+    inStock: true
+    tags:
+      - sale
+      - pro
+  - name: Mouse
+    price: 25
+    inStock: false
+    tags:
+      - sale
+  - name: Webcam
+    price: 70
+    inStock: true
+    tags: []

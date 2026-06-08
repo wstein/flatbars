@@ -63,6 +63,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "filters",
+    "label": "Intermediate — Collection filters (where / find / some)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "defaults",
     "label": "Intermediate — Defaults: ?? ?: and ternary",
     "group": "Examples",

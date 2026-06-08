@@ -27,6 +27,7 @@ const groups = [
       { href: "#reference", label: "Surface reference" },
       { href: "#operators", label: "Operators" },
       { href: "#pipes", label: "Pipes" },
+      { href: "#filters", label: "Filters" },
       { href: "#identity", label: "The identity" },
       { href: "#loops", label: "Loop variables" },
       { href: "#inherited", label: "From FullBars" },
@@ -192,6 +193,32 @@ const t = (s) => s;
       <a href={`${SPEC_BASE}engine/prelude/`}>prelude catalog</a> (here <code>pluck</code>,
       <code>join</code>, <code>uppercase</code>, <code>toFixed</code>) — or one a host
       registers. The pipe doesn't add helpers; it's a second way to call them.
+    </p>
+  </section>
+
+  <!-- ─────────────────────── Collection filters ────────────────────── -->
+  <section id="filters">
+    <h2>Collection filters</h2>
+    <p>
+      The most-reached-for transform — keeping only the rows you want — is five
+      pipe-able operations: <code>where</code> / <code>reject</code> /
+      <code>find</code> / <code>some</code> / <code>every</code>. Each filters by a
+      <b>key</b>: <code>{t('where "inStock"')}</code> keeps items whose field is
+      truthy; <code>{t('where "price" "<=" 100')}</code> keeps them by a comparator
+      and value. The comparator is a name (<code>lte</code>) or its glyph alias
+      (<code>&lt;=</code>) — the same operator you write infix — plus the string
+      predicates <code>startsWith</code> / <code>endsWith</code> / <code>includes</code>
+      (here <code>includes</code> tests array membership). <code>find</code> returns
+      the first match; <code>some</code> / <code>every</code> are booleans for an
+      <code>{t("{{#if}}")}</code>.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.filters.template} data={ex.filters.data} />
+    <p class="tip">
+      There are <b>no lambdas</b> (<a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>):
+      you filter by a key, not an arbitrary predicate. For
+      <code>{t('where "price" > 50')}</code>-style code over each element, nest
+      <code>{t("{{#each}}")}</code> + <code>{t("{{#if}}")}</code>, or shape the data
+      first with <a href="/transform">JSONata</a>.
     </p>
   </section>
 
