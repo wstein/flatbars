@@ -37,7 +37,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadThrow, throwError)
 import Data.Array as Array
-import Data.Either (Either)
+import Data.Either (Either, either)
 import Data.Int as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
@@ -1114,11 +1114,17 @@ filterElems = case _ of
 -- | a condition. An incomparable pair (mixed type, null, bool, array, object) is
 -- | `false` for the ordering comparators (`maybe false`), never silently kept.
 -- |
--- | Each comparator also answers to its **glyph alias** — `==` `!=` `<` `<=` `>`
--- | `>=` — so a MaxBars author can write the same operator they use infix
--- | (`score > 50`) as the filter's comparator string (`"score" ">" 50`). The name
--- | is canonical (catalog, error text); the glyph is an accepted synonym, exactly
--- | as `size`≡`count` / `isnt`≡`ne` elsewhere in the prelude.
+-- | The relational comparators also answer to their **glyph alias** — `==` `!=`
+-- | `<` `<=` `>` `>=` — so a MaxBars author can write the same operator they use
+-- | infix (`score > 50`) as the filter's comparator string (`"score" ">" 50`). The
+-- | name is canonical (catalog, error text); the glyph is an accepted synonym,
+-- | exactly as `size`≡`count` / `isnt`≡`ne` elsewhere in the prelude.
+-- |
+-- | The three **string-predicate** comparators — `startsWith` / `endsWith` /
+-- | `includes` — mirror the standalone string operations, but are **total** like
+-- | the relational ones: a non-stringifiable operand (an object) makes them
+-- | `false`, never an error mid-filter. `includes` is polymorphic on the field:
+-- | array ⇒ element membership, string ⇒ substring.
 comparatorByName :: String -> Maybe (Value -> Value -> Boolean)
 comparatorByName = case _ of
   "eq" -> Just (==)
@@ -1133,9 +1139,19 @@ comparatorByName = case _ of
   "<=" -> Just (orderPred (_ /= GT))
   "gte" -> Just (orderPred (_ /= LT))
   ">=" -> Just (orderPred (_ /= LT))
+  "startsWith" -> Just (strPred \field x -> hasAffix CodeUnits.stripPrefix x field)
+  "endsWith" -> Just (strPred \field x -> hasAffix CodeUnits.stripSuffix x field)
+  "includes" -> Just includesPred
   _ -> Nothing
   where
   orderPred ok a b = maybe false ok (compareValues a b)
+  strOf v = either (const Nothing) Just (stringify v)
+  strPred test a b = fromMaybe false (test <$> strOf a <*> strOf b)
+  hasAffix strip affix str = maybe false (const true) (strip (Pattern affix) str)
+  includesPred a b = case a of
+    VArray xs -> Array.elem b xs
+    VString s -> maybe false (\x -> String.contains (Pattern x) s) (strOf b)
+    _ -> false
 
 -- | Parse the shared `coll key [cmp] [value]` arguments and apply `combine` to the
 -- | element-keep predicate and the subject's elements. The keep predicate is the
@@ -1159,7 +1175,8 @@ runFilter truthyF name args combine = case args of
       Nothing -> throwError
         ( HelperError
             ( name <> ": unknown comparator " <> show cmpName
-                <> "; expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>="
+                <>
+                  "; expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>=, startsWith, endsWith, includes"
             )
         )
   _ -> throwError

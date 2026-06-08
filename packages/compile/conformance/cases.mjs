@@ -379,6 +379,18 @@ export const cases = [
   { name: "arr-where-glyph-ne", dialect: "surface", t: "{{#each (where xs \"tier\" \"!=\" \"gold\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", tier: "gold" }, { n: "b", tier: "silver" }] } },
   { name: "arr-some-glyph-eq", dialect: "surface", t: "{{#if (some xs \"id\" \"==\" 2)}}y{{else}}n{{/if}}", d: { xs: [{ id: 1 }, { id: 2 }] } },
   { name: "arr-where-glyph-le", dialect: "maxbars", t: "{{#each x in (xs | where \"v\" \"<=\" 2)}}{{ x.v }};{{/each}}", d: { xs: [{ v: 1 }, { v: 2 }, { v: 3 }] } },
+  // string-predicate comparators (ADR-037): startsWith/endsWith on strings,
+  // includes polymorphic (string substring / array membership).
+  { name: "arr-where-startsWith", dialect: "surface", t: "{{#each (where xs \"name\" \"startsWith\" \"Dr\")}}{{ name }};{{/each}}", d: { xs: [{ name: "Dr Ada" }, { name: "Mr Lin" }, { name: "Dr Bo" }] } },
+  { name: "arr-where-endsWith", dialect: "surface", t: "{{#each (where xs \"file\" \"endsWith\" \".md\")}}{{ file }};{{/each}}", d: { xs: [{ file: "a.md" }, { file: "b.txt" }, { file: "c.md" }] } },
+  { name: "arr-where-includes-str", dialect: "surface", t: "{{#each (where xs \"slug\" \"includes\" \"sale\")}}{{ slug }};{{/each}}", d: { xs: [{ slug: "summer-sale" }, { slug: "new-in" }, { slug: "flash-sale-x" }] } },
+  { name: "arr-where-includes-arr", dialect: "surface", t: "{{#each (where xs \"tags\" \"includes\" \"vip\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", tags: ["vip", "new"] }, { n: "b", tags: ["new"] }, { n: "c", tags: ["vip"] }] } },
+  { name: "arr-some-startsWith", dialect: "surface", t: "{{#if (some xs \"code\" \"startsWith\" \"4\")}}y{{else}}n{{/if}}", d: { xs: [{ code: "200" }, { code: "404" }] } },
+  { name: "arr-find-includes", dialect: "maxbars", t: "{{ lookup (rows | find \"tags\" \"includes\" \"vip\") \"n\" }}", d: { rows: [{ n: "a", tags: ["new"] }, { n: "b", tags: ["vip"] }] } },
+  // a non-stringifiable field (an object) is total-false, never an error mid-filter
+  // (a number field would stringify — 404 ⇒ "404" — and is not the total path).
+  { name: "arr-where-startsWith-obj", dialect: "surface", t: "[{{ count (where xs \"name\" \"startsWith\" \"x\") }}]", d: { xs: [{ name: { sub: 1 } }, { name: "xy" }] } },
+  { name: "arr-where-startsWith-num", dialect: "surface", t: "{{#each (where xs \"code\" \"startsWith\" \"4\")}}{{ code }};{{/each}}", d: { xs: [{ code: 404 }, { code: 200 }] } },
 
   // MaxBars infix arithmetic + `??` operators (desugar to the prelude helpers;
   // the compiled path and the interpreter must agree).

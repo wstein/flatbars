@@ -67,20 +67,27 @@ returns the first match or `null`; `some` / `every` reduce to booleans.
 
 ### 2. The comparator is a closed, named set
 
-`cmp` ∈ the canonical names **`eq` `ne` `lt` `gt` `lte` `gte`** — the same names as
-the standalone comparison operations — each also answering to its **glyph alias**
-**`==` `!=` `<` `<=` `>` `>=`**, dispatched through one table (`comparatorByName`
-in the interpreter, `COMPARATORS` in the runtime):
+`cmp` is a member of a **closed set**, dispatched through one table
+(`comparatorByName` in the interpreter, `COMPARATORS` in the runtime):
 
-* `eq` / `ne` (`==` / `!=`) are the engine's value equality (the deep `==` the
-  3-arg form uses);
-* `lt` / `gt` / `lte` / `gte` (`<` / `>` / `<=` / `>=`) delegate to `compareValues`
-  — numeric or lexicographic; an **incomparable** pair (mixed type, `null`,
-  boolean, array, object) is **`false`**, never silently kept.
+* **Relational** — the canonical names **`eq` `ne` `lt` `gt` `lte` `gte`** (the same
+  names as the standalone comparison operations), each also answering to its
+  **glyph alias** **`==` `!=` `<` `<=` `>` `>=`**:
+  * `eq` / `ne` (`==` / `!=`) are the engine's value equality (the deep `==` the
+    3-arg form uses);
+  * `lt` / `gt` / `lte` / `gte` (`<` / `>` / `<=` / `>=`) delegate to
+    `compareValues` — numeric or lexicographic; an **incomparable** pair (mixed
+    type, `null`, boolean, array, object) is **`false`**, never silently kept.
+* **String-predicate** — **`startsWith` `endsWith` `includes`** (the *amendment*
+  below), mirroring the standalone string operations but **total**: a
+  non-stringifiable operand (an object) is `false`, never an error mid-filter.
+  `includes` is polymorphic on the field — an array ⇒ element membership, a string
+  ⇒ substring. These have **no glyph alias** (there is no infix operator to match).
 
 An **unknown comparator is a located error** (`where: unknown comparator "between";
-expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>=`), not a silently-true
-filter — so a typo fails loudly instead of returning everything.
+expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>=, startsWith, endsWith,
+includes`), not a silently-true filter — so a typo fails loudly instead of
+returning everything.
 
 ### 3. Names are canonical; glyphs are accepted aliases — but the set is closed
 
@@ -100,9 +107,9 @@ filter — so a typo fails loudly instead of returning everything.
   argument "any of ~100 operation names", most of which are not booleans, so a typo
   or a category mistake (`where xs "k" "uppercase" v`) becomes a *silently-truthy*
   filter rather than a clean error. The comparator stays a **fixed set of six**,
-  every member a boolean by construction. String-predicate filtering, if it is ever
-  wanted, is a *deliberate new member* of this same closed set under its own ADR —
-  not a wildcard into the registry.
+  every member a boolean by construction. String-predicate filtering is added as a
+  *deliberate, closed* extension (the three named predicates in §2 and the amendment
+  below) — **not** a wildcard into the registry.
 
 ## Consequences
 
@@ -126,9 +133,37 @@ filter — so a typo fails loudly instead of returning everything.
 * No `where` *clause* / head sugar — the pipe already expresses it
   ([ADR-021](/adr/adr-0021-maxbars-variable-model/) froze the binding surface).
 
+## Amendment (2026-06-08): string-predicate comparators
+
+*Status:* Accepted — *implemented* (same day; `test:compile` byte-identical). The
+open question below is resolved by *adopting* it: the closed comparator set gains
+three **string-predicate** members — **`startsWith`** / **`endsWith`** /
+**`includes`** — so a template can filter by prefix, suffix, or membership without
+precomputing a flag:
+
+```handlebars
+{{#each u in (users | where "name" "startsWith" "Dr") }}…{{/each}}
+{{#each f in (files | where "path" "endsWith" ".md") }}…{{/each}}
+{{#each p in (posts | where "tags" "includes" "vip") }}…{{/each}}   {{!-- array membership --}}
+{{#each p in (posts | where "slug" "includes" "sale") }}…{{/each}}  {{!-- string substring --}}
+```
+
+This is the *deliberate closed extension* §3 anticipated — three named, boolean-by-
+construction predicates, **not** a registry wildcard. They reuse the standalone
+`startsWith` / `endsWith` / `includes` semantics with one principled change: as
+comparators they are **total** (a non-stringifiable operand — an object — is
+`false`), mirroring the relational comparators' "incomparable ⇒ `false`" rather than
+erroring mid-filter. `includes` stays polymorphic on the *field* — array ⇒ element
+membership by value equality, plain string ⇒ substring (a `VSafe` field is not a
+plain string, so it is `false`, exactly as the interpreter's `case` matches). They
+carry **no glyph alias** — there is no infix operator to mirror. The interpreter's
+`comparatorByName` and the runtime's `COMPARATORS` gain the same three entries (the
+runtime's `strSafe` mirrors `either (const Nothing) Just ∘ stringify`), and
+`test:compile` gains cases for each — byte-identical.
+
 ## Open questions
 
-* *String-predicate comparators* (`startsWith` / `includes` / `endsWith` as filter
-  comparators). Expressible within this design as new members of the closed set, but
-  not shipped — revisit only if real templates ask for case-insensitive or
-  substring filtering that `eq` cannot serve.
+* *Case-insensitive / regex string predicates* — `startsWithI`, a `matches`
+  comparator. Out of scope; revisit only if templates need matching that the three
+  exact predicates cannot serve. The closed-set discipline holds: any such addition
+  is a named member, never a wildcard.

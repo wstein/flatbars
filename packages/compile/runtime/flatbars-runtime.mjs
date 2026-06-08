@@ -173,18 +173,33 @@ const cmpLt = (a, b) => { const o = orderOf(a, b); return o !== null && o < 0; }
 const cmpGt = (a, b) => { const o = orderOf(a, b); return o !== null && o > 0; };
 const cmpLe = (a, b) => { const o = orderOf(a, b); return o !== null && o <= 0; };
 const cmpGe = (a, b) => { const o = orderOf(a, b); return o !== null && o >= 0; };
+// string-predicate comparators (ADR-037): total like the relational ones — a
+// non-stringifiable operand (object) is false, never a throw. strSafe mirrors the
+// interpreter's `either (const Nothing) Just (stringify v)`. `includes` is
+// polymorphic on the field (array ⇒ membership, plain string ⇒ substring), matching
+// the interpreter's `case a of VArray … ; VString … ; _ -> false` (a VSafe field is
+// not a plain string here, so it is false — exactly as the interpreter).
+const strSafe = (v) => { try { return stringify(v); } catch { return null; } };
+const cmpStarts = (a, b) => { const f = strSafe(a), x = strSafe(b); return f !== null && x !== null && f.startsWith(x); };
+const cmpEnds = (a, b) => { const f = strSafe(a), x = strSafe(b); return f !== null && x !== null && f.endsWith(x); };
+const cmpIncludes = (a, b) => {
+  if (Array.isArray(a)) return a.some((el) => deepEq(el, b));
+  if (typeof a === "string") { const x = strSafe(b); return x !== null && a.includes(x); }
+  return false;
+};
 // Null-proto so a key like "constructor"/"toString" can't resolve to an inherited
 // function (which would diverge from the interpreter's "unknown comparator" error).
 const COMPARATORS = Object.assign(Object.create(null), {
   eq: cmpEq, "==": cmpEq, ne: cmpNe, "!=": cmpNe,
   lt: cmpLt, "<": cmpLt, gt: cmpGt, ">": cmpGt,
   lte: cmpLe, "<=": cmpLe, gte: cmpGe, ">=": cmpGe,
+  startsWith: cmpStarts, endsWith: cmpEnds, includes: cmpIncludes,
 });
 function keepBy(a, f) {
   const key = stringify(a[1]);
   if (a.length >= 4) {
     const cmpName = stringify(a[2]), cmpFn = COMPARATORS[cmpName];
-    if (!cmpFn) throw new Error(`unknown comparator ${JSON.stringify(cmpName)}; expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>=`);
+    if (!cmpFn) throw new Error(`unknown comparator ${JSON.stringify(cmpName)}; expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>=, startsWith, endsWith, includes`);
     return (el) => cmpFn(pathOf(el, key), a[3]);
   }
   return a.length >= 3

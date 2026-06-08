@@ -385,6 +385,40 @@ main = do
   expectS "p-where-glyph-gte" "{{#each (where xs \"score\" \">=\" 50)}}{{ n }};{{/each}}" scored
     "a;c;"
   expectS "p-where-glyph-lt" "{{#each (where xs \"score\" \"<\" 50)}}{{ n }};{{/each}}" scored "b;"
+  -- string-predicate comparators (ADR-037): startsWith/endsWith on strings;
+  -- includes polymorphic (string substring / array membership); total on objects.
+  expectS "p-where-startsWith"
+    "{{#each (where xs \"name\" \"startsWith\" \"Dr\")}}{{ name }};{{/each}}"
+    (xsObj [ obj [ Tuple "name" (str "Dr Ada") ], obj [ Tuple "name" (str "Mr Lin") ] ])
+    "Dr Ada;"
+  expectS "p-where-endsWith"
+    "{{#each (where xs \"file\" \"endsWith\" \".md\")}}{{ file }};{{/each}}"
+    (xsObj [ obj [ Tuple "file" (str "a.md") ], obj [ Tuple "file" (str "b.txt") ] ])
+    "a.md;"
+  expectS "p-where-includes-str"
+    "{{#each (where xs \"slug\" \"includes\" \"sale\")}}{{ slug }};{{/each}}"
+    (xsObj [ obj [ Tuple "slug" (str "summer-sale") ], obj [ Tuple "slug" (str "new-in") ] ])
+    "summer-sale;"
+  expectS "p-where-includes-arr"
+    "{{#each (where xs \"tags\" \"includes\" \"vip\")}}{{ n }};{{/each}}"
+    ( xsObj
+        [ obj [ Tuple "n" (str "a"), Tuple "tags" (arr [ str "vip", str "new" ]) ]
+        , obj [ Tuple "n" (str "b"), Tuple "tags" (arr [ str "new" ]) ]
+        ]
+    )
+    "a;"
+  -- a number field stringifies (404 ⇒ "404"); an object field is total-false.
+  expectS "p-where-startsWith-num"
+    "{{#each (where xs \"code\" \"startsWith\" \"4\")}}{{ code }};{{/each}}"
+    (xsObj [ obj [ Tuple "code" (VNumber 404.0) ], obj [ Tuple "code" (VNumber 200.0) ] ])
+    "404;"
+  expectS "p-where-startsWith-obj" "{{{ count (where xs \"name\" \"startsWith\" \"x\") }}}"
+    ( xsObj
+        [ obj [ Tuple "name" (obj [ Tuple "sub" (VNumber 1.0) ]) ]
+        , obj [ Tuple "name" (str "xy") ]
+        ]
+    )
+    "1"
   -- an unknown comparator is a located error, never a silently-true filter.
   expectSError "p-where-bad-cmp" "{{ where xs \"score\" \"between\" 50 }}" "unknown comparator"
 
