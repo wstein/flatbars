@@ -94,12 +94,29 @@ export const cases = [
     },
   },
 
-  // ── negatives: outside the slice (oracle renders; emitter excludes) ──────────
+  // ── integer-argument string/array helpers ───────────────────────────────────
+  { id: "slice", template: "{{greeting | slice 0 5}}", data: { greeting: "Hello World" } },
   {
-    id: "neg-slice-helper",
-    template: "{{greeting | slice 0 5}}",
-    data: { greeting: "Hello World" },
+    id: "truncate",
+    template: "{{title | truncate 5}}",
+    data: { title: "Hello World" },
   },
+  { id: "count", template: "{{items | count}} items", data: { items: ["a", "b", "c"] } },
+  { id: "at-negative", template: "last = {{nums | at -1}}", data: { nums: [10, 20, 30] } },
+  { id: "join", template: "{{tags | join \", \"}}", data: { tags: ["a", "b", "c"] } },
+
+  // ── number pack ──────────────────────────────────────────────────────────────
+  { id: "round", template: "{{ratio | round}}", data: { ratio: 3.7 } },
+  { id: "to-fixed", template: "${{price | toFixed 2}}", data: { price: 3.5 } },
+
+  // ── ternary ──────────────────────────────────────────────────────────────────
+  {
+    id: "ternary",
+    template: '{{count > 0 ? "in stock" : "sold out"}}',
+    data: { count: 5 },
+  },
+
+  // ── negative: outside the slice (oracle renders; emitter excludes) ───────────
   {
     id: "neg-coalesce",
     template: "{{nickname ?? name}}",

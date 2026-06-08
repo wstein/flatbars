@@ -15,10 +15,13 @@
 -- | **Scope (vertical slice).** Implemented: content, escaped/raw output, paths,
 -- | `this`/`root`/`loop`, block params, `if`/`unless`/`elif`/`else`, `each`
 -- | (+ loop metadata, block params, empty clause), `with`, the comparison /
--- | logic / arithmetic operators, and the string helper pack. Anything else
--- | (partials, inline, yield, raw blocks, `parent`/`outer` chains, the
--- | integer-argument and array/number helpers, `??`/`?:`/ternary, `dict`) returns
--- | a `Left` "unsupported …" so the conformance harness excludes it honestly.
+-- | logic / arithmetic operators, the `ternary` (`? :`), and the full value-helper
+-- | pack — string (incl. integer-argument `slice`/`truncate`), number
+-- | (`abs`/`round`/`toFixed`/…), and array (`join`/`count`/`at`/`take`/…). Anything
+-- | else (partials, inline, yield, raw blocks, `parent`/`outer` and `loop.parent`
+-- | chains, the Option-typed coalescers `??`/`?:`, the key-path `pluck`/`sortBy`/
+-- | `groupBy`, `dict`) returns a `Left` "unsupported …" so the conformance harness
+-- | excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -34,6 +37,7 @@ import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (foldMap)
+import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
@@ -283,10 +287,14 @@ expr env = case _ of
   App "safe" [ a ] -> do
     ae <- expr env a
     Right ("trussbars_std::safe(&(" <> ae <> "))")
+  -- `cond ? a : b` — a native `if`-expression; the two arms must unify (Rust checks).
+  App "ternary" [ c, a, b ] -> do
+    ce <- expr env c
+    ae <- expr env a
+    be <- expr env b
+    Right ("(if trussbars_core::truthy(&(" <> ce <> ")) { " <> ae <> " } else { " <> be <> " })")
   App name args
-    | Just fn <- Map.lookup name stdStringHelpers -> do
-        es <- traverse (expr env) args
-        Right ("trussbars_std::" <> fn <> "(" <> joinWith ", " (map (\s -> "&(" <> s <> ")") es) <> ")")
+    | Just r <- emitHelper env name args -> r
   App name [] -> case Map.lookup name env.params of
     Just v -> Right v
     Nothing -> Left ("unsupported: expression head '" <> name <> "'")
@@ -328,25 +336,74 @@ path env args = case Array.uncons args of
     Lit (VString k) -> Right ("." <> k)
     _ -> Left "unsupported: computed lookup (a data-derived field name, spec §4.3)"
 
--- Desugar names → `trussbars_std` function names. Only helpers whose arguments are
--- all text (no integer index) are in the slice.
-stdStringHelpers :: Map String String
-stdStringHelpers = Map.fromFoldable
-  [ Tuple "uppercase" "uppercase"
-  , Tuple "lowercase" "lowercase"
-  , Tuple "capitalize" "capitalize"
-  , Tuple "trim" "trim"
-  , Tuple "trimStart" "trim_start"
-  , Tuple "trimEnd" "trim_end"
-  , Tuple "append" "append"
-  , Tuple "prepend" "prepend"
-  , Tuple "replace" "replace"
-  , Tuple "split" "split"
-  , Tuple "includes" "includes"
-  , Tuple "startsWith" "starts_with"
-  , Tuple "endsWith" "ends_with"
-  , Tuple "reverse" "reverse"
-  ]
+-- Argument-passing conventions for a `trussbars_std` value helper.
+data ArgKind
+  = Ref -- `&(expr)`: a text subject/argument, or a slice/`Vec` (deref-coerced)
+  | Num -- `(expr)`: an `f64` by value (the number pack)
+  | IntArg -- an `i64` index/count (a literal → integer; otherwise `(expr as i64)`)
+
+-- Emit a homogeneous value helper as a `trussbars_std::<fn>(…)` call. `Nothing`
+-- means "not a known value helper" — the caller falls through. The string pack,
+-- the integer-index helpers (slice/at/take/…), and the number pack are covered;
+-- the key-path helpers (sort_by/pluck/group_by) and the Option-typed coalescers
+-- (`??`/`?:`) are not (out of the slice).
+emitHelper :: Env -> Ident -> Array Expr -> Maybe (Either String String)
+emitHelper env name args = case name of
+  "uppercase" -> call "uppercase" [ Ref ]
+  "lowercase" -> call "lowercase" [ Ref ]
+  "capitalize" -> call "capitalize" [ Ref ]
+  "trim" -> call "trim" [ Ref ]
+  "trimStart" -> call "trim_start" [ Ref ]
+  "trimEnd" -> call "trim_end" [ Ref ]
+  "append" -> call "append" [ Ref, Ref ]
+  "prepend" -> call "prepend" [ Ref, Ref ]
+  "replace" -> call "replace" [ Ref, Ref, Ref ]
+  "split" -> call "split" [ Ref, Ref ]
+  "includes" -> call "includes" [ Ref, Ref ]
+  "startsWith" -> call "starts_with" [ Ref, Ref ]
+  "endsWith" -> call "ends_with" [ Ref, Ref ]
+  "reverse" -> call "reverse" [ Ref ]
+  "slice"
+    | arity == 3 -> call "slice_range" [ Ref, IntArg, IntArg ]
+    | otherwise -> call "slice" [ Ref, IntArg ]
+  "truncate"
+    | arity == 3 -> call "truncate_with" [ Ref, IntArg, Ref ]
+    | otherwise -> call "truncate" [ Ref, IntArg ]
+  "abs" -> call "abs" [ Num ]
+  "floor" -> call "floor" [ Num ]
+  "ceil" -> call "ceil" [ Num ]
+  "round" -> call "round" [ Num ]
+  "toFixed" -> call "to_fixed" [ Num, IntArg ]
+  "toInt" -> call "to_int" [ Ref ]
+  "toFloat" -> call "to_float" [ Ref ]
+  "join" -> call "join" [ Ref, Ref ]
+  "count" -> call "count" [ Ref ]
+  "size" -> call "count" [ Ref ]
+  "at" -> call "at" [ Ref, IntArg ]
+  "take" -> call "take" [ Ref, IntArg ]
+  "takeRight" -> call "take_right" [ Ref, IntArg ]
+  "unique" -> call "unique" [ Ref ]
+  _ -> Nothing
+  where
+  arity = Array.length args
+  call fn kinds
+    | Array.length kinds == arity = Just do
+        parts <- traverse (\(Tuple k e) -> emitKind env k e) (Array.zip kinds args)
+        Right ("trussbars_std::" <> fn <> "(" <> joinWith ", " parts <> ")")
+    | otherwise = Just
+        (Left ("unsupported: " <> name <> " with " <> show arity <> " arguments"))
+
+emitKind :: Env -> ArgKind -> Expr -> Either String String
+emitKind env kind e = case kind of
+  Ref -> do
+    ee <- expr env e
+    Right ("&(" <> ee <> ")")
+  Num -> expr env e
+  IntArg -> case e of
+    Lit (VNumber n) -> Right (show (Int.round n))
+    _ -> do
+      ee <- expr env e
+      Right ("(" <> ee <> " as i64)")
 
 -- A Rust double-quoted string literal with the dangerous characters escaped.
 rustStr :: String -> String

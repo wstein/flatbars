@@ -1,18 +1,14 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 18,
+  "total": 25,
   "positive": {
-    "count": 16,
-    "byte_matched": 16,
+    "count": 24,
+    "byte_matched": 24,
     "mismatched": 0
   },
   "excluded": {
-    "count": 2,
+    "count": 1,
     "cases": [
-      {
-        "id": "neg-slice-helper",
-        "reason": "unsupported: helper 'slice'"
-      },
       {
         "id": "neg-coalesce",
         "reason": "unsupported: helper 'coalesce'"
