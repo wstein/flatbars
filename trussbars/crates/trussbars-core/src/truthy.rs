@@ -10,7 +10,9 @@
 //! / `0`-falsy (Handlebars) dilemma — rather than pick a rule, the coercion is
 //! rejected (subset spec §5.3).
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 /// The `nonEmpty` truthiness predicate. Implemented for the non-numeric types a
 /// template can place in a boolean position; **not** for numbers (see the module

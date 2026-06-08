@@ -20,6 +20,9 @@
 //! pure profile by the conformance harness, docs/04 §7). `f32` is outside the JS
 //! number model and always uses `Display`.
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 /// A string already safe to emit unescaped — the output of markup-producing
 /// helpers (`escapeHtml`, `safe`, partials). [`esc`] writes it through verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

@@ -30,7 +30,14 @@ thin set of traits and value helpers.
    string/number/array packs, escaping, and json take uniform types — those are
    monomorphized `trussbars_std::*` calls. (See §11 for the split.)
 4. **Output is a single growing `String` buffer.** The emitted `fn render(ctx: &T) -> String`
-   does `let mut out = String::new(); … out`.
+   does `let mut out = String::with_capacity(hint); … out` (the hint is the adaptive
+   `SizeHint`, §2).
+5. **`no_std`-capable.** `trussbars-core` needs only `alloc` (`String`, `Vec`, `BTreeMap`);
+   it is `#![forbid(unsafe_code)]` and the default `std` feature gates nothing in the code.
+   `--no-default-features` is a true `no_std` build — CI proves it against the bare-metal
+   `thumbv7em-none-eabi` target, both pure and with the `perf` backends (itoa +
+   dragonbox_ecma are themselves `no_std`). So compiled templates can render on embedded
+   targets — a niche no injection-safe engine otherwise occupies.
 
 ---
 

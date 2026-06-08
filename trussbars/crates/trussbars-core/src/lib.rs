@@ -23,10 +23,18 @@
 //! (how it is checked byte-identical against the reference interpreter). Keep this
 //! crate and `02-runtime-api.md` in lockstep.
 //!
-//! This crate is std-only and `#![forbid(unsafe_code)]` — a small, auditable
-//! substrate is part of the point. Enabling the `derive` feature re-exports
-//! [`macro@Trussbars`] (`#[derive(Trussbars)]`) so a host depends on this crate
-//! alone; the feature is off by default, keeping the default build dependency-free.
+//! This crate is `#![forbid(unsafe_code)]` — a small, auditable substrate is part
+//! of the point. It is **`no_std`-capable**: it needs only `alloc` (`String`,
+//! `Vec`, `BTreeMap`), so compiled templates run in embedded contexts. The default
+//! `std` feature is on purely for ergonomics (it gates nothing in the code); build
+//! `--no-default-features` for the pure, `no_std`, dependency-free substrate.
+//! Enabling the `derive` feature re-exports [`macro@Trussbars`]
+//! (`#[derive(Trussbars)]`) so a host depends on this crate alone.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+#![forbid(unsafe_code)]
+
+extern crate alloc;
 
 mod capacity;
 mod each;

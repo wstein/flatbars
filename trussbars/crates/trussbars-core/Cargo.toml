@@ -10,9 +10,12 @@ categories = ["template-engine"]
 
 [features]
 # Best-in-class by default; opt out with `--no-default-features` for the pure,
-# zero-dependency, forbid(unsafe) build — where f64 formatting falls back to Rust
-# `Display` (the documented divergence from the reference engine, docs/01 §10).
-default = ["perf"]
+# zero-dependency, forbid(unsafe), `no_std` build — where f64 formatting falls back
+# to Rust `Display` (the documented divergence from the reference engine, docs/01 §10).
+default = ["std", "perf"]
+# `std` gates nothing in the code (the crate only needs `alloc`); it exists so the
+# default build is a normal std crate and `--no-default-features` is `no_std`.
+std = []
 # The pluggable performance backends — each is itself dependency-free:
 perf = ["fast-int", "ecma-float"]
 fast-int = ["dep:itoa"]             # fast integer formatting (byte-identical bytes)

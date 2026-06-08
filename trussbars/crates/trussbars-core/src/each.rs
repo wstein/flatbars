@@ -5,7 +5,9 @@
 //! whether `x` is a `Vec`/slice or a `BTreeMap` — `rustc` picks the impl, and
 //! `loop.key` is `None` for a sequence and the key for a map.
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 /// Uniform iteration for `{{#each}}` over a sequence or a map.
 pub trait Each {

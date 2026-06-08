@@ -54,18 +54,37 @@ jobs:
 
       # Two profiles, both gated: the default best-in-class build (itoa +
       # dragonbox_ecma, ECMA-byte-identical floats) and the pure, zero-dependency,
-      # forbid(unsafe) build (--no-default-features, f64 = Rust Display).
+      # forbid(unsafe) build (f64 = Rust Display). The pure profile keeps the `std`
+      # feature here so the test harness links (bare `--no-default-features` is
+      # no_std — covered build-only by the `no-std` job below).
       - name: Clippy (perf)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Clippy (pure)
-        run: cargo clippy --all-targets --no-default-features -- -D warnings
+        run: cargo clippy --all-targets --no-default-features --features std -- -D warnings
 
       - name: Test (perf + derive)
         run: cargo test --all-features
 
       - name: Test (pure)
-        run: cargo test --no-default-features
+        run: cargo test --no-default-features --features std
+
+  # The no_std proof: build trussbars-core for a bare-metal target (no std to link
+  # against), both the pure and the full `perf` (itoa + dragonbox_ecma) profiles.
+  # Build-only — `#[test]` needs the std harness, so tests run in the `check` job.
+  no-std:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trussbars
+    steps:
+      - uses: actions/checkout@v6
+      - name: Toolchain + bare-metal target
+        run: rustup show && rustup target add thumbv7em-none-eabi
+      - name: Build no_std (pure)
+        run: cargo build -p trussbars-core --no-default-features --target thumbv7em-none-eabi
+      - name: Build no_std (perf — itoa + dragonbox_ecma)
+        run: cargo build -p trussbars-core --no-default-features --features perf --target thumbv7em-none-eabi
 
   # The perf-regression ratchet: a separate workspace (it pulls handlebars/askama/
   # sailfish), run in release. Asserts the machine-independent relative invariants
