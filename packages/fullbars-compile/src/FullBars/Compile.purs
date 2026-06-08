@@ -24,7 +24,7 @@ import FlatBars.Compile.Emit (fullbarsEmit, metaFor)
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Template)
-import FullBars (LoopVars, checkBareInline, desugarSurfaceWith, hoistInline, noLoopVars)
+import FullBars (LoopVars, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars)
 
 -- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
@@ -62,7 +62,7 @@ compileSurfaceWithPartials
 compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
   externals <- traverse compilePartial partialSrcs
   { nodes } <- lmap NEA.head (parseWith opts src)
-  checkBareInline strict nodes
+  checkSurfaceStrict strict nodes
   let
     h = hoistInline (desugarSurfaceWith lv nodes)
     externalT = Map.fromFoldable externals

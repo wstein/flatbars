@@ -131,6 +131,25 @@ export function dialectDiagnostics(text, dialect) {
           `to use them (Cmd-Shift-P → Change Language Mode).`,
       });
     }
+    // Block-scoped `{{#let}}` is a MaxBars-only construct (ADR-024). In FullBars
+    // it parses (a section over a `let` field) but the engine rejects it at render
+    // (`checkSurfaceStrict`) — surface that here as an actionable editor message
+    // rather than a silent no-op. RawBars/MaxBars accept `let`, so this is FullBars
+    // only.
+    if (dialect === "fullbars") {
+      const letRe = /\{\{~?#let\b/g;
+      let lm;
+      while ((lm = letRe.exec(text)) !== null) {
+        out.push({
+          start: lm.index,
+          end: lm.index + lm[0].length,
+          message:
+            "Block-scoped `{{#let}}` is a MaxBars-only construct — FullBars has no `let`. " +
+            "Alias with `{{#with x as |n|}}`, or switch the file to MaxBars " +
+            "(Cmd-Shift-P → Change Language Mode).",
+        });
+      }
+    }
     if (dialect === "fullbars") return out;
     // RawBars/MaxBars still want the rest of the dialect rules (they're not
     // Handlebars-compatible and have their own constraints — see below).

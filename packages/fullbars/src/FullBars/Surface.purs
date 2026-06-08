@@ -34,7 +34,7 @@
 -- |    §5.7. A bare name is literalized. `{{> @partial-block}}` ⇒ a `(partial-block)`
 -- |    call. The `*` decorator sigil is REQUIRED in FullBars: the bare
 -- |    `{{#inline …}}` spelling is rejected (`FullBars.checkBareInline` /
--- |    `bareInlineOffset`), Handlebars-faithful — there is no `inline` block helper.
+-- |    `strictSurfaceViolation`), Handlebars-faithful — there is no `inline` block helper.
 -- |    (MaxBars is the exception: its `{{#*inline}}` is a `LexError`, so it keeps the
 -- |    bare spelling and does not run the gate.)
 -- |
@@ -55,7 +55,7 @@ module FullBars.Surface
   , LoopVars
   , noLoopVars
   , reservedScope
-  , bareInlineOffset
+  , strictSurfaceViolation
   ) where
 
 import Prelude
@@ -179,7 +179,7 @@ desugarWith lv clauseNames = go []
       -- bare `{{#inline name}}` reaches here only on the *lenient* path (MaxBars,
       -- which gates the `{{#*inline}}` decorator off so the bare form is its only
       -- inline-partial spelling). FullBars rejects it before desugar (it requires
-      -- the `{{#*inline}}` decorator) via `bareInlineOffset`.
+      -- the `{{#*inline}}` decorator) via `strictSurfaceViolation`.
       Block sp Section "inline" args body ->
         Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
       -- the inline-partial *decorator* `{{#*inline "name"}}…{{/inline}}` (Decorator
@@ -544,21 +544,33 @@ expandElseIf = map toElif
       , not (Array.null tail) -> Sep sp "elif" tail
     other -> other
 
--- | The source offset of the first *bare* `{{#inline …}}` block, searched
--- | depth-first through block bodies (`Nothing` when there is none). The inline
--- | decorator lexes as the distinct `Decorator` sigil, so a `Section "inline"`
--- | block is unambiguously the bare misuse — `Decorator` blocks are not matched
--- | here. FullBars uses this to reject the bare spelling — an inline partial must
--- | be written as the decorator `{{#*inline "name"}}` (ADR-0009 amendment /
--- | surface.adoc §5.7). MaxBars does not run this gate: it gates the decorator off
--- | and keeps bare `{{#inline}}` as its only inline-partial form.
-bareInlineOffset :: Template -> Maybe Int
-bareInlineOffset nodes = Array.head (Array.mapMaybe node nodes)
+-- | The first FullBars-disallowed surface construct in `nodes` — its source
+-- | offset and a human "shape" string for the located `DisallowedShape` error —
+-- | searched depth-first through block bodies (`Nothing` when there is none).
+-- | FullBars stays Handlebars-faithful, so two MaxBars/decorator shapes are
+-- | rejected on its *strict* surface (`FullBars.checkSurfaceStrict`):
+-- |
+-- |  * a *bare* `{{#inline …}}` — an inline partial must be the decorator
+-- |    `{{#*inline "name"}}` (ADR-0009 amendment / surface.adoc §5.7). The
+-- |    decorator lexes as the distinct `Decorator` sigil, so a `Section "inline"`
+-- |    block is unambiguously the bare misuse.
+-- |  * a `{{#let …}}` — block-scoped `let` is MaxBars-only (ADR-024); silently
+-- |    no-opping it in FullBars is the footgun this turns into a clear error.
+-- |
+-- | MaxBars does not run this gate (it accepts both), so the dict/list literals it
+-- | also adds never reach here — a `{`/`[` literal is a lex error in FullBars long
+-- | before the desugar.
+strictSurfaceViolation :: Template -> Maybe { off :: Int, shape :: String }
+strictSurfaceViolation nodes = Array.head (Array.mapMaybe node nodes)
   where
   node = case _ of
-    Block sp Section "inline" _ _ -> Just sp.start
-    Block _ _ _ _ body -> bareInlineOffset body
+    Block sp Section "inline" _ _ -> Just { off: sp.start, shape: inlineShape }
+    Block sp Section "let" _ _ -> Just { off: sp.start, shape: letShape }
+    Block _ _ _ _ body -> strictSurfaceViolation body
     _ -> Nothing
+  inlineShape = "{{#inline}} (an inline partial uses the {{#*inline \"name\"}} decorator)"
+  letShape =
+    "{{#let}} (block-scoped `let` is a MaxBars-only construct; FullBars has no `let` — alias with {{#with x as |n|}}, or build a constant with (dict …))"
 
 -- | Strip leading `../` runs, counting the parent depth.
 stripParents :: String -> Int -> { depth :: Int, rest :: String }

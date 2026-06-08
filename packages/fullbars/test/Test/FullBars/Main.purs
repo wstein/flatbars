@@ -949,6 +949,14 @@ main = do
   expectSError "inline-bare-rejected-nested"
     "{{#each xs}}{{#inline \"row\"}}x{{/inline}}{{/each}}"
     "DisallowedShape"
+  -- block-scoped `{{#let}}` is MaxBars-only (ADR-024): in FullBars it is a located
+  -- error, not a silent no-op — and the message points to the MaxBars/with fix.
+  expectSError "let-rejected-maxbars-only"
+    "{{#let a=1}}{{a}}{{/let}}"
+    "MaxBars-only"
+  expectSError "let-rejected-nested"
+    "{{#each xs}}{{#let n=this}}{{n}}{{/let}}{{/each}}"
+    "{{#let}}"
 
   -- a {{#> name}} whose partial is missing renders its body as the fallback
   -- (the {{#partial}} block-body fallback, reached through the sigil).

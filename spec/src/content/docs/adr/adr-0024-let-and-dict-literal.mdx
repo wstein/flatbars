@@ -8,9 +8,10 @@ sidebar:
 `{name: expr, …}` (a `:` separator, comma-separated pairs), *revising* the proposed `{name=expr name=expr}`
 (`=`, whitespace-separated) of §2 below — see the *Amendment*. `{{#let}}` shipped as §1 specifies
 (sequential, never re-rooting), as MaxBars-only sugar over the context-preserving `pushHelpers` frame push;
-the *implementation note* on §1 records the two small deviations (a kernel block operation rather than a
-dedicated AST node, and the FullBars rejection left as a follow-up). Revised 2026-06-04 after team review
-(the list literal was split out to [ADR-025](/adr/adr-0025-list-literal/)).
+the *implementation note* on §1 records the one structural deviation (a kernel block operation rather than
+a dedicated AST node); a FullBars `{{#let}}` is rejected with a located, actionable error (render +
+LSP). Revised 2026-06-04 after team review (the list literal was split out to
+[ADR-025](/adr/adr-0025-list-literal/)).
 *Date:* 2026-06-04. Applies to *MaxBars and RawBars* only; *FullBars is unchanged*
 (Handlebars-faithful — see [ADR-009](/adr/adr-0009-fullbars/) and the conformance line at
 [ADR-005](/adr/adr-0005-dialect-ladder/)). Sits alongside
@@ -95,9 +96,13 @@ are [ADR-025](/adr/adr-0025-list-literal/).)
 > MaxBars desugar **nesting** multi-binding lets into single-binding ones — `{{#let a=1 b=(add a 1)}}` ⇒
 > `{{#let a=1}}{{#let b=(add a 1)}}…` — so an inner binding's value is evaluated in the frame the outer
 > installed (a single walk, no second pass). The compiled twin is `rt.letScope` (interpreter ≡ compiled,
-> `test:compile`). (b) The MaxBars-only scoping is enforced by **gating the desugar** to MaxBars; a
-> *FullBars* `{{#let}}` is currently inert (not rejected) — the §Gates `check:isolation` diagnostic is a
-> tracked follow-up.
+> `test:compile`). (b) The MaxBars-only scoping is enforced by **gating the desugar** to MaxBars, and a
+> *FullBars* `{{#let}}` is **rejected** with a located `DisallowedShape` at render
+> (`FullBars.checkSurfaceStrict`, alongside the bare-`{{#inline}}` rejection) whose message points to the
+> `{{#with x as |n|}}` fix — not a silent no-op. The editor surfaces the same as an LSP diagnostic
+> (`dialectDiagnostics`, gated by `check:dialect-diagnostics`). (The §Gates line below named
+> `check:isolation`, which is dependency-scoped; the realized gates are the FullBars `let-rejected-*` unit
+> tests and `check:dialect-diagnostics`.)
 
 `{{#let}}` installs *nullary operations* at the block's lexical scope; they vanish at `{{/let}}`. It is
 the operation model applied to template-local *constants* — no new concept, just a new way to write one.
@@ -222,9 +227,11 @@ The identity worth recording: `{{#with x as |n|}}` ≡ `{{#with x}}{{#let n=x}} 
   byte-identical line. If `let`/`{…}` ever bleed into the FullBars surface parser, the next run of this
   gate flags it. (Unlike ADR-025, this ADR adds no prelude helper, so there is no catalog/conformance
   churn here.)
-* *`check:isolation`* — extended with one MaxBars-only-surface assertion per construct, source-pinned in
-  the style of `check:a11y`: a FullBars template containing `{{#let …}}` or `{name=expr}` in
-  expression position must produce a surface diagnostic, not silent acceptance.
+* *FullBars isolation (realized).* The plan named `check:isolation`, but that gate is dependency-scoped
+  (ADR-003/008). The MaxBars-only-surface guarantee is instead pinned where the diagnostics live: the
+  FullBars `let-rejected-*` unit tests (a FullBars `{{#let …}}` is a located `DisallowedShape` at render —
+  `checkSurfaceStrict`), and `check:dialect-diagnostics` (the LSP flags it in the editor). A `{name: …}` /
+  `[…]` literal needs no separate assertion — `{`/`[` is a lex error in FullBars before the desugar.
 * *Linter round-trip* (`Linter.Lower`) — pins that `{{#let a=1}}` lowers to
   `{{#let (bind a 1)}}` and `{b=1 c=2}` lowers to `(dict b=1 c=2)`. One canonical RawBars
   form per construct — no AST drift, no two-way sugar.
