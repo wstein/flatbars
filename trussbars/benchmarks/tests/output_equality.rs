@@ -7,7 +7,8 @@ use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
     handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, sailfish_big_table,
     sailfish_teams, teams_data, teams_value, trussbars_big_table, trussbars_teams, vm_big_table,
-    vm_big_table_template, vm_teams, vm_teams_template, write_big_table, write_teams,
+    vm_big_table_template, vm_teams, vm_teams_template, vy_big_table, vy_teams, write_big_table,
+    write_teams,
 };
 
 #[test]
@@ -23,6 +24,7 @@ fn big_table_all_engines_agree() {
         "trussbars-vm vs write"
     );
     assert_eq!(sailfish_big_table(&ctx), baseline, "sailfish vs write");
+    assert_eq!(vy_big_table(&ctx), baseline, "vy vs write");
     assert_eq!(askama_big_table(&ctx), baseline, "askama vs write");
     assert_eq!(
         handlebars_big_table(&hb, &ctx),
@@ -44,6 +46,7 @@ fn teams_all_engines_agree() {
         "trussbars-vm vs write"
     );
     assert_eq!(sailfish_teams(&ctx), baseline, "sailfish vs write");
+    assert_eq!(vy_teams(&ctx), baseline, "vy vs write");
     assert_eq!(askama_teams(&ctx), baseline, "askama vs write");
     assert_eq!(handlebars_teams(&hb, &ctx), baseline, "handlebars vs write");
 }

@@ -975,6 +975,7 @@ dependencies = [
  "trussbars-core",
  "trussbars-std",
  "trussbars-vm",
+ "vy",
 ]
 
 [[package]]
@@ -1028,6 +1029,38 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vy"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca9415823937514bbba8aeddee84871f1b137f107878a0fdebf6c8ec2846b3a6"
+dependencies = [
+ "vy-core",
+ "vy-macros",
+]
+
+[[package]]
+name = "vy-core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95c86e70f659b92a9bb20120384e1af5a29eac7f926c484b51fad034e45c8acf"
+dependencies = [
+ "itoap",
+ "ryu",
+]
+
+[[package]]
+name = "vy-macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567c0fb4cea81da221859fbcffa37f614c0460f8804f058c0973b76b571997db"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "vy-core",
+]
 
 [[package]]
 name = "walkdir"

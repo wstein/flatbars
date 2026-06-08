@@ -16,7 +16,8 @@ use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
     handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, sailfish_big_table,
     sailfish_teams, teams_data, teams_value, trussbars_big_table, trussbars_teams, vm_big_table,
-    vm_big_table_template, vm_teams, vm_teams_template, write_big_table, write_teams,
+    vm_big_table_template, vm_teams, vm_teams_template, vy_big_table, vy_teams, write_big_table,
+    write_teams,
 };
 
 fn big_table(c: &mut Criterion) {
@@ -36,6 +37,7 @@ fn big_table(c: &mut Criterion) {
     g.bench_function("sailfish", |b| {
         b.iter(|| sailfish_big_table(black_box(&ctx)))
     });
+    g.bench_function("vy", |b| b.iter(|| vy_big_table(black_box(&ctx))));
     g.bench_function("askama", |b| b.iter(|| askama_big_table(black_box(&ctx))));
     g.bench_function("handlebars", |b| {
         b.iter(|| handlebars_big_table(&hb, black_box(&ctx)))
@@ -57,6 +59,7 @@ fn teams(c: &mut Criterion) {
     });
     g.bench_function("write", |b| b.iter(|| write_teams(black_box(&ctx))));
     g.bench_function("sailfish", |b| b.iter(|| sailfish_teams(black_box(&ctx))));
+    g.bench_function("vy", |b| b.iter(|| vy_teams(black_box(&ctx))));
     g.bench_function("askama", |b| b.iter(|| askama_teams(black_box(&ctx))));
     g.bench_function("handlebars", |b| {
         b.iter(|| handlebars_teams(&hb, black_box(&ctx)))

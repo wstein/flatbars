@@ -22,6 +22,8 @@
 //! emitted function body pasted under a bench-local name), so the bench measures
 //! the shipped codegen, capacity hint and all.
 #![allow(missing_docs)]
+// vy's element macros can expand to braced function arguments; harmless in bench code.
+#![allow(unused_braces)]
 
 use std::fmt::Write as _;
 
@@ -360,4 +362,32 @@ pub fn vm_teams_template() -> VmTemplate {
 
 pub fn vm_teams(tmpl: &VmTemplate, data: &VmValue) -> String {
     tmpl.render(data).expect("vm teams renders")
+}
+
+// ─── 7. vy (compile-time HTML macro DSL) ──────────────────────────────────────
+// An embedded-Rust HTML DSL whose element macros expand to tuple-typed `IntoHtml`
+// values (no closures), pre-sized and single-allocation. Not a separate-language
+// compiler like Trussbars — a different shape, included to test the "vy practices"
+// claims (docs/11 review). Same two canonical workloads, byte-identical output.
+
+use vy::prelude::*;
+
+pub fn vy_big_table(ctx: &BigTable) -> String {
+    table!(ctx.table.iter().map(|row| tr!(row.iter().map(|v| td!(*v))))).into_string()
+}
+
+pub fn vy_teams(ctx: &Teams) -> String {
+    html!(
+        head!(title!(ctx.year)),
+        body!(
+            h1!("CSL ", ctx.year),
+            ul!(ctx.teams.iter().enumerate().map(|(i, team)| li!(
+                class = if i == 0 { "champion" } else { "" },
+                b!(team.name.as_str()),
+                ": ",
+                team.score
+            )))
+        )
+    )
+    .into_string()
 }
