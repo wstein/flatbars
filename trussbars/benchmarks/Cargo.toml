@@ -22,3 +22,8 @@ criterion = "0.8"
 [[bench]]
 name = "render"
 harness = false
+
+# Codegen-strategy profiling (decision tool, not a headline comparison).
+[[bench]]
+name = "codegen_variants"
+harness = false
