@@ -260,6 +260,16 @@ const t = (s) => s;
       <code>{t("}}")}</code> inside a dict-value string is not a tag close either).
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.collections.template} data={ex.collections.data} />
+    <h3>Let — block-scoped aliases</h3>
+    <p>
+      <code>{t("{{#let name=value}}…{{/let}}")}</code> binds template-local constants for the body — a
+      deep path, a computed value, a small table — that vanish at <code>{t("{{/let}}")}</code>. Unlike
+      <code>{t("{{#with}}")}</code> it <b>never re-roots</b>: a bare <code>{t("{{name}}")}</code> still
+      resolves against the current context, so <code>let</code> only adds aliases. Bindings are
+      <b>sequential</b> — a later value sees an earlier name (<code>{t("tax=(multiply subtotal rate)")}</code>
+      after <code>{t("subtotal=…")}</code>). A binding whose name matches a helper shadows it for the body.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.letBindings.template} data={ex.letBindings.data} />
     <h3>Block params &amp; labelled loops</h3>
     <p>
       A trailing <code>{t("as elem index index1")}</code> binds scoped names over the block body —

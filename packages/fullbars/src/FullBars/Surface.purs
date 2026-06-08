@@ -130,6 +130,29 @@ desugarWith lv clauseNames = go []
   -- model selects the block-param spelling.
   dropPipes = isJust (lv reservedMarker)
 
+  -- `{{#let}}` (MaxBars): build *nested* single-binding lets so the bindings are
+  -- sequential. `takeBinding` peels the first `k=v` pair — its value rewritten in
+  -- the *current* scope, so a later binding's value sees an earlier name — and the
+  -- body plus any remaining bindings are desugared in the scope extended by that
+  -- name (so a bare `{{a}}` resolves to the alias `(a)`). Each binding is a one-key
+  -- `@hash` the engine's `letH` installs via `pushHelpers` (context unchanged).
+  letNode sp scope args body = case takeBinding scope args of
+    Nothing -> Block sp Section "let" [] (go scope body)
+    Just { key, val, rest } ->
+      Block sp Section "let" [ App "@hash" [ Lit (VString key), val ] ]
+        ( if Array.null rest then go (scope <> [ key ]) body
+          else [ letNode sp (scope <> [ key ]) rest body ]
+        )
+
+  takeBinding scope args = case Array.uncons args of
+    Just { head, tail } -> case asHashKey lv scope head of
+      Just { key, consumesNext: true } -> case Array.uncons tail of
+        Just { head: v, tail: rest } -> Just { key, val: rewrite lv scope v, rest }
+        Nothing -> Just { key, val: App "null" [], rest: [] }
+      Just { key, inlineVal } -> Just { key, val: inlineVal, rest: tail }
+      Nothing -> Nothing
+    Nothing -> Nothing
+
   go :: Scope -> Template -> Template
   go scope = map node
     where
@@ -174,6 +197,13 @@ desugarWith lv clauseNames = go []
       -- (the FullBars way to "render when falsy"); the head becomes the condition.
       Block sp Inverse name args body ->
         Block sp Section "unless" [ rewriteHead lv scope name args ] (go scope (expandElseIf body))
+      -- `{{#let a=1 b=(add a 1)}}…{{/let}}` (MaxBars only — ADR-024): block-scoped
+      -- aliases that never re-root. Desugars to *nested* single-binding lets so the
+      -- bindings are sequential (`b` sees `a`); each binding name extends the body
+      -- scope so a bare `{{a}}` resolves to the alias `(a)`, and each value is a
+      -- one-key `@hash` the engine's `letH` installs via `pushHelpers`.
+      Block sp Section "let" args body | dropPipes ->
+        letNode sp scope args (expandElseIf body)
       -- block head stays a helper; `else if` chains expand to flat `elif` (§5.6);
       -- a trailing `as |a b|` becomes positional binding-name strings (§5.5) and
       -- extends the scope for the body.

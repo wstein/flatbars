@@ -180,6 +180,14 @@ export const cases = [
   { name: "mx:dict-strkey", dialect: "maxbars", t: '{{#with {"full name": who}}}{{lookup this "full name"}}{{/with}}', d: { who: "Ada L" } },
   { name: "mx:dict-string-brace", dialect: "maxbars", t: '{{#with {msg: "a}}b"}}}{{msg}}{{/with}}', d: {} },
   { name: "mx:dict-json", dialect: "maxbars", t: "{{{json {x: 1, y: 2}}}}", d: {} },
+  // `{{#let}}` (ADR-024): block-scoped aliases, sequential, never re-rooting.
+  { name: "mx:let-single", dialect: "maxbars", t: '{{#let g="Hi"}}{{g}}{{/let}}', d: {} },
+  { name: "mx:let-from-data", dialect: "maxbars", t: "{{#let n=count}}{{n}} items{{/let}}", d: { count: 5 } },
+  { name: "mx:let-sequential", dialect: "maxbars", t: "{{#let a=1 b=(add a 1)}}{{a}},{{b}}{{/let}}", d: {} },
+  { name: "mx:let-no-reroot", dialect: "maxbars", t: "{{#let u=user}}{{name}}/{{u.name}}{{/let}}", d: { name: "ROOT", user: { name: "Ada" } } },
+  { name: "mx:let-dict-value", dialect: "maxbars", t: '{{#let cfg={theme: "dark"}}}{{cfg.theme}}{{/let}}', d: {} },
+  { name: "mx:let-in-loop", dialect: "maxbars", t: "{{#each items}}{{#let u=(uppercase this)}}{{u}}@{{loop.index0}} {{/let}}{{/each}}", d: { items: ["a", "b"] } },
+  { name: "mx:let-shadows-op", dialect: "maxbars", t: '{{#let add="x"}}{{add}}{{/let}}', d: {} },
   { name: "mx:collections-nested", dialect: "maxbars", t: "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}", d: {} },
   // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
   // through to name (where ?? keeps the non-null "" and || yields a boolean).

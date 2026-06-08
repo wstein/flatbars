@@ -131,6 +131,11 @@ fbBlock lenient rec ctx name args body =
       "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx split.positional <> ")") body
       "each" -> frameBlock rec ctx "each" split.positional split.label body
       "with" -> frameBlock rec ctx "with" split.positional split.label body
+      -- `{{#let}}` (ADR-024): bind the hash's name→value pairs in a child frame
+      -- whose context/loop-vars pass through unchanged (never re-roots), then render
+      -- the body there. The surface nests multi-binding lets, so each carries one
+      -- hash; `rt.letScope` mirrors the interpreter's `pushHelpers`.
+      "let" -> letBlock rec ctx split.hash body
       -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
       "inline" -> ""
       -- A block partial (`{{#partial name}}body{{/partial}}` / `{{#>name}}`): like
@@ -207,6 +212,19 @@ frameBlock rec ctx fn args label body =
       <> ", "
       <> lambda rec ctx elseClause
       <> ");\n"
+
+-- `{{#let}}`: bind the hash in a child frame whose context/loop-vars are the
+-- parent's (never re-roots), then render the body in it. The hash is the desugared
+-- `@hash` → `(dict …)` expression; `rt.letScope` builds the frame the same way the
+-- interpreter's `letH` does with `pushHelpers`.
+letBlock :: Rec -> Ctx -> Maybe Expr -> Template -> String
+letBlock rec ctx hash body =
+  let
+    child = rec.child ctx
+    hashJs = maybe "{}" (rec.expr ctx) hash
+  in
+    "  out += rt.letScope(" <> ctx.scope <> ", " <> hashJs <> ", " <> lambda rec child body <>
+      ");\n"
 
 -- The trailing string-literal arguments — block-param binding names.
 bindingNames :: Array Expr -> Array String

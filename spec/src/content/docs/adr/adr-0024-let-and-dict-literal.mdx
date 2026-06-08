@@ -4,11 +4,13 @@ sidebar:
   label: "ADR-024 `let` & dict literal"
 ---
 
-*Status:* **Partially accepted — the dict literal is implemented (2026-06-08); `{{#let}}` remains
-proposed (not yet implemented).** The implemented dict literal uses **JSON-style** `{name: expr, …}`
-(a `:` separator, comma-separated pairs), *revising* the proposed `{name=expr name=expr}` (`=`,
-whitespace-separated) of §2 below — see the *Amendment*. Revised 2026-06-04 after team review (the list
-literal was split out to [ADR-025](/adr/adr-0025-list-literal/)).
+*Status:* **Accepted — both constructs implemented (2026-06-08).** The dict literal uses **JSON-style**
+`{name: expr, …}` (a `:` separator, comma-separated pairs), *revising* the proposed `{name=expr name=expr}`
+(`=`, whitespace-separated) of §2 below — see the *Amendment*. `{{#let}}` shipped as §1 specifies
+(sequential, never re-rooting), as MaxBars-only sugar over the context-preserving `pushHelpers` frame push;
+the *implementation note* on §1 records the two small deviations (a kernel block operation rather than a
+dedicated AST node, and the FullBars rejection left as a follow-up). Revised 2026-06-04 after team review
+(the list literal was split out to [ADR-025](/adr/adr-0025-list-literal/)).
 *Date:* 2026-06-04. Applies to *MaxBars and RawBars* only; *FullBars is unchanged*
 (Handlebars-faithful — see [ADR-009](/adr/adr-0009-fullbars/) and the conformance line at
 [ADR-005](/adr/adr-0005-dialect-ladder/)). Sits alongside
@@ -85,6 +87,17 @@ change*: block-scoped `{{#let}}` and the dict literal. (The list literal and its
 are [ADR-025](/adr/adr-0025-list-literal/).)
 
 ### 1. Block-scoped `{{#let}}` — alias only, never re-root
+
+> *Implementation note (2026-06-08).* Shipped as specified — sequential, never re-rooting — with two
+> deviations from §5's sketch. (a) `let` is a **kernel block operation** (`Kernel.Prelude.letH`), *not* a
+> dedicated `Let` AST node: it reads its bindings from the surface hash and renders the body through the
+> context-preserving `pushHelpers` (the env stack already had it). The sequential semantics come from the
+> MaxBars desugar **nesting** multi-binding lets into single-binding ones — `{{#let a=1 b=(add a 1)}}` ⇒
+> `{{#let a=1}}{{#let b=(add a 1)}}…` — so an inner binding's value is evaluated in the frame the outer
+> installed (a single walk, no second pass). The compiled twin is `rt.letScope` (interpreter ≡ compiled,
+> `test:compile`). (b) The MaxBars-only scoping is enforced by **gating the desugar** to MaxBars; a
+> *FullBars* `{{#let}}` is currently inert (not rejected) — the §Gates `check:isolation` diagnostic is a
+> tracked follow-up.
 
 `{{#let}}` installs *nullary operations* at the block's lexical scope; they vanish at `{{/let}}`. It is
 the operation model applied to template-local *constants* — no new concept, just a new way to write one.

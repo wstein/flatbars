@@ -53,7 +53,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
-import Kernel.Env (RefEnv, constOperation, enterPartial, isScopedBinding, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName, withPartialFileScope)
+import Kernel.Env (RefEnv, constOperation, enterPartial, isScopedBinding, liftEither, lookupOperation, lookupPartial, pushFrame, pushHelpers, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName, withPartialFileScope)
 import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary, variadic)
 import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
@@ -201,6 +201,11 @@ coreOperationDefs =
   , gen "with" "Shifts the context to its argument for the body (else the {{else}} clause)." true
       (AtLeast 1)
       withH
+  , gen "let"
+      "Installs its hash's name=value pairs as block-scoped nullary operations for the body, without re-rooting the context (MaxBars `{{#let a=1}}…{{/let}}`)."
+      true
+      AnyArity
+      letH
   , valDef "else" "A clause separator the enclosing block splits on; renders nothing on its own."
       (nullary (pure (VSafe "")))
   -- `elif cond [opts]`: a clause marker (its body/condition are handled by the
@@ -1472,6 +1477,18 @@ withH ctl args = case Array.uncons args of
       renderSafe ctl (pushFrame frame v ctl.env) (mainBody ctl)
     else renderElse ctl
   Nothing -> throwError (ArityError "with: expected at least 1 argument(s), got 0")
+
+-- | `let`: install the hash's `name → value` pairs as nullary operations in a
+-- | helpers-only frame, then render the body. Unlike `with`, the context, loop
+-- | variables, and reserved chain pass through **unchanged** (`pushHelpers`, not
+-- | `pushFrame`) — `let` never re-roots, it only aliases (ADR-024 §1). The MaxBars
+-- | surface `{{#let a=1 b=(add a 1)}}` desugars to *nested* single-binding lets, so
+-- | each `let` here carries one hash pair and the nesting gives left-to-right
+-- | sequential scope (`b` sees `a`) in a single walk. No `{{else}}` clause.
+letH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+letH ctl _ = case ctl.hash of
+  Just (VObject m) -> renderSafe ctl (pushHelpers (map constOperation m) ctl.env) (mainBody ctl)
+  _ -> renderMain ctl
 
 -- | The FullBars *resolve policy* (`Kernel.Env.refEngineWith`), Handlebars-style.
 -- | Two cases turn a `{{#x}}…{{/x}}` block into an implicit *section* over data

@@ -291,6 +291,20 @@ function withCtx(val, parent, names, label, bodyFn, elseFn) {
   );
 }
 
+// ── aliasing: `let` (FlatBars letH) ──────────────────────────────────────────
+// Install the `bindings` object's name→value pairs as locals in a child frame
+// whose context, loop variables, and chain are the PARENT's unchanged (`let`
+// never re-roots, unlike `with`); only `binds` gains the new names. The surface
+// nests multi-binding lets, so `bindings` is one pair per frame and an inner let
+// sees the outer's names. Mirrors the interpreter's `pushHelpers`.
+function letScope(parent, bindings, bodyFn) {
+  const fr = { ...parent, binds: Object.create(parent.binds) };
+  if (bindings && typeof bindings === "object" && !Array.isArray(bindings) && !isSafe(bindings)) {
+    for (const k of Object.keys(bindings)) fr.binds[k] = bindings[k];
+  }
+  return bodyFn(fr);
+}
+
 // ── partials: render a registered partial (FullBars partialH) ────────────────
 // `partials[name]` is a compiled `function (data, rt, partials)`. The hash (if
 // any) merges onto the context object (opts override); a non-object context
@@ -782,7 +796,7 @@ function mindentOverride(indent, body) {
 }
 
 export const rt = {
-  RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, partial, partialBlock, block, raw, Safe,
+  RUNTIME_VERSION, scope, lookup, out, esc, safe, truthy, truthyWith, call, each, with: withCtx, letScope, partial, partialBlock, block, raw, Safe,
   truthyHandlebars, truthyMustache, truthyNonEmpty, // ADR-022: the named truthiness callbacks (the seed binds one)
   register, // ADR-018: host-registered inline helpers
   registerTranslator, // ADR-029: the host's i18n translator seam (t/number/date/…)

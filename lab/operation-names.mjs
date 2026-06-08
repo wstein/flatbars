@@ -50,6 +50,7 @@ export const OPERATION_NAMES = [
   "key",
   "last",
   "length",
+  "let",
   "list",
   "log",
   "lookup",

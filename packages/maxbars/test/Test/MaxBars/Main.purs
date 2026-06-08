@@ -468,4 +468,38 @@ main = do
     (obj [ Tuple "a" (obj [ Tuple "home town" (VString "Lübeck") ]) ])
     "Lübeck"
 
+  -- block-scoped `{{#let}}` (ADR-024): aliases, sequential, never re-roots.
+  expectM "let: a single binding is in scope for the body"
+    "{{#let greeting=\"Hi\"}}{{greeting}}!{{/let}}"
+    (obj [])
+    "Hi!"
+  expectM "let: a binding reads from the (unchanged) data context"
+    "{{#let n=count}}{{n}} left{{/let}}"
+    (obj [ Tuple "count" (num 3.0) ])
+    "3 left"
+  expectM "let: bindings are sequential — b sees a"
+    "{{#let a=1 b=(add a 1) c=(add b 1)}}{{a}}{{b}}{{c}}{{/let}}"
+    (obj [])
+    "123"
+  -- the defining guarantee: `let` aliases but does NOT re-root, so a bare name
+  -- still resolves against the current context, unlike `with`.
+  expectM "let: does not re-root the context"
+    "{{#let u=user}}{{name}}/{{u.name}}{{/let}}"
+    (obj [ Tuple "name" (VString "ROOT"), Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
+    "ROOT/Ada"
+  expectM "let: a binding's value can be a dict literal"
+    "{{#let cfg={theme: \"dark\", size: 12}}}{{cfg.theme}}/{{cfg.size}}{{/let}}"
+    (obj [])
+    "dark/12"
+  -- inside a loop the binding coexists with the loop's scoped vars.
+  expectM "let: inside a loop, loop.* still resolves"
+    "{{#each items}}{{#let u=(uppercase this)}}{{u}}@{{loop.index1}} {{/let}}{{/each}}"
+    (obj [ Tuple "items" (VArray [ VString "a", VString "b" ]) ])
+    "A@1 B@2 "
+  -- a binding named like a prelude op shadows it inside the body (isScopedBinding).
+  expectM "let: a binding shadows a same-named prelude op"
+    "{{#let add=\"shadowed\"}}{{add}}{{/let}}"
+    (obj [])
+    "shadowed"
+
   log "all MaxBars tests passed"

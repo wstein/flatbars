@@ -194,6 +194,39 @@ which re-enters the full expression grammar.
 {{#each (people | reverse) as p}}{{p.name}}{{/each}}
 ```
 
+## Let bindings
+
+`{{#let name=expr …}}…{{/let}}` ([ADR-024](/adr/adr-0024-let-and-dict-literal/))
+installs *block-scoped aliases* — template-local constants for a deep path, a
+computed value, a small lookup table — that vanish at `{{/let}}`. Each name is a
+nullary operation returning its value:
+
+```handlebars
+{{#let total=(add price tax) label="Subtotal"}}
+  {{label}}: {{total}}
+{{/let}}
+{{#let u=order.customer}}{{u.name}} — {{u.email}}{{/let}}
+```
+
+Two properties define it:
+
+* **Sequential.** Bindings evaluate left-to-right, each in the scope extended by
+  those to its left, so `{{#let a=1 b=(add a 1)}}` binds `b` to `2`. There is no
+  self- or forward-reference (a sequential `let`, not a `letrec`).
+* **Never re-roots.** Unlike `{{#with}}`, `let` only *aliases* — it does not shift
+  the context, so a bare `{{name}}` in the body still resolves against the current
+  context. `{{#let u=user}}{{name}}{{/let}}` reads the *root* `name`, not
+  `user.name` (write `{{u.name}}`). The complement holds:
+  `{{#with x as p}}` ≡ `{{#with x}}{{#let p=this}}…{{/let}}{{/with}}`.
+
+A binding whose name matches an in-scope operation shadows it for the body
+(`{{#let add="…"}}` reads the alias, not the `add` helper). Values are any
+expression — including a dict or list literal (`{{#let cfg={theme: "dark"}}}`).
+The surface desugars to nested single-binding lets, which the engine installs with
+`pushHelpers` (the context-preserving frame push); it is MaxBars-only sugar over
+that one engine primitive (FullBars stays Handlebars-faithful and uses
+`{{#with x as |n|}}` for aliasing).
+
 ## Labelled loops
 
 A trailing `label NAME` clause ([ADR-013](/adr/adr-0013-labelled-loops/))
