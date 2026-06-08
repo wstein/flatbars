@@ -22,7 +22,7 @@ mod number;
 mod string;
 
 pub use array::{
-    at, count, join, reverse_slice, slice_includes, sort_by, take, take_right, unique,
+    at, count, group_by, join, reverse_slice, slice_includes, sort_by, take, take_right, unique,
 };
 pub use number::{abs, ceil, floor, modulo, round, to_fixed, to_float, to_int};
 pub use string::{

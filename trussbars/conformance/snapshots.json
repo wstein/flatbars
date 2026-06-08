@@ -36,5 +36,6 @@
   "pluck": "a,b",
   "block-partial": "<div>Ann &amp; Bo</div>",
   "sort-by": "a, b, c",
-  "neg-groupby": "ab"
+  "group-by": "a:y b:xz ",
+  "neg-rawblock": "{{x}}"
 }

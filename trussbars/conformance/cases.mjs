@@ -209,10 +209,24 @@ export const cases = [
     data: { items: [{ name: "b" }, { name: "a" }, { name: "c" }] },
   },
 
-  // ── negative: groupBy returns a map (needs map iteration) — still excluded ────
+  // ── groupBy → a map, iterated (group key via loop.key, group via this) ───────
   {
-    id: "neg-groupby",
-    template: '{{#each (groupBy items "name")}}{{loop.key}}{{/each}}',
-    data: { items: [{ name: "a" }, { name: "b" }] },
+    id: "group-by",
+    template:
+      '{{#each (groupBy items "kind")}}{{loop.key}}:{{#each this}}{{name}}{{/each}} {{/each}}',
+    data: {
+      items: [
+        { kind: "b", name: "x" },
+        { kind: "a", name: "y" },
+        { kind: "b", name: "z" },
+      ],
+    },
+  },
+
+  // ── negative: raw blocks (verbatim body) — still excluded ────────────────────
+  {
+    id: "neg-rawblock",
+    template: "{{{{#raw}}}}{{x}}{{{{/raw}}}}",
+    data: {},
   },
 ];

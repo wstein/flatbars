@@ -3,6 +3,8 @@
 //! are not here (see the crate docs). Returned slices/`Vec<&T>` borrow the input,
 //! so no element is cloned.
 
+use std::collections::BTreeMap;
+
 use crate::text;
 use trussbars_core::ToText;
 
@@ -83,9 +85,21 @@ where
     out
 }
 
+/// Group the elements by a stringified key (`groupBy`) → a sorted map of key to
+/// the elements with that key (first-seen order). The codegen stringifies the key
+/// path; the result is iterated as a map (`{{#each (groupBy …)}}`), `loop.key`
+/// being the group key — matching the reference, whose object keys are strings.
+pub fn group_by<'a, T>(items: &'a [T], key: impl Fn(&T) -> String) -> BTreeMap<String, Vec<&'a T>> {
+    let mut out: BTreeMap<String, Vec<&'a T>> = BTreeMap::new();
+    for item in items {
+        out.entry(key(item)).or_default().push(item);
+    }
+    out
+}
+
 #[cfg(test)]
 mod sort_tests {
-    use super::sort_by;
+    use super::{group_by, sort_by};
 
     struct Row {
         name: String,
@@ -112,6 +126,19 @@ mod sort_tests {
     fn identity_key_sorts_values() {
         let xs = [3_i64, 1, 2, 1];
         assert_eq!(sort_by(&xs, |x| x), vec![&1, &1, &2, &3]);
+    }
+
+    #[test]
+    fn groups_by_a_stringified_key() {
+        let rows = [
+            Row { name: "a".into() },
+            Row { name: "b".into() },
+            Row { name: "a".into() },
+        ];
+        let g = group_by(&rows, |r| r.name.clone());
+        assert_eq!(g.len(), 2);
+        assert_eq!(g["a"].len(), 2);
+        assert_eq!(g["b"].len(), 1);
     }
 }
 
