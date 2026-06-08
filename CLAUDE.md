@@ -423,3 +423,13 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
 - ADR-001 (`spec/src/content/docs/adr/adr-0001-structural-parser-and-walker.mdx`)
   records the structural-parser-plus-walker decision that the whole design rests
   on.
+- **Decide author-facing surface syntax in the ADR *before* the implementation
+  PR.** The MaxBars `each` loop binding changed twice in one cycle (`as |x|` →
+  `as x` → `x in xs`), each a breaking commit + a full corpus/test/tutorial
+  re-migration + ADR amendments — because the spelling wasn't settled on paper
+  first. When adding a surface construct, write (and freeze) its exact spelling in
+  the relevant ADR, then implement once. When a surface *form is removed*, reject
+  the old form with a located, actionable error (`checkSurfaceStrict` — FullBars
+  `{{#let}}`, MaxBars `{{#each … as …}}`); never let it silently no-op. The MaxBars
+  binding triad (`each … in`, `with … as`, `let name=value`) is now committed
+  surface — see the ADR-021 amendment and `engine/maxbars.mdx`.

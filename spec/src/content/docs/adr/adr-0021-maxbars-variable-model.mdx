@@ -36,8 +36,11 @@ companion surface refinement: the `..` range operator (`1..n` ⇒ `(range 1 n)`)
 in MaxBars because `../` parent-paths are already gone (above), plus the `[…]`/`{…}`
 collection literals and block-scoped `{{#let}}` ([ADR-024](/adr/adr-0024-let-and-dict-literal/)/[ADR-025](/adr/adr-0025-list-literal/)).
 
-*(An interim build within this cycle used a trailing `as a b` on `each` too; it was
-superseded by the `… in coll` spelling before release.)*
+The three binding keywords are **committed surface** (no further changes): `each …
+in coll`, `with value as alias`, `let name=value`. The keywords differ because the
+operations do (iterate / re-root-alias / alias); a removed-form mistake — a trailing
+`{{#each … as …}}` — is a located error, not a silent no-op (`checkSurfaceStrict`,
+MaxBars path).
 
 ## Context
 

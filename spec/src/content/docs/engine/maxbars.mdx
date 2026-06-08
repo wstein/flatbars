@@ -172,11 +172,22 @@ output expressions.
 
 ## Loop and block bindings
 
-`{{#each}}` binds its loop variables **Liquid-style** — the names come *before*
-`in`, the collection after — and `{{#with}}` aliases the shifted context with a
-*drop-pipes* `as` (no bars). `each` binds up to three names: the element, the
-0-based index (or object key), and the 1-based index — one more than FullBars'
-two.
+The three binding constructs and their keywords are **committed surface** — they
+won't change further:
+
+| Construct | Operation | Spelling |
+| --- | --- | --- |
+| `{{#each elem [i0] [i1] in coll}}` | iterate a collection | `… in coll` (names first) |
+| `{{#with value as alias}}` | re-root the context + alias | `value as alias` |
+| `{{#let name=value …}}` | alias, no re-root | `name=value` |
+
+The keywords differ because the operations do: `in` reads "drawn from a
+collection" (so it fits `each`, not `with`), `as` is the alias/re-root word, and
+`=` is the binding word. `{{#each}}` binds its loop variables **Liquid-style** —
+the names come *before* `in`, the collection after — and `{{#with}}` aliases the
+shifted context with a *drop-pipes* `as` (no bars). `each` binds up to three
+names: the element, the 0-based index (or object key), and the 1-based index —
+one more than FullBars' two.
 
 ```handlebars
 {{#each item in items}}{{item}}{{/each}}
