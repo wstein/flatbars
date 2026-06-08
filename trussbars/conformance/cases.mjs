@@ -155,6 +155,24 @@ export const cases = [
     data: { nick: "", name: "Robert" },
   },
 
+  // ── partials (inline definitions, inlined at the call site) ──────────────────
+  {
+    id: "partial-simple",
+    template: '{{#inline "greet"}}Hello {{name}}!{{/inline}}{{> greet}}',
+    data: { name: "World" },
+  },
+  {
+    id: "partial-in-each",
+    template:
+      '{{#inline "row"}}<li>{{name}}</li>{{/inline}}{{#each items}}{{> row}}{{/each}}',
+    data: { items: [{ name: "a" }, { name: "b" }] },
+  },
+  {
+    id: "partial-context",
+    template: '{{#inline "card"}}[{{title}}]{{/inline}}{{> card section}}',
+    data: { section: { title: "Intro" } },
+  },
+
   // ── negative: still outside the slice (oracle renders; emitter excludes) ─────
   {
     id: "neg-pluck",

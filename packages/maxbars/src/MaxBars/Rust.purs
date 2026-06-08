@@ -17,12 +17,13 @@
 -- | chains, `if`/`unless`/`elif`/`else`, `each` (+ loop metadata, block params,
 -- | empty clause), `with`, the comparison / logic / arithmetic operators, the
 -- | `ternary` (`? :`), the coalescers `??` (over `Option<T>`) and `?:` (over a
--- | unifying `T`), and the full value-helper pack — string (incl. integer-argument
+-- | unifying `T`), the full value-helper pack — string (incl. integer-argument
 -- | `slice`/`truncate`), number (`abs`/`round`/`toFixed`/…), and array
--- | (`join`/`count`/`at`/`take`/…). Anything else (partials, inline, yield, raw
--- | blocks, `outer` labelled-loop chains, the key-path `pluck`/`sortBy`/`groupBy`,
--- | `dict`) returns a `Left` "unsupported …" so the conformance harness excludes it
--- | honestly.
+-- | (`join`/`count`/`at`/`take`/…) — and inline partials (`{{#inline}}` +
+-- | `{{> name [ctx]}}`, expanded at the call site). Anything else (block partials
+-- | `{{#partial}}` / `{{yield}}`, raw blocks, `outer` labelled-loop chains, the
+-- | key-path `pluck`/`sortBy`/`groupBy`, `dict`) returns a `Left` "unsupported …"
+-- | so the conformance harness excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -49,7 +50,7 @@ import Data.Tuple (Tuple(..))
 import FlatBars.Parser (parseWith)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
-import FullBars (desugarSurfaceWith)
+import FullBars (desugarSurfaceWith, hoistInline)
 import Kernel.Walk (splitClauses)
 import MaxBars (maxLoopVars, maxOptions)
 
@@ -62,6 +63,9 @@ type Env =
   , loop :: Maybe String
   , params :: Map String String
   , parents :: Array String -- enclosing context bindings, innermost first (`parent` chain)
+  , labels :: Map String String -- labelled-loop name → its `Loop` binding (`label NAME`)
+  , partials :: Map String Template -- hoisted `{{#inline}}` definitions, inlined at the call site
+  , expanding :: Array String -- partials currently being inlined (recursion guard)
   , depth :: Int
   }
 
@@ -77,12 +81,23 @@ compileMaxRust ctxType src = case build of
   build :: Either String String
   build = do
     parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
-    let desugared = desugarSurfaceWith maxLoopVars parsed.nodes
-    body <- nodes initialEnv desugared
+    let
+      h = hoistInline (desugarSurfaceWith maxLoopVars parsed.nodes)
+      env0 = initialEnv h.partials
+    body <- nodes env0 h.template
     pure (renderFn ctxType body)
 
-  initialEnv :: Env
-  initialEnv = { scope: "ctx", loop: Nothing, params: Map.empty, parents: [], depth: 0 }
+  initialEnv :: Map String Template -> Env
+  initialEnv partials =
+    { scope: "ctx"
+    , loop: Nothing
+    , params: Map.empty
+    , parents: []
+    , labels: Map.empty
+    , partials
+    , expanding: []
+    , depth: 0
+    }
 
 renderFn :: String -> String -> String
 renderFn ctxType body =
@@ -102,6 +117,8 @@ nodes env ts = foldMap identity <$> traverse (node env) ts
 node :: Env -> Node -> Either String String
 node env = case _ of
   Content s -> Right ("    out.push_str(" <> rustStr s <> ");\n")
+  -- `{{> name [ctx]}}` — inline the hoisted partial body at the call site.
+  Output _ (App "partial" args) -> emitPartial env args
   -- `{{ x }}` desugars to `escapeHtml (…)`: escape and append.
   Output _ (App "escapeHtml" [ a ]) -> do
     ae <- expr env a
@@ -114,6 +131,34 @@ node env = case _ of
   Sep _ name _ -> Left ("unsupported: standalone separator '" <> name <> "'")
   RawBlock _ name _ _ -> Left ("unsupported: raw block '" <> name <> "'")
   NodeError _ msg -> Left ("parse error: " <> msg)
+
+-- `{{> name}}` (implicit `this`) or `{{> name ctx}}` (explicit context).
+emitPartial :: Env -> Array Expr -> Either String String
+emitPartial env = case _ of
+  [ Lit (VString name) ] -> inlinePartial env name (App "this" [])
+  [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE
+  _ -> Left "unsupported: partial with a hash or a dynamic name"
+
+-- Inline the hoisted partial body with the passed context as the new scope. Loop
+-- metadata and block params do not cross into a partial; `root` (a function-level
+-- binding) does. Recursion is rejected — inlining would not terminate.
+inlinePartial :: Env -> String -> Expr -> Either String String
+inlinePartial env name ctxE = case Map.lookup name env.partials of
+  Nothing -> Left ("unsupported: unknown partial '" <> name <> "'")
+  Just body
+    | Array.elem name env.expanding -> Left ("unsupported: recursive partial '" <> name <> "'")
+    | otherwise -> do
+        ctxCode <- expr env ctxE
+        nodes
+          ( env
+              { scope = ctxCode
+              , loop = Nothing
+              , params = Map.empty
+              , parents = []
+              , expanding = Array.cons name env.expanding
+              }
+          )
+          body
 
 block :: Env -> Ident -> Array Expr -> Template -> Either String String
 block env name args body =
@@ -180,12 +225,12 @@ eachBlock env args body = case Array.head args of
       subVar = "__sub" <> ds
       lenVar = "__len" <> ds
       params' = bindEachParams paramNames cVar iVar env.params
-      childEnv =
-        { scope: cVar
-        , loop: Just lVar
-        , params: params'
-        , parents: Array.cons env.scope env.parents
-        , depth: d
+      childEnv = env
+        { scope = cVar
+        , loop = Just lVar
+        , params = params'
+        , parents = Array.cons env.scope env.parents
+        , depth = d
         }
       parentLoop = maybe "None" (\pl -> "Some(&" <> pl <> ")") env.loop
       s = splitClauses body
@@ -218,12 +263,11 @@ withBlock env args body = case Array.head args of
       d = env.depth + 1
       cVar = "__c" <> show d
       params' = maybe env.params (\n -> Map.insert n cVar env.params) (Array.index paramNames 0)
-      childEnv =
-        { scope: cVar
-        , loop: env.loop
-        , params: params'
-        , parents: Array.cons env.scope env.parents
-        , depth: d
+      childEnv = env
+        { scope = cVar
+        , params = params'
+        , parents = Array.cons env.scope env.parents
+        , depth = d
         }
       s = splitClauses body
     bodyS <- nodes childEnv s.before
