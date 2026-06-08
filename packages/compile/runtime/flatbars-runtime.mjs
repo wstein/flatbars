@@ -292,15 +292,18 @@ function withCtx(val, parent, names, label, bodyFn, elseFn) {
 }
 
 // ── aliasing: `let` (FlatBars letH) ──────────────────────────────────────────
-// Install the `bindings` object's name→value pairs as locals in a child frame
-// whose context, loop variables, and chain are the PARENT's unchanged (`let`
-// never re-roots, unlike `with`); only `binds` gains the new names. The surface
-// nests multi-binding lets, so `bindings` is one pair per frame and an inner let
-// sees the outer's names. Mirrors the interpreter's `pushHelpers`.
-function letScope(parent, bindings, bodyFn) {
+// Install the name→value pairs from `objs` (an array of objects — the surface
+// hash and/or RawBars `(bind …)` positionals, merged left-to-right, a later one
+// winning) as locals in a child frame whose context, loop variables, and chain are
+// the PARENT's unchanged (`let` never re-roots, unlike `with`); only `binds` gains
+// the new names. The surface nests multi-binding lets, so each frame sees the
+// outer's names. Mirrors the interpreter's `letH` + `pushHelpers`.
+function letScope(parent, objs, bodyFn) {
   const fr = { ...parent, binds: Object.create(parent.binds) };
-  if (bindings && typeof bindings === "object" && !Array.isArray(bindings) && !isSafe(bindings)) {
-    for (const k of Object.keys(bindings)) fr.binds[k] = bindings[k];
+  for (const o of objs) {
+    if (o && typeof o === "object" && !Array.isArray(o) && !isSafe(o)) {
+      for (const k of Object.keys(o)) fr.binds[k] = o[k];
+    }
   }
   return bodyFn(fr);
 }
@@ -538,6 +541,8 @@ const helpers = {
   else: () => new Safe(""),
   elif: () => new Safe(""),
   dict: (a) => { const o = {}; for (let i = 0; i + 1 < a.length; i += 2) o[stringify(a[i])] = a[i + 1]; return o; },
+  // a one-key object — the `{{#let (bind "name" value)}}` binding form (ADR-024 §4).
+  bind: (a) => ({ [stringify(a[0])]: a[1] }),
   apply: (a, f) => call(stringify(a[0]), a.slice(1), f),
 };
 // Host-registered helpers (ADR-018): inline JS functions a host adds with

@@ -69,6 +69,13 @@ export const cases = [
   { name: "with", t: "{{#with (lookup this \"u\")}}{{{lookup this \"name\"}}}{{/with}}", d: { u: { name: "Ada" } } },
   { name: "with-falsy-else", t: "{{#with (lookup this \"u\")}}x{{else}}none{{/with}}", d: { u: null } },
 
+  // ── let (RawBars/core canonical `(bind …)` form, ADR-024 §4) ─────────────────
+  { name: "let-bind-single", t: "{{#let (bind \"g\" \"Hi\")}}{{{g}}}{{/let}}", d: {} },
+  { name: "let-bind-data", t: "{{#let (bind \"n\" (lookup this \"count\"))}}{{{n}}} left{{/let}}", d: { count: 5 } },
+  { name: "let-bind-sequential", t: "{{#let (bind \"a\" 1)}}{{#let (bind \"b\" (add a 1))}}{{{a}}},{{{b}}}{{/let}}{{/let}}", d: {} },
+  { name: "let-bind-multi", t: "{{#let (bind \"x\" 1) (bind \"y\" 2)}}{{{x}}}/{{{y}}}{{/let}}", d: {} },
+  { name: "let-no-reroot", t: "{{#let (bind \"u\" (lookup this \"user\"))}}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{{/let}}", d: { name: "ROOT", user: { name: "Ada" } } },
+
   // ── value helpers (via the runtime registry) ────────────────────────────────
   { name: "eq-true", t: "{{{eq (lookup this \"a\") (lookup this \"b\")}}}", d: { a: 1, b: 1 } },
   { name: "ne", t: "{{{ne (lookup this \"a\") (lookup this \"b\")}}}", d: { a: 1, b: 2 } },

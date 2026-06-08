@@ -91,12 +91,13 @@ are [ADR-025](/adr/adr-0025-list-literal/).)
 
 > *Implementation note (2026-06-08).* Shipped as specified — sequential, never re-rooting — with two
 > deviations from §5's sketch. (a) `let` is a **kernel block operation** (`Kernel.Prelude.letH`), *not* a
-> dedicated `Let` AST node: it reads its bindings from the surface hash and renders the body through the
-> context-preserving `pushHelpers` (the env stack already had it). The sequential semantics come from the
-> MaxBars desugar **nesting** multi-binding lets into single-binding ones — `{{#let a=1 b=(add a 1)}}` ⇒
-> `{{#let a=1}}{{#let b=(add a 1)}}…` — so an inner binding's value is evaluated in the frame the outer
+> dedicated `Let` AST node: it reads its bindings from the surface hash (MaxBars) **and** positional
+> objects (the RawBars `(bind "name" value)` — `bind` is a one-key-object prelude helper, §4), then renders
+> the body through the context-preserving `pushHelpers` (the env stack already had it). The sequential
+> semantics come from **nesting** multi-binding lets into single-binding ones — `{{#let a=1 b=(add a 1)}}`
+> ⇒ `{{#let a=1}}{{#let b=(add a 1)}}…` — so an inner binding's value is evaluated in the frame the outer
 > installed (a single walk, no second pass). The compiled twin is `rt.letScope` (interpreter ≡ compiled,
-> `test:compile`). (b) The MaxBars-only scoping is enforced by **gating the desugar** to MaxBars, and a
+> `test:compile`, including the RawBars `let-bind-*` cases). (b) The MaxBars-only scoping is enforced by **gating the desugar** to MaxBars, and a
 > *FullBars* `{{#let}}` is **rejected** with a located `DisallowedShape` at render
 > (`FullBars.checkSurfaceStrict`, alongside the bare-`{{#inline}}` rejection) whose message points to the
 > `{{#with x as |n|}}` fix — not a silent no-op. The editor surfaces the same as an LSP diagnostic
@@ -179,7 +180,7 @@ corpus (see *Gates*).
 
 | Surface | `{{#let}}` | `{…}` dict literal | Notes |
 | --- | --- | --- | --- |
-| *RawBars* | ✓ (explicit form: `{{#let (bind a x)}}…{{/let}}`) | ✗ (no sugar at all by design) | Writes the kernel form directly. |
+| *RawBars* | ✓ (explicit form: `{{#let (bind "a" x)}}…{{/let}}`) | ✗ (no sugar at all by design) | Writes the kernel form directly; `bind` is a prelude helper (a one-key object), nested for sequential scope. |
 | *FullBars* | *✗* | *✗* | Handlebars-faithful. Authors use `{{#with x as \|n\|}}` for aliasing and `(dict …)` for collections. |
 | *MaxBars* | ✓ (with `n=expr` surface sugar) | ✓ (`{name=expr …}`) | The flagship; the list literal is added by ADR-025. |
 
@@ -233,7 +234,7 @@ The identity worth recording: `{{#with x as |n|}}` ≡ `{{#with x}}{{#let n=x}} 
   `checkSurfaceStrict`), and `check:dialect-diagnostics` (the LSP flags it in the editor). A `{name: …}` /
   `[…]` literal needs no separate assertion — `{`/`[` is a lex error in FullBars before the desugar.
 * *Linter round-trip* (`Linter.Lower`) — pins that `{{#let a=1}}` lowers to
-  `{{#let (bind a 1)}}` and `{b=1 c=2}` lowers to `(dict b=1 c=2)`. One canonical RawBars
+  `{{#let (bind "a" 1)}}` and `{b=1 c=2}` lowers to `(dict b=1 c=2)`. One canonical RawBars
   form per construct — no AST drift, no two-way sugar.
 
 ### Linter

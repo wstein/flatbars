@@ -15,6 +15,7 @@ export const OPERATION_NAMES = [
   "append",
   "apply",
   "at",
+  "bind",
   "capitalize",
   "ceil",
   "coalesce",

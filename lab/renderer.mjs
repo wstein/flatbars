@@ -56,7 +56,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=84";
+} from "./vendor/flatbars-engine.mjs?v=85";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -139,6 +139,7 @@ const BB_CATALOG = [
   { name: "json", category: "output", arity: "inline", summary: "Serialize a value as JSON text; pretty=true indents.", example: "{{{ json this pretty=true }}}" },
   { name: "escapeJson", category: "output", arity: "inline", summary: "JSON + HTML-escape (for embedding in HTML).", example: "{{{ escapeJson this }}}" },
   { name: "dict", category: "data", arity: "inline", summary: "Build an object from key/value pairs (target of hash args).", example: "{{#if n (dict \"includeZero\" true)}}…{{/if}}" },
+  { name: "bind", category: "data", arity: "inline", summary: "A one-key object — the RawBars `{{#let (bind \"name\" value)}}` binding form (ADR-024).", example: "{{#let (bind \"total\" (add a b))}}{{{ total }}}{{/let}}" },
   { name: "partial", category: "composition", arity: "inline", summary: "Render a registered partial; block form gives a fallback + {{> @partial-block}}.", example: "{{> nav user}}" },
   { name: "list", category: "collections", arity: "inline", summary: "Build an array from its arguments — the MaxBars […] list-literal helper.", example: "{{#each [\"a\", \"b\", \"c\"]}}{{this}}{{/each}}" },
   { name: "range", category: "collections", arity: "inline", summary: "The inclusive integer range [a, b] as an array (the basis for counted loops); capped to keep a huge range from hanging.", example: "{{#each (range 1 count)}}{{ loop.index1 }}{{/each}}" },

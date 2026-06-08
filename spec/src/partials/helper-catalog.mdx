@@ -9,6 +9,7 @@
 | `append` | value | 2 | registered | Appends the second string to the first. |
 | `apply` | block | ≥1 | registered | Calls a helper named by a string argument with the remaining arguments. |
 | `at` | value | 2 | registered | The element at an index (negative counts from the end). |
+| `bind` | value | 2 | registered | Builds a one-key object `{ name: value }` — the `{{#let (bind "name" value)}}` binding form (RawBars canonical, ADR-024). |
 | `capitalize` | value | 1 | registered | Uppercases the first character of its argument. |
 | `ceil` | value | 1 | registered | Rounds a number up to the nearest integer. |
 | `coalesce` | value | ≥1 | registered | Returns the first non-null argument — the `??` operator's helper. |

@@ -50,6 +50,14 @@
       "doc": "The element at an index (negative counts from the end)."
     },
     {
+      "name": "bind",
+      "kind": "inline",
+      "arity": "2",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Builds a one-key object `{ name: value }` — the `{{#let (bind \"name\" value)}}` binding form (RawBars canonical, ADR-024)."
+    },
+    {
       "name": "capitalize",
       "kind": "inline",
       "arity": "1",

@@ -24,6 +24,21 @@ main = do
   -- core syntax renders against the shared engine (explicit lookup, raw output).
   assert' "render: lookup"
     (render "{{{lookup this \"x\"}}}" (obj [ Tuple "x" (VString "hi") ]) == Right "hi")
+  -- block-scoped `let` — the RawBars canonical `(bind "name" value)` form (ADR-024
+  -- §4). `let` aliases without re-rooting; nesting gives sequential scope; `bind`
+  -- builds the one-key binding object.
+  assert' "render: let (bind) — single binding"
+    (render "{{#let (bind \"g\" \"Hi\")}}{{{g}}}{{/let}}" (obj []) == Right "Hi")
+  assert' "render: let (bind) — sequential nesting (b sees a)"
+    ( render "{{#let (bind \"a\" 1)}}{{#let (bind \"b\" (add a 1))}}{{{a}}},{{{b}}}{{/let}}{{/let}}"
+        (obj []) == Right "1,2"
+    )
+  assert' "render: let (bind) — never re-roots the context"
+    ( render
+        "{{#let (bind \"u\" (lookup this \"user\"))}}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{{/let}}"
+        (obj [ Tuple "name" (VString "ROOT"), Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
+        == Right "ROOT/Ada"
+    )
   assert' "render: if/else block"
     ( render "{{#if (lookup this \"a\")}}Y{{else}}N{{/if}}" (obj [ Tuple "a" (VBool false) ])
         == Right "N"

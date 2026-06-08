@@ -218,6 +218,9 @@ coreOperationDefs =
   , gen "dict" "Builds an object from alternating key/value arguments (the hash target)." false
       AnyArity
       dictH
+  , valDef "bind"
+      "Builds a one-key object `{ name: value }` — the `{{#let (bind \"name\" value)}}` binding form (RawBars canonical, ADR-024)."
+      (binary bindH)
   , gen "apply" "Calls a helper named by a string argument with the remaining arguments." true
       (AtLeast 1)
       applyH
@@ -1464,17 +1467,32 @@ withH ctl args = case Array.uncons args of
     else renderElse ctl
   Nothing -> throwError (ArityError "with: expected at least 1 argument(s), got 0")
 
--- | `let`: install the hash's `name → value` pairs as nullary operations in a
--- | helpers-only frame, then render the body. Unlike `with`, the context, loop
--- | variables, and reserved chain pass through **unchanged** (`pushHelpers`, not
--- | `pushFrame`) — `let` never re-roots, it only aliases (ADR-024 §1). The MaxBars
--- | surface `{{#let a=1 b=(add a 1)}}` desugars to *nested* single-binding lets, so
--- | each `let` here carries one hash pair and the nesting gives left-to-right
--- | sequential scope (`b` sees `a`) in a single walk. No `{{else}}` clause.
+-- | `let`: install `name → value` bindings as nullary operations in a helpers-only
+-- | frame, then render the body. Unlike `with`, the context, loop variables, and
+-- | reserved chain pass through **unchanged** (`pushHelpers`, not `pushFrame`) —
+-- | `let` never re-roots, it only aliases (ADR-024 §1). The bindings come from two
+-- | sources, merged (a later one wins on a name collision):
+-- |
+-- |  * the surface **hash** — the MaxBars `{{#let a=1 b=…}}` desugars to *nested*
+-- |    single-binding lets, each carrying one `@hash` pair, so the nesting gives
+-- |    left-to-right sequential scope (`b` sees `a`) in a single walk; and
+-- |  * **positional objects** — the RawBars canonical form `{{#let (bind "a" x)}}`
+-- |    (ADR-024 §4); `bind` returns a one-key object, and sequential `let` nests the
+-- |    same way (`{{#let (bind "b" (add a 1))}}` sees the outer `a`).
+-- |
+-- | No `{{else}}` clause.
 letH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
-letH ctl _ = case ctl.hash of
-  Just (VObject m) -> renderSafe ctl (pushHelpers (map constOperation m) ctl.env) (mainBody ctl)
-  _ -> renderMain ctl
+letH ctl args =
+  let
+    objs = maybe [] pure ctl.hash <> args
+    bindings = Array.foldl addObj Map.empty objs
+  in
+    if Map.isEmpty bindings then renderMain ctl
+    else renderSafe ctl (pushHelpers (map constOperation bindings) ctl.env) (mainBody ctl)
+  where
+  addObj acc = case _ of
+    VObject m -> Map.union m acc
+    _ -> acc
 
 -- | The FullBars *resolve policy* (`Kernel.Env.refEngineWith`), Handlebars-style.
 -- | Two cases turn a `{{#x}}…{{/x}}` block into an implicit *section* over data
@@ -1580,6 +1598,15 @@ dictH _ args = build args Map.empty
       Just { head: v, tail: rest } -> build rest (Map.insert k v acc)
       Nothing -> throwError (ArityError "dict: odd number of arguments")
     Just _ -> throwError (TypeError "dict: keys must be strings")
+
+-- | `bind name value` → the one-key object `{ name: value }` (a single-pair
+-- | `dict`). It is the explicit `let`-binding constructor for dialects with no
+-- | `k=v` surface: `{{#let (bind "a" x)}}` (RawBars, ADR-024 §4). The name must be
+-- | a string literal — a bare RawBars `a` would be a helper call, not a name.
+bindH :: forall m. MonadThrow Error m => Value -> Value -> m Value
+bindH name value = case name of
+  VString k -> pure (VObject (Map.singleton k value))
+  _ -> throwError (TypeError "bind: the binding name must be a string")
 
 applyH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 applyH ctl args = case Array.uncons args of
