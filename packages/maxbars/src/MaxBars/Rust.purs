@@ -34,11 +34,12 @@
 -- | `clippy -D warnings`.
 -- |
 -- | `compileMaxRustCommented` is a readability variant: it threads the original
--- | surface through and annotates each emitted statement with a `// {{…}}` comment
--- | sliced from the template by the node's span. The comments are inert (output is
--- | byte-identical), and the fact that the spans survive `desugarSurfaceWith` and
--- | slice cleanly is feasibility evidence for the v2 span-mapped diagnostics
--- | (`trussbars/docs/07-v2-spike.md`).
+-- | surface through and annotates each emitted statement with a
+-- | `// <file>:<line>:<col>  {{…}}` comment — the tag sliced from the template by
+-- | the node's span, the location computed from the span start. The comments are
+-- | inert (output is byte-identical), and the fact that the spans survive
+-- | `desugarSurfaceWith` and slice cleanly is feasibility evidence for the v2
+-- | span-mapped diagnostics (`trussbars/docs/07-v2-spike.md`).
 module MaxBars.Rust
   ( compileMaxRust
   , compileMaxRustCommented
@@ -55,7 +56,7 @@ import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, trim)
+import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, split, trim)
 import Data.String.CodeUnits as SCU
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -81,9 +82,11 @@ type Env =
   , expanding :: Array String -- partials currently being inlined (recursion guard)
   , yield :: Maybe String -- pre-rendered body of an enclosing block partial (for `{{yield}}`)
   , depth :: Int
-  -- The original surface source + a flag, for the optional `// {{…}}` annotations
-  -- (`compileMaxRustCommented`); node spans index into `source`.
+  -- The original surface source + the template file name + a flag, for the optional
+  -- `// file:line:col {{…}}` annotations (`compileMaxRustCommented`); node spans
+  -- index into `source`, and `file` labels the breadcrumb (empty ⇒ line:col only).
   , source :: String
+  , file :: String
   , commented :: Boolean
   }
 
@@ -92,17 +95,19 @@ type Env =
 -- | Rust source in `out`, or `!ok` with the reason in `err` (a parse error, or an
 -- | unsupported construct outside the slice).
 compileMaxRust :: String -> String -> { ok :: Boolean, out :: String, err :: String }
-compileMaxRust = compileWith false
+compileMaxRust = compileWith false ""
 
--- | Like `compileMaxRust`, but annotates the emitted Rust with `// {{…}}` comments
--- | showing the originating MaxBars source (sliced from the template by each node's
--- | span) — a readability/teaching aid for reading generated code. The comments are
--- | inert: the rendered output is byte-for-byte identical to `compileMaxRust`.
-compileMaxRustCommented :: String -> String -> { ok :: Boolean, out :: String, err :: String }
+-- | Like `compileMaxRust`, but annotates each emitted statement with a
+-- | `// <file>:<line>:<col>  {{…}}` comment locating its originating MaxBars source
+-- | (the tag sliced by the node's span; the line:col computed from the span start)
+-- | — a readability/teaching aid and the docs/07 source-trail breadcrumb. `file`
+-- | labels the location (pass the template's name; "" ⇒ line:col only). The comments
+-- | are inert: rendered output is byte-for-byte identical to `compileMaxRust`.
+compileMaxRustCommented :: String -> String -> String -> { ok :: Boolean, out :: String, err :: String }
 compileMaxRustCommented = compileWith true
 
-compileWith :: Boolean -> String -> String -> { ok :: Boolean, out :: String, err :: String }
-compileWith commented ctxType src = case build of
+compileWith :: Boolean -> String -> String -> String -> { ok :: Boolean, out :: String, err :: String }
+compileWith commented file ctxType src = case build of
   Right rust -> { ok: true, out: rust, err: "" }
   Left e -> { ok: false, out: "", err: e }
   where
@@ -127,6 +132,7 @@ compileWith commented ctxType src = case build of
     , yield: Nothing
     , depth: 0
     , source: src
+    , file
     , commented
     }
 
@@ -166,13 +172,29 @@ estimateBytes = sum <<< map est
 nodes :: Env -> Template -> Either String String
 nodes env ts = foldMap identity <$> traverse (node env) ts
 
--- A `// {{…}}` annotation showing the originating surface for a node (commented
--- builds only). Slices the node's span from the source, keeps the opening tag, one
--- line, capped — enough to read the generated Rust back against the template.
+-- A `// <file>:<line>:<col>  {{…}}` annotation for a node (commented builds only):
+-- the location of the node's span (line:col from its start) and the opening tag
+-- sliced from the source — enough to read the generated Rust back against the
+-- template and jump to it. `file` is omitted when empty.
 srcComment :: Env -> Span -> String
 srcComment env sp
-  | env.commented = "    // " <> openTag (spanText env.source sp) <> "\n"
+  | env.commented =
+      let
+        { line, col } = lineCol env.source sp.start
+        loc = (if env.file == "" then "" else env.file <> ":") <> show line <> ":" <> show col
+      in
+        "    // " <> loc <> "  " <> openTag (spanText env.source sp) <> "\n"
   | otherwise = ""
+
+-- The 1-based line/column of a code-unit offset into `src` (spans are code-unit
+-- offsets, matching `spanText`). Splitting on `\n` (ASCII, so unit-aligned): the
+-- piece count is the line; the last piece's length is the column prefix.
+lineCol :: String -> Int -> { line :: Int, col :: Int }
+lineCol src start =
+  let
+    pieces = split (Pattern "\n") (SCU.take start src)
+  in
+    { line: Array.length pieces, col: 1 + maybe 0 SCU.length (Array.last pieces) }
 
 -- The opening tag of a (possibly whole-block) source slice: up to and including the
 -- first `}}` run, collapsed to one line and capped to ~64 chars.

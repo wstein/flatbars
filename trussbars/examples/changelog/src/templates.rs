@@ -8,10 +8,10 @@ pub fn render_changelog(ctx: &ChangelogCtx) -> String {
     let __root = ctx;
     let mut out = String::with_capacity(__CAP.suggest());
     out.push_str("# ");
-    // {{project}}
+    // changelog.truss:1:3  {{project}}
     trussbars_core::esc(&(ctx.project), &mut out);
     out.push_str(" — Changelog\n");
-    // {{#each (groupBy commits "category")}}
+    // changelog.truss:2:1  {{#each (groupBy commits "category")}}
     {
         let __sub1 = &(trussbars_std::group_by(&(ctx.commits), |__x| {
             let mut __s = String::new();
@@ -24,10 +24,10 @@ pub fn render_changelog(ctx: &ChangelogCtx) -> String {
             for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
                 let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
                 out.push_str("## ");
-                // {{loop.key}}
+                // changelog.truss:3:4  {{loop.key}}
                 trussbars_core::esc(&(__l1.key), &mut out);
                 out.push_str("\n");
-                // {{#each c in this}}
+                // changelog.truss:4:1  {{#each c in this}}
                 {
                     let __sub2 = &(__c1);
                     let __len2 = trussbars_core::Each::each_len(__sub2);
@@ -36,20 +36,20 @@ pub fn render_changelog(ctx: &ChangelogCtx) -> String {
                         for (__i2, (__k2, __c2)) in trussbars_core::Each::each(__sub2).enumerate() {
                             let __l2 = trussbars_core::Loop::at(__i2, __len2, __k2, Some(&__l1));
                             out.push_str("- ");
-                            // {{c.subject}}
+                            // changelog.truss:5:3  {{c.subject}}
                             trussbars_core::esc(&(__c2.subject), &mut out);
-                            // {{#if c.scope}}
+                            // changelog.truss:5:16  {{#if c.scope}}
                             if trussbars_core::truthy(&(__c2.scope)) {
                                 out.push_str(" _(");
-                                // {{c.scope}}
+                                // changelog.truss:5:34  {{c.scope}}
                                 trussbars_core::esc(&(__c2.scope), &mut out);
                                 out.push_str(")_");
                             }
                             out.push_str(" `");
-                            // {{c.hash}}
+                            // changelog.truss:5:56  {{c.hash}}
                             trussbars_core::esc(&(__c2.hash), &mut out);
                             out.push_str("` · ");
-                            // {{c.date}}
+                            // changelog.truss:5:70  {{c.date}}
                             trussbars_core::esc(&(__c2.date), &mut out);
                             out.push_str("\n");
                         }

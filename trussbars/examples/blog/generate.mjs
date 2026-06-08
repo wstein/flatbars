@@ -26,7 +26,7 @@ const PAGES = [
 const modules = [];
 for (const p of PAGES) {
   const src = readFileSync(resolve(here, "templates", p.file), "utf8");
-  const r = compileMaxRustCommented(p.ctx)(src);
+  const r = compileMaxRustCommented(p.file)(p.ctx)(src);
   if (!r.ok) {
     console.error(`error: ${p.file} did not compile: ${r.err}`);
     process.exit(1);
