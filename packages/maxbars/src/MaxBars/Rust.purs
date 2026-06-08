@@ -24,9 +24,12 @@
 -- | `{{> name [ctx]}}`, and `{{#partial}}` + `{{yield}}` with the body pre-rendered
 -- | in the caller frame), labelled loops (`label NAME` → `outer`), and the
 -- | literal-key closures `pluck` / `sortBy` / `groupBy` (the last grouping into a
--- | map, iterated via the `Each` trait), and raw blocks (the built-in `raw` head,
--- | emitted verbatim). Anything else (`dict`/collection literals, a non-`raw`
--- | raw-block head — which needs a host helper) returns a `Left` "unsupported …"
+-- | map, iterated via the `Each` trait), the collection filters `where` / `reject` /
+-- | `some` / `every` (ADR-036/037: predicate closures over `.iter().filter`/`.any`/
+-- | `.all`), `{{#let}}` block-scoped bindings, list literals `[…]` (→ a Rust array),
+-- | and raw blocks (the built-in `raw` head, emitted verbatim). Anything else
+-- | (`dict` literals — which need a generated struct; `find` — which needs an
+-- | Option-aware `with`; a non-`raw` raw-block head) returns a `Left` "unsupported …"
 -- | so the conformance harness excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
@@ -501,6 +504,50 @@ bindEachParams names cVar iVar m =
   in
     maybe m1 (\n -> Map.insert n iVar m1) (Array.index names 1)
 
+-- A collection-filter adapter (ADR-036/037): `(coll).iter().<method>(|__x| [!](pred))`,
+-- collecting into a `Vec<&T>` for `filter` (an each-subject) or yielding a `bool` for
+-- `any`/`all`. `negated` wraps the predicate in `!(…)` (for `reject`). The element is
+-- `__x` (a reference that auto-derefs on field access).
+collFilter :: Env -> String -> Boolean -> Array Expr -> Either String String
+collFilter env method negated args = case Array.uncons args of
+  Just { head: collE, tail } | not (Array.null tail) -> do
+    ie <- expr env collE
+    body <- predBody env tail
+    let
+      pred = if negated then "!(" <> body <> ")" else body
+      suffix = if method == "filter" then ".collect::<Vec<_>>()" else ""
+    Right ("(" <> ie <> ").iter()." <> method <> "(|__x| " <> pred <> ")" <> suffix)
+  _ -> Left "unsupported: collection filter without a collection and a predicate"
+
+-- The boolean predicate body for a filter, referencing the element as `__x`:
+-- `"key"` → the key's truthiness; `"key" "cmp" value` → a comparator / string-predicate.
+predBody :: Env -> Array Expr -> Either String String
+predBody env = case _ of
+  [ Lit (VString key) ] -> Right ("trussbars_core::truthy(&__x." <> key <> ")")
+  [ Lit (VString key), Lit (VString cmp), val ] -> do
+    ve <- expr env val
+    cmpBody key cmp ve
+  _ -> Left "unsupported: collection-filter predicate (want `\"key\"` or `\"key\" \"cmp\" value`)"
+
+-- A single comparator/string-predicate over `__x.<key>`. Numeric comparators need an
+-- `f64` field (like any literal comparison); the string predicates need a string field.
+cmpBody :: String -> String -> String -> Either String String
+cmpBody key cmp ve =
+  let
+    field = "__x." <> key
+  in
+    case cmp of
+      "gt" -> Right (field <> " > " <> ve)
+      "gte" -> Right (field <> " >= " <> ve)
+      "lt" -> Right (field <> " < " <> ve)
+      "lte" -> Right (field <> " <= " <> ve)
+      "eq" -> Right (field <> " == " <> ve)
+      "ne" -> Right (field <> " != " <> ve)
+      "startsWith" -> Right (field <> ".starts_with(" <> ve <> ")")
+      "endsWith" -> Right (field <> ".ends_with(" <> ve <> ")")
+      "includes" -> Right (field <> ".contains(" <> ve <> ")")
+      _ -> Left ("unsupported: collection comparator '" <> cmp <> "'")
+
 --------------------------------------------------------------------------------
 -- Expressions
 --------------------------------------------------------------------------------
@@ -563,6 +610,14 @@ expr env = case _ of
           <> key
           <> ", &mut __s); __s })"
       )
+  -- Collection filters (ADR-036/037): a key-truthiness (`"key"`) or key-comparator
+  -- (`"key" "cmp" value`) predicate over a collection, emitted as a native iterator
+  -- adapter. `where`/`reject` → `Vec<&T>` (an each-subject); `some`/`every` → `bool`.
+  -- `find` (→ `Option`) is deferred — it needs an Option-aware `with`.
+  App "where" args -> collFilter env "filter" false args
+  App "reject" args -> collFilter env "filter" true args
+  App "some" args -> collFilter env "any" false args
+  App "every" args -> collFilter env "all" false args
   -- `cond ? a : b` — a native `if`-expression; the two arms must unify (Rust checks).
   App "ternary" [ c, a, b ] -> do
     ce <- expr env c

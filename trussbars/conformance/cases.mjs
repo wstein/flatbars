@@ -148,6 +148,61 @@ export const cases = [
     template: "{{[1, 2, 3, 4] | count}} items",
     data: {},
   },
+  {
+    // S1: a list literal in OUTPUT position stringifies like a slice (join ",").
+    id: "list-output",
+    template: "nums: {{[1, 2, 3]}}",
+    data: {},
+  },
+
+  // ── collection filters (ADR-036/037): where/reject/some/every ────────────────
+  {
+    id: "where-comparator",
+    template: '{{#each (where items "age" "gt" 20)}}{{this.name}} {{/each}}',
+    data: {
+      items: [
+        { name: "Ann", age: 30 },
+        { name: "Bo", age: 17 },
+        { name: "Cy", age: 25 },
+      ],
+    },
+  },
+  {
+    id: "where-truthiness",
+    template: '{{#each (where items "active")}}{{this.name}} {{/each}}',
+    data: {
+      items: [
+        { name: "Ann", active: true },
+        { name: "Bo", active: false },
+      ],
+    },
+  },
+  {
+    id: "reject-truthiness",
+    template: '{{#each (reject items "active")}}{{this.name}} {{/each}}',
+    data: {
+      items: [
+        { name: "Ann", active: true },
+        { name: "Bo", active: false },
+      ],
+    },
+  },
+  {
+    id: "where-startswith",
+    template: '{{#each (where items "name" "startsWith" "A")}}{{this.name}} {{/each}}',
+    data: { items: [{ name: "Ann" }, { name: "Bo" }, { name: "Al" }] },
+  },
+  {
+    id: "some-every",
+    template:
+      "{{#if (some items \"active\")}}some {{/if}}{{#if (every items \"active\")}}all{{else}}not-all{{/if}}",
+    data: {
+      items: [
+        { active: true },
+        { active: false },
+      ],
+    },
+  },
 
   // ── loop.parent / loop.root chains (Option-threaded) ─────────────────────────
   {

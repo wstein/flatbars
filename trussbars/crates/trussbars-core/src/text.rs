@@ -237,6 +237,14 @@ impl<T: ToText> ToText for Vec<T> {
     }
 }
 
+// A fixed-size array — so a list literal `[1, 2, 3]` in output position
+// (`{{ [1,2,3] }}`) stringifies like a slice (elements joined with `,`).
+impl<const N: usize, T: ToText> ToText for [T; N] {
+    fn write_text(&self, out: &mut String) {
+        self.as_slice().write_text(out);
+    }
+}
+
 impl<T: ToText + ?Sized> ToText for &T {
     #[inline]
     fn write_text(&self, out: &mut String) {

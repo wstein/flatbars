@@ -14,8 +14,11 @@
 //! f64 formatting, is a documented divergence masked by the conformance harness.
 //!
 //! Deferred (not yet here, by design): `json`/`escape_json` (a serializer
-//! dependency), the i18n pack (`t`/`number`/`date`/… — a host `Translator` seam),
-//! and `sort_by`/`pluck`/`group_by` (the codegen emits field-access closures).
+//! dependency) and the i18n pack (`t`/`number`/`date`/… — a host `Translator`
+//! seam). Some operations are emitted by the codegen as inline closures rather than
+//! living here — `sort_by`/`pluck`/`group_by` (field-access closures) and the
+//! collection filters `where`/`reject`/`some`/`every` (ADR-036/037: predicate
+//! closures over `.iter().filter`/`.any`/`.all`). `find` (→ `Option`) is deferred.
 
 mod array;
 mod number;
