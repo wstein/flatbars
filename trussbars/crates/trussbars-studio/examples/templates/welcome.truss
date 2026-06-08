@@ -1,0 +1,4 @@
+<h1>{{title | shout}}</h1>
+<ul>
+{{#each items}}  <li>{{name}} — {{role}}</li>
+{{/each}}</ul>
