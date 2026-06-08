@@ -336,19 +336,58 @@ binOp env op a b = do
   Right ("(" <> ae <> " " <> op <> " " <> be <> ")")
 
 -- A desugared path `lookup subject "k1" "k2" …` → a typed field access
--- `<subject>.k1.k2`. A non-literal key is a data-derived name (spec §4.3).
+-- `<subject>.k1.k2`. A path rooted at `loop` threads the `parent`/`root` chain
+-- (the `Option<&Loop>` machinery). A non-literal key is a data-derived name
+-- (spec §4.3).
 path :: Env -> Array Expr -> Either String String
 path env args = case Array.uncons args of
   Nothing -> Left "unsupported: lookup without a subject"
+  Just { head: App "loop" [], tail: keys } -> case env.loop of
+    Nothing -> Left "unsupported: 'loop' used outside an each"
+    Just lvar -> traverse keyStr keys >>= emitLoopChain lvar
   Just { head: subj, tail: keys } -> do
     base <- expr env subj
     segs <- traverse seg keys
     Right (base <> foldMap identity segs)
   where
-  seg :: Expr -> Either String String
+  keyStr = case _ of
+    Lit (VString k) -> Right k
+    _ -> Left "unsupported: computed loop key"
   seg = case _ of
     Lit (VString k) -> Right ("." <> k)
     _ -> Left "unsupported: computed lookup (a data-derived field name, spec §4.3)"
+
+-- The direct (non-chained) `Loop` metadata fields.
+loopFields :: Array String
+loopFields = [ "index0", "index1", "rindex0", "rindex1", "first", "last", "length", "key" ]
+
+-- A `loop` path: zero or more `parent`/`root` hops then a terminal metadata field.
+-- `parent` introduces an `Option<&Loop>` (it is `None` at the outermost loop), so
+-- the chain threads it (`map`/`and_then`); the terminal field becomes `.map(|p|
+-- p.field)` once optional — yielding `""` at the root, exactly as the interpreter
+-- renders `loop.parent.index0` of an outermost loop.
+emitLoopChain :: String -> Array String -> Either String String
+emitLoopChain lvar keys = case Array.unsnoc keys of
+  Nothing -> Left "unsupported: bare 'loop'"
+  Just { init: hops, last: field }
+    | not (Array.elem field loopFields) -> Left ("unsupported: loop field '" <> field <> "'")
+    | otherwise -> do
+        acc <- Array.foldM stepHop { code: lvar, opt: false } hops
+        Right
+          ( if acc.opt then acc.code <> ".map(|__p| __p." <> field <> ")"
+            else acc.code <> "." <> field
+          )
+  where
+  stepHop st = case _ of
+    "root" -> Right
+      ( if st.opt then st { code = st.code <> ".map(|__p| __p.root())" }
+        else st { code = st.code <> ".root()" }
+      )
+    "parent" -> Right
+      ( if st.opt then { code: st.code <> ".and_then(|__p| __p.parent)", opt: true }
+        else { code: st.code <> ".parent", opt: true }
+      )
+    h -> Left ("unsupported: loop hop '" <> h <> "'")
 
 -- Argument-passing conventions for a `trussbars_std` value helper.
 data ArgKind

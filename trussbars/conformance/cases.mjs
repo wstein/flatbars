@@ -116,6 +116,20 @@ export const cases = [
     data: { count: 5 },
   },
 
+  // ── loop.parent / loop.root chains (Option-threaded) ─────────────────────────
+  {
+    id: "loop-parent",
+    template:
+      "{{#each rows as |row|}}{{#each row}}{{loop.parent.index0}}:{{this}} {{/each}}{{/each}}",
+    data: { rows: [["a", "b"], ["c"]] },
+  },
+  {
+    id: "loop-root",
+    template:
+      "{{#each groups as |g|}}{{#each g}}{{loop.root.length}}/{{this}} {{/each}}{{/each}}",
+    data: { groups: [["x"], ["y", "z"]] },
+  },
+
   // ── coalescers (?? requires the left to be Option, hence null in the data) ───
   {
     id: "coalesce",
