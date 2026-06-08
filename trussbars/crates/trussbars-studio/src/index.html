@@ -4,15 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trussbars Studio</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
 <style>
-  :root { --bg:#1b1d23; --panel:#23262e; --fg:#e6e6e6; --dim:#9aa0ab; --accent:#a78bfa; --hi:#3b2f57; --ok:#4ade80; --err:#f87171; --border:#343843; }
+  :root { --bg:#1b1d23; --panel:#23262e; --fg:#e6e6e6; --dim:#9aa0ab; --accent:#a78bfa; --hi:#3b2f57; --ok:#4ade80; --err:#f87171; --warn:#fbbf24; --border:#343843; }
   * { box-sizing: border-box; }
-  body { margin:0; font:14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
+  body { margin:0; font:13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--bg); color:var(--fg); height:100vh; display:flex; flex-direction:column; }
   header { padding:.5rem 1rem; background:var(--panel); border-bottom:1px solid var(--border); display:flex; gap:1rem; align-items:center; }
   header b { color:var(--accent); }
   header .grow { flex:1; }
   #layout { flex:1; display:flex; min-height:0; }
-  aside { width:220px; background:var(--panel); border-right:1px solid var(--border); overflow:auto; padding:.5rem; }
+  aside { width:210px; background:var(--panel); border-right:1px solid var(--border); overflow:auto; padding:.5rem; }
   aside h4 { color:var(--dim); margin:.5rem .25rem; font-weight:600; text-transform:uppercase; font-size:11px; letter-spacing:.05em; }
   aside .f { padding:.2rem .4rem; cursor:pointer; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   aside .f:hover { background:var(--hi); }
@@ -23,8 +25,13 @@
   .bar .grow { flex:1; }
   button, select { background:#2c3038; color:var(--fg); border:1px solid var(--border); border-radius:4px; padding:.2rem .5rem; font:inherit; cursor:pointer; }
   button:hover { border-color:var(--accent); }
-  textarea { flex:1; background:var(--bg); color:var(--fg); border:0; padding:.6rem; resize:none; font:inherit; outline:none; }
+  #editwrap { flex:1; min-height:0; display:flex; }
+  .CodeMirror { flex:1; height:auto; font:inherit; }
+  .CodeMirror-gutters { background:#23262e; border-right:1px solid var(--border); }
+  .diag-err { color:var(--err); }
+  .diag-warn { color:var(--warn); }
   .pane { flex:1; display:flex; flex-direction:column; min-height:0; border-bottom:1px solid var(--border); }
+  .pane:last-child { border-bottom:0; }
   .pane h3 { margin:0; padding:.35rem .6rem; background:var(--panel); border-bottom:1px solid var(--border); font-size:12px; color:var(--dim); display:flex; gap:.5rem; }
   .pane .body { flex:1; overflow:auto; padding:.6rem; white-space:pre-wrap; word-break:break-word; }
   pre.body { margin:0; }
@@ -33,7 +40,10 @@
   .link-hi { background:var(--accent) !important; color:#1b1d23 !important; outline:2px solid var(--accent) !important; }
   .verdict.ok { color:var(--ok); }
   .verdict.err { color:var(--err); }
-  .right { display:flex; flex-direction:column; }
+  #ctx { padding:.4rem .6rem; background:var(--panel); border-top:1px solid var(--border); color:var(--dim); white-space:pre-wrap; max-height:25%; overflow:auto; }
+  #ctx b { color:var(--accent); }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; background:var(--ok); }
+  .dot.dirty { background:var(--warn); }
 </style>
 </head>
 <body>
@@ -45,21 +55,31 @@
   </aside>
   <main>
     <div class="col">
-      <div class="bar"><span>template</span><span class="grow"></span><span id="path" style="color:var(--dim)"></span><button id="save">Save</button></div>
-      <textarea id="tpl" spellcheck="false" placeholder="open a .truss template…"></textarea>
+      <div class="bar"><span class="dot" id="dot" title="saved"></span><span id="path" style="color:var(--dim)">template</span><span class="grow"></span><button id="save">Save (⌘S)</button></div>
+      <div id="editwrap"></div>
+      <div id="ctx"><b>context</b> — hover an interpolation to see <code>this</code></div>
     </div>
-    <div class="col right">
+    <div class="col">
       <div class="pane"><h3>Output <span id="verdict" class="verdict"></span></h3><div class="body" id="output"></div></div>
-      <div class="pane" style="border-bottom:0"><h3>Emitted Rust (AOT)</h3><pre class="body" id="rust"></pre></div>
+      <div class="pane"><h3>Emitted Rust (AOT)</h3><pre class="body" id="rust"></pre></div>
     </div>
   </main>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/handlebars/handlebars.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-let dataPath = null, dataCache = "{}", timer = null;
-
+let dataCache = "{}", dirty = false, timer = null;
 const esc = s => s.replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
 const status = m => $("#status").textContent = m;
+const setDirty = d => { dirty = d; $("#dot").classList.toggle("dirty", d); $("#dot").title = d ? "unsaved" : "saved"; };
+
+const cm = CodeMirror($("#editwrap"), {
+  mode: "handlebars", theme: "dracula", lineNumbers: true, lineWrapping: true,
+  gutters: ["CodeMirror-linenumbers", "diag"], value: "",
+});
+cm.on("change", () => { setDirty(true); clearTimeout(timer); timer = setTimeout(inspectNow, 200); });
 
 async function loadFiles() {
   const files = await (await fetch("/api/files")).json();
@@ -72,26 +92,29 @@ async function loadFiles() {
     else { el.onclick = () => selectData(f); dat.append(el); }
   }
 }
-
 async function openTemplate(path) {
-  $("#tpl").value = await (await fetch("/api/file?path=" + encodeURIComponent(path))).text();
-  $("#path").textContent = path;
+  cm.setValue(await (await fetch("/api/file?path=" + encodeURIComponent(path))).text());
+  setDirty(false);
+  $("#path").textContent = path; cm.path = path;
   document.querySelectorAll("#templates .f").forEach(e => e.classList.toggle("active", e.dataset.path === path));
-  $("#tpl").dataset.path = path;
   inspectNow();
 }
-
 async function selectData(path) {
-  dataPath = path;
   dataCache = await (await fetch("/api/file?path=" + encodeURIComponent(path))).text();
   document.querySelectorAll("#datafiles .f").forEach(e => e.classList.toggle("active", e.dataset.path === path));
   inspectNow();
 }
+async function save() {
+  if (!cm.path) return;
+  await fetch("/api/file?path=" + encodeURIComponent(cm.path), { method:"PUT", body: cm.getValue() });
+  setDirty(false); status("saved " + cm.path);
+}
+$("#save").onclick = save;
+document.addEventListener("keydown", e => { if ((e.metaKey||e.ctrlKey) && e.key === "s") { e.preventDefault(); save(); } });
 
 async function inspectNow() {
-  const template = $("#tpl").value;
   let data; try { data = JSON.parse(dataCache); } catch { data = {}; }
-  const insp = await (await fetch("/api/inspect", { method:"POST", body: JSON.stringify({ template, data }) })).json();
+  const insp = await (await fetch("/api/inspect", { method:"POST", body: JSON.stringify({ template: cm.getValue(), data }) })).json();
   render(insp);
 }
 
@@ -99,36 +122,32 @@ function render(insp) {
   const v = $("#verdict");
   if (insp.aotCompatOk) { v.textContent = "✓ compiles under AOT"; v.className = "verdict ok"; }
   else { v.textContent = "✗ " + (insp.aotCompatError || "won't compile under AOT"); v.className = "verdict err"; }
+  diagnostics(insp);
 
   const enc = new TextEncoder(), dec = new TextDecoder();
   const key = s => s.join(",");
-
-  // Output pane: wrap each interpolation's run, tagged by its template span (data→output).
+  // Output pane with data→output provenance + per-run context.
   const bytes = enc.encode(insp.output || "");
   const interps = [...(insp.interpolations || [])].sort((a,b) => a.out[0] - b.out[0]);
   let html = "", pos = 0;
   for (const it of interps) {
     if (it.out[0] < pos) continue;
     html += esc(dec.decode(bytes.slice(pos, it.out[0])));
-    const tip = `${it.value}  ·  template ${it.src[0]}–${it.src[1]}`;
-    html += `<span class="interp" data-src="${key(it.src)}" title="${tip.replace(/"/g,"&quot;")}">`
+    const ctx = JSON.stringify(it.ctxThis);
+    html += `<span class="interp" data-src="${key(it.src)}" data-ctx='${esc(ctx).replace(/'/g,"&#39;")}' title="${esc(it.value)}">`
       + esc(dec.decode(bytes.slice(it.out[0], it.out[1]))) + `</span>`;
     pos = it.out[1];
   }
   html += esc(dec.decode(bytes.slice(pos)));
   $("#output").innerHTML = html || "<span style='color:var(--dim)'>(empty)</span>";
 
-  // Rust pane: wrap the byte range of each interpolation's emitted Rust (template→Rust),
-  // tagged by the SAME template span — so output↔Rust link by source span.
+  // Rust pane with template→Rust provenance (linked by the same template span).
   const rust = insp.emittedRust ?? null;
-  if (rust === null) {
-    $("#rust").textContent = "// emit error: " + (insp.emitError || "");
-  } else {
+  if (rust === null) { $("#rust").textContent = "// emit error: " + (insp.emitError || ""); }
+  else {
     const rb = enc.encode(rust);
     const srcKeys = new Set(interps.map(i => key(i.src)));
-    const tiles = (insp.rustMap || [])
-      .filter(t => srcKeys.has(key(t.src)))
-      .sort((a,b) => a.rust[0] - b.rust[0]);
+    const tiles = (insp.rustMap || []).filter(t => srcKeys.has(key(t.src))).sort((a,b) => a.rust[0] - b.rust[0]);
     let rh = "", rp = 0;
     for (const t of tiles) {
       if (t.rust[0] < rp) continue;
@@ -142,25 +161,27 @@ function render(insp) {
   status(`${interps.length} interpolation(s)`);
 }
 
-// Cross-pane linking: hover any span with data-src → highlight every span (output + Rust)
-// from the same template span.
-function linkHover(e) {
-  const src = e.target.dataset.src;
-  if (!src) return;
-  const on = e.type === "mouseover";
-  document.querySelectorAll(`[data-src="${src}"]`).forEach(el => el.classList.toggle("link-hi", on));
+function diagnostics(insp) {
+  cm.clearGutter("diag");
+  const mark = (line, cls, title) => {
+    const el = document.createElement("div"); el.className = cls; el.textContent = "●"; el.title = title;
+    cm.setGutterMarker(line, "diag", el);
+  };
+  const lineOf = m => { const mm = /^(\d+):(\d+):/.exec(m || ""); return mm ? +mm[1] - 1 : 0; };
+  if (!insp.rendered) mark(lineOf(insp.output), "diag-err", insp.output);
+  else if (!insp.aotCompatOk && insp.aotCompatError) mark(lineOf(insp.aotCompatError), "diag-warn", insp.aotCompatError);
 }
-$("#output").addEventListener("mouseover", linkHover);
-$("#output").addEventListener("mouseout", linkHover);
-$("#rust").addEventListener("mouseover", linkHover);
-$("#rust").addEventListener("mouseout", linkHover);
 
-$("#tpl").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(inspectNow, 200); });
-$("#save").onclick = async () => {
-  const path = $("#tpl").dataset.path; if (!path) return;
-  await fetch("/api/file?path=" + encodeURIComponent(path), { method:"PUT", body: $("#tpl").value });
-  status("saved " + path);
-};
+// Cross-pane linking + the Context Inspector.
+function hover(e) {
+  const t = e.target.closest("[data-src]"); if (!t) return;
+  const on = e.type === "mouseover";
+  document.querySelectorAll(`[data-src="${t.dataset.src}"]`).forEach(el => el.classList.toggle("link-hi", on));
+  if (t.dataset.ctx !== undefined) {
+    $("#ctx").innerHTML = on ? `<b>this</b> = ${esc(t.dataset.ctx)}` : "<b>context</b> — hover an interpolation to see <code>this</code>";
+  }
+}
+for (const id of ["#output", "#rust"]) { $(id).addEventListener("mouseover", hover); $(id).addEventListener("mouseout", hover); }
 loadFiles();
 </script>
 </body>

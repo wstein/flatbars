@@ -410,6 +410,9 @@ pub struct Interp {
     pub out_end: usize,
     /// The raw (unescaped) value it rendered.
     pub value: String,
+    /// The render **context** (`this`) in scope at this interpolation, as JSON — the
+    /// Context Inspector (Phase 2): hover a span → see the data it was rendered against.
+    pub ctx_this: String,
 }
 
 /// A captured inspection of one render — the data model the Trussbars Studio displays
@@ -445,12 +448,13 @@ impl Inspection {
             .iter()
             .map(|i| {
                 format!(
-                    "{{\"src\":[{},{}],\"out\":[{},{}],\"value\":{}}}",
+                    "{{\"src\":[{},{}],\"out\":[{},{}],\"value\":{},\"ctxThis\":{}}}",
                     i.src_start,
                     i.src_end,
                     i.out_start,
                     i.out_end,
-                    jstr(&i.value)
+                    jstr(&i.value),
+                    i.ctx_this
                 )
             })
             .collect::<Vec<_>>()
@@ -478,6 +482,25 @@ impl Inspection {
             interps,
             rust_map,
         )
+    }
+}
+
+/// A dynamic [`Value`] as compact JSON (for the Context Inspector display).
+fn value_json(v: &Value) -> String {
+    match v {
+        Value::Null => "null".to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Num(n) => {
+            let mut s = String::new();
+            n.write_text(&mut s);
+            s
+        }
+        Value::Str(s) => jstr(s),
+        Value::Array(a) => format!("[{}]", a.iter().map(value_json).collect::<Vec<_>>().join(",")),
+        Value::Object(o) => format!(
+            "{{{}}}",
+            o.iter().map(|(k, v)| format!("{}:{}", jstr(k), value_json(v))).collect::<Vec<_>>().join(",")
+        ),
     }
 }
 
@@ -573,6 +596,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
                     out_start: start,
                     out_end: out.len(),
                     value,
+                    ctx_this: value_json(&env.this),
                 });
             }
         }
