@@ -10303,7 +10303,7 @@ var isScopedBinding = function(name2) {
         return member2(name2)(v1.value0) || go(v1.value1);
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Env (line 195, column 3 - line 195, column 17): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Env (line 201, column 3 - line 201, column 17): " + [v1.constructor.name]);
     };
     return go(v.helpers);
   };
@@ -10317,7 +10317,7 @@ var innermostFrame = function(v) {
     return empty3;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Env (line 203, column 29 - line 205, column 19): " + [v.helpers.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Env (line 209, column 29 - line 211, column 19): " + [v.helpers.constructor.name]);
 };
 var enterPartial = function(v) {
   return {
