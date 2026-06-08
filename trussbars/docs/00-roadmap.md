@@ -26,20 +26,36 @@ blog dogfood ─▶ feature freeze ─▶ v2 proc-macro ─▶ (escaping workloa
 The ordering principle: **the example reveals the feature set; the freeze pins it;
 v2 is built against a settled language, not a moving one.**
 
-## Immediate next actions
+## Pre-v2 gate — CLEARED
 
-1. **Ratify the freeze (docs/06).** One open call: `{{#let}}` (F4) — IN or OUT for v2.
-   Collection literals (F5) stay deferred; F1 is wontfix.
-2. **Start v2 in this order** (docs/07 §6): Class-A `compile_error!` with
-   `path:line:col` first (cheap, biggest relief) → `truss!` with template-path-named
-   locals + `quote_spanned!` → the `trybuild` diagnostic gate → the `path=` form.
-3. **Defer** the host-binding affordance (reframed #4) and the escaping workload
-   until v2 lands and a real need shows.
+1. **Freeze ratified (docs/06).** The v1 surface is frozen — `{{#let}}`, list
+   literals, collection filters (`where`/`reject`/`find`/`some`/`every`), and enum
+   context types are all IN; `dict` literals + data-enum dispatch are the two
+   type-aware items deliberately → v2.
+2. **Corpus hardened (56/56).** `ctxgen` synthesizes enums (S4 conformance-gated);
+   escaping-heavy + deep-nesting edges added.
+3. **v2 decisions resolved (docs/07 §5):** stable-not-nightly, no type-descriptor
+   initially, inline `truss!` first.
+4. **The parser scoped (docs/08).** Named as v2's dominant task; recommended a
+   fresh recursive-descent parser for the Trussbars subset + a port of the desugar
+   rules, gated by the corpus.
+5. **Host helpers designed (docs/09).** The F3 convention: unknown head → a
+   typed `helpers::<name>` free-function call ("names static" preserved).
+
+## Starting v2 (the build order)
+
+Parser first (docs/08 §6: lexer → expr → blocks+desugar → emit → diagnostics), with
+the 56-case corpus as the incremental gate; then the diagnostics (docs/07 §6:
+class-A `compile_error!` → `truss!` + `quote_spanned!` → trybuild gate → `path=`);
+then the host-helper convention (docs/09). The runtime crates and the emit logic
+(`MaxBars/Rust.purs`) are unchanged inputs.
 
 ## Reference docs
 
 - `01-subset-spec.md` — the language. `02-runtime-api.md` — the runtime surface
   (incl. `SizeHint`, `no_std`). `04-conformance.md` — the byte-identity harness.
 - `05-codegen-optimization.md` — the profiling pass / safe-ceiling decision record.
-- `06-feature-freeze.md` — the frozen v1 surface v2 targets.
-- `07-v2-spike.md` — the diagnostic span-mapping plan for v2.
+- `06-feature-freeze.md` — the **ratified** v1 surface v2 targets.
+- `07-v2-spike.md` — the diagnostic span-mapping plan (decisions resolved).
+- `08-v2-parser.md` — the Rust parser/desugar scoping (v2's dominant task).
+- `09-host-helpers.md` — the typed host-helper convention (F3).
