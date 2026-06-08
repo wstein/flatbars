@@ -187,6 +187,10 @@ struct Env {
     yield_html: Option<Rc<str>>,
     /// Partial names currently expanding (recursion guard).
     expanding: Vec<String>,
+    /// AOT-compat (strict) mode: reject what the AOT backend would reject — numeric
+    /// truthiness, bare-object output, unknown fields, `dict` — so this render is a
+    /// *verifying proxy* for "would this compile under AOT, identically?" (docs/11 §7).
+    strict: bool,
 }
 
 impl Env {
@@ -227,18 +231,39 @@ impl Template {
     /// # Errors
     /// A reason string for an unimplemented construct/helper (never a wrong answer).
     pub fn render(&self, data: &Value) -> Result<String, String> {
+        self.render_with(data, false)
+    }
+
+    /// Render in **AOT-compat (strict) mode** — a verifying proxy for the AOT backend
+    /// (docs/11 §7): byte-identical to lenient on what the AOT accepts, but an `Err`
+    /// on what AOT would reject (numeric truthiness, bare-object output, an unknown
+    /// field against the data shape, `dict`). "If it renders here, it compiles under
+    /// AOT and renders identically" — 100% modulo schema fidelity (it checks the data
+    /// shape, not the host's real Rust types).
+    ///
+    /// # Errors
+    /// The reason an AOT-rejected construct was used, located at the offending value.
+    pub fn render_compat(&self, data: &Value) -> Result<String, String> {
+        self.render_with(data, true)
+    }
+
+    fn render_with(&self, data: &Value, strict: bool) -> Result<String, String> {
         let mut out = String::with_capacity(self.cap_hint.get().max(16));
-        self.render_into(data, &mut out)?;
+        self.eval_root(data, &mut out, strict)?;
         self.cap_hint.set(out.len());
         Ok(out)
     }
 
-    /// Render appending to a caller-owned buffer — lets a host reuse one allocation
-    /// across renders (clear and re-pass the same `String`).
+    /// Render (lenient) appending to a caller-owned buffer — lets a host reuse one
+    /// allocation across renders (clear and re-pass the same `String`).
     ///
     /// # Errors
     /// As [`Template::render`].
     pub fn render_into(&self, data: &Value, out: &mut String) -> Result<(), String> {
+        self.eval_root(data, out, false)
+    }
+
+    fn eval_root(&self, data: &Value, out: &mut String, strict: bool) -> Result<(), String> {
         let env = Env {
             this: data.clone(),
             root: data.clone(),
@@ -249,6 +274,7 @@ impl Template {
             partials: Rc::clone(&self.partials),
             yield_html: None,
             expanding: Vec::new(),
+            strict,
         };
         eval_nodes(&env, &self.nodes, out)
     }
@@ -320,6 +346,9 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
         Node::RawBlock { body, .. } => out.push_str(body),
         Node::Output { expr, raw, .. } => {
             let v = eval_expr(env, expr)?;
+            if env.strict && matches!(v, Value::Object(_)) {
+                return Err("AOT-compat: a struct/object has no text form (AOT rejects `{{object}}`)".into());
+            }
             if *raw {
                 v.raw_text(out);
             } else {
@@ -388,12 +417,22 @@ fn expand_partial(
         partials: Rc::clone(&env.partials),
         yield_html,
         expanding,
+        strict: env.strict,
     };
     eval_nodes(&child, body, out)
 }
 
+/// Truthiness at a boolean-decision site. In AOT-compat (strict) mode a number is an
+/// error — AOT has no `Truthy` for numbers (docs/01 Option C); write a comparison.
+fn truthy_at(env: &Env, v: &Value) -> Result<bool, String> {
+    if env.strict && matches!(v, Value::Num(_)) {
+        return Err("AOT-compat: a number in boolean position — write an explicit comparison (e.g. `> 0`)".into());
+    }
+    Ok(v.truthy())
+}
+
 fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
-    let mut test = eval_expr(env, &c.cond)?.truthy();
+    let mut test = truthy_at(env, &eval_expr(env, &c.cond)?)?;
     if c.negated {
         test = !test;
     }
@@ -401,7 +440,7 @@ fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
         return eval_nodes(env, &c.body, out);
     }
     for (econd, ebody) in &c.elifs {
-        if eval_expr(env, econd)?.truthy() {
+        if truthy_at(env, &eval_expr(env, econd)?)? {
             return eval_nodes(env, ebody, out);
         }
     }
@@ -410,7 +449,7 @@ fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
 
 fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
     let subj = eval_expr(env, &w.subject)?;
-    if subj.truthy() {
+    if truthy_at(env, &subj)? {
         eval_nodes(&env.rerooted(subj), &w.body, out)
     } else {
         eval_nodes(env, &w.otherwise, out)
@@ -461,7 +500,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("null", []) => Ok(Value::Null),
         ("loop", []) => Err("'loop' used outside an each / in output position".into()),
         ("lookup", _) => eval_path(env, args),
-        ("not", [a]) => Ok(Value::Bool(!eval_expr(env, a)?.truthy())),
+        ("not", [a]) => Ok(Value::Bool(!truthy_at(env, &eval_expr(env, a)?)?)),
         ("and", _) => Ok(Value::Bool(all_truthy(env, args, true)?)),
         ("or", _) => Ok(Value::Bool(all_truthy(env, args, false)?)),
         ("eq", [a, b]) => Ok(Value::Bool(eval_expr(env, a)? == eval_expr(env, b)?)),
@@ -476,7 +515,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("divide", [a, b]) => num_op(env, a, b, |x, y| x / y),
         ("modulo", [a, b]) => num_op(env, a, b, f64::rem_euclid),
         ("ternary", [c, a, b]) => {
-            if eval_expr(env, c)?.truthy() { eval_expr(env, a) } else { eval_expr(env, b) }
+            if truthy_at(env, &eval_expr(env, c)?)? { eval_expr(env, a) } else { eval_expr(env, b) }
         }
         ("coalesce", [a, b]) => {
             let av = eval_expr(env, a)?;
@@ -484,7 +523,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         }
         ("firstTruthy", [a, b]) => {
             let av = eval_expr(env, a)?;
-            if av.truthy() { Ok(av) } else { eval_expr(env, b) }
+            if truthy_at(env, &av)? { Ok(av) } else { eval_expr(env, b) }
         }
         ("list", _) => {
             let xs: Vec<Value> = args.iter().map(|a| eval_expr(env, a)).collect::<Result<_, _>>()?;
@@ -514,6 +553,9 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
             Ok(Value::Object(Rc::new(obj)))
         }
         ("dict", _) => {
+            if env.strict {
+                return Err("AOT-compat: `dict` / collection literals are not in the AOT subset".into());
+            }
             let mut obj = BTreeMap::new();
             for pair in args.chunks(2) {
                 if let [Expr::Lit(Lit::Str(k)), v] = pair {
@@ -615,6 +657,7 @@ fn navigate_ref(env: &Env, base: &Value, keys: &[Expr]) -> Result<Value, String>
         cur = match (cur, &key) {
             (Value::Object(o), Value::Str(s)) => match o.get(&**s) {
                 Some(v) => v,
+                None if env.strict => return Err(format!("AOT-compat: unknown field '{s}'")),
                 None => return Ok(Value::Null),
             },
             (Value::Array(a), Value::Num(n)) => match a.get(*n as usize) {
@@ -645,7 +688,7 @@ fn parent_index(e: &Expr) -> Option<usize> {
 
 fn all_truthy(env: &Env, args: &[Expr], require_all: bool) -> Result<bool, String> {
     for a in args {
-        let t = eval_expr(env, a)?.truthy();
+        let t = truthy_at(env, &eval_expr(env, a)?)?;
         if require_all && !t {
             return Ok(false);
         }
@@ -702,7 +745,7 @@ fn order(a: &Value, b: &Value) -> core::cmp::Ordering {
 /// `"key" "cmp" value` (compare the field).
 fn pred(env: &Env, elem: &Value, pargs: &[Expr]) -> Result<bool, String> {
     match pargs {
-        [Expr::Lit(Lit::Str(key))] => Ok(field(elem, key).truthy()),
+        [Expr::Lit(Lit::Str(key))] => truthy_at(env, &field(elem, key)),
         [Expr::Lit(Lit::Str(key)), Expr::Lit(Lit::Str(cmp)), val] => {
             cmp_values(&field(elem, key), cmp, &eval_expr(env, val)?)
         }
@@ -827,7 +870,7 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Value, render};
+    use super::{Template, Value, render};
     use std::collections::BTreeMap;
     use std::rc::Rc;
 
@@ -893,5 +936,24 @@ mod tests {
         assert_eq!(render(r#"{{#inline "greet"}}Hi {{name}}!{{/inline}}{{> greet}}"#, d.clone()).unwrap(), "Hi Ann &amp; Bo!");
         let blk = r#"{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}"#;
         assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
+    }
+
+    #[test]
+    fn aot_compat_mode() {
+        let d = obj(&[("n", Value::Num(5.0))]);
+        // What AOT accepts renders identically in strict mode…
+        assert_eq!(Template::parse("{{#if n > 0}}pos{{/if}}").unwrap().render_compat(&d).unwrap(), "pos");
+        // …and what AOT rejects is an Err (a verifying proxy):
+        let rejects = [
+            "{{#if n}}x{{/if}}",                            // numeric truthiness
+            "{{this}}",                                     // bare-object output
+            "{{missing}}",                                  // unknown field
+            r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#,      // dict / collection literal
+        ];
+        for t in rejects {
+            assert!(Template::parse(t).unwrap().render_compat(&d).is_err(), "should reject in AOT-compat: {t}");
+            // …but lenient mode still renders them.
+            assert!(Template::parse(t).unwrap().render(&obj(&[("n", Value::Num(5.0)), ("missing", Value::Null)])).is_ok());
+        }
     }
 }

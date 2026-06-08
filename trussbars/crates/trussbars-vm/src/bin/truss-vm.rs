@@ -10,7 +10,7 @@ use std::io::Read;
 use std::rc::Rc;
 
 use serde_json::Value as Json;
-use trussbars_vm::{Value, render};
+use trussbars_vm::{Template, Value};
 
 fn main() {
     let mut input = String::new();
@@ -28,7 +28,19 @@ fn main() {
     let template = req.get("template").and_then(Json::as_str).unwrap_or("");
     let data = from_json(req.get("data").unwrap_or(&Json::Null));
 
-    match render(template, data) {
+    // `--compat` renders in AOT-compat (strict) mode — the verifying proxy.
+    let strict = std::env::args().any(|a| a == "--compat");
+    let result = match Template::parse(template) {
+        Ok(t) => {
+            if strict {
+                t.render_compat(&data)
+            } else {
+                t.render(&data)
+            }
+        }
+        Err(e) => Err(e),
+    };
+    match result {
         Ok(out) => print!("{out}"),
         Err(reason) => {
             eprint!("{reason}");

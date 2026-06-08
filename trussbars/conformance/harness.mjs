@@ -89,6 +89,59 @@ if (process.argv.includes("--vm")) {
   process.exit(fails.length === 0 && oracleErrors === 0 ? 0 : 1);
 }
 
+// `--vm-compat`: render through the VM's AOT-compat (strict) mode and assert it is a
+// VERIFYING PROXY for AOT (docs/11 §7/§9) — it ACCEPTS iff AOT accepts, and on the
+// accepted cases its output byte-matches the golden. So `neg-dict` (AOT-rejected) must
+// also be rejected here, and every positive must render identically.
+if (process.argv.includes("--vm-compat")) {
+  console.error("building truss-vm (VM CLI)…");
+  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
+    cwd: resolve(root, "trussbars/crates/trussbars-vm"),
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  const binPath = resolve(root, "trussbars/target/debug/truss-vm");
+  const snapPath = resolve(here, "snapshots.json");
+  const golden = existsSync(snapPath) ? JSON.parse(readFileSync(snapPath, "utf8")) : {};
+
+  let agreed = 0;
+  const divergences = [];
+  for (const c of cases) {
+    const o = renderMaxbars(c.template, c.data);
+    if (!o.ok) continue;
+    const aotAccepts = compileMaxRust("Ctx")(c.template).ok; // AOT's verdict
+    let vmOut = null;
+    let vmAccepts = true;
+    try {
+      vmOut = execFileSync(binPath, ["--compat"], {
+        input: JSON.stringify({ template: c.template, data: c.data }),
+        encoding: "utf8",
+      });
+    } catch {
+      vmAccepts = false;
+    }
+    const expected = c.id in golden ? golden[c.id] : o.value;
+    if (vmAccepts !== aotAccepts) {
+      divergences.push({ id: c.id, kind: "accept/reject", aot: aotAccepts, vm: vmAccepts });
+    } else if (aotAccepts && vmOut !== expected) {
+      divergences.push({ id: c.id, kind: "byte", expected, vm: vmOut });
+    } else {
+      agreed++;
+    }
+  }
+  console.log(
+    `Trussbars VM AOT-compat (verifying proxy): ${agreed}/${cases.length} agree with AOT ` +
+      `(accept⇔accept + byte-identical), ${divergences.length} divergence(s).`,
+  );
+  for (const d of divergences) {
+    if (d.kind === "accept/reject") {
+      console.error(`  DIVERGENCE ${d.id}: AOT accepts=${d.aot} but VM-compat accepts=${d.vm}`);
+    } else {
+      console.error(`  BYTE DIVERGENCE ${d.id}: expected ${JSON.stringify(d.expected)} got ${JSON.stringify(d.vm)}`);
+    }
+  }
+  process.exit(divergences.length === 0 ? 0 : 1);
+}
+
 // `--v2`: emit through the Rust pipeline (`trussbars-template`, docs/08) instead of
 // the PureScript v1 emitter, asserting v2 hits the SAME byte-for-byte golden. The
 // CLI (`truss-emit`) is built once; each template is then emitted by a fast spawn.
