@@ -200,6 +200,11 @@ tokenizeInterior cfg base src = go 0 []
   readIdent start acc = scan start
     where
     scan j = case at j of
+      -- a mid-identifier `[` is a path-index segment (`a.[k]`) — but with collection
+      -- literals on it is one *only* after a `.`; a `[` glued elsewhere (`xs=[1,2]`,
+      -- `f[…]`) ends the identifier so the `[` opens a list literal in the main loop.
+      Just '[' | cfg.collectionLiterals && at (j - 1) /= Just '.' ->
+        go j (push acc (TIdent (slc start j)) start j)
       Just '[' -> case bracketEnd (j + 1) of
         Just k -> scan (k + 1)
         Nothing -> Left (LexError "unterminated [ segment" (base + j))

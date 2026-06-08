@@ -4564,7 +4564,9 @@ var eqSigil = {
 
 // output/FlatBars.Token/index.js
 var elem3 = /* @__PURE__ */ elem2(eqChar);
-var eq12 = /* @__PURE__ */ eq(/* @__PURE__ */ eqMaybe(eqChar));
+var eqMaybe2 = /* @__PURE__ */ eqMaybe(eqChar);
+var eq12 = /* @__PURE__ */ eq(eqMaybe2);
+var notEq3 = /* @__PURE__ */ notEq(eqMaybe2);
 var TIdent = /* @__PURE__ */ (function() {
   function TIdent2(value0) {
     this.value0 = value0;
@@ -4771,7 +4773,7 @@ var tokenizeInterior = function(cfg) {
                           return new Left(new LexError("invalid string escape", base + j | 0));
                         }
                         ;
-                        throw new Error("Failed pattern match at FlatBars.Token (line 244, column 23 - line 246, column 76): " + [v2.constructor.name]);
+                        throw new Error("Failed pattern match at FlatBars.Token (line 249, column 23 - line 251, column 76): " + [v2.constructor.name]);
                       }
                       ;
                       if (v1 instanceof Nothing) {
@@ -4779,7 +4781,7 @@ var tokenizeInterior = function(cfg) {
                         return new Left(new LexError("unterminated string", base + start | 0));
                       }
                       ;
-                      throw new Error("Failed pattern match at FlatBars.Token (line 243, column 24 - line 247, column 76): " + [v1.constructor.name]);
+                      throw new Error("Failed pattern match at FlatBars.Token (line 248, column 24 - line 252, column 76): " + [v1.constructor.name]);
                     }
                     ;
                     if (otherwise) {
@@ -4790,7 +4792,7 @@ var tokenizeInterior = function(cfg) {
                     ;
                   }
                   ;
-                  throw new Error("Failed pattern match at FlatBars.Token (line 238, column 23 - line 248, column 60): " + [v.constructor.name]);
+                  throw new Error("Failed pattern match at FlatBars.Token (line 243, column 23 - line 253, column 60): " + [v.constructor.name]);
                 }
                 ;
                 while (!$tco_done) {
@@ -4826,7 +4828,7 @@ var tokenizeInterior = function(cfg) {
                 return j;
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Token (line 229, column 5 - line 233, column 17): " + [j.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Token (line 234, column 5 - line 238, column 17): " + [j.constructor.name]);
             }
             ;
             while (!$tco_done1) {
@@ -4846,7 +4848,7 @@ var tokenizeInterior = function(cfg) {
             return new Left(new LexError("malformed number '" + (raw + "'"), base + start | 0));
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Token (line 222, column 7 - line 224, column 87): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Token (line 227, column 7 - line 229, column 87): " + [v.constructor.name]);
         };
       };
       var readIdent = function(start) {
@@ -4870,7 +4872,7 @@ var tokenizeInterior = function(cfg) {
                 return;
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Token (line 211, column 5 - line 214, column 39): " + [k.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Token (line 216, column 5 - line 219, column 39): " + [k.constructor.name]);
             }
             ;
             while (!$tco_done2) {
@@ -4884,6 +4886,11 @@ var tokenizeInterior = function(cfg) {
             var $tco_result;
             function $tco_loop(j) {
               var v = at(j);
+              if (v instanceof Just && (v.value0 === "[" && (cfg.collectionLiterals && notEq3(at(j - 1 | 0))(new Just("."))))) {
+                $tco_done3 = true;
+                return go(j)(push4(acc)(new TIdent(slc(start)(j)))(start)(j));
+              }
+              ;
               if (v instanceof Just && v.value0 === "[") {
                 var v1 = bracketEnd(j + 1 | 0);
                 if (v1 instanceof Just) {
@@ -4896,7 +4903,7 @@ var tokenizeInterior = function(cfg) {
                   return new Left(new LexError("unterminated [ segment", base + j | 0));
                 }
                 ;
-                throw new Error("Failed pattern match at FlatBars.Token (line 203, column 19 - line 205, column 71): " + [v1.constructor.name]);
+                throw new Error("Failed pattern match at FlatBars.Token (line 208, column 19 - line 210, column 71): " + [v1.constructor.name]);
               }
               ;
               if (rangeAt(j)) {
@@ -5009,8 +5016,8 @@ var tokenizeInterior = function(cfg) {
                 }
                 ;
                 if (v.value0 === "&") {
-                  var $63 = eq12(at(i + 1 | 0))(new Just("&"));
-                  if ($63) {
+                  var $66 = eq12(at(i + 1 | 0))(new Just("&"));
+                  if ($66) {
                     $tco_done4 = true;
                     return op2("&&")(i)(acc);
                   }
@@ -5020,8 +5027,8 @@ var tokenizeInterior = function(cfg) {
                 }
                 ;
                 if (v.value0 === "|") {
-                  var $64 = eq12(at(i + 1 | 0))(new Just("|"));
-                  if ($64) {
+                  var $67 = eq12(at(i + 1 | 0))(new Just("|"));
+                  if ($67) {
                     $tco_done4 = true;
                     return op2("||")(i)(acc);
                   }
@@ -5031,8 +5038,8 @@ var tokenizeInterior = function(cfg) {
                 }
                 ;
                 if (v.value0 === "!") {
-                  var $65 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($65) {
+                  var $68 = eq12(at(i + 1 | 0))(new Just("="));
+                  if ($68) {
                     $tco_done4 = true;
                     return op2("!=")(i)(acc);
                   }
@@ -5042,8 +5049,8 @@ var tokenizeInterior = function(cfg) {
                 }
                 ;
                 if (v.value0 === "<") {
-                  var $66 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($66) {
+                  var $69 = eq12(at(i + 1 | 0))(new Just("="));
+                  if ($69) {
                     $tco_done4 = true;
                     return op2("<=")(i)(acc);
                   }
@@ -5053,8 +5060,8 @@ var tokenizeInterior = function(cfg) {
                 }
                 ;
                 if (v.value0 === ">") {
-                  var $67 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($67) {
+                  var $70 = eq12(at(i + 1 | 0))(new Just("="));
+                  if ($70) {
                     $tco_done4 = true;
                     return op2(">=")(i)(acc);
                   }
@@ -5064,8 +5071,8 @@ var tokenizeInterior = function(cfg) {
                 }
                 ;
                 if (v.value0 === "=") {
-                  var $68 = eq12(at(i + 1 | 0))(new Just("="));
-                  if ($68) {
+                  var $71 = eq12(at(i + 1 | 0))(new Just("="));
+                  if ($71) {
                     $tco_done4 = true;
                     return op2("==")(i)(acc);
                   }
@@ -5085,14 +5092,14 @@ var tokenizeInterior = function(cfg) {
                 }
                 ;
                 if (isOp(v.value0) && v.value0 === "?") {
-                  var $69 = eq12(at(i + 1 | 0))(new Just("?"));
-                  if ($69) {
+                  var $72 = eq12(at(i + 1 | 0))(new Just("?"));
+                  if ($72) {
                     $tco_done4 = true;
                     return op2("??")(i)(acc);
                   }
                   ;
-                  var $70 = eq12(at(i + 1 | 0))(new Just(":"));
-                  if ($70) {
+                  var $73 = eq12(at(i + 1 | 0))(new Just(":"));
+                  if ($73) {
                     $tco_done4 = true;
                     return op2("?:")(i)(acc);
                   }
@@ -5200,7 +5207,7 @@ var defaultLexOptions = {
 
 // output/FlatBars.Lexer/index.js
 var eq13 = /* @__PURE__ */ eq(/* @__PURE__ */ eqArray(eqChar));
-var notEq3 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
+var notEq4 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
 var elem4 = /* @__PURE__ */ elem2(eqChar);
 var fromFoldable4 = /* @__PURE__ */ fromFoldable(foldableList);
 var bind2 = /* @__PURE__ */ bind(bindMaybe);
@@ -5434,7 +5441,7 @@ var trimStartWs = function(s) {
   return fromCharArray(dropWhile(isSpace)(toCharArray(s)));
 };
 var hasNL = function(s) {
-  return notEq3(nlIndex(true)(s))(Nothing.value);
+  return notEq4(nlIndex(true)(s))(Nothing.value);
 };
 var findFrom = function(cs) {
   return function(from2) {
@@ -10557,7 +10564,7 @@ var map15 = /* @__PURE__ */ map(functorArray);
 var bind4 = /* @__PURE__ */ bind(bindMaybe);
 var union3 = /* @__PURE__ */ union(ordString);
 var lookup5 = /* @__PURE__ */ lookup3(ordString);
-var notEq4 = /* @__PURE__ */ notEq(eqValue);
+var notEq5 = /* @__PURE__ */ notEq(eqValue);
 var append12 = /* @__PURE__ */ append(semigroupArray);
 var pure3 = /* @__PURE__ */ pure(applicativeArray);
 var map16 = /* @__PURE__ */ map(functorMap);
@@ -10966,7 +10973,7 @@ var ne$prime = function(dictApplicative) {
   var pure13 = pure(dictApplicative);
   return function(a) {
     return function(b) {
-      return pure13(new VBool(notEq4(a)(b)));
+      return pure13(new VBool(notEq5(a)(b)));
     };
   };
 };
@@ -16749,7 +16756,7 @@ var minEngine = function(dictMonadThrow) {
 };
 
 // output/MinBars.Standalone/index.js
-var notEq5 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
+var notEq6 = /* @__PURE__ */ notEq(/* @__PURE__ */ eqMaybe(eqInt));
 var nlIndex2 = function(first) {
   return function(s) {
     var f = (function() {
@@ -16780,7 +16787,7 @@ var isHWs = function(c) {
   return c === " " || c === "	";
 };
 var hasNL2 = function(s) {
-  return notEq5(nlIndex2(true)(s))(Nothing.value);
+  return notEq6(nlIndex2(true)(s))(Nothing.value);
 };
 var eligible = function(v) {
   if (v instanceof ROpen) {

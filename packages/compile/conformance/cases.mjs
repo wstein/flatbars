@@ -195,6 +195,9 @@ export const cases = [
   { name: "mx:let-dict-value", dialect: "maxbars", t: '{{#let cfg={theme: "dark"}}}{{cfg.theme}}{{/let}}', d: {} },
   { name: "mx:let-in-loop", dialect: "maxbars", t: "{{#each items}}{{#let u=(uppercase this)}}{{u}}@{{loop.index0}} {{/let}}{{/each}}", d: { items: ["a", "b"] } },
   { name: "mx:let-shadows-op", dialect: "maxbars", t: '{{#let add="x"}}{{add}}{{/let}}', d: {} },
+  // a list literal GLUED to a let `=` is the list, not a path-bracket of the key
+  // (the `xs=[…]` lexing fix); then iterated with each…in.
+  { name: "mx:let-list-glued-each", dialect: "maxbars", t: "{{#let xs=[10, 20, 30]}}{{#each v in xs}}{{v}} {{/each}}{{/let}}", d: {} },
   { name: "mx:collections-nested", dialect: "maxbars", t: "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}", d: {} },
   // ── feature combinations (the surface features interact; pin them together) ──
   // let + each…in + the `..` range + the 1-based binding, all in one template.
