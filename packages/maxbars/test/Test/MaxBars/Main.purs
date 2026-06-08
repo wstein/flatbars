@@ -436,14 +436,28 @@ main = do
     "[{{#each []}}x{{/each}}]"
     (obj [])
     "[]"
-  expectM "dict literal: bare-ident keys (note the space before }})"
-    "{{#with {name: who, age: 30} }}{{name}}/{{age}}{{/with}}"
+  -- the structural scanner is brace-aware (collectionLiterals): a dict's own `}`
+  -- is balanced before the tag close, so NO disambiguating space is needed even
+  -- when the dict abuts `}}`.
+  expectM "dict literal: bare-ident keys, no space before }}"
+    "{{#with {name: who, age: 30}}}{{name}}/{{age}}{{/with}}"
     (obj [ Tuple "who" (VString "Ada") ])
     "Ada/30"
-  expectM "dict literal: a string key"
-    "{{#with {\"full name\": who} }}{{lookup this \"full name\"}}{{/with}}"
+  expectM "dict literal: a string key, no space"
+    "{{#with {\"full name\": who}}}{{lookup this \"full name\"}}{{/with}}"
     (obj [ Tuple "who" (VString "Ada L") ])
     "Ada L"
+  -- the scanner skips strings, so a `}}` inside a dict value's string is not a tag
+  -- close.
+  expectM "dict literal: a `}}` inside a string value is not the tag close"
+    "{{#with {msg: \"a}}b\"}}}{{msg}}{{/with}}"
+    (obj [])
+    "a}}b"
+  -- an empty dict `{}` abutting the close (falsy under nonEmpty).
+  expectM "dict literal: empty {} with no space"
+    "{{#if {}}}t{{else}}f{{/if}}"
+    (obj [])
+    "f"
   expectM "collection literals nest"
     "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}"
     (obj [])

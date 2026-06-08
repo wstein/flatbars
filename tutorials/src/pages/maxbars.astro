@@ -255,9 +255,9 @@ const t = (s) => s;
       <code>{t("{k: v}")}</code> a dict (sugar for <code>dict</code>). Elements and values are full
       expressions, so they nest and take infix — <code>{t("[1, n + 1, {tag: x}]")}</code>. Keys are
       bare identifiers or quoted strings; an empty <code>{t("[]")}</code>/<code>{t("{}")}</code> is
-      falsy under the <code>nonEmpty</code> rule. One delimiter gotcha: when a dict abuts the tag
-      close, keep a space — <code>{t("{{#with {a: 1} }}")}</code>, since <code>{t("}}}")}</code> would
-      close the tag early.
+      falsy under the <code>nonEmpty</code> rule. The structural scanner is brace-aware, so a dict
+      needs no space before the tag close — <code>{t("{{#with {a: 1}}}")}</code> reads cleanly (a
+      <code>{t("}}")}</code> inside a dict-value string is not a tag close either).
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.collections.template} data={ex.collections.data} />
     <h3>Block params &amp; labelled loops</h3>

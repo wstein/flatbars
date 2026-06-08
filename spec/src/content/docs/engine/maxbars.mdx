@@ -91,9 +91,11 @@ rule an empty list **and** an empty dict are falsy.
 
 The lexer carves `[` `]` `{` `}` `,` as their own punctuation only in MaxBars
 (`lexOptions.collectionLiterals`). A *mid-identifier* `[seg]` — the `a.[home
-town]` path-bracket — is untouched; only a **leading** `[` opens a list. Mind the
-delimiter when a dict abuts the tag close: `{{#with {a: 1} }}` needs the space, as
-`}}}` would otherwise close the tag early.
+town]` path-bracket — is untouched; only a **leading** `[` opens a list. The
+structural scanner is *brace-aware* under the same flag: it balances `{ }` and
+skips string literals, so a dict's own `}` is consumed before the tag close and
+`{{#with {a: 1}}}` (or `{{{json {x: 1}}}}`) needs **no** disambiguating space — a
+`}}` inside a dict-value string is not a tag close either.
 
 ## The variable model
 

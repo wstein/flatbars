@@ -188,7 +188,8 @@ export const examples = {
     label: "Intermediate — Collection literals: [list] & {dict}",
     // `[…]` is a list literal (sugar for the `list` helper) and `{k: v}` a dict
     // (sugar for `dict`). Elements/values are full expressions, so they nest and
-    // take infix. Mind the space in `{…} }}` — `}}}` would close the tag early.
+    // take infix. The structural scanner is brace-aware, so a dict needs no space
+    // before the closing `}}`.
     compiles: true,
     template: `{{#each [{name: lead, role: "lead"}, {name: "Lin", role: "dev"}]}}{{name}} ({{role}}){{#unless loop.last}}, {{/unless}}{{/each}}`,
     data: { lead: "Ada" },

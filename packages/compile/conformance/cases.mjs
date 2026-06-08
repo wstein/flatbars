@@ -175,9 +175,11 @@ export const cases = [
   { name: "mx:list-exprs", dialect: "maxbars", t: "{{#each [1, n + 1, n * 2]}}{{this}} {{/each}}", d: { n: 5 } },
   { name: "mx:list-empty", dialect: "maxbars", t: "[{{#each []}}x{{/each}}]", d: {} },
   { name: "mx:list-value", dialect: "maxbars", t: "{{ [1, 2, 3] }}", d: {} },
-  { name: "mx:dict-lit", dialect: "maxbars", t: "{{#with {name: who, age: 30} }}{{name}}/{{age}}{{/with}}", d: { who: "Ada" } },
-  { name: "mx:dict-strkey", dialect: "maxbars", t: '{{#with {"full name": who} }}{{lookup this "full name"}}{{/with}}', d: { who: "Ada L" } },
-  { name: "mx:dict-json", dialect: "maxbars", t: "{{{ json {x: 1, y: 2} }}}", d: {} },
+  // the structural scanner is brace-aware, so a dict abutting `}}` needs no space.
+  { name: "mx:dict-lit", dialect: "maxbars", t: "{{#with {name: who, age: 30}}}{{name}}/{{age}}{{/with}}", d: { who: "Ada" } },
+  { name: "mx:dict-strkey", dialect: "maxbars", t: '{{#with {"full name": who}}}{{lookup this "full name"}}{{/with}}', d: { who: "Ada L" } },
+  { name: "mx:dict-string-brace", dialect: "maxbars", t: '{{#with {msg: "a}}b"}}}{{msg}}{{/with}}', d: {} },
+  { name: "mx:dict-json", dialect: "maxbars", t: "{{{json {x: 1, y: 2}}}}", d: {} },
   { name: "mx:collections-nested", dialect: "maxbars", t: "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}", d: {} },
   // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
   // through to name (where ?? keeps the non-null "" and || yields a boolean).

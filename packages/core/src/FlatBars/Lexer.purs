@@ -309,6 +309,41 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
   interiorAt :: Int -> String -> Interior
   interiorAt base s = tokenizeInterior lexOpts base s
 
+  -- Find a tag's close delimiter from `from`. With collection literals on
+  -- (MaxBars) the scan is *brace-aware*: it balances `{ }` and skips string
+  -- literals, so a dict literal's own `}` is consumed before the tag close and
+  -- `{{#with {a: 1}}}` needs no disambiguating space (ADR-024 width detection).
+  -- Off — every other dialect, where a `{` in a tag interior is a lex error
+  -- anyway — it is the plain first-match `findFrom`, byte-identical to before. The
+  -- brace-aware scan only diverges once a `{` is seen, which those dialects never
+  -- emit, so the structural stream is unchanged for them.
+  closeFrom :: Int -> String -> Maybe Int
+  closeFrom from close
+    | lexOpts.collectionLiterals = findClose from close
+    | otherwise = findFrom cs from close
+
+  -- The brace/string-aware close finder: the `close` delimiter at brace depth 0.
+  -- A `{` opens a level, a `}` closes one (a stray `}` at depth 0 is ignored), and
+  -- a quoted string (`"…"`/`'…'`, with `\` escapes) is skipped whole — so a `}}` or
+  -- `{` inside a string never moves the depth nor ends the tag.
+  findClose :: Int -> String -> Maybe Int
+  findClose from close = scan from 0
+    where
+    scan i depth
+      | i >= len = Nothing
+      | depth == 0 && matchAt cs i close = Just i
+      | otherwise = case Array.index cs i of
+          Just '"' -> scan (skipString (i + 1) '"') depth
+          Just '\'' -> scan (skipString (i + 1) '\'') depth
+          Just '{' -> scan (i + 1) (depth + 1)
+          Just '}' -> scan (i + 1) (if depth > 0 then depth - 1 else 0)
+          _ -> scan (i + 1) depth
+    skipString j q
+      | j >= len = j
+      | Array.index cs j == Just '\\' = skipString (j + 2) q
+      | Array.index cs j == Just q = j + 1
+      | otherwise = skipString (j + 1) q
+
   -- Tokens accumulate in a *reversed* `List` (O(1) prepend) and are reversed
   -- into an `Array` once, for the same O(n²)-avoidance as the content scan.
   finalize :: List RawTok -> Array RawTok
@@ -564,7 +599,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
     let
       start = i + 3
     in
-      case findFrom cs start "}}}" of
+      case closeFrom start "}}}" of
         Nothing -> Left (UnterminatedTag i)
         Just q ->
           let
@@ -586,7 +621,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
       start = i + SCU.length opener
       cl = SCU.length close
     in
-      case findFrom cs start close of
+      case closeFrom start close of
         Nothing -> Left (UnterminatedTag i)
         Just q ->
           let
@@ -608,7 +643,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
       start = i + SCU.length opener
       cl = SCU.length close
     in
-      case findFrom cs start close of
+      case closeFrom start close of
         Nothing -> Left (UnterminatedTag i)
         Just q ->
           let
@@ -627,7 +662,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
     let
       start = i + SCU.length opener
     in
-      case findFrom cs start "}}" of
+      case closeFrom start "}}" of
         Nothing -> Left (UnterminatedTag i)
         Just q ->
           let
@@ -648,7 +683,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
     let
       start = if leadTrimAt i then i + 3 else i + 2
     in
-      case findFrom cs start "}}" of
+      case closeFrom start "}}" of
         Nothing -> Left (UnterminatedTag i)
         Just q ->
           let
@@ -670,6 +705,8 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
     let
       start = i + SCU.length opener
     in
+      -- comments are prose: never brace-aware (a stray `{` must not swallow the
+      -- close), so the plain first-match `}}` regardless of dialect.
       case findFrom cs start "}}" of
         Nothing -> Left (UnterminatedComment i)
         Just q ->
@@ -794,6 +831,8 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
       start = i + SCU.length open
       cl = SCU.length close
     in
+      -- custom (set-delimiter) tags are MinBars-only, which has no collection
+      -- literals, so the plain first-match close (never brace-aware).
       case findFrom cs start close of
         Nothing -> Left (UnterminatedTag i)
         Just q ->

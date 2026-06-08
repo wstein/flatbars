@@ -30,9 +30,11 @@ a `=`/whitespace dict would split the two literals' surfaces gratuitously; one c
 (`[a, b]` / `{k: v, w: z}`) is the smaller surprise and the JS/JSON author's expectation. The ADR's *key*
 decision is unchanged and upheld: distinct `{…}` (dict) vs `[…]` (list) shapes, so the empty-collection
 case (`{}` vs `[]`) stays unambiguous. The `:` and `,` interior tokens are added behind
-`LexOptions.collectionLiterals` (MaxBars-only). One delimiter caveat: a dict abutting the tag close needs a
-space — `{{#with {a: 1} }}` — since `}}}` would otherwise close the tag early. The desugar target (the
-`dict` helper) and the dialect scope (MaxBars sugar; RawBars writes `(dict …)`) are exactly as below.
+`LexOptions.collectionLiterals` (MaxBars-only). The §3 *width detection* is implemented: the structural
+scanner is brace-aware under the same flag, so a dict abutting the tag close needs **no** space —
+`{{#with {a: 1}}}` reads cleanly (initially shipped requiring a space; that caveat was removed
+2026-06-08). The desugar target (the `dict` helper) and the dialect scope (MaxBars sugar; RawBars writes
+`(dict …)`) are exactly as below.
 
 ## Context
 
@@ -138,15 +140,16 @@ delimiter widths (`{{ }}` / `{{{ }}}` / `{{{{ }}}}`) intact: width detection run
 tag span; only then does the interior tokenizer see the literal braces. (ADR-025 extends the same
 principle to `[`/`]`; the rule is identical.)
 
-> *Implemented behavior (2026-06-08).* The structure lexer was kept **fully untouched** — it gained no
-> brace-depth width detection — so the proposed "authors never insert a space" claim does **not** hold for a
-> dict whose `}` abuts the tag close: `{{#with {a: 1}}}` would have the structure lexer match the *first*
-> `}}` and split the dict. The fix is a single space — `{{#with {a: 1} }}` — and the simpler, smaller change
-> (no structural-scanner surgery) was preferred over width detection. A `[…]` list needs no space (its `]`
-> is not a tag-delimiter char). The original proposal below is retained for the rationale; the space caveat
-> is the one deviation.
+> *Implemented behavior (2026-06-08, revised).* The proposal below is implemented: the structural scanner
+> (`tokenizeTemplate`) is **brace-aware** under `LexOptions.collectionLiterals` (MaxBars). When finding a tag's
+> close it balances `{ }` depth and skips string literals, so a dict literal's own `}` — and any `}}`/`{`
+> inside a dict-value string — is consumed before the tag close. `{{#with {a: 1}}}` and `{{{json {x: 1}}}}`
+> read cleanly with **no** disambiguating space. (An interim build required a space; that caveat was removed
+> the same day by making the scanner brace-aware — exactly the "width detection" §3 specifies.) The change is
+> gated and inert for every other dialect, whose interiors never contain a `{`. Comments and set-delimiter
+> tags are deliberately *not* brace-aware (a comment is prose; a stray `{` must not swallow its close).
 
-The proposed consequence for the surface: inside an already-delimited tag, the interior tokenizer matches `{`
+The realized consequence for the surface: inside an already-delimited tag, the scanner matches `{`
 against its closing `}` by nesting depth, so a literal collection's own closing brace is consumed before
 the tag close. `{{#let x={a=1}}}` therefore reads as `#let x=` · `{a=1}` · `}}` (dict-close, then
 tag-close), and the nested `{{#let x={a={b=1}}}}}` as `{a={b=1}}` · `}}` — no ambiguity, because

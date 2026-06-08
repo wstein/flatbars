@@ -227,7 +227,10 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `MaxBars.Expr` parses a leading `[`/`{` atom into a `list`/`dict` prelude call
   (pure sugar — no new engine/compiler machinery). A *mid-identifier* `[seg]` (the
   `a.[k]` path-bracket) is untouched; only a leading `[` opens a list. Off elsewhere,
-  so `{`/`,` stay a lex error and `[…]` a path there.
+  so `{`/`,` stay a lex error and `[…]` a path there. The same flag makes the
+  *structural* scanner (`tokenizeTemplate`) brace-aware — it balances `{ }` and skips
+  strings when finding a tag close — so a dict abutting `}}` needs no space
+  (`{{#with {a: 1}}}`); comments and set-delim tags stay un-brace-aware by design.
   `check:parity` (in `npm test`) machine-checks that RawBars ≡ MaxBars — the exact
   `nonEmpty` falsy set and byte-identical rendering over a shared core corpus —
   modulo documented surface exceptions (the ADR-021 loop-variable model; the
