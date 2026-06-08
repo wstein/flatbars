@@ -29,6 +29,8 @@
   .pane .body { flex:1; overflow:auto; padding:.6rem; white-space:pre-wrap; word-break:break-word; }
   pre.body { margin:0; }
   .interp { background:var(--hi); border-radius:3px; outline:1px solid var(--accent); cursor:help; }
+  .rtile { border-radius:3px; cursor:help; }
+  .link-hi { background:var(--accent) !important; color:#1b1d23 !important; outline:2px solid var(--accent) !important; }
   .verdict.ok { color:var(--ok); }
   .verdict.err { color:var(--err); }
   .right { display:flex; flex-direction:column; }
@@ -98,8 +100,10 @@ function render(insp) {
   if (insp.aotCompatOk) { v.textContent = "✓ compiles under AOT"; v.className = "verdict ok"; }
   else { v.textContent = "✗ " + (insp.aotCompatError || "won't compile under AOT"); v.className = "verdict err"; }
 
-  // Output with data→output provenance: wrap each interpolation's output run.
   const enc = new TextEncoder(), dec = new TextDecoder();
+  const key = s => s.join(",");
+
+  // Output pane: wrap each interpolation's run, tagged by its template span (data→output).
   const bytes = enc.encode(insp.output || "");
   const interps = [...(insp.interpolations || [])].sort((a,b) => a.out[0] - b.out[0]);
   let html = "", pos = 0;
@@ -107,14 +111,49 @@ function render(insp) {
     if (it.out[0] < pos) continue;
     html += esc(dec.decode(bytes.slice(pos, it.out[0])));
     const tip = `${it.value}  ·  template ${it.src[0]}–${it.src[1]}`;
-    html += `<span class="interp" title="${tip.replace(/"/g,"&quot;")}">` + esc(dec.decode(bytes.slice(it.out[0], it.out[1]))) + `</span>`;
+    html += `<span class="interp" data-src="${key(it.src)}" title="${tip.replace(/"/g,"&quot;")}">`
+      + esc(dec.decode(bytes.slice(it.out[0], it.out[1]))) + `</span>`;
     pos = it.out[1];
   }
   html += esc(dec.decode(bytes.slice(pos)));
   $("#output").innerHTML = html || "<span style='color:var(--dim)'>(empty)</span>";
-  $("#rust").textContent = insp.emittedRust ?? ("// emit error: " + (insp.emitError || ""));
+
+  // Rust pane: wrap the byte range of each interpolation's emitted Rust (template→Rust),
+  // tagged by the SAME template span — so output↔Rust link by source span.
+  const rust = insp.emittedRust ?? null;
+  if (rust === null) {
+    $("#rust").textContent = "// emit error: " + (insp.emitError || "");
+  } else {
+    const rb = enc.encode(rust);
+    const srcKeys = new Set(interps.map(i => key(i.src)));
+    const tiles = (insp.rustMap || [])
+      .filter(t => srcKeys.has(key(t.src)))
+      .sort((a,b) => a.rust[0] - b.rust[0]);
+    let rh = "", rp = 0;
+    for (const t of tiles) {
+      if (t.rust[0] < rp) continue;
+      rh += esc(dec.decode(rb.slice(rp, t.rust[0])));
+      rh += `<span class="rtile" data-src="${key(t.src)}">` + esc(dec.decode(rb.slice(t.rust[0], t.rust[1]))) + `</span>`;
+      rp = t.rust[1];
+    }
+    rh += esc(dec.decode(rb.slice(rp)));
+    $("#rust").innerHTML = rh;
+  }
   status(`${interps.length} interpolation(s)`);
 }
+
+// Cross-pane linking: hover any span with data-src → highlight every span (output + Rust)
+// from the same template span.
+function linkHover(e) {
+  const src = e.target.dataset.src;
+  if (!src) return;
+  const on = e.type === "mouseover";
+  document.querySelectorAll(`[data-src="${src}"]`).forEach(el => el.classList.toggle("link-hi", on));
+}
+$("#output").addEventListener("mouseover", linkHover);
+$("#output").addEventListener("mouseout", linkHover);
+$("#rust").addEventListener("mouseover", linkHover);
+$("#rust").addEventListener("mouseout", linkHover);
 
 $("#tpl").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(inspectNow, 200); });
 $("#save").onclick = async () => {
