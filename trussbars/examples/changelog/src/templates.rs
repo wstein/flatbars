@@ -34,8 +34,7 @@ pub fn render_changelog(ctx: &ChangelogCtx) -> String {
                     let __len2 = trussbars_core::Each::each_len(__sub2);
                     if __len2 == 0 {
                     } else {
-                        for (__i2, (__k2, __c2)) in trussbars_core::Each::each(__sub2).enumerate() {
-                            let __l2 = trussbars_core::Loop::at(__i2, __len2, __k2, Some(&__l1));
+                        for (__k2, __c2) in trussbars_core::Each::each(__sub2) {
                             out.push_str("- ");
                             // changelog.truss:5:3  {{c.subject}}
                             trussbars_core::esc(&(__c2.subject), &mut out);

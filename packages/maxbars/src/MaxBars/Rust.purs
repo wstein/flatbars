@@ -58,7 +58,7 @@ import Data.Foldable (foldMap, sum)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.String (Pattern(..), Replacement(..), joinWith, replaceAll, split, trim)
 import Data.String.CodeUnits as SCU
 import Data.Traversable (traverse)
@@ -381,9 +381,31 @@ elseChain env clauses = case Array.uncons clauses of
       b <- nodes env cl.body
       Right (" else {\n" <> b <> "    }")
 
+-- Whether a bare reference to `name` (head `App name …`, e.g. `loop` or a loop
+-- label) appears anywhere in a subtree — used to elide a dead `Loop::at` frame. It
+-- is conservative on purpose: a `loop` in a *nested* loop keeps this frame too
+-- (the parent chain needs it), but when nothing in the subtree uses `loop`, the
+-- whole subtree elides cleanly (so no nested `Loop::at` references this frame).
+exprMentions :: String -> Expr -> Boolean
+exprMentions name = case _ of
+  App n args -> n == name || Array.any (exprMentions name) args
+  Lit _ -> false
+
+nodeMentions :: String -> Node -> Boolean
+nodeMentions name = case _ of
+  Output _ e -> exprMentions name e
+  Block _ _ _ args body -> Array.any (exprMentions name) args || templateMentions name body
+  RawBlock _ _ args _ -> Array.any (exprMentions name) args
+  Sep _ _ args -> Array.any (exprMentions name) args
+  _ -> false
+
+templateMentions :: String -> Template -> Boolean
+templateMentions name = Array.any (nodeMentions name)
+
 -- `{{#each subject as |item idx|}}` → a native `for` over `subject.iter()
 -- .enumerate()`, binding the loop metadata (`Loop::at`) and the block params, with
--- the empty collection rendering the `{{else}}` clause in the parent scope.
+-- the empty collection rendering the `{{else}}` clause in the parent scope. The
+-- `Loop::at` frame is emitted only when the body actually uses `loop`/the label.
 eachBlock :: Env -> Array Expr -> Maybe String -> Template -> Either String String
 eachBlock env args label body = case Array.head args of
   Nothing -> Left "unsupported: each without a subject"
@@ -402,16 +424,37 @@ eachBlock env args label body = case Array.head args of
       params' = bindEachParams paramNames cVar iVar env.params
       -- a `label NAME` (ADR-013) binds the loop under NAME, visible into nested loops.
       labels' = maybe env.labels (\l -> Map.insert l lVar env.labels) label
+      s = splitClauses body
+      -- The frame is live only if the loop body uses `loop` or this loop's label.
+      needsFrame = templateMentions "loop" s.before
+        || maybe false (\l -> templateMentions l s.before) label
       childEnv = env
         { scope = cVar
-        , loop = Just lVar
+        , loop = if needsFrame then Just lVar else Nothing
         , params = params'
         , parents = Array.cons env.scope env.parents
-        , labels = labels'
+        , labels = if needsFrame then labels' else env.labels
         , depth = d
         }
       parentLoop = maybe "None" (\pl -> "Some(&" <> pl <> ")") env.loop
-      s = splitClauses body
+      -- The 0-based index `__i` is needed only by the frame or an index block param;
+      -- without either, drop `.enumerate()` so no dead index lingers (clippy-clean).
+      needIndex = needsFrame || isJust (Array.index paramNames 1)
+      forHead =
+        if needIndex then "    for (" <> iVar <> ", (" <> kVar <> ", " <> cVar
+          <> ")) in trussbars_core::Each::each("
+          <> subVar
+          <> ").enumerate() {\n"
+        else "    for (" <> kVar <> ", " <> cVar <> ") in trussbars_core::Each::each(" <> subVar <> ") {\n"
+      frameLine =
+        if needsFrame then "    let " <> lVar <> " = trussbars_core::Loop::at(" <> iVar <> ", "
+          <> lenVar
+          <> ", "
+          <> kVar
+          <> ", "
+          <> parentLoop
+          <> ");\n"
+        else ""
     bodyS <- nodes childEnv s.before
     elseS <- clauseBody env s.clauses
     Right
@@ -421,11 +464,8 @@ eachBlock env args label body = case Array.head args of
           <> "    if " <> lenVar <> " == 0 {\n"
           <> elseS
           <> "    } else {\n"
-          <> "    for (" <> iVar <> ", (" <> kVar <> ", " <> cVar <> ")) in trussbars_core::Each::each("
-          <> subVar
-          <> ").enumerate() {\n"
-          <> "    let " <> lVar <> " = trussbars_core::Loop::at(" <> iVar <> ", " <> lenVar
-          <> ", " <> kVar <> ", " <> parentLoop <> ");\n"
+          <> forHead
+          <> frameLine
           <> bodyS
           <> "    }}\n"
           <> "    }\n"

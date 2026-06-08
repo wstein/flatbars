@@ -24,8 +24,7 @@ pub fn render_index(ctx: &IndexCtx) -> String {
         let __len1 = trussbars_core::Each::each_len(__sub1);
         if __len1 == 0 {
         } else {
-            for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
-                let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
+            for (__k1, __c1) in trussbars_core::Each::each(__sub1) {
                 out.push_str("<a href=\"/tag/");
                 // index.truss:2:55  {{this | lowercase}}
                 trussbars_core::esc(&(trussbars_std::lowercase(&(__c1))), &mut out);
@@ -43,8 +42,7 @@ pub fn render_index(ctx: &IndexCtx) -> String {
         let __len1 = trussbars_core::Each::each_len(__sub1);
         if __len1 == 0 {
         } else {
-            for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
-                let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
+            for (__k1, __c1) in trussbars_core::Each::each(__sub1) {
                 // index.truss:9:27  {{> card}}
                 out.push_str("<article>\n  <h2><a href=\"/posts/");
                 // index.truss:4:23  {{slug}}
@@ -69,10 +67,7 @@ pub fn render_index(ctx: &IndexCtx) -> String {
                         let __len2 = trussbars_core::Each::each_len(__sub2);
                         if __len2 == 0 {
                         } else {
-                            for (__i2, (__k2, __c2)) in
-                                trussbars_core::Each::each(__sub2).enumerate()
-                            {
-                                let __l2 = trussbars_core::Loop::at(__i2, __len2, __k2, None);
+                            for (__k2, __c2) in trussbars_core::Each::each(__sub2) {
                                 out.push_str("<a href=\"/tags/");
                                 // index.truss:6:67  {{tag | lowercase}}
                                 trussbars_core::esc(&(trussbars_std::lowercase(&(__c2))), &mut out);
@@ -124,8 +119,7 @@ pub fn render_post(ctx: &PostCtx) -> String {
         let __len1 = trussbars_core::Each::each_len(__sub1);
         if __len1 == 0 {
         } else {
-            for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
-                let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
+            for (__k1, __c1) in trussbars_core::Each::each(__sub1) {
                 out.push_str("<a href=\"/tags/");
                 // post.truss:5:52  {{tag | lowercase}}
                 trussbars_core::esc(&(trussbars_std::lowercase(&(__c1))), &mut out);
@@ -179,11 +173,7 @@ pub fn render_archive(ctx: &ArchiveCtx) -> String {
                         let __len2 = trussbars_core::Each::each_len(__sub2);
                         if __len2 == 0 {
                         } else {
-                            for (__i2, (__k2, __c2)) in
-                                trussbars_core::Each::each(__sub2).enumerate()
-                            {
-                                let __l2 =
-                                    trussbars_core::Loop::at(__i2, __len2, __k2, Some(&__l1));
+                            for (__k2, __c2) in trussbars_core::Each::each(__sub2) {
                                 out.push_str("<li><a href=\"/posts/");
                                 // archive.truss:4:49  {{post.slug}}
                                 trussbars_core::esc(&(__c2.slug), &mut out);
