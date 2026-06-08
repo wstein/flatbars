@@ -974,6 +974,7 @@ dependencies = [
  "serde",
  "trussbars-core",
  "trussbars-std",
+ "trussbars-vm",
 ]
 
 [[package]]
@@ -989,6 +990,19 @@ name = "trussbars-std"
 version = "0.1.0"
 dependencies = [
  "trussbars-core",
+]
+
+[[package]]
+name = "trussbars-template"
+version = "0.1.0"
+
+[[package]]
+name = "trussbars-vm"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "trussbars-core",
+ "trussbars-template",
 ]
 
 [[package]]

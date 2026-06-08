@@ -18,6 +18,7 @@
 //! byte-identical to AOT / the oracle wherever both render.
 
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use trussbars_core::{ToText, escape_html};
 use trussbars_template::{Cond, Each, Expr, Node, Value as Lit, With, parse};
@@ -118,36 +119,64 @@ impl LoopFrame {
     }
 }
 
-/// The render environment threaded through eval (cloned per block scope — the spike
-/// favours clarity over the borrow-juggling an optimized VM would do).
+/// The render environment threaded through eval. The context-carrying slots are
+/// `Rc<Value>` so entering a block scope (clone the env, push a parent) is a refcount
+/// bump, not a deep copy of the data — the difference between O(data) and O(data ×
+/// iterations) on a nested loop.
 #[derive(Clone)]
 struct Env {
-    this: Value,
-    root: Value,
-    params: BTreeMap<String, Value>,
-    parents: Vec<Value>, // parents[0] = the immediately enclosing context
+    this: Rc<Value>,
+    root: Rc<Value>,
+    params: BTreeMap<String, Rc<Value>>,
+    parents: Vec<Rc<Value>>, // parents[0] = the immediately enclosing context
     loop_frame: Option<LoopFrame>,
     labels: BTreeMap<String, LoopFrame>,
 }
 
-/// Render a MaxBars `template` against dynamic `data` (lenient mode).
+/// A **parsed template** — parse + desugar once, render many. Mirrors how a dynamic
+/// host (or handlebars' registry) reuses a compiled template across renders, so the
+/// interpret loop can be measured without re-parsing.
+pub struct Template {
+    nodes: Vec<Node>,
+}
+
+impl Template {
+    /// Parse + desugar a MaxBars template (the `trussbars-template` front-end).
+    ///
+    /// # Errors
+    /// The parse-error reason.
+    pub fn parse(src: &str) -> Result<Template, String> {
+        Ok(Template { nodes: parse(src).map_err(|e| e.message)? })
+    }
+
+    /// Render this template against shared dynamic `data` (lenient mode). Taking an
+    /// `Rc` lets a host that renders the same data repeatedly avoid re-cloning it
+    /// (the per-render cost is then a refcount bump, not a deep copy).
+    ///
+    /// # Errors
+    /// A reason string for an unimplemented construct/helper (never a wrong answer).
+    pub fn render(&self, data: Rc<Value>) -> Result<String, String> {
+        let env = Env {
+            this: Rc::clone(&data),
+            root: data,
+            params: BTreeMap::new(),
+            parents: Vec::new(),
+            loop_frame: None,
+            labels: BTreeMap::new(),
+        };
+        let mut out = String::new();
+        eval_nodes(&env, &self.nodes, &mut out)?;
+        Ok(out)
+    }
+}
+
+/// Render a MaxBars `template` against dynamic `data` (parse + render, lenient mode).
 ///
 /// # Errors
 /// Returns a reason string for a parse error or an unimplemented construct/helper
 /// (the spike never returns a *wrong* answer — unknowns are errors, not guesses).
 pub fn render(template: &str, data: Value) -> Result<String, String> {
-    let nodes = parse(template).map_err(|e| e.message)?;
-    let env = Env {
-        this: data.clone(),
-        root: data,
-        params: BTreeMap::new(),
-        parents: Vec::new(),
-        loop_frame: None,
-        labels: BTreeMap::new(),
-    };
-    let mut out = String::new();
-    eval_nodes(&env, &nodes, &mut out)?;
-    Ok(out)
+    Template::parse(template)?.render(Rc::new(data))
 }
 
 fn eval_nodes(env: &Env, nodes: &[Node], out: &mut String) -> Result<(), String> {
@@ -178,7 +207,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             let mut child = env.clone();
             for (name, value) in bindings {
                 let v = eval_expr(&child, value)?;
-                child.params.insert(name.clone(), v);
+                child.params.insert(name.clone(), Rc::new(v));
             }
             eval_nodes(&child, body, out)?;
         }
@@ -209,8 +238,8 @@ fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
     let subj = eval_expr(env, &w.subject)?;
     if subj.truthy() {
         let mut child = env.clone();
-        child.parents.insert(0, env.this.clone());
-        child.this = subj;
+        child.parents.insert(0, Rc::clone(&env.this));
+        child.this = Rc::new(subj);
         eval_nodes(&child, &w.body, out)
     } else {
         eval_nodes(env, &w.otherwise, out)
@@ -229,16 +258,18 @@ fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
         return eval_nodes(env, &e.otherwise, out);
     }
     let length = items.len();
+    let parent = Rc::clone(&env.this);
     for (i, (key, element)) in items.into_iter().enumerate() {
         let frame = LoopFrame { index0: i, length, key };
+        let element = Rc::new(element);
         let mut child = env.clone();
-        child.parents.insert(0, env.this.clone());
-        child.this = element.clone();
+        child.parents.insert(0, Rc::clone(&parent));
+        child.this = Rc::clone(&element);
         if let Some(item) = &e.item {
             child.params.insert(item.clone(), element);
         }
         if let Some(index) = &e.index {
-            child.params.insert(index.clone(), Value::Num(i as f64));
+            child.params.insert(index.clone(), Rc::new(Value::Num(i as f64)));
         }
         if let Some(label) = &e.label {
             child.labels.insert(label.clone(), frame.clone());
@@ -255,8 +286,8 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         Expr::App(name, args) => (name.as_str(), args.as_slice()),
     };
     match (name, args) {
-        ("this", []) => Ok(env.this.clone()),
-        ("root", []) => Ok(env.root.clone()),
+        ("this", []) => Ok((*env.this).clone()),
+        ("root", []) => Ok((*env.root).clone()),
         ("true", []) => Ok(Value::Bool(true)),
         ("false", []) => Ok(Value::Bool(false)),
         ("null", []) => Ok(Value::Null),
@@ -292,7 +323,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
             if let Some(v) = env.params.get(name)
                 && args.is_empty()
             {
-                return Ok(v.clone());
+                return Ok((**v).clone());
             }
             eval_helper(env, name, args)
         }
@@ -317,11 +348,46 @@ fn eval_path(env: &Env, args: &[Expr]) -> Result<Value, String> {
     }
     // parent chains
     if let Some(depth) = parent_index(head) {
-        let base = env.parents.get(depth).cloned().unwrap_or(Value::Null);
+        let base = env.parents.get(depth).map_or(Value::Null, |p| (**p).clone());
         return navigate(env, base, keys);
+    }
+    // Borrow the base from the env for a context-rooted path (`this`/`root`/a binding),
+    // so plucking a field doesn't deep-clone the whole context object — only the leaf.
+    if let Expr::App(n, a) = head
+        && a.is_empty()
+    {
+        let base: Option<&Value> = match n.as_str() {
+            "this" => Some(&env.this),
+            "root" => Some(&env.root),
+            other => env.params.get(other).map(|r| &**r),
+        };
+        if let Some(base) = base {
+            return navigate_ref(env, base, keys);
+        }
     }
     let base = eval_expr(env, head)?;
     navigate(env, base, keys)
+}
+
+/// Walk a borrowed `base` by the key expressions, cloning only the final leaf
+/// (the allocation-free path for `this.a.b` etc.).
+fn navigate_ref(env: &Env, base: &Value, keys: &[Expr]) -> Result<Value, String> {
+    let mut cur = base;
+    for k in keys {
+        let key = eval_expr(env, k)?;
+        cur = match (cur, &key) {
+            (Value::Object(o), Value::Str(s)) => match o.get(s) {
+                Some(v) => v,
+                None => return Ok(Value::Null),
+            },
+            (Value::Array(a), Value::Num(n)) => match a.get(*n as usize) {
+                Some(v) => v,
+                None => return Ok(Value::Null),
+            },
+            _ => return Ok(Value::Null),
+        };
+    }
+    Ok(cur.clone())
 }
 
 fn loop_chain(frame: &LoopFrame, keys: &[Expr]) -> Result<Value, String> {

@@ -13,18 +13,24 @@ use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use trussbars_benchmarks::{
-    askama_big_table, askama_teams, big_table_data, handlebars_big_table,
+    askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
     handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, sailfish_big_table,
-    sailfish_teams, teams_data, trussbars_big_table, trussbars_teams, write_big_table, write_teams,
+    sailfish_teams, teams_data, teams_value, trussbars_big_table, trussbars_teams, vm_big_table,
+    vm_big_table_template, vm_teams, vm_teams_template, write_big_table, write_teams,
 };
 
 fn big_table(c: &mut Criterion) {
     let ctx = big_table_data();
     let hb = handlebars_big_table_registry();
+    let vm_tmpl = vm_big_table_template();
+    let vm_data = std::rc::Rc::new(big_table_value(&ctx));
 
     let mut g = c.benchmark_group("big-table");
     g.bench_function("trussbars", |b| {
         b.iter(|| trussbars_big_table(black_box(&ctx)))
+    });
+    g.bench_function("trussbars-vm", |b| {
+        b.iter(|| vm_big_table(&vm_tmpl, black_box(&vm_data)))
     });
     g.bench_function("write", |b| b.iter(|| write_big_table(black_box(&ctx))));
     g.bench_function("sailfish", |b| {
@@ -41,8 +47,14 @@ fn teams(c: &mut Criterion) {
     let ctx = teams_data();
     let hb = handlebars_teams_registry();
 
+    let vm_tmpl = vm_teams_template();
+    let vm_data = std::rc::Rc::new(teams_value(&ctx));
+
     let mut g = c.benchmark_group("teams");
     g.bench_function("trussbars", |b| b.iter(|| trussbars_teams(black_box(&ctx))));
+    g.bench_function("trussbars-vm", |b| {
+        b.iter(|| vm_teams(&vm_tmpl, black_box(&vm_data)))
+    });
     g.bench_function("write", |b| b.iter(|| write_teams(black_box(&ctx))));
     g.bench_function("sailfish", |b| b.iter(|| sailfish_teams(black_box(&ctx))));
     g.bench_function("askama", |b| b.iter(|| askama_teams(black_box(&ctx))));

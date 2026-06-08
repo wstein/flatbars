@@ -291,3 +291,69 @@ pub fn handlebars_teams_registry() -> handlebars::Handlebars<'static> {
 pub fn handlebars_teams(hb: &handlebars::Handlebars, ctx: &Teams) -> String {
     hb.render("teams", ctx).unwrap()
 }
+
+// ─── 6. Trussbars VM (dynamic backend, docs/11) ───────────────────────────────
+// The SAME MaxBars language as the AOT column, run through the dynamic tree-walk
+// interpreter instead of compiled to Rust. Like handlebars, the template is parsed
+// ONCE (out of the timed loop) and the data is a pre-built `Value`, so the bench
+// measures the interpret loop — the dynamic peer to handlebars, the AOT peer to the
+// `trussbars` column above. (The VM spike is lenient; these templates are within its
+// covered subset.)
+
+use std::rc::Rc;
+
+use trussbars_vm::{Template as VmTemplate, Value as VmValue};
+
+fn vm_num(n: i64) -> VmValue {
+    VmValue::Num(n as f64)
+}
+
+/// `BigTable` → the VM's dynamic `Value` (`{ table: [[i64]] }`).
+pub fn big_table_value(ctx: &BigTable) -> VmValue {
+    let table = ctx.table.iter().map(|row| VmValue::Array(row.iter().map(|&v| vm_num(v)).collect())).collect();
+    VmValue::Object([("table".to_string(), VmValue::Array(table))].into_iter().collect())
+}
+
+/// `Teams` → the VM's dynamic `Value` (`{ year, teams: [{ name, score }] }`).
+pub fn teams_value(ctx: &Teams) -> VmValue {
+    let teams = ctx
+        .teams
+        .iter()
+        .map(|t| {
+            VmValue::Object(
+                [("name".to_string(), VmValue::Str(t.name.clone())), ("score".to_string(), vm_num(t.score))]
+                    .into_iter()
+                    .collect(),
+            )
+        })
+        .collect();
+    VmValue::Object(
+        [("year".to_string(), vm_num(ctx.year)), ("teams".to_string(), VmValue::Array(teams))]
+            .into_iter()
+            .collect(),
+    )
+}
+
+/// The big-table template in current MaxBars surface, parsed once.
+pub fn vm_big_table_template() -> VmTemplate {
+    VmTemplate::parse("<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>")
+        .expect("vm big-table parses")
+}
+
+pub fn vm_big_table(tmpl: &VmTemplate, data: &Rc<VmValue>) -> String {
+    tmpl.render(Rc::clone(data)).expect("vm big-table renders")
+}
+
+/// The teams template in current MaxBars surface, parsed once.
+pub fn vm_teams_template() -> VmTemplate {
+    VmTemplate::parse(
+        "<html><head><title>{{year}}</title></head><body><h1>CSL {{year}}</h1><ul>\
+         {{#each teams}}<li class=\"{{#if loop.first}}champion{{/if}}\"><b>{{this.name}}</b>: {{this.score}}</li>{{/each}}\
+         </ul></body></html>",
+    )
+    .expect("vm teams parses")
+}
+
+pub fn vm_teams(tmpl: &VmTemplate, data: &Rc<VmValue>) -> String {
+    tmpl.render(Rc::clone(data)).expect("vm teams renders")
+}
