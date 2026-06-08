@@ -100,10 +100,18 @@ non-trivial part (precedence-climbing for the operators).
    `{{ }}` / `{{{ }}}` / `{{# }}` / `{{/ }}` / `{{> }}` / `{{! }}` / `{{!-- --}}` and
    four-brace raw blocks (verbatim body). Gate: round-trips all 57 corpus templates
    (`tests/corpus.rs`, fixture from `extract-corpus.mjs`) + 10 unit tests.
-2. **Expression parser** — precedence-climbing; paths, ops, pipes, parens, list
-   literals, calls. Gate: the value-expression corpus cases.
-3. **Block parser + desugar** — each/if/with/let/partials/raw + the §3 rewrites →
-   the core AST. Gate: the block corpus cases.
+2. **Expression parser — ✅ DONE** (`src/parse_expr.rs`, `src/ast.rs`). An interior
+   tokenizer + a precedence-climbing parser (ternary → pipe → `??` → `?:` → `||` →
+   `&&` → cmp → `+ - ..` → `* / %` → unary → application → atoms) producing the
+   desugared core `Expr` (App/Lit): operators/pipes → `App`, paths → `lookup`
+   chains rooted via a `Scope`, list/dict literals, negatives, true/false/null.
+   Gate: 9 unit tests pinning the AST.
+3. **Block parser + desugar — ✅ DONE** (`src/parse.rs`). The `Lexeme` stream → a
+   structured, desugared `Node` tree: if/unless (negated)/`else if`-chain, the
+   Liquid `each item [i] in coll [label]` binding, `with`, sequential `let` hash,
+   inline/partial/`{{yield}}`, raw blocks; `Scope` threaded so a binding/alias roots
+   its paths at itself. Gate: 10 unit tests + **the whole 57-template corpus parses**
+   (`tests/corpus.rs::parser_accepts_the_whole_corpus`).
 4. **Emit** — transcribe `MaxBars/Rust.purs` (`node`/`expr`/`block`/…) onto the Rust
    AST. Gate: **56/56 byte-identical** + the diagnostics (`docs/07`).
 5. **Diagnostics** — `compile_error!` (class A) + `quote_spanned!` (class B) +

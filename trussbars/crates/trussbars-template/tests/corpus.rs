@@ -3,7 +3,7 @@
 //! `conformance/cases.mjs` by `tests/extract-corpus.mjs` (NUL-separated); regenerate
 //! it after editing the corpus.
 
-use trussbars_template::{Lexeme, lex};
+use trussbars_template::{Lexeme, lex, parse};
 
 const CORPUS: &str = include_str!("fixtures/corpus-templates.txt");
 
@@ -36,6 +36,24 @@ fn lexer_round_trips_the_whole_corpus() {
     assert!(
         failures.is_empty(),
         "{} corpus template(s) did not round-trip through the lexer: {:?}",
+        failures.len(),
+        failures,
+    );
+}
+
+/// The docs/08 §6.3 gate: every corpus template parses to a Node tree without
+/// error (`neg-dict` parses fine — it is the *emit* step that rejects `dict`).
+#[test]
+fn parser_accepts_the_whole_corpus() {
+    let templates: Vec<&str> = CORPUS.split('\0').collect();
+    let failures: Vec<(&str, String)> = templates
+        .iter()
+        .copied()
+        .filter_map(|t| parse(t).err().map(|e| (t, e.message)))
+        .collect();
+    assert!(
+        failures.is_empty(),
+        "{} corpus template(s) failed to parse: {:#?}",
         failures.len(),
         failures,
     );
