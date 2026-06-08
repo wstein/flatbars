@@ -1,0 +1,24 @@
+[package]
+name = "trussbars-benchmarks"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace.
+[workspace]
+
+[dependencies]
+trussbars-core = { path = "../crates/trussbars-core" }
+trussbars-std = { path = "../crates/trussbars-std" }
+serde = { version = "1", features = ["derive"] }
+# Peers: the dynamic interpreter baseline, the typed peer, the fastest reference.
+handlebars = "6"
+askama = "0.16"
+sailfish = "0.11"
+
+[dev-dependencies]
+criterion = "0.8"
+
+[[bench]]
+name = "render"
+harness = false
