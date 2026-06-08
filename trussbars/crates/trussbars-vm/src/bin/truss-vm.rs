@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 use std::io::Read;
+use std::rc::Rc;
 
 use serde_json::Value as Json;
 use trussbars_vm::{Value, render};
@@ -43,10 +44,10 @@ fn from_json(j: &Json) -> Value {
         Json::Null => Value::Null,
         Json::Bool(b) => Value::Bool(*b),
         Json::Number(n) => Value::Num(n.as_f64().unwrap_or(0.0)),
-        Json::String(s) => Value::Str(s.clone()),
-        Json::Array(a) => Value::Array(a.iter().map(from_json).collect()),
+        Json::String(s) => Value::Str(Rc::from(s.as_str())),
+        Json::Array(a) => Value::Array(a.iter().map(from_json).collect::<Vec<_>>().into()),
         Json::Object(o) => {
-            Value::Object(o.iter().map(|(k, v)| (k.clone(), from_json(v))).collect::<BTreeMap<_, _>>())
+            Value::Object(Rc::new(o.iter().map(|(k, v)| (k.clone(), from_json(v))).collect::<BTreeMap<_, _>>()))
         }
     }
 }

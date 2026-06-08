@@ -3,8 +3,6 @@
 //! comparative benchmark measures speed, not output shape. The hand-written
 //! `write!` baseline is the reference. Cheap — runs in debug.
 
-use std::rc::Rc;
-
 use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
     handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, sailfish_big_table,
@@ -20,7 +18,7 @@ fn big_table_all_engines_agree() {
 
     assert_eq!(trussbars_big_table(&ctx), baseline, "trussbars (AOT) vs write");
     assert_eq!(
-        vm_big_table(&vm_big_table_template(), &Rc::new(big_table_value(&ctx))),
+        vm_big_table(&vm_big_table_template(), &big_table_value(&ctx)),
         baseline,
         "trussbars-vm vs write"
     );
@@ -41,7 +39,7 @@ fn teams_all_engines_agree() {
 
     assert_eq!(trussbars_teams(&ctx), baseline, "trussbars (AOT) vs write");
     assert_eq!(
-        vm_teams(&vm_teams_template(), &Rc::new(teams_value(&ctx))),
+        vm_teams(&vm_teams_template(), &teams_value(&ctx)),
         baseline,
         "trussbars-vm vs write"
     );

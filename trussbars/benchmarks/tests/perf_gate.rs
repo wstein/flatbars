@@ -72,7 +72,7 @@ fn trussbars_beats_askama_and_crushes_handlebars() {
         let ctx = big_table_data();
         let hb = handlebars_big_table_registry();
         let vm_tmpl = vm_big_table_template();
-        let vm_data = std::rc::Rc::new(big_table_value(&ctx));
+        let vm_data = big_table_value(&ctx);
         let n = 200;
         let tb = min_time(n, || trussbars_big_table(&ctx));
         let vm = min_time(n, || vm_big_table(&vm_tmpl, &vm_data));
@@ -86,7 +86,7 @@ fn trussbars_beats_askama_and_crushes_handlebars() {
         let ctx = teams_data();
         let hb = handlebars_teams_registry();
         let vm_tmpl = vm_teams_template();
-        let vm_data = std::rc::Rc::new(teams_value(&ctx));
+        let vm_data = teams_value(&ctx);
         let n = 5000;
         let tb = min_time(n, || trussbars_teams(&ctx));
         let vm = min_time(n, || vm_teams(&vm_tmpl, &vm_data));

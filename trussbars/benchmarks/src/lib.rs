@@ -310,28 +310,32 @@ fn vm_num(n: i64) -> VmValue {
 
 /// `BigTable` → the VM's dynamic `Value` (`{ table: [[i64]] }`).
 pub fn big_table_value(ctx: &BigTable) -> VmValue {
-    let table = ctx.table.iter().map(|row| VmValue::Array(row.iter().map(|&v| vm_num(v)).collect())).collect();
-    VmValue::Object([("table".to_string(), VmValue::Array(table))].into_iter().collect())
+    let table: Vec<VmValue> = ctx
+        .table
+        .iter()
+        .map(|row| VmValue::Array(row.iter().map(|&v| vm_num(v)).collect::<Vec<_>>().into()))
+        .collect();
+    VmValue::Object(Rc::new([("table".to_string(), VmValue::Array(table.into()))].into_iter().collect()))
 }
 
 /// `Teams` → the VM's dynamic `Value` (`{ year, teams: [{ name, score }] }`).
 pub fn teams_value(ctx: &Teams) -> VmValue {
-    let teams = ctx
+    let teams: Vec<VmValue> = ctx
         .teams
         .iter()
         .map(|t| {
-            VmValue::Object(
-                [("name".to_string(), VmValue::Str(t.name.clone())), ("score".to_string(), vm_num(t.score))]
+            VmValue::Object(Rc::new(
+                [("name".to_string(), VmValue::Str(Rc::from(t.name.as_str()))), ("score".to_string(), vm_num(t.score))]
                     .into_iter()
                     .collect(),
-            )
+            ))
         })
         .collect();
-    VmValue::Object(
-        [("year".to_string(), vm_num(ctx.year)), ("teams".to_string(), VmValue::Array(teams))]
+    VmValue::Object(Rc::new(
+        [("year".to_string(), vm_num(ctx.year)), ("teams".to_string(), VmValue::Array(teams.into()))]
             .into_iter()
             .collect(),
-    )
+    ))
 }
 
 /// The big-table template in current MaxBars surface, parsed once.
@@ -340,8 +344,8 @@ pub fn vm_big_table_template() -> VmTemplate {
         .expect("vm big-table parses")
 }
 
-pub fn vm_big_table(tmpl: &VmTemplate, data: &Rc<VmValue>) -> String {
-    tmpl.render(Rc::clone(data)).expect("vm big-table renders")
+pub fn vm_big_table(tmpl: &VmTemplate, data: &VmValue) -> String {
+    tmpl.render(data).expect("vm big-table renders")
 }
 
 /// The teams template in current MaxBars surface, parsed once.
@@ -354,6 +358,6 @@ pub fn vm_teams_template() -> VmTemplate {
     .expect("vm teams parses")
 }
 
-pub fn vm_teams(tmpl: &VmTemplate, data: &Rc<VmValue>) -> String {
-    tmpl.render(Rc::clone(data)).expect("vm teams renders")
+pub fn vm_teams(tmpl: &VmTemplate, data: &VmValue) -> String {
+    tmpl.render(data).expect("vm teams renders")
 }

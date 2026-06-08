@@ -23,7 +23,7 @@ fn big_table(c: &mut Criterion) {
     let ctx = big_table_data();
     let hb = handlebars_big_table_registry();
     let vm_tmpl = vm_big_table_template();
-    let vm_data = std::rc::Rc::new(big_table_value(&ctx));
+    let vm_data = big_table_value(&ctx);
 
     let mut g = c.benchmark_group("big-table");
     g.bench_function("trussbars", |b| {
@@ -48,7 +48,7 @@ fn teams(c: &mut Criterion) {
     let hb = handlebars_teams_registry();
 
     let vm_tmpl = vm_teams_template();
-    let vm_data = std::rc::Rc::new(teams_value(&ctx));
+    let vm_data = teams_value(&ctx);
 
     let mut g = c.benchmark_group("teams");
     g.bench_function("trussbars", |b| b.iter(|| trussbars_teams(black_box(&ctx))));
