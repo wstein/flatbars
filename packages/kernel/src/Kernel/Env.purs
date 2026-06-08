@@ -19,6 +19,7 @@ module Kernel.Env
   , register
   , registerAll
   , lookupOperation
+  , isScopedBinding
   , innermostFrame
   , pushFrame
   , pushHelpers
@@ -179,6 +180,21 @@ lookupOperation name (RefEnv e) = go e.helpers
   go (m : rest) = case Map.lookup name m of
     Just h -> Just h
     Nothing -> go rest
+
+-- | True when `name` is bound by a *pushed* scope frame — a block param, loop
+-- | variable, or loop label — rather than only the outermost prelude/registered-
+-- | helper frame (the base, always the last frame: the seed installs one frame and
+-- | block/`with` push on top). `lenientResolve` consults it so a scoped binding
+-- | wins over the *data-section* reinterpretation of a same-named prelude value op
+-- | (`{{#each xs as t}}{{t}}` must read the block param `t`, not the `t` translate
+-- | helper). The compiled `rt.call` checks `frame.binds` first for the same reason,
+-- | so the two paths stay byte-identical (`test:compile`).
+isScopedBinding :: forall m. String -> RefEnv m -> Boolean
+isScopedBinding name (RefEnv e) = go e.helpers
+  where
+  go Nil = false
+  go (_ : Nil) = false -- the outermost frame is the prelude/helpers base, not scope
+  go (m : rest) = Map.member name m || go rest
 
 -- | The innermost helper frame — the loop/with bindings of the current scope (for
 -- | the context inspector, ADR-035): a block frame's keys are its scoped vars plus

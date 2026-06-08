@@ -329,6 +329,21 @@ main = do
     "{{#each o as v k}}{{k}}={{v}};{{/each}}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "x=1;y=2;"
+  -- a block param named like a prelude value op shadows the op: `{{t}}`/`{{t.name}}`
+  -- read the binding, not the `t` (translate) helper. Drop-pipes makes short
+  -- op-shaped names like `t` common, so this is the everyday case.
+  expectM "shadow: a block param `t` shadows the translate helper"
+    "{{#each rows as t}}[{{t.name}}]{{/each}}"
+    ( obj
+        [ Tuple "rows"
+            (VArray [ obj [ Tuple "name" (VString "A") ], obj [ Tuple "name" (VString "B") ] ])
+        ]
+    )
+    "[A][B]"
+  expectM "shadow: a bare block param `add` shadows the add helper"
+    "{{#each xs as add}}[{{add}}]{{/each}}"
+    (obj [ Tuple "xs" (VArray [ VString "x", VString "y" ]) ])
+    "[x][y]"
 
   -- label-shadow lint (ADR-021): a loop `label NAME` whose name is a reserved root
   -- (this/loop/root/parent/yield) shadows it for the whole body, so it warns; a

@@ -92,6 +92,12 @@ export const cases = [
   { name: "s:each-blockparams", dialect: "surface", t: "{{#each items as |item i|}}{{ i }}:{{ item }};{{/each}}", d: { items: ["a", "b"] } },
   { name: "s:each-object-blockparams", dialect: "surface", t: "{{#each o as |v k|}}{{ k }}={{ v }};{{/each}}", d: { o: { b: 2, a: 1 } } },
   { name: "s:with-blockparam", dialect: "surface", t: "{{#with user as |u|}}{{ u.name }}{{/with}}", d: { user: { name: "Ada" } } },
+  // a block param named like a prelude value op shadows it (resolves to the binding,
+  // not the helper's data-section reinterpretation) — interpreter ≡ compiled.
+  { name: "s:blockparam-shadows-op", dialect: "surface", t: "{{#each rows as |t|}}[{{ t.name }}]{{/each}}", d: { rows: [{ name: "A" }, { name: "B" }] } },
+  { name: "s:blockparam-shadows-op-bare", dialect: "surface", t: "{{#with row as |add|}}{{ add }}{{/with}}", d: { row: "x" } },
+  // a same-named prelude op still data-sections as a BARE block (no binding in scope).
+  { name: "s:section-over-op-field", dialect: "surface", t: "{{#uppercase}}{{ this }}{{/uppercase}}", d: { uppercase: ["a", "b"] } },
   { name: "s:at-index", dialect: "surface", t: "{{#each xs}}{{@index}}:{{ this }};{{/each}}", d: { xs: ["a", "b"] } },
   { name: "s:at-first-last", dialect: "surface", t: "{{#each xs}}{{#if @first}}<{{/if}}{{ this }}{{#if @last}}>{{/if}}{{/each}}", d: { xs: ["x", "y"] } },
   { name: "s:at-parent-index", dialect: "surface", t: "{{#each rows}}{{#each this}}[{{@../index}}-{{@index}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
@@ -326,6 +332,10 @@ export const cases = [
   { name: "mx:blockparams-paren-pipe", dialect: "maxbars", t: "{{#each (xs | reverse) as x}}{{x}}{{/each}}", d: { xs: ["a", "b", "c"] } },
   // an OUTER block param stays visible inside a nested loop (frame binds inherit).
   { name: "mx:blockparams-nested-outer", dialect: "maxbars", t: "{{#each rows as row}}{{#each row}}[{{row}}={{this}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  // a block param named like a prelude op (here `t`, the translate helper) shadows
+  // it — `{{t}}`/`{{t.name}}` read the binding, not the helper (interpreter ≡ compiled).
+  { name: "mx:blockparam-shadows-op", dialect: "maxbars", t: "{{#each rows as t}}[{{t.name}}]{{/each}}", d: { rows: [{ name: "A" }, { name: "B" }] } },
+  { name: "mx:blockparam-shadows-op-bare", dialect: "maxbars", t: "{{#each xs as add}}[{{add}}]{{/each}}", d: { xs: ["x", "y"] } },
   // ── labelled loops (ADR-013): the label binds the frame reified as an object ──
   { name: "mx:label-outer-array", dialect: "maxbars", t: "{{#each rows as row label outer}}{{#each row}}{{outer.index1}}/{{outer.length}}:{{this}}{{#if outer.first}}*{{/if}} {{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
   { name: "mx:label-single", dialect: "maxbars", t: "{{#each xs label l}}{{l.index0}}:{{this}}/{{l.last}} {{/each}}", d: { xs: ["a", "b", "c"] } },

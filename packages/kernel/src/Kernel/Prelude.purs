@@ -53,7 +53,7 @@ import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value(..))
 import Kernel.Engine (Ctl, Operation)
-import Kernel.Env (RefEnv, constOperation, enterPartial, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName, withPartialFileScope)
+import Kernel.Env (RefEnv, constOperation, enterPartial, isScopedBinding, liftEither, lookupOperation, lookupPartial, pushFrame, recursionBudget, refContext, refDepth, refTranslator, refTruthy, refYieldName, withPartialFileScope)
 import Kernel.Operation (ArgSpec, atLeast, binary, nullary, unary)
 import Kernel.Value (escapeHtml, handlebars, jsonStringify, jsonStringifyPretty, stringify)
 import Kernel.Walk (Arity(..), Clause, Schema, splitClauses)
@@ -1496,8 +1496,13 @@ lenientResolve
   -> Ident
   -> Maybe (Operation m (RefEnv m))
   -> m (Operation m (RefEnv m))
-lenientResolve _ name = case _ of
+lenientResolve env name = case _ of
   Just h
+    -- a scoped binding (block param / loop var / label) wins over the data-section
+    -- reinterpretation of a same-named prelude value op: `{{#each xs as t}}{{t}}`
+    -- reads the block param, not the `t` translate helper. Matches the compiled
+    -- `rt.call`, which checks `frame.binds` before the helper registry.
+    | isScopedBinding name env -> pure h
     | Array.elem name sectionableValueNames -> pure (valueOrSection name h)
     | otherwise -> pure h
   Nothing -> pure (sectionOp name)
