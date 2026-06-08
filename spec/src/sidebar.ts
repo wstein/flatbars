@@ -159,6 +159,10 @@ export const sidebar = [
         "link": "/adr/adr-0035-source-map-provenance/"
       },
       {
+        "label": "ADR-036: collection filters",
+        "link": "/adr/adr-0036-collection-filter-operations/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }

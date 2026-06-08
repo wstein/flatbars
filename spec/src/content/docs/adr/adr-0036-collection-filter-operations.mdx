@@ -1,0 +1,164 @@
+---
+title: "ADR-036: collection-filter operations — where / reject / find / some / every (key-based)"
+sidebar:
+  label: "ADR-036 collection filters"
+---
+
+*Status:* **Proposed.** *Date:* 2026-06-09. Owner: Werner. Five value operations
+added to the *shared prelude* (RawBars / FullBars / MaxBars / MinBars), pipe-able
+through the existing MaxBars pipe — **no new surface syntax**. Builds on
+[ADR-019](/adr/adr-0019-operation-vocabulary/) (the operation vocabulary),
+[ADR-020](/adr/adr-0020-user-block-helpers/) (the no-`Value`-functions boundary —
+the constraint this ADR is shaped by), and [ADR-022](/adr/adr-0022-analyse-mode/)
+(the truthiness rule the truthy form depends on). Sits beside
+[ADR-025](/adr/adr-0025-list-literal/) (`list`) as another *value-only*, shared-
+prelude addition.
+
+> *On nomenclature.* These are **value operations** (a value-producing operation
+> is a *definition*, [ADR-019](/adr/adr-0019-operation-vocabulary/)), registered
+> with `valDef` next to `sortBy` / `groupBy` / `pluck`. "Helper" is the *host-API*
+> word — `registerHelper` — reserved for the JS boundary; it is not the native
+> noun. This ADR says *operation* throughout.
+
+## Context
+
+MaxBars already has the *pipe* (`{{ xs | sortBy "name" }}`) and a useful slice of
+collection operations in the shared prelude — `sortBy`, `groupBy`, `pluck`,
+`unique`, `take` / `takeRight`, `reverse`, `count`, `join`, `at`, `range`, `list`.
+What is missing is the most-reached-for transform: **filtering a collection**.
+There is no `where` / `reject` / `find`, so a template that wants "only the active
+rows" must precompute in the host or fall back to `groupBy`.
+
+One constraint dominates the design:
+
+* **There are no lambdas.** [ADR-020](/adr/adr-0020-user-block-helpers/) keeps
+  *functions out of `Value`* by design (in-data lambdas: value-producing →
+  precompute, body-aware → a block operation; arbitrary closures stay out). So an
+  *arbitrary-predicate* filter — `where (gt x.score 50)` — is **impossible**: the
+  predicate would be a per-element closure over the loop variable, which is exactly
+  the `Value`-function this engine forbids. The realisable filter is **key-based**:
+  by a field's truthiness, or its equality to a constant — Liquid's `where`/`reject`
+  model, not LINQ. This is the wall; the design lives inside it.
+
+The other relevant fact: the *truthy* form is truthiness-rule-dependent
+([ADR-022](/adr/adr-0022-analyse-mode/)). `where xs "count"` keeps items whose
+`count` is truthy — and `0` is truthy under MaxBars/RawBars (`nonEmpty`) but falsy
+under FullBars (`handlebars`). The equality form (`where xs "count" 0`) is
+rule-independent.
+
+## Decision
+
+Add five **key-based collection-filter value operations** to the shared prelude,
+each pure and pipe-able. No new surface syntax — they compose with the pipe and
+`each … in` we already have:
+
+```handlebars
+{{#each row in (rows | where "active") }}…{{/each}}
+{{#each u in (users | reject "archived") }}…{{/each}}
+{{ users | find "role" "admin" | json }}
+{{#if (orders | some "open") }}You have open orders.{{/if}}
+```
+
+### 1. The operations
+
+Each takes a collection and a **key path** (dotted, resolved by the same
+`extractPath` `groupBy`/`pluck` use, so `where users "profile.active"` works), with
+an **optional comparison value**. Arity `Between 2 3`. A non-array subject yields
+the empty result (`[]` / `null` / `false` / `true`, per op), matching the other
+collection operations.
+
+| Operation | Result | 2-arg (`coll key`) | 3-arg (`coll key value`) |
+| --- | --- | --- | --- |
+| `where`  | array  | items where `item.key` is **truthy** | items where `item.key` **==** `value` |
+| `reject` | array  | the complement of `where` (key falsy) | items where `item.key` **!=** `value` |
+| `find`   | a value or `null` | the first item whose `key` is truthy | the first item whose `key` **==** `value` |
+| `some`   | boolean | `true` iff **any** item's `key` is truthy | `true` iff any item's `key` **==** `value` |
+| `every`  | boolean | `true` iff **all** items' `key` are truthy | `true` iff all items' `key` **==** `value` (vacuously `true` on `[]`) |
+
+* *Equality* is the engine's `eq` (the deep value equality the `eq` operation uses)
+  — so `where xs "tier" "gold"` and `find xs "id" 7` work for strings and numbers.
+* *Truthiness* (the 2-arg form) is the env's rule
+  ([ADR-022](/adr/adr-0022-analyse-mode/)) — the same callback `{{#if}}` uses, so a
+  filtered item agrees with how the same value would test in a condition.
+* `find`'s miss is `null` (not `[]`), so `(xs | find "k") | json` and
+  `{{#with (xs | find "k") }}…{{else}}none{{/with}}` read naturally.
+
+### 2. No new syntax — and what we are *not* adding
+
+* **No `where` *clause*** (`{{#each x in xs where active}}`). The pipe already
+  expresses it (`{{#each x in (xs | where "active")}}`); a head-keyword sugar saves
+  one paren at the cost of new grammar, and the MaxBars binding surface was just
+  *frozen* ([ADR-021](/adr/adr-0021-maxbars-variable-model/) amendment). If a clause
+  is ever wanted, it is its own ADR.
+* **No `map`.** Arbitrary element-transform needs a lambda (the wall); the *common*
+  map — extract one field per item — is already `pluck`. `map` would be impossible
+  (arbitrary) or redundant (`pluck`).
+* **No arbitrary predicate.** `where (gt x.score 50)` stays out — precompute the
+  flag in the data (`{ score, top: … }`) and filter on the key, or shape the data
+  host-side. This boundary is documented on the MaxBars page so authors meet it as
+  a rule, not a surprise.
+
+### 3. Dialect scope
+
+Shared prelude, like `list`/`sortBy`/`groupBy` — value-only, no surface change, so
+every dialect gets the operations (RawBars writes them explicitly, MaxBars pipes
+them). FullBars's Handlebars conformance is value-only and untouched (the
+`check:hbs-conformance` `49/50` line must stay green — verified in *Gates*). There
+is no MaxBars-only sugar here: the asymmetry is `>=` → `(gte …)`-style only when a
+*surface operator* is involved, and this ADR adds none.
+
+## Consequences
+
+### Gates
+
+* *`test:compile`* — one interpreter-≡-compiled case per operation, across the
+  truthy form, the equality form, a non-array subject, and an empty result, with the runtime twins
+  (`rt.call` table) added alongside `groupBy`/`pluck`. The byte-identical invariant
+  is the acceptance bar.
+* *`check:catalog` / `check:operations`* — five new `valDef`s ⇒ regenerate the
+  helper catalog and `operations.json`; the catalog count moves (100 → 105).
+* *`check:hbs-conformance`* — re-run; value-only additions must not move the `49/50`
+  FullBars line.
+* *Truthiness footgun, pinned.* A test asserts the 2-arg `where`/`some`/`every`
+  honour the *env's* truthiness rule — `where [{c:0}] "c"` keeps the item under
+  MaxBars/RawBars (`0` truthy) and drops it under FullBars (`0` falsy) — so the
+  rule-dependence is a documented, tested property, not a latent surprise. Analyse
+  mode ([ADR-022](/adr/adr-0022-analyse-mode/)) already flags `nonEmpty`-vs-`handlebars`
+  divergences; the truthy filter forms surface there for free.
+
+### Documentation
+
+* The MaxBars page gains a *Collection filters* note: the five operations, the
+  key-based boundary (no `score > 50` — the lambda wall), and the truthy-form
+  truthiness caveat.
+* The generated helper catalog lists them (single-sourced from `preludeSchema`).
+
+### Non-goals (deliberately deferred)
+
+* A `where` loop clause, `map`, `reduce`/`fold`, and any arbitrary-predicate or
+  arbitrary-transform form — all need lambdas or new grammar. Revisit only with a
+  dedicated ADR (and only if the lambda boundary itself is ever revisited, which is
+  a much larger decision than this one).
+
+## Alternatives considered
+
+* *Arbitrary-predicate `where (expr)`* — the LINQ/`Array.filter` shape. Rejected by
+  [ADR-020](/adr/adr-0020-user-block-helpers/): it requires a per-element closure
+  (`Value`-function), the one thing the engine keeps out. Key-based is the largest
+  filter we can express purely.
+* *A `where` block/loop clause* — new head grammar one week after the binding
+  surface was frozen; the pipe already expresses it. Rejected (see Decision §2).
+* *`filter` as the name* (vs `where`) — `where` matches Liquid/SQL and pairs with
+  `reject`; `filter` reads as "apply a function," which we cannot do. `where` is the
+  honest name for key-based.
+* *Folding `find`/`some`/`every` into `where` + `at`/`count`* — `(xs | where "k" v
+  | at 0)` is `find`; `(xs | where "k" | count) > 0` is `some`. Expressible, but
+  verbose and re-scans; the three are cheap single-pass operations and read far
+  better, so they earn their place.
+
+## Open questions
+
+* *Comparison operators beyond `==`* — Liquid's `where_exp` allows `>`/`<`. We only
+  ship equality, because `>`/`<` on a key edges back toward the predicate wall (it
+  is still key-based, but the API grows a comparator argument). Deferred; add a
+  `whereCmp xs "key" ">" 50` form only if real templates demand it.
