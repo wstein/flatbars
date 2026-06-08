@@ -12,7 +12,8 @@ the full `this`/`loop`/`root`/`parent`/`outer` model (`outer` = a `label NAME`) 
 
 ## Context
 
-MaxBars v1 reaches only the *outer element/index/key*, via block params `{{#each users as |user uidx|}}`.
+MaxBars v1 reaches only the *outer element/index/key*, via block params `{{#each users as user uidx}}`
+(the drop-pipes spelling — [ADR-021](/adr/adr-0021-maxbars-variable-model/) amendment).
 The outer loop's `first`/`last`/`length`/`rindex` are unreachable, and the companion spec's "compute from a
 named outer length" idea was shown wrong: block params bind only the item plus index/key, so the
 outer length cannot be named. Reaching full outer-loop state needs a *naming/scoping* construct, not
@@ -37,7 +38,7 @@ not scope-declared. So a label must be a **scope-declared binding**, exactly lik
    single-sourced in the surface desugar beside `extractBlockParams` (it adds `NAME` to `scope` and has
    `each` bind the frame-object). Rejected alternatives: a static `loop="outer"` hash (a hash
    value is a runtime expression, but a label is a *static* scope fact — special-casing a string-literal
-   hash is magic); an `as |user ^outer|` sigil (MaxBars deliberately dropped sigils, ADR-006).
+   hash is magic); an `as user ^outer` sigil (MaxBars deliberately dropped sigils, ADR-006).
 1. *The frame-object field set is normative* —
    `{ this, index0, index1, rindex0, rindex1, first, last, length, key }`, reusing ADR-006's fixed
    arithmetic (`rindex0 = length − 1 − index0`, `first = index0 == 0`, …). It is an **immutable

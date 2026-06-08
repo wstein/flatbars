@@ -177,16 +177,17 @@ register and is exactly the two-register model applied at the boundary, not just
   `registerOperation(name, fn[, arity])` affordance, mirroring `registerHelper`). RawBars is the
   desugared core surface: it has *no surface sugar*, so a block head emits no `@hash`/`@param` markers — a
   RawBars block operation therefore gets `options.fn`/`options.inverse` (and `options.fn(ctx, { data })`
-  for scoped vars) but *no* `options.hash` and no `as |…|` block params (there is no surface to write
+  for scoped vars) but *no* `options.hash` and no `as` block-param clause (there is no surface to write
   them). Resolution stays *strict* — an unknown operation is `UnknownHelper`, never `blockHelperMissing`
   (RawBars has no implicit-section policy; ADR-020's lenient resolve is FullBars/MaxBars only).
 * *MaxBars* — `renderWithOperations(...)` over the MaxBars surface (infix/pipes/loop vars). It desugars the
   same `@hash`/`@param` markers, so a MaxBars block operation gets the *full* surface: `fn`/`inverse`/`hash`
   + `options.fn(ctx, { data, blockParams })`, and the lenient `blockHelperMissing` resolve it inherits.
-  Block params (`as |a b|`) parse because the MaxBars head grammar omits its top-level *pipe* rung, leaving
-  a bar in head position to serve as the block-parameter delimiter — exactly as FullBars and the core
-  parser already treat it. The only head-position consequence: to *pipe* a block argument, parenthesise it
-  (`{{#each (xs | f) as |x|}}`), which re-enters the full expression grammar.
+  Block params use the MaxBars **drop-pipes** spelling (`as a b`; the head grammar omits its top-level
+  *pipe* rung and a bar in a head is a parse error — [ADR-021](/adr/adr-0021-maxbars-variable-model/)
+  amendment), and `each` binds a third name to the 1-based index (`as a i0 i1`). The only head-position
+  consequence: to *pipe* a block argument, parenthesise it (`{{#each (xs | f) as x}}`), which re-enters the
+  full expression grammar.
 
 ### Mechanism — reuse, do not rebuild
 
@@ -202,10 +203,10 @@ machinery:
   `flatbars-js` facade.
 * `Ctl.hash`/`blockParams` are populated by the shared `blockArgs` seam regardless of dialect; RawBars sees
   `Nothing`/`[]` (no markers), MaxBars sees both — so the *same* marshaller yields the per-dialect surface
-  above with no per-dialect branching. (MaxBars producing `@param` markers required one dialect-local parser
-  change — the head ladder dropping its pipe rung so `as |…|` survives as structure; see
-  [the MaxBars page](/engine/maxbars/). No core or desugar change: `as` stays single-sourced in the surface
-  desugar's `extractBlockParams`.)
+  above with no per-dialect branching. (MaxBars producing `@param` markers required only the dialect-local
+  drop-pipes head grammar — `as a b`, a bar in a head being a parse error ([ADR-021](/adr/adr-0021-maxbars-variable-model/)
+  amendment); see [the MaxBars page](/engine/maxbars/). No core change: `as` stays single-sourced in the
+  surface desugar's `extractBlockParams`, which selects the pipe vs drop-pipes spelling by dialect.)
 
 ### Gating
 

@@ -35,7 +35,8 @@ scope is scoped helpers). The cost is that bare names can shadow data fields.
    an *error*.
 
 1. *v1 outer-loop limit (documented).* Only the outer element/index/key are reachable, via block
-   params `as |user uidx|`. Outer `first`/`last`/`length`/`rindex` are *not* reachable — labelled loops
+   params (`as user uidx` in current MaxBars — drop-pipes, [ADR-021](/adr/adr-0021-maxbars-variable-model/)
+   amendment). Outer `first`/`last`/`length`/`rindex` are *not* reachable — labelled loops
    are future work. The companion spec's claim "compute from a named outer length" is wrong: block
    params bind only the item plus index/key, so the outer length cannot be named.
 

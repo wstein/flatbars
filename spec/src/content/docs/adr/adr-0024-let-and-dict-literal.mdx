@@ -4,7 +4,10 @@ sidebar:
   label: "ADR-024 `let` & dict literal"
 ---
 
-*Status:* Proposed (revised 2026-06-04 after team review — see *Resolved during review* below; the list
+*Status:* **Partially accepted — the dict literal is implemented (2026-06-08); `{{#let}}` remains
+proposed (not yet implemented).** The implemented dict literal uses **JSON-style** `{name: expr, …}`
+(a `:` separator, comma-separated pairs), *revising* the proposed `{name=expr name=expr}` (`=`,
+whitespace-separated) of §2 below — see the *Amendment*. Revised 2026-06-04 after team review (the list
 literal was split out to [ADR-025](/adr/adr-0025-list-literal/)).
 *Date:* 2026-06-04. Applies to *MaxBars and RawBars* only; *FullBars is unchanged*
 (Handlebars-faithful — see [ADR-009](/adr/adr-0009-fullbars/) and the conformance line at
@@ -16,6 +19,20 @@ This ADR covers the two constructs that need *no shared-prelude change*: block-s
 dict literal (which reuses the existing `dict` helper). The *list literal* needs a new `list` constructor
 in the shared prelude, a different blast radius, so it is its own decision —
 [ADR-025](/adr/adr-0025-list-literal/). The two ADRs share this Context and the lexing/dialect model.
+
+*Amendment (2026-06-08, implementation).* The dict literal shipped as **`{name: expr, …}`** — a `:`
+key/value separator, **comma**-separated pairs, keys a bare identifier or a quoted string — *not* the
+proposed `{name=expr name=expr}` (§2). The reason is consistency with the [list
+literal](/adr/adr-0025-list-literal/): a list **must** be comma-separated because MaxBars juxtaposition is
+*application* (`[a b]` would parse as the single element `(a b)`), so the §"JSON-style literals" negative's
+premise — that `:`/`,` could be avoided — does not hold once lists exist. With the list forced to commas,
+a `=`/whitespace dict would split the two literals' surfaces gratuitously; one comma-separated family
+(`[a, b]` / `{k: v, w: z}`) is the smaller surprise and the JS/JSON author's expectation. The ADR's *key*
+decision is unchanged and upheld: distinct `{…}` (dict) vs `[…]` (list) shapes, so the empty-collection
+case (`{}` vs `[]`) stays unambiguous. The `:` and `,` interior tokens are added behind
+`LexOptions.collectionLiterals` (MaxBars-only). One delimiter caveat: a dict abutting the tag close needs a
+space — `{{#with {a: 1} }}` — since `}}}` would otherwise close the tag early. The desugar target (the
+`dict` helper) and the dialect scope (MaxBars sugar; RawBars writes `(dict …)`) are exactly as below.
 
 ## Context
 
@@ -92,19 +109,21 @@ Semantics:
 * *Does not re-root context.* `{{#let u=user}}{{name}}{{/let}}` resolves `name` against the *root*, not
   against `user`. To re-root, use `{{#with}}` (which stays — see below).
 
-### 2. Dict literal `{name=expr name=expr …}` — MaxBars expression sugar
+### 2. Dict literal `{name: expr, …}` — MaxBars expression sugar
 
-A brace-delimited list of hash-arg pairs in expression position is sugar for `(dict …)`. The interior
-syntax is FlatBars-native — *bare* keys, `=` separator, *whitespace*-separated pairs — no JSON
-conventions are imported.
+> *Implemented form (see the Amendment above).* A brace-delimited list of `key: value` pairs in
+> expression position is sugar for `(dict …)`. Keys are a bare identifier or a quoted string; values are
+> full expressions; pairs are comma-separated. *(The original proposal was `{name=expr name=expr}` —
+> `=`-separated, whitespace-separated; revised to the JSON-style form for consistency with the
+> comma-separated list literal.)*
 
 ```handlebars
-{{#let forges={codeberg="…" github="…" gitlab="…"}}}
+{{#let forges={codeberg: "…", github: "…", gitlab: "…"} }}
   …
 {{/let}}
 ```
 
-Desugars at the MaxBars parser stage to `(dict codeberg="…" github="…" gitlab="…")`. The `dict`
+Desugars at the MaxBars parser stage to `(dict "codeberg" "…" "github" "…" "gitlab" "…")`. The `dict`
 helper already lives in the shared prelude ([prelude](/engine/prelude/)); *no kernel or prelude change* — this is
 the property that lets the dict literal ship ahead of the list literal.
 
@@ -119,7 +138,15 @@ delimiter widths (`{{ }}` / `{{{ }}}` / `{{{{ }}}}`) intact: width detection run
 tag span; only then does the interior tokenizer see the literal braces. (ADR-025 extends the same
 principle to `[`/`]`; the rule is identical.)
 
-The one consequence for the surface: inside an already-delimited tag, the interior tokenizer matches `{`
+> *Implemented behavior (2026-06-08).* The structure lexer was kept **fully untouched** — it gained no
+> brace-depth width detection — so the proposed "authors never insert a space" claim does **not** hold for a
+> dict whose `}` abuts the tag close: `{{#with {a: 1}}}` would have the structure lexer match the *first*
+> `}}` and split the dict. The fix is a single space — `{{#with {a: 1} }}` — and the simpler, smaller change
+> (no structural-scanner surgery) was preferred over width detection. A `[…]` list needs no space (its `]`
+> is not a tag-delimiter char). The original proposal below is retained for the rationale; the space caveat
+> is the one deviation.
+
+The proposed consequence for the surface: inside an already-delimited tag, the interior tokenizer matches `{`
 against its closing `}` by nesting depth, so a literal collection's own closing brace is consumed before
 the tag close. `{{#let x={a=1}}}` therefore reads as `#let x=` · `{a=1}` · `}}` (dict-close, then
 tag-close), and the nested `{{#let x={a={b=1}}}}}` as `{a={b=1}}` · `}}` — no ambiguity, because

@@ -4,11 +4,21 @@ sidebar:
   label: ADR-025 list literal
 ---
 
-*Status:* Proposed. *Date:* 2026-06-04. The list-literal half of the collection-literal design,
-*split from* [ADR-024](/adr/adr-0024-let-and-dict-literal/) during the 2026-06-04 team review.
-Applies to *MaxBars* (surface sugar) and the *shared prelude* (a new constructor). FullBars's surface is
-*unchanged*; the prelude addition is value-only and Handlebars-compatible (gated by
+*Status:* **Accepted — implemented 2026-06-08.** *Date:* 2026-06-04. The list-literal half of the
+collection-literal design, *split from* [ADR-024](/adr/adr-0024-let-and-dict-literal/) during the
+2026-06-04 team review. Applies to *MaxBars* (surface sugar) and the *shared prelude* (a new constructor).
+FullBars's surface is *unchanged*; the prelude addition is value-only and Handlebars-compatible (gated by
 `check:hbs-conformance`).
+
+*Amendment (2026-06-08, implementation).* The list literal shipped as **comma**-separated —
+`[e1, e2, …]`, *not* the whitespace-separated `[expr expr …]` of §2. This **resolves the *Open question*'s
+tokenizer spike** in the only way the MaxBars grammar allows: juxtaposition is *application* there
+(`{{ f a b }}` ⇒ `(f a b)`), so a whitespace-separated `[a b]` would be the single element `(a b)`, not two
+elements — a separator is mandatory. The comma matches the [dict literal](/adr/adr-0024-let-and-dict-literal/),
+which the same review revised to JSON-style for the same consistency. The `[`/`.[`/`]` disambiguation
+holds as in §3: a *leading* `[` is unconditionally a list-open and a *mid-identifier* `[seg]` (the `a.[k]`
+path-bracket, consumed inside `readIdent`) is a path index — the two never compete. The `list` helper and
+the dialect scope (§1, §4) ship exactly as specified.
 
 This is a separate ADR from [ADR-024](/adr/adr-0024-let-and-dict-literal/) for one reason: the
 list literal is *not* pure MaxBars surface. Its desugar target does not exist, so it ships a new helper
@@ -51,13 +61,13 @@ a *shared-prelude* change, with the catalog + conformance consequences in *Gates
 A bracket-delimited list of positional expressions in expression position is sugar for `(list …)`.
 
 ```handlebars
-{{#let langs=["PureScript" "TypeScript" "Rust"]}}
+{{#let langs=["PureScript", "TypeScript", "Rust"]}}
   {{#each langs}} — {{this}}{{/each}}
 {{/let}}
 ```
 
 Desugars at the MaxBars parser stage to `(list "PureScript" "TypeScript" "Rust")`. Empty: `[]` is
-the empty list, lowers to `(list)`. The sugar is MaxBars-only; RawBars writes `(list …)` directly;
+the empty list, lowers to `(list)`. (Implemented form: comma-separated — see the *Amendment* above.) The sugar is MaxBars-only; RawBars writes `(list …)` directly;
 FullBars has neither the sugar nor (by convention) uses it, though the `list` helper is *present* in its
 prelude.
 
