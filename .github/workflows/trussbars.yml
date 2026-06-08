@@ -89,3 +89,30 @@ jobs:
         run: rustup show && cargo --version
       - name: Perf-regression gate
         run: cargo test --release
+
+  # The blog dogfood example: build it and assert the three pages still match
+  # their committed golden HTML (no PureScript toolchain needed — the generated
+  # render module is committed).
+  example-blog:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trussbars/examples/blog
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            trussbars/examples/blog/target
+          key: trussbars-blog-${{ runner.os }}-${{ hashFiles('trussbars/examples/blog/Cargo.lock') }}
+      - name: Toolchain
+        run: rustup show && cargo --version
+      - name: Format
+        run: cargo fmt -- --check
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Golden gate
+        run: cargo test

@@ -1,0 +1,20 @@
+[package]
+name = "blog-example"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace.
+[workspace]
+
+[lib]
+name = "blog_example"
+
+[[bin]]
+name = "blog"
+path = "src/main.rs"
+
+[dependencies]
+# The Trussbars runtime the generated code links against (default `perf` features).
+trussbars-core = { path = "../../crates/trussbars-core" }
+trussbars-std = { path = "../../crates/trussbars-std" }

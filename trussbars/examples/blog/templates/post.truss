@@ -1,0 +1,6 @@
+<article>
+  <h1>{{post.title}}</h1>
+  <p class="meta">by {{post.author}} · {{post.date}} · {{post.tags | count}} tags</p>
+  <div class="body">{{{post.body_html}}}</div>
+  <footer>{{#each post.tags as |tag|}}<a href="/tags/{{tag | lowercase}}">#{{tag}}</a> {{/each}}</footer>
+</article>

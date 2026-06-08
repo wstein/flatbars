@@ -1,0 +1,8 @@
+<h1>{{site.title}}</h1>
+{{#inline "card"}}<article>
+  <h2><a href="/posts/{{slug}}">{{title}}</a></h2>
+  <p class="meta">by {{author}}{{#if views > 100}} · 🔥 popular{{/if}}</p>
+  {{#if tags}}<p class="tags">{{#each tags as |tag|}}<a href="/tags/{{tag | lowercase}}">#{{tag}}</a> {{/each}}</p>{{/if}}
+  <p>{{excerpt}}</p>
+</article>
+{{/inline}}{{#each posts}}{{> card}}{{/each}}
