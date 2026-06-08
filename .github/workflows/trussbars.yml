@@ -66,3 +66,26 @@ jobs:
 
       - name: Test (pure)
         run: cargo test --no-default-features
+
+  # The perf-regression ratchet: a separate workspace (it pulls handlebars/askama/
+  # sailfish), run in release. Asserts the machine-independent relative invariants
+  # (Trussbars <= Askama, << handlebars).
+  benchmarks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trussbars/benchmarks
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            trussbars/benchmarks/target
+          key: trussbars-bench-${{ runner.os }}-${{ hashFiles('trussbars/benchmarks/Cargo.lock') }}
+      - name: Toolchain
+        run: rustup show && cargo --version
+      - name: Perf-regression gate
+        run: cargo test --release

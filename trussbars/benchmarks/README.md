@@ -39,8 +39,12 @@ string field and an integer field. Criterion medians on this machine (Rust 1.96,
 
 ## Notes
 
-- The Trussbars column is the **verbatim** output of `compileMaxRust` for the
-  template, pasted into `benches/render.rs` — exactly what the codegen emits.
+- The engine setups live in `src/lib.rs` (shared by the bench and the gate); the
+  Trussbars column is the **verbatim** output of `compileMaxRust`.
 - Sailfish needs `self.`-qualified fields in its `.stpl` (`templates/items.stpl`).
-- A perf-regression gate (criterion baselines committed + checked in CI) is a
-  tracked follow-up; this crate is the manual measurement tool for now.
+- **Perf-regression gate:** `tests/perf_gate.rs` asserts the machine-independent
+  relative invariants (Trussbars ≤ Askama, Trussbars × 5 ≤ handlebars), measured in
+  one run so a slow CI box doesn't matter; meaningful only in release, so it
+  self-skips in debug. Run it with `cargo +1.96.0 test --release --manifest-path
+  trussbars/benchmarks/Cargo.toml`; CI runs it as the `benchmarks` job in
+  `trussbars.yml`.
