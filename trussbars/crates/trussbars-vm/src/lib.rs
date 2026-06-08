@@ -251,6 +251,10 @@ pub struct Template {
     nodes: Vec<Node>,
     partials: Rc<BTreeMap<String, Vec<Node>>>,
     cap_hint: Cell<usize>,
+    /// The fast path: a compiled bytecode program when the whole template is within the
+    /// bytecode subset; `None` → lenient renders fall back to the tree-walk. So bytecode
+    /// is the *primary* path where it covers, the tree-walk the always-correct fallback.
+    bytecode: Option<bytecode::Program>,
 }
 
 impl Template {
@@ -261,7 +265,9 @@ impl Template {
     /// The parse-error reason.
     pub fn parse(src: &str) -> Result<Template, String> {
         let (registry, nodes) = hoist(parse(src).map_err(|e| e.message)?);
-        Ok(Template { nodes, partials: Rc::new(registry), cap_hint: Cell::new(64) })
+        // Try the bytecode fast path (no host helpers / strict — the tree-walk owns those).
+        let bytecode = registry.is_empty().then(|| bytecode::Program::from_nodes(&nodes).ok()).flatten();
+        Ok(Template { nodes, partials: Rc::new(registry), cap_hint: Cell::new(64), bytecode })
     }
 
     /// Render this template against dynamic `data` (lenient mode), returning a fresh
@@ -297,6 +303,16 @@ impl Template {
     }
 
     fn render_string(&self, data: &Value, helpers: &Rc<Helpers>, strict: bool) -> Result<String, String> {
+        // Fast path: a fully-compiled template renders via bytecode (lenient only — the
+        // tree-walk owns strict/AOT-compat). It only compiles when it uses no host helpers
+        // and no out-of-subset construct, so it needs neither `helpers` nor strict checks.
+        if !strict
+            && let Some(bc) = &self.bytecode
+        {
+            let out = bc.render(data);
+            self.cap_hint.set(out.len());
+            return Ok(out);
+        }
         let mut out = String::with_capacity(self.cap_hint.get().max(16));
         self.eval_root(data, &mut out, helpers, strict)?;
         self.cap_hint.set(out.len());

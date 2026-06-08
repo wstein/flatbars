@@ -60,9 +60,17 @@ impl Program {
     /// # Errors
     /// A parse error, or a construct outside the experiment's subset.
     pub fn compile(template: &str) -> Result<Program, String> {
-        let nodes = parse(template).map_err(|e| e.message)?;
+        Self::from_nodes(&parse(template).map_err(|e| e.message)?)
+    }
+
+    /// Compile from an already-parsed (and hoisted) node tree — lets `Template` try the
+    /// fast path without re-parsing.
+    ///
+    /// # Errors
+    /// A construct outside the experiment's subset.
+    pub fn from_nodes(nodes: &[Node]) -> Result<Program, String> {
         let mut ops = Vec::new();
-        compile_nodes(&nodes, &mut ops)?;
+        compile_nodes(nodes, &mut ops)?;
         Ok(Program { ops })
     }
 
