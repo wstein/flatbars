@@ -16,8 +16,12 @@
 //!
 //! Status: **lexer landed** (the first slice). Parser, desugar, and emit follow.
 
+pub mod ast;
 pub mod lex;
+pub mod parse_expr;
 pub mod span;
 
+pub use ast::{Cond, Each, Expr, Node, Value, With};
 pub use lex::{Lexeme, Sigil, lex};
+pub use parse_expr::{ParseError, Scope, parse_expr};
 pub use span::Span;
