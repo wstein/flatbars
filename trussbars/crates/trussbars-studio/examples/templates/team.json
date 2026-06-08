@@ -1,7 +1,0 @@
-{
-  "title": "the crew",
-  "items": [
-    { "name": "Ann", "role": "lead" },
-    { "name": "Bo", "role": "dev" }
-  ]
-}

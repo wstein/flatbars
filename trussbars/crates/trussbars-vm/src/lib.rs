@@ -21,12 +21,12 @@
 
 pub mod bytecode;
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use trussbars_core::{ToText, escape_html};
-use trussbars_template::{Cond, Each, Expr, Node, Tile, Value as Lit, With, parse};
+use trussbars_template::{Cond, Each, Expr, Node, Value as Lit, With, parse};
 
 /// A dynamic runtime value. Heap variants (`Str`/`Array`/`Object`) are **`Rc`-backed**
 /// so [`Clone`] is a refcount bump, not a deep copy — the env can then hold values
@@ -195,9 +195,6 @@ struct Env {
     strict: bool,
     /// The host-helper registry (F3).
     helpers: Rc<Helpers>,
-    /// When inspecting, the shared sink each interpolation records its output↔source
-    /// segment into (the data→output provenance). `None` for a plain render.
-    trace: Option<Rc<RefCell<Vec<Interp>>>>,
 }
 
 impl Env {
@@ -301,7 +298,7 @@ impl Template {
 
     fn render_string(&self, data: &Value, helpers: &Rc<Helpers>, strict: bool) -> Result<String, String> {
         let mut out = String::with_capacity(self.cap_hint.get().max(16));
-        self.eval_root(data, &mut out, helpers, strict, None)?;
+        self.eval_root(data, &mut out, helpers, strict)?;
         self.cap_hint.set(out.len());
         Ok(out)
     }
@@ -312,7 +309,7 @@ impl Template {
     /// # Errors
     /// As [`Template::render`].
     pub fn render_into(&self, data: &Value, out: &mut String) -> Result<(), String> {
-        self.eval_root(data, out, &Rc::new(Helpers::new()), false, None)
+        self.eval_root(data, out, &Rc::new(Helpers::new()), false)
     }
 
     fn eval_root(
@@ -321,7 +318,6 @@ impl Template {
         out: &mut String,
         helpers: &Rc<Helpers>,
         strict: bool,
-        trace: Option<Rc<RefCell<Vec<Interp>>>>,
     ) -> Result<(), String> {
         let env = Env {
             this: data.clone(),
@@ -335,7 +331,6 @@ impl Template {
             expanding: Vec::new(),
             strict,
             helpers: Rc::clone(helpers),
-            trace,
         };
         eval_nodes(&env, &self.nodes, out)
     }
@@ -394,177 +389,6 @@ pub fn render(template: &str, data: Value) -> Result<String, String> {
     Template::parse(template)?.render(&data)
 }
 
-// ── inspection (docs/10): the in-process `inspect()` the Studio views ──────────
-
-/// One interpolation's data→output provenance: the `{{ }}` tag's template byte span,
-/// the byte range it produced in the output, and the raw value it rendered.
-#[derive(Debug, Clone)]
-pub struct Interp {
-    /// The interpolation tag's start byte in the template.
-    pub src_start: usize,
-    /// The interpolation tag's end byte in the template.
-    pub src_end: usize,
-    /// The start byte of the run it produced in the output.
-    pub out_start: usize,
-    /// The end byte of that run in the output.
-    pub out_end: usize,
-    /// The raw (unescaped) value it rendered.
-    pub value: String,
-    /// The render **context** (`this`) in scope at this interpolation, as JSON — the
-    /// Context Inspector (Phase 2): hover a span → see the data it was rendered against.
-    pub ctx_this: String,
-}
-
-/// A captured inspection of one render — the data model the Trussbars Studio displays
-/// (docs/10). Produced in-process by [`inspect`], so it reflects *your* data and *your*
-/// registered helpers; the Studio UI is purely a viewer.
-#[derive(Debug, Clone)]
-pub struct Inspection {
-    /// The template source.
-    pub template: String,
-    /// The lenient render output (or the render-error message, if it failed).
-    pub output: String,
-    /// Whether the lenient render succeeded.
-    pub rendered: bool,
-    /// Whether the template would compile under AOT (the verifying-proxy verdict).
-    pub aot_compat_ok: bool,
-    /// The AOT-compat rejection reason, if it would not compile under AOT.
-    pub aot_compat_error: Option<String>,
-    /// The Rust the AOT backend would emit (over a placeholder `Ctx`), or the emit error.
-    pub emitted_rust: Result<String, String>,
-    /// data→output provenance, one entry per interpolation, in output order.
-    pub interpolations: Vec<Interp>,
-    /// template→Rust provenance (the AOT source map): each node's template span paired
-    /// with the byte range of `emitted_rust` it produced.
-    pub rust_map: Vec<Tile>,
-}
-
-impl Inspection {
-    /// Serialize to JSON for the Studio viewer (dependency-free).
-    #[must_use]
-    pub fn to_json(&self) -> String {
-        let interps = self
-            .interpolations
-            .iter()
-            .map(|i| {
-                format!(
-                    "{{\"src\":[{},{}],\"out\":[{},{}],\"value\":{},\"ctxThis\":{}}}",
-                    i.src_start,
-                    i.src_end,
-                    i.out_start,
-                    i.out_end,
-                    jstr(&i.value),
-                    i.ctx_this
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(",");
-        let (rust, emit_err) = match &self.emitted_rust {
-            Ok(r) => (jstr(r), "null".to_string()),
-            Err(e) => ("null".to_string(), jstr(e)),
-        };
-        let compat_err = self.aot_compat_error.as_deref().map_or_else(|| "null".to_string(), jstr);
-        let rust_map = self
-            .rust_map
-            .iter()
-            .map(|t| format!("{{\"src\":[{},{}],\"rust\":[{},{}]}}", t.src_start, t.src_end, t.rust_start, t.rust_end))
-            .collect::<Vec<_>>()
-            .join(",");
-        format!(
-            "{{\"template\":{},\"output\":{},\"rendered\":{},\"aotCompatOk\":{},\"aotCompatError\":{},\"emittedRust\":{},\"emitError\":{},\"interpolations\":[{}],\"rustMap\":[{}]}}",
-            jstr(&self.template),
-            jstr(&self.output),
-            self.rendered,
-            self.aot_compat_ok,
-            compat_err,
-            rust,
-            emit_err,
-            interps,
-            rust_map,
-        )
-    }
-}
-
-/// A dynamic [`Value`] as compact JSON (for the Context Inspector display).
-fn value_json(v: &Value) -> String {
-    match v {
-        Value::Null => "null".to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Num(n) => {
-            let mut s = String::new();
-            n.write_text(&mut s);
-            s
-        }
-        Value::Str(s) => jstr(s),
-        Value::Array(a) => format!("[{}]", a.iter().map(value_json).collect::<Vec<_>>().join(",")),
-        Value::Object(o) => format!(
-            "{{{}}}",
-            o.iter().map(|(k, v)| format!("{}:{}", jstr(k), value_json(v))).collect::<Vec<_>>().join(",")
-        ),
-    }
-}
-
-/// A JSON string literal (the escapes JSON requires).
-fn jstr(s: &str) -> String {
-    let mut o = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => o.push_str("\\\""),
-            '\\' => o.push_str("\\\\"),
-            '\n' => o.push_str("\\n"),
-            '\r' => o.push_str("\\r"),
-            '\t' => o.push_str("\\t"),
-            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
-            c => o.push(c),
-        }
-    }
-    o.push('"');
-    o
-}
-
-/// **Inspect a render in-process** (docs/10) — the Studio's entry point, callable from
-/// your code. It runs the render against *your* `data` with *your* `helpers`, captures
-/// the data→output provenance, computes the AOT-compat verdict (would this compile under
-/// AOT?), and emits the Rust the AOT backend would generate. The returned [`Inspection`]
-/// (or [`Inspection::to_json`]) feeds the Studio viewer — so custom helpers "just work":
-/// they ran here, in your process, and the viewer only displays the captured result.
-#[must_use]
-pub fn inspect(template: &str, data: &Value, helpers: &Rc<Helpers>) -> Inspection {
-    let parsed = Template::parse(template);
-    let (output, rendered, interpolations) = match &parsed {
-        Ok(t) => {
-            let trace = Rc::new(RefCell::new(Vec::new()));
-            let mut out = String::new();
-            match t.eval_root(data, &mut out, helpers, false, Some(Rc::clone(&trace))) {
-                Ok(()) => (out, true, trace.borrow().clone()),
-                Err(e) => (e, false, trace.borrow().clone()),
-            }
-        }
-        Err(e) => (e.clone(), false, Vec::new()),
-    };
-    let (aot_compat_ok, aot_compat_error) = match &parsed {
-        Ok(t) => match t.render_compat(data) {
-            Ok(_) => (true, None),
-            Err(e) => (false, Some(e)),
-        },
-        Err(e) => (false, Some(e.clone())),
-    };
-    let (emitted_rust, rust_map) = match trussbars_template::emit_mapped("Ctx", template) {
-        Ok((r, tiles)) => (Ok(r), tiles),
-        Err(e) => (Err(e), Vec::new()),
-    };
-    Inspection {
-        template: template.to_string(),
-        output,
-        rendered,
-        aot_compat_ok,
-        aot_compat_error,
-        emitted_rust,
-        interpolations,
-        rust_map,
-    }
-}
-
 fn eval_nodes(env: &Env, nodes: &[Node], out: &mut String) -> Result<(), String> {
     for n in nodes {
         eval_node(env, n, out)?;
@@ -576,28 +400,15 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
     match n {
         Node::Text(s) => out.push_str(s),
         Node::RawBlock { body, .. } => out.push_str(body),
-        Node::Output { span, expr, raw } => {
+        Node::Output { expr, raw, .. } => {
             let v = eval_expr(env, expr)?;
             if env.strict && matches!(v, Value::Object(_)) {
                 return Err("AOT-compat: a struct/object has no text form (AOT rejects `{{object}}`)".into());
             }
-            let start = out.len();
             if *raw {
                 v.raw_text(out);
             } else {
                 write_escaped(&v, out);
-            }
-            if let Some(trace) = &env.trace {
-                let mut value = String::new();
-                v.raw_text(&mut value);
-                trace.borrow_mut().push(Interp {
-                    src_start: span.start,
-                    src_end: span.end,
-                    out_start: start,
-                    out_end: out.len(),
-                    value,
-                    ctx_this: value_json(&env.this),
-                });
             }
         }
         Node::Cond(c) => eval_cond(env, c, out)?,
@@ -664,7 +475,6 @@ fn expand_partial(
         expanding,
         strict: env.strict,
         helpers: Rc::clone(&env.helpers),
-        trace: env.trace.clone(),
     };
     eval_nodes(&child, body, out)
 }
@@ -1187,27 +997,6 @@ mod tests {
         assert_eq!(render(r#"{{#inline "greet"}}Hi {{name}}!{{/inline}}{{> greet}}"#, d.clone()).unwrap(), "Hi Ann &amp; Bo!");
         let blk = r#"{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}"#;
         assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
-    }
-
-    #[test]
-    fn inspect_captures_provenance_and_verdicts() {
-        let d = obj(&[("name", s("<b>")), ("n", Value::Num(3.0))]);
-        let h = Rc::new(Helpers::new());
-        let insp = super::inspect("Hi {{name}} ({{n}})", &d, &h);
-        assert!(insp.rendered);
-        assert_eq!(insp.output, "Hi &lt;b&gt; (3)");
-        assert!(insp.aot_compat_ok);
-        assert!(insp.emitted_rust.is_ok());
-        // one provenance entry per interpolation, raw values captured
-        assert_eq!(insp.interpolations.len(), 2);
-        assert_eq!(insp.interpolations[0].value, "<b>");
-        assert_eq!(insp.interpolations[1].value, "3");
-        assert!(insp.to_json().contains("\"interpolations\""));
-        // a non-AOT-compilable template still renders (lenient) but the verdict is false
-        let bad = super::inspect("{{#if n}}x{{/if}}", &d, &h);
-        assert!(bad.rendered);
-        assert!(!bad.aot_compat_ok);
-        assert!(bad.aot_compat_error.is_some());
     }
 
     #[test]

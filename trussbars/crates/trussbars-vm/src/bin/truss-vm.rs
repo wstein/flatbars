@@ -28,16 +28,8 @@ fn main() {
     let template = req.get("template").and_then(Json::as_str).unwrap_or("");
     let data = from_json(req.get("data").unwrap_or(&Json::Null));
 
-    let args: Vec<String> = std::env::args().collect();
-
-    // `--inspect` prints the full Inspection as JSON (the Studio viewer's input).
-    if args.iter().any(|a| a == "--inspect") {
-        print!("{}", trussbars_vm::inspect(template, &data, &std::rc::Rc::new(trussbars_vm::Helpers::new())).to_json());
-        return;
-    }
-
     // `--compat` renders in AOT-compat (strict) mode — the verifying proxy.
-    let strict = args.iter().any(|a| a == "--compat");
+    let strict = std::env::args().any(|a| a == "--compat");
     let result = match Template::parse(template) {
         Ok(t) => {
             if strict {

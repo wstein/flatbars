@@ -27,7 +27,7 @@ pub mod parse_expr;
 pub mod span;
 
 pub use ast::{Cond, Each, Expr, Node, Value, With};
-pub use emit::{Tile, emit, emit_mapped, emit_named};
+pub use emit::{emit, emit_named};
 pub use lex::{Lexeme, Sigil, lex};
 pub use parse::parse;
 pub use parse_expr::{ParseError, Scope, parse_expr};

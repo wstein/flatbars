@@ -11,7 +11,7 @@
     "cases": [
       {
         "id": "neg-dict",
-        "reason": "unsupported: helper 'dict'"
+        "reason": "1:1: unsupported: helper 'dict'"
       }
     ]
   },
