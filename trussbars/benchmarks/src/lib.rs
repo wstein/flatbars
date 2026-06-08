@@ -94,6 +94,9 @@ pub fn teams_data() -> Teams {
 // Only the `pub fn render(ctx: &T)` header was renamed; the body is untouched.
 
 pub fn trussbars_big_table(ctx: &BigTable) -> String {
+    // Regenerated with the CURRENT emitter (G2 frame elision): `{{this}}` uses no loop
+    // metadata, so there is no `Loop::at` and no `.enumerate()` — the stale paste had
+    // both (dead, but it made the bench look obsolete).
     static __CAP: trussbars_core::SizeHint = trussbars_core::SizeHint::new(1175);
     let __root = ctx;
     let mut out = String::with_capacity(__CAP.suggest());
@@ -103,16 +106,14 @@ pub fn trussbars_big_table(ctx: &BigTable) -> String {
         let __len1 = trussbars_core::Each::each_len(__sub1);
         if __len1 == 0 {
         } else {
-            for (__i1, (__k1, __c1)) in trussbars_core::Each::each(__sub1).enumerate() {
-                let __l1 = trussbars_core::Loop::at(__i1, __len1, __k1, None);
+            for (__k1, __c1) in trussbars_core::Each::each(__sub1) {
                 out.push_str("<tr>");
                 {
                     let __sub2 = &(__c1);
                     let __len2 = trussbars_core::Each::each_len(__sub2);
                     if __len2 == 0 {
                     } else {
-                        for (__i2, (__k2, __c2)) in trussbars_core::Each::each(__sub2).enumerate() {
-                            let __l2 = trussbars_core::Loop::at(__i2, __len2, __k2, Some(&__l1));
+                        for (__k2, __c2) in trussbars_core::Each::each(__sub2) {
                             out.push_str("<td>");
                             trussbars_core::esc(&(__c2), &mut out);
                             out.push_str("</td>");
