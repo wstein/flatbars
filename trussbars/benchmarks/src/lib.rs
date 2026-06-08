@@ -34,7 +34,7 @@ pub fn sample() -> Ctx {
 /// The Trussbars-emitted Rust (verbatim from `compileMaxRust`).
 pub fn trussbars_render(ctx: &Ctx) -> String {
     let __root = ctx;
-    let mut out = String::new();
+    let mut out = String::with_capacity(29);
     out.push_str("<h1>");
     trussbars_core::esc(&(ctx.title), &mut out);
     out.push_str("</h1><ul>");

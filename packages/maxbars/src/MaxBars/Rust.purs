@@ -39,7 +39,7 @@ import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
-import Data.Foldable (foldMap)
+import Data.Foldable (foldMap, sum)
 import Data.Int as Int
 import Data.Map (Map)
 import Data.Map as Map
@@ -86,7 +86,7 @@ compileMaxRust ctxType src = case build of
       h = hoistInline (desugarSurfaceWith maxLoopVars parsed.nodes)
       env0 = initialEnv h.partials
     body <- nodes env0 h.template
-    pure (renderFn ctxType body)
+    pure (renderFn ctxType (literalBytes h.template) body)
 
   initialEnv :: Map String Template -> Env
   initialEnv partials =
@@ -100,13 +100,23 @@ compileMaxRust ctxType src = case build of
     , depth: 0
     }
 
-renderFn :: String -> String -> String
-renderFn ctxType body =
+renderFn :: String -> Int -> String -> String
+renderFn ctxType cap body =
   "pub fn render(ctx: &" <> ctxType <> ") -> String {\n"
     <> "    let __root = ctx;\n"
-    <> "    let mut out = String::new();\n"
+    <> "    let mut out = String::with_capacity(" <> show cap <> ");\n"
     <> body
     <> "    out\n}\n"
+
+-- A compile-time lower bound on the output size (the static literal bytes), used
+-- to seed `String::with_capacity` and cut reallocations — a Sailfish-style hint.
+literalBytes :: Template -> Int
+literalBytes = sum <<< map nodeBytes
+  where
+  nodeBytes = case _ of
+    Content s -> SCU.length s
+    Block _ _ _ _ body -> literalBytes body
+    _ -> 0
 
 --------------------------------------------------------------------------------
 -- Nodes (statements)
