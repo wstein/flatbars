@@ -88,10 +88,15 @@ spends the adoption capital ADR-018 was paid to build.
 
 ## Consequences
 
-* *A deliberate, documented asymmetry*: the internal type is `Operation`, the host registrar is
-  `registerHelper`. This is the cost of keeping ADR-018's migration value while telling the native model's
-  truth. It is ratified here so a contributor meeting `registerHelper : … -> Operation` reads it as intent,
-  not drift.
+* *A deliberate, documented asymmetry* — in three layers, not two (sharpened by the 2026-06-08
+  amendment below). The internal type is `Operation`. The *runtime* registrar is the neutral
+  `register` (`rt.register` — dialect-agnostic, it serves every compiled dialect). The *source-level*
+  registrars are **dialect-scoped twins of `register`**: `registerHelper` (FullBars / the ADR-018
+  Handlebars-migration anchor) and `registerOperation` (the native RawBars / MaxBars word). This is the
+  cost of keeping ADR-018's migration value while telling the native model's truth, and it is ratified
+  here so a contributor meeting `registerHelper : … -> Operation` reads it as intent, not drift. The
+  earlier framing "the one frozen boundary word is *helper*" was imprecise: *helper* is frozen as
+  *FullBars'* boundary word, never as the *only* one.
 * *A new normative glossary* ([concepts](/concepts/) or a `glossary.adoc`) becomes the single
   teachable artifact for the two registers — and it is *gated*, not prose-on-trust: a `check:` (mirroring
   `check:catalog`) asserts that every native term carries its host-API synonym and that the
@@ -225,3 +230,42 @@ machinery:
 * A *new MaxBars-native block spelling* (a pipe/infix block form) — operators stay surface sugar over the
   same `App`; `{{#op …}}` is the block form for every dialect.
 * `options.ids` / source locations — still throw by design (ADR-020), in every dialect.
+
+## Amendment (2026-06-08): the source-level authoring API gets the native twin
+
+*Status:* Accepted — *implemented*. A team debate (the `registerHelper`-is-a-smell motion) surfaced that
+the asymmetry above leaked at a layer the original ADR did not name: the *source-level authoring
+affordance*. ADR-018's `registerHelper(name, fn)` is not only the JS-facade word — it is the function
+injected into the Lab's helpers panel and the tutorials' runnable cards by `buildHelpers`
+(`lab/helpers.mjs`). That function was injected under **one** name, `registerHelper`, for **every**
+dialect — so a *native* RawBars / MaxBars card taught the Handlebars word the addendum above explicitly
+said those dialects do not use. The RawBars tutorial glossary had even drifted to claim RawBars "keeps the
+word *helper*," the precise opposite of this ADR.
+
+The fix is not a rename and not a third concept — the addendum already specced "the source-level
+`registerOperation(name, fn[, arity])` affordance, mirroring `registerHelper`." It was simply never wired
+in. So:
+
+* `buildHelpers` now injects **both** `registerHelper` and `registerOperation`, both aliasing the *same*
+  internal `register` into the same operation bag. A card teaches its dialect's word; every card stays
+  runnable; a single source may mix the two freely.
+* Native-dialect teaching cards (MaxBars, RawBars) use `registerOperation`; FullBars cards and the
+  Handlebars-migration material keep `registerHelper`.
+* The runtime registrar's error text dropped its lone "helper" mention — `rt.register` is dialect-agnostic
+  (it serves every compiled dialect), so it names no surface register.
+
+This makes the asymmetry honest at all three layers (see the sharpened *Consequences* bullet): internal
+type `Operation`; one neutral runtime `register`; two dialect-scoped source-level twins. The frozen word
+is *helper-as-FullBars'-anchor*, not *helper-as-the-only-word*.
+
+*Gating.* `check:glossary` now asserts `buildHelpers` injects **both** names (neither alias can be silently
+dropped); a `test:lab` unit test pins that the two fill a byte-identical bag and that a source may mix
+them. `check:tutorial-links` / `check:tutorial-tooling` run the migrated native cards through the real
+bundle.
+
+### Still open (deferred, not in this amendment)
+
+* The JS *facade* entry points stay `renderWith` (helpers) / `renderRawWith` / `renderMaxWith`
+  (operations) — already dialect-correct, untouched here. A bare `register`-named facade twin is not added:
+  the runtime `rt.register` already carries the neutral name, and the source-level twins cover the
+  authoring surface authors actually type.
