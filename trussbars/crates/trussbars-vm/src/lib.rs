@@ -191,6 +191,8 @@ struct Env {
     /// truthiness, bare-object output, unknown fields, `dict` — so this render is a
     /// *verifying proxy* for "would this compile under AOT, identically?" (docs/11 §7).
     strict: bool,
+    /// The host-helper registry (F3).
+    helpers: Rc<Helpers>,
 }
 
 impl Env {
@@ -201,6 +203,42 @@ impl Env {
         child.parents = Some(Rc::new(ParentNode { value: self.this.clone(), next: self.parents.clone() }));
         child.this = new_this;
         child
+    }
+}
+
+type HostHelper = Box<dyn Fn(&[Value]) -> Result<Value, String>>;
+
+/// A host-helper registry (F3, docs/11 §8). The dynamic backend's answer to custom
+/// helpers and the i18n/locale pack: a runtime `name → fn(&[Value]) -> Value` table —
+/// trivial here, where the AOT backend would need monomorphized codegen. Build one and
+/// pass it to [`Template::render_with`]. Host helpers are **rejected in AOT-compat
+/// mode** (the AOT backend doesn't register them — docs/11 §7/§8).
+#[derive(Default)]
+pub struct Helpers {
+    map: BTreeMap<String, HostHelper>,
+}
+
+impl Helpers {
+    /// An empty registry.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a host helper callable as `{{name args…}}` or `{{x | name args…}}`. It
+    /// receives the *evaluated* arguments and returns a [`Value`] (or an error message,
+    /// which surfaces as the render error). Chainable.
+    pub fn register(
+        &mut self,
+        name: impl Into<String>,
+        f: impl Fn(&[Value]) -> Result<Value, String> + 'static,
+    ) -> &mut Self {
+        self.map.insert(name.into(), Box::new(f));
+        self
+    }
+
+    fn get(&self, name: &str) -> Option<&HostHelper> {
+        self.map.get(name)
     }
 }
 
@@ -231,7 +269,16 @@ impl Template {
     /// # Errors
     /// A reason string for an unimplemented construct/helper (never a wrong answer).
     pub fn render(&self, data: &Value) -> Result<String, String> {
-        self.render_with(data, false)
+        self.render_string(data, &Rc::new(Helpers::new()), false)
+    }
+
+    /// Render with a host-helper registry (lenient mode, F3 / docs/11 §8). Unknown
+    /// helper heads resolve against `helpers` instead of erroring.
+    ///
+    /// # Errors
+    /// As [`Template::render`], plus any error a host helper returns.
+    pub fn render_with(&self, data: &Value, helpers: &Rc<Helpers>) -> Result<String, String> {
+        self.render_string(data, helpers, false)
     }
 
     /// Render in **AOT-compat (strict) mode** — a verifying proxy for the AOT backend
@@ -244,12 +291,12 @@ impl Template {
     /// # Errors
     /// The reason an AOT-rejected construct was used, located at the offending value.
     pub fn render_compat(&self, data: &Value) -> Result<String, String> {
-        self.render_with(data, true)
+        self.render_string(data, &Rc::new(Helpers::new()), true)
     }
 
-    fn render_with(&self, data: &Value, strict: bool) -> Result<String, String> {
+    fn render_string(&self, data: &Value, helpers: &Rc<Helpers>, strict: bool) -> Result<String, String> {
         let mut out = String::with_capacity(self.cap_hint.get().max(16));
-        self.eval_root(data, &mut out, strict)?;
+        self.eval_root(data, &mut out, helpers, strict)?;
         self.cap_hint.set(out.len());
         Ok(out)
     }
@@ -260,10 +307,16 @@ impl Template {
     /// # Errors
     /// As [`Template::render`].
     pub fn render_into(&self, data: &Value, out: &mut String) -> Result<(), String> {
-        self.eval_root(data, out, false)
+        self.eval_root(data, out, &Rc::new(Helpers::new()), false)
     }
 
-    fn eval_root(&self, data: &Value, out: &mut String, strict: bool) -> Result<(), String> {
+    fn eval_root(
+        &self,
+        data: &Value,
+        out: &mut String,
+        helpers: &Rc<Helpers>,
+        strict: bool,
+    ) -> Result<(), String> {
         let env = Env {
             this: data.clone(),
             root: data.clone(),
@@ -275,6 +328,7 @@ impl Template {
             yield_html: None,
             expanding: Vec::new(),
             strict,
+            helpers: Rc::clone(helpers),
         };
         eval_nodes(&env, &self.nodes, out)
     }
@@ -418,6 +472,7 @@ fn expand_partial(
         yield_html,
         expanding,
         strict: env.strict,
+        helpers: Rc::clone(&env.helpers),
     };
     eval_nodes(&child, body, out)
 }
@@ -864,13 +919,17 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
         }
         ("round", [Value::Num(n)]) => Ok(Value::Num((n + 0.5).floor())),
         ("toFixed", [Value::Num(n), Value::Num(d)]) => Ok(str_val(format!("{:.*}", *d as usize, n))),
-        _ => Err(format!("unsupported (spike): helper '{name}' / {} args", vs.len())),
+        // A host helper (F3) — but not in AOT-compat, where AOT registers none.
+        _ => match env.helpers.get(name) {
+            Some(f) if !env.strict => f(&vs),
+            _ => Err(format!("unsupported: helper '{name}' / {} args", vs.len())),
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Template, Value, render};
+    use super::{Helpers, Template, Value, render};
     use std::collections::BTreeMap;
     use std::rc::Rc;
 
@@ -936,6 +995,26 @@ mod tests {
         assert_eq!(render(r#"{{#inline "greet"}}Hi {{name}}!{{/inline}}{{> greet}}"#, d.clone()).unwrap(), "Hi Ann &amp; Bo!");
         let blk = r#"{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}"#;
         assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
+    }
+
+    #[test]
+    fn host_helper_registry() {
+        let mut h = Helpers::new();
+        h.register("shout", |args| {
+            let t = match args.first() {
+                Some(Value::Str(s)) => s.to_string(),
+                _ => String::new(),
+            };
+            Ok(Value::Str(Rc::from(format!("{}!", t.to_uppercase()).as_str())))
+        });
+        let h = Rc::new(h);
+        let t = Template::parse("{{name | shout}}").unwrap();
+        let d = obj(&[("name", s("hi"))]);
+        assert_eq!(t.render_with(&d, &h).unwrap(), "HI!");
+        // Unknown helper without the registry still errors…
+        assert!(t.render(&d).is_err());
+        // …and a host helper is rejected in AOT-compat (AOT registers none).
+        assert!(t.render_compat(&d).is_err());
     }
 
     #[test]

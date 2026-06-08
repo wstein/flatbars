@@ -214,6 +214,12 @@ needs monomorphized codegen + a registration affordance. So the VM is the natura
 catalog, not less. (AOT pure-op gaps `range`/`bind`/`log` and `dict` are separate,
 small, and tracked independently of this doc.)
 
+**Done** (`trussbars-vm`): `Helpers` is exactly that registry — `register(name, |args:
+&[Value]| -> Result<Value>)` — passed to `Template::render_with`. An unknown helper
+head resolves against it; in AOT-compat mode host helpers are **rejected** (AOT
+registers none), keeping the verifying-proxy guarantee. The i18n/locale pack on top is
+then just a set of host helpers (a follow-up that needs no engine change).
+
 ## 9. Conformance — the third axis
 
 The project's safety net extends cleanly. Today: **interpreter (oracle) ≡ AOT**
