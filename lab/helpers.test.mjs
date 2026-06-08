@@ -207,20 +207,20 @@ test("MaxBars block operation body uses the MaxBars surface (infix arithmetic) (
   assert.equal(renderMaxWith(ops, {}, "{{#wrap}}{{1 + 2}}{{/wrap}}", {}).value, "[3]");
 });
 
-test("MaxBars block operation binds block params via options.fn(ctx, { blockParams }) (ADR-019)", () => {
-  // the head ladder omits the pipe rung, so `as |item idx|` parses; a block
-  // operation receives them through options.fn's blockParams channel.
+test("MaxBars block operation binds drop-pipes block params via options.fn(ctx, { blockParams }) (ADR-019)", () => {
+  // MaxBars block params drop the pipes (`as item idx`); a block operation
+  // receives them through options.fn's blockParams channel.
   const ops = { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) };
   assert.equal(
-    renderMaxWith(ops, {}, "{{#list xs as |item idx|}}[{{idx}}:{{item}}]{{/list}}", { xs: ["a", "b"] }).value,
+    renderMaxWith(ops, {}, "{{#list xs as item idx}}[{{idx}}:{{item}}]{{/list}}", { xs: ["a", "b"] }).value,
     "[0:a][1:b]",
   );
 });
 
-test("MaxBars requires parens to pipe in a block head; a trailing as |x| still binds (ADR-019)", () => {
+test("MaxBars requires parens to pipe in a block head; a trailing drop-pipes as x still binds (ADR-019)", () => {
   const ops = { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) };
   assert.equal(
-    renderMaxWith(ops, {}, "{{#box (xs | reverse) as |x|}}<i>{{x}}</i>{{/box}}", { xs: ["a", "b", "c"] }).value,
+    renderMaxWith(ops, {}, "{{#box (xs | reverse) as x}}<i>{{x}}</i>{{/box}}", { xs: ["a", "b", "c"] }).value,
     "<i>c</i><i>b</i><i>a</i>",
   );
 });

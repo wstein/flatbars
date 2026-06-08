@@ -26,11 +26,12 @@
 -- |    followed by *arguments*, each an infix expression whose primary is a single
 -- |    **atom**. So `{{#if a && b}}` reads as `if (and a b)` (one condition) and
 -- |    `{{#each xs}}` / `{{#if cond k=v}}` keep their positional/hash args. The head
--- |    ladder omits the *pipe* rung: a bar in head position is **structure**, not an
--- |    operator — it carries the block-parameter clause `as |a b|` through to the
--- |    surface desugar (`extractBlockParams`), exactly as the core default parser
--- |    does. Pipe an argument by parenthesising it (`{{#each (xs | reverse) as |x|}}`),
--- |    where an atom re-enters the full expression ladder.
+-- |    ladder omits the *pipe* rung, so a bar can never be the pipe operator there;
+-- |    and MaxBars block params *drop the pipes* (`as a b`, not `as |a b|`), so a
+-- |    bar in a head is a parse error (the block-parameter clause is the bare
+-- |    identifiers after `as` — see `extractBlockParams`). Pipe a head argument by
+-- |    parenthesising it (`{{#each (xs | reverse) as x}}`), where an atom re-enters
+-- |    the full expression ladder.
 module MaxBars.Expr
   ( parseMaxExpr
   , parseMaxHead
@@ -201,12 +202,16 @@ combinators toks =
     Just (TIdent name)
       | isAtVar name -> Left (atVarError (posAt i))
       | otherwise -> Right { val: App name [], pos: i + 1 }
-    -- a bare bar is structure, not an operator: in head position (no pipe rung)
-    -- it survives as `App "|" []` so the surface desugar's `extractBlockParams`
-    -- can strip a trailing `as |…|` clause — matching the core default parser.
-    -- (In output position the pipe rung consumes the bar first, so this case is
-    -- reached only inside a block head.)
-    Just (TOp "|") -> Right { val: App "|" [], pos: i + 1 }
+    -- a bar reaching here is always in a block head (in output position the pipe
+    -- rung consumes it first). MaxBars block params *drop the pipes* — `as a b`,
+    -- not `as |a b|` — so a head bar is a parse error, whether the author meant
+    -- the (now-removed) Handlebars block-param delimiter or an unparenthesised
+    -- pipe. The message names both fixes.
+    Just (TOp "|") -> Left
+      ( LexError
+          "a bar is not allowed in a MaxBars block head: block params drop the pipes (write `as a b`, not `as |a b|`); to pipe a block argument, parenthesise it — e.g. (x | f)"
+          (posAt i)
+      )
     _ -> Left (LexError "expected an expression" (posAt i))
 
   -- application arguments: a run of atoms (paren / literal / nullary ident).

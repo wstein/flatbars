@@ -11,6 +11,7 @@
   "eachList": "Engine (Acme):\n  0. Ada — Engine\n  1. Charles (last) — Engine\nDocs (Acme):\n  0. Grace (last) — Docs\n",
   "eachElse": "(nothing yet)\n",
   "eachObject": "lang = en\ntheme = dark\n",
+  "rangeOp": "Round 1 · Round 2 · Round 3",
   "withBlock": "2 items · 9.50",
   "loopParams": "1/2 Fruit: Pear Plum\n2/2 Veg: Leek (last)\n",
   "partials": "- Ada writes\n- Charles builds\n",

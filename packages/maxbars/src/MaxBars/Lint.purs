@@ -1,15 +1,16 @@
--- | MaxBars schema-less *warn-always* lints (ADR-021). Two warnings remain after
--- | the bare loop-variable vocabulary was retired (ADR-006 §1–2 superseded): there
--- | are no bare loop variables left to shadow, so the old `loopVarShadowWarnings`
--- | is gone. What remains:
+-- | MaxBars schema-less *warn-always* lints (ADR-021). After the bare
+-- | loop-variable vocabulary was retired (ADR-006 §1–2 superseded) there are no
+-- | bare loop variables left to shadow, so the old `loopVarShadowWarnings` is
+-- | gone; and since MaxBars block params drop the pipes (a head bar is now a parse
+-- | error — ADR-021 amendment), the `strayHeadBarWarnings` it superseded is gone
+-- | too. What remains:
 -- |
--- |  * `strayHeadBarWarnings` — an unparenthesised top-level pipe in a block head
--- |    (ADR-019), parsed as a block-parameter delimiter rather than the pipe.
+-- |  * `booleanInOutputWarnings` — a bare boolean `||`/`&&` in output position
+-- |    (yields `true`/`false`, almost always a value-coalesce mistake).
 -- |  * `labelShadowWarnings` — a loop `label NAME` whose name is one of the reserved
 -- |    roots (`this`/`loop`/`root`/`parent`), which would shadow it for the body.
 module MaxBars.Lint
   ( reservedNames
-  , strayHeadBarWarnings
   , labelShadowWarnings
   , booleanInOutputWarnings
   ) where
@@ -20,44 +21,7 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..), maybe)
 import FlatBars.Syntax (Expr(..), Template)
 import FlatBars.Value (Value(..))
-import FullBars.Surface (extractBlockParams)
 import Kernel.Walk (Issue, Severity(..), foldTemplate)
-
--- | Warn on a *stray* bar in a block head, over a *parsed* (pre-desugar) MaxBars
--- | template. The MaxBars head grammar omits the top-level pipe rung so a bar can
--- | delimit an `as |…|` block-parameter clause; an unparenthesised top-level bar
--- | in a head is therefore parsed as structure (a nullary `(|)` application,
--- | matching FullBars and the core parser), not the pipe operator. The legitimate
--- | `as |…|` bars are stripped by `extractBlockParams` — the single source of
--- | `as`-truth, reused here so the lint never re-encodes the keyword — leaving any
--- | bar that survives in `mainArgs` as one the author most likely meant as a pipe
--- | (`{{#each xs | f}}` instead of `{{#each (xs | f)}}`). One `Warn` per stray bar.
--- |
--- | Run this on the *parsed* nodes, not the desugared ones: the surface desugar
--- | rewrites a bare `(|)` into a `lookup` of a field named "|", erasing the signal.
-strayHeadBarWarnings :: Template -> Array Issue
-strayHeadBarWarnings = foldTemplate
-  { content: const []
-  , output: const []
-  , raw: \_ _ _ -> []
-  , sep: \_ _ -> []
-  , nodeError: \_ _ -> []
-  , block: \b -> headBars b.args <> b.recurse b.children
-  , concat: Array.concat
-  }
-  where
-  -- a bar left in the head args after the `as |…|` clause is stripped
-  headBars args = map (const warn) (Array.filter isBar (extractBlockParams args).mainArgs)
-  isBar = case _ of
-    App "|" [] -> true
-    _ -> false
-  warn =
-    { severity: Warn
-    , name: "|"
-    , message:
-        "a bar in a block head is the block-parameter delimiter, not the pipe "
-          <> "operator; to pipe a block argument, parenthesise it — e.g. (x | f)"
-    }
 
 -- | Warn when an *output* expression is a bare boolean logical operator —
 -- | `{{ a || b }}` / `{{ a && b }}` (desugar targets `or` / `and`). In output

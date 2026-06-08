@@ -145,23 +145,26 @@ output expressions.
 
 ## Block parameters
 
-Block parameters work as in FullBars — a trailing `as |a b|` binds scoped
-names over the block body:
+Block parameters **drop the pipes** — a trailing `as a b` (no bars) binds scoped
+names over the block body. MaxBars binds a *third* name to the 1-based index,
+one more than FullBars' two: `as elem index0 index1`.
 
 ```handlebars
-{{#each xs as |item i|}}{{i}}: {{item}}{{/each}}
-{{#with user as |u|}}{{u.name}}{{/with}}
+{{#each xs as item i}}{{i}}: {{item}}{{/each}}
+{{#each xs as item i0 i1}}{{i0}}/{{i1}}: {{item}}{{/each}}
+{{#with user as u}}{{u.name}}{{/with}}
 ```
 
-The head argument grammar omits the *pipe* rung, so a bar in head position is
-**structure** — the block-parameter delimiter — not the pipe operator. The clause
-is carried untouched to the same surface desugar FullBars uses
-([§5.5](/engine/surface/)); MaxBars adds no machinery of its own. The consequence
-is the one head-position rule below: to *pipe* a block argument, parenthesise it,
+The head argument grammar omits the *pipe* rung, and MaxBars rejects a bar in a
+block head outright (the Handlebars `as |a b|` form is a parse error here). The
+bare identifiers after `as` are the binding names, carried to the same surface
+desugar FullBars uses ([§5.5](/engine/surface/)) — MaxBars supplies the
+drop-pipes spelling and the third binding, no other machinery. The consequence is
+the one head-position rule below: to *pipe* a block argument, parenthesise it,
 which re-enters the full expression grammar.
 
 ```handlebars
-{{#each (people | reverse) as |p|}}{{p.name}}{{/each}}
+{{#each (people | reverse) as p}}{{p.name}}{{/each}}
 ```
 
 ## Labelled loops
@@ -173,7 +176,7 @@ shape); it binds the frame reified as an object whose fields are the loop
 variables (`index0`/`first`/`length`/…):
 
 ```handlebars
-{{#each rows as |row| label outer}}
+{{#each rows as row label outer}}
   {{#each row}}{{outer.index1}}/{{outer.length}}: {{this}}{{#if outer.first}} (first row){{/if}}
   {{/each}}
 {{/each}}
@@ -184,7 +187,7 @@ variables (`index0`/`first`/`length`/…):
 the bare loop variables of that loop. It is an *immutable per-iteration snapshot*,
 reached by ordinary path lookup (`{{outer.length}}`), so the interpreter and
 compiler agree by construction. A label and block params compose:
-`{{#each rows as |row| label outer}}` binds both `row` (the element) and
+`{{#each rows as row label outer}}` binds both `row` (the element) and
 `outer` (the frame).
 
 Notes:
@@ -215,7 +218,7 @@ A *block* operation receives a Handlebars-style `options`: `options.fn(ctx)`
 renders the body (shifting context), `options.inverse(ctx)` the `{{else}}`
 clause, `options.hash` the surface `k=v` arguments, `options.fn(ctx, { data })`
 supplies scoped `@vars`, and `options.fn(ctx, { blockParams })` binds the names
-declared by a trailing `as |a b|`. MaxBars is *lenient* (it inherits the
+declared by a trailing drop-pipes `as a b`. MaxBars is *lenient* (it inherits the
 `blockHelperMissing` resolve), so an unknown head falls through rather than
 erroring.
 
@@ -227,11 +230,12 @@ plain functions into these operations (the FlatBars Lab and `flatbars-js`).
 * **Clause separators need parenthesised conditions** — `{{elif (a && b)}}`
   / `{{else if (a && b)}}`, since `{{ … }}` separators and output
   share a tag shape. Block opens (`{{#if a && b}}`) do not.
-* **A pipe in a block head must be parenthesised** — `{{#each (xs | f) …}}`,
-  not `{{#each xs | f}}`. The head grammar omits the top-level pipe rung so
-  a bar can serve as the `as |x|` block-parameter delimiter; an
-  unparenthesised top-level bar in a head is therefore treated as structure, not a
-  pipe (the same way FullBars and the core parser treat it).
+* **A bar in a block head is a parse error** — to pipe a head argument,
+  parenthesise it: `{{#each (xs | f) …}}`, not `{{#each xs | f}}`. The head
+  grammar omits the top-level pipe rung, and MaxBars block params drop the pipes
+  (`as x`, not `as |x|`), so a bar in a head has no meaning and is rejected
+  outright — whether it was the Handlebars block-param delimiter or an
+  unparenthesised pipe.
 * **A few FullBars surface constructs are not accepted** — these are the documented
   exceptions to the `⊂` of `RawBars ⊂ FullBars ⊂ MaxBars` (surface-superset *modulo
   documented exceptions*; [adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/) amendment), the reason

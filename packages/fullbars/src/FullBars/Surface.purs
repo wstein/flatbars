@@ -23,6 +23,8 @@
 -- |    `{{{ escapeHtml (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
 -- |  * block params `{{#each xs as |item i|}}` ⇒ `{{#each xs "item" "i"}}`; a bare
 -- |    reference to an in-scope param becomes a helper call `(item)` (§5.5).
+-- |    MaxBars drops the pipes (`{{#each xs as item i}}`) and binds a third name
+-- |    `as item i j` to the 1-based index; FullBars keeps the Handlebars bars.
 -- |  * `{{> name [ctx] [k=v]}}` ⇒ `{{{ partial "name" ctx [(dict …)] }}}` (a bare
 -- |    name is a string literal, a parenthesized expression is a dynamic name;
 -- |    hash pairs merge onto the partial's context; §5.7).
@@ -120,6 +122,14 @@ desugar = desugarWith noLoopVars
 desugarWith :: LoopVars -> Array Ident -> Template -> Template
 desugarWith lv clauseNames = go []
   where
+  -- the block-parameter spelling is dialect-specific: MaxBars drops the pipes
+  -- (`as a b`), FullBars keeps the Handlebars bars (`as |a b|`). The dialect is
+  -- read from the ADR-021 reserved-variable capability — MaxBars wraps its
+  -- `LoopVars` with `reservedScope` (so it answers `reservedMarker`); FullBars'
+  -- `noLoopVars` never does. No new seam: the same hook that selects the variable
+  -- model selects the block-param spelling.
+  dropPipes = isJust (lv reservedMarker)
+
   go :: Scope -> Template -> Template
   go scope = map node
     where
@@ -170,7 +180,7 @@ desugarWith lv clauseNames = go []
       Block sp Section name args body ->
         let
           { args: args', label } = extractLabel name args
-          { mainArgs, params } = extractBlockParams args'
+          { mainArgs, params } = extractBlockParams dropPipes args'
           bodyScope = scope <> params <> maybe [] pure label
         in
           Block sp Section name (blockHeadArgs lv scope mainArgs params label)
@@ -181,25 +191,37 @@ desugarWith lv clauseNames = go []
       -- section over the head — so this stays exhaustive without crashing.
       Block sp sig name args body ->
         let
-          { mainArgs, params } = extractBlockParams args
+          { mainArgs, params } = extractBlockParams dropPipes args
         in
           Block sp sig name (blockHeadArgs lv scope mainArgs params Nothing)
             (go (scope <> params) (expandElseIf body))
       -- raw blocks are verbatim (surface.adoc §5.8).
       RawBlock sp name args raw -> RawBlock sp name args raw
 
--- | Split a block helper's arguments at a trailing `as |a b|` clause (§5.5),
--- | returning the arguments before `as` and the binding names (with the `|`
--- | bars stripped). When there is no such clause, all args are `mainArgs`.
-extractBlockParams :: Array Expr -> { mainArgs :: Array Expr, params :: Array String }
-extractBlockParams args = case Array.findIndex isAs args of
-  Just i | looksLikeParams (Array.drop (i + 1) args) ->
-    { mainArgs: Array.take i args, params: paramNames (Array.drop (i + 1) args) }
+-- | Split a block helper's arguments at a trailing `as …` block-parameter clause
+-- | (§5.5), returning the arguments before `as` and the binding names. Two
+-- | spellings, selected by `dropPipes` (the dialect):
+-- |
+-- |  * FullBars (`dropPipes = false`) — Handlebars bars `as |a b|`: the clause is
+-- |    recognised by its opening `|` and the bars are stripped from the names.
+-- |  * MaxBars (`dropPipes = true`) — drop the pipes `as a b`: every bare
+-- |    identifier after `as` is a binding name (a bar there is a parse error,
+-- |    rejected earlier by `MaxBars.Expr`, so none reach here).
+-- |
+-- | When there is no `as` clause, all args are `mainArgs`.
+extractBlockParams :: Boolean -> Array Expr -> { mainArgs :: Array Expr, params :: Array String }
+extractBlockParams dropPipes args = case Array.findIndex isAs args of
+  Just i
+    | dropPipes -> { mainArgs: Array.take i args, params: bareNames (Array.drop (i + 1) args) }
+    | looksLikeParams (Array.drop (i + 1) args) ->
+        { mainArgs: Array.take i args, params: paramNames (Array.drop (i + 1) args) }
   _ -> { mainArgs: args, params: [] }
   where
   isAs = case _ of
     App "as" [] -> true
     _ -> false
+  -- the Handlebars pipe form opens with a `|` bar (glued to the first name or its
+  -- own token), so `as |a b|` is a block-param clause and `as x` (FullBars) is not.
   looksLikeParams a = case Array.head a of
     Just (App n []) -> stripPrefix (Pattern "|") n /= Nothing
     _ -> false
@@ -207,6 +229,10 @@ extractBlockParams args = case Array.findIndex isAs args of
     App n [] -> case replaceAll (Pattern "|") (Replacement "") n of
       "" -> Nothing
       s -> Just s
+    _ -> Nothing
+  -- the MaxBars drop-pipes form: every bare identifier after `as` is a name.
+  bareNames = Array.mapMaybe case _ of
+    App n [] -> Just n
     _ -> Nothing
 
 -- | The head of a `{{ head args }}` separator read as output: a bare head (no

@@ -40,7 +40,7 @@ import Kernel.Inspect (Snapshot, Target)
 import Kernel.Provenance (Segment)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
-import MaxBars.Lint (booleanInOutputWarnings, labelShadowWarnings, strayHeadBarWarnings)
+import MaxBars.Lint (booleanInOutputWarnings, labelShadowWarnings)
 
 -- | Parse options for the MaxBars dialect: the default front-end knobs
 -- | (standalone trimming, …) with the interior grammar swapped for
@@ -159,18 +159,14 @@ compileMaxJsWith partials =
 -- |
 -- |  * *label shadow* (ADR-021): a loop `label NAME` whose name is a reserved root
 -- |    (`this`/`loop`/`root`/`parent`).
--- |  * *stray head bar* (ADR-019): an unparenthesised top-level `|` in a block
--- |    head, parsed as structure rather than the pipe operator — the fix is to
--- |    parenthesise the pipe, `{{#x (a | f)}}`.
+-- |  * *boolean in output* (ADR-021): a bare `||`/`&&` in output position, which
+-- |    yields `true`/`false` rather than a value — the fix is `??`/`?:`.
 maxbarsWarnings :: String -> Either ParseError (Array Issue)
 maxbarsWarnings src = do
   { nodes } <- lmap NEA.head (parseWith maxOptions src)
-  -- label shadows read the *desugared* tree (a label survives as the `@label`
-  -- marker); the stray-bar lint reads the *parsed* tree (the desugar rewrites a
-  -- bare bar into a `lookup`, erasing the signal).
+  -- both lints read the *desugared* tree (a label survives as the `@label` marker;
+  -- the boolean operators surface as `or`/`and` applications). The stray-head-bar
+  -- lint is gone — a head bar is now a parse error (block params drop the pipes),
+  -- so a parsed tree can no longer carry one.
   let desugared = desugarSurfaceWith maxLoopVars nodes
-  pure
-    ( labelShadowWarnings desugared
-        <> strayHeadBarWarnings nodes
-        <> booleanInOutputWarnings desugared
-    )
+  pure (labelShadowWarnings desugared <> booleanInOutputWarnings desugared)

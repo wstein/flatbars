@@ -4,9 +4,11 @@
 -- |
 -- | Infix works in output expressions (`{{ a && b }}` / `{{{ … }}}`), pipes, and
 -- | — via the core `parseHead` seam — bare block conditions (`{{#if a && b}}`) and
--- | `as |x|` block params (the head ladder omits the pipe rung, so a bar there is
--- | structural). Clause separators (`{{elif …}}` / `{{else if …}}`) still take a
--- | parenthesised condition; a pipe in a block head must also be parenthesised.
+-- | drop-pipes block params (`as a b c`: element, index, 1-based index — the head
+-- | ladder omits the pipe rung and MaxBars rejects a head bar, so the Handlebars
+-- | `as |x|` form is a parse error here). Clause separators (`{{elif …}}` /
+-- | `{{else if …}}`) still take a parenthesised condition; a pipe in a block head
+-- | must also be parenthesised.
 module Test.MaxBars.Main where
 
 import Prelude
@@ -204,20 +206,20 @@ main = do
   expectM "loopvar-data-field" "{{#each xs}}{{this.first}}{{/each}}"
     (obj [ Tuple "xs" (VArray [ obj [ Tuple "first" (VString "D") ] ]) ])
     "D"
-  -- block params (`as |a b|`): the head ladder omits the pipe rung, so the bars
-  -- are structure the surface desugar strips. `each` binds element + index.
-  expectM "blockparams-each" "{{#each xs as |item i|}}[{{i}}:{{item}}]{{/each}}" xs3
+  -- block params drop the pipes (`as a b`): the bare identifiers after `as` are
+  -- the binding names. `each` binds element + 0-based index (+ a 1-based index).
+  expectM "blockparams-each" "{{#each xs as item i}}[{{i}}:{{item}}]{{/each}}" xs3
     "[0:a][1:b][2:c]"
   -- `with` binds the shifted context to a name.
-  expectM "blockparams-with" "{{#with o as |c|}}{{c.n}}{{/with}}"
+  expectM "blockparams-with" "{{#with o as c}}{{c.n}}{{/with}}"
     (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
     "Z"
   -- a block param binds a bare name directly (there are no bare loop variables in
-  -- ADR-021, so nothing to shadow): `as |x|` binds the element.
-  expectM "blockparams-bind" "{{#each xs as |x|}}{{x}}{{/each}}" xs3 "abc"
+  -- ADR-021, so nothing to shadow): `as x` binds the element.
+  expectM "blockparams-bind" "{{#each xs as x}}{{x}}{{/each}}" xs3 "abc"
   -- outer block param stays in scope inside a nested block.
   expectM "blockparams-nested"
-    "{{#each rows as |row|}}{{#each row.cells}}{{row.id}}{{this}} {{/each}}{{/each}}"
+    "{{#each rows as row}}{{#each row.cells}}{{row.id}}{{this}} {{/each}}{{/each}}"
     ( obj
         [ Tuple "rows"
             ( VArray
@@ -231,8 +233,8 @@ main = do
     )
     "A1 A2 "
   -- a pipe in a block head must be parenthesised; `(xs | f)` re-enters the full
-  -- ladder, and a trailing `as |x|` still binds. Here `(xs | reverse)` pipes.
-  expectM "blockparams-paren-pipe" "{{#each (xs | reverse) as |x|}}{{x}}{{/each}}" xs3 "cba"
+  -- ladder, and a trailing `as x` still binds. Here `(xs | reverse)` pipes.
+  expectM "blockparams-paren-pipe" "{{#each (xs | reverse) as x}}{{x}}{{/each}}" xs3 "cba"
 
   -- labelled loops (ADR-013): `label NAME` binds the loop frame as an object, so
   -- an inner body reads `NAME.index1`/`NAME.length`/`NAME.first`/… of THIS loop.
@@ -242,7 +244,7 @@ main = do
     "1/3< 2/3 3/3> "
   -- the point: an inner loop reaches the *outer* loop's metadata through the label.
   expectM "label-outer-from-inner"
-    "{{#each rows as |row| label outer}}{{#each row}}{{outer.index0}}:{{this}} {{/each}}{{/each}}"
+    "{{#each rows as row label outer}}{{#each row}}{{outer.index0}}:{{this}} {{/each}}{{/each}}"
     (obj [ Tuple "rows" (VArray [ VArray [ VString "a", VString "b" ], VArray [ VString "c" ] ]) ])
     "0:a 0:b 1:c "
   -- the label's `this` is the element; `key` is the object key when iterating one.
@@ -296,16 +298,37 @@ main = do
   assert' "no-shadow-warn: bare {{first}} is a data field, no warning"
     (Array.null (warnNames "{{#each xs}}{{first}}{{length}}{{key}}{{/each}}"))
 
-  -- stray-head-bar lint (ADR-019): an unparenthesised pipe in a block head is
-  -- parsed as structure, so it warns with the bar `|` as the issue name.
-  assert' "headbar-warn: {{#each xs | reverse}} warns"
-    (warnNames "{{#each xs | reverse}}{{this}}{{/each}}" == [ "|" ])
-  -- the parenthesised pipe is a real pipe — no stray bar, no warning.
-  assert' "headbar-warn: {{#each (xs | reverse)}} does not warn"
-    (Array.null (warnNames "{{#each (xs | reverse)}}{{this}}{{/each}}"))
-  -- a legitimate `as |x|` clause is stripped by the desugar — not a stray bar.
-  assert' "headbar-warn: {{#each xs as |x|}} does not warn"
-    (Array.null (warnNames "{{#each xs as |x|}}{{x}}{{/each}}"))
+  -- block params drop the pipes (ADR-021 amendment): a bar in a block head is a
+  -- parse error — whether the author meant the old `as |…|` delimiter or an
+  -- unparenthesised pipe. The parenthesised pipe is still a pipe.
+  assert' "head-bar: {{#each xs | reverse}} is a parse error (parenthesise to pipe)"
+    ( isLeft
+        ( renderMax "{{#each xs | reverse}}{{this}}{{/each}}"
+            (obj [ Tuple "xs" (VArray [ VString "a" ]) ])
+        )
+    )
+  assert' "head-bar: the Handlebars {{#each xs as |x|}} pipe form is rejected"
+    ( isLeft
+        ( renderMax "{{#each xs as |x|}}{{x}}{{/each}}"
+            (obj [ Tuple "xs" (VArray [ VString "a" ]) ])
+        )
+    )
+  expectM "head-bar: {{#each (xs | reverse)}} (parenthesised) is a real pipe"
+    "{{#each (xs | reverse)}}{{this}}{{/each}}"
+    (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
+    "ba"
+
+  -- drop-pipes block params bind a *third* name to the 1-based index — MaxBars'
+  -- extension over the two Handlebars bindings (`as elem index0 index1`).
+  expectM "drop-pipes: as binds element + index0 + index1"
+    "{{#each xs as item i0 i1}}{{i0}}/{{i1}}:{{item}} {{/each}}"
+    (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
+    "0/1:a 1/2:b "
+  -- over an object the second name is the key (matching Handlebars `as |v k|`).
+  expectM "drop-pipes: over an object the second name is the key"
+    "{{#each o as v k}}{{k}}={{v}};{{/each}}"
+    (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
+    "x=1;y=2;"
 
   -- label-shadow lint (ADR-021): a loop `label NAME` whose name is a reserved root
   -- (this/loop/root/parent/yield) shadows it for the whole body, so it warns; a
@@ -349,19 +372,19 @@ main = do
 
   -- range + cycle (the Liquid-inspired iteration helpers).
   expectM "range: inclusive integer range as an array"
-    "{{#each (range 1 4) as |n|}}{{n}}{{/each}}"
+    "{{#each (range 1 4) as n}}{{n}}{{/each}}"
     (obj [])
     "1234"
   expectM "range: descending bounds yield the empty array"
-    "[{{#each (range 4 1) as |n|}}{{n}}{{/each}}]"
+    "[{{#each (range 4 1) as n}}{{n}}{{/each}}]"
     (obj [])
     "[]"
   expectM "cycle: wraps over its values by the loop index"
-    "{{#each xs as |x i|}}{{ cycle i \"a\" \"b\" }}{{/each}}"
+    "{{#each xs as x i}}{{ cycle i \"a\" \"b\" }}{{/each}}"
     (obj [ Tuple "xs" (VArray [ VBool true, VBool true, VBool true ]) ])
     "aba"
   assert' "range: a span past the budget is a located error"
-    (isLeft (renderMax "{{#each (range 1 200000) as |n|}}{{n}}{{/each}}" (obj [])))
+    (isLeft (renderMax "{{#each (range 1 200000) as n}}{{n}}{{/each}}" (obj [])))
 
   -- the `..` range operator (sugar for `(range a b)`): literal and dynamic bounds.
   expectM "range op: 1..4 iterates the inclusive span"

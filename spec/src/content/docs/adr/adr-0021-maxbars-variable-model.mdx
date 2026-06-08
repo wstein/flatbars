@@ -18,6 +18,17 @@ namespace and the bare `index`/`index0` aliases are otherwise unchanged — `ind
 removed because `@index` is the `@data` key host block helpers supply). The on-demand lint migrates
 `parent-index` → `loop.parent.index0` (etc.).
 
+*Amendment (2026-06-08).* MaxBars block parameters **drop the pipes**: the clause
+is the bare identifiers after `as` (`{{#each xs as item i}}`), and a bar in a block
+head is now a parse error — whether it was the Handlebars `as |a b|` delimiter or an
+unparenthesised pipe (so the old "stray head bar" warning is retired; a pipe in a
+head must still be parenthesised, `{{#each (xs | f) as x}}`). MaxBars also binds a
+*third* name to the 1-based index (`as elem index0 index1`), one more than FullBars'
+two. FullBars keeps the Handlebars bars (`as |a b|`) unchanged — the spelling is
+selected by the same reserved-variable capability that selects the variable model.
+A companion surface refinement: the `..` range operator (`1..n` ⇒ `(range 1 n)`),
+free in MaxBars because `../` parent-paths are already gone (above).
+
 ## Context
 
 Three things converged to make the loop/context vocabulary worth redesigning:
@@ -123,7 +134,7 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
 
 ```handlebars
 {{!-- MaxBars --}}
-{{#each rows as |row| label outer}}
+{{#each rows as row label outer}}
   {{#each row.cells}}
     {{loop.index1}}/{{loop.length}}       {{!-- this (inner) loop --}}
     {{outer.index0}} of {{outer.length}}  {{!-- the named enclosing loop --}}

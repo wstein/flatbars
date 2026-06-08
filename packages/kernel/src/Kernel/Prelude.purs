@@ -1296,9 +1296,10 @@ optFlag key = case _ of
 -- Iteration & context shift
 --------------------------------------------------------------------------------
 
--- | `each coll [name1 name2]`: the optional trailing string arguments are block
--- | params (surface `as |name1 name2|`) — `name1` binds the element, `name2` the
--- | index (array) or key (object).
+-- | `each coll [name1 name2 name3]`: the optional trailing string arguments are
+-- | block params (surface `as |name1 name2|` in FullBars, drop-pipes
+-- | `as name1 name2 name3` in MaxBars) — `name1` binds the element, `name2` the
+-- | index (array) or key (object), and `name3` the 1-based index.
 eachH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 eachH ctl args = case Array.uncons args of
   Just { head: coll, tail: rest } ->
@@ -1380,8 +1381,11 @@ iterate ctl names items = do
   let
     main = mainBody ctl
     n = Array.length items
-    -- block params bind, in order, the element value and its index/key.
-    binds val idx = Array.zipWith (\nm v -> Tuple nm (constOperation v)) names [ val, idx ]
+    -- block params bind, in order, the element value, its index/key, and the
+    -- 1-based index (`as elem index index1`). `zipWith` truncates to the names
+    -- given, so `as a` binds one, `as a i` two, `as a i j` three.
+    binds i val idx = Array.zipWith (\nm v -> Tuple nm (constOperation v)) names
+      [ val, idx, VNumber (Int.toNumber (i + 1)) ]
     -- the bare loop variables as fields: `this`/`index0`/…/`length`/`key`. An
     -- immutable per-iteration snapshot; the compiler builds the same object.
     metaFields i val key =
@@ -1440,7 +1444,7 @@ iterate ctl names items = do
             , Tuple "rindex0" (constOperation (VNumber (Int.toNumber (n - 1 - i))))
             , Tuple "rindex1" (constOperation (VNumber (Int.toNumber (n - i))))
             , Tuple "length" (constOperation (VNumber (Int.toNumber n)))
-            ] <> binds val idx <> loopBinds i val key
+            ] <> binds i val idx <> loopBinds i val key
           )
       in
         ctl.render (pushFrame frame val ctl.env) main

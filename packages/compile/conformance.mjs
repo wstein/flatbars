@@ -160,9 +160,9 @@ const helperCases = [
   { name: "op:max-infix", dialect: "maxbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{{#wrap}}{{1 + 2}}{{/wrap}}", d: {}, expect: "[3]" },
   // block params now parse in MaxBars (the head ladder omits the pipe rung), so a
   // block operation can bind them via options.fn(ctx, { blockParams }).
-  { name: "op:max-params", dialect: "maxbars", helpers: { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) }, t: "{{#list xs as |item idx|}}[{{idx}}:{{item}}]{{/list}}", d: { xs: ["a", "b"] }, expect: "[0:a][1:b]" },
+  { name: "op:max-params", dialect: "maxbars", helpers: { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) }, t: "{{#list xs as item idx}}[{{idx}}:{{item}}]{{/list}}", d: { xs: ["a", "b"] }, expect: "[0:a][1:b]" },
   // a parenthesised pipe in the head coexists with block params — both render paths agree.
-  { name: "op:max-paren-pipe-params", dialect: "maxbars", helpers: { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) }, t: "{{#box (xs | reverse) as |x|}}<i>{{x}}</i>{{/box}}", d: { xs: ["a", "b", "c"] }, expect: "<i>c</i><i>b</i><i>a</i>" },
+  { name: "op:max-paren-pipe-params", dialect: "maxbars", helpers: { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) }, t: "{{#box (xs | reverse) as x}}<i>{{x}}</i>{{/box}}", d: { xs: ["a", "b", "c"] }, expect: "<i>c</i><i>b</i><i>a</i>" },
   // ── Raw blocks {{{{name}}}} — the verbatim body is handed to the head helper via
   //    options.fn(); the inner {{x}} is NEVER interpreted (loud upper-cases the raw
   //    text, so `{{x}}` comes out `{{X}}`). Both render paths must agree, and the

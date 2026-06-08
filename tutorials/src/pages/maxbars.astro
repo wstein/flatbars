@@ -251,14 +251,16 @@ const t = (s) => s;
     <OpenInLab client:visible engine="maxbars" template={ex.rangeOp.template} data={ex.rangeOp.data} />
     <h3>Block params &amp; labelled loops</h3>
     <p>
-      A trailing <code>{t("as |name …|")}</code> binds scoped names over the block body (as in
-      <a href="/fullbars">FullBars</a>), staying in scope inside nested blocks. Block params reach an
+      A trailing <code>{t("as elem index index1")}</code> binds scoped names over the block body —
+      <b>drop the pipes</b>: MaxBars writes <code>{t("as p i")}</code>, not the Handlebars
+      <code>{t("as |p i|")}</code> (a bar in a block head is a parse error here). MaxBars binds a
+      <em>third</em> name to the 1-based index (<code>{t("as item i j")}</code>), one more than
+      <a href="/fullbars">FullBars</a>'s two. The names stay in scope inside nested blocks and reach an
       outer <em>element</em>, but not the outer loop's <code>{t("index")}</code> /
       <code>{t("length")}</code>. A trailing <code>{t("label NAME")}</code> clause (ADR-013, MaxBars-only)
       names the loop <b>frame</b>, so an inner loop reads <code>{t("outer.index1")}</code>,
-      <code>{t("outer.length")}</code>, <code>{t("outer.last")}</code> of the enclosing loop. (The bars are
-      the block-parameter delimiter, not the pipe; to pipe a head argument, parenthesise it —
-      <code>{t("{{#each (rows | reverse) as |r|}}")}</code>.)
+      <code>{t("outer.length")}</code>, <code>{t("outer.last")}</code> of the enclosing loop. (To pipe a
+      head argument, parenthesise it — <code>{t("{{#each (rows | reverse) as r}}")}</code>.)
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.loopParams.template} data={ex.loopParams.data} />
     <h3>The empty case</h3>
@@ -329,7 +331,7 @@ const t = (s) => s;
       <code>registerHelper(name, fn)</code> at the JS boundary (native MaxBars calls these
       operations/definitions, <a href={`${SPEC_BASE}adr/adr-0019-operation-vocabulary/`}>ADR-019</a>):
       <code>loud</code> (inline), <code>link</code> (hash args), and <code>list</code> (a block
-      helper binding <code>{t("as |p i|")}</code>).
+      helper binding the drop-pipes <code>{t("as p i")}</code>).
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.helpers.template} data={ex.helpers.data} helpers={ex.helpers.helpers} />
   </section>
@@ -364,9 +366,9 @@ const t = (s) => s;
       <thead><tr><th>FullBars</th><th>MaxBars</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
-          <td>Pipe in a block head <span class="code">{t("{{#each xs | f}}")}</span></td>
-          <td>must be <b>parenthesised</b></td>
-          <td>The head grammar drops the top-level pipe rung so a bar can delimit <span class="code">{t("as |x|")}</span>; write <span class="code">{t("{{#each (xs | f) as |x|}}")}</span>. An unparenthesised head bar is treated as structure (like FullBars), not a pipe.</td>
+          <td>Bar in a block head <span class="code">{t("{{#each xs | f}}")}</span> / <span class="code">{t("as |x|")}</span></td>
+          <td>a <b>parse error</b></td>
+          <td>MaxBars block params <b>drop the pipes</b> (<span class="code">{t("as x")}</span>), so a bar in a head is rejected — whether it was meant as the Handlebars block-param delimiter or an unparenthesised pipe. To pipe a head argument, parenthesise it: <span class="code">{t("{{#each (xs | f) as x}}")}</span>.</td>
         </tr>
         <tr>
           <td>Block partials + <span class="code">{t("{{yield}}")}</span></td>

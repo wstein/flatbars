@@ -320,16 +320,16 @@ export const cases = [
   { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   // block params parse in MaxBars (head ladder omits the pipe rung) — built-ins
   // bind them exactly as FullBars does, compiled ≡ interpreted.
-  { name: "mx:blockparams-each", dialect: "maxbars", t: "{{#each xs as |item i|}}[{{i}}:{{item}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:blockparams-with", dialect: "maxbars", t: "{{#with o as |c|}}{{c.n}}{{/with}}", d: { o: { n: "Z" } } },
+  { name: "mx:blockparams-each", dialect: "maxbars", t: "{{#each xs as item i}}[{{i}}:{{item}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:blockparams-with", dialect: "maxbars", t: "{{#with o as c}}{{c.n}}{{/with}}", d: { o: { n: "Z" } } },
   // a parenthesised pipe coexists with a trailing block-param clause.
-  { name: "mx:blockparams-paren-pipe", dialect: "maxbars", t: "{{#each (xs | reverse) as |x|}}{{x}}{{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:blockparams-paren-pipe", dialect: "maxbars", t: "{{#each (xs | reverse) as x}}{{x}}{{/each}}", d: { xs: ["a", "b", "c"] } },
   // an OUTER block param stays visible inside a nested loop (frame binds inherit).
-  { name: "mx:blockparams-nested-outer", dialect: "maxbars", t: "{{#each rows as |row|}}{{#each row}}[{{row}}={{this}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "mx:blockparams-nested-outer", dialect: "maxbars", t: "{{#each rows as row}}{{#each row}}[{{row}}={{this}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
   // ── labelled loops (ADR-013): the label binds the frame reified as an object ──
-  { name: "mx:label-outer-array", dialect: "maxbars", t: "{{#each rows as |row| label outer}}{{#each row}}{{outer.index1}}/{{outer.length}}:{{this}}{{#if outer.first}}*{{/if}} {{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "mx:label-outer-array", dialect: "maxbars", t: "{{#each rows as row label outer}}{{#each row}}{{outer.index1}}/{{outer.length}}:{{this}}{{#if outer.first}}*{{/if}} {{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
   { name: "mx:label-single", dialect: "maxbars", t: "{{#each xs label l}}{{l.index0}}:{{this}}/{{l.last}} {{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:label-object-key", dialect: "maxbars", t: "{{#each rows as |r| label outer}}{{#each r}}[{{r}}@{{outer.key}}]{{/each}}{{/each}}", d: { rows: { A: ["x"], B: ["y", "z"] } } },
+  { name: "mx:label-object-key", dialect: "maxbars", t: "{{#each rows as r label outer}}{{#each r}}[{{r}}@{{outer.key}}]{{/each}}{{/each}}", d: { rows: { A: ["x"], B: ["y", "z"] } } },
   // ── ADR-021 reserved variable model: loop / root / parent (chainable) ─────────
   { name: "mx:loop-fields", dialect: "maxbars", t: "{{#each xs}}{{loop.index1}}/{{loop.length}}{{#if loop.first}}<{{/if}}{{#if loop.last}}>{{/if}} {{/each}}", d: { xs: ["a", "b", "c"] } },
   { name: "mx:loop-parent", dialect: "maxbars", t: "{{#each rows}}{{#each this}}[{{loop.index0}}@{{loop.parent.index0}}/{{loop.root.length}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },

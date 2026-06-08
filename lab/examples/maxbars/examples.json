@@ -108,6 +108,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "rangeOp",
+    "label": "Intermediate — Ranges: the `..` operator",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "withBlock",
     "label": "Intermediate — With: re-root the context",
     "group": "Examples",

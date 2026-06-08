@@ -188,8 +188,10 @@ function childFrame(parent, ctx, index, key, first, last, len) {
   };
 }
 
-// Bind block-param names in a frame: `names` ⇒ [element, idx] for `each`, [ctx]
-// for `with` (FullBars binds the element/value first, then the index/key).
+// Bind block-param names in a frame: `names` ⇒ [element, idx, index1] for `each`
+// ([ctx] for `with`) — the element/value first, then the index/key, then the
+// 1-based index. Extra values past `names.length` are ignored (the loop below
+// stops at the names given), so `as a` binds one and `as a i j` binds three.
 function bindNames(frame, names, values) {
   if (names && names.length) {
     // set OWN properties on the (inherited) binds chain, so they shadow outer
@@ -266,7 +268,7 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
       bindLoop(
         bindNames(
           childFrame(parent, it.val, i, it.key, i === 0, i === items.length - 1, items.length),
-          names, [it.val, it.idx],
+          names, [it.val, it.idx, i + 1],
         ),
         label,
       ),

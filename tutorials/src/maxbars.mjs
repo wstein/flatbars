@@ -196,13 +196,14 @@ export const examples = {
   loopParams: {
     engine: "maxbars",
     label: "Advanced — Block params & labelled loops",
-    // Block params `as |x i|` bind scoped names that stay visible in nested blocks
-    // (FullBars too). A `label NAME` clause (MaxBars-only) names the loop FRAME, so
-    // an inner loop reads the OUTER loop's full state — `outer.index1`, `outer.length`,
-    // `outer.last` — not just its element.
+    // Block params drop the pipes in MaxBars: `as elem i j` binds the element, the
+    // 0-based index, and the 1-based index — scoped names that stay visible in
+    // nested blocks. A `label NAME` clause (MaxBars-only) names the loop FRAME, so
+    // an inner loop reads the OUTER loop's full state — `outer.index1`,
+    // `outer.length`, `outer.last` — not just its element.
     compiles: true,
-    template: `{{#each sections as |section| label outer}}
-{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each section.items as |item|}} {{item}}{{/each}}{{#if outer.last}} (last){{/if}}
+    template: `{{#each sections as section label outer}}
+{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each section.items as item}} {{item}}{{/each}}{{#if outer.last}} (last){{/if}}
 {{/each}}`,
     data: {
       sections: [
@@ -251,14 +252,14 @@ export const examples = {
     // same registerHelper(name, fn[, arity]) at the JS boundary (ADR-018; native
     // MaxBars calls these operations/definitions, ADR-019). Three shapes: `loud`
     // (inline), `link` (reads trailing hash args), `list` (a BLOCK helper whose
-    // options.fn(item, { blockParams }) binds `as |p i|`).
+    // options.fn(item, { blockParams }) binds the drop-pipes `as p i`).
     helpers:
       "registerHelper('loud', (s) => String(s).toUpperCase(), 1);\n" +
       "registerHelper('link', (text, o) => safe('<a href=\"' + (o.url || '#') + '\">' + text + '</a>'));\n" +
       "registerHelper('list', (items, o) =>\n" +
       "  safe('<ul>' + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('') + '</ul>'));",
     template:
-      '{{loud name}}\n{{{link "Home" url="/home"}}}\n{{#list people as |p i|}}<li>{{i}}: {{p.name}}</li>{{/list}}',
+      '{{loud name}}\n{{{link "Home" url="/home"}}}\n{{#list people as p i}}<li>{{i}}: {{p.name}}</li>{{/list}}',
     data: { name: "ada", people: [{ name: "Ada" }, { name: "Lin" }] },
   },
 
