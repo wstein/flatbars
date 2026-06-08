@@ -4,9 +4,12 @@ sidebar:
   label: "ADR-036 collection filters"
 ---
 
-*Status:* **Proposed.** *Date:* 2026-06-09. Owner: Werner. Five value operations
-added to the *shared prelude* (RawBars / FullBars / MaxBars / MinBars), pipe-able
-through the existing MaxBars pipe — **no new surface syntax**. Builds on
+*Status:* **Accepted — implemented** (2026-06-08; `test:compile` byte-identical,
+catalog 100 → 105). The comparator extension this ADR left open is its fast-follow,
+ADR-037. *Date:* 2026-06-08.
+Owner: Werner. Five value operations added to the *shared prelude*
+(RawBars / FullBars / MaxBars / MinBars), pipe-able through the existing MaxBars
+pipe — **no new surface syntax**. Builds on
 [ADR-019](/adr/adr-0019-operation-vocabulary/) (the operation vocabulary),
 [ADR-020](/adr/adr-0020-user-block-helpers/) (the no-`Value`-functions boundary —
 the constraint this ADR is shaped by), and [ADR-022](/adr/adr-0022-analyse-mode/)
@@ -15,10 +18,16 @@ the constraint this ADR is shaped by), and [ADR-022](/adr/adr-0022-analyse-mode/
 prelude addition.
 
 > *On nomenclature.* These are **value operations** (a value-producing operation
-> is a *definition*, [ADR-019](/adr/adr-0019-operation-vocabulary/)), registered
-> with `valDef` next to `sortBy` / `groupBy` / `pluck`. "Helper" is the *host-API*
-> word — `registerHelper` — reserved for the JS boundary; it is not the native
-> noun. This ADR says *operation* throughout.
+> is a *definition*, [ADR-019](/adr/adr-0019-operation-vocabulary/)), sitting next
+> to `sortBy` / `groupBy` / `pluck`. "Helper" is the *host-API* word —
+> `registerHelper` (`registerOperation` natively, ADR-019 addendum) — reserved for
+> the JS boundary; it is not the native noun. This ADR says *operation* throughout.
+>
+> *Mechanism note (implementation).* Unlike `sortBy` / `pluck`, these are
+> registered with `gen`, **not** `valDef`: the 2-arg *truthy* form must read the
+> environment's truthiness rule (`refTruthy ctl.env` — the same callback `{{#if}}`
+> uses), and a `valDef` never sees the control handle. The pure equality form would
+> fit `valDef`; the truthy form is why all five take `ctl`.
 
 ## Context
 

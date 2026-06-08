@@ -357,6 +357,24 @@ primitiveOperationDefs =
   , valDef "sortBy" "Sorts an array of objects by a key." (binary sortByH)
   , valDef "pluck" "Extracts a key's value from each object in an array." (binary pluckH)
   , valDef "groupBy" "Groups an array of objects into an object keyed by a field." (binary groupByH)
+  -- key-based collection filters (ADR-036): truthy (2-arg) or == a value (3-arg).
+  -- `gen`, not `valDef` — the truthy form reads the env's truthiness rule.
+  , gen "where" "Keeps array items whose key is truthy, or equals a given value." false
+      (Between 2 3)
+      whereH
+  , gen "reject" "Keeps array items whose key is falsy, or differs from a given value." false
+      (Between 2 3)
+      rejectH
+  , gen "find" "The first array item whose key is truthy, or equals a given value (else null)."
+      false
+      (Between 2 3)
+      findH
+  , gen "some" "True when any array item's key is truthy, or equals a given value." false
+      (Between 2 3)
+      someH
+  , gen "every" "True when every array item's key is truthy, or equals a given value." false
+      (Between 2 3)
+      everyH
   ]
 
 -- | The registry: name → runtime helper.
@@ -1063,6 +1081,72 @@ groupByH av keyv = do
   insertGroup key acc el = do
     k <- stringifyM (extractPath key el)
     pure (Map.alter (\mv -> Just (Array.cons el (fromMaybe [] mv))) k acc)
+
+-- | The key-based collection filters (ADR-036): `where` / `reject` / `find` /
+-- | `some` / `every`. Each takes a collection and a dotted **key path** (resolved
+-- | by the same `extractPath` `sortBy`/`groupBy`/`pluck` use), then keeps/tests
+-- | elements by that field. There are *no lambdas* (ADR-020), so the predicate is
+-- | key-based — Liquid's model, not `Array.filter`:
+-- |
+-- |   * 2 args (`coll key`)        — the field is **truthy** under the env's rule;
+-- |   * 3 args (`coll key value`)  — the field **equals** `value` (engine `eq`).
+-- |
+-- | A non-array subject (or empty array) yields each op's natural empty: `where`/
+-- | `reject` → `[]`, `find` → `null`, `some` → `false`, `every` → `true` (vacuous)
+-- | — produced for free by coercing the subject to `[]` and letting `filter`/
+-- | `find`/`any`/`all` do the rest. These are `gen` (not `valDef`) operations
+-- | because the truthy form reads `refTruthy ctl.env`, the same rule `{{#if}}` uses.
+
+-- | Coerce a filter subject to its element array (non-array ⇒ `[]`).
+filterElems :: Value -> Array Value
+filterElems = case _ of
+  VArray xs -> xs
+  _ -> []
+
+-- | Parse the shared `coll key [value]` arguments and apply `combine` to the
+-- | element-keep predicate and the subject's elements. The keep predicate is the
+-- | field's truthiness (2-arg) or its equality to `value` (3-arg).
+runFilter
+  :: forall m
+   . MonadThrow Error m
+  => (Value -> Boolean)
+  -> String
+  -> Array Value
+  -> ((Value -> Boolean) -> Array Value -> Value)
+  -> m Value
+runFilter truthyF name args combine = case args of
+  [ coll, keyv ] -> go coll keyv Nothing
+  [ coll, keyv, val ] -> go coll keyv (Just val)
+  _ -> throwError
+    (ArityError (name <> ": expected 2 or 3 arguments, got " <> show (Array.length args)))
+  where
+  go coll keyv mval = do
+    key <- stringifyM keyv
+    let
+      keep item = case mval of
+        Nothing -> truthyF (extractPath key item)
+        Just v -> extractPath key item == v
+    pure (combine keep (filterElems coll))
+
+whereH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+whereH ctl args =
+  runFilter (refTruthy ctl.env) "where" args (\keep xs -> VArray (Array.filter keep xs))
+
+rejectH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+rejectH ctl args =
+  runFilter (refTruthy ctl.env) "reject" args (\keep xs -> VArray (Array.filter (not <<< keep) xs))
+
+findH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+findH ctl args =
+  runFilter (refTruthy ctl.env) "find" args (\keep xs -> fromMaybe VNull (Array.find keep xs))
+
+someH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+someH ctl args =
+  runFilter (refTruthy ctl.env) "some" args (\keep xs -> VBool (Array.any keep xs))
+
+everyH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+everyH ctl args =
+  runFilter (refTruthy ctl.env) "every" args (\keep xs -> VBool (Array.all keep xs))
 
 --------------------------------------------------------------------------------
 -- Context & access

@@ -335,6 +335,29 @@ export const cases = [
   { name: "arr-pluck-dotted", dialect: "surface", t: "{{ join (pluck xs \"u.name\") sep }}", d: { xs: [{ u: { name: "a" } }, { u: { name: "b" } }], sep: "," } },
   { name: "arr-groupBy", dialect: "surface", t: "{{#each (groupBy xs \"type\")}}{{ @key }}=[{{#each this}}{{ id }}{{/each}}];{{/each}}", d: { xs: [{ type: "x", id: "1" }, { type: "y", id: "2" }, { type: "x", id: "3" }] } },
 
+  // key-based collection filters (ADR-036): truthy (2-arg) / == value (3-arg) /
+  // dotted key / non-array & empty subjects → each op's natural empty. The truthy
+  // form is rendered in FullBars (handlebars rule: 0/""/false falsy) AND in
+  // MaxBars (nonEmpty rule: 0 truthy) so the env-rule dependence is pinned on both
+  // paths. find's miss is null; every is vacuously true on [].
+  { name: "arr-where-truthy", dialect: "surface", t: "{{#each (where xs \"active\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", active: true }, { n: "b", active: false }, { n: "c", active: true }] } },
+  { name: "arr-where-eq", dialect: "surface", t: "{{#each (where xs \"tier\" \"gold\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", tier: "gold" }, { n: "b", tier: "silver" }, { n: "c", tier: "gold" }] } },
+  { name: "arr-where-eq-num", dialect: "surface", t: "{{#each (where xs \"id\" 7)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", id: 7 }, { n: "b", id: 8 }] } },
+  { name: "arr-where-dotted", dialect: "surface", t: "{{#each (where xs \"u.active\")}}{{ u.name }};{{/each}}", d: { xs: [{ u: { name: "a", active: true } }, { u: { name: "b", active: false } }] } },
+  { name: "arr-where-truthy-zero-hb", dialect: "surface", t: "{{ count (where xs \"c\") }}", d: { xs: [{ c: 0 }, { c: 1 }, { c: 2 }] } },
+  { name: "arr-where-truthy-zero-mx", dialect: "maxbars", t: "{{ count (where xs \"c\") }}", d: { xs: [{ c: 0 }, { c: 1 }, { c: 2 }] } },
+  { name: "arr-where-nonarray", dialect: "surface", t: "[{{ count (where x \"k\") }}]", d: { x: 42 } },
+  { name: "arr-reject-truthy", dialect: "surface", t: "{{#each (reject xs \"active\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", active: true }, { n: "b", active: false }] } },
+  { name: "arr-reject-eq", dialect: "surface", t: "{{#each (reject xs \"tier\" \"gold\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", tier: "gold" }, { n: "b", tier: "silver" }] } },
+  { name: "arr-find-truthy", dialect: "surface", t: "{{ lookup (find xs \"active\") \"n\" }}", d: { xs: [{ n: "a", active: false }, { n: "b", active: true }] } },
+  { name: "arr-find-eq", dialect: "surface", t: "{{ lookup (find xs \"id\" 2) \"n\" }}", d: { xs: [{ n: "a", id: 1 }, { n: "b", id: 2 }] } },
+  { name: "arr-find-miss", dialect: "surface", t: "[{{ find xs \"active\" }}]", d: { xs: [{ active: false }] } },
+  { name: "arr-some-true", dialect: "surface", t: "{{#if (some xs \"open\")}}y{{else}}n{{/if}}", d: { xs: [{ open: false }, { open: true }] } },
+  { name: "arr-some-false", dialect: "surface", t: "{{#if (some xs \"open\")}}y{{else}}n{{/if}}", d: { xs: [{ open: false }] } },
+  { name: "arr-every-true", dialect: "surface", t: "{{#if (every xs \"ok\")}}y{{else}}n{{/if}}", d: { xs: [{ ok: true }, { ok: true }] } },
+  { name: "arr-every-false", dialect: "surface", t: "{{#if (every xs \"ok\")}}y{{else}}n{{/if}}", d: { xs: [{ ok: true }, { ok: false }] } },
+  { name: "arr-every-vacuous", dialect: "surface", t: "{{#if (every xs \"ok\")}}y{{else}}n{{/if}}", d: { xs: [] } },
+
   // MaxBars infix arithmetic + `??` operators (desugar to the prelude helpers;
   // the compiled path and the interpreter must agree).
   { name: "mx:add", dialect: "maxbars", t: "{{ a + b }}", d: { a: 2, b: 3 } },

@@ -178,12 +178,28 @@
       "doc": "Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML."
     },
     {
+      "name": "every",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null,
+      "doc": "True when every array item's key is truthy, or equals a given value."
+    },
+    {
       "name": "false",
       "kind": "value",
       "arity": "0",
       "source": "registered",
       "canonical": null,
       "doc": "The boolean literal false."
+    },
+    {
+      "name": "find",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null,
+      "doc": "The first array item whose key is truthy, or equals a given value (else null)."
     },
     {
       "name": "first",
@@ -522,6 +538,14 @@
       "doc": "A raw block that returns its body verbatim, untouched by the engine."
     },
     {
+      "name": "reject",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Keeps array items whose key is falsy, or differs from a given value."
+    },
+    {
       "name": "relative",
       "kind": "inline",
       "arity": "≥2",
@@ -608,6 +632,14 @@
       "source": "registered",
       "canonical": null,
       "doc": "Returns a substring from a start index to an optional end index."
+    },
+    {
+      "name": "some",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null,
+      "doc": "True when any array item's key is truthy, or equals a given value."
     },
     {
       "name": "sortBy",
@@ -784,6 +816,14 @@
       "source": "registered",
       "canonical": null,
       "doc": "Uppercases its argument."
+    },
+    {
+      "name": "where",
+      "kind": "inline",
+      "arity": "2–3",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Keeps array items whose key is truthy, or equals a given value."
     },
     {
       "name": "with",

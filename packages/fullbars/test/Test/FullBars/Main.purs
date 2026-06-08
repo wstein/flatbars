@@ -323,6 +323,36 @@ main = do
     )
     "x=[13];y=[2];"
 
+  -- key-based collection filters (ADR-036). FullBars truthiness (handlebars): a
+  -- `0`/`""`/`false` field is falsy. `where`/`reject`/`some`/`every` 2-arg test the
+  -- key's truthiness; the 3-arg form tests equality (engine eq).
+  let
+    rows =
+      xsObj
+        [ obj [ Tuple "n" (str "a"), Tuple "active" (VBool true), Tuple "tier" (str "gold") ]
+        , obj [ Tuple "n" (str "b"), Tuple "active" (VBool false), Tuple "tier" (str "silver") ]
+        , obj [ Tuple "n" (str "c"), Tuple "active" (VBool true), Tuple "tier" (str "gold") ]
+        ]
+  expectS "p-where-truthy" "{{#each (where xs \"active\")}}{{ n }};{{/each}}" rows "a;c;"
+  expectS "p-where-eq" "{{#each (where xs \"tier\" \"gold\")}}{{ n }};{{/each}}" rows "a;c;"
+  expectS "p-reject-truthy" "{{#each (reject xs \"active\")}}{{ n }};{{/each}}" rows "b;"
+  expectS "p-find-truthy" "{{{ lookup (find xs \"active\") \"n\" }}}" rows "a"
+  expectS "p-find-miss" "[{{{ find xs \"active\" }}}]"
+    (xsObj [ obj [ Tuple "active" (VBool false) ] ])
+    "[]"
+  expectS "p-some-true" "{{#if (some xs \"active\")}}y{{else}}n{{/if}}" rows "y"
+  expectS "p-every-false" "{{#if (every xs \"active\")}}y{{else}}n{{/if}}" rows "n"
+  expectS "p-every-vacuous" "{{#if (every xs \"active\")}}y{{else}}n{{/if}}" (xsObj []) "y"
+  -- the 2-arg truthy form is env-rule-dependent: under FullBars `handlebars`, a `0`
+  -- field is falsy, so `where` drops it (MaxBars keeps it — pinned in test:compile).
+  expectS "p-where-zero-falsy" "{{{ count (where xs \"c\") }}}"
+    (xsObj [ obj [ Tuple "c" (VNumber 0.0) ], obj [ Tuple "c" (VNumber 1.0) ] ])
+    "1"
+  -- a non-array subject yields each op's natural empty.
+  expectS "p-where-nonarray" "[{{{ count (where x \"k\") }}}]"
+    (obj [ Tuple "x" (VNumber 42.0) ])
+    "[0]"
+
   expect "esc-html" "{{{escapeHtml (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
     "&lt;b&gt;&amp;&quot;&#x27;"
@@ -1176,10 +1206,11 @@ main = do
   assert' "separability: a core helper (e.g. 'if') survives the split in coreSchema"
     (Map.member "if" KP.coreSchema.helpers)
   -- `coreOperationDefs` is the non-primitive base; the full roster adds exactly the
-  -- 37-strong primitive pack on top (string + number + array, incl. aliases, range/cycle).
+  -- 42-strong primitive pack on top (string + number + array, incl. aliases, range,
+  -- and the ADR-036 key-based filters where/reject/find/some/every).
   assert'
-    "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (37 primitives)"
-    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 37)
+    "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (42 primitives)"
+    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 42)
 
   -- Set delimiters are EXCLUDED from FullBars (ADR-015): it is the Handlebars-
   -- faithful dialect, and Handlebars has no set delimiters. The `@delimiters`

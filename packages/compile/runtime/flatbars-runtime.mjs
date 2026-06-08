@@ -146,6 +146,20 @@ function pathOf(v, key) {
   return lookup(v, ...key.split("."));
 }
 
+// Collection-filter helpers (ADR-036), shared by where/reject/find/some/every.
+// `filterElems` coerces a non-array subject to [] so each op yields its natural
+// empty; `keepBy` builds the element-keep predicate the interpreter's runFilter
+// builds — the field's truthiness (2-arg) or its deep-equality to a value (3-arg).
+function filterElems(v) {
+  return Array.isArray(v) ? v : [];
+}
+function keepBy(a, f) {
+  const key = stringify(a[1]);
+  return a.length >= 3
+    ? (el) => deepEq(pathOf(el, key), a[2])
+    : (el) => truthy(f.truthy, pathOf(el, key));
+}
+
 // ── frames ───────────────────────────────────────────────────────────────────
 function scope(data, truthyFn, yieldName) {
   return {
@@ -536,6 +550,16 @@ const helpers = {
   sortBy: (a) => { if (!Array.isArray(a[0])) return []; const key = stringify(a[1]); return a[0].slice().sort((x, y) => cmpVals(pathOf(x, key), pathOf(y, key))); },
   pluck: (a) => Array.isArray(a[0]) ? a[0].map((el) => pathOf(el, stringify(a[1]))) : [],
   groupBy: (a) => { if (!Array.isArray(a[0])) return {}; const key = stringify(a[1]), o = {}; for (const el of a[0]) { const k = stringify(pathOf(el, key)); (o[k] = o[k] || []).push(el); } return o; },
+  // ── key-based collection filters (ADR-036) ──────────────────────────────────
+  // Each builds the same element-keep predicate the interpreter's runFilter does:
+  // 2-arg ⇒ the field is truthy under the engine's rule (truthy(f.truthy, …), the
+  // {{#if}} rule); 3-arg ⇒ the field deep-equals the value. Non-array ⇒ each op's
+  // natural empty (filter→[], find→null, some→false, every→true), via filterElems.
+  where: (a, f) => filterElems(a[0]).filter(keepBy(a, f)),
+  reject: (a, f) => { const k = keepBy(a, f); return filterElems(a[0]).filter((el) => !k(el)); },
+  find: (a, f) => { const r = filterElems(a[0]).find(keepBy(a, f)); return r === undefined ? null : r; },
+  some: (a, f) => filterElems(a[0]).some(keepBy(a, f)),
+  every: (a, f) => filterElems(a[0]).every(keepBy(a, f)),
   json: (a) => jsonText(a[0], a[1]),
   escapeJson: (a) => new Safe(escapeHtml(jsonText(a[0], a[1]))),
   else: () => new Safe(""),

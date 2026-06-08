@@ -97,6 +97,37 @@ skips string literals, so a dict's own `}` is consumed before the tag close and
 `{{#with {a: 1}}}` (or `{{{json {x: 1}}}}`) needs **no** disambiguating space — a
 `}}` inside a dict-value string is not a tag close either.
 
+## Collection filters
+
+The shared prelude carries five **key-based** filter operations
+([ADR-036](/adr/adr-0036-collection-filter-operations/)) — pipe-able like every
+other collection op, no new surface:
+
+```handlebars
+{{#each row in (rows | where "active") }}…{{/each}}     {{!-- key is truthy --}}
+{{#each u in (users | where "tier" "gold") }}…{{/each}} {{!-- key == value --}}
+{{#each u in (users | reject "archived") }}…{{/each}}   {{!-- complement of where --}}
+{{ users | find "role" "admin" | json }}                {{!-- first match, else null --}}
+{{#if (orders | some "open") }}You have open orders.{{/if}}
+{{#if (rows | every "valid") }}All valid.{{/if}}
+```
+
+| Operation | 2-arg (`coll key`) | 3-arg (`coll key value`) |
+| --- | --- | --- |
+| `where` / `reject` | items whose `key` is truthy / falsy | items whose `key` `==` / `!=` `value` |
+| `find` | the first item whose `key` is truthy (else `null`) | the first whose `key` `==` `value` |
+| `some` / `every` | any / all items' `key` truthy | any / all `==` `value` (`every` vacuously `true` on `[]`) |
+
+The key is a dotted path (`where users "profile.active"`), resolved exactly as
+`sortBy` / `groupBy` / `pluck` resolve theirs. The 2-arg *truthy* form reads the
+engine's rule, so under MaxBars's `nonEmpty` a `0` field is **kept** (it is truthy
+here) where FullBars's `handlebars` rule would drop it — the same split `{{#if}}`
+shows. There are **no lambdas** ([ADR-020](/adr/adr-0020-user-block-helpers/)), so
+the filter is key-based, not predicate-based: `where (gt x.score 50)` is *not*
+expressible — precompute the flag (`{ score, top }`) and filter on the key.
+Comparison filters (`score > 50`) arrive as the named-comparator fast-follow
+(ADR-037).
+
 ## The variable model
 
 MaxBars has *no bare loop variables* and *no `@` namespace*
