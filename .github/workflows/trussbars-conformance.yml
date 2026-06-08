@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Trussbars cross-language conformance gate (docs/04). Unlike `trussbars.yml`
+# (Rust-only, the runtime crates), this needs BOTH toolchains: the PureScript
+# engine (the interpreter ORACLE + the MaxBars->Rust emitter, built by `spago
+# build` via the npm-provisioned toolchain) AND cargo (the generated crate the
+# harness builds and runs). So it is its own, heavier job.
+#
+# Renders each corpus case through the interpreter and the emitted Rust and
+# asserts byte-identity (floats strict, via the default ecma-float backend),
+# checking the live interpreter against the committed golden snapshots too — so an
+# oracle drift is a distinct, reported failure, not misattributed to Rust.
+name: Trussbars conformance
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    paths: &paths
+      - "trussbars/**"
+      - "packages/maxbars/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/trussbars-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trussbars-conformance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci # provisions purescript + spago
+
+      # The harness invokes `cargo +1.96.0` for the generated crate.
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: trussbars-conf-cargo-${{ runner.os }}-${{ hashFiles('trussbars/Cargo.lock') }}
+
+      # `spago build` (the interpreter + emitter) then renders + diffs every case.
+      - name: Conformance gate
+        run: npm run test:trussbars-conformance
