@@ -1,17 +1,17 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 39,
+  "total": 40,
   "positive": {
-    "count": 38,
-    "byte_matched": 38,
+    "count": 39,
+    "byte_matched": 39,
     "mismatched": 0
   },
   "excluded": {
     "count": 1,
     "cases": [
       {
-        "id": "neg-rawblock",
-        "reason": "unsupported: raw block 'raw'"
+        "id": "neg-dict",
+        "reason": "unsupported: helper 'dict'"
       }
     ]
   },

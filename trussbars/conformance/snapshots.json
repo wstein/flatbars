@@ -37,5 +37,6 @@
   "block-partial": "<div>Ann &amp; Bo</div>",
   "sort-by": "a, b, c",
   "group-by": "a:y b:xz ",
-  "neg-rawblock": "{{x}}"
+  "rawblock": "Literal {{x}} & <b>kept</b>",
+  "neg-dict": "1"
 }

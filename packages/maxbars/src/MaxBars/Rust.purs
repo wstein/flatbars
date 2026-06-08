@@ -24,9 +24,10 @@
 -- | `{{> name [ctx]}}`, and `{{#partial}}` + `{{yield}}` with the body pre-rendered
 -- | in the caller frame), labelled loops (`label NAME` → `outer`), and the
 -- | literal-key closures `pluck` / `sortBy` / `groupBy` (the last grouping into a
--- | map, iterated via the `Each` trait). Anything else (raw blocks,
--- | `dict`/collection literals) returns a `Left` "unsupported …" so the
--- | conformance harness excludes it honestly.
+-- | map, iterated via the `Each` trait), and raw blocks (the built-in `raw` head,
+-- | emitted verbatim). Anything else (`dict`/collection literals, a non-`raw`
+-- | raw-block head — which needs a host helper) returns a `Left` "unsupported …"
+-- | so the conformance harness excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
 -- | every runtime reference is fully path-qualified (so there are no `use`
 -- | statements and thus no unused-import warnings) — the output passes
@@ -152,7 +153,11 @@ node env = case _ of
     Right ("    trussbars_core::ToText::write_text(&(" <> ee <> "), &mut out);\n")
   Block _ _ name args body -> block env name args body
   Sep _ name _ -> Left ("unsupported: standalone separator '" <> name <> "'")
-  RawBlock _ name _ _ -> Left ("unsupported: raw block '" <> name <> "'")
+  -- `{{{{#raw}}}}body{{{{/raw}}}}` — the built-in `raw` head outputs its verbatim
+  -- body unescaped (it is `Safe`); a non-`raw` head would need a host helper.
+  RawBlock _ "raw" _ raw -> Right ("    out.push_str(" <> rustStr raw <> ");\n")
+  RawBlock _ name _ _ ->
+    Left ("unsupported: raw block '" <> name <> "' (only the built-in 'raw' head)")
   NodeError _ msg -> Left ("parse error: " <> msg)
 
 -- Splice the pre-rendered block-partial body at a `{{yield}}`.

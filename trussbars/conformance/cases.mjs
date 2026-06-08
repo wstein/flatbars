@@ -223,10 +223,17 @@ export const cases = [
     },
   },
 
-  // ── negative: raw blocks (verbatim body) — still excluded ────────────────────
+  // ── raw blocks (verbatim body, unescaped) ────────────────────────────────────
   {
-    id: "neg-rawblock",
-    template: "{{{{#raw}}}}{{x}}{{{{/raw}}}}",
+    id: "rawblock",
+    template: "{{{{#raw}}}}Literal {{x}} & <b>kept</b>{{{{/raw}}}}",
+    data: {},
+  },
+
+  // ── negative: dict / collection literals — still excluded ────────────────────
+  {
+    id: "neg-dict",
+    template: '{{#with (dict "a" 1)}}{{a}}{{/with}}',
     data: {},
   },
 ];
