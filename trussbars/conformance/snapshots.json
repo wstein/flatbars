@@ -51,5 +51,9 @@
   "sort-by": "a, b, c",
   "group-by": "a:y b:xz ",
   "rawblock": "Literal {{x}} & <b>kept</b>",
+  "enum-render": "Status: Pending",
+  "enum-truthy": "set: Active",
+  "escape-heavy": "a &amp; b &lt; c &gt; d &quot; e &#x27; f &amp; g &lt; h",
+  "deep-nesting": "[a/T:12][c/T:]",
   "neg-dict": "1"
 }

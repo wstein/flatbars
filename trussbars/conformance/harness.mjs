@@ -68,7 +68,7 @@ for (const c of cases) {
   const data = rawString(JSON.stringify(c.data));
   modules.push(
     `pub mod ${ident} {\n` +
-      `${genCtx(c.data, c.maps)}\n\n` +
+      `${genCtx(c.data, c.maps, c.enums)}\n\n` +
       `${emit.out}\n` +
       `    pub fn run() -> String {\n` +
       `        let ctx: Ctx = serde_json::from_str(${data}).expect("deserialize ${c.id}");\n` +

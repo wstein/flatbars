@@ -11,17 +11,35 @@ function cap(s) {
 
 /// Returns the Rust struct definitions (root `Ctx` first) as one source string.
 /// `maps` lists top-level field names to type as `BTreeMap<String, V>` (object
-/// iteration, `{{#each obj}}`) instead of a struct.
-export function genCtx(data, maps = []) {
+/// iteration, `{{#each obj}}`) instead of a struct. `enums` maps a top-level field
+/// name to its variant list (`{status: ["Active","Pending"]}`): the field is typed
+/// as a unit enum, so serde maps the JSON string `"Active"` to `Status::Active` and
+/// `#[derive(Trussbars)]` renders the variant name.
+export function genCtx(data, maps = [], enums = {}) {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("ctxgen: the data root must be a JSON object");
   }
   const mapSet = new Set(maps);
+  const enumFields = new Map(Object.entries(enums));
   const defs = [];
   let counter = 0;
 
   // `kind`: "root" (the Ctx struct) | "field" (a top-level field) | "nested".
   function rustType(value, kind, fieldName) {
+    // A top-level field named in `enums` is a unit enum (its JSON string value
+    // deserializes to the matching variant).
+    if (kind === "field" && enumFields.has(fieldName)) {
+      const name = cap(fieldName);
+      const variants = enumFields
+        .get(fieldName)
+        .map((v) => `    ${v},`)
+        .join("\n");
+      defs.push(
+        `#[derive(serde::Deserialize, trussbars_core::Trussbars)]\n` +
+          `pub enum ${name} {\n${variants}\n}`,
+      );
+      return name;
+    }
     if (value === null) return "Option<String>";
     switch (typeof value) {
       case "string":

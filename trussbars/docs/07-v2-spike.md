@@ -127,20 +127,26 @@ form. This is the core constraint the spike surfaces.
    tested contract, not a hope. This is the single most important new test artifact
    v2 introduces.
 
-## 5. Open decisions (resolve when v2 starts)
+## 5. Decisions (RESOLVED — pre-v2)
 
-- **Stable vs nightly for exact inline spans.** Recommended: **target stable**, ship
-  the §3 fallbacks now, and feature-detect `proc_macro_span` to upgrade `truss!`
-  to exact spans automatically when it stabilizes. Do **not** make the core require
-  nightly.
-- **How much type info does the macro get?** A bare proc-macro sees only tokens, not
-  the resolved type of `ctx`. To pre-check class-B errors (e.g. `{{struct}}`,
-  unknown field) *at macro time* would need the context type's shape — via a
-  `#[derive(Trussbars)]`-supplied type descriptor the `truss!` invocation references.
-  Decision: start **without** it (let rustc own class B via spans), add a descriptor
-  later only if the fallbacks prove insufficient.
-- **Inline-first or path-first?** Recommended: build `truss!` first (best spans,
-  simplest), add the `path=` derive second for migration familiarity.
+- **Stable, not nightly.** Target stable Rust. Ship the §3 fallbacks (named locals +
+  the `file:line:col` breadcrumb — both already live in v1 via
+  `compileMaxRustCommented`) and feature-detect `proc_macro_span` to upgrade
+  `truss!` to exact intra-template spans automatically once it stabilizes. The core
+  **must not** require nightly.
+- **No type descriptor initially.** A bare proc-macro sees only tokens, not `ctx`'s
+  resolved type, so class-B errors (`{{struct}}`, unknown field) are left to rustc
+  via `quote_spanned!` + named locals. A `#[derive(Trussbars)]`-supplied type
+  descriptor is **deferred** — add it only if the fallbacks prove insufficient.
+  (Keeps v2 a pure tokens-in / Rust-out macro.)
+- **Inline `truss!` first, `path=` second.** Build `truss!("…")` first (best spans,
+  simplest), then `#[derive(Template)] #[template(path=…)]` for Askama-style
+  migration familiarity.
+- **The parser is the dominant task** (the part this spike under-scoped): the
+  proc-macro must *parse and desugar* the MaxBars subset **in Rust** — the front-end
+  the v1 emitter reuses is PureScript-only. Scoping: `docs/08-v2-parser.md`. The
+  emit logic itself is already specified by `MaxBars/Rust.purs` and pinned by the
+  52-case corpus.
 
 ## 6. Scope guard
 

@@ -1,20 +1,24 @@
 # Trussbars — v1 Feature Freeze
 
-> **Status:** Freeze candidate · **Audience:** the v2 proc-macro author.
+> **Status: RATIFIED** (v1 surface frozen) · **Audience:** the v2 proc-macro author.
 > **Rebaselined against current `develop`** (branch `feat/trussbars-rebaseline`):
 > develop's MaxBars dropped the `as |x|` loop form for Liquid binding
-> (`{{#each x in xs}}`) and shipped `{{#let}}` and list/dict literals. The
-> conformance harness is **39/39 byte-matched against develop** after the syntax
-> rebaseline; the freeze below reflects develop's *actual, frozen* surface.
+> (`{{#each x in xs}}`) and shipped `{{#let}}` and list/dict literals. The v1 emitter
+> then closed the surface — `{{#let}}`, list literals, the collection filters
+> (`where`/`reject`/`find`/`some`/`every`), and enum context types are all in.
+> The conformance harness is **52/52 byte-matched against develop**; the freeze
+> below is the v1 surface as it stands.
 > **This document is the contract v2 targets.** v2 reimplements the emitter in
 > idiomatic Rust; it must accept exactly this surface and produce **byte-identical**
 > output (the conformance harness is the witness, docs/04). v2 *adds* mechanism
 > (compile-time codegen, error mapping, a host-helper convention) but does **not**
-> change the language below without an explicit amendment here.
+> change the language below without an explicit amendment here. The two surface
+> items still **out** of v1 are `dict` literals (need a generated struct) and
+> data-carrying-enum field dispatch (a `match`) — both type-aware, deliberately → v2.
 
-Evidence base: the conformance corpus (`trussbars/conformance/cases.mjs`, 39
-byte-matched cases) and the blog dogfood (`trussbars/examples/blog/`, three
-golden-pinned pages). Source of truth for "supported" is the v1 emitter
+Evidence base: the conformance corpus (`trussbars/conformance/cases.mjs`, 52
+byte-matched cases) and the blog/changelog dogfoods (`trussbars/examples/`).
+Source of truth for "supported" is the v1 emitter
 (`packages/maxbars/src/MaxBars/Rust.purs`); this doc is its human-readable freeze.
 
 ## 1. Supported surface (IN)
@@ -83,6 +87,7 @@ From the blog dogfood (`examples/blog/README.md`); each needs an explicit in/out
 | **F1** | Template path == Rust identifier (no rename). | **WONTFIX** — it *is* "names are static"; document only. |
 | **F7** | A **piped or bare multi-arg application used directly as an `{{#if}}`/`{{#unless}}` condition** is rejected ("options argument") — a `startsWith` applied to the subject fails as a bare condition head, whether written as a pipe or as a prefix call. **Workaround: parenthesize** the call — `{{#if (startsWith x "f")}}` works. Applications work in every position *except* a bare condition head. | **v2, IN (fix)** — the desugar should accept a piped/applied condition without the parens. Found via the changelog dogfood (`examples/changelog`); the parens form is the v1 workaround. |
 | **F8** | **Escaping is HTML-only.** `{{ }}` always HTML-escapes, so non-HTML output targets (markdown source, JSON, CSV) get entities — e.g. a commit subject `"x"` becomes `&quot;x&quot;`. Correct when the output is later HTML-rendered (GitHub markdown), literal otherwise. No per-target escaping policy. | **v2, consider** — a target-escape policy (HTML / none / JSON) selected per template, or keep HTML-only and document. Use raw `{{{ }}}` for trusted non-HTML output (XSS-unsafe if later HTML-rendered). Found via the changelog dogfood. |
+| **F10** | **`{{#with (block-param).field}}` renders empty in the reference.** `{{#each row in rows}}{{#with row.meta}}…{{/with}}{{/each}}` — a `with` whose subject is a path off a *Liquid block binding* re-roots to nothing in the interpreter (a plain `{{#with x}}` works; a deep path `{{row.meta.lbl}}` works). The v1 emitter likely resolves it (a latent divergence); the corpus avoids it. | **v2, verify** — match the reference (whatever it is) and pin a case, or treat as a reference bug to fix upstream. Found via the corpus-hardening edges. |
 
 ## 5. The freeze
 

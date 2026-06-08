@@ -327,6 +327,42 @@ export const cases = [
     data: {},
   },
 
+  // ── enum context types (S4) — a unit enum renders the variant name + is truthy ─
+  {
+    id: "enum-render",
+    template: "Status: {{status}}",
+    data: { status: "Pending" },
+    enums: { status: ["Active", "Pending", "Closed"] },
+  },
+  {
+    id: "enum-truthy",
+    template: "{{#if status}}set{{else}}unset{{/if}}: {{status}}",
+    data: { status: "Active" },
+    enums: { status: ["Active", "Pending"] },
+  },
+
+  // ── hardening edges ──────────────────────────────────────────────────────────
+  {
+    // escaping-heavy: repeated escapable characters in one value.
+    id: "escape-heavy",
+    template: "{{s}}",
+    data: { s: "a & b < c > d \" e ' f & g < h" },
+  },
+  {
+    // deep nesting: each → if → nested each, with a deep path and a `root` reach.
+    id: "deep-nesting",
+    template:
+      "{{#each row in rows}}{{#if row.on}}[{{row.meta.lbl}}/{{root.tag}}:{{#each n in row.ns}}{{n}}{{/each}}]{{/if}}{{/each}}",
+    data: {
+      tag: "T",
+      rows: [
+        { on: true, meta: { lbl: "a" }, ns: [1, 2] },
+        { on: false, meta: { lbl: "b" }, ns: [3] },
+        { on: true, meta: { lbl: "c" }, ns: [] },
+      ],
+    },
+  },
+
   // ── negative: dict / collection literals — still excluded ────────────────────
   {
     id: "neg-dict",
