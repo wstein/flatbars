@@ -105,10 +105,12 @@ const t = (s) => s;
         <dt>Engine</dt>
         <dd>the <b>runtime that assigns meaning</b> — operations, scope, truthiness. The FlatBars
           dialects share one.</dd>
-        <dt>Operation <span class="alt">(host API: helper)</span></dt>
+        <dt>Operation <span class="alt">(host API: registerOperation)</span></dt>
         <dd>the named thing a tag <b>applies</b>; there are no variables, so even
-          <code>{t("{{{city}}}")}</code> applies the operation <code>city</code>. The JS host API
-          keeps the word <em>helper</em> (<code>registerHelper</code>).</dd>
+          <code>{t("{{{city}}}")}</code> applies the operation <code>city</code>. RawBars is the
+          native surface that <em>rejects</em> the "helper" framing, so a host registers one with
+          <code>registerOperation</code> (<code>registerHelper</code> stays the FullBars/Handlebars
+          alias).</dd>
       </dl>
     </aside>
   </section>

@@ -272,16 +272,16 @@ export const examples = {
 
   helpers: {
     engine: "maxbars",
-    label: "Advanced — Custom & block helpers",
-    // MaxBars reuses FullBars's engine, so a host registers operations with the
-    // same registerHelper(name, fn[, arity]) at the JS boundary (ADR-018; native
-    // MaxBars calls these operations/definitions, ADR-019). Three shapes: `loud`
-    // (inline), `link` (reads trailing hash args), `list` (a BLOCK helper whose
-    // options.fn(item, { blockParams }) binds the drop-pipes `as p i`).
+    label: "Advanced — Custom & block operations",
+    // MaxBars is a native dialect, so a host registers with the native
+    // registerOperation(name, fn[, arity]) at the JS boundary (ADR-019 addendum;
+    // `registerHelper` is the Handlebars-named alias FullBars keeps). Three
+    // shapes: `loud` (inline), `link` (reads trailing hash args), `list` (a BLOCK
+    // operation whose options.fn(item, { blockParams }) binds the drop-pipes `as p i`).
     helpers:
-      "registerHelper('loud', (s) => String(s).toUpperCase(), 1);\n" +
-      "registerHelper('link', (text, o) => safe('<a href=\"' + (o.url || '#') + '\">' + text + '</a>'));\n" +
-      "registerHelper('list', (items, o) =>\n" +
+      "registerOperation('loud', (s) => String(s).toUpperCase(), 1);\n" +
+      "registerOperation('link', (text, o) => safe('<a href=\"' + (o.url || '#') + '\">' + text + '</a>'));\n" +
+      "registerOperation('list', (items, o) =>\n" +
       "  safe('<ul>' + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('') + '</ul>'));",
     template:
       '{{loud name}}\n{{{link "Home" url="/home"}}}\n{{#list people as p i}}<li>{{i}}: {{p.name}}</li>{{/list}}',
@@ -298,7 +298,7 @@ export const examples = {
     // {{{{#name}}}} spelling (hash sigil), like RawBars — NOT the bare FullBars form;
     // the op name has no hyphen (a `-` would parse as subtraction). The head must
     // resolve to a defined operation (an undefined head is a hard error).
-    helpers: "registerHelper('rawloud', (options) => options.fn().toUpperCase());",
+    helpers: "registerOperation('rawloud', (options) => options.fn().toUpperCase());",
     template: "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}",
     data: { bar: "ignored" },
   },
