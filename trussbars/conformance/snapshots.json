@@ -33,5 +33,6 @@
   "partial-context": "[Intro]",
   "outer-label": "1:a 1:b 2:c ",
   "pluck": "a,b",
-  "neg-yield": "[hi]"
+  "block-partial": "<div>Ann &amp; Bo</div>",
+  "neg-sortby": "a, b, c"
 }

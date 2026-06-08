@@ -186,10 +186,18 @@ export const cases = [
     data: { items: [{ name: "a" }, { name: "b" }] },
   },
 
+  // ── block partials + {{yield}} (body rendered in the caller frame) ───────────
+  {
+    id: "block-partial",
+    template:
+      '{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}',
+    data: { name: "Ann & Bo" },
+  },
+
   // ── negative: still outside the slice (oracle renders; emitter excludes) ─────
   {
-    id: "neg-yield",
-    template: '{{#inline "frame"}}[{{yield}}]{{/inline}}{{#partial "frame"}}hi{{/partial}}',
-    data: {},
+    id: "neg-sortby",
+    template: '{{items | sortBy "name" | pluck "name" | join ", "}}',
+    data: { items: [{ name: "b" }, { name: "a" }, { name: "c" }] },
   },
 ];

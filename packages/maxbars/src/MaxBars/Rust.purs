@@ -19,10 +19,10 @@
 -- | `ternary` (`? :`), the coalescers `??` (over `Option<T>`) and `?:` (over a
 -- | unifying `T`), the full value-helper pack — string (incl. integer-argument
 -- | `slice`/`truncate`), number (`abs`/`round`/`toFixed`/…), and array
--- | (`join`/`count`/`at`/`take`/…) — inline partials (`{{#inline}}` +
--- | `{{> name [ctx]}}`, expanded at the call site), labelled loops (`label NAME` →
--- | `outer`), and `pluck` (a literal-key field-access closure). Anything else
--- | (block partials `{{#partial}}` / `{{yield}}`, raw blocks, the key-path
+-- | (`join`/`count`/`at`/`take`/…) — inline and block partials (`{{#inline}}` +
+-- | `{{> name [ctx]}}`, and `{{#partial}}` + `{{yield}}` with the body pre-rendered
+-- | in the caller frame), labelled loops (`label NAME` → `outer`), and `pluck` (a
+-- | literal-key field-access closure). Anything else (raw blocks, the key-path
 -- | `sortBy`/`groupBy`, `dict`) returns a `Left` "unsupported …" so the conformance
 -- | harness excludes it honestly.
 -- | All generated locals are `__`-prefixed (so an unused one never warns), and
@@ -67,6 +67,7 @@ type Env =
   , labels :: Map String String -- labelled-loop name → its `Loop` binding (`label NAME`)
   , partials :: Map String Template -- hoisted `{{#inline}}` definitions, inlined at the call site
   , expanding :: Array String -- partials currently being inlined (recursion guard)
+  , yield :: Maybe String -- pre-rendered body of an enclosing block partial (for `{{yield}}`)
   , depth :: Int
   }
 
@@ -97,6 +98,7 @@ compileMaxRust ctxType src = case build of
     , labels: Map.empty
     , partials
     , expanding: []
+    , yield: Nothing
     , depth: 0
     }
 
@@ -130,6 +132,10 @@ node env = case _ of
   Content s -> Right ("    out.push_str(" <> rustStr s <> ");\n")
   -- `{{> name [ctx]}}` — inline the hoisted partial body at the call site.
   Output _ (App "partial" args) -> emitPartial env args
+  -- `{{yield}}` / `{{{yield}}}` — splice the pre-rendered block-partial body
+  -- (already safe markup with its own internal escaping), bypassing the escape.
+  Output _ (App "yield" []) -> yieldHere env
+  Output _ (App "escapeHtml" [ App "yield" [] ]) -> yieldHere env
   -- `{{ x }}` desugars to `escapeHtml (…)`: escape and append.
   Output _ (App "escapeHtml" [ a ]) -> do
     ae <- expr env a
@@ -143,18 +149,34 @@ node env = case _ of
   RawBlock _ name _ _ -> Left ("unsupported: raw block '" <> name <> "'")
   NodeError _ msg -> Left ("parse error: " <> msg)
 
+-- Splice the pre-rendered block-partial body at a `{{yield}}`.
+yieldHere :: Env -> Either String String
+yieldHere env = case env.yield of
+  Just code -> Right code
+  Nothing -> Left "unsupported: '{{yield}}' outside a block partial"
+
 -- `{{> name}}` (implicit `this`) or `{{> name ctx}}` (explicit context).
 emitPartial :: Env -> Array Expr -> Either String String
 emitPartial env = case _ of
-  [ Lit (VString name) ] -> inlinePartial env name (App "this" [])
-  [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE
+  [ Lit (VString name) ] -> inlinePartial env name (App "this" []) Nothing
+  [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE Nothing
   _ -> Left "unsupported: partial with a hash or a dynamic name"
 
--- Inline the hoisted partial body with the passed context as the new scope. Loop
--- metadata and block params do not cross into a partial; `root` (a function-level
--- binding) does. Recursion is rejected — inlining would not terminate.
-inlinePartial :: Env -> String -> Expr -> Either String String
-inlinePartial env name ctxE = case Map.lookup name env.partials of
+-- `{{#partial "name"}}body{{/partial}}` — render the body in the caller's frame,
+-- then inline the named partial with that pre-rendered body bound to `{{yield}}`.
+partialBlock :: Env -> Array Expr -> Template -> Either String String
+partialBlock env args body = do
+  yieldCode <- nodes env body
+  case args of
+    [ Lit (VString name) ] -> inlinePartial env name (App "this" []) (Just yieldCode)
+    [ Lit (VString name), ctxE ] -> inlinePartial env name ctxE (Just yieldCode)
+    _ -> Left "unsupported: block partial with a hash or a dynamic name"
+
+-- Inline the hoisted partial body with the passed context as the new scope, and an
+-- optional pre-rendered `yield` body. Loop metadata and block params do not cross
+-- into a partial; `root` (a function-level binding) does. Recursion is rejected.
+inlinePartial :: Env -> String -> Expr -> Maybe String -> Either String String
+inlinePartial env name ctxE yieldCode = case Map.lookup name env.partials of
   Nothing -> Left ("unsupported: unknown partial '" <> name <> "'")
   Just body
     | Array.elem name env.expanding -> Left ("unsupported: recursive partial '" <> name <> "'")
@@ -167,6 +189,7 @@ inlinePartial env name ctxE = case Map.lookup name env.partials of
               , params = Map.empty
               , parents = []
               , expanding = Array.cons name env.expanding
+              , yield = yieldCode
               }
           )
           body
@@ -183,6 +206,7 @@ block env name args body =
       -- literals (which `bindingNames` reads); the subject is its head.
       "each" -> eachBlock env split.positional split.label body
       "with" -> withBlock env split.positional body
+      "partial" -> partialBlock env split.positional body
       _ -> Left ("unsupported: block helper '" <> name <> "'")
 
 -- `{{#if}}` / `{{#unless}}`: a native `if`/`else if`/`else` over the same buffer.

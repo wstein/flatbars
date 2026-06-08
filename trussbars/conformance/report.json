@@ -1,17 +1,17 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 35,
+  "total": 36,
   "positive": {
-    "count": 34,
-    "byte_matched": 34,
+    "count": 35,
+    "byte_matched": 35,
     "mismatched": 0
   },
   "excluded": {
     "count": 1,
     "cases": [
       {
-        "id": "neg-yield",
-        "reason": "unsupported: block helper 'partial'"
+        "id": "neg-sortby",
+        "reason": "unsupported: helper 'sortBy'"
       }
     ]
   },
