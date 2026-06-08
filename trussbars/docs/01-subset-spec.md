@@ -290,8 +290,11 @@ the same harness).
 - `trussbars-derive` — *implemented*: the `#[derive(Trussbars)]` companion macro, generating
   the `Truthy` impl for context structs (≥1 field ⟹ truthy). No `ToText` by design, so
   `{{struct}}` stays a compile error; struct-only until §4.1 enum dispatch.
-- `trussbars-codegen` — *planned*: the compiler library; in v1 driven by the PureScript
-  `rustEmit` backend, in v2 replaced by the `trussbars` proc-macro front-end.
+- `trussbars-codegen` — *v1 implemented* as `MaxBars.Rust` (`packages/maxbars/src/MaxBars/Rust.purs`):
+  the PureScript MaxBars→Rust emitter, reusing the proven parse + desugar and walking the core AST
+  (paths → typed field access, operators → native Rust / `trussbars_std`, `if`/`each`/`with` →
+  native control flow) for the vertical slice; verified end-to-end byte-identical by the
+  conformance harness (`04-conformance.md`). v2 replaces it with the `trussbars` proc-macro.
 
 ---
 

@@ -1,10 +1,18 @@
 # Trussbars — Conformance Harness (cross-language: interpreter ≡ emitted Rust)
 
-> **Status:** Draft / design · **Depends on:** `01-subset-spec.md` (§11 conformance posture),
-> `02-runtime-api.md`, `03-schema-inference.md` (per-case schema generation).
-> **Models on:** the existing JS gate `packages/compile/conformance.mjs` (interpreter ≡
-> compiled-JS, byte-identical, 338 cases) and the committed-`report.json` discipline of
-> `gen:hbs-conformance` / `gen:mustache-conformance`.
+> **Status:** v1 **implemented** — `trussbars/conformance/` (`harness.mjs`, `ctxgen.mjs`,
+> `cases.mjs`, committed `snapshots.json` + `report.json`). Gate: `npm run
+> test:trussbars-conformance`; regenerate golden: `npm run gen:trussbars-snapshots`. Current:
+> 16/16 positive byte-matched vs golden, 2 excluded (outside the slice), 0 oracle drift, on the
+> default `ecma-float` profile (floats strict). **Depends on:** `01-subset-spec.md` (§11),
+> `02-runtime-api.md`, `03-schema-inference.md`. **Models on:** `packages/compile/conformance.mjs`
+> and the committed-`report.json` discipline of `gen:hbs-conformance`.
+>
+> **Golden snapshots (oracle-drift detection).** The committed `snapshots.json` is the contract:
+> emitted Rust is diffed against it, **and** the live interpreter is checked against it, so an
+> interpreter change (oracle drift) is reported as a distinct failure mode, never misattributed
+> to Rust. The harness already caught a real MaxBars footgun — a block param named `t` collides
+> with the blessed `t` (translate) operation (ADR-029), which the interpreter shadows.
 
 Trussbars has **no interpreter** — so it has no in-language oracle. The PureScript MaxBars
 **interpreter is the oracle**; the harness renders the same template+data through it and
