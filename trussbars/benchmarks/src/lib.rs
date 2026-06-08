@@ -162,6 +162,41 @@ pub fn trussbars_teams(ctx: &Teams) -> String {
     out
 }
 
+// ─── 1b. Trussbars AOT — A/B variants isolating the vy gap (SAFE only) ─────────
+// vy hits ~19µs on big-table via (a) an EXACT size pre-pass + (b) an `unsafe`
+// raw-pointer buffer (itoap::write_to_ptr, String::from_raw_parts — no bounds
+// checks). (b) is the boundary Trussbars refuses (docs/05). These variants test how
+// much (a) — exact pre-sizing, plain-slice iteration — buys us *within* safe Rust.
+
+/// Decimal digit count of an `i64` (for the exact size pre-pass).
+fn dig(v: i64) -> usize {
+    v.unsigned_abs().checked_ilog10().map_or(1, |l| l as usize + 1) + usize::from(v < 0)
+}
+
+/// Safe + exact pre-size + plain-slice iteration, but our `esc` (itoa) per cell.
+pub fn trussbars_big_table_safe_exact(ctx: &BigTable) -> String {
+    let mut size = "<table></table>".len();
+    for row in &ctx.table {
+        size += "<tr></tr>".len();
+        for &v in row {
+            size += "<td></td>".len() + dig(v);
+        }
+    }
+    let mut out = String::with_capacity(size);
+    out.push_str("<table>");
+    for row in &ctx.table {
+        out.push_str("<tr>");
+        for &v in row {
+            out.push_str("<td>");
+            trussbars_core::esc(&v, &mut out);
+            out.push_str("</td>");
+        }
+        out.push_str("</tr>");
+    }
+    out.push_str("</table>");
+    out
+}
+
 // ─── 2. `write` baseline — hand-written `write!`, the zero-overhead ceiling ────
 
 pub fn write_big_table(ctx: &BigTable) -> String {

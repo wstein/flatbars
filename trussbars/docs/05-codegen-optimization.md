@@ -109,3 +109,16 @@ is settled.
 - **Migrate to v2** for the reasons that actually motivate it — a single-language
   toolchain, type-aware diagnostics at macro-expansion, and feature headroom — **not**
   for speed, which is already maxed for safe Rust.
+
+## Cross-check: vy (2026-06)
+
+vy 0.2 was added to the suite (`trussbars/benchmarks`). It renders big-table in ~20µs
+vs our AOT's ~50µs — but an A/B (`tests/vy_ab.rs`) attributes the **entire** gap to
+vy's `unsafe` raw-pointer buffer (`itoap::write_to_ptr` + `String::from_raw_parts`, no
+bounds checks). A maximally-optimized **safe** variant (exact size pre-pass +
+plain-slice iteration) measured *slower* than the shipping code (62µs vs 54µs),
+empirically confirming **#5** (the `unsafe` buffer is the boundary, not an optimization
+to take) and **#6** (the adaptive `SizeHint` already beats a data-aware exact pre-pass
+when warm — the pre-pass is pure overhead). vy is an `unsafe`-buffer engine like
+Sailfish; **the safe-Rust ceiling holds**, and the gap is not closeable without crossing
+the boundary Trussbars exists to keep.
