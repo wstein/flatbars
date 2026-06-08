@@ -119,6 +119,26 @@ pub enum Node {
     },
 }
 
+impl Node {
+    /// The originating tag span (for diagnostics / provenance).
+    #[must_use]
+    pub fn span(&self) -> Span {
+        match self {
+            Node::Text(_) => Span::new(0, 0),
+            Node::Output { span, .. }
+            | Node::Let { span, .. }
+            | Node::Partial { span, .. }
+            | Node::Inline { span, .. }
+            | Node::PartialBlock { span, .. }
+            | Node::Yield { span }
+            | Node::RawBlock { span, .. } => *span,
+            Node::Each(e) => e.span,
+            Node::Cond(c) => c.span,
+            Node::With(w) => w.span,
+        }
+    }
+}
+
 /// `{{#each item [i] in coll}}` data.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Each {

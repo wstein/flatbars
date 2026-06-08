@@ -122,8 +122,20 @@ non-trivial part (precedence-climbing for the operators).
    conformance harness `--v2` flag emits through this Rust pipeline instead of the
    v1 PureScript emitter and asserts the SAME golden — **56/56 byte-identical**, 1
    excluded (`neg-dict`, deferred), 0 drift. (`dict` literals stay a v2 follow-up.)
-5. **Diagnostics** — `compile_error!` (class A) + `quote_spanned!` (class B) +
-   the trybuild gate (`docs/07 §4`).
+5. **Diagnostics — ✅ DONE (class A + the gate)** (`crates/trussbars-macros`). The
+   `truss!(name, CtxType, "template")` proc-macro drives the pipeline at compile
+   time and, for every Trussbars-owned (class-A) failure — parse error, unknown
+   helper, unsupported construct — expands to a `compile_error!` whose message
+   carries the template's `line:col` (`emit`/`emit_named` now prefix each error at
+   its tag span; parse errors use their own offset). Each generated `render` fn
+   also gets the `#[doc]` provenance attribute (docs/07 §3). The gate is a
+   `trybuild` compile-fail suite (`tests/ui/*.rs` + `.stderr`) pinning the located
+   text — *the single most important new test artifact v2 introduces* (docs/07
+   §4.4) — plus a happy-path `tests/render.rs` proving the macro emits running Rust.
+   **Class B** (`quote_spanned!` exact intra-literal spans) stays a follow-up: it
+   needs nightly `proc_macro_span` (docs/07 §3/§5), so stable ships the located
+   message + named-fn forms; the `#[template(path=…)]` entry form is also a
+   follow-up (docs/07 §4.1).
 
 The order means the corpus is green incrementally, and the emit step is the *least*
 risky (it's a transcription of a pinned reference).

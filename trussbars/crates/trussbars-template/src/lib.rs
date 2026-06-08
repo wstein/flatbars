@@ -14,7 +14,10 @@
 //! inspect/provenance map (docs/10). Every node carries byte [`span::Span`]s from
 //! the lexer down, so both consumers get exact template coordinates.
 //!
-//! Status: **lexer landed** (the first slice). Parser, desugar, and emit follow.
+//! Status: **complete** — lexer → parser → desugar → emit, gated 56/56
+//! byte-identical to v1 (`conformance/harness.mjs --v2`). The `trussbars-macros`
+//! proc-macro (`truss!`) drives this with located class-A diagnostics; class-B
+//! exact spans (nightly `proc_macro_span`) and the `path=` form are follow-ups.
 
 pub mod ast;
 pub mod emit;
@@ -24,7 +27,7 @@ pub mod parse_expr;
 pub mod span;
 
 pub use ast::{Cond, Each, Expr, Node, Value, With};
-pub use emit::emit;
+pub use emit::{emit, emit_named};
 pub use lex::{Lexeme, Sigil, lex};
 pub use parse::parse;
 pub use parse_expr::{ParseError, Scope, parse_expr};

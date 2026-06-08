@@ -1,0 +1,23 @@
+[package]
+name = "trussbars-macros"
+description = "The Trussbars v2 proc-macro: `truss!(name, CtxType, \"template\")` parses + desugars + emits a MaxBars template to a typed Rust render function at compile time, with located class-A diagnostics (docs/07). A thin driver over trussbars-template."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "proc-macro", "codegen"]
+categories = ["template-engine"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+trussbars-template = { path = "../trussbars-template" }
+
+[dev-dependencies]
+trussbars-core = { path = "../trussbars-core", features = ["derive"] }
+trussbars-std = { path = "../trussbars-std" }
+trybuild = "1"
+
+[lints]
+workspace = true
