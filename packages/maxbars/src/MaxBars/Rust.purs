@@ -225,6 +225,10 @@ block env name args body =
       "each" -> eachBlock env split.positional split.label body
       "with" -> withBlock env split.positional body
       "partial" -> partialBlock env split.positional body
+      -- `{{#let a=(e)}}` — the surface desugar nests multi-binding lets into
+      -- single-binding ones and roots a bare `{{a}}` at the alias, so each block
+      -- carries exactly one `name=value` hash pair (ADR-024).
+      "let" -> letBlock env split.hash body
       _ -> Left ("unsupported: block helper '" <> name <> "'")
 
 -- `{{#if}}` / `{{#unless}}`: a native `if`/`else if`/`else` over the same buffer.
@@ -340,6 +344,27 @@ withBlock env args body = case Array.head args of
           <> elseS
           <> "    }\n    }\n"
       )
+
+-- `{{#let name=(value)}}…{{/let}}` → a block-scoped `let` binding. The value is
+-- emitted in the current scope (let never re-roots); the name is installed as a
+-- scoped nullary op (`env.params`) so a bare `{{name}}` in the body resolves to the
+-- Rust binding. The desugar nests multi-binding lets, so each block has one pair.
+-- Bound by VALUE — correct for the computed-scalar case (`subtotal=(price*qty)`);
+-- binding a non-`Copy` field directly (`n=(user.name)`) would move out of `&ctx`
+-- (use the field directly instead).
+letBlock :: Env -> Maybe Expr -> Template -> Either String String
+letBlock env mhash body = case mhash of
+  Nothing -> do
+    bodyS <- nodes env body
+    Right ("    {\n" <> bodyS <> "    }\n")
+  Just (App "dict" [ Lit (VString name), valE ]) -> do
+    ve <- expr env valE
+    let
+      rust = "__let_" <> name
+      env' = env { params = Map.insert name rust env.params }
+    bodyS <- nodes env' body
+    Right ("    {\n    let " <> rust <> " = " <> ve <> ";\n" <> bodyS <> "    }\n")
+  Just _ -> Left "unsupported: let with a non-single-binding hash"
 
 -- The first clause's body (the `{{else}}` of an each/with), in the parent scope;
 -- empty when there is none.

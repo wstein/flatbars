@@ -124,6 +124,14 @@ export const cases = [
     data: { count: 5 },
   },
 
+  // ── {{#let}} — block-scoped sequential aliases (computed once, never re-roots) ─
+  {
+    id: "let-bindings",
+    template:
+      "{{#let subtotal=(multiply price qty) tax=(multiply subtotal rate)}}{{qty}} x {{price}} = {{subtotal}}, tax {{tax}}, total {{add subtotal tax}}{{/let}}",
+    data: { price: 20, qty: 3, rate: 0.1 },
+  },
+
   // ── loop.parent / loop.root chains (Option-threaded) ─────────────────────────
   {
     id: "loop-parent",
