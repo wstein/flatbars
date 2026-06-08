@@ -61,10 +61,10 @@ export const lessons = {
       "score >= 50 and transform with value | helper.",
     spec: "maxbars", // docs/modules/ROOT/pages/maxbars.adoc
     // The landing's "Edit the template. Watch it render." flagship — one screen of
-    // MaxBars' signature: a pipe (uppercase), drop-pipes block params with an index
-    // (as p i), infix arithmetic (i + 1), and an infix comparison (p.score >= 90).
+    // MaxBars' signature: a pipe (uppercase), Liquid-style loop bindings with an
+    // index (p i in players), infix arithmetic (i + 1), an infix comparison (>= 90).
     template: `{{ title | uppercase }}
-{{#each players as p i}}
+{{#each p i in players}}
 {{ i + 1 }}. {{ p.name }} — {{ p.score }} {{#if p.score >= 90}}👑{{/if}}
 {{/each}}`,
     data: {

@@ -145,7 +145,7 @@
   },
   {
     "id": "loopParams",
-    "label": "Advanced — Block params & labelled loops",
+    "label": "Advanced — Loop bindings & labelled loops",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",

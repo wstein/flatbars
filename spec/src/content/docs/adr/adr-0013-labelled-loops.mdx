@@ -12,7 +12,7 @@ the full `this`/`loop`/`root`/`parent`/`outer` model (`outer` = a `label NAME`) 
 
 ## Context
 
-MaxBars v1 reaches only the *outer element/index/key*, via block params `{{#each users as user uidx}}`
+MaxBars v1 reaches only the *outer element/index/key*, via block params `{{#each user uidx in users}}`
 (the drop-pipes spelling — [ADR-021](/adr/adr-0021-maxbars-variable-model/) amendment).
 The outer loop's `first`/`last`/`length`/`rindex` are unreachable, and the companion spec's "compute from a
 named outer length" idea was shown wrong: block params bind only the item plus index/key, so the

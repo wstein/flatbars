@@ -23,8 +23,10 @@
 -- |    `{{{ escapeHtml (f (lookup this "a") (dict "k" (lookup this "v"))) }}}` (§5.4).
 -- |  * block params `{{#each xs as |item i|}}` ⇒ `{{#each xs "item" "i"}}`; a bare
 -- |    reference to an in-scope param becomes a helper call `(item)` (§5.5).
--- |    MaxBars drops the pipes (`{{#each xs as item i}}`) and binds a third name
--- |    `as item i j` to the 1-based index; FullBars keeps the Handlebars bars.
+-- |    MaxBars binds `each` Liquid-style — `{{#each item i j in xs}}` (names before
+-- |    `in`, the collection after; a third name `j` is the 1-based index) — and
+-- |    keeps a drop-pipes `as` for `{{#with}}` / custom block helpers; FullBars
+-- |    keeps the Handlebars bars.
 -- |  * `{{> name [ctx] [k=v]}}` ⇒ `{{{ partial "name" ctx [(dict …)] }}}` (a bare
 -- |    name is a string literal, a parenthesized expression is a dynamic name;
 -- |    hash pairs merge onto the partial's context; §5.7).
@@ -204,6 +206,28 @@ desugarWith lv clauseNames = go []
       -- one-key `@hash` the engine's `letH` installs via `pushHelpers`.
       Block sp Section "let" args body | dropPipes ->
         letNode sp scope args (expandElseIf body)
+      -- `{{#each item [i0] [i1] in coll}}` (MaxBars only): the Liquid-style loop —
+      -- the binding names come *before* `in`, the collection after. `item` binds
+      -- the element, `i0` the 0-based index (or object key), `i1` the 1-based index
+      -- (the same up-to-three bindings `eachH` installs). `{{#each coll}}` (no `in`)
+      -- is the basic, binding-less form. The Handlebars trailing-`as` form is *not*
+      -- accepted on `each` here (`with`/helpers keep `as`). FullBars keeps `as |x|`
+      -- — this case is `dropPipes`-gated.
+      Block sp Section "each" args body | dropPipes ->
+        let
+          { args: args', label } = extractLabel "each" args
+        in
+          case splitOnIn args' of
+            Just { before, after } ->
+              let
+                names = bareIdentNames before
+                bodyScope = scope <> names <> maybe [] pure label
+              in
+                Block sp Section "each" (blockHeadArgs lv scope (Array.take 1 after) names label)
+                  (go bodyScope (expandElseIf body))
+            Nothing ->
+              Block sp Section "each" (blockHeadArgs lv scope args' [] label)
+                (go (scope <> maybe [] pure label) (expandElseIf body))
       -- block head stays a helper; `else if` chains expand to flat `elif` (§5.6);
       -- a trailing `as |a b|` becomes positional binding-name strings (§5.5) and
       -- extends the scope for the body.
@@ -261,9 +285,27 @@ extractBlockParams dropPipes args = case Array.findIndex isAs args of
       s -> Just s
     _ -> Nothing
   -- the MaxBars drop-pipes form: every bare identifier after `as` is a name.
-  bareNames = Array.mapMaybe case _ of
-    App n [] -> Just n
-    _ -> Nothing
+  bareNames = bareIdentNames
+
+-- | Split a `{{#each … in coll}}` head at the `in` marker (MaxBars): the binding
+-- | names before it, the collection after (`Nothing` when there is no `in` — the
+-- | binding-less `{{#each coll}}` form). A data field literally named `in` is not
+-- | iterable bare here; write `(lookup this "in")`.
+splitOnIn :: Array Expr -> Maybe { before :: Array Expr, after :: Array Expr }
+splitOnIn args = case Array.findIndex isIn args of
+  Just i -> Just { before: Array.take i args, after: Array.drop (i + 1) args }
+  Nothing -> Nothing
+  where
+  isIn = case _ of
+    App "in" [] -> true
+    _ -> false
+
+-- | The bare identifier names among `args` (each `App n []` ⇒ `n`) — the
+-- | drop-pipes block-param / `each … in` binding names.
+bareIdentNames :: Array Expr -> Array String
+bareIdentNames = Array.mapMaybe case _ of
+  App n [] -> Just n
+  _ -> Nothing
 
 -- | The head of a `{{ head args }}` separator read as output: a bare head (no
 -- | arguments) is a path; a head with arguments is a helper call.

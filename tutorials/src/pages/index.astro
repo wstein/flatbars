@@ -213,7 +213,7 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
         <h2>Edit the template. Watch it render.</h2>
         <p class="section-lead">No tagline beats a running example. This is the flagship surface, <b>MaxBars</b> —
           type in either pane and the output re-renders through the very engine the Lab ships. A pipe
-          (<code>{"{{ title | uppercase }}"}</code>), drop-pipes block params with an index (<code>{"as p i"}</code>),
+          (<code>{"{{ title | uppercase }}"}</code>), Liquid-style loop bindings with an index (<code>{"p i in players"}</code>),
           and infix expressions (<code>{"i + 1"}</code>, <code>{"p.score >= 90"}</code>), all in one screen.</p>
         <OpenInLab client:visible engine="maxbars" template={lessons.maxbars.template} data={lessons.maxbars.data} />
       </section>

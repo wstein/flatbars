@@ -220,15 +220,15 @@ export const examples = {
   // ── Advanced: loop params, partials, helpers, capstones ────────────────────
   loopParams: {
     engine: "maxbars",
-    label: "Advanced — Block params & labelled loops",
-    // Block params drop the pipes in MaxBars: `as elem i j` binds the element, the
-    // 0-based index, and the 1-based index — scoped names that stay visible in
-    // nested blocks. A `label NAME` clause (MaxBars-only) names the loop FRAME, so
-    // an inner loop reads the OUTER loop's full state — `outer.index1`,
+    label: "Advanced — Loop bindings & labelled loops",
+    // MaxBars binds loop variables Liquid-style: `{{#each elem i j in xs}}` binds
+    // the element, the 0-based index, and the 1-based index — scoped names that stay
+    // visible in nested blocks. A `label NAME` clause (MaxBars-only) names the loop
+    // FRAME, so an inner loop reads the OUTER loop's full state — `outer.index1`,
     // `outer.length`, `outer.last` — not just its element.
     compiles: true,
-    template: `{{#each sections as section label outer}}
-{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each section.items as item}} {{item}}{{/each}}{{#if outer.last}} (last){{/if}}
+    template: `{{#each section in sections label outer}}
+{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each item in section.items}} {{item}}{{/each}}{{#if outer.last}} (last){{/if}}
 {{/each}}`,
     data: {
       sections: [

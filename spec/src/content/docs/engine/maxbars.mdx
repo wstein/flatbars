@@ -170,28 +170,33 @@ still takes a parenthesised condition — `{{elif (a && b)}}`,
 `{{else if (a && b)}}` — because separators share their tag shape with
 output expressions.
 
-## Block parameters
+## Loop and block bindings
 
-Block parameters **drop the pipes** — a trailing `as a b` (no bars) binds scoped
-names over the block body. MaxBars binds a *third* name to the 1-based index,
-one more than FullBars' two: `as elem index0 index1`.
+`{{#each}}` binds its loop variables **Liquid-style** — the names come *before*
+`in`, the collection after — and `{{#with}}` aliases the shifted context with a
+*drop-pipes* `as` (no bars). `each` binds up to three names: the element, the
+0-based index (or object key), and the 1-based index — one more than FullBars'
+two.
 
 ```handlebars
-{{#each xs as item i}}{{i}}: {{item}}{{/each}}
-{{#each xs as item i0 i1}}{{i0}}/{{i1}}: {{item}}{{/each}}
+{{#each item in items}}{{item}}{{/each}}
+{{#each item i in items}}{{i}}: {{item}}{{/each}}
+{{#each item i0 i1 in items}}{{i0}}/{{i1}}: {{item}}{{/each}}
+{{#each value key in obj}}{{key}}={{value}}{{/each}}
 {{#with user as u}}{{u.name}}{{/with}}
 ```
 
-The head argument grammar omits the *pipe* rung, and MaxBars rejects a bar in a
-block head outright (the Handlebars `as |a b|` form is a parse error here). The
-bare identifiers after `as` are the binding names, carried to the same surface
-desugar FullBars uses ([§5.5](/engine/surface/)) — MaxBars supplies the
-drop-pipes spelling and the third binding, no other machinery. The consequence is
-the one head-position rule below: to *pipe* a block argument, parenthesise it,
-which re-enters the full expression grammar.
+`{{#each items}}` (no `in`) is the binding-less form (`this` is the element). The
+head grammar omits the *pipe* rung and MaxBars rejects a bar in a block head
+outright (the Handlebars `as |a b|` form is a parse error here). The binding names
+are bare identifiers carried to the same surface desugar FullBars uses
+([§5.5](/engine/surface/)); MaxBars supplies the `in` spelling and the third
+binding, no other machinery. The collection after `in` is a full expression — a
+path, a `(subexpr)`, a `1..n` range, or a `[…]` list — so to *pipe* it,
+parenthesise:
 
 ```handlebars
-{{#each (people | reverse) as p}}{{p.name}}{{/each}}
+{{#each p in (people | reverse)}}{{p.name}}{{/each}}
 ```
 
 ## Let bindings
@@ -236,8 +241,8 @@ shape); it binds the frame reified as an object whose fields are the loop
 variables (`index0`/`first`/`length`/…):
 
 ```handlebars
-{{#each rows as row label outer}}
-  {{#each row}}{{outer.index1}}/{{outer.length}}: {{this}}{{#if outer.first}} (first row){{/if}}
+{{#each row in rows label outer}}
+  {{#each cell in row}}{{outer.index1}}/{{outer.length}}: {{cell}}{{#if outer.first}} (first row){{/if}}
   {{/each}}
 {{/each}}
 ```
@@ -246,8 +251,8 @@ variables (`index0`/`first`/`length`/…):
 `last` / `length` / `key` — the same values, and the same normative arithmetic, as
 the bare loop variables of that loop. It is an *immutable per-iteration snapshot*,
 reached by ordinary path lookup (`{{outer.length}}`), so the interpreter and
-compiler agree by construction. A label and block params compose:
-`{{#each rows as row label outer}}` binds both `row` (the element) and
+compiler agree by construction. A label and loop bindings compose:
+`{{#each row in rows label outer}}` binds both `row` (the element) and
 `outer` (the frame).
 
 Notes:
@@ -277,8 +282,9 @@ renderWithOperations
 A *block* operation receives a Handlebars-style `options`: `options.fn(ctx)`
 renders the body (shifting context), `options.inverse(ctx)` the `{{else}}`
 clause, `options.hash` the surface `k=v` arguments, `options.fn(ctx, { data })`
-supplies scoped `@vars`, and `options.fn(ctx, { blockParams })` binds the names
-declared by a trailing drop-pipes `as a b`. MaxBars is *lenient* (it inherits the
+supplies scoped `@vars`, and `options.fn(ctx, { blockParams })` binds the names a
+custom block helper declares with a trailing drop-pipes `as a b` (the built-in
+`each` uses the `… in coll` spelling instead). MaxBars is *lenient* (it inherits the
 `blockHelperMissing` resolve), so an unknown head falls through rather than
 erroring.
 

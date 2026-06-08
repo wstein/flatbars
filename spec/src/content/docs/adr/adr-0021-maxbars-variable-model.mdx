@@ -18,16 +18,26 @@ namespace and the bare `index`/`index0` aliases are otherwise unchanged — `ind
 removed because `@index` is the `@data` key host block helpers supply). The on-demand lint migrates
 `parent-index` → `loop.parent.index0` (etc.).
 
-*Amendment (2026-06-08).* MaxBars block parameters **drop the pipes**: the clause
-is the bare identifiers after `as` (`{{#each xs as item i}}`), and a bar in a block
-head is now a parse error — whether it was the Handlebars `as |a b|` delimiter or an
-unparenthesised pipe (so the old "stray head bar" warning is retired; a pipe in a
-head must still be parenthesised, `{{#each (xs | f) as x}}`). MaxBars also binds a
-*third* name to the 1-based index (`as elem index0 index1`), one more than FullBars'
-two. FullBars keeps the Handlebars bars (`as |a b|`) unchanged — the spelling is
-selected by the same reserved-variable capability that selects the variable model.
-A companion surface refinement: the `..` range operator (`1..n` ⇒ `(range 1 n)`),
-free in MaxBars because `../` parent-paths are already gone (above).
+*Amendment (2026-06-08).* MaxBars drops the Handlebars block-param bars, and a bar
+in a block head is now a parse error — whether it was the `as |a b|` delimiter or an
+unparenthesised pipe (so the old "stray head bar" warning is retired; a pipe must
+still be parenthesised, `{{#each x in (xs | f)}}`). The two loop-binding surfaces:
+
+* **`{{#each}}` binds Liquid-style** — the names come *before* `in`, the collection
+  after: `{{#each item in items}}`, `{{#each item i0 i1 in items}}`. Up to three
+  names bind (element, 0-based index/key, 1-based index — one more than FullBars'
+  two). `{{#each items}}` (no `in`) is the binding-less form.
+* **`{{#with}}` keeps a drop-pipes `as`** — `{{#with x as p}}` (and custom block
+  helpers take their block params the same way).
+
+FullBars keeps the Handlebars bars (`as |a b|`) unchanged — the spelling is selected
+by the same reserved-variable capability that selects the variable model. A
+companion surface refinement: the `..` range operator (`1..n` ⇒ `(range 1 n)`), free
+in MaxBars because `../` parent-paths are already gone (above), plus the `[…]`/`{…}`
+collection literals and block-scoped `{{#let}}` ([ADR-024](/adr/adr-0024-let-and-dict-literal/)/[ADR-025](/adr/adr-0025-list-literal/)).
+
+*(An interim build within this cycle used a trailing `as a b` on `each` too; it was
+superseded by the `… in coll` spelling before release.)*
 
 ## Context
 
@@ -134,7 +144,7 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
 
 ```handlebars
 {{!-- MaxBars --}}
-{{#each rows as row label outer}}
+{{#each row in rows label outer}}
   {{#each row.cells}}
     {{loop.index1}}/{{loop.length}}       {{!-- this (inner) loop --}}
     {{outer.index0}} of {{outer.length}}  {{!-- the named enclosing loop --}}

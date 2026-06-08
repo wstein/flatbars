@@ -1178,8 +1178,8 @@ main = do
   -- `coreOperationDefs` is the non-primitive base; the full roster adds exactly the
   -- 37-strong primitive pack on top (string + number + array, incl. aliases, range/cycle).
   assert'
-    "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (38 primitives)"
-    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 38)
+    "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (37 primitives)"
+    (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 37)
 
   -- Set delimiters are EXCLUDED from FullBars (ADR-015): it is the Handlebars-
   -- faithful dialect, and Handlebars has no set delimiters. The `@delimiters`

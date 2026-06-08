@@ -183,11 +183,11 @@ register and is exactly the two-register model applied at the boundary, not just
 * *MaxBars* — `renderWithOperations(...)` over the MaxBars surface (infix/pipes/loop vars). It desugars the
   same `@hash`/`@param` markers, so a MaxBars block operation gets the *full* surface: `fn`/`inverse`/`hash`
   + `options.fn(ctx, { data, blockParams })`, and the lenient `blockHelperMissing` resolve it inherits.
-  Block params use the MaxBars **drop-pipes** spelling (`as a b`; the head grammar omits its top-level
-  *pipe* rung and a bar in a head is a parse error — [ADR-021](/adr/adr-0021-maxbars-variable-model/)
-  amendment), and `each` binds a third name to the 1-based index (`as a i0 i1`). The only head-position
-  consequence: to *pipe* a block argument, parenthesise it (`{{#each (xs | f) as x}}`), which re-enters the
-  full expression grammar.
+  MaxBars drops the Handlebars block-param bars (a bar in a head is a parse error —
+  [ADR-021](/adr/adr-0021-maxbars-variable-model/) amendment): `{{#each}}` binds Liquid-style with the
+  names before `in` (`{{#each a i0 i1 in xs}}`, a third name being the 1-based index), and `{{#with}}` /
+  custom block helpers take a drop-pipes `as`. The only head-position consequence: to *pipe* the
+  collection, parenthesise it (`{{#each x in (xs | f)}}`), which re-enters the full expression grammar.
 
 ### Mechanism — reuse, do not rebuild
 

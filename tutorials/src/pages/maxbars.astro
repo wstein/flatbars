@@ -270,18 +270,19 @@ const t = (s) => s;
       after <code>{t("subtotal=…")}</code>). A binding whose name matches a helper shadows it for the body.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.letBindings.template} data={ex.letBindings.data} />
-    <h3>Block params &amp; labelled loops</h3>
+    <h3>Loop bindings &amp; labelled loops</h3>
     <p>
-      A trailing <code>{t("as elem index index1")}</code> binds scoped names over the block body —
-      <b>drop the pipes</b>: MaxBars writes <code>{t("as p i")}</code>, not the Handlebars
-      <code>{t("as |p i|")}</code> (a bar in a block head is a parse error here). MaxBars binds a
-      <em>third</em> name to the 1-based index (<code>{t("as item i j")}</code>), one more than
-      <a href="/fullbars">FullBars</a>'s two. The names stay in scope inside nested blocks and reach an
-      outer <em>element</em>, but not the outer loop's <code>{t("index")}</code> /
+      <code>{t("{{#each elem in items}}")}</code> binds loop variables <b>Liquid-style</b> — the names
+      come <em>before</em> <code>in</code>, the collection after — not the Handlebars
+      <code>{t("as |p i|")}</code> (a bar in a block head is a parse error here). Up to three names bind:
+      the element, the 0-based index, and the 1-based index (<code>{t("{{#each item i0 i1 in items}}")}</code>),
+      one more than <a href="/fullbars">FullBars</a>'s two. The names stay in scope inside nested blocks
+      and reach an outer <em>element</em>, but not the outer loop's <code>{t("index")}</code> /
       <code>{t("length")}</code>. A trailing <code>{t("label NAME")}</code> clause (ADR-013, MaxBars-only)
       names the loop <b>frame</b>, so an inner loop reads <code>{t("outer.index1")}</code>,
-      <code>{t("outer.length")}</code>, <code>{t("outer.last")}</code> of the enclosing loop. (To pipe a
-      head argument, parenthesise it — <code>{t("{{#each (rows | reverse) as r}}")}</code>.)
+      <code>{t("outer.length")}</code>, <code>{t("outer.last")}</code> of the enclosing loop. The
+      collection after <code>in</code> is a full expression — to pipe it, parenthesise:
+      <code>{t("{{#each r in (rows | reverse)}}")}</code>.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.loopParams.template} data={ex.loopParams.data} />
     <h3>The empty case</h3>
@@ -389,7 +390,7 @@ const t = (s) => s;
         <tr>
           <td>Bar in a block head <span class="code">{t("{{#each xs | f}}")}</span> / <span class="code">{t("as |x|")}</span></td>
           <td>a <b>parse error</b></td>
-          <td>MaxBars block params <b>drop the pipes</b> (<span class="code">{t("as x")}</span>), so a bar in a head is rejected — whether it was meant as the Handlebars block-param delimiter or an unparenthesised pipe. To pipe a head argument, parenthesise it: <span class="code">{t("{{#each (xs | f) as x}}")}</span>.</td>
+          <td>MaxBars binds loops Liquid-style (<span class="code">{t("{{#each x in xs}}")}</span>), not with bars, so a bar in a head is rejected — whether it was meant as the Handlebars block-param delimiter or an unparenthesised pipe. To pipe the collection, parenthesise it: <span class="code">{t("{{#each x in (xs | f)}}")}</span>.</td>
         </tr>
         <tr>
           <td>Block partials + <span class="code">{t("{{yield}}")}</span></td>
