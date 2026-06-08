@@ -19,6 +19,8 @@
 //! uses), and escaping through `trussbars_core::escape_html`, so VM output is
 //! byte-identical to AOT / the oracle wherever both render.
 
+pub mod bytecode;
+
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::rc::Rc;

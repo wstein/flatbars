@@ -123,10 +123,34 @@ The allocation pass roughly **halved** the VM's time on both workloads (big-tabl
 AOT remains the speed story while the VM owns dynamic flexibility.
 
 **Conclusion (evidence-first, like docs/05):** a *cheap-clone `Value` + tree-walk* clears
-the bar (VM ≥ handlebars, by 3×) without bytecode. So **bytecode stays deferred**, gated
-on a real trigger — a named *embedding* consumer (a portable artifact) or the AOT-compat
-*compile pass* (load-time schema/type checks + name→slot resolution), **not** a speed
-chase.
+the bar (VM ≥ handlebars, by 3×) without bytecode.
+
+### 4.2 Bytecode experiment (measured)
+
+The deferral was *pending a measurement* that bytecode beats the tree-walk. A subset
+bytecode VM (`bytecode.rs` — a flat instruction array + a stack machine; covers the
+benchmark workloads, errors on the rest) provides it. Byte-identical to the tree-walk
+(asserted in the equality gate); same min-of-N run:
+
+```text
+              AOT     vy(unsafe)  tree-walk   BYTECODE    handlebars
+big-table     54 µs   19 µs       1.14 ms     371 µs      2.6 ms      bytecode ~3.0× the tree-walk
+teams         41 ns   83 ns       1.25 µs     667 ns      3.9 µs      bytecode ~1.9× the tree-walk
+```
+
+So **bytecode is ~2–3× faster than the tree-walk** — real, and as expected (no AST
+pointer-chasing; flat dispatch). But two things temper it: **(a)** AOT stays ~7–16×
+faster than *bytecode* (it's still the speed path — if you need speed, compile), and
+**(b)** the tree-walk *already* cleared the only hard bar (≥ handlebars, by 3×).
+
+**Verdict:** bytecode is a genuine dynamic-path speedup, but the *full* build (the whole
+catalog + a name→slot resolve pass + a 3rd conformance axis + perpetual two-backend
+maintenance) is a large, permanent cost for a path where **AOT is the speed answer**. So
+bytecode **stays deferred** — now with data — gated on a real trigger: a workload where
+*dynamic-path throughput* is the proven bottleneck (the 2–3× would matter there), a named
+*embedding* consumer (a portable bytecode artifact), or the AOT-compat *compile pass*
+(load-time checks + slot resolution, which is half a bytecode compiler anyway). Not a
+speed chase — but the experiment crate stays as the head-start.
 
 ## 5. The dynamic `Value` model (the part AOT shed)
 

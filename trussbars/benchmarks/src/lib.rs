@@ -400,6 +400,34 @@ pub fn vm_teams(tmpl: &VmTemplate, data: &VmValue) -> String {
     tmpl.render(data).expect("vm teams renders")
 }
 
+// ── 6b. Trussbars VM — BYTECODE backend (the experiment, docs/11 §4) ───────────
+// The same workloads compiled to bytecode and run by the stack machine, to measure
+// bytecode vs the tree-walk. Compiled once (out of the timed loop), like the others.
+
+use trussbars_vm::bytecode::Program;
+
+pub fn vm_bc_big_table_program() -> Program {
+    Program::compile("<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>")
+        .expect("bytecode big-table compiles")
+}
+
+pub fn vm_bc_big_table(p: &Program, data: &VmValue) -> String {
+    p.render(data)
+}
+
+pub fn vm_bc_teams_program() -> Program {
+    Program::compile(
+        "<html><head><title>{{year}}</title></head><body><h1>CSL {{year}}</h1><ul>\
+         {{#each teams}}<li class=\"{{#if loop.first}}champion{{/if}}\"><b>{{this.name}}</b>: {{this.score}}</li>{{/each}}\
+         </ul></body></html>",
+    )
+    .expect("bytecode teams compiles")
+}
+
+pub fn vm_bc_teams(p: &Program, data: &VmValue) -> String {
+    p.render(data)
+}
+
 // ─── 7. vy (compile-time HTML macro DSL) ──────────────────────────────────────
 // An embedded-Rust HTML DSL whose element macros expand to tuple-typed `IntoHtml`
 // values (no closures), pre-sized and single-allocation. Not a separate-language

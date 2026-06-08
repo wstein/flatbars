@@ -20,8 +20,9 @@ use std::time::{Duration, Instant};
 use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
     handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, teams_data,
-    teams_value, trussbars_big_table, trussbars_teams, vm_big_table, vm_big_table_template,
-    vm_teams, vm_teams_template, vy_big_table, vy_teams,
+    teams_value, trussbars_big_table, trussbars_teams, vm_bc_big_table, vm_bc_big_table_program,
+    vm_bc_teams, vm_bc_teams_program, vm_big_table, vm_big_table_template, vm_teams,
+    vm_teams_template, vy_big_table, vy_teams,
 };
 
 /// The minimum render time over `n` runs (the min is the most noise-stable metric).
@@ -38,9 +39,10 @@ fn min_time(n: u32, f: impl Fn() -> String) -> Duration {
     best
 }
 
-fn assert_invariants(name: &str, tb: Duration, vm: Duration, vy: Duration, ak: Duration, hb: Duration) {
+#[allow(clippy::too_many_arguments)]
+fn assert_invariants(name: &str, tb: Duration, vm: Duration, bc: Duration, vy: Duration, ak: Duration, hb: Duration) {
     eprintln!(
-        "{name}: trussbars(AOT)={tb:?}  trussbars-vm={vm:?}  vy={vy:?}  askama={ak:?}  handlebars={hb:?}"
+        "{name}: trussbars(AOT)={tb:?}  vm-tree-walk={vm:?}  vm-bytecode={bc:?}  vy={vy:?}  askama={ak:?}  handlebars={hb:?}"
     );
     assert!(
         tb <= ak,
@@ -76,12 +78,14 @@ fn trussbars_beats_askama_and_crushes_handlebars() {
         let vm_tmpl = vm_big_table_template();
         let vm_data = big_table_value(&ctx);
         let n = 200;
+        let bc_prog = vm_bc_big_table_program();
         let tb = min_time(n, || trussbars_big_table(&ctx));
         let vm = min_time(n, || vm_big_table(&vm_tmpl, &vm_data));
+        let bc = min_time(n, || vm_bc_big_table(&bc_prog, &vm_data));
         let vy = min_time(n, || vy_big_table(&ctx));
         let ak = min_time(n, || askama_big_table(&ctx));
         let hbt = min_time(n, || handlebars_big_table(&hb, &ctx));
-        assert_invariants("big-table", tb, vm, vy, ak, hbt);
+        assert_invariants("big-table", tb, vm, bc, vy, ak, hbt);
     }
 
     // teams — each render is ~100 ns, so use many samples.
@@ -91,11 +95,13 @@ fn trussbars_beats_askama_and_crushes_handlebars() {
         let vm_tmpl = vm_teams_template();
         let vm_data = teams_value(&ctx);
         let n = 5000;
+        let bc_prog = vm_bc_teams_program();
         let tb = min_time(n, || trussbars_teams(&ctx));
         let vm = min_time(n, || vm_teams(&vm_tmpl, &vm_data));
+        let bc = min_time(n, || vm_bc_teams(&bc_prog, &vm_data));
         let vy = min_time(n, || vy_teams(&ctx));
         let ak = min_time(n, || askama_teams(&ctx));
         let hbt = min_time(n, || handlebars_teams(&hb, &ctx));
-        assert_invariants("teams", tb, vm, vy, ak, hbt);
+        assert_invariants("teams", tb, vm, bc, vy, ak, hbt);
     }
 }
