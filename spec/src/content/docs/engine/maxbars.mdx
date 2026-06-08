@@ -125,8 +125,10 @@ here) where FullBars's `handlebars` rule would drop it — the same split `{{#if
 shows. There are **no lambdas** ([ADR-020](/adr/adr-0020-user-block-helpers/)), so
 the filter is key-based, not predicate-based: `where (gt x.score 50)` is *not*
 expressible — precompute the flag (`{ score, top }`) and filter on the key.
-Comparison filters (`score > 50`) arrive as the named-comparator fast-follow
-(ADR-037).
+Comparison filters add a 4th comparator argument — `where "score" "gt" 50` — with
+the names `eq`/`ne`/`lt`/`gt`/`lte`/`gte` or their glyph aliases `==`/`!=`/`<`/`>`/
+`<=`/`>=`, so `(rows | where "score" ">" 50)` uses the very operator you write infix
+([ADR-037](/adr/adr-0037-collection-filter-comparators/)).
 
 ## The variable model
 

@@ -358,6 +358,28 @@ export const cases = [
   { name: "arr-every-false", dialect: "surface", t: "{{#if (every xs \"ok\")}}y{{else}}n{{/if}}", d: { xs: [{ ok: true }, { ok: false }] } },
   { name: "arr-every-vacuous", dialect: "surface", t: "{{#if (every xs \"ok\")}}y{{else}}n{{/if}}", d: { xs: [] } },
 
+  // comparator filters (ADR-037): the 4-arg form names eq/ne/lt/gt/lte/gte; the
+  // ordering four delegate to compareValues, an incomparable pair (string vs
+  // number) is dropped on both paths. Across all five ops.
+  { name: "arr-where-gt", dialect: "surface", t: "{{#each (where xs \"score\" \"gt\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 30 }, { n: "c", score: 50 }] } },
+  { name: "arr-where-gte", dialect: "surface", t: "{{#each (where xs \"score\" \"gte\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 30 }, { n: "c", score: 50 }] } },
+  { name: "arr-where-lt", dialect: "surface", t: "{{#each (where xs \"score\" \"lt\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 30 }] } },
+  { name: "arr-where-ne", dialect: "surface", t: "{{#each (where xs \"tier\" \"ne\" \"gold\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", tier: "gold" }, { n: "b", tier: "silver" }] } },
+  { name: "arr-where-eq-cmp", dialect: "surface", t: "{{#each (where xs \"id\" \"eq\" 2)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", id: 1 }, { n: "b", id: 2 }] } },
+  { name: "arr-where-str-lex", dialect: "surface", t: "{{#each (where xs \"name\" \"gte\" \"m\")}}{{ name }};{{/each}}", d: { xs: [{ name: "ada" }, { name: "nora" }, { name: "zoe" }] } },
+  { name: "arr-where-incomparable", dialect: "surface", t: "[{{ count (where xs \"v\" \"gt\" 5) }}]", d: { xs: [{ v: "x" }, { v: 9 }, { v: null }] } },
+  { name: "arr-reject-gte", dialect: "surface", t: "{{#each (reject xs \"score\" \"gte\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 30 }] } },
+  { name: "arr-find-gt", dialect: "surface", t: "{{ lookup (find xs \"score\" \"gt\" 50) \"n\" }}", d: { xs: [{ n: "a", score: 30 }, { n: "b", score: 80 }] } },
+  { name: "arr-some-gt", dialect: "surface", t: "{{#if (some xs \"score\" \"gt\" 90)}}y{{else}}n{{/if}}", d: { xs: [{ score: 80 }, { score: 95 }] } },
+  { name: "arr-every-gte", dialect: "surface", t: "{{#if (every xs \"score\" \"gte\" 50)}}y{{else}}n{{/if}}", d: { xs: [{ score: 80 }, { score: 30 }] } },
+  { name: "arr-where-cmp-dotted", dialect: "maxbars", t: "{{#each row in (rows | where \"u.age\" \"gte\" 18)}}{{ row.u.name }};{{/each}}", d: { rows: [{ u: { name: "a", age: 30 } }, { u: { name: "b", age: 10 } }] } },
+  // glyph aliases (ADR-037): == != < <= > >= behave identically to the names.
+  { name: "arr-where-glyph-gt", dialect: "surface", t: "{{#each (where xs \"score\" \">\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 30 }] } },
+  { name: "arr-where-glyph-gte", dialect: "surface", t: "{{#each (where xs \"score\" \">=\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 50 }, { n: "c", score: 30 }] } },
+  { name: "arr-where-glyph-ne", dialect: "surface", t: "{{#each (where xs \"tier\" \"!=\" \"gold\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", tier: "gold" }, { n: "b", tier: "silver" }] } },
+  { name: "arr-some-glyph-eq", dialect: "surface", t: "{{#if (some xs \"id\" \"==\" 2)}}y{{else}}n{{/if}}", d: { xs: [{ id: 1 }, { id: 2 }] } },
+  { name: "arr-where-glyph-le", dialect: "maxbars", t: "{{#each x in (xs | where \"v\" \"<=\" 2)}}{{ x.v }};{{/each}}", d: { xs: [{ v: 1 }, { v: 2 }, { v: 3 }] } },
+
   // MaxBars infix arithmetic + `??` operators (desugar to the prelude helpers;
   // the compiled path and the interpreter must agree).
   { name: "mx:add", dialect: "maxbars", t: "{{ a + b }}", d: { a: 2, b: 3 } },

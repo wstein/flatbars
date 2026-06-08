@@ -353,6 +353,41 @@ main = do
     (obj [ Tuple "x" (VNumber 42.0) ])
     "[0]"
 
+  -- comparator filters (ADR-037): the 4-arg form names a comparator; the ordering
+  -- four delegate to compareValues (numeric / lexicographic; incomparable dropped).
+  let
+    scored =
+      xsObj
+        [ obj [ Tuple "n" (str "a"), Tuple "score" (VNumber 80.0) ]
+        , obj [ Tuple "n" (str "b"), Tuple "score" (VNumber 30.0) ]
+        , obj [ Tuple "n" (str "c"), Tuple "score" (VNumber 50.0) ]
+        ]
+  expectS "p-where-gt" "{{#each (where xs \"score\" \"gt\" 50)}}{{ n }};{{/each}}" scored "a;"
+  expectS "p-where-gte" "{{#each (where xs \"score\" \"gte\" 50)}}{{ n }};{{/each}}" scored "a;c;"
+  expectS "p-where-lt" "{{#each (where xs \"score\" \"lt\" 50)}}{{ n }};{{/each}}" scored "b;"
+  expectS "p-reject-gte" "{{#each (reject xs \"score\" \"gte\" 50)}}{{ n }};{{/each}}" scored "b;"
+  expectS "p-find-gt" "{{{ lookup (find xs \"score\" \"gt\" 50) \"n\" }}}" scored "a"
+  expectS "p-some-gt" "{{#if (some xs \"score\" \"gt\" 90)}}y{{else}}n{{/if}}" scored "n"
+  expectS "p-every-gte" "{{#if (every xs \"score\" \"gte\" 50)}}y{{else}}n{{/if}}" scored "n"
+  -- strings compare lexicographically, exactly as the standalone `gte` operation.
+  expectS "p-where-str-gte" "{{#each (where xs \"name\" \"gte\" \"m\")}}{{ name }};{{/each}}"
+    (xsObj [ obj [ Tuple "name" (str "ada") ], obj [ Tuple "name" (str "nora") ] ])
+    "nora;"
+  -- an incomparable pair (string vs number, null) is dropped, never kept.
+  expectS "p-where-incomparable" "{{{ count (where xs \"v\" \"gt\" 5) }}}"
+    ( xsObj
+        [ obj [ Tuple "v" (str "x") ], obj [ Tuple "v" (VNumber 9.0) ], obj [ Tuple "v" VNull ] ]
+    )
+    "1"
+  -- glyph aliases (ADR-037): == != < <= > >= are accepted synonyms of the names,
+  -- so the same operator written infix in MaxBars works as the filter comparator.
+  expectS "p-where-glyph-gt" "{{#each (where xs \"score\" \">\" 50)}}{{ n }};{{/each}}" scored "a;"
+  expectS "p-where-glyph-gte" "{{#each (where xs \"score\" \">=\" 50)}}{{ n }};{{/each}}" scored
+    "a;c;"
+  expectS "p-where-glyph-lt" "{{#each (where xs \"score\" \"<\" 50)}}{{ n }};{{/each}}" scored "b;"
+  -- an unknown comparator is a located error, never a silently-true filter.
+  expectSError "p-where-bad-cmp" "{{ where xs \"score\" \"between\" 50 }}" "unknown comparator"
+
   expect "esc-html" "{{{escapeHtml (lookup this \"x\")}}}"
     (obj [ Tuple "x" (str "<b>&\"'") ])
     "&lt;b&gt;&amp;&quot;&#x27;"

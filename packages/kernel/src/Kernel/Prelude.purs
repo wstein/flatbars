@@ -357,23 +357,25 @@ primitiveOperationDefs =
   , valDef "sortBy" "Sorts an array of objects by a key." (binary sortByH)
   , valDef "pluck" "Extracts a key's value from each object in an array." (binary pluckH)
   , valDef "groupBy" "Groups an array of objects into an object keyed by a field." (binary groupByH)
-  -- key-based collection filters (ADR-036): truthy (2-arg) or == a value (3-arg).
-  -- `gen`, not `valDef` — the truthy form reads the env's truthiness rule.
-  , gen "where" "Keeps array items whose key is truthy, or equals a given value." false
-      (Between 2 3)
+  -- key-based collection filters (ADR-036/037): truthy (2-arg), == a value
+  -- (3-arg), or a named comparator eq/ne/lt/gt/lte/gte (4-arg). `gen`, not
+  -- `valDef` — the truthy form reads the env's truthiness rule.
+  , gen "where" "Keeps array items whose key is truthy, equals, or compares to a value." false
+      (Between 2 4)
       whereH
-  , gen "reject" "Keeps array items whose key is falsy, or differs from a given value." false
-      (Between 2 3)
+  , gen "reject" "Keeps array items whose key is falsy, or fails the value/comparator test." false
+      (Between 2 4)
       rejectH
-  , gen "find" "The first array item whose key is truthy, or equals a given value (else null)."
+  , gen "find"
+      "The first array item whose key is truthy, equals, or compares to a value (else null)."
       false
-      (Between 2 3)
+      (Between 2 4)
       findH
-  , gen "some" "True when any array item's key is truthy, or equals a given value." false
-      (Between 2 3)
+  , gen "some" "True when any array item's key is truthy, equals, or compares to a value." false
+      (Between 2 4)
       someH
-  , gen "every" "True when every array item's key is truthy, or equals a given value." false
-      (Between 2 3)
+  , gen "every" "True when every array item's key is truthy, equals, or compares to a value." false
+      (Between 2 4)
       everyH
   ]
 
@@ -1088,8 +1090,10 @@ groupByH av keyv = do
 -- | elements by that field. There are *no lambdas* (ADR-020), so the predicate is
 -- | key-based — Liquid's model, not `Array.filter`:
 -- |
--- |   * 2 args (`coll key`)        — the field is **truthy** under the env's rule;
--- |   * 3 args (`coll key value`)  — the field **equals** `value` (engine `eq`).
+-- |   * 2 args (`coll key`)            — the field is **truthy** under the env's rule;
+-- |   * 3 args (`coll key value`)      — the field **equals** `value` (engine `eq`);
+-- |   * 4 args (`coll key cmp value`)  — a named comparator `eq`/`ne`/`lt`/`gt`/
+-- |     `lte`/`gte` applied to `(field, value)` (ADR-037).
 -- |
 -- | A non-array subject (or empty array) yields each op's natural empty: `where`/
 -- | `reject` → `[]`, `find` → `null`, `some` → `false`, `every` → `true` (vacuous)
@@ -1103,9 +1107,40 @@ filterElems = case _ of
   VArray xs -> xs
   _ -> []
 
--- | Parse the shared `coll key [value]` arguments and apply `combine` to the
+-- | The closed set of filter comparators (ADR-037), each a pure `Value -> Value
+-- | -> Boolean`. `eq`/`ne` are the engine's value equality; the ordering four
+-- | delegate to `compareValues` — *exactly* what `lt`/`gt`/`lte`/`gte` compute as
+-- | standalone operations, so a filtered item agrees with the same comparison in
+-- | a condition. An incomparable pair (mixed type, null, bool, array, object) is
+-- | `false` for the ordering comparators (`maybe false`), never silently kept.
+-- |
+-- | Each comparator also answers to its **glyph alias** — `==` `!=` `<` `<=` `>`
+-- | `>=` — so a MaxBars author can write the same operator they use infix
+-- | (`score > 50`) as the filter's comparator string (`"score" ">" 50`). The name
+-- | is canonical (catalog, error text); the glyph is an accepted synonym, exactly
+-- | as `size`≡`count` / `isnt`≡`ne` elsewhere in the prelude.
+comparatorByName :: String -> Maybe (Value -> Value -> Boolean)
+comparatorByName = case _ of
+  "eq" -> Just (==)
+  "==" -> Just (==)
+  "ne" -> Just (/=)
+  "!=" -> Just (/=)
+  "lt" -> Just (orderPred (_ == LT))
+  "<" -> Just (orderPred (_ == LT))
+  "gt" -> Just (orderPred (_ == GT))
+  ">" -> Just (orderPred (_ == GT))
+  "lte" -> Just (orderPred (_ /= GT))
+  "<=" -> Just (orderPred (_ /= GT))
+  "gte" -> Just (orderPred (_ /= LT))
+  ">=" -> Just (orderPred (_ /= LT))
+  _ -> Nothing
+  where
+  orderPred ok a b = maybe false ok (compareValues a b)
+
+-- | Parse the shared `coll key [cmp] [value]` arguments and apply `combine` to the
 -- | element-keep predicate and the subject's elements. The keep predicate is the
--- | field's truthiness (2-arg) or its equality to `value` (3-arg).
+-- | field's truthiness (2-arg), its equality to `value` (3-arg), or a named
+-- | comparator applied to `(field, value)` (4-arg, ADR-037).
 runFilter
   :: forall m
    . MonadThrow Error m
@@ -1115,18 +1150,24 @@ runFilter
   -> ((Value -> Boolean) -> Array Value -> Value)
   -> m Value
 runFilter truthyF name args combine = case args of
-  [ coll, keyv ] -> go coll keyv Nothing
-  [ coll, keyv, val ] -> go coll keyv (Just val)
+  [ coll, keyv ] -> withKey coll keyv \key item -> truthyF (extractPath key item)
+  [ coll, keyv, val ] -> withKey coll keyv \key item -> extractPath key item == val
+  [ coll, keyv, cmpv, val ] -> do
+    cmpName <- stringifyM cmpv
+    case comparatorByName cmpName of
+      Just cmpFn -> withKey coll keyv \key item -> cmpFn (extractPath key item) val
+      Nothing -> throwError
+        ( HelperError
+            ( name <> ": unknown comparator " <> show cmpName
+                <> "; expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>="
+            )
+        )
   _ -> throwError
-    (ArityError (name <> ": expected 2 or 3 arguments, got " <> show (Array.length args)))
+    (ArityError (name <> ": expected 2 to 4 arguments, got " <> show (Array.length args)))
   where
-  go coll keyv mval = do
+  withKey coll keyv mk = do
     key <- stringifyM keyv
-    let
-      keep item = case mval of
-        Nothing -> truthyF (extractPath key item)
-        Just v -> extractPath key item == v
-    pure (combine keep (filterElems coll))
+    pure (combine (mk key) (filterElems coll))
 
 whereH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 whereH ctl args =

@@ -1,0 +1,134 @@
+---
+title: "ADR-037: comparator collection filters — where … \"gt\" 50 (named, closed set)"
+sidebar:
+  label: "ADR-037 filter comparators"
+---
+
+*Status:* **Accepted — implemented** (2026-06-08; `test:compile` byte-identical,
+catalog unchanged). *Date:* 2026-06-08. Owner: Werner. The fast-follow
+[ADR-036](/adr/adr-0036-collection-filter-operations/) named in its own open
+question: the five key-based filters (`where` / `reject` / `find` / `some` /
+`every`) gain a **4-argument comparator form**, so a template can filter by
+`score > 50`, not only by truthiness or equality. No new operations, no new
+surface — the five ops widen from arity `Between 2 3` to `Between 2 4`.
+
+> *On nomenclature.* As [ADR-036](/adr/adr-0036-collection-filter-operations/) and
+> [ADR-019](/adr/adr-0019-operation-vocabulary/): these are **value operations**.
+> The comparator is named with the same word the standalone comparison *operations*
+> already use (`gt`, `lte`, …) — that reuse is the point.
+
+## Context
+
+ADR-036 shipped the filters at *truthy* (`where xs "active"`) and *equality*
+(`where xs "tier" "gold"`), and deferred comparison with a single open question:
+
+> *Comparison operators beyond `==`* — Liquid's `where_exp` allows `>`/`<`. We only
+> ship equality… Deferred; add a `whereCmp xs "key" ">" 50` form only if real
+> templates demand it.
+
+Numeric and lexicographic thresholds — "orders over $50", "users with score ≥ 50",
+"names from *m* on" — are the second-most-reached-for filter after equality, so the
+demand is real. This ADR settles the *shape* a team debate left open.
+
+One fact makes the design safe rather than a slide toward arbitrary predicates: the
+engine **already** has `compareValues :: Value -> Value -> Maybe Ordering` (numbers
+numerically, strings lexicographically, anything else incomparable) and the
+operations `lt` / `gt` / `lte` / `gte` / `eq` / `ne` built on it. A comparator
+filter that *delegates to these* introduces **no new semantics** — `where xs
+"score" "gt" 50` keeps exactly the items `{{#if item.score > 50}}` would. It is the
+same internal lambda `sortBy` already runs over a key; it is not a step toward the
+lambda wall ([ADR-020](/adr/adr-0020-user-block-helpers/)).
+
+## Decision
+
+### 1. The 4-argument form
+
+Each filter accepts an optional **comparator name** as the 3rd argument, with the
+compared value 4th:
+
+```handlebars
+{{#each o in (orders | where "total" "gt" 50) }}…{{/each}}
+{{#each u in (users | where "score" "gte" 50) }}…{{/each}}
+{{ users | find "age" "lt" 18 | json }}
+{{#if (rows | every "score" "gte" 0) }}all non-negative{{/if}}
+```
+
+Disambiguation is purely by **arity**, so the existing forms are untouched:
+
+| Args | Form | Keep an item when… |
+| --- | --- | --- |
+| 2 | `coll key` | the field is **truthy** (env rule) |
+| 3 | `coll key value` | the field **`==`** `value` |
+| 4 | `coll key cmp value` | **`cmp(field, value)`** is true |
+
+The 3-argument `value` slot is **never overloaded** — a comparator only appears in
+the 4-argument form. `reject` is the complement of `where` in every form; `find`
+returns the first match or `null`; `some` / `every` reduce to booleans.
+
+### 2. The comparator is a closed, named set
+
+`cmp` ∈ the canonical names **`eq` `ne` `lt` `gt` `lte` `gte`** — the same names as
+the standalone comparison operations — each also answering to its **glyph alias**
+**`==` `!=` `<` `<=` `>` `>=`**, dispatched through one table (`comparatorByName`
+in the interpreter, `COMPARATORS` in the runtime):
+
+* `eq` / `ne` (`==` / `!=`) are the engine's value equality (the deep `==` the
+  3-arg form uses);
+* `lt` / `gt` / `lte` / `gte` (`<` / `>` / `<=` / `>=`) delegate to `compareValues`
+  — numeric or lexicographic; an **incomparable** pair (mixed type, `null`,
+  boolean, array, object) is **`false`**, never silently kept.
+
+An **unknown comparator is a located error** (`where: unknown comparator "between";
+expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>=`), not a silently-true
+filter — so a typo fails loudly instead of returning everything.
+
+### 3. Names are canonical; glyphs are accepted aliases — but the set is closed
+
+* *The glyph is a synonym, not a second vocabulary.* A first pass rejected glyphs
+  outright — `">"` is a string literal, so it is *lexically identical* to `"gt"`,
+  and a glyph-*only* form would just rename the one comparator word. But accepting
+  the glyph **alongside** the canonical name has a real payoff the first pass
+  under-weighted: in MaxBars you already write `score > 50` *infix*, so letting the
+  filter take `"score" ">" 50` means the comparator string is the **same operator
+  you write everywhere else** — no "translate `>` to `gt` in your head" step. As an
+  *alias* it is idiomatic with the prelude's existing synonyms (`size`≡`count`,
+  `isnt`≡`ne`): the **name is canonical** (catalog, error text, docs), the glyph an
+  accepted input synonym. The set stays **closed** — exactly these six relations,
+  no more — so none of the "open predicate" risks below apply.
+* *Not "any registered binary operation by name."* Tempting — it would make
+  `where users "name" "startsWith" "Dr"` work for free — but it makes the 3rd
+  argument "any of ~100 operation names", most of which are not booleans, so a typo
+  or a category mistake (`where xs "k" "uppercase" v`) becomes a *silently-truthy*
+  filter rather than a clean error. The comparator stays a **fixed set of six**,
+  every member a boolean by construction. String-predicate filtering, if it is ever
+  wanted, is a *deliberate new member* of this same closed set under its own ADR —
+  not a wildcard into the registry.
+
+## Consequences
+
+* *Arity widens* `Between 2 3` → `Between 2 4` for all five ops; the 2- and 3-arg
+  forms are byte-for-byte unchanged. Catalog **count is unchanged** (no new ops);
+  the five doc strings widen to mention the comparator, so `gen:catalog` /
+  `gen:operations` regenerate.
+* *Interpreter ≡ compiler.* `comparatorByName` and `COMPARATORS` are the twins; the
+  runtime's `orderOf` mirrors `compareValues` exactly — notably it does **not**
+  unwrap `Safe` (a `VSafe` is incomparable, as in the interpreter), unlike the
+  sort comparator `cmpVals`. `test:compile` gains comparator cases across all five
+  ops, including string-lexicographic and an incomparable pair — byte-identical.
+* *Tests.* Interpreter cases for each comparator and the located unknown-comparator
+  error; the bundle regenerates (cache-buster bump) so the Lab serves the new form.
+
+### Non-goals (unchanged from ADR-036)
+
+* No arbitrary-predicate `where (expr)` and no `map` — the lambda wall
+  ([ADR-020](/adr/adr-0020-user-block-helpers/)) still holds; this ADR adds a
+  *closed* comparator, not an open predicate.
+* No `where` *clause* / head sugar — the pipe already expresses it
+  ([ADR-021](/adr/adr-0021-maxbars-variable-model/) froze the binding surface).
+
+## Open questions
+
+* *String-predicate comparators* (`startsWith` / `includes` / `endsWith` as filter
+  comparators). Expressible within this design as new members of the closed set, but
+  not shipped — revisit only if real templates ask for case-insensitive or
+  substring filtering that `eq` cannot serve.

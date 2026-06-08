@@ -25,9 +25,9 @@
 | `eq` | value | 2 | registered | True when its two arguments are equal. |
 | `escapeHtml` | value | 1 | registered | HTML-escapes its argument and marks it safe; idempotent on already-safe values. |
 | `escapeJson` | value | 1–2 | registered | Serializes its argument as JSON and HTML-escapes it, for safe embedding in HTML. |
-| `every` | value | 2–3 | registered | True when every array item's key is truthy, or equals a given value. |
+| `every` | value | 2–4 | registered | True when every array item's key is truthy, equals, or compares to a value. |
 | `false` | value | 0 | registered | The boolean literal false. |
-| `find` | value | 2–3 | registered | The first array item whose key is truthy, or equals a given value (else null). |
+| `find` | value | 2–4 | registered | The first array item whose key is truthy, equals, or compares to a value (else null). |
 | `first` | value | 0 | scoped | True on the loop's first iteration. |
 | `firstTruthy` | value | ≥1 | registered | Returns the first truthy argument — the `?:` (Elvis) operator's helper. |
 | `floor` | value | 1 | registered | Rounds a number down to the nearest integer. |
@@ -70,7 +70,7 @@
 | `prepend` | value | 2 | registered | Prepends the second string to the first. |
 | `range` | value | 2 | registered | The inclusive integer range [a, b] as an array (the `..` operator's helper). |
 | `raw` | block | any | registered | A raw block that returns its body verbatim, untouched by the engine. |
-| `reject` | value | 2–3 | registered | Keeps array items whose key is falsy, or differs from a given value. |
+| `reject` | value | 2–4 | registered | Keeps array items whose key is falsy, or fails the value/comparator test. |
 | `relative` | value | ≥2 | registered | Formats a relative time (value, unit) for the host's locale (Intl.RelativeTimeFormat); falls back to a plain English phrasing when no host formatter is registered (ADR-029). |
 | `replace` | value | 3 | registered | Replaces every occurrence of a substring with another. |
 | `reverse` | value | 1 | registered | Reverses an array or string. |
@@ -82,7 +82,7 @@
 | `selectPlural` | value | ≥1 | registered | Returns the CLDR plural category for a number in the host's locale; falls back to the English one/other rule when no host rule is registered (ADR-029). |
 | `size` | value | 1 | synonym of `count` | The number of items in an array (or characters in a string). |
 | `slice` | value | 2–3 | registered | Returns a substring from a start index to an optional end index. |
-| `some` | value | 2–3 | registered | True when any array item's key is truthy, or equals a given value. |
+| `some` | value | 2–4 | registered | True when any array item's key is truthy, equals, or compares to a value. |
 | `sortBy` | value | 2 | registered | Sorts an array of objects by a key. |
 | `split` | value | 2 | registered | Splits a string into an array on a separator. |
 | `startsWith` | value | 2 | registered | True when the string starts with the given prefix. |
@@ -105,6 +105,6 @@
 | `unless` | block | 1–2 | registered | Renders its body when the condition is falsy — the inverse of if. |
 | `upcase` | value | 1 | alias of `uppercase` | Uppercases its argument. |
 | `uppercase` | value | 1 | registered | Uppercases its argument. |
-| `where` | value | 2–3 | registered | Keeps array items whose key is truthy, or equals a given value. |
+| `where` | value | 2–4 | registered | Keeps array items whose key is truthy, equals, or compares to a value. |
 | `with` | block | ≥1 | registered | Shifts the context to its argument for the body (else the &#123;&#123;else&#125;&#125; clause). |
 | `yield` | value | 0 | scoped | Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block). |

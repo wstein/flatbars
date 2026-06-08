@@ -163,6 +163,10 @@ export const sidebar = [
         "link": "/adr/adr-0036-collection-filter-operations/"
       },
       {
+        "label": "ADR-037: filter comparators",
+        "link": "/adr/adr-0037-collection-filter-comparators/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }

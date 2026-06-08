@@ -180,10 +180,10 @@
     {
       "name": "every",
       "kind": "inline",
-      "arity": "2–3",
+      "arity": "2–4",
       "source": "registered",
       "canonical": null,
-      "doc": "True when every array item's key is truthy, or equals a given value."
+      "doc": "True when every array item's key is truthy, equals, or compares to a value."
     },
     {
       "name": "false",
@@ -196,10 +196,10 @@
     {
       "name": "find",
       "kind": "inline",
-      "arity": "2–3",
+      "arity": "2–4",
       "source": "registered",
       "canonical": null,
-      "doc": "The first array item whose key is truthy, or equals a given value (else null)."
+      "doc": "The first array item whose key is truthy, equals, or compares to a value (else null)."
     },
     {
       "name": "first",
@@ -540,10 +540,10 @@
     {
       "name": "reject",
       "kind": "inline",
-      "arity": "2–3",
+      "arity": "2–4",
       "source": "registered",
       "canonical": null,
-      "doc": "Keeps array items whose key is falsy, or differs from a given value."
+      "doc": "Keeps array items whose key is falsy, or fails the value/comparator test."
     },
     {
       "name": "relative",
@@ -636,10 +636,10 @@
     {
       "name": "some",
       "kind": "inline",
-      "arity": "2–3",
+      "arity": "2–4",
       "source": "registered",
       "canonical": null,
-      "doc": "True when any array item's key is truthy, or equals a given value."
+      "doc": "True when any array item's key is truthy, equals, or compares to a value."
     },
     {
       "name": "sortBy",
@@ -820,10 +820,10 @@
     {
       "name": "where",
       "kind": "inline",
-      "arity": "2–3",
+      "arity": "2–4",
       "source": "registered",
       "canonical": null,
-      "doc": "Keeps array items whose key is truthy, or equals a given value."
+      "doc": "Keeps array items whose key is truthy, equals, or compares to a value."
     },
     {
       "name": "with",

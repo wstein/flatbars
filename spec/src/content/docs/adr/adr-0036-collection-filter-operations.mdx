@@ -6,7 +6,7 @@ sidebar:
 
 *Status:* **Accepted — implemented** (2026-06-08; `test:compile` byte-identical,
 catalog 100 → 105). The comparator extension this ADR left open is its fast-follow,
-ADR-037. *Date:* 2026-06-08.
+[ADR-037](/adr/adr-0037-collection-filter-comparators/). *Date:* 2026-06-08.
 Owner: Werner. Five value operations added to the *shared prelude*
 (RawBars / FullBars / MaxBars / MinBars), pipe-able through the existing MaxBars
 pipe — **no new surface syntax**. Builds on
@@ -72,7 +72,9 @@ each pure and pipe-able. No new surface syntax — they compose with the pipe an
 
 Each takes a collection and a **key path** (dotted, resolved by the same
 `extractPath` `groupBy`/`pluck` use, so `where users "profile.active"` works), with
-an **optional comparison value**. Arity `Between 2 3`. A non-array subject yields
+an **optional comparison value**. Arity `Between 2 3` here (widened to `Between 2
+4` by the comparator fast-follow,
+[ADR-037](/adr/adr-0037-collection-filter-comparators/)). A non-array subject yields
 the empty result (`[]` / `null` / `false` / `true`, per op), matching the other
 collection operations.
 

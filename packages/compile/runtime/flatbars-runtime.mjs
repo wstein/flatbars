@@ -146,15 +146,47 @@ function pathOf(v, key) {
   return lookup(v, ...key.split("."));
 }
 
-// Collection-filter helpers (ADR-036), shared by where/reject/find/some/every.
+// Collection-filter helpers (ADR-036/037), shared by where/reject/find/some/every.
 // `filterElems` coerces a non-array subject to [] so each op yields its natural
 // empty; `keepBy` builds the element-keep predicate the interpreter's runFilter
-// builds — the field's truthiness (2-arg) or its deep-equality to a value (3-arg).
+// builds — the field's truthiness (2-arg), its deep-equality to a value (3-arg),
+// or a named comparator applied to (field, value) (4-arg).
 function filterElems(v) {
   return Array.isArray(v) ? v : [];
 }
+// Mirrors the interpreter's compareValues EXACTLY: numbers numerically, strings
+// lexicographically, anything else / mixed ⇒ null (incomparable). Unlike cmpVals
+// (sortBy) it does NOT unwrap Safe — a VSafe is incomparable, as in the interpreter.
+function orderOf(a, b) {
+  const comparable = (typeof a === "number" && typeof b === "number") ||
+    (typeof a === "string" && typeof b === "string");
+  if (!comparable) return null;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+// The closed comparator set (ADR-037). eq/ne use deepEq (the interpreter's ==);
+// the ordering four delegate to orderOf, an incomparable pair ⇒ false (never kept).
+// Each also answers to its glyph alias (== != < <= > >=) so a MaxBars author can
+// pass the operator they write infix; the name is canonical, the glyph a synonym.
+const cmpEq = (a, b) => deepEq(a, b);
+const cmpNe = (a, b) => !deepEq(a, b);
+const cmpLt = (a, b) => { const o = orderOf(a, b); return o !== null && o < 0; };
+const cmpGt = (a, b) => { const o = orderOf(a, b); return o !== null && o > 0; };
+const cmpLe = (a, b) => { const o = orderOf(a, b); return o !== null && o <= 0; };
+const cmpGe = (a, b) => { const o = orderOf(a, b); return o !== null && o >= 0; };
+// Null-proto so a key like "constructor"/"toString" can't resolve to an inherited
+// function (which would diverge from the interpreter's "unknown comparator" error).
+const COMPARATORS = Object.assign(Object.create(null), {
+  eq: cmpEq, "==": cmpEq, ne: cmpNe, "!=": cmpNe,
+  lt: cmpLt, "<": cmpLt, gt: cmpGt, ">": cmpGt,
+  lte: cmpLe, "<=": cmpLe, gte: cmpGe, ">=": cmpGe,
+});
 function keepBy(a, f) {
   const key = stringify(a[1]);
+  if (a.length >= 4) {
+    const cmpName = stringify(a[2]), cmpFn = COMPARATORS[cmpName];
+    if (!cmpFn) throw new Error(`unknown comparator ${JSON.stringify(cmpName)}; expected one of eq/==, ne/!=, lt/<, lte/<=, gt/>, gte/>=`);
+    return (el) => cmpFn(pathOf(el, key), a[3]);
+  }
   return a.length >= 3
     ? (el) => deepEq(pathOf(el, key), a[2])
     : (el) => truthy(f.truthy, pathOf(el, key));
