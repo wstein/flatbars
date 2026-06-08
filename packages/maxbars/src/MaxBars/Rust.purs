@@ -87,7 +87,7 @@ compileMaxRust ctxType src = case build of
       h = hoistInline (desugarSurfaceWith maxLoopVars parsed.nodes)
       env0 = initialEnv h.partials
     body <- nodes env0 h.template
-    pure (renderFn ctxType (literalBytes h.template) body)
+    pure (renderFn ctxType (estimateBytes h.template) body)
 
   initialEnv :: Map String Template -> Env
   initialEnv partials =
@@ -110,14 +110,18 @@ renderFn ctxType cap body =
     <> body
     <> "    out\n}\n"
 
--- A compile-time lower bound on the output size (the static literal bytes), used
--- to seed `String::with_capacity` and cut reallocations — a Sailfish-style hint.
-literalBytes :: Template -> Int
-literalBytes = sum <<< map nodeBytes
+-- A heuristic estimate of the output size, to seed `String::with_capacity` and
+-- cut reallocations — a Sailfish-style hint: the static literal bytes, ~8 bytes
+-- per interpolation, and a `{{#each}}` body scaled by an assumed iteration count.
+-- It is only a hint; the true size depends on the data, so the buffer still grows.
+estimateBytes :: Template -> Int
+estimateBytes = sum <<< map est
   where
-  nodeBytes = case _ of
+  est = case _ of
     Content s -> SCU.length s
-    Block _ _ _ _ body -> literalBytes body
+    Output _ _ -> 8
+    Block _ _ "each" _ body -> 8 * estimateBytes body
+    Block _ _ _ _ body -> estimateBytes body
     _ -> 0
 
 --------------------------------------------------------------------------------
