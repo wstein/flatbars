@@ -382,6 +382,40 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
             let xs: Vec<Value> = args.iter().map(|a| eval_expr(env, a)).collect::<Result<_, _>>()?;
             Ok(Value::Array(Rc::from(xs)))
         }
+        ("where", _) => coll_filter(env, args, false),
+        ("reject", _) => coll_filter(env, args, true),
+        ("some", _) => Ok(Value::Bool(coll_test(env, args, false)?)),
+        ("every", _) => Ok(Value::Bool(coll_test(env, args, true)?)),
+        ("find", _) => coll_find(env, args),
+        ("pluck", [items, Expr::Lit(Lit::Str(key))]) => {
+            let xs: Vec<Value> = array_of(eval_expr(env, items)?).iter().map(|e| field(e, key)).collect();
+            Ok(Value::Array(Rc::from(xs)))
+        }
+        ("sortBy", [items, Expr::Lit(Lit::Str(key))]) => {
+            let mut xs: Vec<Value> = array_of(eval_expr(env, items)?).to_vec();
+            xs.sort_by(|a, b| order(&field(a, key), &field(b, key)));
+            Ok(Value::Array(Rc::from(xs)))
+        }
+        ("groupBy", [items, Expr::Lit(Lit::Str(key))]) => {
+            let mut groups: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+            for e in array_of(eval_expr(env, items)?).iter() {
+                groups.entry(stringify(&field(e, key))).or_default().push(e.clone());
+            }
+            let obj: BTreeMap<String, Value> =
+                groups.into_iter().map(|(k, vs)| (k, Value::Array(Rc::from(vs)))).collect();
+            Ok(Value::Object(Rc::new(obj)))
+        }
+        ("dict", _) => {
+            let mut obj = BTreeMap::new();
+            for pair in args.chunks(2) {
+                if let [Expr::Lit(Lit::Str(k)), v] = pair {
+                    obj.insert(k.clone(), eval_expr(env, v)?);
+                } else {
+                    return Err("unsupported: dict keys must be string literals".into());
+                }
+            }
+            Ok(Value::Object(Rc::new(obj)))
+        }
         _ => {
             if let Some(v) = env.params.get(name)
                 && args.is_empty()
@@ -499,6 +533,103 @@ fn num_cmp(env: &Env, a: &Expr, b: &Expr, f: impl Fn(f64, f64) -> bool) -> Resul
     Ok(Value::Bool(f(eval_expr(env, a)?.as_num()?, eval_expr(env, b)?.as_num()?)))
 }
 
+// ── collection operations (where/reject/some/every/find/pluck/sortBy/groupBy) ──
+
+/// The array form of a value (lenient: a non-array → empty).
+fn array_of(v: Value) -> Rc<[Value]> {
+    match v {
+        Value::Array(a) => a,
+        _ => Rc::from(Vec::new()),
+    }
+}
+
+/// An object field (lenient: a non-object or missing key → `Null`).
+fn field(v: &Value, key: &str) -> Value {
+    match v {
+        Value::Object(o) => o.get(key).cloned().unwrap_or(Value::Null),
+        _ => Value::Null,
+    }
+}
+
+fn stringify(v: &Value) -> String {
+    let mut s = String::new();
+    v.raw_text(&mut s);
+    s
+}
+
+/// A total order for `sortBy` (numbers numerically, strings lexically, else equal).
+fn order(a: &Value, b: &Value) -> core::cmp::Ordering {
+    use core::cmp::Ordering::Equal;
+    match (a, b) {
+        (Value::Num(x), Value::Num(y)) => x.partial_cmp(y).unwrap_or(Equal),
+        (Value::Str(x), Value::Str(y)) => x.cmp(y),
+        _ => Equal,
+    }
+}
+
+/// A collection-filter predicate against one element: `"key"` (truthy) or
+/// `"key" "cmp" value` (compare the field).
+fn pred(env: &Env, elem: &Value, pargs: &[Expr]) -> Result<bool, String> {
+    match pargs {
+        [Expr::Lit(Lit::Str(key))] => Ok(field(elem, key).truthy()),
+        [Expr::Lit(Lit::Str(key)), Expr::Lit(Lit::Str(cmp)), val] => {
+            cmp_values(&field(elem, key), cmp, &eval_expr(env, val)?)
+        }
+        _ => Err("unsupported: predicate (want `\"key\"` or `\"key\" \"cmp\" value`)".into()),
+    }
+}
+
+fn cmp_values(a: &Value, cmp: &str, b: &Value) -> Result<bool, String> {
+    Ok(match cmp {
+        "eq" => a == b,
+        "ne" => a != b,
+        "gt" => a.as_num()? > b.as_num()?,
+        "gte" => a.as_num()? >= b.as_num()?,
+        "lt" => a.as_num()? < b.as_num()?,
+        "lte" => a.as_num()? <= b.as_num()?,
+        "startsWith" => stringify(a).starts_with(&stringify(b)),
+        "endsWith" => stringify(a).ends_with(&stringify(b)),
+        "includes" => stringify(a).contains(&stringify(b)),
+        other => return Err(format!("unsupported: comparator '{other}'")),
+    })
+}
+
+fn coll_filter(env: &Env, args: &[Expr], negate: bool) -> Result<Value, String> {
+    let (coll, tail) = args.split_first().ok_or("collection filter without a collection")?;
+    let mut out = Vec::new();
+    for e in array_of(eval_expr(env, coll)?).iter() {
+        if pred(env, e, tail)? != negate {
+            out.push(e.clone());
+        }
+    }
+    Ok(Value::Array(Rc::from(out)))
+}
+
+fn coll_test(env: &Env, args: &[Expr], require_all: bool) -> Result<bool, String> {
+    let (coll, tail) = args.split_first().ok_or("some/every without a collection")?;
+    for e in array_of(eval_expr(env, coll)?).iter() {
+        let p = pred(env, e, tail)?;
+        if require_all && !p {
+            return Ok(false);
+        }
+        if !require_all && p {
+            return Ok(true);
+        }
+    }
+    Ok(require_all)
+}
+
+/// `find` returns the first matching element, or `Null` (falsy → the `{{else}}` arm).
+fn coll_find(env: &Env, args: &[Expr]) -> Result<Value, String> {
+    let (coll, tail) = args.split_first().ok_or("find without a collection")?;
+    for e in array_of(eval_expr(env, coll)?).iter() {
+        if pred(env, e, tail)? {
+            return Ok(e.clone());
+        }
+    }
+    Ok(Value::Null)
+}
+
 /// The value-helper pack — a spike subset over `Value`. Anything not here is a
 /// reported "unsupported", never a wrong answer.
 fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
@@ -534,6 +665,31 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
             let sep = s(sep);
             Ok(str_val(a.iter().map(s).collect::<Vec<_>>().join(&sep)))
         }
+        ("slice", [a, Value::Num(i), Value::Num(j)]) => {
+            let chars: Vec<char> = s(a).chars().collect();
+            let lo = (*i as usize).min(chars.len());
+            let hi = (*j as usize).clamp(lo, chars.len());
+            Ok(str_val(chars[lo..hi].iter().collect()))
+        }
+        ("truncate", [a, Value::Num(n)]) => {
+            let n = *n as usize;
+            let chars: Vec<char> = s(a).chars().collect();
+            if chars.len() > n {
+                let mut t: String = chars[..n].iter().collect();
+                t.push('…');
+                Ok(str_val(t))
+            } else {
+                Ok(a.clone())
+            }
+        }
+        ("at", [Value::Array(a), Value::Num(i)]) => {
+            let len = a.len() as i64;
+            let idx = *i as i64;
+            let idx = if idx < 0 { len + idx } else { idx };
+            Ok(if idx >= 0 && idx < len { a[idx as usize].clone() } else { Value::Null })
+        }
+        ("round", [Value::Num(n)]) => Ok(Value::Num((n + 0.5).floor())),
+        ("toFixed", [Value::Num(n), Value::Num(d)]) => Ok(str_val(format!("{:.*}", *d as usize, n))),
         _ => Err(format!("unsupported (spike): helper '{name}' / {} args", vs.len())),
     }
 }
