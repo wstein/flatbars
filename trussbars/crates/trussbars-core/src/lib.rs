@@ -26,10 +26,12 @@
 //! [`macro@Trussbars`] (`#[derive(Trussbars)]`) so a host depends on this crate
 //! alone; the feature is off by default, keeping the default build dependency-free.
 
+mod each;
 mod frame;
 mod text;
 mod truthy;
 
+pub use each::Each;
 pub use frame::Loop;
 pub use text::{Safe, ToText, esc, escape_html};
 pub use truthy::{Truthy, truthy};

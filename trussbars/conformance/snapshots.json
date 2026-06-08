@@ -13,6 +13,7 @@
   "each-strings": "#x #y #z ",
   "each-empty": "(none)",
   "each-loopmeta": "1. A 2. B 3. C! ",
+  "each-object": "de = German\nen = English\n",
   "with": "Bo (30)",
   "nested-each-root": "T1 (Acme): a b \nT2 (Acme): c \n",
   "slice": "Hello",

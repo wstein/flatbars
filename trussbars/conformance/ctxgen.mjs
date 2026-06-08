@@ -10,14 +10,18 @@ function cap(s) {
 }
 
 /// Returns the Rust struct definitions (root `Ctx` first) as one source string.
-export function genCtx(data) {
+/// `maps` lists top-level field names to type as `BTreeMap<String, V>` (object
+/// iteration, `{{#each obj}}`) instead of a struct.
+export function genCtx(data, maps = []) {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("ctxgen: the data root must be a JSON object");
   }
+  const mapSet = new Set(maps);
   const defs = [];
   let counter = 0;
 
-  function rustType(value, isRoot) {
+  // `kind`: "root" (the Ctx struct) | "field" (a top-level field) | "nested".
+  function rustType(value, kind, fieldName) {
     if (value === null) return "Option<String>";
     switch (typeof value) {
       case "string":
@@ -28,13 +32,19 @@ export function genCtx(data) {
         return "bool";
     }
     if (Array.isArray(value)) {
-      const elem = value.length ? rustType(value[0], false) : "String";
+      const elem = value.length ? rustType(value[0], "nested", null) : "String";
       return `Vec<${elem}>`;
     }
-    // object → a struct definition
-    const name = isRoot ? "Ctx" : `T${++counter}`;
+    // A top-level field named in `maps` is a map; every other object is a struct.
+    if (kind === "field" && mapSet.has(fieldName)) {
+      const vals = Object.values(value);
+      const vt = vals.length ? rustType(vals[0], "nested", null) : "String";
+      return `std::collections::BTreeMap<String, ${vt}>`;
+    }
+    const name = kind === "root" ? "Ctx" : `T${++counter}`;
+    const childKind = kind === "root" ? "field" : "nested";
     const fields = Object.entries(value)
-      .map(([k, v]) => `    pub ${k}: ${rustType(v, false)},`)
+      .map(([k, v]) => `    pub ${k}: ${rustType(v, childKind, k)},`)
       .join("\n");
     defs.push(
       `#[derive(serde::Deserialize, trussbars_core::Trussbars)]\n` +
@@ -43,7 +53,7 @@ export function genCtx(data) {
     return name;
   }
 
-  rustType(data, true);
+  rustType(data, "root", null);
   // Root `Ctx` is pushed last (after its nested types); order doesn't matter in Rust.
   return defs.join("\n\n");
 }

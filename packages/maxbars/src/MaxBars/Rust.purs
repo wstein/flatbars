@@ -14,8 +14,9 @@
 -- |
 -- | **Scope (vertical slice).** Implemented: content, escaped/raw output, paths,
 -- | `this`/`root`/`loop`, block params, the `parent` / `loop.parent` / `loop.root`
--- | chains, `if`/`unless`/`elif`/`else`, `each` (+ loop metadata, block params,
--- | empty clause), `with`, the comparison / logic / arithmetic operators, the
+-- | chains, `if`/`unless`/`elif`/`else`, `each` (over a sequence **or a map** — via
+-- | the `Each` trait, with `loop.key` in sorted-key order — + loop metadata, block
+-- | params, empty clause), `with`, the comparison / logic / arithmetic operators, the
 -- | `ternary` (`? :`), the coalescers `??` (over `Option<T>`) and `?:` (over a
 -- | unifying `T`), the full value-helper pack — string (incl. integer-argument
 -- | `slice`/`truncate`), number (`abs`/`round`/`toFixed`/…), and array
@@ -261,6 +262,7 @@ eachBlock env args label body = case Array.head args of
       cVar = "__c" <> ds
       lVar = "__l" <> ds
       iVar = "__i" <> ds
+      kVar = "__k" <> ds
       subVar = "__sub" <> ds
       lenVar = "__len" <> ds
       params' = bindEachParams paramNames cVar iVar env.params
@@ -281,13 +283,15 @@ eachBlock env args label body = case Array.head args of
     Right
       ( "    {\n"
           <> "    let " <> subVar <> " = &(" <> subj <> ");\n"
-          <> "    let " <> lenVar <> " = " <> subVar <> ".len();\n"
+          <> "    let " <> lenVar <> " = trussbars_core::Each::each_len(" <> subVar <> ");\n"
           <> "    if " <> lenVar <> " == 0 {\n"
           <> elseS
           <> "    } else {\n"
-          <> "    for (" <> iVar <> ", " <> cVar <> ") in " <> subVar <> ".iter().enumerate() {\n"
+          <> "    for (" <> iVar <> ", (" <> kVar <> ", " <> cVar <> ")) in trussbars_core::Each::each("
+          <> subVar
+          <> ").enumerate() {\n"
           <> "    let " <> lVar <> " = trussbars_core::Loop::at(" <> iVar <> ", " <> lenVar
-          <> ", None, " <> parentLoop <> ");\n"
+          <> ", " <> kVar <> ", " <> parentLoop <> ");\n"
           <> bodyS
           <> "    }}\n"
           <> "    }\n"

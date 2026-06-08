@@ -76,6 +76,14 @@ export const cases = [
     data: { people: [{ name: "A" }, { name: "B" }, { name: "C" }] },
   },
   {
+    // Object iteration: keys in sorted order, `loop.key` bound. `maps` types the
+    // field as a BTreeMap rather than a struct.
+    id: "each-object",
+    template: "{{#each prefs}}{{loop.key}} = {{this}}\n{{/each}}",
+    data: { prefs: { en: "English", de: "German" } },
+    maps: ["prefs"],
+  },
+  {
     id: "with",
     template: "{{#with user}}{{name}} ({{age}}){{else}}?{{/with}}",
     data: { user: { name: "Bo", age: 30 } },
