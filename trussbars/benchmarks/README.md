@@ -17,21 +17,21 @@ string field and an integer field. Criterion medians on this machine (Rust 1.96,
 
 | Engine | Time | vs Trussbars | Model |
 | --- | --- | --- | --- |
-| **Sailfish** | ~0.39 µs | **0.3×** (≈3× faster) | compile-time, but embeds **raw Rust** in templates — no injection-safety boundary |
-| **Trussbars** | ~1.26 µs | 1.0× | compile-time, **typed + injection-safe** (no data-derived dispatch) |
-| **Askama** | ~1.92 µs | 1.5× slower | compile-time, typed, safe |
-| **handlebars** | ~33.8 µs | **27× slower** | runtime interpreter (parse + walk per render) |
+| **Sailfish** | ~0.42 µs | **0.5×** (≈2.2× faster) | compile-time, but embeds **raw Rust** in templates — no injection-safety boundary |
+| **Trussbars** | ~0.92 µs | 1.0× | compile-time, **typed + injection-safe** (no data-derived dispatch) |
+| **Askama** | ~1.71 µs | 1.9× slower | compile-time, typed, safe |
+| **handlebars** | ~33.0 µs | **36× slower** | runtime interpreter (parse + walk per render) |
 
 ## Takeaways
 
-- **~27× over the dynamic interpreter** (handlebars): the compile-time-codegen
+- **~36× over the dynamic interpreter** (handlebars): the compile-time-codegen
   advantage — Trussbars emits straight-line Rust, handlebars parses and walks an
   AST every render. This is the bulk of the "fast template engine" story, and
   Trussbars has it by construction.
-- **Beats Askama (~1.5×)** — best-in-class among the *injection-safe* typed
+- **Beats Askama (~1.9×)** — best-in-class among the *injection-safe* typed
   engines, from the lean codegen plus the `itoa` / `dragonbox_ecma` formatting
   backends (`dragonbox_ecma` is fast *and* ECMA-byte-identical).
-- **Within ~3× of Sailfish** — the absolute fastest, which gets there partly by
+- **Within ~2.2× of Sailfish** — the absolute fastest, which gets there partly by
   letting templates embed arbitrary Rust (`<%= expr %>`): great for speed, but it
   dissolves the injection-safety boundary that is Trussbars's reason to exist
   (the debate's explicit non-adoption). Trussbars stays in the same order of
