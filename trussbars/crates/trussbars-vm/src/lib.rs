@@ -116,12 +116,14 @@ fn write_escaped(v: &Value, out: &mut String) {
     }
 }
 
-/// A loop frame: the `{{loop.*}}` metadata for the current iteration.
+/// A loop frame: the `{{loop.*}}` metadata for the current iteration, with an `Rc`
+/// link to the enclosing loop's frame (for `loop.parent.*` / `loop.root.*`).
 #[derive(Debug, Clone)]
 struct LoopFrame {
     index0: usize,
     length: usize,
     key: Option<String>,
+    parent: Option<Rc<LoopFrame>>,
 }
 
 impl LoopFrame {
@@ -175,8 +177,8 @@ struct Env {
     root: Value,
     params: BTreeMap<String, Value>,
     parents: Parents,
-    loop_frame: Option<LoopFrame>,
-    labels: BTreeMap<String, LoopFrame>,
+    loop_frame: Option<Rc<LoopFrame>>,
+    labels: BTreeMap<String, Rc<LoopFrame>>,
 }
 
 impl Env {
@@ -323,7 +325,7 @@ fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
     }
     let length = items.len();
     for (i, (key, element)) in items.into_iter().enumerate() {
-        let frame = LoopFrame { index0: i, length, key };
+        let frame = Rc::new(LoopFrame { index0: i, length, key, parent: env.loop_frame.clone() });
         let mut child = env.rerooted(element.clone());
         if let Some(item) = &e.item {
             child.params.insert(item.clone(), element);
@@ -332,7 +334,7 @@ fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
             child.params.insert(index.clone(), Value::Num(i as f64));
         }
         if let Some(label) = &e.label {
-            child.labels.insert(label.clone(), frame.clone());
+            child.labels.insert(label.clone(), Rc::clone(&frame));
         }
         child.loop_frame = Some(frame);
         eval_nodes(&child, &e.body, out)?;
@@ -468,11 +470,34 @@ fn eval_path(env: &Env, args: &[Expr]) -> Result<Value, String> {
     navigate_ref(env, &base, keys)
 }
 
-fn loop_chain(frame: &LoopFrame, keys: &[Expr]) -> Result<Value, String> {
-    match keys {
-        [Expr::Lit(Lit::Str(field))] => frame.field(field),
-        _ => Err("unsupported (spike): loop parent/root chains or computed loop field".into()),
+/// Resolve a `loop[.parent|.root]*.field` chain: walk the `parent`/`root` hops up the
+/// frame links, then read the trailing field.
+fn loop_chain(frame: &Rc<LoopFrame>, keys: &[Expr]) -> Result<Value, String> {
+    let mut segs: Vec<&str> = Vec::with_capacity(keys.len());
+    for k in keys {
+        match k {
+            Expr::Lit(Lit::Str(s)) => segs.push(s),
+            _ => return Err("unsupported: computed loop field".into()),
+        }
     }
+    let Some((field_name, hops)) = segs.split_last() else {
+        return Err("unsupported: bare 'loop'".into());
+    };
+    let mut cur = Rc::clone(frame);
+    for hop in hops {
+        cur = match *hop {
+            "parent" => cur.parent.clone().ok_or("'loop.parent' beyond the outermost loop")?,
+            "root" => {
+                let mut r = Rc::clone(&cur);
+                while let Some(p) = &r.parent {
+                    r = Rc::clone(p);
+                }
+                r
+            }
+            other => return Err(format!("unsupported: loop hop '{other}'")),
+        };
+    }
+    cur.field(field_name)
 }
 
 /// Walk a borrowed `base` by the key expressions (a literal name → object field; a
