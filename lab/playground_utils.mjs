@@ -522,6 +522,16 @@ export function analyseDataAccess(astsByFile, data, locals = new Set()) {
         }
         break;
       case "call":
+        // MinBars lowers every data read to `mlookup("a.b")` — the (possibly
+        // dotted) name is a single `lit` string arg. Treat it as a path lookup
+        // (segments split on `.`). The implicit iterator (`.`) and the current
+        // context (`""`) are not named data paths, so they are not classified.
+        if (expr.name === "mlookup") {
+          const lit = expr.args && expr.args[0] && expr.args[0].value;
+          if (lit && lit.t === "lit" && typeof lit.value === "string" && lit.value !== "" && lit.value !== ".")
+            lookup(file, host, lit.value.split("."), scoped);
+          break;
+        }
         for (const arg of expr.args || []) walkExpr(arg.value, file, host, scoped);
         for (const kv of Object.values(expr.kwargs || {})) walkExpr(kv, file, host, scoped);
         break;
@@ -548,6 +558,17 @@ export function analyseDataAccess(astsByFile, data, locals = new Set()) {
           // Inside the body, the subject's elements rebind the scope — any
           // bare identifier could be a field on the element. Mark scoped.
           walkNodes(n.body, file, true); walkNodes(n.else, file, scoped);
+          break;
+        case "section":
+        case "inverted":
+          // MinBars Mustache section/inverted. The tested value (`args[0]`) is read
+          // in the CURRENT scope. A `section` pushes that value as the new context,
+          // so its body is scoped (a body lookup may be a field on the element, or
+          // fall back to a parent — either way not a root miss). An `inverted`
+          // renders its body in the unchanged context (the value was falsy), so its
+          // body keeps the parent scope.
+          walkExpr(n.args && n.args[0] && n.args[0].value, file, n, scoped);
+          walkNodes(n.body, file, n.t === "section" ? true : scoped);
           break;
         case "partial":
           // `{{> name ctx kw=expr ...}}` — the optional context and every

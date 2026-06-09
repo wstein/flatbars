@@ -59,7 +59,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=98";
+} from "./vendor/flatbars-engine.mjs?v=99";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -125,12 +125,12 @@ const BB_FEATURES = [
 // engine-features/v1 for MinBars: it renders + has (Mustache) partials + a catalog
 // + a JS compiler (ADR-016) + truthiness analysis (`analyse`, ADR-022 — the
 // Mustache-portability story: where would `mustache.js` branch the other way?) +
-// the partial-dependency graph (`partial-graph`), now that the lowered MinBars AST
-// surfaces every `{{> name}}` as a `{t:"partial"}` node. Data-access and
-// context-inspect stay absent — MinBars lowers data reads to `mlookup` calls (not
-// the `{t:"path"}` nodes the data-access pass reads) and emits no source map — so
-// those panels gate off; the dock explains why ("Why fewer panels?").
-const MIN_FEATURES = ["partials", "catalog", "compile-js", "analyse", "partial-graph"];
+// the partial-dependency graph (`partial-graph`) + data access (`required-assigns`,
+// now that `analyseDataAccess` reads MinBars's `mlookup` calls as path lookups),
+// all over the lowered MinBars AST. Only `context-inspect` stays absent — it needs
+// an output→source map MinBars doesn't emit — so that panel gates off; the dock
+// explains why ("Why fewer panels?").
+const MIN_FEATURES = ["partials", "catalog", "compile-js", "analyse", "partial-graph", "required-assigns"];
 
 // The prelude helpers, with the metadata the cheat-sheet panel renders. The
 // user-facing subset of the single-source helper catalog.
@@ -455,6 +455,34 @@ function minbarsRenderer(opts) {
     }
     return buildDependencyGraph(asts);
   }
+
+  // required-assigns: the root key of every data read in the ROOT scope. MinBars
+  // lowers reads to `mlookup("a.b")` calls (head = `a`); a `section` pushes a new
+  // context, so reads inside its body are NOT root assigns, while an `inverted`
+  // body keeps the root scope. Mirrors the FullBars `requiredAssigns` over the
+  // MinBars AST (the same scoping `analyseDataAccess` applies).
+  function requiredAssigns(program) {
+    const out = new Set();
+    const visitExpr = (e) => {
+      if (!e || typeof e !== "object" || e.t !== "call") return;
+      if (e.name === "mlookup") {
+        const lit = e.args && e.args[0] && e.args[0].value;
+        if (lit && lit.t === "lit" && typeof lit.value === "string" && lit.value !== "" && lit.value !== ".")
+          out.add(lit.value.split(".")[0]);
+      } else for (const a of e.args || []) visitExpr(a.value);
+    };
+    const visit = (nodes, scoped) => {
+      for (const n of nodes || []) {
+        if (n.t === "emit") { if (!scoped) visitExpr(n.expr); }
+        else if (n.t === "section" || n.t === "inverted") {
+          if (!scoped) visitExpr(n.args && n.args[0] && n.args[0].value);
+          visit(n.body, n.t === "section" ? true : scoped);
+        }
+      }
+    };
+    visit(astJson("minbars", program.source).ast?.nodes || [], false);
+    return [...out].sort();
+  }
   function inspectAt() {
     const err = new Error("MinBars has no context inspector (no output->source map)");
     err.kind = "unsupported";
@@ -467,8 +495,8 @@ function minbarsRenderer(opts) {
   function engineInfo() { return { version: VERSION, builtins: [], features: MIN_FEATURES }; }
 
   return {
-    render, compile, compileToJs, analyze, parseAst, partialGraph, inspectAt,
-    usedTransformers: noUses, requiredAssigns: noUses,
+    render, compile, compileToJs, analyze, parseAst, partialGraph, requiredAssigns, inspectAt,
+    usedTransformers: noUses,
     allTransformers, catalog, engineInfo, version: VERSION,
   };
 }

@@ -477,11 +477,17 @@ const minrun = (r, src, data, opts) => r.render(r.compile(src).program, data, op
 test("createRenderer('minbars') dispatches the Mustache engine (logic-less)", async () => {
   const r = await createRenderer("minbars");
   const info = r.engineInfo();
-  assert.deepEqual(info.features, ["partials", "catalog", "compile-js", "analyse", "partial-graph"]);
+  assert.deepEqual(info.features, ["partials", "catalog", "compile-js", "analyse", "partial-graph", "required-assigns"]);
   assert.deepEqual(r.allTransformers(), []); // Mustache has no helper registry
-  // Data-access gates off (MinBars lowers reads to `mlookup`, not `{t:path}` nodes).
-  assert.deepEqual(r.usedTransformers(), []);
-  assert.deepEqual(r.requiredAssigns({ source: "{{x}}" }), []);
+  assert.deepEqual(r.usedTransformers(), []); // Mustache has no helper calls
+});
+
+test("createRenderer('minbars') reports required assigns (the data-access feature)", async () => {
+  const r = await createRenderer("minbars");
+  // Root-scope reads only: `email` is inside the section body (scoped), `fallback`
+  // is inside an inverted body (root scope), dotted `a.b.c` contributes its head.
+  const prog = r.compile("{{name}}{{#user}}{{email}}{{/user}}{{a.b.c}}{{^done}}{{fallback}}{{/done}}", {}).program;
+  assert.deepEqual(r.requiredAssigns(prog), ["a", "done", "fallback", "name", "user"]);
 });
 
 test("createRenderer('minbars') builds the partial-dependency graph (the partial-graph feature)", async () => {

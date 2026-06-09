@@ -210,6 +210,34 @@ test("analyseDataAccess classifies hits, misses, type-mismatch and OOB", () => {
   assert.deepEqual([rows[1].start, rows[1].end], [11, 20]);
 });
 
+test("analyseDataAccess reads MinBars mlookup/section/inverted nodes", () => {
+  // The MinBars lowered AST shape: reads are `escape(mlookup(lit "name"))`, a
+  // section's tested value is read in the current scope and its body is scoped, an
+  // inverted's body keeps the parent scope, and a dotted name is one `lit`.
+  const ml = (name) => ({ t: "call", name: "mlookup", args: [{ value: { t: "lit", value: name } }] });
+  const emit = (name, s) => ({ t: "emit", expr: { t: "call", name: "escape", args: [{ value: ml(name) }] }, src: span(s, s + 5) });
+  const asts = {
+    main: [
+      emit("name", 0),
+      { t: "section", args: [{ value: ml("user") }], body: [emit("email", 10)], src: span(20, 30) },
+      emit("a.b.c", 40),
+      { t: "inverted", args: [{ value: ml("done") }], body: [emit("fallback", 50)], src: span(60, 70) },
+    ],
+  };
+  const data = { name: "Ada", user: { email: "a@x" }, a: { b: { c: 1 } } };
+  const rows = analyseDataAccess(asts, data);
+  const byPath = Object.fromEntries(rows.map((r) => [r.path, r.status]));
+  assert.equal(byPath["name"], "hit");
+  assert.equal(byPath["user"], "hit"); // section value, root scope
+  assert.equal(byPath["email"], "scoped"); // inside the section body
+  assert.equal(byPath["a.b.c"], "hit"); // dotted name, one mlookup lit
+  assert.equal(byPath["done"], "miss"); // inverted value, root scope, absent
+  assert.equal(byPath["fallback"], "miss"); // inverted body keeps root scope
+  // The implicit iterator (".") is not a named path, so it never classifies.
+  const dotRows = analyseDataAccess({ main: [emit(".", 0)] }, {});
+  assert.equal(dotRows.length, 0);
+});
+
 test("analyseDataAccess leaves start/end null when a node has no span", () => {
   // A span-less node (e.g. a hand-built fixture, or a future node kind) must
   // not crash the panel — it falls back to the 1:1 position downstream.
