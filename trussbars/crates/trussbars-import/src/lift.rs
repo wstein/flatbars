@@ -223,10 +223,28 @@ fn print_app(name: &str, args: &[Expr], out: &mut String) {
         ("root", []) => out.push_str("@root"),
         ("loop", []) => out.push_str("loop"),
         ("lookup", [root, keys @ ..]) => print_path(root, keys, out),
+        // Re-sugar the desugared operators back to idiomatic infix / prefix / ternary.
+        ("ternary", [c, a, b]) => {
+            print_operand(c, out);
+            out.push_str(" ? ");
+            print_operand(a, out);
+            out.push_str(" : ");
+            print_operand(b, out);
+        }
+        ("not", [a]) => {
+            out.push('!');
+            print_operand(a, out);
+        }
+        (n, [a, b]) if infix_op(n).is_some() => {
+            print_operand(a, out);
+            out.push(' ');
+            out.push_str(infix_op(n).expect("checked"));
+            out.push(' ');
+            print_operand(b, out);
+        }
         (n, []) => out.push_str(n),
         (n, args) => {
-            // A helper / operator application; the parenthesised prefix form is valid
-            // surface (juxtaposition is application, parens group).
+            // A helper application: juxtaposition is application; parens group.
             out.push('(');
             out.push_str(n);
             for a in args {
@@ -235,6 +253,53 @@ fn print_app(name: &str, args: &[Expr], out: &mut String) {
             }
             out.push(')');
         }
+    }
+}
+
+/// The infix spelling of a desugared binary-operator head, if it is one.
+fn infix_op(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "eq" => "==",
+        "ne" => "!=",
+        "lte" => "<=",
+        "gte" => ">=",
+        "lt" => "<",
+        "gt" => ">",
+        "and" => "&&",
+        "or" => "||",
+        "coalesce" => "??",
+        "firstTruthy" => "?:",
+        "add" => "+",
+        "subtract" => "-",
+        "range" => "..",
+        "multiply" => "*",
+        "divide" => "/",
+        "modulo" => "%",
+        _ => return None,
+    })
+}
+
+/// Whether an expression must be parenthesised when used as an operator/ternary operand
+/// (any compound operator application; leaves and calls bind tightly enough already).
+fn needs_parens(e: &Expr) -> bool {
+    match e {
+        Expr::App(n, args) => {
+            (n == "ternary" && args.len() == 3)
+                || (n == "not" && args.len() == 1)
+                || (args.len() == 2 && infix_op(n).is_some())
+        }
+        Expr::Lit(_) => false,
+    }
+}
+
+/// Print an operand, wrapping a compound operator application in parens for clarity.
+fn print_operand(e: &Expr, out: &mut String) {
+    if needs_parens(e) {
+        out.push('(');
+        print_expr(e, out);
+        out.push(')');
+    } else {
+        print_expr(e, out);
     }
 }
 
@@ -438,7 +503,41 @@ mod tests {
     #[test]
     fn string_literal_escaping() {
         let app = Expr::App("eq".into(), vec![path(&["x"]), Expr::str("a\"b")]);
-        assert_eq!(to_truss(&[out(app, false)]), "{{(eq x \"a\\\"b\")}}");
+        assert_eq!(to_truss(&[out(app, false)]), "{{x == \"a\\\"b\"}}");
+    }
+
+    #[test]
+    fn ternary_resugars_to_infix() {
+        let t = Expr::App(
+            "ternary".into(),
+            vec![path(&["ok"]), path(&["yes"]), Expr::str("no")],
+        );
+        assert_eq!(to_truss(&[out(t, false)]), "{{ok ? yes : \"no\"}}");
+    }
+
+    #[test]
+    fn operators_resugar_and_parenthesise() {
+        // `and(eq(a, "x"), b)` → `(a == "x") && b`.
+        let e = Expr::App(
+            "and".into(),
+            vec![
+                Expr::App("eq".into(), vec![path(&["a"]), Expr::str("x")]),
+                path(&["b"]),
+            ],
+        );
+        assert_eq!(to_truss(&[out(e, false)]), "{{(a == \"x\") && b}}");
+    }
+
+    #[test]
+    fn not_resugars_to_prefix() {
+        let e = Expr::App("not".into(), vec![path(&["done"])]);
+        assert_eq!(to_truss(&[out(e, false)]), "{{!done}}");
+    }
+
+    #[test]
+    fn coalesce_and_elvis() {
+        let c = Expr::App("coalesce".into(), vec![path(&["name"]), Expr::str("anon")]);
+        assert_eq!(to_truss(&[out(c, false)]), "{{name ?? \"anon\"}}");
     }
 
     #[test]
