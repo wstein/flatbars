@@ -1,0 +1,7 @@
+{{! i18n-data receipt — the catalog is data; declared helpers fetch from it (AOT + VM) }}
+== {{t catalog locale "title"}} ==
+{{t catalog locale "greeting"}}, {{customer}}!
+{{t catalog locale "placed"}}: {{date placed "%d %B %Y" locale}}
+{{#each items}}
+  {{name}}: {{number price 2}}
+{{/each}}{{t catalog locale "total"}}: {{number total 2}}  ({{count}} {{plural catalog locale "item" count}})

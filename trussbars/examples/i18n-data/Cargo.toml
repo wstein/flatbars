@@ -1,0 +1,20 @@
+[package]
+name = "i18n-data"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace (like the other examples).
+[workspace]
+
+[dependencies]
+# AOT: the truss! macro compiles the templates; the runtime they link against.
+trussbars-macros = { path = "../../crates/trussbars-macros" }
+trussbars-core = { path = "../../crates/trussbars-core" }
+# The i18n format primitives the helpers wrap (number / date / selectPlural).
+trussbars-i18n = { path = "../../crates/trussbars-i18n" }
+# VM: render the SAME template + data dynamically, proving AOT ≡ VM.
+trussbars-vm = { path = "../../crates/trussbars-vm" }
+serde = { version = "1", features = ["derive"] }
+# The VM side decodes the same context from YAML.
+serde_yaml = "0.9"
