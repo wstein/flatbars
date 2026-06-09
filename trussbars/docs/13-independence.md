@@ -60,9 +60,13 @@ severances plus owning the spec — not a directory move.
 3. **Schema inference is a *first implementation*, not a port.** There is no reference
    implementation to differentially test against. It is strictly larger and riskier than
    "sneaky-large but designed" — and the harness cannot run oracle-free until it exists.
-4. **The spec already drifts from its own gate.** `docs/04` header still claims "16/16",
-   `docs/00` says "56/56", the gate says "65/65". A project that cannot keep one counter
-   synced inside the monorepo cannot yet defend two normative surfaces. **Fix this first.**
+4. **The spec drifted from its own gate** (now reconciled — see G4). At review time the
+   `docs/04` header claimed "16/16", `docs/00` said "56/56", the gate said "65/65". A
+   project that cannot keep one counter synced inside the monorepo cannot defend two
+   normative surfaces — so this was fixed first: `docs/04` + `docs/00` now read **65/65**
+   against `report.json`. *Residual:* `docs/08`/`docs/11` still carry "56/56"/"64/64" in
+   historical/design context (56 was true at freeze) — normalize when those docs are next
+   touched.
 
 ## 4. Preconditions for the irreversible step (the real enabling event)
 
@@ -83,8 +87,11 @@ divergence* — the last act before deletion:
   the spec (§5), **byte-checked against the still-live oracle** as the acceptance gate,
   *before* those `.purs` modules are deleted. This is the single highest-risk step and it
   needs its own gate, not a comment.
-- **G4 — Counter reconciliation.** `docs/04` header, `docs/00` roadmap, and `report.json`
-  agree on one number. No promotion of a spec that contradicts its own gate.
+- **G4 — Counter reconciliation. ✅ DONE (2026-06-09).** `docs/04` header, `docs/00`
+  roadmap, and `report.json` now agree on **65/65, 0 excluded, 0 oracle drift** (`report.json`
+  is the single source). No promotion of a spec that contradicts its own gate. *Residual:*
+  `docs/08`/`docs/11` carry the freeze-era "56/56"/"64/64" in historical context — normalize
+  on next edit; not a live status contradiction.
 - **G5 — Negative/injection parity.** v2 holds the `--compat-parity 71/71` and the
   reject/injection-boundary classes (`docs/04 §2` buckets) that the JS gate never tested,
   so severing-with-v2 does not strand the rejection contract.

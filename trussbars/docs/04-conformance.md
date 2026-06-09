@@ -3,8 +3,9 @@
 > **Status:** v1 **implemented** — `trussbars/conformance/` (`harness.mjs`, `ctxgen.mjs`,
 > `cases.mjs`, committed `snapshots.json` + `report.json`). Gate: `npm run
 > test:trussbars-conformance`; regenerate golden: `npm run gen:trussbars-snapshots`. Current:
-> 16/16 positive byte-matched vs golden, 2 excluded (outside the slice), 0 oracle drift, on the
-> default `ecma-float` profile (floats strict). **Depends on:** `01-subset-spec.md` (§11),
+> 65/65 positive byte-matched vs golden, 0 excluded, 0 oracle drift, on the
+> default `ecma-float` profile (floats strict) — the single source is the committed
+> `conformance/report.json`. **Depends on:** `01-subset-spec.md` (§11),
 > `02-runtime-api.md`, `03-schema-inference.md`. **Models on:** `packages/compile/conformance.mjs`
 > and the committed-`report.json` discipline of `gen:hbs-conformance`.
 >
