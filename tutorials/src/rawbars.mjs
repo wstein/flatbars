@@ -60,6 +60,16 @@ guest
     data: { admin: false },
   },
 
+  // ── Multi-arm {{#case}} — a nonEmpty-family control structure ──────────────
+  caseBlock: {
+    template: `{{#case (lookup this "status")}}
+{{when "shipped"}}On its way
+{{when "pending" "queued"}}Waiting
+{{else}}Unknown
+{{/case}}`,
+    data: { status: "queued" },
+  },
+
   // ── Comments are dropped by the lexer ─────────────────────────────────────
   comment: {
     template: "A{{! dropped }}B",

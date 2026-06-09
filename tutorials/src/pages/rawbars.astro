@@ -210,6 +210,15 @@ const t = (s) => s;
       same shape to the parser.
     </p>
     <OpenInLab client:visible engine="rawbars" template={ex.cond.template} data={ex.cond.data} />
+    <p>
+      <code>{t("{{#case}}")}</code> is the multi-arm conditional — a first-class engine
+      operation (<code>caseH</code>), not sugar. It dispatches the subject against each
+      <code>{t("{{when}}")}</code> arm by equality, with <code>{t("{{else}}")}</code> the
+      catch-all. RawBars writes the subject explicitly
+      (<code>{t("{{#case (lookup this \"status\")}}")}</code>); the Trussbars compiler lowers
+      the same node to a Rust <code>match</code>. (RawBars and MaxBars only.)
+    </p>
+    <OpenInLab client:visible engine="rawbars" template={ex.caseBlock.template} data={ex.caseBlock.data} />
   </section>
 
   <!-- ───────────────────────── Comments ─────────────────────────── -->

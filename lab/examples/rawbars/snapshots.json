@@ -4,6 +4,7 @@
   "lookup": "ada@example.com",
   "each": "0: alpha\n1: beta\n",
   "cond": "guest\n",
+  "caseBlock": "Waiting\n",
   "comment": "AB",
   "yield": "<main>Ada</main>"
 }

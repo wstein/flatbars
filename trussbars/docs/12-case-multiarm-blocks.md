@@ -64,21 +64,6 @@ Frozen surface (so the implementation is a transcription, not a redesign):
 - `case` becomes a **reserved built-in block head** (joining `if`/`each`/`with`/`let`/
   `inline`/`partial` in `open_block`); it can no longer name a host block helper (§5.2).
 
-Frozen surface (so the eventual PR is a transcription, not a redesign):
-
-- `{{#case SUBJECT}}` opens the block; `SUBJECT` is a required expression.
-- Zero or more `{{when V1 [V2 …]}}` arms. Each carries one or more **value expressions**;
-  the arm is taken when the subject equals **any** of them (`eq s V1 || eq s V2 || …`).
-- An optional trailing `{{else}}` arm (the catch-all). With no `{{else}}`, an unmatched
-  subject renders nothing — exactly like an `{{#if}}` without `{{else}}`.
-- `{{/case}}` closes it. `when` and `else` are **context-sensitive separators** inside a
-  case (like `else`/`else if` inside `if`), split out by the same `parse_until` mechanism.
-- **Only whitespace** may precede the first `{{when}}` (standalone-line trimming applies as
-  for `if`/`each`). Non-whitespace content before the first arm is a **located error** — no
-  Liquid-style silent fall-through.
-- `case` becomes a **reserved built-in block head** (joining `if`/`each`/`with`/`let`/
-  `inline`/`partial` in `open_block`); it can no longer name a host block helper (§5.2).
-
 ## 3. The lowering (concrete)
 
 The parser builds a first-class [`Case`](../crates/trussbars-template/src/ast.rs) node — the
@@ -130,7 +115,7 @@ an ordinary Mustache section.
 | --- | --- | --- | --- |
 | **A1** | **First-class node → Rust `match`** | **Chosen** | A dedicated `Case` node + `caseH` op + per-backend emit. Costs a node and an emit arm, but the subject is evaluated **once** and the AOT backend emits a real `match` — the optimization a desugared `eq`-chain can't express, and the seam A2 extends. |
 | **A1′** | Sugar → `Cond` (eq-chain) | **Superseded** | An earlier draft desugared `{{#case}}` to a `Cond`/`if`-chain (no new machinery, compiler "free"). Rejected because it re-evaluates the subject per arm and gives the codegen nothing to optimize — `case` should *become* a `match`, not an `if`-chain. |
-| **A2** | Typed exhaustive Rust-`match` over closed enums | **Future extension of A1** | The real typed superpower (compile-time exhaustiveness on `#[serde(tag)]` enums) — literal *pattern* arms, not value guards. Needs compile-time knowledge of the subject's variant set (schema, `docs/03`). The first-class `Case` node (A1) is its prerequisite; spelled `{{#match}}` with pattern arms, not `when`. |
+| **A2** | Typed exhaustive Rust-`match` over closed enums | **Future extension of A1** | The real typed superpower (compile-time exhaustiveness on `#[serde(tag)]` enums) — literal *pattern* arms, not value guards. Needs compile-time knowledge of the subject's variant set (schema, `docs/03`). The first-class `Case` node (A1) is its prerequisite; spelled `{{#case}}` with pattern arms, not `when`. |
 | **A3** | A host block helper with N named arms (generalize `docs/09 §3.1`'s arm-selector) | **Rejected** | The matching semantics are *engine value-comparisons over template literals*, not host Rust logic — so the engine is the natural evaluator, not a host fn. Routing it through a helper would force every author to re-implement `eq`-dispatch and fragment the convention. Keeps host block helpers cleanly **binary**. |
 | **A4** | Do nothing — authors write `{{#if (eq s a)}}…{{else if (eq s b)}}…{{/if}}` | **The baseline** | Already works, but re-evaluates the subject per arm and never compiles to a `match`. A1 buys the subject-stated-once readability, the `case/when` spelling, **and** the `match` codegen. |
 
@@ -168,7 +153,7 @@ purpose; conflating them was the failure mode the original debate guarded agains
 
 v1 dispatches by value equality: a subject matching no arm (and no `{{else}}`) renders empty
 — it is **not** a compile error. The exhaustiveness guarantee that would make a typed
-`{{#match}}` genuinely safer than an `if`-chain is **A2**, and it is out of scope here. This
+`{{#case}}` genuinely safer than an `if`-chain is **A2**, and it is out of scope here. This
 is the substantive reason the v1 keyword is `case`, not `match`: `case` promises value
 dispatch (what it does); `match` would promise patterns + exhaustiveness (what A2 will do).
 
@@ -192,7 +177,7 @@ authority for every `{{#case}}` case. (FullBars and MinBars are excluded — see
    (`Stop::When`, splitting on `when`/`else`); the emitter lowers it to a Rust `match` and the
    VM mirrors it; corpus cases on the `--v2`/`--vm`/`--vm-compat` axes; the reserved-word
    rejection (§5.2); `docs/09` cross-linked. **Done.**
-4. **Later, optional:** **A2** — a typed exhaustive `{{#match}}` over closed `#[serde(tag)]`
+4. **Later, optional:** **A2** — a typed exhaustive `{{#case}}` over closed `#[serde(tag)]`
    enums (compile-time exhaustiveness), its own decision once the schema/enum story
    (`docs/03`) needs it. It takes the `match` keyword and *pattern* arms, and plugs into the
    `Case` node A1 established.

@@ -81,6 +81,17 @@ export const cases = [
       '{{#case status}}\n{{when "a"}}A\n{{when "b"}}B\n{{else}}Z\n{{/case}}\n',
     data: { status: "b" },
   },
+  {
+    id: "case-numeric-subject",
+    template: "{{#case level}}{{when 1}}low{{when 2 3}}mid{{else}}high{{/case}}",
+    data: { level: 3 },
+  },
+  {
+    id: "case-nested",
+    template:
+      '{{#case outer}}{{when "a"}}A:{{#case inner}}{{when 1}}one{{else}}other{{/case}}{{else}}Z{{/case}}',
+    data: { outer: "a", inner: 1 },
+  },
 
   // ── each & loop metadata ─────────────────────────────────────────────────────
   {

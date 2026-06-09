@@ -45,6 +45,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "caseBlock",
+    "label": "Case Block",
+    "group": "Examples",
+    "view": "rendered",
+    "main": "main.rawbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "comment",
     "label": "Comment",
     "group": "Examples",

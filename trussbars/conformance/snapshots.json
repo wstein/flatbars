@@ -14,6 +14,8 @@
   "case-else": "Unknown",
   "case-no-else-miss": "",
   "case-standalone": "B\n",
+  "case-numeric-subject": "mid",
+  "case-nested": "A:one",
   "each-strings": "#x #y #z ",
   "each-empty": "(none)",
   "each-loopmeta": "1. A 2. B 3. C! ",
