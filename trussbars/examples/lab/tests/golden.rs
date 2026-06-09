@@ -15,6 +15,13 @@ fn seeded(sample: Sample, locale: Locale, mode: Mode) -> Lab {
     lab
 }
 
+fn receipt_data(count: u32) -> String {
+    format!(
+        "customer: Ada\ncount: {count}\ntotal: 899\nplaced: \"2026-06-09\"\neta: 3\n\
+         items:\n  - name: Keyboard\n    price: 899\n"
+    )
+}
+
 #[test]
 fn golden_matrix() {
     let mut missing = Vec::new();
@@ -47,37 +54,51 @@ fn golden_matrix() {
 
 #[test]
 fn plural_switches_with_count() {
-    // #2: the seed is count=1 (singular); bumping the data to count=3 must flip the
-    // noun per CLDR — en item→items, fr article→articles; de "Artikel" is invariant
-    // (correct German), so only the count changes there.
-    const COUNT_3: &str = r#"{ "customer": "Ada", "count": 3, "total": 899,
-        "placed": "2026-06-09", "eta": 3, "items": [{ "name": "Keyboard", "price": 899 }] }"#;
+    // CLDR cardinal categories drive the noun: en/de/fr have one/other; Polish has
+    // one/few/many — 1 element, 3 elementy, 5 elementów (German Artikel is invariant).
     let cases = [
-        (Locale::En, "1 item", "3 items"),
-        (Locale::De, "1 Artikel", "3 Artikel"),
-        (Locale::Fr, "1 article", "3 articles"),
+        (Locale::En, 1, "1 item"),
+        (Locale::En, 3, "3 items"),
+        (Locale::De, 1, "1 Artikel"),
+        (Locale::De, 3, "3 Artikel"),
+        (Locale::Fr, 1, "1 article"),
+        (Locale::Fr, 3, "3 articles"),
+        (Locale::Pl, 1, "1 element"),
+        (Locale::Pl, 3, "3 elementy"),
+        (Locale::Pl, 5, "5 elementów"),
     ];
-    for (locale, singular, plural) in cases {
-        let lab = seeded(Sample::Receipt, locale, Mode::Render);
+    for (locale, count, expected) in cases {
+        let mut lab = seeded(Sample::Receipt, locale, Mode::Render);
+        lab.data = TextBuffer::from_text(&receipt_data(count));
         let out = lab.render_or_reject();
         assert!(
-            out.contains(singular),
-            "{locale:?} expected {singular:?} in:\n{out}"
-        );
-
-        let mut lab3 = seeded(Sample::Receipt, locale, Mode::Render);
-        lab3.data = TextBuffer::from_text(COUNT_3);
-        let out3 = lab3.render_or_reject();
-        assert!(
-            out3.contains(plural),
-            "{locale:?} expected {plural:?} in:\n{out3}"
+            out.contains(expected),
+            "{locale:?} count={count} expected {expected:?} in:\n{out}"
         );
     }
 }
 
 #[test]
-fn invalid_data_json_is_reported_not_panicked() {
+fn edited_catalog_changes_output() {
+    // The i18n pane is live: overriding the en title flows straight into the render.
+    let mut lab = seeded(Sample::Receipt, Locale::En, Mode::Render);
+    lab.i18n = TextBuffer::from_text("en:\n  title: INVOICE\n");
+    assert!(lab.render_or_reject().contains("== INVOICE =="));
+}
+
+#[test]
+fn invalid_data_is_reported_not_panicked() {
     let mut lab = seeded(Sample::Greeting, Locale::En, Mode::Render);
-    lab.data = TextBuffer::from_text("{ not json");
-    assert!(lab.render_or_reject().starts_with("⟂ invalid JSON:"));
+    lab.data = TextBuffer::from_text("a: [1, 2\nb: oops");
+    assert!(lab.render_or_reject().starts_with("⟂ invalid data YAML:"));
+}
+
+#[test]
+fn invalid_catalog_is_reported() {
+    let mut lab = seeded(Sample::Receipt, Locale::En, Mode::Render);
+    lab.i18n = TextBuffer::from_text("en: [not, a, map]");
+    assert!(
+        lab.render_or_reject()
+            .starts_with("⟂ invalid i18n catalog:")
+    );
 }

@@ -4,33 +4,46 @@
 //! are `Fn(&[Value]) -> Result<Value, String>` (the runtime's calling convention). The
 //! blessed [`trussbars_i18n`] pack is *typed* (`number(&f64, &f64)`, …) and lives below
 //! the VM, so it cannot — and must not — speak `&[Value]` itself (that would invert the
-//! layering; see the design notes). The thin `&[Value]` shims therefore live here, in
-//! the host.
+//! layering). The thin `&[Value]` shims therefore live here, in the host.
 //!
 //! This also draws the documented i18n boundary (`docs/09 §5`): [`trussbars_i18n`] owns
-//! the *format primitives* (`number` / `date` / `selectPlural`), while the **host owns
-//! the message catalog** for `t`. The whole module is self-contained so it can be lifted
-//! verbatim into a future `trussbars-vm-i18n` bridge crate the day a second VM host wants it.
+//! the *format primitives* (`number`/`date`/`selectPlural`/`relative`), while the **host
+//! owns the message catalog** for `t`. Here the catalog is live-editable YAML (the i18n
+//! pane), parsed into a [`Catalog`]. The module is self-contained so it can be lifted into
+//! a future `trussbars-vm-i18n` bridge crate.
 
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use trussbars_vm::{Helpers, Value};
 
 use crate::Locale;
 
-/// Register the i18n host-helper pack on `helpers`, bound to `locale`. The lab's
-/// selected locale (not a data field) is the language: each shim captures it, so
-/// cycling the locale and re-registering re-renders in the new language. Registers
-/// `t`, `number`, `plural`, `selectPlural`, `date`, and `relative`.
-pub fn register(helpers: &mut Helpers, locale: Locale) {
-    let lang = locale.code(); // &'static str, captured by the shims below
+/// A message catalog: locale code → message key → message.
+pub type Catalog = BTreeMap<String, BTreeMap<String, String>>;
 
-    // `t key` — host-owned catalog lookup; the `trussbars_i18n::t` identity fallback
-    // (key echoed) covers a miss, exactly as the reference seam documents.
+/// Parse the i18n pane (YAML) into a [`Catalog`], or a human-readable reason.
+///
+/// # Errors
+/// The `serde_yaml` parse error, prefixed `invalid i18n catalog:`.
+pub fn parse_catalog(src: &str) -> Result<Catalog, String> {
+    serde_yaml::from_str(src).map_err(|e| format!("invalid i18n catalog: {e}"))
+}
+
+/// Register the i18n host-helper pack on `helpers`, bound to `locale` and `catalog`. The
+/// lab's selected locale (not a data field) is the language: each shim captures it, so
+/// cycling the locale (or editing the catalog) and re-registering re-renders.
+pub fn register(helpers: &mut Helpers, locale: Locale, catalog: &Rc<Catalog>) {
+    let lang = locale.code();
+    let code = locale.code().to_string();
+
+    // `t key` — host catalog lookup; `trussbars_i18n::t` (key echoed) covers a miss.
+    let cat = Rc::clone(catalog);
+    let t_code = code.clone();
     helpers.register("t", move |args| {
         let key = str_arg(args, 0, "t")?;
         Ok(vstr(
-            catalog_lookup(locale, key).unwrap_or_else(|| trussbars_i18n::t(key).to_string()),
+            lookup(&cat, &t_code, key).unwrap_or_else(|| trussbars_i18n::t(key).to_string()),
         ))
     });
 
@@ -43,13 +56,14 @@ pub fn register(helpers: &mut Helpers, locale: Locale) {
 
     // `plural count noun` — compose the CLDR category (in the lab's language) with the
     // catalog: `{{plural count "item"}}` → `item.<category>` → localized noun.
+    let cat = Rc::clone(catalog);
     helpers.register("plural", move |args| {
         let count = num_arg(args, 0, "plural")?;
         let noun = str_arg(args, 1, "plural")?;
         let category = trussbars_i18n::selectPlural(&count, lang);
         let key = format!("{noun}.{category}");
         Ok(vstr(
-            catalog_lookup(locale, &key).unwrap_or_else(|| noun.to_string()),
+            lookup(&cat, &code, &key).unwrap_or_else(|| noun.to_string()),
         ))
     });
 
@@ -74,50 +88,52 @@ pub fn register(helpers: &mut Helpers, locale: Locale) {
     });
 }
 
-/// The host message catalog for `t`, keyed by locale. The lab *is* the host, so it owns
-/// these — `trussbars_i18n` deliberately ships none (its `t` only echoes keys).
-/// `samples` reads it too, to bake localized strings into the AOT-friendly greeting.
-pub(crate) fn catalog_lookup(locale: Locale, key: &str) -> Option<String> {
-    catalog(locale)
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|(_, v)| (*v).to_string())
+fn lookup(catalog: &Catalog, code: &str, key: &str) -> Option<String> {
+    catalog.get(code).and_then(|m| m.get(key)).cloned()
 }
 
-fn catalog(locale: Locale) -> &'static [(&'static str, &'static str)] {
-    match locale {
-        Locale::En => &[
-            ("title", "Receipt"),
-            ("hello", "Hello"),
-            ("total", "Total"),
-            ("placed", "Placed"),
-            ("eta", "ETA"),
-            ("item.one", "item"),
-            ("item.other", "items"),
-            ("note", "Thanks for your order."),
-        ],
-        Locale::De => &[
-            ("title", "Beleg"),
-            ("hello", "Hallo"),
-            ("total", "Summe"),
-            ("placed", "Erstellt"),
-            ("eta", "Lieferung"),
-            ("item.one", "Artikel"),
-            ("item.other", "Artikel"),
-            ("note", "Danke für Ihre Bestellung."),
-        ],
-        Locale::Fr => &[
-            ("title", "Reçu"),
-            ("hello", "Bonjour"),
-            ("total", "Total"),
-            ("placed", "Établi"),
-            ("eta", "Livraison"),
-            ("item.one", "article"),
-            ("item.other", "articles"),
-            ("note", "Merci pour votre commande."),
-        ],
-    }
-}
+/// The default i18n catalog seeded into the pane. The host owns it — `trussbars_i18n`
+/// ships none. Polish carries CLDR's four cardinal forms (one/few/many/other); the
+/// others have one/other.
+pub const CATALOG_SEED: &str = r#"en:
+  title: Receipt
+  hello: Hello
+  total: Total
+  placed: Placed
+  eta: ETA
+  note: Thanks for your order.
+  item.one: item
+  item.other: items
+de:
+  title: Beleg
+  hello: Hallo
+  total: Summe
+  placed: Erstellt
+  eta: Lieferung
+  note: Danke für Ihre Bestellung.
+  item.one: Artikel
+  item.other: Artikel
+fr:
+  title: Reçu
+  hello: Bonjour
+  total: Total
+  placed: Établi
+  eta: Livraison
+  note: Merci pour votre commande.
+  item.one: article
+  item.other: articles
+pl:
+  title: Paragon
+  hello: Cześć
+  total: Suma
+  placed: Wystawiono
+  eta: Dostawa
+  note: Dziękujemy za zamówienie.
+  item.one: element
+  item.few: elementy
+  item.many: elementów
+  item.other: elementu
+"#;
 
 // ── `&[Value]` argument shims ────────────────────────────────────────────────
 

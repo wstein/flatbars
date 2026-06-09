@@ -26,7 +26,8 @@ fn paints_panes_and_localized_output() {
     lab.locale = Locale::De;
     let text = frame_text(&lab);
     assert!(text.contains("Template"), "Template pane title missing");
-    assert!(text.contains("Data (JSON)"), "Data pane title missing");
+    assert!(text.contains("Data (YAML)"), "Data pane title missing");
+    assert!(text.contains("i18n catalog"), "i18n pane title missing");
     assert!(
         text.contains("Beleg"),
         "localized output (Beleg) missing from the frame"

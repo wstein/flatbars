@@ -53,9 +53,9 @@ impl Sample {
         }
     }
 
-    /// The seed data, as JSON text (edited live in the Data pane).
+    /// The seed data, as YAML text (edited live in the Data pane).
     #[must_use]
-    pub fn data_json(self) -> &'static str {
+    pub fn data_yaml(self) -> &'static str {
         match self {
             Sample::Receipt => RECEIPT_DATA,
             Sample::Greeting => GREETING_DATA,
@@ -74,16 +74,14 @@ const RECEIPT_TMPL: &str = r#"== {{t "title"}} ==
 {{t "eta"}}: {{relative eta "day"}}
 "#;
 
-const RECEIPT_DATA: &str = r#"{
-  "customer": "Ada",
-  "count": 1,
-  "total": 899,
-  "placed": "2026-06-09",
-  "eta": 3,
-  "items": [
-    { "name": "Keyboard", "price": 899 }
-  ]
-}
+const RECEIPT_DATA: &str = r#"customer: Ada
+count: 1
+total: 899
+placed: "2026-06-09"
+eta: 3
+items:
+  - name: Keyboard
+    price: 899
 "#;
 
 // Plain interpolation — the data already holds the localized strings, so the template
@@ -92,9 +90,7 @@ const GREETING_TMPL: &str = r#"{{greeting}}, {{customer}}!
 {{note}}
 "#;
 
-const GREETING_DATA: &str = r#"{
-  "customer": "Ada",
-  "greeting": "Hello",
-  "note": "Thanks for your order."
-}
+const GREETING_DATA: &str = r#"customer: Ada
+greeting: Hello
+note: Thanks for your order.
 "#;

@@ -26,5 +26,6 @@ trussbars-i18n = { path = "../../crates/trussbars-i18n" }
 # explicitly to ratatui's so the dep is visible and the lock can't drift.
 ratatui = "0.30"
 crossterm = "0.29"
-# The Data pane is edited as live JSON, decoded into the VM's dynamic `Value`.
-serde_json = "1"
+# The Data and i18n-catalog panes are edited as live YAML: the data is decoded into
+# the VM's dynamic `Value`, the catalog into a locale→key→message map.
+serde_yaml = "0.9"

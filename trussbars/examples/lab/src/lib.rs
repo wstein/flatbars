@@ -19,9 +19,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod data;
 pub mod editor;
 pub mod i18n;
-pub mod json;
 pub mod samples;
 
 use std::rc::Rc;
@@ -44,10 +44,11 @@ pub enum Locale {
     En,
     De,
     Fr,
+    Pl,
 }
 
 impl Locale {
-    pub const ALL: [Locale; 3] = [Locale::En, Locale::De, Locale::Fr];
+    pub const ALL: [Locale; 4] = [Locale::En, Locale::De, Locale::Fr, Locale::Pl];
 
     /// The BCP-47 primary subtag passed to the i18n primitives.
     #[must_use]
@@ -56,6 +57,7 @@ impl Locale {
             Locale::En => "en",
             Locale::De => "de",
             Locale::Fr => "fr",
+            Locale::Pl => "pl",
         }
     }
 
@@ -65,6 +67,7 @@ impl Locale {
             Locale::En => "English",
             Locale::De => "Deutsch",
             Locale::Fr => "Français",
+            Locale::Pl => "Polski",
         }
     }
 
@@ -73,7 +76,8 @@ impl Locale {
         match self {
             Locale::En => Locale::De,
             Locale::De => Locale::Fr,
-            Locale::Fr => Locale::En,
+            Locale::Fr => Locale::Pl,
+            Locale::Pl => Locale::En,
         }
     }
 }
@@ -120,10 +124,11 @@ impl Mode {
 pub enum Focus {
     Template,
     Data,
+    I18n,
 }
 
-/// The whole lab state: the editable template + data, plus the selected sample,
-/// locale, mode, and focus.
+/// The whole lab state: the editable template, data, and i18n catalog, plus the selected
+/// sample, locale, mode, and focus.
 #[derive(Clone, Debug)]
 pub struct Lab {
     pub sample: Sample,
@@ -132,10 +137,13 @@ pub struct Lab {
     pub focus: Focus,
     pub template: TextBuffer,
     pub data: TextBuffer,
+    /// The message catalog (YAML), shared across samples — not reseeded on sample change.
+    pub i18n: TextBuffer,
 }
 
 impl Lab {
-    /// Seed the lab from a sample (English, lenient render, template focused).
+    /// Seed the lab from a sample (English, lenient render, template focused, default
+    /// i18n catalog).
     #[must_use]
     pub fn from_sample(sample: Sample) -> Self {
         Lab {
@@ -144,7 +152,8 @@ impl Lab {
             mode: Mode::Render,
             focus: Focus::Template,
             template: TextBuffer::from_text(sample.template()),
-            data: TextBuffer::from_text(sample.data_json()),
+            data: TextBuffer::from_text(sample.data_yaml()),
+            i18n: TextBuffer::from_text(i18n::CATALOG_SEED),
         }
     }
 
@@ -164,12 +173,13 @@ impl Lab {
     /// the reason AOT would reject the template (e.g. a host helper).
     pub fn render(&self) -> Result<String, String> {
         let template = Template::parse(&self.template.text())?;
-        let data = json::parse(&self.data.text())?;
+        let data = data::parse(&self.data.text())?;
         match self.mode {
             Mode::Compat => template.render_compat(&data),
             Mode::Render => {
+                let catalog = Rc::new(i18n::parse_catalog(&self.i18n.text())?);
                 let mut helpers = Helpers::new();
-                i18n::register(&mut helpers, self.locale);
+                i18n::register(&mut helpers, self.locale, &catalog);
                 template.render_with(&data, &Rc::new(helpers))
             }
         }
@@ -192,19 +202,21 @@ impl Lab {
         self.mode = self.mode.toggle();
     }
 
-    /// Load the next sample, reseeding both editor panes (keeps locale + mode).
+    /// Load the next sample, reseeding the template + data panes (keeps the i18n catalog,
+    /// locale, and mode).
     pub fn cycle_sample(&mut self) {
         let next = self.sample.next();
         self.sample = next;
         self.template = TextBuffer::from_text(next.template());
-        self.data = TextBuffer::from_text(next.data_json());
+        self.data = TextBuffer::from_text(next.data_yaml());
         self.focus = Focus::Template;
     }
 
     pub fn cycle_focus(&mut self) {
         self.focus = match self.focus {
             Focus::Template => Focus::Data,
-            Focus::Data => Focus::Template,
+            Focus::Data => Focus::I18n,
+            Focus::I18n => Focus::Template,
         };
     }
 
@@ -213,6 +225,7 @@ impl Lab {
         match self.focus {
             Focus::Template => &mut self.template,
             Focus::Data => &mut self.data,
+            Focus::I18n => &mut self.i18n,
         }
     }
 }
@@ -250,10 +263,13 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
     ]);
     frame.render_widget(Paragraph::new(title), header);
 
-    let [left, right] =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(body);
+    // 2×2 grid: Template | Data  (top) · Output | i18n catalog (bottom).
+    let [top, bottom] =
+        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(body);
     let [tmpl_area, data_area] =
-        Layout::vertical([Constraint::Percentage(62), Constraint::Percentage(38)]).areas(left);
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(top);
+    let [out_area, i18n_area] =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bottom);
 
     let tmpl_inner = render_editor(
         frame,
@@ -265,9 +281,16 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
     let data_inner = render_editor(
         frame,
         data_area,
-        "Data (JSON)",
+        "Data (YAML)",
         &lab.data,
         lab.focus == Focus::Data,
+    );
+    let i18n_inner = render_editor(
+        frame,
+        i18n_area,
+        "i18n catalog (YAML)",
+        &lab.i18n,
+        lab.focus == Focus::I18n,
     );
 
     let out = lab.render_or_reject();
@@ -287,7 +310,7 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
     frame.render_widget(
         Paragraph::new(lines)
             .block(Block::bordered().title(format!(" Output · {} ", lab.mode.key()))),
-        right,
+        out_area,
     );
 
     frame.render_widget(
@@ -303,6 +326,7 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
     let (inner, buf) = match lab.focus {
         Focus::Template => (tmpl_inner, &lab.template),
         Focus::Data => (data_inner, &lab.data),
+        Focus::I18n => (i18n_inner, &lab.i18n),
     };
     if inner.width > 0 && inner.height > 0 {
         let (cy, cx) = buf.cursor();
