@@ -120,12 +120,15 @@ jobs:
   # committed). `blog` = authored content; `changelog` = git-log aggregation;
   # `lab` = the dynamic-VM mini-Lab (the VM northstar — runtime render + i18n host
   # helpers; its golden gate is the {sample × locale × mode} matrix); `i18n-data` = the
-  # unified-i18n reference (compile-time helpers over a data catalog; AOT≡VM parity test).
+  # unified-i18n reference (compile-time helpers over a YAML-fetched data catalog; AOT≡VM
+  # parity test); `i18n-fluent` = the real-Fluent recipe (i18n-embed) — heavier external
+  # deps, kept in its own workspace so they never reach the no_std core, but gated here so
+  # the recipe can't rot (cargo fetches its crates.io deps; cached by its Cargo.lock).
   examples:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        example: [blog, changelog, lab, i18n-data]
+        example: [blog, changelog, lab, i18n-data, i18n-fluent]
     defaults:
       run:
         working-directory: trussbars/examples/${{ matrix.example }}
