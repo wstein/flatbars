@@ -2,7 +2,7 @@
 //!
 //! The VM resolves an unknown helper head against a [`Helpers`] registry whose entries
 //! are `Fn(&[Value]) -> Result<Value, String>` (the runtime's calling convention). The
-//! blessed [`trussbars_i18n`] pack is *typed* (`number(&f64, &f64)`, …) and lives below
+//! blessed [`trussbars_i18n`] pack is *typed* (`number(&f64, &f64, &str)`, …) and lives below
 //! the VM, so it cannot — and must not — speak `&[Value]` itself (that would invert the
 //! layering). The thin `&[Value]` shims therefore live here, in the host.
 //!
@@ -47,11 +47,12 @@ pub fn register(helpers: &mut Helpers, locale: Locale, catalog: &Rc<Catalog>) {
         ))
     });
 
-    // `number value decimals` — fixed-decimals + thousands grouping (en-US fallback).
-    helpers.register("number", |args| {
+    // `number value decimals` — fixed-decimals + locale-aware group/decimal separators
+    // (the language is the lab's locale, like `plural`/`date` — not a data field).
+    helpers.register("number", move |args| {
         let value = num_arg(args, 0, "number")?;
         let decimals = num_arg(args, 1, "number")?;
-        Ok(vstr(trussbars_i18n::number(&value, &decimals)))
+        Ok(vstr(trussbars_i18n::number(&value, &decimals, lang)))
     });
 
     // `plural count noun` — compose the CLDR category (in the lab's language) with the

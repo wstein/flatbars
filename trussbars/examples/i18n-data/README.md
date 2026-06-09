@@ -59,14 +59,19 @@ byte-identical for en/de/fr/pl.
 {{t catalog locale "greeting"}}, {{customer}}!
 {{t catalog locale "placed"}}: {{date placed "%d %B %Y" locale}}
 {{#each items}}
-  {{name}}: {{number price 2}}
-{{/each}}{{t catalog locale "total"}}: {{number total 2}}  ({{count}} {{plural catalog locale "item" count}})
+  {{name}}: {{number price 2 root.locale}}
+{{/each}}{{t catalog locale "total"}}: {{number total 2 locale}}  ({{count}} {{plural catalog locale "item" count}})
 ```
 
+(`number` takes the locale too, so the total localizes — `root.locale` reaches it from
+inside the `{{#each}}` loop, where `this` is the item.)
+
 The format primitives come from [`trussbars-i18n`](../../crates/trussbars-i18n)
-(`number`/`date`/`selectPlural`, incl. CLDR plural categories and localized month names);
-this crate is the **host** that owns the catalog and wires the helpers. Polish exercises the
-four-form plural (`1 element`, `3 elementy`, `5 elementów`).
+(`number`/`date`/`selectPlural`, incl. CLDR plural categories, localized month names, and
+locale group/decimal separators); this crate is the **host** that owns the catalog and
+wires the helpers. The total shows the separators flip per locale — `1,311.80` (en) ·
+`1.311,80` (de) · `1 311,80` (fr/pl) — and Polish exercises the four-form plural
+(`1 element`, `3 elementy`, `5 elementów`).
 
 ## Relationship to the other examples
 

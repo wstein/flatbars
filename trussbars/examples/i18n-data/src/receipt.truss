@@ -3,5 +3,5 @@
 {{t catalog locale "greeting"}}, {{customer}}!
 {{t catalog locale "placed"}}: {{date placed "%d %B %Y" locale}}
 {{#each items}}
-  {{name}}: {{number price 2}}
-{{/each}}{{t catalog locale "total"}}: {{number total 2}}  ({{count}} {{plural catalog locale "item" count}})
+  {{name}}: {{number price 2 root.locale}}
+{{/each}}{{t catalog locale "total"}}: {{number total 2 locale}}  ({{count}} {{plural catalog locale "item" count}})

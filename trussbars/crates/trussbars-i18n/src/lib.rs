@@ -12,7 +12,7 @@
 //! #[trussbars_macros::truss_helpers(date, number)]
 //! mod templates {
 //!     use trussbars_macros::truss;
-//!     truss!(receipt, Order, "{{date placed \"%d %B %Y\" lang}} — total {{number total 2}}");
+//!     truss!(receipt, Order, "{{date placed \"%d %B %Y\" lang}} — total {{number total 2 lang}}");
 //! }
 //! ```
 //!
@@ -45,11 +45,16 @@ pub fn t(key: &str) -> &str {
 }
 
 /// Format a `value` for display: rounded to `decimals` fractional digits, with the
-/// integer part grouped in threes by `,` and a `.` decimal separator (the
-/// en-US-style fallback). `decimals` is taken as a count (templates pass a numeric
-/// literal, which is an `f64`).
+/// integer part grouped in threes using the **locale-appropriate** group/decimal
+/// separators for language `lang` (a BCP-47 tag; only the primary subtag is used).
+/// `en` (and any unlisted tag) → `1,234.50`; `de` → `1.234,50`; `fr` → `1 234,50`
+/// (narrow no-break space group); `pl`/`ru`/`cs`/`uk`/`sk` → `1 234,50` (no-break
+/// space group). `decimals` is taken as a count (templates pass a numeric literal,
+/// which is an `f64`). Dependency-free; byte-identity to a particular locale runtime
+/// (JS `Intl`, ICU) stays the host's responsibility (docs/09 §5).
 #[must_use]
-pub fn number(value: &f64, decimals: &f64) -> String {
+pub fn number(value: &f64, decimals: &f64, lang: &str) -> String {
+    let (group, decimal) = number_format(lang);
     let places = (*decimals).max(0.0).round() as usize;
     let negative = value.is_sign_negative() && *value != 0.0;
     let mag = value.abs();
@@ -61,24 +66,40 @@ pub fn number(value: &f64, decimals: &f64) -> String {
         Some((i, f)) => (i, Some(f)),
         None => (fixed.as_str(), None),
     };
-    let mut grouped = String::with_capacity(int_part.len() + int_part.len() / 3 + 2);
-    let digits: Vec<char> = int_part.chars().collect();
-    for (idx, ch) in digits.iter().enumerate() {
-        if idx > 0 && (digits.len() - idx).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(*ch);
-    }
-    let mut out = String::new();
+    let mut out = String::with_capacity(int_part.len() + int_part.len() / 3 + 4);
     if negative {
         out.push('-');
     }
-    out.push_str(&grouped);
+    let digits: Vec<char> = int_part.chars().collect();
+    for (idx, ch) in digits.iter().enumerate() {
+        if idx > 0 && (digits.len() - idx).is_multiple_of(3) {
+            out.push(group);
+        }
+        out.push(*ch);
+    }
     if let Some(f) = frac_part {
-        out.push('.');
+        out.push(decimal);
         out.push_str(f);
     }
     out
+}
+
+/// The `(group, decimal)` separator pair for `lang` (primary subtag). en-US (`,`/`.`)
+/// is the fallback for any unlisted tag; the listed set mirrors `selectPlural`'s
+/// languages. Faithful to CLDR's `latn` separators for these locales (a documented
+/// fallback, not an `Intl`/ICU byte-parity guarantee — docs/09 §5).
+fn number_format(lang: &str) -> (char, char) {
+    let lang = primary_subtag(lang);
+    let is = |code: &str| lang.eq_ignore_ascii_case(code);
+    if is("de") {
+        ('.', ',')
+    } else if is("fr") {
+        ('\u{202f}', ',') // NARROW NO-BREAK SPACE
+    } else if is("pl") || is("ru") || is("cs") || is("uk") || is("sk") {
+        ('\u{a0}', ',') // NO-BREAK SPACE
+    } else {
+        (',', '.') // en-US fallback
+    }
 }
 
 /// The CLDR cardinal plural **category** for `count` in language `lang` (a BCP-47
@@ -380,11 +401,23 @@ mod tests {
 
     #[test]
     fn number_groups_and_rounds() {
-        assert_eq!(number(&1234.6, &0.0), "1,235");
-        assert_eq!(number(&1234.4, &0.0), "1,234");
-        assert_eq!(number(&1234.567, &2.0), "1,234.57");
-        assert_eq!(number(&-1000000.0, &0.0), "-1,000,000");
-        assert_eq!(number(&5.0, &2.0), "5.00");
+        assert_eq!(number(&1234.6, &0.0, "en"), "1,235");
+        assert_eq!(number(&1234.4, &0.0, "en"), "1,234");
+        assert_eq!(number(&1234.567, &2.0, "en"), "1,234.57");
+        assert_eq!(number(&-1000000.0, &0.0, "en"), "-1,000,000");
+        assert_eq!(number(&5.0, &2.0, "en"), "5.00");
+    }
+
+    #[test]
+    fn number_uses_locale_separators() {
+        // Same value, locale-appropriate group + decimal separators (CLDR `latn`).
+        assert_eq!(number(&1234.5, &2.0, "en"), "1,234.50");
+        assert_eq!(number(&1234.5, &2.0, "de"), "1.234,50");
+        assert_eq!(number(&1234.5, &2.0, "fr"), "1\u{202f}234,50"); // narrow no-break space
+        assert_eq!(number(&1234.5, &2.0, "pl"), "1\u{a0}234,50"); // no-break space
+        // An unlisted tag falls back to en-US; the primary subtag is what counts.
+        assert_eq!(number(&9.5, &1.0, "ja"), "9.5");
+        assert_eq!(number(&1234.5, &2.0, "de-AT"), "1.234,50");
     }
 
     #[test]

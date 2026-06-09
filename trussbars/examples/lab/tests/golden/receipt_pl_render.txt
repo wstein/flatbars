@@ -1,6 +1,6 @@
 == Paragon ==
 Cześć, Ada!
-  - Keyboard: 899.00
-Suma: 899.00  (1 element)
+  - Keyboard: 899,00
+Suma: 899,00  (1 element)
 Wystawiono: 09 czerwiec 2026
 Dostawa: in 3 days

@@ -96,10 +96,10 @@ pub fn plural(catalog: &Catalog, locale: &str, noun: &str, count: &f64) -> Strin
         .unwrap_or_else(|| noun.to_string())
 }
 
-/// `{{number value 2}}` — fixed-decimals + thousands grouping (en-US fallback).
+/// `{{number value 2 locale}}` — fixed-decimals + locale-aware group/decimal separators.
 #[must_use]
-pub fn number(value: &f64, decimals: &f64) -> String {
-    trussbars_i18n::number(value, decimals)
+pub fn number(value: &f64, decimals: &f64, locale: &str) -> String {
+    trussbars_i18n::number(value, decimals, locale)
 }
 
 /// `{{date iso "%d %B %Y" locale}}` — strftime formatting with localized month names.
@@ -174,18 +174,24 @@ mod tests {
     fn aot_localizes_through_the_catalog() {
         let en = render_receipt(&page("en"));
         assert!(en.contains("== Receipt =="), "{en}");
-        assert!(en.contains("Total: 1,311.80"), "{en}");
+        assert!(en.contains("Total: 1,311.80"), "{en}"); // en-US grouping + decimal
         assert!(en.contains("(3 items)"), "{en}");
         assert!(en.contains("Placed: 09 June 2026"), "{en}");
 
         let de = render_receipt(&page("de"));
         assert!(de.contains("== Beleg =="), "{de}");
+        assert!(de.contains("Summe: 1.311,80"), "{de}"); // German: . group, , decimal
         assert!(de.contains("(3 Artikel)"), "{de}");
         assert!(de.contains("09 Juni 2026"), "{de}");
 
-        // Polish exercises the CLDR `few` form (3 → elementy) + the Polish month name.
+        // French: a narrow no-break space groups thousands, comma decimal.
+        let fr = render_receipt(&page("fr"));
+        assert!(fr.contains("Total: 1\u{202f}311,80"), "{fr}");
+
+        // Polish exercises the CLDR `few` form (3 → elementy) + month name + space grouping.
         let pl = render_receipt(&page("pl"));
         assert!(pl.contains("== Paragon =="), "{pl}");
+        assert!(pl.contains("Suma: 1\u{a0}311,80"), "{pl}"); // no-break space group
         assert!(pl.contains("(3 elementy)"), "{pl}");
         assert!(pl.contains("09 czerwiec 2026"), "{pl}");
     }
@@ -220,7 +226,11 @@ mod tests {
                 ))
             });
             helpers.register("number", |a| {
-                Ok(vstr(trussbars_i18n::number(&num_(&a[0]), &num_(&a[1]))))
+                Ok(vstr(trussbars_i18n::number(
+                    &num_(&a[0]),
+                    &num_(&a[1]),
+                    str_(&a[2]),
+                )))
             });
             helpers.register("date", |a| {
                 Ok(vstr(trussbars_i18n::date(
