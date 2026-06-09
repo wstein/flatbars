@@ -69,7 +69,7 @@ import FlatBars.Span (Span, spanText)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
 import FullBars (desugarSurfaceWith, hoistInline)
-import Kernel.Walk (splitClauses)
+import Kernel.Walk (Clause, splitClauses)
 import MaxBars (maxLoopVars, maxOptions)
 
 -- | The emit context threaded through the walk: the Rust binding holding the
@@ -374,7 +374,7 @@ condBlock env prefix positional body = case positional of
   _ -> Left "unsupported: conditional with an options argument (e.g. includeZero)"
 
 elseChain
-  :: Env -> Array { name :: Ident, args :: Array Expr, body :: Template } -> Either String String
+  :: Env -> Array Clause -> Either String String
 elseChain env clauses = case Array.uncons clauses of
   Nothing -> Right ""
   Just { head: cl, tail } -> case cl.name of
@@ -586,7 +586,7 @@ letBlock env mhash body = case mhash of
 -- The first clause's body (the `{{else}}` of an each/with), in the parent scope;
 -- empty when there is none.
 clauseBody
-  :: Env -> Array { name :: Ident, args :: Array Expr, body :: Template } -> Either String String
+  :: Env -> Array Clause -> Either String String
 clauseBody env clauses = case Array.head clauses of
   Just cl -> nodes env cl.body
   Nothing -> Right ""

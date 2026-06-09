@@ -124,11 +124,16 @@ operationRefs = foldRefs Array.singleton
 -- | raw `children` (so it can resolve clauses) *and* a FlatBars-provided
 -- | `recurse` to fold any sub-range. Use it to lower the skeleton to your own
 -- | typed AST, collect diagnostics, or pretty-print — without writing a walk.
+-- |
+-- | Every tag-level case (`output`/`raw`/`sep`/`block`) receives the source
+-- | `Span` of its opening tag, so a pass can carry locations through to its own
+-- | AST — the basis of the lowered AST's `src` (the data-access jump-to-source).
+-- | `content` has no span: it is literal text, never a tag.
 type Algebra a =
   { content :: String -> a
-  , output :: Expr -> a
-  , raw :: Ident -> Array Expr -> String -> a
-  , sep :: Ident -> Array Expr -> a
+  , output :: Span -> Expr -> a
+  , raw :: Span -> Ident -> Array Expr -> String -> a
+  , sep :: Span -> Ident -> Array Expr -> a
   , block ::
       { span :: Span
       , name :: Ident
@@ -153,9 +158,9 @@ foldTemplate alg = go
   node :: Node -> a
   node = case _ of
     Content s -> alg.content s
-    Output _ e -> alg.output e
-    RawBlock _ name args raw' -> alg.raw name args raw'
-    Sep _ name args -> alg.sep name args
+    Output sp e -> alg.output sp e
+    RawBlock sp name args raw' -> alg.raw sp name args raw'
+    Sep sp name args -> alg.sep sp name args
     Block span _ name args children -> alg.block { span, name, args, children, recurse: go }
     NodeError span msg -> alg.nodeError span msg
 
@@ -165,7 +170,10 @@ foldTemplate alg = go
 
 -- | A separator-delimited clause: the section a `{{name args}}` separator opens,
 -- | running up to the next top-level separator (or the end of the block body).
-type Clause = { name :: Ident, args :: Array Expr, body :: Template }
+-- | `span` is the opening separator's source span — what a lowered branch
+-- | (an `elif`'s nested `RIf`) carries so it can be located independently of the
+-- | enclosing block.
+type Clause = { name :: Ident, args :: Array Expr, body :: Template, span :: Span }
 
 -- | Split a block body at *every* top-level separator. `before` is the section
 -- | up to the first separator; `clauses` are the sections that follow, each
@@ -186,11 +194,11 @@ splitClauses nodes = case Array.findIndex isSep nodes of
   -- separator) and recurse on what follows.
   clausesFrom :: Template -> Array Clause
   clausesFrom rest = case Array.uncons rest of
-    Just { head: Sep _ name args, tail } ->
+    Just { head: Sep span name args, tail } ->
       let
         bodyEnd = fromMaybe (Array.length tail) (Array.findIndex isSep tail)
       in
-        Array.cons { name, args, body: Array.take bodyEnd tail }
+        Array.cons { name, args, body: Array.take bodyEnd tail, span }
           (clausesFrom (Array.drop bodyEnd tail))
     _ -> []
 

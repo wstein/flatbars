@@ -35,9 +35,9 @@ import Kernel.Walk (Issue, Severity(..), foldTemplate)
 booleanInOutputWarnings :: Template -> Array Issue
 booleanInOutputWarnings = foldTemplate
   { content: const []
-  , output: \e -> maybe [] pure (boolWarn e)
-  , raw: \name _ _ -> maybe [] pure (issueFor name)
-  , sep: \_ _ -> []
+  , output: \_ e -> maybe [] pure (boolWarn e)
+  , raw: \_ name _ _ -> maybe [] pure (issueFor name)
+  , sep: \_ _ _ -> []
   , block: \b -> b.recurse b.children
   , nodeError: \_ _ -> []
   , concat: Array.concat
@@ -81,9 +81,9 @@ reservedNames = [ "this", "loop", "root", "parent", "yield" ]
 labelShadowWarnings :: Template -> Array Issue
 labelShadowWarnings = foldTemplate
   { content: const []
-  , output: const []
-  , raw: \_ _ _ -> []
-  , sep: \_ _ -> []
+  , output: \_ _ -> []
+  , raw: \_ _ _ _ -> []
+  , sep: \_ _ _ -> []
   , block: \b -> Array.mapMaybe labelOf b.args <> b.recurse b.children
   , nodeError: \_ _ -> []
   , concat: Array.concat

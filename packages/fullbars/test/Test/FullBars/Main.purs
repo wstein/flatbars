@@ -1120,9 +1120,9 @@ main = do
   let
     counter =
       { content: \_ -> 1
-      , output: \_ -> 1
-      , raw: \_ _ _ -> 1
-      , sep: \_ _ -> 1
+      , output: \_ _ -> 1
+      , raw: \_ _ _ _ -> 1
+      , sep: \_ _ _ -> 1
       , block: \b -> 1 + b.recurse b.children
       , nodeError: \_ _ -> 1
       , concat: Array.foldl (+) 0
@@ -1149,16 +1149,38 @@ main = do
       (runTemplate (customEngine VNull) t == Right "0")
 
   -- lower: the structural skeleton becomes the typed real AST — {{else}} is
-  -- consumed into RIf's branches, and escapeHtml becomes the escaped flag.
-  case parse "{{#if this}}A{{{escapeHtml (lookup this \"x\")}}}{{else}}B{{/if}}" of
+  -- consumed into RIf's branches, escapeHtml becomes the escaped flag, and every
+  -- tag-derived node carries its opening-tag span (the lowered AST's `src`).
+  let lowerSrc = "{{#if this}}A{{{escapeHtml (lookup this \"x\")}}}{{else}}B{{/if}}"
+  case parse lowerSrc of
     Left e -> assert' ("lower: parse error " <> show e) false
-    Right { nodes: t } -> assert' ("lower if/else+escape: " <> show (lower t))
-      ( lower t ==
-          [ RIf (App "this" [])
-              [ RText "A", ROut true (App "lookup" [ App "this" [], Lit (VString "x") ]) ]
-              [ RText "B" ]
-          ]
-      )
+    Right { nodes: t } -> case lower t of
+      [ RIf ifSpan (App "this" [])
+          [ RText "A", ROut outSpan true (App "lookup" [ App "this" [], Lit (VString "x") ]) ]
+          [ RText "B" ]
+      ] -> do
+        assert' "lower if/else+escape structure" true
+        assert' "lower carries the {{#if}} opening-tag span"
+          (spanText lowerSrc ifSpan == "{{#if this}}")
+        assert' "lower carries the output-tag span"
+          (spanText lowerSrc outSpan == "{{{escapeHtml (lookup this \"x\")}}}")
+      other -> assert' ("lower if/else+escape: " <> show other) false
+
+  -- elif chains nest into RIf branches; each nested RIf carries that elif
+  -- separator's own span (not the enclosing {{#if}}'s), so a tool locates each
+  -- branch precisely.
+  let elifSrc = "{{#if a}}A{{elif b}}B{{else}}C{{/if}}"
+  case parse elifSrc of
+    Left e -> assert' ("lower elif: parse error " <> show e) false
+    Right { nodes: t } -> case lower t of
+      [ RIf ifSpan (App "a" []) [ RText "A" ]
+          [ RIf elifSpan (App "b" []) [ RText "B" ] [ RText "C" ] ]
+      ] -> do
+        assert' "lower elif: outer RIf carries the {{#if}} span"
+          (spanText elifSrc ifSpan == "{{#if a}}")
+        assert' "lower elif: nested RIf carries the {{elif}} span"
+          (spanText elifSrc elifSpan == "{{elif b}}")
+      other -> assert' ("lower elif chain: " <> show other) false
 
   -- Safe-by-default lint: raw output of data warns; escapeHtml / safe do not.
   case parse "{{{lookup this \"x\"}}}" of

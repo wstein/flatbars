@@ -24,9 +24,9 @@ nodeCount src = case parse src of
   Left _ -> -1
   Right { nodes } -> foldTemplate
     { content: \_ -> 1
-    , output: \_ -> 1
-    , raw: \_ _ _ -> 1
-    , sep: \_ _ -> 1
+    , output: \_ _ -> 1
+    , raw: \_ _ _ _ -> 1
+    , sep: \_ _ _ -> 1
     , block: \b -> 1 + b.recurse b.children
     , nodeError: \_ _ -> 1
     , concat: Array.foldl (+) 0

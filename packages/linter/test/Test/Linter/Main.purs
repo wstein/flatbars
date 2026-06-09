@@ -9,7 +9,10 @@
 -- |   assert srcAst == outAst
 -- |
 -- | i.e. printing the desugared MaxBars AST as RawBars and re-parsing it yields
--- | the same real AST. Plus a couple of direct `printRawBars` shape checks.
+-- | the same real AST. Plus a couple of direct `printRawBars` shape checks. The
+-- | comparison is *structural*: source spans are stripped first, since re-printing
+-- | relocates every tag (the lift is position-lossy by construction, not lossless
+-- | on offsets — only on structure and rendering).
 module Test.Linter.Main where
 
 import Prelude
@@ -21,9 +24,10 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Parser (parse, parseWith)
+import FlatBars.Span (Span)
 import FlatBars.Value (Value(..))
 import FullBars (desugarSurfaceWith, renderSurface)
-import Kernel.Lower (RNode, lower)
+import Kernel.Lower (RNode(..), lower)
 import Linter.Lower (lowerToRawBars)
 import Linter.Migrate (migrateToMaxBars)
 import MaxBars (maxLoopVars, maxOptions, renderMax)
@@ -48,13 +52,32 @@ loweredAst src = case lowerToRawBars src of
     Left e -> Left ("re-parse of lowered RawBars failed: " <> show e <> "\n  lowered = " <> lowered)
     Right { nodes } -> Right (lower nodes)
 
--- | Assert the round-trip property for one template.
+-- | Assert the round-trip property for one template. Compared structurally:
+-- | spans are stripped because re-printing relocates every tag.
 roundTrips :: String -> String -> Effect Unit
 roundTrips name src = case maxAst src, loweredAst src of
   Left e, _ -> assert' (name <> ": " <> e) false
   _, Left e -> assert' (name <> ": " <> e) false
   Right a, Right b ->
-    assert' (name <> ": ASTs differ\n  src = " <> show a <> "\n  out = " <> show b) (a == b)
+    assert' (name <> ": ASTs differ\n  src = " <> show a <> "\n  out = " <> show b)
+      (stripSpans a == stripSpans b)
+
+-- | Zero every node's span so two lowered ASTs compare on structure alone.
+stripSpans :: Array RNode -> Array RNode
+stripSpans = map strip
+  where
+  z :: Span
+  z = { start: 0, end: 0 }
+  strip = case _ of
+    RText s -> RText s
+    ROut _ b e -> ROut z b e
+    RIf _ c a b -> RIf z c (stripSpans a) (stripSpans b)
+    RUnless _ c a b -> RUnless z c (stripSpans a) (stripSpans b)
+    REach _ c a b -> REach z c (stripSpans a) (stripSpans b)
+    RWith _ c a b -> RWith z c (stripSpans a) (stripSpans b)
+    RCall _ n args ch -> RCall z n args (stripSpans ch)
+    RSep _ n args -> RSep z n args
+    RRaw _ s -> RRaw z s
 
 -- | Assert that lowering `src` produces text containing `needle`.
 lowersContaining :: String -> String -> String -> Effect Unit

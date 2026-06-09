@@ -77,7 +77,7 @@ import FlatBars.Error (Error(ArityError, HelperError), ParseDiagnostic)
 import FlatBars.Highlight (HSpan, HighlightConfig, TSpan, highlightSpans, tokenizeSpans) as Highlight
 import FlatBars.Json (fromJson, toJson)
 import FlatBars.Lexer (defaultLexConfig)
-import FlatBars.Span (lineColumn, spanText)
+import FlatBars.Span (Span, lineColumn, spanText)
 import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
@@ -795,6 +795,9 @@ highlightConfig = case _ of
 -- | (surface desugars first). The node shape matches the host's `mapNode`
 -- | contract: `text`/`emit`/`if`/`unless`/`each`/`with`/`raw`/`sep`/custom-block,
 -- | with expressions as `lit`/`identifier`/`path`/`context`/`call`/data vars.
+-- | Every tag-derived node carries a `src: { start, end }` (the opening tag's
+-- | code-unit range), which the Lab's Data Access panel maps to line:column to
+-- | jump to source; `text` nodes are literal content and carry none.
 astJson :: Fn2 String String Json
 astJson = mkFn2 \dialect src ->
   let
@@ -872,33 +875,62 @@ rnode = case _ of
   RText s -> obj [ tt "text", Tuple "text" (str s) ]
   -- A `{{> name}}` partial reference desugars to an emitted `partial "name" …`
   -- call; surface it as a `{t:"partial"}` node so the dependency graph finds it.
-  ROut escaped e -> case partialName e of
-    Just name -> obj [ tt "partial", Tuple "name" (str name) ]
+  ROut sp escaped e -> case partialName e of
+    Just name -> obj [ tt "partial", Tuple "name" (str name), srcOf sp ]
     Nothing ->
       obj
         [ tt "emit"
         , Tuple "expr" (rexpr e)
         , Tuple "escape" (str (if escaped then "html" else "none"))
+        , srcOf sp
         ]
-  RIf c a b -> obj
-    [ tt "if", Tuple "cond" (rexpr c), Tuple "then" (children a), Tuple "else" (children b) ]
-  RUnless c a b -> obj
-    [ tt "unless", Tuple "cond" (rexpr c), Tuple "then" (children a), Tuple "else" (children b) ]
-  REach c a b -> obj
-    [ tt "each", Tuple "subject" (rexpr c), Tuple "body" (children a), Tuple "else" (children b) ]
-  RWith c a b -> obj
-    [ tt "with", Tuple "subject" (rexpr c), Tuple "body" (children a), Tuple "else" (children b) ]
+  RIf sp c a b -> obj
+    [ tt "if"
+    , Tuple "cond" (rexpr c)
+    , Tuple "then" (children a)
+    , Tuple "else" (children b)
+    , srcOf sp
+    ]
+  RUnless sp c a b -> obj
+    [ tt "unless"
+    , Tuple "cond" (rexpr c)
+    , Tuple "then" (children a)
+    , Tuple "else" (children b)
+    , srcOf sp
+    ]
+  REach sp c a b -> obj
+    [ tt "each"
+    , Tuple "subject" (rexpr c)
+    , Tuple "body" (children a)
+    , Tuple "else" (children b)
+    , srcOf sp
+    ]
+  RWith sp c a b -> obj
+    [ tt "with"
+    , Tuple "subject" (rexpr c)
+    , Tuple "body" (children a)
+    , Tuple "else" (children b)
+    , srcOf sp
+    ]
   -- `{{#inline "name"}}…{{/inline}}` defines a partial; `{{#partial name}}…`
   -- is a block partial use. Both name a partial via a leading string literal.
-  RCall "inline" args ch | Just name <- litName args ->
-    obj [ tt "inline", Tuple "name" (str name), Tuple "body" (children ch) ]
-  RCall "partial" args ch | Just name <- litName args ->
-    obj [ tt "partial", Tuple "name" (str name), Tuple "body" (children ch) ]
-  RCall n args ch -> obj [ tt n, Tuple "args" (arr (map argOf args)), Tuple "body" (children ch) ]
-  RSep n args -> obj [ tt "sep", Tuple "name" (str n), Tuple "args" (arr (map argOf args)) ]
-  RRaw s -> obj [ tt "raw", Tuple "text" (str s) ]
+  RCall sp "inline" args ch | Just name <- litName args ->
+    obj [ tt "inline", Tuple "name" (str name), Tuple "body" (children ch), srcOf sp ]
+  RCall sp "partial" args ch | Just name <- litName args ->
+    obj [ tt "partial", Tuple "name" (str name), Tuple "body" (children ch), srcOf sp ]
+  RCall sp n args ch -> obj
+    [ tt n, Tuple "args" (arr (map argOf args)), Tuple "body" (children ch), srcOf sp ]
+  RSep sp n args -> obj
+    [ tt "sep", Tuple "name" (str n), Tuple "args" (arr (map argOf args)), srcOf sp ]
+  RRaw sp s -> obj [ tt "raw", Tuple "text" (str s), srcOf sp ]
   where
   children ns = arr (map rnode ns)
+
+-- The `src` field every tag-derived node carries: the half-open code-unit range
+-- of its opening tag (`Kernel.Lower` threads the span through). The Lab's Data
+-- Access panel maps it to line:column to jump to source.
+srcOf :: Span -> Tuple String Json
+srcOf sp = Tuple "src" (obj [ Tuple "start" (int sp.start), Tuple "end" (int sp.end) ])
 
 -- The static partial name of a `{{> name}}` use (`partial "name" ctx …`), or
 -- Nothing for a dynamic partial (`{{> (expr)}}`).
