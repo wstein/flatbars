@@ -417,6 +417,14 @@ fn let_block(
 }
 
 fn each_block(env: &Env, src: &str, e: &Each, out: &mut String) -> Result<(), String> {
+    // A dict literal compiles to a struct, which has no `Each` impl — so iterating one
+    // is rejected up front (a clean located error, not a downstream rustc failure).
+    // Bind it (`{{#with {…}}}` / `{{#let}}`) and read its fields instead.
+    if dict_arity(&e.subject).is_some() {
+        return Err(
+            "unsupported: cannot iterate a dict literal — bind it and read its fields".into(),
+        );
+    }
     let subj = emit_expr(env, &e.subject)?;
     let d = env.depth + 1;
     let (cvar, lvar, ivar, kvar, subvar, lenvar) = (
@@ -1061,5 +1069,8 @@ mod tests {
         assert!(out2.contains("__let_c.x"));
         // A dangling key (odd token count) is still rejected.
         assert!(emit("Ctx", r#"{{ dict "a" }}"#).is_err());
+        // Iterating a dict literal is rejected (the struct has no `Each` impl).
+        let err = emit("Ctx", "{{#each {a: 1}}}{{this}}{{/each}}").unwrap_err();
+        assert!(err.contains("cannot iterate a dict literal"), "{err}");
     }
 }

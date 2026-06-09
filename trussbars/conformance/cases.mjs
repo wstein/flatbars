@@ -411,4 +411,9 @@ export const cases = [
     template: "{{#with {who: name}}}hi {{who}}{{/with}}",
     data: { name: "Zed" },
   },
+  {
+    id: "dict-nested",
+    template: "{{#with {a: {b: 1}}}}{{a.b}}{{/with}}",
+    data: {},
+  },
 ];

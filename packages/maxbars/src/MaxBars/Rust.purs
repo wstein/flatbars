@@ -417,6 +417,10 @@ templateMentions name = Array.any (nodeMentions name)
 eachBlock :: Env -> Array Expr -> Maybe String -> Template -> Either String String
 eachBlock env args label body = case Array.head args of
   Nothing -> Left "unsupported: each without a subject"
+  -- A dict literal compiles to a struct, which has no `Each` impl — reject iterating
+  -- one up front (bind it and read its fields instead of a downstream rustc failure).
+  Just subjE | isJust (dictArity subjE) ->
+    Left "unsupported: cannot iterate a dict literal — bind it and read its fields"
   Just subjE -> do
     subj <- expr env subjE
     let

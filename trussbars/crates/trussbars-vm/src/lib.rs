@@ -580,6 +580,14 @@ fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
 }
 
 fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
+    // AOT compiles a dict literal to a struct, which has no `Each` impl — so in
+    // AOT-compat (strict) mode, iterating one is rejected (mirroring the AOT emitter);
+    // lenient mode still iterates the dynamic map.
+    if env.strict && matches!(&e.subject, Expr::App(n, _) if n == "dict") {
+        return Err(
+            "AOT-compat: cannot iterate a dict literal — bind it and read its fields".into(),
+        );
+    }
     let subj = eval_expr(env, &e.subject)?;
     // (key, element) pairs — arrays have no key, objects carry their field name.
     // Element clones are refcount bumps (Rc-backed Value), not deep copies.

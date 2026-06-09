@@ -170,6 +170,9 @@ if (process.argv.includes("--compat-parity")) {
     { id: "compat-struct-output", template: "{{user}}", data: { user: { name: "Ada" } } },
     { id: "compat-host-helper", template: '{{t "hi"}}', data: {} },
     { id: "compat-ok-bool", template: "{{#if active}}{{name}}{{/if}}", data: { active: true, name: "Ada" } },
+    // A dict literal is AOT-compatible, but *iterating* one is not (no `Each` impl) —
+    // both the lint and render_compat must reject it.
+    { id: "compat-each-over-dict", template: "{{#each {a: 1}}}{{this}}{{/each}}", data: {} },
   ];
   const parityCases = [...cases, ...extra];
 
