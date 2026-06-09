@@ -10,8 +10,11 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Map as Map
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..))
 import Data.String as String
+import Data.String.CodeUnits as SCU
+import Data.String.Common (joinWith)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
@@ -21,6 +24,8 @@ import FlatBars.Value (Value(..))
 import Kernel.Analyse (Finding)
 import MinBars (minOptions, renderMin, renderMinCompat, renderMinDelimsDiag, renderMinWith)
 import MinBars.Analyse (analyseMin)
+import MinBars.Inspect (inspectMin)
+import MinBars.Provenance (renderMinMapped)
 import MinBars.Standalone (mustacheStandalone)
 import Test.Assert (assert')
 
@@ -339,5 +344,40 @@ main = do
   -- An array section is iteration, not a truthiness branch: no finding.
   expectFindings "section-array" "{{#xs}}x{{/xs}}" (obj [ Tuple "xs" (arr [ num 1.0 ]) ])
     Array.null
+
+  -- Source map (ADR-035): the mapped render tiles the output exactly (correct-or-
+  -- absent), and a top-level emit carries its source span.
+  case renderMinMapped "Hi {{name}}!" (obj [ Tuple "name" (str "Ada") ]) of
+    Left e -> assert' ("mapped render errored: " <> e) false
+    Right { output, segments } -> do
+      assert' ("mapped output: " <> output) (output == "Hi Ada!")
+      assert' "the source map tiles the output"
+        (joinWith "" (map (\s -> SCU.take s.len (SCU.drop s.out output)) segments) == output)
+      assert' "the {{name}} emit carries a source span"
+        (Array.any (\s -> s.kind == "emit" && s.start == Just 3 && s.end == Just 11) segments)
+
+  -- Context Inspector (ADR-035): a section pushes context, so a snapshot at the
+  -- inner emit reports this = the pushed frame, parent = root. One per iteration.
+  let
+    userInner = obj [ Tuple "email" (str "a@x") ]
+    userData = obj [ Tuple "name" (str "Ada"), Tuple "user" userInner ]
+    sectionSrc = "{{#user}}{{email}}{{/user}}"
+  case renderMinMapped sectionSrc userData of
+    Left e -> assert' ("mapped errored: " <> e) false
+    Right { segments } -> case Array.find (\s -> s.kind == "emit" && s.start /= Nothing) segments of
+      Nothing -> assert' "expected an emit segment to target" false
+      Just seg ->
+        case
+          inspectMin { file: "main", start: fromMaybe 0 seg.start, end: fromMaybe 0 seg.end }
+            sectionSrc
+            userData
+          of
+          Left e -> assert' ("inspect errored: " <> e) false
+          Right snaps -> do
+            assert' ("one snapshot, got " <> show (Array.length snaps)) (Array.length snaps == 1)
+            assert' "this is the pushed user frame"
+              (map _.this (Array.head snaps) == Just userInner)
+            assert' "parent is the root data"
+              (map _.parent (Array.head snaps) == Just (Just userData))
 
   log "all MinBars tests passed"

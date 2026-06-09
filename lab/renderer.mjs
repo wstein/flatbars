@@ -55,11 +55,14 @@ import {
   renderMustache as bbRenderMustache,
   renderMinbarsCompat as bbRenderMinbarsCompat,
   renderMinbarsCompatWithPartials as bbRenderMinbarsCompatWith,
+  renderMinbarsMapped as bbRenderMinbarsMapped,
+  renderMinbarsMappedWithPartials as bbRenderMinbarsMappedWith,
+  inspectMinbars as bbInspectMinbars,
   compileMinbars as bbCompileMinbars,
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=99";
+} from "./vendor/flatbars-engine.mjs?v=100";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -107,7 +110,8 @@ const DIALECT = (() => {
 // not heuristic like Handlebars), and an EXACT partial graph (→ Partials panel;
 // {{> name}}/{{#inline}} surface as `partial` AST nodes). The core / surface /
 // maxbars dialects back provenance (`source-map`) and the Context Inspector
-// (`context-inspect`) — both added per-dialect in engineInfo. MinBars backs neither.
+// (`context-inspect`) — both added per-dialect in engineInfo; MinBars backs both
+// through its own mapped/inspect path (see MIN_FEATURES).
 const BB_FEATURES = [
   "catalog",
   "used-transformers",
@@ -126,11 +130,11 @@ const BB_FEATURES = [
 // + a JS compiler (ADR-016) + truthiness analysis (`analyse`, ADR-022 — the
 // Mustache-portability story: where would `mustache.js` branch the other way?) +
 // the partial-dependency graph (`partial-graph`) + data access (`required-assigns`,
-// now that `analyseDataAccess` reads MinBars's `mlookup` calls as path lookups),
-// all over the lowered MinBars AST. Only `context-inspect` stays absent — it needs
-// an output→source map MinBars doesn't emit — so that panel gates off; the dock
-// explains why ("Why fewer panels?").
-const MIN_FEATURES = ["partials", "catalog", "compile-js", "analyse", "partial-graph", "required-assigns"];
+// over the lowered MinBars AST) + a source map (`source-map`, ADR-035 — the mapped
+// render MinBars now emits) + the Context Inspector (`context-inspect`, snapshotting
+// the context stack at a clicked span). MinBars now backs every diagnostic panel
+// (the compat-rule source map is the one tracked follow-up).
+const MIN_FEATURES = ["partials", "catalog", "compile-js", "analyse", "partial-graph", "required-assigns", "source-map", "context-inspect"];
 
 // The prelude helpers, with the metadata the cheat-sheet panel renders. The
 // user-facing subset of the single-source helper catalog.
@@ -406,6 +410,18 @@ function minbarsRenderer(opts) {
     const partials = program.partials || {};
     const d = data == null ? null : data;
     const hasPartials = Object.keys(partials).length > 0;
+    // Source map (ADR-035): the mapped path renders on the spec rule, so it is taken
+    // only when `map` is requested AND we are NOT in `mustache.js`-compat mode (a
+    // compat-rule source map is a follow-up — the two rules render different
+    // sections, so the map must match). In compat-with-map, fall through to the
+    // plain render with empty segments (provenance gates off).
+    if (map && !compat) {
+      const mp = hasPartials
+        ? bbRenderMinbarsMappedWith(partials, program.source, d)
+        : bbRenderMinbarsMapped(program.source, d);
+      if (mp.ok) return { output: mp.output, segments: mp.segments };
+      const e = new Error(mp.error); e.kind = "render"; throw e;
+    }
     const res = compat
       ? (hasPartials ? bbRenderMinbarsCompatWith(partials, program.source, d) : bbRenderMinbarsCompat(program.source, d))
       : bbRenderMustache(partials, program.source, d);
@@ -438,12 +454,18 @@ function minbarsRenderer(opts) {
   // The lowered MinBars AST (flatbars-ast/v1): parse the Mustache surface and lower
   // it to the core operation tree (`section`/`inverted`/`mlookup`/`partial`). This
   // is the real tree — the foundation a Mustache→FlatBars/MaxBars migration reads,
-  // and what the Partials panel walks for `{{> name}}` (a `{t:"partial"}` node).
-  // Data-access classification still gates off: MinBars lowers data reads to
-  // `mlookup` calls, not the `{t:"path"}` nodes `analyseDataAccess` expects (a
-  // MinBars-aware data-access pass is tracked follow-up work). Only `inspectAt`
-  // throws `unsupported` (no output→source map).
+  // what the Partials panel walks for `{{> name}}` (a `{t:"partial"}` node), and
+  // what the Data Access panel reads as `mlookup` lookups.
   function parseAst(source) { return astJson("minbars", source); }
+
+  // context-inspect (ADR-035): snapshot the context stack at a target span (from a
+  // source-map segment). Mustache binds no loop vars, so each snapshot reports only
+  // the context chain (this/parent/root). `inspectAt(program, data, target, _opts)`.
+  function inspectAt(program, data, target) {
+    const r = bbInspectMinbars(program.partials || {}, target, program.source, data == null ? null : data);
+    if (!r.ok) { const e = new Error(r.error); e.kind = "inspect"; throw e; }
+    return r.snapshots;
+  }
 
   // partial-graph (EXACT): every `{{> name}}` lowers to a `{t:"partial"}` node, so
   // the shared dependency-graph builder maps it directly — the same path the
@@ -482,11 +504,6 @@ function minbarsRenderer(opts) {
     };
     visit(astJson("minbars", program.source).ast?.nodes || [], false);
     return [...out].sort();
-  }
-  function inspectAt() {
-    const err = new Error("MinBars has no context inspector (no output->source map)");
-    err.kind = "unsupported";
-    throw err;
   }
   const noUses = () => [];
 

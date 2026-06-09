@@ -28,6 +28,9 @@ module FullBars.JS
   , renderMinbars
   , renderMinbarsCompat
   , renderMinbarsCompatWithPartials
+  , renderMinbarsMapped
+  , renderMinbarsMappedWithPartials
+  , inspectMinbars
   , astJson
   , compile
   , compileSurface
@@ -99,6 +102,8 @@ import MaxBars as MaxBars
 import MaxBars.Compat as Compat
 import MinBars as MinBars
 import MinBars.Analyse as MinAnalyse
+import MinBars.Inspect as MinInspect
+import MinBars.Provenance as MinProv
 import MinBars.Surface (desugar) as MinSurface
 import RawBars as RawBars
 
@@ -452,6 +457,24 @@ inspectSurface = mkFn4 \partials target tpl json ->
 inspect :: Fn4 (FO.Object String) JsTarget String Json InspectResult
 inspect = mkFn4 \partials target tpl json ->
   inspectResult (RawBars.inspectWith target (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Mapped render of a *MinBars* (Mustache) template — the source map (ADR-035)
+-- | MinBars previously did not emit. `renderMinbarsMapped(template, data)`.
+renderMinbarsMapped :: Fn2 String Json MappedResult
+renderMinbarsMapped = mkFn2 \tpl json -> mappedResult (MinProv.renderMinMapped tpl (fromJson json))
+
+-- | Mapped render of a MinBars template with external partials.
+-- | `renderMinbarsMappedWithPartials(partials, template, data)`.
+renderMinbarsMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResult
+renderMinbarsMappedWithPartials = mkFn3 \partials tpl json ->
+  mappedResult (MinProv.renderMinMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Context inspector for a *MinBars* template (ADR-035). Mustache binds no loop
+-- | variables, so each snapshot reports only the context chain (`this`/`parent`/
+-- | `root`). `inspectMinbars(partials, target, template, data)`.
+inspectMinbars :: Fn4 (FO.Object String) JsTarget String Json InspectResult
+inspectMinbars = mkFn4 \partials target tpl json ->
+  inspectResult (MinInspect.inspectMinWith (FO.toUnfoldable partials) target tpl (fromJson json))
 
 -- | Context inspector for a *MaxBars* template.
 -- | `inspectMaxbars(partials, target, template, data)`.

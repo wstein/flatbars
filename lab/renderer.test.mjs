@@ -408,11 +408,21 @@ test("source map: the core and maxbars dialects also emit tiling segments", asyn
   assert.ok(m.segments.every((s) => s.file === "main"));
 });
 
-test("source map: MinBars (logic-less) has no source map", async () => {
+test("source map: MinBars emits a tiling source map (ADR-035)", async () => {
   const r = await createRenderer("minbars");
-  assert.ok(!r.engineInfo().features.includes("source-map"));
+  assert.ok(r.engineInfo().features.includes("source-map"));
   // {{.}} is Mustache's implicit iterator (renders the string context verbatim).
-  assert.deepEqual(r.render(r.compile("{{.}}").program, "x", { map: true }), { output: "x", segments: [] });
+  const { output, segments } = r.render(r.compile("{{.}}").program, "x", { map: true });
+  assert.equal(output, "x");
+  assert.equal(segments.map((s) => output.slice(s.out, s.out + s.len)).join(""), output);
+});
+
+test("source map: MinBars compat-rule render has no source map (the follow-up)", async () => {
+  const r = await createRenderer("minbars");
+  // The mapped path is spec-rule only; in mustache.js-compat mode it falls back to
+  // the plain render with empty segments (a compat-rule source map is tracked).
+  const out = r.render(r.compile("{{#n}}x{{/n}}").program, { n: 0 }, { map: true, compat: true });
+  assert.deepEqual(out, { output: "", segments: [] });
 });
 
 // the source span of the first linkable emit, used to drive the inspector.
@@ -461,13 +471,15 @@ test("context inspector: the core dialect snapshots too", async () => {
   assert.deepEqual(snaps.map((s) => s.this), ["a", "b"]);
 });
 
-test("context inspector: MinBars (logic-less) gates off (unsupported)", async () => {
+test("context inspector: MinBars snapshots the context chain (ADR-035)", async () => {
   const r = await createRenderer("minbars");
-  assert.ok(!r.engineInfo().features.includes("context-inspect"));
-  assert.throws(
-    () => r.inspectAt(r.compile("{{.}}").program, "x", { file: "main", start: 0, end: 1 }),
-    (e) => e.kind === "unsupported",
-  );
+  assert.ok(r.engineInfo().features.includes("context-inspect"));
+  // {{.}} at root: this = root context, no parent/loop vars (Mustache binds none).
+  const prog = r.compile("{{.}}").program;
+  const seg = firstEmitTarget(r, prog, "x");
+  const snaps = r.inspectAt(prog, "x", { file: "main", start: seg.start, end: seg.end });
+  assert.equal(snaps.length, 1);
+  assert.equal(snaps[0].this, "x");
 });
 
 // ── MinBars (Mustache) ───────────────────────────────────────────────────────
@@ -477,9 +489,40 @@ const minrun = (r, src, data, opts) => r.render(r.compile(src).program, data, op
 test("createRenderer('minbars') dispatches the Mustache engine (logic-less)", async () => {
   const r = await createRenderer("minbars");
   const info = r.engineInfo();
-  assert.deepEqual(info.features, ["partials", "catalog", "compile-js", "analyse", "partial-graph", "required-assigns"]);
+  assert.deepEqual(info.features, [
+    "partials", "catalog", "compile-js", "analyse", "partial-graph", "required-assigns", "source-map", "context-inspect",
+  ]);
   assert.deepEqual(r.allTransformers(), []); // Mustache has no helper registry
   assert.deepEqual(r.usedTransformers(), []); // Mustache has no helper calls
+});
+
+test("createRenderer('minbars') emits a source map + inspects context (ADR-035)", async () => {
+  const r = await createRenderer("minbars");
+  const prog = r.compile("{{#user}}{{email}}{{/user}}", {}).program;
+  const data = { name: "Ada", user: { email: "a@x" } };
+  // Source map: the mapped render tiles the output, the {{email}} emit carries its span.
+  const mapped = r.render(prog, data, { map: true });
+  assert.equal(mapped.output, "a@x");
+  const seg = mapped.segments.find((s) => s.kind === "emit" && s.start != null);
+  assert.ok(seg, "an emit segment with a source span");
+  // Context Inspector at that span: a section pushed `user`, so this=user, parent=root.
+  const snaps = r.inspectAt(prog, data, { file: "main", start: seg.start, end: seg.end });
+  assert.equal(snaps.length, 1);
+  assert.deepEqual(snaps[0].this, { email: "a@x" });
+  assert.deepEqual(snaps[0].parent, data);
+  // Mustache binds no loop variables, so the loop-var snapshot fields are absent.
+  assert.equal(snaps[0].index, undefined);
+  assert.deepEqual(snaps[0].locals, {});
+});
+
+test("MinBars source map yields one inspect snapshot per section iteration", async () => {
+  const r = await createRenderer("minbars");
+  const prog = r.compile("{{#xs}}[{{.}}]{{/xs}}", {}).program;
+  const data = { xs: ["a", "b", "c"] };
+  const mapped = r.render(prog, data, { map: true });
+  const seg = mapped.segments.find((s) => s.kind === "emit" && s.start != null);
+  const snaps = r.inspectAt(prog, data, { file: "main", start: seg.start, end: seg.end });
+  assert.deepEqual(snaps.map((s) => s.this), ["a", "b", "c"]);
 });
 
 test("createRenderer('minbars') reports required assigns (the data-access feature)", async () => {

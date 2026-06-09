@@ -15,6 +15,8 @@
 -- | claim a location in the entry template (full multi-file linking is a follow-up).
 module Kernel.Provenance
   ( Segment
+  , RawSeg
+  , assemble
   , runResolvedMapped
   , runResolvedLenientMapped
   ) where
