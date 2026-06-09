@@ -3,7 +3,15 @@
 //! structured migration report (`docs/15`). Currently Mustache-only.
 
 use crate::lower::{LowerOptions, MigrationNote, Severity, ShapeOracle};
-use crate::{ParseError, lift, lower, mustache};
+use crate::{ParseError, handlebars, lift, liquid, lower, mustache, stringtemplate};
+
+/// Assemble a [`Migration`] from a lowering result.
+fn assemble(low: lower::Lowered) -> Migration {
+    Migration {
+        truss: lift::to_truss_annotated(&low.ir, &low.notes),
+        report: low.report,
+    }
+}
 
 /// A completed migration: the idiomatic `.truss` (with inline `{{! migrate: … }}`
 /// notes) and the structured report.
@@ -29,12 +37,59 @@ pub fn mustache(
     opts: &LowerOptions,
 ) -> Result<Migration, ParseError> {
     let nodes = mustache::parse(src)?;
-    let low = lower::mustache(&nodes, shapes, opts);
-    let truss = lift::to_truss_annotated(&low.ir, &low.notes);
-    Ok(Migration {
-        truss,
-        report: low.report,
-    })
+    Ok(assemble(lower::mustache(&nodes, shapes, opts)))
+}
+
+/// Migrate a Handlebars template to idiomatic `.truss`.
+///
+/// # Errors
+/// Returns a [`ParseError`] if the source does not parse as Handlebars.
+pub fn handlebars(
+    src: &str,
+    shapes: &dyn ShapeOracle,
+    opts: &LowerOptions,
+) -> Result<Migration, ParseError> {
+    let nodes = handlebars::parse(src)?;
+    Ok(assemble(lower::handlebars(&nodes, shapes, opts)))
+}
+
+/// Migrate a Liquid template to idiomatic `.truss`.
+///
+/// # Errors
+/// Returns a [`ParseError`] if the source does not parse as Liquid.
+pub fn liquid(
+    src: &str,
+    shapes: &dyn ShapeOracle,
+    opts: &LowerOptions,
+) -> Result<Migration, ParseError> {
+    let nodes = liquid::parse(src)?;
+    Ok(assemble(lower::liquid(&nodes, shapes, opts)))
+}
+
+/// Migrate a StringTemplate4 `.st` body to idiomatic `.truss`.
+///
+/// # Errors
+/// Returns a [`ParseError`] if the source does not parse as a StringTemplate body.
+pub fn stringtemplate(
+    src: &str,
+    shapes: &dyn ShapeOracle,
+    opts: &LowerOptions,
+) -> Result<Migration, ParseError> {
+    let els = stringtemplate::parse_template(src)?;
+    Ok(assemble(lower::stringtemplate(&els, shapes, opts)))
+}
+
+/// Migrate a StringTemplate4 `.stg` group file to idiomatic `.truss` (inline partials).
+///
+/// # Errors
+/// Returns a [`ParseError`] if the source does not parse as a StringTemplate group.
+pub fn stringtemplate_group(
+    src: &str,
+    shapes: &dyn ShapeOracle,
+    opts: &LowerOptions,
+) -> Result<Migration, ParseError> {
+    let group = stringtemplate::parse_group(src)?;
+    Ok(assemble(lower::stringtemplate_group(&group, shapes, opts)))
 }
 
 /// Serialize a migration report to JSON (dependency-free), resolving each note's span

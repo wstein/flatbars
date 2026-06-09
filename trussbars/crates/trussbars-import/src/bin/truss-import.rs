@@ -5,7 +5,7 @@
 //! ```text
 //! truss-import [--dialect <name>] <file|->          # dump the dialect AST ({:#?})
 //! truss-import --metrics <file|->                   # Mustache idiom metrics
-//! truss-import --to-truss [--ternary] <file|->      # migrate Mustache → idiomatic .truss
+//! truss-import --to-truss [--ternary] [--data d.json] <file|->   # migrate → idiomatic .truss
 //! ```
 //!
 //! `--to-truss` writes the `.truss` to stdout and the migration report to stderr.
@@ -158,9 +158,6 @@ fn run_to_truss(
     data: Option<&str>,
     report_json: bool,
 ) -> ExitCode {
-    if dialect != Dialect::Mustache {
-        return usage("`--to-truss` currently supports only the `mustache` dialect");
-    }
     // The shape oracle: a `--data` JSON sample, else the heuristic.
     let oracle: Box<dyn ShapeOracle> = match data {
         Some(path) => {
@@ -183,7 +180,15 @@ fn run_to_truss(
     };
 
     let opts = LowerOptions { ternary };
-    match migrate::mustache(src, oracle.as_ref(), &opts) {
+    let shapes = oracle.as_ref();
+    let migrated = match dialect {
+        Dialect::Mustache => migrate::mustache(src, shapes, &opts),
+        Dialect::Handlebars => migrate::handlebars(src, shapes, &opts),
+        Dialect::Liquid => migrate::liquid(src, shapes, &opts),
+        Dialect::StringTemplateText => migrate::stringtemplate(src, shapes, &opts),
+        Dialect::StringTemplateGroup => migrate::stringtemplate_group(src, shapes, &opts),
+    };
+    match migrated {
         Ok(m) => {
             print!("{}", m.truss);
             if report_json {
@@ -258,7 +263,7 @@ fn print_help() {
     println!("modes:");
     println!("  (default)     dump the parsed dialect AST ({{:#?}})");
     println!("  --metrics     report Mustache idiom metrics (and suggested parameters)");
-    println!("  --to-truss    migrate Mustache → idiomatic .truss (report on stderr)");
+    println!("  --to-truss    migrate the template → idiomatic .truss (report on stderr)");
     println!("    --ternary       collapse trivial complementary pairs to {{x ? a : b}}");
     println!("    --data <f.json> disambiguate sections from a JSON data sample");
     println!("    --report-json   emit the migration report as JSON on stderr");

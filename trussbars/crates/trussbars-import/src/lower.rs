@@ -19,6 +19,7 @@ use crate::handlebars as hb;
 use crate::lift::Notes;
 use crate::liquid as liq;
 use crate::mustache::{Name, Node as M};
+use crate::stringtemplate as st;
 use trussbars_template::ast as ir;
 
 /// The runtime shape of a value at a path — used to disambiguate a Mustache section.
@@ -1372,6 +1373,341 @@ const KNOWN_PASSTHROUGH: &[&str] = &[
     "first", "last", "join", "reverse", "truncate", "replace", "default", "append", "prepend",
 ];
 
+// ===========================================================================
+// StringTemplate4
+// ===========================================================================
+
+/// Lower a parsed StringTemplate4 `.st` body to the Trussbars IR + a migration report.
+///
+/// `<expr>` → output (ST4 is not auto-escaping, so emitted raw), `<if(c)>…<elseif>…<else>`
+/// → `Cond`, a single-target `:` map (`<xs:{x|…}>` / `<xs:t()>`) → `{{#each}}`, a
+/// top-level named include `<t(args)>` → a partial. The constructs with no MaxBars
+/// analogue are residuals: `; separator=`/`null=`/… **options**, **multi-target** and
+/// **chained** maps, **indirect** includes `(e)()`, **dynamic** properties `a.(e)`, an
+/// anonymous subtemplate used as a value, list literals, and `<@region>` (rendered inline
+/// with a note).
+#[must_use]
+pub fn stringtemplate(
+    elements: &[st::Element],
+    shapes: &dyn ShapeOracle,
+    opts: &LowerOptions,
+) -> Lowered {
+    let mut c = Lower {
+        shapes,
+        opts,
+        notes: Notes::new(),
+        report: Vec::new(),
+    };
+    let ir = c.st_elements(elements);
+    Lowered {
+        ir,
+        notes: c.notes,
+        report: c.report,
+    }
+}
+
+/// Lower a parsed StringTemplate4 `.stg` group to the Trussbars IR: each template
+/// definition becomes a `{{#inline "name"}}…{{/inline}}` partial.
+#[must_use]
+pub fn stringtemplate_group(
+    group: &st::Group,
+    shapes: &dyn ShapeOracle,
+    opts: &LowerOptions,
+) -> Lowered {
+    let mut c = Lower {
+        shapes,
+        opts,
+        notes: Notes::new(),
+        report: Vec::new(),
+    };
+    let mut ir = Vec::new();
+    for imp in &group.imports {
+        ir.push(comment(&format!(
+            "import \"{imp}\" — wire up the imported templates"
+        )));
+    }
+    for def in &group.templates {
+        if !def.params.is_empty() {
+            let names = def
+                .params
+                .iter()
+                .map(|p| p.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ");
+            c.note(
+                def.span,
+                Severity::Warn,
+                format!(
+                    "template `{}` parameters ({names}) → declare a context type / pass explicitly",
+                    def.name
+                ),
+            );
+        }
+        let body = c.st_elements(&def.body);
+        ir.push(ir::Node::Inline {
+            span: def.span,
+            name: def.name.clone(),
+            body,
+        });
+    }
+    for dict in &group.dicts {
+        c.report_only(
+            dict.span,
+            Severity::Residual,
+            format!(
+                "dictionary `{}` → a MaxBars dict literal / lookup helper",
+                dict.name
+            ),
+        );
+        ir.push(comment(&format!(
+            "dictionary {} — needs a human",
+            dict.name
+        )));
+    }
+    Lowered {
+        ir,
+        notes: c.notes,
+        report: c.report,
+    }
+}
+
+impl Lower<'_> {
+    fn st_elements(&mut self, els: &[st::Element]) -> Vec<ir::Node> {
+        let mut out = Vec::new();
+        for el in els {
+            self.st_element(el, &mut out);
+        }
+        out
+    }
+
+    fn st_element(&mut self, el: &st::Element, out: &mut Vec<ir::Node>) {
+        match el {
+            st::Element::Text { text, .. } => out.push(ir::Node::Text(text.clone())),
+            st::Element::Comment { text, .. } => out.push(preserved_comment(text)),
+            st::Element::If {
+                span,
+                condition,
+                body,
+                elseifs,
+                otherwise,
+            } => {
+                let cond = self.st_expr(condition, *span);
+                let body = self.st_elements(body);
+                let elifs = elseifs
+                    .iter()
+                    .map(|(c, b)| (self.st_expr(c, *span), self.st_elements(b)))
+                    .collect();
+                let otherwise = otherwise
+                    .as_ref()
+                    .map(|b| self.st_elements(b))
+                    .unwrap_or_default();
+                out.push(ir::Node::Cond(ir::Cond {
+                    span: *span,
+                    negated: false,
+                    cond,
+                    body,
+                    elifs,
+                    otherwise,
+                }));
+            }
+            st::Element::Region { span, name, body } => {
+                self.note(
+                    *span,
+                    Severity::Warn,
+                    format!("ST4 region `{name}` has no MaxBars equivalent — rendered inline"),
+                );
+                let inner = self.st_elements(body);
+                out.extend(inner);
+            }
+            st::Element::Expr { span, value } => {
+                if !value.options.is_empty() {
+                    let opts: Vec<&str> = value.options.iter().map(|(k, _)| k.as_str()).collect();
+                    self.note(
+                        *span,
+                        Severity::Warn,
+                        format!(
+                            "ST4 options ({}) dropped — apply via a helper (e.g. `| join`, `?? default`)",
+                            opts.join(", ")
+                        ),
+                    );
+                }
+                self.st_value(*span, &value.expr, out);
+            }
+        }
+    }
+
+    /// Lower a top-level `<…>` expression: a map becomes iteration, a named include a
+    /// partial, anything else an output.
+    fn st_value(&mut self, span: Span, e: &st::Expr, out: &mut Vec<ir::Node>) {
+        match e {
+            st::Expr::Map { targets, mappers } => self.st_map(span, targets, mappers, out),
+            st::Expr::Include {
+                callee: st::Callee::Named(t),
+                args,
+            } => {
+                if !args.is_empty() {
+                    self.note(
+                        span,
+                        Severity::Warn,
+                        format!("include `{t}(…)` arguments dropped — pass context to the partial"),
+                    );
+                }
+                out.push(ir::Node::Partial {
+                    span,
+                    name: t.clone(),
+                    ctx: None,
+                });
+            }
+            st::Expr::Include {
+                callee: st::Callee::Indirect(_),
+                ..
+            } => {
+                self.report_only(
+                    span,
+                    Severity::Residual,
+                    "indirect include `(expr)(…)` is inadmissible (computed template)".to_string(),
+                );
+                out.push(comment("indirect include — needs a human"));
+            }
+            // ST4 does not HTML-escape, so a plain interpolation is emitted raw.
+            other => out.push(ir::Node::Output {
+                span,
+                expr: self.st_expr(other, span),
+                raw: true,
+            }),
+        }
+    }
+
+    /// Lower a `:` map/apply to `{{#each}}` (single target + single mapper only).
+    fn st_map(
+        &mut self,
+        span: Span,
+        targets: &[st::Expr],
+        mappers: &[st::Mapper],
+        out: &mut Vec<ir::Node>,
+    ) {
+        if targets.len() != 1 || mappers.len() != 1 {
+            self.note(
+                span,
+                Severity::Warn,
+                "multi-target / chained `:` map approximated by its first target+mapper — verify"
+                    .to_string(),
+            );
+        }
+        let Some(subject) = targets.first().map(|t| self.st_expr(t, span)) else {
+            self.report_only(span, Severity::Residual, "empty map".to_string());
+            return;
+        };
+        match mappers.first() {
+            Some(st::Mapper::Anon(sub)) => {
+                let body = self.st_elements(&sub.body);
+                out.push(ir::Node::Each(ir::Each {
+                    span,
+                    subject,
+                    item: sub.params.first().cloned(),
+                    index: sub.params.get(1).cloned(),
+                    label: None,
+                    body,
+                    otherwise: Vec::new(),
+                }));
+            }
+            Some(st::Mapper::Template {
+                callee: st::Callee::Named(t),
+                ..
+            }) => {
+                // Apply template `t` to each element (which re-roots `this`).
+                out.push(ir::Node::Each(ir::Each {
+                    span,
+                    subject,
+                    item: None,
+                    index: None,
+                    label: None,
+                    body: vec![ir::Node::Partial {
+                        span,
+                        name: t.clone(),
+                        ctx: None,
+                    }],
+                    otherwise: Vec::new(),
+                }));
+            }
+            _ => {
+                self.report_only(
+                    span,
+                    Severity::Residual,
+                    "indirect map template `(expr)` is inadmissible".to_string(),
+                );
+                out.push(comment("indirect map — needs a human"));
+            }
+        }
+    }
+
+    fn st_expr(&mut self, e: &st::Expr, span: Span) -> ir::Expr {
+        match e {
+            st::Expr::Attr(s) => lookup_chain(ir::Expr::nullary("this"), std::slice::from_ref(s)),
+            st::Expr::Str(s) => ir::Expr::str(s),
+            st::Expr::Bool(b) => ir::Expr::Lit(ir::Value::Bool(*b)),
+            st::Expr::Prop { object, prop } => {
+                let o = self.st_expr(object, span);
+                match prop {
+                    st::Prop::Name(n) => append_key(o, n),
+                    st::Prop::Dynamic(e) => {
+                        self.note(
+                            span,
+                            Severity::Warn,
+                            "dynamic property `a.(e)` → `lookup` helper — verify".to_string(),
+                        );
+                        let idx = self.st_expr(e, span);
+                        ir::Expr::App("lookup".into(), vec![o, idx])
+                    }
+                }
+            }
+            st::Expr::Not(e) => ir::Expr::App("not".into(), vec![self.st_expr(e, span)]),
+            st::Expr::And(a, b) => ir::Expr::App(
+                "and".into(),
+                vec![self.st_expr(a, span), self.st_expr(b, span)],
+            ),
+            st::Expr::Or(a, b) => ir::Expr::App(
+                "or".into(),
+                vec![self.st_expr(a, span), self.st_expr(b, span)],
+            ),
+            st::Expr::Include {
+                callee: st::Callee::Named(t),
+                args,
+            } => {
+                self.note(
+                    span,
+                    Severity::Warn,
+                    format!(
+                        "template include `{t}(…)` used as a value — verify (emitted as a call)"
+                    ),
+                );
+                let args = args
+                    .iter()
+                    .filter_map(|a| match a {
+                        st::Arg::Positional(e) | st::Arg::Named(_, e) => {
+                            Some(self.st_expr(e, span))
+                        }
+                        st::Arg::Ellipsis => None,
+                    })
+                    .collect();
+                ir::Expr::App(t.clone(), args)
+            }
+            st::Expr::List(items) => {
+                let args = items.iter().map(|i| self.st_expr(i, span)).collect();
+                ir::Expr::App("list".into(), args)
+            }
+            st::Expr::Map { .. } | st::Expr::Anon(_) | st::Expr::Include { .. } => {
+                self.report_only(
+                    span,
+                    Severity::Residual,
+                    "map / anonymous subtemplate / indirect include used as a value — needs a human".to_string(),
+                );
+                ir::Expr::str("")
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -1906,5 +2242,92 @@ mod tests {
     fn liq_truthiness_noted() {
         let l = liq_low("{% if x %}y{% endif %}");
         assert!(l.report.iter().any(|n| n.message.contains("truthiness")));
+    }
+
+    // --- StringTemplate4 ----------------------------------------------------
+
+    fn st_truss(src: &str) -> String {
+        let els = crate::stringtemplate::parse_template(src).unwrap_or_else(|e| panic!("st: {e}"));
+        let l = stringtemplate(&els, &NoShapes, &LowerOptions::default());
+        to_truss_annotated(&l.ir, &l.notes)
+    }
+    fn st_low(src: &str) -> Lowered {
+        stringtemplate(
+            &crate::stringtemplate::parse_template(src).unwrap(),
+            &NoShapes,
+            &LowerOptions::default(),
+        )
+    }
+
+    #[test]
+    fn st_attribute_and_property() {
+        // ST4 is not auto-escaping → raw output.
+        assert!(st_truss("Hi <name>!").contains("{{{name}}}"));
+        assert!(st_truss("<user.email>").contains("{{{user.email}}}"));
+    }
+
+    #[test]
+    fn st_conditional_chain() {
+        let s = st_truss("<if(a)>A<elseif(b)>B<else>C<endif>");
+        assert!(
+            s.contains("{{#if a}}A{{else if b}}B{{else}}C{{/if}}"),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn st_negation_in_condition() {
+        let s = st_truss("<if(!ready)>wait<endif>");
+        assert!(s.contains("{{#if !ready}}"), "{s}");
+    }
+
+    #[test]
+    fn st_map_anon_to_each() {
+        let s = st_truss("<users:{u | <u.name>\n}>");
+        assert!(s.contains("{{#each u in users}}"), "{s}");
+    }
+
+    #[test]
+    fn st_map_named_template_to_each_partial() {
+        let l = st_low("<rows:row()>");
+        let ir::Node::Each(e) = &l.ir[0] else {
+            panic!("{:?}", l.ir)
+        };
+        assert!(matches!(&e.body[0], ir::Node::Partial { name, .. } if name == "row"));
+    }
+
+    #[test]
+    fn st_top_level_include_is_partial() {
+        let l = st_low("<header()>");
+        assert!(matches!(&l.ir[0], ir::Node::Partial { name, .. } if name == "header"));
+    }
+
+    #[test]
+    fn st_options_and_region_noted() {
+        let opt = st_low("<items; separator=\", \">");
+        assert!(opt.report.iter().any(|n| n.message.contains("options")));
+        let reg = st_low("<@footer>x<@end>");
+        assert!(reg.report.iter().any(|n| n.message.contains("region")));
+    }
+
+    #[test]
+    fn st_indirect_include_is_residual() {
+        let l = st_low("<(name)()>");
+        assert!(l.report.iter().any(|n| n.severity == Severity::Residual));
+    }
+
+    #[test]
+    fn st_group_templates_become_inline_partials() {
+        let g = crate::stringtemplate::parse_group(
+            "row(item) ::= \"<item.name>\"\ngreeting() ::= \"hi\"",
+        )
+        .unwrap();
+        let l = stringtemplate_group(&g, &NoShapes, &LowerOptions::default());
+        assert!(
+            l.ir.iter()
+                .any(|n| matches!(n, ir::Node::Inline { name, .. } if name == "row"))
+        );
+        // The parameter is flagged for context declaration.
+        assert!(l.report.iter().any(|n| n.message.contains("parameters")));
     }
 }

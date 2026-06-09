@@ -1,12 +1,12 @@
 # Trussbars — Migration Tool (`trussbars-import`)
 
 > **Status:** **IMPLEMENTED** — the foreign-dialect *parsers* (all four dialects) **and**
-> the **Mustache → idiomatic `.truss`** write half: idiom metrics, an idiom-aware lowering
-> to the Trussbars IR, the IR→`.truss` *Lift*, and the `truss-import` CLI. The
-> Handlebars/Liquid/StringTemplate4 lowerings are the next slices. **Audience:** whoever
-> builds out the `…→.truss` migration tool docs/13 makes a lead post-severance item.
-> **Companion docs:** realises the **migration tool** row of `docs/13 §6`; `docs/12`
-> (`{{#case}}`) and `docs/14` (`{{#match}}`) are downstream collapse targets.
+> the **`…→ idiomatic .truss`** write half for **all four**: idiom metrics (Mustache), an
+> idiom-aware lowering to the Trussbars IR per dialect, the IR→`.truss` *Lift*, and the
+> `truss-import` CLI (`--metrics`, `--to-truss`). **Audience:** whoever builds out the
+> `…→.truss` migration tool docs/13 makes a lead post-severance item. **Companion docs:**
+> realises the **migration tool** row of `docs/13 §6`; `docs/12` (`{{#case}}`) and
+> `docs/14` (`{{#match}}`) are downstream collapse targets.
 
 ## 1. Why this exists
 
@@ -174,12 +174,26 @@ shows the `{{#let}}` to wrap the dependent region), `capture`, `increment`/`decr
 `cycle`, `break`/`continue`, `tablerow`, and unknown tags; `for` `limit`/`offset`/
 `reversed` are noted for conversion to a pipe.
 
+### StringTemplate4
+
+`lower::stringtemplate` (`.st`) maps `<expr>` → output (ST4 is not auto-escaping, so
+*raw*), `<if(c)>…<elseif>…<else>` → `Cond`, a single-target `:` map (`<xs:{x|…}>` /
+`<xs:t()>`) → `{{#each}}`, and a top-level named include `<t(…)>` → a partial.
+`lower::stringtemplate_group` (`.stg`) turns each template definition into a
+`{{#inline "name"}}…{{/inline}}` partial (parameters flagged for context declaration).
+Residuals (no MaxBars analogue): `; separator=`/`null=`/… **options**, **multi-target**
+and **chained** maps, **indirect** includes `(e)()`, **dynamic** properties `a.(e)`, an
+anonymous subtemplate / map used as a value, list literals, dictionaries, and `<@region>`
+(rendered inline with a note).
+
 ## 7. Out of scope (the next deliverables)
 
-- **The StringTemplate4 lowering** — the parser exists; its IR lowering is the next slice.
-  The idiom linter shares this rewrite engine (`docs/13 §6`); conformance-test the Rust
-  output against the PureScript `packages/linter` reference *while it still exists*
-  (`docs/13`).
+- **The differential gate** — render the migrated `.truss` and the original through both
+  engines and assert equivalence *modulo a semantic-delta ledger* (truthiness, escaping,
+  missing-key). Needs the real foreign engines as oracles. The idiom linter shares this
+  rewrite engine (`docs/13 §6`); conformance-test against the PureScript `packages/linter`
+  reference *while it still exists* (`docs/13`).
+- **Schema inference** (`docs/03`) — to emit a *compiling* typed `.truss` (a `Ctx`).
 - **The differential gate** — render the migrated `.truss` and the original through both
   engines and assert equivalence *modulo a semantic-delta ledger* (truthiness, escaping,
   missing-key). Needs the real foreign engines as oracles.
