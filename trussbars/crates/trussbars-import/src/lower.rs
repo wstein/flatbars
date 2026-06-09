@@ -15,6 +15,7 @@
 //! injected `{{! … }}` surface comments (the IR has no comment node).
 
 use crate::Span;
+use crate::handlebars as hb;
 use crate::lift::Notes;
 use crate::mustache::{Name, Node as M};
 use trussbars_template::ast as ir;
@@ -421,6 +422,451 @@ impl Lower<'_> {
     }
 }
 
+// ===========================================================================
+// Handlebars
+// ===========================================================================
+
+/// Lower a parsed Handlebars template to the Trussbars IR + a migration report.
+///
+/// Built-in blocks (`if`/`unless`/`each`/`with`, with `{{else if}}` chains and `as |x|`
+/// block params) map directly; custom block helpers become [`ir::HelperBlock`];
+/// partials / partial blocks / inline partials map across. Divergences are annotated:
+/// the truthiness rule differs, `{{else}}` on a custom block helper is dropped (host
+/// block helpers are binary), hash arguments and `../` parent paths need review, and
+/// dynamic partials / decorators are residuals.
+#[must_use]
+pub fn handlebars(nodes: &[hb::Node], shapes: &dyn ShapeOracle, opts: &LowerOptions) -> Lowered {
+    let mut c = Lower {
+        shapes,
+        opts,
+        notes: Notes::new(),
+        report: Vec::new(),
+    };
+    let ir = c.hb_nodes(nodes);
+    Lowered {
+        ir,
+        notes: c.notes,
+        report: c.report,
+    }
+}
+
+impl Lower<'_> {
+    fn hb_nodes(&mut self, ns: &[hb::Node]) -> Vec<ir::Node> {
+        let mut out = Vec::new();
+        for n in ns {
+            self.hb_node(n, &mut out);
+        }
+        out
+    }
+
+    fn hb_node(&mut self, n: &hb::Node, out: &mut Vec<ir::Node>) {
+        match n {
+            hb::Node::Text { text, .. } => out.push(ir::Node::Text(text.clone())),
+            hb::Node::Mustache {
+                span,
+                path,
+                params,
+                hash,
+                escaped,
+            } => {
+                let expr = if params.is_empty() && hash.is_empty() {
+                    self.hb_path(path, *span)
+                } else {
+                    if !hash.is_empty() {
+                        self.note(
+                            *span,
+                            Severity::Warn,
+                            "helper hash arguments dropped — convert manually".to_string(),
+                        );
+                    }
+                    let args = params.iter().map(|a| self.hb_expr(a, *span)).collect();
+                    ir::Expr::App(path.original.clone(), args)
+                };
+                out.push(ir::Node::Output {
+                    span: *span,
+                    expr,
+                    raw: !escaped,
+                });
+            }
+            hb::Node::Block {
+                span,
+                path,
+                params,
+                hash,
+                block_params,
+                inverted,
+                program,
+                inverse,
+            } => self.hb_block(
+                *span,
+                path,
+                params,
+                hash,
+                block_params,
+                *inverted,
+                program,
+                inverse,
+                out,
+            ),
+            hb::Node::Partial {
+                span,
+                name,
+                params,
+                hash,
+                ..
+            } => {
+                if !hash.is_empty() {
+                    self.note(
+                        *span,
+                        Severity::Warn,
+                        "partial hash arguments dropped — convert manually".to_string(),
+                    );
+                }
+                match name {
+                    hb::PartialName::Simple(n) => {
+                        let ctx = params.first().map(|p| self.hb_expr(p, *span));
+                        out.push(ir::Node::Partial {
+                            span: *span,
+                            name: n.clone(),
+                            ctx,
+                        });
+                    }
+                    hb::PartialName::Dynamic(_) => {
+                        self.report_only(
+                            *span,
+                            Severity::Residual,
+                            "dynamic partial `{{> (expr)}}` is inadmissible (computed name)"
+                                .to_string(),
+                        );
+                        out.push(comment("dynamic partial — needs a human"));
+                    }
+                }
+            }
+            hb::Node::PartialBlock {
+                span,
+                name,
+                params,
+                program,
+                inverse,
+                ..
+            } => {
+                if inverse.is_some() {
+                    self.note(
+                        *span,
+                        Severity::Warn,
+                        "partial-block `{{else}}` arm dropped".to_string(),
+                    );
+                }
+                match name {
+                    hb::PartialName::Simple(n) => {
+                        let ctx = params.first().map(|p| self.hb_expr(p, *span));
+                        let body = self.hb_nodes(program);
+                        out.push(ir::Node::PartialBlock {
+                            span: *span,
+                            name: n.clone(),
+                            ctx,
+                            body,
+                        });
+                    }
+                    hb::PartialName::Dynamic(_) => {
+                        self.report_only(
+                            *span,
+                            Severity::Residual,
+                            "dynamic partial block is inadmissible (computed name)".to_string(),
+                        );
+                        out.push(comment("dynamic partial block — needs a human"));
+                    }
+                }
+            }
+            hb::Node::InlinePartial {
+                span,
+                name,
+                program,
+            } => {
+                let body = self.hb_nodes(program);
+                out.push(ir::Node::Inline {
+                    span: *span,
+                    name: name.clone(),
+                    body,
+                });
+            }
+            hb::Node::Decorator { span, .. } | hb::Node::BlockDecorator { span, .. } => {
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    "Handlebars decorators have no MaxBars equivalent".to_string(),
+                );
+                out.push(comment("decorator — needs a human"));
+            }
+            hb::Node::Comment { text, .. } => out.push(preserved_comment(text)),
+            hb::Node::RawBlock { span, content, .. } => out.push(ir::Node::RawBlock {
+                span: *span,
+                body: content.clone(),
+            }),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn hb_block(
+        &mut self,
+        span: Span,
+        path: &hb::Path,
+        params: &[hb::Expr],
+        hash: &[hb::HashPair],
+        block_params: &[String],
+        inverted: bool,
+        program: &[hb::Node],
+        inverse: &Option<Vec<hb::Node>>,
+        out: &mut Vec<ir::Node>,
+    ) {
+        match path.original.as_str() {
+            "if" => {
+                let cond = self.hb_first(params, span);
+                let body = self.hb_nodes(program);
+                let (elifs, otherwise) = self.hb_inverse_chain(inverse);
+                self.hb_truthiness(span, "if condition");
+                out.push(ir::Node::Cond(ir::Cond {
+                    span,
+                    negated: inverted,
+                    cond,
+                    body,
+                    elifs,
+                    otherwise,
+                }));
+            }
+            "unless" => {
+                let cond = self.hb_first(params, span);
+                let body = self.hb_nodes(program);
+                let otherwise = self.hb_else(inverse);
+                self.hb_truthiness(span, "unless condition");
+                out.push(ir::Node::Cond(ir::Cond {
+                    span,
+                    negated: true,
+                    cond,
+                    body,
+                    elifs: Vec::new(),
+                    otherwise,
+                }));
+            }
+            "each" => {
+                let subject = self.hb_first(params, span);
+                let body = self.hb_nodes(program);
+                let otherwise = self.hb_else(inverse);
+                out.push(ir::Node::Each(ir::Each {
+                    span,
+                    subject,
+                    item: block_params.first().cloned(),
+                    index: block_params.get(1).cloned(),
+                    label: None,
+                    body,
+                    otherwise,
+                }));
+            }
+            "with" => {
+                let subject = self.hb_first(params, span);
+                let body = self.hb_nodes(program);
+                let otherwise = self.hb_else(inverse);
+                self.hb_truthiness(span, "with subject");
+                out.push(ir::Node::With(ir::With {
+                    span,
+                    subject,
+                    body,
+                    otherwise,
+                }));
+            }
+            head if inverted => {
+                // `{{^name}}…{{/name}}` over a non-builtin → `{{#unless name}}`.
+                let cond = self.hb_path(path, span);
+                let body = self.hb_nodes(program);
+                let otherwise = self.hb_else(inverse);
+                self.hb_truthiness(span, head);
+                out.push(ir::Node::Cond(ir::Cond {
+                    span,
+                    negated: true,
+                    cond,
+                    body,
+                    elifs: Vec::new(),
+                    otherwise,
+                }));
+            }
+            head => {
+                // A custom block helper → `{{#head args}}…{{/head}}` (binary, no else).
+                if inverse.is_some() {
+                    self.note(
+                        span,
+                        Severity::Warn,
+                        format!(
+                            "`{{{{#{head}}}}}` else arm dropped (host block helpers are binary)"
+                        ),
+                    );
+                }
+                if !hash.is_empty() {
+                    self.note(
+                        span,
+                        Severity::Warn,
+                        format!("`{{{{#{head}}}}}` hash arguments dropped — convert manually"),
+                    );
+                }
+                let args = params.iter().map(|a| self.hb_expr(a, span)).collect();
+                let body = self.hb_nodes(program);
+                out.push(ir::Node::HelperBlock(ir::HelperBlock {
+                    span,
+                    head: head.to_string(),
+                    args,
+                    body,
+                }));
+            }
+        }
+    }
+
+    /// Flatten a `{{#if}}`'s inverse: a lone nested `if`-block is an `{{else if}}` arm.
+    fn hb_inverse_chain(
+        &mut self,
+        inverse: &Option<Vec<hb::Node>>,
+    ) -> (Vec<(ir::Expr, Vec<ir::Node>)>, Vec<ir::Node>) {
+        let Some(ns) = inverse else {
+            return (Vec::new(), Vec::new());
+        };
+        if let [
+            hb::Node::Block {
+                span,
+                path,
+                params,
+                inverted: false,
+                program,
+                inverse: inner,
+                ..
+            },
+        ] = ns.as_slice()
+            && path.original == "if"
+        {
+            let cond = self.hb_first(params, *span);
+            let body = self.hb_nodes(program);
+            let (mut elifs, otherwise) = self.hb_inverse_chain(inner);
+            elifs.insert(0, (cond, body));
+            return (elifs, otherwise);
+        }
+        (Vec::new(), self.hb_nodes(ns))
+    }
+
+    fn hb_else(&mut self, inverse: &Option<Vec<hb::Node>>) -> Vec<ir::Node> {
+        match inverse {
+            Some(ns) => self.hb_nodes(ns),
+            None => Vec::new(),
+        }
+    }
+
+    /// The first positional argument as an expression (a located note if missing).
+    fn hb_first(&mut self, params: &[hb::Expr], span: Span) -> ir::Expr {
+        match params.first() {
+            Some(e) => self.hb_expr(e, span),
+            None => {
+                self.note(
+                    span,
+                    Severity::Warn,
+                    "block is missing its argument — emitted `this`".to_string(),
+                );
+                ir::Expr::nullary("this")
+            }
+        }
+    }
+
+    fn hb_expr(&mut self, e: &hb::Expr, span: Span) -> ir::Expr {
+        match e {
+            hb::Expr::Literal(l) => hb_lit(l),
+            hb::Expr::Path(p) => self.hb_path(p, span),
+            hb::Expr::Sub { path, params, hash } => {
+                if !hash.is_empty() {
+                    self.note(
+                        span,
+                        Severity::Warn,
+                        "subexpression hash arguments dropped — convert manually".to_string(),
+                    );
+                }
+                let args = params.iter().map(|a| self.hb_expr(a, span)).collect();
+                ir::Expr::App(path.original.clone(), args)
+            }
+        }
+    }
+
+    fn hb_path(&mut self, p: &hb::Path, span: Span) -> ir::Expr {
+        if p.data {
+            return self.hb_data_path(p, span);
+        }
+        if p.depth > 0 {
+            self.note(
+                span,
+                Severity::Warn,
+                format!(
+                    "Handlebars `../`×{} parent path → `@parentchain` (verify; MaxBars parent access differs, ADR-021)",
+                    p.depth
+                ),
+            );
+            return lookup_chain(ir::Expr::nullary("@parentchain"), &p.segments);
+        }
+        if p.segments.is_empty() {
+            return ir::Expr::nullary("this");
+        }
+        lookup_chain(ir::Expr::nullary("this"), &p.segments)
+    }
+
+    /// Map a `@data` reference to its MaxBars equivalent (`@root`, loop variables).
+    fn hb_data_path(&mut self, p: &hb::Path, span: Span) -> ir::Expr {
+        let first = p.segments.first().map_or("", String::as_str);
+        let rest = if p.segments.is_empty() {
+            &[][..]
+        } else {
+            &p.segments[1..]
+        };
+        match first {
+            "root" => lookup_chain(ir::Expr::nullary("root"), rest),
+            "index" => lookup_chain(ir::Expr::nullary("loop"), &["index0".to_string()]),
+            "index0" | "index1" | "first" | "last" | "key" | "length" => {
+                lookup_chain(ir::Expr::nullary("loop"), &[first.to_string()])
+            }
+            other => {
+                self.note(
+                    span,
+                    Severity::Warn,
+                    format!("unknown `@{other}` data reference — verify"),
+                );
+                lookup_chain(ir::Expr::nullary("loop"), &p.segments)
+            }
+        }
+    }
+
+    /// The Handlebars truthiness caveat (its rule differs from MaxBars `nonEmpty`).
+    fn hb_truthiness(&mut self, span: Span, label: &str) {
+        self.note(
+            span,
+            Severity::Warn,
+            format!(
+                "truthiness of {label} differs: Handlebars treats 0/\"\" as falsy and {{}} as truthy; MaxBars `nonEmpty` treats 0 as truthy and \"\"/[]/{{}} as falsy — verify"
+            ),
+        );
+    }
+}
+
+/// Lower a Handlebars literal to an IR literal (`undefined` collapses to `null`).
+fn hb_lit(l: &hb::Literal) -> ir::Expr {
+    ir::Expr::Lit(match l {
+        hb::Literal::Str(s) => ir::Value::Str(s.clone()),
+        hb::Literal::Number(n) => ir::Value::Num(*n),
+        hb::Literal::Bool(b) => ir::Value::Bool(*b),
+        hb::Literal::Null | hb::Literal::Undefined => ir::Value::Null,
+    })
+}
+
+/// Build a `lookup` chain `App("lookup", [root, key…])`, or just `root` with no keys.
+fn lookup_chain(root: ir::Expr, segs: &[String]) -> ir::Expr {
+    if segs.is_empty() {
+        return root;
+    }
+    let mut args = vec![root];
+    args.extend(segs.iter().map(|s| ir::Expr::str(s)));
+    ir::Expr::App("lookup".into(), args)
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -743,5 +1189,117 @@ mod tests {
         let sca = shapes(&[(&["ok"], Shape::Scalar)]);
         let l = low("{{#ok}}y{{/ok}}", &sca, &LowerOptions::default());
         assert!(l.report.iter().any(|n| n.message.contains("truthiness")));
+    }
+
+    // --- Handlebars ---------------------------------------------------------
+
+    fn hb_truss(src: &str) -> String {
+        let nodes = crate::handlebars::parse(src).unwrap_or_else(|e| panic!("hb parse: {e}"));
+        let l = handlebars(&nodes, &NoShapes, &LowerOptions::default());
+        to_truss_annotated(&l.ir, &l.notes)
+    }
+    fn hb_low(src: &str) -> Lowered {
+        handlebars(
+            &crate::handlebars::parse(src).unwrap(),
+            &NoShapes,
+            &LowerOptions::default(),
+        )
+    }
+
+    #[test]
+    fn hb_variable_and_helper() {
+        let l = hb_low("{{a}} {{uppercase b.c}}");
+        assert!(matches!(&l.ir[0], ir::Node::Output { raw: false, .. }));
+        // A helper call lowers to an application.
+        assert!(matches!(
+            &l.ir[2],
+            ir::Node::Output { expr: ir::Expr::App(h, _), .. } if h == "uppercase"
+        ));
+    }
+
+    #[test]
+    fn hb_if_elseif_else_chain() {
+        let s = hb_truss("{{#if a}}A{{else if b}}B{{else}}C{{/if}}");
+        assert!(
+            s.contains("{{#if a}}A{{else if b}}B{{else}}C{{/if}}"),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn hb_each_block_params() {
+        let s = hb_truss("{{#each items as |item idx|}}{{idx}}:{{item.name}}{{/each}}");
+        assert!(s.contains("{{#each item idx in items}}"), "{s}");
+    }
+
+    #[test]
+    fn hb_unless_and_with() {
+        assert!(hb_truss("{{#unless x}}n{{/unless}}").contains("{{#unless x}}"));
+        assert!(hb_truss("{{#with u}}{{name}}{{/with}}").contains("{{#with u}}"));
+    }
+
+    #[test]
+    fn hb_custom_block_helper_is_helperblock() {
+        let s = hb_truss("{{#bold y}}{{x}}{{/bold}}");
+        assert!(s.contains("{{#bold y}}{{x}}{{/bold}}"), "{s}");
+    }
+
+    #[test]
+    fn hb_custom_block_else_is_dropped_with_note() {
+        let l = hb_low("{{#bold}}a{{else}}b{{/bold}}");
+        assert!(
+            l.report
+                .iter()
+                .any(|n| n.message.contains("else arm dropped"))
+        );
+    }
+
+    #[test]
+    fn hb_subexpression() {
+        let l = hb_low("{{outer (inner a)}}");
+        let ir::Node::Output {
+            expr: ir::Expr::App(h, args),
+            ..
+        } = &l.ir[0]
+        else {
+            panic!("{:?}", l.ir)
+        };
+        assert_eq!(h, "outer");
+        assert!(matches!(&args[0], ir::Expr::App(i, _) if i == "inner"));
+    }
+
+    #[test]
+    fn hb_data_paths() {
+        assert!(hb_truss("{{#each xs}}{{@index}}{{/each}}").contains("loop.index0"));
+        assert!(hb_truss("{{@root.title}}").contains("@root.title"));
+    }
+
+    #[test]
+    fn hb_parent_path_warns() {
+        let l = hb_low("{{#each xs}}{{../title}}{{/each}}");
+        assert!(l.report.iter().any(|n| n.message.contains("parent path")));
+    }
+
+    #[test]
+    fn hb_partials_and_dynamic_residual() {
+        let l = hb_low("{{> nav}}{{> (lookup . 'p')}}");
+        assert!(matches!(&l.ir[0], ir::Node::Partial { name, .. } if name == "nav"));
+        assert!(l.report.iter().any(|n| n.severity == Severity::Residual));
+    }
+
+    #[test]
+    fn hb_inline_partial_and_raw_block() {
+        assert!(hb_truss(r#"{{#*inline "card"}}x{{/inline}}"#).contains("{{#inline \"card\"}}"));
+        assert!(hb_truss("{{{{raw}}}}{{x}}{{{{/raw}}}}").contains("{{{{raw}}}}{{x}}{{{{/raw}}}}"));
+    }
+
+    #[test]
+    fn hb_hash_args_noted() {
+        let l = hb_low("{{> nav class=\"top\"}}");
+        assert!(
+            l.report
+                .iter()
+                .any(|n| n.message.contains("hash arguments"))
+        );
     }
 }

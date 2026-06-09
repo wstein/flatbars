@@ -145,12 +145,27 @@ comments.
 `truss-import --to-truss [--ternary] <file>` writes the migrated `.truss` to stdout and the
 report to stderr.
 
+### Handlebars
+
+`lower::handlebars` maps the Handlebars superset to the IR. Built-in blocks
+(`if`/`unless`/`each`/`with`) lower directly, with `{{else if}}` chains flattened to
+`Cond` `elifs`, `as |item idx|` block params to the `each` bindings, and subexpressions
+`(helper a)` to nested applications. Custom block helpers become `{{#head args}}…{{/head}}`
+([`ir::HelperBlock`]); partials / partial blocks / inline partials map across; comments and
+raw blocks are preserved. `@data` references map to MaxBars equivalents (`@root`, `@index`
+→ `loop.index0`, `@first`/`@last`/`@key` → `loop.*`). Divergences are annotated: the
+**truthiness rule** differs (Handlebars `0`/`""` falsy, `{}` truthy; `nonEmpty` the
+inverse); a custom block helper's `{{else}}` arm is dropped (host block helpers are
+binary, `docs/09`); **hash arguments** and `../` **parent paths** (removed in MaxBars,
+ADR-021 — mapped best-effort to `@parentchain`) need review; **dynamic partials** and
+**decorators** are residuals.
+
 ## 7. Out of scope (the next deliverables)
 
-- **The Handlebars / Liquid / StringTemplate4 lowerings** — the parsers exist; their IR
-  lowerings (and their own idiom catalogues) are the next slices. The idiom linter shares
-  this rewrite engine (`docs/13 §6`); conformance-test the Rust output against the
-  PureScript `packages/linter` reference *while it still exists* (`docs/13`).
+- **The Liquid / StringTemplate4 lowerings** — the parsers exist; their IR lowerings (and
+  their own idiom catalogues) are the next slices. The idiom linter shares this rewrite
+  engine (`docs/13 §6`); conformance-test the Rust output against the PureScript
+  `packages/linter` reference *while it still exists* (`docs/13`).
 - **The differential gate** — render the migrated `.truss` and the original through both
   engines and assert equivalence *modulo a semantic-delta ledger* (truthiness, escaping,
   missing-key). Needs the real foreign engines as oracles.
