@@ -115,7 +115,7 @@ an ordinary Mustache section.
 | --- | --- | --- | --- |
 | **A1** | **First-class node → Rust `match`** | **Chosen** | A dedicated `Case` node + `caseH` op + per-backend emit. Costs a node and an emit arm, but the subject is evaluated **once** and the AOT backend emits a real `match` — the optimization a desugared `eq`-chain can't express, and the seam A2 extends. |
 | **A1′** | Sugar → `Cond` (eq-chain) | **Superseded** | An earlier draft desugared `{{#case}}` to a `Cond`/`if`-chain (no new machinery, compiler "free"). Rejected because it re-evaluates the subject per arm and gives the codegen nothing to optimize — `case` should *become* a `match`, not an `if`-chain. |
-| **A2** | Typed exhaustive Rust-`match` over closed enums | **Future extension of A1** | The real typed superpower (compile-time exhaustiveness on `#[serde(tag)]` enums) — literal *pattern* arms, not value guards. Needs compile-time knowledge of the subject's variant set (schema, `docs/03`). The first-class `Case` node (A1) is its prerequisite; spelled `{{#case}}` with pattern arms, not `when`. |
+| **A2** | Typed exhaustive Rust-`match` over closed enums | **Future extension of A1** | The real typed superpower (compile-time exhaustiveness on `#[serde(tag)]` enums) — literal *pattern* arms, not value guards. Needs compile-time knowledge of the subject's variant set (schema, `docs/03`). The first-class `Case` node (A1) is its prerequisite; spelled `{{#match}}` with pattern arms (see `docs/14`). |
 | **A3** | A host block helper with N named arms (generalize `docs/09 §3.1`'s arm-selector) | **Rejected** | The matching semantics are *engine value-comparisons over template literals*, not host Rust logic — so the engine is the natural evaluator, not a host fn. Routing it through a helper would force every author to re-implement `eq`-dispatch and fragment the convention. Keeps host block helpers cleanly **binary**. |
 | **A4** | Do nothing — authors write `{{#if (eq s a)}}…{{else if (eq s b)}}…{{/if}}` | **The baseline** | Already works, but re-evaluates the subject per arm and never compiles to a `match`. A1 buys the subject-stated-once readability, the `case/when` spelling, **and** the `match` codegen. |
 
@@ -153,7 +153,7 @@ purpose; conflating them was the failure mode the original debate guarded agains
 
 v1 dispatches by value equality: a subject matching no arm (and no `{{else}}`) renders empty
 — it is **not** a compile error. The exhaustiveness guarantee that would make a typed
-`{{#case}}` genuinely safer than an `if`-chain is **A2**, and it is out of scope here. This
+`{{#match}}` genuinely safer than an `if`-chain is **A2**, and it is out of scope here. This
 is the substantive reason the v1 keyword is `case`, not `match`: `case` promises value
 dispatch (what it does); `match` would promise patterns + exhaustiveness (what A2 will do).
 
@@ -196,56 +196,14 @@ authority for every `{{#case}}` case. (FullBars and MinBars are excluded — see
 - The keyword is **`case`** because `case…when…else` is the SQL/Ruby/Liquid triad that
   matches both the chosen arm keyword and the v1 (value-dispatch, non-exhaustive) semantics.
 
-## 8. Appendix — typed-exhaustive `{{#case}}` (A2): design review
+## 8. The typed sibling — `{{#match}}` (A2)
 
-A2 is the typed sibling of `{{#case}}`: where `case` dispatches a *value* against literal
-arms by `==`, `{{#case}}` would dispatch a *closed typed* subject (a Rust enum, e.g. a
-`#[serde(tag = "kind")]` model) against **variant patterns**, with **compile-time
-exhaustiveness**. This is a review of its feasibility on the implemented `Case` seam — not a
-commitment.
-
-**The key realization: A2's AOT path does *not* need schema inference.** The tempting framing
-is "infer the subject's enum and its variants (docs/03), then check arms against it." But a
-Rust **proc-macro runs before type-checking**, so `truss!` cannot introspect `Ctx`'s field
-types at all. The way out is to lean on rustc instead of fighting it: emit the author's arm
-patterns into a real Rust `match` and let **rustc** validate the variant names and enforce
-exhaustiveness (a *class-B* diagnostic, `docs/07 §3`). The macro transcribes
-`{{when Shipped}}{{when Pending | Queued}}…` to
-
-```rust
-match &ctx.status {
-    Status::Shipped => { … }
-    Status::Pending | Status::Queued => { … }
-    // no `_` arm  ⇒  rustc errors if a variant is unhandled — exhaustiveness, free
-}
-```
-
-So the AOT `match` + exhaustiveness is buildable today; schema inference (docs/03) is a
-*nice-to-have* for the LSP (variant completion + a located **class-A** "missing arm `X`"
-before rustc), not a blocker for the compiler.
-
-**What A2 actually needs (the real gating items):**
-
-1. **A pattern surface grammar (ADR-first, per the CLAUDE.md rule).** `{{#case}}` arms are
-   *value expressions*; `{{#case}}` arms are *patterns*. Scope to settle: bare variant names;
-   or-patterns (`A | B`); field binds (`{{when Shipped(tracking)}}` → bind `tracking` in the
-   arm body) vs. payload-blind matching; whether `{{else}}` is allowed (it becomes the `_`
-   arm and *disables* exhaustiveness). Recommend v1 = variant names + or-patterns + optional
-   `{{else}}`; defer field binds.
-2. **The VM and reference semantics.** Neither the VM nor the PureScript oracle has Rust
-   types, so they cannot do *static* exhaustiveness. They dispatch at **runtime on the serde
-   tag field** (`status.kind == "Shipped"`). Exhaustiveness is therefore an **AOT-only static
-   guarantee** (a diagnostic, not an output difference) — conformance still holds because the
-   corpus compares *rendered output*, and a runtime-unmatched subject with no `{{else}}` is
-   simply unreachable on inputs the type permits.
-3. **A node (or a `Case` field).** `Case` carries value arms; A2 carries pattern arms. Add a
-   `dispatch: ByValue | ByPattern` discriminant (or a sibling `Match` node) — the
-   `subject`/`arms`/`otherwise` shape is reused, so this is the small part.
-
-**Recommendation.** A2 is feasible and worth doing, but it is a *new construct* (the `match`
-keyword, pattern arms), not a tweak to `case`. Sequence: (a) freeze the pattern grammar in an
-ADR; (b) ship the AOT `match` with rustc-enforced exhaustiveness (no docs/03 dependency); (c)
-runtime tag-dispatch in the VM/oracle; (d) *later*, when docs/03 schema inference lands in
-Rust, upgrade the LSP to located (class-A) exhaustiveness + variant completion. The
-first-class `Case` node established here is the seam all of this plugs into — which was the
-whole point of choosing A1 over the desugar.
+The typed-exhaustive variant has its own ADR: **`docs/14`** (`{{#match SUBJECT "Type"}}`).
+Where `{{#case}}` dispatches a *value* against literal arms by `==`, `{{#match}}` dispatches a
+*closed enum* against **variant** arms with **compile-time exhaustiveness**. The key result
+of that review: the AOT `match` + exhaustiveness is buildable **without** schema inference —
+a proc-macro runs before type-checking, so `truss!` cannot introspect `Ctx`; instead it emits
+the author's variant arms into a real Rust `match` and lets **rustc** enforce exhaustiveness
+(class-B). The first-class `Case` node this ADR established is the seam `{{#match}}` plugs into
+— which was the whole point of choosing A1 over the desugar. See `docs/14` for the frozen
+surface, semantics, and sequencing.

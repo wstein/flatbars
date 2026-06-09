@@ -76,3 +76,8 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
 - `12-case-multiarm-blocks.md` — `{{#case}}…{{when …}}…{{else}}` multi-arm conditional: a
   first-class node lowered to a Rust `match` (subject evaluated once), `caseH` in the oracle.
   Implemented in RawBars/MaxBars and Trussbars.
+- `13-independence.md` — **decision doc** for spinning Trussbars out as its own project
+  (spec-owning; G1–G5 gates; schema-inference critical path).
+- `14-typed-match.md` — **proposed** `{{#match SUBJECT "Type"}}` — the typed-exhaustive sibling
+  of `{{#case}}`: variant dispatch lowered to a Rust `match` whose exhaustiveness rustc enforces
+  (no schema inference needed). Surface-freezing ADR; not yet implemented.
