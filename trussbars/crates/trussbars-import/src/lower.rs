@@ -76,8 +76,34 @@ pub struct MigrationNote {
 #[derive(Debug, Clone, Default)]
 pub struct LowerOptions {
     /// I3: collapse a *trivial* complementary pair (each arm a single literal/escaped
-    /// variable) to a `{{x ? A : B}}` ternary instead of `{{#if}}…{{else}}`.
+    /// variable) to an inline conditional operator — `{{x ?: B}}` (first-truthy) when the
+    /// positive arm echoes the value, else `{{x ? A : B}}` (ternary) — instead of
+    /// `{{#if}}…{{else}}`.
     pub ternary: bool,
+    /// Reproduce the source truthiness rule exactly with operators instead of annotating
+    /// the delta: a bare-value condition `x` becomes `x != null && x != false` (exact for
+    /// Liquid and Mustache scalars under `nonEmpty`). Suppresses the truthiness note where
+    /// it applies; off by default (idiomatic bare `{{#if x}}` + note).
+    pub faithful_truthiness: bool,
+}
+
+/// The truthiness predicate that is exact under `nonEmpty` for Liquid (any value) and
+/// Mustache scalars: falsy ⟺ `null` or `false`, so `0`/`""`/`[]`/`{}` keep the source
+/// engine's treatment. Renders as `x != null && x != false`.
+fn faithful_bool(cond: ir::Expr) -> ir::Expr {
+    ir::Expr::App(
+        "and".into(),
+        vec![
+            ir::Expr::App(
+                "ne".into(),
+                vec![cond.clone(), ir::Expr::Lit(ir::Value::Null)],
+            ),
+            ir::Expr::App(
+                "ne".into(),
+                vec![cond, ir::Expr::Lit(ir::Value::Bool(false))],
+            ),
+        ],
+    )
 }
 
 /// The result of lowering: the IR, the node-attached notes (for [`crate::lift`]), and
@@ -223,20 +249,20 @@ impl Lower<'_> {
                 }));
             }
             Shape::Scalar | Shape::Unknown => {
-                // I3: a trivial scalar pair becomes a ternary when enabled.
+                // I3: a trivial scalar pair collapses to an inline conditional operator.
                 if self.opts.ternary
                     && let (Some(a), Some(b)) = (trivial_arm(then_body), trivial_arm(else_body))
                 {
-                    self.truthiness_note(span, name_a);
+                    let expr = self.inline_conditional(&cond, a, b, span, name_a);
                     out.push(ir::Node::Output {
                         span,
-                        expr: ir::Expr::App("ternary".into(), vec![cond, a, b]),
+                        expr,
                         raw: false,
                     });
                     return Some(j + 1);
                 }
                 // I1: `{{#if x}}then{{else}}else{{/if}}`.
-                self.truthiness_note(span, name_a);
+                let cond = self.cond_truthiness(cond, span, name_a);
                 if matches!(shape, Shape::Unknown) {
                     self.note(
                         span,
@@ -385,7 +411,7 @@ impl Lower<'_> {
                 }));
             }
             Shape::Scalar => {
-                self.truthiness_note(span, name);
+                let cond = self.cond_truthiness(cond, span, name);
                 let body = self.nodes(body, scope);
                 out.push(ir::Node::Cond(ir::Cond {
                     span,
@@ -421,6 +447,47 @@ impl Lower<'_> {
                 key(name)
             ),
         );
+    }
+
+    /// A bare value used as a boolean condition: under `faithful_truthiness`, the exact
+    /// `x != null && x != false` predicate (no note); otherwise the bare value + the
+    /// truthiness-delta caveat. Exact for Mustache scalars.
+    fn cond_truthiness(&mut self, cond: ir::Expr, span: Span, name: &Name) -> ir::Expr {
+        if self.opts.faithful_truthiness {
+            faithful_bool(cond)
+        } else {
+            self.truthiness_note(span, name);
+            cond
+        }
+    }
+
+    /// The inline conditional for a trivial complementary pair (`--ternary`): `x ?: B`
+    /// (first-truthy) when the positive arm just echoes the value, else `x ? A : B`. Under
+    /// `faithful_truthiness` the ternary guards its condition exactly (`(x != null &&
+    /// x != false) ? A : B`); otherwise the truthiness-delta caveat is attached.
+    fn inline_conditional(
+        &mut self,
+        cond: &ir::Expr,
+        then_arm: ir::Expr,
+        else_arm: ir::Expr,
+        span: Span,
+        name: &Name,
+    ) -> ir::Expr {
+        // Faithful mode guards the ternary condition exactly — `(x != null && x != false)
+        // ? A : B` — so `0`/`""`/`{}` keep the source truthiness and no note is needed.
+        if self.opts.faithful_truthiness {
+            return ir::Expr::App(
+                "ternary".into(),
+                vec![faithful_bool(cond.clone()), then_arm, else_arm],
+            );
+        }
+        self.truthiness_note(span, name);
+        // `x ?: B` — the positive arm is the value itself (first-truthy / Elvis).
+        if then_arm == *cond {
+            ir::Expr::App("firstTruthy".into(), vec![cond.clone(), else_arm])
+        } else {
+            ir::Expr::App("ternary".into(), vec![cond.clone(), then_arm, else_arm])
+        }
     }
 }
 
@@ -944,7 +1011,9 @@ impl Lower<'_> {
                     .as_ref()
                     .map(|b| self.liq_nodes(b))
                     .unwrap_or_default();
-                self.liq_truthiness(*span, "if condition");
+                if !self.opts.faithful_truthiness {
+                    self.liq_truthiness(*span, "if condition");
+                }
                 out.push(ir::Node::Cond(ir::Cond {
                     span: *span,
                     negated: false,
@@ -966,7 +1035,9 @@ impl Lower<'_> {
                     .as_ref()
                     .map(|b| self.liq_nodes(b))
                     .unwrap_or_default();
-                self.liq_truthiness(*span, "unless condition");
+                if !self.opts.faithful_truthiness {
+                    self.liq_truthiness(*span, "unless condition");
+                }
                 out.push(ir::Node::Cond(ir::Cond {
                     span: *span,
                     negated: true,
@@ -1246,7 +1317,15 @@ impl Lower<'_> {
                     cmp_op(*op).to_string(),
                     vec![self.liq_expr(left, span), self.liq_expr(right, span)],
                 ),
-                _ => self.liq_expr(left, span),
+                // A bare value used as a boolean: exact predicate under faithful mode.
+                _ => {
+                    let e = self.liq_expr(left, span);
+                    if self.opts.faithful_truthiness {
+                        faithful_bool(e)
+                    } else {
+                        e
+                    }
+                }
             },
             liq::Condition::And(a, b) => ir::Expr::App(
                 "and".into(),
@@ -1965,7 +2044,10 @@ mod tests {
     #[test]
     fn trivial_pair_becomes_ternary_when_enabled() {
         // The ternary IR is emitted here; its idiomatic `?:` rendering is the Lift's job.
-        let opts = LowerOptions { ternary: true };
+        let opts = LowerOptions {
+            ternary: true,
+            ..Default::default()
+        };
         let l = low("{{#ok}}{{yes}}{{/ok}}{{^ok}}no{{/ok}}", &NoShapes, &opts);
         assert!(matches!(
             &l.ir[0],
@@ -2315,6 +2397,75 @@ mod tests {
     fn liq_truthiness_noted() {
         let l = liq_low("{% if x %}y{% endif %}");
         assert!(l.report.iter().any(|n| n.message.contains("truthiness")));
+    }
+
+    // --- truthiness operators ----------------------------------------------
+
+    fn faithful() -> LowerOptions {
+        LowerOptions {
+            ternary: false,
+            faithful_truthiness: true,
+        }
+    }
+
+    #[test]
+    fn faithful_makes_mustache_scalar_exact_no_note() {
+        let sca = shapes(&[(&["ok"], Shape::Scalar)]);
+        let l = mustache(&parse("{{#ok}}y{{/ok}}").unwrap(), &sca, &faithful());
+        let s = to_truss_annotated(&l.ir, &l.notes);
+        assert!(s.contains("{{#if (ok != null) && (ok != false)}}"), "{s}");
+        assert!(!l.report.iter().any(|n| n.message.contains("truthiness")));
+    }
+
+    #[test]
+    fn faithful_makes_liquid_condition_exact_no_note() {
+        let nodes = crate::liquid::parse("{% if x %}y{% endif %}").unwrap();
+        let l = liquid(&nodes, &NoShapes, &faithful());
+        let s = to_truss_annotated(&l.ir, &l.notes);
+        assert!(s.contains("{{#if (x != null) && (x != false)}}"), "{s}");
+        assert!(!l.report.iter().any(|n| n.message.contains("truthiness")));
+        // A comparison condition is left as-is (no predicate, no note).
+        let cmp = liquid(
+            &crate::liquid::parse("{% if a > 1 %}y{% endif %}").unwrap(),
+            &NoShapes,
+            &faithful(),
+        );
+        assert!(to_truss_annotated(&cmp.ir, &cmp.notes).contains("{{#if a > 1}}"));
+    }
+
+    #[test]
+    fn value_or_default_pair_uses_elvis() {
+        // `{{#name}}{{name}}{{/name}}{{^name}}Anon{{/name}}` → `{{name ?: "Anon"}}`.
+        let opts = LowerOptions {
+            ternary: true,
+            faithful_truthiness: false,
+        };
+        let l = mustache(
+            &parse("{{#name}}{{name}}{{/name}}{{^name}}Anon{{/name}}").unwrap(),
+            &NoShapes,
+            &opts,
+        );
+        let s = to_truss_annotated(&l.ir, &l.notes);
+        assert!(s.contains("{{name ?: \"Anon\"}}"), "{s}");
+    }
+
+    #[test]
+    fn faithful_guards_the_ternary_condition() {
+        let opts = LowerOptions {
+            ternary: true,
+            faithful_truthiness: true,
+        };
+        let l = mustache(
+            &parse("{{#ok}}{{yes}}{{/ok}}{{^ok}}no{{/ok}}").unwrap(),
+            &NoShapes,
+            &opts,
+        );
+        let s = to_truss_annotated(&l.ir, &l.notes);
+        assert!(
+            s.contains("((ok != null) && (ok != false)) ? yes : \"no\""),
+            "{s}"
+        );
+        assert!(!l.report.iter().any(|n| n.message.contains("truthiness")));
     }
 
     #[test]

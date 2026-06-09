@@ -128,11 +128,27 @@ Without type information the lowering cannot know which; a [`ShapeOracle`] suppl
 `if`, descending into array elements for nested sections); absent a sample, the heuristic
 assumes iteration and annotates the guess.
 
+### Truthiness operators
+
+Two idioms turn the truthiness delta into explicit operators rather than a caveat:
+
+- **`?:` value-or-default** (`--ternary`): a complementary pair whose positive arm just
+  echoes the value — `{{#name}}{{name}}{{/name}}{{^name}}Anon{{/name}}` — collapses to
+  `{{name ?: "Anon"}}` (first-truthy / Elvis); a non-echoing trivial pair becomes
+  `{{x ? A : B}}`.
+- **Faithful predicate** (`--faithful-truthiness`): a bare-value condition becomes the
+  *exact* predicate `{{#if (x != null) && (x != false)}}` — which reproduces Liquid (any
+  value) and Mustache-scalar truthiness under `nonEmpty` regardless of how it treats
+  `0`/`""`/`[]`/`{}` — and **no caveat is emitted**. Handlebars keeps the note (its rule
+  makes `0`/`""`/`[]` falsy but `{}` truthy, which `nonEmpty` cannot reproduce). Under this
+  flag the ternary's condition is guarded too (`(x != null && x != false) ? A : B`).
+
 ### Faithfulness & residuals
 
-The Mustache↔MaxBars **truthiness delta** (`0`/`""`/`{}` truthy in Mustache; `""`/`[]`/`{}`
-falsy under `nonEmpty`) is **accepted and annotated** on each boolean/scope use — the
-migrated `.truss` carries an inline `{{! migrate: … }}` note and the report records it.
+By default the Mustache↔MaxBars **truthiness delta** (`0`/`""`/`{}` truthy in Mustache;
+`""`/`[]`/`{}` falsy under `nonEmpty`) is **accepted and annotated** on each boolean/scope
+use — the migrated `.truss` carries an inline `{{! migrate: … }}` note and the report
+records it (use `--faithful-truthiness` to make it exact instead).
 Inadmissible constructs become residuals: a **dynamic partial** `{{>*x}}` (crosses the
 names-static / data-dynamic boundary) and **inheritance** `{{<}}/{{$}}` are reported and
 left as `{{! migrate: … — needs a human }}` comments; a **set-delimiter** directive is
@@ -142,8 +158,8 @@ comments.
 ### CLI
 
 `truss-import --metrics <file>` reports the idiom metrics and suggested parameters;
-`truss-import --to-truss [--ternary] <file>` writes the migrated `.truss` to stdout and the
-report to stderr.
+`truss-import --to-truss [--ternary] [--faithful-truthiness] [--data s.json] <file>` writes
+the migrated `.truss` to stdout and the report to stderr.
 
 ### Handlebars
 

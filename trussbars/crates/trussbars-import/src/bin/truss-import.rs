@@ -32,6 +32,7 @@ fn main() -> ExitCode {
     let mut file: Option<String> = None;
     let mut mode = Mode::Dump;
     let mut ternary = false;
+    let mut faithful_truthiness = false;
     let mut data: Option<String> = None;
     let mut report_json = false;
 
@@ -54,6 +55,7 @@ fn main() -> ExitCode {
             "--metrics" => mode = Mode::Metrics,
             "--to-truss" => mode = Mode::ToTruss,
             "--ternary" => ternary = true,
+            "--faithful-truthiness" => faithful_truthiness = true,
             "--report-json" => report_json = true,
             "--help" | "-h" => {
                 print_help();
@@ -94,7 +96,14 @@ fn main() -> ExitCode {
     match mode {
         Mode::Dump => dump(dialect, &src),
         Mode::Metrics => run_metrics(dialect, &src),
-        Mode::ToTruss => run_to_truss(dialect, &src, ternary, data.as_deref(), report_json),
+        Mode::ToTruss => run_to_truss(
+            dialect,
+            &src,
+            ternary,
+            faithful_truthiness,
+            data.as_deref(),
+            report_json,
+        ),
     }
 }
 
@@ -155,6 +164,7 @@ fn run_to_truss(
     dialect: Dialect,
     src: &str,
     ternary: bool,
+    faithful_truthiness: bool,
     data: Option<&str>,
     report_json: bool,
 ) -> ExitCode {
@@ -179,7 +189,10 @@ fn run_to_truss(
         None => Box::new(NoShapes),
     };
 
-    let opts = LowerOptions { ternary };
+    let opts = LowerOptions {
+        ternary,
+        faithful_truthiness,
+    };
     let shapes = oracle.as_ref();
     let migrated = match dialect {
         Dialect::Mustache => migrate::mustache(src, shapes, &opts),
@@ -264,7 +277,8 @@ fn print_help() {
     println!("  (default)     dump the parsed dialect AST ({{:#?}})");
     println!("  --metrics     report Mustache idiom metrics (and suggested parameters)");
     println!("  --to-truss    migrate the template → idiomatic .truss (report on stderr)");
-    println!("    --ternary       collapse trivial complementary pairs to {{x ? a : b}}");
+    println!("    --ternary             trivial pairs → {{x ?: b}} / {{x ? a : b}}");
+    println!("    --faithful-truthiness conditions → x != null && x != false (exact, no note)");
     println!("    --data <f.json> disambiguate sections from a JSON data sample");
     println!("    --report-json   emit the migration report as JSON on stderr");
     println!();
