@@ -68,9 +68,9 @@ import Kernel.Value (Translator, Truthy, escapeHtml, handlebars, minimal, mustac
 import Kernel.Walk (operationRefs)
 
 -- | The clause-separator names this engine recognizes (so the surface knows a
--- | `{{else}}` is a clause marker, not escaped output).
+-- | `{{else}}`/`{{when}}` is a clause marker, not escaped output).
 surfaceClauses :: Array Ident
-surfaceClauses = [ "else", "elif" ]
+surfaceClauses = [ "else", "elif", "when" ]
 
 -- | Desugar Surface syntax to core syntax for this engine (surface.adoc §5).
 desugarSurface :: Template -> Template

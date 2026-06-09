@@ -45,7 +45,7 @@ import FlatBars.Error (Error(ParseFailure), ParseError(DisallowedShape), renderP
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
-import Kernel.CaseSugar (caseLeadingViolation, desugarCase)
+import Kernel.CaseSugar (caseLeadingViolation)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, registerAll, registerPartialFiles, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
@@ -83,11 +83,11 @@ coreOptions = defaultParseOptions
   , standaloneSeps = [ "else", "elif", "when" ]
   }
 
--- | Parse core source, then desugar the `{{#case}}` multi-arm conditional into the
--- | `{{#if (eq …)}}` skeleton (shared with MaxBars via `Kernel.CaseSugar`; docs/12).
--- | `case` is a nonEmpty-family construct, so RawBars supports it directly — non-whitespace
--- | content before the first `{{when}}` is a located error. Every RawBars entry point parses
--- | through here so the construct is available (and the error consistent) everywhere.
+-- | Parse core source, enforcing the one `{{#case}}` surface rule the parser can't: only
+-- | whitespace may precede the first `{{when}}` arm (docs/12). `case` itself is a first-class
+-- | engine operation (`Kernel.Prelude.caseH`) — the `{{#case}}` block flows to the engine
+-- | unchanged; this only adds the located leading-content error. Every RawBars entry point
+-- | parses through here so the rule is enforced consistently.
 parseCore
   :: ParseOptions
   -> String
@@ -96,7 +96,7 @@ parseCore opts src = case parseWith opts src of
   Left pes -> Left pes
   Right r -> case caseLeadingViolation r.nodes of
     Just v -> Left (NEA.singleton (DisallowedShape v.shape v.off))
-    Nothing -> Right (r { nodes = desugarCase r.nodes })
+    Nothing -> Right r
 
 -- | Parse core source and return a pure renderer (the engine's fixed `handlebars`
 -- | truthiness rule applies; ADR-022).

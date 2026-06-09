@@ -206,8 +206,21 @@ coreOperationDefs =
       true
       AnyArity
       letH
+  , gen "case"
+      "Routes to the first {{when}} arm whose value equals the subject (evaluated once), else the {{else}} clause (RawBars/MaxBars `{{#case s}}{{when …}}…{{/case}}`)."
+      true
+      (Exactly 1)
+      caseH
   , valDef "else" "A clause separator the enclosing block splits on; renders nothing on its own."
       (nullary (pure (VSafe "")))
+  -- `when V…`: a `{{#case}}` arm marker (its values/body are handled by the enclosing
+  -- `case` via splitClauses). It carries one or more match values; the marker itself
+  -- renders nothing.
+  , gen "when"
+      "A case arm the enclosing case matches against its subject; renders nothing on its own."
+      false
+      AnyArity
+      (\_ _ -> pure (VSafe ""))
   -- `elif cond [opts]`: a clause marker (its body/condition are handled by the
   -- enclosing `if` via splitClauses). The optional 2nd arg is an options object
   -- (surface hash `includeZero=true`), exactly like `if`'s — so the schema admits
@@ -1394,6 +1407,56 @@ checkIfClauses clauses = case Array.uncons clauses of
       [ _, _ ] -> checkIfClauses tail
       _ -> throwError (ClauseError "elif: expected 1 or 2 arguments")
     other -> throwError (ClauseError ("if: unexpected clause '" <> other <> "'"))
+
+-- | `{{#case s}}{{when V…}}…{{else}}…{{/case}}` — the multi-arm conditional (docs/12). The
+-- | engine evaluates the subject once and hands it here; `caseH` dispatches to the first
+-- | `{{when}}` arm whose value (any of them) equals the subject, else the `{{else}}` body.
+-- | Arm values are evaluated only until one matches (short-circuit). This is the reference
+-- | twin of the AOT Rust `match`: first-class, not a desugared `eq`-chain.
+caseH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
+caseH ctl args = do
+  subj <- case args of
+    [ s ] -> pure s
+    _ -> throwError (ArityError "case expects exactly 1 argument (the subject)")
+  let { clauses } = splitClauses ctl.children
+  checkCaseClauses clauses
+  pickCase ctl subj clauses
+
+-- | Walk the `{{when}}`/`{{else}}` clauses, taking the first `when` whose value equals the
+-- | subject (short-circuiting both within and across arms), else the terminal `else`.
+pickCase
+  :: forall m
+   . MonadThrow Error m
+  => Ctl m (RefEnv m)
+  -> Value
+  -> Array Clause
+  -> m Value
+pickCase ctl subj clauses = case Array.uncons clauses of
+  Nothing -> pure (VSafe "")
+  Just { head: cl, tail } -> case cl.name of
+    "else" -> renderSafe ctl ctl.env cl.body
+    "when" -> do
+      hit <- anyMatch cl.args
+      if hit then renderSafe ctl ctl.env cl.body else pickCase ctl subj tail
+    other -> throwError (ClauseError ("case: unexpected clause '" <> other <> "'"))
+  where
+  anyMatch exprs = case Array.uncons exprs of
+    Nothing -> pure false
+    Just { head: e, tail } -> do
+      v <- ctl.eval ctl.env e
+      if v == subj then pure true else anyMatch tail
+
+-- | Reject a malformed `case` clause chain *before* branching: every clause must be `when`
+-- | or `else`, and `else` (if present) must be last (anything after it is unreachable).
+checkCaseClauses :: forall m. MonadThrow Error m => Array Clause -> m Unit
+checkCaseClauses clauses = case Array.uncons clauses of
+  Nothing -> pure unit
+  Just { head: cl, tail } -> case cl.name of
+    "when" -> checkCaseClauses tail
+    "else"
+      | Array.null tail -> pure unit
+      | otherwise -> throwError (ClauseError "case: {{else}} must be the final clause")
+    other -> throwError (ClauseError ("case: unexpected clause '" <> other <> "'"))
 
 unlessH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
 unlessH ctl args = case args of

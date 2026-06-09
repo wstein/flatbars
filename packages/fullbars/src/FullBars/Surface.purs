@@ -72,7 +72,6 @@ import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPre
 import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Sigil(..), Template)
 import FlatBars.Value (Value(..))
-import Kernel.CaseSugar (desugarCase)
 
 -- | Desugar a Surface template into core syntax. `clauseNames` are the
 -- | separator names the engine treats as clause markers (e.g. `["else"]`); a
@@ -124,15 +123,8 @@ desugar = desugarWith noLoopVars
 -- | Desugar with a dialect `LoopVars` resolver (see `LoopVars`). MaxBars passes
 -- | its loop-variable map; FullBars passes `noLoopVars` (via `desugar`).
 desugarWith :: LoopVars -> Array Ident -> Template -> Template
-desugarWith lv clauseNames template = go [] (preCase template)
+desugarWith lv clauseNames = go []
   where
-  -- `{{#case}}` is a MaxBars (nonEmpty-family) construct, desugared structurally to the
-  -- `{{#if (eq …)}}` skeleton *before* the surface pass, so the subject/values it builds
-  -- are path-rewritten by `go` exactly like a hand-written `if` (shared with RawBars via
-  -- `Kernel.CaseSugar`; docs/12). FullBars has no `case` — `strictSurfaceViolation` rejects
-  -- it before desugar — so this is a no-op there.
-  preCase = if dropPipes then desugarCase else identity
-
   -- the block-parameter spelling is dialect-specific: MaxBars drops the pipes
   -- (`as a b`), FullBars keeps the Handlebars bars (`as |a b|`). The dialect is
   -- read from the ADR-021 reserved-variable capability — MaxBars wraps its

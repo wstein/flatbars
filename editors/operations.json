@@ -66,6 +66,14 @@
       "doc": "Uppercases the first character of its argument."
     },
     {
+      "name": "case",
+      "kind": "block",
+      "arity": "1",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Routes to the first {{when}} arm whose value equals the subject (evaluated once), else the {{else}} clause (RawBars/MaxBars `{{#case s}}{{when …}}…{{/case}}`)."
+    },
+    {
       "name": "ceil",
       "kind": "inline",
       "arity": "1",
@@ -816,6 +824,14 @@
       "source": "registered",
       "canonical": null,
       "doc": "Uppercases its argument."
+    },
+    {
+      "name": "when",
+      "kind": "inline",
+      "arity": "any",
+      "source": "registered",
+      "canonical": null,
+      "doc": "A case arm the enclosing case matches against its subject; renders nothing on its own."
     },
     {
       "name": "where",

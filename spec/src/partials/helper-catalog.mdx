@@ -11,6 +11,7 @@
 | `at` | value | 2 | registered | The element at an index (negative counts from the end). |
 | `bind` | value | 2 | registered | Builds a one-key object `{ name: value }` — the `{{#let (bind "name" value)}}` binding form (RawBars canonical, ADR-024). |
 | `capitalize` | value | 1 | registered | Uppercases the first character of its argument. |
+| `case` | block | 1 | registered | Routes to the first &#123;&#123;when&#125;&#125; arm whose value equals the subject (evaluated once), else the &#123;&#123;else&#125;&#125; clause (RawBars/MaxBars `{{#case s}}{{when …}}…{{/case}}`). |
 | `ceil` | value | 1 | registered | Rounds a number up to the nearest integer. |
 | `coalesce` | value | ≥1 | registered | Returns the first non-null argument — the `??` operator's helper. |
 | `count` | value | 1 | registered | The number of items in an array (or characters in a string). |
@@ -105,6 +106,7 @@
 | `unless` | block | 1–2 | registered | Renders its body when the condition is falsy — the inverse of if. |
 | `upcase` | value | 1 | alias of `uppercase` | Uppercases its argument. |
 | `uppercase` | value | 1 | registered | Uppercases its argument. |
+| `when` | value | any | registered | A case arm the enclosing case matches against its subject; renders nothing on its own. |
 | `where` | value | 2–4 | registered | Keeps array items whose key is truthy, equals, or compares to a value. |
 | `with` | block | ≥1 | registered | Shifts the context to its argument for the body (else the &#123;&#123;else&#125;&#125; clause). |
 | `yield` | value | 0 | scoped | Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block). |

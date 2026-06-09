@@ -383,6 +383,10 @@ block env name args body =
       -- single-binding ones and roots a bare `{{a}}` at the alias, so each block
       -- carries exactly one `name=value` hash pair (ADR-024).
       "let" -> letBlock env split.hash body
+      -- `{{#case s}}{{when V…}}…{{else}}…{{/case}}` (docs/12): a first-class multi-arm
+      -- conditional, lowered to a Rust `match` — the subject is evaluated once (the bound
+      -- `__subj`) and dispatched by one guard arm per `{{when}}`, `{{else}}` the `_` arm.
+      "case" -> caseBlock env split.positional body
       _ -> Left ("unsupported: block helper '" <> name <> "'")
 
 -- `{{#if}}` / `{{#unless}}`: a native `if`/`else if`/`else` over the same buffer.
@@ -402,6 +406,34 @@ condBlock env prefix positional body = case positional of
           <> "\n"
       )
   _ -> Left "unsupported: conditional with an options argument (e.g. includeZero)"
+
+-- `{{#case}}` → a Rust `match`: bind the subject once (`__subj`), then one guard arm per
+-- `{{when}}` (`*__subj == (value)`, OR-chained for a multi-value arm), with `{{else}}` the
+-- `_` arm (an absent `{{else}}` is an empty `_ => {}`). The guard reuses the same `==` the
+-- `eq` operator emits, so the rendered bytes match `caseH` (docs/12).
+caseBlock :: Env -> Array Expr -> Template -> Either String String
+caseBlock env positional body = case positional of
+  [ subj ] -> do
+    se <- expr env subj
+    let s = splitClauses body
+    arms <- caseArms env s.clauses
+    Right ("    {\n    let __subj = &(" <> se <> ");\n    match () {\n" <> arms <> "    }\n    }\n")
+  _ -> Left "unsupported: {{#case}} with multiple subject arguments"
+
+caseArms :: Env -> Array Clause -> Either String String
+caseArms env clauses = case Array.uncons clauses of
+  Nothing -> Right "    _ => {}\n"
+  Just { head: cl, tail } -> case cl.name of
+    "else" -> do
+      b <- nodes env cl.body
+      Right ("    _ => {\n" <> b <> "    }\n")
+    "when" -> do
+      guards <- traverse (\v -> (\ve -> "*__subj == (" <> ve <> ")") <$> expr env v) cl.args
+      b <- nodes env cl.body
+      rest <- caseArms env tail
+      let guard = if Array.null guards then "false" else joinWith " || " guards
+      Right ("    () if " <> guard <> " => {\n" <> b <> "    }\n" <> rest)
+    other -> Left ("unsupported: case clause '" <> other <> "'")
 
 elseChain
   :: Env -> Array Clause -> Either String String

@@ -136,6 +136,10 @@ fbBlock lenient rec ctx name args body =
       -- the body there. The surface nests multi-binding lets, so each carries one
       -- hash; `rt.letScope` mirrors the interpreter's `pushHelpers`.
       "let" -> letBlock rec ctx split body
+      -- `{{#case s}}{{when V…}}…{{else}}…{{/case}}` (docs/12): a first-class multi-arm
+      -- conditional, compiled to an `if`/`else if` chain that compares the subject to each
+      -- arm's value(s) with the same `eq` the interpreter's `caseH` uses — byte-identical.
+      "case" -> caseBlock rec ctx split.positional body
       -- an un-hoisted `{{#inline}}` (core path) is a no-op, like the `inline` helper.
       "inline" -> ""
       -- A block partial (`{{#partial name}}body{{/partial}}` / `{{#>name}}`): like
@@ -171,6 +175,37 @@ ifBlock rec ctx test body =
   in
     "  if (" <> test <> ") {\n" <> rec.nodes ctx s.before <> "  }" <> elseChain rec ctx s.clauses <>
       "\n"
+
+-- `{{#case}}`: like `ifBlock`, the arms share the current frame, so it is an `if`/`else if`
+-- chain over `out`. Each `{{when}}` guard ORs `eq subject value` for its value(s) — built as
+-- the same `(eq subject v)` expression the operator compiles, so it matches `caseH`. The
+-- content before the first `{{when}}` is dropped (whitespace-only by the leading-content
+-- rule), exactly as the interpreter drops `splitClauses`' `before`.
+caseBlock :: Rec -> Ctx -> Array Expr -> Template -> String
+caseBlock rec ctx positional body =
+  let
+    subject = case positional of
+      [ subj ] -> subj
+      _ -> App "null" []
+    s = splitClauses body
+  in
+    caseChain rec ctx subject true s.clauses <> "\n"
+
+caseChain :: Rec -> Ctx -> Expr -> Boolean -> Array Clause -> String
+caseChain rec ctx subject first clauses = case Array.uncons clauses of
+  Nothing -> ""
+  Just { head: cl, tail } -> case cl.name of
+    "when" ->
+      let
+        kw = if first then "  if (" else " else if ("
+        guard = case cl.args of
+          [] -> "false"
+          vs -> joinWith " || "
+            (map (\v -> "(" <> rec.expr ctx (App "eq" [ subject, v ]) <> ")") vs)
+      in
+        kw <> guard <> ") {\n" <> rec.nodes ctx cl.body <> "  }" <> caseChain rec ctx subject false
+          tail
+    _ -> " else {\n" <> rec.nodes ctx cl.body <> "  }" -- else (terminal)
 
 elseChain :: Rec -> Ctx -> Array Clause -> String
 elseChain rec ctx clauses = case Array.uncons clauses of

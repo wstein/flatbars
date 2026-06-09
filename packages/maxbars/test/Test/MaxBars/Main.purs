@@ -124,6 +124,9 @@ main = do
   -- content before the first {{when}} is a located error (no silent fall-through).
   assert' "reject: case content before first when"
     (isLeft (renderMax "{{#case s}}junk{{when 1}}x{{/case}}" (obj [])))
+  -- the first-class clause guard: {{else}} must be the final arm (no dead arms after it).
+  assert' "reject: case else not last"
+    (isLeft (renderMax "{{#case s}}{{else}}x{{when 1}}y{{/case}}" (obj [])))
 
   -- pipes: `a | f` ⇒ (f a); the piped value is the first argument.
   expectM "pipe-json" "{{{ o | json }}}" (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0) ]) ])
