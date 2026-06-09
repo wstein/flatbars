@@ -147,8 +147,8 @@ empty"* vs *"no `{{else}}`"*).
 - **When built (not now):** land it *with* a real example helper that uses `{{else}}`
   (e.g. a `take n` / `paginate`), rendered through AOT **and** the VM and byte-compared,
   added to the `--vm`/`--vm-compat` conformance axes — no untested convention ships.
-- **Not** this: *named, multi-arm* blocks (`{{#match}}…{{when …}}…{{else}}`) are a
-  separate feature with their own decision doc — see [`docs/12`](12-match-multiarm-blocks.md).
+- **Not** this: *named, multi-arm* blocks (`{{#case}}…{{when …}}…{{else}}`) are a
+  separate feature with their own decision doc — see [`docs/12`](12-case-multiarm-blocks.md).
   `Arm` is forward-compatible (it can grow variants without changing the closure shape),
   but `{{when}}` arms are out of scope for the binary inverse arm.
 
@@ -223,7 +223,7 @@ pile *is* the requirements list this convention satisfies.
 - **Block-helper `{{else}}`** — the inverse arm (`{{#x}}…{{else}}…{{/x}}`) is rejected with
   a forward-looking located error; the convention is now **frozen** (the uniform
   arm-selector, §3.1 "Planned"), with implementation gated on a real consumer. *Multi-arm*
-  `{{#match}}…{{when …}}…{{else}}` is a separate feature — [`docs/12`](12-match-multiarm-blocks.md).
+  `{{#case}}…{{when …}}…{{else}}` is a separate feature — [`docs/12`](12-case-multiarm-blocks.md).
 - **Macro-layer catalog checking** (§5) — validating `{{t "id"}}` literals against a
   host catalog at `truss!` expansion time, to recover Fluent's compile-time id check
   inside the static-name model.
