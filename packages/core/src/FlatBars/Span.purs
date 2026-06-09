@@ -1,10 +1,13 @@
 -- | Source spans for diagnostics.
 -- |
--- | A `Span` is a half-open range of code-unit offsets into the original
--- | template source. It is attached to the tag-level AST nodes (`Output`,
--- | `Block`, `RawBlock`) by the parser and surfaced to helpers on the control
--- | handle (`Kernel.Engine.Ctl`), so an engine can point a diagnostic at the
--- | offending tag. `lineColumn` turns an offset into a 1-based line/column.
+-- | A `Span` is a half-open range of **code-unit** (UTF-16) offsets into the
+-- | original template source — the same units a JS string / CodeMirror position
+-- | uses, so a host consumes them with no byte↔char conversion (ADR-035). It is
+-- | attached to *every* AST node — the tag nodes (`Output`, `Block`, `RawBlock`,
+-- | `Sep`) and the literal `Content` run — by the parser, and surfaced to helpers on
+-- | the control handle (`Kernel.Engine.Ctl`), so an engine can point a diagnostic at
+-- | (or a host can jump-to-source for) the offending node. `lineColumn` turns an
+-- | offset into a 1-based line/column.
 module FlatBars.Span
   ( Span
   , spanText
