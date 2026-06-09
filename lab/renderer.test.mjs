@@ -251,6 +251,26 @@ test("parseAst returns the {t:…} node shape", async () => {
   assert.deepEqual(emit.expr.segments, ["name"]);
 });
 
+test("parseAst nodes carry their source span (Data Access jump-to-source)", async () => {
+  // Regression: the lowered-AST JSON used to omit `src`, so the Data Access
+  // panel fell back to line 1, column 1 for every lookup. Each tag-derived
+  // node must now report the code-unit range of its opening tag.
+  const r = await createRenderer("fullbars");
+  const src = "<h1>{{ name }}</h1>{{#each items}}{{ this }}{{/each}}";
+  const { ast } = r.parseAst(src);
+  const emit = ast.nodes[1];
+  assert.deepEqual(emit.src, { start: 4, end: 14 });
+  assert.equal(src.slice(emit.src.start, emit.src.end), "{{ name }}");
+  const each = ast.nodes[3];
+  assert.deepEqual(each.src, { start: 19, end: 34 });
+  assert.equal(src.slice(each.src.start, each.src.end), "{{#each items}}");
+  // …and into block bodies: the scoped `{{ this }}` keeps its own span.
+  assert.deepEqual(each.body[0].src, { start: 34, end: 44 });
+  // Literal text nodes are not tags and carry no span.
+  assert.equal(ast.nodes[0].t, "text");
+  assert.equal(ast.nodes[0].src, undefined);
+});
+
 test("parseAst is forgiving: a parse error yields a recovered tree + located errors", async () => {
   const r = await createRenderer("fullbars");
   const res = r.parseAst("{{#each xs}}…"); // unclosed block

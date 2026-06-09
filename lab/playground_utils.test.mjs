@@ -204,6 +204,20 @@ test("analyseDataAccess classifies hits, misses, type-mismatch and OOB", () => {
   assert.equal(rows[1].status, "miss");
   assert.equal(rows[2].status, "oob");
   assert.equal(rows[3].status, "type-mismatch");
+  // Each row carries its node's span so the panel renders the real
+  // line:column and the row jumps to source (not the 1:1 fallback).
+  assert.deepEqual([rows[0].start, rows[0].end], [0, 10]);
+  assert.deepEqual([rows[1].start, rows[1].end], [11, 20]);
+});
+
+test("analyseDataAccess leaves start/end null when a node has no span", () => {
+  // A span-less node (e.g. a hand-built fixture, or a future node kind) must
+  // not crash the panel — it falls back to the 1:1 position downstream.
+  const asts = { main: [{ t: "emit", expr: { t: "path", segments: ["x"] } }] };
+  const rows = analyseDataAccess(asts, { x: 1 });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].start, null);
+  assert.equal(rows[0].end, null);
 });
 
 test("analyseDataAccess marks loop-body lookups as scoped", () => {
