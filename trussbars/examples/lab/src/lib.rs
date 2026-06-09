@@ -32,7 +32,7 @@ use ratatui::{
     layout::{Constraint, Layout, Position, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Paragraph},
+    widgets::{Block, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 use trussbars_vm::{Helpers, Template};
 
@@ -468,12 +468,14 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
             }
         })
         .collect();
+    let out_len = out.lines().count();
     frame.render_widget(
         Paragraph::new(out_lines)
             .scroll((lab.scroll.output, 0))
             .block(Block::bordered().title(format!(" Output · {} ", lab.mode.key()))),
         p.output,
     );
+    maybe_scrollbar(frame, p.output, out_len, lab.scroll.output);
 
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
@@ -518,6 +520,25 @@ fn render_editor(
         .border_style(border)
         .title(format!(" {title} "));
     let inner = block.inner(area);
+    let content = lines.len();
     frame.render_widget(Paragraph::new(lines).scroll((scroll, 0)).block(block), area);
+    maybe_scrollbar(frame, area, content, scroll);
     inner
+}
+
+/// Draw a vertical scrollbar on `area`'s right border, but only when `content` overflows
+/// the inner height — the "optional" scrollbar (shown only when there is something to
+/// scroll).
+fn maybe_scrollbar(frame: &mut Frame, area: Rect, content: usize, scroll: u16) {
+    let visible = usize::from(area.height.saturating_sub(2));
+    if content > visible {
+        let mut state = ScrollbarState::new(content)
+            .viewport_content_length(visible)
+            .position(usize::from(scroll));
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight),
+            area,
+            &mut state,
+        );
+    }
 }
