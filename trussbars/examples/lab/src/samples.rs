@@ -1,10 +1,10 @@
-//! The two starting samples: each seeds the editable Template and Data (JSON) panes.
+//! The two starting samples: each seeds the editable Template and Data (YAML) panes.
 //!
-//! `Receipt` exercises the i18n **host helpers** (`t`/`number`/`plural`/`date`/`relative`)
-//! — VM-only (AOT rejects host helpers), and it localizes live as the lab's locale
-//! changes. `Greeting` localizes the other way — the (editable) data already holds the
-//! translated strings — so it needs no helpers and renders identically under the
-//! AOT-compat proxy. Both are just seeds: everything is editable at runtime.
+//! `Receipt` exercises the full i18n **host-helper pack** (`t`/`number`/`plural`/`date`/
+//! `relative`); `Greeting` is a minimal one — just `{{t}}` over the catalog, with only the
+//! name in its data. Both localize live as the lab's locale (or the catalog) changes, and
+//! both are VM-only (the compat proxy rejects host helpers). Everything is editable at
+//! runtime.
 
 /// Which starting sample is loaded.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -30,8 +30,8 @@ impl Sample {
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
-            Sample::Receipt => "receipt — i18n host helpers (VM-only)",
-            Sample::Greeting => "greeting — localized via data (AOT-compatible)",
+            Sample::Receipt => "receipt — full i18n host-helper pack (VM-only)",
+            Sample::Greeting => "greeting — minimal i18n via the catalog (VM-only)",
         }
     }
 
@@ -91,14 +91,13 @@ items:
     price: 899
 "#;
 
-// Plain interpolation — the data already holds the localized strings, so the template
-// carries no helpers and renders identically under the AOT-compat proxy.
-const GREETING_TMPL: &str = r#"{{! greeting — localized via data (no helpers), so AOT-compatible }}
-{{greeting}}, {{customer}}!
-{{note}}
+// A minimal i18n sample: the message comes from the catalog via `t`, so only the name
+// lives in the data. Cycling the locale re-localizes it (and, like any host-helper
+// template, it is VM-only — the compat proxy rejects `t`).
+const GREETING_TMPL: &str = r#"{{! greeting — localized through the i18n catalog (the t helper) }}
+{{t "hello"}}, {{customer}}!
+{{t "note"}}
 "#;
 
 const GREETING_DATA: &str = r#"customer: Ada
-greeting: Hello
-note: Thanks for your order.
 "#;

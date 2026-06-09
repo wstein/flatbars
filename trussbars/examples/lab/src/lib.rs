@@ -9,9 +9,9 @@
 //!    `{{t …}}`/`{{number …}}`/`{{plural …}}`/`{{date …}}`/`{{relative …}}` — host
 //!    helpers registered at runtime ([`i18n::register`]); cycling the locale flips the
 //!    title, plural noun, grouped number, and localized month name.
-//! 2. **`render_compat` is the AOT-parity proxy (§7).** Toggle [`Mode::Compat`] and the
-//!    receipt is rejected (host helpers are VM-only); the plain `greeting` (localized via
-//!    its data) renders byte-identically.
+//! 2. **`render_compat` is the AOT-parity proxy (§7).** Toggle [`Mode::Compat`] and both
+//!    samples are rejected — host helpers are VM-only. Strip a template to plain
+//!    `{{field}}` interpolation and compat renders byte-identically to lenient.
 //!
 //! The render core ([`Lab::render`]) and the editor ([`editor::TextBuffer`]) are pure and
 //! unit/golden-tested; [`ui`] is drawn headlessly under a `TestBackend` (`tests/`). The

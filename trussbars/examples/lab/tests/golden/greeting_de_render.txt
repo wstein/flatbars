@@ -1,2 +1,2 @@
-Hello, Ada!
-Thanks for your order.
+Hallo, Ada!
+Danke für Ihre Bestellung.

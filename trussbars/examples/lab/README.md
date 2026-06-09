@@ -54,10 +54,10 @@ via the engine lexer, literal text left plain.
    four cardinal forms — `1 element`, `3 elementy`, `5 elementów` — while German
    `Artikel` is invariant. Edit a message in the i18n pane and the render updates live.
 
-2. **`render_compat` is the AOT-parity proxy (§7).** Press `F3`:
-   - `receipt` → `⟂ unsupported: helper 't'` — host helpers are VM-only.
-   - `greeting` → **byte-identical** to lenient — it localizes the AOT-friendly way (the
-     data already holds the translated strings), so it needs no helpers.
+2. **`render_compat` is the AOT-parity proxy (§7).** Press `F3` and both samples report
+   `⟂ unsupported: helper 't'` — host helpers are VM-only. Delete the `{{t …}}` calls
+   (leaving plain `{{field}}` interpolation) and compat renders **byte-identical** to
+   lenient: "if it renders in compat, it compiles under AOT identically."
 
 ## i18n boundary (`docs/09 §5`)
 
