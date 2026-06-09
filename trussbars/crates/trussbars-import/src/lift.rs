@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use trussbars_template::Span;
-use trussbars_template::ast::{Cond, Each, Expr, Node, Value, With};
+use trussbars_template::ast::{Case, Cond, Each, Expr, HelperBlock, Node, Value, With};
 
 /// Inline migration notes to weave into the output, keyed by a node's source-span
 /// start offset. Each note is emitted as a `{{! migrate: <note> }}` comment
@@ -76,11 +76,103 @@ fn print_node(n: &Node, notes: &Notes, out: &mut String) {
             }
             out.push_str("}}");
         }
-        // The remaining IR variants are not produced by the Mustache lowering; they are
-        // serialized when a later dialect needs them. Until then a faithful fallback
-        // keeps the printer total without inventing surface for untested shapes.
-        other => print_unsupported(other, out),
+        Node::Let {
+            span,
+            bindings,
+            body,
+        } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{{#let");
+            for (name, value) in bindings {
+                out.push(' ');
+                out.push_str(name);
+                out.push_str("=(");
+                print_expr(value, out);
+                out.push(')');
+            }
+            out.push_str("}}");
+            print_nodes(body, notes, out);
+            out.push_str("{{/let}}");
+        }
+        Node::Case(c) => print_case(c, notes, out),
+        Node::Inline { span, name, body } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{{#inline ");
+            quote(name, out);
+            out.push_str("}}");
+            print_nodes(body, notes, out);
+            out.push_str("{{/inline}}");
+        }
+        Node::PartialBlock {
+            span,
+            name,
+            ctx,
+            body,
+        } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{{#partial ");
+            quote(name, out);
+            if let Some(ctx) = ctx {
+                out.push(' ');
+                print_expr(ctx, out);
+            }
+            out.push_str("}}");
+            print_nodes(body, notes, out);
+            out.push_str("{{/partial}}");
+        }
+        Node::Yield { span } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{{yield}}");
+        }
+        Node::RawBlock { span, body } => {
+            emit_notes(*span, notes, out);
+            out.push_str("{{{{raw}}}}");
+            out.push_str(body);
+            out.push_str("{{{{/raw}}}}");
+        }
+        Node::HelperBlock(b) => print_helper_block(b, notes, out),
     }
+}
+
+fn print_case(c: &Case, notes: &Notes, out: &mut String) {
+    emit_notes(c.span, notes, out);
+    out.push_str("{{#case ");
+    print_expr(&c.subject, out);
+    out.push_str("}}");
+    for (values, body) in &c.arms {
+        out.push_str("{{when");
+        for v in values {
+            out.push(' ');
+            print_expr(v, out);
+        }
+        out.push_str("}}");
+        print_nodes(body, notes, out);
+    }
+    if !c.otherwise.is_empty() {
+        out.push_str("{{else}}");
+        print_nodes(&c.otherwise, notes, out);
+    }
+    out.push_str("{{/case}}");
+}
+
+fn print_helper_block(b: &HelperBlock, notes: &Notes, out: &mut String) {
+    emit_notes(b.span, notes, out);
+    out.push_str("{{#");
+    out.push_str(&b.head);
+    for a in &b.args {
+        out.push(' ');
+        print_expr(a, out);
+    }
+    out.push_str("}}");
+    print_nodes(&b.body, notes, out);
+    out.push_str("{{/");
+    out.push_str(&b.head);
+    out.push_str("}}");
+}
+
+/// Append `s` to `out` as a quoted, escaped string literal.
+fn quote(s: &str, out: &mut String) {
+    print_lit(&Value::Str(s.to_string()), out);
 }
 
 fn print_each(e: &Each, notes: &Notes, out: &mut String) {
@@ -153,31 +245,6 @@ fn print_with(w: &With, notes: &Notes, out: &mut String) {
         print_nodes(&w.otherwise, notes, out);
     }
     out.push_str("{{/with}}");
-}
-
-/// A faithful fallback for IR variants the Mustache lowering never emits.
-fn print_unsupported(n: &Node, out: &mut String) {
-    out.push_str("{{! migrate: unsupported node ");
-    out.push_str(node_kind(n));
-    out.push_str(" }}");
-}
-
-fn node_kind(n: &Node) -> &'static str {
-    match n {
-        Node::Text(_) => "text",
-        Node::Output { .. } => "output",
-        Node::Each(_) => "each",
-        Node::Cond(_) => "cond",
-        Node::Case(_) => "case",
-        Node::With(_) => "with",
-        Node::Let { .. } => "let",
-        Node::Partial { .. } => "partial",
-        Node::Inline { .. } => "inline",
-        Node::PartialBlock { .. } => "partial-block",
-        Node::Yield { .. } => "yield",
-        Node::RawBlock { .. } => "raw-block",
-        Node::HelperBlock(_) => "helper-block",
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -538,6 +605,79 @@ mod tests {
     fn coalesce_and_elvis() {
         let c = Expr::App("coalesce".into(), vec![path(&["name"]), Expr::str("anon")]);
         assert_eq!(to_truss(&[out(c, false)]), "{{name ?? \"anon\"}}");
+    }
+
+    #[test]
+    fn let_block() {
+        let n = Node::Let {
+            span: span(),
+            bindings: vec![("x".into(), path(&["a", "b"]))],
+            body: vec![out(path(&["x"]), false)],
+        };
+        assert_eq!(to_truss(&[n]), "{{#let x=(a.b)}}{{x}}{{/let}}");
+    }
+
+    #[test]
+    fn case_block() {
+        let n = Node::Case(trussbars_template::ast::Case {
+            span: span(),
+            subject: path(&["status"]),
+            arms: vec![
+                (
+                    vec![Expr::str("a"), Expr::str("b")],
+                    vec![Node::Text("AB".into())],
+                ),
+                (vec![Expr::str("c")], vec![Node::Text("C".into())]),
+            ],
+            otherwise: vec![Node::Text("else".into())],
+        });
+        assert_eq!(
+            to_truss(&[n]),
+            "{{#case status}}{{when \"a\" \"b\"}}AB{{when \"c\"}}C{{else}}else{{/case}}"
+        );
+    }
+
+    #[test]
+    fn helper_block() {
+        let n = Node::HelperBlock(trussbars_template::ast::HelperBlock {
+            span: span(),
+            head: "bold".into(),
+            args: vec![path(&["x"])],
+            body: vec![Node::Text("hi".into())],
+        });
+        assert_eq!(to_truss(&[n]), "{{#bold x}}hi{{/bold}}");
+    }
+
+    #[test]
+    fn inline_partial_block_and_yield() {
+        let inline = Node::Inline {
+            span: span(),
+            name: "card".into(),
+            body: vec![Node::Yield { span: span() }],
+        };
+        assert_eq!(
+            to_truss(&[inline]),
+            "{{#inline \"card\"}}{{yield}}{{/inline}}"
+        );
+        let pblock = Node::PartialBlock {
+            span: span(),
+            name: "layout".into(),
+            ctx: None,
+            body: vec![Node::Text("body".into())],
+        };
+        assert_eq!(
+            to_truss(&[pblock]),
+            "{{#partial \"layout\"}}body{{/partial}}"
+        );
+    }
+
+    #[test]
+    fn raw_block() {
+        let n = Node::RawBlock {
+            span: span(),
+            body: "{{x}}".into(),
+        };
+        assert_eq!(to_truss(&[n]), "{{{{raw}}}}{{x}}{{{{/raw}}}}");
     }
 
     #[test]
