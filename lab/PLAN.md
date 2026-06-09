@@ -54,7 +54,8 @@ and `partial-graph` because they are computed from the lowered AST, not guessed.
 That lowered AST (`parseAst`) carries each tag-derived node's opening-tag span as
 `src: { start, end }`, so the **Data Access** panel reports the real
 `file:line:column` and its rows jump to source — both keyed off `node.src`, not a
-1:1 fallback.
+1:1 fallback. The `test:lab:browser` smoke pins this end to end: the card example's
+rows report real positions and clicking one moves the template caret to its line.
 The **core / FullBars / MaxBars dialects back `source-map`** (ADR-035): a mapped
 render returns output→source `segments`, each tagged with its source `file`, so the
 three-way editor↔output provenance linking is live and a partial-origin run links to

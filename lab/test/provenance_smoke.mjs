@@ -116,6 +116,60 @@ try {
   assert.ok(outLinked, "a template caret in the tag lights up the output run it produced");
   console.log("  ✓ caret — template caret lights up the output run it produced");
 
+  // ── Data Access: real positions + jump-to-source (the 1:1 regression) ──
+  // The lowered AST now carries each node's opening-tag span, so the panel
+  // reports the true file:line:column instead of the old 1:1 fallback, and a row
+  // click moves the template caret there. Switch to the multi-line "card"
+  // example, whose `{{#each people}}` (line 2) gives a `people` lookup at line 2.
+  await page.click("#example-trigger");
+  await page.waitForSelector("#example-menu li.dropdown-item", { visible: true });
+  await page.evaluate(() => {
+    Array.from(document.querySelectorAll("#example-menu li.dropdown-item"))
+      .find((el) => /html card/i.test(el.textContent || ""))?.click();
+  });
+  await new Promise((r) => setTimeout(r, 800));
+  await page.evaluate(() => {
+    const dock = document.querySelector("#dock");
+    if (!dock || dock.hidden) document.querySelector("#dock-toggle")?.click();
+  });
+  await page.click('#dock-tabs button[data-tab="data-access"]');
+  await page.waitForSelector("#dock-body .dx-row .dx-where", { timeout: 5000 });
+  const wheres = await page.$$eval(
+    "#dock-body .dx-row .dx-where",
+    (els) => els.map((e) => e.textContent || ""),
+  );
+  assert.ok(wheres.length > 0, "Data Access lists lookup rows");
+  assert.ok(
+    wheres.some((w) => !/:1:1$/.test(w)),
+    `Data Access reports real positions, not the 1:1 fallback (got ${wheres.join(", ")})`,
+  );
+  console.log(`  ✓ data access — ${wheres.length} row(s) at real positions (${wheres.join(", ")})`);
+
+  // Jump-to-source: click a main-file row past line 1 and assert the template
+  // editor's active line follows.
+  const jumpWhere = await page.evaluate(() => {
+    const row = Array.from(document.querySelectorAll("#dock-body .dx-row")).find((r) => {
+      const m = (r.querySelector(".dx-where")?.textContent || "").match(/^main:(\d+):/);
+      return m && Number(m[1]) > 1;
+    });
+    if (!row) return null;
+    const w = row.querySelector(".dx-where").textContent;
+    row.click();
+    return w;
+  });
+  assert.ok(jumpWhere, "a main-file lookup past line 1 exists to jump to");
+  await new Promise((r) => setTimeout(r, 250));
+  const wantLine = jumpWhere.match(/^main:(\d+):/)[1];
+  const gutterLine = await page
+    .$eval("#template-editor-container .cm-activeLineGutter", (g) => (g.textContent || "").trim())
+    .catch(() => null);
+  assert.equal(
+    gutterLine,
+    wantLine,
+    `jump-to-source moved the template caret to line ${wantLine} (active gutter=${gutterLine})`,
+  );
+  console.log(`  ✓ jump-to-source — clicking ${jumpWhere} moved the template caret to line ${wantLine}`);
+
   if (consoleErrors.length) fail("console errors during the run:\n    " + consoleErrors.join("\n    "));
 
   // boot defence: a missing asset shows a visible overlay, not a blank page. Fail
