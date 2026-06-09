@@ -24,6 +24,9 @@ module Kernel.Analyse
   , potentialFindings
   , allFindings
   , reportMarkdown
+  , reportMarkdownWith
+  , ReportLabels
+  , handlebarsLabels
   , jsonataScaffold
   ) where
 
@@ -311,11 +314,34 @@ runAnalysis toEngine setup nodes dat =
 -- | (a condition that would branch differently on another engine), each with the
 -- | value, the rules that flip, and a concrete fix; then a `✓` line per portable
 -- | condition as positive evidence. Slices `src` at each span for the tag text.
+-- | The dialect-specific prose for a truthiness report: the name of the engine's
+-- | own rule (shown in the header) and the legend paragraph that frames which
+-- | engines a `flips under` entry refers to. The structural body (findings,
+-- | potentials, misses, portable conditions) is identical across dialects — only
+-- | these two strings differ, because the engine sits at a different point on the
+-- | truthiness axis (ADR-022): FullBars on `handlebars`, MinBars on `mustache-spec`.
+type ReportLabels = { engineRule :: String, legend :: String }
+
+-- | FullBars/RawBars/MaxBars labels: the engine renders on the `handlebars` rule,
+-- | which `mustache.js` shares, so a `flips under` entry names the *other* engines.
+handlebarsLabels :: ReportLabels
+handlebarsLabels =
+  { engineRule: "handlebars"
+  , legend:
+      "_The engine `handlebars` rule is also `mustache.js`' (`0`/`\"\"` falsy), so a"
+        <> " finding's `flips under` names the engines that branch the *other* way —"
+        <> " `mustache-spec` is the language-agnostic Mustache/Ruby reading (`0`/`\"\"`"
+        <> " truthy), not `mustache.js`._"
+  }
+
 reportMarkdown :: PathSchema -> String -> Array Decision -> String
-reportMarkdown schema src decisions =
+reportMarkdown = reportMarkdownWith handlebarsLabels
+
+reportMarkdownWith :: ReportLabels -> PathSchema -> String -> Array Decision -> String
+reportMarkdownWith labels schema src decisions =
   Str.joinWith "\n"
     ( [ "# Truthiness analysis"
-      , "Engine rule: `handlebars` · "
+      , "Engine rule: `" <> labels.engineRule <> "` · "
           <> show (Array.length conds)
           <> " condition(s) evaluated · **"
           <> show (Array.length flagged)
@@ -329,10 +355,7 @@ reportMarkdown schema src decisions =
           <> " stable for CI). \"No observed findings\" means portable *for this data*, not"
           <> " for all data — read the potential section too._"
       , ""
-      , "_The engine `handlebars` rule is also `mustache.js`' (`0`/`\"\"` falsy), so a"
-          <> " finding's `flips under` names the engines that branch the *other* way —"
-          <> " `mustache-spec` is the language-agnostic Mustache/Ruby reading (`0`/`\"\"`"
-          <> " truthy), not `mustache.js`._"
+      , labels.legend
       , ""
       ]
         <>

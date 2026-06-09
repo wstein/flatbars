@@ -477,11 +477,24 @@ const minrun = (r, src, data, opts) => r.render(r.compile(src).program, data, op
 test("createRenderer('minbars') dispatches the Mustache engine (logic-less)", async () => {
   const r = await createRenderer("minbars");
   const info = r.engineInfo();
-  assert.deepEqual(info.features, ["partials", "catalog", "compile-js"]);
+  assert.deepEqual(info.features, ["partials", "catalog", "compile-js", "analyse"]);
   assert.deepEqual(r.allTransformers(), []); // Mustache has no helper registry
   // the AST-analysis panels gate off (no lowered-AST seam): empty, not thrown.
   assert.deepEqual(r.partialGraph(), { nodes: [], edges: [], cycles: [] });
   assert.deepEqual(r.usedTransformers(), []);
+});
+
+test("createRenderer('minbars') analyses truthiness portability (the analyse feature)", async () => {
+  const r = await createRenderer("minbars");
+  // A section over count=0 renders under mustache-spec but would skip under
+  // mustache.js (handlebars rule) — a portability finding (ADR-022).
+  const flagged = r.analyze({ source: "{{#count}}c{{/count}}" }, { count: 0 });
+  assert.equal(flagged.ok, true);
+  assert.equal(flagged.findings.length, 1);
+  assert.ok(flagged.findings[0].flips.includes("handlebars"));
+  // A boolean section is portable (no ambiguous instance), so no finding.
+  const clean = r.analyze({ source: "{{#flag}}c{{/flag}}" }, { flag: true });
+  assert.equal(clean.findings.length, 0);
 });
 
 test("MinBars renders the language-agnostic Mustache (spec) rule by default — 0/'' truthy", async () => {

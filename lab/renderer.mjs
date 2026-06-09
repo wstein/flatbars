@@ -46,6 +46,7 @@ import {
   compileMaxbarsWithPartials as bbCompileMaxbarsWith,
   analyze as bbAnalyze,
   analyzeWith as bbAnalyzeWith,
+  analyzeMinbars as bbAnalyzeMinbars,
   lint as bbLint,
   migrate as bbMigrate,
   maxbarsCompat as bbMaxbarsCompat,
@@ -58,7 +59,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=94";
+} from "./vendor/flatbars-engine.mjs?v=95";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -122,9 +123,12 @@ const BB_FEATURES = [
 ];
 
 // engine-features/v1 for MinBars: it renders + has (Mustache) partials + a catalog
-// + a JS compiler (ADR-016). The AST-analysis features are absent — Mustache is
-// logic-less and there is no lowered AST seam here — so those panels gate off.
-const MIN_FEATURES = ["partials", "catalog", "compile-js"];
+// + a JS compiler (ADR-016) + truthiness analysis (`analyse`, ADR-022 — the
+// Mustache-portability story: where would `mustache.js` branch the other way?).
+// The lowered-AST features (data-access, partial-graph, context-inspect) stay
+// absent — Mustache is logic-less and has no lowered AST seam here — so those
+// panels gate off; the dock explains why ("Why fewer panels?").
+const MIN_FEATURES = ["partials", "catalog", "compile-js", "analyse"];
 
 // The prelude helpers, with the metadata the cheat-sheet panel renders. The
 // user-facing subset of the single-source helper catalog.
@@ -419,9 +423,23 @@ function minbarsRenderer(opts) {
     return hasPartials ? bbCompileMinbarsWithPartials(partials, source) : bbCompileMinbars(source);
   }
 
-  // No lowered-AST seam yet, so the AST-derived panels gate off via the absent
-  // features. The host may still call these analyses defensively during a render,
-  // so they return EMPTY rather than throw. Only `inspectAt` throws `unsupported`.
+  // Truthiness analysis (ADR-022): the Mustache-portability story. MinBars renders
+  // on the language-agnostic `mustache-spec` rule, so a finding marks exactly where
+  // `mustache.js` (the `handlebars` rule, `0`/`""` falsy) would branch the other
+  // way. Same `AnalyseResult` shape as the FlatBars dialects, so the Truthiness
+  // panel is engine-agnostic. (No `analyzeWith` — the host path-schema is a
+  // FlatBars/ADR-030 concern; the Lab falls back to `analyze`.)
+  function analyze(program, data) {
+    return bbAnalyzeMinbars(program.source, data == null ? {} : data);
+  }
+
+  // No lowered-AST seam yet, so the AST-derived panels (data-access, partials,
+  // context) gate off via the absent features. `parseAst` returns an empty
+  // `minbars-ast/v1` envelope — a deliberate, well-formed "no nodes exposed"
+  // shape (not a stub): the host can call it defensively and the AST panels stay
+  // empty rather than erroring. Only `inspectAt` throws `unsupported`. (A real
+  // lowered MinBars AST — the foundation of a Mustache→FlatBars migration tool —
+  // is tracked future work.)
   function parseAst() { return { ast: { version: "minbars-ast/v1", nodes: [] } }; }
   function inspectAt() {
     const err = new Error("MinBars has no context inspector (no output->source map)");
@@ -436,7 +454,7 @@ function minbarsRenderer(opts) {
   function engineInfo() { return { version: VERSION, builtins: [], features: MIN_FEATURES }; }
 
   return {
-    render, compile, compileToJs, parseAst, inspectAt,
+    render, compile, compileToJs, analyze, parseAst, inspectAt,
     usedTransformers: noUses, requiredAssigns: noUses, partialGraph: noGraph,
     allTransformers, catalog, engineInfo, version: VERSION,
   };

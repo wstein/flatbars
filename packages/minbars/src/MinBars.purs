@@ -12,6 +12,7 @@
 -- | standalone-whitespace stripping, and set-delimiters are later phases.
 module MinBars
   ( minOptions
+  , parseMin
   , renderMin
   , renderMinWith
   , renderMinDiag

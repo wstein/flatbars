@@ -10,6 +10,7 @@
 module FullBars.JS
   ( Result
   , AnalyseResult
+  , analyzeMinbars
   , LintResult
   , MigrateOutcome
   , CompatResult
@@ -97,6 +98,7 @@ import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
 import MaxBars.Compat as Compat
 import MinBars as MinBars
+import MinBars.Analyse as MinAnalyse
 import RawBars as RawBars
 
 -- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
@@ -139,6 +141,14 @@ type AnalyseResult =
 -- | data)`.
 analyze :: Fn2 String Json AnalyseResult
 analyze = mkFn2 \tpl json -> analyseResult (FullBars.analyseSurface tpl (fromJson json))
+
+-- | Truthiness analysis for a MinBars (Mustache) template — the narrower
+-- | Mustache-portability story (ADR-022): MinBars renders on `mustache-spec`, so a
+-- | finding is exactly where `mustache.js` (the `handlebars` rule) would branch the
+-- | other way. Same `AnalyseResult` shape as `analyze`. `analyzeMinbars(template,
+-- | data)`.
+analyzeMinbars :: Fn2 String Json AnalyseResult
+analyzeMinbars = mkFn2 \tpl json -> analyseResult (MinAnalyse.analyseMin tpl (fromJson json))
 
 -- | `analyze` with a host `PathSchema` (ADR-030): `schema(path, value) => boolean`
 -- | answers "could this path hold this value?", suppressing potential findings the

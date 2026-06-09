@@ -16,7 +16,9 @@ import Effect.Console (log)
 import FlatBars.Lexer (RawTok(..), tokenizeTemplate)
 import FlatBars.Token (LexOptions, tokenizeInterior)
 import FlatBars.Value (Value(..))
+import Kernel.Analyse (Finding)
 import MinBars (minOptions, renderMin, renderMinCompat, renderMinDelimsDiag, renderMinWith)
+import MinBars.Analyse (analyseMin)
 import MinBars.Standalone (mustacheStandalone)
 import Test.Assert (assert')
 
@@ -61,6 +63,15 @@ expectP name partials src dat expected = case renderMinWith partials src dat of
   Left err -> assert' (name <> ": unexpected error: " <> err) false
   Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
     (out == expected)
+
+-- | Assert the truthiness-analysis findings for `src`/`dat` satisfy `ok`
+-- | (`MinBars.Analyse`, ADR-022).
+expectFindings :: String -> String -> Value -> (Array Finding -> Boolean) -> Effect Unit
+expectFindings name src dat ok = case analyseMin src dat of
+  Left err -> assert' (name <> ": unexpected analyse error: " <> err) false
+  Right r -> assert'
+    (name <> ": findings predicate failed (" <> show (Array.length r.findings) <> " found)")
+    (ok r.findings)
 
 -- | Assert with a custom INITIAL delimiter pair (the `--mustache --delimiters` path).
 expectD :: String -> { open :: String, close :: String } -> String -> Value -> String -> Effect Unit
@@ -306,5 +317,21 @@ main = do
       Right toks -> assert' ("standalone re-lex invariant on " <> show src)
         (Array.all (interiorMatches lx) (mustacheStandalone lx toks))
       Left _ -> assert' ("corpus should lex: " <> show src) false
+
+  -- Truthiness analysis (ADR-022, the Mustache-portability story). A section over
+  -- an ambiguous scalar (`0`/`""`) is a finding: MinBars (mustache-spec) renders it,
+  -- mustache.js (handlebars rule) would not.
+  expectFindings "section-zero" "{{#count}}c{{/count}}" (obj [ Tuple "count" (num 0.0) ])
+    \fs -> Array.length fs == 1 && Array.any (\f -> Array.elem "handlebars" f.flips) fs
+  -- A boolean section is portable: a boolean has no ambiguous instance, so neither
+  -- the observed value nor its type produces a finding.
+  expectFindings "section-flag" "{{#flag}}yes{{/flag}}" (obj [ Tuple "flag" (VBool true) ])
+    Array.null
+  -- An inverted section over `""` flips too (`{{^s}}` renders under mustache.js).
+  expectFindings "inverted-empty" "{{^s}}none{{/s}}" (obj [ Tuple "s" (str "") ])
+    \fs -> Array.length fs == 1
+  -- An array section is iteration, not a truthiness branch: no finding.
+  expectFindings "section-array" "{{#xs}}x{{/xs}}" (obj [ Tuple "xs" (arr [ num 1.0 ]) ])
+    Array.null
 
   log "all MinBars tests passed"
