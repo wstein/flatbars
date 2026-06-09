@@ -278,10 +278,11 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
 }
 
 /// Emit a host **block** helper (docs/09): `name(&(arg0), …, || -> String { <body> })`,
-/// routed through the same `esc` output path as a value helper (so a `Safe` return opts
-/// out of escaping). The body closure renders the inner nodes in the enclosing scope — it
-/// shadows the runtime `out` buffer with its own, so the body's `out.push_str(…)` fills the
-/// closure's buffer, which it returns. Undeclared heads are a located "unknown helper".
+/// whose return is written **raw** (block output is markup; the body is already escaped
+/// inside the closure, so re-escaping would double-escape it). The body closure renders the
+/// inner nodes in the enclosing scope — it shadows the runtime `out` buffer with its own, so
+/// the body's `out.push_str(…)` fills the closure's buffer, which it returns. Undeclared
+/// heads are a located "unknown helper".
 fn helper_block(env: &Env, src: &str, b: &HelperBlock, out: &mut String) -> Result<(), String> {
     if !env.helpers.contains(&b.head) {
         return Err(format!(
@@ -300,7 +301,12 @@ fn helper_block(env: &Env, src: &str, b: &HelperBlock, out: &mut String) -> Resu
         "|| -> String {{\nlet mut out = String::new();\n{body}out\n}}"
     ));
     let call = format!("{}({})", b.head, args.join(", "));
-    out.push_str(&format!("trussbars_core::esc(&({call}), &mut out);\n"));
+    // Block-helper output is markup: the body's interpolations were already escaped inside
+    // the closure, so the helper's return is written **raw** — escaping it would
+    // double-escape the body. (`String` and `Safe` returns both write through `ToText`.)
+    out.push_str(&format!(
+        "trussbars_core::ToText::write_text(&({call}), &mut out);\n"
+    ));
     Ok(())
 }
 
@@ -1054,8 +1060,8 @@ mod tests {
 
     #[test]
     fn block_helper_declared_emits_a_body_closure_call() {
-        // `{{#frame}}…{{/frame}}` → `frame(|| -> String { <body> })`, routed through the
-        // value-output escape path (a `Safe` return opts out).
+        // `{{#frame}}…{{/frame}}` → `frame(|| -> String { <body> })`, written raw (block
+        // output is markup; the body is already escaped inside the closure).
         let code = emit_named(
             "render",
             "Ctx",
@@ -1065,7 +1071,10 @@ mod tests {
         .unwrap();
         assert!(code.contains("frame("), "{code}");
         assert!(code.contains("|| -> String"), "{code}");
-        assert!(code.contains("trussbars_core::esc(&(frame("), "{code}");
+        assert!(
+            code.contains("trussbars_core::ToText::write_text(&(frame("),
+            "{code}"
+        );
     }
 
     #[test]

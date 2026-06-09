@@ -13,7 +13,8 @@
 //! `dict`, and partials (`{{#inline}}`/`{{> }}`/`{{#partial}}`/`{{yield}}`). Anything
 //! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
 //! spike (docs/11): the lenient + AOT-compat (strict) render modes, host-helper
-//! registration, and `no_std` + `alloc` (`--no-default-features`) so the dynamic VM
+//! registration (value *and* block helpers — `{{#name}}…{{/name}}`, docs/09 §3.1),
+//! and `no_std` + `alloc` (`--no-default-features`) so the dynamic VM
 //! can ship to bare-metal/WASM (f64 then formats via `Display`, the documented
 //! divergence; the dev `truss-vm` CLI stays `std`).
 //!
@@ -233,6 +234,13 @@ impl Env {
 
 type HostHelper = Box<dyn Fn(&[Value]) -> Result<Value, String>>;
 
+/// A host **block** helper (`{{#name args}}body{{/name}}`): it receives the evaluated args
+/// plus a `body` thunk that renders the inner template in the enclosing scope, and returns
+/// the wrapped/repeated/suppressed result. The dynamic mirror of the AOT `fn name(args…,
+/// body: impl Fn() -> String) -> R` convention (docs/09 §3.1).
+type HostBlockHelper =
+    Box<dyn Fn(&[Value], &dyn Fn() -> Result<String, String>) -> Result<Value, String>>;
+
 /// A host-helper registry (F3, docs/11 §8). The dynamic backend's answer to custom
 /// helpers and the i18n/locale pack: a runtime `name → fn(&[Value]) -> Value` table —
 /// trivial here, where the AOT backend would need monomorphized codegen. Build one and
@@ -241,6 +249,7 @@ type HostHelper = Box<dyn Fn(&[Value]) -> Result<Value, String>>;
 #[derive(Default)]
 pub struct Helpers {
     map: BTreeMap<String, HostHelper>,
+    blocks: BTreeMap<String, HostBlockHelper>,
 }
 
 impl Helpers {
@@ -262,8 +271,26 @@ impl Helpers {
         self
     }
 
+    /// Register a host **block** helper callable as `{{#name args…}}body{{/name}}`. It
+    /// receives the evaluated args and a `body` thunk (render the inner template in the
+    /// enclosing scope) and returns the result. Its output is emitted **raw** — block
+    /// output is markup and the body is already escaped, matching AOT (docs/09 §3.1).
+    /// Chainable.
+    pub fn register_block(
+        &mut self,
+        name: impl Into<String>,
+        f: impl Fn(&[Value], &dyn Fn() -> Result<String, String>) -> Result<Value, String> + 'static,
+    ) -> &mut Self {
+        self.blocks.insert(name.into(), Box::new(f));
+        self
+    }
+
     fn get(&self, name: &str) -> Option<&HostHelper> {
         self.map.get(name)
+    }
+
+    fn get_block(&self, name: &str) -> Option<&HostBlockHelper> {
+        self.blocks.get(name)
     }
 }
 
@@ -521,16 +548,33 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             Some(y) => out.push_str(y),
             None => return Err("'{{yield}}' used outside a block partial".into()),
         },
-        // Host block helpers (docs/09) are an AOT (truss!) feature for now: AOT emits the
-        // body as an `impl Fn() -> String` closure the helper drives. The VM needs an
-        // equivalent on-demand body renderer (tracked); until then it rejects them rather
-        // than diverge from AOT (e.g. a `{{#repeat n}}` that renders the body N times).
+        // Host block helpers (docs/09 §3.1): the runtime mirror of AOT's body-as-closure.
+        // Evaluate the args, hand the helper a `body` thunk that renders the inner nodes in
+        // this scope, and write its (markup) return raw. Rejected in AOT-compat — the proxy
+        // registers no helpers — with the same marker shape as a value helper.
         Node::HelperBlock(b) => {
-            return Err(format!(
-                "block host-helper '{{{{#{}}}}}' is an AOT-only feature; the VM does not \
-                 support block helpers yet",
-                b.head
-            ));
+            let args: Vec<Value> = b
+                .args
+                .iter()
+                .map(|a| eval_expr(env, a))
+                .collect::<Result<_, _>>()?;
+            match env.helpers.get_block(&b.head) {
+                Some(f) if !env.strict => {
+                    let body = || -> Result<String, String> {
+                        let mut s = String::new();
+                        eval_nodes(env, &b.body, &mut s)?;
+                        Ok(s)
+                    };
+                    f(&args, &body)?.raw_text(out);
+                }
+                _ => {
+                    return Err(format!(
+                        "unsupported: block helper '{}' / {} args",
+                        b.head,
+                        args.len()
+                    ));
+                }
+            }
         }
     }
     Ok(())
@@ -1212,6 +1256,43 @@ mod tests {
         assert!(t.render(&d).is_err());
         // …and a host helper is rejected in AOT-compat (AOT registers none).
         assert!(t.render_compat(&d).is_err());
+    }
+
+    #[test]
+    fn block_host_helper_registry() {
+        // The same `frame`/`repeat` block helpers as the AOT macro test (render.rs):
+        // `frame` wraps the body once, `repeat n` drives it N times. Byte-identical to AOT.
+        let mut h = Helpers::new();
+        h.register_block("frame", |_args, body| {
+            Ok(Value::Str(Rc::from(format!("[{}]", body()?).as_str())))
+        });
+        h.register_block("repeat", |args, body| {
+            let n = match args.first() {
+                Some(Value::Num(n)) => *n as usize,
+                _ => 0,
+            };
+            let mut s = String::new();
+            for _ in 0..n {
+                s.push_str(&body()?);
+            }
+            Ok(Value::Str(Rc::from(s.as_str())))
+        });
+        let h = Rc::new(h);
+        let d = obj(&[("name", s("Ada"))]);
+
+        let framed = Template::parse("{{#frame}}hi {{name}}{{/frame}}").unwrap();
+        assert_eq!(framed.render_with(&d, &h).unwrap(), "[hi Ada]");
+        let repeated = Template::parse("{{#repeat 3}}{{name}}{{/repeat}}").unwrap();
+        assert_eq!(repeated.render_with(&d, &h).unwrap(), "AdaAdaAda");
+
+        // The body renders in the enclosing scope and is escaped before the helper sees it,
+        // so the helper's raw output never double-escapes it.
+        let esc = obj(&[("name", s("<b>"))]);
+        assert_eq!(framed.render_with(&esc, &h).unwrap(), "[hi &lt;b&gt;]");
+
+        // Undeclared block head errors without a registry, and is rejected in AOT-compat.
+        assert!(framed.render(&d).is_err());
+        assert!(framed.render_compat(&d).is_err());
     }
 
     #[test]

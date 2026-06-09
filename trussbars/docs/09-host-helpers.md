@@ -65,7 +65,7 @@ pub fn markdown(src: &str) -> trussbars_core::Safe {
   whose host fn is missing or mistyped is **rustc's** (wrong arg type / arity / "cannot
   find function `date`"), steered to the template span by the `docs/07` machinery.
 
-### 3.1 Block helpers (`{{#name args…}}body{{/name}}`) — shipped (AOT)
+### 3.1 Block helpers (`{{#name args…}}body{{/name}}`) — shipped (AOT + VM)
 
 A **block** host-helper receives its body as a closure, so it can wrap, suppress, or
 repeat the inner template instead of just transforming a value:
@@ -79,7 +79,7 @@ The convention extends the value-helper one with a trailing body closure:
 
 ```rust
 fn frame(body: impl Fn() -> String) -> trussbars_core::Safe {
-    trussbars_core::Safe(format!("[{}]", body()))   // wrap once; Safe → emitted raw
+    trussbars_core::Safe(format!("[{}]", body()))   // wrap the rendered body once
 }
 fn repeat(n: &f64, body: impl Fn() -> String) -> String {
     (0..*n as usize).map(|_| body()).collect()       // drive the body N times
@@ -97,13 +97,17 @@ truss!(framed, Greeting, "{{#frame}}hi {{name}}{{/frame}}", helpers = [frame]);
   `unknown helper` macro-time error. The parser is meaning-free — any non-built-in block
   head parses to a `HelperBlock` node and is resolved at emit time (§1's static-name
   guarantee is preserved).
-- **Return type.** `String` (escaped) or `Safe` (raw), as for value helpers.
+- **Output is markup → written raw.** Unlike a value helper (`String` escaped, `Safe`
+  raw), a block helper's return is emitted **raw** on both backends — the body's
+  interpolations were already escaped when the closure rendered them, so escaping the
+  helper's return would double-escape the body. `String` and `Safe` both write through.
 - **No `{{else}}` in v1.** A block helper with an `{{else}}` arm is a located parse
   error (`block helper \`x\` does not support {{else}}`), not a silent drop. An
   inversion convention is a tracked follow-up.
-- **AOT only for now.** The dynamic VM (`trussbars-vm`) returns an explicit
-  `AOT-only feature` error for a block host-helper rather than diverging from the typed
-  backend; VM block helpers (a `dyn Fn` body convention) are the tracked follow-up below.
+- **Both backends.** AOT emits `name(args…, || -> String { <body> })`; the VM mirrors it
+  via `Helpers::register_block(name, |args: &[Value], body: &dyn Fn() -> Result<String,
+  String>| …)`, where `body()` renders the inner nodes in the enclosing scope. Rejected
+  in AOT-compat (the proxy registers no helpers), so the AOT≡VM parity holds.
 
 ## 4. How the macro learns the allow-list (shipped)
 
@@ -167,14 +171,12 @@ pile *is* the requirements list this convention satisfies.
   auto-borrowed; a literal's `&&T` deref-coerces to the host's `&T`, so signatures are
   plain references. Matches the built-in string-pack emit.
 
-> Resolved: **block host-helpers** (`{{#name}}…{{/name}}`) shipped for the AOT path —
-> the body-as-closure convention is §3.1.
+> Resolved: **block host-helpers** (`{{#name}}…{{/name}}`) shipped on **both** backends —
+> AOT (`name(args…, || -> String {…})`) and the VM (`Helpers::register_block`, body as a
+> `&dyn Fn() -> Result<String, String>`). The body-as-closure convention is §3.1.
 
 ### Still open (not needed yet)
 
-- **VM block host-helpers** — the AOT path supports block helpers (§3.1); the dynamic
-  VM still errors on them (`AOT-only feature`). Closing the gap needs a runtime
-  body-as-`dyn Fn` convention so the two backends stay at conformance parity.
 - **Block-helper `{{else}}`** — an inversion arm (`{{#x}}…{{else}}…{{/x}}`) is rejected
   in v1; a convention (e.g. a second closure) is unspecified.
 - **Macro-layer catalog checking** (§5) — validating `{{t "id"}}` literals against a
