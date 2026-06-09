@@ -84,10 +84,14 @@ already render `Cond` byte-identically (conformance-gated), and `eq`/`or` are ex
 prelude ops. A `{{#case}}` corpus case passes the `--v2`, `--vm`, and `--vm-compat` axes
 the day the parser rewrite lands, with zero new evaluator code.
 
-In the PureScript oracle (MaxBars), the same rewrite is a **surface desugar**: the
-`{{#case}}` block is rewritten into the existing `{{#if (eq s a)}}…{{elif (or (eq s b)
+In the PureScript oracle the same rewrite is a structural desugar shared by the
+**`nonEmpty`-truthiness family — RawBars and MaxBars** (`Kernel.CaseSugar.desugarCase`):
+the `{{#case}}` block is rewritten into the existing `{{#if (eq s a)}}…{{elif (or (eq s b)
 (eq s c))}}…{{else}}…{{/if}}` skeleton *before* lowering, so the interpreter, the JS
-compiler, and the `MaxBars/Rust.purs` emitter all handle it with no change.
+compiler, and the `MaxBars/Rust.purs` emitter all handle it with no change. **FullBars**
+(Handlebars-faithful) and **MinBars** (Mustache) do **not** have `case`: FullBars rejects
+`{{#case}}` with a located error pointing at the `{{#if (eq …)}}` form, and in MinBars a
+`{{#case}}` is an ordinary Mustache section.
 
 ## 4. Alternatives considered
 
@@ -133,20 +137,21 @@ empty — it is **not** a compile error. The exhaustiveness guarantee that would
 is the substantive reason the v1 keyword is `case`, not `match`: `case` promises value
 dispatch (what it does); `match` would promise patterns + exhaustiveness (what A2 will do).
 
-### 5.5 Governance: this is MaxBars *surface*, so the oracle gets it together with Trussbars
+### 5.5 Governance: this is nonEmpty-family *surface*, so the oracle gets it with Trussbars
 
 `{{#case}}` is a **language/surface** construct, not a host concern — so under the project
 framing (*MaxBars/PureScript is the oracle that defines the surface; Trussbars is the
-production impl*), it cannot be a Trussbars-only token. It is added to the **MaxBars surface**
-(the PureScript parser/desugar) so the oracle renders it and Trussbars conforms byte-for-byte
-against the live oracle (`docs/04`). MaxBars is implemented first (or together) precisely so
-the conformance corpus has an authority for every `{{#case}}` case.
+production impl*), it cannot be a Trussbars-only token. It is added to the **`nonEmpty`-family
+surface — RawBars and MaxBars** (the shared `Kernel.CaseSugar` desugar) so the oracle renders
+it and Trussbars conforms byte-for-byte against the live oracle (`docs/04`). The oracle is
+implemented first (or together) precisely so the conformance corpus has an authority for every
+`{{#case}}` case. (FullBars and MinBars are excluded — see §5.4 and §3.)
 
 ## 6. Status & sequencing
 
 1. **Surface frozen (§2).** The exact spelling `{{#case SUBJECT}}{{when V …}}{{else}}{{/case}}`
    is fixed; the implementation is a transcription, not a redesign.
-2. **Oracle first (§5.5).** The MaxBars surface desugar lands so the live oracle renders
+2. **Oracle first (§5.5).** The shared RawBars/MaxBars desugar lands so the live oracle renders
    `{{#case}}`; the conformance corpus then has an authority for each case.
 3. **Trussbars Rust:** a parser rewrite (`case_block` in `open_block`, splitting on `when`/
    `else`) lowering to `Cond`; a corpus case added to the `--v2`/`--vm`/`--vm-compat` axes;

@@ -43,6 +43,35 @@ main = do
     ( render "{{#if (lookup this \"a\")}}Y{{else}}N{{/if}}" (obj [ Tuple "a" (VBool false) ])
         == Right "N"
     )
+  -- {{#case}} — the multi-arm conditional (docs/12). A nonEmpty-family construct, so
+  -- RawBars has it; the subject/values are core expressions (no surface path sugar).
+  assert' "render: case (first arm)"
+    ( render
+        "{{#case (lookup this \"s\")}}{{when \"a\"}}A{{when \"b\"}}B{{else}}Z{{/case}}"
+        (obj [ Tuple "s" (VString "b") ]) == Right "B"
+    )
+  assert' "render: case (else fallback)"
+    ( render
+        "{{#case (lookup this \"s\")}}{{when \"a\"}}A{{else}}Z{{/case}}"
+        (obj [ Tuple "s" (VString "x") ]) == Right "Z"
+    )
+  assert' "render: case (multi-value arm)"
+    ( render
+        "{{#case (lookup this \"s\")}}{{when \"a\" \"b\"}}AB{{else}}Z{{/case}}"
+        (obj [ Tuple "s" (VString "b") ]) == Right "AB"
+    )
+  -- no {{else}} and no match ⇒ empty, like {{#if}} without {{else}}.
+  assert' "render: case (no else, no match)"
+    ( render
+        "{{#case (lookup this \"s\")}}{{when \"a\"}}A{{/case}}"
+        (obj [ Tuple "s" (VString "x") ]) == Right ""
+    )
+  -- content before the first {{when}} is a located error (matches MaxBars).
+  assert' "reject: case content before first when"
+    ( case render "{{#case (lookup this \"s\")}}junk{{when \"a\"}}A{{/case}}" (obj []) of
+        Left _ -> true
+        Right _ -> false
+    )
   -- RawBars uses the `nonEmpty` rule: 0 is TRUTHY (test magnitude with `gt`),
   -- but "" and the empty array/object are falsy.
   assert' "render: 0 is truthy (nonEmpty rule)"

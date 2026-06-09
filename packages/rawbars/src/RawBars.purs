@@ -35,14 +35,17 @@ import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Map as Map
+import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (coreEmit, metaFor)
-import FlatBars.Error (Error(ParseFailure), ParseError, renderParseErrorsAt)
+import FlatBars.Error (Error(ParseFailure), ParseError(DisallowedShape), renderParseErrorsAt)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
+import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
+import Kernel.CaseSugar (caseLeadingViolation, desugarCase)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, registerAll, registerPartialFiles, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
@@ -74,7 +77,26 @@ coreOptions = defaultParseOptions
   -- Handlebars bare `{{{{name}}}}` form.
   , rawBlockHbs = false
   , rawBlockHash = true
+  -- `{{when}}` is the clause separator of `{{#case}}` (like `else`/`elif` of `if`), so
+  -- its standalone lines are trimmed too — keeping RawBars byte-identical to MaxBars
+  -- (`check:parity`) on a `case` block.
+  , standaloneSeps = [ "else", "elif", "when" ]
   }
+
+-- | Parse core source, then desugar the `{{#case}}` multi-arm conditional into the
+-- | `{{#if (eq …)}}` skeleton (shared with MaxBars via `Kernel.CaseSugar`; docs/12).
+-- | `case` is a nonEmpty-family construct, so RawBars supports it directly — non-whitespace
+-- | content before the first `{{when}}` is a located error. Every RawBars entry point parses
+-- | through here so the construct is available (and the error consistent) everywhere.
+parseCore
+  :: ParseOptions
+  -> String
+  -> Either (NEA.NonEmptyArray ParseError) { directives :: Array Directive, nodes :: Template }
+parseCore opts src = case parseWith opts src of
+  Left pes -> Left pes
+  Right r -> case caseLeadingViolation r.nodes of
+    Just v -> Left (NEA.singleton (DisallowedShape v.shape v.off))
+    Nothing -> Right (r { nodes = desugarCase r.nodes })
 
 -- | Parse core source and return a pure renderer (the engine's fixed `handlebars`
 -- | truthiness rule applies; ADR-022).
@@ -84,7 +106,7 @@ compile = compileWith coreOptions
 -- | `compile` with explicit parse options; RawBars always rejects extras.
 compileWith :: ParseOptions -> String -> Either ParseError (Value -> Either Error String)
 compileWith opts src = do
-  { directives, nodes } <- lmap NEA.head $ parseWith
+  { directives, nodes } <- lmap NEA.head $ parseCore
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
   let h = hoistInline nodes
@@ -95,7 +117,7 @@ compileWith opts src = do
 
 -- | One-shot render of core source against data.
 render :: String -> Value -> Either String String
-render src dat = case parseWith coreOptions src of
+render src dat = case parseCore coreOptions src of
   Left pes -> Left (show (ParseFailure pes))
   Right { directives, nodes } ->
     let
@@ -110,7 +132,7 @@ render src dat = case parseWith coreOptions src of
 
 -- | `render` with located parse-error messages (`line:column:`).
 renderDiag :: String -> Value -> Either String String
-renderDiag src dat = case parseWith coreOptions src of
+renderDiag src dat = case parseCore coreOptions src of
   Left pes -> Left (renderParseErrorsAt src pes)
   Right { directives, nodes } ->
     let
@@ -142,7 +164,7 @@ renderWithOperations
 renderWithOperations operations partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseWith coreOptions src of
+    Right ps -> case parseCore coreOptions src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { directives, nodes } ->
         let
@@ -158,7 +180,7 @@ renderWithOperations operations partialSrcs src dat =
         in
           lmap (formatError src) (runResolved directives setup h.template dat)
   where
-  compilePartial (Tuple name s) = case parseWith coreOptions s of
+  compilePartial (Tuple name s) = case parseCore coreOptions s of
     Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: nodes }
 
@@ -177,7 +199,7 @@ renderMappedWith
 renderMappedWith partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseWith coreOptions src of
+    Right ps -> case parseCore coreOptions src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes } ->
         let
@@ -194,7 +216,7 @@ renderMappedWith partialSrcs src dat =
         in
           lmap (formatError src) (runResolvedMapped setup h.template dat)
   where
-  compilePartial (Tuple name s) = case parseWith coreOptions s of
+  compilePartial (Tuple name s) = case parseCore coreOptions s of
     Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: nodes }
 
@@ -213,7 +235,7 @@ inspectWith
 inspectWith target partialSrcs src dat =
   case traverse compilePartial partialSrcs of
     Left e -> Left e
-    Right ps -> case parseWith coreOptions src of
+    Right ps -> case parseCore coreOptions src of
       Left pes -> Left (renderParseErrorsAt src pes)
       Right { nodes } ->
         let
@@ -229,13 +251,13 @@ inspectWith target partialSrcs src dat =
         in
           lmap (formatError src) (inspectResolvedStrict setup target h.template dat)
   where
-  compilePartial (Tuple name s) = case parseWith coreOptions s of
+  compilePartial (Tuple name s) = case parseCore coreOptions s of
     Left es -> Left (renderParseErrorsAt s es)
     Right { nodes } -> Right { name, template: nodes }
 
 -- | The async instantiation: the same engine in `ExceptT Error Aff`.
 renderAff :: String -> Value -> Aff (Either Error String)
-renderAff src dat = case parseWith coreOptions src of
+renderAff src dat = case parseCore coreOptions src of
   Left pe -> pure (Left (ParseFailure pe))
   Right { directives, nodes } ->
     let
@@ -262,7 +284,7 @@ compileJs = compileJsWith coreOptions
 -- | `compileJs` with explicit parse options; RawBars always rejects extras.
 compileJsWith :: ParseOptions -> String -> Either ParseError String
 compileJsWith opts src = do
-  { nodes } <- lmap NEA.head $ parseWith
+  { nodes } <- lmap NEA.head $ parseCore
     (opts { extras = false, decorators = false, partialBlocks = false })
     src
   let h = hoistInline nodes

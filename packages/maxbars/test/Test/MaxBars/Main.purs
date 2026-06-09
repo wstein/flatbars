@@ -97,6 +97,34 @@ main = do
     (obj [ Tuple "h" (VString "biscuit") ])
     "K"
 
+  -- {{#case}} — the multi-arm conditional (docs/12), desugaring to the {{#if (eq …)}}
+  -- chain: subject `eq`-compared to each {{when}} value (OR-chained for a multi-value arm).
+  let
+    caseT =
+      "{{#case status}}{{when \"shipped\"}}On its way{{when \"pending\" \"queued\"}}Waiting{{else}}Unknown{{/case}}"
+  expectM "case-first-arm" caseT (obj [ Tuple "status" (VString "shipped") ]) "On its way"
+  expectM "case-multi-value-arm" caseT (obj [ Tuple "status" (VString "queued") ]) "Waiting"
+  expectM "case-multi-value-arm-other" caseT (obj [ Tuple "status" (VString "pending") ]) "Waiting"
+  expectM "case-else" caseT (obj [ Tuple "status" (VString "lost") ]) "Unknown"
+  -- no {{else}}: an unmatched subject renders nothing, like {{#if}} without {{else}}.
+  let caseNoElse = "{{#case n}}{{when 1}}one{{when 2}}two{{/case}}"
+  expectM "case-no-else-hit" caseNoElse (obj [ Tuple "n" (num 2.0) ]) "two"
+  expectM "case-no-else-miss" caseNoElse (obj [ Tuple "n" (num 3.0) ]) ""
+  -- the subject is a full expression; a numeric subject dispatches by structural eq.
+  expectM "case-expr-subject"
+    "{{#case (add a b)}}{{when 2}}two{{when 3}}three{{else}}other{{/case}}"
+    (obj [ Tuple "a" (num 1.0), Tuple "b" (num 2.0) ])
+    "three"
+  -- standalone {{when}}/{{else}} lines are trimmed (like {{else}}/{{elif}}), so a
+  -- block-form case leaves no stray blank lines.
+  expectM "case-standalone"
+    "{{#case status}}\n{{when \"a\"}}A\n{{when \"b\"}}B\n{{else}}Z\n{{/case}}\n"
+    (obj [ Tuple "status" (VString "b") ])
+    "B\n"
+  -- content before the first {{when}} is a located error (no silent fall-through).
+  assert' "reject: case content before first when"
+    (isLeft (renderMax "{{#case s}}junk{{when 1}}x{{/case}}" (obj [])))
+
   -- pipes: `a | f` ⇒ (f a); the piped value is the first argument.
   expectM "pipe-json" "{{{ o | json }}}" (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0) ]) ])
     "{\"a\":1}"

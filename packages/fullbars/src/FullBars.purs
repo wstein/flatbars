@@ -54,6 +54,7 @@ import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, strictSurfaceViolation)
 import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, handlebarsLabels, jsonataScaffold, reportMarkdown, runAnalysis)
+import Kernel.CaseSugar (caseLeadingViolation)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartialFiles, registerPartials, withTranslator, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
@@ -88,9 +89,10 @@ desugarSurfaceWith lv = desugarWith lv surfaceClauses
 -- |    `{{#*inline "name"}}` decorator, surface.adoc §5.7) and a `{{#let}}`
 -- |    (MaxBars-only, ADR-024). FullBars accepts neither.
 -- |  * **MaxBars** (`strict = false`) — the *removed* `{{#each … as …}}` loop-
--- |    binding form (MaxBars binds `{{#each x in xs}}` now); rejecting it turns a
--- |    silent no-op into a clear "use `x in xs`" error, the same no-silent-no-op
--- |    bar the FullBars `{{#let}}` rejection set.
+-- |    binding form (MaxBars binds `{{#each x in xs}}` now), and a `{{#case}}` with
+-- |    non-whitespace content before its first `{{when}}` arm (docs/12 §2); rejecting
+-- |    each turns a silent no-op into a clear error, the same no-silent-no-op bar the
+-- |    FullBars `{{#let}}` rejection set.
 -- |
 -- | The first violation found wins.
 checkSurfaceStrict :: Boolean -> Template -> Either ParseError Unit
@@ -100,7 +102,9 @@ checkSurfaceStrict strict nodes = case violation of
   where
   violation
     | strict = strictSurfaceViolation nodes
-    | otherwise = maxbarsEachAsViolation nodes
+    | otherwise = case maxbarsEachAsViolation nodes of
+        Just v -> Just v
+        Nothing -> caseLeadingViolation nodes
 
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.

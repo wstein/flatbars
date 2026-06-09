@@ -72,6 +72,7 @@ import Data.String (Pattern(..), Replacement(..), contains, replaceAll, stripPre
 import Data.String.CodeUnits (drop, indexOf, singleton, take, toCharArray)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Sigil(..), Template)
 import FlatBars.Value (Value(..))
+import Kernel.CaseSugar (desugarCase)
 
 -- | Desugar a Surface template into core syntax. `clauseNames` are the
 -- | separator names the engine treats as clause markers (e.g. `["else"]`); a
@@ -123,8 +124,15 @@ desugar = desugarWith noLoopVars
 -- | Desugar with a dialect `LoopVars` resolver (see `LoopVars`). MaxBars passes
 -- | its loop-variable map; FullBars passes `noLoopVars` (via `desugar`).
 desugarWith :: LoopVars -> Array Ident -> Template -> Template
-desugarWith lv clauseNames = go []
+desugarWith lv clauseNames template = go [] (preCase template)
   where
+  -- `{{#case}}` is a MaxBars (nonEmpty-family) construct, desugared structurally to the
+  -- `{{#if (eq …)}}` skeleton *before* the surface pass, so the subject/values it builds
+  -- are path-rewritten by `go` exactly like a hand-written `if` (shared with RawBars via
+  -- `Kernel.CaseSugar`; docs/12). FullBars has no `case` — `strictSurfaceViolation` rejects
+  -- it before desugar — so this is a no-op there.
+  preCase = if dropPipes then desugarCase else identity
+
   -- the block-parameter spelling is dialect-specific: MaxBars drops the pipes
   -- (`as a b`), FullBars keeps the Handlebars bars (`as |a b|`). The dialect is
   -- read from the ADR-021 reserved-variable capability — MaxBars wraps its
@@ -609,11 +617,14 @@ strictSurfaceViolation nodes = Array.head (Array.mapMaybe node nodes)
   node = case _ of
     Block sp Section "inline" _ _ -> Just { off: sp.start, shape: inlineShape }
     Block sp Section "let" _ _ -> Just { off: sp.start, shape: letShape }
+    Block sp Section "case" _ _ -> Just { off: sp.start, shape: caseShape }
     Block _ _ _ _ body -> strictSurfaceViolation body
     _ -> Nothing
   inlineShape = "{{#inline}} (an inline partial uses the {{#*inline \"name\"}} decorator)"
   letShape =
     "{{#let}} (block-scoped `let` is a MaxBars-only construct; FullBars has no `let` — alias with {{#with x as |n|}}, or build a constant with (dict …))"
+  caseShape =
+    "{{#case}} (multi-arm `case` is a RawBars/MaxBars construct; FullBars has no `case` — chain {{#if (eq subject \"v\")}}…{{else if (eq subject \"w\")}}…{{else}}…{{/if}})"
 
 -- | The first MaxBars `{{#each … as …}}` in `nodes` — the *removed* trailing-`as`
 -- | loop-binding form — its offset and a "shape" string for the located

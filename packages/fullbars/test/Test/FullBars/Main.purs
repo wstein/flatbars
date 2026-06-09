@@ -1056,6 +1056,14 @@ main = do
   expectSError "let-rejected-nested"
     "{{#each xs}}{{#let n=this}}{{n}}{{/let}}{{/each}}"
     "{{#let}}"
+  -- multi-arm `{{#case}}` is a RawBars/MaxBars (nonEmpty-family) construct: FullBars has
+  -- no `case`, so it is a located error pointing at the {{#if (eq …)}} fix (docs/12).
+  expectSError "case-rejected-fullbars"
+    "{{#case s}}{{when \"a\"}}A{{else}}B{{/case}}"
+    "FullBars has no `case`"
+  expectSError "case-rejected-nested"
+    "{{#each xs}}{{#case n}}{{when 1}}one{{/case}}{{/each}}"
+    "{{#case}}"
 
   -- a {{#> name}} whose partial is missing renders its body as the fallback
   -- (the {{#partial}} block-body fallback, reached through the sigil).

@@ -53,6 +53,10 @@ maxOptions =
     { parseExpr = parseMaxExpr
     , parseHead = parseMaxHead
     , extras = false
+    -- `{{when}}` is a clause separator of `{{#case}}` (like `else`/`elif` of `if`), so
+    -- its standalone lines are trimmed too (docs/12). `case` desugars to the `if`
+    -- skeleton in `FullBars.Surface`, before the clause split ever sees a `when`.
+    , standaloneSeps = [ "else", "elif", "when" ]
     -- inline partials in MaxBars use the bare `{{#inline}}` form (the old model);
     -- the `{{#*}}` decorator and `{{#>}}` partial block stay gated off.
     , decorators = false

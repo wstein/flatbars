@@ -330,6 +330,7 @@
             "flatbars-compile",
             "foldable-traversable",
             "kernel",
+            "maybe",
             "ordered-collections",
             "prelude",
             "transformers",
