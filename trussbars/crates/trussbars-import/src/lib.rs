@@ -1,7 +1,7 @@
 //! # trussbars-import
 //!
 //! Exhaustive, faithful parsers for **foreign** template dialects — the *read half*
-//! of the Trussbars migration tool (`trussbars/docs/14-migration-import.md`): a
+//! of the Trussbars migration tool (`trussbars/docs/15-migration-import.md`): a
 //! migration tool must parse a foreign template before it can lower it to MaxBars /
 //! `.truss`.
 //!

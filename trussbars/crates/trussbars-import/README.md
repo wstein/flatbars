@@ -1,7 +1,7 @@
 # trussbars-import
 
 Exhaustive, faithful parsers for four **foreign** template dialects — the *read
-half* of the Trussbars migration tool (`trussbars/docs/14-migration-import.md`). A
+half* of the Trussbars migration tool (`trussbars/docs/15-migration-import.md`). A
 migration tool must parse a foreign template before it can lower it to MaxBars /
 `.truss`; this crate is that first step.
 
@@ -47,5 +47,5 @@ the AST (`{:#?}`, no serialization dependency). `--dialect` accepts `mustache`,
 ## Out of scope
 
 The lowering of each foreign AST → `trussbars_template::ast` (the migration tool
-proper) is the next deliverable; see `docs/14 §6`. The parsers record names and
+proper) is the next deliverable; see `docs/15 §6`. The parsers record names and
 structure only — lambda/filter *semantics* are a runtime concern.

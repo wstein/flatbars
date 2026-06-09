@@ -81,7 +81,7 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
 - `14-typed-match.md` — **proposed** `{{#match SUBJECT "Type"}}` — the typed-exhaustive sibling
   of `{{#case}}`: variant dispatch lowered to a Rust `match` whose exhaustiveness rustc enforces
   (no schema inference needed). Surface-freezing ADR; not yet implemented.
-- `14-migration-import.md` — the migration-tool **read half**: foreign-dialect parsers
+- `15-migration-import.md` — the migration-tool **read half**: foreign-dialect parsers
   (`crates/trussbars-import`; Mustache / Handlebars / Liquid / StringTemplate4). Implemented;
   the lowering to the Trussbars AST is the next deliverable.
 
