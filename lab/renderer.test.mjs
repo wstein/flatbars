@@ -477,11 +477,24 @@ const minrun = (r, src, data, opts) => r.render(r.compile(src).program, data, op
 test("createRenderer('minbars') dispatches the Mustache engine (logic-less)", async () => {
   const r = await createRenderer("minbars");
   const info = r.engineInfo();
-  assert.deepEqual(info.features, ["partials", "catalog", "compile-js", "analyse"]);
+  assert.deepEqual(info.features, ["partials", "catalog", "compile-js", "analyse", "partial-graph"]);
   assert.deepEqual(r.allTransformers(), []); // Mustache has no helper registry
-  // the AST-analysis panels gate off (no lowered-AST seam): empty, not thrown.
-  assert.deepEqual(r.partialGraph(), { nodes: [], edges: [], cycles: [] });
+  // Data-access gates off (MinBars lowers reads to `mlookup`, not `{t:path}` nodes).
   assert.deepEqual(r.usedTransformers(), []);
+  assert.deepEqual(r.requiredAssigns({ source: "{{x}}" }), []);
+});
+
+test("createRenderer('minbars') builds the partial-dependency graph (the partial-graph feature)", async () => {
+  const r = await createRenderer("minbars");
+  // The lowered MinBars AST surfaces `{{> name}}` as a `{t:"partial"}` node, so the
+  // shared dependency-graph builder maps it — including a missing partial.
+  const prog = r.compile("{{#a}}x{{/a}}{{> foot}}{{> gone}}", { foot: "F" }).program;
+  const g = r.partialGraph(prog);
+  assert.deepEqual(g.edges.map((e) => e.to).sort(), ["foot", "gone"]);
+  assert.ok(g.edges.find((e) => e.to === "gone").missing); // unregistered → missing
+  assert.equal(g.cycles.length, 0);
+  // parseAst returns the real lowered tree, not an empty envelope.
+  assert.equal(r.parseAst("{{#a}}{{b}}{{/a}}").ast.nodes.length, 1);
 });
 
 test("createRenderer('minbars') analyses truthiness portability (the analyse feature)", async () => {

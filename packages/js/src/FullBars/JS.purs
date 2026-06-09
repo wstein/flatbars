@@ -99,6 +99,7 @@ import MaxBars as MaxBars
 import MaxBars.Compat as Compat
 import MinBars as MinBars
 import MinBars.Analyse as MinAnalyse
+import MinBars.Surface (desugar) as MinSurface
 import RawBars as RawBars
 
 -- | A render outcome as a plain JS object: `ok` selects `value` vs `error`.
@@ -836,14 +837,18 @@ astJson = mkFn2 \dialect src ->
     opts = case dialect of
       "maxbars" -> maxOptions
       "core" -> RawBars.coreOptions
+      "minbars" -> MinBars.minOptions
       _ -> defaultParseOptions
     r = parseRecovering opts src
     -- `core` is the austere syntax (no desugar); `surface` and `maxbars` desugar
-    -- (MaxBars adds bare loop variables via `maxLoopVars`). Desugar passes a
-    -- `NodeError` through; `lower` drops it.
+    -- (MaxBars adds bare loop variables via `maxLoopVars`). MinBars lowers Mustache
+    -- sections/partials to its own operation calls (`section`/`inverted`/`mlookup`/
+    -- `partial`) via its surface desugar, so the partial-dependency graph sees the
+    -- `partial` nodes. Desugar passes a `NodeError` through; `lower` drops it.
     desugared = case dialect of
       "core" -> r.nodes
       "maxbars" -> desugarSurfaceWith maxLoopVars r.nodes
+      "minbars" -> MinSurface.desugar r.nodes
       _ -> desugarSurface r.nodes
     nodes = lower desugared
     errJson pe =

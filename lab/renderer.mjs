@@ -59,7 +59,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=97";
+} from "./vendor/flatbars-engine.mjs?v=98";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -124,11 +124,13 @@ const BB_FEATURES = [
 
 // engine-features/v1 for MinBars: it renders + has (Mustache) partials + a catalog
 // + a JS compiler (ADR-016) + truthiness analysis (`analyse`, ADR-022 — the
-// Mustache-portability story: where would `mustache.js` branch the other way?).
-// The lowered-AST features (data-access, partial-graph, context-inspect) stay
-// absent — Mustache is logic-less and has no lowered AST seam here — so those
-// panels gate off; the dock explains why ("Why fewer panels?").
-const MIN_FEATURES = ["partials", "catalog", "compile-js", "analyse"];
+// Mustache-portability story: where would `mustache.js` branch the other way?) +
+// the partial-dependency graph (`partial-graph`), now that the lowered MinBars AST
+// surfaces every `{{> name}}` as a `{t:"partial"}` node. Data-access and
+// context-inspect stay absent — MinBars lowers data reads to `mlookup` calls (not
+// the `{t:"path"}` nodes the data-access pass reads) and emits no source map — so
+// those panels gate off; the dock explains why ("Why fewer panels?").
+const MIN_FEATURES = ["partials", "catalog", "compile-js", "analyse", "partial-graph"];
 
 // The prelude helpers, with the metadata the cheat-sheet panel renders. The
 // user-facing subset of the single-source helper catalog.
@@ -433,29 +435,40 @@ function minbarsRenderer(opts) {
     return bbAnalyzeMinbars(program.source, data == null ? {} : data);
   }
 
-  // No lowered-AST seam yet, so the AST-derived panels (data-access, partials,
-  // context) gate off via the absent features. `parseAst` returns an empty
-  // `minbars-ast/v1` envelope — a deliberate, well-formed "no nodes exposed"
-  // shape (not a stub): the host can call it defensively and the AST panels stay
-  // empty rather than erroring. Only `inspectAt` throws `unsupported`. (A real
-  // lowered MinBars AST — the foundation of a Mustache→FlatBars migration tool —
-  // is tracked future work.)
-  function parseAst() { return { ast: { version: "minbars-ast/v1", nodes: [] } }; }
+  // The lowered MinBars AST (flatbars-ast/v1): parse the Mustache surface and lower
+  // it to the core operation tree (`section`/`inverted`/`mlookup`/`partial`). This
+  // is the real tree — the foundation a Mustache→FlatBars/MaxBars migration reads,
+  // and what the Partials panel walks for `{{> name}}` (a `{t:"partial"}` node).
+  // Data-access classification still gates off: MinBars lowers data reads to
+  // `mlookup` calls, not the `{t:"path"}` nodes `analyseDataAccess` expects (a
+  // MinBars-aware data-access pass is tracked follow-up work). Only `inspectAt`
+  // throws `unsupported` (no output→source map).
+  function parseAst(source) { return astJson("minbars", source); }
+
+  // partial-graph (EXACT): every `{{> name}}` lowers to a `{t:"partial"}` node, so
+  // the shared dependency-graph builder maps it directly — the same path the
+  // FlatBars dialects take, over the MinBars AST.
+  function partialGraph(program) {
+    const asts = { main: astJson("minbars", program.source).ast?.nodes || [] };
+    for (const [name, src] of Object.entries(program.partials || {})) {
+      asts[name] = astJson("minbars", src).ast?.nodes || [];
+    }
+    return buildDependencyGraph(asts);
+  }
   function inspectAt() {
     const err = new Error("MinBars has no context inspector (no output->source map)");
     err.kind = "unsupported";
     throw err;
   }
   const noUses = () => [];
-  const noGraph = () => ({ nodes: [], edges: [], cycles: [] });
 
   function allTransformers() { return []; }
   function catalog() { return MIN_CATALOG; }
   function engineInfo() { return { version: VERSION, builtins: [], features: MIN_FEATURES }; }
 
   return {
-    render, compile, compileToJs, analyze, parseAst, inspectAt,
-    usedTransformers: noUses, requiredAssigns: noUses, partialGraph: noGraph,
+    render, compile, compileToJs, analyze, parseAst, partialGraph, inspectAt,
+    usedTransformers: noUses, requiredAssigns: noUses,
     allTransformers, catalog, engineInfo, version: VERSION,
   };
 }

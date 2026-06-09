@@ -21287,7 +21287,7 @@ var migrate = function(tpl) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 305, column 25 - line 313, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 306, column 25 - line 314, column 6): " + [v.constructor.name]);
 };
 var mappedResult = /* @__PURE__ */ either(function(e) {
   return {
@@ -21398,7 +21398,7 @@ var lint = function(tpl, dialect) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 209, column 5 - line 241, column 12): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 210, column 5 - line 242, column 12): " + [v.constructor.name]);
 };
 var jsOperation = function(name2) {
   return function(fn) {
@@ -21423,7 +21423,7 @@ var jsOperation = function(name2) {
             return pure16(fromJson(v.payload));
           }
           ;
-          throw new Error("Failed pattern match at FullBars.JS (line 562, column 35 - line 567, column 47): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FullBars.JS (line 563, column 35 - line 568, column 47): " + [v.constructor.name]);
         }
         ;
         var optsFrame = function(optsJson) {
@@ -21460,7 +21460,7 @@ var jsOperation = function(name2) {
                 };
               }
               ;
-              throw new Error("Failed pattern match at FullBars.JS (line 593, column 9 - line 595, column 60): " + [v2.constructor.name]);
+              throw new Error("Failed pattern match at FullBars.JS (line 594, column 9 - line 596, column 60): " + [v2.constructor.name]);
             };
           };
         };
@@ -21528,7 +21528,7 @@ var inspectResult = function(v) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 438, column 17 - line 440, column 79): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 439, column 17 - line 441, column 79): " + [v.constructor.name]);
 };
 var inspectSurface = function(partials, target, tpl, json) {
   return inspectResult(inspectSurfaceWith(target)(toUnfoldable10(partials))(tpl)(fromJson(json)));
@@ -21656,7 +21656,7 @@ var compileResultAt = function(src) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 707, column 23 - line 709, column 49): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 708, column 23 - line 710, column 49): " + [v.constructor.name]);
   };
 };
 var compileSurface2 = function(tpl) {
@@ -21730,7 +21730,7 @@ var compatResultFor = function(tpl) {
       };
     }
     ;
-    throw new Error("Failed pattern match at FullBars.JS (line 280, column 23 - line 291, column 6): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at FullBars.JS (line 281, column 23 - line 292, column 6): " + [v.constructor.name]);
   };
 };
 var maxbarsCompat = function(tpl, json) {
@@ -21774,7 +21774,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map33(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 980, column 9 - line 989, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 985, column 9 - line 994, column 99): " + [v.constructor.name]);
 };
 var path2 = function(args) {
   var v = uncons(args);
@@ -21794,7 +21794,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", function() {
   var children = function(ns) {
-    return arr(map33($lazy_rnode(950))(ns));
+    return arr(map33($lazy_rnode(955))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -21817,7 +21817,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", functio
         })())), srcOf(v.value0)]);
       }
       ;
-      throw new Error("Failed pattern match at FullBars.JS (line 901, column 24 - line 909, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at FullBars.JS (line 906, column 24 - line 914, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -21850,7 +21850,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", functio
           return obj([tt2("raw"), new Tuple("text", str(v.value1)), srcOf(v.value0)]);
         }
         ;
-        throw new Error("Failed pattern match at FullBars.JS (line 896, column 1 - line 896, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FullBars.JS (line 901, column 1 - line 901, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value1 === "partial") {
         var $164 = litName(v.value2);
@@ -21875,7 +21875,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "FullBars.JS", functio
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(896);
+var rnode = /* @__PURE__ */ $lazy_rnode(901);
 var astJson = function(dialect, src) {
   var opts = (function() {
     if (dialect === "maxbars") {
@@ -21884,6 +21884,10 @@ var astJson = function(dialect, src) {
     ;
     if (dialect === "core") {
       return coreOptions;
+    }
+    ;
+    if (dialect === "minbars") {
+      return minOptions;
     }
     ;
     return defaultParseOptions;
@@ -21900,6 +21904,10 @@ var astJson = function(dialect, src) {
     ;
     if (dialect === "maxbars") {
       return desugarSurfaceWith(maxLoopVars)(r.nodes);
+    }
+    ;
+    if (dialect === "minbars") {
+      return desugar2(r.nodes);
     }
     ;
     return desugarSurface(r.nodes);
@@ -21932,7 +21940,7 @@ var analyseResult = function(v) {
     };
   }
   ;
-  throw new Error("Failed pattern match at FullBars.JS (line 170, column 17 - line 180, column 6): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at FullBars.JS (line 171, column 17 - line 181, column 6): " + [v.constructor.name]);
 };
 var analyze = function(tpl, json) {
   return analyseResult(analyseSurface(tpl)(fromJson(json)));
