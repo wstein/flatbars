@@ -22,6 +22,7 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
 import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
+import MaxBars.Compat (compatReport)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -36,6 +37,16 @@ expectM name src dat expected = case renderMax src dat of
   Left err -> assert' (name <> ": unexpected error: " <> err) false
   Right out -> assert' (name <> ": expected " <> show expected <> " got " <> show out)
     (out == expected)
+
+-- | Assert the Trussbars AOT-compat verdict and the exact set of finding `rule`s.
+expectCompat :: String -> String -> Value -> Boolean -> Array String -> Effect Unit
+expectCompat name src dat compatible rules = case compatReport src dat of
+  Left err -> assert' (name <> ": unexpected parse error: " <> show err) false
+  Right r -> do
+    assert' (name <> ": expected compatible=" <> show compatible <> " got " <> show r.compatible)
+      (r.compatible == compatible)
+    let got = map _.rule r.findings
+    assert' (name <> ": expected rules " <> show rules <> " got " <> show got) (got == rules)
 
 main :: Effect Unit
 main = do
@@ -515,5 +526,53 @@ main = do
     "{{#let add=\"shadowed\"}}{{add}}{{/let}}"
     (obj [])
     "shadowed"
+
+  -- ── Trussbars AOT-compat lint (MaxBars.Compat) ────────────────────────────
+  log "Trussbars AOT-compat lint"
+  -- a plain boolean condition + field output compiles under AOT.
+  expectCompat "compat: boolean if + field output"
+    "{{#if active}}{{name}}{{/if}}"
+    (obj [ Tuple "active" (VBool true), Tuple "name" (VString "Ada") ])
+    true
+    []
+  -- data-driven: a numeric condition is a compile error under AOT (no Truthy for f64).
+  expectCompat "compat: numeric truthiness"
+    "{{#if count}}some{{/if}}"
+    (obj [ Tuple "count" (num 3.0) ])
+    false
+    [ "numeric-truthiness" ]
+  -- even 0 trips it (the rule is the *type*, not the value).
+  expectCompat "compat: numeric truthiness on 0"
+    "{{#if count}}x{{/if}}"
+    (obj [ Tuple "count" (num 0.0) ])
+    false
+    [ "numeric-truthiness" ]
+  -- data-driven: a bare struct/object in output has no text form under AOT.
+  expectCompat "compat: struct output"
+    "{{user}}"
+    (obj [ Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
+    false
+    [ "struct-output" ]
+  -- structural (drift-proof, from the real front-end): a host i18n helper.
+  expectCompat "compat: host helper is structural-reject"
+    "{{t \"hello\"}}"
+    (obj [])
+    false
+    [ "aot-structural" ]
+  -- the drift trap: a `{{#let}}` hash desugars to `dict`, yet binding a *scalar/path*
+  -- compiles under AOT — so the lint must NOT flag the let-hash `dict` (the verdict
+  -- delegates to the real compiler, which consumes it structurally).
+  expectCompat "compat: let-binding a path is NOT flagged"
+    "{{#let label=name}}Hi {{label}}{{/let}}"
+    (obj [ Tuple "name" (VString "Ada") ])
+    true
+    []
+  -- but binding a dict *literal value* needs a generated struct — AOT rejects it,
+  -- even though the MaxBars interpreter supports it (a genuine subset boundary).
+  expectCompat "compat: let-binding a dict literal value is rejected"
+    "{{#let cfg={theme: \"dark\"}}}{{cfg.theme}}{{/let}}"
+    (obj [])
+    false
+    [ "aot-structural" ]
 
   log "all MaxBars tests passed"

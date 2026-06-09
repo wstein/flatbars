@@ -33,7 +33,7 @@ for (const p of [enginePath, emitterPath]) {
   }
 }
 
-const { renderMaxbars } = await import(enginePath);
+const { renderMaxbars, maxbarsCompat } = await import(enginePath);
 const { compileMaxRust } = await import(emitterPath);
 
 // `--vm`: render through the Trussbars VM backend (`trussbars-vm`, docs/11) — a
@@ -139,6 +139,69 @@ if (process.argv.includes("--vm-compat")) {
       console.error(`  BYTE DIVERGENCE ${d.id}: expected ${JSON.stringify(d.expected)} got ${JSON.stringify(d.vm)}`);
     }
   }
+  process.exit(divergences.length === 0 ? 0 : 1);
+}
+
+// `--compat-parity`: the *drift gate* between the two AOT-compat verdicts — the
+// PureScript Lab lint (`MaxBars.Compat` via `maxbarsCompat`, the verdict the
+// "FlatBars Studio" Trussbars panel shows) and the Rust VM's verifying proxy
+// (`truss-vm --compat`, i.e. `render_compat`). For every case the two must AGREE on
+// accept/reject, so the lint can never tell a Lab author "AOT-compatible" when the
+// production engine would reject it (or vice-versa). Unlike `--vm-compat` (which
+// keys on `compileMaxRust.ok`, the *structural* front-end verdict only), this keys
+// on the FULL lint verdict — structural PLUS the data-driven rules (numeric
+// truthiness, struct output) — so it needs cases that exercise those, which the
+// shared `cases` corpus cannot hold (a numeric-truthiness positive would fail the
+// byte-emit gate's batched `cargo build`). Hence the extra curated negatives below.
+if (process.argv.includes("--compat-parity")) {
+  console.error("building truss-vm (VM CLI)…");
+  execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
+    cwd: resolve(root, "trussbars/crates/trussbars-vm"),
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  const binPath = resolve(root, "trussbars/target/debug/truss-vm");
+
+  // The shared corpus (every positive + neg-dict) plus negatives that exercise the
+  // two *data-driven* rules the structural front-end can't see without a value.
+  const extra = [
+    { id: "compat-numeric-truthiness", template: "{{#if count}}x{{/if}}", data: { count: 3 } },
+    { id: "compat-numeric-truthiness-zero", template: "{{#if count}}x{{/if}}", data: { count: 0 } },
+    { id: "compat-struct-output", template: "{{user}}", data: { user: { name: "Ada" } } },
+    { id: "compat-host-helper", template: '{{t "hi"}}', data: {} },
+    { id: "compat-ok-bool", template: "{{#if active}}{{name}}{{/if}}", data: { active: true, name: "Ada" } },
+  ];
+  const parityCases = [...cases, ...extra];
+
+  let agreed = 0;
+  const divergences = [];
+  for (const c of parityCases) {
+    // The PureScript Lab lint verdict (what the Studio panel reports).
+    const ps = maxbarsCompat(c.template, c.data);
+    const psCompatible = ps.ok && ps.compatible;
+    // The Rust verifying-proxy verdict: render_compat accepts iff it does not throw.
+    let vmAccepts = true;
+    try {
+      execFileSync(binPath, ["--compat"], {
+        input: JSON.stringify({ template: c.template, data: c.data }),
+        encoding: "utf8",
+      });
+    } catch {
+      vmAccepts = false;
+    }
+    if (psCompatible === vmAccepts) agreed++;
+    else divergences.push({ id: c.id, ps: psCompatible, vm: vmAccepts, rules: ps.findings?.map((f) => f.rule) ?? [] });
+  }
+  console.log(
+    `Trussbars AOT-compat drift gate (PureScript lint ⇔ Rust render_compat): ` +
+      `${agreed}/${parityCases.length} agree, ${divergences.length} divergence(s).`,
+  );
+  for (const d of divergences) {
+    console.error(`  DIVERGENCE ${d.id}: PS compatible=${d.ps} but VM-compat accepts=${d.vm} (PS rules: ${d.rules.join(", ") || "none"})`);
+  }
+  writeFileSync(
+    resolve(here, "compat-parity.json"),
+    JSON.stringify({ agreed, total: parityCases.length, divergences }, null, 2) + "\n",
+  );
   process.exit(divergences.length === 0 ? 0 : 1);
 }
 

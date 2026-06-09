@@ -12,12 +12,14 @@ module FullBars.JS
   , AnalyseResult
   , LintResult
   , MigrateOutcome
+  , CompatResult
   , render
   , analyze
   , analyzeWith
   , JsPathSchema
   , lint
   , migrate
+  , maxbarsCompat
   , renderSurface
   , renderMaxbars
   , renderMaxbarsWithPartials
@@ -92,6 +94,7 @@ import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import Linter.Migrate (migrateToMaxBars)
 import MaxBars (maxLoopVars, maxOptions)
 import MaxBars as MaxBars
+import MaxBars.Compat as Compat
 import MinBars as MinBars
 import RawBars as RawBars
 
@@ -229,6 +232,40 @@ lint = mkFn2 \tpl dialect ->
 -- | The CLI/host spelling of a lint severity (matches `Show Severity`).
 sevText :: Severity -> String
 sevText = show
+
+-- | A Trussbars AOT-compatibility outcome (`MaxBars.Compat`) as a plain JS object.
+-- | `compatible` is the verdict (would this MaxBars build under the Trussbars
+-- | production AOT compiler?); `findings` locate each incompatibility (`rule` is a
+-- | stable kind — `aot-structural` | `numeric-truthiness` | `struct-output`).
+-- | `ok`/`error` carry a parse failure.
+type CompatResult =
+  { ok :: Boolean
+  , compatible :: Boolean
+  , findings ::
+      Array { severity :: String, rule :: String, message :: String, line :: Int, column :: Int }
+  , report :: String
+  , error :: String
+  }
+
+-- | Lint a MaxBars template for Trussbars AOT compatibility against sample data —
+-- | `maxbarsCompat(template, data)`. The structural verdict is the real AOT
+-- | front-end's (drift-proof); the data-driven findings (numeric truthiness, struct
+-- | output) come from an instrumented render. A purely advisory check — MaxBars (and
+-- | the Trussbars VM) still run an incompatible template; only AOT rejects it.
+maxbarsCompat :: Fn2 String Json CompatResult
+maxbarsCompat = mkFn2 \tpl json ->
+  case Compat.compatReport tpl (fromJson json) of
+    Left pe ->
+      { ok: false, compatible: false, findings: [], report: "", error: renderParseErrorAt tpl pe }
+    Right r ->
+      { ok: true
+      , compatible: r.compatible
+      , findings: r.findings
+      , report:
+          if r.compatible then "ok: Trussbars AOT-compatible"
+          else joinWith "\n" (map (\f -> f.rule <> ": " <> f.message) r.findings)
+      , error: ""
+      }
 
 -- | A migrate outcome (`Linter.Migrate`) as a plain JS object: the rewritten
 -- | MaxBars `source`, and the `residuals` the migrator flagged but did not rewrite

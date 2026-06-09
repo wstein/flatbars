@@ -48,6 +48,7 @@ import {
   analyzeWith as bbAnalyzeWith,
   lint as bbLint,
   migrate as bbMigrate,
+  maxbarsCompat as bbMaxbarsCompat,
   // MinBars (Mustache) render + compile paths
   renderMustache as bbRenderMustache,
   renderMinbarsCompat as bbRenderMinbarsCompat,
@@ -56,7 +57,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=90";
+} from "./vendor/flatbars-engine.mjs?v=91";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -251,6 +252,12 @@ function flatbarsRenderer(activeDialect, _opts) {
   function migrate(source) {
     return bbMigrate(source);
   }
+  // Trussbars AOT-compatibility lint (MaxBars only): would this MaxBars build under
+  // the Trussbars production AOT compiler? Structural verdict from the real AOT
+  // front-end; numeric-truthiness / struct-output observed against the sample data.
+  function compatCheck(program, data) {
+    return bbMaxbarsCompat(program.source, data == null ? {} : data);
+  }
 
   // parseAst returns the lowered AST in the host's {t:…} node shape (or {error}).
   function parseAst(source, opts = {}) {
@@ -352,11 +359,13 @@ function flatbarsRenderer(activeDialect, _opts) {
     // The FullBars surface also backs the Context Inspector (`context-inspect`).
     const features = MAPPED[activeDialect] ? [...BB_FEATURES, "source-map"] : [...BB_FEATURES];
     if (INSPECT[activeDialect]) features.push("context-inspect");
+    // Trussbars AOT-compat (MaxBars only): the production-engine compatibility lint.
+    if (activeDialect === "maxbars") features.push("trussbars-compat");
     return { version: VERSION, builtins: allTransformers(), features };
   }
 
   return {
-    render, analyze, analyzeWith, lint, migrate, compile, parseAst, inspectAt,
+    render, analyze, analyzeWith, lint, migrate, compatCheck, compile, parseAst, inspectAt,
     usedTransformers, requiredAssigns, partialGraph, allTransformers, catalog,
     compileToJs, engineInfo, version: VERSION,
   };
