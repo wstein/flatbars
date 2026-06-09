@@ -4,16 +4,28 @@ The one place that answers "how do I do i18n that works the **same on AOT and th
 
 The pattern, in two sentences:
 
-1. **The catalog is data.** A `Catalog` = `locale → key → message` map, carried on the
-   context like any other data (`data.yaml`, a `.ftl` import, a DB row) — *not* a separate
-   helper registry.
+1. **The catalog is fetched data.** A `Catalog` = `locale → key → message` map, *fetched*
+   at render time — here from [`catalog.yaml`](catalog.yaml) via serde (the order lives in
+   [`data.yaml`](data.yaml)) — and carried on the context like any other data, *not* a
+   separate helper registry. Swap the loader body for a `.ftl` import, a DB row, or an HTTP
+   call and nothing else changes.
 2. **Declared helpers fetch from it.** `t` / `plural` / `number` / `date` are plain Rust
    functions listed in `truss!(…, helpers = […])`; the template calls them by name and the
    dynamic catalog lookup happens *inside Rust*.
 
 ```sh
-cargo test   # AOT renders + a VM-parity check (same template + catalog → byte-identical)
+cargo run --release   # render the receipt in en/de/fr/pl (catalog + order loaded from YAML)
+cargo test            # AOT renders + a VM-parity check (same template + data → byte-identical)
 ```
+
+## The data ([`catalog.yaml`](catalog.yaml) + [`data.yaml`](data.yaml))
+
+The catalog and the order are authored as **YAML and decoded through serde** — not Rust
+literals. `load_catalog` / `load_order` `include_str!` them (so the example is
+CWD-independent) and `serde_yaml` deserializes; `page(locale)` composes the two plus the
+chosen locale into the render `Page`. That separation is the point: the order file is
+locale-agnostic, and the catalog source is swappable without touching the template or the
+helpers.
 
 ## Why a helper, not `{{catalog.[locale].title}}`?
 

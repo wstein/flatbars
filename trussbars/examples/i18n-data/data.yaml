@@ -1,0 +1,11 @@
+# The order data — locale-agnostic. The locale and the message catalog are fetched
+# separately (a CLI arg / `catalog.yaml`) and composed onto this to build the render
+# context, so the same order renders in any language. Deserialized by `load_order`.
+customer: Ada
+total: 1311.80
+count: 3
+placed: "2026-06-09"
+items:
+  - { name: Keyboard, price: 899.0 }
+  - { name: Mouse, price: 400.5 }
+  - { name: Cable, price: 12.3 }

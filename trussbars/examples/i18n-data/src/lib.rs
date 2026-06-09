@@ -7,8 +7,10 @@
 //! ## The two pieces
 //!
 //! 1. **The catalog is data.** It's a `Catalog` (`locale → key → message`) field on the
-//!    context — not a separate registry. It deserializes from YAML/JSON like any other
-//!    data, so a host can load it however it likes (`data.yaml`, a `.ftl` import, a DB).
+//!    context — not a separate registry. It is *fetched* and deserialized at render time:
+//!    here from [`catalog.yaml`](../catalog.yaml) (the order data lives in
+//!    [`data.yaml`](../data.yaml)), but swap `load_catalog` for a `.ftl` import, a DB row,
+//!    or an HTTP call and nothing else changes.
 //!
 //! 2. **Helpers fetch from it.** `t` / `plural` / `number` / `date` are plain Rust
 //!    functions declared with `truss!(…, helpers = […])`. The template calls them **by
@@ -29,12 +31,25 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use trussbars_macros::truss;
 
-/// A message catalog: `locale code → message key → translated message`. Plain data — build
-/// it in code, deserialize it from YAML/JSON, or embed it; the helpers don't care.
+/// A message catalog: `locale code → message key → translated message`. Plain data —
+/// fetch it from a file (as [`load_catalog`] does), a DB, or a `.ftl` import; the helpers
+/// don't care where it comes from.
 pub type Catalog = BTreeMap<String, BTreeMap<String, String>>;
 
-/// The render context. Everything — including the catalog and the current `locale` — is
-/// data; there is no out-of-band helper registry.
+/// The (locale-agnostic) order, mirroring [`data.yaml`](../data.yaml). The locale and the
+/// catalog are fetched separately and composed onto this to build a [`Page`].
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Order {
+    pub customer: String,
+    pub total: f64,
+    pub count: f64,
+    pub placed: String,
+    pub items: Vec<Item>,
+}
+
+/// The render context: the chosen `locale`, the fetched `catalog`, and the fetched order
+/// (flattened in so the template's paths stay `{{customer}}`, not `{{order.customer}}` —
+/// AOT compiles each to a typed field access).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Page {
     pub locale: String,
@@ -104,91 +119,37 @@ truss!(
     helpers = [t, plural, number, date]
 );
 
-// ── sample data ──────────────────────────────────────────────────────────────
+// ── fetching the data ──────────────────────────────────────────────────────────
+// The catalog and the order are *data*, authored as YAML and decoded through serde —
+// not Rust literals. They're embedded with `include_str!` to keep the example
+// CWD-independent; a real host swaps these bodies for `std::fs::read_to_string`, a DB
+// query, or a `.ftl` import without touching the template or the helpers.
 
-/// A small en/de/fr/pl catalog. Polish carries CLDR's `few`/`many` forms.
+/// Fetch the en/de/fr/pl message catalog from [`catalog.yaml`](../catalog.yaml). Polish
+/// carries CLDR's `few`/`many` forms.
 #[must_use]
-pub fn sample_catalog() -> Catalog {
-    let entry = |pairs: &[(&str, &str)]| -> BTreeMap<String, String> {
-        pairs
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-            .collect()
-    };
-    BTreeMap::from([
-        (
-            "en".into(),
-            entry(&[
-                ("title", "Receipt"),
-                ("greeting", "Hello"),
-                ("placed", "Placed"),
-                ("total", "Total"),
-                ("item.one", "item"),
-                ("item.other", "items"),
-            ]),
-        ),
-        (
-            "de".into(),
-            entry(&[
-                ("title", "Beleg"),
-                ("greeting", "Hallo"),
-                ("placed", "Erstellt"),
-                ("total", "Summe"),
-                ("item.one", "Artikel"),
-                ("item.other", "Artikel"),
-            ]),
-        ),
-        (
-            "fr".into(),
-            entry(&[
-                ("title", "Reçu"),
-                ("greeting", "Bonjour"),
-                ("placed", "Établi"),
-                ("total", "Total"),
-                ("item.one", "article"),
-                ("item.other", "articles"),
-            ]),
-        ),
-        (
-            "pl".into(),
-            entry(&[
-                ("title", "Paragon"),
-                ("greeting", "Cześć"),
-                ("placed", "Wystawiono"),
-                ("total", "Suma"),
-                ("item.one", "element"),
-                ("item.few", "elementy"),
-                ("item.many", "elementów"),
-                ("item.other", "elementu"),
-            ]),
-        ),
-    ])
+pub fn load_catalog() -> Catalog {
+    serde_yaml::from_str(include_str!("../catalog.yaml")).expect("catalog.yaml is valid YAML")
 }
 
-/// A sample page in `locale`, with the shared catalog and demo order data.
+/// Fetch the (locale-agnostic) order from [`data.yaml`](../data.yaml).
 #[must_use]
-pub fn sample_page(locale: &str) -> Page {
+pub fn load_order() -> Order {
+    serde_yaml::from_str(include_str!("../data.yaml")).expect("data.yaml is valid YAML")
+}
+
+/// Compose the render context for `locale` from the separately-fetched catalog + order.
+#[must_use]
+pub fn page(locale: &str) -> Page {
+    let order = load_order();
     Page {
         locale: locale.to_string(),
-        catalog: sample_catalog(),
-        customer: "Ada".into(),
-        total: 1311.80,
-        count: 3.0,
-        placed: "2026-06-09".into(),
-        items: vec![
-            Item {
-                name: "Keyboard".into(),
-                price: 899.0,
-            },
-            Item {
-                name: "Mouse".into(),
-                price: 400.5,
-            },
-            Item {
-                name: "Cable".into(),
-                price: 12.3,
-            },
-        ],
+        catalog: load_catalog(),
+        customer: order.customer,
+        total: order.total,
+        count: order.count,
+        placed: order.placed,
+        items: order.items,
     }
 }
 
@@ -202,19 +163,19 @@ mod tests {
 
     #[test]
     fn aot_localizes_through_the_catalog() {
-        let en = render_receipt(&sample_page("en"));
+        let en = render_receipt(&page("en"));
         assert!(en.contains("== Receipt =="), "{en}");
         assert!(en.contains("Total: 1,311.80"), "{en}");
         assert!(en.contains("(3 items)"), "{en}");
         assert!(en.contains("Placed: 09 June 2026"), "{en}");
 
-        let de = render_receipt(&sample_page("de"));
+        let de = render_receipt(&page("de"));
         assert!(de.contains("== Beleg =="), "{de}");
         assert!(de.contains("(3 Artikel)"), "{de}");
         assert!(de.contains("09 Juni 2026"), "{de}");
 
         // Polish exercises the CLDR `few` form (3 → elementy) + the Polish month name.
-        let pl = render_receipt(&sample_page("pl"));
+        let pl = render_receipt(&page("pl"));
         assert!(pl.contains("== Paragon =="), "{pl}");
         assert!(pl.contains("(3 elementy)"), "{pl}");
         assert!(pl.contains("09 czerwiec 2026"), "{pl}");
@@ -226,10 +187,10 @@ mod tests {
     #[test]
     fn vm_render_matches_aot() {
         for locale in ["en", "de", "fr", "pl"] {
-            let page = sample_page(locale);
+            let ctx = page(locale);
             // The same context as dynamic data (a YAML round-trip — catalog and order are
             // just data the VM doesn't know the shape of).
-            let yaml = serde_yaml::to_string(&page).unwrap();
+            let yaml = serde_yaml::to_string(&ctx).unwrap();
             let data = to_vm(&serde_yaml::from_str(&yaml).unwrap());
 
             let mut helpers = Helpers::new();
@@ -262,7 +223,7 @@ mod tests {
 
             let tmpl = Template::parse(include_str!("receipt.truss")).unwrap();
             let vm = tmpl.render_with(&data, &Rc::new(helpers)).unwrap();
-            assert_eq!(vm, render_receipt(&page), "VM ≠ AOT for {locale}");
+            assert_eq!(vm, render_receipt(&ctx), "VM ≠ AOT for {locale}");
         }
     }
 

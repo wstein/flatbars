@@ -1,0 +1,34 @@
+# The message catalog as data: locale code → message key → translated message.
+# Fetched and deserialized at render time (see `load_catalog`) — swap this file for a
+# DB row, a `.ftl` import, or an HTTP fetch and nothing else changes; the declared
+# helpers look the message up by key inside Rust. Polish carries CLDR's few/many forms.
+en:
+  title: Receipt
+  greeting: Hello
+  placed: Placed
+  total: Total
+  item.one: item
+  item.other: items
+de:
+  title: Beleg
+  greeting: Hallo
+  placed: Erstellt
+  total: Summe
+  item.one: Artikel
+  item.other: Artikel
+fr:
+  title: Reçu
+  greeting: Bonjour
+  placed: Établi
+  total: Total
+  item.one: article
+  item.other: articles
+pl:
+  title: Paragon
+  greeting: Cześć
+  placed: Wystawiono
+  total: Suma
+  item.one: element
+  item.few: elementy
+  item.many: elementów
+  item.other: elementu
