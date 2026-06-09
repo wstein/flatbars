@@ -1,0 +1,7 @@
+== Receipt ==
+Hello, Ada!
+  - Keyboard: 899.00
+  - Mouse: 400.50
+  - Cable: 12.30
+Total: 1,311.80  (3 items)
+Placed: Jun 09, 2026

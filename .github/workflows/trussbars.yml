@@ -117,12 +117,14 @@ jobs:
 
   # The dogfood examples: build each and assert its pages still match the committed
   # golden output (no PureScript toolchain needed — the generated render module is
-  # committed). `blog` = authored content; `changelog` = git-log aggregation.
+  # committed). `blog` = authored content; `changelog` = git-log aggregation;
+  # `lab` = the dynamic-VM mini-Lab (the VM northstar — runtime render + i18n host
+  # helpers; its golden gate is the {sample × locale × mode} matrix).
   examples:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        example: [blog, changelog]
+        example: [blog, changelog, lab]
     defaults:
       run:
         working-directory: trussbars/examples/${{ matrix.example }}

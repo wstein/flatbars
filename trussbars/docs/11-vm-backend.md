@@ -282,6 +282,15 @@ reference kept alongside to **diff** against. The earlier WASM-AOT slice (W1: co
 diagnostics + source→Rust tiles) becomes the *first half* of that same WASM surface;
 the VM is the second half.
 
+**Shipped precursor — `examples/lab`.** A dependency-free *terminal* mini-Lab already
+exercises this exact surface minus the browser: it parses a template and renders it
+against data at runtime through `trussbars-vm`, switches locale live via i18n **host
+helpers** (`t`/`number`/`plural`/`date`, §8), and toggles `render_compat` to show the
+AOT-parity verdict (§7) — host-helper templates are rejected (VM-only), plain ones render
+byte-identically. It is the runnable VM northstar today, and the state model (`Lab` +
+a pure `render()` core, golden-tested over `sample × locale × mode`) ports directly to
+the WASM Studio panel.
+
 ## 11. Open decisions (resolve before / during implementation)
 
 | # | Decision | Default lean |

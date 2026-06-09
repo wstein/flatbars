@@ -1,0 +1,23 @@
+[package]
+name = "lab-example"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace (like the other examples).
+[workspace]
+
+[lib]
+name = "trussbars_lab"
+
+[[bin]]
+name = "lab"
+path = "src/main.rs"
+
+[dependencies]
+# The dynamic runtime engine — this northstar renders templates the AOT path
+# structurally can't (host helpers, data shapes unknown at build time).
+trussbars-vm = { path = "../../crates/trussbars-vm" }
+# The blessed i18n format primitives (number / date / selectPlural). The lab is the
+# *host*: it owns the message catalog for `t` and wires `&[Value]` shims (src/i18n.rs).
+trussbars-i18n = { path = "../../crates/trussbars-i18n" }
