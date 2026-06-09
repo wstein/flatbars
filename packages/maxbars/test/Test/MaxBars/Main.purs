@@ -22,7 +22,7 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
 import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
-import MaxBars.Compat (compatReport, compatReportWith)
+import MaxBars.Compat (compatReportWith)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value

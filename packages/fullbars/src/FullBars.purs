@@ -410,7 +410,7 @@ analyseSurfaceWith schema src dat = case parse src of
           { output: r.output
           , report: reportMarkdown schema src r.decisions <> i18nNote template
           , jsonata: jsonataScaffold src r.decisions
-          , findings: allFindings schema src r.decisions
+          , findings: allFindings handlebars schema src r.decisions
           , evaluated: evaluatedCount r.decisions
           }
 

@@ -177,10 +177,11 @@ anyPath _ _ = true
 -- | was NOT ambiguous, the same-type ambiguous value it could hold — so coverage
 -- | stops depending on the data sample. Deduped by tag+value; a path already
 -- | flagged by an *observed* finding, or one the host `PathSchema` rules out, is
--- | not reported. The engine verdict for the hypothetical is the `handlebars`
--- | rule (the analysed engine).
-potentialFindings :: PathSchema -> String -> Array Decision -> Array Finding
-potentialFindings schema src decisions =
+-- | not reported. The engine verdict for the hypothetical is the analysed engine's
+-- | own `rule` (`handlebars` for FullBars, `mustache` for MinBars) — so the
+-- | `flips under` set names the *other* engines relative to the right baseline.
+potentialFindings :: Truthy -> PathSchema -> String -> Array Decision -> Array Finding
+potentialFindings rule schema src decisions =
   Array.nubByEq sameTagValue (Array.mapMaybe toPotential decisions)
   where
   observedPaths = Array.mapMaybe
@@ -188,7 +189,7 @@ potentialFindings schema src decisions =
     decisions
   toPotential d = sameTypeAmbiguous d.value >>= \av ->
     let
-      finding = findingAt "potential" src d av (handlebars av)
+      finding = findingAt "potential" src d av (rule av)
     in
       if Array.null finding.flips then Nothing
       else if finding.path /= "" && Array.elem finding.path observedPaths then Nothing
@@ -225,11 +226,13 @@ missFindings schema src decisions =
   sameTag a b = a.path == b.path
 
 -- | Observed findings, potential findings, then advisory miss findings (the host
--- | `PathSchema` filtering the latter two) — the full host-UI finding set.
-allFindings :: PathSchema -> String -> Array Decision -> Array Finding
-allFindings schema src decisions =
+-- | `PathSchema` filtering the latter two) — the full host-UI finding set. `rule`
+-- | is the analysed engine's own truthiness (`handlebars`/`mustache`), used to read
+-- | the potential-finding hypotheticals against the right baseline.
+allFindings :: Truthy -> PathSchema -> String -> Array Decision -> Array Finding
+allFindings rule schema src decisions =
   findings src decisions
-    <> potentialFindings schema src decisions
+    <> potentialFindings rule schema src decisions
     <> missFindings schema src decisions
 
 -- | The five truthiness operations, each wrapped to `tell` a `Decision` and then
@@ -320,13 +323,16 @@ runAnalysis toEngine setup nodes dat =
 -- | potentials, misses, portable conditions) is identical across dialects — only
 -- | these two strings differ, because the engine sits at a different point on the
 -- | truthiness axis (ADR-022): FullBars on `handlebars`, MinBars on `mustache-spec`.
-type ReportLabels = { engineRule :: String, legend :: String }
+-- | `rule` is the matching `Truthy` (`handlebars`/`mustache`), so the
+-- | potential-finding hypotheticals read against the same baseline as the header.
+type ReportLabels = { engineRule :: String, rule :: Truthy, legend :: String }
 
 -- | FullBars/RawBars/MaxBars labels: the engine renders on the `handlebars` rule,
 -- | which `mustache.js` shares, so a `flips under` entry names the *other* engines.
 handlebarsLabels :: ReportLabels
 handlebarsLabels =
   { engineRule: "handlebars"
+  , rule: handlebars
   , legend:
       "_The engine `handlebars` rule is also `mustache.js`' (`0`/`\"\"` falsy), so a"
         <> " finding's `flips under` names the engines that branch the *other* way —"
@@ -387,7 +393,7 @@ reportMarkdownWith labels schema src decisions =
   conds = Array.filter (\d -> d.kind == "cond") decisions
   flagged = Array.filter isFinding decisions
   clean = Array.filter (\d -> d.kind == "cond" && Array.null d.diverges) decisions
-  potentials = potentialFindings schema src decisions
+  potentials = potentialFindings labels.rule schema src decisions
   misses = missFindings schema src decisions
 
   loc d = let lc = lineColumn src d.span.start in "line " <> show lc.line
@@ -410,7 +416,7 @@ reportMarkdownWith labels schema src decisions =
   findingSection d =
     Str.joinWith "\n"
       [ "## ⚠ " <> loc d <> " — `" <> tag d <> "` tested " <> describe d.value
-      , "Under `handlebars` (engine) this is **"
+      , "Under `" <> labels.engineRule <> "` (engine) this is **"
           <> verdict d.truthyHere
           <> "**; it flips under "
           <> Str.joinWith ", " (map (\t -> "`" <> fst t <> "`") d.diverges)

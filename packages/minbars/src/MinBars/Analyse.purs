@@ -51,6 +51,7 @@ type AnalyseM = WriterT (Array Decision) (Either Error)
 minbarsLabels :: ReportLabels
 minbarsLabels =
   { engineRule: "mustache-spec"
+  , rule: mustache
   , legend:
       "_MinBars renders on the language-agnostic `mustache-spec` rule"
         <> " (`0`/`\"\"`/`{}` truthy, as Ruby/Python Mustache). `mustache.js` instead"
@@ -153,7 +154,7 @@ analyseMinWith partialSrcs src dat = case traverse compilePartial partialSrcs of
         { output: r.output
         , report: reportMarkdownWith minbarsLabels anyPath src r.decisions
         , jsonata: jsonataScaffold src r.decisions
-        , findings: allFindings anyPath src r.decisions
+        , findings: allFindings mustache anyPath src r.decisions
         , evaluated: evaluatedCount r.decisions
         }
   where
