@@ -212,7 +212,10 @@ impl Blocks<'_> {
                 body,
             })),
             Stop::Else | Stop::ElseIf(_) => err(
-                format!("block helper `{head}` does not support `{{{{else}}}}`"),
+                // Forward-looking: the inverse-arm convention is frozen but not yet built
+                // (docs/09 §3.1, "Planned"). Until a consumer needs it, this is a located
+                // reject rather than a silent drop.
+                format!("block helper `{head}`: `{{{{else}}}}` is not yet supported"),
                 span.start,
             ),
             Stop::Eof => err(
@@ -800,8 +803,9 @@ mod tests {
 
     #[test]
     fn block_helper_rejects_else() {
-        // No `{{else}}` arm in v1 — a located, actionable error rather than a silent drop.
+        // No `{{else}}` arm yet — a located, forward-looking reject (not a silent drop);
+        // the inverse-arm convention is frozen but unbuilt (docs/09 §3.1, "Planned").
         let err = parse("{{#frame}}a{{else}}b{{/frame}}").unwrap_err();
-        assert!(err.message.contains("does not support"), "{}", err.message);
+        assert!(err.message.contains("not yet supported"), "{}", err.message);
     }
 }
