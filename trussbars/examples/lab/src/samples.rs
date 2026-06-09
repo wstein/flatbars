@@ -63,13 +63,20 @@ impl Sample {
     }
 }
 
-// Host helpers throughout — VM-only. `%B` shows the localized month name (Phase 1);
-// `plural`/`date` take the language from the lab's locale, not the data. `count` is 1
-// by default so the singular shows — bump it (or add items) to watch the plural switch.
-const RECEIPT_TMPL: &str = r#"== {{t "title"}} ==
+// Host helpers throughout — VM-only. `%B` shows the localized month name; `plural`/`date`
+// take the language from the lab's locale, not the data. `count` is 1 by default so the
+// singular shows — bump it (or add items) to watch the plural switch. Block and comment
+// tags sit on their own lines (standalone-trimmed, so they add no output).
+const RECEIPT_TMPL: &str = r#"{{! receipt — i18n host helpers from the catalog pane (VM-only) }}
+== {{t "title"}} ==
 {{t "hello"}}, {{customer}}!
-{{#each items}}  - {{name}}: {{number price 2}}
-{{/each}}{{t "total"}}: {{number total 2}}  ({{count}} {{plural count "item"}})
+{{! one line per item; `number` formats the price }}
+{{#each items}}
+  - {{name}}: {{number price 2}}
+{{/each}}
+{{! `plural count "item"` picks the CLDR form (en items / pl elementy / …) }}
+{{t "total"}}: {{number total 2}}  ({{count}} {{plural count "item"}})
+{{! `date` localizes the month (%B); `relative` is English-fallback phrasing }}
 {{t "placed"}}: {{date placed "%d %B %Y"}}
 {{t "eta"}}: {{relative eta "day"}}
 "#;
@@ -86,7 +93,8 @@ items:
 
 // Plain interpolation — the data already holds the localized strings, so the template
 // carries no helpers and renders identically under the AOT-compat proxy.
-const GREETING_TMPL: &str = r#"{{greeting}}, {{customer}}!
+const GREETING_TMPL: &str = r#"{{! greeting — localized via data (no helpers), so AOT-compatible }}
+{{greeting}}, {{customer}}!
 {{note}}
 "#;
 

@@ -29,7 +29,8 @@ fn pane_hit_test_matches_the_grid() {
 #[test]
 fn scroll_clamps_to_content() {
     let mut lab = Lab::from_sample(Sample::Receipt);
-    // A short buffer can't scroll past 0.
+    // A buffer that fits the pane can't scroll past 0.
+    lab.template = TextBuffer::from_text("one\ntwo\n");
     lab.scroll_pane(Pane::Template, 50, AREA);
     assert_eq!(lab.scroll.template, 0);
 
