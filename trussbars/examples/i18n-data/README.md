@@ -14,9 +14,14 @@ The pattern, in two sentences:
    dynamic catalog lookup happens *inside Rust*.
 
 ```sh
-cargo run --release   # render the receipt in en/de/fr/pl (catalog + order loaded from YAML)
-cargo test            # AOT renders + a VM-parity check (same template + data → byte-identical)
+cargo run --release                          # render en/de/fr/pl from the embedded catalog.yaml
+cargo run --release -- --catalog other.yaml  # fetch the catalog from disk at runtime instead
+cargo test                                   # AOT renders + a VM-parity check (byte-identical)
 ```
+
+`--catalog <path>` makes the "swap the source" claim literal — the messages come from that
+file (`std::fs::read_to_string` + serde) instead of the embedded default, and nothing else
+(template or helpers) changes.
 
 ## The data ([`catalog.yaml`](catalog.yaml) + [`data.yaml`](data.yaml))
 

@@ -138,13 +138,22 @@ pub fn load_order() -> Order {
     serde_yaml::from_str(include_str!("../data.yaml")).expect("data.yaml is valid YAML")
 }
 
-/// Compose the render context for `locale` from the separately-fetched catalog + order.
+/// Compose the render context for `locale` from the embedded catalog + order.
 #[must_use]
 pub fn page(locale: &str) -> Page {
+    page_with_catalog(locale, load_catalog())
+}
+
+/// Compose the render context from an explicitly-supplied `catalog` (e.g. one fetched from
+/// a file at runtime — see the bin's `--catalog`) plus the embedded order. This is the
+/// "swap the source" seam: the template and helpers are identical regardless of where the
+/// catalog came from.
+#[must_use]
+pub fn page_with_catalog(locale: &str, catalog: Catalog) -> Page {
     let order = load_order();
     Page {
         locale: locale.to_string(),
-        catalog: load_catalog(),
+        catalog,
         customer: order.customer,
         total: order.total,
         count: order.count,
