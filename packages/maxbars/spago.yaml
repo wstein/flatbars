@@ -11,12 +11,16 @@ package:
     - bifunctors
     - either
     - flatbars
+    - foldable-traversable
     - fullbars
     - fullbars-compile
+    - integers
     - kernel
     - maybe
+    - ordered-collections
     - prelude
     - strings
+    - transformers
     - tuples
   test:
     main: Test.MaxBars.Main

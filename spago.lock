@@ -265,12 +265,16 @@
             "bifunctors",
             "either",
             "flatbars",
+            "foldable-traversable",
             "fullbars",
             "fullbars-compile",
+            "integers",
             "kernel",
             "maybe",
+            "ordered-collections",
             "prelude",
             "strings",
+            "transformers",
             "tuples"
           ]
         },
