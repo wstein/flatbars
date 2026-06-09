@@ -21,14 +21,15 @@ trussbars-vm = { path = "../../crates/trussbars-vm" }
 # The blessed i18n format primitives (number / date / selectPlural / relative). The
 # lab is the *host*: it owns the message catalog for `t` and wires `&[Value]` shims.
 trussbars-i18n = { path = "../../crates/trussbars-i18n" }
-# The engine lexer — drives Template-pane syntax highlighting and locates the
-# interpolation tags the Output pane bolds (one source of truth, never an approximation).
-trussbars-template = { path = "../../crates/trussbars-template" }
 # The TUI: ratatui for layout/widgets over the crossterm terminal backend. crossterm
 # is sourced through `ratatui::crossterm` in code (one version, no skew); pinned here
 # explicitly to ratatui's so the dep is visible and the lock can't drift.
 ratatui = "0.30"
 crossterm = "0.29"
+# The editable panes are tui-textarea widgets — a full editing experience (selection,
+# undo/redo, word motions, internal scrolling). The `-2` fork tracks ratatui 0.30
+# (ratatui-core 0.1); the original tui-textarea still pins ratatui 0.29.
+tui-textarea = { package = "tui-textarea-2", version = "0.11" }
 # The Data and i18n-catalog panes are edited as live YAML: the data is decoded into
 # the VM's dynamic `Value`, the catalog into a locale→key→message map.
 serde_yaml = "0.9"

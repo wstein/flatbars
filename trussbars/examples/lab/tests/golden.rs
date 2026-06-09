@@ -6,7 +6,7 @@
 
 use std::fs;
 
-use trussbars_lab::{Lab, Locale, Mode, editor::TextBuffer, samples::Sample};
+use trussbars_lab::{Lab, Locale, Mode, samples::Sample};
 
 fn seeded(sample: Sample, locale: Locale, mode: Mode) -> Lab {
     let mut lab = Lab::from_sample(sample);
@@ -69,7 +69,7 @@ fn plural_switches_with_count() {
     ];
     for (locale, count, expected) in cases {
         let mut lab = seeded(Sample::Receipt, locale, Mode::Render);
-        lab.data = TextBuffer::from_text(&receipt_data(count));
+        lab.set_data(&receipt_data(count));
         let out = lab.render_or_reject();
         assert!(
             out.contains(expected),
@@ -82,21 +82,29 @@ fn plural_switches_with_count() {
 fn edited_catalog_changes_output() {
     // The i18n pane is live: overriding the en title flows straight into the render.
     let mut lab = seeded(Sample::Receipt, Locale::En, Mode::Render);
-    lab.i18n = TextBuffer::from_text("en:\n  title: INVOICE\n");
+    lab.set_i18n("en:\n  title: INVOICE\n");
     assert!(lab.render_or_reject().contains("== INVOICE =="));
+}
+
+#[test]
+fn editing_a_pane_flows_into_the_render() {
+    // Editing the focused text area (Template) is reflected by the next render.
+    let mut lab = Lab::new();
+    lab.focused_mut().insert_str("HELLO ");
+    assert!(lab.render_or_reject().contains("HELLO "));
 }
 
 #[test]
 fn invalid_data_is_reported_not_panicked() {
     let mut lab = seeded(Sample::Greeting, Locale::En, Mode::Render);
-    lab.data = TextBuffer::from_text("a: [1, 2\nb: oops");
+    lab.set_data("a: [1, 2\nb: oops");
     assert!(lab.render_or_reject().starts_with("⟂ invalid data YAML:"));
 }
 
 #[test]
 fn invalid_catalog_is_reported() {
     let mut lab = seeded(Sample::Receipt, Locale::En, Mode::Render);
-    lab.i18n = TextBuffer::from_text("en: [not, a, map]");
+    lab.set_i18n("en: [not, a, map]");
     assert!(
         lab.render_or_reject()
             .starts_with("⟂ invalid i18n catalog:")

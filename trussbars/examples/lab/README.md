@@ -33,8 +33,9 @@ through the VM on every keystroke:
  Output   │ i18n catalog (YAML)
 ```
 
-The Template pane is **syntax-highlighted** — each `{{ … }}` tag is coloured by its sigil
-via the engine lexer, literal text left plain.
+The three editable panes are [`tui-textarea`](https://crates.io/crates/tui-textarea-2)
+widgets — a full editing experience (text selection, undo/redo, word motions, internal
+scrolling). They feed the read-only Output, which re-renders on every keystroke.
 
 ## What it proves (straight from `docs/11`)
 
@@ -72,18 +73,20 @@ is self-contained so it can be promoted to a `trussbars-vm-i18n` bridge crate.
 
 ## Dependencies — a deliberate trade-off
 
-Unlike the other examples (path-deps only), this one pulls **`ratatui`** + **`crossterm`**
-(the TUI) and **`serde_yaml`** (to decode the live-edited Data and catalog panes). That is
-the cost of a *real, editable* northstar rather than a print loop — taken knowingly. It
-lives in its own workspace, so the core crates' dependency-free, `forbid(unsafe)` posture
-is untouched; only this example carries the TUI tree.
+Unlike the other examples (path-deps only), this one pulls the editing TUI
+(**`ratatui`**, **`crossterm`**, **`tui-textarea`**) and **`serde_yaml`** (to decode the
+live-edited Data and catalog panes). That is the cost of a *real, editable* northstar
+rather than a print
+loop — taken knowingly. It lives in its own workspace, so the core crates' dependency-free,
+`forbid(unsafe)` posture is untouched; only this example carries the TUI tree. (Syntax
+highlighting is intentionally not included — `tui-textarea` has no token-highlight API, and
+the tree-sitter-based alternative was too heavy for an example.)
 
 ## Layout
 
 | File | Role |
 | --- | --- |
 | [`src/lib.rs`](src/lib.rs) | `Lab` state, the pure `render()` core, and the `ui()` draw |
-| [`src/editor.rs`](src/editor.rs) | `TextBuffer` — a pure char-cursor multiline editor (unit-tested) |
 | [`src/data.rs`](src/data.rs) | decode the Data pane (YAML) into the VM's `Value` |
 | [`src/i18n.rs`](src/i18n.rs) | `&[Value]` shims over `trussbars-i18n` + the editable catalog + its seed |
 | [`src/samples.rs`](src/samples.rs) | the two seed templates + their seed YAML data |
