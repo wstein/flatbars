@@ -27,6 +27,9 @@ pub mod highlight;
 pub mod i18n;
 pub mod samples;
 
+use std::cell::RefCell;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use ratatui::{
@@ -246,6 +249,11 @@ pub struct Lab {
     pub data: TextArea<'static>,
     pub i18n: TextArea<'static>,
     pub output_scroll: u16,
+    /// Memoized last render, keyed on a hash of every input that feeds it (the three pane
+    /// texts + locale + mode + sample). A `ui()` frame renders once and the scroll clamp
+    /// reuses it instead of re-rendering; any input change moves the key, so the cache
+    /// can't go stale — the exact failure this example otherwise teaches against.
+    render_cache: RefCell<Option<(u64, String)>>,
 }
 
 impl Lab {
@@ -262,6 +270,7 @@ impl Lab {
             data: area_from(sample.data_yaml()),
             i18n: area_from(i18n::CATALOG_SEED),
             output_scroll: 0,
+            render_cache: RefCell::new(None),
         };
         lab.rehighlight_template();
         lab
@@ -303,13 +312,40 @@ impl Lab {
         }
     }
 
+    /// A hash of every input [`Lab::render`] reads — the cache key. Lines are hashed with a
+    /// separator so `["ab"]` and `["a","b"]` differ; the enums fold in via their stable keys.
+    fn input_key(&self) -> u64 {
+        let mut h = DefaultHasher::new();
+        for (tag, area) in [(0u8, &self.template), (1, &self.data), (2, &self.i18n)] {
+            tag.hash(&mut h);
+            for line in area.lines() {
+                line.hash(&mut h);
+                0xFFu8.hash(&mut h);
+            }
+        }
+        self.locale.code().hash(&mut h);
+        self.mode.key().hash(&mut h);
+        self.sample.key().hash(&mut h);
+        h.finish()
+    }
+
     /// [`Lab::render`] flattened to text: the output, or a one-line rejection marker.
+    /// Memoized on [`Lab::input_key`], so a single frame's `ui()` + scroll-clamp pair
+    /// renders once; a stale key is impossible because it covers every render input.
     #[must_use]
     pub fn render_or_reject(&self) -> String {
-        match self.render() {
+        let key = self.input_key();
+        if let Some((cached, out)) = self.render_cache.borrow().as_ref()
+            && *cached == key
+        {
+            return out.clone();
+        }
+        let out = match self.render() {
             Ok(out) => out,
             Err(reason) => format!("⟂ {reason}\n"),
-        }
+        };
+        *self.render_cache.borrow_mut() = Some((key, out.clone()));
+        out
     }
 
     pub fn cycle_locale(&mut self) {
@@ -455,7 +491,11 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
         })
         .collect();
     let out_len = out.lines().count();
-    let scroll = clamp_output_scroll(lab.output_scroll, out_len, p.output.height.saturating_sub(2));
+    let scroll = clamp_output_scroll(
+        lab.output_scroll,
+        out_len,
+        p.output.height.saturating_sub(2),
+    );
     frame.render_widget(
         Paragraph::new(out_lines)
             .scroll((scroll, 0))
@@ -544,6 +584,22 @@ mod tests {
         assert_eq!(clamp_output_scroll(99, 10, 4), 6);
         // Content shorter than the viewport pins to the top (the blank-pane case).
         assert_eq!(clamp_output_scroll(50, 2, 4), 0);
+    }
+
+    #[test]
+    fn render_cache_invalidates_on_input_change() {
+        // The memo must reflect edits, not freeze the first render (the staleness bug A
+        // could otherwise introduce). Editing the Data pane moves the key → fresh render.
+        let mut lab = Lab::from_sample(Sample::Greeting);
+        let first = lab.render_or_reject();
+        assert!(first.contains("Hello, Ada!"), "{first:?}");
+        lab.set_data("customer: Bob\ngreeting: Hi\nnote: x\n");
+        let second = lab.render_or_reject();
+        assert!(
+            second.contains("Hi, Bob!"),
+            "cache ignored the edit: {second:?}"
+        );
+        assert_ne!(first, second);
     }
 
     #[test]
