@@ -9,3 +9,23 @@
 #                       Resolve by picking a side, then `npm run gen:bundle`.
 #   linguist-generated → collapse it in GitHub diffs; exclude from language stats.
 lab/vendor/flatbars-engine.mjs binary linguist-generated=true
+
+# FlatBars dialect templates are Handlebars-family `{{…}}` languages that GitHub's
+# linguist does not know by their bespoke extensions, so they render as
+# unhighlighted text and skew language stats. Map each to Handlebars (the closest
+# language linguist ships — it highlights the tags) so github.com treats them as a
+# real language. `.truss` is the MaxBars surface on disk (Trussbars; see
+# trussbars/docs/01-subset-spec.md). The well-known compatibility extensions these
+# dialects also claim — `.hbs`/`.handlebars` (FullBars) and `.mustache` (MinBars) —
+# are left to linguist's native detection. The in-repo editor integrations
+# recognise all of these directly (editors/shared/sync.mjs); this is the github.com
+# counterpart.
+*.rawbars  linguist-language=Handlebars
+*.rbars    linguist-language=Handlebars
+*.minbars  linguist-language=Handlebars
+*.mbars    linguist-language=Handlebars
+*.fullbars linguist-language=Handlebars
+*.fbars    linguist-language=Handlebars
+*.maxbars  linguist-language=Handlebars
+*.xbars    linguist-language=Handlebars
+*.truss    linguist-language=Handlebars
