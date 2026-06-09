@@ -21,6 +21,7 @@
 
 pub mod data;
 pub mod editor;
+pub mod highlight;
 pub mod i18n;
 pub mod samples;
 
@@ -163,16 +164,22 @@ impl Lab {
         Self::from_sample(Sample::Receipt)
     }
 
-    /// Render the current template against the current (JSON) data.
+    /// Render the current template against the current (YAML) data.
     ///
     /// Lenient mode wires the i18n host-helper pack (bound to the lab's locale); compat
     /// mode runs the AOT-parity proxy with no helpers.
     ///
     /// # Errors
-    /// A JSON parse error for the data, the template parse error, or — in compat mode —
-    /// the reason AOT would reject the template (e.g. a host helper).
+    /// A YAML parse error for the data or the catalog, the template parse error, or — in
+    /// compat mode — the reason AOT would reject the template (e.g. a host helper).
     pub fn render(&self) -> Result<String, String> {
-        let template = Template::parse(&self.template.text())?;
+        self.render_source(&self.template.text())
+    }
+
+    /// Render an arbitrary template source against the current data/catalog/mode — the
+    /// seam the Output-pane provenance uses to render a sentinel-wrapped copy.
+    fn render_source(&self, tmpl_src: &str) -> Result<String, String> {
+        let template = Template::parse(tmpl_src)?;
         let data = data::parse(&self.data.text())?;
         match self.mode {
             Mode::Compat => template.render_compat(&data),
@@ -182,6 +189,25 @@ impl Lab {
                 i18n::register(&mut helpers, self.locale, &catalog);
                 template.render_with(&data, &Rc::new(helpers))
             }
+        }
+    }
+
+    /// The render output split into `(text, interpolated?)` runs for the Output pane —
+    /// the runs produced by value interpolation are flagged so the UI can bold them.
+    /// On a render error, a single non-interpolated `⟂ …` run.
+    #[must_use]
+    pub fn output_runs(&self) -> Vec<(String, bool)> {
+        let Ok(base) = self.render() else {
+            return vec![(self.render_or_reject().trim_end().to_string(), false)];
+        };
+        let src = self.template.text();
+        let spans = highlight::interpolation_spans(&src);
+        if spans.is_empty() {
+            return vec![(base, false)];
+        }
+        match self.render_source(&highlight::wrap_interpolations(&src, &spans)) {
+            Ok(marked) => highlight::split_runs(&marked),
+            Err(_) => vec![(base, false)],
         }
     }
 
@@ -275,40 +301,26 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
         frame,
         tmpl_area,
         "Template",
-        &lab.template,
+        highlight::template_lines(&lab.template.text()),
         lab.focus == Focus::Template,
     );
     let data_inner = render_editor(
         frame,
         data_area,
         "Data (YAML)",
-        &lab.data,
+        lab.data.rows().map(Line::from).collect(),
         lab.focus == Focus::Data,
     );
     let i18n_inner = render_editor(
         frame,
         i18n_area,
         "i18n catalog (YAML)",
-        &lab.i18n,
+        lab.i18n.rows().map(Line::from).collect(),
         lab.focus == Focus::I18n,
     );
 
-    let out = lab.render_or_reject();
-    let lines: Vec<Line> = out
-        .lines()
-        .map(|l| {
-            if let Some(rest) = l.strip_prefix("⟂ ") {
-                Line::from(Span::styled(
-                    format!("⟂ {rest}"),
-                    Style::new().fg(Color::Yellow),
-                ))
-            } else {
-                Line::from(l.to_string())
-            }
-        })
-        .collect();
     frame.render_widget(
-        Paragraph::new(lines)
+        Paragraph::new(highlight::output_lines(&lab.output_runs()))
             .block(Block::bordered().title(format!(" Output · {} ", lab.mode.key()))),
         out_area,
     );
@@ -336,12 +348,12 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
     }
 }
 
-/// Render one editable pane and return its inner (text) area.
+/// Render one pane (prebuilt `lines`) and return its inner (text) area.
 fn render_editor(
     frame: &mut Frame,
     area: Rect,
     title: &str,
-    buf: &TextBuffer,
+    lines: Vec<Line<'static>>,
     focused: bool,
 ) -> Rect {
     let border = if focused {
@@ -353,7 +365,6 @@ fn render_editor(
         .border_style(border)
         .title(format!(" {title} "));
     let inner = block.inner(area);
-    let lines: Vec<Line> = buf.rows().map(Line::from).collect();
     frame.render_widget(Paragraph::new(lines).block(block), area);
     inner
 }

@@ -32,6 +32,11 @@ through the VM on every keystroke:
  Output   │ i18n catalog (YAML)
 ```
 
+The Template pane is **syntax-highlighted** (each `{{ … }}` tag coloured by sigil via the
+engine lexer), and in the **Output** the runs produced by value interpolation are **bold**
+— the lab marks the interpolation tags in the source, renders that, and splits the marked
+output back into runs, since the VM emits no source map yet.
+
 ## What it proves (straight from `docs/11`)
 
 1. **The VM leads AOT on host helpers & i18n (§8).** The `receipt` sample calls

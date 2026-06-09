@@ -596,6 +596,7 @@ dependencies = [
  "ratatui",
  "serde_yaml",
  "trussbars-i18n",
+ "trussbars-template",
  "trussbars-vm",
 ]
 
