@@ -597,6 +597,13 @@ name = "trussbars-i18n"
 version = "0.1.0"
 
 [[package]]
+name = "trussbars-import"
+version = "0.1.0"
+dependencies = [
+ "trussbars-template",
+]
+
+[[package]]
 name = "trussbars-macros"
 version = "0.1.0"
 dependencies = [
