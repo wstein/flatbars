@@ -2413,7 +2413,7 @@ mod tests {
         let sca = shapes(&[(&["ok"], Shape::Scalar)]);
         let l = mustache(&parse("{{#ok}}y{{/ok}}").unwrap(), &sca, &faithful());
         let s = to_truss_annotated(&l.ir, &l.notes);
-        assert!(s.contains("{{#if (ok != null) && (ok != false)}}"), "{s}");
+        assert!(s.contains("{{#if ok != null && ok != false}}"), "{s}");
         assert!(!l.report.iter().any(|n| n.message.contains("truthiness")));
     }
 
@@ -2422,7 +2422,7 @@ mod tests {
         let nodes = crate::liquid::parse("{% if x %}y{% endif %}").unwrap();
         let l = liquid(&nodes, &NoShapes, &faithful());
         let s = to_truss_annotated(&l.ir, &l.notes);
-        assert!(s.contains("{{#if (x != null) && (x != false)}}"), "{s}");
+        assert!(s.contains("{{#if x != null && x != false}}"), "{s}");
         assert!(!l.report.iter().any(|n| n.message.contains("truthiness")));
         // A comparison condition is left as-is (no predicate, no note).
         let cmp = liquid(
@@ -2462,7 +2462,7 @@ mod tests {
         );
         let s = to_truss_annotated(&l.ir, &l.notes);
         assert!(
-            s.contains("((ok != null) && (ok != false)) ? yes : \"no\""),
+            s.contains("ok != null && ok != false ? yes : \"no\""),
             "{s}"
         );
         assert!(!l.report.iter().any(|n| n.message.contains("truthiness")));

@@ -319,30 +319,34 @@ fn print_app(name: &str, args: &[Expr], out: &mut String) {
         ("root", []) => out.push_str("@root"),
         ("loop", []) => out.push_str("loop"),
         ("lookup", [root, keys @ ..]) => print_path(root, keys, out),
-        // Re-sugar the desugared operators back to idiomatic infix / prefix / ternary.
+        // Re-sugar the desugared operators back to idiomatic infix / prefix / ternary,
+        // parenthesising an operand only when it binds looser than its parent.
         ("ternary", [c, a, b]) => {
-            print_operand(c, out);
+            let p = prec("ternary");
+            print_operand(c, p, out);
             out.push_str(" ? ");
-            print_operand(a, out);
+            print_operand(a, p, out);
             out.push_str(" : ");
-            print_operand(b, out);
+            print_operand(b, p, out);
         }
         ("not", [a]) => {
             out.push('!');
-            print_operand(a, out);
+            print_operand(a, prec("not"), out);
         }
         // The range operator is idiomatically unspaced (`1..5`).
         ("range", [a, b]) => {
-            print_operand(a, out);
+            let p = prec("range");
+            print_operand(a, p, out);
             out.push_str("..");
-            print_operand(b, out);
+            print_operand(b, p, out);
         }
         (n, [a, b]) if infix_op(n).is_some() => {
-            print_operand(a, out);
+            let p = prec(n);
+            print_operand(a, p, out);
             out.push(' ');
             out.push_str(infix_op(n).expect("checked"));
             out.push(' ');
-            print_operand(b, out);
+            print_operand(b, p, out);
         }
         (n, []) => out.push_str(n),
         (n, args) => {
@@ -381,22 +385,42 @@ fn infix_op(name: &str) -> Option<&'static str> {
     })
 }
 
-/// Whether an expression must be parenthesised when used as an operator/ternary operand
-/// (any compound operator application; leaves and calls bind tightly enough already).
-fn needs_parens(e: &Expr) -> bool {
-    match e {
-        Expr::App(n, args) => {
-            (n == "ternary" && args.len() == 3)
-                || (n == "not" && args.len() == 1)
-                || (args.len() == 2 && infix_op(n).is_some())
-        }
-        Expr::Lit(_) => false,
+/// The binding precedence of an operator head, loosest (1) → tightest. Mirrors the
+/// MaxBars expression grammar (`MaxBars/Expr.purs`). A non-operator expression (path,
+/// literal, call) binds tightest ([`ATOM_PREC`]).
+fn prec(name: &str) -> u8 {
+    match name {
+        "ternary" => 1,
+        "coalesce" | "firstTruthy" => 2,
+        "or" => 3,
+        "and" => 4,
+        "eq" | "ne" | "lt" | "gt" | "lte" | "gte" => 5,
+        "add" | "subtract" | "range" => 6,
+        "multiply" | "divide" | "modulo" => 7,
+        "not" => 8,
+        _ => ATOM_PREC,
     }
 }
 
-/// Print an operand, wrapping a compound operator application in parens for clarity.
-fn print_operand(e: &Expr, out: &mut String) {
-    if needs_parens(e) {
+/// The precedence of a non-operator expression (binds tighter than any operator).
+const ATOM_PREC: u8 = 9;
+
+/// The precedence at which an expression binds (its operator's, or [`ATOM_PREC`]).
+fn expr_prec(e: &Expr) -> u8 {
+    match e {
+        Expr::App(n, args) => match (n.as_str(), args.len()) {
+            ("ternary", 3) | ("not", 1) => prec(n),
+            (_, 2) if infix_op(n).is_some() => prec(n),
+            _ => ATOM_PREC,
+        },
+        Expr::Lit(_) => ATOM_PREC,
+    }
+}
+
+/// Print an operand of an operator with precedence `parent`, parenthesising it only
+/// when it binds looser than its parent (so the re-parse is unambiguous).
+fn print_operand(e: &Expr, parent: u8, out: &mut String) {
+    if expr_prec(e) < parent {
         out.push('(');
         print_expr(e, out);
         out.push(')');
@@ -618,8 +642,8 @@ mod tests {
     }
 
     #[test]
-    fn operators_resugar_and_parenthesise() {
-        // `and(eq(a, "x"), b)` → `(a == "x") && b`.
+    fn operators_resugar_with_minimal_parens() {
+        // `and(eq(a, "x"), b)` → `a == "x" && b` (== binds tighter than &&, no parens).
         let e = Expr::App(
             "and".into(),
             vec![
@@ -627,7 +651,26 @@ mod tests {
                 path(&["b"]),
             ],
         );
-        assert_eq!(to_truss(&[out(e, false)]), "{{(a == \"x\") && b}}");
+        assert_eq!(to_truss(&[out(e, false)]), "{{a == \"x\" && b}}");
+    }
+
+    #[test]
+    fn looser_operand_is_parenthesised() {
+        // `!(a || b)` — `||` binds looser than `!`, so it needs parens.
+        let e = Expr::App(
+            "not".into(),
+            vec![Expr::App("or".into(), vec![path(&["a"]), path(&["b"])])],
+        );
+        assert_eq!(to_truss(&[out(e, false)]), "{{!(a || b)}}");
+        // `(a && b) || c` — `&&` is tighter than `||`, so no parens are needed.
+        let e2 = Expr::App(
+            "or".into(),
+            vec![
+                Expr::App("and".into(), vec![path(&["a"]), path(&["b"])]),
+                path(&["c"]),
+            ],
+        );
+        assert_eq!(to_truss(&[out(e2, false)]), "{{a && b || c}}");
     }
 
     #[test]
