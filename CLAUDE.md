@@ -264,7 +264,11 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   cache-buster (in `lab/index.html`, `lab/renderer.mjs`,
   `lab/helpers-worker.mjs`) — **bump that `N` whenever you regenerate the bundle**,
   or browsers serve a cached old copy (the cause of "the Lab runs an old engine"
-  even though `check:bundle` is green).
+  even though `check:bundle` is green). This is now enforced: `check:lab-cachebust`
+  (in `npm test`) records each cache-busted module's `(version, sha)` in
+  `lab/cachebust.lock.json` and fails if a module's content changed without its
+  `?v=` being bumped — after bumping, run `npm run gen:cachebust` to re-record the
+  lock. It guards `playground_utils.mjs` (the Lab analyses) the same way.
 - **`cli`** (`flatbars-cli`) — render templates, and the `examples verify`
   conformance gate.
 - **`linter`** — cross-dialect lowering (MaxBars → RawBars source).
