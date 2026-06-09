@@ -235,6 +235,29 @@ test("analyseDataAccess marks loop-body lookups as scoped", () => {
   assert.equal(rows.find((r) => r.path === "label").status, "scoped");
 });
 
+test("analyseDataAccess treats a partial body as a partial-scope, not root", () => {
+  // A partial (here `card`, mounted inside `{{#each people}}`) is analysed as
+  // its own file. Its bare `name`/`role` are element fields, absent from the
+  // root dictionary — they must read "scoped", not a false "miss". `main`'s
+  // `people` is still root-classified.
+  const asts = {
+    main: [{
+      t: "each",
+      subject: { t: "identifier", name: "people" },
+      body: [{ t: "partial", name: "card", src: span(0, 18) }],
+      src: span(0, 30),
+    }],
+    card: [
+      { t: "emit", expr: { t: "identifier", name: "name" }, src: span(0, 8) },
+      { t: "emit", expr: { t: "identifier", name: "role" }, src: span(8, 16) },
+    ],
+  };
+  const rows = analyseDataAccess(asts, { people: [{ name: "Ada", role: "Author" }] });
+  assert.equal(rows.find((r) => r.path === "people").status, "hit");
+  assert.equal(rows.find((r) => r.path === "name").status, "scoped");
+  assert.equal(rows.find((r) => r.path === "role").status, "scoped");
+});
+
 test("analyseDataAccess walks partial-tag context and hash-arg expressions", () => {
   // `{{> row name=ghost.field}}` — the partial hash arg is evaluated in the
   // caller's scope, so `ghost.field` is a real lookup that should be

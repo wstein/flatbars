@@ -134,16 +134,35 @@ try {
   });
   await page.click('#dock-tabs button[data-tab="data-access"]');
   await page.waitForSelector("#dock-body .dx-row .dx-where", { timeout: 5000 });
-  const wheres = await page.$$eval(
-    "#dock-body .dx-row .dx-where",
-    (els) => els.map((e) => e.textContent || ""),
+  const rows = await page.$$eval("#dock-body .dx-row", (els) =>
+    els.map((r) => ({
+      status: r.querySelector(".dx-status")?.textContent || "",
+      where: r.querySelector(".dx-where")?.textContent || "",
+    })),
   );
-  assert.ok(wheres.length > 0, "Data Access lists lookup rows");
+  const wheres = rows.map((r) => r.where);
+  assert.ok(rows.length > 0, "Data Access lists lookup rows");
   assert.ok(
     wheres.some((w) => !/:1:1$/.test(w)),
     `Data Access reports real positions, not the 1:1 fallback (got ${wheres.join(", ")})`,
   );
-  console.log(`  ✓ data access — ${wheres.length} row(s) at real positions (${wheres.join(", ")})`);
+  console.log(`  ✓ data access — ${rows.length} row(s) at real positions (${wheres.join(", ")})`);
+
+  // The card partial is mounted inside `{{#each people}}`, so its bare
+  // `name`/`role`/`lead` are element fields — they must read "scoped", not a
+  // false "miss" against the root dictionary. `people` (in main) stays a hit.
+  const cardRows = rows.filter((r) => /^card:/.test(r.where));
+  assert.ok(cardRows.length > 0, "the card partial contributes lookup rows");
+  assert.ok(
+    cardRows.every((r) => r.status === "scoped"),
+    `partial-body lookups are scoped, not miss (got ${JSON.stringify(cardRows)})`,
+  );
+  assert.equal(
+    rows.find((r) => /^main:/.test(r.where))?.status,
+    "hit",
+    "the main-file `people` lookup is still root-classified as a hit",
+  );
+  console.log(`  ✓ partial scope — ${cardRows.length} card lookup(s) read "scoped", not "miss"`);
 
   // Jump-to-source: click a main-file row past line 1 and assert the template
   // editor's active line follows.

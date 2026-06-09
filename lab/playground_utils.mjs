@@ -483,6 +483,11 @@ function resolvePath(data, segments) {
 // Best-effort static: when a path sits inside a loop body or partial scope,
 // the resolver is run against the top-level data (the loop subject's element
 // type is not known here), so the panel labels those as "scoped" not "miss".
+// A partial *body* is itself a partial-scope: it can be mounted in any context
+// (e.g. inside `{{#each people}}`, where its bare `name`/`role` are element
+// fields), so it cannot be classified against the root dictionary. Only the
+// entry template (`main`) is walked at root scope; every partial file is
+// walked scoped, so its lookups read "scoped" rather than a false "miss".
 export function analyseDataAccess(astsByFile, data, locals = new Set()) {
   const out = [];
   const lookup = (file, node, segments, scoped) => {
@@ -559,7 +564,11 @@ export function analyseDataAccess(astsByFile, data, locals = new Set()) {
       }
     }
   };
-  for (const [file, ast] of Object.entries(astsByFile || {})) walkNodes(ast, file, false);
+  // `main` is the entry template (root context); every other file is a partial,
+  // whose body is a partial-scope — walk it scoped so its bare lookups are not
+  // misclassified as misses against the root dictionary.
+  for (const [file, ast] of Object.entries(astsByFile || {}))
+    walkNodes(ast, file, file !== "main");
   return out;
 }
 
