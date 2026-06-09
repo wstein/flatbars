@@ -56,6 +56,10 @@ multiplicative (`*` `/` `%`), prefix `!`, then application/atom — so
 Pipe chains are left-associative: `a | f | g` ⇒ `(g (f a))`. Paths,
 literals, and `(parenthesised)` subexpressions are exactly as in FullBars.
 
+Infix reads identically in a **block head** and in its **clause separators**, so
+`{{#if x >= 18}}…{{elif x < 5}}…{{/if}}` takes each condition bare — no parentheses
+around the `elif` test (it is one infix expression, parsed as a head: `elif (lt x 5)`).
+
 The operator characters are excluded from the identifier set so they tokenise as
 operators — but this is a *MaxBars-only* lexer mode (`ParseOptions.lexOptions`
 `infixArith`): RawBars/FullBars keep `+ - * / ?` as path/name characters, so

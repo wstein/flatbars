@@ -52,13 +52,15 @@ type ExprParser = Array PosToken -> Either ParseError Expr
 -- | block `{{^…}}`/`{{{^…}}}`, and unescaped `{{&…}}`. The core *lexer* always
 -- | recognizes them (meaning-free); a dialect that doesn't accept them (RawBars,
 -- | MaxBars) sets `extras = false` and the parser rejects them.
--- | `parseHead` parses a *block-open* tag's head (`{{# … }}`); it defaults to
--- | `parseExpr` (so the head reads exactly like any other interior), but a
--- | dialect may override it to parse the head specially — MaxBars uses this to
--- | read `{{#if a && b}}` as `if (a && b)` (the helper name then a single infix
--- | condition), which the uniform expression grammar cannot, since application
--- | binds tighter than the operators. Only block opens consult it; output,
--- | separators, closes, and raw blocks keep `parseExpr`.
+-- | `parseHead` parses a *head* — a helper name then arguments (`{{# … }}` opens
+-- | AND `{{ name args }}` separators like `{{elif …}}`/`{{when …}}`); it defaults to
+-- | `parseExpr` (so the head reads exactly like any other interior), but a dialect
+-- | may override it to parse the head specially — MaxBars uses this to read
+-- | `{{#if a && b}}` (and `{{elif a < b}}`) as `if (a && b)` (the helper name then a
+-- | single infix condition), which the uniform expression grammar cannot, since
+-- | application binds tighter than the operators. Block opens and ident-headed
+-- | separators consult it; output, closes, raw blocks, and bare-value tags keep
+-- | `parseExpr`.
 -- | `inheritance` gates the Mustache-inheritance block shapes — the parent tag
 -- | `{{<name}}…{{/name}}` (`Parent`) and the override-block tag
 -- | `{{$name}}…{{/name}}` (`BlockDef`), each with a dynamic `*`-headed spelling.
@@ -360,6 +362,19 @@ partialHead toks = case Array.uncons toks of
   Just { head: pt, tail } | pt.tok == TOp ">" -> Array.cons (pt { tok = TIdent ">" }) tail
   _ -> toks
 
+-- | Is this bare-tag interior a *clause separator* — does it lead with one of the
+-- | engine's clause-marker names (`else`/`elif`/…)? Such a tag (`{{elif a < b}}`) is
+-- | a head and is parsed through `parseHead` (`name arg*`), so its args read like a
+-- | block head's: `elif (lt a b)`, not the `lt ((elif a)) b` the output grammar
+-- | would fold (the `{{elif}}`-needs-parens bug). Every other bare tag (`{{ a && b }}`,
+-- | `{{ x }}`, `{{42}}`) stays an output expression parsed through `parseExpr`.
+sepHeadIsClause :: Array String -> Interior -> Boolean
+sepHeadIsClause seps = case _ of
+  Right toks -> case _.tok <$> Array.head toks of
+    Just (TIdent n) -> Array.elem n seps
+    _ -> false
+  Left _ -> false
+
 -- | Project a `ParseOptions` onto the block-sigil opt-in `Gates` the tree
 -- | builder threads through nested blocks.
 gatesOf :: ParseOptions -> Gates
@@ -370,6 +385,7 @@ gatesOf opts =
   , partialBlocks: opts.partialBlocks
   , rawBlockHbs: opts.rawBlockHbs
   , rawBlockHash: opts.rawBlockHash
+  , clauseSeps: opts.standaloneSeps
   }
 
 -- | `headed`, but for the *recovering* parser: it never discards everything on a
@@ -425,6 +441,12 @@ type Gates =
   , partialBlocks :: Boolean
   , rawBlockHbs :: Boolean
   , rawBlockHash :: Boolean
+  -- The clause-separator head names (`else`/`elif`/…). A bare `{{ name args }}` tag
+  -- whose head is one of these is a *clause marker* parsed through `parseHead`
+  -- (`name arg*`, so `{{elif a < b}}` reads `elif (lt a b)`); any other bare tag is
+  -- an output expression parsed through `parseExpr` (so `{{ a && b }}` stays
+  -- `and(a,b)`). Same list `trimStandalone` uses.
+  , clauseSeps :: Array String
   }
 
 parseSeq
@@ -490,18 +512,27 @@ parseSeq pe ph gates toks = go Nil []
         | otherwise -> case headed pe span int of
             Left e -> recover acc errs span e (i + 1)
             Right h -> go (RawBlock span h.name h.args body : acc) errs (i + 1)
-      RSep span _ s int -> case headed pe span int of
-        Right h -> go (Sep span h.name h.args : acc) errs (i + 1)
-        -- A non-empty interior that is a bare literal (`{{42}}`, `{{"x"}}`) is not
-        -- an application head, but it is still a valid value — emit it as output,
-        -- the same node the triple-stash (`{{{42}}}`) produces. Blocks and closes
-        -- still go through `headed`, so `{{#42}}` / `{{/42}}` stay errors. An empty
-        -- `{{}}` keeps its HeadNotIdent error (the guard excludes it).
-        Left (HeadNotIdent _)
-          | trim s /= "" -> case outputExpr pe span int of
-              Left e -> recover acc errs span e (i + 1)
-              Right e -> go (Output span e : acc) errs (i + 1)
-        Left e -> recover acc errs span e (i + 1)
+      -- A bare `{{ … }}` tag. A *clause separator* (head ∈ `clauseSeps`, e.g.
+      -- `{{elif …}}`/`{{else}}`) is a head, parsed through `parseHead` so its infix
+      -- args read like a block head's (`{{elif a < b}}` → `elif (lt a b)`). Every
+      -- other bare tag is an output expression, parsed through `parseExpr` as before
+      -- (`{{ a && b }}` → `and(a,b)`). For FullBars the two grammars are identical,
+      -- so this only changes MaxBars (where `parseHead` is the `name arg*` grammar).
+      RSep span _ s int ->
+        let
+          hp = if sepHeadIsClause gates.clauseSeps int then ph else pe
+        in
+          case headed hp span int of
+            Right h -> go (Sep span h.name h.args : acc) errs (i + 1)
+            -- A non-empty interior that is a bare literal (`{{42}}`, `{{"x"}}`) is
+            -- not an application head, but it is still a valid value — emit it as
+            -- output, the same node `{{{42}}}` produces. An empty `{{}}` keeps its
+            -- HeadNotIdent error (the guard excludes it).
+            Left (HeadNotIdent _)
+              | trim s /= "" -> case outputExpr pe span int of
+                  Left e -> recover acc errs span e (i + 1)
+                  Right e -> go (Output span e : acc) errs (i + 1)
+            Left e -> recover acc errs span e (i + 1)
       RClose span base _ int -> case headed pe { start: base, end: base } int of
         -- A malformed close head can't name a block; flag it and keep scanning,
         -- so the enclosing block still reports its own missing close.

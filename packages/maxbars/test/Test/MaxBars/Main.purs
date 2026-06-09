@@ -81,6 +81,22 @@ main = do
   -- precedence: comparison binds tighter than &&.
   expectM "precedence" "{{ x > 0 && x < 10 }}" (obj [ Tuple "x" (num 5.0) ]) "true"
 
+  -- Infix reads the same in a block head AND its clause separators: a bare
+  -- `{{elif a < b}}` condition is a single infix expression (parsed as a head,
+  -- `elif (lt a b)`), not the output-grammar fold `lt (elif a) b` — so no parens are
+  -- needed. (Regression: clause separators used the output grammar, which mis-read
+  -- the keyword head as an operand.)
+  let
+    switchT = "{{#if x < 10}}S{{elif x >= 10 && x < 20}}M{{else}}L{{/if}}"
+  expectM "elif-infix-small" switchT (obj [ Tuple "x" (num 5.0) ]) "S"
+  expectM "elif-infix-medium" switchT (obj [ Tuple "x" (num 15.0) ]) "M"
+  expectM "elif-infix-large" switchT (obj [ Tuple "x" (num 99.0) ]) "L"
+  -- equality dispatch (the Liquid case/when shape) also reads bare in elif.
+  expectM "elif-eq"
+    "{{#if h == \"cake\"}}C{{elif h == \"cookie\" || h == \"biscuit\"}}K{{else}}?{{/if}}"
+    (obj [ Tuple "h" (VString "biscuit") ])
+    "K"
+
   -- pipes: `a | f` ⇒ (f a); the piped value is the first argument.
   expectM "pipe-json" "{{{ o | json }}}" (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0) ]) ])
     "{\"a\":1}"
