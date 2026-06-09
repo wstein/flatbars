@@ -119,3 +119,39 @@ fn escapes_html_in_output() {
     };
     assert_eq!(greeting(&g), "Hello &lt;b&gt;");
 }
+
+// F3 block helpers (docs/09): `{{#name args}}body{{/name}}` compiles to
+// `name(args…, || -> String { <body> })`. The body closure renders the inner template in
+// the enclosing scope; the helper drives it — once (wrap), or N times (repeat).
+fn frame(body: impl Fn() -> String) -> trussbars_core::Safe {
+    // Returns Safe → the `[…]` markup is emitted raw (a String return would be escaped).
+    trussbars_core::Safe(format!("[{}]", body()))
+}
+fn repeat(n: &f64, body: impl Fn() -> String) -> String {
+    (0..*n as usize).map(|_| body()).collect()
+}
+truss!(
+    framed,
+    Greeting,
+    "{{#frame}}hi {{name}}{{/frame}}",
+    helpers = [frame]
+);
+truss!(
+    repeated,
+    Greeting,
+    "{{#repeat 3}}{{name}}{{/repeat}}",
+    helpers = [repeat]
+);
+
+#[test]
+fn block_host_helpers_drive_the_body() {
+    let g = Greeting {
+        name: "Ada".into(),
+        shout: false,
+    };
+    // `frame` calls the body once and wraps it; the body renders in scope ({{name}}→Ada),
+    // and the Safe return opts the markup out of escaping.
+    assert_eq!(framed(&g), "[hi Ada]");
+    // `repeat` drives the body closure 3× — the power a pre-rendered body wouldn't have.
+    assert_eq!(repeated(&g), "AdaAdaAda");
+}

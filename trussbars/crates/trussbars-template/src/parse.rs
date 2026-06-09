@@ -4,7 +4,7 @@
 //! `let` hash, threads a [`Scope`] for path rooting, and splits `{{else}}` /
 //! `{{else if}}` clauses.
 
-use crate::ast::{Cond, Each, Expr, Node, With};
+use crate::ast::{Cond, Each, Expr, HelperBlock, Node, With};
 use crate::lex::{Lexeme, Sigil, lex};
 use crate::parse_expr::{ParseError, Scope, parse_expr};
 use alloc::string::{String, ToString};
@@ -13,8 +13,10 @@ use alloc::vec::Vec;
 /// Parse a template source into a desugared [`Node`] tree.
 ///
 /// # Errors
-/// Returns a [`ParseError`] for a lex failure, an unclosed/mismatched block, an
-/// unsupported block helper, or a malformed expression.
+/// Returns a [`ParseError`] for a lex failure, an unclosed/mismatched block, or a
+/// malformed expression. A non-built-in block head is *not* an error here — it parses
+/// to a meaning-free [`Node::HelperBlock`] the emitter/VM resolve against the host
+/// allow-list (an undeclared one becomes a located "unknown helper" there).
 pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
     let mut lexemes = lex(src).map_err(|e| ParseError {
         message: e.message,
@@ -176,7 +178,47 @@ impl Blocks<'_> {
             "let" => self.let_block(span, rest, scope),
             "inline" => self.inline_block(span, rest, scope),
             "partial" => self.partial_block(span, rest, scope),
-            other => err(format!("unsupported block helper `{other}`"), span.start),
+            // Any other head is a *host block helper* (docs/09): parse it meaning-free
+            // into a generic node; the emitter/VM resolve it against the allow-list.
+            other => self.helper_block(span, other, rest, scope),
+        }
+    }
+
+    /// Parse a `{{#name args…}}body{{/name}}` host block helper. The parser attaches no
+    /// meaning (it does not check the allow-list); `{{else}}` is unsupported (v1).
+    fn helper_block(
+        &mut self,
+        span: crate::span::Span,
+        head: &str,
+        rest: &str,
+        scope: &Scope,
+    ) -> Result<Node, ParseError> {
+        // Args are the expressions after the head — parse `head rest` as an application and
+        // take its arguments (the same arg grammar as a value call).
+        let args = if rest.trim().is_empty() {
+            Vec::new()
+        } else {
+            match parse_expr(&format!("{head} {rest}"), scope)? {
+                Expr::App(_, a) => a,
+                other => vec![other],
+            }
+        };
+        let (body, stop) = self.parse_until(scope)?;
+        match stop {
+            Stop::Close(_) => Ok(Node::HelperBlock(HelperBlock {
+                span,
+                head: head.to_string(),
+                args,
+                body,
+            })),
+            Stop::Else | Stop::ElseIf(_) => err(
+                format!("block helper `{head}` does not support `{{{{else}}}}`"),
+                span.start,
+            ),
+            Stop::Eof => err(
+                format!("unclosed block helper `{{{{#{head}}}}}`"),
+                span.start,
+            ),
         }
     }
 
@@ -739,5 +781,27 @@ mod tests {
             ),
             o => panic!("{o:?}"),
         }
+    }
+
+    #[test]
+    fn block_helper_parses_meaning_free() {
+        // A non-built-in block head is no longer a parse error: it becomes a `HelperBlock`
+        // carrying its args + body, to be resolved against the host allow-list at emit time.
+        let ns = parse("{{#frame 2}}hi {{name}}{{/frame}}").unwrap();
+        match &ns[0] {
+            Node::HelperBlock(b) => {
+                assert_eq!(b.head, "frame");
+                assert_eq!(b.args, vec![Expr::Lit(Value::Num(2.0))]);
+                assert_eq!(b.body.len(), 2); // "hi " text + {{name}} output
+            }
+            o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn block_helper_rejects_else() {
+        // No `{{else}}` arm in v1 — a located, actionable error rather than a silent drop.
+        let err = parse("{{#frame}}a{{else}}b{{/frame}}").unwrap_err();
+        assert!(err.message.contains("does not support"), "{}", err.message);
     }
 }

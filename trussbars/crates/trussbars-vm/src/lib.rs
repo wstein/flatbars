@@ -521,6 +521,17 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             Some(y) => out.push_str(y),
             None => return Err("'{{yield}}' used outside a block partial".into()),
         },
+        // Host block helpers (docs/09) are an AOT (truss!) feature for now: AOT emits the
+        // body as an `impl Fn() -> String` closure the helper drives. The VM needs an
+        // equivalent on-demand body renderer (tracked); until then it rejects them rather
+        // than diverge from AOT (e.g. a `{{#repeat n}}` that renders the body N times).
+        Node::HelperBlock(b) => {
+            return Err(format!(
+                "block host-helper '{{{{#{}}}}}' is an AOT-only feature; the VM does not \
+                 support block helpers yet",
+                b.head
+            ));
+        }
     }
     Ok(())
 }

@@ -119,6 +119,25 @@ pub enum Node {
         /// The verbatim body text.
         body: String,
     },
+    /// `{{#name args…}}body{{/name}}` — a host **block** helper (docs/09). The parser is
+    /// meaning-free: any block head that is not a built-in becomes this, and the emitter /
+    /// VM resolve `head` against the declared allow-list (an undeclared head is a located
+    /// "unknown helper"). The helper is `fn name(args…, body: impl Fn() -> String) -> R`
+    /// (`R`: `String`/`Safe`); the body renders the inner nodes in the enclosing scope.
+    HelperBlock(HelperBlock),
+}
+
+/// `{{#name args…}}body{{/name}}` data — a host block-helper invocation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HelperBlock {
+    /// The tag span.
+    pub span: Span,
+    /// The helper name (the block head).
+    pub head: String,
+    /// The positional arguments after the head.
+    pub args: Vec<Expr>,
+    /// The block body, rendered (in the enclosing scope) by the helper's closure.
+    pub body: Vec<Node>,
 }
 
 impl Node {
@@ -137,6 +156,7 @@ impl Node {
             Node::Each(e) => e.span,
             Node::Cond(c) => c.span,
             Node::With(w) => w.span,
+            Node::HelperBlock(b) => b.span,
         }
     }
 }

@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use crate::ast::{Cond, Each, Expr, Node, Value, With};
+use crate::ast::{Cond, Each, Expr, HelperBlock, Node, Value, With};
 use crate::parse::parse;
 use crate::span::Span;
 
@@ -199,6 +199,7 @@ fn estimate_node(n: &Node) -> usize {
         }
         Node::With(w) => estimate_bytes(&w.body) + estimate_bytes(&w.otherwise),
         Node::Let { body, .. } | Node::PartialBlock { body, .. } => estimate_bytes(body),
+        Node::HelperBlock(b) => estimate_bytes(&b.body),
         Node::Partial { .. } | Node::Inline { .. } => 0,
     }
 }
@@ -271,7 +272,35 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
         Node::Cond(c) => return cond_block(env, src, c, out),
         Node::With(w) => return with_block(env, src, w, out),
         Node::Let { bindings, body, .. } => return let_block(env, src, bindings, body, out),
+        Node::HelperBlock(b) => return helper_block(env, src, b, out),
     }
+    Ok(())
+}
+
+/// Emit a host **block** helper (docs/09): `name(&(arg0), …, || -> String { <body> })`,
+/// routed through the same `esc` output path as a value helper (so a `Safe` return opts
+/// out of escaping). The body closure renders the inner nodes in the enclosing scope — it
+/// shadows the runtime `out` buffer with its own, so the body's `out.push_str(…)` fills the
+/// closure's buffer, which it returns. Undeclared heads are a located "unknown helper".
+fn helper_block(env: &Env, src: &str, b: &HelperBlock, out: &mut String) -> Result<(), String> {
+    if !env.helpers.contains(&b.head) {
+        return Err(format!(
+            "unknown helper '{}' (declare it with `truss_helpers` if it is a host block helper)",
+            b.head
+        ));
+    }
+    let mut args: Vec<String> = b
+        .args
+        .iter()
+        .map(|a| Ok(format!("&({})", emit_expr(env, a)?)))
+        .collect::<Result<_, String>>()?;
+    let mut body = String::new();
+    emit_nodes(env, src, &b.body, &mut body)?;
+    args.push(format!(
+        "|| -> String {{\nlet mut out = String::new();\n{body}out\n}}"
+    ));
+    let call = format!("{}({})", b.head, args.join(", "));
+    out.push_str(&format!("trussbars_core::esc(&({call}), &mut out);\n"));
     Ok(())
 }
 
@@ -1017,10 +1046,33 @@ fn rust_str(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::emit;
+    use super::{emit, emit_named};
 
     fn e(src: &str) -> String {
         emit("Ctx", src).unwrap_or_else(|err| panic!("{src:?}: {err}"))
+    }
+
+    #[test]
+    fn block_helper_declared_emits_a_body_closure_call() {
+        // `{{#frame}}…{{/frame}}` → `frame(|| -> String { <body> })`, routed through the
+        // value-output escape path (a `Safe` return opts out).
+        let code = emit_named(
+            "render",
+            "Ctx",
+            "{{#frame}}{{name}}{{/frame}}",
+            &["frame".into()],
+        )
+        .unwrap();
+        assert!(code.contains("frame("), "{code}");
+        assert!(code.contains("|| -> String"), "{code}");
+        assert!(code.contains("trussbars_core::esc(&(frame("), "{code}");
+    }
+
+    #[test]
+    fn block_helper_undeclared_is_a_located_error() {
+        // The allow-list boundary: an undeclared block head is rejected (no host call).
+        let err = emit_named("render", "Ctx", "{{#frame}}x{{/frame}}", &[]).unwrap_err();
+        assert!(err.contains("unknown helper 'frame'"), "{err}");
     }
 
     #[test]

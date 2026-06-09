@@ -65,6 +65,46 @@ pub fn markdown(src: &str) -> trussbars_core::Safe {
   whose host fn is missing or mistyped is **rustc's** (wrong arg type / arity / "cannot
   find function `date`"), steered to the template span by the `docs/07` machinery.
 
+### 3.1 Block helpers (`{{#name args…}}body{{/name}}`) — shipped (AOT)
+
+A **block** host-helper receives its body as a closure, so it can wrap, suppress, or
+repeat the inner template instead of just transforming a value:
+
+```
+{{#frame}}hi {{name}}{{/frame}}     →   frame(|| -> String { let mut out = …; out })
+{{#repeat 3}}{{name}}{{/repeat}}    →   repeat(&(3f64), || -> String { … })
+```
+
+The convention extends the value-helper one with a trailing body closure:
+
+```rust
+fn frame(body: impl Fn() -> String) -> trussbars_core::Safe {
+    trussbars_core::Safe(format!("[{}]", body()))   // wrap once; Safe → emitted raw
+}
+fn repeat(n: &f64, body: impl Fn() -> String) -> String {
+    (0..*n as usize).map(|_| body()).collect()       // drive the body N times
+}
+truss!(framed, Greeting, "{{#frame}}hi {{name}}{{/frame}}", helpers = [frame]);
+```
+
+- **Args then body.** The positional args (after the head) are emitted as `&(expr)`
+  exactly as for value helpers; the body closure is the **last** parameter, typed
+  `impl Fn() -> String`. The closure renders the inner nodes **in the enclosing scope**
+  (`{{name}}` still resolves against the same context), so the helper controls *whether*
+  and *how often* the body runs — power a pre-rendered string couldn't have.
+- **Same allow-list, same boundary.** A block head is a host call **only** if declared
+  in `helpers`/`#[truss_helpers]`; an undeclared `{{#x}}…{{/x}}` is the same located
+  `unknown helper` macro-time error. The parser is meaning-free — any non-built-in block
+  head parses to a `HelperBlock` node and is resolved at emit time (§1's static-name
+  guarantee is preserved).
+- **Return type.** `String` (escaped) or `Safe` (raw), as for value helpers.
+- **No `{{else}}` in v1.** A block helper with an `{{else}}` arm is a located parse
+  error (`block helper \`x\` does not support {{else}}`), not a silent drop. An
+  inversion convention is a tracked follow-up.
+- **AOT only for now.** The dynamic VM (`trussbars-vm`) returns an explicit
+  `AOT-only feature` error for a block host-helper rather than diverging from the typed
+  backend; VM block helpers (a `dyn Fn` body convention) are the tracked follow-up below.
+
 ## 4. How the macro learns the allow-list (shipped)
 
 The set of callable host helpers is **declared, at compile time** — only declared
@@ -127,10 +167,16 @@ pile *is* the requirements list this convention satisfies.
   auto-borrowed; a literal's `&&T` deref-coerces to the host's `&T`, so signatures are
   plain references. Matches the built-in string-pack emit.
 
+> Resolved: **block host-helpers** (`{{#name}}…{{/name}}`) shipped for the AOT path —
+> the body-as-closure convention is §3.1.
+
 ### Still open (not needed yet)
 
-- **Block host-helpers** (`{{#myblock}}…{{/myblock}}`) — value helpers only for now;
-  a block helper would need a body-as-closure convention.
+- **VM block host-helpers** — the AOT path supports block helpers (§3.1); the dynamic
+  VM still errors on them (`AOT-only feature`). Closing the gap needs a runtime
+  body-as-`dyn Fn` convention so the two backends stay at conformance parity.
+- **Block-helper `{{else}}`** — an inversion arm (`{{#x}}…{{else}}…{{/x}}`) is rejected
+  in v1; a convention (e.g. a second closure) is unspecified.
 - **Macro-layer catalog checking** (§5) — validating `{{t "id"}}` literals against a
   host catalog at `truss!` expansion time, to recover Fluent's compile-time id check
   inside the static-name model.
