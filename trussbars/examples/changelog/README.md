@@ -29,7 +29,7 @@ can express none of it:
 | --- | --- | --- |
 | **category** (`feat`) and **scope** (`trussbars-core`) from `feat(trussbars-core): …` | no in-template split/match on a prefix; and a `startsWith` can't head a condition (F7) | a `split` / pattern helper, or a typed `commit.category` projection |
 | **short hash** (`a7e55c2` from the 40-char SHA) | `slice 0 7` *works* in output position, but the host already had the string | minor — `slice` covers it |
-| **date** `2026-06-08` from the ISO timestamp | no `date` helper at all (F3); only a raw `slice` truncation | **the marquee F3 case** — a typed `date(fmt)` host helper |
+| ~~**date** `2026-06-08` from the ISO timestamp~~ — **now in the template** | — | **DONE (F3)** — the context carries the raw ISO timestamp; the template formats it with `{{date c.date "%Y-%m-%d"}}` (`trussbars_i18n::date`, declared via `helpers = [date]`). |
 
 That table **is** the F3 requirements list (docs/06 §4): the v2 host-helper
 convention should let a host register `date`, a categoriser, etc. as typed,

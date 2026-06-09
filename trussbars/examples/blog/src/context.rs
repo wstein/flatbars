@@ -2,8 +2,8 @@
 //!
 //! Two Trussbars facts show up directly in these types:
 //!
-//! 1. **Field names are static** — `{{post.body_html}}` resolves to the Rust field
-//!    `post.body_html` verbatim (no rename layer). So templates use snake_case to
+//! 1. **Field names are static** — `{{post.body}}` resolves to the Rust field
+//!    `post.body` verbatim (no rename layer). So templates use snake_case to
 //!    keep the Rust idiomatic; there is no `serde`-style `#[rename]` for paths.
 //! 2. **Numbers are `f64`** — a field compared against a numeric literal (`{{#if
 //!    views > 100}}`) is emitted as `views > 100.0`, so `views` must be `f64`
@@ -20,11 +20,13 @@ pub struct Post {
     pub slug: String,
     pub title: String,
     pub author: String,
-    /// Pre-formatted — there is no `date` helper in v1 (see the README gap list).
+    /// A raw ISO date; the template formats it with the `date` host helper (F3),
+    /// e.g. `{{date post.date "%B %e, %Y"}}`.
     pub date: String,
     pub excerpt: String,
-    /// Pre-rendered markup, emitted unescaped via `{{{ post.body_html }}}`.
-    pub body_html: String,
+    /// Markdown source; the `markdown` host helper (F3) renders it to safe HTML at
+    /// `{{post.body | markdown}}`.
+    pub body: String,
     pub tags: Vec<String>,
     /// `f64` because the template compares it to a numeric literal.
     pub views: f64,

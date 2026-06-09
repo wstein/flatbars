@@ -7,6 +7,7 @@ name = "changelog-example"
 version = "0.0.0"
 dependencies = [
  "trussbars-core",
+ "trussbars-i18n",
  "trussbars-macros",
  "trussbars-std",
 ]
@@ -30,6 +31,10 @@ dependencies = [
  "dragonbox_ecma",
  "itoa",
 ]
+
+[[package]]
+name = "trussbars-i18n"
+version = "0.1.0"
 
 [[package]]
 name = "trussbars-macros"

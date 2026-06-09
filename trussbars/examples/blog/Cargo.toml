@@ -19,4 +19,5 @@ path = "src/main.rs"
 trussbars-macros = { path = "../../crates/trussbars-macros" }
 # The Trussbars runtime the generated code links against (default `perf` features).
 trussbars-core = { path = "../../crates/trussbars-core" }
+trussbars-i18n = { path = "../../crates/trussbars-i18n" }
 trussbars-std = { path = "../../crates/trussbars-std" }

@@ -1,11 +1,11 @@
 //! A self-hosted changelog: render this repo's own conventional commits (a
 //! committed `git log` snapshot) through a Trussbars-compiled `.truss` template.
 //!
-//! It is a *deliberately* thin template over a *fat* host precompute. Everything
-//! `parse_commit` does below — split the `type(scope): subject` prefix, shorten the
-//! hash, truncate the date — is work the template cannot express today (no host
-//! helpers, no `date`/string-machinery in a condition). That pile is the concrete
-//! requirements list for the v2 host-helper convention (gap F3); see the README.
+//! A thin template over a host precompute. `parse_commit` still splits the
+//! `type(scope): subject` prefix and shortens the hash (a template can't pattern-match
+//! a prefix), but **date formatting now lives in the template** via the F3 host helper
+//! `{{date c.date "%Y-%m-%d"}}` (`trussbars_i18n::date`, declared with
+//! `#[truss_helpers]`) — dogfooding the host-helper convention that closed gap F3.
 
 pub mod context;
 pub mod templates;
@@ -27,9 +27,11 @@ pub fn changelog() -> ChangelogCtx {
     }
 }
 
-/// Parse one log line into a typed [`Commit`]. **This is the F3 evidence**: the
-/// categorisation, scope extraction, hash shortening, and date truncation all live
-/// here because a `.truss` template can do none of them.
+/// Parse one log line into a typed [`Commit`]. The categorisation, scope extraction,
+/// and hash shortening still live here (the template can't pattern-match a prefix),
+/// but **the date is no longer truncated here** — the raw ISO timestamp is carried
+/// through and the template formats it with the F3 host helper `{{date c.date
+/// "%Y-%m-%d"}}` (`trussbars_i18n::date`), closing that part of F3.
 fn parse_commit(line: &str) -> Commit {
     let mut parts = line.splitn(3, '|');
     let hash = parts.next().unwrap_or_default();
@@ -48,6 +50,6 @@ fn parse_commit(line: &str) -> Commit {
         scope: scope.to_string(),
         subject: message.to_string(),
         hash: hash.chars().take(7).collect(),
-        date: iso.chars().take(10).collect(),
+        date: iso.to_string(),
     }
 }
