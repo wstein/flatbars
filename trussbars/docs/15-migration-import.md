@@ -1,11 +1,12 @@
-# Trussbars — Migration-Tool Read Half (`trussbars-import`)
+# Trussbars — Migration Tool (`trussbars-import`)
 
-> **Status:** **IMPLEMENTED** (the foreign-dialect *parsers*). The lowering of each
-> foreign AST → the Trussbars AST (`trussbars-template::ast`) is the **next**,
-> separate deliverable and is explicitly out of scope here. **Audience:** whoever
-> builds the `…→.truss` migration tool docs/13 makes a lead post-severance item.
-> **Companion docs:** realises the **migration tool** row of `docs/13 §6`; the
-> output of these parsers is the migration tool's input.
+> **Status:** **IMPLEMENTED** — the foreign-dialect *parsers* (all four dialects) **and**
+> the **Mustache → idiomatic `.truss`** write half: idiom metrics, an idiom-aware lowering
+> to the Trussbars IR, the IR→`.truss` *Lift*, and the `truss-import` CLI. The
+> Handlebars/Liquid/StringTemplate4 lowerings are the next slices. **Audience:** whoever
+> builds out the `…→.truss` migration tool docs/13 makes a lead post-severance item.
+> **Companion docs:** realises the **migration tool** row of `docs/13 §6`; `docs/12`
+> (`{{#case}}`) and `docs/14` (`{{#match}}`) are downstream collapse targets.
 
 ## 1. Why this exists
 
@@ -92,15 +93,71 @@ construct above; integration tests (`tests/<dialect>.rs`) drive the public
 both AST shape and that spans point back into the source. The crate clears the
 workspace lint bar (`forbid(unsafe)`, `deny(missing_docs)`, `deny(clippy::all)`).
 
-## 6. Out of scope (the next deliverables)
+## 6. The write half — Mustache → idiomatic `.truss`
 
-- **The lowering itself** — foreign AST → `trussbars_template::ast::Node`, the
-  migration tool proper. The idiom linter shares this rewrite engine (`docs/13 §6`).
-  Conformance-test the Rust output against the PureScript `packages/linter` reference
-  *while it still exists* (`docs/13`).
-- **Wiring the official `mustache/spec` JSON suite** as a parser-level fixture (the
-  flatbars repo vendors it under `lab/examples/vendored/mustache/`). Hand-authored
-  corpora cover the constructs here; gating against the full upstream suite is a
-  follow-up.
-- **Runtime/semantic concerns** (lambda evaluation, filter behaviour) — the parsers
-  record names and structure only.
+The conversion is a three-stage pipeline (`metrics → lower → lift`), not a 1:1 node map.
+*Idiomatic* means recurring shapes collapse to the natural MaxBars construct, and which
+collapses to apply (and their thresholds) is chosen from **measured frequencies**, not
+guessed.
+
+- **`metrics`** (`metrics::mustache`) — a structural pass that counts idiom candidates so
+  the lowering's parameters are data-driven. Run over a corpus (`truss-import --metrics`)
+  to see which idioms occur. It detects the idiom catalogue below plus residual counts and
+  structural tallies.
+- **`lower`** (`lower::mustache`) — `mustache::Node` → `trussbars_template::ast` IR + a
+  structured migration report, applying the idioms under [`LowerOptions`].
+- **`lift`** (`lift::to_truss`) — the IR → idiomatic `.truss` serializer (re-sugars `lookup`
+  chains to dotted paths and the desugared operators to infix: `c ? a : b`, `a == b`,
+  `a ?? b`, `!x`). Faithful to the source's own whitespace.
+
+### Idiom catalogue (metric → parameter)
+
+| Idiom | Pattern → target | Default |
+| --- | --- | --- |
+| **I1** complementary collapse | `{{#x}}A{{/x}}{{^x}}B{{/x}}` (either order) → `{{#each}}…{{else}}` / `{{#with}}…{{else}}` / `{{#if}}…{{else}}` by **shape** | on |
+| **I2** lone inverse | unpaired `{{^x}}B{{/x}}` → `{{#unless x}}B{{/unless}}` | on |
+| **I3** trivial ternary | a trivial scalar pair → `{{x ? A : B}}` | `--ternary` |
+| **I4** section shape | `{{#x}}` → `each` / `with` / `if` from an optional data sample (heuristic: assume iteration, with a note) | on |
+| **I5** case run | run of ≥2 exclusive sections → `{{#case}}` | measure-only |
+
+### Section shape — the data sample
+
+A bare Mustache `{{#x}}` is overloaded (iterate a list / re-scope an object / test a scalar).
+Without type information the lowering cannot know which; a [`ShapeOracle`] supplies it. A
+`--data sample.json` resolves each path exactly (array → `each`, object → `with`, scalar →
+`if`, descending into array elements for nested sections); absent a sample, the heuristic
+assumes iteration and annotates the guess.
+
+### Faithfulness & residuals
+
+The Mustache↔MaxBars **truthiness delta** (`0`/`""`/`{}` truthy in Mustache; `""`/`[]`/`{}`
+falsy under `nonEmpty`) is **accepted and annotated** on each boolean/scope use — the
+migrated `.truss` carries an inline `{{! migrate: … }}` note and the report records it.
+Inadmissible constructs become residuals: a **dynamic partial** `{{>*x}}` (crosses the
+names-static / data-dynamic boundary) and **inheritance** `{{<}}/{{$}}` are reported and
+left as `{{! migrate: … — needs a human }}` comments; a **set-delimiter** directive is
+dropped (MaxBars has fixed delimiters); Mustache **comments** are preserved as `.truss`
+comments.
+
+### CLI
+
+`truss-import --metrics <file>` reports the idiom metrics and suggested parameters;
+`truss-import --to-truss [--ternary] <file>` writes the migrated `.truss` to stdout and the
+report to stderr.
+
+## 7. Out of scope (the next deliverables)
+
+- **The Handlebars / Liquid / StringTemplate4 lowerings** — the parsers exist; their IR
+  lowerings (and their own idiom catalogues) are the next slices. The idiom linter shares
+  this rewrite engine (`docs/13 §6`); conformance-test the Rust output against the
+  PureScript `packages/linter` reference *while it still exists* (`docs/13`).
+- **The differential gate** — render the migrated `.truss` and the original through both
+  engines and assert equivalence *modulo a semantic-delta ledger* (truthiness, escaping,
+  missing-key). Needs the real foreign engines as oracles.
+- **Schema inference** (`docs/03`) — to emit a *compiling* typed `.truss` (a `Ctx`), not
+  just idiomatic surface; until then the data sample / heuristic disambiguates sections.
+- **Wiring the official `mustache/spec` JSON suite** as a parser-level fixture (vendored in
+  the flatbars repo under `lab/examples/vendored/mustache/`); hand-authored corpora cover
+  the constructs here today.
+- **Runtime/semantic concerns** (lambda evaluation, filter behaviour) — recorded by name
+  and structure only.

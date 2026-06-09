@@ -24,6 +24,7 @@ pub mod lift;
 pub mod liquid;
 pub mod lower;
 pub mod metrics;
+pub mod migrate;
 pub mod mustache;
 pub mod stringtemplate;
 

@@ -184,32 +184,78 @@ impl Lower<'_> {
         }
 
         let cond = lower_name(name_a);
+        // The shape of the non-inverted section decides the collapse: a list pair is
+        // `{{#each}}…{{else}}…`, an object pair `{{#with}}…{{else}}…`, a scalar pair
+        // `{{#if}}…{{else}}…`. The inverse body always renders in the *outer* scope.
+        let abs = abs_path(scope, name_a);
+        let shape = match &abs {
+            Some(p) => self.shapes.shape_at(p),
+            None => Shape::Unknown,
+        };
+        let inner = abs.as_deref().unwrap_or(scope);
 
-        // I3: a trivial pair becomes a ternary when enabled.
-        if self.opts.ternary
-            && let (Some(a), Some(b)) = (trivial_arm(then_body), trivial_arm(else_body))
-        {
-            self.truthiness_note(span, name_a);
-            out.push(ir::Node::Output {
-                span,
-                expr: ir::Expr::App("ternary".into(), vec![cond, a, b]),
-                raw: false,
-            });
-            return Some(j + 1);
+        match shape {
+            Shape::Array => {
+                let body = self.nodes(then_body, inner);
+                let otherwise = self.nodes(else_body, scope);
+                out.push(ir::Node::Each(ir::Each {
+                    span,
+                    subject: cond,
+                    item: None,
+                    index: None,
+                    label: None,
+                    body,
+                    otherwise,
+                }));
+            }
+            Shape::Object => {
+                self.truthiness_note(span, name_a);
+                let body = self.nodes(then_body, inner);
+                let otherwise = self.nodes(else_body, scope);
+                out.push(ir::Node::With(ir::With {
+                    span,
+                    subject: cond,
+                    body,
+                    otherwise,
+                }));
+            }
+            Shape::Scalar | Shape::Unknown => {
+                // I3: a trivial scalar pair becomes a ternary when enabled.
+                if self.opts.ternary
+                    && let (Some(a), Some(b)) = (trivial_arm(then_body), trivial_arm(else_body))
+                {
+                    self.truthiness_note(span, name_a);
+                    out.push(ir::Node::Output {
+                        span,
+                        expr: ir::Expr::App("ternary".into(), vec![cond, a, b]),
+                        raw: false,
+                    });
+                    return Some(j + 1);
+                }
+                // I1: `{{#if x}}then{{else}}else{{/if}}`.
+                self.truthiness_note(span, name_a);
+                if matches!(shape, Shape::Unknown) {
+                    self.note(
+                        span,
+                        Severity::Warn,
+                        format!(
+                            "collapsed complementary sections to `{{{{#if}}}}`; if `{}` is a list use `{{{{#each}}}}…{{{{else}}}}…`",
+                            key(name_a)
+                        ),
+                    );
+                }
+                let body = self.nodes(then_body, scope);
+                let otherwise = self.nodes(else_body, scope);
+                out.push(ir::Node::Cond(ir::Cond {
+                    span,
+                    negated: false,
+                    cond,
+                    body,
+                    elifs: Vec::new(),
+                    otherwise,
+                }));
+            }
         }
-
-        // I1: `{{#if x}}then{{else}}else{{/if}}`.
-        self.truthiness_note(span, name_a);
-        let body = self.nodes(then_body, scope);
-        let otherwise = self.nodes(else_body, scope);
-        out.push(ir::Node::Cond(ir::Cond {
-            span,
-            negated: false,
-            cond,
-            body,
-            elifs: Vec::new(),
-            otherwise,
-        }));
         Some(j + 1)
     }
 
@@ -575,6 +621,38 @@ mod tests {
             &LowerOptions::default(),
         );
         assert!(matches!(&l.ir[0], ir::Node::Cond(_)));
+    }
+
+    #[test]
+    fn complementary_over_list_is_each_with_else() {
+        // `{{#items}}…{{/items}}{{^items}}empty{{/items}}` over a list → each-with-else,
+        // NOT if/else (which would render the body once, losing iteration).
+        let arr = shapes(&[(&["items"], Shape::Array)]);
+        let l = low(
+            "{{#items}}{{name}}{{/items}}{{^items}}empty{{/items}}",
+            &arr,
+            &LowerOptions::default(),
+        );
+        let ir::Node::Each(e) = &l.ir[0] else {
+            panic!("{:?}", l.ir)
+        };
+        assert_eq!(e.body.len(), 1);
+        assert_eq!(e.otherwise.len(), 1);
+    }
+
+    #[test]
+    fn complementary_unknown_warns_about_list() {
+        let l = low(
+            "{{#items}}{{name}}{{/items}}{{^items}}empty{{/items}}",
+            &NoShapes,
+            &LowerOptions::default(),
+        );
+        assert!(matches!(&l.ir[0], ir::Node::Cond(_)));
+        assert!(
+            l.report
+                .iter()
+                .any(|n| n.message.contains("if `items` is a list"))
+        );
     }
 
     #[test]
