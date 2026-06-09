@@ -15,13 +15,17 @@ use tui_textarea::TextArea;
 pub fn apply(ta: &mut TextArea<'static>, text: &str) {
     ta.clear_custom_highlight();
     let Ok(lexemes) = lex(text) else { return };
+    // Lexeme spans are in source order, so one forward `LineCol` pass maps every byte
+    // boundary to `(row, col)` — O(chars) total, not O(lexemes × chars).
+    let mut lc = LineCol::new(text);
     for lx in lexemes {
         let (span, style) = match lx {
             Lexeme::Tag { sigil, span, .. } => (span, sigil_style(sigil)),
             Lexeme::RawBlock { span, .. } => (span, Style::new().fg(Color::Magenta)),
             Lexeme::Text(_) => continue,
         };
-        ta.custom_highlight((pos(text, span.start), pos(text, span.end)), style, 1);
+        let (start, end) = (lc.at(span.start), lc.at(span.end));
+        ta.custom_highlight((start, end), style, 1);
     }
 }
 
@@ -34,23 +38,41 @@ fn sigil_style(sigil: Sigil) -> Style {
     }
 }
 
-/// The `(row, char-column)` of a byte offset into `text` — the coordinate space
-/// `TextArea::custom_highlight` expects.
-fn pos(text: &str, byte: usize) -> (usize, usize) {
-    let mut row = 0;
-    let mut col = 0;
-    for (i, ch) in text.char_indices() {
-        if i >= byte {
-            break;
-        }
-        if ch == '\n' {
-            row += 1;
-            col = 0;
-        } else {
-            col += 1;
+/// Maps **non-decreasing** byte offsets into `text` to the `(row, char-column)` coordinate
+/// `TextArea::custom_highlight` expects, in one forward pass. Call [`LineCol::at`] with
+/// non-decreasing `byte` values (highlight spans are in source order); it advances the
+/// shared char cursor instead of rescanning from the start each time.
+struct LineCol<'a> {
+    chars: std::iter::Peekable<std::str::CharIndices<'a>>,
+    row: usize,
+    col: usize,
+}
+
+impl<'a> LineCol<'a> {
+    fn new(text: &'a str) -> Self {
+        Self {
+            chars: text.char_indices().peekable(),
+            row: 0,
+            col: 0,
         }
     }
-    (row, col)
+
+    /// Advance to `byte` and return the `(row, col)` there.
+    fn at(&mut self, byte: usize) -> (usize, usize) {
+        while let Some(&(i, ch)) = self.chars.peek() {
+            if i >= byte {
+                break;
+            }
+            self.chars.next();
+            if ch == '\n' {
+                self.row += 1;
+                self.col = 0;
+            } else {
+                self.col += 1;
+            }
+        }
+        (self.row, self.col)
+    }
 }
 
 #[cfg(test)]
@@ -58,11 +80,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn pos_maps_bytes_to_row_col() {
-        let t = "ab\n{{x}}";
-        assert_eq!(pos(t, 0), (0, 0));
-        assert_eq!(pos(t, 3), (1, 0)); // start of line 2 ('{')
-        assert_eq!(pos(t, 5), (1, 2)); // inside the tag
+    fn linecol_maps_increasing_bytes_to_row_col() {
+        // One forward cursor: `at` must be called with non-decreasing offsets.
+        let mut lc = LineCol::new("ab\n{{x}}");
+        assert_eq!(lc.at(0), (0, 0));
+        assert_eq!(lc.at(3), (1, 0)); // start of line 2 ('{')
+        assert_eq!(lc.at(5), (1, 2)); // inside the tag
+    }
+
+    #[test]
+    fn each_sigil_keeps_its_colour() {
+        // The per-sigil contract (a colour regression would otherwise pass silently).
+        assert_eq!(sigil_style(Sigil::Output).fg, Some(Color::Cyan));
+        assert_eq!(sigil_style(Sigil::Raw).fg, Some(Color::Cyan));
+        assert_eq!(sigil_style(Sigil::Open).fg, Some(Color::Magenta));
+        assert_eq!(sigil_style(Sigil::Close).fg, Some(Color::Magenta));
+        assert_eq!(sigil_style(Sigil::Partial).fg, Some(Color::Blue));
+        assert_eq!(sigil_style(Sigil::Comment).fg, Some(Color::DarkGray));
     }
 
     #[test]

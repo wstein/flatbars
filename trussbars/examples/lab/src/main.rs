@@ -157,11 +157,10 @@ fn handle_mouse(lab: &mut Lab, kind: MouseEventKind, col: u16, row: u16, area: R
 
 /// Move the focused editor's caret to a click at screen `(col, row)` within pane `rect`.
 /// `fresh` starts a new selection anchor (a plain click); otherwise the caret extends the
-/// existing selection (a drag). Accurate while the pane isn't scrolled — tui-textarea owns
-/// the viewport top and doesn't expose it.
+/// existing selection (a drag). The border arithmetic is the unit-tested
+/// [`trussbars_lab::caret_offset`]; it is accurate while the pane isn't scrolled (see there).
 fn place_caret(lab: &mut Lab, rect: Rect, col: u16, row: u16, fresh: bool) {
-    let r = row.saturating_sub(rect.y.saturating_add(1));
-    let c = col.saturating_sub(rect.x.saturating_add(1));
+    let (r, c) = trussbars_lab::caret_offset(rect, col, row);
     let ta = lab.focused_mut();
     if fresh {
         ta.cancel_selection();

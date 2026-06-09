@@ -434,6 +434,17 @@ pub fn clamp_output_scroll(scroll: u16, lines: usize, visible: u16) -> u16 {
     scroll.min(u16::try_from(max).unwrap_or(u16::MAX))
 }
 
+/// The `(row, col)` *inside* a bordered pane for a screen click at `(col, row)`: strip the
+/// one-cell top/left border, saturating so a click on the border itself maps to the first
+/// inner cell. Exact only while the pane isn't scrolled — `tui-textarea` owns the viewport
+/// top and doesn't expose it, so a click in a scrolled editor lands on the wrong line.
+#[must_use]
+pub fn caret_offset(rect: Rect, col: u16, row: u16) -> (u16, u16) {
+    let r = row.saturating_sub(rect.y.saturating_add(1));
+    let c = col.saturating_sub(rect.x.saturating_add(1));
+    (r, c)
+}
+
 /// Draw the whole lab to `frame`.
 pub fn ui(frame: &mut Frame, lab: &Lab) {
     let p = panes(frame.area(), lab.sample.uses_i18n());
@@ -446,7 +457,7 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
         Span::styled(
             format!(
                 "· {} · {} · {}",
-                lab.sample.key(),
+                lab.sample.label(),
                 lab.locale.label(),
                 lab.mode.label()
             ),
@@ -584,6 +595,14 @@ mod tests {
         assert_eq!(clamp_output_scroll(99, 10, 4), 6);
         // Content shorter than the viewport pins to the top (the blank-pane case).
         assert_eq!(clamp_output_scroll(50, 2, 4), 0);
+    }
+
+    #[test]
+    fn caret_offset_strips_the_pane_border() {
+        let rect = Rect::new(2, 3, 20, 10);
+        assert_eq!(caret_offset(rect, 3, 4), (0, 0)); // first inner cell
+        assert_eq!(caret_offset(rect, 6, 7), (3, 3));
+        assert_eq!(caret_offset(rect, 0, 0), (0, 0)); // a click on/before the border saturates
     }
 
     #[test]
