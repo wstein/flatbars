@@ -13,8 +13,10 @@ import { readFileSync } from "node:fs";
 import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
 import { createRenderer } from "../lab/renderer.mjs";
 
-// The dialects that back source maps, each with its own example corpus.
-const DIALECTS = ["rawbars", "fullbars", "maxbars"];
+// The dialects that back source maps, each with its own example corpus. MinBars
+// emits a source map too now (ADR-035) — over its own `.mustache` corpus, rendered
+// on the spec rule (`createRenderer("minbars")` defaults to it).
+const DIALECTS = ["rawbars", "fullbars", "maxbars", "minbars"];
 
 // segments tile the output: contiguous from 0, every len > 0, covering it exactly.
 function tiles(output, segments) {

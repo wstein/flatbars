@@ -10,7 +10,9 @@
 //     template editor (`.cm-link-highlight`) and shows the provenance tooltip;
 //   * output → editor (click) — clicking an emit run selects its tag span;
 //   * source → output (caret) — placing the caret in the template lights up the
-//     output run(s) it produced (`.cm-out-linked`).
+//     output run(s) it produced (`.cm-out-linked`);
+//   * multibyte alignment — the marks stay aligned across a multibyte char (the
+//     byte↔UTF-16 offset drift), so a `×`/`—` doesn't shift the highlight.
 //
 // The Node-level gate (`check:provenance`) proves the segments tile; this proves
 // the browser actually paints and links them. Run from lab/test/:
@@ -115,6 +117,27 @@ try {
     .catch(() => false);
   assert.ok(outLinked, "a template caret in the tag lights up the output run it produced");
   console.log("  ✓ caret — template caret lights up the output run it produced");
+
+  // ── Highlight alignment across a multibyte char (the byte↔UTF-16 drift) ──
+  // Segment offsets are UTF-16 code units, so a multibyte char (× = 2 UTF-8 bytes /
+  // 1 code unit) must NOT shift the marks. Replace the template with `a×b{{name}}c`
+  // (data still name=Ada ⇒ output "a×bAdac"); the {{name}} emit mark must wrap
+  // exactly "Ada" and the leading text run exactly "a×b" — a byte→char conversion
+  // would drift both one column right of the × (e.g. emit "dac", text "a×bA").
+  await page.click("#template-editor-container .cm-content");
+  {
+    const mod = process.platform === "darwin" ? "Meta" : "Control";
+    await page.keyboard.down(mod);
+    await page.keyboard.press("KeyA");
+    await page.keyboard.up(mod);
+    await page.keyboard.type("a×b{{name}}c");
+  }
+  await new Promise((r) => setTimeout(r, 500)); // debounced render + repaint
+  const emitText = await page.$eval("#output-text .seg-expr", (el) => el.textContent);
+  assert.equal(emitText, "Ada", `the {{name}} emit mark wraps exactly its output past the × (got "${emitText}")`);
+  const leadText = await page.$eval("#output-text .seg", (el) => el.textContent);
+  assert.equal(leadText, "a×b", `the leading text run mark is aligned past the × (got "${leadText}")`);
+  console.log("  ✓ multibyte — provenance marks stay aligned across a multibyte char (no byte/UTF-16 drift)");
 
   // ── Data Access: real positions + jump-to-source (the 1:1 regression) ──
   // The lowered AST now carries each node's opening-tag span, so the panel

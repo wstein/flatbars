@@ -21,6 +21,7 @@ const DIALECTS = [
   ["maxbars", "maxbars"], // both → maxOptions
   ["surface", "fullbars"], // both → defaultParseOptions
   ["core", "rawbars"], // both → coreOptions
+  ["minbars", "minbars"], // both → minOptions (astJson + diagnostics share it)
 ];
 
 // Templates that the recovering parser keeps walking past — each carries at least
