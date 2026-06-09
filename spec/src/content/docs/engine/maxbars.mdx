@@ -209,6 +209,32 @@ still takes a parenthesised condition — `{{elif (a && b)}}`,
 `{{else if (a && b)}}` — because separators share their tag shape with
 output expressions.
 
+## Multi-arm `case`
+
+For a value with several branches, `{{#case}}` dispatches the subject against each
+`{{when}}` arm by equality — clearer than a chain of `{{else if (eq s …)}}`:
+
+```handlebars
+{{#case status}}
+{{when "shipped"}}On its way
+{{when "pending" "queued"}}Waiting
+{{else}}Unknown
+{{/case}}
+```
+
+The subject is a full expression; each `{{when}}` carries one or more **value
+expressions** and is taken when the subject equals **any** of them. `{{else}}` is the
+catch-all (with none, an unmatched subject renders nothing). `when`/`else` are
+clause separators (their standalone lines are trimmed like `else`/`elif`); only
+whitespace may precede the first `{{when}}` — leading content is a located error.
+
+`case` is **first-class, not sugar**: the reference engine evaluates the subject
+once (`Kernel.Prelude.caseH`) and the Trussbars compiler lowers it to a Rust
+`match`. It belongs to the `nonEmpty`-truthiness family — **RawBars and MaxBars
+only**; FullBars (Handlebars-faithful) has no `case` and rejects it with a located
+error pointing at the `{{#if (eq …)}}` form. The future typed-exhaustive variant
+takes the `match` keyword with pattern arms.
+
 ## Loop and block bindings
 
 The three binding constructs and their keywords are **committed surface** — they

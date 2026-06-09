@@ -150,6 +150,19 @@ export const examples = {
     data: { name: "Keyboard", stock: 3, shipsFree: false },
   },
 
+  caseBlock: {
+    engine: "maxbars",
+    label: "Intermediate — Case / when (multi-arm)",
+    // `{{#case s}}` dispatches the subject against each `{{when}}` arm by equality —
+    // clearer than a chain of `{{else if (eq s …)}}`. One arm can list several values
+    // (`{{when "pending" "queued"}}`); `{{else}}` is the catch-all. It is a first-class
+    // construct: the Trussbars compiler lowers it to a Rust `match` (the subject read once).
+    compiles: true,
+    template:
+      "{{#case status}}{{when \"shipped\"}}📦 On its way{{when \"pending\" \"queued\"}}⏳ Waiting{{when \"delivered\"}}✓ Delivered{{else}}Unknown status{{/case}}",
+    data: { status: "queued" },
+  },
+
   eachList: {
     engine: "maxbars",
     label: "Intermediate — Each: loop vars, nesting & context",

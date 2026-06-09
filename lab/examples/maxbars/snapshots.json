@@ -9,6 +9,7 @@
   "filters": "In stock under 100:\n- Keyboard (45)\n- Webcam (70)\nPremium pick: Monitor\nHas a sale tag? yes",
   "defaults": "coalesce: Ada\nelvis:    untitled\nternary:  sold out",
   "conditionals": "Keyboard: low (3) · shipping extra",
+  "caseBlock": "⏳ Waiting",
   "eachList": "Engine (Acme):\n  0. Ada — Engine\n  1. Charles (last) — Engine\nDocs (Acme):\n  0. Grace (last) — Docs\n",
   "eachElse": "(nothing yet)\n",
   "eachObject": "lang = en\ntheme = dark\n",

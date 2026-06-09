@@ -140,6 +140,16 @@ const t = (s) => s;
       see <a href="#divergences">where it diverges</a>.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.conditionals.template} data={ex.conditionals.data} />
+    <h3>Case / when — multi-arm dispatch</h3>
+    <p>
+      When one value has several branches, <code>{t("{{#case s}}")}</code> reads better than a
+      chain of <code>{t("{{else if (eq s …)}}")}</code>: each <code>{t("{{when}}")}</code> arm
+      matches the subject by equality, one arm can list several values
+      (<code>{t("{{when \"pending\" \"queued\"}}")}</code>), and <code>{t("{{else}}")}</code> is
+      the catch-all. It is <em>first-class</em>, not sugar — the Trussbars compiler lowers it to
+      a Rust <code>match</code> with the subject evaluated once. (RawBars and MaxBars only.)
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.caseBlock.template} data={ex.caseBlock.data} />
     <h3>Logic, <code>??</code>, and <code>?:</code></h3>
     <p>
       <code>&amp;&amp;</code> binds tighter than <code>||</code> and looser than the

@@ -90,6 +90,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "caseBlock",
+    "label": "Intermediate — Case / when (multi-arm)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "eachList",
     "label": "Intermediate — Each: loop vars, nesting & context",
     "group": "Examples",

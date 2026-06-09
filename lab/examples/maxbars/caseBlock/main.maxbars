@@ -1,0 +1,1 @@
+{{#case status}}{{when "shipped"}}📦 On its way{{when "pending" "queued"}}⏳ Waiting{{when "delivered"}}✓ Delivered{{else}}Unknown status{{/case}}
