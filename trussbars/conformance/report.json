@@ -1,19 +1,14 @@
 {
   "profile": "perf (ecma-float, default)",
-  "total": 61,
+  "total": 64,
   "positive": {
-    "count": 60,
-    "byte_matched": 60,
+    "count": 64,
+    "byte_matched": 64,
     "mismatched": 0
   },
   "excluded": {
-    "count": 1,
-    "cases": [
-      {
-        "id": "neg-dict",
-        "reason": "1:1: unsupported: helper 'dict'"
-      }
-    ]
+    "count": 0,
+    "cases": []
   },
   "oracle_drift": 0
 }

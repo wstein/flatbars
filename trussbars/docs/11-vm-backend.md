@@ -258,9 +258,10 @@ it's also dynamic), so the VM is gated everywhere, with **no silent gaps**.
 
 **AOT-compat (§7) is *gated*, not claimed.** The harness asserts, across the whole
 corpus *including the negatives*, that the VM in AOT-compat mode **accepts iff AOT
-accepts** and **outputs byte-identically** — so `neg-dict`, a bare-number `{{#if}}`,
-and bare-struct output are rejected by *both*, while every positive renders the same
-bytes. "100% compat" is therefore a tested contract, exactly the way `interpreter ≡
+accepts** and **outputs byte-identically** — so a bare-number `{{#if}}` and
+bare-struct output are rejected by *both* (while a `dict` literal, now AOT-supported,
+is accepted by both), and every positive renders the same bytes. "100% compat" is
+therefore a tested contract, exactly the way `interpreter ≡
 AOT` already is — the harness `excluded` ledger (AOT-rejected cases) becomes the
 AOT-compat *reject* oracle.
 

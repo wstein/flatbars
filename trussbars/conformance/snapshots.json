@@ -59,5 +59,8 @@
   "standalone-if-else": "a\nno\nb\n",
   "standalone-indented": "<ul>\n  <li>x</li>\n</ul>\n",
   "standalone-not-when-inline": "a b \n",
-  "neg-dict": "1"
+  "dict-with-literal": "Ann is 30",
+  "dict-call-form": "1",
+  "dict-let-literal": "dark/12",
+  "dict-path-value": "hi Zed"
 }

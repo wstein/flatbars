@@ -1,8 +1,7 @@
-// The Trussbars conformance corpus (the vertical slice the v1 emitter supports).
-// Each case is rendered by the interpreter (the oracle) and by the emitted Rust,
-// and asserted byte-identical. The two `neg-*` cases use constructs outside the
-// slice: the oracle renders them, the emitter returns "unsupported …", and the
-// harness records them in the exclusion ledger (it never silently drops them).
+// The Trussbars conformance corpus. Each case is rendered by the interpreter (the
+// oracle) and by the emitted Rust, and asserted byte-identical. A case the active
+// emitter cannot compile would be recorded in the exclusion ledger (never silently
+// dropped); the corpus currently has none — both emitters cover every case.
 //
 // Data keys are Rust-identifier-safe and numbers are JSON numbers (typed `f64`).
 
@@ -388,10 +387,28 @@ export const cases = [
     data: { xs: ["a", "b"] },
   },
 
-  // ── negative: dict / collection literals — still excluded ────────────────────
+  // ── dict literals → synthesized records ──────────────────────────────────────
+  // A dict literal `{k: v}` (or the `(dict "k" v)` call form) compiles to a typed,
+  // block-local generic struct (both emitters synthesize it; the oracle renders it
+  // from a dynamic map). Field types are inferred at instantiation.
   {
-    id: "neg-dict",
+    id: "dict-with-literal",
+    template: "{{#with {name: \"Ann\", age: 30}}}{{name}} is {{age}}{{/with}}",
+    data: {},
+  },
+  {
+    id: "dict-call-form",
     template: '{{#with (dict "a" 1)}}{{a}}{{/with}}',
     data: {},
+  },
+  {
+    id: "dict-let-literal",
+    template: "{{#let cfg={theme: \"dark\", size: 12}}}{{cfg.theme}}/{{cfg.size}}{{/let}}",
+    data: {},
+  },
+  {
+    id: "dict-path-value",
+    template: "{{#with {who: name}}}hi {{who}}{{/with}}",
+    data: { name: "Zed" },
   },
 ];

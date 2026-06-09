@@ -341,13 +341,26 @@ fn with_block(env: &Env, src: &str, w: &With, out: &mut String) -> Result<(), St
     {
         return with_find(env, src, args, &w.body, &w.otherwise, out);
     }
-    let subj = emit_expr(env, &w.subject)?;
     let d = env.depth + 1;
     let cvar = format!("__c{d}");
     let mut child = env.clone();
     child.scope = cvar.clone();
     child.parents.insert(0, env.scope.clone());
     child.depth = d;
+    // A dict-literal subject re-roots to a synthesized struct, which has no `Truthy`
+    // impl — so resolve its truthiness at compile time: a non-empty dict literal
+    // always renders the body, an empty one always the `{{else}}` clause.
+    if let Some(n) = dict_arity(&w.subject) {
+        if n == 0 {
+            return emit_nodes(env, src, &w.otherwise, out);
+        }
+        let subj = emit_expr(env, &w.subject)?;
+        out.push_str(&format!("{{\nlet {cvar} = &({subj});\n"));
+        emit_nodes(&child, src, &w.body, out)?;
+        out.push_str("}\n");
+        return Ok(());
+    }
+    let subj = emit_expr(env, &w.subject)?;
     out.push_str(&format!(
         "{{\nlet {cvar} = &({subj});\nif trussbars_core::truthy({cvar}) {{\n"
     ));
@@ -600,6 +613,7 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(format!("[{}]", es.join(", ")))
         }
+        ("dict", _) => emit_dict(env, args),
         ("where", _) => coll_filter(env, "filter", false, args),
         ("reject", _) => coll_filter(env, "filter", true, args),
         ("some", _) => coll_filter(env, "any", false, args),
@@ -621,6 +635,66 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
                 ))
             }
         }
+    }
+}
+
+/// Emit a dict literal `{k0: v0, …}` (desugared `dict "k0" v0 …`) as a typed record:
+/// a block-local **generic** struct whose field types are inferred at instantiation,
+/// returned as a value. So `{{#with {a: 1} as |c|}}{{c.a}}{{/with}}` re-roots to the
+/// struct and `c.a` is an ordinary field access. The struct is generic (`__Dict<F0,
+/// …>`) so a field can hold any value — a literal (by value) or a path (by reference)
+/// — without the emitter needing to name the type. Keys are static identifiers
+/// (already enforced by the surface), so this is a closed, compile-time record.
+fn emit_dict(env: &Env, args: &[Expr]) -> Result<String, String> {
+    let pairs = dict_pairs(args)?;
+    if pairs.is_empty() {
+        // The empty dict `{}` — a fieldless unit struct (falsy; see `with_block`).
+        return Ok("{ struct __Dict; __Dict }".into());
+    }
+    let mut generics = Vec::with_capacity(pairs.len());
+    let mut decls = Vec::with_capacity(pairs.len());
+    let mut inits = Vec::with_capacity(pairs.len());
+    for (i, (key, val)) in pairs.iter().enumerate() {
+        generics.push(format!("F{i}"));
+        decls.push(format!("{key}: F{i}"));
+        // A literal field is held by value; any other expression (a path) by
+        // reference, so it borrows from `&ctx` rather than moving out of it.
+        let v = match val {
+            Expr::Lit(_) => emit_expr(env, val)?,
+            _ => format!("&({})", emit_expr(env, val)?),
+        };
+        inits.push(format!("{key}: {v}"));
+    }
+    Ok(format!(
+        "{{ struct __Dict<{}> {{ {} }} __Dict {{ {} }} }}",
+        generics.join(", "),
+        decls.join(", "),
+        inits.join(", ")
+    ))
+}
+
+/// The `(key, value)` pairs of a `dict` application: alternating string-literal keys
+/// and value expressions. A computed (non-literal) key is rejected (the surface only
+/// produces literal keys, but be explicit).
+fn dict_pairs(args: &[Expr]) -> Result<Vec<(&str, &Expr)>, String> {
+    if !args.len().is_multiple_of(2) {
+        return Err("unsupported: dict literal with a dangling key".into());
+    }
+    args.chunks_exact(2)
+        .map(|kv| match &kv[0] {
+            Expr::Lit(Value::Str(k)) => Ok((k.as_str(), &kv[1])),
+            _ => Err("unsupported: dict literal with a computed key".into()),
+        })
+        .collect()
+}
+
+/// The field count of a dict-literal expression (`Some(n)`), else `None`. Used to
+/// resolve a dict's truthiness at compile time (a synthesized struct has no `Truthy`
+/// impl, but a non-empty dict literal is always truthy, an empty one always falsy).
+fn dict_arity(e: &Expr) -> Option<usize> {
+    match e {
+        Expr::App(name, args) if name == "dict" => Some(args.len() / 2),
+        _ => None,
     }
 }
 
@@ -976,7 +1050,16 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_dict_reports() {
-        assert!(emit("Ctx", r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#).is_err());
+    fn dict_literal_synthesizes_a_struct() {
+        // A dict literal (call form or `{…}`) re-roots `with` to a generic local struct.
+        let out = emit("Ctx", r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#).unwrap();
+        assert!(out.contains("struct __Dict<F0> { a: F0 }"));
+        assert!(out.contains("__Dict { a: 1.0 }"));
+        // A `let`-bound brace literal with two fields, accessed by `.key`.
+        let out2 = emit("Ctx", "{{#let c={x: 1, y: \"z\"}}}{{c.x}}{{c.y}}{{/let}}").unwrap();
+        assert!(out2.contains("struct __Dict<F0, F1> { x: F0, y: F1 }"));
+        assert!(out2.contains("__let_c.x"));
+        // A dangling key (odd token count) is still rejected.
+        assert!(emit("Ctx", r#"{{ dict "a" }}"#).is_err());
     }
 }

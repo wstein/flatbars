@@ -12,9 +12,10 @@
 -- |
 -- |  * **Structural** (data-free, *drift-proof*): we run the real AOT front-end
 -- |    (`MaxBars.Rust.compileMaxRustCommented`) and surface its located rejection
--- |    verbatim — `dict` literals, computed (data-derived) field names, dynamic
--- |    partials, host helpers (`t`/`number`/…), non-`raw` raw blocks, unknown
--- |    helpers. The lint *is* the compiler's own rejection set, so it can never
+-- |    verbatim — computed (data-derived) field names, dynamic partials, host
+-- |    helpers (`t`/`number`/…), non-`raw` raw blocks, unknown helpers. (Dict
+-- |    literals are *accepted* — the emitter synthesizes a struct for them.) The
+-- |    lint *is* the compiler's own rejection set, so it can never
 -- |    drift from what AOT actually accepts. (One finding — the compiler
 -- |    short-circuits on the first reject, exactly as a compiler would.)
 -- |

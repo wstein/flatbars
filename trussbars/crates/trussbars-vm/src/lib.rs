@@ -7,13 +7,13 @@
 //! compile time.
 //!
 //! **Status:** *tree-walk, lenient mode.* Covers the **whole** conformance corpus
-//! (57/57 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
+//! (64/64 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
 //! `if`/`each`/`with`/`let`, loop metadata incl. `loop.parent`/`loop.root`, the value
 //! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
 //! `dict`, and partials (`{{#inline}}`/`{{> }}`/`{{#partial}}`/`{{yield}}`). Anything
-//! genuinely unimplemented returns `Err` (never a wrong answer). Still to come (docs/11):
-//! the three render modes (incl. the required AOT-compat mode), host-helper registration
-//! (F3), `no_std`, and — only if a need appears — bytecode.
+//! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
+//! spike (docs/11): the lenient + AOT-compat (strict) render modes, host-helper
+//! registration. Still open: `no_std`.
 //!
 //! Scalars stringify through `trussbars_core::ToText` (the same ECMA-f64 path AOT
 //! uses), and escaping through `trussbars_core::escape_html`, so VM output is
@@ -193,7 +193,7 @@ struct Env {
     /// Partial names currently expanding (recursion guard).
     expanding: Vec<String>,
     /// AOT-compat (strict) mode: reject what the AOT backend would reject — numeric
-    /// truthiness, bare-object output, unknown fields, `dict` — so this render is a
+    /// truthiness, bare-object output, unknown fields — so this render is a
     /// *verifying proxy* for "would this compile under AOT, identically?" (docs/11 §7).
     strict: bool,
     /// The host-helper registry (F3).
@@ -306,7 +306,7 @@ impl Template {
     /// Render in **AOT-compat (strict) mode** — a verifying proxy for the AOT backend
     /// (docs/11 §7): byte-identical to lenient on what the AOT accepts, but an `Err`
     /// on what AOT would reject (numeric truthiness, bare-object output, an unknown
-    /// field against the data shape, `dict`). "If it renders here, it compiles under
+    /// field against the data shape). "If it renders here, it compiles under
     /// AOT and renders identically" — 100% modulo schema fidelity (it checks the data
     /// shape, not the host's real Rust types).
     ///
@@ -707,11 +707,8 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
             Ok(Value::Object(Rc::new(obj)))
         }
         ("dict", _) => {
-            if env.strict {
-                return Err(
-                    "AOT-compat: `dict` / collection literals are not in the AOT subset".into(),
-                );
-            }
+            // Dict literals compile under AOT (v2 synthesizes a typed struct), so they
+            // are in the AOT-compat subset too — strict mode renders them like lenient.
             let mut obj = BTreeMap::new();
             for pair in args.chunks(2) {
                 if let [Expr::Lit(Lit::Str(k)), v] = pair {
@@ -1192,12 +1189,19 @@ mod tests {
                 .unwrap(),
             "pos"
         );
+        // …including a dict literal (AOT synthesizes a typed struct for it):
+        assert_eq!(
+            Template::parse(r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#)
+                .unwrap()
+                .render_compat(&d)
+                .unwrap(),
+            "1"
+        );
         // …and what AOT rejects is an Err (a verifying proxy):
         let rejects = [
-            "{{#if n}}x{{/if}}",                       // numeric truthiness
-            "{{this}}",                                // bare-object output
-            "{{missing}}",                             // unknown field
-            r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#, // dict / collection literal
+            "{{#if n}}x{{/if}}", // numeric truthiness
+            "{{this}}",          // bare-object output
+            "{{missing}}",       // unknown field
         ];
         for t in rejects {
             assert!(

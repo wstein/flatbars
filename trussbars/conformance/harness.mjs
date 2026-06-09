@@ -90,9 +90,10 @@ if (process.argv.includes("--vm")) {
 }
 
 // `--vm-compat`: render through the VM's AOT-compat (strict) mode and assert it is a
-// VERIFYING PROXY for AOT (docs/11 §7/§9) — it ACCEPTS iff AOT accepts, and on the
-// accepted cases its output byte-matches the golden. So `neg-dict` (AOT-rejected) must
-// also be rejected here, and every positive must render identically.
+// VERIFYING PROXY for AOT (docs/11 §7/§9) — it ACCEPTS iff AOT accepts (`compileMaxRust`),
+// and on the accepted cases its output byte-matches the golden. A construct AOT rejects
+// (numeric truthiness, bare-struct output) must be rejected here too, and every accepted
+// case must render identically.
 if (process.argv.includes("--vm-compat")) {
   console.error("building truss-vm (VM CLI)…");
   execFileSync("cargo", ["+1.96.0", "build", "--quiet", "--bin", "truss-vm"], {
@@ -161,8 +162,8 @@ if (process.argv.includes("--compat-parity")) {
   });
   const binPath = resolve(root, "trussbars/target/debug/truss-vm");
 
-  // The shared corpus (every positive + neg-dict) plus negatives that exercise the
-  // two *data-driven* rules the structural front-end can't see without a value.
+  // The shared corpus plus negatives that exercise the two *data-driven* rules the
+  // structural front-end can't see without a value (numeric truthiness, struct output).
   const extra = [
     { id: "compat-numeric-truthiness", template: "{{#if count}}x{{/if}}", data: { count: 3 } },
     { id: "compat-numeric-truthiness-zero", template: "{{#if count}}x{{/if}}", data: { count: 0 } },

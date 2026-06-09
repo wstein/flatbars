@@ -567,12 +567,12 @@ main = do
     (obj [ Tuple "name" (VString "Ada") ])
     true
     []
-  -- but binding a dict *literal value* needs a generated struct — AOT rejects it,
-  -- even though the MaxBars interpreter supports it (a genuine subset boundary).
-  expectCompat "compat: let-binding a dict literal value is rejected"
+  -- binding a dict *literal value* compiles under AOT (the emitter synthesizes a
+  -- typed struct for it), so the lint treats it as compatible.
+  expectCompat "compat: let-binding a dict literal value is AOT-compatible"
     "{{#let cfg={theme: \"dark\"}}}{{cfg.theme}}{{/let}}"
     (obj [])
-    false
-    [ "aot-structural" ]
+    true
+    []
 
   log "all MaxBars tests passed"

@@ -530,6 +530,10 @@ withBlock :: Env -> Array Expr -> Template -> Either String String
 withBlock env args body = case Array.head args of
   Nothing -> Left "unsupported: with without a subject"
   Just (App "find" findArgs) -> withFind env findArgs (Array.drop 1 args) body
+  -- A dict-literal subject re-roots to a synthesized struct, which has no `Truthy`
+  -- impl — so resolve its truthiness at compile time: a non-empty dict literal always
+  -- renders the body, an empty one always the `{{else}}` clause.
+  Just subjE | Just n <- dictArity subjE -> withDict env (Array.drop 1 args) subjE n body
   Just subjE -> do
     subj <- expr env subjE
     let
@@ -561,6 +565,31 @@ withBlock env args body = case Array.head args of
           <> elseS
           <> "    }\n    }\n"
       )
+
+-- `{{#with {dict} as |c|}}` — compile-time truthiness: a non-empty dict literal
+-- always renders the body (re-rooted at the synthesized struct), an empty `{}` always
+-- the `{{else}}` clause. No runtime `truthy` check (the struct has no `Truthy` impl).
+withDict :: Env -> Array Expr -> Expr -> Int -> Template -> Either String String
+withDict env blockParams subjE n body =
+  let
+    s = splitClauses body
+  in
+    if n == 0 then clauseBody env s.clauses
+    else do
+      subj <- expr env subjE
+      let
+        paramNames = bindingNames blockParams
+        d = env.depth + 1
+        cVar = "__c" <> show d
+        params' = maybe env.params (\nm -> Map.insert nm cVar env.params) (Array.index paramNames 0)
+        childEnv = env
+          { scope = cVar
+          , params = params'
+          , parents = Array.cons env.scope env.parents
+          , depth = d
+          }
+      bodyS <- nodes childEnv s.before
+      Right ("    {\n    let " <> cVar <> " = &(" <> subj <> ");\n" <> bodyS <> "    }\n")
 
 -- `{{#let name=(value)}}…{{/let}}` → a block-scoped `let` binding. The value is
 -- emitted in the current scope (let never re-roots); the name is installed as a
@@ -748,12 +777,70 @@ expr env = case _ of
   App "list" xs -> do
     es <- traverse (expr env) xs
     Right ("[" <> joinWith ", " es <> "]")
+  -- `{k: v, …}` (dict literal, or the `(dict "k" v …)` call form) → a typed,
+  -- block-local *generic* struct whose field types are inferred at instantiation, so
+  -- a field can hold a literal (by value) or a path (by reference) without naming the
+  -- type. `{{#with {a: 1} as |c|}}{{c.a}}{{/with}}` re-roots to it; `c.a` is an
+  -- ordinary field access. Keys are static identifiers — a closed compile-time record.
+  App "dict" xs -> emitDict env xs
   App name args
     | Just r <- emitHelper env name args -> r
   App name [] -> case Map.lookup name env.params of
     Just v -> Right v
     Nothing -> Left ("unsupported: expression head '" <> name <> "'")
   App name _ -> Left ("unsupported: helper '" <> name <> "'")
+
+-- A dict literal `{k0: v0, …}` (desugared `dict "k0" v0 …`) → a block expression
+-- defining a generic local struct and returning an instance. Generic so each field
+-- type is inferred (a literal by value, a path by reference); the empty dict `{}` is
+-- a fieldless unit struct (falsy — see `withBlock`).
+emitDict :: Env -> Array Expr -> Either String String
+emitDict env args = do
+  pairs <- dictPairs args
+  if Array.null pairs then Right "{ struct __Dict; __Dict }"
+  else do
+    parts <- traverse field (Array.mapWithIndex Tuple pairs)
+    let
+      gens = joinWith ", " (map _.gen parts)
+      decls = joinWith ", " (map _.decl parts)
+      inits = joinWith ", " (map _.init parts)
+    Right ("{ struct __Dict<" <> gens <> "> { " <> decls <> " } __Dict { " <> inits <> " } }")
+  where
+  field (Tuple i (Tuple key val)) = do
+    v <- dictFieldValue env val
+    pure
+      { gen: "F" <> show i
+      , decl: key <> ": F" <> show i
+      , init: key <> ": " <> v
+      }
+
+-- The `(key, value)` pairs of a `dict` application — alternating string-literal keys
+-- and value expressions. A computed (non-literal) key is rejected (the surface only
+-- produces literal keys, but be explicit).
+dictPairs :: Array Expr -> Either String (Array (Tuple String Expr))
+dictPairs args = case Array.uncons args of
+  Nothing -> Right []
+  Just { head: Lit (VString k), tail } -> case Array.uncons tail of
+    Just { head: v, tail: rest } -> Array.cons (Tuple k v) <$> dictPairs rest
+    Nothing -> Left "unsupported: dict literal with a dangling key"
+  Just _ -> Left "unsupported: dict literal with a computed key"
+
+-- A literal field is held by value; any other expression (a path) by reference, so it
+-- borrows from `&ctx` rather than moving out of it.
+dictFieldValue :: Env -> Expr -> Either String String
+dictFieldValue env = case _ of
+  Lit v -> lit v
+  e -> do
+    ee <- expr env e
+    Right ("&(" <> ee <> ")")
+
+-- The field count of a dict-literal subject (`Just n`), else `Nothing` — used to
+-- resolve a dict's truthiness at compile time (a synthesized struct has no `Truthy`
+-- impl; a non-empty dict literal is always truthy, an empty one always falsy).
+dictArity :: Expr -> Maybe Int
+dictArity = case _ of
+  App "dict" args -> Just (Array.length args / 2)
+  _ -> Nothing
 
 lit :: Value -> Either String String
 lit = case _ of

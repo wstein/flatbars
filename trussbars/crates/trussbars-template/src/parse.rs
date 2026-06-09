@@ -279,8 +279,15 @@ impl Blocks<'_> {
                 message: "expected `=` in a `let` binding".into(),
                 at: span.start,
             })?;
-            let (inner, tail) = read_paren(after.trim_start(), span.start)?;
-            let value = parse_expr(inner.trim(), &cur)?;
+            // The value is either a parenthesised expression `=(…)` or a bare dict
+            // literal `={…}` (the brace group is passed whole to the expr parser).
+            let after = after.trim_start();
+            let (value_src, tail) = if after.starts_with('{') {
+                read_braces(after, span.start)?
+            } else {
+                read_paren(after, span.start)?
+            };
+            let value = parse_expr(value_src.trim(), &cur)?;
             cur = cur.with(name);
             bindings.push((name.to_string(), value));
             s = tail.trim_start();
@@ -450,6 +457,35 @@ fn read_string_literal(s: &str) -> Option<(String, &str)> {
 }
 
 /// Read a parenthesised group `( … )` → `(inner, rest)`, brace/string-aware.
+/// Read a balanced brace group `{ … }` (a dict literal value), returning the whole
+/// group *including* its braces (so the expression parser sees the dict literal) and
+/// the tail. Skips quoted strings so a `}` inside a string does not close it early.
+fn read_braces(s: &str, at: usize) -> Result<(&str, &str), ParseError> {
+    let t = s.trim_start();
+    let b = t.as_bytes();
+    let n = b.len();
+    let mut depth = 0i32;
+    let mut i = 0;
+    while i < n {
+        match b[i] {
+            b'"' | b'\'' => {
+                i = skip_str(b, n, i);
+                continue;
+            }
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok((&t[..=i], &t[i + 1..]));
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    err("unterminated `{ … }`", at)
+}
+
 fn read_paren(s: &str, at: usize) -> Result<(&str, &str), ParseError> {
     let t = s.trim_start();
     if !t.starts_with('(') {

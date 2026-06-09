@@ -120,8 +120,9 @@ non-trivial part (precedence-climbing for the operators).
    drop), if/elif/else, with (+ `find`), sequential `let`, partials/`yield`, the
    collection filters (`where`/`reject`/`some`/`every`/`find`). Gate: the
    conformance harness `--v2` flag emits through this Rust pipeline instead of the
-   v1 PureScript emitter and asserts the SAME golden — **56/56 byte-identical**, 1
-   excluded (`neg-dict`, deferred), 0 drift. (`dict` literals stay a v2 follow-up.)
+   v1 PureScript emitter and asserts the SAME golden — **64/64 byte-identical**, 0
+   excluded, 0 drift (the `dict-*` and `standalone-*` cases included). Dict literals
+   now compile to a synthesized generic struct (both emitters).
 5. **Diagnostics — ✅ DONE (class A + the gate)** (`crates/trussbars-macros`). The
    `truss!(name, CtxType, "template")` proc-macro drives the pipeline at compile
    time and, for every Trussbars-owned (class-A) failure — parse error, unknown
