@@ -17,7 +17,13 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { analyze, analyzeWith, lint, migrate } from "../lab/vendor/flatbars-engine.mjs";
+import { analyze, analyzeWith, analyzeMinbars, lint, migrate } from "../lab/vendor/flatbars-engine.mjs";
+
+// Analyse dispatch by example engine: MinBars (Mustache) renders on its own
+// truthiness rule, so it analyses through `analyzeMinbars`; every other dialect
+// is FullBars-surface `analyze`. (analyzeWith — the host PathSchema — is FullBars
+// only; a minbars example never sets `pathSchema`.)
+const analyzeFor = (engine) => (engine === "minbars" ? analyzeMinbars : analyze);
 import { labHref } from "../lab/open-in-lab.mjs";
 import { decodeState } from "../lab/playground_utils.mjs";
 import { examples as analyseExamples, gallery as analyseGallery } from "../tutorials/src/analyse.mjs";
@@ -41,7 +47,7 @@ function noOrphans(page, prefix, keys) {
 console.log("Analyse examples (truthiness portability):");
 for (const [key, ex] of Object.entries(analyseExamples)) {
   const before = fail;
-  const r = analyze(ex.template, ex.data);
+  const r = analyzeFor(ex.engine)(ex.template, ex.data);
   if (!r.ok) {
     miss(`${key}: analyse errored: ${r.error}`);
     continue;
@@ -69,7 +75,7 @@ for (const [key, ex] of Object.entries(analyseExamples)) {
 console.log("Analyse gallery (portability at scale):");
 for (const item of analyseGallery) {
   const before = fail;
-  const r = analyze(item.template, item.data);
+  const r = analyzeFor(item.engine)(item.template, item.data);
   if (!r.ok) { miss(`${item.name}: analyse errored: ${r.error}`); continue; }
   const got = { observed: 0, potential: 0, miss: 0 };
   for (const f of r.findings) if (f.kind in got) got[f.kind]++;

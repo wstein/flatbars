@@ -7,8 +7,12 @@
 // links into the Lab's Truthiness panel. Read-only by design — the editable cards
 // are the dedicated examples above; this is breadth, not depth.
 import { useEffect, useState } from "preact/hooks";
-import { analyze } from "../../../lab/vendor/flatbars-engine.mjs";
+import { analyze, analyzeMinbars } from "../../../lab/vendor/flatbars-engine.mjs";
 import { labHref } from "../../../lab/open-in-lab.mjs";
+
+// MinBars (Mustache) renders on its own truthiness rule, so it analyses through
+// `analyzeMinbars`; every other dialect is FullBars-surface `analyze`.
+const analyzeFor = (engine) => (engine === "minbars" ? analyzeMinbars : analyze);
 
 // A finding-kind badge (count + label), hidden at zero.
 function Badge({ n, kind, label }) {
@@ -20,7 +24,7 @@ function Tile({ item }) {
   const [res, setRes] = useState(null);
   const [href, setHref] = useState(null);
   useEffect(() => {
-    try { setRes(analyze(item.template, item.data)); }
+    try { setRes(analyzeFor(item.engine)(item.template, item.data)); }
     catch (e) { setRes({ ok: false, error: String((e && e.message) || e), findings: [] }); }
     let live = true;
     // Land in the Lab on the Truthiness dock panel (ADR-022), with the example loaded.

@@ -241,6 +241,29 @@ const groups = [
     </p>
   </section>
 
+  <!-- ──────────────────────── Mustache portability ──────────────────────── -->
+  <section id="mustache">
+    <h2>The Mustache story</h2>
+    <p>
+      The same machinery answers the narrower question Mustache portability turns on.
+      <a href="/minbars">MinBars</a> renders on the language-agnostic <code>mustache-spec</code>
+      rule — <code>0</code>, <code>""</code>, and <code>{}</code> are <b>truthy</b> (as Ruby/Python
+      Mustache) — but <code>mustache.js</code> follows the <code>handlebars</code> rule instead
+      (<code>0</code>/<code>""</code> falsy). So a section over <code>count: 0</code> shows the
+      filled branch under MinBars and the empty one under <code>mustache.js</code>: the classic
+      "it worked in my Mustache, not theirs" bug.
+    </p>
+    <OpenInLab client:visible analyse engine="minbars" template={ex.mustache.template} data={ex.mustache.data} />
+    <p>
+      Analyse reports it against the <code>mustache-spec</code> engine baseline, flipping
+      <code>under handlebars</code> (which the legend spells out <em>is</em> <code>mustache.js</code>).
+      The fix is different here: Mustache is <b>logic-less</b>, so there is no inline
+      <code>(ne …)</code> to write — the analyser steers you to <b>reshape the data</b> (a boolean
+      flag in the view-model, or normalising <code>0</code> to absent), which is exactly what the
+      <a href="/transform">JSONata</a> scaffold below generates.
+    </p>
+  </section>
+
   <!-- ──────────────────────── The report & fix ──────────────────────── -->
   <section id="report">
     <h2>The report &amp; the JSONata fix</h2>

@@ -90,6 +90,28 @@ export const examples = {
     pathSchema: ["count", "user.naem"],
     expectSuppressed: 2,
   },
+  // The Mustache-portability story (the same ADR-022 machinery, narrowed). MinBars
+  // renders on the language-agnostic `mustache-spec` rule (`0`/`""`/`{}` truthy), so
+  // a section over `count: 0` shows the filled branch — but `mustache.js` (the
+  // `handlebars` rule, `0`/`""` falsy) skips it. The analyser reports it against the
+  // `mustache-spec` engine baseline, flipping under `handlebars` (= mustache.js),
+  // and — because Mustache is logic-less — its fix is to reshape the data, not an
+  // inline `(ne …)` test. This is the one example whose engine is `minbars`.
+  mustache: {
+    engine: "minbars",
+    template: "{{#count}}{{count}} unread{{/count}}",
+    data: { count: 0 },
+    finds: 1,
+    expect: [
+      "Engine rule: `mustache-spec`",
+      "1 observed",
+      "the number `0`",
+      "flips under `handlebars`",
+      "mustache.js",
+      "reshape the data",
+      "data path: `count`",
+    ],
+  },
 };
 
 // "Portability at scale" gallery — realistic, multi-condition templates rather than

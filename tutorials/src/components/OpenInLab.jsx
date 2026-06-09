@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { labHref, dataText } from "../../../lab/open-in-lab.mjs";
 import { load as loadYaml } from "../../../lab/vendor/js-yaml.mjs";
 import { createRenderer } from "../../../lab/renderer.mjs";
-import { renderWith, renderRawWith, renderMaxWith, safe, lint as runLint, analyze as runAnalyze, analyzeWith as runAnalyzeWith } from "../../../lab/vendor/flatbars-engine.mjs";
+import { renderWith, renderRawWith, renderMaxWith, safe, lint as runLint, analyze as runAnalyze, analyzeWith as runAnalyzeWith, analyzeMinbars as runAnalyzeMinbars } from "../../../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../../../lab/helpers.mjs";
 import { makeI18nBag } from "../../../lab/i18n.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
@@ -233,14 +233,17 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     const safePaths = pathSchemaDemo
       ? schemaStr.split(",").map((p) => p.trim()).filter(Boolean)
       : [];
+    // MinBars renders on its own truthiness rule, so it analyses through
+    // analyzeMinbars; the PathSchema seam (analyzeWith) is FullBars-only.
+    const runAna = engine === "minbars" ? runAnalyzeMinbars : runAnalyze;
     try {
       const advisory = (r) => (r.findings || []).filter((f) => f.kind === "potential" || f.kind === "miss").length;
       const r = safePaths.length
         ? runAnalyzeWith((p) => !safePaths.includes(p), tpl, data)
-        : runAnalyze(tpl, data);
+        : runAna(tpl, data);
       let suppressed = 0;
       if (safePaths.length && r.ok) {
-        const base = runAnalyze(tpl, data);
+        const base = runAna(tpl, data);
         if (base.ok) suppressed = Math.max(0, advisory(base) - advisory(r));
       }
       setAnalyseRes(r.ok
