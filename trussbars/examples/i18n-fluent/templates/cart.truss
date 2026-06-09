@@ -1,0 +1,1 @@
+{{t "cart-title"}}: {{#if item_count > 0}}{{item_count}}{{else}}{{t "cart-empty"}}{{/if}}

@@ -1,0 +1,27 @@
+[package]
+name = "i18n-fluent-example"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace — so the Fluent dependency
+# graph never reaches the no_std-capable trussbars crates.
+[workspace]
+
+[lib]
+name = "i18n_fluent_example"
+
+[[bin]]
+name = "i18n-fluent"
+path = "src/main.rs"
+
+[dependencies]
+# The native v2 front-end + runtime.
+trussbars-macros = { path = "../../crates/trussbars-macros" }
+trussbars-core = { path = "../../crates/trussbars-core" }
+# Real localization: Fluent catalogs embedded + runtime language negotiation.
+i18n-embed = { version = "0.15", features = ["fluent-system"] }
+i18n-embed-fl = "0.9"
+rust-embed = "8"
+unic-langid = "0.9"
+once_cell = "1"

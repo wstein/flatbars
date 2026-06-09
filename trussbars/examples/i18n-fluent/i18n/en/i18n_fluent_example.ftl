@@ -1,0 +1,2 @@
+cart-title = Your cart
+cart-empty = Your cart is empty.

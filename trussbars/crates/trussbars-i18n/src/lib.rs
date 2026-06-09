@@ -30,10 +30,15 @@
 
 #![forbid(unsafe_code)]
 
-/// Translate a message `key`. With no catalog this is the **identity fallback** the
-/// reference uses (ADR-029: "returns the key unchanged when no translator is
-/// registered"). A host that wants real translation declares its own `t` over a
-/// catalog instead of re-exporting this one.
+/// **Fallback `t`** — returns the message `key` unchanged. This crate is
+/// dependency-free and so has no message catalog; echoing the key is the reference's
+/// documented fallback (ADR-029: "returns the key unchanged when no translator is
+/// registered"). It exists so a template that uses `{{t …}}` still compiles and runs.
+///
+/// **It is not translation.** For that, declare your *own* `t` over a catalog and
+/// point `#[truss_helpers(t)]` at it — see the `examples/i18n-fluent` recipe (Project
+/// Fluent via `i18n-embed`, runtime language negotiation). Re-exporting *this* `t`
+/// only echoes keys.
 #[must_use]
 pub fn t(key: &str) -> &str {
     key
@@ -325,6 +330,9 @@ mod tests {
         assert_eq!(selectPlural(&0.0, "en"), "other");
         assert_eq!(selectPlural(&2.0, "en"), "other");
         assert_eq!(selectPlural(&1.5, "en"), "other");
+        // German: same Germanic rule as English.
+        assert_eq!(selectPlural(&1.0, "de"), "one");
+        assert_eq!(selectPlural(&2.0, "de"), "other");
         // French: 0 and 1 are `one`.
         assert_eq!(selectPlural(&0.0, "fr"), "one");
         assert_eq!(selectPlural(&1.0, "fr"), "one");

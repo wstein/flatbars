@@ -92,13 +92,23 @@ typed analog: **byte-identity with the reference is the host's responsibility** 
 typed host uses theirs; the harness can't compare them. Document this clearly: the
 corpus proves the *language*, not the host's helper semantics.
 
-**Shipped:** the `trussbars-i18n` crate (a host-helper pack mirroring the interpreter's
-i18n names — `t`/`number`/`date`/`selectPlural`/`relative`) so a host links it and
-declares `#[truss_helpers(date, number, …)]` instead of writing its own. It provides
-real, dependency-free formatters and the reference *fallback* semantics (`t` =
-identity, English `selectPlural`/`relative`), but — per the boundary above —
-byte-identity to a particular locale runtime (JS `Intl`, ICU) remains the host's
-choice; a host wanting exact parity wraps its own locale library and declares that.
+**Shipped:** the `trussbars-i18n` crate — host-helper implementations of the
+interpreter's i18n names (`t`/`number`/`date`/`selectPlural`/`relative`), declared
+with `#[truss_helpers(date, number, …)]`. `date`/`number` are real, dependency-free
+formatters; **`selectPlural` is CLDR-accurate** (table-driven, per-language cardinal
+categories — en/de/fr/ru/pl/cs/ar/ja… ); `t` is an explicit **fallback** that returns
+the key (a zero-dependency crate has no catalog). Byte-identity to a particular locale
+runtime (JS `Intl`, ICU) stays the host's choice, per the boundary above.
+
+**For real message translation**, a host declares its *own* `t` over a catalog — see
+the worked recipe in **`examples/i18n-fluent/`**: Project Fluent via `i18n-embed`, a
+process-wide `FluentLanguageLoader` with runtime language negotiation (en/de/pl), wired
+into a `#[truss_helpers(t)]` `t`. It also documents the one wrinkle — the template's
+key arrives as a runtime `&str`, so `t` uses the loader's runtime `get` rather than the
+compile-time-checked `fl!` (which needs a *literal* id). Recovering that id check at
+the Trussbars **macro** layer (validating `{{t "id"}}` literals against the catalog at
+expansion time) is a tracked future extension — it is the only way to get Fluent-style
+compile-time checking inside the static-name model.
 
 ## 6. v1 stopgap (today)
 
