@@ -327,6 +327,9 @@ impl Lab {
         self.template = area_from(next.template());
         self.data = area_from(next.data_yaml());
         self.focus = Focus::Template;
+        // The new sample's Output has its own length; a stale offset from the old one
+        // would paint the pane blank until the user scrolls back up.
+        self.output_scroll = 0;
         self.rehighlight_template();
     }
 
@@ -366,20 +369,14 @@ impl Lab {
             Pane::Data => self.data.scroll((delta, 0)),
             Pane::I18n => self.i18n.scroll((delta, 0)),
             Pane::Output => {
-                let visible = usize::from(
-                    panes(area, self.sample.uses_i18n())
-                        .output
-                        .height
-                        .saturating_sub(2),
-                );
-                let max = self
-                    .render_or_reject()
-                    .lines()
-                    .count()
-                    .saturating_sub(visible);
-                let next = (i32::from(self.output_scroll) + i32::from(delta))
-                    .clamp(0, i32::try_from(max).unwrap_or(i32::MAX));
-                self.output_scroll = u16::try_from(next).unwrap_or(u16::MAX);
+                let visible = panes(area, self.sample.uses_i18n())
+                    .output
+                    .height
+                    .saturating_sub(2);
+                let lines = self.render_or_reject().lines().count();
+                let next = i32::from(self.output_scroll) + i32::from(delta);
+                let raised = u16::try_from(next.max(0)).unwrap_or(u16::MAX);
+                self.output_scroll = clamp_output_scroll(raised, lines, visible);
             }
         }
     }
@@ -389,6 +386,15 @@ impl Default for Lab {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Clamp an Output scroll offset so the last line stays in view: the upper bound is
+/// `lines − visible`. Applied at draw time too, so a render that *shrank* (an edit, a
+/// locale/mode switch) never leaves the pane scrolled past its content into blankness.
+#[must_use]
+pub fn clamp_output_scroll(scroll: u16, lines: usize, visible: u16) -> u16 {
+    let max = lines.saturating_sub(usize::from(visible));
+    scroll.min(u16::try_from(max).unwrap_or(u16::MAX))
 }
 
 /// Draw the whole lab to `frame`.
@@ -448,13 +454,14 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
         })
         .collect();
     let out_len = out.lines().count();
+    let scroll = clamp_output_scroll(lab.output_scroll, out_len, p.output.height.saturating_sub(2));
     frame.render_widget(
         Paragraph::new(out_lines)
-            .scroll((lab.output_scroll, 0))
+            .scroll((scroll, 0))
             .block(Block::bordered().title(format!(" Output · {} ", lab.mode.key()))),
         p.output,
     );
-    maybe_scrollbar(frame, p.output, out_len, lab.output_scroll);
+    maybe_scrollbar(frame, p.output, out_len, scroll);
 
     // Get cursor position from the focused pane (1-indexed for display).
     let cursor_info = match lab.focus {
@@ -521,5 +528,29 @@ fn maybe_scrollbar(frame: &mut Frame, area: Rect, content: usize, scroll: u16) {
             area,
             &mut state,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clamp_output_scroll_keeps_the_last_line_in_view() {
+        // 10 lines, 4 visible → the furthest useful offset is 6; anything beyond clamps.
+        assert_eq!(clamp_output_scroll(0, 10, 4), 0);
+        assert_eq!(clamp_output_scroll(6, 10, 4), 6);
+        assert_eq!(clamp_output_scroll(99, 10, 4), 6);
+        // Content shorter than the viewport pins to the top (the blank-pane case).
+        assert_eq!(clamp_output_scroll(50, 2, 4), 0);
+    }
+
+    #[test]
+    fn cycle_sample_resets_the_output_scroll() {
+        // Bug B: a stale offset from the previous sample must not survive the switch.
+        let mut lab = Lab::new();
+        lab.output_scroll = 50;
+        lab.cycle_sample();
+        assert_eq!(lab.output_scroll, 0);
     }
 }

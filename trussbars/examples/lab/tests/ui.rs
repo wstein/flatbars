@@ -56,6 +56,19 @@ fn template_tags_are_highlighted() {
 }
 
 #[test]
+fn stale_high_scroll_never_blanks_the_output() {
+    // Bug B regression: a scroll offset left over from a long render must not paint the
+    // (short) Output blank — ui() clamps it to the content at draw time.
+    let mut lab = Lab::from_sample(Sample::Greeting);
+    lab.output_scroll = 999;
+    let text = frame_text(&lab);
+    assert!(
+        text.contains("Hello, Ada!"),
+        "the Output must stay visible despite a stale-high scroll offset"
+    );
+}
+
+#[test]
 fn greeting_hides_the_i18n_pane() {
     // The no-i18n greeting drops the i18n pane (Output takes the full bottom row).
     let text = frame_text(&Lab::from_sample(Sample::Greeting));
