@@ -1,7 +1,6 @@
 == Beleg ==
 Hallo, Ada!
   - Keyboard: 899.00
-  - Mouse: 400.50
-  - Cable: 12.30
-Summe: 1,311.80  (3 Artikel)
-Erstellt: 09.06.2026
+Summe: 899.00  (1 Artikel)
+Erstellt: 09 Juni 2026
+Lieferung: in 3 days

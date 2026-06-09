@@ -1,36 +1,44 @@
-//! # trussbars-lab — the VM northstar
+//! # trussbars-lab — the VM northstar (Ratatui TUI)
 //!
-//! A **mini Lab** built on the dynamic VM ([`trussbars_vm`]): parse a template and
-//! re-render it against data at *runtime*, the case the AOT (`truss!`) path
-//! structurally cannot serve. It is the runtime mirror of the `blog`/`changelog`
-//! AOT examples, and it doubles as a worked **i18n integration**.
+//! A terminal **mini-Lab** on the dynamic VM ([`trussbars_vm`]): edit a template and its
+//! data live and watch it re-render — the case the AOT (`truss!`) path structurally
+//! can't serve. Built with [`ratatui`] over the crossterm backend.
 //!
-//! Two things it sets out to prove, both straight from `docs/11`:
-//!
+//! Two things it proves, straight from `docs/11`:
 //! 1. **The VM leads AOT on host helpers & i18n (§8).** The `receipt` sample calls
-//!    `{{t …}}` / `{{number …}}` / `{{plural …}}` / `{{date …}}` — host helpers
-//!    registered at runtime ([`i18n::register`]). The `greeting` sample localizes
-//!    the *opposite* way — the host bakes already-translated strings into the data —
-//!    so it needs no helpers and compiles under AOT too.
-//! 2. **`render_compat` is the AOT-parity proxy (§7).** Toggle [`Mode::Compat`] and
-//!    the receipt is *rejected* (host helpers are VM-only); the greeting renders
-//!    byte-identically. "If it renders in compat, it compiles under AOT."
+//!    `{{t …}}`/`{{number …}}`/`{{plural …}}`/`{{date …}}`/`{{relative …}}` — host
+//!    helpers registered at runtime ([`i18n::register`]); cycling the locale flips the
+//!    title, plural noun, grouped number, and localized month name.
+//! 2. **`render_compat` is the AOT-parity proxy (§7).** Toggle [`Mode::Compat`] and the
+//!    receipt is rejected (host helpers are VM-only); the plain `greeting` (localized via
+//!    its data) renders byte-identically.
 //!
-//! The render core ([`Lab::render`]) is a pure function of state, so it is
-//! golden-tested headlessly (`tests/golden.rs`); `main.rs` is only the terminal I/O.
+//! The render core ([`Lab::render`]) and the editor ([`editor::TextBuffer`]) are pure and
+//! unit/golden-tested; [`ui`] is drawn headlessly under a `TestBackend` (`tests/`). The
+//! `main.rs` event loop is the only part that touches a real terminal.
 
 #![forbid(unsafe_code)]
 
+pub mod editor;
 pub mod i18n;
+pub mod json;
 pub mod samples;
 
 use std::rc::Rc;
 
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout, Position, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Paragraph},
+};
 use trussbars_vm::{Helpers, Template};
 
+use crate::editor::TextBuffer;
 use crate::samples::Sample;
 
-/// A display locale. BCP-47 primary subtag + a human label.
+/// A display locale: BCP-47 primary subtag + a human label.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Locale {
     En,
@@ -39,11 +47,9 @@ pub enum Locale {
 }
 
 impl Locale {
-    /// Every locale, for the golden matrix and the UI cycle.
     pub const ALL: [Locale; 3] = [Locale::En, Locale::De, Locale::Fr];
 
-    /// The BCP-47 primary subtag (what `selectPlural` and the template's `locale`
-    /// data field carry).
+    /// The BCP-47 primary subtag passed to the i18n primitives.
     #[must_use]
     pub fn code(self) -> &'static str {
         match self {
@@ -53,7 +59,6 @@ impl Locale {
         }
     }
 
-    /// The human-facing name shown in the status bar.
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
@@ -63,7 +68,6 @@ impl Locale {
         }
     }
 
-    /// The next locale in the UI cycle.
     #[must_use]
     pub fn next(self) -> Locale {
         match self {
@@ -84,10 +88,8 @@ pub enum Mode {
 }
 
 impl Mode {
-    /// Every mode, for the golden matrix.
     pub const ALL: [Mode; 2] = [Mode::Render, Mode::Compat];
 
-    /// A short, stable key used in golden filenames.
     #[must_use]
     pub fn key(self) -> &'static str {
         match self {
@@ -96,16 +98,14 @@ impl Mode {
         }
     }
 
-    /// The human-facing label shown in the status bar.
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Mode::Render => "render (VM, lenient)",
-            Mode::Compat => "render_compat (AOT-parity proxy)",
+            Mode::Compat => "render_compat (AOT proxy)",
         }
     }
 
-    /// Toggle between the two modes.
     #[must_use]
     pub fn toggle(self) -> Mode {
         match self {
@@ -115,39 +115,56 @@ impl Mode {
     }
 }
 
-/// The whole lab state: which sample, locale, and render mode are selected.
+/// Which editable pane has keyboard focus.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Focus {
+    Template,
+    Data,
+}
+
+/// The whole lab state: the editable template + data, plus the selected sample,
+/// locale, mode, and focus.
+#[derive(Clone, Debug)]
 pub struct Lab {
     pub sample: Sample,
     pub locale: Locale,
     pub mode: Mode,
+    pub focus: Focus,
+    pub template: TextBuffer,
+    pub data: TextBuffer,
 }
 
 impl Lab {
-    /// The opening state: the receipt sample, English, lenient VM render.
+    /// Seed the lab from a sample (English, lenient render, template focused).
     #[must_use]
-    pub fn new() -> Self {
+    pub fn from_sample(sample: Sample) -> Self {
         Lab {
-            sample: Sample::Receipt,
+            sample,
             locale: Locale::En,
             mode: Mode::Render,
+            focus: Focus::Template,
+            template: TextBuffer::from_text(sample.template()),
+            data: TextBuffer::from_text(sample.data_json()),
         }
     }
 
-    /// Render the current sample against its data.
+    /// The opening state: the receipt sample.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::from_sample(Sample::Receipt)
+    }
+
+    /// Render the current template against the current (JSON) data.
     ///
-    /// In [`Mode::Render`] the i18n host-helper pack is registered and the template
-    /// runs through [`Template::render_with`]. In [`Mode::Compat`] no helpers are
-    /// registered and [`Template::render_compat`] runs the AOT-parity proxy — so a
-    /// host-helper template returns the AOT rejection reason (the documented
-    /// VM-leads-AOT divergence), while a plain one renders byte-identically.
+    /// Lenient mode wires the i18n host-helper pack (bound to the lab's locale); compat
+    /// mode runs the AOT-parity proxy with no helpers.
     ///
     /// # Errors
-    /// The parse-error reason, or — in compat mode — the reason AOT would reject the
-    /// template (e.g. a host helper it cannot resolve).
+    /// A JSON parse error for the data, the template parse error, or — in compat mode —
+    /// the reason AOT would reject the template (e.g. a host helper).
     pub fn render(&self) -> Result<String, String> {
-        let template = Template::parse(self.sample.template())?;
-        let data = self.sample.data(self.locale);
+        let template = Template::parse(&self.template.text())?;
+        let data = json::parse(&self.data.text())?;
         match self.mode {
             Mode::Compat => template.render_compat(&data),
             Mode::Render => {
@@ -159,12 +176,43 @@ impl Lab {
     }
 
     /// [`Lab::render`] flattened to text: the output, or a one-line rejection marker.
-    /// This is what the golden matrix pins and what the TUI shows in the output pane.
     #[must_use]
     pub fn render_or_reject(&self) -> String {
         match self.render() {
             Ok(out) => out,
-            Err(reason) => format!("⟂ AOT-rejected: {reason}\n"),
+            Err(reason) => format!("⟂ {reason}\n"),
+        }
+    }
+
+    pub fn cycle_locale(&mut self) {
+        self.locale = self.locale.next();
+    }
+
+    pub fn toggle_mode(&mut self) {
+        self.mode = self.mode.toggle();
+    }
+
+    /// Load the next sample, reseeding both editor panes (keeps locale + mode).
+    pub fn cycle_sample(&mut self) {
+        let next = self.sample.next();
+        self.sample = next;
+        self.template = TextBuffer::from_text(next.template());
+        self.data = TextBuffer::from_text(next.data_json());
+        self.focus = Focus::Template;
+    }
+
+    pub fn cycle_focus(&mut self) {
+        self.focus = match self.focus {
+            Focus::Template => Focus::Data,
+            Focus::Data => Focus::Template,
+        };
+    }
+
+    /// The buffer currently receiving edits.
+    pub fn focused_mut(&mut self) -> &mut TextBuffer {
+        match self.focus {
+            Focus::Template => &mut self.template,
+            Focus::Data => &mut self.data,
         }
     }
 }
@@ -173,4 +221,115 @@ impl Default for Lab {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Draw the whole lab to `frame`. Pure over `lab` (no I/O), so it renders identically
+/// under a real terminal or a `TestBackend`.
+pub fn ui(frame: &mut Frame, lab: &Lab) {
+    let [header, body, help] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ])
+    .areas(frame.area());
+
+    let title = Line::from(vec![
+        Span::styled(
+            "  Trussbars VM · mini-Lab ",
+            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(
+                "· {} · {} · {}",
+                lab.sample.key(),
+                lab.locale.label(),
+                lab.mode.label()
+            ),
+            Style::new().fg(Color::DarkGray),
+        ),
+    ]);
+    frame.render_widget(Paragraph::new(title), header);
+
+    let [left, right] =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(body);
+    let [tmpl_area, data_area] =
+        Layout::vertical([Constraint::Percentage(62), Constraint::Percentage(38)]).areas(left);
+
+    let tmpl_inner = render_editor(
+        frame,
+        tmpl_area,
+        "Template",
+        &lab.template,
+        lab.focus == Focus::Template,
+    );
+    let data_inner = render_editor(
+        frame,
+        data_area,
+        "Data (JSON)",
+        &lab.data,
+        lab.focus == Focus::Data,
+    );
+
+    let out = lab.render_or_reject();
+    let lines: Vec<Line> = out
+        .lines()
+        .map(|l| {
+            if let Some(rest) = l.strip_prefix("⟂ ") {
+                Line::from(Span::styled(
+                    format!("⟂ {rest}"),
+                    Style::new().fg(Color::Yellow),
+                ))
+            } else {
+                Line::from(l.to_string())
+            }
+        })
+        .collect();
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(Block::bordered().title(format!(" Output · {} ", lab.mode.key()))),
+        right,
+    );
+
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            " [Tab] focus   [F2] locale   [F3] mode   [F4] sample   [Esc] quit ",
+            Style::new().fg(Color::DarkGray),
+        ))),
+        help,
+    );
+
+    // Place the terminal cursor in the focused pane (no horizontal/vertical scroll —
+    // the seeds fit; a larger doc would clamp at the edge).
+    let (inner, buf) = match lab.focus {
+        Focus::Template => (tmpl_inner, &lab.template),
+        Focus::Data => (data_inner, &lab.data),
+    };
+    if inner.width > 0 && inner.height > 0 {
+        let (cy, cx) = buf.cursor();
+        let x = inner.x + u16::try_from(cx).unwrap_or(u16::MAX).min(inner.width - 1);
+        let y = inner.y + u16::try_from(cy).unwrap_or(u16::MAX).min(inner.height - 1);
+        frame.set_cursor_position(Position::new(x, y));
+    }
+}
+
+/// Render one editable pane and return its inner (text) area.
+fn render_editor(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    buf: &TextBuffer,
+    focused: bool,
+) -> Rect {
+    let border = if focused {
+        Style::new().fg(Color::Cyan)
+    } else {
+        Style::new().fg(Color::DarkGray)
+    };
+    let block = Block::bordered()
+        .border_style(border)
+        .title(format!(" {title} "));
+    let inner = block.inner(area);
+    let lines: Vec<Line> = buf.rows().map(Line::from).collect();
+    frame.render_widget(Paragraph::new(lines).block(block), area);
+    inner
 }

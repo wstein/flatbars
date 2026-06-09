@@ -18,6 +18,13 @@ path = "src/main.rs"
 # The dynamic runtime engine — this northstar renders templates the AOT path
 # structurally can't (host helpers, data shapes unknown at build time).
 trussbars-vm = { path = "../../crates/trussbars-vm" }
-# The blessed i18n format primitives (number / date / selectPlural). The lab is the
-# *host*: it owns the message catalog for `t` and wires `&[Value]` shims (src/i18n.rs).
+# The blessed i18n format primitives (number / date / selectPlural / relative). The
+# lab is the *host*: it owns the message catalog for `t` and wires `&[Value]` shims.
 trussbars-i18n = { path = "../../crates/trussbars-i18n" }
+# The TUI: ratatui for layout/widgets over the crossterm terminal backend. crossterm
+# is sourced through `ratatui::crossterm` in code (one version, no skew); pinned here
+# explicitly to ratatui's so the dep is visible and the lock can't drift.
+ratatui = "0.30"
+crossterm = "0.29"
+# The Data pane is edited as live JSON, decoded into the VM's dynamic `Value`.
+serde_json = "1"

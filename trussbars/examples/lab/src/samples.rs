@@ -1,19 +1,12 @@
-//! The two demo samples and their runtime data.
+//! The two starting samples: each seeds the editable Template and Data (JSON) panes.
 //!
-//! `Receipt` exercises the i18n **host helpers** (`t`/`number`/`plural`/`date`) — it is
-//! VM-only (AOT rejects host helpers). `Greeting` localizes the other way: the host bakes
-//! already-translated strings into the data, so it needs no helpers and compiles under AOT
-//! — the contrast `render_compat` makes visible.
+//! `Receipt` exercises the i18n **host helpers** (`t`/`number`/`plural`/`date`/`relative`)
+//! — VM-only (AOT rejects host helpers), and it localizes live as the lab's locale
+//! changes. `Greeting` localizes the other way — the (editable) data already holds the
+//! translated strings — so it needs no helpers and renders identically under the
+//! AOT-compat proxy. Both are just seeds: everything is editable at runtime.
 
-use std::collections::BTreeMap;
-use std::rc::Rc;
-
-use trussbars_vm::Value;
-
-use crate::Locale;
-use crate::i18n::catalog_lookup;
-
-/// Which demo template is loaded.
+/// Which starting sample is loaded.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Sample {
     Receipt,
@@ -51,7 +44,7 @@ impl Sample {
         }
     }
 
-    /// The template source.
+    /// The seed template source.
     #[must_use]
     pub fn template(self) -> &'static str {
         match self {
@@ -60,80 +53,48 @@ impl Sample {
         }
     }
 
-    /// The runtime data for this sample at `locale`.
+    /// The seed data, as JSON text (edited live in the Data pane).
     #[must_use]
-    pub fn data(self, locale: Locale) -> Value {
+    pub fn data_json(self) -> &'static str {
         match self {
-            Sample::Receipt => receipt_data(locale),
-            Sample::Greeting => greeting_data(locale),
+            Sample::Receipt => RECEIPT_DATA,
+            Sample::Greeting => GREETING_DATA,
         }
     }
 }
 
-// Host helpers throughout (`t`/`number`/`plural`/`date`) — VM-only by construction.
+// Host helpers throughout — VM-only. `%B` shows the localized month name (Phase 1);
+// `plural`/`date` take the language from the lab's locale, not the data. `count` is 1
+// by default so the singular shows — bump it (or add items) to watch the plural switch.
 const RECEIPT_TMPL: &str = r#"== {{t "title"}} ==
 {{t "hello"}}, {{customer}}!
 {{#each items}}  - {{name}}: {{number price 2}}
-{{/each}}{{t "total"}}: {{number total 2}}  ({{count}} {{plural count "item" locale}})
-{{t "placed"}}: {{date placed dateFmt}}
+{{/each}}{{t "total"}}: {{number total 2}}  ({{count}} {{plural count "item"}})
+{{t "placed"}}: {{date placed "%d %B %Y"}}
+{{t "eta"}}: {{relative eta "day"}}
 "#;
 
-// Plain interpolation — the host pre-localized `greeting`/`note` into the data, so the
-// template carries no helpers and renders identically under the AOT-compat proxy.
+const RECEIPT_DATA: &str = r#"{
+  "customer": "Ada",
+  "count": 1,
+  "total": 899,
+  "placed": "2026-06-09",
+  "eta": 3,
+  "items": [
+    { "name": "Keyboard", "price": 899 }
+  ]
+}
+"#;
+
+// Plain interpolation — the data already holds the localized strings, so the template
+// carries no helpers and renders identically under the AOT-compat proxy.
 const GREETING_TMPL: &str = r#"{{greeting}}, {{customer}}!
 {{note}}
 "#;
 
-fn receipt_data(locale: Locale) -> Value {
-    obj([
-        ("customer", vstr("Ada")),
-        ("count", Value::Num(3.0)),
-        ("total", Value::Num(1311.80)),
-        ("placed", vstr("2026-06-09")),
-        ("locale", vstr(locale.code())),
-        ("dateFmt", vstr(date_fmt(locale))),
-        (
-            "items",
-            Value::Array(Rc::from(vec![
-                item("Keyboard", 899.0),
-                item("Mouse", 400.5),
-                item("Cable", 12.3),
-            ])),
-        ),
-    ])
+const GREETING_DATA: &str = r#"{
+  "customer": "Ada",
+  "greeting": "Hello",
+  "note": "Thanks for your order."
 }
-
-fn greeting_data(locale: Locale) -> Value {
-    obj([
-        ("customer", vstr("Ada")),
-        ("greeting", vstr(&loc(locale, "hello"))),
-        ("note", vstr(&loc(locale, "note"))),
-    ])
-}
-
-/// A locale-appropriate `strftime` pattern (the crate's `%b` month names are English,
-/// so `de`/`fr` use numeric patterns).
-fn date_fmt(locale: Locale) -> &'static str {
-    match locale {
-        Locale::En => "%b %d, %Y",
-        Locale::De => "%d.%m.%Y",
-        Locale::Fr => "%d/%m/%Y",
-    }
-}
-
-fn loc(locale: Locale, key: &str) -> String {
-    catalog_lookup(locale, key).unwrap_or_else(|| key.to_string())
-}
-
-fn item(name: &str, price: f64) -> Value {
-    obj([("name", vstr(name)), ("price", Value::Num(price))])
-}
-
-fn vstr(s: &str) -> Value {
-    Value::Str(Rc::from(s))
-}
-
-fn obj<const N: usize>(pairs: [(&str, Value); N]) -> Value {
-    let map: BTreeMap<String, Value> = pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
-    Value::Object(Rc::new(map))
-}
+"#;

@@ -18,10 +18,13 @@ use trussbars_vm::{Helpers, Value};
 
 use crate::Locale;
 
-/// Register the i18n host-helper pack on `helpers`, bound to `locale`:
-/// `t` (catalog lookup, identity fallback), `number`, `plural` (selectPlural + catalog),
-/// `selectPlural` (raw CLDR category), `date`, and `relative`.
+/// Register the i18n host-helper pack on `helpers`, bound to `locale`. The lab's
+/// selected locale (not a data field) is the language: each shim captures it, so
+/// cycling the locale and re-registering re-renders in the new language. Registers
+/// `t`, `number`, `plural`, `selectPlural`, `date`, and `relative`.
 pub fn register(helpers: &mut Helpers, locale: Locale) {
+    let lang = locale.code(); // &'static str, captured by the shims below
+
     // `t key` — host-owned catalog lookup; the `trussbars_i18n::t` identity fallback
     // (key echoed) covers a miss, exactly as the reference seam documents.
     helpers.register("t", move |args| {
@@ -38,12 +41,11 @@ pub fn register(helpers: &mut Helpers, locale: Locale) {
         Ok(vstr(trussbars_i18n::number(&value, &decimals)))
     });
 
-    // `plural count noun lang` — compose the CLDR category with the catalog:
-    // `{{plural count "item" locale}}` → `item.<category>` → localized noun.
+    // `plural count noun` — compose the CLDR category (in the lab's language) with the
+    // catalog: `{{plural count "item"}}` → `item.<category>` → localized noun.
     helpers.register("plural", move |args| {
         let count = num_arg(args, 0, "plural")?;
         let noun = str_arg(args, 1, "plural")?;
-        let lang = str_arg(args, 2, "plural")?;
         let category = trussbars_i18n::selectPlural(&count, lang);
         let key = format!("{noun}.{category}");
         Ok(vstr(
@@ -51,19 +53,17 @@ pub fn register(helpers: &mut Helpers, locale: Locale) {
         ))
     });
 
-    // `selectPlural count lang` — the raw CLDR cardinal category, for templates that
-    // want to drive their own selection.
-    helpers.register("selectPlural", |args| {
+    // `selectPlural count` — the raw CLDR cardinal category (lab's language).
+    helpers.register("selectPlural", move |args| {
         let count = num_arg(args, 0, "selectPlural")?;
-        let lang = str_arg(args, 1, "selectPlural")?;
         Ok(vstr(trussbars_i18n::selectPlural(&count, lang).to_string()))
     });
 
-    // `date iso pattern` — strftime-style formatting of an ISO-8601 string.
-    helpers.register("date", |args| {
+    // `date iso pattern` — strftime formatting; `%B`/`%b` localize to the lab's language.
+    helpers.register("date", move |args| {
         let value = str_arg(args, 0, "date")?;
         let pattern = str_arg(args, 1, "date")?;
-        Ok(vstr(trussbars_i18n::date(value, pattern)))
+        Ok(vstr(trussbars_i18n::date(value, pattern, lang)))
     });
 
     // `relative value unit` — "in 3 days" / "2 hours ago" (English phrasing fallback).
@@ -91,6 +91,7 @@ fn catalog(locale: Locale) -> &'static [(&'static str, &'static str)] {
             ("hello", "Hello"),
             ("total", "Total"),
             ("placed", "Placed"),
+            ("eta", "ETA"),
             ("item.one", "item"),
             ("item.other", "items"),
             ("note", "Thanks for your order."),
@@ -100,6 +101,7 @@ fn catalog(locale: Locale) -> &'static [(&'static str, &'static str)] {
             ("hello", "Hallo"),
             ("total", "Summe"),
             ("placed", "Erstellt"),
+            ("eta", "Lieferung"),
             ("item.one", "Artikel"),
             ("item.other", "Artikel"),
             ("note", "Danke für Ihre Bestellung."),
@@ -109,6 +111,7 @@ fn catalog(locale: Locale) -> &'static [(&'static str, &'static str)] {
             ("hello", "Bonjour"),
             ("total", "Total"),
             ("placed", "Établi"),
+            ("eta", "Livraison"),
             ("item.one", "article"),
             ("item.other", "articles"),
             ("note", "Merci pour votre commande."),
