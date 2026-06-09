@@ -60,7 +60,7 @@ fn print_node(n: &Node, notes: &Notes, out: &mut String) {
         Node::Output { span, expr, raw } => {
             emit_notes(*span, notes, out);
             out.push_str(if *raw { "{{{" } else { "{{" });
-            print_expr(expr, out);
+            print_top_expr(expr, out);
             out.push_str(if *raw { "}}}" } else { "}}" });
         }
         Node::Each(e) => print_each(e, notes, out),
@@ -258,6 +258,35 @@ fn print_expr(e: &Expr, out: &mut String) {
     }
 }
 
+/// Print a top-level expression (a tag's whole content): a bare helper application
+/// `helper a b` needs no surrounding parens here, unlike when nested as an operand.
+fn print_top_expr(e: &Expr, out: &mut String) {
+    match e {
+        Expr::App(name, args)
+            if !args.is_empty()
+                && infix_op(name).is_none()
+                && !matches!(
+                    name.as_str(),
+                    "lookup"
+                        | "this"
+                        | "root"
+                        | "loop"
+                        | "@parentchain"
+                        | "ternary"
+                        | "not"
+                        | "range"
+                ) =>
+        {
+            out.push_str(name);
+            for a in args {
+                out.push(' ');
+                print_expr(a, out);
+            }
+        }
+        _ => print_expr(e, out),
+    }
+}
+
 fn print_lit(v: &Value, out: &mut String) {
     match v {
         Value::Str(s) => {
@@ -301,6 +330,12 @@ fn print_app(name: &str, args: &[Expr], out: &mut String) {
         ("not", [a]) => {
             out.push('!');
             print_operand(a, out);
+        }
+        // The range operator is idiomatically unspaced (`1..5`).
+        ("range", [a, b]) => {
+            print_operand(a, out);
+            out.push_str("..");
+            print_operand(b, out);
         }
         (n, [a, b]) if infix_op(n).is_some() => {
             print_operand(a, out);

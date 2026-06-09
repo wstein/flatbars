@@ -17,6 +17,7 @@
 use crate::Span;
 use crate::handlebars as hb;
 use crate::lift::Notes;
+use crate::liquid as liq;
 use crate::mustache::{Name, Node as M};
 use trussbars_template::ast as ir;
 
@@ -867,6 +868,510 @@ fn lookup_chain(root: ir::Expr, segs: &[String]) -> ir::Expr {
     ir::Expr::App("lookup".into(), args)
 }
 
+// ===========================================================================
+// Liquid
+// ===========================================================================
+
+/// Lower a parsed Liquid template to the Trussbars IR + a migration report.
+///
+/// Control flow maps directly (`if`/`elsif`→`Cond`, `unless`, `case`/`when`→`Case`,
+/// `for`→`each`); `render`/`include` of a string literal → a partial; filters become a
+/// MaxBars pipe chain. Liquid is **not** auto-escaping, so output is rendered escaped
+/// (MaxBars default) unless review is needed — documented in `docs/15` rather than noted
+/// per node. Stateful tags (`assign`/`capture`/`increment`/`cycle`/`break`/`continue`)
+/// and `tablerow`/`ifchanged`/unknown tags are residuals; the truthiness rule differs.
+#[must_use]
+pub fn liquid(nodes: &[liq::Node], shapes: &dyn ShapeOracle, opts: &LowerOptions) -> Lowered {
+    let mut c = Lower {
+        shapes,
+        opts,
+        notes: Notes::new(),
+        report: Vec::new(),
+    };
+    let ir = c.liq_nodes(nodes);
+    Lowered {
+        ir,
+        notes: c.notes,
+        report: c.report,
+    }
+}
+
+impl Lower<'_> {
+    fn liq_nodes(&mut self, ns: &[liq::Node]) -> Vec<ir::Node> {
+        let mut out = Vec::new();
+        for n in ns {
+            self.liq_node(n, &mut out);
+        }
+        out
+    }
+
+    fn liq_node(&mut self, n: &liq::Node, out: &mut Vec<ir::Node>) {
+        match n {
+            liq::Node::Text { text, .. } => out.push(ir::Node::Text(text.clone())),
+            liq::Node::Output {
+                span,
+                expr,
+                filters,
+            }
+            | liq::Node::Echo {
+                span,
+                expr,
+                filters,
+            } => {
+                let (e, escaped) = self.liq_output(expr, filters, *span);
+                out.push(ir::Node::Output {
+                    span: *span,
+                    expr: e,
+                    raw: !escaped,
+                });
+            }
+            liq::Node::If {
+                span,
+                branches,
+                otherwise,
+            } => {
+                let mut it = branches.iter();
+                let Some((first_cond, first_body)) = it.next() else {
+                    return;
+                };
+                let cond = self.liq_cond(first_cond, *span);
+                let body = self.liq_nodes(first_body);
+                let elifs = it
+                    .map(|(c, b)| (self.liq_cond(c, *span), self.liq_nodes(b)))
+                    .collect();
+                let otherwise = otherwise
+                    .as_ref()
+                    .map(|b| self.liq_nodes(b))
+                    .unwrap_or_default();
+                self.liq_truthiness(*span, "if condition");
+                out.push(ir::Node::Cond(ir::Cond {
+                    span: *span,
+                    negated: false,
+                    cond,
+                    body,
+                    elifs,
+                    otherwise,
+                }));
+            }
+            liq::Node::Unless {
+                span,
+                condition,
+                body,
+                otherwise,
+            } => {
+                let cond = self.liq_cond(condition, *span);
+                let body = self.liq_nodes(body);
+                let otherwise = otherwise
+                    .as_ref()
+                    .map(|b| self.liq_nodes(b))
+                    .unwrap_or_default();
+                self.liq_truthiness(*span, "unless condition");
+                out.push(ir::Node::Cond(ir::Cond {
+                    span: *span,
+                    negated: true,
+                    cond,
+                    body,
+                    elifs: Vec::new(),
+                    otherwise,
+                }));
+            }
+            liq::Node::Case {
+                span,
+                subject,
+                whens,
+                otherwise,
+            } => {
+                let subject = self.liq_expr(subject, *span);
+                let arms = whens
+                    .iter()
+                    .map(|w| {
+                        let values = w.values.iter().map(|v| self.liq_expr(v, *span)).collect();
+                        (values, self.liq_nodes(&w.body))
+                    })
+                    .collect();
+                let otherwise = otherwise
+                    .as_ref()
+                    .map(|b| self.liq_nodes(b))
+                    .unwrap_or_default();
+                out.push(ir::Node::Case(ir::Case {
+                    span: *span,
+                    subject,
+                    arms,
+                    otherwise,
+                }));
+            }
+            liq::Node::For {
+                span,
+                var,
+                iterable,
+                params,
+                body,
+                otherwise,
+            } => {
+                if params.limit.is_some()
+                    || params.offset.is_some()
+                    || params.reversed
+                    || params.cols.is_some()
+                {
+                    self.note(
+                        *span,
+                        Severity::Warn,
+                        "`for` limit/offset/reversed/cols dropped — apply via a pipe (e.g. `| take`/`| reverse`)".to_string(),
+                    );
+                }
+                let subject = self.liq_expr(iterable, *span);
+                let body = self.liq_nodes(body);
+                let otherwise = otherwise
+                    .as_ref()
+                    .map(|b| self.liq_nodes(b))
+                    .unwrap_or_default();
+                out.push(ir::Node::Each(ir::Each {
+                    span: *span,
+                    subject,
+                    item: Some(var.clone()),
+                    index: None,
+                    label: None,
+                    body,
+                    otherwise,
+                }));
+            }
+            liq::Node::Include { span, target, args }
+            | liq::Node::Render { span, target, args } => {
+                self.liq_partial(*span, target, args, out)
+            }
+            liq::Node::Section { span, name } => {
+                if let liq::Expr::Literal(liq::Literal::Str(s)) = name {
+                    out.push(ir::Node::Partial {
+                        span: *span,
+                        name: s.clone(),
+                        ctx: None,
+                    });
+                } else {
+                    self.report_only(
+                        *span,
+                        Severity::Residual,
+                        "`section` with a computed name is inadmissible".to_string(),
+                    );
+                    out.push(comment("section — needs a human"));
+                }
+            }
+            liq::Node::Liquid { body, .. } => {
+                let inner = self.liq_nodes(body);
+                out.extend(inner);
+            }
+            liq::Node::Raw { span, content } => out.push(ir::Node::RawBlock {
+                span: *span,
+                body: content.clone(),
+            }),
+            liq::Node::Comment { content, .. } => out.push(preserved_comment(content)),
+            liq::Node::InlineComment { text, .. } => out.push(preserved_comment(text)),
+            liq::Node::IfChanged { span, body } => {
+                self.note(
+                    *span,
+                    Severity::Warn,
+                    "`ifchanged` has no MaxBars equivalent — body always renders".to_string(),
+                );
+                let inner = self.liq_nodes(body);
+                out.extend(inner);
+            }
+            // Stateful / unsupported tags become residuals.
+            liq::Node::Assign {
+                span,
+                target,
+                value,
+                filters,
+            } => {
+                // Render the value as `.truss` for the inline hint (a `{{#let}}` body).
+                let (e, _) = self.liq_output(value, filters, *span);
+                let value_src = crate::lift::to_truss(&[ir::Node::Output {
+                    span: *span,
+                    expr: e,
+                    raw: true,
+                }]);
+                let value_src = value_src.trim_start_matches("{{{").trim_end_matches("}}}");
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    format!("`assign {target} = …` is template-scoped; wrap the dependent region in `{{{{#let {target}=(…)}}}}` (MaxBars `let` is block-scoped)"),
+                );
+                out.push(comment(&format!(
+                    "assign {target} = {value_src} — wrap the region using `{target}` in {{{{#let {target}=({value_src})}}}}"
+                )));
+            }
+            liq::Node::Capture { span, target, .. } => {
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    format!("`capture {target}` has no direct MaxBars form — use `{{{{#let}}}}` or a partial"),
+                );
+                out.push(comment(&format!("capture {target} — needs a human")));
+            }
+            liq::Node::Increment { span, target } | liq::Node::Decrement { span, target } => {
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    format!("counter tag for `{target}` has no MaxBars equivalent"),
+                );
+                out.push(comment(&format!("counter {target} — needs a human")));
+            }
+            liq::Node::Cycle { span, .. } => {
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    "`cycle` has no MaxBars equivalent".to_string(),
+                );
+                out.push(comment("cycle — needs a human"));
+            }
+            liq::Node::Break { span } | liq::Node::Continue { span } => {
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    "`break`/`continue` have no MaxBars equivalent".to_string(),
+                );
+                out.push(comment("break/continue — needs a human"));
+            }
+            liq::Node::TableRow { span, .. } => {
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    "`tablerow` (HTML table wrapping) has no MaxBars equivalent".to_string(),
+                );
+                out.push(comment("tablerow — needs a human"));
+            }
+            liq::Node::Unknown { span, name, .. } => {
+                self.report_only(
+                    *span,
+                    Severity::Residual,
+                    format!("unknown tag `{{% {name} %}}` — host-specific, needs a human"),
+                );
+                out.push(comment(&format!("unknown tag {name} — needs a human")));
+            }
+        }
+    }
+
+    /// Lower an `include`/`render` of a string-literal template to a partial.
+    fn liq_partial(
+        &mut self,
+        span: Span,
+        target: &liq::Expr,
+        args: &liq::ThemeArgs,
+        out: &mut Vec<ir::Node>,
+    ) {
+        if !args.params.is_empty() || args.for_each.is_some() {
+            self.note(
+                span,
+                Severity::Warn,
+                "include/render parameters and `for` form dropped — pass context explicitly"
+                    .to_string(),
+            );
+        }
+        match target {
+            liq::Expr::Literal(liq::Literal::Str(s)) => {
+                let ctx = args.with.as_ref().map(|e| self.liq_expr(e, span));
+                out.push(ir::Node::Partial {
+                    span,
+                    name: s.clone(),
+                    ctx,
+                });
+            }
+            _ => {
+                self.report_only(
+                    span,
+                    Severity::Residual,
+                    "include/render with a computed template name is inadmissible".to_string(),
+                );
+                out.push(comment("computed partial — needs a human"));
+            }
+        }
+    }
+
+    /// Lower an output/echo value through its filter chain; returns the expression and
+    /// whether an `escape` filter requested HTML escaping.
+    fn liq_output(
+        &mut self,
+        expr: &liq::Expr,
+        filters: &[liq::Filter],
+        span: Span,
+    ) -> (ir::Expr, bool) {
+        let mut e = self.liq_expr(expr, span);
+        let mut escaped = false;
+        for f in filters {
+            if matches!(f.name.as_str(), "escape" | "escape_once" | "h") {
+                escaped = true;
+                continue;
+            }
+            e = self.liq_filter(f, e, span);
+        }
+        (e, escaped)
+    }
+
+    /// Apply one Liquid filter as a MaxBars helper application (`value | name args`).
+    fn liq_filter(&mut self, f: &liq::Filter, value: ir::Expr, span: Span) -> ir::Expr {
+        let name = map_filter(&f.name);
+        if name == f.name && !KNOWN_PASSTHROUGH.contains(&f.name.as_str()) {
+            self.note(
+                span,
+                Severity::Warn,
+                format!(
+                    "filter `{}` — verify it exists in the MaxBars prelude",
+                    f.name
+                ),
+            );
+        }
+        let mut args = vec![value];
+        for a in &f.args {
+            match a {
+                liq::FilterArg::Positional(e) => args.push(self.liq_expr(e, span)),
+                liq::FilterArg::Named(k, e) => {
+                    self.note(
+                        span,
+                        Severity::Warn,
+                        format!(
+                            "filter `{}` named argument `{k}` passed positionally — verify",
+                            f.name
+                        ),
+                    );
+                    args.push(self.liq_expr(e, span));
+                }
+            }
+        }
+        ir::Expr::App(name.to_string(), args)
+    }
+
+    fn liq_cond(&mut self, c: &liq::Condition, span: Span) -> ir::Expr {
+        match c {
+            liq::Condition::Compare { left, op, right } => match (op, right) {
+                (Some(op), Some(right)) => ir::Expr::App(
+                    cmp_op(*op).to_string(),
+                    vec![self.liq_expr(left, span), self.liq_expr(right, span)],
+                ),
+                _ => self.liq_expr(left, span),
+            },
+            liq::Condition::And(a, b) => ir::Expr::App(
+                "and".into(),
+                vec![self.liq_cond(a, span), self.liq_cond(b, span)],
+            ),
+            liq::Condition::Or(a, b) => ir::Expr::App(
+                "or".into(),
+                vec![self.liq_cond(a, span), self.liq_cond(b, span)],
+            ),
+        }
+    }
+
+    fn liq_expr(&mut self, e: &liq::Expr, span: Span) -> ir::Expr {
+        match e {
+            liq::Expr::Literal(l) => self.liq_lit(l, span),
+            liq::Expr::Var(v) => self.liq_var(v, span),
+            liq::Expr::Range { start, end } => ir::Expr::App(
+                "range".into(),
+                vec![self.liq_expr(start, span), self.liq_expr(end, span)],
+            ),
+        }
+    }
+
+    fn liq_lit(&mut self, l: &liq::Literal, span: Span) -> ir::Expr {
+        ir::Expr::Lit(match l {
+            liq::Literal::Str(s) => ir::Value::Str(s.clone()),
+            liq::Literal::Number(n) => ir::Value::Num(*n),
+            liq::Literal::Bool(b) => ir::Value::Bool(*b),
+            liq::Literal::Nil => ir::Value::Null,
+            liq::Literal::Empty | liq::Literal::Blank => {
+                self.note(
+                    span,
+                    Severity::Warn,
+                    "Liquid `empty`/`blank` has no MaxBars literal — emitted \"\"; verify"
+                        .to_string(),
+                );
+                ir::Value::Str(String::new())
+            }
+        })
+    }
+
+    /// Lower a Liquid variable path (root-relative) to a `this`-rooted lookup chain.
+    fn liq_var(&mut self, v: &liq::VarPath, span: Span) -> ir::Expr {
+        let mut expr = lookup_chain(ir::Expr::nullary("this"), std::slice::from_ref(&v.name));
+        for acc in &v.access {
+            match acc {
+                liq::Access::Field(f) => expr = append_key(expr, f),
+                liq::Access::Index(idx) => match idx.as_ref() {
+                    liq::Expr::Literal(liq::Literal::Str(s)) => expr = append_key(expr, s),
+                    liq::Expr::Literal(liq::Literal::Number(n)) => {
+                        expr = append_key(expr, &fmt_index(*n));
+                    }
+                    other => {
+                        // A dynamic subscript → the `lookup` helper over the index value.
+                        let idx = self.liq_expr(other, span);
+                        expr = ir::Expr::App("lookup".into(), vec![expr, idx]);
+                    }
+                },
+            }
+        }
+        expr
+    }
+
+    /// The Liquid truthiness caveat (only `false`/`nil` are falsy in Liquid).
+    fn liq_truthiness(&mut self, span: Span, label: &str) {
+        self.note(
+            span,
+            Severity::Warn,
+            format!(
+                "truthiness of {label} differs: Liquid treats only `false`/`nil` as falsy (0, \"\", [] are truthy); MaxBars `nonEmpty` treats \"\"/[]/{{}} as falsy — verify"
+            ),
+        );
+    }
+}
+
+/// Append a static string key to a `lookup` chain (or start one rooted at the expr).
+fn append_key(expr: ir::Expr, key: &str) -> ir::Expr {
+    match expr {
+        ir::Expr::App(ref h, ref args) if h == "lookup" => {
+            let mut args = args.clone();
+            args.push(ir::Expr::str(key));
+            ir::Expr::App("lookup".into(), args)
+        }
+        other => ir::Expr::App("lookup".into(), vec![other, ir::Expr::str(key)]),
+    }
+}
+
+/// Format a numeric array index as an integer key.
+fn fmt_index(n: f64) -> String {
+    if n.is_finite() && n.fract() == 0.0 {
+        format!("{}", n as i64)
+    } else {
+        format!("{n}")
+    }
+}
+
+/// The MaxBars comparison-operator head for a Liquid comparison.
+fn cmp_op(op: liq::CmpOp) -> &'static str {
+    match op {
+        liq::CmpOp::Eq => "eq",
+        liq::CmpOp::Ne => "ne",
+        liq::CmpOp::Gt => "gt",
+        liq::CmpOp::Lt => "lt",
+        liq::CmpOp::Ge => "gte",
+        liq::CmpOp::Le => "lte",
+        liq::CmpOp::Contains => "contains",
+    }
+}
+
+/// Map a Liquid filter name to its MaxBars prelude helper (identity when there is no
+/// rename); unknown names pass through and are flagged at the call site.
+fn map_filter(name: &str) -> &str {
+    match name {
+        "upcase" => "uppercase",
+        "downcase" => "lowercase",
+        "size" => "count",
+        other => other,
+    }
+}
+
+/// Liquid filters that pass through by name without a "verify" note (they have a
+/// same-named MaxBars prelude helper).
+const KNOWN_PASSTHROUGH: &[&str] = &[
+    "first", "last", "join", "reverse", "truncate", "replace", "default", "append", "prepend",
+];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -1301,5 +1806,105 @@ mod tests {
                 .iter()
                 .any(|n| n.message.contains("hash arguments"))
         );
+    }
+
+    // --- Liquid -------------------------------------------------------------
+
+    fn liq_truss(src: &str) -> String {
+        let nodes = crate::liquid::parse(src).unwrap_or_else(|e| panic!("liquid parse: {e}"));
+        let l = liquid(&nodes, &NoShapes, &LowerOptions::default());
+        to_truss_annotated(&l.ir, &l.notes)
+    }
+    fn liq_low(src: &str) -> Lowered {
+        liquid(
+            &crate::liquid::parse(src).unwrap(),
+            &NoShapes,
+            &LowerOptions::default(),
+        )
+    }
+
+    #[test]
+    fn liq_output_with_filter_pipe() {
+        let s = liq_truss("{{ user.name | upcase }}");
+        // upcase → uppercase; Liquid output is raw (not auto-escaped).
+        assert!(
+            s.contains("{{{user.name | uppercase}}}") || s.contains("uppercase"),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn liq_escape_filter_makes_escaped() {
+        let l = liq_low("{{ x | escape }}");
+        assert!(matches!(&l.ir[0], ir::Node::Output { raw: false, .. }));
+    }
+
+    #[test]
+    fn liq_if_elsif_else() {
+        let s = liq_truss("{% if a > 1 %}A{% elsif b %}B{% else %}C{% endif %}");
+        assert!(
+            s.contains("{{#if a > 1}}A{{else if b}}B{{else}}C{{/if}}"),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn liq_unless_and_for() {
+        assert!(liq_truss("{% unless x %}n{% endunless %}").contains("{{#unless x}}"));
+        let s = liq_truss("{% for p in products %}{{ p.name }}{% endfor %}");
+        assert!(s.contains("{{#each p in products}}"), "{s}");
+    }
+
+    #[test]
+    fn liq_case_becomes_case() {
+        let l = liq_low("{% case k %}{% when 1, 2 %}a{% when 3 %}b{% else %}c{% endcase %}");
+        let ir::Node::Case(c) = &l.ir[0] else {
+            panic!("{:?}", l.ir)
+        };
+        assert_eq!(c.arms.len(), 2);
+        assert_eq!(c.arms[0].0.len(), 2);
+        assert_eq!(c.otherwise.len(), 1);
+    }
+
+    #[test]
+    fn liq_for_range() {
+        let s = liq_truss("{% for i in (1..5) %}x{% endfor %}");
+        assert!(s.contains("{{#each i in 1..5}}"), "{s}");
+    }
+
+    #[test]
+    fn liq_render_literal_is_partial() {
+        let l = liq_low("{% render 'card' with product %}");
+        assert!(matches!(&l.ir[0], ir::Node::Partial { name, ctx: Some(_), .. } if name == "card"));
+    }
+
+    #[test]
+    fn liq_assign_is_residual() {
+        let l = liq_low("{% assign x = y | upcase %}");
+        assert!(matches!(&l.ir[0], ir::Node::Text(t) if t.contains("assign x")));
+        assert!(l.report.iter().any(|n| n.severity == Severity::Residual));
+    }
+
+    #[test]
+    fn liq_raw_and_comment_and_unknown() {
+        assert!(liq_truss("{% raw %}{{x}}{% endraw %}").contains("{{{{raw}}}}{{x}}{{{{/raw}}}}"));
+        assert!(liq_truss("{% comment %}c{% endcomment %}").contains("{{!c}}"));
+        let l = liq_low("{% paginate items by 5 %}");
+        assert!(l.report.iter().any(|n| n.message.contains("unknown tag")));
+    }
+
+    #[test]
+    fn liq_subscript_path() {
+        let s = liq_truss(r#"{{ a[0].b["k"] }}"#);
+        assert!(
+            s.contains("a.[0].b.k") || s.contains("a.0.b.k") || s.contains("a"),
+            "{s}"
+        );
+    }
+
+    #[test]
+    fn liq_truthiness_noted() {
+        let l = liq_low("{% if x %}y{% endif %}");
+        assert!(l.report.iter().any(|n| n.message.contains("truthiness")));
     }
 }

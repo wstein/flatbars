@@ -160,12 +160,26 @@ binary, `docs/09`); **hash arguments** and `../` **parent paths** (removed in Ma
 ADR-021 — mapped best-effort to `@parentchain`) need review; **dynamic partials** and
 **decorators** are residuals.
 
+### Liquid
+
+`lower::liquid` maps control flow directly — `if`/`elsif`/`else` → `Cond`, `unless`,
+`case`/`when` → `{{#case}}`, `for` → `{{#each}}` — and `render`/`include`/`section` of a
+**string-literal** template → a partial (computed names are residuals). Output filters
+become a MaxBars helper chain (`upcase` → `uppercase`, `size` → `count`; unknown filters
+pass through and are flagged). Two semantic deltas: Liquid is **not auto-escaping**, so
+output is emitted *raw* (`{{{ }}}`) unless an `escape` filter is present (which is
+consumed) — preserving behaviour; and the **truthiness rule** differs (Liquid: only
+`false`/`nil` falsy). Stateful tags are residuals: `assign` (template-scoped — the report
+shows the `{{#let}}` to wrap the dependent region), `capture`, `increment`/`decrement`,
+`cycle`, `break`/`continue`, `tablerow`, and unknown tags; `for` `limit`/`offset`/
+`reversed` are noted for conversion to a pipe.
+
 ## 7. Out of scope (the next deliverables)
 
-- **The Liquid / StringTemplate4 lowerings** — the parsers exist; their IR lowerings (and
-  their own idiom catalogues) are the next slices. The idiom linter shares this rewrite
-  engine (`docs/13 §6`); conformance-test the Rust output against the PureScript
-  `packages/linter` reference *while it still exists* (`docs/13`).
+- **The StringTemplate4 lowering** — the parser exists; its IR lowering is the next slice.
+  The idiom linter shares this rewrite engine (`docs/13 §6`); conformance-test the Rust
+  output against the PureScript `packages/linter` reference *while it still exists*
+  (`docs/13`).
 - **The differential gate** — render the migrated `.truss` and the original through both
   engines and assert equivalence *modulo a semantic-delta ledger* (truthiness, escaping,
   missing-key). Needs the real foreign engines as oracles.
