@@ -58,8 +58,10 @@ fn from_json(j: &Json) -> Value {
         Json::Number(n) => Value::Num(n.as_f64().unwrap_or(0.0)),
         Json::String(s) => Value::Str(Rc::from(s.as_str())),
         Json::Array(a) => Value::Array(a.iter().map(from_json).collect::<Vec<_>>().into()),
-        Json::Object(o) => {
-            Value::Object(Rc::new(o.iter().map(|(k, v)| (k.clone(), from_json(v))).collect::<BTreeMap<_, _>>()))
-        }
+        Json::Object(o) => Value::Object(Rc::new(
+            o.iter()
+                .map(|(k, v)| (k.clone(), from_json(v)))
+                .collect::<BTreeMap<_, _>>(),
+        )),
     }
 }

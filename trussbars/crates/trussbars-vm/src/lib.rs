@@ -142,7 +142,10 @@ impl LoopFrame {
             "first" => Value::Bool(i == 0),
             "last" => Value::Bool(i + 1 == n),
             "length" => Value::Num(n as f64),
-            "key" => self.key.clone().map_or(Value::Null, |k| Value::Str(Rc::from(k.as_str()))),
+            "key" => self
+                .key
+                .clone()
+                .map_or(Value::Null, |k| Value::Str(Rc::from(k.as_str()))),
             other => return Err(format!("unsupported: loop field '{other}'")),
         })
     }
@@ -202,7 +205,10 @@ impl Env {
     /// chain (O(1)).
     fn rerooted(&self, new_this: Value) -> Env {
         let mut child = self.clone();
-        child.parents = Some(Rc::new(ParentNode { value: self.this.clone(), next: self.parents.clone() }));
+        child.parents = Some(Rc::new(ParentNode {
+            value: self.this.clone(),
+            next: self.parents.clone(),
+        }));
         child.this = new_this;
         child
     }
@@ -266,8 +272,16 @@ impl Template {
     pub fn parse(src: &str) -> Result<Template, String> {
         let (registry, nodes) = hoist(parse(src).map_err(|e| e.message)?);
         // Try the bytecode fast path (no host helpers / strict — the tree-walk owns those).
-        let bytecode = registry.is_empty().then(|| bytecode::Program::from_nodes(&nodes).ok()).flatten();
-        Ok(Template { nodes, partials: Rc::new(registry), cap_hint: Cell::new(64), bytecode })
+        let bytecode = registry
+            .is_empty()
+            .then(|| bytecode::Program::from_nodes(&nodes).ok())
+            .flatten();
+        Ok(Template {
+            nodes,
+            partials: Rc::new(registry),
+            cap_hint: Cell::new(64),
+            bytecode,
+        })
     }
 
     /// Render this template against dynamic `data` (lenient mode), returning a fresh
@@ -302,13 +316,16 @@ impl Template {
         self.render_string(data, &Rc::new(Helpers::new()), true)
     }
 
-    fn render_string(&self, data: &Value, helpers: &Rc<Helpers>, strict: bool) -> Result<String, String> {
+    fn render_string(
+        &self,
+        data: &Value,
+        helpers: &Rc<Helpers>,
+        strict: bool,
+    ) -> Result<String, String> {
         // Fast path: a fully-compiled template renders via bytecode (lenient only — the
         // tree-walk owns strict/AOT-compat). It only compiles when it uses no host helpers
         // and no out-of-subset construct, so it needs neither `helpers` nor strict checks.
-        if !strict
-            && let Some(bc) = &self.bytecode
-        {
+        if !strict && let Some(bc) = &self.bytecode {
             let out = bc.render(data);
             self.cap_hint.set(out.len());
             return Ok(out);
@@ -375,7 +392,11 @@ fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<No
             }
             Node::Cond(mut c) => {
                 c.body = hoist_into(c.body, reg);
-                c.elifs = c.elifs.into_iter().map(|(x, b)| (x, hoist_into(b, reg))).collect();
+                c.elifs = c
+                    .elifs
+                    .into_iter()
+                    .map(|(x, b)| (x, hoist_into(b, reg)))
+                    .collect();
                 c.otherwise = hoist_into(c.otherwise, reg);
                 out.push(Node::Cond(c));
             }
@@ -384,11 +405,29 @@ fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<No
                 w.otherwise = hoist_into(w.otherwise, reg);
                 out.push(Node::With(w));
             }
-            Node::Let { span, bindings, body } => {
-                out.push(Node::Let { span, bindings, body: hoist_into(body, reg) });
+            Node::Let {
+                span,
+                bindings,
+                body,
+            } => {
+                out.push(Node::Let {
+                    span,
+                    bindings,
+                    body: hoist_into(body, reg),
+                });
             }
-            Node::PartialBlock { span, name, ctx, body } => {
-                out.push(Node::PartialBlock { span, name, ctx, body: hoist_into(body, reg) });
+            Node::PartialBlock {
+                span,
+                name,
+                ctx,
+                body,
+            } => {
+                out.push(Node::PartialBlock {
+                    span,
+                    name,
+                    ctx,
+                    body: hoist_into(body, reg),
+                });
             }
             other => out.push(other),
         }
@@ -419,7 +458,10 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
         Node::Output { expr, raw, .. } => {
             let v = eval_expr(env, expr)?;
             if env.strict && matches!(v, Value::Object(_)) {
-                return Err("AOT-compat: a struct/object has no text form (AOT rejects `{{object}}`)".into());
+                return Err(
+                    "AOT-compat: a struct/object has no text form (AOT rejects `{{object}}`)"
+                        .into(),
+                );
             }
             if *raw {
                 v.raw_text(out);
@@ -446,7 +488,9 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             };
             expand_partial(env, name, scope, env.yield_html.clone(), out)?;
         }
-        Node::PartialBlock { name, ctx, body, .. } => {
+        Node::PartialBlock {
+            name, ctx, body, ..
+        } => {
             // Render the block body in the CALLER frame, then splice it at `{{yield}}`.
             let mut yielded = String::new();
             eval_nodes(env, body, &mut yielded)?;
@@ -476,7 +520,10 @@ fn expand_partial(
     if env.expanding.iter().any(|n| n == name) {
         return Err(format!("unsupported: recursive partial '{name}'"));
     }
-    let body = env.partials.get(name).ok_or_else(|| format!("unsupported: unknown partial '{name}'"))?;
+    let body = env
+        .partials
+        .get(name)
+        .ok_or_else(|| format!("unsupported: unknown partial '{name}'"))?;
     let mut expanding = env.expanding.clone();
     expanding.push(name.to_string());
     let child = Env {
@@ -499,7 +546,10 @@ fn expand_partial(
 /// error — AOT has no `Truthy` for numbers (docs/01 Option C); write a comparison.
 fn truthy_at(env: &Env, v: &Value) -> Result<bool, String> {
     if env.strict && matches!(v, Value::Num(_)) {
-        return Err("AOT-compat: a number in boolean position — write an explicit comparison (e.g. `> 0`)".into());
+        return Err(
+            "AOT-compat: a number in boolean position — write an explicit comparison (e.g. `> 0`)"
+                .into(),
+        );
     }
     Ok(v.truthy())
 }
@@ -535,7 +585,10 @@ fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
     // Element clones are refcount bumps (Rc-backed Value), not deep copies.
     let items: Vec<(Option<String>, Value)> = match &subj {
         Value::Array(a) => a.iter().map(|v| (None, v.clone())).collect(),
-        Value::Object(o) => o.iter().map(|(k, v)| (Some(k.clone()), v.clone())).collect(),
+        Value::Object(o) => o
+            .iter()
+            .map(|(k, v)| (Some(k.clone()), v.clone()))
+            .collect(),
         _ => Vec::new(), // non-collection → empty (lenient)
     };
     if items.is_empty() {
@@ -543,7 +596,12 @@ fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
     }
     let length = items.len();
     for (i, (key, element)) in items.into_iter().enumerate() {
-        let frame = Rc::new(LoopFrame { index0: i, length, key, parent: env.loop_frame.clone() });
+        let frame = Rc::new(LoopFrame {
+            index0: i,
+            length,
+            key,
+            parent: env.loop_frame.clone(),
+        });
         let mut child = env.rerooted(element.clone());
         if let Some(item) = &e.item {
             child.params.insert(item.clone(), element);
@@ -588,18 +646,33 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("divide", [a, b]) => num_op(env, a, b, |x, y| x / y),
         ("modulo", [a, b]) => num_op(env, a, b, f64::rem_euclid),
         ("ternary", [c, a, b]) => {
-            if truthy_at(env, &eval_expr(env, c)?)? { eval_expr(env, a) } else { eval_expr(env, b) }
+            if truthy_at(env, &eval_expr(env, c)?)? {
+                eval_expr(env, a)
+            } else {
+                eval_expr(env, b)
+            }
         }
         ("coalesce", [a, b]) => {
             let av = eval_expr(env, a)?;
-            if av == Value::Null { eval_expr(env, b) } else { Ok(av) }
+            if av == Value::Null {
+                eval_expr(env, b)
+            } else {
+                Ok(av)
+            }
         }
         ("firstTruthy", [a, b]) => {
             let av = eval_expr(env, a)?;
-            if truthy_at(env, &av)? { Ok(av) } else { eval_expr(env, b) }
+            if truthy_at(env, &av)? {
+                Ok(av)
+            } else {
+                eval_expr(env, b)
+            }
         }
         ("list", _) => {
-            let xs: Vec<Value> = args.iter().map(|a| eval_expr(env, a)).collect::<Result<_, _>>()?;
+            let xs: Vec<Value> = args
+                .iter()
+                .map(|a| eval_expr(env, a))
+                .collect::<Result<_, _>>()?;
             Ok(Value::Array(Rc::from(xs)))
         }
         ("where", _) => coll_filter(env, args, false),
@@ -608,7 +681,10 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("every", _) => Ok(Value::Bool(coll_test(env, args, true)?)),
         ("find", _) => coll_find(env, args),
         ("pluck", [items, Expr::Lit(Lit::Str(key))]) => {
-            let xs: Vec<Value> = array_of(eval_expr(env, items)?).iter().map(|e| field(e, key)).collect();
+            let xs: Vec<Value> = array_of(eval_expr(env, items)?)
+                .iter()
+                .map(|e| field(e, key))
+                .collect();
             Ok(Value::Array(Rc::from(xs)))
         }
         ("sortBy", [items, Expr::Lit(Lit::Str(key))]) => {
@@ -619,15 +695,22 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("groupBy", [items, Expr::Lit(Lit::Str(key))]) => {
             let mut groups: BTreeMap<String, Vec<Value>> = BTreeMap::new();
             for e in array_of(eval_expr(env, items)?).iter() {
-                groups.entry(stringify(&field(e, key))).or_default().push(e.clone());
+                groups
+                    .entry(stringify(&field(e, key)))
+                    .or_default()
+                    .push(e.clone());
             }
-            let obj: BTreeMap<String, Value> =
-                groups.into_iter().map(|(k, vs)| (k, Value::Array(Rc::from(vs)))).collect();
+            let obj: BTreeMap<String, Value> = groups
+                .into_iter()
+                .map(|(k, vs)| (k, Value::Array(Rc::from(vs))))
+                .collect();
             Ok(Value::Object(Rc::new(obj)))
         }
         ("dict", _) => {
             if env.strict {
-                return Err("AOT-compat: `dict` / collection literals are not in the AOT subset".into());
+                return Err(
+                    "AOT-compat: `dict` / collection literals are not in the AOT subset".into(),
+                );
             }
             let mut obj = BTreeMap::new();
             for pair in args.chunks(2) {
@@ -659,7 +742,10 @@ fn eval_path(env: &Env, args: &[Expr]) -> Result<Value, String> {
         && hargs.is_empty()
     {
         if h == "loop" {
-            let frame = env.loop_frame.as_ref().ok_or("'loop' used outside an each")?;
+            let frame = env
+                .loop_frame
+                .as_ref()
+                .ok_or("'loop' used outside an each")?;
             return loop_chain(frame, keys);
         }
         if let Some(frame) = env.labels.get(h.as_str()) {
@@ -707,7 +793,10 @@ fn loop_chain(frame: &Rc<LoopFrame>, keys: &[Expr]) -> Result<Value, String> {
     let mut cur = Rc::clone(frame);
     for hop in hops {
         cur = match *hop {
-            "parent" => cur.parent.clone().ok_or("'loop.parent' beyond the outermost loop")?,
+            "parent" => cur
+                .parent
+                .clone()
+                .ok_or("'loop.parent' beyond the outermost loop")?,
             "root" => {
                 let mut r = Rc::clone(&cur);
                 while let Some(p) = &r.parent {
@@ -773,11 +862,17 @@ fn all_truthy(env: &Env, args: &[Expr], require_all: bool) -> Result<bool, Strin
 }
 
 fn num_op(env: &Env, a: &Expr, b: &Expr, f: impl Fn(f64, f64) -> f64) -> Result<Value, String> {
-    Ok(Value::Num(f(eval_expr(env, a)?.as_num()?, eval_expr(env, b)?.as_num()?)))
+    Ok(Value::Num(f(
+        eval_expr(env, a)?.as_num()?,
+        eval_expr(env, b)?.as_num()?,
+    )))
 }
 
 fn num_cmp(env: &Env, a: &Expr, b: &Expr, f: impl Fn(f64, f64) -> bool) -> Result<Value, String> {
-    Ok(Value::Bool(f(eval_expr(env, a)?.as_num()?, eval_expr(env, b)?.as_num()?)))
+    Ok(Value::Bool(f(
+        eval_expr(env, a)?.as_num()?,
+        eval_expr(env, b)?.as_num()?,
+    )))
 }
 
 // ── collection operations (where/reject/some/every/find/pluck/sortBy/groupBy) ──
@@ -842,7 +937,9 @@ fn cmp_values(a: &Value, cmp: &str, b: &Value) -> Result<bool, String> {
 }
 
 fn coll_filter(env: &Env, args: &[Expr], negate: bool) -> Result<Value, String> {
-    let (coll, tail) = args.split_first().ok_or("collection filter without a collection")?;
+    let (coll, tail) = args
+        .split_first()
+        .ok_or("collection filter without a collection")?;
     let mut out = Vec::new();
     for e in array_of(eval_expr(env, coll)?).iter() {
         if pred(env, e, tail)? != negate {
@@ -853,7 +950,9 @@ fn coll_filter(env: &Env, args: &[Expr], negate: bool) -> Result<Value, String> 
 }
 
 fn coll_test(env: &Env, args: &[Expr], require_all: bool) -> Result<bool, String> {
-    let (coll, tail) = args.split_first().ok_or("some/every without a collection")?;
+    let (coll, tail) = args
+        .split_first()
+        .ok_or("some/every without a collection")?;
     for e in array_of(eval_expr(env, coll)?).iter() {
         let p = pred(env, e, tail)?;
         if require_all && !p {
@@ -880,7 +979,10 @@ fn coll_find(env: &Env, args: &[Expr]) -> Result<Value, String> {
 /// The value-helper pack — a spike subset over `Value`. Anything not here is a
 /// reported "unsupported", never a wrong answer.
 fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
-    let vs: Vec<Value> = args.iter().map(|a| eval_expr(env, a)).collect::<Result<_, _>>()?;
+    let vs: Vec<Value> = args
+        .iter()
+        .map(|a| eval_expr(env, a))
+        .collect::<Result<_, _>>()?;
     let s = |v: &Value| -> String {
         let mut t = String::new();
         v.raw_text(&mut t);
@@ -893,7 +995,9 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
         ("capitalize", [a]) => {
             let t = s(a);
             let mut c = t.chars();
-            Ok(str_val(c.next().map_or(String::new(), |f| f.to_uppercase().chain(c).collect())))
+            Ok(str_val(c.next().map_or(String::new(), |f| {
+                f.to_uppercase().chain(c).collect()
+            })))
         }
         ("trim", [a]) => Ok(str_val(s(a).trim().to_string())),
         ("append", [a, b]) => Ok(str_val(s(a) + &s(b))),
@@ -933,10 +1037,16 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
             let len = a.len() as i64;
             let idx = *i as i64;
             let idx = if idx < 0 { len + idx } else { idx };
-            Ok(if idx >= 0 && idx < len { a[idx as usize].clone() } else { Value::Null })
+            Ok(if idx >= 0 && idx < len {
+                a[idx as usize].clone()
+            } else {
+                Value::Null
+            })
         }
         ("round", [Value::Num(n)]) => Ok(Value::Num((n + 0.5).floor())),
-        ("toFixed", [Value::Num(n), Value::Num(d)]) => Ok(str_val(format!("{:.*}", *d as usize, n))),
+        ("toFixed", [Value::Num(n), Value::Num(d)]) => {
+            Ok(str_val(format!("{:.*}", *d as usize, n)))
+        }
         // A host helper (F3) — but not in AOT-compat, where AOT registers none.
         _ => match env.helpers.get(name) {
             Some(f) if !env.strict => f(&vs),
@@ -952,7 +1062,12 @@ mod tests {
     use std::rc::Rc;
 
     fn obj(pairs: &[(&str, Value)]) -> Value {
-        Value::Object(Rc::new(pairs.iter().map(|(k, v)| ((*k).to_string(), v.clone())).collect::<BTreeMap<_, _>>()))
+        Value::Object(Rc::new(
+            pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), v.clone()))
+                .collect::<BTreeMap<_, _>>(),
+        ))
     }
 
     fn arr(items: &[Value]) -> Value {
@@ -973,22 +1088,37 @@ mod tests {
     #[test]
     fn if_and_each_with_loop_meta() {
         let d = obj(&[("xs", arr(&[s("a"), s("b")]))]);
-        assert_eq!(render("{{#each xs}}{{loop.index1}}:{{this}} {{/each}}", d).unwrap(), "1:a 2:b ");
+        assert_eq!(
+            render("{{#each xs}}{{loop.index1}}:{{this}} {{/each}}", d).unwrap(),
+            "1:a 2:b "
+        );
         let empty = obj(&[("xs", arr(&[]))]);
-        assert_eq!(render("{{#each xs}}x{{else}}none{{/each}}", empty).unwrap(), "none");
+        assert_eq!(
+            render("{{#each xs}}x{{else}}none{{/each}}", empty).unwrap(),
+            "none"
+        );
     }
 
     #[test]
     fn paths_operators_and_let() {
         let d = obj(&[("p", obj(&[("n", Value::Num(3.0))]))]);
-        assert_eq!(render("{{#if p.n > 2}}big{{else}}small{{/if}}", d.clone()).unwrap(), "big");
-        assert_eq!(render("{{#let t=(multiply p.n 2)}}{{t}}{{/let}}", d).unwrap(), "6");
+        assert_eq!(
+            render("{{#if p.n > 2}}big{{else}}small{{/if}}", d.clone()).unwrap(),
+            "big"
+        );
+        assert_eq!(
+            render("{{#let t=(multiply p.n 2)}}{{t}}{{/let}}", d).unwrap(),
+            "6"
+        );
     }
 
     #[test]
     fn parent_chain_in_each() {
         let d = obj(&[("title", s("T")), ("xs", arr(&[s("a")]))]);
-        assert_eq!(render("{{#each xs}}{{parent.title}}:{{this}}{{/each}}", d).unwrap(), "T:a");
+        assert_eq!(
+            render("{{#each xs}}{{parent.title}}:{{this}}{{/each}}", d).unwrap(),
+            "T:a"
+        );
     }
 
     #[test]
@@ -1004,13 +1134,27 @@ mod tests {
             obj(&[("name", s("Bo")), ("age", Value::Num(17.0))]),
         ]);
         let d = obj(&[("items", items)]);
-        assert_eq!(render(r#"{{#each (where items "age" "gt" 20)}}{{this.name}}{{/each}}"#, d).unwrap(), "Ann");
+        assert_eq!(
+            render(
+                r#"{{#each (where items "age" "gt" 20)}}{{this.name}}{{/each}}"#,
+                d
+            )
+            .unwrap(),
+            "Ann"
+        );
     }
 
     #[test]
     fn inline_partial_and_yield() {
         let d = obj(&[("name", s("Ann & Bo"))]);
-        assert_eq!(render(r#"{{#inline "greet"}}Hi {{name}}!{{/inline}}{{> greet}}"#, d.clone()).unwrap(), "Hi Ann &amp; Bo!");
+        assert_eq!(
+            render(
+                r#"{{#inline "greet"}}Hi {{name}}!{{/inline}}{{> greet}}"#,
+                d.clone()
+            )
+            .unwrap(),
+            "Hi Ann &amp; Bo!"
+        );
         let blk = r#"{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}"#;
         assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
     }
@@ -1023,7 +1167,9 @@ mod tests {
                 Some(Value::Str(s)) => s.to_string(),
                 _ => String::new(),
             };
-            Ok(Value::Str(Rc::from(format!("{}!", t.to_uppercase()).as_str())))
+            Ok(Value::Str(Rc::from(
+                format!("{}!", t.to_uppercase()).as_str(),
+            )))
         });
         let h = Rc::new(h);
         let t = Template::parse("{{name | shout}}").unwrap();
@@ -1039,18 +1185,32 @@ mod tests {
     fn aot_compat_mode() {
         let d = obj(&[("n", Value::Num(5.0))]);
         // What AOT accepts renders identically in strict mode…
-        assert_eq!(Template::parse("{{#if n > 0}}pos{{/if}}").unwrap().render_compat(&d).unwrap(), "pos");
+        assert_eq!(
+            Template::parse("{{#if n > 0}}pos{{/if}}")
+                .unwrap()
+                .render_compat(&d)
+                .unwrap(),
+            "pos"
+        );
         // …and what AOT rejects is an Err (a verifying proxy):
         let rejects = [
-            "{{#if n}}x{{/if}}",                            // numeric truthiness
-            "{{this}}",                                     // bare-object output
-            "{{missing}}",                                  // unknown field
-            r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#,      // dict / collection literal
+            "{{#if n}}x{{/if}}",                       // numeric truthiness
+            "{{this}}",                                // bare-object output
+            "{{missing}}",                             // unknown field
+            r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#, // dict / collection literal
         ];
         for t in rejects {
-            assert!(Template::parse(t).unwrap().render_compat(&d).is_err(), "should reject in AOT-compat: {t}");
+            assert!(
+                Template::parse(t).unwrap().render_compat(&d).is_err(),
+                "should reject in AOT-compat: {t}"
+            );
             // …but lenient mode still renders them.
-            assert!(Template::parse(t).unwrap().render(&obj(&[("n", Value::Num(5.0)), ("missing", Value::Null)])).is_ok());
+            assert!(
+                Template::parse(t)
+                    .unwrap()
+                    .render(&obj(&[("n", Value::Num(5.0)), ("missing", Value::Null)]))
+                    .is_ok()
+            );
         }
     }
 }

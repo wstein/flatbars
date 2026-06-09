@@ -114,7 +114,11 @@ impl Program {
                         continue;
                     }
                     let saved = std::mem::replace(&mut this, items[0].clone());
-                    frames.push(IterFrame { items, index: 0, saved_this: saved });
+                    frames.push(IterFrame {
+                        items,
+                        index: 0,
+                        saved_this: saved,
+                    });
                 }
                 Op::EachNext(body) => {
                     let frame = frames.last_mut().expect("EachNext without a frame");
@@ -150,7 +154,8 @@ fn compile_node(n: &Node, ops: &mut Vec<Op>) -> Result<(), String> {
             ops.push(if *raw { Op::Raw } else { Op::Esc });
         }
         Node::Each(e) => {
-            if e.item.is_some() || e.index.is_some() || e.label.is_some() || !e.otherwise.is_empty() {
+            if e.item.is_some() || e.index.is_some() || e.label.is_some() || !e.otherwise.is_empty()
+            {
                 return Err("bytecode subset: each bindings / else unsupported".into());
             }
             compile_expr(&e.subject, ops)?;
@@ -223,7 +228,12 @@ mod tests {
     use std::rc::Rc;
 
     fn obj(pairs: &[(&str, Value)]) -> Value {
-        Value::Object(Rc::new(pairs.iter().map(|(k, v)| ((*k).to_string(), v.clone())).collect::<BTreeMap<_, _>>()))
+        Value::Object(Rc::new(
+            pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), v.clone()))
+                .collect::<BTreeMap<_, _>>(),
+        ))
     }
     fn arr(items: &[Value]) -> Value {
         Value::Array(Rc::from(items.to_vec()))
@@ -247,7 +257,11 @@ mod tests {
         ];
         for (tpl, data) in cases {
             let prog = Program::compile(tpl).unwrap_or_else(|e| panic!("{tpl}: {e}"));
-            assert_eq!(prog.render(data), render(tpl, data.clone()).unwrap(), "{tpl}");
+            assert_eq!(
+                prog.render(data),
+                render(tpl, data.clone()).unwrap(),
+                "{tpl}"
+            );
         }
     }
 }

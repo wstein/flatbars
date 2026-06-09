@@ -107,7 +107,11 @@ fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<No
             }
             Node::Cond(mut c) => {
                 c.body = hoist_into(c.body, reg);
-                c.elifs = c.elifs.into_iter().map(|(e, b)| (e, hoist_into(b, reg))).collect();
+                c.elifs = c
+                    .elifs
+                    .into_iter()
+                    .map(|(e, b)| (e, hoist_into(b, reg)))
+                    .collect();
                 c.otherwise = hoist_into(c.otherwise, reg);
                 out.push(Node::Cond(c));
             }
@@ -116,11 +120,29 @@ fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<No
                 w.otherwise = hoist_into(w.otherwise, reg);
                 out.push(Node::With(w));
             }
-            Node::Let { span, bindings, body } => {
-                out.push(Node::Let { span, bindings, body: hoist_into(body, reg) });
+            Node::Let {
+                span,
+                bindings,
+                body,
+            } => {
+                out.push(Node::Let {
+                    span,
+                    bindings,
+                    body: hoist_into(body, reg),
+                });
             }
-            Node::PartialBlock { span, name, ctx, body } => {
-                out.push(Node::PartialBlock { span, name, ctx, body: hoist_into(body, reg) });
+            Node::PartialBlock {
+                span,
+                name,
+                ctx,
+                body,
+            } => {
+                out.push(Node::PartialBlock {
+                    span,
+                    name,
+                    ctx,
+                    body: hoist_into(body, reg),
+                });
             }
             other => out.push(other),
         }
@@ -155,7 +177,10 @@ fn estimate_node(n: &Node) -> usize {
         Node::Each(e) => 8 * (estimate_bytes(&e.body) + estimate_bytes(&e.otherwise)),
         Node::Cond(c) => {
             estimate_bytes(&c.body)
-                + c.elifs.iter().map(|(_, b)| estimate_bytes(b)).sum::<usize>()
+                + c.elifs
+                    .iter()
+                    .map(|(_, b)| estimate_bytes(b))
+                    .sum::<usize>()
                 + estimate_bytes(&c.otherwise)
         }
         Node::With(w) => estimate_bytes(&w.body) + estimate_bytes(&w.otherwise),
@@ -176,8 +201,13 @@ fn emit_nodes(env: &Env, src: &str, nodes: &[Node], out: &mut String) -> Result<
 /// Emit one node into `out`, attaching its tag's `line:col` to any leaf error that does
 /// not already carry one (class-A diagnostics).
 fn emit_node(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(), String> {
-    emit_node_inner(env, src, n, out)
-        .map_err(|m| if is_located(&m) { m } else { located(n.span().start, src, &m) })
+    emit_node_inner(env, src, n, out).map_err(|m| {
+        if is_located(&m) {
+            m
+        } else {
+            located(n.span().start, src, &m)
+        }
+    })
 }
 
 fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(), String> {
@@ -186,17 +216,30 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
         Node::Output { expr, raw, .. } => {
             let e = emit_expr(env, expr)?;
             if *raw {
-                out.push_str(&format!("trussbars_core::ToText::write_text(&({e}), &mut out);\n"));
+                out.push_str(&format!(
+                    "trussbars_core::ToText::write_text(&({e}), &mut out);\n"
+                ));
             } else {
                 out.push_str(&format!("trussbars_core::esc(&({e}), &mut out);\n"));
             }
         }
-        Node::RawBlock { body, .. } => out.push_str(&format!("out.push_str({});\n", rust_str(body))),
+        Node::RawBlock { body, .. } => {
+            out.push_str(&format!("out.push_str({});\n", rust_str(body)))
+        }
         Node::Yield { .. } => return yield_here(env, out),
         Node::Partial { name, ctx, .. } => {
-            return inline_partial(env, src, name, ctx.clone().unwrap_or_else(|| Expr::nullary("this")), None, out);
+            return inline_partial(
+                env,
+                src,
+                name,
+                ctx.clone().unwrap_or_else(|| Expr::nullary("this")),
+                None,
+                out,
+            );
         }
-        Node::PartialBlock { name, ctx, body, .. } => {
+        Node::PartialBlock {
+            name, ctx, body, ..
+        } => {
             // The block body renders into a separate buffer (its yield).
             let mut yield_buf = String::new();
             emit_nodes(env, src, body, &mut yield_buf)?;
@@ -291,7 +334,9 @@ fn with_block(env: &Env, src: &str, w: &With, out: &mut String) -> Result<(), St
     child.scope = cvar.clone();
     child.parents.insert(0, env.scope.clone());
     child.depth = d;
-    out.push_str(&format!("{{\nlet {cvar} = &({subj});\nif trussbars_core::truthy({cvar}) {{\n"));
+    out.push_str(&format!(
+        "{{\nlet {cvar} = &({subj});\nif trussbars_core::truthy({cvar}) {{\n"
+    ));
     emit_nodes(&child, src, &w.body, out)?;
     out.push_str("} else {\n");
     emit_nodes(env, src, &w.otherwise, out)?;
@@ -367,18 +412,32 @@ fn each_block(env: &Env, src: &str, e: &Each, out: &mut String) -> Result<(), St
         labels.insert(lbl.clone(), lvar.clone());
     }
     // The frame is live only if the body uses `loop` or this loop's label (G2).
-    let needs_frame = mentions(&e.body, "loop") || e.label.as_deref().is_some_and(|l| mentions(&e.body, l));
+    let needs_frame =
+        mentions(&e.body, "loop") || e.label.as_deref().is_some_and(|l| mentions(&e.body, l));
     let mut child = env.clone();
     child.scope = cvar.clone();
-    child.loop_var = if needs_frame { Some(lvar.clone()) } else { None };
+    child.loop_var = if needs_frame {
+        Some(lvar.clone())
+    } else {
+        None
+    };
     child.params = params;
     child.parents.insert(0, env.scope.clone());
-    child.labels = if needs_frame { labels } else { env.labels.clone() };
+    child.labels = if needs_frame {
+        labels
+    } else {
+        env.labels.clone()
+    };
     child.depth = d;
-    let parent_loop = env.loop_var.as_ref().map_or_else(|| "None".to_string(), |pl| format!("Some(&{pl})"));
+    let parent_loop = env
+        .loop_var
+        .as_ref()
+        .map_or_else(|| "None".to_string(), |pl| format!("Some(&{pl})"));
     let need_index = needs_frame || e.index.is_some();
     let for_head = if need_index {
-        format!("for ({ivar}, ({kvar}, {cvar})) in trussbars_core::Each::each({subvar}).enumerate() {{\n")
+        format!(
+            "for ({ivar}, ({kvar}, {cvar})) in trussbars_core::Each::each({subvar}).enumerate() {{\n"
+        )
     } else {
         format!("for ({kvar}, {cvar}) in trussbars_core::Each::each({subvar}) {{\n")
     };
@@ -389,7 +448,9 @@ fn each_block(env: &Env, src: &str, e: &Each, out: &mut String) -> Result<(), St
     };
     out.push_str("{\n");
     out.push_str(&format!("let {subvar} = &({subj});\n"));
-    out.push_str(&format!("let {lenvar} = trussbars_core::Each::each_len({subvar});\n"));
+    out.push_str(&format!(
+        "let {lenvar} = trussbars_core::Each::each_len({subvar});\n"
+    ));
     out.push_str(&format!("if {lenvar} == 0 {{\n"));
     emit_nodes(env, src, &e.otherwise, out)?;
     out.push_str("} else {\n");
@@ -410,14 +471,24 @@ fn mentions(nodes: &[Node], name: &str) -> bool {
 fn node_mentions(n: &Node, name: &str) -> bool {
     match n {
         Node::Output { expr, .. } => expr_mentions(expr, name),
-        Node::Each(e) => mentions(&e.body, name) || mentions(&e.otherwise, name) || expr_mentions(&e.subject, name),
+        Node::Each(e) => {
+            mentions(&e.body, name)
+                || mentions(&e.otherwise, name)
+                || expr_mentions(&e.subject, name)
+        }
         Node::Cond(c) => {
             expr_mentions(&c.cond, name)
                 || mentions(&c.body, name)
-                || c.elifs.iter().any(|(e, b)| expr_mentions(e, name) || mentions(b, name))
+                || c.elifs
+                    .iter()
+                    .any(|(e, b)| expr_mentions(e, name) || mentions(b, name))
                 || mentions(&c.otherwise, name)
         }
-        Node::With(w) => expr_mentions(&w.subject, name) || mentions(&w.body, name) || mentions(&w.otherwise, name),
+        Node::With(w) => {
+            expr_mentions(&w.subject, name)
+                || mentions(&w.body, name)
+                || mentions(&w.otherwise, name)
+        }
         Node::Let { bindings, body, .. } => {
             bindings.iter().any(|(_, e)| expr_mentions(e, name)) || mentions(body, name)
         }
@@ -447,10 +518,15 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
     match (name, args) {
         ("this", []) => Ok(env.scope.clone()),
         ("root", []) => Ok("__root".into()),
-        ("loop", []) => env.loop_var.clone().ok_or_else(|| "unsupported: 'loop' used outside an each".into()),
-        ("@parentchain", []) => {
-            env.parents.first().cloned().ok_or_else(|| "unsupported: 'parent' used outside an enclosing block".into())
-        }
+        ("loop", []) => env
+            .loop_var
+            .clone()
+            .ok_or_else(|| "unsupported: 'loop' used outside an each".into()),
+        ("@parentchain", []) => env
+            .parents
+            .first()
+            .cloned()
+            .ok_or_else(|| "unsupported: 'parent' used outside an enclosing block".into()),
         ("true", []) => Ok("true".into()),
         ("false", []) => Ok("false".into()),
         ("null", []) => Ok("()".into()),
@@ -468,16 +544,20 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
         ("subtract", [a, b]) => bin_op(env, "-", a, b),
         ("multiply", [a, b]) => bin_op(env, "*", a, b),
         ("divide", [a, b]) => bin_op(env, "/", a, b),
-        ("modulo", [a, b]) => {
-            Ok(format!("trussbars_std::modulo({}, {})", emit_expr(env, a)?, emit_expr(env, b)?))
-        }
+        ("modulo", [a, b]) => Ok(format!(
+            "trussbars_std::modulo({}, {})",
+            emit_expr(env, a)?,
+            emit_expr(env, b)?
+        )),
         ("safe", [a]) => Ok(format!("trussbars_std::safe(&({}))", emit_expr(env, a)?)),
-        ("pluck", [items, Expr::Lit(Value::Str(key))]) => {
-            Ok(format!("({}).iter().map(|__x| &__x.{key}).collect::<Vec<_>>()", emit_expr(env, items)?))
-        }
-        ("sortBy", [items, Expr::Lit(Value::Str(key))]) => {
-            Ok(format!("trussbars_std::sort_by(&({}), |__x| &__x.{key})", emit_expr(env, items)?))
-        }
+        ("pluck", [items, Expr::Lit(Value::Str(key))]) => Ok(format!(
+            "({}).iter().map(|__x| &__x.{key}).collect::<Vec<_>>()",
+            emit_expr(env, items)?
+        )),
+        ("sortBy", [items, Expr::Lit(Value::Str(key))]) => Ok(format!(
+            "trussbars_std::sort_by(&({}), |__x| &__x.{key})",
+            emit_expr(env, items)?
+        )),
         ("groupBy", [items, Expr::Lit(Value::Str(key))]) => Ok(format!(
             "trussbars_std::group_by(&({}), |__x| {{ let mut __s = String::new(); \
              trussbars_core::ToText::write_text(&__x.{key}, &mut __s); __s }})",
@@ -500,7 +580,10 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
             emit_expr(env, b)?
         )),
         ("list", _) => {
-            let es = args.iter().map(|a| emit_expr(env, a)).collect::<Result<Vec<_>, _>>()?;
+            let es = args
+                .iter()
+                .map(|a| emit_expr(env, a))
+                .collect::<Result<Vec<_>, _>>()?;
             Ok(format!("[{}]", es.join(", ")))
         }
         ("where", _) => coll_filter(env, "filter", false, args),
@@ -512,7 +595,10 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
             if let Some(call) = emit_helper(env, name, args) {
                 call
             } else if args.is_empty() {
-                env.params.get(name).cloned().ok_or_else(|| format!("unsupported: expression head '{name}'"))
+                env.params
+                    .get(name)
+                    .cloned()
+                    .ok_or_else(|| format!("unsupported: expression head '{name}'"))
             } else {
                 Err(format!("unsupported: helper '{name}'"))
             }
@@ -521,7 +607,10 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
 }
 
 fn join_truthy(env: &Env, args: &[Expr], sep: &str) -> Result<String, String> {
-    let parts = args.iter().map(|a| truthy_of(env, a)).collect::<Result<Vec<_>, _>>()?;
+    let parts = args
+        .iter()
+        .map(|a| truthy_of(env, a))
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(parts.join(sep))
 }
 
@@ -530,7 +619,11 @@ fn truthy_of(env: &Env, a: &Expr) -> Result<String, String> {
 }
 
 fn bin_op(env: &Env, op: &str, a: &Expr, b: &Expr) -> Result<String, String> {
-    Ok(format!("({} {op} {})", emit_expr(env, a)?, emit_expr(env, b)?))
+    Ok(format!(
+        "({} {op} {})",
+        emit_expr(env, a)?,
+        emit_expr(env, b)?
+    ))
 }
 
 // ── collection filters ────────────────────────────────────────────────────────
@@ -545,7 +638,11 @@ fn coll_filter(env: &Env, method: &str, negated: bool, args: &[Expr]) -> Result<
     let ie = emit_expr(env, coll)?;
     let body = pred_body(env, tail)?;
     let pred = if negated { format!("!({body})") } else { body };
-    let suffix = if method == "filter" { ".collect::<Vec<_>>()" } else { "" };
+    let suffix = if method == "filter" {
+        ".collect::<Vec<_>>()"
+    } else {
+        ""
+    };
     Ok(format!("({ie}).iter().{method}(|__x| {pred}){suffix}"))
 }
 
@@ -567,7 +664,10 @@ fn pred_body(env: &Env, args: &[Expr]) -> Result<String, String> {
         [Expr::Lit(Value::Str(key)), Expr::Lit(Value::Str(cmp)), val] => {
             cmp_body(key, cmp, &emit_expr(env, val)?)
         }
-        _ => Err("unsupported: collection-filter predicate (want `\"key\"` or `\"key\" \"cmp\" value`)".into()),
+        _ => Err(
+            "unsupported: collection-filter predicate (want `\"key\"` or `\"key\" \"cmp\" value`)"
+                .into(),
+        ),
     }
 }
 
@@ -599,7 +699,10 @@ fn path(env: &Env, args: &[Expr]) -> Result<String, String> {
         && hargs.is_empty()
     {
         if n == "loop" {
-            let lvar = env.loop_var.clone().ok_or_else(|| "unsupported: 'loop' used outside an each".to_string())?;
+            let lvar = env
+                .loop_var
+                .clone()
+                .ok_or_else(|| "unsupported: 'loop' used outside an each".to_string())?;
             return emit_loop_chain(&lvar, &key_strs(keys)?);
         }
         if let Some(lvar) = env.labels.get(n) {
@@ -608,7 +711,9 @@ fn path(env: &Env, args: &[Expr]) -> Result<String, String> {
     }
     // `parent` chains → the enclosing context bindings.
     if let Some(k) = parent_index(head) {
-        let pvar = env.parents.get(k).ok_or_else(|| "unsupported: 'parent' beyond the enclosing context depth".to_string())?;
+        let pvar = env.parents.get(k).ok_or_else(|| {
+            "unsupported: 'parent' beyond the enclosing context depth".to_string()
+        })?;
         return Ok(format!("{pvar}{}", segs(keys)?));
     }
     let base = emit_expr(env, head)?;
@@ -632,7 +737,9 @@ fn parent_index(e: &Expr) -> Option<usize> {
     }
 }
 
-const LOOP_FIELDS: &[&str] = &["index0", "index1", "rindex0", "rindex1", "first", "last", "length", "key"];
+const LOOP_FIELDS: &[&str] = &[
+    "index0", "index1", "rindex0", "rindex1", "first", "last", "length", "key",
+];
 
 fn emit_loop_chain(lvar: &str, keys: &[String]) -> Result<String, String> {
     let Some((field, hops)) = keys.split_last() else {
@@ -646,16 +753,28 @@ fn emit_loop_chain(lvar: &str, keys: &[String]) -> Result<String, String> {
     for hop in hops {
         match hop.as_str() {
             "root" => {
-                code = if opt { format!("{code}.map(|__p| __p.root())") } else { format!("{code}.root()") };
+                code = if opt {
+                    format!("{code}.map(|__p| __p.root())")
+                } else {
+                    format!("{code}.root()")
+                };
             }
             "parent" => {
-                code = if opt { format!("{code}.and_then(|__p| __p.parent)") } else { format!("{code}.parent") };
+                code = if opt {
+                    format!("{code}.and_then(|__p| __p.parent)")
+                } else {
+                    format!("{code}.parent")
+                };
                 opt = true;
             }
             other => return Err(format!("unsupported: loop hop '{other}'")),
         }
     }
-    Ok(if opt { format!("{code}.map(|__p| __p.{field})") } else { format!("{code}.{field}") })
+    Ok(if opt {
+        format!("{code}.map(|__p| __p.{field})")
+    } else {
+        format!("{code}.{field}")
+    })
 }
 
 fn key_strs(keys: &[Expr]) -> Result<Vec<String>, String> {
@@ -693,8 +812,11 @@ fn emit_helper(env: &Env, name: &str, args: &[Expr]) -> Option<Result<String, St
         if kinds.len() != arity {
             return Some(Err(format!("unsupported: {name} with {arity} arguments")));
         }
-        let parts: Result<Vec<String>, String> =
-            kinds.iter().zip(args).map(|(k, e)| emit_kind(env, *k, e)).collect();
+        let parts: Result<Vec<String>, String> = kinds
+            .iter()
+            .zip(args)
+            .map(|(k, e)| emit_kind(env, *k, e))
+            .collect();
         Some(parts.map(|p| format!("trussbars_std::{fname}({})", p.join(", "))))
     };
     use Kind::{IntArg, Num, Ref};
@@ -792,7 +914,9 @@ mod tests {
     #[test]
     fn output_escaped_and_raw() {
         assert!(e("{{name}}").contains("trussbars_core::esc(&(ctx.name), &mut out)"));
-        assert!(e("{{{html}}}").contains("trussbars_core::ToText::write_text(&(ctx.html), &mut out)"));
+        assert!(
+            e("{{{html}}}").contains("trussbars_core::ToText::write_text(&(ctx.html), &mut out)")
+        );
     }
 
     #[test]
@@ -815,7 +939,10 @@ mod tests {
     #[test]
     fn helper_and_collection_filter() {
         assert!(e("{{name | uppercase}}").contains("trussbars_std::uppercase(&(ctx.name))"));
-        assert!(e(r#"{{#each (where items "n" "gt" 1)}}{{this.n}}{{/each}}"#).contains(".iter().filter(|__x| __x.n > 1.0)"));
+        assert!(
+            e(r#"{{#each (where items "n" "gt" 1)}}{{this.n}}{{/each}}"#)
+                .contains(".iter().filter(|__x| __x.n > 1.0)")
+        );
     }
 
     #[test]
