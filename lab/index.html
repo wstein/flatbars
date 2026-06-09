@@ -1674,8 +1674,9 @@
         vendoredWorkspace,
       // Cache-bust query: bump on any playground_utils.mjs change so a freshly
       // loaded index.html never pairs with a stale cached module (which silently
-      // ran the old, uncompressed encodeState). Bumped for the vendored source link (E2).
-      } from "./playground_utils.mjs?v=16";
+      // ran the old, uncompressed encodeState). Bumped for the Data Access
+      // partial-scope classification fix.
+      } from "./playground_utils.mjs?v=17";
       // Output-view decisions (extracted for testability; lab/output-view.test.mjs).
       import {
         VIEW_TABS,
