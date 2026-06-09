@@ -12,7 +12,7 @@
 //! #[trussbars_macros::truss_helpers(date, number)]
 //! mod templates {
 //!     use trussbars_macros::truss;
-//!     truss!(receipt, Order, "{{date placed \"%Y-%m-%d\"}} — total {{number total 2}}");
+//!     truss!(receipt, Order, "{{date placed \"%d %B %Y\" lang}} — total {{number total 2}}");
 //! }
 //! ```
 //!
@@ -194,11 +194,14 @@ pub fn relative(value: &f64, unit: &str) -> String {
 }
 
 /// Format an ISO-8601 date/time string `value` (`YYYY-MM-DD` or
-/// `YYYY-MM-DDTHH:MM:SS…`) with a `strftime`-style `pattern`. Supported fields:
-/// `%Y` `%y` `%m` `%d` `%e` `%H` `%M` `%S` `%B` `%b` `%%`. An unparseable input or an
+/// `YYYY-MM-DDTHH:MM:SS…`) with a `strftime`-style `pattern`, in language `lang`
+/// (a BCP-47 tag; only the primary subtag is used). Supported fields:
+/// `%Y` `%y` `%m` `%d` `%e` `%H` `%M` `%S` `%B` `%b` `%%`. The month-name fields
+/// `%B`/`%b` are **localized** for `en`/`de`/`fr` and fall back to English for any
+/// other tag; the numeric fields are language-independent. An unparseable input or an
 /// unknown field is passed through unchanged (a forgiving fallback). Dependency-free.
 #[must_use]
-pub fn date(value: &str, pattern: &str) -> String {
+pub fn date(value: &str, pattern: &str, lang: &str) -> String {
     let Some(parts) = parse_iso(value) else {
         return value.to_string();
     };
@@ -218,8 +221,8 @@ pub fn date(value: &str, pattern: &str) -> String {
             Some('H') => out.push_str(&format!("{:02}", parts.hour)),
             Some('M') => out.push_str(&format!("{:02}", parts.minute)),
             Some('S') => out.push_str(&format!("{:02}", parts.second)),
-            Some('B') => out.push_str(month_name(parts.month, false)),
-            Some('b') => out.push_str(month_name(parts.month, true)),
+            Some('B') => out.push_str(month_name(parts.month, false, lang)),
+            Some('b') => out.push_str(month_name(parts.month, true, lang)),
             Some('%') => out.push('%'),
             // Unknown field: emit it verbatim so nothing is silently dropped.
             Some(other) => {
@@ -273,10 +276,11 @@ fn parse_iso(s: &str) -> Option<DateParts> {
     })
 }
 
-/// The English month name (full or 3-letter abbreviation) for `1..=12`; an
-/// out-of-range month yields an empty string.
-fn month_name(month: u32, abbrev: bool) -> &'static str {
-    const FULL: [&str; 12] = [
+/// The localized month name (full, or abbreviation) for `1..=12` in `lang`'s primary
+/// subtag — `de`/`fr` tables, English for any other tag; an out-of-range month yields
+/// an empty string.
+fn month_name(month: u32, abbrev: bool, lang: &str) -> &'static str {
+    const EN_FULL: [&str; 12] = [
         "January",
         "February",
         "March",
@@ -290,19 +294,60 @@ fn month_name(month: u32, abbrev: bool) -> &'static str {
         "November",
         "December",
     ];
-    const ABBR: [&str; 12] = [
+    const EN_ABBR: [&str; 12] = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
-    match month.checked_sub(1).and_then(|i| usize::try_from(i).ok()) {
-        Some(i) if i < 12 => {
-            if abbrev {
-                ABBR[i]
-            } else {
-                FULL[i]
-            }
-        }
-        _ => "",
-    }
+    const DE_FULL: [&str; 12] = [
+        "Januar",
+        "Februar",
+        "März",
+        "April",
+        "Mai",
+        "Juni",
+        "Juli",
+        "August",
+        "September",
+        "Oktober",
+        "November",
+        "Dezember",
+    ];
+    const DE_ABBR: [&str; 12] = [
+        "Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+    ];
+    const FR_FULL: [&str; 12] = [
+        "janvier",
+        "février",
+        "mars",
+        "avril",
+        "mai",
+        "juin",
+        "juillet",
+        "août",
+        "septembre",
+        "octobre",
+        "novembre",
+        "décembre",
+    ];
+    const FR_ABBR: [&str; 12] = [
+        "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.",
+        "déc.",
+    ];
+    let Some(i) = month
+        .checked_sub(1)
+        .and_then(|i| usize::try_from(i).ok())
+        .filter(|i| *i < 12)
+    else {
+        return "";
+    };
+    let sub = primary_subtag(lang);
+    let (full, abbr): (&[&str; 12], &[&str; 12]) = if sub.eq_ignore_ascii_case("de") {
+        (&DE_FULL, &DE_ABBR)
+    } else if sub.eq_ignore_ascii_case("fr") {
+        (&FR_FULL, &FR_ABBR)
+    } else {
+        (&EN_FULL, &EN_ABBR)
+    };
+    if abbrev { abbr[i] } else { full[i] }
 }
 
 #[cfg(test)]
@@ -382,11 +427,25 @@ mod tests {
 
     #[test]
     fn date_formats_iso() {
-        assert_eq!(date("2026-06-09", "%Y-%m-%d"), "2026-06-09");
-        assert_eq!(date("2026-06-09T14:05:09Z", "%d %B %Y"), "09 June 2026");
-        assert_eq!(date("2026-06-09T14:05:09+02:00", "%H:%M"), "14:05");
-        assert_eq!(date("2026-01-02", "%b %e"), "Jan  2");
+        assert_eq!(date("2026-06-09", "%Y-%m-%d", "en"), "2026-06-09");
+        assert_eq!(
+            date("2026-06-09T14:05:09Z", "%d %B %Y", "en"),
+            "09 June 2026"
+        );
+        assert_eq!(date("2026-06-09T14:05:09+02:00", "%H:%M", "en"), "14:05");
+        assert_eq!(date("2026-01-02", "%b %e", "en"), "Jan  2");
         // Unparseable → passthrough.
-        assert_eq!(date("not-a-date", "%Y"), "not-a-date");
+        assert_eq!(date("not-a-date", "%Y", "en"), "not-a-date");
+    }
+
+    #[test]
+    fn date_localizes_month_names() {
+        // `%B`/`%b` follow the language; numeric fields do not. Unknown tags → English.
+        assert_eq!(date("2026-06-09", "%d. %B %Y", "de"), "09. Juni 2026");
+        assert_eq!(date("2026-03-02", "%b", "de"), "Mär");
+        assert_eq!(date("2026-06-09", "%e %B %Y", "fr"), " 9 juin 2026");
+        assert_eq!(date("2026-08-01", "%b", "fr"), "août");
+        assert_eq!(date("2026-06-09", "%B", "pt"), "June"); // fallback
+        assert_eq!(date("2026-06-09", "%Y-%m-%d", "de"), "2026-06-09"); // numeric unaffected
     }
 }
