@@ -20141,7 +20141,7 @@ var inspectMinWith = function(partialSrcs) {
             return new Right(new Tuple(v3.value0, desugar2(v12.value0.nodes)));
           }
           ;
-          throw new Error("Failed pattern match at MinBars.Inspect (line 65, column 35 - line 67, column 58): " + [v12.constructor.name]);
+          throw new Error("Failed pattern match at MinBars.Inspect (line 66, column 35 - line 68, column 58): " + [v12.constructor.name]);
         };
         var v = traverse14(compilePartial)(partialSrcs);
         if (v instanceof Left) {
@@ -20176,13 +20176,13 @@ var inspectMinWith = function(partialSrcs) {
               return new Right(v2.value0.value1);
             }
             ;
-            throw new Error("Failed pattern match at MinBars.Inspect (line 61, column 9 - line 63, column 47): " + [v2.constructor.name]);
+            throw new Error("Failed pattern match at MinBars.Inspect (line 62, column 9 - line 64, column 47): " + [v2.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at MinBars.Inspect (line 54, column 15 - line 63, column 47): " + [v1.constructor.name]);
+          throw new Error("Failed pattern match at MinBars.Inspect (line 55, column 15 - line 64, column 47): " + [v1.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Inspect (line 52, column 45 - line 63, column 47): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Inspect (line 53, column 45 - line 64, column 47): " + [v.constructor.name]);
       };
     };
   };
