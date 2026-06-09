@@ -165,8 +165,11 @@ ADR-021 — mapped best-effort to `@parentchain`) need review; **dynamic partial
 `lower::liquid` maps control flow directly — `if`/`elsif`/`else` → `Cond`, `unless`,
 `case`/`when` → `{{#case}}`, `for` → `{{#each}}` — and `render`/`include`/`section` of a
 **string-literal** template → a partial (computed names are residuals). Output filters
-become a MaxBars helper chain (`upcase` → `uppercase`, `size` → `count`; unknown filters
-pass through and are flagged). Two semantic deltas: Liquid is **not auto-escaping**, so
+become a MaxBars helper chain (`upcase` → `uppercase`, `size` → `count`, `default` →
+`firstTruthy`); a filter that matches a Trussbars prelude operation or a blessed i18n
+host helper (`t`, `relative`, `number`, `date`, `selectPlural`, `json` — docs/09) passes
+through unflagged, while a foreign one (e.g. Shopify's `link_to`) is flagged to register
+as a host helper or convert. Two semantic deltas: Liquid is **not auto-escaping**, so
 output is emitted *raw* (`{{{ }}}`) unless an `escape` filter is present (which is
 consumed) — preserving behaviour; and the **truthiness rule** differs (Liquid: only
 `false`/`nil` falsy). Stateful tags are residuals: `assign` (template-scoped — the report

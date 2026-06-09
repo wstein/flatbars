@@ -1209,12 +1209,12 @@ impl Lower<'_> {
     /// Apply one Liquid filter as a MaxBars helper application (`value | name args`).
     fn liq_filter(&mut self, f: &liq::Filter, value: ir::Expr, span: Span) -> ir::Expr {
         let name = map_filter(&f.name);
-        if name == f.name && !KNOWN_PASSTHROUGH.contains(&f.name.as_str()) {
+        if !is_known_helper(name) {
             self.note(
                 span,
                 Severity::Warn,
                 format!(
-                    "filter `{}` — verify it exists in the MaxBars prelude",
+                    "filter `{}` is not a Trussbars prelude/host helper — register it with `#[truss_helpers]` or convert",
                     f.name
                 ),
             );
@@ -1356,21 +1356,94 @@ fn cmp_op(op: liq::CmpOp) -> &'static str {
     }
 }
 
-/// Map a Liquid filter name to its MaxBars prelude helper (identity when there is no
-/// rename); unknown names pass through and are flagged at the call site.
+/// Map a Liquid filter name to its Trussbars prelude helper (identity when there is no
+/// rename); names not in [`is_known_helper`] are flagged at the call site.
 fn map_filter(name: &str) -> &str {
     match name {
         "upcase" => "uppercase",
         "downcase" => "lowercase",
         "size" => "count",
+        "strip" => "trim",
+        "default" => "firstTruthy", // `x | default: y` ≡ first truthy of (x, y)
         other => other,
     }
 }
 
-/// Liquid filters that pass through by name without a "verify" note (they have a
-/// same-named MaxBars prelude helper).
-const KNOWN_PASSTHROUGH: &[&str] = &[
-    "first", "last", "join", "reverse", "truncate", "replace", "default", "append", "prepend",
+/// Whether `name` is a known Trussbars prelude operation or blessed host helper, so a
+/// migrated call to it needs no "provide a host helper" note.
+///
+/// Mirrors the reference prelude (`FullBars.preludeSchema`) plus the i18n host-helper
+/// pack (`t`/`relative`/`number`/`date`/`selectPlural`/`json` — docs/09, ADR-0029).
+/// Curated, not generated — extend it as the prelude grows; an over-strict miss only
+/// produces an extra advisory note, never a wrong migration.
+fn is_known_helper(name: &str) -> bool {
+    TRUSSBARS_HELPERS.contains(&name)
+}
+
+/// The known Trussbars prelude operations + blessed i18n host helpers.
+const TRUSSBARS_HELPERS: &[&str] = &[
+    // i18n host-helper pack (docs/09, ADR-0029) — first-class in Trussbars.
+    "t",
+    "relative",
+    "number",
+    "date",
+    "selectPlural",
+    "json",
+    // String helpers.
+    "uppercase",
+    "lowercase",
+    "capitalize",
+    "trim",
+    "truncate",
+    "slice",
+    "replace",
+    "strlen",
+    // Number helpers.
+    "abs",
+    "round",
+    "toFixed",
+    "toInt",
+    "modulo",
+    // Array / collection helpers.
+    "count",
+    "first",
+    "last",
+    "at",
+    "take",
+    "unique",
+    "reverse",
+    "join",
+    "sortBy",
+    "pluck",
+    "groupBy",
+    "where",
+    "reject",
+    "find",
+    "some",
+    "every",
+    "contains",
+    // Logic / coalescing / construction.
+    "and",
+    "or",
+    "not",
+    "eq",
+    "ne",
+    "lt",
+    "gt",
+    "lte",
+    "gte",
+    "add",
+    "subtract",
+    "multiply",
+    "divide",
+    "range",
+    "coalesce",
+    "firstTruthy",
+    "ternary",
+    "dict",
+    "list",
+    "lookup",
+    "safe",
 ];
 
 // ===========================================================================
@@ -2242,6 +2315,35 @@ mod tests {
     fn liq_truthiness_noted() {
         let l = liq_low("{% if x %}y{% endif %}");
         assert!(l.report.iter().any(|n| n.message.contains("truthiness")));
+    }
+
+    #[test]
+    fn liq_blessed_helper_not_flagged_but_foreign_is() {
+        // `t` (i18n) is first-class in Trussbars; `link_to` (Shopify) is not.
+        let l = liq_low(r#"{{ "blogs.newer" | t | link_to: blog.next }}"#);
+        assert!(
+            !l.report.iter().any(|n| n.message.contains("`t`")),
+            "t should not be flagged: {:?}",
+            l.report
+        );
+        assert!(
+            l.report.iter().any(|n| n.message.contains("`link_to`")),
+            "link_to should be flagged: {:?}",
+            l.report
+        );
+    }
+
+    #[test]
+    fn liq_filter_renames_are_known() {
+        // upcase→uppercase, size→count, default→firstTruthy, strip→trim — none flagged.
+        let l = liq_low("{{ x | upcase | size }}{{ y | default: 'n' | strip }}");
+        assert!(
+            !l.report
+                .iter()
+                .any(|n| n.message.contains("not a Trussbars")),
+            "{:?}",
+            l.report
+        );
     }
 
     // --- StringTemplate4 ----------------------------------------------------
