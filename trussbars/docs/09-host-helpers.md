@@ -1,9 +1,15 @@
 # Trussbars — The Host-Helper Convention (F3 design)
 
-> **Status:** Design (a v2 feature) · **Audience:** the v2 proc-macro author.
+> **Status:** Implemented (v2) · **Audience:** the v2 proc-macro author.
 > Closes gap **F3** — the #1 finding from both dogfoods: there is no way for a host
 > to provide `date` / `markdown` / `pluralize` / i18n, so they had to be precomputed
 > in Rust (see `examples/*/README.md`).
+>
+> Shipped as the **closed allow-list** (§7's alternative, not the open "any unknown
+> head" convention): a host helper is callable only when its name is declared, via
+> `truss!(…, helpers = [date, markdown])` or the `#[truss_helpers(date, markdown)]`
+> module attribute. An undeclared head stays a located, macro-time **`unknown
+> helper`** error (a typo never silently becomes a host call).
 
 ## 1. The constraint that makes this safe
 
@@ -23,51 +29,57 @@ unknown head and returns `unsupported: helper 'date'` (it cannot know the host
 defines one). So host helpers are a **v2** feature — the proc-macro can be told the
 host-helper set (or assume any unknown head is one) and emit a typed call.
 
-## 3. Design: host helpers are free functions resolved by name
+## 3. Design: declared host helpers are free functions called by name
 
-**An unknown application head is a host-helper call**, emitted as a path-qualified
-free function:
+**A declared head is a host-helper call**, emitted as a plain free-function call
+whose arguments are passed uniformly by reference:
 
 ```
-{{ date publishedAt "%Y-%m-%d" }}      →   helpers::date(&ctx.publishedAt, "%Y-%m-%d")
-{{ body | markdown }}                  →   helpers::markdown(&ctx.body)
+{{ date publishedAt "%Y-%m-%d" }}      →   date(&(ctx.publishedAt), &("%Y-%m-%d"))
+{{ body | markdown }}                  →   markdown(&(ctx.body))
 ```
 
-The host writes ordinary, typed Rust:
+The host writes ordinary, typed Rust functions and brings them into the template
+module's scope (a `use`, or a `helpers` module — organisation is the host's choice;
+the call itself is unqualified):
 
 ```rust
-mod helpers {
-    pub fn date(ts: &i64, fmt: &str) -> String { /* host's choice of date lib */ }
-    pub fn markdown(src: &impl trussbars_core::ToText) -> trussbars_core::Safe {
-        trussbars_core::Safe(/* host's markdown render */)
-    }
+pub fn date(ts: &i64, fmt: &str) -> String { /* host's choice of date lib */ }
+pub fn markdown(src: &str) -> trussbars_core::Safe {
+    trussbars_core::Safe(/* host's markdown render */)
 }
 ```
 
-- **Subject + args.** The piped/first argument is the subject (`&T`), the rest are
-  the literal/expression args — matching how the built-in value helpers already
-  emit (`trussbars_std::truncate(&x, 5)`).
+- **Subject + args, all by reference.** Every argument is emitted as `&(expr)` — the
+  piped/first argument (the subject) and the rest alike. A string- or number-literal
+  argument's `&&T` deref-coerces to the host's `&T`, so a signature is plain (`fmt:
+  &str`, not `&&str`). This is the uniform analog of how the built-in string pack
+  emits (`trussbars_std::uppercase(&x)`).
 - **Return type.** `String` (escaped on output like any value) or
   [`Safe`](../crates/trussbars-core/src/text.rs) (markup, emitted raw — e.g.
   `markdown`). The author's `{{ }}` vs `{{{ }}}` still controls escaping of a
   `String`; a `Safe` return is the *typed* way to opt a helper's output out of
   escaping (no `{{{ }}}` needed, and it can't be forgotten).
-- **Errors are rustc's.** Wrong arg type / wrong arity → a normal Rust type error at
-  the call site (steered to the template span by the `docs/07` machinery). Unknown
-  helper → "no function `date` in `helpers`", with the breadcrumb.
+- **Two error tiers.** An **undeclared** head is a Trussbars-owned, located *macro-time*
+  error (`unknown helper 'daet' (declare it with truss_helpers …)`). A declared head
+  whose host fn is missing or mistyped is **rustc's** (wrong arg type / arity / "cannot
+  find function `date`"), steered to the template span by the `docs/07` machinery.
 
-## 4. How the macro learns the helper module
+## 4. How the macro learns the allow-list (shipped)
 
-| Option | Form | Notes |
+The set of callable host helpers is **declared, at compile time** — only declared
+names resolve to a host call; everything else stays a built-in or an `unknown helper`
+error. Two equivalent surfaces:
+
+| Form | Where | Notes |
 | --- | --- | --- |
-| **A — convention (recommended)** | a `helpers` module in scope; any unknown head → `helpers::<name>` | zero ceremony; the host just defines `mod helpers`. The macro treats unknown heads as host calls. |
-| **B — explicit path** | `truss!(helpers = my_crate::tpl_helpers, "…")` / `#[template(helpers = …)]` | disambiguates when helpers live elsewhere; falls back to A's default. |
-| **C — a `Helpers` trait** | host impls a trait, passed beside `ctx` | most structured, but adds a dispatch object and a second parameter — heavier than the niche needs. |
+| **Per-call clause** | `truss!(render_post, PostCtx, path = "…", helpers = [date, markdown])` | the literal allow-list, on one template. |
+| **Module attribute** | `#[truss_helpers(date, markdown)] mod templates { truss!(…); … }` | declares it once; the attribute rewrites each inner `truss!` to carry the same `helpers = […]`. |
 
-Recommend **A with B as the override**: unknown head → `helpers::<name>(…)`, where
-`helpers` defaults to a module named `helpers` in scope and can be redirected with a
-`helpers = <path>` argument. No registry, no trait object — just name resolution,
-which keeps "names are static" literally true (the name resolves at compile time).
+Both are pure compile-time token wiring — no registry, no trait object, no runtime
+dispatch — which keeps "names are static" literally true (the name resolves to a
+static Rust path at compile time). This is the *closed-set* choice over the original
+"any unknown head is a host call" convention, so a typo is caught at macro time (§7).
 
 ## 5. Relationship to the reference engine (and conformance)
 
@@ -91,15 +103,18 @@ categorise, render markdown into `Safe`/`String` fields on the context) and let 
 template render the precomputed typed fields. The `examples/changelog` `parse_commit`
 pile *is* the requirements list this convention satisfies.
 
-## 7. Open questions (resolve when building it)
+## 7. Resolved decisions
 
-- **Unknown-head policy.** With convention A, *every* unknown head becomes a
-  host-call — so a genuine typo (`{{daet x}}`) surfaces as "no function `daet` in
-  `helpers`" rather than "unknown helper". Acceptable (the breadcrumb points at the
-  template), but consider a `#[trussbars_helper]` attribute registry if a closed set
-  is preferred (turns typos back into "unknown helper" at macro time).
-- **Block host-helpers** (`{{#myblock}}…{{/myblock}}`). Out of scope for the first
-  cut — value helpers only. Block helpers would need a body-as-closure convention.
-- **Arg coercion.** The built-ins coerce args via `stringify`; host helpers take
-  native typed args. Decide whether to auto-`&`-borrow the subject (yes, matching the
-  built-in emit) and how string-literal args bind (`&str`).
+- **Unknown-head policy — closed set.** A head is a host call **only** if declared in
+  the allow-list (§4); an undeclared head is a located, macro-time `unknown helper`
+  error. So a typo (`{{daet x}}`) is caught before rustc, the closed-set behaviour the
+  original §7 open question preferred over "any unknown head becomes a call".
+- **Arg coercion — uniform `&(expr)`.** Every argument (subject and the rest) is
+  auto-borrowed; a literal's `&&T` deref-coerces to the host's `&T`, so signatures are
+  plain references. Matches the built-in string-pack emit.
+
+### Still open (not needed yet)
+
+- **Block host-helpers** (`{{#myblock}}…{{/myblock}}`) — value helpers only for now;
+  a block helper would need a body-as-closure convention.
+- **A reference-faithful `trussbars-i18n` crate** (§5) — a separate deliverable.

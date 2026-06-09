@@ -3,7 +3,7 @@
 //! `MaxBars/Rust.purs`. The emitted code links against `trussbars-core` /
 //! `trussbars-std`; the conformance corpus pins the output byte-for-byte.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use crate::ast::{Cond, Each, Expr, Node, Value, With};
@@ -16,15 +16,25 @@ use crate::span::Span;
 /// Returns the `line:col: message` reason for a parse error or an unsupported
 /// construct (the located string the `truss!` macro drops into `compile_error!`).
 pub fn emit(ctx_type: &str, src: &str) -> Result<String, String> {
-    emit_named("render", ctx_type, src)
+    emit_named("render", ctx_type, src, &[])
 }
 
 /// As [`emit`], but the generated function is named `fn_name` (the `truss!` macro
-/// names each template's function so several can coexist in one module).
+/// names each template's function so several can coexist in one module) and
+/// `helpers` is the allow-list of host-helper names the template may call (F3): a
+/// non-built-in name `{{date x}}` / `{{x | markdown}}` compiles to a call to a host
+/// Rust fn of that name **only** when it is declared here, otherwise it is a located
+/// `unknown helper` error. So data can never name a function — the allow-list is
+/// static, set by the trusted host at compile time.
 ///
 /// # Errors
 /// The located `line:col: message` reason (see [`emit`]).
-pub fn emit_named(fn_name: &str, ctx_type: &str, src: &str) -> Result<String, String> {
+pub fn emit_named(
+    fn_name: &str,
+    ctx_type: &str,
+    src: &str,
+    helpers: &[String],
+) -> Result<String, String> {
     let nodes = parse(src).map_err(|e| located(e.at, src, &e.message))?;
     let (registry, top) = hoist(nodes);
     let env = Env {
@@ -37,6 +47,7 @@ pub fn emit_named(fn_name: &str, ctx_type: &str, src: &str) -> Result<String, St
         expanding: Vec::new(),
         yield_code: None,
         depth: 0,
+        helpers: Rc::new(helpers.iter().cloned().collect()),
     };
     // The node emit writes into one buffer (no per-node String allocs); the body then
     // sits between the render-fn header and footer.
@@ -80,6 +91,9 @@ struct Env {
     expanding: Vec<String>,
     yield_code: Option<String>,
     depth: usize,
+    /// The host-helper allow-list (F3): names the template may call as host Rust
+    /// functions. Shared (cheap clone) across the recursive emit.
+    helpers: Rc<BTreeSet<String>>,
 }
 
 // ── inline-partial hoisting ───────────────────────────────────────────────────
@@ -594,16 +608,32 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
         _ => {
             if let Some(call) = emit_helper(env, name, args) {
                 call
+            } else if args.is_empty() && env.params.contains_key(name) {
+                Ok(env.params[name].clone())
+            } else if env.helpers.contains(name) {
+                // A declared host helper (F3): a call to a host Rust fn of that name.
+                emit_host_call(env, name, args)
             } else if args.is_empty() {
-                env.params
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| format!("unsupported: expression head '{name}'"))
+                Err(format!("unsupported: expression head '{name}'"))
             } else {
-                Err(format!("unsupported: helper '{name}'"))
+                Err(format!(
+                    "unknown helper '{name}' (declare it with `truss_helpers` if it is a host helper)"
+                ))
             }
         }
     }
+}
+
+/// Emit a declared host-helper call (F3): `name(&(arg0), &(arg1), …)`. Every argument
+/// is passed by reference (the uniform convention — a string/number literal's `&&T`
+/// deref-coerces, so the host fn signature is plain `&T`); the host returns any
+/// `ToText` value, which the output path escapes or writes like a built-in.
+fn emit_host_call(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
+    let parts = args
+        .iter()
+        .map(|a| Ok(format!("&({})", emit_expr(env, a)?)))
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(format!("{name}({})", parts.join(", ")))
 }
 
 fn join_truthy(env: &Env, args: &[Expr], sep: &str) -> Result<String, String> {

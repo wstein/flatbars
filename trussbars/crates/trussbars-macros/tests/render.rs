@@ -23,6 +23,56 @@ truss!(
     "{{#each items}}- {{this}}\n{{else}}empty\n{{/each}}"
 );
 
+// F3: a declared host helper (`helpers = [..]`) compiles to a call to a host Rust
+// fn of that name. Both the call form `{{exclaim name}}` and the pipe form
+// `{{name | exclaim}}` desugar to the same `exclaim(&name)` host call.
+fn exclaim(s: &str) -> String {
+    format!("{s}!")
+}
+truss!(call_form, Greeting, "{{exclaim name}}", helpers = [exclaim]);
+truss!(
+    pipe_form,
+    Greeting,
+    "{{name | exclaim}}",
+    helpers = [exclaim]
+);
+
+// A two-arg host helper with a string-literal argument — proves the uniform
+// `&(expr)` arg convention (the literal's `&&str` deref-coerces to the host's `&str`).
+fn wrap(s: &str, brace: &str) -> String {
+    format!("{brace}{s}{brace}")
+}
+truss!(wrapped, Greeting, "{{wrap name \"*\"}}", helpers = [wrap]);
+
+#[test]
+fn declared_host_helper_is_called() {
+    let g = Greeting {
+        name: "hi".into(),
+        shout: false,
+    };
+    assert_eq!(call_form(&g), "hi!");
+    assert_eq!(pipe_form(&g), "hi!");
+    assert_eq!(wrapped(&g), "*hi*");
+}
+
+// The `#[truss_helpers(..)]` attribute declares the allow-list once for a whole
+// module of templates instead of repeating `helpers = [..]` on every call.
+#[trussbars_macros::truss_helpers(exclaim)]
+mod via_attr {
+    use super::{Greeting, exclaim};
+    use trussbars_macros::truss;
+    truss!(attr_form, Greeting, "{{exclaim name}}");
+}
+
+#[test]
+fn attribute_declares_the_allow_list() {
+    let g = Greeting {
+        name: "hi".into(),
+        shout: false,
+    };
+    assert_eq!(via_attr::attr_form(&g), "hi!");
+}
+
 // The `path = …` form: read the template from a file (relative to the crate root)
 // at macro-expansion time — same source as `cart`, so it must render identically.
 truss!(cart_from_file, Cart, path = "tests/templates/cart.truss");

@@ -39,8 +39,10 @@ v2 is built against a settled language, not a moving one.**
 4. **The parser scoped (docs/08).** Named as v2's dominant task; recommended a
    fresh recursive-descent parser for the Trussbars subset + a port of the desugar
    rules, gated by the corpus.
-5. **Host helpers designed (docs/09).** The F3 convention: unknown head → a
-   typed `helpers::<name>` free-function call ("names static" preserved).
+5. **Host helpers shipped (docs/09).** The F3 convention, built as a *closed
+   allow-list*: a declared head (`helpers = […]` / `#[truss_helpers(…)]`) emits a
+   typed free-function call, an undeclared one is a located `unknown helper` error
+   ("names static" preserved).
 
 ## Starting v2 (the build order)
 

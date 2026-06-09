@@ -1,4 +1,4 @@
-error: 1:8: unsupported: helper 'bogus'
+error: 1:8: unknown helper 'bogus' (declare it with `truss_helpers` if it is a host helper)
  --> tests/ui/unknown_helper.rs:5:1
   |
 5 | truss!(render, str, "<title>{{name | bogus}}</title>");
