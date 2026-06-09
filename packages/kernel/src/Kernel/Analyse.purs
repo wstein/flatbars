@@ -123,9 +123,11 @@ type Finding =
   }
 
 -- | A `Finding` for value `v` reported at decision `d`'s location, with the given
--- | `kind` and the rules that flip vs the engine's verdict (`here`).
-findingAt :: String -> String -> Decision -> Value -> Boolean -> Finding
-findingAt kind src d v here =
+-- | `kind` and the rules that flip vs the engine's verdict (`here`). `fix` is the
+-- | dialect's portable-fix advice for `v` (so the structured finding never carries
+-- | a fix the dialect can't express).
+findingAt :: (Value -> String) -> String -> String -> Decision -> Value -> Boolean -> Finding
+findingAt fix kind src d v here =
   let
     lc = lineColumn src d.span.start
     tagTxt = Str.trim (spanText src d.span)
@@ -136,7 +138,7 @@ findingAt kind src d v here =
     , tag: tagTxt
     , value: describe v
     , flips: map fst (divergence v here)
-    , fix: fixFor v
+    , fix: fix v
     , path: case recoverPath tagTxt of
         Just p -> p
         Nothing -> ""
@@ -145,8 +147,8 @@ findingAt kind src d v here =
 -- | The *observed* findings: ambiguous-four conditions the sample data actually
 -- | hit, which diverge across engines. The markdown `reportMarkdown` and this
 -- | share the same helpers, so the panel and the report never drift.
-findings :: String -> Array Decision -> Array Finding
-findings src = map (\d -> findingAt "observed" src d d.value d.truthyHere) <<< Array.filter
+findings :: (Value -> String) -> String -> Array Decision -> Array Finding
+findings fix src = map (\d -> findingAt fix "observed" src d d.value d.truthyHere) <<< Array.filter
   isFinding
 
 -- | The same-type ambiguous value a non-ambiguous, non-falsy observed value could
@@ -180,8 +182,9 @@ anyPath _ _ = true
 -- | not reported. The engine verdict for the hypothetical is the analysed engine's
 -- | own `rule` (`handlebars` for FullBars, `mustache` for MinBars) — so the
 -- | `flips under` set names the *other* engines relative to the right baseline.
-potentialFindings :: Truthy -> PathSchema -> String -> Array Decision -> Array Finding
-potentialFindings rule schema src decisions =
+potentialFindings
+  :: Truthy -> (Value -> String) -> PathSchema -> String -> Array Decision -> Array Finding
+potentialFindings rule fix schema src decisions =
   Array.nubByEq sameTagValue (Array.mapMaybe toPotential decisions)
   where
   observedPaths = Array.mapMaybe
@@ -189,7 +192,7 @@ potentialFindings rule schema src decisions =
     decisions
   toPotential d = sameTypeAmbiguous d.value >>= \av ->
     let
-      finding = findingAt "potential" src d av (rule av)
+      finding = findingAt fix "potential" src d av (rule av)
     in
       if Array.null finding.flips then Nothing
       else if finding.path /= "" && Array.elem finding.path observedPaths then Nothing
@@ -226,13 +229,13 @@ missFindings schema src decisions =
   sameTag a b = a.path == b.path
 
 -- | Observed findings, potential findings, then advisory miss findings (the host
--- | `PathSchema` filtering the latter two) — the full host-UI finding set. `rule`
--- | is the analysed engine's own truthiness (`handlebars`/`mustache`), used to read
--- | the potential-finding hypotheticals against the right baseline.
-allFindings :: Truthy -> PathSchema -> String -> Array Decision -> Array Finding
-allFindings rule schema src decisions =
-  findings src decisions
-    <> potentialFindings rule schema src decisions
+-- | `PathSchema` filtering the latter two) — the full host-UI finding set. The
+-- | engine profile (`labels`) supplies the truthiness `rule` for the
+-- | potential-finding hypotheticals and the dialect's `fix` advice.
+allFindings :: ReportLabels -> PathSchema -> String -> Array Decision -> Array Finding
+allFindings labels schema src decisions =
+  findings labels.fix src decisions
+    <> potentialFindings labels.rule labels.fix schema src decisions
     <> missFindings schema src decisions
 
 -- | The five truthiness operations, each wrapped to `tell` a `Decision` and then
@@ -324,8 +327,12 @@ runAnalysis toEngine setup nodes dat =
 -- | these two strings differ, because the engine sits at a different point on the
 -- | truthiness axis (ADR-022): FullBars on `handlebars`, MinBars on `mustache-spec`.
 -- | `rule` is the matching `Truthy` (`handlebars`/`mustache`), so the
--- | potential-finding hypotheticals read against the same baseline as the header.
-type ReportLabels = { engineRule :: String, rule :: Truthy, legend :: String }
+-- | potential-finding hypotheticals read against the same baseline as the header;
+-- | `fix` is the dialect's portable-fix advice for an ambiguous value (FullBars can
+-- | suggest helper syntax like `(ne x 0)`; logic-less Mustache must reshape the data
+-- | instead), so the report never prints a fix the dialect can't express.
+type ReportLabels =
+  { engineRule :: String, rule :: Truthy, fix :: Value -> String, legend :: String }
 
 -- | FullBars/RawBars/MaxBars labels: the engine renders on the `handlebars` rule,
 -- | which `mustache.js` shares, so a `flips under` entry names the *other* engines.
@@ -333,6 +340,7 @@ handlebarsLabels :: ReportLabels
 handlebarsLabels =
   { engineRule: "handlebars"
   , rule: handlebars
+  , fix: fixForHandlebars
   , legend:
       "_The engine `handlebars` rule is also `mustache.js`' (`0`/`\"\"` falsy), so a"
         <> " finding's `flips under` names the engines that branch the *other* way —"
@@ -393,7 +401,7 @@ reportMarkdownWith labels schema src decisions =
   conds = Array.filter (\d -> d.kind == "cond") decisions
   flagged = Array.filter isFinding decisions
   clean = Array.filter (\d -> d.kind == "cond" && Array.null d.diverges) decisions
-  potentials = potentialFindings labels.rule schema src decisions
+  potentials = potentialFindings labels.rule labels.fix schema src decisions
   misses = missFindings schema src decisions
 
   loc d = let lc = lineColumn src d.span.start in "line " <> show lc.line
@@ -421,7 +429,7 @@ reportMarkdownWith labels schema src decisions =
           <> "**; it flips under "
           <> Str.joinWith ", " (map (\t -> "`" <> fst t <> "`") d.diverges)
           <> "."
-      , "**Fix** · " <> fixFor d.value <> pathNote (recoverPath (tag d))
+      , "**Fix** · " <> labels.fix d.value <> pathNote (recoverPath (tag d))
       , ""
       ]
 
@@ -448,8 +456,10 @@ describe = case _ of
   VSafe _ -> "a safe string"
 
 -- | The portable fix to suggest for an ambiguous value tested in a condition.
-fixFor :: Value -> String
-fixFor = case _ of
+-- | The FullBars/RawBars/MaxBars portable-fix advice: these dialects have helpers
+-- | and `{{#each}}`, so the fix can be expressed in-template.
+fixForHandlebars :: Value -> String
+fixForHandlebars = case _ of
   VString "" -> "make it explicit and rule-free: `(ne s \"\")` / `(eq s \"\")`."
   VNumber _ ->
     "if 0 should count, `includeZero=true` (Handlebars-only — not portable); for portability test explicitly: `(ne x 0)`."

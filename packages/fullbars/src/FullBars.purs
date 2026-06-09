@@ -53,7 +53,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import FullBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, strictSurfaceViolation)
-import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, jsonataScaffold, reportMarkdown, runAnalysis)
+import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, handlebarsLabels, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartialFiles, registerPartials, withTranslator, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
@@ -410,7 +410,7 @@ analyseSurfaceWith schema src dat = case parse src of
           { output: r.output
           , report: reportMarkdown schema src r.decisions <> i18nNote template
           , jsonata: jsonataScaffold src r.decisions
-          , findings: allFindings handlebars schema src r.decisions
+          , findings: allFindings handlebarsLabels schema src r.decisions
           , evaluated: evaluatedCount r.decisions
           }
 

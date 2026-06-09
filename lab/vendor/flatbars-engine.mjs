@@ -13091,7 +13091,7 @@ var jsonataScaffold = function(src) {
         return "$";
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 495, column 16 - line 497, column 19): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 505, column 16 - line 507, column 19): " + [v.constructor.name]);
     };
     var normOf = function(p) {
       return function(v) {
@@ -13124,7 +13124,7 @@ var jsonataScaffold = function(src) {
         return p;
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 498, column 14 - line 500, column 17): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 508, column 14 - line 510, column 17): " + [v.constructor.name]);
     };
     var jsq = function(s) {
       return '"' + (s + '"');
@@ -13146,7 +13146,7 @@ var jsonataScaffold = function(src) {
         return new Just("(* computed condition, not path-targetable: " + (trim(spanText(src)(d.span)) + " *)"));
       }
       ;
-      throw new Error("Failed pattern match at Kernel.Analyse (line 490, column 20 - line 493, column 98): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Kernel.Analyse (line 500, column 20 - line 503, column 98): " + [v.constructor.name]);
     };
     var computed = nub2(mapMaybe(computedNote)(flagged));
     return joinWith("\n")(append13(["(* Truthiness cleanup scaffold (ADR-022) \u2014 REVIEW each rule before applying. *)", "(* Each path resolved to an engine-ambiguous value in a condition. *)"])(append13((function() {
@@ -13166,14 +13166,7 @@ var jsonataScaffold = function(src) {
     })())));
   };
 };
-var handlebarsLabels = /* @__PURE__ */ (function() {
-  return {
-    engineRule: "handlebars",
-    rule: handlebars,
-    legend: '_The engine `handlebars` rule is also `mustache.js`\' (`0`/`""` falsy), so a finding\'s `flips under` names the engines that branch the *other* way \u2014 `mustache-spec` is the language-agnostic Mustache/Ruby reading (`0`/`""` truthy), not `mustache.js`._'
-  };
-})();
-var fixFor = function(v) {
+var fixForHandlebars = function(v) {
   if (v instanceof VString && v.value0 === "") {
     return 'make it explicit and rule-free: `(ne s "")` / `(eq s "")`.';
   }
@@ -13192,6 +13185,14 @@ var fixFor = function(v) {
   ;
   return "branch explicitly so the decision does not ride on the host's truthiness rule.";
 };
+var handlebarsLabels = /* @__PURE__ */ (function() {
+  return {
+    engineRule: "handlebars",
+    rule: handlebars,
+    fix: fixForHandlebars,
+    legend: '_The engine `handlebars` rule is also `mustache.js`\' (`0`/`""` falsy), so a finding\'s `flips under` names the engines that branch the *other* way \u2014 `mustache-spec` is the language-agnostic Mustache/Ruby reading (`0`/`""` truthy), not `mustache.js`._'
+  };
+})();
 var evaluatedCount = /* @__PURE__ */ (function() {
   var $143 = filter(function(d) {
     return d.kind === "cond";
@@ -13259,89 +13260,95 @@ var describe = function(v) {
     return "a safe string";
   }
   ;
-  throw new Error("Failed pattern match at Kernel.Analyse (line 440, column 12 - line 448, column 29): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.Analyse (line 448, column 12 - line 456, column 29): " + [v.constructor.name]);
 };
-var findingAt = function(kind) {
-  return function(src) {
-    return function(d) {
-      return function(v) {
-        return function(here) {
-          var tagTxt = trim(spanText(src)(d.span));
-          var lc = lineColumn(src)(d.span.start);
-          return {
-            kind,
-            line: lc.line,
-            column: lc.column,
-            tag: tagTxt,
-            value: describe(v),
-            flips: map18(fst)(divergence(v)(here)),
-            fix: fixFor(v),
-            path: (function() {
-              var v1 = recoverPath(tagTxt);
-              if (v1 instanceof Just) {
-                return v1.value0;
-              }
-              ;
-              if (v1 instanceof Nothing) {
-                return "";
-              }
-              ;
-              throw new Error("Failed pattern match at Kernel.Analyse (line 140, column 13 - line 142, column 22): " + [v1.constructor.name]);
-            })()
+var findingAt = function(fix) {
+  return function(kind) {
+    return function(src) {
+      return function(d) {
+        return function(v) {
+          return function(here) {
+            var tagTxt = trim(spanText(src)(d.span));
+            var lc = lineColumn(src)(d.span.start);
+            return {
+              kind,
+              line: lc.line,
+              column: lc.column,
+              tag: tagTxt,
+              value: describe(v),
+              flips: map18(fst)(divergence(v)(here)),
+              fix: fix(v),
+              path: (function() {
+                var v1 = recoverPath(tagTxt);
+                if (v1 instanceof Just) {
+                  return v1.value0;
+                }
+                ;
+                if (v1 instanceof Nothing) {
+                  return "";
+                }
+                ;
+                throw new Error("Failed pattern match at Kernel.Analyse (line 142, column 13 - line 144, column 22): " + [v1.constructor.name]);
+              })()
+            };
           };
         };
       };
     };
   };
 };
-var findings = function(src) {
-  var $145 = map18(function(d) {
-    return findingAt("observed")(src)(d)(d.value)(d.truthyHere);
-  });
-  var $146 = filter(isFinding);
-  return function($147) {
-    return $145($146($147));
+var findings = function(fix) {
+  return function(src) {
+    var $145 = map18(function(d) {
+      return findingAt(fix)("observed")(src)(d)(d.value)(d.truthyHere);
+    });
+    var $146 = filter(isFinding);
+    return function($147) {
+      return $145($146($147));
+    };
   };
 };
 var potentialFindings = function(rule) {
-  return function(schema) {
-    return function(src) {
-      return function(decisions) {
-        var sameTagValue = function(a) {
-          return function(b) {
-            return a.tag === b.tag && a.value === b.value;
+  return function(fix) {
+    return function(schema) {
+      return function(src) {
+        return function(decisions) {
+          var sameTagValue = function(a) {
+            return function(b) {
+              return a.tag === b.tag && a.value === b.value;
+            };
           };
+          var observedPaths = mapMaybe(function(d) {
+            var $109 = isFinding(d);
+            if ($109) {
+              return recoverPath(trim(spanText(src)(d.span)));
+            }
+            ;
+            return Nothing.value;
+          })(decisions);
+          var toPotential = function(d) {
+            return bind5(sameTypeAmbiguous(d.value))(function(av) {
+              var finding = findingAt(fix)("potential")(src)(d)(av)(rule(av));
+              var $110 = $$null(finding.flips);
+              if ($110) {
+                return Nothing.value;
+              }
+              ;
+              var $111 = finding.path !== "" && elem8(finding.path)(observedPaths);
+              if ($111) {
+                return Nothing.value;
+              }
+              ;
+              var $112 = finding.path !== "" && !schema(finding.path)(av);
+              if ($112) {
+                return Nothing.value;
+              }
+              ;
+              return new Just(finding);
+            });
+          };
+          return nubByEq(sameTagValue)(mapMaybe(toPotential)(decisions));
         };
-        var observedPaths = mapMaybe(function(d) {
-          var $109 = isFinding(d);
-          if ($109) {
-            return recoverPath(trim(spanText(src)(d.span)));
-          }
-          ;
-          return Nothing.value;
-        })(decisions);
-        var toPotential = function(d) {
-          return bind5(sameTypeAmbiguous(d.value))(function(av) {
-            var finding = findingAt("potential")(src)(d)(av)(rule(av));
-            var $110 = $$null(finding.flips);
-            if ($110) {
-              return Nothing.value;
-            }
-            ;
-            var $111 = finding.path !== "" && elem8(finding.path)(observedPaths);
-            if ($111) {
-              return Nothing.value;
-            }
-            ;
-            var $112 = finding.path !== "" && !schema(finding.path)(av);
-            if ($112) {
-              return Nothing.value;
-            }
-            ;
-            return new Just(finding);
-          });
-        };
-        return nubByEq(sameTagValue)(mapMaybe(toPotential)(decisions));
       };
     };
   };
@@ -13360,7 +13367,7 @@ var reportMarkdownWith = function(labels) {
         var tag = function(d) {
           return trim(spanText(src)(d.span));
         };
-        var potentials = potentialFindings(labels.rule)(schema)(src)(decisions);
+        var potentials = potentialFindings(labels.rule)(labels.fix)(schema)(src)(decisions);
         var potentialLine = function(f) {
           return "* \u26A0 line " + (show22(f.line) + (" \u2014 `" + (f.tag + ("` would diverge if it held " + (f.value + (" (flips under " + (joinWith(", ")(map18(function(r) {
             return "`" + (r + "`");
@@ -13382,7 +13389,7 @@ var reportMarkdownWith = function(labels) {
             return "";
           }
           ;
-          throw new Error("Failed pattern match at Kernel.Analyse (line 433, column 14 - line 435, column 18): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Kernel.Analyse (line 441, column 14 - line 443, column 18): " + [v.constructor.name]);
         };
         var misses = missFindings(schema)(src)(decisions);
         var missLine = function(f) {
@@ -13396,7 +13403,7 @@ var reportMarkdownWith = function(labels) {
         var findingSection = function(d) {
           return joinWith("\n")(["## \u26A0 " + (loc(d) + (" \u2014 `" + (tag(d) + ("` tested " + describe(d.value))))), "Under `" + (labels.engineRule + ("` (engine) this is **" + (verdict(d.truthyHere) + ("**; it flips under " + (joinWith(", ")(map18(function(t) {
             return "`" + (fst(t) + "`");
-          })(d.diverges)) + "."))))), "**Fix** \xB7 " + (fixFor(d.value) + pathNote(recoverPath(tag(d)))), ""]);
+          })(d.diverges)) + "."))))), "**Fix** \xB7 " + (labels.fix(d.value) + pathNote(recoverPath(tag(d)))), ""]);
         };
         var conds = filter(function(d) {
           return d.kind === "cond";
@@ -13510,7 +13517,7 @@ var analysisWrappers = /* @__PURE__ */ (function() {
       return [new Tuple("lookup", analysedLookup(v.value0))];
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Analyse (line 272, column 19 - line 274, column 58): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Analyse (line 275, column 19 - line 277, column 58): " + [v.constructor.name]);
   })();
   var analysed = function(name2) {
     return function(variadic2) {
@@ -13544,7 +13551,7 @@ var analysisWrappers = /* @__PURE__ */ (function() {
       return new Just(new Tuple(v.value0, analysed(v.value0)(v.value1)(v1.value0)));
     }
     ;
-    throw new Error("Failed pattern match at Kernel.Analyse (line 249, column 32 - line 251, column 65): " + [v1.constructor.name]);
+    throw new Error("Failed pattern match at Kernel.Analyse (line 252, column 32 - line 254, column 65): " + [v1.constructor.name]);
   };
   return append13(mapMaybe(wrap3)(conds))(lookupWrapper);
 })();
@@ -13563,11 +13570,11 @@ var runAnalysis = function(toEngine) {
     };
   };
 };
-var allFindings = function(rule) {
+var allFindings = function(labels) {
   return function(schema) {
     return function(src) {
       return function(decisions) {
-        return append13(findings(src)(decisions))(append13(potentialFindings(rule)(schema)(src)(decisions))(missFindings(schema)(src)(decisions)));
+        return append13(findings(labels.fix)(src)(decisions))(append13(potentialFindings(labels.rule)(labels.fix)(schema)(src)(decisions))(missFindings(schema)(src)(decisions)));
       };
     };
   };
@@ -14719,7 +14726,7 @@ var analyseSurfaceWith = function(schema) {
               output: v4.value0.output,
               report: reportMarkdown(schema)(src)(v4.value0.decisions) + i18nNote(v3.template),
               jsonata: jsonataScaffold(src)(v4.value0.decisions),
-              findings: allFindings(handlebars)(schema)(src)(v4.value0.decisions),
+              findings: allFindings(handlebarsLabels)(schema)(src)(v4.value0.decisions),
               evaluated: evaluatedCount(v4.value0.decisions)
             });
           }
@@ -19863,10 +19870,30 @@ var mapFlipped4 = /* @__PURE__ */ mapFlipped(functorEither);
 var runTemplate7 = /* @__PURE__ */ runTemplate(/* @__PURE__ */ monadWriterT(monoidArray)(monadEither));
 var traverse13 = /* @__PURE__ */ traverse(traversableArray)(applicativeEither);
 var fromFoldable14 = /* @__PURE__ */ fromFoldable3(ordString)(foldableArray);
+var fixForMustache = function(v) {
+  if (v instanceof VString && v.value0 === "") {
+    return "Mustache is logic-less \u2014 reshape the data: add a boolean flag in the view-model (e.g. `hasText`), or normalize the empty string to absent (`null`).";
+  }
+  ;
+  if (v instanceof VNumber) {
+    return "Mustache is logic-less \u2014 reshape the data: add a boolean flag (e.g. `hasCount`) in the view-model, or normalize 0 to absent (`null`).";
+  }
+  ;
+  if (v instanceof VArray) {
+    return "an empty array is falsy on every engine \u2014 iterate with `{{#xs}}\u2026{{/xs}}` and pair `{{^xs}}\u2026{{/xs}}` for the empty case.";
+  }
+  ;
+  if (v instanceof VObject) {
+    return "only the `presence` rule calls `{}` falsy \u2014 add an explicit boolean flag to the view-model rather than testing the object.";
+  }
+  ;
+  return "reshape the data so the section tests a real boolean (Mustache is logic-less \u2014 there is no inline test).";
+};
 var minbarsLabels = /* @__PURE__ */ (function() {
   return {
     engineRule: "mustache-spec",
     rule: mustache,
+    fix: fixForMustache,
     legend: '_MinBars renders on the language-agnostic `mustache-spec` rule (`0`/`""`/`{}` truthy, as Ruby/Python Mustache). `mustache.js` instead follows the `handlebars` rule (`0`/`""` falsy), so a finding\'s `flips under: handlebars` is exactly where `mustache.js` branches the other way._'
   };
 })();
@@ -19914,8 +19941,8 @@ var analysedEngine = function(seeded) {
       return function(name2) {
         return bind15(resolve(env)(name2))(function(op) {
           return pure14((function() {
-            var $36 = name2 === "section" || name2 === "inverted";
-            if ($36) {
+            var $42 = name2 === "section" || name2 === "inverted";
+            if ($42) {
               return observe(name2)(op);
             }
             ;
@@ -19961,7 +19988,7 @@ var analyseMinWith = function(partialSrcs) {
           return new Right(new Tuple(v3.value0, desugar2(v12.value0.nodes)));
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Analyse (line 161, column 35 - line 163, column 58): " + [v12.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Analyse (line 183, column 35 - line 185, column 58): " + [v12.constructor.name]);
       };
       var v = traverse13(compilePartial)(partialSrcs);
       if (v instanceof Left) {
@@ -19985,18 +20012,18 @@ var analyseMinWith = function(partialSrcs) {
               output: v2.value0.output,
               report: reportMarkdownWith(minbarsLabels)(anyPath)(src)(v2.value0.decisions),
               jsonata: jsonataScaffold(src)(v2.value0.decisions),
-              findings: allFindings(mustache)(anyPath)(src)(v2.value0.decisions),
+              findings: allFindings(minbarsLabels)(anyPath)(src)(v2.value0.decisions),
               evaluated: evaluatedCount(v2.value0.decisions)
             });
           }
           ;
-          throw new Error("Failed pattern match at MinBars.Analyse (line 151, column 24 - line 159, column 10): " + [v2.constructor.name]);
+          throw new Error("Failed pattern match at MinBars.Analyse (line 173, column 24 - line 181, column 10): " + [v2.constructor.name]);
         }
         ;
-        throw new Error("Failed pattern match at MinBars.Analyse (line 149, column 15 - line 159, column 10): " + [v1.constructor.name]);
+        throw new Error("Failed pattern match at MinBars.Analyse (line 171, column 15 - line 181, column 10): " + [v1.constructor.name]);
       }
       ;
-      throw new Error("Failed pattern match at MinBars.Analyse (line 147, column 38 - line 159, column 10): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at MinBars.Analyse (line 169, column 38 - line 181, column 10): " + [v.constructor.name]);
     };
   };
 };

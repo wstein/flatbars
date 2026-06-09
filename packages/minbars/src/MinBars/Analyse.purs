@@ -52,6 +52,7 @@ minbarsLabels :: ReportLabels
 minbarsLabels =
   { engineRule: "mustache-spec"
   , rule: mustache
+  , fix: fixForMustache
   , legend:
       "_MinBars renders on the language-agnostic `mustache-spec` rule"
         <> " (`0`/`\"\"`/`{}` truthy, as Ruby/Python Mustache). `mustache.js` instead"
@@ -59,6 +60,27 @@ minbarsLabels =
         <> " `flips under: handlebars` is exactly where `mustache.js` branches the"
         <> " other way._"
   }
+
+-- | The MinBars portable-fix advice. Mustache is logic-less — there is no inline
+-- | test to suggest — so the fix is always to reshape the data (a boolean flag in
+-- | the view-model, or normalizing the ambiguous value to absent).
+fixForMustache :: Value -> String
+fixForMustache = case _ of
+  VString "" ->
+    "Mustache is logic-less — reshape the data: add a boolean flag in the view-model"
+      <> " (e.g. `hasText`), or normalize the empty string to absent (`null`)."
+  VNumber _ ->
+    "Mustache is logic-less — reshape the data: add a boolean flag (e.g. `hasCount`)"
+      <> " in the view-model, or normalize 0 to absent (`null`)."
+  VArray _ ->
+    "an empty array is falsy on every engine — iterate with `{{#xs}}…{{/xs}}` and"
+      <> " pair `{{^xs}}…{{/xs}}` for the empty case."
+  VObject _ ->
+    "only the `presence` rule calls `{}` falsy — add an explicit boolean flag to the"
+      <> " view-model rather than testing the object."
+  _ ->
+    "reshape the data so the section tests a real boolean (Mustache is logic-less —"
+      <> " there is no inline test)."
 
 -- | The MinBars engine with `section`/`inverted` wrapped to record a truthiness
 -- | `Decision` at each scalar test. Built from the real `minEngine` so the render
@@ -154,7 +176,7 @@ analyseMinWith partialSrcs src dat = case traverse compilePartial partialSrcs of
         { output: r.output
         , report: reportMarkdownWith minbarsLabels anyPath src r.decisions
         , jsonata: jsonataScaffold src r.decisions
-        , findings: allFindings mustache anyPath src r.decisions
+        , findings: allFindings minbarsLabels anyPath src r.decisions
         , evaluated: evaluatedCount r.decisions
         }
   where

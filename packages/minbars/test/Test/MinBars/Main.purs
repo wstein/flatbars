@@ -10,6 +10,8 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Map as Map
+import Data.String (Pattern(..))
+import Data.String as String
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
@@ -321,8 +323,12 @@ main = do
   -- Truthiness analysis (ADR-022, the Mustache-portability story). A section over
   -- an ambiguous scalar (`0`/`""`) is a finding: MinBars (mustache-spec) renders it,
   -- mustache.js (handlebars rule) would not.
+  -- The fix is Mustache-honest: data-reshaping advice, never FullBars helper syntax
+  -- like `(ne x 0)` (logic-less Mustache cannot express it).
   expectFindings "section-zero" "{{#count}}c{{/count}}" (obj [ Tuple "count" (num 0.0) ])
-    \fs -> Array.length fs == 1 && Array.any (\f -> Array.elem "handlebars" f.flips) fs
+    \fs -> Array.length fs == 1
+      && Array.any (\f -> Array.elem "handlebars" f.flips) fs
+      && Array.all (\f -> not (String.contains (Pattern "(ne ") f.fix)) fs
   -- A boolean section is portable: a boolean has no ambiguous instance, so neither
   -- the observed value nor its type produces a finding.
   expectFindings "section-flag" "{{#flag}}yes{{/flag}}" (obj [ Tuple "flag" (VBool true) ])
