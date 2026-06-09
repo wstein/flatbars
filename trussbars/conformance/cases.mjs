@@ -57,6 +57,31 @@ export const cases = [
     data: { done: false },
   },
 
+  // ── case / when (multi-arm conditional, docs/12) ─────────────────────────────
+  {
+    id: "case-hit",
+    template:
+      '{{#case status}}{{when "shipped"}}On its way{{when "pending" "queued"}}Waiting{{else}}Unknown{{/case}}',
+    data: { status: "queued" },
+  },
+  {
+    id: "case-else",
+    template:
+      '{{#case status}}{{when "shipped"}}On its way{{else}}Unknown{{/case}}',
+    data: { status: "lost" },
+  },
+  {
+    id: "case-no-else-miss",
+    template: "{{#case n}}{{when 1}}one{{when 2}}two{{/case}}",
+    data: { n: 3 },
+  },
+  {
+    id: "case-standalone",
+    template:
+      '{{#case status}}\n{{when "a"}}A\n{{when "b"}}B\n{{else}}Z\n{{/case}}\n',
+    data: { status: "b" },
+  },
+
   // ── each & loop metadata ─────────────────────────────────────────────────────
   {
     id: "each-strings",

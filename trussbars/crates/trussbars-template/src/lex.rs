@@ -173,7 +173,8 @@ fn eligible(src: &str, l: &Lexeme) -> bool {
         } => {
             let head = interior.of(src).trim_start();
             let head = head.split(|c: char| c.is_whitespace()).next().unwrap_or("");
-            head == "else" || head == "elif"
+            // `else`/`elif` split an `if`; `when` splits a `{{#case}}` (docs/12).
+            head == "else" || head == "elif" || head == "when"
         }
         _ => false,
     }

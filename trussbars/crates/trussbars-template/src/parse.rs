@@ -4,7 +4,7 @@
 //! `let` hash, threads a [`Scope`] for path rooting, and splits `{{else}}` /
 //! `{{else if}}` clauses.
 
-use crate::ast::{Cond, Each, Expr, HelperBlock, Node, With};
+use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, With};
 use crate::lex::{Lexeme, Sigil, lex};
 use crate::parse_expr::{ParseError, Scope, parse_expr};
 use alloc::string::{String, ToString};
@@ -38,6 +38,7 @@ pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
         Stop::Eof => Ok(nodes),
         Stop::Close(name) => err(format!("unexpected `{{{{/{name}}}}}` (no open block)"), 0),
         Stop::Else | Stop::ElseIf(_) => err("unexpected `{{else}}` outside a block".to_string(), 0),
+        Stop::When(_) => err("unexpected `{{when}}` outside a `{{#case}}`".to_string(), 0),
     }
 }
 
@@ -48,6 +49,12 @@ fn err<T>(message: impl Into<String>, at: usize) -> Result<T, ParseError> {
     })
 }
 
+/// The built-in block heads `open_block` dispatches — reserved, so a host cannot declare a
+/// block helper with one of these names (docs/12 §5.2). Keep in sync with `open_block`.
+pub const RESERVED_BLOCK_HEADS: &[&str] = &[
+    "if", "unless", "each", "with", "let", "case", "inline", "partial",
+];
+
 /// What stopped a body scan.
 enum Stop {
     /// A `{{/name}}` close.
@@ -56,6 +63,8 @@ enum Stop {
     Else,
     /// A `{{else if cond}}` (the raw condition source).
     ElseIf(String),
+    /// A `{{when V …}}` arm of a `{{#case}}` (the raw value-expression source).
+    When(String),
     /// End of input.
     Eof,
 }
@@ -106,6 +115,10 @@ impl Blocks<'_> {
                     if let Some(c) = strip_else_if(text) {
                         self.pos += 1;
                         return Ok((nodes, Stop::ElseIf(c.to_string())));
+                    }
+                    if let Some(vals) = strip_when(text) {
+                        self.pos += 1;
+                        return Ok((nodes, Stop::When(vals.to_string())));
                     }
                     if text == "yield" {
                         nodes.push(Node::Yield { span });
@@ -161,7 +174,8 @@ impl Blocks<'_> {
         }
     }
 
-    /// Dispatch a `{{# … }}` block (called with `pos` at the open tag).
+    /// Dispatch a `{{# … }}` block (called with `pos` at the open tag). The built-in
+    /// heads matched here are [`RESERVED_BLOCK_HEADS`] — they cannot name a host helper.
     fn open_block(
         &mut self,
         span: crate::span::Span,
@@ -176,6 +190,7 @@ impl Blocks<'_> {
             "each" => self.each_block(span, rest, scope),
             "with" => self.with_block(span, rest, scope),
             "let" => self.let_block(span, rest, scope),
+            "case" => self.case_block(span, rest, scope),
             "inline" => self.inline_block(span, rest, scope),
             "partial" => self.partial_block(span, rest, scope),
             // Any other head is a *host block helper* (docs/09): parse it meaning-free
@@ -218,6 +233,10 @@ impl Blocks<'_> {
                 format!("block helper `{head}`: `{{{{else}}}}` is not yet supported"),
                 span.start,
             ),
+            Stop::When(_) => err(
+                format!("block helper `{head}`: `{{{{when}}}}` is only valid in a `{{{{#case}}}}`"),
+                span.start,
+            ),
             Stop::Eof => err(
                 format!("unclosed block helper `{{{{#{head}}}}}`"),
                 span.start,
@@ -251,6 +270,12 @@ impl Blocks<'_> {
                     break;
                 }
                 Stop::Close(_) => break,
+                Stop::When(_) => {
+                    return err(
+                        "unexpected `{{when}}` outside a `{{#case}}` block",
+                        span.start,
+                    );
+                }
                 Stop::Eof => return err("unclosed conditional block", span.start),
             }
         }
@@ -260,6 +285,59 @@ impl Blocks<'_> {
             cond,
             body,
             elifs,
+            otherwise,
+        }))
+    }
+
+    /// `{{#case SUBJECT}}{{when V …}}…{{else}}…{{/case}}` — the multi-arm conditional
+    /// (docs/12). First-class [`Case`]: the subject and each arm's raw value(s) are kept so
+    /// the emitter can lower it to a Rust `match` (the subject evaluated once) rather than a
+    /// repeated-`eq` `if`-chain.
+    fn case_block(
+        &mut self,
+        span: crate::span::Span,
+        subject_src: &str,
+        scope: &Scope,
+    ) -> Result<Node, ParseError> {
+        let subject = parse_expr(subject_src.trim(), scope)?;
+        // Only whitespace may precede the first `{{when}}` (no Liquid-style fall-through).
+        let (leading, mut stop) = self.parse_until(scope)?;
+        if leading.iter().any(|n| !is_blank_text(n)) {
+            return err(
+                "only whitespace may precede the first `{{when}}` in a `{{#case}}`",
+                span.start,
+            );
+        }
+        let mut arms: Vec<(Vec<Expr>, Vec<Node>)> = Vec::new();
+        let mut otherwise: Vec<Node> = Vec::new();
+        loop {
+            match stop {
+                Stop::When(vals) => {
+                    let values = when_values(&vals, scope)?;
+                    let (body, s) = self.parse_until(scope)?;
+                    arms.push((values, body));
+                    stop = s;
+                }
+                Stop::Else => {
+                    let (ebody, s) = self.parse_until(scope)?;
+                    otherwise = ebody;
+                    expect_close(&s, span.start)?;
+                    break;
+                }
+                Stop::Close(_) => break,
+                Stop::ElseIf(_) => {
+                    return err(
+                        "`{{else if}}` is not valid in a `{{#case}}` (use `{{when}}`)",
+                        span.start,
+                    );
+                }
+                Stop::Eof => return err("unclosed `{{#case}}` block", span.start),
+            }
+        }
+        Ok(Node::Case(Case {
+            span,
+            subject,
+            arms,
             otherwise,
         }))
     }
@@ -412,6 +490,7 @@ impl Blocks<'_> {
                 Ok(ebody)
             }
             Stop::ElseIf(_) => err("`{{else if}}` is only valid in a conditional", at),
+            Stop::When(_) => err("`{{when}}` is only valid in a `{{#case}}`", at),
             Stop::Eof => err("unclosed block", at),
         }
     }
@@ -475,6 +554,36 @@ fn strip_else_if(text: &str) -> Option<&str> {
         .map(str::trim_start)
         .and_then(|r| r.strip_prefix("if"))
         .map(str::trim)
+}
+
+/// `when <values…>` → `Some(values)` (a `{{#case}}` arm). Requires a word boundary, so
+/// `whenever` is not read as `when ever`.
+fn strip_when(text: &str) -> Option<&str> {
+    let rest = text.strip_prefix("when")?;
+    if rest.is_empty() || rest.starts_with(char::is_whitespace) {
+        Some(rest.trim())
+    } else {
+        None
+    }
+}
+
+/// The match value expressions of a `{{when V …}}` arm. Parsed as the arguments of a
+/// throwaway `when` application (the same arg grammar as a value call); an empty `{{when}}`
+/// has no values (it never matches).
+fn when_values(vals_src: &str, scope: &Scope) -> Result<Vec<Expr>, ParseError> {
+    if vals_src.trim().is_empty() {
+        Ok(Vec::new())
+    } else {
+        match parse_expr(&format!("when {vals_src}"), scope)? {
+            Expr::App(_, a) => Ok(a),
+            other => Ok(vec![other]),
+        }
+    }
+}
+
+/// A whitespace-only text node — what may legally precede the first `{{when}}` arm.
+fn is_blank_text(node: &Node) -> bool {
+    matches!(node, Node::Text(s) if s.trim().is_empty())
 }
 
 /// Read a leading identifier: `(name, rest)`.
@@ -667,6 +776,48 @@ mod tests {
     fn unless_is_negated() {
         let ns = parse("{{#unless done}}todo{{/unless}}").unwrap();
         assert!(matches!(&ns[0], Node::Cond(c) if c.negated));
+    }
+
+    #[test]
+    fn case_is_first_class_with_raw_arm_values() {
+        let ns =
+            parse("{{#case s}}{{when \"a\"}}A{{when \"b\" \"c\"}}BC{{else}}E{{/case}}").unwrap();
+        match &ns[0] {
+            Node::Case(c) => {
+                assert_eq!(c.arms.len(), 2);
+                // first arm: one value, body "A".
+                assert_eq!(c.arms[0].0, vec![Expr::str("a")]);
+                assert_eq!(c.arms[0].1, vec![Node::Text("A".into())]);
+                // second arm: two raw values (kept for the `match`), body "BC".
+                assert_eq!(c.arms[1].0, vec![Expr::str("b"), Expr::str("c")]);
+                assert_eq!(c.arms[1].1, vec![Node::Text("BC".into())]);
+                assert_eq!(c.otherwise, vec![Node::Text("E".into())]);
+            }
+            o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn case_without_else_has_empty_otherwise() {
+        let ns = parse("{{#case s}}{{when 1}}one{{when 2}}two{{/case}}").unwrap();
+        match &ns[0] {
+            Node::Case(c) => {
+                assert_eq!(c.arms.len(), 2);
+                assert_eq!(c.arms[0].1, vec![Node::Text("one".into())]);
+                assert!(c.otherwise.is_empty());
+            }
+            o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn case_content_before_first_when_is_rejected() {
+        assert!(parse("{{#case s}}junk{{when 1}}x{{/case}}").is_err());
+    }
+
+    #[test]
+    fn when_outside_case_is_rejected() {
+        assert!(parse("{{when 1}}x").is_err());
     }
 
     #[test]

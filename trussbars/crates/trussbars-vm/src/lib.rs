@@ -37,7 +37,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 
 use trussbars_core::{ToText, escape_html};
-use trussbars_template::{Cond, Each, Expr, Node, Value as Lit, With, parse};
+use trussbars_template::{Case, Cond, Each, Expr, Node, Value as Lit, With, parse};
 
 /// Euclidean remainder, `no_std`-safe (`f64::rem_euclid` is std-only). Byte-identical
 /// to it: the `%` operator is in `core`, and a negative remainder is lifted by `|b|`.
@@ -514,6 +514,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
             }
         }
         Node::Cond(c) => eval_cond(env, c, out)?,
+        Node::Case(c) => eval_case(env, c, out)?,
         Node::With(w) => eval_with(env, w, out)?,
         Node::Each(e) => eval_each(env, e, out)?,
         Node::Let { bindings, body, .. } => {
@@ -637,6 +638,21 @@ fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
     for (econd, ebody) in &c.elifs {
         if truthy_at(env, &eval_expr(env, econd)?)? {
             return eval_nodes(env, ebody, out);
+        }
+    }
+    eval_nodes(env, &c.otherwise, out)
+}
+
+/// `{{#case}}` — the subject is evaluated **once**, then the first `{{when}}` arm whose
+/// value (any of them) equals it renders; else the `{{else}}` body (docs/12). The runtime
+/// mirror of the AOT `match`.
+fn eval_case(env: &Env, c: &Case, out: &mut String) -> Result<(), String> {
+    let subject = eval_expr(env, &c.subject)?;
+    for (values, body) in &c.arms {
+        for v in values {
+            if eval_expr(env, v)? == subject {
+                return eval_nodes(env, body, out);
+            }
         }
     }
     eval_nodes(env, &c.otherwise, out)

@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use crate::ast::{Cond, Each, Expr, HelperBlock, Node, Value, With};
+use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, Value, With};
 use crate::parse::parse;
 use crate::span::Span;
 
@@ -35,6 +35,16 @@ pub fn emit_named(
     src: &str,
     helpers: &[String],
 ) -> Result<String, String> {
+    // A host cannot declare a built-in block head (`if`/`each`/`case`/…) as a helper —
+    // it is shadowed by the parser, so accepting it would silently never fire (docs/12 §5.2).
+    if let Some(name) = helpers
+        .iter()
+        .find(|h| crate::parse::RESERVED_BLOCK_HEADS.contains(&h.as_str()))
+    {
+        return Err(format!(
+            "`{name}` is a reserved built-in block and cannot be declared as a host helper"
+        ));
+    }
     let nodes = parse(src).map_err(|e| located(e.at, src, &e.message))?;
     let (registry, top) = hoist(nodes);
     let env = Env {
@@ -129,6 +139,15 @@ fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<No
                 c.otherwise = hoist_into(c.otherwise, reg);
                 out.push(Node::Cond(c));
             }
+            Node::Case(mut c) => {
+                c.arms = c
+                    .arms
+                    .into_iter()
+                    .map(|(v, b)| (v, hoist_into(b, reg)))
+                    .collect();
+                c.otherwise = hoist_into(c.otherwise, reg);
+                out.push(Node::Case(c));
+            }
             Node::With(mut w) => {
                 w.body = hoist_into(w.body, reg);
                 w.otherwise = hoist_into(w.otherwise, reg);
@@ -195,6 +214,10 @@ fn estimate_node(n: &Node) -> usize {
                     .iter()
                     .map(|(_, b)| estimate_bytes(b))
                     .sum::<usize>()
+                + estimate_bytes(&c.otherwise)
+        }
+        Node::Case(c) => {
+            c.arms.iter().map(|(_, b)| estimate_bytes(b)).sum::<usize>()
                 + estimate_bytes(&c.otherwise)
         }
         Node::With(w) => estimate_bytes(&w.body) + estimate_bytes(&w.otherwise),
@@ -270,6 +293,7 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
         Node::Inline { .. } => {} // hoisted away
         Node::Each(e) => return each_block(env, src, e, out),
         Node::Cond(c) => return cond_block(env, src, c, out),
+        Node::Case(c) => return case_block(env, src, c, out),
         Node::With(w) => return with_block(env, src, w, out),
         Node::Let { bindings, body, .. } => return let_block(env, src, bindings, body, out),
         Node::HelperBlock(b) => return helper_block(env, src, b, out),
@@ -366,6 +390,33 @@ fn cond_block(env: &Env, src: &str, c: &Cond, out: &mut String) -> Result<(), St
         out.push('}');
     }
     out.push('\n');
+    Ok(())
+}
+
+/// `{{#case}}` → a Rust `match`: the subject is evaluated **once** (bound as `__subj`) and
+/// dispatched by one guard arm per `{{when}}` — the first-class lowering the user asked for
+/// (`case` becomes `match`), not a repeated-`eq` `if`-chain. Each guard reuses the same
+/// `==` the `eq` operator emits, so the rendered bytes match the interpreter (docs/12).
+fn case_block(env: &Env, src: &str, c: &Case, out: &mut String) -> Result<(), String> {
+    let subject = emit_expr(env, &c.subject)?;
+    out.push_str(&format!("{{\nlet __subj = &({subject});\nmatch () {{\n"));
+    for (values, body) in &c.arms {
+        let guard = if values.is_empty() {
+            "false".to_string()
+        } else {
+            values
+                .iter()
+                .map(|v| Ok(format!("*__subj == ({})", emit_expr(env, v)?)))
+                .collect::<Result<Vec<_>, String>>()?
+                .join(" || ")
+        };
+        out.push_str(&format!("() if {guard} => {{\n"));
+        emit_nodes(env, src, body, out)?;
+        out.push_str("}\n");
+    }
+    out.push_str("_ => {\n");
+    emit_nodes(env, src, &c.otherwise, out)?;
+    out.push_str("}\n}\n}\n");
     Ok(())
 }
 

@@ -66,6 +66,8 @@ pub enum Node {
     Each(Each),
     /// `{{#if}}` / `{{#unless}}` (`negated`) with `{{else if}}` / `{{else}}` arms.
     Cond(Cond),
+    /// `{{#case subject}}{{when V…}}…{{else}}…{{/case}}` — the multi-arm conditional.
+    Case(Case),
     /// `{{#with subject}}…{{else}}…{{/with}}` (re-root).
     With(With),
     /// `{{#let a=(e) b=(e)…}}…{{/let}}` — sequential block-scoped aliases.
@@ -155,6 +157,7 @@ impl Node {
             | Node::RawBlock { span, .. } => *span,
             Node::Each(e) => e.span,
             Node::Cond(c) => c.span,
+            Node::Case(c) => c.span,
             Node::With(w) => w.span,
             Node::HelperBlock(b) => b.span,
         }
@@ -194,6 +197,21 @@ pub struct Cond {
     /// `{{else if cond}}` arms, in order.
     pub elifs: Vec<(Expr, Vec<Node>)>,
     /// The trailing `{{else}}` body.
+    pub otherwise: Vec<Node>,
+}
+
+/// `{{#case subject}}{{when V…}}…{{else}}…{{/case}}` data — the multi-arm conditional
+/// (docs/12). First-class so the emitter lowers it to a Rust `match` (the subject evaluated
+/// once as the scrutinee) rather than a repeated-`eq` `if`-chain.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Case {
+    /// The tag span.
+    pub span: Span,
+    /// The subject, evaluated once and compared against each arm's value(s).
+    pub subject: Expr,
+    /// The `{{when V…}}` arms in order: each arm's match value(s) and its body.
+    pub arms: Vec<(Vec<Expr>, Vec<Node>)>,
+    /// The trailing `{{else}}` body (empty when absent).
     pub otherwise: Vec<Node>,
 }
 
