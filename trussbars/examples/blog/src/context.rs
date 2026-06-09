@@ -21,7 +21,7 @@ pub struct Post {
     pub title: String,
     pub author: String,
     /// A raw ISO date; the template formats it with the `date` host helper (F3),
-    /// e.g. `{{date post.date "%B %e, %Y"}}`.
+    /// e.g. `{{date post.date "%B %e, %Y" "en"}}`.
     pub date: String,
     pub excerpt: String,
     /// Markdown source; the `markdown` host helper (F3) renders it to safe HTML at

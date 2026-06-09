@@ -4,7 +4,7 @@
 //! A thin template over a host precompute. `parse_commit` still splits the
 //! `type(scope): subject` prefix and shortens the hash (a template can't pattern-match
 //! a prefix), but **date formatting now lives in the template** via the F3 host helper
-//! `{{date c.date "%Y-%m-%d"}}` (`trussbars_i18n::date`, declared with
+//! `{{date c.date "%Y-%m-%d" "en"}}` (`trussbars_i18n::date`, declared with
 //! `#[truss_helpers]`) — dogfooding the host-helper convention that closed gap F3.
 
 pub mod context;
