@@ -15,7 +15,8 @@ use std::io::Read;
 use std::path::Path;
 use std::process::ExitCode;
 
-use trussbars_import::lower::{LowerOptions, NoShapes, Severity};
+use trussbars_import::lower::{LowerOptions, NoShapes, Severity, ShapeOracle};
+use trussbars_import::sample::JsonShapes;
 use trussbars_import::{Ast, Dialect, metrics, migrate, parse};
 
 #[derive(PartialEq)]
@@ -31,6 +32,8 @@ fn main() -> ExitCode {
     let mut file: Option<String> = None;
     let mut mode = Mode::Dump;
     let mut ternary = false;
+    let mut data: Option<String> = None;
+    let mut report_json = false;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -41,9 +44,17 @@ fn main() -> ExitCode {
             other if other.starts_with("--dialect=") => {
                 dialect_override = Some(other["--dialect=".len()..].to_string());
             }
+            "--data" => match args.next() {
+                Some(v) => data = Some(v),
+                None => return usage("`--data` needs a file path"),
+            },
+            other if other.starts_with("--data=") => {
+                data = Some(other["--data=".len()..].to_string());
+            }
             "--metrics" => mode = Mode::Metrics,
             "--to-truss" => mode = Mode::ToTruss,
             "--ternary" => ternary = true,
+            "--report-json" => report_json = true,
             "--help" | "-h" => {
                 print_help();
                 return ExitCode::SUCCESS;
@@ -83,7 +94,7 @@ fn main() -> ExitCode {
     match mode {
         Mode::Dump => dump(dialect, &src),
         Mode::Metrics => run_metrics(dialect, &src),
-        Mode::ToTruss => run_to_truss(dialect, &src, ternary),
+        Mode::ToTruss => run_to_truss(dialect, &src, ternary, data.as_deref(), report_json),
     }
 }
 
@@ -140,15 +151,44 @@ fn run_metrics(dialect: Dialect, src: &str) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn run_to_truss(dialect: Dialect, src: &str, ternary: bool) -> ExitCode {
+fn run_to_truss(
+    dialect: Dialect,
+    src: &str,
+    ternary: bool,
+    data: Option<&str>,
+    report_json: bool,
+) -> ExitCode {
     if dialect != Dialect::Mustache {
         return usage("`--to-truss` currently supports only the `mustache` dialect");
     }
+    // The shape oracle: a `--data` JSON sample, else the heuristic.
+    let oracle: Box<dyn ShapeOracle> = match data {
+        Some(path) => {
+            let json = match read_source(path) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("error: failed to read data sample `{path}`: {e}");
+                    return ExitCode::from(2);
+                }
+            };
+            match JsonShapes::parse(&json) {
+                Ok(s) => Box::new(s),
+                Err(e) => {
+                    eprintln!("error: `{path}` is not valid JSON: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+        }
+        None => Box::new(NoShapes),
+    };
+
     let opts = LowerOptions { ternary };
-    match migrate::mustache(src, &NoShapes, &opts) {
+    match migrate::mustache(src, oracle.as_ref(), &opts) {
         Ok(m) => {
             print!("{}", m.truss);
-            if !m.report.is_empty() {
+            if report_json {
+                eprintln!("{}", migrate::report_json(&m.report, src));
+            } else if !m.report.is_empty() {
                 eprintln!("\n{} migration note(s):", m.report.len());
                 for n in &m.report {
                     let (line, col) = line_col(src, n.span.start);
@@ -219,7 +259,9 @@ fn print_help() {
     println!("  (default)     dump the parsed dialect AST ({{:#?}})");
     println!("  --metrics     report Mustache idiom metrics (and suggested parameters)");
     println!("  --to-truss    migrate Mustache → idiomatic .truss (report on stderr)");
-    println!("    --ternary   collapse trivial complementary pairs to {{x ? a : b}}");
+    println!("    --ternary       collapse trivial complementary pairs to {{x ? a : b}}");
+    println!("    --data <f.json> disambiguate sections from a JSON data sample");
+    println!("    --report-json   emit the migration report as JSON on stderr");
     println!();
     println!("dialects (inferred from extension when omitted):");
     println!("  mustache              .mustache");

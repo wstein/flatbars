@@ -26,6 +26,7 @@ pub mod lower;
 pub mod metrics;
 pub mod migrate;
 pub mod mustache;
+pub mod sample;
 pub mod stringtemplate;
 
 pub use trussbars_template::Span;
