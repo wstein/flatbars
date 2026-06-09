@@ -1,0 +1,16 @@
+{{!-- a representative Handlebars template --}}
+<h1>{{title}}</h1>
+{{#each items as |item index|}}
+  <li>{{index}}: {{uppercase item.name}} {{{item.html}}}</li>
+{{else}}
+  <p>No items.</p>
+{{/each}}
+{{#if user.admin}}
+  Admin
+{{else if user.editor}}
+  Editor
+{{else}}
+  Guest
+{{/if}}
+{{> nav class="top"}}
+{{#> layout title=(concat a b)}}body{{/layout}}

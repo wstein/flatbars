@@ -1,0 +1,15 @@
+// a representative StringTemplate4 group file
+delimiters "<", ">"
+import "common.stg"
+group Page;
+
+page(title, items) ::= <<
+Title: <title>
+<items:row()>
+>>
+
+row(item, sep=", ") ::= "<item.name><sep>"
+
+typeNames ::= ["int": "Integer", "bool": "Boolean", default: "Object"]
+
+@page.header() ::= "Default header"

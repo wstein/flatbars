@@ -1,0 +1,15 @@
+<h1>{{ page.title | upcase }}</h1>
+{% assign featured = products | where: "featured", true %}
+{% for product in featured limit: 3 %}
+  <li>{{ product.name }} — {{ product.price | money }}</li>
+{% else %}
+  <p>Nothing featured.</p>
+{% endfor %}
+{% case product.kind %}
+  {% when "book", "ebook" %}Readable
+  {% when "video" %}Watchable
+  {% else %}Other
+{% endcase %}
+{% if cart.items == empty or items.size > 0 %}cart{% endif %}
+{% render "card", product: featured %}
+{% raw %}{{ literal }}{% endraw %}

@@ -1,0 +1,11 @@
+{{! a small but representative Mustache template }}
+<h1>{{title}}</h1>
+{{#items}}
+  <li>{{name}}: {{{html}}}</li>
+{{/items}}
+{{^items}}
+  <p>No items.</p>
+{{/items}}
+{{> footer}}
+{{=<% %>=}}
+<%greeting%>
