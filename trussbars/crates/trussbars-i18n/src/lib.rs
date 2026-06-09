@@ -18,8 +18,9 @@
 //!
 //! **Faithfulness.** The names, arities and *fallback* semantics mirror the
 //! reference engine's i18n pack (ADR-029): `t` returns its key unchanged absent a
-//! catalog, `selectPlural` uses the English `one`/`other` rule, `relative` falls
-//! back to a plain English phrasing. The formatters (`date`, `number`) are real,
+//! catalog (an explicit *fallback* — see [`t`]); `relative` falls back to a plain
+//! English phrasing. `selectPlural` is **CLDR-accurate** (table-driven, per-language
+//! cardinal categories). The formatters (`date`, `number`) are real,
 //! dependency-free implementations — **byte-identity to a particular locale runtime
 //! (JS `Intl`, ICU, …) stays the host's responsibility** (the reference i18n seam is
 //! itself a documented non-byte-identical boundary; docs/09 §5). A host wanting exact
@@ -75,17 +76,92 @@ pub fn number(value: &f64, decimals: &f64) -> String {
     out
 }
 
-/// The CLDR-style plural **category** for `n` under the English `one`/`other` rule
-/// (the reference fallback, ADR-029): `1` → `"one"`, everything else → `"other"`.
-/// A locale-aware host declares its own rule for languages with more categories.
+/// The CLDR cardinal plural **category** for `count` in language `lang` (a BCP-47
+/// tag; only the primary subtag is used, so `pt-BR` → `pt`): one of `"zero"`,
+/// `"one"`, `"two"`, `"few"`, `"many"`, `"other"`. Table-driven and dependency-free.
+///
+/// CLDR-accurate for the bundled rule shapes — the English/Germanic group (en, de,
+/// es, it, nl, sv, …), French (fr/pt), the East-Slavic group (ru/uk), Polish (pl),
+/// the Czech/Slovak group (cs/sk), Arabic (ar, all six categories), and the
+/// no-plural group (ja, zh, ko, …). Any other tag falls back to the English rule.
+/// Operands are read off `count` as an `f64`: `i` is its integer part and a non-zero
+/// fraction counts as visible fraction digits (`v > 0`), which the cardinal rules
+/// need; `NaN`/∞ → `"other"`. Returns the category, not a formatted string — pair it
+/// with a `{{#with}}`/`select` over the result. `no_std`-clean (core ops only).
 #[must_use]
 #[allow(non_snake_case)] // mirrors the blessed template name `selectPlural`
-pub fn selectPlural(n: &f64) -> &'static str {
-    if (*n - 1.0).abs() < f64::EPSILON {
-        "one"
-    } else {
-        "other"
+pub fn selectPlural(count: &f64, lang: &str) -> &'static str {
+    // Manual abs (keeps this `no_std`-clean — `f64::abs` is std-only).
+    let n = if *count < 0.0 { -*count } else { *count };
+    if !n.is_finite() {
+        return "other";
     }
+    let i = n as u64; // integer part (a saturating cast)
+    let v0 = n == i as f64; // true ⇒ no visible fraction digits (v = 0)
+    let (m10, m100) = (i % 10, i % 100);
+    let lang = primary_subtag(lang);
+    let is = |code: &str| lang.eq_ignore_ascii_case(code);
+
+    if is("ja") || is("zh") || is("ko") || is("th") || is("vi") || is("id") || is("ms") {
+        "other" // languages without a cardinal plural distinction
+    } else if is("ar") {
+        if n == 0.0 {
+            "zero"
+        } else if n == 1.0 {
+            "one"
+        } else if n == 2.0 {
+            "two"
+        } else if v0 && (3..=10).contains(&m100) {
+            "few"
+        } else if v0 && (11..=99).contains(&m100) {
+            "many"
+        } else {
+            "other"
+        }
+    } else if is("pl") {
+        if i == 1 && v0 {
+            "one"
+        } else if v0 && (2..=4).contains(&m10) && !(12..=14).contains(&m100) {
+            "few"
+        } else if v0 && i != 1 && (m10 <= 1 || (5..=9).contains(&m10) || (12..=14).contains(&m100))
+        {
+            "many"
+        } else {
+            "other"
+        }
+    } else if is("ru") || is("uk") {
+        if v0 && m10 == 1 && m100 != 11 {
+            "one"
+        } else if v0 && (2..=4).contains(&m10) && !(12..=14).contains(&m100) {
+            "few"
+        } else if v0 && (m10 == 0 || (5..=9).contains(&m10) || (11..=14).contains(&m100)) {
+            "many"
+        } else {
+            "other"
+        }
+    } else if is("cs") || is("sk") {
+        if i == 1 && v0 {
+            "one"
+        } else if (2..=4).contains(&i) && v0 {
+            "few"
+        } else if !v0 {
+            "many"
+        } else {
+            "other"
+        }
+    } else if is("fr") || is("pt") {
+        // French/Portuguese: `one` for i ∈ {0, 1} (the compact-notation `many` omitted).
+        if i == 0 || i == 1 { "one" } else { "other" }
+    } else {
+        // Default: the English/Germanic rule — `one` iff exactly 1 with no fraction.
+        if i == 1 && v0 { "one" } else { "other" }
+    }
+}
+
+/// The primary language subtag — the part before the first `-`/`_` (so `pt-BR` → `pt`).
+fn primary_subtag(lang: &str) -> &str {
+    let end = lang.find(['-', '_']).unwrap_or(lang.len());
+    &lang[..end]
 }
 
 /// A plain-English **relative time** phrasing for a signed `value` of `unit`
@@ -243,10 +319,48 @@ mod tests {
     }
 
     #[test]
-    fn select_plural_english_rule() {
-        assert_eq!(selectPlural(&1.0), "one");
-        assert_eq!(selectPlural(&0.0), "other");
-        assert_eq!(selectPlural(&2.0), "other");
+    fn select_plural_cldr_categories() {
+        // English/Germanic: `one` only for exactly 1.
+        assert_eq!(selectPlural(&1.0, "en"), "one");
+        assert_eq!(selectPlural(&0.0, "en"), "other");
+        assert_eq!(selectPlural(&2.0, "en"), "other");
+        assert_eq!(selectPlural(&1.5, "en"), "other");
+        // French: 0 and 1 are `one`.
+        assert_eq!(selectPlural(&0.0, "fr"), "one");
+        assert_eq!(selectPlural(&1.0, "fr"), "one");
+        assert_eq!(selectPlural(&2.0, "fr"), "other");
+        // Russian: one/few/many, with the 11→many and 21→one edges.
+        assert_eq!(selectPlural(&1.0, "ru"), "one");
+        assert_eq!(selectPlural(&21.0, "ru"), "one");
+        assert_eq!(selectPlural(&2.0, "ru"), "few");
+        assert_eq!(selectPlural(&5.0, "ru"), "many");
+        assert_eq!(selectPlural(&11.0, "ru"), "many");
+        assert_eq!(selectPlural(&1.5, "ru"), "other");
+        // Polish.
+        assert_eq!(selectPlural(&1.0, "pl"), "one");
+        assert_eq!(selectPlural(&2.0, "pl"), "few");
+        assert_eq!(selectPlural(&22.0, "pl"), "few");
+        assert_eq!(selectPlural(&5.0, "pl"), "many");
+        assert_eq!(selectPlural(&12.0, "pl"), "many");
+        // Czech.
+        assert_eq!(selectPlural(&1.0, "cs"), "one");
+        assert_eq!(selectPlural(&3.0, "cs"), "few");
+        assert_eq!(selectPlural(&5.0, "cs"), "other");
+        assert_eq!(selectPlural(&1.5, "cs"), "many");
+        // Arabic: all six categories.
+        assert_eq!(selectPlural(&0.0, "ar"), "zero");
+        assert_eq!(selectPlural(&1.0, "ar"), "one");
+        assert_eq!(selectPlural(&2.0, "ar"), "two");
+        assert_eq!(selectPlural(&3.0, "ar"), "few");
+        assert_eq!(selectPlural(&11.0, "ar"), "many");
+        assert_eq!(selectPlural(&100.0, "ar"), "other");
+        // Japanese: no plural distinction.
+        assert_eq!(selectPlural(&1.0, "ja"), "other");
+        assert_eq!(selectPlural(&5.0, "ja"), "other");
+        // Region subtag ignored; an unknown language falls back to the English rule.
+        assert_eq!(selectPlural(&1.0, "pl-PL"), "one");
+        assert_eq!(selectPlural(&1.0, "xx"), "one");
+        assert_eq!(selectPlural(&2.0, "xx"), "other");
     }
 
     #[test]
