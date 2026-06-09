@@ -22,17 +22,21 @@ const fails = [];
 // Positive: each catalogued operation in head position MUST paint as `operation`.
 // Catalogue entries that are CLAUSE SEPARATORS (engine `keyword` tag class) — they
 // live in the catalogue for hover/completion but are NOT helper invocations, so
-// the painter correctly leaves them to the engine's keyword-kind paint.
-const KEYWORD_NAMES = new Set(["else", "elif"]);
+// the painter correctly leaves them to the engine's keyword-kind paint. `when` is the
+// `{{#case}}` arm separator (RawBars/MaxBars); `else`/`elif` are the `{{#if}}` clauses.
+const KEYWORD_NAMES = new Set(["else", "elif", "when"]);
 
 for (const op of operations) {
   const text = `{{${op.name} x}}`;
-  const tokens = tokensOf(text, "fullbars");
+  // A separator paints as a keyword only in a dialect that treats it as one — `when` is
+  // a separator in MaxBars (its `clauseSeps`), not in FullBars. Tokenize the keyword
+  // names through MaxBars (where else/elif/when are all separators), the helper
+  // operations through FullBars.
+  const tokens = tokensOf(text, KEYWORD_NAMES.has(op.name) ? "maxbars" : "fullbars");
   // Find any token that covers the head identifier's first character (offset 2,
   // after `{{`). For `operation`-kind paints the token covers just the name;
-  // for `keyword`-kind paints (else / elif) the token covers the whole inner
-  // trimmed body `else x`. Either way, the token at offset 2 carries the kind
-  // we care about.
+  // for `keyword`-kind paints (else / elif / when) the token covers the whole inner
+  // trimmed body. Either way, the token at offset 2 carries the kind we care about.
   const opTok = tokens.find((t) => t.char <= 2 && t.char + t.length > 2);
   const expectedKind = KEYWORD_NAMES.has(op.name) ? "keyword" : "operation";
   if (!opTok || opTok.kind !== expectedKind) {
@@ -63,5 +67,5 @@ if (fails.length) {
 const kwCount = [...KEYWORD_NAMES].filter((n) => operations.some((o) => o.name === n)).length;
 console.log(
   `✓ operations-paint parity: ${operations.length - kwCount} catalog names paint as operation, ` +
-  `${kwCount} as keyword (else/elif), ${fakes.length} non-catalog names stay default`,
+  `${kwCount} as keyword (else/elif/when), ${fakes.length} non-catalog names stay default`,
 );
