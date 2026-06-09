@@ -19,6 +19,7 @@
 
 use std::path::Path;
 
+pub mod handlebars;
 pub mod mustache;
 
 pub use trussbars_template::Span;
@@ -128,6 +129,8 @@ impl Dialect {
 pub enum Ast {
     /// A parsed Mustache template.
     Mustache(Vec<mustache::Node>),
+    /// A parsed Handlebars template.
+    Handlebars(Vec<handlebars::Node>),
 }
 
 /// Parse `src` as `dialect`, returning the dialect-tagged [`Ast`].
@@ -137,6 +140,7 @@ pub enum Ast {
 pub fn parse(dialect: Dialect, src: &str) -> Result<Ast, ParseError> {
     match dialect {
         Dialect::Mustache => mustache::parse(src).map(Ast::Mustache),
+        Dialect::Handlebars => handlebars::parse(src).map(Ast::Handlebars),
         _ => Err(ParseError::new(
             format!("dialect `{}` not yet implemented", dialect.name()),
             0,
