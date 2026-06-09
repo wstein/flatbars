@@ -7,8 +7,9 @@
 //!
 //! Two rendering modes, proving patterns from `docs/11`:
 //! 1. **Helper-based VM** — `{{t …}}/{{number …}}/…` via host helpers registered at runtime
-//!    ([`i18n::register`]). The `receipt` sample. Cycling the locale flips the title, plural
-//!    noun, grouped number, and localized month. VM-only — host helpers can't work in AOT.
+//!    ([`i18n::register`]). The `receipt` sample. Cycling the locale flips the localized
+//!    dimensions — title, plural noun, and month name (`number` grouping and `relative`
+//!    phrasing are en-US fallbacks). VM-only — host helpers can't work in AOT.
 //! 2. **AOT-compat proxy** — Toggle [`Mode::Compat`]: strict mode, rejects host helpers.
 //!    The `receipt` is rejected. The plain `greeting` (no i18n) renders byte-identically.
 //!

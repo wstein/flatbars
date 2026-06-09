@@ -47,7 +47,8 @@ API (so it stays correct under scrolling and selection).
    `{{t …}}` / `{{number …}}` / `{{plural …}}` / `{{date …}}` / `{{relative …}}` — host
    helpers registered at runtime in [`src/i18n.rs`](src/i18n.rs), with the language taken
    from the lab's locale and the messages from the **editable catalog pane**. Press `F2`
-   and the title, plural noun, grouped number, and **localized month name** all change:
+   and the localized dimensions change — the **title**, the **plural noun**, and the
+   **localized month name**:
 
    ```text
    == Receipt ==              == Beleg ==                == Paragon ==
@@ -55,12 +56,15 @@ API (so it stays correct under scrolling and selection).
    Placed: 09 June 2026       Erstellt: 09 Juni 2026     Wystawiono: 09 czerwiec 2026
    ```
 
+   Number grouping (`899.00`) and `relative` phrasing (`in 3 days`) are **en-US
+   fallbacks** — invariant across locales, as the output above shows; locale-aware
+   separators belong in `trussbars-i18n`, not this host shim (a tracked follow-up).
    Bump `count` in the Data pane to watch the plural switch. Polish exercises CLDR's
    four cardinal forms — `1 element`, `3 elementy`, `5 elementów` — while German
    `Artikel` is invariant. Edit a message in the i18n pane and the render updates live.
 
 2. **`render_compat` is the AOT-parity proxy (§7).** Press `F3`:
-   - `receipt` → `⟂ unsupported: helper 't'` — host helpers are VM-only.
+   - `receipt` → `⟂ unsupported: helper 't' / 1 args` — host helpers are VM-only.
    - `greeting` → **byte-identical** to lenient. It uses no i18n (plain `{{field}}`
      interpolation), so it carries no helpers — and the lab hides the i18n pane for it,
      giving the Output the full bottom row.
