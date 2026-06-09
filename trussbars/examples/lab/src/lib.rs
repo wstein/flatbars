@@ -5,14 +5,15 @@
 //! serve. Built with [`ratatui`] over the crossterm backend; the editable panes are
 //! [`tui_textarea`] widgets (selection, undo/redo, word motions, internal scrolling).
 //!
-//! Two things it proves, straight from `docs/11`:
-//! 1. **The VM leads AOT on host helpers & i18n (§8).** The `receipt` sample calls
-//!    `{{t …}}`/`{{number …}}`/`{{plural …}}`/`{{date …}}`/`{{relative …}}` — host
-//!    helpers registered at runtime ([`i18n::register`]); cycling the locale flips the
-//!    title, plural noun, grouped number, and localized month name.
-//! 2. **`render_compat` is the AOT-parity proxy (§7).** Toggle [`Mode::Compat`]: the
-//!    `receipt` is rejected (host helpers are VM-only), while the plain `greeting` (no
-//!    i18n — its i18n pane is hidden) renders byte-identically.
+//! Two rendering modes, proving patterns from `docs/11`:
+//! 1. **Helper-based VM** — `{{t …}}/{{number …}}/…` via host helpers registered at runtime
+//!    ([`i18n::register`]). The `receipt` sample. Cycling the locale flips the title, plural
+//!    noun, grouped number, and localized month. VM-only — host helpers can't work in AOT.
+//! 2. **AOT-compat proxy** — Toggle [`Mode::Compat`]: strict mode, rejects host helpers.
+//!    The `receipt` is rejected. The plain `greeting` (no i18n) renders byte-identically.
+//!
+//! (The data-driven catalog pattern — catalog as data, looked up by declared helpers,
+//! identical on AOT + VM — has its own focused example, `examples/i18n-data`.)
 //!
 //! The render core ([`Lab::render`]) is pure and golden-tested; [`ui`] is drawn headlessly
 //! under a `TestBackend` (`tests/`). The `main.rs` event loop is the only part that touches
@@ -455,11 +456,33 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
     );
     maybe_scrollbar(frame, p.output, out_len, lab.output_scroll);
 
+    // Get cursor position from the focused pane (1-indexed for display).
+    let cursor_info = match lab.focus {
+        Focus::Template => {
+            let (row, col) = lab.template.cursor();
+            format!(" Ln {}, Col {} ", row + 1, col + 1)
+        }
+        Focus::Data => {
+            let (row, col) = lab.data.cursor();
+            format!(" Ln {}, Col {} ", row + 1, col + 1)
+        }
+        Focus::I18n => {
+            let (row, col) = lab.i18n.cursor();
+            format!(" Ln {}, Col {} ", row + 1, col + 1)
+        }
+    };
+
     frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            " [Tab/click] focus  [F2] locale  [F3] mode  [F4] sample  [wheel/PgUp/PgDn] scroll  [Esc] quit ",
-            Style::new().fg(Color::DarkGray),
-        ))),
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                cursor_info,
+                Style::new().fg(Color::Cyan),
+            ),
+            Span::styled(
+                " [Tab/click] focus  [F2] locale  [F3] mode  [F4] sample  [wheel/PgUp/PgDn] scroll  [Esc] quit ",
+                Style::new().fg(Color::DarkGray),
+            ),
+        ])),
         p.help,
     );
 }

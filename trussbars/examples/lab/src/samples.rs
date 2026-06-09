@@ -4,7 +4,9 @@
 //! `relative`) and localizes live as the lab's locale (or the catalog) changes — VM-only,
 //! since the compat proxy rejects host helpers. `Greeting` uses **no i18n**: plain data
 //! interpolation, so it carries no helpers, hides the i18n pane, and renders identically
-//! under the AOT-compat proxy. Everything is editable at runtime.
+//! under the AOT-compat proxy. (The data-driven catalog pattern — catalog as data, looked
+//! up by declared helpers, identical on AOT + VM — lives in its own focused example,
+//! `examples/i18n-data`.)
 
 /// Which starting sample is loaded.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

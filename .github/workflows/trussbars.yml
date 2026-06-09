@@ -119,12 +119,13 @@ jobs:
   # golden output (no PureScript toolchain needed — the generated render module is
   # committed). `blog` = authored content; `changelog` = git-log aggregation;
   # `lab` = the dynamic-VM mini-Lab (the VM northstar — runtime render + i18n host
-  # helpers; its golden gate is the {sample × locale × mode} matrix).
+  # helpers; its golden gate is the {sample × locale × mode} matrix); `i18n-data` = the
+  # unified-i18n reference (compile-time helpers over a data catalog; AOT≡VM parity test).
   examples:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        example: [blog, changelog, lab]
+        example: [blog, changelog, lab, i18n-data]
     defaults:
       run:
         working-directory: trussbars/examples/${{ matrix.example }}

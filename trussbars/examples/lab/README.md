@@ -21,7 +21,7 @@ cargo test                     # editor + data units, the golden matrix, a TestB
 | `Tab` | cycle focus (Template → Data → i18n) |
 | wheel / `PageUp` / `PageDown` | scroll the pane under the cursor / the focused pane |
 | `F2` | cycle locale (en → de → fr → **pl**) |
-| `F3` | toggle mode (`render` ⇄ `render_compat`) |
+| `F3` | toggle render mode (`render` ⇄ `render_compat`) |
 | `F4` | load the next sample (reseeds Template + Data; keeps the catalog) |
 | `Esc` / `Ctrl-Q` | quit |
 
@@ -65,6 +65,20 @@ API (so it stays correct under scrolling and selection).
      interpolation), so it carries no helpers — and the lab hides the i18n pane for it,
      giving the Output the full bottom row.
 
+For the **data-driven catalog** pattern (catalog as data, looked up by declared helpers,
+identical on AOT + VM), see the focused [`i18n-data`](../i18n-data) example.
+
+## The two samples
+
+| Sample | Pattern | Modes | i18n Pane |
+| --- | --- | --- | --- |
+| **receipt** | Helper-based i18n: `{{t …}}`, `{{number …}}`, `{{plural …}}`, `{{date …}}`, `{{relative …}}` | render only (VM-exclusive) | visible ✓ |
+| **greeting** | Plain data interpolation: `{{field}}` (no i18n) | render + compat (AOT-compatible) | hidden |
+
+Cycle samples with `F4`. The **receipt** uses host helpers from `src/i18n.rs` that must be
+registered at runtime — VM-only, rejected by `render_compat`. The **greeting** is pure data
+interpolation, so it works on both backends.
+
 ## i18n boundary (`docs/09 §5`)
 
 `trussbars-i18n` owns the *format primitives* (`number`/`date`/`selectPlural`/`relative`,
@@ -93,7 +107,7 @@ tree.
 | [`src/highlight.rs`](src/highlight.rs) | lexer-driven Template highlighting via tui-textarea custom highlights |
 | [`src/data.rs`](src/data.rs) | decode the Data pane (YAML) into the VM's `Value` |
 | [`src/i18n.rs`](src/i18n.rs) | `&[Value]` shims over `trussbars-i18n` + the editable catalog + its seed |
-| [`src/samples.rs`](src/samples.rs) | the two seed templates + their seed YAML data |
+| [`src/samples.rs`](src/samples.rs) | two seed templates + their seed YAML data |
 | [`src/main.rs`](src/main.rs) | the crossterm/ratatui event loop + `--demo` / `--bless` |
 | [`tests/`](tests/) | the golden matrix, plural/catalog/error tests, and a `TestBackend` UI smoke |
 
