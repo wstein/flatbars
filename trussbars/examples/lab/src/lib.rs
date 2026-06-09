@@ -128,8 +128,135 @@ pub enum Focus {
     I18n,
 }
 
+impl Focus {
+    #[must_use]
+    pub fn pane(self) -> Pane {
+        match self {
+            Focus::Template => Pane::Template,
+            Focus::Data => Pane::Data,
+            Focus::I18n => Pane::I18n,
+        }
+    }
+}
+
+/// Every scrollable pane — the three editors plus the read-only Output.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Pane {
+    Template,
+    Data,
+    I18n,
+    Output,
+}
+
+impl Pane {
+    /// The editable focus for this pane, or `None` for the read-only Output.
+    #[must_use]
+    pub fn focus(self) -> Option<Focus> {
+        match self {
+            Pane::Template => Some(Focus::Template),
+            Pane::Data => Some(Focus::Data),
+            Pane::I18n => Some(Focus::I18n),
+            Pane::Output => None,
+        }
+    }
+}
+
+/// Per-pane vertical scroll offset (the first line shown).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Scroll {
+    pub template: u16,
+    pub data: u16,
+    pub i18n: u16,
+    pub output: u16,
+}
+
+impl Scroll {
+    #[must_use]
+    pub fn get(&self, pane: Pane) -> u16 {
+        match pane {
+            Pane::Template => self.template,
+            Pane::Data => self.data,
+            Pane::I18n => self.i18n,
+            Pane::Output => self.output,
+        }
+    }
+
+    fn slot(&mut self, pane: Pane) -> &mut u16 {
+        match pane {
+            Pane::Template => &mut self.template,
+            Pane::Data => &mut self.data,
+            Pane::I18n => &mut self.i18n,
+            Pane::Output => &mut self.output,
+        }
+    }
+}
+
+/// The screen rectangles of the 2×2 grid plus the header and help bars.
+#[derive(Clone, Copy, Debug)]
+pub struct Panes {
+    pub header: Rect,
+    pub template: Rect,
+    pub data: Rect,
+    pub output: Rect,
+    pub i18n: Rect,
+    pub help: Rect,
+}
+
+/// Lay out the screen: a header line, the `Template | Data` / `Output | i18n` 2×2 grid,
+/// and a help line. Shared by [`ui`] and the event loop (so mouse hit-testing matches what
+/// is drawn).
+#[must_use]
+pub fn panes(area: Rect) -> Panes {
+    let [header, body, help] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Min(0),
+        Constraint::Length(1),
+    ])
+    .areas(area);
+    let [top, bottom] =
+        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(body);
+    let [template, data] =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(top);
+    let [output, i18n] =
+        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bottom);
+    Panes {
+        header,
+        template,
+        data,
+        output,
+        i18n,
+        help,
+    }
+}
+
+impl Panes {
+    #[must_use]
+    pub fn rect(&self, pane: Pane) -> Rect {
+        match pane {
+            Pane::Template => self.template,
+            Pane::Data => self.data,
+            Pane::I18n => self.i18n,
+            Pane::Output => self.output,
+        }
+    }
+
+    /// The pane containing screen point `(col, row)`, if any.
+    #[must_use]
+    pub fn pane_at(&self, col: u16, row: u16) -> Option<Pane> {
+        let pos = Position::new(col, row);
+        [Pane::Template, Pane::Data, Pane::I18n, Pane::Output]
+            .into_iter()
+            .find(|&p| self.rect(p).contains(pos))
+    }
+}
+
+/// The visible text height of a pane (its inner height, minus the border).
+fn visible_height(pane: Pane, area: Rect) -> u16 {
+    panes(area).rect(pane).height.saturating_sub(2)
+}
+
 /// The whole lab state: the editable template, data, and i18n catalog, plus the selected
-/// sample, locale, mode, and focus.
+/// sample, locale, mode, focus, and per-pane scroll.
 #[derive(Clone, Debug)]
 pub struct Lab {
     pub sample: Sample,
@@ -140,6 +267,7 @@ pub struct Lab {
     pub data: TextBuffer,
     /// The message catalog (YAML), shared across samples — not reseeded on sample change.
     pub i18n: TextBuffer,
+    pub scroll: Scroll,
 }
 
 impl Lab {
@@ -155,6 +283,7 @@ impl Lab {
             template: TextBuffer::from_text(sample.template()),
             data: TextBuffer::from_text(sample.data_yaml()),
             i18n: TextBuffer::from_text(i18n::CATALOG_SEED),
+            scroll: Scroll::default(),
         }
     }
 
@@ -173,13 +302,7 @@ impl Lab {
     /// A YAML parse error for the data or the catalog, the template parse error, or — in
     /// compat mode — the reason AOT would reject the template (e.g. a host helper).
     pub fn render(&self) -> Result<String, String> {
-        self.render_source(&self.template.text())
-    }
-
-    /// Render an arbitrary template source against the current data/catalog/mode — the
-    /// seam the Output-pane provenance uses to render a sentinel-wrapped copy.
-    fn render_source(&self, tmpl_src: &str) -> Result<String, String> {
-        let template = Template::parse(tmpl_src)?;
+        let template = Template::parse(&self.template.text())?;
         let data = data::parse(&self.data.text())?;
         match self.mode {
             Mode::Compat => template.render_compat(&data),
@@ -189,25 +312,6 @@ impl Lab {
                 i18n::register(&mut helpers, self.locale, &catalog);
                 template.render_with(&data, &Rc::new(helpers))
             }
-        }
-    }
-
-    /// The render output split into `(text, interpolated?)` runs for the Output pane —
-    /// the runs produced by value interpolation are flagged so the UI can bold them.
-    /// On a render error, a single non-interpolated `⟂ …` run.
-    #[must_use]
-    pub fn output_runs(&self) -> Vec<(String, bool)> {
-        let Ok(base) = self.render() else {
-            return vec![(self.render_or_reject().trim_end().to_string(), false)];
-        };
-        let src = self.template.text();
-        let spans = highlight::interpolation_spans(&src);
-        if spans.is_empty() {
-            return vec![(base, false)];
-        }
-        match self.render_source(&highlight::wrap_interpolations(&src, &spans)) {
-            Ok(marked) => highlight::split_runs(&marked),
-            Err(_) => vec![(base, false)],
         }
     }
 
@@ -254,6 +358,50 @@ impl Lab {
             Focus::I18n => &mut self.i18n,
         }
     }
+
+    /// The number of display lines a pane currently holds.
+    fn pane_line_count(&self, pane: Pane) -> usize {
+        match pane {
+            Pane::Template => self.template.line_count(),
+            Pane::Data => self.data.line_count(),
+            Pane::I18n => self.i18n.line_count(),
+            Pane::Output => self.render_or_reject().lines().count().max(1),
+        }
+    }
+
+    /// Scroll a pane by `delta` lines (negative = up), clamped to its content within
+    /// `area`. Used by the mouse wheel and `PageUp`/`PageDown`.
+    pub fn scroll_pane(&mut self, pane: Pane, delta: i32, area: Rect) {
+        let visible = i32::from(visible_height(pane, area));
+        let max = (self.pane_line_count(pane) as i32 - visible).max(0);
+        let next = (i32::from(self.scroll.get(pane)) + delta).clamp(0, max);
+        *self.scroll.slot(pane) = u16::try_from(next).unwrap_or(u16::MAX);
+    }
+
+    /// Keep the focused editor's cursor in view after a move/edit, scrolling minimally.
+    pub fn follow_cursor(&mut self, area: Rect) {
+        let pane = self.focus.pane();
+        let visible = visible_height(pane, area);
+        if visible == 0 {
+            return;
+        }
+        let (cy, _) = self.focused_ref().cursor();
+        let cy = u16::try_from(cy).unwrap_or(u16::MAX);
+        let slot = self.scroll.slot(pane);
+        if cy < *slot {
+            *slot = cy;
+        } else if cy >= *slot + visible {
+            *slot = cy - visible + 1;
+        }
+    }
+
+    fn focused_ref(&self) -> &TextBuffer {
+        match self.focus {
+            Focus::Template => &self.template,
+            Focus::Data => &self.data,
+            Focus::I18n => &self.i18n,
+        }
+    }
 }
 
 impl Default for Lab {
@@ -265,12 +413,7 @@ impl Default for Lab {
 /// Draw the whole lab to `frame`. Pure over `lab` (no I/O), so it renders identically
 /// under a real terminal or a `TestBackend`.
 pub fn ui(frame: &mut Frame, lab: &Lab) {
-    let [header, body, help] = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Min(0),
-        Constraint::Length(1),
-    ])
-    .areas(frame.area());
+    let p = panes(frame.area());
 
     let title = Line::from(vec![
         Span::styled(
@@ -287,74 +430,84 @@ pub fn ui(frame: &mut Frame, lab: &Lab) {
             Style::new().fg(Color::DarkGray),
         ),
     ]);
-    frame.render_widget(Paragraph::new(title), header);
-
-    // 2×2 grid: Template | Data  (top) · Output | i18n catalog (bottom).
-    let [top, bottom] =
-        Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(body);
-    let [tmpl_area, data_area] =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(top);
-    let [out_area, i18n_area] =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bottom);
+    frame.render_widget(Paragraph::new(title), p.header);
 
     let tmpl_inner = render_editor(
         frame,
-        tmpl_area,
+        p.template,
         "Template",
         highlight::template_lines(&lab.template.text()),
         lab.focus == Focus::Template,
+        lab.scroll.template,
     );
     let data_inner = render_editor(
         frame,
-        data_area,
+        p.data,
         "Data (YAML)",
         lab.data.rows().map(Line::from).collect(),
         lab.focus == Focus::Data,
+        lab.scroll.data,
     );
     let i18n_inner = render_editor(
         frame,
-        i18n_area,
+        p.i18n,
         "i18n catalog (YAML)",
         lab.i18n.rows().map(Line::from).collect(),
         lab.focus == Focus::I18n,
+        lab.scroll.i18n,
     );
 
+    let out = lab.render_or_reject();
+    let out_lines: Vec<Line> = out
+        .lines()
+        .map(|l| {
+            if l.starts_with('⟂') {
+                Line::from(Span::styled(l.to_string(), Style::new().fg(Color::Yellow)))
+            } else {
+                Line::from(l.to_string())
+            }
+        })
+        .collect();
     frame.render_widget(
-        Paragraph::new(highlight::output_lines(&lab.output_runs()))
+        Paragraph::new(out_lines)
+            .scroll((lab.scroll.output, 0))
             .block(Block::bordered().title(format!(" Output · {} ", lab.mode.key()))),
-        out_area,
+        p.output,
     );
 
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
-            " [Tab] focus   [F2] locale   [F3] mode   [F4] sample   [Esc] quit ",
+            " [Tab/click] focus  [F2] locale  [F3] mode  [F4] sample  [wheel/PgUp/PgDn] scroll  [Esc] quit ",
             Style::new().fg(Color::DarkGray),
         ))),
-        help,
+        p.help,
     );
 
-    // Place the terminal cursor in the focused pane (no horizontal/vertical scroll —
-    // the seeds fit; a larger doc would clamp at the edge).
-    let (inner, buf) = match lab.focus {
-        Focus::Template => (tmpl_inner, &lab.template),
-        Focus::Data => (data_inner, &lab.data),
-        Focus::I18n => (i18n_inner, &lab.i18n),
+    // Place the terminal cursor in the focused pane, accounting for its scroll; hide it
+    // (skip) when the cursor has scrolled out of view.
+    let (inner, buf, scroll) = match lab.focus {
+        Focus::Template => (tmpl_inner, &lab.template, lab.scroll.template),
+        Focus::Data => (data_inner, &lab.data, lab.scroll.data),
+        Focus::I18n => (i18n_inner, &lab.i18n, lab.scroll.i18n),
     };
     if inner.width > 0 && inner.height > 0 {
         let (cy, cx) = buf.cursor();
-        let x = inner.x + u16::try_from(cx).unwrap_or(u16::MAX).min(inner.width - 1);
-        let y = inner.y + u16::try_from(cy).unwrap_or(u16::MAX).min(inner.height - 1);
-        frame.set_cursor_position(Position::new(x, y));
+        let cy = u16::try_from(cy).unwrap_or(u16::MAX);
+        if cy >= scroll && cy - scroll < inner.height {
+            let x = inner.x + u16::try_from(cx).unwrap_or(u16::MAX).min(inner.width - 1);
+            frame.set_cursor_position(Position::new(x, inner.y + (cy - scroll)));
+        }
     }
 }
 
-/// Render one pane (prebuilt `lines`) and return its inner (text) area.
+/// Render one pane (prebuilt `lines`, scrolled by `scroll`) and return its inner area.
 fn render_editor(
     frame: &mut Frame,
     area: Rect,
     title: &str,
     lines: Vec<Line<'static>>,
     focused: bool,
+    scroll: u16,
 ) -> Rect {
     let border = if focused {
         Style::new().fg(Color::Cyan)
@@ -365,6 +518,6 @@ fn render_editor(
         .border_style(border)
         .title(format!(" {title} "));
     let inner = block.inner(area);
-    frame.render_widget(Paragraph::new(lines).block(block), area);
+    frame.render_widget(Paragraph::new(lines).scroll((scroll, 0)).block(block), area);
     inner
 }

@@ -14,10 +14,11 @@ cargo test                     # editor + data units, the golden matrix, a TestB
 
 ## Controls
 
-| Key | Action |
+| Key / mouse | Action |
 | --- | --- |
 | type / arrows / Backspace / Enter | edit the focused pane |
-| `Tab` | cycle focus: **Template → Data → i18n catalog** |
+| `Tab` / left-click | cycle focus / focus the clicked pane (Template, Data, i18n) |
+| wheel / `PageUp` / `PageDown` | scroll the pane under the cursor / the focused pane |
 | `F2` | cycle locale (en → de → fr → **pl**) |
 | `F3` | toggle mode (`render` ⇄ `render_compat`) |
 | `F4` | load the next sample (reseeds Template + Data; keeps the catalog) |
@@ -32,10 +33,8 @@ through the VM on every keystroke:
  Output   │ i18n catalog (YAML)
 ```
 
-The Template pane is **syntax-highlighted** (each `{{ … }}` tag coloured by sigil via the
-engine lexer), and in the **Output** the runs produced by value interpolation are **bold**
-— the lab marks the interpolation tags in the source, renders that, and splits the marked
-output back into runs, since the VM emits no source map yet.
+The Template pane is **syntax-highlighted** — each `{{ … }}` tag is coloured by its sigil
+via the engine lexer, literal text left plain.
 
 ## What it proves (straight from `docs/11`)
 
