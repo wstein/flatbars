@@ -73,5 +73,6 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
 - `09-host-helpers.md` — the typed host-helper convention (F3; value + block helpers).
 - `10-inspect.md` — the inspector / provenance design (STViz-style; Lab as blueprint).
 - `11-vm-backend.md` — the dynamic VM backend (two-backends framing, conformance axes).
-- `12-case-multiarm-blocks.md` — `{{#case}}…{{when …}}…{{else}}` surface sugar (desugars
-  to `Cond`; surface frozen; implemented in the MaxBars oracle and Trussbars).
+- `12-case-multiarm-blocks.md` — `{{#case}}…{{when …}}…{{else}}` multi-arm conditional: a
+  first-class node lowered to a Rust `match` (subject evaluated once), `caseH` in the oracle.
+  Implemented in RawBars/MaxBars and Trussbars.
