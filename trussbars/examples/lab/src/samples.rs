@@ -81,7 +81,7 @@ impl Sample {
 // tags sit on their own lines (standalone-trimmed, so they add no output).
 const RECEIPT_TMPL: &str = r#"{{! receipt — i18n host helpers from the catalog pane (VM-only) }}
 == {{t "title"}} ==
-{{t "hello"}}, {{customer}}!
+{{t "greeting"}}, {{customer}}!
 {{! one line per item; `number` formats the price }}
 {{#each items}}
   - {{name}}: {{number price 2}}

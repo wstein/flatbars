@@ -2,11 +2,16 @@
 # Fetched and deserialized at render time (see `load_catalog`) — swap this file for a
 # DB row, a `.ftl` import, or an HTTP fetch and nothing else changes; the declared
 # helpers look the message up by key inside Rust. Polish carries CLDR's few/many forms.
+#
+# Single source: the `lab` example seeds its i18n pane from this same file
+# (`include_str!`), so the two examples can't drift on the message data. `eta` is used by
+# the lab's receipt only; an unused key is harmless to this example.
 en:
   title: Receipt
   greeting: Hello
   placed: Placed
   total: Total
+  eta: ETA
   item.one: item
   item.other: items
 de:
@@ -14,6 +19,7 @@ de:
   greeting: Hallo
   placed: Erstellt
   total: Summe
+  eta: Lieferung
   item.one: Artikel
   item.other: Artikel
 fr:
@@ -21,6 +27,7 @@ fr:
   greeting: Bonjour
   placed: Établi
   total: Total
+  eta: Livraison
   item.one: article
   item.other: articles
 pl:
@@ -28,6 +35,7 @@ pl:
   greeting: Cześć
   placed: Wystawiono
   total: Suma
+  eta: Dostawa
   item.one: element
   item.few: elementy
   item.many: elementów

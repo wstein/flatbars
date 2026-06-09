@@ -93,47 +93,10 @@ fn lookup(catalog: &Catalog, code: &str, key: &str) -> Option<String> {
 }
 
 /// The default i18n catalog seeded into the pane. The host owns it — `trussbars_i18n`
-/// ships none. Polish carries CLDR's four cardinal forms (one/few/many/other); the
-/// others have one/other.
-pub const CATALOG_SEED: &str = r#"en:
-  title: Receipt
-  hello: Hello
-  total: Total
-  placed: Placed
-  eta: ETA
-  note: Thanks for your order.
-  item.one: item
-  item.other: items
-de:
-  title: Beleg
-  hello: Hallo
-  total: Summe
-  placed: Erstellt
-  eta: Lieferung
-  note: Danke für Ihre Bestellung.
-  item.one: Artikel
-  item.other: Artikel
-fr:
-  title: Reçu
-  hello: Bonjour
-  total: Total
-  placed: Établi
-  eta: Livraison
-  note: Merci pour votre commande.
-  item.one: article
-  item.other: articles
-pl:
-  title: Paragon
-  hello: Cześć
-  total: Suma
-  placed: Wystawiono
-  eta: Dostawa
-  note: Dziękujemy za zamówienie.
-  item.one: element
-  item.few: elementy
-  item.many: elementów
-  item.other: elementu
-"#;
+/// ships none. Single-sourced from the sibling `i18n-data` example's `catalog.yaml`
+/// (embedded at build time) so the two examples can't drift on the message data; Polish
+/// carries CLDR's four cardinal forms (one/few/many/other), the others one/other.
+pub const CATALOG_SEED: &str = include_str!("../../i18n-data/catalog.yaml");
 
 // ── `&[Value]` argument shims ────────────────────────────────────────────────
 
