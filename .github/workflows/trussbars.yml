@@ -69,9 +69,11 @@ jobs:
       - name: Test (pure)
         run: cargo test --no-default-features --features std
 
-  # The no_std proof: build trussbars-core for a bare-metal target (no std to link
-  # against), both the pure and the full `perf` (itoa + dragonbox_ecma) profiles.
-  # Build-only — `#[test]` needs the std harness, so tests run in the `check` job.
+  # The no_std proof: build the no_std-capable crates for a bare-metal target (no std
+  # to link against). `trussbars-core` builds pure and full `perf`; the front-end
+  # `trussbars-template` (parse path) and the dynamic `trussbars-vm` build their libs
+  # `--no-default-features` (`--lib`: the dev CLIs and `#[test]` need the std harness,
+  # which runs in the `check` job).
   no-std:
     runs-on: ubuntu-latest
     defaults:
@@ -81,10 +83,14 @@ jobs:
       - uses: actions/checkout@v6
       - name: Toolchain + bare-metal target
         run: rustup show && rustup target add thumbv7em-none-eabi
-      - name: Build no_std (pure)
+      - name: Build no_std (core, pure)
         run: cargo build -p trussbars-core --no-default-features --target thumbv7em-none-eabi
-      - name: Build no_std (perf — itoa + dragonbox_ecma)
+      - name: Build no_std (core, perf — itoa + dragonbox_ecma)
         run: cargo build -p trussbars-core --no-default-features --features perf --target thumbv7em-none-eabi
+      - name: Build no_std (template parse path)
+        run: cargo build -p trussbars-template --lib --no-default-features --target thumbv7em-none-eabi
+      - name: Build no_std (VM)
+        run: cargo build -p trussbars-vm --lib --no-default-features --target thumbv7em-none-eabi
 
   # The perf-regression ratchet: a separate workspace (it pulls handlebars/askama/
   # sailfish), run in release. Asserts the machine-independent relative invariants

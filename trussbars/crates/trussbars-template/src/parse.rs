@@ -7,6 +7,8 @@
 use crate::ast::{Cond, Each, Expr, Node, With};
 use crate::lex::{Lexeme, Sigil, lex};
 use crate::parse_expr::{ParseError, Scope, parse_expr};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 /// Parse a template source into a desugared [`Node`] tree.
 ///

@@ -8,6 +8,8 @@
 //! binding / reserved root / `this`, list/dict literals → `App("list"/"dict", …)`.
 
 use crate::ast::{Expr, Value};
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 /// The in-scope binding names (block params, `let` aliases, loop labels) — used to
 /// root a path at the binding (`App(name, [])`) rather than `this`.

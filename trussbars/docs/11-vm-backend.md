@@ -46,7 +46,7 @@ What this buys, and what it costs, stated plainly:
 | **Injection-safe (no SSTI)** | ✅ no interpreter at all | ✅ **preserved** — static names rule (§6); no `apply`, no computed partials, no computed `lookup` |
 | **Host-typed field checking** (`{{post.titlee}}` ⇒ compile error) | ✅ rustc-enforced | ⚠️ lost in lenient mode; **recovered in AOT-compat mode** (§7), exact for the modeled subset |
 | **Performance** | safe-Rust ceiling (~0.8 µs, docs/05) | interpreter — 10–100× slower; still expected to beat handlebars, nowhere near AOT |
-| **`no_std` + `forbid(unsafe)`** | ✅ | ✅ target (the value model is `alloc`-only; see §5) |
+| **`no_std` + `forbid(unsafe)`** | ✅ | ✅ **shipped** — the VM lib (+ the `trussbars-template` parse path it reuses) builds `--no-default-features` for bare-metal/WASM; `alloc`-only, `forbid(unsafe)` (see §5). The dev `truss-vm` CLI stays `std`. |
 
 The host-typed-checking loss is the real trade. It is the *same* trade Tera/minijinja
 make against Askama/Maud — Trussbars now spans both halves of that split deliberately,

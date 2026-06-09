@@ -13,20 +13,37 @@
 //! `dict`, and partials (`{{#inline}}`/`{{> }}`/`{{#partial}}`/`{{yield}}`). Anything
 //! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
 //! spike (docs/11): the lenient + AOT-compat (strict) render modes, host-helper
-//! registration. Still open: `no_std`.
+//! registration, and `no_std` + `alloc` (`--no-default-features`) so the dynamic VM
+//! can ship to bare-metal/WASM (f64 then formats via `Display`, the documented
+//! divergence; the dev `truss-vm` CLI stays `std`).
 //!
 //! Scalars stringify through `trussbars_core::ToText` (the same ECMA-f64 path AOT
 //! uses), and escaping through `trussbars_core::escape_html`, so VM output is
 //! byte-identical to AOT / the oracle wherever both render.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[macro_use]
+extern crate alloc;
+
 pub mod bytecode;
 
-use std::cell::Cell;
-use std::collections::BTreeMap;
-use std::rc::Rc;
+use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
+use alloc::rc::Rc;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::cell::Cell;
 
 use trussbars_core::{ToText, escape_html};
 use trussbars_template::{Cond, Each, Expr, Node, Value as Lit, With, parse};
+
+/// Euclidean remainder, `no_std`-safe (`f64::rem_euclid` is std-only). Byte-identical
+/// to it: the `%` operator is in `core`, and a negative remainder is lifted by `|b|`.
+fn rem_euclid(a: f64, b: f64) -> f64 {
+    let r = a % b;
+    if r < 0.0 { r + libm::fabs(b) } else { r }
+}
 
 /// A dynamic runtime value. Heap variants (`Str`/`Array`/`Object`) are **`Rc`-backed**
 /// so [`Clone`] is a refcount bump, not a deep copy — the env can then hold values
@@ -652,7 +669,7 @@ fn eval_expr(env: &Env, e: &Expr) -> Result<Value, String> {
         ("subtract", [a, b]) => num_op(env, a, b, |x, y| x - y),
         ("multiply", [a, b]) => num_op(env, a, b, |x, y| x * y),
         ("divide", [a, b]) => num_op(env, a, b, |x, y| x / y),
-        ("modulo", [a, b]) => num_op(env, a, b, f64::rem_euclid),
+        ("modulo", [a, b]) => num_op(env, a, b, rem_euclid),
         ("ternary", [c, a, b]) => {
             if truthy_at(env, &eval_expr(env, c)?)? {
                 eval_expr(env, a)
@@ -1048,7 +1065,7 @@ fn eval_helper(env: &Env, name: &str, args: &[Expr]) -> Result<Value, String> {
                 Value::Null
             })
         }
-        ("round", [Value::Num(n)]) => Ok(Value::Num((n + 0.5).floor())),
+        ("round", [Value::Num(n)]) => Ok(Value::Num(libm::floor(n + 0.5))),
         ("toFixed", [Value::Num(n), Value::Num(d)]) => {
             Ok(str_val(format!("{:.*}", *d as usize, n)))
         }

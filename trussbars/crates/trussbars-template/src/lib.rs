@@ -18,8 +18,18 @@
 //! byte-identical to v1 (`conformance/harness.mjs --v2`). The `trussbars-macros`
 //! proc-macro (`truss!`) drives this with located class-A diagnostics; class-B
 //! exact spans (nightly `proc_macro_span`) and the `path=` form are follow-ups.
+//!
+//! **`no_std`-capable**: the front-end (lexer → parser → desugar → emit) needs only
+//! `alloc`, so it builds for bare-metal/WASM targets. `--no-default-features` drops
+//! the (code-inert) `std` feature. The dev CLIs in `src/bin/` stay `std` (host only).
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[macro_use]
+extern crate alloc;
 
 pub mod ast;
+#[cfg(feature = "std")]
 pub mod emit;
 pub mod lex;
 pub mod parse;
@@ -27,6 +37,7 @@ pub mod parse_expr;
 pub mod span;
 
 pub use ast::{Cond, Each, Expr, Node, Value, With};
+#[cfg(feature = "std")]
 pub use emit::{emit, emit_named};
 pub use lex::{Lexeme, Sigil, lex};
 pub use parse::parse;

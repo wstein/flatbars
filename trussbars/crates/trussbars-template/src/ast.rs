@@ -5,6 +5,8 @@
 //! `splitBlockArgs` plumbing is replaced by typed fields).
 
 use crate::span::Span;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 /// A literal value.
 #[derive(Debug, Clone, PartialEq)]

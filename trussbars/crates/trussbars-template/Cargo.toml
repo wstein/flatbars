@@ -8,7 +8,19 @@ license.workspace = true
 keywords = ["template", "maxbars", "parser", "codegen"]
 categories = ["template-engine", "parser-implementations"]
 
-# A build-time library (the proc-macro depends on it); std, no runtime deps yet.
+# The front-end (lexer → parser → desugar) needs only `alloc`, so it is
+# `no_std`-capable for the VM on bare-metal/WASM. The emitter (build-time codegen,
+# used only by the proc-macro / dev CLIs) stays behind `std`.
+[features]
+default = ["std"]
+# `std` also gates the `emit` module (it uses `f64::round`/`fract`, std-only). The
+# parse path builds with `--no-default-features` for `no_std` + `alloc`.
+std = []
+
+# The dev CLI drives the std-only `emit`, so it needs `std`.
+[[bin]]
+name = "truss-emit"
+required-features = ["std"]
 
 [lints]
 workspace = true

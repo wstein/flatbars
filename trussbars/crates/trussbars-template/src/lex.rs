@@ -10,6 +10,8 @@
 //! `{{{{#raw}}}}…{{{{/raw}}}}` captures its body verbatim.
 
 use crate::span::Span;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 /// One lexed surface token. Spans are byte offsets into the source.
 #[derive(Debug, Clone, PartialEq, Eq)]

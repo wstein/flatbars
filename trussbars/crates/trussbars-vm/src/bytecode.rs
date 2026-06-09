@@ -12,7 +12,9 @@
 //! Shares the tree-walk's [`Value`](crate::Value) and the `field` / `write_escaped`
 //! helpers, so a matching render is byte-identical (asserted in the benchmark).
 
-use std::rc::Rc;
+use alloc::rc::Rc;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use trussbars_template::{Expr, Node, Value as Lit, parse};
 
@@ -113,7 +115,7 @@ impl Program {
                         pc = *end;
                         continue;
                     }
-                    let saved = std::mem::replace(&mut this, items[0].clone());
+                    let saved = core::mem::replace(&mut this, items[0].clone());
                     frames.push(IterFrame {
                         items,
                         index: 0,
