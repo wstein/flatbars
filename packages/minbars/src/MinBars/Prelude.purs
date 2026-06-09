@@ -57,8 +57,9 @@ minEngine initial =
   , stringify: \v -> liftEither (stringify v)
   -- Mustache has no hash / block-param / label surface, so the identity split (ADR-020 Phase 3).
   , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
-  -- MinBars has no source-map yet, so it records no provenance (ADR-035).
-  , recordText: \_ _ -> pure unit
+  -- The base engine records no provenance; the mapped runner (`MinBars.Provenance`)
+  -- overrides these recorders (ADR-035).
+  , recordText: \_ _ _ -> pure unit
   , recordEmit: \_ _ produce -> produce
   }
 
@@ -198,7 +199,7 @@ dedentTemplate :: Template -> Template
 dedentTemplate = \tmpl ->
   let
     amount = case Array.head tmpl of
-      Just (Content s) -> leadingIndent s
+      Just (Content _ s) -> leadingIndent s
       _ -> ""
   in
     if amount == "" then tmpl else go true amount tmpl
@@ -206,11 +207,11 @@ dedentTemplate = \tmpl ->
   go atLineStart amount nodes = case Array.uncons nodes of
     Nothing -> []
     Just { head, tail } -> case head of
-      Content s ->
+      Content sp s ->
         let
           { text, nextAtLineStart } = dropContent atLineStart amount s
         in
-          Array.cons (Content text) (go nextAtLineStart amount tail)
+          Array.cons (Content sp text) (go nextAtLineStart amount tail)
       other -> Array.cons other (go false amount tail)
 
   -- drop `amount` from each line start of `s` (start if `atLineStart`, and after
@@ -306,16 +307,21 @@ indentTemplate indent tmpl
             isLast = i == lastI
           in
             case head of
-              Content s ->
+              Content sp s ->
                 let
                   { text, nextAtLineStart } = indentContent atLineStart isLast s
                 in
-                  Array.cons (Content text) (go nextAtLineStart (i + 1) tail)
+                  -- keep the run's span (re-indenting changes the text, not where it
+                  -- came from); this runs inside a partial body, where the provenance
+                  -- claims no span anyway (depth > 0).
+                  Array.cons (Content sp text) (go nextAtLineStart (i + 1) tail)
               other ->
                 let
                   -- a tag at line start is preceded by the indent as its own
-                  -- content; tags carry no newline, so the next node is not.
-                  pre = if atLineStart then [ Content indent ] else []
+                  -- content; tags carry no newline, so the next node is not. This
+                  -- indent is synthetic (no source origin) — a zero span; it is only
+                  -- reachable inside a partial body, so provenance ignores it.
+                  pre = if atLineStart then [ Content { start: 0, end: 0 } indent ] else []
                 in
                   pre <> Array.cons other (go false (i + 1) tail)
 

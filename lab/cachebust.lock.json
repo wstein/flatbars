@@ -1,10 +1,10 @@
 {
   "lab/playground_utils.mjs": {
-    "v": 18,
-    "sha": "49c77c55380dcbfaaae13a7d32bced9cb036f101623f0a0f33c1b980a09d8276"
+    "v": 19,
+    "sha": "b1d67da3187b4824e0b442a5f7033ad9d01dc238ba2bbaa8e01717f3edebd90d"
   },
   "lab/vendor/flatbars-engine.mjs": {
-    "v": 102,
-    "sha": "59c461083c7bd9f3cd2b560489c8a24da079b436dc2ca1af8638ebc7f6404055"
+    "v": 104,
+    "sha": "1ef8fe5347e4fb717ddf73e3a7a0be5e59c91df3d8fbecebbdd48543f441fb63"
   }
 }

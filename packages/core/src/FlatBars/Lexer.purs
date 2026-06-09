@@ -41,7 +41,7 @@ import FlatBars.Token (Interior, LexOptions, tokenizeInterior)
 -- | re-lexing the text; the text is retained for directive lifting,
 -- | standalone-whitespace head-words, and raw-block close-matching.
 data RawTok
-  = RContent String
+  = RContent Span String -- span of the source run, text
   | ROutput Span Int String Interior -- {{{ <interior> }}}
   | RAmp Span Int String Interior -- {{& <interior> }} — unescaped output (Handlebars `&`)
   | ROpen Span Sigil Int String Interior -- {{# / {{^ / {{< / {{$ <interior> }} — sigil distinguishes them
@@ -80,7 +80,7 @@ derive instance eqRawTok :: Eq RawTok
 
 instance showRawTok :: Show RawTok where
   show = case _ of
-    RContent s -> "RContent " <> show s
+    RContent _ s -> "RContent " <> show s
     ROutput _ _ s _ -> "ROutput " <> show s
     RAmp _ _ s _ -> "RAmp " <> show s
     ROpen _ sig _ s _ -> "ROpen " <> show sig <> " " <> show s
@@ -157,14 +157,16 @@ trimStandalone seps toks = Array.mapWithIndex trimContent toks
 
   trimContent :: Int -> RawTok -> RawTok
   trimContent j = case _ of
-    RContent s ->
+    RContent sp s ->
       let
         -- the tag *before* this content is standalone ⇒ drop its trailing line.
         s1 = if standaloneAt (j - 1) then dropLeadingLine s else s
         -- the tag *after* this content is standalone ⇒ drop this line's indent.
         s2 = if standaloneAt (j + 1) then dropTrailingIndent s1 else s1
       in
-        RContent s2
+        -- the source span is kept (the original run's location) — trimming removes
+        -- whitespace from the rendered text, not from where it sits in the source.
+        RContent sp s2
     other -> other
 
   standaloneAt :: Int -> Boolean
@@ -182,7 +184,7 @@ trimStandalone seps toks = Array.mapWithIndex trimContent toks
     where
     goLeft k = case Array.index toks k of
       Nothing -> true -- start of input
-      Just (RContent s)
+      Just (RContent _ s)
         | hasNL s -> allWs (afterLastNL s) -- reached this line's start
         | allWs s -> goLeft (k - 1) -- a wholly-blank run; keep scanning left
         | otherwise -> false -- visible text on this line
@@ -194,7 +196,7 @@ trimStandalone seps toks = Array.mapWithIndex trimContent toks
     where
     goRight k = case Array.index toks k of
       Nothing -> true -- end of input
-      Just (RContent s)
+      Just (RContent _ s)
         | hasNL s -> allWs (beforeFirstNL s) -- reached this line's end
         | allWs s -> goRight (k + 1) -- a wholly-blank run; keep scanning right
         | otherwise -> false -- visible text on this line
@@ -368,9 +370,11 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
     -> Boolean
     -> Either ParseError (List RawTok)
   go i open close segStart frags acc pend
-    | i >= len = Right (flush (contentTo segStart frags i) acc pend false)
+    | i >= len = Right
+        (flush { start: segStart, end: i } (contentTo segStart frags i) acc pend false)
     | otherwise = case Array.index cs i of
-        Nothing -> Right (flush (contentTo segStart frags i) acc pend false)
+        Nothing -> Right
+          (flush { start: segStart, end: i } (contentTo segStart frags i) acc pend false)
         Just c
           -- A set-delimiter tag `<open>=A B=<close>` (Mustache; gated). Checked
           -- before the opener probe so `{{=…=}}` is not read as a bare separator.
@@ -379,7 +383,8 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
               Left e -> recoverFrom i e segStart frags acc pend open close
               Right sd ->
                 let
-                  acc1 = flush (contentTo segStart frags i) acc pend sd.trimL
+                  acc1 = flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                    sd.trimL
                 in
                   go sd.next sd.open sd.close sd.next [] (sd.tok : acc1) sd.trimR
           -- Default delimiters `{{`/`}}`: the full Handlebars-flavored grammar,
@@ -400,7 +405,10 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
               Left e -> recoverFrom i e segStart frags acc pend open close
               Right res ->
                 let
-                  acc2 = consTok res.mtok (flush (contentTo segStart frags i) acc pend res.trimL)
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
                 in
                   case delimSwitch res.mtok of
                     Left e -> Left e
@@ -413,7 +421,10 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
               Left e -> recoverFrom i e segStart frags acc pend open close
               Right res ->
                 let
-                  acc2 = consTok res.mtok (flush (contentTo segStart frags i) acc pend res.trimL)
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
                 in
                   case delimSwitch res.mtok of
                     Left e -> Left e
@@ -443,7 +454,11 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
   recoverFrom i e segStart frags acc pend open close =
     let
       resync = fromMaybe len (findFrom cs (i + SCU.length open) open)
-      acc2 = RError { start: i, end: resync } e : flush (contentTo segStart frags i) acc pend false
+      acc2 = RError { start: i, end: resync } e : flush { start: segStart, end: i }
+        (contentTo segStart frags i)
+        acc
+        pend
+        false
     in
       go resync open close resync [] acc2 false
 
@@ -490,13 +505,15 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
 
   -- Flush a content string (prepending to the reversed token list), applying a
   -- pending leading trim and an optional trailing trim (from the following tag).
-  flush :: String -> List RawTok -> Boolean -> Boolean -> List RawTok
-  flush s0 acc pend trimR =
+  -- `span` is the source run `[segStart, i)`; kept even when `~`-trimming shortens
+  -- the rendered text (the literal still sits at that source location).
+  flush :: Span -> String -> List RawTok -> Boolean -> Boolean -> List RawTok
+  flush span s0 acc pend trimR =
     let
       s1 = if pend then trimStartWs s0 else s0
       s2 = if trimR then trimEndWs s1 else s1
     in
-      if s2 == "" then acc else RContent s2 : acc
+      if s2 == "" then acc else RContent span s2 : acc
 
   -- The brace-prefixed openers, longest first. The `~` whitespace-control
   -- variants (`{{~#`, `{{~/`, …) are recognized so a left-trim tilde may sit

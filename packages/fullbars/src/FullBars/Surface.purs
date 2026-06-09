@@ -160,7 +160,7 @@ desugarWith lv clauseNames = go []
   go scope = map node
     where
     node = case _ of
-      Content s -> Content s
+      Content sp s -> Content sp s
       -- a recovered parse error (ADR-023) passes through untouched; the fail-fast
       -- parse projection means desugar only ever runs on error-free trees.
       NodeError sp msg -> NodeError sp msg

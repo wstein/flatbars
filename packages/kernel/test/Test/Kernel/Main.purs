@@ -23,7 +23,7 @@ nodeCount :: String -> Int
 nodeCount src = case parse src of
   Left _ -> -1
   Right { nodes } -> foldTemplate
-    { content: \_ -> 1
+    { content: \_ _ -> 1
     , output: \_ _ -> 1
     , raw: \_ _ _ _ -> 1
     , sep: \_ _ _ -> 1
@@ -64,7 +64,8 @@ main = do
   -- walk: splitClauses splits a body at separators.
   case parse "{{#if c}}A{{else}}B{{/if}}" of
     Right { nodes: [ Block _ _ _ _ body ] } ->
-      assert' "splitClauses before" ((splitClauses body).before == [ Content "A" ])
+      assert' "splitClauses before"
+        ((splitClauses body).before == [ Content { start: 9, end: 10 } "A" ])
     _ -> assert' "splitClauses: unexpected parse" false
 
   -- walk: schema validation flags an unknown helper.

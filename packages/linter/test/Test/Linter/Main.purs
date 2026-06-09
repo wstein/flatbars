@@ -69,7 +69,7 @@ stripSpans = map strip
   z :: Span
   z = { start: 0, end: 0 }
   strip = case _ of
-    RText s -> RText s
+    RText _ s -> RText z s
     ROut _ b e -> ROut z b e
     RIf _ c a b -> RIf z c (stripSpans a) (stripSpans b)
     RUnless _ c a b -> RUnless z c (stripSpans a) (stripSpans b)

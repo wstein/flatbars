@@ -44,7 +44,7 @@ printDirectives = foldMap (\d -> "{{! @" <> d.key <> ": " <> d.value <> " }}")
 
 printNode :: Node -> String
 printNode = case _ of
-  Content s -> s
+  Content _ s -> s
   Output _ e -> "{{{ " <> exprTop e <> " }}}"
   Block _ sig name args body -> printBlock sig name args body
   Sep _ name args -> "{{" <> head name args <> "}}"

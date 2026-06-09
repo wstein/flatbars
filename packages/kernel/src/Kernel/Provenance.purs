@@ -92,12 +92,13 @@ runMappedUsing toEngine setup nodes dat =
       Left e -> Left e
       Right (Tuple output raws) -> Right { output, segments: assemble output raws }
 
--- | Log a literal-text run (no source span), tagged with the current file,
+-- | Log a literal-text run, tagged with its source `span` and the current file (so
+-- | a literal inside a partial links to the partial's own source — jump-to-source),
 -- | skipping empty runs.
-recordTextProv :: RefEnv Prov -> String -> Prov Unit
-recordTextProv env text
+recordTextProv :: RefEnv Prov -> Span -> String -> Prov Unit
+recordTextProv env span text
   | text == "" = pure unit
-  | otherwise = tell [ { isEmit: false, file: refCurrentFile env, span: Nothing, text } ]
+  | otherwise = tell [ { isEmit: false, file: refCurrentFile env, span: Just span, text } ]
 
 -- | Run an expression render and log ONE emit run for it — unless it already
 -- | logged sub-runs (a partial expanding its body), in which case those cover the

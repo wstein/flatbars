@@ -107,12 +107,12 @@ mustacheStandalone lx toks0 = Array.mapWithIndex inject trimmed
 
   trimContent :: Int -> RawTok -> RawTok
   trimContent j = case _ of
-    RContent s ->
+    RContent sp s ->
       let
         s1 = if standaloneAt (j - 1) then dropLeadingLine s else s
         s2 = if standaloneAt (j + 1) then dropTrailingIndent s1 else s1
       in
-        RContent s2
+        RContent sp s2
     other -> other
 
   -- The indent a standalone tag at index `i` sits at: the horizontal whitespace
@@ -121,7 +121,7 @@ mustacheStandalone lx toks0 = Array.mapWithIndex inject trimmed
   indentAt :: Int -> String
   indentAt i = case Array.index toks0 (i - 1) of
     Nothing -> ""
-    Just (RContent s) ->
+    Just (RContent _ s) ->
       SCU.fromCharArray (Array.takeWhile isHWs (SCU.toCharArray (afterLastNL s)))
     Just _ -> ""
 
@@ -139,7 +139,7 @@ mustacheStandalone lx toks0 = Array.mapWithIndex inject trimmed
   leftBlank :: Int -> Boolean
   leftBlank i = case Array.index toks0 (i - 1) of
     Nothing -> true
-    Just (RContent s)
+    Just (RContent _ s)
       | hasNL s -> allWs (afterLastNL s)
       | otherwise -> allWs s && leftBlank (i - 1)
     -- another standalone-eligible tag sharing the line is transparent (a line of
@@ -152,7 +152,7 @@ mustacheStandalone lx toks0 = Array.mapWithIndex inject trimmed
   rightBlank :: Int -> Boolean
   rightBlank i = case Array.index toks0 (i + 1) of
     Nothing -> true
-    Just (RContent s)
+    Just (RContent _ s)
       | hasNL s -> allWs (beforeFirstNL s)
       | otherwise -> allWs s && rightBlank (i + 1)
     Just t -> eligible t && rightBlank (i + 1)

@@ -22,6 +22,7 @@ import {
   mergeDataOverlays,
   stemTruthy,
   partialNameAt,
+  segmentRanges,
   tabVisibleUnder,
   validateOverlayName,
   vendoredWorkspace,
@@ -186,6 +187,38 @@ test("decodeState still reads legacy plain-base64 links", async () => {
 // WASM `parseAst`, so they exercise only the JS analyses (no engine boundary).
 
 const span = (start, end) => ({ start, end });
+
+test("segmentRanges treats output offsets as UTF-16, not UTF-8 bytes", () => {
+  // RC regression: provenance segment out/len are JS string indices (UTF-16), so a
+  // multibyte char (× = 2 bytes / 1 UTF-16 unit) must NOT shift the marks. Output
+  // "a×bZc": the {{x}} emit "Z" sits at UTF-16 index 3, byte index 4.
+  const output = "a×bZc";
+  const segments = [
+    { out: 0, len: 3, kind: "text", file: "main" },
+    { out: 3, len: 1, kind: "emit", file: "main", start: 3, end: 8 },
+    { out: 4, len: 1, kind: "text", file: "main" },
+  ];
+  const views = segmentRanges(output, segments);
+  // The emit must mark exactly "Z" (3..4) — a byte conversion would mark "b" (2..3).
+  const emit = views.find((v) => v.kind === "emit");
+  assert.equal(output.slice(emit.from, emit.to), "Z");
+  assert.deepEqual([emit.from, emit.to], [3, 4]);
+  // The source span passes through untouched (bytes, for jump-to-source).
+  assert.deepEqual([emit.start, emit.end], [3, 8]);
+  // A text run with no source span keeps null start/end (a literal can't jump).
+  const lit = views.find((v) => v.kind === "text");
+  assert.equal(lit.start, null);
+});
+
+test("segmentRanges drops runs at/after EOF and clamps to the output length", () => {
+  const out = "ab";
+  const v = segmentRanges(out, [
+    { out: 0, len: 5, kind: "text", file: "main" }, // len overflows → clamps to 2
+    { out: 2, len: 1, kind: "emit", file: "main" }, // at EOF → dropped
+  ]);
+  assert.equal(v.length, 1);
+  assert.deepEqual([v[0].from, v[0].to], [0, 2]);
+});
 
 test("analyseDataAccess classifies hits, misses, type-mismatch and OOB", () => {
   const asts = {

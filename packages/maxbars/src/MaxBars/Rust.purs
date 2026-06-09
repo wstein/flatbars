@@ -202,7 +202,7 @@ estimateBytes :: Template -> Int
 estimateBytes = sum <<< map est
   where
   est = case _ of
-    Content s -> SCU.length s
+    Content _ s -> SCU.length s
     Output _ _ -> 8
     Block _ _ "each" _ body -> 8 * estimateBytes body
     Block _ _ _ _ body -> estimateBytes body
@@ -297,7 +297,7 @@ node env n = case nodeBody env n of
 
 nodeBody :: Env -> Node -> Either String String
 nodeBody env = case _ of
-  Content s -> Right ("    out.push_str(" <> rustStr s <> ");\n")
+  Content _ s -> Right ("    out.push_str(" <> rustStr s <> ");\n")
   -- `{{> name [ctx]}}` — inline the hoisted partial body at the call site.
   Output _ (App "partial" args) -> emitPartial env args
   -- `{{yield}}` / `{{{yield}}}` — splice the pre-rendered block-partial body

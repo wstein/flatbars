@@ -99,11 +99,19 @@ runMapped rule partialSrcs src dat = case traverse compilePartial partialSrcs of
     Left (pe :: ParseError) -> Left (renderParseErrorAt s pe)
     Right { nodes } -> Right (Tuple name (desugar nodes))
 
--- | Log a literal-text run (no source span), tagged `"main"`, skipping empty runs.
-recordTextProv :: MinEnv -> String -> Prov Unit
-recordTextProv _ text
+-- | Log a literal-text run, tagged `"main"`, skipping empty runs. A source span is
+-- | claimed only at the top level (`minDepth == 0`) — a literal inside a partial
+-- | tiles the output but claims no entry-template location, matching the emit path.
+recordTextProv :: MinEnv -> Span -> String -> Prov Unit
+recordTextProv env span text
   | text == "" = pure unit
-  | otherwise = tell [ { isEmit: false, file: "main", span: Nothing, text } ]
+  | otherwise = tell
+      [ { isEmit: false
+        , file: "main"
+        , span: if minDepth env == 0 then Just span else Nothing
+        , text
+        }
+      ]
 
 -- | Run an emit and log ONE run for it — unless it already logged sub-runs (a
 -- | section iterating, or a partial expanding its body), in which case those cover

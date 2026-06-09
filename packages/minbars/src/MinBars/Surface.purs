@@ -41,7 +41,7 @@ desugar :: Template -> Template
 desugar = map node
   where
   node = case _ of
-    Content s -> Content s
+    Content sp s -> Content sp s
     -- a recovered parse error (ADR-023) passes through; desugar only runs on
     -- error-free trees (the fail-fast parse projection rejects the rest).
     NodeError sp msg -> NodeError sp msg

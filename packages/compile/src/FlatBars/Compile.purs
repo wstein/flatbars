@@ -120,7 +120,7 @@ compile meta emit partials main =
   -- The universal, meaning-free node cases; `Block`/`Expr` defer to the dialect.
   node :: Ctx -> Node -> String
   node ctx = case _ of
-    Content s -> stmtOut (jsString s)
+    Content _ s -> stmtOut (jsString s)
     Output _ e -> stmtOut ("rt.out(" <> rec.expr ctx e <> ")")
     -- the sigil is `Section` here: FullBars desugars `Inverse` (`{{^}}`) to
     -- `unless` upstream, and RawBars rejects it — so the compiler never sees it.

@@ -34,7 +34,7 @@ import Kernel.Walk (Issue, Severity(..), foldTemplate)
 -- | (`{{ pick (a || b) }}`) is left alone — those are legitimate boolean uses.
 booleanInOutputWarnings :: Template -> Array Issue
 booleanInOutputWarnings = foldTemplate
-  { content: const []
+  { content: \_ _ -> []
   , output: \_ e -> maybe [] pure (boolWarn e)
   , raw: \_ name _ _ -> maybe [] pure (issueFor name)
   , sep: \_ _ _ -> []
@@ -80,7 +80,7 @@ reservedNames = [ "this", "loop", "root", "parent", "yield" ]
 -- | reserved `@label` marker the surface emits.
 labelShadowWarnings :: Template -> Array Issue
 labelShadowWarnings = foldTemplate
-  { content: const []
+  { content: \_ _ -> []
   , output: \_ _ -> []
   , raw: \_ _ _ _ -> []
   , sep: \_ _ _ -> []

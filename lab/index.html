@@ -1664,7 +1664,7 @@
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=102";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=104";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -1688,15 +1688,16 @@
         hasFeature,
         mergeDataOverlays,
         partialNameAt,
+        segmentRanges,
         tabVisibleUnder,
         validateOverlayName,
         vendoredVerdict,
         vendoredWorkspace,
       // Cache-bust query: bump on any playground_utils.mjs change so a freshly
       // loaded index.html never pairs with a stale cached module (which silently
-      // ran the old, uncompressed encodeState). Bumped for the Data Access
-      // partial-scope classification fix.
-      } from "./playground_utils.mjs?v=18";
+      // ran the old, uncompressed encodeState). Bumped for `segmentRanges` (the
+      // provenance-highlight byte↔UTF-16 fix).
+      } from "./playground_utils.mjs?v=19";
       // Output-view decisions (extracted for testability; lab/output-view.test.mjs).
       import {
         VIEW_TABS,
@@ -3480,39 +3481,19 @@
         caretLinkKey = null;
       }
 
-      // Map the renderer's byte-offset segments to output character ranges in one
-      // forward pass (monotonic cursor; UTF-8 widths computed arithmetically), and
-      // build the provenance mark decorations. Each mark carries its index in
+      // Build the provenance mark decorations from the renderer's segments. The
+      // output offsets are UTF-16 code units (JS string indices), so `segmentRanges`
+      // uses them directly — NO byte↔char conversion (which drifts every mark after a
+      // multibyte char, the misalignment bug). Each mark carries its index in
       // lastSegViews via data-i so hover/click can recover the segment.
       function buildProvenance(output, segments) {
-        const segViews = [];
-        if (!segments.length) return { segViews, deco: Decoration.none };
-        let ci = 0, bytes = 0;
-        const charAt = (targetByte) => {
-          while (bytes < targetByte && ci < output.length) {
-            const cp = output.codePointAt(ci);
-            bytes += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
-            ci += cp > 0xffff ? 2 : 1;
-          }
-          return ci;
-        };
-        const ranges = [];
-        for (const seg of segments) {
-          const from = charAt(seg.out);
-          if (from >= output.length) continue; // nothing to mark at/after EOF
-          let to = Math.max(from + 1, charAt(seg.out + seg.len));
-          if (to > output.length) to = output.length;
-          const i = segViews.length;
-          segViews.push({
-            from, to, file: seg.file, kind: seg.kind,
-            start: typeof seg.start === "number" ? seg.start : null,
-            end: typeof seg.end === "number" ? seg.end : null,
-          });
-          ranges.push(Decoration.mark({
-            class: "seg" + (seg.kind === "emit" ? " seg-expr" : ""),
+        if (!segments.length) return { segViews: [], deco: Decoration.none };
+        const segViews = segmentRanges(output, segments);
+        const ranges = segViews.map((v, i) =>
+          Decoration.mark({
+            class: "seg" + (v.kind === "emit" ? " seg-expr" : ""),
             attributes: { "data-i": String(i) },
-          }).range(from, to));
-        }
+          }).range(v.from, v.to));
         return { segViews, deco: Decoration.set(ranges, true) };
       }
 

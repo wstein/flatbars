@@ -266,9 +266,11 @@ test("parseAst nodes carry their source span (Data Access jump-to-source)", asyn
   assert.equal(src.slice(each.src.start, each.src.end), "{{#each items}}");
   // …and into block bodies: the scoped `{{ this }}` keeps its own span.
   assert.deepEqual(each.body[0].src, { start: 34, end: 44 });
-  // Literal text nodes are not tags and carry no span.
+  // Literal text nodes now carry their source span too (literal jump-to-source):
+  // the leading "<h1>" run sits at code units [0,4).
   assert.equal(ast.nodes[0].t, "text");
-  assert.equal(ast.nodes[0].src, undefined);
+  assert.deepEqual(ast.nodes[0].src, { start: 0, end: 4 });
+  assert.equal(src.slice(ast.nodes[0].src.start, ast.nodes[0].src.end), "<h1>");
 });
 
 test("parseAst is forgiving: a parse error yields a recovered tree + located errors", async () => {
@@ -368,8 +370,9 @@ test("source map: a mapped surface render returns segments that tile the output 
   // both loop iterations of {{ this }} point at the same source tag.
   const thisEnds = emits.filter((s) => s.start === 30).map((s) => s.end);
   assert.deepEqual(thisEnds, [40, 40], "both {{ this }} iterations share the tag span");
-  // text runs carry no source span.
-  assert.ok(segments.every((s) => s.kind !== "text" || (s.start == null && s.end == null)));
+  // text runs now carry their own source span too (literal jump-to-source): the
+  // leading "<b>" run sits at [0,3).
+  assert.ok(segments.some((s) => s.kind === "text" && s.start === 0 && s.end === 3));
 });
 
 test("source map: partials tile, and partial-origin emits link to their own document", async () => {

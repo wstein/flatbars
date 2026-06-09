@@ -283,6 +283,6 @@ refEngineWith policy initial =
   -- No provenance by default: an unmapped render records nothing and `recordEmit`
   -- just runs its production, so output stays byte-identical (the compiler≡interpreter
   -- invariant). The mapped runner (`Kernel.Provenance`) overrides these fields.
-  , recordText: \_ _ -> pure unit
+  , recordText: \_ _ _ -> pure unit
   , recordEmit: \_ _ produce -> produce
   }

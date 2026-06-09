@@ -135,7 +135,7 @@ sliceSpan src span = SCU.slice span.start span.end src
 
 step :: String -> Acc -> RawTok -> Acc
 step src acc = case _ of
-  RContent s -> emit acc s
+  RContent _ s -> emit acc s
 
   ROutput span _ _ _ -> emit acc (mapDataInTag (sliceSpan src span))
 

@@ -33,13 +33,12 @@ import Kernel.Walk (Clause, Issue, Severity(..), foldTemplate, splitClause, spli
 -- | The reference real AST. Control flow is explicit (branches, not a flat
 -- | `Sep` marker) and escaping is a boolean, not a wrapper helper.
 -- |
--- | Every tag-derived node carries the source `Span` of its opening tag (an
--- | `elif`'s nested `RIf` carries the `elif` separator's span). It is what
--- | tooling locates a node by — the lowered AST's JSON `src` the playground's
--- | Data Access panel uses to jump to source. `RText` is literal content and
--- | has no span.
+-- | Every node carries a source `Span` (a tag node its opening tag's; an `elif`'s
+-- | nested `RIf` the `elif` separator's; `RText` the literal run's). It is what
+-- | tooling locates a node by — the lowered AST's JSON `src` the playground's Data
+-- | Access panel and jump-to-source use.
 data RNode
-  = RText String
+  = RText Span String -- span, literal text
   | ROut Span Boolean Expr -- span, escaped?, expression
   | RIf Span Expr (Array RNode) (Array RNode) -- span, cond, then, else
   | RUnless Span Expr (Array RNode) (Array RNode) -- span, cond, body, else
@@ -53,7 +52,7 @@ derive instance eqRNode :: Eq RNode
 
 instance showRNode :: Show RNode where
   show = case _ of
-    RText s -> "RText " <> show s
+    RText _ s -> "RText " <> show s
     ROut sp e x -> "ROut " <> show sp <> " " <> show e <> " (" <> show x <> ")"
     RIf sp c a b -> "RIf " <> show sp <> " (" <> show c <> ") " <> show a <> " " <> show b
     RUnless sp c a b -> "RUnless " <> show sp <> " (" <> show c <> ") " <> show a <> " " <> show b
@@ -66,7 +65,7 @@ instance showRNode :: Show RNode where
 -- | Lower a structural template to the reference real AST.
 lower :: Template -> Array RNode
 lower = foldTemplate
-  { content: \s -> [ RText s ]
+  { content: \sp s -> [ RText sp s ]
   , output: \sp e -> [ uncurry (ROut sp) (escaping e) ]
   , raw: \sp _ _ body -> [ RRaw sp body ]
   , sep: \sp name args -> [ RSep sp name args ]

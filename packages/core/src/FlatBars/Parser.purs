@@ -256,7 +256,7 @@ collectDirectives toks = go 0 true []
         else case Array.head dirs of
           Just d -> Left (DirectiveAfterHeader d.span.start)
           Nothing -> go (i + 1) false acc
-    Just (RContent _) -> go (i + 1) headerOpen acc -- content does not close the header
+    Just (RContent _ _) -> go (i + 1) headerOpen acc -- content does not close the header
     Just _ -> go (i + 1) false acc -- a real tag closes the header
 
 -- | Parse the `@key[: value]` directives out of one comment interior. The parser
@@ -459,7 +459,7 @@ parseSeq pe ph gates toks = go Nil []
   go acc errs i = case Array.index toks i of
     Nothing -> done acc errs StopEOF
     Just t -> case t of
-      RContent s -> go (Content s : acc) errs (i + 1)
+      RContent sp s -> go (Content sp s : acc) errs (i + 1)
       RComment _ _ _ -> go acc errs (i + 1) -- filtered upstream; skip defensively
       RLongComment _ -> go acc errs (i + 1) -- highlight-only token (keepLongComments); never reaches the parser
       RSetDelim _ -> go acc errs (i + 1) -- renders nothing; the delimiter swap already happened in the lexer

@@ -112,7 +112,7 @@ tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig cfg.lexOptions src o
   where
   spansOf :: RawTok -> Array TSpan
   spansOf = case _ of
-    RContent _ -> []
+    RContent _ _ -> []
     ROutput sp _ _ int -> tag sp "raw" <> carveInterior int
     -- `{{&x}}` (unescaped) is a Handlebars-extra: disallowed when `extras` is off
     -- (RawBars/MaxBars), exactly as the parser gates it.

@@ -68,7 +68,7 @@ nodeCount :: String -> Int
 nodeCount src = case parse src of
   Left _ -> -1
   Right { nodes: t } -> foldTemplate
-    { content: \_ -> 1
+    { content: \_ _ -> 1
     , output: \_ _ -> 1
     , raw: \_ _ _ _ -> 1
     , sep: \_ _ _ -> 1
@@ -122,6 +122,16 @@ hlMax =
 kinds :: HighlightConfig -> String -> Array String
 kinds cfg src = map _.kind (highlightSpans cfg src)
 
+-- A `Content` with a canonical zero span, for structural (span-insensitive)
+-- comparisons; `stripC` zeroes the `Content` spans of an actual node list to match.
+czero :: String -> Node
+czero = Content { start: 0, end: 0 }
+
+stripC :: Array Node -> Array Node
+stripC = map case _ of
+  Content _ s -> czero s
+  other -> other
+
 main :: Effect Unit
 main = do
   log "FlatBars framework tests"
@@ -132,10 +142,13 @@ main = do
     Right { nodes: t } -> do
       assert' "parse: content/output/block shapes"
         ( t ==
-            [ Content "a"
+            [ Content { start: 0, end: 1 } "a"
             , Output { start: 1, end: 8 } (App "x" [])
             , Block { start: 8, end: 17 } Section "if" [ App "c" [] ]
-                [ Content "t", Sep { start: 18, end: 26 } "else" [], Content "e" ]
+                [ Content { start: 17, end: 18 } "t"
+                , Sep { start: 18, end: 26 } "else" []
+                , Content { start: 26, end: 27 } "e"
+                ]
             ]
         )
 
@@ -156,7 +169,7 @@ main = do
   -- ── Recovering parse (ADR-023): one parser; `parse` is its fail-fast projection.
   -- A well-formed template recovers nothing — same tree, no errors.
   case parseRecovering defaultParseOptions "a{{x}}{{#s}}b{{/s}}" of
-    { errors: [], nodes: [ Content "a", Sep _ "x" [], Block _ Section "s" [] [ Content "b" ] ] } ->
+    { errors: [], nodes: [ Content _ "a", Sep _ "x" [], Block _ Section "s" [] [ Content _ "b" ] ] } ->
       assert' "recover: clean template ⇒ no errors, normal tree" true
     r -> assert'
       ("recover: clean template unexpected " <> show r.nodes <> " errs " <> show r.errors)
@@ -164,7 +177,7 @@ main = do
   -- A bad block head salvages its name and still nests — the body and close parse,
   -- and exactly one error (the bad args) is recorded. `parse` rejects it.
   case parseRecovering defaultParseOptions "{{#if a == 1}}x{{/if}}" of
-    { errors, nodes: [ Block _ Section "if" [] [ Content "x" ] ] } ->
+    { errors, nodes: [ Block _ Section "if" [] [ Content _ "x" ] ] } ->
       assert' "recover: bad block head nests, one error" (Array.length errors == 1)
     r -> assert' ("recover: bad block head not recovered " <> show r.nodes) false
   assert' "recover: the projection still rejects it" (isLeft (parse "{{#if a == 1}}x{{/if}}"))
@@ -176,7 +189,7 @@ main = do
     )
   -- Structural recovery: a missing close still builds the block + flags it.
   case parseRecovering defaultParseOptions "{{#each x}}y" of
-    { errors, nodes: [ Block _ Section "each" _ [ Content "y" ] ] } ->
+    { errors, nodes: [ Block _ Section "each" _ [ Content _ "y" ] ] } ->
       assert' "recover: missing close ⇒ block kept, one error" (Array.length errors == 1)
     r -> assert' ("recover: missing close not recovered " <> show r.nodes) false
   -- A stray close at top level is reported and recovered past.
@@ -198,20 +211,20 @@ main = do
   case parseWith inh "{{<p}}B{{/p}}" of
     Right { nodes: t } ->
       assert' "inheritance: parent block shape"
-        (t == [ Block { start: 0, end: 6 } Parent "p" [] [ Content "B" ] ])
+        (t == [ Block { start: 0, end: 6 } Parent "p" [] [ Content { start: 6, end: 7 } "B" ] ])
     Left e -> assert' ("inheritance: parent parse error " <> show e) false
   -- `{{$b}}D{{/b}}` ⇒ a BlockDef block headed `b`.
   case parseWith inh "{{$b}}D{{/b}}" of
     Right { nodes: t } ->
       assert' "inheritance: block-def shape"
-        (t == [ Block { start: 0, end: 6 } BlockDef "b" [] [ Content "D" ] ])
+        (t == [ Block { start: 0, end: 6 } BlockDef "b" [] [ Content { start: 6, end: 7 } "D" ] ])
     Left e -> assert' ("inheritance: block-def parse error " <> show e) false
   -- dynamic spelling: `*` is an ident char, so `{{<*dyn}}…{{/*dyn}}` heads on
   -- `*dyn` and the close matches that headed name.
   case parseWith inh "{{<*dyn}}B{{/*dyn}}" of
     Right { nodes: t } ->
       assert' "inheritance: dynamic parent shape"
-        (t == [ Block { start: 0, end: 9 } Parent "*dyn" [] [ Content "B" ] ])
+        (t == [ Block { start: 0, end: 9 } Parent "*dyn" [] [ Content { start: 9, end: 10 } "B" ] ])
     Left e -> assert' ("inheritance: dynamic parent parse error " <> show e) false
   -- with the default options (`inheritance = false`) the shapes are rejected.
   case parse "{{<p}}B{{/p}}" of
@@ -222,10 +235,10 @@ main = do
     _ -> assert' "inheritance: block-def rejected when not opted in" false
   -- a normal section / inverse still parse unchanged (sigil regression).
   case parse "{{#x}}A{{/x}}" of
-    Right { nodes: [ Block _ Section "x" [] [ Content "A" ] ] } -> pure unit
+    Right { nodes: [ Block _ Section "x" [] [ Content _ "A" ] ] } -> pure unit
     other -> assert' ("inheritance: section regressed " <> show other) false
   case parse "{{^x}}A{{/x}}" of
-    Right { nodes: [ Block _ Inverse "x" [] [ Content "A" ] ] } -> pure unit
+    Right { nodes: [ Block _ Inverse "x" [] [ Content _ "A" ] ] } -> pure unit
     other -> assert' ("inheritance: inverse regressed " <> show other) false
 
   -- ── Set delimiters (ADR-015): the lexer's gated `mustacheDelims` mode ────────
@@ -243,12 +256,12 @@ main = do
     other -> assert' ("set-delim: switch back to default " <> show other) false
   -- content is preserved, and `{{y}}` is literal text once delimiters are custom.
   case parseWith md "{{=<% %>=}}* <%x%> {{y}}" of
-    Right { nodes: [ Content "* ", Sep _ "x" [], Content " {{y}}" ] } -> pure unit
+    Right { nodes: [ Content _ "* ", Sep _ "x" [], Content _ " {{y}}" ] } -> pure unit
     other -> assert' ("set-delim: content + literal default braces after switch " <> show other)
       false
   -- sigils rebase under custom delimiters: `<%#a%>…<%/a%>` is a section.
   case parseWith md "{{=<% %>=}}<%#a%>b<%/a%>" of
-    Right { nodes: [ Block _ Section "a" [] [ Content "b" ] ] } -> pure unit
+    Right { nodes: [ Block _ Section "a" [] [ Content _ "b" ] ] } -> pure unit
     other -> assert' ("set-delim: custom-delimited section " <> show other) false
   -- exactly two delimiters are required; a malformed set-delimiter is a parse error.
   case parseWith md "{{=onlyone=}}" of
@@ -270,7 +283,7 @@ main = do
   -- is the only difference; clause *meaning* is the engine's job, not the parser's.
   let
     sepShape src = case parse src of
-      Right { nodes: [ Content "a", Sep _ name args, Content "b" ] } -> Just
+      Right { nodes: [ Content _ "a", Sep _ name args, Content _ "b" ] } -> Just
         (Tuple name (Array.length args))
       _ -> Nothing
   assert' "ADR-001: {{else}} is a plain Sep, identical in shape to a user separator"
@@ -295,7 +308,7 @@ main = do
         s = splitClause "else" body
       in
         assert' "splitClause before/after"
-          (s.before == [ Content "A" ] && s.clause == Just [ Content "B" ])
+          (stripC s.before == [ czero "A" ] && map stripC s.clause == Just [ czero "B" ])
     _ -> assert' "splitClause: unexpected parse" false
 
   -- splitClauses returns every separator-delimited section; splitClause bounds a
@@ -305,11 +318,11 @@ main = do
     Right { nodes: [ Block _ _ _ _ body ] } -> do
       let
         cs = splitClauses body
-      assert' "splitClauses before" (cs.before == [ Content "A" ])
+      assert' "splitClauses before" (stripC cs.before == [ czero "A" ])
       assert' "splitClauses yields both clauses"
-        (map _.body cs.clauses == [ [ Content "B" ], [ Content "C" ] ])
+        (map (stripC <<< _.body) cs.clauses == [ [ czero "B" ], [ czero "C" ] ])
       assert' "splitClause bounds at next separator"
-        ((splitClause "else" body).clause == Just [ Content "B" ])
+        (map stripC (splitClause "else" body).clause == Just [ czero "B" ])
     _ -> assert' "splitClauses: unexpected parse" false
 
   -- Schema validation flags an unknown helper; a known-arity call is clean.
@@ -356,12 +369,12 @@ main = do
       Left _ -> [ Tuple "<error>" "" ]
     nodesOf src = case parse src of
       Right { nodes } -> nodes
-      Left _ -> [ Content "<error>" ]
+      Left _ -> [ czero "<error>" ]
   -- single directive lifted; the comment leaves no node behind.
   assert' "directive: single key:value"
     (dirsOf "{{! @truthiness:always }}Hi" == [ Tuple "truthiness" "always" ])
   assert' "directive: comment produces no node"
-    (nodesOf "{{! @truthiness:always }}Hi" == [ Content "Hi" ])
+    (stripC (nodesOf "{{! @truthiness:always }}Hi") == [ czero "Hi" ])
   -- multiline block, several heads, one per line and several on one line.
   assert' "directive: multiline + multi-head"
     ( dirsOf "{{! @truthiness: empty\n@foo: bar }}{{! @baz @qux:1 }}x"
@@ -393,7 +406,7 @@ main = do
   -- turn it off, and a `@trim` directive overrides the option either way.
   let
     contentStr = case _ of
-      Content s -> Just s
+      Content _ s -> Just s
       _ -> Nothing
     contentOf src opts = case parseWith opts src of
       Right { nodes } -> Array.mapMaybe contentStr nodes

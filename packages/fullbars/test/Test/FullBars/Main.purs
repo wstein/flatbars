@@ -130,7 +130,7 @@ customEngine root =
   , resolveStrict: res -- already strict (unknown ⇒ UnknownHelper)
   , stringify
   , blockArgs: \args -> { positional: args, hash: Nothing, params: [], label: Nothing }
-  , recordText: \_ _ -> pure unit
+  , recordText: \_ _ _ -> pure unit
   , recordEmit: \_ _ produce -> produce
   }
   where
@@ -1119,7 +1119,7 @@ main = do
   -- engine API). Here we count nodes, recursing into block bodies.
   let
     counter =
-      { content: \_ -> 1
+      { content: \_ _ -> 1
       , output: \_ _ -> 1
       , raw: \_ _ _ _ -> 1
       , sep: \_ _ _ -> 1
@@ -1156,8 +1156,8 @@ main = do
     Left e -> assert' ("lower: parse error " <> show e) false
     Right { nodes: t } -> case lower t of
       [ RIf ifSpan (App "this" [])
-          [ RText "A", ROut outSpan true (App "lookup" [ App "this" [], Lit (VString "x") ]) ]
-          [ RText "B" ]
+          [ RText _ "A", ROut outSpan true (App "lookup" [ App "this" [], Lit (VString "x") ]) ]
+          [ RText _ "B" ]
       ] -> do
         assert' "lower if/else+escape structure" true
         assert' "lower carries the {{#if}} opening-tag span"
@@ -1173,8 +1173,8 @@ main = do
   case parse elifSrc of
     Left e -> assert' ("lower elif: parse error " <> show e) false
     Right { nodes: t } -> case lower t of
-      [ RIf ifSpan (App "a" []) [ RText "A" ]
-          [ RIf elifSpan (App "b" []) [ RText "B" ] [ RText "C" ] ]
+      [ RIf ifSpan (App "a" []) [ RText _ "A" ]
+          [ RIf elifSpan (App "b" []) [ RText _ "B" ] [ RText _ "C" ] ]
       ] -> do
         assert' "lower elif: outer RIf carries the {{#if}} span"
           (spanText elifSrc ifSpan == "{{#if a}}")
@@ -1364,8 +1364,8 @@ main = do
   assert' "catalog-md: no raw prose tag braces"
     (not (contains (Pattern "{{elif}}") helperCatalogMarkdown))
 
-  -- Source maps (ADR-035): a mapped render's segments tile the output, and emit
-  -- runs carry the originating tag's byte span (text runs carry none).
+  -- Source maps (ADR-035): a mapped render's segments tile the output; emit runs
+  -- carry the originating tag's byte span, and text runs carry the literal's.
   case renderSurfaceMapped "Hi {{ name }}!" (obj [ Tuple "name" (str "Ada") ]) of
     Left e -> assert' ("mapped: unexpected error: " <> e) false
     Right r -> do
@@ -1381,7 +1381,9 @@ main = do
         )
       assert' "mapped: the {{ name }} emit carries its tag span"
         (any (\s -> s.kind == "emit" && s.start == Just 3 && s.end == Just 13) r.segments)
-      assert' "mapped: text runs carry no source span"
-        (not (any (\s -> s.kind == "text" && s.start /= Nothing) r.segments))
+      -- Text runs now carry their own source span too (literal jump-to-source): the
+      -- leading "Hi " run sits at bytes [0,3).
+      assert' "mapped: the leading text run carries its source span"
+        (any (\s -> s.kind == "text" && s.start == Just 0 && s.end == Just 3) r.segments)
 
   log "all core tests passed"

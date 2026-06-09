@@ -947,7 +947,7 @@ ctx kind = obj [ tt "context", Tuple "kind" (str kind) ]
 
 rnode :: RNode -> Json
 rnode = case _ of
-  RText s -> obj [ tt "text", Tuple "text" (str s) ]
+  RText sp s -> obj [ tt "text", Tuple "text" (str s), srcOf sp ]
   -- A `{{> name}}` partial reference desugars to an emitted `partial "name" …`
   -- call; surface it as a `{t:"partial"}` node so the dependency graph finds it.
   ROut sp escaped e -> case partialName e of

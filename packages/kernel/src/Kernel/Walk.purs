@@ -93,7 +93,7 @@ foldRefs f = foldMap (node f)
   where
   node :: (OperationRef -> m) -> Node -> m
   node g = case _ of
-    Content _ -> mempty
+    Content _ _ -> mempty
     Output sp e -> expr g sp e
     Block sp _ name args body ->
       g { name, kind: BlockRef, argc: Array.length args, span: sp }
@@ -128,9 +128,11 @@ operationRefs = foldRefs Array.singleton
 -- | Every tag-level case (`output`/`raw`/`sep`/`block`) receives the source
 -- | `Span` of its opening tag, so a pass can carry locations through to its own
 -- | AST — the basis of the lowered AST's `src` (the data-access jump-to-source).
--- | `content` has no span: it is literal text, never a tag.
+-- | `content` carries the literal run's source `Span` (it is text, never a tag,
+-- | but it still has a source location — used for jump-to-source and the lowered
+-- | `RText`'s `src`).
 type Algebra a =
-  { content :: String -> a
+  { content :: Span -> String -> a
   , output :: Span -> Expr -> a
   , raw :: Span -> Ident -> Array Expr -> String -> a
   , sep :: Span -> Ident -> Array Expr -> a
@@ -157,7 +159,7 @@ foldTemplate alg = go
 
   node :: Node -> a
   node = case _ of
-    Content s -> alg.content s
+    Content sp s -> alg.content sp s
     Output sp e -> alg.output sp e
     RawBlock sp name args raw' -> alg.raw sp name args raw'
     Sep sp name args -> alg.sep sp name args

@@ -166,7 +166,7 @@ printTemplate nodes =
 
 printNode :: Node -> Out
 printNode = case _ of
-  Content s -> emptyOut { text = s }
+  Content _ s -> emptyOut { text = s }
 
   -- `Output _ (App "escapeHtml" [e])` is the auto-escaped `{{ e }}`; any other
   -- `Output _ e` is the raw `{{{ e }}}`.

@@ -91,7 +91,7 @@ type Engine m env =
   -- render) and logs ONE emit run for it — unless `produce` itself logged sub-runs
   -- (a partial expanding its body), in which case those cover it and no outer run is
   -- added, avoiding a double count.
-  , recordText :: env -> String -> m Unit
+  , recordText :: env -> Span -> String -> m Unit
   , recordEmit :: env -> Span -> m String -> m String
   }
 
@@ -104,7 +104,7 @@ runTemplate engine = renderTemplate engine.initial
 
   renderNode :: env -> Node -> m String
   renderNode env = case _ of
-    Content s -> engine.recordText env s *> pure s
+    Content span s -> engine.recordText env span s *> pure s
     Output span e -> engine.recordEmit env span (evalExpr env span e >>= engine.stringify)
     -- the engine applies the head as a block helper; the opener sigil (`#`/`^`)
     -- is a dialect concern (FullBars desugars `Inverse` to `unless`), so the
@@ -115,7 +115,7 @@ runTemplate engine = renderTemplate engine.initial
     -- purpose is to feed the verbatim body to a helper, so there is no meaningful
     -- implicit-section fallback. See `Engine`'s `resolveStrict`.
     RawBlock span name args raw -> applyBlock engine.resolveStrict env span name args
-      [ Content raw ]
+      [ Content span raw ]
     -- A separator rendered on its own is just an application of its head; a
     -- block helper that cares (e.g. `if` at `{{else}}`) intercepts it by
     -- splitting its children before rendering, so it is never reached there.

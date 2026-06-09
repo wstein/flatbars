@@ -47,7 +47,10 @@ type Directive = { key :: Ident, value :: String, span :: Span }
 -- | `{{case 1}}` a `switch`, is decided entirely by the second pass (the engine
 -- | walk) — the lexer and parser never interpret the name.
 data Node
-  = Content String
+  -- span, literal text. Carries its source `Span` like every other node, so the
+  -- mapped runner can locate a literal output run (jump-to-source) and the lowered
+  -- AST gives `RText` a `src` (ADR-035).
+  = Content Span String
   | Output Span Expr
   -- span, opener sigil, head, args, captured body
   | Block Span Sigil Ident (Array Expr) Template
@@ -105,7 +108,7 @@ instance showExpr :: Show Expr where
 
 instance showNode :: Show Node where
   show = case _ of
-    Content s -> "Content " <> show s
+    Content _ s -> "Content " <> show s
     Output _ e -> "Output (" <> show e <> ")"
     Block _ sig n args body ->
       "Block " <> show sig <> " " <> show n <> " " <> show args <> " " <> show body

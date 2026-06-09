@@ -327,7 +327,7 @@ expansionIndent :: String -> Template -> Either ParseError String
 expansionIndent indent body
   | indent /= "" = Right indent
   | otherwise = case Array.head body of
-      Just (Content s) -> Right (leadingIndent s)
+      Just (Content _ s) -> Right (leadingIndent s)
       _ -> Left
         ( DisallowedShape "intrinsic block indentation with a non-static default (MinBars compile)"
             0

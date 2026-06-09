@@ -83,6 +83,33 @@ export function byteRangeToCharRange(source, startByte, endByte) {
   return [from, Math.max(from + 1, to)];
 }
 
+// Map provenance segments (ADR-035) to output character ranges + the rows the
+// hover/click recover. `seg.out`/`seg.len` are UTF-16 code-unit offsets into the
+// OUTPUT — JS string indices, exactly what `Kernel.Provenance` emits (NOT UTF-8
+// bytes) — so they are CodeMirror positions directly. Converting them as if they
+// were bytes drifts every mark after a multibyte char (`×`/`—`/…), which is the
+// provenance-highlight misalignment bug. `start`/`end` are the SOURCE span (UTF-8
+// bytes into the segment's file), passed through untouched for jump-to-source
+// (which converts them against the source there). A run at/after EOF is dropped.
+export function segmentRanges(output, segments) {
+  const len = output.length;
+  const views = [];
+  for (const seg of segments || []) {
+    const from = Math.min(seg.out, len);
+    if (from >= len) continue;
+    const to = Math.min(Math.max(from + 1, seg.out + seg.len), len);
+    views.push({
+      from,
+      to,
+      file: seg.file,
+      kind: seg.kind,
+      start: typeof seg.start === "number" ? seg.start : null,
+      end: typeof seg.end === "number" ? seg.end : null,
+    });
+  }
+  return views;
+}
+
 // The partial name if `charIndex` sits inside a `{{> name ...}}` tag, else null.
 // A partial tag expands inline and produces no output run of its own, so the
 // playground uses this to map a caret on the tag to that partial's output. The
