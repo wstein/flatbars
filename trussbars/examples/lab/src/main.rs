@@ -100,7 +100,13 @@ fn handle_key(lab: &mut Lab, code: KeyCode, mods: KeyModifiers, area: Rect) -> b
         // Page keys scroll the focused pane by a screenful (manual — no cursor-follow).
         (KeyCode::PageDown | KeyCode::PageUp, _) => {
             let pane = lab.focus.pane();
-            let page = i32::from(panes(area).rect(pane).height.saturating_sub(2)).max(1);
+            let page = i32::from(
+                panes(area, lab.sample.uses_i18n())
+                    .rect(pane)
+                    .height
+                    .saturating_sub(2),
+            )
+            .max(1);
             lab.scroll_pane(
                 pane,
                 if code == KeyCode::PageDown {
@@ -121,7 +127,7 @@ fn handle_key(lab: &mut Lab, code: KeyCode, mods: KeyModifiers, area: Rect) -> b
 
 /// Handle a mouse event: left-click focuses a pane, the wheel scrolls the pane under it.
 fn handle_mouse(lab: &mut Lab, kind: MouseEventKind, col: u16, row: u16, area: Rect) {
-    let layout = panes(area);
+    let layout = panes(area, lab.sample.uses_i18n());
     match kind {
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(focus) = layout.pane_at(col, row).and_then(|p| p.focus()) {

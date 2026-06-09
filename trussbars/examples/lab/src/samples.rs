@@ -1,10 +1,10 @@
 //! The two starting samples: each seeds the editable Template and Data (YAML) panes.
 //!
 //! `Receipt` exercises the full i18n **host-helper pack** (`t`/`number`/`plural`/`date`/
-//! `relative`); `Greeting` is a minimal one — just `{{t}}` over the catalog, with only the
-//! name in its data. Both localize live as the lab's locale (or the catalog) changes, and
-//! both are VM-only (the compat proxy rejects host helpers). Everything is editable at
-//! runtime.
+//! `relative`) and localizes live as the lab's locale (or the catalog) changes — VM-only,
+//! since the compat proxy rejects host helpers. `Greeting` uses **no i18n**: plain data
+//! interpolation, so it carries no helpers, hides the i18n pane, and renders identically
+//! under the AOT-compat proxy. Everything is editable at runtime.
 
 /// Which starting sample is loaded.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -31,7 +31,7 @@ impl Sample {
     pub fn label(self) -> &'static str {
         match self {
             Sample::Receipt => "receipt — full i18n host-helper pack (VM-only)",
-            Sample::Greeting => "greeting — minimal i18n via the catalog (VM-only)",
+            Sample::Greeting => "greeting — plain data, no i18n (AOT-compatible)",
         }
     }
 
@@ -41,6 +41,16 @@ impl Sample {
         match self {
             Sample::Receipt => Sample::Greeting,
             Sample::Greeting => Sample::Receipt,
+        }
+    }
+
+    /// Whether this sample uses the i18n catalog (host helpers). The lab hides the i18n
+    /// pane for samples that don't.
+    #[must_use]
+    pub fn uses_i18n(self) -> bool {
+        match self {
+            Sample::Receipt => true,
+            Sample::Greeting => false,
         }
     }
 
@@ -91,13 +101,14 @@ items:
     price: 899
 "#;
 
-// A minimal i18n sample: the message comes from the catalog via `t`, so only the name
-// lives in the data. Cycling the locale re-localizes it (and, like any host-helper
-// template, it is VM-only — the compat proxy rejects `t`).
-const GREETING_TMPL: &str = r#"{{! greeting — localized through the i18n catalog (the t helper) }}
-{{t "hello"}}, {{customer}}!
-{{t "note"}}
+// No i18n: plain data interpolation. Carries no host helpers, so it renders identically
+// under the AOT-compat proxy and the lab hides the i18n pane for it.
+const GREETING_TMPL: &str = r#"{{! greeting — plain data interpolation, no i18n (AOT-compatible) }}
+{{greeting}}, {{customer}}!
+{{note}}
 "#;
 
 const GREETING_DATA: &str = r#"customer: Ada
+greeting: Hello
+note: Thanks for your order.
 "#;

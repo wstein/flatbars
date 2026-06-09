@@ -14,7 +14,7 @@ const AREA: Rect = Rect {
 
 #[test]
 fn pane_hit_test_matches_the_grid() {
-    let p = panes(AREA);
+    let p = panes(AREA, true);
     // Corners of each quadrant resolve to the right pane (header row 0 / help last row
     // are neither). Template top-left, Data top-right, Output bottom-left, i18n bottom-right.
     let mid_x = AREA.width / 2;
@@ -38,7 +38,7 @@ fn scroll_clamps_to_content() {
     let tall: String = (0..100).map(|i| format!("line {i}\n")).collect();
     lab.template = TextBuffer::from_text(&tall);
     lab.scroll_pane(Pane::Template, 1000, AREA);
-    let visible = panes(AREA).template.height.saturating_sub(2);
+    let visible = panes(AREA, true).template.height.saturating_sub(2);
     assert!(lab.scroll.template > 0);
     assert!(lab.scroll.template <= 101 - visible);
 
@@ -56,7 +56,7 @@ fn follow_cursor_keeps_the_caret_visible() {
         lab.template.move_down();
     }
     lab.follow_cursor(AREA);
-    let visible = panes(AREA).template.height.saturating_sub(2);
+    let visible = panes(AREA, true).template.height.saturating_sub(2);
     let (cy, _) = lab.template.cursor();
     let cy = u16::try_from(cy).unwrap();
     assert!(lab.scroll.template <= cy && cy < lab.scroll.template + visible);

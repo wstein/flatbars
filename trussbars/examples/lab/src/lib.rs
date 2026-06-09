@@ -9,9 +9,9 @@
 //!    `{{t …}}`/`{{number …}}`/`{{plural …}}`/`{{date …}}`/`{{relative …}}` — host
 //!    helpers registered at runtime ([`i18n::register`]); cycling the locale flips the
 //!    title, plural noun, grouped number, and localized month name.
-//! 2. **`render_compat` is the AOT-parity proxy (§7).** Toggle [`Mode::Compat`] and both
-//!    samples are rejected — host helpers are VM-only. Strip a template to plain
-//!    `{{field}}` interpolation and compat renders byte-identically to lenient.
+//! 2. **`render_compat` is the AOT-parity proxy (§7).** Toggle [`Mode::Compat`]: the
+//!    `receipt` is rejected (host helpers are VM-only), while the plain `greeting` (no
+//!    i18n — its i18n pane is hidden) renders byte-identically.
 //!
 //! The render core ([`Lab::render`]) and the editor ([`editor::TextBuffer`]) are pure and
 //! unit/golden-tested; [`ui`] is drawn headlessly under a `TestBackend` (`tests/`). The
@@ -203,10 +203,11 @@ pub struct Panes {
 }
 
 /// Lay out the screen: a header line, the `Template | Data` / `Output | i18n` 2×2 grid,
-/// and a help line. Shared by [`ui`] and the event loop (so mouse hit-testing matches what
-/// is drawn).
+/// and a help line. When `show_i18n` is false (a sample with no i18n) the Output takes the
+/// whole bottom row and the i18n rect is empty. Shared by [`ui`] and the event loop (so
+/// mouse hit-testing matches what is drawn).
 #[must_use]
-pub fn panes(area: Rect) -> Panes {
+pub fn panes(area: Rect, show_i18n: bool) -> Panes {
     let [header, body, help] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(0),
@@ -217,8 +218,14 @@ pub fn panes(area: Rect) -> Panes {
         Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(body);
     let [template, data] =
         Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(top);
-    let [output, i18n] =
-        Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)]).areas(bottom);
+    let (output, i18n) = if show_i18n {
+        let [output, i18n] =
+            Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .areas(bottom);
+        (output, i18n)
+    } else {
+        (bottom, Rect::new(0, 0, 0, 0))
+    };
     Panes {
         header,
         template,
@@ -251,8 +258,8 @@ impl Panes {
 }
 
 /// The visible text height of a pane (its inner height, minus the border).
-fn visible_height(pane: Pane, area: Rect) -> u16 {
-    panes(area).rect(pane).height.saturating_sub(2)
+fn visible_height(pane: Pane, area: Rect, show_i18n: bool) -> u16 {
+    panes(area, show_i18n).rect(pane).height.saturating_sub(2)
 }
 
 /// The whole lab state: the editable template, data, and i18n catalog, plus the selected
@@ -345,8 +352,9 @@ impl Lab {
     pub fn cycle_focus(&mut self) {
         self.focus = match self.focus {
             Focus::Template => Focus::Data,
-            Focus::Data => Focus::I18n,
-            Focus::I18n => Focus::Template,
+            // Skip the i18n pane on samples that don't use it (it's hidden).
+            Focus::Data if self.sample.uses_i18n() => Focus::I18n,
+            Focus::Data | Focus::I18n => Focus::Template,
         };
     }
 
@@ -372,7 +380,7 @@ impl Lab {
     /// Scroll a pane by `delta` lines (negative = up), clamped to its content within
     /// `area`. Used by the mouse wheel and `PageUp`/`PageDown`.
     pub fn scroll_pane(&mut self, pane: Pane, delta: i32, area: Rect) {
-        let visible = i32::from(visible_height(pane, area));
+        let visible = i32::from(visible_height(pane, area, self.sample.uses_i18n()));
         let max = (self.pane_line_count(pane) as i32 - visible).max(0);
         let next = (i32::from(self.scroll.get(pane)) + delta).clamp(0, max);
         *self.scroll.slot(pane) = u16::try_from(next).unwrap_or(u16::MAX);
@@ -381,7 +389,7 @@ impl Lab {
     /// Keep the focused editor's cursor in view after a move/edit, scrolling minimally.
     pub fn follow_cursor(&mut self, area: Rect) {
         let pane = self.focus.pane();
-        let visible = visible_height(pane, area);
+        let visible = visible_height(pane, area, self.sample.uses_i18n());
         if visible == 0 {
             return;
         }
@@ -413,7 +421,7 @@ impl Default for Lab {
 /// Draw the whole lab to `frame`. Pure over `lab` (no I/O), so it renders identically
 /// under a real terminal or a `TestBackend`.
 pub fn ui(frame: &mut Frame, lab: &Lab) {
-    let p = panes(frame.area());
+    let p = panes(frame.area(), lab.sample.uses_i18n());
 
     let title = Line::from(vec![
         Span::styled(

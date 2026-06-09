@@ -5,7 +5,7 @@
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
-use trussbars_lab::{Lab, Locale, ui};
+use trussbars_lab::{Lab, Locale, samples::Sample, ui};
 
 fn frame_text(lab: &Lab) -> String {
     let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
@@ -31,5 +31,17 @@ fn paints_panes_and_localized_output() {
     assert!(
         text.contains("Beleg"),
         "localized output (Beleg) missing from the frame"
+    );
+}
+
+#[test]
+fn greeting_hides_the_i18n_pane() {
+    // The no-i18n greeting drops the i18n pane (Output takes the full bottom row).
+    let text = frame_text(&Lab::from_sample(Sample::Greeting));
+    assert!(text.contains("Template"), "Template pane still shown");
+    assert!(text.contains("Hello, Ada!"), "greeting output present");
+    assert!(
+        !text.contains("i18n catalog"),
+        "i18n pane should be hidden for the no-i18n greeting"
     );
 }
