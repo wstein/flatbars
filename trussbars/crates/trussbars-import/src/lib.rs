@@ -20,6 +20,7 @@
 use std::path::Path;
 
 pub mod handlebars;
+pub mod lift;
 pub mod liquid;
 pub mod mustache;
 pub mod stringtemplate;
