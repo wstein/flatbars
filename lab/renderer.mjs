@@ -49,6 +49,7 @@ import {
   lint as bbLint,
   migrate as bbMigrate,
   maxbarsCompat as bbMaxbarsCompat,
+  maxbarsCompatWithPartials as bbMaxbarsCompatWith,
   // MinBars (Mustache) render + compile paths
   renderMustache as bbRenderMustache,
   renderMinbarsCompat as bbRenderMinbarsCompat,
@@ -57,7 +58,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=93";
+} from "./vendor/flatbars-engine.mjs?v=94";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -256,7 +257,13 @@ function flatbarsRenderer(activeDialect, _opts) {
   // the Trussbars production AOT compiler? Structural verdict from the real AOT
   // front-end; numeric-truthiness / struct-output observed against the sample data.
   function compatCheck(program, data) {
-    return bbMaxbarsCompat(program.source, data == null ? {} : data);
+    const d = data == null ? {} : data;
+    const partials = program.partials || {};
+    // Thread the registered partials so a `{{> name}}` is checked against the same
+    // partials the render uses — not mis-reported as an "unknown partial".
+    return Object.keys(partials).length
+      ? bbMaxbarsCompatWith(partials, program.source, d)
+      : bbMaxbarsCompat(program.source, d);
   }
 
   // parseAst returns the lowered AST in the host's {t:…} node shape (or {error}).

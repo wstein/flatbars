@@ -22,7 +22,7 @@ import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
 import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
-import MaxBars.Compat (compatReport)
+import MaxBars.Compat (compatReport, compatReportWith)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -40,13 +40,25 @@ expectM name src dat expected = case renderMax src dat of
 
 -- | Assert the Trussbars AOT-compat verdict and the exact set of finding `rule`s.
 expectCompat :: String -> String -> Value -> Boolean -> Array String -> Effect Unit
-expectCompat name src dat compatible rules = case compatReport src dat of
-  Left err -> assert' (name <> ": unexpected parse error: " <> show err) false
-  Right r -> do
-    assert' (name <> ": expected compatible=" <> show compatible <> " got " <> show r.compatible)
-      (r.compatible == compatible)
-    let got = map _.rule r.findings
-    assert' (name <> ": expected rules " <> show rules <> " got " <> show got) (got == rules)
+expectCompat name = expectCompatWith name []
+
+-- | `expectCompat` with named external partials threaded into the compat check.
+expectCompatWith
+  :: String
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Boolean
+  -> Array String
+  -> Effect Unit
+expectCompatWith name partials src dat compatible rules =
+  case compatReportWith partials src dat of
+    Left err -> assert' (name <> ": unexpected parse error: " <> show err) false
+    Right r -> do
+      assert' (name <> ": expected compatible=" <> show compatible <> " got " <> show r.compatible)
+        (r.compatible == compatible)
+      let got = map _.rule r.findings
+      assert' (name <> ": expected rules " <> show rules <> " got " <> show got) (got == rules)
 
 main :: Effect Unit
 main = do
@@ -574,5 +586,20 @@ main = do
     (obj [])
     true
     []
+
+  -- a `{{> name}}` resolving to a provided external partial is AOT-compatible
+  -- (threaded into the structural check, so not a false "unknown partial").
+  expectCompatWith "compat: external partial resolves (not 'unknown partial')"
+    [ Tuple "styles" "<b>styled</b>" ]
+    "{{> styles}} {{name}}"
+    (obj [ Tuple "name" (VString "A") ])
+    true
+    []
+  -- without the partial provided, the same template IS flagged structural.
+  expectCompat "compat: an unprovided partial is flagged"
+    "{{> styles}} {{name}}"
+    (obj [ Tuple "name" (VString "A") ])
+    false
+    [ "aot-structural" ]
 
   log "all MaxBars tests passed"

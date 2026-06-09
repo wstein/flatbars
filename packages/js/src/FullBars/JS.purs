@@ -20,6 +20,7 @@ module FullBars.JS
   , lint
   , migrate
   , maxbarsCompat
+  , maxbarsCompatWithPartials
   , renderSurface
   , renderMaxbars
   , renderMaxbarsWithPartials
@@ -253,19 +254,31 @@ type CompatResult =
 -- | output) come from an instrumented render. A purely advisory check — MaxBars (and
 -- | the Trussbars VM) still run an incompatible template; only AOT rejects it.
 maxbarsCompat :: Fn2 String Json CompatResult
-maxbarsCompat = mkFn2 \tpl json ->
-  case Compat.compatReport tpl (fromJson json) of
-    Left pe ->
-      { ok: false, compatible: false, findings: [], report: "", error: renderParseErrorAt tpl pe }
-    Right r ->
-      { ok: true
-      , compatible: r.compatible
-      , findings: r.findings
-      , report:
-          if r.compatible then "ok: Trussbars AOT-compatible"
-          else joinWith "\n" (map (\f -> f.rule <> ": " <> f.message) r.findings)
-      , error: ""
-      }
+maxbarsCompat = mkFn2 \tpl json -> compatResultFor tpl (Compat.compatReport tpl (fromJson json))
+
+-- | `maxbarsCompat` with named external partials (each MaxBars surface source) — the
+-- | host/Lab-registered partials a `{{> name}}` resolves to, threaded into the check
+-- | exactly as the render threads them (so a `{{> styles}}` to a provided partial is
+-- | not mis-reported as an "unknown partial").
+-- | `maxbarsCompatWithPartials(partials, template, data)`.
+maxbarsCompatWithPartials :: Fn3 (FO.Object String) String Json CompatResult
+maxbarsCompatWithPartials = mkFn3 \partials tpl json ->
+  compatResultFor tpl (Compat.compatReportWith (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | Project a compat report into the JS result shape (shared by both facades).
+compatResultFor :: String -> Either ParseError Compat.CompatReport -> CompatResult
+compatResultFor tpl = case _ of
+  Left pe ->
+    { ok: false, compatible: false, findings: [], report: "", error: renderParseErrorAt tpl pe }
+  Right r ->
+    { ok: true
+    , compatible: r.compatible
+    , findings: r.findings
+    , report:
+        if r.compatible then "ok: Trussbars AOT-compatible"
+        else joinWith "\n" (map (\f -> f.rule <> ": " <> f.message) r.findings)
+    , error: ""
+    }
 
 -- | A migrate outcome (`Linter.Migrate`) as a plain JS object: the rewritten
 -- | MaxBars `source`, and the `residuals` the migrator flagged but did not rewrite

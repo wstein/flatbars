@@ -11,8 +11,9 @@
 -- | Two tiers, by how they are decided:
 -- |
 -- |  * **Structural** (data-free, *drift-proof*): we run the real AOT front-end
--- |    (`MaxBars.Rust.compileMaxRustCommented`) and surface its located rejection
--- |    verbatim — computed (data-derived) field names, dynamic partials, host
+-- |    (`MaxBars.Rust.compileMaxRustCommentedWith`, threaded with the same external
+-- |    partials the render uses) and surface its located rejection verbatim —
+-- |    computed (data-derived) field names, *computed* partials, host
 -- |    helpers (`t`/`number`/…), non-`raw` raw blocks, unknown helpers. (Dict
 -- |    literals are *accepted* — the emitter synthesizes a struct for them.) The
 -- |    lint *is* the compiler's own rejection set, so it can never
@@ -37,6 +38,7 @@ module MaxBars.Compat
   ( CompatFinding
   , CompatReport
   , compatReport
+  , compatReportWith
   ) where
 
 import Prelude
@@ -54,6 +56,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..))
 import Data.String as Str
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Error (Error(..), ParseError)
 import FlatBars.Parser (parseWith)
@@ -67,7 +70,7 @@ import Kernel.Prelude (lenientResolve, prelude)
 import Kernel.Render (preludeEnv)
 import Kernel.Value (nonEmpty)
 import MaxBars (maxLoopVars, maxOptions)
-import MaxBars.Rust (compileMaxRustCommented)
+import MaxBars.Rust (compileMaxRustCommentedWith)
 
 -- | One incompatibility, located in the MaxBars source and ready for a host UI
 -- | (the Lab's Trussbars panel). `severity` is always `"Err"` (an incompatibility
@@ -89,19 +92,37 @@ type CompatReport =
   , findings :: Array CompatFinding
   }
 
--- | Lint MaxBars `src` against the sample `dat` for Trussbars AOT compatibility.
--- | A parse error short-circuits to `Left` (the same first-error projection the
--- | other MaxBars analyses use); otherwise the structural verdict and the
--- | data-driven findings are merged.
+-- | Lint MaxBars `src` against the sample `dat` for Trussbars AOT compatibility,
+-- | with no external partials.
 compatReport :: String -> Value -> Either ParseError CompatReport
-compatReport src dat = do
+compatReport = compatReportWith []
+
+-- | `compatReport` with named *external* partials (each MaxBars surface source) — the
+-- | host/Lab-registered partials a `{{> name}}` resolves to. They are threaded into
+-- | *both* tiers, exactly as the render path threads them: the structural front-end
+-- | inlines them (so a `{{> styles}}` resolving to a provided partial is not
+-- | mis-reported as an "unknown partial"), and the data-driven trace registers them
+-- | so a partial-using template still renders for the numeric/struct observations.
+-- | A parse error short-circuits to `Left`.
+compatReportWith
+  :: Array (Tuple String String) -> String -> Value -> Either ParseError CompatReport
+compatReportWith externalSrcs src dat = do
   { nodes } <- lmap NEA.head (parseWith maxOptions src)
+  externals <- traverse parsePartial externalSrcs
   let
-    { partials, template } = hoistInline (desugarSurfaceWith maxLoopVars nodes)
-    structural = structuralFinding src
-    dataDriven = dataFindings src partials template dat
+    { partials: inlineP, template } = hoistInline (desugarSurfaceWith maxLoopVars nodes)
+    allPartials = Map.union inlineP (Map.fromFoldable externals)
+    structural = structuralFinding externalSrcs src
+    dataDriven = dataFindings src allPartials template dat
     findings = structural <> dataDriven
   pure { compatible: Array.null findings, findings }
+
+-- | Parse + desugar a named external partial into the registry form (its desugared
+-- | body), so it can be `Map.union`'d alongside the template's inline partials.
+parsePartial :: Tuple String String -> Either ParseError (Tuple String Template)
+parsePartial (Tuple name s) = do
+  { nodes } <- lmap NEA.head (parseWith maxOptions s)
+  pure (Tuple name (desugarSurfaceWith maxLoopVars nodes))
 
 --------------------------------------------------------------------------------
 -- Structural tier — delegate to the real AOT front-end (drift-proof)
@@ -112,10 +133,10 @@ compatReport src dat = do
 -- | reason is prefixed `main:<line>:<col>: ` — the breadcrumb we parse back into a
 -- | location. The context type is a placeholder: only the accept/reject verdict and
 -- | the reason matter here, never the emitted Rust.
-structuralFinding :: String -> Array CompatFinding
-structuralFinding src =
+structuralFinding :: Array (Tuple String String) -> String -> Array CompatFinding
+structuralFinding externalSrcs src =
   let
-    r = compileMaxRustCommented "main" "TrussbarsCtx" src
+    r = compileMaxRustCommentedWith externalSrcs "main" "TrussbarsCtx" src
   in
     if r.ok then []
     else

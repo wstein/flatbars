@@ -1644,7 +1644,7 @@
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=93";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=94";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -3699,7 +3699,7 @@
         // production Rust AOT compiler? Structural verdict from the real front-end;
         // numeric-truthiness / struct-output observed against the rendered data.
         lastCompat = engineFeatures.includes("trussbars-compat") && typeof renderer.compatCheck === "function"
-          ? renderer.compatCheck({ source: mainSource }, data)
+          ? renderer.compatCheck({ source: mainSource, partials: partialsMap() }, data)
           : { ok: true, compatible: true, findings: [] };
         refreshCoverageGutter();
         // Engine-reported assigns that aren't present at the data root — a
