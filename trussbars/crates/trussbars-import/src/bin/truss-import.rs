@@ -38,6 +38,7 @@ fn main() -> ExitCode {
     // The migration idioms are on by default; the `--no-*` flags opt out.
     let mut ternary = true;
     let mut faithful_truthiness = true;
+    let mut compact = false;
     let mut data: Option<String> = None;
     let mut report_json = false;
 
@@ -62,6 +63,7 @@ fn main() -> ExitCode {
             "--to-truss" => mode = Mode::ToTruss,
             "--no-ternary" => ternary = false,
             "--no-faithful-truthiness" => faithful_truthiness = false,
+            "--compact" => compact = true,
             "--report-json" => report_json = true,
             "--help" | "-h" => {
                 print_help();
@@ -107,6 +109,7 @@ fn main() -> ExitCode {
             &src,
             ternary,
             faithful_truthiness,
+            compact,
             data.as_deref(),
             report_json,
         ),
@@ -171,6 +174,7 @@ fn run_to_truss(
     src: &str,
     ternary: bool,
     faithful_truthiness: bool,
+    compact: bool,
     data: Option<&str>,
     report_json: bool,
 ) -> ExitCode {
@@ -209,7 +213,12 @@ fn run_to_truss(
     };
     match migrated {
         Ok(m) => {
-            print!("{}", m.truss);
+            // Readable (block tags on their own lines) by default; `--compact` is verbatim.
+            if compact {
+                print!("{}", m.truss);
+            } else {
+                print!("{}", m.pretty());
+            }
             if report_json {
                 eprintln!("{}", migrate::report_json(&m.report, src));
             } else if !m.report.is_empty() {
@@ -290,6 +299,9 @@ fn print_help() {
     );
     println!(
         "  --no-faithful-truthiness  annotate the truthiness delta instead of an exact predicate"
+    );
+    println!(
+        "  --compact                 verbatim output (preserve source whitespace; no re-flow)"
     );
     println!("  --data <f.json>           disambiguate sections from a JSON data sample");
     println!("  --report-json             emit the migration report as JSON on stderr");

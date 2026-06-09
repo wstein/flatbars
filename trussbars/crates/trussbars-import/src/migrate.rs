@@ -2,14 +2,18 @@
 //! Trussbars IR, and [`crate::lift`] it back to idiomatic `.truss`, paired with a
 //! structured migration report (`docs/15`). Currently Mustache-only.
 
+use crate::lift::Notes;
 use crate::lower::{LowerOptions, MigrationNote, Severity, ShapeOracle};
 use crate::{ParseError, handlebars, lift, liquid, lower, mustache, stringtemplate};
+use trussbars_template::ast as ir;
 
 /// Assemble a [`Migration`] from a lowering result.
 fn assemble(low: lower::Lowered) -> Migration {
     Migration {
         truss: lift::to_truss_annotated(&low.ir, &low.notes),
         report: low.report,
+        ir: low.ir,
+        notes: low.notes,
     }
 }
 
@@ -17,10 +21,23 @@ fn assemble(low: lower::Lowered) -> Migration {
 /// notes) and the structured report.
 #[derive(Debug, Clone)]
 pub struct Migration {
-    /// The migrated `.truss` source.
+    /// The migrated `.truss` source — the verbatim ([`lift::to_truss`]) rendering.
     pub truss: String,
     /// The migration report, in source order.
     pub report: Vec<MigrationNote>,
+    /// The lowered IR (so callers can re-render, e.g. [`Migration::pretty`]).
+    pub ir: Vec<ir::Node>,
+    /// The node-attached inline notes for re-rendering.
+    pub notes: Notes,
+}
+
+impl Migration {
+    /// The readable rendering ([`lift::to_truss_pretty`]) — block tags on their own
+    /// indented lines.
+    #[must_use]
+    pub fn pretty(&self) -> String {
+        lift::to_truss_pretty(&self.ir, &self.notes)
+    }
 }
 
 /// Migrate a Mustache template to idiomatic `.truss`.

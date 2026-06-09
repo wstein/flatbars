@@ -37,6 +37,280 @@ pub fn to_truss_annotated(nodes: &[Node], notes: &Notes) -> String {
     out
 }
 
+/// Pretty-print the IR to *readable* `.truss`: each block tag (`{{#each}}`, `{{#if}}`,
+/// `{{else}}`, `{{/…}}`, …) on its own indented line, content re-flowed to trimmed lines.
+///
+/// Block-tag lines are *standalone*, which the engine trims, so the render is preserved
+/// for whitespace-insensitive content; per-line trimming may alter significant whitespace
+/// (e.g. inside `<pre>` or code generation), where [`to_truss`] (verbatim) is preferable.
+#[must_use]
+pub fn to_truss_pretty(nodes: &[Node], notes: &Notes) -> String {
+    let mut p = Pretty {
+        out: String::new(),
+        notes,
+        indent: 0,
+    };
+    p.nodes(nodes);
+    p.out
+}
+
+/// A readable-formatting walker: block structure on its own indented lines, inline runs
+/// (text + interpolations) flushed as trimmed content lines.
+struct Pretty<'a> {
+    out: String,
+    notes: &'a Notes,
+    indent: usize,
+}
+
+impl Pretty<'_> {
+    fn line(&mut self, s: &str) {
+        for _ in 0..self.indent {
+            self.out.push_str("  ");
+        }
+        self.out.push_str(s);
+        self.out.push('\n');
+    }
+
+    /// Emit any migration notes attached to `span` as their own comment lines.
+    fn note_lines(&mut self, span: Span) {
+        if let Some(msgs) = self.notes.get(&span.start) {
+            for m in msgs {
+                self.line(&format!("{{{{! migrate: {m} }}}}"));
+            }
+        }
+    }
+
+    fn nodes(&mut self, nodes: &[Node]) {
+        let mut inline = String::new();
+        for n in nodes {
+            if is_block(n) {
+                self.flush(&mut inline);
+                self.block(n);
+            } else {
+                // Inline surface (text + interpolations), including its own notes.
+                print_node(n, self.notes, &mut inline);
+            }
+        }
+        self.flush(&mut inline);
+    }
+
+    /// Emit a buffered inline run as trimmed, indented content lines (blank lines dropped).
+    fn flush(&mut self, inline: &mut String) {
+        for raw in inline.lines() {
+            let t = raw.trim();
+            if !t.is_empty() {
+                self.line(t);
+            }
+        }
+        inline.clear();
+    }
+
+    fn block(&mut self, n: &Node) {
+        match n {
+            Node::Each(e) => {
+                self.note_lines(e.span);
+                self.line(&tag_each_open(e));
+                self.body(&e.body);
+                if !e.otherwise.is_empty() {
+                    self.line("{{else}}");
+                    self.body(&e.otherwise);
+                }
+                self.line("{{/each}}");
+            }
+            Node::Cond(c) => {
+                self.note_lines(c.span);
+                let (open, close) = tag_cond_open_close(c);
+                self.line(&open);
+                self.body(&c.body);
+                for (cond, body) in &c.elifs {
+                    let mut s = String::from("{{else if ");
+                    print_expr(cond, &mut s);
+                    s.push_str("}}");
+                    self.line(&s);
+                    self.body(body);
+                }
+                if !c.otherwise.is_empty() {
+                    self.line("{{else}}");
+                    self.body(&c.otherwise);
+                }
+                self.line(close);
+            }
+            Node::With(w) => {
+                self.note_lines(w.span);
+                let mut s = String::from("{{#with ");
+                print_expr(&w.subject, &mut s);
+                s.push_str("}}");
+                self.line(&s);
+                self.body(&w.body);
+                if !w.otherwise.is_empty() {
+                    self.line("{{else}}");
+                    self.body(&w.otherwise);
+                }
+                self.line("{{/with}}");
+            }
+            Node::Let {
+                span,
+                bindings,
+                body,
+            } => {
+                self.note_lines(*span);
+                let mut s = String::from("{{#let");
+                for (name, value) in bindings {
+                    s.push(' ');
+                    s.push_str(name);
+                    s.push_str("=(");
+                    print_expr(value, &mut s);
+                    s.push(')');
+                }
+                s.push_str("}}");
+                self.line(&s);
+                self.body(body);
+                self.line("{{/let}}");
+            }
+            Node::Case(c) => {
+                self.note_lines(c.span);
+                let mut s = String::from("{{#case ");
+                print_expr(&c.subject, &mut s);
+                s.push_str("}}");
+                self.line(&s);
+                for (values, body) in &c.arms {
+                    let mut w = String::from("{{when");
+                    for v in values {
+                        w.push(' ');
+                        print_expr(v, &mut w);
+                    }
+                    w.push_str("}}");
+                    self.line(&w);
+                    self.body(body);
+                }
+                if !c.otherwise.is_empty() {
+                    self.line("{{else}}");
+                    self.body(&c.otherwise);
+                }
+                self.line("{{/case}}");
+            }
+            Node::HelperBlock(b) => {
+                self.note_lines(b.span);
+                let mut s = String::from("{{#");
+                s.push_str(&b.head);
+                for a in &b.args {
+                    s.push(' ');
+                    print_expr(a, &mut s);
+                }
+                s.push_str("}}");
+                self.line(&s);
+                self.body(&b.body);
+                self.line(&format!("{{{{/{}}}}}", b.head));
+            }
+            Node::Inline { span, name, body } => {
+                self.note_lines(*span);
+                let mut s = String::from("{{#inline ");
+                quote(name, &mut s);
+                s.push_str("}}");
+                self.line(&s);
+                self.body(body);
+                self.line("{{/inline}}");
+            }
+            Node::PartialBlock {
+                span,
+                name,
+                ctx,
+                body,
+            } => {
+                self.note_lines(*span);
+                let mut s = String::from("{{#partial ");
+                quote(name, &mut s);
+                if let Some(ctx) = ctx {
+                    s.push(' ');
+                    print_expr(ctx, &mut s);
+                }
+                s.push_str("}}");
+                self.line(&s);
+                self.body(body);
+                self.line("{{/partial}}");
+            }
+            // A raw block's body is verbatim — emit it un-reflowed on its own.
+            Node::RawBlock { span, body } => {
+                self.note_lines(*span);
+                let mut s = String::from("{{{{raw}}}}");
+                s.push_str(body);
+                s.push_str("{{{{/raw}}}}");
+                self.line(&s);
+            }
+            // Inline nodes never reach here (`is_block` gates them).
+            _ => {
+                let mut s = String::new();
+                print_node(n, self.notes, &mut s);
+                self.line(s.trim());
+            }
+        }
+    }
+
+    /// Render a block body one indent deeper.
+    fn body(&mut self, nodes: &[Node]) {
+        self.indent += 1;
+        self.nodes(nodes);
+        self.indent -= 1;
+    }
+}
+
+/// Whether a node is rendered as its own indented block (vs an inline run).
+fn is_block(n: &Node) -> bool {
+    matches!(
+        n,
+        Node::Each(_)
+            | Node::Cond(_)
+            | Node::With(_)
+            | Node::Let { .. }
+            | Node::Case(_)
+            | Node::HelperBlock(_)
+            | Node::Inline { .. }
+            | Node::PartialBlock { .. }
+            | Node::RawBlock { .. }
+    )
+}
+
+/// The `{{#each …}}` open tag.
+fn tag_each_open(e: &Each) -> String {
+    let mut s = String::from("{{#each ");
+    if let Some(item) = &e.item {
+        s.push_str(item);
+        if let Some(index) = &e.index {
+            s.push(' ');
+            s.push_str(index);
+        }
+        s.push_str(" in ");
+    }
+    print_expr(&e.subject, &mut s);
+    if let Some(label) = &e.label {
+        s.push_str(" label ");
+        s.push_str(label);
+    }
+    s.push_str("}}");
+    s
+}
+
+/// The `{{#if}}` / `{{#unless}}` open tag and its matching close.
+fn tag_cond_open_close(c: &Cond) -> (String, &'static str) {
+    let unless = c.negated && c.elifs.is_empty();
+    let mut s = String::new();
+    if unless {
+        s.push_str("{{#unless ");
+        print_expr(&c.cond, &mut s);
+    } else {
+        s.push_str("{{#if ");
+        if c.negated {
+            s.push_str("(not ");
+            print_expr(&c.cond, &mut s);
+            s.push(')');
+        } else {
+            print_expr(&c.cond, &mut s);
+        }
+    }
+    s.push_str("}}");
+    (s, if unless { "{{/unless}}" } else { "{{/if}}" })
+}
+
 fn print_nodes(nodes: &[Node], notes: &Notes, out: &mut String) {
     for n in nodes {
         print_node(n, notes, out);
@@ -756,6 +1030,28 @@ mod tests {
             body: "{{x}}".into(),
         };
         assert_eq!(to_truss(&[n]), "{{{{raw}}}}{{x}}{{{{/raw}}}}");
+    }
+
+    #[test]
+    fn pretty_puts_tags_on_their_own_indented_lines() {
+        let each = Each {
+            span: span(),
+            subject: path(&["items"]),
+            item: Some("item".into()),
+            index: None,
+            label: None,
+            body: vec![
+                Node::Text("  <li>".into()),
+                out(path(&["name"]), false),
+                Node::Text("</li>\n".into()),
+            ],
+            otherwise: vec![Node::Text("none".into())],
+        };
+        let pretty = to_truss_pretty(&[Node::Each(each)], &Notes::new());
+        assert_eq!(
+            pretty,
+            "{{#each item in items}}\n  <li>{{name}}</li>\n{{else}}\n  none\n{{/each}}\n"
+        );
     }
 
     #[test]

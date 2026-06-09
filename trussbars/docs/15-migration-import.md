@@ -162,6 +162,11 @@ comments.
 dumps the parsed AST. The idioms (`?:`/ternary collapse and the faithful-truthiness
 predicate) are **on by default** — opt out with `--no-ternary` / `--no-faithful-truthiness`;
 `--data s.json` supplies the section-shape sample, `--report-json` emits the report as JSON.
+Output is **readable by default** — each block tag (`{{#each}}`, `{{#if}}`, `{{else}}`,
+`{{/…}}`) on its own indented line, content re-flowed to trimmed lines; since block-tag
+lines are standalone (the engine trims them) the render is preserved for
+whitespace-insensitive content. Use `--compact` for the verbatim rendering (preserves
+source whitespace exactly — preferable for `<pre>`/code-generation).
 (The library `LowerOptions::default()` stays conservative — all idioms off — so a host opts
 in explicitly; the CLI is the opinionated front-end.)
 
