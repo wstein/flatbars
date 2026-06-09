@@ -1,0 +1,15 @@
+[package]
+name = "trussbars-i18n"
+description = "A reference-faithful i18n host-helper pack for Trussbars (date/number/t/selectPlural/relative): compiled host functions a template declares with #[truss_helpers(...)] and calls by name (docs/09). Dependency-free; byte-identity to a specific locale runtime is the host's choice."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+keywords = ["template", "maxbars", "i18n", "l10n"]
+categories = ["template-engine", "localization"]
+
+# Dependency-free — like trussbars-std, the helpers are self-contained.
+[dependencies]
+
+[lints]
+workspace = true

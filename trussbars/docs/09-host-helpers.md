@@ -92,9 +92,13 @@ typed analog: **byte-identity with the reference is the host's responsibility** 
 typed host uses theirs; the harness can't compare them. Document this clearly: the
 corpus proves the *language*, not the host's helper semantics.
 
-A future option: ship a *reference-faithful* `trussbars-i18n` crate (a host-helper
-module mirroring the interpreter's i18n pack) so a host that wants parity links it
-instead of writing its own — but that's a separate deliverable, not the convention.
+**Shipped:** the `trussbars-i18n` crate (a host-helper pack mirroring the interpreter's
+i18n names — `t`/`number`/`date`/`selectPlural`/`relative`) so a host links it and
+declares `#[truss_helpers(date, number, …)]` instead of writing its own. It provides
+real, dependency-free formatters and the reference *fallback* semantics (`t` =
+identity, English `selectPlural`/`relative`), but — per the boundary above —
+byte-identity to a particular locale runtime (JS `Intl`, ICU) remains the host's
+choice; a host wanting exact parity wraps its own locale library and declares that.
 
 ## 6. v1 stopgap (today)
 
