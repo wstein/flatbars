@@ -641,6 +641,11 @@ type Algebra a =
 foldTemplate :: forall a. Algebra a -> Template -> a       -- FlatBars owns the traversal
 ```
 
+(Elided for clarity: the real algebra also carries `sep` and `nodeError` cases, and
+hands every tag-level case — `output`/`raw`/`sep`/`block` — the source `Span` of its
+opening tag, so a lowering can record positions. That span is what the reference
+lower threads into its real AST and the Lab reads back as each node's `src`.)
+
 *Lowering* a skeleton into a typed engine AST that resolves `if`/`else` into one node — the
 "prepare the AST" the title asks for:
 

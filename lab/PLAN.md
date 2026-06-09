@@ -51,6 +51,10 @@ panel**, so an unequal engine never lies about what it can do. The dock panels �
 
 FlatBars advertises exact (non-heuristic) `used-transformers`, `required-assigns`,
 and `partial-graph` because they are computed from the lowered AST, not guessed.
+That lowered AST (`parseAst`) carries each tag-derived node's opening-tag span as
+`src: { start, end }`, so the **Data Access** panel reports the real
+`file:line:column` and its rows jump to source — both keyed off `node.src`, not a
+1:1 fallback.
 The **core / FullBars / MaxBars dialects back `source-map`** (ADR-035): a mapped
 render returns output→source `segments`, each tagged with its source `file`, so the
 three-way editor↔output provenance linking is live and a partial-origin run links to
