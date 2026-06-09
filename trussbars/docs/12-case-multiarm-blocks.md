@@ -180,7 +180,8 @@ authority for every `{{#case}}` case. (FullBars and MinBars are excluded — see
 4. **Later, optional:** **A2** — a typed exhaustive `{{#case}}` over closed `#[serde(tag)]`
    enums (compile-time exhaustiveness), its own decision once the schema/enum story
    (`docs/03`) needs it. It takes the `match` keyword and *pattern* arms, and plugs into the
-   `Case` node A1 established.
+   `Case` node A1 established. **Design review: §8** (notably, the AOT path needs rustc's
+   exhaustiveness, *not* schema inference — that is an LSP nice-to-have, not a blocker).
 
 ## 7. Summary
 
@@ -194,3 +195,57 @@ authority for every `{{#case}}` case. (FullBars and MinBars are excluded — see
   extension that takes the **`match`** keyword with pattern arms, built on the `Case` node.
 - The keyword is **`case`** because `case…when…else` is the SQL/Ruby/Liquid triad that
   matches both the chosen arm keyword and the v1 (value-dispatch, non-exhaustive) semantics.
+
+## 8. Appendix — typed-exhaustive `{{#case}}` (A2): design review
+
+A2 is the typed sibling of `{{#case}}`: where `case` dispatches a *value* against literal
+arms by `==`, `{{#case}}` would dispatch a *closed typed* subject (a Rust enum, e.g. a
+`#[serde(tag = "kind")]` model) against **variant patterns**, with **compile-time
+exhaustiveness**. This is a review of its feasibility on the implemented `Case` seam — not a
+commitment.
+
+**The key realization: A2's AOT path does *not* need schema inference.** The tempting framing
+is "infer the subject's enum and its variants (docs/03), then check arms against it." But a
+Rust **proc-macro runs before type-checking**, so `truss!` cannot introspect `Ctx`'s field
+types at all. The way out is to lean on rustc instead of fighting it: emit the author's arm
+patterns into a real Rust `match` and let **rustc** validate the variant names and enforce
+exhaustiveness (a *class-B* diagnostic, `docs/07 §3`). The macro transcribes
+`{{when Shipped}}{{when Pending | Queued}}…` to
+
+```rust
+match &ctx.status {
+    Status::Shipped => { … }
+    Status::Pending | Status::Queued => { … }
+    // no `_` arm  ⇒  rustc errors if a variant is unhandled — exhaustiveness, free
+}
+```
+
+So the AOT `match` + exhaustiveness is buildable today; schema inference (docs/03) is a
+*nice-to-have* for the LSP (variant completion + a located **class-A** "missing arm `X`"
+before rustc), not a blocker for the compiler.
+
+**What A2 actually needs (the real gating items):**
+
+1. **A pattern surface grammar (ADR-first, per the CLAUDE.md rule).** `{{#case}}` arms are
+   *value expressions*; `{{#case}}` arms are *patterns*. Scope to settle: bare variant names;
+   or-patterns (`A | B`); field binds (`{{when Shipped(tracking)}}` → bind `tracking` in the
+   arm body) vs. payload-blind matching; whether `{{else}}` is allowed (it becomes the `_`
+   arm and *disables* exhaustiveness). Recommend v1 = variant names + or-patterns + optional
+   `{{else}}`; defer field binds.
+2. **The VM and reference semantics.** Neither the VM nor the PureScript oracle has Rust
+   types, so they cannot do *static* exhaustiveness. They dispatch at **runtime on the serde
+   tag field** (`status.kind == "Shipped"`). Exhaustiveness is therefore an **AOT-only static
+   guarantee** (a diagnostic, not an output difference) — conformance still holds because the
+   corpus compares *rendered output*, and a runtime-unmatched subject with no `{{else}}` is
+   simply unreachable on inputs the type permits.
+3. **A node (or a `Case` field).** `Case` carries value arms; A2 carries pattern arms. Add a
+   `dispatch: ByValue | ByPattern` discriminant (or a sibling `Match` node) — the
+   `subject`/`arms`/`otherwise` shape is reused, so this is the small part.
+
+**Recommendation.** A2 is feasible and worth doing, but it is a *new construct* (the `match`
+keyword, pattern arms), not a tweak to `case`. Sequence: (a) freeze the pattern grammar in an
+ADR; (b) ship the AOT `match` with rustc-enforced exhaustiveness (no docs/03 dependency); (c)
+runtime tag-dispatch in the VM/oracle; (d) *later*, when docs/03 schema inference lands in
+Rust, upgrade the LSP to located (class-A) exhaustiveness + variant completion. The
+first-class `Case` node established here is the seam all of this plugs into — which was the
+whole point of choosing A1 over the desugar.
