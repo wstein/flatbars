@@ -15341,7 +15341,7 @@ var head1 = function(rec) {
         return "null";
       }
       ;
-      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 335, column 22 - line 337, column 20): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 346, column 22 - line 348, column 20): " + [v.constructor.name]);
     };
   };
 };
@@ -15361,7 +15361,7 @@ var elseChain = function(rec) {
         return " else {\n" + (rec.nodes(ctx2)(v.value0.head.body) + "  }");
       }
       ;
-      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 211, column 29 - line 222, column 55): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 222, column 29 - line 233, column 55): " + [v.constructor.name]);
     };
   };
 };
@@ -15385,42 +15385,49 @@ var clausesObj = function(rec) {
     };
   };
 };
+var caseEq = function(rec) {
+  return function(ctx2) {
+    return function(v) {
+      return "rt.call(" + (jsString("eq") + (", [__case, " + (rec.expr(ctx2)(v) + ("], " + (ctx2.scope + ")")))));
+    };
+  };
+};
 var caseChain = function(rec) {
   return function(ctx2) {
-    return function(subject) {
-      return function(first) {
-        return function(clauses) {
-          var v = uncons(clauses);
-          if (v instanceof Nothing) {
-            return "";
+    return function(first) {
+      return function(clauses) {
+        var v = uncons(clauses);
+        if (v instanceof Nothing) {
+          return "";
+        }
+        ;
+        if (v instanceof Just) {
+          if (v.value0.head.name === "when") {
+            var kw = (function() {
+              if (first) {
+                return "  if (";
+              }
+              ;
+              return " else if (";
+            })();
+            var guard2 = (function() {
+              if (v.value0.head.args.length === 0) {
+                return "false";
+              }
+              ;
+              return joinWith(" || ")(map26(caseEq(rec)(ctx2))(v.value0.head.args));
+            })();
+            return kw + (guard2 + (") {\n" + (rec.nodes(ctx2)(v.value0.head.body) + ("  }" + caseChain(rec)(ctx2)(false)(v.value0.tail)))));
           }
           ;
-          if (v instanceof Just) {
-            if (v.value0.head.name === "when") {
-              var kw = (function() {
-                if (first) {
-                  return "  if (";
-                }
-                ;
-                return " else if (";
-              })();
-              var guard2 = (function() {
-                if (v.value0.head.args.length === 0) {
-                  return "false";
-                }
-                ;
-                return joinWith(" || ")(map26(function(v1) {
-                  return "(" + (rec.expr(ctx2)(new App2("eq", [subject, v1])) + ")");
-                })(v.value0.head.args));
-              })();
-              return kw + (guard2 + (") {\n" + (rec.nodes(ctx2)(v.value0.head.body) + ("  }" + caseChain(rec)(ctx2)(subject)(false)(v.value0.tail)))));
-            }
-            ;
-            return " else {\n" + (rec.nodes(ctx2)(v.value0.head.body) + "  }");
+          if (first) {
+            return "  {\n" + (rec.nodes(ctx2)(v.value0.head.body) + "  }");
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 195, column 43 - line 208, column 55): " + [v.constructor.name]);
-        };
+          return " else {\n" + (rec.nodes(ctx2)(v.value0.head.body) + "  }");
+        }
+        ;
+        throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 200, column 35 - line 213, column 55): " + [v.constructor.name]);
       };
     };
   };
@@ -15437,7 +15444,7 @@ var caseBlock = function(rec) {
           return new App2("null", []);
         })();
         var s = splitClauses(body);
-        return caseChain(rec)(ctx2)(subject)(true)(s.clauses) + "\n";
+        return "  {\n  const __case = " + (rec.expr(ctx2)(subject) + (";\n" + (caseChain(rec)(ctx2)(true)(s.clauses) + "\n  }\n")));
       };
     };
   };
@@ -15476,7 +15483,7 @@ var frameBlock = function(rec) {
                 return [];
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 239, column 18 - line 241, column 20): " + [v.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Compile.Emit (line 250, column 18 - line 252, column 20): " + [v.constructor.name]);
             })();
             var child = rec.child(ctx2);
             return "  out += rt." + (fn + ("(" + (subject + (", " + (ctx2.scope + (", " + (names + (", " + (labelJs + (", " + (lambda(rec)(child)(s.before) + (", " + (lambda(rec)(ctx2)(elseClause) + ");\n")))))))))))));

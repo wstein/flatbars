@@ -177,10 +177,13 @@ ifBlock rec ctx test body =
       "\n"
 
 -- `{{#case}}`: like `ifBlock`, the arms share the current frame, so it is an `if`/`else if`
--- chain over `out`. Each `{{when}}` guard ORs `eq subject value` for its value(s) — built as
--- the same `(eq subject v)` expression the operator compiles, so it matches `caseH`. The
--- content before the first `{{when}}` is dropped (whitespace-only by the leading-content
--- rule), exactly as the interpreter drops `splitClauses`' `before`.
+-- chain over `out`. The subject is bound **once** to `__case` (matching `caseH`, which the
+-- engine hands an already-evaluated subject) — not re-evaluated per arm — and each `{{when}}`
+-- guard ORs `eq __case value`, the same `rt.call("eq", …)` the operator compiles, so the
+-- result matches `caseH` byte-for-byte (a `switch` can't: it uses `===`, while `eq` is the
+-- runtime's `deepEq` — `Safe`-unwrapping and structural). A block scopes `__case`, so a nested
+-- `{{#case}}` shadows cleanly. Content before the first `{{when}}` is dropped (whitespace-only
+-- by the leading-content rule), exactly as the interpreter drops `splitClauses`' `before`.
 caseBlock :: Rec -> Ctx -> Array Expr -> Template -> String
 caseBlock rec ctx positional body =
   let
@@ -189,10 +192,12 @@ caseBlock rec ctx positional body =
       _ -> App "null" []
     s = splitClauses body
   in
-    caseChain rec ctx subject true s.clauses <> "\n"
+    "  {\n  const __case = " <> rec.expr ctx subject <> ";\n"
+      <> caseChain rec ctx true s.clauses
+      <> "\n  }\n"
 
-caseChain :: Rec -> Ctx -> Expr -> Boolean -> Array Clause -> String
-caseChain rec ctx subject first clauses = case Array.uncons clauses of
+caseChain :: Rec -> Ctx -> Boolean -> Array Clause -> String
+caseChain rec ctx first clauses = case Array.uncons clauses of
   Nothing -> ""
   Just { head: cl, tail } -> case cl.name of
     "when" ->
@@ -200,12 +205,18 @@ caseChain rec ctx subject first clauses = case Array.uncons clauses of
         kw = if first then "  if (" else " else if ("
         guard = case cl.args of
           [] -> "false"
-          vs -> joinWith " || "
-            (map (\v -> "(" <> rec.expr ctx (App "eq" [ subject, v ]) <> ")") vs)
+          vs -> joinWith " || " (map (caseEq rec ctx) vs)
       in
-        kw <> guard <> ") {\n" <> rec.nodes ctx cl.body <> "  }" <> caseChain rec ctx subject false
-          tail
+        kw <> guard <> ") {\n" <> rec.nodes ctx cl.body <> "  }" <> caseChain rec ctx false tail
+    -- a leading `{{else}}` (no `{{when}}`) renders unconditionally.
+    _ | first -> "  {\n" <> rec.nodes ctx cl.body <> "  }"
     _ -> " else {\n" <> rec.nodes ctx cl.body <> "  }" -- else (terminal)
+
+-- The bound-subject equality guard: the same `rt.call("eq", …)` the `eq` operator emits, but
+-- against the once-bound `__case` instead of re-evaluating the subject expression per arm.
+caseEq :: Rec -> Ctx -> Expr -> String
+caseEq rec ctx v =
+  "rt.call(" <> jsString "eq" <> ", [__case, " <> rec.expr ctx v <> "], " <> ctx.scope <> ")"
 
 elseChain :: Rec -> Ctx -> Array Clause -> String
 elseChain rec ctx clauses = case Array.uncons clauses of
