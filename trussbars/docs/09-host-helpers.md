@@ -131,4 +131,10 @@ pile *is* the requirements list this convention satisfies.
 
 - **Block host-helpers** (`{{#myblock}}…{{/myblock}}`) — value helpers only for now;
   a block helper would need a body-as-closure convention.
-- **A reference-faithful `trussbars-i18n` crate** (§5) — a separate deliverable.
+- **Macro-layer catalog checking** (§5) — validating `{{t "id"}}` literals against a
+  host catalog at `truss!` expansion time, to recover Fluent's compile-time id check
+  inside the static-name model.
+
+> Resolved: the i18n pack (`trussbars-i18n`) shipped (§5), and the real-Fluent path is
+> the worked `examples/i18n-fluent` recipe — so a separate turnkey Fluent crate is *not*
+> tracked; a host that wants Fluent copies the recipe and declares its own `t`.
