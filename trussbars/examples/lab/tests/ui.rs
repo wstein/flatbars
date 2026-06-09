@@ -35,6 +35,27 @@ fn paints_panes_and_localized_output() {
 }
 
 #[test]
+fn template_tags_are_highlighted() {
+    // The Template pane applies syntax highlighting via tui-textarea custom highlights,
+    // so a `{{ … }}` tag paints cyan while literal text does not.
+    use ratatui::style::Color;
+    let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let lab = Lab::new();
+    terminal.draw(|f| ui(f, &lab)).unwrap();
+    let buf = terminal.backend().buffer();
+    let cyan: String = buf
+        .content()
+        .iter()
+        .filter(|c| c.fg == Color::Cyan)
+        .map(ratatui::buffer::Cell::symbol)
+        .collect();
+    assert!(
+        cyan.contains("{{"),
+        "template tags should be highlighted cyan, got {cyan:?}"
+    );
+}
+
+#[test]
 fn greeting_hides_the_i18n_pane() {
     // The no-i18n greeting drops the i18n pane (Output takes the full bottom row).
     let text = frame_text(&Lab::from_sample(Sample::Greeting));

@@ -26,7 +26,8 @@ use ratatui::crossterm::{
 };
 use ratatui::layout::Rect;
 
-use trussbars_lab::{Lab, Locale, Mode, Pane, panes, samples::Sample};
+use trussbars_lab::{Focus, Lab, Locale, Mode, panes, samples::Sample};
+use tui_textarea::CursorMove;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -114,20 +115,31 @@ fn handle_key(lab: &mut Lab, key: KeyEvent, area: Rect) -> bool {
             );
         }
         _ => {
-            lab.focused_mut().input(key);
+            let edited = lab.focused_mut().input(key);
+            if edited && lab.focus == Focus::Template {
+                lab.rehighlight_template();
+            }
         }
     }
     false
 }
 
-/// Handle a mouse event: left-click focuses a pane, the wheel scrolls the pane under it.
+/// Handle a mouse event: left-click focuses a pane and places the caret, dragging
+/// extends the selection, and the wheel scrolls the pane under the cursor.
 fn handle_mouse(lab: &mut Lab, kind: MouseEventKind, col: u16, row: u16, area: Rect) {
     let layout = panes(area, lab.sample.uses_i18n());
     match kind {
         MouseEventKind::Down(MouseButton::Left) => {
-            if let Some(focus) = layout.pane_at(col, row).and_then(Pane::focus) {
+            if let Some(pane) = layout.pane_at(col, row)
+                && let Some(focus) = pane.focus()
+            {
                 lab.focus = focus;
+                place_caret(lab, layout.rect(pane), col, row, true);
             }
+        }
+        MouseEventKind::Drag(MouseButton::Left) => {
+            let rect = layout.rect(lab.focus.pane());
+            place_caret(lab, rect, col, row, false);
         }
         MouseEventKind::ScrollDown => {
             if let Some(pane) = layout.pane_at(col, row) {
@@ -140,6 +152,23 @@ fn handle_mouse(lab: &mut Lab, kind: MouseEventKind, col: u16, row: u16, area: R
             }
         }
         _ => {}
+    }
+}
+
+/// Move the focused editor's caret to a click at screen `(col, row)` within pane `rect`.
+/// `fresh` starts a new selection anchor (a plain click); otherwise the caret extends the
+/// existing selection (a drag). Accurate while the pane isn't scrolled — tui-textarea owns
+/// the viewport top and doesn't expose it.
+fn place_caret(lab: &mut Lab, rect: Rect, col: u16, row: u16, fresh: bool) {
+    let r = row.saturating_sub(rect.y.saturating_add(1));
+    let c = col.saturating_sub(rect.x.saturating_add(1));
+    let ta = lab.focused_mut();
+    if fresh {
+        ta.cancel_selection();
+    }
+    ta.move_cursor(CursorMove::Jump(r, c));
+    if fresh {
+        ta.start_selection();
     }
 }
 

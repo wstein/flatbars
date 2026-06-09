@@ -21,6 +21,7 @@
 #![forbid(unsafe_code)]
 
 pub mod data;
+pub mod highlight;
 pub mod i18n;
 pub mod samples;
 
@@ -250,7 +251,7 @@ impl Lab {
     /// i18n catalog).
     #[must_use]
     pub fn from_sample(sample: Sample) -> Self {
-        Lab {
+        let mut lab = Lab {
             sample,
             locale: Locale::En,
             mode: Mode::Render,
@@ -259,7 +260,16 @@ impl Lab {
             data: area_from(sample.data_yaml()),
             i18n: area_from(i18n::CATALOG_SEED),
             output_scroll: 0,
-        }
+        };
+        lab.rehighlight_template();
+        lab
+    }
+
+    /// Re-apply Trussbars syntax highlighting to the Template pane (call after any edit
+    /// or reseed of the template).
+    pub fn rehighlight_template(&mut self) {
+        let text = self.template.lines().join("\n");
+        highlight::apply(&mut self.template, &text);
     }
 
     /// The opening state: the receipt sample.
@@ -316,6 +326,7 @@ impl Lab {
         self.template = area_from(next.template());
         self.data = area_from(next.data_yaml());
         self.focus = Focus::Template;
+        self.rehighlight_template();
     }
 
     pub fn cycle_focus(&mut self) {

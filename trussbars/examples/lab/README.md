@@ -17,7 +17,8 @@ cargo test                     # editor + data units, the golden matrix, a TestB
 | Key / mouse | Action |
 | --- | --- |
 | type / arrows / Backspace / Enter | edit the focused pane |
-| `Tab` / left-click | cycle focus / focus the clicked pane (Template, Data, i18n) |
+| left-click / drag | focus a pane + place the caret / select text |
+| `Tab` | cycle focus (Template → Data → i18n) |
 | wheel / `PageUp` / `PageDown` | scroll the pane under the cursor / the focused pane |
 | `F2` | cycle locale (en → de → fr → **pl**) |
 | `F3` | toggle mode (`render` ⇄ `render_compat`) |
@@ -34,8 +35,11 @@ through the VM on every keystroke:
 ```
 
 The three editable panes are [`tui-textarea`](https://crates.io/crates/tui-textarea-2)
-widgets — a full editing experience (text selection, undo/redo, word motions, internal
-scrolling). They feed the read-only Output, which re-renders on every keystroke.
+widgets — a full editing experience (mouse caret + selection, undo/redo, word motions,
+internal scrolling). They feed the read-only Output, which re-renders on every keystroke.
+The **Template** pane is **syntax-highlighted**: the engine lexer ([`src/highlight.rs`](src/highlight.rs))
+colours each `{{ … }}` tag by sigil and applies it through tui-textarea's custom-highlight
+API (so it stays correct under scrolling and selection).
 
 ## What it proves (straight from `docs/11`)
 
@@ -75,18 +79,18 @@ is self-contained so it can be promoted to a `trussbars-vm-i18n` bridge crate.
 
 Unlike the other examples (path-deps only), this one pulls the editing TUI
 (**`ratatui`**, **`crossterm`**, **`tui-textarea`**) and **`serde_yaml`** (to decode the
-live-edited Data and catalog panes). That is the cost of a *real, editable* northstar
-rather than a print
-loop — taken knowingly. It lives in its own workspace, so the core crates' dependency-free,
-`forbid(unsafe)` posture is untouched; only this example carries the TUI tree. (Syntax
-highlighting is intentionally not included — `tui-textarea` has no token-highlight API, and
-the tree-sitter-based alternative was too heavy for an example.)
+live-edited Data and catalog panes); syntax highlighting reuses the engine's own
+`trussbars-template` lexer. That is the cost of a *real, editable* northstar rather than a
+print loop — taken knowingly. It lives in its own workspace, so the core crates'
+dependency-free, `forbid(unsafe)` posture is untouched; only this example carries the TUI
+tree.
 
 ## Layout
 
 | File | Role |
 | --- | --- |
 | [`src/lib.rs`](src/lib.rs) | `Lab` state, the pure `render()` core, and the `ui()` draw |
+| [`src/highlight.rs`](src/highlight.rs) | lexer-driven Template highlighting via tui-textarea custom highlights |
 | [`src/data.rs`](src/data.rs) | decode the Data pane (YAML) into the VM's `Value` |
 | [`src/i18n.rs`](src/i18n.rs) | `&[Value]` shims over `trussbars-i18n` + the editable catalog + its seed |
 | [`src/samples.rs`](src/samples.rs) | the two seed templates + their seed YAML data |

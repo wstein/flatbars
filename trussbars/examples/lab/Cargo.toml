@@ -21,6 +21,9 @@ trussbars-vm = { path = "../../crates/trussbars-vm" }
 # The blessed i18n format primitives (number / date / selectPlural / relative). The
 # lab is the *host*: it owns the message catalog for `t` and wires `&[Value]` shims.
 trussbars-i18n = { path = "../../crates/trussbars-i18n" }
+# The engine lexer — drives the Template pane's syntax highlighting (applied to the
+# tui-textarea via its custom-highlight API), straight from the real token stream.
+trussbars-template = { path = "../../crates/trussbars-template" }
 # The TUI: ratatui for layout/widgets over the crossterm terminal backend. crossterm
 # is sourced through `ratatui::crossterm` in code (one version, no skew); pinned here
 # explicitly to ratatui's so the dep is visible and the lock can't drift.
