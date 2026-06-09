@@ -57,12 +57,15 @@ import {
   renderMinbarsCompatWithPartials as bbRenderMinbarsCompatWith,
   renderMinbarsMapped as bbRenderMinbarsMapped,
   renderMinbarsMappedWithPartials as bbRenderMinbarsMappedWith,
+  renderMinbarsMappedCompat as bbRenderMinbarsMappedCompat,
+  renderMinbarsMappedCompatWithPartials as bbRenderMinbarsMappedCompatWith,
   inspectMinbars as bbInspectMinbars,
+  inspectMinbarsCompat as bbInspectMinbarsCompat,
   compileMinbars as bbCompileMinbars,
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=101";
+} from "./vendor/flatbars-engine.mjs?v=102";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -410,15 +413,14 @@ function minbarsRenderer(opts) {
     const partials = program.partials || {};
     const d = data == null ? null : data;
     const hasPartials = Object.keys(partials).length > 0;
-    // Source map (ADR-035): the mapped path renders on the spec rule, so it is taken
-    // only when `map` is requested AND we are NOT in `mustache.js`-compat mode (a
-    // compat-rule source map is a follow-up — the two rules render different
-    // sections, so the map must match). In compat-with-map, fall through to the
-    // plain render with empty segments (provenance gates off).
-    if (map && !compat) {
-      const mp = hasPartials
-        ? bbRenderMinbarsMappedWith(partials, program.source, d)
-        : bbRenderMinbarsMapped(program.source, d);
+    // Source map (ADR-035): the mapped path tiles the output under the SAME
+    // truthiness rule the render uses, so it tracks the compat toggle (the Lab's
+    // MinBars default is mustache.js-compat). The spec/compat rules render different
+    // sections, so the segments must match the output shown.
+    if (map) {
+      const plain = compat ? bbRenderMinbarsMappedCompat : bbRenderMinbarsMapped;
+      const withP = compat ? bbRenderMinbarsMappedCompatWith : bbRenderMinbarsMappedWith;
+      const mp = hasPartials ? withP(partials, program.source, d) : plain(program.source, d);
       if (mp.ok) return { output: mp.output, segments: mp.segments };
       const e = new Error(mp.error); e.kind = "render"; throw e;
     }
@@ -460,9 +462,12 @@ function minbarsRenderer(opts) {
 
   // context-inspect (ADR-035): snapshot the context stack at a target span (from a
   // source-map segment). Mustache binds no loop vars, so each snapshot reports only
-  // the context chain (this/parent/root). `inspectAt(program, data, target, _opts)`.
-  function inspectAt(program, data, target) {
-    const r = bbInspectMinbars(program.partials || {}, target, program.source, data == null ? null : data);
+  // the context chain (this/parent/root). The truthiness rule must match the one the
+  // source map used (the target span came from it), so `opts.compat` (the Lab's
+  // MinBars rule) picks the inspector. `inspectAt(program, data, target, opts)`.
+  function inspectAt(program, data, target, { compat = defaultCompat } = {}) {
+    const fn = compat ? bbInspectMinbarsCompat : bbInspectMinbars;
+    const r = fn(program.partials || {}, target, program.source, data == null ? null : data);
     if (!r.ok) { const e = new Error(r.error); e.kind = "inspect"; throw e; }
     return r.snapshots;
   }

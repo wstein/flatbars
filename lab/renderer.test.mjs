@@ -417,12 +417,33 @@ test("source map: MinBars emits a tiling source map (ADR-035)", async () => {
   assert.equal(segments.map((s) => output.slice(s.out, s.out + s.len)).join(""), output);
 });
 
-test("source map: MinBars compat-rule render has no source map (the follow-up)", async () => {
+test("source map: MinBars emits a map under the mustache.js-compat rule too (the Lab default)", async () => {
   const r = await createRenderer("minbars");
-  // The mapped path is spec-rule only; in mustache.js-compat mode it falls back to
-  // the plain render with empty segments (a compat-rule source map is tracked).
-  const out = r.render(r.compile("{{#n}}x{{/n}}").program, { n: 0 }, { map: true, compat: true });
-  assert.deepEqual(out, { output: "", segments: [] });
+  // RC regression: the Lab defaults MinBars to compat (mustache.js) mode, so the
+  // mapped path MUST track the rule — the segments tile the *compat* output. Here
+  // `{{#n}}` over n=0 is falsy under compat (skipped), truthy under spec (rendered),
+  // so the two maps differ and both must still tile their own output exactly.
+  const prog = r.compile("a{{#n}}b{{/n}}c").program;
+  const compat = r.render(prog, { n: 0 }, { map: true, compat: true });
+  const spec = r.render(prog, { n: 0 }, { map: true, compat: false });
+  assert.equal(compat.output, "ac"); // 0 falsy → section skipped
+  assert.equal(spec.output, "abc"); // 0 truthy → section rendered
+  for (const m of [compat, spec]) {
+    assert.ok(m.segments.length > 0, "compat-mode render must emit segments");
+    assert.equal(m.segments.map((s) => m.output.slice(s.out, s.out + s.len)).join(""), m.output);
+  }
+});
+
+test("context inspector: MinBars uses the same rule as its source map (compat)", async () => {
+  const r = await createRenderer("minbars");
+  // The inspector must seed the same rule the clicked segment came from, or it
+  // re-executes different sections. Under compat, {{.}} inside {{#xs}} over [a,b].
+  const prog = r.compile("{{#xs}}{{.}}{{/xs}}").program;
+  const data = { xs: ["a", "b"] };
+  const mapped = r.render(prog, data, { map: true, compat: true });
+  const seg = mapped.segments.find((s) => s.kind === "emit" && s.start != null);
+  const snaps = r.inspectAt(prog, data, { file: "main", start: seg.start, end: seg.end }, { compat: true });
+  assert.deepEqual(snaps.map((s) => s.this), ["a", "b"]);
 });
 
 // the source span of the first linkable emit, used to drive the inspector.

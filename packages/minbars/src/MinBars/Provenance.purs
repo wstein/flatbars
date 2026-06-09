@@ -14,6 +14,8 @@
 module MinBars.Provenance
   ( renderMinMapped
   , renderMinMappedWith
+  , renderMinMappedCompat
+  , renderMinMappedCompatWith
   ) where
 
 import Prelude
@@ -33,7 +35,7 @@ import FlatBars.Value (Value)
 import Kernel.Engine (runTemplate)
 import Kernel.Provenance (RawSeg, Segment, assemble)
 import Kernel.Render (formatError)
-import Kernel.Value (mustache)
+import Kernel.Value (Truthy, mustache, mustacheJs)
 import MinBars (parseMin)
 import MinBars.Context (MinEnv, minDepth, seedEnv)
 import MinBars.Prelude (minEngine)
@@ -55,13 +57,37 @@ renderMinMappedWith
   -> String
   -> Value
   -> Either String { output :: String, segments :: Array Segment }
-renderMinMappedWith partialSrcs src dat = case traverse compilePartial partialSrcs of
+renderMinMappedWith = runMapped mustache
+
+-- | `renderMinMapped` under the `mustache.js`-compat rule (`0`/`""` falsy) — the
+-- | mapped twin of `renderMinCompat`. The Lab's MinBars default is this rule, so the
+-- | source map (and the Context Inspector that targets its spans) must track it: the
+-- | segments tile the *compat* output, not the spec output.
+renderMinMappedCompat
+  :: String -> Value -> Either String { output :: String, segments :: Array Segment }
+renderMinMappedCompat = renderMinMappedCompatWith []
+
+renderMinMappedCompatWith
+  :: Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String { output :: String, segments :: Array Segment }
+renderMinMappedCompatWith = runMapped mustacheJs
+
+-- | The shared mapped render, seeding the given truthiness `rule` (spec / compat).
+runMapped
+  :: Truthy
+  -> Array (Tuple String String)
+  -> String
+  -> Value
+  -> Either String { output :: String, segments :: Array Segment }
+runMapped rule partialSrcs src dat = case traverse compilePartial partialSrcs of
   Left e -> Left e
   Right ps -> case parseMin src of
     Left pe -> Left (renderParseErrorAt src pe)
     Right { nodes } ->
       let
-        engine = (minEngine (seedEnv mustache dat (Map.fromFoldable ps)))
+        engine = (minEngine (seedEnv rule dat (Map.fromFoldable ps)))
           { recordText = recordTextProv, recordEmit = recordEmitProv }
       in
         case runWriterT (runTemplate engine (desugar nodes)) of

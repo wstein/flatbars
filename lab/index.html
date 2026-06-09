@@ -1664,7 +1664,7 @@
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=101";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=102";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -6022,7 +6022,10 @@
           snaps = renderer.inspectAt(
             lastProgram, lastData,
             { file: ctxTarget.file, start: ctxTarget.start, end: ctxTarget.end },
-            {}
+            // MinBars only: the inspector rule must match the source map that produced
+            // the clicked target (the Lab's MinBars default is mustache.js-compat).
+            // FlatBars dialects ignore the opts argument.
+            { compat: minbarsCompat }
           );
         } catch (err) {
           pane.append(makeEl("div", { class: "ctx-hint" }, "inspect error: " + err.message));

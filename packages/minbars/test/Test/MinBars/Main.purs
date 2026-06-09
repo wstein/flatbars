@@ -25,7 +25,7 @@ import Kernel.Analyse (Finding)
 import MinBars (minOptions, renderMin, renderMinCompat, renderMinDelimsDiag, renderMinWith)
 import MinBars.Analyse (analyseMin)
 import MinBars.Inspect (inspectMin)
-import MinBars.Provenance (renderMinMapped)
+import MinBars.Provenance (renderMinMapped, renderMinMappedCompat)
 import MinBars.Standalone (mustacheStandalone)
 import Test.Assert (assert')
 
@@ -355,6 +355,16 @@ main = do
         (joinWith "" (map (\s -> SCU.take s.len (SCU.drop s.out output)) segments) == output)
       assert' "the {{name}} emit carries a source span"
         (Array.any (\s -> s.kind == "emit" && s.start == Just 3 && s.end == Just 11) segments)
+
+  -- The compat (mustache.js) source map tracks its rule: `{{#n}}` over n=0 is falsy
+  -- under compat (skipped) but truthy under spec (rendered), so the two maps tile
+  -- different output. (The Lab's MinBars default is the compat rule — RC regression.)
+  case renderMinMappedCompat "a{{#n}}b{{/n}}c" (obj [ Tuple "n" (num 0.0) ]) of
+    Left e -> assert' ("compat mapped errored: " <> e) false
+    Right { output, segments } -> do
+      assert' ("compat output (0 falsy → skip): " <> output) (output == "ac")
+      assert' "the compat source map tiles its own output"
+        (joinWith "" (map (\s -> SCU.take s.len (SCU.drop s.out output)) segments) == output)
 
   -- Context Inspector (ADR-035): a section pushes context, so a snapshot at the
   -- inner emit reports this = the pushed frame, parent = root. One per iteration.

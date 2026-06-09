@@ -13,6 +13,8 @@
 module MinBars.Inspect
   ( inspectMin
   , inspectMinWith
+  , inspectMinCompat
+  , inspectMinCompatWith
   ) where
 
 import Prelude
@@ -31,7 +33,7 @@ import FlatBars.Value (Value(..))
 import Kernel.Engine (runTemplate)
 import Kernel.Inspect (Snapshot, Target)
 import Kernel.Render (formatError)
-import Kernel.Value (mustache)
+import Kernel.Value (Truthy, mustache, mustacheJs)
 import MinBars (parseMin)
 import MinBars.Context (MinEnv, minDepth, minStack, seedEnv)
 import MinBars.Prelude (minEngine)
@@ -50,13 +52,34 @@ inspectMin = inspectMinWith []
 -- | `inspectMin` with named partials (parsed + desugared like the render path).
 inspectMinWith
   :: Array (Tuple String String) -> Target -> String -> Value -> Either String (Array Snapshot)
-inspectMinWith partialSrcs target src dat = case traverse compilePartial partialSrcs of
+inspectMinWith = runInspect mustache
+
+-- | `inspectMin` under the `mustache.js`-compat rule — paired with
+-- | `renderMinMappedCompat`. The inspector must seed the SAME rule the source map
+-- | did, or the sections it re-executes (and the snapshots it captures) diverge from
+-- | the spans the host clicked.
+inspectMinCompat :: Target -> String -> Value -> Either String (Array Snapshot)
+inspectMinCompat = inspectMinCompatWith []
+
+inspectMinCompatWith
+  :: Array (Tuple String String) -> Target -> String -> Value -> Either String (Array Snapshot)
+inspectMinCompatWith = runInspect mustacheJs
+
+-- | The shared inspect, seeding the given truthiness `rule`.
+runInspect
+  :: Truthy
+  -> Array (Tuple String String)
+  -> Target
+  -> String
+  -> Value
+  -> Either String (Array Snapshot)
+runInspect rule partialSrcs target src dat = case traverse compilePartial partialSrcs of
   Left e -> Left e
   Right ps -> case parseMin src of
     Left pe -> Left (renderParseErrorAt src pe)
     Right { nodes } ->
       let
-        engine = (minEngine (seedEnv mustache dat (Map.fromFoldable ps)))
+        engine = (minEngine (seedEnv rule dat (Map.fromFoldable ps)))
           { recordEmit = inspectEmit target }
       in
         case runWriterT (runTemplate engine (desugar nodes)) of

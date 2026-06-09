@@ -30,7 +30,10 @@ module FullBars.JS
   , renderMinbarsCompatWithPartials
   , renderMinbarsMapped
   , renderMinbarsMappedWithPartials
+  , renderMinbarsMappedCompat
+  , renderMinbarsMappedCompatWithPartials
   , inspectMinbars
+  , inspectMinbarsCompat
   , astJson
   , compile
   , compileSurface
@@ -459,7 +462,8 @@ inspect = mkFn4 \partials target tpl json ->
   inspectResult (RawBars.inspectWith target (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Mapped render of a *MinBars* (Mustache) template — the source map (ADR-035)
--- | MinBars previously did not emit. `renderMinbarsMapped(template, data)`.
+-- | MinBars previously did not emit. Spec (`mustache`) rule.
+-- | `renderMinbarsMapped(template, data)`.
 renderMinbarsMapped :: Fn2 String Json MappedResult
 renderMinbarsMapped = mkFn2 \tpl json -> mappedResult (MinProv.renderMinMapped tpl (fromJson json))
 
@@ -469,12 +473,32 @@ renderMinbarsMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResu
 renderMinbarsMappedWithPartials = mkFn3 \partials tpl json ->
   mappedResult (MinProv.renderMinMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
 
+-- | `renderMinbarsMapped` under the `mustache.js`-compat rule — the mapped twin of
+-- | `renderMinbarsCompat`. The Lab's MinBars default is this rule, so its source map
+-- | (and the inspector targeting its spans) must track it.
+renderMinbarsMappedCompat :: Fn2 String Json MappedResult
+renderMinbarsMappedCompat = mkFn2 \tpl json -> mappedResult
+  (MinProv.renderMinMappedCompat tpl (fromJson json))
+
+-- | `renderMinbarsMappedCompat` with external partials.
+-- | `renderMinbarsMappedCompatWithPartials(partials, template, data)`.
+renderMinbarsMappedCompatWithPartials :: Fn3 (FO.Object String) String Json MappedResult
+renderMinbarsMappedCompatWithPartials = mkFn3 \partials tpl json ->
+  mappedResult (MinProv.renderMinMappedCompatWith (FO.toUnfoldable partials) tpl (fromJson json))
+
 -- | Context inspector for a *MinBars* template (ADR-035). Mustache binds no loop
 -- | variables, so each snapshot reports only the context chain (`this`/`parent`/
--- | `root`). `inspectMinbars(partials, target, template, data)`.
+-- | `root`). Spec rule. `inspectMinbars(partials, target, template, data)`.
 inspectMinbars :: Fn4 (FO.Object String) JsTarget String Json InspectResult
 inspectMinbars = mkFn4 \partials target tpl json ->
   inspectResult (MinInspect.inspectMinWith (FO.toUnfoldable partials) target tpl (fromJson json))
+
+-- | `inspectMinbars` under the `mustache.js`-compat rule — paired with
+-- | `renderMinbarsMappedCompat`, so the snapshots match the spans that map produced.
+inspectMinbarsCompat :: Fn4 (FO.Object String) JsTarget String Json InspectResult
+inspectMinbarsCompat = mkFn4 \partials target tpl json ->
+  inspectResult
+    (MinInspect.inspectMinCompatWith (FO.toUnfoldable partials) target tpl (fromJson json))
 
 -- | Context inspector for a *MaxBars* template.
 -- | `inspectMaxbars(partials, target, template, data)`.
