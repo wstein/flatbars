@@ -55,5 +55,9 @@
   "enum-truthy": "set: Active",
   "escape-heavy": "a &amp; b &lt; c &gt; d &quot; e &#x27; f &amp; g &lt; h",
   "deep-nesting": "[a/T:12][c/T:]",
+  "standalone-each": "items:\n- a\n- b\ndone\n",
+  "standalone-if-else": "a\nno\nb\n",
+  "standalone-indented": "<ul>\n  <li>x</li>\n</ul>\n",
+  "standalone-not-when-inline": "a b \n",
   "neg-dict": "1"
 }

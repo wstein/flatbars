@@ -108,6 +108,120 @@ struct Lexed {
     next: usize,
 }
 
+// ── Standalone-line whitespace trimming (Handlebars/MaxBars) ──────────────────
+
+/// Strip the line a "standalone" tag sits on: when a block open/close, a comment,
+/// or a clause separator (`else`/`elif`) is alone on its line (only whitespace from
+/// the previous newline up to it, and only whitespace after it to the next newline),
+/// remove that indentation and the trailing newline so the tag leaves no blank line.
+///
+/// A faithful port of the PureScript `FlatBars.Lexer.trimStandalone` (Lexer.purs):
+/// block opens/closes (`{{#…}}` / `{{/…}}`) and comments are always eligible; output
+/// tags (`{{ }}` / `{{{ }}}`) and partials never are; a `{{ }}` tag is eligible only
+/// when its head word is `else`/`elif` (a clause marker — so `{{else}}` strips but an
+/// arbitrary `{{ x }}` does not). It only adjusts `Text` spans (shrinking off the
+/// leading line after a standalone tag and the trailing indent before one), so the
+/// result is still a sub-span of the source — output stays byte-identical to v1.
+pub fn trim_standalone(src: &str, lexemes: &mut [Lexeme]) {
+    let n = lexemes.len();
+    // Precompute per-index standalone-ness so the scan is a simple lookup.
+    let standalone: Vec<bool> = (0..n).map(|i| standalone_at(src, lexemes, i)).collect();
+    for j in 0..n {
+        let Lexeme::Text(span) = lexemes[j] else {
+            continue;
+        };
+        let (mut lo, hi) = (span.start, span.end);
+        let mut end = hi;
+        // The tag *before* this text is standalone ⇒ drop this text's leading line.
+        if j > 0 && standalone[j - 1] {
+            lo = match src[lo..hi].find('\n') {
+                Some(k) => lo + k + 1,
+                None => hi, // no newline ⇒ trailing EOF whitespace, dropped whole
+            };
+        }
+        // The tag *after* this text is standalone ⇒ drop this text's trailing indent.
+        if j + 1 < n && standalone[j + 1] {
+            end = match src[lo..end].rfind('\n') {
+                Some(k) => lo + k + 1, // keep up to and including the newline
+                None => lo,            // all indentation on the first line, dropped whole
+            };
+        }
+        lexemes[j] = Lexeme::Text(Span::new(lo, end));
+    }
+}
+
+/// Whether the lexeme at `i` is a standalone tag: eligible AND its line is blank on
+/// both sides (scanning through wholly-blank text runs, stopping at any other tag).
+fn standalone_at(src: &str, lexemes: &[Lexeme], i: usize) -> bool {
+    eligible(src, &lexemes[i]) && left_blank(src, lexemes, i) && right_blank(src, lexemes, i)
+}
+
+/// Standalone-eligible: a block open/close, a comment, or a `{{ }}` tag whose head
+/// word is a clause separator (`else`/`elif`). Partials and real output never are.
+fn eligible(src: &str, l: &Lexeme) -> bool {
+    match l {
+        Lexeme::Tag {
+            sigil: Sigil::Open | Sigil::Close | Sigil::Comment,
+            ..
+        } => true,
+        Lexeme::Tag {
+            sigil: Sigil::Output,
+            interior,
+            ..
+        } => {
+            let head = interior.of(src).trim_start();
+            let head = head.split(|c: char| c.is_whitespace()).next().unwrap_or("");
+            head == "else" || head == "elif"
+        }
+        _ => false,
+    }
+}
+
+/// Everything from the previous newline (or start of input) up to the tag at `i` is
+/// blank. Scans *through* wholly-blank text runs but stops at any other tag.
+fn left_blank(src: &str, lexemes: &[Lexeme], i: usize) -> bool {
+    let mut k = i;
+    while k > 0 {
+        k -= 1;
+        match &lexemes[k] {
+            Lexeme::Text(span) => {
+                let s = span.of(src);
+                if let Some(idx) = s.rfind('\n') {
+                    return s[idx + 1..].chars().all(char::is_whitespace); // reached this line's start
+                } else if s.chars().all(char::is_whitespace) {
+                    continue; // a wholly-blank run; keep scanning left
+                } else {
+                    return false; // visible text on this line
+                }
+            }
+            _ => return false, // another tag on this line ⇒ not standalone
+        }
+    }
+    true // start of input
+}
+
+/// Everything from the tag at `i` to the next newline (or end of input) is blank.
+/// Scans *through* wholly-blank text runs but stops at any other tag.
+fn right_blank(src: &str, lexemes: &[Lexeme], i: usize) -> bool {
+    let mut k = i + 1;
+    while k < lexemes.len() {
+        match &lexemes[k] {
+            Lexeme::Text(span) => {
+                let s = span.of(src);
+                if let Some(idx) = s.find('\n') {
+                    return s[..idx].chars().all(char::is_whitespace); // reached this line's end
+                } else if s.chars().all(char::is_whitespace) {
+                    k += 1; // a wholly-blank run; keep scanning right
+                } else {
+                    return false; // visible text on this line
+                }
+            }
+            _ => return false, // another tag on this line ⇒ not standalone
+        }
+    }
+    true // end of input
+}
+
 /// Lex one tag beginning at `i` (where `b[i..i+2] == "{{"`).
 fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     // Four-brace raw block: `{{{{`.
@@ -375,5 +489,39 @@ mod tests {
     fn unterminated_tag_errors() {
         assert!(lex("ok {{oops").is_err());
         assert!(lex("{{{{#raw}}}}no close").is_err());
+    }
+
+    /// The text payload after `trim_standalone`, concatenated (tags render nothing).
+    fn trimmed_text(src: &str) -> String {
+        let mut ls = lex(src).unwrap();
+        super::trim_standalone(src, &mut ls);
+        ls.iter()
+            .filter_map(|l| match l {
+                Lexeme::Text(sp) => Some(sp.of(src)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn standalone_block_tags_leave_no_blank_line() {
+        // The `{{#each}}` / `{{/each}}` lines (alone on their line) are stripped whole.
+        assert_eq!(
+            trimmed_text("a\n{{#each xs}}\n-\n{{/each}}\nb\n"),
+            "a\n-\nb\n"
+        );
+        // Indentation before a standalone tag goes too (the `  ` on the each line).
+        assert_eq!(
+            trimmed_text("<ul>\n  {{#each xs}}\n  x\n  {{/each}}\n</ul>\n"),
+            "<ul>\n  x\n</ul>\n"
+        );
+    }
+
+    #[test]
+    fn interpolation_is_never_standalone() {
+        // A lone `{{x}}` on its line keeps its surrounding whitespace (output, not a block).
+        assert_eq!(trimmed_text("a\n{{x}}\nb\n"), "a\n\nb\n");
+        // An inline block (text on the same line) is not standalone — the space stays.
+        assert_eq!(trimmed_text("{{#each xs}}{{this}} {{/each}}\n"), " \n");
     }
 }

@@ -134,8 +134,19 @@ non-trivial part (precedence-climbing for the operators).
    §4.4) — plus a happy-path `tests/render.rs` proving the macro emits running Rust.
    **Class B** (`quote_spanned!` exact intra-literal spans) stays a follow-up: it
    needs nightly `proc_macro_span` (docs/07 §3/§5), so stable ships the located
-   message + named-fn forms; the `#[template(path=…)]` entry form is also a
-   follow-up (docs/07 §4.1).
+   message + named-fn forms. The **file-loading entry form** is **shipped**:
+   `truss!(name, Ctx, path = "templates/foo.truss")` reads the file at expansion
+   time relative to `CARGO_MANIFEST_DIR` (the Askama convention) and emits an
+   `include_bytes!` so cargo re-triggers on a template edit — this is what the
+   `examples/blog` and `examples/changelog` apps use to compile their `.truss`
+   files at build time (no committed generated module).
+
+6. **Standalone-line whitespace trimming** (`lex::trim_standalone`). A block
+   open/close, comment, or clause separator (`else`/`elif`) alone on its line
+   leaves no blank line — the Handlebars/MaxBars rule, a faithful port of the
+   PureScript `FlatBars.Lexer.trimStandalone`. It runs on the lexeme stream before
+   parsing (shrinking `Text` spans only), so v2 stays byte-identical to v1; pinned
+   by the `standalone-*` corpus cases (the multi-line example templates rely on it).
 
 The order means the corpus is green incrementally, and the emit step is the *least*
 risky (it's a transcription of a pinned reference).

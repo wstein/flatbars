@@ -6,11 +6,14 @@ Renders **this repo's own conventional commits** (a committed `git log` snapshot
 machine-generated aggregation data, not authored prose — so it stresses grouping,
 sorting, dates, and categorisation.
 
+The template is compiled at build time by the native v2 `truss!` proc-macro,
+loaded straight from `templates/changelog.truss` (`path = …`) — no PureScript
+transpiler, no committed generated module.
+
 ```sh
 cargo +1.96.0 run                     # print CHANGELOG.md to stdout
 cargo +1.96.0 test                    # golden gate (tests/golden/CHANGELOG.md)
 BLESS=1 cargo +1.96.0 test            # re-bless after an intended change
-node generate.mjs                     # regenerate src/templates.rs from the .truss
 # refresh the data snapshot from live git:
 git log --format='%H|%aI|%s' -n 60 -- trussbars/ packages/maxbars/src/MaxBars/Rust.purs \
   | grep -E '\|(feat|fix|docs|perf|test)(\(|:)' | head -20 > data/git-log.txt

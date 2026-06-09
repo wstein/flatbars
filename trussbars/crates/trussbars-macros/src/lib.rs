@@ -22,14 +22,19 @@ use proc_macro::{TokenStream, TokenTree};
 /// Compile a MaxBars template into a render function.
 ///
 /// ```ignore
-/// truss!(greeting, Greeting, "Hello {{name}}!");
-/// // expands to: pub fn greeting(ctx: &Greeting) -> String { … }
+/// truss!(greeting, Greeting, "Hello {{name}}!");           // inline source
+/// truss!(index, IndexCtx, path = "templates/index.truss"); // load from a file
+/// // each expands to: pub fn name(ctx: &CtxType) -> String { … }
 /// ```
 ///
 /// The arguments are `name` (the generated function's identifier), `CtxType` (the
 /// context type the template renders against — a single ident or a path/generic
-/// type), and a string literal holding the template source. A Trussbars-owned
-/// (class-A) error expands to a `compile_error!` located at `line:col`.
+/// type), and the template source — either a **string literal** (inline) or the
+/// **`path = "…"`** form, which reads the file at macro-expansion time relative to
+/// the crate root (`CARGO_MANIFEST_DIR`, the Askama convention). The `path` form
+/// also emits an `include_bytes!` of that file, so a template edit re-triggers the
+/// build (cargo tracks it as a source dependency). A Trussbars-owned (class-A)
+/// error expands to a `compile_error!` located at `line:col`.
 #[proc_macro]
 pub fn truss(input: TokenStream) -> TokenStream {
     match expand(input) {
@@ -59,27 +64,80 @@ fn expand(input: TokenStream) -> Result<TokenStream, String> {
 
     let name = match groups[0].as_slice() {
         [TokenTree::Ident(id)] => id.to_string(),
-        _ => return Err("truss!: the first argument must be a function name (an identifier)".into()),
+        _ => {
+            return Err(
+                "truss!: the first argument must be a function name (an identifier)".into(),
+            );
+        }
     };
 
     if groups[1].is_empty() {
         return Err("truss!: the second argument must be the context type".into());
     }
-    let ctx_type = groups[1].iter().map(ToString::to_string).collect::<Vec<_>>().join(" ");
+    let ctx_type = groups[1]
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(" ");
 
-    let template = match groups[2].as_slice() {
-        [TokenTree::Literal(lit)] => string_literal_text(&lit.to_string())
-            .ok_or_else(|| "truss!: the third argument must be a string literal".to_string())?,
-        _ => return Err("truss!: the third argument must be a string literal".into()),
-    };
+    // The third argument is either an inline string literal or `path = "file"`.
+    let (template, dep) = template_arg(&groups[2])?;
 
     let rust = trussbars_template::emit_named(&name, &ctx_type, &template)?;
-    rust.parse().map_err(|e| format!("truss!: internal error re-tokenizing generated Rust: {e}"))
+    // The `path` form appends an anonymous `include_bytes!` so cargo tracks the
+    // `.truss` file as a source dependency (an edit re-triggers the build). It uses
+    // an absolute path via `CARGO_MANIFEST_DIR` so it resolves regardless of which
+    // module the macro is invoked from.
+    let source = match dep {
+        Some(rel) => format!(
+            "{rust}\nconst _: &[u8] = include_bytes!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/\", {rel}));\n"
+        ),
+        None => rust,
+    };
+    source
+        .parse()
+        .map_err(|e| format!("truss!: internal error re-tokenizing generated Rust: {e}"))
+}
+
+/// Resolve the third `truss!` argument to `(template source, dependency relpath)`.
+/// An inline string literal yields the source with no dependency; the `path = "…"`
+/// form reads the file (relative to `CARGO_MANIFEST_DIR`) and returns the relpath
+/// (a quoted Rust string-literal token) so the caller can emit dep-tracking.
+fn template_arg(group: &[TokenTree]) -> Result<(String, Option<String>), String> {
+    match group {
+        [TokenTree::Literal(lit)] => {
+            let text = string_literal_text(&lit.to_string())
+                .ok_or_else(|| "truss!: the third argument must be a string literal".to_string())?;
+            Ok((text, None))
+        }
+        // `path = "file.truss"` — read it relative to the crate root.
+        [
+            TokenTree::Ident(id),
+            TokenTree::Punct(eq),
+            TokenTree::Literal(lit),
+        ] if id.to_string() == "path" && eq.as_char() == '=' => {
+            let rel = string_literal_text(&lit.to_string())
+                .ok_or_else(|| "truss!: `path = …` needs a string-literal file path".to_string())?;
+            let root = std::env::var("CARGO_MANIFEST_DIR").map_err(|_| {
+                "truss!: CARGO_MANIFEST_DIR is unset (cannot resolve `path`)".to_string()
+            })?;
+            let full = std::path::Path::new(&root).join(&rel);
+            let text = std::fs::read_to_string(&full)
+                .map_err(|e| format!("truss!: cannot read template `{}`: {e}", full.display()))?;
+            Ok((text, Some(lit.to_string())))
+        }
+        _ => Err(
+            "truss!: the third argument must be a string literal or `path = \"file.truss\"`".into(),
+        ),
+    }
 }
 
 /// `::core::compile_error!("msg")` as a token stream.
 fn compile_error(msg: &str) -> TokenStream {
-    let escaped = msg.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+    let escaped = msg
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n");
     format!("::core::compile_error!(\"{escaped}\");")
         .parse()
         .expect("compile_error! literal is always valid Rust")

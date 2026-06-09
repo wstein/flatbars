@@ -14,10 +14,15 @@ use crate::parse_expr::{ParseError, Scope, parse_expr};
 /// Returns a [`ParseError`] for a lex failure, an unclosed/mismatched block, an
 /// unsupported block helper, or a malformed expression.
 pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
-    let lexemes = lex(src).map_err(|e| ParseError {
+    let mut lexemes = lex(src).map_err(|e| ParseError {
         message: e.message,
         at: e.at,
     })?;
+    // Standalone-line whitespace trimming (the Handlebars/MaxBars rule): a block
+    // open/close, comment, or clause separator (`else`/`elif`) alone on its line
+    // leaves no blank line. Run on the lexeme stream before parsing, matching the
+    // PureScript `FlatBars.Lexer.trimStandalone` — so v2 is byte-identical to v1.
+    crate::lex::trim_standalone(src, &mut lexemes);
     let mut p = Blocks {
         lexemes: &lexemes,
         src,

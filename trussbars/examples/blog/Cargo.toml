@@ -15,6 +15,8 @@ name = "blog"
 path = "src/main.rs"
 
 [dependencies]
+# The native v2 front-end: `truss!` compiles templates/*.truss at build time.
+trussbars-macros = { path = "../../crates/trussbars-macros" }
 # The Trussbars runtime the generated code links against (default `perf` features).
 trussbars-core = { path = "../../crates/trussbars-core" }
 trussbars-std = { path = "../../crates/trussbars-std" }

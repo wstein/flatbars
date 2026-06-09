@@ -363,6 +363,31 @@ export const cases = [
     },
   },
 
+  // ── standalone-line whitespace (the Handlebars/MaxBars trim rule) ────────────
+  // A block open/close alone on its line leaves no blank line; an interpolation
+  // never trims. These pin the v2 lexer's `trim_standalone` against v1 (and the
+  // oracle) byte-for-byte — the rule the example apps' multi-line templates need.
+  {
+    id: "standalone-each",
+    template: "items:\n{{#each xs}}\n- {{this}}\n{{/each}}\ndone\n",
+    data: { xs: ["a", "b"] },
+  },
+  {
+    id: "standalone-if-else",
+    template: "a\n{{#if on}}\nyes\n{{else}}\nno\n{{/if}}\nb\n",
+    data: { on: false },
+  },
+  {
+    id: "standalone-indented",
+    template: "<ul>\n  {{#each xs}}\n  <li>{{this}}</li>\n  {{/each}}\n</ul>\n",
+    data: { xs: ["x"] },
+  },
+  {
+    id: "standalone-not-when-inline",
+    template: "{{#each xs}}{{this}} {{/each}}\n",
+    data: { xs: ["a", "b"] },
+  },
+
   // ── negative: dict / collection literals — still excluded ────────────────────
   {
     id: "neg-dict",

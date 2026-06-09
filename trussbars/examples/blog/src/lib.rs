@@ -1,8 +1,9 @@
 //! A small but realistic blog rendered entirely by Trussbars-compiled templates —
-//! a dogfood of the v1 emitter + runtime to find ergonomics gaps (see README).
+//! a dogfood of the engine + runtime to find ergonomics gaps (see README).
 //!
-//! `templates.rs` is generated from `templates/*.truss` by `generate.mjs`; this
-//! crate just supplies the typed context and sample data.
+//! `templates.rs` compiles `templates/*.truss` at build time via the native
+//! `truss!` proc-macro (loaded from each file with `path = …`); this crate just
+//! supplies the typed context and sample data.
 
 pub mod context;
 pub mod templates;
