@@ -157,9 +157,13 @@ comments.
 
 ### CLI
 
-`truss-import --metrics <file>` reports the idiom metrics and suggested parameters;
-`truss-import --to-truss [--ternary] [--faithful-truthiness] [--data s.json] <file>` writes
-the migrated `.truss` to stdout and the report to stderr.
+**Migrating to `.truss` is the default mode.** `truss-import <file>` writes the migrated
+`.truss` to stdout and the report to stderr; `--metrics` reports the idiom metrics, `--ast`
+dumps the parsed AST. The idioms (`?:`/ternary collapse and the faithful-truthiness
+predicate) are **on by default** — opt out with `--no-ternary` / `--no-faithful-truthiness`;
+`--data s.json` supplies the section-shape sample, `--report-json` emits the report as JSON.
+(The library `LowerOptions::default()` stays conservative — all idioms off — so a host opts
+in explicitly; the CLI is the opinionated front-end.)
 
 ### Handlebars
 

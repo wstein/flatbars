@@ -1,14 +1,17 @@
 //! `truss-import` — the dev CLI for the migration tool's read half (`docs/15`).
 //!
-//! Modes (the dialect is inferred from the file extension unless `--dialect` overrides):
+//! Migrating to `.truss` is the **default**; the dialect is inferred from the file
+//! extension unless `--dialect` overrides it:
 //!
 //! ```text
-//! truss-import [--dialect <name>] <file|->          # dump the dialect AST ({:#?})
-//! truss-import --metrics <file|->                   # Mustache idiom metrics
-//! truss-import --to-truss [--ternary] [--data d.json] <file|->   # migrate → idiomatic .truss
+//! truss-import [--dialect <name>] [--data d.json] <file|->   # migrate → idiomatic .truss
+//! truss-import --metrics <file|->                            # Mustache idiom metrics
+//! truss-import --ast <file|->                                # dump the dialect AST ({:#?})
 //! ```
 //!
-//! `--to-truss` writes the `.truss` to stdout and the migration report to stderr.
+//! The migration idioms (`?:`/ternary collapse and the faithful-truthiness predicate)
+//! are on by default; opt out with `--no-ternary` / `--no-faithful-truthiness`. The
+//! `.truss` goes to stdout, the migration report to stderr (`--report-json` for JSON).
 //! Exit codes: `0` ok, `1` parse error, `2` usage / I/O error.
 
 use std::io::Read;
@@ -30,9 +33,11 @@ fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     let mut dialect_override: Option<String> = None;
     let mut file: Option<String> = None;
-    let mut mode = Mode::Dump;
-    let mut ternary = false;
-    let mut faithful_truthiness = false;
+    // Migrating to `.truss` is the default; `--ast` / `--metrics` switch modes.
+    let mut mode = Mode::ToTruss;
+    // The migration idioms are on by default; the `--no-*` flags opt out.
+    let mut ternary = true;
+    let mut faithful_truthiness = true;
     let mut data: Option<String> = None;
     let mut report_json = false;
 
@@ -52,10 +57,11 @@ fn main() -> ExitCode {
             other if other.starts_with("--data=") => {
                 data = Some(other["--data=".len()..].to_string());
             }
+            "--ast" => mode = Mode::Dump,
             "--metrics" => mode = Mode::Metrics,
             "--to-truss" => mode = Mode::ToTruss,
-            "--ternary" => ternary = true,
-            "--faithful-truthiness" => faithful_truthiness = true,
+            "--no-ternary" => ternary = false,
+            "--no-faithful-truthiness" => faithful_truthiness = false,
             "--report-json" => report_json = true,
             "--help" | "-h" => {
                 print_help();
@@ -274,13 +280,19 @@ fn print_help() {
     println!("usage: truss-import [--dialect <name>] [MODE] <file|->");
     println!();
     println!("modes:");
-    println!("  (default)     dump the parsed dialect AST ({{:#?}})");
+    println!("  (default)     migrate the template → idiomatic .truss (report on stderr)");
     println!("  --metrics     report Mustache idiom metrics (and suggested parameters)");
-    println!("  --to-truss    migrate the template → idiomatic .truss (report on stderr)");
-    println!("    --ternary             trivial pairs → {{x ?: b}} / {{x ? a : b}}");
-    println!("    --faithful-truthiness conditions → x != null && x != false (exact, no note)");
-    println!("    --data <f.json> disambiguate sections from a JSON data sample");
-    println!("    --report-json   emit the migration report as JSON on stderr");
+    println!("  --ast         dump the parsed dialect AST ({{:#?}})");
+    println!();
+    println!("migration options (idioms are on by default):");
+    println!(
+        "  --no-ternary              keep {{#if}}…{{else}} instead of {{x ?: b}} / {{x ? a : b}}"
+    );
+    println!(
+        "  --no-faithful-truthiness  annotate the truthiness delta instead of an exact predicate"
+    );
+    println!("  --data <f.json>           disambiguate sections from a JSON data sample");
+    println!("  --report-json             emit the migration report as JSON on stderr");
     println!();
     println!("dialects (inferred from extension when omitted):");
     println!("  mustache              .mustache");
