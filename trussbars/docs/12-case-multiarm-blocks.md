@@ -196,9 +196,11 @@ authority for every `{{#case}}` case. (FullBars and MinBars are excluded — see
 - The keyword is **`case`** because `case…when…else` is the SQL/Ruby/Liquid triad that
   matches both the chosen arm keyword and the v1 (value-dispatch, non-exhaustive) semantics.
 
-## 8. The typed sibling — `{{#match}}` (A2)
+## 8. The typed sibling — `{{#match}}` (A2, postponed)
 
-The typed-exhaustive variant has its own ADR: **`docs/14`** (`{{#match SUBJECT "Type"}}`).
+The typed-exhaustive variant has its own ADR: **`docs/14`** (`{{#match SUBJECT "Type"}}`) —
+now **postponed** (typed-exhaustive matching is not a template-engine idiom; `{{#case}}`
+covers the common need). The design and the cross-backend contract are kept there for revival.
 Where `{{#case}}` dispatches a *value* against literal arms by `==`, `{{#match}}` dispatches a
 *closed enum* against **variant** arms with **compile-time exhaustiveness**. The key result
 of that review: the AOT `match` + exhaustiveness is buildable **without** schema inference —

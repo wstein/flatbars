@@ -1,11 +1,20 @@
 # Trussbars — Typed-exhaustive `{{#match}}` blocks
 
-> **Status:** Proposed / **surface-freezing ADR** — paper first, no code. This is the typed
-> sibling of `{{#case}}` (`docs/12`); it builds on the first-class `Case` seam `docs/12`
-> established and supersedes the `docs/12 §8` design review. **Audience:** whoever implements
-> the typed dispatch. Companion to `docs/01` (subset spec), `docs/03` (schema inference — a
-> *later* enabler, **not** a prerequisite, see §4), `docs/04` (conformance), `docs/07`
-> (diagnostics — class-A vs class-B), and `docs/12` (`{{#case}}`).
+> **Status:** **POSTPONED** (not scheduled) — paper only, **no code**. Typed-exhaustive
+> pattern matching is an ML/Rust construct, *not* an idiom of the Handlebars/Mustache/Liquid
+> family Trussbars descends from — value dispatch (`{{#case}}`, shipped) covers the common
+> need. The design below is kept on record; revive it only if a concrete consumer needs
+> compile-time variant-coverage. **If revived, the team-agreed contract is uniform *runtime*
+> exhaustiveness** (an unhandled variant ⇒ an error on *all four* surfaces — AOT, interpreter,
+> bytecode VM, and the PureScript Lab), with `"Type"` an *optional, output-preserving* AOT
+> refinement (a real Rust `match` + rustc's static check). That supersedes §3's earlier
+> "AOT-only, runtime-ignored" wording, which broke the spirit of the `--vm-compat` gate
+> (the AOT would reject what the VM accepts). See the deferral note at the end of §6.
+>
+> This is the typed sibling of `{{#case}}` (`docs/12`); it builds on the first-class `Case`
+> seam `docs/12` established. **Audience:** whoever revives the typed dispatch. Companion to
+> `docs/01` (subset spec), `docs/03` (schema inference — a *later* enabler, **not** a
+> prerequisite, see §4), `docs/04` (conformance), `docs/07` (diagnostics), and `docs/12`.
 >
 > **Why a separate construct.** `{{#case}}` is **value** dispatch: any subject, arms are value
 > literals compared by `==`, no exhaustiveness (a miss → `{{else}}`/empty). `{{#match}}` is
@@ -147,6 +156,24 @@ confines the new code to the AOT emitter.
 - **Internally/adjacently-tagged enums** (`#[serde(tag = "kind")]` with payload) — the runtime
   discriminator-field model. v1 targets the externally-tagged / unit-string case.
 - **Inferred subject type** (omit `"TYPE"`) — gated on `docs/03` in Rust.
+
+### 6.1 Deferral note (team decision)
+
+`{{#match}}` is **postponed**: typed-exhaustive matching is not a template-engine idiom, and
+`{{#case}}` (shipped) covers the common multi-arm need. If revived, the agreed contract — from
+the cross-backend debate — is:
+
+- **Runtime exhaustiveness is uniform on all four surfaces.** No `{{else}}` + an unmatched
+  subject ⇒ an **error**: a compile error in the AOT macro, a render `Err`/`Left` in the
+  interpreter, the bytecode VM, and the PureScript Lab. This (not §3's earlier "AOT-only")
+  is what satisfies "works the same" — and it keeps `--vm-compat`'s accept⇔accept honest,
+  since under the old wording the AOT would *reject* a non-exhaustive match the VM *accepts*.
+- **`"Type"` is an optional, output-preserving AOT refinement** — it lets the AOT emit a real
+  Rust `match` (no `_`) so rustc proves the runtime error unreachable and gives the jump table.
+  On the three non-AOT surfaces it is **inert** (ignored; a gibberish `"Type"` ≡ a real path).
+- **Three gates, authored with the feature:** the byte-identity corpus on covered inputs; a
+  *tri-surface negative gate* (one uncovered input → AOT compile-error + VM/oracle render-error);
+  and a `"Type"`-inertness case. Plus a `case`↔`match` lint pair (suggest/​warn).
 
 ## 7. Conformance & governance
 
