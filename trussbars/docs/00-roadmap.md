@@ -68,5 +68,8 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
 - `06-feature-freeze.md` — the **ratified** v1 surface v2 targets.
 - `07-v2-spike.md` — the diagnostic span-mapping plan (decisions resolved).
 - `08-v2-parser.md` — the Rust parser/desugar scoping (v2's dominant task).
-- `09-host-helpers.md` — the typed host-helper convention (F3).
+- `09-host-helpers.md` — the typed host-helper convention (F3; value + block helpers).
 - `10-inspect.md` — the inspector / provenance design (STViz-style; Lab as blueprint).
+- `11-vm-backend.md` — the dynamic VM backend (two-backends framing, conformance axes).
+- `12-match-multiarm-blocks.md` — **proposed** `{{#match}}…{{when …}}…{{else}}` surface
+  sugar (desugars to `Cond`; gated on a use case + MaxBars-spec ratification).
