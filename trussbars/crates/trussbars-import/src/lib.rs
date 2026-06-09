@@ -22,6 +22,7 @@ use std::path::Path;
 pub mod handlebars;
 pub mod liquid;
 pub mod mustache;
+pub mod stringtemplate;
 
 pub use trussbars_template::Span;
 
@@ -134,6 +135,10 @@ pub enum Ast {
     Handlebars(Vec<handlebars::Node>),
     /// A parsed Liquid template.
     Liquid(Vec<liquid::Node>),
+    /// A parsed StringTemplate4 template body (`.st`).
+    StringTemplate(Vec<stringtemplate::Element>),
+    /// A parsed StringTemplate4 group file (`.stg`).
+    StringTemplateGroup(stringtemplate::Group),
 }
 
 /// Parse `src` as `dialect`, returning the dialect-tagged [`Ast`].
@@ -145,9 +150,9 @@ pub fn parse(dialect: Dialect, src: &str) -> Result<Ast, ParseError> {
         Dialect::Mustache => mustache::parse(src).map(Ast::Mustache),
         Dialect::Handlebars => handlebars::parse(src).map(Ast::Handlebars),
         Dialect::Liquid => liquid::parse(src).map(Ast::Liquid),
-        _ => Err(ParseError::new(
-            format!("dialect `{}` not yet implemented", dialect.name()),
-            0,
-        )),
+        Dialect::StringTemplateText => stringtemplate::parse_template(src).map(Ast::StringTemplate),
+        Dialect::StringTemplateGroup => {
+            stringtemplate::parse_group(src).map(Ast::StringTemplateGroup)
+        }
     }
 }
