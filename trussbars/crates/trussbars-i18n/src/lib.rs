@@ -277,8 +277,8 @@ fn parse_iso(s: &str) -> Option<DateParts> {
 }
 
 /// The localized month name (full, or abbreviation) for `1..=12` in `lang`'s primary
-/// subtag — `de`/`fr` tables, English for any other tag; an out-of-range month yields
-/// an empty string.
+/// subtag — `de`/`fr`/`pl` tables, English for any other tag; an out-of-range month
+/// yields an empty string.
 fn month_name(month: u32, abbrev: bool, lang: &str) -> &'static str {
     const EN_FULL: [&str; 12] = [
         "January",
@@ -332,6 +332,23 @@ fn month_name(month: u32, abbrev: bool, lang: &str) -> &'static str {
         "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.",
         "déc.",
     ];
+    const PL_FULL: [&str; 12] = [
+        "styczeń",
+        "luty",
+        "marzec",
+        "kwiecień",
+        "maj",
+        "czerwiec",
+        "lipiec",
+        "sierpień",
+        "wrzesień",
+        "październik",
+        "listopad",
+        "grudzień",
+    ];
+    const PL_ABBR: [&str; 12] = [
+        "sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru",
+    ];
     let Some(i) = month
         .checked_sub(1)
         .and_then(|i| usize::try_from(i).ok())
@@ -344,6 +361,8 @@ fn month_name(month: u32, abbrev: bool, lang: &str) -> &'static str {
         (&DE_FULL, &DE_ABBR)
     } else if sub.eq_ignore_ascii_case("fr") {
         (&FR_FULL, &FR_ABBR)
+    } else if sub.eq_ignore_ascii_case("pl") {
+        (&PL_FULL, &PL_ABBR)
     } else {
         (&EN_FULL, &EN_ABBR)
     };
@@ -445,6 +464,8 @@ mod tests {
         assert_eq!(date("2026-03-02", "%b", "de"), "Mär");
         assert_eq!(date("2026-06-09", "%e %B %Y", "fr"), " 9 juin 2026");
         assert_eq!(date("2026-08-01", "%b", "fr"), "août");
+        assert_eq!(date("2026-01-09", "%d %B %Y", "pl"), "09 styczeń 2026");
+        assert_eq!(date("2026-10-09", "%b", "pl"), "paź");
         assert_eq!(date("2026-06-09", "%B", "pt"), "June"); // fallback
         assert_eq!(date("2026-06-09", "%Y-%m-%d", "de"), "2026-06-09"); // numeric unaffected
     }
