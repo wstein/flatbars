@@ -10,9 +10,6 @@ import {
   analyseWhitespace,
   buildCheatSheetData,
   buildDependencyGraph,
-  byteToChar,
-  byteRangeToCharRange,
-  charToByte,
   charToLineColumn,
   decodeState,
   disassemble,
@@ -23,6 +20,7 @@ import {
   stemTruthy,
   partialNameAt,
   segmentRanges,
+  spanRange,
   tabVisibleUnder,
   validateOverlayName,
   vendoredWorkspace,
@@ -96,39 +94,17 @@ test("stemTruthy: falsy on null/false/\"\"/0/[]/{}; truthy on non-empty", () => 
   }
 });
 
-test("byteToChar maps UTF-8 byte offsets to JS character indices", () => {
-  const source = "A😀B";
-
-  assert.equal(byteToChar(source, 0), 0);
-  assert.equal(byteToChar(source, 1), 1);
-  assert.equal(byteToChar(source, 2), 1);
-  assert.equal(byteToChar(source, 5), 3);
-  assert.equal(byteToChar(source, 6), 4);
-});
-
-test("charToByte maps JS character indices to UTF-8 byte offsets", () => {
-  const source = "A😀B";
-
-  assert.equal(charToByte(source, 0), 0);
-  assert.equal(charToByte(source, 1), 1); // after "A"
-  assert.equal(charToByte(source, 3), 5); // after "A😀" (😀 is 4 bytes)
-  assert.equal(charToByte(source, 4), 6); // after "A😀B"
-  // Inverts byteToChar on character boundaries.
-  for (const byte of [0, 1, 5, 6]) {
-    assert.equal(charToByte(source, byteToChar(source, byte)), byte);
-  }
-});
-
-test("byteRangeToCharRange returns a safe non-empty range", () => {
-  const source = "line 1\nline 2";
-
-  const [from, to] = byteRangeToCharRange(source, 0, 0);
-  assert.equal(from, 0);
-  assert.equal(to, 1);
-
-  const [from2, to2] = byteRangeToCharRange(source, 2, 6);
-  assert.equal(from2, 2);
-  assert.equal(to2, 6);
+test("spanRange maps an engine span to a CodeMirror range (UTF-16, not UTF-8 bytes)", () => {
+  // RC regression: a ` ×` literal in `{{n}} ×{{q}}` has engine span [5,7] (UTF-16
+  // code units). Used directly it selects " ×"; byte-converting it (the old bug)
+  // collapsed to [5,6] — only the space — because byte 7 lands mid-× (× = bytes 6,7).
+  const src = "{{n}} ×{{q}}";
+  assert.deepEqual(spanRange(src, 5, 7), [5, 7]);
+  assert.equal(src.slice(...spanRange(src, 5, 7)), " ×");
+  // clamps to the document and keeps a minimum width of 1.
+  assert.deepEqual(spanRange("ab", 1, 1), [1, 2]); // zero-length → width 1
+  assert.deepEqual(spanRange("ab", 0, 99), [0, 2]); // end past EOF → clamp
+  assert.deepEqual(spanRange("ab", -3, 1), [0, 1]); // negative start → clamp
 });
 
 test("charToLineColumn reports 1-based line and column", () => {

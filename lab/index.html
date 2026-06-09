@@ -1677,8 +1677,7 @@
         astOutline,
         buildCheatSheetData,
         buildDependencyGraph,
-        byteRangeToCharRange,
-        charToByte,
+        spanRange,
         charToLineColumn,
         debounce,
         decodeState,
@@ -1697,7 +1696,7 @@
       // loaded index.html never pairs with a stale cached module (which silently
       // ran the old, uncompressed encodeState). Bumped for `segmentRanges` (the
       // provenance-highlight byte↔UTF-16 fix).
-      } from "./playground_utils.mjs?v=19";
+      } from "./playground_utils.mjs?v=20";
       // Output-view decisions (extracted for testability; lab/output-view.test.mjs).
       import {
         VIEW_TABS,
@@ -2150,7 +2149,7 @@
         const total = source.length;
         for (const r of rowsForFile) {
           if (r.executed || typeof r.start !== "number") continue;
-          const [from, to] = byteRangeToCharRange(source, r.start, r.end);
+          const [from, to] = spanRange(source, r.start, r.end);
           const cls = "cm-dead-line";
           // Walk the line set the span covers — Decoration.line takes a
           // single offset and decorates the entire line containing it, so we
@@ -3560,7 +3559,7 @@
           for (const e of compiled.errors) {
             const file = e.file || "main";
             const src = fileSource(file);
-            const [from, to] = byteRangeToCharRange(src, e.start, e.end);
+            const [from, to] = spanRange(src, e.start, e.end);
             const pos = charToLineColumn(src, from);
             // Dedupe identical errors (e.g. a partial expanded at several sites).
             const key = `${file}:${pos.line}:${pos.column}:${e.message}`;
@@ -3718,7 +3717,7 @@
           const file = firstHit?.file || "main";
           const src = fileSource(file);
           const pos = firstHit && typeof firstHit.start === "number"
-            ? charToLineColumn(src, byteRangeToCharRange(src, firstHit.start, firstHit.end)[0])
+            ? charToLineColumn(src, spanRange(src, firstHit.start, firstHit.end)[0])
             : { line: 1, column: 1 };
           dockProblems.push({
             severity: "missing",
@@ -3978,7 +3977,7 @@
         // output, so a snippet would be redundant).
         if (isExpr && sv.start !== null) {
           const src = fileSource(file);
-          const [s, e] = byteRangeToCharRange(src, sv.start, sv.end);
+          const [s, e] = spanRange(src, sv.start, sv.end);
           const tag = src.slice(s, e).trim();
           if (tag) {
             const code = document.createElement("code");
@@ -4052,7 +4051,7 @@
         if (linkedTabEl) { linkedTabEl.classList.remove("tab-linked"); linkedTabEl = null; }
 
         if (active) {
-          const [from, to] = byteRangeToCharRange(tabs[idx].source, start, end);
+          const [from, to] = spanRange(tabs[idx].source, start, end);
           templateView.dispatch({ effects: setLinkHighlight.of({ from, to }) });
         } else {
           templateView.dispatch({ effects: setLinkHighlight.of(null) });
@@ -4085,20 +4084,20 @@
         const file = activeTabIdx === 0 ? "main" : activeTab().name;
         const src = templateView.state.doc.toString();
         const caretChar = templateView.state.selection.main.head;
-        const byte = charToByte(src, caretChar);
+        const pos = caretChar; // engine spans are char offsets — compare char↔char
 
         // A `{{> name}}` tag expands inline and emits no run of its own, so a
         // caret on it has no covering span; map it to every run that partial
         // produced instead.
         const partial = partialNameAt(src, caretChar);
-        const key = partial ? `>${partial}` : `${file}:${byte}`;
+        const key = partial ? `>${partial}` : `${file}:${pos}`;
         if (key === caretLinkKey) return;
         caretLinkKey = key;
         const ranges = [];
         for (const sv of lastSegViews) {
           const hit = partial
             ? sv.file === partial
-            : (sv.file === file && sv.start !== null && sv.start <= byte && byte < sv.end);
+            : (sv.file === file && sv.start !== null && sv.start <= pos && pos < sv.end);
           if (hit) ranges.push(outLinkMark.range(sv.from, sv.to));
         }
         outputEditor.dispatch({ effects: setOutLink.of(Decoration.set(ranges, true)) });
@@ -4113,7 +4112,7 @@
         selectTemplateTab(idx);
         templateView.focus();
         if (start !== null) {
-          const [from, to] = byteRangeToCharRange(tabs[idx].source, start, end);
+          const [from, to] = spanRange(tabs[idx].source, start, end);
           templateView.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
         }
         hideSegTip();
@@ -5435,7 +5434,7 @@
           makeEl,
           fileSource,
           charToLineColumn,
-          byteRangeToCharRange,
+          spanRange,
           openProblem,
           usedTransformersApproximate:
             featureFidelity(engineFeatures, "used-transformers") === "approximate",
@@ -5500,7 +5499,7 @@
             r.status === "hit" ? dxSnippet(r.value) : ""));
           const src = fileSource(r.file);
           const pos = typeof r.start === "number"
-            ? charToLineColumn(src, byteRangeToCharRange(src, r.start, r.end)[0])
+            ? charToLineColumn(src, spanRange(src, r.start, r.end)[0])
             : { line: 1, column: 1 };
           row.append(makeEl("span", { class: "dx-where" }, `${r.file}:${pos.line}:${pos.column}`));
           // Save-as-vector button on every non-hit row. Hits already render the
@@ -5802,7 +5801,7 @@
           const cls = r.executed ? "ok" : "dead";
           const src = fileSource(r.file);
           const pos = typeof r.start === "number"
-            ? charToLineColumn(src, byteRangeToCharRange(src, r.start, r.end)[0])
+            ? charToLineColumn(src, spanRange(src, r.start, r.end)[0])
             : { line: 1, column: 1 };
           const row = makeEl("div", { class: `cv-row ${cls}` }, [
             makeEl("span", { class: "cv-kind" }, r.kind),
@@ -6079,7 +6078,7 @@
       function setContextTarget(sv) {
         if (!sv || sv.start === null) return;
         const src = fileSource(sv.file);
-        const [from, to] = byteRangeToCharRange(src, sv.start, sv.end);
+        const [from, to] = spanRange(src, sv.start, sv.end);
         const label = src.slice(from, to).trim() || `${sv.file}:${sv.start}`;
         ctxTarget = { file: sv.file, start: sv.start, end: sv.end, label };
         selectDataTab("context");
@@ -6116,12 +6115,12 @@
           if (typeof r.start === "number") {
             row.classList.add("linked");
             row.addEventListener("mouseenter", () => {
-              const [from, to] = byteRangeToCharRange(source, r.start, r.end);
+              const [from, to] = spanRange(source, r.start, r.end);
               templateView.dispatch({ effects: setLinkHighlight.of({ from, to }) });
             });
             row.addEventListener("mouseleave", clearLink);
             row.addEventListener("click", () => {
-              const [from] = byteRangeToCharRange(source, r.start, r.end);
+              const [from] = spanRange(source, r.start, r.end);
               templateView.focus();
               templateView.dispatch({ selection: { anchor: from }, scrollIntoView: true });
             });

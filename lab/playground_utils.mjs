@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-const encoder = new TextEncoder();
-
 export function debounce(fn, waitMs = 160) {
   let handle = null;
   return (...args) => {
@@ -50,37 +48,19 @@ export function tabVisibleUnder(features, requires) {
   return (requires || []).every((feature) => map.has(feature));
 }
 
-// Rust spans are UTF-8 byte offsets; map them into JS string indices.
-export function byteToChar(source, byteOffset) {
-  if (byteOffset <= 0) return 0;
-
-  let bytes = 0;
-  for (let i = 0; i < source.length; ) {
-    if (bytes >= byteOffset) return i;
-
-    const codePoint = source.codePointAt(i);
-    const char = String.fromCodePoint(codePoint);
-    const charBytes = encoder.encode(char).length;
-    if (bytes + charBytes > byteOffset) return i;
-
-    bytes += charBytes;
-    i += codePoint > 0xffff ? 2 : 1;
-  }
-
-  return source.length;
-}
-
-// Inverse of byteToChar: the UTF-8 byte offset of a JS string index, so a
-// CodeMirror caret position can be compared against Rust byte spans.
-export function charToByte(source, charIndex) {
-  const index = Math.max(0, Math.min(charIndex, source.length));
-  return encoder.encode(source.slice(0, index)).length;
-}
-
-export function byteRangeToCharRange(source, startByte, endByte) {
-  const from = byteToChar(source, startByte);
-  const to = byteToChar(source, endByte);
-  return [from, Math.max(from + 1, to)];
+// An engine `Span` (`{start, end}`) → a CodeMirror editor range. The PureScript
+// engine's source spans are UTF-16 code-unit (JS string index) offsets — the same
+// units CodeMirror positions use (see `FlatBars.Span` / ADR-035) — so the span maps
+// to a range DIRECTLY, with no byte↔char conversion. Converting it as if it were a
+// UTF-8 byte range corrupts any span that includes or follows a multibyte char
+// (`×`/`—`), e.g. a ` ×` literal's `[c,c+2)` collapses to `[c,c+1)` — only the space.
+// Clamp to the document; keep a minimum width of 1 so a zero-length run is still
+// selectable.
+export function spanRange(text, start, end) {
+  const len = text.length;
+  const from = Math.min(Math.max(start, 0), len);
+  const to = Math.min(Math.max(from + 1, end), len);
+  return [from, to];
 }
 
 // Map provenance segments (ADR-035) to output character ranges + the rows the
@@ -88,9 +68,9 @@ export function byteRangeToCharRange(source, startByte, endByte) {
 // OUTPUT — JS string indices, exactly what `Kernel.Provenance` emits (NOT UTF-8
 // bytes) — so they are CodeMirror positions directly. Converting them as if they
 // were bytes drifts every mark after a multibyte char (`×`/`—`/…), which is the
-// provenance-highlight misalignment bug. `start`/`end` are the SOURCE span (UTF-8
-// bytes into the segment's file), passed through untouched for jump-to-source
-// (which converts them against the source there). A run at/after EOF is dropped.
+// provenance-highlight misalignment bug. `start`/`end` are the SOURCE span (also
+// UTF-16 code units — see `spanRange`), passed through for jump-to-source. A run
+// at/after EOF is dropped.
 export function segmentRanges(output, segments) {
   const len = output.length;
   const views = [];

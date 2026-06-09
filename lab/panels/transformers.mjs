@@ -61,7 +61,7 @@ export function renderTransformers(body, deps) {
     makeEl,
     fileSource,
     charToLineColumn,
-    byteRangeToCharRange,
+    spanRange,
     openProblem,
     // ADR-0020 Phase 4: true when the engine derives `used-transformers`
     // heuristically (a static AST walk) rather than from a compiled wire — the
@@ -129,7 +129,7 @@ export function renderTransformers(body, deps) {
       const sitesEl = makeEl("div", { class: "tx-sites" });
       for (const s of sites) {
         const src = fileSource(s.file);
-        const pos = (typeof s.start === "number") ? charToLineColumn(src, byteRangeToCharRange(src, s.start, s.end)[0]) : { line: 1, column: 1 };
+        const pos = (typeof s.start === "number") ? charToLineColumn(src, spanRange(src, s.start, s.end)[0]) : { line: 1, column: 1 };
         const link = makeEl("button", { class: "tx-site", title: "jump to source" },
           `${s.file}:${pos.line}:${pos.column}`);
         link.addEventListener("click", () => openProblem({ file: s.file, line: pos.line, col: pos.column }));
