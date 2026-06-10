@@ -11,6 +11,11 @@
 > `docs/12` (the naming principle: a name signals its semantics), `docs/16` (truthiness),
 > and the as-yet-unfiled `{{#capture}}` ADR (`docs/18`), the rendered-body counterpart.
 >
+> **Spelling note (superseded by `docs/19`).** In RawBars/MaxBars/Trussbars this tag is spelled
+> **`{% assign name = expr %}`** under the Django-style `{% %}` statement-tag surface (`docs/19`);
+> the `{{assign …}}` spelling below predates that ADR. The **semantics are unchanged** — only the
+> delimiters move.
+>
 > **Naming.** The keyword is **`assign`**, not a block-less `let`. `assign…=` is Liquid's and
 > Ruby's spelling for *sequential, forward-scoped* binding; `let` (Rust/ML) connotes a
 > *lexical, nested* scope — and Trussbars already uses `{{#let}}` for exactly that. Per the
@@ -126,12 +131,14 @@ MinBars it is an ordinary (meaningless) section/variable.
 ## 5. Consequences
 
 ### 5.1 One node, two spellings, byte-identical across backends
+
 `assign` and `{{#let}}` share the `Let` node and the `let`-emit. The reference `letH`, the AOT
 Rust `let`, the VM, and the JS compiler render identically, pinned by the corpus (`--v2`,
 `--vm`, `--vm-compat`) and `test:compile`. Adding `assign` cannot diverge a backend without
 also diverging `{{#let}}`.
 
 ### 5.2 Strictly stricter than Liquid (a documented divergence)
+
 `assign` does not leak past its enclosing block and cannot mutate across scopes. Migrating a
 Liquid template that relies on the leak or on a loop accumulator (`docs/15`, the import path)
 must rewrite — the importer flags both as located, actionable findings rather than silently
@@ -139,11 +146,13 @@ mis-scoping. This is the same "reject the removed form with a located error" dis
 project applies to dropped surface (CLAUDE.md, ADR-021).
 
 ### 5.3 The injection boundary is untouched
+
 `NAME` is a static identifier and `EXPR` is an ordinary expression — no data selects a name or
 a code path, so `assign` is inside the boundary (docs/06 §3) by construction. It adds no
 computed-name surface.
 
 ### 5.4 Governance: nonEmpty-family *surface*, so the oracle gets it first
+
 `assign` is a language/surface construct, not a host concern, so under the project framing
 (MaxBars/PureScript is the oracle that defines the surface; Trussbars is the production impl)
 it lands in the **RawBars/MaxBars** oracle first (or together), giving the conformance corpus

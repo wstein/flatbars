@@ -12,6 +12,11 @@
 > freeze, amended §5), `docs/09` (host helpers — a frequent consumer of captured strings),
 > `docs/04` (conformance), `docs/05` (the perf note: capture is the one intentional buffer).
 >
+> **Spelling note (superseded by `docs/19`).** In RawBars/MaxBars/Trussbars this is spelled
+> **`{% capture name %}…{% endcapture %}`** under the Django-style `{% %}` statement-tag surface
+> (`docs/19`); the `{{#capture …}}` spelling below predates that ADR. The **semantics are
+> unchanged** — only the delimiters move.
+>
 > **Naming.** The keyword is **`capture`** (Liquid/Ruby), spelled as a block
 > (`{{#capture name}}…{{/capture}}`) because it *has* a body — unlike `{{assign}}`, which has
 > an expression RHS. `capture` is to `assign` what a rendered block is to an expression.
@@ -126,6 +131,7 @@ only**; **FullBars** rejects it with a located error (use `{{#inline}}`/`{{#part
 ## 5. Consequences
 
 ### 5.1 The one intentional buffer (a documented perf cost)
+
 Trussbars renders straight to the output sink with no intermediate allocations (docs/05, the
 safe-Rust ceiling). `{{#capture}}` is the deliberate exception: it allocates a `String` and
 renders into it eagerly. The cost is bounded (only where authored) and visible (a `Safe` bind
@@ -133,21 +139,25 @@ in the generated code). The size-hint pass (docs/02) should seed `__cap`'s capac
 body's static-text length, as it does for the main buffer.
 
 ### 5.2 `Safe` is the escaping contract, statically
+
 A captured value is `trussbars_std::Safe`. Emitting it is passthrough; passing it to a host
 helper or filter that expects `&str` coerces via `as_str()`. A helper that needs to *escape*
 its input still can — but the default `{{name}}` does not, which is the correct "render once"
 semantics. This makes the no-double-escape guarantee a *type* property, not a convention.
 
 ### 5.3 Eager, with an unused-capture lint
+
 Because capture is eager, a `{{#capture x}}…{{/capture}}` whose `x` is never read still renders
 its body (wasted work). v1 keeps eager semantics (A3) but the linter/inspector (docs/10) should
 flag an unread capture as a warning — the same located-finding discipline used elsewhere.
 
 ### 5.4 The injection boundary is untouched
+
 `NAME` is static; the body is a static template fragment. No data selects a name or a code
 path — capture is inside the boundary (docs/06 §3) by construction.
 
 ### 5.5 Governance: nonEmpty-family *surface*, oracle-first
+
 A language/surface construct, so it lands in the RawBars/MaxBars oracle first (or together),
 giving the corpus an authority before Trussbars conforms byte-for-byte (docs/12 §5.5).
 
