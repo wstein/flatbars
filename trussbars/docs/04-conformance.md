@@ -110,7 +110,7 @@ Negative cases prove the subset boundary is *enforced*, not merely documented. T
   front-end** must reject these *before* codegen, with a diagnostic naming the spec rule
   (`01` §4). Assert the rejection and its category.
 - **changed-contract** (missing-key §5.1, bare-number condition §5.3): these reach codegen and
-  must be rejected by **`rustc`** — "no field `nope` on `Ctx`" / "`Truthy` not implemented for
+  must be rejected by **`rustc`** — "no field `nope` on `Ctx`" / "`TruthyIn<NonEmpty>` not implemented for
   `i64`". Use **`trybuild`** (the standard Rust compile-fail harness) with committed
   `.stderr` snapshots, asserting the *error class*, not the exact wording (rustc messages
   drift across versions — match on the category, e.g. "unknown field" / "trait not

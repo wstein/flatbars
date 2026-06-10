@@ -84,4 +84,8 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
 - `15-migration-import.md` — the migration-tool **read half**: foreign-dialect parsers
   (`crates/trussbars-import`; Mustache / Handlebars / Liquid / StringTemplate4). Implemented;
   the lowering to the Trussbars AST is the next deliverable.
+- `16-truthiness-modes.md` — **SHIPPED** selectable truthiness policies: `TruthyIn<Mode>` with
+  `NonEmpty` (default, conformance-checked), `Liquid`, `Handlebars`, and host-defined policies
+  over foreign types; `truss!(…, truthiness = Mode)`. Zero-cost (monomorphized); the
+  non-default policies are out of conformance by construction.
 

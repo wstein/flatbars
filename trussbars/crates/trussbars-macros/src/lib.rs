@@ -46,7 +46,7 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// Trailing clauses, in any order, tune compilation: `helpers = [a, b]` is the
 /// host-helper allow-list (F3, below), and `truthiness = Mode` selects the
 /// truthiness policy — `NonEmpty` (default, conformance-checked), `Liquid`, or
-/// `Handlebars` (spec §7, `docs/15-truthiness-modes.md`). A Trussbars-owned
+/// `Handlebars` (spec §7, `docs/16-truthiness-modes.md`). A Trussbars-owned
 /// (class-A) error expands to a `compile_error!` located at `line:col`.
 #[proc_macro]
 pub fn truss(input: TokenStream) -> TokenStream {

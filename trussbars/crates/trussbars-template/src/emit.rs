@@ -14,7 +14,7 @@ use crate::span::Span;
 /// default [`TruthMode::NonEmpty`] is the one fixed Trussbars rule and the only one
 /// the conformance corpus is checked against; the others are opt-in via
 /// `truss!(…, truthiness = Liquid)` and emit through `trussbars_core::truthy_in`
-/// (`docs/15-truthiness-modes.md`).
+/// (`docs/16-truthiness-modes.md`).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum TruthMode {
     /// `nonEmpty` minus numbers — the default; a bare-number condition is a compile error.

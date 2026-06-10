@@ -209,7 +209,7 @@ Three render modes, from most dynamic to a strict AOT proxy:
    the host schema, it applies AOT's exact static rules at load:
    - every referenced path must exist (missing field → error, *not* lenient-empty);
    - **numeric truthiness is an error** (`{{#if count}}` is rejected — AOT's Option C,
-     no `Truthy` for numbers; `docs/01`);
+     no `TruthyIn<NonEmpty>` for numbers; `docs/01`);
    - **a bare struct/object in output position is an error** (AOT has no `ToText` for
      structs);
    - operations are restricted to AOT's supported set (so the dynamic-only host-helper

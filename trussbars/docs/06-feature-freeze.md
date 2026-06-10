@@ -47,10 +47,13 @@ Source of truth for "supported" is the v1 emitter
 
 ## 2. Value policy (fixed)
 
-- **Truthiness = `nonEmpty`, numbers excluded.** `false`/`None`/`()`/`""`/`[]`/`{}`
-  are falsy; everything else non-numeric is truthy. **Numbers have no `Truthy` impl**,
-  so `{{#if count}}` is a *compile error* — write `{{#if count > 0}}`. (The typed
-  escape from the `0`-truthy vs `0`-falsy dilemma; docs/01 §5.3.)
+- **Truthiness = `nonEmpty`, numbers excluded** *(the default policy)*.
+  `false`/`None`/`()`/`""`/`[]`/`{}` are falsy; everything else non-numeric is truthy.
+  **Numbers have no `TruthyIn<NonEmpty>` impl**, so `{{#if count}}` is a *compile error* —
+  write `{{#if count > 0}}`. (The typed escape from the `0`-truthy vs `0`-falsy dilemma;
+  docs/01 §5.3.) A template may opt into the `Liquid`/`Handlebars`/host-defined policies at
+  compile time (`truss!(…, truthiness = …)`); only `nonEmpty` is conformance-checked
+  (docs/01 §7.1, docs/16).
 - **Numbers are `f64`.** Numeric literals emit as `f64`, so a field compared to a
   literal must be `f64` (blog finding F2). Print-only / `groupBy`-key numbers may be `i64`.
 - **Escaping** mirrors the reference `escapeHtml`: `& < > " '` → entities; raw/`safe`/

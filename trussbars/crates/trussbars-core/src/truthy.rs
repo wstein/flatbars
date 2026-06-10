@@ -16,7 +16,7 @@
 //! its **own** policy over the standard library's types and its own newtypes alike
 //! — `impl TruthyIn<MyMode> for str` is permitted even though `str` is foreign,
 //! because the marker `MyMode` is local (the orphan rule's covered-parameter case;
-//! `docs/15-truthiness-modes.md`). Every policy is monomorphized, so selecting one
+//! `docs/16-truthiness-modes.md`). Every policy is monomorphized, so selecting one
 //! costs nothing at runtime.
 
 use alloc::collections::BTreeMap;
@@ -39,12 +39,12 @@ pub trait TruthyIn<Mode> {
 pub struct NonEmpty;
 
 /// The Liquid policy: only `false` and `nil` (`None`/`()`) are falsy. `0`, `""`,
-/// `[]`, and `{}` are all truthy. Out of conformance (`docs/15-truthiness-modes.md`).
+/// `[]`, and `{}` are all truthy. Out of conformance (`docs/16-truthiness-modes.md`).
 pub struct Liquid;
 
 /// The Handlebars policy: `false`, `null` (`None`/`()`), `0`, `NaN`, `""`, and `[]`
 /// are falsy; a non-empty value and an (empty or non-empty) object `{}` are truthy.
-/// Out of conformance (`docs/15-truthiness-modes.md`).
+/// Out of conformance (`docs/16-truthiness-modes.md`).
 pub struct Handlebars;
 
 /// Evaluate truthiness under the default [`NonEmpty`] policy.

@@ -64,9 +64,14 @@ prelude semantics are inherited unchanged **except** where this document marks a
 - The prelude / stdlib operations. (`packages/kernel/src/Kernel/Prelude.purs`; see §6.)
 
 It does **not** inherit the FlatBars kit: there is no dialect seam, no `parseExpr`
-indirection, no truthiness-policy switch, no support for other dialects' spellings
-(`{{#*inline}}`, `{{^}}`, `{{&}}`, `partial-block`, set-delimiters) — MaxBars already
-rejects those, and Trussbars hard-codes the MaxBars front-end.
+indirection, no support for other dialects' spellings (`{{#*inline}}`, `{{^}}`, `{{&}}`,
+`partial-block`, set-delimiters) — MaxBars already rejects those, and Trussbars hard-codes
+the MaxBars front-end. Nor is there FlatBars's *runtime* truthiness-policy switch (the
+per-file `@truthiness` / `Value -> Boolean` callback): the `nonEmpty` rule is the default
+and the only conformance-checked one. A template **may** opt into a different family's
+policy at compile time (`truss!(…, truthiness = Liquid)`), but that selection is
+type-directed, per-template, and out of conformance — a distinct mechanism from a runtime
+data-driven switch (§7).
 
 ---
 
@@ -173,7 +178,7 @@ Rationale: MaxBars's `nonEmpty` rule makes `0` *truthy*; Handlebars makes `0` *f
 surprises half its audience, and either way a bare-number condition is ambiguous. The typed
 setting escapes the dilemma: rather than pick a rule, Trussbars **rejects the coercion** and
 demands the comparison. This is the §5.2 philosophy (footgun → compile error) applied to
-truthiness, enforced for free by simply not implementing `Truthy` for numeric types (runtime
+truthiness, enforced for free by simply not implementing `TruthyIn<NonEmpty>` for numeric types (runtime
 API §3). `nonEmpty` still applies to every *non-numeric* type, where emptiness is
 unambiguous. (`Option<number>` is likewise rejected; test presence first, then compare:
 `{{(count ?? 0) > 0}}`.)
@@ -223,17 +228,38 @@ impls, not runtime `register`): `{{loud name}}`, `{{{link "Home" url="/home"}}}`
 
 ---
 
-## 7. Truthiness — `nonEmpty`, minus numbers
+## 7. Truthiness — `nonEmpty` by default, policy-selectable
 
-Trussbars has one fixed truthiness rule (no policy switch), applied to **non-numeric** types
-only. **Falsy:** `false`, `null` (`None`), `""`, `[]`, `{}`. **Truthy:** every other
-non-numeric value. It governs `if`/`unless`/`&&`/`||`/`!`, `?:` (`firstTruthy`), and the
-ternary condition.
+Trussbars's default truthiness rule is `nonEmpty`, applied to **non-numeric** types only.
+**Falsy:** `false`, `null` (`None`), `""`, `[]`, `{}`. **Truthy:** every other non-numeric
+value. It governs `if`/`unless`/`&&`/`||`/`!`, `?:` (`firstTruthy`), and the ternary
+condition.
 
-**Numbers are not coercible to bool** — a bare-number condition is a compile error (§5.3);
-write the comparison. `??` (`coalesce`) is *not* truthiness — it tests presence (non-null),
-so `""` survives a `??` fallback but not a `?:` one. `Option<String>` of `Some("")` is
-**falsy** — absence *and* emptiness both fall through, matching the interpreter.
+**Numbers are not coercible to bool** under `nonEmpty` — a bare-number condition is a compile
+error (§5.3); write the comparison. `??` (`coalesce`) is *not* truthiness — it tests presence
+(non-null), so `""` survives a `??` fallback but not a `?:` one. `Option<String>` of
+`Some("")` is **falsy** — absence *and* emptiness both fall through, matching the interpreter.
+
+### 7.1 Selectable policies (`TruthyIn<Mode>`)
+
+The rule is a **trait parameterized by a policy marker** — `trussbars_core::TruthyIn<Mode>` —
+not a hard-coded predicate. The compiler emits `truthy_in::<Mode, _>(…)` at every boolean
+position, so a template can be compiled under a different template family's semantics with
+`truss!(…, truthiness = Mode)`. Three policies ship; each is a zero-sized marker and fully
+monomorphized, so selecting one costs nothing at runtime:
+
+| `Mode` | Falsy set | Numbers |
+| --- | --- | --- |
+| `NonEmpty` *(default)* | `false`, `None`/`null`, `""`, `[]`, `{}` | no impl — bare-number condition is a compile error (§5.3) |
+| `Liquid` | `false`, `nil` (`None`) only | always truthy (`0` is truthy) |
+| `Handlebars` | `false`, `null`, `0`, `NaN`, `""`, `[]` (but `{}` is **truthy**) | `0`/`NaN` falsy, else truthy |
+
+Because `Mode` is a *type parameter*, a host can also define its **own** policy — including
+over the standard library's foreign types — since the orphan rule permits
+`impl TruthyIn<MyMode> for str` when the marker `MyMode` is local. This is the type-directed
+extension point that replaces a runtime callback. **Only `NonEmpty` is conformance-checked**
+(§11); the others are loud, per-template opt-ins. See `docs/16-truthiness-modes.md` for the
+design, the rejected alternatives, and the conformance posture.
 
 ---
 
@@ -287,14 +313,15 @@ the same harness).
 **Crate layout:**
 
 - `trussbars-core` — *implemented*: the `Safe`/`ToText`/`escape_html`/`esc` output layer,
-  `nonEmpty` `Truthy` (minus numbers), and the borrowed-reference `Loop` frame model.
+  `nonEmpty` `TruthyIn<NonEmpty>` (minus numbers) plus the `Liquid`/`Handlebars` policy
+  markers, and the borrowed-reference `Loop` frame model.
   (`coalesce`/`firstTruthy`/`ternary` are *not* here — they are emitted inline by codegen;
   see `02-runtime-api.md` §4.)
 - `trussbars-std` — *implemented*: the prelude/stdlib operations as monomorphized functions —
   the string, number, and array packs plus `safe`/`modulo`. (`json`/`escape_json`, the i18n
   `Translator` pack, and `sort_by`/`pluck`/`group_by` are deferred; see `02-runtime-api.md` §9.)
 - `trussbars-derive` — *implemented*: the `#[derive(Trussbars)]` companion macro, generating
-  the `Truthy` impl for context structs (≥1 field ⟹ truthy). No `ToText` by design, so
+  the policy-independent `TruthyIn` impl for context structs (≥1 field ⟹ truthy). No `ToText` by design, so
   `{{struct}}` stays a compile error; struct-only until §4.1 enum dispatch.
 - `trussbars-codegen` — *v1 implemented* as `MaxBars.Rust` (`packages/maxbars/src/MaxBars/Rust.purs`):
   the PureScript MaxBars→Rust emitter, reusing the proven parse + desugar and walking the core AST
@@ -331,6 +358,11 @@ emitted Rust, and asserts equal bytes — **on the admissible subset only**. It 
    "Trussbars implements the data-derived-name-free subset," never a bare case count that
    silently shrank. Same anti-over-claim discipline as the existing `EXCEPTIONS` maps in
    the repo.
+3. **Pin the truthiness policy to `NonEmpty`.** The oracle is `nonEmpty`, so the corpus is
+   checked under the default policy only (§7.1). The `Liquid` / `Handlebars` / host-defined
+   policies are *out of conformance by construction* — they intentionally diverge from the
+   oracle — and are gated instead by `trussbars-core`'s own `TruthyIn<Mode>` unit tests and
+   the `truss!(…, truthiness = …)` render tests, not by oracle byte-identity.
 
 ---
 

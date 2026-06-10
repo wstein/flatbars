@@ -91,35 +91,50 @@ it never affects the output bytes, so it is invisible to the conformance harness
 
 ---
 
-## 3. Truthiness: the `Truthy` trait (`nonEmpty`)
+## 3. Truthiness: the `TruthyIn<Mode>` trait (`nonEmpty` by default)
 
-Trussbars has one fixed rule (spec §7). It is a trait so each type answers for itself, and
-**a condition over an impossible type is a compile error**, not a silent `false`.
+Truthiness is a trait **parameterized by a policy marker** `Mode`, so each type answers for
+itself under a named policy and **a condition over a type with no impl is a compile error**,
+not a silent `false`. The default policy is `NonEmpty` (spec §7).
 
 ```rust
-pub trait Truthy { fn truthy(&self) -> bool; }
-pub fn truthy<T: Truthy>(v: &T) -> bool { v.truthy() }
+pub trait TruthyIn<Mode> { fn truthy(&self) -> bool; }
+
+pub struct NonEmpty; // default; pub struct Liquid; pub struct Handlebars;
+
+pub fn truthy<T: TruthyIn<NonEmpty>>(v: &T) -> bool { v.truthy() }      // the default
+pub fn truthy_in<Mode, T: TruthyIn<Mode>>(v: &T) -> bool { v.truthy() } // a chosen policy
 ```
 
-| Type | `truthy()` |
-| --- | --- |
-| `bool` | `*self` |
-| `&str` / `String` / `Safe` | `!is_empty()` |
-| `&[T]` / `Vec<T>` | `!is_empty()` |
-| `Option<T: Truthy>` | `self.as_ref().is_some_and(Truthy::truthy)` |
-| maps (`BTreeMap`) | `!is_empty()` |
-| a context struct | `true` when it has ≥1 field, else `false` (via `#[derive(Trussbars)]`; no `ToText`, so `{{struct}}` won't compile — §12) |
-| **numeric** (`i*` / `u*` / `f64`) | *no impl* — see below |
+| Type | `NonEmpty` (default) | `Liquid` | `Handlebars` |
+| --- | --- | --- | --- |
+| `bool` | `*self` | `*self` | `*self` |
+| `()` (`null`) | `false` | `false` | `false` |
+| `&str` / `String` / `Safe` | `!is_empty()` | `true` | `!is_empty()` |
+| `&[T]` / `Vec<T>` | `!is_empty()` | `true` | `!is_empty()` |
+| maps (`BTreeMap`) | `!is_empty()` | `true` | `true` (`{}` truthy) |
+| `Option<T>` | defers to inner (same policy) | defers | defers |
+| numeric (`i*` / `u*` / `f*`) | *no impl* — see below | `true` | `0`/`NaN` → `false`, else `true` |
+| a context struct/enum | `true` (≥1 field) / `false` (unit); policy-independent via `#[derive(Trussbars)]`; no `ToText`, so `{{struct}}` won't compile (§12) | same | same |
 
-**Numbers deliberately have no `Truthy` impl.** `{{#if count}}` therefore fails to compile,
-forcing an explicit comparison (`{{#if count > 0}}`) — spec §5.3, the typed escape from the
-`0`-truthy / `0`-falsy dilemma. Because `Option<T: Truthy>` requires the inner type to be
-`Truthy`, `Option<i64>` is non-`Truthy` too (test presence with `??`, then compare). The v2
-proc-macro can intercept the missing impl to emit a friendly *"numbers aren't truthy — write
-`count > 0`"* diagnostic; in v1 the raw `rustc` *"`Truthy` not implemented for `i64`"* stands.
+**Under `NonEmpty`, numbers deliberately have no impl.** `{{#if count}}` therefore fails to
+compile, forcing an explicit comparison (`{{#if count > 0}}`) — spec §5.3, the typed escape
+from the `0`-truthy / `0`-falsy dilemma. Because `Option<T>` defers to the inner type,
+`Option<i64>` is likewise non-truthy under `NonEmpty` (test presence with `??`, then compare).
+The v2 proc-macro can intercept the missing impl to emit a friendly *"numbers aren't truthy —
+write `count > 0`"* diagnostic; in v1 the raw `rustc` *"`TruthyIn<NonEmpty>` not implemented
+for `i64`"* stands.
 
-`{{#if cond}}` → `if truthy(&cond) {`. Note `Option<String>` of `Some("")` is **falsy** —
-absence *and* emptiness both fall through, matching the interpreter.
+`{{#if cond}}` → `if truthy(&cond) {` (default) or `if truthy_in::<Liquid, _>(&cond) {` under
+`truss!(…, truthiness = Liquid)`. Note `Option<String>` of `Some("")` is **falsy under
+`NonEmpty`** (absence *and* emptiness fall through, matching the interpreter) but **truthy
+under `Liquid`** — `Option` defers to the inner type's policy.
+
+**Host-defined policies.** Because `Mode` is a type parameter, a host can define its own
+policy — even over the standard library's types — with `impl TruthyIn<MyMode> for str`
+(orphan-rule-legal because the marker is local). Every policy is monomorphized: selecting one
+is free at runtime. Only `NonEmpty` is conformance-checked; the rest are loud, per-template
+opt-ins (`docs/16-truthiness-modes.md`).
 
 ---
 
@@ -135,7 +150,7 @@ operand types must unify (Rust enforces it).
 | `c ? a : b` (`ternary`) | `if truthy(&c) { a } else { b }` | |
 
 `??` is presence (operates over `Option<T>` → `T`); `?:` is truthiness (operates over a
-uniform `T: Truthy + Clone`). The distinction is preserved by *type*, not a runtime flag.
+uniform `T: TruthyIn<Mode> + Clone`). The distinction is preserved by *type*, not a runtime flag.
 
 ---
 
@@ -301,7 +316,7 @@ uniform-typed is a call.**
 ## 12. Open design questions (to resolve in implementation)
 
 1. **Trait coherence for context structs.** *Resolved (`trussbars-derive`).* The companion
-   **`#[derive(Trussbars)]`** generates the `Truthy` impl a context struct needs (a struct with
+   **`#[derive(Trussbars)]`** generates the policy-independent `TruthyIn` impl a context struct needs (a struct with
    ≥1 field is truthy, a field-less struct falsy — the nonEmpty object rule). It deliberately
    generates **no `ToText`**, so `{{struct}}` / `{{this}}` over a struct stays a compile error —
    the typed counterpart of "cannot stringify an object" (§3, subset spec §2). Structs only;
