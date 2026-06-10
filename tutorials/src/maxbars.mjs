@@ -265,10 +265,11 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
 
   withBlock: {
     engine: "maxbars",
-    label: "Intermediate — With: re-root the context",
-    // {{#with obj}} re-roots the context, unchanged from ClassicBars — operators and
-    // pipes apply to the shifted context just the same.
-    template: "{% with totals %}{{count}} items · {{total | toFixed 2}}{% endwith %}",
+    label: "Intermediate — Scope: re-root the context",
+    // {% scope obj %} re-roots the context (ADR-039 — the re-root keyword renamed
+    // from `with`; RawBars keeps `with`). Operators and pipes apply to the shifted
+    // context just the same.
+    template: "{% scope totals %}{{count}} items · {{total | toFixed 2}}{% endscope %}",
     data: { totals: { count: 2, total: 9.5 } },
   },
 

@@ -39,7 +39,7 @@ module ClassicBars
 
 import Prelude
 
-import ClassicBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, retiredLetViolation, strictSurfaceViolation)
+import ClassicBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, renameScope, retiredLetViolation, strictSurfaceViolation, withReRootViolation)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -89,7 +89,8 @@ desugarSurfaceWith lv = desugarWith lv surfaceClauses
 -- | compile entry points use this in place of `desugarSurfaceWith`.
 desugarStmt :: ParseOptions -> LoopVars -> Template -> Template
 desugarStmt opts lv nodes =
-  desugarSurfaceWith lv (if opts.lexConfig.statementTags then liftSet nodes else nodes)
+  desugarSurfaceWith lv
+    (if opts.lexConfig.statementTags then renameScope (liftSet nodes) else nodes)
 
 -- | Reject each dialect's disallowed *surface* shapes (the `strict` flag is the
 -- | ClassicBars/MaxBars distinction the render paths already thread), reported as a
@@ -131,7 +132,11 @@ checkBraceControl src nodes = case braceControlViolation surfaceClauses src node
   -- name (docs-17 §2) — `{% set this = … %}` / `{% local loop = … %}` and the like.
   Nothing -> case reservedBindingViolation blockHelperNames nodes of
     Just v -> Left (DisallowedShape v.shape v.off)
-    Nothing -> pure unit
+    -- ADR-039 item 9: the re-rooting `{% with %}` is renamed `{% scope %}` in MaxBars
+    -- (RawBars keeps `with`, so this runs only on the ClassicBars statementTags path).
+    Nothing -> case withReRootViolation nodes of
+      Just v -> Left (DisallowedShape v.shape v.off)
+      Nothing -> pure unit
 
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.

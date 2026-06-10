@@ -38,6 +38,8 @@ const RULES = [
   ["maxbars", "{% let a=1 %}{% endlet %}", /let.*retired.*\{% local/, "let-retired (maxbars)"],
   // the removed `{{#each … as …}}` form is flagged in MaxBars (use `x in xs`).
   ["maxbars", "{{#each xs as a}}{{/each}}", /Liquid-style.*names before .in.*each x in xs/, "each-as (maxbars)"],
+  // the re-rooting `{% with %}` is renamed `{% scope %}` in MaxBars (ADR-039); RawBars keeps `with`.
+  ["maxbars", "{% with o %}{{n}}{% endwith %}", /context re-root.*\{% scope.*with. is reserved/, "with-scope (maxbars)"],
   // MinBars / RawBars share the rest of the dialect rules. RawBars stops here
   // because it also short-circuits on set-delim above; verify the cascading
   // rules for both dialects in MinBars (the engine accepts everything we test

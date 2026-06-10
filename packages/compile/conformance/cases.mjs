@@ -188,9 +188,9 @@ export const cases = [
   { name: "mx:list-empty", dialect: "maxbars", t: "[{% each [] %}x{% endeach %}]", d: {} },
   { name: "mx:list-value", dialect: "maxbars", t: "{{ [1, 2, 3] }}", d: {} },
   // the structural scanner is brace-aware, so a dict abutting `}}` needs no space.
-  { name: "mx:dict-lit", dialect: "maxbars", t: "{% with {name: who, age: 30} %}{{name}}/{{age}}{% endwith %}", d: { who: "Ada" } },
-  { name: "mx:dict-strkey", dialect: "maxbars", t: '{% with {"full name": who} %}{{lookup this "full name"}}{% endwith %}', d: { who: "Ada L" } },
-  { name: "mx:dict-string-brace", dialect: "maxbars", t: '{% with {msg: "a}}b"} %}{{msg}}{% endwith %}', d: {} },
+  { name: "mx:dict-lit", dialect: "maxbars", t: "{% scope {name: who, age: 30} %}{{name}}/{{age}}{% endscope %}", d: { who: "Ada" } },
+  { name: "mx:dict-strkey", dialect: "maxbars", t: '{% scope {"full name": who} %}{{lookup this "full name"}}{% endscope %}', d: { who: "Ada L" } },
+  { name: "mx:dict-string-brace", dialect: "maxbars", t: '{% scope {msg: "a}}b"} %}{{msg}}{% endscope %}', d: {} },
   { name: "mx:dict-json", dialect: "maxbars", t: "{{{json {x: 1, y: 2}}}}", d: {} },
   // `{{#let}}` (ADR-024): block-scoped aliases, sequential, never re-rooting.
   { name: "mx:let-single", dialect: "maxbars", t: '{% local g="Hi" %}{{g}}{% endlocal %}', d: {} },
@@ -430,7 +430,7 @@ export const cases = [
   // block params parse in MaxBars (head ladder omits the pipe rung) — built-ins
   // bind them exactly as ClassicBars does, compiled ≡ interpreted.
   { name: "mx:blockparams-each", dialect: "maxbars", t: "{% each item i in xs %}[{{i}}:{{item}}]{% endeach %}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:blockparams-with", dialect: "maxbars", t: "{% with o as c %}{{c.n}}{% endwith %}", d: { o: { n: "Z" } } },
+  { name: "mx:blockparams-scope", dialect: "maxbars", t: "{% scope o as c %}{{c.n}}{% endscope %}", d: { o: { n: "Z" } } },
   // a parenthesised pipe coexists with a trailing block-param clause.
   { name: "mx:blockparams-paren-pipe", dialect: "maxbars", t: "{% each x in (xs | reverse) %}{{x}}{% endeach %}", d: { xs: ["a", "b", "c"] } },
   // an OUTER block param stays visible inside a nested loop (frame binds inherit).

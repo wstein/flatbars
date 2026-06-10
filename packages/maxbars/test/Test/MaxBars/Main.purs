@@ -317,8 +317,8 @@ main = do
   -- (+ a 1-based index).
   expectM "each-in-each" "{% each item i in xs %}[{{i}}:{{item}}]{% endeach %}" xs3
     "[0:a][1:b][2:c]"
-  -- `with` binds the shifted context to a name (drop-pipes `as`).
-  expectM "with-as-binding" "{% with o as c %}{{c.n}}{% endwith %}"
+  -- `scope` (the renamed re-root, ADR-039) binds the shifted context to a name (drop-pipes `as`).
+  expectM "scope-as-binding" "{% scope o as c %}{{c.n}}{% endscope %}"
     (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
     "Z"
   -- a loop binding is a bare name directly (there are no bare loop variables in
@@ -471,11 +471,19 @@ main = do
             (obj [ Tuple "xs" (VArray []) ])
         )
     )
-  -- `with … as` and `{{#each x in xs}}` are unaffected (only `each … as` is gone).
-  expectM "each-as: {% with o as p %} keeps `as`"
-    "{% with o as p %}{{p.n}}{% endwith %}"
+  -- `scope … as` and `{% each x in xs %}` are unaffected (only `each … as` is gone).
+  expectM "each-as: {% scope o as p %} keeps `as`"
+    "{% scope o as p %}{{p.n}}{% endscope %}"
     (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
     "Z"
+  -- ADR-039 item 9: the old re-root keyword `{% with %}` is rejected in MaxBars
+  -- (it is renamed `scope`); RawBars keeps `with`.
+  assert' "scope: {% with %} is rejected in MaxBars (use {% scope %})"
+    ( isLeft
+        ( renderMax "{% with o %}{{n}}{% endwith %}"
+            (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
+        )
+    )
 
   -- `each … in` binds a *third* name to the 1-based index — MaxBars' extension
   -- over the two Handlebars bindings (`item index0 index1 in xs`).
@@ -595,17 +603,17 @@ main = do
   -- is balanced before the tag close, so NO disambiguating space is needed even
   -- when the dict abuts `}}`.
   expectM "dict literal: bare-ident keys, no space before }}"
-    "{% with {name: who, age: 30} %}{{name}}/{{age}}{% endwith %}"
+    "{% scope {name: who, age: 30} %}{{name}}/{{age}}{% endscope %}"
     (obj [ Tuple "who" (VString "Ada") ])
     "Ada/30"
   expectM "dict literal: a string key, no space"
-    "{% with {\"full name\": who} %}{{lookup this \"full name\"}}{% endwith %}"
+    "{% scope {\"full name\": who} %}{{lookup this \"full name\"}}{% endscope %}"
     (obj [ Tuple "who" (VString "Ada L") ])
     "Ada L"
   -- the scanner skips strings, so a `}}` inside a dict value's string is not a tag
   -- close.
   expectM "dict literal: a `}}` inside a string value is not the tag close"
-    "{% with {msg: \"a}}b\"} %}{{msg}}{% endwith %}"
+    "{% scope {msg: \"a}}b\"} %}{{msg}}{% endscope %}"
     (obj [])
     "a}}b"
   -- an empty dict `{}` abutting the close (falsy under nonEmpty).

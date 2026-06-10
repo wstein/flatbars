@@ -1,3 +1,3 @@
-{% with report %}<table>
+{% scope report %}<table>
 {% each rows %}  <tr><td>{{k}}</td><td>{{v}}</td></tr>
-{% endeach %}</table>{% endwith %}
+{% endeach %}</table>{% endscope %}

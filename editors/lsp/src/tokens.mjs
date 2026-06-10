@@ -182,7 +182,21 @@ export function dialectDiagnostics(text, dialect) {
           message:
             "MaxBars binds loops Liquid-style — write the names before `in`, " +
             "e.g. `{{#each x in xs}}` or `{{#each x i in xs}}`. The trailing `as` " +
-            "form on `each` is gone (`with`/custom helpers still use `as`).",
+            "form on `each` is gone (`scope`/custom helpers still use `as`).",
+        });
+      }
+      // The re-rooting `{% with %}` is renamed `{% scope %}` in MaxBars (ADR-039);
+      // the engine rejects `with` at render. Flag it here with the rename fix
+      // (RawBars keeps `with`, so this rule is MaxBars-only).
+      const withRe = /\{%~?\s*with\b/g;
+      let wm;
+      while ((wm = withRe.exec(text)) !== null) {
+        out.push({
+          start: wm.index,
+          end: wm.index + wm[0].length,
+          message:
+            "The context re-root is spelled `{% scope … %} … {% endscope %}` in MaxBars (ADR-039) — " +
+            "`with` is reserved. (RawBars keeps `{% with %}`.)",
         });
       }
     }

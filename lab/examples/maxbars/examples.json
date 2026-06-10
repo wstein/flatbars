@@ -163,7 +163,7 @@
   },
   {
     "id": "withBlock",
-    "label": "Intermediate — With: re-root the context",
+    "label": "Intermediate — Scope: re-root the context",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",

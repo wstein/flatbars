@@ -21,7 +21,9 @@
 // (ADR-021) — RawBars installs bare `index`/`key`/`first`/`last`; MaxBars exposes
 // loop state as `loop.index0`/`loop.key`/… and treats a bare `index` as a data
 // field. (`this`/`root`/`parent` ARE shared.) Also MaxBars rejects the ClassicBars
-// `{% *inline %}` decorator. The corpus avoids those constructs by design.
+// `{% *inline %}` decorator, and the context re-root is `{% with %}` in RawBars but
+// renamed `{% scope %}` in MaxBars (ADR-039 item 9 — RawBars keeps the op-name head).
+// The corpus avoids those constructs by design.
 import { render, renderMaxbars } from "../lab/vendor/flatbars-engine.mjs";
 
 const fail = [];
@@ -84,7 +86,8 @@ const CORPUS = [
   // documented variable-model exception above.
   { id: "each-array", tpl: `{% each (lookup this "xs") %}[{{{this}}}]{% endeach %}`, data: { xs: ["p", "q"] } },
   { id: "each-object", tpl: `{% each (lookup this "o") %}[{{{this}}}]{% endeach %}`, data: { o: { a: 1, b: 2 } } },
-  { id: "with", tpl: `{% with (lookup this "u") %}{{{lookup this "name"}}}{% endwith %}`, data: { u: { name: "Ada" } } },
+  // `with`/`scope` is a documented surface exception (RawBars `{% with %}` vs MaxBars
+  // `{% scope %}`, ADR-039) — not in the shared corpus.
   { id: "compare", tpl: `{% if (gt (lookup this "n") 3) %}big{% else %}small{% endif %}`, data: { n: 5 } },
   { id: "arith", tpl: `{{{multiply (add (lookup this "a") 1) 2}}}`, data: { a: 4 } },
   { id: "coalesce", tpl: `{{{coalesce (lookup this "a") (lookup this "b")}}}`, data: { a: null, b: "fallback" } },

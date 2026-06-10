@@ -60,6 +60,8 @@ module ClassicBars.Surface
   , strictSurfaceViolation
   , maxbarsEachAsViolation
   , retiredLetViolation
+  , renameScope
+  , withReRootViolation
   ) where
 
 import Prelude
@@ -657,6 +659,35 @@ retiredLetViolation nodes = Array.head (Array.mapMaybe node nodes)
     _ -> Nothing
   letShape =
     "{% let … %} (`let` is retired — docs-17; the bounded binding is now {% local … %} … {% endlocal %}, the forward binding is {% set name = … %})"
+
+-- | Rename the MaxBars-surface re-root keyword `scope` to the canonical `with`
+-- | operation head before desugar (ADR-039 item 9). `scope` is pure MaxBars sugar
+-- | for the shared `with` re-root operation — no prelude operation is added — so
+-- | this walk simply rewrites the head, recursing through block bodies. Run only on
+-- | the statement-tag path (`desugarStmt`); RawBars keeps the `with` op-name head.
+renameScope :: Template -> Template
+renameScope = map node
+  where
+  node = case _ of
+    Block sp sig head args body ->
+      Block sp sig (if head == "scope" then "with" else head) args (renameScope body)
+    other -> other
+
+-- | The first re-rooting `{% with … %}` in `nodes` — its offset and a "shape"
+-- | string for the located `DisallowedShape` error (ADR-039 item 9). In MaxBars the
+-- | context re-root is spelled `{% scope … %}`; the `with` head is reserved and
+-- | rejected with a pointer rather than resolving (it would otherwise desugar past
+-- | this gate into the live re-root). RawBars keeps `with` (it is the operation
+-- | name there), so this runs only on the MaxBars `checkBraceControl` path.
+withReRootViolation :: Template -> Maybe { off :: Int, shape :: String }
+withReRootViolation nodes = Array.head (Array.mapMaybe node nodes)
+  where
+  node = case _ of
+    Block sp Section "with" _ _ -> Just { off: sp.start, shape: withShape }
+    Block _ _ _ _ body -> withReRootViolation body
+    _ -> Nothing
+  withShape =
+    "{% with … %} (the context re-root is renamed `scope` — write {% scope … %} … {% endscope %}; `with` is reserved, ADR-039)"
 
 -- | Strip leading `../` runs, counting the parent depth.
 stripParents :: String -> Int -> { depth :: Int, rest :: String }
