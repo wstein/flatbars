@@ -313,7 +313,7 @@ export const cases = [
   {
     id: "partial-in-each",
     template:
-      '{% inline "row" %}<li>{{name}}</li>{% endinline %}{% each items %}{% include "row" %}{% endeach %}',
+      '{% inline "row" %}<li>{{name}}</li>{% endinline %}{% for items %}{% include "row" %}{% endfor %}',
     data: { items: [{ name: "a" }, { name: "b" }] },
   },
   {
