@@ -88,4 +88,11 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
   `NonEmpty` (default, conformance-checked), `Liquid`, `Handlebars`, and host-defined policies
   over foreign types; `truss!(…, truthiness = Mode)`. Zero-cost (monomorphized); the
   non-default policies are out of conformance by construction.
-
+- `17-assign-forward-let.md` — **PROPOSED** `{{assign name = expr}}` — the block-less,
+  forward-scoped sibling of `{{#let}}` (Liquid `assign`, Rust scope). Reuses the `Let` node +
+  `let`-emit (a bare Rust `let` in the current block); stricter than Liquid (no block-leak, no
+  loop accumulators). nonEmpty-family surface; oracle-first.
+- `18-capture-blocks.md` — **PROPOSED** `{{#capture name}}…{{/capture}}` — renders its body once
+  into a pre-escaped `safe` string and binds it forward (the `{{assign}}` scope): a first-class,
+  pipeable value. The one intentional intermediate buffer (docs/05); `safe` type prevents
+  double-escaping. nonEmpty-family surface; oracle-first.
