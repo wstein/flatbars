@@ -643,17 +643,29 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
     | matchAt cs i "{{" = readSeparator i
     | otherwise = Left (LexError "internal: no opener" i)
 
-  -- A left-trim tilde may sit immediately after the braces, before the sigil.
-  leadTrimAt :: Int -> Boolean
-  leadTrimAt i = matchAt cs (i + 2) "~"
+  -- The explicit whitespace-control marker. The Handlebars family spells it `~`
+  -- (`{{~ … ~}}`); the Django/Jinja/Liquid `{% %}` family spells it `-`
+  -- (`{%- … -%}` / `{{- … -}}`, ADR-039 item 3). The two are mutually exclusive by
+  -- dialect — `statementTags` selects which one the scanner trims on — so the `~`
+  -- spelling is simply inert in the statement-tag dialects (the ADR's "`~` not
+  -- adopted"), and `-` is inert (an ordinary operator char) everywhere else.
+  trimMark :: String
+  trimMark = if cfg.statementTags then "-" else "~"
 
-  -- Split a tag interior on leading/trailing `~`, returning (trimL, trimR, core)
+  -- A left-trim marker may sit immediately after the braces, before the sigil.
+  leadTrimAt :: Int -> Boolean
+  leadTrimAt i = matchAt cs (i + 2) trimMark
+
+  -- Split a tag interior on a leading/trailing trim marker, returning
+  -- (trimL, trimR, core). The marker must be *glued* to the delimiter (it is the
+  -- interior's first/last char), so a spaced operator (`{{ a - b }}`, `{{ -x }}`)
+  -- never trims — exactly the Jinja rule.
   splitTrims :: String -> { trimL :: Boolean, trimR :: Boolean, core :: String }
   splitTrims raw =
     let
-      trimL = SCU.take 1 raw == "~"
+      trimL = SCU.take 1 raw == trimMark
       r1 = if trimL then SCU.drop 1 raw else raw
-      trimR = SCU.takeRight 1 r1 == "~"
+      trimR = SCU.takeRight 1 r1 == trimMark
       core = if trimR then SCU.dropRight 1 r1 else r1
     in
       { trimL, trimR, core }

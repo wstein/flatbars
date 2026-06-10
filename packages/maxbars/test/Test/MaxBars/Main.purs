@@ -85,6 +85,28 @@ main = do
     (obj [ Tuple "h" (VString "biscuit") ])
     "K"
 
+  -- Whitespace control (ADR-039 item 3): a `-` *glued* to a brace trims the
+  -- adjacent whitespace (Jinja/Liquid/Django), `{%- … -%}` and `{{- … -}}`. The
+  -- `~` Handlebars marker is not adopted here; a *spaced* `-` stays the subtraction
+  -- operator and never trims (the glued-only rule), so the feature is pure additive
+  -- sugar that no existing template triggers.
+  expectM "ws-stmt-trim-both"
+    "a\n  {%- if on -%}  \nB\n  {%- endif -%}  \nc"
+    (obj [ Tuple "on" (VBool true) ])
+    "aBc"
+  expectM "ws-output-trim-both" "a   {{- x -}}   b" (obj [ Tuple "x" (VString "Z") ]) "aZb"
+  expectM "ws-output-trim-left" "a   {{- x }} b" (obj [ Tuple "x" (VString "Z") ]) "aZ b"
+  expectM "ws-output-trim-right" "a {{ x -}}   b" (obj [ Tuple "x" (VString "Z") ]) "a Zb"
+  -- a spaced `-` is subtraction, not a trim marker — no false positive.
+  expectM "ws-subtraction-untouched" "[ {{ a - b }} ]"
+    (obj [ Tuple "a" (num 9.0), Tuple "b" (num 4.0) ])
+    "[ 5 ]"
+  -- the loop form collapses the per-iteration newlines into a single line.
+  expectM "ws-each-trim"
+    "<ul>\n{%- each i in xs -%}\n<li>{{i}}</li>\n{%- endeach -%}\n</ul>"
+    (obj [ Tuple "xs" (VArray [ num 1.0, num 2.0 ]) ])
+    "<ul><li>1</li><li>2</li></ul>"
+
   -- {{#case}} — the multi-arm conditional (docs/12), desugaring to the {{#if (eq …)}}
   -- chain: subject `eq`-compared to each {{when}} value (OR-chained for a multi-value arm).
   let
