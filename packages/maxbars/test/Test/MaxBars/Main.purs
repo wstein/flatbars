@@ -103,7 +103,7 @@ main = do
     "[ 5 ]"
   -- the loop form collapses the per-iteration newlines into a single line.
   expectM "ws-each-trim"
-    "<ul>\n{%- each i in xs -%}\n<li>{{i}}</li>\n{%- endeach -%}\n</ul>"
+    "<ul>\n{%- for i in xs -%}\n<li>{{i}}</li>\n{%- endfor -%}\n</ul>"
     (obj [ Tuple "xs" (VArray [ num 1.0, num 2.0 ]) ])
     "<ul><li>1</li><li>2</li></ul>"
 

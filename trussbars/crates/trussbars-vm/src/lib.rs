@@ -1292,7 +1292,7 @@ mod tests {
         let d = obj(&[("xs", arr(&[Value::Num(1.0), Value::Num(2.0)]))]);
         assert_eq!(
             render(
-                "<ul>\n{%- each i in xs -%}\n<li>{{i}}</li>\n{%- endeach -%}\n</ul>",
+                "<ul>\n{%- for i in xs -%}\n<li>{{i}}</li>\n{%- endfor -%}\n</ul>",
                 d
             )
             .unwrap(),

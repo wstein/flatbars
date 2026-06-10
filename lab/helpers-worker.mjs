@@ -16,7 +16,7 @@
 import { buildHelpers } from "./helpers.mjs";
 import { buildI18nHelpers, buildTranslator } from "./i18n.mjs";
 import { load as loadYaml } from "./vendor/js-yaml.mjs";
-import { renderWith, renderRawWith, renderMaxWith, renderSurfaceI18n, safe } from "./vendor/flatbars-engine.mjs?v=130";
+import { renderWith, renderRawWith, renderMaxWith, renderSurfaceI18n, safe } from "./vendor/flatbars-engine.mjs?v=131";
 
 // The dialect → operations-aware render entry. MinBars has no helper path (its
 // catalog/`t` are excluded, ADR-029), so it never reaches the worker.
