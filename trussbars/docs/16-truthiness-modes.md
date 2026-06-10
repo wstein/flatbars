@@ -72,14 +72,21 @@ policy (`Option` defers to its inner type *under the same policy*, so `Some("")`
 ## 4. Selecting a policy
 
 ```rust
-truss!(card, Card, "{{#if tags}}…{{/if}}", truthiness = Liquid);
+truss!(card, Card, "{{#if tags}}…{{/if}}", truthiness = Liquid);        // a built-in policy
+truss!(note, Note, "{{#if body}}…{{/if}}", truthiness = self::NonBlank); // a host policy
 ```
 
-The `truthiness = Mode` clause sits alongside `helpers = [..]` (any order). The default is
-`NonEmpty`. An unknown mode is a located class-A `compile_error!` naming the valid modes
-(pinned by `tests/ui/unknown_truthiness.{rs,stderr}`). The choice is per-template and visible
-in the source — the same template compiled with and without the clause renders `[]` as truthy
-or falsy respectively, so a divergence is never silent.
+The `truthiness = Mode` clause sits alongside `helpers = [..]` (any order); the default is
+`NonEmpty`. `Mode` is either a **built-in ident** (`NonEmpty` / `Liquid` / `Handlebars`) or a
+**host policy named by its Rust type path** (`self::NonBlank`, `crate::policies::Foo`): the
+emitter drops the path straight into `truthy_in::<Path, _>`, so a host's own
+`impl TruthyIn<Mode>` (the §2 orphan-rule extension) governs the condition at zero cost. The
+path requirement is the disambiguator — a *lone* identifier must be a built-in, so a typo
+(`truthiness = Mustache`) stays a located class-A `compile_error!` naming the valid modes
+(pinned by `tests/ui/unknown_truthiness.{rs,stderr}`), while a host marker is written as a
+path. The choice is per-template and visible in the source — the same template with and
+without the clause renders `[]` as truthy or falsy respectively, so a divergence is never
+silent.
 
 ## 5. Conformance posture
 
@@ -90,7 +97,8 @@ construction**, exactly like custom helpers (`docs/01` §11). They are gated ins
 
 - `trussbars-core` `TruthyIn<Mode>` unit tests (every policy, including a host-defined marker
   proving the orphan-rule extension);
-- the `truss!(…, truthiness = …)` end-to-end render test;
+- the `truss!(…, truthiness = …)` end-to-end render tests — built-in *and* host-selected-by-path;
+- the emitter unit test that a custom path becomes the `truthy_in::<Path, _>` marker;
 - the unknown-mode `trybuild` golden.
 
 ## 6. Alternatives rejected

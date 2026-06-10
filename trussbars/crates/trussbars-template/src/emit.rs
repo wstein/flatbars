@@ -6,27 +6,28 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, TruthMode, Value, With};
+use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, TruthMode, TruthPolicy, Value, With};
 use crate::parse::parse;
 use crate::span::Span;
 
-impl TruthMode {
+impl TruthPolicy {
     /// The truthiness call for this policy over an already-referenced expression
-    /// (`&(expr)` or a borrowed binding). `NonEmpty` emits the bare `truthy(…)` —
-    /// byte-identical to the v1 emitter, so the conformance corpus is unaffected; a
-    /// non-default policy routes through the monomorphized `truthy_in::<Mode, _>(…)`.
+    /// (`&(expr)` or a borrowed binding). The default `NonEmpty` emits the bare
+    /// `truthy(…)` — byte-identical to the v1 emitter, so the conformance corpus is
+    /// unaffected; every other policy (built-in or host-defined) routes through the
+    /// monomorphized `truthy_in::<Mode, _>(…)`.
     /// (Defined here, in the std-only emit module, since it builds codegen strings; the
-    /// policy enum itself lives in [`crate::ast`] so the `no_std` VM can name it.)
-    fn call(self, ref_expr: &str) -> String {
-        match self {
-            Self::NonEmpty => format!("trussbars_core::truthy({ref_expr})"),
-            Self::Liquid => {
-                format!("trussbars_core::truthy_in::<trussbars_core::Liquid, _>({ref_expr})")
+    /// policy types live in [`crate::ast`] so the `no_std` VM can name [`TruthMode`].)
+    fn call(&self, ref_expr: &str) -> String {
+        let marker = match self {
+            Self::Builtin(TruthMode::NonEmpty) => {
+                return format!("trussbars_core::truthy({ref_expr})");
             }
-            Self::Handlebars => {
-                format!("trussbars_core::truthy_in::<trussbars_core::Handlebars, _>({ref_expr})")
-            }
-        }
+            Self::Builtin(TruthMode::Liquid) => "trussbars_core::Liquid",
+            Self::Builtin(TruthMode::Handlebars) => "trussbars_core::Handlebars",
+            Self::Custom(path) => path,
+        };
+        format!("trussbars_core::truthy_in::<{marker}, _>({ref_expr})")
     }
 }
 
@@ -55,8 +56,9 @@ pub fn emit_named(
     ctx_type: &str,
     src: &str,
     helpers: &[String],
-    mode: TruthMode,
+    mode: impl Into<TruthPolicy>,
 ) -> Result<String, String> {
+    let mode = mode.into();
     // A host cannot declare a built-in block head (`if`/`each`/`case`/…) as a helper —
     // it is shadowed by the parser, so accepting it would silently never fire (docs/12 §5.2).
     if let Some(name) = helpers
@@ -128,7 +130,7 @@ struct Env {
     /// functions. Shared (cheap clone) across the recursive emit.
     helpers: Rc<BTreeSet<String>>,
     /// The truthiness policy this template compiles under (spec §7).
-    mode: TruthMode,
+    mode: TruthPolicy,
 }
 
 impl Env {
@@ -1138,7 +1140,7 @@ fn rust_str(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{TruthMode, emit, emit_named};
+    use super::{TruthMode, TruthPolicy, emit, emit_named};
 
     fn e(src: &str) -> String {
         emit("Ctx", src).unwrap_or_else(|err| panic!("{src:?}: {err}"))
@@ -1217,6 +1219,25 @@ mod tests {
             hbs.contains("trussbars_core::truthy_in::<trussbars_core::Handlebars, _>(&("),
             "{hbs}"
         );
+    }
+
+    #[test]
+    fn custom_policy_emits_the_host_marker_path() {
+        // A host-defined policy is emitted verbatim as the `truthy_in::<Path, _>` marker,
+        // so the host's `impl TruthyIn<MyMode>` governs the condition (docs/16 §2).
+        let out = emit_named(
+            "render",
+            "Ctx",
+            "{{#if flag}}x{{/if}}",
+            &[],
+            TruthPolicy::Custom("self :: NonBlank".into()),
+        )
+        .unwrap();
+        assert!(
+            out.contains("trussbars_core::truthy_in::<self :: NonBlank, _>(&("),
+            "{out}"
+        );
+        assert!(!out.contains("trussbars_core::truthy(&("), "{out}");
     }
 
     #[test]

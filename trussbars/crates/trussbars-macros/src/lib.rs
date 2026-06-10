@@ -183,7 +183,7 @@ fn expand(input: TokenStream) -> Result<TokenStream, String> {
     // The optional trailing clauses — `helpers = [a, b]` (F3) and `truthiness = Mode`
     // (spec §7) — in any order.
     let mut helpers = Vec::new();
-    let mut mode = trussbars_template::TruthMode::NonEmpty;
+    let mut mode = trussbars_template::TruthPolicy::default();
     for group in &groups[3..] {
         match clause_key(group).as_deref() {
             Some("helpers") => helpers = parse_helpers(group)?,
@@ -258,24 +258,47 @@ fn clause_key(group: &[TokenTree]) -> Option<String> {
     }
 }
 
-/// Parse the optional `truthiness = Mode` clause (spec §7) into the policy marker.
-/// `Mode` is a single ident — `NonEmpty` (default), `Liquid`, or `Handlebars`.
-fn parse_truthiness(group: &[TokenTree]) -> Result<trussbars_template::TruthMode, String> {
-    match group {
-        [
-            TokenTree::Ident(kw),
-            TokenTree::Punct(eq),
-            TokenTree::Ident(mode),
-        ] if kw.to_string() == "truthiness" && eq.as_char() == '=' => {
-            let name = mode.to_string();
-            trussbars_template::TruthMode::from_ident(&name).ok_or_else(|| {
-                format!(
-                    "truss!: unknown truthiness mode `{name}` (expected NonEmpty, Liquid, or Handlebars)"
-                )
-            })
+/// Parse the optional `truthiness = Mode` clause (spec §7, `docs/16`) into the policy.
+/// `Mode` is either a built-in policy ident — `NonEmpty` (default), `Liquid`, or
+/// `Handlebars` — or a *host-defined* policy named by a Rust type path (`self::MyMode`,
+/// `crate::policies::Foo`), emitted as the marker of `truthy_in::<Path, _>`. A lone
+/// unknown ident is reported as a typo of a built-in (the common case); anything longer
+/// than one identifier is taken as a host policy path.
+fn parse_truthiness(group: &[TokenTree]) -> Result<trussbars_template::TruthPolicy, String> {
+    use trussbars_template::{TruthMode, TruthPolicy};
+    let rest = match group {
+        [TokenTree::Ident(kw), TokenTree::Punct(eq), rest @ ..]
+            if kw.to_string() == "truthiness" && eq.as_char() == '=' && !rest.is_empty() =>
+        {
+            rest
         }
-        _ => Err("truss!: `truthiness = Mode` needs a single mode identifier".into()),
+        _ => {
+            return Err(
+                "truss!: `truthiness = Mode` needs a built-in mode ident or a host policy path"
+                    .into(),
+            );
+        }
+    };
+    // A lone identifier selects a built-in policy — and a wrong one gets the located
+    // "expected …" hint rather than a confusing downstream trait error. Anything longer
+    // (a `::`-qualified path or generics) is a host-defined marker, emitted verbatim.
+    if let [TokenTree::Ident(mode)] = rest {
+        let name = mode.to_string();
+        return TruthMode::from_ident(&name)
+            .map(TruthPolicy::Builtin)
+            .ok_or_else(|| {
+                format!(
+                    "truss!: unknown truthiness mode `{name}` (expected NonEmpty, Liquid, or \
+                     Handlebars; write a host-defined policy as a path, e.g. `self::MyMode`)"
+                )
+            });
     }
+    // Reconstruct the path via a `TokenStream` rather than `join(" ")`: token-wise
+    // joining would split `::` into `: :` (each colon is a separate `Punct`), so the
+    // stream's own `Display` — which respects `Punct` spacing/jointness — is the correct
+    // way to render a path/generic back to valid Rust.
+    let path = rest.iter().cloned().collect::<TokenStream>().to_string();
+    Ok(TruthPolicy::Custom(path))
 }
 
 /// Parse the optional `helpers = [name, name, …]` clause into the allow-list of

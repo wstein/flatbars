@@ -36,7 +36,7 @@ pub mod parse;
 pub mod parse_expr;
 pub mod span;
 
-pub use ast::{Case, Cond, Each, Expr, Node, TruthMode, Value, With};
+pub use ast::{Case, Cond, Each, Expr, Node, TruthMode, TruthPolicy, Value, With};
 #[cfg(feature = "std")]
 pub use emit::{emit, emit_named};
 pub use lex::{Lexeme, Sigil, lex};

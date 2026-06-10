@@ -186,3 +186,42 @@ fn block_host_helpers_drive_the_body() {
     // `repeat` drives the body closure 3× — the power a pre-rendered body wouldn't have.
     assert_eq!(repeated(&g), "AdaAdaAda");
 }
+
+// A *host-defined* truthiness policy, selected through the macro (docs/16 §2). Because
+// the mode is a type parameter, the host writes `impl TruthyIn<NonBlank>` for its own
+// rule — here "a whitespace-only string is falsy", which no built-in policy offers — and
+// selects it with `truthiness = self::NonBlank` (a path, so a lone built-in typo still
+// gets the located "expected NonEmpty, …" hint).
+struct NonBlank;
+impl trussbars_core::TruthyIn<NonBlank> for String {
+    fn truthy(&self) -> bool {
+        !self.trim().is_empty()
+    }
+}
+struct Banner {
+    title: String,
+}
+truss!(
+    banner,
+    Banner,
+    "{{#if title}}show{{else}}hide{{/if}}",
+    truthiness = self::NonBlank
+);
+
+#[test]
+fn host_defined_policy_selected_through_the_macro() {
+    assert_eq!(banner(&Banner { title: "Hi".into() }), "show");
+    // Whitespace-only is falsy under NonBlank — a rule no built-in policy can express.
+    assert_eq!(
+        banner(&Banner {
+            title: "   ".into()
+        }),
+        "hide"
+    );
+    assert_eq!(
+        banner(&Banner {
+            title: String::new()
+        }),
+        "hide"
+    );
+}

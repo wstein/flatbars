@@ -39,6 +39,32 @@ impl TruthMode {
     }
 }
 
+/// The truthiness policy the **AOT emitter** compiles a template under: either a built-in
+/// [`TruthMode`] marker, or a *host-defined* policy named by its Rust type path
+/// (`truss!(…, truthiness = self::MyMode)`), emitted verbatim as the type argument of
+/// `truthy_in::<Path, _>`. This richer form is AOT-only — a host `TruthyIn<Mode>` impl is
+/// resolved at compile time, so the dynamic VM keeps the closed [`TruthMode`] enum
+/// (`docs/16-truthiness-modes.md`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TruthPolicy {
+    /// One of the three built-in, `trussbars-core`-provided policy markers.
+    Builtin(TruthMode),
+    /// A host-defined marker, named by its Rust type path (e.g. `self::NonBlank`).
+    Custom(String),
+}
+
+impl Default for TruthPolicy {
+    fn default() -> Self {
+        Self::Builtin(TruthMode::NonEmpty)
+    }
+}
+
+impl From<TruthMode> for TruthPolicy {
+    fn from(mode: TruthMode) -> Self {
+        Self::Builtin(mode)
+    }
+}
+
 /// A literal value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

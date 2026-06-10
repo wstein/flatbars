@@ -3,8 +3,8 @@
 
 use trussbars_vm::TruthMode;
 use truthiness_example::{
-    Cart, cart_default, cart_liquid, count_handlebars, count_liquid, empty_cart, non_blank,
-    vm_render,
+    Cart, Note, cart_default, cart_liquid, count_handlebars, count_liquid, empty_cart, non_blank,
+    note_nonblank, vm_render,
 };
 
 fn empty() -> Cart {
@@ -56,4 +56,17 @@ fn host_defined_policy_over_a_foreign_type() {
     assert!(non_blank("hi"));
     assert!(!non_blank("   "));
     assert!(!non_blank(""));
+}
+
+#[test]
+fn host_defined_policy_selected_through_the_macro() {
+    // The same policy, chosen by its path in the `truss!` clause (not just a built-in ident).
+    assert_eq!(note_nonblank(&Note { body: "hi".into() }), "content");
+    assert_eq!(note_nonblank(&Note { body: "   ".into() }), "blank");
+    assert_eq!(
+        note_nonblank(&Note {
+            body: String::new()
+        }),
+        "blank"
+    );
 }

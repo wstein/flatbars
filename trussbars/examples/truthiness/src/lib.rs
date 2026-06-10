@@ -85,16 +85,24 @@ pub fn empty_cart() -> Value {
 }
 
 // ── 3. A host-defined policy over a foreign type (the orphan-rule extension) ───────────
-// `NonBlank` is a *local* marker, so impl'ing the foreign trait `TruthyIn` for the foreign
-// type `str` is allowed — a policy the built-ins don't offer: a whitespace-only string is
-// falsy. This is the "define your own rule, even for std types" capability; it is a
-// library-level (`truthy_in`) facility, not a `truss!` macro clause (which is limited to
-// the built-in policy idents).
+// `NonBlank` is a *local* marker, so impl'ing the foreign trait `TruthyIn` for foreign
+// types (`str`/`String`) is allowed — a policy the built-ins don't offer: a whitespace-only
+// string is falsy. This is the "define your own rule, even for std types" capability, and
+// it is usable at every layer: the library `truthy_in` (below) *and* — selected by its type
+// path — the `truss!(…, truthiness = self::NonBlank)` AOT clause.
 
 /// A host policy in which a string is truthy only when it has non-whitespace content.
 pub struct NonBlank;
 
 impl TruthyIn<NonBlank> for str {
+    fn truthy(&self) -> bool {
+        !self.trim().is_empty()
+    }
+}
+
+// The owned-`String` impl too, so a context *field* (serde deserializes strings as `String`)
+// can sit in a boolean position under this policy via the macro.
+impl TruthyIn<NonBlank> for String {
     fn truthy(&self) -> bool {
         !self.trim().is_empty()
     }
@@ -106,3 +114,20 @@ impl TruthyIn<NonBlank> for str {
 pub fn non_blank(s: &str) -> bool {
     truthy_in::<NonBlank, _>(&s)
 }
+
+/// A one-field context, to show the host policy governing a real template condition.
+pub struct Note {
+    /// The note body — blank (empty *or* whitespace-only) takes the `{{else}}` arm under
+    /// [`NonBlank`], where any non-empty string would be truthy under the built-ins.
+    pub body: String,
+}
+
+// The host policy selected through the macro by its type path — the capability the AOT
+// `truthiness` clause gained: not just the three built-in idents, but any `TruthyIn<Mode>`
+// a host defines. A lone unknown ident still gets the located "expected NonEmpty, …" hint.
+truss!(
+    note_nonblank,
+    Note,
+    "{{#if body}}content{{else}}blank{{/if}}",
+    truthiness = self::NonBlank
+);

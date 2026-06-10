@@ -1,4 +1,4 @@
-error: truss!: unknown truthiness mode `Mustache` (expected NonEmpty, Liquid, or Handlebars)
+error: truss!: unknown truthiness mode `Mustache` (expected NonEmpty, Liquid, or Handlebars; write a host-defined policy as a path, e.g. `self::MyMode`)
  --> tests/ui/unknown_truthiness.rs:5:1
   |
 5 | truss!(render, str, "{{#if name}}x{{/if}}", truthiness = Mustache);
