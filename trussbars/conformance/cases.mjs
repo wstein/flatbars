@@ -3,7 +3,9 @@
 // emitter cannot compile would be recorded in the exclusion ledger (never silently
 // dropped); the corpus currently has none — both emitters cover every case.
 //
-// Data keys are Rust-identifier-safe and numbers are JSON numbers (typed `f64`).
+// Control flow uses the native Django-style `{% … %}` statement tags (docs/19);
+// `{{ … }}` stays the output/interpolation surface. Data keys are
+// Rust-identifier-safe and numbers are JSON numbers (typed `f64`).
 
 export const cases = [
   // ── output & paths ─────────────────────────────────────────────────────────
@@ -23,12 +25,12 @@ export const cases = [
   },
   {
     id: "comparison",
-    template: "{{#if count >= 3}}many ({{count}}){{else}}few{{/if}}",
+    template: "{% if count >= 3 %}many ({{count}}){% else %}few{% endif %}",
     data: { count: 5 },
   },
   {
     id: "logic",
-    template: "{{#if a && b}}both{{else}}no{{/if}}",
+    template: "{% if a && b %}both{% else %}no{% endif %}",
     data: { a: true, b: true },
   },
   {
@@ -48,12 +50,12 @@ export const cases = [
   // ── conditionals ─────────────────────────────────────────────────────────────
   {
     id: "if-else",
-    template: "{{#if active}}on{{else}}off{{/if}}",
+    template: "{% if active %}on{% else %}off{% endif %}",
     data: { active: false },
   },
   {
     id: "unless",
-    template: "{{#unless done}}todo{{/unless}}",
+    template: "{% unless done %}todo{% endunless %}",
     data: { done: false },
   },
 
@@ -61,73 +63,73 @@ export const cases = [
   {
     id: "case-hit",
     template:
-      '{{#case status}}{{when "shipped"}}On its way{{when "pending" "queued"}}Waiting{{else}}Unknown{{/case}}',
+      '{% case status %}{% when "shipped" %}On its way{% when "pending" "queued" %}Waiting{% else %}Unknown{% endcase %}',
     data: { status: "queued" },
   },
   {
     id: "case-else",
     template:
-      '{{#case status}}{{when "shipped"}}On its way{{else}}Unknown{{/case}}',
+      '{% case status %}{% when "shipped" %}On its way{% else %}Unknown{% endcase %}',
     data: { status: "lost" },
   },
   {
     id: "case-no-else-miss",
-    template: "{{#case n}}{{when 1}}one{{when 2}}two{{/case}}",
+    template: "{% case n %}{% when 1 %}one{% when 2 %}two{% endcase %}",
     data: { n: 3 },
   },
   {
     id: "case-standalone",
     template:
-      '{{#case status}}\n{{when "a"}}A\n{{when "b"}}B\n{{else}}Z\n{{/case}}\n',
+      '{% case status %}\n{% when "a" %}A\n{% when "b" %}B\n{% else %}Z\n{% endcase %}\n',
     data: { status: "b" },
   },
   {
     id: "case-numeric-subject",
-    template: "{{#case level}}{{when 1}}low{{when 2 3}}mid{{else}}high{{/case}}",
+    template: "{% case level %}{% when 1 %}low{% when 2 3 %}mid{% else %}high{% endcase %}",
     data: { level: 3 },
   },
   {
     id: "case-nested",
     template:
-      '{{#case outer}}{{when "a"}}A:{{#case inner}}{{when 1}}one{{else}}other{{/case}}{{else}}Z{{/case}}',
+      '{% case outer %}{% when "a" %}A:{% case inner %}{% when 1 %}one{% else %}other{% endcase %}{% else %}Z{% endcase %}',
     data: { outer: "a", inner: 1 },
   },
 
   // ── each & loop metadata ─────────────────────────────────────────────────────
   {
     id: "each-strings",
-    template: "{{#each tags}}#{{this}} {{/each}}",
+    template: "{% each tags %}#{{this}} {% endeach %}",
     data: { tags: ["x", "y", "z"] },
   },
   {
     id: "each-empty",
-    template: "{{#each items}}- {{this}}\n{{else}}(none){{/each}}",
+    template: "{% each items %}- {{this}}\n{% else %}(none){% endeach %}",
     data: { items: [] },
   },
   {
     id: "each-loopmeta",
     template:
-      "{{#each p in people}}{{loop.index1}}. {{p.name}}{{#if loop.last}}!{{/if}} {{/each}}",
+      "{% each p in people %}{{loop.index1}}. {{p.name}}{% if loop.last %}!{% endif %} {% endeach %}",
     data: { people: [{ name: "A" }, { name: "B" }, { name: "C" }] },
   },
   {
     // Object iteration: keys in sorted order, `loop.key` bound. `maps` types the
     // field as a BTreeMap rather than a struct.
     id: "each-object",
-    template: "{{#each prefs}}{{loop.key}} = {{this}}\n{{/each}}",
+    template: "{% each prefs %}{{loop.key}} = {{this}}\n{% endeach %}",
     data: { prefs: { en: "English", de: "German" } },
     maps: ["prefs"],
   },
   {
     id: "with",
-    template: "{{#with user}}{{name}} ({{age}}){{else}}?{{/with}}",
+    template: "{% with user %}{{name}} ({{age}}){% else %}?{% endwith %}",
     data: { user: { name: "Bo", age: 30 } },
   },
   {
     id: "nested-each-root",
     // Param name avoids the blessed-op collision (`t` is the translate operation).
     template:
-      "{{#each team in teams}}{{team.name}} ({{root.org}}): {{#each team.members}}{{this}} {{/each}}\n{{/each}}",
+      "{% each team in teams %}{{team.name}} ({{root.org}}): {% each team.members %}{{this}} {% endeach %}\n{% endeach %}",
     data: {
       org: "Acme",
       teams: [
@@ -159,23 +161,24 @@ export const cases = [
     data: { count: 5 },
   },
 
-  // ── {{#let}} — block-scoped sequential aliases (computed once, never re-roots) ─
+  // ── {% local %} — block-scoped sequential aliases (computed once, never re-roots;
+  //    the bounded binding, docs-17 — `let` is retired) ────────────────────────
   {
-    id: "let-bindings",
+    id: "local-bindings",
     template:
-      "{{#let subtotal=(multiply price qty) tax=(multiply subtotal rate)}}{{qty}} x {{price}} = {{subtotal}}, tax {{tax}}, total {{add subtotal tax}}{{/let}}",
+      "{% local subtotal=(multiply price qty) tax=(multiply subtotal rate) %}{{qty}} x {{price}} = {{subtotal}}, tax {{tax}}, total {{add subtotal tax}}{% endlocal %}",
     data: { price: 20, qty: 3, rate: 0.1 },
   },
 
   // ── list literals `[…]` → a Rust array (homogeneous; rustc enforces) ──────────
   {
     id: "list-each-int",
-    template: "{{#each [1, 2, 3]}}{{this}} {{/each}}",
+    template: "{% each [1, 2, 3] %}{{this}} {% endeach %}",
     data: {},
   },
   {
     id: "list-each-str",
-    template: '{{#each ["a", "b", "c"]}}#{{this}} {{/each}}',
+    template: '{% each ["a", "b", "c"] %}#{{this}} {% endeach %}',
     data: {},
   },
   {
@@ -193,7 +196,8 @@ export const cases = [
   // ── collection filters (ADR-036/037): where/reject/some/every ────────────────
   {
     id: "where-comparator",
-    template: '{{#each (where items "age" "gt" 20)}}{{this.name}} {{/each}}',
+    ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
+    template: '{% each (where items "age" "gt" 20) %}{{this.name}} {% endeach %}',
     data: {
       items: [
         { name: "Ann", age: 30 },
@@ -204,7 +208,8 @@ export const cases = [
   },
   {
     id: "where-truthiness",
-    template: '{{#each (where items "active")}}{{this.name}} {{/each}}',
+    ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
+    template: '{% each (where items "active") %}{{this.name}} {% endeach %}',
     data: {
       items: [
         { name: "Ann", active: true },
@@ -214,7 +219,8 @@ export const cases = [
   },
   {
     id: "reject-truthiness",
-    template: '{{#each (reject items "active")}}{{this.name}} {{/each}}',
+    ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
+    template: '{% each (reject items "active") %}{{this.name}} {% endeach %}',
     data: {
       items: [
         { name: "Ann", active: true },
@@ -224,13 +230,14 @@ export const cases = [
   },
   {
     id: "where-startswith",
-    template: '{{#each (where items "name" "startsWith" "A")}}{{this.name}} {{/each}}',
+    ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
+    template: '{% each (where items "name" "startsWith" "A") %}{{this.name}} {% endeach %}',
     data: { items: [{ name: "Ann" }, { name: "Bo" }, { name: "Al" }] },
   },
   {
     id: "some-every",
     template:
-      "{{#if (some items \"active\")}}some {{/if}}{{#if (every items \"active\")}}all{{else}}not-all{{/if}}",
+      "{% if (some items \"active\") %}some {% endif %}{% if (every items \"active\") %}all{% else %}not-all{% endif %}",
     data: {
       items: [
         { active: true },
@@ -239,20 +246,22 @@ export const cases = [
     },
   },
   {
-    // find → Option, unwrapped by an Option-aware {{#with}} (hit / miss) and read
-    // by {{#if}} (truthiness of the Option).
+    // find → Option, unwrapped by an Option-aware {% with %} (hit / miss) and read
+    // by {% if %} (truthiness of the Option).
     id: "find-with-hit",
-    template: '{{#with (find items "name" "eq" "Bo")}}{{age}}{{else}}none{{/with}}',
+    ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
+    template: '{% with (find items "name" "eq" "Bo") %}{{age}}{% else %}none{% endwith %}',
     data: { items: [{ name: "Ann", age: 30 }, { name: "Bo", age: 17 }] },
   },
   {
     id: "find-with-miss",
-    template: '{{#with (find items "name" "eq" "Zz")}}{{age}}{{else}}none{{/with}}',
+    ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
+    template: '{% with (find items "name" "eq" "Zz") %}{{age}}{% else %}none{% endwith %}',
     data: { items: [{ name: "Ann", age: 30 }, { name: "Bo", age: 17 }] },
   },
   {
     id: "find-if",
-    template: '{{#if (find items "age" "gt" 99)}}has{{else}}no{{/if}}',
+    template: '{% if (find items "age" "gt" 99) %}has{% else %}no{% endif %}',
     data: { items: [{ name: "Ann", age: 30 }] },
   },
 
@@ -260,13 +269,13 @@ export const cases = [
   {
     id: "loop-parent",
     template:
-      "{{#each row in rows}}{{#each row}}{{loop.parent.index0}}:{{this}} {{/each}}{{/each}}",
+      "{% each row in rows %}{% each row %}{{loop.parent.index0}}:{{this}} {% endeach %}{% endeach %}",
     data: { rows: [["a", "b"], ["c"]] },
   },
   {
     id: "loop-root",
     template:
-      "{{#each g in groups}}{{#each g}}{{loop.root.length}}/{{this}} {{/each}}{{/each}}",
+      "{% each g in groups %}{% each g %}{{loop.root.length}}/{{this}} {% endeach %}{% endeach %}",
     data: { groups: [["x"], ["y", "z"]] },
   },
 
@@ -274,7 +283,7 @@ export const cases = [
   {
     id: "parent-context",
     template:
-      "{{#each team in teams}}{{#each team.members}}{{parent.name}}={{this}} {{/each}}{{/each}}",
+      "{% each team in teams %}{% each team.members %}{{parent.name}}={{this}} {% endeach %}{% endeach %}",
     data: {
       teams: [
         { name: "T1", members: ["a", "b"] },
@@ -298,18 +307,18 @@ export const cases = [
   // ── partials (inline definitions, inlined at the call site) ──────────────────
   {
     id: "partial-simple",
-    template: '{{#inline "greet"}}Hello {{name}}!{{/inline}}{{> greet}}',
+    template: '{% inline "greet" %}Hello {{name}}!{% endinline %}{{> greet}}',
     data: { name: "World" },
   },
   {
     id: "partial-in-each",
     template:
-      '{{#inline "row"}}<li>{{name}}</li>{{/inline}}{{#each items}}{{> row}}{{/each}}',
+      '{% inline "row" %}<li>{{name}}</li>{% endinline %}{% each items %}{{> row}}{% endeach %}',
     data: { items: [{ name: "a" }, { name: "b" }] },
   },
   {
     id: "partial-context",
-    template: '{{#inline "card"}}[{{title}}]{{/inline}}{{> card section}}',
+    template: '{% inline "card" %}[{{title}}]{% endinline %}{{> card section}}',
     data: { section: { title: "Intro" } },
   },
 
@@ -317,7 +326,7 @@ export const cases = [
   {
     id: "outer-label",
     template:
-      "{{#each row in rows label outer}}{{#each row}}{{outer.index1}}:{{this}} {{/each}}{{/each}}",
+      "{% each row in rows label outer %}{% each row %}{{outer.index1}}:{{this}} {% endeach %}{% endeach %}",
     data: { rows: [["a", "b"], ["c"]] },
   },
   {
@@ -330,7 +339,7 @@ export const cases = [
   {
     id: "block-partial",
     template:
-      '{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}',
+      '{% inline "card" %}<div>{{yield}}</div>{% endinline %}{% partial "card" %}{{name}}{% endpartial %}',
     data: { name: "Ann & Bo" },
   },
 
@@ -344,8 +353,9 @@ export const cases = [
   // ── groupBy → a map, iterated (group key via loop.key, group via this) ───────
   {
     id: "group-by",
+    ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
     template:
-      '{{#each (groupBy items "kind")}}{{loop.key}}:{{#each this}}{{name}}{{/each}} {{/each}}',
+      '{% each (groupBy items "kind") %}{{loop.key}}:{% each this %}{{name}}{% endeach %} {% endeach %}',
     data: {
       items: [
         { kind: "b", name: "x" },
@@ -371,7 +381,7 @@ export const cases = [
   },
   {
     id: "enum-truthy",
-    template: "{{#if status}}set{{else}}unset{{/if}}: {{status}}",
+    template: "{% if status %}set{% else %}unset{% endif %}: {{status}}",
     data: { status: "Active" },
     enums: { status: ["Active", "Pending"] },
   },
@@ -387,7 +397,7 @@ export const cases = [
     // deep nesting: each → if → nested each, with a deep path and a `root` reach.
     id: "deep-nesting",
     template:
-      "{{#each row in rows}}{{#if row.on}}[{{row.meta.lbl}}/{{root.tag}}:{{#each n in row.ns}}{{n}}{{/each}}]{{/if}}{{/each}}",
+      "{% each row in rows %}{% if row.on %}[{{row.meta.lbl}}/{{root.tag}}:{% each n in row.ns %}{{n}}{% endeach %}]{% endif %}{% endeach %}",
     data: {
       tag: "T",
       rows: [
@@ -404,22 +414,22 @@ export const cases = [
   // oracle) byte-for-byte — the rule the example apps' multi-line templates need.
   {
     id: "standalone-each",
-    template: "items:\n{{#each xs}}\n- {{this}}\n{{/each}}\ndone\n",
+    template: "items:\n{% each xs %}\n- {{this}}\n{% endeach %}\ndone\n",
     data: { xs: ["a", "b"] },
   },
   {
     id: "standalone-if-else",
-    template: "a\n{{#if on}}\nyes\n{{else}}\nno\n{{/if}}\nb\n",
+    template: "a\n{% if on %}\nyes\n{% else %}\nno\n{% endif %}\nb\n",
     data: { on: false },
   },
   {
     id: "standalone-indented",
-    template: "<ul>\n  {{#each xs}}\n  <li>{{this}}</li>\n  {{/each}}\n</ul>\n",
+    template: "<ul>\n  {% each xs %}\n  <li>{{this}}</li>\n  {% endeach %}\n</ul>\n",
     data: { xs: ["x"] },
   },
   {
     id: "standalone-not-when-inline",
-    template: "{{#each xs}}{{this}} {{/each}}\n",
+    template: "{% each xs %}{{this}} {% endeach %}\n",
     data: { xs: ["a", "b"] },
   },
 
@@ -429,27 +439,32 @@ export const cases = [
   // from a dynamic map). Field types are inferred at instantiation.
   {
     id: "dict-with-literal",
-    template: "{{#with {name: \"Ann\", age: 30}}}{{name}} is {{age}}{{/with}}",
+    ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
+    template: "{% with {name: \"Ann\", age: 30} %}{{name}} is {{age}}{% endwith %}",
     data: {},
   },
   {
     id: "dict-call-form",
-    template: '{{#with (dict "a" 1)}}{{a}}{{/with}}',
+    ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
+    template: '{% with (dict "a" 1) %}{{a}}{% endwith %}',
     data: {},
   },
   {
-    id: "dict-let-literal",
-    template: "{{#let cfg={theme: \"dark\", size: 12}}}{{cfg.theme}}/{{cfg.size}}{{/let}}",
+    id: "dict-local-literal",
+    ctxFromData: true, // inference gap: with-into-dict re-root mis-hoists root fields (docs/03 §Not-yet)
+    template: "{% local cfg={theme: \"dark\", size: 12} %}{{cfg.theme}}/{{cfg.size}}{% endlocal %}",
     data: {},
   },
   {
     id: "dict-path-value",
-    template: "{{#with {who: name}}}hi {{who}}{{/with}}",
+    ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
+    template: "{% with {who: name} %}hi {{who}}{% endwith %}",
     data: { name: "Zed" },
   },
   {
     id: "dict-nested",
-    template: "{{#with {a: {b: 1}}}}{{a.b}}{{/with}}",
+    ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
+    template: "{% with {a: {b: 1}} %}{{a.b}}{% endwith %}",
     data: {},
   },
 ];
