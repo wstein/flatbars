@@ -13,6 +13,7 @@
     "check:isolation": "node scripts/check-package-isolation.mjs",
     "check:glossary": "node scripts/check-glossary.mjs",
     "examples:verify": "spago build -p flatbars-cli && spago run -p flatbars-cli -- examples verify",
+    "infer": "spago build -p flatbars-js && node trussbars/conformance/infer.mjs",
     "gen:tokens": "node scripts/gen-tokens.mjs",
     "check:tokens": "node scripts/gen-tokens.mjs --check",
     "gen:cachebust": "node scripts/check-lab-cachebust.mjs --write",

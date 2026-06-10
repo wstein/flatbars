@@ -24,7 +24,7 @@
 //   • Operators are infix and spaced: `{{price * qty}}`, `{{qty >= 1}}`, and the
 //     pipe `{{name | uppercase}}` feeds the left value as the helper's first arg.
 //   • Loop variables are BARE under `loop.` — `loop.index0/index1/first/last/
-//     length/key/rindex0` — never @-prefixed. Context climbs with `parent`
+//     length/key/rindex0/depth` — never @-prefixed. Context climbs with `parent`
 //     (chainable) and `root`, never `../` or `@root`.
 //   • A clause-separator condition MUST be parenthesised: `{% else if (gte n 1) %}`.
 //     A bare infix separator parses but silently takes the wrong branch.
@@ -289,6 +289,25 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
       sections: [
         { title: "Fruit", items: ["Pear", "Plum"] },
         { title: "Veg", items: ["Leek"] },
+      ],
+    },
+  },
+
+  loopDepth: {
+    engine: "maxbars",
+    label: "Advanced — Nesting depth (loop.depth)",
+    // `{{loop.depth}}` is the 1-based loop-nesting level: the outermost {% each %}
+    // is 1, a loop nested directly inside it is 2, and so on. `loop.parent.depth`
+    // is the enclosing loop's. Unlike `label`, it needs no clause — handy for
+    // indentation in a nested/tree render.
+    compiles: true,
+    template: `{% each node in outline %}{{loop.depth}}. {{node.name}}
+{% each child in node.children %}  {{loop.depth}}.{{loop.index1}} {{child}}
+{% endeach %}{% endeach %}`,
+    data: {
+      outline: [
+        { name: "Fruit", children: ["Pear", "Plum"] },
+        { name: "Veg", children: ["Leek"] },
       ],
     },
   },

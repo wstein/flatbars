@@ -180,6 +180,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "loopDepth",
+    "label": "Advanced — Nesting depth (loop.depth)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "partials",
     "label": "Advanced — External partials: per-row & dynamic",
     "group": "Examples",

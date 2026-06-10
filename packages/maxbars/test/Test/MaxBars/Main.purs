@@ -21,8 +21,9 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
+import MaxBars (compileMaxJs, inferMax, inferMaxData, maxbarsWarnings, renderMax)
 import MaxBars.Compat (compatReportWith)
+import MaxBars.Rust (compileMaxRust)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -285,6 +286,29 @@ main = do
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "xy"
   expectM "loopvars-key-array-null" "{% each xs %}[{{loop.key}}]{% endeach %}" xs3 "[][][]"
+  -- `loop.depth` (ADR-021 amendment): the 1-based loop-nesting level. An outermost
+  -- loop is depth 1.
+  expectM "loopvars-depth-outer" "{% each xs %}{{loop.depth}}{% endeach %}" xs3 "111"
+  -- a loop nested directly inside another is depth 2; the outer stays depth 1.
+  let
+    grid = obj
+      [ Tuple "rows"
+          (VArray [ VArray [ VString "a", VString "b" ], VArray [ VString "c" ] ])
+      ]
+  expectM "loopvars-depth-nested"
+    "{% each rows %}{{loop.depth}}{% each this %}{{loop.depth}}{% endeach %}{% endeach %}"
+    grid
+    "12212"
+  -- the enclosing loop's depth is reached through the chain — `loop.parent.depth`
+  -- of an inner loop is its outer loop's depth (1).
+  expectM "loopvars-parent-depth"
+    "{% each rows %}{% each this %}{{loop.parent.depth}}{% endeach %}{% endeach %}"
+    grid
+    "111"
+  -- at the outermost loop, `loop.parent` is absent, so `loop.parent.depth` renders
+  -- empty (like every other `loop.parent.*` field).
+  expectM "loopvars-parent-depth-root" "{% each xs %}[{{loop.parent.depth}}]{% endeach %}" xs3
+    "[][][]"
   -- a data field named `first` is read with an explicit path; `loop.first` is the
   -- loop variable (the names never collide — one is `loop.`-namespaced).
   expectM "loopvar-data-field" "{% each xs %}{{this.first}}{% endeach %}"
@@ -341,6 +365,23 @@ main = do
     Left e -> assert' ("compile loopvar: unexpected error " <> show e) false
     Right js -> assert' ("compile loopvar: expected rt.call(\"loop\" in\n" <> js)
       (contains (Pattern "rt.call(\"loop\"") js)
+
+  -- the Trussbars (Rust) backend emits `loop.depth` as the `Loop::at` frame's
+  -- `.depth` field, and `loop.parent.depth` through the borrowed-`parent` chain
+  -- (ADR-021 amendment). The frame's nesting is the `Some(&outer)` parent link, so
+  -- `Loop::at` derives the depth — no extra codegen at the access site.
+  let
+    rustDepth =
+      compileMaxRust "Ctx"
+        "{% each g in groups %}{{loop.depth}}{% each x in g %}{{loop.parent.depth}}{% endeach %}{% endeach %}"
+  assert' ("compile loop.depth (Rust): emit failed — " <> rustDepth.err) rustDepth.ok
+  assert' ("compile loop.depth (Rust): expected `.depth` field access in\n" <> rustDepth.out)
+    (contains (Pattern ".depth") rustDepth.out)
+  assert'
+    ( "compile loop.parent.depth (Rust): expected parent-chain `.map(|__p| __p.depth)` in\n" <>
+        rustDepth.out
+    )
+    (contains (Pattern "__p.depth") rustDepth.out)
 
   -- MaxBars also rejects the Handlebars-only shapes (not the Handlebars-compat
   -- dialect): inverse {{^}}, unescaped {{&}}, and raw blocks {{{{}}}}.
@@ -690,5 +731,81 @@ main = do
     (obj [ Tuple "name" (VString "A") ])
     false
     [ "aot-structural" ]
+
+  log "MaxBars schema inference (docs/03 L1 — the §9 worked example)"
+  let
+    teamsTpl =
+      "{% each team in teams %}\n{{team.name}} ({{root.org}}):\n{% each m in team.members %}\n  {{loop.index1}}. {{m | uppercase}}{% if loop.last %} (last){% endif %} — {{parent.name}}\n{% endeach %}\n{% endeach %}"
+    schemaOf src = case inferMax src of
+      Left e -> "ERR: " <> e
+      Right r -> r.schema
+    hasS nm src needle = assert'
+      (nm <> ": schema should contain " <> show needle <> "\n--- got ---\n" <> schemaOf src)
+      (contains (Pattern needle) (schemaOf src))
+  hasS "infer:ctx-struct" teamsTpl "struct Ctx"
+  hasS "infer:teams-vec-team" teamsTpl "teams: Vec<Team>"
+  hasS "infer:org-string" teamsTpl "org: String"
+  hasS "infer:team-struct" teamsTpl "struct Team"
+  hasS "infer:members-vec-string" teamsTpl "members: Vec<String>"
+  hasS "infer:name-string" teamsTpl "name: String"
+
+  let
+    whereTpl = "{% each u in users %}{{u.name}}{% endeach %}{{ users | where \"active\" }}"
+    mapTpl = "{% each v in settings %}{{loop.key}}={{v}}{% endeach %}"
+    optTpl = "{% if user.bio %}{{user.bio}}{% else %}none{% endif %}"
+    letTpl = "{% local greeting=(append \"Hi \" name) %}{{greeting}}{% endlocal %}"
+    lacksS nm src needle = assert'
+      (nm <> ": schema should NOT contain " <> show needle <> "\n--- got ---\n" <> schemaOf src)
+      (not (contains (Pattern needle) (schemaOf src)))
+  hasS "infer:where-elem-vec" whereTpl "Vec<User>"
+  hasS "infer:where-field" whereTpl "active"
+  hasS "infer:map-iter-btree" mapTpl "BTreeMap<String,"
+  hasS "infer:if-else-option" optTpl "Option<String>"
+  hasS "infer:let-value-pins-name" letTpl "name: String"
+  lacksS "infer:let-shadows-greeting" letTpl "greeting"
+
+  -- data-observed refinement (§2): a bare {{count}} defaults to String, but a
+  -- sample {count: 5} refines it to f64.
+  let
+    schemaOfD samples src = case inferMaxData samples src of
+      Left e -> "ERR: " <> e
+      Right r -> r.schema
+    hasSD nm samples src needle = assert'
+      ( nm <> ": schema should contain " <> show needle <> "\n--- got ---\n" <> schemaOfD samples
+          src
+      )
+      (contains (Pattern needle) (schemaOfD samples src))
+  hasS "infer:no-data-defaults-string" "{{count}}" "count: String"
+  hasSD "infer:data-refines-number" [ obj [ Tuple "count" (num 5.0) ] ] "{{count}}" "count: f64"
+
+  -- == coupling: a path compared to a literal is pinned to the literal's type.
+  let
+    eqTpl = "{% if status == \"active\" %}on{% endif %}"
+    -- partial-context coupling: {{> card item}} infers `item`'s fields from card's body.
+    partialTpl =
+      "{% inline \"card\" %}{{name}}: {{price}}{% endinline %}{% each item in items %}{{> card item}}{% endeach %}"
+  hasS "infer:eq-literal-pins-string" eqTpl "status: String"
+  hasS "infer:partial-couples-vec" partialTpl "Vec<Item>"
+  hasS "infer:partial-couples-name" partialTpl "name: String"
+  hasS "infer:partial-couples-price" partialTpl "price: String"
+
+  -- §5 enum: {% case x.kind %}{% when … %} ⇒ a #[serde(tag)] enum; variants from
+  -- the when-literals, unioned with data-observed tag values.
+  let
+    enumTpl =
+      "{% each shape in shapes %}{% case shape.kind %}{% when \"circle\" %}o{% when \"square\" %}x{% endcase %}{% endeach %}"
+  hasS "infer:enum-vec" enumTpl "Vec<Shape>"
+  hasS "infer:enum-serde-tag" enumTpl "tag = \"kind\""
+  hasS "infer:enum-variant-circle" enumTpl "Circle"
+  hasS "infer:enum-variant-square" enumTpl "Square"
+  hasSD "infer:enum-data-union-triangle"
+    [ obj [ Tuple "shapes" (VArray [ obj [ Tuple "kind" (VString "triangle") ] ]) ] ]
+    enumTpl
+    "Triangle"
+  -- a bare `{% case status %}` (not over a collection element) is a plain value
+  -- switch ⇒ status: String, NOT a tagged enum.
+  let bareCaseTpl = "{% case status %}{% when \"a\" %}x{% when \"b\" %}y{% endcase %}"
+  hasS "infer:bare-case-is-string" bareCaseTpl "status: String"
+  lacksS "infer:bare-case-not-enum" bareCaseTpl "enum"
 
   log "all MaxBars tests passed"

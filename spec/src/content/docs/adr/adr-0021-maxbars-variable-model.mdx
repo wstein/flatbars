@@ -42,6 +42,30 @@ operations do (iterate / re-root-alias / alias); a removed-form mistake — a tr
 `{{#each … as …}}` — is a located error, not a silent no-op (`checkSurfaceStrict`,
 MaxBars path).
 
+*Amendment (2026-06-10).* The deferred **`loop.depth`** (the last Open question, below)
+is resolved **adopted**, as a full peer of the existing loop fields — bare `{{{depth}}}`
+(RawBars), bare `{{depth}}` (MaxBars), `loop.depth`, and the chained `loop.parent.depth`
+(the enclosing loop's depth) all resolve, exactly like `index0`/`length`/`key`. Semantics:
+
+* **`depth` is the loop-nesting level, 1-based** — the outermost `{{#each}}` is `depth` 1,
+  a loop nested directly inside it is `depth` 2, and so on. It counts enclosing *loop*
+  frames (a `{{#with}}`/`{{#if}}` between two loops does not increment it — the same
+  chain-skipping the `loop.parent` link already uses). Definitionally `loop.depth` =
+  `loop.parent.depth + 1`, with the outermost loop's `loop.parent` being absent (so
+  `loop.parent.depth` renders `""`/`None` there, like every other `loop.parent.*` field).
+* **It is undefined outside a loop**, like every loop variable: bare `{{depth}}` with no
+  enclosing `each` is an ordinary data path (or `null`), and `loop` itself is null.
+* **Derivation, not state.** Each frame model computes it from its enclosing-loop link —
+  the interpreter from the read-once `enclosingLoop` (`Kernel.Prelude.iterate`), the JS
+  runtime from `parent.binds.loop.depth` (`childFrame`), the Trussbars AOT backend from the
+  borrowed `parent` (`Loop::at` → `parent.map_or(0, |p| p.depth) + 1`), and the Trussbars
+  VM from its `Rc`-linked `LoopFrame` parent (the same `parent.depth + 1`). The AOT and VM
+  hold *separate* loop-metadata representations, kept byte-identical by the conformance
+  harness's AOT≡VM axis — so `depth` is added to each but verified as one.
+* **Shadowing.** Like `first`/`last`/`key`/`length`, a same-named data field `depth` is
+  shadowed inside a loop body; the escape is the explicit `{{lookup this "depth"}}` — the
+  documented `Con` of this model, unchanged.
+
 ## Context
 
 Three things converged to make the loop/context vocabulary worth redesigning:
@@ -202,4 +226,6 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
 
 * Exact error text for `@` / `../` in MaxBars (point at `root`/`parent`/`loop`).
 * `parent` at the *top level* (no enclosing context): propose `null`; `root` is always available.
-* Whether to expose `loop.depth` (nesting depth) — *defer* to a follow-up.
+* ~~Whether to expose `loop.depth` (nesting depth) — *defer* to a follow-up.~~ **Resolved
+  (2026-06-10): adopted** as a 1-based loop-nesting field, a peer of the other loop variables.
+  See the *Amendment (2026-06-10)* above.

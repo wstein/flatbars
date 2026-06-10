@@ -1,0 +1,3 @@
+{% each sections %}{{this.title}}
+{% each this.items %}{% each this.notes %}{{loop.depth}}/{{loop.parent.depth}}/{{loop.parent.parent.depth}} {{this}}
+{% endeach %}{% endeach %}{% endeach %}

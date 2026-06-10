@@ -169,6 +169,7 @@ pub struct Loop<'p> {
     pub first: bool,
     pub last: bool,
     pub length: usize,
+    pub depth: usize,                  // 1-based loop-nesting level (parent.depth + 1)
     pub key: Option<&'p str>,          // Some(k) for map iteration, None for Vec
     pub parent: Option<&'p Loop<'p>>,  // nearest enclosing loop
 }
@@ -186,6 +187,7 @@ impl<'p> Loop<'p> {
 construction (`loop.root` of the outermost loop is the loop itself).
 
 - `{{loop.index1}}` → `cur_loop.index1`. `{{loop.last}}` → `cur_loop.last`.
+- `{{loop.depth}}` → `cur_loop.depth` (1 at the outermost loop; `loop.parent.depth` is the enclosing loop's).
 - `{{loop.parent.index0}}` → `cur_loop.parent.unwrap().index0` (the chain is borrowed refs).
 - `{{loop.root.length}}` → `cur_loop.root().length`.
 - `{{loop.key}}` → `cur_loop.key` (only present for map iteration).

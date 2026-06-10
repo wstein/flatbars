@@ -263,6 +263,7 @@ const t = (s) => s;
         <tr><td><span class="code">{t("first")}</span> / <span class="code">{t("last")}</span></td><td><span class="code">true</span> on the first / last element</td></tr>
         <tr><td><span class="code">{t("length")}</span></td><td>the collection's length</td></tr>
         <tr><td><span class="code">{t("key")}</span></td><td>the property name when iterating an object</td></tr>
+        <tr><td><span class="code">{t("depth")}</span></td><td>the 1-based loop-nesting level (outermost loop = 1)</td></tr>
       </tbody>
     </table>
     <p>
@@ -332,6 +333,15 @@ const t = (s) => s;
       <code>{t("{{#each r in (rows | reverse)}}")}</code>.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.loopParams.template} data={ex.loopParams.data} />
+    <h3>Nesting depth — <code>loop.depth</code></h3>
+    <p>
+      <code>{t("{{loop.depth}}")}</code> is the <b>1-based loop-nesting level</b>: the outermost
+      <code>{t("{{#each}}")}</code> is <code>1</code>, a loop nested directly inside it is <code>2</code>,
+      and so on. It counts enclosing <em>loops</em> only (a <code>{t("{{#with}}")}</code>/<code>{t("{{#if}}")}</code>
+      between two loops does not bump it), and <code>{t("loop.parent.depth")}</code> is the enclosing loop's —
+      handy for indentation in a nested or tree render. Unlike <code>{t("label NAME")}</code> it needs no clause.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.loopDepth.template} data={ex.loopDepth.data} />
     <h3>The empty case</h3>
     <p><code>{t("{{#each}}")}</code> carries its own <code>{t("{{else}}")}</code> for an empty list — inherited from ClassicBars.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.eachElse.template} data={ex.eachElse.data} />

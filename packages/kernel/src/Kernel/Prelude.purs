@@ -480,7 +480,7 @@ scopedSpecs =
     , block: false
     , arity: Exactly 0
     , doc:
-        "The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length, plus the chain links loop.parent (the enclosing loop) and loop.root."
+        "The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length/depth, plus the chain links loop.parent (the enclosing loop) and loop.root."
     }
   , { name: "index", block: false, arity: Exactly 0, doc: "The current loop item's 0-based index." }
   , { name: "key"
@@ -518,6 +518,11 @@ scopedSpecs =
     , block: false
     , arity: Exactly 0
     , doc: "The number of items in the current loop."
+    }
+  , { name: "depth"
+    , block: false
+    , arity: Exactly 0
+    , doc: "The 1-based loop-nesting level (outermost loop = 1; a directly nested loop = 2)."
     }
   -- The enclosing loop's fields are reached through the `loop` chain
   -- (`loop.parent.index0`, `loop.parent.key`, …); the flat `parent-index`/
@@ -596,6 +601,7 @@ loopFieldCanonical =
   , Tuple "key" "key"
   , Tuple "length" "length"
   , Tuple "size" "length"
+  , Tuple "depth" "depth"
   ]
 
 -- | The names of the prelude's *block* helpers (`d.block`), projected from
@@ -1582,6 +1588,15 @@ iterate ctl names items = do
   let
     main = mainBody ctl
     n = Array.length items
+    -- the 1-based loop-nesting depth (ADR-021 amendment): the enclosing loop's
+    -- `depth` + 1, or 1 when this loop is outermost. Read once from the enclosing
+    -- `loop` object — the same chain-skipping `loop.parent` uses, so a `with`
+    -- between two loops does not increment it.
+    thisDepth = case enclosingLoop of
+      VObject m -> case Map.lookup "depth" m of
+        Just (VNumber d) -> d + 1.0
+        _ -> 1.0
+      _ -> 1.0
     -- block params bind, in order, the element value, its index/key, and the
     -- 1-based index (`as elem index index1`). `zipWith` truncates to the names
     -- given, so `as a` binds one, `as a i` two, `as a i j` three.
@@ -1599,6 +1614,7 @@ iterate ctl names items = do
       , Tuple "last" (VBool (i == n - 1))
       , Tuple "length" (VNumber (Int.toNumber n))
       , Tuple "key" key
+      , Tuple "depth" (VNumber thisDepth)
       ]
     -- the outermost loop's object, a *shallow* snapshot (no `parent`/`root`) so the
     -- `loop.root` chain terminates without a cycle.
@@ -1645,6 +1661,7 @@ iterate ctl names items = do
             , Tuple "rindex0" (constOperation (VNumber (Int.toNumber (n - 1 - i))))
             , Tuple "rindex1" (constOperation (VNumber (Int.toNumber (n - i))))
             , Tuple "length" (constOperation (VNumber (Int.toNumber n)))
+            , Tuple "depth" (constOperation (VNumber thisDepth))
             ] <> binds i val idx <> loopBinds i val key
           )
       in

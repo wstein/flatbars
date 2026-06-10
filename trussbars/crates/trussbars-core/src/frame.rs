@@ -31,6 +31,12 @@ pub struct Loop<'p> {
     pub last: bool,
     /// Total number of items being iterated.
     pub length: usize,
+    /// The 1-based loop-nesting level (`loop.depth`, ADR-021 amendment): the
+    /// outermost loop is `1`, a loop nested directly inside it is `2`, and so on.
+    /// Definitionally `parent.depth + 1`, counting enclosing *loop* frames only
+    /// (a `{{#with}}`/`{{#if}}` between two loops does not increment it, since it
+    /// introduces no [`Loop`]).
+    pub depth: usize,
     /// The entry key, for map iteration; `None` for array iteration.
     pub key: Option<&'p str>,
     /// The nearest enclosing loop, if any.
@@ -63,6 +69,9 @@ impl<'p> Loop<'p> {
             first: index == 0,
             last: index + 1 == length,
             length,
+            // 1-based nesting depth, derived from the borrowed enclosing loop —
+            // no extra state. Mirrors the interpreter's `enclosingLoop.depth + 1`.
+            depth: parent.map_or(0, |p| p.depth) + 1,
             key,
             parent,
         }
@@ -96,6 +105,8 @@ mod tests {
         assert_eq!(l.length, 3);
         assert_eq!(l.key, None);
         assert!(l.parent.is_none());
+        // an outermost loop is depth 1.
+        assert_eq!(l.depth, 1);
     }
 
     #[test]
@@ -157,5 +168,17 @@ mod tests {
     fn root_of_the_outermost_loop_is_itself() {
         let a = Loop::at(0, 1, None, None);
         assert!(std::ptr::eq(a.root(), &a));
+    }
+
+    #[test]
+    fn depth_counts_loop_nesting_one_based() {
+        let a = Loop::at(0, 1, None, None);
+        let b = Loop::at(0, 1, None, Some(&a));
+        let c = Loop::at(0, 1, None, Some(&b));
+        assert_eq!(a.depth, 1);
+        assert_eq!(b.depth, 2);
+        assert_eq!(c.depth, 3);
+        // `loop.parent.depth` is the enclosing loop's depth.
+        assert_eq!(c.parent.map(|p| p.depth), Some(2));
     }
 }

@@ -212,6 +212,7 @@ function scope(data, truthyFn, yieldName) {
   return {
     ctx: data ?? null, index: null, key: null, first: null, last: null,
     index0: null, index1: null, rindex0: null, rindex1: null, length: null,
+    depth: null,
     parent: null,
     root: data ?? null,
     // scoped bindings (block params + loop labels). A null-proto object so the
@@ -231,6 +232,11 @@ function scope(data, truthyFn, yieldName) {
 // Arithmetic mirrors the interpreter's `iterate` so the two paths never drift.
 function childFrame(parent, ctx, index, key, first, last, len) {
   const inLoop = index !== null && index !== undefined;
+  // the 1-based loop-nesting depth (ADR-021 amendment): the enclosing loop's depth
+  // + 1, 1 at the outermost loop. The enclosing `loop` object is read through the
+  // binds prototype chain (so a `with` between two loops is skipped), mirroring the
+  // interpreter's read-once `enclosingLoop`.
+  const encLoop = parent.binds && parent.binds.loop;
   return {
     ctx, index, key, first, last,
     index0: inLoop ? index : null,
@@ -238,6 +244,7 @@ function childFrame(parent, ctx, index, key, first, last, len) {
     rindex0: inLoop ? len - 1 - index : null,
     rindex1: inLoop ? len - index : null,
     length: inLoop ? len : null,
+    depth: inLoop ? ((encLoop ? encLoop.depth : 0) + 1) : null,
     parent: parent.ctx,
     root: parent.root,
     // inherit the enclosing frame's scoped bindings (outer block params + loop
@@ -274,6 +281,7 @@ function bindLoop(frame, label) {
     this: frame.ctx, index0: frame.index0, index1: frame.index1,
     rindex0: frame.rindex0, rindex1: frame.rindex1,
     first: frame.first, last: frame.last, length: frame.length, key: frame.key,
+    depth: frame.depth,
   };
   // the enclosing loop's object, inherited through the binds prototype chain (so a
   // `with` between two loops is skipped). `undefined` when this loop is outermost.

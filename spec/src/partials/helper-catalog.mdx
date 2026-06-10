@@ -16,6 +16,7 @@
 | `coalesce` | value | ≥1 | registered | Returns the first non-null argument — the `??` operator's helper. |
 | `count` | value | 1 | registered | The number of items in an array (or characters in a string). |
 | `date` | value | ≥1 | registered | Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029). |
+| `depth` | value | 0 | scoped | The 1-based loop-nesting level (outermost loop = 1; a directly nested loop = 2). |
 | `dict` | value | any | registered | Builds an object from alternating key/value arguments (the hash target). |
 | `divide` | value | 2 | registered | Divides the first number by the second — the `/` operator's helper. |
 | `downcase` | value | 1 | alias of `lowercase` | Lowercases its argument. |
@@ -51,7 +52,7 @@
 | `local` | block | any | registered | Bounded binding: installs its hash's name=value pairs as block-scoped nullary operations for the body, without re-rooting the context, discarded at its close (RawBars/MaxBars `{% local a=1 %}…{% endlocal %}`; docs-17). |
 | `log` | value | ≥1 | registered | Logs its arguments to the host and returns null. |
 | `lookup` | value | ≥1 | registered | Indexes a value by each key or index in turn, returning null at the first miss. |
-| `loop` | value | 0 | scoped | The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length, plus the chain links loop.parent (the enclosing loop) and loop.root. |
+| `loop` | value | 0 | scoped | The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length/depth, plus the chain links loop.parent (the enclosing loop) and loop.root. |
 | `lowercase` | value | 1 | registered | Lowercases its argument. |
 | `lt` | value | 2 | registered | True when the first argument is less than the second. |
 | `lte` | value | 2 | registered | True when the first argument is less than or equal to the second. |
