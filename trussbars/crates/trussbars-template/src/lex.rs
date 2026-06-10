@@ -43,9 +43,8 @@ pub enum Lexeme {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sigil {
     /// `{{ x }}` — escaped output, or a separator (`else`/`elif`); the parser decides.
+    /// (Raw/unescaped output is `{{ x | safe }}`, not a separate sigil — ADR-039.)
     Output,
-    /// `{{{ x }}}` — unescaped (raw) output.
-    Raw,
     /// `{%  …  %}` — a block open.
     Open,
     /// `{% end …  %}` — a block close.
@@ -187,7 +186,7 @@ struct Lexed {
 ///
 /// A faithful port of the PureScript `FlatBars.Lexer.trimStandalone` (Lexer.purs):
 /// block opens/closes (`{% … %}` / `{% end… %}`) and comments are always eligible; output
-/// tags (`{{ }}` / `{{{ }}}`) and partials never are; a `{{ }}` tag is eligible only
+/// tags (`{{ }}`, incl. `{{ x | safe }}`) and partials never are; a `{{ }}` tag is eligible only
 /// when its head word is `else`/`elif` (a clause marker — so `{% else %}` strips but an
 /// arbitrary `{{ x }}` does not). It only adjusts `Text` spans (shrinking off the
 /// leading line after a standalone tag and the trailing indent before one), so the
@@ -324,24 +323,10 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     if at(b, i, b"{{{{") {
         return lex_raw_block(b, n, i);
     }
-    // Three-brace raw output: `{{{ … }}}`.
-    if at(b, i, b"{{{") {
-        let inner = i + 3;
-        let close = find_close(b, n, inner, 3)?;
-        // Explicit whitespace control `{{{- … -}}}` (the `-` glued to the inner braces);
-        // the `{{{`/`}}}` braces themselves are never the marker.
-        let (ts, te, lead_trim, trail_trim) = strip_trim_markers(b, inner, close);
-        return Ok(Lexed {
-            lexeme: Lexeme::Tag {
-                sigil: Sigil::Raw,
-                interior: Span::new(ts, te),
-                span: Span::new(i, close + 3),
-            },
-            next: close + 3,
-            lead_trim,
-            trail_trim,
-        });
-    }
+    // PURE grammar (ADR-039): the three-brace raw-output sigil `{{{ … }}}` is NOT
+    // recognized — raw (un-escaped) output is the `safe` filter, `{{ x | safe }}`. A
+    // stray `{{{` falls through to the two-brace handling below and fails as a plain
+    // parse error; there is no compat mapping.
     // Two-brace tag: the byte after `{{` selects the sigil. PURE native dialect
     // (ADR-039): `{{ … }}` is OUTPUT-ONLY. No Handlebars holdovers — the legacy
     // block-open/close (`{{#`/`{{/`) AND the partial reference `{{> name}}` are NOT
@@ -691,25 +676,22 @@ mod tests {
 
     #[test]
     fn all_two_brace_sigils() {
-        let s = "{{x}}{{{y}}}{% for xs %}{% endfor %}{{! c }}";
+        let s = "{{x}}{% for xs %}{% endfor %}{{! c }}";
         assert_eq!(
             sigils(s),
-            vec![
-                Sigil::Output,
-                Sigil::Raw,
-                Sigil::Open,
-                Sigil::Close,
-                Sigil::Comment
-            ]
+            vec![Sigil::Output, Sigil::Open, Sigil::Close, Sigil::Comment]
         );
         assert_round_trip(s);
     }
 
     #[test]
-    fn raw_output_triple() {
-        assert_eq!(sigils("{{{ html }}}"), vec![Sigil::Raw]);
-        assert_eq!(interiors("{{{ html }}}"), vec![" html "]);
-        assert_round_trip("{{{ html }}}");
+    fn raw_output_is_the_safe_filter() {
+        // PURE grammar (ADR-039): raw/unescaped output is `{{ x | safe }}`, an ordinary
+        // `Output` tag whose interior carries the `| safe` pipe — there is no `{{{ }}}`
+        // raw sigil. (`safe` marks the value; the escaper passes it through.)
+        assert_eq!(sigils("{{ html | safe }}"), vec![Sigil::Output]);
+        assert_eq!(interiors("{{ html | safe }}"), vec![" html | safe "]);
+        assert_round_trip("{{ html | safe }}");
     }
 
     #[test]
@@ -1002,12 +984,12 @@ mod tests {
 
     #[test]
     fn raw_output_takes_trim_markers() {
-        // `{{{- z -}}}`: the inner `-` trims, the `{{{`/`}}}` braces themselves never do.
-        // The interior keeps its inner spaces (` z `, output tags don't whitespace-trim).
+        // Raw output is `{{ z | safe }}` (no `{{{ }}}`); the `-` trim markers glue to the
+        // two-brace tag like any output. The interior keeps its inner spaces.
         assert_eq!(
-            tags("x  {{{- z -}}}  y"),
-            vec![(Sigil::Raw, " z ".to_string())]
+            tags("x  {{- z | safe -}}  y"),
+            vec![(Sigil::Output, " z | safe ".to_string())]
         );
-        assert_eq!(marked_text("x  {{{- z -}}}  y"), "xy");
+        assert_eq!(marked_text("x  {{- z | safe -}}  y"), "xy");
     }
 }

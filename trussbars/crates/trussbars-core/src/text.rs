@@ -70,7 +70,7 @@ pub fn esc<T: ToText + ?Sized>(v: &T, out: &mut String) {
 /// `{{struct}}` fails to compile.
 pub trait ToText {
     /// Append the raw (unescaped) text form of `self` to `out` — the emission for
-    /// a `{{{ x }}}` (raw) tag.
+    /// a `{{ x | safe }}` (raw) tag.
     fn write_text(&self, out: &mut String);
 
     /// Append the HTML-escaped text form of `self` to `out`.

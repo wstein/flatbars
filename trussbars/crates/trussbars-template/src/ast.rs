@@ -110,13 +110,14 @@ impl Expr {
 pub enum Node {
     /// Literal content.
     Text(String),
-    /// `{{ expr }}` (escaped) or `{{{ expr }}}` (raw, `raw = true`).
+    /// `{{ expr }}` (escaped) or `{{ expr | safe }}` (raw, `raw = true`).
     Output {
         /// The originating tag span.
         span: Span,
         /// The desugared expression.
         expr: Expr,
-        /// Whether this is raw (`{{{ }}}`) output (no HTML escaping).
+        /// Whether this is raw (un-escaped) output — set by the `safe` final pipe
+        /// `{{ expr | safe }}` (ADR-039; there is no `{{{ }}}` raw sigil).
         raw: bool,
     },
     /// `{% for item [i] in coll [label name] %}…{% else %}…{% endfor %}`.

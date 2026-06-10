@@ -10,7 +10,7 @@
 export const cases = [
   // ── output & paths ─────────────────────────────────────────────────────────
   { id: "hello", template: "Hello, {{name}}!", data: { name: "<b>Ann</b>" } },
-  { id: "raw", template: "raw: {{{html}}}", data: { html: "<i>x</i>" } },
+  { id: "raw", template: "raw: {{ html | safe }}", data: { html: "<i>x</i>" } },
   {
     id: "dotted",
     template: "{{user.name}} from {{user.city}}",

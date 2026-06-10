@@ -31,7 +31,7 @@ at the template's `line:col`.
 ## What worked (no friction)
 
 Nested `{{#each}}` with block params, field paths, `{{#if}}` on a `Vec`
-(non-empty) and on a **comparison** (`views > 100`), `{{{ raw }}}` for pre-rendered
+(non-empty) and on a **comparison** (`views > 100`), `{{ raw | safe }}` for pre-rendered
 markup, pipes (`tag | lowercase`, `tags | count`), interpolation inside attributes
 (`href="/posts/{{slug}}"`), an inline partial reused via `{{> card}}` inside
 `{{#each}}`, and `{{#each (groupBy posts "year")}}` with `{{loop.key}}` for the

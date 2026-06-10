@@ -1437,8 +1437,10 @@ mod tests {
     #[test]
     fn output_escaped_and_raw() {
         assert!(e("{{name}}").contains("trussbars_core::esc(&(ctx.name), &mut out)"));
+        // PURE grammar (ADR-039): raw output is `{{ x | safe }}` (no `{{{ }}}` sigil); the
+        // `safe` final pipe desugars to the raw-output path (`write_text`, un-escaped).
         assert!(
-            e("{{{html}}}").contains("trussbars_core::ToText::write_text(&(ctx.html), &mut out)")
+            e("{{ html | safe }}").contains("trussbars_core::ToText::write_text(&(ctx.html), &mut out)")
         );
     }
 

@@ -1181,7 +1181,7 @@ mod tests {
     fn output_escapes() {
         let d = obj(&[("name", s("<b>"))]);
         assert_eq!(render("{{name}}", d.clone()).unwrap(), "&lt;b&gt;");
-        assert_eq!(render("{{{name}}}", d).unwrap(), "<b>");
+        assert_eq!(render("{{ name | safe }}", d).unwrap(), "<b>");
     }
 
     #[test]

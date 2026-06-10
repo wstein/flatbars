@@ -136,24 +136,19 @@ impl Blocks<'_> {
                         continue;
                     }
                     let expr = parse_expr(text, scope)?;
-                    nodes.push(Node::Output {
-                        span,
-                        expr,
-                        raw: false,
-                    });
-                    self.pos += 1;
-                }
-                Lexeme::Tag {
-                    sigil: Sigil::Raw,
-                    interior,
-                    span,
-                } => {
-                    let expr = parse_expr(interior.of(self.src).trim(), scope)?;
-                    nodes.push(Node::Output {
-                        span: *span,
-                        expr,
-                        raw: true,
-                    });
+                    // PURE grammar (ADR-039): raw (un-escaped) output is `{{ E | safe }}`,
+                    // not a `{{{ }}}` sigil. A `safe` *final* pipe desugars to the raw-output
+                    // flag, reusing the same raw path the AOT (`write_text`) and VM
+                    // (`raw_text`) already have — so no `{{{ }}}` and no VM `Safe` value.
+                    // (Host helpers that return a `Safe` value, e.g. `markdown`, keep the
+                    // runtime SafeString mechanism; only the bare `safe` filter desugars.)
+                    let (expr, raw) = match expr {
+                        Expr::App(name, mut a) if name == "safe" && a.len() == 1 => {
+                            (a.remove(0), true)
+                        }
+                        other => (other, false),
+                    };
+                    nodes.push(Node::Output { span, expr, raw });
                     self.pos += 1;
                 }
                 Lexeme::Tag {
@@ -824,8 +819,10 @@ mod tests {
     }
 
     #[test]
-    fn raw_output() {
-        let ns = parse("{{{html}}}").unwrap();
+    fn raw_output_via_safe_filter() {
+        // PURE grammar (ADR-039): raw output is `{{ x | safe }}` (no `{{{ }}}` raw sigil);
+        // the `safe` final pipe desugars to `Output { raw: true }` with `safe` stripped.
+        let ns = parse("{{ html | safe }}").unwrap();
         assert!(matches!(&ns[0], Node::Output { raw: true, .. }));
     }
 
