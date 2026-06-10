@@ -25,11 +25,10 @@ module Kernel.Schema
 
 import Prelude
 
-import Control.Alt ((<|>))
 import Data.Array as Array
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Set (Set)
 import Data.Set as Set
 import Data.String as Str
@@ -102,7 +101,7 @@ mergeC a b =
   , fields: Set.union a.fields b.fields
   , scalar: unifyScalar a.scalar b.scalar
   , optional: a.optional || b.optional
-  , enumTag: a.enumTag <|> b.enumTag
+  , enumTag: maybe b.enumTag Just a.enumTag
   , enumVariants: Set.union a.enumVariants b.enumVariants
   }
 
@@ -231,7 +230,10 @@ useExpr sc cs expr = case expr of
     | Set.member name stringPack -> pinFirst (pinScalar sc SString) name args cs
     | Set.member name numberPack -> foldl (\acc a -> pinScalar sc SNumber a acc) cs args
     | Set.member name arrayPack -> pinFirst (pinArray sc) name args cs
-    | name == "coalesce" || name == "firstTruthy" -> optionalFirst sc args cs
+    -- `a ?? b` (coalesce): `a` is nullable ⇒ Option; `b` is the fallback.
+    | name == "coalesce" -> optionalFirst sc args cs
+    -- `a ?: b` (firstTruthy/Elvis) and `a ? b : c` (ternary): operands share the
+    -- result type (the emitter unifies the branches), so do *not* mark Option.
     | otherwise -> foldl (useExpr sc) cs args
   where
   -- `a == lit` / `a != lit` couples `a` to the literal's type (the common,
@@ -248,10 +250,14 @@ useExpr sc cs expr = case expr of
   pinFirst pin _ args acc = case Array.head args of
     Just first -> foldl (useExpr sc) (pin first acc) (fromMaybe [] (Array.tail args))
     Nothing -> acc
-  optionalFirst sc' args acc = case Array.head args of
-    Just first -> case exprCanon sc' first of
-      Just canon -> record canon (emptyC { optional = true }) acc
-      Nothing -> useExpr sc' acc first
+  optionalFirst sc' args acc = case Array.uncons args of
+    Just { head: first, tail } ->
+      let
+        acc1 = case exprCanon sc' first of
+          Just canon -> record canon (emptyC { optional = true }) acc
+          Nothing -> useExpr sc' acc first
+      in
+        foldl (useExpr sc') acc1 tail   -- the fallbacks (`?? y`) are ordinary uses
     Nothing -> acc
   -- `xs | pluck "k"` / `xs | where "k"`: `xs` is an array whose element has field `k`.
   filterUse args acc = case Array.uncons args of
@@ -457,9 +463,11 @@ data Ty
 
 derive instance eqTy :: Eq Ty
 
--- | Build the root type from the flat constraint set.
-buildTy :: Constraints -> Ty
-buildTy cs = atPrefix []
+-- | Build the root type from the flat constraint set. `obs` is the data-observed
+-- | scalar at each path — the fallback for a leaf the template touches
+-- | structurally (e.g. `nums | at`) but never types (the element's scalar).
+buildTy :: Map String ScalarHint -> Constraints -> Ty
+buildTy obs cs = atPrefix []
   where
   entries :: Array (Tuple Canon PathC)
   entries = map snd (Map.toUnfoldable cs)
@@ -496,7 +504,12 @@ buildTy cs = atPrefix []
           else if not (Array.null keyKids) || not (Set.isEmpty c.fields) then
             TyObject (Map.fromFoldable (map (\k -> Tuple k (atPrefix (prefix <> [ SKey k ]))) keyKids))
           else
-            TyScalar c.scalar c.optional
+            -- template-determined scalar wins; an under-determined one falls back
+            -- to the data-observed type at this path, else `String` (§4).
+            let
+              s = if c.scalar == SUnknown then fromMaybe SUnknown (Map.lookup (canonKey prefix) obs) else c.scalar
+            in
+              TyScalar s c.optional
 
 -- ---------------------------------------------------------------------------
 -- Emit: Rust structs, JSON scaffold, report
@@ -537,7 +550,7 @@ emitSchema :: Ty -> String
 emitSchema root =
   Str.joinWith "\n\n" ([ rootDecl ] <> structDecls)
   where
-  rootDecl = "#[derive(Deserialize, Trussbars)]\nstruct Ctx " <> objBody "Ctx" root
+  rootDecl = "#[derive(serde::Deserialize, trussbars_core::Trussbars)]\nstruct Ctx " <> objBody "Ctx" root
 
   -- accumulate nested object structs (named by their field) other than root
   structDecls = collect root
@@ -553,15 +566,15 @@ emitSchema root =
   namedFor :: String -> Ty -> Array String
   namedFor k = case _ of
     TyArray (TyObject fields) ->
-      [ "#[derive(Deserialize, Trussbars)]\nstruct " <> structName k <> " " <> objBody (structName k) (TyObject fields) ]
+      [ "#[derive(serde::Deserialize, trussbars_core::Trussbars)]\nstruct " <> structName k <> " " <> objBody (structName k) (TyObject fields) ]
     TyArray (TyEnum tag vars) -> [ enumDecl (structName k) tag vars ]
     TyObject fields ->
-      [ "#[derive(Deserialize, Trussbars)]\nstruct " <> cap1 k <> " " <> objBody (cap1 k) (TyObject fields) ]
+      [ "#[derive(serde::Deserialize, trussbars_core::Trussbars)]\nstruct " <> cap1 k <> " " <> objBody (cap1 k) (TyObject fields) ]
     TyEnum tag vars -> [ enumDecl (cap1 k) tag vars ]
     _ -> []
 
   enumDecl nm tag vars =
-    "#[derive(Deserialize, Trussbars)]\n#[serde(tag = \"" <> tag <> "\")]\nenum " <> nm <> " { "
+    "#[derive(serde::Deserialize, trussbars_core::Trussbars)]\n#[serde(tag = \"" <> tag <> "\")]\nenum " <> nm <> " { "
       <> Str.joinWith ", " (map cap1 (Array.fromFoldable vars :: Array String)) <> " }"
 
   objBody :: String -> Ty -> String
@@ -665,19 +678,6 @@ observeScalars = foldl addSample Map.empty
   addSample m s = foldl addObs m (observe [] s)
   addObs m (Tuple canon h) = Map.insertWith unifyScalar (canonKey canon) h m
 
--- | Refine each under-determined (`SUnknown`) scalar with the observed type.
-refineScalars :: Map String ScalarHint -> Constraints -> Constraints
-refineScalars obs cs =
-  Map.fromFoldable (map ref (Map.toUnfoldable cs :: Array (Tuple String (Tuple Canon PathC))))
-  where
-  ref (Tuple key (Tuple canon c)) =
-    let
-      c' = case Map.lookup key obs of
-        Just h | c.scalar == SUnknown -> c { scalar = h }
-        _ -> c
-    in
-      Tuple key (Tuple canon c')
-
 -- | Observe distinct string values at every path (for enum tag-value union, §5).
 observeStr :: Canon -> Value -> Array (Tuple Canon String)
 observeStr canon = case _ of
@@ -716,9 +716,8 @@ inferTemplateData :: Array Value -> Template -> InferResult
 inferTemplateData samples tmpl =
   let
     sc0 = rootScope { partials = collectInlines tmpl }
-    cs = refineEnums (observeTags samples)
-      (refineScalars (observeScalars samples) (walk sc0 Map.empty tmpl))
-    ty = buildTy cs
+    cs = refineEnums (observeTags samples) (walk sc0 Map.empty tmpl)
+    ty = buildTy (observeScalars samples) cs
   in
     { schema: emitSchema ty
     , dataScaffold: scaffoldJson ty

@@ -33,7 +33,26 @@ for (const p of [enginePath, emitterPath]) {
   }
 }
 
-const { renderMaxbars, maxbarsCompat } = await import(enginePath);
+const { renderMaxbars, maxbarsCompat, inferMaxbarsData } = await import(enginePath);
+
+// Ctx source (docs/03 G2 step): prefer schema *inference* from the template
+// (Kernel.Schema), falling back to the data-only `genCtx` only where the case
+// declares manual `maps`/`enums` hints inference does not yet derive, or where
+// inference fails. Tracks how many cases each path served (the G2-readiness
+// signal — inference supersedes ctxgen as its coverage grows).
+let ctxInferred = 0;
+let ctxFallback = 0;
+function ctxFor(c) {
+  if (!c.maps && !c.enums) {
+    const r = inferMaxbarsData(c.template, c.data);
+    if (r.ok && r.schema.includes("struct Ctx")) {
+      ctxInferred++;
+      return r.schema;
+    }
+  }
+  ctxFallback++;
+  return genCtx(c.data, c.maps, c.enums);
+}
 const { compileMaxRust } = await import(emitterPath);
 
 // `--vm`: render through the Trussbars VM backend (`trussbars-vm`, docs/11) — a
@@ -264,7 +283,7 @@ for (const c of cases) {
   const data = rawString(JSON.stringify(c.data));
   modules.push(
     `pub mod ${ident} {\n` +
-      `${genCtx(c.data, c.maps, c.enums)}\n\n` +
+      `${ctxFor(c)}\n\n` +
       `${emit.out}\n` +
       `    pub fn run() -> String {\n` +
       `        let ctx: Ctx = serde_json::from_str(${data}).expect("deserialize ${c.id}");\n` +
@@ -375,6 +394,9 @@ console.log(
   `Trussbars conformance (${report.profile}): ` +
     `${matched}/${positiveCount} positive byte-matched vs golden, ` +
     `${excluded.length} excluded, ${drift.length} oracle-drift, ${oracleErrors} oracle errors.`,
+);
+console.log(
+  `  Ctx source (docs/03 G2): ${ctxInferred} inferred (Kernel.Schema), ${ctxFallback} via genCtx fallback (maps/enums hints or infer-miss).`,
 );
 for (const x of excluded) console.log(`  excluded ${x.id}: ${x.reason}`);
 for (const id of missing) console.error(`  MISSING snapshot for ${id} (run with --update)`);
