@@ -90,7 +90,7 @@ test("renders the maxbars dialect: infix, bare-infix block conditions, loop vars
   // bare (un-parenthesised) infix block condition
   assert.equal(mx("{% if a && b %}Y{% else %}N{% endif %}", { a: true, b: false }), "N");
   // loop variables through the loop object (ADR-021)
-  assert.equal(mx("{% each xs %}[{{loop.index1}}/{{loop.length}}]{% endeach %}", { xs: ["a", "b"] }), "[1/2][2/2]");
+  assert.equal(mx("{% for xs %}[{{loop.index1}}/{{loop.length}}]{% endfor %}", { xs: ["a", "b"] }), "[1/2][2/2]");
   // a pipe
   assert.equal(mx("{{{ o | json }}}", { o: { a: 1 } }), '{"a":1}');
 });
@@ -405,7 +405,7 @@ test("source map: the core and maxbars dialects also emit tiling segments", asyn
   // maxbars: an each over a pipe expression tiles, every run tagged file=main.
   const max = await createRenderer("maxbars");
   assert.ok(max.engineInfo().features.includes("source-map"));
-  const m = max.render(max.compile("{% each xs %}[{{ this }}]{% endeach %}").program, { xs: ["a", "b"] }, { map: true });
+  const m = max.render(max.compile("{% for xs %}[{{ this }}]{% endfor %}").program, { xs: ["a", "b"] }, { map: true });
   assert.equal(m.output, "[a][b]");
   assert.ok(tilesExactly(m.output, m.segments));
   assert.ok(m.segments.every((s) => s.file === "main"));
@@ -479,7 +479,7 @@ test("context inspector: block params surface as locals", async () => {
 test("context inspector: the maxbars dialect snapshots too", async () => {
   const r = await createRenderer("maxbars");
   assert.ok(r.engineInfo().features.includes("context-inspect"));
-  const prog = r.compile("{% each xs %}[{{ this }}]{% endeach %}").program;
+  const prog = r.compile("{% for xs %}[{{ this }}]{% endfor %}").program;
   const snaps = r.inspectAt(prog, { xs: ["x", "y"] }, firstEmitTarget(r, prog, { xs: ["x", "y"] }));
   assert.deepEqual(snaps.map((s) => s.this), ["x", "y"]);
   assert.deepEqual(snaps.map((s) => s.index), [0, 1]);
