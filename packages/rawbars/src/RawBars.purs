@@ -46,7 +46,7 @@ import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
-import Kernel.CaseSugar (caseLeadingViolation)
+import Kernel.CaseSugar (braceControlViolation, caseLeadingViolation)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, registerAll, registerPartialFiles, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
@@ -98,9 +98,18 @@ parseCore
   -> Either (NEA.NonEmptyArray ParseError) { directives :: Array Directive, nodes :: Template }
 parseCore opts src = case parseWith opts src of
   Left pes -> Left pes
-  Right r -> case caseLeadingViolation r.nodes of
+  Right r -> case firstViolation r.nodes of
     Just v -> Left (NEA.singleton (DisallowedShape v.shape v.off))
     Nothing -> Right r
+  where
+  -- In the statementTags surface (docs-19) RawBars rejects legacy `{{ }}` control
+  -- (it is output-only there); the `{{#case}}` leading-content rule applies in both.
+  firstViolation nodes
+    | opts.lexConfig.statementTags =
+        case braceControlViolation [ "else", "elif", "when" ] src nodes of
+          Just v -> Just v
+          Nothing -> caseLeadingViolation nodes
+    | otherwise = caseLeadingViolation nodes
 
 -- | Parse core source and return a pure renderer (the engine's fixed `handlebars`
 -- | truthiness rule applies; ADR-022).

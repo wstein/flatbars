@@ -13,7 +13,7 @@ module ClassicBars.Compile
 
 import Prelude
 
-import ClassicBars (LoopVars, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars)
+import ClassicBars (LoopVars, checkBraceControl, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars)
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
@@ -63,6 +63,9 @@ compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
   externals <- traverse compilePartial partialSrcs
   { nodes } <- lmap NEA.head (parseWith opts src)
   checkSurfaceStrict strict nodes
+  -- statementTags dialects (RawBars/MaxBars) reject legacy {{ }} control flow —
+  -- the compiled path mirrors the interpreter's checkBraceControl (docs-19).
+  when opts.lexConfig.statementTags (checkBraceControl src nodes)
   let
     h = hoistInline (desugarSurfaceWith lv nodes)
     externalT = Map.fromFoldable externals

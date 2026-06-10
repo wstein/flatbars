@@ -86,14 +86,17 @@ async function runCompiled(t, d, dialect, partials, helpers, translator) {
   }
 }
 
-// Collect cases: the inline corpus + every examples/*/ (core templates).
+// Collect cases: the inline corpus + every examples/*/ (idiomatic MaxBars/Trussbars
+// templates, `template.truss`). They render through the MaxBars dialect — bare paths,
+// auto-escape, infix operators, list/dict literals, the `..` range operator.
 function exampleCases() {
   const dir = resolve(root, "examples");
   return readdirSync(dir)
-    .filter((n) => existsSync(resolve(dir, n, "template.hbs")))
+    .filter((n) => existsSync(resolve(dir, n, "template.truss")))
     .map((n) => ({
       name: "example:" + n,
-      t: readFileSync(resolve(dir, n, "template.hbs"), "utf8"),
+      dialect: "maxbars",
+      t: readFileSync(resolve(dir, n, "template.truss"), "utf8"),
       d: JSON.parse(readFileSync(resolve(dir, n, "data.json"), "utf8")),
     }));
 }
@@ -143,26 +146,26 @@ const helperCases = [
   // syntax) and MaxBars (lenient, infix/pipe surface) dialects too.
   // RawBars: core syntax (explicit `lookup this`), fn/inverse + options.fn(ctx,{data});
   // no hash / block params (there is no surface to write them).
-  { name: "op:raw-simple", dialect: "rawbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{{#wrap}}{{{lookup this \"x\"}}}{{/wrap}}", d: { x: "hi" }, expect: "[hi]" },
-  { name: "op:raw-context-shift", dialect: "rawbars", helpers: { list: (items, o) => safe(items.map((i) => o.fn(i)).join("")) }, t: "{{#list (lookup this \"items\")}}{{{lookup this \"name\"}}}{{/list}}", d: { items: [{ name: "a" }, { name: "b" }] }, expect: "ab" },
-  { name: "op:raw-inverse", dialect: "rawbars", helpers: { ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()) }, t: "{{#ifAny (lookup this \"xs\")}}y{{else}}n{{/ifAny}}", d: { xs: [] }, expect: "n" },
+  { name: "op:raw-simple", dialect: "rawbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{% wrap %}{{{lookup this \"x\"}}}{% endwrap %}", d: { x: "hi" }, expect: "[hi]" },
+  { name: "op:raw-context-shift", dialect: "rawbars", helpers: { list: (items, o) => safe(items.map((i) => o.fn(i)).join("")) }, t: "{% list (lookup this \"items\") %}{{{lookup this \"name\"}}}{% endlist %}", d: { items: [{ name: "a" }, { name: "b" }] }, expect: "ab" },
+  { name: "op:raw-inverse", dialect: "rawbars", helpers: { ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()) }, t: "{% ifAny (lookup this \"xs\") %}y{% else %}n{% endifAny %}", d: { xs: [] }, expect: "n" },
   // a block operation SUPPLIES scoped data; in core a scoped var is just an operation name.
-  { name: "op:raw-data", dialect: "rawbars", helpers: { rows: (items, o) => safe(items.map((x, i) => o.fn(x, { data: { index: i } })).join("")) }, t: "{{#rows (lookup this \"items\")}}{{{index}}}:{{{lookup this \"label\"}}} {{/rows}}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0:a 1:b " },
+  { name: "op:raw-data", dialect: "rawbars", helpers: { rows: (items, o) => safe(items.map((x, i) => o.fn(x, { data: { index: i } })).join("")) }, t: "{% rows (lookup this \"items\") %}{{{index}}}:{{{lookup this \"label\"}}} {% endrows %}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0:a 1:b " },
   // MaxBars: full surface MINUS block params — fn/inverse + options.hash + options.fn(ctx,{data}).
-  { name: "op:max-hash", dialect: "maxbars", helpers: { box: (xs, o) => safe('<ul class="' + o.hash.cls + '">' + xs.map((p) => o.fn(p)).join("") + "</ul>") }, t: '{{#box xs cls="r"}}<li>{{this}}</li>{{/box}}', d: { xs: ["a", "b"] }, expect: '<ul class="r"><li>a</li><li>b</li></ul>' },
+  { name: "op:max-hash", dialect: "maxbars", helpers: { box: (xs, o) => safe('<ul class="' + o.hash.cls + '">' + xs.map((p) => o.fn(p)).join("") + "</ul>") }, t: '{% box xs cls="r" %}<li>{{this}}</li>{% endbox %}', d: { xs: ["a", "b"] }, expect: '<ul class="r"><li>a</li><li>b</li></ul>' },
   // a block operation supplying scoped @data is a ClassicBars feature (MaxBars dropped
   // the @ namespace, ADR-021); the MaxBars equivalent supplies block params, see
   // op:max-params below.
   { name: "op:fb-data", dialect: "surface", helpers: { idx: (items, o) => items.map((x, i) => o.fn(x, { data: { index: i, first: i === 0 } })).join("") }, t: "{{#idx items}}{{@index}}{{#if @first}}*{{/if}}:{{label}} {{/idx}}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0*:a 1:b " },
-  { name: "op:max-inverse", dialect: "maxbars", helpers: { ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()) }, t: "{{#ifAny xs}}y{{else}}n{{/ifAny}}", d: { xs: [] }, expect: "n" },
+  { name: "op:max-inverse", dialect: "maxbars", helpers: { ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()) }, t: "{% ifAny xs %}y{% else %}n{% endifAny %}", d: { xs: [] }, expect: "n" },
   // a MaxBars-distinctive infix expression inside a block-operation body — proves the
   // MaxBars surface (not ClassicBars) is what compiles/interprets.
-  { name: "op:max-infix", dialect: "maxbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{{#wrap}}{{1 + 2}}{{/wrap}}", d: {}, expect: "[3]" },
+  { name: "op:max-infix", dialect: "maxbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{% wrap %}{{1 + 2}}{% endwrap %}", d: {}, expect: "[3]" },
   // block params now parse in MaxBars (the head ladder omits the pipe rung), so a
   // block operation can bind them via options.fn(ctx, { blockParams }).
-  { name: "op:max-params", dialect: "maxbars", helpers: { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) }, t: "{{#list xs as item idx}}[{{idx}}:{{item}}]{{/list}}", d: { xs: ["a", "b"] }, expect: "[0:a][1:b]" },
+  { name: "op:max-params", dialect: "maxbars", helpers: { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) }, t: "{% list xs as item idx %}[{{idx}}:{{item}}]{% endlist %}", d: { xs: ["a", "b"] }, expect: "[0:a][1:b]" },
   // a parenthesised pipe in the head coexists with block params — both render paths agree.
-  { name: "op:max-paren-pipe-params", dialect: "maxbars", helpers: { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) }, t: "{{#box (xs | reverse) as x}}<i>{{x}}</i>{{/box}}", d: { xs: ["a", "b", "c"] }, expect: "<i>c</i><i>b</i><i>a</i>" },
+  { name: "op:max-paren-pipe-params", dialect: "maxbars", helpers: { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) }, t: "{% box (xs | reverse) as x %}<i>{{x}}</i>{% endbox %}", d: { xs: ["a", "b", "c"] }, expect: "<i>c</i><i>b</i><i>a</i>" },
   // ── Raw blocks {{{{name}}}} — the verbatim body is handed to the head helper via
   //    options.fn(); the inner {{x}} is NEVER interpreted (loud upper-cases the raw
   //    text, so `{{x}}` comes out `{{X}}`). Both render paths must agree, and the
@@ -181,7 +184,7 @@ const helperCases = [
   //    (the `| uppercase` pipe), proving it desugars with MaxBars options.
   { name: "partials:max-simple", dialect: "maxbars", partials: { greeting: "Hi {{name | uppercase}}!" }, t: "{{> greeting}}", d: { name: "ada" }, expect: "Hi ADA!" },
   // a template-local {{#inline}} definition wins over a same-named external (left-biased union, as render does).
-  { name: "partials:max-inline-wins", dialect: "maxbars", partials: { g: "EXTERNAL" }, t: '{{#inline "g"}}INLINE{{/inline}}{{> g}}', d: {}, expect: "INLINE" },
+  { name: "partials:max-inline-wins", dialect: "maxbars", partials: { g: "EXTERNAL" }, t: '{% inline "g" %}INLINE{% endinline %}{{> g}}', d: {}, expect: "INLINE" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 

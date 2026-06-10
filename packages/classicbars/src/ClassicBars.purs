@@ -16,6 +16,7 @@ module ClassicBars
   , module ClassicBars.Surface
   , surfaceClauses
   , checkSurfaceStrict
+  , checkBraceControl
   , desugarSurface
   , desugarSurfaceWith
   , compileSurface
@@ -54,7 +55,7 @@ import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
 import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, handlebarsLabels, jsonataScaffold, reportMarkdown, runAnalysis)
-import Kernel.CaseSugar (caseLeadingViolation)
+import Kernel.CaseSugar (braceControlViolation, caseLeadingViolation)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartialFiles, registerPartials, withTranslator, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
@@ -105,6 +106,17 @@ checkSurfaceStrict strict nodes = case violation of
     | otherwise = case maxbarsEachAsViolation nodes of
         Just v -> Just v
         Nothing -> caseLeadingViolation nodes
+
+-- | Reject `{{ … }}`-delimited control flow in a `statementTags` dialect
+-- | (RawBars/MaxBars, docs-19): there, control uses Django-style `{% … %}` tags and
+-- | `{{ … }}` is output-only, so a legacy `{{#if}}` / `{{/if}}` / bare `{{else}}` is
+-- | a located `DisallowedShape` error rather than a silent re-acceptance. The render
+-- | and compile paths run it (the source-aware twin of `checkSurfaceStrict`) only
+-- | when `opts.lexConfig.statementTags` is on, so ClassicBars/MinBars are untouched.
+checkBraceControl :: String -> Template -> Either ParseError Unit
+checkBraceControl src nodes = case braceControlViolation surfaceClauses src nodes of
+  Just v -> Left (DisallowedShape v.shape v.off)
+  Nothing -> pure unit
 
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.
@@ -182,7 +194,10 @@ renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
     Left e -> Left e
     Right ps -> case parseWith opts src of
       Left pes -> Left (renderParseErrorsAt src pes)
-      Right { nodes } | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+      Right { nodes }
+        | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+        | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+            (renderParseErrorAt src e)
       Right { nodes } ->
         let
           { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
@@ -233,7 +248,10 @@ inspectSurfaceDiagWith strict lv opts truthy target partialSrcs src dat =
     Left e -> Left e
     Right ps -> case parseWith opts src of
       Left pes -> Left (renderParseErrorsAt src pes)
-      Right { nodes } | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+      Right { nodes }
+        | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+        | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+            (renderParseErrorAt src e)
       Right { nodes } ->
         let
           { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
@@ -288,7 +306,10 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
     Left e -> Left e
     Right ps -> case parseWith opts src of
       Left pes -> Left (renderParseErrorsAt src pes)
-      Right { nodes } | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+      Right { nodes }
+        | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+        | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+            (renderParseErrorAt src e)
       Right { directives, nodes } ->
         let
           { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
@@ -325,7 +346,10 @@ renderSurfaceDiagWith
   :: Boolean -> LoopVars -> ParseOptions -> Truthy -> String -> Value -> Either String String
 renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of
   Left pes -> Left (renderParseErrorsAt src pes)
-  Right { nodes } | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+  Right { nodes }
+    | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
+    | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
+        (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
       { partials, template } = hoistInline (desugarSurfaceWith lv nodes)

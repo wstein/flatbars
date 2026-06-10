@@ -101,13 +101,13 @@ main = do
   assert' "lint finding locates the name (line 2, col 4)"
     (maybe false (\f -> f.line == 2 && f.column == 4) (head ll.findings))
 
-  -- migrate: Handlebars → MaxBars. `{{^x}}` → `{{#unless x}}`, `@index` →
-  -- `loop.index0`; an ambiguous bare section surfaces as a residual.
+  -- migrate: Handlebars → MaxBars. `{{^x}}` → `{% unless x %}` (docs-19 control
+  -- surface), `@index` → `loop.index0`; an ambiguous bare section is a residual.
   let mr = runFn1 migrate "{{#each xs}}{{@index}}{{/each}}{{^done}}todo{{/done}}"
   assert' "migrate ok flag" mr.ok
   assert' ("migrate rewrites @index: " <> mr.source) (contains (Pattern "loop.index0") mr.source)
   assert' ("migrate rewrites inverted section: " <> mr.source)
-    (contains (Pattern "{{#unless done}}") mr.source)
+    (contains (Pattern "{% unless done %}") mr.source)
   let mres = runFn1 migrate "{{#widget}}x{{/widget}}"
   assert' "migrate surfaces an ambiguous-section residual"
     (any (\r -> r.kind == "ambiguous-section") mres.residuals)

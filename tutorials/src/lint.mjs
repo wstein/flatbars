@@ -33,7 +33,7 @@ export const lintExamples = {
   // resolve to the position in the card — exactly why the linter steers you off it.)
   scopedVariable: {
     engine: "maxbars",
-    template: "{{#each items}}{{index}}. {{this}}{{/each}}",
+    template: "{% each items %}{{index}}. {{this}}{% endeach %}",
     data: { items: ["alpha", "beta", "gamma"] },
     report: "warning: `index` is the non-canonical scoped variable — prefer `index0` (the native RawBars/MaxBars spelling)",
   },
@@ -60,13 +60,13 @@ export const migrateExamples = {
   // `@`-data loop variables migrate to the MaxBars `loop` object (ADR-021).
   loopVars: {
     template: "{{#each items}}{{@index}}. {{this}}\n{{/each}}",
-    source: "{{#each items}}{{loop.index0}}. {{this}}\n{{/each}}",
+    source: "{% each items %}{{loop.index0}}. {{this}}\n{% endeach %}",
     data: { items: ["alpha", "beta", "gamma"] },
   },
   // An inverted section `{{^x}}` becomes `{{#unless x}}` (its close pairs too).
   inverted: {
     template: "{{^items}}nothing here{{/items}}",
-    source: "{{#unless items}}nothing here{{/unless}}",
+    source: "{% unless items %}nothing here{% endunless %}",
     data: { items: [] },
   },
   // The block-partial reference `{{> @partial-block}}` becomes `{{yield}}` (a direct
@@ -83,7 +83,7 @@ export const migrateExamples = {
   // verbatim and reported as a residual for a human to resolve, never guessed.
   ambiguousSection: {
     template: "{{#widget}}{{title}}{{/widget}}",
-    source: "{{#widget}}{{title}}{{/widget}}",
+    source: "{% widget %}{{title}}{% endwidget %}",
     residualKind: "ambiguous-section",
   },
 };

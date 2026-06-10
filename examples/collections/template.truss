@@ -1,0 +1,1 @@
+{% each ["Ada", "Lin", "Bo"] %}{{this}} {% endeach %}| {{lookup {lang: "PureScript", year: 2024} "lang"}}

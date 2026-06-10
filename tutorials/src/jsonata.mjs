@@ -112,7 +112,7 @@ export const sections = [
   {
     id: "booleans",
     title: "Booleans & tests",
-    lead: "Precompute flags the template can branch on with a plain {{#if}}.",
+    lead: "Precompute flags the template can branch on with a plain {% if %}.",
     functions: ["$exists", "$not", "$contains"],
     cells: [
       { id: "exists", label: "$exists", note: "True when a path resolves to anything — guard optional fields.",
@@ -206,11 +206,11 @@ export const flagship = {
   }
 )`,
   template: `# {{project}} {{version}}
-{{#each sections}}
+{% each sections %}
 ## {{title}}
-{{#each items}}- {{this}}
-{{/each}}
-{{/each}}`,
+{% each items %}- {{this}}
+{% endeach %}
+{% endeach %}`,
   expect: "# flatbars 0.2.0\n## Features\n- lab: live transform pane\n- cli: emit-jsonata scaffold\n## Fixes\n- parser: trim standalone comments\n## Chores\n- deps: bump esbuild\n",
 };
 

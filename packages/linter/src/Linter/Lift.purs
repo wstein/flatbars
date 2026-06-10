@@ -130,14 +130,18 @@ binaryOps =
   ]
 
 -- | Lift RawBars (core) source up to MaxBars source, collecting advisory flags.
--- | A parse failure is propagated. The input is parsed with the *default core*
--- | options (RawBars is core syntax, no surface desugar), then each node is
--- | re-sugared by the MaxBars-surface printer below.
+-- | A parse failure is propagated. The input is parsed with RawBars's options
+-- | (core syntax, no surface desugar, but `statementTags` on so `{% … %}` control
+-- | parses — docs-19), then each node is re-sugared by the MaxBars-surface printer
+-- | below.
 liftToMaxBars :: String -> Either ParseError LiftResult
 liftToMaxBars src = do
   -- Lift reports the first parse error (the recovering parser's full list is for
   -- the render/CLI paths); `lmap NEA.head` keeps the simpler `ParseError`.
-  { nodes } <- lmap NEA.head (parseWith (defaultParseOptions { extras = false }) src)
+  let
+    opts = defaultParseOptions
+      { extras = false, lexConfig = defaultParseOptions.lexConfig { statementTags = true } }
+  { nodes } <- lmap NEA.head (parseWith opts src)
   pure (printTemplate nodes)
 
 --------------------------------------------------------------------------------
@@ -180,12 +184,13 @@ printNode = case _ of
 
   Block span sig name args body -> printBlock span sig name args body
 
-  -- A separator (`{{else}}`, `{{elif c}}`, …) — re-emit as a bare `{{name …}}`.
+  -- A separator (`else`, `elif c`, `when …`) — re-emit as a `{% … %}` statement
+  -- tag, the control surface MaxBars requires (docs-19).
   Sep span name args ->
     let
       h = headOut span name args
     in
-      h { text = "{{" <> h.text <> "}}" }
+      h { text = "{% " <> h.text <> " %}" }
 
   -- A raw block (`{{{{name}}}}…{{{{/name}}}}`) — re-emit verbatim; its body is
   -- literal text, not re-sugared.
@@ -206,16 +211,16 @@ escaped span inner =
   in
     ex { text = "{{ " <> ex.text <> " }}" }
 
--- | A `{{#name …}}body{{/name}}` section (every desugared sigil prints in the
--- | section shape; `Inverse`/`Parent`/`BlockDef` are unreachable for RawBars
--- | input under `extras = false`, but printed totally).
+-- | A `{% name … %}body{% endname %}` section (docs-19 control surface; every
+-- | desugared sigil prints in the section shape — `Inverse`/`Parent`/`BlockDef`
+-- | are unreachable for RawBars input under `extras = false`, but printed totally).
 printBlock :: Span -> Sigil -> Ident -> Array Expr -> Template -> Out
 printBlock span _ name args body =
   let
     h = headOut span name args
     inner = printTemplate body
   in
-    { text: "{{#" <> h.text <> "}}" <> inner.source <> "{{/" <> name <> "}}"
+    { text: "{% " <> h.text <> " %}" <> inner.source <> "{% end" <> name <> " %}"
     , flags: h.flags <> inner.flags
     }
 

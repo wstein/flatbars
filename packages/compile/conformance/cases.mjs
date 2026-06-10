@@ -30,51 +30,51 @@ export const cases = [
   { name: "lookup-array-index", t: "{{{lookup this \"xs\" 1}}}", d: { xs: ["a", "b"] } },
 
   // ── if / unless / elif ──────────────────────────────────────────────────────
-  { name: "if-true", t: "{{#if (lookup this \"a\")}}Y{{/if}}", d: { a: true } },
-  { name: "if-false-empty", t: "[{{#if (lookup this \"a\")}}Y{{/if}}]", d: { a: false } },
-  { name: "if-else", t: "{{#if (lookup this \"a\")}}Y{{else}}N{{/if}}", d: { a: false } },
-  { name: "elif-mid", t: "{{#if (lookup this \"a\")}}A{{elif (lookup this \"b\")}}B{{else}}C{{/if}}", d: { a: false, b: true } },
-  { name: "elif-else", t: "{{#if (lookup this \"a\")}}A{{elif (lookup this \"b\")}}B{{else}}C{{/if}}", d: { a: false, b: false } },
-  { name: "unless", t: "{{#unless (lookup this \"a\")}}N{{/unless}}", d: { a: false } },
-  { name: "if-zero-falsy", t: "{{#if (lookup this \"n\")}}y{{else}}n{{/if}}", d: { n: 0 } },
-  { name: "if-includeZero", t: "{{#if (lookup this \"n\") (dict \"includeZero\" true)}}y{{else}}n{{/if}}", d: { n: 0 } },
-  { name: "if-empty-array-falsy", t: "{{#if (lookup this \"xs\")}}y{{else}}n{{/if}}", d: { xs: [] } },
-  { name: "if-empty-object-truthy", t: "{{#if (lookup this \"o\")}}y{{else}}n{{/if}}", d: { o: {} } },
-  { name: "if-safe-empty-falsy", t: "{{#if (safe (lookup this \"s\"))}}y{{else}}n{{/if}}", d: { s: "" } },
+  { name: "if-true", t: "{% if (lookup this \"a\") %}Y{% endif %}", d: { a: true } },
+  { name: "if-false-empty", t: "[{% if (lookup this \"a\") %}Y{% endif %}]", d: { a: false } },
+  { name: "if-else", t: "{% if (lookup this \"a\") %}Y{% else %}N{% endif %}", d: { a: false } },
+  { name: "elif-mid", t: "{% if (lookup this \"a\") %}A{% elif (lookup this \"b\") %}B{% else %}C{% endif %}", d: { a: false, b: true } },
+  { name: "elif-else", t: "{% if (lookup this \"a\") %}A{% elif (lookup this \"b\") %}B{% else %}C{% endif %}", d: { a: false, b: false } },
+  { name: "unless", t: "{% unless (lookup this \"a\") %}N{% endunless %}", d: { a: false } },
+  { name: "if-zero-falsy", t: "{% if (lookup this \"n\") %}y{% else %}n{% endif %}", d: { n: 0 } },
+  { name: "if-includeZero", t: "{% if (lookup this \"n\") (dict \"includeZero\" true) %}y{% else %}n{% endif %}", d: { n: 0 } },
+  { name: "if-empty-array-falsy", t: "{% if (lookup this \"xs\") %}y{% else %}n{% endif %}", d: { xs: [] } },
+  { name: "if-empty-object-truthy", t: "{% if (lookup this \"o\") %}y{% else %}n{% endif %}", d: { o: {} } },
+  { name: "if-safe-empty-falsy", t: "{% if (safe (lookup this \"s\")) %}y{% else %}n{% endif %}", d: { s: "" } },
 
   // ── each ────────────────────────────────────────────────────────────────────
-  { name: "each-array", t: "{{#each (lookup this \"xs\")}}[{{{this}}}={{{index}}}]{{/each}}", d: { xs: ["a", "b"] } },
-  { name: "each-first-last", t: "{{#each (lookup this \"xs\")}}{{#if first}}<{{/if}}{{{this}}}{{#if last}}>{{/if}}{{/each}}", d: { xs: ["x", "y"] } },
-  { name: "each-empty-else", t: "{{#each (lookup this \"xs\")}}x{{else}}empty{{/each}}", d: { xs: [] } },
-  { name: "each-array-key-null", t: "{{#each (lookup this \"xs\")}}[{{{key}}}]{{/each}}", d: { xs: ["a", "b"] } },
-  { name: "each-object-sorted", t: "{{#each (lookup this \"o\")}}{{{key}}}={{{this}}};{{/each}}", d: { o: { b: 2, a: 1, c: 3 } } },
-  { name: "each-object-index", t: "{{#each (lookup this \"o\")}}{{{index}}}:{{{key}}};{{/each}}", d: { o: { z: 1, a: 2 } } },
-  { name: "each-parent-index", t: "{{#each (lookup this \"rows\")}}{{#each this}}[{{{lookup loop \"parent\" \"index0\"}}}-{{{index}}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "each-array", t: "{% each (lookup this \"xs\") %}[{{{this}}}={{{index}}}]{% endeach %}", d: { xs: ["a", "b"] } },
+  { name: "each-first-last", t: "{% each (lookup this \"xs\") %}{% if first %}<{% endif %}{{{this}}}{% if last %}>{% endif %}{% endeach %}", d: { xs: ["x", "y"] } },
+  { name: "each-empty-else", t: "{% each (lookup this \"xs\") %}x{% else %}empty{% endeach %}", d: { xs: [] } },
+  { name: "each-array-key-null", t: "{% each (lookup this \"xs\") %}[{{{key}}}]{% endeach %}", d: { xs: ["a", "b"] } },
+  { name: "each-object-sorted", t: "{% each (lookup this \"o\") %}{{{key}}}={{{this}}};{% endeach %}", d: { o: { b: 2, a: 1, c: 3 } } },
+  { name: "each-object-index", t: "{% each (lookup this \"o\") %}{{{index}}}:{{{key}}};{% endeach %}", d: { o: { z: 1, a: 2 } } },
+  { name: "each-parent-index", t: "{% each (lookup this \"rows\") %}{% each this %}[{{{lookup loop \"parent\" \"index0\"}}}-{{{index}}}]{% endeach %}{% endeach %}", d: { rows: [["a", "b"], ["c"]] } },
   // the `loop` object (ADR-021) reached as a core operation: current metadata, the
   // enclosing loop via loop.parent (chainable), and the outermost via loop.root.
-  { name: "loop-chain", t: "{{#each (lookup this \"rows\")}}{{#each this}}[{{{lookup loop \"index0\"}}}@{{{lookup (lookup loop \"parent\") \"index0\"}}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
-  { name: "loop-root", t: "{{#each (lookup this \"rows\")}}{{#each this}}{{{lookup (lookup loop \"root\") \"length\"}}} {{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
-  { name: "loop-this-key", t: "{{#each (lookup this \"o\")}}{{{lookup loop \"key\"}}}={{{lookup loop \"this\"}}};{{/each}}", d: { o: { b: 2, a: 1 } } },
+  { name: "loop-chain", t: "{% each (lookup this \"rows\") %}{% each this %}[{{{lookup loop \"index0\"}}}@{{{lookup (lookup loop \"parent\") \"index0\"}}}]{% endeach %}{% endeach %}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "loop-root", t: "{% each (lookup this \"rows\") %}{% each this %}{{{lookup (lookup loop \"root\") \"length\"}}} {% endeach %}{% endeach %}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "loop-this-key", t: "{% each (lookup this \"o\") %}{{{lookup loop \"key\"}}}={{{lookup loop \"this\"}}};{% endeach %}", d: { o: { b: 2, a: 1 } } },
 
   // ── apply (dynamic block dispatch; compiled via rt.block) ────────────────────
-  { name: "apply-each", t: "{{#apply \"each\" (lookup this \"xs\")}}[{{{this}}}]{{/apply}}", d: { xs: ["a", "b"] } },
-  { name: "apply-each-else", t: "{{#apply \"each\" (lookup this \"xs\")}}x{{else}}none{{/apply}}", d: { xs: [] } },
-  { name: "apply-if-true", t: "{{#apply \"if\" (lookup this \"c\")}}Y{{else}}N{{/apply}}", d: { c: true } },
-  { name: "apply-if-false", t: "{{#apply \"if\" (lookup this \"c\")}}Y{{else}}N{{/apply}}", d: { c: false } },
-  { name: "apply-unless", t: "{{#apply \"unless\" (lookup this \"c\")}}N{{/apply}}", d: { c: false } },
-  { name: "apply-with", t: "{{#apply \"with\" (lookup this \"o\")}}{{{lookup this \"k\"}}}{{/apply}}", d: { o: { k: "v" } } },
-  { name: "apply-inline-helper", t: "{{#apply \"escapeHtml\" (lookup this \"x\")}}ignored{{/apply}}", d: { x: "<b>" } },
+  { name: "apply-each", t: "{% apply \"each\" (lookup this \"xs\") %}[{{{this}}}]{% endapply %}", d: { xs: ["a", "b"] } },
+  { name: "apply-each-else", t: "{% apply \"each\" (lookup this \"xs\") %}x{% else %}none{% endapply %}", d: { xs: [] } },
+  { name: "apply-if-true", t: "{% apply \"if\" (lookup this \"c\") %}Y{% else %}N{% endapply %}", d: { c: true } },
+  { name: "apply-if-false", t: "{% apply \"if\" (lookup this \"c\") %}Y{% else %}N{% endapply %}", d: { c: false } },
+  { name: "apply-unless", t: "{% apply \"unless\" (lookup this \"c\") %}N{% endapply %}", d: { c: false } },
+  { name: "apply-with", t: "{% apply \"with\" (lookup this \"o\") %}{{{lookup this \"k\"}}}{% endapply %}", d: { o: { k: "v" } } },
+  { name: "apply-inline-helper", t: "{% apply \"escapeHtml\" (lookup this \"x\") %}ignored{% endapply %}", d: { x: "<b>" } },
 
   // ── with ────────────────────────────────────────────────────────────────────
-  { name: "with", t: "{{#with (lookup this \"u\")}}{{{lookup this \"name\"}}}{{/with}}", d: { u: { name: "Ada" } } },
-  { name: "with-falsy-else", t: "{{#with (lookup this \"u\")}}x{{else}}none{{/with}}", d: { u: null } },
+  { name: "with", t: "{% with (lookup this \"u\") %}{{{lookup this \"name\"}}}{% endwith %}", d: { u: { name: "Ada" } } },
+  { name: "with-falsy-else", t: "{% with (lookup this \"u\") %}x{% else %}none{% endwith %}", d: { u: null } },
 
   // ── let (RawBars/core canonical `(bind …)` form, ADR-024 §4) ─────────────────
-  { name: "let-bind-single", t: "{{#let (bind \"g\" \"Hi\")}}{{{g}}}{{/let}}", d: {} },
-  { name: "let-bind-data", t: "{{#let (bind \"n\" (lookup this \"count\"))}}{{{n}}} left{{/let}}", d: { count: 5 } },
-  { name: "let-bind-sequential", t: "{{#let (bind \"a\" 1)}}{{#let (bind \"b\" (add a 1))}}{{{a}}},{{{b}}}{{/let}}{{/let}}", d: {} },
-  { name: "let-bind-multi", t: "{{#let (bind \"x\" 1) (bind \"y\" 2)}}{{{x}}}/{{{y}}}{{/let}}", d: {} },
-  { name: "let-no-reroot", t: "{{#let (bind \"u\" (lookup this \"user\"))}}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{{/let}}", d: { name: "ROOT", user: { name: "Ada" } } },
+  { name: "let-bind-single", t: "{% let (bind \"g\" \"Hi\") %}{{{g}}}{% endlet %}", d: {} },
+  { name: "let-bind-data", t: "{% let (bind \"n\" (lookup this \"count\")) %}{{{n}}} left{% endlet %}", d: { count: 5 } },
+  { name: "let-bind-sequential", t: "{% let (bind \"a\" 1) %}{% let (bind \"b\" (add a 1)) %}{{{a}}},{{{b}}}{% endlet %}{% endlet %}", d: {} },
+  { name: "let-bind-multi", t: "{% let (bind \"x\" 1) (bind \"y\" 2) %}{{{x}}}/{{{y}}}{% endlet %}", d: {} },
+  { name: "let-no-reroot", t: "{% let (bind \"u\" (lookup this \"user\")) %}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{% endlet %}", d: { name: "ROOT", user: { name: "Ada" } } },
 
   // ── value helpers (via the runtime registry) ────────────────────────────────
   { name: "eq-true", t: "{{{eq (lookup this \"a\") (lookup this \"b\")}}}", d: { a: 1, b: 1 } },
@@ -84,8 +84,8 @@ export const cases = [
   { name: "json-pretty", t: "{{{json (lookup this \"o\") (dict \"pretty\" true)}}}", d: { o: { a: 1 } } },
 
   // ── nesting & escaping interplay ────────────────────────────────────────────
-  { name: "nested-if-each", t: "<ul>{{#each (lookup this \"xs\")}}{{#if this}}<li>{{{escapeHtml this}}}</li>{{/if}}{{/each}}</ul>", d: { xs: ["a", "", "b"] } },
-  { name: "auto-escape-each", t: "{{#each (lookup this \"xs\")}}{{{escapeHtml this}}} {{/each}}", d: { xs: ["<x>", "a&b"] } },
+  { name: "nested-if-each", t: "<ul>{% each (lookup this \"xs\") %}{% if this %}<li>{{{escapeHtml this}}}</li>{% endif %}{% endeach %}</ul>", d: { xs: ["a", "", "b"] } },
+  { name: "auto-escape-each", t: "{% each (lookup this \"xs\") %}{{{escapeHtml this}}} {% endeach %}", d: { xs: ["<x>", "a&b"] } },
 
   // ── SURFACE dialect (desugars to core, then compiles) ───────────────────────
   { name: "s:bare-path", dialect: "surface", t: "Hello {{ name }}!", d: { name: "Ada" } },
@@ -130,7 +130,7 @@ export const cases = [
   { name: "p:block-missing-fallback", dialect: "surface", t: "{{#>missing}}fb{{/missing}}", d: {} },
   // MaxBars: the bare {{#inline}}/{{#partial}} blocks + the reserved {{yield}}
   // keyword (the cross-dialect synonym; MaxBars reserves @, so no @partial-block).
-  { name: "p:max-yield", dialect: "maxbars", t: "{{#inline \"layout\"}}<{{yield}}>{{/inline}}{{#partial \"layout\"}}HI{{/partial}}", d: {} },
+  { name: "p:max-yield", dialect: "maxbars", t: "{% inline \"layout\" %}<{{yield}}>{% endinline %}{% partial \"layout\" %}HI{% endpartial %}", d: {} },
 
   // ── @truthiness modes (compiled per-mode codegen vs interpreter) ─────────────
   { name: "t:default-zero-falsy", dialect: "surface", t: "{{#if n}}y{{else}}m{{/if}}", d: { n: 0 } },
@@ -144,7 +144,7 @@ export const cases = [
   { name: "t:not-retuned", dialect: "surface", t: "{{! @truthiness:minimal }}{{{ not 0 }}}", d: null },
   { name: "t:includeZero-compose", dialect: "surface", t: "{{! @truthiness:empty }}{{#if n includeZero=true}}y{{else}}m{{/if}}", d: { n: 0 } },
   { name: "t:with-empty-array-minimal", dialect: "surface", t: "{{! @truthiness:minimal }}{{#with xs}}has{{else}}none{{/with}}", d: { xs: [] } },
-  { name: "t:core-minimal", dialect: "core", t: "{{! @truthiness:minimal }}{{#if (lookup this \"n\")}}y{{else}}m{{/if}}", d: { n: 0 } },
+  { name: "t:core-minimal", dialect: "core", t: "{{! @truthiness:minimal }}{% if (lookup this \"n\") %}y{% else %}m{% endif %}", d: { n: 0 } },
   { name: "t:each-body-inherits-mode", dialect: "surface", t: "{{! @truthiness:minimal }}{{#each xs}}{{#if this}}t{{else}}f{{/if}}{{/each}}", d: { xs: [0, 1] } },
 
   // ── MaxBars: infix operators, pipes, bare loop variables ─────────────────────
@@ -159,55 +159,55 @@ export const cases = [
   { name: "mx:pipe", dialect: "maxbars", t: "{{{ o | json }}}", d: { o: { a: 1 } } },
   { name: "mx:pipe-arg", dialect: "maxbars", t: "{{{ xs | lookup 0 }}}", d: { xs: ["a", "b"] } },
   { name: "mx:pipe-chain", dialect: "maxbars", t: "{{{ n | not | not }}}", d: { n: 0 } },
-  { name: "mx:if-paren-infix", dialect: "maxbars", t: "{{#if (a && b)}}Y{{else}}N{{/if}}", d: { a: true, b: false } },
-  { name: "mx:if-bare-infix", dialect: "maxbars", t: "{{#if a && b}}Y{{else}}N{{/if}}", d: { a: true, b: false } },
-  { name: "mx:if-bare-cmp", dialect: "maxbars", t: "{{#if x >= 18}}adult{{else}}minor{{/if}}", d: { x: 21 } },
-  { name: "mx:unless-bare-infix", dialect: "maxbars", t: "{{#unless a || b}}none{{/unless}}", d: { a: false, b: false } },
-  { name: "mx:if-bare-precedence", dialect: "maxbars", t: "{{#if x > 0 && x < 10}}in{{else}}out{{/if}}", d: { x: 5 } },
+  { name: "mx:if-paren-infix", dialect: "maxbars", t: "{% if (a && b) %}Y{% else %}N{% endif %}", d: { a: true, b: false } },
+  { name: "mx:if-bare-infix", dialect: "maxbars", t: "{% if a && b %}Y{% else %}N{% endif %}", d: { a: true, b: false } },
+  { name: "mx:if-bare-cmp", dialect: "maxbars", t: "{% if x >= 18 %}adult{% else %}minor{% endif %}", d: { x: 21 } },
+  { name: "mx:unless-bare-infix", dialect: "maxbars", t: "{% unless a || b %}none{% endunless %}", d: { a: false, b: false } },
+  { name: "mx:if-bare-precedence", dialect: "maxbars", t: "{% if x > 0 && x < 10 %}in{% else %}out{% endif %}", d: { x: 5 } },
   // the loop variables, read through the `loop` object (ADR-021).
-  { name: "mx:loopvars", dialect: "maxbars", t: "{{#each xs}}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:loopvar-first-last", dialect: "maxbars", t: "{{#each xs}}{{#if loop.first}}<{{/if}}{{this}}{{#if loop.last}}>{{/if}}{{/each}}", d: { xs: ["a", "b"] } },
-  { name: "mx:loopvar-key", dialect: "maxbars", t: "{{#each o}}{{loop.key}}={{this}};{{/each}}", d: { o: { x: 1, y: 2 } } },
+  { name: "mx:loopvars", dialect: "maxbars", t: "{% each xs %}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{% endeach %}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:loopvar-first-last", dialect: "maxbars", t: "{% each xs %}{% if loop.first %}<{% endif %}{{this}}{% if loop.last %}>{% endif %}{% endeach %}", d: { xs: ["a", "b"] } },
+  { name: "mx:loopvar-key", dialect: "maxbars", t: "{% each o %}{{loop.key}}={{this}};{% endeach %}", d: { o: { x: 1, y: 2 } } },
   // a dotted path is still a path (not a loop var) in MaxBars.
   { name: "mx:path-still-works", dialect: "maxbars", t: "{{ user.name }}", d: { user: { name: "Ada" } } },
   // `..` range operator — sugar for (range a b); a single `.` stays a path/decimal.
-  { name: "mx:range-lit", dialect: "maxbars", t: "{{#each 1..4}}{{this}}{{/each}}", d: {} },
-  { name: "mx:range-dyn", dialect: "maxbars", t: "{{#each lo..hi}}{{this}} {{/each}}", d: { lo: 2, hi: 5 } },
-  { name: "mx:range-precedence", dialect: "maxbars", t: "{{#each 1..n+1}}{{this}}{{/each}}", d: { n: 3 } },
+  { name: "mx:range-lit", dialect: "maxbars", t: "{% each 1..4 %}{{this}}{% endeach %}", d: {} },
+  { name: "mx:range-dyn", dialect: "maxbars", t: "{% each lo..hi %}{{this}} {% endeach %}", d: { lo: 2, hi: 5 } },
+  { name: "mx:range-precedence", dialect: "maxbars", t: "{% each 1..n+1 %}{{this}}{% endeach %}", d: { n: 3 } },
   { name: "mx:range-value", dialect: "maxbars", t: "{{ 1..3 }}", d: {} },
   { name: "mx:range-decimal-untouched", dialect: "maxbars", t: "{{ 1.5 }}", d: {} },
   { name: "mx:range-path-untouched", dialect: "maxbars", t: "{{ a.b }}", d: { a: { b: "ok" } } },
   // `[…]` list and `{k: v}` dict literals — sugar for the `list`/`dict` helpers.
-  { name: "mx:list-lit", dialect: "maxbars", t: "{{#each [10, 20, 30]}}{{this}} {{/each}}", d: {} },
-  { name: "mx:list-exprs", dialect: "maxbars", t: "{{#each [1, n + 1, n * 2]}}{{this}} {{/each}}", d: { n: 5 } },
-  { name: "mx:list-empty", dialect: "maxbars", t: "[{{#each []}}x{{/each}}]", d: {} },
+  { name: "mx:list-lit", dialect: "maxbars", t: "{% each [10, 20, 30] %}{{this}} {% endeach %}", d: {} },
+  { name: "mx:list-exprs", dialect: "maxbars", t: "{% each [1, n + 1, n * 2] %}{{this}} {% endeach %}", d: { n: 5 } },
+  { name: "mx:list-empty", dialect: "maxbars", t: "[{% each [] %}x{% endeach %}]", d: {} },
   { name: "mx:list-value", dialect: "maxbars", t: "{{ [1, 2, 3] }}", d: {} },
   // the structural scanner is brace-aware, so a dict abutting `}}` needs no space.
-  { name: "mx:dict-lit", dialect: "maxbars", t: "{{#with {name: who, age: 30}}}{{name}}/{{age}}{{/with}}", d: { who: "Ada" } },
-  { name: "mx:dict-strkey", dialect: "maxbars", t: '{{#with {"full name": who}}}{{lookup this "full name"}}{{/with}}', d: { who: "Ada L" } },
-  { name: "mx:dict-string-brace", dialect: "maxbars", t: '{{#with {msg: "a}}b"}}}{{msg}}{{/with}}', d: {} },
+  { name: "mx:dict-lit", dialect: "maxbars", t: "{% with {name: who, age: 30} %}{{name}}/{{age}}{% endwith %}", d: { who: "Ada" } },
+  { name: "mx:dict-strkey", dialect: "maxbars", t: '{% with {"full name": who} %}{{lookup this "full name"}}{% endwith %}', d: { who: "Ada L" } },
+  { name: "mx:dict-string-brace", dialect: "maxbars", t: '{% with {msg: "a}}b"} %}{{msg}}{% endwith %}', d: {} },
   { name: "mx:dict-json", dialect: "maxbars", t: "{{{json {x: 1, y: 2}}}}", d: {} },
   // `{{#let}}` (ADR-024): block-scoped aliases, sequential, never re-rooting.
-  { name: "mx:let-single", dialect: "maxbars", t: '{{#let g="Hi"}}{{g}}{{/let}}', d: {} },
-  { name: "mx:let-from-data", dialect: "maxbars", t: "{{#let n=count}}{{n}} items{{/let}}", d: { count: 5 } },
-  { name: "mx:let-sequential", dialect: "maxbars", t: "{{#let a=1 b=(add a 1)}}{{a}},{{b}}{{/let}}", d: {} },
-  { name: "mx:let-no-reroot", dialect: "maxbars", t: "{{#let u=user}}{{name}}/{{u.name}}{{/let}}", d: { name: "ROOT", user: { name: "Ada" } } },
-  { name: "mx:let-dict-value", dialect: "maxbars", t: '{{#let cfg={theme: "dark"}}}{{cfg.theme}}{{/let}}', d: {} },
-  { name: "mx:let-in-loop", dialect: "maxbars", t: "{{#each items}}{{#let u=(uppercase this)}}{{u}}@{{loop.index0}} {{/let}}{{/each}}", d: { items: ["a", "b"] } },
-  { name: "mx:let-shadows-op", dialect: "maxbars", t: '{{#let add="x"}}{{add}}{{/let}}', d: {} },
+  { name: "mx:let-single", dialect: "maxbars", t: '{% let g="Hi" %}{{g}}{% endlet %}', d: {} },
+  { name: "mx:let-from-data", dialect: "maxbars", t: "{% let n=count %}{{n}} items{% endlet %}", d: { count: 5 } },
+  { name: "mx:let-sequential", dialect: "maxbars", t: "{% let a=1 b=(add a 1) %}{{a}},{{b}}{% endlet %}", d: {} },
+  { name: "mx:let-no-reroot", dialect: "maxbars", t: "{% let u=user %}{{name}}/{{u.name}}{% endlet %}", d: { name: "ROOT", user: { name: "Ada" } } },
+  { name: "mx:let-dict-value", dialect: "maxbars", t: '{% let cfg={theme: "dark"} %}{{cfg.theme}}{% endlet %}', d: {} },
+  { name: "mx:let-in-loop", dialect: "maxbars", t: "{% each items %}{% let u=(uppercase this) %}{{u}}@{{loop.index0}} {% endlet %}{% endeach %}", d: { items: ["a", "b"] } },
+  { name: "mx:let-shadows-op", dialect: "maxbars", t: '{% let add="x" %}{{add}}{% endlet %}', d: {} },
   // a list literal GLUED to a let `=` is the list, not a path-bracket of the key
   // (the `xs=[…]` lexing fix); then iterated with each…in.
-  { name: "mx:let-list-glued-each", dialect: "maxbars", t: "{{#let xs=[10, 20, 30]}}{{#each v in xs}}{{v}} {{/each}}{{/let}}", d: {} },
-  { name: "mx:collections-nested", dialect: "maxbars", t: "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}", d: {} },
+  { name: "mx:let-list-glued-each", dialect: "maxbars", t: "{% let xs=[10, 20, 30] %}{% each v in xs %}{{v}} {% endeach %}{% endlet %}", d: {} },
+  { name: "mx:collections-nested", dialect: "maxbars", t: "{% each [{tags: [1, 2]}, {tags: [3]}] %}{% each tags %}{{this}}{% endeach %};{% endeach %}", d: {} },
   // ── feature combinations (the surface features interact; pin them together) ──
   // let + each…in + the `..` range + the 1-based binding, all in one template.
-  { name: "mx:combo-let-each-range", dialect: "maxbars", t: "{{#let hi=(add n 1)}}{{#each x i1 in 1..hi}}{{x}}#{{i1}} {{/each}}{{/let}}", d: { n: 2 } },
+  { name: "mx:combo-let-each-range", dialect: "maxbars", t: "{% let hi=(add n 1) %}{% each x i1 in 1..hi %}{{x}}#{{i1}} {% endeach %}{% endlet %}", d: { n: 2 } },
   // each…in over a list-of-dict literal, binding element + index, aliasing with let.
-  { name: "mx:combo-each-list-dict-let", dialect: "maxbars", t: '{{#each row i in [{n: "a"}, {n: "b"}]}}{{#let tag=(uppercase row.n)}}{{i}}:{{tag}} {{/let}}{{/each}}', d: {} },
+  { name: "mx:combo-each-list-dict-let", dialect: "maxbars", t: '{% each row i in [{n: "a"}, {n: "b"}] %}{% let tag=(uppercase row.n) %}{{i}}:{{tag}} {% endlet %}{% endeach %}', d: {} },
   // a dict literal as a let value, read inside a nested each…in over a range.
-  { name: "mx:combo-let-dict-each", dialect: "maxbars", t: "{{#let cfg={base: 10}}}{{#each k in 1..3}}{{add cfg.base k}} {{/each}}{{/let}}", d: {} },
+  { name: "mx:combo-let-dict-each", dialect: "maxbars", t: "{% let cfg={base: 10} %}{% each k in 1..3 %}{{add cfg.base k}} {% endeach %}{% endlet %}", d: {} },
   // labelled each…in with an inner each…in reading the outer frame + a let alias.
-  { name: "mx:combo-label-let", dialect: "maxbars", t: "{{#each row j in rows label outer}}{{#each c in row}}{{#let tag=(uppercase c)}}{{outer.index1}}.{{j}}:{{tag}} {{/let}}{{/each}}{{/each}}", d: { rows: [["a"], ["b", "c"]] } },
+  { name: "mx:combo-label-let", dialect: "maxbars", t: "{% each row j in rows label outer %}{% each c in row %}{% let tag=(uppercase c) %}{{outer.index1}}.{{j}}:{{tag}} {% endlet %}{% endeach %}{% endeach %}", d: { rows: [["a"], ["b", "c"]] } },
   // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
   // through to name (where ?? keeps the non-null "" and || yields a boolean).
   { name: "mx:elvis-empty", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "", name: "Ada" } },
@@ -372,13 +372,13 @@ export const cases = [
   { name: "arr-find-gt", dialect: "surface", t: "{{ lookup (find xs \"score\" \"gt\" 50) \"n\" }}", d: { xs: [{ n: "a", score: 30 }, { n: "b", score: 80 }] } },
   { name: "arr-some-gt", dialect: "surface", t: "{{#if (some xs \"score\" \"gt\" 90)}}y{{else}}n{{/if}}", d: { xs: [{ score: 80 }, { score: 95 }] } },
   { name: "arr-every-gte", dialect: "surface", t: "{{#if (every xs \"score\" \"gte\" 50)}}y{{else}}n{{/if}}", d: { xs: [{ score: 80 }, { score: 30 }] } },
-  { name: "arr-where-cmp-dotted", dialect: "maxbars", t: "{{#each row in (rows | where \"u.age\" \"gte\" 18)}}{{ row.u.name }};{{/each}}", d: { rows: [{ u: { name: "a", age: 30 } }, { u: { name: "b", age: 10 } }] } },
+  { name: "arr-where-cmp-dotted", dialect: "maxbars", t: "{% each row in (rows | where \"u.age\" \"gte\" 18) %}{{ row.u.name }};{% endeach %}", d: { rows: [{ u: { name: "a", age: 30 } }, { u: { name: "b", age: 10 } }] } },
   // glyph aliases (ADR-037): == != < <= > >= behave identically to the names.
   { name: "arr-where-glyph-gt", dialect: "surface", t: "{{#each (where xs \"score\" \">\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 30 }] } },
   { name: "arr-where-glyph-gte", dialect: "surface", t: "{{#each (where xs \"score\" \">=\" 50)}}{{ n }};{{/each}}", d: { xs: [{ n: "a", score: 80 }, { n: "b", score: 50 }, { n: "c", score: 30 }] } },
   { name: "arr-where-glyph-ne", dialect: "surface", t: "{{#each (where xs \"tier\" \"!=\" \"gold\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", tier: "gold" }, { n: "b", tier: "silver" }] } },
   { name: "arr-some-glyph-eq", dialect: "surface", t: "{{#if (some xs \"id\" \"==\" 2)}}y{{else}}n{{/if}}", d: { xs: [{ id: 1 }, { id: 2 }] } },
-  { name: "arr-where-glyph-le", dialect: "maxbars", t: "{{#each x in (xs | where \"v\" \"<=\" 2)}}{{ x.v }};{{/each}}", d: { xs: [{ v: 1 }, { v: 2 }, { v: 3 }] } },
+  { name: "arr-where-glyph-le", dialect: "maxbars", t: "{% each x in (xs | where \"v\" \"<=\" 2) %}{{ x.v }};{% endeach %}", d: { xs: [{ v: 1 }, { v: 2 }, { v: 3 }] } },
   // string-predicate comparators (ADR-037): startsWith/endsWith on strings,
   // includes polymorphic (string substring / array membership).
   { name: "arr-where-startsWith", dialect: "surface", t: "{{#each (where xs \"name\" \"startsWith\" \"Dr\")}}{{ name }};{{/each}}", d: { xs: [{ name: "Dr Ada" }, { name: "Mr Lin" }, { name: "Dr Bo" }] } },
@@ -401,7 +401,7 @@ export const cases = [
   { name: "mx:modulo", dialect: "maxbars", t: "{{ a % b }}", d: { a: 17, b: 5 } },
   { name: "mx:arith-precedence", dialect: "maxbars", t: "{{ a + b * c }}", d: { a: 2, b: 3, c: 4 } },
   { name: "mx:arith-parens", dialect: "maxbars", t: "{{ (a + b) * c }}", d: { a: 2, b: 3, c: 4 } },
-  { name: "mx:arith-cmp", dialect: "maxbars", t: "{{#if n + 1 > 5}}big{{else}}small{{/if}}", d: { n: 5 } },
+  { name: "mx:arith-cmp", dialect: "maxbars", t: "{% if n + 1 > 5 %}big{% else %}small{% endif %}", d: { n: 5 } },
   { name: "mx:arith-path", dialect: "maxbars", t: "{{ price.net * qty }}", d: { price: { net: 10 }, qty: 3 } },
   { name: "mx:coalesce-null", dialect: "maxbars", t: "{{ a ?? b }}", d: { a: null, b: "fb" } },
   { name: "mx:coalesce-zero", dialect: "maxbars", t: "{{ a ?? b }}", d: { a: 0, b: "fb" } },
@@ -409,37 +409,37 @@ export const cases = [
 
   // `elif` honours an `includeZero=true` options hash (like the head `if`): a
   // bare 0 in the elif is truthy only with the flag. Compiled ≡ interpreter.
-  { name: "mx:elif-includeZero-pass", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif 0 includeZero=true}}F{{/if}}", d: { score: 150 } },
-  { name: "mx:elif-includeZero-fire", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif 0 includeZero=true}}F{{/if}}", d: { score: 50 } },
-  { name: "mx:elif-no-includeZero", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif n}}Z{{else}}E{{/if}}", d: { score: 50, n: 0 } },
-  { name: "mx:elif-includeZero-else", dialect: "maxbars", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
+  { name: "mx:elif-includeZero-pass", dialect: "maxbars", t: "{% if score >= 100 %}P{% elif 0 includeZero=true %}F{% endif %}", d: { score: 150 } },
+  { name: "mx:elif-includeZero-fire", dialect: "maxbars", t: "{% if score >= 100 %}P{% elif 0 includeZero=true %}F{% endif %}", d: { score: 50 } },
+  { name: "mx:elif-no-includeZero", dialect: "maxbars", t: "{% if score >= 100 %}P{% elif n %}Z{% else %}E{% endif %}", d: { score: 50, n: 0 } },
+  { name: "mx:elif-includeZero-else", dialect: "maxbars", t: "{% if a %}A{% elif n includeZero=true %}Z{% else %}E{% endif %}", d: { a: false, n: 0 } },
   // surface (ClassicBars) elif + includeZero hash.
   { name: "s:elif-includeZero", dialect: "surface", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   // the `{{else if …}}` spelling carries a trailing hash through to `elif`, so it
   // behaves identically to the `{{elif …}}` form above (both targets).
   { name: "s:else-if-includeZero", dialect: "surface", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
-  { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
+  { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{% if a %}A{% else if n includeZero=true %}Z{% else %}E{% endif %}", d: { a: false, n: 0 } },
   // block params parse in MaxBars (head ladder omits the pipe rung) — built-ins
   // bind them exactly as ClassicBars does, compiled ≡ interpreted.
-  { name: "mx:blockparams-each", dialect: "maxbars", t: "{{#each item i in xs}}[{{i}}:{{item}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:blockparams-with", dialect: "maxbars", t: "{{#with o as c}}{{c.n}}{{/with}}", d: { o: { n: "Z" } } },
+  { name: "mx:blockparams-each", dialect: "maxbars", t: "{% each item i in xs %}[{{i}}:{{item}}]{% endeach %}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:blockparams-with", dialect: "maxbars", t: "{% with o as c %}{{c.n}}{% endwith %}", d: { o: { n: "Z" } } },
   // a parenthesised pipe coexists with a trailing block-param clause.
-  { name: "mx:blockparams-paren-pipe", dialect: "maxbars", t: "{{#each x in (xs | reverse)}}{{x}}{{/each}}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:blockparams-paren-pipe", dialect: "maxbars", t: "{% each x in (xs | reverse) %}{{x}}{% endeach %}", d: { xs: ["a", "b", "c"] } },
   // an OUTER block param stays visible inside a nested loop (frame binds inherit).
-  { name: "mx:blockparams-nested-outer", dialect: "maxbars", t: "{{#each row in rows}}{{#each row}}[{{row}}={{this}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "mx:blockparams-nested-outer", dialect: "maxbars", t: "{% each row in rows %}{% each row %}[{{row}}={{this}}]{% endeach %}{% endeach %}", d: { rows: [["a", "b"], ["c"]] } },
   // a block param named like a prelude op (here `t`, the translate helper) shadows
   // it — `{{t}}`/`{{t.name}}` read the binding, not the helper (interpreter ≡ compiled).
-  { name: "mx:blockparam-shadows-op", dialect: "maxbars", t: "{{#each t in rows}}[{{t.name}}]{{/each}}", d: { rows: [{ name: "A" }, { name: "B" }] } },
-  { name: "mx:blockparam-shadows-op-bare", dialect: "maxbars", t: "{{#each add in xs}}[{{add}}]{{/each}}", d: { xs: ["x", "y"] } },
+  { name: "mx:blockparam-shadows-op", dialect: "maxbars", t: "{% each t in rows %}[{{t.name}}]{% endeach %}", d: { rows: [{ name: "A" }, { name: "B" }] } },
+  { name: "mx:blockparam-shadows-op-bare", dialect: "maxbars", t: "{% each add in xs %}[{{add}}]{% endeach %}", d: { xs: ["x", "y"] } },
   // ── labelled loops (ADR-013): the label binds the frame reified as an object ──
-  { name: "mx:label-outer-array", dialect: "maxbars", t: "{{#each row in rows label outer}}{{#each row}}{{outer.index1}}/{{outer.length}}:{{this}}{{#if outer.first}}*{{/if}} {{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
-  { name: "mx:label-single", dialect: "maxbars", t: "{{#each xs label l}}{{l.index0}}:{{this}}/{{l.last}} {{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:label-object-key", dialect: "maxbars", t: "{{#each r in rows label outer}}{{#each r}}[{{r}}@{{outer.key}}]{{/each}}{{/each}}", d: { rows: { A: ["x"], B: ["y", "z"] } } },
+  { name: "mx:label-outer-array", dialect: "maxbars", t: "{% each row in rows label outer %}{% each row %}{{outer.index1}}/{{outer.length}}:{{this}}{% if outer.first %}*{% endif %} {% endeach %}{% endeach %}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "mx:label-single", dialect: "maxbars", t: "{% each xs label l %}{{l.index0}}:{{this}}/{{l.last}} {% endeach %}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:label-object-key", dialect: "maxbars", t: "{% each r in rows label outer %}{% each r %}[{{r}}@{{outer.key}}]{% endeach %}{% endeach %}", d: { rows: { A: ["x"], B: ["y", "z"] } } },
   // ── ADR-021 reserved variable model: loop / root / parent (chainable) ─────────
-  { name: "mx:loop-fields", dialect: "maxbars", t: "{{#each xs}}{{loop.index1}}/{{loop.length}}{{#if loop.first}}<{{/if}}{{#if loop.last}}>{{/if}} {{/each}}", d: { xs: ["a", "b", "c"] } },
-  { name: "mx:loop-parent", dialect: "maxbars", t: "{{#each rows}}{{#each this}}[{{loop.index0}}@{{loop.parent.index0}}/{{loop.root.length}}]{{/each}}{{/each}}", d: { rows: [["a", "b"], ["c"]] } },
-  { name: "mx:root", dialect: "maxbars", t: "{{#each xs}}{{root.title}}:{{this}} {{/each}}", d: { title: "T", xs: ["a", "b"] } },
-  { name: "mx:parent-chain", dialect: "maxbars", t: "{{#each rows}}{{#each cells}}[{{parent.tag}}|{{parent.parent.title}}|{{parent.root.title}}]{{/each}}{{/each}}", d: { title: "R", rows: [{ tag: "A", cells: ["x", "y"] }, { tag: "B", cells: ["z"] }] } },
+  { name: "mx:loop-fields", dialect: "maxbars", t: "{% each xs %}{{loop.index1}}/{{loop.length}}{% if loop.first %}<{% endif %}{% if loop.last %}>{% endif %} {% endeach %}", d: { xs: ["a", "b", "c"] } },
+  { name: "mx:loop-parent", dialect: "maxbars", t: "{% each rows %}{% each this %}[{{loop.index0}}@{{loop.parent.index0}}/{{loop.root.length}}]{% endeach %}{% endeach %}", d: { rows: [["a", "b"], ["c"]] } },
+  { name: "mx:root", dialect: "maxbars", t: "{% each xs %}{{root.title}}:{{this}} {% endeach %}", d: { title: "T", xs: ["a", "b"] } },
+  { name: "mx:parent-chain", dialect: "maxbars", t: "{% each rows %}{% each cells %}[{{parent.tag}}|{{parent.parent.title}}|{{parent.root.title}}]{% endeach %}{% endeach %}", d: { title: "R", rows: [{ tag: "A", cells: ["x", "y"] }, { tag: "B", cells: ["z"] }] } },
 
   // canonical escapers escapeHtml/escapeJson (compiled ≡ interpreter).
   { name: "escapeHtml-canonical", t: "{{{escapeHtml (lookup this \"x\")}}}", d: { x: "<b>&\"'" } },

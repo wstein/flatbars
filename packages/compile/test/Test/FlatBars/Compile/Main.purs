@@ -47,7 +47,7 @@ main = do
     [ "rt.out(rt.esc(rt.lookup(c0.ctx, \"name\")))" ]
 
   expectJs "if/else compiles to native control flow"
-    "{{#if (lookup this \"a\")}}X{{else}}Y{{/if}}"
+    "{% if (lookup this \"a\") %}X{% else %}Y{% endif %}"
     [ "if (rt.truthy(c0.truthy, rt.lookup(c0.ctx, \"a\"))) {"
     , "} else {"
     , "out += \"X\""
@@ -55,25 +55,25 @@ main = do
     ]
 
   expectJs "elif chains to else-if"
-    "{{#if (lookup this \"a\")}}A{{elif (lookup this \"b\")}}B{{else}}C{{/if}}"
+    "{% if (lookup this \"a\") %}A{% elif (lookup this \"b\") %}B{% else %}C{% endif %}"
     [ "} else if (rt.truthy(c0.truthy, rt.lookup(c0.ctx, \"b\"))) {" ]
 
   expectJs "unless negates the test"
-    "{{#unless (lookup this \"a\")}}N{{/unless}}"
+    "{% unless (lookup this \"a\") %}N{% endunless %}"
     [ "if (!(rt.truthy(c0.truthy, rt.lookup(c0.ctx, \"a\")))) {" ]
 
   expectJs "each compiles to a frame loop with a child scope"
-    "{{#each (lookup this \"xs\")}}{{{this}}}{{/each}}"
+    "{% each (lookup this \"xs\") %}{{{this}}}{% endeach %}"
     [ "rt.each(rt.lookup(c0.ctx, \"xs\"), c0, [], null, function (c1)", "rt.out(c1.ctx)" ]
 
   expectJs "each passes block-param names to the runtime"
-    "{{#each (lookup this \"xs\") \"item\" \"i\"}}{{{item}}}{{/each}}"
+    "{% each (lookup this \"xs\") \"item\" \"i\" %}{{{item}}}{% endeach %}"
     [ "rt.each(rt.lookup(c0.ctx, \"xs\"), c0, [\"item\", \"i\"], null, function (c1)"
     , "rt.call(\"item\", [], c1)"
     ]
 
   expectJs "with shifts the frame"
-    "{{#with (lookup this \"o\")}}{{{this}}}{{/with}}"
+    "{% with (lookup this \"o\") %}{{{this}}}{% endwith %}"
     [ "rt.with(rt.lookup(c0.ctx, \"o\"), c0, [], null, function (c1)" ]
 
   expectJs "unknown helper routes through the runtime registry"

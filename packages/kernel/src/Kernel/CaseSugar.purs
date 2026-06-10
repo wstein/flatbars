@@ -7,6 +7,7 @@
 -- | identical across them.
 module Kernel.CaseSugar
   ( caseLeadingViolation
+  , braceControlViolation
   ) where
 
 import Prelude
@@ -14,7 +15,8 @@ import Prelude
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.String (trim)
-import FlatBars.Syntax (Node(..), Sigil(..), Template)
+import Data.String.CodeUnits (drop, take)
+import FlatBars.Syntax (Ident, Node(..), Sigil(..), Template)
 
 -- | The first `{{#case}}` whose body carries non-whitespace content before its first
 -- | `{{when}}`/`{{else}}` arm — its offset and a "shape" string for the located
@@ -36,6 +38,44 @@ caseLeadingViolation nodes = Array.head (Array.mapMaybe node nodes)
     Nothing -> Nothing
   caseLeadingShape =
     "{{#case}} (only whitespace may precede the first {{when}} — move leading content into a {{when}}/{{else}} arm)"
+
+-- | The first `{{ … }}`-delimited CONTROL tag (a block open/close or a clause
+-- | separator) in `nodes` — its offset and a "shape" string for the located
+-- | `DisallowedShape` error, searched depth-first through block bodies. In a
+-- | `statementTags` dialect (RawBars/MaxBars, docs-19) control flow is written with
+-- | Django-style `{% … %}` tags and `{{ … }}` is OUTPUT-ONLY, so a legacy `{{#if}}` /
+-- | `{{/if}}` / bare `{{else}}` is rejected with an actionable "use {% … %}" message
+-- | rather than silently re-accepted (the no-silent-no-op bar — CLAUDE.md). Raw
+-- | blocks (`{{{{#op}}}}`) are a separate `RawBlock` node and keep their quad-stache
+-- | spelling, so they never reach here.
+-- |
+-- | `clauses` are the engine's clause-separator names (`else`/`elif`/`when`): only a
+-- | `Sep` with one of those names is a *control* separator. A bare `{{name}}` is a
+-- | `Sep` too in the skeleton (output vs separator is settled at desugar, not parse),
+-- | so the name gate is what keeps plain output from being mistaken for control.
+braceControlViolation :: Array Ident -> String -> Template -> Maybe { off :: Int, shape :: String }
+braceControlViolation clauses src nodes = Array.head (Array.mapMaybe node nodes)
+  where
+  node = case _ of
+    Block sp _ name _ body
+      | isBrace sp -> Just { off: sp.start, shape: blockShape name }
+      | otherwise -> braceControlViolation clauses src body
+    Sep sp name _
+      | isBrace sp && Array.elem name clauses -> Just { off: sp.start, shape: sepShape name }
+    _ -> Nothing
+  isBrace sp = take 2 (drop sp.start src) == "{{"
+  blockShape name =
+    "{{#" <> name
+      <> " …}} (control flow uses Django-style {% … %} tags in this dialect — write {% "
+      <> name
+      <> " … %} … {% end"
+      <> name
+      <> " %})"
+  sepShape name =
+    "{{" <> name
+      <> " …}} (a clause separator uses a {% … %} tag in this dialect — write {% "
+      <> name
+      <> " … %})"
 
 -- | The source offset of a node's span (for located errors).
 nodeStart :: Node -> Int

@@ -10,8 +10,14 @@
 -- |
 -- | ## Rewrites (mechanical, meaning-preserving)
 -- |
--- |  * `{{^x}}` (inverted section) → `{{#unless x}}`; its matching `{{/x}}` →
--- |    `{{/unless}}`. Pairing uses an open/close **stack** so nested same-named
+-- |  * **Control flow re-delimits to Django-style `{% … %}` statement tags**
+-- |    (docs-19) — the only control surface MaxBars accepts (`{{ … }}` is output-
+-- |    only there). A `{{#name …}}` open → `{% name … %}`, its `{{/name}}` close →
+-- |    `{% endname %}`, and a clause separator (`{{else}}` → `{% else %}`,
+-- |    `{{else if c}}` → `{% elif c %}`) → a `{% … %}` tag. `~` whitespace-control
+-- |    is preserved as `{%~ … ~%}`.
+-- |  * `{{^x}}` (inverted section) → `{% unless x %}`; its matching `{{/x}}` →
+-- |    `{% endunless %}`. Pairing uses an open/close **stack** so nested same-named
 -- |    sections close correctly.
 -- |  * `{{&x}}` (amp-unescaped) → `{{{x}}}`. (`{{&x}}` and `{{{x}}}` already lex
 -- |    to the same skeleton — this is a cosmetic source normalization.)
@@ -21,7 +27,6 @@
 -- |    `@../index`→`loop.parent.index0`, `@../../x`→`parent.parent.x`.
 -- |  * the block-partial reference `{{> @partial-block}}` → `{{yield}}` (MaxBars'
 -- |    spelling; the bare `@partial-block` name is otherwise left alone).
--- |  * `{{else if c}}` → `{{elif c}}`.
 -- |
 -- | ## Residuals (detected + reported, NOT rewritten — each carries a span,
 -- | a message, and a suggested fix):
@@ -109,7 +114,7 @@ migrateToMaxBars src = do
 -- | A close-pairing decision pushed by an `ROpen`: when its matching `RClose`
 -- | arrives, was the open rewritten to a `{{#unless …}}` (so the close becomes
 -- | `{{/unless}}`), or kept verbatim (so the close is sliced verbatim)?
-data CloseRule = CloseUnless | CloseVerbatim
+data CloseRule = CloseUnless | CloseEnd
 
 -- | The fold accumulator: the emitted source so far (reversed list of chunks),
 -- | the residuals so far (reversed), and the open/close stack of pairing rules.
@@ -144,37 +149,45 @@ step src acc = case _ of
   RAmp _ _ interior _ ->
     emit acc ("{{{" <> mapDataNames interior <> "}}}")
 
+  -- Control flow migrates to Django-style `{% … %}` statement tags (docs-19), the
+  -- only control surface MaxBars accepts; `~` whitespace-control is read off the
+  -- original slice and re-emitted as `{%~ … ~%}`.
   ROpen span sigil _ interior _ ->
     let
       acc1 = addResiduals acc (openResiduals span sigil interior)
+      tr = trimsOf (sliceSpan src span)
     in
       case sigil of
         Inverse ->
-          -- `{{^e}}` → `{{#unless <e>}}`; keep the interior verbatim (incl. a
-          -- leading `~`), map its `@`-data names; mark the close for `{{/unless}}`.
-          push (emit acc1 ("{{#unless " <> mapDataNames interior <> "}}")) CloseUnless
+          -- `{{^e}}` → `{% unless <e> %}`; map the interior's `@`-data names and
+          -- mark the close for `{% endunless %}`.
+          push (emit acc1 (stmtTag tr ("unless " <> mapDataNames interior))) CloseUnless
         _ ->
-          -- a `{{#…}}` (or inheritance) open: keep the source slice verbatim
-          -- (only `@`-data names mapped) and pair its close verbatim.
-          push (emit acc1 (mapDataInTag (sliceSpan src span))) CloseVerbatim
+          -- a `{{#name …}}` open → `{% name … %}`; the matching close emits
+          -- `{% end<name> %}` (the name comes from the `RClose` token).
+          push (emit acc1 (stmtTag tr (mapDataNames interior))) CloseEnd
 
-  RClose span _ _ _ ->
-    case Array.head acc.stack of
-      Just CloseUnless ->
-        emit (popStack acc) "{{/unless}}"
-      _ ->
-        emit (popStack acc) (mapDataInTag (sliceSpan src span))
+  RClose span _ name _ ->
+    let
+      tr = trimsOf (sliceSpan src span)
+    in
+      case Array.head acc.stack of
+        Just CloseUnless ->
+          emit (popStack acc) (stmtTag tr "endunless")
+        _ ->
+          emit (popStack acc) (stmtTag tr ("end" <> name))
 
-  -- A separator. `{{else if c}}` → `{{elif c}}`; the Handlebars block-partial
-  -- reference `{{> @partial-block}}` → `{{yield}}` (the MaxBars spelling — dropping
-  -- the `>` sigil, since it is a direct yield, not a partial *named* yield);
-  -- otherwise verbatim (with `@`-data mapping, which auto-migrates `@../`/`@root`
-  -- too — ADR-021).
+  -- A separator. A clause separator (`{{else}}` / `{{else if c}}` → `{% elif c %}` /
+  -- `{{when …}}`) becomes a `{% … %}` tag; the Handlebars block-partial reference
+  -- `{{> @partial-block}}` → `{{yield}}` (an output, stays `{{ }}`); a bare `{{name}}`
+  -- output is verbatim (with `@`-data mapping — `@../`/`@root`, ADR-021).
   RSep span _ interior _ ->
     case rewriteElseIf interior of
-      Just rebuilt -> emit acc ("{{" <> rebuilt <> "}}")
+      Just rebuilt -> emit acc (stmtTag (trimsOf (sliceSpan src span)) rebuilt)
       Nothing
         | isPartialBlockRef interior -> emit acc "{{yield}}"
+        | isClauseSep interior -> emit acc
+            (stmtTag (trimsOf (sliceSpan src span)) (mapDataNames interior))
         | otherwise -> emit acc (mapDataInTag (sliceSpan src span))
 
   RComment span _ _ -> emit acc (sliceSpan src span)
@@ -338,6 +351,8 @@ charStr = SCU.singleton
 -- | `{{else if c}}` (interior `else if c`, modulo `~` and spacing) → `elif c`.
 -- | Returns `Nothing` for any other separator (left verbatim). The leading `~`
 -- | (if any) is preserved on the rebuilt interior; the trailing `~` likewise.
+-- | `{{else if c}}` → the bare `elif c` interior (whitespace-control trims are
+-- | re-applied by `stmtTag` from the source slice, so this returns no `~`).
 rewriteElseIf :: String -> Maybe String
 rewriteElseIf interior =
   let
@@ -349,14 +364,36 @@ rewriteElseIf interior =
     trimmed = String.trim core
   in
     case String.stripPrefix (Pattern "else if ") trimmed of
-      Just rest ->
-        let
-          cond = mapDataNames (String.trim rest)
-          tildeL = if lead then "~" else ""
-          tildeR = if trail then "~" else ""
-        in
-          Just (tildeL <> "elif " <> cond <> tildeR)
+      Just rest -> Just ("elif " <> mapDataNames (String.trim rest))
       Nothing -> Nothing
+
+-- | The leading/trailing `~` whitespace-control flags of a tag, read off its raw
+-- | source slice (`{{~…~}}`), so a re-delimited `{% … %}` keeps them faithfully.
+trimsOf :: String -> { l :: Boolean, r :: Boolean }
+trimsOf slice = { l: SCU.take 3 slice == "{{~", r: SCU.takeRight 3 slice == "~}}" }
+
+-- | Build a `{% … %}` statement tag for a (trimmed) head, re-applying `~` trims as
+-- | `{%~ … ~%}`. The head is already `@`-data-mapped by the caller.
+stmtTag :: { l :: Boolean, r :: Boolean } -> String -> String
+stmtTag tr head =
+  "{%" <> (if tr.l then "~" else "") <> " " <> String.trim head <> " "
+    <> (if tr.r then "~" else "")
+    <> "%}"
+
+-- | A `RSep` interior is a *clause* separator (vs a bare output) when its head name
+-- | is one of the engine's clause keywords (`else`/`elif`/`when`).
+isClauseSep :: String -> Boolean
+isClauseSep interior = Array.elem (firstWord interior) [ "else", "elif", "when" ]
+
+-- | The first whitespace-delimited word of an interior (a leading `~` stripped).
+firstWord :: String -> String
+firstWord s =
+  let
+    core = String.trim (if SCU.take 1 s == "~" then SCU.drop 1 s else s)
+  in
+    case Array.head (String.split (Pattern " ") core) of
+      Just w -> w
+      Nothing -> ""
 
 --------------------------------------------------------------------------------
 -- Residual detection

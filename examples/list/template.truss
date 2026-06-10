@@ -1,0 +1,3 @@
+<ul>
+{% each items %}  <li>{{loop.index0}}. {{this}}</li>
+{% endeach %}</ul>

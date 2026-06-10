@@ -191,14 +191,14 @@ main = do
     listMatrix
 
   -- ── Direct source-shape assertions ──
-  migratesContaining "unless open shape" "{{^items}}none{{/items}}" "{{#unless items}}"
-  migratesContaining "unless close shape" "{{^items}}none{{/items}}" "{{/unless}}"
+  migratesContaining "unless open shape" "{{^items}}none{{/items}}" "{% unless items %}"
+  migratesContaining "unless close shape" "{{^items}}none{{/items}}" "{% endunless %}"
   -- ADR-021: `@index` migrates to the loop object, `@first` likewise; `@` is gone.
   migratesContaining "loop.index0 rewrite" "{{#each items}}{{@index}}{{/each}}" "loop.index0"
   migratesContaining "loop.first rewrite" "{{#each items}}{{@first}}{{/each}}" "{{loop.first}}"
   assertNotContaining "first @ dropped" "{{#each items}}{{@first}}{{/each}}" "@first"
   migratesContaining "amp to triple" "{{&x}}" "{{{x}}}"
-  migratesContaining "elif rewrite" "{{#if a}}x{{else if b}}y{{/if}}" "{{elif b}}"
+  migratesContaining "elif rewrite" "{{#if a}}x{{else if b}}y{{/if}}" "{% elif b %}"
 
   -- The block-partial reference `{{> @partial-block}}` migrates to `{{yield}}`
   -- (MaxBars' spelling); the `@partial-block` name must not survive (it is not

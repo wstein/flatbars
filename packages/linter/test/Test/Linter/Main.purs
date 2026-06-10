@@ -24,7 +24,7 @@ import Data.String (Pattern(..), contains)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FlatBars.Parser (parse, parseWith)
+import FlatBars.Parser (parseWith)
 import FlatBars.Span (Span)
 import FlatBars.Value (Value(..))
 import Kernel.Lower (RNode(..), lower)
@@ -43,12 +43,12 @@ maxAst src = case parseWith maxOptions src of
   Left e -> Left ("MaxBars parse failed: " <> show e)
   Right { nodes } -> Right (lower (desugarSurfaceWith maxLoopVars nodes))
 
--- | The lowered RawBars source, re-parsed with the *default core* parser, as the
--- | reference real AST.
+-- | The lowered RawBars source, re-parsed with the *RawBars* parser (statementTags
+-- | on, docs-19: the lowering emits `{% … %}` control), as the reference real AST.
 loweredAst :: String -> Either String (Array RNode)
 loweredAst src = case lowerToRawBars src of
   Left e -> Left ("lower failed: " <> show e)
-  Right lowered -> case parse lowered of
+  Right lowered -> case parseWith RawBars.coreOptions lowered of
     Left e -> Left ("re-parse of lowered RawBars failed: " <> show e <> "\n  lowered = " <> lowered)
     Right { nodes } -> Right (lower nodes)
 
@@ -174,19 +174,20 @@ main = do
   roundTrips "infix comparison" "{{ a > b }}"
   roundTrips "pipe unary" "{{ o | json }}"
   roundTrips "pipe with arg" "{{ a | f x }}"
-  roundTrips "if/else" "{{#if x > 0}}big{{else}}small{{/if}}"
-  roundTrips "if elif else" "{{#if x > 10}}big{{elif x > 0}}small{{else}}none{{/if}}"
-  roundTrips "unless" "{{#unless done}}todo{{/unless}}"
+  roundTrips "if/else" "{% if x > 0 %}big{% else %}small{% endif %}"
+  roundTrips "if elif else" "{% if x > 10 %}big{% elif x > 0 %}small{% else %}none{% endif %}"
+  roundTrips "unless" "{% unless done %}todo{% endunless %}"
   -- MaxBars has no `{{^x}}` syntax (extras off); the inverted-section role is
   -- spelled `{{#unless}}` / negation here.
-  roundTrips "unless with else" "{{#unless items}}empty{{else}}has items{{/unless}}"
+  roundTrips "unless with else" "{% unless items %}empty{% else %}has items{% endunless %}"
   roundTrips "not infix" "{{ !done }}"
-  roundTrips "each loop vars" "{{#each xs}}[{{index1}}/{{this}}]{{/each}}"
+  roundTrips "each loop vars" "{% each xs %}[{{index1}}/{{this}}]{% endeach %}"
   roundTrips "each first/last"
-    "{{#each xs}}{{#if first}}({{/if}}{{this}}{{#if last}}){{/if}}{{/each}}"
-  roundTrips "each with infix cond" "{{#each xs}}{{#if index0 > 0}}, {{/if}}{{this}}{{/each}}"
-  roundTrips "nested each" "{{#each users}}{{#each this.posts}}{{this}}{{/each}}{{/each}}"
-  roundTrips "mixed" "Hi {{ user.name | upper }}!{{#each xs}} {{index1}}={{this}}{{/each}}"
+    "{% each xs %}{% if first %}({% endif %}{{this}}{% if last %}){% endif %}{% endeach %}"
+  roundTrips "each with infix cond"
+    "{% each xs %}{% if index0 > 0 %}, {% endif %}{{this}}{% endeach %}"
+  roundTrips "nested each" "{% each users %}{% each this.posts %}{{this}}{% endeach %}{% endeach %}"
+  roundTrips "mixed" "Hi {{ user.name | upper }}!{% each xs %} {{index1}}={{this}}{% endeach %}"
 
   -- X1 — truthiness materialization. A non-`handlebars`-mode file is lowered by
   -- carrying its `@truthiness` directive forward; the lowered RawBars source must
@@ -196,18 +197,18 @@ main = do
   -- handlebars and diverge).
   --   `minimal` (nil/ruby): 0, "", [], {} are all truthy (only false/null falsy).
   --   `mustache`:            [] is falsy but 0 and "" are truthy.
-  rendersSame "minimal: 0 truthy" "minimal" "{{#if zero}}T{{else}}F{{/if}}"
-  rendersSame "minimal: \"\" truthy" "minimal" "{{#if empty}}T{{else}}F{{/if}}"
-  rendersSame "minimal: [] truthy" "minimal" "{{#if arr}}T{{else}}F{{/if}}"
-  rendersSame "minimal: unless 0" "minimal" "{{#unless zero}}U{{else}}-{{/unless}}"
+  rendersSame "minimal: 0 truthy" "minimal" "{% if zero %}T{% else %}F{% endif %}"
+  rendersSame "minimal: \"\" truthy" "minimal" "{% if empty %}T{% else %}F{% endif %}"
+  rendersSame "minimal: [] truthy" "minimal" "{% if arr %}T{% else %}F{% endif %}"
+  rendersSame "minimal: unless 0" "minimal" "{% unless zero %}U{% else %}-{% endunless %}"
   rendersSame "minimal: && over 0" "minimal" "{{ zero && yes }}"
-  rendersSame "nil alias: 0 truthy" "nil" "{{#if zero}}T{{else}}F{{/if}}"
-  rendersSame "mustache: \"\" truthy" "mustache" "{{#if empty}}T{{else}}F{{/if}}"
-  rendersSame "mustache: [] falsy" "mustache" "{{#if arr}}T{{else}}F{{/if}}"
+  rendersSame "nil alias: 0 truthy" "nil" "{% if zero %}T{% else %}F{% endif %}"
+  rendersSame "mustache: \"\" truthy" "mustache" "{% if empty %}T{% else %}F{% endif %}"
+  rendersSame "mustache: [] falsy" "mustache" "{% if arr %}T{% else %}F{% endif %}"
   rendersSame "presence: 0 truthy, {} falsy" "presence"
-    "{{#if zero}}{{#if ob}}A{{else}}B{{/if}}{{/if}}"
+    "{% if zero %}{% if ob %}A{% else %}B{% endif %}{% endif %}"
   rendersSame "explicit list (minimal shapes)" "false null"
-    "{{#if zero}}T{{else}}F{{/if}}"
+    "{% if zero %}T{% else %}F{% endif %}"
 
   -- source fidelity: header directives are carried verbatim into the lowering
   -- (an inert `@truthiness` is preserved like any other directive — ADR-022).
@@ -221,8 +222,8 @@ main = do
     "{{{ escapeHtml (gt (lookup this \"a\") (lookup this \"b\")) }}}"
   lowersContaining "pipe shape" "{{{ o | json }}}"
     "{{{ json (lookup this \"o\") }}}"
-  lowersContaining "section shape" "{{#unless done}}x{{/unless}}"
-    "{{#unless (lookup this \"done\")}}x{{/unless}}"
+  lowersContaining "section shape" "{% unless done %}x{% endunless %}"
+    "{% unless (lookup this \"done\") %}x{% endunless %}"
 
   log "Linter tests passed"
 

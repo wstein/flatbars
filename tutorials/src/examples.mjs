@@ -16,7 +16,7 @@ export const lessons = {
     spec: "concepts", // docs/modules/ROOT/pages/concepts.adoc
     template:
       '<h1>{{{escapeHtml (lookup this "name")}}}</h1>\n' +
-      '<ul>{{#each (lookup this "items")}}<li>{{{escapeHtml this}}}</li>{{/each}}</ul>',
+      '<ul>{% each (lookup this "items") %}<li>{{{escapeHtml this}}}</li>{% endeach %}</ul>',
     data: { name: "Ada <core>", items: ["alpha", "beta"] },
   },
 
@@ -64,9 +64,9 @@ export const lessons = {
     // MaxBars' signature: a pipe (uppercase), Liquid-style loop bindings with an
     // index (p i in players), infix arithmetic (i + 1), an infix comparison (>= 90).
     template: `{{ title | uppercase }}
-{{#each p i in players}}
-{{ i + 1 }}. {{ p.name }} — {{ p.score }} {{#if p.score >= 90}}👑{{/if}}
-{{/each}}`,
+{% each p i in players %}
+{{ i + 1 }}. {{ p.name }} — {{ p.score }} {% if p.score >= 90 %}👑{% endif %}
+{% endeach %}`,
     data: {
       title: "top scorers",
       players: [

@@ -1,0 +1,3 @@
+<dl>
+{% each profile %}  <dt>{{loop.key}}</dt><dd>{{this}}</dd>
+{% endeach %}</dl>

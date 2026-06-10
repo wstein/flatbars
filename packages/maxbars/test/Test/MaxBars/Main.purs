@@ -97,13 +97,13 @@ main = do
   -- needed. (Regression: clause separators used the output grammar, which mis-read
   -- the keyword head as an operand.)
   let
-    switchT = "{{#if x < 10}}S{{elif x >= 10 && x < 20}}M{{else}}L{{/if}}"
+    switchT = "{% if x < 10 %}S{% elif x >= 10 && x < 20 %}M{% else %}L{% endif %}"
   expectM "elif-infix-small" switchT (obj [ Tuple "x" (num 5.0) ]) "S"
   expectM "elif-infix-medium" switchT (obj [ Tuple "x" (num 15.0) ]) "M"
   expectM "elif-infix-large" switchT (obj [ Tuple "x" (num 99.0) ]) "L"
   -- equality dispatch (the Liquid case/when shape) also reads bare in elif.
   expectM "elif-eq"
-    "{{#if h == \"cake\"}}C{{elif h == \"cookie\" || h == \"biscuit\"}}K{{else}}?{{/if}}"
+    "{% if h == \"cake\" %}C{% elif h == \"cookie\" || h == \"biscuit\" %}K{% else %}?{% endif %}"
     (obj [ Tuple "h" (VString "biscuit") ])
     "K"
 
@@ -111,32 +111,32 @@ main = do
   -- chain: subject `eq`-compared to each {{when}} value (OR-chained for a multi-value arm).
   let
     caseT =
-      "{{#case status}}{{when \"shipped\"}}On its way{{when \"pending\" \"queued\"}}Waiting{{else}}Unknown{{/case}}"
+      "{% case status %}{% when \"shipped\" %}On its way{% when \"pending\" \"queued\" %}Waiting{% else %}Unknown{% endcase %}"
   expectM "case-first-arm" caseT (obj [ Tuple "status" (VString "shipped") ]) "On its way"
   expectM "case-multi-value-arm" caseT (obj [ Tuple "status" (VString "queued") ]) "Waiting"
   expectM "case-multi-value-arm-other" caseT (obj [ Tuple "status" (VString "pending") ]) "Waiting"
   expectM "case-else" caseT (obj [ Tuple "status" (VString "lost") ]) "Unknown"
   -- no {{else}}: an unmatched subject renders nothing, like {{#if}} without {{else}}.
-  let caseNoElse = "{{#case n}}{{when 1}}one{{when 2}}two{{/case}}"
+  let caseNoElse = "{% case n %}{% when 1 %}one{% when 2 %}two{% endcase %}"
   expectM "case-no-else-hit" caseNoElse (obj [ Tuple "n" (num 2.0) ]) "two"
   expectM "case-no-else-miss" caseNoElse (obj [ Tuple "n" (num 3.0) ]) ""
   -- the subject is a full expression; a numeric subject dispatches by structural eq.
   expectM "case-expr-subject"
-    "{{#case (add a b)}}{{when 2}}two{{when 3}}three{{else}}other{{/case}}"
+    "{% case (add a b) %}{% when 2 %}two{% when 3 %}three{% else %}other{% endcase %}"
     (obj [ Tuple "a" (num 1.0), Tuple "b" (num 2.0) ])
     "three"
   -- standalone {{when}}/{{else}} lines are trimmed (like {{else}}/{{elif}}), so a
   -- block-form case leaves no stray blank lines.
   expectM "case-standalone"
-    "{{#case status}}\n{{when \"a\"}}A\n{{when \"b\"}}B\n{{else}}Z\n{{/case}}\n"
+    "{% case status %}\n{% when \"a\" %}A\n{% when \"b\" %}B\n{% else %}Z\n{% endcase %}\n"
     (obj [ Tuple "status" (VString "b") ])
     "B\n"
   -- content before the first {{when}} is a located error (no silent fall-through).
   assert' "reject: case content before first when"
-    (isLeft (renderMax "{{#case s}}junk{{when 1}}x{{/case}}" (obj [])))
+    (isLeft (renderMax "{% case s %}junk{% when 1 %}x{% endcase %}" (obj [])))
   -- the first-class clause guard: {{else}} must be the final arm (no dead arms after it).
   assert' "reject: case else not last"
-    (isLeft (renderMax "{{#case s}}{{else}}x{{when 1}}y{{/case}}" (obj [])))
+    (isLeft (renderMax "{% case s %}{% else %}x{% when 1 %}y{% endcase %}" (obj [])))
 
   -- pipes: `a | f` ⇒ (f a); the piped value is the first argument.
   expectM "pipe-json" "{{{ o | json }}}" (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0) ]) ])
@@ -161,7 +161,8 @@ main = do
   expectM "arith-parens" "{{ (a + b) * c }}"
     (obj [ Tuple "a" (num 2.0), Tuple "b" (num 3.0), Tuple "c" (num 4.0) ])
     "20"
-  expectM "arith-in-cmp" "{{#if n + 1 > 5}}big{{else}}small{{/if}}" (obj [ Tuple "n" (num 5.0) ])
+  expectM "arith-in-cmp" "{% if n + 1 > 5 %}big{% else %}small{% endif %}"
+    (obj [ Tuple "n" (num 5.0) ])
     "big"
   -- a dotted path operand stays a path; `*` is unambiguously multiply.
   expectM "arith-path" "{{ price.net * qty }}"
@@ -215,49 +216,49 @@ main = do
   -- `elif` honours an `includeZero=true` options hash, like the head `if`: a
   -- bare 0 is falsy normally, truthy with the flag (so the elif fires).
   expectM "elif-includeZero-pass"
-    "{{#if score >= 100}}<b>pass</b>{{elif 0 includeZero=true}}<b>fail</b>{{/if}}"
+    "{% if score >= 100 %}<b>pass</b>{% elif 0 includeZero=true %}<b>fail</b>{% endif %}"
     (obj [ Tuple "score" (num 150.0) ])
     "<b>pass</b>"
   expectM "elif-includeZero-fire"
-    "{{#if score >= 100}}<b>pass</b>{{elif 0 includeZero=true}}<b>fail</b>{{/if}}"
+    "{% if score >= 100 %}<b>pass</b>{% elif 0 includeZero=true %}<b>fail</b>{% endif %}"
     (obj [ Tuple "score" (num 50.0) ])
     "<b>fail</b>"
   -- under MaxBars' `nonEmpty` rule a bare 0 is truthy, so the elif fires even
   -- without the flag (`includeZero` is a no-op here — 0 is already truthy). An
   -- empty string, by contrast, IS falsy under nonEmpty → falls through.
-  expectM "elif-bare-0-fires" "{{#if score >= 100}}P{{elif 0}}Z{{/if}}"
+  expectM "elif-bare-0-fires" "{% if score >= 100 %}P{% elif 0 %}Z{% endif %}"
     (obj [ Tuple "score" (num 50.0) ])
     "Z"
-  expectM "elif-empty-string-falls-through" "{{#if score >= 100}}P{{elif s}}Z{{/if}}"
+  expectM "elif-empty-string-falls-through" "{% if score >= 100 %}P{% elif s %}Z{% endif %}"
     (obj [ Tuple "score" (num 50.0), Tuple "s" (VString "") ])
     ""
   -- the hash works on a data-driven elif condition + an else fallback too.
-  expectM "elif-includeZero-data" "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}"
+  expectM "elif-includeZero-data" "{% if a %}A{% elif n includeZero=true %}Z{% else %}E{% endif %}"
     (obj [ Tuple "a" (VBool false), Tuple "n" (num 0.0) ])
     "Z"
 
   -- parenthesised infix in a block condition.
-  expectM "if-paren-infix" "{{#if (a && b)}}Y{{else}}N{{/if}}"
+  expectM "if-paren-infix" "{% if (a && b) %}Y{% else %}N{% endif %}"
     (obj [ Tuple "a" (VBool true), Tuple "b" (VBool false) ])
     "N"
-  expectM "if-paren-comparison" "{{#if (x >= 18)}}adult{{else}}minor{{/if}}"
+  expectM "if-paren-comparison" "{% if (x >= 18) %}adult{% else %}minor{% endif %}"
     (obj [ Tuple "x" (num 21.0) ])
     "adult"
   -- bare (un-parenthesised) infix block conditions, via the `parseHead` seam.
-  expectM "if-bare-infix" "{{#if a && b}}Y{{else}}N{{/if}}"
+  expectM "if-bare-infix" "{% if a && b %}Y{% else %}N{% endif %}"
     (obj [ Tuple "a" (VBool true), Tuple "b" (VBool false) ])
     "N"
-  expectM "if-bare-comparison" "{{#if x >= 18}}adult{{else}}minor{{/if}}"
+  expectM "if-bare-comparison" "{% if x >= 18 %}adult{% else %}minor{% endif %}"
     (obj [ Tuple "x" (num 21.0) ])
     "adult"
-  expectM "unless-bare-infix" "{{#unless a || b}}none{{/unless}}"
+  expectM "unless-bare-infix" "{% unless a || b %}none{% endunless %}"
     (obj [ Tuple "a" (VBool false), Tuple "b" (VBool false) ])
     "none"
-  expectM "if-bare-precedence" "{{#if x > 0 && x < 10}}in{{else}}out{{/if}}"
+  expectM "if-bare-precedence" "{% if x > 0 && x < 10 %}in{% else %}out{% endif %}"
     (obj [ Tuple "x" (num 5.0) ])
     "in"
   -- a block head with a single subject still works (each over a bare path).
-  expectM "each-bare-subject" "{{#each xs}}{{this}}{{/each}}"
+  expectM "each-bare-subject" "{% each xs %}{{this}}{% endeach %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "ab"
 
@@ -269,37 +270,40 @@ main = do
   -- rindex1/length.
   let xs3 = obj [ Tuple "xs" (VArray [ VString "a", VString "b", VString "c" ]) ]
   expectM "loopvars-all"
-    "{{#each xs}}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{{/each}}"
+    "{% each xs %}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{% endeach %}"
     xs3
     "[0/1/2/3/3][1/2/1/2/3][2/3/0/1/3]"
   -- first/last via the loop object.
-  expectM "loopvars-first" "{{#each xs}}{{#if loop.first}}F{{else}}-{{/if}}{{/each}}" xs3 "F--"
-  expectM "loopvars-last" "{{#each xs}}{{#if loop.last}}L{{else}}-{{/if}}{{/each}}" xs3 "--L"
+  expectM "loopvars-first" "{% each xs %}{% if loop.first %}F{% else %}-{% endif %}{% endeach %}"
+    xs3
+    "F--"
+  expectM "loopvars-last" "{% each xs %}{% if loop.last %}L{% else %}-{% endif %}{% endeach %}" xs3
+    "--L"
   -- object iteration exposes `loop.key`; array iteration's key is null
   -- (Handlebars parity — use loop.index0 for the array position).
-  expectM "loopvars-key" "{{#each o}}{{loop.key}}{{/each}}"
+  expectM "loopvars-key" "{% each o %}{{loop.key}}{% endeach %}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "xy"
-  expectM "loopvars-key-array-null" "{{#each xs}}[{{loop.key}}]{{/each}}" xs3 "[][][]"
+  expectM "loopvars-key-array-null" "{% each xs %}[{{loop.key}}]{% endeach %}" xs3 "[][][]"
   -- a data field named `first` is read with an explicit path; `loop.first` is the
   -- loop variable (the names never collide — one is `loop.`-namespaced).
-  expectM "loopvar-data-field" "{{#each xs}}{{this.first}}{{/each}}"
+  expectM "loopvar-data-field" "{% each xs %}{{this.first}}{% endeach %}"
     (obj [ Tuple "xs" (VArray [ obj [ Tuple "first" (VString "D") ] ]) ])
     "D"
   -- `each` binds Liquid-style — names before `in`: element + 0-based index
   -- (+ a 1-based index).
-  expectM "each-in-each" "{{#each item i in xs}}[{{i}}:{{item}}]{{/each}}" xs3
+  expectM "each-in-each" "{% each item i in xs %}[{{i}}:{{item}}]{% endeach %}" xs3
     "[0:a][1:b][2:c]"
   -- `with` binds the shifted context to a name (drop-pipes `as`).
-  expectM "with-as-binding" "{{#with o as c}}{{c.n}}{{/with}}"
+  expectM "with-as-binding" "{% with o as c %}{{c.n}}{% endwith %}"
     (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
     "Z"
   -- a loop binding is a bare name directly (there are no bare loop variables in
   -- ADR-021, so nothing to shadow): `x in xs` binds the element.
-  expectM "each-in-bind" "{{#each x in xs}}{{x}}{{/each}}" xs3 "abc"
+  expectM "each-in-bind" "{% each x in xs %}{{x}}{% endeach %}" xs3 "abc"
   -- an outer loop binding stays in scope inside a nested block.
   expectM "each-in-nested"
-    "{{#each row in rows}}{{#each row.cells}}{{row.id}}{{this}} {{/each}}{{/each}}"
+    "{% each row in rows %}{% each row.cells %}{{row.id}}{{this}} {% endeach %}{% endeach %}"
     ( obj
         [ Tuple "rows"
             ( VArray
@@ -314,33 +318,33 @@ main = do
     "A1 A2 "
   -- the collection after `in` is a full expression; `(xs | reverse)` pipes, and
   -- the binding `x` still binds the (reversed) element.
-  expectM "each-in-paren-pipe" "{{#each x in (xs | reverse)}}{{x}}{{/each}}" xs3 "cba"
+  expectM "each-in-paren-pipe" "{% each x in (xs | reverse) %}{{x}}{% endeach %}" xs3 "cba"
 
   -- labelled loops (ADR-013): `label NAME` binds the loop frame as an object, so
   -- an inner body reads `NAME.index1`/`NAME.length`/`NAME.first`/… of THIS loop.
   expectM "label-fields"
-    "{{#each xs label l}}{{l.index1}}/{{l.length}}{{#if l.first}}<{{/if}}{{#if l.last}}>{{/if}} {{/each}}"
+    "{% each xs label l %}{{l.index1}}/{{l.length}}{% if l.first %}<{% endif %}{% if l.last %}>{% endif %} {% endeach %}"
     xs3
     "1/3< 2/3 3/3> "
   -- the point: an inner loop reaches the *outer* loop's metadata through the label.
   expectM "label-outer-from-inner"
-    "{{#each row in rows label outer}}{{#each row}}{{outer.index0}}:{{this}} {{/each}}{{/each}}"
+    "{% each row in rows label outer %}{% each row %}{{outer.index0}}:{{this}} {% endeach %}{% endeach %}"
     (obj [ Tuple "rows" (VArray [ VArray [ VString "a", VString "b" ], VArray [ VString "c" ] ]) ])
     "0:a 0:b 1:c "
   -- the label's `this` is the element; `key` is the object key when iterating one.
-  expectM "label-this-key" "{{#each o label l}}{{l.key}}={{l.this}} {{/each}}"
+  expectM "label-this-key" "{% each o label l %}{{l.key}}={{l.this}} {% endeach %}"
     (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0), Tuple "b" (num 2.0) ]) ])
     "a=1 b=2 "
 
   -- compiled path reaches the loop variable through the `loop` object (ADR-021).
-  case compileMaxJs "{{#each xs}}{{loop.index1}}{{/each}}" of
+  case compileMaxJs "{% each xs %}{{loop.index1}}{% endeach %}" of
     Left e -> assert' ("compile loopvar: unexpected error " <> show e) false
     Right js -> assert' ("compile loopvar: expected rt.call(\"loop\" in\n" <> js)
       (contains (Pattern "rt.call(\"loop\"") js)
 
   -- MaxBars also rejects the Handlebars-only shapes (not the Handlebars-compat
   -- dialect): inverse {{^}}, unescaped {{&}}, and raw blocks {{{{}}}}.
-  assert' "reject: inverse {{^}}" (isLeft (renderMax "{{^a}}x{{/a}}" (obj [])))
+  assert' "reject: inverse {{^}}" (isLeft (renderMax "{{^a}}x{% enda %}" (obj [])))
   assert' "reject: unescaped {{&}}" (isLeft (renderMax "{{&a}}" (obj [])))
   assert' "reject: raw block {{{{}}}}" (isLeft (renderMax "{{{{r}}}}body{{{{/r}}}}" (obj [])))
 
@@ -348,7 +352,7 @@ main = do
   -- renders the caller's block body. It is `{{ }}`-escaped by MaxBars' rule but
   -- the body is a `VSafe` value, so escapeHtml is the identity — no double-escape.
   expectM "yield"
-    "{{#inline \"layout\"}}<{{yield}}>{{/inline}}{{#partial \"layout\"}}HI{{/partial}}"
+    "{% inline \"layout\" %}<{{yield}}>{% endinline %}{% partial \"layout\" %}HI{% endpartial %}"
     (obj [])
     "<HI>"
   -- the Handlebars `@partial-block` spelling is rejected (MaxBars reserves `@`); the
@@ -376,62 +380,64 @@ main = do
       Left _ -> [ "<parse error>" ]
       Right is -> map _.name is
   assert' "no-shadow-warn: bare {{first}} is a data field, no warning"
-    (Array.null (warnNames "{{#each xs}}{{first}}{{length}}{{key}}{{/each}}"))
+    (Array.null (warnNames "{% each xs %}{{first}}{{length}}{{key}}{% endeach %}"))
 
   -- a bar in a block head is a parse error — whether the author meant the
   -- Handlebars `as |…|` delimiter or an unparenthesised pipe. The parenthesised
   -- pipe is still a pipe.
-  assert' "head-bar: {{#each xs | reverse}} is a parse error (parenthesise to pipe)"
+  assert' "head-bar: {% each xs | reverse %} is a parse error (parenthesise to pipe)"
     ( isLeft
-        ( renderMax "{{#each xs | reverse}}{{this}}{{/each}}"
+        ( renderMax "{% each xs | reverse %}{{this}}{% endeach %}"
             (obj [ Tuple "xs" (VArray [ VString "a" ]) ])
         )
     )
-  assert' "head-bar: the Handlebars {{#each xs as |x|}} pipe form is rejected"
+  assert' "head-bar: the Handlebars {% each xs as |x| %} pipe form is rejected"
     ( isLeft
-        ( renderMax "{{#each xs as |x|}}{{x}}{{/each}}"
+        ( renderMax "{% each xs as |x| %}{{x}}{% endeach %}"
             (obj [ Tuple "xs" (VArray [ VString "a" ]) ])
         )
     )
-  expectM "head-bar: {{#each (xs | reverse)}} (parenthesised) is a real pipe"
-    "{{#each (xs | reverse)}}{{this}}{{/each}}"
+  expectM "head-bar: {% each (xs | reverse) %} (parenthesised) is a real pipe"
+    "{% each (xs | reverse) %}{{this}}{% endeach %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "ba"
 
   -- the removed trailing-`as` loop-binding form on `each` is a located error, not a
   -- silent no-op — MaxBars binds `{{#each x in xs}}` now. `with`/custom `as` stay.
-  assert' "each-as: {{#each xs as a}} is rejected (use `x in xs`)"
+  assert' "each-as: {% each xs as a %} is rejected (use `x in xs`)"
     ( isLeft
-        (renderMax "{{#each xs as a}}{{a}}{{/each}}" (obj [ Tuple "xs" (VArray [ VString "x" ]) ]))
+        ( renderMax "{% each xs as a %}{{a}}{% endeach %}"
+            (obj [ Tuple "xs" (VArray [ VString "x" ]) ])
+        )
     )
-  assert' "each-as: a nested {{#each y as z}} is rejected too"
+  assert' "each-as: a nested {% each y as z %} is rejected too"
     ( isLeft
-        ( renderMax "{{#each x in xs}}{{#each y as z}}{{/each}}{{/each}}"
+        ( renderMax "{% each x in xs %}{% each y as z %}{% endeach %}{% endeach %}"
             (obj [ Tuple "xs" (VArray []) ])
         )
     )
   -- `with … as` and `{{#each x in xs}}` are unaffected (only `each … as` is gone).
-  expectM "each-as: {{#with o as p}} keeps `as`"
-    "{{#with o as p}}{{p.n}}{{/with}}"
+  expectM "each-as: {% with o as p %} keeps `as`"
+    "{% with o as p %}{{p.n}}{% endwith %}"
     (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
     "Z"
 
   -- `each … in` binds a *third* name to the 1-based index — MaxBars' extension
   -- over the two Handlebars bindings (`item index0 index1 in xs`).
   expectM "each-in: binds element + index0 + index1"
-    "{{#each item i0 i1 in xs}}{{i0}}/{{i1}}:{{item}} {{/each}}"
+    "{% each item i0 i1 in xs %}{{i0}}/{{i1}}:{{item}} {% endeach %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "0/1:a 1/2:b "
   -- over an object the second name is the key.
   expectM "each-in: over an object the second name is the key"
-    "{{#each v k in o}}{{k}}={{v}};{{/each}}"
+    "{% each v k in o %}{{k}}={{v}};{% endeach %}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "x=1;y=2;"
   -- a loop binding named like a prelude value op shadows the op: `{{t}}`/`{{t.name}}`
   -- read the binding, not the `t` (translate) helper. Short op-shaped names like
   -- `t` are common with `in`, so this is the everyday case.
   expectM "shadow: a loop binding `t` shadows the translate helper"
-    "{{#each t in rows}}[{{t.name}}]{{/each}}"
+    "{% each t in rows %}[{{t.name}}]{% endeach %}"
     ( obj
         [ Tuple "rows"
             (VArray [ obj [ Tuple "name" (VString "A") ], obj [ Tuple "name" (VString "B") ] ])
@@ -439,21 +445,21 @@ main = do
     )
     "[A][B]"
   expectM "shadow: a bare block param `add` shadows the add helper"
-    "{{#each add in xs}}[{{add}}]{{/each}}"
+    "{% each add in xs %}[{{add}}]{% endeach %}"
     (obj [ Tuple "xs" (VArray [ VString "x", VString "y" ]) ])
     "[x][y]"
 
   -- label-shadow lint (ADR-021): a loop `label NAME` whose name is a reserved root
   -- (this/loop/root/parent/yield) shadows it for the whole body, so it warns; a
   -- fresh name does not.
-  assert' "label-warn: {{#each xs label loop}} warns"
-    (warnNames "{{#each xs label loop}}{{this}}{{/each}}" == [ "loop" ])
-  assert' "label-warn: {{#each xs label parent}} warns"
-    (warnNames "{{#each xs label parent}}{{this}}{{/each}}" == [ "parent" ])
-  assert' "label-warn: {{#each xs label yield}} warns"
-    (warnNames "{{#each xs label yield}}{{this}}{{/each}}" == [ "yield" ])
-  assert' "label-warn: {{#each xs label outer}} (fresh name) does not warn"
-    (Array.null (warnNames "{{#each xs label outer}}{{outer.index0}}{{/each}}"))
+  assert' "label-warn: {% each xs label loop %} warns"
+    (warnNames "{% each xs label loop %}{{this}}{% endeach %}" == [ "loop" ])
+  assert' "label-warn: {% each xs label parent %} warns"
+    (warnNames "{% each xs label parent %}{{this}}{% endeach %}" == [ "parent" ])
+  assert' "label-warn: {% each xs label yield %} warns"
+    (warnNames "{% each xs label yield %}{{this}}{% endeach %}" == [ "yield" ])
+  assert' "label-warn: {% each xs label outer %} (fresh name) does not warn"
+    (Array.null (warnNames "{% each xs label outer %}{{outer.index0}}{% endeach %}"))
 
   -- boolean-in-output lint (the ?:/??/|| debate): a bare `||`/`&&` in OUTPUT
   -- position yields true/false, almost always a mistake — warn and point at
@@ -462,8 +468,8 @@ main = do
     (warnNames "{{ a || b }}" == [ "or" ])
   assert' "bool-output-warn: {{ a && b }} warns with 'and'"
     (warnNames "{{ a && b }}" == [ "and" ])
-  assert' "bool-output-warn: {{#if a || b}}…{{/if}} (condition) does not warn"
-    (Array.null (warnNames "{{#if a || b}}Y{{/if}}"))
+  assert' "bool-output-warn: {% if a || b %}…{% endif %} (condition) does not warn"
+    (Array.null (warnNames "{% if a || b %}Y{% endif %}"))
   assert' "bool-output-warn: {{ a ?? b }} (null-coalesce) does not warn"
     (Array.null (warnNames "{{ a ?? b }}"))
   assert' "bool-output-warn: {{ a ?: b }} (truthy-coalesce) does not warn"
@@ -485,23 +491,23 @@ main = do
 
   -- range (the Liquid-inspired counted-loop helper).
   expectM "range: inclusive integer range as an array"
-    "{{#each n in (range 1 4)}}{{n}}{{/each}}"
+    "{% each n in (range 1 4) %}{{n}}{% endeach %}"
     (obj [])
     "1234"
   expectM "range: descending bounds yield the empty array"
-    "[{{#each n in (range 4 1)}}{{n}}{{/each}}]"
+    "[{% each n in (range 4 1) %}{{n}}{% endeach %}]"
     (obj [])
     "[]"
   assert' "range: a span past the budget is a located error"
-    (isLeft (renderMax "{{#each n in (range 1 200000)}}{{n}}{{/each}}" (obj [])))
+    (isLeft (renderMax "{% each n in (range 1 200000) %}{{n}}{% endeach %}" (obj [])))
 
   -- the `..` range operator (sugar for `(range a b)`): literal and dynamic bounds.
   expectM "range op: 1..4 iterates the inclusive span"
-    "{{#each 1..4}}{{this}}{{/each}}"
+    "{% each 1..4 %}{{this}}{% endeach %}"
     (obj [])
     "1234"
   expectM "range op: bounds are expressions (additive binds tighter than ..)"
-    "{{#each lo..hi+1}}{{this}}{{/each}}"
+    "{% each lo..hi+1 %}{{this}}{% endeach %}"
     (obj [ Tuple "lo" (num 2.0), Tuple "hi" (num 4.0) ])
     "2345"
   expectM "range op: a value-position range stringifies the array"
@@ -519,41 +525,41 @@ main = do
 
   -- collection literals: `[…]` ⇒ (list …), `{k: v}` ⇒ (dict …).
   expectM "list literal: iterates its elements"
-    "{{#each [10, 20, 30]}}{{this}} {{/each}}"
+    "{% each [10, 20, 30] %}{{this}} {% endeach %}"
     (obj [])
     "10 20 30 "
   expectM "list literal: elements are full expressions"
-    "{{#each [1, n + 1, n * 2]}}{{this}} {{/each}}"
+    "{% each [1, n + 1, n * 2] %}{{this}} {% endeach %}"
     (obj [ Tuple "n" (num 5.0) ])
     "1 6 10 "
   expectM "list literal: empty []"
-    "[{{#each []}}x{{/each}}]"
+    "[{% each [] %}x{% endeach %}]"
     (obj [])
     "[]"
   -- the structural scanner is brace-aware (collectionLiterals): a dict's own `}`
   -- is balanced before the tag close, so NO disambiguating space is needed even
   -- when the dict abuts `}}`.
   expectM "dict literal: bare-ident keys, no space before }}"
-    "{{#with {name: who, age: 30}}}{{name}}/{{age}}{{/with}}"
+    "{% with {name: who, age: 30} %}{{name}}/{{age}}{% endwith %}"
     (obj [ Tuple "who" (VString "Ada") ])
     "Ada/30"
   expectM "dict literal: a string key, no space"
-    "{{#with {\"full name\": who}}}{{lookup this \"full name\"}}{{/with}}"
+    "{% with {\"full name\": who} %}{{lookup this \"full name\"}}{% endwith %}"
     (obj [ Tuple "who" (VString "Ada L") ])
     "Ada L"
   -- the scanner skips strings, so a `}}` inside a dict value's string is not a tag
   -- close.
   expectM "dict literal: a `}}` inside a string value is not the tag close"
-    "{{#with {msg: \"a}}b\"}}}{{msg}}{{/with}}"
+    "{% with {msg: \"a}}b\"} %}{{msg}}{% endwith %}"
     (obj [])
     "a}}b"
   -- an empty dict `{}` abutting the close (falsy under nonEmpty).
   expectM "dict literal: empty {} with no space"
-    "{{#if {}}}t{{else}}f{{/if}}"
+    "{% if {} %}t{% else %}f{% endif %}"
     (obj [])
     "f"
   expectM "collection literals nest"
-    "{{#each [{tags: [1, 2]}, {tags: [3]}]}}{{#each tags}}{{this}}{{/each}};{{/each}}"
+    "{% each [{tags: [1, 2]}, {tags: [3]}] %}{% each tags %}{{this}}{% endeach %};{% endeach %}"
     (obj [])
     "12;3;"
   -- a mid-identifier `[seg]` path-bracket is untouched (only a *leading* `[` is a list).
@@ -564,35 +570,35 @@ main = do
 
   -- block-scoped `{{#let}}` (ADR-024): aliases, sequential, never re-roots.
   expectM "let: a single binding is in scope for the body"
-    "{{#let greeting=\"Hi\"}}{{greeting}}!{{/let}}"
+    "{% let greeting=\"Hi\" %}{{greeting}}!{% endlet %}"
     (obj [])
     "Hi!"
   expectM "let: a binding reads from the (unchanged) data context"
-    "{{#let n=count}}{{n}} left{{/let}}"
+    "{% let n=count %}{{n}} left{% endlet %}"
     (obj [ Tuple "count" (num 3.0) ])
     "3 left"
   expectM "let: bindings are sequential — b sees a"
-    "{{#let a=1 b=(add a 1) c=(add b 1)}}{{a}}{{b}}{{c}}{{/let}}"
+    "{% let a=1 b=(add a 1) c=(add b 1) %}{{a}}{{b}}{{c}}{% endlet %}"
     (obj [])
     "123"
   -- the defining guarantee: `let` aliases but does NOT re-root, so a bare name
   -- still resolves against the current context, unlike `with`.
   expectM "let: does not re-root the context"
-    "{{#let u=user}}{{name}}/{{u.name}}{{/let}}"
+    "{% let u=user %}{{name}}/{{u.name}}{% endlet %}"
     (obj [ Tuple "name" (VString "ROOT"), Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
     "ROOT/Ada"
   expectM "let: a binding's value can be a dict literal"
-    "{{#let cfg={theme: \"dark\", size: 12}}}{{cfg.theme}}/{{cfg.size}}{{/let}}"
+    "{% let cfg={theme: \"dark\", size: 12} %}{{cfg.theme}}/{{cfg.size}}{% endlet %}"
     (obj [])
     "dark/12"
   -- inside a loop the binding coexists with the loop's scoped vars.
   expectM "let: inside a loop, loop.* still resolves"
-    "{{#each items}}{{#let u=(uppercase this)}}{{u}}@{{loop.index1}} {{/let}}{{/each}}"
+    "{% each items %}{% let u=(uppercase this) %}{{u}}@{{loop.index1}} {% endlet %}{% endeach %}"
     (obj [ Tuple "items" (VArray [ VString "a", VString "b" ]) ])
     "A@1 B@2 "
   -- a binding named like a prelude op shadows it inside the body (isScopedBinding).
   expectM "let: a binding shadows a same-named prelude op"
-    "{{#let add=\"shadowed\"}}{{add}}{{/let}}"
+    "{% let add=\"shadowed\" %}{{add}}{% endlet %}"
     (obj [])
     "shadowed"
 
@@ -600,19 +606,19 @@ main = do
   log "Trussbars AOT-compat lint"
   -- a plain boolean condition + field output compiles under AOT.
   expectCompat "compat: boolean if + field output"
-    "{{#if active}}{{name}}{{/if}}"
+    "{% if active %}{{name}}{% endif %}"
     (obj [ Tuple "active" (VBool true), Tuple "name" (VString "Ada") ])
     true
     []
   -- data-driven: a numeric condition is a compile error under AOT (no Truthy for f64).
   expectCompat "compat: numeric truthiness"
-    "{{#if count}}some{{/if}}"
+    "{% if count %}some{% endif %}"
     (obj [ Tuple "count" (num 3.0) ])
     false
     [ "numeric-truthiness" ]
   -- even 0 trips it (the rule is the *type*, not the value).
   expectCompat "compat: numeric truthiness on 0"
-    "{{#if count}}x{{/if}}"
+    "{% if count %}x{% endif %}"
     (obj [ Tuple "count" (num 0.0) ])
     false
     [ "numeric-truthiness" ]
@@ -632,14 +638,14 @@ main = do
   -- compiles under AOT — so the lint must NOT flag the let-hash `dict` (the verdict
   -- delegates to the real compiler, which consumes it structurally).
   expectCompat "compat: let-binding a path is NOT flagged"
-    "{{#let label=name}}Hi {{label}}{{/let}}"
+    "{% let label=name %}Hi {{label}}{% endlet %}"
     (obj [ Tuple "name" (VString "Ada") ])
     true
     []
   -- binding a dict *literal value* compiles under AOT (the emitter synthesizes a
   -- typed struct for it), so the lint treats it as compatible.
   expectCompat "compat: let-binding a dict literal value is AOT-compatible"
-    "{{#let cfg={theme: \"dark\"}}}{{cfg.theme}}{{/let}}"
+    "{% let cfg={theme: \"dark\"} %}{{cfg.theme}}{% endlet %}"
     (obj [])
     true
     []

@@ -3,7 +3,7 @@
 -- | linter's *lower* job (loopvars-linter-spec.md §B.2): a MaxBars template,
 -- | once desugared to the meaning-free core `Template`, is printed here in the
 -- | austere RawBars surface — explicit `{{{ escapeHtml (lookup this "x") }}}`,
--- | `{{#name …}}`, no infix, no pipes, no dotted-path sugar.
+-- | `{% name … %}` control tags (docs-19), no infix, no pipes, no dotted-path sugar.
 -- |
 -- | The printer is *mechanical and lossless* for the desugared corpus: every
 -- | construct that appears after `desugarSurfaceWith` has one canonical core
@@ -47,7 +47,10 @@ printNode = case _ of
   Content _ s -> s
   Output _ e -> "{{{ " <> exprTop e <> " }}}"
   Block _ sig name args body -> printBlock sig name args body
-  Sep _ name args -> "{{" <> head name args <> "}}"
+  -- A desugared `Sep` is always a clause separator (`else`/`elif`/`when`) — bare
+  -- output is an `Output` node — so it prints as a `{% … %}` statement tag, the
+  -- control surface RawBars requires (docs-19; `{{ … }}` is output-only there).
+  Sep _ name args -> "{% " <> head name args <> " %}"
   RawBlock _ name args raw ->
     "{{{{" <> head name args <> "}}}}" <> raw <> "{{{{/" <> name <> "}}}}"
   -- a recovered parse error (ADR-023): print it as a comment. The linter runs on
@@ -62,8 +65,10 @@ printNode = case _ of
 printBlock :: Sigil -> Ident -> Array Expr -> Template -> String
 printBlock _ name args body = section
   where
+  -- Control flow in RawBars is Django-style `{% … %}` (docs-19): the section opens
+  -- `{% name … %}` and closes `{% endname %}` (the close keyword is `end` + name).
   section =
-    "{{#" <> head name args <> "}}" <> printRawBars body <> "{{/" <> name <> "}}"
+    "{% " <> head name args <> " %}" <> printRawBars body <> "{% end" <> name <> " %}"
 
 -- | A tag *head*: the helper name, plus space-separated arguments when present.
 head :: Ident -> Array Expr -> String

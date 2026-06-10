@@ -186,7 +186,7 @@ test("RawBars renderRawWith runs a block operation over core syntax (ADR-019)", 
   const ops = { wrap: (o) => safe("[" + o.fn() + "]") };
   // core syntax: explicit `lookup this`, no path sugar
   assert.equal(
-    renderRawWith(ops, {}, '{{#wrap}}{{{lookup this "x"}}}{{/wrap}}', { x: "hi" }).value,
+    renderRawWith(ops, {}, '{% wrap %}{{{lookup this "x"}}}{% endwrap %}', { x: "hi" }).value,
     "[hi]",
   );
 });
@@ -197,18 +197,18 @@ test("RawBars block operation gets fn/inverse (context shift + {{else}}) (ADR-01
     ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()),
   };
   assert.equal(
-    renderRawWith(ops, {}, '{{#list (lookup this "items")}}{{{lookup this "name"}}}{{/list}}',
+    renderRawWith(ops, {}, '{% list (lookup this "items") %}{{{lookup this "name"}}}{% endlist %}',
       { items: [{ name: "a" }, { name: "b" }] }).value,
     "ab",
   );
   assert.equal(
-    renderRawWith(ops, {}, '{{#ifAny (lookup this "xs")}}y{{else}}n{{/ifAny}}', { xs: [] }).value,
+    renderRawWith(ops, {}, '{% ifAny (lookup this "xs") %}y{% else %}n{% endifAny %}', { xs: [] }).value,
     "n",
   );
 });
 
 test("RawBars stays STRICT: an unknown head is an error, not blockHelperMissing (ADR-019)", () => {
-  const r = renderRawWith({}, {}, "{{#nope}}b{{/nope}}", {});
+  const r = renderRawWith({}, {}, "{% nope %}b{% endnope %}", {});
   assert.equal(r.ok, false);
   assert.match(r.error, /nope/);
 });
@@ -216,14 +216,14 @@ test("RawBars stays STRICT: an unknown head is an error, not blockHelperMissing 
 test("MaxBars renderMaxWith runs a block operation with options.hash (ADR-019)", () => {
   const ops = { box: (xs, o) => safe('<ul class="' + o.hash.cls + '">' + xs.map((p) => o.fn(p)).join("") + "</ul>") };
   assert.equal(
-    renderMaxWith(ops, {}, '{{#box xs cls="r"}}<li>{{this}}</li>{{/box}}', { xs: ["a", "b"] }).value,
+    renderMaxWith(ops, {}, '{% box xs cls="r" %}<li>{{this}}</li>{% endbox %}', { xs: ["a", "b"] }).value,
     '<ul class="r"><li>a</li><li>b</li></ul>',
   );
 });
 
 test("MaxBars block operation body uses the MaxBars surface (infix arithmetic) (ADR-019)", () => {
   const ops = { wrap: (o) => safe("[" + o.fn() + "]") };
-  assert.equal(renderMaxWith(ops, {}, "{{#wrap}}{{1 + 2}}{{/wrap}}", {}).value, "[3]");
+  assert.equal(renderMaxWith(ops, {}, "{% wrap %}{{1 + 2}}{% endwrap %}", {}).value, "[3]");
 });
 
 test("MaxBars block operation binds drop-pipes block params via options.fn(ctx, { blockParams }) (ADR-019)", () => {
@@ -231,7 +231,7 @@ test("MaxBars block operation binds drop-pipes block params via options.fn(ctx, 
   // receives them through options.fn's blockParams channel.
   const ops = { list: (xs, o) => safe(xs.map((x, i) => o.fn(x, { blockParams: [x, i] })).join("")) };
   assert.equal(
-    renderMaxWith(ops, {}, "{{#list xs as item idx}}[{{idx}}:{{item}}]{{/list}}", { xs: ["a", "b"] }).value,
+    renderMaxWith(ops, {}, "{% list xs as item idx %}[{{idx}}:{{item}}]{% endlist %}", { xs: ["a", "b"] }).value,
     "[0:a][1:b]",
   );
 });
@@ -239,7 +239,7 @@ test("MaxBars block operation binds drop-pipes block params via options.fn(ctx, 
 test("MaxBars requires parens to pipe in a block head; a trailing drop-pipes as x still binds (ADR-019)", () => {
   const ops = { box: (xs, o) => safe(xs.map((x) => o.fn(x, { blockParams: [x] })).join("")) };
   assert.equal(
-    renderMaxWith(ops, {}, "{{#box (xs | reverse) as x}}<i>{{x}}</i>{{/box}}", { xs: ["a", "b", "c"] }).value,
+    renderMaxWith(ops, {}, "{% box (xs | reverse) as x %}<i>{{x}}</i>{% endbox %}", { xs: ["a", "b", "c"] }).value,
     "<i>c</i><i>b</i><i>a</i>",
   );
 });
