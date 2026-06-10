@@ -135,7 +135,7 @@ export const cases = [
   { name: "p:block-missing-fallback", dialect: "surface", t: "{{#>missing}}fb{{/missing}}", d: {} },
   // MaxBars: the bare {{#inline}}/{{#partial}} blocks + the reserved {{yield}}
   // keyword (the cross-dialect synonym; MaxBars reserves @, so no @partial-block).
-  { name: "p:max-yield", dialect: "maxbars", t: "{% inline \"layout\" %}<{{yield}}>{% endinline %}{% partial \"layout\" %}HI{% endpartial %}", d: {} },
+  { name: "p:max-yield", dialect: "maxbars", t: "{% inline \"layout\" %}<{% yield %}>{% endinline %}{% partial \"layout\" %}HI{% endpartial %}", d: {} },
 
   // ── @truthiness modes (compiled per-mode codegen vs interpreter) ─────────────
   { name: "t:default-zero-falsy", dialect: "surface", t: "{{#if n}}y{{else}}m{{/if}}", d: { n: 0 } },

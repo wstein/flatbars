@@ -60,7 +60,7 @@ test("maxbars threads external (host) partials through render + compileToJs", as
   // the helper-less entrypoint, dropping external partials (`{{> name}}` → empty).
   const r = await createRenderer("maxbars");
   const partials = { greeting: "Hi {{name | uppercase}}!" };
-  const tpl = "{{> greeting}} ({{count items}})";
+  const tpl = '{% include "greeting" %} ({{count items}})';
   const data = { name: "ada", items: [1, 2, 3] };
   assert.equal(r.render(r.compile(tpl, partials, { dialect: "maxbars" }).program, data), "Hi ADA! (3)");
   // and the compiled module folds the same partials into its registry

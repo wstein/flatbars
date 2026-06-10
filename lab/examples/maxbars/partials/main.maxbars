@@ -1,2 +1,2 @@
-{% each people %}{% include (lookup this "kind") %}
-{% endeach %}
+{% for people %}{% include (lookup this "kind") %}
+{% endfor %}

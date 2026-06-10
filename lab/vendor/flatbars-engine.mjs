@@ -6850,8 +6850,8 @@ var isSpace = function(c) {
 };
 var sepHead = function(s) {
   var cs = dropWhile(isSpace)(toCharArray(s));
-  return fromCharArray(takeWhile(function($453) {
-    return !isSpace($453);
+  return fromCharArray(takeWhile(function($456) {
+    return !isSpace($456);
   })(cs));
 };
 var trimEndWs = function(s) {
@@ -6864,8 +6864,8 @@ var hasNL = function(s) {
   return notEq4(nlIndex(true)(s))(Nothing.value);
 };
 var firstWord = function(s) {
-  return fromCharArray(takeWhile(function($454) {
-    return !isSpace($454);
+  return fromCharArray(takeWhile(function($457) {
+    return !isSpace($457);
   })(dropWhile(isSpace)(toCharArray(s))));
 };
 var findFrom = function(cs) {
@@ -6941,8 +6941,8 @@ var tokenizeTemplate = function(cfg) {
         };
       };
       var rawName = function(s) {
-        return fromCharArray(takeWhile(function($455) {
-          return !isSpace($455);
+        return fromCharArray(takeWhile(function($458) {
+          return !isSpace($458);
         })(dropWhile(isSpace)(toCharArray(s))));
       };
       var interiorAt = function(base) {
@@ -6969,8 +6969,8 @@ var tokenizeTemplate = function(cfg) {
                   ;
                   return s1;
                 })();
-                var $214 = s2 === "";
-                if ($214) {
+                var $215 = s2 === "";
+                if ($215) {
                   return acc;
                 }
                 ;
@@ -6980,25 +6980,25 @@ var tokenizeTemplate = function(cfg) {
           };
         };
       };
-      var finalize = function($456) {
-        return fromFoldable3(reverse2($456));
+      var finalize = function($459) {
+        return fromFoldable3(reverse2($459));
       };
       var delimWords = function(s) {
         var a0 = dropWhile(isSpace)(toCharArray(s));
-        var a1 = dropWhile(isSpace)(dropWhile(function($457) {
-          return !isSpace($457);
-        })(a0));
-        var rest = dropWhile(isSpace)(dropWhile(function($458) {
-          return !isSpace($458);
-        })(a1));
-        var w2 = takeWhile(function($459) {
-          return !isSpace($459);
-        })(a1);
-        var w1 = takeWhile(function($460) {
+        var a1 = dropWhile(isSpace)(dropWhile(function($460) {
           return !isSpace($460);
+        })(a0));
+        var rest = dropWhile(isSpace)(dropWhile(function($461) {
+          return !isSpace($461);
+        })(a1));
+        var w2 = takeWhile(function($462) {
+          return !isSpace($462);
+        })(a1);
+        var w1 = takeWhile(function($463) {
+          return !isSpace($463);
         })(a0);
-        var $215 = $$null(w1) || ($$null(w2) || !$$null(rest));
-        if ($215) {
+        var $216 = $$null(w1) || ($$null(w2) || !$$null(rest));
+        if ($216) {
           return Nothing.value;
         }
         ;
@@ -7010,9 +7010,9 @@ var tokenizeTemplate = function(cfg) {
       var parseDelimDirective = function(interior) {
         var t = trimStartWs(interior);
         var v = bind3(stripPrefix("@delimiters")(t))((function() {
-          var $461 = stripPrefix(":");
-          return function($462) {
-            return $461(trimStartWs($462));
+          var $464 = stripPrefix(":");
+          return function($465) {
+            return $464(trimStartWs($465));
           };
         })());
         if (v instanceof Nothing) {
@@ -7136,8 +7136,8 @@ var tokenizeTemplate = function(cfg) {
                   if (v instanceof Just && v.value0 === "}") {
                     $tco_var_i = i + 1 | 0;
                     $copy_depth = (function() {
-                      var $238 = depth > 0;
-                      if ($238) {
+                      var $239 = depth > 0;
+                      if ($239) {
                         return depth - 1 | 0;
                       }
                       ;
@@ -7276,8 +7276,8 @@ var tokenizeTemplate = function(cfg) {
         }
         ;
         if (v instanceof Nothing) {
-          var $245 = isSeparatorAt(i);
-          if ($245) {
+          var $246 = isSeparatorAt(i);
+          if ($246) {
             return new Just("{{");
           }
           ;
@@ -7381,7 +7381,7 @@ var tokenizeTemplate = function(cfg) {
               return mk(new RSep(span2, start, interior, interiorAt(start)(interior)));
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 987, column 7 - line 1018, column 77): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 1002, column 7 - line 1033, column 77): " + [v.constructor.name]);
           };
         };
       };
@@ -7410,7 +7410,7 @@ var tokenizeTemplate = function(cfg) {
             });
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 880, column 30 - line 887, column 8): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 895, column 30 - line 902, column 8): " + [v.constructor.name]);
         };
       };
       var readRaw = function(i) {
@@ -7443,10 +7443,10 @@ var tokenizeTemplate = function(cfg) {
               });
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 907, column 13 - line 921, column 22): " + [v1.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 922, column 13 - line 936, column 22): " + [v1.constructor.name]);
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 896, column 7 - line 921, column 22): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 911, column 7 - line 936, column 22): " + [v.constructor.name]);
         };
       };
       var readSetDelim = function(i) {
@@ -7486,10 +7486,10 @@ var tokenizeTemplate = function(cfg) {
                 ;
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Lexer (line 943, column 19 - line 954, column 88): " + [v1.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Lexer (line 958, column 19 - line 969, column 88): " + [v1.constructor.name]);
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 940, column 7 - line 954, column 88): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 955, column 7 - line 969, column 88): " + [v.constructor.name]);
           };
         };
       };
@@ -7521,7 +7521,7 @@ var tokenizeTemplate = function(cfg) {
             });
           }
           ;
-          throw new Error("Failed pattern match at FlatBars.Lexer (line 861, column 7 - line 873, column 16): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at FlatBars.Lexer (line 876, column 7 - line 888, column 16): " + [v.constructor.name]);
         };
       };
       var contentTo = function(segStart) {
@@ -7584,7 +7584,7 @@ var tokenizeTemplate = function(cfg) {
                 return;
               }
               ;
-              throw new Error("Failed pattern match at FlatBars.Lexer (line 842, column 29 - line 847, column 34): " + [v.constructor.name]);
+              throw new Error("Failed pattern match at FlatBars.Lexer (line 857, column 29 - line 862, column 34): " + [v.constructor.name]);
             }
             ;
             if (otherwise) {
@@ -7592,7 +7592,7 @@ var tokenizeTemplate = function(cfg) {
               return;
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 840, column 5 - line 848, column 33): " + [j.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 855, column 5 - line 863, column 33): " + [j.constructor.name]);
           }
           ;
           while (!$tco_done2) {
@@ -7623,7 +7623,7 @@ var tokenizeTemplate = function(cfg) {
               });
             }
             ;
-            throw new Error("Failed pattern match at FlatBars.Lexer (line 821, column 39 - line 832, column 8): " + [v.constructor.name]);
+            throw new Error("Failed pattern match at FlatBars.Lexer (line 836, column 39 - line 847, column 8): " + [v.constructor.name]);
           };
         };
       };
@@ -7731,8 +7731,8 @@ var tokenizeTemplate = function(cfg) {
       };
       var readSeparator = function(i) {
         var start = (function() {
-          var $290 = leadTrimAt(i);
-          if ($290) {
+          var $291 = leadTrimAt(i);
+          if ($291) {
             return i + 3 | 0;
           }
           ;
@@ -7871,8 +7871,8 @@ var tokenizeTemplate = function(cfg) {
       };
       var readStatementTag = function(i) {
         var start = (function() {
-          var $294 = leadTrimAt(i);
-          if ($294) {
+          var $295 = leadTrimAt(i);
+          if ($295) {
             return i + 3 | 0;
           }
           ;
@@ -7898,31 +7898,58 @@ var tokenizeTemplate = function(cfg) {
             });
           };
           var headWord2 = firstWord(t.core);
-          var $296 = headWord2 === "";
-          if ($296) {
+          var $297 = headWord2 === "";
+          if ($297) {
             return new Left(new LexError("empty statement tag '{% %}'", i));
           }
           ;
-          var $297 = trim(t.core) === "raw";
-          if ($297) {
+          var $298 = trim(t.core) === "raw";
+          if ($298) {
             return readRawBody(i)(start)(v.value0 + 2 | 0);
           }
           ;
-          var $298 = isStmtClose(headWord2);
-          if ($298) {
+          var $299 = isStmtClose(headWord2);
+          if ($299) {
             var name2 = drop2(3)(headWord2);
             return mk(new RClose(span2, start, name2, interiorAt(start)(name2)));
           }
           ;
-          var $299 = isStmtSep(headWord2) || headWord2 === "set";
-          if ($299) {
+          var $300 = isStmtSep(headWord2) || (headWord2 === "set" || trim(t.core) === "yield");
+          if ($300) {
             return mk(new RSep(span2, start, t.core, interiorAt(start)(t.core)));
+          }
+          ;
+          var $301 = headWord2 === "include";
+          if ($301) {
+            var skipSp = function($copy_j) {
+              var $tco_done3 = false;
+              var $tco_result;
+              function $tco_loop(j) {
+                var $302 = j < v.value0 && maybe(false)(isSpace)(index(cs)(j));
+                if ($302) {
+                  $copy_j = j + 1 | 0;
+                  return;
+                }
+                ;
+                $tco_done3 = true;
+                return j;
+              }
+              ;
+              while (!$tco_done3) {
+                $tco_result = $tco_loop($copy_j);
+              }
+              ;
+              return $tco_result;
+            };
+            var argsOff = skipSp(skipSp(start) + length2(headWord2) | 0);
+            var pcore = "> " + slice3(cs)(argsOff)(v.value0);
+            return mk(new RSep(span2, start, pcore, interiorAt(argsOff - 2 | 0)(pcore)));
           }
           ;
           return mk(new ROpen(span2, Section.value, start, t.core, interiorAt(start)(t.core)));
         }
         ;
-        throw new Error("Failed pattern match at FlatBars.Lexer (line 785, column 7 - line 814, column 73): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at FlatBars.Lexer (line 785, column 7 - line 829, column 73): " + [v.constructor.name]);
       };
       var recoverFrom = function(i) {
         return function(e) {
@@ -7962,11 +7989,11 @@ var tokenizeTemplate = function(cfg) {
                     var $tco_var_segStart = $copy_segStart;
                     var $tco_var_frags = $copy_frags;
                     var $tco_var_acc = $copy_acc;
-                    var $tco_done3 = false;
+                    var $tco_done4 = false;
                     var $tco_result;
                     function $tco_loop(i, open, close, segStart, frags, acc, pend) {
                       if (i >= len) {
-                        $tco_done3 = true;
+                        $tco_done4 = true;
                         return new Right(flush({
                           start: segStart,
                           end: i
@@ -7976,7 +8003,7 @@ var tokenizeTemplate = function(cfg) {
                       if (otherwise) {
                         var v = index(cs)(i);
                         if (v instanceof Nothing) {
-                          $tco_done3 = true;
+                          $tco_done4 = true;
                           return new Right(flush({
                             start: segStart,
                             end: i
@@ -7987,7 +8014,7 @@ var tokenizeTemplate = function(cfg) {
                           if (cfg.mustacheDelims && matchAt(cs)(i)(open + "=")) {
                             var v1 = readSetDelim(i)(open)(close);
                             if (v1 instanceof Left) {
-                              $tco_done3 = true;
+                              $tco_done4 = true;
                               return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
                             }
                             ;
@@ -8012,7 +8039,7 @@ var tokenizeTemplate = function(cfg) {
                           if (cfg.statementTags && matchAt(cs)(i)("{%")) {
                             var v1 = readStatementTag(i);
                             if (v1 instanceof Left) {
-                              $tco_done3 = true;
+                              $tco_done4 = true;
                               return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
                             }
                             ;
@@ -8035,8 +8062,8 @@ var tokenizeTemplate = function(cfg) {
                           }
                           ;
                           if (open === "{{" && (close === "}}" && v.value0 === "\\")) {
-                            var $315 = matchAt(cs)(i + 1 | 0)("\\");
-                            if ($315) {
+                            var $318 = matchAt(cs)(i + 1 | 0)("\\");
+                            if ($318) {
                               $tco_var_i = i + 2 | 0;
                               $tco_var_open = open;
                               $tco_var_close = close;
@@ -8077,7 +8104,7 @@ var tokenizeTemplate = function(cfg) {
                           if (open === "{{" && (close === "}}" && (v.value0 === "{" && isOpenerAt(i)))) {
                             var v1 = readTag(i);
                             if (v1 instanceof Left) {
-                              $tco_done3 = true;
+                              $tco_done4 = true;
                               return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
                             }
                             ;
@@ -8088,7 +8115,7 @@ var tokenizeTemplate = function(cfg) {
                               })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
                               var v2 = delimSwitch(v1.value0.mtok);
                               if (v2 instanceof Left) {
-                                $tco_done3 = true;
+                                $tco_done4 = true;
                                 return new Left(v2.value0);
                               }
                               ;
@@ -8134,7 +8161,7 @@ var tokenizeTemplate = function(cfg) {
                           if (matchAt(cs)(i)(open)) {
                             var v1 = readCustomTag(i)(open)(close);
                             if (v1 instanceof Left) {
-                              $tco_done3 = true;
+                              $tco_done4 = true;
                               return recoverFrom(i)(v1.value0)(segStart)(frags)(acc)(pend)(open)(close);
                             }
                             ;
@@ -8145,7 +8172,7 @@ var tokenizeTemplate = function(cfg) {
                               })(contentTo(segStart)(frags)(i))(acc)(pend)(v1.value0.trimL));
                               var v2 = delimSwitch(v1.value0.mtok);
                               if (v2 instanceof Left) {
-                                $tco_done3 = true;
+                                $tco_done4 = true;
                                 return new Left(v2.value0);
                               }
                               ;
@@ -8196,7 +8223,7 @@ var tokenizeTemplate = function(cfg) {
                       throw new Error("Failed pattern match at FlatBars.Lexer (line 397, column 3 - line 405, column 39): " + [i.constructor.name, open.constructor.name, close.constructor.name, segStart.constructor.name, frags.constructor.name, acc.constructor.name, pend.constructor.name]);
                     }
                     ;
-                    while (!$tco_done3) {
+                    while (!$tco_done4) {
                       $tco_result = $tco_loop($tco_var_i, $tco_var_open, $tco_var_close, $tco_var_segStart, $tco_var_frags, $tco_var_acc, $copy_pend);
                     }
                     ;
@@ -8275,9 +8302,9 @@ var beforeFirstNL = function(s) {
   throw new Error("Failed pattern match at FlatBars.Lexer (line 259, column 19 - line 261, column 15): " + [v.constructor.name]);
 };
 var allWs = /* @__PURE__ */ (function() {
-  var $463 = all2(isSpace);
-  return function($464) {
-    return $463(toCharArray($464));
+  var $466 = all2(isSpace);
+  return function($467) {
+    return $466(toCharArray($467));
   };
 })();
 var afterLastNL = function(s) {
@@ -8405,16 +8432,16 @@ var trimStandalone = function(seps) {
       return function(v) {
         if (v instanceof RContent) {
           var s1 = (function() {
-            var $449 = standaloneAt(j - 1 | 0);
-            if ($449) {
+            var $452 = standaloneAt(j - 1 | 0);
+            if ($452) {
               return dropLeadingLine(v.value1);
             }
             ;
             return v.value1;
           })();
           var s2 = (function() {
-            var $450 = standaloneAt(j + 1 | 0);
-            if ($450) {
+            var $453 = standaloneAt(j + 1 | 0);
+            if ($453) {
               return dropTrailingIndent(s1);
             }
             ;
@@ -13870,7 +13897,7 @@ var nodeStart = function(v) {
     return v.value0.start;
   }
   ;
-  throw new Error("Failed pattern match at Kernel.CaseSugar (line 90, column 13 - line 96, column 29): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Kernel.CaseSugar (line 100, column 13 - line 106, column 29): " + [v.constructor.name]);
 };
 var caseLeadingViolation = function(nodes) {
   var leadingOffset = function($copy_nodes$prime) {
@@ -13964,11 +13991,28 @@ var braceControlViolation = function(clauses) {
           ;
         }
         ;
-        if (v instanceof Sep && (isBrace(v.value0) && elem9(v.value1)(clauses))) {
-          return new Just({
-            off: v.value0.start,
-            shape: sepShape(v.value1)
-          });
+        if (v instanceof Sep) {
+          if (isBrace(v.value0) && elem9(v.value1)(clauses)) {
+            return new Just({
+              off: v.value0.start,
+              shape: sepShape(v.value1)
+            });
+          }
+          ;
+          if (isBrace(v.value0) && take2(1)(v.value1) === ">") {
+            return new Just({
+              off: v.value0.start,
+              shape: '{{> name}} (a partial include uses a {% \u2026 %} tag in this dialect \u2014 write {% include "name" %})'
+            });
+          }
+          ;
+          if (isBrace(v.value0) && v.value1 === "yield") {
+            return new Just({
+              off: v.value0.start,
+              shape: "{{yield}} (the block-partial slot uses a {% \u2026 %} tag in this dialect \u2014 write {% yield %})"
+            });
+          }
+          ;
         }
         ;
         if (v instanceof RawBlock && (isBrace(v.value0) && v.value1 === "raw")) {

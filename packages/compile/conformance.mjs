@@ -182,9 +182,9 @@ const helperCases = [
   //    and the compiled module (compileMaxbarsWithPartials folds them into the
   //    partial registry) must agree. The partial body uses the MaxBars surface
   //    (the `| uppercase` pipe), proving it desugars with MaxBars options.
-  { name: "partials:max-simple", dialect: "maxbars", partials: { greeting: "Hi {{name | uppercase}}!" }, t: "{{> greeting}}", d: { name: "ada" }, expect: "Hi ADA!" },
+  { name: "partials:max-simple", dialect: "maxbars", partials: { greeting: "Hi {{name | uppercase}}!" }, t: "{% include \"greeting\" %}", d: { name: "ada" }, expect: "Hi ADA!" },
   // a template-local {{#inline}} definition wins over a same-named external (left-biased union, as render does).
-  { name: "partials:max-inline-wins", dialect: "maxbars", partials: { g: "EXTERNAL" }, t: '{% inline "g" %}INLINE{% endinline %}{{> g}}', d: {}, expect: "INLINE" },
+  { name: "partials:max-inline-wins", dialect: "maxbars", partials: { g: "EXTERNAL" }, t: '{% inline "g" %}INLINE{% endinline %}{% include "g" %}', d: {}, expect: "INLINE" },
 ];
 const allCases = [...corpus, ...exampleCases(), ...helperCases];
 

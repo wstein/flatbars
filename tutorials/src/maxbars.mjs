@@ -321,8 +321,8 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     // ClassicBars. Combined with {{#each}} it templates a row each, and the name can
     // be an EXPRESSION resolved per row — {% include (lookup this "kind") %} picks the
     // partial from the data. (A template-local {{#inline}} of the same name wins.)
-    template: `{% each people %}{% include (lookup this "kind") %}
-{% endeach %}`,
+    template: `{% for people %}{% include (lookup this "kind") %}
+{% endfor %}`,
     partials: {
       author: "- {{name}} writes",
       engineer: "- {{name}} builds",
@@ -403,7 +403,7 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     template: `Hi {{name}},
 
 Your order shipped. Items:
-{% each items %}
+{% for items %}
 {% include "item" %}
 {% else %}
 - (none)
@@ -423,9 +423,9 @@ Your order shipped. Items:
     label: "Advanced — HTML card (styling in a partial)",
     // The one example whose OUTPUT is HTML — so it previews as HTML, not text. An
     // external {% include "styles" %} partial holds the CSS once, {% include "card" %} is one row's
-    // markup with a {% if lead %} badge, and {% each %} iterates.
+    // markup with a {% if lead %} badge, and {% for %} iterates.
     view: "rendered",
-    template: "{% include \"styles\" %}\n{% each people %}\n{% include \"card\" %}\n{% endeach %}",
+    template: "{% include \"styles\" %}\n{% for people %}\n{% include \"card\" %}\n{% endfor %}",
     partials: {
       styles:
         "<style>\n" +

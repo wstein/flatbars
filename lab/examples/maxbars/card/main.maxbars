@@ -1,4 +1,4 @@
 {% include "styles" %}
-{% each people %}
+{% for people %}
 {% include "card" %}
-{% endeach %}
+{% endfor %}
