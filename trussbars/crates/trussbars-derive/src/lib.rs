@@ -16,7 +16,7 @@
 //! serde-tagged object being non-empty). A **fieldless** enum (all unit variants)
 //! additionally derives `ToText` writing the variant *name* — matching serde's
 //! unit-variant serialization (`Status::Active` → `"Active"`), so `{{status}}`
-//! renders the name and `{{#if (eq status "Active")}}` works. An enum with
+//! renders the name and `{% if (eq status "Active") %}` works. An enum with
 //! **data-carrying** variants gets truthiness only; field-access dispatch over its
 //! variants is the §4.1 polymorphic-dispatch work (a `match`, type-aware → v2).
 //!

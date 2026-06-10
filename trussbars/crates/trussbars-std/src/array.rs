@@ -87,7 +87,7 @@ where
 
 /// Group the elements by a stringified key (`groupBy`) → a sorted map of key to
 /// the elements with that key (first-seen order). The codegen stringifies the key
-/// path; the result is iterated as a map (`{{#each (groupBy …)}}`), `loop.key`
+/// path; the result is iterated as a map (`{% for (groupBy …) %}`), `loop.key`
 /// being the group key — matching the reference, whose object keys are strings.
 pub fn group_by<'a, T>(items: &'a [T], key: impl Fn(&T) -> String) -> BTreeMap<String, Vec<&'a T>> {
     let mut out: BTreeMap<String, Vec<&'a T>> = BTreeMap::new();

@@ -48,7 +48,7 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// policy — `NonEmpty` (default, conformance-checked), `Liquid`, `Handlebars`, or a
 /// host policy path (spec §7, `docs/16-truthiness-modes.md`); and
 /// `partials = [name = "file.truss"]` imports partials from other files, resolved by
-/// `{{> name}}` / `{% partial "name" %}` (cross-file layouts and sub-context partials,
+/// `{% include "name" %}` / `{% partial "name" %}` (cross-file layouts and sub-context partials,
 /// `docs/21-cross-file-partials.md`). A Trussbars-owned (class-A) error expands to a
 /// `compile_error!` located at `line:col`.
 #[proc_macro]

@@ -5,8 +5,8 @@
 //! 1. **Field names are static** — `{{post.body}}` resolves to the Rust field
 //!    `post.body` verbatim (no rename layer). So templates use snake_case to
 //!    keep the Rust idiomatic; there is no `serde`-style `#[rename]` for paths.
-//! 2. **Numbers are `f64`** — a field compared against a numeric literal (`{{#if
-//!    views > 100}}`) is emitted as `views > 100.0`, so `views` must be `f64`
+//! 2. **Numbers are `f64`** — a field compared against a numeric literal (`{% if
+//!    views > 100 %}`) is emitted as `views > 100.0`, so `views` must be `f64`
 //!    (`i64 > f64` would not type-check). Counters that are *only* printed or used
 //!    as a `groupBy` key (like `year`) can stay `i64`.
 

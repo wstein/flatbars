@@ -10,7 +10,7 @@
 //! (71/71 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
 //! `if`/`each`/`with`/`let`, loop metadata incl. `loop.parent`/`loop.root`, the value
 //! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
-//! `dict`, and partials (`{% inline %}`/`{{> }}`/`{% partial %}`/`{% yield %}`). Anything
+//! `dict`, and partials (`{% inline %}`/`{% include %}`/`{% partial %}`/`{% yield %}`). Anything
 //! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
 //! spike (docs/11): the lenient render path, host-helper
 //! registration (value *and* block helpers — `{% name %}…{% endname %}`, docs/09 §3.1),
