@@ -42,10 +42,32 @@ This rule is reached independently from two directions, and they coincide exactl
   — i.e. an interpreter. So *statically resolvable* ⟹ *no data-derived names*.
 - **From security.** "Data chooses which template/helper runs" is the server-side template
   injection (SSTI) / confused-deputy shape. Eliminating data-derived dispatch removes that
-  hazard class outright. So *injection-safe* ⟹ *no data-derived names*.
+  *name-injection* sub-class outright. So *injection-safe* ⟹ *no data-derived names*.
 
 The safety property and the typing property are **the same boundary**. The subset is
 therefore not "MaxBars minus the inconvenient parts" — it is the closure of a single law.
+
+### Scope of the safety property (what the bright line does and does not cover)
+
+The single law is precise, so its security claim must be too. The bright line removes the
+**name-injection sub-class**: data can no longer select which partial, helper, or field a
+render reaches (§4). That is the eval-shaped, confused-deputy hazard — a real and complete
+elimination, enforced at compile time. It is **not** a claim to have solved *all* template
+security:
+
+- **Resource exhaustion (DoS) is not addressed by the bright line.** A compiled `for` over
+  an attacker-sized collection runs just as long as an interpreted one; static typing buys
+  nothing here. This is the threat class that historically bit runtime template engines in
+  production, and it remains the **host's** responsibility — see the resource-bounds note in
+  §8 and the explicit non-goal in §10.
+- **The two designs are duals, not rankings.** A runtime interpreter (Handlebars,
+  Liquid) treats the template as untrusted authored data and *sandboxes the template* — the
+  template literally cannot reach `eval`. Trussbars treats the template as trusted source and
+  the data as untrusted, and so *sandboxes the data* — no value may become a name. Neither is
+  "more secure"; they answer different questions about who holds the template. Trussbars is the
+  right tool when the template author is trusted (a developer-authored, compiled view layer)
+  and the data is not; it is the wrong tool when the template author is untrusted (a
+  user-editable theme), which is the runtime engine's home turf.
 
 ---
 
@@ -299,6 +321,16 @@ partials (§4.1) and missing-key-empty (§5.1). Schema inference (`03-schema-inf
 softens the authoring cost by *deriving* a candidate `T` from the template, but a declared
 `T` remains the precondition.
 
+**Resource bounds live at the deserialization seam, not in the template.** A compiled
+`{{#each items}}` is a native `for` over `ctx.items`; its cost is the *cardinality of `T`*,
+which is set when the dynamic JSON is deserialized into `T`. Trussbars deliberately emits no
+per-iteration budget or recursion guard — that overhead would contradict the zero-cost
+codegen thesis (§9), and the loop bound is not knowable AOT (it is data). The honest
+mitigation is therefore the same seam the type check rides on: **the host caps the input
+before `serde` builds `T`** — a byte limit on the request body, `serde`'s recursion limit for
+nesting depth, and (where the shape allows it) a bounded collection type. The compiled
+`render(&T)` is then bounded by a `T` the host already sized. See the §10 non-goal.
+
 ---
 
 ## 9. Compilation model (no interpreter, no VM)
@@ -342,6 +374,15 @@ the same harness).
 - **i18n precision.** `t` / `number` / `date` / `selectPlural` / `relative` are a
   documented host-locale seam with English fallback, exactly as the JS engine treats the
   `translator` seam (ADR-029). Not byte-identical; not a correctness gate.
+- **Resource exhaustion (DoS) is a host responsibility, by design.** Trussbars eliminates
+  the *name-injection* hazard class (§1, §4) but adds **no** loop budget, recursion guard,
+  or output cap — a compiled `for` over an attacker-sized `Vec` runs as long as the data
+  demands, exactly as an interpreter would, and "compiled" buys no protection here. The
+  bound belongs at the input seam: the host MUST cap the request body size and rely on
+  `serde`'s recursion limit (and, where the shape allows, a bounded collection type) before
+  deserializing into the context type `T` (§8). Stating this as an explicit non-goal — rather
+  than implying "compiled ⟹ safe" — keeps the safety claim honest and scoped to what the
+  bright line actually delivers.
 
 ---
 
