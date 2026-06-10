@@ -806,10 +806,20 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
                 mk (RClose span start name (interiorAt start name))
             -- a clause separator (`else`/`elif`/`when`) OR a block-LESS statement that
             -- lexes to a name-agnostic `RSep` (no `{% end… %}` to pair): the forward
-            -- binding `{% set … %}` (docs-17, reparented by `Kernel.SetSugar`) and the
+            -- binding `{% set … %}` (docs-17, reparented by `Kernel.SetSugar`), the
             -- block-partial placeholder `{% yield %}` (ADR-039 item 5 — the surface
-            -- outputs the scoped `yield` op, exactly as the retired `{{yield}}`).
-            else if isStmtSep headWord || headWord == "set" || trim core == "yield" then
+            -- outputs the scoped `yield` op, exactly as the retired `{{yield}}`), and the
+            -- inheritance parent-body splice `{% super %}` (ADR-040 — the named-block
+            -- sibling of `{% yield %}`, consumed by `Kernel.Inherit`).
+            else if
+              isStmtSep headWord || headWord == "set" || trim core == "yield"
+                || trim core == "super" then
+              mk (RSep span start core (interiorAt start core))
+            -- the inheritance directive `{% extends "base" %}` (ADR-040): a block-LESS
+            -- statement (no `{% endextends %}`) consumed by the `Kernel.Inherit` flatten
+            -- pre-pass; it never reaches the engine. Lexed to a name-agnostic `RSep` whose
+            -- name is `extends` and whose one argument is the base name (a string literal).
+            else if headWord == "extends" then
               mk (RSep span start core (interiorAt start core))
             -- the partial include `{% include "name" [ctx] [k=v] %}` (ADR-039 item 5).
             -- It lexes to the SAME `>`-prefixed `RSep` the retired `{{> name …}}` does —

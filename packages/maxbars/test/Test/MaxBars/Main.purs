@@ -400,6 +400,50 @@ main = do
     "{% raw %}Literal {{x}} & <b>{% if a %}kept{% endif %}</b>{% endraw %}"
     (obj [ Tuple "x" (VString "V"), Tuple "a" (VBool true) ])
     "Literal {{x}} & <b>{% if a %}kept{% endif %}</b>"
+
+  -- ADR-040 template inheritance: `{% extends %}` / named `{% block %}` / `{% super %}`,
+  -- statically flattened (Kernel.Inherit) over the `{% inline %}` base registry.
+  let
+    layout =
+      "{% inline \"base\" %}<h>{% block title %}Site{% endblock %}</h><b>{% block content %}{% endblock %}</b>{% endinline %}"
+  -- override `content`, inherit the `title` default.
+  expectM "inherit-override-and-default"
+    (layout <> "{% extends \"base\" %}{% block content %}Hi{% endblock %}")
+    (obj [])
+    "<h>Site</h><b>Hi</b>"
+  -- `{% super %}` splices the parent block's body into the override.
+  expectM "inherit-super"
+    ( layout
+        <>
+          "{% extends \"base\" %}{% block title %}A — {% super %}{% endblock %}{% block content %}X{% endblock %}"
+    )
+    (obj [])
+    "<h>A — Site</h><b>X</b>"
+  -- multi-level chain leaf → mid → base; the leaf override wins.
+  expectM "inherit-multilevel"
+    ( "{% inline \"base\" %}<b>{% block content %}base{% endblock %}</b>{% endinline %}"
+        <>
+          "{% inline \"mid\" %}{% extends \"base\" %}{% block content %}mid{% endblock %}{% endinline %}"
+        <> "{% extends \"mid\" %}{% block content %}leaf{% endblock %}"
+    )
+    (obj [])
+    "<b>leaf</b>"
+  -- a block body interpolates context data like any other content.
+  expectM "inherit-block-output"
+    ( "{% inline \"base\" %}{% block g %}hi{% endblock %}{% endinline %}{% extends \"base\" %}{% block g %}Hi {{name}}{% endblock %}"
+    )
+    (obj [ Tuple "name" (VString "Ada") ])
+    "Hi Ada"
+  -- reject: a child with `{% extends %}` may hold only `{% block %}` defs at top level.
+  assert' "reject: stray child content"
+    ( isLeft
+        ( renderMax (layout <> "{% extends \"base\" %}oops{% block content %}X{% endblock %}")
+            (obj [])
+        )
+    )
+  -- reject: an `{% extends %}` naming a base that does not exist.
+  assert' "reject: unknown extends base"
+    (isLeft (renderMax "{% extends \"ghost\" %}{% block content %}X{% endblock %}" (obj [])))
   -- whitespace-tolerant open/close, and an empty region renders nothing.
   expectM "raw-region-spaced" "{%  raw  %}{{x}}{%  endraw  %}" (obj []) "{{x}}"
   expectM "raw-region-empty" "{% raw %}{% endraw %}" (obj []) ""

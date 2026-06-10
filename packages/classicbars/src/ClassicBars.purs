@@ -43,7 +43,7 @@ import ClassicBars.Surface (LoopVars, desugar, desugarWith, eachLoopViolation, e
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
-import Data.Either (Either(..))
+import Data.Either (Either(..), either)
 import Data.Foldable (elem)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
@@ -59,6 +59,7 @@ import Kernel.CaseSugar (braceControlViolation, caseLeadingViolation)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refEngineWith, register, registerAll, registerPartialFiles, registerPartials, withTranslator, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
+import Kernel.Inherit (resolveInheritance)
 import Kernel.Inspect (Snapshot, Target, inspectResolvedLenient)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (blockHelperNames, lenientResolve, prelude, preludeSchema)
@@ -375,9 +376,18 @@ renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of
     | Left e <- checkSurfaceStrict strict nodes -> Left (renderParseErrorAt src e)
     | opts.lexConfig.statementTags, Left e <- checkBraceControl src nodes -> Left
         (renderParseErrorAt src e)
+    -- ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` before desugar. A
+    -- located error (stray child content, unknown base) surfaces here; the body below
+    -- re-applies the (now known-good) flatten.
+    | opts.lexConfig.statementTags, Left e <- resolveInheritance nodes -> Left
+        (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
-      { partials, template } = hoistInline (desugarStmt opts lv nodes)
+      inherited =
+        if opts.lexConfig.statementTags then either (const nodes) identity
+          (resolveInheritance nodes)
+        else nodes
+      { partials, template } = hoistInline (desugarStmt opts lv inherited)
     in
       case
         runResolvedLenient directives
