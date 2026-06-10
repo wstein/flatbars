@@ -62,6 +62,35 @@ parse→desugar→emit** (already required for diagnostics) and **design the pro
 emit mode alongside clean/commented from the start** — don't bolt it on. Phase 1
 (the source map) is a natural follow-on to the breadcrumb work and Lab-pluggable.
 
+## Open-ADR triage (2026-06-10)
+
+Snapshot of every open/Draft/Proposed/Postponed ADR across both trees (Trussbars `docs/` + spec
+`adr/`) and what closes each. Priority is relative to the product goals (`docs/13` Part I: Trussbars =
+production Rust engine; sharpen editors; the **(C) versioned-artifact** path). **Repo-split
+implementation is deferred** (user); decision/tracking lives here, not in scratch notes.
+
+| ADR | Status | What closes it | Priority |
+| --- | --- | --- | --- |
+| **22** `#[derive(Template)]` | Proposed — *decisions required* | Pick the derive form (struct-owns-template vs `truss!(name, Ctx, "…")` free-fn); freeze surface | **P1** — decision-ripe, the adoption ergonomic Rust users expect, no deps |
+| **17 / 18 / 19** `{% %}` surface (set·local / capture / statement-tags) | Proposed — *surface frozen* | Oracle-first impl: `statementTags` `LexConfig` knob + `set`/`local`/`capture` in `Kernel.Prelude`; conformance cases; then Trussbars; the §19.6 **atomic cutover** | **P2** — design done; large breaking impl, sequence via docs/19 §6 |
+| **03** schema inference (G2) | Draft — *built nowhere* | Finish design + first Rust impl (analyse→report→schema→data scaffold) | **P2/P3** — critical-path for **(C)/Phase-0** (deferred with the split); also a DX win (removes the declare-`T` cost) |
+| **01** subset spec → normative | Draft / normative-intent | RFC-2119 grading, conformance levels, self-containment (`docs/13 §5`) | **P3** — part of the **(C)** Phase-0 contract work |
+| spec **0027** cross-template scope graph | Proposed — *gated* | Build the scope graph → unlocks `definition`/references/rename | **P3** — editor future; **re-scope under the Rust-LSP direction** (`docs/13 §I.5`) |
+| spec **0028** hybrid template LSP | Proposed — *gated* | The HTML+template hybrid LSP | **P3** — editor future; **re-scope under the Rust-LSP direction** |
+| **14** typed `{{#match}}` | Postponed | Revive only on a concrete consumer needing compile-time variant coverage | **Parked** |
+| **02** runtime-api | Draft (living) | Update as the runtime evolves | **Living** — not an open decision |
+
+**Recommended order to "go further":** status reconciliation (below, done) → **22** (decision) → **17/18/19**
+implementation behind the docs/19 §6 cutover → **03 + 01** as the (C)/Phase-0 contract work → **0027/0028**
+re-scoped when the editor phase starts. **14** stays parked.
+
+**Status reconciliations (this pass):**
+
+- spec **ADR-0021** (maxbars-variable-model): `Proposed` → **Accepted** (its own text says shipped 2026-06-07; referenced as live throughout CLAUDE.md). ✅ fixed.
+- spec **ADR-0026** (editor-capability-matrix): *no status line* — descriptive/settled; stamp `Accepted` on next edit.
+- `docs/13` own status is **not** stale (the survey's "Draft" hit was §5 quoting *docs/01*'s header); its Decision was amended to the ratified **(C)**.
+- Residual (noted `docs/13 §3`): `docs/08`/`docs/11` still carry freeze-era "56/56"/"64/64" — normalize on next touch.
+
 ## Reference docs
 
 - `01-subset-spec.md` — the language. `02-runtime-api.md` — the runtime surface
@@ -76,8 +105,14 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
 - `12-case-multiarm-blocks.md` — `{{#case}}…{{when …}}…{{else}}` multi-arm conditional: a
   first-class node lowered to a Rust `match` (subject evaluated once), `caseH` in the oracle.
   Implemented in RawBars/MaxBars and Trussbars.
-- `13-independence.md` — **decision doc** for spinning Trussbars out as its own project
-  (spec-owning; G1–G5 gates; schema-inference critical path).
+- `13-independence.md` — **decision doc**, now two parts. **Part I (2026-06-10):** ecosystem
+  product & repo organization — three products (PureScript *learning platform* / *Trussbars* Rust
+  engine / *editors*), product-aligned repo split gated on a versioned-artifact Phase 0, BOM-not-
+  submodules umbrella, the editor strategy (IDE = MaxBars/Trussbars only; Rust LSP via a recovering
+  parser; tree-sitter reach), and — key — it carries the **RATIFIED** sever decision: **(C) conform-to-
+  versioned is the destination** (Trussbars splits but conforms to the platform's versioned spec+corpus;
+  live oracle survives), **(A) sever is the escape hatch**. Under (C): G1+G3-deletion are only-if-(A),
+  G2/G5/§5-grading required either way. **Part II:** the original (A) oracle-sever playbook, retained.
 - `14-typed-match.md` — **proposed** `{{#match SUBJECT "Type"}}` — the typed-exhaustive sibling
   of `{{#case}}`: variant dispatch lowered to a Rust `match` whose exhaustiveness rustc enforces
   (no schema inference needed). Surface-freezing ADR; not yet implemented.
