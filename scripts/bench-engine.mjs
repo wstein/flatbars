@@ -36,21 +36,21 @@ const cases = [
   {
     name: "loop 1k (maxbars)",
     render: (t, d) => E.renderMaxbars(t, d),
-    t: "<ul>{{#each x in items}}<li>{{loop.index1}}: {{x.name}} = {{x.score}}{{#if x.score > 500}} *{{/if}}</li>{{/each}}</ul>",
+    t: "<ul>{% each x in items %}<li>{{loop.index1}}: {{x.name}} = {{x.score}}{% if x.score > 500 %} *{% endif %}</li>{% endeach %}</ul>",
     d: { items: Array.from({ length: 1000 }, (_, i) => row(i)) },
   },
   {
     name: "nested 100x10 (maxbars)",
     render: (t, d) => E.renderMaxbars(t, d),
-    t: "{{#each r in rows label outer}}<tr>{{#each c in r}}<td>{{outer.index0}}:{{c}}</td>{{/each}}</tr>{{/each}}",
+    t: "{% each r in rows label outer %}<tr>{% each c in r %}<td>{{outer.index0}}:{{c}}</td>{% endeach %}</tr>{% endeach %}",
     d: { rows: Array.from({ length: 100 }, () => Array.from({ length: 10 }, (_, i) => "c" + i)) },
   },
   {
-    name: "let + literals (maxbars)",
+    name: "local + literals (maxbars)",
     render: (t, d) => E.renderMaxbars(t, d),
-    // `let` (no re-root) + a glued list-of-dicts literal + each…in with a 1-based
-    // index + the `..` range + arithmetic, over 200 iterations.
-    t: "{{#let tiers=[{n: \"gold\", at: 3}, {n: \"silver\", at: 6}]}}{{#each t i in tiers}}<h>{{add i 1}}. {{t.n}}</h>{{#each k in 1..t.at}}<i>{{k}}</i>{{/each}}{{/each}}{{/let}}",
+    // `local` (bounded binding, no re-root) + a glued list-of-dicts literal + each…in
+    // with a 1-based index + the `..` range + arithmetic, over 200 iterations.
+    t: "{% local tiers=[{n: \"gold\", at: 3}, {n: \"silver\", at: 6}] %}{% each t i in tiers %}<h>{{add i 1}}. {{t.n}}</h>{% each k in 1..t.at %}<i>{{k}}</i>{% endeach %}{% endeach %}{% endlocal %}",
     d: {},
   },
 ];
