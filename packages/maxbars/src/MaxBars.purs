@@ -25,7 +25,7 @@ module MaxBars
 
 import Prelude
 
-import ClassicBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
+import ClassicBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renameScope, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
 import ClassicBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
 import ClassicBars.Surface (noLoopVars, reservedScope)
 import Data.Array.NonEmpty as NEA
@@ -108,7 +108,7 @@ renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 inferMax :: String -> Either String InferResult
 inferMax src = do
   parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
-  pure (inferTemplate (desugarSurfaceWith maxLoopVars parsed.nodes))
+  pure (inferTemplate (desugarSurfaceWith maxLoopVars (renameScope parsed.nodes)))
 
 -- | `inferMax` refined by sample data (docs/03 §2): under-determined scalars
 -- | (a bare `{{x}}` defaulted to `String`) are pinned to the type the samples
@@ -116,7 +116,7 @@ inferMax src = do
 inferMaxData :: Array Value -> String -> Either String InferResult
 inferMaxData samples src = do
   parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
-  pure (inferTemplateData samples (desugarSurfaceWith maxLoopVars parsed.nodes))
+  pure (inferTemplateData samples (desugarSurfaceWith maxLoopVars (renameScope parsed.nodes)))
 
 -- | Render MaxBars source with a set of named *external* (host-threaded) partials,
 -- | each given as MaxBars surface source — the MaxBars twin of
@@ -200,5 +200,5 @@ maxbarsWarnings src = do
   -- the boolean operators surface as `or`/`and` applications). The stray-head-bar
   -- lint is gone — a head bar is now a parse error (block params drop the pipes),
   -- so a parsed tree can no longer carry one.
-  let desugared = desugarSurfaceWith maxLoopVars nodes
+  let desugared = desugarSurfaceWith maxLoopVars (renameScope nodes)
   pure (labelShadowWarnings desugared <> booleanInOutputWarnings desugared)

@@ -57,7 +57,7 @@ fn err<T>(message: impl Into<String>, at: usize) -> Result<T, ParseError> {
 /// The built-in block heads `open_block` dispatches — reserved, so a host cannot declare a
 /// block helper with one of these names (docs/12 §5.2). Keep in sync with `open_block`.
 pub const RESERVED_BLOCK_HEADS: &[&str] = &[
-    "if", "unless", "each", "with", "let", "local", "case", "inline", "partial",
+    "if", "unless", "each", "scope", "let", "local", "case", "inline", "partial",
 ];
 
 /// What stopped a body scan.
@@ -198,7 +198,13 @@ impl Blocks<'_> {
             "if" => self.cond_block(span, rest, false, scope),
             "unless" => self.cond_block(span, rest, true, scope),
             "each" => self.each_block(span, rest, scope),
-            "with" => self.with_block(span, rest, scope),
+            // ADR-039 item 9: the context re-root is spelled `scope` (renamed from
+            // `with`); `with` is rejected with a located fix-it.
+            "scope" => self.with_block(span, "scope", rest, scope),
+            "with" => err(
+                "the context re-root is renamed `scope` (ADR-039) — write `{% scope … %}` … `{% endscope %}`",
+                span.start,
+            ),
             // `local` is the docs-17 spelling of the bounded block binding; `let` is the
             // retained legacy head. Same construct, each paired by its own close name.
             "let" | "local" => self.let_block(span, head, rest, scope),
@@ -386,13 +392,14 @@ impl Blocks<'_> {
     fn with_block(
         &mut self,
         span: crate::span::Span,
+        head: &str,
         rest: &str,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
         let subject = parse_expr(rest.trim(), scope)?;
-        // `with` re-roots `this` to the subject but introduces no named binding.
+        // `scope` re-roots `this` to the subject but introduces no named binding.
         let (body, stop) = self.parse_until(scope)?;
-        let otherwise = self.else_arm(stop, scope, "with", span.start)?;
+        let otherwise = self.else_arm(stop, scope, head, span.start)?;
         Ok(Node::With(With {
             span,
             subject,
@@ -832,10 +839,10 @@ mod tests {
     fn mismatched_close_is_a_located_error() {
         // A close tag naming the wrong block is rejected here (a class-A parse
         // error), not left to rustc as a downstream "unknown field" — across each
-        // block kind: each/with (else_arm), if (cond), case, let, and host helpers.
+        // block kind: each/scope (else_arm), if (cond), case, let, and host helpers.
         for src in [
             "{% each items %}{{this}}{% endwith %}",
-            "{% with user %}{{name}}{% endeach %}",
+            "{% scope user %}{{name}}{% endeach %}",
             "{% if a %}A{% endunless %}",
             "{% case s %}{% when \"a\" %}A{% endif %}",
             "{% let x=(1) %}{{x}}{% endeach %}",

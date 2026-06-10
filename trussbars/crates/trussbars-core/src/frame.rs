@@ -34,7 +34,7 @@ pub struct Loop<'p> {
     /// The 1-based loop-nesting level (`loop.depth`, ADR-021 amendment): the
     /// outermost loop is `1`, a loop nested directly inside it is `2`, and so on.
     /// Definitionally `parent.depth + 1`, counting enclosing *loop* frames only
-    /// (a `{% with %}`/`{% if %}` between two loops does not increment it, since it
+    /// (a `{% scope %}`/`{% if %}` between two loops does not increment it, since it
     /// introduces no [`Loop`]).
     pub depth: usize,
     /// The entry key, for map iteration; `None` for array iteration.

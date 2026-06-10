@@ -121,8 +121,8 @@ export const cases = [
     maps: ["prefs"],
   },
   {
-    id: "with",
-    template: "{% with user %}{{name}} ({{age}}){% else %}?{% endwith %}",
+    id: "scope",
+    template: "{% scope user %}{{name}} ({{age}}){% else %}?{% endscope %}",
     data: { user: { name: "Bo", age: 30 } },
   },
   {
@@ -246,17 +246,17 @@ export const cases = [
     },
   },
   {
-    // find → Option, unwrapped by an Option-aware {% with %} (hit / miss) and read
+    // find → Option, unwrapped by an Option-aware {% scope %} (hit / miss) and read
     // by {% if %} (truthiness of the Option).
     id: "find-with-hit",
     ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
-    template: '{% with (find items "name" "eq" "Bo") %}{{age}}{% else %}none{% endwith %}',
+    template: '{% scope (find items "name" "eq" "Bo") %}{{age}}{% else %}none{% endscope %}',
     data: { items: [{ name: "Ann", age: 30 }, { name: "Bo", age: 17 }] },
   },
   {
     id: "find-with-miss",
     ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
-    template: '{% with (find items "name" "eq" "Zz") %}{{age}}{% else %}none{% endwith %}',
+    template: '{% scope (find items "name" "eq" "Zz") %}{{age}}{% else %}none{% endscope %}',
     data: { items: [{ name: "Ann", age: 30 }, { name: "Bo", age: 17 }] },
   },
   {
@@ -440,13 +440,13 @@ export const cases = [
   {
     id: "dict-with-literal",
     ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
-    template: "{% with {name: \"Ann\", age: 30} %}{{name}} is {{age}}{% endwith %}",
+    template: "{% scope {name: \"Ann\", age: 30} %}{{name}} is {{age}}{% endscope %}",
     data: {},
   },
   {
     id: "dict-call-form",
     ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
-    template: '{% with (dict "a" 1) %}{{a}}{% endwith %}',
+    template: '{% scope (dict "a" 1) %}{{a}}{% endscope %}',
     data: {},
   },
   {
@@ -458,13 +458,13 @@ export const cases = [
   {
     id: "dict-path-value",
     ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
-    template: "{% with {who: name} %}hi {{who}}{% endwith %}",
+    template: "{% scope {who: name} %}hi {{who}}{% endscope %}",
     data: { name: "Zed" },
   },
   {
     id: "dict-nested",
     ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
-    template: "{% with {a: {b: 1}} %}{{a.b}}{% endwith %}",
+    template: "{% scope {a: {b: 1}} %}{{a.b}}{% endscope %}",
     data: {},
   },
 ];

@@ -52,7 +52,7 @@ module MaxBars.Rust
 
 import Prelude
 
-import ClassicBars (desugarSurfaceWith, hoistInline)
+import ClassicBars (desugarSurfaceWith, hoistInline, renameScope)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -142,7 +142,9 @@ compileWith commented externalSrcs file ctxType src = case build of
     parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
     externals <- traverse compilePartial externalSrcs
     let
-      h = hoistInline (desugarSurfaceWith maxLoopVars parsed.nodes)
+      -- `renameScope`: `{% scope %}` → the `with` re-root op head (ADR-039 item 9),
+      -- matching the interpreter's `desugarStmt`.
+      h = hoistInline (desugarSurfaceWith maxLoopVars (renameScope parsed.nodes))
       externalMap = Map.fromFoldable externals
       -- The template's own `{{#inline}}` definitions plus the external partials; an
       -- inline of the same name wins (it indexes `main`).
@@ -159,7 +161,7 @@ compileWith commented externalSrcs file ctxType src = case build of
   compilePartial :: Tuple String String -> Either String (Tuple String Template)
   compilePartial (Tuple name s) = do
     p <- lmap (show <<< NEA.head) (parseWith maxOptions s)
-    Right (Tuple name (desugarSurfaceWith maxLoopVars p.nodes))
+    Right (Tuple name (desugarSurfaceWith maxLoopVars (renameScope p.nodes)))
 
   initialEnv :: Map String Template -> Env
   initialEnv partials =

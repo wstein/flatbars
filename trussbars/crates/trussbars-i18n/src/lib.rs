@@ -113,7 +113,7 @@ fn number_format(lang: &str) -> (char, char) {
 /// Operands are read off `count` as an `f64`: `i` is its integer part and a non-zero
 /// fraction counts as visible fraction digits (`v > 0`), which the cardinal rules
 /// need; `NaN`/∞ → `"other"`. Returns the category, not a formatted string — pair it
-/// with a `{{#with}}`/`select` over the result. `no_std`-clean (core ops only).
+/// with a `{% scope %}`/`select` over the result. `no_std`-clean (core ops only).
 #[must_use]
 #[allow(non_snake_case)] // mirrors the blessed template name `selectPlural`
 pub fn selectPlural(count: &f64, lang: &str) -> &'static str {

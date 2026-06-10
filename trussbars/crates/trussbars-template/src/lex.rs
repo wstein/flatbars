@@ -511,7 +511,7 @@ fn trim_span(b: &[u8], lo: usize, hi: usize) -> (usize, usize) {
 }
 
 /// Find the closing `%}` of a statement tag at brace/bracket depth 0, skipping quoted
-/// strings — so a dict/list literal's own `}`/`]` (`{% with {a: {b: 1}} %}`) and a `%}`
+/// strings — so a dict/list literal's own `}`/`]` (`{% scope {a: {b: 1}} %}`) and a `%}`
 /// inside a string never end the tag. Returns the index of the `%`.
 fn find_stmt_close(b: &[u8], n: usize, start: usize) -> Result<usize, LexError> {
     let mut depth: i32 = 0;
@@ -813,14 +813,14 @@ mod tests {
     fn statement_tag_brace_aware_close() {
         // A dict literal's own `}` (and a `%}` inside a string) must not end the tag.
         assert_eq!(
-            tags("{% with {a: {b: 1}} %}{{a.b}}{% endwith %}")[0],
-            (Sigil::Open, "with {a: {b: 1}}".to_string())
+            tags("{% scope {a: {b: 1}} %}{{a.b}}{% endscope %}")[0],
+            (Sigil::Open, "scope {a: {b: 1}}".to_string())
         );
         assert_eq!(
             tags(r#"{% if (eq s "%}") %}x{% endif %}"#)[0],
             (Sigil::Open, r#"if (eq s "%}")"#.to_string())
         );
-        assert_round_trip("{% with {a: {b: 1}} %}{{a.b}}{% endwith %}");
+        assert_round_trip("{% scope {a: {b: 1}} %}{{a.b}}{% endscope %}");
     }
 
     #[test]

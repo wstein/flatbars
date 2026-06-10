@@ -272,7 +272,7 @@ pub struct Case {
     pub otherwise: Vec<Node>,
 }
 
-/// `{% with subject %}` data.
+/// `{% scope subject %}` data (the context re-root; renamed from `with`, ADR-039).
 #[derive(Debug, Clone, PartialEq)]
 pub struct With {
     /// The tag span.

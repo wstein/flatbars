@@ -640,7 +640,7 @@ fn let_block(
 fn each_block(env: &Env, src: &str, e: &Each, out: &mut String) -> Result<(), String> {
     // A dict literal compiles to a struct, which has no `Each` impl — so iterating one
     // is rejected up front (a clean located error, not a downstream rustc failure).
-    // Bind it (`{% with {…} %}` / `{% let %}`) and read its fields instead.
+    // Bind it (`{% scope {…} %}` / `{% let %}`) and read its fields instead.
     if dict_arity(&e.subject).is_some() {
         return Err(
             "unsupported: cannot iterate a dict literal — bind it and read its fields".into(),
@@ -1470,8 +1470,8 @@ mod tests {
 
     #[test]
     fn dict_literal_synthesizes_a_struct() {
-        // A dict literal (call form or `{…}`) re-roots `with` to a generic local struct.
-        let out = emit("Ctx", r#"{% with (dict "a" 1) %}{{a}}{% endwith %}"#).unwrap();
+        // A dict literal (call form or `{…}`) re-roots `scope` to a generic local struct.
+        let out = emit("Ctx", r#"{% scope (dict "a" 1) %}{{a}}{% endscope %}"#).unwrap();
         assert!(out.contains("struct __Dict<F0> { a: F0 }"));
         assert!(out.contains("__Dict { a: 1.0 }"));
         // A `let`-bound brace literal with two fields, accessed by `.key`.
