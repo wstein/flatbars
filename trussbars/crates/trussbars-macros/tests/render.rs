@@ -299,7 +299,7 @@ struct Page {
 truss!(
     blog,
     Page,
-    "{{> header}}<ul>{% for items %}{{> row this}}{% endfor %}</ul>{{> footer}}",
+    r#"{% include "header" %}<ul>{% for items %}{% include "row" this %}{% endfor %}</ul>{% include "footer" %}"#,
     partials = [
         header = "tests/templates/header.truss",
         footer = "tests/templates/footer.truss",

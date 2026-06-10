@@ -1322,7 +1322,7 @@ mod tests {
         let d = obj(&[("name", s("Ann & Bo"))]);
         assert_eq!(
             render(
-                r#"{% inline "greet" %}Hi {{name}}!{% endinline %}{{> greet}}"#,
+                r#"{% inline "greet" %}Hi {{name}}!{% endinline %}{% include "greet" %}"#,
                 d.clone()
             )
             .unwrap(),

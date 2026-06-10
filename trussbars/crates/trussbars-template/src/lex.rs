@@ -342,17 +342,14 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             trail_trim,
         });
     }
-    // Two-brace tag: the byte after `{{` selects the sigil. Strict native dialect
-    // (docs-19): `{{ … }}` is OUTPUT-ONLY — control flow is the Django-style `{% … %}`
-    // statement tag (`lex_statement_tag`). The legacy Handlebars block-open/close
-    // sigils (a `#` or `/` right after the `{{`) are deliberately NOT recognized here
-    // — such a tag just falls through to an ordinary (and invalid) output expression.
-    // `{{> }}`
-    // (partial inclusion) and `{{! }}` (comment) stay; they are output / metadata,
-    // not control.
+    // Two-brace tag: the byte after `{{` selects the sigil. PURE native dialect
+    // (ADR-039): `{{ … }}` is OUTPUT-ONLY. No Handlebars holdovers — the legacy
+    // block-open/close (`{{#`/`{{/`) AND the partial reference `{{> name}}` are NOT
+    // recognized here (a partial include is `{% include "name" %}`); such a tag falls
+    // through to an ordinary (and invalid) output expression — a plain parse error, no
+    // compat mapping. Only `{{! … }}` (comment) remains a two-brace metadata sigil.
     let c = b.get(i + 2).copied();
     let (sigil, sig_len) = match c {
-        Some(b'>') => (Sigil::Partial, 1),
         Some(b'!') => (Sigil::Comment, 1),
         _ => (Sigil::Output, 0),
     };
@@ -694,7 +691,7 @@ mod tests {
 
     #[test]
     fn all_two_brace_sigils() {
-        let s = "{{x}}{{{y}}}{% for xs %}{% endfor %}{{> card}}{{! c }}";
+        let s = "{{x}}{{{y}}}{% for xs %}{% endfor %}{{! c }}";
         assert_eq!(
             sigils(s),
             vec![
@@ -702,7 +699,6 @@ mod tests {
                 Sigil::Raw,
                 Sigil::Open,
                 Sigil::Close,
-                Sigil::Partial,
                 Sigil::Comment
             ]
         );
@@ -875,11 +871,12 @@ mod tests {
             tags("{% yield %}"),
             vec![(Sigil::Output, "yield".to_string())]
         );
-        // The legacy `{{> }}` / `{{yield}}` still lex (the Rust parser stays a lenient
-        // superset; only the corpus migrates).
+        // PURE grammar (ADR-039): the legacy partial sigil `{{> }}` is NOT recognized —
+        // it lexes as an ordinary (and invalid) output, a plain parse error downstream.
+        // A partial include is `{% include "name" %}` only.
         assert_eq!(
             tags("{{> row}}"),
-            vec![(Sigil::Partial, " row".to_string())]
+            vec![(Sigil::Output, "> row".to_string())]
         );
     }
 

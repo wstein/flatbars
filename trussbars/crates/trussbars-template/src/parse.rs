@@ -499,8 +499,9 @@ impl Blocks<'_> {
         interior: &str,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
-        // `{% include "name" %}` (ADR-039 item 5) quotes the name; the legacy `{{> name}}`
-        // is a bare head. Accept either.
+        // `{% include "name" %}` quotes the name; a bare head `{% include name %}` is a
+        // (static) variable name. Accept either; a parenthesised/computed name is rejected
+        // by `read_string_literal`/`split_head` returning no clean name.
         let (name, after) = match read_string_literal(interior.trim_start()) {
             Some((n, rest)) => (n, rest),
             None => {
@@ -993,7 +994,7 @@ mod tests {
     #[test]
     fn partials_inline_and_use_and_yield() {
         let ns = parse(
-            r#"{% inline "card" %}<b>{{title}}</b>{% endinline %}{% for posts %}{{> card}}{% endfor %}"#,
+            r#"{% inline "card" %}<b>{{title}}</b>{% endinline %}{% for posts %}{% include "card" %}{% endfor %}"#,
         )
         .unwrap();
         assert!(matches!(&ns[0], Node::Inline { name, .. } if name == "card"));

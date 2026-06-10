@@ -63,9 +63,9 @@ pub fn emit_named(
 
 /// As [`emit_named`], plus **cross-file partials** (docs/21): `file_partials` is the declared
 /// `partials = [name = "file"]` map as `(name, source)` pairs (the macro reads the files). Each
-/// is parsed and merged into the partial registry — so `{{> name}}` / `{% partial "name" %}`
+/// is parsed and merged into the partial registry — so `{% include "name" %}` / `{% partial "name" %}`
 /// resolves to it, inlined against the caller's context (a layout's `{{yield}}` and nested
-/// `{{> other}}` work for free). A name defined more than once (in-source `{% inline %}` ×
+/// `{% include "other" %}` work for free). A name defined more than once (in-source `{% inline %}` ×
 /// imported file, or twice in the map) is a compile error; an error *inside* a partial locates
 /// within that partial's source and is tagged `(in partial 'name')`.
 ///
@@ -1276,12 +1276,12 @@ mod tests {
 
     #[test]
     fn file_partial_body_inlines_at_the_call_site() {
-        // A `partials = [name = source]` entry resolves `{{> name}}` to that body, inlined
+        // A `partials = [name = source]` entry resolves `{% include "name" %}` to that body, inlined
         // against the caller's context (so it type-checks like an in-source `{% inline %}`).
         let out = emit_with_partials(
             "render",
             "Ctx",
-            "{{> header}}",
+            r#"{% include "header" %}"#,
             &[],
             TruthMode::NonEmpty,
             &[("header".to_string(), "<h1>{{title}}</h1>".to_string())],
@@ -1297,7 +1297,7 @@ mod tests {
         let err = emit_with_partials(
             "render",
             "Ctx",
-            "{% inline \"h\" %}x{% endinline %}{{> h}}",
+            r#"{% inline "h" %}x{% endinline %}{% include "h" %}"#,
             &[],
             TruthMode::NonEmpty,
             &[("h".to_string(), "<p>file</p>".to_string())],
@@ -1312,7 +1312,7 @@ mod tests {
         let err = emit_with_partials(
             "render",
             "Ctx",
-            "{{> broken}}",
+            r#"{% include "broken" %}"#,
             &[],
             TruthMode::NonEmpty,
             &[("broken".to_string(), "{% for items %}{{this}}".to_string())],
@@ -1329,7 +1329,7 @@ mod tests {
         let err = emit_with_partials(
             "render",
             "Ctx",
-            "{{> p}}",
+            r#"{% include "p" %}"#,
             &[],
             TruthMode::NonEmpty,
             &[("p".to_string(), "x {{bogus y}}".to_string())],

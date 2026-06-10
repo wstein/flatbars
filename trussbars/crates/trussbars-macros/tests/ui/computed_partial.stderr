@@ -1,7 +1,7 @@
 error: 1:1: a partial reference (`{% include "name" %}`) needs a name
  --> tests/ui/computed_partial.rs:5:1
   |
-5 | truss!(render, str, "{{> (lookup this \"kind\")}}");
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | truss!(render, str, "{% include (lookup this \"kind\") %}");
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
   = note: this error originates in the macro `truss` (in Nightly builds, run with -Z macro-backtrace for more info)

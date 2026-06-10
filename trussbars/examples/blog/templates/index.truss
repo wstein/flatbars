@@ -6,4 +6,4 @@
   {% if tags %}<p class="tags">{% for tag in tags %}<a href="/tags/{{tag | lowercase}}">#{{tag}}</a> {% endfor %}</p>{% endif %}
   <p>{{excerpt}}</p>
 </article>
-{% endinline %}{% for posts %}{{> card}}{% endfor %}
+{% endinline %}{% for posts %}{% include "card" %}{% endfor %}
