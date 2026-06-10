@@ -156,7 +156,7 @@ pub enum Node {
         body: Vec<Node>,
     },
     /// `{% partial "name" [ctx] %}…{% endpartial %}` — render the body in the caller
-    /// frame and splice it at the named partial's `{{yield}}`.
+    /// frame and splice it at the named partial's `{% yield %}`.
     PartialBlock {
         /// The tag span.
         span: Span,
@@ -167,7 +167,7 @@ pub enum Node {
         /// The body to render as the yield.
         body: Vec<Node>,
     },
-    /// `{{yield}}` — splice the block partial's pre-rendered body.
+    /// `{% yield %}` — splice the block partial's pre-rendered body.
     Yield {
         /// The tag span.
         span: Span,

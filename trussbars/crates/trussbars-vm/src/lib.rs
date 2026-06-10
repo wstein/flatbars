@@ -10,7 +10,7 @@
 //! (71/71 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
 //! `if`/`each`/`with`/`let`, loop metadata incl. `loop.parent`/`loop.root`, the value
 //! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
-//! `dict`, and partials (`{% inline %}`/`{{> }}`/`{% partial %}`/`{{yield}}`). Anything
+//! `dict`, and partials (`{% inline %}`/`{{> }}`/`{% partial %}`/`{% yield %}`). Anything
 //! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
 //! spike (docs/11): the lenient render path, host-helper
 //! registration (value *and* block helpers — `{% name %}…{% endname %}`, docs/09 §3.1),
@@ -238,7 +238,7 @@ struct Env {
     labels: BTreeMap<String, Rc<LoopFrame>>,
     /// Hoisted `{% inline %}` definitions, shared across the render.
     partials: Rc<BTreeMap<String, Vec<Node>>>,
-    /// The pre-rendered body a block partial splices at its `{{yield}}`.
+    /// The pre-rendered body a block partial splices at its `{% yield %}`.
     yield_html: Option<Rc<str>>,
     /// Partial names currently expanding (recursion guard).
     expanding: Vec<String>,
@@ -560,7 +560,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
         Node::PartialBlock {
             name, ctx, body, ..
         } => {
-            // Render the block body in the CALLER frame, then splice it at `{{yield}}`.
+            // Render the block body in the CALLER frame, then splice it at `{% yield %}`.
             let mut yielded = String::new();
             eval_nodes(env, body, &mut yielded)?;
             let scope = match ctx {
@@ -571,7 +571,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
         }
         Node::Yield { .. } => match &env.yield_html {
             Some(y) => out.push_str(y),
-            None => return Err("'{{yield}}' used outside a block partial".into()),
+            None => return Err("'{% yield %}' used outside a block partial".into()),
         },
         // Host block helpers (docs/09 §3.1): the runtime mirror of AOT's body-as-closure.
         // Evaluate the args, hand the helper a `body` thunk that renders the inner nodes in
@@ -605,7 +605,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
 }
 
 /// Expand the named partial with `scope` as `this` in a fresh frame (params/loop reset,
-/// like the AOT inline-expansion), with `yield_html` available to its `{{yield}}`.
+/// like the AOT inline-expansion), with `yield_html` available to its `{% yield %}`.
 fn expand_partial(
     env: &Env,
     name: &str,
@@ -1328,7 +1328,7 @@ mod tests {
             .unwrap(),
             "Hi Ann &amp; Bo!"
         );
-        let blk = r#"{% inline "card" %}<div>{{yield}}</div>{% endinline %}{% partial "card" %}{{name}}{% endpartial %}"#;
+        let blk = r#"{% inline "card" %}<div>{% yield %}</div>{% endinline %}{% partial "card" %}{{name}}{% endpartial %}"#;
         assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
     }
 

@@ -283,7 +283,7 @@ fn numeric_literal_coerces_against_an_i64_field() {
 
 // #4 cross-file partials (docs/21): `partials = [name = "file"]` loads partials from separate
 // files, resolved by the same inline mechanism — so a shared header/footer, a sub-context
-// partial, and a `{{yield}}` layout all compose across files, type-checked against the
+// partial, and a `{% yield %}` layout all compose across files, type-checked against the
 // caller's context.
 #[derive(trussbars_core::Trussbars)]
 struct Item {
@@ -307,7 +307,7 @@ truss!(
     ]
 );
 // A cross-file layout: the block body renders in the caller's frame and splices into the
-// imported layout's `{{yield}}`.
+// imported layout's `{% yield %}`.
 truss!(
     doc,
     Page,

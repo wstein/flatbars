@@ -456,10 +456,11 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             trail_trim,
         });
     }
-    // A clause separator — and the block-partial slot `{% yield %}` (ADR-039 item 5,
-    // the parser maps the bare `yield` to `Node::Yield`) — lexes to `Output`; every
-    // other head opens a block.
-    let sigil = if head == b"else" || head == b"elif" || head == b"when" || head == b"yield" {
+    // A clause separator (`else`/`elif`/`when`) lexes to `Output` (the parser turns it
+    // into a `Stop`); every other head — including the block-partial slot `{% yield %}`
+    // (PURE grammar: it is control, so `{% %}` not `{{ }}`) — opens a block
+    // (`Sigil::Open`), which `open_block` dispatches.
+    let sigil = if head == b"else" || head == b"elif" || head == b"when" {
         Sigil::Output
     } else {
         Sigil::Open
@@ -793,8 +794,8 @@ mod tests {
     #[test]
     fn include_and_yield_statement_tags() {
         // `{% include "name" [ctx] %}` → a `Partial` sigil (interior = the args after
-        // `include`); `{% yield %}` → `Output "yield"` (the parser makes it `Node::Yield`).
-        // ADR-039 item 5 — the same nodes the retired `{{> name}}` / `{{yield}}` produced.
+        // `include`); `{% yield %}` → `Open "yield"` (control — `open_block` makes it
+        // `Node::Yield`; PURE grammar, no longer the `{{yield}}` output form).
         assert_eq!(
             tags(r#"{% include "card" sec %}"#),
             vec![(Sigil::Partial, r#""card" sec"#.to_string())]
@@ -805,7 +806,7 @@ mod tests {
         );
         assert_eq!(
             tags("{% yield %}"),
-            vec![(Sigil::Output, "yield".to_string())]
+            vec![(Sigil::Open, "yield".to_string())]
         );
         // PURE grammar (ADR-039): the legacy partial sigil `{{> }}` is NOT recognized —
         // it lexes as an ordinary (and invalid) output, a plain parse error downstream.

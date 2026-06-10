@@ -64,7 +64,7 @@ pub fn emit_named(
 /// As [`emit_named`], plus **cross-file partials** (docs/21): `file_partials` is the declared
 /// `partials = [name = "file"]` map as `(name, source)` pairs (the macro reads the files). Each
 /// is parsed and merged into the partial registry — so `{% include "name" %}` / `{% partial "name" %}`
-/// resolves to it, inlined against the caller's context (a layout's `{{yield}}` and nested
+/// resolves to it, inlined against the caller's context (a layout's `{% yield %}` and nested
 /// `{% include "other" %}` work for free). A name defined more than once (in-source `{% inline %}` ×
 /// imported file, or twice in the map) is a compile error; an error *inside* a partial locates
 /// within that partial's source and is tagged `(in partial 'name')`.
@@ -465,7 +465,7 @@ fn yield_here(env: &Env, out: &mut String) -> Result<(), String> {
             out.push_str(code);
             Ok(())
         }
-        None => Err("unsupported: '{{yield}}' outside a block partial".into()),
+        None => Err("unsupported: '{% yield %}' outside a block partial".into()),
     }
 }
 

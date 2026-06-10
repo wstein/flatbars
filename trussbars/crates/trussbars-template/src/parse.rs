@@ -57,7 +57,7 @@ fn err<T>(message: impl Into<String>, at: usize) -> Result<T, ParseError> {
 /// The built-in block heads `open_block` dispatches — reserved, so a host cannot declare a
 /// block helper with one of these names (docs/12 §5.2). Keep in sync with `open_block`.
 pub const RESERVED_BLOCK_HEADS: &[&str] = &[
-    "if", "unless", "for", "scope", "local", "case", "inline", "partial",
+    "if", "unless", "for", "scope", "local", "case", "inline", "partial", "yield",
 ];
 
 /// What stopped a body scan.
@@ -129,11 +129,6 @@ impl Blocks<'_> {
                     if let Some(vals) = strip_when(text) {
                         self.pos += 1;
                         return Ok((nodes, Stop::When(vals.to_string())));
-                    }
-                    if text == "yield" {
-                        nodes.push(Node::Yield { span });
-                        self.pos += 1;
-                        continue;
                     }
                     let expr = parse_expr(text, scope)?;
                     // PURE grammar (ADR-039): raw (un-escaped) output is `{{ E | safe }}`,
@@ -213,6 +208,14 @@ impl Blocks<'_> {
             "case" => self.case_block(span, rest, scope),
             "inline" => self.inline_block(span, rest, scope),
             "partial" => self.partial_block(span, rest, scope),
+            // The block-partial slot `{% yield %}` (ADR-039: control, no longer the
+            // `{% yield %}` output form) — a standalone tag with no body and no arguments.
+            "yield" => {
+                if !rest.trim().is_empty() {
+                    return err("`{% yield %}` takes no arguments", span.start);
+                }
+                Ok(Node::Yield { span })
+            }
             // Any other head is a *host block helper* (docs/09): parse it meaning-free
             // into a generic node; the emitter/VM resolve it against the allow-list.
             other => self.helper_block(span, other, rest, scope),
@@ -997,7 +1000,7 @@ mod tests {
         .unwrap();
         assert!(matches!(&ns[0], Node::Inline { name, .. } if name == "card"));
         let y = parse(
-            r#"{% inline "c" %}<div>{{yield}}</div>{% endinline %}{% partial "c" %}{{name}}{% endpartial %}"#,
+            r#"{% inline "c" %}<div>{% yield %}</div>{% endinline %}{% partial "c" %}{{name}}{% endpartial %}"#,
         )
         .unwrap();
         assert!(matches!(&y[1], Node::PartialBlock { name, .. } if name == "c"));
