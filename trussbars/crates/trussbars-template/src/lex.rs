@@ -433,6 +433,27 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             trail_trim,
         });
     }
+    // `{% raw %}…{% endraw %}` — a verbatim region (ADR-039 item 2): capture the body
+    // untouched (like the quad-stache `{{{{#raw}}}}`) into a `RawBlock`. Only the bare
+    // head `raw` (no args) opens a region; `{% raw … %}` with args is not one.
+    if &b[ts..te] == b"raw" {
+        let body_start = end;
+        let (body_end, close_end) = find_endraw(b, n, body_start)
+            .ok_or_else(|| LexError::new("unterminated `{% raw %}` (no `{% endraw %}`)", i))?;
+        return Ok(Lexed {
+            lexeme: Lexeme::RawBlock {
+                head: Span::new(ts, te),
+                body: Span::new(body_start, body_end),
+                span: Span::new(i, close_end),
+            },
+            next: close_end,
+            // `{%- raw %}` trims preceding whitespace; the body is verbatim and the
+            // trailing edge is not trimmed — matching the PureScript `readRawBody`
+            // (`trimL` from the opening, `trimR = false`) so interpreter ≡ compiled.
+            lead_trim,
+            trail_trim: false,
+        });
+    }
     // A clause separator lexes to `Output` (the parser's `else`/`elif`/`when` split);
     // every other head opens a block.
     let sigil = if head == b"else" || head == b"elif" || head == b"when" {
@@ -450,6 +471,30 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
         lead_trim,
         trail_trim,
     })
+}
+
+/// Scan for the first `{% endraw %}` from `start`. Returns `(body_end, close_end)`:
+/// `body_end` is the `{%` of the endraw tag, `close_end` is just past its `%}`. A
+/// `{% … %}` that is not `endraw` (and a `{%` with no `%}`) is verbatim body, scanned
+/// past — `{% raw %}` does not nest (the first `{% endraw %}` closes it, like Liquid).
+fn find_endraw(b: &[u8], n: usize, start: usize) -> Option<(usize, usize)> {
+    let mut j = start;
+    while j < n {
+        if b[j] == b'{'
+            && j + 1 < n
+            && b[j + 1] == b'%'
+            && let Ok(q) = find_stmt_close(b, n, j + 2)
+        {
+            let (ts, te) = trim_span(b, j + 2, q);
+            if &b[ts..te] == b"endraw" {
+                return Some((j, q + 2));
+            }
+            j = q + 2;
+            continue;
+        }
+        j += 1;
+    }
+    None
 }
 
 /// The non-whitespace sub-range of `b[lo..hi]` (ASCII-whitespace trimmed both ends).
@@ -792,6 +837,30 @@ mod tests {
     fn empty_or_unterminated_statement_tag_errors() {
         assert!(lex("{%  %}").is_err()); // empty
         assert!(lex("ok {% each xs no close").is_err()); // no `%}`
+    }
+
+    #[test]
+    fn raw_region_captures_body_verbatim() {
+        // `{% raw %}…{% endraw %}` (ADR-039 item 2) is a `RawBlock` whose body is
+        // verbatim — a nested `{{x}}` / `{% if %}` is literal text, not a tag.
+        let s = "A{% raw %}Literal {{x}} {% if z %}b{% endif %}{% endraw %}B";
+        let ls = lex(s).unwrap();
+        let raw = ls
+            .iter()
+            .find_map(|l| match l {
+                Lexeme::RawBlock { head, body, .. } => Some((head.of(s), body.of(s))),
+                _ => None,
+            })
+            .expect("a RawBlock lexeme");
+        assert_eq!(raw.0, "raw");
+        assert_eq!(raw.1, "Literal {{x}} {% if z %}b{% endif %}");
+        assert_round_trip(s);
+        // whitespace-tolerant open/close; an unterminated region errors.
+        assert!(matches!(
+            lex("{%  raw  %}x{%  endraw  %}").unwrap()[0],
+            Lexeme::RawBlock { .. }
+        ));
+        assert!(lex("{% raw %}no close").is_err());
     }
 
     /// The text payload after `trim_standalone`, concatenated (tags render nothing).

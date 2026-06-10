@@ -368,7 +368,7 @@ export const cases = [
   // ── raw blocks (verbatim body, unescaped) ────────────────────────────────────
   {
     id: "rawblock",
-    template: "{{{{#raw}}}}Literal {{x}} & <b>kept</b>{{{{/raw}}}}",
+    template: "{% raw %}Literal {{x}} & <b>kept</b>{% endraw %}",
     data: {},
   },
 

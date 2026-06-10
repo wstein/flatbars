@@ -388,6 +388,21 @@ main = do
   assert' "reject: unescaped {{&}}" (isLeft (renderMax "{{&a}}" (obj [])))
   assert' "reject: raw block {{{{}}}}" (isLeft (renderMax "{{{{r}}}}body{{{{/r}}}}" (obj [])))
 
+  -- Verbatim region: the `{% raw %}` spelling (ADR-039 item 2) keeps its body
+  -- untouched — `{{x}}` and a nested `{% if %}` are literal text, not interpolated.
+  expectM "raw-region"
+    "{% raw %}Literal {{x}} & <b>{% if a %}kept{% endif %}</b>{% endraw %}"
+    (obj [ Tuple "x" (VString "V"), Tuple "a" (VBool true) ])
+    "Literal {{x}} & <b>{% if a %}kept{% endif %}</b>"
+  -- whitespace-tolerant open/close, and an empty region renders nothing.
+  expectM "raw-region-spaced" "{%  raw  %}{{x}}{%  endraw  %}" (obj []) "{{x}}"
+  expectM "raw-region-empty" "{% raw %}{% endraw %}" (obj []) ""
+  -- the legacy quad-stache verbatim region `{{{{#raw}}}}` is rejected with a fix-it
+  -- pointing at `{% raw %}` (the no-silent-no-op bar); a raw-block *helper*
+  -- (`{{{{#op}}}}`, op ≠ raw) is unaffected — it still resolves its head strictly.
+  assert' "reject: {{{{#raw}}}} verbatim region (use {% raw %})"
+    (isLeft (renderMax "{{{{#raw}}}}{{x}}{{{{/raw}}}}" (obj [])))
+
   -- block-partial yield: the reserved `{{yield}}` (the `partial-block` synonym)
   -- renders the caller's block body. It is `{{ }}`-escaped by MaxBars' rule but
   -- the body is a `VSafe` value, so escapeHtml is the identity — no double-escape.

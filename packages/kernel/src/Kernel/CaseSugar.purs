@@ -45,9 +45,11 @@ caseLeadingViolation nodes = Array.head (Array.mapMaybe node nodes)
 -- | `statementTags` dialect (RawBars/MaxBars, docs-19) control flow is written with
 -- | Django-style `{% … %}` tags and `{{ … }}` is OUTPUT-ONLY, so a legacy `{{#if}}` /
 -- | `{{/if}}` / bare `{{else}}` is rejected with an actionable "use {% … %}" message
--- | rather than silently re-accepted (the no-silent-no-op bar — CLAUDE.md). Raw
--- | blocks (`{{{{#op}}}}`) are a separate `RawBlock` node and keep their quad-stache
--- | spelling, so they never reach here.
+-- | rather than silently re-accepted (the no-silent-no-op bar — CLAUDE.md). Raw-block
+-- | *helpers* (`{{{{#op}}}}`, op ≠ `raw`) keep their quad-stache spelling and are not
+-- | flagged; only the literal *verbatim region* `{{{{#raw}}}}` is rejected (ADR-039
+-- | item 2 — write `{% raw %} … {% endraw %}`). The raw-block helper head semantics
+-- | (strict-head resolution) are unchanged.
 -- |
 -- | `clauses` are the engine's clause-separator names (`else`/`elif`/`when`): only a
 -- | `Sep` with one of those names is a *control* separator. A bare `{{name}}` is a
@@ -62,6 +64,10 @@ braceControlViolation clauses src nodes = Array.head (Array.mapMaybe node nodes)
       | otherwise -> braceControlViolation clauses src body
     Sep sp name _
       | isBrace sp && Array.elem name clauses -> Just { off: sp.start, shape: sepShape name }
+    -- The verbatim region `{{{{#raw}}}}` moves to `{% raw %}` (ADR-039 item 2); a
+    -- raw-block *helper* (`op ≠ raw`) is unaffected.
+    RawBlock sp name _ _
+      | isBrace sp && name == "raw" -> Just { off: sp.start, shape: rawShape }
     _ -> Nothing
   isBrace sp = take 2 (drop sp.start src) == "{{"
   blockShape name =
@@ -76,6 +82,8 @@ braceControlViolation clauses src nodes = Array.head (Array.mapMaybe node nodes)
       <> " …}} (a clause separator uses a {% … %} tag in this dialect — write {% "
       <> name
       <> " … %})"
+  rawShape =
+    "{{{{#raw}}}} … {{{{/raw}}}} (a verbatim region uses a {% … %} tag in this dialect — write {% raw %} … {% endraw %})"
 
 -- | The source offset of a node's span (for located errors).
 nodeStart :: Node -> Int

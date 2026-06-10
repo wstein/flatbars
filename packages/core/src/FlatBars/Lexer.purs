@@ -26,7 +26,7 @@ import Data.List as List
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String (Pattern(..))
 import Data.String.CodeUnits as SCU
-import Data.String.Common (joinWith)
+import Data.String.Common (joinWith, trim)
 import FlatBars.Error (ParseError(..))
 import FlatBars.Span (Span)
 import FlatBars.Syntax (Sigil(..))
@@ -794,6 +794,11 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
               { mtok: Just tok, next: q + 2, trimL: leadTrimAt i || t.trimL, trimR: t.trimR }
           in
             if headWord == "" then Left (LexError "empty statement tag '{% %}'" i)
+            -- The verbatim region `{% raw %}…{% endraw %}` (ADR-039 item 2). It is NOT a
+            -- section open: the body is captured untouched (to the matching `{% endraw %}`),
+            -- reusing the very `RRaw`/`RawBlock "raw"` pipeline the `{{{{#raw}}}}` spelling
+            -- feeds — pure surface sugar. Only the bare head `raw` (no args) opens a region.
+            else if trim core == "raw" then readRawBody i start (q + 2)
             else if isStmtClose headWord then
               let
                 name = SCU.drop 3 headWord
@@ -807,6 +812,40 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
               mk (RSep span start core (interiorAt start core))
             else
               mk (ROpen span Section start core (interiorAt start core))
+
+  -- Capture a `{% raw %}…{% endraw %}` body verbatim (ADR-039 item 2): from the
+  -- opening tag's close (`bodyStart`) to the matching `{% endraw %}`. Emits the same
+  -- `RRaw` the FlatBars `{{{{#raw}}}}` spelling does (`isHash` = `true`, so it clears
+  -- the statement-tag dialects' `rawBlockHash` gate) → `RawBlock "raw"` → `rawH`.
+  readRawBody :: Int -> Int -> Int -> Either ParseError TagResult
+  readRawBody i headStart bodyStart = case findEndrawFrom bodyStart of
+    Nothing -> Left (UnterminatedRaw i)
+    Just close -> Right
+      { mtok: Just
+          ( RRaw { start: i, end: close.tagEnd } true headStart "raw"
+              (interiorAt headStart "raw")
+              (slice cs bodyStart close.tagStart)
+          )
+      , next: close.tagEnd
+      , trimL: leadTrimAt i
+      , trimR: false
+      }
+
+  -- Scan for the first `{% endraw %}` from `j0`. A `{% … %}` that is not `endraw`
+  -- (and a `{%` with no `%}` close) is verbatim body, scanned past — `{% raw %}` does
+  -- not nest, exactly as Liquid: the first `{% endraw %}` closes the region.
+  findEndrawFrom :: Int -> Maybe { tagStart :: Int, tagEnd :: Int }
+  findEndrawFrom = scan
+    where
+    scan j
+      | j >= len = Nothing
+      | matchAt cs j "{%" = case closeFrom (j + 2) "%}" of
+          Just q
+            | firstWord (splitTrims (slice cs (j + 2) q)).core == "endraw" ->
+                Just { tagStart: j, tagEnd: q + 2 }
+            | otherwise -> scan (q + 2)
+          Nothing -> scan (j + 1)
+      | otherwise = scan (j + 1)
 
   -- A short comment `{{! [~] … [~] }}` is *kept* as an `RComment` carrying its
   -- interior (trailing `~` stripped) and offset, so the parser can lift any
