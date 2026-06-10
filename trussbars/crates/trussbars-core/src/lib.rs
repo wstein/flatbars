@@ -11,8 +11,10 @@
 //!   ([`text`]). Stringification mirrors the reference engine's `stringify`, and
 //!   escaping mirrors its `escapeHtml`, byte-for-byte (one deliberate exception:
 //!   f64 formatting, which is out of scope for v1 — see the module docs).
-//! - [`Truthy`] / [`truthy`] — the `nonEmpty` truthiness rule, minus numbers
-//!   ([`truthy`](mod@truthy)). A bare-number condition does not compile.
+//! - [`TruthyIn`] / [`truthy`] / [`truthy_in`] — truthiness under a named policy
+//!   ([`truthy`](mod@truthy)). The default is `nonEmpty` minus numbers (a bare-number
+//!   condition does not compile); [`Liquid`] / [`Handlebars`] and host-defined policies
+//!   are selectable per render.
 //! - [`Loop`] — the borrowed-reference loop frame model ([`frame`]): per-iteration
 //!   `{{#each}}` metadata threaded by lexical nesting, no `Rc`, no heap frame.
 //! - [`SizeHint`] — the adaptive output-capacity hint ([`capacity`]): a warm
@@ -46,9 +48,9 @@ pub use capacity::SizeHint;
 pub use each::Each;
 pub use frame::Loop;
 pub use text::{Safe, ToText, esc, escape_html};
-pub use truthy::{Truthy, truthy};
+pub use truthy::{Handlebars, Liquid, NonEmpty, TruthyIn, truthy, truthy_in};
 
-/// `#[derive(Trussbars)]` — generates [`Truthy`] for a context struct or enum (and
+/// `#[derive(Trussbars)]` — generates [`TruthyIn`] for a context struct or enum (and
 /// [`ToText`] for a fieldless enum, writing the variant name). Available with the
 /// `derive` feature; re-exported from `trussbars-derive`.
 #[cfg(feature = "derive")]

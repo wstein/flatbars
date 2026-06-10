@@ -6,7 +6,7 @@
 //! dead-code is allowed for the whole fixture module.
 #![allow(dead_code)]
 
-use trussbars_core::truthy;
+use trussbars_core::{Handlebars, Liquid, truthy, truthy_in};
 use trussbars_derive::Trussbars;
 
 #[derive(Trussbars)]
@@ -82,4 +82,22 @@ fn data_enum_is_truthy() {
     // error; variant field access is the deferred §4.1 dispatch.
     assert!(truthy(&Shape::Circle { radius: 1.0 }));
     assert!(truthy(&Shape::Square(2.0)));
+}
+
+#[test]
+fn derived_truthiness_is_policy_independent() {
+    // The generated `TruthyIn<__TruthMode>` impl holds under every policy: an
+    // inhabited object is truthy whether the template renders under NonEmpty,
+    // Liquid, or Handlebars, and a unit struct is falsy under all three.
+    let v = WithFields {
+        a: 0,
+        b: String::new(),
+    };
+    assert!(truthy_in::<Liquid, _>(&v));
+    assert!(truthy_in::<Handlebars, _>(&v));
+    assert!(!truthy_in::<Liquid, _>(&Unit));
+    assert!(!truthy_in::<Handlebars, _>(&Unit));
+    // Generic context types keep the extra mode parameter off the Self type.
+    assert!(truthy_in::<Liquid, _>(&Generic { x: 0_i64 }));
+    assert!(truthy_in::<Handlebars, _>(&Status::Active));
 }
