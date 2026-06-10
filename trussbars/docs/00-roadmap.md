@@ -71,7 +71,7 @@ implementation is deferred** (user); decision/tracking lives here, not in scratc
 
 | ADR | Status | What closes it | Priority |
 | --- | --- | --- | --- |
-| **22** `#[derive(Template)]` | Proposed — *decisions required* | Pick the derive form (struct-owns-template vs `truss!(name, Ctx, "…")` free-fn); freeze surface | **P1** — decision-ripe, the adoption ergonomic Rust users expect, no deps |
+| **22** `#[derive(Template)]` | **Accepted** (decisions ratified 2026-06-10) | Implement the derive: `render_into` primitive + defaulted `render` + zero-alloc `Display`; full `truss!` clause parity; infallible trait. **Now depends on docs/23** (emit→`fmt::Write`) — build that first | **P1 → ready to build** (after docs/23) |
 | **17 / 18 / 19** `{% %}` surface (set·local / capture / statement-tags) | Proposed — *surface frozen* | Oracle-first impl: `statementTags` `LexConfig` knob + `set`/`local`/`capture` in `Kernel.Prelude`; conformance cases; then Trussbars; the §19.6 **atomic cutover** | **P2** — design done; large breaking impl, sequence via docs/19 §6 |
 | **03** schema inference (G2) | Draft — *built nowhere* | Finish design + first Rust impl (analyse→report→schema→data scaffold) | **P2/P3** — critical-path for **(C)/Phase-0** (deferred with the split); also a DX win (removes the declare-`T` cost) |
 | **01** subset spec → normative | Draft / normative-intent | RFC-2119 grading, conformance levels, self-containment (`docs/13 §5`) | **P3** — part of the **(C)** Phase-0 contract work |
