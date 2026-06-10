@@ -248,9 +248,13 @@ and `{% %}` — strictly more capable. The quad-stache is retired in `statementT
    The commit is the one-way door: there is no staged coexistence and no `{{ }}`-control-flow
    fallback for these dialects (the `{{:else}}` clause-sigil of §4 A2 is *not* held in reserve —
    it is a rejected alternative, not an escape hatch).
-4. **Trussbars (`docs/08`).** v2 lexer learns `{% %}`; emitter/VM unchanged; corpus on
-   `--v2`/`--vm`/`--vm-compat`; the parse-time diagnostics (§3) wired to template spans. Sequenced
-   *after* step 3 so the Trussbars corpus it gates against is already `{% %}`.
+4. **Trussbars (`docs/08`) — DONE.** The Rust `trussbars-template` lexer learns `{% %}`
+   (a port of `FlatBars.Lexer.readStatementTag`: `{%`→the same `Lexeme::Tag` sigils the
+   `{{ }}` form yields, brace-aware `%}` close); the parser gains the `local` block
+   (docs-17) and the `elif` clause; the desugar/emitter/VM are untouched. The conformance
+   corpus is `{% %}` and all backends pass — AOT 71/71, `--v2` 71/71, `--vm` 71/71,
+   `--vm-compat` 71/71. `{{ }}` control flow stays a lenient superset for now (the strict
+   legacy-reject + the remaining parse-time diagnostics of §3 are a follow-on refinement).
 5. **Editors (§5.5)** and the `docs/06` freeze amendment, both inside the step-3 commit (the
    editor fixtures are migrated in 3.ii; the freeze §1 spellings update with the flip in 3.iii).
 

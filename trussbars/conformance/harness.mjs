@@ -37,13 +37,21 @@ const { renderMaxbars, maxbarsCompat, inferMaxbarsData } = await import(enginePa
 
 // Ctx source (docs/03 G2 step): prefer schema *inference* from the template
 // (Kernel.Schema), falling back to the data-only `genCtx` only where the case
-// declares manual `maps`/`enums` hints inference does not yet derive, or where
+// declares manual `maps`/`enums` hints inference does not yet derive, where the
+// case opts out via `ctxFromData` (a known inference gap — see below), or where
 // inference fails. Tracks how many cases each path served (the G2-readiness
 // signal — inference supersedes ctxgen as its coverage grows).
+//
+// `ctxFromData: true` marks a case whose template inference produces a *struct*
+// but an INCOMPLETE one: a collection produced by a `where`/`reject`/`find`/
+// `groupBy` filter does not yet thread the body's element-field accesses
+// (`{{this.name}}`) onto the inferred element type — the §3 rule table is a
+// follow-on increment (docs/03 §"Not yet"). Those cases use the complete
+// data-driven `genCtx`; drop the flag as inference grows to cover them.
 let ctxInferred = 0;
 let ctxFallback = 0;
 function ctxFor(c) {
-  if (!c.maps && !c.enums) {
+  if (!c.maps && !c.enums && !c.ctxFromData) {
     const r = inferMaxbarsData(c.template, c.data);
     if (r.ok && r.schema.includes("struct Ctx")) {
       ctxInferred++;

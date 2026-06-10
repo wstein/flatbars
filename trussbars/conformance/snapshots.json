@@ -30,7 +30,7 @@
   "round": "4",
   "to-fixed": "$3.50",
   "ternary": "in stock",
-  "let-bindings": "3 x 20 = 60, tax 6, total 66",
+  "local-bindings": "3 x 20 = 60, tax 6, total 66",
   "list-each-int": "1 2 3 ",
   "list-each-str": "#a #b #c ",
   "list-count": "4 items",
@@ -67,7 +67,7 @@
   "standalone-not-when-inline": "a b \n",
   "dict-with-literal": "Ann is 30",
   "dict-call-form": "1",
-  "dict-let-literal": "dark/12",
+  "dict-local-literal": "dark/12",
   "dict-path-value": "hi Zed",
   "dict-nested": "1"
 }

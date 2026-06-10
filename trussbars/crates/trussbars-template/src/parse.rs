@@ -52,7 +52,7 @@ fn err<T>(message: impl Into<String>, at: usize) -> Result<T, ParseError> {
 /// The built-in block heads `open_block` dispatches — reserved, so a host cannot declare a
 /// block helper with one of these names (docs/12 §5.2). Keep in sync with `open_block`.
 pub const RESERVED_BLOCK_HEADS: &[&str] = &[
-    "if", "unless", "each", "with", "let", "case", "inline", "partial",
+    "if", "unless", "each", "with", "let", "local", "case", "inline", "partial",
 ];
 
 /// What stopped a body scan.
@@ -113,6 +113,11 @@ impl Blocks<'_> {
                         return Ok((nodes, Stop::Else));
                     }
                     if let Some(c) = strip_else_if(text) {
+                        self.pos += 1;
+                        return Ok((nodes, Stop::ElseIf(c.to_string())));
+                    }
+                    // `elif` — the `{% %}` statement-tag spelling of `else if` (docs-19).
+                    if let Some(c) = strip_elif(text) {
                         self.pos += 1;
                         return Ok((nodes, Stop::ElseIf(c.to_string())));
                     }
@@ -189,7 +194,9 @@ impl Blocks<'_> {
             "unless" => self.cond_block(span, rest, true, scope),
             "each" => self.each_block(span, rest, scope),
             "with" => self.with_block(span, rest, scope),
-            "let" => self.let_block(span, rest, scope),
+            // `local` is the docs-17 spelling of the bounded block binding; `let` is the
+            // retained legacy head. Same construct, each paired by its own close name.
+            "let" | "local" => self.let_block(span, head, rest, scope),
             "case" => self.case_block(span, rest, scope),
             "inline" => self.inline_block(span, rest, scope),
             "partial" => self.partial_block(span, rest, scope),
@@ -392,6 +399,7 @@ impl Blocks<'_> {
     fn let_block(
         &mut self,
         span: crate::span::Span,
+        head: &str,
         rest: &str,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
@@ -422,7 +430,7 @@ impl Blocks<'_> {
             s = tail.trim_start();
         }
         let (body, stop) = self.parse_until(&cur)?;
-        expect_close(&stop, "let", span.start)?;
+        expect_close(&stop, head, span.start)?;
         Ok(Node::Let {
             span,
             bindings,
@@ -585,6 +593,17 @@ fn strip_else_if(text: &str) -> Option<&str> {
 /// `whenever` is not read as `when ever`.
 fn strip_when(text: &str) -> Option<&str> {
     let rest = text.strip_prefix("when")?;
+    if rest.is_empty() || rest.starts_with(char::is_whitespace) {
+        Some(rest.trim())
+    } else {
+        None
+    }
+}
+
+/// `elif COND` (the `{% %}` spelling of `else if`) → the raw condition source. The head
+/// word must be exactly `elif` (a bare `elif` or `elif…` identifier is not a clause).
+fn strip_elif(text: &str) -> Option<&str> {
+    let rest = text.strip_prefix("elif")?;
     if rest.is_empty() || rest.starts_with(char::is_whitespace) {
         Some(rest.trim())
     } else {
@@ -1013,5 +1032,73 @@ mod tests {
         // the inverse-arm convention is frozen but unbuilt (docs/09 §3.1, "Planned").
         let err = parse("{{#frame}}a{{else}}b{{/frame}}").unwrap_err();
         assert!(err.message.contains("not yet supported"), "{}", err.message);
+    }
+
+    // ── Django-style statement tags `{% … %}` (docs-19) ──────────────────────────
+
+    #[test]
+    fn statement_each_parses_like_brace_each() {
+        // `{% each … %}…{% endeach %}` desugars to the same `Node::Each` as `{{#each}}`.
+        let ns = parse("{% each item in xs %}{{item}}{% endeach %}").unwrap();
+        match &ns[0] {
+            Node::Each(e) => {
+                assert_eq!(e.item.as_deref(), Some("item"));
+                assert_eq!(e.body.len(), 1);
+            }
+            o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn statement_local_is_the_let_block() {
+        // `{% local … %}` is the bounded binding (docs-17), the `let` block renamed; its
+        // close is `{% endlocal %}`.
+        let ns = parse("{% local x=(add 1 2) y=(add x 1) %}{{x}}/{{y}}{% endlocal %}").unwrap();
+        match &ns[0] {
+            Node::Let { bindings, .. } => {
+                let names: Vec<&str> = bindings.iter().map(|(n, _)| n.as_str()).collect();
+                assert_eq!(names, vec!["x", "y"]);
+            }
+            o => panic!("{o:?}"),
+        }
+        // The legacy `let` head still parses (lenient superset).
+        assert!(matches!(
+            parse("{{#let x=(add 1 2)}}{{x}}{{/let}}").unwrap()[0],
+            Node::Let { .. }
+        ));
+    }
+
+    #[test]
+    fn statement_elif_is_an_else_if_clause() {
+        // `{% elif … %}` is the statement-tag spelling of `{{else if …}}`.
+        let ns = parse("{% if a %}A{% elif b %}B{% else %}C{% endif %}").unwrap();
+        match &ns[0] {
+            Node::Cond(c) => {
+                assert_eq!(c.elifs.len(), 1);
+                assert_eq!(c.otherwise.len(), 1);
+            }
+            o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn statement_case_when_parses() {
+        let ns =
+            parse(r#"{% case s %}{% when "a" %}A{% when "b" "c" %}BC{% else %}Z{% endcase %}"#)
+                .unwrap();
+        match &ns[0] {
+            Node::Case(c) => {
+                assert_eq!(c.arms.len(), 2);
+                assert_eq!(c.otherwise.len(), 1);
+            }
+            o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn statement_mismatched_close_is_located_error() {
+        // `{% endeach %}` cannot close a `{% if %}` — the same check as `{{/each}}` vs `{{#if}}`.
+        let err = parse("{% if a %}x{% endeach %}").unwrap_err();
+        assert!(err.message.contains("mismatched"), "{}", err.message);
     }
 }
