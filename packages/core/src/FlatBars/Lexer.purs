@@ -804,12 +804,27 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
                 name = SCU.drop 3 headWord
               in
                 mk (RClose span start name (interiorAt start name))
-            -- a clause separator (`else`/`elif`/`when`) OR the block-LESS forward
-            -- binding `{% set NAME = EXPR %}` (docs-17): both are standalone tags, so
-            -- they lex to a name-agnostic `RSep` (no `{% end… %}` to pair). `set` is
-            -- reparented to a `{% local %}` over its sibling tail by `Kernel.SetSugar`.
-            else if isStmtSep headWord || headWord == "set" then
+            -- a clause separator (`else`/`elif`/`when`) OR a block-LESS statement that
+            -- lexes to a name-agnostic `RSep` (no `{% end… %}` to pair): the forward
+            -- binding `{% set … %}` (docs-17, reparented by `Kernel.SetSugar`) and the
+            -- block-partial placeholder `{% yield %}` (ADR-039 item 5 — the surface
+            -- outputs the scoped `yield` op, exactly as the retired `{{yield}}`).
+            else if isStmtSep headWord || headWord == "set" || trim core == "yield" then
               mk (RSep span start core (interiorAt start core))
+            -- the partial include `{% include "name" [ctx] [k=v] %}` (ADR-039 item 5).
+            -- It lexes to the SAME `>`-prefixed `RSep` the retired `{{> name …}}` does —
+            -- pure surface sugar, reusing the existing partial reinterpretation — by
+            -- prefixing a `> ` to the args *as they sit in the source*: the interior is
+            -- lexed with the args' real source offset so its spans stay accurate (a
+            -- synthetic offset mis-resolves the partial name).
+            else if headWord == "include" then
+              let
+                skipSp j =
+                  if j < q && maybe false isSpace (Array.index cs j) then skipSp (j + 1) else j
+                argsOff = skipSp (skipSp start + SCU.length headWord)
+                pcore = "> " <> slice cs argsOff q
+              in
+                mk (RSep span start pcore (interiorAt (argsOff - 2) pcore))
             else
               mk (ROpen span Section start core (interiorAt start core))
 

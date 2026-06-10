@@ -1,8 +1,8 @@
 Hi {{name}},
 
 Your order shipped. Items:
-{% for items %}
-{{> item}}
+{% each items %}
+{% include "item" %}
 {% else %}
 - (none)
 {% endfor %}

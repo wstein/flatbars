@@ -307,18 +307,18 @@ export const cases = [
   // ── partials (inline definitions, inlined at the call site) ──────────────────
   {
     id: "partial-simple",
-    template: '{% inline "greet" %}Hello {{name}}!{% endinline %}{{> greet}}',
+    template: '{% inline "greet" %}Hello {{name}}!{% endinline %}{% include "greet" %}',
     data: { name: "World" },
   },
   {
     id: "partial-in-each",
     template:
-      '{% inline "row" %}<li>{{name}}</li>{% endinline %}{% for items %}{{> row}}{% endfor %}',
+      '{% inline "row" %}<li>{{name}}</li>{% endinline %}{% each items %}{% include "row" %}{% endeach %}',
     data: { items: [{ name: "a" }, { name: "b" }] },
   },
   {
     id: "partial-context",
-    template: '{% inline "card" %}[{{title}}]{% endinline %}{{> card section}}',
+    template: '{% inline "card" %}[{{title}}]{% endinline %}{% include "card" section %}',
     data: { section: { title: "Intro" } },
   },
 
@@ -335,11 +335,11 @@ export const cases = [
     data: { items: [{ name: "a" }, { name: "b" }] },
   },
 
-  // ── block partials + {{yield}} (body rendered in the caller frame) ───────────
+  // ── block partials + {% yield %} (body rendered in the caller frame) ───────────
   {
     id: "block-partial",
     template:
-      '{% inline "card" %}<div>{{yield}}</div>{% endinline %}{% partial "card" %}{{name}}{% endpartial %}',
+      '{% inline "card" %}<div>{% yield %}</div>{% endinline %}{% partial "card" %}{{name}}{% endpartial %}',
     data: { name: "Ann & Bo" },
   },
 

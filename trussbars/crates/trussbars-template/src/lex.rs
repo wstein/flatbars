@@ -454,9 +454,28 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             trail_trim: false,
         });
     }
-    // A clause separator lexes to `Output` (the parser's `else`/`elif`/`when` split);
-    // every other head opens a block.
-    let sigil = if head == b"else" || head == b"elif" || head == b"when" {
+    // `{% include "name" [ctx] %}` → a partial reference (ADR-039 item 5): the same
+    // `Node::Partial` the retired `{{> name …}}` produced. The interior is the args
+    // after `include` (the quoted name + optional context/hash).
+    if head == b"include" {
+        let args_start = (hw_end..te)
+            .find(|&k| !b[k].is_ascii_whitespace())
+            .unwrap_or(te);
+        return Ok(Lexed {
+            lexeme: Lexeme::Tag {
+                sigil: Sigil::Partial,
+                interior: Span::new(args_start, te),
+                span,
+            },
+            next: end,
+            lead_trim,
+            trail_trim,
+        });
+    }
+    // A clause separator — and the block-partial slot `{% yield %}` (ADR-039 item 5,
+    // the parser maps the bare `yield` to `Node::Yield`) — lexes to `Output`; every
+    // other head opens a block.
+    let sigil = if head == b"else" || head == b"elif" || head == b"when" || head == b"yield" {
         Sigil::Output
     } else {
         Sigil::Open
@@ -837,6 +856,31 @@ mod tests {
     fn empty_or_unterminated_statement_tag_errors() {
         assert!(lex("{%  %}").is_err()); // empty
         assert!(lex("ok {% for xs no close").is_err()); // no `%}`
+    }
+
+    #[test]
+    fn include_and_yield_statement_tags() {
+        // `{% include "name" [ctx] %}` → a `Partial` sigil (interior = the args after
+        // `include`); `{% yield %}` → `Output "yield"` (the parser makes it `Node::Yield`).
+        // ADR-039 item 5 — the same nodes the retired `{{> name}}` / `{{yield}}` produced.
+        assert_eq!(
+            tags(r#"{% include "card" sec %}"#),
+            vec![(Sigil::Partial, r#""card" sec"#.to_string())]
+        );
+        assert_eq!(
+            tags("{% include \"row\" %}"),
+            vec![(Sigil::Partial, "\"row\"".to_string())]
+        );
+        assert_eq!(
+            tags("{% yield %}"),
+            vec![(Sigil::Output, "yield".to_string())]
+        );
+        // The legacy `{{> }}` / `{{yield}}` still lex (the Rust parser stays a lenient
+        // superset; only the corpus migrates).
+        assert_eq!(
+            tags("{{> row}}"),
+            vec![(Sigil::Partial, " row".to_string())]
+        );
     }
 
     #[test]

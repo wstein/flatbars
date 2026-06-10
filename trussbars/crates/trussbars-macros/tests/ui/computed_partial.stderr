@@ -1,4 +1,4 @@
-error: 1:1: {{> …}} needs a partial name
+error: 1:1: a partial reference (`{% include "name" %}`) needs a name
  --> tests/ui/computed_partial.rs:5:1
   |
 5 | truss!(render, str, "{{> (lookup this \"kind\")}}");

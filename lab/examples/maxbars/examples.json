@@ -202,7 +202,7 @@
   },
   {
     "id": "layoutPartials",
-    "label": "Advanced — Layout partials ({{yield}})",
+    "label": "Advanced — Layout partials ({% yield %})",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",

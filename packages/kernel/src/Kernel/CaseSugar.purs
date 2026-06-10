@@ -64,6 +64,12 @@ braceControlViolation clauses src nodes = Array.head (Array.mapMaybe node nodes)
       | otherwise -> braceControlViolation clauses src body
     Sep sp name _
       | isBrace sp && Array.elem name clauses -> Just { off: sp.start, shape: sepShape name }
+      -- The partial include `{{> name}}` and the block-partial slot `{{yield}}` move to
+      -- `{% include "name" %}` / `{% yield %}` (ADR-039 item 5) — a partial expansion and
+      -- a structural slot are statements, not output. (The `{% include %}` form lexes to
+      -- a `>`-Sep whose span opens `{%`, so `isBrace` spares it.)
+      | isBrace sp && take 1 name == ">" -> Just { off: sp.start, shape: includeShape }
+      | isBrace sp && name == "yield" -> Just { off: sp.start, shape: yieldShape }
     -- The verbatim region `{{{{#raw}}}}` moves to `{% raw %}` (ADR-039 item 2); a
     -- raw-block *helper* (`op ≠ raw`) is unaffected.
     RawBlock sp name _ _
@@ -84,6 +90,10 @@ braceControlViolation clauses src nodes = Array.head (Array.mapMaybe node nodes)
       <> " … %})"
   rawShape =
     "{{{{#raw}}}} … {{{{/raw}}}} (a verbatim region uses a {% … %} tag in this dialect — write {% raw %} … {% endraw %})"
+  includeShape =
+    "{{> name}} (a partial include uses a {% … %} tag in this dialect — write {% include \"name\" %})"
+  yieldShape =
+    "{{yield}} (the block-partial slot uses a {% … %} tag in this dialect — write {% yield %})"
 
 -- | The source offset of a node's span (for located errors).
 nodeStart :: Node -> Int

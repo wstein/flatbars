@@ -499,16 +499,23 @@ impl Blocks<'_> {
         interior: &str,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
-        let (name, after) = split_head(interior);
+        // `{% include "name" %}` (ADR-039 item 5) quotes the name; the legacy `{{> name}}`
+        // is a bare head. Accept either.
+        let (name, after) = match read_string_literal(interior.trim_start()) {
+            Some((n, rest)) => (n, rest),
+            None => {
+                let (n, rest) = split_head(interior);
+                (n.to_string(), rest)
+            }
+        };
         if name.is_empty() {
-            return err("{{> …}} needs a partial name", span.start);
+            return err(
+                "a partial reference (`{% include \"name\" %}`) needs a name",
+                span.start,
+            );
         }
         let ctx = parse_opt_ctx(after, scope)?;
-        Ok(Node::Partial {
-            span,
-            name: name.to_string(),
-            ctx,
-        })
+        Ok(Node::Partial { span, name, ctx })
     }
 
     /// After a body, consume a `{% else %}` arm (if any) and require the close — which

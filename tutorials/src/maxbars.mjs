@@ -28,9 +28,9 @@
 //     (chainable) and `root`, never `../` or `@root`.
 //   • A clause-separator condition MUST be parenthesised: `{% else if (gte n 1) %}`.
 //     A bare infix separator parses but silently takes the wrong branch.
-//   • Partials: EXTERNAL host-threaded `{{> name}}` (the partials registry, each
+//   • Partials: EXTERNAL host-threaded `{% include "name" %}` (the partials registry, each
 //     partial itself MaxBars source — ADR/commit cfadebc) AND template-local
-//     `{% inline "x" %}…{% endinline %}` both work, plus the `{{yield}}` layout
+//     `{% inline "x" %}…{% endinline %}` both work, plus the `{% yield %}` layout
 //     pattern via `{% partial %}` (inline wins on a name clash). Only the
 //     `{{#*inline}}` decorator stays ClassicBars-only. Raw blocks use the
 //     `{{{{#op}}}}` hash sigil.
@@ -316,13 +316,13 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
   partials: {
     engine: "maxbars",
     label: "Advanced — External partials: per-row & dynamic",
-    // MaxBars resolves EXTERNAL {{> name}} against host-supplied partials (each
+    // MaxBars resolves EXTERNAL {% include "name" %} against host-supplied partials (each
     // itself MaxBars source — render AND compile, commit cfadebc), exactly like
     // ClassicBars. Combined with {{#each}} it templates a row each, and the name can
-    // be an EXPRESSION resolved per row — {{> (lookup this "kind")}} picks the
+    // be an EXPRESSION resolved per row — {% include (lookup this "kind") %} picks the
     // partial from the data. (A template-local {{#inline}} of the same name wins.)
-    template: `{% for people %}{{> (lookup this "kind")}}
-{% endfor %}`,
+    template: `{% each people %}{% include (lookup this "kind") %}
+{% endeach %}`,
     partials: {
       author: "- {{name}} writes",
       engineer: "- {{name}} builds",
@@ -337,12 +337,12 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
 
   layoutPartials: {
     engine: "maxbars",
-    label: "Advanced — Layout partials ({{yield}})",
+    label: "Advanced — Layout partials ({% yield %})",
     // The MaxBars layout pattern, the bare spelling of Handlebars' block partials:
-    // {{#inline "x"}}…{{yield}}…{{/inline}} DEFINES a layout with a hole, and
-    // {{#partial "x"}}body{{/partial}} invokes it, dropping `body` in at {{yield}}.
+    // {% inline "x" %}…{% yield %}…{% endinline %} DEFINES a layout with a hole, and
+    // {% partial "x" %}body{% endpartial %} invokes it, dropping `body` in at {% yield %}.
     template: `{% inline "frame" %}== {{title}} ==
-{{yield}}
+{% yield %}
 == end =={% endinline %}{% partial "frame" %}Glad you came.{% endpartial %}`,
     data: { title: "Welcome" },
   },
@@ -399,12 +399,12 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     label: "Advanced — Putting it together (email)",
     // The capstone reusing familiar pieces in one realistic, non-HTML template:
     // interpolation, a dotted path, an {{#each}} with its built-in {{else}}, and an
-    // external {{> item}} partial — a plain-text shipping notice.
+    // external {% include "item" %} partial — a plain-text shipping notice.
     template: `Hi {{name}},
 
 Your order shipped. Items:
-{% for items %}
-{{> item}}
+{% each items %}
+{% include "item" %}
 {% else %}
 - (none)
 {% endfor %}
@@ -422,10 +422,10 @@ Your order shipped. Items:
     engine: "maxbars",
     label: "Advanced — HTML card (styling in a partial)",
     // The one example whose OUTPUT is HTML — so it previews as HTML, not text. An
-    // external {{> styles}} partial holds the CSS once, {{> card}} is one row's
-    // markup with a {% if lead %} badge, and {% for %} iterates.
+    // external {% include "styles" %} partial holds the CSS once, {% include "card" %} is one row's
+    // markup with a {% if lead %} badge, and {% each %} iterates.
     view: "rendered",
-    template: "{{> styles}}\n{% for people %}\n{{> card}}\n{% endfor %}",
+    template: "{% include \"styles\" %}\n{% each people %}\n{% include \"card\" %}\n{% endeach %}",
     partials: {
       styles:
         "<style>\n" +

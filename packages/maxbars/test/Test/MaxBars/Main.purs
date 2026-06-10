@@ -403,17 +403,33 @@ main = do
   assert' "reject: {{{{#raw}}}} verbatim region (use {% raw %})"
     (isLeft (renderMax "{{{{#raw}}}}{{x}}{{{{/raw}}}}" (obj [])))
 
-  -- block-partial yield: the reserved `{{yield}}` (the `partial-block` synonym)
-  -- renders the caller's block body. It is `{{ }}`-escaped by MaxBars' rule but
-  -- the body is a `VSafe` value, so escapeHtml is the identity — no double-escape.
+  -- partial include + block-partial slot are statements (ADR-039 item 5):
+  -- `{% include "name" %}` expands a partial, `{% yield %}` renders the caller's body.
+  expectM "include"
+    "{% inline \"greet\" %}Hi {{name}}!{% endinline %}{% include \"greet\" %}"
+    (obj [ Tuple "name" (VString "Ada") ])
+    "Hi Ada!"
+  expectM "include-ctx"
+    "{% inline \"card\" %}[{{title}}]{% endinline %}{% include \"card\" section %}"
+    (obj [ Tuple "section" (obj [ Tuple "title" (VString "Intro") ]) ])
+    "[Intro]"
   expectM "yield"
-    "{% inline \"layout\" %}<{{yield}}>{% endinline %}{% partial \"layout\" %}HI{% endpartial %}"
+    "{% inline \"layout\" %}<{% yield %}>{% endinline %}{% partial \"layout\" %}HI{% endpartial %}"
     (obj [])
     "<HI>"
-  -- the Handlebars `@partial-block` spelling is rejected (MaxBars reserves `@`); the
-  -- hyphenated bare `partial-block` is `partial - block` (subtraction), not a name.
-  assert' "reject: @partial-block (reserved @ sigil)"
+  -- the retired `{{ }}` spellings are rejected with a fix-it (no silent no-op): the
+  -- inline partial `{{> name}}`, the Handlebars block-partial yield `{{> @partial-block}}`,
+  -- and the bare slot `{{yield}}`.
+  assert' "reject: {{> name}} partial include (use {% include %})"
+    (isLeft (renderMax "{% inline \"g\" %}x{% endinline %}{{> g}}" (obj [])))
+  assert' "reject: {{> @partial-block}}"
     (isLeft (renderMax "{{> @partial-block}}" (obj [])))
+  assert' "reject: {{yield}} block-partial slot (use {% yield %})"
+    ( isLeft
+        ( renderMax "{% inline \"l\" %}{{yield}}{% endinline %}{% partial \"l\" %}x{% endpartial %}"
+            (obj [])
+        )
+    )
   -- a data field named `yield` is shadowed by the reserved name everywhere (like
   -- loop/root/parent — even `{{this.yield}}` resolves the reserved name, since the
   -- path reduces to the segment `yield`). The escape hatch is an explicit lookup.

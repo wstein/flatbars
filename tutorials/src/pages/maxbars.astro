@@ -397,21 +397,21 @@ const t = (s) => s;
 
     <h3>External partials</h3>
     <p>
-      MaxBars resolves <b>external</b> <code>{t("{{> name}}")}</code> against host-supplied partials —
+      MaxBars resolves <b>external</b> <code>{t("{% include \"name\" %}")}</code> against host-supplied partials —
       each itself MaxBars source, so a partial uses the full surface (pipes, infix) — in both the
       interpreter (<code>renderMaxbarsWithPartials</code>) and the compiler
       (<code>compileMaxbarsWithPartials</code>), exactly like <a href="/classicbars">ClassicBars</a>.
       Combined with <code>{t("{{#each}}")}</code> it templates a row each, the name resolvable from
-      the data (<code>{t("{{> (lookup this \"kind\")}}")}</code>). A template-local
+      the data (<code>{t("{% include (lookup this \"kind\") %}")}</code>). A template-local
       <code>{t("{{#inline}}")}</code> of the same name wins; only the <code>{t("{{#*inline}}")}</code>
       <em>decorator</em> stays a ClassicBars job (see <a href="#divergences">where it diverges</a>).
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.partials.template} data={ex.partials.data} partials={ex.partials.partials} />
-    <h3>Layout partials &amp; <code>{t("{{yield}}")}</code></h3>
+    <h3>Layout partials &amp; <code>{t("{% yield %}")}</code></h3>
     <p>
-      <code>{t("{{#inline \"x\"}}…{{yield}}…{{/inline}}")}</code> defines a layout with a hole, and
+      <code>{t("{% inline \"x\" %}…{% yield %}…{% endinline %}")}</code> defines a layout with a hole, and
       <code>{t("{{#partial \"x\"}}body{{/partial}}")}</code> invokes it — the definition drops
-      <code>body</code> in at <code>{t("{{yield}}")}</code>, MaxBars' bare spelling of Handlebars'
+      <code>body</code> in at <code>{t("{% yield %}")}</code>, MaxBars' bare spelling of Handlebars'
       <code>{t("{{> @partial-block}}")}</code>.
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.layoutPartials.template} data={ex.layoutPartials.data} />
@@ -432,13 +432,13 @@ const t = (s) => s;
     <p>
       Real templates reuse these pieces at once. A plain-text shipping notice —
       interpolation, a dotted path, an <code>{t("{{#each}}")}</code> with its
-      <code>{t("{{else}}")}</code>, and an external <code>{t("{{> item}}")}</code> partial:
+      <code>{t("{{else}}")}</code>, and an external <code>{t("{% include \"item\" %}")}</code> partial:
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.email.template} data={ex.email.data} partials={ex.email.partials} />
     <h3>When the output <em>is</em> HTML</h3>
     <p>
-      The capstone is an HTML card: a <code>{t("{{> styles}}")}</code> partial holds the CSS once,
-      <code>{t("{{> card}}")}</code> is one row's markup with a <code>{t("{{#if lead}}")}</code> badge,
+      The capstone is an HTML card: a <code>{t("{% include \"styles\" %}")}</code> partial holds the CSS once,
+      <code>{t("{% include \"card\" %}")}</code> is one row's markup with a <code>{t("{{#if lead}}")}</code> badge,
       and <code>{t("{{#each}}")}</code> iterates. (The one example that previews as HTML in the Lab.)
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.card.template} data={ex.card.data} partials={ex.card.partials} />
@@ -461,9 +461,9 @@ const t = (s) => s;
           <td>MaxBars binds loops Liquid-style (<span class="code">{t("{{#each x in xs}}")}</span>), not with bars, so a bar in a head is rejected — whether it was meant as the Handlebars block-param delimiter or an unparenthesised pipe. To pipe the collection, parenthesise it: <span class="code">{t("{{#each x in (xs | f)}}")}</span>.</td>
         </tr>
         <tr>
-          <td>Block partials + <span class="code">{t("{{yield}}")}</span></td>
+          <td>Block partials + <span class="code">{t("{% yield %}")}</span></td>
           <td>bare <span class="code">{t("{{#inline}}")}</span></td>
-          <td>Inline-defined partials work — <span class="code">{t("{{#inline \"layout\"}}<{{yield}}>{{/inline}}")}</span> then <span class="code">{t("{{#partial \"layout\"}}…{{/partial}}")}</span> — where <span class="code">{t("{{yield}}")}</span> renders the caller's block body (MaxBars' bare spelling of Handlebars' <span class="code">{t("{{> @partial-block}}")}</span>; the <span class="code">@</span> sigil is reserved, so that Handlebars form is rejected). Host-threaded <em>external</em> partials (<span class="code">{t("{{> name}}")}</span>) work too, render and compile. Only the <span class="code">{t("{{#*inline}}")}</span> <em>decorator</em> stays ClassicBars-only — MaxBars uses bare <span class="code">{t("{{#inline}}")}</span>.</td>
+          <td>Inline-defined partials work — <span class="code">{t("{% inline \"layout\" %}<{% yield %}>{% endinline %}")}</span> then <span class="code">{t("{% partial \"layout\" %}…{% endpartial %}")}</span> — where <span class="code">{t("{% yield %}")}</span> renders the caller's block body (MaxBars' bare spelling of Handlebars' <span class="code">{t("{{> @partial-block}}")}</span>; the <span class="code">@</span> sigil is reserved, so that Handlebars form is rejected). Host-threaded <em>external</em> partials (<span class="code">{t("{% include \"name\" %}")}</span>) work too, render and compile. Only the <span class="code">{t("{{#*inline}}")}</span> <em>decorator</em> stays ClassicBars-only — MaxBars uses bare <span class="code">{t("{{#inline}}")}</span>.</td>
         </tr>
         <tr>
           <td>Infix anywhere</td>
