@@ -589,6 +589,23 @@ export function analyseDataAccess(astsByFile, data, locals = new Set()) {
         case "scope":
         case "partial_scope":
           walkNodes(n.body, file, true); break;
+        case "case":
+          // `{% case subject %}{% when v %}…{% endcase %}` (docs/12): the subject
+          // (`args[0].value`) is read in the current scope; each `when` arm's values
+          // are literals/exprs read there too. The arm bodies render in the unchanged
+          // context (no re-root), so they keep the current scope.
+          for (const a of n.args || []) walkExpr(a && a.value, file, n, scoped);
+          walkNodes(n.body, file, scoped);
+          break;
+        default:
+          // Any other block helper lowers to a generic `call` (Kernel.Lower RCall)
+          // whose AST `t` is the helper name (`inline`, a custom block helper, …). Its
+          // positional arg EXPRESSIONS are read in the current scope, so classify those
+          // — this is what surfaced the `case` subject. We do NOT walk the body here:
+          // its scope is helper-dependent (a custom helper may re-root) and `inline`'s
+          // body is a separate partial scope walked via `astsByFile`.
+          if (Array.isArray(n.args)) for (const a of n.args) walkExpr(a && a.value, file, n, scoped);
+          break;
       }
     }
   };

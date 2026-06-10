@@ -90,6 +90,9 @@
           "include": "#amp_unescaped"
         },
         {
+          "include": "#statement_tag"
+        },
+        {
           "include": "#block_open"
         },
         {
@@ -372,6 +375,30 @@
         }
       },
       "end": "(~?\\}\\})",
+      "endCaptures": {
+        "1": {
+          "name": "punctuation.section.embedded.end.flatbars"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#tag_interior"
+        }
+      ]
+    },
+    "statement_tag": {
+      "_doc": "{% [~] head \u2026 %} \u2014 a Django-style statement tag (docs-19): RawBars/MaxBars control flow (if/each/with/unless/case/local/when/else/elif and their endX closes). The {%/%} braces are escape tokens; the leading head word (optionally a # sigil) is the control keyword. The {{ }} surface uses #block_open/#block_close instead.",
+      "name": "meta.embedded.line.flatbars",
+      "begin": "(\\{%~?)\\s*(#?[A-Za-z_][\\w-]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.section.embedded.begin.flatbars"
+        },
+        "2": {
+          "name": "keyword.control.section.flatbars"
+        }
+      },
+      "end": "(~?%\\})",
       "endCaptures": {
         "1": {
           "name": "punctuation.section.embedded.end.flatbars"

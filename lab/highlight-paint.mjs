@@ -100,10 +100,12 @@ export function tagRanges(text, dialect = "classicbars") {
 function fill(kind, from, to, k, n) {
   for (let i = Math.max(0, from); i < Math.min(n, to); i++) kind[i] = k;
 }
-const braceLens = (tag) => [
-  (tag.match(/^\{{2,4}/) || [""])[0].length,
-  (tag.match(/\}{2,4}$/) || [""])[0].length,
-];
+const braceLens = (tag) =>
+  // A `{% … %}` statement tag (docs-19): the two-char `{%` / `%}` delimiters are the
+  // escape tokens (the grammar's #statement_tag scopes them punctuation).
+  tag.startsWith("{%")
+    ? [2, tag.endsWith("%}") ? 2 : 0]
+    : [(tag.match(/^\{{2,4}/) || [""])[0].length, (tag.match(/\}{2,4}$/) || [""])[0].length];
 
 function paintStructure(kind, text, s, n) {
   const { from, to } = s;
@@ -193,6 +195,13 @@ function paintStructure(kind, text, s, n) {
     // keyword.control.section (the `>` / `*` is keyword.operator → default). Paint
     // just the sigil char; the partial name stays default (the LSP leaves it).
     if (/^[#^/]/.test(inner)) { fill(kind, i, i + 1, "keyword", n); return; }
+    // A `{% … %}` statement tag (docs-19): the head is a BAREWORD (no sigil) —
+    // `if`/`each`/`case`/`unless`/`with`/`local`/`endX` — scoped keyword.control by
+    // the grammar's #statement_tag rule. Paint the head word; args stay default.
+    if (tag.startsWith("{%")) {
+      const w = inner.match(/^#?[A-Za-z_][\w-]*/);
+      if (w) { fill(kind, i, i + w[0].length, "keyword", n); return; }
+    }
   }
   // Inheritance / partial sigils ({{<l}}, {{$b}}, {{> p}}). Paint ONLY the sigil
   // char (the grammar's keyword.control.import) — NOT the trailing whitespace —

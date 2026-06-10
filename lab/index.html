@@ -1659,7 +1659,7 @@
       import { createRenderer } from "./renderer.mjs?v=2";
       // Engine-derived INNER-TOKEN highlighting (ADR-014 amendment): the shared
       // painter + the lexer's own tokenizer, in place of a hand-written tag regex.
-      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=6";
+      import { flatbarsHighlight } from "./cm-flatbars.mjs?v=7";
       // The full prelude vocabulary (vendored projection of editors/operations.json)
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
@@ -1696,7 +1696,7 @@
       // loaded index.html never pairs with a stale cached module (which silently
       // ran the old, uncompressed encodeState). Bumped for `segmentRanges` (the
       // provenance-highlight byte↔UTF-16 fix).
-      } from "./playground_utils.mjs?v=20";
+      } from "./playground_utils.mjs?v=21";
       // Output-view decisions (extracted for testability; lab/output-view.test.mjs).
       import {
         VIEW_TABS,

@@ -120,6 +120,14 @@ const CASES = [
   ["Hello {{name}}, you have {{count items}} ({{round pct 1}}%)."],
   ["<h2>{{author.firstName}} {{author.lastName}}</h2>"],
   ["tasks is {{#if tasks}}truthy{{else}}falsy{{/if}}."],
+  // {% %} statement tags (docs-19): the {%/%} braces are punct and the bareword head
+  // (if/each/case/unless/local/endX) is the control keyword — args stay default. The
+  // separators when/else/elif paint keyword too. nonEmpty-family only (RawBars/MaxBars).
+  ["{% if (gt qty 0) %}x{% else %}y{% endif %}", ["rawbars", "maxbars"]],
+  ["{% case status %}{% when \"shipped\" %}a{% else %}b{% endcase %}", ["rawbars", "maxbars"]],
+  ["{% unless done %}todo{% endunless %}", ["rawbars", "maxbars"]],
+  ["{% each rows %}{{this}}{% endeach %}", ["rawbars", "maxbars"]],
+  ["{% local total=(add a b) %}{{total}}{% endlocal %}", ["rawbars", "maxbars"]],
 ];
 
 let fails = 0;

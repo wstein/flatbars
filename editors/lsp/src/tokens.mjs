@@ -390,12 +390,15 @@ export function flatten(text, dialect) {
     if (emitKinds.has(s.kind)) {
       const [from, to] = shrinkToInner(text, s.from, s.to, openDelim, closeDelim);
       fillRange(kinds, from, to, s.kind);
-    } else if (!startsWithOpen(text, s.from, openDelim) || openDelim !== "{{") {
+    } else if ((!startsWithOpen(text, s.from, openDelim) || openDelim !== "{{") && !startsWithOpen(text, s.from, "{%")) {
       // Delimiter-switched tag — the stateless grammar can't see it because it
       // hard-codes `{{` / `}}`. Paint ONLY the opener and closer (as the same
       // `set-delimiter` kind as the directive that introduced them — themes
       // paint them like the directive), so the body stays default-coloured and
-      // the tag reads visually consistent with default-delim tags.
+      // the tag reads visually consistent with default-delim tags. A `{% … %}`
+      // statement tag (docs-19) is EXCLUDED: the grammar's #statement_tag rule
+      // paints its braces (punctuation) and head (keyword.control), so the LSP
+      // defers to the floor exactly as it does for the `{{#x}}` block forms.
       fillRange(kinds, s.from, s.from + openDelim.length, "set-delimiter");
       fillRange(kinds, s.to - closeDelim.length, s.to, "set-delimiter");
     }
