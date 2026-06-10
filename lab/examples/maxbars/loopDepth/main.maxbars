@@ -1,0 +1,3 @@
+{% each node in outline %}{{loop.depth}}. {{node.name}}
+{% each child in node.children %}  {{loop.depth}}.{{loop.index1}} {{child}}
+{% endeach %}{% endeach %}
