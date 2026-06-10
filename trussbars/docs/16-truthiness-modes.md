@@ -117,13 +117,21 @@ construction**, exactly like custom helpers (`docs/01` §11). They are gated ins
 - `crates/trussbars-template/src/emit.rs` — `TruthMode` and `TruthMode::call`, threaded through
   `Env`; every boolean-position emission routes through `Env::truthy_ref`.
 - `crates/trussbars-macros/src/lib.rs` — the `truthiness = Mode` clause parser.
+- `crates/trussbars-vm/src/lib.rs` — `Value::truthy_in`, `Template::with_truthiness`, the
+  policy-aware `truthy_at`, and the `TruthMode` re-export (the dynamic-backend parity).
 
-## 8. Future work (non-blocking)
+## 8. Shipped follow-ups
 
-- **VM parity.** The bytecode VM (`docs/11`) has its own `Value::truthy()`. If a host needs a
-  non-default policy under the *dynamic* backend too, the VM would carry the selected policy as
-  a load-time setting — the natural home for a *runtime*-swappable rule, distinct from the AOT
-  proc-macro. Not required for the AOT feature shipped here.
-- **A friendlier numeric-truthiness diagnostic** that names the seam (“numbers aren't truthy
-  under `NonEmpty` — write `count > 0`, switch policy, or impl `TruthyIn` for a newtype”),
-  per `docs/07` §3 class-A messages.
+- **VM parity — DONE.** The bytecode VM (`docs/11`) mirrors the policy:
+  `Value::truthy_in(mode)` and `Template::with_truthiness(mode)` carry the selected policy as a
+  load-time setting (the dynamic backend's home for a runtime-swappable rule), the single
+  `truthy_at` decision point applies it, and the numeric AOT-compat rejection fires only under
+  `NonEmpty`. A non-default policy renders via the tree-walk, not the `NonEmpty` bytecode fast
+  path. `truss-vm --truthiness=<Mode>` exposes it; `harness.mjs --vm`/`--vm-compat` stay 71/71.
+- **Friendlier diagnostic — DONE.** `TruthyIn` carries `#[diagnostic::on_unimplemented]`, so a
+  numeric (or otherwise un-impl'd) condition reports *"`i64` is not truthy under the `NonEmpty`
+  policy"* with notes to write a comparison, select a policy, or impl `TruthyIn` — and `rustc`
+  adds that `i64` *does* implement `TruthyIn<Liquid>`/`TruthyIn<Handlebars>`. The guidance is on
+  the trait, so it fires under both v1 and v2; the compile-fail behavior is gated by the
+  `truthy` doctest (the error *class*, per `docs/04` §11 — the exact rustc wording is
+  deliberately not pinned).

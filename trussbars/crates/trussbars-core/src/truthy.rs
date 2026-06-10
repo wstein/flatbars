@@ -28,6 +28,16 @@ use alloc::vec::Vec;
 /// `!` operators. A type that has no `TruthyIn<Mode>` impl cannot appear in a
 /// boolean position under that policy: the condition is a compile error, not a
 /// silent `false` (numbers under [`NonEmpty`], for example).
+///
+/// The `#[diagnostic::on_unimplemented]` message turns the bare `rustc` E0277 into
+/// actionable guidance — it fires for the common §5.3 footgun (a bare number under
+/// `NonEmpty`) as well as any other type used in a boolean position without an impl.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` is not truthy under the `{Mode}` policy",
+    label = "needs a `TruthyIn<{Mode}>` impl to be used in a boolean position",
+    note = "a bare number is the usual cause: under `NonEmpty`, write a comparison like `count > 0` rather than a bare `count` (subset spec §5.3)",
+    note = "or select a policy that defines it (`truss!(…, truthiness = Liquid)`), or `impl trussbars_core::TruthyIn<{Mode}>` for the type"
+)]
 pub trait TruthyIn<Mode> {
     /// Whether `self` is truthy under `Mode`.
     fn truthy(&self) -> bool;
@@ -61,7 +71,7 @@ pub struct Handlebars;
 ///
 /// ```compile_fail
 /// use trussbars_core::truthy;
-/// let _ = truthy(&5_i64); // error[E0277]: `i64: TruthyIn<NonEmpty>` is not satisfied
+/// let _ = truthy(&5_i64); // E0277: "`i64` is not truthy under the `NonEmpty` policy"
 /// ```
 pub fn truthy<T: TruthyIn<NonEmpty> + ?Sized>(v: &T) -> bool {
     <T as TruthyIn<NonEmpty>>::truthy(v)

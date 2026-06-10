@@ -121,9 +121,11 @@ pub fn truthy_in<Mode, T: TruthyIn<Mode>>(v: &T) -> bool { v.truthy() } // a cho
 compile, forcing an explicit comparison (`{{#if count > 0}}`) — spec §5.3, the typed escape
 from the `0`-truthy / `0`-falsy dilemma. Because `Option<T>` defers to the inner type,
 `Option<i64>` is likewise non-truthy under `NonEmpty` (test presence with `??`, then compare).
-The v2 proc-macro can intercept the missing impl to emit a friendly *"numbers aren't truthy —
-write `count > 0`"* diagnostic; in v1 the raw `rustc` *"`TruthyIn<NonEmpty>` not implemented
-for `i64`"* stands.
+The `TruthyIn` trait carries a `#[diagnostic::on_unimplemented]` message, so the raw E0277
+becomes *"`i64` is not truthy under the `NonEmpty` policy"* with notes to write a comparison,
+select a policy, or impl `TruthyIn` for the type — and `rustc` additionally points out that
+`i64` *does* implement `TruthyIn<Liquid>`/`TruthyIn<Handlebars>`. This guidance is on the
+**trait**, so it fires identically under v1 and v2 (it does not depend on the proc-macro).
 
 `{{#if cond}}` → `if truthy(&cond) {` (default) or `if truthy_in::<Liquid, _>(&cond) {` under
 `truss!(…, truthiness = Liquid)`. Note `Option<String>` of `Some("")` is **falsy under
