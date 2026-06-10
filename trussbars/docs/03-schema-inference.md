@@ -158,8 +158,10 @@ variants).
 > (`npm run infer`) is the `trussbars infer` prototype — **71/71 conformance-corpus templates
 > produce a schema**. It is a *new* module (not literally an `analyze` extension): the
 > template-symbolic source (§2) is a fresh static walk, but it reuses the AST and is the producer
-> dual of ADR-0030 as designed. **Not yet:** two-path `==` unification, the `--strict` flag wired,
-> harness ctxgen-replacement, and the Rust port (G2).
+> dual of ADR-0030 as designed. The harness uses inference as its primary ctx source (genCtx
+> fallback for maps/enums hints); `infer --strict` exits non-zero on conflicts; two-path `{{a == b}}`
+> unifies the operands' types (a fixpoint propagates a determined side to the other). **Not yet:**
+> the Rust port (G2).
 
 ---
 

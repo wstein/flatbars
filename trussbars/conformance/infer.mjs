@@ -5,6 +5,7 @@
 //
 //   node infer.mjs <template-file> [data.json]   infer one template (+ sample)
 //   node infer.mjs --corpus                       coverage over cases.mjs
+//   --strict                                      exit non-zero if conflicts > 0
 //
 // Output: the Rust context type(s), a JSON data scaffold, and a report.
 import { readFileSync } from "node:fs";
@@ -15,7 +16,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const enginePath = resolve(here, "../..", "output/ClassicBars.JS/index.js");
 const { inferMaxbars, inferMaxbarsData } = await import(enginePath);
 
-const args = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const strict = argv.includes("--strict");
+const args = argv.filter((a) => a !== "--strict");
 
 if (args[0] === "--corpus") {
   const { cases } = await import(resolve(here, "cases.mjs"));
@@ -31,11 +34,15 @@ if (args[0] === "--corpus") {
   console.log(`schema inference over ${cases.length} corpus templates (template-symbolic L1):`);
   console.log(`  ${withSchema} produced a struct schema · ${withData} had sample data · ${conflicts} total conflicts`);
   console.log(`  (the Rust port — \`trussbars infer\` native — is docs/13 G2; it supersedes ctxgen.mjs)`);
+  if (strict && conflicts > 0) {
+    console.error(`infer --strict: ${conflicts} type conflict(s) across the corpus`);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
 if (args.length === 0) {
-  console.error("usage: node infer.mjs <template-file> [data.json]   |   node infer.mjs --corpus");
+  console.error("usage: node infer.mjs [--strict] <template-file> [data.json]   |   node infer.mjs [--strict] --corpus");
   process.exit(2);
 }
 
@@ -54,3 +61,8 @@ console.log(r.schema);
 console.log();
 console.log("// data scaffold (" + (args[1] ? "refined by " + args[1] : "no data — bare outputs are guessed String") + "):");
 console.log(r.dataScaffold);
+
+if (strict && r.conflicts > 0) {
+  console.error(`\ninfer --strict: ${r.conflicts} type conflict(s) — a path is used at two incompatible types.`);
+  process.exit(1);
+}

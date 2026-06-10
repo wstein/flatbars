@@ -80,25 +80,20 @@ unifyScalar a b
 
 -- | The accumulated constraints on one canonical path.
 type PathC =
-  { isArray :: Boolean -- used as a collection (each / count / join / pluck)
-  , isMap :: Boolean -- map iteration (loop.key in an each body)
-  , fields :: Set String -- object fields observed off this path
-  , scalar :: ScalarHint -- under-determined / pinned / conflicting scalar
-  , optional :: Boolean -- ?? / ?: / if-else signal (§5)
-  , enumTag :: Maybe String -- a {% case this.<tag> %} dispatch ⇒ a tagged enum (§5)
-  , enumVariants :: Set String -- the observed variant tags
+  { isArray :: Boolean      -- used as a collection (each / count / join / pluck)
+  , isMap :: Boolean        -- map iteration (loop.key in an each body)
+  , fields :: Set String    -- object fields observed off this path
+  , scalar :: ScalarHint    -- under-determined / pinned / conflicting scalar
+  , optional :: Boolean      -- ?? / ?: / if-else signal (§5)
+  , enumTag :: Maybe String  -- a {% case this.<tag> %} dispatch ⇒ a tagged enum (§5)
+  , enumVariants :: Set String  -- the observed variant tags
+  , coupled :: Set String     -- canonKeys this path is `==`-coupled to (§3 order-3)
   }
 
 emptyC :: PathC
 emptyC =
-  { isArray: false
-  , isMap: false
-  , fields: Set.empty
-  , scalar: SUnknown
-  , optional: false
-  , enumTag: Nothing
-  , enumVariants: Set.empty
-  }
+  { isArray: false, isMap: false, fields: Set.empty, scalar: SUnknown, optional: false
+  , enumTag: Nothing, enumVariants: Set.empty, coupled: Set.empty }
 
 mergeC :: PathC -> PathC -> PathC
 mergeC a b =
@@ -109,6 +104,7 @@ mergeC a b =
   , optional: a.optional || b.optional
   , enumTag: maybe b.enumTag Just a.enumTag
   , enumVariants: Set.union a.enumVariants b.enumVariants
+  , coupled: Set.union a.coupled b.coupled
   }
 
 type Constraints = Map String (Tuple Canon PathC)
@@ -292,17 +288,26 @@ useExpr sc cs expr = case expr of
     -- result type (the emitter unifies the branches), so do *not* mark Option.
     | otherwise -> foldl (useExpr sc) cs args
   where
-  -- `a == lit` / `a != lit` couples `a` to the literal's type (the common,
-  -- pin-by-comparison case of §3's `==` coupling). Two-path `a == b` coupling
-  -- is a follow-on (needs cross-path unification).
+  -- `a == lit`: pin `a` to the literal's type. `a == b` (two paths, no literal):
+  -- *couple* their types (§3 order-3) — a later fixpoint propagates a determined
+  -- side to the other.
   compareUse args acc = case Array.findMap litScalar args of
     Just h -> foldl (\a e -> pinScalar sc h e a) acc args
-    Nothing -> foldl (useExpr sc) acc args
+    Nothing ->
+      let acc1 = foldl (useExpr sc) acc args
+      in coupleAll (Array.mapMaybe (exprCanon sc) args) acc1
   litScalar = case _ of
     Lit (VString _) -> Just SString
     Lit (VNumber _) -> Just SNumber
     Lit (VBool _) -> Just SBool
     _ -> Nothing
+  -- mutually couple the first path with each of the rest (binary `==` ⇒ a↔b).
+  coupleAll canons acc = case Array.uncons canons of
+    Just { head: first, tail } -> foldl (\a cB -> link first cB a) acc tail
+    Nothing -> acc
+  link cA cB acc =
+    record cA (emptyC { coupled = Set.singleton (canonKey cB) })
+      (record cB (emptyC { coupled = Set.singleton (canonKey cA) }) acc)
   pinFirst pin _ args acc = case Array.head args of
     Just first -> foldl (useExpr sc) (pin first acc) (fromMaybe [] (Array.tail args))
     Nothing -> acc
@@ -797,14 +802,46 @@ refineEnums obs cs =
         Tuple key (Tuple canon (c { enumVariants = Set.union c.enumVariants dataVars }))
     Nothing -> Tuple key (Tuple canon c)
 
+-- | Refine each under-determined (`SUnknown`) *constraint* scalar with the
+-- | observed type, so `==` coupling can propagate data-determined types too.
+-- | (Leaves with no constraint are handled by `buildTy`'s `obs` fallback.)
+refineScalars :: Map String ScalarHint -> Constraints -> Constraints
+refineScalars obs cs =
+  Map.fromFoldable (map ref (Map.toUnfoldable cs :: Array (Tuple String (Tuple Canon PathC))))
+  where
+  ref (Tuple key (Tuple canon c)) = case Map.lookup key obs of
+    Just h | c.scalar == SUnknown -> Tuple key (Tuple canon (c { scalar = h }))
+    _ -> Tuple key (Tuple canon c)
+
+-- | Propagate a determined scalar across `==` couples to a fixpoint (§3 order-3:
+-- | `{{a == b}}` makes `a` and `b` share a type, so either side determines the
+-- | other). A conflict surfaces naturally (both determined, different ⇒ the
+-- | coupled side stays as-is; `buildTy` still reports its own conflict).
+propagateCouples :: Constraints -> Constraints
+propagateCouples cs =
+  let cs' = onePass cs
+  in if cs' == cs then cs else propagateCouples cs'
+  where
+  onePass m = foldl push m (Map.toUnfoldable m :: Array (Tuple String (Tuple Canon PathC)))
+  push acc (Tuple _ (Tuple _ c)) =
+    if c.scalar == SUnknown then acc
+    else foldl (pushTo c.scalar) acc (Set.toUnfoldable c.coupled :: Array String)
+  pushTo hint acc coupledKey = case Map.lookup coupledKey acc of
+    Just (Tuple canon c2) | c2.scalar == SUnknown ->
+      Map.insert coupledKey (Tuple canon (c2 { scalar = hint })) acc
+    _ -> acc
+
 -- | Infer a candidate schema, refining under-determined scalars + enum variants
--- | with sample data (docs/03 §2, §5). `inferTemplate` is the no-data case.
+-- | with sample data (docs/03 §2, §5) and unifying `==` couples (§3). `inferTemplate`
+-- | is the no-data case.
 inferTemplateData :: Array Value -> Template -> InferResult
 inferTemplateData samples tmpl =
   let
     sc0 = rootScope { partials = collectInlines tmpl }
-    cs = refineEnums (observeTags samples) (walk sc0 Map.empty tmpl)
-    ty = buildTy (observeScalars samples) cs
+    obs = observeScalars samples
+    cs = refineEnums (observeTags samples)
+      (propagateCouples (refineScalars obs (walk sc0 Map.empty tmpl)))
+    ty = buildTy obs cs
   in
     { schema: emitSchema ty
     , dataScaffold: scaffoldJson ty
