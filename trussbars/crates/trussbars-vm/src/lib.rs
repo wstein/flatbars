@@ -1206,7 +1206,7 @@ mod tests {
             "big"
         );
         assert_eq!(
-            render("{% let t=(multiply p.n 2) %}{{t}}{% endlet %}", d).unwrap(),
+            render("{% local t=(multiply p.n 2) %}{{t}}{% endlocal %}", d).unwrap(),
             "6"
         );
     }

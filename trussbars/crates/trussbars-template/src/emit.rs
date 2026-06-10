@@ -640,7 +640,7 @@ fn let_block(
 fn for_block(env: &Env, src: &str, e: &For, out: &mut String) -> Result<(), String> {
     // A dict literal compiles to a struct, which has no `Each` impl — so iterating one
     // is rejected up front (a clean located error, not a downstream rustc failure).
-    // Bind it (`{% scope {…} %}` / `{% let %}`) and read its fields instead.
+    // Bind it (`{% scope {…} %}` / `{% local %}`) and read its fields instead.
     if dict_arity(&e.subject).is_some() {
         return Err(
             "unsupported: cannot iterate a dict literal — bind it and read its fields".into(),
@@ -1446,7 +1446,7 @@ mod tests {
 
     #[test]
     fn arithmetic_and_let() {
-        let out = e("{% let s=(multiply price qty) %}{{s}}{% endlet %}");
+        let out = e("{% local s=(multiply price qty) %}{{s}}{% endlocal %}");
         assert!(out.contains("let __let_s = (ctx.price * ctx.qty);"));
         assert!(out.contains("trussbars_core::esc(&(__let_s), &mut out)"));
     }
@@ -1479,7 +1479,7 @@ mod tests {
         // A `let`-bound brace literal with two fields, accessed by `.key`.
         let out2 = emit(
             "Ctx",
-            "{% let c={x: 1, y: \"z\"} %}{{c.x}}{{c.y}}{% endlet %}",
+            "{% local c={x: 1, y: \"z\"} %}{{c.x}}{{c.y}}{% endlocal %}",
         )
         .unwrap();
         assert!(out2.contains("struct __Dict<F0, F1> { x: F0, y: F1 }"));

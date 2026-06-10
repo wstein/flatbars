@@ -57,7 +57,7 @@ fn err<T>(message: impl Into<String>, at: usize) -> Result<T, ParseError> {
 /// The built-in block heads `open_block` dispatches — reserved, so a host cannot declare a
 /// block helper with one of these names (docs/12 §5.2). Keep in sync with `open_block`.
 pub const RESERVED_BLOCK_HEADS: &[&str] = &[
-    "if", "unless", "for", "scope", "let", "local", "case", "inline", "partial",
+    "if", "unless", "for", "scope", "local", "case", "inline", "partial",
 ];
 
 /// What stopped a body scan.
@@ -206,9 +206,10 @@ impl Blocks<'_> {
                 "the context re-root is renamed `scope` (ADR-039) — write `{% scope … %}` … `{% endscope %}`",
                 span.start,
             ),
-            // `local` is the docs-17 spelling of the bounded block binding; `let` is the
-            // retained legacy head. Same construct, each paired by its own close name.
-            "let" | "local" => self.let_block(span, head, rest, scope),
+            // `{% local … %}` is the bounded block binding (docs-17). The retired `let`
+            // head is NOT recognized — it falls through to `helper_block` and fails as a
+            // plain "unknown helper" error (no compat mapping).
+            "local" => self.let_block(span, head, rest, scope),
             "case" => self.case_block(span, rest, scope),
             "inline" => self.inline_block(span, rest, scope),
             "partial" => self.partial_block(span, rest, scope),
@@ -857,7 +858,7 @@ mod tests {
             "{% scope user %}{{name}}{% endfor %}",
             "{% if a %}A{% endunless %}",
             "{% case s %}{% when \"a\" %}A{% endif %}",
-            "{% let x=(1) %}{{x}}{% endfor %}",
+            "{% local x=(1) %}{{x}}{% endfor %}",
             "{% bold %}hi{% enditalic %}",
         ] {
             let e = parse(src).unwrap_err();
@@ -970,7 +971,7 @@ mod tests {
 
     #[test]
     fn let_bindings_sequential_scope() {
-        let ns = parse("{% let a=(x) b=(a) %}{{a}}/{{b}}{% endlet %}").unwrap();
+        let ns = parse("{% local a=(x) b=(a) %}{{a}}/{{b}}{% endlocal %}").unwrap();
         match &ns[0] {
             Node::Let { bindings, .. } => {
                 assert_eq!(bindings.len(), 2);
@@ -1088,11 +1089,13 @@ mod tests {
             }
             o => panic!("{o:?}"),
         }
-        // The legacy `let` head still parses (lenient superset).
+        // `{% local %}` is the bounded binding (the AST node is still `Node::Let`).
         assert!(matches!(
-            parse("{% let x=(add 1 2) %}{{x}}{% endlet %}").unwrap()[0],
+            parse("{% local x=(add 1 2) %}{{x}}{% endlocal %}").unwrap()[0],
             Node::Let { .. }
         ));
+        // PURE grammar (ADR-039 / docs-17): the retired `let` head is rejected.
+        assert!(parse("{% let x=(1) %}{{x}}{% endlet %}").is_err());
     }
 
     #[test]

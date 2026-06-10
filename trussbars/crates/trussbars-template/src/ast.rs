@@ -128,7 +128,7 @@ pub enum Node {
     Case(Case),
     /// `{% with subject %}…{% else %}…{% endwith %}` (re-root).
     With(With),
-    /// `{% let a=(e) b=(e)… %}…{% endlet %}` — sequential block-scoped aliases.
+    /// `{% local a=(e) b=(e)… %}…{% endlocal %}` — sequential block-scoped aliases.
     Let {
         /// The tag span.
         span: Span,

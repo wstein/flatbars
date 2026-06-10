@@ -695,7 +695,7 @@ mod tests {
     #[test]
     fn liquid_loop_and_let_round_trip() {
         assert_round_trip("{% for post i in posts label outer %}{{post.title}}{% endfor %}");
-        assert_round_trip("{% let a=(multiply x y) b=(add a 1) %}{{a}}/{{b}}{% endlet %}");
+        assert_round_trip("{% local a=(multiply x y) b=(add a 1) %}{{a}}/{{b}}{% endlocal %}");
     }
 
     #[test]
