@@ -1,2 +1,2 @@
-{{#each people}}{{> (lookup this "kind")}}
-{{/each}}
+{% each people %}{{> (lookup this "kind")}}
+{% endeach %}

@@ -26,13 +26,14 @@
 //   • Loop variables are BARE under `loop.` — `loop.index0/index1/first/last/
 //     length/key/rindex0` — never @-prefixed. Context climbs with `parent`
 //     (chainable) and `root`, never `../` or `@root`.
-//   • A clause-separator condition MUST be parenthesised: `{{else if (gte n 1)}}`.
+//   • A clause-separator condition MUST be parenthesised: `{% else if (gte n 1) %}`.
 //     A bare infix separator parses but silently takes the wrong branch.
 //   • Partials: EXTERNAL host-threaded `{{> name}}` (the partials registry, each
 //     partial itself MaxBars source — ADR/commit cfadebc) AND template-local
-//     `{{#inline "x"}}…{{/inline}}` both work, plus the `{{yield}}` layout pattern
-//     via `{{#partial}}` (inline wins on a name clash). Only the `{{#*inline}}`
-//     decorator stays ClassicBars-only. Raw blocks use the `{{{{#op}}}}` hash sigil.
+//     `{% inline "x" %}…{% endinline %}` both work, plus the `{{yield}}` layout
+//     pattern via `{% partial %}` (inline wins on a name clash). Only the
+//     `{{#*inline}}` decorator stays ClassicBars-only. Raw blocks use the
+//     `{{{{#op}}}}` hash sigil.
 //   • Arithmetic is strictly numeric: `"x" + "y"` throws (no string concat).
 
 export const examples = {
@@ -114,9 +115,9 @@ export const examples = {
     // lambdas — you filter by a key, not an arbitrary predicate (ADR-020).
     template:
       "In stock under 100:\n" +
-      "{{#each p in (products | where \"inStock\" | where \"price\" \"<=\" 100)}}- {{p.name}} ({{p.price}})\n{{/each}}" +
+      "{% each p in (products | where \"inStock\" | where \"price\" \"<=\" 100) %}- {{p.name}} ({{p.price}})\n{% endeach %}" +
       "Premium pick: {{lookup (products | find \"price\" \">\" 100) \"name\"}}\n" +
-      "Has a sale tag? {{#if (products | some \"tags\" \"includes\" \"sale\")}}yes{{else}}no{{/if}}",
+      "Has a sale tag? {% if (products | some \"tags\" \"includes\" \"sale\") %}yes{% else %}no{% endif %}",
     data: {
       products: [
         { name: "Keyboard", price: 45, inStock: true, tags: ["new"] },
@@ -154,13 +155,13 @@ export const examples = {
   caseBlock: {
     engine: "maxbars",
     label: "Intermediate — Case / when (multi-arm)",
-    // `{{#case s}}` dispatches the subject against each `{{when}}` arm by equality —
-    // clearer than a chain of `{{else if (eq s …)}}`. One arm can list several values
-    // (`{{when "pending" "queued"}}`); `{{else}}` is the catch-all. It is a first-class
+    // `{% case s %}` dispatches the subject against each `{% when %}` arm by equality —
+    // clearer than a chain of `{% else if (eq s …) %}`. One arm can list several values
+    // (`{% when "pending" "queued" %}`); `{% else %}` is the catch-all. It is a first-class
     // construct: the Trussbars compiler lowers it to a Rust `match` (the subject read once).
     compiles: true,
     template:
-      "{{#case status}}{{when \"shipped\"}}📦 On its way{{when \"pending\" \"queued\"}}⏳ Waiting{{when \"delivered\"}}✓ Delivered{{else}}Unknown status{{/case}}",
+      "{% case status %}{% when \"shipped\" %}📦 On its way{% when \"pending\" \"queued\" %}⏳ Waiting{% when \"delivered\" %}✓ Delivered{% else %}Unknown status{% endcase %}",
     data: { status: "queued" },
   },
 
@@ -171,12 +172,12 @@ export const examples = {
     // loop.last, loop.length, …) — never @index. Context climbs with `parent` (the
     // enclosing context) and `root` (the top-level data) — never `../` or @root.
     compiles: true,
-    template: `{{#each teams}}
+    template: `{% each teams %}
 {{name}} ({{root.org}}):
-{{#each members}}
-  {{loop.index0}}. {{this}}{{#if loop.last}} (last){{/if}} — {{parent.name}}
-{{/each}}
-{{/each}}`,
+{% each members %}
+  {{loop.index0}}. {{this}}{% if loop.last %} (last){% endif %} — {{parent.name}}
+{% endeach %}
+{% endeach %}`,
     data: {
       org: "Acme",
       teams: [
@@ -188,13 +189,13 @@ export const examples = {
 
   eachElse: {
     engine: "maxbars",
-    label: "Intermediate — Each: the empty case ({{else}})",
+    label: "Intermediate — Each: the empty case ({% else %})",
     // {{#each}} carries its own {{else}} for an empty list — inherited from ClassicBars.
-    template: `{{#each items}}
+    template: `{% each items %}
 - {{this}}
-{{else}}
+{% else %}
 (nothing yet)
-{{/each}}`,
+{% endeach %}`,
     data: { items: [] },
   },
 
@@ -203,9 +204,9 @@ export const examples = {
     label: "Intermediate — Each over an object (loop.key)",
     // Over an object, `loop.key` is the property name and `this` the value (ClassicBars's
     // @key, bare).
-    template: `{{#each prefs}}
+    template: `{% each prefs %}
 {{loop.key}} = {{this}}
-{{/each}}`,
+{% endeach %}`,
     data: { prefs: { theme: "dark", lang: "en" } },
   },
 
@@ -217,7 +218,7 @@ export const examples = {
     // additive binds tighter than `..`, so `1..pages` and `start..start+2` both
     // read naturally. Descending bounds yield the empty list (the `{{else}}`).
     compiles: true,
-    template: `{{#each 1..rounds}}Round {{this}}{{#unless loop.last}} · {{/unless}}{{/each}}`,
+    template: "{% each 1..rounds %}Round {{this}}{% unless loop.last %} · {% endunless %}{% endeach %}",
     data: { rounds: 3 },
   },
 
@@ -229,7 +230,7 @@ export const examples = {
     // take infix. The structural scanner is brace-aware, so a dict needs no space
     // before the closing `}}`.
     compiles: true,
-    template: `{{#each [{name: lead, role: "lead"}, {name: "Lin", role: "dev"}]}}{{name}} ({{role}}){{#unless loop.last}}, {{/unless}}{{/each}}`,
+    template: "{% each [{name: lead, role: \"lead\"}, {name: \"Lin\", role: \"dev\"}] %}{{name}} ({{role}}){% unless loop.last %}, {% endunless %}{% endeach %}",
     data: { lead: "Ada" },
   },
 
@@ -240,9 +241,9 @@ export const examples = {
     // re-rooting the context (unlike `with`). Bindings are sequential — a later
     // value sees an earlier name — so `tax` can build on `subtotal`.
     compiles: true,
-    template: `{{#let subtotal=(multiply price qty) tax=(multiply subtotal rate)}}
+    template: `{% let subtotal=(multiply price qty) tax=(multiply subtotal rate) %}
 {{qty}} × {{price}} = {{subtotal}}, tax {{tax}}, total {{add subtotal tax}}
-{{/let}}`,
+{% endlet %}`,
     data: { price: 20, qty: 3, rate: 0.1 },
   },
 
@@ -251,7 +252,7 @@ export const examples = {
     label: "Intermediate — With: re-root the context",
     // {{#with obj}} re-roots the context, unchanged from ClassicBars — operators and
     // pipes apply to the shifted context just the same.
-    template: "{{#with totals}}{{count}} items · {{total | toFixed 2}}{{/with}}",
+    template: "{% with totals %}{{count}} items · {{total | toFixed 2}}{% endwith %}",
     data: { totals: { count: 2, total: 9.5 } },
   },
 
@@ -265,9 +266,9 @@ export const examples = {
     // FRAME, so an inner loop reads the OUTER loop's full state — `outer.index1`,
     // `outer.length`, `outer.last` — not just its element.
     compiles: true,
-    template: `{{#each section in sections label outer}}
-{{outer.index1}}/{{outer.length}} {{section.title}}:{{#each item in section.items}} {{item}}{{/each}}{{#if outer.last}} (last){{/if}}
-{{/each}}`,
+    template: `{% each section in sections label outer %}
+{{outer.index1}}/{{outer.length}} {{section.title}}:{% each item in section.items %} {{item}}{% endeach %}{% if outer.last %} (last){% endif %}
+{% endeach %}`,
     data: {
       sections: [
         { title: "Fruit", items: ["Pear", "Plum"] },
@@ -284,8 +285,8 @@ export const examples = {
     // ClassicBars. Combined with {{#each}} it templates a row each, and the name can
     // be an EXPRESSION resolved per row — {{> (lookup this "kind")}} picks the
     // partial from the data. (A template-local {{#inline}} of the same name wins.)
-    template: `{{#each people}}{{> (lookup this "kind")}}
-{{/each}}`,
+    template: `{% each people %}{{> (lookup this "kind")}}
+{% endeach %}`,
     partials: {
       author: "- {{name}} writes",
       engineer: "- {{name}} builds",
@@ -304,7 +305,9 @@ export const examples = {
     // The MaxBars layout pattern, the bare spelling of Handlebars' block partials:
     // {{#inline "x"}}…{{yield}}…{{/inline}} DEFINES a layout with a hole, and
     // {{#partial "x"}}body{{/partial}} invokes it, dropping `body` in at {{yield}}.
-    template: '{{#inline "frame"}}== {{title}} ==\n{{yield}}\n== end =={{/inline}}{{#partial "frame"}}Glad you came.{{/partial}}',
+    template: `{% inline "frame" %}== {{title}} ==
+{{yield}}
+== end =={% endinline %}{% partial "frame" %}Glad you came.{% endpartial %}`,
     data: { title: "Welcome" },
   },
 
@@ -322,13 +325,15 @@ export const examples = {
       "registerOperation('list', (items, o) =>\n" +
       "  safe('<ul>' + items.map((p, i) => o.fn(p, { blockParams: [p, i] })).join('') + '</ul>'));",
     template:
-      '{{loud name}}\n{{{link "Home" url="/home"}}}\n{{#list people as p i}}<li>{{i}}: {{p.name}}</li>{{/list}}',
+      `{{loud name}}
+{{{link "Home" url="/home"}}}
+{% list people as p i %}<li>{{i}}: {{p.name}}</li>{% endlist %}`,
     data: { name: "ada", people: [{ name: "Ada" }, { name: "Lin" }] },
   },
 
   rawBlock: {
     engine: "maxbars",
-    label: "Advanced — Raw blocks ({{{{#op}}}})",
+    label: "Advanced — Raw blocks ({{{% op %}}})",
     // A raw block hands its body to the head OPERATION completely UNPROCESSED: the
     // inner {{bar}} is never interpreted — it is literal text the operation receives
     // via options.fn(). `rawloud` upper-cases that raw body, so the verbatim {{bar}}
@@ -350,11 +355,11 @@ export const examples = {
     template: `Hi {{name}},
 
 Your order shipped. Items:
-{{#each items}}
+{% each items %}
 {{> item}}
-{{else}}
+{% else %}
 - (none)
-{{/each}}
+{% endeach %}
 
 — {{store.name}} ({{store.url}})`,
     partials: { item: "- {{title}} ×{{qty}}" },
@@ -370,9 +375,9 @@ Your order shipped. Items:
     label: "Advanced — HTML card (styling in a partial)",
     // The one example whose OUTPUT is HTML — so it previews as HTML, not text. An
     // external {{> styles}} partial holds the CSS once, {{> card}} is one row's
-    // markup with a {{#if lead}} badge, and {{#each}} iterates.
+    // markup with a {% if lead %} badge, and {% each %} iterates.
     view: "rendered",
-    template: "{{> styles}}\n{{#each people}}\n{{> card}}\n{{/each}}",
+    template: "{{> styles}}\n{% each people %}\n{{> card}}\n{% endeach %}",
     partials: {
       styles:
         "<style>\n" +
@@ -380,7 +385,7 @@ Your order shipped. Items:
         "  .card h3 { margin: 0 0 .15rem; font-size: 1rem; }\n" +
         "  .card p  { margin: 0; color: #57606a; }\n" +
         "</style>",
-      card: '<div class="card">\n  <h3>{{name}}{{#if lead}} ★{{/if}}</h3>\n  <p>{{role}}</p>\n</div>',
+      card: '<div class="card">\n  <h3>{{name}}{% if lead %} ★{% endif %}</h3>\n  <p>{{role}}</p>\n</div>',
     },
     data: {
       people: [

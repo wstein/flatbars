@@ -1,3 +1,3 @@
-{{#let subtotal=(multiply price qty) tax=(multiply subtotal rate)}}
+{% let subtotal=(multiply price qty) tax=(multiply subtotal rate) %}
 {{qty}} × {{price}} = {{subtotal}}, tax {{tax}}, total {{add subtotal tax}}
-{{/let}}
+{% endlet %}

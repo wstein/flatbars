@@ -1,3 +1,3 @@
-{{#inline "frame"}}== {{title}} ==
+{% inline "frame" %}== {{title}} ==
 {{yield}}
-== end =={{/inline}}{{#partial "frame"}}Glad you came.{{/partial}}
+== end =={% endinline %}{% partial "frame" %}Glad you came.{% endpartial %}

@@ -1,5 +1,5 @@
-{{#case (lookup this "status")}}
-{{when "shipped"}}On its way
-{{when "pending" "queued"}}Waiting
-{{else}}Unknown
-{{/case}}
+{% case (lookup this "status") %}
+{% when "shipped" %}On its way
+{% when "pending" "queued" %}Waiting
+{% else %}Unknown
+{% endcase %}

@@ -43,30 +43,30 @@ export const examples = {
   // Block tags sit on their own lines; standalone-line trimming drops those
   // lines, so the output is one clean row per item.
   each: {
-    template: `{{#each (lookup this "items")}}
+    template: `{% each (lookup this "items") %}
 {{{index}}}: {{{escapeHtml this}}}
-{{/each}}`,
+{% endeach %}`,
     data: { items: ["alpha", "beta"] },
     compiles: true,
   },
 
-  // ── No keywords: {{else}} is a separator the `if` helper splits on ────────
+  // ── No keywords: {% else %} is a separator the `if` helper splits on ──────
   cond: {
-    template: `{{#if (lookup this "admin")}}
+    template: `{% if (lookup this "admin") %}
 admin
-{{else}}
+{% else %}
 guest
-{{/if}}`,
+{% endif %}`,
     data: { admin: false },
   },
 
-  // ── Multi-arm {{#case}} — a nonEmpty-family control structure ──────────────
+  // ── Multi-arm {% case %} — a nonEmpty-family control structure ─────────────
   caseBlock: {
-    template: `{{#case (lookup this "status")}}
-{{when "shipped"}}On its way
-{{when "pending" "queued"}}Waiting
-{{else}}Unknown
-{{/case}}`,
+    template: `{% case (lookup this "status") %}
+{% when "shipped" %}On its way
+{% when "pending" "queued" %}Waiting
+{% else %}Unknown
+{% endcase %}`,
     data: { status: "queued" },
   },
 
@@ -76,13 +76,13 @@ guest
     data: {},
   },
 
-  // ── Block partials: define with {{#inline}}, fill with {{{yield}}} ─────────
-  // RawBars hoists {{#inline "name"}} definitions into the partial registry (the
-  // shared Kernel.Hoist, same engine step as ClassicBars/MaxBars); {{#partial "name"
-  // ctx}} then invokes it with the block body, dropped in at {{{yield}}}. Bare
+  // ── Block partials: define with {% inline %}, fill with {{{yield}}} ────────
+  // RawBars hoists {% inline "name" %} definitions into the partial registry (the
+  // shared Kernel.Hoist, same engine step as ClassicBars/MaxBars); {% partial "name"
+  // ctx %} then invokes it with the block body, dropped in at {{{yield}}}. Bare
   // core: triple-stash and an explicit context — no surface sugar.
   yield: {
-    template: '{{#inline "frame"}}<main>{{{yield}}}</main>{{/inline}}{{#partial "frame" this}}{{{lookup this "name"}}}{{/partial}}',
+    template: '{% inline "frame" %}<main>{{{yield}}}</main>{% endinline %}{% partial "frame" this %}{{{lookup this "name"}}}{% endpartial %}',
     data: { name: "Ada" },
   },
 };

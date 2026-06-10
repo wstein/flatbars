@@ -1,1 +1,1 @@
-{{#with totals}}{{count}} items · {{total | toFixed 2}}{{/with}}
+{% with totals %}{{count}} items · {{total | toFixed 2}}{% endwith %}

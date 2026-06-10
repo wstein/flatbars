@@ -1,3 +1,3 @@
-{{#each prefs}}
+{% each prefs %}
 {{loop.key}} = {{this}}
-{{/each}}
+{% endeach %}

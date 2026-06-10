@@ -109,7 +109,7 @@
   },
   {
     "id": "eachElse",
-    "label": "Intermediate — Each: the empty case ({{else}})",
+    "label": "Intermediate — Each: the empty case ({% else %})",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",

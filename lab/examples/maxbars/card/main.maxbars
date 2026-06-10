@@ -1,4 +1,4 @@
 {{> styles}}
-{{#each people}}
+{% each people %}
 {{> card}}
-{{/each}}
+{% endeach %}
