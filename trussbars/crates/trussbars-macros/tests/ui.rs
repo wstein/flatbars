@@ -9,6 +9,11 @@
 //!   * parse-class — `unclosed_block`;
 //!   * resolution-class — `unknown_helper`, `unknown_partial`,
 //!     `yield_outside_partial`;
+//!   * arity-class — `arity_wrong` (a fixed-arity stdlib op, wrong arg count);
+//!   * dict-literal-class — `dict_literal_iterated` (a `{k: v}` literal cannot be
+//!     iterated);
+//!   * loop-metadata-class — `loop_outside_each` (`loop` outside an `{{#each}}`),
+//!     `loop_unknown_field` (an unknown field on the loop frame);
 //!   * policy-class — `unknown_truthiness` (an unknown `truss!(…, truthiness = …)`
 //!     mode; §7.1);
 //!   * **injection-class (§4)** — the security boundary, all three constructs:

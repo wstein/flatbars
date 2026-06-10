@@ -1,0 +1,7 @@
+error: 1:1: unsupported: uppercase with 2 arguments
+ --> tests/ui/arity_wrong.rs:5:1
+  |
+5 | truss!(render, str, "{{uppercase a b}}");
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `truss` (in Nightly builds, run with -Z macro-backtrace for more info)
