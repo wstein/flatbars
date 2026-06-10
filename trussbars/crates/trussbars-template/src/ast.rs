@@ -119,15 +119,15 @@ pub enum Node {
         /// Whether this is raw (`{{{ }}}`) output (no HTML escaping).
         raw: bool,
     },
-    /// `{{#each item [i] in coll [label name]}}…{{else}}…{{/each}}`.
+    /// `{% each item [i] in coll [label name] %}…{% else %}…{% endeach %}`.
     Each(Each),
-    /// `{{#if}}` / `{{#unless}}` (`negated`) with `{{else if}}` / `{{else}}` arms.
+    /// `{% if %}` / `{% unless %}` (`negated`) with `{{else if}}` / `{% else %}` arms.
     Cond(Cond),
-    /// `{{#case subject}}{{when V…}}…{{else}}…{{/case}}` — the multi-arm conditional.
+    /// `{% case subject %}{% when V… %}…{% else %}…{% endcase %}` — the multi-arm conditional.
     Case(Case),
-    /// `{{#with subject}}…{{else}}…{{/with}}` (re-root).
+    /// `{% with subject %}…{% else %}…{% endwith %}` (re-root).
     With(With),
-    /// `{{#let a=(e) b=(e)…}}…{{/let}}` — sequential block-scoped aliases.
+    /// `{% let a=(e) b=(e)… %}…{% endlet %}` — sequential block-scoped aliases.
     Let {
         /// The tag span.
         span: Span,
@@ -145,7 +145,7 @@ pub enum Node {
         /// An explicit context expression, if given.
         ctx: Option<Expr>,
     },
-    /// `{{#inline "name"}}…{{/inline}}` — a partial definition (hoisted at emit).
+    /// `{% inline "name" %}…{% endinline %}` — a partial definition (hoisted at emit).
     Inline {
         /// The tag span.
         span: Span,
@@ -154,7 +154,7 @@ pub enum Node {
         /// The definition body.
         body: Vec<Node>,
     },
-    /// `{{#partial "name" [ctx]}}…{{/partial}}` — render the body in the caller
+    /// `{% partial "name" [ctx] %}…{% endpartial %}` — render the body in the caller
     /// frame and splice it at the named partial's `{{yield}}`.
     PartialBlock {
         /// The tag span.
@@ -178,7 +178,7 @@ pub enum Node {
         /// The verbatim body text.
         body: String,
     },
-    /// `{{#name args…}}body{{/name}}` — a host **block** helper (docs/09). The parser is
+    /// `{% name args… %}body{% endname %}` — a host **block** helper (docs/09). The parser is
     /// meaning-free: any block head that is not a built-in becomes this, and the emitter /
     /// VM resolve `head` against the declared allow-list (an undeclared head is a located
     /// "unknown helper"). The helper is `fn name(args…, body: impl Fn() -> String) -> R`
@@ -186,7 +186,7 @@ pub enum Node {
     HelperBlock(HelperBlock),
 }
 
-/// `{{#name args…}}body{{/name}}` data — a host block-helper invocation.
+/// `{% name args… %}body{% endname %}` data — a host block-helper invocation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HelperBlock {
     /// The tag span.
@@ -221,7 +221,7 @@ impl Node {
     }
 }
 
-/// `{{#each item [i] in coll}}` data.
+/// `{% each item [i] in coll %}` data.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Each {
     /// The tag span.
@@ -236,16 +236,16 @@ pub struct Each {
     pub label: Option<String>,
     /// The loop body.
     pub body: Vec<Node>,
-    /// The `{{else}}` (empty-collection) arm.
+    /// The `{% else %}` (empty-collection) arm.
     pub otherwise: Vec<Node>,
 }
 
-/// `{{#if}}` / `{{#unless}}` data.
+/// `{% if %}` / `{% unless %}` data.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cond {
     /// The tag span.
     pub span: Span,
-    /// Whether this is `{{#unless}}` (the condition is inverted).
+    /// Whether this is `{% unless %}` (the condition is inverted).
     pub negated: bool,
     /// The condition.
     pub cond: Expr,
@@ -253,11 +253,11 @@ pub struct Cond {
     pub body: Vec<Node>,
     /// `{{else if cond}}` arms, in order.
     pub elifs: Vec<(Expr, Vec<Node>)>,
-    /// The trailing `{{else}}` body.
+    /// The trailing `{% else %}` body.
     pub otherwise: Vec<Node>,
 }
 
-/// `{{#case subject}}{{when V…}}…{{else}}…{{/case}}` data — the multi-arm conditional
+/// `{% case subject %}{% when V… %}…{% else %}…{% endcase %}` data — the multi-arm conditional
 /// (docs/12). First-class so the emitter lowers it to a Rust `match` (the subject evaluated
 /// once as the scrutinee) rather than a repeated-`eq` `if`-chain.
 #[derive(Debug, Clone, PartialEq)]
@@ -266,13 +266,13 @@ pub struct Case {
     pub span: Span,
     /// The subject, evaluated once and compared against each arm's value(s).
     pub subject: Expr,
-    /// The `{{when V…}}` arms in order: each arm's match value(s) and its body.
+    /// The `{% when V… %}` arms in order: each arm's match value(s) and its body.
     pub arms: Vec<(Vec<Expr>, Vec<Node>)>,
-    /// The trailing `{{else}}` body (empty when absent).
+    /// The trailing `{% else %}` body (empty when absent).
     pub otherwise: Vec<Node>,
 }
 
-/// `{{#with subject}}` data.
+/// `{% with subject %}` data.
 #[derive(Debug, Clone, PartialEq)]
 pub struct With {
     /// The tag span.
@@ -281,6 +281,6 @@ pub struct With {
     pub subject: Expr,
     /// The body, rendered in the subject's scope when truthy.
     pub body: Vec<Node>,
-    /// The `{{else}}` (falsy) body.
+    /// The `{% else %}` (falsy) body.
     pub otherwise: Vec<Node>,
 }

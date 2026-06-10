@@ -1,7 +1,7 @@
-error: 1:16: unsupported: loop field 'bogus'
+error: 1:17: unsupported: loop field 'bogus'
  --> tests/ui/loop_unknown_field.rs:4:1
   |
-4 | truss!(render, str, "{{#each items}}{{loop.bogus}}{{/each}}");
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4 | truss!(render, str, "{% each items %}{{loop.bogus}}{% endeach %}");
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
   = note: this error originates in the macro `truss` (in Nightly builds, run with -Z macro-backtrace for more info)

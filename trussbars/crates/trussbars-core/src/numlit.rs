@@ -1,22 +1,22 @@
 //! `NumLit` — the coercing wrapper for a *numeric literal operand* (docs/20, F2).
 //!
 //! The emitter wraps a numeric literal that sits in comparison/arithmetic position — the
-//! `100` in `{{#if views > 100}}` — as [`NumLit`] rather than a bare `f64`. `NumLit`
+//! `100` in `{% if views > 100 %}` — as [`NumLit`] rather than a bare `f64`. `NumLit`
 //! compares and does arithmetic against **any** numeric field type (`i64`, `u32`, `f64`, …)
 //! by widening that operand to `f64`, the engine's number model (spec §8). So
-//! `{{#if views > 100}}` compiles whether the host declares `views: i64` or `views: f64`,
+//! `{% if views > 100 %}` compiles whether the host declares `views: i64` or `views: f64`,
 //! instead of forcing `f64`.
 //!
 //! It is emitted **only** in operator-operand position, so:
-//! - non-numeric operands are untouched — `{{#if name < "m"}}` keeps native string ordering;
-//! - a string-vs-number comparison (`{{#if name > 100}}`) has no impl and is a **compile
+//! - non-numeric operands are untouched — `{% if name < "m" %}` keeps native string ordering;
+//! - a string-vs-number comparison (`{% if name > 100 %}`) has no impl and is a **compile
 //!   error**, the §5.1/§5.3 "footgun → caught" discipline (the interpreter would render it
 //!   as a silent `false`);
 //! - arithmetic yields `f64` (the number model), so `i64_field + 1` is `f64` — a deliberate
 //!   consequence, not integer arithmetic.
 //!
 //! `NumLit` is intentionally **not** `Truthy`/`TruthyIn`, so a bare-number condition
-//! (`{{#if 1}}`) stays the §5.3 compile error.
+//! (`{% if 1 %}`) stays the §5.3 compile error.
 
 use core::cmp::Ordering;
 use core::ops::{Add, Div, Mul, Sub};
@@ -97,7 +97,7 @@ impl_numlit!(
     i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, isize, usize, f32, f64
 );
 
-// Two literals (`{{add 1 2}}`, `{{#if 1 < 2}}`): arithmetic yields `f64`; ordering/equality
+// Two literals (`{{add 1 2}}`, `{% if 1 < 2 %}`): arithmetic yields `f64`; ordering/equality
 // come from the derived `PartialOrd`/`PartialEq` above.
 impl Add for NumLit {
     type Output = f64;

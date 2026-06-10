@@ -1,7 +1,7 @@
-error: 1:1: mismatched closing tag `{{/with}}` (expected `{{/each}}`)
+error: 1:1: mismatched closing tag `{% endwith %}` (expected `{% endeach %}`)
  --> tests/ui/mismatched_block.rs:5:1
   |
-5 | truss!(render, str, "{{#each items}}{{this}}{{/with}}");
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | truss!(render, str, "{% each items %}{{this}}{% endwith %}");
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
   = note: this error originates in the macro `truss` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -6,7 +6,7 @@
 //!
 //! Brace-aware: the closing `}}` is found at brace/bracket **depth 0**, skipping
 //! quoted strings, so a dict/list literal needs no space before the close
-//! (`{{#each {a: 1}}}` lexes with interior `each {a: 1}`). The four-brace raw block
+//! (`{% each {a: 1} %}` lexes with interior `each {a: 1}`). The four-brace raw block
 //! `{{{{#raw}}}}…{{{{/raw}}}}` captures its body verbatim.
 
 use crate::span::Span;
@@ -46,9 +46,9 @@ pub enum Sigil {
     Output,
     /// `{{{ x }}}` — unescaped (raw) output.
     Raw,
-    /// `{{# … }}` — a block open.
+    /// `{%  …  %}` — a block open.
     Open,
-    /// `{{/ … }}` — a block close.
+    /// `{% end …  %}` — a block close.
     Close,
     /// `{{> … }}` — a partial reference.
     Partial,
@@ -126,9 +126,9 @@ struct Lexed {
 /// remove that indentation and the trailing newline so the tag leaves no blank line.
 ///
 /// A faithful port of the PureScript `FlatBars.Lexer.trimStandalone` (Lexer.purs):
-/// block opens/closes (`{{#…}}` / `{{/…}}`) and comments are always eligible; output
+/// block opens/closes (`{% … %}` / `{% end… %}`) and comments are always eligible; output
 /// tags (`{{ }}` / `{{{ }}}`) and partials never are; a `{{ }}` tag is eligible only
-/// when its head word is `else`/`elif` (a clause marker — so `{{else}}` strips but an
+/// when its head word is `else`/`elif` (a clause marker — so `{% else %}` strips but an
 /// arbitrary `{{ x }}` does not). It only adjusts `Text` spans (shrinking off the
 /// leading line after a standalone tag and the trailing indent before one), so the
 /// result is still a sub-span of the source — output stays byte-identical to v1.
@@ -181,7 +181,7 @@ fn eligible(src: &str, l: &Lexeme) -> bool {
         } => {
             let head = interior.of(src).trim_start();
             let head = head.split(|c: char| c.is_whitespace()).next().unwrap_or("");
-            // `else`/`elif` split an `if`; `when` splits a `{{#case}}` (docs/12).
+            // `else`/`elif` split an `if`; `when` splits a `{% case %}` (docs/12).
             head == "else" || head == "elif" || head == "when"
         }
         _ => false,
@@ -252,11 +252,16 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             next: close + 3,
         });
     }
-    // Two-brace tag: the byte after `{{` selects the sigil.
+    // Two-brace tag: the byte after `{{` selects the sigil. Strict native dialect
+    // (docs-19): `{{ … }}` is OUTPUT-ONLY — control flow is the Django-style `{% … %}`
+    // statement tag (`lex_statement_tag`). The legacy Handlebars block-open/close
+    // sigils (a `#` or `/` right after the `{{`) are deliberately NOT recognized here
+    // — such a tag just falls through to an ordinary (and invalid) output expression.
+    // `{{> }}`
+    // (partial inclusion) and `{{! }}` (comment) stay; they are output / metadata,
+    // not control.
     let c = b.get(i + 2).copied();
     let (sigil, sig_len) = match c {
-        Some(b'#') => (Sigil::Open, 1),
-        Some(b'/') => (Sigil::Close, 1),
         Some(b'>') => (Sigil::Partial, 1),
         Some(b'!') => (Sigil::Comment, 1),
         _ => (Sigil::Output, 0),
@@ -294,7 +299,7 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
 /// * `{% endX %}` → [`Sigil::Close`] naming `X` (the interior is the substring *after*
 ///   the `end` prefix — e.g. `endeach` carries the `each` it spans).
 /// * `{% else %}` / `{% elif … %}` / `{% when … %}` → [`Sigil::Output`], which the parser
-///   already splits into a clause (`Stop::Else` / `ElseIf` / `When`), exactly as `{{else}}`.
+///   already splits into a clause (`Stop::Else` / `ElseIf` / `When`), exactly as `{% else %}`.
 /// * anything else (`{% if … %}`, `{% each … %}`, `{% local … %}`, host block heads) →
 ///   [`Sigil::Open`].
 ///
@@ -309,9 +314,7 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     if ts == te {
         return Err(LexError::new("empty statement tag `{% %}`", i));
     }
-    let hw_end = (ts..te)
-        .find(|&k| b[k].is_ascii_whitespace())
-        .unwrap_or(te);
+    let hw_end = (ts..te).find(|&k| b[k].is_ascii_whitespace()).unwrap_or(te);
     let head = &b[ts..hw_end];
     // `{% endX %}` — a close whose name is the `X` after `end` (length > 3, so a bare
     // `{% end %}` is an ordinary head, matching the PureScript `isStmtClose`).
@@ -518,7 +521,7 @@ mod tests {
 
     #[test]
     fn all_two_brace_sigils() {
-        let s = "{{x}}{{{y}}}{{#each xs}}{{/each}}{{> card}}{{! c }}";
+        let s = "{{x}}{{{y}}}{% each xs %}{% endeach %}{{> card}}{{! c }}";
         assert_eq!(
             sigils(s),
             vec![
@@ -543,14 +546,14 @@ mod tests {
     #[test]
     fn brace_aware_dict_needs_no_space() {
         // The dict's `}` must not be mistaken for the tag close.
-        let s = "{{#each {a: 1, b: 2}}}{{this}}{{/each}}";
+        let s = "{% each {a: 1, b: 2} %}{{this}}{% endeach %}";
         assert_eq!(interiors(s)[0], "each {a: 1, b: 2}");
         assert_round_trip(s);
     }
 
     #[test]
     fn list_literal_brackets() {
-        let s = "{{#each [1, 2, 3]}}{{this}}{{/each}}";
+        let s = "{% each [1, 2, 3] %}{{this}}{% endeach %}";
         assert_eq!(interiors(s)[0], "each [1, 2, 3]");
         assert_round_trip(s);
     }
@@ -586,8 +589,8 @@ mod tests {
 
     #[test]
     fn liquid_loop_and_let_round_trip() {
-        assert_round_trip("{{#each post i in posts label outer}}{{post.title}}{{/each}}");
-        assert_round_trip("{{#let a=(multiply x y) b=(add a 1)}}{{a}}/{{b}}{{/let}}");
+        assert_round_trip("{% each post i in posts label outer %}{{post.title}}{% endeach %}");
+        assert_round_trip("{% let a=(multiply x y) b=(add a 1) %}{{a}}/{{b}}{% endlet %}");
     }
 
     #[test]
@@ -630,7 +633,7 @@ mod tests {
 
     #[test]
     fn statement_tag_clause_separators_are_output() {
-        // `else`/`elif`/`when` lex to `Output` (the parser splits the clause), like `{{else}}`.
+        // `else`/`elif`/`when` lex to `Output` (the parser splits the clause), like `{% else %}`.
         // (The `A`/`B`/`C` bodies are `Text`, filtered out by `tags`.)
         assert_eq!(
             tags("{% if a %}A{% elif b %}B{% else %}C{% endif %}"),
@@ -645,10 +648,10 @@ mod tests {
 
     #[test]
     fn statement_tag_reduces_like_brace_tag() {
-        // The structural token stream of the `{% %}` and `{{# }}` spellings is identical
+        // The structural token stream of the `{% %}` and `{%   %}` spellings is identical
         // (modulo the `let`→`local` head rename), so the parser/engine are unchanged.
         let pct = tags("{% each x in xs %}{{x}}{% endeach %}");
-        let brace = tags("{{#each x in xs}}{{x}}{{/each}}");
+        let brace = tags("{% each x in xs %}{{x}}{% endeach %}");
         assert_eq!(pct, brace);
     }
 
@@ -669,7 +672,7 @@ mod tests {
     #[test]
     fn statement_tag_standalone_lines_trim() {
         // A `{% each %}`/`{% endeach %}` alone on its line leaves no blank line — the
-        // same standalone rule as `{{#each}}` (the sigils drive `trim_standalone`).
+        // same standalone rule as `{% each %}` (the sigils drive `trim_standalone`).
         assert_eq!(
             trimmed_text("a\n{% each xs %}\n-\n{% endeach %}\nb\n"),
             "a\n-\nb\n"
@@ -696,14 +699,14 @@ mod tests {
 
     #[test]
     fn standalone_block_tags_leave_no_blank_line() {
-        // The `{{#each}}` / `{{/each}}` lines (alone on their line) are stripped whole.
+        // The `{% each %}` / `{% endeach %}` lines (alone on their line) are stripped whole.
         assert_eq!(
-            trimmed_text("a\n{{#each xs}}\n-\n{{/each}}\nb\n"),
+            trimmed_text("a\n{% each xs %}\n-\n{% endeach %}\nb\n"),
             "a\n-\nb\n"
         );
         // Indentation before a standalone tag goes too (the `  ` on the each line).
         assert_eq!(
-            trimmed_text("<ul>\n  {{#each xs}}\n  x\n  {{/each}}\n</ul>\n"),
+            trimmed_text("<ul>\n  {% each xs %}\n  x\n  {% endeach %}\n</ul>\n"),
             "<ul>\n  x\n</ul>\n"
         );
     }
@@ -713,6 +716,6 @@ mod tests {
         // A lone `{{x}}` on its line keeps its surrounding whitespace (output, not a block).
         assert_eq!(trimmed_text("a\n{{x}}\nb\n"), "a\n\nb\n");
         // An inline block (text on the same line) is not standalone — the space stays.
-        assert_eq!(trimmed_text("{{#each xs}}{{this}} {{/each}}\n"), " \n");
+        assert_eq!(trimmed_text("{% each xs %}{{this}} {% endeach %}\n"), " \n");
     }
 }

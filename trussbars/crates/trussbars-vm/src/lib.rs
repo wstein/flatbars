@@ -10,10 +10,10 @@
 //! (71/71 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
 //! `if`/`each`/`with`/`let`, loop metadata incl. `loop.parent`/`loop.root`, the value
 //! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
-//! `dict`, and partials (`{{#inline}}`/`{{> }}`/`{{#partial}}`/`{{yield}}`). Anything
+//! `dict`, and partials (`{% inline %}`/`{{> }}`/`{% partial %}`/`{{yield}}`). Anything
 //! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
 //! spike (docs/11): the lenient + AOT-compat (strict) render modes, host-helper
-//! registration (value *and* block helpers — `{{#name}}…{{/name}}`, docs/09 §3.1),
+//! registration (value *and* block helpers — `{% name %}…{% endname %}`, docs/09 §3.1),
 //! a **selectable truthiness policy** ([`Template::with_truthiness`] — the dynamic
 //! backend's home for a runtime-swappable rule, parity with AOT's
 //! `truss!(…, truthiness = Mode)`, docs/16), and `no_std` + `alloc`
@@ -237,7 +237,7 @@ struct Env {
     parents: Parents,
     loop_frame: Option<Rc<LoopFrame>>,
     labels: BTreeMap<String, Rc<LoopFrame>>,
-    /// Hoisted `{{#inline}}` definitions, shared across the render.
+    /// Hoisted `{% inline %}` definitions, shared across the render.
     partials: Rc<BTreeMap<String, Vec<Node>>>,
     /// The pre-rendered body a block partial splices at its `{{yield}}`.
     yield_html: Option<Rc<str>>,
@@ -270,7 +270,7 @@ impl Env {
 
 type HostHelper = Box<dyn Fn(&[Value]) -> Result<Value, String>>;
 
-/// A host **block** helper (`{{#name args}}body{{/name}}`): it receives the evaluated args
+/// A host **block** helper (`{% name args %}body{% endname %}`): it receives the evaluated args
 /// plus a `body` thunk that renders the inner template in the enclosing scope, and returns
 /// the wrapped/repeated/suppressed result. The dynamic mirror of the AOT `fn name(args…,
 /// body: impl Fn() -> String) -> R` convention (docs/09 §3.1).
@@ -307,7 +307,7 @@ impl Helpers {
         self
     }
 
-    /// Register a host **block** helper callable as `{{#name args…}}body{{/name}}`. It
+    /// Register a host **block** helper callable as `{% name args… %}body{% endname %}`. It
     /// receives the evaluated args and a `body` thunk (render the inner template in the
     /// enclosing scope) and returns the result. Its output is emitted **raw** — block
     /// output is markup and the body is already escaped, matching AOT (docs/09 §3.1).
@@ -348,7 +348,7 @@ pub struct Template {
 
 impl Template {
     /// Parse + desugar a MaxBars template (the `trussbars-template` front-end),
-    /// hoisting `{{#inline}}` definitions into the partial registry.
+    /// hoisting `{% inline %}` definitions into the partial registry.
     ///
     /// # Errors
     /// The parse-error reason.
@@ -470,7 +470,7 @@ impl Template {
     }
 }
 
-/// Lift every `{{#inline "name"}}…{{/inline}}` definition (anywhere in the tree) into
+/// Lift every `{% inline "name" %}…{% endinline %}` definition (anywhere in the tree) into
 /// a registry and return the tree with those definitions removed.
 fn hoist(nodes: Vec<Node>) -> (BTreeMap<String, Vec<Node>>, Vec<Node>) {
     let mut reg = BTreeMap::new();
@@ -704,8 +704,8 @@ fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
     eval_nodes(env, &c.otherwise, out)
 }
 
-/// `{{#case}}` — the subject is evaluated **once**, then the first `{{when}}` arm whose
-/// value (any of them) equals it renders; else the `{{else}}` body (docs/12). The runtime
+/// `{% case %}` — the subject is evaluated **once**, then the first `{% when %}` arm whose
+/// value (any of them) equals it renders; else the `{% else %}` body (docs/12). The runtime
 /// mirror of the AOT `match`.
 fn eval_case(env: &Env, c: &Case, out: &mut String) -> Result<(), String> {
     let subject = eval_expr(env, &c.subject)?;
@@ -1120,7 +1120,7 @@ fn coll_test(env: &Env, args: &[Expr], require_all: bool) -> Result<bool, String
     Ok(require_all)
 }
 
-/// `find` returns the first matching element, or `Null` (falsy → the `{{else}}` arm).
+/// `find` returns the first matching element, or `Null` (falsy → the `{% else %}` arm).
 fn coll_find(env: &Env, args: &[Expr]) -> Result<Value, String> {
     let (coll, tail) = args.split_first().ok_or("find without a collection")?;
     for e in array_of(eval_expr(env, coll)?).iter() {
@@ -1244,12 +1244,12 @@ mod tests {
     fn if_and_each_with_loop_meta() {
         let d = obj(&[("xs", arr(&[s("a"), s("b")]))]);
         assert_eq!(
-            render("{{#each xs}}{{loop.index1}}:{{this}} {{/each}}", d).unwrap(),
+            render("{% each xs %}{{loop.index1}}:{{this}} {% endeach %}", d).unwrap(),
             "1:a 2:b "
         );
         let empty = obj(&[("xs", arr(&[]))]);
         assert_eq!(
-            render("{{#each xs}}x{{else}}none{{/each}}", empty).unwrap(),
+            render("{% each xs %}x{% else %}none{% endeach %}", empty).unwrap(),
             "none"
         );
     }
@@ -1258,11 +1258,11 @@ mod tests {
     fn paths_operators_and_let() {
         let d = obj(&[("p", obj(&[("n", Value::Num(3.0))]))]);
         assert_eq!(
-            render("{{#if p.n > 2}}big{{else}}small{{/if}}", d.clone()).unwrap(),
+            render("{% if p.n > 2 %}big{% else %}small{% endif %}", d.clone()).unwrap(),
             "big"
         );
         assert_eq!(
-            render("{{#let t=(multiply p.n 2)}}{{t}}{{/let}}", d).unwrap(),
+            render("{% let t=(multiply p.n 2) %}{{t}}{% endlet %}", d).unwrap(),
             "6"
         );
     }
@@ -1271,7 +1271,7 @@ mod tests {
     fn parent_chain_in_each() {
         let d = obj(&[("title", s("T")), ("xs", arr(&[s("a")]))]);
         assert_eq!(
-            render("{{#each xs}}{{parent.title}}:{{this}}{{/each}}", d).unwrap(),
+            render("{% each xs %}{{parent.title}}:{{this}}{% endeach %}", d).unwrap(),
             "T:a"
         );
     }
@@ -1284,7 +1284,7 @@ mod tests {
         let d = obj(&[("gs", arr(&[arr(&[s("a"), s("b")]), arr(&[s("c")])]))]);
         assert_eq!(
             render(
-                "{{#each gs}}{{loop.depth}}:{{#each this}}{{loop.depth}}/{{loop.parent.depth}} {{/each}}{{/each}}",
+                "{% each gs %}{{loop.depth}}:{% each this %}{{loop.depth}}/{{loop.parent.depth}} {% endeach %}{% endeach %}",
                 d
             )
             .unwrap(),
@@ -1307,7 +1307,7 @@ mod tests {
         let d = obj(&[("items", items)]);
         assert_eq!(
             render(
-                r#"{{#each (where items "age" "gt" 20)}}{{this.name}}{{/each}}"#,
+                r#"{% each (where items "age" "gt" 20) %}{{this.name}}{% endeach %}"#,
                 d
             )
             .unwrap(),
@@ -1320,13 +1320,13 @@ mod tests {
         let d = obj(&[("name", s("Ann & Bo"))]);
         assert_eq!(
             render(
-                r#"{{#inline "greet"}}Hi {{name}}!{{/inline}}{{> greet}}"#,
+                r#"{% inline "greet" %}Hi {{name}}!{% endinline %}{{> greet}}"#,
                 d.clone()
             )
             .unwrap(),
             "Hi Ann &amp; Bo!"
         );
-        let blk = r#"{{#inline "card"}}<div>{{yield}}</div>{{/inline}}{{#partial "card"}}{{name}}{{/partial}}"#;
+        let blk = r#"{% inline "card" %}<div>{{yield}}</div>{% endinline %}{% partial "card" %}{{name}}{% endpartial %}"#;
         assert_eq!(render(blk, d).unwrap(), "<div>Ann &amp; Bo</div>");
     }
 
@@ -1374,9 +1374,9 @@ mod tests {
         let h = Rc::new(h);
         let d = obj(&[("name", s("Ada"))]);
 
-        let framed = Template::parse("{{#frame}}hi {{name}}{{/frame}}").unwrap();
+        let framed = Template::parse("{% frame %}hi {{name}}{% endframe %}").unwrap();
         assert_eq!(framed.render_with(&d, &h).unwrap(), "[hi Ada]");
-        let repeated = Template::parse("{{#repeat 3}}{{name}}{{/repeat}}").unwrap();
+        let repeated = Template::parse("{% repeat 3 %}{{name}}{% endrepeat %}").unwrap();
         assert_eq!(repeated.render_with(&d, &h).unwrap(), "AdaAdaAda");
 
         // The body renders in the enclosing scope and is escaped before the helper sees it,
@@ -1394,7 +1394,7 @@ mod tests {
         let d = obj(&[("n", Value::Num(5.0))]);
         // What AOT accepts renders identically in strict mode…
         assert_eq!(
-            Template::parse("{{#if n > 0}}pos{{/if}}")
+            Template::parse("{% if n > 0 %}pos{% endif %}")
                 .unwrap()
                 .render_compat(&d)
                 .unwrap(),
@@ -1402,7 +1402,7 @@ mod tests {
         );
         // …including a dict literal (AOT synthesizes a typed struct for it):
         assert_eq!(
-            Template::parse(r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#)
+            Template::parse(r#"{% with (dict "a" 1) %}{{a}}{% endwith %}"#)
                 .unwrap()
                 .render_compat(&d)
                 .unwrap(),
@@ -1410,9 +1410,9 @@ mod tests {
         );
         // …and what AOT rejects is an Err (a verifying proxy):
         let rejects = [
-            "{{#if n}}x{{/if}}", // numeric truthiness
-            "{{this}}",          // bare-object output
-            "{{missing}}",       // unknown field
+            "{% if n %}x{% endif %}", // numeric truthiness
+            "{{this}}",               // bare-object output
+            "{{missing}}",            // unknown field
         ];
         for t in rejects {
             assert!(
@@ -1434,7 +1434,7 @@ mod tests {
         use super::TruthMode;
         // An empty list: falsy under NonEmpty (default), truthy under Liquid.
         let d = obj(&[("xs", arr(&[]))]);
-        let src = "{{#if xs}}has{{else}}none{{/if}}";
+        let src = "{% if xs %}has{% else %}none{% endif %}";
         assert_eq!(Template::parse(src).unwrap().render(&d).unwrap(), "none");
         assert_eq!(
             Template::parse(src)
@@ -1446,7 +1446,7 @@ mod tests {
         );
         // An empty string: falsy under NonEmpty/Handlebars, truthy under Liquid.
         let e = obj(&[("s", s(""))]);
-        let ssrc = "{{#if s}}y{{else}}n{{/if}}";
+        let ssrc = "{% if s %}y{% else %}n{% endif %}";
         assert_eq!(
             Template::parse(ssrc)
                 .unwrap()
@@ -1469,7 +1469,7 @@ mod tests {
     fn numeric_truthiness_per_policy() {
         use super::TruthMode;
         let zero = obj(&[("n", Value::Num(0.0))]);
-        let src = "{{#if n}}t{{else}}f{{/if}}";
+        let src = "{% if n %}t{% else %}f{% endif %}";
         // NonEmpty (lenient): 0 is truthy (the interpreter rule).
         assert_eq!(Template::parse(src).unwrap().render(&zero).unwrap(), "t");
         // Handlebars: 0 is falsy.

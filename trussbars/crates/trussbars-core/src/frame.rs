@@ -1,4 +1,4 @@
-//! The loop frame model: [`Loop`], the per-iteration metadata of `{{#each}}`
+//! The loop frame model: [`Loop`], the per-iteration metadata of `{% each %}`
 //! (ADR-021; see `trussbars/docs/02-runtime-api.md` §5).
 //!
 //! Frames are **borrowed references living on the stack**, not heap frames. In
@@ -8,7 +8,7 @@
 //! is the borrowed [`Loop::parent`]; `loop.root` walks that chain
 //! ([`Loop::root`]).
 //!
-//! The current element (`{{this}}` inside `{{#each}}`) is the loop *binding*
+//! The current element (`{{this}}` inside `{% each %}`) is the loop *binding*
 //! (`team`, `m`, …) the codegen introduces, not a field of [`Loop`] — this type
 //! carries metadata only.
 
@@ -34,7 +34,7 @@ pub struct Loop<'p> {
     /// The 1-based loop-nesting level (`loop.depth`, ADR-021 amendment): the
     /// outermost loop is `1`, a loop nested directly inside it is `2`, and so on.
     /// Definitionally `parent.depth + 1`, counting enclosing *loop* frames only
-    /// (a `{{#with}}`/`{{#if}}` between two loops does not increment it, since it
+    /// (a `{% with %}`/`{% if %}` between two loops does not increment it, since it
     /// introduces no [`Loop`]).
     pub depth: usize,
     /// The entry key, for map iteration; `None` for array iteration.
@@ -47,7 +47,7 @@ impl<'p> Loop<'p> {
     /// Build the metadata for iteration `index` of a collection of `length`
     /// items, with an optional map `key` and enclosing `parent` loop.
     ///
-    /// `index` must be `< length` (every `{{#each}}` guards the empty case before
+    /// `index` must be `< length` (every `{% each %}` guards the empty case before
     /// iterating, so this always holds for generated code).
     #[inline]
     #[must_use]

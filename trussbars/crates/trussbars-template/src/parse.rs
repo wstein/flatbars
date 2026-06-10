@@ -1,7 +1,7 @@
 //! Slice 3 — the block parser + desugar: the [`Lexeme`] stream → a desugared
 //! [`Node`] tree (docs/08 §6.3). Matches block opens/closes, dispatches
 //! if/unless/each/with/let/partials/raw, parses the Liquid `each` binding and the
-//! `let` hash, threads a [`Scope`] for path rooting, and splits `{{else}}` /
+//! `let` hash, threads a [`Scope`] for path rooting, and splits `{% else %}` /
 //! `{{else if}}` clauses.
 
 use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, With};
@@ -36,9 +36,14 @@ pub fn parse(src: &str) -> Result<Vec<Node>, ParseError> {
     let (nodes, stop) = p.parse_until(&scope)?;
     match stop {
         Stop::Eof => Ok(nodes),
-        Stop::Close(name) => err(format!("unexpected `{{{{/{name}}}}}` (no open block)"), 0),
-        Stop::Else | Stop::ElseIf(_) => err("unexpected `{{else}}` outside a block".to_string(), 0),
-        Stop::When(_) => err("unexpected `{{when}}` outside a `{{#case}}`".to_string(), 0),
+        Stop::Close(name) => err(format!("unexpected `{{% end{name} %}}` (no open block)"), 0),
+        Stop::Else | Stop::ElseIf(_) => {
+            err("unexpected `{% else %}` outside a block".to_string(), 0)
+        }
+        Stop::When(_) => err(
+            "unexpected `{% when %}` outside a `{% case %}`".to_string(),
+            0,
+        ),
     }
 }
 
@@ -57,13 +62,13 @@ pub const RESERVED_BLOCK_HEADS: &[&str] = &[
 
 /// What stopped a body scan.
 enum Stop {
-    /// A `{{/name}}` close.
+    /// A `{% endname %}` close.
     Close(String),
-    /// A `{{else}}`.
+    /// A `{% else %}`.
     Else,
     /// A `{{else if cond}}` (the raw condition source).
     ElseIf(String),
-    /// A `{{when V …}}` arm of a `{{#case}}` (the raw value-expression source).
+    /// A `{% when V … %}` arm of a `{% case %}` (the raw value-expression source).
     When(String),
     /// End of input.
     Eof,
@@ -179,7 +184,7 @@ impl Blocks<'_> {
         }
     }
 
-    /// Dispatch a `{{# … }}` block (called with `pos` at the open tag). The built-in
+    /// Dispatch a `{%  …  %}` block (called with `pos` at the open tag). The built-in
     /// heads matched here are [`RESERVED_BLOCK_HEADS`] — they cannot name a host helper.
     fn open_block(
         &mut self,
@@ -206,8 +211,8 @@ impl Blocks<'_> {
         }
     }
 
-    /// Parse a `{{#name args…}}body{{/name}}` host block helper. The parser attaches no
-    /// meaning (it does not check the allow-list); `{{else}}` is unsupported (v1).
+    /// Parse a `{% name args… %}body{% endname %}` host block helper. The parser attaches no
+    /// meaning (it does not check the allow-list); `{% else %}` is unsupported (v1).
     fn helper_block(
         &mut self,
         span: crate::span::Span,
@@ -238,15 +243,15 @@ impl Blocks<'_> {
                 // Forward-looking: the inverse-arm convention is frozen but not yet built
                 // (docs/09 §3.1, "Planned"). Until a consumer needs it, this is a located
                 // reject rather than a silent drop.
-                format!("block helper `{head}`: `{{{{else}}}}` is not yet supported"),
+                format!("block helper `{head}`: `{{% else %}}` is not yet supported"),
                 span.start,
             ),
             Stop::When(_) => err(
-                format!("block helper `{head}`: `{{{{when}}}}` is only valid in a `{{{{#case}}}}`"),
+                format!("block helper `{head}`: `{{% when %}}` is only valid in a `{{% case %}}`"),
                 span.start,
             ),
             Stop::Eof => err(
-                format!("unclosed block helper `{{{{#{head}}}}}`"),
+                format!("unclosed block helper `{{% {head} %}}`"),
                 span.start,
             ),
         }
@@ -282,7 +287,7 @@ impl Blocks<'_> {
                 Stop::Close(name) => return err(mismatched_close(&name, open), span.start),
                 Stop::When(_) => {
                     return err(
-                        "unexpected `{{when}}` outside a `{{#case}}` block",
+                        "unexpected `{% when %}` outside a `{% case %}` block",
                         span.start,
                     );
                 }
@@ -299,7 +304,7 @@ impl Blocks<'_> {
         }))
     }
 
-    /// `{{#case SUBJECT}}{{when V …}}…{{else}}…{{/case}}` — the multi-arm conditional
+    /// `{% case SUBJECT %}{% when V … %}…{% else %}…{% endcase %}` — the multi-arm conditional
     /// (docs/12). First-class [`Case`]: the subject and each arm's raw value(s) are kept so
     /// the emitter can lower it to a Rust `match` (the subject evaluated once) rather than a
     /// repeated-`eq` `if`-chain.
@@ -310,11 +315,11 @@ impl Blocks<'_> {
         scope: &Scope,
     ) -> Result<Node, ParseError> {
         let subject = parse_expr(subject_src.trim(), scope)?;
-        // Only whitespace may precede the first `{{when}}` (no Liquid-style fall-through).
+        // Only whitespace may precede the first `{% when %}` (no Liquid-style fall-through).
         let (leading, mut stop) = self.parse_until(scope)?;
         if leading.iter().any(|n| !is_blank_text(n)) {
             return err(
-                "only whitespace may precede the first `{{when}}` in a `{{#case}}`",
+                "only whitespace may precede the first `{% when %}` in a `{% case %}`",
                 span.start,
             );
         }
@@ -338,11 +343,11 @@ impl Blocks<'_> {
                 Stop::Close(name) => return err(mismatched_close(&name, "case"), span.start),
                 Stop::ElseIf(_) => {
                     return err(
-                        "`{{else if}}` is not valid in a `{{#case}}` (use `{{when}}`)",
+                        "`{% elif %}` is not valid in a `{% case %}` (use `{% when %}`)",
                         span.start,
                     );
                 }
-                Stop::Eof => return err("unclosed `{{#case}}` block", span.start),
+                Stop::Eof => return err("unclosed `{% case %}` block", span.start),
             }
         }
         Ok(Node::Case(Case {
@@ -445,7 +450,7 @@ impl Blocks<'_> {
         scope: &Scope,
     ) -> Result<Node, ParseError> {
         let (name, _) = read_string_literal(rest).ok_or_else(|| ParseError {
-            message: "{{#inline}} needs a quoted name".into(),
+            message: "{% inline %} needs a quoted name".into(),
             at: span.start,
         })?;
         let (body, stop) = self.parse_until(scope)?;
@@ -460,7 +465,7 @@ impl Blocks<'_> {
         scope: &Scope,
     ) -> Result<Node, ParseError> {
         let (name, after) = read_string_literal(rest).ok_or_else(|| ParseError {
-            message: "{{#partial}} needs a quoted name".into(),
+            message: "{% partial %} needs a quoted name".into(),
             at: span.start,
         })?;
         let ctx = parse_opt_ctx(after, scope)?;
@@ -492,7 +497,7 @@ impl Blocks<'_> {
         })
     }
 
-    /// After a body, consume a `{{else}}` arm (if any) and require the close — which
+    /// After a body, consume a `{% else %}` arm (if any) and require the close — which
     /// must name `open` (`each` / `with`).
     fn else_arm(
         &mut self,
@@ -509,23 +514,24 @@ impl Blocks<'_> {
                 expect_close(&s, open, at)?;
                 Ok(ebody)
             }
-            Stop::ElseIf(_) => err("`{{else if}}` is only valid in a conditional", at),
-            Stop::When(_) => err("`{{when}}` is only valid in a `{{#case}}`", at),
+            Stop::ElseIf(_) => err("`{% elif %}` is only valid in a conditional", at),
+            Stop::When(_) => err("`{% when %}` is only valid in a `{% case %}`", at),
             Stop::Eof => err("unclosed block", at),
         }
     }
 }
 
-/// Whether a `{{/close}}` tag may close a `{{#open}}` block. A *named* close must
-/// match the open exactly; a bare `{{/}}` is accepted as a wildcard (so this rule
-/// only rejects, never tightens what already parsed).
+/// Whether a `{% endX %}` tag may close a `{% X %}` block. A *named* close must match the
+/// open exactly. There is no bare `{% end %}` wildcard — `end` with no suffix lexes as an
+/// *open* of a block named `end`, so `close` is never empty in practice (the guard is kept
+/// defensively, and never tightens what already parsed).
 fn close_matches(close: &str, open: &str) -> bool {
     close.is_empty() || close == open
 }
 
 /// The located message for a close tag that names the wrong block.
 fn mismatched_close(close: &str, open: &str) -> String {
-    format!("mismatched closing tag `{{{{/{close}}}}}` (expected `{{{{/{open}}}}}`)")
+    format!("mismatched closing tag `{{% end{close} %}}` (expected `{{% end{open} %}}`)")
 }
 
 fn expect_close(stop: &Stop, open: &str, at: usize) -> Result<(), ParseError> {
@@ -589,7 +595,7 @@ fn strip_else_if(text: &str) -> Option<&str> {
         .map(str::trim)
 }
 
-/// `when <values…>` → `Some(values)` (a `{{#case}}` arm). Requires a word boundary, so
+/// `when <values…>` → `Some(values)` (a `{% case %}` arm). Requires a word boundary, so
 /// `whenever` is not read as `when ever`.
 fn strip_when(text: &str) -> Option<&str> {
     let rest = text.strip_prefix("when")?;
@@ -611,8 +617,8 @@ fn strip_elif(text: &str) -> Option<&str> {
     }
 }
 
-/// The match value expressions of a `{{when V …}}` arm. Parsed as the arguments of a
-/// throwaway `when` application (the same arg grammar as a value call); an empty `{{when}}`
+/// The match value expressions of a `{% when V … %}` arm. Parsed as the arguments of a
+/// throwaway `when` application (the same arg grammar as a value call); an empty `{% when %}`
 /// has no values (it never matches).
 fn when_values(vals_src: &str, scope: &Scope) -> Result<Vec<Expr>, ParseError> {
     if vals_src.trim().is_empty() {
@@ -625,7 +631,7 @@ fn when_values(vals_src: &str, scope: &Scope) -> Result<Vec<Expr>, ParseError> {
     }
 }
 
-/// A whitespace-only text node — what may legally precede the first `{{when}}` arm.
+/// A whitespace-only text node — what may legally precede the first `{% when %}` arm.
 fn is_blank_text(node: &Node) -> bool {
     matches!(node, Node::Text(s) if s.trim().is_empty())
 }
@@ -803,7 +809,7 @@ mod tests {
 
     #[test]
     fn if_else_chain() {
-        let ns = parse("{{#if a}}A{{else if b}}B{{else}}C{{/if}}").unwrap();
+        let ns = parse("{% if a %}A{{else if b}}B{% else %}C{% endif %}").unwrap();
         match &ns[0] {
             Node::Cond(c) => {
                 assert!(!c.negated);
@@ -818,7 +824,7 @@ mod tests {
 
     #[test]
     fn unless_is_negated() {
-        let ns = parse("{{#unless done}}todo{{/unless}}").unwrap();
+        let ns = parse("{% unless done %}todo{% endunless %}").unwrap();
         assert!(matches!(&ns[0], Node::Cond(c) if c.negated));
     }
 
@@ -828,12 +834,12 @@ mod tests {
         // error), not left to rustc as a downstream "unknown field" — across each
         // block kind: each/with (else_arm), if (cond), case, let, and host helpers.
         for src in [
-            "{{#each items}}{{this}}{{/with}}",
-            "{{#with user}}{{name}}{{/each}}",
-            "{{#if a}}A{{/unless}}",
-            "{{#case s}}{{when \"a\"}}A{{/if}}",
-            "{{#let x=(1)}}{{x}}{{/each}}",
-            "{{#bold}}hi{{/italic}}",
+            "{% each items %}{{this}}{% endwith %}",
+            "{% with user %}{{name}}{% endeach %}",
+            "{% if a %}A{% endunless %}",
+            "{% case s %}{% when \"a\" %}A{% endif %}",
+            "{% let x=(1) %}{{x}}{% endeach %}",
+            "{% bold %}hi{% enditalic %}",
         ] {
             let e = parse(src).unwrap_err();
             assert!(
@@ -845,17 +851,18 @@ mod tests {
     }
 
     #[test]
-    fn matching_and_bare_closes_still_parse() {
-        // The correct name parses; a bare `{{/}}` stays a lenient wildcard, so the
-        // new check only rejects, never tightens what already parsed.
-        assert!(parse("{{#each items}}{{this}}{{/each}}").is_ok());
-        assert!(parse("{{#each items}}{{this}}{{/}}").is_ok());
+    fn named_close_parses() {
+        // The strict native dialect closes a block with a *named* `{% endX %}`. The
+        // legacy Handlebars bare wildcard close (`{{/}}`) is gone — there is no
+        // `{% end %}` wildcard (it would lex as an *open* of a block named `end`).
+        assert!(parse("{% each items %}{{this}}{% endeach %}").is_ok());
     }
 
     #[test]
     fn case_is_first_class_with_raw_arm_values() {
         let ns =
-            parse("{{#case s}}{{when \"a\"}}A{{when \"b\" \"c\"}}BC{{else}}E{{/case}}").unwrap();
+            parse("{% case s %}{% when \"a\" %}A{% when \"b\" \"c\" %}BC{% else %}E{% endcase %}")
+                .unwrap();
         match &ns[0] {
             Node::Case(c) => {
                 assert_eq!(c.arms.len(), 2);
@@ -873,7 +880,7 @@ mod tests {
 
     #[test]
     fn case_without_else_has_empty_otherwise() {
-        let ns = parse("{{#case s}}{{when 1}}one{{when 2}}two{{/case}}").unwrap();
+        let ns = parse("{% case s %}{% when 1 %}one{% when 2 %}two{% endcase %}").unwrap();
         match &ns[0] {
             Node::Case(c) => {
                 assert_eq!(c.arms.len(), 2);
@@ -886,18 +893,19 @@ mod tests {
 
     #[test]
     fn case_content_before_first_when_is_rejected() {
-        assert!(parse("{{#case s}}junk{{when 1}}x{{/case}}").is_err());
+        assert!(parse("{% case s %}junk{% when 1 %}x{% endcase %}").is_err());
     }
 
     #[test]
     fn when_outside_case_is_rejected() {
-        assert!(parse("{{when 1}}x").is_err());
+        assert!(parse("{% when 1 %}x").is_err());
     }
 
     #[test]
     fn each_liquid_binding_and_scope() {
         // `post` is a binding → it roots at itself, not `this`.
-        let ns = parse("{{#each post i in posts}}{{post.title}}{{else}}none{{/each}}").unwrap();
+        let ns =
+            parse("{% each post i in posts %}{{post.title}}{% else %}none{% endeach %}").unwrap();
         match &ns[0] {
             Node::Each(e) => {
                 assert_eq!(e.item.as_deref(), Some("post"));
@@ -931,7 +939,7 @@ mod tests {
 
     #[test]
     fn each_with_label() {
-        let ns = parse("{{#each row in rows label outer}}{{outer.index1}}{{/each}}").unwrap();
+        let ns = parse("{% each row in rows label outer %}{{outer.index1}}{% endeach %}").unwrap();
         match &ns[0] {
             Node::Each(e) => {
                 assert_eq!(e.label.as_deref(), Some("outer"));
@@ -943,7 +951,7 @@ mod tests {
 
     #[test]
     fn let_bindings_sequential_scope() {
-        let ns = parse("{{#let a=(x) b=(a)}}{{a}}/{{b}}{{/let}}").unwrap();
+        let ns = parse("{% let a=(x) b=(a) %}{{a}}/{{b}}{% endlet %}").unwrap();
         match &ns[0] {
             Node::Let { bindings, .. } => {
                 assert_eq!(bindings.len(), 2);
@@ -964,12 +972,12 @@ mod tests {
     #[test]
     fn partials_inline_and_use_and_yield() {
         let ns = parse(
-            r#"{{#inline "card"}}<b>{{title}}</b>{{/inline}}{{#each posts}}{{> card}}{{/each}}"#,
+            r#"{% inline "card" %}<b>{{title}}</b>{% endinline %}{% each posts %}{{> card}}{% endeach %}"#,
         )
         .unwrap();
         assert!(matches!(&ns[0], Node::Inline { name, .. } if name == "card"));
         let y = parse(
-            r#"{{#inline "c"}}<div>{{yield}}</div>{{/inline}}{{#partial "c"}}{{name}}{{/partial}}"#,
+            r#"{% inline "c" %}<div>{{yield}}</div>{% endinline %}{% partial "c" %}{{name}}{% endpartial %}"#,
         )
         .unwrap();
         assert!(matches!(&y[1], Node::PartialBlock { name, .. } if name == "c"));
@@ -1015,7 +1023,7 @@ mod tests {
     fn block_helper_parses_meaning_free() {
         // A non-built-in block head is no longer a parse error: it becomes a `HelperBlock`
         // carrying its args + body, to be resolved against the host allow-list at emit time.
-        let ns = parse("{{#frame 2}}hi {{name}}{{/frame}}").unwrap();
+        let ns = parse("{% frame 2 %}hi {{name}}{% endframe %}").unwrap();
         match &ns[0] {
             Node::HelperBlock(b) => {
                 assert_eq!(b.head, "frame");
@@ -1028,9 +1036,9 @@ mod tests {
 
     #[test]
     fn block_helper_rejects_else() {
-        // No `{{else}}` arm yet — a located, forward-looking reject (not a silent drop);
+        // No `{% else %}` arm yet — a located, forward-looking reject (not a silent drop);
         // the inverse-arm convention is frozen but unbuilt (docs/09 §3.1, "Planned").
-        let err = parse("{{#frame}}a{{else}}b{{/frame}}").unwrap_err();
+        let err = parse("{% frame %}a{% else %}b{% endframe %}").unwrap_err();
         assert!(err.message.contains("not yet supported"), "{}", err.message);
     }
 
@@ -1038,7 +1046,7 @@ mod tests {
 
     #[test]
     fn statement_each_parses_like_brace_each() {
-        // `{% each … %}…{% endeach %}` desugars to the same `Node::Each` as `{{#each}}`.
+        // `{% each … %}…{% endeach %}` desugars to the same `Node::Each` as `{% each %}`.
         let ns = parse("{% each item in xs %}{{item}}{% endeach %}").unwrap();
         match &ns[0] {
             Node::Each(e) => {
@@ -1063,7 +1071,7 @@ mod tests {
         }
         // The legacy `let` head still parses (lenient superset).
         assert!(matches!(
-            parse("{{#let x=(add 1 2)}}{{x}}{{/let}}").unwrap()[0],
+            parse("{% let x=(add 1 2) %}{{x}}{% endlet %}").unwrap()[0],
             Node::Let { .. }
         ));
     }
@@ -1097,7 +1105,7 @@ mod tests {
 
     #[test]
     fn statement_mismatched_close_is_located_error() {
-        // `{% endeach %}` cannot close a `{% if %}` — the same check as `{{/each}}` vs `{{#if}}`.
+        // `{% endeach %}` cannot close a `{% if %}` — the same check as `{% endeach %}` vs `{% if %}`.
         let err = parse("{% if a %}x{% endeach %}").unwrap_err();
         assert!(err.message.contains("mismatched"), "{}", err.message);
     }

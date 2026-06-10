@@ -5,8 +5,8 @@
 //! `Mode`*. The default `Mode` is [`NonEmpty`] — the one fixed Trussbars rule
 //! (`trussbars/docs/01-subset-spec.md` §7): falsy is `false`, `None`/`()`, `""`,
 //! `[]`, `{}`; truthy is every other non-numeric value; and **numbers have no
-//! [`NonEmpty`] impl**, so a bare-number condition (`{{#if count}}`) does not
-//! compile — write the comparison (`{{#if count > 0}}`, §5.3).
+//! [`NonEmpty`] impl**, so a bare-number condition (`{% if count %}`) does not
+//! compile — write the comparison (`{% if count > 0 %}`, §5.3).
 //!
 //! Two further built-in policies ship for hosts that want a different family's
 //! semantics (selected with `truss!(…, truthiness = Liquid)`; out of conformance,
@@ -24,7 +24,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 /// Truthiness under a named policy `Mode` — the per-type half of the rule the
-/// compiler emits for an `{{#if}}` / `{{#unless}}` condition and the `&&` / `||` /
+/// compiler emits for an `{% if %}` / `{% unless %}` condition and the `&&` / `||` /
 /// `!` operators. A type that has no `TruthyIn<Mode>` impl cannot appear in a
 /// boolean position under that policy: the condition is a compile error, not a
 /// silent `false` (numbers under [`NonEmpty`], for example).

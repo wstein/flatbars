@@ -63,9 +63,9 @@ pub fn emit_named(
 
 /// As [`emit_named`], plus **cross-file partials** (docs/21): `file_partials` is the declared
 /// `partials = [name = "file"]` map as `(name, source)` pairs (the macro reads the files). Each
-/// is parsed and merged into the partial registry — so `{{> name}}` / `{{#partial "name"}}`
+/// is parsed and merged into the partial registry — so `{{> name}}` / `{% partial "name" %}`
 /// resolves to it, inlined against the caller's context (a layout's `{{yield}}` and nested
-/// `{{> other}}` work for free). A name defined more than once (in-source `{{#inline}}` ×
+/// `{{> other}}` work for free). A name defined more than once (in-source `{% inline %}` ×
 /// imported file, or twice in the map) is a compile error; an error *inside* a partial locates
 /// within that partial's source and is tagged `(in partial 'name')`.
 ///
@@ -93,7 +93,7 @@ pub fn emit_with_partials(
     let nodes = parse(src).map_err(|e| located(e.at, src, &e.message))?;
     let (main_inlines, top) = hoist(nodes);
 
-    // Build the registry: in-source `{{#inline}}` defs (spans index the main template), then
+    // Build the registry: in-source `{% inline %}` defs (spans index the main template), then
     // the imported file partials (spans index each file). A duplicate name is rejected.
     let main_src: Rc<str> = Rc::from(src);
     let mut registry: BTreeMap<String, PartialDef> = BTreeMap::new();
@@ -112,7 +112,7 @@ pub fn emit_with_partials(
         let pnodes = parse(psrc)
             .map_err(|e| format!("{} (in partial '{name}')", located(e.at, psrc, &e.message)))?;
         let (nested, ptop) = hoist(pnodes);
-        // A file partial may itself define `{{#inline}}`s (hoisted, spans into this file).
+        // A file partial may itself define `{% inline %}`s (hoisted, spans into this file).
         for (iname, ibody) in nested {
             insert_partial(
                 &mut registry,
@@ -165,7 +165,7 @@ fn insert_partial(
 ) -> Result<(), String> {
     if registry.contains_key(&name) {
         return Err(format!(
-            "duplicate partial '{name}' — defined more than once (an in-source `{{{{#inline}}}}` and a `partials = […]` file, or twice in the map)"
+            "duplicate partial '{name}' — defined more than once (an in-source `{{% inline %}}` and a `partials = […]` file, or twice in the map)"
         ));
     }
     registry.insert(name, def);
@@ -195,11 +195,11 @@ fn is_located(m: &str) -> bool {
 
 /// A registered partial: its body plus the **source its node spans index into**, so an error
 /// inside a partial locates within *that* source — the main template for an in-source
-/// `{{#inline}}`, or the imported file for a `partials = […]` entry (docs/21 §4).
+/// `{% inline %}`, or the imported file for a `partials = […]` entry (docs/21 §4).
 struct PartialDef {
     /// The source the body's spans index into.
     src: Rc<str>,
-    /// `None` for an in-source `{{#inline}}` (errors read against the main template); `Some(name)`
+    /// `None` for an in-source `{% inline %}` (errors read against the main template); `Some(name)`
     /// for an imported file partial (its errors get a `(in partial 'name')` tag).
     origin: Option<String>,
     /// The partial's node tree.
@@ -235,7 +235,7 @@ impl Env {
 
 // ── inline-partial hoisting ───────────────────────────────────────────────────
 
-/// Lift every `{{#inline "n"}}…{{/inline}}` definition (anywhere in the tree) into
+/// Lift every `{% inline "n" %}…{% endinline %}` definition (anywhere in the tree) into
 /// a registry and return the tree with those definitions removed.
 fn hoist(nodes: Vec<Node>) -> (BTreeMap<String, Vec<Node>>, Vec<Node>) {
     let mut reg = BTreeMap::new();
@@ -529,8 +529,8 @@ fn cond_block(env: &Env, src: &str, c: &Cond, out: &mut String) -> Result<(), St
     Ok(())
 }
 
-/// `{{#case}}` → a Rust `match`: the subject is evaluated **once** (bound as `__subj`) and
-/// dispatched by one guard arm per `{{when}}` — the first-class lowering the user asked for
+/// `{% case %}` → a Rust `match`: the subject is evaluated **once** (bound as `__subj`) and
+/// dispatched by one guard arm per `{% when %}` — the first-class lowering the user asked for
 /// (`case` becomes `match`), not a repeated-`eq` `if`-chain. Each guard reuses the same
 /// `==` the `eq` operator emits, so the rendered bytes match the interpreter (docs/12).
 fn case_block(env: &Env, src: &str, c: &Case, out: &mut String) -> Result<(), String> {
@@ -571,7 +571,7 @@ fn with_block(env: &Env, src: &str, w: &With, out: &mut String) -> Result<(), St
     child.depth = d;
     // A dict-literal subject re-roots to a synthesized struct, which has no `Truthy`
     // impl — so resolve its truthiness at compile time: a non-empty dict literal
-    // always renders the body, an empty one always the `{{else}}` clause.
+    // always renders the body, an empty one always the `{% else %}` clause.
     if let Some(n) = dict_arity(&w.subject) {
         if n == 0 {
             return emit_nodes(env, src, &w.otherwise, out);
@@ -640,7 +640,7 @@ fn let_block(
 fn each_block(env: &Env, src: &str, e: &Each, out: &mut String) -> Result<(), String> {
     // A dict literal compiles to a struct, which has no `Each` impl — so iterating one
     // is rejected up front (a clean located error, not a downstream rustc failure).
-    // Bind it (`{{#with {…}}}` / `{{#let}}`) and read its fields instead.
+    // Bind it (`{% with {…} %}` / `{% let %}`) and read its fields instead.
     if dict_arity(&e.subject).is_some() {
         return Err(
             "unsupported: cannot iterate a dict literal — bind it and read its fields".into(),
@@ -870,7 +870,7 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
 
 /// Emit a dict literal `{k0: v0, …}` (desugared `dict "k0" v0 …`) as a typed record:
 /// a block-local **generic** struct whose field types are inferred at instantiation,
-/// returned as a value. So `{{#with {a: 1} as |c|}}{{c.a}}{{/with}}` re-roots to the
+/// returned as a value. So `{% with {a: 1} as |c| %}{{c.a}}{% endwith %}` re-roots to the
 /// struct and `c.a` is an ordinary field access. The struct is generic (`__Dict<F0,
 /// …>`) so a field can hold any value — a literal (by value) or a path (by reference)
 /// — without the emitter needing to name the type. Keys are static identifiers
@@ -1261,13 +1261,13 @@ mod tests {
     fn numeric_literal_operand_wraps_in_numlit() {
         // A numeric literal in operator position becomes `NumLit`, so the comparison works
         // against any numeric field type — the F2 fix (docs/20).
-        let cmp = e("{{#if n > 100}}x{{/if}}");
+        let cmp = e("{% if n > 100 %}x{% endif %}");
         assert!(cmp.contains("trussbars_core::NumLit(100.0)"), "{cmp}");
         let arith = e("{{add n 1}}");
         assert!(arith.contains("trussbars_core::NumLit(1.0)"), "{arith}");
         // A string-literal operand is left alone, so native string ordering is preserved
         // (and a string-vs-number comparison stays a compile error — no NumLit impl).
-        let s = e(r#"{{#if name < "m"}}x{{/if}}"#);
+        let s = e(r#"{% if name < "m" %}x{% endif %}"#);
         assert!(s.contains("< \"m\""), "{s}");
         assert!(!s.contains("NumLit"), "{s}");
     }
@@ -1277,7 +1277,7 @@ mod tests {
     #[test]
     fn file_partial_body_inlines_at_the_call_site() {
         // A `partials = [name = source]` entry resolves `{{> name}}` to that body, inlined
-        // against the caller's context (so it type-checks like an in-source `{{#inline}}`).
+        // against the caller's context (so it type-checks like an in-source `{% inline %}`).
         let out = emit_with_partials(
             "render",
             "Ctx",
@@ -1292,12 +1292,12 @@ mod tests {
 
     #[test]
     fn duplicate_partial_name_is_rejected() {
-        // An in-source `{{#inline}}` and an imported file of the same name is a compile error
+        // An in-source `{% inline %}` and an imported file of the same name is a compile error
         // (names are static — an ambiguous binding is a bug; docs/21 §5.2).
         let err = emit_with_partials(
             "render",
             "Ctx",
-            "{{#inline \"h\"}}x{{/inline}}{{> h}}",
+            "{% inline \"h\" %}x{% endinline %}{{> h}}",
             &[],
             TruthMode::NonEmpty,
             &[("h".to_string(), "<p>file</p>".to_string())],
@@ -1315,7 +1315,7 @@ mod tests {
             "{{> broken}}",
             &[],
             TruthMode::NonEmpty,
-            &[("broken".to_string(), "{{#each items}}{{this}}".to_string())],
+            &[("broken".to_string(), "{% each items %}{{this}}".to_string())],
         )
         .unwrap_err();
         assert!(err.contains("unclosed block"), "{err}");
@@ -1342,12 +1342,12 @@ mod tests {
 
     #[test]
     fn block_helper_declared_emits_a_body_closure_call() {
-        // `{{#frame}}…{{/frame}}` → `frame(|| -> String { <body> })`, written raw (block
+        // `{% frame %}…{% endframe %}` → `frame(|| -> String { <body> })`, written raw (block
         // output is markup; the body is already escaped inside the closure).
         let code = emit_named(
             "render",
             "Ctx",
-            "{{#frame}}{{name}}{{/frame}}",
+            "{% frame %}{{name}}{% endframe %}",
             &["frame".into()],
             TruthMode::NonEmpty,
         )
@@ -1366,7 +1366,7 @@ mod tests {
         let err = emit_named(
             "render",
             "Ctx",
-            "{{#frame}}x{{/frame}}",
+            "{% frame %}x{% endframe %}",
             &[],
             TruthMode::NonEmpty,
         )
@@ -1378,7 +1378,7 @@ mod tests {
     fn default_mode_emits_bare_truthy_byte_identical() {
         // The conformance invariant: under NonEmpty (the default) every truthiness
         // site stays the v1 `trussbars_core::truthy(…)` call — no `truthy_in`.
-        let out = e("{{#if flag}}x{{/if}}");
+        let out = e("{% if flag %}x{% endif %}");
         assert!(out.contains("trussbars_core::truthy(&("), "{out}");
         assert!(!out.contains("truthy_in::<"), "{out}");
     }
@@ -1390,7 +1390,7 @@ mod tests {
         let liquid = emit_named(
             "render",
             "Ctx",
-            "{{#if flag}}x{{/if}}",
+            "{% if flag %}x{% endif %}",
             &[],
             TruthMode::Liquid,
         )
@@ -1404,7 +1404,7 @@ mod tests {
         let hbs = emit_named(
             "render",
             "Ctx",
-            "{{#unless done}}x{{/unless}}",
+            "{% unless done %}x{% endunless %}",
             &[],
             TruthMode::Handlebars,
         )
@@ -1422,7 +1422,7 @@ mod tests {
         let out = emit_named(
             "render",
             "Ctx",
-            "{{#if flag}}x{{/if}}",
+            "{% if flag %}x{% endif %}",
             &[],
             TruthPolicy::Custom("self :: NonBlank".into()),
         )
@@ -1444,17 +1444,17 @@ mod tests {
 
     #[test]
     fn arithmetic_and_let() {
-        let out = e("{{#let s=(multiply price qty)}}{{s}}{{/let}}");
+        let out = e("{% let s=(multiply price qty) %}{{s}}{% endlet %}");
         assert!(out.contains("let __let_s = (ctx.price * ctx.qty);"));
         assert!(out.contains("trussbars_core::esc(&(__let_s), &mut out)"));
     }
 
     #[test]
     fn each_elides_frame_when_loop_unused() {
-        let out = e("{{#each xs}}{{this}}{{/each}}");
+        let out = e("{% each xs %}{{this}}{% endeach %}");
         assert!(!out.contains("Loop::at"), "frame should be elided");
         assert!(!out.contains(".enumerate()"), "enumerate should be dropped");
-        let withmeta = e("{{#each xs}}{{loop.index1}}{{/each}}");
+        let withmeta = e("{% each xs %}{{loop.index1}}{% endeach %}");
         assert!(withmeta.contains("Loop::at"));
         assert!(withmeta.contains(".enumerate()"));
     }
@@ -1463,7 +1463,7 @@ mod tests {
     fn helper_and_collection_filter() {
         assert!(e("{{name | uppercase}}").contains("trussbars_std::uppercase(&(ctx.name))"));
         assert!(
-            e(r#"{{#each (where items "n" "gt" 1)}}{{this.n}}{{/each}}"#)
+            e(r#"{% each (where items "n" "gt" 1) %}{{this.n}}{% endeach %}"#)
                 .contains(".iter().filter(|__x| __x.n > 1.0)")
         );
     }
@@ -1471,17 +1471,21 @@ mod tests {
     #[test]
     fn dict_literal_synthesizes_a_struct() {
         // A dict literal (call form or `{…}`) re-roots `with` to a generic local struct.
-        let out = emit("Ctx", r#"{{#with (dict "a" 1)}}{{a}}{{/with}}"#).unwrap();
+        let out = emit("Ctx", r#"{% with (dict "a" 1) %}{{a}}{% endwith %}"#).unwrap();
         assert!(out.contains("struct __Dict<F0> { a: F0 }"));
         assert!(out.contains("__Dict { a: 1.0 }"));
         // A `let`-bound brace literal with two fields, accessed by `.key`.
-        let out2 = emit("Ctx", "{{#let c={x: 1, y: \"z\"}}}{{c.x}}{{c.y}}{{/let}}").unwrap();
+        let out2 = emit(
+            "Ctx",
+            "{% let c={x: 1, y: \"z\"} %}{{c.x}}{{c.y}}{% endlet %}",
+        )
+        .unwrap();
         assert!(out2.contains("struct __Dict<F0, F1> { x: F0, y: F1 }"));
         assert!(out2.contains("__let_c.x"));
         // A dangling key (odd token count) is still rejected.
         assert!(emit("Ctx", r#"{{ dict "a" }}"#).is_err());
         // Iterating a dict literal is rejected (the struct has no `Each` impl).
-        let err = emit("Ctx", "{{#each {a: 1}}}{{this}}{{/each}}").unwrap_err();
+        let err = emit("Ctx", "{% each {a: 1} %}{{this}}{% endeach %}").unwrap_err();
         assert!(err.contains("cannot iterate a dict literal"), "{err}");
     }
 }

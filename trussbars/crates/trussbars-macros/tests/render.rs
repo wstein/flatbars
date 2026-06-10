@@ -10,7 +10,11 @@ struct Greeting {
     shout: bool,
 }
 
-truss!(greeting, Greeting, "Hello {{name}}{{#if shout}}!{{/if}}");
+truss!(
+    greeting,
+    Greeting,
+    "Hello {{name}}{% if shout %}!{% endif %}"
+);
 
 #[derive(trussbars_core::Trussbars)]
 struct Cart {
@@ -20,7 +24,7 @@ struct Cart {
 truss!(
     cart,
     Cart,
-    "{{#each items}}- {{this}}\n{{else}}empty\n{{/each}}"
+    "{% each items %}- {{this}}\n{% else %}empty\n{% endeach %}"
 );
 
 // F3: a declared host helper (`helpers = [..]`) compiles to a call to a host Rust
@@ -121,7 +125,7 @@ fn escapes_html_in_output() {
 }
 
 // `truthiness = Mode` selects a non-default policy (spec §7). Under Liquid an empty
-// list is **truthy** (only `false`/`nil` are falsy), so `{{#if tags}}` fires where the
+// list is **truthy** (only `false`/`nil` are falsy), so `{% if tags %}` fires where the
 // default `nonEmpty` rule treats `[]` as falsy. The same source without the clause
 // takes the default — a per-template, type-directed, loud choice.
 #[derive(trussbars_core::Trussbars)]
@@ -131,10 +135,14 @@ struct Card {
 truss!(
     card_liquid,
     Card,
-    "{{#if tags}}has{{else}}none{{/if}}",
+    "{% if tags %}has{% else %}none{% endif %}",
     truthiness = Liquid
 );
-truss!(card_default, Card, "{{#if tags}}has{{else}}none{{/if}}");
+truss!(
+    card_default,
+    Card,
+    "{% if tags %}has{% else %}none{% endif %}"
+);
 
 #[test]
 fn truthiness_mode_governs_the_condition() {
@@ -151,7 +159,7 @@ fn truthiness_mode_governs_the_condition() {
     assert_eq!(card_default(&full), "has");
 }
 
-// F3 block helpers (docs/09): `{{#name args}}body{{/name}}` compiles to
+// F3 block helpers (docs/09): `{% name args %}body{% endname %}` compiles to
 // `name(args…, || -> String { <body> })`. The body closure renders the inner template in
 // the enclosing scope; the helper drives it — once (wrap), or N times (repeat).
 fn frame(body: impl Fn() -> String) -> trussbars_core::Safe {
@@ -164,13 +172,13 @@ fn repeat(n: &f64, body: impl Fn() -> String) -> String {
 truss!(
     framed,
     Greeting,
-    "{{#frame}}hi {{name}}{{/frame}}",
+    "{% frame %}hi {{name}}{% endframe %}",
     helpers = [frame]
 );
 truss!(
     repeated,
     Greeting,
-    "{{#repeat 3}}{{name}}{{/repeat}}",
+    "{% repeat 3 %}{{name}}{% endrepeat %}",
     helpers = [repeat]
 );
 
@@ -204,7 +212,7 @@ struct Banner {
 truss!(
     banner,
     Banner,
-    "{{#if title}}show{{else}}hide{{/if}}",
+    "{% if title %}show{% else %}hide{% endif %}",
     truthiness = self::NonBlank
 );
 
@@ -252,7 +260,7 @@ struct Stats {
 truss!(
     popular,
     Stats,
-    "{{#if views > 100}}hot{{else}}meh{{/if}} {{#if ratio < 1}}low{{else}}high{{/if}} {{add views 1}}"
+    "{% if views > 100 %}hot{% else %}meh{% endif %} {% if ratio < 1 %}low{% else %}high{% endif %} {{add views 1}}"
 );
 
 #[test]
@@ -291,7 +299,7 @@ struct Page {
 truss!(
     blog,
     Page,
-    "{{> header}}<ul>{{#each items}}{{> row this}}{{/each}}</ul>{{> footer}}",
+    "{{> header}}<ul>{% each items %}{{> row this}}{% endeach %}</ul>{{> footer}}",
     partials = [
         header = "tests/templates/header.truss",
         footer = "tests/templates/footer.truss",
@@ -303,7 +311,7 @@ truss!(
 truss!(
     doc,
     Page,
-    "{{#partial \"layout\"}}<h1>{{title}}</h1>{{/partial}}",
+    "{% partial \"layout\" %}<h1>{{title}}</h1>{% endpartial %}",
     partials = [layout = "tests/templates/layout.truss"]
 );
 
