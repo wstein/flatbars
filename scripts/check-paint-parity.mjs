@@ -128,6 +128,9 @@ const CASES = [
   ["{% unless done %}todo{% endunless %}", ["rawbars", "maxbars"]],
   ["{% each rows %}{{this}}{% endeach %}", ["rawbars", "maxbars"]],
   ["{% local total=(add a b) %}{{total}}{% endlocal %}", ["rawbars", "maxbars"]],
+  // the block-less {% set %} forward binding (docs-17): the `set` head is keyword,
+  // the binding args stay default (the grammar's #statement_tag scopes the head).
+  ["{% set total = (add a b) %}{{total}}", ["maxbars"]],
 ];
 
 let fails = 0;

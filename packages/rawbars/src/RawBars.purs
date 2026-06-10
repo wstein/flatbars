@@ -53,6 +53,7 @@ import Kernel.Hoist (hoistInline)
 import Kernel.Inspect (Snapshot, Target, inspectResolvedStrict)
 import Kernel.Provenance (Segment, runResolvedMapped)
 import Kernel.Render (formatError, runResolved)
+import Kernel.SetSugar (liftSet)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (nonEmpty)
 
@@ -100,7 +101,9 @@ parseCore opts src = case parseWith opts src of
   Left pes -> Left pes
   Right r -> case firstViolation r.nodes of
     Just v -> Left (NEA.singleton (DisallowedShape v.shape v.off))
-    Nothing -> Right r
+    -- `{% set NAME = … %}` (docs-17) is lifted to a `{% local %}` over its sibling
+    -- tail before render (statementTags only); the validation above saw the original.
+    Nothing -> Right (if opts.lexConfig.statementTags then r { nodes = liftSet r.nodes } else r)
   where
   -- In the statementTags surface (docs-19) RawBars rejects legacy `{{ }}` control
   -- (it is output-only there); the `{{#case}}` leading-content rule applies in both.

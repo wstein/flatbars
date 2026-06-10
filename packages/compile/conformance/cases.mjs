@@ -75,6 +75,11 @@ export const cases = [
   { name: "let-bind-sequential", t: "{% local (bind \"a\" 1) %}{% local (bind \"b\" (add a 1)) %}{{{a}}},{{{b}}}{% endlocal %}{% endlocal %}", d: {} },
   { name: "let-bind-multi", t: "{% local (bind \"x\" 1) (bind \"y\" 2) %}{{{x}}}/{{{y}}}{% endlocal %}", d: {} },
   { name: "let-no-reroot", t: "{% local (bind \"u\" (lookup this \"user\")) %}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{% endlocal %}", d: { name: "ROOT", user: { name: "Ada" } } },
+  // `{% set %}` forward binding (docs-17): block-less, lifts to a `{% local %}` over
+  // the sibling tail — interpreter ≡ compiled JS for both core (bind form) and maxbars.
+  { name: "set-forward", t: "{% set (bind \"g\" \"Hi\") %}{{{g}}}/{{{g}}}", d: {} },
+  { name: "set-sequential", t: "{% set (bind \"a\" 1) %}{% set (bind \"b\" (add a 1)) %}{{{a}}}{{{b}}}", d: {} },
+  { name: "set-scoped-to-block", t: "{% if (lookup this \"on\") %}{% set (bind \"x\" \"in\") %}{{{x}}}{% endif %}[{{{lookup this \"x\"}}}]", d: { on: true } },
 
   // ── value helpers (via the runtime registry) ────────────────────────────────
   { name: "eq-true", t: "{{{eq (lookup this \"a\") (lookup this \"b\")}}}", d: { a: 1, b: 1 } },
@@ -193,6 +198,9 @@ export const cases = [
   { name: "mx:let-sequential", dialect: "maxbars", t: "{% local a=1 b=(add a 1) %}{{a}},{{b}}{% endlocal %}", d: {} },
   { name: "mx:let-no-reroot", dialect: "maxbars", t: "{% local u=user %}{{name}}/{{u.name}}{% endlocal %}", d: { name: "ROOT", user: { name: "Ada" } } },
   { name: "mx:let-dict-value", dialect: "maxbars", t: '{% local cfg={theme: "dark"} %}{{cfg.theme}}{% endlocal %}', d: {} },
+  { name: "mx:set-forward", dialect: "maxbars", t: "{% set greeting = \"Hi\" %}{{greeting}}, {{greeting}}!", d: {} },
+  { name: "mx:set-sequential", dialect: "maxbars", t: "{% set a = 1 %}{% set b = (add a 1) %}{{a}}{{b}}", d: {} },
+  { name: "mx:set-scoped", dialect: "maxbars", t: "{% if on %}{% set x = \"in\" %}{{x}}{% endif %}[{{x}}]", d: { on: true } },
   { name: "mx:let-in-loop", dialect: "maxbars", t: "{% each items %}{% local u=(uppercase this) %}{{u}}@{{loop.index0}} {% endlocal %}{% endeach %}", d: { items: ["a", "b"] } },
   { name: "mx:let-shadows-op", dialect: "maxbars", t: '{% local add="x" %}{{add}}{% endlocal %}', d: {} },
   // a list literal GLUED to a let `=` is the list, not a path-bracket of the key

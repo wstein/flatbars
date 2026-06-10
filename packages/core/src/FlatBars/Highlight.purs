@@ -128,6 +128,11 @@ tokenizeSpans cfg src = case tokenizeTemplate cfg.lexConfig cfg.lexOptions src o
     RSep sp _ txt int
       | isPartialHead txt -> tag sp "partial"
       | Array.elem (headWord txt) cfg.clauseSeps -> tag sp "keyword" <> carveInterior int
+      -- the block-less `{% set NAME = … %}` forward binding (docs-17) lexes as a
+      -- standalone RSep; its head is a control keyword in the statementTags dialects
+      -- (RawBars/MaxBars). In ClassicBars (off) a bare `{{set}}` stays plain output.
+      | cfg.lexConfig.statementTags && headWord txt == "set" -> tag sp "keyword" <> carveInterior
+          int
       | otherwise -> tag sp "expr" <> carveInterior int
     -- Two raw-block spellings, each gated: `{{{{#name}}}}` (FlatBars) by
     -- `rawBlockHash`, the bare `{{{{name}}}}` (Handlebars) by `rawBlockHbs`. A

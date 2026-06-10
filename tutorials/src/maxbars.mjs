@@ -248,6 +248,21 @@ export const examples = {
     data: { price: 20, qty: 3, rate: 0.1 },
   },
 
+  setForward: {
+    engine: "maxbars",
+    label: "Intermediate — Set: forward binding (no end tag)",
+    // `{% set name = value %}` is the block-LESS sibling of `{% local %}` (docs-17):
+    // it binds up front and flows forward to the close of the enclosing block — no
+    // `{% endset %}`, no extra indentation. Bindings are sequential, and (like Jinja,
+    // unlike Liquid) a `set` does NOT leak past its block, so a `set` inside `{% each %}`
+    // is per-iteration. Use `set` for a prologue of names; `local` to confine a temporary.
+    compiles: true,
+    template: `{% set tax = (multiply subtotal rate) %}
+{% set total = (add subtotal tax) %}
+Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
+    data: { subtotal: 60, rate: 0.1 },
+  },
+
   withBlock: {
     engine: "maxbars",
     label: "Intermediate — With: re-root the context",

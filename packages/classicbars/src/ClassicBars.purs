@@ -64,6 +64,7 @@ import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
 import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
 import Kernel.Provenance (Segment, runResolvedLenientMapped)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
+import Kernel.SetSugar (liftSet)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (Translator, Truthy, escapeHtml, handlebars, minimal, mustache, nonEmpty, presence, stringify)
 import Kernel.Walk (operationRefs)
@@ -81,6 +82,14 @@ desugarSurface = desugar surfaceClauses
 -- | map; `desugarSurface` is `desugarSurfaceWith noLoopVars`).
 desugarSurfaceWith :: LoopVars -> Template -> Template
 desugarSurfaceWith lv = desugarWith lv surfaceClauses
+
+-- | Desugar for the statementTags path: lift `{% set %}` to a `{% local %}` over its
+-- | sibling tail (docs-17) first, then desugar. Gated on `opts.lexConfig.statementTags`
+-- | so ClassicBars (off) leaves a bare `{{set}}` output untouched. The MaxBars render/
+-- | compile entry points use this in place of `desugarSurfaceWith`.
+desugarStmt :: ParseOptions -> LoopVars -> Template -> Template
+desugarStmt opts lv nodes =
+  desugarSurfaceWith lv (if opts.lexConfig.statementTags then liftSet nodes else nodes)
 
 -- | Reject each dialect's disallowed *surface* shapes (the `strict` flag is the
 -- | ClassicBars/MaxBars distinction the render paths already thread), reported as a
@@ -202,7 +211,7 @@ renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
             (renderParseErrorAt src e)
       Right { nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
+          { partials: inlineP, template } = hoistInline (desugarStmt opts lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           -- inline partials index "main" (where they are defined); externals index
           -- their own source — the file dimension of the source map (ADR-035).
@@ -218,7 +227,7 @@ renderSurfaceMappedDiagWith strict lv opts truthy partialSrcs src dat =
   where
   compilePartial (Tuple name s) = case parseWith opts s of
     Left pes -> Left (renderParseErrorsAt s pes)
-    Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
+    Right { nodes } -> Right { name, template: desugarStmt opts lv nodes }
 
 -- | Context Inspector (ADR-035): snapshot the render context at the source span
 -- | `target` (an output run's provenance) — one snapshot per execution of the
@@ -256,7 +265,7 @@ inspectSurfaceDiagWith strict lv opts truthy target partialSrcs src dat =
             (renderParseErrorAt src e)
       Right { nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
+          { partials: inlineP, template } = hoistInline (desugarStmt opts lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           partialFiles = Map.union (map (const "main") inlineP)
             (Map.fromFoldable (map (\p -> Tuple p.name p.name) ps))
@@ -270,7 +279,7 @@ inspectSurfaceDiagWith strict lv opts truthy target partialSrcs src dat =
   where
   compilePartial (Tuple name s) = case parseWith opts s of
     Left pes -> Left (renderParseErrorsAt s pes)
-    Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
+    Right { nodes } -> Right { name, template: desugarStmt opts lv nodes }
 
 -- | `renderSurfaceWith` plus host-registered inline helpers (ADR-018): each
 -- | `(name, helper)` is registered into the env alongside the prelude and the
@@ -314,7 +323,7 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
             (renderParseErrorAt src e)
       Right { directives, nodes } ->
         let
-          { partials: inlineP, template } = hoistInline (desugarSurfaceWith lv nodes)
+          { partials: inlineP, template } = hoistInline (desugarStmt opts lv nodes)
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           setup =
             withTruthy truthy
@@ -333,7 +342,7 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
   -- dialect's parse options + loop-var desugar.
   compilePartial (Tuple name s) = case parseWith opts s of
     Left es -> Left (renderParseErrorsAt s es)
-    Right { nodes } -> Right { name, template: desugarSurfaceWith lv nodes }
+    Right { nodes } -> Right { name, template: desugarStmt opts lv nodes }
 
 -- | `renderSurface` with located parse-error messages (`formatError`): a parse
 -- | failure reports `line:column`, an eval failure keeps its `show` form.
@@ -354,7 +363,7 @@ renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of
         (renderParseErrorAt src e)
   Right { directives, nodes } ->
     let
-      { partials, template } = hoistInline (desugarSurfaceWith lv nodes)
+      { partials, template } = hoistInline (desugarStmt opts lv nodes)
     in
       case
         runResolvedLenient directives

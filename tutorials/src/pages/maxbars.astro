@@ -308,6 +308,15 @@ const t = (s) => s;
       (The <code>let</code> keyword is retired — docs-17; <code>local</code> names its bounded scope.)
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.localBindings.template} data={ex.localBindings.data} />
+    <h3>Set — forward binding (no end tag)</h3>
+    <p>
+      <code>{t("{% set name = value %}")}</code> is the block-less sibling of <code>local</code>: it binds
+      up front and flows <b>forward</b> to the close of the enclosing block — no <code>{t("{% endset %}")}</code>,
+      no extra indentation. Bindings are sequential, and (like Jinja, unlike Liquid) a <code>set</code> does
+      <b>not</b> leak past its block, so a <code>set</code> inside <code>{t("{% each %}")}</code> is per-iteration.
+      Reach for <code>set</code> to declare a prologue of names; for <code>local</code> to confine a temporary.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.setForward.template} data={ex.setForward.data} />
     <h3>Loop bindings &amp; labelled loops</h3>
     <p>
       <code>{t("{{#each elem in items}}")}</code> binds loop variables <b>Liquid-style</b> — the names

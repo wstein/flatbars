@@ -153,6 +153,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "setForward",
+    "label": "Intermediate — Set: forward binding (no end tag)",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "withBlock",
     "label": "Intermediate — With: re-root the context",
     "group": "Examples",

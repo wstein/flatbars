@@ -787,7 +787,11 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
                 name = SCU.drop 3 headWord
               in
                 mk (RClose span start name (interiorAt start name))
-            else if isStmtSep headWord then
+            -- a clause separator (`else`/`elif`/`when`) OR the block-LESS forward
+            -- binding `{% set NAME = EXPR %}` (docs-17): both are standalone tags, so
+            -- they lex to a name-agnostic `RSep` (no `{% end… %}` to pair). `set` is
+            -- reparented to a `{% local %}` over its sibling tail by `Kernel.SetSugar`.
+            else if isStmtSep headWord || headWord == "set" then
               mk (RSep span start core (interiorAt start core))
             else
               mk (ROpen span Section start core (interiorAt start core))

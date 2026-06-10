@@ -25,6 +25,7 @@ import FlatBars.Compile.Emit (classicbarsEmit, metaFor)
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Template)
+import Kernel.SetSugar (liftSet)
 
 -- | Compile *surface* ClassicBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
@@ -67,7 +68,9 @@ compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
   -- the compiled path mirrors the interpreter's checkBraceControl (docs-19).
   when opts.lexConfig.statementTags (checkBraceControl src nodes)
   let
-    h = hoistInline (desugarSurfaceWith lv nodes)
+    -- `{% set %}` → `{% local %}` over the sibling tail (docs-17), statementTags only.
+    lifted = if opts.lexConfig.statementTags then liftSet nodes else nodes
+    h = hoistInline (desugarSurfaceWith lv lifted)
     externalT = Map.fromFoldable externals
     -- inline definitions win over same-named externals (left-biased), as render does.
     registry = Map.union h.partials externalT
@@ -85,4 +88,5 @@ compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
   compilePartial :: Tuple String String -> Either ParseError (Tuple String Template)
   compilePartial (Tuple name s) = do
     { nodes } <- lmap NEA.head (parseWith opts s)
-    pure (Tuple name (desugarSurfaceWith lv nodes))
+    let lifted = if opts.lexConfig.statementTags then liftSet nodes else nodes
+    pure (Tuple name (desugarSurfaceWith lv lifted))

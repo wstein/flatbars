@@ -608,6 +608,26 @@ main = do
     (obj [])
     "shadowed"
 
+  -- the forward binding `{% set NAME = EXPR %}` (docs-17): block-LESS, live from its
+  -- position to the close of the enclosing block. Sugars to a `{% local %}` over the
+  -- sibling tail (Kernel.SetSugar), so it reuses local's semantics with no end tag.
+  expectM "set: binds forward to the end of the enclosing block (no end tag)"
+    "{% set greeting = \"Hi\" %}{{greeting}}, {{greeting}}!"
+    (obj [])
+    "Hi, Hi!"
+  expectM "set: a later binding sees an earlier one (sequential)"
+    "{% set a = 1 %}{% set b = (add a 1) %}{{a}}{{b}}"
+    (obj [])
+    "12"
+  expectM "set: scoped to the enclosing block — does not leak past it (Jinja, not Liquid)"
+    "{% if on %}{% set x = \"in\" %}{{x}}{% endif %}[{{x}}]"
+    (obj [ Tuple "on" (VBool true) ])
+    "in[]"
+  expectM "set: inside a loop, the binding is per-iteration"
+    "{% each xs %}{% set u = (uppercase this) %}{{u}} {% endeach %}"
+    (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
+    "A B "
+
   -- ── Trussbars AOT-compat lint (MaxBars.Compat) ────────────────────────────
   log "Trussbars AOT-compat lint"
   -- a plain boolean condition + field output compiles under AOT.
