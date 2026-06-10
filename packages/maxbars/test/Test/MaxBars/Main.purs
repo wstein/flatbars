@@ -21,7 +21,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
+import MaxBars (compileMaxJs, inferMax, inferMaxData, maxbarsWarnings, renderMax)
 import MaxBars.Compat (compatReportWith)
 import MaxBars.Rust (compileMaxRust)
 import Test.Assert (assert')
@@ -705,5 +705,76 @@ main = do
     (obj [ Tuple "name" (VString "A") ])
     false
     [ "aot-structural" ]
+
+  log "MaxBars schema inference (docs/03 L1 — the §9 worked example)"
+  let
+    teamsTpl =
+      "{% each team in teams %}\n{{team.name}} ({{root.org}}):\n{% each m in team.members %}\n  {{loop.index1}}. {{m | uppercase}}{% if loop.last %} (last){% endif %} — {{parent.name}}\n{% endeach %}\n{% endeach %}"
+    schemaOf src = case inferMax src of
+      Left e -> "ERR: " <> e
+      Right r -> r.schema
+    hasS nm src needle = assert'
+      (nm <> ": schema should contain " <> show needle <> "\n--- got ---\n" <> schemaOf src)
+      (contains (Pattern needle) (schemaOf src))
+  hasS "infer:ctx-struct" teamsTpl "struct Ctx"
+  hasS "infer:teams-vec-team" teamsTpl "teams: Vec<Team>"
+  hasS "infer:org-string" teamsTpl "org: String"
+  hasS "infer:team-struct" teamsTpl "struct Team"
+  hasS "infer:members-vec-string" teamsTpl "members: Vec<String>"
+  hasS "infer:name-string" teamsTpl "name: String"
+
+  let
+    whereTpl = "{% each u in users %}{{u.name}}{% endeach %}{{ users | where \"active\" }}"
+    mapTpl = "{% each v in settings %}{{loop.key}}={{v}}{% endeach %}"
+    optTpl = "{% if user.bio %}{{user.bio}}{% else %}none{% endif %}"
+    letTpl = "{% let greeting=(append \"Hi \" name) %}{{greeting}}{% endlet %}"
+    lacksS nm src needle = assert'
+      (nm <> ": schema should NOT contain " <> show needle <> "\n--- got ---\n" <> schemaOf src)
+      (not (contains (Pattern needle) (schemaOf src)))
+  hasS "infer:where-elem-vec" whereTpl "Vec<User>"
+  hasS "infer:where-field" whereTpl "active"
+  hasS "infer:map-iter-btree" mapTpl "BTreeMap<String,"
+  hasS "infer:if-else-option" optTpl "Option<String>"
+  hasS "infer:let-value-pins-name" letTpl "name: String"
+  lacksS "infer:let-shadows-greeting" letTpl "greeting"
+
+  -- data-observed refinement (§2): a bare {{count}} defaults to String, but a
+  -- sample {count: 5} refines it to f64.
+  let
+    schemaOfD samples src = case inferMaxData samples src of
+      Left e -> "ERR: " <> e
+      Right r -> r.schema
+    hasSD nm samples src needle = assert'
+      (nm <> ": schema should contain " <> show needle <> "\n--- got ---\n" <> schemaOfD samples src)
+      (contains (Pattern needle) (schemaOfD samples src))
+  hasS "infer:no-data-defaults-string" "{{count}}" "count: String"
+  hasSD "infer:data-refines-number" [ obj [ Tuple "count" (num 5.0) ] ] "{{count}}" "count: f64"
+
+  -- == coupling: a path compared to a literal is pinned to the literal's type.
+  let
+    eqTpl = "{% if status == \"active\" %}on{% endif %}"
+    -- partial-context coupling: {{> card item}} infers `item`'s fields from card's body.
+    partialTpl = "{% inline \"card\" %}{{name}}: {{price}}{% endinline %}{% each item in items %}{{> card item}}{% endeach %}"
+  hasS "infer:eq-literal-pins-string" eqTpl "status: String"
+  hasS "infer:partial-couples-vec" partialTpl "Vec<Item>"
+  hasS "infer:partial-couples-name" partialTpl "name: String"
+  hasS "infer:partial-couples-price" partialTpl "price: String"
+
+  -- §5 enum: {% case x.kind %}{% when … %} ⇒ a #[serde(tag)] enum; variants from
+  -- the when-literals, unioned with data-observed tag values.
+  let
+    enumTpl = "{% each shape in shapes %}{% case shape.kind %}{% when \"circle\" %}o{% when \"square\" %}x{% endcase %}{% endeach %}"
+  hasS "infer:enum-vec" enumTpl "Vec<Shape>"
+  hasS "infer:enum-serde-tag" enumTpl "tag = \"kind\""
+  hasS "infer:enum-variant-circle" enumTpl "Circle"
+  hasS "infer:enum-variant-square" enumTpl "Square"
+  hasSD "infer:enum-data-union-triangle"
+    [ obj [ Tuple "shapes" (VArray [ obj [ Tuple "kind" (VString "triangle") ] ]) ] ]
+    enumTpl "Triangle"
+  -- a bare `{% case status %}` (not over a collection element) is a plain value
+  -- switch ⇒ status: String, NOT a tagged enum.
+  let bareCaseTpl = "{% case status %}{% when \"a\" %}x{% when \"b\" %}y{% endcase %}"
+  hasS "infer:bare-case-is-string" bareCaseTpl "status: String"
+  lacksS "infer:bare-case-not-enum" bareCaseTpl "enum"
 
   log "all MaxBars tests passed"
