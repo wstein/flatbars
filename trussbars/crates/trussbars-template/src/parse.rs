@@ -4,7 +4,7 @@
 //! `let` hash, threads a [`Scope`] for path rooting, and splits `{% else %}` /
 //! `{{else if}}` clauses.
 
-use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, With};
+use crate::ast::{Case, Cond, Expr, For, HelperBlock, Node, With};
 use crate::lex::{Lexeme, Sigil, lex};
 use crate::parse_expr::{ParseError, Scope, parse_expr};
 use alloc::string::{String, ToString};
@@ -199,7 +199,7 @@ impl Blocks<'_> {
             "unless" => self.cond_block(span, rest, true, scope),
             // ADR-039 item 4: the loop keyword is `for` (renamed from `each`),
             // binding Liquid-style `for x in xs` or bare `for xs`; `each` is rejected.
-            "for" => self.each_block(span, "for", rest, scope),
+            "for" => self.for_block(span, "for", rest, scope),
             "each" => err(
                 "the loop keyword is renamed `for` (ADR-039) — write `{% for x in xs %}` (or bare `{% for xs %}`) … `{% endfor %}`",
                 span.start,
@@ -370,14 +370,14 @@ impl Blocks<'_> {
         }))
     }
 
-    fn each_block(
+    fn for_block(
         &mut self,
         span: crate::span::Span,
         head: &str,
         rest: &str,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
-        let (subject, item, index, label) = parse_each_binding(rest, scope)?;
+        let (subject, item, index, label) = parse_for_binding(rest, scope)?;
         let mut bound = Vec::new();
         bound.extend(item.clone());
         bound.extend(index.clone());
@@ -385,7 +385,7 @@ impl Blocks<'_> {
         let child = scope.with_all(&bound);
         let (body, stop) = self.parse_until(&child)?;
         let otherwise = self.else_arm(stop, scope, head, span.start)?;
-        Ok(Node::Each(Each {
+        Ok(Node::For(For {
             span,
             subject,
             item,
@@ -574,10 +574,10 @@ fn parse_opt_ctx(rest: &str, scope: &Scope) -> Result<Option<Expr>, ParseError> 
 
 // ── the Liquid `each` binding ─────────────────────────────────────────────────
 
-type EachBinding = (Expr, Option<String>, Option<String>, Option<String>);
+type ForBinding = (Expr, Option<String>, Option<String>, Option<String>);
 
 /// Parse `item [i] in coll [label name]` (or a bare `coll`).
-fn parse_each_binding(rest: &str, scope: &Scope) -> Result<EachBinding, ParseError> {
+fn parse_for_binding(rest: &str, scope: &Scope) -> Result<ForBinding, ParseError> {
     if let Some((before, after)) = split_kw(rest, "in") {
         let names: Vec<&str> = before.split_whitespace().collect();
         let item = names.first().map(|s| (*s).to_string());
@@ -928,7 +928,7 @@ mod tests {
         let ns =
             parse("{% for post i in posts %}{{post.title}}{% else %}none{% endfor %}").unwrap();
         match &ns[0] {
-            Node::Each(e) => {
+            Node::For(e) => {
                 assert_eq!(e.item.as_deref(), Some("post"));
                 assert_eq!(e.index.as_deref(), Some("i"));
                 assert_eq!(
@@ -962,7 +962,7 @@ mod tests {
     fn each_with_label() {
         let ns = parse("{% for row in rows label outer %}{{outer.index1}}{% endfor %}").unwrap();
         match &ns[0] {
-            Node::Each(e) => {
+            Node::For(e) => {
                 assert_eq!(e.label.as_deref(), Some("outer"));
                 assert_eq!(e.item.as_deref(), Some("row"));
             }
@@ -1067,10 +1067,10 @@ mod tests {
 
     #[test]
     fn statement_each_parses_like_brace_each() {
-        // `{% for … %}…{% endfor %}` desugars to the same `Node::Each` as `{% for %}`.
+        // `{% for … %}…{% endfor %}` desugars to the same `Node::For` as `{% for %}`.
         let ns = parse("{% for item in xs %}{{item}}{% endfor %}").unwrap();
         match &ns[0] {
-            Node::Each(e) => {
+            Node::For(e) => {
                 assert_eq!(e.item.as_deref(), Some("item"));
                 assert_eq!(e.body.len(), 1);
             }

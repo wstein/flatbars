@@ -227,7 +227,7 @@ impl Lower<'_> {
             Shape::Array => {
                 let body = self.nodes(then_body, inner);
                 let otherwise = self.nodes(else_body, scope);
-                out.push(ir::Node::Each(ir::Each {
+                out.push(ir::Node::For(ir::For {
                     span,
                     subject: cond,
                     item: None,
@@ -721,7 +721,7 @@ impl Lower<'_> {
                 let subject = self.hb_first(params, span);
                 let body = self.hb_nodes(program);
                 let otherwise = self.hb_else(inverse);
-                out.push(ir::Node::Each(ir::Each {
+                out.push(ir::Node::For(ir::For {
                     span,
                     subject,
                     item: block_params.first().cloned(),
@@ -1097,7 +1097,7 @@ impl Lower<'_> {
                     .as_ref()
                     .map(|b| self.liq_nodes(b))
                     .unwrap_or_default();
-                out.push(ir::Node::Each(ir::Each {
+                out.push(ir::Node::For(ir::For {
                     span: *span,
                     subject,
                     item: Some(var.clone()),
@@ -1753,7 +1753,7 @@ impl Lower<'_> {
         match mappers.first() {
             Some(st::Mapper::Anon(sub)) => {
                 let body = self.st_elements(&sub.body);
-                out.push(ir::Node::Each(ir::Each {
+                out.push(ir::Node::For(ir::For {
                     span,
                     subject,
                     item: sub.params.first().cloned(),
@@ -1768,7 +1768,7 @@ impl Lower<'_> {
                 ..
             }) => {
                 // Apply template `t` to each element (which re-roots `this`).
-                out.push(ir::Node::Each(ir::Each {
+                out.push(ir::Node::For(ir::For {
                     span,
                     subject,
                     item: None,
@@ -1950,7 +1950,7 @@ fn trivial_arm(body: &[M]) -> Option<ir::Expr> {
 
 /// A bare `{{#each subject}}` (re-roots `this`), no binding.
 fn each(span: Span, subject: ir::Expr, body: Vec<ir::Node>) -> ir::Node {
-    ir::Node::Each(ir::Each {
+    ir::Node::For(ir::For {
         span,
         subject,
         item: None,
@@ -2075,7 +2075,7 @@ mod tests {
             &arr,
             &LowerOptions::default(),
         );
-        let ir::Node::Each(e) = &l.ir[0] else {
+        let ir::Node::For(e) = &l.ir[0] else {
             panic!("{:?}", l.ir)
         };
         assert_eq!(e.body.len(), 1);
@@ -2117,7 +2117,7 @@ mod tests {
                 &LowerOptions::default()
             )
             .ir[0],
-            ir::Node::Each(_)
+            ir::Node::For(_)
         ));
         let obj = shapes(&[(&["user"], Shape::Object)]);
         assert!(matches!(
@@ -2142,16 +2142,16 @@ mod tests {
             &oracle,
             &LowerOptions::default(),
         );
-        let ir::Node::Each(outer) = &l.ir[0] else {
+        let ir::Node::For(outer) = &l.ir[0] else {
             panic!("{:?}", l.ir)
         };
-        assert!(matches!(&outer.body[0], ir::Node::Each(_)));
+        assert!(matches!(&outer.body[0], ir::Node::For(_)));
     }
 
     #[test]
     fn unknown_section_defaults_to_each_with_note() {
         let l = low("{{#xs}}{{.}}{{/xs}}", &NoShapes, &LowerOptions::default());
-        assert!(matches!(&l.ir[0], ir::Node::Each(_)));
+        assert!(matches!(&l.ir[0], ir::Node::For(_)));
         assert!(
             l.report
                 .iter()
@@ -2543,7 +2543,7 @@ mod tests {
     #[test]
     fn st_map_named_template_to_each_partial() {
         let l = st_low("<rows:row()>");
-        let ir::Node::Each(e) = &l.ir[0] else {
+        let ir::Node::For(e) = &l.ir[0] else {
             panic!("{:?}", l.ir)
         };
         assert!(matches!(&e.body[0], ir::Node::Partial { name, .. } if name == "row"));

@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use trussbars_template::Span;
-use trussbars_template::ast::{Case, Cond, Each, Expr, HelperBlock, Node, Value, With};
+use trussbars_template::ast::{Case, Cond, Expr, For, HelperBlock, Node, Value, With};
 
 /// Inline migration notes to weave into the output, keyed by a node's source-span
 /// start offset. Each note is emitted as a `{{! migrate: <note> }}` comment
@@ -107,7 +107,7 @@ impl Pretty<'_> {
 
     fn block(&mut self, n: &Node) {
         match n {
-            Node::Each(e) => {
+            Node::For(e) => {
                 self.note_lines(e.span);
                 self.line(&tag_each_open(e));
                 self.body(&e.body);
@@ -258,7 +258,7 @@ impl Pretty<'_> {
 fn is_block(n: &Node) -> bool {
     matches!(
         n,
-        Node::Each(_)
+        Node::For(_)
             | Node::Cond(_)
             | Node::With(_)
             | Node::Let { .. }
@@ -271,7 +271,7 @@ fn is_block(n: &Node) -> bool {
 }
 
 /// The `{{#each …}}` open tag.
-fn tag_each_open(e: &Each) -> String {
+fn tag_each_open(e: &For) -> String {
     let mut s = String::from("{{#each ");
     if let Some(item) = &e.item {
         s.push_str(item);
@@ -337,7 +337,7 @@ fn print_node(n: &Node, notes: &Notes, out: &mut String) {
             print_top_expr(expr, out);
             out.push_str(if *raw { "}}}" } else { "}}" });
         }
-        Node::Each(e) => print_each(e, notes, out),
+        Node::For(e) => print_each(e, notes, out),
         Node::Cond(c) => print_cond(c, notes, out),
         Node::With(w) => print_with(w, notes, out),
         Node::Partial { span, name, ctx } => {
@@ -449,7 +449,7 @@ fn quote(s: &str, out: &mut String) {
     print_lit(&Value::Str(s.to_string()), out);
 }
 
-fn print_each(e: &Each, notes: &Notes, out: &mut String) {
+fn print_each(e: &For, notes: &Notes, out: &mut String) {
     emit_notes(e.span, notes, out);
     out.push_str("{{#each ");
     // `item [index] in coll [label name]`, or a bare `coll` (which re-roots `this`).
@@ -805,7 +805,7 @@ mod tests {
 
     #[test]
     fn each_bare_reroots() {
-        let e = Each {
+        let e = For {
             span: span(),
             subject: path(&["items"]),
             item: None,
@@ -815,14 +815,14 @@ mod tests {
             otherwise: vec![],
         };
         assert_eq!(
-            to_truss(&[Node::Each(e)]),
+            to_truss(&[Node::For(e)]),
             "{{#each items}}{{name}}{{/each}}"
         );
     }
 
     #[test]
     fn each_with_binding_index_and_else() {
-        let e = Each {
+        let e = For {
             span: span(),
             subject: path(&["rows"]),
             item: Some("row".into()),
@@ -832,7 +832,7 @@ mod tests {
             otherwise: vec![Node::Text("none".into())],
         };
         assert_eq!(
-            to_truss(&[Node::Each(e)]),
+            to_truss(&[Node::For(e)]),
             "{{#each row i in rows}}x{{else}}none{{/each}}"
         );
     }
@@ -1034,7 +1034,7 @@ mod tests {
 
     #[test]
     fn pretty_puts_tags_on_their_own_indented_lines() {
-        let each = Each {
+        let each = For {
             span: span(),
             subject: path(&["items"]),
             item: Some("item".into()),
@@ -1047,7 +1047,7 @@ mod tests {
             ],
             otherwise: vec![Node::Text("none".into())],
         };
-        let pretty = to_truss_pretty(&[Node::Each(each)], &Notes::new());
+        let pretty = to_truss_pretty(&[Node::For(each)], &Notes::new());
         assert_eq!(
             pretty,
             "{{#each item in items}}\n  <li>{{name}}</li>\n{{else}}\n  none\n{{/each}}\n"
@@ -1058,7 +1058,7 @@ mod tests {
     fn notes_are_woven_inline() {
         let mut notes = Notes::new();
         notes.insert(0, vec!["assumed iteration; verify".into()]);
-        let e = Each {
+        let e = For {
             span: Span::new(0, 5),
             subject: path(&["items"]),
             item: None,
@@ -1068,7 +1068,7 @@ mod tests {
             otherwise: vec![],
         };
         assert_eq!(
-            to_truss_annotated(&[Node::Each(e)], &notes),
+            to_truss_annotated(&[Node::For(e)], &notes),
             "{{! migrate: assumed iteration; verify }}{{#each items}}{{/each}}"
         );
     }

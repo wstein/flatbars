@@ -120,7 +120,7 @@ pub enum Node {
         raw: bool,
     },
     /// `{% for item [i] in coll [label name] %}…{% else %}…{% endfor %}`.
-    Each(Each),
+    For(For),
     /// `{% if %}` / `{% unless %}` (`negated`) with `{{else if}}` / `{% else %}` arms.
     Cond(Cond),
     /// `{% case subject %}{% when V… %}…{% else %}…{% endcase %}` — the multi-arm conditional.
@@ -212,7 +212,7 @@ impl Node {
             | Node::PartialBlock { span, .. }
             | Node::Yield { span }
             | Node::RawBlock { span, .. } => *span,
-            Node::Each(e) => e.span,
+            Node::For(e) => e.span,
             Node::Cond(c) => c.span,
             Node::Case(c) => c.span,
             Node::With(w) => w.span,
@@ -223,7 +223,7 @@ impl Node {
 
 /// `{% for item [i] in coll %}` data.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Each {
+pub struct For {
     /// The tag span.
     pub span: Span,
     /// The collection expression.

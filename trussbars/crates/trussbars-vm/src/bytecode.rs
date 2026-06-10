@@ -155,7 +155,7 @@ fn compile_node(n: &Node, ops: &mut Vec<Op>) -> Result<(), String> {
             compile_expr(expr, ops)?;
             ops.push(if *raw { Op::Raw } else { Op::Esc });
         }
-        Node::Each(e) => {
+        Node::For(e) => {
             if e.item.is_some() || e.index.is_some() || e.label.is_some() || !e.otherwise.is_empty()
             {
                 return Err("bytecode subset: each bindings / else unsupported".into());

@@ -39,7 +39,7 @@ use alloc::vec::Vec;
 use core::cell::Cell;
 
 use trussbars_core::{ToText, escape_html};
-use trussbars_template::{Case, Cond, Each, Expr, Node, Value as Lit, With, parse};
+use trussbars_template::{Case, Cond, Expr, For, Node, Value as Lit, With, parse};
 
 /// The truthiness policy a render uses — re-exported from `trussbars-template` so a host
 /// selects a policy through the VM's own surface (`docs/16-truthiness-modes.md`).
@@ -459,10 +459,10 @@ fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<No
                 let body = hoist_into(body, reg);
                 reg.insert(name, body);
             }
-            Node::Each(mut e) => {
+            Node::For(mut e) => {
                 e.body = hoist_into(e.body, reg);
                 e.otherwise = hoist_into(e.otherwise, reg);
-                out.push(Node::Each(e));
+                out.push(Node::For(e));
             }
             Node::Cond(mut c) => {
                 c.body = hoist_into(c.body, reg);
@@ -540,7 +540,7 @@ fn eval_node(env: &Env, n: &Node, out: &mut String) -> Result<(), String> {
         Node::Cond(c) => eval_cond(env, c, out)?,
         Node::Case(c) => eval_case(env, c, out)?,
         Node::With(w) => eval_with(env, w, out)?,
-        Node::Each(e) => eval_each(env, e, out)?,
+        Node::For(e) => eval_for(env, e, out)?,
         Node::Let { bindings, body, .. } => {
             let mut child = env.clone();
             for (name, value) in bindings {
@@ -683,7 +683,7 @@ fn eval_with(env: &Env, w: &With, out: &mut String) -> Result<(), String> {
     }
 }
 
-fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
+fn eval_for(env: &Env, e: &For, out: &mut String) -> Result<(), String> {
     let subj = eval_expr(env, &e.subject)?;
     // (key, element) pairs — arrays have no key, objects carry their field name.
     // Element clones are refcount bumps (Rc-backed Value), not deep copies.

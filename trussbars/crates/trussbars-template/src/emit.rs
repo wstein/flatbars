@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, TruthMode, TruthPolicy, Value, With};
+use crate::ast::{Case, Cond, Expr, For, HelperBlock, Node, TruthMode, TruthPolicy, Value, With};
 use crate::parse::parse;
 use crate::span::Span;
 
@@ -251,10 +251,10 @@ fn hoist_into(nodes: Vec<Node>, reg: &mut BTreeMap<String, Vec<Node>>) -> Vec<No
                 let body = hoist_into(body, reg);
                 reg.insert(name, body);
             }
-            Node::Each(mut e) => {
+            Node::For(mut e) => {
                 e.body = hoist_into(e.body, reg);
                 e.otherwise = hoist_into(e.otherwise, reg);
-                out.push(Node::Each(e));
+                out.push(Node::For(e));
             }
             Node::Cond(mut c) => {
                 c.body = hoist_into(c.body, reg);
@@ -334,7 +334,7 @@ fn estimate_node(n: &Node) -> usize {
         Node::Text(s) => s.len(),
         Node::Output { .. } | Node::Yield { .. } => 8,
         Node::RawBlock { body, .. } => body.len(),
-        Node::Each(e) => 8 * (estimate_bytes(&e.body) + estimate_bytes(&e.otherwise)),
+        Node::For(e) => 8 * (estimate_bytes(&e.body) + estimate_bytes(&e.otherwise)),
         Node::Cond(c) => {
             estimate_bytes(&c.body)
                 + c.elifs
@@ -416,7 +416,7 @@ fn emit_node_inner(env: &Env, src: &str, n: &Node, out: &mut String) -> Result<(
             );
         }
         Node::Inline { .. } => {} // hoisted away
-        Node::Each(e) => return each_block(env, src, e, out),
+        Node::For(e) => return for_block(env, src, e, out),
         Node::Cond(c) => return cond_block(env, src, c, out),
         Node::Case(c) => return case_block(env, src, c, out),
         Node::With(w) => return with_block(env, src, w, out),
@@ -637,7 +637,7 @@ fn let_block(
     Ok(())
 }
 
-fn each_block(env: &Env, src: &str, e: &Each, out: &mut String) -> Result<(), String> {
+fn for_block(env: &Env, src: &str, e: &For, out: &mut String) -> Result<(), String> {
     // A dict literal compiles to a struct, which has no `Each` impl — so iterating one
     // is rejected up front (a clean located error, not a downstream rustc failure).
     // Bind it (`{% scope {…} %}` / `{% let %}`) and read its fields instead.
@@ -727,7 +727,7 @@ fn mentions(nodes: &[Node], name: &str) -> bool {
 fn node_mentions(n: &Node, name: &str) -> bool {
     match n {
         Node::Output { expr, .. } => expr_mentions(expr, name),
-        Node::Each(e) => {
+        Node::For(e) => {
             mentions(&e.body, name)
                 || mentions(&e.otherwise, name)
                 || expr_mentions(&e.subject, name)
