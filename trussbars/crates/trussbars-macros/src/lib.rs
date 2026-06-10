@@ -171,11 +171,14 @@ fn expand(input: TokenStream) -> Result<TokenStream, String> {
     if groups[1].is_empty() {
         return Err("truss!: the second argument must be the context type".into());
     }
+    // Reconstruct via a `TokenStream` (its `Display` respects `Punct` spacing), not a
+    // token-wise `join(" ")` — the latter splits `::` into `: :` and breaks a path or
+    // generic context type (`crate::Page`, `Wrapper<u8>`).
     let ctx_type = groups[1]
         .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>()
-        .join(" ");
+        .cloned()
+        .collect::<TokenStream>()
+        .to_string();
 
     // The third argument is either an inline string literal or `path = "file"`.
     let (template, dep) = template_arg(&groups[2])?;

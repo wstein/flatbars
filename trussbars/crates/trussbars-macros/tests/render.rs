@@ -225,3 +225,19 @@ fn host_defined_policy_selected_through_the_macro() {
         "hide"
     );
 }
+
+// A *path-qualified* context type — `truss!(name, model::Page, "…")`. The CtxType
+// argument is reconstructed via the token stream, so a `::` path (or generics) survives
+// rather than being mangled into `model : : Page`.
+mod model {
+    pub struct Page {
+        pub title: String,
+    }
+}
+truss!(page, model::Page, "<h1>{{title}}</h1>");
+
+#[test]
+fn path_qualified_context_type() {
+    let p = model::Page { title: "Hi".into() };
+    assert_eq!(page(&p), "<h1>Hi</h1>");
+}
