@@ -19,6 +19,7 @@ module MaxBars
   , compileMaxJs
   , compileMaxJsWith
   , maxbarsWarnings
+  , inferMax
   ) where
 
 import Prelude
@@ -38,6 +39,7 @@ import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Inspect (Snapshot, Target)
+import Kernel.Schema (InferResult, inferTemplate)
 import Kernel.Provenance (Segment)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
@@ -96,6 +98,16 @@ maxLoopVars = reservedScope noLoopVars
 -- | loop variables.
 renderMax :: String -> Value -> Either String String
 renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
+
+-- | Infer a candidate Rust context type from a MaxBars template (Trussbars
+-- | docs/03, L1 template-symbolic). Parses + desugars to the core AST, then runs
+-- | `Kernel.Schema.inferTemplate`: a static walk that collects each path's
+-- | usage-implied type, unifies, and emits a Rust schema + a JSON data scaffold +
+-- | a report. Data-observed refinement and enums (§5) are follow-on increments.
+inferMax :: String -> Either String InferResult
+inferMax src = do
+  parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
+  pure (inferTemplate (desugarSurfaceWith maxLoopVars parsed.nodes))
 
 -- | Render MaxBars source with a set of named *external* (host-threaded) partials,
 -- | each given as MaxBars surface source — the MaxBars twin of

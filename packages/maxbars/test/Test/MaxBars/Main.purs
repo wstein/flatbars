@@ -21,7 +21,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
+import MaxBars (compileMaxJs, inferMax, maxbarsWarnings, renderMax)
 import MaxBars.Compat (compatReportWith)
 import Test.Assert (assert')
 
@@ -664,5 +664,22 @@ main = do
     (obj [ Tuple "name" (VString "A") ])
     false
     [ "aot-structural" ]
+
+  log "MaxBars schema inference (docs/03 L1 — the §9 worked example)"
+  let
+    teamsTpl =
+      "{% each team in teams %}\n{{team.name}} ({{root.org}}):\n{% each m in team.members %}\n  {{loop.index1}}. {{m | uppercase}}{% if loop.last %} (last){% endif %} — {{parent.name}}\n{% endeach %}\n{% endeach %}"
+    schemaOf src = case inferMax src of
+      Left e -> "ERR: " <> e
+      Right r -> r.schema
+    hasS nm src needle = assert'
+      (nm <> ": schema should contain " <> show needle <> "\n--- got ---\n" <> schemaOf src)
+      (contains (Pattern needle) (schemaOf src))
+  hasS "infer:ctx-struct" teamsTpl "struct Ctx"
+  hasS "infer:teams-vec-team" teamsTpl "teams: Vec<Team>"
+  hasS "infer:org-string" teamsTpl "org: String"
+  hasS "infer:team-struct" teamsTpl "struct Team"
+  hasS "infer:members-vec-string" teamsTpl "members: Vec<String>"
+  hasS "infer:name-string" teamsTpl "name: String"
 
   log "all MaxBars tests passed"
