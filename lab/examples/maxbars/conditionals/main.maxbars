@@ -1,1 +1,1 @@
-{{name}}: {{#if stock >= 10}}in stock{{else if (gte stock 1)}}low ({{stock}}){{else}}sold out{{/if}}{{#unless shipsFree}} · shipping extra{{/unless}}
+{{name}}: {% if stock >= 10 %}in stock{% else if (gte stock 1) %}low ({{stock}}){% else %}sold out{% endif %}{% unless shipsFree %} · shipping extra{% endunless %}

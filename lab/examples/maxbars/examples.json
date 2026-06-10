@@ -82,7 +82,7 @@
   },
   {
     "id": "conditionals",
-    "label": "Intermediate — If / else if / unless (infix)",
+    "label": "Intermediate — If / else if / unless (infix, {% %} tags)",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",

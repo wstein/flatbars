@@ -22433,10 +22433,10 @@ var highlightConfig = /* @__PURE__ */ (function() {
     if (v === "rawbars") {
       return {
         lexConfig: {
-          open: defaultLexConfig.open,
-          close: defaultLexConfig.close,
-          mustacheDelims: defaultLexConfig.mustacheDelims,
-          statementTags: defaultLexConfig.statementTags,
+          open: coreOptions.lexConfig.open,
+          close: coreOptions.lexConfig.close,
+          mustacheDelims: coreOptions.lexConfig.mustacheDelims,
+          statementTags: coreOptions.lexConfig.statementTags,
           keepLongComments: true
         },
         clauseSeps: coreOptions.standaloneSeps,
@@ -22641,7 +22641,7 @@ var rexpr = function(v) {
     return obj([tt2("call"), new Tuple("name", str(v.value0)), new Tuple("args", arr(map34(argOf)(v.value1)))]);
   }
   ;
-  throw new Error("Failed pattern match at ClassicBars.JS (line 1036, column 9 - line 1045, column 99): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at ClassicBars.JS (line 1037, column 9 - line 1046, column 99): " + [v.constructor.name]);
 };
 var path2 = function(args) {
   var v = uncons(args);
@@ -22661,7 +22661,7 @@ var argOf = function(e) {
 };
 var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "ClassicBars.JS", function() {
   var children = function(ns) {
-    return arr(map34($lazy_rnode(1006))(ns));
+    return arr(map34($lazy_rnode(1007))(ns));
   };
   return function(v) {
     if (v instanceof RText) {
@@ -22684,7 +22684,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "ClassicBars.JS", func
         })())), srcOf(v.value0)]);
       }
       ;
-      throw new Error("Failed pattern match at ClassicBars.JS (line 957, column 24 - line 965, column 10): " + [v1.constructor.name]);
+      throw new Error("Failed pattern match at ClassicBars.JS (line 958, column 24 - line 966, column 10): " + [v1.constructor.name]);
     }
     ;
     if (v instanceof RIf) {
@@ -22717,7 +22717,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "ClassicBars.JS", func
           return obj([tt2("raw"), new Tuple("text", str(v.value1)), srcOf(v.value0)]);
         }
         ;
-        throw new Error("Failed pattern match at ClassicBars.JS (line 952, column 1 - line 952, column 23): " + [v.constructor.name]);
+        throw new Error("Failed pattern match at ClassicBars.JS (line 953, column 1 - line 953, column 23): " + [v.constructor.name]);
       };
       if (v instanceof RCall && v.value1 === "partial") {
         var $165 = litName(v.value2);
@@ -22742,7 +22742,7 @@ var $lazy_rnode = /* @__PURE__ */ $runtime_lazy7("rnode", "ClassicBars.JS", func
     return v1(true);
   };
 });
-var rnode = /* @__PURE__ */ $lazy_rnode(952);
+var rnode = /* @__PURE__ */ $lazy_rnode(953);
 var astJson = function(dialect, src) {
   var opts = (function() {
     if (dialect === "maxbars") {

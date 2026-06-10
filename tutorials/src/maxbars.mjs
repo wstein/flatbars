@@ -139,14 +139,15 @@ export const examples = {
 
   conditionals: {
     engine: "maxbars",
-    label: "Intermediate — If / else if / unless (infix)",
-    // Infix comparisons make the condition direct — `{{#if stock >= 10}}` instead of
-    // ClassicBars's `{{#if (gte stock 10)}}`. The ONE catch: a clause SEPARATOR must
-    // parenthesise its condition (`{{else if (gte stock 1)}}`) — a bare infix there
-    // silently takes the wrong branch. {{#unless}} is the inverse.
+    label: "Intermediate — If / else if / unless (infix, {% %} tags)",
+    // Control flow is written with Django-style `{% %}` statement tags (docs-19); `{{ }}`
+    // stays for output. Infix comparisons make the condition direct — `{% if stock >= 10 %}`
+    // instead of ClassicBars's `{{#if (gte stock 10)}}`. The ONE catch: a clause SEPARATOR
+    // must parenthesise its condition (`{% else if (gte stock 1) %}`) — a bare infix there
+    // silently takes the wrong branch. `{% unless %}` is the inverse.
     compiles: true,
     template:
-      "{{name}}: {{#if stock >= 10}}in stock{{else if (gte stock 1)}}low ({{stock}}){{else}}sold out{{/if}}{{#unless shipsFree}} · shipping extra{{/unless}}",
+      "{{name}}: {% if stock >= 10 %}in stock{% else if (gte stock 1) %}low ({{stock}}){% else %}sold out{% endif %}{% unless shipsFree %} · shipping extra{% endunless %}",
     data: { name: "Keyboard", stock: 3, shipsFree: false },
   },
 

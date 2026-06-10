@@ -825,10 +825,11 @@ highlightConfig = case _ of
     -- RawBars does not enable set-delim (per ADR-015 amendment); use the
     -- default lex config so highlighting agrees with parsing and the
     -- editor flags `{{=A B=}}` in `.rawbars` files instead of accepting it.
-    -- `clauseSeps` mirrors RawBars' own parse options (the single source), so
-    -- `{{when}}` — the `{{#case}}` arm separator RawBars supports — paints as a
-    -- keyword, exactly like `{{else}}`/`{{elif}}`.
-    { lexConfig: defaultLexConfig { keepLongComments = true }
+    -- `lexConfig` and `clauseSeps` both derive from RawBars' own parse options (the
+    -- single source) so highlighting agrees with parsing: `{{when}}` — the `{{#case}}`
+    -- arm separator — paints as a keyword like `{{else}}`/`{{elif}}`, and the `{% %}`
+    -- statement tags (docs-19, `statementTags` on for RawBars) highlight too.
+    { lexConfig: RawBars.coreOptions.lexConfig { keepLongComments = true }
     , clauseSeps: RawBars.coreOptions.standaloneSeps
     , lexOptions: defaultLexOptions
     , extras: false
