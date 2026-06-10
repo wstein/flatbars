@@ -44,20 +44,20 @@ subexpression produces — so the prelude, engine, and emit rules need no change
 | `==` `!=` | `eq` `ne` | `{{ x == 1 }}` → `(eq x 1)` |
 | `<` `>` `<=` `>=` | `lt` `gt` `lte` `gte` | `{{ x >= 18 }}` → `(gte x 18)` |
 | `+` `-` `*` `/` `%` | `add` `subtract` `multiply` `divide` `modulo` | `{{ price * qty }}` → `(multiply price qty)` |
-| `..` (range) | `range` | `{{#each 1..n}}` → `(range 1 n)` (the inclusive integer span) |
+| `..` (range) | `range` | `{% for 1..n %}` → `(range 1 n)` (the inclusive integer span) |
 | `??` | `coalesce` | `{{ a ?? b }}` → `(coalesce a b)` (first non-null) |
 | `\|` (pipe) | application | `{{ a \| f x }}` → `(f a x)` (piped value first) |
 
 Precedence (loosest → tightest): pipe, `??`, `||`, `&&`, comparisons
 (non-associative), range `..` (non-associative), additive (`+` `-`),
 multiplicative (`*` `/` `%`), prefix `!`, then application/atom — so
-`{{ n + 1 > 5 }}` is `(gt (add n 1) 5)` and `{{#each 1..n + 1}}` is
+`{{ n + 1 > 5 }}` is `(gt (add n 1) 5)` and `{% for 1..n + 1 %}` is
 `(range 1 (add n 1))`.
 Pipe chains are left-associative: `a | f | g` ⇒ `(g (f a))`. Paths,
 literals, and `(parenthesised)` subexpressions are exactly as in ClassicBars.
 
 Infix reads identically in a **block head** and in its **clause separators**, so
-`{{#if x >= 18}}…{{elif x < 5}}…{{/if}}` takes each condition bare — no parentheses
+`{% if x >= 18 %}…{% elif x < 5 %}…{% endif %}` takes each condition bare — no parentheses
 around the `elif` test (it is one infix expression, parsed as a head: `elif (lt x 5)`).
 
 The operator characters are excluded from the identifier set so they tokenise as
@@ -77,13 +77,13 @@ truthiness rule.
 ## Collection literals
 
 MaxBars adds two literal *atoms* — a `[…]` list and a `{k: v}` dict — usable
-anywhere an expression is (`each` subjects, arguments, pipe sources, nested):
+anywhere an expression is (loop subjects, arguments, pipe sources, nested):
 
-```handlebars
-{{#each [1, 2, 3]}}{{this}} {{/each}}            {{!-- ⇒ (list 1 2 3) --}}
-{{#each [first, n + 1, {tag: x}]}}…{{/each}}     {{!-- elements are full expressions --}}
-{{#with {name: who, age: 30} }}{{name}}{{/with}} {{!-- ⇒ (dict "name" who "age" 30) --}}
-{{{ json {"full name": who} }}}                  {{!-- a string key, for spaces --}}
+```maxbars
+{% for [1, 2, 3] %}{{this}} {% endfor %}            {{!-- ⇒ (list 1 2 3) --}}
+{% for [first, n + 1, {tag: x}] %}…{% endfor %}     {{!-- elements are full expressions --}}
+{% scope {name: who, age: 30} %}{{name}}{% endscope %} {{!-- ⇒ (dict "name" who "age" 30) --}}
+{{{ json {"full name": who} }}}                     {{!-- a string key, for spaces --}}
 ```
 
 They are pure sugar: `[e1, …]` desugars to the prelude `list` helper and
@@ -98,7 +98,7 @@ The lexer carves `[` `]` `{` `}` `,` as their own punctuation only in MaxBars
 town]` path-bracket — is untouched; only a **leading** `[` opens a list. The
 structural scanner is *brace-aware* under the same flag: it balances `{ }` and
 skips string literals, so a dict's own `}` is consumed before the tag close and
-`{{#with {a: 1}}}` (or `{{{json {x: 1}}}}`) needs **no** disambiguating space — a
+`{% scope {a: 1} %}` (or `{{{json {x: 1}}}}`) needs **no** disambiguating space — a
 `}}` inside a dict-value string is not a tag close either.
 
 ## Collection filters
@@ -107,13 +107,13 @@ The shared prelude carries five **key-based** filter operations
 ([ADR-036](/adr/adr-0036-collection-filter-operations/)) — pipe-able like every
 other collection op, no new surface:
 
-```handlebars
-{{#each row in (rows | where "active") }}…{{/each}}     {{!-- key is truthy --}}
-{{#each u in (users | where "tier" "gold") }}…{{/each}} {{!-- key == value --}}
-{{#each u in (users | reject "archived") }}…{{/each}}   {{!-- complement of where --}}
-{{ users | find "role" "admin" | json }}                {{!-- first match, else null --}}
-{{#if (orders | some "open") }}You have open orders.{{/if}}
-{{#if (rows | every "valid") }}All valid.{{/if}}
+```maxbars
+{% for row in (rows | where "active") %}…{% endfor %}     {{!-- key is truthy --}}
+{% for u in (users | where "tier" "gold") %}…{% endfor %} {{!-- key == value --}}
+{% for u in (users | reject "archived") %}…{% endfor %}   {{!-- complement of where --}}
+{{ users | find "role" "admin" | json }}                  {{!-- first match, else null --}}
+{% if (orders | some "open") %}You have open orders.{% endif %}
+{% if (rows | every "valid") %}All valid.{% endif %}
 ```
 
 | Operation | 2-arg (`coll key`) | 3-arg (`coll key value`) |
@@ -125,7 +125,7 @@ other collection op, no new surface:
 The key is a dotted path (`where users "profile.active"`), resolved exactly as
 `sortBy` / `groupBy` / `pluck` resolve theirs. The 2-arg *truthy* form reads the
 engine's rule, so under MaxBars's `nonEmpty` a `0` field is **kept** (it is truthy
-here) where ClassicBars's `handlebars` rule would drop it — the same split `{{#if}}`
+here) where ClassicBars's `handlebars` rule would drop it — the same split `{% if %}`
 shows. There are **no lambdas** ([ADR-020](/adr/adr-0020-user-block-helpers/)), so
 the filter is key-based, not predicate-based: `where (gt x.score 50)` is *not*
 expressible — precompute the flag (`{ score, top }`) and filter on the key.
@@ -159,9 +159,9 @@ construction. `@root` becomes `root`, `../x` becomes `parent.x`, and an
 `@`-prefixed name is a *located parse error* pointing at this model.
 
 ```handlebars
-{{#each items}}{{loop.index1}}/{{loop.length}}: {{this.name}}{{#unless loop.last}}, {{/unless}}{{/each}}
+{% for items %}{{loop.index1}}/{{loop.length}}: {{this.name}}{% unless loop.last %}, {% endunless %}{% endfor %}
 
-{{#each rows}}{{#each this}}{{loop.parent.index0}}.{{loop.index0}} {{parent.label}} {{root.title}}{{/each}}{{/each}}
+{% for rows %}{% for this %}{{loop.parent.index0}}.{{loop.index0}} {{parent.label}} {{root.title}}{% endfor %}{% endfor %}
 ```
 
 ## The block-partial body (`{% yield %}`)
@@ -200,30 +200,30 @@ A block *open* parses its head as the helper name followed by arguments, each a
 full infix expression — so a condition needs no parentheses:
 
 ```handlebars
-{{#if x > 0 && x < 10}}in range{{/if}}      {{!-- = {{#if (and (gt x 0) (lt x 10))}} --}}
-{{#unless a || b}}neither{{/unless}}
+{% if x > 0 && x < 10 %}in range{% endif %}      {{!-- = {% if (and (gt x 0) (lt x 10)) %} --}}
+{% unless a || b %}neither{% endunless %}
 ```
 
 This is the core `parseHead` seam: only block opens use it. A *clause* separator
-still takes a parenthesised condition — `{{elif (a && b)}}`,
+still takes a parenthesised condition — `{% elif (a && b) %}`,
 `{{else if (a && b)}}` — because separators share their tag shape with
 output expressions.
 
 ## Multi-arm `case`
 
-For a value with several branches, `{{#case}}` dispatches the subject against each
+For a value with several branches, `{% case %}` dispatches the subject against each
 `{{when}}` arm by equality — clearer than a chain of `{{else if (eq s …)}}`:
 
 ```handlebars
-{{#case status}}
-{{when "shipped"}}On its way
-{{when "pending" "queued"}}Waiting
-{{else}}Unknown
-{{/case}}
+{% case status %}
+{% when "shipped" %}On its way
+{% when "pending" "queued" %}Waiting
+{% else %}Unknown
+{% endcase %}
 ```
 
 The subject is a full expression; each `{{when}}` carries one or more **value
-expressions** and is taken when the subject equals **any** of them. `{{else}}` is the
+expressions** and is taken when the subject equals **any** of them. `{% else %}` is the
 catch-all (with none, an unmatched subject renders nothing). `when`/`else` are
 clause separators (their standalone lines are trimmed like `else`/`elif`); only
 whitespace may precede the first `{{when}}` — leading content is a located error.
@@ -232,7 +232,7 @@ whitespace may precede the first `{{when}}` — leading content is a located err
 once (`Kernel.Prelude.caseH`) and the Trussbars compiler lowers it to a Rust
 `match`. It belongs to the `nonEmpty`-truthiness family — **RawBars and MaxBars
 only**; ClassicBars (Handlebars-faithful) has no `case` and rejects it with a located
-error pointing at the `{{#if (eq …)}}` form. The future typed-exhaustive variant
+error pointing at the `{% if (eq …) %}` form. The future typed-exhaustive variant
 takes the `match` keyword with pattern arms.
 
 ## Loop and block bindings
@@ -242,27 +242,27 @@ won't change further:
 
 | Construct | Operation | Spelling |
 | --- | --- | --- |
-| `{{#each elem [i0] [i1] in coll}}` | iterate a collection | `… in coll` (names first) |
-| `{{#with value as alias}}` | re-root the context + alias | `value as alias` |
-| `{{#let name=value …}}` | alias, no re-root | `name=value` |
+| `{% for elem [i0] [i1] in coll %}` | iterate a collection | `… in coll` (names first) |
+| `{% scope value [as alias] %}` | re-root the context (optional alias) | `value [as alias]` |
+| `{% local name=value … %}` | alias, no re-root | `name=value` |
 
 The keywords differ because the operations do: `in` reads "drawn from a
-collection" (so it fits `each`, not `with`), `as` is the alias/re-root word, and
-`=` is the binding word. `{{#each}}` binds its loop variables **Liquid-style** —
-the names come *before* `in`, the collection after — and `{{#with}}` aliases the
-shifted context with a *drop-pipes* `as` (no bars). `each` binds up to three
-names: the element, the 0-based index (or object key), and the 1-based index —
-one more than ClassicBars' two.
+collection" (so it fits `for`, not `scope`), `as` is the alias word, and
+`=` is the binding word. `{% for %}` binds its loop variables **Liquid-style** —
+the names come *before* `in`, the collection after — and `{% scope %}` re-roots the
+context, optionally aliasing it with a *drop-pipes* `as` (no bars). `for` binds up
+to three names: the element, the 0-based index (or object key), and the 1-based
+index — one more than ClassicBars' two.
 
-```handlebars
-{{#each item in items}}{{item}}{{/each}}
-{{#each item i in items}}{{i}}: {{item}}{{/each}}
-{{#each item i0 i1 in items}}{{i0}}/{{i1}}: {{item}}{{/each}}
-{{#each value key in obj}}{{key}}={{value}}{{/each}}
-{{#with user as u}}{{u.name}}{{/with}}
+```maxbars
+{% for item in items %}{{item}}{% endfor %}
+{% for item i in items %}{{i}}: {{item}}{% endfor %}
+{% for item i0 i1 in items %}{{i0}}/{{i1}}: {{item}}{% endfor %}
+{% for value key in obj %}{{key}}={{value}}{% endfor %}
+{% scope user as u %}{{u.name}}{% endscope %}
 ```
 
-`{{#each items}}` (no `in`) is the binding-less form (`this` is the element). The
+`{% for items %}` (no `in`) is the binding-less form (`this` is the element). The
 head grammar omits the *pipe* rung and MaxBars rejects a bar in a block head
 outright (the Handlebars `as |a b|` form is a parse error here). The binding names
 are bare identifiers carried to the same surface desugar ClassicBars uses
@@ -271,38 +271,39 @@ binding, no other machinery. The collection after `in` is a full expression — 
 path, a `(subexpr)`, a `1..n` range, or a `[…]` list — so to *pipe* it,
 parenthesise:
 
-```handlebars
-{{#each p in (people | reverse)}}{{p.name}}{{/each}}
+```maxbars
+{% for p in (people | reverse) %}{{p.name}}{% endfor %}
 ```
 
-## Let bindings
+## Local bindings
 
-`{{#let name=expr …}}…{{/let}}` ([ADR-024](/adr/adr-0024-let-and-dict-literal/))
+`{% local name=expr … %}…{% endlocal %}` ([ADR-024](/adr/adr-0024-let-and-dict-literal/))
 installs *block-scoped aliases* — template-local constants for a deep path, a
-computed value, a small lookup table — that vanish at `{{/let}}`. Each name is a
-nullary operation returning its value:
+computed value, a small lookup table — that vanish at `{% endlocal %}`. (The keyword
+was `let` before docs-17; it is now `local` for the bounded binding, `set` for the
+forward one.) Each name is a nullary operation returning its value:
 
-```handlebars
-{{#let total=(add price tax) label="Subtotal"}}
+```maxbars
+{% local total=(add price tax) label="Subtotal" %}
   {{label}}: {{total}}
-{{/let}}
-{{#let u=order.customer}}{{u.name}} — {{u.email}}{{/let}}
+{% endlocal %}
+{% local u=order.customer %}{{u.name}} — {{u.email}}{% endlocal %}
 ```
 
 Two properties define it:
 
 * **Sequential.** Bindings evaluate left-to-right, each in the scope extended by
-  those to its left, so `{{#let a=1 b=(add a 1)}}` binds `b` to `2`. There is no
+  those to its left, so `{% local a=1 b=(add a 1) %}` binds `b` to `2`. There is no
   self- or forward-reference (a sequential `let`, not a `letrec`).
-* **Never re-roots.** Unlike `{{#with}}`, `let` only *aliases* — it does not shift
+* **Never re-roots.** Unlike `{% scope %}`, `local` only *aliases* — it does not shift
   the context, so a bare `{{name}}` in the body still resolves against the current
-  context. `{{#let u=user}}{{name}}{{/let}}` reads the *root* `name`, not
+  context. `{% local u=user %}{{name}}{% endlocal %}` reads the *root* `name`, not
   `user.name` (write `{{u.name}}`). The complement holds:
-  `{{#with x as p}}` ≡ `{{#with x}}{{#let p=this}}…{{/let}}{{/with}}`.
+  `{% scope x as p %}` ≡ `{% scope x %}{% local p=this %}…{% endlocal %}{% endscope %}`.
 
 A binding whose name matches an in-scope operation shadows it for the body
-(`{{#let add="…"}}` reads the alias, not the `add` helper). Values are any
-expression — including a dict or list literal (`{{#let cfg={theme: "dark"}}}`).
+(`{% local add="…" %}` reads the alias, not the `add` helper). Values are any
+expression — including a dict or list literal (`{% local cfg={theme: "dark"} %}`).
 The surface desugars to nested single-binding lets, which the engine installs with
 `pushHelpers` (the context-preserving frame push); it is MaxBars-only sugar over
 that one engine primitive (ClassicBars stays Handlebars-faithful and uses
@@ -317,10 +318,10 @@ shape); it binds the frame reified as an object whose fields are the loop
 variables (`index0`/`first`/`length`/…):
 
 ```handlebars
-{{#each row in rows label outer}}
-  {{#each cell in row}}{{outer.index1}}/{{outer.length}}: {{cell}}{{#if outer.first}} (first row){{/if}}
-  {{/each}}
-{{/each}}
+{% for row in rows label outer %}
+  {% for cell in row %}{{outer.index1}}/{{outer.length}}: {{cell}}{% if outer.first %} (first row){% endif %}
+  {% endfor %}
+{% endfor %}
 ```
 
 `outer` exposes `this` / `index0` / `index1` / `rindex0` / `rindex1` / `first` /
@@ -328,7 +329,7 @@ variables (`index0`/`first`/`length`/…):
 the bare loop variables of that loop. It is an *immutable per-iteration snapshot*,
 reached by ordinary path lookup (`{{outer.length}}`), so the interpreter and
 compiler agree by construction. A label and loop bindings compose:
-`{{#each row in rows label outer}}` binds both `row` (the element) and
+`{% for row in rows label outer %}` binds both `row` (the element) and
 `outer` (the frame).
 
 Notes:
@@ -356,7 +357,7 @@ renderWithOperations
 ```
 
 A *block* operation receives a Handlebars-style `options`: `options.fn(ctx)`
-renders the body (shifting context), `options.inverse(ctx)` the `{{else}}`
+renders the body (shifting context), `options.inverse(ctx)` the `{% else %}`
 clause, `options.hash` the surface `k=v` arguments, `options.fn(ctx, { data })`
 supplies scoped `@vars`, and `options.fn(ctx, { blockParams })` binds the names a
 custom block helper declares with a trailing drop-pipes `as a b` (the built-in
@@ -369,11 +370,11 @@ plain functions into these operations (the FlatBars Lab and `flatbars-js`).
 
 ## v1 limitations
 
-* **Clause separators need parenthesised conditions** — `{{elif (a && b)}}`
+* **Clause separators need parenthesised conditions** — `{% elif (a && b) %}`
   / `{{else if (a && b)}}`, since `{{ … }}` separators and output
-  share a tag shape. Block opens (`{{#if a && b}}`) do not.
+  share a tag shape. Block opens (`{% if a && b %}`) do not.
 * **A bar in a block head is a parse error** — to pipe a head argument,
-  parenthesise it: `{{#each (xs | f) …}}`, not `{{#each xs | f}}`. The head
+  parenthesise it: `{% for (xs | f) … %}`, not `{% for xs | f %}`. The head
   grammar omits the top-level pipe rung, and MaxBars block params drop the pipes
   (`as x`, not `as |x|`), so a bar in a head has no meaning and is rejected
   outright — whether it was the Handlebars block-param delimiter or an
@@ -399,9 +400,9 @@ plain functions into these operations (the FlatBars Lab and `flatbars-js`).
 
 MaxBars uses the `nonEmpty` rule (ADR-022): `false`/`null`/`""`/`[]`/`{}`
 are falsy, but `0` is *truthy* — test magnitude with the built-in compare,
-`{{#if val > 0}}`. This *differs* from ClassicBars (`handlebars`, where `0`
+`{% if val > 0 %}`. This *differs* from ClassicBars (`handlebars`, where `0`
 and `{}` flip); MaxBars is not a Handlebars clone, so it leans on its
 compare operators rather than coercing `0`. There is no `@truthiness` directive
-(removed in [ADR-022](/adr/adr-0022-analyse-mode/)). `{{#if x}}` and
+(removed in [ADR-022](/adr/adr-0022-analyse-mode/)). `{% if x %}` and
 `{{ x && y }}` always agree (both test through the engine's one rule).
 `includeZero` is a no-op here (`0` is already truthy). See [directives](/engine/directives/).
