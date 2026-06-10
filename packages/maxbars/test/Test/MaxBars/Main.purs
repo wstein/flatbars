@@ -23,6 +23,7 @@ import Effect.Console (log)
 import FlatBars.Value (Value(..))
 import MaxBars (compileMaxJs, maxbarsWarnings, renderMax)
 import MaxBars.Compat (compatReportWith)
+import MaxBars.Rust (compileMaxRust)
 import Test.Assert (assert')
 
 obj :: Array (Tuple String Value) -> Value
@@ -364,6 +365,23 @@ main = do
     Left e -> assert' ("compile loopvar: unexpected error " <> show e) false
     Right js -> assert' ("compile loopvar: expected rt.call(\"loop\" in\n" <> js)
       (contains (Pattern "rt.call(\"loop\"") js)
+
+  -- the Trussbars (Rust) backend emits `loop.depth` as the `Loop::at` frame's
+  -- `.depth` field, and `loop.parent.depth` through the borrowed-`parent` chain
+  -- (ADR-021 amendment). The frame's nesting is the `Some(&outer)` parent link, so
+  -- `Loop::at` derives the depth — no extra codegen at the access site.
+  let
+    rustDepth =
+      compileMaxRust "Ctx"
+        "{% each g in groups %}{{loop.depth}}{% each x in g %}{{loop.parent.depth}}{% endeach %}{% endeach %}"
+  assert' ("compile loop.depth (Rust): emit failed — " <> rustDepth.err) rustDepth.ok
+  assert' ("compile loop.depth (Rust): expected `.depth` field access in\n" <> rustDepth.out)
+    (contains (Pattern ".depth") rustDepth.out)
+  assert'
+    ( "compile loop.parent.depth (Rust): expected parent-chain `.map(|__p| __p.depth)` in\n" <>
+        rustDepth.out
+    )
+    (contains (Pattern "__p.depth") rustDepth.out)
 
   -- MaxBars also rejects the Handlebars-only shapes (not the Handlebars-compat
   -- dialect): inverse {{^}}, unescaped {{&}}, and raw blocks {{{{}}}}.

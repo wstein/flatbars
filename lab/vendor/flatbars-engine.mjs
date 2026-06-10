@@ -17320,7 +17320,7 @@ var openTag = function(raw) {
   ;
   return tag;
 };
-var loopFields = ["index0", "index1", "rindex0", "rindex1", "first", "last", "length", "key"];
+var loopFields = ["index0", "index1", "rindex0", "rindex1", "first", "last", "length", "depth", "key"];
 var lit = function(v) {
   if (v instanceof VString) {
     return new Right(rustStr(v.value0));

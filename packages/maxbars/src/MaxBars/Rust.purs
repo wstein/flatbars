@@ -971,7 +971,7 @@ parentIndex = case _ of
 
 -- The direct (non-chained) `Loop` metadata fields.
 loopFields :: Array String
-loopFields = [ "index0", "index1", "rindex0", "rindex1", "first", "last", "length", "key" ]
+loopFields = [ "index0", "index1", "rindex0", "rindex1", "first", "last", "length", "depth", "key" ]
 
 -- A `loop` path: zero or more `parent`/`root` hops then a terminal metadata field.
 -- `parent` introduces an `Option<&Loop>` (it is `None` at the outermost loop), so

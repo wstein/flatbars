@@ -172,6 +172,10 @@ fn write_escaped(v: &Value, out: &mut String) {
 struct LoopFrame {
     index0: usize,
     length: usize,
+    /// The 1-based loop-nesting level (`loop.depth`, ADR-021 amendment): the
+    /// enclosing frame's `depth + 1`, `1` at the outermost loop. Stored (not
+    /// walked) so it matches the AOT backend's `Loop::at` derivation in O(1).
+    depth: usize,
     key: Option<String>,
     parent: Option<Rc<LoopFrame>>,
 }
@@ -188,6 +192,7 @@ impl LoopFrame {
             "first" => Value::Bool(i == 0),
             "last" => Value::Bool(i + 1 == n),
             "length" => Value::Num(n as f64),
+            "depth" => Value::Num(self.depth as f64),
             "key" => self
                 .key
                 .clone()
@@ -751,6 +756,7 @@ fn eval_each(env: &Env, e: &Each, out: &mut String) -> Result<(), String> {
         let frame = Rc::new(LoopFrame {
             index0: i,
             length,
+            depth: env.loop_frame.as_ref().map_or(0, |p| p.depth) + 1,
             key,
             parent: env.loop_frame.clone(),
         });
@@ -1267,6 +1273,22 @@ mod tests {
         assert_eq!(
             render("{{#each xs}}{{parent.title}}:{{this}}{{/each}}", d).unwrap(),
             "T:a"
+        );
+    }
+
+    #[test]
+    fn loop_depth_counts_nesting() {
+        // `loop.depth` (ADR-021 amendment): 1-based nesting; the inner loop is
+        // depth 2 and its `loop.parent.depth` is the outer loop's depth (1). Must
+        // match the AOT backend's `Loop::at` derivation (AOT≡VM).
+        let d = obj(&[("gs", arr(&[arr(&[s("a"), s("b")]), arr(&[s("c")])]))]);
+        assert_eq!(
+            render(
+                "{{#each gs}}{{loop.depth}}:{{#each this}}{{loop.depth}}/{{loop.parent.depth}} {{/each}}{{/each}}",
+                d
+            )
+            .unwrap(),
+            "1:2/1 2/1 1:2/1 "
         );
     }
 
