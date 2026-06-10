@@ -98,25 +98,25 @@ export const cases = [
   // ── each & loop metadata ─────────────────────────────────────────────────────
   {
     id: "each-strings",
-    template: "{% each tags %}#{{this}} {% endeach %}",
+    template: "{% for tags %}#{{this}} {% endfor %}",
     data: { tags: ["x", "y", "z"] },
   },
   {
     id: "each-empty",
-    template: "{% each items %}- {{this}}\n{% else %}(none){% endeach %}",
+    template: "{% for items %}- {{this}}\n{% else %}(none){% endfor %}",
     data: { items: [] },
   },
   {
     id: "each-loopmeta",
     template:
-      "{% each p in people %}{{loop.index1}}. {{p.name}}{% if loop.last %}!{% endif %} {% endeach %}",
+      "{% for p in people %}{{loop.index1}}. {{p.name}}{% if loop.last %}!{% endif %} {% endfor %}",
     data: { people: [{ name: "A" }, { name: "B" }, { name: "C" }] },
   },
   {
     // Object iteration: keys in sorted order, `loop.key` bound. `maps` types the
     // field as a BTreeMap rather than a struct.
     id: "each-object",
-    template: "{% each prefs %}{{loop.key}} = {{this}}\n{% endeach %}",
+    template: "{% for prefs %}{{loop.key}} = {{this}}\n{% endfor %}",
     data: { prefs: { en: "English", de: "German" } },
     maps: ["prefs"],
   },
@@ -129,7 +129,7 @@ export const cases = [
     id: "nested-each-root",
     // Param name avoids the blessed-op collision (`t` is the translate operation).
     template:
-      "{% each team in teams %}{{team.name}} ({{root.org}}): {% each team.members %}{{this}} {% endeach %}\n{% endeach %}",
+      "{% for team in teams %}{{team.name}} ({{root.org}}): {% for team.members %}{{this}} {% endfor %}\n{% endfor %}",
     data: {
       org: "Acme",
       teams: [
@@ -173,12 +173,12 @@ export const cases = [
   // ── list literals `[…]` → a Rust array (homogeneous; rustc enforces) ──────────
   {
     id: "list-each-int",
-    template: "{% each [1, 2, 3] %}{{this}} {% endeach %}",
+    template: "{% for [1, 2, 3] %}{{this}} {% endfor %}",
     data: {},
   },
   {
     id: "list-each-str",
-    template: '{% each ["a", "b", "c"] %}#{{this}} {% endeach %}',
+    template: '{% for ["a", "b", "c"] %}#{{this}} {% endfor %}',
     data: {},
   },
   {
@@ -197,7 +197,7 @@ export const cases = [
   {
     id: "where-comparator",
     ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
-    template: '{% each (where items "age" "gt" 20) %}{{this.name}} {% endeach %}',
+    template: '{% for (where items "age" "gt" 20) %}{{this.name}} {% endfor %}',
     data: {
       items: [
         { name: "Ann", age: 30 },
@@ -209,7 +209,7 @@ export const cases = [
   {
     id: "where-truthiness",
     ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
-    template: '{% each (where items "active") %}{{this.name}} {% endeach %}',
+    template: '{% for (where items "active") %}{{this.name}} {% endfor %}',
     data: {
       items: [
         { name: "Ann", active: true },
@@ -220,7 +220,7 @@ export const cases = [
   {
     id: "reject-truthiness",
     ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
-    template: '{% each (reject items "active") %}{{this.name}} {% endeach %}',
+    template: '{% for (reject items "active") %}{{this.name}} {% endfor %}',
     data: {
       items: [
         { name: "Ann", active: true },
@@ -231,7 +231,7 @@ export const cases = [
   {
     id: "where-startswith",
     ctxFromData: true, // inference gap: where-key / with-into-dict re-root mis-hoist root fields (docs/03 §Not-yet)
-    template: '{% each (where items "name" "startsWith" "A") %}{{this.name}} {% endeach %}',
+    template: '{% for (where items "name" "startsWith" "A") %}{{this.name}} {% endfor %}',
     data: { items: [{ name: "Ann" }, { name: "Bo" }, { name: "Al" }] },
   },
   {
@@ -269,13 +269,13 @@ export const cases = [
   {
     id: "loop-parent",
     template:
-      "{% each row in rows %}{% each row %}{{loop.parent.index0}}:{{this}} {% endeach %}{% endeach %}",
+      "{% for row in rows %}{% for row %}{{loop.parent.index0}}:{{this}} {% endfor %}{% endfor %}",
     data: { rows: [["a", "b"], ["c"]] },
   },
   {
     id: "loop-root",
     template:
-      "{% each g in groups %}{% each g %}{{loop.root.length}}/{{this}} {% endeach %}{% endeach %}",
+      "{% for g in groups %}{% for g %}{{loop.root.length}}/{{this}} {% endfor %}{% endfor %}",
     data: { groups: [["x"], ["y", "z"]] },
   },
 
@@ -283,7 +283,7 @@ export const cases = [
   {
     id: "parent-context",
     template:
-      "{% each team in teams %}{% each team.members %}{{parent.name}}={{this}} {% endeach %}{% endeach %}",
+      "{% for team in teams %}{% for team.members %}{{parent.name}}={{this}} {% endfor %}{% endfor %}",
     data: {
       teams: [
         { name: "T1", members: ["a", "b"] },
@@ -313,7 +313,7 @@ export const cases = [
   {
     id: "partial-in-each",
     template:
-      '{% inline "row" %}<li>{{name}}</li>{% endinline %}{% each items %}{{> row}}{% endeach %}',
+      '{% inline "row" %}<li>{{name}}</li>{% endinline %}{% for items %}{{> row}}{% endfor %}',
     data: { items: [{ name: "a" }, { name: "b" }] },
   },
   {
@@ -326,7 +326,7 @@ export const cases = [
   {
     id: "outer-label",
     template:
-      "{% each row in rows label outer %}{% each row %}{{outer.index1}}:{{this}} {% endeach %}{% endeach %}",
+      "{% for row in rows label outer %}{% for row %}{{outer.index1}}:{{this}} {% endfor %}{% endfor %}",
     data: { rows: [["a", "b"], ["c"]] },
   },
   {
@@ -355,7 +355,7 @@ export const cases = [
     id: "group-by",
     ctxFromData: true, // inference gap: filter/find element body-fields (docs/03 §Not-yet)
     template:
-      '{% each (groupBy items "kind") %}{{loop.key}}:{% each this %}{{name}}{% endeach %} {% endeach %}',
+      '{% for (groupBy items "kind") %}{{loop.key}}:{% for this %}{{name}}{% endfor %} {% endfor %}',
     data: {
       items: [
         { kind: "b", name: "x" },
@@ -397,7 +397,7 @@ export const cases = [
     // deep nesting: each → if → nested each, with a deep path and a `root` reach.
     id: "deep-nesting",
     template:
-      "{% each row in rows %}{% if row.on %}[{{row.meta.lbl}}/{{root.tag}}:{% each n in row.ns %}{{n}}{% endeach %}]{% endif %}{% endeach %}",
+      "{% for row in rows %}{% if row.on %}[{{row.meta.lbl}}/{{root.tag}}:{% for n in row.ns %}{{n}}{% endfor %}]{% endif %}{% endfor %}",
     data: {
       tag: "T",
       rows: [
@@ -414,7 +414,7 @@ export const cases = [
   // oracle) byte-for-byte — the rule the example apps' multi-line templates need.
   {
     id: "standalone-each",
-    template: "items:\n{% each xs %}\n- {{this}}\n{% endeach %}\ndone\n",
+    template: "items:\n{% for xs %}\n- {{this}}\n{% endfor %}\ndone\n",
     data: { xs: ["a", "b"] },
   },
   {
@@ -424,12 +424,12 @@ export const cases = [
   },
   {
     id: "standalone-indented",
-    template: "<ul>\n  {% each xs %}\n  <li>{{this}}</li>\n  {% endeach %}\n</ul>\n",
+    template: "<ul>\n  {% for xs %}\n  <li>{{this}}</li>\n  {% endfor %}\n</ul>\n",
     data: { xs: ["x"] },
   },
   {
     id: "standalone-not-when-inline",
-    template: "{% each xs %}{{this}} {% endeach %}\n",
+    template: "{% for xs %}{{this}} {% endfor %}\n",
     data: { xs: ["a", "b"] },
   },
 

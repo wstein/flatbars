@@ -6,7 +6,7 @@
 //!
 //! Brace-aware: the closing `}}` is found at brace/bracket **depth 0**, skipping
 //! quoted strings, so a dict/list literal needs no space before the close
-//! (`{% each {a: 1} %}` lexes with interior `each {a: 1}`). The four-brace raw block
+//! (`{% for {a: 1} %}` lexes with interior `for {a: 1}`). The four-brace raw block
 //! `{{{{#raw}}}}…{{{{/raw}}}}` captures its body verbatim.
 
 use crate::span::Span;
@@ -395,10 +395,10 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
 /// and VM never see `{% %}` — a faithful port of `FlatBars.Lexer.readStatementTag`:
 ///
 /// * `{% endX %}` → [`Sigil::Close`] naming `X` (the interior is the substring *after*
-///   the `end` prefix — e.g. `endeach` carries the `each` it spans).
+///   the `end` prefix — e.g. `endfor` carries the `for` it spans).
 /// * `{% else %}` / `{% elif … %}` / `{% when … %}` → [`Sigil::Output`], which the parser
 ///   already splits into a clause (`Stop::Else` / `ElseIf` / `When`), exactly as `{% else %}`.
-/// * anything else (`{% if … %}`, `{% each … %}`, `{% local … %}`, host block heads) →
+/// * anything else (`{% if … %}`, `{% for … %}`, `{% local … %}`, host block heads) →
 ///   [`Sigil::Open`].
 ///
 /// The `%}` close is found brace-aware (depth 0, strings skipped), like `{{ }}`.
@@ -675,7 +675,7 @@ mod tests {
 
     #[test]
     fn all_two_brace_sigils() {
-        let s = "{{x}}{{{y}}}{% each xs %}{% endeach %}{{> card}}{{! c }}";
+        let s = "{{x}}{{{y}}}{% for xs %}{% endfor %}{{> card}}{{! c }}";
         assert_eq!(
             sigils(s),
             vec![
@@ -700,15 +700,15 @@ mod tests {
     #[test]
     fn brace_aware_dict_needs_no_space() {
         // The dict's `}` must not be mistaken for the tag close.
-        let s = "{% each {a: 1, b: 2} %}{{this}}{% endeach %}";
-        assert_eq!(interiors(s)[0], "each {a: 1, b: 2}");
+        let s = "{% for {a: 1, b: 2} %}{{this}}{% endfor %}";
+        assert_eq!(interiors(s)[0], "for {a: 1, b: 2}");
         assert_round_trip(s);
     }
 
     #[test]
     fn list_literal_brackets() {
-        let s = "{% each [1, 2, 3] %}{{this}}{% endeach %}";
-        assert_eq!(interiors(s)[0], "each [1, 2, 3]");
+        let s = "{% for [1, 2, 3] %}{{this}}{% endfor %}";
+        assert_eq!(interiors(s)[0], "for [1, 2, 3]");
         assert_round_trip(s);
     }
 
@@ -743,7 +743,7 @@ mod tests {
 
     #[test]
     fn liquid_loop_and_let_round_trip() {
-        assert_round_trip("{% each post i in posts label outer %}{{post.title}}{% endeach %}");
+        assert_round_trip("{% for post i in posts label outer %}{{post.title}}{% endfor %}");
         assert_round_trip("{% let a=(multiply x y) b=(add a 1) %}{{a}}/{{b}}{% endlet %}");
     }
 
@@ -772,17 +772,17 @@ mod tests {
 
     #[test]
     fn statement_tag_open_close_sigils() {
-        // `{% each xs %}` opens (interior = the trimmed head+args), `{% endeach %}` closes
-        // naming `each` (the substring after `end`).
+        // `{% for xs %}` opens (interior = the trimmed head+args), `{% endfor %}` closes
+        // naming `for` (the substring after `end`).
         assert_eq!(
-            tags("{% each xs %}{{this}}{% endeach %}"),
+            tags("{% for xs %}{{this}}{% endfor %}"),
             vec![
-                (Sigil::Open, "each xs".to_string()),
+                (Sigil::Open, "for xs".to_string()),
                 (Sigil::Output, "this".to_string()),
-                (Sigil::Close, "each".to_string()),
+                (Sigil::Close, "for".to_string()),
             ]
         );
-        assert_round_trip("{% each xs %}{{this}}{% endeach %}");
+        assert_round_trip("{% for xs %}{{this}}{% endfor %}");
     }
 
     #[test]
@@ -804,8 +804,8 @@ mod tests {
     fn statement_tag_reduces_like_brace_tag() {
         // The structural token stream of the `{% %}` and `{%   %}` spellings is identical
         // (modulo the `let`→`local` head rename), so the parser/engine are unchanged.
-        let pct = tags("{% each x in xs %}{{x}}{% endeach %}");
-        let brace = tags("{% each x in xs %}{{x}}{% endeach %}");
+        let pct = tags("{% for x in xs %}{{x}}{% endfor %}");
+        let brace = tags("{% for x in xs %}{{x}}{% endfor %}");
         assert_eq!(pct, brace);
     }
 
@@ -825,10 +825,10 @@ mod tests {
 
     #[test]
     fn statement_tag_standalone_lines_trim() {
-        // A `{% each %}`/`{% endeach %}` alone on its line leaves no blank line — the
-        // same standalone rule as `{% each %}` (the sigils drive `trim_standalone`).
+        // A `{% for %}`/`{% endfor %}` alone on its line leaves no blank line — the
+        // same standalone rule as `{% for %}` (the sigils drive `trim_standalone`).
         assert_eq!(
-            trimmed_text("a\n{% each xs %}\n-\n{% endeach %}\nb\n"),
+            trimmed_text("a\n{% for xs %}\n-\n{% endfor %}\nb\n"),
             "a\n-\nb\n"
         );
     }
@@ -836,7 +836,7 @@ mod tests {
     #[test]
     fn empty_or_unterminated_statement_tag_errors() {
         assert!(lex("{%  %}").is_err()); // empty
-        assert!(lex("ok {% each xs no close").is_err()); // no `%}`
+        assert!(lex("ok {% for xs no close").is_err()); // no `%}`
     }
 
     #[test]
@@ -877,14 +877,14 @@ mod tests {
 
     #[test]
     fn standalone_block_tags_leave_no_blank_line() {
-        // The `{% each %}` / `{% endeach %}` lines (alone on their line) are stripped whole.
+        // The `{% for %}` / `{% endfor %}` lines (alone on their line) are stripped whole.
         assert_eq!(
-            trimmed_text("a\n{% each xs %}\n-\n{% endeach %}\nb\n"),
+            trimmed_text("a\n{% for xs %}\n-\n{% endfor %}\nb\n"),
             "a\n-\nb\n"
         );
         // Indentation before a standalone tag goes too (the `  ` on the each line).
         assert_eq!(
-            trimmed_text("<ul>\n  {% each xs %}\n  x\n  {% endeach %}\n</ul>\n"),
+            trimmed_text("<ul>\n  {% for xs %}\n  x\n  {% endfor %}\n</ul>\n"),
             "<ul>\n  x\n</ul>\n"
         );
     }
@@ -894,7 +894,7 @@ mod tests {
         // A lone `{{x}}` on its line keeps its surrounding whitespace (output, not a block).
         assert_eq!(trimmed_text("a\n{{x}}\nb\n"), "a\n\nb\n");
         // An inline block (text on the same line) is not standalone — the space stays.
-        assert_eq!(trimmed_text("{% each xs %}{{this}} {% endeach %}\n"), " \n");
+        assert_eq!(trimmed_text("{% for xs %}{{this}} {% endfor %}\n"), " \n");
     }
 
     // ── Explicit whitespace control `{{- … -}}` / `{%- … -%}` (ADR-039 item 3) ────

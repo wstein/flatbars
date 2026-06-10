@@ -108,7 +108,12 @@ the explicit override.
 Replaces `{% each x in xs %}` / `{% each xs %}`. `for` is unanimous across Liquid, Django, and Jinja.
 This is *surface only* — it desugars to the same `each` operation; the loop variables stay `loop.*`
 (already Jinja's naming, deliberately not Liquid's `forloop.*`). The `else` clause (`{% for … %} … {%
-else %} … {% endfor %}` for the empty case) is preserved.
+else %} … {% endfor %}` for the empty case) is preserved. **Both binding shapes carry over**: the bound
+`{% for x [i0] [i1] in xs %}` *and* the bare `{% for xs %}` (element → `this`, the binding-less form).
+Bare `for` is a documented **MaxBars extension** over Liquid/Django/Jinja (which always require `x in`),
+kept so every `each` form migrates 1:1 by swapping the keyword and no capability is lost; the head
+rewrite reuses the existing `each` binding desugar (`splitOnIn`) unchanged. The `each` head is rejected
+in MaxBars (use `for`); RawBars keeps `{% each %}` (the op-name surface — see the dialect-scope rule).
 
 **5. Partial include → `{% include "name" %}`.**
 Replaces the inline `{{> name}}` and the Handlebars block-partial sigil `{{#> name}}`. An include

@@ -164,8 +164,9 @@ step src acc = case _ of
           push (emit acc1 (stmtTag tr ("unless " <> mapDataNames interior))) CloseUnless
         _ ->
           -- a `{{#name …}}` open → `{% name … %}`; the matching close emits
-          -- `{% end<name> %}` (the name comes from the `RClose` token).
-          push (emit acc1 (stmtTag tr (mapDataNames interior))) CloseEnd
+          -- `{% end<name> %}` (the name comes from the `RClose` token). The loop/re-root
+          -- heads are renamed to the current MaxBars surface (ADR-039: each→for, with→scope).
+          push (emit acc1 (stmtTag tr (renameInteriorHead (mapDataNames interior)))) CloseEnd
 
   RClose span _ name _ ->
     let
@@ -175,7 +176,7 @@ step src acc = case _ of
         Just CloseUnless ->
           emit (popStack acc) (stmtTag tr "endunless")
         _ ->
-          emit (popStack acc) (stmtTag tr ("end" <> name))
+          emit (popStack acc) (stmtTag tr ("end" <> canonLoopHead name))
 
   -- A separator. A clause separator (`{{else}}` / `{{else if c}}` → `{% elif c %}` /
   -- `{{when …}}`) becomes a `{% … %}` tag; the Handlebars block-partial reference
@@ -384,6 +385,29 @@ stmtTag tr head =
 -- | is one of the engine's clause keywords (`else`/`elif`/`when`).
 isClauseSep :: String -> Boolean
 isClauseSep interior = Array.elem (firstWord interior) [ "else", "elif", "when" ]
+
+-- | Rename a Handlebars block-operation head to its current MaxBars surface keyword
+-- | for migrate output (ADR-039): `each` → `for` (item 4), `with` → `scope` (item 9).
+-- | The Handlebars source names the operation (`{{#each}}`/`{{#with}}`); migrated MaxBars
+-- | uses the renamed keyword (and rejects the op-name head).
+canonLoopHead :: String -> String
+canonLoopHead = case _ of
+  "each" -> "for"
+  "with" -> "scope"
+  w -> w
+
+-- | Apply `canonLoopHead` to the first word of a block-open interior, keeping its args
+-- | (and any leading `~` trim marker) intact.
+renameInteriorHead :: String -> String
+renameInteriorHead interior =
+  let
+    tilde = SCU.take 1 interior == "~"
+    body = String.trim (if tilde then SCU.drop 1 interior else interior)
+    lead = if tilde then "~ " else ""
+  in
+    case String.indexOf (Pattern " ") body of
+      Just i -> lead <> canonLoopHead (SCU.take i body) <> SCU.drop i body
+      Nothing -> lead <> canonLoopHead body
 
 -- | The first whitespace-delimited word of an interior (a leading `~` stripped).
 firstWord :: String -> String

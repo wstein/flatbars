@@ -20,7 +20,7 @@ module Linter.Lower
 
 import Prelude
 
-import ClassicBars (desugarSurfaceWith)
+import ClassicBars (desugarSurfaceWith, renameSurfaceHeads)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -40,7 +40,10 @@ import MaxBars (maxLoopVars, maxOptions)
 lowerToRawBars :: String -> Either ParseError String
 lowerToRawBars src = do
   { directives, nodes } <- lmap NEA.head (parseWith maxOptions src)
-  let desugared = desugarSurfaceWith maxLoopVars nodes
+  -- `renameSurfaceHeads`: the MaxBars surface keywords `for`/`scope` → their canonical
+  -- operation heads `each`/`with` (ADR-039) — RawBars (the lowering target) uses the
+  -- op-name heads, so a `{% for %}` must print as `{% each %}`.
+  let desugared = desugarSurfaceWith maxLoopVars (renameSurfaceHeads nodes)
   case findInheritance desugared of
     Just sigil ->
       Left

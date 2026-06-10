@@ -60,8 +60,9 @@ module ClassicBars.Surface
   , strictSurfaceViolation
   , maxbarsEachAsViolation
   , retiredLetViolation
-  , renameScope
+  , renameSurfaceHeads
   , withReRootViolation
+  , eachLoopViolation
   ) where
 
 import Prelude
@@ -625,17 +626,18 @@ strictSurfaceViolation nodes = Array.head (Array.mapMaybe node nodes)
   caseShape =
     "{{#case}} (multi-arm `case` is a RawBars/MaxBars construct; ClassicBars has no `case` — chain {{#if (eq subject \"v\")}}…{{else if (eq subject \"w\")}}…{{else}}…{{/if}})"
 
--- | The first MaxBars `{{#each … as …}}` in `nodes` — the *removed* trailing-`as`
+-- | The first MaxBars `{% for … as … %}` in `nodes` — the *removed* trailing-`as`
 -- | loop-binding form — its offset and a "shape" string for the located
--- | `DisallowedShape` error. MaxBars `each` binds Liquid-style (`{{#each x in xs}}`),
--- | so a bare `as` in an `each` head is the legacy form and is rejected rather than
--- | silently no-opping (`ClassicBars.checkSurfaceStrict` on the MaxBars path). Only
--- | `each` is matched — `{{#with x as p}}` and custom block helpers keep `as`.
+-- | `DisallowedShape` error. The MaxBars loop binds Liquid-style (`{% for x in xs %}`),
+-- | so a bare `as` in a `for` head is the legacy form and is rejected rather than
+-- | silently no-opping (`ClassicBars.checkSurfaceStrict` on the MaxBars path). The
+-- | head is matched as `for` — its surface spelling, pre-rename (ADR-039 item 4);
+-- | `{% scope x as p %}` and custom block helpers keep `as`.
 maxbarsEachAsViolation :: Template -> Maybe { off :: Int, shape :: String }
 maxbarsEachAsViolation nodes = Array.head (Array.mapMaybe node nodes)
   where
   node = case _ of
-    Block sp Section "each" args _ | Array.any isAs args -> Just
+    Block sp Section "for" args _ | Array.any isAs args -> Just
       { off: sp.start, shape: eachAsShape }
     Block _ _ _ _ body -> maxbarsEachAsViolation body
     _ -> Nothing
@@ -643,7 +645,7 @@ maxbarsEachAsViolation nodes = Array.head (Array.mapMaybe node nodes)
     App "as" [] -> true
     _ -> false
   eachAsShape =
-    "{{#each … as …}} (MaxBars binds loops Liquid-style — write the names before `in`, e.g. {{#each x in xs}} or {{#each x i in xs}}; the trailing `as` form is gone. `with`/custom helpers still use `as`.)"
+    "{% for … as … %} (MaxBars binds loops Liquid-style — write the names before `in`, e.g. {% for x in xs %} or {% for x i in xs %}; the trailing `as` form is gone. `scope`/custom helpers still use `as`.)"
 
 -- | The first retired `{% let … %}` (the old bounded-binding keyword, docs-17) in
 -- | `nodes` — its offset and a "shape" string for the located `DisallowedShape`
@@ -660,18 +662,40 @@ retiredLetViolation nodes = Array.head (Array.mapMaybe node nodes)
   letShape =
     "{% let … %} (`let` is retired — docs-17; the bounded binding is now {% local … %} … {% endlocal %}, the forward binding is {% set name = … %})"
 
--- | Rename the MaxBars-surface re-root keyword `scope` to the canonical `with`
--- | operation head before desugar (ADR-039 item 9). `scope` is pure MaxBars sugar
--- | for the shared `with` re-root operation — no prelude operation is added — so
--- | this walk simply rewrites the head, recursing through block bodies. Run only on
--- | the statement-tag path (`desugarStmt`); RawBars keeps the `with` op-name head.
-renameScope :: Template -> Template
-renameScope = map node
+-- | Rewrite MaxBars-surface keyword heads to their canonical operation heads
+-- | before desugar (ADR-039): `scope` → `with` (item 9, re-root) and `for` → `each`
+-- | (item 4, loop). These are pure MaxBars sugar for shared operations — no prelude
+-- | operation is added or renamed — so this walk just rewrites the head, recursing
+-- | through block bodies; the `each` binding desugar (`splitOnIn`) then handles a
+-- | `for x in xs` / bare `for xs` head unchanged. Run only on the statement-tag path
+-- | (`desugarStmt`); RawBars keeps the op-name heads (`with`/`each`).
+renameSurfaceHeads :: Template -> Template
+renameSurfaceHeads = map node
   where
   node = case _ of
     Block sp sig head args body ->
-      Block sp sig (if head == "scope" then "with" else head) args (renameScope body)
+      Block sp sig (canonicalHead head) args (renameSurfaceHeads body)
     other -> other
+  canonicalHead = case _ of
+    "scope" -> "with"
+    "for" -> "each"
+    h -> h
+
+-- | The first re-rooting `{% with … %}` in `nodes` — its offset and a "shape"
+-- | string for the located `DisallowedShape` error (ADR-039 item 9). In MaxBars the
+-- | context re-root is spelled `{% scope … %}`; the `with` head is reserved and
+-- | rejected with a pointer rather than resolving (it would otherwise desugar past
+-- | this gate into the live re-root). RawBars keeps `with` (it is the operation
+-- | name there), so this runs only on the MaxBars `checkBraceControl` path.
+eachLoopViolation :: Template -> Maybe { off :: Int, shape :: String }
+eachLoopViolation nodes = Array.head (Array.mapMaybe node nodes)
+  where
+  node = case _ of
+    Block sp Section "each" _ _ -> Just { off: sp.start, shape: eachShape }
+    Block _ _ _ _ body -> eachLoopViolation body
+    _ -> Nothing
+  eachShape =
+    "{% each … %} (the loop keyword is renamed `for` — write {% for x in xs %} (or bare {% for xs %}) … {% endfor %}; `each` is reserved, ADR-039)"
 
 -- | The first re-rooting `{% with … %}` in `nodes` — its offset and a "shape"
 -- | string for the located `DisallowedShape` error (ADR-039 item 9). In MaxBars the

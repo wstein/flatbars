@@ -39,7 +39,7 @@ module ClassicBars
 
 import Prelude
 
-import ClassicBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, renameScope, retiredLetViolation, strictSurfaceViolation, withReRootViolation)
+import ClassicBars.Surface (LoopVars, desugar, desugarWith, eachLoopViolation, maxbarsEachAsViolation, noLoopVars, renameSurfaceHeads, retiredLetViolation, strictSurfaceViolation, withReRootViolation)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -90,7 +90,7 @@ desugarSurfaceWith lv = desugarWith lv surfaceClauses
 desugarStmt :: ParseOptions -> LoopVars -> Template -> Template
 desugarStmt opts lv nodes =
   desugarSurfaceWith lv
-    (if opts.lexConfig.statementTags then renameScope (liftSet nodes) else nodes)
+    (if opts.lexConfig.statementTags then renameSurfaceHeads (liftSet nodes) else nodes)
 
 -- | Reject each dialect's disallowed *surface* shapes (the `strict` flag is the
 -- | ClassicBars/MaxBars distinction the render paths already thread), reported as a
@@ -132,11 +132,14 @@ checkBraceControl src nodes = case braceControlViolation surfaceClauses src node
   -- name (docs-17 §2) — `{% set this = … %}` / `{% local loop = … %}` and the like.
   Nothing -> case reservedBindingViolation blockHelperNames nodes of
     Just v -> Left (DisallowedShape v.shape v.off)
-    -- ADR-039 item 9: the re-rooting `{% with %}` is renamed `{% scope %}` in MaxBars
-    -- (RawBars keeps `with`, so this runs only on the ClassicBars statementTags path).
+    -- ADR-039: the re-rooting `{% with %}` is renamed `{% scope %}` (item 9) and the
+    -- loop `{% each %}` is renamed `{% for %}` (item 4) in MaxBars (RawBars keeps both
+    -- op-name heads, so this runs only on the ClassicBars statementTags path).
     Nothing -> case withReRootViolation nodes of
       Just v -> Left (DisallowedShape v.shape v.off)
-      Nothing -> pure unit
+      Nothing -> case eachLoopViolation nodes of
+        Just v -> Left (DisallowedShape v.shape v.off)
+        Nothing -> pure unit
 
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.

@@ -13,7 +13,7 @@ module ClassicBars.Compile
 
 import Prelude
 
-import ClassicBars (LoopVars, checkBraceControl, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars, renameScope)
+import ClassicBars (LoopVars, checkBraceControl, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars, renameSurfaceHeads)
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
@@ -70,7 +70,7 @@ compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
   let
     -- `{% set %}` → `{% local %}` over the sibling tail (docs-17), and `{% scope %}`
     -- → the `with` op head (ADR-039 item 9) — both statementTags only.
-    lifted = if opts.lexConfig.statementTags then renameScope (liftSet nodes) else nodes
+    lifted = if opts.lexConfig.statementTags then renameSurfaceHeads (liftSet nodes) else nodes
     h = hoistInline (desugarSurfaceWith lv lifted)
     externalT = Map.fromFoldable externals
     -- inline definitions win over same-named externals (left-biased), as render does.
@@ -89,5 +89,5 @@ compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
   compilePartial :: Tuple String String -> Either ParseError (Tuple String Template)
   compilePartial (Tuple name s) = do
     { nodes } <- lmap NEA.head (parseWith opts s)
-    let lifted = if opts.lexConfig.statementTags then renameScope (liftSet nodes) else nodes
+    let lifted = if opts.lexConfig.statementTags then renameSurfaceHeads (liftSet nodes) else nodes
     pure (Tuple name (desugarSurfaceWith lv lifted))

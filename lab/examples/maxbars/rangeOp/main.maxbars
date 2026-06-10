@@ -1,1 +1,1 @@
-{% each 1..rounds %}Round {{this}}{% unless loop.last %} · {% endunless %}{% endeach %}
+{% for 1..rounds %}Round {{this}}{% unless loop.last %} · {% endunless %}{% endfor %}

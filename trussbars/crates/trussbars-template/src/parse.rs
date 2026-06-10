@@ -57,7 +57,7 @@ fn err<T>(message: impl Into<String>, at: usize) -> Result<T, ParseError> {
 /// The built-in block heads `open_block` dispatches — reserved, so a host cannot declare a
 /// block helper with one of these names (docs/12 §5.2). Keep in sync with `open_block`.
 pub const RESERVED_BLOCK_HEADS: &[&str] = &[
-    "if", "unless", "each", "scope", "let", "local", "case", "inline", "partial",
+    "if", "unless", "for", "scope", "let", "local", "case", "inline", "partial",
 ];
 
 /// What stopped a body scan.
@@ -197,7 +197,13 @@ impl Blocks<'_> {
         match head {
             "if" => self.cond_block(span, rest, false, scope),
             "unless" => self.cond_block(span, rest, true, scope),
-            "each" => self.each_block(span, rest, scope),
+            // ADR-039 item 4: the loop keyword is `for` (renamed from `each`),
+            // binding Liquid-style `for x in xs` or bare `for xs`; `each` is rejected.
+            "for" => self.each_block(span, "for", rest, scope),
+            "each" => err(
+                "the loop keyword is renamed `for` (ADR-039) — write `{% for x in xs %}` (or bare `{% for xs %}`) … `{% endfor %}`",
+                span.start,
+            ),
             // ADR-039 item 9: the context re-root is spelled `scope` (renamed from
             // `with`); `with` is rejected with a located fix-it.
             "scope" => self.with_block(span, "scope", rest, scope),
@@ -367,6 +373,7 @@ impl Blocks<'_> {
     fn each_block(
         &mut self,
         span: crate::span::Span,
+        head: &str,
         rest: &str,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
@@ -377,7 +384,7 @@ impl Blocks<'_> {
         bound.extend(label.clone());
         let child = scope.with_all(&bound);
         let (body, stop) = self.parse_until(&child)?;
-        let otherwise = self.else_arm(stop, scope, "each", span.start)?;
+        let otherwise = self.else_arm(stop, scope, head, span.start)?;
         Ok(Node::Each(Each {
             span,
             subject,
@@ -841,11 +848,11 @@ mod tests {
         // error), not left to rustc as a downstream "unknown field" — across each
         // block kind: each/scope (else_arm), if (cond), case, let, and host helpers.
         for src in [
-            "{% each items %}{{this}}{% endwith %}",
-            "{% scope user %}{{name}}{% endeach %}",
+            "{% for items %}{{this}}{% endwith %}",
+            "{% scope user %}{{name}}{% endfor %}",
             "{% if a %}A{% endunless %}",
             "{% case s %}{% when \"a\" %}A{% endif %}",
-            "{% let x=(1) %}{{x}}{% endeach %}",
+            "{% let x=(1) %}{{x}}{% endfor %}",
             "{% bold %}hi{% enditalic %}",
         ] {
             let e = parse(src).unwrap_err();
@@ -862,7 +869,7 @@ mod tests {
         // The strict native dialect closes a block with a *named* `{% endX %}`. The
         // legacy Handlebars bare wildcard close (`{{/}}`) is gone — there is no
         // `{% end %}` wildcard (it would lex as an *open* of a block named `end`).
-        assert!(parse("{% each items %}{{this}}{% endeach %}").is_ok());
+        assert!(parse("{% for items %}{{this}}{% endfor %}").is_ok());
     }
 
     #[test]
@@ -912,7 +919,7 @@ mod tests {
     fn each_liquid_binding_and_scope() {
         // `post` is a binding → it roots at itself, not `this`.
         let ns =
-            parse("{% each post i in posts %}{{post.title}}{% else %}none{% endeach %}").unwrap();
+            parse("{% for post i in posts %}{{post.title}}{% else %}none{% endfor %}").unwrap();
         match &ns[0] {
             Node::Each(e) => {
                 assert_eq!(e.item.as_deref(), Some("post"));
@@ -946,7 +953,7 @@ mod tests {
 
     #[test]
     fn each_with_label() {
-        let ns = parse("{% each row in rows label outer %}{{outer.index1}}{% endeach %}").unwrap();
+        let ns = parse("{% for row in rows label outer %}{{outer.index1}}{% endfor %}").unwrap();
         match &ns[0] {
             Node::Each(e) => {
                 assert_eq!(e.label.as_deref(), Some("outer"));
@@ -979,7 +986,7 @@ mod tests {
     #[test]
     fn partials_inline_and_use_and_yield() {
         let ns = parse(
-            r#"{% inline "card" %}<b>{{title}}</b>{% endinline %}{% each posts %}{{> card}}{% endeach %}"#,
+            r#"{% inline "card" %}<b>{{title}}</b>{% endinline %}{% for posts %}{{> card}}{% endfor %}"#,
         )
         .unwrap();
         assert!(matches!(&ns[0], Node::Inline { name, .. } if name == "card"));
@@ -1053,8 +1060,8 @@ mod tests {
 
     #[test]
     fn statement_each_parses_like_brace_each() {
-        // `{% each … %}…{% endeach %}` desugars to the same `Node::Each` as `{% each %}`.
-        let ns = parse("{% each item in xs %}{{item}}{% endeach %}").unwrap();
+        // `{% for … %}…{% endfor %}` desugars to the same `Node::Each` as `{% for %}`.
+        let ns = parse("{% for item in xs %}{{item}}{% endfor %}").unwrap();
         match &ns[0] {
             Node::Each(e) => {
                 assert_eq!(e.item.as_deref(), Some("item"));
@@ -1112,8 +1119,8 @@ mod tests {
 
     #[test]
     fn statement_mismatched_close_is_located_error() {
-        // `{% endeach %}` cannot close a `{% if %}` — the same check as `{% endeach %}` vs `{% if %}`.
-        let err = parse("{% if a %}x{% endeach %}").unwrap_err();
+        // `{% endfor %}` cannot close a `{% if %}` — the same check as `{% endfor %}` vs `{% if %}`.
+        let err = parse("{% if a %}x{% endfor %}").unwrap_err();
         assert!(err.message.contains("mismatched"), "{}", err.message);
     }
 }

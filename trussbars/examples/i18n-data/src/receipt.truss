@@ -2,6 +2,6 @@
 == {{t catalog locale "title"}} ==
 {{t catalog locale "greeting"}}, {{customer}}!
 {{t catalog locale "placed"}}: {{date placed "%d %B %Y" locale}}
-{% each items %}
+{% for items %}
   {{name}}: {{number price 2 root.locale}}
-{% endeach %}{{t catalog locale "total"}}: {{number total 2 locale}}  ({{count}} {{plural catalog locale "item" count}})
+{% endfor %}{{t catalog locale "total"}}: {{number total 2 locale}}  ({{count}} {{plural catalog locale "item" count}})

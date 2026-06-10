@@ -1,4 +1,4 @@
-//! The loop frame model: [`Loop`], the per-iteration metadata of `{% each %}`
+//! The loop frame model: [`Loop`], the per-iteration metadata of `{% for %}`
 //! (ADR-021; see `trussbars/docs/02-runtime-api.md` §5).
 //!
 //! Frames are **borrowed references living on the stack**, not heap frames. In
@@ -8,7 +8,7 @@
 //! is the borrowed [`Loop::parent`]; `loop.root` walks that chain
 //! ([`Loop::root`]).
 //!
-//! The current element (`{{this}}` inside `{% each %}`) is the loop *binding*
+//! The current element (`{{this}}` inside `{% for %}`) is the loop *binding*
 //! (`team`, `m`, …) the codegen introduces, not a field of [`Loop`] — this type
 //! carries metadata only.
 
@@ -47,7 +47,7 @@ impl<'p> Loop<'p> {
     /// Build the metadata for iteration `index` of a collection of `length`
     /// items, with an optional map `key` and enclosing `parent` loop.
     ///
-    /// `index` must be `< length` (every `{% each %}` guards the empty case before
+    /// `index` must be `< length` (every `{% for %}` guards the empty case before
     /// iterating, so this always holds for generated code).
     #[inline]
     #[must_use]

@@ -34,9 +34,13 @@ const bad = (m) => {
 };
 
 // Render the same source through both dialects; returns { eq, raw, max }.
-function both(tpl, data) {
-  const r = render(tpl, data);
-  const m = renderMaxbars(tpl, data);
+// Render the RawBars source through RawBars and the MaxBars source through MaxBars
+// (the same string unless a case overrides `maxTpl` — used where the SURFACE legitimately
+// diverges, e.g. RawBars `{% each %}` vs MaxBars `{% for %}`, ADR-039 — while the engine
+// output must still match).
+function both(rawTpl, maxTpl, data) {
+  const r = render(rawTpl, data);
+  const m = renderMaxbars(maxTpl, data);
   return { eq: r.ok && m.ok && r.value === m.value, ok: r.ok && m.ok, raw: r, max: m };
 }
 
@@ -62,7 +66,7 @@ const WITNESS = [
   ["true", true, false],
 ];
 for (const [label, value, expectFalsy] of WITNESS) {
-  const { eq, ok: rendered, raw, max } = both(COND, { v: value });
+  const { eq, ok: rendered, raw, max } = both(COND, COND, { v: value });
   if (!rendered) { bad(`v=${label}: render error (raw=${raw.error || "ok"}, max=${max.error || "ok"})`); continue; }
   if (!eq) { bad(`v=${label}: RawBars=${JSON.stringify(raw.value)} ≠ MaxBars=${JSON.stringify(max.value)}`); continue; }
   const expected = expectFalsy ? "falsy" : "truthy";
@@ -83,9 +87,11 @@ const CORPUS = [
   { id: "if-elif-else", tpl: `{% if (lookup this "a") %}A{% elif (lookup this "b") %}B{% else %}C{% endif %}`, data: { a: false, b: true } },
   { id: "unless", tpl: `{% unless (lookup this "x") %}none{% endunless %}`, data: { x: [] } },
   // `{{{this}}}` is shared; bare loop vars (index/key/…) are excluded — see the
-  // documented variable-model exception above.
-  { id: "each-array", tpl: `{% each (lookup this "xs") %}[{{{this}}}]{% endeach %}`, data: { xs: ["p", "q"] } },
-  { id: "each-object", tpl: `{% each (lookup this "o") %}[{{{this}}}]{% endeach %}`, data: { o: { a: 1, b: 2 } } },
+  // documented variable-model exception above. The loop SURFACE diverges (RawBars
+  // `{% each %}` vs MaxBars `{% for %}`, ADR-039 item 4), so `maxTpl` spells the
+  // MaxBars form; the engine output must still match byte-for-byte.
+  { id: "each-array", tpl: `{% each (lookup this "xs") %}[{{{this}}}]{% endeach %}`, maxTpl: `{% for (lookup this "xs") %}[{{{this}}}]{% endfor %}`, data: { xs: ["p", "q"] } },
+  { id: "each-object", tpl: `{% each (lookup this "o") %}[{{{this}}}]{% endeach %}`, maxTpl: `{% for (lookup this "o") %}[{{{this}}}]{% endfor %}`, data: { o: { a: 1, b: 2 } } },
   // `with`/`scope` is a documented surface exception (RawBars `{% with %}` vs MaxBars
   // `{% scope %}`, ADR-039) — not in the shared corpus.
   { id: "compare", tpl: `{% if (gt (lookup this "n") 3) %}big{% else %}small{% endif %}`, data: { n: 5 } },
@@ -94,10 +100,10 @@ const CORPUS = [
   { id: "string-prim", tpl: `{{{uppercase (lookup this "s")}}}`, data: { s: "hi" } },
   { id: "array-prim", tpl: `{{{join (lookup this "xs") ", "}}}`, data: { xs: ["a", "b", "c"] } },
   { id: "inline-yield", tpl: `{% inline "f" %}<{{{yield}}}>{% endinline %}{% partial "f" this %}{{{lookup this "n"}}}{% endpartial %}`, data: { n: "Z" } },
-  { id: "nested-each-if", tpl: `{% each (lookup this "xs") %}{% if (gt this 1) %}{{{this}}}{% endif %}{% endeach %}`, data: { xs: [1, 2, 3] } },
+  { id: "nested-each-if", tpl: `{% each (lookup this "xs") %}{% if (gt this 1) %}{{{this}}}{% endif %}{% endeach %}`, maxTpl: `{% for (lookup this "xs") %}{% if (gt this 1) %}{{{this}}}{% endif %}{% endfor %}`, data: { xs: [1, 2, 3] } },
 ];
 for (const c of CORPUS) {
-  const { eq, ok: rendered, raw, max } = both(c.tpl, c.data);
+  const { eq, ok: rendered, raw, max } = both(c.tpl, c.maxTpl ?? c.tpl, c.data);
   if (!rendered) bad(`${c.id}: render error (raw=${raw.error || "ok"}, max=${max.error || "ok"})`);
   else if (!eq) bad(`${c.id}: RawBars=${JSON.stringify(raw.value)} ≠ MaxBars=${JSON.stringify(max.value)}`);
 }

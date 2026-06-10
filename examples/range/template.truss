@@ -1,1 +1,1 @@
-{% each 1..4 %}{{loop.index0}} {% endeach %}
+{% for 1..4 %}{{loop.index0}} {% endfor %}

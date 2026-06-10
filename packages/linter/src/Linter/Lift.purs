@@ -217,12 +217,23 @@ escaped span inner =
 printBlock :: Span -> Sigil -> Ident -> Array Expr -> Template -> Out
 printBlock span _ name args body =
   let
-    h = headOut span name args
+    -- RawBars (the lift *input*) names the operation; MaxBars (the *output*) uses the
+    -- renamed surface keyword — `each` → `for`, `with` → `scope` (ADR-039).
+    mxName = canonLoopHead name
+    h = headOut span mxName args
     inner = printTemplate body
   in
-    { text: "{% " <> h.text <> " %}" <> inner.source <> "{% end" <> name <> " %}"
+    { text: "{% " <> h.text <> " %}" <> inner.source <> "{% end" <> mxName <> " %}"
     , flags: h.flags <> inner.flags
     }
+
+-- | A RawBars block op-name head → the current MaxBars surface keyword (ADR-039):
+-- | `each` → `for` (item 4), `with` → `scope` (item 9). Other heads are unchanged.
+canonLoopHead :: Ident -> Ident
+canonLoopHead = case _ of
+  "each" -> "for"
+  "with" -> "scope"
+  n -> n
 
 -- | A tag *head*: the helper name plus space-separated argument re-sugars.
 headOut :: Span -> Ident -> Array Expr -> Out

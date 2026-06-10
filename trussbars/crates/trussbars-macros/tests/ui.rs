@@ -13,7 +13,7 @@
 //!   * arity-class — `arity_wrong` (a fixed-arity stdlib op, wrong arg count);
 //!   * dict-literal-class — `dict_literal_iterated` (a `{k: v}` literal cannot be
 //!     iterated);
-//!   * loop-metadata-class — `loop_outside_each` (`loop` outside an `{% each %}`),
+//!   * loop-metadata-class — `loop_outside_each` (`loop` outside an `{% for %}`),
 //!     `loop_unknown_field` (an unknown field on the loop frame);
 //!   * policy-class — `unknown_truthiness` (an unknown `truss!(…, truthiness = …)`
 //!     mode; §7.1);

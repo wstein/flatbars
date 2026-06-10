@@ -1,7 +1,7 @@
 error: 1:1: unclosed block
  --> tests/ui/unclosed_block.rs:5:1
   |
-5 | truss!(render, str, "{% each items %}{{this}}");
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 | truss!(render, str, "{% for items %}{{this}}");
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
   = note: this error originates in the macro `truss` (in Nightly builds, run with -Z macro-backtrace for more info)

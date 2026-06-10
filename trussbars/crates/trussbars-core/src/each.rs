@@ -1,7 +1,7 @@
-//! `Each` — uniform `{% each %}` iteration over either a sequence (array) or a map
+//! `Each` — uniform `{% for %}` iteration over either a sequence (array) or a map
 //! (object). A sequence yields `(None, &item)`; a map yields `(Some(key), &value)`
 //! in sorted-key order (matching the reference engine's object iteration). The
-//! codegen emits `Each::each` / `Each::each_len`, so the same `{% each x %}` works
+//! codegen emits `Each::each` / `Each::each_len`, so the same `{% for x %}` works
 //! whether `x` is a `Vec`/slice or a `BTreeMap` — `rustc` picks the impl, and
 //! `loop.key` is `None` for a sequence and the key for a map.
 
@@ -9,7 +9,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-/// Uniform iteration for `{% each %}` over a sequence or a map.
+/// Uniform iteration for `{% for %}` over a sequence or a map.
 pub trait Each {
     /// The element (sequence) or value (map) type.
     type Item;

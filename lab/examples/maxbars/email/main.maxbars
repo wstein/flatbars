@@ -1,10 +1,10 @@
 Hi {{name}},
 
 Your order shipped. Items:
-{% each items %}
+{% for items %}
 {{> item}}
 {% else %}
 - (none)
-{% endeach %}
+{% endfor %}
 
 — {{store.name}} ({{store.url}})

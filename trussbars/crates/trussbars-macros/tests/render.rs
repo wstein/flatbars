@@ -24,7 +24,7 @@ struct Cart {
 truss!(
     cart,
     Cart,
-    "{% each items %}- {{this}}\n{% else %}empty\n{% endeach %}"
+    "{% for items %}- {{this}}\n{% else %}empty\n{% endfor %}"
 );
 
 // F3: a declared host helper (`helpers = [..]`) compiles to a call to a host Rust
@@ -299,7 +299,7 @@ struct Page {
 truss!(
     blog,
     Page,
-    "{{> header}}<ul>{% each items %}{{> row this}}{% endeach %}</ul>{{> footer}}",
+    "{{> header}}<ul>{% for items %}{{> row this}}{% endfor %}</ul>{{> footer}}",
     partials = [
         header = "tests/templates/header.truss",
         footer = "tests/templates/footer.truss",

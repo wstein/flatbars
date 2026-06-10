@@ -82,9 +82,9 @@ const RECEIPT_TMPL: &str = r#"{{! receipt — i18n host helpers from the catalog
 == {{t "title"}} ==
 {{t "greeting"}}, {{customer}}!
 {{! one line per item; `number` formats the price }}
-{% each items %}
+{% for items %}
   - {{name}}: {{number price 2}}
-{% endeach %}
+{% endfor %}
 {{! `plural count "item"` picks the CLDR form (en items / pl elementy / …) }}
 {{t "total"}}: {{number total 2}}  ({{count}} {{plural count "item"}})
 {{! `date` localizes the month (%B); `relative` is English-fallback phrasing }}

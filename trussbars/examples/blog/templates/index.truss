@@ -1,9 +1,9 @@
 <h1>{{site.title}}</h1>
-<nav>{% each ["All", "Rust", "Design"] %}<a href="/tag/{{this | lowercase}}">{{this}}</a> {% endeach %}</nav>
+<nav>{% for ["All", "Rust", "Design"] %}<a href="/tag/{{this | lowercase}}">{{this}}</a> {% endfor %}</nav>
 {% inline "card" %}<article>
   <h2><a href="/posts/{{slug}}">{{title}}</a></h2>
   <p class="meta">by {{author}}{% if views > 100 %} · 🔥 popular{% endif %}</p>
-  {% if tags %}<p class="tags">{% each tag in tags %}<a href="/tags/{{tag | lowercase}}">#{{tag}}</a> {% endeach %}</p>{% endif %}
+  {% if tags %}<p class="tags">{% for tag in tags %}<a href="/tags/{{tag | lowercase}}">#{{tag}}</a> {% endfor %}</p>{% endif %}
   <p>{{excerpt}}</p>
 </article>
-{% endinline %}{% each posts %}{{> card}}{% endeach %}
+{% endinline %}{% for posts %}{{> card}}{% endfor %}

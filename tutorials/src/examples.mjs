@@ -64,9 +64,9 @@ export const lessons = {
     // MaxBars' signature: a pipe (uppercase), Liquid-style loop bindings with an
     // index (p i in players), infix arithmetic (i + 1), an infix comparison (>= 90).
     template: `{{ title | uppercase }}
-{% each p i in players %}
+{% for p i in players %}
 {{ i + 1 }}. {{ p.name }} — {{ p.score }} {% if p.score >= 90 %}👑{% endif %}
-{% endeach %}`,
+{% endfor %}`,
     data: {
       title: "top scorers",
       players: [

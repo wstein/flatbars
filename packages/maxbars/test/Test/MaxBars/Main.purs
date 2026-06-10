@@ -55,7 +55,7 @@ main = do
     "yes"
   expectM "stmt-if-false" "{% if a %}yes{% else %}no{% endif %}" (obj [ Tuple "a" (VBool false) ])
     "no"
-  expectM "stmt-each-output" "{% each xs %}[{{ this }}]{% endeach %}"
+  expectM "stmt-each-output" "{% for xs %}[{{ this }}]{% endfor %}"
     (obj [ Tuple "xs" (VArray [ num 1.0, num 2.0 ]) ])
     "[1][2]"
 
@@ -258,7 +258,7 @@ main = do
     (obj [ Tuple "x" (num 5.0) ])
     "in"
   -- a block head with a single subject still works (each over a bare path).
-  expectM "each-bare-subject" "{% each xs %}{{this}}{% endeach %}"
+  expectM "each-bare-subject" "{% for xs %}{{this}}{% endfor %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "ab"
 
@@ -270,24 +270,24 @@ main = do
   -- rindex1/length.
   let xs3 = obj [ Tuple "xs" (VArray [ VString "a", VString "b", VString "c" ]) ]
   expectM "loopvars-all"
-    "{% each xs %}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{% endeach %}"
+    "{% for xs %}[{{loop.index0}}/{{loop.index1}}/{{loop.rindex0}}/{{loop.rindex1}}/{{loop.length}}]{% endfor %}"
     xs3
     "[0/1/2/3/3][1/2/1/2/3][2/3/0/1/3]"
   -- first/last via the loop object.
-  expectM "loopvars-first" "{% each xs %}{% if loop.first %}F{% else %}-{% endif %}{% endeach %}"
+  expectM "loopvars-first" "{% for xs %}{% if loop.first %}F{% else %}-{% endif %}{% endfor %}"
     xs3
     "F--"
-  expectM "loopvars-last" "{% each xs %}{% if loop.last %}L{% else %}-{% endif %}{% endeach %}" xs3
+  expectM "loopvars-last" "{% for xs %}{% if loop.last %}L{% else %}-{% endif %}{% endfor %}" xs3
     "--L"
   -- object iteration exposes `loop.key`; array iteration's key is null
   -- (Handlebars parity — use loop.index0 for the array position).
-  expectM "loopvars-key" "{% each o %}{{loop.key}}{% endeach %}"
+  expectM "loopvars-key" "{% for o %}{{loop.key}}{% endfor %}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "xy"
-  expectM "loopvars-key-array-null" "{% each xs %}[{{loop.key}}]{% endeach %}" xs3 "[][][]"
+  expectM "loopvars-key-array-null" "{% for xs %}[{{loop.key}}]{% endfor %}" xs3 "[][][]"
   -- `loop.depth` (ADR-021 amendment): the 1-based loop-nesting level. An outermost
   -- loop is depth 1.
-  expectM "loopvars-depth-outer" "{% each xs %}{{loop.depth}}{% endeach %}" xs3 "111"
+  expectM "loopvars-depth-outer" "{% for xs %}{{loop.depth}}{% endfor %}" xs3 "111"
   -- a loop nested directly inside another is depth 2; the outer stays depth 1.
   let
     grid = obj
@@ -295,27 +295,27 @@ main = do
           (VArray [ VArray [ VString "a", VString "b" ], VArray [ VString "c" ] ])
       ]
   expectM "loopvars-depth-nested"
-    "{% each rows %}{{loop.depth}}{% each this %}{{loop.depth}}{% endeach %}{% endeach %}"
+    "{% for rows %}{{loop.depth}}{% for this %}{{loop.depth}}{% endfor %}{% endfor %}"
     grid
     "12212"
   -- the enclosing loop's depth is reached through the chain — `loop.parent.depth`
   -- of an inner loop is its outer loop's depth (1).
   expectM "loopvars-parent-depth"
-    "{% each rows %}{% each this %}{{loop.parent.depth}}{% endeach %}{% endeach %}"
+    "{% for rows %}{% for this %}{{loop.parent.depth}}{% endfor %}{% endfor %}"
     grid
     "111"
   -- at the outermost loop, `loop.parent` is absent, so `loop.parent.depth` renders
   -- empty (like every other `loop.parent.*` field).
-  expectM "loopvars-parent-depth-root" "{% each xs %}[{{loop.parent.depth}}]{% endeach %}" xs3
+  expectM "loopvars-parent-depth-root" "{% for xs %}[{{loop.parent.depth}}]{% endfor %}" xs3
     "[][][]"
   -- a data field named `first` is read with an explicit path; `loop.first` is the
   -- loop variable (the names never collide — one is `loop.`-namespaced).
-  expectM "loopvar-data-field" "{% each xs %}{{this.first}}{% endeach %}"
+  expectM "loopvar-data-field" "{% for xs %}{{this.first}}{% endfor %}"
     (obj [ Tuple "xs" (VArray [ obj [ Tuple "first" (VString "D") ] ]) ])
     "D"
   -- `each` binds Liquid-style — names before `in`: element + 0-based index
   -- (+ a 1-based index).
-  expectM "each-in-each" "{% each item i in xs %}[{{i}}:{{item}}]{% endeach %}" xs3
+  expectM "each-in-each" "{% for item i in xs %}[{{i}}:{{item}}]{% endfor %}" xs3
     "[0:a][1:b][2:c]"
   -- `scope` (the renamed re-root, ADR-039) binds the shifted context to a name (drop-pipes `as`).
   expectM "scope-as-binding" "{% scope o as c %}{{c.n}}{% endscope %}"
@@ -323,10 +323,10 @@ main = do
     "Z"
   -- a loop binding is a bare name directly (there are no bare loop variables in
   -- ADR-021, so nothing to shadow): `x in xs` binds the element.
-  expectM "each-in-bind" "{% each x in xs %}{{x}}{% endeach %}" xs3 "abc"
+  expectM "each-in-bind" "{% for x in xs %}{{x}}{% endfor %}" xs3 "abc"
   -- an outer loop binding stays in scope inside a nested block.
   expectM "each-in-nested"
-    "{% each row in rows %}{% each row.cells %}{{row.id}}{{this}} {% endeach %}{% endeach %}"
+    "{% for row in rows %}{% for row.cells %}{{row.id}}{{this}} {% endfor %}{% endfor %}"
     ( obj
         [ Tuple "rows"
             ( VArray
@@ -341,26 +341,26 @@ main = do
     "A1 A2 "
   -- the collection after `in` is a full expression; `(xs | reverse)` pipes, and
   -- the binding `x` still binds the (reversed) element.
-  expectM "each-in-paren-pipe" "{% each x in (xs | reverse) %}{{x}}{% endeach %}" xs3 "cba"
+  expectM "each-in-paren-pipe" "{% for x in (xs | reverse) %}{{x}}{% endfor %}" xs3 "cba"
 
   -- labelled loops (ADR-013): `label NAME` binds the loop frame as an object, so
   -- an inner body reads `NAME.index1`/`NAME.length`/`NAME.first`/… of THIS loop.
   expectM "label-fields"
-    "{% each xs label l %}{{l.index1}}/{{l.length}}{% if l.first %}<{% endif %}{% if l.last %}>{% endif %} {% endeach %}"
+    "{% for xs label l %}{{l.index1}}/{{l.length}}{% if l.first %}<{% endif %}{% if l.last %}>{% endif %} {% endfor %}"
     xs3
     "1/3< 2/3 3/3> "
   -- the point: an inner loop reaches the *outer* loop's metadata through the label.
   expectM "label-outer-from-inner"
-    "{% each row in rows label outer %}{% each row %}{{outer.index0}}:{{this}} {% endeach %}{% endeach %}"
+    "{% for row in rows label outer %}{% for row %}{{outer.index0}}:{{this}} {% endfor %}{% endfor %}"
     (obj [ Tuple "rows" (VArray [ VArray [ VString "a", VString "b" ], VArray [ VString "c" ] ]) ])
     "0:a 0:b 1:c "
   -- the label's `this` is the element; `key` is the object key when iterating one.
-  expectM "label-this-key" "{% each o label l %}{{l.key}}={{l.this}} {% endeach %}"
+  expectM "label-this-key" "{% for o label l %}{{l.key}}={{l.this}} {% endfor %}"
     (obj [ Tuple "o" (obj [ Tuple "a" (num 1.0), Tuple "b" (num 2.0) ]) ])
     "a=1 b=2 "
 
   -- compiled path reaches the loop variable through the `loop` object (ADR-021).
-  case compileMaxJs "{% each xs %}{{loop.index1}}{% endeach %}" of
+  case compileMaxJs "{% for xs %}{{loop.index1}}{% endfor %}" of
     Left e -> assert' ("compile loopvar: unexpected error " <> show e) false
     Right js -> assert' ("compile loopvar: expected rt.call(\"loop\" in\n" <> js)
       (contains (Pattern "rt.call(\"loop\"") js)
@@ -372,7 +372,7 @@ main = do
   let
     rustDepth =
       compileMaxRust "Ctx"
-        "{% each g in groups %}{{loop.depth}}{% each x in g %}{{loop.parent.depth}}{% endeach %}{% endeach %}"
+        "{% for g in groups %}{{loop.depth}}{% for x in g %}{{loop.parent.depth}}{% endfor %}{% endfor %}"
   assert' ("compile loop.depth (Rust): emit failed — " <> rustDepth.err) rustDepth.ok
   assert' ("compile loop.depth (Rust): expected `.depth` field access in\n" <> rustDepth.out)
     (contains (Pattern ".depth") rustDepth.out)
@@ -435,43 +435,43 @@ main = do
       Left _ -> [ "<parse error>" ]
       Right is -> map _.name is
   assert' "no-shadow-warn: bare {{first}} is a data field, no warning"
-    (Array.null (warnNames "{% each xs %}{{first}}{{length}}{{key}}{% endeach %}"))
+    (Array.null (warnNames "{% for xs %}{{first}}{{length}}{{key}}{% endfor %}"))
 
   -- a bar in a block head is a parse error — whether the author meant the
   -- Handlebars `as |…|` delimiter or an unparenthesised pipe. The parenthesised
   -- pipe is still a pipe.
-  assert' "head-bar: {% each xs | reverse %} is a parse error (parenthesise to pipe)"
+  assert' "head-bar: {% for xs | reverse %} is a parse error (parenthesise to pipe)"
     ( isLeft
-        ( renderMax "{% each xs | reverse %}{{this}}{% endeach %}"
+        ( renderMax "{% for xs | reverse %}{{this}}{% endfor %}"
             (obj [ Tuple "xs" (VArray [ VString "a" ]) ])
         )
     )
-  assert' "head-bar: the Handlebars {% each xs as |x| %} pipe form is rejected"
+  assert' "head-bar: the Handlebars {% for xs as |x| %} pipe form is rejected"
     ( isLeft
-        ( renderMax "{% each xs as |x| %}{{x}}{% endeach %}"
+        ( renderMax "{% for xs as |x| %}{{x}}{% endfor %}"
             (obj [ Tuple "xs" (VArray [ VString "a" ]) ])
         )
     )
-  expectM "head-bar: {% each (xs | reverse) %} (parenthesised) is a real pipe"
-    "{% each (xs | reverse) %}{{this}}{% endeach %}"
+  expectM "head-bar: {% for (xs | reverse) %} (parenthesised) is a real pipe"
+    "{% for (xs | reverse) %}{{this}}{% endfor %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "ba"
 
   -- the removed trailing-`as` loop-binding form on `each` is a located error, not a
   -- silent no-op — MaxBars binds `{{#each x in xs}}` now. `with`/custom `as` stay.
-  assert' "each-as: {% each xs as a %} is rejected (use `x in xs`)"
+  assert' "each-as: {% for xs as a %} is rejected (use `x in xs`)"
     ( isLeft
-        ( renderMax "{% each xs as a %}{{a}}{% endeach %}"
+        ( renderMax "{% for xs as a %}{{a}}{% endfor %}"
             (obj [ Tuple "xs" (VArray [ VString "x" ]) ])
         )
     )
-  assert' "each-as: a nested {% each y as z %} is rejected too"
+  assert' "each-as: a nested {% for y as z %} is rejected too"
     ( isLeft
-        ( renderMax "{% each x in xs %}{% each y as z %}{% endeach %}{% endeach %}"
+        ( renderMax "{% for x in xs %}{% for y as z %}{% endfor %}{% endfor %}"
             (obj [ Tuple "xs" (VArray []) ])
         )
     )
-  -- `scope … as` and `{% each x in xs %}` are unaffected (only `each … as` is gone).
+  -- `scope … as` and `{% for x in xs %}` are unaffected (only `each … as` is gone).
   expectM "each-as: {% scope o as p %} keeps `as`"
     "{% scope o as p %}{{p.n}}{% endscope %}"
     (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
@@ -484,23 +484,30 @@ main = do
             (obj [ Tuple "o" (obj [ Tuple "n" (VString "Z") ]) ])
         )
     )
+  -- ADR-039 item 4: the old loop keyword `{% each %}` is rejected in MaxBars
+  -- (it is renamed `for`); RawBars keeps `each`. Bare `{% for xs %}` is accepted.
+  assert' "for: {% each %} is rejected in MaxBars (use {% for %})"
+    (isLeft (renderMax "{% each xs %}{{this}}{% endeach %}" (obj [ Tuple "xs" (VArray []) ])))
+  expectM "for: bare {% for xs %} (this = element)" "{% for xs %}[{{this}}]{% endfor %}"
+    (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
+    "[a][b]"
 
   -- `each … in` binds a *third* name to the 1-based index — MaxBars' extension
   -- over the two Handlebars bindings (`item index0 index1 in xs`).
   expectM "each-in: binds element + index0 + index1"
-    "{% each item i0 i1 in xs %}{{i0}}/{{i1}}:{{item}} {% endeach %}"
+    "{% for item i0 i1 in xs %}{{i0}}/{{i1}}:{{item}} {% endfor %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "0/1:a 1/2:b "
   -- over an object the second name is the key.
   expectM "each-in: over an object the second name is the key"
-    "{% each v k in o %}{{k}}={{v}};{% endeach %}"
+    "{% for v k in o %}{{k}}={{v}};{% endfor %}"
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "x=1;y=2;"
   -- a loop binding named like a prelude value op shadows the op: `{{t}}`/`{{t.name}}`
   -- read the binding, not the `t` (translate) helper. Short op-shaped names like
   -- `t` are common with `in`, so this is the everyday case.
   expectM "shadow: a loop binding `t` shadows the translate helper"
-    "{% each t in rows %}[{{t.name}}]{% endeach %}"
+    "{% for t in rows %}[{{t.name}}]{% endfor %}"
     ( obj
         [ Tuple "rows"
             (VArray [ obj [ Tuple "name" (VString "A") ], obj [ Tuple "name" (VString "B") ] ])
@@ -508,21 +515,21 @@ main = do
     )
     "[A][B]"
   expectM "shadow: a bare block param `add` shadows the add helper"
-    "{% each add in xs %}[{{add}}]{% endeach %}"
+    "{% for add in xs %}[{{add}}]{% endfor %}"
     (obj [ Tuple "xs" (VArray [ VString "x", VString "y" ]) ])
     "[x][y]"
 
   -- label-shadow lint (ADR-021): a loop `label NAME` whose name is a reserved root
   -- (this/loop/root/parent/yield) shadows it for the whole body, so it warns; a
   -- fresh name does not.
-  assert' "label-warn: {% each xs label loop %} warns"
-    (warnNames "{% each xs label loop %}{{this}}{% endeach %}" == [ "loop" ])
-  assert' "label-warn: {% each xs label parent %} warns"
-    (warnNames "{% each xs label parent %}{{this}}{% endeach %}" == [ "parent" ])
-  assert' "label-warn: {% each xs label yield %} warns"
-    (warnNames "{% each xs label yield %}{{this}}{% endeach %}" == [ "yield" ])
-  assert' "label-warn: {% each xs label outer %} (fresh name) does not warn"
-    (Array.null (warnNames "{% each xs label outer %}{{outer.index0}}{% endeach %}"))
+  assert' "label-warn: {% for xs label loop %} warns"
+    (warnNames "{% for xs label loop %}{{this}}{% endfor %}" == [ "loop" ])
+  assert' "label-warn: {% for xs label parent %} warns"
+    (warnNames "{% for xs label parent %}{{this}}{% endfor %}" == [ "parent" ])
+  assert' "label-warn: {% for xs label yield %} warns"
+    (warnNames "{% for xs label yield %}{{this}}{% endfor %}" == [ "yield" ])
+  assert' "label-warn: {% for xs label outer %} (fresh name) does not warn"
+    (Array.null (warnNames "{% for xs label outer %}{{outer.index0}}{% endfor %}"))
 
   -- boolean-in-output lint (the ?:/??/|| debate): a bare `||`/`&&` in OUTPUT
   -- position yields true/false, almost always a mistake — warn and point at
@@ -554,23 +561,23 @@ main = do
 
   -- range (the Liquid-inspired counted-loop helper).
   expectM "range: inclusive integer range as an array"
-    "{% each n in (range 1 4) %}{{n}}{% endeach %}"
+    "{% for n in (range 1 4) %}{{n}}{% endfor %}"
     (obj [])
     "1234"
   expectM "range: descending bounds yield the empty array"
-    "[{% each n in (range 4 1) %}{{n}}{% endeach %}]"
+    "[{% for n in (range 4 1) %}{{n}}{% endfor %}]"
     (obj [])
     "[]"
   assert' "range: a span past the budget is a located error"
-    (isLeft (renderMax "{% each n in (range 1 200000) %}{{n}}{% endeach %}" (obj [])))
+    (isLeft (renderMax "{% for n in (range 1 200000) %}{{n}}{% endfor %}" (obj [])))
 
   -- the `..` range operator (sugar for `(range a b)`): literal and dynamic bounds.
   expectM "range op: 1..4 iterates the inclusive span"
-    "{% each 1..4 %}{{this}}{% endeach %}"
+    "{% for 1..4 %}{{this}}{% endfor %}"
     (obj [])
     "1234"
   expectM "range op: bounds are expressions (additive binds tighter than ..)"
-    "{% each lo..hi+1 %}{{this}}{% endeach %}"
+    "{% for lo..hi+1 %}{{this}}{% endfor %}"
     (obj [ Tuple "lo" (num 2.0), Tuple "hi" (num 4.0) ])
     "2345"
   expectM "range op: a value-position range stringifies the array"
@@ -588,15 +595,15 @@ main = do
 
   -- collection literals: `[…]` ⇒ (list …), `{k: v}` ⇒ (dict …).
   expectM "list literal: iterates its elements"
-    "{% each [10, 20, 30] %}{{this}} {% endeach %}"
+    "{% for [10, 20, 30] %}{{this}} {% endfor %}"
     (obj [])
     "10 20 30 "
   expectM "list literal: elements are full expressions"
-    "{% each [1, n + 1, n * 2] %}{{this}} {% endeach %}"
+    "{% for [1, n + 1, n * 2] %}{{this}} {% endfor %}"
     (obj [ Tuple "n" (num 5.0) ])
     "1 6 10 "
   expectM "list literal: empty []"
-    "[{% each [] %}x{% endeach %}]"
+    "[{% for [] %}x{% endfor %}]"
     (obj [])
     "[]"
   -- the structural scanner is brace-aware (collectionLiterals): a dict's own `}`
@@ -622,7 +629,7 @@ main = do
     (obj [])
     "f"
   expectM "collection literals nest"
-    "{% each [{tags: [1, 2]}, {tags: [3]}] %}{% each tags %}{{this}}{% endeach %};{% endeach %}"
+    "{% for [{tags: [1, 2]}, {tags: [3]}] %}{% for tags %}{{this}}{% endfor %};{% endfor %}"
     (obj [])
     "12;3;"
   -- a mid-identifier `[seg]` path-bracket is untouched (only a *leading* `[` is a list).
@@ -662,7 +669,7 @@ main = do
     "dark/12"
   -- inside a loop the binding coexists with the loop's scoped vars.
   expectM "local: inside a loop, loop.* still resolves"
-    "{% each items %}{% local u=(uppercase this) %}{{u}}@{{loop.index1}} {% endlocal %}{% endeach %}"
+    "{% for items %}{% local u=(uppercase this) %}{{u}}@{{loop.index1}} {% endlocal %}{% endfor %}"
     (obj [ Tuple "items" (VArray [ VString "a", VString "b" ]) ])
     "A@1 B@2 "
   -- a binding named like a prelude op shadows it inside the body (isScopedBinding).
@@ -687,7 +694,7 @@ main = do
     (obj [ Tuple "on" (VBool true) ])
     "in[]"
   expectM "set: inside a loop, the binding is per-iteration"
-    "{% each xs %}{% set u = (uppercase this) %}{{u}} {% endeach %}"
+    "{% for xs %}{% set u = (uppercase this) %}{{u}} {% endfor %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "A B "
   -- a binding NAME may not shadow a reserved scope root or a block head (docs-17 §2)
@@ -729,7 +736,7 @@ main = do
   log "MaxBars schema inference (docs/03 L1 — the §9 worked example)"
   let
     teamsTpl =
-      "{% each team in teams %}\n{{team.name}} ({{root.org}}):\n{% each m in team.members %}\n  {{loop.index1}}. {{m | uppercase}}{% if loop.last %} (last){% endif %} — {{parent.name}}\n{% endeach %}\n{% endeach %}"
+      "{% for team in teams %}\n{{team.name}} ({{root.org}}):\n{% for m in team.members %}\n  {{loop.index1}}. {{m | uppercase}}{% if loop.last %} (last){% endif %} — {{parent.name}}\n{% endfor %}\n{% endfor %}"
     schemaOf src = case inferMax src of
       Left e -> "ERR: " <> e
       Right r -> r.schema
@@ -744,8 +751,8 @@ main = do
   hasS "infer:name-string" teamsTpl "name: String"
 
   let
-    whereTpl = "{% each u in users %}{{u.name}}{% endeach %}{{ users | where \"active\" }}"
-    mapTpl = "{% each v in settings %}{{loop.key}}={{v}}{% endeach %}"
+    whereTpl = "{% for u in users %}{{u.name}}{% endfor %}{{ users | where \"active\" }}"
+    mapTpl = "{% for v in settings %}{{loop.key}}={{v}}{% endfor %}"
     optTpl = "{% if user.bio %}{{user.bio}}{% else %}none{% endif %}"
     letTpl = "{% local greeting=(append \"Hi \" name) %}{{greeting}}{% endlocal %}"
     lacksS nm src needle = assert'
@@ -777,7 +784,7 @@ main = do
     eqTpl = "{% if status == \"active\" %}on{% endif %}"
     -- partial-context coupling: {{> card item}} infers `item`'s fields from card's body.
     partialTpl =
-      "{% inline \"card\" %}{{name}}: {{price}}{% endinline %}{% each item in items %}{{> card item}}{% endeach %}"
+      "{% inline \"card\" %}{{name}}: {{price}}{% endinline %}{% for item in items %}{{> card item}}{% endfor %}"
   hasS "infer:eq-literal-pins-string" eqTpl "status: String"
   hasS "infer:partial-couples-vec" partialTpl "Vec<Item>"
   hasS "infer:partial-couples-name" partialTpl "name: String"
@@ -787,7 +794,7 @@ main = do
   -- the when-literals, unioned with data-observed tag values.
   let
     enumTpl =
-      "{% each shape in shapes %}{% case shape.kind %}{% when \"circle\" %}o{% when \"square\" %}x{% endcase %}{% endeach %}"
+      "{% for shape in shapes %}{% case shape.kind %}{% when \"circle\" %}o{% when \"square\" %}x{% endcase %}{% endfor %}"
   hasS "infer:enum-vec" enumTpl "Vec<Shape>"
   hasS "infer:enum-serde-tag" enumTpl "tag = \"kind\""
   hasS "infer:enum-variant-circle" enumTpl "Circle"

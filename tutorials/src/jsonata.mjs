@@ -206,11 +206,11 @@ export const flagship = {
   }
 )`,
   template: `# {{project}} {{version}}
-{% each sections %}
+{% for sections %}
 ## {{title}}
-{% each items %}- {{this}}
-{% endeach %}
-{% endeach %}`,
+{% for items %}- {{this}}
+{% endfor %}
+{% endfor %}`,
   expect: "# flatbars 0.2.0\n## Features\n- lab: live transform pane\n- cli: emit-jsonata scaffold\n## Fixes\n- parser: trim standalone comments\n## Chores\n- deps: bump esbuild\n",
 };
 

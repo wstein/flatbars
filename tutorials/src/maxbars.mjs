@@ -115,7 +115,7 @@ export const examples = {
     // lambdas — you filter by a key, not an arbitrary predicate (ADR-020).
     template:
       "In stock under 100:\n" +
-      "{% each p in (products | where \"inStock\" | where \"price\" \"<=\" 100) %}- {{p.name}} ({{p.price}})\n{% endeach %}" +
+      "{% for p in (products | where \"inStock\" | where \"price\" \"<=\" 100) %}- {{p.name}} ({{p.price}})\n{% endfor %}" +
       "Premium pick: {{lookup (products | find \"price\" \">\" 100) \"name\"}}\n" +
       "Has a sale tag? {% if (products | some \"tags\" \"includes\" \"sale\") %}yes{% else %}no{% endif %}",
     data: {
@@ -172,12 +172,12 @@ export const examples = {
     // loop.last, loop.length, …) — never @index. Context climbs with `parent` (the
     // enclosing context) and `root` (the top-level data) — never `../` or @root.
     compiles: true,
-    template: `{% each teams %}
+    template: `{% for teams %}
 {{name}} ({{root.org}}):
-{% each members %}
+{% for members %}
   {{loop.index0}}. {{this}}{% if loop.last %} (last){% endif %} — {{parent.name}}
-{% endeach %}
-{% endeach %}`,
+{% endfor %}
+{% endfor %}`,
     data: {
       org: "Acme",
       teams: [
@@ -191,11 +191,11 @@ export const examples = {
     engine: "maxbars",
     label: "Intermediate — Each: the empty case ({% else %})",
     // {{#each}} carries its own {{else}} for an empty list — inherited from ClassicBars.
-    template: `{% each items %}
+    template: `{% for items %}
 - {{this}}
 {% else %}
 (nothing yet)
-{% endeach %}`,
+{% endfor %}`,
     data: { items: [] },
   },
 
@@ -204,9 +204,9 @@ export const examples = {
     label: "Intermediate — Each over an object (loop.key)",
     // Over an object, `loop.key` is the property name and `this` the value (ClassicBars's
     // @key, bare).
-    template: `{% each prefs %}
+    template: `{% for prefs %}
 {{loop.key}} = {{this}}
-{% endeach %}`,
+{% endfor %}`,
     data: { prefs: { theme: "dark", lang: "en" } },
   },
 
@@ -218,7 +218,7 @@ export const examples = {
     // additive binds tighter than `..`, so `1..pages` and `start..start+2` both
     // read naturally. Descending bounds yield the empty list (the `{{else}}`).
     compiles: true,
-    template: "{% each 1..rounds %}Round {{this}}{% unless loop.last %} · {% endunless %}{% endeach %}",
+    template: "{% for 1..rounds %}Round {{this}}{% unless loop.last %} · {% endunless %}{% endfor %}",
     data: { rounds: 3 },
   },
 
@@ -230,7 +230,7 @@ export const examples = {
     // take infix. The structural scanner is brace-aware, so a dict needs no space
     // before the closing `}}`.
     compiles: true,
-    template: "{% each [{name: lead, role: \"lead\"}, {name: \"Lin\", role: \"dev\"}] %}{{name}} ({{role}}){% unless loop.last %}, {% endunless %}{% endeach %}",
+    template: "{% for [{name: lead, role: \"lead\"}, {name: \"Lin\", role: \"dev\"}] %}{{name}} ({{role}}){% unless loop.last %}, {% endunless %}{% endfor %}",
     data: { lead: "Ada" },
   },
 
@@ -254,7 +254,7 @@ export const examples = {
     // `{% set name = value %}` is the block-LESS sibling of `{% local %}` (docs-17):
     // it binds up front and flows forward to the close of the enclosing block — no
     // `{% endset %}`, no extra indentation. Bindings are sequential, and (like Jinja,
-    // unlike Liquid) a `set` does NOT leak past its block, so a `set` inside `{% each %}`
+    // unlike Liquid) a `set` does NOT leak past its block, so a `set` inside `{% for %}`
     // is per-iteration. Use `set` for a prologue of names; `local` to confine a temporary.
     compiles: true,
     template: `{% set tax = (multiply subtotal rate) %}
@@ -283,9 +283,9 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     // FRAME, so an inner loop reads the OUTER loop's full state — `outer.index1`,
     // `outer.length`, `outer.last` — not just its element.
     compiles: true,
-    template: `{% each section in sections label outer %}
-{{outer.index1}}/{{outer.length}} {{section.title}}:{% each item in section.items %} {{item}}{% endeach %}{% if outer.last %} (last){% endif %}
-{% endeach %}`,
+    template: `{% for section in sections label outer %}
+{{outer.index1}}/{{outer.length}} {{section.title}}:{% for item in section.items %} {{item}}{% endfor %}{% if outer.last %} (last){% endif %}
+{% endfor %}`,
     data: {
       sections: [
         { title: "Fruit", items: ["Pear", "Plum"] },
@@ -297,14 +297,14 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
   loopDepth: {
     engine: "maxbars",
     label: "Advanced — Nesting depth (loop.depth)",
-    // `{{loop.depth}}` is the 1-based loop-nesting level: the outermost {% each %}
+    // `{{loop.depth}}` is the 1-based loop-nesting level: the outermost {% for %}
     // is 1, a loop nested directly inside it is 2, and so on. `loop.parent.depth`
     // is the enclosing loop's. Unlike `label`, it needs no clause — handy for
     // indentation in a nested/tree render.
     compiles: true,
-    template: `{% each node in outline %}{{loop.depth}}. {{node.name}}
-{% each child in node.children %}  {{loop.depth}}.{{loop.index1}} {{child}}
-{% endeach %}{% endeach %}`,
+    template: `{% for node in outline %}{{loop.depth}}. {{node.name}}
+{% for child in node.children %}  {{loop.depth}}.{{loop.index1}} {{child}}
+{% endfor %}{% endfor %}`,
     data: {
       outline: [
         { name: "Fruit", children: ["Pear", "Plum"] },
@@ -321,8 +321,8 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     // ClassicBars. Combined with {{#each}} it templates a row each, and the name can
     // be an EXPRESSION resolved per row — {{> (lookup this "kind")}} picks the
     // partial from the data. (A template-local {{#inline}} of the same name wins.)
-    template: `{% each people %}{{> (lookup this "kind")}}
-{% endeach %}`,
+    template: `{% for people %}{{> (lookup this "kind")}}
+{% endfor %}`,
     partials: {
       author: "- {{name}} writes",
       engineer: "- {{name}} builds",
@@ -403,11 +403,11 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     template: `Hi {{name}},
 
 Your order shipped. Items:
-{% each items %}
+{% for items %}
 {{> item}}
 {% else %}
 - (none)
-{% endeach %}
+{% endfor %}
 
 — {{store.name}} ({{store.url}})`,
     partials: { item: "- {{title}} ×{{qty}}" },
@@ -423,9 +423,9 @@ Your order shipped. Items:
     label: "Advanced — HTML card (styling in a partial)",
     // The one example whose OUTPUT is HTML — so it previews as HTML, not text. An
     // external {{> styles}} partial holds the CSS once, {{> card}} is one row's
-    // markup with a {% if lead %} badge, and {% each %} iterates.
+    // markup with a {% if lead %} badge, and {% for %} iterates.
     view: "rendered",
-    template: "{{> styles}}\n{% each people %}\n{{> card}}\n{% endeach %}",
+    template: "{{> styles}}\n{% for people %}\n{{> card}}\n{% endfor %}",
     partials: {
       styles:
         "<style>\n" +

@@ -1,6 +1,6 @@
-{% each teams %}
+{% for teams %}
 {{name}} ({{root.org}}):
-{% each members %}
+{% for members %}
   {{loop.index0}}. {{this}}{% if loop.last %} (last){% endif %} — {{parent.name}}
-{% endeach %}
-{% endeach %}
+{% endfor %}
+{% endfor %}

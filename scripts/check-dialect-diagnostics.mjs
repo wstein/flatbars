@@ -40,6 +40,8 @@ const RULES = [
   ["maxbars", "{{#each xs as a}}{{/each}}", /Liquid-style.*names before .in.*each x in xs/, "each-as (maxbars)"],
   // the re-rooting `{% with %}` is renamed `{% scope %}` in MaxBars (ADR-039); RawBars keeps `with`.
   ["maxbars", "{% with o %}{{n}}{% endwith %}", /context re-root.*\{% scope.*with. is reserved/, "with-scope (maxbars)"],
+  // the loop `{% each %}` is renamed `{% for %}` in MaxBars (ADR-039); RawBars keeps `each`.
+  ["maxbars", "{% each xs %}{{this}}{% endeach %}", /loop keyword is .for.*\{% for.*each. is reserved/, "each-for (maxbars)"],
   // MinBars / RawBars share the rest of the dialect rules. RawBars stops here
   // because it also short-circuits on set-delim above; verify the cascading
   // rules for both dialects in MinBars (the engine accepts everything we test

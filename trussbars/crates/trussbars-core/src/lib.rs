@@ -16,7 +16,7 @@
 //!   condition does not compile); [`Liquid`] / [`Handlebars`] and host-defined policies
 //!   are selectable per render.
 //! - [`Loop`] — the borrowed-reference loop frame model ([`frame`]): per-iteration
-//!   `{% each %}` metadata threaded by lexical nesting, no `Rc`, no heap frame.
+//!   `{% for %}` metadata threaded by lexical nesting, no `Rc`, no heap frame.
 //! - [`SizeHint`] — the adaptive output-capacity hint ([`capacity`]): a warm
 //!   template reallocates at most once, however large the data.
 //! - [`NumLit`] — the numeric-literal wrapper ([`numlit`]): a literal in

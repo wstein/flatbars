@@ -1315,7 +1315,7 @@ mod tests {
             "{{> broken}}",
             &[],
             TruthMode::NonEmpty,
-            &[("broken".to_string(), "{% each items %}{{this}}".to_string())],
+            &[("broken".to_string(), "{% for items %}{{this}}".to_string())],
         )
         .unwrap_err();
         assert!(err.contains("unclosed block"), "{err}");
@@ -1451,10 +1451,10 @@ mod tests {
 
     #[test]
     fn each_elides_frame_when_loop_unused() {
-        let out = e("{% each xs %}{{this}}{% endeach %}");
+        let out = e("{% for xs %}{{this}}{% endfor %}");
         assert!(!out.contains("Loop::at"), "frame should be elided");
         assert!(!out.contains(".enumerate()"), "enumerate should be dropped");
-        let withmeta = e("{% each xs %}{{loop.index1}}{% endeach %}");
+        let withmeta = e("{% for xs %}{{loop.index1}}{% endfor %}");
         assert!(withmeta.contains("Loop::at"));
         assert!(withmeta.contains(".enumerate()"));
     }
@@ -1463,7 +1463,7 @@ mod tests {
     fn helper_and_collection_filter() {
         assert!(e("{{name | uppercase}}").contains("trussbars_std::uppercase(&(ctx.name))"));
         assert!(
-            e(r#"{% each (where items "n" "gt" 1) %}{{this.n}}{% endeach %}"#)
+            e(r#"{% for (where items "n" "gt" 1) %}{{this.n}}{% endfor %}"#)
                 .contains(".iter().filter(|__x| __x.n > 1.0)")
         );
     }
@@ -1485,7 +1485,7 @@ mod tests {
         // A dangling key (odd token count) is still rejected.
         assert!(emit("Ctx", r#"{{ dict "a" }}"#).is_err());
         // Iterating a dict literal is rejected (the struct has no `Each` impl).
-        let err = emit("Ctx", "{% each {a: 1} %}{{this}}{% endeach %}").unwrap_err();
+        let err = emit("Ctx", "{% for {a: 1} %}{{this}}{% endfor %}").unwrap_err();
         assert!(err.contains("cannot iterate a dict literal"), "{err}");
     }
 }

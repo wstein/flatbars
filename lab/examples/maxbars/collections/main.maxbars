@@ -1,1 +1,1 @@
-{% each [{name: lead, role: "lead"}, {name: "Lin", role: "dev"}] %}{{name}} ({{role}}){% unless loop.last %}, {% endunless %}{% endeach %}
+{% for [{name: lead, role: "lead"}, {name: "Lin", role: "dev"}] %}{{name}} ({{role}}){% unless loop.last %}, {% endunless %}{% endfor %}

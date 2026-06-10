@@ -1188,12 +1188,12 @@ mod tests {
     fn if_and_each_with_loop_meta() {
         let d = obj(&[("xs", arr(&[s("a"), s("b")]))]);
         assert_eq!(
-            render("{% each xs %}{{loop.index1}}:{{this}} {% endeach %}", d).unwrap(),
+            render("{% for xs %}{{loop.index1}}:{{this}} {% endfor %}", d).unwrap(),
             "1:a 2:b "
         );
         let empty = obj(&[("xs", arr(&[]))]);
         assert_eq!(
-            render("{% each xs %}x{% else %}none{% endeach %}", empty).unwrap(),
+            render("{% for xs %}x{% else %}none{% endfor %}", empty).unwrap(),
             "none"
         );
     }
@@ -1215,7 +1215,7 @@ mod tests {
     fn parent_chain_in_each() {
         let d = obj(&[("title", s("T")), ("xs", arr(&[s("a")]))]);
         assert_eq!(
-            render("{% each xs %}{{parent.title}}:{{this}}{% endeach %}", d).unwrap(),
+            render("{% for xs %}{{parent.title}}:{{this}}{% endfor %}", d).unwrap(),
             "T:a"
         );
     }
@@ -1228,7 +1228,7 @@ mod tests {
         let d = obj(&[("gs", arr(&[arr(&[s("a"), s("b")]), arr(&[s("c")])]))]);
         assert_eq!(
             render(
-                "{% each gs %}{{loop.depth}}:{% each this %}{{loop.depth}}/{{loop.parent.depth}} {% endeach %}{% endeach %}",
+                "{% for gs %}{{loop.depth}}:{% for this %}{{loop.depth}}/{{loop.parent.depth}} {% endfor %}{% endfor %}",
                 d
             )
             .unwrap(),
@@ -1309,7 +1309,7 @@ mod tests {
         let d = obj(&[("items", items)]);
         assert_eq!(
             render(
-                r#"{% each (where items "age" "gt" 20) %}{{this.name}}{% endeach %}"#,
+                r#"{% for (where items "age" "gt" 20) %}{{this.name}}{% endfor %}"#,
                 d
             )
             .unwrap(),

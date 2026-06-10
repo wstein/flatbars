@@ -33,7 +33,7 @@ export const lintExamples = {
   // resolve to the position in the card — exactly why the linter steers you off it.)
   scopedVariable: {
     engine: "maxbars",
-    template: "{% each items %}{{index}}. {{this}}{% endeach %}",
+    template: "{% for items %}{{index}}. {{this}}{% endfor %}",
     data: { items: ["alpha", "beta", "gamma"] },
     report: "warning: `index` is the non-canonical scoped variable — prefer `index0` (the native RawBars/MaxBars spelling)",
   },
@@ -60,7 +60,7 @@ export const migrateExamples = {
   // `@`-data loop variables migrate to the MaxBars `loop` object (ADR-021).
   loopVars: {
     template: "{{#each items}}{{@index}}. {{this}}\n{{/each}}",
-    source: "{% each items %}{{loop.index0}}. {{this}}\n{% endeach %}",
+    source: "{% for items %}{{loop.index0}}. {{this}}\n{% endfor %}",
     data: { items: ["alpha", "beta", "gamma"] },
   },
   // An inverted section `{{^x}}` becomes `{{#unless x}}` (its close pairs too).

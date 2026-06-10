@@ -199,6 +199,19 @@ export function dialectDiagnostics(text, dialect) {
             "`with` is reserved. (RawBars keeps `{% with %}`.)",
         });
       }
+      // The loop keyword is `for` in MaxBars (ADR-039 item 4); `{% each %}` is
+      // rejected at render. Flag it with the rename fix (RawBars keeps `each`).
+      const eachRe = /\{%~?\s*each\b/g;
+      let em2;
+      while ((em2 = eachRe.exec(text)) !== null) {
+        out.push({
+          start: em2.index,
+          end: em2.index + em2[0].length,
+          message:
+            "The loop keyword is `for` in MaxBars (ADR-039) — write `{% for x in xs %}` " +
+            "(or bare `{% for xs %}`) … `{% endfor %}`; `each` is reserved. (RawBars keeps `{% each %}`.)",
+        });
+      }
     }
     // RawBars/MaxBars still want the rest of the dialect rules (they're not
     // Handlebars-compatible and have their own constraints — see below).

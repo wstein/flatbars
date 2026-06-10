@@ -1,4 +1,4 @@
 In stock under 100:
-{% each p in (products | where "inStock" | where "price" "<=" 100) %}- {{p.name}} ({{p.price}})
-{% endeach %}Premium pick: {{lookup (products | find "price" ">" 100) "name"}}
+{% for p in (products | where "inStock" | where "price" "<=" 100) %}- {{p.name}} ({{p.price}})
+{% endfor %}Premium pick: {{lookup (products | find "price" ">" 100) "name"}}
 Has a sale tag? {% if (products | some "tags" "includes" "sale") %}yes{% else %}no{% endif %}

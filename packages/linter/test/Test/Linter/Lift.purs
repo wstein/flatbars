@@ -147,9 +147,9 @@ maxCorpus =
   , Tuple "nested op" "{{ done && (b > 21) }}"
   , Tuple "if/else" "{% if b > 21 %}big{% else %}small{% endif %}"
   , Tuple "unless" "{% unless done %}todo{% endunless %}"
-  , Tuple "each" "{% each xs %}[{{index1}}/{{this}}]{% endeach %}"
-  , Tuple "each cond" "{% each xs %}{% if index0 > 0 %}, {% endif %}{{this}}{% endeach %}"
-  , Tuple "mixed" "Hi {{ user.name | escapeHtml }}!{% each xs %} {{index1}}={{this}}{% endeach %}"
+  , Tuple "each" "{% for xs %}[{{index1}}/{{this}}]{% endfor %}"
+  , Tuple "each cond" "{% for xs %}{% if index0 > 0 %}, {% endif %}{{this}}{% endfor %}"
+  , Tuple "mixed" "Hi {{ user.name | escapeHtml }}!{% for xs %} {{index1}}={{this}}{% endfor %}"
   -- arithmetic + `??` round-trip (lower desugars to helpers, lift re-sugars back).
   , Tuple "arith" "{{ b + 1 }}"
   , Tuple "arith precedence" "{{ b * 2 + 1 }}"

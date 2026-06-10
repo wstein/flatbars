@@ -249,11 +249,11 @@ mod tests {
     fn bytecode_matches_tree_walk() {
         let cases: &[(&str, Value)] = &[
             (
-                "<table>{% each rows %}<tr>{% each this %}<td>{{this}}</td>{% endeach %}</tr>{% endeach %}</table>",
+                "<table>{% for rows %}<tr>{% for this %}<td>{{this}}</td>{% endfor %}</tr>{% endfor %}</table>",
                 obj(&[("rows", arr(&[arr(&[s("a"), s("b")]), arr(&[s("c")])]))]),
             ),
             (
-                "{% each xs %}<li class=\"{% if loop.first %}first{% endif %}\">{{this.n}}</li>{% endeach %}",
+                "{% for xs %}<li class=\"{% if loop.first %}first{% endif %}\">{{this.n}}</li>{% endfor %}",
                 obj(&[("xs", arr(&[obj(&[("n", s("x"))]), obj(&[("n", s("y"))])]))]),
             ),
         ];

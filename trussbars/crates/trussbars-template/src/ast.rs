@@ -119,7 +119,7 @@ pub enum Node {
         /// Whether this is raw (`{{{ }}}`) output (no HTML escaping).
         raw: bool,
     },
-    /// `{% each item [i] in coll [label name] %}…{% else %}…{% endeach %}`.
+    /// `{% for item [i] in coll [label name] %}…{% else %}…{% endfor %}`.
     Each(Each),
     /// `{% if %}` / `{% unless %}` (`negated`) with `{{else if}}` / `{% else %}` arms.
     Cond(Cond),
@@ -221,7 +221,7 @@ impl Node {
     }
 }
 
-/// `{% each item [i] in coll %}` data.
+/// `{% for item [i] in coll %}` data.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Each {
     /// The tag span.
