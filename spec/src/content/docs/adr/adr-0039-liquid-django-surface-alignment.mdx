@@ -31,13 +31,18 @@ are **not value output** still ride in the `{{`-sigil family as Handlebars holdo
 | Partial include | `{{> name}}` | Expands a template — a *statement* in the family |
 | Block-partial placeholder | `{{yield}}` | A structural slot, not a data value |
 
-Two more axes are *spelling* divergences from the Liquid/Django/Jinja family the dialects now belong
+Three more axes are *spelling* divergences from the Liquid/Django/Jinja family the dialects now belong
 to — not invariant violations, but inconsistencies a reader coming from that family trips over:
 
 * The loop keyword is `each` (the lone Handlebars word); the whole family uses `for`.
 * Boolean logic is the C-style `&&` / `||` / `!`; the family has no `&&` — it uses the `and` / `or` /
   `not` keywords. There is no membership operator at all, where the family has `in` (Django/Jinja) /
   `contains` (Liquid).
+* Unescaped output is a *sigil* — `{{{ x }}}` (Handlebars) and its redundant alias `{{& x }}`
+  (Mustache). The whole family instead spells raw output as a *filter*: Django/Jinja `{{ x | safe }}`
+  (opt **out** of the auto-escape default), Liquid `{{ x | escape }}` (opt **in**, no auto-escape).
+  MaxBars/Trussbars auto-escape by default — the Django/Jinja model — so a `| safe` filter, not a
+  third brace count, is the matching idiom, and the pipe already exists.
 
 And one axis is a genuine **semantic trap**: `{% with EXPR %}` *re-roots* the context (Handlebars
 `{{#with}}`), but Django's `{% with x=… %}` *binds a name* (the role MaxBars fills with `{% local %}`).
@@ -111,9 +116,19 @@ canonical form. `in` composes with the `..` range and the `{% for x in xs %}` he
 (the `for`-head `in` is consumed by the loop grammar; a bare `in` in expression position is the
 operator).
 
+**8. Unescaped output → `{{ x | safe }}`; drop `{{{ … }}}` and `{{& … }}`.**
+Raw (un-auto-escaped) output is spelled with a `safe` filter, the Django/Jinja idiom that matches
+MaxBars/Trussbars's escape-by-default. `safe` is a **pseudo-filter recognised at parse time as the
+*final* pipe stage**: it clears the Output node's escape flag — the *identical* mechanism the
+triple-stache uses today — so this is pure surface sugar with **no `SafeString` value type required**
+(`{{ x | upcase | safe }}` is raw output of `(upcase x)`; `safe` anywhere but last is an error). The
+triple-stache `{{{ … }}}` and the redundant Mustache alias `{{& … }}` are both rejected in the
+statement-tag dialects with a fix-it to `{{ … | safe }}`. *Out of scope, unchanged:* ClassicBars keeps
+`{{{ … }}}` (Handlebars-faithful) and MinBars keeps `{{{ … }}}` / `{{& … }}` (Mustache conformance).
+
 ### The `with` semantic trap — rename the re-root form
 
-**8. `{% with EXPR %}` (re-root) → `{% scope EXPR %} … {% endscope %}`.**
+**9. `{% with EXPR %}` (re-root) → `{% scope EXPR %} … {% endscope %}`.**
 The context-re-rooting block (Handlebars `{{#with}}`, with its optional `as NAME` alias and `{% else
 %}` falsy clause) is renamed `scope`. The keyword **`with` is then reserved and rejected** with a
 fix-it that disambiguates intent: *"to re-root the context use `{% scope … %}`; to bind a name use
@@ -139,14 +154,16 @@ its own ADR-disciplined PR:
 4. Update the migration tooling so `flatbars migrate` and the Liquid/HB importers emit the new form.
 
 Sequence by friction: **comments → raw → whitespace** (Tier 1, mostly mechanical), then **for →
-include/yield → scope** (additive desugars + reserved-word rejects), then **operators → membership**
-(touch every expression — last, possibly split out).
+include/yield → safe → scope** (additive desugars + reserved-word rejects; `safe` reuses the existing
+triple-stache escape-flag mechanism), then **operators → membership** (touch every expression — last,
+possibly split out).
 
 ### Gates
 
 * *`check:isolation`* — assert the new forms parse in the statement-tag dialects and the old forms
-  (`{{!-- --}}`, `{{{{raw}}}}`, `{{> }}`, `{% each %}`, `{% with %}`, `&&`/`||`/`!`) each produce a
-  located surface diagnostic with the documented fix-it, not silent acceptance.
+  (`{{!-- --}}`, `{{{{raw}}}}`, `{{> }}`, `{% each %}`, `{% with %}`, `&&`/`||`/`!`, `{{{ }}}`,
+  `{{& }}`) each produce a located surface diagnostic with the documented fix-it, not silent
+  acceptance.
 * *`check:hbs-conformance`* / *`check:mustache-conformance`* — must be **inert**: ClassicBars and
   MinBars are out of scope, so their byte-identical lines (49/50, 184/184) cannot move. The gate
   proves the new lexical pairs (`{#`/`#}`, `{%- -%}`) don't bleed into those surfaces.
@@ -183,6 +200,10 @@ include/yield → scope** (additive desugars + reserved-word rejects), then **op
   capabilities, not consistency fixes, and several conflict with the immutable / sandboxed model.
 * **The `contains` membership spelling and the `~` whitespace marker.** Rejected to keep one canonical
   form per concept (`in` and `-`).
+* **A first-class `SafeString` value type (mid-pipe safe propagation).** The `safe` filter here is the
+  final-stage raw-output desugar only (item 8); a safe-marked *value* carrying its safe-ness through
+  helpers and partials (Django `mark_safe` / Jinja `Markup`) is a separate engine decision, not a
+  surface respelling, and is deferred.
 * **`loop.*` completeness polish** (`revindex` naming, `loop.cycle`/`previtem`/`nextitem`). Minor,
   tracked separately; the existing `loop.*` set already follows Jinja, not Liquid.
 
