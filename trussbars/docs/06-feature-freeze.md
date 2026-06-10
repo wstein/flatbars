@@ -15,6 +15,16 @@
 > change the language below without an explicit amendment here. The two surface
 > items still **out** of v1 are `dict` literals (need a generated struct) and
 > data-carrying-enum field dispatch (a `match`) — both type-aware, deliberately → v2.
+>
+> **Amended by docs/19 (Proposed) — surface delimiters.** §1's control-flow surface below is
+> written in the `{{ }}`/`{{#…}}` spelling. For **RawBars/MaxBars/Trussbars**, docs/19 moves all
+> control-flow keywords, separators, and binding statements to Django-style **`{% %}`** (so
+> `{{#if}}`→`{% if %}`, `{{#let}}`→`{% local %}` per docs/17, the quad-stache raw block →
+> `{% raw %}`); `{{ }}` becomes output-only. FullBars/MinBars keep `{{ }}`. The *language* below
+> (constructs, value policy, exclusions) is unchanged — only the delimiters — so the byte-identity
+> contract holds. **Governance:** `{% %}` is a *surface* decision, which docs/12 §5.5 places with
+> the **oracle** (PureScript RawBars/MaxBars); docs/17–19 are Trussbars's conformance view of that
+> decision, not its authority. The freeze §1 spellings are updated when docs/19 lands.
 
 Evidence base: the conformance corpus (`trussbars/conformance/cases.mjs`, 52
 byte-matched cases) and the blog/changelog dogfoods (`trussbars/examples/`).

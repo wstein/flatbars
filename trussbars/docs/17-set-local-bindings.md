@@ -1,5 +1,9 @@
 # Trussbars — `{% set %}` (forward) & `{% local %}` (bounded): scope-named bindings
 
+> **Read `docs/19` first.** This ADR is written in the Django-style `{% %}` statement-tag surface
+> that `docs/19` defines; the conceptual dependency runs 19 → 17 → 18 even though the numbering
+> runs the other way. `{% set %}`/`{% local %}` presuppose that surface.
+>
 > **Status:** **Proposed** — supersedes the earlier `assign`/`let` naming. The two binding
 > forms are renamed so **the keyword states the scope**: `{% set name = expr %}` binds into the
 > *current* scope and flows forward to its close; `{% local name = expr %}…{% endlocal %}` opens
@@ -19,6 +23,11 @@
 > contrast directly: `set` flows on, `local` is confined. `let` is dropped because a block-scoped
 > `let` is **backwards** from the universal convention (Rust/ML/JS `let` is forward-scoped), so it
 > mis-signalled scope — the exact complaint this ADR fixes.
+>
+> **"`let` retired" means the *surface keyword*, not the mechanism.** Authors no longer write
+> `let`. The *lowering target* is still a Rust `let` (both `set` and `local` emit one), and the
+> *oracle operation* is still `letH` — those are implementation names, unchanged. So "reuses the
+> `let`-emit" / "`letH`-backed" below refer to the mechanism, not a surface form.
 
 ## 1. Context
 
@@ -60,9 +69,11 @@ close of the *enclosing block*. Block-less: no `{% endset %}`.
 - `NAME` is a static identifier; `EXPR` is any expression (operators, pipes, filters, calls).
 - **Scope is the enclosing block, forward only.** A top-level `{% set %}` is live to the end of
   the template; a `{% set %}` inside `{% each %}`/`{% if %}`/`{% with %}`/`{% local %}` is live
-  to that block's close and **does not leak past it** — Rust lexical scope, and a *deliberate
-  divergence from Liquid/Jinja*, whose forward bindings leak further (Liquid into the whole
-  document). Trussbars keeps the stricter, predictable rule.
+  to that block's close and **does not leak past it** — Rust lexical scope. This is a *deliberate
+  divergence from **Liquid*** (whose `assign` persists into the whole document) but is
+  **equivalent to Jinja's** `{% set %}`, which is already block-scoped — a `set` inside a Jinja
+  `{% for %}` likewise does not survive the loop (Jinja's `namespace()`-or-nothing gotcha). So we
+  match Jinja and tighten only Liquid.
 - **Re-setting a name in the same block shadows** (a fresh binding), like a second Rust
   `let x = …;`. It does **not** mutate the prior binding and never reaches across a block
   boundary — so the loop-accumulator idiom (`{% set total = total + 1 %}` inside `{% each %}`)
@@ -83,8 +94,11 @@ Common to both:
 ## 3. The lowering (concrete)
 
 Both build the **same binding node**; they differ only in whether it opens a fresh scope. `local`
-is the node today's block-`let` builds; `set` is the same node tagged *open-ended* (its "body" is
-the remainder of the enclosing block's node list). No new AST node.
+is the node today's block-`let` builds; `set` is that node tagged *open-ended* — it has no
+delimited body, so its "body" is the remainder of the enclosing block's node list. That is a
+**small but nonzero** parser change: a `Let` variant (or an `open_ended: bool` flag) plus a
+parse-time step that captures the sibling tail as the binding's scope. Not a new *kind* of node,
+but not free — budget it.
 
 The AOT emitter:
 
@@ -110,7 +124,7 @@ for post in (&ctx.posts).iter() {
     out.push_str("\">");
     out.push_str(&trussbars_std::escape_html(&post.title));
     out.push_str("</a>\n");
-}   // ← `slug` drops here; it never leaked out of the loop (the Liquid/Jinja divergence)
+}   // ← `slug` drops here; it never leaked out of the loop (the Liquid divergence; matches Jinja)
 ```
 
 The F4 caveat carries over to both: binding a non-`Copy` field *directly* (`{% set n = post.title %}`)
@@ -131,7 +145,7 @@ likewise, pointing at `{% with %}`/Handlebars idioms; in MinBars they are ordina
 | --- | --- | --- | --- |
 | **A1** | **`set` (forward) + `local` (bounded)** | **Chosen** | Each keyword names its scope; `set` has the exact Jinja precedent for forward binding, `local` plainly marks the confined region. Both reuse the one binding node — no runtime, no new AST. |
 | **A2** | Keep `let` for one of them | **Rejected** | `let` is forward everywhere (Rust/ML/JS) but was *bounded* here — it mis-signalled scope (the complaint). Reusing it for *forward* would also clash with FullBars's Handlebars-`{{#let}}` rejection narrative. Retire it. |
-| **A3** | Liquid/Jinja-faithful: leak past enclosing blocks + mutable re-set (loop accumulators) | **Rejected** | The further leak is unimplementable against `&ctx` without hoisting an `Option` above every conditional; cross-iteration mutation breaks the borrow model and the effect-light property. We take the **name** (`set`) from Jinja and the **scope** from Rust. |
+| **A3** | Liquid-faithful: document-wide leak + mutable re-set (loop accumulators, Liquid; Jinja via `namespace()`) | **Rejected** | The Liquid-style leak is unimplementable against `&ctx` without hoisting an `Option` above every conditional; cross-iteration mutation breaks the borrow model and the effect-light property. We take the **name** (`set`) and the **block scope** from Jinja, and reject only Liquid's wider leak + Jinja's `namespace()` escape hatch. |
 | **A4** | `set` only — drop the bounded form | **Rejected** | The bounded `local` earns its keep: it confines a temporary so it can't pollute the rest of the region (and auto-drops). Both scopes are real needs (§1). |
 
 ## 5. Consequences
@@ -149,11 +163,14 @@ it to `local`**; semantics are unchanged. The `flatbars migrate` codemod (docs/1
 rewrites `{{#let …}}`/`{% let … %}` → `{% local … %}…{% endlocal %}`, and `checkSurfaceStrict`
 rejects the old `let` spelling in the nonEmpty surface with a located pointer to `local`.
 
-### 5.3 Stricter than Liquid/Jinja by design (a documented divergence)
+### 5.3 Scope matches Jinja; stricter than Liquid (a documented divergence)
 
-`set` does not leak past its enclosing block and cannot mutate across scopes. Migrating a
-Liquid/Jinja template that relies on the wider leak or a loop accumulator (docs/15) must rewrite —
-the importer flags both as located findings rather than silently mis-scoping.
+`set` is block-scoped — **equivalent to Jinja's** `{% set %}` — so it does not leak past its
+enclosing block and cannot mutate across scopes. It is stricter only than **Liquid**, whose
+`assign` persists document-wide and supports loop accumulators. Migrating a *Liquid* template that
+relies on that wider leak or an accumulator (docs/15) must rewrite; a *Jinja* template that leans
+on `namespace()` for cross-scope mutation likewise has no equivalent here. The importer flags both
+as located findings rather than silently mis-scoping.
 
 ### 5.4 The injection boundary is untouched
 
@@ -188,7 +205,7 @@ byte-for-byte (docs/12 §5.5).
   precedent; `local` states the confined scope.
 - Both **reuse the one binding node and the `let`-emit**; `local` opens a fresh Rust `{ }`, `set`
   splices a `let` into the current block. Byte-identical across backends.
-- **Stricter than Liquid/Jinja**: no leak past the enclosing block, no cross-scope mutation —
+- **Scope matches Jinja, stricter than Liquid**: no leak past the enclosing block, no cross-scope mutation —
   preserving the borrow model and effect-light property.
 - **nonEmpty-family surface** (RawBars/MaxBars + Trussbars); FullBars and MinBars get neither
   (FullBars already rejects block-`let`, ADR-024). `let`→`local` is a rename/freeze-amendment;

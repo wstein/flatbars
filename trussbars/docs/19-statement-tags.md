@@ -94,11 +94,17 @@ existing per-dialect knobs (`mustacheDelims`, `rangeOperator`, `collectionLitera
 `{% %}` is a **re-delimiting of the same structural nodes**, not new semantics. The skeleton
 AST is unchanged: `{% if %}…{% endif %}` still parses to the same `Block`, `{% else %}` /
 `{% when %}` to the same `Sep`, `{% set %}` to the same binding node the block-`let` (now
-`{% local %}`) builds. The **engine, desugar, validate, and compile drivers never see the
-difference** — they
-consume `Block`/`Sep`, and a `Block` does not record which delimiters opened it.
+`{% local %}`) builds. The **desugar, interpret, and compile drivers never see the difference** —
+they consume `Block`/`Sep`, and a `Block` does not record which delimiters opened it.
 
-What changes is confined to the **lexer/parser**:
+Two layers *do* change, and the doc should not pretend otherwise (cf. §5.1): the **lexer/parser**
+(it recognizes `{% %}` and produces `Sep` from a lexical token instead of a reserved *name*), and
+**`splitClauses`** in `Kernel.Walk` (it keys off that token rather than a reserved-name list). That
+is precisely the *simplification* §5.1 claims — but it is a change to the walk machinery, not a
+no-op. What stays invariant is everything *downstream* of `Block`/`Sep`: the IoC interpret driver,
+the desugar rules, the validator, and every emit backend.
+
+What changes is confined to the **lexer/parser and `splitClauses`**:
 
 ```text
 LexConfig { statementTags = true }     ⇒  `{%` opens a statement tag, scanned to `%}`
@@ -223,19 +229,39 @@ and `{% %}` — strictly more capable. The quad-stache is retired in `statementT
    into the existing `Block`/`Sep`/statement nodes; enable for RawBars/MaxBars. Re-render the
    corpus byte-for-byte; add `stmt-*` cases (stray-separator parse error, `endX` mismatch, the
    namespace-split proof — a field named `else`).
-3. **Migration (§5.4).** Ship the `flatbars migrate` codemod and the `checkSurfaceStrict`
-   rejections; migrate the corpus, tutorials, and `examples/` in one pass.
+3. **Atomic cutover — no red window (§5.4).** The danger is an interval where the oracle accepts
+   only `{% %}` but every downstream fixture is still `{{ }}` (or vice versa) and the gates go red.
+   Avoid it by making the switch *one commit*, staged in three sub-steps **within** that commit:
+   1. **Land the lexer dual-reading, gated off.** `statementTags` defaults **false**, so the
+      oracle still parses today's `{{ }}` surface and every gate stays green — the knob is dormant.
+   2. **Run the codemod over every fixture in the same commit.** `flatbars migrate` rewrites the
+      71-case corpus, the `/rawbars` + `/maxbars` tutorials, `examples/`, and the editor fixtures
+      from `{{ }}` → `{% %}` (a delimiter swap on the unchanged tree, so it is total and
+      reversible). Because the moved tags re-parse to the *same* `Block`/`Sep` nodes, every
+      rewritten template renders byte-for-byte identically — the conformance corpus, `check:parity`
+      (RawBars ≡ MaxBars), and `test:compile` (interpreter ≡ compiler) all stay green across the
+      rewrite.
+   3. **Flip `statementTags = true` for RawBars/MaxBars and turn on `checkSurfaceStrict`** for the
+      old `{{#…}}`/`{{else}}`/quad-stache forms — in the *same* commit, after the fixtures are
+      already `{% %}`. The flip and the now-migrated fixtures land together, so the build is never
+      half-converted.
+   The commit is the one-way door: there is no staged coexistence and no `{{ }}`-control-flow
+   fallback for these dialects (the `{{:else}}` clause-sigil of §4 A2 is *not* held in reserve —
+   it is a rejected alternative, not an escape hatch).
 4. **Trussbars (`docs/08`).** v2 lexer learns `{% %}`; emitter/VM unchanged; corpus on
-   `--v2`/`--vm`/`--vm-compat`; the parse-time diagnostics (§3) wired to template spans.
-5. **Editors (§5.5)** and the `docs/06` freeze amendment.
+   `--v2`/`--vm`/`--vm-compat`; the parse-time diagnostics (§3) wired to template spans. Sequenced
+   *after* step 3 so the Trussbars corpus it gates against is already `{% %}`.
+5. **Editors (§5.5)** and the `docs/06` freeze amendment, both inside the step-3 commit (the
+   editor fixtures are migrated in 3.ii; the freeze §1 spellings update with the flip in 3.iii).
 
 ## 7. Summary
 
 - In **RawBars / MaxBars / Trussbars**, `{{ }}` is **output-only** and every control keyword,
   clause separator, and binding statement is **`{% %}`** (Django/Jinja/Liquid).
 - It ships as a **`LexConfig` knob (`statementTags`)** that **re-delimits the existing
-  `Block`/`Sep` nodes** — engine, desugar, and compiler are **untouched**; rendered bytes are
-  identical (conformance holds).
+  `Block`/`Sep` nodes**. The lexer/parser and `splitClauses` change (the *simplification*, §5.1);
+  the desugar, interpret, and compile drivers are **untouched** — rendered bytes are identical
+  (conformance holds).
 - It **deletes** the separator-ambiguity machinery (`docs/12 §2`): `else`/`when`/`elif`/`case`
   stop being reserved names, `splitClauses` keys off a real token, the AST stops lying.
 - **FullBars** (Handlebars) and **MinBars** (Mustache) are **excluded** and keep `{{ }}`-only —

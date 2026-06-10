@@ -170,8 +170,12 @@ the corpus an authority before Trussbars conforms byte-for-byte (docs/12 §5.5).
    `--v2`/`--vm`/`--vm-compat`; freeze (docs/06 §5) amended to list `capture` IN; the
    unused-capture lint filed against docs/10.
 4. **Importer (docs/15).** Map Liquid `{% capture %}` / Jinja `{% set x %}…{% endset %}` →
-   `{% capture %}`, noting the escaping difference (Liquid re-escapes captured output via an
-   explicit `escape` filter; Trussbars's capture is `safe` by default) as a located finding.
+   `{% capture %}`. Trussbars's `safe`-by-default capture **matches Jinja**, whose `{% set %}…
+   {% endset %}` yields `Markup` (safe). It differs from **Liquid**, which has no autoescape: a
+   captured Liquid string is plain text, emitted verbatim and re-escaped only if the author adds an
+   explicit `| escape`. Flag that Liquid difference as a located finding (a captured fragment
+   containing HTML will render as markup here, as literal-then-escaped under explicit Liquid
+   `escape`).
 
 ## 7. Summary
 
