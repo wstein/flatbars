@@ -1,8 +1,8 @@
 //! Slice 3 — the block parser + desugar: the [`Lexeme`] stream → a desugared
 //! [`Node`] tree (docs/08 §6.3). Matches block opens/closes, dispatches
 //! if/unless/each/with/let/partials/raw, parses the Liquid `each` binding and the
-//! `let` hash, threads a [`Scope`] for path rooting, and splits `{% else %}` /
-//! `{{else if}}` clauses.
+//! `let` hash, threads a [`Scope`] for path rooting, and splits the `{% %}`-only
+//! `{% else %}` / `{% elif %}` / `{% when %}` clauses.
 
 use crate::ast::{Case, Cond, Expr, For, HelperBlock, Node, With};
 use crate::lex::{Lexeme, Sigil, lex};
@@ -66,7 +66,7 @@ enum Stop {
     Close(String),
     /// A `{% else %}`.
     Else,
-    /// A `{{else if cond}}` (the raw condition source).
+    /// A `{% elif cond %}` / `{% else if cond %}` (the raw condition source).
     ElseIf(String),
     /// A `{% when V … %}` arm of a `{% case %}` (the raw value-expression source).
     When(String),
@@ -106,6 +106,32 @@ impl Blocks<'_> {
                     self.pos += 1;
                     return Ok((nodes, Stop::Close(name)));
                 }
+                // A `{% else %}` / `{% elif … %}` / `{% when … %}` clause separator. The
+                // lexer tags ONLY the `{% %}` form as `Clause`, so a brace-form `{{else}}`
+                // never reaches here — it is plain output (PURE grammar).
+                Lexeme::Tag {
+                    sigil: Sigil::Clause,
+                    interior,
+                    ..
+                } => {
+                    let text = interior.of(self.src).trim();
+                    self.pos += 1;
+                    if text == "else" {
+                        return Ok((nodes, Stop::Else));
+                    }
+                    if let Some(c) = strip_else_if(text) {
+                        return Ok((nodes, Stop::ElseIf(c.to_string())));
+                    }
+                    // `elif` — the `{% %}` statement-tag spelling of `else if` (docs-19).
+                    if let Some(c) = strip_elif(text) {
+                        return Ok((nodes, Stop::ElseIf(c.to_string())));
+                    }
+                    if let Some(vals) = strip_when(text) {
+                        return Ok((nodes, Stop::When(vals.to_string())));
+                    }
+                    // Unreachable: the lexer only tags `else`/`elif`/`when` as `Clause`.
+                    return err(format!("unexpected clause `{{% {text} %}}`"), 0);
+                }
                 Lexeme::Tag {
                     sigil: Sigil::Output,
                     interior,
@@ -113,23 +139,6 @@ impl Blocks<'_> {
                 } => {
                     let span = *span;
                     let text = interior.of(self.src).trim();
-                    if text == "else" {
-                        self.pos += 1;
-                        return Ok((nodes, Stop::Else));
-                    }
-                    if let Some(c) = strip_else_if(text) {
-                        self.pos += 1;
-                        return Ok((nodes, Stop::ElseIf(c.to_string())));
-                    }
-                    // `elif` — the `{% %}` statement-tag spelling of `else if` (docs-19).
-                    if let Some(c) = strip_elif(text) {
-                        self.pos += 1;
-                        return Ok((nodes, Stop::ElseIf(c.to_string())));
-                    }
-                    if let Some(vals) = strip_when(text) {
-                        self.pos += 1;
-                        return Ok((nodes, Stop::When(vals.to_string())));
-                    }
                     let expr = parse_expr(text, scope)?;
                     // PURE grammar (ADR-039): raw (un-escaped) output is `{{ E | safe }}`,
                     // not a `{{{ }}}` sigil. A `safe` *final* pipe desugars to the raw-output
@@ -832,7 +841,8 @@ mod tests {
 
     #[test]
     fn if_else_chain() {
-        let ns = parse("{% if a %}A{{else if b}}B{% else %}C{% endif %}").unwrap();
+        // PURE grammar: clauses are `{% %}`-only — `{% elif %}` / `{% else %}`.
+        let ns = parse("{% if a %}A{% elif b %}B{% else %}C{% endif %}").unwrap();
         match &ns[0] {
             Node::Cond(c) => {
                 assert!(!c.negated);
@@ -842,6 +852,38 @@ mod tests {
                 assert_eq!(c.otherwise, vec![Node::Text("C".into())]);
             }
             o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn brace_clause_words_are_plain_output() {
+        // A brace-form `{{else}}` is NOT a clause separator (PURE grammar): it is output of
+        // a variable named `else`, so a `{% if %}` containing it has no else branch.
+        let ns = parse("{% if a %}x{{else}}y{% endif %}").unwrap();
+        match &ns[0] {
+            Node::Cond(c) => {
+                assert!(c.elifs.is_empty());
+                assert!(c.otherwise.is_empty());
+                // body is `x`, output(`else`), `y` — the `{{else}}` rendered as output.
+                assert!(matches!(c.body[1], Node::Output { .. }));
+            }
+            o => panic!("{o:?}"),
+        }
+    }
+
+    #[test]
+    fn legacy_handlebars_forms_are_rejected() {
+        // PURE grammar — no Handlebars holdovers. Each legacy form fails to parse (a plain
+        // syntax error; no compat mapping to its `{% %}` replacement).
+        for src in [
+            "{{#each xs}}{{this}}{{/each}}", // block open/close
+            "{{#if a}}x{{/if}}",
+            "{{> partial}}",               // partial reference
+            "{{^inverted}}x{{/inverted}}", // inverted section
+            "{{{ raw }}}",                 // triple-stache
+            "{{{{#raw}}}}v{{{{/raw}}}}",   // quad-stache raw block
+        ] {
+            assert!(parse(src).is_err(), "expected reject: {src:?}");
         }
     }
 

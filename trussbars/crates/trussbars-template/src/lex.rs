@@ -42,14 +42,21 @@ pub enum Lexeme {
 /// The form of a `{{ … }}` tag, distinguished by the opening sigil.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sigil {
-    /// `{{ x }}` — escaped output, or a separator (`else`/`elif`); the parser decides.
-    /// (Raw/unescaped output is `{{ x | safe }}`, not a separate sigil — ADR-039.)
+    /// `{{ x }}` — escaped output (and only output). Raw/unescaped output is the `safe`
+    /// filter (`{{ x | safe }}`), not a separate sigil; clause separators are `{% %}`-only
+    /// ([`Sigil::Clause`]). A `{{else}}` is therefore plain output of a variable named
+    /// `else`, never a separator (PURE grammar — ADR-039).
     Output,
+    /// `{% else %}` / `{% elif … %}` / `{% when … %}` — a clause separator inside a block.
+    /// Distinct from [`Sigil::Output`] so the brace form `{{else}}` is never mistaken for a
+    /// separator: clause control is `{% %}`-only, mirroring the PureScript
+    /// `braceControlViolation` reject.
+    Clause,
     /// `{%  …  %}` — a block open.
     Open,
     /// `{% end …  %}` — a block close.
     Close,
-    /// `{{> … }}` — a partial reference.
+    /// `{% include "name" %}` — a partial reference.
     Partial,
     /// `{# … #}` — a Django/Jinja inline comment (the parser ignores it).
     Comment,
@@ -226,29 +233,19 @@ pub fn trim_standalone(src: &str, lexemes: &mut [Lexeme]) {
 /// Whether the lexeme at `i` is a standalone tag: eligible AND its line is blank on
 /// both sides (scanning through wholly-blank text runs, stopping at any other tag).
 fn standalone_at(src: &str, lexemes: &[Lexeme], i: usize) -> bool {
-    eligible(src, &lexemes[i]) && left_blank(src, lexemes, i) && right_blank(src, lexemes, i)
+    eligible(&lexemes[i]) && left_blank(src, lexemes, i) && right_blank(src, lexemes, i)
 }
 
-/// Standalone-eligible: a block open/close, a comment, or a `{{ }}` tag whose head
-/// word is a clause separator (`else`/`elif`). Partials and real output never are.
-fn eligible(src: &str, l: &Lexeme) -> bool {
-    match l {
+/// Standalone-eligible: a block open/close, a comment, or a `{% %}` clause separator
+/// (`else`/`elif`/`when`). Partials and `{{ }}` output never are.
+fn eligible(l: &Lexeme) -> bool {
+    matches!(
+        l,
         Lexeme::Tag {
-            sigil: Sigil::Open | Sigil::Close | Sigil::Comment,
+            sigil: Sigil::Open | Sigil::Close | Sigil::Comment | Sigil::Clause,
             ..
-        } => true,
-        Lexeme::Tag {
-            sigil: Sigil::Output,
-            interior,
-            ..
-        } => {
-            let head = interior.of(src).trim_start();
-            let head = head.split(|c: char| c.is_whitespace()).next().unwrap_or("");
-            // `else`/`elif` split an `if`; `when` splits a `{% case %}` (docs/12).
-            head == "else" || head == "elif" || head == "when"
         }
-        _ => false,
-    }
+    )
 }
 
 /// Everything from the previous newline (or start of input) up to the tag at `i` is
@@ -337,6 +334,18 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     // include is `{% include "name" %}`. Anything but a plain output expression falls
     // through and fails as a plain parse error — no compat mapping.
     let inner = i + 2;
+    // PURE grammar (ADR-039): three-or-more opening braces are NOT a tag. A `{` glued
+    // directly to the `{{` open is the retired triple-stache `{{{ … }}}` (or the quad
+    // `{{{{ … }}}}` raw block); reject it so it can never silently misparse as a dict
+    // literal (`{{{a: 1}}}`). Unescaped output is the `safe` filter (`{{ x | safe }}`); a
+    // verbatim region is `{% raw %}`. A *spaced* `{` (`{{ {a: 1} }}`) is a dict and stays
+    // valid.
+    if inner < n && b[inner] == b'{' {
+        return Err(LexError::new(
+            "`{{{ … }}}` is not a tag (unescaped output is `{{ x | safe }}`, a verbatim region is `{% raw %}`)",
+            i,
+        ));
+    }
     let close = find_close(b, n, inner, 2)?;
     // Explicit whitespace control `{{- … -}}` (output / partial). The marker is the `-`
     // glued to the inner braces; a spaced `-` stays an operator.
@@ -456,12 +465,13 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             trail_trim,
         });
     }
-    // A clause separator (`else`/`elif`/`when`) lexes to `Output` (the parser turns it
-    // into a `Stop`); every other head — including the block-partial slot `{% yield %}`
-    // (PURE grammar: it is control, so `{% %}` not `{{ }}`) — opens a block
+    // A clause separator (`else`/`elif`/`when`) lexes to `Clause` — a sigil distinct from
+    // `{{ }}` output, so only the `{% %}` form separates clauses (the parser turns a
+    // `Clause` into a `Stop`). Every other head — including the block-partial slot
+    // `{% yield %}` (PURE grammar: it is control, so `{% %}` not `{{ }}`) — opens a block
     // (`Sigil::Open`), which `open_block` dispatches.
     let sigil = if head == b"else" || head == b"elif" || head == b"when" {
-        Sigil::Output
+        Sigil::Clause
     } else {
         Sigil::Open
     };
@@ -738,18 +748,42 @@ mod tests {
     }
 
     #[test]
-    fn statement_tag_clause_separators_are_output() {
-        // `else`/`elif`/`when` lex to `Output` (the parser splits the clause), like `{% else %}`.
-        // (The `A`/`B`/`C` bodies are `Text`, filtered out by `tags`.)
+    fn statement_tag_clause_separators_are_clause_sigil() {
+        // `{% else %}`/`{% elif %}`/`{% when %}` lex to the dedicated `Clause` sigil —
+        // distinct from `{{ }}` output, so a brace-form `{{else}}` is NOT a separator (PURE
+        // grammar). (The `A`/`B`/`C` bodies are `Text`, filtered out by `tags`.)
         assert_eq!(
             tags("{% if a %}A{% elif b %}B{% else %}C{% endif %}"),
             vec![
                 (Sigil::Open, "if a".to_string()),
-                (Sigil::Output, "elif b".to_string()),
-                (Sigil::Output, "else".to_string()),
+                (Sigil::Clause, "elif b".to_string()),
+                (Sigil::Clause, "else".to_string()),
                 (Sigil::Close, "if".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn brace_clause_words_lex_as_output_not_clause() {
+        // The brace form `{{else}}` / `{{when 1}}` is OUTPUT, never a clause separator —
+        // only `{% %}` separates clauses (PURE grammar, no Handlebars holdover).
+        assert_eq!(
+            tags("{{else}}{{when 1}}"),
+            vec![
+                (Sigil::Output, "else".to_string()),
+                (Sigil::Output, "when 1".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn triple_and_quad_stache_are_rejected() {
+        // PURE grammar: three-or-more opening braces are not a tag. Unescaped output is
+        // `{{ x | safe }}`; a verbatim region is `{% raw %}`. A *spaced* `{` stays a dict.
+        assert!(lex("{{{ x }}}").is_err());
+        assert!(lex("{{{a: 1}}}").is_err());
+        assert!(lex("{{{{#raw}}}}v{{{{/raw}}}}").is_err());
+        assert!(lex("{{ {a: 1} }}").is_ok()); // a spaced dict literal is still valid output
     }
 
     #[test]
