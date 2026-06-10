@@ -175,6 +175,10 @@ export const sidebar = [
         "link": "/adr/adr-0039-liquid-django-surface-alignment/"
       },
       {
+        "label": "ADR-040: extends/block inheritance",
+        "link": "/adr/adr-0040-template-inheritance-extends-block/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }

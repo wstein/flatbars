@@ -250,7 +250,9 @@ each justified against these invariants, not against a feeling that the surface 
   %}body{% endpartial %}` invokes a layout and `{% yield %}` drops the body into its one hole, which
   is genuine inheritance for the common case. What is deferred is only the multi-slot,
   named-block, override-with-`super()` generalization. (The earlier "no template inheritance" framing
-  understated this: the capability is in; the ergonomic generalization is out.)
+  understated this: the capability is in; the ergonomic generalization is out.) **Now picked up by
+  [ADR-040](/adr/adr-0040-template-inheritance-extends-block/)** (`{% extends %}` + named `{% block %}`
+  + `{% super %}`, statically resolved at compile time).
 * **Liquid-only iteration sugar** — `tablerow`, `cycle`, `increment`/`decrement`, `paginate`. These are
   capabilities, not consistency fixes, and several conflict with the immutable / sandboxed model.
 * **The `contains` membership spelling and the `~` whitespace marker.** Rejected to keep one canonical

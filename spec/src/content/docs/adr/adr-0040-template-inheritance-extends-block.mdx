@@ -1,0 +1,215 @@
+---
+title: "ADR-040: Template inheritance — `{% extends %}` + named `{% block %}`"
+sidebar:
+  label: ADR-040 extends/block inheritance
+---
+
+*Status:* **Proposed.** *Date:* 2026-06-11. Applies to the *statement-tag dialects* with a layout
+surface — *MaxBars* (the PureScript reference / oracle) and *Trussbars* (the Rust production engine).
+*RawBars* is the **desugar target**, not a surface consumer: inheritance lowers *to* its
+partial/yield primitives. *ClassicBars* and *MinBars* are **out of scope** — ClassicBars keeps
+Handlebars' `{{#> }}` partial-block, MinBars (Mustache) has no inheritance. Picks up the one
+capability [ADR-039](/adr/adr-0039-liquid-django-surface-alignment/) explicitly deferred (its
+Non-goals: "Django's *named multi-block* template inheritance … is out") and builds directly on the
+single-slot layout primitives shipped there — `{% partial "layout" %}…{% endpartial %}` + `{% yield %}`
+(ADR-039 item 5) and `{% include "name" %}`.
+
+## Context
+
+Trussbars now has the **single-slot** layout pattern: a base template exposes one anonymous hole with
+`{% yield %}`, and a caller drives it with `{% partial "base" %}body{% endpartial %}`, dropping its
+body into that hole. That is genuine inheritance for the common "one content area inside a chrome"
+case, and it is enough for Jekyll-style front-matter layouts.
+
+It is **not** enough for the template systems that own the server-rendered market — Django, Jinja2,
+Tera (Zola), Askama/Rinja, Liquid-with-`{% layout %}`. Every one of them composes pages with
+*named, multi-slot* inheritance:
+
+```django
+{# base.html #}
+<html><head><title>{% block title %}Site{% endblock %}</title></head>
+<body>{% block content %}{% endblock %}{% block footer %}© Acme{% endblock %}</body></html>
+
+{# page.html #}
+{% extends "base.html" %}
+{% block title %}Welcome — {% super %}{% endblock %}
+{% block content %}<h1>Hi</h1>{% endblock %}
+{# footer not overridden → inherits base's "© Acme" #}
+```
+
+Three capabilities the single slot lacks: **(1)** more than one hole per layout, addressed **by name**
+rather than by position; **(2)** a *default* body per hole that survives when the child does not
+override it; **(3)** a way for an override to splice in the **parent's** body (`super`). This is the
+deferred generalization, and it is the single biggest gap blocking the northstar ports — mdBook-class
+docs themes get by on single-slot, but any Django/Zola/Askama app port stalls here.
+
+The design tension is that Trussbars is **AOT-compiled, typed, and logic-free in templates**
+(StringTemplate model–view separation — no in-template lambdas, no arbitrary runtime logic). So the
+inheritance design must (a) resolve **statically** — the `extends` chain and block names known at
+compile time — so the AOT backend can flatten it to straight-line Rust with the typed context
+inference (docs/03) seeing one merged template; and (b) introduce **no new runtime machinery** beyond
+what the partial/yield primitives already provide.
+
+## Decision
+
+Add **compile-time, statically-resolved, single-chain named-block inheritance**. Two surface
+statements, one structural slot, all desugaring to the existing partial/yield registry — no new engine
+primitive, no runtime inheritance object.
+
+### Surface
+
+| Form | Role |
+| --- | --- |
+| `{% extends "base" %}` | This template *refines* `base`. Must be the first non-whitespace node. String-literal name, parsed by the same quoted-name reader as `{% include "name" %}`. |
+| `{% block name %}…{% endblock %}` | Declare a named, overridable slot. In a *base*, the body is the **default**. In a *child*, the body is the **override**. `name` is a bare identifier, unique per template. |
+| `{% super %}` | Inside a child block, splice in the **parent** block's body at this point. A structural slot, exactly like `{% yield %}`. |
+
+`{% endblock %}` may name its block for readability — `{% endblock content %}` — and the name, if
+present, must match (a located `DisallowedShape` error otherwise, like the `case`-leading rule).
+
+### Semantics (Django-compatible, statically resolved)
+
+1. **The chain.** `{% extends "B" %}` makes `B` the parent; `B` may itself `{% extends %}`. The chain
+   is a list of string-literal names resolved against the partial/inline registry at lower time — the
+   same registry `hoistInline` ([Kernel.Hoist](/engine/host-api/)) populates. No runtime lookup.
+2. **Merge.** The *root* of the chain (the topmost base) supplies the page skeleton. Walking
+   leaf→root, each `{% block name %}` override replaces the body of the same-named block below it; an
+   un-overridden block keeps the nearest-ancestor body (its default if never overridden). Block
+   identity is **by name across the whole chain**, not by lexical nesting.
+3. **`{% super %}`** in an override renders the body that block *would have had* one level up the chain
+   (the parent's override, or the base default). Outside a block, or with no parent block of that
+   name, it is a located error.
+4. **A child is blocks-only.** A template with `{% extends %}` may contain, at top level, **only**
+   `{% block %}` definitions (and whitespace/comments). Stray content outside a block is a located
+   `DisallowedShape` error — *not* silently dropped (the no-silent-no-op bar, CLAUDE.md) — with the
+   fix-it "move this into a `{% block %}`, or remove the `{% extends %}`". (Django silently ignores it;
+   we reject, consistent with how this project treats every removed/!misused surface form.)
+5. **Single inheritance.** One `{% extends %}` per template; a second is a located error. Diamonds
+   cannot arise (linear chain). A cycle in the chain is a located error caught at lower time.
+
+### `{% yield %}` and `{% block %}` are duals — and they unify
+
+`{% yield %}` is the **anonymous, single, defaultless** slot; `{% block name %}default{% endblock %}`
+is the **named, multi, defaulted** slot. They are the same mechanism at two ergonomic points, so the
+desugar is one target:
+
+* `{% yield %}` ≡ a block with the reserved anonymous name and an empty default.
+* `{% partial "L" %}body{% endpartial %}` ≡ `{% extends "L" %}{% block ⟨anon⟩ %}body{% endblock %}`.
+
+So the single-slot layout shipped in ADR-039 becomes the **degenerate one-block case** of this ADR —
+not a parallel mechanism. The lower pass that already lifts `{% inline %}` definitions and threads the
+`{% yield %}` slot is extended to thread *named* slots; nothing new lands in the interpret driver, the
+compiler emit driver, or the runtime.
+
+## The engine model — a lower-phase pre-pass (the IoC `desugar` instance)
+
+Inheritance is a **structural rewrite**, so it slots into the existing `desugar` IoC instance
+(`foldTemplate` + rewrite rules, `Kernel.Lower`) and runs as a pre-pass beside `hoistInline`
+(propose: `Kernel.Inherit.resolveInheritance`). Given the parsed skeleton + the partial registry:
+
+1. If the template has no `{% extends %}`, collect its `{% block %}` bodies as the slot defaults and
+   leave it otherwise untouched (a base *is* a renderable template).
+2. If it extends `B`, resolve `B` from the registry, recurse to flatten `B`, then overlay this
+   template's blocks (rule 2) and resolve every `{% super %}` against the pre-overlay body. The result
+   is **one flattened skeleton** with all blocks inlined — a plain template the existing interpret /
+   compile / validate drivers consume unchanged.
+
+Because the flatten is total and static, three properties fall out for free:
+
+* **AOT (Trussbars).** The flattened skeleton is what the Rust backend lowers — inheritance costs
+  **zero runtime**; it is gone before codegen. Schema inference (docs/03) infers the typed context of
+  the *merged* page in one pass. This is the differentiator: Django/Tera/Jinja resolve inheritance per
+  request at runtime; Trussbars resolves it at compile time, the way Askama does — but with the
+  Django/Liquid surface.
+* **VM (Trussbars dynamic).** The same flatten runs once at template-load; the VM executes the merged
+  program. AOT≡VM parity (the conformance invariant) holds because both consume the identical
+  flattened skeleton.
+* **Source maps / Context Inspector (ADR-035).** Provenance is preserved by carrying each inlined
+  block's original span through the overlay, so a value in the rendered page still maps to the
+  `{% block %}` (base *or* child) it came from.
+
+### Why `{% super %}`, not `{{ block.super }}` / `{{ super() }}`
+
+Django spells the parent splice `{{ block.super }}`, Jinja `{{ super() }}`. Both are **rejected**: in
+the statement-tag dialects `{{ }}` is **output-only** (ADR-039 Tier 1 invariant) — it carries *data*,
+never control or structure, and there are no in-template calls (`super()` is a call; `block.super` is a
+magic path). A structural splice is a *statement*. `{% yield %}` already set this precedent (the
+hyphen-free, sigil-free spelling of a structural slot — ADR-039 item 5), and `{% super %}` is its exact
+sibling: the slot that pulls the *parent's* body the way `{% yield %}` pulls the *caller's*. One rule —
+structure is `{% %}`, output is `{{ }}` — stays intact.
+
+## Consequences
+
+### Migration & blast radius
+
+**Additive — zero existing-corpus migration.** Inheritance is a *new* surface; nothing that parses
+today changes meaning. The single-slot `{% partial %}`/`{% yield %}` forms keep working verbatim (they
+become the degenerate case but are not rewritten). The only corpus churn is *new* golden cases
+exercising multi-block chains. Contrast ADR-039 item 6 (the `and`/`or`/`not` cutover) whose blast
+radius spanned every boolean expression — this one has none.
+
+### Gates
+
+* **Conformance (`trussbars/conformance/harness.mjs`).** Add multi-block-chain cases; the oracle
+  (PureScript `renderMaxbars`), AOT (`compileMaxRust`), and VM must stay byte-identical across all four
+  modes (`--v2`/`--vm`/`--vm-compat`/`--compat-parity`). The flatten runs in the shared lower pass, so
+  AOT≡VM≡oracle is structural, not per-backend.
+* **`test:compile`** (interpreter ≡ compiled JS) gains the same cases — the JS runtime consumes the
+  flattened skeleton, so no `flatbars-runtime.mjs` change is expected.
+* **`check:parity`** (RawBars ≡ MaxBars): RawBars is the desugar target, so a flattened MaxBars
+  inheritance program must equal the hand-written RawBars partial/yield program it lowers to.
+* **Strict rejects** (new `DisallowedShape` cases, pinned like `check:dialect-diagnostics`): a child
+  with stray top-level content; a duplicate block name; a second `{% extends %}`; a mismatched
+  `{% endblock name %}`; `{% super %}` outside a block / with no parent; an `{% extends %}` cycle or
+  unknown base. Each located, each with a fix-it.
+* **Editors** (ADR-017): `extends`/`block`/`endblock`/`super` join the operation vocabulary
+  (`editors/operations.json` + `token-vocabulary.json`) so highlighting, hover, and folding cover them;
+  `check:operations-paint` extends to the new heads.
+
+### Documentation
+
+* `engine/maxbars.mdx` — promote the existing "block-partial body (`{% yield %}`)" section to a
+  "Layouts & inheritance" section presenting the `{% yield %}` → `{% block %}` continuum.
+* The `/maxbars` tutorial gains a multi-block inheritance example (gate-validated by
+  `check:tutorial-links`).
+* `trussbars/docs/` — a new feature doc; mark the relevant docs/19 / docs/06-freeze tail item.
+* The helper/operation catalog regenerates (`gen:catalog`, `gen:operations`) for the new heads.
+
+## Design invariants — the ceiling this stays under
+
+1. **Static resolution only.** Every `extends` target and `block` name is known at compile time (string
+   literals / bare identifiers — no computed `{% extends someVar %}`). This is what keeps AOT codegen
+   and typed-context inference possible; a dynamic parent is **out** by construction, not omission.
+2. **No new runtime, no new engine primitive.** Inheritance is a lower-phase flatten to the
+   partial/yield registry. The interpret driver, compiler emit driver, and runtime are untouched.
+3. **`{{ }}` stays output-only.** The parent splice is `{% super %}`, never `{{ super() }}` /
+   `{{ block.super }}`. Structure is `{% %}`; output is data.
+4. **No silent no-ops.** Every misuse (stray child content, dup/mismatched/duplicate block, double
+   extends, orphan `super`, unknown/cyclic base) is a *located, actionable* error — never silently
+   dropped the way Django drops stray content.
+5. **Single linear chain.** One `{% extends %}` per template; no multiple inheritance, no mixins.
+
+## Non-goals (deliberately deferred)
+
+* **Dynamic / computed parents** (`{% extends some_expr %}`). Breaks static resolution (invariant 1).
+  Django allows it; we do not — and the typed AOT story is the reason.
+* **Block-scoped `{% block name scoped %}`** (Jinja's loop-variable capture into a block). The
+  flattened-skeleton model already shares the enclosing scope; the explicit `scoped` modifier is a
+  finer-grained capture we can add later if a port needs it.
+* **`{{ block.super }}` as a *value*** (passing the parent body around as data). `{% super %}` is a
+  structural splice, not an expression — consistent with `{% yield %}` never being a value.
+* **Mixins / multiple inheritance / `{% use %}`-style horizontal composition.** Single linear chain
+  only (invariant 5). Horizontal reuse is what `{% include %}` is for.
+* **Cross-dialect surface in ClassicBars/MinBars.** ClassicBars keeps Handlebars `{{#> }}`; MinBars has
+  no inheritance. The *mechanism* lives in the shared kernel; only the statement-tag surface is added.
+
+## Open question
+
+**The anonymous-block spelling for the `{% yield %}` unification.** The desugar treats `{% yield %}` as
+a block with a reserved anonymous name (so `{% partial %}` and `{% extends %}` share one flatten). That
+reserved name must be one a user can never write as a `{% block %}` identifier. Options: a sentinel that
+fails the bare-identifier lexer (e.g. an internal `@yield` key never surface-reachable), or keep
+`{% yield %}` a genuinely *separate* anonymous slot in the lower pass and only *share the overlay
+logic*. The second is less elegant but sidesteps the reserved-name question entirely — decide at
+implementation, in the ADR's spirit of "settle the surface on paper, allow one internal seam to be
+chosen in code."
