@@ -93,8 +93,12 @@ jobs:
         run: cargo build -p trussbars-vm --lib --no-default-features --target thumbv7em-none-eabi
 
   # The perf-regression ratchet: a separate workspace (it pulls handlebars/askama/
-  # sailfish), run in release. Asserts the machine-independent relative invariants
-  # (Trussbars <= Askama, << handlebars).
+  # sailfish/liquid), run in release. The `Perf-regression gate` step asserts the
+  # machine-independent relative invariants (Trussbars <= Askama, << handlebars); the
+  # `Benchmark` step then runs criterion to publish the *canonical, CI-stamped*
+  # medians (one consistent runner class, not a contributor's laptop) to the job
+  # summary + an artifact. The bench is informational only — it never fails the build
+  # (CI runners are noisy), so it does not double as the regression gate.
   benchmarks:
     runs-on: ubuntu-latest
     defaults:
@@ -114,6 +118,28 @@ jobs:
         run: rustup show && cargo --version
       - name: Perf-regression gate
         run: cargo test --release
+      - name: Benchmark (canonical CI-stamped medians)
+        run: |
+          cargo bench --bench render -- \
+            --warm-up-time 1 --measurement-time 2 --sample-size 30 \
+            | tee bench-render.txt
+          {
+            echo "### Trussbars render benchmark — canonical CI medians"
+            echo ""
+            echo "Runner: \`${{ runner.os }}\` · ref \`${{ github.sha }}\`. Indicative (CI"
+            echo "runners are shared); the README table is a contributor-machine snapshot."
+            echo ""
+            echo '```'
+            grep -E 'time:' bench-render.txt || echo "(no medians captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload benchmark medians
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trussbars-bench-render-medians
+          path: trussbars/benchmarks/bench-render.txt
+          if-no-files-found: warn
 
   # The dogfood examples: build each and assert its pages still match the committed
   # golden output (no PureScript toolchain needed — the generated render module is

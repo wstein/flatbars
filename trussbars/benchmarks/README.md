@@ -32,8 +32,13 @@ and **`write`** (a naive hand-written `write!` — see the note below).
 
 ## Results
 
-Criterion medians on this machine (Rust 1.96, `--release`); reproduce with the
-command above.
+Criterion medians from a **contributor machine** (Rust 1.96, `--release`); reproduce
+with the command above. These are a snapshot for orientation — the **canonical,
+machine-stamped** medians come from the `benchmarks` job of the Trussbars CI workflow
+(`.github/workflows/trussbars.yml`), which runs `cargo bench --bench render` on a
+consistent runner class each push and publishes them to the run's **job summary** and a
+`trussbars-bench-render-medians` artifact. Trust the CI numbers for cross-run
+comparison; the table below for the *shape* of the result.
 
 ### big-table (100×100 = 10 000 cells)
 
