@@ -86,7 +86,11 @@ pub fn lex(src: &str) -> Result<Vec<Lexeme>, LexError> {
     let mut text_start = 0;
 
     while i < n {
-        if !(b[i] == b'{' && i + 1 < n && b[i + 1] == b'{') {
+        // A tag opens with `{{` (output/block/raw/comment/partial) or, in this native
+        // Trussbars dialect, the Django-style statement tag `{%` (docs-19).
+        let brace = b[i] == b'{' && i + 1 < n && b[i + 1] == b'{';
+        let stmt = b[i] == b'{' && i + 1 < n && b[i + 1] == b'%';
+        if !(brace || stmt) {
             i += 1;
             continue;
         }
@@ -94,7 +98,11 @@ pub fn lex(src: &str) -> Result<Vec<Lexeme>, LexError> {
         if i > text_start {
             out.push(Lexeme::Text(Span::new(text_start, i)));
         }
-        let lex = lex_tag(b, n, i)?;
+        let lex = if stmt {
+            lex_statement_tag(b, n, i)?
+        } else {
+            lex_tag(b, n, i)?
+        };
         i = lex.next;
         text_start = i;
         out.push(lex.lexeme);
@@ -277,6 +285,100 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
         },
         next: close + 2,
     })
+}
+
+/// Lex a Django-style statement tag `{% head args %}` (docs-19) into the SAME
+/// [`Lexeme::Tag`] its `{{ … }}` counterpart yields, so the parser, desugar, emitter,
+/// and VM never see `{% %}` — a faithful port of `FlatBars.Lexer.readStatementTag`:
+///
+/// * `{% endX %}` → [`Sigil::Close`] naming `X` (the interior is the substring *after*
+///   the `end` prefix — e.g. `endeach` carries the `each` it spans).
+/// * `{% else %}` / `{% elif … %}` / `{% when … %}` → [`Sigil::Output`], which the parser
+///   already splits into a clause (`Stop::Else` / `ElseIf` / `When`), exactly as `{{else}}`.
+/// * anything else (`{% if … %}`, `{% each … %}`, `{% local … %}`, host block heads) →
+///   [`Sigil::Open`].
+///
+/// The `%}` close is found brace-aware (depth 0, strings skipped), like `{{ }}`.
+fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
+    let inner = i + 2; // past `{%`
+    let close = find_stmt_close(b, n, inner)?; // index of `%` in the closing `%}`
+    let end = close + 2; // past `%}`
+    let span = Span::new(i, end);
+    // The non-whitespace content bounds and its leading head word.
+    let (ts, te) = trim_span(b, inner, close);
+    if ts == te {
+        return Err(LexError::new("empty statement tag `{% %}`", i));
+    }
+    let hw_end = (ts..te)
+        .find(|&k| b[k].is_ascii_whitespace())
+        .unwrap_or(te);
+    let head = &b[ts..hw_end];
+    // `{% endX %}` — a close whose name is the `X` after `end` (length > 3, so a bare
+    // `{% end %}` is an ordinary head, matching the PureScript `isStmtClose`).
+    if head.len() > 3 && &head[..3] == b"end" {
+        return Ok(Lexed {
+            lexeme: Lexeme::Tag {
+                sigil: Sigil::Close,
+                interior: Span::new(ts + 3, hw_end),
+                span,
+            },
+            next: end,
+        });
+    }
+    // A clause separator lexes to `Output` (the parser's `else`/`elif`/`when` split);
+    // every other head opens a block.
+    let sigil = if head == b"else" || head == b"elif" || head == b"when" {
+        Sigil::Output
+    } else {
+        Sigil::Open
+    };
+    Ok(Lexed {
+        lexeme: Lexeme::Tag {
+            sigil,
+            interior: Span::new(ts, te),
+            span,
+        },
+        next: end,
+    })
+}
+
+/// The non-whitespace sub-range of `b[lo..hi]` (ASCII-whitespace trimmed both ends).
+fn trim_span(b: &[u8], lo: usize, hi: usize) -> (usize, usize) {
+    let mut s = lo;
+    let mut e = hi;
+    while s < e && b[s].is_ascii_whitespace() {
+        s += 1;
+    }
+    while e > s && b[e - 1].is_ascii_whitespace() {
+        e -= 1;
+    }
+    (s, e)
+}
+
+/// Find the closing `%}` of a statement tag at brace/bracket depth 0, skipping quoted
+/// strings — so a dict/list literal's own `}`/`]` (`{% with {a: {b: 1}} %}`) and a `%}`
+/// inside a string never end the tag. Returns the index of the `%`.
+fn find_stmt_close(b: &[u8], n: usize, start: usize) -> Result<usize, LexError> {
+    let mut depth: i32 = 0;
+    let mut j = start;
+    while j < n {
+        if depth == 0 && b[j] == b'%' && j + 1 < n && b[j + 1] == b'}' {
+            return Ok(j);
+        }
+        match b[j] {
+            b'"' | b'\'' => j = skip_string(b, n, j),
+            b'{' | b'[' => {
+                depth += 1;
+                j += 1;
+            }
+            b'}' | b']' if depth > 0 => {
+                depth -= 1;
+                j += 1;
+            }
+            _ => j += 1,
+        }
+    }
+    Err(LexError::new("unterminated statement tag `{% … %}`", start))
 }
 
 /// Lex a `{{{{#head}}}}body{{{{/head}}}}` raw block beginning at `i`.
@@ -492,6 +594,92 @@ mod tests {
     fn unterminated_tag_errors() {
         assert!(lex("ok {{oops").is_err());
         assert!(lex("{{{{#raw}}}}no close").is_err());
+    }
+
+    // ── Django-style statement tags `{% … %}` (docs-19) ──────────────────────────
+
+    /// The (sigil, interior) of every `Tag` lexeme — the structural projection the
+    /// parser consumes. `{% %}` and `{{ }}` must reduce to the same pairs.
+    fn tags(src: &str) -> Vec<(Sigil, String)> {
+        lex(src)
+            .unwrap()
+            .into_iter()
+            .filter_map(|l| match l {
+                Lexeme::Tag {
+                    sigil, interior, ..
+                } => Some((sigil, interior.of(src).to_string())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn statement_tag_open_close_sigils() {
+        // `{% each xs %}` opens (interior = the trimmed head+args), `{% endeach %}` closes
+        // naming `each` (the substring after `end`).
+        assert_eq!(
+            tags("{% each xs %}{{this}}{% endeach %}"),
+            vec![
+                (Sigil::Open, "each xs".to_string()),
+                (Sigil::Output, "this".to_string()),
+                (Sigil::Close, "each".to_string()),
+            ]
+        );
+        assert_round_trip("{% each xs %}{{this}}{% endeach %}");
+    }
+
+    #[test]
+    fn statement_tag_clause_separators_are_output() {
+        // `else`/`elif`/`when` lex to `Output` (the parser splits the clause), like `{{else}}`.
+        // (The `A`/`B`/`C` bodies are `Text`, filtered out by `tags`.)
+        assert_eq!(
+            tags("{% if a %}A{% elif b %}B{% else %}C{% endif %}"),
+            vec![
+                (Sigil::Open, "if a".to_string()),
+                (Sigil::Output, "elif b".to_string()),
+                (Sigil::Output, "else".to_string()),
+                (Sigil::Close, "if".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn statement_tag_reduces_like_brace_tag() {
+        // The structural token stream of the `{% %}` and `{{# }}` spellings is identical
+        // (modulo the `let`→`local` head rename), so the parser/engine are unchanged.
+        let pct = tags("{% each x in xs %}{{x}}{% endeach %}");
+        let brace = tags("{{#each x in xs}}{{x}}{{/each}}");
+        assert_eq!(pct, brace);
+    }
+
+    #[test]
+    fn statement_tag_brace_aware_close() {
+        // A dict literal's own `}` (and a `%}` inside a string) must not end the tag.
+        assert_eq!(
+            tags("{% with {a: {b: 1}} %}{{a.b}}{% endwith %}")[0],
+            (Sigil::Open, "with {a: {b: 1}}".to_string())
+        );
+        assert_eq!(
+            tags(r#"{% if (eq s "%}") %}x{% endif %}"#)[0],
+            (Sigil::Open, r#"if (eq s "%}")"#.to_string())
+        );
+        assert_round_trip("{% with {a: {b: 1}} %}{{a.b}}{% endwith %}");
+    }
+
+    #[test]
+    fn statement_tag_standalone_lines_trim() {
+        // A `{% each %}`/`{% endeach %}` alone on its line leaves no blank line — the
+        // same standalone rule as `{{#each}}` (the sigils drive `trim_standalone`).
+        assert_eq!(
+            trimmed_text("a\n{% each xs %}\n-\n{% endeach %}\nb\n"),
+            "a\n-\nb\n"
+        );
+    }
+
+    #[test]
+    fn empty_or_unterminated_statement_tag_errors() {
+        assert!(lex("{%  %}").is_err()); // empty
+        assert!(lex("ok {% each xs no close").is_err()); // no `%}`
     }
 
     /// The text payload after `trim_standalone`, concatenated (tags render nothing).
