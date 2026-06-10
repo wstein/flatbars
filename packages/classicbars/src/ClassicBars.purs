@@ -39,7 +39,7 @@ module ClassicBars
 
 import Prelude
 
-import ClassicBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, strictSurfaceViolation)
+import ClassicBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, retiredLetViolation, strictSurfaceViolation)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -105,7 +105,9 @@ checkSurfaceStrict strict nodes = case violation of
     | strict = strictSurfaceViolation nodes
     | otherwise = case maxbarsEachAsViolation nodes of
         Just v -> Just v
-        Nothing -> caseLeadingViolation nodes
+        Nothing -> case retiredLetViolation nodes of
+          Just v -> Just v
+          Nothing -> caseLeadingViolation nodes
 
 -- | Reject `{{ … }}`-delimited control flow in a `statementTags` dialect
 -- | (RawBars/MaxBars, docs-19): there, control uses Django-style `{% … %}` tags and

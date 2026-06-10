@@ -59,6 +59,7 @@ module ClassicBars.Surface
   , reservedScope
   , strictSurfaceViolation
   , maxbarsEachAsViolation
+  , retiredLetViolation
   ) where
 
 import Prelude
@@ -140,9 +141,9 @@ desugarWith lv clauseNames = go []
   -- name (so a bare `{{a}}` resolves to the alias `(a)`). Each binding is a one-key
   -- `@hash` the engine's `letH` installs via `pushHelpers` (context unchanged).
   letNode sp scope args body = case takeBinding scope args of
-    Nothing -> Block sp Section "let" [] (go scope body)
+    Nothing -> Block sp Section "local" [] (go scope body)
     Just { key, val, rest } ->
-      Block sp Section "let" [ App "@hash" [ Lit (VString key), val ] ]
+      Block sp Section "local" [ App "@hash" [ Lit (VString key), val ] ]
         ( if Array.null rest then go (scope <> [ key ]) body
           else [ letNode sp (scope <> [ key ]) rest body ]
         )
@@ -200,12 +201,13 @@ desugarWith lv clauseNames = go []
       -- (the ClassicBars way to "render when falsy"); the head becomes the condition.
       Block sp Inverse name args body ->
         Block sp Section "unless" [ rewriteHead lv scope name args ] (go scope (expandElseIf body))
-      -- `{{#let a=1 b=(add a 1)}}…{{/let}}` (MaxBars only — ADR-024): block-scoped
-      -- aliases that never re-root. Desugars to *nested* single-binding lets so the
-      -- bindings are sequential (`b` sees `a`); each binding name extends the body
-      -- scope so a bare `{{a}}` resolves to the alias `(a)`, and each value is a
-      -- one-key `@hash` the engine's `letH` installs via `pushHelpers`.
-      Block sp Section "let" args body | dropPipes ->
+      -- `{% local a=1 b=(add a 1) %}…{% endlocal %}` (MaxBars only — ADR-024/docs-17):
+      -- the *bounded* binding — block-scoped aliases that never re-root. Desugars to
+      -- *nested* single-binding lets so the bindings are sequential (`b` sees `a`);
+      -- each binding name extends the body scope so a bare `{{a}}` resolves to the
+      -- alias `(a)`, and each value is a one-key `@hash` the engine's `letH` installs
+      -- via `pushHelpers`. (`let` is retired — the keyword now names its scope.)
+      Block sp Section "local" args body | dropPipes ->
         letNode sp scope args (expandElseIf body)
       -- `{{#each item [i0] [i1] in coll}}` (MaxBars only): the Liquid-style loop —
       -- the binding names come *before* `in`, the collection after. `item` binds
@@ -608,13 +610,16 @@ strictSurfaceViolation nodes = Array.head (Array.mapMaybe node nodes)
   where
   node = case _ of
     Block sp Section "inline" _ _ -> Just { off: sp.start, shape: inlineShape }
+    Block sp Section "local" _ _ -> Just { off: sp.start, shape: localShape }
     Block sp Section "let" _ _ -> Just { off: sp.start, shape: letShape }
     Block sp Section "case" _ _ -> Just { off: sp.start, shape: caseShape }
     Block _ _ _ _ body -> strictSurfaceViolation body
     _ -> Nothing
   inlineShape = "{{#inline}} (an inline partial uses the {{#*inline \"name\"}} decorator)"
+  localShape =
+    "{{#local}} (the bounded binding is a RawBars/MaxBars construct; ClassicBars has no `local` — alias with {{#with x as |n|}}, or build a constant with (dict …))"
   letShape =
-    "{{#let}} (block-scoped `let` is a MaxBars-only construct; ClassicBars has no `let` — alias with {{#with x as |n|}}, or build a constant with (dict …))"
+    "{{#let}} (`let` is retired — docs-17; the bounded binding is now {% local … %} … {% endlocal %} in RawBars/MaxBars; ClassicBars has neither — alias with {{#with x as |n|}})"
   caseShape =
     "{{#case}} (multi-arm `case` is a RawBars/MaxBars construct; ClassicBars has no `case` — chain {{#if (eq subject \"v\")}}…{{else if (eq subject \"w\")}}…{{else}}…{{/if}})"
 
@@ -637,6 +642,21 @@ maxbarsEachAsViolation nodes = Array.head (Array.mapMaybe node nodes)
     _ -> false
   eachAsShape =
     "{{#each … as …}} (MaxBars binds loops Liquid-style — write the names before `in`, e.g. {{#each x in xs}} or {{#each x i in xs}}; the trailing `as` form is gone. `with`/custom helpers still use `as`.)"
+
+-- | The first retired `{% let … %}` (the old bounded-binding keyword, docs-17) in
+-- | `nodes` — its offset and a "shape" string for the located `DisallowedShape`
+-- | error. The keyword now names its scope: the bounded binding is `{% local %}`
+-- | (the forward binding is `{% set %}`). Run on the MaxBars/nonEmpty path so the old
+-- | spelling is a clear error with a pointer, not a silent unknown-operation failure.
+retiredLetViolation :: Template -> Maybe { off :: Int, shape :: String }
+retiredLetViolation nodes = Array.head (Array.mapMaybe node nodes)
+  where
+  node = case _ of
+    Block sp Section "let" _ _ -> Just { off: sp.start, shape: letShape }
+    Block _ _ _ _ body -> retiredLetViolation body
+    _ -> Nothing
+  letShape =
+    "{% let … %} (`let` is retired — docs-17; the bounded binding is now {% local … %} … {% endlocal %}, the forward binding is {% set name = … %})"
 
 -- | Strip leading `../` runs, counting the parent depth.
 stripParents :: String -> Int -> { depth :: Int, rest :: String }

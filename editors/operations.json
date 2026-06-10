@@ -354,20 +354,20 @@
       "doc": "The number of items in the current loop."
     },
     {
-      "name": "let",
-      "kind": "block",
-      "arity": "any",
-      "source": "registered",
-      "canonical": null,
-      "doc": "Installs its hash's name=value pairs as block-scoped nullary operations for the body, without re-rooting the context (MaxBars `{{#let a=1}}…{{/let}}`)."
-    },
-    {
       "name": "list",
       "kind": "inline",
       "arity": "any",
       "source": "registered",
       "canonical": null,
       "doc": "Builds an array from its arguments (the `[…]` list-literal helper)."
+    },
+    {
+      "name": "local",
+      "kind": "block",
+      "arity": "any",
+      "source": "registered",
+      "canonical": null,
+      "doc": "Bounded binding: installs its hash's name=value pairs as block-scoped nullary operations for the body, without re-rooting the context, discarded at its close (RawBars/MaxBars `{% local a=1 %}…{% endlocal %}`; docs-17)."
     },
     {
       "name": "log",

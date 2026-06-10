@@ -234,16 +234,17 @@ export const examples = {
     data: { lead: "Ada" },
   },
 
-  letBindings: {
+  localBindings: {
     engine: "maxbars",
-    label: "Intermediate — Let: block-scoped aliases",
-    // `{{#let name=value}}` binds template-local constants for the body WITHOUT
-    // re-rooting the context (unlike `with`). Bindings are sequential — a later
-    // value sees an earlier name — so `tax` can build on `subtotal`.
+    label: "Intermediate — Local: bounded block-scoped aliases",
+    // `{% local name=value %}` binds template-local constants for the body WITHOUT
+    // re-rooting the context (unlike `with`), discarded at `{% endlocal %}`. Bindings
+    // are sequential — a later value sees an earlier name — so `tax` builds on
+    // `subtotal`. (The `let` keyword is retired — docs-17; `local` names its scope.)
     compiles: true,
-    template: `{% let subtotal=(multiply price qty) tax=(multiply subtotal rate) %}
+    template: `{% local subtotal=(multiply price qty) tax=(multiply subtotal rate) %}
 {{qty}} × {{price}} = {{subtotal}}, tax {{tax}}, total {{add subtotal tax}}
-{% endlet %}`,
+{% endlocal %}`,
     data: { price: 20, qty: 3, rate: 0.1 },
   },
 

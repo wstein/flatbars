@@ -201,8 +201,8 @@ coreOperationDefs =
   , gen "with" "Shifts the context to its argument for the body (else the {{else}} clause)." true
       (AtLeast 1)
       withH
-  , gen "let"
-      "Installs its hash's name=value pairs as block-scoped nullary operations for the body, without re-rooting the context (MaxBars `{{#let a=1}}…{{/let}}`)."
+  , gen "local"
+      "Bounded binding: installs its hash's name=value pairs as block-scoped nullary operations for the body, without re-rooting the context, discarded at its close (RawBars/MaxBars `{% local a=1 %}…{% endlocal %}`; docs-17)."
       true
       AnyArity
       letH

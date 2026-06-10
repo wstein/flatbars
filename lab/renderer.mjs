@@ -65,7 +65,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=114";
+} from "./vendor/flatbars-engine.mjs?v=116";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -146,7 +146,7 @@ const BB_CATALOG = [
   { name: "unless", category: "logic", arity: "block", summary: "The inverse of if.", example: "{{#unless done}}todo{{/unless}}" },
   { name: "each", category: "collections", arity: "block", summary: "Iterate an array or object; @index/@key/@first/@last (and @../index) in scope. MaxBars adds bare loop vars: index0/index1/rindex0/rindex1/length (aliases index/rindex/size).", example: "{{#each items}}{{ this }}{{/each}}" },
   { name: "with", category: "access", arity: "block", summary: "Shift context into the argument for the block.", example: "{{#with user}}{{ name }}{{/with}}" },
-  { name: "let", category: "access", arity: "block", summary: "Bind block-scoped aliases (name=value) for the body without re-rooting the context — sequential, MaxBars-only sugar (ADR-024).", example: "{{#let total=(add a b)}}{{ total }}{{/let}}" },
+  { name: "local", category: "access", arity: "block", summary: "Bounded binding: block-scoped aliases (name=value) for the body without re-rooting the context — sequential, RawBars/MaxBars (ADR-024, renamed from `let` by docs-17).", example: "{% local total=(add a b) %}{{ total }}{% endlocal %}" },
   { name: "lookup", category: "access", arity: "inline", summary: "Variadic path lookup; the target of surface path desugaring.", example: "{{{ lookup this \"a\" \"b\" }}}" },
   { name: "eq", category: "logic", arity: "inline", summary: "Value equality ⇒ boolean. Also ne/lt/gt/lte/gte, and/or/not.", example: "{{#if (eq a b)}}…{{/if}}" },
   { name: "escapeHtml", category: "output", arity: "inline", summary: "HTML-escape a value (idempotent on safe values).", example: "{{{ escapeHtml x }}}" },
@@ -154,7 +154,7 @@ const BB_CATALOG = [
   { name: "json", category: "output", arity: "inline", summary: "Serialize a value as JSON text; pretty=true indents.", example: "{{{ json this pretty=true }}}" },
   { name: "escapeJson", category: "output", arity: "inline", summary: "JSON + HTML-escape (for embedding in HTML).", example: "{{{ escapeJson this }}}" },
   { name: "dict", category: "data", arity: "inline", summary: "Build an object from key/value pairs (target of hash args).", example: "{{#if n (dict \"includeZero\" true)}}…{{/if}}" },
-  { name: "bind", category: "data", arity: "inline", summary: "A one-key object — the RawBars `{{#let (bind \"name\" value)}}` binding form (ADR-024).", example: "{{#let (bind \"total\" (add a b))}}{{{ total }}}{{/let}}" },
+  { name: "bind", category: "data", arity: "inline", summary: "A one-key object — the RawBars `{% local (bind \"name\" value) %}` binding form (ADR-024/docs-17).", example: "{% local (bind \"total\" (add a b)) %}{{{ total }}}{% endlocal %}" },
   { name: "partial", category: "composition", arity: "inline", summary: "Render a registered partial; block form gives a fallback + {{> @partial-block}}.", example: "{{> nav user}}" },
   { name: "list", category: "collections", arity: "inline", summary: "Build an array from its arguments — the MaxBars […] list-literal helper.", example: "{{#each [\"a\", \"b\", \"c\"]}}{{this}}{{/each}}" },
   { name: "range", category: "collections", arity: "inline", summary: "The inclusive integer range [a, b] as an array (the basis for counted loops); capped to keep a huge range from hanging.", example: "{{#each (range 1 count)}}{{ loop.index1 }}{{/each}}" },

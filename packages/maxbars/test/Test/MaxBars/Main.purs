@@ -570,35 +570,35 @@ main = do
 
   -- block-scoped `{{#let}}` (ADR-024): aliases, sequential, never re-roots.
   expectM "let: a single binding is in scope for the body"
-    "{% let greeting=\"Hi\" %}{{greeting}}!{% endlet %}"
+    "{% local greeting=\"Hi\" %}{{greeting}}!{% endlocal %}"
     (obj [])
     "Hi!"
   expectM "let: a binding reads from the (unchanged) data context"
-    "{% let n=count %}{{n}} left{% endlet %}"
+    "{% local n=count %}{{n}} left{% endlocal %}"
     (obj [ Tuple "count" (num 3.0) ])
     "3 left"
   expectM "let: bindings are sequential — b sees a"
-    "{% let a=1 b=(add a 1) c=(add b 1) %}{{a}}{{b}}{{c}}{% endlet %}"
+    "{% local a=1 b=(add a 1) c=(add b 1) %}{{a}}{{b}}{{c}}{% endlocal %}"
     (obj [])
     "123"
   -- the defining guarantee: `let` aliases but does NOT re-root, so a bare name
   -- still resolves against the current context, unlike `with`.
   expectM "let: does not re-root the context"
-    "{% let u=user %}{{name}}/{{u.name}}{% endlet %}"
+    "{% local u=user %}{{name}}/{{u.name}}{% endlocal %}"
     (obj [ Tuple "name" (VString "ROOT"), Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
     "ROOT/Ada"
   expectM "let: a binding's value can be a dict literal"
-    "{% let cfg={theme: \"dark\", size: 12} %}{{cfg.theme}}/{{cfg.size}}{% endlet %}"
+    "{% local cfg={theme: \"dark\", size: 12} %}{{cfg.theme}}/{{cfg.size}}{% endlocal %}"
     (obj [])
     "dark/12"
   -- inside a loop the binding coexists with the loop's scoped vars.
   expectM "let: inside a loop, loop.* still resolves"
-    "{% each items %}{% let u=(uppercase this) %}{{u}}@{{loop.index1}} {% endlet %}{% endeach %}"
+    "{% each items %}{% local u=(uppercase this) %}{{u}}@{{loop.index1}} {% endlocal %}{% endeach %}"
     (obj [ Tuple "items" (VArray [ VString "a", VString "b" ]) ])
     "A@1 B@2 "
   -- a binding named like a prelude op shadows it inside the body (isScopedBinding).
   expectM "let: a binding shadows a same-named prelude op"
-    "{% let add=\"shadowed\" %}{{add}}{% endlet %}"
+    "{% local add=\"shadowed\" %}{{add}}{% endlocal %}"
     (obj [])
     "shadowed"
 
@@ -638,14 +638,14 @@ main = do
   -- compiles under AOT — so the lint must NOT flag the let-hash `dict` (the verdict
   -- delegates to the real compiler, which consumes it structurally).
   expectCompat "compat: let-binding a path is NOT flagged"
-    "{% let label=name %}Hi {{label}}{% endlet %}"
+    "{% local label=name %}Hi {{label}}{% endlocal %}"
     (obj [ Tuple "name" (VString "Ada") ])
     true
     []
   -- binding a dict *literal value* compiles under AOT (the emitter synthesizes a
   -- typed struct for it), so the lint treats it as compatible.
   expectCompat "compat: let-binding a dict literal value is AOT-compatible"
-    "{% let cfg={theme: \"dark\"} %}{{cfg.theme}}{% endlet %}"
+    "{% local cfg={theme: \"dark\"} %}{{cfg.theme}}{% endlocal %}"
     (obj [])
     true
     []

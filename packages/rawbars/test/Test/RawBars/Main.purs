@@ -28,15 +28,15 @@ main = do
   -- §4). `let` aliases without re-rooting; nesting gives sequential scope; `bind`
   -- builds the one-key binding object.
   assert' "render: let (bind) — single binding"
-    (render "{% let (bind \"g\" \"Hi\") %}{{{g}}}{% endlet %}" (obj []) == Right "Hi")
+    (render "{% local (bind \"g\" \"Hi\") %}{{{g}}}{% endlocal %}" (obj []) == Right "Hi")
   assert' "render: let (bind) — sequential nesting (b sees a)"
     ( render
-        "{% let (bind \"a\" 1) %}{% let (bind \"b\" (add a 1)) %}{{{a}}},{{{b}}}{% endlet %}{% endlet %}"
+        "{% local (bind \"a\" 1) %}{% local (bind \"b\" (add a 1)) %}{{{a}}},{{{b}}}{% endlocal %}{% endlocal %}"
         (obj []) == Right "1,2"
     )
   assert' "render: let (bind) — never re-roots the context"
     ( render
-        "{% let (bind \"u\" (lookup this \"user\")) %}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{% endlet %}"
+        "{% local (bind \"u\" (lookup this \"user\")) %}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{% endlocal %}"
         (obj [ Tuple "name" (VString "ROOT"), Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
         == Right "ROOT/Ada"
     )

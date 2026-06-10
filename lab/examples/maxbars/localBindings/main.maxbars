@@ -1,0 +1,3 @@
+{% local subtotal=(multiply price qty) tax=(multiply subtotal rate) %}
+{{qty}} × {{price}} = {{subtotal}}, tax {{tax}}, total {{add subtotal tax}}
+{% endlocal %}

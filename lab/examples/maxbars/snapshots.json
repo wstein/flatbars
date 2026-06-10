@@ -15,7 +15,7 @@
   "eachObject": "lang = en\ntheme = dark\n",
   "rangeOp": "Round 1 · Round 2 · Round 3",
   "collections": "Ada (lead), Lin (dev)",
-  "letBindings": "3 × 20 = 60, tax 6, total 66\n",
+  "localBindings": "3 × 20 = 60, tax 6, total 66\n",
   "withBlock": "2 items · 9.50",
   "loopParams": "1/2 Fruit: Pear Plum\n2/2 Veg: Leek (last)\n",
   "partials": "- Ada writes\n- Charles builds\n",

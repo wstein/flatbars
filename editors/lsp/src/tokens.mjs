@@ -133,22 +133,37 @@ export function dialectDiagnostics(text, dialect) {
           `to use them (Cmd-Shift-P → Change Language Mode).`,
       });
     }
-    // Block-scoped `{{#let}}` is a MaxBars-only construct (ADR-024). In ClassicBars
-    // it parses (a section over a `let` field) but the engine rejects it at render
-    // (`checkSurfaceStrict`) — surface that here as an actionable editor message
-    // rather than a silent no-op. RawBars/MaxBars accept `let`, so this is ClassicBars
-    // only.
+    // The bounded binding `{{#local}}` is a RawBars/MaxBars construct (ADR-024,
+    // renamed from `let` by docs-17). In ClassicBars it has no meaning (the engine
+    // rejects it at render, `checkSurfaceStrict`) — surface that here as an actionable
+    // editor message rather than a silent no-op.
     if (dialect === "classicbars") {
-      const letRe = /\{\{~?#let\b/g;
+      const localRe = /\{\{~?#local\b/g;
+      let lm;
+      while ((lm = localRe.exec(text)) !== null) {
+        out.push({
+          start: lm.index,
+          end: lm.index + lm[0].length,
+          message:
+            "The bounded binding `{{#local}}` is a RawBars/MaxBars construct — ClassicBars has no `local`. " +
+            "Alias with `{{#with x as |n|}}`, or switch the file to MaxBars " +
+            "(Cmd-Shift-P → Change Language Mode).",
+        });
+      }
+    }
+    // The `let` keyword is retired (docs-17) — flag it in every nonEmpty dialect, in
+    // both the `{{#let}}` (ClassicBars braces) and `{% let %}` (RawBars/MaxBars
+    // statement-tag) spellings, with a pointer to the scope-named replacements.
+    {
+      const letRe = /\{\{~?#let\b|\{%~?\s*let\b/g;
       let lm;
       while ((lm = letRe.exec(text)) !== null) {
         out.push({
           start: lm.index,
           end: lm.index + lm[0].length,
           message:
-            "Block-scoped `{{#let}}` is a MaxBars-only construct — ClassicBars has no `let`. " +
-            "Alias with `{{#with x as |n|}}`, or switch the file to MaxBars " +
-            "(Cmd-Shift-P → Change Language Mode).",
+            "`{{#let}}` / `{% let %}` is retired (docs-17) — the bounded binding is now " +
+            "`{% local … %} … {% endlocal %}`, the forward binding `{% set name = … %}`.",
         });
       }
     }

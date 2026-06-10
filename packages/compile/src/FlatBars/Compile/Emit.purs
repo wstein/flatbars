@@ -131,11 +131,12 @@ fbBlock lenient rec ctx name args body =
       "unless" -> ifBlock rec ctx ("!(" <> truthyTest rec ctx split.positional <> ")") body
       "each" -> frameBlock rec ctx "each" split.positional split.label body
       "with" -> frameBlock rec ctx "with" split.positional split.label body
-      -- `{{#let}}` (ADR-024): bind the hash's name→value pairs in a child frame
-      -- whose context/loop-vars pass through unchanged (never re-roots), then render
-      -- the body there. The surface nests multi-binding lets, so each carries one
-      -- hash; `rt.letScope` mirrors the interpreter's `pushHelpers`.
-      "let" -> letBlock rec ctx split body
+      -- `{% local %}` (ADR-024, renamed from `let` by docs-17): the bounded binding —
+      -- bind the hash's name→value pairs in a child frame whose context/loop-vars pass
+      -- through unchanged (never re-roots), then render the body there. The surface
+      -- nests multi-binding lets, so each carries one hash; `rt.letScope` mirrors the
+      -- interpreter's `pushHelpers`.
+      "local" -> letBlock rec ctx split body
       -- `{{#case s}}{{when V…}}…{{else}}…{{/case}}` (docs/12): a first-class multi-arm
       -- conditional, compiled to an `if`/`else if` chain that compares the subject to each
       -- arm's value(s) with the same `eq` the interpreter's `caseH` uses — byte-identical.

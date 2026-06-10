@@ -30,8 +30,12 @@ const RULES = [
   ["classicbars", "{{=<% %>=}}", /Set-delimiter directives.*ClassicBars.*Mustache feature.*MinBars/, "set-delim (classicbars)"],
   ["rawbars",  "{{=<% %>=}}", /Set-delimiter directives.*RawBars.*Mustache feature.*MinBars/,  "set-delim (rawbars)"],
   ["maxbars",  "{{=<% %>=}}", /Set-delimiter directives.*MaxBars.*Mustache feature.*MinBars/,  "set-delim (maxbars)"],
-  // `{{#let}}` is MaxBars-only (ADR-024): ClassicBars flags it; MaxBars/RawBars accept it.
-  ["classicbars", "{{#let a=1}}{{/let}}", /\{\{#let\}\}.*MaxBars-only.*ClassicBars has no .let./, "let (classicbars)"],
+  // the bounded `{{#local}}` is a RawBars/MaxBars construct (ADR-024, renamed from
+  // `let` by docs-17): ClassicBars flags it; MaxBars/RawBars accept it.
+  ["classicbars", "{{#local a=1}}{{/local}}", /\{\{#local\}\}.*ClassicBars has no .local./, "local (classicbars)"],
+  // the retired `let` keyword (docs-17) is flagged in every dialect with a pointer to {% local %}.
+  ["classicbars", "{{#let a=1}}{{/let}}", /\{\{#let\}\}.*retired.*\{% local/, "let-retired (classicbars)"],
+  ["maxbars", "{% let a=1 %}{% endlet %}", /let.*retired.*\{% local/, "let-retired (maxbars)"],
   // the removed `{{#each … as …}}` form is flagged in MaxBars (use `x in xs`).
   ["maxbars", "{{#each xs as a}}{{/each}}", /Liquid-style.*names before .in.*each x in xs/, "each-as (maxbars)"],
   // MinBars / RawBars share the rest of the dialect rules. RawBars stops here

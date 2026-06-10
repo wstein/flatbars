@@ -379,10 +379,11 @@ block env name args body =
       "each" -> eachBlock env split.positional split.label body
       "with" -> withBlock env split.positional body
       "partial" -> partialBlock env split.positional body
-      -- `{{#let a=(e)}}` — the surface desugar nests multi-binding lets into
-      -- single-binding ones and roots a bare `{{a}}` at the alias, so each block
-      -- carries exactly one `name=value` hash pair (ADR-024).
-      "let" -> letBlock env split.hash body
+      -- `{% local a=(e) %}` — the bounded binding (renamed from `let`, docs-17). The
+      -- surface desugar nests multi-binding locals into single-binding ones and roots
+      -- a bare `{{a}}` at the alias, so each block carries exactly one `name=value`
+      -- hash pair (ADR-024).
+      "local" -> letBlock env split.hash body
       -- `{{#case s}}{{when V…}}…{{else}}…{{/case}}` (docs/12): a first-class multi-arm
       -- conditional, lowered to a Rust `match` — the subject is evaluated once (the bound
       -- `__subj`) and dispatched by one guard arm per `{{when}}`, `{{else}}` the `_` arm.

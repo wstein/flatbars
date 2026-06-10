@@ -70,11 +70,11 @@ export const cases = [
   { name: "with-falsy-else", t: "{% with (lookup this \"u\") %}x{% else %}none{% endwith %}", d: { u: null } },
 
   // ── let (RawBars/core canonical `(bind …)` form, ADR-024 §4) ─────────────────
-  { name: "let-bind-single", t: "{% let (bind \"g\" \"Hi\") %}{{{g}}}{% endlet %}", d: {} },
-  { name: "let-bind-data", t: "{% let (bind \"n\" (lookup this \"count\")) %}{{{n}}} left{% endlet %}", d: { count: 5 } },
-  { name: "let-bind-sequential", t: "{% let (bind \"a\" 1) %}{% let (bind \"b\" (add a 1)) %}{{{a}}},{{{b}}}{% endlet %}{% endlet %}", d: {} },
-  { name: "let-bind-multi", t: "{% let (bind \"x\" 1) (bind \"y\" 2) %}{{{x}}}/{{{y}}}{% endlet %}", d: {} },
-  { name: "let-no-reroot", t: "{% let (bind \"u\" (lookup this \"user\")) %}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{% endlet %}", d: { name: "ROOT", user: { name: "Ada" } } },
+  { name: "let-bind-single", t: "{% local (bind \"g\" \"Hi\") %}{{{g}}}{% endlocal %}", d: {} },
+  { name: "let-bind-data", t: "{% local (bind \"n\" (lookup this \"count\")) %}{{{n}}} left{% endlocal %}", d: { count: 5 } },
+  { name: "let-bind-sequential", t: "{% local (bind \"a\" 1) %}{% local (bind \"b\" (add a 1)) %}{{{a}}},{{{b}}}{% endlocal %}{% endlocal %}", d: {} },
+  { name: "let-bind-multi", t: "{% local (bind \"x\" 1) (bind \"y\" 2) %}{{{x}}}/{{{y}}}{% endlocal %}", d: {} },
+  { name: "let-no-reroot", t: "{% local (bind \"u\" (lookup this \"user\")) %}{{{lookup this \"name\"}}}/{{{lookup u \"name\"}}}{% endlocal %}", d: { name: "ROOT", user: { name: "Ada" } } },
 
   // ── value helpers (via the runtime registry) ────────────────────────────────
   { name: "eq-true", t: "{{{eq (lookup this \"a\") (lookup this \"b\")}}}", d: { a: 1, b: 1 } },
@@ -188,26 +188,26 @@ export const cases = [
   { name: "mx:dict-string-brace", dialect: "maxbars", t: '{% with {msg: "a}}b"} %}{{msg}}{% endwith %}', d: {} },
   { name: "mx:dict-json", dialect: "maxbars", t: "{{{json {x: 1, y: 2}}}}", d: {} },
   // `{{#let}}` (ADR-024): block-scoped aliases, sequential, never re-rooting.
-  { name: "mx:let-single", dialect: "maxbars", t: '{% let g="Hi" %}{{g}}{% endlet %}', d: {} },
-  { name: "mx:let-from-data", dialect: "maxbars", t: "{% let n=count %}{{n}} items{% endlet %}", d: { count: 5 } },
-  { name: "mx:let-sequential", dialect: "maxbars", t: "{% let a=1 b=(add a 1) %}{{a}},{{b}}{% endlet %}", d: {} },
-  { name: "mx:let-no-reroot", dialect: "maxbars", t: "{% let u=user %}{{name}}/{{u.name}}{% endlet %}", d: { name: "ROOT", user: { name: "Ada" } } },
-  { name: "mx:let-dict-value", dialect: "maxbars", t: '{% let cfg={theme: "dark"} %}{{cfg.theme}}{% endlet %}', d: {} },
-  { name: "mx:let-in-loop", dialect: "maxbars", t: "{% each items %}{% let u=(uppercase this) %}{{u}}@{{loop.index0}} {% endlet %}{% endeach %}", d: { items: ["a", "b"] } },
-  { name: "mx:let-shadows-op", dialect: "maxbars", t: '{% let add="x" %}{{add}}{% endlet %}', d: {} },
+  { name: "mx:let-single", dialect: "maxbars", t: '{% local g="Hi" %}{{g}}{% endlocal %}', d: {} },
+  { name: "mx:let-from-data", dialect: "maxbars", t: "{% local n=count %}{{n}} items{% endlocal %}", d: { count: 5 } },
+  { name: "mx:let-sequential", dialect: "maxbars", t: "{% local a=1 b=(add a 1) %}{{a}},{{b}}{% endlocal %}", d: {} },
+  { name: "mx:let-no-reroot", dialect: "maxbars", t: "{% local u=user %}{{name}}/{{u.name}}{% endlocal %}", d: { name: "ROOT", user: { name: "Ada" } } },
+  { name: "mx:let-dict-value", dialect: "maxbars", t: '{% local cfg={theme: "dark"} %}{{cfg.theme}}{% endlocal %}', d: {} },
+  { name: "mx:let-in-loop", dialect: "maxbars", t: "{% each items %}{% local u=(uppercase this) %}{{u}}@{{loop.index0}} {% endlocal %}{% endeach %}", d: { items: ["a", "b"] } },
+  { name: "mx:let-shadows-op", dialect: "maxbars", t: '{% local add="x" %}{{add}}{% endlocal %}', d: {} },
   // a list literal GLUED to a let `=` is the list, not a path-bracket of the key
   // (the `xs=[…]` lexing fix); then iterated with each…in.
-  { name: "mx:let-list-glued-each", dialect: "maxbars", t: "{% let xs=[10, 20, 30] %}{% each v in xs %}{{v}} {% endeach %}{% endlet %}", d: {} },
+  { name: "mx:let-list-glued-each", dialect: "maxbars", t: "{% local xs=[10, 20, 30] %}{% each v in xs %}{{v}} {% endeach %}{% endlocal %}", d: {} },
   { name: "mx:collections-nested", dialect: "maxbars", t: "{% each [{tags: [1, 2]}, {tags: [3]}] %}{% each tags %}{{this}}{% endeach %};{% endeach %}", d: {} },
   // ── feature combinations (the surface features interact; pin them together) ──
   // let + each…in + the `..` range + the 1-based binding, all in one template.
-  { name: "mx:combo-let-each-range", dialect: "maxbars", t: "{% let hi=(add n 1) %}{% each x i1 in 1..hi %}{{x}}#{{i1}} {% endeach %}{% endlet %}", d: { n: 2 } },
+  { name: "mx:combo-let-each-range", dialect: "maxbars", t: "{% local hi=(add n 1) %}{% each x i1 in 1..hi %}{{x}}#{{i1}} {% endeach %}{% endlocal %}", d: { n: 2 } },
   // each…in over a list-of-dict literal, binding element + index, aliasing with let.
-  { name: "mx:combo-each-list-dict-let", dialect: "maxbars", t: '{% each row i in [{n: "a"}, {n: "b"}] %}{% let tag=(uppercase row.n) %}{{i}}:{{tag}} {% endlet %}{% endeach %}', d: {} },
+  { name: "mx:combo-each-list-dict-let", dialect: "maxbars", t: '{% each row i in [{n: "a"}, {n: "b"}] %}{% local tag=(uppercase row.n) %}{{i}}:{{tag}} {% endlocal %}{% endeach %}', d: {} },
   // a dict literal as a let value, read inside a nested each…in over a range.
-  { name: "mx:combo-let-dict-each", dialect: "maxbars", t: "{% let cfg={base: 10} %}{% each k in 1..3 %}{{add cfg.base k}} {% endeach %}{% endlet %}", d: {} },
+  { name: "mx:combo-let-dict-each", dialect: "maxbars", t: "{% local cfg={base: 10} %}{% each k in 1..3 %}{{add cfg.base k}} {% endeach %}{% endlocal %}", d: {} },
   // labelled each…in with an inner each…in reading the outer frame + a let alias.
-  { name: "mx:combo-label-let", dialect: "maxbars", t: "{% each row j in rows label outer %}{% each c in row %}{% let tag=(uppercase c) %}{{outer.index1}}.{{j}}:{{tag}} {% endlet %}{% endeach %}{% endeach %}", d: { rows: [["a"], ["b", "c"]] } },
+  { name: "mx:combo-label-let", dialect: "maxbars", t: "{% each row j in rows label outer %}{% each c in row %}{% local tag=(uppercase c) %}{{outer.index1}}.{{j}}:{{tag}} {% endlocal %}{% endeach %}{% endeach %}", d: { rows: [["a"], ["b", "c"]] } },
   // ?: (Elvis) — truthy-coalesce: the first truthy value, so an empty "" falls
   // through to name (where ?? keeps the non-null "" and || yields a boolean).
   { name: "mx:elvis-empty", dialect: "maxbars", t: "Hi {{ nickname ?: name }}", d: { nickname: "", name: "Ada" } },

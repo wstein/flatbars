@@ -144,8 +144,8 @@
     "data": "data.yaml"
   },
   {
-    "id": "letBindings",
-    "label": "Intermediate — Let: block-scoped aliases",
+    "id": "localBindings",
+    "label": "Intermediate — Local: bounded block-scoped aliases",
     "group": "Examples",
     "view": "source",
     "main": "main.maxbars",

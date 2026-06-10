@@ -1048,14 +1048,20 @@ main = do
   expectSError "inline-bare-rejected-nested"
     "{{#each xs}}{{#inline \"row\"}}x{{/inline}}{{/each}}"
     "DisallowedShape"
-  -- block-scoped `{{#let}}` is MaxBars-only (ADR-024): in ClassicBars it is a located
-  -- error, not a silent no-op — and the message points to the MaxBars/with fix.
-  expectSError "let-rejected-maxbars-only"
+  -- the bounded binding `{{#local}}` is a RawBars/MaxBars construct (ADR-024, renamed
+  -- from `let` by docs-17): in ClassicBars it is a located error, not a silent no-op,
+  -- and the message points to the `{{#with}}` fix.
+  expectSError "local-rejected-classicbars"
+    "{{#local a=1}}{{a}}{{/local}}"
+    "ClassicBars has no `local`"
+  expectSError "local-rejected-nested"
+    "{{#each xs}}{{#local n=this}}{{n}}{{/local}}{{/each}}"
+    "{{#local}}"
+  -- the retired `let` keyword (docs-17) is flagged everywhere with a pointer to
+  -- `{% local %}` — never a silent no-op.
+  expectSError "let-retired"
     "{{#let a=1}}{{a}}{{/let}}"
-    "MaxBars-only"
-  expectSError "let-rejected-nested"
-    "{{#each xs}}{{#let n=this}}{{n}}{{/let}}{{/each}}"
-    "{{#let}}"
+    "retired"
   -- multi-arm `{{#case}}` is a RawBars/MaxBars (nonEmpty-family) construct: ClassicBars has
   -- no `case`, so it is a located error pointing at the {{#if (eq …)}} fix (docs/12).
   expectSError "case-rejected-classicbars"
