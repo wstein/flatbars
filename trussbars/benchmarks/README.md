@@ -1,6 +1,6 @@
 # trussbars-benchmarks
 
-Comparative render benchmark across five engines on the **two canonical workloads**
+Comparative render benchmark across six engines on the **two canonical workloads**
 of [`djc/template-benchmarks-rs`](https://github.com/djc/template-benchmarks-rs) —
 the de-facto Rust suite that **Askama and Sailfish both report from** (Sailfish
 [deleted its own benches](https://github.com/rust-sailfish/sailfish/blob/main/benches/README.md)
@@ -24,8 +24,11 @@ cargo +1.96.0 bench --manifest-path trussbars/benchmarks/Cargo.toml
   per-render overhead.
 
 The columns: **Trussbars** (verbatim `compileMaxRust` output), **Sailfish** (the
-fastest reference), **Askama** (the typed safe peer), **handlebars** (the dynamic
-interpreter), and **`write`** (a naive hand-written `write!` — see the note below).
+fastest reference), **Askama** (the typed safe peer), the dynamic interpreters
+**handlebars** and **liquid** (the latter is the engine the Rust ecosystem reaches
+for when templates are runtime/user-authored — the use case Trussbars deliberately
+does *not* serve, included so the headline reads "vs. what you'd otherwise use"),
+and **`write`** (a naive hand-written `write!` — see the note below).
 
 ## Results
 
@@ -36,21 +39,23 @@ command above.
 
 | Engine | Time | vs Trussbars | Model |
 | --- | --- | --- | --- |
-| **Sailfish** | ~17.9 µs | **0.48×** (≈2.1× faster) | raw Rust + `unsafe` buffer — no injection boundary |
-| **Trussbars** | ~37.3 µs | 1.0× | typed + injection-safe codegen, `#![forbid(unsafe_code)]` |
-| **Askama** | ~138.5 µs | 3.7× slower | typed, safe codegen |
-| `write` | ~195.5 µs | 5.2× slower | naive hand-written `write!` |
-| **handlebars** | ~2.71 ms | **73× slower** | runtime interpreter |
+| **Sailfish** | ~17.8 µs | **0.49×** (≈2.0× faster) | raw Rust + `unsafe` buffer — no injection boundary |
+| **Trussbars** | ~36.3 µs | 1.0× | typed + injection-safe codegen, `#![forbid(unsafe_code)]` |
+| **Askama** | ~129.8 µs | 3.6× slower | typed, safe codegen |
+| `write` | ~195.9 µs | 5.4× slower | naive hand-written `write!` |
+| **liquid** | ~2.36 ms | **65× slower** | runtime interpreter (the runtime-template engine) |
+| **handlebars** | ~2.70 ms | **75× slower** | runtime interpreter |
 
 ### teams (small page)
 
 | Engine | Time | vs Trussbars | Model |
 | --- | --- | --- | --- |
-| **Sailfish** | ~67.7 ns | **0.77×** (≈1.3× faster) | raw Rust + `unsafe` buffer |
-| **Trussbars** | ~88.2 ns | 1.0× | typed + injection-safe codegen |
-| `write` | ~235.9 ns | 2.7× slower | naive hand-written `write!` |
+| **Sailfish** | ~65.9 ns | **0.76×** (≈1.3× faster) | raw Rust + `unsafe` buffer |
+| **Trussbars** | ~87.0 ns | 1.0× | typed + injection-safe codegen |
+| `write` | ~223.8 ns | 2.6× slower | naive hand-written `write!` |
 | **Askama** | ~245.6 ns | 2.8× slower | typed, safe codegen |
-| **handlebars** | ~4.06 µs | **46× slower** | runtime interpreter |
+| **handlebars** | ~4.20 µs | **48× slower** | runtime interpreter |
+| **liquid** | ~4.27 µs | **49× slower** | runtime interpreter (the runtime-template engine) |
 
 ## Takeaways
 
@@ -59,9 +64,14 @@ command above.
   `dragonbox_ecma` formatting backends (`dragonbox_ecma` is fast *and*
   ECMA-byte-identical) and `#[inline]` on the runtime hot path (so the per-cell
   `esc` / `ToText` / `Loop::at` calls inline into the host crate without LTO).
-- **~46–73× over the dynamic interpreter** (handlebars): straight-line Rust vs
-  parse-and-walk-an-AST per render. The bulk of the "fast template engine" story,
-  by construction.
+- **~48–75× over the dynamic interpreters** (handlebars and liquid): straight-line
+  Rust vs parse-and-walk-an-AST per render. The bulk of the "fast template engine"
+  story, by construction. **liquid** is the honest comparison here — it is the engine
+  you'd reach for if you needed the runtime/user-authored templates Trussbars gives
+  up; the order-of-magnitude gap is the price of that flexibility, and the latency
+  the compiled model buys back. (On the tiny `teams` page the two interpreters are
+  neck-and-neck; on `big-table`'s tight loop liquid pulls slightly ahead of
+  handlebars — neither is within reach of compiled output.)
 - **Beats the naive `write!` baseline.** Surprising but well-known (and visible in
   the upstream suite too): `core::fmt` integer formatting plus per-call
   format-argument parsing is slower than emitting `itoa`-class digits and
@@ -88,10 +98,13 @@ command above.
   most once. The `SizeHint` is semantically inert — the conformance harness stays
   byte-identical.
 - Sailfish needs `self.`-qualified fields in its `.stpl`
-  (`templates/big-table.stpl`, `templates/teams.stpl`); handlebars registers each
-  template **once**, outside the timed loop (only render is measured).
-- **Output-equality gate:** `tests/output_equality.rs` asserts all five engines
-  emit identical bytes for both workloads.
+  (`templates/big-table.stpl`, `templates/teams.stpl`); handlebars and liquid each
+  parse/register their template **once**, outside the timed loop (only render is
+  measured — and, like handlebars, liquid marshals the `Serialize` context into its
+  own `Object` per render, so the dynamic columns are measured on equal footing).
+- **Output-equality gate:** `tests/output_equality.rs` asserts all six engines
+  emit identical bytes for both workloads. Liquid does not auto-escape `{{ }}`, but
+  the workloads carry no HTML-special data, so its output matches byte-for-byte.
 - **Perf-regression gate:** `tests/perf_gate.rs` asserts the machine-independent
   relative invariants (Trussbars ≤ Askama, Trussbars × 5 ≤ handlebars) for both
   workloads, measured in one run so a slow CI box doesn't matter; meaningful only

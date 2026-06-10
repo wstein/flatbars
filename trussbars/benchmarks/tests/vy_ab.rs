@@ -40,6 +40,9 @@ fn big_table_ab() {
         "big-table A/B:  AOT(shipping)={base:?}  AOT(safe+exact-size+slice)={safe_exact:?}  vy(unsafe-buffer)={vy:?}"
     );
     // Sanity: all three render the same bytes.
-    assert_eq!(trussbars_big_table(&ctx), trussbars_big_table_safe_exact(&ctx));
+    assert_eq!(
+        trussbars_big_table(&ctx),
+        trussbars_big_table_safe_exact(&ctx)
+    );
     assert_eq!(trussbars_big_table(&ctx), vy_big_table(&ctx));
 }

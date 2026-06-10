@@ -1,7 +1,9 @@
 //! Comparative render benchmark: the two canonical `template-benchmarks-rs`
 //! workloads (big-table, teams) rendered by the Trussbars-emitted Rust, a
 //! hand-written `write!` baseline (the zero-overhead ceiling), Sailfish (fastest
-//! reference), Askama (typed safe peer), and handlebars (dynamic interpreter).
+//! reference), Askama (typed safe peer), and the dynamic interpreters handlebars
+//! and liquid (the runtime engine the Rust ecosystem reaches for — the honest
+//! "vs. what you'd otherwise use" column).
 //! All engines emit byte-identical output (see `tests/output_equality.rs`).
 //!
 //! ```sh
@@ -14,7 +16,8 @@ use std::hint::black_box;
 use criterion::{Criterion, criterion_group, criterion_main};
 use trussbars_benchmarks::{
     askama_big_table, askama_teams, big_table_data, big_table_value, handlebars_big_table,
-    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, sailfish_big_table,
+    handlebars_big_table_registry, handlebars_teams, handlebars_teams_registry, liquid_big_table,
+    liquid_big_table_template, liquid_teams, liquid_teams_template, sailfish_big_table,
     sailfish_teams, teams_data, teams_value, trussbars_big_table, trussbars_teams, vm_big_table,
     vm_big_table_template, vm_teams, vm_teams_template, vy_big_table, vy_teams, write_big_table,
     write_teams,
@@ -23,6 +26,7 @@ use trussbars_benchmarks::{
 fn big_table(c: &mut Criterion) {
     let ctx = big_table_data();
     let hb = handlebars_big_table_registry();
+    let lq = liquid_big_table_template();
     let vm_tmpl = vm_big_table_template();
     let vm_data = big_table_value(&ctx);
 
@@ -42,12 +46,16 @@ fn big_table(c: &mut Criterion) {
     g.bench_function("handlebars", |b| {
         b.iter(|| handlebars_big_table(&hb, black_box(&ctx)))
     });
+    g.bench_function("liquid", |b| {
+        b.iter(|| liquid_big_table(&lq, black_box(&ctx)))
+    });
     g.finish();
 }
 
 fn teams(c: &mut Criterion) {
     let ctx = teams_data();
     let hb = handlebars_teams_registry();
+    let lq = liquid_teams_template();
 
     let vm_tmpl = vm_teams_template();
     let vm_data = teams_value(&ctx);
@@ -64,6 +72,7 @@ fn teams(c: &mut Criterion) {
     g.bench_function("handlebars", |b| {
         b.iter(|| handlebars_teams(&hb, black_box(&ctx)))
     });
+    g.bench_function("liquid", |b| b.iter(|| liquid_teams(&lq, black_box(&ctx))));
     g.finish();
 }
 

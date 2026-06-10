@@ -12,6 +12,12 @@
 //!   * **teams** — a small fixed HTML page with a `{{#each}}` and a first-item
 //!     branch: control flow + escaping + fixed per-render overhead.
 //!
+//! The dynamic interpreters are represented by **handlebars** and **liquid** —
+//! the latter being the engine the Rust ecosystem reaches for when templates are
+//! runtime/user-authored (cobalt), i.e. the use case Trussbars deliberately does
+//! not serve. Including it keeps the perf headline honest: "vs. the runtime engine
+//! you'd otherwise use," not just vs. the typed/compiled peers.
+//!
 //! Every engine renders to **byte-identical** output (asserted by the equality
 //! test), so the comparison measures speed, not output shape. The **`write`**
 //! column is a naive hand-written `write!` reference — note the codegen engines
@@ -170,7 +176,10 @@ pub fn trussbars_teams(ctx: &Teams) -> String {
 
 /// Decimal digit count of an `i64` (for the exact size pre-pass).
 fn dig(v: i64) -> usize {
-    v.unsigned_abs().checked_ilog10().map_or(1, |l| l as usize + 1) + usize::from(v < 0)
+    v.unsigned_abs()
+        .checked_ilog10()
+        .map_or(1, |l| l as usize + 1)
+        + usize::from(v < 0)
 }
 
 /// Safe + exact pre-size + plain-slice iteration, but our `esc` (itoa) per cell.
@@ -330,6 +339,51 @@ pub fn handlebars_teams(hb: &handlebars::Handlebars, ctx: &Teams) -> String {
     hb.render("teams", ctx).unwrap()
 }
 
+// ─── 5b. liquid (the runtime engine the Rust ecosystem reaches for) ───────────
+// Liquid's home turf is the use case Trussbars deliberately *doesn't* serve:
+// runtime/user-authored templates (cobalt builds sites with it). Including it
+// makes the comparison honest — the perf headline is "vs the runtime engines you'd
+// otherwise reach for," and liquid-rust is the named one. Like handlebars, the
+// template is parsed ONCE (out of the timed loop) and the `Serialize` context is
+// turned into liquid's `Object` per render (handlebars serializes per render too),
+// so both dynamic columns measure parse-free render incl. their data marshalling.
+// Liquid does not auto-escape `{{ }}`; the workloads have no HTML-special data
+// (integers; CSL team names), so output stays byte-identical to the escaping peers.
+
+pub fn liquid_parser() -> liquid::Parser {
+    liquid::ParserBuilder::with_stdlib()
+        .build()
+        .expect("liquid stdlib parser builds")
+}
+
+pub fn liquid_big_table_template() -> liquid::Template {
+    liquid_parser()
+        .parse(
+            "<table>{% for row in table %}<tr>{% for v in row %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}</table>",
+        )
+        .expect("liquid big-table parses")
+}
+
+pub fn liquid_big_table(tmpl: &liquid::Template, ctx: &BigTable) -> String {
+    let globals = liquid::to_object(ctx).expect("big-table → liquid object");
+    tmpl.render(&globals).expect("liquid big-table renders")
+}
+
+pub fn liquid_teams_template() -> liquid::Template {
+    liquid_parser()
+        .parse(
+            "<html><head><title>{{ year }}</title></head><body><h1>CSL {{ year }}</h1><ul>\
+             {% for team in teams %}<li class=\"{% if forloop.first %}champion{% endif %}\"><b>{{ team.name }}</b>: {{ team.score }}</li>{% endfor %}\
+             </ul></body></html>",
+        )
+        .expect("liquid teams parses")
+}
+
+pub fn liquid_teams(tmpl: &liquid::Template, ctx: &Teams) -> String {
+    let globals = liquid::to_object(ctx).expect("teams → liquid object");
+    tmpl.render(&globals).expect("liquid teams renders")
+}
+
 // ─── 6. Trussbars VM (dynamic backend, docs/11) ───────────────────────────────
 // The SAME MaxBars language as the AOT column, run through the dynamic tree-walk
 // interpreter instead of compiled to Rust. Like handlebars, the template is parsed
@@ -353,7 +407,11 @@ pub fn big_table_value(ctx: &BigTable) -> VmValue {
         .iter()
         .map(|row| VmValue::Array(row.iter().map(|&v| vm_num(v)).collect::<Vec<_>>().into()))
         .collect();
-    VmValue::Object(Rc::new([("table".to_string(), VmValue::Array(table.into()))].into_iter().collect()))
+    VmValue::Object(Rc::new(
+        [("table".to_string(), VmValue::Array(table.into()))]
+            .into_iter()
+            .collect(),
+    ))
 }
 
 /// `Teams` → the VM's dynamic `Value` (`{ year, teams: [{ name, score }] }`).
@@ -363,23 +421,31 @@ pub fn teams_value(ctx: &Teams) -> VmValue {
         .iter()
         .map(|t| {
             VmValue::Object(Rc::new(
-                [("name".to_string(), VmValue::Str(Rc::from(t.name.as_str()))), ("score".to_string(), vm_num(t.score))]
-                    .into_iter()
-                    .collect(),
+                [
+                    ("name".to_string(), VmValue::Str(Rc::from(t.name.as_str()))),
+                    ("score".to_string(), vm_num(t.score)),
+                ]
+                .into_iter()
+                .collect(),
             ))
         })
         .collect();
     VmValue::Object(Rc::new(
-        [("year".to_string(), vm_num(ctx.year)), ("teams".to_string(), VmValue::Array(teams.into()))]
-            .into_iter()
-            .collect(),
+        [
+            ("year".to_string(), vm_num(ctx.year)),
+            ("teams".to_string(), VmValue::Array(teams.into())),
+        ]
+        .into_iter()
+        .collect(),
     ))
 }
 
 /// The big-table template in current MaxBars surface, parsed once.
 pub fn vm_big_table_template() -> VmTemplate {
-    VmTemplate::parse("<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>")
-        .expect("vm big-table parses")
+    VmTemplate::parse(
+        "<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>",
+    )
+    .expect("vm big-table parses")
 }
 
 pub fn vm_big_table(tmpl: &VmTemplate, data: &VmValue) -> String {
@@ -407,8 +473,10 @@ pub fn vm_teams(tmpl: &VmTemplate, data: &VmValue) -> String {
 use trussbars_vm::bytecode::Program;
 
 pub fn vm_bc_big_table_program() -> Program {
-    Program::compile("<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>")
-        .expect("bytecode big-table compiles")
+    Program::compile(
+        "<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>",
+    )
+    .expect("bytecode big-table compiles")
 }
 
 pub fn vm_bc_big_table(p: &Program, data: &VmValue) -> String {

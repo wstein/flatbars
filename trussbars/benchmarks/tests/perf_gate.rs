@@ -40,7 +40,15 @@ fn min_time(n: u32, f: impl Fn() -> String) -> Duration {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn assert_invariants(name: &str, tb: Duration, vm: Duration, bc: Duration, vy: Duration, ak: Duration, hb: Duration) {
+fn assert_invariants(
+    name: &str,
+    tb: Duration,
+    vm: Duration,
+    bc: Duration,
+    vy: Duration,
+    ak: Duration,
+    hb: Duration,
+) {
     eprintln!(
         "{name}: trussbars(AOT)={tb:?}  vm-tree-walk={vm:?}  vm-bytecode={bc:?}  vy={vy:?}  askama={ak:?}  handlebars={hb:?}"
     );
