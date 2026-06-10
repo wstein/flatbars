@@ -1,0 +1,7 @@
+error: 1:1: unknown helper 'apply' (declare it with `truss_helpers` if it is a host helper)
+ --> tests/ui/apply_meta_helper.rs:4:1
+  |
+4 | truss!(render, str, "{{apply op x}}");
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `truss` (in Nightly builds, run with -Z macro-backtrace for more info)

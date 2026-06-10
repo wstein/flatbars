@@ -63,8 +63,9 @@ severances plus owning the spec — not a directory move.
 4. **The spec drifted from its own gate** (now reconciled — see G4). At review time the
    `docs/04` header claimed "16/16", `docs/00` said "56/56", the gate said "65/65". A
    project that cannot keep one counter synced inside the monorepo cannot defend two
-   normative surfaces — so this was fixed first: `docs/04` + `docs/00` now read **65/65**
-   against `report.json`. *Residual:* `docs/08`/`docs/11` still carry "56/56"/"64/64" in
+   normative surfaces — so this was fixed first: `docs/04` + `docs/00` now read **71/71**
+   against `report.json` (reconciled to 65/65 at review time; re-synced as the corpus grew
+   to 71). *Residual:* `docs/08`/`docs/11` still carry "56/56"/"64/64" in
    historical/design context (56 was true at freeze) — normalize when those docs are next
    touched.
 
@@ -76,7 +77,7 @@ arbiter.** These gates must ALL be green *while the live oracle still exists to 
 divergence* — the last act before deletion:
 
 - **G1 — Default cutover.** Flip the default emitter to v2 (procmacro), delete the
-  opt-in `--v2` split, and re-prove **65/65 with `MaxBars.Rust.purs` deleted**, so a
+  opt-in `--v2` split, and re-prove **71/71 with `MaxBars.Rust.purs` deleted**, so a
   v2-only regression is caught by the *live* PureScript oracle, not by a frozen photograph
   of it. (`docs/04 §10`.)
 - **G2 — Schema inference, Rust-native.** Port `docs/03` L1+L2 into Rust so the harness's
@@ -87,9 +88,10 @@ divergence* — the last act before deletion:
   the spec (§5), **byte-checked against the still-live oracle** as the acceptance gate,
   *before* those `.purs` modules are deleted. This is the single highest-risk step and it
   needs its own gate, not a comment.
-- **G4 — Counter reconciliation. ✅ DONE (2026-06-09).** `docs/04` header, `docs/00`
-  roadmap, and `report.json` now agree on **65/65, 0 excluded, 0 oracle drift** (`report.json`
-  is the single source). No promotion of a spec that contradicts its own gate. *Residual:*
+- **G4 — Counter reconciliation. ✅ DONE (2026-06-09; re-synced 2026-06-10 as the corpus
+  grew 65→71).** `docs/04` header, `docs/00` roadmap, and `report.json` now agree on
+  **71/71, 0 excluded, 0 oracle drift** (`report.json` is the single source). No promotion
+  of a spec that contradicts its own gate. *Residual:*
   `docs/08`/`docs/11` carry the freeze-era "56/56"/"64/64" in historical context — normalize
   on next edit; not a live status contradiction.
 - **G5 — Negative/injection parity.** v2 holds the `--compat-parity 71/71` and the
@@ -131,7 +133,7 @@ by the review:
 | --- | --- | --- |
 | **Type-aware LSP** *(priority)* | **Additive overlay, not greenfield.** `editors/lsp/src/server.mjs` already ships semantic tokens, hover, completion, code-actions, folding, documentSymbol, formatting, ADR-023 diagnostics, all via one engine seam (`engine.mjs`). | **Repoint `engine.mjs` at a Rust-WASM `tokenize`+`diagnostics` export**, then overlay schema/type diagnostics + `Ctx`-aware completion + hover-types. Keep `server.mjs`, the vocabulary, the `operations.json` projection. Prerequisite: the Rust core must expose lexer/parser/diagnostics as a **library API** *before* any editor work — an earlier, separate deliverable the proposal buried inside "step 3". |
 | **Migration tool** *(priority)* | **A port, not net-new** — *for the cross-MaxBars-dialect half.* `packages/linter/src/Linter/{Lower,Migrate,Aliases,Print}.purs` already implements cross-dialect lowering + migration; `check:tutorial-tooling` gates it. The **foreign-engine half** (Mustache/Handlebars/Liquid/StringTemplate4 → `.truss`) has no PureScript precedent. **Read half SHIPPED** — `crates/trussbars-import` parses all four foreign dialects to faithful, byte-spanned ASTs (`docs/15`). | Port the cross-dialect rewrite to Rust; conformance-test the Rust output against the PureScript reference *while it still exists*. The idiom linter shares this one suggestion/rewrite engine. Its "this is AOT-compatible" verdict loses the `--vm-compat` PS cross-check on severance (`harness.mjs:151`) — needs a Rust-native replacement. **Next on the foreign half:** the lowering `trussbars-import` AST → `trussbars-template::ast` (`docs/15 §6`). |
-| Compiler diagnostics | class-A `compile_error!` shipped (`docs/07/08`) — but **no message/span stability gate exists**; all 65 cases are *positive* byte-match. | **Add a trybuild/insta UI-snapshot gate** for class-A text+span *before* "language DONE" is credible. Once external crates depend on Trussbars, error messages are a public API with no regression net. **This is the cheapest, highest-leverage adoption work and the proposal omitted it.** |
+| Compiler diagnostics | class-A `compile_error!` shipped (`docs/07/08`); the **`trybuild` UI-snapshot gate now exists** (`crates/trussbars-macros/tests/ui`) and pins located text+span for parse-, resolution-, and **all three injection-class** constructs (computed partial §4.1, `apply` §4.2, computed lookup §4.3). Conformance (the separate `report.json` gate) is 71/71 positive byte-match. | **Broaden the corpus** toward the remaining owned-error vocabulary (arity, dict-literal, loop-metadata) as the message set settles; consider an `insta` overlay if richer snapshots are wanted. The injection boundary — the security headline — is now a *tested* contract, not prose. Once external crates depend on Trussbars these messages are public API; the net is in place. |
 | `dragonbox_ecma` float formatting | the load-bearing semantic that makes byte-identity work (chosen to match JS `String(n)`). | Pin as a **named, separately-tested frozen invariant** — one regression breaks every conformance case at once. |
 | crates.io publish | `0.1.0`, unpublished. | **The single highest adoption lever for a Rust library; do it early, not last.** A typed compiler nobody can `cargo add` is not independent in any practical sense. |
 
@@ -144,7 +146,7 @@ build-out, but they do not gate the declaration.
 ## 7. Sequence
 
 ```text
-G4 reconcile counters ─▶ G1 default-cutover (delete MaxBars.Rust.purs, re-prove 65/65)
+G4 reconcile counters ─▶ G1 default-cutover (delete MaxBars.Rust.purs, re-prove 71/71)
         │                        │
         │                G2 schema inference → Rust  ─────────┐  (critical path)
         │                        │                            │

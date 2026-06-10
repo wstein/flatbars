@@ -32,9 +32,9 @@ v2 is built against a settled language, not a moving one.**
    literals, collection filters (`where`/`reject`/`find`/`some`/`every`), and enum
    context types are all IN; `dict` literals + data-enum dispatch are the two
    type-aware items deliberately → v2.
-2. **Corpus hardened (56/56 at freeze; now 65/65 — `conformance/report.json`).** `ctxgen`
+2. **Corpus hardened (56/56 at freeze; now 71/71 — `conformance/report.json`).** `ctxgen`
    synthesizes enums (S4 conformance-gated); escaping-heavy + deep-nesting edges added. The
-   corpus has since grown to 65 cases (dict-nested et al. added during v2); the gate score
+   corpus has since grown to 71 cases (dict-nested et al. added during v2); the gate score
    is the committed `report.json`, not this freeze-time milestone.
 3. **v2 decisions resolved (docs/07 §5):** stable-not-nightly, no type-descriptor
    initially, inline `truss!` first.
@@ -49,7 +49,7 @@ v2 is built against a settled language, not a moving one.**
 ## Starting v2 (the build order)
 
 Parser first (docs/08 §6: lexer → expr → blocks+desugar → emit → diagnostics), with
-the corpus as the incremental gate (56 cases at v2 start, 65 now); then the diagnostics (docs/07 §6:
+the corpus as the incremental gate (56 cases at v2 start, 71 now); then the diagnostics (docs/07 §6:
 class-A `compile_error!` → `truss!` + `quote_spanned!` → trybuild gate → `path=`);
 then the host-helper convention (docs/09). The runtime crates and the emit logic
 (`MaxBars/Rust.purs`) are unchanged inputs.
