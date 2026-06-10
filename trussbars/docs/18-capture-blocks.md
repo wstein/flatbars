@@ -75,7 +75,10 @@ Frozen surface:
 
 The parser builds a `Capture { name, body }` node (a sibling of the binding node; its `body` is a
 normal node list). The AOT emitter renders the body into a fresh `String` and binds it as a `safe`
-value with the forward `{% set %}` scope:
+value with the forward `{% set %}` scope. (This `String` buffer is the same intermediate-buffer
+class as block helpers and `{{yield}}`; once the emitter targets `fmt::Write`, `docs/23` already
+governs it — the body emit propagates `fmt::Result` and the buffer stays a `String`, so no
+separate decision is needed here.)
 
 ```text
 {% capture byline %}{{ author.name }}{% if author.title %} · {{ author.title }}{% endif %}{% endcapture %}

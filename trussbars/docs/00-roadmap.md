@@ -110,3 +110,11 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
   imports partials from other files (shared header/footer, sub-context partials, `{{yield}}`
   layouts), resolved by the inline mechanism. Per-source error spans (`(in partial 'name')`);
   duplicate name = compile error. v2-conformance 71/71, 0 drift.
+- `22-derive-template.md` — **PROPOSED** (#5) `#[derive(Template)]` — a struct owns its template
+  (`#[template(source|path=…, helpers/truthiness/partials=…)]`), fields are the context; generates
+  the `Template` trait (`render`/`render_into`) + `Display`. Reuses the emitter; surface-agnostic.
+  Depends on docs/23.
+- `23-emit-targets-writer.md` — **PROPOSED** (enabler for docs/22) the emitter targets a generic
+  `fmt::Write` (zero-alloc `render_into`) instead of `String`: `esc`/`ToText` → `fmt::Result`,
+  uniform `?`, host-block-helper bodies become `Fn() -> Result<String, fmt::Error>`. `truss!`
+  stays `String`-only public; SizeHint kept on the `String` path. Atomic; conformance-re-gated.
