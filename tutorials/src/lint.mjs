@@ -69,13 +69,14 @@ export const migrateExamples = {
     source: "{% unless items %}nothing here{% endunless %}",
     data: { items: [] },
   },
-  // The block-partial reference `{{> @partial-block}}` becomes `{{yield}}` (a direct
-  // yield, not a partial named `@partial-block`). The bare fragment can't render on
-  // its own, so the card runs `{{yield}}` in a minimal inline-partial host.
+  // The block-partial reference `{{> @partial-block}}` becomes `{% yield %}` (ADR-039
+  // item 5 — the structural slot, not a partial named `@partial-block`). The bare
+  // fragment can't render on its own, so the card runs `{% yield %}` in a minimal
+  // inline-partial host.
   partialBlock: {
     template: "{{> @partial-block}}",
-    source: "{{yield}}",
-    cardTemplate: '{{#inline "card"}}<section>{{yield}}</section>{{/inline}}{{#partial "card"}}Hello, {{name}}!{{/partial}}',
+    source: "{% yield %}",
+    cardTemplate: '{% inline "card" %}<section>{% yield %}</section>{% endinline %}{% partial "card" %}Hello, {{name}}!{% endpartial %}',
     data: { name: "Ada" },
   },
   // What migration CANNOT do: a bare Mustache section `{{#name}}` whose name is not a

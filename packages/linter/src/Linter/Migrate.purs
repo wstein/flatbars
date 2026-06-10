@@ -114,7 +114,7 @@ migrateToMaxBars src = do
 -- | A close-pairing decision pushed by an `ROpen`: when its matching `RClose`
 -- | arrives, was the open rewritten to a `{{#unless …}}` (so the close becomes
 -- | `{{/unless}}`), or kept verbatim (so the close is sliced verbatim)?
-data CloseRule = CloseUnless | CloseEnd
+data CloseRule = CloseUnless | CloseEnd | ClosePartial
 
 -- | The fold accumulator: the emitted source so far (reversed list of chunks),
 -- | the residuals so far (reversed), and the open/close stack of pairing rules.
@@ -162,6 +162,11 @@ step src acc = case _ of
           -- `{{^e}}` → `{% unless <e> %}`; map the interior's `@`-data names and
           -- mark the close for `{% endunless %}`.
           push (emit acc1 (stmtTag tr ("unless " <> mapDataNames interior))) CloseUnless
+        PartialBlock ->
+          -- `{{#> name [ctx]}}…{{/name}}` (HB block-partial) → MaxBars
+          -- `{% partial "name" [ctx] %}…{% endpartial %}` (ADR-039 item 5): the partial
+          -- NAME is quoted, the close is the keyword-paired `{% endpartial %}`.
+          push (emit acc1 (stmtTag tr (quoteHead "partial" (mapDataNames interior)))) ClosePartial
         _ ->
           -- a `{{#name …}}` open → `{% name … %}`; the matching close emits
           -- `{% end<name> %}` (the name comes from the `RClose` token). The loop/re-root
@@ -175,6 +180,8 @@ step src acc = case _ of
       case Array.head acc.stack of
         Just CloseUnless ->
           emit (popStack acc) (stmtTag tr "endunless")
+        Just ClosePartial ->
+          emit (popStack acc) (stmtTag tr "endpartial")
         _ ->
           emit (popStack acc) (stmtTag tr ("end" <> canonLoopHead name))
 
@@ -183,13 +190,18 @@ step src acc = case _ of
   -- `{{> @partial-block}}` → `{{yield}}` (an output, stays `{{ }}`); a bare `{{name}}`
   -- output is verbatim (with `@`-data mapping — `@../`/`@root`, ADR-021).
   RSep span _ interior _ ->
-    case rewriteElseIf interior of
-      Just rebuilt -> emit acc (stmtTag (trimsOf (sliceSpan src span)) rebuilt)
-      Nothing
-        | isPartialBlockRef interior -> emit acc "{{yield}}"
-        | isClauseSep interior -> emit acc
-            (stmtTag (trimsOf (sliceSpan src span)) (mapDataNames interior))
-        | otherwise -> emit acc (mapDataInTag (sliceSpan src span))
+    let
+      tr = trimsOf (sliceSpan src span)
+    in
+      case rewriteElseIf interior of
+        Just rebuilt -> emit acc (stmtTag tr rebuilt)
+        Nothing
+          -- `{{> @partial-block}}` → the block-partial slot `{% yield %}` (ADR-039 item 5).
+          | isPartialBlockRef interior -> emit acc (stmtTag tr "yield")
+          -- `{{> name [ctx] [k=v]}}` → the partial include `{% include "name" … %}` (item 5).
+          | Just inc <- partialInclude interior -> emit acc (stmtTag tr inc)
+          | isClauseSep interior -> emit acc (stmtTag tr (mapDataNames interior))
+          | otherwise -> emit acc (mapDataInTag (sliceSpan src span))
 
   RComment span _ _ -> emit acc (sliceSpan src span)
 
@@ -230,6 +242,30 @@ isPartialBlockRef :: String -> Boolean
 isPartialBlockRef interior = case String.stripPrefix (Pattern ">") (String.trim interior) of
   Just rest -> String.trim rest == "@partial-block"
   Nothing -> false
+
+-- | A `{{> name [ctx] [k=v]}}` partial include (interior `> name …`) → the MaxBars
+-- | `include "name" …` statement head (ADR-039 item 5): the partial NAME is quoted,
+-- | any trailing context/hash args are kept. `Nothing` for a non-partial interior or
+-- | the `@partial-block` ref (that becomes `{% yield %}`, handled separately).
+partialInclude :: String -> Maybe String
+partialInclude interior = case String.stripPrefix (Pattern ">") (String.trim interior) of
+  Nothing -> Nothing
+  Just rest ->
+    let
+      r = String.trim rest
+    in
+      if r == "" || r == "@partial-block" then Nothing else Just (quoteHead "include" r)
+
+-- | A `{% <kw> "name" [args] %}` statement head: the first word of `s` is the partial
+-- | NAME (quoted), the rest are kept verbatim (ADR-039 item 5 — `include`/`partial`).
+quoteHead :: String -> String -> String
+quoteHead kw s =
+  let
+    t = String.trim s
+  in
+    case String.indexOf (Pattern " ") t of
+      Nothing -> kw <> " \"" <> t <> "\""
+      Just i -> kw <> " \"" <> SCU.take i t <> "\" " <> String.trim (SCU.drop i t)
 
 -- | Map the `@`-data names inside the *interior* of a tag's source slice. The
 -- | slice still has its braces/sigil/`~`, so we operate over the whole slice but

@@ -164,26 +164,26 @@ construction. `@root` becomes `root`, `../x` becomes `parent.x`, and an
 {{#each rows}}{{#each this}}{{loop.parent.index0}}.{{loop.index0}} {{parent.label}} {{root.title}}{{/each}}{{/each}}
 ```
 
-## The block-partial body (`yield`)
+## The block-partial body (`{% yield %}`)
 
-Inside a block partial — `{{#partial "name"}}…{{/partial}}` or the
-Handlebars block-partial sigil `{{#> name}}…{{/name}}` — the caller's body
-is rendered by the reserved name **`yield`**:
+Inside a block partial — `{% partial "name" %}…{% endpartial %}` — the caller's
+body is rendered by the structural slot **`{% yield %}`** (ADR-039 item 5: a
+structural slot is a statement, so it leaves the `{{ }}` output family):
 
-```handlebars
-{{!-- the "layout" partial --}}    <main>{{yield}}</main>
-{{#partial "layout"}}<p>hi</p>{{/partial}}    {{!-- → <main><p>hi</p></main> --}}
+```maxbars
+{% inline "layout" %}<main>{% yield %}</main>{% endinline %}
+{% partial "layout" %}<p>hi</p>{% endpartial %}    {# → <main><p>hi</p></main> #}
 ```
 
-`yield` is the hyphen-free, cross-dialect spelling of Handlebars'
-`{{> @partial-block}}`, which MaxBars cannot use: the `@` sigil is reserved,
-and a bare `partial-block` would lex as the subtraction `partial - block`. One
-scoped operation, reached one way per dialect:
+`{% yield %}` is the hyphen-free, cross-dialect spelling of Handlebars'
+`{{> @partial-block}}`, which MaxBars cannot use: the `@` sigil is reserved, and a
+bare `partial-block` would lex as the subtraction `partial - block`. One scoped
+operation, reached one way per dialect:
 
 | Dialect | Spelling |
 | --- | --- |
-| MaxBars | `{{yield}}` |
-| RawBars | `{{{yield}}}` |
+| MaxBars | `{% yield %}` |
+| RawBars | `{{{yield}}}` (the raw output of the `yield` op — RawBars keeps the op-name surface) |
 | Handlebars / ClassicBars | `{{> @partial-block}}` |
 
 The body is already-rendered, escape-safe output (a `VSafe` value), so MaxBars'
@@ -383,11 +383,14 @@ plain functions into these operations (the FlatBars Lab and `flatbars-js`).
   documented exceptions*; [adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/) amendment), the reason
   MaxBars borrows *most* of ClassicBars's surface, not all:
 --
-** the `{{#*inline}}` *decorator* — MaxBars spells inline partials with bare
-   `{{#inline "name"}}…{{/inline}}` / `{{#partial "name"}}…{{/partial}}`;
-   the `*`-prefixed decorator form is ClassicBars-only.
+** the `{{#*inline}}` *decorator* — MaxBars spells inline partials with the
+   statement tags `{% inline "name" %}…{% endinline %}` /
+   `{% partial "name" %}…{% endpartial %}`; the `*`-prefixed decorator form is
+   ClassicBars-only.
 ** `{{> @partial-block}}` — the `@` sigil is reserved, so render the caller's
-   body with bare `{{yield}}` instead (see "The block-partial body" above).
+   body with `{% yield %}` instead (see "The block-partial body" above).
+** the inline partial reference `{{> name}}` — MaxBars spells a partial include
+   `{% include "name" [ctx] %}` (ADR-039 item 5; a partial expansion is a statement).
 ** host-threaded *external* partial files — for host-loaded partials, use
    [ClassicBars](/engine/classicbars-compat/).
 --

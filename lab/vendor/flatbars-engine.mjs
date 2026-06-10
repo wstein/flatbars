@@ -16633,6 +16633,13 @@ var CloseEnd = /* @__PURE__ */ (function() {
   CloseEnd2.value = new CloseEnd2();
   return CloseEnd2;
 })();
+var ClosePartial = /* @__PURE__ */ (function() {
+  function ClosePartial2() {
+  }
+  ;
+  ClosePartial2.value = new ClosePartial2();
+  return ClosePartial2;
+})();
 var trimsOf = function(slice4) {
   return {
     l: take2(3)(slice4) === "{{~",
@@ -16664,7 +16671,7 @@ var stripDotDot = function($copy_s) {
         };
       }
       ;
-      throw new Error("Failed pattern match at Linter.Migrate (line 328, column 23 - line 330, column 32): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Linter.Migrate (line 364, column 23 - line 366, column 32): " + [v.constructor.name]);
     }
     ;
     while (!$tco_done) {
@@ -16696,6 +16703,21 @@ var sliceSpan = function(src) {
     return slice2(span2.start)(span2.end)(src);
   };
 };
+var quoteHead = function(kw) {
+  return function(s) {
+    var t = trim(s);
+    var v = indexOf2(" ")(t);
+    if (v instanceof Nothing) {
+      return kw + (' "' + (t + '"'));
+    }
+    ;
+    if (v instanceof Just) {
+      return kw + (' "' + (take2(v.value0)(t) + ('" ' + trim(drop2(v.value0)(t)))));
+    }
+    ;
+    throw new Error("Failed pattern match at Linter.Migrate (line 266, column 5 - line 268, column 83): " + [v.constructor.name]);
+  };
+};
 var push2 = function(acc) {
   return function(r) {
     return {
@@ -16711,6 +16733,24 @@ var popStack = function(acc) {
     residuals: acc.residuals,
     stack: fromMaybe([])(tail(acc.stack))
   };
+};
+var partialInclude = function(interior) {
+  var v = stripPrefix(">")(trim(interior));
+  if (v instanceof Nothing) {
+    return Nothing.value;
+  }
+  ;
+  if (v instanceof Just) {
+    var r = trim(v.value0);
+    var $54 = r === "" || r === "@partial-block";
+    if ($54) {
+      return Nothing.value;
+    }
+    ;
+    return new Just(quoteHead("include")(r));
+  }
+  ;
+  throw new Error("Failed pattern match at Linter.Migrate (line 251, column 27 - line 257, column 89): " + [v.constructor.name]);
 };
 var matchAt2 = function(cs) {
   return function(i) {
@@ -16731,8 +16771,8 @@ var joinReplicate = function(n) {
 };
 var migrateAtName = function(name2) {
   var v = stripDotDot(name2)(0);
-  var $48 = v.depth > 0;
-  if ($48) {
+  var $57 = v.depth > 0;
+  if ($57) {
     return new Just((function() {
       var v12 = loopField(v.rest);
       if (v12 instanceof Just) {
@@ -16741,15 +16781,15 @@ var migrateAtName = function(name2) {
       ;
       if (v12 instanceof Nothing) {
         var chain = joinWith(".")(replicate(v.depth)("parent"));
-        var $51 = v.rest === "";
-        if ($51) {
+        var $60 = v.rest === "";
+        if ($60) {
           return chain;
         }
         ;
         return chain + ("." + v.rest);
       }
       ;
-      throw new Error("Failed pattern match at Linter.Migrate (line 305, column 9 - line 311, column 65): " + [v12.constructor.name]);
+      throw new Error("Failed pattern match at Linter.Migrate (line 341, column 9 - line 347, column 65): " + [v12.constructor.name]);
     })());
   }
   ;
@@ -16766,7 +16806,7 @@ var migrateAtName = function(name2) {
     return Nothing.value;
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 313, column 10 - line 318, column 31): " + [v1.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 349, column 10 - line 354, column 31): " + [v1.constructor.name]);
 };
 var isPartialBlockRef = function(interior) {
   var v = stripPrefix(">")(trim(interior));
@@ -16778,7 +16818,7 @@ var isPartialBlockRef = function(interior) {
     return false;
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 230, column 30 - line 232, column 19): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 242, column 30 - line 244, column 19): " + [v.constructor.name]);
 };
 var isIdentChar2 = function(c) {
   return c >= "a" && c <= "z" || (c >= "A" && c <= "Z" || (c >= "0" && c <= "9" || (c === "_" || (c === "-" || (c === "." || c === "/")))));
@@ -16795,7 +16835,7 @@ var matchData = function(cs) {
       return Nothing.value;
     }
     ;
-    throw new Error("Failed pattern match at Linter.Migrate (line 286, column 5 - line 288, column 25): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Linter.Migrate (line 322, column 5 - line 324, column 25): " + [v.constructor.name]);
   };
 };
 var precededByBoundary = function(cs) {
@@ -16809,7 +16849,7 @@ var precededByBoundary = function(cs) {
       return !isIdentChar2(v.value0);
     }
     ;
-    throw new Error("Failed pattern match at Linter.Migrate (line 271, column 27 - line 273, column 32): " + [v.constructor.name]);
+    throw new Error("Failed pattern match at Linter.Migrate (line 307, column 27 - line 309, column 32): " + [v.constructor.name]);
   };
 };
 var isBareName = function(s) {
@@ -16817,8 +16857,8 @@ var isBareName = function(s) {
 };
 var firstWord2 = function(s) {
   var core = trim((function() {
-    var $62 = take2(1)(s) === "~";
-    if ($62) {
+    var $71 = take2(1)(s) === "~";
+    if ($71) {
       return drop2(1)(s);
     }
     ;
@@ -16833,7 +16873,7 @@ var firstWord2 = function(s) {
     return "";
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 418, column 5 - line 420, column 20): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 454, column 5 - line 456, column 20): " + [v.constructor.name]);
 };
 var isClauseSep = function(interior) {
   return elem16(firstWord2(interior))(["else", "elif", "when"]);
@@ -16861,7 +16901,7 @@ var findFrom2 = function(cs) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at Linter.Migrate (line 542, column 3 - line 545, column 30): " + [i.constructor.name]);
+          throw new Error("Failed pattern match at Linter.Migrate (line 578, column 3 - line 581, column 30): " + [i.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -16912,7 +16952,7 @@ var scanSetDelimiters = function(src) {
             return;
           }
           ;
-          throw new Error("Failed pattern match at Linter.Migrate (line 507, column 9 - line 528, column 36): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Linter.Migrate (line 543, column 9 - line 564, column 36): " + [v.constructor.name]);
         }
         ;
         if (otherwise) {
@@ -16921,7 +16961,7 @@ var scanSetDelimiters = function(src) {
           return;
         }
         ;
-        throw new Error("Failed pattern match at Linter.Migrate (line 503, column 3 - line 503, column 48): " + [i.constructor.name, acc.constructor.name]);
+        throw new Error("Failed pattern match at Linter.Migrate (line 539, column 3 - line 539, column 48): " + [i.constructor.name, acc.constructor.name]);
       }
       ;
       while (!$tco_done) {
@@ -16975,7 +17015,7 @@ var mapDataNames = function(s) {
                 return;
               }
               ;
-              throw new Error("Failed pattern match at Linter.Migrate (line 260, column 11 - line 263, column 68): " + [v1.constructor.name]);
+              throw new Error("Failed pattern match at Linter.Migrate (line 296, column 11 - line 299, column 68): " + [v1.constructor.name]);
             }
             ;
             if (otherwise) {
@@ -16987,7 +17027,7 @@ var mapDataNames = function(s) {
             ;
           }
           ;
-          throw new Error("Failed pattern match at Linter.Migrate (line 256, column 19 - line 264, column 66): " + [v.constructor.name]);
+          throw new Error("Failed pattern match at Linter.Migrate (line 292, column 19 - line 300, column 66): " + [v.constructor.name]);
         }
         ;
         while (!$tco_done) {
@@ -17035,7 +17075,7 @@ var rewriteElseIf = function(interior) {
     return Nothing.value;
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 367, column 5 - line 369, column 25): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 403, column 5 - line 405, column 25): " + [v.constructor.name]);
 };
 var canonLoopHead = function(v) {
   if (v === "each") {
@@ -17073,7 +17113,7 @@ var renameInteriorHead = function(interior) {
     return lead + canonLoopHead(body);
   }
   ;
-  throw new Error("Failed pattern match at Linter.Migrate (line 408, column 5 - line 410, column 44): " + [v.constructor.name]);
+  throw new Error("Failed pattern match at Linter.Migrate (line 444, column 5 - line 446, column 44): " + [v.constructor.name]);
 };
 var ambiguousSection = function(span2) {
   return function(sigil) {
@@ -17081,8 +17121,8 @@ var ambiguousSection = function(span2) {
       if (sigil instanceof Section) {
         var core = stripTildes(interior);
         var name2 = trim(core);
-        var $86 = isBareName(name2) && !elem16(name2)(knownBlockHelpers);
-        if ($86) {
+        var $95 = isBareName(name2) && !elem16(name2)(knownBlockHelpers);
+        if ($95) {
           return [{
             kind: "ambiguous-section",
             span: span2,
@@ -17136,6 +17176,10 @@ var step = function(src) {
           return push2(emit(acc1)(stmtTag(tr)("unless " + mapDataNames(v.value3))))(CloseUnless.value);
         }
         ;
+        if (v.value1 instanceof PartialBlock) {
+          return push2(emit(acc1)(stmtTag(tr)(quoteHead("partial")(mapDataNames(v.value3)))))(ClosePartial.value);
+        }
+        ;
         return push2(emit(acc1)(stmtTag(tr)(renameInteriorHead(mapDataNames(v.value3)))))(CloseEnd.value);
       }
       ;
@@ -17146,31 +17190,48 @@ var step = function(src) {
           return emit(popStack(acc))(stmtTag(tr)("endunless"));
         }
         ;
+        if (v1 instanceof Just && v1.value0 instanceof ClosePartial) {
+          return emit(popStack(acc))(stmtTag(tr)("endpartial"));
+        }
+        ;
         return emit(popStack(acc))(stmtTag(tr)("end" + canonLoopHead(v.value2)));
       }
       ;
       if (v instanceof RSep) {
+        var tr = trimsOf(sliceSpan(src)(v.value0));
         var v1 = rewriteElseIf(v.value2);
         if (v1 instanceof Just) {
-          return emit(acc)(stmtTag(trimsOf(sliceSpan(src)(v.value0)))(v1.value0));
+          return emit(acc)(stmtTag(tr)(v1.value0));
         }
         ;
+        if (v1 instanceof Nothing && isPartialBlockRef(v.value2)) {
+          return emit(acc)(stmtTag(tr)("yield"));
+        }
+        ;
+        var v2 = function(v3) {
+          if (v1 instanceof Nothing) {
+            if (isClauseSep(v.value2)) {
+              return emit(acc)(stmtTag(tr)(mapDataNames(v.value2)));
+            }
+            ;
+            if (otherwise) {
+              return emit(acc)(mapDataInTag(sliceSpan(src)(v.value0)));
+            }
+            ;
+          }
+          ;
+          throw new Error("Failed pattern match at Linter.Migrate (line 141, column 1 - line 141, column 39): " + [v1.constructor.name]);
+        };
         if (v1 instanceof Nothing) {
-          if (isPartialBlockRef(v.value2)) {
-            return emit(acc)("{{yield}}");
+          var $124 = partialInclude(v.value2);
+          if ($124 instanceof Just) {
+            return emit(acc)(stmtTag(tr)($124.value0));
           }
           ;
-          if (isClauseSep(v.value2)) {
-            return emit(acc)(stmtTag(trimsOf(sliceSpan(src)(v.value0)))(mapDataNames(v.value2)));
-          }
-          ;
-          if (otherwise) {
-            return emit(acc)(mapDataInTag(sliceSpan(src)(v.value0)));
-          }
-          ;
+          return v2(true);
         }
         ;
-        throw new Error("Failed pattern match at Linter.Migrate (line 186, column 5 - line 192, column 68): " + [v1.constructor.name]);
+        return v2(true);
       }
       ;
       if (v instanceof RComment) {
@@ -17193,7 +17254,7 @@ var step = function(src) {
         return emit(acc)(sliceSpan(src)(v.value0));
       }
       ;
-      throw new Error("Failed pattern match at Linter.Migrate (line 142, column 16 - line 208, column 49): " + [v.constructor.name]);
+      throw new Error("Failed pattern match at Linter.Migrate (line 142, column 16 - line 220, column 49): " + [v.constructor.name]);
     };
   };
 };
