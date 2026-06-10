@@ -171,6 +171,10 @@ export const sidebar = [
         "link": "/adr/adr-0038-rename-fullbars-classicbars/"
       },
       {
+        "label": "ADR-039: Liquid/Django alignment",
+        "link": "/adr/adr-0039-liquid-django-surface-alignment/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }

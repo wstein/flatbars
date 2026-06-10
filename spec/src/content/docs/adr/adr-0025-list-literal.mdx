@@ -31,7 +31,8 @@ Read the examples below in the current surface: `let` is retired, so `{{#let …
 are now `{% local … %}` / `{% endlocal %}` (docs-17, a freeze amendment), and MaxBars/RawBars
 control flow uses Django-style `{% … %}` tags with `{{ … }}` output-only (docs-19): read
 `{{#each}}` / `{{else}}` below as `{% each %}` / `{% else %}`. The decision recorded here is
-unchanged.
+unchanged. A later proposal,
+[ADR-039](/adr/adr-0039-liquid-django-surface-alignment/), renames `{% each %}` → `{% for … %}`.
 :::
 
 ## Context

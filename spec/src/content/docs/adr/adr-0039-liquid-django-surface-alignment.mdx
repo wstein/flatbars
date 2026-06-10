@@ -1,0 +1,197 @@
+---
+title: "ADR-039: Liquid/Django surface alignment — finishing the `{% %}` family"
+sidebar:
+  label: ADR-039 Liquid/Django alignment
+---
+
+*Status:* **Proposed.** *Date:* 2026-06-10. Applies to the *statement-tag dialects* —
+*RawBars*, *MaxBars*, and *Trussbars* (the Rust production engine) — i.e. every dialect with
+`statementTags` on. *ClassicBars* and *MinBars* are **out of scope** and keep their Handlebars /
+Mustache surfaces unchanged. Builds directly on the docs-19 cutover ([ADR-024](/adr/adr-0024-let-and-dict-literal/)
+amendment, the `{% %}` statement tags) and the docs-17 bindings (`{% local %}` / `{% set %}` /
+`{% capture %}`).
+
+## Context
+
+The docs-19 cutover established a single, load-bearing invariant for the statement-tag dialects:
+
+> **`{% … %}` is for statements (control, bindings, structure); `{{ … }}` emits a value and nothing
+> else.**
+
+That cutover migrated *control flow* (`if`/`each`/`with`/`case`) out of `{{#…}}` into `{% … %}` and
+made a `{{ }}` control form a located error. But it stopped at control flow. Several constructs that
+are **not value output** still ride in the `{{`-sigil family as Handlebars holdovers, so they quietly
+*violate the very invariant the cutover created*:
+
+| Construct | Today (Handlebars holdover) | Is it output? |
+| --- | --- | --- |
+| Comment (block) | `{{!-- … --}}` | No — produces nothing |
+| Comment (inline) | `{{! … }}` | No |
+| Raw / verbatim block | `{{{{raw}}}} … {{{{/raw}}}}` | No — it's a *region directive* |
+| Partial include | `{{> name}}` | Expands a template — a *statement* in the family |
+| Block-partial placeholder | `{{yield}}` | A structural slot, not a data value |
+
+Two more axes are *spelling* divergences from the Liquid/Django/Jinja family the dialects now belong
+to — not invariant violations, but inconsistencies a reader coming from that family trips over:
+
+* The loop keyword is `each` (the lone Handlebars word); the whole family uses `for`.
+* Boolean logic is the C-style `&&` / `||` / `!`; the family has no `&&` — it uses the `and` / `or` /
+  `not` keywords. There is no membership operator at all, where the family has `in` (Django/Jinja) /
+  `contains` (Liquid).
+
+And one axis is a genuine **semantic trap**: `{% with EXPR %}` *re-roots* the context (Handlebars
+`{{#with}}`), but Django's `{% with x=… %}` *binds a name* (the role MaxBars fills with `{% local %}`).
+Same keyword, opposite meaning — silently misleading to every author arriving from Django.
+
+Finally, the family has explicit **whitespace control** (`{%- … -%}` / `{{- … -}}`); the statement-tag
+dialects have only implicit standalone-line trimming and no explicit marker (the Handlebars `~` was
+never carried into the `{% %}` lexer).
+
+This ADR is *consistency-driven, not compatibility-driven*. The goal is not to run Liquid templates
+unchanged (that is what the Trussbars importer is for); it is to make the native surface internally
+coherent now that it has committed to the `{% %}` / pipe family. "90% Liquid" should not mean "Liquid
+control with Handlebars comments, raw blocks, and operators."
+
+## Decision
+
+Adopt the constructs below. Each is a **full replacement** (a cutover, per the chosen strategy): the
+new form is canonical and the old form is *rejected with a located, actionable error* and an
+automatic fix — never silently accepted alongside it, and never a silent no-op. This follows the
+docs-19 / docs-17 precedent (`checkSurfaceStrict`, `braceControlViolation`) and the standing rule
+that a removed surface form must reject loudly. The migration tooling (`flatbars migrate`, the
+Trussbars importer) maps every old form to its new one, so author corpora migrate mechanically.
+
+### Tier 1 — finish the invariant (move non-output out of `{{ }}` / `{{{{ }}}}`)
+
+**1. Comments → `{% comment %} … {% endcomment %}` (block) and `{# … #}` (inline).**
+Replaces `{{!-- … --}}` and `{{! … }}`. The block form matches Liquid **and** Django; the inline
+`{# … #}` matches Django **and** Jinja. A comment emits nothing, so it leaves the `{{ }}` family
+entirely. The inline `{#`/`#}` is a new lexical pair (a third sigil family alongside `{{`/`}}` and
+`{%`/`%}`); it nests no interior grammar — everything to `#}` is discarded.
+
+**2. Raw / verbatim → `{% raw %} … {% endraw %}`.**
+Replaces the quad-stache `{{{{raw}}}} … {{{{/raw}}}}`. A raw region is a directive, not output; the
+quad-stache is a pure Handlebars artefact that reads like nothing else in the surface. `{% raw %}` is
+the family-universal spelling. *Note:* this is distinct from the raw-block **helper** head semantics
+(strict-head resolution — undefined raw-block head ⇒ `UnknownHelper` in every dialect — is unchanged);
+`{% raw %}` is the literal verbatim region only.
+
+**3. Whitespace control → `{%- … -%}` and `{{- … -}}`.**
+A new feature (not a respelling): a leading `-` trims preceding whitespace, a trailing `-` trims
+following whitespace, exactly as in Jinja / Liquid / Django. The `~` trim marker is **not** adopted
+(it is the Handlebars spelling). Implicit standalone-line trimming is unchanged; the `-` markers are
+the explicit override.
+
+### Tier 2 — family spelling alignment
+
+**4. Loop keyword → `{% for x in xs %} … {% endfor %}`.**
+Replaces `{% each x in xs %}` / `{% each xs %}`. `for` is unanimous across Liquid, Django, and Jinja.
+This is *surface only* — it desugars to the same `each` operation; the loop variables stay `loop.*`
+(already Jinja's naming, deliberately not Liquid's `forloop.*`). The `else` clause (`{% for … %} … {%
+else %} … {% endfor %}` for the empty case) is preserved.
+
+**5. Partial include → `{% include "name" %}`.**
+Replaces the inline `{{> name}}` and the Handlebars block-partial sigil `{{#> name}}`. An include
+expands a template — a statement in the family, not a value. The *definition* block keeps its existing
+`{% partial "name" %} … {% endpartial %}` spelling (it is already a `{% %}` form). The block-partial
+placeholder `{{yield}}` becomes **`{% yield %}`** — a structural slot is control, not a data value, so
+by the invariant it leaves `{{ }}` too.
+
+**6. Boolean operators → `and` / `or` / `not` keywords.**
+Replaces the infix `&&` / `||` / `!`. These already exist as prelude operations and as the desugar
+target of the C-style forms; this promotes the keyword spelling to canonical and rejects `&&`/`||`/`!`.
+This is the **highest-friction** item (it touches every boolean expression in the corpus); it is
+sequenced last and may ship as its own follow-up PR under this ADR. Comparison operators
+(`==`/`!=`/`<`/`>`/`<=`/`>=`) are **unchanged** — they are family-universal already.
+
+**7. Membership operator → `x in xs`.**
+A new infix operator (Django/Jinja spelling), desugaring to the existing membership operation
+(`includes`/`some`). The Liquid `contains` spelling is *not* adopted as a second keyword — one
+canonical form. `in` composes with the `..` range and the `{% for x in xs %}` head without ambiguity
+(the `for`-head `in` is consumed by the loop grammar; a bare `in` in expression position is the
+operator).
+
+### The `with` semantic trap — rename the re-root form
+
+**8. `{% with EXPR %}` (re-root) → `{% scope EXPR %} … {% endscope %}`.**
+The context-re-rooting block (Handlebars `{{#with}}`, with its optional `as NAME` alias and `{% else
+%}` falsy clause) is renamed `scope`. The keyword **`with` is then reserved and rejected** with a
+fix-it that disambiguates intent: *"to re-root the context use `{% scope … %}`; to bind a name use
+`{% local … %}`."* This removes the same-word-opposite-meaning hazard for Django authors and leaves
+`with` free for a possible future Django-style binding alias of `local` (explicitly **not** decided
+here — see Non-goals).
+
+## Consequences
+
+### Migration & strategy (read the blast-radius lesson first)
+
+Every item is a cutover, and a cutover to the *shared* parser has a large blast radius — proven twice
+during docs-19: the strict legacy-`{{#…}}`-reject fired on **every** `parse()` consumer (the `truss!`
+macro, all examples, benches, trybuild UI expectations, the harness compat-parity cases), and an
+**incremental** `cargo test` missed 11+ failures that clean CI caught. Therefore each construct here is
+its own ADR-disciplined PR:
+
+1. Write the exact spelling here *before* implementing (done above — frozen).
+2. Implement in the oracle (PureScript) first; migrate the whole corpus (`examples/*/template.truss`,
+   `conformance/cases.mjs`, tutorials, `.purs` suites) **in the same atomic change**.
+3. Port to Trussbars (Rust): lexer + parser + every `.truss`, `truss!` call, bench, and trybuild
+   expectation — and run **`cargo test --all-targets` clean**, never incremental `--workspace`.
+4. Update the migration tooling so `flatbars migrate` and the Liquid/HB importers emit the new form.
+
+Sequence by friction: **comments → raw → whitespace** (Tier 1, mostly mechanical), then **for →
+include/yield → scope** (additive desugars + reserved-word rejects), then **operators → membership**
+(touch every expression — last, possibly split out).
+
+### Gates
+
+* *`check:isolation`* — assert the new forms parse in the statement-tag dialects and the old forms
+  (`{{!-- --}}`, `{{{{raw}}}}`, `{{> }}`, `{% each %}`, `{% with %}`, `&&`/`||`/`!`) each produce a
+  located surface diagnostic with the documented fix-it, not silent acceptance.
+* *`check:hbs-conformance`* / *`check:mustache-conformance`* — must be **inert**: ClassicBars and
+  MinBars are out of scope, so their byte-identical lines (49/50, 184/184) cannot move. The gate
+  proves the new lexical pairs (`{#`/`#}`, `{%- -%}`) don't bleed into those surfaces.
+* *Trussbars conformance harness* (`node trussbars/conformance/harness.mjs`) — AOT/v2/vm/vm-compat
+  stay byte-matched after each construct's corpus migration; no case excluded to make a count.
+* *Editor tooling* (ADR-017) — `editors/token-vocabulary.json` gains the `{#`/`#}` comment pair, the
+  `-` trim markers, and the `for`/`scope`/`include`/`yield`/`in` keyword classifications; the TextMate
+  grammar `#statement_tag` rule, the LSP legend, and the lab painter derive from it
+  (`check:vocab`/`check:tmgrammar`/`check:highlight`/`check:paint-parity`). The LSP
+  `dialectDiagnostics` gains the deprecation fix-its (old form → new form), mirroring the
+  retired-`let` rule.
+* *`check:catalog`* — no new prelude **helpers** ship (every item desugars to existing operations), so
+  the catalog is unchanged. `for`/`scope`/`in`/`and`/`or`/`not` are surface keywords, not catalog
+  entries.
+
+### Documentation
+
+* `engine/maxbars.mdx` and `engine/rawbars.mdx`: replace all holdover spellings in examples; add a
+  *Comments*, *Raw region*, and *Whitespace control* subsection; rename the `with`/`yield` sections.
+* The docs-19 / docs-17 amendment notes on [ADR-021](/adr/adr-0021-maxbars-variable-model/),
+  [ADR-024](/adr/adr-0024-let-and-dict-literal/), [ADR-025](/adr/adr-0025-list-literal/) gain a
+  forward pointer to this ADR for the `each`→`for`, `with`→`scope`, and comment/raw respellings.
+* The Liquid-vs-Trussbars comparison material is updated to reflect the closed gaps.
+
+### Non-goals (deliberately deferred)
+
+* **A Django-style binding `{% with name=expr %}`.** Renaming the re-root form frees the keyword, but
+  whether `with` later becomes an *alias of `local`* is a separate decision — `{% local %}` / `{% set
+  %}` / `{% capture %}` already cover binding, so there is no gap to close. Reserved for now.
+* **`{% extends %}` / `{% block %}` template inheritance (Django).** A *feature*, not a respelling; the
+  `{% partial %}` + `{% yield %}` layout pattern is the current equivalent. Opens cleanly later if
+  pressure shows up.
+* **Liquid-only iteration sugar** — `tablerow`, `cycle`, `increment`/`decrement`, `paginate`. These are
+  capabilities, not consistency fixes, and several conflict with the immutable / sandboxed model.
+* **The `contains` membership spelling and the `~` whitespace marker.** Rejected to keep one canonical
+  form per concept (`in` and `-`).
+* **`loop.*` completeness polish** (`revindex` naming, `loop.cycle`/`previtem`/`nextitem`). Minor,
+  tracked separately; the existing `loop.*` set already follows Jinja, not Liquid.
+
+## Open question
+
+Item 6 (boolean keyword operators) is the one cutover whose blast radius spans *every boolean
+expression* in every corpus, and unlike the others it has no narrowing desugar shortcut (the lexer
+must stop treating `&&`/`||`/`!` as operators and start treating `and`/`or`/`not` as keyword
+operators in expression position, without breaking their existing use as prelude *helper heads*). A
+small tokenizer spike should confirm that `and`/`or`/`not` as infix keywords never collide with their
+head-position helper use before this item is scheduled; until then it stays the last, separable PR
+under this ADR.

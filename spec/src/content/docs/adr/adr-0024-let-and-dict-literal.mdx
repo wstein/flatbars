@@ -29,6 +29,10 @@ Two later cutovers renamed the spelling this ADR uses; the decision and design a
 2. **Control flow uses Django-style `{% … %}` tags (docs-19).** In MaxBars/RawBars
    `{{ … }}` is output-only, so read `{{#if}}` / `{{#each}}` / `{{#with}}` / `{{else}}` below as
    `{% if %}` / `{% each %}` / `{% with %}` / `{% else %}`.
+3. **Further alignment is proposed in
+   [ADR-039](/adr/adr-0039-liquid-django-surface-alignment/)** — `{% each %}` → `{% for … %}`, the
+   re-rooting `{% with %}` → `{% scope %}`, and Handlebars comment/raw holdovers → `{% comment %}` /
+   `{% raw %}`.
 :::
 
 This ADR covers the two constructs that need *no shared-prelude change*: block-scoped `{{#let}}` and the

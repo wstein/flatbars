@@ -72,6 +72,8 @@ are now `{% local … %}` / `{% endlocal %}` (docs-17, a freeze amendment; the f
 `{% set NAME = EXPR %}` is its sibling), and MaxBars/RawBars control flow uses Django-style
 `{% … %}` tags with `{{ … }}` output-only (docs-19): `{{#each}}` / `{{else}}` read as
 `{% each %}` / `{% else %}`. The variable model recorded here is unchanged.
+[ADR-039](/adr/adr-0039-liquid-django-surface-alignment/) (proposed) continues this direction —
+`{% each %}` → `{% for … %}` and the `{% with %}` re-root → `{% scope %}`.
 :::
 
 ## Context
