@@ -1242,6 +1242,64 @@ mod tests {
         assert_eq!(render("{{name | uppercase}}", d).unwrap(), "ANN");
     }
 
+    // ── Explicit whitespace control `{{- … -}}` / `{%- … -%}` (ADR-039 item 3) ────
+    // Cross-impl vectors: these MUST render byte-for-byte identically to the
+    // PureScript oracle (`renderMaxbars`). A glued `-` trims ALL adjacent whitespace
+    // (newlines included); a spaced `-` stays the subtraction operator.
+
+    #[test]
+    fn ws_control_both_sides_trim() {
+        let d = obj(&[("x", s("Z"))]);
+        assert_eq!(render("a   {{- x -}}   b", d).unwrap(), "aZb");
+    }
+
+    #[test]
+    fn ws_control_left_only() {
+        let d = obj(&[("x", s("Z"))]);
+        assert_eq!(render("a   {{- x }} b", d).unwrap(), "aZ b");
+    }
+
+    #[test]
+    fn ws_control_right_only() {
+        let d = obj(&[("x", s("Z"))]);
+        assert_eq!(render("a {{ x -}}   b", d).unwrap(), "a Zb");
+    }
+
+    #[test]
+    fn ws_control_spaced_dash_is_not_a_trim_marker() {
+        // A SPACED `-` is never a trim marker: the surrounding whitespace is NOT
+        // collapsed. Here `{{ x }}` has a spaced (non-glued) interior — no trim — so
+        // the literal spaces around the tag survive. (The oracle's `[ {{ a - b }} ]`
+        // → `[ 5 ]` vector additionally exercises SUBTRACTION inside an output tag,
+        // a pre-existing limitation of the output-expression parser unrelated to and
+        // out of scope for this lexer change; the lexer-level proof that a spaced `-`
+        // stays an operator and never trims lives in `lex::tests`.)
+        let d = obj(&[("x", s("Z"))]);
+        assert_eq!(render("a   {{ x }}   b", d).unwrap(), "a   Z   b");
+    }
+
+    #[test]
+    fn ws_control_block_eats_newlines() {
+        let d = obj(&[("on", Value::Bool(true))]);
+        assert_eq!(
+            render("a\n  {%- if on -%}  \nB\n  {%- endif -%}  \nc", d).unwrap(),
+            "aBc"
+        );
+    }
+
+    #[test]
+    fn ws_control_loop_collapses() {
+        let d = obj(&[("xs", arr(&[Value::Num(1.0), Value::Num(2.0)]))]);
+        assert_eq!(
+            render(
+                "<ul>\n{%- each i in xs -%}\n<li>{{i}}</li>\n{%- endeach -%}\n</ul>",
+                d
+            )
+            .unwrap(),
+            "<ul><li>1</li><li>2</li></ul>"
+        );
+    }
+
     #[test]
     fn collection_ops() {
         let items = arr(&[

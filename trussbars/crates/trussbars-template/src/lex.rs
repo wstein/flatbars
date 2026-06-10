@@ -84,6 +84,11 @@ pub fn lex(src: &str) -> Result<Vec<Lexeme>, LexError> {
     let mut out = Vec::new();
     let mut i = 0;
     let mut text_start = 0;
+    // Pending right-trim from the *previous* tag's trailing `-}}`/`-%}` marker: when
+    // set, the next emitted `Text` has its leading whitespace (newlines included)
+    // dropped. The Jinja/Liquid/Django explicit whitespace-control rule (ADR-039 item
+    // 3) — see `apply_lead_trim`/`apply_trail_trim`. Composes with `trim_standalone`.
+    let mut pending_trail_trim = false;
 
     while i < n {
         // A tag opens with `{{` (output/block/raw/comment/partial) or, in this native
@@ -94,9 +99,13 @@ pub fn lex(src: &str) -> Result<Vec<Lexeme>, LexError> {
             i += 1;
             continue;
         }
-        // A tag starts here; flush any pending text run first.
+        // A tag starts here; flush any pending text run first, applying any pending
+        // right-trim from the previous tag's `-}}`/`-%}` to this run's start. (With no
+        // intervening text the pending right-trim has nothing to trim; it is simply
+        // overwritten by this tag's own marker below.)
         if i > text_start {
-            out.push(Lexeme::Text(Span::new(text_start, i)));
+            let span = apply_trail_trim(b, Span::new(text_start, i), &mut pending_trail_trim);
+            push_text(&mut out, span);
         }
         let lex = if stmt {
             lex_statement_tag(b, n, i)?
@@ -105,17 +114,68 @@ pub fn lex(src: &str) -> Result<Vec<Lexeme>, LexError> {
         };
         i = lex.next;
         text_start = i;
+        // A leading `{{-`/`{%-` marker retroactively trims the END of the just-pushed
+        // `Text` lexeme (drop trailing whitespace, newlines included).
+        if lex.lead_trim {
+            apply_lead_trim(b, &mut out);
+        }
+        pending_trail_trim = lex.trail_trim;
         out.push(lex.lexeme);
     }
     if n > text_start {
-        out.push(Lexeme::Text(Span::new(text_start, n)));
+        let span = apply_trail_trim(b, Span::new(text_start, n), &mut pending_trail_trim);
+        push_text(&mut out, span);
     }
     Ok(out)
+}
+
+/// Push a `Text` lexeme unless its span is empty (an all-trimmed run leaves nothing,
+/// mirroring the PureScript `flush` which drops a now-empty content string).
+fn push_text(out: &mut Vec<Lexeme>, span: Span) {
+    if span.end > span.start {
+        out.push(Lexeme::Text(span));
+    }
+}
+
+/// Apply a pending trailing `-}}`/`-%}` trim to a text run's START: drop leading
+/// whitespace (newlines included). Clears the pending flag. A span-only shrink to a
+/// sub-span (like `trim_standalone`), safe on byte boundaries.
+fn apply_trail_trim(b: &[u8], span: Span, pending: &mut bool) -> Span {
+    if !*pending {
+        return span;
+    }
+    *pending = false;
+    let mut lo = span.start;
+    while lo < span.end && b[lo].is_ascii_whitespace() {
+        lo += 1;
+    }
+    Span::new(lo, span.end)
+}
+
+/// Apply a leading `{{-`/`{%-` trim to the END of the just-pushed `Text` lexeme (if
+/// the last lexeme is `Text`): drop trailing whitespace (newlines included). If the
+/// shrink empties the run, the `Text` lexeme is removed (mirroring `flush`).
+fn apply_lead_trim(b: &[u8], out: &mut Vec<Lexeme>) {
+    if let Some(&Lexeme::Text(span)) = out.last() {
+        let mut hi = span.end;
+        while hi > span.start && b[hi - 1].is_ascii_whitespace() {
+            hi -= 1;
+        }
+        if hi > span.start {
+            *out.last_mut().unwrap() = Lexeme::Text(Span::new(span.start, hi));
+        } else {
+            out.pop();
+        }
+    }
 }
 
 struct Lexed {
     lexeme: Lexeme,
     next: usize,
+    /// A `-` glued to the opening sigil (`{{-`/`{%-`): trim the preceding text's end.
+    lead_trim: bool,
+    /// A `-` glued to the closing braces (`-}}`/`-%}`): trim the following text's start.
+    trail_trim: bool,
 }
 
 // ── Standalone-line whitespace trimming (Handlebars/MaxBars) ──────────────────
@@ -233,6 +293,31 @@ fn right_blank(src: &str, lexemes: &[Lexeme], i: usize) -> bool {
     true // end of input
 }
 
+/// Detect and strip explicit whitespace-control `-` markers from a tag's raw content
+/// range `[inner, close)` (just past the sigil, up to the closing braces). A `-`
+/// **glued** to the opening sigil (`b[inner] == '-'`) is a lead-trim; a `-` glued to
+/// the closing braces (`b[close-1] == '-'`, still inside the content) is a trail-trim
+/// — the Jinja/Liquid/Django rule (ADR-039 item 3). Returns the inner range with the
+/// marker bytes excluded, plus `(lead_trim, trail_trim)`, so the subsequent
+/// `trim_span` never sees the `-` (`{%- if x -%}` ⇒ interior `if x`). A spaced `-`
+/// (`{{ a - b }}`, `{{ -x }}`) is NOT glued and never trims — it stays in the
+/// interior as an operator. Mirrors the PureScript `splitTrims`/`leadTrimAt`.
+fn strip_trim_markers(b: &[u8], inner: usize, close: usize) -> (usize, usize, bool, bool) {
+    let mut lo = inner;
+    let mut hi = close;
+    let lead = lo < hi && b[lo] == b'-';
+    if lead {
+        lo += 1;
+    }
+    // The trailing `-` must still be inside the (possibly lead-stripped) content, so a
+    // single `-` interior cannot count as both a lead and a trail marker.
+    let trail = hi > lo && b[hi - 1] == b'-';
+    if trail {
+        hi -= 1;
+    }
+    (lo, hi, lead, trail)
+}
+
 /// Lex one tag beginning at `i` (where `b[i..i+2] == "{{"`).
 fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     // Four-brace raw block: `{{{{`.
@@ -243,13 +328,18 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     if at(b, i, b"{{{") {
         let inner = i + 3;
         let close = find_close(b, n, inner, 3)?;
+        // Explicit whitespace control `{{{- … -}}}` (the `-` glued to the inner braces);
+        // the `{{{`/`}}}` braces themselves are never the marker.
+        let (ts, te, lead_trim, trail_trim) = strip_trim_markers(b, inner, close);
         return Ok(Lexed {
             lexeme: Lexeme::Tag {
                 sigil: Sigil::Raw,
-                interior: Span::new(inner, close),
+                interior: Span::new(ts, te),
                 span: Span::new(i, close + 3),
             },
             next: close + 3,
+            lead_trim,
+            trail_trim,
         });
     }
     // Two-brace tag: the byte after `{{` selects the sigil. Strict native dialect
@@ -266,7 +356,8 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
         Some(b'!') => (Sigil::Comment, 1),
         _ => (Sigil::Output, 0),
     };
-    // Long comment `{{!-- … --}}` ends at `--}}`.
+    // Long comment `{{!-- … --}}` ends at `--}}`. Comments do not take `-` trim markers
+    // (the `--` close would falsely trip the detector), so no trimming here.
     if sigil == Sigil::Comment && at(b, i + 2, b"!--") {
         let inner = i + 5;
         let close = find_seq(b, n, inner, b"--}}")
@@ -278,17 +369,24 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
                 span: Span::new(i, close + 4),
             },
             next: close + 4,
+            lead_trim: false,
+            trail_trim: false,
         });
     }
     let inner = i + 2 + sig_len;
     let close = find_close(b, n, inner, 2)?;
+    // Explicit whitespace control `{{- … -}}` (output / partial / short comment). The
+    // marker is the `-` glued to the inner braces; a spaced `-` stays an operator.
+    let (ts, te, lead_trim, trail_trim) = strip_trim_markers(b, inner, close);
     Ok(Lexed {
         lexeme: Lexeme::Tag {
             sigil,
-            interior: Span::new(inner, close),
+            interior: Span::new(ts, te),
             span: Span::new(i, close + 2),
         },
         next: close + 2,
+        lead_trim,
+        trail_trim,
     })
 }
 
@@ -309,8 +407,13 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     let close = find_stmt_close(b, n, inner)?; // index of `%` in the closing `%}`
     let end = close + 2; // past `%}`
     let span = Span::new(i, end);
+    // Explicit whitespace control `{%- … -%}` (ADR-039 item 3): strip the glued `-`
+    // markers from the raw content BEFORE trimming whitespace, so `{%- if x -%}` parses
+    // as `if x`, not `- if x -`. A spaced `-` (`{% set n = a - b %}`) is not glued and
+    // stays an operator.
+    let (cs, ce, lead_trim, trail_trim) = strip_trim_markers(b, inner, close);
     // The non-whitespace content bounds and its leading head word.
-    let (ts, te) = trim_span(b, inner, close);
+    let (ts, te) = trim_span(b, cs, ce);
     if ts == te {
         return Err(LexError::new("empty statement tag `{% %}`", i));
     }
@@ -326,6 +429,8 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
                 span,
             },
             next: end,
+            lead_trim,
+            trail_trim,
         });
     }
     // A clause separator lexes to `Output` (the parser's `else`/`elif`/`when` split);
@@ -342,6 +447,8 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             span,
         },
         next: end,
+        lead_trim,
+        trail_trim,
     })
 }
 
@@ -410,6 +517,8 @@ fn lex_raw_block(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
             span: Span::new(i, close_end),
         },
         next: close_end,
+        lead_trim: false,
+        trail_trim: false,
     })
 }
 
@@ -717,5 +826,78 @@ mod tests {
         assert_eq!(trimmed_text("a\n{{x}}\nb\n"), "a\n\nb\n");
         // An inline block (text on the same line) is not standalone — the space stays.
         assert_eq!(trimmed_text("{% each xs %}{{this}} {% endeach %}\n"), " \n");
+    }
+
+    // ── Explicit whitespace control `{{- … -}}` / `{%- … -%}` (ADR-039 item 3) ────
+
+    /// The text payload after BOTH passes (`-` markers in `lex`, then `trim_standalone`),
+    /// concatenated — the rendered whitespace a template would emit between tags.
+    fn marked_text(src: &str) -> String {
+        let mut ls = lex(src).unwrap();
+        super::trim_standalone(src, &mut ls);
+        ls.iter()
+            .filter_map(|l| match l {
+                Lexeme::Text(sp) => Some(sp.of(src)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn trim_markers_are_stripped_from_interior() {
+        // The `-` markers are excluded from the interior: `{%- if x -%}` carries `if x`
+        // (statement tags `trim_span` the interior), `{{- y -}}` carries ` y ` (output
+        // tags do NOT whitespace-trim — the parser does — so only the `-` is removed,
+        // matching the PureScript `splitTrims`).
+        assert_eq!(
+            tags("{%- if x -%}{{- y -}}{%- endif -%}"),
+            vec![
+                (Sigil::Open, "if x".to_string()),
+                (Sigil::Output, " y ".to_string()),
+                (Sigil::Close, "if".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn trim_markers_drop_adjacent_whitespace() {
+        // Both-trim: all whitespace each side of the marked tag is dropped (newlines too).
+        assert_eq!(marked_text("a   {{- x -}}   b"), "ab");
+        // Left-only: leading side trimmed, trailing side kept.
+        assert_eq!(marked_text("a   {{- x }} b"), "a b");
+        // Right-only: trailing side trimmed, leading side kept.
+        assert_eq!(marked_text("a {{ x -}}   b"), "a b");
+    }
+
+    #[test]
+    fn trim_markers_eat_newlines() {
+        // The `-` markers eat ALL adjacent whitespace, newlines included: every gap
+        // around the marked block collapses, leaving just the bodies abutting.
+        assert_eq!(
+            marked_text("a\n  {%- if on -%}  \nB\n  {%- endif -%}  \nc"),
+            "aBc"
+        );
+    }
+
+    #[test]
+    fn spaced_dash_is_not_a_trim_marker() {
+        // A `-` NOT glued to the brace stays an operator and trims nothing (interior
+        // keeps the spaced `- `, and no adjacent whitespace is removed).
+        assert_eq!(
+            tags("[ {{ a - b }} ]"),
+            vec![(Sigil::Output, " a - b ".to_string())]
+        );
+        assert_eq!(marked_text("[ {{ a - b }} ]"), "[  ]");
+    }
+
+    #[test]
+    fn raw_output_takes_trim_markers() {
+        // `{{{- z -}}}`: the inner `-` trims, the `{{{`/`}}}` braces themselves never do.
+        // The interior keeps its inner spaces (` z `, output tags don't whitespace-trim).
+        assert_eq!(
+            tags("x  {{{- z -}}}  y"),
+            vec![(Sigil::Raw, " z ".to_string())]
+        );
+        assert_eq!(marked_text("x  {{{- z -}}}  y"), "xy");
     }
 }
