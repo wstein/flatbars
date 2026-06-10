@@ -24,9 +24,11 @@
 > (constructs, value policy, exclusions) is unchanged — only the delimiters — so the byte-identity
 > contract holds. **Governance:** `{% %}` is a *surface* decision, which docs/12 §5.5 places with
 > the **oracle** (PureScript RawBars/MaxBars); docs/17–19 are Trussbars's conformance view of that
-> decision, not its authority. The freeze §1 spellings are updated when docs/19 lands.
+> decision, not its authority. **The §1 spellings below are now the `{% %}` surface** (docs/19
+step 4 landed — the Rust `trussbars-template` lexer reads `{% %}` and the corpus is migrated;
+the raw block stays the quad-stache `{{{{#raw}}}}`).
 
-Evidence base: the conformance corpus (`trussbars/conformance/cases.mjs`, 52
+Evidence base: the conformance corpus (`trussbars/conformance/cases.mjs`, 71
 byte-matched cases) and the blog/changelog dogfoods (`trussbars/examples/`).
 Source of truth for "supported" is the v1 emitter
 (`packages/maxbars/src/MaxBars/Rust.purs`); this doc is its human-readable freeze.
@@ -37,21 +39,21 @@ Source of truth for "supported" is the v1 emitter
 | --- | --- |
 | **Output** | `{{ x }}` (escaped), `{{{ x }}}` (raw), dotted paths `{{ a.b.c }}` |
 | **Reserved scope** | `this`, `root`, `parent`, `outer` (labelled loop), `loop`, `yield` |
-| **Conditionals** | `{{#if}}` / `{{else}}` / `{{#unless}}`; `else if` via the `elif` chain |
-| **Iteration** | `{{#each xs}}` over arrays **and** maps (`groupBy` result) — map iteration binds `loop.key`; Liquid-style block binding `{{#each item in xs}}` / `{{#each item i in xs}}` (the `as \|…\|` form was removed on develop, ADR/commit `4729026`); `label NAME` after `in`; `{{else}}` empty arm |
-| **Loop metadata** | `loop.index0/index1/rindex0/rindex1/first/last/length/key`; `loop.parent` / `loop.root` chains; `outer` via `label NAME` |
-| **Context** | `{{#with obj}}` re-root (needs `#[derive(Trussbars)]` on `obj`'s type) |
-| **Let** | `{{#let a=(e) b=(e2)}}…{{/let}}` — block-scoped sequential aliases (`b` sees `a`), computed once, **never re-roots**; value-bound to a Rust `let` (best for computed scalars) |
+| **Conditionals** | `{% if %}` / `{% else %}` / `{% unless %}`; `else if` via the `elif` chain (`{% elif … %}`) |
+| **Iteration** | `{% each xs %}` over arrays **and** maps (`groupBy` result) — map iteration binds `loop.key`; Liquid-style block binding `{% each item in xs %}` / `{% each item i in xs %}` (the `as \|…\|` form was removed on develop, ADR/commit `4729026`); `label NAME` after `in`; `{% else %}` empty arm; closes `{% endeach %}` |
+| **Loop metadata** | `loop.index0/index1/rindex0/rindex1/first/last/length/key/depth`; `loop.parent` / `loop.root` chains; `outer` via `label NAME` |
+| **Context** | `{% with obj %}…{% endwith %}` re-root (needs `#[derive(Trussbars)]` on `obj`'s type) |
+| **Local** | `{% local a=(e) b=(e2) %}…{% endlocal %}` — block-scoped sequential aliases (`b` sees `a`), computed once, **never re-roots**; value-bound to a Rust `let` (best for computed scalars; the `let` head is retired per docs-17) |
 | **Operators (inline)** | `+ - * / %`, `== != < > <= >=`, `&& \|\| !`, `??` (coalesce), `?:` (first-truthy), `a ? b : c` (ternary) |
 | **Pipes** | `{{ x \| f arg }}` desugars to the helper call `f(x, arg)` |
-| **Partials** | inline definitions `{{#inline "n"}}…{{/inline}}` + use `{{> n}}` / `{{> n ctx}}`; block partials `{{#partial "n"}}…{{/partial}}` with `{{yield}}` |
+| **Partials** | inline definitions `{% inline "n" %}…{% endinline %}` + use `{{> n}}` / `{{> n ctx}}`; block partials `{% partial "n" %}…{% endpartial %}` with `{{yield}}` |
 | **Raw blocks** | `{{{{#raw}}}}…{{{{/raw}}}}` (verbatim body) |
 | **Literals** | string, number (`f64`), `true`/`false`, `null`, **list `[a, b, c]`** (homogeneous → a Rust array; `Each`/`count` work). Dict `{k: v}` literals are **not** in v1 (see F5). |
 
 **Helper inventory** (monomorphized `trussbars_std::*` calls; `count`/`size`/`length` alias):
 - *string* — `uppercase capitalize lowercase trim trimStart trimEnd append prepend replace split startsWith endsWith includes slice truncate reverse`
 - *array* — `count at take takeRight join reverse unique includes slice pluck sortBy groupBy`
-- *collection filters* (ADR-036/037) — `where reject find some every` (`"key"` truthiness or `"key" "cmp" value`; cmp ∈ gt/gte/lt/lte/eq/ne/startsWith/endsWith/includes). `find` returns `Option`, unwrapped by an Option-aware `{{#with}}` (`if let Some`).
+- *collection filters* (ADR-036/037) — `where reject find some every` (`"key"` truthiness or `"key" "cmp" value`; cmp ∈ gt/gte/lt/lte/eq/ne/startsWith/endsWith/includes). `find` returns `Option`, unwrapped by an Option-aware `{% with %}` (`if let Some`).
 - *number* — `abs ceil floor round modulo toFixed toFloat toInt`
 - *escaping* — `escapeHtml safe raw`
 
@@ -59,8 +61,8 @@ Source of truth for "supported" is the v1 emitter
 
 - **Truthiness = `nonEmpty`, numbers excluded** *(the default policy)*.
   `false`/`None`/`()`/`""`/`[]`/`{}` are falsy; everything else non-numeric is truthy.
-  **Numbers have no `TruthyIn<NonEmpty>` impl**, so `{{#if count}}` is a *compile error* —
-  write `{{#if count > 0}}`. (The typed escape from the `0`-truthy vs `0`-falsy dilemma;
+  **Numbers have no `TruthyIn<NonEmpty>` impl**, so `{% if count %}` is a *compile error* —
+  write `{% if count > 0 %}`. (The typed escape from the `0`-truthy vs `0`-falsy dilemma;
   docs/01 §5.3.) A template may opt into the `Liquid`/`Handlebars`/host-defined policies at
   compile time (`truss!(…, truthiness = …)`); only `nonEmpty` is conformance-checked
   (docs/01 §7.1, docs/16).
@@ -71,7 +73,7 @@ Source of truth for "supported" is the v1 emitter
 - **Context types** (`#[derive(Trussbars)]`): a struct is truthy iff it has ≥1 field;
   an **enum** is always truthy, and a **fieldless** enum also stringifies to the
   variant name (`Status::Active` → `"Active"`, matching serde's unit-variant form) —
-  so `{{status}}` and `{{#if (eq status "Active")}}` work. A **data-carrying** enum
+  so `{{status}}` and `{% if (eq status "Active") %}` work. A **data-carrying** enum
   gets truthiness only; variant field-access (`match`) is the §4.1 dispatch, → v2.
 - **Names are static.** A template path is the Rust field identifier verbatim — no
   rename layer (blog finding F1). Templates use snake_case to keep Rust idiomatic.
@@ -95,7 +97,7 @@ From the blog dogfood (`examples/blog/README.md`); each needs an explicit in/out
 | **F3** | **No host-helper registration** (`date`, `markdown`, `pluralize`, i18n `t` all `unsupported`). | **DONE (v2)** — the closed-allow-list host-helper convention (docs/09): `truss!(…, helpers = [date, markdown])` / `#[truss_helpers(…)]` declares the callable host fns, a declared head emits a typed free-function call, an undeclared one is a located `unknown helper` error. Keeps "names static" (only the impl is host-provided). |
 | **F6** | Generated module is hand-committed; a `.truss` typo is a Node error, not a `rustc` error at the call site. | **DONE (v2)** — the `truss!` proc-macro compiles templates at build time (`path = "…"` loads from a file) with diagnostics mapped to template spans (docs/07). |
 | **F2** | A field compared to a numeric literal must be `f64`. | **DONE** — a numeric literal in operator position emits as `trussbars_core::NumLit`, which coerces against any numeric field type (`views: i64` works with `> 100`); string ordering untouched, string-vs-number is a compile error (docs/20, v2-conformance 71/71). |
-| **F4** | `{{#let}}` block-scoped sequential aliases — **DONE.** The emitter now emits nested `{{#let name=(e)}}` as block-scoped Rust `let`s (value-bound; `let-bindings` conformance case, byte-matched 40/40). The one limit: binding a non-`Copy` field *directly* (`n=(user.name)`) would move out of `&ctx` — use the field instead. | **CLOSED** (this branch). |
+| **F4** | `{% local %}` (the `{{#let}}` block, renamed per docs-17) block-scoped sequential aliases — **DONE.** The emitter emits nested `{% local name=(e) %}` as block-scoped Rust `let`s (value-bound; `local-bindings` conformance case). The one limit: binding a non-`Copy` field *directly* (`n=(user.name)`) would move out of `&ctx` — use the field instead. | **CLOSED** (this branch). |
 | **F5** | **List literals `[…]` — DONE** (homogeneous → a Rust array; `Each` via a fixed-array runtime impl, `count` via slice coercion; `list-each-int`/`-str`/`-count` cases). **Dict literals `{k: v}` — DONE:** field access (`{{#with {a:1}}}{{a}}`) compiles to a block-local **generic** struct (`struct __Dict<F0,…>`), whose field types are inferred at instantiation — so even the type-blind emitters synthesize it (both v1 and v2; `dict-*` conformance cases gated v-vs-oracle). Truthiness of a dict subject is resolved at compile time (a non-empty literal is always truthy). | **list & dict CLOSED.** |
 | **F1** | Template path == Rust identifier (no rename). | **WONTFIX** — it *is* "names are static"; document only. |
 | **F7** | A **piped or bare multi-arg application used directly as an `{{#if}}`/`{{#unless}}` condition** is rejected ("options argument") — a `startsWith` applied to the subject fails as a bare condition head, whether written as a pipe or as a prefix call. **Workaround: parenthesize** the call — `{{#if (startsWith x "f")}}` works. Applications work in every position *except* a bare condition head. | **v2, IN (fix)** — the desugar should accept a piped/applied condition without the parens. Found via the changelog dogfood (`examples/changelog`); the parens form is the v1 workaround. |
