@@ -2,5 +2,5 @@
   <h1>{{post.title}}</h1>
   <p class="meta">by {{post.author}} · {{date post.date "%B %e, %Y" "en"}} · {{post.tags | count}} tags</p>
   <div class="body">{{post.body | markdown}}</div>
-  <footer>{{#each tag in post.tags}}<a href="/tags/{{tag | lowercase}}">#{{tag}}</a> {{/each}}</footer>
+  <footer>{% each tag in post.tags %}<a href="/tags/{{tag | lowercase}}">#{{tag}}</a> {% endeach %}</footer>
 </article>

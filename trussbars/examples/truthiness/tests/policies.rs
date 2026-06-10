@@ -31,7 +31,7 @@ fn aot_empty_list_diverges_by_policy() {
 #[test]
 fn aot_numeric_truthiness_only_exists_under_a_policy() {
     // 0 is falsy under Handlebars, truthy under Liquid. (There is no NonEmpty variant —
-    // `{{#if count}}` does not compile under NonEmpty, §5.3.)
+    // `{% if count %}` does not compile under NonEmpty, §5.3.)
     assert_eq!(count_handlebars(&empty()), "none");
     assert_eq!(count_liquid(&empty()), "some");
     let one = Cart {
@@ -44,7 +44,7 @@ fn aot_numeric_truthiness_only_exists_under_a_policy() {
 
 #[test]
 fn vm_selects_policy_at_runtime() {
-    let src = "{{#if items}}filled{{else}}empty{{/if}}";
+    let src = "{% if items %}filled{% else %}empty{% endif %}";
     let data = empty_cart();
     assert_eq!(vm_render(src, &data, TruthMode::NonEmpty), "empty");
     assert_eq!(vm_render(src, &data, TruthMode::Liquid), "filled");

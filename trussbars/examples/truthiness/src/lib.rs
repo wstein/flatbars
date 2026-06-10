@@ -32,12 +32,12 @@ pub struct Cart {
 truss!(
     cart_default,
     Cart,
-    "{{#if items}}filled{{else}}empty{{/if}}"
+    "{% if items %}filled{% else %}empty{% endif %}"
 );
 truss!(
     cart_liquid,
     Cart,
-    "{{#if items}}filled{{else}}empty{{/if}}",
+    "{% if items %}filled{% else %}empty{% endif %}",
     truthiness = Liquid
 );
 
@@ -48,13 +48,13 @@ truss!(
 truss!(
     count_handlebars,
     Cart,
-    "{{#if count}}some{{else}}none{{/if}}",
+    "{% if count %}some{% else %}none{% endif %}",
     truthiness = Handlebars
 );
 truss!(
     count_liquid,
     Cart,
-    "{{#if count}}some{{else}}none{{/if}}",
+    "{% if count %}some{% else %}none{% endif %}",
     truthiness = Liquid
 );
 
@@ -117,7 +117,7 @@ pub fn non_blank(s: &str) -> bool {
 
 /// A one-field context, to show the host policy governing a real template condition.
 pub struct Note {
-    /// The note body — blank (empty *or* whitespace-only) takes the `{{else}}` arm under
+    /// The note body — blank (empty *or* whitespace-only) takes the `{% else %}` arm under
     /// [`NonBlank`], where any non-empty string would be truthy under the built-ins.
     pub body: String,
 }
@@ -128,6 +128,6 @@ pub struct Note {
 truss!(
     note_nonblank,
     Note,
-    "{{#if body}}content{{else}}blank{{/if}}",
+    "{% if body %}content{% else %}blank{% endif %}",
     truthiness = self::NonBlank
 );

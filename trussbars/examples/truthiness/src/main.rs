@@ -22,7 +22,7 @@ fn main() {
     println!("  Liquid:     {}", count_liquid(&empty)); // some  (0 is truthy)
 
     println!("\n== VM: the same policy choice, at runtime, over dynamic data ==");
-    let src = "{{#if items}}filled{{else}}empty{{/if}}";
+    let src = "{% if items %}filled{% else %}empty{% endif %}";
     let data = empty_cart();
     println!("  NonEmpty: {}", vm_render(src, &data, TruthMode::NonEmpty));
     println!("  Liquid:   {}", vm_render(src, &data, TruthMode::Liquid));
