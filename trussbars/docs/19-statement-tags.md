@@ -11,7 +11,7 @@
 > faithful) and **MinBars** (Mustache) keep `{{ }}`-only and are explicitly **out** — see §5.3.
 >
 > **Audience:** the lexer/parser owner and the v2 proc-macro author. Companions: `docs/12`
-> (the `{{#case}}` separator machinery this simplifies), `docs/17`/`docs/18` (`assign`/`capture`
+> (the `{{#case}}` separator machinery this simplifies), `docs/17`/`docs/18` (`set`/`local`/`capture`
 > — **re-spelled** by this ADR, §5.6), `docs/01`/`docs/06` (subset + freeze — a major amendment,
 > §5.4), `docs/08` (the v2 parser this extends), `docs/15` (the migration codemod), `docs/04`
 > (conformance). Upstream: CLAUDE.md (the `LexConfig` knobs; the `RawBars ⊂ FullBars ⊂ MaxBars`
@@ -40,7 +40,7 @@ The tax is visible in this repo's own decisions. `docs/12 §2` had to legislate 
 
 None of those rules describe *meaning*; they exist only because the parser cannot *see* that a
 separator is a separator. The defect is **worst in exactly the dialects that added rich control
-flow** — RawBars/MaxBars/Trussbars, which grew `case`/`when`/`elif`/`let`/`assign`. The mild
+flow** — RawBars/MaxBars/Trussbars, which grew `case`/`when`/`elif`/`local`/`set`. The mild
 classic `{{else}}` of Handlebars (FullBars) and the inverted sections of Mustache (MinBars)
 carry far less of it (§5.3). So the cure belongs precisely where the disease is.
 
@@ -76,8 +76,8 @@ one question.
 | Each (+ empty arm) | `{% each item in xs %}…{% else %}…{% endeach %}` (the `docs/06`/`each-empty` arm) |
 | With | `{% with obj %}…{% endwith %}` |
 | Case / when / else | `{% case s %}{% when v … %}…{% else %}…{% endcase %}` |
-| Let (block scope) | `{% let a=(e) b=(e2) %}…{% endlet %}` |
-| Assign (forward, `docs/17`) | `{% assign name = expr %}` |
+| Local (bounded scope, `docs/17`) | `{% local a=(e) b=(e2) %}…{% endlocal %}` (the renamed block-`let`) |
+| Set (forward scope, `docs/17`) | `{% set name = expr %}` |
 | Capture (`docs/18`) | `{% capture name %}…{% endcapture %}` |
 | Inline partial **definition** | `{% inline "n" %}…{% endinline %}` |
 | Block-partial **definition-call** | `{% partial "n" ctx %}…{% endpartial %}` |
@@ -93,8 +93,9 @@ existing per-dialect knobs (`mustacheDelims`, `rangeOperator`, `collectionLitera
 
 `{% %}` is a **re-delimiting of the same structural nodes**, not new semantics. The skeleton
 AST is unchanged: `{% if %}…{% endif %}` still parses to the same `Block`, `{% else %}` /
-`{% when %}` to the same `Sep`, `{% assign %}` to the same binding the `{{assign}}` proposal
-used. The **engine, desugar, validate, and compile drivers never see the difference** — they
+`{% when %}` to the same `Sep`, `{% set %}` to the same binding node the block-`let` (now
+`{% local %}`) builds. The **engine, desugar, validate, and compile drivers never see the
+difference** — they
 consume `Block`/`Sep`, and a `Block` does not record which delimiters opened it.
 
 What changes is confined to the **lexer/parser**:
@@ -135,7 +136,7 @@ vs `{% endeach %}` mismatches are caught lexically.
 | # | Alternative | Verdict | Why |
 | --- | --- | --- | --- |
 | **A1** | **Full `{% %}` for all non-output tags** (this ADR) | **Chosen** | Gives separators, keywords, *and* statements one unambiguous class. A `LexConfig` knob re-delimits existing nodes — engine/compiler untouched. Matches Django/Jinja/Liquid muscle memory and the project's "output vs effect" split. |
-| **A2** | Clause sigil only — `{{:else}}` / `{{:when}}` (Svelte's `{:else if}`) | **Rejected** | Fixes *only* the separator, keeping blocks as `{{#if}}`. Smaller, but leaves a *third* delimiter style in play and still reads control flow as curlies; the team chose the cleaner two-sigil split that also re-homes `let`/`assign`/`capture`. Recorded as the runner-up. |
+| **A2** | Clause sigil only — `{{:else}}` / `{{:when}}` (Svelte's `{:else if}`) | **Rejected** | Fixes *only* the separator, keeping blocks as `{{#if}}`. Smaller, but leaves a *third* delimiter style in play and still reads control flow as curlies; the team chose the cleaner two-sigil split that also re-homes `local`/`set`/`capture`. Recorded as the runner-up. |
 | **A3** | Close tags `{% /if %}` (uniform structural close) | **Rejected** | More regular vs `#`/`/`, but non-idiomatic for `{% %}`; Django/Jinja/Liquid/Twig all spell `{% endif %}`. Faithfulness wins; the verbosity is the cost of the convention. |
 | **A4** | Also move comments to `{# #}` and rename `each`→`for` | **Out of scope** | Each is an *independent* breaking change with its own churn; bundling them inflates the migration. `{{! }}` comments and the `each` keyword stay. `for`/`{# #}` may be revisited as separate alignments. |
 | **A5** | Status quo — name-agnostic `Sep` in `{{ }}` | **The baseline** | Smallest grammar, but pays the `docs/12 §2` reservation/located-error tax in every control-flow ADR and produces a structurally-dishonest AST (output-shaped separators). |
@@ -181,7 +182,8 @@ actionable error*):
 
 - **Codemod.** Extend `flatbars migrate` / `docs/15` with a purely-mechanical rewrite
   (`{{#if}}`→`{% if %}`, `{{/if}}`→`{% endif %}`, `{{else}}`→`{% else %}`, `{{#each … in …}}`→
-  `{% each … in … %}`, `{{when v}}`→`{% when v %}`, `{{#let …}}`→`{% let … %}`, etc.). It is a
+  `{% each … in … %}`, `{{when v}}`→`{% when v %}`, `{{#let …}}`→`{% local … %}` (rename, docs/17),
+  etc.). It is a
   delimiter swap on an unchanged tree, so it is total and reversible.
 - **Reject the old form.** In `statementTags` dialects a `{{#if}}` / `{{/if}}` / bare `{{else}}`
   is a `checkSurfaceStrict` located error pointing at the `{% %}` form — never a silent no-op.
@@ -194,9 +196,10 @@ to the engine `tokenize`, the TextMate grammar (`check:tmgrammar`), and the LSP 
 lexically separable from output, so the grammar no longer needs the keyword-name heuristics it
 uses to tint `{{else}}` differently from `{{city}}`.
 
-### 5.6 Re-spells `docs/17` (`assign`) and `docs/18` (`capture`)
-In these dialects the binding statements are `{% assign x = e %}` and
-`{% capture x %}…{% endcapture %}` — the `{{assign}}`/`{{#capture}}` spellings in `docs/17`/`18`
+### 5.6 Houses `docs/17` (`set`/`local`) and `docs/18` (`capture`)
+
+In these dialects the binding statements are `{% set x = e %}` / `{% local x = e %}…{% endlocal %}`
+and `{% capture x %}…{% endcapture %}` — the spellings in `docs/17`/`18`
 were written before this ADR and are superseded *for RawBars/MaxBars/Trussbars*. Their
 **semantics are unchanged** (forward scope, `safe`-typed capture, the borrow/injection rules);
 only the delimiters move. Those ADRs carry a forward-pointer to here.
@@ -240,4 +243,4 @@ and `{% %}` — strictly more capable. The quad-stache is retired in `statementT
   aligned with the disease.
 - It is a **breaking** change handled by the project discipline: freeze here, a mechanical
   `flatbars migrate` codemod, and a located rejection of the old `{{#…}}` form. It re-spells the
-  `assign`/`capture` tags of `docs/17`/`18` and retires the raw quad-stache (§5.8).
+  `set`/`local`/`capture` tags of `docs/17`/`18` and retires the raw quad-stache (§5.8).
