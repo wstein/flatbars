@@ -77,6 +77,7 @@ before deserializing into `T`). See [docs/01 §10][spec].
 - **MSRV / edition.** Rust **1.96**, **edition 2024** — a deliberate floor, aggressive for
   broad adoption (stated so the consumer requirement is explicit).
 - **Tooling** is ~30%: the `truss!` proc-macro, located class-A diagnostics, host helpers,
+  selectable truthiness policies (`truss!(…, truthiness = …)`, [docs/16](docs/16-truthiness-modes.md)),
   and a VM backend ship; a type-aware LSP and the foreign-dialect migration tool lead the
   post-severance build-out.
 
@@ -99,7 +100,8 @@ The normative language and design docs live in [`docs/`](docs):
 [`01` subset spec][spec] · [`02` runtime API](docs/02-runtime-api.md) ·
 [`03` schema inference][infer] · [`04` conformance](docs/04-conformance.md) ·
 [`11` VM backend](docs/11-vm-backend.md) · [`13` independence][independence] ·
-[`15` migration import](docs/15-migration-import.md). Start with the
+[`15` migration import](docs/15-migration-import.md) ·
+[`16` truthiness modes](docs/16-truthiness-modes.md). Start with the
 [roadmap](docs/00-roadmap.md).
 
 ## License

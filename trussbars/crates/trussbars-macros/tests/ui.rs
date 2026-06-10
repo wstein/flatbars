@@ -9,6 +9,8 @@
 //!   * parse-class — `unclosed_block`;
 //!   * resolution-class — `unknown_helper`, `unknown_partial`,
 //!     `yield_outside_partial`;
+//!   * policy-class — `unknown_truthiness` (an unknown `truss!(…, truthiness = …)`
+//!     mode; §7.1);
 //!   * **injection-class (§4)** — the security boundary, all three constructs:
 //!     `computed_partial` (§4.1), `apply_meta_helper` (§4.2), and
 //!     `computed_lookup` (§4.3). Each is rejected with a located, owned message,
