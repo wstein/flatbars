@@ -7,9 +7,11 @@
 > **Status:** **Accepted — PureScript oracle implemented** (§6 steps 1–2 done): the
 > `let`→`local` rename shipped, and `{% set NAME = EXPR %}` is the block-less forward
 > binding, desugared to a `{% local %}` over its sibling tail (`Kernel.SetSugar.liftSet`)
-> — RawBars (`(bind …)`) and MaxBars (`name = value`, spaced or glued). Conformance-pinned
-> (interpreter ≡ compiled JS). Remaining: §6 step 3 (Trussbars Rust) and the reserved-name
-> check (§2, shared with `local`). Supersedes the earlier `assign`/`let` naming. The two binding
+> — RawBars (`(bind …)`) and MaxBars (`name = value`, spaced or glued). The §2
+> reserved-name check is enforced for both bindings (a NAME may not shadow a scope root
+> or a block head — `Kernel.SetSugar.reservedBindingViolation`). Conformance-pinned
+> (interpreter ≡ compiled JS). Remaining: §6 step 3 (Trussbars Rust). Supersedes the
+> earlier `assign`/`let` naming. The two binding
 > forms are renamed so **the keyword states the scope**: `{% set name = expr %}` binds into the
 > *current* scope and flows forward to its close; `{% local name = expr %}…{% endlocal %}` opens
 > a *bounded* region the binding is local to. The keyword **`let` is retired** (§4). Reference

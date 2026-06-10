@@ -51,9 +51,10 @@ import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, registerAll, registerPartialFiles, registerPartials, withTruthy, withYieldName)
 import Kernel.Hoist (hoistInline)
 import Kernel.Inspect (Snapshot, Target, inspectResolvedStrict)
+import Kernel.Prelude (blockHelperNames)
 import Kernel.Provenance (Segment, runResolvedMapped)
 import Kernel.Render (formatError, runResolved)
-import Kernel.SetSugar (liftSet)
+import Kernel.SetSugar (liftSet, reservedBindingViolation)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (nonEmpty)
 
@@ -111,7 +112,10 @@ parseCore opts src = case parseWith opts src of
     | opts.lexConfig.statementTags =
         case braceControlViolation [ "else", "elif", "when" ] src nodes of
           Just v -> Just v
-          Nothing -> caseLeadingViolation nodes
+          -- a binding name may not shadow a reserved scope root / block head (docs-17 §2).
+          Nothing -> case reservedBindingViolation blockHelperNames nodes of
+            Just v -> Just v
+            Nothing -> caseLeadingViolation nodes
     | otherwise = caseLeadingViolation nodes
 
 -- | Parse core source and return a pure renderer (the engine's fixed `handlebars`

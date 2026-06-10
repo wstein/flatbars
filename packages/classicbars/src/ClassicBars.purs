@@ -61,10 +61,10 @@ import Kernel.Env (RefEnv, constOperation, emptyEnv, liftEither, refEngine, refE
 import Kernel.Hoist (hoistInline)
 import Kernel.Inspect (Snapshot, Target, inspectResolvedLenient)
 import Kernel.Lower (RNode(..), directiveLints, escapingWarnings, lower)
-import Kernel.Prelude (lenientResolve, prelude, preludeSchema)
+import Kernel.Prelude (blockHelperNames, lenientResolve, prelude, preludeSchema)
 import Kernel.Provenance (Segment, runResolvedLenientMapped)
 import Kernel.Render (formatError, preludeEnv, runResolvedLenient)
-import Kernel.SetSugar (liftSet)
+import Kernel.SetSugar (liftSet, reservedBindingViolation)
 import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (Translator, Truthy, escapeHtml, handlebars, minimal, mustache, nonEmpty, presence, stringify)
 import Kernel.Walk (operationRefs)
@@ -127,7 +127,11 @@ checkSurfaceStrict strict nodes = case violation of
 checkBraceControl :: String -> Template -> Either ParseError Unit
 checkBraceControl src nodes = case braceControlViolation surfaceClauses src nodes of
   Just v -> Left (DisallowedShape v.shape v.off)
-  Nothing -> pure unit
+  -- the statementTags strict pass also rejects a binding that shadows a reserved
+  -- name (docs-17 §2) — `{% set this = … %}` / `{% local loop = … %}` and the like.
+  Nothing -> case reservedBindingViolation blockHelperNames nodes of
+    Just v -> Left (DisallowedShape v.shape v.off)
+    Nothing -> pure unit
 
 -- | Parse + desugar Surface source into a compiled renderer. `{{#inline}}`
 -- | definitions are hoisted into the partial registry before rendering.

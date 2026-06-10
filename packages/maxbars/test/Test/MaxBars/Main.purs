@@ -668,6 +668,18 @@ main = do
     "{% each xs %}{% set u = (uppercase this) %}{{u}} {% endeach %}"
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "A B "
+  -- a binding NAME may not shadow a reserved scope root or a block head (docs-17 §2)
+  -- — a located error in both forms, for `set` and `local`.
+  assert' "reject: set binds a scope root (this)"
+    (isLeft (renderMax "{% set this = 1 %}{{this}}" (obj [])))
+  assert' "reject: local binds a scope root (loop)"
+    (isLeft (renderMax "{% local loop = 1 %}{{loop}}{% endlocal %}" (obj [])))
+  assert' "reject: set binds a block head (each)"
+    (isLeft (renderMax "{% set each = 1 %}{{each}}" (obj [])))
+  expectM "binding a non-reserved name is fine"
+    "{% set total = (add 1 2) %}{{total}}"
+    (obj [])
+    "3"
 
   -- ── Trussbars AOT-compat lint (MaxBars.Compat) ────────────────────────────
   log "Trussbars AOT-compat lint"
