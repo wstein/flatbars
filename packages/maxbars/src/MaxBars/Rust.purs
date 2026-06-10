@@ -52,7 +52,7 @@ module MaxBars.Rust
 
 import Prelude
 
-import ClassicBars (desugarSurfaceWith, hoistInline, renameSurfaceHeads)
+import ClassicBars (desugarSurfaceWith, hoistInline, renameSurfaceHeads, resolveInheritance)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -140,11 +140,14 @@ compileWith commented externalSrcs file ctxType src = case build of
   build :: Either String String
   build = do
     parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
+    -- ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` before desugar, exactly
+    -- as the interpreter does, so the emitted Rust matches the oracle.
+    inherited <- lmap show (resolveInheritance parsed.nodes)
     externals <- traverse compilePartial externalSrcs
     let
       -- `renameSurfaceHeads`: `{% scope %}`→`with` (item 9) and `{% for %}`→`each`
       -- (item 4) — the MaxBars sugar heads → their op-name heads, matching `desugarStmt`.
-      h = hoistInline (desugarSurfaceWith maxLoopVars (renameSurfaceHeads parsed.nodes))
+      h = hoistInline (desugarSurfaceWith maxLoopVars (renameSurfaceHeads inherited))
       externalMap = Map.fromFoldable externals
       -- The template's own `{{#inline}}` definitions plus the external partials; an
       -- inline of the same name wins (it indexes `main`).

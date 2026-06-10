@@ -13,6 +13,7 @@ module ClassicBars
   , module Kernel.Lower
   , module Kernel.Render
   , module Kernel.Hoist
+  , module Kernel.Inherit
   , module ClassicBars.Surface
   , surfaceClauses
   , checkSurfaceStrict

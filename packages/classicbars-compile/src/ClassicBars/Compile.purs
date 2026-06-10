@@ -13,10 +13,10 @@ module ClassicBars.Compile
 
 import Prelude
 
-import ClassicBars (LoopVars, checkBraceControl, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars, renameSurfaceHeads)
+import ClassicBars (LoopVars, checkBraceControl, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars, renameSurfaceHeads, resolveInheritance)
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -67,10 +67,16 @@ compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
   -- statementTags dialects (RawBars/MaxBars) reject legacy {{ }} control flow —
   -- the compiled path mirrors the interpreter's checkBraceControl (docs-19).
   when opts.lexConfig.statementTags (checkBraceControl src nodes)
+  -- ADR-040: flatten `{% extends %}`/`{% block %}`/`{% super %}` before desugar, exactly
+  -- as the interpreter (`renderSurfaceDiagWith`) does — so the compiled output matches.
+  inherited <-
+    if opts.lexConfig.statementTags then resolveInheritance nodes
+    else Right nodes
   let
     -- `{% set %}` → `{% local %}` over the sibling tail (docs-17), and `{% scope %}`
     -- → the `with` op head (ADR-039 item 9) — both statementTags only.
-    lifted = if opts.lexConfig.statementTags then renameSurfaceHeads (liftSet nodes) else nodes
+    lifted =
+      if opts.lexConfig.statementTags then renameSurfaceHeads (liftSet inherited) else inherited
     h = hoistInline (desugarSurfaceWith lv lifted)
     externalT = Map.fromFoldable externals
     -- inline definitions win over same-named externals (left-biased), as render does.
