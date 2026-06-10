@@ -1004,7 +1004,7 @@ mod tests {
 
     #[test]
     fn raw_block() {
-        let ns = parse("{{{{#raw}}}}Literal {{x}}{{{{/raw}}}}").unwrap();
+        let ns = parse("{% raw %}Literal {{x}}{% endraw %}").unwrap();
         assert_eq!(
             ns[0],
             Node::RawBlock {

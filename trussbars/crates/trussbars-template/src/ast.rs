@@ -172,7 +172,7 @@ pub enum Node {
         /// The tag span.
         span: Span,
     },
-    /// `{{{{#raw}}}}body{{{{/raw}}}}` — verbatim body.
+    /// `{% raw %}body{% endraw %}` — verbatim body.
     RawBlock {
         /// The tag span.
         span: Span,

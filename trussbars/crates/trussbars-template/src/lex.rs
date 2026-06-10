@@ -6,8 +6,8 @@
 //!
 //! Brace-aware: the closing `}}` is found at brace/bracket **depth 0**, skipping
 //! quoted strings, so a dict/list literal needs no space before the close
-//! (`{% for {a: 1} %}` lexes with interior `for {a: 1}`). The four-brace raw block
-//! `{{{{#raw}}}}…{{{{/raw}}}}` captures its body verbatim.
+//! (`{% for {a: 1} %}` lexes with interior `for {a: 1}`). The raw region
+//! `{% raw %}…{% endraw %}` captures its body verbatim.
 
 use crate::span::Span;
 use alloc::string::String;
@@ -28,13 +28,13 @@ pub enum Lexeme {
         /// The whole tag, opening and closing braces included.
         span: Span,
     },
-    /// A raw block `{{{{#head}}}}body{{{{/head}}}}` — `body` is captured verbatim.
+    /// A raw region `{% raw %}body{% endraw %}` — `body` is captured verbatim.
     RawBlock {
-        /// The head name after `{{{{#` (and repeated in the close).
+        /// The head name (always `raw`).
         head: Span,
         /// The verbatim body between the open and close tags.
         body: Span,
-        /// The whole construct, both four-brace tags included.
+        /// The whole construct, both `{% raw %}` / `{% endraw %}` tags included.
         span: Span,
     },
 }
@@ -319,10 +319,9 @@ fn strip_trim_markers(b: &[u8], inner: usize, close: usize) -> (usize, usize, bo
 
 /// Lex one tag beginning at `i` (where `b[i..i+2] == "{{"`).
 fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
-    // Four-brace raw block: `{{{{`.
-    if at(b, i, b"{{{{") {
-        return lex_raw_block(b, n, i);
-    }
+    // PURE grammar (ADR-039): the four-brace raw block `{{{{#raw}}}}…{{{{/raw}}}}` is NOT
+    // recognized — a verbatim region is `{% raw %}…{% endraw %}` (lexed in
+    // `lex_statement_tag`). A stray `{{{{` falls through to the two-brace handling below.
     // PURE grammar (ADR-039): the three-brace raw-output sigil `{{{ … }}}` is NOT
     // recognized — raw (un-escaped) output is the `safe` filter, `{{ x | safe }}`. A
     // stray `{{{` falls through to the two-brace handling below and fails as a plain
@@ -416,8 +415,9 @@ fn lex_statement_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
         });
     }
     // `{% raw %}…{% endraw %}` — a verbatim region (ADR-039 item 2): capture the body
-    // untouched (like the quad-stache `{{{{#raw}}}}`) into a `RawBlock`. Only the bare
-    // head `raw` (no args) opens a region; `{% raw … %}` with args is not one.
+    // untouched into a `RawBlock` (the only raw-region form — there is no `{{{{ }}}}`
+    // quad-stache). Only the bare head `raw` (no args) opens a region; `{% raw … %}`
+    // with args is not one.
     if &b[ts..te] == b"raw" {
         let body_start = end;
         let (body_end, close_end) = find_endraw(b, n, body_start)
@@ -535,37 +535,6 @@ fn find_stmt_close(b: &[u8], n: usize, start: usize) -> Result<usize, LexError> 
         }
     }
     Err(LexError::new("unterminated statement tag `{% … %}`", start))
-}
-
-/// Lex a `{{{{#head}}}}body{{{{/head}}}}` raw block beginning at `i`.
-fn lex_raw_block(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
-    // Open: `{{{{#head}}}}` (allow an optional `#`).
-    let mut h = i + 4;
-    if b.get(h) == Some(&b'#') {
-        h += 1;
-    }
-    let open_close = find_seq(b, n, h, b"}}}}")
-        .ok_or_else(|| LexError::new("unterminated raw-block open `{{{{#…}}}}`", i))?;
-    let head = Span::new(h, open_close);
-    let body_start = open_close + 4;
-    // Body runs verbatim until the matching `{{{{/`.
-    let body_close = find_seq(b, n, body_start, b"{{{{/")
-        .ok_or_else(|| LexError::new("unterminated raw block (no `{{{{/…}}}}`)", i))?;
-    let body = Span::new(body_start, body_close);
-    // Close: `{{{{/head}}}}`.
-    let close_end = find_seq(b, n, body_close, b"}}}}")
-        .ok_or_else(|| LexError::new("malformed raw-block close `{{{{/…}}}}`", body_close))?
-        + 4;
-    Ok(Lexed {
-        lexeme: Lexeme::RawBlock {
-            head,
-            body,
-            span: Span::new(i, close_end),
-        },
-        next: close_end,
-        lead_trim: false,
-        trail_trim: false,
-    })
 }
 
 /// Find the closing run of `n_braces` `}` at brace/bracket depth 0, starting at
@@ -725,20 +694,6 @@ mod tests {
     }
 
     #[test]
-    fn raw_block_body_verbatim() {
-        let s = "{{{{#raw}}}}Literal {{x}} & <b>{{{{/raw}}}}";
-        let ls = lex(s).unwrap();
-        match &ls[0] {
-            Lexeme::RawBlock { head, body, .. } => {
-                assert_eq!(head.of(s), "raw");
-                assert_eq!(body.of(s), "Literal {{x}} & <b>");
-            }
-            other => panic!("expected RawBlock, got {other:?}"),
-        }
-        assert_round_trip(s);
-    }
-
-    #[test]
     fn liquid_loop_and_let_round_trip() {
         assert_round_trip("{% for post i in posts label outer %}{{post.title}}{% endfor %}");
         assert_round_trip("{% let a=(multiply x y) b=(add a 1) %}{{a}}/{{b}}{% endlet %}");
@@ -747,7 +702,7 @@ mod tests {
     #[test]
     fn unterminated_tag_errors() {
         assert!(lex("ok {{oops").is_err());
-        assert!(lex("{{{{#raw}}}}no close").is_err());
+        assert!(lex("{% raw %}no close").is_err());
     }
 
     // ── Django-style statement tags `{% … %}` (docs-19) ──────────────────────────
