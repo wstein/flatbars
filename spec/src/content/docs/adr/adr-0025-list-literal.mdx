@@ -26,6 +26,14 @@ into the *shared* prelude — a different blast radius (catalog regen, conforman
 every dialect) than `let` and the dict literal, both of which reuse what is already there. Conflating the
 two understated this cost; separating them keeps each decision honest and lets ADR-024 ship first.
 
+:::note[Amendment (docs-17 / docs-19)]
+Read the examples below in the current surface: `let` is retired, so `{{#let …}}` / `{{/let}}`
+are now `{% local … %}` / `{% endlocal %}` (docs-17, a freeze amendment), and MaxBars/RawBars
+control flow uses Django-style `{% … %}` tags with `{{ … }}` output-only (docs-19): read
+`{{#each}}` / `{{else}}` below as `{% each %}` / `{% else %}`. The decision recorded here is
+unchanged.
+:::
+
 ## Context
 
 Shared with the *Context* of [ADR-024](/adr/adr-0024-let-and-dict-literal/) — the

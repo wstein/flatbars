@@ -18,6 +18,19 @@ LSP). Revised 2026-06-04 after team review (the list literal was split out to
 [ADR-021](/adr/adr-0021-maxbars-variable-model/) (the MaxBars/RawBars variable model) as the
 expression-sugar half of the same dialect carve-out.
 
+:::note[Amendment (docs-17 / docs-19, 2026-06) — read the examples below in the current surface]
+Two later cutovers renamed the spelling this ADR uses; the decision and design are unchanged.
+
+1. **`let` is retired (docs-17).** The bounded binding is now
+   `{% local NAME = EXPR %}…{% endlocal %}` — read every `{{#let …}}` below as `{% local … %}` and
+   every `{{/let}}` as `{% endlocal %}` (semantics and lowering unchanged — a freeze amendment;
+   the keyword now names its scope). Its block-less, forward-scoped sibling is the new
+   `{% set NAME = EXPR %}` (binds to the end of the enclosing block).
+2. **Control flow uses Django-style `{% … %}` tags (docs-19).** In MaxBars/RawBars
+   `{{ … }}` is output-only, so read `{{#if}}` / `{{#each}}` / `{{#with}}` / `{{else}}` below as
+   `{% if %}` / `{% each %}` / `{% with %}` / `{% else %}`.
+:::
+
 This ADR covers the two constructs that need *no shared-prelude change*: block-scoped `{{#let}}` and the
 dict literal (which reuses the existing `dict` helper). The *list literal* needs a new `list` constructor
 in the shared prelude, a different blast radius, so it is its own decision —

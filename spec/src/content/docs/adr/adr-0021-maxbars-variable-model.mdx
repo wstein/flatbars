@@ -66,6 +66,14 @@ is resolved **adopted**, as a full peer of the existing loop fields — bare `{{
   shadowed inside a loop body; the escape is the explicit `{{lookup this "depth"}}` — the
   documented `Con` of this model, unchanged.
 
+:::note[Amendment (docs-17 / docs-19)]
+Read the examples below in the current surface: `let` is retired, so `{{#let …}}` / `{{/let}}`
+are now `{% local … %}` / `{% endlocal %}` (docs-17, a freeze amendment; the forward-scoped
+`{% set NAME = EXPR %}` is its sibling), and MaxBars/RawBars control flow uses Django-style
+`{% … %}` tags with `{{ … }}` output-only (docs-19): `{{#each}}` / `{{else}}` read as
+`{% each %}` / `{% else %}`. The variable model recorded here is unchanged.
+:::
+
 ## Context
 
 Three things converged to make the loop/context vocabulary worth redesigning:
