@@ -120,6 +120,37 @@ fn escapes_html_in_output() {
     assert_eq!(greeting(&g), "Hello &lt;b&gt;");
 }
 
+// `truthiness = Mode` selects a non-default policy (spec §7). Under Liquid an empty
+// list is **truthy** (only `false`/`nil` are falsy), so `{{#if tags}}` fires where the
+// default `nonEmpty` rule treats `[]` as falsy. The same source without the clause
+// takes the default — a per-template, type-directed, loud choice.
+#[derive(trussbars_core::Trussbars)]
+struct Card {
+    tags: Vec<String>,
+}
+truss!(
+    card_liquid,
+    Card,
+    "{{#if tags}}has{{else}}none{{/if}}",
+    truthiness = Liquid
+);
+truss!(card_default, Card, "{{#if tags}}has{{else}}none{{/if}}");
+
+#[test]
+fn truthiness_mode_governs_the_condition() {
+    let empty = Card { tags: vec![] };
+    // Liquid: [] is truthy → the positive arm.
+    assert_eq!(card_liquid(&empty), "has");
+    // NonEmpty (default): [] is falsy → the else arm. The divergence is opt-in.
+    assert_eq!(card_default(&empty), "none");
+    // A non-empty list is truthy under both.
+    let full = Card {
+        tags: vec!["x".into()],
+    };
+    assert_eq!(card_liquid(&full), "has");
+    assert_eq!(card_default(&full), "has");
+}
+
 // F3 block helpers (docs/09): `{{#name args}}body{{/name}}` compiles to
 // `name(args…, || -> String { <body> })`. The body closure renders the inner template in
 // the enclosing scope; the helper drives it — once (wrap), or N times (repeat).

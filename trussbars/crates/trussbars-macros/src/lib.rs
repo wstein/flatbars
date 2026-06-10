@@ -31,6 +31,7 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// ```ignore
 /// truss!(greeting, Greeting, "Hello {{name}}!");           // inline source
 /// truss!(index, IndexCtx, path = "templates/index.truss"); // load from a file
+/// truss!(card, Card, "{{#if tags}}…{{/if}}", truthiness = Liquid); // Liquid policy
 /// // each expands to: pub fn name(ctx: &CtxType) -> String { … }
 /// ```
 ///
@@ -40,8 +41,13 @@ use proc_macro::{Delimiter, Group, Ident, Punct, Spacing, Span, TokenStream, Tok
 /// **`path = "…"`** form, which reads the file at macro-expansion time relative to
 /// the crate root (`CARGO_MANIFEST_DIR`, the Askama convention). The `path` form
 /// also emits an `include_bytes!` of that file, so a template edit re-triggers the
-/// build (cargo tracks it as a source dependency). A Trussbars-owned (class-A)
-/// error expands to a `compile_error!` located at `line:col`.
+/// build (cargo tracks it as a source dependency).
+///
+/// Trailing clauses, in any order, tune compilation: `helpers = [a, b]` is the
+/// host-helper allow-list (F3, below), and `truthiness = Mode` selects the
+/// truthiness policy — `NonEmpty` (default, conformance-checked), `Liquid`, or
+/// `Handlebars` (spec §7, `docs/15-truthiness-modes.md`). A Trussbars-owned
+/// (class-A) error expands to a `compile_error!` located at `line:col`.
 #[proc_macro]
 pub fn truss(input: TokenStream) -> TokenStream {
     match expand(input) {
@@ -145,10 +151,10 @@ fn expand(input: TokenStream) -> Result<TokenStream, String> {
         }
         groups.last_mut().expect("at least one group").push(tt);
     }
-    if groups.len() != 3 && groups.len() != 4 {
+    if groups.len() < 3 {
         return Err(format!(
-            "truss! expects `name, CtxType, \"template\"` (optionally `, helpers = [..]`) \
-             ({} comma-separated parts given)",
+            "truss! expects `name, CtxType, \"template\"` (optionally `, helpers = [..]` \
+             and/or `, truthiness = Mode`) ({} comma-separated parts given)",
             groups.len()
         ));
     }
@@ -174,13 +180,25 @@ fn expand(input: TokenStream) -> Result<TokenStream, String> {
     // The third argument is either an inline string literal or `path = "file"`.
     let (template, dep) = template_arg(&groups[2])?;
 
-    // The optional fourth argument is the host-helper allow-list `helpers = [a, b]`.
-    let helpers = match groups.get(3) {
-        Some(g) => parse_helpers(g)?,
-        None => Vec::new(),
-    };
+    // The optional trailing clauses — `helpers = [a, b]` (F3) and `truthiness = Mode`
+    // (spec §7) — in any order.
+    let mut helpers = Vec::new();
+    let mut mode = trussbars_template::TruthMode::NonEmpty;
+    for group in &groups[3..] {
+        match clause_key(group).as_deref() {
+            Some("helpers") => helpers = parse_helpers(group)?,
+            Some("truthiness") => mode = parse_truthiness(group)?,
+            _ => {
+                return Err(
+                    "truss!: trailing arguments must be `helpers = [name, …]` or \
+                     `truthiness = Mode`"
+                        .into(),
+                );
+            }
+        }
+    }
 
-    let rust = trussbars_template::emit_named(&name, &ctx_type, &template, &helpers)?;
+    let rust = trussbars_template::emit_named(&name, &ctx_type, &template, &helpers, mode)?;
     // The `path` form appends an anonymous `include_bytes!` so cargo tracks the
     // `.truss` file as a source dependency (an edit re-triggers the build). It uses
     // an absolute path via `CARGO_MANIFEST_DIR` so it resolves regardless of which
@@ -226,6 +244,37 @@ fn template_arg(group: &[TokenTree]) -> Result<(String, Option<String>), String>
         _ => Err(
             "truss!: the third argument must be a string literal or `path = \"file.truss\"`".into(),
         ),
+    }
+}
+
+/// The leading `key` of a `key = …` trailing clause (e.g. `helpers`, `truthiness`),
+/// or `None` if the group does not start with `ident =`.
+fn clause_key(group: &[TokenTree]) -> Option<String> {
+    match group {
+        [TokenTree::Ident(id), TokenTree::Punct(eq), ..] if eq.as_char() == '=' => {
+            Some(id.to_string())
+        }
+        _ => None,
+    }
+}
+
+/// Parse the optional `truthiness = Mode` clause (spec §7) into the policy marker.
+/// `Mode` is a single ident — `NonEmpty` (default), `Liquid`, or `Handlebars`.
+fn parse_truthiness(group: &[TokenTree]) -> Result<trussbars_template::TruthMode, String> {
+    match group {
+        [
+            TokenTree::Ident(kw),
+            TokenTree::Punct(eq),
+            TokenTree::Ident(mode),
+        ] if kw.to_string() == "truthiness" && eq.as_char() == '=' => {
+            let name = mode.to_string();
+            trussbars_template::TruthMode::from_ident(&name).ok_or_else(|| {
+                format!(
+                    "truss!: unknown truthiness mode `{name}` (expected NonEmpty, Liquid, or Handlebars)"
+                )
+            })
+        }
+        _ => Err("truss!: `truthiness = Mode` needs a single mode identifier".into()),
     }
 }
 

@@ -10,13 +10,60 @@ use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, Value, With};
 use crate::parse::parse;
 use crate::span::Span;
 
-/// Compile MaxBars surface `src` into a Rust `render` function over `ctx_type`.
+/// The truthiness policy a template compiles under (runtime API §3, spec §7). The
+/// default [`TruthMode::NonEmpty`] is the one fixed Trussbars rule and the only one
+/// the conformance corpus is checked against; the others are opt-in via
+/// `truss!(…, truthiness = Liquid)` and emit through `trussbars_core::truthy_in`
+/// (`docs/15-truthiness-modes.md`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum TruthMode {
+    /// `nonEmpty` minus numbers — the default; a bare-number condition is a compile error.
+    #[default]
+    NonEmpty,
+    /// Liquid: only `false`/`nil` are falsy.
+    Liquid,
+    /// Handlebars: `false`/`null`/`0`/`NaN`/`""`/`[]` falsy, `{}` truthy.
+    Handlebars,
+}
+
+impl TruthMode {
+    /// Parse the `truss!(…, truthiness = <ident>)` marker name. `None` for an
+    /// unrecognized name (the macro reports it as a located error).
+    #[must_use]
+    pub fn from_ident(name: &str) -> Option<Self> {
+        match name {
+            "NonEmpty" => Some(Self::NonEmpty),
+            "Liquid" => Some(Self::Liquid),
+            "Handlebars" => Some(Self::Handlebars),
+            _ => None,
+        }
+    }
+
+    /// The truthiness call for this policy over an already-referenced expression
+    /// (`&(expr)` or a borrowed binding). `NonEmpty` emits the bare `truthy(…)` —
+    /// byte-identical to the v1 emitter, so the conformance corpus is unaffected; a
+    /// non-default policy routes through the monomorphized `truthy_in::<Mode, _>(…)`.
+    fn call(self, ref_expr: &str) -> String {
+        match self {
+            Self::NonEmpty => format!("trussbars_core::truthy({ref_expr})"),
+            Self::Liquid => {
+                format!("trussbars_core::truthy_in::<trussbars_core::Liquid, _>({ref_expr})")
+            }
+            Self::Handlebars => {
+                format!("trussbars_core::truthy_in::<trussbars_core::Handlebars, _>({ref_expr})")
+            }
+        }
+    }
+}
+
+/// Compile MaxBars surface `src` into a Rust `render` function over `ctx_type`, under
+/// the default [`TruthMode::NonEmpty`] truthiness policy.
 ///
 /// # Errors
 /// Returns the `line:col: message` reason for a parse error or an unsupported
 /// construct (the located string the `truss!` macro drops into `compile_error!`).
 pub fn emit(ctx_type: &str, src: &str) -> Result<String, String> {
-    emit_named("render", ctx_type, src, &[])
+    emit_named("render", ctx_type, src, &[], TruthMode::NonEmpty)
 }
 
 /// As [`emit`], but the generated function is named `fn_name` (the `truss!` macro
@@ -34,6 +81,7 @@ pub fn emit_named(
     ctx_type: &str,
     src: &str,
     helpers: &[String],
+    mode: TruthMode,
 ) -> Result<String, String> {
     // A host cannot declare a built-in block head (`if`/`each`/`case`/…) as a helper —
     // it is shadowed by the parser, so accepting it would silently never fire (docs/12 §5.2).
@@ -58,6 +106,7 @@ pub fn emit_named(
         yield_code: None,
         depth: 0,
         helpers: Rc::new(helpers.iter().cloned().collect()),
+        mode,
     };
     // The node emit writes into one buffer (no per-node String allocs); the body then
     // sits between the render-fn header and footer.
@@ -104,6 +153,15 @@ struct Env {
     /// The host-helper allow-list (F3): names the template may call as host Rust
     /// functions. Shared (cheap clone) across the recursive emit.
     helpers: Rc<BTreeSet<String>>,
+    /// The truthiness policy this template compiles under (spec §7).
+    mode: TruthMode,
+}
+
+impl Env {
+    /// The active policy's truthiness call over an already-referenced expression.
+    fn truthy_ref(&self, ref_expr: &str) -> String {
+        self.mode.call(ref_expr)
+    }
 }
 
 // ── inline-partial hoisting ───────────────────────────────────────────────────
@@ -375,12 +433,15 @@ fn cond_block(env: &Env, src: &str, c: &Cond, out: &mut String) -> Result<(), St
     let prefix = if c.negated { "if !" } else { "if " };
     let cond = truthy_of(env, &c.cond)?;
     out.push_str(prefix);
-    out.push_str(&format!("trussbars_core::truthy(&({cond})) {{\n"));
+    out.push_str(&format!("{} {{\n", env.truthy_ref(&format!("&({cond})"))));
     emit_nodes(env, src, &c.body, out)?;
     out.push('}');
     for (econd, ebody) in &c.elifs {
         let ec = truthy_of(env, econd)?;
-        out.push_str(&format!(" else if trussbars_core::truthy(&({ec})) {{\n"));
+        out.push_str(&format!(
+            " else if {} {{\n",
+            env.truthy_ref(&format!("&({ec})"))
+        ));
         emit_nodes(env, src, ebody, out)?;
         out.push('}');
     }
@@ -447,9 +508,8 @@ fn with_block(env: &Env, src: &str, w: &With, out: &mut String) -> Result<(), St
         return Ok(());
     }
     let subj = emit_expr(env, &w.subject)?;
-    out.push_str(&format!(
-        "{{\nlet {cvar} = &({subj});\nif trussbars_core::truthy({cvar}) {{\n"
-    ));
+    let test = env.truthy_ref(&cvar);
+    out.push_str(&format!("{{\nlet {cvar} = &({subj});\nif {test} {{\n"));
     emit_nodes(&child, src, &w.body, out)?;
     out.push_str("} else {\n");
     emit_nodes(env, src, &w.otherwise, out)?;
@@ -685,8 +745,8 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
             emit_expr(env, items)?
         )),
         ("ternary", [c, a, b]) => Ok(format!(
-            "(if trussbars_core::truthy(&({})) {{ {} }} else {{ {} }})",
-            emit_expr(env, c)?,
+            "(if {} {{ {} }} else {{ {} }})",
+            env.truthy_ref(&format!("&({})", emit_expr(env, c)?)),
             emit_expr(env, a)?,
             emit_expr(env, b)?
         )),
@@ -696,8 +756,9 @@ fn emit_app(env: &Env, name: &str, args: &[Expr]) -> Result<String, String> {
             emit_expr(env, b)?
         )),
         ("firstTruthy", [a, b]) => Ok(format!(
-            "{{ let __t = ({}).clone(); if trussbars_core::truthy(&__t) {{ __t }} else {{ ({}).clone() }} }}",
+            "{{ let __t = ({}).clone(); if {} {{ __t }} else {{ ({}).clone() }} }}",
             emit_expr(env, a)?,
+            env.truthy_ref("&__t"),
             emit_expr(env, b)?
         )),
         ("list", _) => {
@@ -813,7 +874,7 @@ fn join_truthy(env: &Env, args: &[Expr], sep: &str) -> Result<String, String> {
 }
 
 fn truthy_of(env: &Env, a: &Expr) -> Result<String, String> {
-    Ok(format!("trussbars_core::truthy(&({}))", emit_expr(env, a)?))
+    Ok(env.truthy_ref(&format!("&({})", emit_expr(env, a)?)))
 }
 
 fn bin_op(env: &Env, op: &str, a: &Expr, b: &Expr) -> Result<String, String> {
@@ -858,7 +919,7 @@ fn coll_find(env: &Env, args: &[Expr]) -> Result<String, String> {
 
 fn pred_body(env: &Env, args: &[Expr]) -> Result<String, String> {
     match args {
-        [Expr::Lit(Value::Str(key))] => Ok(format!("trussbars_core::truthy(&__x.{key})")),
+        [Expr::Lit(Value::Str(key))] => Ok(env.truthy_ref(&format!("&__x.{key}"))),
         [Expr::Lit(Value::Str(key)), Expr::Lit(Value::Str(cmp)), val] => {
             cmp_body(key, cmp, &emit_expr(env, val)?)
         }
@@ -1103,7 +1164,7 @@ fn rust_str(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{emit, emit_named};
+    use super::{TruthMode, emit, emit_named};
 
     fn e(src: &str) -> String {
         emit("Ctx", src).unwrap_or_else(|err| panic!("{src:?}: {err}"))
@@ -1118,6 +1179,7 @@ mod tests {
             "Ctx",
             "{{#frame}}{{name}}{{/frame}}",
             &["frame".into()],
+            TruthMode::NonEmpty,
         )
         .unwrap();
         assert!(code.contains("frame("), "{code}");
@@ -1131,8 +1193,56 @@ mod tests {
     #[test]
     fn block_helper_undeclared_is_a_located_error() {
         // The allow-list boundary: an undeclared block head is rejected (no host call).
-        let err = emit_named("render", "Ctx", "{{#frame}}x{{/frame}}", &[]).unwrap_err();
+        let err = emit_named(
+            "render",
+            "Ctx",
+            "{{#frame}}x{{/frame}}",
+            &[],
+            TruthMode::NonEmpty,
+        )
+        .unwrap_err();
         assert!(err.contains("unknown helper 'frame'"), "{err}");
+    }
+
+    #[test]
+    fn default_mode_emits_bare_truthy_byte_identical() {
+        // The conformance invariant: under NonEmpty (the default) every truthiness
+        // site stays the v1 `trussbars_core::truthy(…)` call — no `truthy_in`.
+        let out = e("{{#if flag}}x{{/if}}");
+        assert!(out.contains("trussbars_core::truthy(&("), "{out}");
+        assert!(!out.contains("truthy_in::<"), "{out}");
+    }
+
+    #[test]
+    fn non_default_mode_routes_through_truthy_in() {
+        // Liquid/Handlebars route every truthiness site through the monomorphized
+        // `truthy_in::<Mode, _>` so the selected policy governs the condition.
+        let liquid = emit_named(
+            "render",
+            "Ctx",
+            "{{#if flag}}x{{/if}}",
+            &[],
+            TruthMode::Liquid,
+        )
+        .unwrap();
+        assert!(
+            liquid.contains("trussbars_core::truthy_in::<trussbars_core::Liquid, _>(&("),
+            "{liquid}"
+        );
+        assert!(!liquid.contains("trussbars_core::truthy(&("), "{liquid}");
+
+        let hbs = emit_named(
+            "render",
+            "Ctx",
+            "{{#unless done}}x{{/unless}}",
+            &[],
+            TruthMode::Handlebars,
+        )
+        .unwrap();
+        assert!(
+            hbs.contains("trussbars_core::truthy_in::<trussbars_core::Handlebars, _>(&("),
+            "{hbs}"
+        );
     }
 
     #[test]

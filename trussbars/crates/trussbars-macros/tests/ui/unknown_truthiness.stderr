@@ -1,0 +1,7 @@
+error: truss!: unknown truthiness mode `Mustache` (expected NonEmpty, Liquid, or Handlebars)
+ --> tests/ui/unknown_truthiness.rs:5:1
+  |
+5 | truss!(render, str, "{{#if name}}x{{/if}}", truthiness = Mustache);
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `truss` (in Nightly builds, run with -Z macro-backtrace for more info)
