@@ -133,6 +133,7 @@ knownScoped =
   , "rindex0"
   , "rindex1"
   , "length"
+  , "depth"
   , "key"
   , "first"
   , "last"

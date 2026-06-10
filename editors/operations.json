@@ -106,6 +106,14 @@
       "doc": "Formats a date value for the host's locale (Intl.DateTimeFormat); returns the value's plain text when no host formatter is registered (ADR-029)."
     },
     {
+      "name": "depth",
+      "kind": "value",
+      "arity": "0",
+      "source": "scoped",
+      "canonical": null,
+      "doc": "The 1-based loop-nesting level (outermost loop = 1; a directly nested loop = 2)."
+    },
+    {
       "name": "dict",
       "kind": "inline",
       "arity": "any",
@@ -391,7 +399,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": "The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length, plus the chain links loop.parent (the enclosing loop) and loop.root."
+      "doc": "The current loop's metadata object: index0/index1/rindex0/rindex1/first/last/key/length/depth, plus the chain links loop.parent (the enclosing loop) and loop.root."
     },
     {
       "name": "lowercase",

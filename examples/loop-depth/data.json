@@ -1,0 +1,6 @@
+{
+  "sections": [
+    { "title": "Alpha", "items": [ { "notes": ["a1", "a2"] }, { "notes": ["b1"] } ] },
+    { "title": "Beta", "items": [ { "notes": ["c1"] } ] }
+  ]
+}

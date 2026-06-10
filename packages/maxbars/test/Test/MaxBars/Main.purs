@@ -285,6 +285,29 @@ main = do
     (obj [ Tuple "o" (obj [ Tuple "x" (num 1.0), Tuple "y" (num 2.0) ]) ])
     "xy"
   expectM "loopvars-key-array-null" "{% each xs %}[{{loop.key}}]{% endeach %}" xs3 "[][][]"
+  -- `loop.depth` (ADR-021 amendment): the 1-based loop-nesting level. An outermost
+  -- loop is depth 1.
+  expectM "loopvars-depth-outer" "{% each xs %}{{loop.depth}}{% endeach %}" xs3 "111"
+  -- a loop nested directly inside another is depth 2; the outer stays depth 1.
+  let
+    grid = obj
+      [ Tuple "rows"
+          (VArray [ VArray [ VString "a", VString "b" ], VArray [ VString "c" ] ])
+      ]
+  expectM "loopvars-depth-nested"
+    "{% each rows %}{{loop.depth}}{% each this %}{{loop.depth}}{% endeach %}{% endeach %}"
+    grid
+    "12212"
+  -- the enclosing loop's depth is reached through the chain — `loop.parent.depth`
+  -- of an inner loop is its outer loop's depth (1).
+  expectM "loopvars-parent-depth"
+    "{% each rows %}{% each this %}{{loop.parent.depth}}{% endeach %}{% endeach %}"
+    grid
+    "111"
+  -- at the outermost loop, `loop.parent` is absent, so `loop.parent.depth` renders
+  -- empty (like every other `loop.parent.*` field).
+  expectM "loopvars-parent-depth-root" "{% each xs %}[{{loop.parent.depth}}]{% endeach %}" xs3
+    "[][][]"
   -- a data field named `first` is read with an explicit path; `loop.first` is the
   -- loop variable (the names never collide — one is `loop.`-namespaced).
   expectM "loopvar-data-field" "{% each xs %}{{this.first}}{% endeach %}"
