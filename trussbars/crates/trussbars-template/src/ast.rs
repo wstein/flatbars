@@ -8,6 +8,37 @@ use crate::span::Span;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+/// The truthiness policy a template compiles/renders under (runtime API §3, spec §7,
+/// `docs/16-truthiness-modes.md`). The default [`TruthMode::NonEmpty`] is the one fixed
+/// Trussbars rule and the only one the conformance corpus is checked against; the others
+/// are opt-in (AOT: `truss!(…, truthiness = Liquid)`; VM: `Template::with_truthiness`) and
+/// out of conformance. It lives here (not in the std-only `emit` module) so the
+/// `no_std` VM can name it too; the emitter adds the codegen half.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum TruthMode {
+    /// `nonEmpty` minus numbers — the default; a bare-number condition is a compile error.
+    #[default]
+    NonEmpty,
+    /// Liquid: only `false`/`nil` are falsy.
+    Liquid,
+    /// Handlebars: `false`/`null`/`0`/`NaN`/`""`/`[]` falsy, `{}` truthy.
+    Handlebars,
+}
+
+impl TruthMode {
+    /// Parse the `truss!(…, truthiness = <ident>)` / `--truthiness=<ident>` marker name.
+    /// `None` for an unrecognized name (the caller reports it as a located error).
+    #[must_use]
+    pub fn from_ident(name: &str) -> Option<Self> {
+        match name {
+            "NonEmpty" => Some(Self::NonEmpty),
+            "Liquid" => Some(Self::Liquid),
+            "Handlebars" => Some(Self::Handlebars),
+            _ => None,
+        }
+    }
+}
+
 /// A literal value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

@@ -6,43 +6,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, Value, With};
+use crate::ast::{Case, Cond, Each, Expr, HelperBlock, Node, TruthMode, Value, With};
 use crate::parse::parse;
 use crate::span::Span;
 
-/// The truthiness policy a template compiles under (runtime API §3, spec §7). The
-/// default [`TruthMode::NonEmpty`] is the one fixed Trussbars rule and the only one
-/// the conformance corpus is checked against; the others are opt-in via
-/// `truss!(…, truthiness = Liquid)` and emit through `trussbars_core::truthy_in`
-/// (`docs/16-truthiness-modes.md`).
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub enum TruthMode {
-    /// `nonEmpty` minus numbers — the default; a bare-number condition is a compile error.
-    #[default]
-    NonEmpty,
-    /// Liquid: only `false`/`nil` are falsy.
-    Liquid,
-    /// Handlebars: `false`/`null`/`0`/`NaN`/`""`/`[]` falsy, `{}` truthy.
-    Handlebars,
-}
-
 impl TruthMode {
-    /// Parse the `truss!(…, truthiness = <ident>)` marker name. `None` for an
-    /// unrecognized name (the macro reports it as a located error).
-    #[must_use]
-    pub fn from_ident(name: &str) -> Option<Self> {
-        match name {
-            "NonEmpty" => Some(Self::NonEmpty),
-            "Liquid" => Some(Self::Liquid),
-            "Handlebars" => Some(Self::Handlebars),
-            _ => None,
-        }
-    }
-
     /// The truthiness call for this policy over an already-referenced expression
     /// (`&(expr)` or a borrowed binding). `NonEmpty` emits the bare `truthy(…)` —
     /// byte-identical to the v1 emitter, so the conformance corpus is unaffected; a
     /// non-default policy routes through the monomorphized `truthy_in::<Mode, _>(…)`.
+    /// (Defined here, in the std-only emit module, since it builds codegen strings; the
+    /// policy enum itself lives in [`crate::ast`] so the `no_std` VM can name it.)
     fn call(self, ref_expr: &str) -> String {
         match self {
             Self::NonEmpty => format!("trussbars_core::truthy({ref_expr})"),
