@@ -32,7 +32,7 @@ import Data.Set (Set)
 import Data.Set as Set
 import Data.String as Str
 import Data.String.CodeUnits as SCU
-import Data.Tuple (Tuple(..), snd)
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Foldable (foldl)
 import FlatBars.Syntax (Expr(..), Node(..), Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
@@ -112,10 +112,11 @@ type Scope =
   { current :: Canon            -- `this`
   , parents :: Array Canon      -- enclosing contexts (for `parent`, `parent.parent`)
   , binds :: Map String Canon   -- loop/with-bound names → their canonical path
+  , shadowed :: Set String      -- let/local-bound names (not data fields)
   }
 
 rootScope :: Scope
-rootScope = { current: [], parents: [], binds: Map.empty }
+rootScope = { current: [], parents: [], binds: Map.empty, shadowed: Set.empty }
 
 -- | Reserved scoped names that are engine metadata, never data fields (skip).
 reserved :: Set String
@@ -134,6 +135,7 @@ resolveHead sc name
   | name == "parent" || name == "@parentchain" = Array.head sc.parents
   | Str.take 1 name == "@" = Nothing  -- other reserved data-markers (@hash/@param/@label/…)
   | Set.member name reserved = Nothing
+  | Set.member name sc.shadowed = Nothing  -- a let/local-bound name, not a data field
   | otherwise = case Map.lookup name sc.binds of
       Just c -> Just c
       Nothing -> Just (sc.current <> [ SKey name ])
@@ -174,8 +176,13 @@ numberPack = Set.fromFoldable
 
 arrayPack :: Set String
 arrayPack = Set.fromFoldable
-  [ "count", "size", "length", "join", "at", "take", "takeRight", "unique"
-  , "sortBy", "pluck", "groupBy", "where", "reject", "find", "some", "every" ]
+  [ "count", "size", "length", "join", "at", "take", "takeRight", "unique", "reverse" ]
+
+-- | Collection filters/projections whose 2nd arg is a literal field key
+-- | (`xs | pluck "name"`, `xs | where "active"`): the subject is `Vec<{ key: _ }>`.
+filterPack :: Set String
+filterPack = Set.fromFoldable
+  [ "where", "reject", "find", "some", "every", "pluck", "sortBy", "groupBy" ]
 
 -- | Record the subject `e` as a scalar of the given hint, if it is a path.
 pinScalar :: Scope -> ScalarHint -> Expr -> Constraints -> Constraints
@@ -201,6 +208,7 @@ useExpr sc cs expr = case expr of
     Just canon -> record canon (emptyC { scalar = SUnknown }) cs
     Nothing -> cs
   App name args
+    | Set.member name filterPack -> filterUse args cs
     | Set.member name stringPack -> pinFirst (pinScalar sc SString) name args cs
     | Set.member name numberPack -> foldl (\acc a -> pinScalar sc SNumber a acc) cs args
     | Set.member name arrayPack -> pinFirst (pinArray sc) name args cs
@@ -215,6 +223,17 @@ useExpr sc cs expr = case expr of
       Just canon -> record canon (emptyC { optional = true }) acc
       Nothing -> useExpr sc' acc first
     Nothing -> acc
+  -- `xs | pluck "k"` / `xs | where "k"`: `xs` is an array whose element has field `k`.
+  filterUse args acc = case Array.uncons args of
+    Just { head: coll, tail } ->
+      let acc1 = pinArray sc coll acc
+      in case exprCanon sc coll, keyOf tail of
+        Just cc, Just k -> record (cc <> [ SElem, SKey k ]) emptyC acc1
+        _, _ -> acc1
+    Nothing -> acc
+  keyOf args = case Array.head args of
+    Just (Lit (VString k)) -> Just k
+    _ -> Nothing
 
 -- | Walk a template body, threading scope + constraints.
 walk :: Scope -> Constraints -> Template -> Constraints
@@ -233,48 +252,108 @@ block :: Scope -> Constraints -> String -> Array Expr -> Template -> Constraints
 block sc cs name args body =
   let split = splitBlockArgs args
   in case name of
-    "each" ->
-      case Array.head split.positional of
-        Just collExpr ->
-          let
-            cs1 = pinArray sc collExpr cs                     -- the collection is an array
-            collCanon = exprCanon sc collExpr
-            elemCanon = map (_ <> [ SElem ]) collCanon
-            param = Array.head split.params
-            binds' = case param, elemCanon of
-              Just p, Just ec -> Map.insert p ec sc.binds
-              _, _ -> sc.binds
-            childCanon = fromMaybe sc.current elemCanon
-            sc' = { current: childCanon, parents: Array.cons sc.current sc.parents, binds: binds' }
-          in
-            walk sc' cs1 body
-        Nothing -> walk sc cs body
-    "with" ->
-      case Array.head split.positional of
-        Just o ->
-          let
-            oc = fromMaybe sc.current (exprCanon sc o)
-            sc' = { current: oc, parents: Array.cons sc.current sc.parents, binds: sc.binds }
-            cs1 = useExpr sc cs o
-          in
-            walk sc' cs1 body
-        Nothing -> walk sc cs body
-    "if" -> condBody sc (markNonNumeric sc cs split.positional) body
-    "unless" -> condBody sc (markNonNumeric sc cs split.positional) body
-    -- let/local/set, case, etc.: descend, recording subject usage; binding
-    -- semantics for scalar `let` names are a follow-on increment.
+    "each" -> eachBlock split
+    "with" -> withBlock split
+    "if" -> walk sc (markCond sc cs split.positional body) body
+    "unless" -> walk sc (markCond sc cs split.positional body) body
+    "let" -> letBlock split
+    "local" -> letBlock split
+    -- case, etc.: descend, recording subject usage.
     _ -> walk sc (foldl (useExpr sc) cs split.positional) body
   where
-  condBody sc' cs' b = walk sc' cs' b
+  eachBlock split =
+    case Array.head split.positional of
+      Just collExpr ->
+        let
+          collCanon = exprCanon sc collExpr
+          isMapIter = mentionsKey body            -- `loop.key` in the body ⇒ map iteration
+          cs1 = case collCanon of
+            Just cc -> record cc (emptyC { isArray = not isMapIter, isMap = isMapIter }) cs
+            Nothing -> useExpr sc cs collExpr
+          elemCanon = map (_ <> [ SElem ]) collCanon
+          param = Array.head split.params
+          binds' = case param, elemCanon of
+            Just p, Just ec -> Map.insert p ec sc.binds
+            _, _ -> sc.binds
+          childCanon = fromMaybe sc.current elemCanon
+          sc' = sc { current = childCanon, parents = Array.cons sc.current sc.parents, binds = binds' }
+        in
+          walk sc' cs1 body
+      Nothing -> walk sc cs body
+  withBlock split =
+    case Array.head split.positional of
+      Just o ->
+        let
+          oc = fromMaybe sc.current (exprCanon sc o)
+          sc' = sc { current = oc, parents = Array.cons sc.current sc.parents }
+          cs1 = useExpr sc cs o
+        in
+          walk sc' cs1 body
+      Nothing -> walk sc cs body
+  letBlock split =
+    let
+      pairs = hashPairs split.hash
+      cs1 = foldl (\acc (Tuple _ v) -> useExpr sc acc v) cs pairs
+      names = map fst pairs
+      sc' = sc { shadowed = Set.union sc.shadowed (Set.fromFoldable names) }
+    in
+      walk sc' cs1 body
 
--- | A condition path is non-numeric truthy (§3) and optional-ish; record it as
--- | optional (it is treated as possibly-absent) — a coarse but useful signal.
-markNonNumeric :: Scope -> Constraints -> Array Expr -> Constraints
-markNonNumeric sc cs = foldl step cs
+-- | Mark each condition path: it exists (a non-numeric truthy field), and it is
+-- | `Option` iff the block has an `{% else %}` clause (§5 optionality signal).
+markCond :: Scope -> Constraints -> Array Expr -> Template -> Constraints
+markCond sc cs conds body = foldl step cs conds
   where
+  opt = hasElse body
   step acc e = case exprCanon sc e of
-    Just canon -> record canon (emptyC { optional = true }) acc
+    Just canon -> record canon (emptyC { optional = opt }) acc
     Nothing -> useExpr sc acc e
+
+-- | Does a body contain an `{% else %}` / `{% elif %}` separator?
+hasElse :: Template -> Boolean
+hasElse = Array.any isElse
+  where
+  isElse = case _ of
+    Sep _ n _ -> n == "else" || n == "elif"
+    _ -> false
+
+-- | Does a body reference `loop.key` / bare `key` (⇒ the loop is over a map)?
+mentionsKey :: Template -> Boolean
+mentionsKey = Array.any nodeKey
+  where
+  nodeKey = case _ of
+    Output _ e -> mentionsKeyE e
+    Sep _ _ as -> Array.any mentionsKeyE as
+    Block _ _ _ as b -> Array.any mentionsKeyE as || mentionsKey b
+    _ -> false
+
+mentionsKeyE :: Expr -> Boolean
+mentionsKeyE = case _ of
+  App "key" [] -> true
+  App "lookup" as -> case Array.head as of
+    Just (App "loop" []) -> Array.any isKeyLit (fromMaybe [] (Array.tail as))
+    Just (App "key" []) -> true
+    _ -> Array.any mentionsKeyE as
+  App _ as -> Array.any mentionsKeyE as
+  Lit _ -> false
+
+isKeyLit :: Expr -> Boolean
+isKeyLit = case _ of
+  Lit (VString "key") -> true
+  _ -> false
+
+-- | Extract `name = value` pairs from a desugared `{% let %}` hash
+-- | (`App "dict" [Lit name1, val1, Lit name2, val2, …]`).
+hashPairs :: Maybe Expr -> Array (Tuple String Expr)
+hashPairs = case _ of
+  Just (App "dict" xs) -> pairUp xs
+  _ -> []
+  where
+  pairUp ys = case Array.uncons ys of
+    Just { head: Lit (VString k), tail } -> case Array.uncons tail of
+      Just { head: v, tail: rest } -> Array.cons (Tuple k v) (pairUp rest)
+      Nothing -> []
+    _ -> []
 
 -- ---------------------------------------------------------------------------
 -- Tree assembly: canonical paths → a `Ty` tree

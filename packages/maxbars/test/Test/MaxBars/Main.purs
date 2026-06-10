@@ -682,4 +682,19 @@ main = do
   hasS "infer:members-vec-string" teamsTpl "members: Vec<String>"
   hasS "infer:name-string" teamsTpl "name: String"
 
+  let
+    whereTpl = "{% each u in users %}{{u.name}}{% endeach %}{{ users | where \"active\" }}"
+    mapTpl = "{% each v in settings %}{{loop.key}}={{v}}{% endeach %}"
+    optTpl = "{% if user.bio %}{{user.bio}}{% else %}none{% endif %}"
+    letTpl = "{% let greeting=(append \"Hi \" name) %}{{greeting}}{% endlet %}"
+    lacksS nm src needle = assert'
+      (nm <> ": schema should NOT contain " <> show needle <> "\n--- got ---\n" <> schemaOf src)
+      (not (contains (Pattern needle) (schemaOf src)))
+  hasS "infer:where-elem-vec" whereTpl "Vec<User>"
+  hasS "infer:where-field" whereTpl "active"
+  hasS "infer:map-iter-btree" mapTpl "BTreeMap<String,"
+  hasS "infer:if-else-option" optTpl "Option<String>"
+  hasS "infer:let-value-pins-name" letTpl "name: String"
+  lacksS "infer:let-shadows-greeting" letTpl "greeting"
+
   log "all MaxBars tests passed"
