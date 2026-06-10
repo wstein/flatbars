@@ -443,7 +443,7 @@ pub fn teams_value(ctx: &Teams) -> VmValue {
 /// The big-table template in current MaxBars surface, parsed once.
 pub fn vm_big_table_template() -> VmTemplate {
     VmTemplate::parse(
-        "<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>",
+        "<table>{% each table %}<tr>{% each this %}<td>{{this}}</td>{% endeach %}</tr>{% endeach %}</table>",
     )
     .expect("vm big-table parses")
 }
@@ -456,7 +456,7 @@ pub fn vm_big_table(tmpl: &VmTemplate, data: &VmValue) -> String {
 pub fn vm_teams_template() -> VmTemplate {
     VmTemplate::parse(
         "<html><head><title>{{year}}</title></head><body><h1>CSL {{year}}</h1><ul>\
-         {{#each teams}}<li class=\"{{#if loop.first}}champion{{/if}}\"><b>{{this.name}}</b>: {{this.score}}</li>{{/each}}\
+         {% each teams %}<li class=\"{% if loop.first %}champion{% endif %}\"><b>{{this.name}}</b>: {{this.score}}</li>{% endeach %}\
          </ul></body></html>",
     )
     .expect("vm teams parses")
@@ -474,7 +474,7 @@ use trussbars_vm::bytecode::Program;
 
 pub fn vm_bc_big_table_program() -> Program {
     Program::compile(
-        "<table>{{#each table}}<tr>{{#each this}}<td>{{this}}</td>{{/each}}</tr>{{/each}}</table>",
+        "<table>{% each table %}<tr>{% each this %}<td>{{this}}</td>{% endeach %}</tr>{% endeach %}</table>",
     )
     .expect("bytecode big-table compiles")
 }
@@ -486,7 +486,7 @@ pub fn vm_bc_big_table(p: &Program, data: &VmValue) -> String {
 pub fn vm_bc_teams_program() -> Program {
     Program::compile(
         "<html><head><title>{{year}}</title></head><body><h1>CSL {{year}}</h1><ul>\
-         {{#each teams}}<li class=\"{{#if loop.first}}champion{{/if}}\"><b>{{this.name}}</b>: {{this.score}}</li>{{/each}}\
+         {% each teams %}<li class=\"{% if loop.first %}champion{% endif %}\"><b>{{this.name}}</b>: {{this.score}}</li>{% endeach %}\
          </ul></body></html>",
     )
     .expect("bytecode teams compiles")
