@@ -127,6 +127,22 @@ trimEndWs :: String -> String
 trimEndWs s =
   SCU.fromCharArray (Array.reverse (Array.dropWhile isSpace (Array.reverse (SCU.toCharArray s))))
 
+-- | The first whitespace-delimited word of a string (leading whitespace skipped) — the
+-- | head keyword of a `{% … %}` statement tag. `""` for an all-whitespace string.
+firstWord :: String -> String
+firstWord s =
+  SCU.fromCharArray
+    (Array.takeWhile (not <<< isSpace) (Array.dropWhile isSpace (SCU.toCharArray s)))
+
+-- | A `{% endX %}` close head (`endif`, `endeach`, …): `end` + a non-empty block name.
+isStmtClose :: String -> Boolean
+isStmtClose h = SCU.take 3 h == "end" && SCU.length h > 3
+
+-- | A `{% %}` clause separator head — splits the enclosing block (docs-19), the `{% %}`
+-- | analogue of the bare `{{else}}` / `{{when}}` / `{{elif}}`.
+isStmtSep :: String -> Boolean
+isStmtSep h = h == "else" || h == "elif" || h == "when"
+
 --------------------------------------------------------------------------------
 -- Standalone whitespace removal (Handlebars-style)
 --------------------------------------------------------------------------------
@@ -273,13 +289,31 @@ dropTrailingIndent s = case nlIndex false s of
 -- | span-only `RLongComment` tokens instead of dropping them; only the syntax
 -- | highlighter sets it (rendering/compilation leave it off, so their token
 -- | stream — and output — is unchanged).
+-- | `statementTags` enables the Django-style `{% … %}` statement surface (ADR/docs-19,
+-- | RawBars/MaxBars/Trussbars): when on, a `{% … %}` tag lexes into the *same* structural
+-- | tokens its `{{ … }}` counterpart would — `{% if %}`/`{% each %}`/… → `ROpen Section`,
+-- | `{% endX %}` → `RClose X`, `{% else %}`/`{% elif %}`/`{% when %}` → `RSep` — so the
+-- | parser, engine, and every backend are unchanged (docs-19 §3). Off (the default) the
+-- | `{%` opener is ordinary content, byte-identical to before; ClassicBars/MinBars keep it
+-- | off.
 type LexConfig =
-  { open :: String, close :: String, mustacheDelims :: Boolean, keepLongComments :: Boolean }
+  { open :: String
+  , close :: String
+  , mustacheDelims :: Boolean
+  , keepLongComments :: Boolean
+  , statementTags :: Boolean
+  }
 
 -- | Default template-lexer config: `{{`/`}}`, no set-delimiter switching, long
--- | comments dropped (the render/compile default).
+-- | comments dropped (the render/compile default), no `{% %}` statement tags.
 defaultLexConfig :: LexConfig
-defaultLexConfig = { open: "{{", close: "}}", mustacheDelims: false, keepLongComments: false }
+defaultLexConfig =
+  { open: "{{"
+  , close: "}}"
+  , mustacheDelims: false
+  , keepLongComments: false
+  , statementTags: false
+  }
 
 type TagResult = { mtok :: Maybe RawTok, next :: Int, trimL :: Boolean, trimR :: Boolean }
 
@@ -387,6 +421,19 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
                     sd.trimL
                 in
                   go sd.next sd.open sd.close sd.next [] (sd.tok : acc1) sd.trimR
+          -- A Django-style statement tag `{% … %}` (docs-19; gated on `statementTags`).
+          -- Checked before the `{{` opener probe; it re-delimits the same structural tokens
+          -- (`ROpen`/`RClose`/`RSep`) so the parser is unchanged. It never switches delimiters.
+          | cfg.statementTags && matchAt cs i "{%" -> case readStatementTag i of
+              Left e -> recoverFrom i e segStart frags acc pend open close
+              Right res ->
+                let
+                  acc2 = consTok res.mtok
+                    ( flush { start: segStart, end: i } (contentTo segStart frags i) acc pend
+                        res.trimL
+                    )
+                in
+                  go res.next open close res.next [] acc2 res.trimR
           -- Default delimiters `{{`/`}}`: the full Handlebars-flavored grammar,
           -- byte-identical to the fixed-delimiter lexer (backslash escapes, triple,
           -- raw blocks, long comments, `~`). The opener probe is gated on `{`, so
@@ -712,6 +759,38 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
               , trimL: leadTrimAt i || t.trimL
               , trimR: t.trimR
               }
+
+  -- A Django-style statement tag `{% [~] head args [~] %}` (docs-19), lexed into the
+  -- structural token its `{{ }}` counterpart would yield, so the parser/engine never see
+  -- `{% %}`: `{% endX %}` → `RClose X`; `{% else %}` / `{% elif … %}` / `{% when … %}` → a
+  -- clause `RSep`; anything else (`{% if … %}`, `{% each … %}`, host block heads) →
+  -- `ROpen Section`. The leading/trailing `~` trim works as for any tag.
+  readStatementTag :: Int -> Either ParseError TagResult
+  readStatementTag i =
+    let
+      start = if leadTrimAt i then i + 3 else i + 2
+    in
+      case closeFrom start "%}" of
+        Nothing -> Left (UnterminatedTag i)
+        Just q ->
+          let
+            t = splitTrims (slice cs start q)
+            core = t.core
+            headWord = firstWord core
+            span = { start: i, end: q + 2 }
+            mk tok = Right
+              { mtok: Just tok, next: q + 2, trimL: leadTrimAt i || t.trimL, trimR: t.trimR }
+          in
+            if headWord == "" then Left (LexError "empty statement tag '{% %}'" i)
+            else if isStmtClose headWord then
+              let
+                name = SCU.drop 3 headWord
+              in
+                mk (RClose span start name (interiorAt start name))
+            else if isStmtSep headWord then
+              mk (RSep span start core (interiorAt start core))
+            else
+              mk (ROpen span Section start core (interiorAt start core))
 
   -- A short comment `{{! [~] … [~] }}` is *kept* as an `RComment` carrying its
   -- interior (trailing `~` stripped) and offset, so the parser can lift any
