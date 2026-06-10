@@ -241,3 +241,34 @@ fn path_qualified_context_type() {
     let p = model::Page { title: "Hi".into() };
     assert_eq!(page(&p), "<h1>Hi</h1>");
 }
+
+// F2 (docs/20): a numeric literal in a comparison/arithmetic works against a non-f64
+// numeric field — `views: i64` with `> 100` compiles (the literal emits as `NumLit`,
+// which widens the field to the f64 number model), instead of forcing `views: f64`.
+struct Stats {
+    views: i64,
+    ratio: f64,
+}
+truss!(
+    popular,
+    Stats,
+    "{{#if views > 100}}hot{{else}}meh{{/if}} {{#if ratio < 1}}low{{else}}high{{/if}} {{add views 1}}"
+);
+
+#[test]
+fn numeric_literal_coerces_against_an_i64_field() {
+    assert_eq!(
+        popular(&Stats {
+            views: 150,
+            ratio: 0.5
+        }),
+        "hot low 151"
+    );
+    assert_eq!(
+        popular(&Stats {
+            views: 50,
+            ratio: 2.0
+        }),
+        "meh high 51"
+    );
+}

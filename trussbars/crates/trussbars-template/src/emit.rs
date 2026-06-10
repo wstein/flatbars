@@ -856,9 +856,21 @@ fn truthy_of(env: &Env, a: &Expr) -> Result<String, String> {
 fn bin_op(env: &Env, op: &str, a: &Expr, b: &Expr) -> Result<String, String> {
     Ok(format!(
         "({} {op} {})",
-        emit_expr(env, a)?,
-        emit_expr(env, b)?
+        emit_operand(env, a)?,
+        emit_operand(env, b)?
     ))
+}
+
+/// Emit a binary-operator operand. A bare numeric literal becomes a `NumLit(…)` (docs/20,
+/// F2) so the operator works against any numeric field type (`i64`/`u32`/`f64`) by widening
+/// to the f64 number model; every other operand — a field, a sub-expression, or a *string*
+/// literal — emits normally, so string ordering (`name < "m"`) is preserved and a
+/// string-vs-number comparison (`name > 100`) is a compile error (no `NumLit` impl).
+fn emit_operand(env: &Env, e: &Expr) -> Result<String, String> {
+    match e {
+        Expr::Lit(Value::Num(n)) => Ok(format!("trussbars_core::NumLit({})", rust_num(*n))),
+        _ => emit_expr(env, e),
+    }
 }
 
 // ── collection filters ────────────────────────────────────────────────────────
@@ -1144,6 +1156,21 @@ mod tests {
 
     fn e(src: &str) -> String {
         emit("Ctx", src).unwrap_or_else(|err| panic!("{src:?}: {err}"))
+    }
+
+    #[test]
+    fn numeric_literal_operand_wraps_in_numlit() {
+        // A numeric literal in operator position becomes `NumLit`, so the comparison works
+        // against any numeric field type — the F2 fix (docs/20).
+        let cmp = e("{{#if n > 100}}x{{/if}}");
+        assert!(cmp.contains("trussbars_core::NumLit(100.0)"), "{cmp}");
+        let arith = e("{{add n 1}}");
+        assert!(arith.contains("trussbars_core::NumLit(1.0)"), "{arith}");
+        // A string-literal operand is left alone, so native string ordering is preserved
+        // (and a string-vs-number comparison stays a compile error — no NumLit impl).
+        let s = e(r#"{{#if name < "m"}}x{{/if}}"#);
+        assert!(s.contains("< \"m\""), "{s}");
+        assert!(!s.contains("NumLit"), "{s}");
     }
 
     #[test]

@@ -102,3 +102,7 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
   nodes, so engine/desugar/compiler are untouched and rendered bytes are identical. Deletes the
   `{{else}}`/`{{when}}`/`{{elif}}` separator-ambiguity machinery (docs/12 §2); re-spells docs/17/18.
   Breaking — `flatbars migrate` codemod + located rejection of the old `{{#…}}` form.
+- `20-numeric-literal-coercion.md` — **DONE** (F2). A numeric literal in operator position emits
+  as `trussbars_core::NumLit`, coercing against any numeric field type (`views: i64` works with
+  `> 100`) by widening to the f64 model; string ordering untouched, string-vs-number a compile
+  error. v2-conformance 71/71, 0 drift.

@@ -19,6 +19,9 @@
 //!   `{{#each}}` metadata threaded by lexical nesting, no `Rc`, no heap frame.
 //! - [`SizeHint`] — the adaptive output-capacity hint ([`capacity`]): a warm
 //!   template reallocates at most once, however large the data.
+//! - [`NumLit`] — the numeric-literal wrapper ([`numlit`]): a literal in
+//!   comparison/arithmetic position coerces against any numeric field type (`i64`/`u32`/
+//!   `f64`) by widening to the `f64` number model (docs/20, F2).
 //!
 //! The design contract is the `trussbars/docs/` set: `01-subset-spec.md` (the
 //! language), `02-runtime-api.md` (this crate's surface), and `04-conformance.md`
@@ -41,12 +44,14 @@ extern crate alloc;
 mod capacity;
 mod each;
 mod frame;
+mod numlit;
 mod text;
 mod truthy;
 
 pub use capacity::SizeHint;
 pub use each::Each;
 pub use frame::Loop;
+pub use numlit::NumLit;
 pub use text::{Safe, ToText, esc, escape_html};
 pub use truthy::{Handlebars, Liquid, NonEmpty, TruthyIn, truthy, truthy_in};
 
