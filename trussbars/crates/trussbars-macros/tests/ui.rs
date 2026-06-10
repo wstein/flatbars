@@ -6,7 +6,8 @@
 //! change with `TRYBUILD=overwrite cargo test -p trussbars-macros`.
 //!
 //! Coverage (`tests/ui/*.rs`):
-//!   * parse-class — `unclosed_block`;
+//!   * parse-class — `unclosed_block`, `mismatched_block` (a close tag naming the
+//!     wrong block);
 //!   * resolution-class — `unknown_helper`, `unknown_partial`,
 //!     `yield_outside_partial`;
 //!   * arity-class — `arity_wrong` (a fixed-arity stdlib op, wrong arg count);

@@ -220,12 +220,13 @@ impl Blocks<'_> {
         };
         let (body, stop) = self.parse_until(scope)?;
         match stop {
-            Stop::Close(_) => Ok(Node::HelperBlock(HelperBlock {
+            Stop::Close(name) if close_matches(&name, head) => Ok(Node::HelperBlock(HelperBlock {
                 span,
                 head: head.to_string(),
                 args,
                 body,
             })),
+            Stop::Close(name) => err(mismatched_close(&name, head), span.start),
             Stop::Else | Stop::ElseIf(_) => err(
                 // Forward-looking: the inverse-arm convention is frozen but not yet built
                 // (docs/09 §3.1, "Planned"). Until a consumer needs it, this is a located
@@ -251,6 +252,7 @@ impl Blocks<'_> {
         negated: bool,
         scope: &Scope,
     ) -> Result<Node, ParseError> {
+        let open = if negated { "unless" } else { "if" };
         let cond = parse_expr(cond_src.trim(), scope)?;
         let (body, mut stop) = self.parse_until(scope)?;
         let mut elifs = Vec::new();
@@ -266,10 +268,11 @@ impl Blocks<'_> {
                 Stop::Else => {
                     let (ebody, s) = self.parse_until(scope)?;
                     otherwise = ebody;
-                    expect_close(&s, span.start)?;
+                    expect_close(&s, open, span.start)?;
                     break;
                 }
-                Stop::Close(_) => break,
+                Stop::Close(name) if close_matches(&name, open) => break,
+                Stop::Close(name) => return err(mismatched_close(&name, open), span.start),
                 Stop::When(_) => {
                     return err(
                         "unexpected `{{when}}` outside a `{{#case}}` block",
@@ -321,10 +324,11 @@ impl Blocks<'_> {
                 Stop::Else => {
                     let (ebody, s) = self.parse_until(scope)?;
                     otherwise = ebody;
-                    expect_close(&s, span.start)?;
+                    expect_close(&s, "case", span.start)?;
                     break;
                 }
-                Stop::Close(_) => break,
+                Stop::Close(name) if close_matches(&name, "case") => break,
+                Stop::Close(name) => return err(mismatched_close(&name, "case"), span.start),
                 Stop::ElseIf(_) => {
                     return err(
                         "`{{else if}}` is not valid in a `{{#case}}` (use `{{when}}`)",
@@ -355,7 +359,7 @@ impl Blocks<'_> {
         bound.extend(label.clone());
         let child = scope.with_all(&bound);
         let (body, stop) = self.parse_until(&child)?;
-        let otherwise = self.else_arm(stop, scope, span.start)?;
+        let otherwise = self.else_arm(stop, scope, "each", span.start)?;
         Ok(Node::Each(Each {
             span,
             subject,
@@ -376,7 +380,7 @@ impl Blocks<'_> {
         let subject = parse_expr(rest.trim(), scope)?;
         // `with` re-roots `this` to the subject but introduces no named binding.
         let (body, stop) = self.parse_until(scope)?;
-        let otherwise = self.else_arm(stop, scope, span.start)?;
+        let otherwise = self.else_arm(stop, scope, "with", span.start)?;
         Ok(Node::With(With {
             span,
             subject,
@@ -418,7 +422,7 @@ impl Blocks<'_> {
             s = tail.trim_start();
         }
         let (body, stop) = self.parse_until(&cur)?;
-        expect_close(&stop, span.start)?;
+        expect_close(&stop, "let", span.start)?;
         Ok(Node::Let {
             span,
             bindings,
@@ -437,7 +441,7 @@ impl Blocks<'_> {
             at: span.start,
         })?;
         let (body, stop) = self.parse_until(scope)?;
-        expect_close(&stop, span.start)?;
+        expect_close(&stop, "inline", span.start)?;
         Ok(Node::Inline { span, name, body })
     }
 
@@ -453,7 +457,7 @@ impl Blocks<'_> {
         })?;
         let ctx = parse_opt_ctx(after, scope)?;
         let (body, stop) = self.parse_until(scope)?;
-        expect_close(&stop, span.start)?;
+        expect_close(&stop, "partial", span.start)?;
         Ok(Node::PartialBlock {
             span,
             name,
@@ -480,13 +484,21 @@ impl Blocks<'_> {
         })
     }
 
-    /// After a body, consume a `{{else}}` arm (if any) and require the close.
-    fn else_arm(&mut self, stop: Stop, scope: &Scope, at: usize) -> Result<Vec<Node>, ParseError> {
+    /// After a body, consume a `{{else}}` arm (if any) and require the close — which
+    /// must name `open` (`each` / `with`).
+    fn else_arm(
+        &mut self,
+        stop: Stop,
+        scope: &Scope,
+        open: &str,
+        at: usize,
+    ) -> Result<Vec<Node>, ParseError> {
         match stop {
-            Stop::Close(_) => Ok(Vec::new()),
+            Stop::Close(name) if close_matches(&name, open) => Ok(Vec::new()),
+            Stop::Close(name) => err(mismatched_close(&name, open), at),
             Stop::Else => {
                 let (ebody, s) = self.parse_until(scope)?;
-                expect_close(&s, at)?;
+                expect_close(&s, open, at)?;
                 Ok(ebody)
             }
             Stop::ElseIf(_) => err("`{{else if}}` is only valid in a conditional", at),
@@ -496,9 +508,22 @@ impl Blocks<'_> {
     }
 }
 
-fn expect_close(stop: &Stop, at: usize) -> Result<(), ParseError> {
+/// Whether a `{{/close}}` tag may close a `{{#open}}` block. A *named* close must
+/// match the open exactly; a bare `{{/}}` is accepted as a wildcard (so this rule
+/// only rejects, never tightens what already parsed).
+fn close_matches(close: &str, open: &str) -> bool {
+    close.is_empty() || close == open
+}
+
+/// The located message for a close tag that names the wrong block.
+fn mismatched_close(close: &str, open: &str) -> String {
+    format!("mismatched closing tag `{{{{/{close}}}}}` (expected `{{{{/{open}}}}}`)")
+}
+
+fn expect_close(stop: &Stop, open: &str, at: usize) -> Result<(), ParseError> {
     match stop {
-        Stop::Close(_) => Ok(()),
+        Stop::Close(name) if close_matches(name, open) => Ok(()),
+        Stop::Close(name) => err(mismatched_close(name, open), at),
         _ => err("expected a closing tag", at),
     }
 }
@@ -776,6 +801,36 @@ mod tests {
     fn unless_is_negated() {
         let ns = parse("{{#unless done}}todo{{/unless}}").unwrap();
         assert!(matches!(&ns[0], Node::Cond(c) if c.negated));
+    }
+
+    #[test]
+    fn mismatched_close_is_a_located_error() {
+        // A close tag naming the wrong block is rejected here (a class-A parse
+        // error), not left to rustc as a downstream "unknown field" — across each
+        // block kind: each/with (else_arm), if (cond), case, let, and host helpers.
+        for src in [
+            "{{#each items}}{{this}}{{/with}}",
+            "{{#with user}}{{name}}{{/each}}",
+            "{{#if a}}A{{/unless}}",
+            "{{#case s}}{{when \"a\"}}A{{/if}}",
+            "{{#let x=(1)}}{{x}}{{/each}}",
+            "{{#bold}}hi{{/italic}}",
+        ] {
+            let e = parse(src).unwrap_err();
+            assert!(
+                e.message.starts_with("mismatched closing tag"),
+                "expected a mismatch error for {src:?}, got {:?}",
+                e.message
+            );
+        }
+    }
+
+    #[test]
+    fn matching_and_bare_closes_still_parse() {
+        // The correct name parses; a bare `{{/}}` stays a lenient wildcard, so the
+        // new check only rejects, never tightens what already parsed.
+        assert!(parse("{{#each items}}{{this}}{{/each}}").is_ok());
+        assert!(parse("{{#each items}}{{this}}{{/}}").is_ok());
     }
 
     #[test]
