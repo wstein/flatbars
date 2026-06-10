@@ -80,20 +80,27 @@ unifyScalar a b
 
 -- | The accumulated constraints on one canonical path.
 type PathC =
-  { isArray :: Boolean      -- used as a collection (each / count / join / pluck)
-  , isMap :: Boolean        -- map iteration (loop.key in an each body)
-  , fields :: Set String    -- object fields observed off this path
-  , scalar :: ScalarHint    -- under-determined / pinned / conflicting scalar
-  , optional :: Boolean      -- ?? / ?: / if-else signal (§5)
-  , enumTag :: Maybe String  -- a {% case this.<tag> %} dispatch ⇒ a tagged enum (§5)
-  , enumVariants :: Set String  -- the observed variant tags
-  , coupled :: Set String     -- canonKeys this path is `==`-coupled to (§3 order-3)
+  { isArray :: Boolean -- used as a collection (each / count / join / pluck)
+  , isMap :: Boolean -- map iteration (loop.key in an each body)
+  , fields :: Set String -- object fields observed off this path
+  , scalar :: ScalarHint -- under-determined / pinned / conflicting scalar
+  , optional :: Boolean -- ?? / ?: / if-else signal (§5)
+  , enumTag :: Maybe String -- a {% case this.<tag> %} dispatch ⇒ a tagged enum (§5)
+  , enumVariants :: Set String -- the observed variant tags
+  , coupled :: Set String -- canonKeys this path is `==`-coupled to (§3 order-3)
   }
 
 emptyC :: PathC
 emptyC =
-  { isArray: false, isMap: false, fields: Set.empty, scalar: SUnknown, optional: false
-  , enumTag: Nothing, enumVariants: Set.empty, coupled: Set.empty }
+  { isArray: false
+  , isMap: false
+  , fields: Set.empty
+  , scalar: SUnknown
+  , optional: false
+  , enumTag: Nothing
+  , enumVariants: Set.empty
+  , coupled: Set.empty
+  }
 
 mergeC :: PathC -> PathC -> PathC
 mergeC a b =
@@ -294,8 +301,10 @@ useExpr sc cs expr = case expr of
   compareUse args acc = case Array.findMap litScalar args of
     Just h -> foldl (\a e -> pinScalar sc h e a) acc args
     Nothing ->
-      let acc1 = foldl (useExpr sc) acc args
-      in coupleAll (Array.mapMaybe (exprCanon sc) args) acc1
+      let
+        acc1 = foldl (useExpr sc) acc args
+      in
+        coupleAll (Array.mapMaybe (exprCanon sc) args) acc1
   litScalar = case _ of
     Lit (VString _) -> Just SString
     Lit (VNumber _) -> Just SNumber
@@ -819,8 +828,10 @@ refineScalars obs cs =
 -- | coupled side stays as-is; `buildTy` still reports its own conflict).
 propagateCouples :: Constraints -> Constraints
 propagateCouples cs =
-  let cs' = onePass cs
-  in if cs' == cs then cs else propagateCouples cs'
+  let
+    cs' = onePass cs
+  in
+    if cs' == cs then cs else propagateCouples cs'
   where
   onePass m = foldl push m (Map.toUnfoldable m :: Array (Tuple String (Tuple Canon PathC)))
   push acc (Tuple _ (Tuple _ c)) =

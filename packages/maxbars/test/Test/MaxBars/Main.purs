@@ -822,7 +822,7 @@ main = do
 
   -- two-path == coupling (§3 order-3): `a == b` unifies their types, so a type
   -- determined for one side (by usage OR data) propagates to the other.
-  let coupleTpl = "{{ a == b }} {{ b * 2 }}"   -- b numeric (b*2); a coupled to b
+  let coupleTpl = "{{ a == b }} {{ b * 2 }}" -- b numeric (b*2); a coupled to b
   hasS "infer:couple-template-a" coupleTpl "a: f64"
   hasS "infer:couple-template-b" coupleTpl "b: f64"
   hasSD "infer:couple-data" [ obj [ Tuple "a" (num 5.0) ] ] "{{ a == b }}" "b: f64"
