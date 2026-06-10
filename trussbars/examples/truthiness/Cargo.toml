@@ -1,0 +1,24 @@
+[package]
+name = "truthiness-example"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Own workspace, independent of the trussbars/ workspace.
+[workspace]
+
+[lib]
+name = "truthiness_example"
+
+[[bin]]
+name = "truthiness"
+path = "src/main.rs"
+
+[dependencies]
+# The native v2 front-end: `truss!` compiles templates at build time, here with the
+# optional `truthiness = Mode` clause (docs/16).
+trussbars-macros = { path = "../../crates/trussbars-macros" }
+# The runtime the generated code links against — `TruthyIn<Mode>` and the policy markers.
+trussbars-core = { path = "../../crates/trussbars-core" }
+# The dynamic backend: a runtime-selectable policy via `Template::with_truthiness`.
+trussbars-vm = { path = "../../crates/trussbars-vm" }
