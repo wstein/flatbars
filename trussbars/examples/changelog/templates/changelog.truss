@@ -1,7 +1,7 @@
 # {{project}} — Changelog
-{{#each (groupBy commits "category")}}
+{% each (groupBy commits "category") %}
 ## {{loop.key}}
-{{#each c in this}}
-- {{c.subject}}{{#if c.scope}} _({{c.scope}})_{{/if}} `{{c.hash}}` · {{date c.date "%Y-%m-%d" "en"}}
-{{/each}}
-{{/each}}
+{% each c in this %}
+- {{c.subject}}{% if c.scope %} _({{c.scope}})_{% endif %} `{{c.hash}}` · {{date c.date "%Y-%m-%d" "en"}}
+{% endeach %}
+{% endeach %}

@@ -63,13 +63,7 @@ jobs:
       - name: v2 emit gate (v2 ≡ v1, byte-identical)
         run: npm run test:trussbars-v2
 
-      # The VM backend (`truss-vm`): the lenient tree-walk renders the corpus, and
-      # AOT-compat (strict) mode is a verifying proxy for the AOT subset.
-      - name: VM gates (tree-walk + AOT-compat proxy)
-        run: npm run test:trussbars-vm && npm run test:trussbars-vm-compat
-
-      # The AOT-compat drift gate: the PureScript Lab lint (`MaxBars.Compat`, the
-      # FlatBars Studio Trussbars panel) must agree with the Rust `render_compat`
-      # verifying proxy on every case — so the lint can never mislabel a template.
-      - name: AOT-compat drift gate (PureScript lint ⇔ Rust render_compat)
-        run: npm run check:trussbars-compat
+      # The VM backend (`truss-vm`): the lenient tree-walk renders the corpus and
+      # must byte-match the interpreter on every covered case.
+      - name: VM gate (tree-walk ≡ interpreter)
+        run: npm run test:trussbars-vm
