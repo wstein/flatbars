@@ -31,6 +31,7 @@ import Data.Bifunctor (lmap)
 import Data.Either (Either)
 import Data.Tuple (Tuple)
 import FlatBars.Error (Error, ParseError)
+import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
@@ -70,6 +71,10 @@ maxOptions =
     -- `[…]`/`{k: v}` collection literals.
     , lexOptions =
         { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
+    -- Django-style `{% … %}` statement tags (docs-19): control flow / separators move
+    -- to `{% %}`, with `{{ }}` for output. Enabled additively here (the `{{ }}` forms
+    -- still parse); the breaking "reject the old `{{#…}}`" hardening is a follow-up.
+    , lexConfig = defaultLexConfig { statementTags = true }
     -- Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is
     -- a Mustache feature reserved for MinBars. RawBars / MaxBars / ClassicBars all
     -- reject it so the dialect ladder has one consistent answer to "does

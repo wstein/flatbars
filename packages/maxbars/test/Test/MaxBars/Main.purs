@@ -71,6 +71,16 @@ main = do
   expectM "or" "{{ a || b }}" (obj [ Tuple "a" (VBool false), Tuple "b" (VBool true) ]) "true"
   expectM "not" "{{ !a }}" (obj [ Tuple "a" (VBool false) ]) "true"
 
+  -- Django statement tags (docs-19): `{% %}` control flow renders identically to the
+  -- `{{ }}` form, with `{{ }}` still the output surface inside the block.
+  expectM "stmt-if-true" "{% if a %}yes{% else %}no{% endif %}" (obj [ Tuple "a" (VBool true) ])
+    "yes"
+  expectM "stmt-if-false" "{% if a %}yes{% else %}no{% endif %}" (obj [ Tuple "a" (VBool false) ])
+    "no"
+  expectM "stmt-each-output" "{% each xs %}[{{ this }}]{% endeach %}"
+    (obj [ Tuple "xs" (VArray [ num 1.0, num 2.0 ]) ])
+    "[1][2]"
+
   -- comparisons.
   expectM "gt" "{{ x > 3 }}" (obj [ Tuple "x" (num 5.0) ]) "true"
   expectM "gte-eq" "{{ x >= 18 }}" (obj [ Tuple "x" (num 18.0) ]) "true"

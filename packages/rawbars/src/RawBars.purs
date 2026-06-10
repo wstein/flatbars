@@ -42,6 +42,7 @@ import Effect.Aff (Aff)
 import FlatBars.Compile (compile) as Driver
 import FlatBars.Compile.Emit (coreEmit, metaFor)
 import FlatBars.Error (Error(ParseFailure), ParseError(DisallowedShape), renderParseErrorsAt)
+import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Directive, Template)
 import FlatBars.Value (Value)
@@ -81,6 +82,9 @@ coreOptions = defaultParseOptions
   -- its standalone lines are trimmed too — keeping RawBars byte-identical to MaxBars
   -- (`check:parity`) on a `case` block.
   , standaloneSeps = [ "else", "elif", "when" ]
+  -- Django-style `{% … %}` statement tags (docs-19), enabled additively (keeps RawBars ≡
+  -- MaxBars for `check:parity`); the `{{ }}` control forms still parse for now.
+  , lexConfig = defaultLexConfig { statementTags = true }
   }
 
 -- | Parse core source, enforcing the one `{{#case}}` surface rule the parser can't: only
