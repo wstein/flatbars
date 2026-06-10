@@ -78,16 +78,16 @@ impl Sample {
 // take the language from the lab's locale, not the data. `count` is 1 by default so the
 // singular shows — bump it (or add items) to watch the plural switch. Block and comment
 // tags sit on their own lines (standalone-trimmed, so they add no output).
-const RECEIPT_TMPL: &str = r#"{{! receipt — i18n host helpers from the catalog pane (VM-only) }}
+const RECEIPT_TMPL: &str = r#"{# receipt — i18n host helpers from the catalog pane (VM-only) #}
 == {{t "title"}} ==
 {{t "greeting"}}, {{customer}}!
-{{! one line per item; `number` formats the price }}
+{# one line per item; `number` formats the price #}
 {% for items %}
   - {{name}}: {{number price 2}}
 {% endfor %}
-{{! `plural count "item"` picks the CLDR form (en items / pl elementy / …) }}
+{# `plural count "item"` picks the CLDR form (en items / pl elementy / …) #}
 {{t "total"}}: {{number total 2}}  ({{count}} {{plural count "item"}})
-{{! `date` localizes the month (%B); `relative` is English-fallback phrasing }}
+{# `date` localizes the month (%B); `relative` is English-fallback phrasing #}
 {{t "placed"}}: {{date placed "%d %B %Y"}}
 {{t "eta"}}: {{relative eta "day"}}
 "#;
@@ -104,7 +104,7 @@ items:
 
 // No i18n: plain data interpolation. Carries no host helpers, so the lab hides the i18n
 // pane for it.
-const GREETING_TMPL: &str = r#"{{! greeting — plain data interpolation, no i18n }}
+const GREETING_TMPL: &str = r#"{# greeting — plain data interpolation, no i18n #}
 {{greeting}}, {{customer}}!
 {{note}}
 "#;

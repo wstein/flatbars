@@ -51,7 +51,7 @@ pub enum Sigil {
     Close,
     /// `{{> … }}` — a partial reference.
     Partial,
-    /// `{{! … }}` or `{{!-- … --}}` — a comment (the parser ignores it).
+    /// `{# … #}` — a Django/Jinja inline comment (the parser ignores it).
     Comment,
 }
 
@@ -90,11 +90,13 @@ pub fn lex(src: &str) -> Result<Vec<Lexeme>, LexError> {
     let mut pending_trail_trim = false;
 
     while i < n {
-        // A tag opens with `{{` (output/block/raw/comment/partial) or, in this native
-        // Trussbars dialect, the Django-style statement tag `{%` (docs-19).
+        // A tag opens with `{{` (output / partial), the Django-style statement tag `{%`
+        // (control), or the Django/Jinja inline comment `{# … #}` (ADR-039 — replaces the
+        // Handlebars `{{! }}`).
         let brace = b[i] == b'{' && i + 1 < n && b[i + 1] == b'{';
         let stmt = b[i] == b'{' && i + 1 < n && b[i + 1] == b'%';
-        if !(brace || stmt) {
+        let comment = b[i] == b'{' && i + 1 < n && b[i + 1] == b'#';
+        if !(brace || stmt || comment) {
             i += 1;
             continue;
         }
@@ -108,6 +110,8 @@ pub fn lex(src: &str) -> Result<Vec<Lexeme>, LexError> {
         }
         let lex = if stmt {
             lex_statement_tag(b, n, i)?
+        } else if comment {
+            lex_inline_comment(b, n, i)?
         } else {
             lex_tag(b, n, i)?
         };
@@ -326,48 +330,46 @@ fn lex_tag(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
     // recognized — raw (un-escaped) output is the `safe` filter, `{{ x | safe }}`. A
     // stray `{{{` falls through to the two-brace handling below and fails as a plain
     // parse error; there is no compat mapping.
-    // Two-brace tag: the byte after `{{` selects the sigil. PURE native dialect
-    // (ADR-039): `{{ … }}` is OUTPUT-ONLY. No Handlebars holdovers — the legacy
-    // block-open/close (`{{#`/`{{/`) AND the partial reference `{{> name}}` are NOT
-    // recognized here (a partial include is `{% include "name" %}`); such a tag falls
-    // through to an ordinary (and invalid) output expression — a plain parse error, no
-    // compat mapping. Only `{{! … }}` (comment) remains a two-brace metadata sigil.
-    let c = b.get(i + 2).copied();
-    let (sigil, sig_len) = match c {
-        Some(b'!') => (Sigil::Comment, 1),
-        _ => (Sigil::Output, 0),
-    };
-    // Long comment `{{!-- … --}}` ends at `--}}`. Comments do not take `-` trim markers
-    // (the `--` close would falsely trip the detector), so no trimming here.
-    if sigil == Sigil::Comment && at(b, i + 2, b"!--") {
-        let inner = i + 5;
-        let close = find_seq(b, n, inner, b"--}}")
-            .ok_or_else(|| LexError::new("unterminated `{{!-- … --}}` comment", i))?;
-        return Ok(Lexed {
-            lexeme: Lexeme::Tag {
-                sigil: Sigil::Comment,
-                interior: Span::new(inner, close),
-                span: Span::new(i, close + 4),
-            },
-            next: close + 4,
-            lead_trim: false,
-            trail_trim: false,
-        });
-    }
-    let inner = i + 2 + sig_len;
+    // Two-brace tag: PURE native dialect (ADR-039) — `{{ … }}` is OUTPUT-ONLY. No
+    // Handlebars holdovers: the legacy block-open/close (`{{#`/`{{/`), the partial
+    // reference `{{> name}}`, AND the comment `{{! … }}` are NOT recognized here. A
+    // comment is the Django/Jinja `{# … #}` (lexed in `lex_inline_comment`); a partial
+    // include is `{% include "name" %}`. Anything but a plain output expression falls
+    // through and fails as a plain parse error — no compat mapping.
+    let inner = i + 2;
     let close = find_close(b, n, inner, 2)?;
-    // Explicit whitespace control `{{- … -}}` (output / partial / short comment). The
-    // marker is the `-` glued to the inner braces; a spaced `-` stays an operator.
+    // Explicit whitespace control `{{- … -}}` (output / partial). The marker is the `-`
+    // glued to the inner braces; a spaced `-` stays an operator.
     let (ts, te, lead_trim, trail_trim) = strip_trim_markers(b, inner, close);
     Ok(Lexed {
         lexeme: Lexeme::Tag {
-            sigil,
+            sigil: Sigil::Output,
             interior: Span::new(ts, te),
             span: Span::new(i, close + 2),
         },
         next: close + 2,
         lead_trim,
         trail_trim,
+    })
+}
+
+/// Lex a `{# … #}` inline comment (Django/Jinja — ADR-039, replacing the Handlebars
+/// `{{! }}` / `{{!-- --}}`). The body runs verbatim until the first `#}` (it may span
+/// lines and contain `}`); comments produce no output (the parser drops them). No `-`
+/// trim markers.
+fn lex_inline_comment(b: &[u8], n: usize, i: usize) -> Result<Lexed, LexError> {
+    let inner = i + 2;
+    let close = find_seq(b, n, inner, b"#}")
+        .ok_or_else(|| LexError::new("unterminated `{# … #}` comment", i))?;
+    Ok(Lexed {
+        lexeme: Lexeme::Tag {
+            sigil: Sigil::Comment,
+            interior: Span::new(inner, close),
+            span: Span::new(i, close + 2),
+        },
+        next: close + 2,
+        lead_trim: false,
+        trail_trim: false,
     })
 }
 
@@ -582,11 +584,6 @@ fn is_run(b: &[u8], n: usize, at: usize, c: u8, count: usize) -> bool {
     at + count <= n && (0..count).all(|k| b[at + k] == c)
 }
 
-/// Whether `b[at..]` begins with `pat`.
-fn at(b: &[u8], at: usize, pat: &[u8]) -> bool {
-    b.len() >= at + pat.len() && &b[at..at + pat.len()] == pat
-}
-
 /// Find `pat` in `b[start..]`, returning its start index.
 fn find_seq(b: &[u8], n: usize, start: usize, pat: &[u8]) -> Option<usize> {
     if pat.is_empty() || start + pat.len() > n {
@@ -645,7 +642,7 @@ mod tests {
 
     #[test]
     fn all_two_brace_sigils() {
-        let s = "{{x}}{% for xs %}{% endfor %}{{! c }}";
+        let s = "{{x}}{% for xs %}{% endfor %}{# c #}";
         assert_eq!(
             sigils(s),
             vec![Sigil::Output, Sigil::Open, Sigil::Close, Sigil::Comment]
@@ -686,8 +683,10 @@ mod tests {
     }
 
     #[test]
-    fn long_comment() {
-        let s = "a {{!-- a }} comment --}} b";
+    fn inline_comment() {
+        // `{# … #}` (Django/Jinja): the body may span lines and contain `}` / `}}`; it
+        // ends at the first `#}`. The parser drops it (no output).
+        let s = "a {# a }} comment #} b";
         assert_eq!(sigils(s), vec![Sigil::Comment]);
         assert_eq!(interiors(s), vec![" a }} comment "]);
         assert_round_trip(s);
