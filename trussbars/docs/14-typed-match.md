@@ -182,7 +182,7 @@ the cross-backend debate — is:
   the same. The new thing to test is the **AOT exhaustiveness diagnostic**: a `trybuild`
   UI-snapshot (an omitted variant → rustc's non-exhaustive-`match` error) and the accept case.
 - Governed like `{{#case}}`: it is **nonEmpty-family surface** (RawBars/MaxBars), so the
-  oracle (`matchH`) gets it with Trussbars; FullBars/MinBars reject it. The oracle defines the
+  oracle (`matchH`) gets it with Trussbars; ClassicBars/MinBars reject it. The oracle defines the
   *runtime* semantics; rustc owns the *static* exhaustiveness.
 
 ## 8. Sequencing

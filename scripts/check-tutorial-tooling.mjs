@@ -21,7 +21,7 @@ import { analyze, analyzeWith, analyzeMinbars, lint, migrate } from "../lab/vend
 
 // Analyse dispatch by example engine: MinBars (Mustache) renders on its own
 // truthiness rule, so it analyses through `analyzeMinbars`; every other dialect
-// is FullBars-surface `analyze`. (analyzeWith — the host PathSchema — is FullBars
+// is ClassicBars-surface `analyze`. (analyzeWith — the host PathSchema — is ClassicBars
 // only; a minbars example never sets `pathSchema`.)
 const analyzeFor = (engine) => (engine === "minbars" ? analyzeMinbars : analyze);
 import { labHref } from "../lab/open-in-lab.mjs";

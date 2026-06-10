@@ -6,16 +6,16 @@
 // real engine bundle and asserts it produces output. RawBars is the desugared
 // core surface: no surface sugar, so every value is an explicit helper application.
 //
-// `engine` defaults to "rawbars"; the `sugar` example is FullBars on purpose —
+// `engine` defaults to "rawbars"; the `sugar` example is ClassicBars on purpose —
 // it's the left half of the "sugar → core" diptych (what `{{name}}` desugars
 // to). `compiles: true` marks the flagship the page shows compiled to JS (and
 // the gate asserts compileToJs succeeds for it).
 
 export const examples = {
   // ── Output & escaping: the sugar → core diptych ──────────────────────────
-  // FullBars writes {{name}}; that is exactly this RawBars application.
+  // ClassicBars writes {{name}}; that is exactly this RawBars application.
   sugar: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{name}}",
     data: { name: "Ada <core>" },
   },
@@ -78,7 +78,7 @@ guest
 
   // ── Block partials: define with {{#inline}}, fill with {{{yield}}} ─────────
   // RawBars hoists {{#inline "name"}} definitions into the partial registry (the
-  // shared Kernel.Hoist, same engine step as FullBars/MaxBars); {{#partial "name"
+  // shared Kernel.Hoist, same engine step as ClassicBars/MaxBars); {{#partial "name"
   // ctx}} then invokes it with the block body, dropped in at {{{yield}}}. Bare
   // core: triple-stash and an explicit context — no surface sugar.
   yield: {

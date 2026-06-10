@@ -21,16 +21,16 @@ implementation and a CLI, alongside the normative specification and the
 ├── site/                  Hand-written marketing landing page (index.html)
 ├── packages/
 │   ├── core/              `flatbars` — the engine-agnostic framework (lexer · parser · driver · walk)
-│   ├── fullbars/          `fullbars` — the reference engine (value policy · prelude · lowering)
+│   ├── classicbars/          `classicbars` — the reference engine (value policy · prelude · lowering)
 │   ├── json/              `flatbars-json` — JSON ⇆ `Value` adapter (kept out of the framework)
 │   └── cli/               `flatbars-cli` — render templates + run the example/conformance corpus
 ├── examples/              Foldered core-template fixtures (golden cases for the compiler conformance harness)
 │   └── vendored/          Vendored upstream corpus (mustache/spec) for `flatbars examples verify`
 ├── conformance/
-│   ├── handlebars/        Differential Handlebars conformance — FullBars matches real handlebars@4.7.9 on 98% (49/50)
+│   ├── handlebars/        Differential Handlebars conformance — ClassicBars matches real handlebars@4.7.9 on 98% (49/50)
 │   └── mustache/          MinBars vs the full official mustache/spec — 100% (184/184) of every module it implements
 └── reference/
-    └── web/               FlatBars Lab — the JS/WASM polyglot playground (Stem · RawBars · MinBars · FullBars · MaxBars)
+    └── web/               FlatBars Lab — the JS/WASM polyglot playground (Stem · RawBars · MinBars · ClassicBars · MaxBars)
 ```
 
 The specification (`spec/`) is the contract. The PureScript packages target it;
@@ -45,8 +45,8 @@ verify`. The FlatBars Lab's own demo templates live under `lab/examples/`.
 **Conformance proofs.** `conformance/` measures the surface engines against the upstream
 suites so the claims can't over-state. Both are gated in `npm test`:
 
-- `conformance/handlebars/` — **FullBars vs Handlebars**, *differential*: every case rendered
-  through the real `handlebars` npm package (a dev-only oracle) **and** FullBars, asserted
+- `conformance/handlebars/` — **ClassicBars vs Handlebars**, *differential*: every case rendered
+  through the real `handlebars` npm package (a dev-only oracle) **and** ClassicBars, asserted
   byte-identical. Currently **98% (49/50)** (user block helpers landed — ADR-020); `npm run check:hbs-conformance`.
 - `conformance/mustache/` — **MinBars vs the full official `mustache/spec`** (every module,
   optional `~` ones included). Each fixture carries its own `expected`, so the spec is the
@@ -74,7 +74,7 @@ npm test               # run the full suite (per-package tests + conformance gat
 npm run cli -- --help  # run the CLI
 npm run build:spec     # build the Astro Starlight spec site (spec/)
 # FlatBars Lab: serve lab/ over HTTP and open index.html
-#   (defaults to the FullBars engine — no build needed; the Stem engine also
+#   (defaults to the ClassicBars engine — no build needed; the Stem engine also
 #    needs its wasm: run lab/build.sh, requires the Rust wasm toolchain)
 ```
 

@@ -25,11 +25,11 @@ we skip."
 
 The decisive constraint, found in the code: **MinBars lexes through the
 *shared* core lexer** — `FlatBars.Lexer.tokenizeTemplate`, the same lexer the
-RawBars ⊂ FullBars ⊂ MaxBars ladder uses, whose `openerLiteralAt` hardcodes
+RawBars ⊂ ClassicBars ⊂ MaxBars ladder uses, whose `openerLiteralAt` hardcodes
 `{{` / `{{{` / `{{!--` … via `matchAt cs i "{{"`. Set
 delimiters makes the open/close pair **mutable mid-parse**. So this is a
 shared-lexer question, not a MinBars-local one, and Handlebars (hence
-FullBars / MaxBars) has no `{{=...=}}` — the feature is Mustache-only.
+ClassicBars / MaxBars) has no `{{=...=}}` — the feature is Mustache-only.
 
 ## Decision
 
@@ -58,7 +58,7 @@ keeps the flag off so the dialect ladder has a single consistent answer to
 * *MinBars* — `mustacheDelims = true`. Inline `{{=...=}}` switches the
   active pair mid-stream; the `{{! @delimiters: <% %> }}` long-comment
   directive seeds the file's initial pair.
-* *RawBars*, *MaxBars*, *FullBars* — `mustacheDelims = false`. The inline form
+* *RawBars*, *MaxBars*, *ClassicBars* — `mustacheDelims = false`. The inline form
   is rejected at the parser (a `LexError: unexpected character` from the
   recovering parser, refined into the actionable LSP diagnostic below). The
   `{{! @delimiters: …}}` long-comment form parses as a normal comment, and the
@@ -143,8 +143,8 @@ precedes a passing fixture.
   14/14.
 * ADR-007's deferral is lifted; the tutorial's static set-delimiters block is
   a live runnable card.
-* FullBars stays Handlebars-faithful (no set delimiters). The off-by-default
-  invariant keeps existing RawBars / MaxBars / FullBars templates
+* ClassicBars stays Handlebars-faithful (no set delimiters). The off-by-default
+  invariant keeps existing RawBars / MaxBars / ClassicBars templates
   byte-identical.
 
 ## Scope narrowing (2026-06-04)
@@ -162,12 +162,12 @@ implementation collapsed accordingly:
 
 * `RawBars.coreOptions.lexConfig` and `MaxBars.maxOptions.lexConfig` revert to
   `defaultLexConfig` (no `mustacheDelims`).
-* `packages/js/src/FullBars/JS.purs` `highlightConfig` matches at the
+* `packages/js/src/ClassicBars/JS.purs` `highlightConfig` matches at the
   highlight layer for `rawbars`, so highlighting agrees with parsing.
 * The rawbars and maxbars test suites flip from "asserts switching works" to
   "asserts the inline form is rejected and the long-comment form is ignored".
 * `dialectDiagnostics` (`editors/lsp/src/tokens.mjs`) emits the actionable
-  message described in "Editor diagnostic" above for FullBars / RawBars /
+  message described in "Editor diagnostic" above for ClassicBars / RawBars /
   MaxBars; MinBars silent.
 
 The four opt-in mechanisms (config / runtime / CLI / directive) listed in

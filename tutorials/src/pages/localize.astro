@@ -34,7 +34,7 @@ const groups = [
   title="Localization"
   subtitle="FlatBars ships no i18n — it is the host's job (ADR-029). Until you wire a host translator, the i18n ops render their key/value verbatim — you ship untranslated strings (analyse mode flags exactly this). This guide is the Lab acting as the host: one translator seeded onto the engine's i18n seam, backed by the browser's native Intl, so plurals and number formatting come from the platform, not a vendored library."
   groups={groups}
-  dialect="fullbars"
+  dialect="classicbars"
 >
   <style>
     .lz-cell { margin: 1rem 0 1.6rem; }
@@ -110,7 +110,7 @@ const groups = [
           <p class="lz-h"><b>{c.label}</b> — <span>{c.note}</span></p>
           <I18nCard
             client:visible
-            engine="fullbars"
+            engine="classicbars"
             template={c.template}
             data={c.data}
             locale={c.locale}
@@ -159,7 +159,7 @@ const groups = [
     </p>
     <I18nCard
       client:visible
-      engine="fullbars"
+      engine="classicbars"
       template={flagship.template}
       data={flagship.data}
       locale={flagship.locale}
@@ -181,7 +181,7 @@ const groups = [
     <p>
       Upstream, <a href="/transform">Data shaping</a> builds the view-model your
       localized template walks; the surfaces that render it are
-      <a href="/minbars">MinBars</a>, <a href="/fullbars">FullBars</a>, and
+      <a href="/minbars">MinBars</a>, <a href="/classicbars">ClassicBars</a>, and
       <a href="/maxbars">MaxBars</a>.
     </p>
   </section>

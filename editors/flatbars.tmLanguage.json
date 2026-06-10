@@ -7,7 +7,7 @@
     "rbars",
     "minbars",
     "mbars",
-    "fullbars",
+    "classicbars",
     "fbars",
     "maxbars",
     "xbars",
@@ -117,7 +117,7 @@
     },
     "//interior": "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 TAG INTERIOR \u2014 included from every expression-bearing tag \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550",
     "tag_interior": {
-      "_doc": "The pattern set every expression-bearing tag includes inside its region. Covers the lexical pieces shared across all FlatBars dialects: quoted strings, numeric literals, boolean/null constants, operators (FullBars `as |x|` / MaxBars infix + pipe), subexpression parens, list-literal brackets, and path separators (`.` / `/` for nested paths). Stateless: cannot distinguish first-position helper names from later-position arguments \u2014 that's the LSP's job. The LSP's semantic tokens override these where they overlap.",
+      "_doc": "The pattern set every expression-bearing tag includes inside its region. Covers the lexical pieces shared across all FlatBars dialects: quoted strings, numeric literals, boolean/null constants, operators (ClassicBars `as |x|` / MaxBars infix + pipe), subexpression parens, list-literal brackets, and path separators (`.` / `/` for nested paths). Stateless: cannot distinguish first-position helper names from later-position arguments \u2014 that's the LSP's job. The LSP's semantic tokens override these where they overlap.",
       "patterns": [
         {
           "include": "#tag_string_double"

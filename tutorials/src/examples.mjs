@@ -34,9 +34,9 @@ export const lessons = {
     data: { name: "Ada", items: ["alpha", "beta"] },
   },
 
-  fullbars: {
-    engine: "fullbars",
-    title: "FullBars — Handlebars-faithful",
+  classicbars: {
+    engine: "classicbars",
+    title: "ClassicBars — Handlebars-faithful",
     blurb:
       "Faithful to Handlebars, the industry-standard {{ }} engine: {{name}} auto-escapes, dotted paths " +
       "read data, {{#each}} / {{#if}} are block helpers, and you register your own " +

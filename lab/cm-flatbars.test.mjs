@@ -85,10 +85,10 @@ test("a dialect-disallowed shape is tk-error", () => {
 test("an unterminated tag recovers to a tk-error decoration (ADR-023), not blank", () => {
   // The recovering lexer marks the orphan as `unterminated` (painted tk-error)
   // instead of dropping all highlighting.
-  assert.ok(marks("{{oops", "fullbars").some(([, c]) => c === "tk-error"));
+  assert.ok(marks("{{oops", "classicbars").some(([, c]) => c === "tk-error"));
   // …and earlier valid tags stay painted: a {{name}} before the break still gets
   // its tk-tag plate, plus the broken tail is tk-error.
-  const m = marks("Hi {{name}} more {{oops", "fullbars");
+  const m = marks("Hi {{name}} more {{oops", "classicbars");
   assert.ok(m.some(([, c]) => c === "tk-error"), "the broken tail is tk-error");
   assert.ok(m.some(([, c]) => c === "tk-tag"), "the earlier {{name}} still gets a plate");
 });
@@ -97,7 +97,7 @@ test("each whole tag gets ONE tk-tag plate over its full { … } range", () => {
   // The plate layer (returned last) marks each tag from first { to last } so it
   // reads as one pill, with the token marks nested inside.
   const tpl = "{{#each xs}}{{name}}{{/each}}";
-  const plates = marks(tpl, "fullbars").filter(([, c]) => c === "tk-tag");
+  const plates = marks(tpl, "classicbars").filter(([, c]) => c === "tk-tag");
   assert.equal(plates.length, 3, JSON.stringify(plates)); // one per tag, not per token
   assert.deepEqual(
     plates.map(([t]) => t),

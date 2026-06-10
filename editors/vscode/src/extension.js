@@ -16,14 +16,14 @@ const { LanguageClient, TransportKind } = require("vscode-languageclient/node");
 // The four dialect language ids the extension contributes. Kept identical to
 // editors/shared/sync.mjs LANGUAGES (codegened into package.json via
 // editors/scripts/sync-manifests.mjs, gated by check:editors-manifests).
-const LANGUAGE_IDS = ["rawbars", "minbars", "fullbars", "maxbars"];
+const LANGUAGE_IDS = ["rawbars", "minbars", "classicbars", "maxbars"];
 
 let client;
 
 function activate(context) {
   // The server is bundled to a single self-contained file (no node_modules).
   const serverModule = context.asAbsolutePath(path.join("dist", "server", "flatbars-lsp.cjs"));
-  const defaultDialect = workspace.getConfiguration("flatbars").get("defaultDialect", "fullbars");
+  const defaultDialect = workspace.getConfiguration("flatbars").get("defaultDialect", "classicbars");
 
   const serverOptions = {
     run: { module: serverModule, transport: TransportKind.stdio },

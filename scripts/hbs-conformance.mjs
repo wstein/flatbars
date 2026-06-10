@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 //
-// Handlebars conformance proof for FullBars — DIFFERENTIAL, so it cannot
+// Handlebars conformance proof for ClassicBars — DIFFERENTIAL, so it cannot
 // over-claim. For every case in conformance/handlebars/corpus.json it renders
 // the template through the REAL `handlebars` npm package (the oracle, a
-// dev-only dependency) and through FullBars (lab/vendor/flatbars-engine.mjs,
+// dev-only dependency) and through ClassicBars (lab/vendor/flatbars-engine.mjs,
 // the same bundle the Lab ships), then asserts byte-equality. The "expected"
 // output is therefore whatever upstream Handlebars actually produces — never a
-// value we wrote down. The headline number is the share of cases where FullBars
+// value we wrote down. The headline number is the share of cases where ClassicBars
 // matches Handlebars exactly.
 //
 //   node scripts/hbs-conformance.mjs            # measure + write the report
 //   node scripts/hbs-conformance.mjs --check    # CI: fail if the report is stale
 //   node scripts/hbs-conformance.mjs --verbose  # also print every mismatch
 //
-// Cases tagged `gap` in the corpus are the documented FullBars divergences we
+// Cases tagged `gap` in the corpus are the documented ClassicBars divergences we
 // are closing (blockHelperMissing / Mustache-style sections). They start as
 // misses; the number rises as the feature lands.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -29,10 +29,10 @@ const corpusFile = resolve(root, "conformance/handlebars/corpus.json");
 const reportFile = resolve(root, "conformance/handlebars/report.json");
 
 // ── Helper definitions, registered IDENTICALLY in both engines ───────────────
-// Each entry gives the Handlebars form and the FullBars form (an inline
+// Each entry gives the Handlebars form and the ClassicBars form (an inline
 // `{ name: fn }` per ADR-018). They must be semantically identical so a
-// mismatch reflects the engine, not the helper. A helper FullBars cannot
-// express (e.g. a user-defined *block* helper) is omitted on the FullBars side
+// mismatch reflects the engine, not the helper. A helper ClassicBars cannot
+// express (e.g. a user-defined *block* helper) is omitted on the ClassicBars side
 // on purpose — the resulting miss is a real, reported gap.
 const HELPERS = {
   loud: {
@@ -68,7 +68,7 @@ function renderHandlebars(test) {
   return hb.compile(test.template)(test.data ?? {});
 }
 
-function renderFullBars(test) {
+function renderClassicBars(test) {
   const bag = Object.create(null);
   for (const name of test.helpers || []) if (HELPERS[name].fb) bag[name] = HELPERS[name].fb;
   const r = renderWith(bag, test.partials || {}, test.template, test.data ?? {});
@@ -98,7 +98,7 @@ for (const cat of corpus.categories) {
       expected = "<<oracle-threw: " + (e && e.message) + ">>";
     }
     try {
-      actual = renderFullBars(t);
+      actual = renderClassicBars(t);
       ok = actual === expected;
     } catch (e) {
       err = String((e && e.message) || e);
@@ -119,8 +119,8 @@ const pct = (p, t) => (t === 0 ? "100.0" : ((100 * p) / t).toFixed(1));
 const report = {
   _generated: "by scripts/hbs-conformance.mjs — DO NOT EDIT; run `npm run gen:hbs-conformance`",
   oracle: "handlebars@" + Handlebars.VERSION + " (dev-only differential oracle)",
-  engine: "FullBars (lab/vendor/flatbars-engine.mjs — the shipped Lab bundle)",
-  method: "render each corpus case through real Handlebars AND FullBars; pass = byte-identical",
+  engine: "ClassicBars (lab/vendor/flatbars-engine.mjs — the shipped Lab bundle)",
+  method: "render each corpus case through real Handlebars AND ClassicBars; pass = byte-identical",
   total: { pass: gp, total: gt, pct: Number(pct(gp, gt)) },
   gap: { pass: gapP, total: gapT, label: "blockHelperMissing / Mustache-style sections" },
   modules,
@@ -141,10 +141,10 @@ if (check) {
     );
     process.exit(1);
   }
-  console.log(`✓ report.json current — FullBars ${gp}/${gt} (${pct(gp, gt)}%) vs handlebars@${Handlebars.VERSION}`);
+  console.log(`✓ report.json current — ClassicBars ${gp}/${gt} (${pct(gp, gt)}%) vs handlebars@${Handlebars.VERSION}`);
 } else {
   writeFileSync(reportFile, text);
-  console.log(`\nFullBars vs handlebars@${Handlebars.VERSION} — DIFFERENTIAL conformance\n`);
+  console.log(`\nClassicBars vs handlebars@${Handlebars.VERSION} — DIFFERENTIAL conformance\n`);
   for (const m of modules) {
     const flag = m.pass === m.total ? "✓" : "✗";
     console.log(`  ${flag} ${m.label.padEnd(38)} ${m.pass}/${m.total}`);
@@ -159,7 +159,7 @@ if (check) {
       console.log(`\n  ✗ ${m.category}/${m.name}${m.gap ? " [gap]" : ""}`);
       console.log(`      template: ${JSON.stringify(m.template)}`);
       console.log(`      handlebars: ${JSON.stringify(m.expected)}`);
-      console.log(`      fullbars:   ${m.error ? "THREW " + JSON.stringify(m.error) : JSON.stringify(m.actual)}`);
+      console.log(`      classicbars:   ${m.error ? "THREW " + JSON.stringify(m.error) : JSON.stringify(m.actual)}`);
     }
   } else if (misses.length) {
     console.log(`\n  ${misses.length} mismatch(es) — run with --verbose to see them.`);

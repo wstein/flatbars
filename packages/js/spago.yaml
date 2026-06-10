@@ -14,12 +14,12 @@ package:
     - argonaut-core
     - flatbars
     - flatbars-json
-    - fullbars
+    - classicbars
     - kernel
     - rawbars
     - maxbars
     - minbars
-    - fullbars-compile
+    - classicbars-compile
     - linter
     - arrays
     - integers
@@ -29,7 +29,7 @@ package:
     - foreign-object
     - ordered-collections
   test:
-    main: Test.FullBars.JS.Main
+    main: Test.ClassicBars.JS.Main
     dependencies:
       - prelude
       - effect

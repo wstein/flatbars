@@ -1,28 +1,28 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 //
-// The comprehensive FullBars reference — the Handlebars-faithful surface. Modelled
+// The comprehensive ClassicBars reference — the Handlebars-faithful surface. Modelled
 // on the handlebarsjs.com guide's spine (expressions → paths → block helpers →
 // built-ins → subexpressions → custom helpers → partials → comments) but NOT a
 // copy: it leads with what works exactly like Handlebars, then a named "Where
-// FullBars diverges" section sourced from fullbars-compat.adoc. Prose is
+// ClassicBars diverges" section sourced from classicbars-compat.adoc. Prose is
 // illustrative only; every runnable example comes from the single gate-validated
-// source ../fullbars.mjs and renders through the real `surface` engine. The
+// source ../classicbars.mjs and renders through the real `surface` engine. The
 // ~80-helper prelude is NOT re-listed here (that is the generated catalog's job) —
 // this page teaches the language and the six built-ins, and links the catalog.
 import Reference from "../layouts/Reference.astro";
 import SurfaceDeltas from "../components/SurfaceDeltas.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
-import { examples as ex } from "../fullbars.mjs";
+import { examples as ex } from "../classicbars.mjs";
 
 const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/spec/";
 
-// Sticky left-nav: FullBars concepts, then the sibling surfaces, then the Lab.
+// Sticky left-nav: ClassicBars concepts, then the sibling surfaces, then the Lab.
 const groups = [
   {
-    label: "FullBars",
+    label: "ClassicBars",
     items: [
-      { href: "#intro", label: "What FullBars is" },
+      { href: "#intro", label: "What ClassicBars is" },
       { href: "#reference", label: "Surface reference" },
       { href: "#expressions", label: "Expressions & escaping" },
       { href: "#paths", label: "Paths" },
@@ -56,7 +56,7 @@ const groups = [
   },
   {
     label: "Play",
-    items: [{ href: "/lab/index.html?engine=fullbars", label: "FlatBars Lab ↗" }],
+    items: [{ href: "/lab/index.html?engine=classicbars", label: "FlatBars Lab ↗" }],
   },
 ];
 
@@ -80,17 +80,17 @@ $ ~> | $ | {
 ---
 
 <Reference
-  title="FullBars — Handlebars-faithful"
-  subtitle="FullBars is faithful to Handlebars — the industry-standard {{ }} engine — and gives you its Handlebars-style surface: {{ }} auto-escaping, dotted paths, block helpers, @data, and `as |x|`. This runnable reference walks the language the way a Handlebars author already thinks."
+  title="ClassicBars — Handlebars-faithful"
+  subtitle="ClassicBars is faithful to Handlebars — the industry-standard {{ }} engine — and gives you its Handlebars-style surface: {{ }} auto-escaping, dotted paths, block helpers, @data, and `as |x|`. This runnable reference walks the language the way a Handlebars author already thinks."
   groups={groups}
   spec="surface"
-  dialect="fullbars"
+  dialect="classicbars"
 >
   <!-- ─────────────────────────── Intro ─────────────────────────── -->
   <section id="intro">
-    <h2>What FullBars is</h2>
+    <h2>What ClassicBars is</h2>
     <p>
-      <b>FullBars is the Handlebars-faithful member of the FlatBars family.</b> If
+      <b>ClassicBars is the Handlebars-faithful member of the FlatBars family.</b> If
       you know Handlebars, you already know most of this page: <code>{t("{{name}}")}</code>
       auto-escapes, dotted paths read nested data, <code>{t("{{#each}}")}</code> /
       <code>{t("{{#if}}")}</code> are block helpers, and partials, subexpressions, and
@@ -98,16 +98,16 @@ $ ~> | $ | {
     </p>
     <p>
       What's underneath is different, and it's the whole point of the project.
-      FullBars isn't a separate engine — it's a <b>surface syntax</b> over the same
+      ClassicBars isn't a separate engine — it's a <b>surface syntax</b> over the same
       meaning-free core that runs <a href="/minbars">MinBars (Mustache)</a> and
       <a href="/rawbars">RawBars</a>. One parser, four languages. In the core there
       are <b>no variables</b>: <code>{t("{{name}}")}</code> doesn't read a variable,
       it <em>applies</em> the helper <code>name</code> (see <a href="/rawbars">RawBars</a>).
       That model holds the line in a few places where Handlebars is looser — gathered
-      under <a href="#divergences">Where FullBars diverges</a>.
+      under <a href="#divergences">Where ClassicBars diverges</a>.
     </p>
     <p>The simplest template — the panes are live, so start here:</p>
-    <OpenInLab client:visible engine="fullbars" template={ex.hello.template} data={ex.hello.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.hello.template} data={ex.hello.data} />
     <p class="tip">
       The panes are live: edit the <b>template</b> or the <b>data</b> and the output
       re-renders as you type. <b>Open in Lab</b> carries the example over to the full
@@ -118,10 +118,10 @@ $ ~> | $ | {
   <!-- ────────────────────── Surface reference ───────────────────── -->
   <section id="reference">
     <h2>Surface reference</h2>
-    <p>The syntax and value-policy deltas that define FullBars, at a glance — generated from the
+    <p>The syntax and value-policy deltas that define ClassicBars, at a glance — generated from the
       same single source (<code>shared/surface-syntax.json</code>) the FlatBars Lab's Reference
       popup and the spec engine page read, so it can never drift from what they render.</p>
-    <SurfaceDeltas surface="fullbars" />
+    <SurfaceDeltas surface="classicbars" />
   </section>
 
   <!-- ────────────────────── Expressions & escaping ───────────────────── -->
@@ -132,9 +132,9 @@ $ ~> | $ | {
       inserts the result, <b>HTML-escaped by default</b> so data can't inject markup.
       To emit raw markup use the triple-stash <code>{t("{{{name}}}")}</code>. (Handlebars's
       <code>{t("{{&name}}")}</code> is accepted as an alias, but the triple-stash is the
-      canonical FullBars spelling.)
+      canonical ClassicBars spelling.)
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.escaping.template} data={ex.escaping.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.escaping.template} data={ex.escaping.data} />
   </section>
 
   <!-- ───────────────────────────── Paths ───────────────────────────── -->
@@ -144,13 +144,13 @@ $ ~> | $ | {
       Reach into nested objects with dots — <code>{t("{{user.address.city}}")}</code> —
       and <code>{t("{{this}}")}</code> is the current context.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.dotted.template} data={ex.dotted.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.dotted.template} data={ex.dotted.data} />
     <h3>Missing keys</h3>
     <p>
       A path that resolves to nothing — missing or <code>null</code> — renders as the
-      empty string. FullBars never errors on a missing key.
+      empty string. ClassicBars never errors on a missing key.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.missing.template} data={ex.missing.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.missing.template} data={ex.missing.data} />
     <h3>Climbing out: <code>../</code> and <code>@root</code></h3>
     <p>
       Inside a block, <code>{t("{{../x}}")}</code> climbs to the enclosing context and
@@ -206,13 +206,13 @@ $ ~> | $ | {
       <code>{t("{{#if x}} … {{else}} … {{/if}}")}</code> is a <b>block helper</b>: its
       head is a helper application, not a bare key. The <code>{t("{{else if …}}")}</code>
       chain works too. To test more than a bare value, nest a <a href="#subexpressions">subexpression</a>
-      — <code>{t("{{#if (gte stock 10)}}")}</code> is how FullBars writes "stock ≥ 10"
+      — <code>{t("{{#if (gte stock 10)}}")}</code> is how ClassicBars writes "stock ≥ 10"
       (the infix <code>{t(">=")}</code> belongs to <a href="/maxbars">MaxBars</a>).
       <code>{t("{{#unless x}}")}</code> is its explicit inverse — it renders when
-      <code>x</code> is falsy. Note <code>0</code> is <b>falsy</b> in FullBars (the
+      <code>x</code> is falsy. Note <code>0</code> is <b>falsy</b> in ClassicBars (the
       opposite of <a href="/minbars">MinBars</a>, where a section over <code>0</code> renders).
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.conditionals.template} data={ex.conditionals.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.conditionals.template} data={ex.conditionals.data} />
   </section>
 
   <!-- ───────────────────────────── each ────────────────────────────── -->
@@ -224,13 +224,13 @@ $ ~> | $ | {
       <code>{t("@index")}</code>, <code>{t("@first")}</code>, and <code>{t("@last")}</code>
       describe the position.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.eachList.template} data={ex.eachList.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.eachList.template} data={ex.eachList.data} />
     <h3>Over an object</h3>
     <p>Iterating an object, <code>{t("@key")}</code> is the property name and <code>{t("{{this}}")}</code> the value.</p>
-    <OpenInLab client:visible engine="fullbars" template={ex.eachObject.template} data={ex.eachObject.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.eachObject.template} data={ex.eachObject.data} />
     <h3>The empty case</h3>
     <p><code>{t("{{#each}}")}</code> has its own <code>{t("{{else}}")}</code> for an empty list — no separate inverted section.</p>
-    <OpenInLab client:visible engine="fullbars" template={ex.eachElse.template} data={ex.eachElse.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.eachElse.template} data={ex.eachElse.data} />
     <p class="tip">
       Rename the loop bindings with block params: <code>{t("{{#each xs as |item i|}}")}</code>
       gives the element and index your own names — useful inside nested loops.
@@ -244,7 +244,7 @@ $ ~> | $ | {
       <code>{t("{{#with obj}}")}</code> makes <code>obj</code> the context for its body,
       so a deep path is written once.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.withBlock.template} data={ex.withBlock.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.withBlock.template} data={ex.withBlock.data} />
   </section>
 
   <!-- ─────────────────── Subexpressions & lookup ────────────────────── -->
@@ -252,13 +252,13 @@ $ ~> | $ | {
     <h2>Subexpressions &amp; <code>lookup</code></h2>
     <p>
       Parentheses nest one helper's result into another's arguments:
-      <code>{t("(lookup colours selected)")}</code>. This is how FullBars avoids
+      <code>{t("(lookup colours selected)")}</code>. This is how ClassicBars avoids
       "write a JS helper for everything" — you <b>compose the ~80 helpers that ship</b>.
       <code>{t("{{lookup obj key}}")}</code> itself reads a field whose name isn't known
       until render — an array index, or a key chosen by the data. Below, the looked-up
       colour is upper-cased in one expression.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.subexprLookup.template} data={ex.subexprLookup.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.subexprLookup.template} data={ex.subexprLookup.data} />
     <p>
       <code>{t("{{log x}}")}</code> is a sibling debugging aid: it writes to the console
       and renders to the empty string.
@@ -279,7 +279,7 @@ $ ~> | $ | {
       <li><b><code>link</code></b> — reads trailing <code>key=value</code> <b>hash</b> arguments (<code>url=…</code>) and returns <code>safe(…)</code> raw markup.</li>
       <li><b><code>list</code></b> — a <b>block helper</b> (<a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>): <code>options.fn(item, &#123; blockParams &#125;)</code> renders its body with a shifted context and binds <code>as |p i|</code>.</li>
     </ul>
-    <OpenInLab client:visible engine="fullbars" template={ex.helpers.template} data={ex.helpers.data} helpers={ex.helpers.helpers} />
+    <OpenInLab client:visible engine="classicbars" template={ex.helpers.template} data={ex.helpers.data} helpers={ex.helpers.helpers} />
     <div class="callout info">
       <p>
         The full block <code>options</code> surface works: <code>fn</code>/<code>inverse</code>/<code>hash</code>
@@ -287,7 +287,7 @@ $ ~> | $ | {
         <code>@vars</code>, and <code>as |…|</code> block params are all supported
         (<a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>); only
         <code>ids</code>/<code>loc</code>/<code>lookupProperty</code> throw. <code>registerHelper</code>
-        is <b>FullBars-only</b>: RawBars and MaxBars use a different concept and terminology
+        is <b>ClassicBars-only</b>: RawBars and MaxBars use a different concept and terminology
         (operations / definitions, <a href={`${SPEC_BASE}adr/adr-0019-operation-vocabulary/`}>ADR-019</a>).
         Declaring an arity (<code>registerHelper('loud', fn, 1)</code>) gives the same diagnostics
         as a built-in. In the <b>Lab</b>, helper code runs in a Worker (no page access), not a full
@@ -306,7 +306,7 @@ $ ~> | $ | {
       <code>{t("{{bar}}")}</code> comes out as <code>{t("{{BAR}}")}</code> — the
       data's <code>bar</code> is never read.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.rawBlock.template} data={ex.rawBlock.data} helpers={ex.rawBlock.helpers} />
+    <OpenInLab client:visible engine="classicbars" template={ex.rawBlock.template} data={ex.rawBlock.data} helpers={ex.rawBlock.helpers} />
   </section>
 
   <!-- ─────────────────── Lambdas → precalculated values ─────────────────── -->
@@ -343,7 +343,7 @@ $ ~> | $ | {
       it templates a row each, and the name can be an <b>expression</b> resolved per row —
       <code>{t("{{> (lookup this \"kind\")}}")}</code> picks the partial from the data.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.partials.template} data={ex.partials.data} partials={ex.partials.partials} />
+    <OpenInLab client:visible engine="classicbars" template={ex.partials.template} data={ex.partials.data} partials={ex.partials.partials} />
     <h3>Layout &amp; inline partials</h3>
     <p>
       Two Handlebars-only forms. <code>{t("{{#*inline \"name\"}}…{{/inline}}")}</code> defines
@@ -351,7 +351,7 @@ $ ~> | $ | {
       <code>{t("{{#> layout}}…{{/layout}}")}</code> hands its body to the partial, which drops
       it in with <code>{t("{{> @partial-block}}")}</code> — Handlebars-style layout reuse.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.layoutPartials.template} data={ex.layoutPartials.data} partials={ex.layoutPartials.partials} />
+    <OpenInLab client:visible engine="classicbars" template={ex.layoutPartials.template} data={ex.layoutPartials.data} partials={ex.layoutPartials.partials} />
   </section>
 
   <!-- ─────────────────────────── Comments ───────────────────────────── -->
@@ -361,7 +361,7 @@ $ ~> | $ | {
       <code>{t("{{! … }}")}</code> is dropped from the output. The
       <code>{t("{{!-- … --}}")}</code> form may itself contain <code>{t("}}")}</code>.
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.comment.template} data={ex.comment.data} />
+    <OpenInLab client:visible engine="classicbars" template={ex.comment.template} data={ex.comment.data} />
   </section>
 
   <!-- ─────────────────── Putting it together ─────────────────────── -->
@@ -372,7 +372,7 @@ $ ~> | $ | {
       interpolation, a dotted path, an <code>{t("{{#each}}")}</code> with its built-in
       <code>{t("{{else}}")}</code>, and a <code>{t("{{> item}}")}</code> partial:
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.email.template} data={ex.email.data} partials={ex.email.partials} />
+    <OpenInLab client:visible engine="classicbars" template={ex.email.template} data={ex.email.data} partials={ex.email.partials} />
     <h3>When the output <em>is</em> HTML</h3>
     <p>
       Handlebars is an HTML engine, so the capstone is an HTML card: a
@@ -380,7 +380,7 @@ $ ~> | $ | {
       partial is one row's markup with a <code>{t("{{#if lead}}")}</code> badge, and
       <code>{t("{{#each}}")}</code> iterates. (The one example that previews as HTML in the Lab.)
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.card.template} data={ex.card.data} partials={ex.card.partials} />
+    <OpenInLab client:visible engine="classicbars" template={ex.card.template} data={ex.card.data} partials={ex.card.partials} />
   </section>
 
   <!-- ───────────────────── Style & conventions ─────────────────────── -->
@@ -411,25 +411,25 @@ $ ~> | $ | {
   <section id="compile">
     <h2>Compiles to JS</h2>
     <p>
-      Like Handlebars's precompilation, FullBars <b>compiles a template to a JS
+      Like Handlebars's precompilation, ClassicBars <b>compiles a template to a JS
       module</b> — and FlatBars gates that the compiled module and the interpreter
       produce <b>byte-identical</b> output (so the pane below is the same render, just
       ahead of time). Expand <b>Compiled JS</b> on the conditionals example:
     </p>
-    <OpenInLab client:visible engine="fullbars" template={ex.conditionals.template} data={ex.conditionals.data} compile />
+    <OpenInLab client:visible engine="classicbars" template={ex.conditionals.template} data={ex.conditionals.data} compile />
   </section>
 
-  <!-- ───────────────── Where FullBars diverges ──────────────────────── -->
+  <!-- ───────────────── Where ClassicBars diverges ──────────────────────── -->
   <section id="divergences">
-    <h2>Where FullBars diverges from Handlebars</h2>
+    <h2>Where ClassicBars diverges from Handlebars</h2>
     <p>
       Most of Handlebars works unchanged. A few things differ <b>by design</b> — each a
       consequence of the meaning-free core, each with a one-line replacement. The
-      normative list is <a href={`${SPEC_BASE}engine/fullbars-compat/`}>fullbars-compat.adoc</a>;
+      normative list is <a href={`${SPEC_BASE}engine/classicbars-compat/`}>classicbars-compat.adoc</a>;
       this table is the short version.
     </p>
     <table class="cmp">
-      <thead><tr><th>Handlebars</th><th>FullBars</th><th>Why</th></tr></thead>
+      <thead><tr><th>Handlebars</th><th>ClassicBars</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
           <td><span class="code">else</span> as a keyword</td>
@@ -456,12 +456,12 @@ $ ~> | $ | {
     <p class="tip">
       Coming from Mustache or Handlebars? An <b>implicit section</b> just works:
       <code>{t("{{#person}}…{{/person}}")}</code> renders once when <code>person</code> is
-      truthy and <code>{t("{{#tags}}…{{/tags}}")}</code> iterates a list — FullBars looks an
+      truthy and <code>{t("{{#tags}}…{{/tags}}")}</code> iterates a list — ClassicBars looks an
       unregistered block head up as data and dispatches it like Handlebars'
       <code>blockHelperMissing</code> (array&nbsp;⇒&nbsp;<code>each</code>,
       truthy&nbsp;⇒&nbsp;<code>with</code>, empty&nbsp;⇒&nbsp;<code>{t("{{else}}")}</code>).
       Writing <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> explicitly is still
-      the clearer style. FullBars matches Handlebars on <b>98%</b> of a differential
+      the clearer style. ClassicBars matches Handlebars on <b>98%</b> of a differential
       conformance corpus (rendered through the real Handlebars engine); the one corpus miss is a
       raw-block corner (user-defined block helpers now pass — <a href={`${SPEC_BASE}adr/adr-0020-user-block-helpers/`}>ADR-020</a>).
       In-data lambdas aren't a gap: a value is pure data, so value-producing lambdas are precalculated
@@ -475,7 +475,7 @@ $ ~> | $ | {
     <p>
       The examples above are the Handlebars guide's own building blocks — expressions,
       paths, the built-in helpers, subexpressions, partials, custom helpers — running
-      <b>unchanged on FullBars</b>. The complete concept-by-concept mapping (with the
+      <b>unchanged on ClassicBars</b>. The complete concept-by-concept mapping (with the
       core each one desugars to) is the normative
       <a href={`${SPEC_BASE}appendix/handlebars/`}>Handlebars → FlatBars appendix</a>.
     </p>
@@ -489,11 +489,11 @@ $ ~> | $ | {
     </p>
     <h3>Up and down the ladder</h3>
     <p>
-      <a href="/rawbars">RawBars</a> is what FullBars desugars <em>to</em> — the
+      <a href="/rawbars">RawBars</a> is what ClassicBars desugars <em>to</em> — the
       meaning-free core. <a href="/maxbars">MaxBars</a> adds infix operators and pipes
       on top — so <code>{t("{{#if (gte score 50)}}")}</code> here becomes
       <code>{t("{{#if score >= 50}}")}</code> there. Same engine, same compiler. Or jump
-      straight into the <a href="/lab/index.html?engine=fullbars">Lab</a> and start typing.
+      straight into the <a href="/lab/index.html?engine=classicbars">Lab</a> and start typing.
     </p>
   </section>
 </Reference>

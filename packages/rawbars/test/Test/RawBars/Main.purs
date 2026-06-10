@@ -99,7 +99,7 @@ main = do
 
   -- ── Set delimiters (ADR-015 amendment): MinBars-exclusive ─────────────────
   -- RawBars REJECTS set-delim. The Mustache `{{=A B=}}` inline directive is a
-  -- hard parse error in RawBars/MaxBars/FullBars; the `{{! @delimiters: …}}`
+  -- hard parse error in RawBars/MaxBars/ClassicBars; the `{{! @delimiters: …}}`
   -- long-comment form parses as a normal comment and the directive inside is
   -- silently ignored (no delimiter switch happens, so `<%name%>` reads as
   -- plain content). The dialect ladder has one consistent answer to "does
@@ -109,7 +109,7 @@ main = do
   assert' "set-delim: `{{! @delimiters: …}}` directive is ignored — `<%a%>` stays content"
     (render "{{! @delimiters: <% %> }}<%a%>" (obj []) == Right "<%a%>")
 
-  -- block-partial yield: the native RawBars `yield` operation (FullBars uses `partial-block`)
+  -- block-partial yield: the native RawBars `yield` operation (ClassicBars uses `partial-block`)
   -- renders the caller's block body. RawBars has no surface, so it is the explicit
   -- raw spelling `{{{yield}}}` inside a registered partial, invoked as a block
   -- partial (the ctx is passed explicitly — no surface to default it to `this`).
@@ -139,7 +139,7 @@ main = do
         == Right "[Bo]"
     )
 
-  -- Inline-partial hoisting — parity with FullBars/MaxBars (ADR-005/008): a bare
+  -- Inline-partial hoisting — parity with ClassicBars/MaxBars (ADR-005/008): a bare
   -- {{#inline "x"}} in the template defines a partial (hoisted by the shared
   -- Kernel.Hoist.hoistInline), invoked by {{#partial "x" this}} with {{{yield}}}
   -- the caller's body. Same engine; only the surface syntax differs.

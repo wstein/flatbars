@@ -63,7 +63,7 @@ replicate them (port the rules, not the code):
 - **Operator/pipe desugar** to `App`-head calls the emitter matches
   (`a + b` → `App "add" [a, b]`, `x | f arg` → `App "f" [x, arg]`).
 
-These are documented in `FullBars/Surface.purs`; that module is the desugar spec.
+These are documented in `ClassicBars/Surface.purs`; that module is the desugar spec.
 
 ## 4. Options
 

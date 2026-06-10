@@ -1,4 +1,4 @@
--- | A thin, JS/TS-friendly facade over the FullBars engine (review P6), and the
+-- | A thin, JS/TS-friendly facade over the ClassicBars engine (review P6), and the
 -- | engine seam the polyglot lab (Brace Lab) consumes.
 -- |
 -- | The library renders against the core `Value` type with curried,
@@ -7,7 +7,7 @@
 -- | `{ ok, value, error }`; `astJson` returns the lowered AST as the lab's
 -- | `{t:…}` JSON node shape (or `{error}`), so a JS host's AST-outline and
 -- | data-access inspectors can walk it.
-module FullBars.JS
+module ClassicBars.JS
   ( Result
   , AnalyseResult
   , analyzeMinbars
@@ -69,6 +69,9 @@ module FullBars.JS
 
 import Prelude
 
+import ClassicBars (RNode(..), Translator, desugarSurface, desugarSurfaceWith, lower)
+import ClassicBars as ClassicBars
+import ClassicBars.Compile (compileSurface) as Compile
 import Control.Monad.Error.Class (throwError)
 import Data.Argonaut.Core (Json, caseJsonArray, caseJsonObject, caseJsonString, fromArray, fromBoolean, fromNumber, fromObject, fromString, jsonNull)
 import Data.Array (elem, head, length, null, take, uncons, zipWith) as Array
@@ -89,9 +92,6 @@ import FlatBars.Span (Span, lineColumn, spanText)
 import FlatBars.Token (defaultLexOptions)
 import FlatBars.Value (Value(..))
 import Foreign.Object as FO
-import FullBars (RNode(..), Translator, desugarSurface, desugarSurfaceWith, lower)
-import FullBars as FullBars
-import FullBars.Compile (compileSurface) as Compile
 import Kernel.Analyse (Finding, PathSchema) as Analyse
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
@@ -144,12 +144,12 @@ type AnalyseResult =
   , error :: String
   }
 
--- | Analyse a FullBars surface template against JS data: render and report every
+-- | Analyse a ClassicBars surface template against JS data: render and report every
 -- | truthiness decision that would branch differently on another engine — observed
 -- | *and* the symbolic same-type potential what-ifs (ADR-030). `analyze(template,
 -- | data)`.
 analyze :: Fn2 String Json AnalyseResult
-analyze = mkFn2 \tpl json -> analyseResult (FullBars.analyseSurface tpl (fromJson json))
+analyze = mkFn2 \tpl json -> analyseResult (ClassicBars.analyseSurface tpl (fromJson json))
 
 -- | Truthiness analysis for a MinBars (Mustache) template — the narrower
 -- | Mustache-portability story (ADR-022): MinBars renders on `mustache-spec`, so a
@@ -164,7 +164,7 @@ analyzeMinbars = mkFn2 \tpl json -> analyseResult (MinAnalyse.analyseMin tpl (fr
 -- | host's types rule out. `analyzeWith(schema, template, data)`.
 analyzeWith :: Fn3 JsPathSchema String Json AnalyseResult
 analyzeWith = mkFn3 \schema tpl json ->
-  analyseResult (FullBars.analyseSurfaceWith (toPathSchema schema) tpl (fromJson json))
+  analyseResult (ClassicBars.analyseSurfaceWith (toPathSchema schema) tpl (fromJson json))
 
 -- | Shared marshalling of an `analyseSurface*` outcome to the JS `AnalyseResult`.
 analyseResult
@@ -201,18 +201,18 @@ type LintResult =
   }
 
 -- | Lint a template for deprecated aliases and non-canonical scoped variables.
--- | `lint(template, dialect)`, where `dialect` is `"rawbars"` | `"fullbars"` |
--- | `"maxbars"` (anything else is treated as `"rawbars"`). FullBars lints aliases
+-- | `lint(template, dialect)`, where `dialect` is `"rawbars"` | `"classicbars"` |
+-- | `"maxbars"` (anything else is treated as `"rawbars"`). ClassicBars lints aliases
 -- | only (its `@`-data spellings are canonical there); RawBars/MaxBars also flag
 -- | non-canonical scoped variables (`index` → `index0`, `partial-block` → `yield`).
 -- | Never blocks rendering — this is a host/CI hygiene check (ADR-019).
 lint :: Fn2 String String LintResult
 lint = mkFn2 \tpl dialect ->
   let
-    surface = dialect == "fullbars"
+    surface = dialect == "classicbars"
     opts = case dialect of
       "maxbars" -> maxOptions
-      "fullbars" -> defaultParseOptions
+      "classicbars" -> defaultParseOptions
       _ -> RawBars.coreOptions
   in
     case parseWith opts tpl of
@@ -323,9 +323,9 @@ migrate = mkFn1 \tpl -> case migrateToMaxBars tpl of
 
 -- | Render a surface-dialect template against JS data. `renderSurface(template, data)`.
 renderSurface :: Fn2 String Json Result
-renderSurface = mkFn2 \tpl json -> result (FullBars.renderSurfaceDiag tpl (fromJson json))
+renderSurface = mkFn2 \tpl json -> result (ClassicBars.renderSurfaceDiag tpl (fromJson json))
 
--- | Render a *MaxBars* template (FullBars surface + infix/pipes + bare loop
+-- | Render a *MaxBars* template (ClassicBars surface + infix/pipes + bare loop
 -- | variables) against JS data. `renderMaxbars(template, data)`.
 renderMaxbars :: Fn2 String Json Result
 renderMaxbars = mkFn2 \tpl json -> result (MaxBars.renderMax tpl (fromJson json))
@@ -363,7 +363,7 @@ renderMinbarsCompatWithPartials = mkFn3 \partials tpl json ->
 -- | partials. `{{> name}}` renders the registered partial.
 renderSurfaceWithPartials :: Fn3 (FO.Object String) String Json Result
 renderSurfaceWithPartials = mkFn3 \partials tpl json ->
-  result (FullBars.renderSurfaceWith (FO.toUnfoldable partials) tpl (fromJson json))
+  result (ClassicBars.renderSurfaceWith (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | A mapped render outcome (ADR-035): the output plus a `segments` source map
 -- | (each `{ out, len, kind, start, end }`, with `start`/`end` null on text runs
@@ -391,13 +391,13 @@ mappedResult = either
 -- | `renderSurfaceMapped(template, data)`.
 renderSurfaceMapped :: Fn2 String Json MappedResult
 renderSurfaceMapped = mkFn2 \tpl json ->
-  mappedResult (FullBars.renderSurfaceMapped tpl (fromJson json))
+  mappedResult (ClassicBars.renderSurfaceMapped tpl (fromJson json))
 
 -- | `renderSurfaceMapped` with named external partials — the mapped twin of
 -- | `renderSurfaceWithPartials`. `renderSurfaceMappedWithPartials(partials, template, data)`.
 renderSurfaceMappedWithPartials :: Fn3 (FO.Object String) String Json MappedResult
 renderSurfaceMappedWithPartials = mkFn3 \partials tpl json ->
-  mappedResult (FullBars.renderSurfaceMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
+  mappedResult (ClassicBars.renderSurfaceMappedWith (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Mapped render of a *core* template. `renderMapped(template, data)`.
 renderMapped :: Fn2 String Json MappedResult
@@ -454,7 +454,8 @@ inspectResult = case _ of
 -- | execution of the matching emit (a loop body yields one per iteration).
 inspectSurface :: Fn4 (FO.Object String) JsTarget String Json InspectResult
 inspectSurface = mkFn4 \partials target tpl json ->
-  inspectResult (FullBars.inspectSurfaceWith target (FO.toUnfoldable partials) tpl (fromJson json))
+  inspectResult
+    (ClassicBars.inspectSurfaceWith target (FO.toUnfoldable partials) tpl (fromJson json))
 
 -- | Context inspector for a *core* template. `inspect(partials, target, template, data)`.
 inspect :: Fn4 (FO.Object String) JsTarget String Json InspectResult
@@ -512,7 +513,7 @@ inspectMaxbars = mkFn4 \partials target tpl json ->
 -- | template, data)`, where `translator` is a `(name, args) => string | null`.
 renderSurfaceI18n :: Fn3 JsTranslator String Json Result
 renderSurfaceI18n = mkFn3 \jt tpl json ->
-  result (FullBars.renderSurfaceI18n (toTranslator jt) tpl (fromJson json))
+  result (ClassicBars.renderSurfaceI18n (toTranslator jt) tpl (fromJson json))
 
 -- | Render a *MinBars* template (the mustache-conformant core dialect) with a
 -- | set of named partials, against JS data. `renderMustache(partials, template,
@@ -589,7 +590,7 @@ foreign import callJsBlockHelperImpl
 -- | The `SafeString` equivalent a helper returns for raw markup. `safe(string)`.
 foreign import safe :: String -> Json
 
--- | Render a *surface* (FullBars) template with host-registered inline helpers
+-- | Render a *surface* (ClassicBars) template with host-registered inline helpers
 -- | and partials. `renderWith(helpers, partials, template, data)`, where
 -- | `helpers` is a plain `{ name: (…args) => value }` object and `partials` a
 -- | `{ name: source }` object. A helper returns a value (a string is
@@ -597,7 +598,7 @@ foreign import safe :: String -> Json
 -- | for raw markup; a thrown helper surfaces as a render error. Mirrors the
 -- | compiled path, which routes the same names through `rt.call`/`rt.register`.
 -- | Marshal one host JS function into an engine `Operation`, shared by every
--- | registrar facade (`renderWith` for FullBars; `renderRawWith`/`renderMaxWith`
+-- | registrar facade (`renderWith` for ClassicBars; `renderRawWith`/`renderMaxWith`
 -- | for RawBars/MaxBars, ADR-019 addendum). Usage decides inline vs block: a
 -- | non-empty `ctl.children` means `pass:[{{#name}}…{{/name}}]`. Inline (ADR-018):
 -- | args marshal Value→JSON, the result JSON→Value (escaped `VString`, or
@@ -659,7 +660,7 @@ marshalOps = map (\(Tuple n fn) -> Tuple n (jsOperation n fn)) <<< FO.toUnfoldab
 renderWith :: Fn4 (FO.Object JsHelperFn) (FO.Object String) String Json Result
 renderWith = mkFn4 \helpers partials tpl json ->
   result
-    ( FullBars.renderSurfaceWithHelpers (marshalOps helpers) (FO.toUnfoldable partials) tpl
+    ( ClassicBars.renderSurfaceWithHelpers (marshalOps helpers) (FO.toUnfoldable partials) tpl
         (fromJson json)
     )
 
@@ -667,7 +668,7 @@ renderWith = mkFn4 \helpers partials tpl json ->
 -- | addendum). `renderRawWith(operations, partials, template, data)`. Strict
 -- | resolve; a block operation gets `options.fn`/`inverse` (+ `{ data }`) but no
 -- | hash / block params (RawBars has no surface to write them). The boundary word
--- | is *operation* — FullBars' `renderWith` is the helper-named twin.
+-- | is *operation* — ClassicBars' `renderWith` is the helper-named twin.
 renderRawWith :: Fn4 (FO.Object JsHelperFn) (FO.Object String) String Json Result
 renderRawWith = mkFn4 \operations partials tpl json ->
   result
@@ -734,8 +735,8 @@ compileMinbarsCompatWithPartials = mkFn2 \partials tpl ->
 
 -- | Compile a template to JS for a named dialect — one entry over the four
 -- | per-dialect compilers. `compileFor(dialect, template)`, where `dialect` is
--- | `"rawbars"` | `"fullbars"` | `"maxbars"` | `"minbars"` (anything else is
--- | treated as `"fullbars"`). RawBars/FullBars/MaxBars share one emit driver
+-- | `"rawbars"` | `"classicbars"` | `"maxbars"` | `"minbars"` (anything else is
+-- | treated as `"classicbars"`). RawBars/ClassicBars/MaxBars share one emit driver
 -- | (the surfaces desugar to the same core; xref ADR-011); MinBars compiles via
 -- | its own inliner (ADR-016). For MinBars *with partials*, use
 -- | `compileMinbarsWithPartials`. Equivalent to picking the matching
@@ -761,8 +762,8 @@ compileResultAt src = case _ of
 --------------------------------------------------------------------------------
 
 -- | Tokenize template source into highlight spans for the given dialect
--- | (`"rawbars"` | `"fullbars"` | `"maxbars"` | `"minbars"`; anything else is
--- | treated as `"fullbars"`). `highlightSpans(template, dialect)` returns a plain
+-- | (`"rawbars"` | `"classicbars"` | `"maxbars"` | `"minbars"`; anything else is
+-- | treated as `"classicbars"`). `highlightSpans(template, dialect)` returns a plain
 -- | JS array of `{ from, to, kind }` (UTF-16 offsets + a kind tag). Highlighting
 -- | derives from the engine lexer, so it is correct on set delimiters and on each
 -- | dialect's tag boundaries and clause keywords (`{{else}}`/`{{elif}}`). See
@@ -793,14 +794,14 @@ diagnostics = mkFn2 \src dialect ->
       "maxbars" -> maxOptions
       "minbars" -> MinBars.minOptions
       "rawbars" -> RawBars.coreOptions
-      _ -> defaultParseOptions -- fullbars (parsed with the default options)
+      _ -> defaultParseOptions -- classicbars (parsed with the default options)
   in
     map (parseErrorAt src) (parseRecovering opts src).errors
 
 -- | Map a dialect name to its highlight seams, mirroring each dialect's own parse
 -- | settings (the single source of truth — drift is caught by `check:highlight`):
 -- | RawBars/MaxBars/MinBars enable the `{{=A B=}}` set-delimiter tag
--- | (`mustacheDelims`), FullBars does not; the kernel dialects treat
+-- | (`mustacheDelims`), ClassicBars does not; the kernel dialects treat
 -- | `else`/`elif` as clause separators, MinBars (Mustache) treats none; only
 -- | MaxBars enables the infix-arithmetic interior lexer (`lexOptions.operatorChars`),
 -- | so `+`/`-`/`*`/`/` carve as `operator` spans there and stay path punctuation
@@ -851,7 +852,7 @@ highlightConfig = case _ of
     , lexOptions: defaultLexOptions
     , extras: true
     , inheritance: false
-    -- FullBars is Handlebars-faithful: the bare `{{{{name}}}}` only.
+    -- ClassicBars is Handlebars-faithful: the bare `{{{{name}}}}` only.
     , rawBlockHbs: true
     , rawBlockHash: false
     }
@@ -882,7 +883,7 @@ astJson = mkFn2 \dialect src ->
     -- set `diagnostics` reports (both project `parseRecovering` — gated by
     -- check:parse-views).
     -- each dialect parses with its own gates — the same mapping `diagnostics` uses
-    -- (Lab vocabulary: "core" = RawBars, "surface" = FullBars), so the AST view and
+    -- (Lab vocabulary: "core" = RawBars, "surface" = ClassicBars), so the AST view and
     -- the Problems panel agree (gated by check:parse-views).
     opts = case dialect of
       "maxbars" -> maxOptions

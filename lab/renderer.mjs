@@ -9,8 +9,8 @@
 // dialect doesn't back.
 //
 //   createRenderer("rawbars" | "core")     → the austere meaning-free core
-//   createRenderer("fullbars" | "surface") → the Handlebars-flavoured surface (default)
-//   createRenderer("maxbars")              → FullBars + infix operators / pipes / bare loop vars
+//   createRenderer("classicbars" | "surface") → the Handlebars-flavoured surface (default)
+//   createRenderer("maxbars")              → ClassicBars + infix operators / pipes / bare loop vars
 //   createRenderer("minbars" | "mustache", { compat }) → Mustache (logic-less)
 //
 // All four are the PureScript `flatbars-js` engine compiled to JS — no WASM. The
@@ -65,7 +65,7 @@ import {
   compileMinbarsWithPartials as bbCompileMinbarsWithPartials,
   compileMinbarsCompat as bbCompileMinbarsCompat,
   compileMinbarsCompatWithPartials as bbCompileMinbarsCompatWith,
-} from "./vendor/flatbars-engine.mjs?v=108";
+} from "./vendor/flatbars-engine.mjs?v=109";
 
 import { buildDependencyGraph } from "./playground_utils.mjs";
 
@@ -90,12 +90,12 @@ const INSPECT = {
 };
 
 // Map a UI/param dialect name to the engine's internal dialect, or `null` for an
-// unrecognised value. `rawbars`→"core", `fullbars`→"surface", `mustache`→"minbars";
+// unrecognised value. `rawbars`→"core", `classicbars`→"surface", `mustache`→"minbars";
 // `maxbars`/`minbars` are their own engine entrypoints.
 function normalizeDialect(d) {
   if (d === "maxbars" || d === "core" || d === "surface" || d === "minbars") return d;
   if (d === "rawbars") return "core";
-  if (d === "fullbars") return "surface";
+  if (d === "classicbars") return "surface";
   if (d === "mustache") return "minbars";
   return null;
 }
@@ -126,7 +126,7 @@ const BB_FEATURES = [
   "migrate", // Handlebars → MaxBars source rewrite, with a residual report (Migrated view)
   "surface-dialect", // {{ }} auto-escape, paths, @data, else/elif (Handlebars-flavoured)
   "core-dialect", // the austere meaning-free core syntax
-  "maxbars-dialect", // FullBars + infix operators, pipes, bare loop variables
+  "maxbars-dialect", // ClassicBars + infix operators, pipes, bare loop variables
 ];
 
 // engine-features/v1 for MinBars: it renders + has (Mustache) partials + a catalog
@@ -259,7 +259,7 @@ function flatbarsRenderer(activeDialect, _opts) {
   // warnings for the active dialect. The facade keys on the UI dialect name.
   function lint(source, dialect) {
     const internal = normalizeDialect(dialect) ?? activeDialect;
-    const ui = internal === "core" ? "rawbars" : internal === "surface" ? "fullbars" : internal;
+    const ui = internal === "core" ? "rawbars" : internal === "surface" ? "classicbars" : internal;
     return bbLint(source, ui);
   }
   // Handlebars → MaxBars source migration (ADR; the `migrate` feature).
@@ -376,7 +376,7 @@ function flatbarsRenderer(activeDialect, _opts) {
   function engineInfo() {
     // The core / surface / maxbars dialects back source maps (ADR-035), lighting
     // up the provenance UI; a dialect without a mapped entrypoint advertises it off.
-    // The FullBars surface also backs the Context Inspector (`context-inspect`).
+    // The ClassicBars surface also backs the Context Inspector (`context-inspect`).
     const features = MAPPED[activeDialect] ? [...BB_FEATURES, "source-map"] : [...BB_FEATURES];
     if (INSPECT[activeDialect]) features.push("context-inspect");
     // Trussbars AOT-compat (MaxBars only): the production-engine compatibility lint.
@@ -486,7 +486,7 @@ function minbarsRenderer(opts) {
   // required-assigns: the root key of every data read in the ROOT scope. MinBars
   // lowers reads to `mlookup("a.b")` calls (head = `a`); a `section` pushes a new
   // context, so reads inside its body are NOT root assigns, while an `inverted`
-  // body keeps the root scope. Mirrors the FullBars `requiredAssigns` over the
+  // body keeps the root scope. Mirrors the ClassicBars `requiredAssigns` over the
   // MinBars AST (the same scoping `analyseDataAccess` applies).
   function requiredAssigns(program) {
     const out = new Set();

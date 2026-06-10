@@ -26,7 +26,7 @@ try {
     processId: process.pid,
     rootUri: null,
     capabilities: {},
-    initializationOptions: { defaultDialect: "fullbars" },
+    initializationOptions: { defaultDialect: "classicbars" },
   });
 
   const provider = init.capabilities.semanticTokensProvider;
@@ -92,12 +92,12 @@ try {
   );
   assert.deepEqual(await maxDiags, [], "valid MaxBars publishes no diagnostics");
 
-  // A FullBars doc with `{{#if a == 1}}` → one parse diagnostic (ADR-023): the same
+  // A ClassicBars doc with `{{#if a == 1}}` → one parse diagnostic (ADR-023): the same
   // dialect resolution that makes `==` valid in MaxBars makes it an error here.
-  const badUri = "file:///test/bad.fullbars";
+  const badUri = "file:///test/bad.classicbars";
   const badDiags = waitDiagnostics(badUri);
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri: badUri, languageId: "fullbars", version: 1, text: "{{#if a == 1}}x{{/if}}" },
+    textDocument: { uri: badUri, languageId: "classicbars", version: 1, text: "{{#if a == 1}}x{{/if}}" },
   });
   const ds = await badDiags;
   assert.equal(ds.length, 1, "one parse diagnostic");
@@ -105,13 +105,13 @@ try {
   assert.equal(ds[0].severity, 1, "Error severity");
   assert.equal(ds[0].range.start.line, 0, "diagnostic on line 0");
 
-  // Hover + completion (ADR-017) over a FullBars doc with a real operation head.
+  // Hover + completion (ADR-017) over a ClassicBars doc with a real operation head.
   // Position is computed from the source so a cosmetic edit doesn't break the test.
-  const hovUri = "file:///test/hov.fullbars";
+  const hovUri = "file:///test/hov.classicbars";
   const hovText = "{{uppercase name}}";
   const hovTarget = hovText.indexOf("uppercase");
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri: hovUri, languageId: "fullbars", version: 1, text: hovText },
+    textDocument: { uri: hovUri, languageId: "classicbars", version: 1, text: hovText },
   });
   const hover = await conn.sendRequest("textDocument/hover", {
     textDocument: { uri: hovUri },
@@ -159,10 +159,10 @@ try {
   assert.equal(caText.slice(edit.range.start.character, edit.range.end.character), "index", "edit range covers exactly `index`");
 
   // ── new capabilities (ADR-026): folding, document symbols, formatting ──────
-  const capUri = "file:///test/cap.fullbars";
+  const capUri = "file:///test/cap.classicbars";
   const capText = "<ul>\n{{#each items}}\n  <li>{{this}}</li>\n{{/each}}\n</ul>\n";
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri: capUri, languageId: "fullbars", version: 1, text: capText },
+    textDocument: { uri: capUri, languageId: "classicbars", version: 1, text: capText },
   });
   const folds = await conn.sendRequest("textDocument/foldingRange", { textDocument: { uri: capUri } });
   assert.equal(folds.length, 1, "one fold for the each block");
@@ -172,10 +172,10 @@ try {
   assert.equal(symbols.length, 1, "one top-level symbol");
   assert.equal(symbols[0].name, "#each", "the each block surfaces as a symbol");
   // Formatter — request edits for a messy version of the same template.
-  const messyUri = "file:///test/messy.fullbars";
+  const messyUri = "file:///test/messy.classicbars";
   const messyText = "{{   name   }}\n{{#each  items  }}\n{{/each}}\n";
   await conn.sendNotification("textDocument/didOpen", {
-    textDocument: { uri: messyUri, languageId: "fullbars", version: 1, text: messyText },
+    textDocument: { uri: messyUri, languageId: "classicbars", version: 1, text: messyText },
   });
   const fmtEdits = await conn.sendRequest("textDocument/formatting", {
     textDocument: { uri: messyUri },

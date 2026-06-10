@@ -27,7 +27,7 @@
       <li>TextMate fallback (every JetBrains IDE) and Ultimate-only LSP ceiling
       (IntelliJ IDEA Ultimate 2024.2+).</li>
       <li>Native extensions per dialect — long (.rawbars / .minbars /
-      .fullbars / .maxbars) and short (.rbars / .mbars / .fbars / .xbars); MaxBars
+      .classicbars / .maxbars) and short (.rbars / .mbars / .fbars / .xbars); MaxBars
       also claims .truss (Trussbars AOT-compiled templates).</li>
       <li>Helper-name highlighting from the prelude catalogue; canonicalisation
       quick-fix on deprecated aliases.</li>
@@ -69,7 +69,7 @@
 
     <!-- The runnable file templates "New ▸ FlatBars Template" surface, gated by
          the textmate bundle providing the dialect language registration. -->
-    <internalFileTemplate name="FlatBars Template.fullbars"/>
+    <internalFileTemplate name="FlatBars Template.classicbars"/>
 
     <!-- Live Templates (every common block form). The XML lives at
          resources/liveTemplates/FlatBars.xml. -->

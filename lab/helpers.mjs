@@ -4,7 +4,7 @@
 // panel and the tutorials' runnable cards (ADR-018). The source registers via
 // one of two dialect-scoped names (ADR-019 addendum), both aliasing the *same*
 // registrar into the same bag:
-//   • `registerHelper(name, fn)`    — the FullBars / Handlebars-migration word;
+//   • `registerHelper(name, fn)`    — the ClassicBars / Handlebars-migration word;
 //   • `registerOperation(name, fn)` — the native word the RawBars / MaxBars docs
 //     use, since those dialects reject the "helper" framing (concepts §1).
 // It may call `safe(str)` to emit raw markup; `buildHelpers` runs the source and
@@ -37,7 +37,7 @@ export function buildHelpers(source, safe) {
     helpers[name] = arity === undefined ? fn : { fn, arity };
   };
   try {
-    // `registerHelper` (FullBars) and `registerOperation` (native RawBars/MaxBars)
+    // `registerHelper` (ClassicBars) and `registerOperation` (native RawBars/MaxBars)
     // are dialect-scoped aliases of the one `register` above — both fill the same
     // bag, so a card teaches its dialect's word while every card stays runnable
     // (ADR-019 addendum). `safe` is the third injected name; the source runs for

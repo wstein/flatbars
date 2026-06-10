@@ -1,6 +1,6 @@
 -- | **MinBars** — the Mustache-compatible engine, the fourth member of the
--- | dialect ladder (RawBars · MinBars · FullBars · MaxBars). It is a *peer*
--- | engine to FullBars over the shared substrate: it reuses the skeleton parser,
+-- | dialect ladder (RawBars · MinBars · ClassicBars · MaxBars). It is a *peer*
+-- | engine to ClassicBars over the shared substrate: it reuses the skeleton parser,
 -- | the `Value` ADT, the IoC walker, and the truthiness machinery, but supplies
 -- | its own context-stack environment (`MinBars.Context`), its own Mustache
 -- | prelude (`MinBars.Prelude`), and its own surface desugar
@@ -119,7 +119,7 @@ renderMin :: String -> Value -> Either String String
 renderMin = renderMinWith []
 
 -- | Render MinBars source with a set of named partials, each given as Mustache
--- | source (parsed + desugared, like `FullBars.renderSurfaceWith`). `{{> name}}`
+-- | source (parsed + desugared, like `ClassicBars.renderSurfaceWith`). `{{> name}}`
 -- | renders the registered partial under the current context stack. Uses the
 -- | language-agnostic `mustache` rule (`0`/`""` truthy); see `renderMinCompatWith`
 -- | for the `mustache.js`-compatible reading.

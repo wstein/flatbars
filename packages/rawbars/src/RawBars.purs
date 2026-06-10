@@ -1,7 +1,7 @@
--- | **RawBars** — the austere base of the dialect ladder (RawBars ⊂ FullBars ⊂
+-- | **RawBars** — the austere base of the dialect ladder (RawBars ⊂ ClassicBars ⊂
 -- | MaxBars). It renders/compiles the *core* skeleton syntax directly — explicit
 -- | `pass:[{{{ lookup this "x" }}}]`, no surface sugar — against the shared
--- | *reference engine*. (FullBars adds the surface desugar; MaxBars adds operators
+-- | *reference engine*. (ClassicBars adds the surface desugar; MaxBars adds operators
 -- | and pipes. The engine, value policy, prelude, and compiler are all shared.)
 -- |
 -- | This is a thin dialect layer: it reuses the reference engine's `runResolved`
@@ -9,7 +9,7 @@
 -- | shared compiler's `Emit` (`FlatBars.Compile.Emit.coreEmit` — the strict emit,
 -- | matching RawBars' strict `runResolved`: no value-helper sectioning), swapping in
 -- | *no* surface desugar. Note it depends on `kernel` + `flatbars-compile`, *not*
--- | the `fullbars` package — its dependency closure is FullBars-free (see ADR-008).
+-- | the `classicbars` package — its dependency closure is ClassicBars-free (see ADR-008).
 -- | It exists so the three dialects are symmetric packages over one engine.
 module RawBars
   ( coreOptions
@@ -56,7 +56,7 @@ import Kernel.ToValue (class ToValue, toValue)
 import Kernel.Value (nonEmpty)
 
 --------------------------------------------------------------------------------
--- Rendering (core syntax + the FullBars engine)
+-- Rendering (core syntax + the ClassicBars engine)
 --------------------------------------------------------------------------------
 
 -- | RawBars is the austere dialect: it rejects the Handlebars-only tag shapes
@@ -64,7 +64,7 @@ import Kernel.Value (nonEmpty)
 -- | off. Front-end knobs like standalone trimming still pass through.
 -- |
 -- | Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is a
--- | Mustache feature and only MinBars accepts it. RawBars, MaxBars, and FullBars
+-- | Mustache feature and only MinBars accepts it. RawBars, MaxBars, and ClassicBars
 -- | all reject set-delim directives — the dialect ladder treats set-delim as
 -- | MinBars-exclusive so the four surfaces have a single, consistent answer to
 -- | "does delimiter switching work here?" instead of three yeses and one no.
@@ -154,7 +154,7 @@ renderValue src = renderDiag src <<< toValue
 -- | `UnknownHelper`, never `blockHelperMissing` — and has no surface sugar, so a
 -- | block operation gets `options.fn`/`inverse` (and `options.fn(ctx, { data })`)
 -- | but no `options.hash` / block params (there is no `k=v` or `as |…|` to write).
--- | "operation" is the native boundary word; FullBars' twin is `renderWith` (helper).
+-- | "operation" is the native boundary word; ClassicBars' twin is `renderWith` (helper).
 renderWithOperations
   :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
   -> Array (Tuple String String)
@@ -171,7 +171,7 @@ renderWithOperations operations partialSrcs src dat =
           h = hoistInline nodes
           externalT = Map.fromFoldable (map (\p -> Tuple p.name p.template) ps)
           -- Inline definitions in the template win over same-named external
-          -- partials (left-biased union), matching FullBars.
+          -- partials (left-biased union), matching ClassicBars.
           setup =
             withTruthy nonEmpty
               <<< withYieldName "yield"
@@ -271,12 +271,12 @@ renderAff src dat = case parseCore coreOptions src of
         )
 
 --------------------------------------------------------------------------------
--- Compilation (core syntax → JS, via the shared driver + FullBars Emit)
+-- Compilation (core syntax → JS, via the shared driver + ClassicBars Emit)
 --------------------------------------------------------------------------------
 
 -- | Compile core source to a JS ES module. `{{#inline "name"}}` definitions are
 -- | hoisted into the partial registry (the shared `Kernel.Hoist.hoistInline`),
--- | exactly as `render` does and as FullBars/MaxBars compile — so RawBars differs
+-- | exactly as `render` does and as ClassicBars/MaxBars compile — so RawBars differs
 -- | only in surface syntax, not capability (ADR-005/008).
 compileJs :: String -> Either ParseError String
 compileJs = compileJsWith coreOptions

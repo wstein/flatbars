@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The FlatBars compiled-template runtime (FullBars dialect). Compiled templates
-// (FlatBars.Compile.FullBars) are `function (data, rt)` and call into this `rt`.
-// It re-implements the FullBars value semantics on *plain JS values* — string /
+// The FlatBars compiled-template runtime (ClassicBars dialect). Compiled templates
+// (FlatBars.Compile.ClassicBars) are `function (data, rt)` and call into this `rt`.
+// It re-implements the ClassicBars value semantics on *plain JS values* — string /
 // number / boolean / null / array / object, plus a `Safe` wrapper for VSafe —
 // so the compiled path never touches the PureScript `Value` ADT.
 //
-// CONFORMANCE: this must match the interpreter (FullBars.renderWith) byte for
+// CONFORMANCE: this must match the interpreter (ClassicBars.renderWith) byte for
 // byte; the deliberate divergences live here too (content-based VSafe truthiness:
 // `safe ""` is falsy; explicit escaping). The example conformance harness
 // (compile_conformance.mjs) is the gate.
@@ -22,7 +22,7 @@ class Safe {
 }
 const isSafe = (v) => v instanceof Safe;
 
-// ── stringify (FullBars.Value.stringify) ─────────────────────────────────────
+// ── stringify (ClassicBars.Value.stringify) ─────────────────────────────────────
 // VString→s, VSafe→content, bool→"true"/"false", null→"", number (no trailing
 // .0; JS String already does this), array→join ",", object→error.
 function stringify(v) {
@@ -37,13 +37,13 @@ function stringify(v) {
   throw new Error("cannot stringify an object");
 }
 
-// ── escaping (FullBars.Value.escapeHtml) ─────────────────────────────────────
+// ── escaping (ClassicBars.Value.escapeHtml) ─────────────────────────────────────
 function escapeHtml(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }
 
-// ── truthiness (FullBars.Value) — a Value→boolean CALLBACK (ADR-022) ─────────
+// ── truthiness (ClassicBars.Value) — a Value→boolean CALLBACK (ADR-022) ─────────
 // Truthiness is *only* a callback; there is no falsy-set data form. A scope
 // carries its rule in `.truthy`; the compiled module binds one of the named
 // rules below (`$truthy = rt.truthyHandlebars` / `rt.truthyMustache`). These
@@ -121,7 +121,7 @@ function cmpVals(a, b) {
   return x < y ? -1 : x > y ? 1 : 0;
 }
 
-// ── lookup (FullBars.Prelude.lookup): walk segments, null at first miss ──────
+// ── lookup (ClassicBars.Prelude.lookup): walk segments, null at first miss ──────
 function lookup(obj, ...segs) {
   let cur = obj;
   for (const seg of segs) {
@@ -219,7 +219,7 @@ function scope(data, truthyFn, yieldName) {
     binds: Object.create(null),
     truthy: truthyFn || truthyHandlebars, // the engine's truthiness callback (ADR-022)
     // the dialect's spelling for a block partial's body (ADR-005 amendment):
-    // `partial-block` (FullBars) or `yield` (RawBars/MaxBars). Seeded per-dialect
+    // `partial-block` (ClassicBars) or `yield` (RawBars/MaxBars). Seeded per-dialect
     // like `truthy`, mirroring the interpreter's `RefEnv.yieldName`.
     yieldName: yieldName || "partial-block",
   };
@@ -306,7 +306,7 @@ function bindContextChain(frame, parentFrame) {
   return frame;
 }
 
-// ── iteration: `each` over array or object (FullBars eachH) ──────────────────
+// ── iteration: `each` over array or object (ClassicBars eachH) ──────────────────
 // `names` are block-param names (`as |item i|`): item = element, i = index
 // (array) or key (object), matching the interpreter.
 function each(coll, parent, names, label, bodyFn, elseFn) {
@@ -316,7 +316,7 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
     // index for the array position); the block-param `idx` still binds the index.
     items = coll.map((val, i) => ({ val, key: null, idx: i }));
   } else if (coll && typeof coll === "object" && !isSafe(coll)) {
-    // FullBars VObject is an ordered Map — iteration is by *sorted* key.
+    // ClassicBars VObject is an ordered Map — iteration is by *sorted* key.
     items = Object.keys(coll).sort().map((k) => ({ val: coll[k], key: k, idx: k }));
   } else {
     items = [];
@@ -340,7 +340,7 @@ function each(coll, parent, names, label, bodyFn, elseFn) {
   return out;
 }
 
-// ── context shift: `with` (FullBars withH) ───────────────────────────────────
+// ── context shift: `with` (ClassicBars withH) ───────────────────────────────────
 // `with` is not a loop, so it binds no `loop`; it INHERITS the enclosing loop's
 // object through the binds chain (so `loop`/`loop.parent` keep working across a
 // context shift). `label` is accepted for signature symmetry with `each` but the
@@ -369,7 +369,7 @@ function letScope(parent, objs, bodyFn) {
   return bodyFn(fr);
 }
 
-// ── partials: render a registered partial (FullBars partialH) ────────────────
+// ── partials: render a registered partial (ClassicBars partialH) ────────────────
 // `partials[name]` is a compiled `function (data, rt, partials)`. The hash (if
 // any) merges onto the context object (opts override); a non-object context
 // means the hash *is* the context. The result is unescaped (Safe), since a
@@ -412,7 +412,7 @@ function partialBlock(name, ctx, hash, partials, rt, bodyThunk) {
   }
 }
 
-// ── JSON serialization (FullBars.Value.jsonStringify): compact or pretty, with
+// ── JSON serialization (ClassicBars.Value.jsonStringify): compact or pretty, with
 //    sorted object keys (ordered Map) and per-code-unit string escaping ────────
 function jsonQuote(s) {
   let r = '"';
@@ -682,10 +682,10 @@ function call(name, args, frame) {
   // prototype chain so an outer binding stays visible in a nested block.
   if (frame && frame.binds && name in frame.binds) return frame.binds[name];
   // The block partial's body, under the DIALECT's spelling only (ADR-005
-  // amendment): `partial-block` for FullBars, `yield` for RawBars/MaxBars — the
+  // amendment): `partial-block` for ClassicBars, `yield` for RawBars/MaxBars — the
   // name the frame was seeded with (`frame.yieldName`), mirroring the interpreter's
   // single-name `partialH` frame. The other spelling falls through (empty under
-  // FullBars' lenient resolve, the UnknownHelper throw under RawBars/MaxBars).
+  // ClassicBars' lenient resolve, the UnknownHelper throw under RawBars/MaxBars).
   // Outside a block partial the stack is empty, so this falls through too.
   if (frame && name === frame.yieldName && yieldStack.length) {
     return new Safe(yieldStack[yieldStack.length - 1]());
@@ -698,7 +698,7 @@ function call(name, args, frame) {
 }
 
 // truthiness under a callback, honouring an options object's includeZero as a
-// per-call exception (FullBars truthyWith): the number 0 counts as truthy for
+// per-call exception (ClassicBars truthyWith): the number 0 counts as truthy for
 // this one test, on top of the engine's rule `f` (ADR-022).
 function truthyWith(f, v, opts) {
   const inc = opts && typeof opts === "object" && truthyHandlebars(opts.includeZero);
@@ -783,7 +783,7 @@ function block(name, args, frame, bodyFn, clauses, channel) {
   ) {
     return stringify(call(name, args, frame));
   }
-  // Otherwise Handlebars' `blockHelperMissing` (FullBars policy, mirrors
+  // Otherwise Handlebars' `blockHelperMissing` (ClassicBars policy, mirrors
   // Kernel.Prelude.sectionOp): the head names *data*, not a helper. Look it up in
   // the current context and dispatch — an array iterates (`each`), anything else
   // shifts context and renders once when truthy (`with`), falsy ⇒ the `{{else}}`

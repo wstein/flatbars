@@ -1,5 +1,5 @@
 {
-  "_generated": "by scripts/gen-operations.mjs from FullBars.preludeSchema — DO NOT EDIT; run `npm run gen:operations`",
+  "_generated": "by scripts/gen-operations.mjs from ClassicBars.preludeSchema — DO NOT EDIT; run `npm run gen:operations`",
   "operations": [
     {
       "name": "abs",
@@ -503,7 +503,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": "yield",
-      "doc": "Inside a block partial, the caller's block body — FullBars' {{> @partial-block}} target (RawBars/MaxBars use yield)."
+      "doc": "Inside a block partial, the caller's block body — ClassicBars' {{> @partial-block}} target (RawBars/MaxBars use yield)."
     },
     {
       "name": "pluck",
@@ -855,7 +855,7 @@
       "arity": "0",
       "source": "scoped",
       "canonical": null,
-      "doc": "Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block)."
+      "doc": "Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (ClassicBars uses partial-block)."
     }
   ]
 }

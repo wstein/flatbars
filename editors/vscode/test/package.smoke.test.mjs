@@ -86,12 +86,12 @@ try {
     processId: process.pid,
     rootUri: null,
     capabilities: {},
-    initializationOptions: { defaultDialect: "fullbars" },
+    initializationOptions: { defaultDialect: "classicbars" },
   });
   const legend = init.capabilities.semanticTokensProvider.legend;
   await conn.sendNotification("initialized", {});
 
-  // languageId 'maxbars' on a `.rawbars` URI with a fullbars default: the dialect
+  // languageId 'maxbars' on a `.rawbars` URI with a classicbars default: the dialect
   // must come from the languageId, so `??` is an operator and "b" a string.
   const uri = "file:///t/page.rawbars";
   const text = '{{ a ?? "b" }}';

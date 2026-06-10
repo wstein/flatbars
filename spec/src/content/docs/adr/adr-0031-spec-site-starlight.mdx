@@ -121,7 +121,7 @@ reuse outweigh Docusaurus's lone real edge in versioning maturity.
 
 ## Consequences
 
-* *The codegen single-sources are preserved, not broken.* `FullBars.Catalog` gains a
+* *The codegen single-sources are preserved, not broken.* `ClassicBars.Catalog` gains a
   `helperCatalogMarkdown` emitter beside the AsciiDoc one (same `preludeSchema`
   source), so `check:catalog` stays a gate on the MDX partial. `gen:tokens` writes the
   shared token CSS once for both sites; `check:adr-nav` and `check:glossary` repoint to

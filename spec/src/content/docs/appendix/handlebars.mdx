@@ -33,7 +33,7 @@ toc::[]
 | --- | --- | --- | --- |
 | `{{x}}` | `{{x}}` | `{{{ escapeHtml (lookup this "x") }}}` | SURFACE |
 | `{{{x}}}` | `{{{x}}}` | `{{{ lookup this "x" }}}` | SURFACE |
-| `{{&x}}` (HB unescaped alias) | `{{{x}}}` (FullBars accepts `{{&}}`) | `{{{ lookup this "x" }}}` | PROVIDED (FullBars; RawBars/MaxBars reject) |
+| `{{&x}}` (HB unescaped alias) | `{{{x}}}` (ClassicBars accepts `{{&}}`) | `{{{ lookup this "x" }}}` | PROVIDED (ClassicBars; RawBars/MaxBars reject) |
 | `{{a.b.c}}` | same | `{{{ escapeHtml (lookup this "a" "b" "c") }}}` | SURFACE |
 | `{{a.[1}}]` / `{{a.1}}` | same | `{{{ escapeHtml (lookup this "a" 1) }}}` | SURFACE |
 | `{{a.[home town}}]` | same | `{{{ escapeHtml (lookup this "a" "home town") }}}` | SURFACE |
@@ -102,7 +102,7 @@ Core:        {{{ escapeHtml (field (lookup this "value")
 | `{{#h}}…{{/h}}` | same | `{{#h}}…{{/h}}` | CORE |
 | `{{#h arg}}…{{/h}}` | same | args desugar like any call | CORE |
 | `{{else}}` separator | `{{else}}` | a `Sep "else"` marker the block helper splits at | CORE+ENGINE |
-| `{{^h c}}…{{/h}}` (HB inverted) | `{{#unless c}}…{{/unless}}` (FullBars desugars `{{^}}`) | `{{#unless c}}…{{/unless}}` | PROVIDED (FullBars; RawBars/MaxBars reject) |
+| `{{^h c}}…{{/h}}` (HB inverted) | `{{#unless c}}…{{/unless}}` (ClassicBars desugars `{{^}}`) | `{{#unless c}}…{{/unless}}` | PROVIDED (ClassicBars; RawBars/MaxBars reject) |
 | `else if` (chained) | same | nested `{{#if c}}…{{/if}}` inside an `else` clause | SURFACE→ENGINE |
 | block params `{{#h x as \|a b\|}}` | same | `{{#h x "a" "b"}}` — binding-name args | SURFACE |
 | `options.fn(ctx)` | — | `ctx.render` over the body's non-clause nodes | ENGINE |
@@ -241,16 +241,16 @@ than walk a stack: `{{#each teams as \|team\|}}…{{#each team.members}}{{team.n
 `{{> name ctx}}`, dynamic `{{> (expr)}}`, hash context `{{> name k=v}}`, block
 partials `{{#partial name}}body{{/partial}}` (body = fallback + `{{> @partial-block}}`
 yield), and inline partials `{{#*inline "name"}}body{{/inline}}` (the Handlebars decorator
-form, hoisted into the registry) — see [compatibility matrix](/engine/fullbars-compat/) §3. The
-Handlebars `{{#> }}` sigil and the `{{#*inline}}` decorator are the FullBars author
+form, hoisted into the registry) — see [compatibility matrix](/engine/classicbars-compat/) §3. The
+Handlebars `{{#> }}` sigil and the `{{#*inline}}` decorator are the ClassicBars author
 forms; they desugar internally to the core `partial` / `inline` helpers. The bare
-`{{#inline "name"}}` spelling is *rejected* (`DisallowedShape`) in FullBars — `inline` is a
+`{{#inline "name"}}` spelling is *rejected* (`DisallowedShape`) in ClassicBars — `inline` is a
 decorator, not a block helper to be written bare.
 :::
 
 All partial forms become the engine helpers `partial` (inline and block) and `inline`, plus the
 scoped `partial-block` ([prelude](/engine/prelude/) §6.6; [surface](/engine/surface/) §5.7). The rows below show the
-mapping shape; the FullBars author forms are `{{#partial}}` / `{{#> }}` for block
+mapping shape; the ClassicBars author forms are `{{#partial}}` / `{{#> }}` for block
 partials and the `{{#*inline}}` decorator for inline partials (see the status note above).
 Partials emit *unescaped*.
 
@@ -326,8 +326,8 @@ Core:        {{{{raw}}}}Hello {{name}}{{{{/raw}}}}   (verbatim; `raw` engine hel
 verbatim body to a helper (via `options.fn()`), so its head must name a defined
 operation — an undefined head is a hard `UnknownHelper` error in **every** dialect,
 never an implicit section. (This is why the worked example uses `raw`, the engine's
-identity passthrough helper, and the MaxBars/FullBars references register their own
-`rawloud`/`raw-loud`.) FullBars therefore diverges from Handlebars' `blockHelperMissing`
+identity passthrough helper, and the MaxBars/ClassicBars references register their own
+`rawloud`/`raw-loud`.) ClassicBars therefore diverges from Handlebars' `blockHelperMissing`
 here: there is no silent fall-through to a context section for a raw block. The common
 `{{{{raw}}}}…{{{{/raw}}}}` keeps working because `raw` is a prelude helper.
 :::
@@ -345,10 +345,10 @@ with the CLI `--trim none` / `flatbars.json`; explicit `~` composes on top. Outp
 ## A.8 Decorators
 
 :::caution
-*Not yet implemented.* FullBars ships no *decorator* helpers; the mapping below is the design
-([compatibility matrix](/engine/fullbars-compat/) §3). Because a decorator is just a block helper
+*Not yet implemented.* ClassicBars ships no *decorator* helpers; the mapping below is the design
+([compatibility matrix](/engine/classicbars-compat/) §3). Because a decorator is just a block helper
 here, no grammar or core change is needed to add them. (Inline *partials* — Handlebars'
-`{{#*inline}}` decorator — *are* implemented: in FullBars the `{{#*inline}}` decorator
+`{{#*inline}}` decorator — *are* implemented: in ClassicBars the `{{#*inline}}` decorator
 is the required author form, desugaring internally to the core `inline` block helper rather than to a
 distinct decorator mechanism; the bare `{{#inline}}` spelling is rejected. See
 [prelude](/engine/prelude/) §6.6.)
@@ -403,21 +403,21 @@ to `escapeHtml`; the AST `Visitor` maps to the Phase-2 `render`/`validate` walk.
 | Mustache feature | FlatBars | Kind |
 | --- | --- | --- |
 | sections `{{#section}}` (truthy / list / lambda) | write the helper explicitly: `if`/`each` | DROPPED→`if`/`each` |
-| inverted sections `{{^section}}` | FullBars desugars to `{{#unless …}}` | PROVIDED (FullBars) |
+| inverted sections `{{^section}}` | ClassicBars desugars to `{{#unless …}}` | PROVIDED (ClassicBars) |
 | implicit iterator `{{.}}` | `this` (A.1) | SURFACE |
 | lambdas (functions in the data) | values are never functions; expose behaviour as a helper, or call via `apply` | DROPPED→helper |
 | set delimiters `{{=<% %>=}}` | *not supported* — delimiters are fixed; a host may pre-process the source | DROPPED |
 | HTML-escaping by default | Surface `{{ }}` ⇒ `escapeHtml`; core never escapes | SURFACE |
 
 The *core* parser adopts no section semantics: structurally `{{#x}}` is just "apply the block
-operation `x`". The *FullBars engine* then layers on Handlebars' implicit sections (its lenient
+operation `x`". The *ClassicBars engine* then layers on Handlebars' implicit sections (its lenient
 resolve, `Kernel.Prelude.lenientResolve`): when `x` names no helper — *or* names a prelude value
 helper used as a *bare* block, which has no argument to apply (`{{#count}}…{{/count}}` with a
 numeric `count`) — `x` is read as data and dispatched like Handlebars (array ⇒ `each`, truthy ⇒
-`with`, falsy/empty ⇒ `{{else}}`); see [fullbars-compat](/engine/fullbars-compat/) §4. RawBars keeps the strict resolve
+`with`, falsy/empty ⇒ `{{else}}`); see [classicbars-compat](/engine/classicbars-compat/) §4. RawBars keeps the strict resolve
 (unknown / value-as-block ⇒ `UnknownHelper` / arity error), so there you iterate with
 `{{#each x}}…{{/each}}` and branch with `if`/`unless` explicitly. The *inverted* opener
-`{{^x}}` *is* recognized by the core (a `Block` with the `Inverse` sigil); FullBars desugars it
+`{{^x}}` *is* recognized by the core (a `Block` with the `Inverse` sigil); ClassicBars desugars it
 to `{{#unless x}}`, while RawBars/MaxBars reject it.
 
 <a id="coverage"></a>
@@ -442,7 +442,7 @@ Every Handlebars/Mustache surface element, asserting a mapping exists. A missing
 .Blocks & branches
 * [x] block helper `{{#h}}…{{/h}}` — A.3
 * [x] `{{else}}` → a separator — A.3, A.4
-* [x] `{{^h}}` inverted — PROVIDED (FullBars → `unless`; RawBars/MaxBars reject) — A.3, A.11
+* [x] `{{^h}}` inverted — PROVIDED (ClassicBars → `unless`; RawBars/MaxBars reject) — A.3, A.11
 * [x] `else if` chaining — A.3
 * [x] block params `as \|a b\|` — A.3, A.5
 * [x] `options.fn` / `options.inverse` — A.3
@@ -521,8 +521,8 @@ Both invert control. Pick `runTemplate` to *execute*, `foldTemplate` to *prepare
 :::note
 *What v1 ships.* The polymorphic `Engine m env` / `Ctl m env` / `Helper m env` and the drivers
 `runTemplate` (`Monad m`) and `runString` (`MonadThrow Error m`) are implemented as shown. The
-reference engine, *FullBars*, supplies these instantiations (`renderWith`/`compile`/`renderAff` from
-`FullBars`) at both `m = Either Error` (`renderWith`/`compile`) and
+reference engine, *ClassicBars*, supplies these instantiations (`renderWith`/`compile`/`renderAff` from
+`ClassicBars`) at both `m = Either Error` (`renderWith`/`compile`) and
 `m = ExceptT Error Aff` (`renderAff`), proving the monad is pluggable; its environment is the newtype
 `RefEnv m` (a type *synonym* `Env = { … Helper … Env }` would be cyclic — use a newtype). The handle
 carries a `span` (the opening tag's code-unit range; `Span.lineColumn` maps it to line/column), and

@@ -92,7 +92,7 @@ function genVscodePackageJson() {
   pkg.icon = "icon.png";
   pkg.bugs = { url: "https://github.com/wstein/flatbars/issues" };
   pkg.homepage = "https://github.com/wstein/flatbars#readme";
-  pkg.keywords = ["handlebars", "mustache", "templates", "hbs", "lsp", "flatbars", "rawbars", "minbars", "fullbars", "maxbars"];
+  pkg.keywords = ["handlebars", "mustache", "templates", "hbs", "lsp", "flatbars", "rawbars", "minbars", "classicbars", "maxbars"];
   pkg.qna = "https://github.com/wstein/flatbars/discussions";
   pkg.categories = ["Programming Languages", "Snippets"];
   pkg.galleryBanner = { color: "#7c4dff", theme: "dark" };
@@ -109,8 +109,8 @@ function genVscodePackageJson() {
       "flatbars.defaultDialect": {
         type: "string",
         enum: LANGUAGES.map((l) => l.id),
-        default: "fullbars",
-        description: "Dialect the FlatBars language server falls back to when the document's languageId and URI extension both fail to resolve. Defaults to FullBars (Handlebars-faithful).",
+        default: "classicbars",
+        description: "Dialect the FlatBars language server falls back to when the document's languageId and URI extension both fail to resolve. Defaults to ClassicBars (Handlebars-faithful).",
       },
     },
   };

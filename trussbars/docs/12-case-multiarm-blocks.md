@@ -104,8 +104,8 @@ engine evaluates the subject once and hands it in; `caseH` takes the first `{{wh
 whose value equals it (short-circuit), else `{{else}}`. The compilers match: the JS emitter
 compiles an `if`/`else if` chain over the same `eq`; `MaxBars/Rust.purs` (the v1 emitter)
 emits the same Rust `match`. The construct belongs to the **`nonEmpty`-truthiness family —
-RawBars and MaxBars**; `when` joins their clause-separator set. **FullBars** (Handlebars-
-faithful) and **MinBars** (Mustache) do **not** have `case`: FullBars rejects `{{#case}}`
+RawBars and MaxBars**; `when` joins their clause-separator set. **ClassicBars** (Handlebars-
+faithful) and **MinBars** (Mustache) do **not** have `case`: ClassicBars rejects `{{#case}}`
 with a located error pointing at the `{{#if (eq …)}}` form, and in MinBars a `{{#case}}` is
 an ordinary Mustache section.
 
@@ -140,7 +140,7 @@ A host block helper named `case` is now shadowed by the built-in. Acceptable (`i
 `with` are already reserved), but it is called out in `docs/09` and rejected with a located
 error if someone declares `helpers = [case]`. In the PureScript reference the same
 reservation holds: `case` is a registered engine operation, so it can never resolve to a
-host operation; FullBars (which has no `case`) rejects it with a located, actionable error
+host operation; ClassicBars (which has no `case`) rejects it with a located, actionable error
 pointing at the `{{#if (eq …)}}` form.
 
 ### 5.3 Host block helpers stay binary
@@ -165,7 +165,7 @@ production impl*), it cannot be a Trussbars-only token. It is a first-class oper
 **`nonEmpty`-family surface — RawBars and MaxBars** (`Kernel.Prelude.caseH`) so the oracle
 renders it and Trussbars conforms byte-for-byte against the live oracle (`docs/04`). The
 oracle is implemented first (or together) precisely so the conformance corpus has an
-authority for every `{{#case}}` case. (FullBars and MinBars are excluded — see §5.4 and §3.)
+authority for every `{{#case}}` case. (ClassicBars and MinBars are excluded — see §5.4 and §3.)
 
 ## 6. Status & sequencing
 

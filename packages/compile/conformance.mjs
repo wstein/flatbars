@@ -2,7 +2,7 @@
 //
 // The compiler conformance harness — the gate that keeps the two execution
 // paths from drifting. For every case it renders with the INTERPRETER
-// (FullBars.renderWith, the executable spec) and with the COMPILED function
+// (ClassicBars.renderWith, the executable spec) and with the COMPILED function
 // (FlatBars.Compile → JS, run against the runtime) and asserts byte-identical
 // output. Sources: the inline corpus (conformance/cases.mjs) + the golden
 // examples/ (core templates).
@@ -20,7 +20,7 @@ import rt from "./runtime/flatbars-runtime.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
-const enginePath = resolve(root, "output/FullBars.JS/index.js");
+const enginePath = resolve(root, "output/ClassicBars.JS/index.js");
 if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:compile does).");
   process.exit(2);
@@ -28,8 +28,8 @@ if (!existsSync(enginePath)) {
 const { compile, compileSurface, compileMaxbars, compileMaxbarsWithPartials, compileMinbars, compileMinbarsCompat, compileMinbarsWithPartials, render, renderSurface, renderMaxbars, renderMaxbarsWithPartials, renderMinbars, renderMinbarsCompat, renderMustache, renderWith, renderRawWith, renderMaxWith, renderSurfaceI18n, safe } =
   await import(enginePath);
 
-// Pick the interpreter/compiler pair for a case's dialect: "surface" (FullBars),
-// "maxbars" (FullBars + infix/pipes/loop vars), "minbars" (Mustache, spec
+// Pick the interpreter/compiler pair for a case's dialect: "surface" (ClassicBars),
+// "maxbars" (ClassicBars + infix/pipes/loop vars), "minbars" (Mustache, spec
 // truthiness), "minbars-compat" (Mustache under mustache.js' 0/"" -falsy rule), or
 // core. The compat pair gates that the mustache.js render and compile agree too.
 const interpreterFor = (dialect) =>
@@ -47,7 +47,7 @@ const compilerFor = (dialect) =>
 
 // Render with the interpreter (the spec), in the case's dialect. A `minbars`
 // case with `partials` uses the MinBars + partials interpreter (renderMustache).
-// Helper/operation cases route by dialect: FullBars `renderWith` (helper),
+// Helper/operation cases route by dialect: ClassicBars `renderWith` (helper),
 // RawBars `renderRawWith` / MaxBars `renderMaxWith` (operation — ADR-019 addendum).
 const renderWithFor = (dialect) =>
   dialect === "rawbars" ? renderRawWith
@@ -150,13 +150,13 @@ const helperCases = [
   { name: "op:raw-data", dialect: "rawbars", helpers: { rows: (items, o) => safe(items.map((x, i) => o.fn(x, { data: { index: i } })).join("")) }, t: "{{#rows (lookup this \"items\")}}{{{index}}}:{{{lookup this \"label\"}}} {{/rows}}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0:a 1:b " },
   // MaxBars: full surface MINUS block params — fn/inverse + options.hash + options.fn(ctx,{data}).
   { name: "op:max-hash", dialect: "maxbars", helpers: { box: (xs, o) => safe('<ul class="' + o.hash.cls + '">' + xs.map((p) => o.fn(p)).join("") + "</ul>") }, t: '{{#box xs cls="r"}}<li>{{this}}</li>{{/box}}', d: { xs: ["a", "b"] }, expect: '<ul class="r"><li>a</li><li>b</li></ul>' },
-  // a block operation supplying scoped @data is a FullBars feature (MaxBars dropped
+  // a block operation supplying scoped @data is a ClassicBars feature (MaxBars dropped
   // the @ namespace, ADR-021); the MaxBars equivalent supplies block params, see
   // op:max-params below.
   { name: "op:fb-data", dialect: "surface", helpers: { idx: (items, o) => items.map((x, i) => o.fn(x, { data: { index: i, first: i === 0 } })).join("") }, t: "{{#idx items}}{{@index}}{{#if @first}}*{{/if}}:{{label}} {{/idx}}", d: { items: [{ label: "a" }, { label: "b" }] }, expect: "0*:a 1:b " },
   { name: "op:max-inverse", dialect: "maxbars", helpers: { ifAny: (xs, o) => (xs.length ? o.fn() : o.inverse()) }, t: "{{#ifAny xs}}y{{else}}n{{/ifAny}}", d: { xs: [] }, expect: "n" },
   // a MaxBars-distinctive infix expression inside a block-operation body — proves the
-  // MaxBars surface (not FullBars) is what compiles/interprets.
+  // MaxBars surface (not ClassicBars) is what compiles/interprets.
   { name: "op:max-infix", dialect: "maxbars", helpers: { wrap: (o) => safe("[" + o.fn() + "]") }, t: "{{#wrap}}{{1 + 2}}{{/wrap}}", d: {}, expect: "[3]" },
   // block params now parse in MaxBars (the head ladder omits the pipe rung), so a
   // block operation can bind them via options.fn(ctx, { blockParams }).

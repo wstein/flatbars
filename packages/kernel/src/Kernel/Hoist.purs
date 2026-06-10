@@ -5,10 +5,10 @@
 -- | the template with the `inline` blocks removed. It is a semantic step tied to
 -- | the prelude's `inline`/`partial` operations (the registry the `partial` helper
 -- | reads), NOT a syntactic desugar — so it belongs to the shared engine machinery
--- | and applies to *every* dialect. RawBars (core syntax), FullBars, and MaxBars
+-- | and applies to *every* dialect. RawBars (core syntax), ClassicBars, and MaxBars
 -- | all run it, differing only in their surface syntax (ADR-005/008): the bare
 -- | `{{#inline}}` in core/MaxBars and the desugared `{{#*inline}}` decorator in
--- | FullBars both reduce to the same `inline` block this walks.
+-- | ClassicBars both reduce to the same `inline` block this walks.
 -- |
 -- | Definitions are *global* to the render (not lexically scoped) — a documented
 -- | simplification of Handlebars' block scoping.

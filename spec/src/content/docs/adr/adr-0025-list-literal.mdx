@@ -7,7 +7,7 @@ sidebar:
 *Status:* **Accepted — implemented 2026-06-08.** *Date:* 2026-06-04. The list-literal half of the
 collection-literal design, *split from* [ADR-024](/adr/adr-0024-let-and-dict-literal/) during the
 2026-06-04 team review. Applies to *MaxBars* (surface sugar) and the *shared prelude* (a new constructor).
-FullBars's surface is *unchanged*; the prelude addition is value-only and Handlebars-compatible (gated by
+ClassicBars's surface is *unchanged*; the prelude addition is value-only and Handlebars-compatible (gated by
 `check:hbs-conformance`).
 
 *Amendment (2026-06-08, implementation).* The list literal shipped as **comma**-separated —
@@ -50,7 +50,7 @@ Two things ship together, because the surface sugar is inert without its target:
 
 A variadic value helper `(list e …)` that returns the array of its evaluated arguments. It lives
 in the *shared* prelude next to `dict`, so it is available in every dialect's expression position
-(RawBars/FullBars/MaxBars/MinBars), exactly as `dict` is. It adds no new `Value` shape (arrays already
+(RawBars/ClassicBars/MaxBars/MinBars), exactly as `dict` is. It adds no new `Value` shape (arrays already
 exist) and no kernel change — it is an ordinary value-producing operation, the list analogue of `dict`.
 
 This is the one piece that distinguishes this ADR from [ADR-024](/adr/adr-0024-let-and-dict-literal/):
@@ -68,7 +68,7 @@ A bracket-delimited list of positional expressions in expression position is sug
 
 Desugars at the MaxBars parser stage to `(list "PureScript" "TypeScript" "Rust")`. Empty: `[]` is
 the empty list, lowers to `(list)`. (Implemented form: comma-separated — see the *Amendment* above.) The sugar is MaxBars-only; RawBars writes `(list …)` directly;
-FullBars has neither the sugar nor (by convention) uses it, though the `list` helper is *present* in its
+ClassicBars has neither the sugar nor (by convention) uses it, though the `list` helper is *present* in its
 prelude.
 
 ### 3. Lexing and the `[` / `.[` disambiguation
@@ -93,7 +93,7 @@ spike — see *Open question*.)
 | Surface | `[…]` list literal | `(list …)` helper |
 | --- | --- | --- |
 | *RawBars* | ✗ (no sugar by design) | ✓ (write it directly) |
-| *FullBars* | ✗ (Handlebars-faithful surface) | ✓ (present in the shared prelude; convention says don't use it) |
+| *ClassicBars* | ✗ (Handlebars-faithful surface) | ✓ (present in the shared prelude; convention says don't use it) |
 | *MaxBars* | ✓ (`[expr …]`) | ✓ |
 
 The helper is shared (a value-policy-free constructor, like `dict`); only the *sugar* is MaxBars-scoped —
@@ -104,17 +104,17 @@ the same asymmetry as `>=` → `(gte …)`.
 ### Gates
 
 * *`check:catalog`* — the new `list` helper makes the generated helper catalog stale; run
-  `npm run gen:catalog` and the gate keeps the docs partial in step with `FullBars.preludeSchema`. *This
+  `npm run gen:catalog` and the gate keeps the docs partial in step with `ClassicBars.preludeSchema`. *This
   gate is the headline difference from [ADR-024](/adr/adr-0024-let-and-dict-literal/)*, which
   adds no helper.
 * *`check:hbs-conformance`* — already in `npm test`. Re-run after adding `list` to confirm the `49/50`
-  byte-identical FullBars line is unmoved (a value-producing helper should be inert to it, but the gate
-  proves it). Also catches any `[…]` bleed into the FullBars surface parser.
+  byte-identical ClassicBars line is unmoved (a value-producing helper should be inert to it, but the gate
+  proves it). Also catches any `[…]` bleed into the ClassicBars surface parser.
 * *Tokenizer corpus (precondition — must land before implementation).* Extends the ADR-024 corpus with
   the bracket cases: `{{#let xs=[}}]`, `{{#let xs=[1 2 3}}]`, the mixed
   `{{#let x={a=[1 2}}}}]` (four trailing braces), and the path-index control `{{a.[0}}]` to
   pin that `.[` is *not* read as a list-open. No corpus, no merge.
-* *`check:isolation`* — one MaxBars-only-surface assertion: a FullBars template with `[expr …]` in
+* *`check:isolation`* — one MaxBars-only-surface assertion: a ClassicBars template with `[expr …]` in
   expression position produces a surface diagnostic, not silent acceptance. (Note the `list` *helper* is
   legal everywhere; only the bracket *sugar* is gated.)
 * *Linter round-trip* (`Linter.Lower`) — pins that `[1 2 3]` lowers to `(list 1 2 3)`. One
@@ -135,7 +135,7 @@ Code / JetBrains grammars each receive a one-time update; the contract source
   [ADR-024](/adr/adr-0024-let-and-dict-literal/)).
 * `prelude.adoc` / the generated helper catalog gain the `list` entry (via `gen:catalog`).
 * `rawbars.adoc` notes `(list …)` as the canonical form behind the MaxBars `[…]` sugar.
-* `fullbars.adoc` convention line (`tutorials/src/fullbars.mjs`) extends to *"no MaxBars list literals"*
+* `classicbars.adoc` convention line (`tutorials/src/classicbars.mjs`) extends to *"no MaxBars list literals"*
   (the `list` helper itself stays available, like any prelude value helper).
 
 ### Non-goals (deliberately deferred)

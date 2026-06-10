@@ -24,19 +24,19 @@ than no compiler. The decision is therefore not "add a compiler" but "keep *two*
    (`packages/compile/runtime/flatbars-runtime.mjs`).
 
 1. *Two `Emit` tiers.* The faithful baseline routes everything through `rt.call`/`rt.block` (the
-   reference behaviour). The FullBars optimiser (`fullbarsEmit`) additionally emits *native* JS control
+   reference behaviour). The ClassicBars optimiser (`classicbarsEmit`) additionally emits *native* JS control
    flow for `if`/`unless`/`each`/`with`. Data-dependent work (truthiness, lookup) is deferred to the
    runtime, so compiled code operates on plain JS values — not the `Value` ADT.
 
 1. *The runtime contract is versioned.* `runtimeVersion` is stamped in the compiled module header and
    checked by the runtime; it is bumped on any runtime-incompatible codegen change. The engine's
-   truthiness rule is a *callback* the root frame is seeded with — `rt.truthyHandlebars` (FullBars),
+   truthiness rule is a *callback* the root frame is seeded with — `rt.truthyHandlebars` (ClassicBars),
    `rt.truthyNonEmpty` (RawBars/MaxBars), or `rt.truthyMustache` (MinBars); no baked falsy-set
    ([ADR-022](/adr/adr-0022-analyse-mode/) superseded the old `$falsy` constant).
 
 1. *The interpreter is the executable spec; a conformance gate enforces equality.*
    `packages/compile/conformance.mjs` (`npm run test:compile`) renders every case with *both* the
-   interpreter (`FullBars.renderWith`) and the compiled function, and asserts *byte-identical* output.
+   interpreter (`ClassicBars.renderWith`) and the compiled function, and asserts *byte-identical* output.
    The corpus is the inline `conformance/cases.mjs` plus the golden `examples/`. The harness imports
    from `output/` (the build product), so it always tests current source.
 

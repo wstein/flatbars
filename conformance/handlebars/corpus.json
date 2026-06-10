@@ -1,5 +1,5 @@
 {
-  "_doc": "Handlebars conformance corpus for FullBars. DIFFERENTIAL: the `expected` output is NOT stored here — scripts/hbs-conformance.mjs renders each case through the real `handlebars` npm package (the oracle) AND through FullBars, then compares. So a case can never over-claim: the expectation IS whatever upstream Handlebars actually produces. `helpers` lists helper names the runner registers identically in BOTH engines (definitions live in scripts/hbs-conformance.mjs). Categories mirror the Handlebars guide. Cases tagged `gap` are the documented FullBars divergences we are closing (blockHelperMissing).",
+  "_doc": "Handlebars conformance corpus for ClassicBars. DIFFERENTIAL: the `expected` output is NOT stored here — scripts/hbs-conformance.mjs renders each case through the real `handlebars` npm package (the oracle) AND through ClassicBars, then compares. So a case can never over-claim: the expectation IS whatever upstream Handlebars actually produces. `helpers` lists helper names the runner registers identically in BOTH engines (definitions live in scripts/hbs-conformance.mjs). Categories mirror the Handlebars guide. Cases tagged `gap` are the documented ClassicBars divergences we are closing (blockHelperMissing).",
   "categories": [
     {
       "id": "expressions",

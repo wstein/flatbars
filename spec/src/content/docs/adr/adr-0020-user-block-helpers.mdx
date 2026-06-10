@@ -1,5 +1,5 @@
 ---
-title: "ADR-020: User-defined block (section) helpers (FullBars)"
+title: "ADR-020: User-defined block (section) helpers (ClassicBars)"
 sidebar:
   label: ADR-020 User block helpers
 ---
@@ -7,7 +7,7 @@ sidebar:
 *Status:* Accepted (v1 scope set by team review — see Decision). *Date:* 2026-06-02. Extends
 [ADR-018](/adr/adr-0018-user-defined-helpers/) (user helpers, inline-only) by lifting the one limit it
 stated: custom *block* helpers. Builds on [ADR-011](/adr/adr-0011-compile-to-js/) (compile ≡ interpret)
-and the `blockHelperMissing` work ([fullbars-compat](/engine/fullbars-compat/)), which is what makes this now feasible.
+and the `blockHelperMissing` work ([classicbars-compat](/engine/classicbars-compat/)), which is what makes this now feasible.
 
 ## Context
 
@@ -28,30 +28,30 @@ boundary* (`buildHelpers` marshals `(args) ⇒ value` — inline only) and the *
 
 Three facts scope the decision:
 
-1. *Block operations are a kernel capability, not a per-dialect feature.* RawBars/FullBars/MaxBars share
+1. *Block operations are a kernel capability, not a per-dialect feature.* RawBars/ClassicBars/MaxBars share
    the engine, so the interpreter already runs any registered block operation. The new work is the JS
    *host* affordance (`registerHelper`) plus its compiled twin.
 1. *MinBars is a peer engine whose sections dispatch on the data value.* A Mustache "section lambda" is a
    *function in the data* — precisely what `Value` deliberately is not ([concepts](/concepts/); the
    conformance stance in [ADR-007](/adr/adr-0007-minbars/)). Adding MinBars section helpers would
    reintroduce `VFunction` or bolt a non-standard registry onto a Mustache-fidelity engine. Out of scope.
-1. *The Handlebars workflow is the target.* The clone goal ([fullbars-compat](/engine/fullbars-compat/)) means the API is
+1. *The Handlebars workflow is the target.* The clone goal ([classicbars-compat](/engine/classicbars-compat/)) means the API is
    Handlebars': a block helper is a registered function that receives an `options` object with `fn`
    (render the body) and `inverse` (render `{{else}}`). "Paste your Handlebars block helper and it runs"
    is the bar.
 
 ## Decision
 
-1. *`registerHelper` block helpers are FullBars-only; RawBars and MaxBars do not get them.* The kernel
+1. *`registerHelper` block helpers are ClassicBars-only; RawBars and MaxBars do not get them.* The kernel
    block-operation *capability* is dialect-agnostic (it already runs any `Operation` seeded at the
-   PureScript level), but `registerHelper` is the *FullBars* JS affordance — the Handlebars-compat boundary
+   PureScript level), but `registerHelper` is the *ClassicBars* JS affordance — the Handlebars-compat boundary
    word (ADR-018). RawBars and MaxBars use a *different concept and terminology* — *operations* /
    *definitions* per [ADR-019](/adr/adr-0019-operation-vocabulary/) — so they get *no* `registerHelper`,
    and their facades (`render`, `renderMaxbars`) deliberately take no helpers bag. A native MaxBars
    block-operation registration is ADR-019's concern, not this one. MinBars section helpers are *not*
    provided either — its sections are function-in-data, which `Value` does not model, and faking it would
    regress ADR-007's conformance posture. So this ADR adds the JS-source block-helper path and its compiled
-   twin to the *FullBars* facade (`renderWith`) alone.
+   twin to the *ClassicBars* facade (`renderWith`) alone.
 
 1. *One registration; usage decides block vs inline (Handlebars-compatible).* `registerHelper(name,
    fn[, arity])` is unchanged. The engine passes a trailing `options` object whenever the call site is a
@@ -109,9 +109,9 @@ registerHelper("list", (items, options) =>
 
 ## Consequences
 
-* `flatbars-js` block helpers work in both the interpreter and the compiled module; the FullBars
+* `flatbars-js` block helpers work in both the interpreter and the compiled module; the ClassicBars
   Handlebars-conformance corpus's one block-helper miss (`{{#bold}}`) flips to a pass
-  (96% → ~98%), and `fullbars-compat.adoc` §3's "user-defined block helpers" roadmap item moves ☐ → ☑.
+  (96% → ~98%), and `classicbars-compat.adoc` §3's "user-defined block helpers" roadmap item moves ☐ → ☑.
   The numbers are the acceptance test.
 * The interpreter FFI grows by one call site (`callJsBlockHelperImpl`) and one wrapper
   (`jsBlockOperation`); the canonical PureScript `prelude`/engine are unchanged.
@@ -131,7 +131,7 @@ registerHelper("list", (items, options) =>
   surface to keep interpreter ≡ compiled; ship `fn`/`inverse`/`hash` first and *throw* on the rest, so
   the gap is loud. Phase 2.
 * *Do nothing (keep inline-only).* The block-helper case is the documented section-lambda path
-  ([fullbars-compat](/engine/fullbars-compat/)) and a measured conformance miss; the `blockHelperMissing` work already
+  ([classicbars-compat](/engine/classicbars-compat/)) and a measured conformance miss; the `blockHelperMissing` work already
   paid the hard cost (generic block emission), so the remaining delta is small.
 
 ## Open questions
@@ -181,7 +181,7 @@ marker operations* that *evaluate to exactly the value the built-ins already exp
 *additionally* extracts them — recognised structurally, from the head application's arg expressions — into
 two new `Ctl` fields that only the user-helper marshaller reads.
 
-1. *Surface markers (FullBars desugar).* Collected hash pairs desugar to a trailing `(@hash k v …)`
+1. *Surface markers (ClassicBars desugar).* Collected hash pairs desugar to a trailing `(@hash k v …)`
    instead of `(dict …)`; each `as |name|` to `(@param "name")` instead of a bare
    `Lit (VString "name")`. The `@`-prefix makes them *unspellable by users* (surface `@x` strips the
    `@` to the scoped helper `x`), so they cannot collide with a real helper or data field — but they are
@@ -191,7 +191,7 @@ two new `Ctl` fields that only the user-helper marshaller reads.
 1. *Engine seam + `Ctl` channel.* The `Engine` record gains a small pluggable `blockArgs` splitter
    `Array Expr -> { positional :: Array Expr, hash :: Maybe Expr, params :: Array String }`; the kernel
    driver stays generic (it calls the seam, evaluates the returned `positional` for the `Operation`, and
-   evaluates `hash` once to seed `Ctl`). FullBars supplies the marker-aware splitter; RawBars/MaxBars (no
+   evaluates `hash` once to seed `Ctl`). ClassicBars supplies the marker-aware splitter; RawBars/MaxBars (no
    such markers) supply the identity split — so neither the catalog nor the meaning-free core changes. `Ctl`
    gains `hash :: Maybe Value` and `blockParams :: Array String`. *Built-ins keep working* because the
    splitter, by default, still appends the hash dict + name strings to `positional` exactly as today — the

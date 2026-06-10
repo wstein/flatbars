@@ -14,7 +14,7 @@ import "../styles/docs-chrome.css";
 const SPEC_BASE = import.meta.env.PUBLIC_SPEC_BASE || "/flatbars/spec/";
 // `dialect` drives the topbar "Open the Lab" target and the runtime inline-code
 // highlighter (so a prose `{{name}}` lights up in the page's own dialect).
-const { title, subtitle, groups = [], spec, dialect = "fullbars" } = Astro.props;
+const { title, subtitle, groups = [], spec, dialect = "classicbars" } = Astro.props;
 
 // Persistent cross-reference nav, appended to every reference sidebar below the
 // page's own TOC, so the siblings — and the Data shaping guide — are reachable
@@ -24,7 +24,7 @@ const PATH = Astro.url.pathname.replace(/\/$/, "");
 const xref = [
   { href: "/rawbars", label: "RawBars" },
   { href: "/minbars", label: "MinBars" },
-  { href: "/fullbars", label: "FullBars" },
+  { href: "/classicbars", label: "ClassicBars" },
   { href: "/maxbars", label: "MaxBars" },
   { href: "/transform", label: "Data shaping" },
   { href: "/localize", label: "Localization" },
@@ -137,7 +137,7 @@ const xref = [
       // in a card (and drops its grey code plate via docs-chrome.css's :has rule).
       // The Chips/Theme/Legend control wiring lives in Topbar.astro.
       import { highlightTemplate } from "../lib/highlight.mjs";
-      const dialect = document.body.dataset.dialect || "fullbars";
+      const dialect = document.body.dataset.dialect || "classicbars";
       document.querySelectorAll(".content :not(pre) > code, .content :not(pre) > .code").forEach((c) => {
         if (c.textContent.includes("{{")) c.innerHTML = highlightTemplate(c.textContent, dialect);
       });

@@ -97,7 +97,7 @@ emit mode alongside clean/commented from the start** — don't bolt it on. Phase
   first-class, pipeable value. The one intentional intermediate buffer (docs/05); `safe` type
   prevents double-escaping. nonEmpty-family surface; oracle-first.
 - `19-statement-tags.md` — **PROPOSED** Django-style `{% %}` for control flow + separators +
-  statements (RawBars/MaxBars/Trussbars only; FullBars/MinBars stay `{{ }}`-only). `{{ }}` becomes
+  statements (RawBars/MaxBars/Trussbars only; ClassicBars/MinBars stay `{{ }}`-only). `{{ }}` becomes
   output-only; a `LexConfig` knob (`statementTags`) re-delimits the **existing** `Block`/`Sep`
   nodes, so engine/desugar/compiler are untouched and rendered bytes are identical. Deletes the
   `{{else}}`/`{{when}}`/`{{elif}}` separator-ambiguity machinery (docs/12 §2); re-spells docs/17/18.

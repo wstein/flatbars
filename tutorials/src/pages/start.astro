@@ -11,17 +11,17 @@
 // concepts.adoc, linked) and adds NO example corpus: every runnable beat reuses an
 // already-gated example object, shown through the same mechanism its home gate
 // validates — so the page inherits coverage:
-//   • maxbars.hello / mustache.truthyZero / fullbars.conditionals / maxbars.conditionals
+//   • maxbars.hello / mustache.truthyZero / classicbars.conditionals / maxbars.conditionals
 //       → plain render, gated by scripts/check-tutorial-links.mjs
 //   • analyse.zero  → the cross-engine point; its analyze() finding is gated by
-//       scripts/check-tutorial-tooling.mjs (here it is a plain FullBars render that
+//       scripts/check-tutorial-tooling.mjs (here it is a plain ClassicBars render that
 //       shows the *opposite* branch from the same data — the trap, made concrete)
 //   • flagship      → rendered with the JSONata `transform` applied (OpenInLab's
 //       transform prop), gated by scripts/check-jsonata.mjs
 import Reference from "../layouts/Reference.astro";
 import OpenInLab from "../components/OpenInLab.jsx";
 import { examples as mustache } from "../mustache.mjs";
-import { examples as fullbars } from "../fullbars.mjs";
+import { examples as classicbars } from "../classicbars.mjs";
 import { examples as maxbars } from "../maxbars.mjs";
 import { examples as analyse } from "../analyse.mjs";
 import { flagship } from "../jsonata.mjs";
@@ -108,7 +108,7 @@ const groups = [
         </tr>
         <tr>
           <td>Importing existing Handlebars templates</td>
-          <td><a href="/fullbars">FullBars</a></td>
+          <td><a href="/classicbars">ClassicBars</a></td>
           <td>Handlebars-faithful (49/50 vs the real engine); your team already knows it</td>
         </tr>
         <tr>
@@ -124,7 +124,7 @@ const groups = [
       </tbody>
     </table>
     <p class="tip">
-      It's a superset ladder — RawBars ⊂ FullBars ⊂ MaxBars — plus logic-less MinBars off
+      It's a superset ladder — RawBars ⊂ ClassicBars ⊂ MaxBars — plus logic-less MinBars off
       to the side. <a href="/maxbars">MaxBars</a> gives you everything the others do and
       more, so it's the recommended default; this page's first ten minutes use it.
     </p>
@@ -165,11 +165,11 @@ const groups = [
     </p>
     <OpenInLab client:visible engine="minbars" template={mustache.truthyZero.template} data={mustache.truthyZero.data} />
     <p>
-      Hand the <em>same</em> <code>count: 0</code> to Handlebars (FullBars), where
+      Hand the <em>same</em> <code>count: 0</code> to Handlebars (ClassicBars), where
       <code>0</code> is <b>falsy</b>, and the identical question takes the
       <em>opposite</em> branch:
     </p>
-    <OpenInLab client:visible engine="fullbars" template={analyse.zero.template} data={analyse.zero.data} />
+    <OpenInLab client:visible engine="classicbars" template={analyse.zero.template} data={analyse.zero.data} />
     <div class="note">
       <b>Same data, opposite output — that's the trap.</b> Don't memorize four falsy
       tables. Two fixes, in order of preference: (1) <b>shape the ambiguity out</b> in the
@@ -193,12 +193,12 @@ const groups = [
     <p>
       Here's the expressiveness in one comparison. Coming from Handlebars, a condition is a
       <b>subexpression</b> — a helper application, <code>{t("(gte stock 10)")}</code>
-      (FullBars, on the left):
+      (ClassicBars, on the left):
     </p>
     <div class="pair">
       <div>
-        <div class="lbl">FullBars — subexpression</div>
-        <OpenInLab client:visible engine="fullbars" template={fullbars.conditionals.template} data={fullbars.conditionals.data} />
+        <div class="lbl">ClassicBars — subexpression</div>
+        <OpenInLab client:visible engine="classicbars" template={classicbars.conditionals.template} data={classicbars.conditionals.data} />
       </div>
       <div>
         <div class="lbl">MaxBars — infix</div>
@@ -209,7 +209,7 @@ const groups = [
       <a href="/maxbars">MaxBars</a> reads it as <code>stock &gt;= 10</code> — with
       <code>&amp;&amp;</code>, pipes (<code>value | helper</code>), and bare loop variables.
       That's the full expressiveness, and why it's the recommended default. It's the same
-      engine and prelude as FullBars, just an expression surface on top — so if you do start
+      engine and prelude as ClassicBars, just an expression surface on top — so if you do start
       on a smaller dialect, you grow into MaxBars without restarting.
     </p>
   </section>

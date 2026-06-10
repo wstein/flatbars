@@ -1,5 +1,5 @@
 package:
-  name: fullbars-compile
+  name: classicbars-compile
   publish:
     version: 0.1.0
     license: Apache-2.0
@@ -13,12 +13,12 @@ package:
     - flatbars
     - flatbars-compile
     - foldable-traversable
-    - fullbars
+    - classicbars
     - ordered-collections
     - prelude
     - tuples
   test:
-    main: Test.FullBars.Compile.Main
+    main: Test.ClassicBars.Compile.Main
     dependencies:
       - effect
       - console

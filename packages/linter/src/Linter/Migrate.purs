@@ -3,7 +3,7 @@
 -- | report. Unlike `Linter.Lower` (which parse-and-reprints), this is a
 -- | *minimal-diff source rewrite over the token stream*: it lexes the Handlebars
 -- | source with the Handlebars-compatible lexer (`FlatBars.Lexer.tokenizeTemplate`,
--- | which the FullBars `defaultParseOptions` parser uses), rewrites only the
+-- | which the ClassicBars `defaultParseOptions` parser uses), rewrites only the
 -- | tokens that change, and rebuilds the rest from the *original source slice* —
 -- | so the author's formatting, spacing, and `~` whitespace-control are preserved
 -- | verbatim on every untouched tag.

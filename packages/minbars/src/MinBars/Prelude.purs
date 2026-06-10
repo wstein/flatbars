@@ -6,7 +6,7 @@
 -- | `inverted`, `partial`. The engine's `resolve` is therefore **closed** — it
 -- | maps those fixed names and throws `HelperError` for anything else.
 -- |
--- | These are *not* the FullBars prelude: MinBars' `section` is polymorphic
+-- | These are *not* the ClassicBars prelude: MinBars' `section` is polymorphic
 -- | (list-coercion + push), name resolution walks the context stack with parent
 -- | fallback, and a missing `partial` renders `""` rather than throwing.
 module MinBars.Prelude

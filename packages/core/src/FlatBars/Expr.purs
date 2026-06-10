@@ -3,7 +3,7 @@
 -- | application is an identifier head followed by atom arguments; a group is a
 -- | parenthesised expression; a literal is a string or number. Operators
 -- | (`TOp`) are *not* part of this grammar, so `{{ a && b }}` is a parse error
--- | here — only MaxBars accepts them. Shared by RawBars and FullBars (it is the
+-- | here — only MaxBars accepts them. Shared by RawBars and ClassicBars (it is the
 -- | default `ParseOptions.parseExpr`); MaxBars supplies its own infix grammar.
 module FlatBars.Expr
   ( parseExpr

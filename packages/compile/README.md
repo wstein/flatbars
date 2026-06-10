@@ -12,13 +12,13 @@ Handlebars precompiles.
   driver**: walks the structural `Template` and assembles a JS function source.
   `Content`/`Output`/`Sep`/`RawBlock` are universal; `Block`/`Expr` defer to a
   dialect's `Emit` rules. Reserves no names.
-- [`FlatBars.Compile.FullBars`](src/FlatBars/Compile/FullBars.purs) — the
-  **FullBars** `Emit` binding: native JS control flow for `if`/`unless`/`each`/
+- [`FlatBars.Compile.ClassicBars`](src/FlatBars/Compile/ClassicBars.purs) — the
+  **ClassicBars** `Emit` binding: native JS control flow for `if`/`unless`/`each`/
   `with` (the optimiser), hot helpers (`this`/`lookup`/`escapeHtml`/`safe`)
   inlined, everything else through `rt.call`/`rt.block` (the baseline). A Core or
   Max dialect would add its own binding to the same seam.
 - [`runtime/flatbars-runtime.mjs`](runtime/flatbars-runtime.mjs) — the JS runtime
-  the compiled code calls. It re-implements the FullBars value semantics —
+  the compiled code calls. It re-implements the ClassicBars value semantics —
   including the deliberate divergences (content-based `VSafe` truthiness, explicit
   escaping, sorted object iteration, `@../` parent-data).
 
@@ -28,7 +28,7 @@ The one real risk of a compiler is the compiled path drifting from the
 interpreter. [`conformance.mjs`](conformance.mjs) renders every case with **both**
 paths and asserts byte-identical output:
 
-- *spec* = the interpreter (`FullBars.renderWith`, imported from `output/` so it
+- *spec* = the interpreter (`ClassicBars.renderWith`, imported from `output/` so it
   is always current source);
 - *compiled* = `FlatBars.Compile` → JS, executed against the runtime.
 

@@ -12,13 +12,13 @@ sidebar:
 The dialect ladder (ADR-005) needs a *base*: a dialect that exercises the substrate with **zero**
 surface sugar. It is two things at once — the runnable proof that the engine works on raw core syntax
 (ADR-001's "core syntax renders end-to-end" as an actual package, not an aspiration), and the package
-whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim made testable).
+whose dependency closure must stay *ClassicBars-free* (ADR-003's isolation claim made testable).
 
 ## Decision
 
 1. *No surface — authors write core syntax directly.* Explicit `{{{ lookup this "x" }}}`,
    `{{#each …}}`, `{{else}}`. No path desugar, no `@data`, no `{{ }}`
-   auto-escape, no hash args, no block-param sugar. The seam that distinguishes RawBars from FullBars
+   auto-escape, no hash args, no block-param sugar. The seam that distinguishes RawBars from ClassicBars
    is precisely the `identity` desugar: `runResolved directives identity nodes dat`
    (`RawBars.purs:55`) — *same engine, no rewrite*.
 
@@ -28,10 +28,10 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
    (`opts { extras = false }`) so a caller-supplied `ParseOptions` cannot smuggle them back in. Other
    front-end knobs (standalone trimming) still pass through.
 
-1. *Reuse by dependency, with a FullBars-free closure.* RawBars renders through the shared reference
-   engine via `Kernel.Render.runResolved` and compiles through the shared driver + `fullbarsEmit` from
-   `FlatBars.Compile.Emit`. It imports `kernel` and `flatbars-compile` — **not** the `fullbars`
-   package. Its dependency closure is therefore provably free of FullBars (this is the closure the
+1. *Reuse by dependency, with a ClassicBars-free closure.* RawBars renders through the shared reference
+   engine via `Kernel.Render.runResolved` and compiles through the shared driver + `classicbarsEmit` from
+   `FlatBars.Compile.Emit`. It imports `kernel` and `flatbars-compile` — **not** the `classicbars`
+   package. Its dependency closure is therefore provably free of ClassicBars (this is the closure the
    [final review](/adr/adr-final-review/) asks to lock with a test).
 
 1. *Full instantiation set.* The same dialect is offered pure (`render`/`renderDiag`/`renderValue`),
@@ -39,7 +39,7 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
    (`compileJs`/`compileJsWith`) — so RawBars covers every host shape the engine supports.
 
 1. *Host-registered operations.* `renderWithOperations` (ADR-019 addendum) renders against a bag of
-   host-supplied *operations* — the native boundary word for what FullBars calls a *helper*
+   host-supplied *operations* — the native boundary word for what ClassicBars calls a *helper*
    (`renderWith`). RawBars stays *strict*: an unknown head is an `UnknownHelper`, never the lenient
    `blockHelperMissing`. A *block* operation gets `options.fn(ctx)` / `options.inverse(ctx)` and may
    supply scoped data through `options.fn(ctx, { data })` (read back as a core operation name, since
@@ -48,17 +48,17 @@ whose dependency closure must stay *FullBars-free* (ADR-003's isolation claim ma
 
 ## Consequences
 
-* *Pro:* the substrate's central promise is a *running dialect*, not prose; the FullBars-free closure
+* *Pro:* the substrate's central promise is a *running dialect*, not prose; the ClassicBars-free closure
   turns ADR-003's layering into something a CI test can assert.
 * *Con:* authoring is verbose (every `lookup` is explicit) — RawBars is the desugared core surface, a base/test dialect, not
-  the one most authors should reach for. The module docstring still says "the FullBars reference
-  engine"/"the compiler's FullBars `Emit`," which is cosmetic drift: that engine and that `Emit` now
-  live in `kernel`/`flatbars-compile`, which is *why* the closure is FullBars-free.
+  the one most authors should reach for. The module docstring still says "the ClassicBars reference
+  engine"/"the compiler's ClassicBars `Emit`," which is cosmetic drift: that engine and that `Emit` now
+  live in `kernel`/`flatbars-compile`, which is *why* the closure is ClassicBars-free.
 
 ## Amendment (2026-06-04): inline-partial hoisting is shared, so RawBars has full parity
 
 RawBars previously could *not* hoist `{{#inline "name"}}…{{/inline}}` definitions: the
-`hoistInline` pre-pass lived in `FullBars.Surface`, so only FullBars/MaxBars ran it, and a RawBars
+`hoistInline` pre-pass lived in `ClassicBars.Surface`, so only ClassicBars/MaxBars ran it, and a RawBars
 `{{#inline}}` was a no-op (the matching `{{#partial}}` then failed as an unregistered
 partial). That was a *functional* gap, contradicting this ADR's "same engine, no rewrite": hoisting
 is not surface sugar — it is the semantic step that populates the registry the prelude's `partial`
@@ -66,8 +66,8 @@ helper reads.
 
 `hoistInline` is now `Kernel.Hoist.hoistInline`, a shared concept every dialect runs. RawBars'
 `render`/`renderWithOperations`/`compileJs` hoist before rendering/compiling exactly as
-FullBars/MaxBars do; FullBars/MaxBars re-import it (behaviour unchanged). So `{{#inline}}` +
-`{{{yield}}}` (the bare-core spelling of FullBars' `{{> @partial-block}}`) now work in
+ClassicBars/MaxBars do; ClassicBars/MaxBars re-import it (behaviour unchanged). So `{{#inline}}` +
+`{{{yield}}}` (the bare-core spelling of ClassicBars' `{{> @partial-block}}`) now work in
 RawBars, and the three dialects differ *only* in surface syntax (and truthiness, ADR-022) — the
 ladder's actual contract. Inline-free templates render byte-identically (the hoist is a no-op on
 them), so the change is additive; `test:compile` stays 300/300.

@@ -73,11 +73,11 @@ newtype RefEnv m = RefEnv
   -- `registerHelper` override), so the engine always knows whether one is present.
   , translator :: Maybe Translator
   -- The bare scoped name a block partial's body is exposed under (ADR-005
-  -- amendment), seeded per-dialect like `truthy`: FullBars uses Handlebars'
+  -- amendment), seeded per-dialect like `truthy`: ClassicBars uses Handlebars'
   -- `partial-block` (the `{{> @partial-block}}` target); RawBars/MaxBars use the
   -- hyphen-free `yield` (writable bare where `-` is subtraction). Only the dialect's
   -- own spelling is bound to the body — the other resolves by the dialect's normal
-  -- rule (empty under FullBars' lenient resolve; UnknownHelper under RawBars/MaxBars).
+  -- rule (empty under ClassicBars' lenient resolve; UnknownHelper under RawBars/MaxBars).
   , yieldName :: String
   -- how many partials deep this environment is. `partialH` bumps it on entry and
   -- refuses to recurse past `recursionBudget`, so a cyclic partial raises a
@@ -102,18 +102,18 @@ refContext (RefEnv e) = e.context
 refTruthy :: forall m. RefEnv m -> Value -> Boolean
 refTruthy (RefEnv e) = e.truthy
 
--- | Seed the engine's truthiness rule. FullBars/RawBars/MaxBars keep the
+-- | Seed the engine's truthiness rule. ClassicBars/RawBars/MaxBars keep the
 -- | `handlebars` default `emptyEnv` installs; MinBars seeds `truthy mustache`.
 withTruthy :: forall m. (Value -> Boolean) -> RefEnv m -> RefEnv m
 withTruthy tf (RefEnv e) = RefEnv (e { truthy = tf })
 
 -- | The scoped name this environment exposes a block partial's body under
--- | (ADR-005 amendment): `partial-block` (FullBars) or `yield` (RawBars/MaxBars).
+-- | (ADR-005 amendment): `partial-block` (ClassicBars) or `yield` (RawBars/MaxBars).
 refYieldName :: forall m. RefEnv m -> String
 refYieldName (RefEnv e) = e.yieldName
 
 -- | Seed the block-partial body's scoped name — the dialect analogue of
--- | `withTruthy`. FullBars keeps the `partial-block` default `emptyEnv` installs;
+-- | `withTruthy`. ClassicBars keeps the `partial-block` default `emptyEnv` installs;
 -- | RawBars/MaxBars seed `"yield"`.
 withYieldName :: forall m. String -> RefEnv m -> RefEnv m
 withYieldName n (RefEnv e) = RefEnv (e { yieldName = n })
@@ -191,7 +191,7 @@ lookupOperation name (RefEnv e) = go e.helpers
 -- | so the two paths stay byte-identical (`test:compile`).
 -- |
 -- | Cost: O(frame depth) `Map.member` probes, but it fires only for a *sectionable*
--- | value-op name in *lenient* (FullBars/MaxBars) resolve — a narrow slice — and
+-- | value-op name in *lenient* (ClassicBars/MaxBars) resolve — a narrow slice — and
 -- | frame depth is the static block-nesting depth, not a data dimension. If a deep
 -- | `let`/loop nest ever makes this hot, short-circuit on the prelude membership
 -- | check instead of walking to the base.
@@ -256,7 +256,7 @@ refEngine = refEngineWith (\_ name -> maybe (throwError (UnknownHelper name)) pu
 -- | the name and the frame-stack lookup result (`Just h` when some frame defines
 -- | it, `Nothing` when none does) and decides the operation to run. The strict
 -- | default (`refEngine`) returns the found helper and throws `UnknownHelper`
--- | otherwise; FullBars supplies `Kernel.Prelude.lenientResolve` (Handlebars-style
+-- | otherwise; ClassicBars supplies `Kernel.Prelude.lenientResolve` (Handlebars-style
 -- | implicit sections) so a bare `{{#x}}` over data — whether `x` is unknown or a
 -- | prelude value helper used in block position — iterates / renders rather than
 -- | erroring. RawBars keeps the strict default — the divergence stays a
@@ -270,12 +270,12 @@ refEngineWith
 refEngineWith policy initial =
   { initial
   , resolve: \env name -> policy env name (lookupOperation name env)
-  -- raw-block heads resolve strictly regardless of `policy` (so even FullBars'
+  -- raw-block heads resolve strictly regardless of `policy` (so even ClassicBars'
   -- lenient implicit sections don't apply): an undefined head is `UnknownHelper`.
   , resolveStrict: \env name -> maybe (throwError (UnknownHelper name)) pure
       (lookupOperation name env)
   , stringify: \v -> liftEither (stringify v)
-  -- The marker-aware split (ADR-020 Phase 3). Recognises FullBars' `@hash`/`@param`
+  -- The marker-aware split (ADR-020 Phase 3). Recognises ClassicBars' `@hash`/`@param`
   -- block markers; a no-op for RawBars/MaxBars, which emit none — so this is safe
   -- as the shared default. `splitBlockArgs` demarkers the positional list, so
   -- built-in helpers receive exactly the values they did before.

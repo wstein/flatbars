@@ -28,7 +28,7 @@ export const lintExamples = {
     report: "warning: `plus` is a deprecated alias of `add` — prefer `add` (the lift/migrate assist rewrites it)",
   },
   // A non-canonical scoped variable: the loop index is `index0` in RawBars/MaxBars
-  // (bare `index` is the legacy spelling). Flagged in RawBars/MaxBars only — FullBars
+  // (bare `index` is the legacy spelling). Flagged in RawBars/MaxBars only — ClassicBars
   // keeps Handlebars' `@index`, so it is canonical there. (Bare `index` does not
   // resolve to the position in the card — exactly why the linter steers you off it.)
   scopedVariable: {
@@ -93,11 +93,11 @@ export const migrateExamples = {
 // deep-link from, so the link can never target a view the example does not belong
 // in. A lint example opens the Lab's **Lint dock panel** under its own dialect; a
 // migrate example opens the **Migrated MaxBars output view**, loading the
-// Handlebars source as the FullBars (Handlebars-faithful) engine. The shape is
+// Handlebars source as the ClassicBars (Handlebars-faithful) engine. The shape is
 // `{ engine, example }` — exactly the `labHref(engine, example)` arguments.
 export function lintLabInput(ex) {
   return { engine: ex.engine, example: { template: ex.template, dock: "lint" } };
 }
 export function migrateLabInput(ex) {
-  return { engine: "fullbars", example: { template: ex.template, view: "migrated" } };
+  return { engine: "classicbars", example: { template: ex.template, view: "migrated" } };
 }

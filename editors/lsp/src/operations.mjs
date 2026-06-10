@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The prelude operations the LSP offers for hover + completion (ADR-017). The data
-// is editors/operations.json — projected from FullBars.preludeSchema by
+// is editors/operations.json — projected from ClassicBars.preludeSchema by
 // scripts/gen-operations.mjs and kept honest by check:operations — imported here
 // as data so the bundler inlines it into the self-contained server (like the token
 // vocabulary). This module is pure (no transport, no server library), so the unit

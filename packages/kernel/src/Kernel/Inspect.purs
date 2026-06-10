@@ -54,7 +54,7 @@ type Insp = WriterT (Array Snapshot) (Either Error)
 
 -- | Render `nodes`, capturing a snapshot at every emit whose tag span + file match
 -- | `target` (in execution order; empty when the span is never reached). The lenient
--- | variant is for FullBars / MaxBars; the strict one for RawBars.
+-- | variant is for ClassicBars / MaxBars; the strict one for RawBars.
 inspectResolvedLenient
   :: (RefEnv Insp -> RefEnv Insp) -> Target -> Template -> Value -> Either Error (Array Snapshot)
 inspectResolvedLenient = inspectUsing (refEngineWith lenientResolve)

@@ -1,6 +1,62 @@
 {
   "workspace": {
     "packages": {
+      "classicbars": {
+        "path": "packages/classicbars",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "bifunctors",
+            "either",
+            "flatbars",
+            "foldable-traversable",
+            "integers",
+            "kernel",
+            "maybe",
+            "numbers",
+            "ordered-collections",
+            "prelude",
+            "strings",
+            "tuples"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "aff",
+            "assert",
+            "console",
+            "effect",
+            "transformers"
+          ]
+        }
+      },
+      "classicbars-compile": {
+        "path": "packages/classicbars-compile",
+        "core": {
+          "dependencies": [
+            "arrays",
+            "bifunctors",
+            "classicbars",
+            "either",
+            "flatbars",
+            "flatbars-compile",
+            "foldable-traversable",
+            "ordered-collections",
+            "prelude",
+            "tuples"
+          ]
+        },
+        "test": {
+          "dependencies": [
+            "assert",
+            "console",
+            "effect",
+            "either",
+            "foldable-traversable",
+            "strings"
+          ]
+        }
+      },
       "flatbars": {
         "path": "packages/core",
         "core": {
@@ -31,14 +87,14 @@
         "core": {
           "dependencies": [
             "arrays",
+            "classicbars",
+            "classicbars-compile",
             "effect",
             "either",
             "exceptions",
             "flatbars",
             "flatbars-json",
             "foldable-traversable",
-            "fullbars",
-            "fullbars-compile",
             "integers",
             "kernel",
             "linter",
@@ -88,12 +144,12 @@
           "dependencies": [
             "argonaut-core",
             "arrays",
+            "classicbars",
+            "classicbars-compile",
             "either",
             "flatbars",
             "flatbars-json",
             "foreign-object",
-            "fullbars",
-            "fullbars-compile",
             "functions",
             "integers",
             "kernel",
@@ -143,62 +199,6 @@
           ]
         }
       },
-      "fullbars": {
-        "path": "packages/fullbars",
-        "core": {
-          "dependencies": [
-            "arrays",
-            "bifunctors",
-            "either",
-            "flatbars",
-            "foldable-traversable",
-            "integers",
-            "kernel",
-            "maybe",
-            "numbers",
-            "ordered-collections",
-            "prelude",
-            "strings",
-            "tuples"
-          ]
-        },
-        "test": {
-          "dependencies": [
-            "aff",
-            "assert",
-            "console",
-            "effect",
-            "transformers"
-          ]
-        }
-      },
-      "fullbars-compile": {
-        "path": "packages/fullbars-compile",
-        "core": {
-          "dependencies": [
-            "arrays",
-            "bifunctors",
-            "either",
-            "flatbars",
-            "flatbars-compile",
-            "foldable-traversable",
-            "fullbars",
-            "ordered-collections",
-            "prelude",
-            "tuples"
-          ]
-        },
-        "test": {
-          "dependencies": [
-            "assert",
-            "console",
-            "effect",
-            "either",
-            "foldable-traversable",
-            "strings"
-          ]
-        }
-      },
       "kernel": {
         "path": "packages/kernel",
         "core": {
@@ -233,10 +233,10 @@
           "dependencies": [
             "arrays",
             "bifunctors",
+            "classicbars",
             "either",
             "flatbars",
             "foldable-traversable",
-            "fullbars",
             "kernel",
             "maxbars",
             "maybe",
@@ -263,11 +263,11 @@
           "dependencies": [
             "arrays",
             "bifunctors",
+            "classicbars",
+            "classicbars-compile",
             "either",
             "flatbars",
             "foldable-traversable",
-            "fullbars",
-            "fullbars-compile",
             "integers",
             "kernel",
             "maybe",

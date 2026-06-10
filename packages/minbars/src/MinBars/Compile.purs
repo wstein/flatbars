@@ -1,6 +1,6 @@
 -- | The MinBars **emit rules** for the dialect-agnostic `FlatBars.Compile` driver
--- | (ADR-016). MinBars is a *peer* engine, so — unlike the RawBars/FullBars/MaxBars
--- | ladder, which shares `FlatBars.Compile.Emit.fullbarsEmit` — it plugs in its own
+-- | (ADR-016). MinBars is a *peer* engine, so — unlike the RawBars/ClassicBars/MaxBars
+-- | ladder, which shares `FlatBars.Compile.Emit.classicbarsEmit` — it plugs in its own
 -- | `Emit` targeting the MinBars `m*` runtime ops (`flatbars-runtime.mjs`), exactly
 -- | as it plugs in its own `Engine m MinEnv` for interpretation.
 -- |

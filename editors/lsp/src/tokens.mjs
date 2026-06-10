@@ -41,9 +41,9 @@ function kindEncoder(vocab, legend) {
 }
 
 // FlatBars has four surfaces, each a first-class editor language. The dialect is
-// the document's `languageId` — `rawbars`/`minbars`/`fullbars`/`maxbars`; the
+// the document's `languageId` — `rawbars`/`minbars`/`classicbars`/`maxbars`; the
 // `flatbars` umbrella (and anything else) yields null so the caller falls back.
-export const DIALECTS = ["rawbars", "minbars", "fullbars", "maxbars"];
+export const DIALECTS = ["rawbars", "minbars", "classicbars", "maxbars"];
 
 export function dialectForLanguageId(languageId) {
   return DIALECTS.includes(languageId) ? languageId : null;
@@ -52,7 +52,7 @@ export function dialectForLanguageId(languageId) {
 // A robust fallback when the languageId is not a dialect (the `flatbars` umbrella,
 // or a host — e.g. JetBrains — that doesn't send our id): map the native extension.
 // Returns null if the extension picks no dialect. Each dialect ships long-form
-// (`.rawbars`) and short-form (`.rbars`) extensions; FullBars also claims the
+// (`.rawbars`) and short-form (`.rbars`) extensions; ClassicBars also claims the
 // Handlebars extensions, MinBars the Mustache extension, and MaxBars `.truss`
 // (Trussbars AOT-compiled templates) — see editors/shared/sync.mjs LANGUAGES for
 // the canonical mapping.
@@ -62,10 +62,10 @@ const URI_EXTENSION_DIALECT = {
   ".minbars": "minbars",
   ".mbars": "minbars",
   ".mustache": "minbars",
-  ".fullbars": "fullbars",
-  ".fbars": "fullbars",
-  ".hbs": "fullbars",
-  ".handlebars": "fullbars",
+  ".classicbars": "classicbars",
+  ".fbars": "classicbars",
+  ".hbs": "classicbars",
+  ".handlebars": "classicbars",
   ".maxbars": "maxbars",
   ".xbars": "maxbars",
   ".truss": "maxbars",
@@ -78,8 +78,8 @@ export function dialectForUri(uri) {
 }
 
 // The resolution the server uses: languageId first, then the URI, then the
-// configured default (FullBars unless overridden).
-export function resolveDialect(languageId, uri, fallback = "fullbars") {
+// configured default (ClassicBars unless overridden).
+export function resolveDialect(languageId, uri, fallback = "classicbars") {
   return dialectForLanguageId(languageId) ?? dialectForUri(uri) ?? fallback;
 }
 
@@ -110,19 +110,19 @@ export function parseDiagnostics(text, dialect) {
 //   * MinBars — no subexpressions, no helper invocations (tag body must be a
 //     single path: `name`, `name.foo`, `name/foo`, `[seg.with.dot]`).
 //   * RawBars — same as MinBars (core dialect has no helpers either).
-//   * FullBars / MaxBars — no extra checks; the parser already accepts their
+//   * ClassicBars / MaxBars — no extra checks; the parser already accepts their
 //     full surface.
 export function dialectDiagnostics(text, dialect) {
   // Set-delimiter directives are a MinBars (Mustache) feature only (ADR-015
-  // amendment). RawBars, MaxBars, and FullBars all reject `{{=A B=}}` at the
+  // amendment). RawBars, MaxBars, and ClassicBars all reject `{{=A B=}}` at the
   // parser; the recovering parser surfaces a generic "LexError: unexpected
   // character" without telling the user the feature is dialect-gated. Surface
   // an actionable message at the `=` instead. MinBars accepts silently.
-  if (dialect === "fullbars" || dialect === "rawbars" || dialect === "maxbars") {
+  if (dialect === "classicbars" || dialect === "rawbars" || dialect === "maxbars") {
     const out = [];
     const re = /\{\{=/g;
     let m;
-    const dialectName = { fullbars: "FullBars (Handlebars surface)", rawbars: "RawBars", maxbars: "MaxBars" }[dialect];
+    const dialectName = { classicbars: "ClassicBars (Handlebars surface)", rawbars: "RawBars", maxbars: "MaxBars" }[dialect];
     while ((m = re.exec(text)) !== null) {
       out.push({
         start: m.index,
@@ -133,12 +133,12 @@ export function dialectDiagnostics(text, dialect) {
           `to use them (Cmd-Shift-P → Change Language Mode).`,
       });
     }
-    // Block-scoped `{{#let}}` is a MaxBars-only construct (ADR-024). In FullBars
+    // Block-scoped `{{#let}}` is a MaxBars-only construct (ADR-024). In ClassicBars
     // it parses (a section over a `let` field) but the engine rejects it at render
     // (`checkSurfaceStrict`) — surface that here as an actionable editor message
-    // rather than a silent no-op. RawBars/MaxBars accept `let`, so this is FullBars
+    // rather than a silent no-op. RawBars/MaxBars accept `let`, so this is ClassicBars
     // only.
-    if (dialect === "fullbars") {
+    if (dialect === "classicbars") {
       const letRe = /\{\{~?#let\b/g;
       let lm;
       while ((lm = letRe.exec(text)) !== null) {
@@ -146,13 +146,13 @@ export function dialectDiagnostics(text, dialect) {
           start: lm.index,
           end: lm.index + lm[0].length,
           message:
-            "Block-scoped `{{#let}}` is a MaxBars-only construct — FullBars has no `let`. " +
+            "Block-scoped `{{#let}}` is a MaxBars-only construct — ClassicBars has no `let`. " +
             "Alias with `{{#with x as |n|}}`, or switch the file to MaxBars " +
             "(Cmd-Shift-P → Change Language Mode).",
         });
       }
     }
-    if (dialect === "fullbars") return out;
+    if (dialect === "classicbars") return out;
     // MaxBars binds loops Liquid-style (`{{#each x in xs}}`); the removed trailing
     // `{{#each … as …}}` form parses but the engine rejects it at render
     // (`checkSurfaceStrict`, MaxBars path). Flag it here too, with the `x in xs`
@@ -811,7 +811,7 @@ function canonicaliseBody(body, sigil) {
 // tag), or null — the data behind the "rewrite X → Y" quick-fix. Returns the word
 // range and the canonical replacement. Alias rewrites apply in any dialect; the
 // scoped-variable rewrite (index → index0, partial-block → yield) is native to
-// RawBars/MaxBars only (FullBars/MinBars keep Handlebars' @index/@partial-block).
+// RawBars/MaxBars only (ClassicBars/MinBars keep Handlebars' @index/@partial-block).
 export function canonAt(text, dialect, offset) {
   if (!inTagContext(text, dialect, offset)) return null;
   const w = wordAt(text, offset);

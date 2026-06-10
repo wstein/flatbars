@@ -48,14 +48,14 @@ const IDENT_RE = /^[A-Za-z_][\w-]*/;
 // Block / inheritance / partial-import sigils + their keyword word. Clause
 // keywords (`{{else}}` / `{{elif}}`) are NOT special-cased here: the engine's
 // `tokenize` already gives them the `keyword` kind in dialects where they ARE
-// clause separators (FullBars/MaxBars); in MinBars `{{else}}` is a plain `expr`
+// clause separators (ClassicBars/MaxBars); in MinBars `{{else}}` is a plain `expr`
 // (Mustache has no `else`), so the operation pass owns it — exactly like the LSP.
 const SIGIL_KW = /^[#^/]\s*[A-Za-z_][\w-]*/;
 
 // Paint `text` (under `dialect`) into a flat array of non-overlapping segments
 // `{ from, to, kind, inTag }` covering [0, text.length). `isOperation(name)`
 // returns true for a known prelude helper.
-export function paintKinds(text, dialect = "fullbars", isOperation = () => false) {
+export function paintKinds(text, dialect = "classicbars", isOperation = () => false) {
   const n = text.length;
   const kind = new Array(n).fill(null);
   const inTag = new Array(n).fill(false);
@@ -89,7 +89,7 @@ export function paintKinds(text, dialect = "fullbars", isOperation = () => false
 // included. The highlighters lay one `tag-bg` plate over each so a tag reads as a
 // single pill, with the per-token colours layered on top. Defensive (a non-tag
 // dialect / lex failure yields none), like paintKinds.
-export function tagRanges(text, dialect = "fullbars") {
+export function tagRanges(text, dialect = "classicbars") {
   let raw;
   try { raw = tokenize(text, dialect); } catch { raw = null; }
   return (raw || [])
@@ -283,7 +283,7 @@ export const KIND_CLASS = {
 };
 
 // A per-character kind array (for the parity gate / consumers that prefer it).
-export function paintCharKinds(text, dialect = "fullbars", isOperation = () => false) {
+export function paintCharKinds(text, dialect = "classicbars", isOperation = () => false) {
   const kinds = new Array(text.length).fill(null);
   for (const seg of paintKinds(text, dialect, isOperation)) {
     for (let i = seg.from; i < seg.to; i++) kinds[i] = seg.kind;

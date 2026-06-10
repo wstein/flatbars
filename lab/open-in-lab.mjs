@@ -16,7 +16,7 @@ import { encodeState } from "./playground_utils.mjs";
 import { dump as dumpYaml } from "./vendor/js-yaml.mjs";
 
 // The engines the Lab accepts on `?engine=` (the four FlatBars surfaces).
-export const LAB_ENGINES = ["rawbars", "minbars", "fullbars", "maxbars"];
+export const LAB_ENGINES = ["rawbars", "minbars", "classicbars", "maxbars"];
 
 // Render an example's data as the Lab's data-editor text. The Lab's native data
 // format is YAML (data.yaml), so an object/array is dumped to YAML; a string is
@@ -40,7 +40,7 @@ export function workspaceState({ template = "", data, partials, helpers, transfo
   for (const name of Object.keys(p)) tabs.push({ n: name, s: p[name] });
   const st = { x: -1, tabs, d: dataText(data), av: "tmpl", ai: 0 };
   // Custom-helper JS (ADR-018) — a separate field `h` from the data transform
-  // (`t`). The Lab loads it into its FullBars-only helpers.js editor and runs it
+  // (`t`). The Lab loads it into its ClassicBars-only helpers.js editor and runs it
   // in a sandboxed Worker (no DOM access), so a shared link cannot touch the page.
   if (helpers && helpers.trim()) st.h = helpers;
   // A JSONata data transform (the data → view-model preprocess `restoreHash`

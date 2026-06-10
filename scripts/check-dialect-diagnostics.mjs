@@ -25,13 +25,13 @@ const bad = (msg) => {
 // in `editors/lsp/src/tokens.mjs` `dialectRulesFor`, so any reordering there
 // shows up here as a different rule matching a fixture.
 const RULES = [
-  // FullBars / RawBars / MaxBars all flag set-delim with the same message (the
+  // ClassicBars / RawBars / MaxBars all flag set-delim with the same message (the
   // dialect name in the middle varies).
-  ["fullbars", "{{=<% %>=}}", /Set-delimiter directives.*FullBars.*Mustache feature.*MinBars/, "set-delim (fullbars)"],
+  ["classicbars", "{{=<% %>=}}", /Set-delimiter directives.*ClassicBars.*Mustache feature.*MinBars/, "set-delim (classicbars)"],
   ["rawbars",  "{{=<% %>=}}", /Set-delimiter directives.*RawBars.*Mustache feature.*MinBars/,  "set-delim (rawbars)"],
   ["maxbars",  "{{=<% %>=}}", /Set-delimiter directives.*MaxBars.*Mustache feature.*MinBars/,  "set-delim (maxbars)"],
-  // `{{#let}}` is MaxBars-only (ADR-024): FullBars flags it; MaxBars/RawBars accept it.
-  ["fullbars", "{{#let a=1}}{{/let}}", /\{\{#let\}\}.*MaxBars-only.*FullBars has no .let./, "let (fullbars)"],
+  // `{{#let}}` is MaxBars-only (ADR-024): ClassicBars flags it; MaxBars/RawBars accept it.
+  ["classicbars", "{{#let a=1}}{{/let}}", /\{\{#let\}\}.*MaxBars-only.*ClassicBars has no .let./, "let (classicbars)"],
   // the removed `{{#each … as …}}` form is flagged in MaxBars (use `x in xs`).
   ["maxbars", "{{#each xs as a}}{{/each}}", /Liquid-style.*names before .in.*each x in xs/, "each-as (maxbars)"],
   // MinBars / RawBars share the rest of the dialect rules. RawBars stops here

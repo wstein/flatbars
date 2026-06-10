@@ -49,7 +49,7 @@ The decisive constraint is that highlighting FlatBars is *stateful and content-d
   `<%={{ }}=%>`. A correct highlighter must carry the *active delimiter pair* as state across the
   document.
 * *Per-dialect grammar*: the `parseExpr` / `parseHead` seam and `LexOptions` make tag interiors and the
-  legal shape set differ across RawBars / FullBars / MaxBars / MinBars; the separator set that paints as
+  legal shape set differ across RawBars / ClassicBars / MaxBars / MinBars; the separator set that paints as
   a statement is the parser's own `standaloneSeps` (empty for MinBars), never a fixed keyword list.
 * Raw blocks `{{{{ … }}}}`, long comments `{{!-- … --}}`, the inheritance sigils
   `{{<}}` / `{{$}}`.
@@ -102,7 +102,7 @@ developers know. It colours *only* the template syntax and a leading YAML front-
 template's output is not necessarily HTML (it may be JSON, SQL, Markdown, plain text), so the grammar's
 HTML/CSS/JS embedding is removed and host text is left plain. It is explicitly *best-effort and
 non-authoritative*: being stateless it cannot follow a
-set-delimiter *switch* (the tags past `{{=A B=}}`) and is FullBars-flavoured (it paints
+set-delimiter *switch* (the tags past `{{=A B=}}`) and is ClassicBars-flavoured (it paints
 `else`/`each` as keywords even in MinBars, and paints RawBars/MaxBars's `extras`-off shapes as valid).
 When the LSP is attached, its semantic tokens are *sparse corrections*, not a blanket re-colour: because
 the floor is now a rich, familiar grammar, the LSP emits a token ONLY where it knows something the
@@ -275,7 +275,7 @@ hover + completion, the open question above. They are *not* keyed to the recover
 parser's `NodeError` nodes after all — the operation set is static, so a per-edit
 parse buys nothing. Instead:
 
-* `FullBars.Catalog.operations` projects `preludeSchema` (the same single source the
+* `ClassicBars.Catalog.operations` projects `preludeSchema` (the same single source the
   helper catalog renders) to each operation's name, its ADR-019 kind
   ([ADR-019](/adr/adr-0019-operation-vocabulary/); `value`/`inline`/`block`,
   derived structurally — `operator` is a MaxBars surface form, not a runtime kind),
@@ -309,7 +309,7 @@ The replacement is the `canonical` field already in `operations.json` — aliase
 `preludeAliases`, scoped from `Kernel.Prelude.scopedCanonical` (the shared table the
 `Linter.Aliases` lint and the `flatbars lint` CLI also read; *not* `synonymOf` —
 synonyms are endorsed and never offered). It is dialect-scoped: alias rewrites apply
-anywhere, the scoped rewrite only in RawBars/MaxBars (FullBars/MinBars keep
+anywhere, the scoped rewrite only in RawBars/MaxBars (ClassicBars/MinBars keep
 Handlebars' `@index`/`@partial-block`). So the same single source drives the lint
 (report), the CLI (`flatbars lint`), and the editor (one-click fix).
 
@@ -354,7 +354,7 @@ default-coloured.
 ## Amendment (2026-06-04): short-form dialect extensions + hybrid templates
 
 Each dialect now ships two equivalent native extensions — the long form
-(`.rawbars`/`.minbars`/`.fullbars`/`.maxbars`) and a short alias
+(`.rawbars`/`.minbars`/`.classicbars`/`.maxbars`) and a short alias
 (`.rbars`/`.mbars`/`.fbars`/`.xbars`). Both resolve to the same language id;
 both are listed in every consumer (`shared/sync.mjs`, VS Code's
 `package.json`, JetBrains's TextMate bundle, the grammar's `fileTypes`,

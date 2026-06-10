@@ -19,7 +19,7 @@
 -- | RawBars/MaxBars canonical one. The engine installs *both* names (they render
 -- | identically — `scopedSpecs`), so this is purely a *lint* preference, not a
 -- | render or `synonymOf` concern; it is surface-scoped (run it for RawBars/MaxBars
--- | source, where the native form is canonical — not FullBars, where `@index` /
+-- | source, where the native form is canonical — not ClassicBars, where `@index` /
 -- | `@partial-block` are the Handlebars-faithful spelling).
 module Linter.Aliases
   ( LintWarning
@@ -71,7 +71,7 @@ aliasWarnings = Array.mapMaybe warnOf <<< operationRefs
     Nothing -> Nothing
 
 -- | Parse `src` with the default (core) parser and warn on any alias use — the
--- | convenience entry point for the RawBars/FullBars explicit-call form
+-- | convenience entry point for the RawBars/ClassicBars explicit-call form
 -- | (`{{plus a b}}` / `(plus a b)`). A MaxBars caller parses with `maxOptions`
 -- | and uses `aliasWarnings` directly.
 aliasWarningsOf :: String -> Either ParseError (Array LintWarning)
@@ -80,7 +80,7 @@ aliasWarningsOf src = (aliasWarnings <<< _.nodes) <$> lmap NEA.head (parse src)
 -- | Warn on every use of a non-canonical scoped variable (`index` → `index0`,
 -- | `partial-block` → `yield`), pointing at the native spelling. Surface-scoped:
 -- | the caller runs it for RawBars/MaxBars source (where the native form is
--- | canonical), not FullBars. Same shape as `aliasWarnings`; one `Warn` per use.
+-- | canonical), not ClassicBars. Same shape as `aliasWarnings`; one `Warn` per use.
 scopedCanonWarnings :: Template -> Array LintWarning
 scopedCanonWarnings = Array.mapMaybe warnOf <<< operationRefs
   where

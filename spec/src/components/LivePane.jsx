@@ -12,12 +12,12 @@ import {
 } from "../../../lab/vendor/flatbars-engine.mjs";
 
 const RENDERERS = {
-  fullbars: renderSurface,
+  classicbars: renderSurface,
   minbars: renderMinbars,
   maxbars: renderMaxbars,
 };
 
-export default function LivePane({ template = "", data = "{}", dialect = "fullbars" }) {
+export default function LivePane({ template = "", data = "{}", dialect = "classicbars" }) {
   const [tpl, setTpl] = useState(template);
   const [dataText, setDataText] = useState(data);
 

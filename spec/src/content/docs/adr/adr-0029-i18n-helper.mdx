@@ -14,7 +14,7 @@ both interpreter and compiled runtime, *no per-file config, no baked data*), ext
 path of [ADR-018](/adr/adr-0018-user-defined-helpers/) (`registerHelper`), and is gated by the
 compile ≡ interpret invariant of [ADR-011](/adr/adr-0011-compile-to-js/). It respects the dialect-purity
 boundaries of [ADR-007](/adr/adr-0007-minbars/) (MinBars is *Mustache*) and
-[ADR-009](/adr/adr-0009-fullbars/) (FullBars is *Handlebars-faithful*), using the engine-level opt-in
+[ADR-009](/adr/adr-0009-classicbars/) (ClassicBars is *Handlebars-faithful*), using the engine-level opt-in
 precedent of [ADR-015](/adr/adr-0015-set-delimiters/) (set-delimiters is a MinBars-only knob, not a
 global). Escaping follows [ADR-002](/adr/adr-0002-escaping-and-value-policy/).
 
@@ -22,7 +22,7 @@ global). Escaping follows [ADR-002](/adr/adr-0002-escaping-and-value-policy/).
 
 The https://en.wikipedia.org/wiki/Comparison_of_web_template_engines[Wikipedia comparison of web template
 engines] scores FlatBars *i18n: No*. The evidence is direct: the 90-operation prelude
-(`FullBars.preludeSchema`) ships no `t` / `translate` / `gettext`. Two facts frame the decision:
+(`ClassicBars.preludeSchema`) ships no `t` / `translate` / `gettext`. Two facts frame the decision:
 
 * *This is the company we keep.* Handlebars and Mustache *also* have no built-in i18n — their ecosystems do it
   with userland helpers/lambdas (i18next, `handlebars-i18n`, Mustache lambdas). So "absent from the core"
@@ -39,7 +39,7 @@ Three hard constraints fell out of team review (debate recorded against this ADR
    committed Lab bundle are size-gated; CLDR plural data is tens of KB and would tax *every* compiled
    template, including the majority that never localize.
 1. *The prelude is one shared schema across all four dialects.* Adding `t` to the base prelude adds it to
-   *MinBars* (breaking the "pure Mustache" claim, ADR-007) and *FullBars* (Handlebars ships no `t`,
+   *MinBars* (breaking the "pure Mustache" claim, ADR-007) and *ClassicBars* (Handlebars ships no `t`,
    ADR-009) — a faithfulness regression even though byte-identical conformance would stay green (the spec
    corpora never call `t`).
 1. *Whatever ships must satisfy compile ≡ interpret (ADR-011)* or `test:compile` goes red.
@@ -50,10 +50,10 @@ Adopt the truthiness pattern (ADR-022) for localization: *FlatBars supplies the 
 supplies the brain; we never bundle CLDR.*
 
 1. *`t` is a blessed operation in the shared kernel prelude* (`Kernel.Prelude`), reserved for the
-   *core-surface family* — *RawBars, FullBars, and MaxBars* — and *absent from MinBars* (the separate
+   *core-surface family* — *RawBars, ClassicBars, and MaxBars* — and *absent from MinBars* (the separate
    Mustache peer engine has its own closed prelude, so adding to the kernel prelude never touches it; ADR-007
    stays intact). *RawBars is included precisely because it is the desugared core surface* (not a
-   meaning-free substrate): FullBars's `{{t …}}` desugars to a core `t` operation, so the operation
+   meaning-free substrate): ClassicBars's `{{t …}}` desugars to a core `t` operation, so the operation
    *must* exist at the RawBars level for the desugar target to be complete, and RawBars runs the same
    prelude/engine. As implemented, the prelude `t` ships only the *fallback* (return the key unchanged); it
    carries no locale or CLDR data. Because — like every prelude operation — `t` only fires when applied with
@@ -104,15 +104,15 @@ legacy spellings are a lint concern, ADR-019).
 
 ## Consequences
 
-* The Wikipedia *i18n: No* becomes *Yes (host-plugged)* for RawBars/FullBars/MaxBars, with the honest
+* The Wikipedia *i18n: No* becomes *Yes (host-plugged)* for RawBars/ClassicBars/MaxBars, with the honest
   footnote that the plural/format brain is the host's — which is exactly how i18next-backed Handlebars works.
-* The catalog gains a `t` entry (`FullBars.Catalog`, the LSP `operations.json`); `npm run gen:catalog` and
+* The catalog gains a `t` entry (`ClassicBars.Catalog`, the LSP `operations.json`); `npm run gen:catalog` and
   `npm run gen:operations` regenerate them and `check:catalog` / `check:operations` gate the drift. `t` is
   now hover-documented and operation-painted in the editors.
 * *Only MinBars is unaffected* — its separate closed prelude does not gain `t`, so ADR-007 purity and the
   Mustache conformance claim are untouched. RawBars *does* gain `t` (ADR-008's `nonEmpty` truthiness is
-  orthogonal and unchanged); this is required, not incidental — it is the desugar target FullBars/MaxBars
-  lower to. FullBars's `t` is an *extension* beyond Handlebars (faithful to the workflow, not a Handlebars
+  orthogonal and unchanged); this is required, not incidental — it is the desugar target ClassicBars/MaxBars
+  lower to. ClassicBars's `t` is an *extension* beyond Handlebars (faithful to the workflow, not a Handlebars
   built-in); `hbs-conformance` is unaffected because the corpus never calls `t`.
 * Zero bundle-size impact and no behavioural change for templates that don't localize: no CLDR ships, and a
   bare `{{t}}` still resolves to the data field.
@@ -123,7 +123,7 @@ legacy spellings are a lint concern, ADR-019).
   debate): heavy data, violates meaning-free + the bundle gates. Plurals are the host's job.
 * *No per-file `@locale` directive.* Locale is the host's, closed over by the registered `t` — mirroring
   ADR-022's rejection of per-file `@truthiness`.
-* *No `t` in MinBars.* It lives in the *kernel* prelude (shared by RawBars/FullBars/MaxBars), never in
+* *No `t` in MinBars.* It lives in the *kernel* prelude (shared by RawBars/ClassicBars/MaxBars), never in
   MinBars's separate Mustache prelude — so the Mustache-purity claim stays clean without a conditional
   mechanism (rejected option B was forcing it onto *every* engine, which would have hit MinBars).
 * *No dedicated translate-callback parameter or new env field.* The host plugs in through the existing
@@ -136,7 +136,7 @@ legacy spellings are a lint concern, ADR-019).
 | --- | --- | --- |
 | Option | Summary | Verdict |
 | A — recipe only | Document `registerHelper('t', …)` + i18next; ship no engine surface. The honest "you can already do this today" answer, and how Handlebars/Mustache users localize. | *Adopt as the interim*, but it documents a workaround rather than closing the gap. |
-| B — `t` in the base prelude | Simplest, but adds `t` to MinBars + FullBars schemas. | Rejected — pollutes Mustache/Handlebars faithfulness. |
+| B — `t` in the base prelude | Simplest, but adds `t` to MinBars + ClassicBars schemas. | Rejected — pollutes Mustache/Handlebars faithfulness. |
 | C — opt-in module + host `translate` callback | This ADR. Truthiness pattern applied to localization; no CLDR shipped; dialect-gated. | *Accepted (proposed).* |
 | D — full ICU/CLDR in-core | Correct plurals out of the box, but tens of KB of data in core/runtime. | Rejected — violates meaning-free + bundle gates. |
 | E — `number` / `date` / `selectPlural` (+ `relative`) helpers | A locale-aware formatting helper set, same host-register discipline. | *Adopted* — all are blessed prelude operations alongside `t` (pure fallbacks: plain text; the English one/other rule; "N units ago"). All four accept an Intl options hash — the trailing dict passes through with no arity change (the fallbacks ignore it; the host reads it). |
@@ -145,7 +145,7 @@ legacy spellings are a lint concern, ADR-019).
 
 1. ✅ *Done — the interim recipe and Lab demo:* the `/localize` guide renders `{{t …}}` live via the
    host-register seam, on the browser's native `Intl` (see the 2026-06-05 amendment), gated by `check:i18n`.
-1. ✅ *Done — this ADR (C):* the `t` prelude operation (RawBars/FullBars/MaxBars; not MinBars), the host
+1. ✅ *Done — this ADR (C):* the `t` prelude operation (RawBars/ClassicBars/MaxBars; not MinBars), the host
    brain via the ADR-018 registration seam (interpreter + compiled runtime), the pure key-returning
    fallback, catalog/operations generation, and `test:compile` parity.
 1. ✅ *Done — the E formatting set:* `number` / `date` / `selectPlural` / `relative` are blessed prelude
@@ -153,8 +153,8 @@ legacy spellings are a lint concern, ADR-019).
    overridden by the host's native `Intl`). All four read an Intl options hash
    (`{{number n style="currency" currency="EUR"}}`, `{{selectPlural n type="ordinal"}}`,
    `{{relative v u numeric="always"}}`), which the trailing dict delivers without an arity change.
-1. *Conformance note:* add an `i18n` row to [fullbars-compat](/engine/fullbars-compat/) documenting that the `t` operation
-   (shared by RawBars/FullBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
+1. *Conformance note:* add an `i18n` row to [classicbars-compat](/engine/classicbars-compat/) documenting that the `t` operation
+   (shared by RawBars/ClassicBars/MaxBars) is an *extension* beyond Handlebars (faithful to the workflow, not a
    Handlebars built-in), the same framing ADR-018 used for `registerHelper`.
 
 ## Amendment (2026-06-05): the Lab demonstrates the seam via native `Intl` — i18next is not vendored
@@ -199,7 +199,7 @@ The Lab exposes the seam as two dedicated sidebar *views* (not partial tabs), mi
 data/config split: a *LOCALIZATION* section with *`catalog.yaml`* (the message DATA, locale-keyed; shown
 on every surface except MinBars) and a generalized *`config.yaml`* (the former Stem-only `stem.config.yaml`)
 that now also carries `i18n.locale` on the t-surfaces and `minbars.truthiness` on MinBars — the latter
-replacing the old mustache.js-truthiness UI toggle. The render routes RawBars/FullBars/MaxBars through the
+replacing the old mustache.js-truthiness UI toggle. The render routes RawBars/ClassicBars/MaxBars through the
 helper Worker (`lab/i18n.mjs` `buildI18nHelpers`), so
 `{{t …}}`/`number`/`date`/`selectPlural`/`relative` resolve from `catalog.yaml` bound to the locale
 the Lab parses from `config.yaml` (its inline `parseConfigYaml`). One shared catalog/config (the groups are
@@ -247,10 +247,10 @@ was aspirational. The implementation is now the *first-class seam* the Decision 
   a CI-gating lint, so it cannot false-positive a wired project.
 * *Consumers use the seam.* The `flatbars-js` facade exposes `renderSurfaceI18n` (host translator as a JS
   `(name, args) => string | null`); the Lab's `TryI18n` island, `check:i18n`, and the `/localize`
-  host recipe all seed a translator (`registerTranslator`), not `registerHelper`. FullBars carrying these
-  ops is recorded as an explicit exception in [ADR-009](/adr/adr-0009-fullbars/) (no faithfulness-by-omission).
+  host recipe all seed a translator (`registerTranslator`), not `registerHelper`. ClassicBars carrying these
+  ops is recorded as an explicit exception in [ADR-009](/adr/adr-0009-classicbars/) (no faithfulness-by-omission).
 
-The Lab worker (`helpers-worker.mjs`) renders pure i18n (no custom helpers, FullBars — the common
+The Lab worker (`helpers-worker.mjs`) renders pure i18n (no custom helpers, ClassicBars — the common
 localization case) through the seam (`renderSurfaceI18n`); the *combined* i18n+custom-helpers render (and
 RawBars/MaxBars i18n) still merges the i18n bag with the custom helpers, where a registered i18n op shadows
 the seamed prelude op (identical output). The wired-translator `test:compile` case now gates the

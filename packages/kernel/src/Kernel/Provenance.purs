@@ -69,7 +69,7 @@ runResolvedMapped
   -> Either Error { output :: String, segments :: Array Segment }
 runResolvedMapped = runMappedUsing refEngine
 
--- | Like `runResolvedMapped`, with FullBars' lenient resolve (FullBars / MaxBars).
+-- | Like `runResolvedMapped`, with ClassicBars' lenient resolve (ClassicBars / MaxBars).
 runResolvedLenientMapped
   :: (RefEnv Prov -> RefEnv Prov)
   -> Template

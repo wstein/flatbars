@@ -7,14 +7,14 @@
 > `collectionLiterals` — so it re-delimits the **existing** structural `Block`/`Sep` nodes and
 > leaves the engine, desugar, validate, and compile drivers **untouched**.
 >
-> **Scope (by decision):** **RawBars, MaxBars, and Trussbars** only. **FullBars** (Handlebars-
+> **Scope (by decision):** **RawBars, MaxBars, and Trussbars** only. **ClassicBars** (Handlebars-
 > faithful) and **MinBars** (Mustache) keep `{{ }}`-only and are explicitly **out** — see §5.3.
 >
 > **Audience:** the lexer/parser owner and the v2 proc-macro author. Companions: `docs/12`
 > (the `{{#case}}` separator machinery this simplifies), `docs/17`/`docs/18` (`set`/`local`/`capture`
 > — **re-spelled** by this ADR, §5.6), `docs/01`/`docs/06` (subset + freeze — a major amendment,
 > §5.4), `docs/08` (the v2 parser this extends), `docs/15` (the migration codemod), `docs/04`
-> (conformance). Upstream: CLAUDE.md (the `LexConfig` knobs; the `RawBars ⊂ FullBars ⊂ MaxBars`
+> (conformance). Upstream: CLAUDE.md (the `LexConfig` knobs; the `RawBars ⊂ ClassicBars ⊂ MaxBars`
 > ladder, ADR-005; `check:parity`; `checkSurfaceStrict`).
 >
 > **Naming.** `{% %}` is Django's, shared by Jinja, Liquid, and Twig — the established mark for
@@ -41,7 +41,7 @@ The tax is visible in this repo's own decisions. `docs/12 §2` had to legislate 
 None of those rules describe *meaning*; they exist only because the parser cannot *see* that a
 separator is a separator. The defect is **worst in exactly the dialects that added rich control
 flow** — RawBars/MaxBars/Trussbars, which grew `case`/`when`/`elif`/`local`/`set`. The mild
-classic `{{else}}` of Handlebars (FullBars) and the inverted sections of Mustache (MinBars)
+classic `{{else}}` of Handlebars (ClassicBars) and the inverted sections of Mustache (MinBars)
 carry far less of it (§5.3). So the cure belongs precisely where the disease is.
 
 The governing question is **not** "should output syntax change?" (it must not — `{{ x }}` is
@@ -86,7 +86,7 @@ one question.
 **Whitespace control** rides along on the same `~` marker as `{{~ ~}}`: `{%~ if c ~%}`.
 
 **Delivery is a `LexConfig` knob — `statementTags`** — **on** for RawBars/MaxBars (and the
-Trussbars subset), **off** for FullBars/MinBars (§5.3). This is the exact pattern of the
+Trussbars subset), **off** for ClassicBars/MinBars (§5.3). This is the exact pattern of the
 existing per-dialect knobs (`mustacheDelims`, `rangeOperator`, `collectionLiterals`).
 
 ## 3. The mechanism (why this is small)
@@ -159,8 +159,8 @@ than a reserved-name list; the `case`-as-reserved-head rule (`docs/12 §5.2`) an
 `{{else}}`" payoff stated in the request — realized as *removed* special-casing.
 
 ### 5.2 The `⊂` ladder becomes structural, not textual (ADR-005 amendment)
-`RawBars ⊂ FullBars ⊂ MaxBars` was a *surface*-superset "modulo documented exceptions." With
-RawBars/MaxBars on `{% %}` and FullBars on `{{# }}`, FullBars is no longer a textual superset of
+`RawBars ⊂ ClassicBars ⊂ MaxBars` was a *surface*-superset "modulo documented exceptions." With
+RawBars/MaxBars on `{% %}` and ClassicBars on `{{# }}`, ClassicBars is no longer a textual superset of
 RawBars. The ladder is amended to mean **shared engine/prelude/compiler** (still true) with the
 control-tag *delimiter* now a documented per-dialect surface divergence — the largest yet, but
 the same *kind* as `mustacheDelims`/`rangeOperator`. `check:parity` (RawBars ≡ MaxBars) is
@@ -168,11 +168,11 @@ the same *kind* as `mustacheDelims`/`rangeOperator`. `check:parity` (RawBars ≡
 RawBars *source*) emits `{% %}`, which makes "this is the desugared structural form" visually
 obvious.
 
-### 5.3 FullBars and MinBars stay `{{ }}`-only — the cure is aligned with the disease
-- **FullBars is Handlebars-faithful**; its value is drop-in `{{#if}}…{{/if}}{{else}}`
+### 5.3 ClassicBars and MinBars stay `{{ }}`-only — the cure is aligned with the disease
+- **ClassicBars is Handlebars-faithful**; its value is drop-in `{{#if}}…{{/if}}{{else}}`
   compatibility, gated against the real `handlebars` npm package (98% conformance). `{% %}` would
   break that contract outright — so `statementTags = false`, and the LSP keeps layering its
-  `dialectDiagnostics` (as it already does for `mustacheDelims`) so a `{% %}` typed in FullBars
+  `dialectDiagnostics` (as it already does for `mustacheDelims`) so a `{% %}` typed in ClassicBars
   surfaces an actionable "use RawBars/MaxBars" message, not a raw parse failure.
 - **MinBars is Mustache-faithful** (`{{#}}/{{/}}/{{^}}`, no `else`/`elif`/`when`), gated against
   the official `mustache/spec`. It has *no* separators to disambiguate. `statementTags = false`.
@@ -219,7 +219,7 @@ byte (`docs/12 §5.5`).
 `{{{{#raw}}}}…{{{{/raw}}}}` existed so a raw body could contain literal `{{ }}`. `{% raw %}…{%
 endraw %}` scans verbatim to `{% endraw %}`, so the body may now contain **both** literal `{{ }}`
 and `{% %}` — strictly more capable. The quad-stache is retired in `statementTags` dialects
-(rejected with a located error, §5.4); it remains in FullBars/MinBars.
+(rejected with a located error, §5.4); it remains in ClassicBars/MinBars.
 
 ## 6. Status & sequencing
 
@@ -264,7 +264,7 @@ and `{% %}` — strictly more capable. The quad-stache is retired in `statementT
   (conformance holds).
 - It **deletes** the separator-ambiguity machinery (`docs/12 §2`): `else`/`when`/`elif`/`case`
   stop being reserved names, `splitClauses` keys off a real token, the AST stops lying.
-- **FullBars** (Handlebars) and **MinBars** (Mustache) are **excluded** and keep `{{ }}`-only —
+- **ClassicBars** (Handlebars) and **MinBars** (Mustache) are **excluded** and keep `{{ }}`-only —
   upstream-fidelity contracts, and the dialects where the ambiguity is mildest. The cure is
   aligned with the disease.
 - It is a **breaking** change handled by the project discipline: freeze here, a mechanical

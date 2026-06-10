@@ -10,9 +10,9 @@ The core is austere by design. *FlatBars Surface* is an optional dialect that re
 ergonomics. It is *not* a separate parser ([ADR-001](/adr/adr-0001-structural-parser-and-walker/)):
 the one structural parser (`parse`) is unchanged, and Surface is a *desugaring walk* over the
 structural AST — part of the second pass ([host-api](/engine/host-api/) §7.1), naturally a `foldTemplate`
-([A.13.2](/appendix/handlebars/#engine-api)). `FullBars.Surface.desugar` performs the surface
+([A.13.2](/appendix/handlebars/#engine-api)). `ClassicBars.Surface.desugar` performs the surface
 rewrites below (output and paths today; see the status note); it is distinct from
-`FullBars.Lower.lower`, which lowers the *core* skeleton to the engine's typed real AST for tooling.
+`ClassicBars.Lower.lower`, which lowers the *core* skeleton to the engine's typed real AST for tooling.
 You can run the desugarer, swap it, or write your own.
 
 Surface adds nothing the core cannot already express. Every rule below is a *rewrite* of one
@@ -20,7 +20,7 @@ structural node into core nodes. Where a rewrite names a helper (`escapeHtml`, `
 `partial`, …), that helper must exist in the [engine](/engine/prelude/).
 
 :::note
-*Implementation status.* `FullBars.Surface.desugar` (and the convenience
+*Implementation status.* `ClassicBars.Surface.desugar` (and the convenience
 `renderSurface` / `compileSurface`) implement §5.1 *output* (`{{ }}` ⇒
 escaped, `{{{ }}}` ⇒ raw), §5.2 *paths* (bare, dotted, numeric index,
 legacy slash, `this`/`.`, `../`), §5.3 *literals* and head-vs-argument, §5.5
@@ -37,7 +37,7 @@ render the partial with `body` as the fallback (if missing) and the
 `{{#*inline "name"}}body{{/inline}}` (the Handlebars decorator form,
 with the `*` sigil) define a partial, hoisted into the
 registry before rendering. The bare `{{#inline "name"}}` is *rejected*
-(`DisallowedShape`): in FullBars, as in Handlebars, `inline` is a decorator, not
+(`DisallowedShape`): in ClassicBars, as in Handlebars, `inline` is a decorator, not
 a block helper. *Hash arguments* (§5.4) collect into a trailing `dict`:
 `{{ f a k=v k2="s"}}` ⇒ `{{{ escapeHtml (f (lookup this "a") (dict "k" … "k2" "s")) }}}`
 — this is what feeds `if`/`unless`' `includeZero`, e.g. `{{#if n includeZero=true}}`.
@@ -54,17 +54,17 @@ for context. A deeper run (`@../../index`) climbs the chain. (The flat
 The Handlebars block-partial *sigil* `{{#> name}}…{{/name}}` is also
 accepted and desugars to the same core form as the `{{#partial}}`
 spelling; the inline-partial *decorator* `{{#*inline "name"}}…{{/inline}}`
-is the *required* FullBars author form and desugars internally to the core
+is the *required* ClassicBars author form and desugars internally to the core
 `inline` helper. The core lexes `{{#>` and `{{#*` as the distinct
 `PartialBlock` and `Decorator` sigils — each with a clean head (the partial name
 for `{{#>}}`, the decorator name `inline` for `{{#*inline}}`) and a
 `{{/…}}` close that simply repeats that head. They are opt-in via
-`ParseOptions.partialBlocks` / `decorators` (on for FullBars; the austere dialects
+`ParseOptions.partialBlocks` / `decorators` (on for ClassicBars; the austere dialects
 gate them off as a located `DisallowedShape`). The bare
-`{{#inline}}` is rejected by `FullBars.checkBareInline` with a located
-`DisallowedShape` error — this gate is FullBars-surface-only (RawBars and MaxBars
+`{{#inline}}` is rejected by `ClassicBars.checkBareInline` with a located
+`DisallowedShape` error — this gate is ClassicBars-surface-only (RawBars and MaxBars
 still accept bare `{{#inline}}`). See the
-[compatibility matrix](/engine/fullbars-compat/) for per-feature status.
+[compatibility matrix](/engine/classicbars-compat/) for per-feature status.
 :::
 
 :::note[Important]
@@ -83,7 +83,7 @@ argument.
 | `{{{ E }}}` | `{{{ E' }}}` |
 
 Handlebars' ampersand form `{{& E }}` (unescaped) is accepted as an alias of the triple-stash
-`{{{ E }}}` (see §5.6) — both mean "do not escape". The triple-stash is the canonical FullBars
+`{{{ E }}}` (see §5.6) — both mean "do not escape". The triple-stash is the canonical ClassicBars
 spelling; the austere RawBars and MaxBars dialects accept only it and reject `{{&}}`.
 
 `E'` is `E` after the *path rewrite* (5.2). If `E'` is itself a multi-token application it is wrapped
@@ -179,7 +179,7 @@ read a clause named `otherwise` or provide `case`/`default`; Surface simply targ
 engine defines. (Authoring `{{elif b}}` directly in Surface also works — it is a clause
 separator like `{{else}}`.)
 
-FullBars supports Mustache's inverted section `{{^x}}…{{/x}}` (and the triple variant
+ClassicBars supports Mustache's inverted section `{{^x}}…{{/x}}` (and the triple variant
 `{{{^x}}}…{{{/x}}}`), desugaring it to `{{#unless x}}…{{/unless}}` — so "render when
 falsy" reads the way Handlebars authors expect. You may always write the `unless` helper explicitly
 instead. (The austere RawBars and MaxBars dialects do *not* accept `{{^}}` — there you write
@@ -203,7 +203,7 @@ Block partials are written with the *core spelling* `{{#partial}}`
 Handlebars *sigil* `{{#> name}}…{{/name}}`. Inline partials use the
 Handlebars *decorator* `{{#*inline "name"}}…{{/inline}}`, which desugars to
 the core `inline` helper; the bare `{{#inline …}}` spelling is *rejected*
-(`DisallowedShape`) in FullBars — authors do not write `inline` bare. A block `partial`
+(`DisallowedShape`) in ClassicBars — authors do not write `inline` bare. A block `partial`
 renders the named partial with its `body` as both the fallback (when the partial is missing) and the
 `{{> @partial-block}}` yield point; `inline` definitions are hoisted into the registry before
 rendering.
@@ -211,11 +211,11 @@ rendering.
 Partials render *unescaped* — a partial produces markup, not a data value, so the desugaring is the
 plain triple-stash with no `escapeHtml`. The partial *name* desugars to a `STRING` literal; a dynamic
 partial keeps the computed expression. `partial`, `inline`, and the scoped `partial-block` are engine
-helpers; see [A.6](/appendix/handlebars/#partials). `partial-block` is **FullBars'** spelling of the
+helpers; see [A.6](/appendix/handlebars/#partials). `partial-block` is **ClassicBars'** spelling of the
 block-partial body. RawBars and MaxBars instead bind `yield` — the hyphen-free name, writable bare where
 `-` is subtraction (MaxBars `{{yield}}`, RawBars `{{{yield}}}`; see [maxbars](/engine/maxbars/)). They
 are **not** synonyms: since the ADR-005 amendment the partial frame binds only the dialect's own
-spelling, so `yield` is unavailable in FullBars (it resolves empty) and `partial-block` is unavailable in
+spelling, so `yield` is unavailable in ClassicBars (it resolves empty) and `partial-block` is unavailable in
 RawBars/MaxBars.
 
 ## 5.8 What Surface does *not* change

@@ -16,7 +16,7 @@
 -- |     the MinBars surface (`MinBars.Surface`) reads back as the partial's indent
 -- |     (indent is whitespace-only, so quoting it is always safe).
 -- |
--- | RawBars/FullBars/MaxBars never run this pass; their whitespace behaviour is
+-- | RawBars/ClassicBars/MaxBars never run this pass; their whitespace behaviour is
 -- | unchanged.
 module MinBars.Standalone
   ( mustacheStandalone

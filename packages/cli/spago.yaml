@@ -17,8 +17,8 @@ package:
     - flatbars
     - kernel
     - flatbars-json
-    - fullbars-compile
-    - fullbars
+    - classicbars-compile
+    - classicbars
     - rawbars
     - maxbars
     - minbars

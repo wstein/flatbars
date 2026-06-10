@@ -467,7 +467,7 @@ tokenizeTemplate cfg lexOpts src = map finalize (go 0 cfg.open cfg.close 0 [] Ni
   -- `{{=A B=}}`): when `mustacheDelims` is on it switches the active pair from
   -- here on (the comment is still emitted, so it is carried as a directive the
   -- engine ignores — lexer-acted, like `@trim`). Gated on `mustacheDelims`, so
-  -- the Handlebars family (FullBars, default) never treats `@delimiters`
+  -- the Handlebars family (ClassicBars, default) never treats `@delimiters`
   -- specially. `Right Nothing` ⇒ no switch; this is a pure decision, never
   -- recursing — `go` must call itself directly to keep its tail-call loop.
   delimSwitch :: Maybe RawTok -> Either ParseError (Maybe { open :: String, close :: String })

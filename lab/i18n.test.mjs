@@ -2,7 +2,7 @@
 //
 // Unit tests for the catalog.yaml → i18n helper bag builder (ADR-029) and its
 // wiring through the helper worker, across the three t-supporting dialects
-// (RawBars/FullBars/MaxBars; MinBars is excluded). catalog.yaml is pure message
+// (RawBars/ClassicBars/MaxBars; MinBars is excluded). catalog.yaml is pure message
 // DATA; the active locale comes from config.yaml. Uses the REAL vendored js-yaml
 // and engine bundle.
 
@@ -57,10 +57,10 @@ test("a malformed / non-mapping catalog is reported, not thrown", () => {
 });
 
 test("the worker renders against catalog + locale for each t-supporting dialect", () => {
-  // FullBars: hash-arg surface
-  const fb = runHelperRequest({ dialect: "fullbars", template: '{{t "greeting" name=who}}', data: { who: "Ada" }, catalogSrc: CATALOG, locale: "pl" });
+  // ClassicBars: hash-arg surface
+  const fb = runHelperRequest({ dialect: "classicbars", template: '{{t "greeting" name=who}}', data: { who: "Ada" }, catalogSrc: CATALOG, locale: "pl" });
   assert.equal(fb.value, "Cześć, Ada!", fb.error);
-  // MaxBars: borrows the FullBars surface
+  // MaxBars: borrows the ClassicBars surface
   const mx = runHelperRequest({ dialect: "maxbars", template: '{{t "greeting" name=who}}', data: { who: "Ada" }, catalogSrc: CATALOG, locale: "pl" });
   assert.equal(mx.value, "Cześć, Ada!", mx.error);
   // RawBars: the desugared core surface — explicit dict + lookup, no hash sugar
@@ -71,13 +71,13 @@ test("the worker renders against catalog + locale for each t-supporting dialect"
 });
 
 test("locale defaults to en when none is given", () => {
-  const noLoc = runHelperRequest({ dialect: "fullbars", template: '{{t "hello"}}', data: {}, catalogSrc: CATALOG });
+  const noLoc = runHelperRequest({ dialect: "classicbars", template: '{{t "hello"}}', data: {}, catalogSrc: CATALOG });
   assert.equal(noLoc.value, "Hi there", noLoc.error); // en default
 });
 
 test("helpers.js overrides a catalog-derived helper", () => {
   const res = runHelperRequest({
-    dialect: "fullbars",
+    dialect: "classicbars",
     template: '{{t "greeting" name=who}}',
     data: { who: "Ada" },
     catalogSrc: CATALOG,

@@ -19,7 +19,7 @@ import { dirname, resolve, join } from "node:path";
 import { ESBUILD_VERSION } from "../editors/shared/sync.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const ENTRY = resolve(root, "output/FullBars.JS/index.js");
+const ENTRY = resolve(root, "output/ClassicBars.JS/index.js");
 const COMMITTED = resolve(root, "lab/vendor/flatbars-engine.mjs");
 // Pinned so the regen is byte-reproducible regardless of the local toolchain;
 // the committed bundle is produced by this exact command. The version is the
@@ -27,10 +27,10 @@ const COMMITTED = resolve(root, "lab/vendor/flatbars-engine.mjs");
 // editor packagers use) — imported, not duplicated, so the gate can never drift
 // from it again.
 const ESBUILD = `esbuild@${ESBUILD_VERSION}`;
-const REGEN_CMD = `npx --yes ${ESBUILD} output/FullBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs`;
+const REGEN_CMD = `npx --yes ${ESBUILD} output/ClassicBars.JS/index.js --bundle --format=esm --platform=browser --outfile=lab/vendor/flatbars-engine.mjs`;
 
 if (!existsSync(ENTRY)) {
-  console.error("check:bundle: output/FullBars.JS not found — run `spago build` first.");
+  console.error("check:bundle: output/ClassicBars.JS not found — run `spago build` first.");
   process.exit(2);
 }
 
@@ -38,7 +38,7 @@ const out = join(mkdtempSync(join(tmpdir(), "bb-bundle-")), "engine.mjs");
 try {
   execFileSync(
     "npx",
-    ["--yes", ESBUILD, "output/FullBars.JS/index.js", "--bundle", "--format=esm", "--platform=browser", `--outfile=${out}`],
+    ["--yes", ESBUILD, "output/ClassicBars.JS/index.js", "--bundle", "--format=esm", "--platform=browser", `--outfile=${out}`],
     { cwd: root, stdio: ["ignore", "ignore", "pipe"] },
   );
 } catch (e) {

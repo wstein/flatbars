@@ -7,7 +7,7 @@
 // ADR-018 registerHelper / renderWith path — no engine feature, no vendored lib
 // (see the ADR-029 amendment, 2026-06-05).
 //
-// Each cell carries its `expect`, the string FullBars must render for
+// Each cell carries its `expect`, the string ClassicBars must render for
 // {template, data} with the `t` helper bound to `locale`; the gate asserts it, so
 // a snippet can never drift from what the engine produces. The Polish (`pl`) cells
 // exercise a non-trivial plural set (one/few/many/other) and the locale-aware
@@ -59,7 +59,7 @@ export const localeNames = { en: "English", de: "Deutsch", pl: "Polski" };
 // core (lab/i18n.mjs makeI18nBag) — the translate/plural/format logic lives in ONE
 // place, so the page and the Lab can't drift (the t/number/… helpers, the native
 // `Intl` brain). For an inline helper the key=value hash arrives as a trailing
-// object directly (FullBars convention), so `number n style="…"` calls
+// object directly (ClassicBars convention), so `number n style="…"` calls
 // number(n, { style: "…" }). Swap native Intl for i18next/ICU in production (see
 // `escapeHatch`).
 export const makeTranslator = (locale) => labMakeTranslator(catalog, locale);
@@ -213,7 +213,7 @@ export const sections = [
 
 // A flagship: two helpers, one locale, the full plural+interpolation story.
 export const flagship = {
-  engine: "fullbars",
+  engine: "classicbars",
   locale: "pl",
   template: '{{t "greeting" name=user}}\n{{t "files.deleted" count=count}}',
   data: { user: "Ada", count: 5 },

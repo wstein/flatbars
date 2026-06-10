@@ -20,7 +20,7 @@
 > written in the `{{ }}`/`{{#…}}` spelling. For **RawBars/MaxBars/Trussbars**, docs/19 moves all
 > control-flow keywords, separators, and binding statements to Django-style **`{% %}`** (so
 > `{{#if}}`→`{% if %}`, `{{#let}}`→`{% local %}` per docs/17, the quad-stache raw block →
-> `{% raw %}`); `{{ }}` becomes output-only. FullBars/MinBars keep `{{ }}`. The *language* below
+> `{% raw %}`); `{{ }}` becomes output-only. ClassicBars/MinBars keep `{{ }}`. The *language* below
 > (constructs, value policy, exclusions) is unchanged — only the delimiters — so the byte-identity
 > contract holds. **Governance:** `{% %}` is a *surface* decision, which docs/12 §5.5 places with
 > the **oracle** (PureScript RawBars/MaxBars); docs/17–19 are Trussbars's conformance view of that

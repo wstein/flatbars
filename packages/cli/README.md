@@ -54,6 +54,6 @@ Templates use core syntax — `{{{ lookup this "x" }}}`, `{{#each …}}`, and
 name-agnostic *separator* — the parser keeps it as a structural marker and the
 prelude `if`/`each`/`with` split their body at it. The surface dialect (`{{ x }}`
 auto-escape, dotted paths, `@data`, `as |x|`) is available via `--surface`; it is
-the desugaring walk in [`FullBars.Surface`](../fullbars/src/FullBars/Surface.purs)
+the desugaring walk in [`ClassicBars.Surface`](../classicbars/src/ClassicBars/Surface.purs)
 over the structural AST that [`Kernel.Lower`](../kernel/src/Kernel/Lower.purs)
 also materializes for tooling.

@@ -2,7 +2,7 @@
 //
 // The MinBars mustache-conformance harness — a *measurement* tool. It runs the
 // vendored mustache/spec JSON suite (test/spec/*.json) against the MinBars
-// engine (via the FullBars.JS `renderMustache` facade) and reports honest
+// engine (via the ClassicBars.JS `renderMustache` facade) and reports honest
 // per-module pass counts. Some cases are expected to fail until a later phase
 // adds standalone-whitespace / indentation handling; this harness MEASURES that
 // gap, so it always EXITS 0. Run:
@@ -21,7 +21,7 @@ import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../../..");
-const enginePath = resolve(root, "output/FullBars.JS/index.js");
+const enginePath = resolve(root, "output/ClassicBars.JS/index.js");
 if (!existsSync(enginePath)) {
   console.error("error: " + enginePath + " not found — run `spago build` first (npm run test:minbars-spec does).");
   process.exit(2);

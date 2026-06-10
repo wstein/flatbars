@@ -11,14 +11,14 @@
 //      check:examples. (Helper-bearing entries carry a `helpers` field — ADR-018 —
 //      and are page-only: the Lab dropdown skips them.)
 //
-// This set is the MaxBars MIRROR of the FullBars reference (fullbars.mjs): every
-// FullBars concept is reimplemented in IDIOMATIC MaxBars, then the MaxBars-only
+// This set is the MaxBars MIRROR of the ClassicBars reference (classicbars.mjs): every
+// ClassicBars concept is reimplemented in IDIOMATIC MaxBars, then the MaxBars-only
 // features are GROUPED into a few larger examples. Like the other references it is
 // NON-HTML by default (the `card` capstone is the one HTML preview; `escaping`
 // keeps its markup in the DATA). ORDER IS DISPLAY ORDER and each `label` carries
 // its tier — the Lab dropdown is a flat list, read simple → advanced.
 //
-// MaxBars is FlatBars' flagship surface: it borrows MOST of FullBars and adds infix
+// MaxBars is FlatBars' flagship surface: it borrows MOST of ClassicBars and adds infix
 // operators, a pipe `|`, defaults (`??` `?:` `? :`), and a different loop/context
 // model. The deltas the engine ENFORCES, that shape every example here:
 //   • Operators are infix and spaced: `{{price * qty}}`, `{{qty >= 1}}`, and the
@@ -32,7 +32,7 @@
 //     partial itself MaxBars source — ADR/commit cfadebc) AND template-local
 //     `{{#inline "x"}}…{{/inline}}` both work, plus the `{{yield}}` layout pattern
 //     via `{{#partial}}` (inline wins on a name clash). Only the `{{#*inline}}`
-//     decorator stays FullBars-only. Raw blocks use the `{{{{#op}}}}` hash sigil.
+//     decorator stays ClassicBars-only. Raw blocks use the `{{{{#op}}}}` hash sigil.
 //   • Arithmetic is strictly numeric: `"x" + "y"` throws (no string concat).
 
 export const examples = {
@@ -62,7 +62,7 @@ export const examples = {
   escaping: {
     engine: "maxbars",
     label: "Simple — Escaping (markup in data)",
-    // {{x}} HTML-escapes (the safe default); {{{x}}} emits raw — identical to FullBars.
+    // {{x}} HTML-escapes (the safe default); {{{x}}} emits raw — identical to ClassicBars.
     // The markup is in the DATA; shown as plain text so the entities are visible.
     template: "escaped: {{html}}\nraw:     {{{html}}}",
     data: { html: "<b>bold & bright</b>" },
@@ -92,7 +92,7 @@ export const examples = {
     // The pipe feeds the left value in as the helper's FIRST argument and chains
     // left-to-right: `name | uppercase` is `(uppercase name)`; extra args follow
     // the helper name; and `lookup` reads a data-chosen key — the MaxBars idiom for
-    // FullBars's `{{uppercase (lookup …)}}` subexpression.
+    // ClassicBars's `{{uppercase (lookup …)}}` subexpression.
     template: "{{name | uppercase}}\n{{price | toFixed 2}}\n{{items | pluck \"name\" | join \", \"}}\n{{lookup colours selected | uppercase}}",
     data: {
       name: "ada",
@@ -141,7 +141,7 @@ export const examples = {
     engine: "maxbars",
     label: "Intermediate — If / else if / unless (infix)",
     // Infix comparisons make the condition direct — `{{#if stock >= 10}}` instead of
-    // FullBars's `{{#if (gte stock 10)}}`. The ONE catch: a clause SEPARATOR must
+    // ClassicBars's `{{#if (gte stock 10)}}`. The ONE catch: a clause SEPARATOR must
     // parenthesise its condition (`{{else if (gte stock 1)}}`) — a bare infix there
     // silently takes the wrong branch. {{#unless}} is the inverse.
     compiles: true,
@@ -188,7 +188,7 @@ export const examples = {
   eachElse: {
     engine: "maxbars",
     label: "Intermediate — Each: the empty case ({{else}})",
-    // {{#each}} carries its own {{else}} for an empty list — inherited from FullBars.
+    // {{#each}} carries its own {{else}} for an empty list — inherited from ClassicBars.
     template: `{{#each items}}
 - {{this}}
 {{else}}
@@ -200,7 +200,7 @@ export const examples = {
   eachObject: {
     engine: "maxbars",
     label: "Intermediate — Each over an object (loop.key)",
-    // Over an object, `loop.key` is the property name and `this` the value (FullBars's
+    // Over an object, `loop.key` is the property name and `this` the value (ClassicBars's
     // @key, bare).
     template: `{{#each prefs}}
 {{loop.key}} = {{this}}
@@ -248,7 +248,7 @@ export const examples = {
   withBlock: {
     engine: "maxbars",
     label: "Intermediate — With: re-root the context",
-    // {{#with obj}} re-roots the context, unchanged from FullBars — operators and
+    // {{#with obj}} re-roots the context, unchanged from ClassicBars — operators and
     // pipes apply to the shifted context just the same.
     template: "{{#with totals}}{{count}} items · {{total | toFixed 2}}{{/with}}",
     data: { totals: { count: 2, total: 9.5 } },
@@ -280,7 +280,7 @@ export const examples = {
     label: "Advanced — External partials: per-row & dynamic",
     // MaxBars resolves EXTERNAL {{> name}} against host-supplied partials (each
     // itself MaxBars source — render AND compile, commit cfadebc), exactly like
-    // FullBars. Combined with {{#each}} it templates a row each, and the name can
+    // ClassicBars. Combined with {{#each}} it templates a row each, and the name can
     // be an EXPRESSION resolved per row — {{> (lookup this "kind")}} picks the
     // partial from the data. (A template-local {{#inline}} of the same name wins.)
     template: `{{#each people}}{{> (lookup this "kind")}}
@@ -312,7 +312,7 @@ export const examples = {
     label: "Advanced — Custom & block operations",
     // MaxBars is a native dialect, so a host registers with the native
     // registerOperation(name, fn[, arity]) at the JS boundary (ADR-019 addendum;
-    // `registerHelper` is the Handlebars-named alias FullBars keeps). Three
+    // `registerHelper` is the Handlebars-named alias ClassicBars keeps). Three
     // shapes: `loud` (inline), `link` (reads trailing hash args), `list` (a BLOCK
     // operation whose options.fn(item, { blockParams }) binds the drop-pipes `as p i`).
     helpers:
@@ -332,7 +332,7 @@ export const examples = {
     // inner {{bar}} is never interpreted — it is literal text the operation receives
     // via options.fn(). `rawloud` upper-cases that raw body, so the verbatim {{bar}}
     // comes out {{BAR}} (the data is never read). MaxBars uses the FlatBars
-    // {{{{#name}}}} spelling (hash sigil), like RawBars — NOT the bare FullBars form;
+    // {{{{#name}}}} spelling (hash sigil), like RawBars — NOT the bare ClassicBars form;
     // the op name has no hyphen (a `-` would parse as subtraction). The head must
     // resolve to a defined operation (an undefined head is a hard error).
     helpers: "registerOperation('rawloud', (options) => options.fn().toUpperCase());",

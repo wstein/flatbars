@@ -1,5 +1,5 @@
 ---
-title: "ADR-024: Block-scoped `let` and the dict literal — MaxBars surface, FullBars unchanged"
+title: "ADR-024: Block-scoped `let` and the dict literal — MaxBars surface, ClassicBars unchanged"
 sidebar:
   label: "ADR-024 `let` & dict literal"
 ---
@@ -9,11 +9,11 @@ sidebar:
 (`=`, whitespace-separated) of §2 below — see the *Amendment*. `{{#let}}` shipped as §1 specifies
 (sequential, never re-rooting), as MaxBars-only sugar over the context-preserving `pushHelpers` frame push;
 the *implementation note* on §1 records the one structural deviation (a kernel block operation rather than
-a dedicated AST node); a FullBars `{{#let}}` is rejected with a located, actionable error (render +
+a dedicated AST node); a ClassicBars `{{#let}}` is rejected with a located, actionable error (render +
 LSP). Revised 2026-06-04 after team review (the list literal was split out to
 [ADR-025](/adr/adr-0025-list-literal/)).
-*Date:* 2026-06-04. Applies to *MaxBars and RawBars* only; *FullBars is unchanged*
-(Handlebars-faithful — see [ADR-009](/adr/adr-0009-fullbars/) and the conformance line at
+*Date:* 2026-06-04. Applies to *MaxBars and RawBars* only; *ClassicBars is unchanged*
+(Handlebars-faithful — see [ADR-009](/adr/adr-0009-classicbars/) and the conformance line at
 [ADR-005](/adr/adr-0005-dialect-ladder/)). Sits alongside
 [ADR-021](/adr/adr-0021-maxbars-variable-model/) (the MaxBars/RawBars variable model) as the
 expression-sugar half of the same dialect carve-out.
@@ -56,8 +56,8 @@ Three things make this a design problem, not a one-helper fix:
   out of the core (*"JSON-ness is a host concern"*). YAML / JSON-style literal collections in *tag*
   bodies would re-import the same dependency under a different name.
 * *Dialect carve-out is the established lever.* [ADR-005](/adr/adr-0005-dialect-ladder/) gives MaxBars
-  the room for surface additions FullBars cannot have, by reuse-by-dependency: MaxBars depends on
-  `fullbars`, swaps the interior expression grammar, and FullBars's Handlebars conformance
+  the room for surface additions ClassicBars cannot have, by reuse-by-dependency: MaxBars depends on
+  `classicbars`, swaps the interior expression grammar, and ClassicBars's Handlebars conformance
   (`49/50` byte-identical, gated by `check:hbs-conformance`) is untouched. [ADR-006](/adr/adr-0006-maxbars-loop-variables/)
   /[ADR-021](/adr/adr-0021-maxbars-variable-model/) use this for the variable model; this ADR uses it
   for `let` and the dict literal.
@@ -98,11 +98,11 @@ are [ADR-025](/adr/adr-0025-list-literal/).)
 > ⇒ `{{#let a=1}}{{#let b=(add a 1)}}…` — so an inner binding's value is evaluated in the frame the outer
 > installed (a single walk, no second pass). The compiled twin is `rt.letScope` (interpreter ≡ compiled,
 > `test:compile`, including the RawBars `let-bind-*` cases). (b) The MaxBars-only scoping is enforced by **gating the desugar** to MaxBars, and a
-> *FullBars* `{{#let}}` is **rejected** with a located `DisallowedShape` at render
-> (`FullBars.checkSurfaceStrict`, alongside the bare-`{{#inline}}` rejection) whose message points to the
+> *ClassicBars* `{{#let}}` is **rejected** with a located `DisallowedShape` at render
+> (`ClassicBars.checkSurfaceStrict`, alongside the bare-`{{#inline}}` rejection) whose message points to the
 > `{{#with x as |n|}}` fix — not a silent no-op. The editor surfaces the same as an LSP diagnostic
 > (`dialectDiagnostics`, gated by `check:dialect-diagnostics`). (The §Gates line below named
-> `check:isolation`, which is dependency-scoped; the realized gates are the FullBars `let-rejected-*` unit
+> `check:isolation`, which is dependency-scoped; the realized gates are the ClassicBars `let-rejected-*` unit
 > tests and `check:dialect-diagnostics`.)
 
 `{{#let}}` installs *nullary operations* at the block's lexical scope; they vanish at `{{/let}}`. It is
@@ -181,7 +181,7 @@ corpus (see *Gates*).
 | Surface | `{{#let}}` | `{…}` dict literal | Notes |
 | --- | --- | --- | --- |
 | *RawBars* | ✓ (explicit form: `{{#let (bind "a" x)}}…{{/let}}`) | ✗ (no sugar at all by design) | Writes the kernel form directly; `bind` is a prelude helper (a one-key object), nested for sequential scope. |
-| *FullBars* | *✗* | *✗* | Handlebars-faithful. Authors use `{{#with x as \|n\|}}` for aliasing and `(dict …)` for collections. |
+| *ClassicBars* | *✗* | *✗* | Handlebars-faithful. Authors use `{{#with x as \|n\|}}` for aliasing and `(dict …)` for collections. |
 | *MaxBars* | ✓ (with `n=expr` surface sugar) | ✓ (`{name=expr …}`) | The flagship; the list literal is added by ADR-025. |
 
 This is the same asymmetry already enforced for MaxBars operators (`>=` is MaxBars-only sugar that
@@ -224,15 +224,15 @@ The identity worth recording: `{{#with x as |n|}}` ≡ `{{#with x}}{{#let n=x}} 
   `{{#let x={}}}`, and the nested `{{#let x={a={b=1}}}}}` (five trailing braces). Each must
   tokenize with the tag span fixed by width detection *before* the interior is scanned. No corpus, no
   merge — this is the construct's highest-risk surface. (ADR-025 adds the bracket cases.)
-* *`check:hbs-conformance`* — already in `npm test`. Catches any FullBars regression from the `49/50`
-  byte-identical line. If `let`/`{…}` ever bleed into the FullBars surface parser, the next run of this
+* *`check:hbs-conformance`* — already in `npm test`. Catches any ClassicBars regression from the `49/50`
+  byte-identical line. If `let`/`{…}` ever bleed into the ClassicBars surface parser, the next run of this
   gate flags it. (Unlike ADR-025, this ADR adds no prelude helper, so there is no catalog/conformance
   churn here.)
-* *FullBars isolation (realized).* The plan named `check:isolation`, but that gate is dependency-scoped
+* *ClassicBars isolation (realized).* The plan named `check:isolation`, but that gate is dependency-scoped
   (ADR-003/008). The MaxBars-only-surface guarantee is instead pinned where the diagnostics live: the
-  FullBars `let-rejected-*` unit tests (a FullBars `{{#let …}}` is a located `DisallowedShape` at render —
+  ClassicBars `let-rejected-*` unit tests (a ClassicBars `{{#let …}}` is a located `DisallowedShape` at render —
   `checkSurfaceStrict`), and `check:dialect-diagnostics` (the LSP flags it in the editor). A `{name: …}` /
-  `[…]` literal needs no separate assertion — `{`/`[` is a lex error in FullBars before the desugar.
+  `[…]` literal needs no separate assertion — `{`/`[` is a lex error in ClassicBars before the desugar.
 * *Linter round-trip* (`Linter.Lower`) — pins that `{{#let a=1}}` lowers to
   `{{#let (bind "a" 1)}}` and `{b=1 c=2}` lowers to `(dict b=1 c=2)`. One canonical RawBars
   form per construct — no AST drift, no two-way sugar.
@@ -261,7 +261,7 @@ adds the `[`/`]` tokens, including the `[` dual-context disambiguation.)
 * `maxbars.adoc` gains a `Let` section and a `Dict literal` section.
 * `rawbars.adoc` adds one paragraph: the explicit `(bind …)` form is the desugared canonical;
   surface sugar lives in MaxBars.
-* `fullbars.adoc` is *not* modified. The existing convention rule in `tutorials/src/fullbars.mjs`
+* `classicbars.adoc` is *not* modified. The existing convention rule in `tutorials/src/classicbars.mjs`
   (*"No MaxBars operators"*) gains a parallel line: *"No MaxBars block-scoped bindings, no MaxBars dict
   literals."*
 

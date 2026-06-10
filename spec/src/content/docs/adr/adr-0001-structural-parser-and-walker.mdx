@@ -19,7 +19,7 @@ supplies meaning. We need a pipeline that makes that split structural rather tha
 and that does not grow a second parser/AST for "surface" sugar.
 
 Since the original decision the repository has gained a shared `kernel` package, a token-stream
-interior lexer, and a *dialect ladder* (RawBars ⊂ FullBars ⊂ MaxBars, with MinBars planned). The
+interior lexer, and a *dialect ladder* (RawBars ⊂ ClassicBars ⊂ MaxBars, with MinBars planned). The
 normative claims below are unchanged in spirit; the [review](#review) section records where the words had
 to be sharpened to stay true to the code.
 
@@ -65,11 +65,11 @@ source ──Lexer/Parser──▶ structural AST ──the walker──▶ real
    branches), and — for a surface dialect — paths (`name` ⇒ `lookup this "name"`) are all walker
    decisions. The reference lowering is `Kernel.Lower.lower :: Template -> Array RNode`, a
    `foldTemplate` ([A.13.2](/appendix/handlebars/#engine-api)). The surface desugar is
-   `FullBars.Surface.desugar`.
+   `ClassicBars.Surface.desugar`.
 
 1. *No mandated real AST; one shared reference lowering.* `RNode` (`RIf`/`ROut`/…) is the real AST of
    the reference lowering, now living in the shared `kernel` package and used by the whole ladder
-   (RawBars/FullBars/MaxBars) as a worked example for tool authors. Another engine (e.g. MinBars) may
+   (RawBars/ClassicBars/MaxBars) as a worked example for tool authors. Another engine (e.g. MinBars) may
    lower to any shape. Crucially, `lower` is **not on the render path**: the reference renderer
    (`runTemplate`, `Kernel.Engine`) interprets the structural tree *directly*; `lower` materializes
    the real AST only for tooling (the playground's "Real AST" view) and lints (`escapingWarnings`).
@@ -123,15 +123,15 @@ polite way of saying XSS is opt-in. `escapingWarnings` (`Lower.purs:125`) is a *
 ignored. A substrate that can't mandate escaping is defensible; a substrate that *frames* an
 ignorable warning as the safety mechanism is not."
 
-*Petra (spec / docs).* "Half the ADR's identifiers are stale. It says `FullBars.Lower.lower` and
-`FlatBars.Surface`; the code says `Kernel.Lower.lower` (`Lower.purs:62`) and `FullBars.Surface`. And
+*Petra (spec / docs).* "Half the ADR's identifiers are stale. It says `ClassicBars.Lower.lower` and
+`FlatBars.Surface`; the code says `Kernel.Lower.lower` (`Lower.purs:62`) and `ClassicBars.Surface`. And
 '`RNode` is the real AST of the reference engine, published as an example — another engine may lower
 to any shape' reads very differently now that `RNode` sits in the *shared kernel* and *all three*
-dialects lower through it (`FullBars.purs:39`). De facto, it is canonical for the ladder."
+dialects lower through it (`ClassicBars.purs:39`). De facto, it is canonical for the ladder."
 
 *Kai (dialects / MinBars).* "The ADR predates dialects entirely, yet the dialect seams are the most
 important thing the architecture earned. `ParseOptions.parseExpr` *and* `parseHead`
-(`Parser.purs:57`) are how RawBars/FullBars/MaxBars share one parser. And the MinBars review found a
+(`Parser.purs:57`) are how RawBars/ClassicBars/MaxBars share one parser. And the MinBars review found a
 load-bearing falsehood in the folklore: 'the core is reused unchanged.' It is not — MinBars'
 `{{<`/`{{$`/`{{>*` sigils have to be added to the *shared* lexer and gated like
 `extras`. The core's sigil set is a fixed, growing vocabulary, not an open extension point."
@@ -141,7 +141,7 @@ load-bearing falsehood in the folklore: 'the core is reused unchanged.' It is no
 *On "meaning-free" (Mara ↔ Kai ↔ Petra).* Kai pushed Mara: "`extras` proves your concession is
 bigger than you think. `Parser.purs:271/276/288` reject `{{&}}`, `{{{{}}}}`,
 `{{^}}` with `DisallowedShape` when `extras = false`. The *same source text* parses under
-FullBars and fails under RawBars. That is the parser making a per-dialect decision." Mara held the
+ClassicBars and fails under RawBars. That is the parser making a per-dialect decision." Mara held the
 line but moved: "Agreed, but note *what* it decides — whether a *shape* is admitted, never what a
 *name* evaluates to. `else` and `user` are still indistinguishable. The honest phrasing is
 *name-agnostic, shape-aware, shape-gated*." Petra: "Then say exactly that in the Decision, because
@@ -155,7 +155,7 @@ exist. Conceptual honesty cuts the other way: show the render path as single-pas
 path as a parallel tooling branch." Mara conceded the diagram, not the principle.
 
 *On escaping (Soren ↔ Devi ↔ Mara).* Devi resisted Soren's maximalism: "The substrate *can't*
-mandate escaping without choosing a value policy — `truthy`/`escapeHtml`/`stringify` are FullBars',
+mandate escaping without choosing a value policy — `truthy`/`escapeHtml`/`stringify` are ClassicBars',
 and MinBars deliberately picks its own. Bake escaping into core and you've smuggled an engine into
 the substrate, which is the exact thing this ADR exists to prevent." Soren narrowed the claim: "Fine
 — I'm not asking core to escape. I'm asking that (a) every engine be *required by contract* to
@@ -175,7 +175,7 @@ ladder, mandated for no one.'
 | --- | --- | --- |
 | Reword the core principle to *name-agnostic, shape-aware, shape-gated* and document the `extras` gate as structural-not-semantic. | 5 | Mara, Kai; Petra: "non-negotiable, it's the most-quoted line." |
 | Redraw the pipeline diagram: render path is single-pass (`runTemplate` over the structural tree); the `lower`→`RNode` real-AST path is a parallel *tooling/lint* branch, not the render path. | 5 | Devi; Mara concedes. |
-| Fix stale identifiers (`Kernel.Lower.lower`, `FullBars.Surface`) and add the `parseExpr`/`parseHead` seams + the dialect ladder to the Decision. | 5 | Petra, Kai. |
+| Fix stale identifiers (`Kernel.Lower.lower`, `ClassicBars.Surface`) and add the `parseExpr`/`parseHead` seams + the dialect ladder to the Decision. | 5 | Petra, Kai. |
 | Soften "no canonical real AST" → "no *mandated* real AST; one *shared reference* lowering (`kernel`), used by the ladder." | 4 | Petra; Devi: "accurate, low risk." |
 | Require (by engine-conformance contract) that each engine declare an escaping policy; make `escapingWarnings` on-by-default in the CLI (it already is in the playground). | 4 | Soren; Devi: "+1 for the contract, the CLI default needs a flag to suppress." |
 | Spin escaping/value-policy out into its own *ADR-002* rather than overloading this record. | 3 | Soren; Mara: "yes, but after we land the wording here." |

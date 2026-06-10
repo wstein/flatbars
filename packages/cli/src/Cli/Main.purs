@@ -16,6 +16,8 @@ module Cli.Main where
 
 import Prelude
 
+import ClassicBars (analyseSurface, directiveLints, handlebars, noLoopVars, preludeSchema, renderSurfaceDiagWith)
+import ClassicBars.Compile (compileSurfaceWith) as Compile
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Int as Int
@@ -31,8 +33,6 @@ import FlatBars (ParseOptions, defaultParseOptions, parseWith, renderParseErrorA
 import FlatBars.Json (parseValue)
 import FlatBars.Lexer (defaultLexConfig)
 import FlatBars.Value (Value(..))
-import FullBars (analyseSurface, directiveLints, handlebars, noLoopVars, preludeSchema, renderSurfaceDiagWith)
-import FullBars.Compile (compileSurfaceWith) as Compile
 import Kernel.Walk (Severity, validate)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import MaxBars (maxOptions, maxbarsWarnings)
@@ -190,7 +190,7 @@ run opts = do
           }
       if isJust delims && opts.surface then
         die
-          "flatbars: --delimiters/config delimiters apply to core syntax only, not --surface (FullBars, the Handlebars-faithful dialect, has no set delimiters)"
+          "flatbars: --delimiters/config delimiters apply to core syntax only, not --surface (ClassicBars, the Handlebars-faithful dialect, has no set delimiters)"
       else if opts.mustache && (opts.compileOnly || opts.validateOnly || opts.surface) then
         die
           "flatbars: --mustache renders the Mustache (MinBars) engine; it cannot combine with --surface, --compile, or --validate"
@@ -229,7 +229,7 @@ runCompile :: ParseOptions -> Options -> String -> Effect Unit
 runCompile popts opts tpl =
   case
     ( if opts.surface
-      -- surface = FullBars (Handlebars rule); core = RawBars (nonEmpty rule).
+      -- surface = ClassicBars (Handlebars rule); core = RawBars (nonEmpty rule).
       then Compile.compileSurfaceWith true noLoopVars popts "rt.truthyHandlebars" tpl
       else compileJsWith popts tpl
     )
@@ -348,7 +348,7 @@ analyseUsage =
     , "Usage:"
     , "  flatbars analyse <template> <data.json> [--emit-jsonata]"
     , ""
-    , "Renders the FullBars template against the data and reports every condition"
+    , "Renders the ClassicBars template against the data and reports every condition"
     , "whose branch would differ on another engine (Mustache, presence, …),"
     , "with a concrete fix each — and a `✓` line per portable condition."
     , "  --emit-jsonata   emit a reviewable JSONata data-cleanup scaffold instead"
@@ -356,7 +356,7 @@ analyseUsage =
     ]
 
 -- | `flatbars analyse <template> <data.json> [--emit-jsonata]` (ADR-022 Part B):
--- | render the FullBars template against the data and print a markdown report of
+-- | render the ClassicBars template against the data and print a markdown report of
 -- | every truthiness decision that would branch differently on another engine
 -- | (with a fix each), or `--emit-jsonata` for the reviewable cleanup scaffold.
 runAnalyse :: Array String -> Effect Unit
@@ -395,7 +395,7 @@ lintUsage =
     , "  • scoped-variable spelling (core/MaxBars)  `index` → `index0`, `partial-block` → `yield`"
     , ""
     , "Dialect (default core/RawBars):"
-    , "  -s, --surface   lint the FullBars surface — aliases only (the scoped-variable lint"
+    , "  -s, --surface   lint the ClassicBars surface — aliases only (the scoped-variable lint"
     , "                  is the native RawBars/MaxBars spelling, not Handlebars @index)."
     , "      --maxbars   lint MaxBars source (infix operators, pipes) — aliases + scoped,"
     , "                  plus the dialect lints: label shadow, and a boolean || / &&"
@@ -434,7 +434,7 @@ parseLintArgs = go { surface: false, maxbars: false, maxWarnings: 0, positional:
 -- | `flatbars lint <template> [--surface | --maxbars] [--max-warnings <n>]`: run
 -- | the on-demand canonicalization lints (`Linter.Aliases`) and report them. Core/
 -- | RawBars by default — alias + scoped-variable (`index`→`index0`,
--- | `partial-block`→`yield`) warnings; `--surface` lints the FullBars surface for
+-- | `partial-block`→`yield`) warnings; `--surface` lints the ClassicBars surface for
 -- | aliases only (the scoped-variable spelling is RawBars/MaxBars-native, not
 -- | Handlebars); `--maxbars` lints MaxBars source. Findings print to stderr; the
 -- | exit code is governed by `--max-warnings` (default 0 ⇒ any finding fails).
@@ -464,7 +464,7 @@ runLint args
                       ("flatbars lint: " <> tplPath <> ":" <> renderParseErrorsAt tpl pes)
                     Right { nodes } ->
                       -- The scoped-variable lint is for the native (core/MaxBars)
-                      -- spelling; on the FullBars surface `@index`/`@partial-block`
+                      -- spelling; on the ClassicBars surface `@index`/`@partial-block`
                       -- are canonical, so run aliases only there. `--maxbars` adds
                       -- the MaxBars dialect lints (stray head bar, label shadow, and
                       -- a boolean `||`/`&&` in output position — use ?? / ?:).

@@ -19,7 +19,7 @@ scope is scoped helpers). The cost is that bare names can shadow data fields.
 
 ## Decision
 
-1. *MaxBars-only.* FullBars stays as-is (`@index`/`@../`, via `noLoopVars`); MaxBars installs bare
+1. *MaxBars-only.* ClassicBars stays as-is (`@index`/`@../`, via `noLoopVars`); MaxBars installs bare
    scoped helpers via `maxLoopVars` (`MaxBars.purs:41`). The richer each-frame metadata the kernel now
    exposes (Phase A) backs both.
 

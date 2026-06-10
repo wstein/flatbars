@@ -6,7 +6,7 @@
 // overrides (t / number / date / selectPlural / relative), each backed by the
 // browser's native `Intl` — FlatBars ships no CLDR data. The host (the Lab)
 // supplies the brain; this is that brain, authored as strings instead of code.
-// These run in RawBars / FullBars / MaxBars (the t-supporting surfaces), not
+// These run in RawBars / ClassicBars / MaxBars (the t-supporting surfaces), not
 // MinBars (ADR-029).
 //
 // `loadYaml` is injected (the Lab's vendored js-yaml `load`) so this module has no

@@ -83,7 +83,7 @@ type ParseOptions =
   , decorators :: Boolean
   , partialBlocks :: Boolean
   -- raw blocks have two spellings gated separately: `rawBlockHbs` accepts the bare
-  -- `{{{{name}}}}` (the real Handlebars form — FullBars only), `rawBlockHash`
+  -- `{{{{name}}}}` (the real Handlebars form — ClassicBars only), `rawBlockHash`
   -- accepts the FlatBars `{{{{#name}}}}` form (RawBars/MaxBars). Mustache has
   -- neither, so MinBars sets both off.
   , rawBlockHbs :: Boolean
@@ -94,7 +94,7 @@ type ParseOptions =
   }
 
 -- | Standalone trimming on (Handlebars parity), the core expression grammar, and
--- | Handlebars-extras allowed (the engine + FullBars use this; RawBars/MaxBars
+-- | Handlebars-extras allowed (the engine + ClassicBars use this; RawBars/MaxBars
 -- | override `extras = false`).
 defaultParseOptions :: ParseOptions
 defaultParseOptions =
@@ -103,11 +103,11 @@ defaultParseOptions =
   , parseHead: Expr.parseExpr
   , extras: true
   , inheritance: false
-  -- the FullBars surface accepts both Handlebars block sigils; austere dialects
+  -- the ClassicBars surface accepts both Handlebars block sigils; austere dialects
   -- (RawBars/MinBars/MaxBars) turn these off in their own options.
   , decorators: true
   , partialBlocks: true
-  -- the default is the FullBars stance: the Handlebars `{{{{name}}}}` raw block is
+  -- the default is the ClassicBars stance: the Handlebars `{{{{name}}}}` raw block is
   -- accepted; the FlatBars `{{{{#name}}}}` spelling is not (Handlebars rejects it).
   , rawBlockHbs: true
   , rawBlockHash: false
@@ -355,7 +355,7 @@ headed pe span = case _ of
 -- | so remap it to a `>` head identifier — `{{> name …}}` then reads as an
 -- | application headed by `>` (the rest are its flat arguments, so the
 -- | name/context/hash split survives). Meaning-free: the core attaches nothing
--- | to a `>`-named head; FullBars' surface desugar is what reads it as a partial
+-- | to a `>`-named head; ClassicBars' surface desugar is what reads it as a partial
 -- | (other dialects simply see an undefined helper named `>`).
 partialHead :: Array PosToken -> Array PosToken
 partialHead toks = case Array.uncons toks of
@@ -500,7 +500,7 @@ parseSeq pe ph gates toks = go Nil []
             Left e -> recover acc errs span e (i + 1)
             Right e -> go (Output span e : acc) errs (i + 1)
       -- Two raw-block spellings, gated separately: `{{{{#name}}}}` (FlatBars,
-      -- RawBars/MaxBars) vs the bare `{{{{name}}}}` (Handlebars, FullBars only).
+      -- RawBars/MaxBars) vs the bare `{{{{name}}}}` (Handlebars, ClassicBars only).
       -- `int` is the raw block's HEAD interior (the body stays verbatim).
       RRaw span hash _ _ int body
         | hash && not gates.rawBlockHash -> recover acc errs span
@@ -516,7 +516,7 @@ parseSeq pe ph gates toks = go Nil []
       -- `{{elif …}}`/`{{else}}`) is a head, parsed through `parseHead` so its infix
       -- args read like a block head's (`{{elif a < b}}` → `elif (lt a b)`). Every
       -- other bare tag is an output expression, parsed through `parseExpr` as before
-      -- (`{{ a && b }}` → `and(a,b)`). For FullBars the two grammars are identical,
+      -- (`{{ a && b }}` → `and(a,b)`). For ClassicBars the two grammars are identical,
       -- so this only changes MaxBars (where `parseHead` is the `name arg*` grammar).
       RSep span _ s int ->
         let
@@ -576,7 +576,7 @@ parseSeq pe ph gates toks = go Nil []
 
   -- A block opener, recovering. `gateErr` is a dialect-gate rejection recorded
   -- alongside any head error. A *salvageable* head (a leading identifier, even if
-  -- the args won't parse — e.g. `{{#if a == 1}}` in FullBars) still nests, so the
+  -- the args won't parse — e.g. `{{#if a == 1}}` in ClassicBars) still nests, so the
   -- body and close parse and only the bad args/shape are flagged; an unsalvageable
   -- head degrades to a `NodeError` and the scan resumes after the opener.
   buildBlock

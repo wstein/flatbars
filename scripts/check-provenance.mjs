@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Tiling-conformance gate for the source map (ADR-035). Renders every example of
-// each source-map dialect (core / FullBars / MaxBars) through the mapped render
+// each source-map dialect (core / ClassicBars / MaxBars) through the mapped render
 // and asserts its `segments` tile the output exactly: ordered, contiguous from 0,
 // each `len > 0`, covering [0, output.len) with no gaps or overlaps — the contract
 // the playground's provenance UI relies on. The engine self-verifies per render
@@ -16,7 +16,7 @@ import { createRenderer } from "../lab/renderer.mjs";
 // The dialects that back source maps, each with its own example corpus. MinBars
 // emits a source map too now (ADR-035) — over its own `.mustache` corpus, rendered
 // on the spec rule (`createRenderer("minbars")` defaults to it).
-const DIALECTS = ["rawbars", "fullbars", "maxbars", "minbars"];
+const DIALECTS = ["rawbars", "classicbars", "maxbars", "minbars"];
 
 // segments tile the output: contiguous from 0, every len > 0, covering it exactly.
 function tiles(output, segments) {

@@ -35,7 +35,7 @@ toolchain** (the IntelliJ Platform baseline) — Gradle can auto-provision it.
 **Settings ▸ Languages & Frameworks ▸ FlatBars** offers a **default dialect** for
 contexts where the URI cannot resolve to a dialect (the JetBrains LSP client
 sometimes elides the language id; the long and short native extensions —
-`.rawbars`/`.rbars`, `.minbars`/`.mbars`, `.fullbars`/`.fbars`,
+`.rawbars`/`.rbars`, `.minbars`/`.mbars`, `.classicbars`/`.fbars`,
 `.maxbars`/`.xbars`/`.truss` — resolve themselves). It's an application-level preference
 (`FlatBarsSettings`) passed to the server as an initialization option
 (`FlatBarsLspServerDescriptor.createInitializationOptions`); like the VS Code client,

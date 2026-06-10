@@ -71,7 +71,7 @@ type Decision =
 type AnalyseM = WriterT (Array Decision) (Either Error)
 
 -- | The named, data-backed rules Part B replays to decide divergence (ADR-022
--- | Part A.2). `handlebars` is the engine rule the analysed FullBars render uses;
+-- | Part A.2). `handlebars` is the engine rule the analysed ClassicBars render uses;
 -- | the others are the cross-engine comparison set. `mustache-spec` is the
 -- | language-agnostic Mustache reading (`0`/`""` truthy, the Ruby/Python
 -- | implementations) — deliberately *not* labelled plain `mustache`, because
@@ -180,7 +180,7 @@ anyPath _ _ = true
 -- | stops depending on the data sample. Deduped by tag+value; a path already
 -- | flagged by an *observed* finding, or one the host `PathSchema` rules out, is
 -- | not reported. The engine verdict for the hypothetical is the analysed engine's
--- | own `rule` (`handlebars` for FullBars, `mustache` for MinBars) — so the
+-- | own `rule` (`handlebars` for ClassicBars, `mustache` for MinBars) — so the
 -- | `flips under` set names the *other* engines relative to the right baseline.
 potentialFindings
   :: Truthy -> (Value -> String) -> PathSchema -> String -> Array Decision -> Array Finding
@@ -299,7 +299,7 @@ analysisWrappers = Array.mapMaybe wrap conds <> lookupWrapper
 
 -- | Render `nodes` against `dat` under analysis, returning the (byte-identical)
 -- | output plus the decisions observed. `toEngine` is the dialect's engine builder
--- | (FullBars passes the lenient one); `setup` adds partials/helpers.
+-- | (ClassicBars passes the lenient one); `setup` adds partials/helpers.
 runAnalysis
   :: (RefEnv AnalyseM -> Engine AnalyseM (RefEnv AnalyseM))
   -> (RefEnv AnalyseM -> RefEnv AnalyseM)
@@ -325,16 +325,16 @@ runAnalysis toEngine setup nodes dat =
 -- | engines a `flips under` entry refers to. The structural body (findings,
 -- | potentials, misses, portable conditions) is identical across dialects — only
 -- | these two strings differ, because the engine sits at a different point on the
--- | truthiness axis (ADR-022): FullBars on `handlebars`, MinBars on `mustache-spec`.
+-- | truthiness axis (ADR-022): ClassicBars on `handlebars`, MinBars on `mustache-spec`.
 -- | `rule` is the matching `Truthy` (`handlebars`/`mustache`), so the
 -- | potential-finding hypotheticals read against the same baseline as the header;
--- | `fix` is the dialect's portable-fix advice for an ambiguous value (FullBars can
+-- | `fix` is the dialect's portable-fix advice for an ambiguous value (ClassicBars can
 -- | suggest helper syntax like `(ne x 0)`; logic-less Mustache must reshape the data
 -- | instead), so the report never prints a fix the dialect can't express.
 type ReportLabels =
   { engineRule :: String, rule :: Truthy, fix :: Value -> String, legend :: String }
 
--- | FullBars/RawBars/MaxBars labels: the engine renders on the `handlebars` rule,
+-- | ClassicBars/RawBars/MaxBars labels: the engine renders on the `handlebars` rule,
 -- | which `mustache.js` shares, so a `flips under` entry names the *other* engines.
 handlebarsLabels :: ReportLabels
 handlebarsLabels =
@@ -456,7 +456,7 @@ describe = case _ of
   VSafe _ -> "a safe string"
 
 -- | The portable fix to suggest for an ambiguous value tested in a condition.
--- | The FullBars/RawBars/MaxBars portable-fix advice: these dialects have helpers
+-- | The ClassicBars/RawBars/MaxBars portable-fix advice: these dialects have helpers
 -- | and `{{#each}}`, so the fix can be expressed in-template.
 fixForHandlebars :: Value -> String
 fixForHandlebars = case _ of

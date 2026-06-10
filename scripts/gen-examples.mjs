@@ -13,11 +13,11 @@
 //   node scripts/gen-examples.mjs           # regenerate
 //   node scripts/gen-examples.mjs --check    # CI: fail on drift
 //
-// Projects MinBars, RawBars and MaxBars from their typed sources. FullBars keeps
-// its curated lab/examples/fullbars/ set (the former shared `handlebars/` catalog),
+// Projects MinBars, RawBars and MaxBars from their typed sources. ClassicBars keeps
+// its curated lab/examples/classicbars/ set (the former shared `handlebars/` catalog),
 // so no dialect shares a folder. Examples carrying a custom `helpers` field
 // (ADR-018) or a cross-dialect `engine` override are page-only and skipped here.
-// Converting FullBars to a typed-source projection too is a tracked follow-up.
+// Converting ClassicBars to a typed-source projection too is a tracked follow-up.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, existsSync, statSync } from "node:fs";
 import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,14 +35,14 @@ const humanize = (id) =>
 // dialects now project from their typed sources — no hand-maintained catalog, no
 // shared folder. Entries carrying a custom `helpers` field (ADR-018) or a cross-
 // dialect `engine` override are page-only and skipped here (the Lab dropdown
-// hosts neither), so FullBars's helper/raw-block examples stay tutorial-only.
+// hosts neither), so ClassicBars's helper/raw-block examples stay tutorial-only.
 const DIALECTS = [
-  // MinBars + FullBars examples are deliberately non-HTML (plain text / Markdown /
+  // MinBars + ClassicBars examples are deliberately non-HTML (plain text / Markdown /
   // config / email), so they land in the "Plain Text" output view, not the HTML
   // preview — `defaultView: "source"` (the real view-tab name; see lab/output-view.mjs).
   // A per-example `view: "rendered"` (e.g. the HTML `card`) overrides it.
   { engine: "minbars", module: "../tutorials/src/mustache.mjs", ext: "mustache", defaultView: "source", makeRenderer: () => createRenderer("minbars") },
-  { engine: "fullbars", module: "../tutorials/src/fullbars.mjs", ext: "hbs", defaultView: "source", makeRenderer: () => createRenderer("surface") },
+  { engine: "classicbars", module: "../tutorials/src/classicbars.mjs", ext: "hbs", defaultView: "source", makeRenderer: () => createRenderer("surface") },
   { engine: "rawbars", module: "../tutorials/src/rawbars.mjs", ext: "rawbars", makeRenderer: () => createRenderer("core") },
   { engine: "maxbars", module: "../tutorials/src/maxbars.mjs", ext: "maxbars", defaultView: "source", makeRenderer: () => createRenderer("maxbars") },
 ];
@@ -58,7 +58,7 @@ async function buildDialect(d) {
   const snapshots = {};
   for (const [id, ex] of Object.entries(examples)) {
     // The catalog loader hosts neither custom helpers (ADR-018) nor a cross-dialect
-    // `engine` override (RawBars diptychs render `sugar` under FullBars), so those
+    // `engine` override (RawBars diptychs render `sugar` under ClassicBars), so those
     // page-only examples are not projected to the Lab dropdown.
     if (ex.helpers && ex.helpers.trim()) continue;
     if (ex.engine && ex.engine !== d.engine) continue;

@@ -22,7 +22,7 @@ import { genCtx } from "./ctxgen.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
-const enginePath = resolve(root, "output/FullBars.JS/index.js");
+const enginePath = resolve(root, "output/ClassicBars.JS/index.js");
 const emitterPath = resolve(root, "output/MaxBars.Rust/index.js");
 const genDir = resolve(here, "gen");
 

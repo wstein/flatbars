@@ -6,7 +6,7 @@ A *directive* is a `@key`/`@key: value` marker carried in a short `{{! … }}`
 comment at the **head** of a file. The core lifts directives meaning-free (the
 `Sep` precedent applied to comments — [grammar](/spec/grammar/)); the engine assigns
 meaning. Because carriage lives in the core parser, every dialect (RawBars,
-FullBars, MaxBars) inherits directives uniformly.
+ClassicBars, MaxBars) inherits directives uniformly.
 
 ## The mechanism
 
@@ -33,7 +33,7 @@ Rules ([lexical](/spec/lexical/)):
 
 :::note[Important]
 *The per-file `{{! @truthiness: … }}` directive was removed* — see
-[ADR-022](/adr/adr-0022-analyse-mode/). Truthiness is now each engine's *one fixed rule*: **FullBars**
+[ADR-022](/adr/adr-0022-analyse-mode/). Truthiness is now each engine's *one fixed rule*: **ClassicBars**
 uses `handlebars` (Handlebars fidelity), **RawBars** and **MaxBars** use `nonEmpty`, **MinBars** uses
 `mustache`. (The dialects therefore *diverge* in value policy — RawBars/MaxBars are not Handlebars clones.)
 There is no per-file override, no per-partial scoping, and no alias/shape-list value to write. A leftover
@@ -48,7 +48,7 @@ treat as false. The named rules — the menu engines are built from — are:
 
 | Rule | Falsy set | Notes |
 | --- | --- | --- |
-| `handlebars` | `false null "" 0 []` | *FullBars*; `{}` truthy, `"0"` truthy |
+| `handlebars` | `false null "" 0 []` | *ClassicBars*; `{}` truthy, `"0"` truthy |
 | `nonEmpty` | `false null "" [] {}` | *RawBars/MaxBars*; truthy ⟺ non-empty present value — `0` truthy (use `val > 0`), every empty container falsy |
 | `mustache` | `false null []` | *MinBars*; `0`/`""`/`{}` truthy |
 | `minimal` | `false null` | comparison only (analyse): only `false`/`null` false |
@@ -56,7 +56,7 @@ treat as false. The named rules — the menu engines are built from — are:
 
 Decisions worth stating: `"0"` is truthy under every rule; `0` is falsy only under `handlebars`; `{}`
 is falsy under `nonEmpty`/`presence`; `""` is falsy under `handlebars`/`nonEmpty`; `NaN` is always truthy;
-`safe ""` is falsy iff `""` is in the rule (content-based — [fullbars-compat](/engine/fullbars-compat/) §1.4).
+`safe ""` is falsy iff `""` is in the rule (content-based — [classicbars-compat](/engine/classicbars-compat/) §1.4).
 
 `includeZero` on a single `if`/`unless` makes the number `0` truthy *for that one test* — genuine
 Handlebars compat, but a Handlebars-only escape hatch (not portable). It is a per-call helper option, no
@@ -125,7 +125,7 @@ directory, then the built-in default (on).
 
 Both interpreter and compiler honour `@trim` identically. Truthiness is a
 *callback* in both: the compiled module seeds its root frame with the engine's
-truthiness callback — `rt.truthyHandlebars` (FullBars), `rt.truthyNonEmpty`
+truthiness callback — `rt.truthyHandlebars` (ClassicBars), `rt.truthyNonEmpty`
 (RawBars/MaxBars), or `rt.truthyMustache` (MinBars) — so a compiled template
 branches under the same rule as the interpreter, asserted byte-for-byte by the
 conformance harness ([ADR-022](/adr/adr-0022-analyse-mode/)).

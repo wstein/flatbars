@@ -1,13 +1,14 @@
 -- | `flatbars-js` facade test suite (`spago test -p flatbars-js`).
 -- |
--- | Exercises the public JS boundary `FullBars.JS.render` / `renderSurface`
+-- | Exercises the public JS boundary `ClassicBars.JS.render` / `renderSurface`
 -- | exactly as a JS host would call them (uncurried, over a `Json` value),
 -- | checking the `{ ok, value, error }` result shape, auto-escaping, and that
 -- | parse failures come back located rather than thrown.
-module Test.FullBars.JS.Main where
+module Test.ClassicBars.JS.Main where
 
 import Prelude
 
+import ClassicBars.JS (Result, compileFor, lint, migrate, render, renderSurface)
 import Data.Argonaut (Json, jsonParser)
 import Data.Array (any, head, length)
 import Data.Either (Either(..))
@@ -17,7 +18,6 @@ import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect (Effect)
 import Effect.Console (log)
-import FullBars.JS (Result, compileFor, lint, migrate, render, renderSurface)
 import Test.Assert (assert')
 
 -- Parse a JSON literal for use as render data, failing the test on a bad fixture.
@@ -28,7 +28,7 @@ json label src k = case jsonParser src of
 
 main :: Effect Unit
 main = do
-  log "FullBars.JS facade tests"
+  log "ClassicBars.JS facade tests"
 
   -- Surface dialect: paths resolve and {{ }} auto-escapes.
   json "surface-escape" "{\"name\": \"Ada & <b>\"}" \j -> do
@@ -67,12 +67,12 @@ main = do
           assert' (label <> " compiles ok: " <> r.error) r.ok
           assert' (label <> " emits a module") (contains (Pattern "export default") r.value)
   compiles "rawbars" "rawbars" "{{{ escapeHtml (lookup this \"x\") }}}"
-  compiles "fullbars" "fullbars" "<h1>{{ name }}</h1>"
+  compiles "classicbars" "classicbars" "<h1>{{ name }}</h1>"
   compiles "maxbars" "maxbars" "{{ score >= 50 }}" -- infix desugars to core, then shared driver
   compiles "minbars" "minbars" "{{name}}"
-  compiles "unknown→fullbars" "wat" "{{ name }}" -- unknown dialect falls back to surface
+  compiles "unknown→classicbars" "wat" "{{ name }}" -- unknown dialect falls back to surface
   -- parse failures come back located as `line:column:` (like render), not thrown.
-  let bad = runFn2 compileFor "fullbars" "line1\nline2 {{ oops"
+  let bad = runFn2 compileFor "classicbars" "line1\nline2 {{ oops"
   assert' "compileFor parse error not ok" (not bad.ok)
   assert' ("compileFor parse error located: " <> bad.error) (contains (Pattern "2:7:") bad.error)
 
@@ -88,9 +88,9 @@ main = do
   assert' ("lint flags the plus alias: " <> lr.report) (contains (Pattern "add") lr.report)
   assert' "lint report uses the CLI severity word" (contains (Pattern "warning:") lr.report)
   assert' "lint findings are structured" (length lr.findings == 2)
-  -- FullBars keeps @index canonical, so only the alias is flagged there.
-  let lf = runFn2 lint "{{ plus a b }}" "fullbars"
-  assert' "fullbars lint flags the alias" (length lf.findings == 1)
+  -- ClassicBars keeps @index canonical, so only the alias is flagged there.
+  let lf = runFn2 lint "{{ plus a b }}" "classicbars"
+  assert' "classicbars lint flags the alias" (length lf.findings == 1)
   -- A clean template reports the CLI's no-findings line.
   let lc = runFn2 lint "{{ name }}" "rawbars"
   assert' "clean lint report" (lc.report == "ok: no lint findings")

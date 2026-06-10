@@ -15,7 +15,7 @@ import { dirname, resolve } from "node:path";
 import { existsSync } from "node:fs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const enginePath = resolve(here, "../output/FullBars.JS/index.js");
+const enginePath = resolve(here, "../output/ClassicBars.JS/index.js");
 if (!existsSync(enginePath)) {
   console.error("error: output/ not found — run `npm run build` first.");
   process.exit(2);

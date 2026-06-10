@@ -2,7 +2,7 @@
 -- |
 -- | Structural only — parsing shapes, the foldTemplate catamorphism, clause
 -- | splitting, schema validation, and source spans. No rendering: that is the
--- | engine's job and is tested in `fullbars`.
+-- | engine's job and is tested in `classicbars`.
 module Test.FlatBars.Main where
 
 import Prelude
@@ -79,7 +79,7 @@ nodeCount src = case parse src of
     t
 
 -- Highlight configs mirror each dialect's parse gates. A kernel-dialect config
--- (FullBars-like — `else`/`elif` are clause separators, extras on, inheritance
+-- (ClassicBars-like — `else`/`elif` are clause separators, extras on, inheritance
 -- off) and a Mustache config (set delimiters on, no clause words, inheritance on).
 hlKernel :: HighlightConfig
 hlKernel =
@@ -88,7 +88,7 @@ hlKernel =
   , lexOptions: defaultLexOptions
   , extras: true
   , inheritance: false
-  , rawBlockHbs: true -- FullBars: the bare `{{{{name}}}}` (Handlebars)
+  , rawBlockHbs: true -- ClassicBars: the bare `{{{{name}}}}` (Handlebars)
   , rawBlockHash: false -- but not the `{{{{#name}}}}` FlatBars spelling
   }
 
@@ -522,12 +522,12 @@ main = do
     (kinds hlMax "{{&x}}" == [ "error" ])
   assert' "highlight: extras-off disallows {{^x}} (inverse) → error, close stays block-close"
     (kinds hlMax "{{^x}}b{{/x}}" == [ "error", "block-close" ])
-  -- Raw blocks have two spellings gated separately. FullBars accepts the bare
+  -- Raw blocks have two spellings gated separately. ClassicBars accepts the bare
   -- Handlebars `{{{{r}}}}` and rejects the FlatBars `{{{{#r}}}}`; MaxBars/RawBars
   -- are the mirror; MinBars rejects both (Mustache has no raw blocks).
-  assert' "highlight: FullBars allows the bare {{{{r}}}} raw block"
+  assert' "highlight: ClassicBars allows the bare {{{{r}}}} raw block"
     (kinds hlKernel "{{{{r}}}}b{{{{/r}}}}" == [ "raw-block" ])
-  assert' "highlight: FullBars rejects the {{{{#r}}}} FlatBars spelling → error"
+  assert' "highlight: ClassicBars rejects the {{{{#r}}}} FlatBars spelling → error"
     (kinds hlKernel "{{{{#r}}}}b{{{{/r}}}}" == [ "error" ])
   assert' "highlight: MaxBars rejects the bare {{{{r}}}} → error"
     (kinds hlMax "{{{{r}}}}b{{{{/r}}}}" == [ "error" ])
@@ -538,7 +538,7 @@ main = do
   -- …but with extras on (Mustache) the {{^}}/{{&}} shapes are valid kinds.
   assert' "highlight: extras-on allows {{^x}} (inverse) and {{&x}} (raw)"
     (kinds hlMustache "{{^x}}b{{/x}}{{&y}}" == [ "block-inverse", "block-close", "raw" ])
-  -- `inheritance = false` (the kernel/FullBars config) disallows {{<}}/{{$}}.
+  -- `inheritance = false` (the kernel/ClassicBars config) disallows {{<}}/{{$}}.
   assert' "highlight: inheritance-off disallows {{<l}}/{{$b}} → error"
     ( kinds hlKernel "{{<l}}{{$b}}x{{/b}}{{/l}}" ==
         [ "error", "error", "block-close", "block-close" ]

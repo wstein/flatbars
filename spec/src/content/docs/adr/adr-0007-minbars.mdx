@@ -26,8 +26,8 @@ an engine dependency — the engine, CLI and compiled output only ever receive p
 ## Context
 
 A Mustache-compatible engine completes the family. The key decision is its *position*: MinBars is a
-*peer* of FullBars, not a desugar over it. The lattice becomes RawBars ⊂ MinBars (Mustache) and
-RawBars ⊂ FullBars ⊂ MaxBars, with MinBars and FullBars as siblings over the shared kernel.
+*peer* of ClassicBars, not a desugar over it. The lattice becomes RawBars ⊂ MinBars (Mustache) and
+RawBars ⊂ ClassicBars ⊂ MaxBars, with MinBars and ClassicBars as siblings over the shared kernel.
 
 The draft spec was reviewed against the real code; that review found several "core is reused
 unchanged" claims to be false. They are recorded here because they reshape the plan.
@@ -40,11 +40,11 @@ unchanged" claims to be false. They are recorded here because they reshape the p
    (`{{>* }}`). Lambdas are dropped (`Value` has no function arm). Set delimiters
    (`{{=<% %>=}}`) were initially deferred but are now *implemented* MinBars-exclusively
    ([ADR-015](/adr/adr-0015-set-delimiters/) + 2026-06-04 scope narrowing; RawBars / MaxBars /
-   FullBars reject the inline form). MinBars passes the full `delimiters` module, 14/14.
+   ClassicBars reject the inline form). MinBars passes the full `delimiters` module, 14/14.
 
 1. *Truthiness `mustache` default = a shared parameter.* Add `mustache = false null []` to the alias
    table *and* thread a per-engine default `FalsySet` through `resolveTruthiness` + `runResolved`
-   (today `handlebars` is hardwired, `Value.purs:69`); update the RawBars/FullBars/MaxBars call sites to
+   (today `handlebars` is hardwired, `Value.purs:69`); update the RawBars/ClassicBars/MaxBars call sites to
    pass `handlebars` explicitly. Recursion budget default = 64.
 
 1. *Conformance harness = a Node-side runner* (`.mjs`, mirroring `packages/compile/conformance.mjs`)

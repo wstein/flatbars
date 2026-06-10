@@ -6,8 +6,8 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
 | Path | What it is |
 | --- | --- |
 | `token-vocabulary.json` | **The single source of truth.** Each engine token `kind` → its `role` (`tag`/`interior`), LSP semantic-token `type`/`modifiers`, and TextMate `tmScopes`. The three consumers below all derive from it. |
-| `flatbars.tmLanguage.json` | The TextMate **fallback** grammar — the *floor*. The well-known Handlebars grammar, re-identified as `source.flatbars` and extended for all four dialects (inverse, Mustache inheritance, set delimiters, MaxBars operators), keeping its standard scope names so themes colour FlatBars familiarly. Colours **only template syntax + a leading YAML front-matter block** — host text is left plain (a FlatBars template's output need not be HTML). Best-effort and non-authoritative: stateless, FullBars-flavoured, and it cannot follow a set-delimiter *switch* — the LSP corrects those. |
-| `lsp/` | **`flatbars-lsp`** — the authoritative server (the *ceiling*). Embeds the committed `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize`, `publishDiagnostics` from the recovering parser (ADR-023), `hover`/`completion` from `editors/operations.json` (the prelude schema projected by `FullBars.Catalog.operations`, incl. each operation's one-line `OperationDef.doc`), and a `codeAction` quick-fix that rewrites a deprecated alias / non-canonical scoped variable to its canonical form (`index`→`index0`, dialect-scoped). Stateful by construction, so set delimiters and dialects are correct. |
+| `flatbars.tmLanguage.json` | The TextMate **fallback** grammar — the *floor*. The well-known Handlebars grammar, re-identified as `source.flatbars` and extended for all four dialects (inverse, Mustache inheritance, set delimiters, MaxBars operators), keeping its standard scope names so themes colour FlatBars familiarly. Colours **only template syntax + a leading YAML front-matter block** — host text is left plain (a FlatBars template's output need not be HTML). Best-effort and non-authoritative: stateless, ClassicBars-flavoured, and it cannot follow a set-delimiter *switch* — the LSP corrects those. |
+| `lsp/` | **`flatbars-lsp`** — the authoritative server (the *ceiling*). Embeds the committed `flatbars-js` bundle and answers `semanticTokens/full` from `tokenize`, `publishDiagnostics` from the recovering parser (ADR-023), `hover`/`completion` from `editors/operations.json` (the prelude schema projected by `ClassicBars.Catalog.operations`, incl. each operation's one-line `OperationDef.doc`), and a `codeAction` quick-fix that rewrites a deprecated alias / non-canonical scoped variable to its canonical form (`index`→`index0`, dialect-scoped). Stateful by construction, so set delimiters and dialects are correct. |
 | `vscode/` | The VS Code extension: contributes the fallback grammar and spawns `flatbars-lsp`. `dist/` is a git-ignored build product (`npm run build`). |
 | `jetbrains/` | The JetBrains plugin (Gradle/Kotlin): bundles the fallback grammar via a `TextMateBundleProvider` (all IDEs) and, on Ultimate (`-PwithLsp`), spawns `flatbars-lsp` through the platform LSP API. `build/` and the synced resources are git-ignored. |
 
@@ -28,7 +28,7 @@ approximating it. See `docs/modules/ROOT/pages/adr-0017-editor-support-lsp.adoc`
   drives the real stdio server over LSP (`semanticTokens/full`, `hover`,
   `completion`, `codeAction`, `publishDiagnostics`).
 - **`check:operations`** (in `npm test`, needs a build like `check:catalog`) keeps
-  `editors/operations.json` in step with `FullBars.preludeSchema` — the hover /
+  `editors/operations.json` in step with `ClassicBars.preludeSchema` — the hover /
   completion / code-action data the server reads (incl. each operation's
   `canonical` rewrite target).
 - **`test:vscode`** drives the *bundled* server over LSP, asserts the
@@ -68,13 +68,13 @@ grammar — we ship overridable defaults derived from `token-vocabulary.json`.
     scopes (the *floor*, and tags **injected into host files**). These scopes are
     unique to FlatBars, so the global rule is safe.
   - `editor.semanticTokenColorCustomizations` — bolds every semantic type, scoped
-    to the four dialect languages (`[fullbars]` …) so we never bold a shared type
+    to the four dialect languages (`[classicbars]` …) so we never bold a shared type
     like `variable` outside a FlatBars document (the *ceiling*).
 
   Both are **defaults** — override in your `settings.json`, e.g. to turn it off:
 
   ```jsonc
-  "editor.semanticTokenColorCustomizations": { "[fullbars]": { "rules": { "variable": { "fontStyle": "" } } } }
+  "editor.semanticTokenColorCustomizations": { "[classicbars]": { "rules": { "variable": { "fontStyle": "" } } } }
   ```
 
   `check:editors-manifests` diffs the whole manifest, so the bold block can't drift

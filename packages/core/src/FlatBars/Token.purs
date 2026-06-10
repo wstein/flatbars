@@ -97,7 +97,7 @@ type Interior = Either ParseError (Array PosToken)
 -- | dot tokenizes as `TOp ".."` (so `1..5` and `a..b` carve into `a`/`..`/`b`),
 -- | while a single `.` stays an identifier char (dotted paths `a.b` are untouched).
 -- | Off by default — the dialects that keep the Handlebars `../` parent-path
--- | (FullBars/RawBars) and MinBars leave `..` inside the identifier run.
+-- | (ClassicBars/RawBars) and MinBars leave `..` inside the identifier run.
 -- |
 -- | `collectionLiterals` opts in to the `[…]` list and `{k: v}` dict literals
 -- | (MaxBars): `[` `]` `{` `}` `,` tokenize as their own punctuation. Off by

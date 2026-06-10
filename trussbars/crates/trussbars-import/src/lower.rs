@@ -1451,7 +1451,7 @@ fn map_filter(name: &str) -> &str {
 /// Whether `name` is a known Trussbars prelude operation or blessed host helper, so a
 /// migrated call to it needs no "provide a host helper" note.
 ///
-/// Mirrors the reference prelude (`FullBars.preludeSchema`) plus the i18n host-helper
+/// Mirrors the reference prelude (`ClassicBars.preludeSchema`) plus the i18n host-helper
 /// pack (`t`/`relative`/`number`/`date`/`selectPlural`/`json` — docs/09, ADR-0029).
 /// Curated, not generated — extend it as the prelude grows; an over-strict miss only
 /// produces an extra advisory note, never a wrong migration.

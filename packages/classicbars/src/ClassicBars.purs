@@ -1,4 +1,4 @@
--- | FullBars — the reference template engine built on the FlatBars framework.
+-- | ClassicBars — the reference template engine built on the FlatBars framework.
 -- |
 -- | "Flat bars" to FlatBars' "bare rods": one *possible* engine over the
 -- | substrate (ADR-001). It supplies the Handlebars-flavoured meaning the
@@ -6,14 +6,14 @@
 -- | `stringify`), an environment (`RefEnv`/`refEngine`), the prelude of helpers,
 -- | and the desugaring walk (`lower`) — and wires them into convenience
 -- | renderers. Swap any of it for a different engine without touching `flatbars`.
-module FullBars
+module ClassicBars
   ( module Kernel.Value
   , module Kernel.Env
   , module Kernel.Prelude
   , module Kernel.Lower
   , module Kernel.Render
   , module Kernel.Hoist
-  , module FullBars.Surface
+  , module ClassicBars.Surface
   , surfaceClauses
   , checkSurfaceStrict
   , desugarSurface
@@ -38,6 +38,7 @@ module FullBars
 
 import Prelude
 
+import ClassicBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, strictSurfaceViolation)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -52,7 +53,6 @@ import FlatBars.Error (Error, ParseError(..), renderParseErrorAt, renderParseErr
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parse, parseWith)
 import FlatBars.Syntax (Ident, Template)
 import FlatBars.Value (Value)
-import FullBars.Surface (LoopVars, desugar, desugarWith, maxbarsEachAsViolation, noLoopVars, strictSurfaceViolation)
 import Kernel.Analyse (Finding, PathSchema, allFindings, anyPath, evaluatedCount, handlebarsLabels, jsonataScaffold, reportMarkdown, runAnalysis)
 import Kernel.CaseSugar (caseLeadingViolation)
 import Kernel.Engine (Operation)
@@ -82,17 +82,17 @@ desugarSurfaceWith :: LoopVars -> Template -> Template
 desugarSurfaceWith lv = desugarWith lv surfaceClauses
 
 -- | Reject each dialect's disallowed *surface* shapes (the `strict` flag is the
--- | FullBars/MaxBars distinction the render paths already thread), reported as a
+-- | ClassicBars/MaxBars distinction the render paths already thread), reported as a
 -- | located `DisallowedShape`:
 -- |
--- |  * **FullBars** (`strict = true`) — a bare `{{#inline}}` (must be the
+-- |  * **ClassicBars** (`strict = true`) — a bare `{{#inline}}` (must be the
 -- |    `{{#*inline "name"}}` decorator, surface.adoc §5.7) and a `{{#let}}`
--- |    (MaxBars-only, ADR-024). FullBars accepts neither.
+-- |    (MaxBars-only, ADR-024). ClassicBars accepts neither.
 -- |  * **MaxBars** (`strict = false`) — the *removed* `{{#each … as …}}` loop-
 -- |    binding form (MaxBars binds `{{#each x in xs}}` now), and a `{{#case}}` with
 -- |    non-whitespace content before its first `{{when}}` arm (docs/12 §2); rejecting
 -- |    each turns a silent no-op into a clear error, the same no-silent-no-op bar the
--- |    FullBars `{{#let}}` rejection set.
+-- |    ClassicBars `{{#let}}` rejection set.
 -- |
 -- | The first violation found wins.
 checkSurfaceStrict :: Boolean -> Template -> Either ParseError Unit
@@ -165,7 +165,7 @@ renderSurfaceMappedWith = renderSurfaceMappedDiagWith true noLoopVars defaultPar
 
 -- | The mapped twin of `renderSurfaceDiagWith`, parameterised by dialect: the
 -- | bare-`{{#inline}}` strictness, the `LoopVars` resolver, the parse options, and
--- | the truthiness rule. FullBars passes the surface defaults; MaxBars passes its
+-- | the truthiness rule. ClassicBars passes the surface defaults; MaxBars passes its
 -- | own (`maxLoopVars` / `maxOptions` / `nonEmpty`). Returns the output plus a
 -- | tiling source map (located parse/render errors as `Left`).
 renderSurfaceMappedDiagWith
@@ -269,10 +269,10 @@ renderSurfaceWithHelpers = renderSurfaceWithHelpersWith true noLoopVars defaultP
 
 -- | `renderSurfaceWithHelpers` parameterised by the dialect's `LoopVars` and
 -- | `ParseOptions`, so MaxBars (`renderWithOperations`, ADR-019 addendum) registers
--- | host operations over *its* surface (infix/pipes/loop vars). FullBars is the
+-- | host operations over *its* surface (infix/pipes/loop vars). ClassicBars is the
 -- | `noLoopVars` / `defaultParseOptions` specialisation above. The leading
 -- | `strict` flag gates the bare-`{{#inline}}` rejection (`checkSurfaceStrict`):
--- | `true` for FullBars/CLI, `false` for MaxBars.
+-- | `true` for ClassicBars/CLI, `false` for MaxBars.
 renderSurfaceWithHelpersWith
   :: Boolean
   -> LoopVars
@@ -296,7 +296,7 @@ renderSurfaceWithHelpersWith strict lv opts truthy helpers partialSrcs src dat =
           setup =
             withTruthy truthy
               -- ADR-005 amendment: the dialect that accepts Handlebars `{{#> }}`
-              -- block partials (`opts.partialBlocks` — FullBars) exposes the body as
+              -- block partials (`opts.partialBlocks` — ClassicBars) exposes the body as
               -- `partial-block`; the others (MaxBars, reusing this path) use `yield`.
               <<< withYieldName (if opts.partialBlocks then "partial-block" else "yield")
               <<< registerAll helpers
@@ -318,9 +318,9 @@ renderSurfaceDiag :: String -> Value -> Either String String
 renderSurfaceDiag = renderSurfaceDiagWith true noLoopVars defaultParseOptions handlebars
 
 -- | `renderSurfaceDiag` with explicit parse options and a dialect `LoopVars`
--- | resolver (the CLI/config + dialect path; FullBars passes `noLoopVars`,
+-- | resolver (the CLI/config + dialect path; ClassicBars passes `noLoopVars`,
 -- | MaxBars its loop-variable map). The leading `strict` flag gates the
--- | bare-`{{#inline}}` rejection: `true` for FullBars/CLI, `false` for MaxBars.
+-- | bare-`{{#inline}}` rejection: `true` for ClassicBars/CLI, `false` for MaxBars.
 renderSurfaceDiagWith
   :: Boolean -> LoopVars -> ParseOptions -> Truthy -> String -> Value -> Either String String
 renderSurfaceDiagWith strict lv opts truthy src dat = case parseWith opts src of

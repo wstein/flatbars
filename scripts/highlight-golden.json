@@ -4,7 +4,7 @@
   "cases": [
     {
       "id": "exhibit-a-long-comment",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "the whole {{!-- name --}} is ONE comment span and the trailing `!` is OUTSIDE it — the regex closed the comment at the inner }} (Exhibit A fixed)",
       "src": "Hello, {{!-- name --}}!",
       "spans": [
@@ -25,7 +25,7 @@
     },
     {
       "id": "exhibit-b-unterminated-comment",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "an unterminated {{!-- swallows to the next --}} (one comment span) exactly as the lexer does — no stray raw tag (Exhibit B fixed)",
       "src": "escaped: {{html}}\nraw:     {{!-- html}}\namp:     {{&html--}}",
       "spans": [
@@ -57,7 +57,7 @@
     },
     {
       "id": "unterminated-tag",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "an unterminated {{ with no }} recovers to an `unterminated` span (ADR-023) instead of dropping all highlighting; the earlier {{name}} stays lit and the scan resyncs to the broken tail",
       "src": "Hi {{name}} more {{oops",
       "spans": [
@@ -89,7 +89,7 @@
     },
     {
       "id": "expr",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{name}} → expr",
       "src": "Hello, {{name}}!",
       "spans": [
@@ -110,7 +110,7 @@
     },
     {
       "id": "triple-raw",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{{x}}} → raw (unescaped)",
       "src": "raw: {{{html}}}",
       "spans": [
@@ -131,7 +131,7 @@
     },
     {
       "id": "amp-raw",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{&x}} → raw",
       "src": "amp: {{&html}}",
       "spans": [
@@ -152,7 +152,7 @@
     },
     {
       "id": "dotted",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "dotted path stays one expr tag",
       "src": "{{name.first}} {{name.last}}",
       "spans": [
@@ -184,7 +184,7 @@
     },
     {
       "id": "implicit",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "implicit iterator {{.}} inside a section",
       "src": "{{#tags}}[{{.}}]{{/tags}}",
       "spans": [
@@ -227,7 +227,7 @@
     },
     {
       "id": "section",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{#}}/{{/}} → block-open/block-close",
       "src": "{{#items}}{{name}}{{/items}}",
       "spans": [
@@ -270,7 +270,7 @@
     },
     {
       "id": "inverted",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{^}} → block-inverse",
       "src": "{{^items}}none{{/items}}",
       "spans": [
@@ -302,7 +302,7 @@
     },
     {
       "id": "clause-else",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{else}} between block open/close → keyword (statement-like)",
       "src": "{{#if a}}x{{else}}y{{/if}}",
       "spans": [
@@ -409,7 +409,7 @@
     },
     {
       "id": "partial",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{> name}} → partial",
       "src": "{{> row}}",
       "spans": [
@@ -430,7 +430,7 @@
     },
     {
       "id": "dynamic-partial",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{>* name}} → partial",
       "src": "{{>* which}}",
       "spans": [
@@ -451,7 +451,7 @@
     },
     {
       "id": "inheritance",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{<parent}} → block-parent, {{$block}} → block-decl (regression: the regex mis-coloured these as plain expressions)",
       "src": "{{<layout}}{{$title}}Welcome{{/title}}{{/layout}}",
       "spans": [
@@ -505,7 +505,7 @@
     },
     {
       "id": "short-comment",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{! … }} (single bang) → comment",
       "src": "Total{{! dropped }}: {{total}}",
       "spans": [
@@ -537,7 +537,7 @@
     },
     {
       "id": "raw-block",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "{{{{raw}}}} … {{{{/raw}}}} → one raw-block span",
       "src": "{{{{raw}}}}{{x}}{{{{/raw}}}}",
       "spans": [
@@ -937,7 +937,7 @@
     },
     {
       "id": "interior-number-in-block-arg",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "a numeric literal in a block arg carves a `number` span; the tag stays `block-open`",
       "src": "{{#if (gt qty 5)}}{{/if}}",
       "spans": [
@@ -975,7 +975,7 @@
     },
     {
       "id": "interior-kernel-path-punctuation",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "OFF MaxBars, `a-b` is a path (no operator span) — the interior seam follows the dialect's `lexOptions`",
       "src": "{{ a-b }}",
       "spans": [
@@ -996,7 +996,7 @@
     },
     {
       "id": "interior-partial-no-op",
-      "dialect": "fullbars",
+      "dialect": "classicbars",
       "note": "a partial's leading `>` is the tag's meaning, never an interior `operator` span",
       "src": "{{> row}}",
       "spans": [
@@ -1111,9 +1111,9 @@
       ]
     },
     {
-      "id": "fullbars-rawblock-hash",
-      "dialect": "fullbars",
-      "note": "FullBars rejects the FlatBars {{{{#raw}}}} spelling (not Handlebars) → error",
+      "id": "classicbars-rawblock-hash",
+      "dialect": "classicbars",
+      "note": "ClassicBars rejects the FlatBars {{{{#raw}}}} spelling (not Handlebars) → error",
       "src": "{{{{#raw}}}}b{{{{/raw}}}}",
       "spans": [
         {
@@ -1132,9 +1132,9 @@
       ]
     },
     {
-      "id": "fullbars-inheritance-off",
-      "dialect": "fullbars",
-      "note": "inheritance off: the Mustache {{<l}}/{{$b}} sigils are disallowed → error (FullBars is not a Mustache surface)",
+      "id": "classicbars-inheritance-off",
+      "dialect": "classicbars",
+      "note": "inheritance off: the Mustache {{<l}}/{{$b}} sigils are disallowed → error (ClassicBars is not a Mustache surface)",
       "src": "{{<l}}{{$b}}x{{/b}}{{/l}}",
       "spans": [
         {

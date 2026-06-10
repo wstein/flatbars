@@ -62,7 +62,7 @@ need(/`Operation`|Operation m /.test(hostApi), "host-api.adoc §7.3/§7.4: the h
 
 // The SECOND boundary spelling (ADR-019 addendum): the native dialects expose
 // host-registered operations as `renderWithOperations`, NOT `renderWith`/
-// `registerHelper` — the FullBars-frozen word. Both dialect pages must document
+// `registerHelper` — the ClassicBars-frozen word. Both dialect pages must document
 // the native spelling so the two registers cannot drift back together.
 need(/renderWithOperations/.test(rawbars), "adr-0008-rawbars.adoc: must document `renderWithOperations` (native operation boundary, ADR-019 addendum)");
 need(/\boperation/i.test(rawbars), "adr-0008-rawbars.adoc: must use the native word \"operation\" (not \"helper\") for RawBars");
@@ -72,11 +72,11 @@ need(/\boperation/i.test(maxbars), "maxbars.adoc: must use the native word \"ope
 // The SOURCE-LEVEL authoring affordance honours the same split (ADR-019 addendum):
 // `buildHelpers` (the Lab panel + tutorial cards) must inject BOTH dialect-scoped
 // names, aliasing one registrar, so native cards can teach `registerOperation`
-// while FullBars/migration cards keep `registerHelper`. Pinned so neither alias is
+// while ClassicBars/migration cards keep `registerHelper`. Pinned so neither alias is
 // silently dropped (Nadia's "the two registers can't drift").
 const injects = buildHelpersSrc.match(/new Function\(([^)]*)\)/);
 const injected = injects ? injects[1] : "";
-need(/registerHelper/.test(injected), "lab/helpers.mjs: buildHelpers must inject `registerHelper` (FullBars boundary word)");
+need(/registerHelper/.test(injected), "lab/helpers.mjs: buildHelpers must inject `registerHelper` (ClassicBars boundary word)");
 need(/registerOperation/.test(injected), "lab/helpers.mjs: buildHelpers must inject `registerOperation` (native RawBars/MaxBars twin, ADR-019 addendum)");
 
 if (fail.length) {

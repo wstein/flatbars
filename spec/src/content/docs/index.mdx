@@ -21,7 +21,7 @@ plus the interpreter.
 | Principle | What it means |
 | --- | --- |
 | The core has no semantics | The parser does not know what `if` does, whether output should be escaped, what a path is, or even that an identifier names a "helper." It produces `Content`, `Output`, and `Block` nodes and stops. All meaning is added by the [engine walk](/spec/evaluation/). |
-| No built-in helpers, no keywords | `if`, `each`, `with`, `unless`, `lookup`, HTML escaping — and `else` — are *userland*. The core ships none of them and reserves no names. The [reference engine](/engine/prelude/), *FullBars*, reproduces Handlebars, but you can delete, replace, or rename any of it. |
+| No built-in helpers, no keywords | `if`, `each`, `with`, `unless`, `lookup`, HTML escaping — and `else` — are *userland*. The core ships none of them and reserves no names. The [reference engine](/engine/prelude/), *ClassicBars*, reproduces Handlebars, but you can delete, replace, or rename any of it. |
 | No sugar in the core | Dotted paths, `{{ }}` auto-escaping, `@`-variables, `as \|x\|`, partials — all of that lives in an *optional* [surface dialect](/engine/surface/) that compiles to the core skeleton. |
 | Everything is a helper application | In the reference engine a bare identifier `{{{city}}}` *calls the helper* `city`. To read a data field you call a helper: `{{{lookup this "city"}}}`. No variables, no implicit context. |
 | Application is juxtaposition; parens group | `{{{upcase (lookup this "name")}}}` is `upcase` applied to one argument; the parentheses *group* the nested application. The Handlebars subexpression model, used uniformly — not Lisp prefix. |
@@ -48,13 +48,13 @@ conforming implementation, in PureScript. Code fragments use `text`/`haskell` bl
 normative only where marked _normative_.
 :::
 
-## The reference dialect: FullBars
+## The reference dialect: ClassicBars
 
-The engine and surface dialect that ship with FlatBars are *FullBars* — a member of the
+The engine and surface dialect that ship with FlatBars are *ClassicBars* — a member of the
 Handlebars/Mustache family, familiar on sight, but a *dialect* with its own reasoned choices, not a
 clone: a helper-first core, escaping as an explicit helper, `{{else}}` as a name-agnostic
 separator, a native short-circuit `{{elif}}`, content-based safe-string truthiness, and
 explicit (`~`) whitespace. The differences from Handlebars are *features, not gaps* — see
-[the FullBars dialect — differences from Handlebars](/engine/fullbars-compat/). And because the core
+[the ClassicBars dialect — differences from Handlebars](/engine/classicbars-compat/). And because the core
 reserves no names, you can delete, replace, or rename any of it and grow a different dialect on the
 same substrate.

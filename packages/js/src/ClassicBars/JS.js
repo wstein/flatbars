@@ -6,7 +6,7 @@
 // the `safe` sentinel. A helper may declare an arity (`registerHelper(name, fn,
 // arity)`); when it does, an arity mismatch is reported with the SAME message
 // the prelude's arity-checked helpers produce, so a custom helper's diagnostics
-// read like a built-in's. The PureScript side (FullBars.JS) marshals `Value`
+// read like a built-in's. The PureScript side (ClassicBars.JS) marshals `Value`
 // arguments to JSON and the result back to a `Value`.
 
 // Arity descriptor → text, matching Kernel.Walk.arityText. `arity` is a number

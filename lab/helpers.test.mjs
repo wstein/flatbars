@@ -19,7 +19,7 @@ test("buildHelpers collects registerHelper calls into a bag", () => {
 });
 
 test("registerOperation is the native alias of registerHelper — same bag (ADR-019)", () => {
-  // The two dialect-scoped names (FullBars `registerHelper`, native
+  // The two dialect-scoped names (ClassicBars `registerHelper`, native
   // `registerOperation`) fill an identical bag, so a MaxBars/RawBars card can
   // teach the native word and still run. Pins Nadia's "the two are identical".
   const viaHelper = buildHelpers("registerHelper('loud', (s) => String(s).toUpperCase(), 1)", safe);
@@ -179,7 +179,7 @@ test("an unsupported options.* still throws (ADR-020)", () => {
 });
 
 // ── ADR-019 addendum: host-registered block OPERATIONS for RawBars/MaxBars ─────
-// The marshaller is shared with FullBars (registerHelper), but the boundary word
+// The marshaller is shared with ClassicBars (registerHelper), but the boundary word
 // and the entry point differ per dialect: renderRawWith / renderMaxWith.
 
 test("RawBars renderRawWith runs a block operation over core syntax (ADR-019)", () => {

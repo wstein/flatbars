@@ -2,10 +2,10 @@
 //
 // Package-isolation regression check (ADR-003 lazy extraction / ADR-008 strict
 // dialect separation). The dialect packages must not depend on each other; in
-// particular RawBars — the austere substrate — must NOT pull in FullBars, even
-// transitively. This guards the boundary the `fullbars-compile` split (driver +
+// particular RawBars — the austere substrate — must NOT pull in ClassicBars, even
+// transitively. This guards the boundary the `classicbars-compile` split (driver +
 // emit vs. surface compile) was made to keep: RawBars compiles through
-// `flatbars-compile`, which carries no `fullbars` dependency.
+// `flatbars-compile`, which carries no `classicbars` dependency.
 //
 // It reads each packages/*/spago.yaml, takes the package's *library*
 // dependencies (the first `dependencies:` block — test deps are exempt),
@@ -61,8 +61,8 @@ function closure(root) {
 
 // The forbidden edges (ADR-008): a package -> a package its closure must exclude.
 const FORBIDDEN = [
-  { from: "rawbars", to: "fullbars" },
-  { from: "rawbars", to: "fullbars-compile" },
+  { from: "rawbars", to: "classicbars" },
+  { from: "rawbars", to: "classicbars-compile" },
   { from: "rawbars", to: "maxbars" },
   { from: "rawbars", to: "minbars" },
 ];

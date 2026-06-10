@@ -1,4 +1,4 @@
--- | The FullBars *surface dialect* — a desugaring of Handlebars-flavoured
+-- | The ClassicBars *surface dialect* — a desugaring of Handlebars-flavoured
 -- | author syntax into core syntax. See `docs/modules/ROOT/pages/surface.adoc`.
 -- |
 -- | This is *not* a separate parser (ADR-001): `desugar` is a pure rewrite of
@@ -25,7 +25,7 @@
 -- |    reference to an in-scope param becomes a helper call `(item)` (§5.5).
 -- |    MaxBars binds `each` Liquid-style — `{{#each item i j in xs}}` (names before
 -- |    `in`, the collection after; a third name `j` is the 1-based index) — and
--- |    keeps a drop-pipes `as` for `{{#with}}` / custom block helpers; FullBars
+-- |    keeps a drop-pipes `as` for `{{#with}}` / custom block helpers; ClassicBars
 -- |    keeps the Handlebars bars.
 -- |  * `{{> name [ctx] [k=v]}}` ⇒ `{{{ partial "name" ctx [(dict …)] }}}` (a bare
 -- |    name is a string literal, a parenthesized expression is a dynamic name;
@@ -34,8 +34,8 @@
 -- |    `{{> @partial-block}}` yield) and the inline-partial decorator
 -- |    `{{#*inline "name"}}body{{/inline}}` (a definition, hoisted by `hoistInline`);
 -- |    §5.7. A bare name is literalized. `{{> @partial-block}}` ⇒ a `(partial-block)`
--- |    call. The `*` decorator sigil is REQUIRED in FullBars: the bare
--- |    `{{#inline …}}` spelling is rejected (`FullBars.checkBareInline` /
+-- |    call. The `*` decorator sigil is REQUIRED in ClassicBars: the bare
+-- |    `{{#inline …}}` spelling is rejected (`ClassicBars.checkBareInline` /
 -- |    `strictSurfaceViolation`), Handlebars-faithful — there is no `inline` block helper.
 -- |    (MaxBars is the exception: its `{{#*inline}}` is a `LexError`, so it keeps the
 -- |    bare spelling and does not run the gate.)
@@ -50,7 +50,7 @@
 -- |    `{{#>` and `{{#*` as the distinct `PartialBlock` / `Decorator` sigils (each
 -- |    with a clean head — the partial name / the decorator name), so this rewrite
 -- |    just maps those sigils onto `partial` / `inline`.
-module FullBars.Surface
+module ClassicBars.Surface
   ( desugar
   , desugarWith
   , extractBlockParams
@@ -81,7 +81,7 @@ import FlatBars.Value (Value(..))
 type Scope = Array Ident
 
 -- | A *dialect* hook: bare names a dialect resolves to a **scoped-helper call**
--- | rather than a data path. FullBars uses `noLoopVars` (every bare name is a
+-- | rather than a data path. ClassicBars uses `noLoopVars` (every bare name is a
 -- | path — Handlebars-faithful); MaxBars uses `reservedScope noLoopVars` (ADR-021),
 -- | so only the reserved roots (`this`/`loop`/`root`/`parent`) resolve bare — the
 -- | loop *fields* are reached through `loop.*` (`{{loop.index0}}`), and a bare
@@ -93,7 +93,7 @@ type Scope = Array Ident
 -- | `@`/`../` path — so a `{{#each … as |index|}}` body binding shadows it.
 type LoopVars = Ident -> Maybe Ident
 
--- | The FullBars resolver: no bare name is a loop variable (Handlebars rule —
+-- | The ClassicBars resolver: no bare name is a loop variable (Handlebars rule —
 -- | scoped vars are reached only through `@`).
 noLoopVars :: LoopVars
 noLoopVars _ = Nothing
@@ -102,7 +102,7 @@ noLoopVars _ = Nothing
 -- | `pathExpr` asks `lv reservedMarker`: when answered, the *reserved variable
 -- | model* is on (`loop`/`root`/`parent` are scope-declared names, with
 -- | `parent`/`parent.parent` climbing and `loop`/`root` as scoped operations).
--- | FullBars' `noLoopVars` never answers it (Handlebars-faithful: those are data
+-- | ClassicBars' `noLoopVars` never answers it (Handlebars-faithful: those are data
 -- | fields, `@`/`../` reach scope); MaxBars wraps its resolver with `reservedScope`.
 -- | A control-char string no author can type, so it never collides with a path.
 reservedMarker :: Ident
@@ -116,19 +116,19 @@ reservedScope lv name
   | name == reservedMarker = Just reservedMarker
   | otherwise = lv name
 
--- | `desugarWith noLoopVars` — the FullBars surface (Handlebars-faithful).
+-- | `desugarWith noLoopVars` — the ClassicBars surface (Handlebars-faithful).
 desugar :: Array Ident -> Template -> Template
 desugar = desugarWith noLoopVars
 
 -- | Desugar with a dialect `LoopVars` resolver (see `LoopVars`). MaxBars passes
--- | its loop-variable map; FullBars passes `noLoopVars` (via `desugar`).
+-- | its loop-variable map; ClassicBars passes `noLoopVars` (via `desugar`).
 desugarWith :: LoopVars -> Array Ident -> Template -> Template
 desugarWith lv clauseNames = go []
   where
   -- the block-parameter spelling is dialect-specific: MaxBars drops the pipes
-  -- (`as a b`), FullBars keeps the Handlebars bars (`as |a b|`). The dialect is
+  -- (`as a b`), ClassicBars keeps the Handlebars bars (`as |a b|`). The dialect is
   -- read from the ADR-021 reserved-variable capability — MaxBars wraps its
-  -- `LoopVars` with `reservedScope` (so it answers `reservedMarker`); FullBars'
+  -- `LoopVars` with `reservedScope` (so it answers `reservedMarker`); ClassicBars'
   -- `noLoopVars` never does. No new seam: the same hook that selects the variable
   -- model selects the block-param spelling.
   dropPipes = isJust (lv reservedMarker)
@@ -181,7 +181,7 @@ desugarWith lv clauseNames = go []
         Block sp Section "partial" (partialArgs lv scope args) (go scope (expandElseIf body))
       -- bare `{{#inline name}}` reaches here only on the *lenient* path (MaxBars,
       -- which gates the `{{#*inline}}` decorator off so the bare form is its only
-      -- inline-partial spelling). FullBars rejects it before desugar (it requires
+      -- inline-partial spelling). ClassicBars rejects it before desugar (it requires
       -- the `{{#*inline}}` decorator) via `strictSurfaceViolation`.
       Block sp Section "inline" args body ->
         Block sp Section "inline" (inlineArgs lv scope args) (go scope (expandElseIf body))
@@ -197,7 +197,7 @@ desugarWith lv clauseNames = go []
         Block sp Section "partial" (partialArgs lv scope (Array.cons (App name []) args))
           (go scope (expandElseIf body))
       -- the inverted section `{{^x}}…{{/x}}` desugars to `{{#unless x}}…{{/unless}}`
-      -- (the FullBars way to "render when falsy"); the head becomes the condition.
+      -- (the ClassicBars way to "render when falsy"); the head becomes the condition.
       Block sp Inverse name args body ->
         Block sp Section "unless" [ rewriteHead lv scope name args ] (go scope (expandElseIf body))
       -- `{{#let a=1 b=(add a 1)}}…{{/let}}` (MaxBars only — ADR-024): block-scoped
@@ -212,7 +212,7 @@ desugarWith lv clauseNames = go []
       -- the element, `i0` the 0-based index (or object key), `i1` the 1-based index
       -- (the same up-to-three bindings `eachH` installs). `{{#each coll}}` (no `in`)
       -- is the basic, binding-less form. The Handlebars trailing-`as` form is *not*
-      -- accepted on `each` here (`with`/helpers keep `as`). FullBars keeps `as |x|`
+      -- accepted on `each` here (`with`/helpers keep `as`). ClassicBars keeps `as |x|`
       -- — this case is `dropPipes`-gated.
       Block sp Section "each" args body | dropPipes ->
         let
@@ -241,7 +241,7 @@ desugarWith lv clauseNames = go []
           Block sp Section name (blockHeadArgs lv scope mainArgs params label)
             (go bodyScope (expandElseIf body))
       -- the Mustache-inheritance shapes `{{<name}}` (Parent) / `{{$name}}`
-      -- (BlockDef) are gated off for FullBars (`inheritance = false`), so the
+      -- (BlockDef) are gated off for ClassicBars (`inheritance = false`), so the
       -- parser never produces them here; handle them totally — like a plain
       -- section over the head — so this stays exhaustive without crashing.
       Block sp sig name args body ->
@@ -257,7 +257,7 @@ desugarWith lv clauseNames = go []
 -- | (§5.5), returning the arguments before `as` and the binding names. Two
 -- | spellings, selected by `dropPipes` (the dialect):
 -- |
--- |  * FullBars (`dropPipes = false`) — Handlebars bars `as |a b|`: the clause is
+-- |  * ClassicBars (`dropPipes = false`) — Handlebars bars `as |a b|`: the clause is
 -- |    recognised by its opening `|` and the bars are stripped from the names.
 -- |  * MaxBars (`dropPipes = true`) — drop the pipes `as a b`: every bare
 -- |    identifier after `as` is a binding name (a bar there is a parse error,
@@ -276,7 +276,7 @@ extractBlockParams dropPipes args = case Array.findIndex isAs args of
     App "as" [] -> true
     _ -> false
   -- the Handlebars pipe form opens with a `|` bar (glued to the first name or its
-  -- own token), so `as |a b|` is a block-param clause and `as x` (FullBars) is not.
+  -- own token), so `as |a b|` is a block-param clause and `as x` (ClassicBars) is not.
   looksLikeParams a = case Array.head a of
     Just (App n []) -> stripPrefix (Pattern "|") n /= Nothing
     _ -> false
@@ -506,7 +506,7 @@ pathExpr lv scope raw
                 -- internal `@parentchain` object the frame installs — a materialized
                 -- chain of enclosing contexts, so `parent.parent.x` is an ordinary
                 -- nested lookup (`@parentchain.parent.x`), not a special climb. Using a
-                -- distinct binding keeps FullBars' `@../`-facing `parent` helper intact.
+                -- distinct binding keeps ClassicBars' `@../`-facing `parent` helper intact.
                 | reserved && depth == 0 && first == "loop" -> scopedHead "loop" tail
                 | reserved && depth == 0 && first == "root" -> scopedHead "root" tail
                 | reserved && depth == 0 && first == "parent" -> scopedHead "@parentchain" tail
@@ -569,7 +569,7 @@ dataExpr raw =
     other -> other
 
 -- | Expand `{{else if C}}` chains into nested `{{#if C}}…{{/if}}` in the else
--- | clause (surface.adoc §5.6) — the FullBars convention (clause `else`, helper
+-- | clause (surface.adoc §5.6) — the ClassicBars convention (clause `else`, helper
 -- | `if`). The condition is one argument; parenthesize a helper call
 -- | (`{{else if (eq a b)}}`). A trailing `key=value` hash is carried through, so
 -- | `{{else if n includeZero=true}}` behaves exactly like `{{elif n includeZero=true}}`.
@@ -587,21 +587,21 @@ expandElseIf = map toElif
       , not (Array.null tail) -> Sep sp "elif" tail
     other -> other
 
--- | The first FullBars-disallowed surface construct in `nodes` — its source
+-- | The first ClassicBars-disallowed surface construct in `nodes` — its source
 -- | offset and a human "shape" string for the located `DisallowedShape` error —
 -- | searched depth-first through block bodies (`Nothing` when there is none).
--- | FullBars stays Handlebars-faithful, so two MaxBars/decorator shapes are
--- | rejected on its *strict* surface (`FullBars.checkSurfaceStrict`):
+-- | ClassicBars stays Handlebars-faithful, so two MaxBars/decorator shapes are
+-- | rejected on its *strict* surface (`ClassicBars.checkSurfaceStrict`):
 -- |
 -- |  * a *bare* `{{#inline …}}` — an inline partial must be the decorator
 -- |    `{{#*inline "name"}}` (ADR-0009 amendment / surface.adoc §5.7). The
 -- |    decorator lexes as the distinct `Decorator` sigil, so a `Section "inline"`
 -- |    block is unambiguously the bare misuse.
 -- |  * a `{{#let …}}` — block-scoped `let` is MaxBars-only (ADR-024); silently
--- |    no-opping it in FullBars is the footgun this turns into a clear error.
+-- |    no-opping it in ClassicBars is the footgun this turns into a clear error.
 -- |
 -- | MaxBars does not run this gate (it accepts both), so the dict/list literals it
--- | also adds never reach here — a `{`/`[` literal is a lex error in FullBars long
+-- | also adds never reach here — a `{`/`[` literal is a lex error in ClassicBars long
 -- | before the desugar.
 strictSurfaceViolation :: Template -> Maybe { off :: Int, shape :: String }
 strictSurfaceViolation nodes = Array.head (Array.mapMaybe node nodes)
@@ -614,15 +614,15 @@ strictSurfaceViolation nodes = Array.head (Array.mapMaybe node nodes)
     _ -> Nothing
   inlineShape = "{{#inline}} (an inline partial uses the {{#*inline \"name\"}} decorator)"
   letShape =
-    "{{#let}} (block-scoped `let` is a MaxBars-only construct; FullBars has no `let` — alias with {{#with x as |n|}}, or build a constant with (dict …))"
+    "{{#let}} (block-scoped `let` is a MaxBars-only construct; ClassicBars has no `let` — alias with {{#with x as |n|}}, or build a constant with (dict …))"
   caseShape =
-    "{{#case}} (multi-arm `case` is a RawBars/MaxBars construct; FullBars has no `case` — chain {{#if (eq subject \"v\")}}…{{else if (eq subject \"w\")}}…{{else}}…{{/if}})"
+    "{{#case}} (multi-arm `case` is a RawBars/MaxBars construct; ClassicBars has no `case` — chain {{#if (eq subject \"v\")}}…{{else if (eq subject \"w\")}}…{{else}}…{{/if}})"
 
 -- | The first MaxBars `{{#each … as …}}` in `nodes` — the *removed* trailing-`as`
 -- | loop-binding form — its offset and a "shape" string for the located
 -- | `DisallowedShape` error. MaxBars `each` binds Liquid-style (`{{#each x in xs}}`),
 -- | so a bare `as` in an `each` head is the legacy form and is rejected rather than
--- | silently no-opping (`FullBars.checkSurfaceStrict` on the MaxBars path). Only
+-- | silently no-opping (`ClassicBars.checkSurfaceStrict` on the MaxBars path). Only
 -- | `each` is matched — `{{#with x as p}}` and custom block helpers keep `as`.
 maxbarsEachAsViolation :: Template -> Maybe { off :: Int, shape :: String }
 maxbarsEachAsViolation nodes = Array.head (Array.mapMaybe node nodes)

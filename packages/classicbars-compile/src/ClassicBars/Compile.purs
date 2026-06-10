@@ -1,11 +1,11 @@
--- | The **FullBars surface** compile path: desugar surface syntax to the core
+-- | The **ClassicBars surface** compile path: desugar surface syntax to the core
 -- | skeleton, hoist `{{#inline}}` into the partial registry, then run the shared
 -- | emit rules (`FlatBars.Compile.Emit`) through the driver. This module is the
--- | only compile piece that depends on the FullBars dialect (for the desugar);
+-- | only compile piece that depends on the ClassicBars dialect (for the desugar);
 -- | the emit rules themselves are dialect-free, so RawBars compiles without it.
--- | It lives in its own package (`fullbars-compile`) so the dialect-free
--- | `flatbars-compile` (driver + emit) carries no FullBars dependency.
-module FullBars.Compile
+-- | It lives in its own package (`classicbars-compile`) so the dialect-free
+-- | `flatbars-compile` (driver + emit) carries no ClassicBars dependency.
+module ClassicBars.Compile
   ( compileSurface
   , compileSurfaceWith
   , compileSurfaceWithPartials
@@ -13,6 +13,7 @@ module FullBars.Compile
 
 import Prelude
 
+import ClassicBars (LoopVars, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars)
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
@@ -20,13 +21,12 @@ import Data.Map as Map
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import FlatBars.Compile (compile)
-import FlatBars.Compile.Emit (fullbarsEmit, metaFor)
+import FlatBars.Compile.Emit (classicbarsEmit, metaFor)
 import FlatBars.Error (ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Syntax (Template)
-import FullBars (LoopVars, checkSurfaceStrict, desugarSurfaceWith, hoistInline, noLoopVars)
 
--- | Compile *surface* FullBars source: desugar (paths, `{{ }}` auto-escape,
+-- | Compile *surface* ClassicBars source: desugar (paths, `{{ }}` auto-escape,
 -- | `@data`, hash args, block params, `else if`) to the core skeleton, hoist
 -- | `{{#inline}}` definitions into the partial registry (as `renderSurfaceWith`
 -- | does), then emit. The emit rules are dialect-pure — they only ever see core.
@@ -35,8 +35,8 @@ compileSurface = compileSurfaceWith true noLoopVars defaultParseOptions "rt.trut
 
 -- | `compileSurface` with explicit parse options, a dialect `LoopVars` resolver,
 -- | and the runtime truthiness *callback* to seed (`"rt.truthyHandlebars"` for
--- | FullBars, `"rt.truthyNonEmpty"` for MaxBars). The leading `strict` flag gates
--- | the bare-`{{#inline}}` rejection (FullBars requires the `{{#*inline}}`
+-- | ClassicBars, `"rt.truthyNonEmpty"` for MaxBars). The leading `strict` flag gates
+-- | the bare-`{{#inline}}` rejection (ClassicBars requires the `{{#*inline}}`
 -- | decorator; MaxBars passes `false`).
 compileSurfaceWith
   :: Boolean -> LoopVars -> ParseOptions -> String -> String -> Either ParseError String
@@ -68,11 +68,11 @@ compileSurfaceWithPartials strict lv opts truthyCallback partialSrcs src = do
     externalT = Map.fromFoldable externals
     -- inline definitions win over same-named externals (left-biased), as render does.
     registry = Map.union h.partials externalT
-  -- ADR-005 amendment: FullBars (Handlebars `{{#> }}`, `opts.partialBlocks`)
+  -- ADR-005 amendment: ClassicBars (Handlebars `{{#> }}`, `opts.partialBlocks`)
   -- exposes a block partial's body as `partial-block`; MaxBars (same emit) uses `yield`.
   pure
     ( compile (metaFor truthyCallback (if opts.partialBlocks then "partial-block" else "yield"))
-        fullbarsEmit
+        classicbarsEmit
         (Map.toUnfoldable registry)
         h.template
     )

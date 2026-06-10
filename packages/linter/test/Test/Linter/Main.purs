@@ -17,6 +17,7 @@ module Test.Linter.Main where
 
 import Prelude
 
+import ClassicBars (desugarSurfaceWith, renderSurface)
 import Data.Either (Either(..))
 import Data.Map as Map
 import Data.String (Pattern(..), contains)
@@ -26,7 +27,6 @@ import Effect.Console (log)
 import FlatBars.Parser (parse, parseWith)
 import FlatBars.Span (Span)
 import FlatBars.Value (Value(..))
-import FullBars (desugarSurfaceWith, renderSurface)
 import Kernel.Lower (RNode(..), lower)
 import Linter.Lower (lowerToRawBars)
 import Linter.Migrate (migrateToMaxBars)

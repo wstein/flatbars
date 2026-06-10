@@ -66,7 +66,7 @@ spends the adoption capital ADR-018 was paid to build.
    operations (ignore the control handle) from *block* operations (use it). *Values* are not a third kind:
    a value is a *nullary inline operation* — there being no variables, that is the only way a value appears.
 
-1. *Rename the internal type `Helper` → `Operation`.* The kernel/fullbars/compile `Helper` type, the
+1. *Rename the internal type `Helper` → `Operation`.* The kernel/classicbars/compile `Helper` type, the
    prelude table, and the schema's kind language (`inline` / `block`, arity) read as operations and
    definitions. The JS-facing `registerHelper` and the rest of the `flatbars-js` facade are the *explicit
    exception* — they stay, by Decision 1.
@@ -91,12 +91,12 @@ spends the adoption capital ADR-018 was paid to build.
 * *A deliberate, documented asymmetry* — in three layers, not two (sharpened by the 2026-06-08
   amendment below). The internal type is `Operation`. The *runtime* registrar is the neutral
   `register` (`rt.register` — dialect-agnostic, it serves every compiled dialect). The *source-level*
-  registrars are **dialect-scoped twins of `register`**: `registerHelper` (FullBars / the ADR-018
+  registrars are **dialect-scoped twins of `register`**: `registerHelper` (ClassicBars / the ADR-018
   Handlebars-migration anchor) and `registerOperation` (the native RawBars / MaxBars word). This is the
   cost of keeping ADR-018's migration value while telling the native model's truth, and it is ratified
   here so a contributor meeting `registerHelper : … -> Operation` reads it as intent, not drift. The
   earlier framing "the one frozen boundary word is *helper*" was imprecise: *helper* is frozen as
-  *FullBars'* boundary word, never as the *only* one.
+  *ClassicBars'* boundary word, never as the *only* one.
 * *A new normative glossary* ([concepts](/concepts/) or a `glossary.adoc`) becomes the single
   teachable artifact for the two registers — and it is *gated*, not prose-on-trust: a `check:` (mirroring
   `check:catalog`) asserts that every native term carries its host-API synonym and that the
@@ -109,7 +109,7 @@ spends the adoption capital ADR-018 was paid to build.
   declared arities and [ADR-017](/adr/adr-0017-editor-support-lsp/)'s catalog-driven completion both
   *reference* this taxonomy rather than coining their own labels. (Note: the kind is *inline*, not
   "transform" — "transform" is the Lab's JSONata data-preprocess and must not be overloaded as a kind.)
-* *The `Helper` → `Operation` rename is wide and mechanical* across kernel / fullbars / compile and the
+* *The `Helper` → `Operation` rename is wide and mechanical* across kernel / classicbars / compile and the
   schema language, and lands in *one* commit gated by a hard checklist, all green:
 --
   . `npm run build` — every package compiles under the new type name;
@@ -153,7 +153,7 @@ type, the prelude/schema kind language, and `concepts`/dialect prose.
 *Status:* Accepted (team-reviewed). Reopens the *"open custom block operations"* alternative this ADR
 deferred — now unblocked, because [ADR-020](/adr/adr-0020-user-block-helpers/) built the block-operation
 machinery (the `Engine.blockArgs` seam, `Ctl.hash`/`blockParams`, the `rt.block` channel, and a JS
-marshaller) and proved it byte-identical across interpreter and compiler. Only one dialect (FullBars) wired
+marshaller) and proved it byte-identical across interpreter and compiler. Only one dialect (ClassicBars) wired
 a host registrar to it. This addendum extends host registration to *RawBars* and *MaxBars*, and settles
 what they expose and what they call it.
 
@@ -164,15 +164,15 @@ operations through each dialect's compile + render path so the new cases gate *b
 
 ### The vocabulary fork (resolved)
 
-ADR-018 shipped `renderWith` / `registerHelper` for FullBars; Decision 1 above froze *helper* as that
+ADR-018 shipped `renderWith` / `registerHelper` for ClassicBars; Decision 1 above froze *helper* as that
 facade's boundary word — the *Handlebars-migration anchor*. The fork: when RawBars and MaxBars gain a
 registrar, is the boundary word still *helper*, or *operation*?
 
-*Decision: the boundary word is dialect-scoped, not global.* FullBars keeps `renderWith` / `registerHelper`
+*Decision: the boundary word is dialect-scoped, not global.* ClassicBars keeps `renderWith` / `registerHelper`
 — it is the Handlebars-faithful surface, and "helper" is the migrator's term it was paid to keep. RawBars
 and MaxBars are *native* dialects with no Handlebars-migration debt — RawBars is the very dialect that
 *rejects* the helper framing (concepts §1) — so their registrars use the native noun: a host registers an
-*operation*. The frozen "helper" of Decision 1 is thereby scoped to *FullBars' facade* (the anchor it was
+*operation*. The frozen "helper" of Decision 1 is thereby scoped to *ClassicBars' facade* (the anchor it was
 created for), not imposed on dialects that never had it. This keeps each facade honest to its own dialect's
 register and is exactly the two-register model applied at the boundary, not just in the docs.
 
@@ -184,7 +184,7 @@ register and is exactly the two-register model applied at the boundary, not just
   RawBars block operation therefore gets `options.fn`/`options.inverse` (and `options.fn(ctx, { data })`
   for scoped vars) but *no* `options.hash` and no `as` block-param clause (there is no surface to write
   them). Resolution stays *strict* — an unknown operation is `UnknownHelper`, never `blockHelperMissing`
-  (RawBars has no implicit-section policy; ADR-020's lenient resolve is FullBars/MaxBars only).
+  (RawBars has no implicit-section policy; ADR-020's lenient resolve is ClassicBars/MaxBars only).
 * *MaxBars* — `renderWithOperations(...)` over the MaxBars surface (infix/pipes/loop vars). It desugars the
   same `@hash`/`@param` markers, so a MaxBars block operation gets the *full* surface: `fn`/`inverse`/`hash`
   + `options.fn(ctx, { data, blockParams })`, and the lenient `blockHelperMissing` resolve it inherits.
@@ -200,7 +200,7 @@ The kernel already supports all of this; the work is two thin facades plus marsh
 machinery:
 
 * The JS marshaller that turns a host function into an `Operation` (inline *or* block, usage-decided, with
-  `options.hash`/`fn`/`inverse` + the `{ data, blockParams }` frame) is *dialect-agnostic* — `FullBars.JS`'s
+  `options.hash`/`fn`/`inverse` + the `{ data, blockParams }` frame) is *dialect-agnostic* — `ClassicBars.JS`'s
   `mk` is lifted to a shared helper and reused by all three registrars.
 * RawBars renders through the *strict* `runResolved` (registering the operations into the env via
   `registerAll`); MaxBars through the *lenient* `runResolvedLenient` with `maxOptions` + `maxLoopVars`, the
@@ -216,12 +216,12 @@ machinery:
 ### Gating
 
 * `test:compile` gains RawBars and MaxBars block-operation cases (interpreter ≡ compiled), mirroring the
-  FullBars `block:*` cases — RawBars covering `fn`/`inverse`/`data`, MaxBars also `hash` and block params
+  ClassicBars `block:*` cases — RawBars covering `fn`/`inverse`/`data`, MaxBars also `hash` and block params
   (`op:max-params`, plus `op:max-paren-pipe-params` pinning the parenthesise-to-pipe rule).
 * `check:glossary` extends to record the second boundary spelling: *operation* is the RawBars/MaxBars host
-  registrar's word, *helper* the FullBars one — both naming the same `Operation`. The gate keeps the
+  registrar's word, *helper* the ClassicBars one — both naming the same `Operation`. The gate keeps the
   glossary and the facade in step (a registrar named against the wrong register fails the build).
-* Docs: the RawBars and MaxBars dialect pages document `renderWithOperations`; the FullBars ADR-020 line
+* Docs: the RawBars and MaxBars dialect pages document `renderWithOperations`; the ClassicBars ADR-020 line
   that read "RawBars/MaxBars use the operation vocabulary, not `registerHelper`" is now precise — they use
   `registerOperation`, the native-boundary twin.
 
@@ -249,14 +249,14 @@ in. So:
 * `buildHelpers` now injects **both** `registerHelper` and `registerOperation`, both aliasing the *same*
   internal `register` into the same operation bag. A card teaches its dialect's word; every card stays
   runnable; a single source may mix the two freely.
-* Native-dialect teaching cards (MaxBars, RawBars) use `registerOperation`; FullBars cards and the
+* Native-dialect teaching cards (MaxBars, RawBars) use `registerOperation`; ClassicBars cards and the
   Handlebars-migration material keep `registerHelper`.
 * The runtime registrar's error text dropped its lone "helper" mention — `rt.register` is dialect-agnostic
   (it serves every compiled dialect), so it names no surface register.
 
 This makes the asymmetry honest at all three layers (see the sharpened *Consequences* bullet): internal
 type `Operation`; one neutral runtime `register`; two dialect-scoped source-level twins. The frozen word
-is *helper-as-FullBars'-anchor*, not *helper-as-the-only-word*.
+is *helper-as-ClassicBars'-anchor*, not *helper-as-the-only-word*.
 
 *Gating.* `check:glossary` now asserts `buildHelpers` injects **both** names (neither alias can be silently
 dropped); a `test:lab` unit test pins that the two fill a byte-identical bag and that a source may mix

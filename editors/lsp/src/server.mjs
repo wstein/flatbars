@@ -37,7 +37,7 @@ import {
 export function startServer(connection) {
   const documents = new TextDocuments(TextDocument);
   const legend = buildLegend();
-  let defaultDialect = "fullbars";
+  let defaultDialect = "classicbars";
 
   connection.onInitialize((params) => {
     const opt = params.initializationOptions;

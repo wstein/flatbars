@@ -51,9 +51,9 @@ not scope-declared. So a label must be a **scope-declared binding**, exactly lik
    loop-variable name (`label index0` must not silently re-open the §4 footgun). The risk is lower than
    for bare loop variables, since a label is an explicit author-chosen name rather than an implicit
    vocabulary word.
-1. *Available in both surface dialects (FullBars + MaxBars)* — *revised at implementation* from the
+1. *Available in both surface dialects (ClassicBars + MaxBars)* — *revised at implementation* from the
    proposed "MaxBars-only". The `label NAME` recognizer lives in the *shared* surface desugar and is gated
-   on the `each` head, not the dialect, so FullBars accepts it too. This is safe because — unlike the bare
+   on the `each` head, not the dialect, so ClassicBars accepts it too. This is safe because — unlike the bare
    loop variables, which change bare-name *resolution* and so are MaxBars-only — a label is purely
    additive new syntax with no Handlebars equivalent: a template that does not write `label NAME` is
    unaffected, so there is no semantic divergence to contain. Gating it MaxBars-only would have meant
@@ -87,7 +87,7 @@ not scope-declared. So a label must be a **scope-declared binding**, exactly lik
 
 Shipped across the five expected phases:
 
-1. *Desugar* — `FullBars.Surface.extractLabel` strips a trailing `label NAME` off an `each` head, adds
+1. *Desugar* — `ClassicBars.Surface.extractLabel` strips a trailing `label NAME` off an `each` head, adds
    `NAME` to `scope`, and `blockHeadArgs` emits a reserved `@label` marker. `core` `splitBlockArgs` lifts
    it into a new `label` field (dropped from the positional list) and the engine seam carries it as
    `Ctl.loopLabel`.

@@ -1,5 +1,5 @@
 -- | MaxBars dialect tests (`spago test -p maxbars`): the infix-operator + pipe
--- | surface desugaring to FullBars/core, rendered through the reused engine, and
+-- | surface desugaring to ClassicBars/core, rendered through the reused engine, and
 -- | a compile-shape check.
 -- |
 -- | Infix works in output expressions (`{{ a && b }}` / `{{{ … }}}`), pipes, and
@@ -251,7 +251,7 @@ main = do
     (obj [ Tuple "xs" (VArray [ VString "a", VString "b" ]) ])
     "ab"
 
-  -- a plain path still works (FullBars surface reused unchanged).
+  -- a plain path still works (ClassicBars surface reused unchanged).
   expectM "path" "{{ user.name }}" (obj [ Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
     "Ada"
 
@@ -353,7 +353,7 @@ main = do
     (obj [ Tuple "yield" (VString "5%") ])
     "5%"
 
-  -- compilation reuses the FullBars compiler: && desugars to the `and` helper.
+  -- compilation reuses the ClassicBars compiler: && desugars to the `and` helper.
   case compileMaxJs "{{ a && b }}" of
     Left e -> assert' ("compile: unexpected error " <> show e) false
     Right js -> assert' ("compile: expected rt.call(\"and\" in\n" <> js)

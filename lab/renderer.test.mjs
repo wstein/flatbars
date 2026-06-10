@@ -2,7 +2,7 @@
 //
 // Renderer tests — verify the unified `createRenderer(dialect)` seam (the single
 // FlatBars-family adapter) without booting the browser app. Covers the FlatBars
-// dialects (RawBars / FullBars / MaxBars) and MinBars (Mustache), plus the
+// dialects (RawBars / ClassicBars / MaxBars) and MinBars (Mustache), plus the
 // capability vector each advertises. Run with: node --test renderer.test.mjs
 // Requires vendor/flatbars-engine.mjs (the bundled flatbars-js facade).
 
@@ -21,7 +21,7 @@ const FLATBARS_SEAM = [
 const run = (r, src, data, opts) => r.render(r.compile(src, {}, opts).program, data);
 
 test("createRenderer dispatches the FlatBars dialects and exposes the full seam", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   for (const k of FLATBARS_SEAM) assert.ok(k in r, `missing seam member: ${k}`);
 });
 
@@ -34,7 +34,7 @@ test("renders the surface dialect (paths + auto-escape) by default", async () =>
 });
 
 test("renders user-defined helpers via opts.helpers (ADR-018)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const helpers = { loud: (s) => String(s).toUpperCase() };
   // escaped in {{ }}, and threaded alongside any partials
   assert.equal(run(r, "{{loud x}}", { x: "<b>ada" }, { helpers }), "&lt;B&gt;ADA");
@@ -46,7 +46,7 @@ test("opts.helpers register for the maxbars and core dialects too (operation reg
   // per-dialect registrar, not the helper-less render. Regression: the Lab once
   // rendered maxbars before checking opts.helpers, so {{{{#rawloud}}}} threw
   // UnknownHelper in the playground despite the example registering it.
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const helpers = { rawloud: (options) => options.fn().toUpperCase() };
   const tpl = "{{{{#rawloud}}}}\n  {{bar}}\n{{{{/rawloud}}}}";
   assert.equal(run(r, tpl, null, { dialect: "maxbars", helpers }), "\n  {{BAR}}\n");
@@ -119,7 +119,7 @@ test("a parse error is thrown as a located render error", async () => {
 });
 
 test("engineInfo advertises an honest capability vector", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const info = r.engineInfo();
   assert.match(info.version, /\d+\.\d+/);
   assert.ok(Array.isArray(info.features));
@@ -137,7 +137,7 @@ test("engineInfo advertises an honest capability vector", async () => {
 });
 
 test("compileToJs emits a JS module (the compile-js feature)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.equal(typeof r.compileToJs, "function");
   assert.ok(r.engineInfo().features.includes("compile-js"));
   const c = r.compileToJs("Hello {{ name }}!");
@@ -147,7 +147,7 @@ test("compileToJs emits a JS module (the compile-js feature)", async () => {
 });
 
 test("lint flags a deprecated alias and is surface-scoped (the lint feature)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.equal(typeof r.lint, "function");
   assert.ok(r.engineInfo().features.includes("lint"));
   // a deprecated alias (`plus` for `add`) — flagged in every dialect.
@@ -160,16 +160,16 @@ test("lint flags a deprecated alias and is surface-scoped (the lint feature)", a
   assert.equal(aliased.findings[0].line, 1);
   assert.equal(aliased.findings[0].column, 4);
   // a non-canonical scoped variable (`index` for `index0`) — flagged in maxbars
-  // (native), but NOT in the FullBars surface where {{@index}} is canonical.
+  // (native), but NOT in the ClassicBars surface where {{@index}} is canonical.
   const scoped = "{{#each xs}}{{ index }}{{/each}}";
   assert.ok(r.lint(scoped, "maxbars").findings.length >= 1, "maxbars flags `index`");
-  assert.equal(r.lint(scoped, "fullbars").findings.length, 0, "fullbars does not");
+  assert.equal(r.lint(scoped, "classicbars").findings.length, 0, "classicbars does not");
   // a clean template reports zero findings.
-  assert.equal(r.lint("{{ name }}", "fullbars").findings.length, 0);
+  assert.equal(r.lint("{{ name }}", "classicbars").findings.length, 0);
 });
 
 test("migrate rewrites Handlebars to MaxBars with a residual report (the migrate feature)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.equal(typeof r.migrate, "function");
   assert.ok(r.engineInfo().features.includes("migrate"));
   // an inverted section migrates to {{#unless}}.
@@ -180,7 +180,7 @@ test("migrate rewrites Handlebars to MaxBars with a residual report (the migrate
 });
 
 test("analyze reports a truthiness portability finding (the analyse feature)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.equal(typeof r.analyze, "function");
   assert.ok(r.engineInfo().features.includes("analyse"));
   // an empty string in a condition diverges (falsy in handlebars/mustache.js,
@@ -232,7 +232,7 @@ test("analyze reports a truthiness portability finding (the analyse feature)", a
 });
 
 test("the catalog entries have the cheat-sheet shape", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   for (const e of r.catalog()) {
     for (const f of ["name", "category", "arity", "summary", "example"]) {
       assert.ok(f in e, `catalog entry missing ${f}`);
@@ -241,7 +241,7 @@ test("the catalog entries have the cheat-sheet shape", async () => {
 });
 
 test("parseAst returns the {t:…} node shape", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const { ast } = r.parseAst("<h1>{{ name }}</h1>{{#each items}}{{ this }}{{/each}}");
   assert.equal(ast.version, "flatbars-ast/v1");
   const kinds = ast.nodes.map((n) => n.t);
@@ -255,7 +255,7 @@ test("parseAst nodes carry their source span (Data Access jump-to-source)", asyn
   // Regression: the lowered-AST JSON used to omit `src`, so the Data Access
   // panel fell back to line 1, column 1 for every lookup. Each tag-derived
   // node must now report the code-unit range of its opening tag.
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const src = "<h1>{{ name }}</h1>{{#each items}}{{ this }}{{/each}}";
   const { ast } = r.parseAst(src);
   const emit = ast.nodes[1];
@@ -274,7 +274,7 @@ test("parseAst nodes carry their source span (Data Access jump-to-source)", asyn
 });
 
 test("parseAst is forgiving: a parse error yields a recovered tree + located errors", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const res = r.parseAst("{{#each xs}}…"); // unclosed block
   // ADR-023: the AST view never blanks — it returns the best-effort tree…
   assert.ok(res.ast && Array.isArray(res.ast.nodes), "expected a recovered AST tree");
@@ -285,7 +285,7 @@ test("parseAst is forgiving: a parse error yields a recovered tree + located err
 });
 
 test("requiredAssigns is exact (path roots only, no helpers/params)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const prog = r.compile(
     '{{ title }}{{#each rows as |row|}}{{ row.id }} {{ city.name }}{{/each}}{{#if (eq a b)}}{{ a }}{{/if}}',
     {},
@@ -296,7 +296,7 @@ test("requiredAssigns is exact (path roots only, no helpers/params)", async () =
 });
 
 test("usedTransformers collects block + call helpers (the used-transformers feature)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.ok(r.engineInfo().features.includes("used-transformers"));
   const prog = r.compile("{{#each xs}}{{#if (eq a b)}}{{ x }}{{/if}}{{/each}}", {}).program;
   const used = r.usedTransformers(prog);
@@ -304,7 +304,7 @@ test("usedTransformers collects block + call helpers (the used-transformers feat
 });
 
 test("parseAst surfaces partial uses and inline defs as semantic nodes", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const { ast } = r.parseAst('{{#*inline "row"}}<li>{{ this }}</li>{{/inline}}{{> row}}{{> missing}}');
   const top = ast.nodes;
   const inline = top.find((n) => n.t === "inline");
@@ -314,20 +314,20 @@ test("parseAst surfaces partial uses and inline defs as semantic nodes", async (
 });
 
 test("named partial documents render (multi-document)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   // the host passes partial documents to compile; render registers them.
   const prog = r.compile("<nav>{{> nav}}</nav>{{ title }}", { nav: "[home]" }).program;
   assert.equal(r.render(prog, { title: "T" }), "<nav>[home]</nav>T");
 });
 
 test("inline-defined partials actually render", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const out = run(r, '{{#*inline "row"}}[{{ this }}]{{/inline}}{{#each xs}}{{> row}}{{/each}}', { xs: ["a", "b"] });
   assert.equal(out, "[a][b]");
 });
 
 test("partialGraph builds a real dependency graph natively (the partial-graph feature)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.ok(r.engineInfo().features.includes("partial-graph"));
   // main → header, main → body, body → header — drawn from the lowered AST's
   // `{t:"partial"}` nodes across every document.
@@ -356,7 +356,7 @@ const tilesExactly = (output, segments) => {
 };
 
 test("source map: a mapped surface render returns segments that tile the output (the source-map feature)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.ok(r.engineInfo().features.includes("source-map"));
   const prog = r.compile("<b>{{ name }}</b>{{#each xs}}[{{ this }}]{{/each}}").program;
   const { output, segments } = r.render(prog, { name: "Ada", xs: ["a", "b"] }, { map: true });
@@ -376,7 +376,7 @@ test("source map: a mapped surface render returns segments that tile the output 
 });
 
 test("source map: partials tile, and partial-origin emits link to their own document", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const prog = r.compile("{{#each xs}}{{> row}}{{/each}}", { row: "<li>{{ this }}</li>" }).program;
   const { output, segments } = r.render(prog, { xs: ["x", "y"] }, { map: true });
   assert.equal(output, "<li>x</li><li>y</li>");
@@ -456,7 +456,7 @@ const firstEmitTarget = (r, prog, data) => {
 };
 
 test("context inspector: per-execution snapshots of the render context (context-inspect)", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   assert.ok(r.engineInfo().features.includes("context-inspect"));
   const prog = r.compile("{{#each xs}}<b>{{ this }}</b>{{/each}}").program;
   const data = { xs: ["a", "b"], top: "T" };
@@ -470,7 +470,7 @@ test("context inspector: per-execution snapshots of the render context (context-
 });
 
 test("context inspector: block params surface as locals", async () => {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const prog = r.compile("{{#each xs as |item|}}[{{ item }}]{{/each}}").program;
   const snaps = r.inspectAt(prog, { xs: ["x"] }, firstEmitTarget(r, prog, { xs: ["x"] }));
   assert.deepEqual(snaps[0].locals, { item: "x" });

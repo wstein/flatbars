@@ -1,4 +1,4 @@
-{/* Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit. */}
+{/* Generated from ClassicBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit. */}
 {/* Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`. */}
 
 | Operation | Form | Arity | Source | Description |
@@ -65,7 +65,7 @@
 | `or` | value | any | registered | True when any argument is truthy. |
 | `parent` | value | 0–1 | scoped | The enclosing block's context (chainable). |
 | `partial` | value | 1–3 | registered | Renders a registered partial; the context defaults to the current one, options are an optional hash, and a block body is the fallback. |
-| `partial-block` | value | 0 | scoped | Inside a block partial, the caller's block body — FullBars' &#123;&#123;> @partial-block&#125;&#125; target (RawBars/MaxBars use yield). |
+| `partial-block` | value | 0 | scoped | Inside a block partial, the caller's block body — ClassicBars' &#123;&#123;> @partial-block&#125;&#125; target (RawBars/MaxBars use yield). |
 | `pluck` | value | 2 | registered | Extracts a key's value from each object in an array. |
 | `plus` | value | 2 | alias of `add` | Adds two numbers. |
 | `prepend` | value | 2 | registered | Prepends the second string to the first. |
@@ -109,4 +109,4 @@
 | `when` | value | any | registered | A case arm the enclosing case matches against its subject; renders nothing on its own. |
 | `where` | value | 2–4 | registered | Keeps array items whose key is truthy, equals, or compares to a value. |
 | `with` | block | ≥1 | registered | Shifts the context to its argument for the body (else the &#123;&#123;else&#125;&#125; clause). |
-| `yield` | value | 0 | scoped | Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block). |
+| `yield` | value | 0 | scoped | Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (ClassicBars uses partial-block). |

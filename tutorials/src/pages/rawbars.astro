@@ -40,7 +40,7 @@ const groups = [
     label: "Other surfaces",
     items: [
       { href: "/minbars", label: "MinBars — Mustache" },
-      { href: "/fullbars", label: "FullBars — Handlebars" },
+      { href: "/classicbars", label: "ClassicBars — Handlebars" },
       { href: "/maxbars", label: "MaxBars — operators" },
     ],
   },
@@ -85,9 +85,9 @@ const t = (s) => s;
     <p>
       That makes RawBars <b>verbose on purpose</b>. The verbosity is the feature:
       nothing is hidden, so it's the honest substrate to target when you build a
-      friendlier surface. The dialect ladder runs <b>RawBars → FullBars → MaxBars</b>,
+      friendlier surface. The dialect ladder runs <b>RawBars → ClassicBars → MaxBars</b>,
       each adding surface sugar over the same core; end users reach for
-      <a href="/fullbars">FullBars</a> or the flagship <a href="/maxbars">MaxBars</a>,
+      <a href="/classicbars">ClassicBars</a> or the flagship <a href="/maxbars">MaxBars</a>,
       which buy back the brevity. They all share
       one engine, prelude, and compiler — they differ only in surface syntax.
     </p>
@@ -99,7 +99,7 @@ const t = (s) => s;
         <dd>the <b>meaning-free parser</b> (the <code>flatbars</code> package). It gives a tag
           <em>structure</em>, never meaning. RawBars is the core's bare surface.</dd>
         <dt>Surface</dt>
-        <dd>the <b>syntax you write</b>. FlatBars has four: RawBars ⊂ FullBars ⊂ MaxBars form the
+        <dd>the <b>syntax you write</b>. FlatBars has four: RawBars ⊂ ClassicBars ⊂ MaxBars form the
           <em>dialect ladder</em> (each adds sugar over the same core); MinBars is a
           Mustache-compatible peer.</dd>
         <dt>Engine</dt>
@@ -109,7 +109,7 @@ const t = (s) => s;
         <dd>the named thing a tag <b>applies</b>; there are no variables, so even
           <code>{t("{{{city}}}")}</code> applies the operation <code>city</code>. RawBars is the
           native surface that <em>rejects</em> the "helper" framing, so a host registers one with
-          <code>registerOperation</code> (<code>registerHelper</code> stays the FullBars/Handlebars
+          <code>registerOperation</code> (<code>registerHelper</code> stays the ClassicBars/Handlebars
           alias).</dd>
       </dl>
     </aside>
@@ -129,16 +129,16 @@ const t = (s) => s;
     <h2>Output &amp; escaping — sugar → core</h2>
     <p>
       RawBars has one inline output form, the triple-stash <code>{t("{{{ … }}}")}</code>,
-      and it is <b>never auto-escaped</b>. Here is what FullBars's friendly
+      and it is <b>never auto-escaped</b>. Here is what ClassicBars's friendly
       <code>{t("{{name}}")}</code> actually <em>is</em> — the same render, written
       out explicitly:
     </p>
-    <p class="diptych-cap"><b>FullBars</b> (sugar):</p>
+    <p class="diptych-cap"><b>ClassicBars</b> (sugar):</p>
     <OpenInLab client:visible engine={ex.sugar.engine} template={ex.sugar.template} data={ex.sugar.data} />
     <p class="diptych-cap"><b>RawBars</b> (the same thing, explicit):</p>
     <OpenInLab client:visible engine="rawbars" template={ex.core.template} data={ex.core.data} />
     <p class="tip">
-      Same output, <code>Ada &amp;lt;core&amp;gt;</code>. FullBars' <code>{t("{{x}}")}</code>
+      Same output, <code>Ada &amp;lt;core&amp;gt;</code>. ClassicBars' <code>{t("{{x}}")}</code>
       desugars to exactly <code>{t("{{{escapeHtml (lookup this \"x\")}}}")}</code>.
       The sugar is convenience; the core is the contract.
     </p>
@@ -261,7 +261,7 @@ const t = (s) => s;
       <code>extras = false</code>, so it rejects the Handlebars-only shapes
       (<code>{t("{{^ }}")}</code> inverse, <code>{t("{{& }}")}</code> unescaped,
       <code>{t("{{{{ }}}}")}</code> raw blocks). That seam is how
-      <a href="/minbars">MinBars</a> and <a href="/fullbars">FullBars</a> are
+      <a href="/minbars">MinBars</a> and <a href="/classicbars">ClassicBars</a> are
       built on the same core.
     </p>
   </section>
@@ -289,7 +289,7 @@ const t = (s) => s;
       The full list — comparisons, arithmetic, string/array helpers, the scoped
       loop variables — is the generated
       <a href={`${SPEC_BASE}engine/prelude/`}>helper catalog</a>. Every one is
-      available identically in FullBars and MaxBars.
+      available identically in ClassicBars and MaxBars.
     </p>
     <p>
       One scoped helper has no surface sugar: <code>{t("{{{yield}}}")}</code> renders
@@ -299,7 +299,7 @@ const t = (s) => s;
       writes the bare <code>{t("{{yield}}")}</code>, and all three name the one
       scoped <code>partial-block</code> operation. A partial can be defined inline with
       <code>{t("{{#inline \"name\"}} … {{/inline}}")}</code> (hoisted into the registry,
-      the same shared engine step FullBars and MaxBars run) — so partials/inline/yield
+      the same shared engine step ClassicBars and MaxBars run) — so partials/inline/yield
       are core capability, not surface sugar; RawBars differs from the others only in
       syntax.
     </p>
@@ -309,7 +309,7 @@ const t = (s) => s;
     <p>
       You rarely write RawBars by hand — it's the desugared core surface you target. For everyday
       templating, climb the ladder: <a href="/minbars">MinBars</a> is the
-      logic-less on-ramp, <a href="/fullbars">FullBars</a> adds Handlebars-style blocks
+      logic-less on-ramp, <a href="/classicbars">ClassicBars</a> adds Handlebars-style blocks
       and helpers, and <a href="/maxbars">MaxBars</a> adds infix operators and pipes —
       all desugaring to the core you just saw. To compute a value before rendering, see
       <a href="/transform">Data shaping</a>. Or open the bare core in the

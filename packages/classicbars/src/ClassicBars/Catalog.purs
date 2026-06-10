@@ -8,7 +8,7 @@
 -- | helper like `partial>` slips in). `scripts/generate-helper-catalog.mjs` writes
 -- | this to a partial the prelude page includes, and re-runs with `--check` in CI
 -- | to fail on drift.
-module FullBars.Catalog
+module ClassicBars.Catalog
   ( helperCatalogMarkdown
   , OpInfo
   , operations
@@ -99,7 +99,7 @@ helperCatalogMarkdown =
     <> rows
   where
   header =
-    "{/* Generated from FullBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit. */}\n"
+    "{/* Generated from ClassicBars.preludeSchema by scripts/generate-helper-catalog.mjs — do not edit. */}\n"
       <>
         "{/* Regenerate with `npm run gen:catalog`; CI checks it with `npm run check:catalog`. */}\n\n"
   rows =

@@ -6,13 +6,13 @@ sidebar:
 
 *Status:* Accepted. *Date:* 2026-06-02. Builds on
 [ADR-001](/adr/adr-0001-structural-parser-and-walker/) (helpers are the meaning plug-in) and
-[ADR-011](/adr/adr-0011-compile-to-js/) (compile ≡ interpret). Extends the FullBars
-Handlebars-faithfulness claim ([fullbars-compat](/engine/fullbars-compat/)) from syntax/semantics to the one piece of the
+[ADR-011](/adr/adr-0011-compile-to-js/) (compile ≡ interpret). Extends the ClassicBars
+Handlebars-faithfulness claim ([classicbars-compat](/engine/classicbars-compat/)) from syntax/semantics to the one piece of the
 Handlebars *workflow* that was missing: `Handlebars.registerHelper(name, fn)`.
 
 ## Context
 
-A JS host can render and compile FullBars, but cannot supply its own helper:
+A JS host can render and compile ClassicBars, but cannot supply its own helper:
 `Handlebars.registerHelper('loud', s => s.toUpperCase())` has no equivalent. Helpers are the IoC
 plug-in (ADR-001) — but the plug-in language has been PureScript (`Kernel.Prelude`), and the JS facade
 ships only that curated prelude. For real Handlebars users, registering a helper is the *single most
@@ -45,7 +45,7 @@ lacked.
 *Superseded for block helpers by [ADR-020](/adr/adr-0020-user-block-helpers/).* The
 :::
 `blockHelperMissing` work gave the emitter exactly that generic block path (`rt.block` now carries the
-body as a callback), so user-defined block helpers are now supported on FullBars (one `registerHelper`,
+body as a callback), so user-defined block helpers are now supported on ClassicBars (one `registerHelper`,
 usage-decided `options.fn`/`inverse`). The "inline-only" limit below describes this ADR's v1, not the
 current state.
 
@@ -93,7 +93,7 @@ current state.
    async render, which re-runs once it lands. A Worker is not a full capability jail (it still has
    `fetch`); it removes the page-takeover surface, which is the threat a shared "playground link" poses.
    The Lab surfaces helpers as a *separate* `helpers.js` editor (its own explorer group / tab / share
-   field `h`), FullBars-only — distinct from the JSONata data `transform`, because helpers extend the
+   field `h`), ClassicBars-only — distinct from the JSONata data `transform`, because helpers extend the
    *engine* while the transform pre-processes the *data*. (RawBars/MaxBars helper terminology is
    [ADR-019](/adr/adr-0019-operation-vocabulary/)'s concern, not this one.)
 

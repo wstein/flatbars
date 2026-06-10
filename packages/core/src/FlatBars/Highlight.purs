@@ -25,7 +25,7 @@
 -- | The dialect seams the lexer already exposes are threaded straight through —
 -- | `LexConfig` (delimiters + set delimiters), the clause-separator names, and the
 -- | interior `LexOptions` (so MaxBars operators tokenize as operators while in
--- | RawBars/FullBars the same characters stay path punctuation) — so both views are
+-- | RawBars/ClassicBars the same characters stay path punctuation) — so both views are
 -- | per-dialect *by construction*, with no highlighter-side knowledge of any
 -- | dialect. This is the same IoC seam the parser uses: the highlighter drives, the
 -- | dialect supplies the meaning.
@@ -86,7 +86,7 @@ type TSpan = { from :: Int, to :: Int, kind :: String, role :: String }
 -- | dialect *rejects* are coloured `error` rather than painted as valid. With
 -- | `extras = false` (RawBars/MaxBars) that is `{{&x}}` (unescaped), `{{^x}}`
 -- | (inverse), and `{{{{…}}}}` (raw block); with `inheritance = false`
--- | (RawBars/MaxBars/FullBars) it is `{{<x}}` / `{{$x}}`. So the highlighter never
+-- | (RawBars/MaxBars/ClassicBars) it is `{{<x}}` / `{{$x}}`. So the highlighter never
 -- | paints a shape valid that the same dialect would reject at parse.
 type HighlightConfig =
   { lexConfig :: LexConfig
@@ -95,7 +95,7 @@ type HighlightConfig =
   , extras :: Boolean
   , inheritance :: Boolean
   -- the two raw-block spellings, gated separately (mirrors `ParseOptions`):
-  -- `rawBlockHbs` = the bare `{{{{name}}}}` (FullBars), `rawBlockHash` =
+  -- `rawBlockHbs` = the bare `{{{{name}}}}` (ClassicBars), `rawBlockHash` =
   -- `{{{{#name}}}}` (RawBars/MaxBars). A disallowed spelling colours `error`.
   , rawBlockHbs :: Boolean
   , rawBlockHash :: Boolean

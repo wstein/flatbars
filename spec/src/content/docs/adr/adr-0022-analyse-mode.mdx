@@ -48,7 +48,7 @@ its implementations stay introspectable.
 
 - . *Truthiness is one rule per engine, plugged in as a lambda* `truthy  — Value -> Boolean`, the same IoC
   shape interpret/desugar/validate/compile already use ("don't call FlatBars, FlatBars calls you").
-  FullBars plugs in the Handlebars rule; *RawBars and MaxBars plug in `nonEmpty`* (`false null "" [] {}`
+  ClassicBars plugs in the Handlebars rule; *RawBars and MaxBars plug in `nonEmpty`* (`false null "" [] {}`
   falsy — `0` truthy, every empty container falsy; the dialects deliberately diverge in value policy since
   RawBars/MaxBars are not Handlebars clones); MinBars plugs in the language-agnostic Mustache rule
   (`mustache`: `false null []` falsy, `0`/`""`/`{}` truthy — the Ruby/Python implementations).
@@ -84,7 +84,7 @@ is gated by the `minbars-compat` cases in the compile-conformance harness.
    untouched — `@trim` still needs it, and a now-inert `@truthiness` is *carried, never an error*, but
    `directiveLints` warns it as deprecated so a stale directive does not silently mislead.
 *As-built note (compiler).* The plan said the compiler should drop the baked `$falsy` constant entirely.
-In practice the FullBars and MinBars compiled paths share one runtime (`flatbars-runtime.mjs`) but need
+In practice the ClassicBars and MinBars compiled paths share one runtime (`flatbars-runtime.mjs`) but need
 *different* fixed rules (handlebars vs mustache), so ripping `$falsy` out would mean a rule table in the
 shared runtime — disproportionate risk for no behavioural gain. The implemented change keeps `$falsy` but
 bakes it as a **fixed per-dialect constant** (`resolveForCompile` ignores directives and returns the
@@ -93,7 +93,7 @@ engine rule); the *per-file configurability* — the actual over-engineering —
 
 1. *`includeZero` survives, decoupled from the machinery.* It becomes a per-call helper option on
    `if`/`unless` (`0` + `includeZero` ⇒ truthy), not a `FalsySet` mutation. It is genuine Handlebars
-   compat (the clone goal — [fullbars-compat](/engine/fullbars-compat/)); the 28 references simplify rather than vanish.
+   compat (the clone goal — [classicbars-compat](/engine/classicbars-compat/)); the 28 references simplify rather than vanish.
 
 1. *An open (arbitrary host) truthiness lambda is rejected for now.* Letting a host pass any
    `Value -> Boolean` (e.g. "the string `"no"` is falsy") is expressive but (a) *non-compilable* — the
@@ -250,4 +250,4 @@ panel render without it.
   (keeping `test:compile` honest) or analysis stays interpreter-only is deferred.
 * *Docs cleanup.* [directives](/engine/directives/) must drop the `@truthiness` directive/alias sections and re-cast
   the named rules as *per-engine* rules (not per-file aliases); the `stringtemplate4`-as-alias line
-  becomes "the rule FullBars could plug in," not a directive token.
+  becomes "the rule ClassicBars could plug in," not a directive token.

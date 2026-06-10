@@ -67,15 +67,15 @@ t("completionItems exclude deprecated aliases; scoped sort after helpers", () =>
 const tpl = "Hi {{uppercase name}} {{#each xs}}{{this}}{{/each}}";
 
 t("hoverAt fires on an operation head inside a tag, with its range", () => {
-  const h = hoverAt(tpl, "fullbars", 8); // inside `uppercase` (chars 5–14)
+  const h = hoverAt(tpl, "classicbars", 8); // inside `uppercase` (chars 5–14)
   assert.ok(h, "hover present");
   assert.match(h.markdown, /uppercase/);
   assert.equal(tpl.slice(h.start, h.end), "uppercase", "range is the operation word");
 });
 
 t("hoverAt is null outside a tag and on a non-operation word", () => {
-  assert.equal(hoverAt(tpl, "fullbars", 0), null, "in surrounding text");
-  assert.equal(hoverAt(tpl, "fullbars", 16), null, "`name` is not a prelude operation");
+  assert.equal(hoverAt(tpl, "classicbars", 0), null, "in surrounding text");
+  assert.equal(hoverAt(tpl, "classicbars", 16), null, "`name` is not a prelude operation");
 });
 
 t("hoverAt is suppressed inside a string literal", () => {
@@ -84,8 +84,8 @@ t("hoverAt is suppressed inside a string literal", () => {
 });
 
 t("completionsAt offers operations in a tag, nothing outside", () => {
-  assert.ok(completionsAt(tpl, "fullbars", 8).length > 0, "inside a tag");
-  assert.equal(completionsAt(tpl, "fullbars", 0).length, 0, "outside any tag");
+  assert.ok(completionsAt(tpl, "classicbars", 8).length > 0, "inside a tag");
+  assert.equal(completionsAt(tpl, "classicbars", 0).length, 0, "outside any tag");
 });
 
 // ── Canonicalization (rewriteFor / canonAt — the quick-fix data) ─────────────
@@ -107,8 +107,8 @@ t("canonAt resolves the word range + canonical inside a tag", () => {
 });
 
 t("canonAt is dialect-scoped and tag-scoped", () => {
-  assert.equal(canonAt("{{{index}}}", "fullbars", 5), null, "scoped rewrite is RawBars/MaxBars-only");
-  assert.ok(canonAt("{{{downcase x}}}", "fullbars", 5), "alias rewrite applies in any dialect");
+  assert.equal(canonAt("{{{index}}}", "classicbars", 5), null, "scoped rewrite is RawBars/MaxBars-only");
+  assert.ok(canonAt("{{{downcase x}}}", "classicbars", 5), "alias rewrite applies in any dialect");
   assert.equal(canonAt("index", "rawbars", 1), null, "outside any tag");
 });
 

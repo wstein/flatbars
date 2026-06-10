@@ -1,5 +1,5 @@
 -- | Truthiness portability analysis for MinBars (Mustache), the narrower sibling
--- | of `FullBars.analyseSurface` (ADR-022). The machinery is identical — render
+-- | of `ClassicBars.analyseSurface` (ADR-022). The machinery is identical — render
 -- | the template in a `WriterT` that records, at every condition, the value tested
 -- | and the named rules whose verdict differs — but the engine sits at a different
 -- | point on the truthiness axis: MinBars renders on the language-agnostic
@@ -139,7 +139,7 @@ runAnalysisMin partials dat nodes =
     \(Tuple output decisions) -> { output, decisions }
 
 -- | Analyse a MinBars template against sample data — the same `{ output, report,
--- | jsonata, findings, evaluated }` shape `FullBars.analyseSurface` returns, so the
+-- | jsonata, findings, evaluated }` shape `ClassicBars.analyseSurface` returns, so the
 -- | JS facade and Lab marshal both identically.
 analyseMin
   :: String

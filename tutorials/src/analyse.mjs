@@ -8,7 +8,7 @@
 // not produce. The normative text lives in docs/ (adr-0022-analyse-mode.adoc); the
 // page only annotates these.
 //
-// All examples are FullBars surface (the analyser renders under the FullBars
+// All examples are ClassicBars surface (the analyser renders under the ClassicBars
 // `handlebars` truthiness rule and replays the others). `finds` is the exact
 // number of portability findings; `expect` are substrings the markdown report must
 // contain (the located finding + its portable fix). The "ambiguous four" — `0`,
@@ -21,7 +21,7 @@ export const examples = {
   // branch on another" bug. The report legend names mustache.js explicitly so a JS
   // reader isn't misled by the `mustache-spec` flip.
   emptyString: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if bio}}{{bio}}{{else}}(no bio yet){{/if}}",
     data: { bio: "" },
     finds: 1,
@@ -32,7 +32,7 @@ export const examples = {
   // `includeZero=true` keeps it truthy on Handlebars, but the portable fix is to
   // test explicitly.
   zero: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if count}}{{count}} unread{{else}}all caught up{{/if}}",
     data: { count: 0 },
     finds: 1,
@@ -42,7 +42,7 @@ export const examples = {
   // to the engine-agnostic spelling) — iterate with `{{#each}}…{{else}}` so the
   // empty branch fires the same way everywhere.
   emptyArray: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if items}}{{#each items}}{{this}} {{/each}}{{else}}empty{{/if}}",
     data: { items: [] },
     finds: 1,
@@ -51,7 +51,7 @@ export const examples = {
   // An empty object is truthy in Handlebars, mustache.js, AND spec Mustache; it
   // flips only under the `presence` rule — the non-obvious case the report catches.
   emptyObject: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if profile}}has profile{{else}}none{{/if}}",
     data: { profile: {} },
     finds: 1,
@@ -60,7 +60,7 @@ export const examples = {
   // `false` is portable — every rule agrees — so it is NOT a finding; it appears as
   // a `✓` line, positive evidence the condition is safe.
   portable: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if active}}on{{else}}off{{/if}}",
     data: { active: false },
     finds: 0,
@@ -71,7 +71,7 @@ export const examples = {
   // derives that same-type ambiguous value and reports a POTENTIAL finding, so
   // coverage no longer depends on the sample happening to hold the edge value.
   potential: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if count}}{{count}} unread{{else}}all caught up{{/if}}",
     data: { count: 5 },
     finds: 1,
@@ -82,7 +82,7 @@ export const examples = {
   // user); declaring both paths safe suppresses both. `pathSchema`/`expectSuppressed`
   // drive the gate's analyzeWith assertion (the headline interaction, CI-locked).
   suppress: {
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if count}}{{count}} unread{{/if}} {{user.naem}}",
     data: { count: 5, user: { name: "Ada" } },
     finds: 2,
@@ -118,13 +118,13 @@ export const examples = {
 // the single-value teaching toys above, so the analyser is shown across the spread
 // of finding kinds on templates that look like production. Each card runs through
 // the real `analyze` (client-side, and CI-gated by check-tutorial-tooling, which
-// asserts the per-kind counts below). FullBars templates: analyse is FullBars, and
+// asserts the per-kind counts below). ClassicBars templates: analyse is ClassicBars, and
 // the Mustache conformance corpus doesn't exercise truthiness — so this is curated.
 export const gallery = [
   {
     name: "Inbox badge",
     desc: "A zero count silently flips “0 unread” to “Inbox zero” on a spec-Mustache host.",
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if unread}}{{unread}} unread{{else}}Inbox zero{{/if}}",
     data: { unread: 0 },
     expect: { observed: 1, potential: 0, miss: 0 },
@@ -132,7 +132,7 @@ export const gallery = [
   {
     name: "Profile card",
     desc: "An empty bio is an observed divergence; a non-empty post count is a potential one.",
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{name}}{{#if bio}} — {{bio}}{{/if}}{{#if posts}} · {{posts}} posts{{/if}}",
     data: { name: "Ada", bio: "", posts: 3 },
     expect: { observed: 1, potential: 1, miss: 0 },
@@ -140,7 +140,7 @@ export const gallery = [
   {
     name: "Shopping cart",
     desc: "A non-empty cart is portable now, but the empty-cart branch rides on list falsiness.",
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{#if items}}{{#each items}}{{this}} {{/each}}{{else}}Empty{{/if}}",
     data: { items: ["Book"] },
     expect: { observed: 0, potential: 1, miss: 0 },
@@ -148,7 +148,7 @@ export const gallery = [
   {
     name: "Contact line",
     desc: "A misspelled field resolves to absent from a present object — the typo catcher.",
-    engine: "fullbars",
+    engine: "classicbars",
     template: "{{user.name}} <{{user.emial}}>",
     data: { user: { name: "Ada", email: "a@x.io" } },
     expect: { observed: 0, potential: 0, miss: 1 },

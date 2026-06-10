@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// The FullBars reference's runnable examples — ONE source, consumed by THREE
+// The ClassicBars reference's runnable examples — ONE source, consumed by THREE
 // places so they can never drift:
-//   1. the /fullbars reference page (live preview + "Open in Lab"),
+//   1. the /classicbars reference page (live preview + "Open in Lab"),
 //   2. the CI gate scripts/check-tutorial-links.mjs (renders each through the real
-//      FullBars `surface` engine and asserts output; `compiles: true` also asserts
+//      ClassicBars `surface` engine and asserts output; `compiles: true` also asserts
 //      the compiled JS), and
-//   3. the FlatBars Lab's FullBars example dropdown — generated into
-//      lab/examples/fullbars/ by scripts/gen-examples.mjs, snapshot-gated by
+//   3. the FlatBars Lab's ClassicBars example dropdown — generated into
+//      lab/examples/classicbars/ by scripts/gen-examples.mjs, snapshot-gated by
 //      check:examples. (Helper-bearing entries carry a `helpers` field — ADR-018
 //      registerHelper source — and are page-only: the Lab dropdown skips them.)
 //
-// This set is the FullBars MIRROR of the MinBars reference (mustache.mjs): every
+// This set is the ClassicBars MIRROR of the MinBars reference (mustache.mjs): every
 // MinBars concept is reimplemented in IDIOMATIC Handlebars, then the
 // Handlebars-only features are GROUPED into a few larger examples to keep the
 // count low. Like MinBars the examples are NON-HTML by default (plain text is
@@ -20,8 +20,8 @@
 // is HTML, so it previews as HTML). ORDER IS DISPLAY ORDER and each `label`
 // carries its tier — the Lab dropdown is a flat list, read simple → advanced.
 //
-// Two rules keep every entry honest to FullBars and off its neighbours:
-//   • No MaxBars operators. `score >= 50` is MaxBars; FullBars writes the
+// Two rules keep every entry honest to ClassicBars and off its neighbours:
+//   • No MaxBars operators. `score >= 50` is MaxBars; ClassicBars writes the
 //     subexpression `(gte score 50)`.
 //   • No Mustache sections / set delimiters. `{{#each}}`/`{{#if}}` are explicit;
 //     `{{#person}}` is not an implicit section, and `{{=A B=}}` is MinBars-only
@@ -31,14 +31,14 @@
 export const examples = {
   // ── Simple: interpolation & paths ──────────────────────────────────────────
   hello: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Simple — Hello World",
     template: "Hello, {{name}}!",
     data: { name: "Ada" },
   },
 
   dotted: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Simple — Dotted paths",
     // A dot walks into nested objects; missing segments stop at empty, not error.
     template: "{{user.name}} — {{user.address.city}}",
@@ -46,7 +46,7 @@ export const examples = {
   },
 
   missing: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Simple — Missing → empty",
     // A path that resolves to nothing renders the empty string — never an error.
     template: "name=[{{name}}] missing=[{{nope}}] null=[{{nada}}]",
@@ -54,7 +54,7 @@ export const examples = {
   },
 
   escaping: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Simple — Escaping (markup in data)",
     // {{x}} HTML-escapes (the safe default — Handlebars's defining feature); {{{x}}}
     // and the {{&x}} alias emit raw. The markup is in the DATA; shown as plain text
@@ -64,7 +64,7 @@ export const examples = {
   },
 
   comment: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Simple — Comments",
     // {{! … }} (and the {{!-- … --}} form, which may itself contain }}) is dropped.
     template: "Total{{! dropped }}: {{total}}{{!-- not shown: }} --}}",
@@ -73,12 +73,12 @@ export const examples = {
 
   // ── Intermediate: control flow ─────────────────────────────────────────────
   conditionals: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Intermediate — If / else if / else / unless",
     // Handlebars control flow is EXPLICIT (unlike Mustache's shape-decides
     // sections): {{#if}} takes a helper application — here the subexpression
-    // `(gte stock 10)`, the FullBars way to write `stock >= 10` — and chains via
-    // `else if`; {{#unless}} is its inverse. Note 0 is falsy in FullBars (the
+    // `(gte stock 10)`, the ClassicBars way to write `stock >= 10` — and chains via
+    // `else if`; {{#unless}} is its inverse. Note 0 is falsy in ClassicBars (the
     // opposite of MinBars). Compiles to JS (the pane below).
     compiles: true,
     template:
@@ -87,7 +87,7 @@ export const examples = {
   },
 
   eachList: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Intermediate — Each: nesting, loop data & parent paths",
     // {{#each}} iterates — the idiomatic form of a Mustache list section. Nested,
     // it shows the loop-data variables (@index, @last) AND the path climbers
@@ -109,7 +109,7 @@ export const examples = {
   },
 
   eachElse: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Intermediate — Each: the empty case ({{else}})",
     // {{#each}} carries its own {{else}} for an empty (or absent) list — the
     // idiomatic Handlebars form of a Mustache inverted section. No separate tag.
@@ -122,7 +122,7 @@ export const examples = {
   },
 
   eachObject: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Intermediate — Each over an object (@key)",
     // Over an object, @key is the property name and `this` the value — there is no
     // Mustache equivalent (sections push an object as context; they don't iterate).
@@ -133,7 +133,7 @@ export const examples = {
   },
 
   withBlock: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Intermediate — With: re-root the context",
     // {{#with obj}} makes obj the body's context — the idiomatic Handlebars form of
     // a Mustache object section ({{#user}}…{{/user}}), handy for a deep path.
@@ -145,9 +145,9 @@ export const examples = {
 
   // ── Advanced: compose helpers, partials, capstones ─────────────────────────
   subexprLookup: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Advanced — Subexpressions & lookup",
-    // Parentheses nest one helper's result into another's arguments — how FullBars
+    // Parentheses nest one helper's result into another's arguments — how ClassicBars
     // composes its ~80 prelude helpers instead of "write a JS helper for
     // everything". {{lookup obj key}} reads a field whose name isn't known until
     // render (an array index or a data-chosen property); here its result is upper-
@@ -157,7 +157,7 @@ export const examples = {
   },
 
   partials: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Advanced — Partials: per-row & dynamic",
     // {{> name}} includes another template, inheriting the caller's context — the
     // natural unit of reuse. Combined here with {{#each}} (a partial per row) and a
@@ -178,7 +178,7 @@ export const examples = {
   },
 
   layoutPartials: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Advanced — Layout & inline partials",
     // Two Handlebars-only partial forms. {{#*inline "name"}}…{{/inline}} DEFINES a
     // partial inline (scoped to the rest of the template); {{#> layout}}…{{/layout}}
@@ -190,7 +190,7 @@ export const examples = {
   },
 
   helpers: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Advanced — Custom & block helpers",
     // A host registers its own with the Handlebars-style registerHelper(name,
     // fn[, arity]) — the single most common extension, grouped here three ways:
@@ -208,7 +208,7 @@ export const examples = {
   },
 
   rawBlock: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Advanced — Raw blocks",
     // A raw block {{{{helper}}}}…{{{{/helper}}}} hands its body to the helper
     // UNPROCESSED: the inner `{{bar}}` is never interpreted — it's literal text the
@@ -221,7 +221,7 @@ export const examples = {
   },
 
   email: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Advanced — Putting it together (email)",
     // The capstone reusing familiar pieces in one realistic, non-HTML template:
     // interpolation, dotted paths, an {{#each}} with its built-in {{else}} for the
@@ -245,7 +245,7 @@ Your order shipped. Items:
   },
 
   card: {
-    engine: "fullbars",
+    engine: "classicbars",
     label: "Advanced — HTML card (styling in a partial)",
     // The one example whose OUTPUT is HTML — so it previews as HTML, not text.
     // Partials compose the markup: {{> styles}} holds the CSS once, {{> card}} is

@@ -29,10 +29,10 @@ const KEYWORD_NAMES = new Set(["else", "elif", "when"]);
 for (const op of operations) {
   const text = `{{${op.name} x}}`;
   // A separator paints as a keyword only in a dialect that treats it as one — `when` is
-  // a separator in MaxBars (its `clauseSeps`), not in FullBars. Tokenize the keyword
+  // a separator in MaxBars (its `clauseSeps`), not in ClassicBars. Tokenize the keyword
   // names through MaxBars (where else/elif/when are all separators), the helper
-  // operations through FullBars.
-  const tokens = tokensOf(text, KEYWORD_NAMES.has(op.name) ? "maxbars" : "fullbars");
+  // operations through ClassicBars.
+  const tokens = tokensOf(text, KEYWORD_NAMES.has(op.name) ? "maxbars" : "classicbars");
   // Find any token that covers the head identifier's first character (offset 2,
   // after `{{`). For `operation`-kind paints the token covers just the name;
   // for `keyword`-kind paints (else / elif / when) the token covers the whole inner
@@ -51,7 +51,7 @@ const fakes = ["xyzzy", "totallyMadeUp", "notAHelper", "userVariable", "myCustom
 if (fakes.length === 0) throw new Error("test setup: every made-up name happens to be in the catalogue");
 for (const name of fakes) {
   const text = `{{${name} x}}`;
-  const tokens = tokensOf(text, "fullbars");
+  const tokens = tokensOf(text, "classicbars");
   const opTok = tokens.find((t) => t.kind === "operation");
   if (opTok) {
     fails.push(`negative: '${name}' should NOT paint as operation in '${text}'`);

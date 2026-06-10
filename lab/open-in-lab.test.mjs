@@ -11,8 +11,8 @@ function decodeFragment(href) {
 }
 
 test("labHref puts the surface on ?engine= and the workspace in the fragment", async () => {
-  const href = await labHref("fullbars", { template: "{{ name }}", data: { name: "Ada" } }, { labUrl: "lab.html" });
-  assert.match(href, /^lab\.html\?engine=fullbars#/);
+  const href = await labHref("classicbars", { template: "{{ name }}", data: { name: "Ada" } }, { labUrl: "lab.html" });
+  assert.match(href, /^lab\.html\?engine=classicbars#/);
   const state = await decodeFragment(href);
   assert.equal(state.x, -1); // custom edit → restored verbatim
   assert.equal(state.tabs[0].s, "{{ name }}");
@@ -109,5 +109,5 @@ test("openInLab returns the URL when there is no window (SSR/build)", async () =
 });
 
 test("LAB_ENGINES are exactly the four FlatBars surfaces", () => {
-  assert.deepEqual([...LAB_ENGINES].sort(), ["fullbars", "maxbars", "minbars", "rawbars"]);
+  assert.deepEqual([...LAB_ENGINES].sort(), ["classicbars", "maxbars", "minbars", "rawbars"]);
 });

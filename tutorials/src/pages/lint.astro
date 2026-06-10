@@ -36,7 +36,7 @@ const groups = [
       { href: "/start", label: "Getting started" },
       { href: "/analyse", label: "Truthiness portability" },
       { href: "/maxbars", label: "MaxBars" },
-      { href: "/fullbars", label: "FullBars" },
+      { href: "/classicbars", label: "ClassicBars" },
     ],
   },
   {
@@ -123,7 +123,7 @@ const groups = [
     <OpenInLab client:visible engine={lintExamples.scopedVariable.engine} template={lintExamples.scopedVariable.template} data={lintExamples.scopedVariable.data} lint />
     <p>
       This lint is <b>surface-scoped</b>: it runs for RawBars/MaxBars, where the bare native
-      name is canonical, but <em>not</em> for FullBars — there <code>{t("{{@index}}")}</code>
+      name is canonical, but <em>not</em> for ClassicBars — there <code>{t("{{@index}}")}</code>
       is the Handlebars spelling and stays canonical. Run it with <code>--surface</code> and
       only the alias lint applies.
     </p>

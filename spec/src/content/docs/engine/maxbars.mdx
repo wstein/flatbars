@@ -3,29 +3,29 @@ title: "The MaxBars dialect (infix operators & pipes)"
 ---
 
 MaxBars is FlatBars' flagship surface, the top of the dialect ladder — **RawBars ⊂
-FullBars ⊂ MaxBars**. It reuses FullBars's engine wholesale and adds a richer
+ClassicBars ⊂ MaxBars**. It reuses ClassicBars's engine wholesale and adds a richer
 *surface*: infix operators and pipes. Everything below the surface is reused
-unchanged; the surface itself borrows most of FullBars — the handful of exceptions
+unchanged; the surface itself borrows most of ClassicBars — the handful of exceptions
 are noted under "v1 limitations" below.
 
 ## Reuse by dependency
 
-MaxBars desugars to the same core `Expr` that FullBars already understands, so it
-reuses FullBars *wholesale by dependency* — the engine, prelude, surface desugar,
+MaxBars desugars to the same core `Expr` that ClassicBars already understands, so it
+reuses ClassicBars *wholesale by dependency* — the engine, prelude, surface desugar,
 **and the compiler**. (One value-policy axis differs: truthiness — MaxBars uses
-the `nonEmpty` rule, not FullBars' `handlebars`; see below.) The only new piece is
+the `nonEmpty` rule, not ClassicBars' `handlebars`; see below.) The only new piece is
 the interior expression grammar, plugged in through the `ParseOptions.parseExpr` seam
 ([grammar](/spec/grammar/)); the structural tree-builder stays grammar-agnostic.
 
 ```purescript
 maxOptions   = defaultParseOptions { parseExpr = MaxBars.Expr.parseMaxExpr }
-renderMax    = renderSurfaceDiagWith maxLoopVars maxOptions  -- FullBars engine, reused
-compileMaxJs = compileSurfaceWith   maxLoopVars maxOptions  -- FullBars compiler, reused
+renderMax    = renderSurfaceDiagWith maxLoopVars maxOptions  -- ClassicBars engine, reused
+compileMaxJs = compileSurfaceWith   maxLoopVars maxOptions  -- ClassicBars compiler, reused
 ```
 
 The second seam, `maxLoopVars`, is a `LoopVars` resolver the surface desugar
 consults; MaxBars wraps `noLoopVars` with `reservedScope` to turn on the *reserved
-variable model* (below) — `loop`/`root`/`parent` as scope-declared names. FullBars
+variable model* (below) — `loop`/`root`/`parent` as scope-declared names. ClassicBars
 passes `noLoopVars`, keeping `@`/`../` and leaving bare names as data paths.
 
 A shared semantic *kernel* (truthiness/stringify/escape, frame mechanics) is
@@ -54,7 +54,7 @@ multiplicative (`*` `/` `%`), prefix `!`, then application/atom — so
 `{{ n + 1 > 5 }}` is `(gt (add n 1) 5)` and `{{#each 1..n + 1}}` is
 `(range 1 (add n 1))`.
 Pipe chains are left-associative: `a | f | g` ⇒ `(g (f a))`. Paths,
-literals, and `(parenthesised)` subexpressions are exactly as in FullBars.
+literals, and `(parenthesised)` subexpressions are exactly as in ClassicBars.
 
 Infix reads identically in a **block head** and in its **clause separators**, so
 `{{#if x >= 18}}…{{elif x < 5}}…{{/if}}` takes each condition bare — no parentheses
@@ -62,13 +62,13 @@ around the `elif` test (it is one infix expression, parsed as a head: `elif (lt 
 
 The operator characters are excluded from the identifier set so they tokenise as
 operators — but this is a *MaxBars-only* lexer mode (`ParseOptions.lexOptions`
-`infixArith`): RawBars/FullBars keep `+ - * / ?` as path/name characters, so
+`infixArith`): RawBars/ClassicBars keep `+ - * / ?` as path/name characters, so
 `../x`, `a/b`, and `partial-block` are unaffected. `.` and `@` stay identifier
 characters in **every** dialect, so a dotted path like `price.net` is still one
 path even in MaxBars (and `/` is therefore unambiguously division). A glued
 double dot is the one exception MaxBars carves back out — `lexOptions.rangeOperator`
 splits `1..n` / `a..b` into `1`/`..`/`n`, while a single `.` stays path
-punctuation; it is MaxBars-only because RawBars/FullBars keep `..` for the
+punctuation; it is MaxBars-only because RawBars/ClassicBars keep `..` for the
 Handlebars `../` parent-path (already gone in MaxBars — ADR-021). Arithmetic is
 strictly numeric — a non-number operand is a `TypeError` (no coercion) — and `??`
 is *null*-coalescing (a present `0`/`""`/`[]` wins), independent of the engine's
@@ -125,7 +125,7 @@ other collection op, no new surface:
 The key is a dotted path (`where users "profile.active"`), resolved exactly as
 `sortBy` / `groupBy` / `pluck` resolve theirs. The 2-arg *truthy* form reads the
 engine's rule, so under MaxBars's `nonEmpty` a `0` field is **kept** (it is truthy
-here) where FullBars's `handlebars` rule would drop it — the same split `{{#if}}`
+here) where ClassicBars's `handlebars` rule would drop it — the same split `{{#if}}`
 shows. There are **no lambdas** ([ADR-020](/adr/adr-0020-user-block-helpers/)), so
 the filter is key-based, not predicate-based: `where (gt x.score 50)` is *not*
 expressible — precompute the flag (`{ score, top }`) and filter on the key.
@@ -184,7 +184,7 @@ scoped operation, reached one way per dialect:
 | --- | --- |
 | MaxBars | `{{yield}}` |
 | RawBars | `{{{yield}}}` |
-| Handlebars / FullBars | `{{> @partial-block}}` |
+| Handlebars / ClassicBars | `{{> @partial-block}}` |
 
 The body is already-rendered, escape-safe output (a `VSafe` value), so MaxBars'
 `{{ }}` auto-escape is a no-op on it — `{{yield}}` and
@@ -231,7 +231,7 @@ whitespace may precede the first `{{when}}` — leading content is a located err
 `case` is **first-class, not sugar**: the reference engine evaluates the subject
 once (`Kernel.Prelude.caseH`) and the Trussbars compiler lowers it to a Rust
 `match`. It belongs to the `nonEmpty`-truthiness family — **RawBars and MaxBars
-only**; FullBars (Handlebars-faithful) has no `case` and rejects it with a located
+only**; ClassicBars (Handlebars-faithful) has no `case` and rejects it with a located
 error pointing at the `{{#if (eq …)}}` form. The future typed-exhaustive variant
 takes the `match` keyword with pattern arms.
 
@@ -252,7 +252,7 @@ collection" (so it fits `each`, not `with`), `as` is the alias/re-root word, and
 the names come *before* `in`, the collection after — and `{{#with}}` aliases the
 shifted context with a *drop-pipes* `as` (no bars). `each` binds up to three
 names: the element, the 0-based index (or object key), and the 1-based index —
-one more than FullBars' two.
+one more than ClassicBars' two.
 
 ```handlebars
 {{#each item in items}}{{item}}{{/each}}
@@ -265,7 +265,7 @@ one more than FullBars' two.
 `{{#each items}}` (no `in`) is the binding-less form (`this` is the element). The
 head grammar omits the *pipe* rung and MaxBars rejects a bar in a block head
 outright (the Handlebars `as |a b|` form is a parse error here). The binding names
-are bare identifiers carried to the same surface desugar FullBars uses
+are bare identifiers carried to the same surface desugar ClassicBars uses
 ([§5.5](/engine/surface/)); MaxBars supplies the `in` spelling and the third
 binding, no other machinery. The collection after `in` is a full expression — a
 path, a `(subexpr)`, a `1..n` range, or a `[…]` list — so to *pipe* it,
@@ -305,7 +305,7 @@ A binding whose name matches an in-scope operation shadows it for the body
 expression — including a dict or list literal (`{{#let cfg={theme: "dark"}}}`).
 The surface desugars to nested single-binding lets, which the engine installs with
 `pushHelpers` (the context-preserving frame push); it is MaxBars-only sugar over
-that one engine primitive (FullBars stays Handlebars-faithful and uses
+that one engine primitive (ClassicBars stays Handlebars-faithful and uses
 `{{#with x as |n|}}` for aliasing).
 
 ## Labelled loops
@@ -338,13 +338,13 @@ Notes:
 * Choosing a *reserved root* as the label — `label this` / `loop` / `root` /
   `parent` / `yield` — shadows that name for the body; the MaxBars lint warns and
   suggests a fresh name.
-* `label` is a surface-desugar feature on `each`, so FullBars accepts it too; only
+* `label` is a surface-desugar feature on `each`, so ClassicBars accepts it too; only
   the bare-loop-variable *vocabulary* is MaxBars-only.
 
 ## Host-registered operations
 
 `renderWithOperations` renders MaxBars source against a bag of host-supplied
-*operations* (ADR-019 addendum) — the native boundary word for what FullBars
+*operations* (ADR-019 addendum) — the native boundary word for what ClassicBars
 calls a *helper* (`renderWith` / `registerHelper`). It is the same marshaller and
 runtime; only the dialect surface and the vocabulary differ.
 
@@ -378,25 +378,25 @@ plain functions into these operations (the FlatBars Lab and `flatbars-js`).
   (`as x`, not `as |x|`), so a bar in a head has no meaning and is rejected
   outright — whether it was the Handlebars block-param delimiter or an
   unparenthesised pipe.
-* **A few FullBars surface constructs are not accepted** — these are the documented
-  exceptions to the `⊂` of `RawBars ⊂ FullBars ⊂ MaxBars` (surface-superset *modulo
+* **A few ClassicBars surface constructs are not accepted** — these are the documented
+  exceptions to the `⊂` of `RawBars ⊂ ClassicBars ⊂ MaxBars` (surface-superset *modulo
   documented exceptions*; [adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/) amendment), the reason
-  MaxBars borrows *most* of FullBars's surface, not all:
+  MaxBars borrows *most* of ClassicBars's surface, not all:
 --
 ** the `{{#*inline}}` *decorator* — MaxBars spells inline partials with bare
    `{{#inline "name"}}…{{/inline}}` / `{{#partial "name"}}…{{/partial}}`;
-   the `*`-prefixed decorator form is FullBars-only.
+   the `*`-prefixed decorator form is ClassicBars-only.
 ** `{{> @partial-block}}` — the `@` sigil is reserved, so render the caller's
    body with bare `{{yield}}` instead (see "The block-partial body" above).
 ** host-threaded *external* partial files — for host-loaded partials, use
-   [FullBars](/engine/fullbars-compat/).
+   [ClassicBars](/engine/classicbars-compat/).
 --
 
 ## Truthiness
 
 MaxBars uses the `nonEmpty` rule (ADR-022): `false`/`null`/`""`/`[]`/`{}`
 are falsy, but `0` is *truthy* — test magnitude with the built-in compare,
-`{{#if val > 0}}`. This *differs* from FullBars (`handlebars`, where `0`
+`{{#if val > 0}}`. This *differs* from ClassicBars (`handlebars`, where `0`
 and `{}` flip); MaxBars is not a Handlebars clone, so it leans on its
 compare operators rather than coercing `0`. There is no `@truthiness` directive
 (removed in [ADR-022](/adr/adr-0022-analyse-mode/)). `{{#if x}}` and

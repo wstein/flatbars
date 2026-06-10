@@ -1422,7 +1422,7 @@
           <select id="engine-select" class="select" aria-label="Engine">
             <option value="rawbars">RawBars — no sugar</option>
             <option value="minbars">MinBars — Mustache like</option>
-            <option value="fullbars">FullBars — Handlebars like</option>
+            <option value="classicbars">ClassicBars — Handlebars like</option>
             <option value="maxbars">MaxBars — operators &amp; pipes</option>
           </select>
         </div>
@@ -1664,7 +1664,7 @@
       // so the editor paints helper names exactly like the LSP / VS Code — NOT the
       // 12-entry user-facing Transformers-panel subset (renderer.allTransformers()).
       import { OPERATION_NAMES } from "./operation-names.mjs?v=1";
-      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=108";
+      import { highlightSpans } from "./vendor/flatbars-engine.mjs?v=109";
       import { createHelperSandbox } from "./helper-sandbox.mjs?v=1";
       import { renderTransformers as renderTransformersPanel } from "./panels/transformers.mjs";
       import { renderPartials as renderPartialsPanel } from "./panels/partials.mjs";
@@ -1786,10 +1786,10 @@
       });
 
       // Pick the engine adapter. The lab exposes the FlatBars dialects as
-      // first-class engines — RawBars (no sugar) / FullBars (Handlebars-like) /
+      // first-class engines — RawBars (no sugar) / ClassicBars (Handlebars-like) /
       // MaxBars (operators & pipes) — alongside MinBars (Mustache-like). The
       // former "FlatBars + Dialect" two-selector model is flattened into one
-      // engine choice, and native Handlebars is dropped (FullBars fills the
+      // engine choice, and native Handlebars is dropped (ClassicBars fills the
       // Handlebars-like role). Every `create…()` returns the identical renderer
       // shape, so everything downstream stays engine-agnostic — the panel gate
       // (below) hides whatever the chosen engine doesn't back.
@@ -1798,21 +1798,21 @@
       let ENGINE =
         ["rawbars", "raw", "core"].includes(ENGINE_PARAM) ? "rawbars"
         : ["minbars", "mustache"].includes(ENGINE_PARAM) ? "minbars"
-        : ["fullbars", "full", "surface"].includes(ENGINE_PARAM) ? "fullbars"
+        : ["classicbars", "full", "surface"].includes(ENGINE_PARAM) ? "classicbars"
         : ["maxbars", "max"].includes(ENGINE_PARAM) ? "maxbars"
         // back-compat: old `?engine=flatbars[&dialect=…]` links → dialect engine.
         : ["flatbars", "bb"].includes(ENGINE_PARAM)
             ? (["core", "rawbars"].includes(DIALECT_PARAM) ? "rawbars"
-               : DIALECT_PARAM === "maxbars" ? "maxbars" : "fullbars")
-        // Default to FullBars — the Handlebars-like FlatBars surface.
-        : "fullbars";
+               : DIALECT_PARAM === "maxbars" ? "maxbars" : "classicbars")
+        // Default to ClassicBars — the Handlebars-like FlatBars surface.
+        : "classicbars";
       // One adapter backs every engine; createRenderer maps the engine name to its
-      // dialect (rawbars→core, fullbars→surface, maxbars, minbars).
+      // dialect (rawbars→core, classicbars→surface, maxbars, minbars).
       const renderer = await createRenderer(ENGINE).catch(bootFail);
       // Show the engine + its version (from the bundled FlatBars/MinBars engine).
       const ENGINE_LABEL =
         ENGINE === "rawbars" ? "RawBars"
-        : ENGINE === "fullbars" ? "FullBars"
+        : ENGINE === "classicbars" ? "ClassicBars"
         : ENGINE === "maxbars" ? "MaxBars"
         : "MinBars";
       byId("brand-ver").textContent = ENGINE_LABEL + " v" + renderer.version;
@@ -1837,11 +1837,11 @@
       // The file extension shown for this engine's template/partial files — one
       // per dialect, so a file name reflects the surface it is written in
       // (`.stem`, `.rawbars`, `.mustache` for MinBars, `.hbs` for the
-      // Handlebars-flavoured FullBars, `.maxbars`). Used wherever a file name is
+      // Handlebars-flavoured ClassicBars, `.maxbars`). Used wherever a file name is
       // displayed or downloaded. (The on-disk *example* files keep the catalog's
       // own extension — see the example loader — so this is purely the label.)
       const TEMPLATE_EXT =
-        ({ rawbars: "rawbars", minbars: "mustache", fullbars: "hbs", maxbars: "maxbars" })[ENGINE] ||
+        ({ rawbars: "rawbars", minbars: "mustache", classicbars: "hbs", maxbars: "maxbars" })[ENGINE] ||
         "hbs";
       // The Markdown code-fence language for an exported template: only `mustache`
       // and `handlebars` are languages a Markdown highlighter knows, so MinBars
@@ -1867,7 +1867,7 @@
       // The example catalog is engine-appropriate: every dialect has its OWN
       // folder (no shared `handlebars/` fallback anymore). MinBars/RawBars/MaxBars
       // are projected from typed sources (tutorials/src/*.mjs) by gen:examples;
-      // FullBars keeps its curated `examples/fullbars/` set; Stem ships its own.
+      // ClassicBars keeps its curated `examples/classicbars/` set; Stem ships its own.
       // Loading one engine's templates under another would produce syntax the
       // active engine can't parse, so the base follows the engine.
       const EXAMPLES_BASE = `./examples/${ENGINE}/`;
@@ -1912,7 +1912,7 @@
       let transformSrc = "";
       // Custom helpers (ADR-018) — a fundamentally different thing from the
       // transform: registerHelper(...) JS that extends the engine. A SEPARATE
-      // editor (helpers.js), for every FlatBars dialect (RawBars/FullBars/MaxBars;
+      // editor (helpers.js), for every FlatBars dialect (RawBars/ClassicBars/MaxBars;
       // not MinBars). The source is evaluated and
       // run in a Worker (no DOM / no page access), never on the main thread, so a
       // shared workspace cannot deface or read the page (no consent prompt
@@ -1924,7 +1924,7 @@
       // i18n (ADR-029): catalog.yaml is the message DATA (a LOCALIZATION view,
       // edited in the data pane like config.yaml); the active locale lives in
       // config.yaml (`i18n.locale`). Both feed the t/number/… helper bag, built
-      // in the Worker for RawBars/FullBars/MaxBars (not MinBars).
+      // in the Worker for RawBars/ClassicBars/MaxBars (not MinBars).
       let catalogSource = "";
       let catalogDirty = false;
       let labLocale = "en";
@@ -2485,7 +2485,7 @@
                   ov.name = v; ov.dirty = true; markCustom(); scheduleRun(); return true;
                 } }
             ))},
-          // The "Controller" editor. On the FullBars surface it is the custom-helper
+          // The "Controller" editor. On the ClassicBars surface it is the custom-helper
           // file (registerHelper source, run in the Worker sandbox — ADR-018); on
           // The transform is a data → view-model preprocess (JSONata), all engines.
           { key: "transform", label: "TRANSFORM", files: [
@@ -2497,7 +2497,7 @@
           ]},
           // Custom helpers/operations (ADR-018; ADR-019 for the native dialects)
           // are a separate editor that extends the engine, not the data — available
-          // for every FlatBars dialect (RawBars/FullBars/MaxBars), MinBars excluded
+          // for every FlatBars dialect (RawBars/ClassicBars/MaxBars), MinBars excluded
           // (Mustache is logic-less). The Worker routes to the dialect's registrar.
           ...(ENGINE !== "minbars" ? [{ key: "helpers", label: "HELPERS", files: [
             { icon: "fn",
@@ -3026,7 +3026,7 @@
           byId("sources-sub").textContent = "transform · JSONata";
         } else if (templateMode === "helpers") {
           // Custom helpers (ADR-018) — a fundamentally different thing from the
-          // transform: registerHelper(...) JS that extends the engine, FullBars
+          // transform: registerHelper(...) JS that extends the engine, ClassicBars
           // only, run in the Worker sandbox.
           setEditorText(templateView, helpersSrc);
           templateView.dispatch({ effects: templateLangComp.reconfigure([jsLang]) });
@@ -3056,7 +3056,7 @@
         showActiveTab();
       }
 
-      // Activate the helpers.js editor (FullBars custom helpers, ADR-018) — a
+      // Activate the helpers.js editor (ClassicBars custom helpers, ADR-018) — a
       // separate editor from the transform.
       function selectHelpersTab() {
         templateMode = "helpers";
@@ -3755,7 +3755,7 @@
           // async render re-run. Provenance segments aren't produced for helper
           // renders (as the in-process renderWith path also returns none).
           // Both helpers.js and the catalog (t/number/…) work on every FlatBars
-          // dialect — the t-surfaces RawBars/FullBars/MaxBars (ADR-029) — MinBars
+          // dialect — the t-surfaces RawBars/ClassicBars/MaxBars (ADR-029) — MinBars
           // excluded (logic-less). The Worker routes each to the dialect's
           // operations-aware entry (renderRawWith/renderWith/renderMaxWith), with
           // the locale from config.yaml.
@@ -6718,7 +6718,7 @@
         if (vendoredParam) {
           await loadVendoredById(vendoredParam);
         } else if (!(await restoreHash())) {
-          // Landing example: "greeting" (FullBars/MaxBars catalogs) or "hello"
+          // Landing example: "greeting" (ClassicBars/MaxBars catalogs) or "hello"
           // (MinBars), else the first entry.
           const def = examples.findIndex((e) => e.id === "greeting" || e.id === "hello");
           await loadExample(def < 0 ? 0 : def);

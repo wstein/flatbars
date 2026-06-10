@@ -25,7 +25,7 @@ by the language server, structured around the two named references FlatBars
 templates actually carry:
 
 * **Partial names** — every `{{> name}}` (and `{{#> name}}`) is a reference;
-  every `{{#*inline "name"}} … {{/inline}}` block (FullBars) is a definition.
+  every `{{#*inline "name"}} … {{/inline}}` block (ClassicBars) is a definition.
 * **Helper / operation names** — every identifier the painter resolves
   through `editors/operations.json` is a reference to the catalogue entry;
   user-defined helpers registered via `registerHelper` (ADR-018) are
@@ -91,10 +91,10 @@ multi-file scenario.
   Implement with `workspace/configuration` so users can cap the scope.
 * `registerHelper`-style host-defined helpers remain unreachable until the
   registry abstraction in ADR-018 grows an editor-visible projection.
-* User-defined inline partials in non-FullBars dialects are unreachable as
+* User-defined inline partials in non-ClassicBars dialects are unreachable as
   written — RawBars/MaxBars do not have `{{#*inline}}`. Either the partial
   registry is host-provided (unindexable today) or partials become a
-  filesystem convention (one `.fullbars` file per partial name).
+  filesystem convention (one `.classicbars` file per partial name).
 
 ## Status
 

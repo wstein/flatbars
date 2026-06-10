@@ -7,12 +7,12 @@ sidebar:
 *Status:* Proposed. *Date:* 2026-06-03. *Supersedes* [ADR-006](/adr/adr-0006-maxbars-loop-variables/)
 Decision §1–2 (the bare loop-variable vocabulary) and §5 (its v1 outer-loop limit). *Extends*
 [ADR-013](/adr/adr-0013-labelled-loops/) (labelled loops → `outer`). Applies to *MaxBars and RawBars*
-only; FullBars is unchanged (Handlebars-faithful).
+only; ClassicBars is unchanged (Handlebars-faithful).
 
 *Amendment (2026-06-07).* The flat enclosing-loop names `parent-index` / `parent-key` /
 `parent-first` / `parent-last` are **removed**. The enclosing loop is reached through the
 `loop` chain instead — `loop.parent.index0`, `loop.parent.key`, … (deeper nesting climbs
-`loop.parent.parent.…`) — and `loop` is now a first-class scoped root in the catalog. FullBars'
+`loop.parent.parent.…`) — and `loop` is now a first-class scoped root in the catalog. ClassicBars'
 `@../index` lowers to `(lookup loop "parent" "index0")` (byte-identical; the Handlebars `@data`
 namespace and the bare `index`/`index0` aliases are otherwise unchanged — `index` could **not** be
 removed because `@index` is the `@data` key host block helpers supply). The on-demand lint migrates
@@ -25,12 +25,12 @@ still be parenthesised, `{{#each x in (xs | f)}}`). The two loop-binding surface
 
 * **`{{#each}}` binds Liquid-style** — the names come *before* `in`, the collection
   after: `{{#each item in items}}`, `{{#each item i0 i1 in items}}`. Up to three
-  names bind (element, 0-based index/key, 1-based index — one more than FullBars'
+  names bind (element, 0-based index/key, 1-based index — one more than ClassicBars'
   two). `{{#each items}}` (no `in`) is the binding-less form.
 * **`{{#with}}` keeps a drop-pipes `as`** — `{{#with x as p}}` (and custom block
   helpers take their block params the same way).
 
-FullBars keeps the Handlebars bars (`as |a b|`) unchanged — the spelling is selected
+ClassicBars keeps the Handlebars bars (`as |a b|`) unchanged — the spelling is selected
 by the same reserved-variable capability that selects the variable model. A
 companion surface refinement: the `..` range operator (`1..n` ⇒ `(range 1 n)`), free
 in MaxBars because `../` parent-paths are already gone (above), plus the `[…]`/`{…}`
@@ -64,7 +64,7 @@ scoped names, and drop `@`/`../` in MaxBars and RawBars.
 ## Decision
 
 1. *The model is `this` / `loop` / `root` / `parent` / `outer`* — five reserved scoped names, available in
-   *MaxBars and RawBars*. FullBars is untouched: it keeps `@index`/`@root`/`../` (Handlebars
+   *MaxBars and RawBars*. ClassicBars is untouched: it keeps `@index`/`@root`/`../` (Handlebars
    fidelity) and does *not* get these names. The set is *complete*: current context (`this`), current-loop
    metadata (`loop`), a named enclosing loop's metadata (`outer`/labels), enclosing context (`parent`),
    root context (`root`).
@@ -96,17 +96,17 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
    resolves the binding, not a data path — the ADR-013 mechanism, generalized.
 * *MaxBars* — the surface desugar **seeds** the reserved names into `scope` (so `{{loop.first}}`
   desugars to `(lookup (loop) "first")`, not a data lookup). This seeding is *MaxBars-only*: it rides the
-  same dialect hook that already distinguishes MaxBars from FullBars (which seeds nothing). This is "the
+  same dialect hook that already distinguishes MaxBars from ClassicBars (which seeds nothing). This is "the
   MaxBars-only scoped-name seeding."
 * *RawBars* — has no surface desugar, so the names are reached as ordinary *operations* the frame
   installs, in RawBars' explicit style: `{{{loop}}}`, `{{{lookup loop "first"}}}`,
   `{{{lookup (lookup loop "parent") "index0"}}}`.
-* The *engine* installs the same frame bindings for both dialects; FullBars' surface routes bare names to
+* The *engine* installs the same frame bindings for both dialects; ClassicBars' surface routes bare names to
   data lookups, so it never reaches them — no gating of the bindings is required.
 
 1. *`@` and `../` are removed in MaxBars* — at the parser seam (`parseMaxExpr`/`parseMaxHead`): an
    `@`-prefixed name or a `../` run is a *located parse error* that points the author at `root` /
-   `parent` / `loop`. MaxBars-local; FullBars' default parser keeps both. RawBars never had `@`/`../`
+   `parent` / `loop`. MaxBars-local; ClassicBars' default parser keeps both. RawBars never had `@`/`../`
    (no surface), so there is nothing to remove there.
 
 1. *The bare loop-variable vocabulary differs by dialect* (amends ADR-006 §1–2; reconciled with the
@@ -124,7 +124,7 @@ is the enclosing loop's index; `{{parent.name}}` is a field on the enclosing con
    lexes as the subtraction `partial - block` under MaxBars' infix arithmetic. `yield` is added as a
    hyphen-free *synonym* of the `partial-block` scoped operation, installed under both names in the
    partial block frame, so the one yield is spelled `{{yield}}` (MaxBars), `{{{yield}}}`
-   (RawBars), and `{{> @partial-block}}` (FullBars, unchanged). It is reserved like the other
+   (RawBars), and `{{> @partial-block}}` (ClassicBars, unchanged). It is reserved like the other
    roots: a same-named data field is shadowed (read it with an explicit `{{lookup this "yield"}}`),
    and a `label yield` is flagged by the label-shadow lint. The yield is escape-safe (`VSafe`), so
    MaxBars' `{{ }}` form does not re-escape it.

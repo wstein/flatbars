@@ -1,6 +1,6 @@
 -- | The MinBars *surface dialect* — a structural `Template -> Template` rewrite
 -- | from the Mustache surface into core applications over the MinBars prelude
--- | (`MinBars.Prelude`). Like `FullBars.Surface.desugar`, this is a pure rewrite
+-- | (`MinBars.Prelude`). Like `ClassicBars.Surface.desugar`, this is a pure rewrite
 -- | of the one skeleton the parser already produces; the engine then runs the
 -- | result unchanged.
 -- |

@@ -1,12 +1,14 @@
--- | FullBars engine test suite (`spago test -p fullbars`).
+-- | ClassicBars engine test suite (`spago test -p classicbars`).
 -- |
 -- | Exercises the reference engine end to end — rendering, the `lower` real AST,
 -- | the escaping lint, the Aff instantiation, and a pluggable-env engine — over
 -- | the FlatBars framework (parse/foldTemplate/spans).
-module Test.FullBars.Main where
+module Test.ClassicBars.Main where
 
 import Prelude
 
+import ClassicBars (RNode(..), RefEnv, analyseSurface, analyseSurfaceWith, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceMapped, renderSurfaceWith, stringify)
+import ClassicBars.Catalog (helperCatalogMarkdown)
 import Control.Monad.Except.Trans (runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..), isLeft)
@@ -25,8 +27,6 @@ import FlatBars (parse, spanText)
 import FlatBars.Error (Error(..))
 import FlatBars.Syntax (Expr(..), Node(..))
 import FlatBars.Value (Value(..))
-import FullBars (RNode(..), RefEnv, analyseSurface, analyseSurfaceWith, desugarSurface, directiveLints, emptyEnv, escapingWarnings, handlebars, lower, minimal, prelude, preludeEnv, preludeSchema, presence, refEngine, renderSurface, renderSurfaceMapped, renderSurfaceWith, stringify)
-import FullBars.Catalog (helperCatalogMarkdown)
 import Kernel.Engine (Ctl, Engine, Operation, runString, runTemplate)
 import Kernel.Env (withTranslator)
 import Kernel.Prelude (coreSchema, preludeSchema) as KP
@@ -59,7 +59,7 @@ str :: String -> Value
 str = VString
 
 -- Render core syntax straight through the engine (no dialect layer): this suite
--- tests the FullBars *engine*, so it uses `runString` directly rather than the
+-- tests the ClassicBars *engine*, so it uses `runString` directly rather than the
 -- RawBars dialect (which now owns the `render` convenience).
 renderCore :: String -> Value -> Either String String
 renderCore src dat = case runString (refEngine (preludeEnv dat)) src of
@@ -323,7 +323,7 @@ main = do
     )
     "x=[13];y=[2];"
 
-  -- key-based collection filters (ADR-036). FullBars truthiness (handlebars): a
+  -- key-based collection filters (ADR-036). ClassicBars truthiness (handlebars): a
   -- `0`/`""`/`false` field is falsy. `where`/`reject`/`some`/`every` 2-arg test the
   -- key's truthiness; the 3-arg form tests equality (engine eq).
   let
@@ -343,7 +343,7 @@ main = do
   expectS "p-some-true" "{{#if (some xs \"active\")}}y{{else}}n{{/if}}" rows "y"
   expectS "p-every-false" "{{#if (every xs \"active\")}}y{{else}}n{{/if}}" rows "n"
   expectS "p-every-vacuous" "{{#if (every xs \"active\")}}y{{else}}n{{/if}}" (xsObj []) "y"
-  -- the 2-arg truthy form is env-rule-dependent: under FullBars `handlebars`, a `0`
+  -- the 2-arg truthy form is env-rule-dependent: under ClassicBars `handlebars`, a `0`
   -- field is falsy, so `where` drops it (MaxBars keeps it — pinned in test:compile).
   expectS "p-where-zero-falsy" "{{{ count (where xs \"c\") }}}"
     (xsObj [ obj [ Tuple "c" (VNumber 0.0) ], obj [ Tuple "c" (VNumber 1.0) ] ])
@@ -534,7 +534,7 @@ main = do
   row "safe-empty" (VSafe "") false true true
   row "NaN" (VNumber nan) true true true
 
-  -- ADR-022: truthiness is the engine's *fixed* rule (handlebars for FullBars) —
+  -- ADR-022: truthiness is the engine's *fixed* rule (handlebars for ClassicBars) —
   -- there is no per-file @truthiness directive. The conditionals/operators read
   -- that one rule; `includeZero` is the only per-call exception.
   let
@@ -763,13 +763,13 @@ main = do
     (obj [ Tuple "top" (str "T"), Tuple "u" (obj [ Tuple "name" (str "x") ]) ])
     "T"
 
-  -- FullBars accepts the Handlebars raw block `{{{{raw}}}}` (no `#`); the FlatBars
+  -- ClassicBars accepts the Handlebars raw block `{{{{raw}}}}` (no `#`); the FlatBars
   -- `{{{{#raw}}}}` spelling is a RawBars/MaxBars shape that real Handlebars rejects,
-  -- so FullBars rejects it too.
+  -- so ClassicBars rejects it too.
   expect "raw-block" "{{{{raw}}}}{{name}} stays{{{{/raw}}}}" VNull "{{name}} stays"
   expectError "raw-block-hash-rejected" "{{{{#raw}}}}{{name}} stays{{{{/raw}}}}" VNull
 
-  -- Handlebars-extra shapes (FullBars accepts). The inverted section {{^x}}
+  -- Handlebars-extra shapes (ClassicBars accepts). The inverted section {{^x}}
   -- desugars to {{#unless x}}; the triple variant {{{^x}}} is the same.
   expectS "inverse-section" "{{^admin}}guest{{/admin}}" (obj [ Tuple "admin" (VBool false) ])
     "guest"
@@ -830,7 +830,7 @@ main = do
     (obj [ Tuple "user" (obj [ Tuple "name" (str "Ada") ]) ])
     "Ada"
   expectS "surface-index" "{{ xs.1 }}" (obj [ Tuple "xs" (arr [ str "a", str "b" ]) ]) "b"
-  -- the MaxBars-only loop-variable guarantee: in FullBars a bare loop-variable
+  -- the MaxBars-only loop-variable guarantee: in ClassicBars a bare loop-variable
   -- *name* is a plain data path, NOT the loop datum. `{{index0}}` reads the field
   -- "index0" (the loop index is `{{@index}}` here); MaxBars is the dialect that
   -- makes bare `{{index0}}` the scoped variable.
@@ -999,9 +999,9 @@ main = do
   expectS "block-partial-fallback" "{{#partial \"missing\"}}<i>fb</i>{{/partial}}" VNull "<i>fb</i>"
 
   -- ADR-005 amendment: `yield` is the RawBars/MaxBars spelling and is NOT bound in
-  -- FullBars — a partial referencing the hyphen-free `{{yield}}` finds no body and
-  -- (under FullBars' lenient resolve) renders empty. FullBars uses `{{> @partial-block}}`.
-  expectP "block-partial-yield-not-fullbars" [ Tuple "layout" "<div>{{yield}}</div>" ]
+  -- ClassicBars — a partial referencing the hyphen-free `{{yield}}` finds no body and
+  -- (under ClassicBars' lenient resolve) renders empty. ClassicBars uses `{{> @partial-block}}`.
+  expectP "block-partial-yield-not-classicbars" [ Tuple "layout" "<div>{{yield}}</div>" ]
     "{{#partial \"layout\"}}<b>{{ name }}</b>{{/partial}}"
     (obj [ Tuple "name" (str "Ada") ])
     "<div></div>"
@@ -1017,7 +1017,7 @@ main = do
     (obj [ Tuple "name" (str "Bo") ])
     "hi Bo"
 
-  -- Handlebars block-partial sigil {{#> name}}…{{/name}} (FullBars only): desugars
+  -- Handlebars block-partial sigil {{#> name}}…{{/name}} (ClassicBars only): desugars
   -- to the SAME core form as the {{#partial name}}…{{/partial}} spelling, so the
   -- two render identically (a registered `greeting` partial yields the body via
   -- {{> @partial-block}}; the close is matched by the headed name `greeting`).
@@ -1031,7 +1031,7 @@ main = do
     (obj [ Tuple "name" (str "Ada") ])
     "<div><b>Ada</b></div>"
 
-  -- inline-partial decorator {{#*inline "name"}}…{{/inline}} (FullBars): the core
+  -- inline-partial decorator {{#*inline "name"}}…{{/inline}} (ClassicBars): the core
   -- lexes `{{#*` as the `Decorator` sigil (head `inline`, close {{/inline}}), `"row"`
   -- its sole argument; the surface maps it to the hoisted inline definition.
   expectS "inline-decorator-sigil"
@@ -1048,7 +1048,7 @@ main = do
   expectSError "inline-bare-rejected-nested"
     "{{#each xs}}{{#inline \"row\"}}x{{/inline}}{{/each}}"
     "DisallowedShape"
-  -- block-scoped `{{#let}}` is MaxBars-only (ADR-024): in FullBars it is a located
+  -- block-scoped `{{#let}}` is MaxBars-only (ADR-024): in ClassicBars it is a located
   -- error, not a silent no-op — and the message points to the MaxBars/with fix.
   expectSError "let-rejected-maxbars-only"
     "{{#let a=1}}{{a}}{{/let}}"
@@ -1056,11 +1056,11 @@ main = do
   expectSError "let-rejected-nested"
     "{{#each xs}}{{#let n=this}}{{n}}{{/let}}{{/each}}"
     "{{#let}}"
-  -- multi-arm `{{#case}}` is a RawBars/MaxBars (nonEmpty-family) construct: FullBars has
+  -- multi-arm `{{#case}}` is a RawBars/MaxBars (nonEmpty-family) construct: ClassicBars has
   -- no `case`, so it is a located error pointing at the {{#if (eq …)}} fix (docs/12).
-  expectSError "case-rejected-fullbars"
+  expectSError "case-rejected-classicbars"
     "{{#case s}}{{when \"a\"}}A{{else}}B{{/case}}"
-    "FullBars has no `case`"
+    "ClassicBars has no `case`"
   expectSError "case-rejected-nested"
     "{{#each xs}}{{#case n}}{{when 1}}one{{/case}}{{/each}}"
     "{{#case}}"
@@ -1069,7 +1069,7 @@ main = do
   -- (the {{#partial}} block-body fallback, reached through the sigil).
   expectS "block-partial-sigil-fallback" "{{#> missing}}<i>fb</i>{{/missing}}" VNull "<i>fb</i>"
 
-  -- the {{#>}} sigil is meaningful only in FullBars: the core lexes it as the
+  -- the {{#>}} sigil is meaningful only in ClassicBars: the core lexes it as the
   -- `PartialBlock` sigil (head = the partial name), but the raw engine has no
   -- surface to map it onto `partial`, so the head `x` is an unknown helper — a
   -- Left at render.
@@ -1311,11 +1311,11 @@ main = do
     "separability: operationDefs = coreOperationDefs <> primitiveOperationDefs (42 primitives)"
     (Map.size KP.preludeSchema.helpers == Map.size KP.coreSchema.helpers + 42)
 
-  -- Set delimiters are EXCLUDED from FullBars (ADR-015): it is the Handlebars-
+  -- Set delimiters are EXCLUDED from ClassicBars (ADR-015): it is the Handlebars-
   -- faithful dialect, and Handlebars has no set delimiters. The `@delimiters`
   -- directive is an inert comment here, so `<%name%>` after it stays literal text,
-  -- never interpolated. (RawBars/MaxBars opt in; FullBars does not.)
-  expect "set-delim excluded from FullBars" "{{! @delimiters: <% %> }}<%name%>"
+  -- never interpolated. (RawBars/MaxBars opt in; ClassicBars does not.)
+  expect "set-delim excluded from ClassicBars" "{{! @delimiters: <% %> }}<%name%>"
     (obj [ Tuple "name" (str "Ada") ])
     "<%name%>"
 
@@ -1358,7 +1358,7 @@ main = do
   -- Helper catalog, MDX twin (ADR-031): same single source as the AsciiDoc
   -- partial, emitted as a GFM table for the Starlight spec site.
   assert' "catalog-md: MDX comment header"
-    (contains (Pattern "{/* Generated from FullBars.preludeSchema") helperCatalogMarkdown)
+    (contains (Pattern "{/* Generated from ClassicBars.preludeSchema") helperCatalogMarkdown)
   assert' "catalog-md: table header row"
     (contains (Pattern "| Operation | Form | Arity | Source | Description |") helperCatalogMarkdown)
   assert' "catalog-md: GFM separator row"

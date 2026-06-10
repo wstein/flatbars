@@ -20,7 +20,7 @@
 // not engine splits): the loop-variable *spelling* differs by the variable model
 // (ADR-021) — RawBars installs bare `index`/`key`/`first`/`last`; MaxBars exposes
 // loop state as `loop.index0`/`loop.key`/… and treats a bare `index` as a data
-// field. (`this`/`root`/`parent` ARE shared.) Also MaxBars rejects the FullBars
+// field. (`this`/`root`/`parent` ARE shared.) Also MaxBars rejects the ClassicBars
 // `{{#*inline}}` decorator. The corpus avoids those constructs by design.
 import { render, renderMaxbars } from "../lab/vendor/flatbars-engine.mjs";
 

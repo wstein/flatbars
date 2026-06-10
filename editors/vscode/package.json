@@ -20,7 +20,7 @@
   "activationEvents": [
     "onLanguage:rawbars",
     "onLanguage:minbars",
-    "onLanguage:fullbars",
+    "onLanguage:classicbars",
     "onLanguage:maxbars"
   ],
   "contributes": {
@@ -49,12 +49,12 @@
         "configuration": "./language-configuration.json"
       },
       {
-        "id": "fullbars",
+        "id": "classicbars",
         "aliases": [
-          "FullBars"
+          "ClassicBars"
         ],
         "extensions": [
-          ".fullbars",
+          ".classicbars",
           ".fbars",
           ".hbs",
           ".handlebars"
@@ -86,7 +86,7 @@
         "path": "./dist/flatbars.tmLanguage.json"
       },
       {
-        "language": "fullbars",
+        "language": "classicbars",
         "scopeName": "source.flatbars",
         "path": "./dist/flatbars.tmLanguage.json"
       },
@@ -136,11 +136,11 @@
           "enum": [
             "rawbars",
             "minbars",
-            "fullbars",
+            "classicbars",
             "maxbars"
           ],
-          "default": "fullbars",
-          "description": "Dialect the FlatBars language server falls back to when the document's languageId and URI extension both fail to resolve. Defaults to FullBars (Handlebars-faithful)."
+          "default": "classicbars",
+          "description": "Dialect the FlatBars language server falls back to when the document's languageId and URI extension both fail to resolve. Defaults to ClassicBars (Handlebars-faithful)."
         }
       }
     },
@@ -154,7 +154,7 @@
         "path": "./snippets/flatbars.json"
       },
       {
-        "language": "fullbars",
+        "language": "classicbars",
         "path": "./snippets/flatbars.json"
       },
       {
@@ -187,7 +187,7 @@
         }
       },
       {
-        "language": "fullbars",
+        "language": "classicbars",
         "scopes": {
           "embeddedDelimiter": [
             "punctuation.section.embedded.flatbars"
@@ -345,7 +345,7 @@
             }
           }
         },
-        "[fullbars]": {
+        "[classicbars]": {
           "enabled": true,
           "rules": {
             "comment": {
@@ -436,7 +436,7 @@
     "flatbars",
     "rawbars",
     "minbars",
-    "fullbars",
+    "classicbars",
     "maxbars"
   ],
   "qna": "https://github.com/wstein/flatbars/discussions",

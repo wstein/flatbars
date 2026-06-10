@@ -51,8 +51,8 @@ export const sidebar = [
         "link": "/adr/adr-0008-rawbars/"
       },
       {
-        "label": "ADR-009: FullBars reference engine",
-        "link": "/adr/adr-0009-fullbars/"
+        "label": "ADR-009: ClassicBars reference engine",
+        "link": "/adr/adr-0009-classicbars/"
       },
       {
         "label": "ADR-010: header directives",
@@ -167,6 +167,10 @@ export const sidebar = [
         "link": "/adr/adr-0037-collection-filter-comparators/"
       },
       {
+        "label": "ADR-038: FullBars → ClassicBars",
+        "link": "/adr/adr-0038-rename-fullbars-classicbars/"
+      },
+      {
         "label": "Final ADR review (2026-06-01)",
         "link": "/adr/adr-final-review/"
       }
@@ -213,8 +217,8 @@ export const sidebar = [
         "link": "/engine/directives/"
       },
       {
-        "label": "The FullBars dialect (vs Handlebars)",
-        "link": "/engine/fullbars-compat/"
+        "label": "The ClassicBars dialect (vs Handlebars)",
+        "link": "/engine/classicbars-compat/"
       },
       {
         "label": "The MaxBars dialect (operators & pipes)",

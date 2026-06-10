@@ -1,6 +1,6 @@
 -- | The shared *render glue*: assemble the prelude environment (with the engine's
 -- | fixed truthiness rule) and run the engine. Dialect-agnostic — every dialect
--- | (RawBars/FullBars/MaxBars) renders through `runResolved`, so it lives in the
+-- | (RawBars/ClassicBars/MaxBars) renders through `runResolved`, so it lives in the
 -- | kernel, not in any one dialect.
 module Kernel.Render
   ( preludeEnv
@@ -42,10 +42,10 @@ runResolved
   -> m String
 runResolved = runResolvedUsing refEngine
 
--- | Like `runResolved`, but with FullBars' Handlebars-style *lenient resolve*: a
+-- | Like `runResolved`, but with ClassicBars' Handlebars-style *lenient resolve*: a
 -- | `{{#x}}` block over data iterates / renders rather than erroring — whether `x`
 -- | is unregistered or a prelude value helper used as a bare block
--- | (`Kernel.Prelude.lenientResolve`). FullBars (and MaxBars, its superset) render
+-- | (`Kernel.Prelude.lenientResolve`). ClassicBars (and MaxBars, its superset) render
 -- | through this; RawBars keeps the strict `runResolved`.
 runResolvedLenient
   :: forall m

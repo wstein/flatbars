@@ -1,6 +1,6 @@
 # Mustache Set Delimiters — Specification & Implementation Plan
 
-Status: **implemented** (all four phases shipped; MinBars 14/14 on the mustache/spec `delimiters` module) · Companions: ADR-015 (set delimiters), ADR-007 (MinBars), ADR-001 (one structural lexer), ADR-014 (highlighting from the lexer) · Scope: **MinBars** (on by default) + **opt-in** for **RawBars / MaxBars** (FullBars excluded — Handlebars has no set delimiters)
+Status: **implemented** (all four phases shipped; MinBars 14/14 on the mustache/spec `delimiters` module) · Companions: ADR-015 (set delimiters), ADR-007 (MinBars), ADR-001 (one structural lexer), ADR-014 (highlighting from the lexer) · Scope: **MinBars** (on by default) + **opt-in** for **RawBars / MaxBars** (ClassicBars excluded — Handlebars has no set delimiters)
 
 ---
 
@@ -44,9 +44,9 @@ Mustache **has** set delimiters; Handlebars **does not** — so the matrix:
   2. **runtime** — `ParseOptions { delimiters :: Maybe { open, close } }`
   3. **CLI** — `flatbars render --delimiters '<% %>' …`
   4. **directive** — `{{! @delimiters: <% %> }}` (header directive, colon + space-separated new pair; rides the comment lexeme exactly like `@truthiness` / `@trim`; sets the file's *initial* pair). **Chosen syntax.**
-- **FullBars** — **excluded.** It is the Handlebars-faithful dialect, and Handlebars has no set delimiters.
+- **ClassicBars** — **excluded.** It is the Handlebars-faithful dialect, and Handlebars has no set delimiters.
 
-The off-by-default invariant is the contract: *with the flag off, RawBars/MaxBars/FullBars lex exactly as before* (byte-identical).
+The off-by-default invariant is the contract: *with the flag off, RawBars/MaxBars/ClassicBars lex exactly as before* (byte-identical).
 
 **Precedence** when several are present: directive (most local) ▸ runtime ▸ CLI ▸ config (most global) — the most-local initial pair wins; inline `{{=...=}}` then overrides mid-stream from that point. (Mirrors how `@truthiness` overrides project config.)
 
@@ -83,7 +83,7 @@ What they exercise — note the whitespace-heavy tail, which is where MinBars's 
 1. **Promote the corpus.** Move `spec-pending/delimiters.json` → `packages/minbars/test/spec/`; add `"delimiters"` to `scripts/vendor-mustache.mjs` MODULES and re-vendor the split fixtures into `lab/examples/vendored/mustache/`.
 2. **Lexer.** Add `mustacheDelims` to `LexOptions` + `RSetDelim` to `RawTok`; implement the gated pair-swap in `FlatBars.Lexer` (sigils-only rebasing, §4.1). Off-by-default ⇒ ladder unchanged.
 3. **MinBars.** Set the flag in MinBars `ParseOptions`; make `RSetDelim` standalone-eligible in `MinBars.Standalone`; handle partial-boundary reset; drop `RSetDelim` from `buildFromTokens`.
-4. **RawBars + MaxBars opt-in (not FullBars).** Thread `delimiters` through `ParseOptions` (runtime); read it from `flatbars.json` (config) and `--delimiters` (CLI); add the `{{! @delimiters: <% %> }}` header directive (parse + carry, like `@trim`/`@truthiness`); enforce the no-whitespace/no-`=` validation with a parse error on a bad pair. Leave FullBars's `ParseOptions` without the knob.
+4. **RawBars + MaxBars opt-in (not ClassicBars).** Thread `delimiters` through `ParseOptions` (runtime); read it from `flatbars.json` (config) and `--delimiters` (CLI); add the `{{! @delimiters: <% %> }}` header directive (parse + carry, like `@trim`/`@truthiness`); enforce the no-whitespace/no-`=` validation with a parse error on a bad pair. Leave ClassicBars's `ParseOptions` without the knob.
 5. **Gate it.** Flip delimiters into `examples:verify` / `test:minbars-spec`; regen `tutorials/src/conformance.json` (and reconcile the tutorial's hand-written `Set delimiters` row → generated); update ADR-007 (deferred → implemented) and ADR-015 (Proposed → Accepted).
 6. **Tutorial.** Promote the static `set-delimiters` block to a live runnable card.
 7. **Highlighting.** Add the `RSetDelim` kind to the ADR-014 Tier-1 `tokenizeTemplate` map.
@@ -91,8 +91,8 @@ What they exercise — note the whitespace-heavy tail, which is where MinBars's 
 ## 7. Acceptance
 
 - `delimiters` 14/14 in `examples:verify` and `test:minbars-spec`.
-- **Ladder-default regression:** with `mustacheDelims` off, the existing RawBars/FullBars/MaxBars corpora render byte-identically (the off-by-default invariant — gate it explicitly).
-- **Ladder opt-in:** a FullBars/MaxBars fixture with `@delimiters` (or the flag) renders custom-delimited tags correctly.
+- **Ladder-default regression:** with `mustacheDelims` off, the existing RawBars/ClassicBars/MaxBars corpora render byte-identically (the off-by-default invariant — gate it explicitly).
+- **Ladder opt-in:** a ClassicBars/MaxBars fixture with `@delimiters` (or the flag) renders custom-delimited tags correctly.
 - The highlighter colours `<%=...=%>` (the ADR-014 corpus gains a delimiters case).
 
 ## 8. Non-goals / resolved questions
@@ -100,4 +100,4 @@ What they exercise — note the whitespace-heavy tail, which is where MinBars's 
 - **Not** rebasing the FlatBars extensions under custom delimiters (§4.1) — spec-undefined; revisit only on demand.
 - **Resolved:** directive syntax is `{{! @delimiters: <% %> }}` (colon + space-separated new pair). It composes with the other header directives; ordering is independent (delimiters affect lexing, `@truthiness`/`@trim` affect later phases).
 - **Resolved:** RawBars/MaxBars get **full Mustache behaviour** — config/runtime/CLI/directive set the *initial* pair, and inline `{{=...=}}` changes work mid-file once enabled (mimic Mustache). Not a directive-only path.
-- **Resolved:** FullBars is **excluded** (mimic Handlebars, which has no set delimiters).
+- **Resolved:** ClassicBars is **excluded** (mimic Handlebars, which has no set delimiters).

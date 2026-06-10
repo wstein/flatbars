@@ -5,7 +5,7 @@
 -- | JS (native control flow, inlined hot helpers, the runtime header);
 -- | byte-for-byte execution conformance against the interpreter is the Node
 -- | harness `packages/compile/conformance.mjs`. Surface-only codegen
--- | (`compileSurface`) is tested in the `fullbars-compile` package.
+-- | (`compileSurface`) is tested in the `classicbars-compile` package.
 module Test.FlatBars.Compile.Main where
 
 import Prelude

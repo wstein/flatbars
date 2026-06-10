@@ -56,7 +56,7 @@ test("a partial name is an operation (like the LSP always-head); the sigil a key
   // {{> card}} — `>` is a keyword (only the sigil, not the trailing space, which
   // VS Code leaves default), `card` paints as the `function`/operation semantic
   // token (purple), matching VS Code (grammar `keyword.control.import` + LSP).
-  const out = highlightTemplate("{{> card}}", "fullbars");
+  const out = highlightTemplate("{{> card}}", "classicbars");
   assert.ok(out.includes('<span class="tk-keyword">&gt;</span><span class="tk-in"> </span><span class="tk-operation">card</span>'), out);
 });
 
@@ -116,8 +116,8 @@ test("a dialect-disallowed shape is flagged tk-error, not painted valid", () => 
   // MaxBars (extras off) rejects {{&x}} and the Handlebars no-hash raw block.
   assert.ok(highlightTemplate("{{&x}}", "maxbars").startsWith('<span class="tk-tag"><span class="tk-error">'));
   assert.ok(highlightTemplate("{{{{raw}}}}b{{{{/raw}}}}", "maxbars").includes('class="tk-error"'));
-  // FullBars (inheritance off) rejects the Mustache {{<l}} sigil.
-  assert.ok(highlightTemplate("{{<l}}x{{/l}}", "fullbars").startsWith('<span class="tk-tag"><span class="tk-error">'));
+  // ClassicBars (inheritance off) rejects the Mustache {{<l}} sigil.
+  assert.ok(highlightTemplate("{{<l}}x{{/l}}", "classicbars").startsWith('<span class="tk-tag"><span class="tk-error">'));
   // …but MinBars allows {{&x}} — no error; braces punctuation, body default.
   assert.ok(highlightTemplate("{{&x}}", "minbars").startsWith('<span class="tk-tag"><span class="tk-punct">'));
 });

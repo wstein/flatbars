@@ -9,8 +9,8 @@
 // drift onto different parsers (or different per-dialect options).
 //
 // Dialect vocabularies differ between the two facades — the Lab uses
-// "core"/"surface"/"maxbars" (rawbars→core, fullbars→surface), the LSP uses
-// "rawbars"/"fullbars"/"maxbars"/"minbars". We pair the ones that resolve to the
+// "core"/"surface"/"maxbars" (rawbars→core, classicbars→surface), the LSP uses
+// "rawbars"/"classicbars"/"maxbars"/"minbars". We pair the ones that resolve to the
 // SAME ParseOptions so the comparison is apples-to-apples; a mismatch means
 // `astJson` and `diagnostics` have diverged on either the parser or the options.
 import { astJson, diagnostics } from "../lab/vendor/flatbars-engine.mjs";
@@ -19,7 +19,7 @@ import { astJson, diagnostics } from "../lab/vendor/flatbars-engine.mjs";
 // pair resolves to identical ParseOptions in both facades.
 const DIALECTS = [
   ["maxbars", "maxbars"], // both → maxOptions
-  ["surface", "fullbars"], // both → defaultParseOptions
+  ["surface", "classicbars"], // both → defaultParseOptions
   ["core", "rawbars"], // both → coreOptions
   ["minbars", "minbars"], // both → minOptions (astJson + diagnostics share it)
 ];
@@ -32,7 +32,7 @@ const CASES = [
   "{{#if a}}x{{/each}}", // mismatched close
   "{{> }}", // partial with no name
   "{{{{raw}}}}body{{{{/wrong}}}}", // raw-block name mismatch
-  "{{&x}}", // extras: rejected by core/maxbars, fine in fullbars-as-surface
+  "{{&x}}", // extras: rejected by core/maxbars, fine in classicbars-as-surface
   "{{<layout}}x{{/layout}}", // inheritance: rejected outside minbars
   "before {{#with o}}{{a}} after", // unclosed with, content around it
   "{{=<% %>=}}", // set-delimiter: only minbars accepts; an error elsewhere
@@ -65,7 +65,7 @@ for (const src of CASES) {
 if (fails) {
   console.error(
     `\n✘ check:parse-views — ${fails} case(s) where the AST view and the diagnostics disagree.\n` +
-      `  Both must project the one recovering parser (ADR-023); see packages/js/src/FullBars/JS.purs.`,
+      `  Both must project the one recovering parser (ADR-023); see packages/js/src/ClassicBars/JS.purs.`,
   );
   process.exit(1);
 }

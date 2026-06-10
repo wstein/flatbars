@@ -1,7 +1,7 @@
 -- | X2 acceptance tests for `Linter.Migrate` (Handlebars → MaxBars source
 -- | migrator). The strong oracle is **render-equivalence**: for mechanical
 -- | templates with NO residual, the original Handlebars source rendered by
--- | `FullBars.renderSurface` must equal the migrated MaxBars source rendered by
+-- | `ClassicBars.renderSurface` must equal the migrated MaxBars source rendered by
 -- | `MaxBars.renderMax`, across a small data matrix — proving the rewrite
 -- | preserves meaning. Plus residual-report assertions and a couple of direct
 -- | source-shape checks.
@@ -9,6 +9,7 @@ module Test.Linter.Migrate (main) where
 
 import Prelude
 
+import ClassicBars (renderSurface)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Map as Map
@@ -18,7 +19,6 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import FullBars (renderSurface)
 import Linter.Migrate (Residual, migrateToMaxBars)
 import MaxBars (renderMax)
 import Test.Assert (assert')

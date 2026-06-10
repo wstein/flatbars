@@ -13,8 +13,8 @@ the ADR-001 review. Suggestions rated 1–5 (5 = adopt now).
 *Post-review status (2026-06-01).* Several rating-5 items below were actioned in the same pass:
 the two extension axes are now named in [adr-0004-token-lexer-and-grammar-seams](/adr/adr-0004-token-lexer-and-grammar-seams/);
 superset-vs-isolation is sharpened in [adr-0003-strict-layering](/adr/adr-0003-strict-layering/)/[adr-0005-dialect-ladder](/adr/adr-0005-dialect-ladder/);
-the engine-conformance checklist landed in [host-api](/engine/host-api/) §7.7; the "FullBars" term is split in
-[adr-0008-rawbars](/adr/adr-0008-rawbars/)/[adr-0009-fullbars](/adr/adr-0009-fullbars/) and the RawBars docstring fixed; the
+the engine-conformance checklist landed in [host-api](/engine/host-api/) §7.7; the "ClassicBars" term is split in
+[adr-0008-rawbars](/adr/adr-0008-rawbars/)/[adr-0009-classicbars](/adr/adr-0009-classicbars/) and the RawBars docstring fixed; the
 directives decision is recorded in [adr-0010-header-directives](/adr/adr-0010-header-directives/) and the `mustache` alias added
 to [directives](/engine/directives/). *Still open (code, not docs):* the recursion guard
 ([adr-0012-recursion-budget](/adr/adr-0012-recursion-budget/)), the two regression tests, and the loop-variable warn-always
@@ -39,18 +39,18 @@ sentences, three mechanisms. Right now ADR-004 blurs A and B in one 'Watch' note
 *Consensus:* name the two axes explicitly in ADR-004 and cross-link ADR-007's sigils to axis B.
 *Rating 5.*
 
-### 2. "RawBars ⊂ FullBars ⊂ MaxBars" vs. "no dialect imports another"
+### 2. "RawBars ⊂ ClassicBars ⊂ MaxBars" vs. "no dialect imports another"
 
-*Petra:* "ADR-003 says dialects never import each other; ADR-005 says `maxbars → fullbars` is fine.
+*Petra:* "ADR-003 says dialects never import each other; ADR-005 says `maxbars → classicbars` is fine.
 Both are in the record, a click apart. That looks like the dogma cracked."
 
 *Kai:* "It didn't crack — it was never about imports. `⊂` is a *surface-superset* claim: every MaxBars
-template that avoids operators is a FullBars template. Package isolation is a *different* property,
-and RawBars *does* have it (FullBars-free closure, ADR-003). MaxBars deliberately trades isolation for
+template that avoids operators is a ClassicBars template. Package isolation is a *different* property,
+and RawBars *does* have it (ClassicBars-free closure, ADR-003). MaxBars deliberately trades isolation for
 reuse because it genuinely *is* a superset. The fix is wording: say 'no dialect imports another
 *except along the ladder's superset edge*,' and state plainly that `⊂` ≠ isolation."
 
-*Soren:* "Then make it falsifiable: a test asserting RawBars' closure excludes `fullbars`, so the one
+*Soren:* "Then make it falsifiable: a test asserting RawBars' closure excludes `classicbars`, so the one
 allowed exception can't quietly become two."
 
 *Consensus:* reword both ADRs to separate *superset* from *isolation*; add the closure test.
@@ -115,25 +115,25 @@ A future change touches one, not all three. Separate records, heavily cross-link
 *Consensus:* keep them separate. *Rating 4* (for the cross-linking, which was thin in the first
 drafts).
 
-### 7. "FullBars" names two different things (ADR-008/009)
+### 7. "ClassicBars" names two different things (ADR-008/009)
 
-*Kai:* "ADR-008 says RawBars' closure is *FullBars-free*, then RawBars' own docstring says it renders
-'against the FullBars reference engine.' Both ship. A reader cannot tell whether RawBars uses FullBars
+*Kai:* "ADR-008 says RawBars' closure is *ClassicBars-free*, then RawBars' own docstring says it renders
+'against the ClassicBars reference engine.' Both ship. A reader cannot tell whether RawBars uses ClassicBars
 or not."
 
-*Devi:* "Because 'FullBars' is overloaded. There's *FullBars the engine* — value policy + prelude +
-`lower`, which moved to `kernel` (ADR-003) — and *FullBars the package/dialect*, which is now only the
+*Devi:* "Because 'ClassicBars' is overloaded. There's *ClassicBars the engine* — value policy + prelude +
+`lower`, which moved to `kernel` (ADR-003) — and *ClassicBars the package/dialect*, which is now only the
 surface desugar + renderers + catalog. RawBars uses the former (via `kernel`) and not the latter. The
 prose conflates them, and ADR-008's own *Con* admits the docstring is stale."
 
 *Mara:* "This is the same disease as tension #1 and #2 — one word, two referents. Decide the
-vocabulary: 'the *reference engine*' = the `kernel` machinery; 'the *FullBars dialect*' = the package.
+vocabulary: 'the *reference engine*' = the `kernel` machinery; 'the *ClassicBars dialect*' = the package.
 Then RawBars' sentence becomes true: 'renders against the reference engine, with no surface desugar.'"
 
 *Petra:* "And fix the RawBars docstring in the same change, or we've documented the bug instead of
 the decision."
 
-*Consensus:* split the term — *reference engine* (kernel) vs *FullBars dialect* (package) — in ADR-008/009
+*Consensus:* split the term — *reference engine* (kernel) vs *ClassicBars dialect* (package) — in ADR-008/009
 and the RawBars docstring. *Rating 4.*
 
 ## Consensus summary
@@ -141,9 +141,9 @@ and the RawBars docstring. *Rating 4.*
 1. *Name the two extension axes* — grammar seam (`parseExpr`/`parseHead`) vs. shape gate
    (`extras`/sigils) — in ADR-004; stop letting one word cover both.
 1. *Separate "superset" from "isolation"* in ADR-003/005; the ladder's `⊂` is about surface, the
-   isolation rule is about imports, and they have exactly one sanctioned crossing (`maxbars → fullbars`).
+   isolation rule is about imports, and they have exactly one sanctioned crossing (`maxbars → classicbars`).
    (Later narrowed: the 2026-06-04 ADR-005 amendment redefines `⊂` as surface-superset *modulo
-   documented exceptions* — MaxBars borrows most of FullBars's surface, not all, so Kai's "genuinely
+   documented exceptions* — MaxBars borrows most of ClassicBars's surface, not all, so Kai's "genuinely
    *is* a superset" above holds only up to those exceptions.)
 1. *Write the engine-conformance checklist now* — it is load-bearing in ADR-001/002/007 and exists
    nowhere.
@@ -151,7 +151,7 @@ and the RawBars docstring. *Rating 4.*
    (truthiness default, recursion guard) land first and stay green.
 1. *The loop-variable shadow check warns always, errors with a schema.*
 1. *003/004/005 stay separate* — different reversal costs — but cross-linked.
-1. *Disambiguate "FullBars"* — the *reference engine* (the `kernel` machinery) vs the *FullBars
+1. *Disambiguate "ClassicBars"* — the *reference engine* (the `kernel` machinery) vs the *ClassicBars
    dialect* (the package: surface desugar + renderers + catalog). RawBars uses the former, not the
    latter; the prose must say so.
 
@@ -175,10 +175,10 @@ and the RawBars docstring. *Rating 4.*
 1. *Add the engine-conformance checklist to [host-api](/engine/host-api/)*: escape fn · stringify · truthiness
    default · raw-output safety stance · admitted sigil set · real-AST shape (or "none").
 1. *Add two regression tests*: (a) `parse` yields the same `Sep` shape for `else` and `user` (ADR-001's
-   crown jewel); (b) RawBars' dependency closure excludes `fullbars` (ADR-003/005's isolation claim).
+   crown jewel); (b) RawBars' dependency closure excludes `classicbars` (ADR-003/005's isolation claim).
 1. *Implement the recursion guard as ADR-007 P0* and immediately point the reference `partialH` at it,
    closing the unbounded-recursion gap that exists *today* regardless of MinBars.
 1. *Promote the loop-variable shadow check to warn-always* with the schema-present error retained.
 1. *Add an ADR index page* (this nav group) so the set is navigable and new ADRs have an obvious home.
-1. *Fix the RawBars module docstring* to say "the reference engine" rather than "the FullBars reference
+1. *Fix the RawBars module docstring* to say "the reference engine" rather than "the ClassicBars reference
    engine," matching ADR-008/009's split term and ADR-008's own *Con*.

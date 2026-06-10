@@ -25,7 +25,7 @@ anti-flash seed, and `ThemeSelect.astro` is empty (the element is the sole theme
 control). The sidebar, TOC and search are otherwise unchanged. The spec was
 migrated from Antora/AsciiDoc to Starlight in ADR-031; the `.mdx` are the
 maintained source (the one-time converter is gone), and the helper catalog is
-generated into `spec/src/partials/helper-catalog.mdx` from `FullBars.Catalog`.
+generated into `spec/src/partials/helper-catalog.mdx` from `ClassicBars.Catalog`.
 
 ## Toolchain & commands
 
@@ -54,7 +54,7 @@ npm run build:spec     # astro build: MDX validity + Pagefind + starlight-links-
 Conventions: every ADR page must be linked from `spec/src/sidebar.ts`
 (`check:adr-nav`); the helper catalog is generated into
 `spec/src/partials/helper-catalog.mdx` by `npm run gen:catalog` from the one
-`FullBars.Catalog` source (`check:catalog`); the token palette is copied into
+`ClassicBars.Catalog` source (`check:catalog`); the token palette is copied into
 `spec/src/styles/` by `gen:tokens` (`check:tokens`); `check:glossary` reads the
 spec MDX. Spec deps live in `spec/package.json` (not the root install). The one
 PlantUML diagram became an ASCII flow; richer Mermaid diagrams are a follow-up.
@@ -62,7 +62,7 @@ PlantUML diagram became an ASCII flow; richer Mermaid diagrams are a follow-up.
 Run one package's PureScript tests directly (faster than `npm test`):
 
 ```sh
-spago test -p maxbars        # or flatbars / fullbars / kernel / rawbars / flatbars-json / fullbars-compile / flatbars-js
+spago test -p maxbars        # or flatbars / classicbars / kernel / rawbars / flatbars-json / classicbars-compile / flatbars-js
 ```
 
 There is no finer-grained-than-package test runner; each package's tests run
@@ -74,7 +74,7 @@ which they invoke):
 ```sh
 npm run test:compile   # conformance harness: asserts the INTERPRETER and the COMPILED JS
                        # produce byte-identical output for every case
-npm run check:catalog  # fails if docs' helper-catalog partial is stale vs FullBars.preludeSchema
+npm run check:catalog  # fails if docs' helper-catalog partial is stale vs ClassicBars.preludeSchema
 npm run gen:catalog    # regenerate that partial after changing the prelude
 ```
 
@@ -85,14 +85,14 @@ Differential conformance proofs live under `conformance/` (both gated in `npm
 test`, both write a committed `report.json` so the score can't silently drift):
 
 ```sh
-npm run gen:hbs-conformance       # FullBars vs the REAL handlebars npm pkg (dev-only oracle),
+npm run gen:hbs-conformance       # ClassicBars vs the REAL handlebars npm pkg (dev-only oracle),
 npm run check:hbs-conformance     # asserting byte-identical; currently 49/50 (98%)
 npm run gen:mustache-conformance  # MinBars vs the FULL official mustache/spec (every module),
 npm run check:mustache-conformance # 184/184 (100%) of the modules MinBars implements
 ```
 
 `conformance/handlebars/` renders a categorised corpus through real Handlebars
-*and* FullBars; `conformance/mustache/` runs the whole vendored `mustache/spec`
+*and* ClassicBars; `conformance/mustache/` runs the whole vendored `mustache/spec`
 (optional `~` modules included) through MinBars against each fixture's own
 `expected`. Each dir's `README.md` documents the method and the boundary
 (in-data lambdas: value-producing → precompute, body-aware → a block helper —
@@ -107,7 +107,7 @@ node scripts/vendor-mustache.mjs   # re-vendor lab/examples/vendored/mustache/ a
 npm run test:minbars-spec     # LENIENT measurement: per-module pass counts; always exits 0
 npm run test:lab              # FlatBars Lab pure-Node unit tests (playground_utils, adapter)
 npm run check:provenance      # tiling gate (in `npm test`): the source map (ADR-035) tiles
-                              # the output for every core/FullBars/MaxBars example
+                              # the output for every core/ClassicBars/MaxBars example
 npm run test:lab:browser      # OPT-IN real-browser smoke (NOT in `npm test`): drives Brave via
                               # puppeteer-core to confirm the three-way provenance linking paints
                               # (needs a Chromium-family browser; set FLATBARS_BROWSER to override)
@@ -165,7 +165,7 @@ of helper frames + current context).
    attaches **no meaning** — it doesn't know what `each` is, doesn't know
    `else`, does no name resolution.
 2. **Walk.** An engine supplies the second pass. The reference engine lives in
-   `kernel` + `fullbars`.
+   `kernel` + `classicbars`.
 
 Key core facts (see `concepts.mdx`): everything is a helper application
 (`{{{city}}}` *calls* helper `city` — there are no variables); application is
@@ -189,16 +189,16 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   in a `WriterT` to emit a tiling output→source map — source maps, ADR-035),
   `Inspect` (`inspectResolvedLenient`: the same driver snapshotting the render
   context at a target span — the Context Inspector, ADR-035), `Value`, `Walk`.
-- **`fullbars`** — the reference engine + its surface dialect (`{{ }}`
+- **`classicbars`** — the reference engine + its surface dialect (`{{ }}`
   auto-escape, dotted paths, `@data`, `as |x|`). Re-exports kernel modules and
   adds surface desugar/compile/render.
-- **The dialect ladder: RawBars ⊂ FullBars ⊂ MaxBars** (the `⊂` is surface-superset
-  *modulo documented exceptions* — MaxBars is the flagship that reuses FullBars's engine
+- **The dialect ladder: RawBars ⊂ ClassicBars ⊂ MaxBars** (the `⊂` is surface-superset
+  *modulo documented exceptions* — MaxBars is the flagship that reuses ClassicBars's engine
   wholesale and borrows most, not all, of its surface; see the ADR-005 amendment).
   All three share one
   engine, prelude, and compiler, differing mainly in *surface syntax* (swapped in
   through the `ParseOptions.parseExpr` seam). They *diverge* in one value-policy
-  axis — truthiness (ADR-022): FullBars uses `handlebars`, RawBars/MaxBars use
+  axis — truthiness (ADR-022): ClassicBars uses `handlebars`, RawBars/MaxBars use
   `nonEmpty` (`false null "" [] {}` falsy; `0` truthy), MinBars uses `mustache`
   (the *language-agnostic* spec rule — `0`/`""`/`{}` truthy, as in Ruby/Python
   Mustache). Note `mustache.js` (the JS implementation) instead treats `0`/`""` as
@@ -210,7 +210,7 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   `mustache-spec` (not bare `mustache`) so its findings never imply a `mustache.js`
   flip that does not apply (ADR-022 S1/S2).
   A second `LexConfig` knob diverges too — **`mustacheDelims`** (set-delimiter
-  support, `{{=A B=}}`): **MinBars only** (ADR-015 amendment). FullBars / RawBars /
+  support, `{{=A B=}}`): **MinBars only** (ADR-015 amendment). ClassicBars / RawBars /
   MaxBars all set `mustacheDelims = false`, and the LSP layers
   `dialectDiagnostics` on top so an attempted set-delim in one of those dialects
   surfaces as an actionable "use MinBars" message instead of a raw parse failure
@@ -240,13 +240,13 @@ name-agnostic `Sep` *separator* the engine splits on, not a keyword.
   - **`rawbars`** — the *desugared core surface*: core skeleton syntax directly, no surface sugar
     (it still runs the engine — it is the form the richer surfaces desugar to, *not* the meaning-free
     core, which is the `core`/`flatbars` parser package).
-  - **`fullbars`** — adds the Handlebars-style surface desugar.
-  - **`maxbars`** — the flagship surface: reuses FullBars's engine by dependency and
+  - **`classicbars`** — adds the Handlebars-style surface desugar.
+  - **`maxbars`** — the flagship surface: reuses ClassicBars's engine by dependency and
     adds infix operators and pipes (`MaxBars.Expr`), desugaring to the same core
-    `Expr`. Borrows most of FullBars's surface, not quite all (a few FullBars-only
+    `Expr`. Borrows most of ClassicBars's surface, not quite all (a few ClassicBars-only
     constructs diverge — see `engine/maxbars.mdx`).
 - **`compile`** (`flatbars-compile`) — the dialect-agnostic emit driver →
-  `export default function (data, rt)`. **`fullbars-compile`** layers the
+  `export default function (data, rt)`. **`classicbars-compile`** layers the
   surface compiler on top. Emitted JS runs against
   `packages/compile/runtime/flatbars-runtime.mjs`.
 - **`json`** (`flatbars-json`) — JSON ⇆ `Value` adapter, deliberately kept out
@@ -280,7 +280,7 @@ The **`tutorials`** site (Astro + Preact, also not a PureScript package) is the
 learner-facing front end: every surface now has a comprehensive runnable
 reference — **MinBars/Mustache** (`/minbars`, the recommended start) leads, with
 **RawBars** (`/rawbars`, the desugared core surface, live compiled-JS pane),
-**FullBars** (`/fullbars`, Handlebars-faithful), and **MaxBars** (`/maxbars`, the
+**ClassicBars** (`/classicbars`, Handlebars-faithful), and **MaxBars** (`/maxbars`, the
 flagship: infix operators, pipes, bare loop vars) alongside. Beyond the dialects,
 two *tooling* guides: **Truthiness portability** (`/analyse`, analyse mode —
 Lab-first, the ambiguous-value findings + JSONata fix) and **Linting & migration**
@@ -319,7 +319,7 @@ run in `.github/workflows/editors.yml`, path-filtered to the editor surface (ADR
 amendment). Both VS Code and JetBrains packagers share one esbuild-pinned bundle step
 (`editors/shared/sync.mjs`). Diagnostics shipped (ADR-023's recovering parser), and
 so did hover/completion: the server reads `editors/operations.json` — `preludeSchema`
-projected by `FullBars.Catalog.operations`, gated by `check:operations` like the
+projected by `ClassicBars.Catalog.operations`, gated by `check:operations` like the
 catalog — and gates both on being inside a tag via `tokenize`. Hover shows the
 ADR-019 kind, arity, and a one-line prose doc from the required `OperationDef.doc`
 field (the single source; run `npm run gen:operations` after a prelude change). A
@@ -345,9 +345,9 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
 
 ### Conventions worth knowing
 
-- **One source of truth for the prelude.** `FullBars.Catalog` renders the
+- **One source of truth for the prelude.** `ClassicBars.Catalog` renders the
   helper catalog; the docs partial and the `check:catalog` gate are generated
-  from `FullBars.preludeSchema`. Change the prelude → run `npm run gen:catalog`.
+  from `ClassicBars.preludeSchema`. Change the prelude → run `npm run gen:catalog`.
 - **One source of truth for the design tokens.** `scripts/gen-tokens.mjs` single-
   sources two token sets from `shared/` into fenced regions of the same consumers,
   so the three front-ends can't drift on either: the seven-family `--c-*` syntax
@@ -433,7 +433,7 @@ plus `check:vsix-integrity` for end-to-end .vsix shape (run before publish).
   re-migration + ADR amendments — because the spelling wasn't settled on paper
   first. When adding a surface construct, write (and freeze) its exact spelling in
   the relevant ADR, then implement once. When a surface *form is removed*, reject
-  the old form with a located, actionable error (`checkSurfaceStrict` — FullBars
+  the old form with a located, actionable error (`checkSurfaceStrict` — ClassicBars
   `{{#let}}`, MaxBars `{{#each … as …}}`); never let it silently no-op. The MaxBars
   binding triad (`each … in`, `with … as`, `let name=value`) is now committed
   surface — see the ADR-021 amendment and `engine/maxbars.mdx`.

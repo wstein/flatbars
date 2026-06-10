@@ -12,8 +12,8 @@ package:
     - either
     - flatbars
     - foldable-traversable
-    - fullbars
-    - fullbars-compile
+    - classicbars
+    - classicbars-compile
     - integers
     - kernel
     - maybe

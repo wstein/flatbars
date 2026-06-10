@@ -88,7 +88,7 @@ try {
     processId: process.pid,
     rootUri: null,
     capabilities: {},
-    initializationOptions: { defaultDialect: "fullbars" },
+    initializationOptions: { defaultDialect: "classicbars" },
   });
   assert.ok(init.capabilities.semanticTokensProvider, "bundled server advertises semantic tokens");
   assert.ok(init.capabilities.codeActionProvider, "bundled server advertises code actions");

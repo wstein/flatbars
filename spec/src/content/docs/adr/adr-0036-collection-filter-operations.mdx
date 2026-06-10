@@ -8,7 +8,7 @@ sidebar:
 catalog 100 → 105). The comparator extension this ADR left open is its fast-follow,
 [ADR-037](/adr/adr-0037-collection-filter-comparators/). *Date:* 2026-06-08.
 Owner: Werner. Five value operations added to the *shared prelude*
-(RawBars / FullBars / MaxBars / MinBars), pipe-able through the existing MaxBars
+(RawBars / ClassicBars / MaxBars / MinBars), pipe-able through the existing MaxBars
 pipe — **no new surface syntax**. Builds on
 [ADR-019](/adr/adr-0019-operation-vocabulary/) (the operation vocabulary),
 [ADR-020](/adr/adr-0020-user-block-helpers/) (the no-`Value`-functions boundary —
@@ -52,7 +52,7 @@ One constraint dominates the design:
 The other relevant fact: the *truthy* form is truthiness-rule-dependent
 ([ADR-022](/adr/adr-0022-analyse-mode/)). `where xs "count"` keeps items whose
 `count` is truthy — and `0` is truthy under MaxBars/RawBars (`nonEmpty`) but falsy
-under FullBars (`handlebars`). The equality form (`where xs "count" 0`) is
+under ClassicBars (`handlebars`). The equality form (`where xs "count" 0`) is
 rule-independent.
 
 ## Decision
@@ -113,7 +113,7 @@ collection operations.
 
 Shared prelude, like `list`/`sortBy`/`groupBy` — value-only, no surface change, so
 every dialect gets the operations (RawBars writes them explicitly, MaxBars pipes
-them). FullBars's Handlebars conformance is value-only and untouched (the
+them). ClassicBars's Handlebars conformance is value-only and untouched (the
 `check:hbs-conformance` `49/50` line must stay green — verified in *Gates*). There
 is no MaxBars-only sugar here: the asymmetry is `>=` → `(gte …)`-style only when a
 *surface operator* is involved, and this ADR adds none.
@@ -129,10 +129,10 @@ is no MaxBars-only sugar here: the asymmetry is `>=` → `(gte …)`-style only 
 * *`check:catalog` / `check:operations`* — five new `valDef`s ⇒ regenerate the
   helper catalog and `operations.json`; the catalog count moves (100 → 105).
 * *`check:hbs-conformance`* — re-run; value-only additions must not move the `49/50`
-  FullBars line.
+  ClassicBars line.
 * *Truthiness footgun, pinned.* A test asserts the 2-arg `where`/`some`/`every`
   honour the *env's* truthiness rule — `where [{c:0}] "c"` keeps the item under
-  MaxBars/RawBars (`0` truthy) and drops it under FullBars (`0` falsy) — so the
+  MaxBars/RawBars (`0` truthy) and drops it under ClassicBars (`0` falsy) — so the
   rule-dependence is a documented, tested property, not a latent surprise. Analyse
   mode ([ADR-022](/adr/adr-0022-analyse-mode/)) already flags `nonEmpty`-vs-`handlebars`
   divergences; the truthy filter forms surface there for free.

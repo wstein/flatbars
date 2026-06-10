@@ -49,7 +49,7 @@ const groups = [
     label: "Other surfaces",
     items: [
       { href: "/rawbars", label: "RawBars — the core" },
-      { href: "/fullbars", label: "FullBars — Handlebars" },
+      { href: "/classicbars", label: "ClassicBars — Handlebars" },
       { href: "/maxbars", label: "MaxBars — operators" },
     ],
   },
@@ -331,7 +331,7 @@ $ ~> | $ | {
         date, compute a total) is <b>precalculated before rendering</b> — in the Lab, with the
         <a href="/transform">JSONata transform</a> (first-class functions and
         closures), though any host-side computation works; the engine just receives plain data. A
-        <b>section lambda</b> that rewrites its block body is a <a href="/fullbars">FullBars</a>
+        <b>section lambda</b> that rewrites its block body is a <a href="/classicbars">ClassicBars</a>
         <b>helper</b>, where render-time behaviour belongs — a preprocess step never sees the
         unrendered body. The guarantee: <em>no arbitrary host code runs from template data, and the
         rendered value stays JSON-serialisable.</em>
@@ -398,7 +398,7 @@ $ ~> | $ | {
     <p>
       Mustache is the on-ramp. When you want real conditionals, helpers, and
       computed values, the FlatBars ladder continues:
-      <a href="/fullbars">FullBars</a> adds Handlebars-style blocks and helpers,
+      <a href="/classicbars">ClassicBars</a> adds Handlebars-style blocks and helpers,
       and <a href="/maxbars">MaxBars</a> adds infix operators and pipes — all on
       the same core. Or jump straight into the
       <a href="/lab/index.html?engine=minbars">Lab</a> and start typing.

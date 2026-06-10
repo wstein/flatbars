@@ -2,7 +2,7 @@
 
 A runnable, lab-themed documentation site. The landing leads with the **thesis** —
 FlatBars is a meaning-free parser, and the four surfaces — **RawBars · MinBars ·
-FullBars · MaxBars** — are languages built on it. **MinBars is the recommended
+ClassicBars · MaxBars** — are languages built on it. **MinBars is the recommended
 start**: a comprehensive `/minbars` reference walks every tag in the logic-less
 Mustache language, each illustrated by a live example that renders through the
 real MinBars engine and opens in the FlatBars Lab (`lab/`) with one click.
@@ -18,7 +18,7 @@ npm run build          # static site → dist/
 
 Pages: `/` (landing — thesis first, MinBars the recommended start) · `/minbars`
 (the comprehensive MinBars / Mustache reference) · `/rawbars` (the desugared core surface reference) ·
-`/fullbars` (the comprehensive FullBars / Handlebars reference) · `/maxbars`
+`/classicbars` (the comprehensive ClassicBars / Handlebars reference) · `/maxbars`
 (the comprehensive MaxBars reference — infix operators, pipes, bare loop vars).
 All four surfaces now have a dedicated reference, so there is no generic
 per-surface lesson page any more. Three tooling guides sit alongside the dialects:
@@ -102,7 +102,7 @@ pill resolves to `/flatbars/spec/`.
 
 - **One source per example, gate-validated:** the Mustache reference's runnable
   examples live in `src/mustache.mjs`, the RawBars reference's in `src/rawbars.mjs`,
-  the FullBars reference's in `src/fullbars.mjs`, the MaxBars reference's in
+  the ClassicBars reference's in `src/classicbars.mjs`, the MaxBars reference's in
   `src/maxbars.mjs`, and the landing-page surface cards in `src/examples.mjs`.
   `scripts/check-tutorial-links.mjs` (in `npm test`) renders
   every one through the real engine bundle (custom-helper examples via the
@@ -112,7 +112,7 @@ pill resolves to `/flatbars/spec/`.
   from what's tested.
 - **Compiled-JS pane (opt-in):** an example can pass `compile` to show its
   template compiled to a JS module. It's guarded on the engine exposing
-  `compileToJs` — the FlatBars dialects (RawBars/FullBars/MaxBars) do, MinBars
+  `compileToJs` — the FlatBars dialects (RawBars/ClassicBars/MaxBars) do, MinBars
   doesn't — so the pane never appears where it can't run. The RawBars reference
   uses it on one flagship.
 - **Prose illustrates; the spec is the contract.** Page copy annotates verified,
@@ -166,7 +166,7 @@ pill resolves to `/flatbars/spec/`.
   count.** It's about the `flatbars` *core* package — the meaning-free parser, which
   has no engine or prelude — guaranteed by the package dependency graph and `npm run
   lint` (`--pedantic-packages`). The shipped engine bundle *does* carry the ~80-helper
-  FullBars prelude (a plug-in), so grepping the bundle for helpers would be the wrong
+  ClassicBars prelude (a plug-in), so grepping the bundle for helpers would be the wrong
   check; the claim is verified by the layering, not a count.
 - **Conformance badges are generated, not asserted.** `npm run gen:conformance`
   runs the vendored `mustache/spec` suite through the shipped MinBars bundle and

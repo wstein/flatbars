@@ -1,12 +1,12 @@
 ---
 // SPDX-License-Identifier: Apache-2.0
 //
-// The comprehensive MaxBars reference — FlatBars' flagship surface: most of FullBars,
+// The comprehensive MaxBars reference — FlatBars' flagship surface: most of ClassicBars,
 // reinterpreted, plus infix operators, a pipe, and bare loop variables. Structured deltas-first
 // (operators → pipes → the identity → loop vars), Jinja-style around an
 // expression core rather than re-walking the Handlebars spine — then the inherited
-// FullBars constructs (shown only with operators woven through, linking to
-// /fullbars rather than re-teaching), the divergences, compile, and a "when (not)
+// ClassicBars constructs (shown only with operators woven through, linking to
+// /classicbars rather than re-teaching), the divergences, compile, and a "when (not)
 // to use" close. Prose is illustrative only; every runnable example comes from the
 // single gate-validated source ../maxbars.mjs and renders through the real
 // `maxbars` engine. The ~80-helper prelude is NOT re-listed (the generated catalog
@@ -30,7 +30,7 @@ const groups = [
       { href: "#filters", label: "Filters" },
       { href: "#identity", label: "The identity" },
       { href: "#loops", label: "Loop variables" },
-      { href: "#inherited", label: "From FullBars" },
+      { href: "#inherited", label: "From ClassicBars" },
       { href: "#together", label: "Putting it together" },
       { href: "#divergences", label: "Where it diverges" },
       { href: "#compile", label: "Compiles to JS" },
@@ -46,7 +46,7 @@ const groups = [
     items: [
       { href: "/minbars", label: "MinBars — Mustache" },
       { href: "/rawbars", label: "RawBars — the core" },
-      { href: "/fullbars", label: "FullBars — Handlebars" },
+      { href: "/classicbars", label: "ClassicBars — Handlebars" },
     ],
   },
   {
@@ -61,7 +61,7 @@ const t = (s) => s;
 
 <Reference
   title="MaxBars — the FlatBars expression language"
-  subtitle="MaxBars is FlatBars' flagship surface — an expression layer over the same meaning-free core: infix operators ({{ a >= b }}), a pipe ({{ value | helper }}), and bare loop variables. The most capable surface in the family; it borrows most of FullBars and adds the expression freedom FullBars holds back — and underneath, every operator is still just a helper application."
+  subtitle="MaxBars is FlatBars' flagship surface — an expression layer over the same meaning-free core: infix operators ({{ a >= b }}), a pipe ({{ value | helper }}), and bare loop variables. The most capable surface in the family; it borrows most of ClassicBars and adds the expression freedom ClassicBars holds back — and underneath, every operator is still just a helper application."
   groups={groups}
   spec="maxbars"
   dialect="maxbars"
@@ -71,10 +71,10 @@ const t = (s) => s;
     <h2>What MaxBars is</h2>
     <p>
       <b>MaxBars is FlatBars' flagship surface — an expression layer over the same
-      meaning-free core.</b> If you've read the <a href="/fullbars">FullBars reference</a>,
-      you'll recognise most of it: MaxBars borrows the bulk of FullBars and adds three
-      things on top (a few FullBars-only constructs are the deliberate exceptions —
-      see <a href="#divergences">where MaxBars and FullBars diverge</a>):
+      meaning-free core.</b> If you've read the <a href="/classicbars">ClassicBars reference</a>,
+      you'll recognise most of it: MaxBars borrows the bulk of ClassicBars and adds three
+      things on top (a few ClassicBars-only constructs are the deliberate exceptions —
+      see <a href="#divergences">where MaxBars and ClassicBars diverge</a>):
     </p>
     <ul class="conv">
       <li><b>Infix operators</b> — <code>{t("{{score >= 50}}")}</code>, <code>{t("{{price * qty}}")}</code>, <code>{t("{{a && b}}")}</code> — instead of nesting subexpressions.</li>
@@ -83,7 +83,7 @@ const t = (s) => s;
     </ul>
     <p>
       None of it is new machinery. <code>{t("{{price * qty}}")}</code> <em>desugars to</em>
-      <code>{t("(multiply price qty)")}</code> — the same helper application FullBars and
+      <code>{t("(multiply price qty)")}</code> — the same helper application ClassicBars and
       RawBars run. MaxBars is sugar that compiles down the ladder, not a second engine.
     </p>
     <p>The simplest template — the panes are live, so start here:</p>
@@ -94,7 +94,7 @@ const t = (s) => s;
         expressions live in the template. If you want strict model-view separation
         (the StringTemplate philosophy — no logic in templates), drop down the ladder:
         <a href="/rawbars">RawBars</a> is the same engine with none of this sugar, and
-        <a href="/fullbars">FullBars</a> sits in between. One core, four levels of
+        <a href="/classicbars">ClassicBars</a> sits in between. One core, four levels of
         expressiveness.
       </p>
     </div>
@@ -132,7 +132,7 @@ const t = (s) => s;
     <h3>Comparisons in conditions</h3>
     <p>
       The everyday use: a comparison as the head of <code>{t("{{#if}}")}</code>. Where
-      FullBars writes the subexpression <code>{t("{{#if (gte stock 10)}}")}</code>, MaxBars
+      ClassicBars writes the subexpression <code>{t("{{#if (gte stock 10)}}")}</code>, MaxBars
       writes the infix form — and chains with <code>{t("{{else if …}}")}</code> and
       <code>{t("{{#unless}}")}</code>. (Arithmetic gets its own showcase in
       <a href="#identity">the identity</a> below.) The one catch: a clause separator
@@ -194,7 +194,7 @@ const t = (s) => s;
       name, so <code>{t("{{price | toFixed 2}}")}</code> is <code>{t("(toFixed price 2)")}</code>.
       Pipes <b>chain</b> left-to-right, each stage feeding the next — the readable way to
       express a sequence of transforms that would otherwise nest inside-out — and the
-      right of a pipe can be <code>{t("lookup")}</code>, the idiom for FullBars's
+      right of a pipe can be <code>{t("lookup")}</code>, the idiom for ClassicBars's
       <code>{t("{{uppercase (lookup …)}}")}</code> subexpression. One example, four pipes:
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.pipes.template} data={ex.pipes.data} />
@@ -242,7 +242,7 @@ const t = (s) => s;
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.identity.template} data={ex.identity.data} />
     <p>
-      So "MaxBars vs FullBars vs RawBars" isn't three engines — it's how much sugar the
+      So "MaxBars vs ClassicBars vs RawBars" isn't three engines — it's how much sugar the
       surface gives you over one core. <a href="/rawbars">RawBars</a> shows the bottom of
       that ladder, where <code>{t("(multiply price qty)")}</code> is all there is.
     </p>
@@ -313,7 +313,7 @@ const t = (s) => s;
       come <em>before</em> <code>in</code>, the collection after — not the Handlebars
       <code>{t("as |p i|")}</code> (a bar in a block head is a parse error here). Up to three names bind:
       the element, the 0-based index, and the 1-based index (<code>{t("{{#each item i0 i1 in items}}")}</code>),
-      one more than <a href="/fullbars">FullBars</a>'s two. The names stay in scope inside nested blocks
+      one more than <a href="/classicbars">ClassicBars</a>'s two. The names stay in scope inside nested blocks
       and reach an outer <em>element</em>, but not the outer loop's <code>{t("index")}</code> /
       <code>{t("length")}</code>. A trailing <code>{t("label NAME")}</code> clause (ADR-013, MaxBars-only)
       names the loop <b>frame</b>, so an inner loop reads <code>{t("outer.index1")}</code>,
@@ -323,20 +323,20 @@ const t = (s) => s;
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.loopParams.template} data={ex.loopParams.data} />
     <h3>The empty case</h3>
-    <p><code>{t("{{#each}}")}</code> carries its own <code>{t("{{else}}")}</code> for an empty list — inherited from FullBars.</p>
+    <p><code>{t("{{#each}}")}</code> carries its own <code>{t("{{else}}")}</code> for an empty list — inherited from ClassicBars.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.eachElse.template} data={ex.eachElse.data} />
   </section>
 
-  <!-- ─────────────────────── Inherited from FullBars ─────────────────── -->
+  <!-- ─────────────────────── Inherited from ClassicBars ─────────────────── -->
   <section id="inherited">
-    <h2>Most of FullBars — with operators inside</h2>
+    <h2>Most of ClassicBars — with operators inside</h2>
     <p>
-      MaxBars borrows FullBars's core underneath, so paths (<code>{t("user.address.city")}</code>,
+      MaxBars borrows ClassicBars's core underneath, so paths (<code>{t("user.address.city")}</code>,
       <code>{t("../x")}</code>, <code>{t("@root")}</code>), the block helpers
       <code>{t("{{#if}}")}</code> / <code>{t("{{#each}}")}</code> / <code>{t("{{#with}}")}</code> /
       <code>{t("{{#unless}}")}</code>, escaping, and subexpressions all work as the
-      <a href="/fullbars">FullBars reference</a> documents them. The headline addition is that
-      operators and pipes can now appear anywhere a value can — and a handful of FullBars-only
+      <a href="/classicbars">ClassicBars reference</a> documents them. The headline addition is that
+      operators and pipes can now appear anywhere a value can — and a handful of ClassicBars-only
       constructs are the deliberate exceptions (see <a href="#divergences">where it diverges</a>).
       The everyday basics carry over unchanged — a dotted path, a missing key rendering empty,
       and comments:
@@ -347,7 +347,7 @@ const t = (s) => s;
     <h3><code>with</code> — re-root the context</h3>
     <OpenInLab client:visible engine="maxbars" template={ex.withBlock.template} data={ex.withBlock.data} />
     <h3>Escaping</h3>
-    <p><code>{t("{{x}}")}</code> HTML-escapes; the triple-stash <code>{t("{{{x}}}")}</code> emits raw markup — unchanged from FullBars.</p>
+    <p><code>{t("{{x}}")}</code> HTML-escapes; the triple-stash <code>{t("{{{x}}}")}</code> emits raw markup — unchanged from ClassicBars.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.escaping.template} data={ex.escaping.data} />
 
     <h3>Raw blocks</h3>
@@ -369,11 +369,11 @@ const t = (s) => s;
       MaxBars resolves <b>external</b> <code>{t("{{> name}}")}</code> against host-supplied partials —
       each itself MaxBars source, so a partial uses the full surface (pipes, infix) — in both the
       interpreter (<code>renderMaxbarsWithPartials</code>) and the compiler
-      (<code>compileMaxbarsWithPartials</code>), exactly like <a href="/fullbars">FullBars</a>.
+      (<code>compileMaxbarsWithPartials</code>), exactly like <a href="/classicbars">ClassicBars</a>.
       Combined with <code>{t("{{#each}}")}</code> it templates a row each, the name resolvable from
       the data (<code>{t("{{> (lookup this \"kind\")}}")}</code>). A template-local
       <code>{t("{{#inline}}")}</code> of the same name wins; only the <code>{t("{{#*inline}}")}</code>
-      <em>decorator</em> stays a FullBars job (see <a href="#divergences">where it diverges</a>).
+      <em>decorator</em> stays a ClassicBars job (see <a href="#divergences">where it diverges</a>).
     </p>
     <OpenInLab client:visible engine="maxbars" template={ex.partials.template} data={ex.partials.data} partials={ex.partials.partials} />
     <h3>Layout partials &amp; <code>{t("{{yield}}")}</code></h3>
@@ -386,7 +386,7 @@ const t = (s) => s;
     <OpenInLab client:visible engine="maxbars" template={ex.layoutPartials.template} data={ex.layoutPartials.data} />
     <h3>Custom helpers</h3>
     <p>
-      MaxBars reuses FullBars's engine, so a host registers operations with the same
+      MaxBars reuses ClassicBars's engine, so a host registers operations with the same
       <code>registerHelper(name, fn)</code> at the JS boundary (native MaxBars calls these
       operations/definitions, <a href={`${SPEC_BASE}adr/adr-0019-operation-vocabulary/`}>ADR-019</a>):
       <code>loud</code> (inline), <code>link</code> (hash args), and <code>list</code> (a block
@@ -415,14 +415,14 @@ const t = (s) => s;
 
   <!-- ───────────────── Where MaxBars diverges ──────────────────────── -->
   <section id="divergences">
-    <h2>Where MaxBars diverges from FullBars</h2>
+    <h2>Where MaxBars diverges from ClassicBars</h2>
     <p>
-      The expression layer costs a few things FullBars has. Each is a direct
+      The expression layer costs a few things ClassicBars has. Each is a direct
       consequence of putting operators and a pipe into the grammar — none is a
       surprise once you see why.
     </p>
     <table class="cmp">
-      <thead><tr><th>FullBars</th><th>MaxBars</th><th>Why</th></tr></thead>
+      <thead><tr><th>ClassicBars</th><th>MaxBars</th><th>Why</th></tr></thead>
       <tbody>
         <tr>
           <td>Bar in a block head <span class="code">{t("{{#each xs | f}}")}</span> / <span class="code">{t("as |x|")}</span></td>
@@ -432,7 +432,7 @@ const t = (s) => s;
         <tr>
           <td>Block partials + <span class="code">{t("{{yield}}")}</span></td>
           <td>bare <span class="code">{t("{{#inline}}")}</span></td>
-          <td>Inline-defined partials work — <span class="code">{t("{{#inline \"layout\"}}<{{yield}}>{{/inline}}")}</span> then <span class="code">{t("{{#partial \"layout\"}}…{{/partial}}")}</span> — where <span class="code">{t("{{yield}}")}</span> renders the caller's block body (MaxBars' bare spelling of Handlebars' <span class="code">{t("{{> @partial-block}}")}</span>; the <span class="code">@</span> sigil is reserved, so that Handlebars form is rejected). Host-threaded <em>external</em> partials (<span class="code">{t("{{> name}}")}</span>) work too, render and compile. Only the <span class="code">{t("{{#*inline}}")}</span> <em>decorator</em> stays FullBars-only — MaxBars uses bare <span class="code">{t("{{#inline}}")}</span>.</td>
+          <td>Inline-defined partials work — <span class="code">{t("{{#inline \"layout\"}}<{{yield}}>{{/inline}}")}</span> then <span class="code">{t("{{#partial \"layout\"}}…{{/partial}}")}</span> — where <span class="code">{t("{{yield}}")}</span> renders the caller's block body (MaxBars' bare spelling of Handlebars' <span class="code">{t("{{> @partial-block}}")}</span>; the <span class="code">@</span> sigil is reserved, so that Handlebars form is rejected). Host-threaded <em>external</em> partials (<span class="code">{t("{{> name}}")}</span>) work too, render and compile. Only the <span class="code">{t("{{#*inline}}")}</span> <em>decorator</em> stays ClassicBars-only — MaxBars uses bare <span class="code">{t("{{#inline}}")}</span>.</td>
         </tr>
         <tr>
           <td>Infix anywhere</td>
@@ -447,7 +447,7 @@ const t = (s) => s;
         <tr>
           <td>Names with <span class="code">+ - * / % ? :</span> (e.g. <span class="code">{t("{{first-name}}")}</span>, <span class="code">{t("{{done?}}")}</span>)</td>
           <td>need <b>[bracket] segments</b></td>
-          <td>Those are operator characters here, so <span class="code">{t("{{first-name}}")}</span> reads as subtraction and <span class="code">{t("{{done?}}")}</span> as a ternary head. Bracket the key — <span class="code">{t("{{[first-name]}}")}</span>, <span class="code">{t("{{[done?]}}")}</span> — the same segment-literal escape <a href="/fullbars#identifiers">FullBars</a> uses. (In FullBars and Mustache these are ordinary name characters.)</td>
+          <td>Those are operator characters here, so <span class="code">{t("{{first-name}}")}</span> reads as subtraction and <span class="code">{t("{{done?}}")}</span> as a ternary head. Bracket the key — <span class="code">{t("{{[first-name]}}")}</span>, <span class="code">{t("{{[done?]}}")}</span> — the same segment-literal escape <a href="/classicbars#identifiers">ClassicBars</a> uses. (In ClassicBars and Mustache these are ordinary name characters.)</td>
         </tr>
         <tr>
           <td>Mustache-style <span class="code">{t("{{^x}}")}</span> / <span class="code">{t("{{&x}}")}</span> / <span class="code">{t("{{{{raw}}}}")}</span></td>
@@ -489,7 +489,7 @@ const t = (s) => s;
     <p>Reach for a sibling instead when:</p>
     <ul class="conv">
       <li>You want <b>strict model-view separation</b> — push all logic into the model and keep templates dumb. That's <a href="/rawbars">RawBars</a> (or, outside this family, StringTemplate).</li>
-      <li>You want <b>Handlebars compatibility</b> — block params, partials, the <code>{t("{{&x}}")}</code> spellings. That's <a href="/fullbars">FullBars</a>.</li>
+      <li>You want <b>Handlebars compatibility</b> — block params, partials, the <code>{t("{{&x}}")}</code> spellings. That's <a href="/classicbars">ClassicBars</a>.</li>
       <li>You're porting <b>Mustache</b> templates. That's <a href="/minbars">MinBars</a>.</li>
     </ul>
     <p>

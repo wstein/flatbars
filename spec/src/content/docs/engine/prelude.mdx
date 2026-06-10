@@ -6,7 +6,7 @@ sidebar:
 
 import HelperCatalog from "../../../partials/helper-catalog.mdx";
 
-The *reference engine*, *FullBars*, is a Phase-2 walk ([evaluation](/spec/evaluation/)) plus a set of helpers that,
+The *reference engine*, *ClassicBars*, is a Phase-2 walk ([evaluation](/spec/evaluation/)) plus a set of helpers that,
 together with the [surface dialect](/engine/surface/), reproduces Handlebars.js. *None of it is in the core.*
 It is a library you register into the helper environment. Delete `each` and `{{#each}}` stops
 validating; the core is unaffected. Rename `escapeHtml` and update your Surface. This is what "no
@@ -49,7 +49,7 @@ the core does not — they are ordinary separators. `if` rejects a malformed cha
 other than `elif`/`else`, or anything after `else`) as a `ClauseError`, so the error never depends on
 which branch the data takes.
 *Truthiness* is the *engine's* rule (a `Value -> Boolean` callback the conditionals test through;
-[ADR-022](/adr/adr-0022-analyse-mode/)), so it depends on the dialect: **FullBars** uses `handlebars`
+[ADR-022](/adr/adr-0022-analyse-mode/)), so it depends on the dialect: **ClassicBars** uses `handlebars`
 (`false`/`null`/`0`/`""`/`[]` falsy; `{}` and non-zero/non-empty truthy), **RawBars/MaxBars** use
 `nonEmpty` (`false`/`null`/`""`/`[]`/`{}` falsy — `0` truthy), **MinBars** uses `mustache`. The
 `includeZero` option makes the number `0` truthy for one `if`/`unless` test — `pass:[{{#if n (dict
@@ -88,7 +88,7 @@ Scoped helpers installed by `each`:
 | Helper | Form | Behaviour |
 | --- | --- | --- |
 | `partial` | 2–3 | `(partial name ctx hash?)` renders the registered partial `name` with `context = ctx`, the optional `hash` object merged onto it. *As a block* (`{{#partial name}}body{{/partial}}`) the body is the fallback (rendered if `name` is unregistered) and is exposed inside the partial as the scoped `partial-block` helper. Returns `VSafe`. |
-| `inline` | block | `{{#inline "name"}}body{{/inline}}` defines a partial named `name`. Definitions are *hoisted* into the registry before rendering (`FullBars.Surface.hoistInline`) and are global to the render; the block itself emits `""`. |
+| `inline` | block | `{{#inline "name"}}body{{/inline}}` defines a partial named `name`. Definitions are *hoisted* into the registry before rendering (`ClassicBars.Surface.hoistInline`) and are global to the render; the block itself emits `""`. |
 | `partial-block` | 0 | Scoped helper installed by a *block* `partial`; returns the enclosing block body. Target of `{{> @partial-block}}`. |
 
 ## 6.7 A minimal engine is enough
@@ -100,8 +100,8 @@ presumes which of these exist.
 
 ## 6.8 Helper catalog (generated)
 
-The table below is *generated* from `FullBars.preludeSchema` — the same single source the validator
-uses (`FullBars.Catalog.helperCatalogAdoc`; regenerate with `npm run gen:catalog`, checked in CI by
+The table below is *generated* from `ClassicBars.preludeSchema` — the same single source the validator
+uses (`ClassicBars.Catalog.helperCatalogAdoc`; regenerate with `npm run gen:catalog`, checked in CI by
 `npm run check:catalog`). It is the authoritative list of names, arities, block-ness, and one-line
 *descriptions*; each description is the operation's own `doc` (the same string the editor shows on
 hover), so it never drifts from the engine — the prose sections above remain the long-form reference.

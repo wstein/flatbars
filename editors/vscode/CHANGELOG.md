@@ -10,7 +10,7 @@ First public release.
 
 ### Added
 
-- Per-dialect language registration (`rawbars`, `minbars`, `fullbars`,
+- Per-dialect language registration (`rawbars`, `minbars`, `classicbars`,
   `maxbars`) with both long-form (`.rawbars`) and short-form (`.rbars`)
   native extensions.
 - Engine-backed `flatbars-lsp` server, bundled into the extension as a
@@ -36,6 +36,6 @@ First public release.
 - Snippets for common block forms (`if`, `each`, `with`, `let`, `partial`,
   comment).
 - Settings: `flatbars.defaultDialect` selectable via Settings UI (RawBars /
-  MinBars / FullBars / MaxBars).
+  MinBars / ClassicBars / MaxBars).
 
 [0.1.0]: https://github.com/wstein/flatbars/releases/tag/v0.1.0

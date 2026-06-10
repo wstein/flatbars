@@ -52,6 +52,7 @@ module MaxBars.Rust
 
 import Prelude
 
+import ClassicBars (desugarSurfaceWith, hoistInline)
 import Data.Array as Array
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
@@ -69,7 +70,6 @@ import FlatBars.Parser (parseWith)
 import FlatBars.Span (Span, spanText)
 import FlatBars.Syntax (Expr(..), Ident, Node(..), Template, splitBlockArgs)
 import FlatBars.Value (Value(..))
-import FullBars (desugarSurfaceWith, hoistInline)
 import Kernel.Walk (Clause, splitClauses)
 import MaxBars (maxLoopVars, maxOptions)
 

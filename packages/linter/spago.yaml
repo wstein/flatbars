@@ -12,7 +12,7 @@ package:
     - either
     - flatbars
     - foldable-traversable
-    - fullbars
+    - classicbars
     - kernel
     - maxbars
     - maybe

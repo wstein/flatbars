@@ -1,4 +1,4 @@
--- | Value *policy* for the FullBars engine — the meaning the framework
+-- | Value *policy* for the ClassicBars engine — the meaning the framework
 -- | deliberately leaves out (`FlatBars.Value` is just the data type). See
 -- | `docs/modules/ROOT/pages/evaluation.adoc` §3.2, §3.6.
 -- |
@@ -56,7 +56,7 @@ type Translator = String -> Array Value -> Maybe String
 
 -- | The Handlebars rule: `false`, `null`, `""`, `0`, and the empty array are
 -- | falsy; `{}` and every non-empty/non-zero value are truthy. The fixed
--- | truthiness rule of FullBars/RawBars/MaxBars (ADR-022).
+-- | truthiness rule of ClassicBars/RawBars/MaxBars (ADR-022).
 handlebars :: Truthy
 handlebars = case _ of
   VBool b -> b
@@ -89,7 +89,7 @@ presence = case _ of
 -- | `false`/`null` and every empty container — `""`, `[]`, `{}` — are falsy, but
 -- | `0` is truthy (it is a present value, not emptiness; test magnitude with an
 -- | explicit compare, e.g. `val > 0`). This is RawBars/MaxBars' rule (ADR-022):
--- | `presence` plus empty-string-is-empty. FullBars keeps `handlebars` (Handlebars
+-- | `presence` plus empty-string-is-empty. ClassicBars keeps `handlebars` (Handlebars
 -- | fidelity), so the dialects deliberately diverge in value policy here.
 nonEmpty :: Truthy
 nonEmpty = case _ of

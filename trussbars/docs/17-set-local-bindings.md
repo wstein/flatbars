@@ -135,7 +135,7 @@ In the PureScript oracle, `local` is the existing `letH` (renamed); `set` is `le
 that installs `NAME` as a nullary operation in the *current* frame (not a pushed child), so
 siblings resolve it and the frame's close discards it. The JS compiler and VM mirror both; every
 backend is pinned byte-for-byte by the corpus. Both belong to the **nonEmpty family — RawBars and
-MaxBars**. **FullBars** (Handlebars-faithful) and **MinBars** (Mustache) get **neither**: FullBars
+MaxBars**. **ClassicBars** (Handlebars-faithful) and **MinBars** (Mustache) get **neither**: ClassicBars
 already rejects block-`let` on its strict surface (`checkSurfaceStrict`, ADR-024) and rejects `set`
 likewise, pointing at `{% with %}`/Handlebars idioms; in MinBars they are ordinary text.
 
@@ -144,7 +144,7 @@ likewise, pointing at `{% with %}`/Handlebars idioms; in MinBars they are ordina
 | # | Alternative | Verdict | Why |
 | --- | --- | --- | --- |
 | **A1** | **`set` (forward) + `local` (bounded)** | **Chosen** | Each keyword names its scope; `set` has the exact Jinja precedent for forward binding, `local` plainly marks the confined region. Both reuse the one binding node — no runtime, no new AST. |
-| **A2** | Keep `let` for one of them | **Rejected** | `let` is forward everywhere (Rust/ML/JS) but was *bounded* here — it mis-signalled scope (the complaint). Reusing it for *forward* would also clash with FullBars's Handlebars-`{{#let}}` rejection narrative. Retire it. |
+| **A2** | Keep `let` for one of them | **Rejected** | `let` is forward everywhere (Rust/ML/JS) but was *bounded* here — it mis-signalled scope (the complaint). Reusing it for *forward* would also clash with ClassicBars's Handlebars-`{{#let}}` rejection narrative. Retire it. |
 | **A3** | Liquid-faithful: document-wide leak + mutable re-set (loop accumulators, Liquid; Jinja via `namespace()`) | **Rejected** | The Liquid-style leak is unimplementable against `&ctx` without hoisting an `Option` above every conditional; cross-iteration mutation breaks the borrow model and the effect-light property. We take the **name** (`set`) and the **block scope** from Jinja, and reject only Liquid's wider leak + Jinja's `namespace()` escape hatch. |
 | **A4** | `set` only — drop the bounded form | **Rejected** | The bounded `local` earns its keep: it confines a temporary so it can't pollute the rest of the region (and auto-drops). Both scopes are real needs (§1). |
 
@@ -207,6 +207,6 @@ byte-for-byte (docs/12 §5.5).
   splices a `let` into the current block. Byte-identical across backends.
 - **Scope matches Jinja, stricter than Liquid**: no leak past the enclosing block, no cross-scope mutation —
   preserving the borrow model and effect-light property.
-- **nonEmpty-family surface** (RawBars/MaxBars + Trussbars); FullBars and MinBars get neither
-  (FullBars already rejects block-`let`, ADR-024). `let`→`local` is a rename/freeze-amendment;
+- **nonEmpty-family surface** (RawBars/MaxBars + Trussbars); ClassicBars and MinBars get neither
+  (ClassicBars already rejects block-`let`, ADR-024). `let`→`local` is a rename/freeze-amendment;
   oracle-first, conformance-pinned.

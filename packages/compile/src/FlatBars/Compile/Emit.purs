@@ -1,15 +1,15 @@
 -- | The shared **emit rules** for the dialect-agnostic `FlatBars.Compile` driver
--- | — the FullBars *value semantics* lowered to JS, used by every dialect that
--- | compiles (RawBars/FullBars/MaxBars). It depends only on the driver and the
+-- | — the ClassicBars *value semantics* lowered to JS, used by every dialect that
+-- | compiles (RawBars/ClassicBars/MaxBars). It depends only on the driver and the
 -- | kernel value policy, *never* on a dialect (no surface desugar here), so the
--- | austere RawBars compile path can use it without pulling in FullBars.
+-- | austere RawBars compile path can use it without pulling in ClassicBars.
 -- |
 -- | The optimiser tier: `if`/`unless`/`each`/`with` emit native JS control flow;
 -- | the hot value helpers (`this`/`lookup`/`escapeHtml`/`safe`) inline to direct
 -- | runtime calls; everything else routes through `rt.call`/`rt.block`. The code
 -- | runs against `runtime/flatbars-runtime.mjs`.
 module FlatBars.Compile.Emit
-  ( fullbarsEmit
+  ( classicbarsEmit
   , coreEmit
   , metaFor
   , runtimeVersion
@@ -34,9 +34,9 @@ runtimeVersion = "0.2.0"
 -- | The compile metadata for the RefEnv dialects, parameterised by the runtime
 -- | truthiness *callback* the root frame is seeded with (ADR-022 — truthiness is
 -- | only ever a `Value -> Boolean` callback, never a baked falsy-set):
--- | `"rt.truthyHandlebars"` for FullBars, `"rt.truthyNonEmpty"` for RawBars/MaxBars.
+-- | `"rt.truthyHandlebars"` for ClassicBars, `"rt.truthyNonEmpty"` for RawBars/MaxBars.
 -- | The second argument is the dialect's block-partial body spelling (ADR-005
--- | amendment) — `"partial-block"` for FullBars, `"yield"` for RawBars/MaxBars —
+-- | amendment) — `"partial-block"` for ClassicBars, `"yield"` for RawBars/MaxBars —
 -- | seeded onto the root frame next to the truthy callback (mirrors the
 -- | interpreter's `RefEnv.yieldName`). The seed references the callback directly
 -- | (no module-level const — `rt` is only in scope inside the emitted function).
@@ -48,11 +48,11 @@ metaFor truthyCallback yieldName =
   , seed: "rt.scope(data, " <> truthyCallback <> ", " <> jsString yieldName <> ")"
   }
 
--- | The *lenient* emit (FullBars / MaxBars): a prelude value helper used as a
+-- | The *lenient* emit (ClassicBars / MaxBars): a prelude value helper used as a
 -- | bare block (`{{#count}}…{{/count}}`) compiles to a data *section*, mirroring
 -- | the interpreter's `Kernel.Prelude.lenientResolve`.
-fullbarsEmit :: Emit
-fullbarsEmit = emitWith true
+classicbarsEmit :: Emit
+classicbarsEmit = emitWith true
 
 -- | The *strict* emit (RawBars): no value-helper sectioning — RawBars keeps the
 -- | austere `runResolved` resolve, so a value helper in block position is applied

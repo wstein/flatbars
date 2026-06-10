@@ -76,7 +76,7 @@ type Engine m env =
   -- the operation, *unchanged* for built-ins), the surface hash (`@hash` marker),
   -- and the `as |a b|` names (`@param` markers). The default identity split
   -- (`{ positional: args, hash: Nothing, params: [] }`) is what RawBars uses;
-  -- FullBars supplies a marker-aware split. See ADR-020 Phase 3.
+  -- ClassicBars supplies a marker-aware split. See ADR-020 Phase 3.
   , blockArgs ::
       Array Expr
       -> { positional :: Array Expr
@@ -107,7 +107,7 @@ runTemplate engine = renderTemplate engine.initial
     Content span s -> engine.recordText env span s *> pure s
     Output span e -> engine.recordEmit env span (evalExpr env span e >>= engine.stringify)
     -- the engine applies the head as a block helper; the opener sigil (`#`/`^`)
-    -- is a dialect concern (FullBars desugars `Inverse` to `unless`), so the
+    -- is a dialect concern (ClassicBars desugars `Inverse` to `unless`), so the
     -- meaning-free driver ignores it. A block's output is the leaves its body
     -- renders (recorded by the nested `render`), so the driver records nothing here.
     Block span _ name args body -> applyBlock engine.resolve env span name args body

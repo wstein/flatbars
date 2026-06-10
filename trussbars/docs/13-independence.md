@@ -29,7 +29,7 @@ Why (A) and not (B) "stay tracking": `docs/01` literally defines Trussbars as *t
 of MaxBars*, and the harness defines *correct* as *byte-identical to `renderMaxbars`*
 (`conformance/harness.mjs:36,249`). You cannot ship an "independent project" whose
 definition of correct lives in another repo's build output. (B) is a permanent sync tax
-against a *moving* oracle — `FullBars/Surface.purs` was edited **2026-06-09, hours after**
+against a *moving* oracle — `ClassicBars/Surface.purs` was edited **2026-06-09, hours after**
 the v2 Rust parser landed 2026-06-08. Independence and oracle-tracking are mutually
 exclusive; (A) is the only coherent reading of the goal.
 
@@ -40,9 +40,9 @@ Verified against the repo (team review, ground-truth pass):
 | Boundary | State | Evidence |
 | --- | --- | --- |
 | **Rust workspace** | **Clean.** No path dep escapes `trussbars/`; 7 crates; MSRV 1.96 / edition 2024 pinned in both `Cargo.toml` and `rust-toolchain.toml`. | every `crates/*/Cargo.toml` path dep targets a sibling |
-| **Oracle (correctness)** | **Attached.** Harness imports `renderMaxbars` from `output/FullBars.JS`; runs the interpreter **live** per case; `snapshots.json` is a drift-detector both the live oracle *and* the Rust output are checked against. | `harness.mjs:36,249`; `docs/04 §12 Q2` |
+| **Oracle (correctness)** | **Attached.** Harness imports `renderMaxbars` from `output/ClassicBars.JS`; runs the interpreter **live** per case; `snapshots.json` is a drift-detector both the live oracle *and* the Rust output are checked against. | `harness.mjs:36,249`; `docs/04 §12 Q2` |
 | **Default emitter** | **Attached.** `--v2` is opt-in; the **default** path still emits via `compileMaxRust` = the PureScript `MaxBars.Rust.purs`, which still exists. | `harness.mjs:215,257`; `packages/maxbars/src/MaxBars/Rust.purs` |
-| **Desugar source-of-truth** | **Attached (by reference).** The Rust port re-derived the *rules*; `parse.rs`/`parse_expr.rs` cite `FullBars/Surface.purs` + `MaxBars/Expr.purs`/`FlatBars.Lexer` as the authority. Those modules remain the spec. | `docs/08:66`; `parse_expr.rs:1-8` |
+| **Desugar source-of-truth** | **Attached (by reference).** The Rust port re-derived the *rules*; `parse.rs`/`parse_expr.rs` cite `ClassicBars/Surface.purs` + `MaxBars/Expr.purs`/`FlatBars.Lexer` as the authority. Those modules remain the spec. | `docs/08:66`; `parse_expr.rs:1-8` |
 | **Schema inference** | **Designed-only, built nowhere.** `docs/03` is `Status: Draft`; the designed L1 (`schemaScaffold`/`dataScaffold` atop `Kernel.Analyse`) exists in **no language** — only a JS data-only `ctxgen.mjs`. It is on the harness's **critical path** (per-case `Ctx` generation). | `docs/03:3`; `ctxgen.mjs`; `harness.mjs:267` |
 | **Editor / LSP** | **Attached.** `.truss` is a pure `maxbars` alias → shared `source.flatbars` grammar; nothing type-aware. The LSP's value flows through the committed `lab/vendor/flatbars-engine.mjs` PureScript bundle. | `editors/shared/sync.mjs:67`; `editors/lsp/src/tokens.mjs:71` |
 
@@ -84,7 +84,7 @@ divergence* — the last act before deletion:
   `Ctx` generation runs without `ctxgen.mjs`/spago. This is on the critical path: until it
   exists the harness is *not* oracle-free regardless of what else is done.
 - **G3 — Desugar transcribed to normative prose.** Lift the rules out of
-  `FullBars/Surface.purs` + `MaxBars/Expr.purs` into a self-contained grammar section of
+  `ClassicBars/Surface.purs` + `MaxBars/Expr.purs` into a self-contained grammar section of
   the spec (§5), **byte-checked against the still-live oracle** as the acceptance gate,
   *before* those `.purs` modules are deleted. This is the single highest-risk step and it
   needs its own gate, not a comment.

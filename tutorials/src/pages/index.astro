@@ -35,8 +35,8 @@ const proof = [
   },
   {
     num: `${hbs.total.pass}`, of: `/${hbs.total.total}`, label: "byte-identical",
-    desc: "Outputs asserted differentially against handlebars@4.7.9 by FullBars.",
-    href: "/fullbars",
+    desc: "Outputs asserted differentially against handlebars@4.7.9 by ClassicBars.",
+    href: "/classicbars",
   },
   {
     num: "0", of: "", label: "built-in helpers",
@@ -53,7 +53,7 @@ const surfaceMeta = {
     blurb: "The core syntax, exposed. No surface sugar — every value is an explicit helper application." },
   minbars: { role: "mustache-compatible", sample: "{{#items}}\n  {{name}}\n{{/items}}",
     blurb: "The complete logic-less language. New to templates? You already know it." },
-  fullbars: { role: "handlebars-faithful", sample: "{{#each xs}}\n  {{this}}\n{{/each}}",
+  classicbars: { role: "handlebars-faithful", sample: "{{#each xs}}\n  {{this}}\n{{/each}}",
     blurb: "Faithful to Handlebars, the industry-standard engine — block helpers, dotted paths, and your own registerHelper." },
   maxbars: { role: "the flagship", sample: "{{#if score >= 50}}\n  {{ nick ?: name | uppercase }}\n{{/if}}",
     blurb: "The most capable surface — infix operators, pipes, and bare loop variables put real expression back in the template." },
@@ -190,7 +190,7 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
           <span class="chip core">flatbars core</span>
           <span class="arrow">→</span>
           <a class="chip chip-link" href="/rawbars">RawBars</a><a class="chip chip-link" href="/minbars">MinBars</a>
-          <a class="chip chip-link" href="/fullbars">FullBars</a><a class="chip chip-link" href="/maxbars">MaxBars</a>
+          <a class="chip chip-link" href="/classicbars">ClassicBars</a><a class="chip chip-link" href="/maxbars">MaxBars</a>
         </p>
         <h1>The <span class="flat">Handlebars</span> &amp; Mustache you know, on a core small enough to <em>be the language you want.</em></h1>
         <p class="lead">One parser. Four surfaces. <strong>Proven against the real specs</strong> — Mustache and Handlebars run on it unchanged, and MaxBars is the flagship we built on top.</p>
@@ -267,7 +267,7 @@ const hbsN = `${hbs.total.pass}/${hbs.total.total}`;
 
       <footer class="site-foot">
         <Wordmark href="/" />
-        <span class="ver">core v0.1.0 · MinBars · FullBars · MaxBars</span>
+        <span class="ver">core v0.1.0 · MinBars · ClassicBars · MaxBars</span>
         <span class="spacer"></span>
         <span class="links">
           <a href={`${SPEC_BASE}`}>Docs</a>

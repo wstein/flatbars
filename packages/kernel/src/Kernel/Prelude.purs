@@ -69,7 +69,7 @@ type OperationDef m =
   { name :: String
   -- | A one-line, prose description of what the operation does, in the present
   -- | tense — the single source the editor surfaces on hover and the helper
-  -- | catalog renders (`FullBars.Catalog`). Required (set via `valDef`/`gen`), so
+  -- | catalog renders (`ClassicBars.Catalog`). Required (set via `valDef`/`gen`), so
   -- | an operation cannot ship undocumented. Keep it one sentence; the long-form
   -- | reference prose lives in `prelude.adoc`.
   , doc :: String
@@ -260,7 +260,7 @@ coreOperationDefs =
   , gen "and" "True when every argument is truthy." false AnyArity (boolH Array.all)
   , gen "or" "True when any argument is truthy." false AnyArity (boolH Array.any)
   -- arithmetic: the desugar targets of the MaxBars `+ - * / %` operators, also
-  -- callable explicitly in RawBars/FullBars (`(add a b)`). Strictly numeric:
+  -- callable explicitly in RawBars/ClassicBars (`(add a b)`). Strictly numeric:
   -- both operands must be `VNumber` (no string coercion — determinism), so the
   -- interpreter (which is itself JS) and the compiled runtime share JS's `+ - * /`
   -- bit-for-bit; `modulo` uses the `trunc` form, which equals JS `%`.
@@ -522,23 +522,23 @@ scopedSpecs =
   -- The enclosing loop's fields are reached through the `loop` chain
   -- (`loop.parent.index0`, `loop.parent.key`, …); the flat `parent-index`/
   -- `parent-key`/`parent-first`/`parent-last` names were removed (the lint
-  -- migrates them to `loop.parent.*`, and FullBars' `@../index` lowers there).
+  -- migrates them to `loop.parent.*`, and ClassicBars' `@../index` lowers there).
   , { name: "partial-block"
     , block: false
     , arity: Exactly 0
     , doc:
-        "Inside a block partial, the caller's block body — FullBars' {{> @partial-block}} target (RawBars/MaxBars use yield)."
+        "Inside a block partial, the caller's block body — ClassicBars' {{> @partial-block}} target (RawBars/MaxBars use yield)."
     }
   -- `yield` — the RawBars/MaxBars spelling of the block-partial body (ADR-005
   -- amendment). Hyphen-free so it is writable bare in MaxBars (where `-` is
   -- subtraction). It is NOT a synonym installed alongside `partial-block`: the
   -- partial frame binds only the dialect's own spelling (`refYieldName`), so
-  -- `yield` is the body in RawBars/MaxBars and `partial-block` is the body in FullBars.
+  -- `yield` is the body in RawBars/MaxBars and `partial-block` is the body in ClassicBars.
   , { name: "yield"
     , block: false
     , arity: Exactly 0
     , doc:
-        "Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (FullBars uses partial-block)."
+        "Inside a block partial, the caller's block body — the RawBars/MaxBars spelling (ClassicBars uses partial-block)."
     }
   ]
 
@@ -556,13 +556,13 @@ scopedDocs = map (\s -> Tuple s.name s.doc) scopedSpecs
 -- | canonical form: `index` → `index0` (the bare native index), `partial-block` →
 -- | `yield` (the bare native block-body name). `index`/`index0` co-exist (both
 -- | render, this is editor *preference*); `partial-block`/`yield`, since the
--- | ADR-005 amendment, are the FullBars vs RawBars/MaxBars spellings of the SAME
+-- | ADR-005 amendment, are the ClassicBars vs RawBars/MaxBars spellings of the SAME
 -- | body and each only binds in its own dialect (`refYieldName`), so in
 -- | RawBars/MaxBars `partial-block` does not render at all — the rewrite to `yield`
 -- | is the fix, not just a preference. Shared here so the linter
 -- | (`Linter.Aliases.scopedCanonWarnings`), the catalog/editor projection
--- | (`FullBars.Catalog.operations` → `editors/operations.json`), and the CLI all
--- | read one source. Surface-scoped: only the native dialects prefer it (FullBars
+-- | (`ClassicBars.Catalog.operations` → `editors/operations.json`), and the CLI all
+-- | read one source. Surface-scoped: only the native dialects prefer it (ClassicBars
 -- | keeps Handlebars' `@index`/`@partial-block`).
 scopedCanonical :: Array (Tuple String String)
 scopedCanonical =
@@ -1498,7 +1498,7 @@ optFlag key = case _ of
 --------------------------------------------------------------------------------
 
 -- | `each coll [name1 name2 name3]`: the optional trailing string arguments are
--- | block params (surface `as |name1 name2|` in FullBars, drop-pipes
+-- | block params (surface `as |name1 name2|` in ClassicBars, drop-pipes
 -- | `as name1 name2 name3` in MaxBars) — `name1` binds the element, `name2` the
 -- | index (array) or key (object), and `name3` the 1-based index.
 eachH :: forall m. MonadThrow Error m => Operation m (RefEnv m)
@@ -1637,7 +1637,7 @@ iterate ctl names items = do
             , Tuple "parent" (constOperation (refContext ctl.env))
             -- The richer loop metadata (MaxBars' bare loop variables). These are
             -- exposed for every dialect's `each`, but only MaxBars' surface names
-            -- them: FullBars reaches scoped vars solely through the `@` sigil and
+            -- them: ClassicBars reaches scoped vars solely through the `@` sigil and
             -- never emits these, so its behaviour is unchanged. `index0` mirrors
             -- `index`; arithmetic is normative so interpreter and compiler agree.
             , Tuple "index0" (constOperation (VNumber (Int.toNumber i)))
@@ -1699,7 +1699,7 @@ letH ctl args =
     VObject m -> Map.union m acc
     _ -> acc
 
--- | The FullBars *resolve policy* (`Kernel.Env.refEngineWith`), Handlebars-style.
+-- | The ClassicBars *resolve policy* (`Kernel.Env.refEngineWith`), Handlebars-style.
 -- | Two cases turn a `{{#x}}…{{/x}}` block into an implicit *section* over data
 -- | rather than a helper application:
 -- |
@@ -1743,7 +1743,7 @@ lenientResolve env name = case _ of
 -- | keep calling the real helper.
 -- |
 -- | `Array.null args` alone is the right signal: a *bare* inline `{{count}}`
--- | desugars to a `lookup` data path (`FullBars.Surface.rewriteHead`) and never
+-- | desugars to a `lookup` data path (`ClassicBars.Surface.rewriteHead`) and never
 -- | reaches `resolve`/`valueOrSection`, so the only thing that resolves the helper
 -- | with no positional args is the **block** form. Hence empty args ⟹ block
 -- | position, body or not. (The compiler's emit gates identically — block-only,
@@ -1840,10 +1840,10 @@ partialH ctl args = case args of
   _ -> throwError (TypeError "partial: expected (name string, [context], [options])")
   where
   -- the caller's block body, rendered in the caller's context — exposed inside
-  -- the partial under the dialect's own spelling (`refYieldName`): FullBars binds
+  -- the partial under the dialect's own spelling (`refYieldName`): ClassicBars binds
   -- `partial-block` (Handlebars `{{> @partial-block}}`); RawBars/MaxBars bind the
   -- hyphen-free `yield` (ADR-005 amendment). Only the native name is bound — the
-  -- other resolves by the dialect's normal rule (empty under FullBars' lenient
+  -- other resolves by the dialect's normal rule (empty under ClassicBars' lenient
   -- resolve, UnknownHelper under RawBars/MaxBars). Only installed when there is a body.
   blockFrame =
     if Array.null ctl.children then Map.empty

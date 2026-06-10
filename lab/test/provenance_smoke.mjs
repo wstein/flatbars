@@ -5,7 +5,7 @@
 // download — over a local HTTP server, and confirms the three-way editor↔output
 // linking the tiling map drives:
 //
-//   * boot — the FullBars engine loads with no uncaught console error;
+//   * boot — the ClassicBars engine loads with no uncaught console error;
 //   * output → source (hover) — hovering an emit run highlights its tag in the
 //     template editor (`.cm-link-highlight`) and shows the provenance tooltip;
 //   * output → editor (click) — clicking an emit run selects its tag span;
@@ -41,7 +41,7 @@ function resolveBrowser() {
 const server = createServer(makeHandler(ROOT));
 await new Promise((r) => server.listen(0, r));
 const PORT = server.address().port;
-const URL_ = `http://localhost:${PORT}/lab/index.html?engine=fullbars`;
+const URL_ = `http://localhost:${PORT}/lab/index.html?engine=classicbars`;
 
 const browser = await puppeteer.launch({
   executablePath: resolveBrowser(),
@@ -67,13 +67,13 @@ try {
 
   // boot — the engine resolved and stamped its version into the brand.
   const brand = await page.$eval("#brand-ver", (el) => el.textContent.trim());
-  assert.match(brand, /FullBars v\d/, `brand shows the FullBars engine (got "${brand}")`);
+  assert.match(brand, /ClassicBars v\d/, `brand shows the ClassicBars engine (got "${brand}")`);
 
   // provenance painted — the default `hello` example ({{name}}) yields emit runs.
   await page.waitForSelector("#output-text .seg-expr", { timeout: 15000 });
   const emitCount = await page.$$eval("#output-text .seg-expr", (els) => els.length);
   assert.ok(emitCount >= 1, `at least one emit run is painted (got ${emitCount})`);
-  console.log(`  ✓ boot + provenance — FullBars loaded, ${emitCount} emit run(s) painted`);
+  console.log(`  ✓ boot + provenance — ClassicBars loaded, ${emitCount} emit run(s) painted`);
 
   // output → source (hover): the emit run highlights its tag in the editor.
   await page.hover("#output-text .seg-expr");

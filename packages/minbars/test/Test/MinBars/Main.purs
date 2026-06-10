@@ -328,7 +328,7 @@ main = do
   -- Truthiness analysis (ADR-022, the Mustache-portability story). A section over
   -- an ambiguous scalar (`0`/`""`) is a finding: MinBars (mustache-spec) renders it,
   -- mustache.js (handlebars rule) would not.
-  -- The fix is Mustache-honest: data-reshaping advice, never FullBars helper syntax
+  -- The fix is Mustache-honest: data-reshaping advice, never ClassicBars helper syntax
   -- like `(ne x 0)` (logic-less Mustache cannot express it).
   expectFindings "section-zero" "{{#count}}c{{/count}}" (obj [ Tuple "count" (num 0.0) ])
     \fs -> Array.length fs == 1

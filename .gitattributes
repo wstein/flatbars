@@ -16,7 +16,7 @@ lab/vendor/flatbars-engine.mjs binary linguist-generated=true
 # language linguist ships — it highlights the tags) so github.com treats them as a
 # real language. `.truss` is the MaxBars surface on disk (Trussbars; see
 # trussbars/docs/01-subset-spec.md). The well-known compatibility extensions these
-# dialects also claim — `.hbs`/`.handlebars` (FullBars) and `.mustache` (MinBars) —
+# dialects also claim — `.hbs`/`.handlebars` (ClassicBars) and `.mustache` (MinBars) —
 # are left to linguist's native detection. The in-repo editor integrations
 # recognise all of these directly (editors/shared/sync.mjs); this is the github.com
 # counterpart.
@@ -24,7 +24,7 @@ lab/vendor/flatbars-engine.mjs binary linguist-generated=true
 *.rbars    linguist-language=Handlebars
 *.minbars  linguist-language=Handlebars
 *.mbars    linguist-language=Handlebars
-*.fullbars linguist-language=Handlebars
+*.classicbars linguist-language=Handlebars
 *.fbars    linguist-language=Handlebars
 *.maxbars  linguist-language=Handlebars
 *.xbars    linguist-language=Handlebars

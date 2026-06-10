@@ -1,7 +1,7 @@
--- | **MaxBars** — the top tier of the dialect ladder (RawBars ⊂ FullBars ⊂
--- | MaxBars). It is FullBars plus a richer *surface*: infix operators and pipes
+-- | **MaxBars** — the top tier of the dialect ladder (RawBars ⊂ ClassicBars ⊂
+-- | MaxBars). It is ClassicBars plus a richer *surface*: infix operators and pipes
 -- | (`MaxBars.Expr`). Because that surface desugars to the same core `Expr` that
--- | FullBars already understands, MaxBars reuses FullBars wholesale by
+-- | ClassicBars already understands, MaxBars reuses ClassicBars wholesale by
 -- | dependency — the engine, prelude, value policy, surface desugar, and the
 -- | compiler — swapping only the interior expression grammar through the
 -- | `ParseOptions.parseExpr` seam. (A shared semantic *kernel* is extracted
@@ -23,6 +23,9 @@ module MaxBars
 
 import Prelude
 
+import ClassicBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
+import ClassicBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
+import ClassicBars.Surface (noLoopVars, reservedScope)
 import Data.Array.NonEmpty as NEA
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
@@ -31,9 +34,6 @@ import FlatBars.Error (Error, ParseError)
 import FlatBars.Parser (ParseOptions, defaultParseOptions, parseWith)
 import FlatBars.Token (infixOperatorChars)
 import FlatBars.Value (Value)
-import FullBars (LoopVars, desugarSurfaceWith, inspectSurfaceDiagWith, nonEmpty, renderSurfaceDiagWith, renderSurfaceMappedDiagWith, renderSurfaceWithHelpersWith)
-import FullBars.Compile (compileSurfaceWith, compileSurfaceWithPartials)
-import FullBars.Surface (noLoopVars, reservedScope)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Inspect (Snapshot, Target)
@@ -55,7 +55,7 @@ maxOptions =
     , extras = false
     -- `{{when}}` is a clause separator of `{{#case}}` (like `else`/`elif` of `if`), so
     -- its standalone lines are trimmed too (docs/12). `case` desugars to the `if`
-    -- skeleton in `FullBars.Surface`, before the clause split ever sees a `when`.
+    -- skeleton in `ClassicBars.Surface`, before the clause split ever sees a `when`.
     , standaloneSeps = [ "else", "elif", "when" ]
     -- inline partials in MaxBars use the bare `{{#inline}}` form (the old model);
     -- the `{{#*}}` decorator and `{{#>}}` partial block stay gated off.
@@ -71,7 +71,7 @@ maxOptions =
     , lexOptions =
         { operatorChars: infixOperatorChars, rangeOperator: true, collectionLiterals: true }
     -- Set delimiters are NOT enabled (per ADR-015 amendment): `{{=<% %>=}}` is
-    -- a Mustache feature reserved for MinBars. RawBars / MaxBars / FullBars all
+    -- a Mustache feature reserved for MinBars. RawBars / MaxBars / ClassicBars all
     -- reject it so the dialect ladder has one consistent answer to "does
     -- delimiter switching work here?" — yes only on the Mustache surface.
     }
@@ -86,7 +86,7 @@ maxOptions =
 maxLoopVars :: LoopVars
 maxLoopVars = reservedScope noLoopVars
 
--- | Render MaxBars surface source against data, reusing FullBars' surface
+-- | Render MaxBars surface source against data, reusing ClassicBars' surface
 -- | pipeline (desugar → hoist → engine) with located errors and MaxBars' bare
 -- | loop variables.
 renderMax :: String -> Value -> Either String String
@@ -94,7 +94,7 @@ renderMax = renderSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 
 -- | Render MaxBars source with a set of named *external* (host-threaded) partials,
 -- | each given as MaxBars surface source — the MaxBars twin of
--- | `FullBars.renderSurfaceWith`. `{{> name}}` renders a registered partial;
+-- | `ClassicBars.renderSurfaceWith`. `{{> name}}` renders a registered partial;
 -- | template-local `{{#inline}}` definitions are hoisted into the same registry
 -- | (and win on a clash). It is `renderWithOperations` with no host operations.
 renderMaxWithPartials :: Array (Tuple String String) -> String -> Value -> Either String String
@@ -129,13 +129,13 @@ inspectMaxWith
 inspectMaxWith = inspectSurfaceDiagWith false maxLoopVars maxOptions nonEmpty
 
 -- | Render MaxBars source with host-registered *operations* (ADR-019 addendum) —
--- | the same `renderSurfaceWithHelpersWith` path FullBars uses, over MaxBars' own
+-- | the same `renderSurfaceWithHelpersWith` path ClassicBars uses, over MaxBars' own
 -- | surface (`maxLoopVars` / `maxOptions`). A block operation gets the full surface:
 -- | `options.hash`, `options.fn(ctx, { data, blockParams })`, and `options.inverse`.
 -- | Block params (`as |a b|`) parse because the MaxBars head grammar omits the pipe
 -- | rung (a bar in head position is the block-param delimiter); pipe a block
 -- | argument by parenthesising it (`{{#each (xs | f) as |x|}}`).
--- | "operation" is the native boundary word; FullBars' twin is `renderWith` (helper).
+-- | "operation" is the native boundary word; ClassicBars' twin is `renderWith` (helper).
 renderWithOperations
   :: Array (Tuple String (Operation (Either Error) (RefEnv (Either Error))))
   -> Array (Tuple String String)
@@ -144,7 +144,7 @@ renderWithOperations
   -> Either String String
 renderWithOperations = renderSurfaceWithHelpersWith false maxLoopVars maxOptions nonEmpty
 
--- | Compile MaxBars surface source to a JS ES module, reusing the FullBars
+-- | Compile MaxBars surface source to a JS ES module, reusing the ClassicBars
 -- | compiler (`FlatBars.Compile`) — infix/pipe and loop vars desugar to the same
 -- | core helpers the emit rules already handle.
 compileMaxJs :: String -> Either ParseError String

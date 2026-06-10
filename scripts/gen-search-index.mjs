@@ -10,7 +10,7 @@
 //   • surface deltas        ← shared/surface-syntax.json      (kind "surface" + "feature")
 //   • ADRs                  ← spec/src/content/docs/adr/*.mdx (kind "adr")
 //   • spec pages            ← spec/src/content/docs/**/*.mdx  (kind "page")
-//   • runnable examples     ← tutorials/src/{rawbars,fullbars,maxbars,mustache}.mjs (kind "example")
+//   • runnable examples     ← tutorials/src/{rawbars,classicbars,maxbars,mustache}.mjs (kind "example")
 //   • tutorial pages + Lab  ← the curated list below          (kind "page")
 //
 // URLs are base-relative root-absolute (e.g. "/maxbars", "/spec/concepts/", "/lab/");
@@ -48,7 +48,7 @@ const TUTORIAL_PAGES = [
   ["Home", "The FlatBars landing", "/", "home landing overview thesis"],
   ["Getting started", "The 10-minute on-ramp", "/start", "start onboarding first render"],
   ["RawBars reference", "The desugared core surface", "/rawbars", "rawbars core skeleton no sugar"],
-  ["FullBars reference", "Handlebars-faithful surface", "/fullbars", "fullbars handlebars auto-escape paths"],
+  ["ClassicBars reference", "Handlebars-faithful surface", "/classicbars", "classicbars handlebars auto-escape paths"],
   ["MaxBars reference", "Operators, pipes — the flagship", "/maxbars", "maxbars operators pipes infix"],
   ["MinBars / Mustache reference", "Mustache-compatible surface", "/minbars", "minbars mustache sections set delimiters"],
   ["Truthiness portability", "Analyse mode", "/analyse", "analyse analyze truthiness portability ambiguous"],
@@ -98,7 +98,7 @@ for (const s of surfaces) {
 // ── runnable examples (the dialect example modules) → their reference page ──────
 const EXAMPLE_MODULES = [
   ["rawbars", "/rawbars", "RawBars"],
-  ["fullbars", "/fullbars", "FullBars"],
+  ["classicbars", "/classicbars", "ClassicBars"],
   ["maxbars", "/maxbars", "MaxBars"],
   ["mustache", "/minbars", "MinBars"],
 ];

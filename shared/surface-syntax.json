@@ -1,5 +1,5 @@
 {
-  "_doc": "SINGLE SOURCE of the per-surface syntax & policy DELTAS across the four FlatBars dialects (RawBars, FullBars, MaxBars, MinBars). Authored here; everything downstream is DERIVED and drift-gated by `check:surface-syntax` (run `npm run gen:surface-syntax` after editing). Consumers: the Lab projection lab/surface-syntax.mjs (the surface-aware Reference popup), the generated spec partial spec/src/partials/surface-deltas.mdx, and the tutorials' <SurfaceDeltas> component. The prelude OPERATION list is NOT here — that is operations.json (the ops are shared across surfaces); this file is only the surface sugar + value-policy deltas. Truthiness rules: ADR-022. Set-delimiters: ADR-015 (MinBars only). MaxBars variable model: ADR-021.",
+  "_doc": "SINGLE SOURCE of the per-surface syntax & policy DELTAS across the four FlatBars dialects (RawBars, ClassicBars, MaxBars, MinBars). Authored here; everything downstream is DERIVED and drift-gated by `check:surface-syntax` (run `npm run gen:surface-syntax` after editing). Consumers: the Lab projection lab/surface-syntax.mjs (the surface-aware Reference popup), the generated spec partial spec/src/partials/surface-deltas.mdx, and the tutorials' <SurfaceDeltas> component. The prelude OPERATION list is NOT here — that is operations.json (the ops are shared across surfaces); this file is only the surface sugar + value-policy deltas. Truthiness rules: ADR-022. Set-delimiters: ADR-015 (MinBars only). MaxBars variable model: ADR-021.",
   "rowKinds": {
     "shared": "available in this surface (may also exist in others)",
     "only": "distinctive to this surface within the ladder",
@@ -24,14 +24,14 @@
         { "feature": "Loop variables", "syntax": "{{{index}}}  {{{first}}}  {{{key}}}", "note": "Bare scoped ops: index, key, first, last, length. No @-data.", "kind": "only" },
         { "feature": "Comments", "syntax": "{{! editorial note }}", "note": "Dropped by the lexer.", "kind": "shared" },
         { "feature": "Partials", "syntax": "{{{(partial \"name\")}}}", "note": "Called as the partial helper, unescaped. The context is optional (defaults to the current one); pass one to override, plus an optional hash.", "kind": "only" },
-        { "feature": "Block-partial body", "syntax": "{{{yield}}}", "note": "The caller's body inside a block partial — the hyphen-free yield (FullBars uses partial-block; ADR-005).", "kind": "only" }
+        { "feature": "Block-partial body", "syntax": "{{{yield}}}", "note": "The caller's body inside a block partial — the hyphen-free yield (ClassicBars uses partial-block; ADR-005).", "kind": "only" }
       ]
     },
     {
-      "id": "fullbars",
-      "label": "FullBars",
-      "engine": "fullbars",
-      "route": "/fullbars",
+      "id": "classicbars",
+      "label": "ClassicBars",
+      "engine": "classicbars",
+      "route": "/classicbars",
       "tagline": "The Handlebars-faithful surface — auto-escape, dotted paths, @-data.",
       "compiles": true,
       "truthiness": { "rule": "handlebars", "falsy": "false  null  0  \"\"  []", "note": "{} is truthy; 0 is falsy unless includeZero=true" },
@@ -52,7 +52,7 @@
       "label": "MaxBars",
       "engine": "maxbars",
       "route": "/maxbars",
-      "tagline": "The flagship — FullBars plus infix operators and pipes.",
+      "tagline": "The flagship — ClassicBars plus infix operators and pipes.",
       "compiles": true,
       "truthiness": { "rule": "nonEmpty", "falsy": "false  null  \"\"  []  {}", "note": "0 is truthy; same rule as RawBars" },
       "rows": [
@@ -62,7 +62,7 @@
         { "feature": "Path access", "syntax": "{{user.city}}   {{root.x}}   {{parent.x}}", "note": "Reserved names instead of @root / ../  (no @-sigil).", "kind": "only" },
         { "feature": "Loop variables", "syntax": "{{index0}}   {{loop.first}}   {{outer.index0}}", "note": "Bare scoped ops or labelled loop / outer chains (ADR-021).", "kind": "only" },
         { "feature": "Block params", "syntax": "{{#each xs as |item i|}}", "note": "The as |…| bars are distinct from the pipe operator.", "kind": "shared" },
-        { "feature": "Output (auto-escape)", "syntax": "{{value}}  /  {{{value}}}", "note": "Inherits the FullBars escape model.", "kind": "shared" },
+        { "feature": "Output (auto-escape)", "syntax": "{{value}}  /  {{{value}}}", "note": "Inherits the ClassicBars escape model.", "kind": "shared" },
         { "feature": "Inline / block partials", "syntax": "{{#inline \"name\"}} … {{/inline}}   {{yield}}", "note": "Bare yield (no @partial-block); rejects {{^}} and {{#*inline}}.", "kind": "only" }
       ]
     },

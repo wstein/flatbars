@@ -1,8 +1,8 @@
 {
   "_generated": "by scripts/hbs-conformance.mjs — DO NOT EDIT; run `npm run gen:hbs-conformance`",
   "oracle": "handlebars@4.7.9 (dev-only differential oracle)",
-  "engine": "FullBars (lab/vendor/flatbars-engine.mjs — the shipped Lab bundle)",
-  "method": "render each corpus case through real Handlebars AND FullBars; pass = byte-identical",
+  "engine": "ClassicBars (lab/vendor/flatbars-engine.mjs — the shipped Lab bundle)",
+  "method": "render each corpus case through real Handlebars AND ClassicBars; pass = byte-identical",
   "total": {
     "pass": 49,
     "total": 50,

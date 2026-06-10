@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The conformance corpus: core-syntax templates + data exercising every
-// construct the v0 compiler supports and — deliberately — the FullBars
+// construct the v0 compiler supports and — deliberately — the ClassicBars
 // divergences (content-based VSafe truthiness, explicit escaping, sorted object
 // iteration, @../ parent-data, includeZero). Each case is rendered by both the
 // interpreter and the compiled function; the harness asserts byte-identical
@@ -121,7 +121,7 @@ export const cases = [
   // ── block partials + body-yield (the rt-stack: a {{#>name}}/{{#partial}} block
   //     threads its body so {{> @partial-block}} / {{yield}} inside the partial
   //     renders it — must match the interpreter's pushed frame, Prelude.partialH) ─
-  // FullBars: the {{#>name}} sigil + the {{> @partial-block}} body reference.
+  // ClassicBars: the {{#>name}} sigil + the {{> @partial-block}} body reference.
   { name: "p:block-yield", dialect: "surface", t: "{{#*inline \"layout\"}}[{{> @partial-block}}]{{/inline}}{{#>layout}}hi{{/layout}}", d: {} },
   // the body renders in the CALLER frame: the partial's hash (title) is invisible
   // to the yielded body, so {{title}} there is empty — proves frame separation.
@@ -337,7 +337,7 @@ export const cases = [
 
   // key-based collection filters (ADR-036): truthy (2-arg) / == value (3-arg) /
   // dotted key / non-array & empty subjects → each op's natural empty. The truthy
-  // form is rendered in FullBars (handlebars rule: 0/""/false falsy) AND in
+  // form is rendered in ClassicBars (handlebars rule: 0/""/false falsy) AND in
   // MaxBars (nonEmpty rule: 0 truthy) so the env-rule dependence is pinned on both
   // paths. find's miss is null; every is vacuously true on [].
   { name: "arr-where-truthy", dialect: "surface", t: "{{#each (where xs \"active\")}}{{ n }};{{/each}}", d: { xs: [{ n: "a", active: true }, { n: "b", active: false }, { n: "c", active: true }] } },
@@ -413,14 +413,14 @@ export const cases = [
   { name: "mx:elif-includeZero-fire", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif 0 includeZero=true}}F{{/if}}", d: { score: 50 } },
   { name: "mx:elif-no-includeZero", dialect: "maxbars", t: "{{#if score >= 100}}P{{elif n}}Z{{else}}E{{/if}}", d: { score: 50, n: 0 } },
   { name: "mx:elif-includeZero-else", dialect: "maxbars", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
-  // surface (FullBars) elif + includeZero hash.
+  // surface (ClassicBars) elif + includeZero hash.
   { name: "s:elif-includeZero", dialect: "surface", t: "{{#if a}}A{{elif n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   // the `{{else if …}}` spelling carries a trailing hash through to `elif`, so it
   // behaves identically to the `{{elif …}}` form above (both targets).
   { name: "s:else-if-includeZero", dialect: "surface", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   { name: "mx:else-if-includeZero", dialect: "maxbars", t: "{{#if a}}A{{else if n includeZero=true}}Z{{else}}E{{/if}}", d: { a: false, n: 0 } },
   // block params parse in MaxBars (head ladder omits the pipe rung) — built-ins
-  // bind them exactly as FullBars does, compiled ≡ interpreted.
+  // bind them exactly as ClassicBars does, compiled ≡ interpreted.
   { name: "mx:blockparams-each", dialect: "maxbars", t: "{{#each item i in xs}}[{{i}}:{{item}}]{{/each}}", d: { xs: ["a", "b", "c"] } },
   { name: "mx:blockparams-with", dialect: "maxbars", t: "{{#with o as c}}{{c.n}}{{/with}}", d: { o: { n: "Z" } } },
   // a parenthesised pipe coexists with a trailing block-param clause.
@@ -505,11 +505,11 @@ export const cases = [
   { name: "inh:intrinsic-indentation", dialect: "minbars", t: "{{<parent}}{{$block}}\none\ntwo\n{{/block}}{{/parent}}\n", d: {}, partials: { parent: "Hi,\n{{$block}}\n  default\n{{/block}}\n" } },
   { name: "inh:nested-block-reindentation", dialect: "minbars", t: "{{<parent}}{{$nested}}\nthree\n{{/nested}}{{/parent}}\n", d: {}, partials: { parent: "{{<grandparent}}{{$block}}\n  one\n  {{$nested}}\n    two\n  {{/nested}}\n{{/block}}{{/grandparent}}\n", grandparent: "{{$block}}default{{/block}}" } },
 
-  // ── blockHelperMissing — FullBars' Handlebars-style implicit sections ─────────
+  // ── blockHelperMissing — ClassicBars' Handlebars-style implicit sections ─────────
   // A `{{#x}}` whose head names no helper is treated as data (array ⇒ each,
   // truthy ⇒ with-once, falsy/empty ⇒ {{else}}), matching Handlebars. The gate
   // pins that the interpreter (lenient `resolve`) and the compiled `rt.block`
-  // fallback render this identically. (See fullbars-compat.adoc §4.)
+  // fallback render this identically. (See classicbars-compat.adoc §4.)
   { name: "bhm:array-iterates", dialect: "surface", t: "{{#tags}}[{{.}}] {{/tags}}", d: { tags: ["math", "logic", "engines"] } },
   { name: "bhm:truthy-once", dialect: "surface", t: "{{#person}}{{name}}{{/person}}", d: { person: { name: "Ada" } } },
   { name: "bhm:falsy-empty", dialect: "surface", t: "[{{#person}}{{name}}{{/person}}]", d: { person: false } },

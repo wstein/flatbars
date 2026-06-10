@@ -70,13 +70,13 @@ Grammar choices, all matching the C-family expectation an author imports:
   (`{{#if}}` remains the way to avoid rendering an expensive/again-effecting
   branch). This is stated in the operation's doc and the `/maxbars` tutorial.
 - **MaxBars-only.** The `? :` syntax is parsed only by the MaxBars grammar; the
-  `ternary` *operation* lives in the shared prelude, so RawBars/FullBars can call
+  `ternary` *operation* lives in the shared prelude, so RawBars/ClassicBars can call
   it explicitly (`(ternary cond a b)`) but only MaxBars has the operator — one
   more documented surface divergence in the dialect ladder.
 
 ## Deferred / open
 
-- **Lower-dialect exposure.** Whether FullBars should gain an inline-conditional
+- **Lower-dialect exposure.** Whether ClassicBars should gain an inline-conditional
   *operator* (not just the callable `ternary` operation) is left open, like the
   same question for `?:` in ADR-033.
 - **An `if`/`ifElse` value alias** of `ternary`, for discoverability, via the

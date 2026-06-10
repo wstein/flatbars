@@ -7,7 +7,7 @@
 // dependency to pin (ADR-029 amendment, 2026-06-05), unlike check-jsonata.
 //
 // Three assertions:
-//   1. every cell  {template, data, locale} ⟶ FullBars render === expect
+//   1. every cell  {template, data, locale} ⟶ ClassicBars render === expect
 //      (so the snippet is honest; the `t` helper is bound per cell locale)
 //   2. the flagship (two helpers, plural + interpolation) ⟶ render === expect
 //   3. coverage: every catalog key is demonstrated by some cell (no over-claim),
@@ -23,14 +23,14 @@ import { load as loadYaml } from "../lab/vendor/js-yaml.mjs";
 let fail = 0;
 const allCells = sections.flatMap((s) => s.cells.map((c) => ({ section: s.id, ...c })));
 
-// Render a cell's template through FullBars with `t` bound to the cell's locale.
+// Render a cell's template through ClassicBars with `t` bound to the cell's locale.
 async function renderCell(cell) {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   const program = r.compile(cell.template, {}, { translator: makeTranslator(cell.locale) }).program;
   return r.render(program, cell.data);
 }
 
-console.log("i18n cells (native Intl, FullBars render):");
+console.log("i18n cells (native Intl, ClassicBars render):");
 for (const cell of allCells) {
   try {
     const out = await renderCell(cell);
@@ -61,7 +61,7 @@ try {
 // catalog.yaml round-trip can't drift from the page.
 console.log("\ncatalog.yaml route (Lab builder ≡ page):");
 try {
-  const r = await createRenderer("fullbars");
+  const r = await createRenderer("classicbars");
   for (const cell of allCells) {
     if (cell.missing) continue;
     const built = buildTranslator(flagshipCatalogYaml, cell.locale, loadYaml);

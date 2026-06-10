@@ -60,16 +60,16 @@ JSON.parse(readFileSync(resolve(editors, "token-vocabulary.json"), "utf8"));
 // ── The per-dialect corpus. Default delimiters; no set-delimiter SWITCH (the
 //    stateless fallback gives up past `{{=A B=}}`). `note` documents the form. ────
 const CORPUS = [
-  // FullBars — Handlebars-faithful.
-  { dialect: "fullbars", src: "Hello, {{name}}!", note: "interpolation" },
-  { dialect: "fullbars", src: "{{name.first}} {{name.last}}", note: "dotted paths" },
-  { dialect: "fullbars", src: "raw: {{{html}}} {{&html}}", note: "unescaped" },
-  { dialect: "fullbars", src: "{{#each items}}{{name}}{{/each}}", note: "section + close" },
-  { dialect: "fullbars", src: "{{#if a}}x{{else}}y{{/if}}", note: "block + else" },
-  { dialect: "fullbars", src: "{{> row}} {{>* which}}", note: "partials" },
-  { dialect: "fullbars", src: "a{{! short }}b {{!-- long {{x}} --}}c", note: "comments" },
-  { dialect: "fullbars", src: "{{{{raw}}}}{{x}}{{{{/raw}}}}", note: "raw block (body inside)" },
-  { dialect: "fullbars", src: '{{ "x" }} {{#if (gt qty 5)}}{{/if}}', note: "string + number literals" },
+  // ClassicBars — Handlebars-faithful.
+  { dialect: "classicbars", src: "Hello, {{name}}!", note: "interpolation" },
+  { dialect: "classicbars", src: "{{name.first}} {{name.last}}", note: "dotted paths" },
+  { dialect: "classicbars", src: "raw: {{{html}}} {{&html}}", note: "unescaped" },
+  { dialect: "classicbars", src: "{{#each items}}{{name}}{{/each}}", note: "section + close" },
+  { dialect: "classicbars", src: "{{#if a}}x{{else}}y{{/if}}", note: "block + else" },
+  { dialect: "classicbars", src: "{{> row}} {{>* which}}", note: "partials" },
+  { dialect: "classicbars", src: "a{{! short }}b {{!-- long {{x}} --}}c", note: "comments" },
+  { dialect: "classicbars", src: "{{{{raw}}}}{{x}}{{{{/raw}}}}", note: "raw block (body inside)" },
+  { dialect: "classicbars", src: '{{ "x" }} {{#if (gt qty 5)}}{{/if}}', note: "string + number literals" },
   // MinBars — Mustache: inverse, inheritance, set-delimiter directive.
   { dialect: "minbars", src: "{{#items}}{{.}}{{/items}}", note: "section + implicit" },
   { dialect: "minbars", src: "{{^items}}none{{/items}}", note: "inverted section" },
@@ -88,11 +88,11 @@ const CORPUS = [
   { dialect: "maxbars", src: "{{ (add a 1) }}", note: "subexpression + number" },
   { dialect: "maxbars", src: "{{{{#raw}}}}{{x}}{{{{/raw}}}}", note: "raw block — MaxBars-native hash form" },
   // Interaction cases: `|` as a block param (not a pipe), hash args + string literal.
-  { dialect: "fullbars", src: "{{#each xs as |x i|}}{{x}}{{/each}}", note: "block params" },
-  { dialect: "fullbars", src: '{{> row name="x"}}', note: "partial hash + string" },
+  { dialect: "classicbars", src: "{{#each xs as |x i|}}{{x}}{{/each}}", note: "block params" },
+  { dialect: "classicbars", src: '{{> row name="x"}}', note: "partial hash + string" },
   // Inline decorators and partial blocks (a3360f6 / 845aed4) — already correct, now pinned.
-  { dialect: "fullbars", src: '{{#*inline "layout"}}b{{/inline}}', note: "inline decorator block + string" },
-  { dialect: "fullbars", src: "{{#>layout}}b{{/layout}}", note: "partial block" },
+  { dialect: "classicbars", src: '{{#*inline "layout"}}b{{/inline}}', note: "inline decorator block + string" },
+  { dialect: "classicbars", src: "{{#>layout}}b{{/layout}}", note: "partial block" },
   { dialect: "maxbars", src: "{{#>layout}}b{{/layout}}", note: "partial block (maxbars re-spelling)" },
 ];
 
@@ -168,4 +168,4 @@ for (const { src, dialect, note } of CORPUS) {
   checked++;
 }
 
-console.log(`✓ check:tmgrammar — thin-floor grammar agrees with the engine on tag boundaries across ${checked} fixtures (rawbars/minbars/fullbars/maxbars)`);
+console.log(`✓ check:tmgrammar — thin-floor grammar agrees with the engine on tag boundaries across ${checked} fixtures (rawbars/minbars/classicbars/maxbars)`);

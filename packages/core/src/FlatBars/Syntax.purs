@@ -70,7 +70,7 @@ data Node
 -- | triple variant `{{{^name}}}`). `Parent` is the Mustache-inheritance parent
 -- | tag `{{<name}}` and `BlockDef` the override-block tag `{{$name}}` (each with
 -- | a dynamic-name spelling whose head begins with `*`, e.g. `{{<*name}}`). The
--- | engine/dialect decides what these mean (FullBars desugars `Inverse` to
+-- | engine/dialect decides what these mean (ClassicBars desugars `Inverse` to
 -- | `unless`; inheritance is wired per dialect); the core only knows the shape,
 -- | and a dialect must opt in (`ParseOptions.inheritance`) to accept the
 -- | inheritance shapes at all.

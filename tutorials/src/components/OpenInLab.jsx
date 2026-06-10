@@ -18,7 +18,7 @@ import { makeI18nBag } from "../../../lab/i18n.mjs";
 import jsonata from "../../../lab/vendor/jsonata.mjs";
 import { highlightTemplate, highlightYaml, highlightJsonata, esc } from "../lib/highlight.mjs";
 
-const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
+const DIALECT = { rawbars: "core", classicbars: "surface", maxbars: "maxbars" };
 
 // The analyse JSONata scaffold (ADR-022) carries `(* … *)` review comments that
 // this JSONata build doesn't parse (it is meant for review, not auto-apply). The
@@ -31,7 +31,7 @@ function runnableJsonata(scaffold) {
     .trim();
 }
 // The operations-aware render entry per surface (for the catalog/helpers path).
-const RENDER_WITH = { rawbars: renderRawWith, fullbars: renderWith, maxbars: renderMaxWith };
+const RENDER_WITH = { rawbars: renderRawWith, classicbars: renderWith, maxbars: renderMaxWith };
 
 // Where the Lab is served. Same-origin `/lab/` in production (one host serves
 // both); in local dev the tutorials run on their own port, so point this at the
@@ -41,7 +41,7 @@ const LAB_URL = import.meta.env.PUBLIC_LAB_URL || "/lab/index.html";
 // One code editor: a syntax-highlight layer with a transparent textarea atop, so
 // the reader edits real text while seeing colour. Heights are synced after every
 // render (the textarea auto-grows; the highlight <pre> follows it).
-function CodeEditor({ lang, value, onInput, dialect = "fullbars", label }) {
+function CodeEditor({ lang, value, onInput, dialect = "classicbars", label }) {
   const taRef = useRef(null);
   const preRef = useRef(null);
   // template → engine highlighter; yaml → data highlighter; js (custom helpers)
@@ -104,7 +104,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   const isI18n = !!(effectiveCatalog && effectiveCatalog.trim()) || !!(locales && locales.length);
   const [transformStr, setTransformStr] = useState(transform || "");
   const [parts, setParts] = useState(partials || {});
-  // Custom-helper JS source (ADR-018). Only the FullBars/Handlebars surface has
+  // Custom-helper JS source (ADR-018). Only the ClassicBars/Handlebars surface has
   // user helpers; the cell shows when an example supplies them.
   const [helpersStr, setHelpersStr] = useState(helpers || "");
   const [edited, setEdited] = useState(false);
@@ -119,7 +119,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
   const [analyseRes, setAnalyseRes] = useState(null);
   const [schemaStr, setSchemaStr] = useState("");
   const [href, setHref] = useState(null);
-  // Only the compiling dialects (RawBars/FullBars/MaxBars) expose compileToJs;
+  // Only the compiling dialects (RawBars/ClassicBars/MaxBars) expose compileToJs;
   // MinBars doesn't, so the pane is gated on the method actually existing.
   const canCompile = compile && !!renderer && typeof renderer.compileToJs === "function";
 
@@ -190,7 +190,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
     }
   }, [renderer, tpl, dataStr, transformStr, parts, helpersStr, effectiveCatalog, loc, isI18n]);
 
-  // Optional: compile the template to a JS module (RawBars/FullBars/MaxBars only).
+  // Optional: compile the template to a JS module (RawBars/ClassicBars/MaxBars only).
   useEffect(() => {
     if (!canCompile) return;
     const r = renderer.compileToJs(tpl);
@@ -234,7 +234,7 @@ export default function OpenInLab({ engine, template, data = {}, partials = {}, 
       ? schemaStr.split(",").map((p) => p.trim()).filter(Boolean)
       : [];
     // MinBars renders on its own truthiness rule, so it analyses through
-    // analyzeMinbars; the PathSchema seam (analyzeWith) is FullBars-only.
+    // analyzeMinbars; the PathSchema seam (analyzeWith) is ClassicBars-only.
     const runAna = engine === "minbars" ? runAnalyzeMinbars : runAnalyze;
     try {
       const advisory = (r) => (r.findings || []).filter((f) => f.kind === "potential" || f.kind === "miss").length;

@@ -38,13 +38,13 @@ const groups = [
     items: [
       { href: "/start", label: "Getting started" },
       { href: "/lint", label: "Linting & migration" },
-      { href: "/fullbars", label: "FullBars" },
+      { href: "/classicbars", label: "ClassicBars" },
       { href: "/transform", label: "Data shaping" },
     ],
   },
   {
     label: "Play",
-    items: [{ href: "/lab/index.html?engine=fullbars", label: "FlatBars Lab ↗" }],
+    items: [{ href: "/lab/index.html?engine=classicbars", label: "FlatBars Lab ↗" }],
   },
 ];
 ---
@@ -53,7 +53,7 @@ const groups = [
   title="Truthiness portability"
   subtitle="The same template can take a different branch on a different engine: false, null, 0, '', [], and {} are not all falsy everywhere. Analyse mode renders against your real data and flags every condition that would flip — with a rule-free fix — so a template stays portable."
   groups={groups}
-  dialect="fullbars"
+  dialect="classicbars"
 >
   <style>
     .ambig { display: inline-flex; gap: 0.35rem; flex-wrap: wrap; font: 600 12px/1.6 var(--font-mono); margin: 0.4rem 0 0; }
@@ -67,7 +67,7 @@ const groups = [
     <p>
       A FlatBars template is logic-light, but it still asks yes/no questions:
       <code>{t("{{#if bio}}")}</code>, <code>{t("{{#unless items}}")}</code>. The answer
-      depends on a <b>truthiness rule</b>, and engines disagree. FullBars uses
+      depends on a <b>truthiness rule</b>, and engines disagree. ClassicBars uses
       Handlebars's rule; Mustache, StringTemplate, and others differ. Six values are
       the flashpoints — the <b>ambiguous set</b>:
     </p>
@@ -112,7 +112,7 @@ const groups = [
       as truthy and shows the filled branch — same template, two outputs. (<code>mustache.js</code>
       sides with Handlebars here.)
     </p>
-    <OpenInLab client:visible analyse engine="fullbars" template={ex.emptyString.template} data={ex.emptyString.data} />
+    <OpenInLab client:visible analyse engine="classicbars" template={ex.emptyString.template} data={ex.emptyString.data} />
     <p class="tip">
       The <b>flatbars analyse</b> pane runs live: the finding is the engine's, not hand-typed —
       edit <code>bio</code> to a non-empty string and it clears. The fix it names
@@ -128,7 +128,7 @@ const groups = [
       <code>mustache.js</code>), truthy under spec Mustache and the minimal/presence rules.
       "0 unread" silently becomes "all caught up" on the wrong engine.
     </p>
-    <OpenInLab client:visible analyse engine="fullbars" template={ex.zero.template} data={ex.zero.data} />
+    <OpenInLab client:visible analyse engine="classicbars" template={ex.zero.template} data={ex.zero.data} />
     <p class="tip">
       <code>includeZero=true</code> keeps <code>0</code> truthy on Handlebars <em>only</em> (not
       portable); the rule-free fix the pane names — <code>{t("(ne count 0)")}</code> — holds on
@@ -144,13 +144,13 @@ const groups = [
       is still to <em>iterate</em>: <code>{t("{{#each}}…{{else}}…{{/each}}")}</code> renders
       the empty branch the same way on every engine, without leaning on `if`-falsiness.
     </p>
-    <OpenInLab client:visible analyse engine="fullbars" template={ex.emptyArray.template} data={ex.emptyArray.data} />
+    <OpenInLab client:visible analyse engine="classicbars" template={ex.emptyArray.template} data={ex.emptyArray.data} />
     <p>
       An empty <b>object</b> is the non-obvious one: truthy in Handlebars,
       <code>mustache.js</code>, <em>and</em> spec Mustache, so it looks safe — but it flips under
       the <code>presence</code> rule. The analyser still catches it (watch the pane).
     </p>
-    <OpenInLab client:visible analyse engine="fullbars" template={ex.emptyObject.template} data={ex.emptyObject.data} />
+    <OpenInLab client:visible analyse engine="classicbars" template={ex.emptyObject.template} data={ex.emptyObject.data} />
   </section>
 
   <!-- ───────────────────────── What's portable ───────────────────────── -->
@@ -161,7 +161,7 @@ const groups = [
       on every engine, so a condition testing them is safe — the analyser confirms it with a
       <code>✓</code> line, positive evidence rather than silence.
     </p>
-    <OpenInLab client:visible analyse engine="fullbars" template={ex.portable.template} data={ex.portable.data} />
+    <OpenInLab client:visible analyse engine="classicbars" template={ex.portable.template} data={ex.portable.data} />
     <p class="tip">
       The pane says it plainly — <em>every condition agrees across engines for this data</em>.
       <code>false</code> (and <code>null</code>) are falsy everywhere, so there's nothing to fix.
@@ -186,7 +186,7 @@ const groups = [
       <b>potential</b> finding. This is a pure post-process over the render: its output is a
       function of the <em>template</em>, not the sample, so it is stable enough to gate in CI.
     </p>
-    <OpenInLab client:visible analyse engine="fullbars" template={ex.potential.template} data={ex.potential.data} />
+    <OpenInLab client:visible analyse engine="classicbars" template={ex.potential.template} data={ex.potential.data} />
     <p class="tip">
       The pane reads <b>0 observed · 1 potential</b>: <code>count</code> is <code>5</code> here
       (portable now), but it's a number, so the analyser flags that it <em>would diverge if it
@@ -214,7 +214,7 @@ const groups = [
       <b>N&nbsp;suppressed</b> count. That is <code>analyzeWith</code>, the seam the Lab's
       <code>config.yaml</code> exposes.
     </p>
-    <OpenInLab client:visible analyse pathSchemaDemo engine="fullbars" template={ex.suppress.template} data={ex.suppress.data} />
+    <OpenInLab client:visible analyse pathSchemaDemo engine="classicbars" template={ex.suppress.template} data={ex.suppress.data} />
     <p class="tip">
       Suppression is advisory: it never changes what renders, only which what-ifs the report
       shows. Observed findings — the ones your data actually hit — are <em>never</em> suppressed,
@@ -234,7 +234,7 @@ const groups = [
     </p>
     <AnalyseGallery client:visible items={gallery} />
     <p class="tip">
-      These are <b>FullBars</b> templates: analyse is the FullBars engine, and the Mustache
+      These are <b>ClassicBars</b> templates: analyse is the ClassicBars engine, and the Mustache
       conformance corpus doesn't exercise truthiness — so a portability gallery is a curated set,
       not a fixture dump. Point <code>flatbars analyse</code> at your own template directory in CI
       to get this profile across your real corpus.

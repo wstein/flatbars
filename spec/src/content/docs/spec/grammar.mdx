@@ -114,7 +114,7 @@ parser. A separator's head may not begin with the reserved sigils `# / ! {` (tho
 A few consequences the parser does *not* legislate, leaving them to the engine:
 
 * *Standalone separator.* A `Sep` with no enclosing block to interpret it is not a parse error; the
-  reference engine (*FullBars*) renders it as the application of its head, i.e. `{{x}}` ≡ `{{{x}}}`
+  reference engine (*ClassicBars*) renders it as the application of its head, i.e. `{{x}}` ≡ `{{{x}}}`
   when not consumed ([evaluation](/spec/evaluation/) §3.5). A standalone `{{else}}` thus just invokes
   the (inert) `else` helper and yields nothing.
 * *Repeated separators.* A block may contain several `Sep` nodes (`{{case}}` … `{{case}}`
@@ -131,7 +131,7 @@ has a home in the surface dialect or the engine:
 | Absent from the core | Where it lives |
 | --- | --- |
 | `{{ }}` *as escaped output* | surface → `{{{ escapeHtml … }}}`. (In the core a bare `{{ Ident … }}` is a *separator* marker, §2.4 — not output.) |
-| `{{^}}` inverse opener | recognized as a `Block` with the `Inverse` sigil (meaning-free); FullBars desugars it to `unless`, RawBars/MaxBars reject it. (`{{else}}` *is* in the core: a separator.) |
+| `{{^}}` inverse opener | recognized as a `Block` with the `Inverse` sigil (meaning-free); ClassicBars desugars it to `unless`, RawBars/MaxBars reject it. (`{{else}}` *is* in the core: a separator.) |
 | dotted/parent paths `a.b`, `../a`, `this.a` | surface → `lookup` / `parent` |
 | index & segment-literal paths `a.1`, `a.[k v]` | surface → `lookup` with number / string segments |
 | `@index`, `@key`, `@root`, … | surface → scoped engine helpers `index`, `key`, `root`, … |

@@ -1,0 +1,74 @@
+---
+title: "ADR-038: rename the FullBars dialect to ClassicBars"
+sidebar:
+  label: "ADR-038 FullBars → ClassicBars"
+---
+
+*Status:* **Accepted — implemented** (2026-06-10; full internal rename, all gates green).
+*Date:* 2026-06-10. Owner: Werner. The Handlebars-faithful reference dialect is renamed
+**FullBars → ClassicBars** — a pure rename (no behaviour, surface, or API-shape change), so the
+name states the dialect's role on the same axis as its siblings.
+
+## Context
+
+The dialect ladder is **RawBars ⊂ ClassicBars ⊂ MaxBars** (shared engine/prelude/compiler;
+surface-superset *modulo documented exceptions*, [ADR-005](/adr/adr-0005-dialect-ladder/)).
+"FullBars" mis-signalled: it is the **Handlebars-faithful reference** surface — the *classic,
+familiar* one — but the name "Full" implies maximal capability, which is precisely **MaxBars**'s
+role (infix operators, pipes, bare loop vars). So "Full" over-claimed relative to the dialect
+*above* it, and the pair `Full`/`Max` read as near-synonyms rather than as a contrast.
+
+The point is sharpened by the proposed Django-style `{% %}` statement tags (a Trussbars design
+note): RawBars/MaxBars would move control flow to `{% %}` while this dialect stays `{{ }}`-only
+for drop-in Handlebars compatibility — i.e. it is explicitly *the classic `{{ }}` Handlebars
+dialect*. The name should say that.
+
+## Decision
+
+Rename **FullBars → ClassicBars** everywhere — a **full internal rename** (not a display-name
+alias): package directories, spago package names, the `ClassicBars.*` PureScript module
+namespace, every reference, and all docs/spec/tutorials/editors.
+
+**Rationale for "ClassicBars":**
+
+- **Honorable, not deprecated.** "Classic" reads as *the familiar, well-trodden* surface — not
+  "legacy" or superseded. ClassicBars remains the Handlebars-conformance reference (49/50 vs
+  `handlebars@4.7.9`, unchanged).
+- **A clean `classic ↔ max` axis.** ClassicBars (the classic Handlebars surface) and MaxBars
+  (the maximal flagship) now name a genuine contrast, not a `Full`/`Max` near-tie.
+- **Reads naturally beside RawBars / MinBars / MaxBars** — adjective-or-role + "Bars", no
+  trademark clash.
+
+This is a **rename only**: no operation, truthiness rule, escaping policy, surface construct,
+or conformance case changes. Every backend renders byte-for-byte as before.
+
+## Scope (what was renamed)
+
+- **Packages:** `packages/fullbars` → `packages/classicbars`, `packages/fullbars-compile` →
+  `packages/classicbars-compile`; spago `name:` and inter-package deps.
+- **Modules:** `FullBars` / `FullBars.Surface` / `FullBars.Catalog` / `FullBars.Compile` /
+  `FullBars.JS` / `Test.FullBars.*` → `ClassicBars.*` (file/dir paths follow the module name;
+  `output/FullBars.JS` → `output/ClassicBars.JS`, so `gen:bundle`, the conformance harnesses,
+  and `check:catalog` track the new path).
+- **Gates & scripts:** `package.json` (`spago test -p classicbars[-compile]`, the bundle path),
+  every `scripts/*.mjs` and `conformance/*.mjs` importing the renamed modules.
+- **Artifacts regenerated, not hand-edited:** `spago.lock`, the Lab bundle
+  (`lab/vendor/flatbars-engine.mjs` via `gen:bundle`, with the `?v=` cache-buster bumped and
+  `gen:cachebust` re-recorded), the helper catalog.
+- **Docs/spec/tutorials/editors:** the dialect ladder, `adr-0009-classicbars.mdx`,
+  `engine/classicbars-compat.mdx`, the `/classicbars` tutorial page (`classicbars.astro`,
+  `classicbars.mjs`), the JetBrains file template/icon, the surface-syntax + token vocabularies.
+
+## Consequences
+
+- **Pure rename, fully gated.** Verified green: `spago build` + per-package tests
+  (`classicbars`, `classicbars-compile`, `maxbars`), `test:compile` (420/420 interpreter ≡
+  compiled), `check:hbs-conformance` (49/50), `check:catalog`, `check:bundle`,
+  `check:lab-cachebust`, `check:surface-syntax`, `check:adr-nav`, `check:tutorial-links`,
+  `check:parity`, `check:isolation`, and the editor/vocabulary gates.
+- **The ladder doc ([ADR-005](/adr/adr-0005-dialect-ladder/)) is amended** to read
+  `RawBars ⊂ ClassicBars ⊂ MaxBars`. No semantics change.
+- **MaxBars's "reuses ClassicBars's engine wholesale"** lineage statement is unchanged in
+  substance — only the name it points at.
+- **No migration for template authors.** The rename is to the *implementation/dialect name*, not
+  to any `{{ }}` surface a `.classicbars` author writes; existing templates render identically.

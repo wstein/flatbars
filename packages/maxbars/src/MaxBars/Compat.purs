@@ -43,6 +43,7 @@ module MaxBars.Compat
 
 import Prelude
 
+import ClassicBars (desugarSurfaceWith, hoistInline)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Writer.Class (tell)
 import Control.Monad.Writer.Trans (WriterT, runWriterT)
@@ -63,7 +64,6 @@ import FlatBars.Parser (parseWith)
 import FlatBars.Span (Span, lineColumn)
 import FlatBars.Syntax (Template)
 import FlatBars.Value (Value(..))
-import FullBars (desugarSurfaceWith, hoistInline)
 import Kernel.Engine (Operation, runTemplate)
 import Kernel.Env (RefEnv, refEngineWith, registerAll, registerPartials, withTruthy, withYieldName)
 import Kernel.Prelude (lenientResolve, prelude)

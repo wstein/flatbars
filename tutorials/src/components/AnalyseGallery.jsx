@@ -11,7 +11,7 @@ import { analyze, analyzeMinbars } from "../../../lab/vendor/flatbars-engine.mjs
 import { labHref } from "../../../lab/open-in-lab.mjs";
 
 // MinBars (Mustache) renders on its own truthiness rule, so it analyses through
-// `analyzeMinbars`; every other dialect is FullBars-surface `analyze`.
+// `analyzeMinbars`; every other dialect is ClassicBars-surface `analyze`.
 const analyzeFor = (engine) => (engine === "minbars" ? analyzeMinbars : analyze);
 
 // A finding-kind badge (count + label), hidden at zero.

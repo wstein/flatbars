@@ -10,13 +10,13 @@
 import { highlightTemplate, highlightYaml } from "../lib/highlight.mjs";
 
 const tags = [
-  { code: "{{name}}", dialect: "fullbars", label: "Interpolation", note: "a value, HTML-escaped" },
-  { code: "{{{html}}}", dialect: "fullbars", label: "Unescaped output", note: "{{{…}}} or {{&…}}" },
-  { code: "{{#each xs}} … {{/each}}", dialect: "fullbars", label: "Block / section", note: "opens & closes a region" },
-  { code: "{{else}} {{elif ok}}", dialect: "fullbars", label: "Clause keyword", note: "a separator inside a block" },
-  { code: "{{> card}}", dialect: "fullbars", label: "Partial", note: "includes another template" },
-  { code: "{{<layout}} {{$title}}", dialect: "fullbars", label: "Inheritance", note: "parent layout · overridable block" },
-  { code: "{{! note }} {{!-- long --}}", dialect: "fullbars", label: "Comment", note: "dropped from output" },
+  { code: "{{name}}", dialect: "classicbars", label: "Interpolation", note: "a value, HTML-escaped" },
+  { code: "{{{html}}}", dialect: "classicbars", label: "Unescaped output", note: "{{{…}}} or {{&…}}" },
+  { code: "{{#each xs}} … {{/each}}", dialect: "classicbars", label: "Block / section", note: "opens & closes a region" },
+  { code: "{{else}} {{elif ok}}", dialect: "classicbars", label: "Clause keyword", note: "a separator inside a block" },
+  { code: "{{> card}}", dialect: "classicbars", label: "Partial", note: "includes another template" },
+  { code: "{{<layout}} {{$title}}", dialect: "classicbars", label: "Inheritance", note: "parent layout · overridable block" },
+  { code: "{{! note }} {{!-- long --}}", dialect: "classicbars", label: "Comment", note: "dropped from output" },
   { code: "{{=<% %>=}}", dialect: "minbars", label: "Set delimiters", note: "switches the {{ }} pair" },
 ];
 

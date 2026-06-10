@@ -18,7 +18,7 @@ validates the tree against the engine's rules and interprets it — precisely th
 between a JSON document and a JSON Schema. FlatBars defines the tree and the walking contract; the
 engine defines the schema and the interpreter.
 
-Everything below describes the interpretation of the reference engine, *FullBars*. A different engine may choose
+Everything below describes the interpretation of the reference engine, *ClassicBars*. A different engine may choose
 differently; the core does not care.
 
 ## 1. Everything is an operation
@@ -79,13 +79,13 @@ its body, then removes them.
 &lt;1> Inside the block, `index` and `this` resolve — `each` installed them.
 &lt;2> Outside, `index` is undefined; resolving it is a validation error in the engine walk.
 
-Try it — this pane runs the *real* FullBars engine (the surface dialect, where the
+Try it — this pane runs the *real* ClassicBars engine (the surface dialect, where the
 scoped loop variable spells `@index`). Edit the template or data and the output
 re-renders:
 
 <LivePane
   client:visible
-  dialect="fullbars"
+  dialect="classicbars"
   template={`{{#each people}}{{ @index }}. {{ upcase name }}\n{{/each}}`}
   data={`{\n  "people": [\n    { "name": "ada" },\n    { "name": "linus" },\n    { "name": "grace" }\n  ]\n}`}
 />
@@ -118,7 +118,7 @@ body at that separator ([evaluation](/spec/evaluation/)). The name is the engine
 with no enclosing block to interpret it, simply renders as an application of its head.
 
 The core *recognizes* the inverse opener `{{^x}}` structurally — it records the opener sigil on
-the `Block` node (`Section` vs `Inverse`) but assigns it no meaning. FullBars desugars `{{^x}}`
+the `Block` node (`Section` vs `Inverse`) but assigns it no meaning. ClassicBars desugars `{{^x}}`
 to `{{#unless x}}`; the austere RawBars and MaxBars dialects reject it (write the `unless`
 helper). See [directives](/engine/directives/).
 :::
@@ -141,12 +141,12 @@ and the shape gates, never a fork of the grammar:
   (that is the parser).
 * *MinBars* — a Mustache-compatible *peer* engine, with its own context-stack scope and Mustache
   truthiness (`0` and `""` are truthy); it passes the vendored `mustache/spec` suite.
-* *FullBars* — faithful to Handlebars, the industry-standard `{{ }}` engine (`{{ name }}`,
+* *ClassicBars* — faithful to Handlebars, the industry-standard `{{ }}` engine (`{{ name }}`,
   dotted paths, `{{#each}}`).
 * *MaxBars* — the flagship surface: infix operators, pipes, and bare loop variables. It borrows
-  most of FullBars (not quite all) on its own expression-first terms.
+  most of ClassicBars (not quite all) on its own expression-first terms.
 
-That MinBars (Mustache) and FullBars (Handlebars) — two *mutually incompatible* template languages,
+That MinBars (Mustache) and ClassicBars (Handlebars) — two *mutually incompatible* template languages,
 differing in scope rules and truthiness — both render through one structural core is the demonstration
 that the parser is universal across the `{{ }}` family. RawBars is that core exposed; MaxBars is
 FlatBars's own maximal language on top. The normative contract for all four is this spec, not any one
@@ -161,7 +161,7 @@ interpret, desugar, and validate. The dialects on the kernel ladder do not have 
 have separate *front-ends* that desugar to the same core, then share one driver and one `Emit`:
 
 * *RawBars* parses core directly, then `compile meta emit nodes`.
-* *FullBars* / *MaxBars* desugar the surface (the `parseExpr` seam, block params, MaxBars infix/pipes)
+* *ClassicBars* / *MaxBars* desugar the surface (the `parseExpr` seam, block params, MaxBars infix/pipes)
   to the same core AST, then call the *same* `compile` with the *same* emit rules — MaxBars `score >= 50`
   is already core `App` by the time the compiler sees it, so it compiles for free.
 

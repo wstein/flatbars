@@ -114,7 +114,7 @@ sub-render in the current frame) and installs `name` as a nullary operation retu
 `VSafe rendered` in the current frame — so `{{ name }}` yields the already-escaped text and the
 frame's close discards the binding (the `{% set %}` scope). The JS compiler and the VM mirror
 render-into-buffer-then-bind; all backends are pinned byte-for-byte by the corpus. Like
-`{% set %}`/`{% local %}`/`{% case %}`, `capture` is **RawBars/MaxBars only**; **FullBars** rejects
+`{% set %}`/`{% local %}`/`{% case %}`, `capture` is **RawBars/MaxBars only**; **ClassicBars** rejects
 it with a located error (use `{% inline %}`/`{{> partial}}`), and in **MinBars** it is an ordinary
 section.
 
@@ -191,5 +191,5 @@ the corpus an authority before Trussbars conforms byte-for-byte (docs/12 §5.5).
   intermediate buffer** in Trussbars (docs/05), bounded and size-hinted.
 - It is **`capture`** (a block, because it has a body) and the rendered-body counterpart to
   `{% set %}`; distinct from `{% inline %}`, which yields a re-invokable fragment, not a value.
-- **nonEmpty-family surface** (RawBars/MaxBars + Trussbars); FullBars/MinBars reject it.
+- **nonEmpty-family surface** (RawBars/MaxBars + Trussbars); ClassicBars/MinBars reject it.
   Oracle-first, conformance-pinned across all backends, eager with an unused-capture lint.

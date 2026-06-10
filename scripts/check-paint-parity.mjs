@@ -88,7 +88,7 @@ function grammarKinds(line) {
   return g;
 }
 
-const DIALECTS = ["fullbars", "maxbars", "minbars", "rawbars"];
+const DIALECTS = ["classicbars", "maxbars", "minbars", "rawbars"];
 // Each case is `[template, dialects?]`; default = all four. Set-delimiters are
 // MinBars-only (the others reject them), so that case is scoped.
 const CASES = [
@@ -110,7 +110,7 @@ const CASES = [
   ["{{#*inline \"x\"}}y{{/inline}}"],
   // raw blocks: braces are punct, the whole head (#name / /name) is the section
   // keyword — both spellings, in the dialects that accept each.
-  ["{{{{myraw}}}}body {{x}}{{{{/myraw}}}}", ["fullbars"]],
+  ["{{{{myraw}}}}body {{x}}{{{{/myraw}}}}", ["classicbars"]],
   ["{{{{#myraw}}}}body {{x}}{{{{/myraw}}}}", ["rawbars", "maxbars"]],
   ["{{! comment with add toFixed }}"],
   ["{{!-- a {{nested}}-looking comment --}}"],

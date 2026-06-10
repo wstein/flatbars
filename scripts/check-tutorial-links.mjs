@@ -14,14 +14,14 @@ import { readFileSync } from "node:fs";
 import { lessons } from "../tutorials/src/examples.mjs";
 import { examples as mustacheExamples } from "../tutorials/src/mustache.mjs";
 import { examples as rawbarsExamples } from "../tutorials/src/rawbars.mjs";
-import { examples as fullbarsExamples } from "../tutorials/src/fullbars.mjs";
+import { examples as classicbarsExamples } from "../tutorials/src/classicbars.mjs";
 import { examples as maxbarsExamples } from "../tutorials/src/maxbars.mjs";
 import { createRenderer } from "../lab/renderer.mjs";
 import { renderWith, renderMaxWith, safe } from "../lab/vendor/flatbars-engine.mjs";
 import { buildHelpers } from "../lab/helpers.mjs";
 import { labHref } from "../lab/open-in-lab.mjs";
 
-const DIALECT = { rawbars: "core", fullbars: "surface", maxbars: "maxbars" };
+const DIALECT = { rawbars: "core", classicbars: "surface", maxbars: "maxbars" };
 
 let fail = 0;
 const warnings = [];
@@ -153,7 +153,7 @@ console.log(
   fail ? `\n${fail} example(s) broken overall` : `\nall mustache reference examples render + link`,
 );
 // RawBars reference examples (tutorials/src/rawbars.mjs) — each runs under its
-// own engine (the diptych's `sugar` is FullBars); a `compiles` example must also
+// own engine (the diptych's `sugar` is ClassicBars); a `compiles` example must also
 // emit JS via compileToJs. Orphan guard against examples never shown on the page.
 console.log("\nRawBars reference examples:");
 const rawPageSrc = readFileSync(new URL("../tutorials/src/pages/rawbars.astro", import.meta.url), "utf8");
@@ -188,20 +188,20 @@ for (const [key, rex] of Object.entries(rawbarsExamples)) {
   }
 }
 
-// FullBars reference examples (tutorials/src/fullbars.mjs) — every one runs under
+// ClassicBars reference examples (tutorials/src/classicbars.mjs) — every one runs under
 // the `surface` engine; a custom-helper example (ADR-018) renders through
 // `renderWith` (the same path the card uses), and a `compiles` example must also
-// emit JS. Orphan guard against examples never shown on fullbars.astro.
-console.log("\nFullBars reference examples (fullbars):");
-const fullPageSrc = readFileSync(new URL("../tutorials/src/pages/fullbars.astro", import.meta.url), "utf8");
+// emit JS. Orphan guard against examples never shown on classicbars.astro.
+console.log("\nClassicBars reference examples (classicbars):");
+const fullPageSrc = readFileSync(new URL("../tutorials/src/pages/classicbars.astro", import.meta.url), "utf8");
 const fbr = await createRenderer("surface");
-for (const [key, fex] of Object.entries(fullbarsExamples)) {
+for (const [key, fex] of Object.entries(classicbarsExamples)) {
   if (!fullPageSrc.includes(`ex.${key}.`)) {
-    console.error(`  ✗ ${key}: defined in fullbars.mjs but never referenced by fullbars.astro (orphan)`);
+    console.error(`  ✗ ${key}: defined in classicbars.mjs but never referenced by classicbars.astro (orphan)`);
     fail++;
   }
   try {
-    await labHref("fullbars", fex, { labUrl: "/lab/index.html" });
+    await labHref("classicbars", fex, { labUrl: "/lab/index.html" });
   } catch (e) {
     console.error(`  ✗ ${key}: Open-in-Lab link failed to build — ${e.message}`);
     fail++;
@@ -225,16 +225,16 @@ for (const [key, fex] of Object.entries(fullbarsExamples)) {
       if (!c || !c.ok) throw new Error("compileToJs failed: " + ((c && c.error) || "unknown"));
       note = ` [compiles ✓ ${c.value.length}b]`;
     }
-    console.log(`  ✓ ${key} (fullbars) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}${note}`);
-    collapseWarn(`${key} (fullbars)`, fex, out);
+    console.log(`  ✓ ${key} (classicbars) → ${JSON.stringify(out.slice(0, 50))}${out.length > 50 ? "…" : ""}${note}`);
+    collapseWarn(`${key} (classicbars)`, fex, out);
   } catch (e) {
-    console.error(`  ✗ ${key} (fullbars): ${e && e.message ? e.message : e}`);
+    console.error(`  ✗ ${key} (classicbars): ${e && e.message ? e.message : e}`);
     fail++;
   }
 }
 
 // MaxBars reference examples (tutorials/src/maxbars.mjs) — every one runs under
-// the `maxbars` engine (FullBars + infix operators, pipes, bare loop vars); a
+// the `maxbars` engine (ClassicBars + infix operators, pipes, bare loop vars); a
 // `compiles` example must also emit JS via compileToJs. Orphan guard against
 // examples never shown on maxbars.astro.
 console.log("\nMaxBars reference examples (maxbars):");

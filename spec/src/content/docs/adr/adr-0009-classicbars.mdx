@@ -1,7 +1,7 @@
 ---
-title: "ADR-009: FullBars — the reference engine and surface dialect"
+title: "ADR-009: ClassicBars — the reference engine and surface dialect"
 sidebar:
-  label: ADR-009 FullBars
+  label: ADR-009 ClassicBars
 ---
 
 *Status:* Accepted. *Date:* 2026-06-01. The middle rung of the ladder
@@ -11,21 +11,21 @@ sidebar:
 
 The substrate needs *one* worked, Handlebars-faithful engine — to validate the host API (ADR-001
 §A.13), to be the family's reference and Handlebars migration target, and to be the surface the other
-dialects are defined against. FullBars is "one *possible* engine over the substrate" (ADR-001), not a
+dialects are defined against. ClassicBars is "one *possible* engine over the substrate" (ADR-001), not a
 privileged one; the architecture must keep it swappable even as it serves as the default.
 
 ## Decision
 
-1. *FullBars = value policy + environment + prelude + lowering + surface desugar*, wired into
+1. *ClassicBars = value policy + environment + prelude + lowering + surface desugar*, wired into
    convenience renderers. After the kernel extraction (ADR-003) the value policy
-   (`truthy`/`escapeHtml`/`stringify`), `RefEnv`, prelude, and `lower` live in `kernel`; the `fullbars`
-   package owns the *surface desugar* (`FullBars.Surface`), the convenience renderers, and the helper
+   (`truthy`/`escapeHtml`/`stringify`), `RefEnv`, prelude, and `lower` live in `kernel`; the `classicbars`
+   package owns the *surface desugar* (`ClassicBars.Surface`), the convenience renderers, and the helper
    *catalog* (the single source of truth for `gen:catalog`).
 
-1. *`extras = true`.* FullBars admits the Handlebars-only shapes (raw blocks, inverse, unescaped) that
+1. *`extras = true`.* ClassicBars admits the Handlebars-only shapes (raw blocks, inverse, unescaped) that
    RawBars ([adr-0008-rawbars](/adr/adr-0008-rawbars/)) and MaxBars reject.
 
-1. *The surface is a desugar, not a parser* (ADR-001). `FullBars.Surface.desugar` is a pure
+1. *The surface is a desugar, not a parser* (ADR-001). `ClassicBars.Surface.desugar` is a pure
    `Template → Template` rewrite into core forms, then the reference renderer (or `lower`) runs the
    result unchanged. It rewrites: `{{ E }}` ⇒ escaped `{{{ escapeHtml E }}}`; bare/dotted
    *paths* ⇒ `lookup` chains (`name` ⇒ `lookup this "name"`, `a.b`, `a.[1]`, `../a` ⇒
@@ -50,29 +50,29 @@ privileged one; the architecture must keep it swappable even as it serves as the
   (the core lexes them as the distinct `PartialBlock` / `Decorator` sigils — each with a clean head
   and a `{{/…}}` close that repeats it — gated by `ParseOptions.partialBlocks` / `decorators`,
   and they desugar to the `{{#partial}}`/`{{#inline}}` core spellings).
-* *Con:* because every other dialect is defined *relative to* FullBars, it carries gravitational
+* *Con:* because every other dialect is defined *relative to* ClassicBars, it carries gravitational
   weight despite being "just one engine" — the same tension ADR-001 logged as the
   shared-reference-lowering point.
 
 ## Amendment (2026-06-03): inline partials require the `{{#*inline}}` decorator
 
-FullBars now *requires* the Handlebars decorator form `{{#*inline "name"}}…{{/inline}}`
+ClassicBars now *requires* the Handlebars decorator form `{{#*inline "name"}}…{{/inline}}`
 for inline partials and *rejects* the bare `{{#inline "name"}}…{{/inline}}` spelling with a
 located `DisallowedShape` parse error. This matches Handlebars, where `inline` is a *decorator*, not
 a block helper. The original "Note" above — that `{{#*inline}}` is merely accepted and
-desugars to a `{{#inline}}` core spelling — is superseded *for the FullBars surface*: the
+desugars to a `{{#inline}}` core spelling — is superseded *for the ClassicBars surface*: the
 decorator is now the author form, and it still desugars internally to the core `inline` helper
 (hoisted by `hoistInline`).
 
-This is a *FullBars-surface-only* gate (`FullBars.checkBareInline`, which also governs the CLI
+This is a *ClassicBars-surface-only* gate (`ClassicBars.checkBareInline`, which also governs the CLI
 `--surface` path). The shared kernel `inline` helper is *retained* (a no-op block), so *RawBars and
 MaxBars are unchanged*: they still accept bare `{{#inline}}` (MaxBars's grammar bans the `*`
 head, so bare is its only inline form). The generated helper catalog is unaffected — the helper still
 exists.
 
-## Amendment (2026-06-05): FullBars carries the blessed i18n operations (ADR-029)
+## Amendment (2026-06-05): ClassicBars carries the blessed i18n operations (ADR-029)
 
-FullBars's prelude includes the blessed i18n operations `t` / `number` / `date` / `selectPlural` /
+ClassicBars's prelude includes the blessed i18n operations `t` / `number` / `date` / `selectPlural` /
 `relative` ([ADR-029](/adr/adr-0029-i18n-helper/)), which *Handlebars does not have*. This is a
 *deliberate, documented exception* to "Handlebars-faithful", recorded here so faithfulness is never
 claimed by omission: these names are reserved at the prelude level, host-driven through the first-class
@@ -86,9 +86,9 @@ Why this does *not* erode the faithfulness the ADR rests on:
   template that never calls `t`/`number`/`date` is byte-identical (the `handlebars` conformance corpus
   stays 49/50 — but note the *guarantee* is the application-gated semantics, not merely that the corpus
   happens not to exercise them).
-* *Shared-prelude scope is deliberate.* They live in the *core-surface* prelude (RawBars/FullBars/MaxBars)
-  so FullBars's `{{t …}}` has a desugar target; they are *absent from MinBars* (its closed
+* *Shared-prelude scope is deliberate.* They live in the *core-surface* prelude (RawBars/ClassicBars/MaxBars)
+  so ClassicBars's `{{t …}}` has a desugar target; they are *absent from MinBars* (its closed
   Mustache prelude), so [ADR-007](/adr/adr-0007-minbars/)'s "pure Mustache" claim is intact.
 * *No bundled CLDR.* The seam carries no locale data; the brain is the host's (ADR-029).
 
-In short: FullBars is "Handlebars + the host-pluggable i18n seam", and that "+" is stated, not hidden.
+In short: ClassicBars is "Handlebars + the host-pluggable i18n seam", and that "+" is stated, not hidden.

@@ -32,8 +32,8 @@ const isOperation = (name) => OP_NAMES.has(name);
 // model. Every segment inside a tag is bold (the editor "bold tag" treatment),
 // and each whole tag (`{ … }`, braces included) sits on a `tk-tag` plate so it
 // reads as one pill. `dialect` selects the lexer config (set delimiters, clause
-// keywords) exactly as the renderer would; it defaults to FullBars.
-export function highlightTemplate(src, dialect = "fullbars") {
+// keywords) exactly as the renderer would; it defaults to ClassicBars.
+export function highlightTemplate(src, dialect = "classicbars") {
   const text = String(src);
   const tags = tagRanges(text, dialect); // ascending, non-overlapping
   let out = "";

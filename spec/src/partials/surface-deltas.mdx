@@ -16,9 +16,9 @@ The desugared core surface — core skeleton syntax, no sugar. Truthiness: `nonE
 | Loop variables | `{{{index}}}  {{{first}}}  {{{key}}}` | Bare scoped ops: index, key, first, last, length. No @-data. |
 | Comments | `{{! editorial note }}` | Dropped by the lexer. |
 | Partials | `{{{(partial "name")}}}` | Called as the partial helper, unescaped. The context is optional (defaults to the current one); pass one to override, plus an optional hash. |
-| Block-partial body | `{{{yield}}}` | The caller's body inside a block partial — the hyphen-free yield (FullBars uses partial-block; ADR-005). |
+| Block-partial body | `{{{yield}}}` | The caller's body inside a block partial — the hyphen-free yield (ClassicBars uses partial-block; ADR-005). |
 
-### FullBars
+### ClassicBars
 
 The Handlebars-faithful surface — auto-escape, dotted paths, @-data. Truthiness: `handlebars` (falsy: `false  null  0  ""  []` — &#123;&#125; is truthy; 0 is falsy unless includeZero=true).
 
@@ -36,7 +36,7 @@ The Handlebars-faithful surface — auto-escape, dotted paths, @-data. Truthines
 
 ### MaxBars
 
-The flagship — FullBars plus infix operators and pipes. Truthiness: `nonEmpty` (falsy: `false  null  ""  []  {}` — 0 is truthy; same rule as RawBars).
+The flagship — ClassicBars plus infix operators and pipes. Truthiness: `nonEmpty` (falsy: `false  null  ""  []  {}` — 0 is truthy; same rule as RawBars).
 
 | Feature | Syntax | Notes |
 | --- | --- | --- |
@@ -46,7 +46,7 @@ The flagship — FullBars plus infix operators and pipes. Truthiness: `nonEmpty`
 | Path access | `{{user.city}}   {{root.x}}   {{parent.x}}` | Reserved names instead of @root / ../  (no @-sigil). |
 | Loop variables | `{{index0}}   {{loop.first}}   {{outer.index0}}` | Bare scoped ops or labelled loop / outer chains (ADR-021). |
 | Block params | `{{#each xs as \|item i\|}}` | The as \|…\| bars are distinct from the pipe operator. |
-| Output (auto-escape) | `{{value}}  /  {{{value}}}` | Inherits the FullBars escape model. |
+| Output (auto-escape) | `{{value}}  /  {{{value}}}` | Inherits the ClassicBars escape model. |
 | Inline / block partials | `{{#inline "name"}} … {{/inline}}   {{yield}}` | Bare yield (no @partial-block); rejects &#123;&#123;^&#125;&#125; and &#123;&#123;#*inline&#125;&#125;. |
 
 ### MinBars

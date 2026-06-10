@@ -10,11 +10,11 @@ the tag that produced it. Owner: Werner. Builds on the polymorphic interpret
 driver ([ADR-001](/adr/adr-0001-structural-parser-and-walker/)) and the engine
 seam ([ADR-020](/adr/adr-0020-user-block-helpers/)).
 
-*Implementation status — complete for the core, FullBars, and MaxBars dialects.*
+*Implementation status — complete for the core, ClassicBars, and MaxBars dialects.*
 `Kernel.Engine` carries two no-op-by-default provenance hooks (`recordText` /
 `recordEmit`); `Kernel.Provenance` runs the driver in a `WriterT` and returns
 `{ output, segments }`. Each dialect exposes a mapped facade —
-`RawBars.renderMapped[With]`, `FullBars.renderSurfaceMapped[With]` (generalised by
+`RawBars.renderMapped[With]`, `ClassicBars.renderSurfaceMapped[With]` (generalised by
 `renderSurfaceMappedDiagWith`, which MaxBars reuses), `MaxBars.renderMaxMapped[With]`
 — behind the FFI (`renderMapped`, `renderSurfaceMapped`, `renderMaxbarsMapped`, each
 with a `…WithPartials` twin) and the Lab's `render(.., { map: true })`. The Lab's
@@ -23,11 +23,11 @@ capability; `check:provenance` pins that the corpus tiles. MinBars (logic-less) 
 no segments and advertises `source-map` off, so its provenance UI gates off.
 
 The same instrumentation backs the **Context Inspector** (`context-inspect`, the
-core / FullBars / MaxBars dialects): `Kernel.Inspect.inspectResolved{Lenient,Strict}`
+core / ClassicBars / MaxBars dialects): `Kernel.Inspect.inspectResolved{Lenient,Strict}`
 swaps a snapshotting `recordEmit` that, at every execution of the emit whose span +
 file match a clicked run, captures the render context — `this`, the scoped vars
 (`parent`/`root`/`index`/`first`/…), and the block-param `locals` — one snapshot
-per loop iteration. Each dialect exposes a facade (`FullBars.inspectSurfaceWith`,
+per loop iteration. Each dialect exposes a facade (`ClassicBars.inspectSurfaceWith`,
 generalised by `inspectSurfaceDiagWith` which MaxBars reuses; `RawBars.inspectWith`)
 behind the FFI (`inspectSurface` / `inspect` / `inspectMaxbars`) and the Lab's
 `inspectAt`. MinBars gates off. Verified end-to-end by `test:lab:browser`.
@@ -83,7 +83,7 @@ tile the output: ordered, contiguous, each `len > 0`, covering `[0, output.len)`
 
 ## Consequences
 
-- The FullBars-surface provenance UI lights up; the other dialects gate off
+- The ClassicBars-surface provenance UI lights up; the other dialects gate off
   honestly via their capability vector.
 - Templates whose output is reshaped by a transforming helper get no map for that
   render (degrade to `[]`), which is correct, not broken.

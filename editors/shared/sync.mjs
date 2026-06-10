@@ -51,9 +51,9 @@ export async function bundleServer(esbuild, { repoRoot, outfile, sourcemap = fal
 // bundle manifest. All four share the one `source.flatbars` grammar.
 //
 // Each dialect ships TWO native extensions: the long form (`.rawbars`) and a
-// short alias (`.rbars`). FullBars and MinBars additionally claim the
+// short alias (`.rbars`). ClassicBars and MinBars additionally claim the
 // Handlebars / Mustache extensions they're semantically compatible with —
-// `.hbs` / `.handlebars` for FullBars (Handlebars surface), `.mustache` for
+// `.hbs` / `.handlebars` for ClassicBars (Handlebars surface), `.mustache` for
 // MinBars (Mustache spec). MaxBars additionally claims `.truss` — the on-disk
 // extension for Trussbars templates (the MaxBars→Rust AOT compiler, `trussbars/`);
 // a Trussbars template is MaxBars source, so it highlights through the same
@@ -63,7 +63,7 @@ export async function bundleServer(esbuild, { repoRoot, outfile, sourcemap = fal
 export const LANGUAGES = [
   { id: "rawbars", aliases: ["RawBars"], extensions: [".rawbars", ".rbars"] },
   { id: "minbars", aliases: ["MinBars"], extensions: [".minbars", ".mbars", ".mustache"] },
-  { id: "fullbars", aliases: ["FullBars"], extensions: [".fullbars", ".fbars", ".hbs", ".handlebars"] },
+  { id: "classicbars", aliases: ["ClassicBars"], extensions: [".classicbars", ".fbars", ".hbs", ".handlebars"] },
   { id: "maxbars", aliases: ["MaxBars"], extensions: [".maxbars", ".xbars", ".truss"] },
 ];
 

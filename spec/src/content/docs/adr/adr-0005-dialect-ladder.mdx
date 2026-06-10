@@ -14,17 +14,17 @@ The family needs several Handlebars-lineage dialects that share one engine witho
 
 ## Decision
 
-1. *The ladder: RawBars ⊂ FullBars ⊂ MaxBars.*
+1. *The ladder: RawBars ⊂ ClassicBars ⊂ MaxBars.*
 | Dialect | Surface |
 | --- | --- |
 | *RawBars* | the core prefix grammar directly — explicit `{{{ lookup this "x" }}}`, no sugar; `extras = false`. |
-| *FullBars* | adds the surface desugar — paths, `@data`, `as \|x\|`, `{{ }}` auto-escape; `extras = true`. |
-| *MaxBars* | FullBars + infix operators and pipes (`MaxBars.Expr`), desugaring to the same core `Expr`; `extras = false`. |
+| *ClassicBars* | adds the surface desugar — paths, `@data`, `as \|x\|`, `{{ }}` auto-escape; `extras = true`. |
+| *MaxBars* | ClassicBars + infix operators and pipes (`MaxBars.Expr`), desugaring to the same core `Expr`; `extras = false`. |
 
 ```mermaid
 flowchart LR
     subgraph MaxBars["MaxBars — flagship surface (infix · pipes)"]
-        subgraph FullBars["FullBars — Handlebars-style surface (paths · @data · auto-escape)"]
+        subgraph ClassicBars["ClassicBars — Handlebars-style surface (paths · @data · auto-escape)"]
             subgraph RawBars["RawBars — core prefix grammar (no sugar)"]
                 engine["one shared engine<br/>prelude · compiler · value policy"]
             end
@@ -32,14 +32,14 @@ flowchart LR
     end
 ```
 
-1. *Reuse by dependency, not copy.* MaxBars depends on `fullbars` and reuses its engine, prelude, value
+1. *Reuse by dependency, not copy.* MaxBars depends on `classicbars` and reuses its engine, prelude, value
    policy, surface desugar, and compiler — swapping *only* the interior grammar through the
    `parseExpr`/`parseHead` seams. A shared semantic kernel is extracted *lazily*, only on a proven
    second consumer (ADR-003), never speculatively.
 
 1. *Shared compile driver + per-dialect `Emit`.* `FlatBars.Compile` is the dialect-agnostic emit driver
    — the *fourth* instance of the inversion-of-control pattern (interpret / desugar / validate /
-   *compile*). `type Emit = { expr, block }` (`Compile.purs:54`); FullBars' `fullbarsEmit`
+   *compile*). `type Emit = { expr, block }` (`Compile.purs:54`); ClassicBars' `classicbarsEmit`
    (`Emit.purs:74`) emits native control flow for `if`/`each`/…. The conformance harness asserts the
    interpreter and the compiled JS produce byte-identical output.
 
@@ -51,43 +51,43 @@ flowchart LR
 
 * *Pro:* one engine, four IoC instances, N dialects as symmetric packages; a new tier is a grammar
   swap, not a fork.
-* *Con:* `maxbars → fullbars` is a *real* cross-dialect dependency — the single sanctioned violation
+* *Con:* `maxbars → classicbars` is a *real* cross-dialect dependency — the single sanctioned violation
   of ADR-003's "no dialect imports another." The "⊂" is a claim about *surface supersetting*, not
   about package isolation; the two must not be conflated (see the final review).
 
 ## Alternatives considered
 
-* *Copy FullBars into MaxBars.* Rejected: guarantees drift between the dialects' shared semantics.
+* *Copy ClassicBars into MaxBars.* Rejected: guarantees drift between the dialects' shared semantics.
 * *A `common` engine package up front.* Rejected for the same reason as in ADR-003 — extract on a
   proven overlap, not on speculation.
 
 ## Amendment (2026-06-04): `⊂` is surface-superset *modulo documented exceptions*
 
-The original decision wrote the ladder as `RawBars ⊂ FullBars ⊂ MaxBars` and the final
-review pinned `⊂` as a strict *surface-superset* claim — "every FullBars template is a
+The original decision wrote the ladder as `RawBars ⊂ ClassicBars ⊂ MaxBars` and the final
+review pinned `⊂` as a strict *surface-superset* claim — "every ClassicBars template is a
 MaxBars template." That overclaims: MaxBars is FlatBars' **flagship** surface, but it
-deliberately does *not* accept a couple of FullBars surface constructs, so the top edge
-is "most of FullBars, not quite all."
+deliberately does *not* accept a couple of ClassicBars surface constructs, so the top edge
+is "most of ClassicBars, not quite all."
 
 Two layers, two different truths — they must not be conflated:
 
-* *Engine reuse by dependency is total and unchanged.* MaxBars still reuses FullBars's
+* *Engine reuse by dependency is total and unchanged.* MaxBars still reuses ClassicBars's
   engine, prelude, value policy (truthiness aside, ADR-022), surface desugar, and compiler
   *wholesale* — swapping only the interior grammar through the `parseExpr`/`parseHead`
   seams. Nothing below the surface diverges.
 * *Surface supersetting is "most, not all."* The MaxBars surface borrows the bulk of
-  FullBars's surface, but rejects, by design:
-| FullBars construct | Why MaxBars rejects it |
+  ClassicBars's surface, but rejects, by design:
+| ClassicBars construct | Why MaxBars rejects it |
 | --- | --- |
-| the `{{#*inline}}` *decorator* | MaxBars spells inline partials with bare `{{#inline}}`; the `*`-decorator form is FullBars-only. |
-| `{{> @partial-block}}` (and the bare `partial-block` name) | a block partial's body is exposed under one spelling per dialect, not both: `partial-block` is FullBars-only; RawBars and MaxBars bind the hyphen-free `{{yield}}` (writable bare where `-` is subtraction). The partial frame installs only the dialect's own spelling (`RefEnv.yieldName`), so `partial-block` does not resolve in RawBars/MaxBars and `yield` resolves empty in FullBars. |
+| the `{{#*inline}}` *decorator* | MaxBars spells inline partials with bare `{{#inline}}`; the `*`-decorator form is ClassicBars-only. |
+| `{{> @partial-block}}` (and the bare `partial-block` name) | a block partial's body is exposed under one spelling per dialect, not both: `partial-block` is ClassicBars-only; RawBars and MaxBars bind the hyphen-free `{{yield}}` (writable bare where `-` is subtraction). The partial frame installs only the dialect's own spelling (`RefEnv.yieldName`), so `partial-block` does not resolve in RawBars/MaxBars and `yield` resolves empty in ClassicBars. |
 (Separately, MaxBars *adds* surface — operators, pipes, bare loop vars — and tightens a
 few spellings where its richer grammar would otherwise be ambiguous: a clause-separator
 condition and a block-head pipe must be parenthesised. Those are MaxBars-only additions,
-not FullBars constructs it drops; see [maxbars](/engine/maxbars/) "v1 limitations.")
+not ClassicBars constructs it drops; see [maxbars](/engine/maxbars/) "v1 limitations.")
 
 So `⊂` now reads: **surface-superset modulo the documented exceptions above**, over a
 fully reused engine. The thesis of the original decision is untouched — one engine, four
 IoC instances, dialects as symmetric packages, a new tier as a grammar swap not a fork.
 What changes is only the *honesty of the top edge*: MaxBars is the flagship that reuses
-FullBars and reinterprets its surface, not a strict superset of it.
+ClassicBars and reinterprets its surface, not a strict superset of it.
