@@ -4,7 +4,7 @@
 //! extension unless `--dialect` overrides it:
 //!
 //! ```text
-//! truss-import [--dialect <name>] [--data d.json] <file|->   # migrate → idiomatic .truss
+//! truss-import [--dialect <name>] [-o <dir|file>] <file|->   # migrate → idiomatic .truss
 //! truss-import --metrics <file|->                            # Mustache idiom metrics
 //! truss-import --ast <file|->                                # dump the dialect AST ({:#?})
 //! ```
@@ -40,6 +40,7 @@ fn main() -> ExitCode {
     let mut faithful_truthiness = true;
     let mut compact = false;
     let mut data: Option<String> = None;
+    let mut out: Option<String> = None;
     let mut report_json = false;
 
     while let Some(arg) = args.next() {
@@ -57,6 +58,13 @@ fn main() -> ExitCode {
             },
             other if other.starts_with("--data=") => {
                 data = Some(other["--data=".len()..].to_string());
+            }
+            "--out" | "-o" => match args.next() {
+                Some(v) => out = Some(v),
+                None => return usage("`--out` needs a folder or file path"),
+            },
+            other if other.starts_with("--out=") => {
+                out = Some(other["--out=".len()..].to_string());
             }
             "--ast" => mode = Mode::Dump,
             "--metrics" => mode = Mode::Metrics,
@@ -106,11 +114,13 @@ fn main() -> ExitCode {
         Mode::Metrics => run_metrics(dialect, &src),
         Mode::ToTruss => run_to_truss(
             dialect,
+            &file,
             &src,
             ternary,
             faithful_truthiness,
             compact,
             data.as_deref(),
+            out.as_deref(),
             report_json,
         ),
     }
@@ -169,13 +179,16 @@ fn run_metrics(dialect: Dialect, src: &str) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_to_truss(
     dialect: Dialect,
+    input_file: &str,
     src: &str,
     ternary: bool,
     faithful_truthiness: bool,
     compact: bool,
     data: Option<&str>,
+    out: Option<&str>,
     report_json: bool,
 ) -> ExitCode {
     // The shape oracle: a `--data` JSON sample, else the heuristic.
@@ -214,10 +227,23 @@ fn run_to_truss(
     match migrated {
         Ok(m) => {
             // Readable (block tags on their own lines) by default; `--compact` is verbatim.
-            if compact {
-                print!("{}", m.truss);
+            let rendered = if compact { m.truss.clone() } else { m.pretty() };
+            // Write to a folder/file with `--out`, else stdout.
+            if let Some(out) = out {
+                let target = resolve_out(out, input_file);
+                if let Some(parent) = target.parent()
+                    && let Err(e) = std::fs::create_dir_all(parent)
+                {
+                    eprintln!("error: failed to create `{}`: {e}", parent.display());
+                    return ExitCode::from(2);
+                }
+                if let Err(e) = std::fs::write(&target, &rendered) {
+                    eprintln!("error: failed to write `{}`: {e}", target.display());
+                    return ExitCode::from(2);
+                }
+                eprintln!("wrote {}", target.display());
             } else {
-                print!("{}", m.pretty());
+                print!("{rendered}");
             }
             if report_json {
                 eprintln!("{}", migrate::report_json(&m.report, src));
@@ -231,6 +257,28 @@ fn run_to_truss(
             ExitCode::SUCCESS
         }
         Err(e) => parse_error(dialect, src, &e),
+    }
+}
+
+/// Resolve the `--out` value to a target file path. A folder (ends with `/`, or an
+/// existing directory) gets `<input-stem>.truss` appended (stem `out` for stdin); any
+/// other value is taken as the file path verbatim.
+fn resolve_out(out: &str, input_file: &str) -> std::path::PathBuf {
+    let as_folder = out.ends_with('/') || out.ends_with(std::path::MAIN_SEPARATOR) || {
+        let p = Path::new(out);
+        p.is_dir() || p.extension().is_none()
+    };
+    if as_folder {
+        let stem = if input_file == "-" {
+            "out".to_string()
+        } else {
+            Path::new(input_file)
+                .file_stem()
+                .map_or_else(|| "out".to_string(), |s| s.to_string_lossy().into_owned())
+        };
+        Path::new(out).join(format!("{stem}.truss"))
+    } else {
+        std::path::PathBuf::from(out)
     }
 }
 
@@ -302,6 +350,9 @@ fn print_help() {
     );
     println!(
         "  --compact                 verbatim output (preserve source whitespace; no re-flow)"
+    );
+    println!(
+        "  -o, --out <path>          write to a folder (<stem>.truss) or file instead of stdout"
     );
     println!("  --data <f.json>           disambiguate sections from a JSON data sample");
     println!("  --report-json             emit the migration report as JSON on stderr");

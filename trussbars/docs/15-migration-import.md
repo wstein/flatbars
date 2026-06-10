@@ -166,7 +166,10 @@ Output is **readable by default** — each block tag (`{{#each}}`, `{{#if}}`, `{
 `{{/…}}`) on its own indented line, content re-flowed to trimmed lines; since block-tag
 lines are standalone (the engine trims them) the render is preserved for
 whitespace-insensitive content. Use `--compact` for the verbatim rendering (preserves
-source whitespace exactly — preferable for `<pre>`/code-generation).
+source whitespace exactly — preferable for `<pre>`/code-generation). `-o/--out <path>`
+writes to disk instead of stdout: a folder (or a path with no extension) receives
+`<input-stem>.truss` (parents created as needed), any other path is taken as the output
+file.
 (The library `LowerOptions::default()` stays conservative — all idioms off — so a host opts
 in explicitly; the CLI is the opinionated front-end.)
 
