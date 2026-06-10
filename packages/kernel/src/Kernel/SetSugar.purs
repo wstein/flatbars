@@ -12,6 +12,12 @@
 -- | `local`); the binding cannot leak past the enclosing block's close (the tail it
 -- | wraps ends there) — exactly the docs-17 scope.
 -- |
+-- | `liftSet` also lowers **`{% capture NAME %}body{% endcapture %}`** (docs-18) the
+-- | same way: it emits an inline partial holding the body and a forward `{% local
+-- | NAME = (partial <that>) %}` over the tail. `(partial …)` in value position yields
+-- | the rendered output as a `VSafe` (pre-escaped) value, so capture's render-once,
+-- | safe-string, forward-scope semantics reuse existing ops with no new construct.
+-- |
 -- | Run by the `statementTags` dialects (RawBars/MaxBars) on the skeleton before
 -- | desugar/render; ClassicBars never runs it (its bare `{{set}}` output is left
 -- | alone). Depth-first, so a `set` inside any block body wraps only that body's tail.
@@ -36,11 +42,36 @@ liftSet nodes = case Array.uncons nodes of
     -- `{% set NAME = EXPR %}` → `{% local NAME = EXPR %}` wrapping the sibling tail.
     Sep sp "set" args ->
       [ Block sp Section "local" args (liftSet tail) ]
+    -- `{% capture NAME %}body{% endcapture %}` (docs-18): the body, rendered once
+    -- into a pre-escaped *safe* string, bound forward like `set`. Desugars — with
+    -- NO new engine op — to an inline partial holding the body plus a forward
+    -- `local NAME = (partial <that>)` over the sibling tail. `(partial …)` in value
+    -- position yields the rendered output as a `VSafe` (already-escaped) value, so
+    -- `{{NAME}}` emits it verbatim, never double-escaping (docs-18 §2).
+    Block sp Section "capture" args body
+      | Just name <- captureName args ->
+          let
+            -- unique per source position, so re-captures never collide.
+            capName = "@cap$" <> show sp.start
+          in
+            [ Block sp Section "inline" [ Lit (VString capName) ] (liftSet body)
+            , Block sp Section "local"
+                [ App (name <> "=") [], App "partial" [ Lit (VString capName) ] ]
+                (liftSet tail)
+            ]
     -- recurse into a block body (a `set` there scopes to that block), keep walking.
     Block sp sig name args body ->
       Array.cons (Block sp sig name args (liftSet body)) (liftSet tail)
     other ->
       Array.cons other (liftSet tail)
+
+-- | The bound name of a `{% capture NAME %}` block (a bare identifier `App n []`
+-- | or a quoted `Lit (VString n)`).
+captureName :: Array Expr -> Maybe String
+captureName args = case Array.head args of
+  Just (App n []) -> Just n
+  Just (Lit (VString n)) -> Just n
+  _ -> Nothing
 
 -- | The first `{% set %}` / `{% local %}` binding whose NAME shadows a reserved
 -- | name — its offset and a located-error "shape" (docs-17 §2; `Nothing` when clean).
@@ -62,7 +93,15 @@ reservedBindingViolation blockHeads nodes = Array.head (Array.mapMaybe node node
     Block sp Section "local" args body -> case firstReserved args of
       Just k -> Just { off: sp.start, shape: shapeFor k }
       Nothing -> reservedBindingViolation blockHeads body
+    -- a `{% capture NAME %}` binds NAME forward (docs-18), so the same reservation
+    -- applies; its name is a bare identifier, not a `k=v`/`bind` form.
+    Block sp Section "capture" args body -> case captureReserved args of
+      Just k -> Just { off: sp.start, shape: shapeFor k }
+      Nothing -> reservedBindingViolation blockHeads body
     Block _ _ _ _ body -> reservedBindingViolation blockHeads body
+    _ -> Nothing
+  captureReserved args = case captureName args of
+    Just k | Array.elem k reserved -> Just k
     _ -> Nothing
   firstReserved args =
     Array.find (\k -> Array.elem k reserved) (Array.mapMaybe bindingKey args)

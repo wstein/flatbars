@@ -681,6 +681,29 @@ main = do
     (obj [])
     "3"
 
+  -- {% capture %} (docs-18): renders its body once into a forward-scoped *safe*
+  -- string (reusable, pipeable, never double-escaped). Desugars to an inline
+  -- partial + a forward `local NAME = (partial …)` — no new engine op.
+  expectM "capture-reuse-no-double-escape"
+    "{% capture b %}{{author}}{% if title %} · {{title}}{% endif %}{% endcapture %}<h>{{b}}</h><f>{{b}}</f>"
+    (obj [ Tuple "author" (VString "<b>Ann</b>"), Tuple "title" (VString "Lead") ])
+    "<h>&lt;b&gt;Ann&lt;/b&gt; · Lead</h><f>&lt;b&gt;Ann&lt;/b&gt; · Lead</f>"
+  expectM "capture-safe-markup"
+    "{% capture x %}<i>{{name}}</i>{% endcapture %}[{{x}}]"
+    (obj [ Tuple "name" (VString "a&b") ])
+    "[<i>a&amp;b</i>]"
+  expectM "capture-forward-scope"
+    "before {% capture x %}HI{% endcapture %}after {{x}}"
+    (obj [])
+    "before after HI"
+  expectM "capture-pipeable"
+    "{% capture x %}  hi  {% endcapture %}[{{ x | trim }}]"
+    (obj [])
+    "[hi]"
+  -- a capture NAME may not shadow a reserved name (docs-18 §2, like set/local).
+  assert' "capture: reserved binding name rejected"
+    (isLeft (renderMax "{% capture loop %}x{% endcapture %}" (obj [])))
+
   -- ── Trussbars AOT-compat lint (MaxBars.Compat) ────────────────────────────
   log "Trussbars AOT-compat lint"
   -- a plain boolean condition + field output compiles under AOT.

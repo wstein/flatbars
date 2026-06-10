@@ -127,10 +127,11 @@ re-scoped when the editor phase starts. **14** stays parked.
   current scope, Jinja precedent) + `{% local … %}…{% endlocal %}` (bounded — the renamed block-`let`).
   `let` retired (block-`let` was backwards from convention). Both reuse one binding node + the
   `let`-emit; stricter than Liquid/Jinja (no leak, no loop accumulators). nonEmpty-family; oracle-first.
-- `18-capture-blocks.md` — **PROPOSED** `{% capture name %}…{% endcapture %}` — renders its body
-  once into a pre-escaped `safe` string and binds it forward (the `{% set %}` scope, docs/17): a
-  first-class, pipeable value. The one intentional intermediate buffer (docs/05); `safe` type
-  prevents double-escaping. nonEmpty-family surface; oracle-first.
+- `18-capture-blocks.md` — **IMPLEMENTED in the oracle** (RawBars/MaxBars) `{% capture name %}…
+  {% endcapture %}` — renders its body once into a pre-escaped `safe` string, bound forward (the
+  `{% set %}` scope). Done as a pure `Kernel.SetSugar.liftSet` desugar (inline partial + forward
+  `local NAME=(partial …)`) — no new engine op; reuse-only, `safe` via `(partial …)` value. **Next:**
+  the Trussbars Rust emitter (the render-into-buffer of §3) — follows the docs/19 Rust lexer.
 - `19-statement-tags.md` — **PROPOSED** Django-style `{% %}` for control flow + separators +
   statements (RawBars/MaxBars/Trussbars only; ClassicBars/MinBars stay `{{ }}`-only). `{{ }}` becomes
   output-only; a `LexConfig` knob (`statementTags`) re-delimits the **existing** `Block`/`Sep`

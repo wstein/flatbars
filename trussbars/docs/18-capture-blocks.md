@@ -1,6 +1,6 @@
 # Trussbars — `{% capture name %}…{% endcapture %}` (render-body-into-variable)
 
-> **Status:** **Proposed** — a Liquid/Jinja-borrowed *surface* construct, adapted to Trussbars's
+> **Status:** **Implemented in the oracle** (RawBars/MaxBars, 2026-06-10) — a Liquid/Jinja-borrowed *surface* construct, adapted to Trussbars's
 > typed, auto-escaping model. `{% capture name %}…{% endcapture %}` renders its body once into a
 > **pre-escaped safe string** and binds it forward (the `{% set %}` scope, `docs/17`) so the
 > result is a first-class value: printable with `{{ name }}`, pipeable into filters, passable to
@@ -18,6 +18,14 @@
 > `{% set %}`, which has an expression RHS. `capture` is to `set` what a rendered block is to an
 > expression; its name reflects *what it does* (captures rendered output), since its scope is just
 > `set`'s.
+>
+> **Oracle implementation (2026-06-10).** Rather than the §3 `Capture` AST node + render-into-buffer,
+> the oracle uses a **pure skeleton desugar** in `Kernel.SetSugar.liftSet` (the same pass that lifts
+> `{% set %}`): `{% capture NAME %}body{% endcapture %}` → an inline partial holding the body, plus a
+> forward `{% local NAME = (partial <that>) %}` over the sibling tail. `(partial …)` in value position
+> already yields the rendered output as a `VSafe` value, so the safe-string + forward-scope semantics
+> fall out of existing ops — **no new engine/compiler construct**. The Trussbars Rust emitter (§3) may
+> still prefer the direct render-into-buffer; the *surface and semantics* are what this ADR freezes.
 
 ## 1. Context
 
