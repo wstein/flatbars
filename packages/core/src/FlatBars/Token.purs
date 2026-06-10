@@ -212,7 +212,25 @@ tokenizeInterior cfg base src = go 0 []
       -- `.` keeps the dotted path together.
       _ | rangeAt j -> go j (push acc (TIdent (slc start j)) start j)
       Just c | identChar c -> scan (j + 1)
+      -- a *spaced* hash assignment `key = value` (or `key =value`): the ident run
+      -- ended on whitespace, and the next non-space char is a lone `=` (NOT `==`).
+      -- Fold the `=` into the key as the `consumesNext` form `key=` — identical
+      -- downstream to the glued `key=` (`asHashKey`), so the value is the next token.
+      -- This is what lets the docs-17 binding surface (`{% set x = e %}` /
+      -- `{% local x = 1 %}`) and any spaced helper hash (`{{tag k = v}}`) lex.
+      _ | hashEqAt j -> go (skipWs j + 1)
+        (push acc (TIdent (slc start j <> "=")) start (skipWs j + 1))
       _ -> go j (push acc (TIdent (slc start j)) start j)
+    -- the index of the first non-whitespace char at or after `k`.
+    skipWs k = case at k of
+      Just c | isWs c -> skipWs (k + 1)
+      _ -> k
+    -- true when the run [start, j) is followed (past whitespace) by a lone `=`.
+    hashEqAt j =
+      let
+        w = skipWs j
+      in
+        j > start && at w == Just '=' && at (w + 1) /= Just '='
     bracketEnd k
       | k > len = Nothing
       | at k == Just ']' = Just k

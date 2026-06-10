@@ -568,36 +568,42 @@ main = do
     (obj [ Tuple "a" (obj [ Tuple "home town" (VString "Lübeck") ]) ])
     "Lübeck"
 
-  -- block-scoped `{{#let}}` (ADR-024): aliases, sequential, never re-roots.
-  expectM "let: a single binding is in scope for the body"
+  -- block-scoped `{% local %}` (ADR-024/docs-17): aliases, sequential, never re-roots.
+  expectM "local: a single binding is in scope for the body"
     "{% local greeting=\"Hi\" %}{{greeting}}!{% endlocal %}"
     (obj [])
     "Hi!"
-  expectM "let: a binding reads from the (unchanged) data context"
+  -- spaced `name = value` lexes the same as the glued `name=value` (docs-17): the
+  -- tokenizer folds ` = ` into the `consumesNext` hash key, so both spell one binding.
+  expectM "local: a spaced binding (name = value) reads like the glued form"
+    "{% local greeting = \"Hi\" n = (add 1 2) %}{{greeting}}{{n}}{% endlocal %}"
+    (obj [])
+    "Hi3"
+  expectM "local: a binding reads from the (unchanged) data context"
     "{% local n=count %}{{n}} left{% endlocal %}"
     (obj [ Tuple "count" (num 3.0) ])
     "3 left"
-  expectM "let: bindings are sequential — b sees a"
+  expectM "local: bindings are sequential — b sees a"
     "{% local a=1 b=(add a 1) c=(add b 1) %}{{a}}{{b}}{{c}}{% endlocal %}"
     (obj [])
     "123"
   -- the defining guarantee: `let` aliases but does NOT re-root, so a bare name
   -- still resolves against the current context, unlike `with`.
-  expectM "let: does not re-root the context"
+  expectM "local: does not re-root the context"
     "{% local u=user %}{{name}}/{{u.name}}{% endlocal %}"
     (obj [ Tuple "name" (VString "ROOT"), Tuple "user" (obj [ Tuple "name" (VString "Ada") ]) ])
     "ROOT/Ada"
-  expectM "let: a binding's value can be a dict literal"
+  expectM "local: a binding's value can be a dict literal"
     "{% local cfg={theme: \"dark\", size: 12} %}{{cfg.theme}}/{{cfg.size}}{% endlocal %}"
     (obj [])
     "dark/12"
   -- inside a loop the binding coexists with the loop's scoped vars.
-  expectM "let: inside a loop, loop.* still resolves"
+  expectM "local: inside a loop, loop.* still resolves"
     "{% each items %}{% local u=(uppercase this) %}{{u}}@{{loop.index1}} {% endlocal %}{% endeach %}"
     (obj [ Tuple "items" (VArray [ VString "a", VString "b" ]) ])
     "A@1 B@2 "
   -- a binding named like a prelude op shadows it inside the body (isScopedBinding).
-  expectM "let: a binding shadows a same-named prelude op"
+  expectM "local: a binding shadows a same-named prelude op"
     "{% local add=\"shadowed\" %}{{add}}{% endlocal %}"
     (obj [])
     "shadowed"
