@@ -25,6 +25,7 @@ module Kernel.Schema
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Data.Array as Array
 import Data.Map (Map)
 import Data.Map as Map
@@ -85,10 +86,14 @@ type PathC =
   , fields :: Set String    -- object fields observed off this path
   , scalar :: ScalarHint    -- under-determined / pinned / conflicting scalar
   , optional :: Boolean      -- ?? / ?: / if-else signal (§5)
+  , enumTag :: Maybe String  -- a {% case this.<tag> %} dispatch ⇒ a tagged enum (§5)
+  , enumVariants :: Set String  -- the observed variant tags
   }
 
 emptyC :: PathC
-emptyC = { isArray: false, isMap: false, fields: Set.empty, scalar: SUnknown, optional: false }
+emptyC =
+  { isArray: false, isMap: false, fields: Set.empty, scalar: SUnknown, optional: false
+  , enumTag: Nothing, enumVariants: Set.empty }
 
 mergeC :: PathC -> PathC -> PathC
 mergeC a b =
@@ -97,6 +102,8 @@ mergeC a b =
   , fields: Set.union a.fields b.fields
   , scalar: unifyScalar a.scalar b.scalar
   , optional: a.optional || b.optional
+  , enumTag: a.enumTag <|> b.enumTag
+  , enumVariants: Set.union a.enumVariants b.enumVariants
   }
 
 type Constraints = Map String (Tuple Canon PathC)
@@ -303,7 +310,8 @@ block sc cs name args body =
     -- an `{{#inline}}` *definition* emits nothing in place; its body is walked
     -- at each use site (partialUse), rooted at the call's context arg.
     "inline" -> cs
-    -- case, etc.: descend, recording subject usage.
+    "case" -> caseBlock split
+    -- other blocks: descend, recording subject usage.
     _ -> walk sc (foldl (useExpr sc) cs split.positional) body
   where
   eachBlock split =
@@ -343,6 +351,21 @@ block sc cs name args body =
       sc' = sc { shadowed = Set.union sc.shadowed (Set.fromFoldable names) }
     in
       walk sc' cs1 body
+  -- `{% case x.tag %}{% when "A" %}…{% endcase %}`: walk the arms, then mark
+  -- `x` as a tagged enum (tag = the subject's last key; variants = the `when`
+  -- literals, later unioned with data-observed tag values, §5).
+  caseBlock split =
+    let
+      cs1 = walk sc (foldl (useExpr sc) cs split.positional) body
+      subjCanon = Array.head split.positional >>= exprCanon sc
+      variants = whenLiterals body
+    in
+      case subjCanon of
+        Just sj
+          | Just { init, last: SKey tag } <- Array.unsnoc sj
+          , not (Set.isEmpty variants) ->
+              record init (emptyC { enumTag = Just tag, enumVariants = variants }) cs1
+        _ -> cs1
 
 -- | Mark each condition path: it exists (a non-numeric truthy field), and it is
 -- | `Option` iff the block has an `{% else %}` clause (§5 optionality signal).
@@ -353,6 +376,17 @@ markCond sc cs conds body = foldl step cs conds
   step acc e = case exprCanon sc e of
     Just canon -> record canon (emptyC { optional = opt }) acc
     Nothing -> useExpr sc acc e
+
+-- | The `{% when "lit" … %}` literal values in a `{% case %}` body (§5 variants).
+whenLiterals :: Template -> Set String
+whenLiterals = foldl go Set.empty
+  where
+  go s = case _ of
+    Sep _ "when" args -> Set.union s (Set.fromFoldable (Array.mapMaybe litStr args))
+    _ -> s
+  litStr = case _ of
+    Lit (VString v) -> Just v
+    _ -> Nothing
 
 -- | Does a body contain an `{% else %}` / `{% elif %}` separator?
 hasElse :: Template -> Boolean
@@ -410,6 +444,7 @@ data Ty
   | TyArray Ty
   | TyMap Ty
   | TyObject (Map String Ty)
+  | TyEnum String (Set String)        -- #[serde(tag)] enum: tag field, variant tags
   | TyUnknown
 
 derive instance eqTy :: Eq Ty
@@ -443,14 +478,17 @@ buildTy cs = atPrefix []
       keyKids = Array.mapMaybe segKeyName kids
       hasElem = Array.elem SElem kids
     in
-      if c.isMap then
-        TyMap (atPrefix (prefix <> [ SElem ]))
-      else if c.isArray || hasElem then
-        TyArray (atPrefix (prefix <> [ SElem ]))
-      else if not (Array.null keyKids) || not (Set.isEmpty c.fields) then
-        TyObject (Map.fromFoldable (map (\k -> Tuple k (atPrefix (prefix <> [ SKey k ]))) keyKids))
-      else
-        TyScalar c.scalar c.optional
+      case c.enumTag of
+        Just tag -> TyEnum tag c.enumVariants
+        Nothing ->
+          if c.isMap then
+            TyMap (atPrefix (prefix <> [ SElem ]))
+          else if c.isArray || hasElem then
+            TyArray (atPrefix (prefix <> [ SElem ]))
+          else if not (Array.null keyKids) || not (Set.isEmpty c.fields) then
+            TyObject (Map.fromFoldable (map (\k -> Tuple k (atPrefix (prefix <> [ SKey k ]))) keyKids))
+          else
+            TyScalar c.scalar c.optional
 
 -- ---------------------------------------------------------------------------
 -- Emit: Rust structs, JSON scaffold, report
@@ -508,9 +546,15 @@ emitSchema root =
   namedFor k = case _ of
     TyArray (TyObject fields) ->
       [ "#[derive(Deserialize, Trussbars)]\nstruct " <> structName k <> " " <> objBody (structName k) (TyObject fields) ]
+    TyArray (TyEnum tag vars) -> [ enumDecl (structName k) tag vars ]
     TyObject fields ->
       [ "#[derive(Deserialize, Trussbars)]\nstruct " <> cap1 k <> " " <> objBody (cap1 k) (TyObject fields) ]
+    TyEnum tag vars -> [ enumDecl (cap1 k) tag vars ]
     _ -> []
+
+  enumDecl nm tag vars =
+    "#[derive(Deserialize, Trussbars)]\n#[serde(tag = \"" <> tag <> "\")]\nenum " <> nm <> " { "
+      <> Str.joinWith ", " (map cap1 (Array.fromFoldable vars :: Array String)) <> " }"
 
   objBody :: String -> Ty -> String
   objBody _ = case _ of
@@ -523,9 +567,11 @@ emitSchema root =
   tyRef field = case _ of
     TyScalar h opt -> wrapOpt opt (scalarRust h)
     TyArray (TyObject _) -> "Vec<" <> structName field <> ">"
+    TyArray (TyEnum _ _) -> "Vec<" <> structName field <> ">"
     TyArray t -> "Vec<" <> tyRef field t <> ">"
     TyMap t -> "BTreeMap<String, " <> tyRef field t <> ">"
     TyObject _ -> cap1 field
+    TyEnum _ _ -> cap1 field
     TyUnknown -> "String"
 
   wrapOpt opt s = if opt then "Option<" <> s <> ">" else s
@@ -546,6 +592,8 @@ scaffoldJson = case _ of
   TyMap t -> "{ \"key\": " <> scaffoldJson t <> " }"
   TyObject fields ->
     "{ " <> Str.joinWith ", " (map (\(Tuple k t) -> "\"" <> k <> "\": " <> scaffoldJson t) (Map.toUnfoldable fields)) <> " }"
+  TyEnum tag vars ->
+    "{ \"" <> tag <> "\": \"" <> fromMaybe "" (Array.head (Array.fromFoldable vars :: Array String)) <> "\" }"
   TyUnknown -> "\"\""
 
 -- | Count scalar conflicts in the tree.
@@ -556,6 +604,7 @@ countConflicts = case _ of
   TyArray t -> countConflicts t
   TyMap t -> countConflicts t
   TyObject fields -> foldl (\n (Tuple _ t) -> n + countConflicts t) 0 (Map.toUnfoldable fields :: Array (Tuple String Ty))
+  TyEnum _ _ -> 0
   TyUnknown -> 0
 
 -- | Count under-determined (defaulted) scalars.
@@ -566,6 +615,7 @@ countGuessed = case _ of
   TyArray t -> countGuessed t
   TyMap t -> countGuessed t
   TyObject fields -> foldl (\n (Tuple _ t) -> n + countGuessed t) 0 (Map.toUnfoldable fields :: Array (Tuple String Ty))
+  TyEnum _ _ -> 0
   TyUnknown -> 0
 
 emitReport :: Ty -> String
@@ -620,13 +670,46 @@ refineScalars obs cs =
     in
       Tuple key (Tuple canon c')
 
--- | Infer a candidate schema, refining under-determined scalars with sample
--- | data (docs/03 §2). `inferTemplate` is the no-data (template-symbolic) case.
+-- | Observe distinct string values at every path (for enum tag-value union, §5).
+observeStr :: Canon -> Value -> Array (Tuple Canon String)
+observeStr canon = case _ of
+  VString s -> [ Tuple canon s ]
+  VSafe s -> [ Tuple canon s ]
+  VArray xs -> Array.concatMap (observeStr (Array.snoc canon SElem)) xs
+  VObject m ->
+    Array.concatMap (\(Tuple k v) -> observeStr (Array.snoc canon (SKey k)) v)
+      (Map.toUnfoldable m :: Array (Tuple String Value))
+  _ -> []
+
+-- | The distinct string values observed at each path across all samples.
+observeTags :: Array Value -> Map String (Set String)
+observeTags = foldl addSample Map.empty
+  where
+  addSample m s = foldl addV m (observeStr [] s)
+  addV m (Tuple canon v) = Map.insertWith Set.union (canonKey canon) (Set.singleton v) m
+
+-- | Union data-observed tag values into each enum's variant set (§5: "the
+-- | variants come from the data's tag field").
+refineEnums :: Map String (Set String) -> Constraints -> Constraints
+refineEnums obs cs =
+  Map.fromFoldable (map ref (Map.toUnfoldable cs :: Array (Tuple String (Tuple Canon PathC))))
+  where
+  ref (Tuple key (Tuple canon c)) = case c.enumTag of
+    Just tag ->
+      let
+        dataVars = fromMaybe Set.empty (Map.lookup (canonKey (canon <> [ SKey tag ])) obs)
+      in
+        Tuple key (Tuple canon (c { enumVariants = Set.union c.enumVariants dataVars }))
+    Nothing -> Tuple key (Tuple canon c)
+
+-- | Infer a candidate schema, refining under-determined scalars + enum variants
+-- | with sample data (docs/03 §2, §5). `inferTemplate` is the no-data case.
 inferTemplateData :: Array Value -> Template -> InferResult
 inferTemplateData samples tmpl =
   let
     sc0 = rootScope { partials = collectInlines tmpl }
-    cs = refineScalars (observeScalars samples) (walk sc0 Map.empty tmpl)
+    cs = refineEnums (observeTags samples)
+      (refineScalars (observeScalars samples) (walk sc0 Map.empty tmpl))
     ty = buildTy cs
   in
     { schema: emitSchema ty

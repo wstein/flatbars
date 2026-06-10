@@ -719,4 +719,16 @@ main = do
   hasS "infer:partial-couples-name" partialTpl "name: String"
   hasS "infer:partial-couples-price" partialTpl "price: String"
 
+  -- §5 enum: {% case x.kind %}{% when … %} ⇒ a #[serde(tag)] enum; variants from
+  -- the when-literals, unioned with data-observed tag values.
+  let
+    enumTpl = "{% each shape in shapes %}{% case shape.kind %}{% when \"circle\" %}o{% when \"square\" %}x{% endcase %}{% endeach %}"
+  hasS "infer:enum-vec" enumTpl "Vec<Shape>"
+  hasS "infer:enum-serde-tag" enumTpl "tag = \"kind\""
+  hasS "infer:enum-variant-circle" enumTpl "Circle"
+  hasS "infer:enum-variant-square" enumTpl "Square"
+  hasSD "infer:enum-data-union-triangle"
+    [ obj [ Tuple "shapes" (VArray [ obj [ Tuple "kind" (VString "triangle") ] ]) ] ]
+    enumTpl "Triangle"
+
   log "all MaxBars tests passed"
