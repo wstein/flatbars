@@ -72,6 +72,7 @@ export const CORPUS = [
   // ── Comments / raw blocks ───────────────────────────────────────────────
   { id: "short-comment", dialect: "classicbars", note: "{{! … }} (single bang) → comment", src: "Total{{! dropped }}: {{total}}" },
   { id: "raw-block", dialect: "classicbars", note: "{{{{raw}}}} … {{{{/raw}}}} → one raw-block span", src: "{{{{raw}}}}{{x}}{{{{/raw}}}}" },
+  { id: "raw-region-statement", dialect: "maxbars", note: "{% raw %} … {% endraw %} → one raw-block span (the verbatim region, ADR-039 item 2); the inner {{x}} is literal, not an interpolation", src: "{% raw %}{{x}}{% endraw %}" },
 
   // ── Set delimiters (the case every regex fails — stateful) ───────────────
   { id: "set-delimiter-switch", dialect: "minbars", note: "{{=A B=}} → set-delimiter, and the FOLLOWING <%x%> is lexed in the new pair (a regex cannot track this)", src: "{{=<% %>=}}<%x%>" },

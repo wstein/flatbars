@@ -22,6 +22,7 @@
   "loopDepth": "1. Fruit\n  2.1 Pear\n  2.2 Plum\n1. Veg\n  2.1 Leek\n",
   "partials": "- Ada writes\n- Charles builds\n",
   "layoutPartials": "== Welcome ==\nGlad you came.\n== end ==",
+  "rawRegion": "Format money with {{ price | toFixed 2 }}.",
   "email": "Hi Ada,\n\nYour order shipped. Items:\n- Pen ×3\n- Ink ×1\n\n— FlatMart (flatmart.example)",
   "card": "<style>\n  .card { border: 1px solid #d0d7de; border-radius: 8px; padding: .5rem .8rem; margin: .5rem 0; font-family: system-ui, sans-serif; }\n  .card h3 { margin: 0 0 .15rem; font-size: 1rem; }\n  .card p  { margin: 0; color: #57606a; }\n</style>\n<div class=\"card\">\n  <h3>Ada Lovelace ★</h3>\n  <p>Author</p>\n</div>\n<div class=\"card\">\n  <h3>Charles Babbage</h3>\n  <p>Engine</p>\n</div>\n"
 }

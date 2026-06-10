@@ -557,6 +557,27 @@
       ]
     },
     {
+      "id": "raw-region-statement",
+      "dialect": "maxbars",
+      "note": "{% raw %} … {% endraw %} → one raw-block span (the verbatim region, ADR-039 item 2); the inner {{x}} is literal, not an interpolation",
+      "src": "{% raw %}{{x}}{% endraw %}",
+      "spans": [
+        {
+          "from": 0,
+          "to": 26,
+          "kind": "raw-block"
+        }
+      ],
+      "tokens": [
+        {
+          "from": 0,
+          "to": 26,
+          "kind": "raw-block",
+          "role": "tag"
+        }
+      ]
+    },
+    {
       "id": "set-delimiter-switch",
       "dialect": "minbars",
       "note": "{{=A B=}} → set-delimiter, and the FOLLOWING <%x%> is lexed in the new pair (a regex cannot track this)",

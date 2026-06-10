@@ -366,6 +366,18 @@ Subtotal {{subtotal}} + tax {{tax}} = {{total}}`,
     data: { name: "ada", people: [{ name: "Ada" }, { name: "Lin" }] },
   },
 
+  rawRegion: {
+    engine: "maxbars",
+    label: "Advanced — Verbatim region ({% raw %})",
+    // {% raw %} … {% endraw %} keeps its body COMPLETELY untouched — ideal for showing
+    // template syntax literally. The inner {{ … }} and {% … %} are plain text, never
+    // interpreted. This is the literal verbatim REGION (ADR-039), distinct from a
+    // raw-block OPERATION ({{{{#op}}}}, below): no head operation, no body processing.
+    // The legacy {{{{#raw}}}} spelling is rejected with a fix-it pointing here.
+    template: "Format money with {% raw %}{{ price | toFixed 2 }}{% endraw %}.",
+    data: {},
+  },
+
   rawBlock: {
     engine: "maxbars",
     label: "Advanced — Raw blocks ({{{% op %}}})",

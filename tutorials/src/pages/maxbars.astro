@@ -370,6 +370,17 @@ const t = (s) => s;
     <p><code>{t("{{x}}")}</code> HTML-escapes; the triple-stash <code>{t("{{{x}}}")}</code> emits raw markup — unchanged from ClassicBars.</p>
     <OpenInLab client:visible engine="maxbars" template={ex.escaping.template} data={ex.escaping.data} />
 
+    <h3>Verbatim region — <code>{t("{% raw %}")}</code></h3>
+    <p>
+      <code>{t("{% raw %} … {% endraw %}")}</code> keeps its body <b>completely
+      untouched</b> — the inner <code>{t("{{ … }}")}</code> and <code>{t("{% … %}")}</code>
+      are plain text, never interpreted. It's the idiomatic way to show template syntax
+      literally (docs, code samples). This is the literal verbatim <em>region</em>; it has
+      no head operation and does not nest (the first <code>{t("{% endraw %}")}</code> closes
+      it, like Liquid). The legacy quad-stache <code>{t("{{{{#raw}}}}")}</code> is rejected
+      with a fix-it pointing here.
+    </p>
+    <OpenInLab client:visible engine="maxbars" template={ex.rawRegion.template} data={ex.rawRegion.data} />
     <h3>Raw blocks</h3>
     <p>
       A <b>raw block</b> — four staches, <code>{t("{{{{#op}}}}…{{{{/op}}}}")}</code> (MaxBars

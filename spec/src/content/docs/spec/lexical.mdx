@@ -111,6 +111,12 @@ Hello {{name}} — emitted verbatim.
 After the `}}}}` closing the raw-block head, the lexer captures everything up to the matching
 `{{{{/IDENT}}}}` as one uninterpreted string. The closing `IDENT` must equal the opening one.
 
+The quad-stache is the core spelling. In the **statement-tag dialects** (RawBars / MaxBars /
+Trussbars — `statementTags`), the literal *verbatim region* is written `{% raw %} … {% endraw %}`
+(ADR-039) — it lexes to the same raw-block node (head `raw`), so this section's semantics are
+unchanged, and the quad-stache `{{{{#raw}}}}` is rejected there with a fix-it. The distinct
+raw-block *helper* form (`{{{{#op}}}}`, head ≠ `raw`, fed to an operation) keeps the quad-stache.
+
 ## 1.8 Lexer summary (informative)
 
 ```text

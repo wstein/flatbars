@@ -26,7 +26,8 @@
 > the **oracle** (PureScript RawBars/MaxBars); docs/17–19 are Trussbars's conformance view of that
 > decision, not its authority. **The §1 spellings below are now the `{% %}` surface** (docs/19
 step 4 landed — the Rust `trussbars-template` lexer reads `{% %}` and the corpus is migrated;
-the raw block stays the quad-stache `{{{{#raw}}}}`).
+the literal *verbatim region* is now `{% raw %} … {% endraw %}` per ADR-039 item 2, while a
+raw-block *helper* — `{{{{#op}}}}`, head ≠ `raw`, fed to an operation — keeps the quad-stache).
 
 Evidence base: the conformance corpus (`trussbars/conformance/cases.mjs`, 71
 byte-matched cases) and the blog/changelog dogfoods (`trussbars/examples/`).
@@ -47,7 +48,7 @@ Source of truth for "supported" is the v1 emitter
 | **Operators (inline)** | `+ - * / %`, `== != < > <= >=`, `&& \|\| !`, `??` (coalesce), `?:` (first-truthy), `a ? b : c` (ternary) |
 | **Pipes** | `{{ x \| f arg }}` desugars to the helper call `f(x, arg)` |
 | **Partials** | inline definitions `{% inline "n" %}…{% endinline %}` + use `{{> n}}` / `{{> n ctx}}`; block partials `{% partial "n" %}…{% endpartial %}` with `{{yield}}` |
-| **Raw blocks** | `{{{{#raw}}}}…{{{{/raw}}}}` (verbatim body) |
+| **Verbatim region** | `{% raw %}…{% endraw %}` (verbatim body; ADR-039 item 2 — retires the quad-stache `{{{{#raw}}}}`). A raw-block *helper* `{{{{#op}}}}` (op ≠ `raw`, fed to an operation) is the separate, unchanged form. |
 | **Literals** | string, number (`f64`), `true`/`false`, `null`, **list `[a, b, c]`** (homogeneous → a Rust array; `Each`/`count` work). Dict `{k: v}` literals are **not** in v1 (see F5). |
 
 **Helper inventory** (monomorphized `trussbars_std::*` calls; `count`/`size`/`length` alias):

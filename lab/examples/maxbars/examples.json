@@ -210,6 +210,15 @@
     "data": "data.yaml"
   },
   {
+    "id": "rawRegion",
+    "label": "Advanced — Verbatim region ({% raw %})",
+    "group": "Examples",
+    "view": "source",
+    "main": "main.maxbars",
+    "partials": [],
+    "data": "data.yaml"
+  },
+  {
     "id": "email",
     "label": "Advanced — Putting it together (email)",
     "group": "Examples",

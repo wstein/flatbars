@@ -1,0 +1,1 @@
+Format money with {% raw %}{{ price | toFixed 2 }}{% endraw %}.
