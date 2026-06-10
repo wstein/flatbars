@@ -21,7 +21,7 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 import FlatBars.Value (Value(..))
-import MaxBars (compileMaxJs, inferMax, maxbarsWarnings, renderMax)
+import MaxBars (compileMaxJs, inferMax, inferMaxData, maxbarsWarnings, renderMax)
 import MaxBars.Compat (compatReportWith)
 import Test.Assert (assert')
 
@@ -696,5 +696,17 @@ main = do
   hasS "infer:if-else-option" optTpl "Option<String>"
   hasS "infer:let-value-pins-name" letTpl "name: String"
   lacksS "infer:let-shadows-greeting" letTpl "greeting"
+
+  -- data-observed refinement (§2): a bare {{count}} defaults to String, but a
+  -- sample {count: 5} refines it to f64.
+  let
+    schemaOfD samples src = case inferMaxData samples src of
+      Left e -> "ERR: " <> e
+      Right r -> r.schema
+    hasSD nm samples src needle = assert'
+      (nm <> ": schema should contain " <> show needle <> "\n--- got ---\n" <> schemaOfD samples src)
+      (contains (Pattern needle) (schemaOfD samples src))
+  hasS "infer:no-data-defaults-string" "{{count}}" "count: String"
+  hasSD "infer:data-refines-number" [ obj [ Tuple "count" (num 5.0) ] ] "{{count}}" "count: f64"
 
   log "all MaxBars tests passed"

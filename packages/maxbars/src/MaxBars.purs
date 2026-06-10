@@ -20,6 +20,7 @@ module MaxBars
   , compileMaxJsWith
   , maxbarsWarnings
   , inferMax
+  , inferMaxData
   ) where
 
 import Prelude
@@ -39,7 +40,7 @@ import FlatBars.Value (Value)
 import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv)
 import Kernel.Inspect (Snapshot, Target)
-import Kernel.Schema (InferResult, inferTemplate)
+import Kernel.Schema (InferResult, inferTemplate, inferTemplateData)
 import Kernel.Provenance (Segment)
 import Kernel.Walk (Issue)
 import MaxBars.Expr (parseMaxExpr, parseMaxHead)
@@ -108,6 +109,14 @@ inferMax :: String -> Either String InferResult
 inferMax src = do
   parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
   pure (inferTemplate (desugarSurfaceWith maxLoopVars parsed.nodes))
+
+-- | `inferMax` refined by sample data (docs/03 §2): under-determined scalars
+-- | (a bare `{{x}}` defaulted to `String`) are pinned to the type the samples
+-- | observe. Many samples are unioned.
+inferMaxData :: Array Value -> String -> Either String InferResult
+inferMaxData samples src = do
+  parsed <- lmap (show <<< NEA.head) (parseWith maxOptions src)
+  pure (inferTemplateData samples (desugarSurfaceWith maxLoopVars parsed.nodes))
 
 -- | Render MaxBars source with a set of named *external* (host-threaded) partials,
 -- | each given as MaxBars surface source — the MaxBars twin of

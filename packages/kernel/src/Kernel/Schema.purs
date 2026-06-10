@@ -20,6 +20,7 @@ module Kernel.Schema
   , PathC
   , InferResult
   , inferTemplate
+  , inferTemplateData
   ) where
 
 import Prelude
@@ -536,11 +537,51 @@ emitReport root =
   guessed = countGuessed root
   conflicts = countConflicts root
 
--- | Infer a candidate schema from a parsed template (template-symbolic, no data).
-inferTemplate :: Template -> InferResult
-inferTemplate tmpl =
+-- ---------------------------------------------------------------------------
+-- Data-observed refinement (docs/03 §2): pin under-determined scalars from
+-- sample data. Many samples are unioned (decision §2).
+-- ---------------------------------------------------------------------------
+
+-- | Observe the scalar type at every path of a sample value (arrays recurse
+-- | through `SElem`, objects through `SKey`).
+observe :: Canon -> Value -> Array (Tuple Canon ScalarHint)
+observe canon = case _ of
+  VString _ -> [ Tuple canon SString ]
+  VSafe _ -> [ Tuple canon SString ]
+  VNumber _ -> [ Tuple canon SNumber ]
+  VBool _ -> [ Tuple canon SBool ]
+  VNull -> []
+  VArray xs -> Array.concatMap (observe (Array.snoc canon SElem)) xs
+  VObject m ->
+    Array.concatMap (\(Tuple k v) -> observe (Array.snoc canon (SKey k)) v)
+      (Map.toUnfoldable m :: Array (Tuple String Value))
+
+-- | Union the observed scalar at each path across all samples.
+observeScalars :: Array Value -> Map String ScalarHint
+observeScalars = foldl addSample Map.empty
+  where
+  addSample m s = foldl addObs m (observe [] s)
+  addObs m (Tuple canon h) = Map.insertWith unifyScalar (canonKey canon) h m
+
+-- | Refine each under-determined (`SUnknown`) scalar with the observed type.
+refineScalars :: Map String ScalarHint -> Constraints -> Constraints
+refineScalars obs cs =
+  Map.fromFoldable (map ref (Map.toUnfoldable cs :: Array (Tuple String (Tuple Canon PathC))))
+  where
+  ref (Tuple key (Tuple canon c)) =
+    let
+      c' = case Map.lookup key obs of
+        Just h | c.scalar == SUnknown -> c { scalar = h }
+        _ -> c
+    in
+      Tuple key (Tuple canon c')
+
+-- | Infer a candidate schema, refining under-determined scalars with sample
+-- | data (docs/03 §2). `inferTemplate` is the no-data (template-symbolic) case.
+inferTemplateData :: Array Value -> Template -> InferResult
+inferTemplateData samples tmpl =
   let
-    cs = walk rootScope Map.empty tmpl
+    cs = refineScalars (observeScalars samples) (walk rootScope Map.empty tmpl)
     ty = buildTy cs
   in
     { schema: emitSchema ty
@@ -548,3 +589,7 @@ inferTemplate tmpl =
     , report: emitReport ty
     , conflicts: countConflicts ty
     }
+
+-- | Infer a candidate schema from a parsed template (template-symbolic, no data).
+inferTemplate :: Template -> InferResult
+inferTemplate = inferTemplateData []
