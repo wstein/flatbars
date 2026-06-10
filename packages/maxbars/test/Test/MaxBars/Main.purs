@@ -709,4 +709,14 @@ main = do
   hasS "infer:no-data-defaults-string" "{{count}}" "count: String"
   hasSD "infer:data-refines-number" [ obj [ Tuple "count" (num 5.0) ] ] "{{count}}" "count: f64"
 
+  -- == coupling: a path compared to a literal is pinned to the literal's type.
+  let
+    eqTpl = "{% if status == \"active\" %}on{% endif %}"
+    -- partial-context coupling: {{> card item}} infers `item`'s fields from card's body.
+    partialTpl = "{% inline \"card\" %}{{name}}: {{price}}{% endinline %}{% each item in items %}{{> card item}}{% endeach %}"
+  hasS "infer:eq-literal-pins-string" eqTpl "status: String"
+  hasS "infer:partial-couples-vec" partialTpl "Vec<Item>"
+  hasS "infer:partial-couples-name" partialTpl "name: String"
+  hasS "infer:partial-couples-price" partialTpl "price: String"
+
   log "all MaxBars tests passed"

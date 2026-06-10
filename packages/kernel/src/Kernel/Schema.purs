@@ -114,10 +114,14 @@ type Scope =
   , parents :: Array Canon      -- enclosing contexts (for `parent`, `parent.parent`)
   , binds :: Map String Canon   -- loop/with-bound names → their canonical path
   , shadowed :: Set String      -- let/local-bound names (not data fields)
+  , partials :: Map String Template  -- inline-partial bodies (for context coupling)
+  , visiting :: Set String       -- partials being walked (recursion guard)
   }
 
 rootScope :: Scope
-rootScope = { current: [], parents: [], binds: Map.empty, shadowed: Set.empty }
+rootScope =
+  { current: [], parents: [], binds: Map.empty, shadowed: Set.empty
+  , partials: Map.empty, visiting: Set.empty }
 
 -- | Reserved scoped names that are engine metadata, never data fields (skip).
 reserved :: Set String
@@ -185,6 +189,11 @@ filterPack :: Set String
 filterPack = Set.fromFoldable
   [ "where", "reject", "find", "some", "every", "pluck", "sortBy", "groupBy" ]
 
+-- | Equality comparisons (`==`/`!=`): a path compared to a literal is pinned to
+-- | the literal's scalar type.
+comparePack :: Set String
+comparePack = Set.fromFoldable [ "eq", "ne", "isnt" ]
+
 -- | Record the subject `e` as a scalar of the given hint, if it is a path.
 pinScalar :: Scope -> ScalarHint -> Expr -> Constraints -> Constraints
 pinScalar sc hint e cs = case exprCanon sc e of
@@ -208,14 +217,27 @@ useExpr sc cs expr = case expr of
   App _ [] -> case exprCanon sc expr of
     Just canon -> record canon (emptyC { scalar = SUnknown }) cs
     Nothing -> cs
+  App "partial" args -> partialUse args cs
   App name args
     | Set.member name filterPack -> filterUse args cs
+    | Set.member name comparePack -> compareUse args cs
     | Set.member name stringPack -> pinFirst (pinScalar sc SString) name args cs
     | Set.member name numberPack -> foldl (\acc a -> pinScalar sc SNumber a acc) cs args
     | Set.member name arrayPack -> pinFirst (pinArray sc) name args cs
     | name == "coalesce" || name == "firstTruthy" -> optionalFirst sc args cs
     | otherwise -> foldl (useExpr sc) cs args
   where
+  -- `a == lit` / `a != lit` couples `a` to the literal's type (the common,
+  -- pin-by-comparison case of §3's `==` coupling). Two-path `a == b` coupling
+  -- is a follow-on (needs cross-path unification).
+  compareUse args acc = case Array.findMap litScalar args of
+    Just h -> foldl (\a e -> pinScalar sc h e a) acc args
+    Nothing -> foldl (useExpr sc) acc args
+  litScalar = case _ of
+    Lit (VString _) -> Just SString
+    Lit (VNumber _) -> Just SNumber
+    Lit (VBool _) -> Just SBool
+    _ -> Nothing
   pinFirst pin _ args acc = case Array.head args of
     Just first -> foldl (useExpr sc) (pin first acc) (fromMaybe [] (Array.tail args))
     Nothing -> acc
@@ -235,6 +257,25 @@ useExpr sc cs expr = case expr of
   keyOf args = case Array.head args of
     Just (Lit (VString k)) -> Just k
     _ -> Nothing
+  -- `{{> name ctx}}`: walk the inline partial `name`'s body with `current` set
+  -- to `ctx`'s canon, so the partial's field usage is recorded against `ctx`
+  -- (partial-context coupling, §3). A recursion guard via `visiting`.
+  partialUse args acc = case Array.uncons args of
+    Just { head: Lit (VString nm), tail }
+      | Just body <- Map.lookup nm sc.partials
+      , not (Set.member nm sc.visiting) ->
+          let
+            ctxCanon = Array.head tail >>= exprCanon sc
+            sc' = sc
+              { current = fromMaybe sc.current ctxCanon
+              , parents = Array.cons sc.current sc.parents
+              , binds = Map.empty
+              , visiting = Set.insert nm sc.visiting
+              }
+            acc1 = foldl (useExpr sc) acc tail
+          in
+            walk sc' acc1 body
+    _ -> foldl (useExpr sc) acc args
 
 -- | Walk a template body, threading scope + constraints.
 walk :: Scope -> Constraints -> Template -> Constraints
@@ -259,6 +300,9 @@ block sc cs name args body =
     "unless" -> walk sc (markCond sc cs split.positional body) body
     "let" -> letBlock split
     "local" -> letBlock split
+    -- an `{{#inline}}` *definition* emits nothing in place; its body is walked
+    -- at each use site (partialUse), rooted at the call's context arg.
+    "inline" -> cs
     -- case, etc.: descend, recording subject usage.
     _ -> walk sc (foldl (useExpr sc) cs split.positional) body
   where
@@ -581,7 +625,8 @@ refineScalars obs cs =
 inferTemplateData :: Array Value -> Template -> InferResult
 inferTemplateData samples tmpl =
   let
-    cs = refineScalars (observeScalars samples) (walk rootScope Map.empty tmpl)
+    sc0 = rootScope { partials = collectInlines tmpl }
+    cs = refineScalars (observeScalars samples) (walk sc0 Map.empty tmpl)
     ty = buildTy cs
   in
     { schema: emitSchema ty
@@ -593,3 +638,19 @@ inferTemplateData samples tmpl =
 -- | Infer a candidate schema from a parsed template (template-symbolic, no data).
 inferTemplate :: Template -> InferResult
 inferTemplate = inferTemplateData []
+
+-- | Collect inline-partial definitions (`{{#inline "name"}}…{{/inline}}`) by name,
+-- | recursing into block bodies.
+collectInlines :: Template -> Map String Template
+collectInlines = foldl go Map.empty
+  where
+  go m = case _ of
+    Block _ _ "inline" args body ->
+      let
+        m' = Map.union (collectInlines body) m
+      in
+        case Array.head (splitBlockArgs args).positional of
+          Just (Lit (VString nm)) -> Map.insert nm body m'
+          _ -> m'
+    Block _ _ _ _ body -> Map.union (collectInlines body) m
+    _ -> m
