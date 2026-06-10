@@ -103,7 +103,7 @@ these unify into the schema.
 | `{% if x %}…` | `x` is a **non-numeric** truthy type (numeric is a compile error, `01` §5.3) — rules `x` *out* of being a bare number |
 | `{{x ?? y}}`, `{{x ?: y}}` | `x` is **optional** ⟹ `Option<_>` (a template-level optionality signal) |
 | `{{> card item}}` | `item` has the inferred context type of partial `card` (couples partial schemas) |
-| `{{> this}}` over a collection | a polymorphic dispatch site → an enum (§5, needs data tags) |
+| `{% case x.tag %}{% when "A" %}…` over a collection | `x` is a `#[serde(tag="tag")]` enum; variants = the `when` literals ∪ data tag values (§5) |
 
 Constraints unify per path; a conflict (e.g. `{{x \| uppercase}}` *and* `{{x * 2}}`) is
 **reported, not silently merged** (decision §3 above): `infer` emits the best-guess schema with the
@@ -140,11 +140,26 @@ widening a wrong guess is the author's call.
    Advisory.
 3. Neither ⟹ **required** (no `Option`), consistent with `01` §5.1 (absence must be declared).
 
-**Polymorphic dispatch (§4.1) → a tagged enum** is the one case template-symbolic analysis
-*cannot* finish alone: `{{> this}}` over a collection says "dispatch by variant," but the
-*variants* come from the data's tag field. Inference emits a `#[serde(tag = "kind")]` enum with
-one variant per **observed** tag value, and flags it as data-derived (re-run with broader data
-to discover more variants — the report says so explicitly, never implying completeness).
+**Polymorphic dispatch (§4.1) → a tagged enum.** The dispatch marker is
+**`{% case x.tag %}{% when "A" %}…{% when "B" %}…{% endcase %}`** over a collection — the
+*supported* Trussbars idiom (`{{#case}}`, docs/12). (An earlier draft named `{{> this}}`; that is
+a **computed partial**, forbidden by the injection boundary — F3/§3 of docs/06 — so it can never
+be the marker. The implemented `Kernel.Schema` keys off `{% case %}`.) The serde **tag** is the
+case subject's last key (`x.tag`); the **variants** are the `{% when %}` literals, **unioned with
+the data-observed values** of that tag field. So the template gives an exhaustive-by-authoring
+variant set and data only *adds* any extras (strictly better than the data-only enumeration the
+draft assumed). Inference emits `#[serde(tag = "tag")] enum X { … }` and the report flags it as
+template+data-derived, never implying completeness (broader data / more `when` arms reveal more
+variants).
+
+> **Implemented (L1, 2026-06-10).** `packages/kernel/src/Kernel/Schema.purs` does the
+> template-symbolic walk (most of §3 + §5 enums) and §2 data-scalar refinement; `MaxBars.inferMax`/
+> `inferMaxData` and the `inferMaxbars` JS facade expose it; `node trussbars/conformance/infer.mjs`
+> (`npm run infer`) is the `trussbars infer` prototype — **71/71 conformance-corpus templates
+> produce a schema**. It is a *new* module (not literally an `analyze` extension): the
+> template-symbolic source (§2) is a fresh static walk, but it reuses the AST and is the producer
+> dual of ADR-0030 as designed. **Not yet:** two-path `==` unification, the `--strict` flag wired,
+> harness ctxgen-replacement, and the Rust port (G2).
 
 ---
 
@@ -192,8 +207,9 @@ v1 ships **L1 + L2**, **PureScript-first then ported to Rust** (decision §1):
 
 ## 8. Limits (state them, don't hide them)
 
-- **Enum variants need data** (§5) — template alone can't enumerate them; report flags
-  incompleteness.
+- **Enum variants may be incomplete** (§5) — the `{% when %}` arms enumerate the variants the
+  *template* handles, and data adds any extra observed tags; a variant neither matched nor observed
+  is missed. The report flags the set as non-exhaustive.
 - **Heterogeneous JSON arrays** (mixed-type elements) have no `Vec<T>`; flagged, not guessed.
 - **Numeric width** (`i64`/`u32`/`f64`) is defaulted (`f64`) and flagged; the author narrows.
 - **Order-3 coupling** — `{{a == b}}` couples two paths' types; if they disagree across

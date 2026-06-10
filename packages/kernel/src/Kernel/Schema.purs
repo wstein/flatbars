@@ -361,10 +361,18 @@ block sc cs name args body =
       variants = whenLiterals body
     in
       case subjCanon of
+        -- `{% case el.tag %}` where `el` is a *collection element* (init ends in
+        -- an element step) ⇒ a tagged data-enum on `el` (§5: "over a collection").
         Just sj
           | Just { init, last: SKey tag } <- Array.unsnoc sj
+          , Just SElem <- Array.last init
           , not (Set.isEmpty variants) ->
               record init (emptyC { enumTag = Just tag, enumVariants = variants }) cs1
+        -- otherwise a plain value switch (`{% case status %}`): the subject is a
+        -- scalar whose values are the (string) `when` literals ⇒ pin as String.
+        Just sj
+          | not (Set.isEmpty variants) ->
+              record sj (emptyC { scalar = SString }) cs1
         _ -> cs1
 
 -- | Mark each condition path: it exists (a non-numeric truthy field), and it is

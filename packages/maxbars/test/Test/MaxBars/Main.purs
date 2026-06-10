@@ -730,5 +730,10 @@ main = do
   hasSD "infer:enum-data-union-triangle"
     [ obj [ Tuple "shapes" (VArray [ obj [ Tuple "kind" (VString "triangle") ] ]) ] ]
     enumTpl "Triangle"
+  -- a bare `{% case status %}` (not over a collection element) is a plain value
+  -- switch ⇒ status: String, NOT a tagged enum.
+  let bareCaseTpl = "{% case status %}{% when \"a\" %}x{% when \"b\" %}y{% endcase %}"
+  hasS "infer:bare-case-is-string" bareCaseTpl "status: String"
+  lacksS "infer:bare-case-not-enum" bareCaseTpl "enum"
 
   log "all MaxBars tests passed"

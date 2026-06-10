@@ -25,6 +25,8 @@ module ClassicBars.JS
   , renderSurface
   , renderMaxbars
   , renderMaxbarsWithPartials
+  , inferMaxbars
+  , inferMaxbarsData
   , renderMinbars
   , renderMinbarsCompat
   , renderMinbarsCompatWithPartials
@@ -97,6 +99,7 @@ import Kernel.Engine (Operation)
 import Kernel.Env (RefEnv, constOperation, pushFrame, refContext)
 import Kernel.Inspect (Snapshot)
 import Kernel.Provenance (Segment)
+import Kernel.Schema (InferResult)
 import Kernel.Walk (Severity)
 import Linter.Aliases (aliasWarnings, scopedCanonWarnings)
 import Linter.Migrate (migrateToMaxBars)
@@ -337,6 +340,33 @@ renderMaxbars = mkFn2 \tpl json -> result (MaxBars.renderMax tpl (fromJson json)
 renderMaxbarsWithPartials :: Fn3 (FO.Object String) String Json Result
 renderMaxbarsWithPartials = mkFn3 \partials tpl json ->
   result (MaxBars.renderMaxWithPartials (FO.toUnfoldable partials) tpl (fromJson json))
+
+-- | A schema-inference outcome (Trussbars docs/03) as a plain JS object.
+type InferOut =
+  { ok :: Boolean
+  , schema :: String       -- the Rust context type(s)
+  , dataScaffold :: String -- a skeleton JSON fixture
+  , report :: String       -- the human report
+  , conflicts :: Int        -- scalar conflicts (for --strict)
+  , error :: String
+  }
+
+inferOut :: Either String InferResult -> InferOut
+inferOut = case _ of
+  Left e -> { ok: false, schema: "", dataScaffold: "", report: "", conflicts: 0, error: e }
+  Right r ->
+    { ok: true, schema: r.schema, dataScaffold: r.dataScaffold, report: r.report
+    , conflicts: r.conflicts, error: "" }
+
+-- | Infer a candidate Rust context type from a MaxBars template (docs/03 L1).
+-- | `inferMaxbars(template)` ⇒ { ok, schema, dataScaffold, report, conflicts, error }.
+inferMaxbars :: String -> InferOut
+inferMaxbars tpl = inferOut (MaxBars.inferMax tpl)
+
+-- | `inferMaxbars` refined by one sample-data object (§2 scalar/enum refinement).
+-- | `inferMaxbarsData(template, data)`.
+inferMaxbarsData :: Fn2 String Json InferOut
+inferMaxbarsData = mkFn2 \tpl json -> inferOut (MaxBars.inferMaxData [ fromJson json ] tpl)
 
 -- | Render a MinBars (Mustache) template against JS data. `renderMinbars(template, data)`.
 -- | Uses the language-agnostic Mustache rule (`0`/`""` truthy).
