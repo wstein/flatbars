@@ -4,13 +4,17 @@
 //! the rendered output to stdout. On a parse error or an unimplemented construct it
 //! prints the reason to stderr and exits `1` (so the conformance harness can tally
 //! coverage). Drives the `harness.mjs --vm` gate (docs/11 §9).
+//!
+//! Flags: `--compat` renders in AOT-compat (strict) mode; `--truthiness=<Mode>` selects
+//! the truthiness policy (`NonEmpty` default, `Liquid`, `Handlebars`; docs/16).
 
 use std::collections::BTreeMap;
 use std::io::Read;
+use std::process::exit;
 use std::rc::Rc;
 
 use serde_json::Value as Json;
-use trussbars_vm::{Template, Value};
+use trussbars_vm::{Template, TruthMode, Value};
 
 fn main() {
     let mut input = String::new();
@@ -30,8 +34,19 @@ fn main() {
 
     // `--compat` renders in AOT-compat (strict) mode — the verifying proxy.
     let strict = std::env::args().any(|a| a == "--compat");
+    // `--truthiness=<Mode>` selects the truthiness policy (default NonEmpty; docs/16).
+    let mode = match truthiness_arg() {
+        Ok(m) => m,
+        Err(name) => {
+            eprintln!(
+                "unknown --truthiness mode `{name}` (expected NonEmpty, Liquid, or Handlebars)"
+            );
+            exit(2);
+        }
+    };
     let result = match Template::parse(template) {
         Ok(t) => {
+            let t = t.with_truthiness(mode);
             if strict {
                 t.render_compat(&data)
             } else {
@@ -46,6 +61,15 @@ fn main() {
             eprint!("{reason}");
             std::process::exit(1);
         }
+    }
+}
+
+/// The truthiness mode from `--truthiness=<Mode>` (default `NonEmpty`), or `Err(name)`
+/// for an unrecognized mode.
+fn truthiness_arg() -> Result<TruthMode, String> {
+    match std::env::args().find_map(|a| a.strip_prefix("--truthiness=").map(str::to_string)) {
+        None => Ok(TruthMode::NonEmpty),
+        Some(name) => TruthMode::from_ident(&name).ok_or(name),
     }
 }
 

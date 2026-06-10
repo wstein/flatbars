@@ -7,16 +7,18 @@
 //! compile time.
 //!
 //! **Status:** *tree-walk, lenient mode.* Covers the **whole** conformance corpus
-//! (64/64 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
+//! (71/71 byte-matched vs the oracle, `harness.mjs --vm`): output/paths/operators,
 //! `if`/`each`/`with`/`let`, loop metadata incl. `loop.parent`/`loop.root`, the value
 //! helpers, the collection ops (where/reject/some/every/find/pluck/sortBy/groupBy),
 //! `dict`, and partials (`{{#inline}}`/`{{> }}`/`{{#partial}}`/`{{yield}}`). Anything
 //! genuinely unimplemented returns `Err` (never a wrong answer). Shipped since the
 //! spike (docs/11): the lenient + AOT-compat (strict) render modes, host-helper
 //! registration (value *and* block helpers — `{{#name}}…{{/name}}`, docs/09 §3.1),
-//! and `no_std` + `alloc` (`--no-default-features`) so the dynamic VM
-//! can ship to bare-metal/WASM (f64 then formats via `Display`, the documented
-//! divergence; the dev `truss-vm` CLI stays `std`).
+//! a **selectable truthiness policy** ([`Template::with_truthiness`] — the dynamic
+//! backend's home for a runtime-swappable rule, parity with AOT's
+//! `truss!(…, truthiness = Mode)`, docs/16), and `no_std` + `alloc`
+//! (`--no-default-features`) so the dynamic VM can ship to bare-metal/WASM (f64 then
+//! formats via `Display`, the documented divergence; the dev `truss-vm` CLI stays `std`).
 //!
 //! Scalars stringify through `trussbars_core::ToText` (the same ECMA-f64 path AOT
 //! uses), and escaping through `trussbars_core::escape_html`, so VM output is
@@ -38,6 +40,10 @@ use core::cell::Cell;
 
 use trussbars_core::{ToText, escape_html};
 use trussbars_template::{Case, Cond, Each, Expr, Node, Value as Lit, With, parse};
+
+/// The truthiness policy a render uses — re-exported from `trussbars-template` so a host
+/// selects a policy through the VM's own surface (`docs/16-truthiness-modes.md`).
+pub use trussbars_template::TruthMode;
 
 /// Euclidean remainder, `no_std`-safe (`f64::rem_euclid` is std-only). Byte-identical
 /// to it: the `%` operator is in `core`, and a negative remainder is lifted by `|b|`.
@@ -78,6 +84,28 @@ impl Value {
             Value::Str(s) => !s.is_empty(),
             Value::Array(a) => !a.is_empty(),
             Value::Object(o) => !o.is_empty(),
+        }
+    }
+
+    /// Truthiness under a selected policy — the dynamic mirror of the AOT
+    /// `trussbars_core::TruthyIn<Mode>` (`docs/16-truthiness-modes.md`). `NonEmpty` is
+    /// the default rule above (a number is truthy when rendered leniently; the §5.3
+    /// compile error is an AOT/strict concern — see [`truthy_at`]). `Liquid` treats only
+    /// `false`/`null` as falsy; `Handlebars` treats `0`/`NaN`/`""`/`[]` as falsy, but an
+    /// object `{}` as truthy.
+    #[must_use]
+    pub fn truthy_in(&self, mode: TruthMode) -> bool {
+        match mode {
+            TruthMode::NonEmpty => self.truthy(),
+            TruthMode::Liquid => !matches!(self, Value::Null | Value::Bool(false)),
+            TruthMode::Handlebars => match self {
+                Value::Null => false,
+                Value::Bool(b) => *b,
+                Value::Num(n) => *n != 0.0 && !n.is_nan(),
+                Value::Str(s) => !s.is_empty(),
+                Value::Array(a) => !a.is_empty(),
+                Value::Object(_) => true,
+            },
         }
     }
 
@@ -214,6 +242,9 @@ struct Env {
     /// truthiness, bare-object output, unknown fields — so this render is a
     /// *verifying proxy* for "would this compile under AOT, identically?" (docs/11 §7).
     strict: bool,
+    /// The truthiness policy this render uses (the load-time setting on [`Template`];
+    /// docs/16). The dynamic backend's home for a *runtime*-swappable rule.
+    mode: TruthMode,
     /// The host-helper registry (F3).
     helpers: Rc<Helpers>,
 }
@@ -305,6 +336,9 @@ pub struct Template {
     /// bytecode subset; `None` → lenient renders fall back to the tree-walk. So bytecode
     /// is the *primary* path where it covers, the tree-walk the always-correct fallback.
     bytecode: Option<bytecode::Program>,
+    /// The truthiness policy every render of this template uses (a load-time setting,
+    /// docs/16). Defaults to [`TruthMode::NonEmpty`]; set with [`Template::with_truthiness`].
+    mode: TruthMode,
 }
 
 impl Template {
@@ -325,7 +359,20 @@ impl Template {
             partials: Rc::new(registry),
             cap_hint: Cell::new(64),
             bytecode,
+            mode: TruthMode::NonEmpty,
         })
+    }
+
+    /// Set the truthiness policy for every render of this template — the dynamic
+    /// backend's parallel to AOT's `truss!(…, truthiness = Mode)`, carried as a
+    /// load-time setting (docs/11 §8, docs/16). `NonEmpty` is the default; `Liquid` and
+    /// `Handlebars` (and any policy `TruthMode` names) are out-of-conformance opt-ins. A
+    /// non-default policy renders through the always-correct tree-walk, not the bytecode
+    /// fast path (whose truthiness is `NonEmpty`).
+    #[must_use]
+    pub fn with_truthiness(mut self, mode: TruthMode) -> Self {
+        self.mode = mode;
+        self
     }
 
     /// Render this template against dynamic `data` (lenient mode), returning a fresh
@@ -366,10 +413,14 @@ impl Template {
         helpers: &Rc<Helpers>,
         strict: bool,
     ) -> Result<String, String> {
-        // Fast path: a fully-compiled template renders via bytecode (lenient only — the
-        // tree-walk owns strict/AOT-compat). It only compiles when it uses no host helpers
-        // and no out-of-subset construct, so it needs neither `helpers` nor strict checks.
-        if !strict && let Some(bc) = &self.bytecode {
+        // Fast path: a fully-compiled template renders via bytecode (lenient, default
+        // policy only — the tree-walk owns strict/AOT-compat and any non-`NonEmpty`
+        // policy). It uses no host helpers and no out-of-subset construct, so it needs
+        // neither `helpers` nor strict checks; its truthiness is `NonEmpty`.
+        if !strict
+            && self.mode == TruthMode::NonEmpty
+            && let Some(bc) = &self.bytecode
+        {
             let out = bc.render(data);
             self.cap_hint.set(out.len());
             return Ok(out);
@@ -407,6 +458,7 @@ impl Template {
             yield_html: None,
             expanding: Vec::new(),
             strict,
+            mode: self.mode,
             helpers: Rc::clone(helpers),
         };
         eval_nodes(&env, &self.nodes, out)
@@ -610,21 +662,25 @@ fn expand_partial(
         yield_html,
         expanding,
         strict: env.strict,
+        mode: env.mode,
         helpers: Rc::clone(&env.helpers),
     };
     eval_nodes(&child, body, out)
 }
 
-/// Truthiness at a boolean-decision site. In AOT-compat (strict) mode a number is an
-/// error — AOT has no `Truthy` for numbers (docs/01 Option C); write a comparison.
+/// Truthiness at a boolean-decision site, under the render's policy (docs/16). In
+/// AOT-compat (strict) mode under the default `NonEmpty` policy a number is an error —
+/// AOT has no `TruthyIn<NonEmpty>` for numbers (docs/01 §5.3); write a comparison. Under
+/// a `Liquid`/`Handlebars` policy numbers *are* truthy/comparable, so the rejection does
+/// not apply.
 fn truthy_at(env: &Env, v: &Value) -> Result<bool, String> {
-    if env.strict && matches!(v, Value::Num(_)) {
+    if env.strict && env.mode == TruthMode::NonEmpty && matches!(v, Value::Num(_)) {
         return Err(
             "AOT-compat: a number in boolean position — write an explicit comparison (e.g. `> 0`)"
                 .into(),
         );
     }
-    Ok(v.truthy())
+    Ok(v.truthy_in(env.mode))
 }
 
 fn eval_cond(env: &Env, c: &Cond, out: &mut String) -> Result<(), String> {
@@ -1349,5 +1405,78 @@ mod tests {
                     .is_ok()
             );
         }
+    }
+
+    #[test]
+    fn truthiness_policy_governs_conditions() {
+        use super::TruthMode;
+        // An empty list: falsy under NonEmpty (default), truthy under Liquid.
+        let d = obj(&[("xs", arr(&[]))]);
+        let src = "{{#if xs}}has{{else}}none{{/if}}";
+        assert_eq!(Template::parse(src).unwrap().render(&d).unwrap(), "none");
+        assert_eq!(
+            Template::parse(src)
+                .unwrap()
+                .with_truthiness(TruthMode::Liquid)
+                .render(&d)
+                .unwrap(),
+            "has"
+        );
+        // An empty string: falsy under NonEmpty/Handlebars, truthy under Liquid.
+        let e = obj(&[("s", s(""))]);
+        let ssrc = "{{#if s}}y{{else}}n{{/if}}";
+        assert_eq!(
+            Template::parse(ssrc)
+                .unwrap()
+                .with_truthiness(TruthMode::Handlebars)
+                .render(&e)
+                .unwrap(),
+            "n"
+        );
+        assert_eq!(
+            Template::parse(ssrc)
+                .unwrap()
+                .with_truthiness(TruthMode::Liquid)
+                .render(&e)
+                .unwrap(),
+            "y"
+        );
+    }
+
+    #[test]
+    fn numeric_truthiness_per_policy() {
+        use super::TruthMode;
+        let zero = obj(&[("n", Value::Num(0.0))]);
+        let src = "{{#if n}}t{{else}}f{{/if}}";
+        // NonEmpty (lenient): 0 is truthy (the interpreter rule).
+        assert_eq!(Template::parse(src).unwrap().render(&zero).unwrap(), "t");
+        // Handlebars: 0 is falsy.
+        assert_eq!(
+            Template::parse(src)
+                .unwrap()
+                .with_truthiness(TruthMode::Handlebars)
+                .render(&zero)
+                .unwrap(),
+            "f"
+        );
+        // Liquid: 0 is truthy (only false/nil are falsy).
+        assert_eq!(
+            Template::parse(src)
+                .unwrap()
+                .with_truthiness(TruthMode::Liquid)
+                .render(&zero)
+                .unwrap(),
+            "t"
+        );
+        // Strict (AOT-compat) rejects a numeric condition only under NonEmpty; under a
+        // policy where numbers are truthy/comparable it is accepted.
+        assert!(Template::parse(src).unwrap().render_compat(&zero).is_err());
+        assert!(
+            Template::parse(src)
+                .unwrap()
+                .with_truthiness(TruthMode::Handlebars)
+                .render_compat(&zero)
+                .is_ok()
+        );
     }
 }
